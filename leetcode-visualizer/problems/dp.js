@@ -16289,7 +16289,964 @@ function buildSteps4027(input, params = {}) {
   return { original: { n, start, requests: requests.map((request) => [...request]) }, answer, steps };
 }
 
+/**
+ * LeetCode 1155: Number of Dice Rolls With Target Sum.
+ * dp[d][s] = số cách gieo d xúc xắc (mỗi mặt 1..k) để tổng = s.
+ */
+function buildSteps1155(input, params) {
+  const MOD = 1000000007;
+  const n = Math.max(1, Math.min(6, Number(Array.isArray(input) ? input[0] : input) || 2));
+  const k = Math.max(1, Math.min(6, Number((params && params.k) ?? 6)));
+  const target = Math.max(1, Math.min(20, Number((params && params.target) ?? 7)));
+  const dp = Array.from({ length: n + 1 }, () => new Array(target + 1).fill(0));
+  const computed = Array.from({ length: n + 1 }, () => new Array(target + 1).fill(false));
+  dp[0][0] = 1;
+  for (let s = 0; s <= target; s++) computed[0][s] = true;
+  const steps = [];
+  const text1 = Array.from({ length: n }, (_, i) => `d=${i + 1}`);
+  const text2 = Array.from({ length: target }, (_, j) => `s=${j + 1}`);
+
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : "·")));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display(),
+        text1, text2,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        rowLabels: text1.map((t) => ({ index: t, char: "🎲" })),
+        largeCells: true,
+        caption: opts.caption,
+      },
+      highlight: [], mark: [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: "dp[0][0] = 1", en: "dp[0][0] = 1" },
+    codeLines: [5],
+    caption: "dp[d][s] = số cách gieo d xúc xắc để tổng = s",
+    vars: [{ name: "n (xúc xắc)", value: n }, { name: "k (mặt)", value: k }, { name: "target", value: target }],
+    note: {
+      vi: `dp[d][s] = số cách gieo d xúc xắc (mỗi con có mặt 1..${k}) để được tổng s. Cơ sở: dp[0][0]=1 (0 xúc xắc, tổng 0 có đúng 1 cách). Hàng/cột được điền dần.`,
+      en: `dp[d][s] = ways to roll d dice (faces 1..${k}) summing to s. Base: dp[0][0]=1 (zero dice, sum 0 in exactly one way). Filled progressively.`,
+    },
+  });
+
+  for (let d = 1; d <= n; d++) {
+    for (let s = 1; s <= target; s++) {
+      let ways = 0;
+      const src = [];
+      for (let f = 1; f <= k; f++) {
+        if (s - f >= 0) { ways = (ways + dp[d - 1][s - f]) % MOD; src.push([d - 1, s - f]); }
+      }
+      dp[d][s] = ways;
+      computed[d][s] = true;
+      push({
+        title: { vi: `dp[${d}][${s}] = ${ways}`, en: `dp[${d}][${s}] = ${ways}` },
+        codeLines: [10],
+        hlCell: [d, s],
+        pathCells: src,
+        caption: `dp[${d}][${s}] = Σ dp[${d - 1}][${s}-f], f=1..${k} = ${ways}`,
+        vars: [{ name: "d", value: d }, { name: "s", value: s }, { name: `dp[${d}][${s}]`, value: ways }],
+        note: {
+          vi: `Gieo con xúc xắc thứ ${d}: mặt f (1..${k}) làm tổng giảm còn s−f. Cộng dp[${d - 1}][${s}−f] cho mọi f hợp lệ → dp[${d}][${s}] = ${ways}. (Các ô tím là nguồn.)`,
+          en: `Roll die #${d}: face f (1..${k}) reduces the sum to s−f. Sum dp[${d - 1}][${s}−f] over valid f → dp[${d}][${s}] = ${ways}. (Purple cells are the sources.)`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[n][target];
+  push({
+    title: { vi: `Kết quả: dp[${n}][${target}] = ${answer}`, en: `Result: dp[${n}][${target}] = ${answer}` },
+    codeLines: [11],
+    hlCell: [n, target],
+    final: true,
+    caption: `Đáp án = dp[${n}][${target}] = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Số cách gieo ${n} xúc xắc để tổng = ${target} là dp[${n}][${target}] = ${answer} (mod 1e9+7).`,
+      en: `The number of ways to roll ${n} dice summing to ${target} is dp[${n}][${target}] = ${answer} (mod 1e9+7).`,
+    },
+  });
+
+  return { original: { n, k, target }, answer, steps };
+}
+
+/**
+ * LeetCode 1269: Number of Ways to Stay in the Same Place After Some Steps.
+ * dp[t][p] = số cách sau t bước con trỏ đứng ở vị trí p (0..maxPos).
+ */
+function buildSteps1269(input, params) {
+  const MOD = 1000000007;
+  const stepsCount = Math.max(1, Math.min(12, Number(Array.isArray(input) ? input[0] : input) || 3));
+  const arrLen = Math.max(1, Math.min(12, Number((params && params.arrLen) ?? 2)));
+  const maxPos = Math.min(Math.floor(stepsCount / 2), arrLen - 1);
+  const dp = Array.from({ length: stepsCount + 1 }, () => new Array(maxPos + 1).fill(0));
+  const computed = Array.from({ length: stepsCount + 1 }, () => new Array(maxPos + 1).fill(false));
+  dp[0][0] = 1;
+  for (let p = 0; p <= maxPos; p++) computed[0][p] = true;
+  const steps = [];
+  const text1 = Array.from({ length: stepsCount }, (_, i) => `t=${i + 1}`);
+  const text2 = Array.from({ length: maxPos }, (_, j) => `p=${j + 1}`);
+
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : "·")));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display(),
+        text1, text2,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+        caption: opts.caption,
+      },
+      highlight: [], mark: [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: "dp[0][0] = 1", en: "dp[0][0] = 1" },
+    codeLines: [6],
+    caption: "dp[t][p] = số cách sau t bước con trỏ ở vị trí p",
+    vars: [{ name: "steps", value: stepsCount }, { name: "arrLen", value: arrLen }, { name: "maxPos", value: maxPos }],
+    note: {
+      vi: `dp[t][p] = số cách để sau t bước con trỏ đứng ở vị trí p. Mỗi bước có thể sang trái, sang phải, hoặc đứng yên. Cơ sở dp[0][0]=1. Chỉ cần xét p ≤ maxPos = min(steps//2, arrLen−1) = ${maxPos} (không thể đi xa hơn rồi quay về kịp).`,
+      en: `dp[t][p] = ways to be at position p after t steps. Each step may go left, right, or stay. Base dp[0][0]=1. We only need p ≤ maxPos = min(steps//2, arrLen−1) = ${maxPos} (cannot go farther and still return in time).`,
+    },
+  });
+
+  for (let t = 1; t <= stepsCount; t++) {
+    for (let p = 0; p <= maxPos; p++) {
+      let ways = dp[t - 1][p];
+      const src = [[t - 1, p]];
+      if (p > 0) { ways += dp[t - 1][p - 1]; src.push([t - 1, p - 1]); }
+      if (p < maxPos) { ways += dp[t - 1][p + 1]; src.push([t - 1, p + 1]); }
+      ways %= MOD;
+      dp[t][p] = ways;
+      computed[t][p] = true;
+      push({
+        title: { vi: `dp[${t}][${p}] = ${ways}`, en: `dp[${t}][${p}] = ${ways}` },
+        codeLines: [9, 10, 11],
+        hlCell: [t, p],
+        pathCells: src,
+        caption: `dp[${t}][${p}] = đứng yên + trái + phải = ${ways}`,
+        vars: [{ name: "t", value: t }, { name: "p", value: p }, { name: `dp[${t}][${p}]`, value: ways }],
+        note: {
+          vi: `Ở bước ${t}, để đứng tại p=${p}: từ p (đứng yên)${p > 0 ? `, từ p−1 (đi phải)` : ""}${p < maxPos ? `, từ p+1 (đi trái)` : ""}. Cộng các nguồn (ô tím) → dp[${t}][${p}] = ${ways}.`,
+          en: `At step ${t}, to be at p=${p}: from p (stay)${p > 0 ? `, from p−1 (move right)` : ""}${p < maxPos ? `, from p+1 (move left)` : ""}. Sum the sources (purple) → dp[${t}][${p}] = ${ways}.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[stepsCount][0];
+  push({
+    title: { vi: `Kết quả: dp[${stepsCount}][0] = ${answer}`, en: `Result: dp[${stepsCount}][0] = ${answer}` },
+    codeLines: [13],
+    hlCell: [stepsCount, 0],
+    final: true,
+    caption: `Đáp án = dp[${stepsCount}][0] = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Ta cần con trỏ QUAY VỀ vị trí 0 sau ${stepsCount} bước → đáp án = dp[${stepsCount}][0] = ${answer} (mod 1e9+7).`,
+      en: `We need the pointer back at position 0 after ${stepsCount} steps → answer = dp[${stepsCount}][0] = ${answer} (mod 1e9+7).`,
+    },
+  });
+
+  return { original: { steps: stepsCount, arrLen }, answer, steps };
+}
+
+/**
+ * LeetCode 1547: Minimum Cost to Cut a Stick.
+ * Interval DP trên các điểm cắt đã thêm 0 và n rồi sắp xếp.
+ */
+function buildSteps1547(input, params) {
+  const n = Math.max(1, Number((params && params.n) ?? 7));
+  const cutsRaw = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim())))
+    .filter((c) => Number.isFinite(c) && c > 0 && c < n);
+  const points = [0, ...Array.from(new Set(cutsRaw)).sort((a, b) => a - b), n];
+  const m = points.length;
+  const dp = Array.from({ length: m }, () => new Array(m).fill(0));
+  const computed = Array.from({ length: m }, () => new Array(m).fill(false));
+  for (let i = 0; i < m; i++) computed[i][i] = true;
+  const steps = [];
+
+  // Pass the m×m interval table directly. The generic grid treats row 0 / col 0
+  // as unlabeled base cells; text1/text2 label rows/cols 1..m-1 with the point value.
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j <= i ? "" : "·"))));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display(),
+        text1: points.slice(1).map((p) => `pt=${p}`),
+        text2: points.slice(1).map((p) => `pt=${p}`),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+        caption: opts.caption,
+      },
+      highlight: [], mark: [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  // Interval DP: dp[i][j] = min cost to make all cuts strictly between points[i] and points[j].
+  push({
+    title: { vi: `Điểm cắt (thêm 0 và ${n}): [${points.join(", ")}]`, en: `Cut points (with 0 and ${n}): [${points.join(", ")}]` },
+    codeLines: [4],
+    caption: `dp[i][j] = chi phí nhỏ nhất để cắt hết các điểm giữa points[i]=? và points[j]=?`,
+    vars: [{ name: "n", value: n }, { name: "points", value: `[${points.join(", ")}]` }],
+    note: {
+      vi: `Thêm 2 đầu 0 và ${n} vào danh sách cắt rồi sắp xếp: [${points.join(", ")}]. dp[i][j] = chi phí nhỏ nhất để thực hiện mọi vết cắt NẰM GIỮA points[i] và points[j]. Chi phí một lần cắt = độ dài đoạn đang cắt = points[j] − points[i].`,
+      en: `Add both ends 0 and ${n} to the cuts and sort: [${points.join(", ")}]. dp[i][j] = min cost to perform every cut strictly BETWEEN points[i] and points[j]. One cut costs the current segment length = points[j] − points[i].`,
+    },
+  });
+
+  for (let len = 2; len < m; len++) {
+    for (let i = 0; i + len < m; i++) {
+      const j = i + len;
+      let best = Infinity;
+      let bestK = -1;
+      for (let kk = i + 1; kk < j; kk++) {
+        const cost = dp[i][kk] + dp[kk][j] + (points[j] - points[i]);
+        if (cost < best) { best = cost; bestK = kk; }
+      }
+      dp[i][j] = best === Infinity ? 0 : best;
+      computed[i][j] = true;
+      push({
+        title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+        codeLines: [9, 10],
+        hlCell: [i, j],
+        pathCells: bestK >= 0 ? [[i, bestK], [bestK, j]] : [],
+        caption: `dp[${i}][${j}] = min_k( dp[${i}][k]+dp[k][${j}] ) + (${points[j]}−${points[i]}) = ${dp[i][j]}`,
+        vars: [
+          { name: "đoạn", value: `points[${i}]=${points[i]} … points[${j}]=${points[j]}` },
+          { name: "độ dài (chi phí cắt)", value: points[j] - points[i] },
+          { name: "cắt đầu tiên tại k", value: bestK >= 0 ? points[bestK] : "—" },
+          { name: `dp[${i}][${j}]`, value: dp[i][j] },
+        ],
+        note: {
+          vi: `Đoạn [${points[i]}, ${points[j]}]: thử vết cắt ĐẦU TIÊN tại mỗi điểm k ở giữa. Chi phí = dp[${i}][k] + dp[k][${j}] + độ dài đoạn (${points[j]}−${points[i]}=${points[j] - points[i]}). Chọn nhỏ nhất → dp[${i}][${j}] = ${dp[i][j]}${bestK >= 0 ? ` (cắt trước ở ${points[bestK]})` : ""}.`,
+          en: `Segment [${points[i]}, ${points[j]}]: try the FIRST cut at each interior point k. Cost = dp[${i}][k] + dp[k][${j}] + segment length (${points[j]}−${points[i]}=${points[j] - points[i]}). Take the minimum → dp[${i}][${j}] = ${dp[i][j]}${bestK >= 0 ? ` (first cut at ${points[bestK]})` : ""}.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[0][m - 1];
+  push({
+    title: { vi: `Kết quả: dp[0][${m - 1}] = ${answer}`, en: `Result: dp[0][${m - 1}] = ${answer}` },
+    codeLines: [11],
+    hlCell: [0, m - 1],
+    final: true,
+    caption: `Đáp án = dp[0][${m - 1}] = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Chi phí nhỏ nhất để cắt cả cây gậy [0, ${n}] = dp[0][${m - 1}] = ${answer}.`,
+      en: `Minimum cost to cut the whole stick [0, ${n}] = dp[0][${m - 1}] = ${answer}.`,
+    },
+  });
+
+  return { original: { n, cuts: cutsRaw }, answer, steps };
+}
+
+/**
+ * LeetCode 983: Minimum Cost For Tickets.
+ * dp[i] = chi phí nhỏ nhất để đi được i ngày đầu tiên trong danh sách days.
+ * Mỗi ngày đi thử 3 loại vé: 1 ngày, 7 ngày, 30 ngày.
+ */
+function buildSteps983(input, params) {
+  const days = (Array.isArray(input) ? input.map(Number) : []).filter((d) => Number.isFinite(d));
+  const costsRaw = String((params && params.costs) || "2,7,15").split(",").map((v) => Number(v.trim()));
+  const costs = [costsRaw[0] || 2, costsRaw[1] || 7, costsRaw[2] || 15];
+  const n = days.length;
+  const dp = new Array(n + 1).fill(null);
+  dp[0] = 0;
+  const steps = [];
+  const firstAtLeast = (value) => {
+    for (let idx = 0; idx < n; idx++) if (days[idx] >= value) return idx;
+    return n;
+  };
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      ticketsView: {
+        days: [...days],
+        costs: [...costs],
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        dp: dp.map((v) => v),
+        options: meta.options || null,
+        windowSeven: meta.windowSeven || null,
+        windowThirty: meta.windowThirty || null,
+        answer: meta.final ? dp[n] : null,
+      },
+    }));
+  };
+
+  push({ phase: "init", currentIndex: 0 }, {
+    title: { vi: "dp[0] = 0", en: "dp[0] = 0" },
+    arr: [], highlight: [], mark: [],
+    codeLines: [5],
+    vars: [{ name: "days", value: `[${days.join(", ")}]` }, { name: "costs (1/7/30)", value: `[${costs.join(", ")}]` }],
+    note: {
+      vi: `dp[i] = chi phí ít nhất để đi được i ngày ĐẦU TIÊN trong danh sách. Chỉ quan tâm các ngày phải đi: [${days.join(", ")}]. Mỗi ngày thử 3 vé: 1 ngày (${costs[0]}), 7 ngày (${costs[1]}), 30 ngày (${costs[2]}).`,
+      en: `dp[i] = minimum cost to cover the FIRST i travel days. Only travel days matter: [${days.join(", ")}]. Each day tries 3 passes: 1-day (${costs[0]}), 7-day (${costs[1]}), 30-day (${costs[2]}).`,
+    },
+  });
+
+  for (let i = 1; i <= n; i++) {
+    const day = days[i - 1];
+    const j7 = firstAtLeast(day - 6);
+    const j30 = firstAtLeast(day - 29);
+    const optOne = dp[i - 1] + costs[0];
+    const optSeven = dp[j7] + costs[1];
+    const optThirty = dp[j30] + costs[2];
+    dp[i] = Math.min(optOne, optSeven, optThirty);
+    const chosen = dp[i] === optOne ? "one" : dp[i] === optSeven ? "seven" : "thirty";
+    push({
+      phase: "compute",
+      currentIndex: i,
+      windowSeven: [j7, i - 1],
+      windowThirty: [j30, i - 1],
+      options: {
+        one: { dpIdx: i - 1, dpVal: dp[i - 1], cost: costs[0], total: optOne },
+        seven: { dpIdx: j7, dpVal: dp[j7], cost: costs[1], total: optSeven, windowStart: day - 6 },
+        thirty: { dpIdx: j30, dpVal: dp[j30], cost: costs[2], total: optThirty, windowStart: day - 29 },
+        chosen,
+      },
+    }, {
+      title: { vi: `Ngày đi ${day}: dp[${i}] = ${dp[i]}`, en: `Travel day ${day}: dp[${i}] = ${dp[i]}` },
+      arr: [], highlight: [], mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "ngày phải đi", value: day },
+        { name: "vé 1 ngày", value: `dp[${i - 1}]+${costs[0]} = ${dp[i - 1]}+${costs[0]} = ${optOne}` },
+        { name: "vé 7 ngày", value: `dp[${j7}]+${costs[1]} = ${dp[j7]}+${costs[1]} = ${optSeven}` },
+        { name: "vé 30 ngày", value: `dp[${j30}]+${costs[2]} = ${dp[j30]}+${costs[2]} = ${optThirty}` },
+        { name: `dp[${i}]`, value: dp[i] },
+      ],
+      note: {
+        vi: `Để đi ngày ${day}, thử 3 vé:\n• Vé 1 ngày: chi phí trước đó dp[${i - 1}]=${dp[i - 1]} + ${costs[0]} = ${optOne}.\n• Vé 7 ngày (phủ ngày ${day - 6}..${day}): dp[${j7}]=${dp[j7]} + ${costs[1]} = ${optSeven}.\n• Vé 30 ngày (phủ ngày ${day - 29}..${day}): dp[${j30}]=${dp[j30]} + ${costs[2]} = ${optThirty}.\n→ Chọn rẻ nhất: dp[${i}] = ${dp[i]} (vé ${chosen === "one" ? "1 ngày" : chosen === "seven" ? "7 ngày" : "30 ngày"}).`,
+        en: `To cover day ${day}, try 3 passes:\n• 1-day: prior cost dp[${i - 1}]=${dp[i - 1]} + ${costs[0]} = ${optOne}.\n• 7-day (covers days ${day - 6}..${day}): dp[${j7}]=${dp[j7]} + ${costs[1]} = ${optSeven}.\n• 30-day (covers days ${day - 29}..${day}): dp[${j30}]=${dp[j30]} + ${costs[2]} = ${optThirty}.\n→ Pick the cheapest: dp[${i}] = ${dp[i]} (${chosen === "one" ? "1-day" : chosen === "seven" ? "7-day" : "30-day"} pass).`,
+      },
+    });
+  }
+
+  const answer = dp[n];
+  push({ phase: "done", final: true, currentIndex: n }, {
+    title: { vi: `Kết quả: dp[${n}] = ${answer}`, en: `Result: dp[${n}] = ${answer}` },
+    arr: [], highlight: [], mark: [],
+    final: true,
+    codeLines: [13],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Chi phí nhỏ nhất để đi hết ${n} ngày = dp[${n}] = ${answer}.`,
+      en: `Minimum cost to cover all ${n} travel days = dp[${n}] = ${answer}.`,
+    },
+  });
+
+  return { original: [...days], answer, steps };
+}
+
+/**
+ * LeetCode 309: Best Time to Buy and Sell Stock with Cooldown.
+ * 3 trạng thái: hold (đang giữ CP), sold (vừa bán hôm nay), rest (rảnh).
+ */
+function buildSteps309(prices) {
+  const arr = Array.isArray(prices) ? prices.map(Number) : [];
+  const steps = [];
+  let hold = -Infinity;
+  let sold = 0;
+  let rest = 0;
+  const asVal = (v) => (v === -Infinity ? null : v);
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      stockCooldownView: {
+        prices: [...arr],
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        states: { hold: asVal(hold), sold, rest },
+        transitions: meta.transitions || null,
+        answer: meta.final ? meta.answer : null,
+      },
+    }));
+  };
+
+  push({ phase: "init", currentIndex: -1 }, {
+    title: { vi: "hold = -∞, sold = 0, rest = 0", en: "hold = -∞, sold = 0, rest = 0" },
+    arr: [...arr], highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "prices", value: `[${arr.join(", ")}]` }],
+    note: {
+      vi: "3 trạng thái lợi nhuận lớn nhất: hold = đang GIỮ cổ phiếu; sold = VỪA BÁN hôm nay; rest = RẢNH (không giữ, không vừa bán). hold bắt đầu -∞ vì chưa thể đang giữ.",
+      en: "Three max-profit states: hold = currently HOLDING a share; sold = just SOLD today; rest = free (not holding, not just sold). hold starts at -∞ because holding is impossible before buying.",
+    },
+  });
+
+  for (let i = 0; i < arr.length; i++) {
+    const price = arr[i];
+    const oldHold = hold;
+    const oldSold = sold;
+    const oldRest = rest;
+    const newSold = oldHold + price;
+    const newHold = Math.max(oldHold, oldRest - price);
+    const newRest = Math.max(oldRest, oldSold);
+    hold = newHold;
+    sold = newSold;
+    rest = newRest;
+    push({
+      phase: "day",
+      currentIndex: i,
+      transitions: {
+        price,
+        oldHold: asVal(oldHold), oldSold, oldRest,
+        newSold: asVal(newSold), newHold: asVal(newHold), newRest,
+      },
+    }, {
+      title: { vi: `Ngày ${i}: giá = ${price}`, en: `Day ${i}: price = ${price}` },
+      arr: [...arr], highlight: [i], mark: [],
+      codeLines: [6, 7, 8],
+      vars: [
+        { name: "price", value: price },
+        { name: "sold = hold + price", value: asVal(newSold) === null ? "-∞" : newSold },
+        { name: "hold = max(hold, rest - price)", value: asVal(newHold) === null ? "-∞" : newHold },
+        { name: "rest = max(rest, prev_sold)", value: newRest },
+      ],
+      note: {
+        vi: `Ngày ${i} (giá ${price}):\n• BÁN hôm nay: sold = hold + price = ${asVal(oldHold) === null ? "-∞" : oldHold} + ${price} = ${asVal(newSold) === null ? "-∞" : newSold}.\n• GIỮ/MUA: hold = max(giữ tiếp ${asVal(oldHold) === null ? "-∞" : oldHold}, mua từ rest ${oldRest}-${price}=${oldRest - price}) = ${asVal(newHold) === null ? "-∞" : newHold}.\n• NGHỈ (cooldown sau bán): rest = max(${oldRest}, prev_sold ${oldSold}) = ${newRest}.`,
+        en: `Day ${i} (price ${price}):\n• SELL today: sold = hold + price = ${asVal(oldHold) === null ? "-∞" : oldHold} + ${price} = ${asVal(newSold) === null ? "-∞" : newSold}.\n• HOLD/BUY: hold = max(keep ${asVal(oldHold) === null ? "-∞" : oldHold}, buy from rest ${oldRest}-${price}=${oldRest - price}) = ${asVal(newHold) === null ? "-∞" : newHold}.\n• REST (cooldown after selling): rest = max(${oldRest}, prev_sold ${oldSold}) = ${newRest}.`,
+      },
+    });
+  }
+
+  const answer = Math.max(sold, rest);
+  push({ phase: "done", final: true, answer, currentIndex: arr.length - 1 }, {
+    title: { vi: `Kết quả: max(sold=${sold}, rest=${rest}) = ${answer}`, en: `Result: max(sold=${sold}, rest=${rest}) = ${answer}` },
+    arr: [...arr], highlight: [], mark: [],
+    final: true,
+    codeLines: [9],
+    vars: [{ name: "sold", value: sold }, { name: "rest", value: rest }, { name: "answer", value: answer }],
+    note: {
+      vi: `Cuối cùng không nên đang GIỮ cổ phiếu, nên đáp án = max(sold, rest) = max(${sold}, ${rest}) = ${answer}.`,
+      en: `At the end you should not be HOLDING, so the answer = max(sold, rest) = max(${sold}, ${rest}) = ${answer}.`,
+    },
+  });
+
+  return { original: [...arr], answer, steps };
+}
+
+/**
+ * LeetCode 221: Maximal Square.
+ * dp[r][c] = cạnh hình vuông toàn số 1 lớn nhất có góc dưới-phải tại (r,c).
+ * dp[r][c] = min(trên, trái, chéo) + 1 nếu ô = 1.
+ */
+function buildSteps221(input) {
+  const matrix = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+  const rows = matrix.length;
+  const cols = rows ? matrix[0].length : 0;
+  const dp = Array.from({ length: rows }, () => new Array(cols).fill(null));
+  const steps = [];
+  let best = 0;
+  let bestCell = null;
+
+  const squareCells = () => {
+    if (!bestCell || best === 0) return [];
+    const cells = [];
+    for (let r = bestCell.r - best + 1; r <= bestCell.r; r++) {
+      for (let c = bestCell.c - best + 1; c <= bestCell.c; c++) cells.push(`${r},${c}`);
+    }
+    return cells;
+  };
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      maximalSquareView: {
+        rows,
+        cols,
+        matrix: matrix.map((row) => [...row]),
+        dp: dp.map((row) => row.map((v) => v)),
+        phase: meta.phase || "",
+        current: meta.current || null,
+        neighbors: meta.neighbors || null,
+        formula: meta.formula || null,
+        best,
+        squareCells: meta.final ? squareCells() : [],
+        answer: meta.final ? best * best : null,
+      },
+    }));
+  };
+
+  push({ phase: "init" }, {
+    title: { vi: `Lưới ${rows}×${cols}`, en: `Grid ${rows}×${cols}` },
+    arr: [], highlight: [], mark: [],
+    codeLines: [4, 5],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: "dp[r][c] = cạnh của hình vuông toàn số 1 LỚN NHẤT có góc dưới-phải tại ô (r,c). Nếu ô là 1, dp phụ thuộc 3 ô: TRÊN, TRÁI, CHÉO trên-trái.",
+      en: "dp[r][c] = side of the LARGEST all-ones square whose bottom-right corner is cell (r,c). If the cell is 1, dp depends on 3 cells: TOP, LEFT, and TOP-LEFT DIAGONAL.",
+    },
+  });
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (matrix[r][c] === 1) {
+        const top = r > 0 ? dp[r - 1][c] : 0;
+        const left = c > 0 ? dp[r][c - 1] : 0;
+        const diag = r > 0 && c > 0 ? dp[r - 1][c - 1] : 0;
+        dp[r][c] = Math.min(top, left, diag) + 1;
+        if (dp[r][c] > best) { best = dp[r][c]; bestCell = { r, c }; }
+        push({
+          phase: "compute",
+          current: { r, c },
+          neighbors: { top: { r: r - 1, c }, left: { r, c: c - 1 }, diag: { r: r - 1, c: c - 1 } },
+          formula: { top, left, diag, min: Math.min(top, left, diag), result: dp[r][c] },
+        }, {
+          title: { vi: `Ô (${r},${c})=1 → dp=${dp[r][c]}`, en: `Cell (${r},${c})=1 → dp=${dp[r][c]}` },
+          arr: [], highlight: [], mark: [],
+          codeLines: [9, 10],
+          vars: [
+            { name: "trên", value: top },
+            { name: "trái", value: left },
+            { name: "chéo", value: diag },
+            { name: "dp[r][c] = min+1", value: dp[r][c] },
+            { name: "best", value: best },
+          ],
+          note: {
+            vi: `Ô (${r},${c}) là 1. dp = min(trên=${top}, trái=${left}, chéo=${diag}) + 1 = ${Math.min(top, left, diag)} + 1 = ${dp[r][c]}. Hình vuông chỉ mở rộng bằng ô nhỏ nhất trong 3 hướng. best = ${best}.`,
+            en: `Cell (${r},${c}) is 1. dp = min(top=${top}, left=${left}, diag=${diag}) + 1 = ${Math.min(top, left, diag)} + 1 = ${dp[r][c]}. A square only grows by the smallest of the 3 directions. best = ${best}.`,
+          },
+        });
+      } else {
+        dp[r][c] = 0;
+        push({
+          phase: "compute",
+          current: { r, c },
+          neighbors: null,
+          formula: null,
+        }, {
+          title: { vi: `Ô (${r},${c})=0 → dp=0`, en: `Cell (${r},${c})=0 → dp=0` },
+          arr: [], highlight: [], mark: [],
+          codeLines: [8],
+          vars: [{ name: "matrix[r][c]", value: 0 }, { name: "dp[r][c]", value: 0 }],
+          note: {
+            vi: `Ô (${r},${c}) là 0 → không thể là góc của hình vuông toàn 1 → dp = 0.`,
+            en: `Cell (${r},${c}) is 0 → cannot be the corner of an all-ones square → dp = 0.`,
+          },
+        });
+      }
+    }
+  }
+
+  push({ phase: "done", final: true }, {
+    title: { vi: `Cạnh lớn nhất = ${best} → diện tích = ${best * best}`, en: `Max side = ${best} → area = ${best * best}` },
+    arr: [], highlight: [], mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "best (cạnh)", value: best }, { name: "answer (diện tích)", value: best * best }],
+    note: {
+      vi: `Cạnh hình vuông lớn nhất = ${best}, nên diện tích = ${best} × ${best} = ${best * best}. Các ô xanh tạo thành hình vuông đó.`,
+      en: `The largest square side = ${best}, so the area = ${best} × ${best} = ${best * best}. The green cells form that square.`,
+    },
+  });
+
+  return { original: matrix, answer: best * best, steps };
+}
+
+/**
+ * LeetCode 673: Number of Longest Increasing Subsequence.
+ * length[i] = độ dài LIS kết thúc tại i; count[i] = số LIS như vậy.
+ */
+function buildSteps673(nums) {
+  const arr = Array.isArray(nums) ? nums.map(Number) : [];
+  const n = arr.length;
+  const length = new Array(n).fill(1);
+  const count = new Array(n).fill(1);
+  const steps = [];
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      numberOfLISView: {
+        nums: [...arr],
+        n,
+        phase: meta.phase || "",
+        currentI: Number.isInteger(meta.currentI) ? meta.currentI : -1,
+        currentJ: Number.isInteger(meta.currentJ) ? meta.currentJ : -1,
+        length: [...length],
+        count: [...count],
+        candidate: meta.candidate || null,
+        maxLen: meta.maxLen ?? null,
+        answer: meta.final ? meta.answer : null,
+      },
+    }));
+  };
+
+  push({ phase: "init" }, {
+    title: { vi: "length[i] = count[i] = 1", en: "length[i] = count[i] = 1" },
+    arr: [...arr],
+    sub: arr.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [4, 5],
+    vars: [{ name: "nums", value: `[${arr.join(", ")}]` }],
+    note: {
+      vi: "length[i] = độ dài dãy con tăng dài nhất KẾT THÚC tại i. count[i] = có bao nhiêu dãy như vậy. Ban đầu mỗi phần tử tự nó là 1 dãy độ dài 1.",
+      en: "length[i] = length of the longest increasing subsequence ENDING at i. count[i] = how many such subsequences. Initially each element alone is one subsequence of length 1.",
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      const extendable = arr[j] < arr[i];
+      let action = "skip";
+      if (extendable) {
+        if (length[j] + 1 > length[i]) {
+          length[i] = length[j] + 1;
+          count[i] = count[j];
+          action = "new";
+        } else if (length[j] + 1 === length[i]) {
+          count[i] += count[j];
+          action = "add";
+        }
+      }
+      push({
+        phase: "scan",
+        currentI: i,
+        currentJ: j,
+        candidate: { i, j, numI: arr[i], numJ: arr[j], extendable, action, lenJ: length[j], lenI: length[i], cntJ: count[j], cntI: count[i] },
+      }, {
+        title: {
+          vi: `i=${i} (${arr[i]}), j=${j} (${arr[j]}) → ${extendable ? (action === "new" ? "dài hơn" : action === "add" ? "bằng → cộng count" : "không cải thiện") : "không tăng"}`,
+          en: `i=${i} (${arr[i]}), j=${j} (${arr[j]}) → ${extendable ? (action === "new" ? "longer" : action === "add" ? "tie → add count" : "no gain") : "not increasing"}`,
+        },
+        arr: [...arr],
+        sub: arr.map((_, idx) => `L${length[idx]}·C${count[idx]}`),
+        highlight: [i], mark: extendable ? [j] : [],
+        codeLines: !extendable ? [8] : action === "new" ? [10, 11] : action === "add" ? [13] : [9],
+        vars: [
+          { name: "i", value: `${i} (nums=${arr[i]})` },
+          { name: "j", value: `${j} (nums=${arr[j]})` },
+          { name: "nums[j] < nums[i]?", value: extendable },
+          { name: `length[${i}]`, value: length[i] },
+          { name: `count[${i}]`, value: count[i] },
+        ],
+        note: {
+          vi: !extendable
+            ? `nums[${j}]=${arr[j]} không nhỏ hơn nums[${i}]=${arr[i]} → không nối được, bỏ qua.`
+            : action === "new"
+              ? `Nối sau ${j} cho dãy DÀI HƠN: length[${i}] = length[${j}]+1 = ${length[i]}, count[${i}] = count[${j}] = ${count[i]}.`
+              : action === "add"
+                ? `Nối sau ${j} cho dãy CÙNG độ dài ${length[i]} → cộng thêm count: count[${i}] += count[${j}] = ${count[i]}.`
+                : `Nối được nhưng ngắn hơn/bằng cũ mà không dài hơn → không đổi.`,
+          en: !extendable
+            ? `nums[${j}]=${arr[j]} is not smaller than nums[${i}]=${arr[i]} → cannot extend, skip.`
+            : action === "new"
+              ? `Extending after ${j} is LONGER: length[${i}] = length[${j}]+1 = ${length[i]}, count[${i}] = count[${j}] = ${count[i]}.`
+              : action === "add"
+                ? `Extending after ${j} gives the SAME length ${length[i]} → add counts: count[${i}] += count[${j}] = ${count[i]}.`
+                : `Extendable but not longer → no change.`,
+        },
+      });
+    }
+  }
+
+  const maxLen = n ? Math.max(...length) : 0;
+  const answer = length.reduce((sum, l, i) => (l === maxLen ? sum + count[i] : sum), 0);
+  push({ phase: "done", final: true, maxLen, answer }, {
+    title: { vi: `maxLen=${maxLen} → đáp án = ${answer}`, en: `maxLen=${maxLen} → answer = ${answer}` },
+    arr: [...arr],
+    sub: arr.map((_, idx) => `L${length[idx]}·C${count[idx]}`),
+    highlight: length.map((l, i) => (l === maxLen ? i : -1)).filter((i) => i >= 0),
+    mark: length.map((l, i) => (l === maxLen ? i : -1)).filter((i) => i >= 0),
+    final: true,
+    codeLines: [15],
+    vars: [{ name: "maxLen", value: maxLen }, { name: "answer", value: answer }],
+    note: {
+      vi: `Độ dài LIS lớn nhất = ${maxLen}. Cộng count của mọi i có length[i]=${maxLen} → số LIS = ${answer}.`,
+      en: `The longest LIS length = ${maxLen}. Sum count of every i with length[i]=${maxLen} → number of LIS = ${answer}.`,
+    },
+  });
+
+  return { original: [...arr], answer, steps };
+}
+
 module.exports = {
+  1155: {
+    id: 1155,
+    difficulty: "medium",
+    slug: "number-of-dice-rolls-with-target-sum",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Number of Dice Rolls With Target Sum", en: "Number of Dice Rolls With Target Sum" },
+    titleVi: { vi: "Số cách gieo xúc xắc ra tổng", en: "Dice rolls with target sum" },
+    statement: {
+      vi: "Có n xúc xắc, mỗi con có k mặt (1..k). Đếm số cách gieo để tổng điểm bằng target (mod 1e9+7).",
+      en: "You have n dice each with k faces (1..k). Count the ways to roll a total equal to target (mod 1e9+7).",
+    },
+    defaultInput: [2],
+    inputKind: "positive",
+    inputLabel: { vi: "n (số xúc xắc)", en: "n (dice)" },
+    singleInput: true,
+    maxInput: 6,
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k (số mặt)", en: "k (faces)" }, default: 6 },
+      { key: "target", type: "number", label: { vi: "target", en: "target" }, default: 7 },
+    ],
+    complexity: { time: "O(n × target × k)", space: "O(n × target)", note: { vi: "Bảng dp 2 chiều.", en: "2D dp table." } },
+    code: [
+      "class Solution:",
+      "    def numRollsToTarget(self, n, k, target):",
+      "        MOD = 10**9 + 7",
+      "        dp = [[0]*(target+1) for _ in range(n+1)]",
+      "        dp[0][0] = 1",
+      "        for d in range(1, n+1):",
+      "            for s in range(1, target+1):",
+      "                for f in range(1, k+1):",
+      "                    if s - f >= 0:",
+      "                        dp[d][s] = (dp[d][s] + dp[d-1][s-f]) % MOD",
+      "        return dp[n][target]",
+    ],
+    builder: buildSteps1155,
+  },
+  1269: {
+    id: 1269,
+    difficulty: "hard",
+    slug: "number-of-ways-to-stay-in-the-same-place-after-some-steps",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Number of Ways to Stay in the Same Place After Some Steps", en: "Number of Ways to Stay in the Same Place After Some Steps" },
+    titleVi: { vi: "Số cách quay về vị trí đầu", en: "Ways to stay in the same place" },
+    statement: {
+      vi: "Con trỏ ở vị trí 0 của mảng dài arrLen. Mỗi bước đi trái/phải/đứng yên (không ra ngoài mảng). Đếm số cách sau steps bước con trỏ vẫn ở vị trí 0 (mod 1e9+7).",
+      en: "A pointer starts at index 0 of an array of length arrLen. Each step move left/right/stay (staying in bounds). Count ways to be back at index 0 after steps steps (mod 1e9+7).",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    inputLabel: { vi: "steps", en: "steps" },
+    singleInput: true,
+    maxInput: 12,
+    extraParams: [
+      { key: "arrLen", type: "number", label: { vi: "arrLen", en: "arrLen" }, default: 2 },
+    ],
+    complexity: { time: "O(steps × maxPos)", space: "O(steps × maxPos)", note: { vi: "maxPos = min(steps//2, arrLen−1).", en: "maxPos = min(steps//2, arrLen−1)." } },
+    code: [
+      "class Solution:",
+      "    def numWays(self, steps, arrLen):",
+      "        MOD = 10**9 + 7",
+      "        maxPos = min(steps // 2, arrLen - 1)",
+      "        dp = [[0]*(maxPos+1) for _ in range(steps+1)]",
+      "        dp[0][0] = 1",
+      "        for t in range(1, steps+1):",
+      "            for p in range(maxPos+1):",
+      "                dp[t][p] = dp[t-1][p]",
+      "                if p > 0: dp[t][p] += dp[t-1][p-1]",
+      "                if p < maxPos: dp[t][p] += dp[t-1][p+1]",
+      "                dp[t][p] %= MOD",
+      "        return dp[steps][0]",
+    ],
+    builder: buildSteps1269,
+  },
+  1547: {
+    id: 1547,
+    difficulty: "hard",
+    slug: "minimum-cost-to-cut-a-stick",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Minimum Cost to Cut a Stick", en: "Minimum Cost to Cut a Stick" },
+    titleVi: { vi: "Chi phí cắt gậy nhỏ nhất", en: "Minimum cost to cut a stick" },
+    statement: {
+      vi: "Cây gậy dài n. cuts là các vị trí cần cắt. Chi phí mỗi lần cắt = độ dài đoạn đang cắt. Chọn thứ tự cắt để tổng chi phí nhỏ nhất.",
+      en: "A stick of length n with positions cuts to cut. Each cut costs the length of the segment being cut. Choose the cut order minimizing total cost.",
+    },
+    defaultInput: [1, 3, 4, 5],
+    inputKind: "positive",
+    inputLabel: { vi: "cuts (vị trí cắt)", en: "cuts (positions)" },
+    extraParams: [
+      { key: "n", type: "number", label: { vi: "n (độ dài gậy)", en: "n (stick length)" }, default: 7 },
+    ],
+    complexity: { time: "O(m³)", space: "O(m²)", note: { vi: "m = số điểm cắt (kể cả 0 và n).", en: "m = number of points (including 0 and n)." } },
+    code: [
+      "class Solution:",
+      "    def minCost(self, n, cuts):",
+      "        points = sorted([0] + cuts + [n])",
+      "        m = len(points)",
+      "        dp = [[0]*m for _ in range(m)]",
+      "        for length in range(2, m):",
+      "            for i in range(m - length):",
+      "                j = i + length",
+      "                dp[i][j] = min(dp[i][k] + dp[k][j]",
+      "                               for k in range(i+1, j)) + points[j] - points[i]",
+      "        return dp[0][m-1]",
+    ],
+    builder: buildSteps1547,
+  },
+  983: {
+    id: 983,
+    difficulty: "medium",
+    slug: "minimum-cost-for-tickets",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Minimum Cost For Tickets", en: "Minimum Cost For Tickets" },
+    titleVi: { vi: "Chi phí vé nhỏ nhất", en: "Minimum ticket cost" },
+    statement: {
+      vi: "Cho days là các ngày bạn phải đi (tăng dần) và costs = [vé 1 ngày, vé 7 ngày, vé 30 ngày]. Tìm tổng chi phí nhỏ nhất để đi được tất cả các ngày.",
+      en: "Given days you must travel (increasing) and costs = [1-day, 7-day, 30-day pass], find the minimum total cost to cover all travel days.",
+    },
+    defaultInput: [1, 4, 6, 7, 8, 20],
+    inputKind: "positive",
+    inputLabel: { vi: "days (ngày phải đi)", en: "days (travel days)" },
+    extraParams: [
+      { key: "costs", type: "string", label: { vi: "costs (1,7,30 ngày)", en: "costs (1,7,30 day)" }, default: "2,7,15" },
+    ],
+    approach: [
+      { vi: "dp[i] = chi phí nhỏ nhất để đi i ngày đầu tiên trong days.", en: "dp[i] = min cost to cover the first i travel days." },
+      { vi: "Mỗi ngày thử 3 vé; vé 7/30 ngày nhảy về ngày đi đầu tiên còn nằm ngoài cửa sổ.", en: "Each day tries 3 passes; 7/30-day passes jump back to the first travel day outside the window." },
+      { vi: "dp[i] = min(dp[i-1]+c1, dp[j7]+c7, dp[j30]+c30).", en: "dp[i] = min(dp[i-1]+c1, dp[j7]+c7, dp[j30]+c30)." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Chỉ duyệt các ngày phải đi (n ngày).", en: "Iterate only travel days (n days)." } },
+    code: [
+      "from bisect import bisect_left",
+      "class Solution:",
+      "    def mincostTickets(self, days, costs):",
+      "        n = len(days)",
+      "        dp = [0] * (n + 1)",
+      "        for i in range(1, n + 1):",
+      "            day = days[i-1]",
+      "            j7 = bisect_left(days, day - 6)",
+      "            j30 = bisect_left(days, day - 29)",
+      "            dp[i] = min(dp[i-1] + costs[0],",
+      "                        dp[j7]  + costs[1],",
+      "                        dp[j30] + costs[2])",
+      "        return dp[n]",
+    ],
+    builder: buildSteps983,
+  },
+  309: {
+    id: 309,
+    difficulty: "medium",
+    slug: "best-time-to-buy-and-sell-stock-with-cooldown",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Best Time to Buy and Sell Stock with Cooldown", en: "Best Time to Buy and Sell Stock with Cooldown" },
+    titleVi: { vi: "Mua bán cổ phiếu có ngày nghỉ", en: "Stock trading with cooldown" },
+    statement: {
+      vi: "Cho mảng prices. Có thể giao dịch nhiều lần nhưng sau khi BÁN phải nghỉ 1 ngày (cooldown) mới được mua lại. Tìm lợi nhuận lớn nhất.",
+      en: "Given prices, you may trade multiple times but after SELLING you must cooldown 1 day before buying again. Find the maximum profit.",
+    },
+    defaultInput: [1, 2, 3, 0, 2],
+    inputKind: "nonneg",
+    inputLabel: { vi: "prices", en: "prices" },
+    extraParams: [],
+    approach: [
+      { vi: "3 trạng thái: hold (đang giữ), sold (vừa bán), rest (rảnh).", en: "3 states: hold (holding), sold (just sold), rest (free)." },
+      { vi: "sold = hold + price; hold = max(hold, rest - price); rest = max(rest, prev_sold).", en: "sold = hold + price; hold = max(hold, rest - price); rest = max(rest, prev_sold)." },
+      { vi: "Đáp án = max(sold, rest) cuối cùng.", en: "Answer = final max(sold, rest)." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ giữ 3 biến trạng thái.", en: "Only 3 state variables." } },
+    code: [
+      "class Solution:",
+      "    def maxProfit(self, prices):",
+      "        hold, sold, rest = float('-inf'), 0, 0",
+      "        for price in prices:",
+      "            prev_sold = sold",
+      "            sold = hold + price",
+      "            hold = max(hold, rest - price)",
+      "            rest = max(rest, prev_sold)",
+      "        return max(sold, rest)",
+    ],
+    builder: buildSteps309,
+  },
+  221: {
+    id: 221,
+    difficulty: "medium",
+    slug: "maximal-square",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Maximal Square", en: "Maximal Square" },
+    titleVi: { vi: "Hình vuông toàn 1 lớn nhất", en: "Largest all-ones square" },
+    statement: {
+      vi: "Cho lưới nhị phân (0/1), tìm diện tích hình vuông toàn số 1 lớn nhất. Nhập từng hàng cách nhau bởi | và các ô cách nhau bởi dấu phẩy.",
+      en: "Given a binary grid (0/1), find the area of the largest all-ones square. Enter rows separated by | and cells separated by commas.",
+    },
+    defaultInput: "1,0,1,0,0|1,0,1,1,1|1,1,1,1,1|1,0,0,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "matrix (hàng | , ô ,)", en: "matrix (rows |, cells ,)" },
+    extraParams: [],
+    approach: [
+      { vi: "dp[r][c] = cạnh hình vuông toàn 1 có góc dưới-phải tại (r,c).", en: "dp[r][c] = side of the all-ones square with bottom-right corner at (r,c)." },
+      { vi: "Nếu ô = 1: dp = min(trên, trái, chéo) + 1.", en: "If cell = 1: dp = min(top, left, diag) + 1." },
+      { vi: "Đáp án = (cạnh lớn nhất)².", en: "Answer = (largest side)²." },
+    ],
+    complexity: { time: "O(rows × cols)", space: "O(rows × cols)", note: { vi: "Duyệt mỗi ô một lần.", en: "Visit each cell once." } },
+    code: [
+      "class Solution:",
+      "    def maximalSquare(self, matrix):",
+      "        rows, cols = len(matrix), len(matrix[0])",
+      "        dp = [[0]*(cols+1) for _ in range(rows+1)]",
+      "        best = 0",
+      "        for r in range(1, rows+1):",
+      "            for c in range(1, cols+1):",
+      "                if matrix[r-1][c-1] == '1':",
+      "                    dp[r][c] = min(dp[r-1][c], dp[r][c-1], dp[r-1][c-1]) + 1",
+      "                    best = max(best, dp[r][c])",
+      "        return best * best",
+    ],
+    builder: buildSteps221,
+  },
+  673: {
+    id: 673,
+    difficulty: "medium",
+    slug: "number-of-longest-increasing-subsequence",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Number of Longest Increasing Subsequence", en: "Number of Longest Increasing Subsequence" },
+    titleVi: { vi: "Số lượng LIS dài nhất", en: "Number of longest increasing subsequences" },
+    statement: {
+      vi: "Cho mảng nums, đếm số dãy con tăng nghiêm ngặt có độ dài LỚN NHẤT.",
+      en: "Given nums, count the number of strictly increasing subsequences of the LONGEST length.",
+    },
+    defaultInput: [1, 3, 5, 4, 7],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "length[i] = độ dài LIS kết thúc tại i; count[i] = số LIS như vậy.", en: "length[i] = LIS length ending at i; count[i] = number of them." },
+      { vi: "Với mỗi j<i mà nums[j]<nums[i]: nếu dài hơn thì thay, nếu bằng thì cộng count.", en: "For each j<i with nums[j]<nums[i]: if longer replace, if equal add count." },
+      { vi: "Đáp án = tổng count[i] tại các i có length[i] = maxLen.", en: "Answer = sum of count[i] where length[i] = maxLen." },
+    ],
+    complexity: { time: "O(n²)", space: "O(n)", note: { vi: "Hai vòng lồng nhau; mỗi phần tử giữ 2 giá trị.", en: "Two nested loops; two values per element." } },
+    code: [
+      "class Solution:",
+      "    def findNumberOfLIS(self, nums):",
+      "        n = len(nums)",
+      "        length = [1] * n",
+      "        count = [1] * n",
+      "        for i in range(n):",
+      "            for j in range(i):",
+      "                if nums[j] < nums[i]:",
+      "                    if length[j] + 1 > length[i]:",
+      "                        length[i] = length[j] + 1",
+      "                        count[i] = count[j]",
+      "                    elif length[j] + 1 == length[i]:",
+      "                        count[i] += count[j]",
+      "        max_len = max(length)",
+      "        return sum(c for l, c in zip(length, count) if l == max_len)",
+    ],
+    builder: buildSteps673,
+  },
   486: {
     id: 486,
     difficulty: "medium",

@@ -15798,6 +15798,196 @@ function renderCinemaSeatView(step) {
   </section>`;
 }
 
+function renderTicketsView(step) {
+  const view = step.ticketsView || {};
+  const vi = lang === "vi";
+  const days = Array.isArray(view.days) ? view.days : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const costs = Array.isArray(view.costs) ? view.costs : [];
+  const opt = view.options;
+  const wSeven = view.windowSeven;
+  const wThirty = view.windowThirty;
+  const chosen = opt ? opt.chosen : null;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    compute: vi ? "Chọn vé cho ngày" : "Pick a pass",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  // The window highlighted on the travel-day row depends on the chosen pass.
+  const activeWindow = chosen === "seven" ? wSeven : chosen === "thirty" ? wThirty : null;
+
+  const daysHtml = days.map((d, idx) => {
+    const classes = ["mct983-day"];
+    if (idx === view.currentIndex - 1) classes.push("current");
+    if (activeWindow && idx >= activeWindow[0] && idx <= activeWindow[1]) classes.push("covered");
+    return `<span class="${classes.join(" ")}"><small>#${idx + 1}</small><strong>${d}</strong></span>`;
+  }).join("");
+
+  const dpHtml = dp.map((v, idx) => {
+    const classes = ["mct983-dp"];
+    if (idx === view.currentIndex) classes.push("current");
+    if (opt && (idx === opt.one.dpIdx || (chosen === "seven" && idx === opt.seven.dpIdx) || (chosen === "thirty" && idx === opt.thirty.dpIdx))) classes.push("source");
+    if (v === null || v === undefined) classes.push("pending");
+    return `<span class="${classes.join(" ")}"><small>dp${idx}</small><strong>${v === null || v === undefined ? "·" : v}</strong></span>`;
+  }).join("");
+
+  let optionsHtml = "";
+  if (opt) {
+    const card = (key, label, o, extra) => `<article class="mct983-opt ${key}${chosen === key ? " chosen" : ""}"><small>${label}</small><strong>${o.total}</strong><em>dp[${o.dpIdx}]=${o.dpVal} + ${o.cost}${extra ? `<br>${extra}` : ""}</em></article>`;
+    optionsHtml = `<section class="mct983-opts">
+      ${card("one", vi ? "Vé 1 ngày" : "1-day", opt.one, "")}
+      ${card("seven", vi ? "Vé 7 ngày" : "7-day", opt.seven, vi ? `phủ ${opt.seven.windowStart}..${days[view.currentIndex - 1]}` : `covers ${opt.seven.windowStart}..${days[view.currentIndex - 1]}`)}
+      ${card("thirty", vi ? "Vé 30 ngày" : "30-day", opt.thirty, vi ? `phủ ${opt.thirty.windowStart}..${days[view.currentIndex - 1]}` : `covers ${opt.thirty.windowStart}..${days[view.currentIndex - 1]}`)}
+    </section>`;
+  }
+
+  $("treeView").innerHTML = `<section class="mct983-viz" role="img" aria-label="${vi ? "Trực quan hóa Minimum Cost For Tickets" : "Minimum Cost For Tickets visualization"}">
+    <header><strong>MINIMUM COST FOR TICKETS</strong><span class="mct983-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="mct983-rule"><b>3 VÉ</b><strong>1 ngày = ${costs[0]} · 7 ngày = ${costs[1]} · 30 ngày = ${costs[2]}</strong><span>${vi ? "mỗi ngày phải đi: chọn vé rẻ nhất; vé dài phủ nhiều ngày cùng lúc" : "for each travel day pick the cheapest pass; longer passes cover many days at once"}</span></section>
+    <section class="mct983-panel"><header><strong>${vi ? "NGÀY PHẢI ĐI" : "TRAVEL DAYS"}</strong><span>${vi ? "vàng = đang xét · xanh = được vé đang chọn phủ" : "yellow = current · green = covered by chosen pass"}</span></header><div class="mct983-days">${daysHtml}</div></section>
+    ${optionsHtml}
+    <section class="mct983-panel"><header><strong>dp</strong><span>${vi ? "dp[i] = chi phí đi i ngày đầu" : "dp[i] = cost of first i days"}</span></header><div class="mct983-dps">${dpHtml}</div></section>
+    ${view.answer != null ? `<section class="mct983-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong></section>` : ""}
+  </section>`;
+}
+
+function renderStockCooldownView(step) {
+  const view = step.stockCooldownView || {};
+  const vi = lang === "vi";
+  const prices = Array.isArray(view.prices) ? view.prices : [];
+  const st = view.states || {};
+  const t = view.transitions;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    day: vi ? "Xử lý ngày" : "Process day",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const fmt = (v) => (v === null || v === undefined ? "−∞" : v);
+
+  const pricesHtml = prices.map((p, i) => {
+    const classes = ["sc309-price"];
+    if (i === view.currentIndex) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>${vi ? "ngày" : "day"} ${i}</small><strong>${p}</strong></span>`;
+  }).join("");
+
+  const stateCard = (key, label, value, desc) => `<article class="sc309-state ${key}${view.phase === "day" ? " active" : ""}"><small>${label}</small><strong>${fmt(value)}</strong><em>${desc}</em></article>`;
+  const statesHtml = `
+    ${stateCard("hold", "hold", st.hold, vi ? "đang GIỮ cổ phiếu" : "HOLDING a share")}
+    ${stateCard("sold", "sold", st.sold, vi ? "VỪA BÁN hôm nay" : "just SOLD today")}
+    ${stateCard("rest", "rest", st.rest, vi ? "RẢNH / cooldown" : "free / cooldown")}
+  `;
+
+  let action = "";
+  if (t) {
+    action = `${vi ? "giá" : "price"} ${t.price}: sold=${fmt(t.oldHold)}+${t.price}=<b>${fmt(t.newSold)}</b> · hold=max(${fmt(t.oldHold)}, ${t.oldRest}−${t.price})=<b>${fmt(t.newHold)}</b> · rest=max(${t.oldRest}, ${t.oldSold})=<b>${t.newRest}</b>`;
+  } else if (view.phase === "done") {
+    action = `max(sold, rest) = <b>${view.answer}</b>`;
+  } else {
+    action = vi ? "3 trạng thái bắt đầu: hold=-∞, sold=0, rest=0" : "3 initial states: hold=-∞, sold=0, rest=0";
+  }
+
+  $("treeView").innerHTML = `<section class="sc309-viz" role="img" aria-label="${vi ? "Trực quan hóa Stock with Cooldown" : "Stock with Cooldown visualization"}">
+    <header><strong>STOCK WITH COOLDOWN</strong><span class="sc309-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="sc309-rule"><b>3 STATES</b><strong>hold → sold → (cooldown) rest → hold</strong><span>${vi ? "bán xong phải NGHỈ 1 ngày mới mua lại; mua lại chỉ từ trạng thái rest" : "after selling you must REST 1 day before buying; buying happens only from rest"}</span></section>
+    <section class="sc309-panel"><header><strong>prices</strong></header><div class="sc309-prices">${pricesHtml}</div></section>
+    <section class="sc309-action">${action}</section>
+    <section class="sc309-states">${statesHtml}</section>
+    ${view.answer != null ? `<section class="sc309-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong></section>` : ""}
+  </section>`;
+}
+
+function renderMaximalSquareView(step) {
+  const view = step.maximalSquareView || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const cur = view.current;
+  const nb = view.neighbors;
+  const squareCells = new Set(view.squareCells || []);
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    compute: vi ? "Tính ô dp" : "Compute cell",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const nbSet = new Set();
+  if (nb) { ["top", "left", "diag"].forEach((k) => { if (nb[k]) nbSet.add(`${nb[k].r},${nb[k].c}`); }); }
+
+  const gridHtml = matrix.map((row, r) => {
+    const cells = row.map((val, c) => {
+      const classes = ["ms221-cell", val === 1 ? "one" : "zero"];
+      if (cur && cur.r === r && cur.c === c) classes.push("current");
+      else if (nbSet.has(`${r},${c}`)) classes.push("neighbor");
+      if (squareCells.has(`${r},${c}`)) classes.push("square");
+      const dpVal = dp[r] && dp[r][c] !== null && dp[r][c] !== undefined ? dp[r][c] : "";
+      return `<span class="${classes.join(" ")}"><b>${val}</b><i>${dpVal}</i></span>`;
+    }).join("");
+    return `<div class="ms221-row">${cells}</div>`;
+  }).join("");
+
+  let action = "";
+  if (view.formula) {
+    const f = view.formula;
+    action = `dp = min(${vi ? "trên" : "top"}=${f.top}, ${vi ? "trái" : "left"}=${f.left}, ${vi ? "chéo" : "diag"}=${f.diag}) + 1 = <b>${f.result}</b>`;
+  } else if (cur) {
+    action = `${vi ? "ô" : "cell"} (${cur.r},${cur.c}) = 0 → dp = 0`;
+  } else if (view.phase === "done") {
+    action = `${vi ? "cạnh" : "side"} = ${view.best} → ${vi ? "diện tích" : "area"} = <b>${view.answer}</b>`;
+  } else {
+    action = vi ? "dp[r][c] = min(3 ô) + 1" : "dp[r][c] = min(3 cells) + 1";
+  }
+
+  $("treeView").innerHTML = `<section class="ms221-viz" role="img" aria-label="${vi ? "Trực quan hóa Maximal Square" : "Maximal Square visualization"}">
+    <header><strong>MAXIMAL SQUARE</strong><span class="ms221-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="ms221-rule"><b>CORE RULE</b><strong>dp[r][c] = min(top, left, diag) + 1</strong><span>${vi ? "ô hiển thị số gốc (to) và dp (nhỏ, góc). vàng = ô đang tính · tím = 3 ô nguồn · xanh = hình vuông lớn nhất" : "each cell shows original value (big) and dp (small). yellow = current · purple = 3 sources · green = largest square"}</span></section>
+    <section class="ms221-action">${action}</section>
+    <section class="ms221-grid">${gridHtml}</section>
+    <section class="ms221-best"><small>${vi ? "CẠNH LỚN NHẤT" : "MAX SIDE"}</small><strong>${view.best}</strong>${view.answer != null ? `<em>${vi ? "diện tích" : "area"} = ${view.answer}</em>` : ""}</section>
+  </section>`;
+}
+
+function renderNumberOfLISView(step) {
+  const view = step.numberOfLISView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const length = Array.isArray(view.length) ? view.length : [];
+  const count = Array.isArray(view.count) ? view.count : [];
+  const cand = view.candidate;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    scan: vi ? "Quét cặp (j, i)" : "Scan pair (j, i)",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const isBest = (i) => view.phase === "done" && view.maxLen != null && length[i] === view.maxLen;
+
+  const cellsHtml = nums.map((v, i) => {
+    const classes = ["lis673-cell"];
+    if (i === view.currentI) classes.push("current");
+    if (i === view.currentJ) classes.push("source");
+    if (isBest(i)) classes.push("best");
+    return `<article class="${classes.join(" ")}"><small>[${i}]</small><strong>${v}</strong><div class="lis673-lc"><span class="len">L=${length[i]}</span><span class="cnt">C=${count[i]}</span></div></article>`;
+  }).join("");
+
+  let action = "";
+  if (cand) {
+    const cmp = cand.extendable ? `${cand.numJ} &lt; ${cand.numI} ✓` : `${cand.numJ} ≥ ${cand.numI} ✗`;
+    if (!cand.extendable) action = `nums[${cand.j}] ${cmp} → ${vi ? "bỏ qua" : "skip"}`;
+    else if (cand.action === "new") action = `length[${cand.j}]+1 &gt; length[${cand.i}] → <b>${vi ? "dãy dài hơn" : "longer"}</b>: L=${cand.lenI}, C=${cand.cntI}`;
+    else if (cand.action === "add") action = `length[${cand.j}]+1 = length[${cand.i}] → <b>${vi ? "cộng count" : "add count"}</b>: C=${cand.cntI}`;
+    else action = `${cmp} ${vi ? "nhưng không dài hơn" : "but not longer"}`;
+  } else if (view.phase === "done") {
+    action = `maxLen = ${view.maxLen} → <b>${view.answer}</b> ${vi ? "dãy" : "subsequences"}`;
+  } else {
+    action = vi ? "mỗi phần tử: L=1, C=1" : "each element: L=1, C=1";
+  }
+
+  $("treeView").innerHTML = `<section class="lis673-viz" role="img" aria-label="${vi ? "Trực quan hóa Number of LIS" : "Number of LIS visualization"}">
+    <header><strong>NUMBER OF LIS</strong><span class="lis673-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="lis673-rule"><b>CORE RULE</b><strong>L=${vi ? "độ dài LIS kết thúc tại i" : "LIS length ending at i"} · C=${vi ? "số cách" : "how many"}</strong><span>${vi ? "nối sau j (nums[j]<nums[i]): dài hơn → thay; bằng → cộng C" : "extend after j (nums[j]<nums[i]): longer → replace; tie → add C"}</span></section>
+    <section class="lis673-action">${action}</section>
+    <section class="lis673-panel"><header><strong>nums</strong><span>${vi ? "vàng = i · tím = j đang xét · xanh = thuộc LIS dài nhất" : "yellow = i · purple = j · green = in longest LIS"}</span></header><div class="lis673-cells">${cellsHtml}</div></section>
+  </section>`;
+}
+
 function renderHouseRobberView(step) {
   const view = step.houseRobberView || {};
   const vi = lang === "vi";
@@ -17217,6 +17407,30 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.ticketsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTicketsView(step);
+  } else if (step.stockCooldownView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStockCooldownView(step);
+  } else if (step.maximalSquareView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximalSquareView(step);
+  } else if (step.numberOfLISView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNumberOfLISView(step);
   } else if (step.houseRobberView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
