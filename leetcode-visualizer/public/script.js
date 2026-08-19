@@ -15417,6 +15417,116 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderCinemaSeatView(step) {
+  const view = step.cinemaSeatView || {};
+  const vi = lang === "vi";
+  const seats = Array.isArray(view.seats) ? view.seats : null;
+  const phaseLabels = {
+    intro: vi ? "Giới thiệu" : "Intro",
+    empty: vi ? "Hàng trống" : "Empty rows",
+    inspect: vi ? "Kiểm tra cửa sổ" : "Check windows",
+    assign: vi ? "Xếp nhóm" : "Assign groups",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  let seatSection = "";
+  if (seats) {
+    const seatHtml = seats.map((seat) => {
+      const classes = ["cin1386-seat"];
+      if (seat.reserved) classes.push("reserved");
+      else if (seat.group) classes.push("group", seat.group);
+      if (seat.aisle) classes.push("aisle");
+      const icon = seat.reserved ? "✕" : seat.group ? "●" : "";
+      return `<span class="${classes.join(" ")}"><small>${seat.col}</small><b>${icon}</b></span>`;
+    }).join("");
+    seatSection = `<section class="cin1386-row"><header><strong>${vi ? "HÀNG" : "ROW"} ${view.currentRow}</strong><span>${vi ? "✕ đã đặt · ● ghế trong nhóm · | lối đi" : "✕ reserved · ● seat in a group · | aisle"}</span></header><div class="cin1386-seats">${seatHtml}</div></section>`;
+  }
+
+  let windowSection = "";
+  if (view.windows) {
+    const w = view.windows;
+    const chosenNames = new Set((view.chosen || []).map((g) => g.name));
+    const box = (name, label, free) => {
+      const state = chosenNames.has(name) ? "chosen" : free ? "free" : "blocked";
+      const stateText = chosenNames.has(name) ? (vi ? "đã chọn" : "chosen") : free ? (vi ? "trống" : "free") : (vi ? "bị chặn" : "blocked");
+      return `<div class="cin1386-window ${state}"><small>${label}</small><em>${stateText}</em></div>`;
+    };
+    windowSection = `<section class="cin1386-windows">
+      ${box("left", "2–5", w.left)}
+      ${box("mid", "4–7", w.mid)}
+      ${box("right", "6–9", w.right)}
+    </section>`;
+  }
+
+  const answerLine = view.phase === "done"
+    ? `<b>${view.answer}</b> ${vi ? "nhóm" : "groups"}`
+    : `${vi ? "tổng hiện tại" : "running total"}: <b>${view.answer}</b>`;
+
+  $("treeView").innerHTML = `<section class="cin1386-viz" role="img" aria-label="${vi ? "Trực quan hóa xếp ghế rạp phim" : "Cinema seat allocation visualization"}">
+    <header><strong>CINEMA SEAT ALLOCATION</strong><span class="cin1386-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="cin1386-rule"><b>CORE RULE</b><strong>${vi ? "3 cửa sổ nhóm: 2–5 · 6–9 · 4–7" : "3 group windows: 2–5 · 6–9 · 4–7"}</strong><span>${vi ? "hai bên trống → 2 nhóm; chỉ giữa trống → 1 nhóm" : "both sides free → 2 groups; only middle free → 1 group"}</span></section>
+    <section class="cin1386-stats">
+      <div><small>${vi ? "hàng trống" : "empty rows"}</small><strong>${view.emptyRows} × 2 = ${view.emptyContribution}</strong></div>
+      <div><small>${vi ? "hàng có ghế đặt" : "reserved rows"}</small><strong>${view.reservedRowCount}</strong></div>
+      <div class="answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${answerLine}</strong></div>
+    </section>
+    ${seatSection}
+    ${windowSection}
+  </section>`;
+}
+
+function renderCoinChangeView(step) {
+  const view = step.coinChangeView || {};
+  const vi = lang === "vi";
+  const cells = Array.isArray(view.cells) ? view.cells : [];
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    base: vi ? "Cơ sở" : "Base case",
+    compute: vi ? "Tính ô mới" : "Compute cell",
+    try: vi ? "Thử xu" : "Try coin",
+    update: vi ? "Cập nhật" : "Update",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  const cellsHtml = cells.map((cell) => {
+    const classes = ["cc322-cell"];
+    if (cell.amount === view.currentIndex) classes.push("current");
+    if (cell.amount === view.sourceIndex) classes.push("source");
+    const valueText = cell.value === null ? "∞" : cell.value;
+    const chips = Array.isArray(cell.coins) && cell.coins.length
+      ? cell.coins.map((coin) => `<span class="cc322-coin">${coin}</span>`).join("")
+      : (cell.value === 0 ? `<span class="cc322-none">∅</span>` : "");
+    return `<div class="${classes.join(" ")}">
+      <small>[${cell.amount}]</small>
+      <strong>${valueText}</strong>
+      <div class="cc322-coins">${chips}</div>
+    </div>`;
+  }).join("");
+
+  let action = "";
+  if (view.phase === "try" || view.phase === "update") {
+    const src = view.sourceIndex >= 0 ? `dp[${view.sourceIndex}]` : "—";
+    action = `dp[${view.currentIndex}] ← min(dp[${view.currentIndex}], ${src} + 1×<span class="cc322-coin sm">${view.currentCoin}</span>)`;
+  } else if (view.phase === "done") {
+    action = view.answer < 0
+      ? (vi ? "không tạo được → −1" : "cannot form → −1")
+      : `dp[${view.amount}] = <b>${view.answer}</b>`;
+  } else if (view.phase === "compute") {
+    action = `${vi ? "đang tính" : "computing"} dp[${view.currentIndex}]`;
+  } else {
+    action = vi ? "chuẩn bị bảng dp" : "prepare dp table";
+  }
+
+  const coinLegend = view.coins.map((coin) => `<span class="cc322-coin">${coin}</span>`).join("");
+
+  $("treeView").innerHTML = `<section class="cc322-viz" role="img" aria-label="${vi ? "Trực quan hóa Coin Change" : "Coin Change visualization"}">
+    <header><strong>COIN CHANGE</strong><span class="cc322-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="cc322-rule"><b>CORE RULE</b><strong>dp[i] = min(dp[i − coin] + 1)</strong><span>${vi ? "mỗi ô = số xu ít nhất; chip bên trong = các xu tạo nên số tiền đó" : "each cell = fewest coins; chips inside = the coins that build that amount"}</span></section>
+    <section class="cc322-action"><small>${vi ? "XU CÓ" : "COINS"}: </small><span class="cc322-legend">${coinLegend}</span><strong>${action}</strong></section>
+    <section class="cc322-grid">${cellsHtml}</section>
+  </section>`;
+}
+
 function renderMissingNumberView(step) {
   const view = step.missingNumberView || {};
   const vi = lang === "vi";
@@ -16451,6 +16561,18 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.cinemaSeatView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCinemaSeatView(step);
+  } else if (step.coinChangeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCoinChangeView(step);
   } else if (step.missingNumberView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

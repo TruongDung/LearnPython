@@ -6674,9 +6674,43 @@ function buildSteps322(nums, params) {
   const steps = [];
   const INF = amount + 1;
   const dp = new Array(amount + 1).fill(INF);
+  const choice = new Array(amount + 1).fill(-1); // choice[i] = coin picked to reach dp[i]
+
+  // Rebuild the coin combination that composes dp[j] by following choices.
+  const comboOf = (j) => {
+    const out = [];
+    let rem = j;
+    let guard = 0;
+    while (rem > 0 && choice[rem] > 0 && guard++ <= amount) {
+      out.push(choice[rem]);
+      rem -= choice[rem];
+    }
+    return rem === 0 ? out : null;
+  };
+
+  const viewCells = () => Array.from({ length: amount + 1 }, (_, j) => ({
+    amount: j,
+    value: dp[j] >= INF ? null : dp[j],
+    coins: comboOf(j),
+  }));
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      coinChangeView: {
+        coins: [...coins],
+        amount,
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sourceIndex: Number.isInteger(meta.sourceIndex) ? meta.sourceIndex : -1,
+        currentCoin: meta.currentCoin ?? null,
+        answer: meta.final ? (dp[amount] >= INF ? -1 : dp[amount]) : null,
+        cells: viewCells(),
+      },
+    }));
+  };
 
   // Line 3: dp = [float('inf')] * (amount + 1)
-  steps.push({
+  push({ phase: "init" }, {
     title: { vi: "dp = [inf] * (amount + 1)", en: "dp = [inf] * (amount + 1)" },
     arr: dp.map((v) => (v >= INF ? 0 : v)),
     sub: dp.map((v) => (v >= INF ? "∞" : String(v))),
@@ -6696,7 +6730,7 @@ function buildSteps322(nums, params) {
 
   // Line 4: dp[0] = 0
   dp[0] = 0;
-  steps.push({
+  push({ phase: "base", currentIndex: 0 }, {
     title: { vi: "dp[0] = 0", en: "dp[0] = 0" },
     arr: dp.map((v) => (v >= INF ? 0 : v)),
     sub: dp.map((v) => (v >= INF ? "∞" : String(v))),
@@ -6714,7 +6748,7 @@ function buildSteps322(nums, params) {
 
   for (let i = 1; i <= amount; i++) {
     // Line 5: for i in range(1, amount + 1)
-    steps.push({
+    push({ phase: "compute", currentIndex: i }, {
       title: { vi: `Tính dp[${i}] (số tiền = ${i})`, en: `Compute dp[${i}] (amount = ${i})` },
       arr: dp.slice(0, i + 1).map((v) => (v >= INF ? 0 : v)),
       sub: dp.slice(0, i + 1).map((v) => (v >= INF ? "∞" : String(v))),
@@ -6734,7 +6768,7 @@ function buildSteps322(nums, params) {
     for (const coin of coins) {
       // Lines 6-7: for coin in coins → if coin <= i (merged into one clear step)
       const canUse = coin <= i;
-      steps.push({
+      push({ phase: "try", currentIndex: i, currentCoin: coin, sourceIndex: canUse ? i - coin : -1 }, {
         title: canUse
           ? { vi: `Thử xu ${coin} (≤ ${i} ✓)`, en: `Try coin ${coin} (≤ ${i} ✓)` }
           : { vi: `Thử xu ${coin} (> ${i}, bỏ qua)`, en: `Try coin ${coin} (> ${i}, skip)` },
@@ -6766,13 +6800,14 @@ function buildSteps322(nums, params) {
         let updated = false;
         if (candidate < dp[i]) {
           dp[i] = candidate;
+          choice[i] = coin;
           updated = true;
         }
         const srcTxt = dp[i - coin] >= INF ? "∞" : String(dp[i - coin]);
         const candTxt = candidate >= INF ? "∞" : String(candidate);
         const oldTxt = oldDpi >= INF ? "∞" : String(oldDpi);
         const newTxt = dp[i] >= INF ? "∞" : String(dp[i]);
-        steps.push({
+        push({ phase: "update", currentIndex: i, currentCoin: coin, sourceIndex: i - coin }, {
           title: updated
             ? { vi: `Cập nhật dp[${i}] = ${newTxt} ✓`, en: `Update dp[${i}] = ${newTxt} ✓` }
             : { vi: `Giữ nguyên dp[${i}] = ${newTxt}`, en: `Keep dp[${i}] = ${newTxt}` },
@@ -6805,23 +6840,9 @@ function buildSteps322(nums, params) {
 
   // Line 9: return dp[amount] if dp[amount] != float('inf') else -1
   const answer = dp[amount] >= INF ? -1 : dp[amount];
+  const coinsUsed = answer >= 0 ? (comboOf(amount) || []) : [];
 
-  // Trace back coins used
-  const coinsUsed = [];
-  if (answer >= 0) {
-    let rem = amount;
-    while (rem > 0) {
-      for (const coin of coins) {
-        if (coin <= rem && dp[rem - coin] + 1 === dp[rem]) {
-          coinsUsed.push(coin);
-          rem -= coin;
-          break;
-        }
-      }
-    }
-  }
-
-  steps.push({
+  push({ phase: "done", currentIndex: amount, final: true }, {
     title: { vi: "return dp[amount]", en: "return dp[amount]" },
     arr: dp.map((v) => (v >= INF ? 0 : v)),
     sub: dp.map((v) => (v >= INF ? "∞" : String(v))),

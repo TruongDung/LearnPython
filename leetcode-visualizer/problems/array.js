@@ -3078,6 +3078,185 @@ function buildSteps268Sum(nums) {
   return { original: nums, answer: missing, steps };
 }
 
+/** LeetCode 1386: Cinema Seat Allocation — greedy per row over 3 group windows. */
+function buildSteps1386(input, params) {
+  const n = Number(Array.isArray(input) ? input[0] : input) || 1;
+  const reservedRaw = String((params && params.reserved) || "").trim();
+  const reservedByRow = new Map(); // row → Set of seat columns
+  if (reservedRaw) {
+    for (const token of reservedRaw.split(";")) {
+      const [rowStr, colStr] = token.split(",");
+      const row = Number(String(rowStr).trim());
+      const col = Number(String(colStr).trim());
+      if (!Number.isInteger(row) || !Number.isInteger(col)) continue;
+      if (row < 1 || row > n || col < 1 || col > 10) continue;
+      if (!reservedByRow.has(row)) reservedByRow.set(row, new Set());
+      reservedByRow.get(row).add(col);
+    }
+  }
+
+  const steps = [];
+  let answer = 0;
+  const reservedRows = [...reservedByRow.keys()].sort((a, b) => a - b);
+  const emptyRows = n - reservedRows.length;
+
+  const seatBoard = (reservedSet, chosen) => {
+    // chosen: array of {name, cols}
+    const chosenCols = new Map();
+    (chosen || []).forEach((g) => g.cols.forEach((c) => chosenCols.set(c, g.name)));
+    return Array.from({ length: 10 }, (_, idx) => {
+      const col = idx + 1;
+      return {
+        col,
+        reserved: reservedSet ? reservedSet.has(col) : false,
+        group: chosenCols.get(col) || null,
+        aisle: col === 1 || col === 10,
+      };
+    });
+  };
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      cinemaSeatView: {
+        n,
+        emptyRows,
+        emptyContribution: emptyRows * 2,
+        reservedRowCount: reservedRows.length,
+        phase: meta.phase || "",
+        currentRow: meta.currentRow ?? null,
+        seats: meta.seats || null,
+        windows: meta.windows || null,
+        chosen: meta.chosen || [],
+        rowGroups: meta.rowGroups ?? null,
+        answer,
+        final: Boolean(meta.final),
+      },
+    }));
+  };
+
+  push({ phase: "intro" }, {
+    title: { vi: "Cinema Seat Allocation", en: "Cinema Seat Allocation" },
+    arr: [],
+    highlight: [], mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "n (số hàng)", value: n },
+      { name: "hàng có ghế đặt", value: reservedRows.length ? `[${reservedRows.join(", ")}]` : "không" },
+    ],
+    note: {
+      vi: "Mỗi nhóm 4 người cần 4 ghế liền kề. Ghế 1 và 10 sát lối đi nên không thuộc nhóm nào. Chỉ có 3 cửa sổ nhóm: ghế 2–5, 6–9 và 4–7 (cửa sổ giữa dùng khi hai bên bị chặn).",
+      en: "Each 4-person group needs 4 adjacent seats. Seats 1 and 10 are next to the aisle and belong to no group. Only 3 group windows exist: seats 2–5, 6–9, and 4–7 (the middle window is used when both sides are blocked).",
+    },
+  });
+
+  if (emptyRows > 0) {
+    push({ phase: "empty" }, {
+      title: { vi: `${emptyRows} hàng trống → +${emptyRows * 2}`, en: `${emptyRows} empty rows → +${emptyRows * 2}` },
+      arr: [],
+      highlight: [], mark: [],
+      codeLines: [7],
+      vars: [
+        { name: "hàng trống", value: emptyRows },
+        { name: "mỗi hàng", value: "2 nhóm (2–5 và 6–9)" },
+      ],
+      note: {
+        vi: `Có ${emptyRows} hàng không có ghế nào bị đặt. Mỗi hàng như vậy xếp được 2 nhóm (2–5 và 6–9), cộng ${emptyRows * 2} nhóm.`,
+        en: `${emptyRows} rows have no reserved seats. Each such row fits 2 groups (2–5 and 6–9), adding ${emptyRows * 2} groups.`,
+      },
+    });
+    answer += emptyRows * 2;
+  }
+
+  for (const row of reservedRows) {
+    const reserved = reservedByRow.get(row);
+    const leftFree = ![2, 3, 4, 5].some((c) => reserved.has(c));
+    const rightFree = ![6, 7, 8, 9].some((c) => reserved.has(c));
+    const midFree = ![4, 5, 6, 7].some((c) => reserved.has(c));
+
+    push({ phase: "inspect", currentRow: row, seats: seatBoard(reserved, []), windows: { left: leftFree, right: rightFree, mid: midFree } }, {
+      title: { vi: `Hàng ${row}: kiểm tra 3 cửa sổ`, en: `Row ${row}: check the 3 windows` },
+      arr: [],
+      highlight: [], mark: [],
+      codeLines: [9, 10, 11],
+      vars: [
+        { name: "hàng", value: row },
+        { name: "ghế đã đặt", value: `[${[...reserved].sort((a, b) => a - b).join(", ")}]` },
+        { name: "2–5 trống?", value: leftFree ? "có" : "không" },
+        { name: "6–9 trống?", value: rightFree ? "có" : "không" },
+        { name: "4–7 trống?", value: midFree ? "có" : "không" },
+      ],
+      note: {
+        vi: `Hàng ${row} có ghế đặt tại [${[...reserved].sort((a, b) => a - b).join(", ")}]. Xét từng cửa sổ: 2–5 ${leftFree ? "trống" : "bị chặn"}, 6–9 ${rightFree ? "trống" : "bị chặn"}, 4–7 ${midFree ? "trống" : "bị chặn"}.`,
+        en: `Row ${row} has reserved seats [${[...reserved].sort((a, b) => a - b).join(", ")}]. Check each window: 2–5 ${leftFree ? "free" : "blocked"}, 6–9 ${rightFree ? "free" : "blocked"}, 4–7 ${midFree ? "free" : "blocked"}.`,
+      },
+    });
+
+    let chosen = [];
+    let rowGroups = 0;
+    if (leftFree && rightFree) {
+      chosen = [{ name: "left", cols: [2, 3, 4, 5] }, { name: "right", cols: [6, 7, 8, 9] }];
+      rowGroups = 2;
+    } else if (midFree) {
+      chosen = [{ name: "mid", cols: [4, 5, 6, 7] }];
+      rowGroups = 1;
+    } else if (leftFree) {
+      chosen = [{ name: "left", cols: [2, 3, 4, 5] }];
+      rowGroups = 1;
+    } else if (rightFree) {
+      chosen = [{ name: "right", cols: [6, 7, 8, 9] }];
+      rowGroups = 1;
+    }
+    answer += rowGroups;
+
+    const reasonVi = rowGroups === 2
+      ? "Cả 2–5 và 6–9 đều trống → xếp 2 nhóm."
+      : rowGroups === 1 && chosen[0].name === "mid"
+        ? "Hai bên bị chặn nhưng 4–7 trống → xếp 1 nhóm ở giữa."
+        : rowGroups === 1
+          ? `Chỉ ${chosen[0].name === "left" ? "2–5" : "6–9"} trống → xếp 1 nhóm.`
+          : "Không cửa sổ nào trống → 0 nhóm.";
+    const reasonEn = rowGroups === 2
+      ? "Both 2–5 and 6–9 are free → place 2 groups."
+      : rowGroups === 1 && chosen[0].name === "mid"
+        ? "Both sides blocked but 4–7 is free → place 1 middle group."
+        : rowGroups === 1
+          ? `Only ${chosen[0].name === "left" ? "2–5" : "6–9"} is free → place 1 group.`
+          : "No window is free → 0 groups.";
+
+    push({ phase: "assign", currentRow: row, seats: seatBoard(reserved, chosen), windows: { left: leftFree, right: rightFree, mid: midFree }, chosen, rowGroups }, {
+      title: { vi: `Hàng ${row}: +${rowGroups} nhóm`, en: `Row ${row}: +${rowGroups} groups` },
+      arr: [],
+      highlight: [], mark: [],
+      codeLines: [12],
+      vars: [
+        { name: "hàng", value: row },
+        { name: "nhóm hàng này", value: rowGroups },
+        { name: "tổng hiện tại", value: answer },
+      ],
+      note: { vi: reasonVi, en: reasonEn },
+    });
+  }
+
+  push({ phase: "done", final: true }, {
+    title: { vi: `Đáp án: ${answer} nhóm`, en: `Answer: ${answer} groups` },
+    arr: [],
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [13],
+    vars: [
+      { name: "hàng trống × 2", value: emptyRows * 2 },
+      { name: "cộng từ hàng có ghế đặt", value: answer - emptyRows * 2 },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Tổng số nhóm 4 người tối đa = ${emptyRows * 2} (từ ${emptyRows} hàng trống) + ${answer - emptyRows * 2} (từ các hàng có ghế đặt) = ${answer}.`,
+      en: `Maximum number of 4-person groups = ${emptyRows * 2} (from ${emptyRows} empty rows) + ${answer - emptyRows * 2} (from reserved rows) = ${answer}.`,
+    },
+  });
+
+  return { original: n, answer, steps };
+}
+
 function parseMatrix(input) {
   return String(input).split(/[;|]/).map((r) => r.trim()).filter(Boolean).map((r) => r.split(",").map((v) => Number(v.trim())));
 }
@@ -8006,6 +8185,52 @@ module.exports = {
     codeLabel: { vi: "Cách 1: XOR O(1) space", en: "Approach 1: XOR O(1) space" },
     code2Label: { vi: "Cách 2: Tổng Gauss (expected − actual)", en: "Approach 2: Gauss sum (expected − actual)" },
     builder: buildSteps268,
+  },
+  1386: {
+    id: 1386,
+    difficulty: "medium",
+    slug: "cinema-seat-allocation",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Cinema Seat Allocation", en: "Cinema Seat Allocation" },
+    titleVi: { vi: "Xếp ghế rạp chiếu phim", en: "Cinema seat allocation" },
+    statement: {
+      vi: "Rạp có n hàng, mỗi hàng 10 ghế (1..10). Một nhóm 4 người cần 4 ghế liền kề trong cùng hàng (không tính lối đi giữa ghế 5 và 6). Cho danh sách ghế đã đặt, trả về số nhóm 4 người tối đa có thể xếp.",
+      en: "A cinema has n rows with 10 seats each (1..10). A 4-person group needs 4 adjacent seats in one row (the aisle between seats 5 and 6 is allowed within a group only via seats 4–7). Given reserved seats, return the maximum number of 4-person groups.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    inputLabel: { vi: "n (số hàng)", en: "n (rows)" },
+    singleInput: true,
+    maxInput: 50,
+    extraParams: [
+      { key: "reserved", type: "string", label: { vi: "reservedSeats (hàng,ghế; ...)", en: "reservedSeats (row,seat; ...)" }, default: "1,2;1,3;1,8;2,6;3,1;3,10" },
+    ],
+    approach: [
+      { vi: "Hàng trống xếp được 2 nhóm (2–5 và 6–9).", en: "An empty row fits 2 groups (2–5 and 6–9)." },
+      { vi: "Với hàng có ghế đặt, xét 3 cửa sổ: 2–5, 6–9, 4–7.", en: "For reserved rows, check 3 windows: 2–5, 6–9, 4–7." },
+      { vi: "Nếu cả hai bên trống → 2 nhóm; nếu chỉ giữa (4–7) trống → 1 nhóm.", en: "If both sides free → 2 groups; if only the middle (4–7) is free → 1 group." },
+    ],
+    complexity: {
+      time: "O(reserved)",
+      space: "O(reserved)",
+      note: { vi: "Chỉ xét các hàng có ghế đặt; hàng trống tính gộp 2 nhóm mỗi hàng.", en: "Only reserved rows are examined; empty rows contribute 2 groups each in bulk." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        from collections import defaultdict",
+      "        rows = defaultdict(set)",
+      "        for r, c in reservedSeats:",
+      "            rows[r].add(c)",
+      "        total = (n - len(rows)) * 2",
+      "        for cols in rows.values():",
+      "            left = not (cols & {2, 3, 4, 5})",
+      "            right = not (cols & {6, 7, 8, 9})",
+      "            mid = not (cols & {4, 5, 6, 7})",
+      "            total += 2 if left and right else 1 if left or right or mid else 0",
+      "        return total",
+    ],
+    builder: buildSteps1386,
   },
   31: {
     id: 31,

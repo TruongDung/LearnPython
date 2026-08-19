@@ -3430,7 +3430,7 @@ function buildSteps2286(input, params) {
 
   snapshot({
     title: { vi: `Khởi tạo ${n} hàng, mỗi hàng ${m} ghế`, en: `Initialize ${n} rows with ${m} seats each` },
-    codeLine: 5,
+    codeLine: 7,
     phase: "init",
     status: [
       { label: "rows", value: n },
@@ -3457,7 +3457,7 @@ function buildSteps2286(input, params) {
     const opLabel = `${command.op}(${command.k}, ${command.maxRow})`;
     snapshot({
       title: { vi: `Operation ${index + 1}: ${opLabel}`, en: `Operation ${index + 1}: ${opLabel}` },
-      codeLine: command.op === "gather" ? 8 : 15,
+      codeLine: command.op === "gather" ? 9 : 20,
       phase: command.op,
       operationIndex: index,
       operation: command,
@@ -3482,7 +3482,7 @@ function buildSteps2286(input, params) {
       const row = findGatherRow(command.k, maxRow);
       snapshot({
         title: { vi: row >= 0 ? `Tìm thấy row ${row}` : "Không có row đủ chỗ", en: row >= 0 ? `Found row ${row}` : "No row has enough seats" },
-        codeLine: 9,
+        codeLine: 10,
         phase: "gather",
         operationIndex: index,
         operation: command,
@@ -3509,7 +3509,7 @@ function buildSteps2286(input, params) {
         outputs.push([]);
         snapshot({
           title: { vi: "gather trả []", en: "gather returns []" },
-          codeLine: 10,
+          codeLine: 12,
           phase: "gather",
           operationIndex: index,
           operation: command,
@@ -3525,7 +3525,7 @@ function buildSteps2286(input, params) {
       const startSeat = used[row];
       snapshot({
         title: { vi: `start = used[${row}] = ${startSeat}`, en: `start = used[${row}] = ${startSeat}` },
-        codeLine: 11,
+        codeLine: 13,
         phase: "gather",
         operationIndex: index,
         operation: command,
@@ -3546,7 +3546,7 @@ function buildSteps2286(input, params) {
       used[row] += command.k;
       snapshot({
         title: { vi: `Book ${command.k} ghế ở row ${row}`, en: `Book ${command.k} seats in row ${row}` },
-        codeLine: 12,
+        codeLine: 14,
         phase: "gather",
         operationIndex: index,
         operation: command,
@@ -3566,7 +3566,7 @@ function buildSteps2286(input, params) {
       outputs.push([row, startSeat]);
       snapshot({
         title: { vi: `Return [${row}, ${startSeat}]`, en: `Return [${row}, ${startSeat}]` },
-        codeLine: 14,
+        codeLine: 18,
         phase: "gather",
         operationIndex: index,
         operation: command,
@@ -3584,7 +3584,7 @@ function buildSteps2286(input, params) {
       const available = totalRemaining(maxRow);
       snapshot({
         title: { vi: `Tổng ghế trống 0..${maxRow} = ${available}`, en: `Free seats in 0..${maxRow} = ${available}` },
-        codeLine: 16,
+        codeLine: 21,
         phase: "scatter",
         operationIndex: index,
         operation: command,
@@ -3609,7 +3609,7 @@ function buildSteps2286(input, params) {
         outputs.push(false);
         snapshot({
           title: { vi: "scatter trả False", en: "scatter returns False" },
-          codeLine: 16,
+          codeLine: 22,
           phase: "scatter",
           operationIndex: index,
           operation: command,
@@ -3627,7 +3627,7 @@ function buildSteps2286(input, params) {
       for (let row = 0; row <= maxRow && remainingNeed > 0; row += 1) {
         snapshot({
           title: { vi: `Xét row ${row}`, en: `Inspect row ${row}` },
-          codeLine: 17,
+          codeLine: 24,
           phase: "scatter",
           operationIndex: index,
           operation: command,
@@ -3647,7 +3647,7 @@ function buildSteps2286(input, params) {
         const take = Math.min(remainingNeed, m - used[row]);
         snapshot({
           title: { vi: `take = ${take}`, en: `take = ${take}` },
-          codeLine: 18,
+          codeLine: 25,
           phase: "scatter",
           operationIndex: index,
           operation: command,
@@ -3671,7 +3671,7 @@ function buildSteps2286(input, params) {
         allocation.push({ row, start: startSeat, count: take });
         snapshot({
           title: { vi: `Book ${take} ghế ở row ${row}`, en: `Book ${take} seats in row ${row}` },
-          codeLine: 19,
+          codeLine: 26,
           phase: "scatter",
           operationIndex: index,
           operation: command,
@@ -3692,7 +3692,7 @@ function buildSteps2286(input, params) {
       outputs.push(true);
       snapshot({
         title: { vi: "scatter trả True", en: "scatter returns True" },
-        codeLine: 22,
+        codeLine: 31,
         phase: "scatter",
         operationIndex: index,
         operation: command,
@@ -6045,6 +6045,7 @@ module.exports = {
       "        self.n = n",
       "        self.m = m",
       "        self.used = [0] * n",
+      "        self.first = 0  # leftmost row that still has free seats",
       "        self.seg = SegmentTree([m] * n)",
       "",
       "    def gather(self, k: int, maxRow: int) -> List[int]:",
@@ -6054,19 +6055,74 @@ module.exports = {
       "        start = self.used[row]",
       "        self.used[row] += k",
       "        self.seg.update(row, self.m - self.used[row])",
+      "        while self.first < self.n and self.used[self.first] == self.m:",
+      "            self.first += 1",
       "        return [row, start]",
       "",
       "    def scatter(self, k: int, maxRow: int) -> bool:",
       "        if self.seg.sum_range(0, maxRow) < k:",
       "            return False",
-      "        for row in range(maxRow + 1):",
-      "            take = min(k, self.m - self.used[row])",
-      "            self.used[row] += take",
+      "        while k > 0:",
+      "            free = self.m - self.used[self.first]",
+      "            take = min(k, free)",
+      "            self.used[self.first] += take",
       "            k -= take",
-      "            self.seg.update(row, self.m - self.used[row])",
-      "            if k == 0:",
-      "                return True",
+      "            self.seg.update(self.first, self.m - self.used[self.first])",
+      "            if self.used[self.first] == self.m:",
+      "                self.first += 1",
       "        return True",
+      "",
+      "",
+      "class SegmentTree:",
+      "    def __init__(self, arr: List[int]):",
+      "        self.n = len(arr)",
+      "        self.size = 1",
+      "        while self.size < self.n:",
+      "            self.size *= 2",
+      "        self.max_tree = [0] * (2 * self.size)",
+      "        self.sum_tree = [0] * (2 * self.size)",
+      "        for i in range(self.n):",
+      "            self.max_tree[self.size + i] = arr[i]",
+      "            self.sum_tree[self.size + i] = arr[i]",
+      "        for i in range(self.size - 1, 0, -1):",
+      "            self.max_tree[i] = max(self.max_tree[2 * i], self.max_tree[2 * i + 1])",
+      "            self.sum_tree[i] = self.sum_tree[2 * i] + self.sum_tree[2 * i + 1]",
+      "",
+      "    def update(self, idx: int, value: int) -> None:",
+      "        i = self.size + idx",
+      "        self.max_tree[i] = value",
+      "        self.sum_tree[i] = value",
+      "        i //= 2",
+      "        while i:",
+      "            self.max_tree[i] = max(self.max_tree[2 * i], self.max_tree[2 * i + 1])",
+      "            self.sum_tree[i] = self.sum_tree[2 * i] + self.sum_tree[2 * i + 1]",
+      "            i //= 2",
+      "",
+      "    def sum_range(self, left: int, right: int) -> int:",
+      "        res = 0",
+      "        left += self.size",
+      "        right += self.size + 1",
+      "        while left < right:",
+      "            if left & 1:",
+      "                res += self.sum_tree[left]; left += 1",
+      "            if right & 1:",
+      "                right -= 1; res += self.sum_tree[right]",
+      "            left //= 2; right //= 2",
+      "        return res",
+      "",
+      "    def first_at_least(self, k: int, lo: int, hi: int) -> int:",
+      "        return self._query(1, 0, self.size - 1, lo, hi, k)",
+      "",
+      "    def _query(self, node, nl, nr, lo, hi, k):",
+      "        if nr < lo or hi < nl or self.max_tree[node] < k:",
+      "            return -1",
+      "        if nl == nr:",
+      "            return nl",
+      "        mid = (nl + nr) // 2",
+      "        left = self._query(2 * node, nl, mid, lo, hi, k)",
+      "        if left != -1:",
+      "            return left",
+      "        return self._query(2 * node + 1, mid + 1, nr, lo, hi, k)",
     ],
     builder: buildSteps2286,
   },
