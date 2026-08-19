@@ -15475,6 +15475,65 @@ function renderCinemaSeatView(step) {
   </section>`;
 }
 
+function renderWordBreakView(step) {
+  const view = step.wordBreakView || {};
+  const vi = lang === "vi";
+  const chars = String(view.s || "").split("");
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const cand = view.candidate;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    check: vi ? "Thử điểm cắt j" : "Try split j",
+    fail: vi ? "Không cắt được" : "No cut",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  // String characters with the candidate substring s[j:i] highlighted.
+  const charHtml = chars.map((ch, idx) => {
+    const classes = ["wb139-char"];
+    if (cand && idx >= cand.j && idx < cand.i) classes.push(cand.matched ? "match" : "trying");
+    return `<span class="${classes.join(" ")}"><small>${idx}</small><strong>${escapeHtml(ch)}</strong></span>`;
+  }).join("") || `<span class="wb139-empty">${vi ? "chuỗi rỗng" : "empty string"}</span>`;
+
+  // dp cells over positions 0..n.
+  const dpHtml = dp.map((val, pos) => {
+    const classes = ["wb139-dp"];
+    if (pos === view.currentI) classes.push("current");
+    if (cand && pos === cand.j) classes.push("source");
+    classes.push(val ? "t" : "f");
+    return `<span class="${classes.join(" ")}"><small>${pos}</small><strong>${val ? "T" : "F"}</strong></span>`;
+  }).join("");
+
+  const dictHtml = (view.wordDict || []).map((w) => {
+    const active = cand && cand.word === w && cand.inDict ? " active" : "";
+    return `<span class="wb139-word${active}">${escapeHtml(w)}</span>`;
+  }).join("") || `<span class="wb139-empty">${vi ? "từ điển rỗng" : "empty dict"}</span>`;
+
+  let action = "";
+  if (cand) {
+    const dpOk = cand.dpJ ? "✓" : "✗";
+    const dictOk = cand.inDict ? "✓" : "✗";
+    action = `dp[${cand.j}] ${dpOk} &nbsp;&&&nbsp; "${escapeHtml(cand.word)}" ∈ dict ${dictOk} → ${cand.matched ? `<b>dp[${cand.i}] = True</b>` : "thử tiếp"}`;
+  } else if (view.phase === "done") {
+    action = view.answer
+      ? `<b>${vi ? "Tách được" : "Segmentable"}</b>: ${(view.segmentation || []).map((w) => `"${escapeHtml(w)}"`).join(" + ")}`
+      : `<b>${vi ? "Không tách được" : "Not segmentable"}</b>`;
+  } else if (view.phase === "fail") {
+    action = `dp[${view.currentI}] = False`;
+  } else {
+    action = vi ? "dp[0] = True (chuỗi rỗng)" : "dp[0] = True (empty string)";
+  }
+
+  $("treeView").innerHTML = `<section class="wb139-viz" role="img" aria-label="${vi ? "Trực quan hóa Word Break" : "Word Break visualization"}">
+    <header><strong>WORD BREAK</strong><span class="wb139-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="wb139-rule"><b>CORE RULE</b><strong>dp[i] = ∃ j: dp[j] and s[j:i] ∈ dict</strong><span>${vi ? "cắt tại j: phần trái dp[j] phải tách được, phần phải s[j:i] phải là một từ" : "cut at j: left part dp[j] must be segmentable, right part s[j:i] must be a word"}</span></section>
+    <section class="wb139-panel"><header><strong>${vi ? "TỪ ĐIỂN" : "DICTIONARY"}</strong></header><div class="wb139-words">${dictHtml}</div></section>
+    <section class="wb139-panel"><header><strong>s</strong><span>${vi ? "tô = đoạn s[j:i] đang thử" : "highlight = current s[j:i]"}</span></header><div class="wb139-chars">${charHtml}</div></section>
+    <section class="wb139-action">${action}</section>
+    <section class="wb139-panel"><header><strong>dp[0..${view.n}]</strong><span>${vi ? "T = tách được tới vị trí đó" : "T = prefix segmentable"}</span></header><div class="wb139-dps">${dpHtml}</div></section>
+  </section>`;
+}
+
 function renderCoinChangeView(step) {
   const view = step.coinChangeView || {};
   const vi = lang === "vi";
@@ -16561,6 +16620,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.wordBreakView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordBreakView(step);
   } else if (step.cinemaSeatView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

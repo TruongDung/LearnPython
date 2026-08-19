@@ -7360,59 +7360,99 @@ function buildSteps139(input, params) {
   const dp = new Array(n + 1).fill(false);
   dp[0] = true;
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      wordBreakView: {
+        s,
+        n,
+        wordDict: [...wordDict],
+        dp: dp.map((v) => Boolean(v)),
+        phase: meta.phase || "",
+        currentI: Number.isInteger(meta.currentI) ? meta.currentI : -1,
+        candidate: meta.candidate || null,
+        segmentation: meta.segmentation || null,
+        answer: meta.final ? dp[n] : null,
+      },
+    }));
+  };
+
+  push({ phase: "init", currentI: 0 }, {
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
     arr: dp.map((v) => (v ? 1 : 0)),
     sub: ["ε", ...s.split("")],
     highlight: [0],
     mark: [],
-    codeLines: [3, 4, 5],
+    codeLines: [6],
     vars: [
       { name: "s", value: s },
       { name: "wordDict", value: `[${wordDict.join(", ")}]` },
       { name: "dp[0]", value: true },
     ],
     note: {
-      vi: `dp[i] = True nếu s[0..i-1] tách được thành từ.\ndp[0] = True (chuỗi rỗng).\ndp[i] = ∃ j: dp[j] = True ∧ s[j:i] ∈ wordDict.`,
-      en: `dp[i] = True if s[0..i-1] can be segmented.\ndp[0] = True (empty string).\ndp[i] = ∃ j: dp[j] = True ∧ s[j:i] ∈ wordDict.`,
+      vi: `dp[i] = True nếu ${n === 0 ? "chuỗi rỗng" : "s[0..i-1]"} tách được thành các từ trong từ điển. dp[0] = True vì chuỗi rỗng luôn tách được. Ta xét dp[i] = có j sao cho dp[j]=True và s[j:i] ∈ dict.`,
+      en: `dp[i] = True if the prefix of length i can be segmented into dictionary words. dp[0] = True because the empty string is always segmentable. Then dp[i] = there exists j with dp[j]=True and s[j:i] ∈ dict.`,
     },
   });
 
   for (let i = 1; i <= n; i++) {
-    let matchWord = "";
-    let matchJ = -1;
+    let matched = false;
     for (let j = 0; j < i; j++) {
       const word = s.slice(j, i);
-      if (dp[j] && wordSet.has(word)) {
-        dp[i] = true;
-        matchWord = word;
-        matchJ = j;
-        break;
-      }
+      const dpJ = dp[j];
+      const inDict = wordSet.has(word);
+      const isMatch = dpJ && inDict;
+      if (isMatch) dp[i] = true;
+
+      push({
+        phase: "check",
+        currentI: i,
+        candidate: { j, i, word, dpJ, inDict, matched: isMatch },
+      }, {
+        title: { vi: `dp[${i}]: thử j=${j} → "${word}"`, en: `dp[${i}]: try j=${j} → "${word}"` },
+        arr: dp.map((v) => (v ? 1 : 0)),
+        sub: ["ε", ...s.split("")],
+        highlight: [i],
+        mark: isMatch ? [j] : [],
+        codeLines: isMatch ? [10] : [9],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: `dp[${j}]`, value: dpJ },
+          { name: `s[${j}:${i}]`, value: `"${word}"` },
+          { name: "∈ dict?", value: inDict },
+        ],
+        note: isMatch
+          ? {
+              vi: `dp[${j}]=True và "${word}" ∈ dict → cắt được tại đây. Đặt dp[${i}]=True và dừng (break).`,
+              en: `dp[${j}]=True and "${word}" ∈ dict → a valid cut exists here. Set dp[${i}]=True and break.`,
+            }
+          : {
+              vi: `${!dpJ ? `dp[${j}]=False nên đoạn trước chưa tách được` : `"${word}" không có trong dict`} → thử j tiếp theo.`,
+              en: `${!dpJ ? `dp[${j}]=False so the prefix is not segmentable` : `"${word}" is not in the dictionary`} → try the next j.`,
+            },
+      });
+
+      if (isMatch) { matched = true; break; }
     }
 
-    steps.push({
-      title: { vi: `dp[${i}]: s[0..${i - 1}]="${s.slice(0, i)}"`, en: `dp[${i}]: s[0..${i - 1}]="${s.slice(0, i)}"` },
-      arr: dp.map((v) => (v ? 1 : 0)),
-      sub: ["ε", ...s.split("")],
-      highlight: [i],
-      mark: dp[i] && matchJ >= 0 ? [matchJ] : [],
-      codeLines: [6, 7, 8, 9],
-      vars: [
-        { name: "i", value: i },
-        { name: "dp[i]", value: dp[i] },
-        { name: "match", value: dp[i] ? `dp[${matchJ}]=T ∧ "${matchWord}" ∈ dict` : "none" },
-      ],
-      note: dp[i]
-        ? {
-            vi: `dp[${matchJ}]=True ∧ s[${matchJ}:${i}]="${matchWord}" ∈ dict → dp[${i}]=True.`,
-            en: `dp[${matchJ}]=True ∧ s[${matchJ}:${i}]="${matchWord}" ∈ dict → dp[${i}]=True.`,
-          }
-        : {
-            vi: `Không tìm được j thỏa dp[j]=True ∧ s[j:${i}] ∈ dict → dp[${i}]=False.`,
-            en: `No j found where dp[j]=True ∧ s[j:${i}] ∈ dict → dp[${i}]=False.`,
-          },
-    });
+    if (!matched && i >= 1) {
+      push({ phase: "fail", currentI: i }, {
+        title: { vi: `dp[${i}] = False`, en: `dp[${i}] = False` },
+        arr: dp.map((v) => (v ? 1 : 0)),
+        sub: ["ε", ...s.split("")],
+        highlight: [i],
+        mark: [],
+        codeLines: [8],
+        vars: [
+          { name: "i", value: i },
+          { name: `dp[${i}]`, value: false },
+        ],
+        note: {
+          vi: `Không có j nào thỏa dp[j]=True ∧ s[j:${i}] ∈ dict → dp[${i}]=False.`,
+          en: `No j satisfies dp[j]=True ∧ s[j:${i}] ∈ dict → dp[${i}]=False.`,
+        },
+      });
+    }
   }
 
   // Trace back segmentation
@@ -7431,20 +7471,20 @@ function buildSteps139(input, params) {
     }
   }
 
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
+  push({ phase: "done", currentI: n, final: true, segmentation: dp[n] ? words : null }, {
+    title: { vi: `Kết quả: dp[${n}] = ${dp[n]}`, en: `Result: dp[${n}] = ${dp[n]}` },
     arr: dp.map((v) => (v ? 1 : 0)),
     sub: ["ε", ...s.split("")],
     highlight: [],
     mark: dp[n] ? dp.map((v, idx) => (v ? idx : -1)).filter((v) => v >= 0) : [],
     final: true,
-    codeLines: [10],
+    codeLines: [11],
     vars: [
       { name: "answer", value: dp[n] },
       { name: "segmentation", value: dp[n] ? words.join(" | ") : "impossible" },
     ],
     note: dp[n]
-      ? { vi: `Có thể tách: "${words.join('" + "')}". dp[${n}]=True.`, en: `Can segment: "${words.join('" + "')}". dp[${n}]=True.` }
+      ? { vi: `Có thể tách "${s}" = "${words.join('" + "')}". dp[${n}]=True.`, en: `Can segment "${s}" = "${words.join('" + "')}". dp[${n}]=True.` }
       : { vi: `Không thể tách "${s}" bằng từ điển. dp[${n}]=False.`, en: `Cannot segment "${s}" using the dictionary. dp[${n}]=False.` },
   });
 
