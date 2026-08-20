@@ -633,7 +633,7 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
-    if (group.key === "union-find") {
+    if (group.key === "mst") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
       learnButton.className = "trie-learn-suggestion mst-learn-suggestion";
