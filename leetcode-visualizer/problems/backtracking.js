@@ -153,6 +153,7 @@ function addBacktrackingDecisionTree(result, problemId) {
     if (problemId === 980) return compact(getVar(vars, "at", "backtrack"));
     if (problemId === 79) return compact(getVar(vars, "at", "cell", "next cell"));
     if (problemId === 17) return compact(getVar(vars, "letter", "removed"));
+    if (problemId === 131) return compact(getVar(vars, "piece"));
     if (problemId === 784) return compact(getVar(vars, "branch", "char"));
     return compact(getVar(vars, "nums[i]", "candidate", "sorted[i]", "i (pick)", "popped"));
   };
@@ -215,9 +216,11 @@ function addBacktrackingDecisionTree(result, problemId) {
     const vars = varMap(step);
     const isFinal = Boolean(step.final) || /^Result\b/i.test(title);
     const isBacktrack = /^(Backtrack:|Backtrack from)|current\.pop\(\)/i.test(title);
-    const isComplete = /^✓|^Save\b|^Permutation\b|^Solution #|Found valid path/i.test(title);
+    const isComplete = /^✓|^Save\b|^Permutation\b|^Solution #|Found valid path/i.test(title)
+      || (problemId === 131 && /^End of string → save/i.test(title));
     const isPruned = /not safe|blocked|^Skip\b|too early|Overshoot|invalid/i.test(title);
-    const isChoice = /place queen|✓ place|^Pick\b|^Add\b|current\.append|try '.+'|is digit → keep|Enter cell/i.test(title);
+    const isChoice = /place queen|✓ place|^Pick\b|^Add\b|current\.append|try '.+'|is digit → keep|Enter cell/i.test(title)
+      || (problemId === 131 && /is a palindrome → choose$/i.test(title));
 
     let highlight = active;
     let activeAfter = active;
@@ -3216,20 +3219,33 @@ function buildSteps131(input) {
   const steps = [];
   const result = [];
   const isPal = (sub) => sub === sub.split("").reverse().join("");
-  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      arr: Array(n).fill(1),
+      sub: Array.from(s),
+      highlight: o.highlight || [],
+      mark: o.mark || [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
   snap({ title: { vi: `Chia "${s}" thành các palindrome`, en: `Partition "${s}" into palindromes` }, codeLines: [3], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "Backtracking: thử mọi đoạn s[start:end]; nếu là palindrome thì chọn và đệ quy tiếp.", en: "Backtracking: try each piece s[start:end]; if palindrome, choose it and recurse." } });
   let guard = 0;
   function bt(start, pathArr) {
     if (guard > 200) return;
     guard++;
-    if (start === n) { result.push([...pathArr]); snap({ title: { vi: `Hết chuỗi → lưu [${pathArr.map((x) => `"${x}"`).join(",")}]`, en: `End of string → save [${pathArr.map((x) => `"${x}"`).join(",")}]` }, codeLines: [4, 5], vars: [{ name: "partition", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }, { name: "result", value: JSON.stringify(result) }], note: { vi: `Chia hết chuỗi thành palindrome → một cách phân hoạch hợp lệ.`, en: `Split the whole string into palindromes → a valid partition.` } }); return; }
+    if (start === n) { result.push([...pathArr]); snap({ title: { vi: `Hết chuỗi → lưu [${pathArr.map((x) => `"${x}"`).join(",")}]`, en: `End of string → save [${pathArr.map((x) => `"${x}"`).join(",")}]` }, mark: Array.from({ length: n }, (_, index) => index), codeLines: [4, 5], vars: [{ name: "partition", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }, { name: "result", value: JSON.stringify(result) }], note: { vi: `Chia hết chuỗi thành palindrome → một cách phân hoạch hợp lệ.`, en: `Split the whole string into palindromes → a valid partition.` } }); return; }
     for (let end = start + 1; end <= n; end++) {
       const piece = s.slice(start, end);
       if (isPal(piece)) {
         pathArr.push(piece);
-        if (guard <= 60) snap({ title: { vi: `"${piece}" là palindrome → chọn`, en: `"${piece}" is a palindrome → choose` }, codeLines: [6, 7, 8], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `s[${start}:${end}]="${piece}" đối xứng → thêm vào phân hoạch, đệ quy từ ${end}.`, en: `s[${start}:${end}]="${piece}" is a palindrome → add to partition, recurse from ${end}.` } });
+        if (guard <= 60) snap({ title: { vi: `"${piece}" là palindrome → chọn`, en: `"${piece}" is a palindrome → choose` }, highlight: Array.from({ length: end - start }, (_, index) => start + index), mark: Array.from({ length: end }, (_, index) => index), codeLines: [6, 7, 8], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `s[${start}:${end}]="${piece}" đối xứng → thêm vào phân hoạch, đệ quy từ ${end}.`, en: `s[${start}:${end}]="${piece}" is a palindrome → add to partition, recurse from ${end}.` } });
         bt(end, pathArr);
         pathArr.pop();
+        if (guard <= 60) snap({ title: { vi: `Quay lui: bỏ "${piece}"`, en: `Backtrack: remove "${piece}"` }, mark: Array.from({ length: start }, (_, index) => index), codeLines: [9], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `Bỏ "${piece}" để thử đoạn palindrome khác từ vị trí ${start}.`, en: `Remove "${piece}" and try another palindrome starting at ${start}.` } });
       }
     }
   }
@@ -3286,8 +3302,8 @@ module.exports = {
     defaultInput: "aab", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
     approach: [{ vi: "Backtracking: tại start, thử mọi đoạn s[start:end].", en: "Backtracking: at start, try each piece s[start:end]." }, { vi: "Nếu đoạn là palindrome → chọn và đệ quy từ end.", en: "If the piece is a palindrome → choose it and recurse from end." }, { vi: "start == len(s) → lưu phân hoạch.", en: "start == len(s) → save the partition." }],
     complexity: { time: "O(n·2^n)", space: "O(n)", note: { vi: "2^n cách chia, kiểm tra palindrome O(n).", en: "2^n partitions, O(n) palindrome checks." } },
-    code: ["class Solution:", "    def partition(self, s):", "        res = []", "        def bt(start, path):", "            if start == len(s): res.append(list(path)); return", "            for end in range(start+1, len(s)+1):", "                piece = s[start:end]", "                if piece == piece[::-1]:", "                    path.append(piece); bt(end, path); path.pop()", "        bt(0, []); return res"],
-    builder: buildSteps131,
+    code: ["class Solution:", "    def partition(self, s: str) -> List[List[str]]:", "        res = []", "        def bt(start, path):", "            if start == len(s):", "                res.append(list(path))", "                return", "            for end in range(start+1, len(s)+1):", "                piece = s[start:end]", "                if piece == piece[::-1]:", "                    path.append(piece)", "                    bt(end, path)", "                    path.pop()", "        bt(0, [])", "        return res"],
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps131(input, params), 131),
   },
   491: {
     id: 491,
