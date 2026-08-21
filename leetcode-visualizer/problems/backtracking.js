@@ -3219,8 +3219,27 @@ function buildSteps131(input) {
   const steps = [];
   const result = [];
   const isPal = (sub) => sub === sub.split("").reverse().join("");
-  function snap(o) {
-    steps.push({
+  const TRACE_LIMIT = 240;
+  let traceTruncated = false;
+  const indices = (from, to) => Array.from({ length: Math.max(0, to - from) }, (_, index) => from + index);
+  const formatPath = (path) => `[${path.map((piece) => `"${piece}"`).join(",")}]`;
+  const callStack = [];
+  const cloneResults = () => result.map((partition) => [...partition]);
+  const makePartitionView = (view = {}) => ({
+    s,
+    action: view.action || "intro",
+    start: Number.isInteger(view.start) ? view.start : null,
+    end: Number.isInteger(view.end) ? view.end : null,
+    piece: view.piece ?? null,
+    palindrome: typeof view.palindrome === "boolean" ? view.palindrome : null,
+    path: Array.isArray(view.path) ? [...view.path] : [],
+    stack: (Array.isArray(view.stack) ? view.stack : callStack).map((frame) => ({ start: frame.start, path: [...frame.path] })),
+    results: cloneResults(),
+    justSaved: view.justSaved ? [...view.justSaved] : null,
+    removed: view.removed ?? null,
+  });
+  function makeStep(o) {
+    return {
       title: o.title,
       arr: Array(n).fill(1),
       sub: Array.from(s),
@@ -3230,27 +3249,49 @@ function buildSteps131(input) {
       codeLines: o.codeLines || [],
       vars: o.vars || [],
       note: o.note,
-    });
+      palindromePartitionView: o.partitionView ? makePartitionView(o.partitionView) : undefined,
+    };
   }
-  snap({ title: { vi: `Chia "${s}" thành các palindrome`, en: `Partition "${s}" into palindromes` }, codeLines: [3], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "Backtracking: thử mọi đoạn s[start:end]; nếu là palindrome thì chọn và đệ quy tiếp.", en: "Backtracking: try each piece s[start:end]; if palindrome, choose it and recurse." } });
-  let guard = 0;
+  function snap(o) {
+    if (steps.length >= TRACE_LIMIT) {
+      traceTruncated = true;
+      return;
+    }
+    steps.push(makeStep(o));
+  }
+  snap({ title: { vi: `Mục tiêu: chia "${s}" thành các palindrome`, en: `Goal: split "${s}" into palindromes` }, codeLines: [2], vars: [{ name: "s", value: `"${s}"` }, { name: "res", value: "[]" }], note: { vi: "Ta đặt vết cắt để mọi mảnh đều đọc xuôi và ngược giống nhau. Mỗi đường đi hoàn chỉnh là một đáp án.", en: "We place cuts so every piece reads the same forward and backward. Each complete path is one answer." }, partitionView: { action: "intro", path: [] } });
+  snap({ title: { vi: "Gọi bt(0, [])", en: "Call bt(0, [])" }, codeLines: [14], vars: [{ name: "start", value: 0 }, { name: "path", value: "[]" }], note: { vi: "start=0 nghĩa là bắt đầu ở ký tự đầu tiên; path hiện chưa có mảnh nào.", en: "start=0 means start at the first character; path has no pieces yet." }, partitionView: { action: "call", start: 0, path: [], stack: [{ start: 0, path: [] }] } });
+
   function bt(start, pathArr) {
-    if (guard > 200) return;
-    guard++;
-    if (start === n) { result.push([...pathArr]); snap({ title: { vi: `Hết chuỗi → lưu [${pathArr.map((x) => `"${x}"`).join(",")}]`, en: `End of string → save [${pathArr.map((x) => `"${x}"`).join(",")}]` }, mark: Array.from({ length: n }, (_, index) => index), codeLines: [4, 5], vars: [{ name: "partition", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }, { name: "result", value: JSON.stringify(result) }], note: { vi: `Chia hết chuỗi thành palindrome → một cách phân hoạch hợp lệ.`, en: `Split the whole string into palindromes → a valid partition.` } }); return; }
+    callStack.push({ start, path: [...pathArr] });
+    if (start === n) {
+      snap({ title: { vi: `bt(${start}, ${formatPath(pathArr)}): đã dùng hết chuỗi`, en: `bt(${start}, ${formatPath(pathArr)}): whole string used` }, mark: indices(0, n), codeLines: [5], vars: [{ name: "start", value: start }, { name: "path", value: formatPath(pathArr) }], note: { vi: "Không còn ký tự nào phía sau start. Vì mọi mảnh trong path đều là palindrome, đây là một đáp án hoàn chỉnh.", en: "There are no characters after start. Because every piece in path is a palindrome, this is one complete answer." }, partitionView: { action: "save", start, path: pathArr } });
+      result.push([...pathArr]);
+      snap({ title: { vi: `Lưu đáp án ${formatPath(pathArr)}`, en: `Save answer ${formatPath(pathArr)}` }, mark: indices(0, n), codeLines: [6], vars: [{ name: "partition", value: formatPath(pathArr) }, { name: "res", value: JSON.stringify(result) }], note: { vi: "Dùng list(path) để lưu bản sao. Sau đó path còn được thay đổi khi quay lui, nhưng đáp án đã lưu không đổi.", en: "Use list(path) to save a copy. path will change while backtracking, but the saved answer will not." }, partitionView: { action: "saved", start, path: pathArr, justSaved: pathArr } });
+      snap({ title: { vi: `return từ bt(${start})`, en: `return from bt(${start})` }, mark: indices(0, n), codeLines: [7], vars: [{ name: "start", value: start }, { name: "path", value: formatPath(pathArr) }], note: { vi: "Quay về frame trước. Frame đó sẽ bỏ mảnh cuối và thử một vị trí cắt khác.", en: "Return to the previous frame. It will remove the last piece and try another cut position." }, partitionView: { action: "return", start, path: pathArr } });
+      callStack.pop();
+      return;
+    }
     for (let end = start + 1; end <= n; end++) {
       const piece = s.slice(start, end);
-      if (isPal(piece)) {
+      snap({ title: { vi: `Thử cắt: s[${start}:${end}] = "${piece}"`, en: `Try cut: s[${start}:${end}] = "${piece}"` }, highlight: indices(start, end), mark: indices(0, start), codeLines: [8, 9], vars: [{ name: "start,end", value: `${start},${end}` }, { name: "candidate", value: `"${piece}"` }, { name: "path", value: formatPath(pathArr) }], note: { vi: `Giữ path hiện tại, rồi thử lấy "${piece}" làm mảnh kế tiếp. Đây chỉ là candidate, chưa được chọn.`, en: `Keep the current path, then try "${piece}" as the next piece. It is only a candidate, not chosen yet.` }, partitionView: { action: "try", start, end, piece, path: pathArr } });
+      const palindrome = isPal(piece);
+      snap({ title: { vi: `Kiểm tra: "${piece}" ${palindrome ? "là" : "không phải"} palindrome`, en: `Check: "${piece}" is ${palindrome ? "" : "not "}a palindrome` }, highlight: indices(start, end), mark: indices(0, start), codeLines: [10], vars: [{ name: "piece", value: `"${piece}"` }, { name: "reverse", value: `"${piece.split("").reverse().join("")}"` }, { name: "palindrome", value: palindrome }], note: { vi: palindrome ? `"${piece}" == "${piece.split("").reverse().join("")}" → qua cổng, được phép đi sâu.` : `"${piece}" != "${piece.split("").reverse().join("")}" → bỏ nhánh này, không được đệ quy.`, en: palindrome ? `"${piece}" == "${piece.split("").reverse().join("")}" → pass the gate and recurse.` : `"${piece}" != "${piece.split("").reverse().join("")}" → skip this branch; do not recurse.` }, partitionView: { action: palindrome ? "check-pass" : "check-fail", start, end, piece, palindrome, path: pathArr } });
+      if (palindrome) {
         pathArr.push(piece);
-        if (guard <= 60) snap({ title: { vi: `"${piece}" là palindrome → chọn`, en: `"${piece}" is a palindrome → choose` }, highlight: Array.from({ length: end - start }, (_, index) => start + index), mark: Array.from({ length: end }, (_, index) => index), codeLines: [6, 7, 8], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `s[${start}:${end}]="${piece}" đối xứng → thêm vào phân hoạch, đệ quy từ ${end}.`, en: `s[${start}:${end}]="${piece}" is a palindrome → add to partition, recurse from ${end}.` } });
+        snap({ title: { vi: `Chọn "${piece}" → path = ${formatPath(pathArr)}`, en: `Choose "${piece}" → path = ${formatPath(pathArr)}` }, highlight: indices(start, end), mark: indices(0, end), codeLines: [11], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: formatPath(pathArr) }], note: { vi: `path.append("${piece}") chỉ là quyết định tạm thời. Ta sẽ quay lại đây để thử các cách cắt khác.`, en: `path.append("${piece}") is a temporary choice. We will come back here to try other cuts.` }, partitionView: { action: "choose", start, end, piece, palindrome: true, path: pathArr } });
+        snap({ title: { vi: `Đi sâu: bt(${end}, ${formatPath(pathArr)})`, en: `Recurse: bt(${end}, ${formatPath(pathArr)})` }, highlight: indices(start, end), mark: indices(0, end), codeLines: [12], vars: [{ name: "next start", value: end }, { name: "path", value: formatPath(pathArr) }], note: { vi: `start mới là ${end}: phần chưa xử lý bắt đầu ngay sau "${piece}".`, en: `The new start is ${end}: the unprocessed suffix begins right after "${piece}".` }, partitionView: { action: "recurse", start, end, piece, palindrome: true, path: pathArr, stack: [...callStack, { start: end, path: [...pathArr] }] } });
         bt(end, pathArr);
         pathArr.pop();
-        if (guard <= 60) snap({ title: { vi: `Quay lui: bỏ "${piece}"`, en: `Backtrack: remove "${piece}"` }, mark: Array.from({ length: start }, (_, index) => index), codeLines: [9], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `Bỏ "${piece}" để thử đoạn palindrome khác từ vị trí ${start}.`, en: `Remove "${piece}" and try another palindrome starting at ${start}.` } });
+        snap({ title: { vi: `Quay lui: bỏ "${piece}"`, en: `Backtrack: remove "${piece}"` }, highlight: indices(start, end), mark: indices(0, start), codeLines: [13], vars: [{ name: "removed", value: `"${piece}"` }, { name: "path", value: formatPath(pathArr) }], note: { vi: `path.pop() đưa path về ${formatPath(pathArr)}. Đây là điểm mấu chốt: xóa lựa chọn cũ trước khi thử end khác.`, en: `path.pop() restores path to ${formatPath(pathArr)}. This is the key: remove the old choice before trying another end.` }, partitionView: { action: "backtrack", start, end, piece, path: pathArr, removed: piece } });
       }
     }
+    callStack.pop();
   }
   bt(0, []);
-  snap({ title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, final: true, codeLines: [9], vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Mọi cách chia "${s}" thành các palindrome.`, en: `All ways to split "${s}" into palindromes.` } });
+  const finalStep = { title: { vi: `Hoàn tất: ${result.length} partition`, en: `Complete: ${result.length} partitions` }, mark: indices(0, n), final: true, codeLines: [15], vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `${traceTruncated ? "Trace được rút gọn sau 240 bước. " : ""}Mỗi đáp án là một cách đặt vết cắt khác nhau mà mọi mảnh đều là palindrome.`, en: `${traceTruncated ? "The trace was shortened after 240 steps. " : ""}Each answer places cuts differently while keeping every piece palindromic.` }, partitionView: { action: "done", start: n, path: [], stack: [] } };
+  if (traceTruncated && steps.length) steps[steps.length - 1] = makeStep(finalStep);
+  else snap(finalStep);
   return { original: s, answer: result, steps };
 }
 
@@ -3303,7 +3344,7 @@ module.exports = {
     approach: [{ vi: "Backtracking: tại start, thử mọi đoạn s[start:end].", en: "Backtracking: at start, try each piece s[start:end]." }, { vi: "Nếu đoạn là palindrome → chọn và đệ quy từ end.", en: "If the piece is a palindrome → choose it and recurse from end." }, { vi: "start == len(s) → lưu phân hoạch.", en: "start == len(s) → save the partition." }],
     complexity: { time: "O(n·2^n)", space: "O(n)", note: { vi: "2^n cách chia, kiểm tra palindrome O(n).", en: "2^n partitions, O(n) palindrome checks." } },
     code: ["class Solution:", "    def partition(self, s: str) -> List[List[str]]:", "        res = []", "        def bt(start, path):", "            if start == len(s):", "                res.append(list(path))", "                return", "            for end in range(start+1, len(s)+1):", "                piece = s[start:end]", "                if piece == piece[::-1]:", "                    path.append(piece)", "                    bt(end, path)", "                    path.pop()", "        bt(0, [])", "        return res"],
-    builder: (input, params) => addBacktrackingDecisionTree(buildSteps131(input, params), 131),
+    builder: buildSteps131,
   },
   491: {
     id: 491,

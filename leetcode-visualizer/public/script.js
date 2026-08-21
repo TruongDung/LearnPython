@@ -908,6 +908,104 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "2d-array") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">▦</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Mảng 2D · duyệt → biến đổi → grid DFS/BFS → DP" : "2D Array · traversal → transforms → grid DFS/BFS → DP"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🧭", name: vi ? "Duyệt & biến đổi ma trận" : "Matrix traversal & transforms", problems: [
+            [54, "Spiral Matrix — 4 boundaries"],
+            [48, "Rotate Image — transpose + reverse"],
+            [73, "Set Matrix Zeroes — marker rows / columns"],
+          ] },
+          { icon: "🔎", name: vi ? "Tìm kiếm trong ma trận" : "Matrix search", problems: [
+            [74, "Search a 2D Matrix — binary search"],
+            [240, "Search a 2D Matrix II — top-right staircase"],
+          ] },
+          { icon: "🌊", name: vi ? "Graph trên grid" : "Grid graph traversal", problems: [
+            [733, "Flood Fill — DFS / BFS"],
+            [200, "Number of Islands — connected components"],
+            [695, "Max Area of Island — DFS area"],
+            [994, "Rotting Oranges — multi-source BFS"],
+            [542, "01 Matrix — multi-source BFS distance"],
+            [79, "Word Search — grid backtracking"],
+          ] },
+          { icon: "📐", name: vi ? "Prefix sum & DP 2D" : "2D prefix sums & DP", problems: [
+            [304, "Range Sum Query 2D — 2D prefix sum"],
+            [62, "Unique Paths — grid DP"],
+            [64, "Minimum Path Sum — grid DP"],
+            [221, "Maximal Square — square DP"],
+          ] },
+        ];
+        const sequence = [54, 48, 73, 74, 240, 733, 200, 695, 994, 542, 79, 304, 62, 64, 221];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-array2d-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-array2d-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "2D ARRAY LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Lộ trình Mảng 2D" : "2D Array roadmap";
+        $("trieLearnIntro").textContent = vi
+          ? "Bắt đầu bằng cách duyệt và biến đổi ma trận, sau đó tìm kiếm, DFS/BFS trên grid, và kết thúc với prefix sum cùng DP 2D."
+          : "Start with matrix traversal and transforms, then search, grid DFS/BFS, and finish with 2D prefix sums and DP.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Mảng 2D" : "Close 2D Array learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Nhóm bài theo kỹ thuật" : "Problems grouped by technique"}</h3><p>${vi ? "Mỗi nhóm bổ sung một cách nhìn mới: tọa độ, đường đi, component, khoảng cách và trạng thái DP." : "Each group adds a new view: coordinates, paths, components, distances, and DP state."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Từ duyệt ma trận cơ bản đến grid graph, rồi đi tới prefix sum và dynamic programming 2D." : "From basic matrix traversal through grid graphs, then into 2D prefix sums and dynamic programming."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-array2d-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.array2dProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "backtracking") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
@@ -4812,6 +4910,101 @@ function renderKeypadHeapView(step) {
 
 function renderDecisionTree(step) {
   renderTree({ tree: step.decisionTree }, "decisionTreeView");
+}
+
+// ---- Palindrome Partitioning (#131): show the backtracking state directly. ----
+function renderPalindromePartitionView(step) {
+  const view = step.palindromePartitionView || {};
+  const vi = lang === "vi";
+  const s = String(view.s || "");
+  const chars = Array.from(s);
+  const path = Array.isArray(view.path) ? view.path : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const start = Number.isInteger(view.start) ? view.start : null;
+  const end = Number.isInteger(view.end) ? view.end : null;
+  const piece = view.piece === null || view.piece === undefined ? "" : String(view.piece);
+  const hasCandidate = start !== null && end !== null && end > start;
+  const action = String(view.action || "intro");
+  const phaseIndex = action === "done" ? 4
+    : ["save", "saved", "return"].includes(action) ? 3
+      : ["choose", "recurse", "backtrack"].includes(action) ? 2
+        : ["try", "check-pass", "check-fail"].includes(action) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["Chọn mảnh", "Kiểm tra palindrome", "Đi sâu / quay lui", "Lưu đáp án"]
+    : ["Choose a piece", "Check palindrome", "Recurse / backtrack", "Save answer"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  let pathCursor = 0;
+  const chosenRanges = path.map((value) => {
+    const from = pathCursor;
+    pathCursor += String(value).length;
+    return { from, to: pathCursor, value: String(value) };
+  });
+  const cellHtml = chars.length ? chars.map((char, index) => {
+    const chosen = chosenRanges.find((range) => index >= range.from && index < range.to);
+    const candidate = hasCandidate && index >= start && index < end;
+    const classes = ["pp131-char"];
+    if (chosen) classes.push("is-chosen");
+    if (candidate && !chosen) classes.push("is-candidate");
+    if (start === index && hasCandidate) classes.push("is-start");
+    if (end === index + 1 && hasCandidate) classes.push("is-end");
+    if (start !== null && index >= start && !candidate && !chosen) classes.push("is-remaining");
+    const pointer = start === index && hasCandidate ? `<em>start=${start}</em>` : "";
+    return `<div class="${classes.join(" ")}">${pointer}<small>[${index}]</small><strong>${escapeHtml(char)}</strong></div>`;
+  }).join("") : `<div class="pp131-empty">${vi ? "Chuỗi rỗng" : "Empty string"}</div>`;
+  const cutsHtml = chosenRanges.length
+    ? chosenRanges.map((range, index) => `<span class="${view.removed === range.value ? "is-removed" : ""}"><small>${range.from}:${range.to}</small><strong>"${escapeHtml(range.value)}"</strong>${index < chosenRanges.length - 1 ? "<b>|</b>" : ""}</span>`).join("")
+    : `<em>${vi ? "path = [] — chưa chọn mảnh nào" : "path = [] — no piece selected"}</em>`;
+
+  const reversed = Array.from(piece).reverse().join("");
+  const gateState = view.palindrome === true ? "pass" : view.palindrome === false ? "fail" : "waiting";
+  const gateWord = gateState === "pass" ? "PASS" : gateState === "fail" ? "SKIP" : "?";
+  const gateDetail = hasCandidate
+    ? `"${piece}" ${view.palindrome === null ? "?" : view.palindrome ? "==" : "!="} "${reversed}"`
+    : (vi ? "Chọn một đoạn để kiểm tra" : "Choose a piece to check");
+  const gateExplain = gateState === "pass"
+    ? (vi ? "Palindrome → được gọi bt(end, path)." : "Palindrome → call bt(end, path).")
+    : gateState === "fail"
+      ? (vi ? "Không phải palindrome → không đệ quy." : "Not a palindrome → do not recurse.")
+      : (vi ? "Chỉ đoạn PASS mới được đưa vào path." : "Only a PASS piece can enter path.");
+
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => {
+      const framePath = Array.isArray(frame.path) && frame.path.length ? `[${frame.path.map((value) => `"${value}"`).join(", ")}]` : "[]";
+      return `<span class="${index === stack.length - 1 ? "is-active" : ""}"><small>${vi ? "frame" : "frame"} ${index + 1}</small><strong>bt(${escapeHtml(String(frame.start))})</strong><em>${escapeHtml(framePath)}</em></span>`;
+    }).join("<b class=\"pp131-stack-arrow\">→</b>")
+    : `<em>${vi ? "Chưa ở trong lời gọi bt nào" : "Not inside a bt call"}</em>`;
+  const resultsHtml = results.length
+    ? results.map((partition, index) => {
+      const text = `[${partition.map((value) => `"${value}"`).join(", ")}]`;
+      const newest = Array.isArray(view.justSaved) && JSON.stringify(view.justSaved) === JSON.stringify(partition);
+      return `<span class="${newest ? "is-new" : ""}"><small>#${index + 1}</small>${escapeHtml(text)}</span>`;
+    }).join("")
+    : `<em>${vi ? "Chưa có đáp án — cần đi đến cuối chuỗi." : "No answer yet — reach the end of the string."}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Palindrome Partitioning cho chuỗi ${s}. Path hiện tại có ${path.length} mảnh, đã lưu ${results.length} đáp án.`
+    : `Palindrome Partitioning for ${s}. The current path has ${path.length} pieces and ${results.length} answers are saved.`;
+
+  $("treeView").innerHTML = `<section class="pp131-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="pp131-phases">${phasesHtml}</div>
+    <section class="pp131-string-section">
+      <header><strong>${vi ? "CHUỖI GỐC" : "ORIGINAL STRING"}</strong><span>${hasCandidate ? `candidate = s[${start}:${end}]` : (vi ? "mỗi ô là một ký tự" : "one cell per character")}</span></header>
+      <div class="pp131-chars">${cellHtml}</div>
+      <div class="pp131-legend"><span><i class="chosen"></i>${vi ? "đã ở trong path" : "already in path"}</span><span><i class="candidate"></i>${vi ? "đang thử" : "candidate"}</span><span><i class="remaining"></i>${vi ? "chưa xử lý" : "not processed"}</span></div>
+    </section>
+    <div class="pp131-main-row">
+      <section class="pp131-path-section"><header><strong>path</strong><span>${vi ? "các mảnh đã chọn tạm thời" : "temporarily chosen pieces"}</span></header><div class="pp131-cuts">${cutsHtml}</div></section>
+      <section class="pp131-gate ${gateState}"><header><strong>${vi ? "CỔNG PALINDROME" : "PALINDROME GATE"}</strong><b>${gateWord}</b></header><code>${escapeHtml(gateDetail)}</code><span>${escapeHtml(gateExplain)}</span></section>
+    </div>
+    <section class="pp131-stack-section"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối là lời gọi đang chạy" : "the last frame is running now"}</span></header><div class="pp131-stack">${stackHtml}</div></section>
+    <section class="pp131-results-section"><header><strong>res</strong><span>${results.length} ${vi ? "partition đã lưu" : "saved partitions"}</span></header><div class="pp131-results">${resultsHtml}</div></section>
+    <div class="pp131-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
 }
 
 function renderNonDecreasingSubsequencesView(step) {
@@ -18643,6 +18836,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitPodiumView(step);
+  } else if (step.palindromePartitionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPalindromePartitionView(step);
   } else if (step.nonDecreasingView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

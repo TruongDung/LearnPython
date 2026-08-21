@@ -3478,6 +3478,73 @@ function buildSteps2022(input, params = {}) {
   return { original: nums, answer: result, steps };
 }
 
+/** LeetCode 73: Set Matrix Zeroes. */
+function buildSteps73(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  const result = cloneMatrix2D(matrix);
+  const zeroRows = new Set();
+  const zeroCols = new Set();
+  const steps = [];
+  const markerCells = () => [
+    ...[...zeroRows].flatMap((row) => matrix[row].map((_, col) => [row, col])),
+    ...[...zeroCols].flatMap((col) => matrix.map((_, row) => [row, col])),
+  ];
+
+  steps.push(matrixStep2D(matrix, { title: { vi: "Quét các số 0", en: "Scan for zeroes" }, codeLines: [3, 4], vars: [{ name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }], note: { vi: "Ghi lại hàng và cột chứa số 0 trước khi thay đổi ma trận.", en: "Record every row and column containing a zero before changing the matrix." }, grid: { caption: "Original matrix" } }));
+  for (let row = 0; row < matrix.length; row++) for (let col = 0; col < matrix[0].length; col++) {
+    const value = matrix[row][col];
+    steps.push(matrixStep2D(matrix, { title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` }, codeLines: [5, 6, 7], vars: [{ name: "row,col", value: `${row},${col}` }, { name: "value", value }], note: { vi: value === 0 ? "Đây là marker 0; cần lưu hàng và cột." : "Không phải 0, tiếp tục quét.", en: value === 0 ? "This is a zero marker; record its row and column." : "Not a zero; keep scanning." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Scanning" } }));
+    if (value === 0) {
+      zeroRows.add(row); zeroCols.add(col);
+      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu hàng ${row}, cột ${col}`, en: `Record row ${row}, column ${col}` }, codeLines: [8], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Mọi ô thuộc hàng hoặc cột này sẽ thành 0 ở lượt hai.", en: "Every cell in this row or column will become zero on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked row and column" } }));
+    }
+  }
+  for (let row = 0; row < result.length; row++) for (let col = 0; col < result[0].length; col++) {
+    if (!zeroRows.has(row) && !zeroCols.has(col)) continue;
+    const before = result[row][col];
+    result[row][col] = 0;
+    steps.push(matrixStep2D(result, { title: { vi: `Đặt result[${row}][${col}] = 0`, en: `Set result[${row}][${col}] = 0` }, codeLines: [10, 11, 12, 13], vars: [{ name: "row,col", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: `(${row},${col}) thuộc ${zeroRows.has(row) ? "hàng" : "cột"} đã được đánh dấu nên đổi thành 0.`, en: `(${row},${col}) belongs to a marked ${zeroRows.has(row) ? "row" : "column"}, so set it to 0.` }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Applying zero markers" } }));
+  }
+  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" }, codeLines: [14], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Mọi hàng/cột từng chứa 0 đã được đặt thành 0.", en: "Every row or column that contained a zero is now zeroed." }, grid: { pathCells: markerCells(), caption: "Final matrix" } }));
+  return { original: matrix, answer: result, steps };
+}
+
+/** LeetCode 74: Search a 2D Matrix. */
+function buildSteps74(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const target = Number(params.target);
+  if (!Number.isInteger(target)) throw new Error("target must be an integer");
+  const rows = matrix.length, cols = matrix[0].length;
+  const steps = [];
+  const visited = [];
+  let lo = 0, hi = rows * cols - 1;
+  const coord = (index) => [Math.floor(index / cols), index % cols];
+
+  steps.push(matrixStep2D(matrix, { title: { vi: "Binary search trên index phẳng", en: "Binary-search flat indexes" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }], note: { vi: "Thứ tự toàn ma trận cũng tăng dần, nên coi matrix là mảng 1D dài rows×cols.", en: "The entire matrix order is sorted, so treat it as one 1D array of rows×cols values." }, grid: { caption: "Flattened binary search" } }));
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const [row, col] = coord(mid);
+    const value = matrix[row][col];
+    visited.push([row, col]);
+    steps.push(matrixStep2D(matrix, { title: { vi: `mid = ${mid} → (${row},${col})`, en: `mid = ${mid} → (${row},${col})` }, codeLines: [5, 6, 7], vars: [{ name: "lo,hi", value: `${lo},${hi}` }, { name: "mid", value: mid }, { name: "value", value }], note: { vi: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; đọc giá trị ${value}.`, en: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; read value ${value}.` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Current binary-search midpoint" } }));
+    if (value === target) {
+      steps.push(matrixStep2D(matrix, { title: { vi: `${value} == target → True`, en: `${value} == target → True` }, codeLines: [8, 9], final: true, vars: [{ name: "target", value: target }, { name: "found", value: true }], note: { vi: `Tìm thấy target tại matrix[${row}][${col}].`, en: `Found target at matrix[${row}][${col}].` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Target found" } }));
+      return { original: matrix, answer: true, steps };
+    }
+    if (value < target) {
+      const nextLo = mid + 1;
+      steps.push(matrixStep2D(matrix, { title: { vi: `${value} < ${target} → lo = ${nextLo}`, en: `${value} < ${target} → lo = ${nextLo}` }, codeLines: [10, 11], vars: [{ name: "old lo", value: lo }, { name: "new lo", value: nextLo }, { name: "hi", value: hi }], note: { vi: "Target phải nằm bên phải mid nên bỏ nửa trái.", en: "The target must be right of mid, so discard the left half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the right half" } }));
+      lo = nextLo;
+    } else {
+      const nextHi = mid - 1;
+      steps.push(matrixStep2D(matrix, { title: { vi: `${value} > ${target} → hi = ${nextHi}`, en: `${value} > ${target} → hi = ${nextHi}` }, codeLines: [12, 13], vars: [{ name: "lo", value: lo }, { name: "old hi", value: hi }, { name: "new hi", value: nextHi }], note: { vi: "Target phải nằm bên trái mid nên bỏ nửa phải.", en: "The target must be left of mid, so discard the right half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the left half" } }));
+      hi = nextHi;
+    }
+  }
+  steps.push(matrixStep2D(matrix, { title: { vi: "Không tìm thấy target", en: "Target not found" }, codeLines: [14], final: true, vars: [{ name: "target", value: target }, { name: "found", value: false }], note: { vi: "lo đã vượt hi, nên target không tồn tại trong matrix.", en: "lo crossed hi, so the target is not in the matrix." }, grid: { historyCells: visited, caption: "Search finished" } }));
+  return { original: matrix, answer: false, steps };
+}
+
 /** LeetCode 48: Rotate Image — transpose then reverse rows. */
 function buildSteps48(input) {
   const m = parseMatrix(input);
@@ -9279,5 +9346,28 @@ Object.assign(module.exports, {
     approach: [{ vi: "Kiểm tra len(original) == m×n.", en: "Check len(original) == m×n." }, { vi: "Với index i: row=i//n và col=i%n.", en: "For index i: row=i//n and col=i%n." }],
     complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Mỗi giá trị original được đặt một lần.", en: "Each original value is placed once." } },
     code: ["class Solution:", "    def construct2DArray(self, original, m, n):", "        if len(original) != m * n:", "            return []", "        result = [[0] * n for _ in range(m)]", "        for index, value in enumerate(original):", "            result[index // n][index % n] = value", "        return result"], builder: buildSteps2022,
+  },
+});
+
+Object.assign(module.exports, {
+  73: {
+    id: 73, difficulty: "medium", slug: "set-matrix-zeroes",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Set Matrix Zeroes", en: "Set Matrix Zeroes" }, titleVi: { vi: "Đặt hàng/cột chứa 0 thành 0", en: "Zero every row and column containing a zero" },
+    statement: { vi: "Nếu matrix[r][c] là 0, đặt toàn bộ hàng r và cột c thành 0. Visualizer dùng hai Set để nhớ marker trước khi đổi ma trận.", en: "If matrix[r][c] is 0, set its entire row r and column c to zero. The visualizer uses two Sets to preserve markers before changing the matrix." },
+    defaultInput: "1,1,1;1,0,1;1,1,1", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Lượt 1: quét matrix, ghi mọi chỉ số hàng và cột chứa 0 vào Set.", en: "Pass 1: scan the matrix and record every row and column that contains a zero." }, { vi: "Lượt 2: ô nào nằm trong hàng hoặc cột đã ghi thì đổi thành 0.", en: "Pass 2: turn a cell to 0 if its row or column was recorded." }],
+    complexity: { time: "O(m·n)", space: "O(m+n)", note: { vi: "Mỗi ô được quét tối đa hai lần; các Set chứa tối đa m hàng và n cột.", en: "Each cell is scanned at most twice; the Sets hold at most m rows and n columns." } },
+    code: ["class Solution:", "    def setZeroes(self, matrix):", "        rows, cols = len(matrix), len(matrix[0])", "        zero_rows, zero_cols = set(), set()", "        for r in range(rows):", "            for c in range(cols):", "                if matrix[r][c] == 0:", "                    zero_rows.add(r); zero_cols.add(c)", "        # second pass uses the saved markers", "        for r in range(rows):", "            for c in range(cols):", "                if r in zero_rows or c in zero_cols:", "                    matrix[r][c] = 0", "        return matrix"], builder: buildSteps73,
+  },
+  74: {
+    id: 74, difficulty: "medium", slug: "search-a-2d-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Search a 2D Matrix", en: "Search a 2D Matrix" }, titleVi: { vi: "Tìm kiếm nhị phân trong ma trận", en: "Binary-search a sorted matrix" },
+    statement: { vi: "Mỗi hàng tăng dần và phần tử đầu của hàng sau lớn hơn phần tử cuối của hàng trước. Tìm target bằng binary search trên index phẳng.", en: "Every row is sorted and the first value of a row is greater than the last value of the previous row. Find target with binary search over flat indexes." },
+    defaultInput: "1,3,5,7;10,11,16,20;23,30,34,60", inputKind: "string", inputLabel: { vi: "matrix đã sắp xếp (hàng cách ;)", en: "sorted matrix (rows separated by ;)" }, extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 3 }],
+    approach: [{ vi: "Coi matrix là mảng đã sắp xếp dài rows×cols: lo=0, hi=rows×cols−1.", en: "Treat the matrix as one sorted array of rows×cols values: lo=0, hi=rows×cols−1." }, { vi: "Đổi index mid trở lại tọa độ bằng row=mid//cols, col=mid%cols.", en: "Convert flat mid back to a coordinate with row=mid//cols, col=mid%cols." }],
+    complexity: { time: "O(log(m·n))", space: "O(1)", note: { vi: "Mỗi bước bỏ đi một nửa toàn bộ vùng tìm kiếm.", en: "Each step discards half of the entire search range." } },
+    code: ["class Solution:", "    def searchMatrix(self, matrix, target):", "        rows, cols = len(matrix), len(matrix[0])", "        lo, hi = 0, rows * cols - 1", "        while lo <= hi:", "            mid = (lo + hi) // 2", "            value = matrix[mid // cols][mid % cols]", "            if value == target:", "                return True", "            elif value < target:", "                lo = mid + 1", "            else:", "                hi = mid - 1", "        return False"], builder: buildSteps74,
   },
 });
