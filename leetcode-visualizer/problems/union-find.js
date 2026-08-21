@@ -5303,7 +5303,7 @@ module.exports = {
     slug: "find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree",
     category: UF_CAT,
     tags: [
-      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree (MST)" },
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
     ],
@@ -5501,7 +5501,7 @@ module.exports = {
     slug: "connecting-cities-with-minimum-cost",
     category: UF_CAT,
     tags: [
-      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree (MST)" },
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
     ],
@@ -5564,7 +5564,7 @@ module.exports = {
     slug: "optimize-water-distribution-in-a-village",
     category: UF_CAT,
     tags: [
-      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree (MST)" },
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "greedy", vi: "Tham lam", en: "Greedy" },
     ],

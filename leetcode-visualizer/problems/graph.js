@@ -19035,7 +19035,7 @@ module.exports = {
     difficulty: "medium",
     slug: "min-cost-to-connect-all-points",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
-    tags: [{ key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" }],
+    tags: [{ key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree (MST)" }],
     title: { vi: "Min Cost to Connect All Points", en: "Min Cost to Connect All Points" },
     titleVi: { vi: "Chi phí nhỏ nhất nối tất cả điểm (MST - Prim)", en: "Min cost to connect all points (MST - Prim)" },
     statement: {

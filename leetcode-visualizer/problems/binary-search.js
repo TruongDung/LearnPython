@@ -5346,3 +5346,291 @@ module.exports = Object.assign(module.exports, {
     builder: buildSteps154,
   },
 });
+
+// ─── Inclusion–Exclusion + Binary Search learning set ───
+const IE_MAX_INPUT = 1000000;
+const IE_MAX_VALUE = 1000000000000;
+
+function iePositive(value, name, max = IE_MAX_INPUT) {
+  const number = Array.isArray(value) ? Number(value[0]) : Number(value);
+  if (!Number.isSafeInteger(number) || number < 1 || number > max) {
+    throw new Error(`${name} must be an integer from 1 to ${max} for this visualization`);
+  }
+  return number;
+}
+
+function ieGcd(a, b) {
+  while (b !== 0) [a, b] = [b, a % b];
+  return a;
+}
+
+function ieLcm(a, b, cap = IE_MAX_VALUE) {
+  const value = (a / ieGcd(a, b)) * b;
+  return value > cap ? cap : value;
+}
+
+function ieBitCount(mask) {
+  let count = 0;
+  while (mask) { count += mask & 1; mask >>= 1; }
+  return count;
+}
+
+function ieTwoTerms(x, a, b) {
+  const lcm = ieLcm(a, b);
+  const terms = [
+    { sign: "+", label: `⌊x/${a}⌋`, value: Math.floor(x / a), divisor: a },
+    { sign: "+", label: `⌊x/${b}⌋`, value: Math.floor(x / b), divisor: b },
+    { sign: "−", label: `⌊x/lcm(${a},${b})⌋`, value: Math.floor(x / lcm), divisor: lcm },
+  ];
+  return { count: terms[0].value + terms[1].value - terms[2].value, terms, formula: `count(x) = ⌊x/${a}⌋ + ⌊x/${b}⌋ − ⌊x/${lcm}⌋` };
+}
+
+function ieThreeTerms(x, a, b, c) {
+  const ab = ieLcm(a, b);
+  const ac = ieLcm(a, c);
+  const bc = ieLcm(b, c);
+  const abc = ieLcm(ab, c);
+  const terms = [
+    { sign: "+", label: `⌊x/${a}⌋`, value: Math.floor(x / a), divisor: a },
+    { sign: "+", label: `⌊x/${b}⌋`, value: Math.floor(x / b), divisor: b },
+    { sign: "+", label: `⌊x/${c}⌋`, value: Math.floor(x / c), divisor: c },
+    { sign: "−", label: `⌊x/${ab}⌋`, value: Math.floor(x / ab), divisor: ab },
+    { sign: "−", label: `⌊x/${ac}⌋`, value: Math.floor(x / ac), divisor: ac },
+    { sign: "−", label: `⌊x/${bc}⌋`, value: Math.floor(x / bc), divisor: bc },
+    { sign: "+", label: `⌊x/${abc}⌋`, value: Math.floor(x / abc), divisor: abc },
+  ];
+  const count = terms.reduce((sum, term) => sum + (term.sign === "+" ? term.value : -term.value), 0);
+  return { count, terms, formula: `A + B + C − AB − AC − BC + ABC` };
+}
+
+function ieCoinTerms(x, coins) {
+  const terms = [];
+  let count = 0;
+  for (let mask = 1; mask < (1 << coins.length); mask++) {
+    const selected = coins.filter((_, index) => mask & (1 << index));
+    const lcm = selected.reduce((current, coin) => ieLcm(current, coin), 1);
+    const sign = ieBitCount(mask) % 2 === 1 ? "+" : "−";
+    const value = Math.floor(x / lcm);
+    terms.push({ sign, label: selected.join("·"), value, divisor: lcm, members: selected });
+    count += sign === "+" ? value : -value;
+  }
+  return { count, terms, formula: "Σ single − Σ pairs + Σ triples − …" };
+}
+
+function buildIeBinarySearch({ input, target, targetLabel, divisors, kind, formula, intro, codeLines, high, countAt, answerTransform = (value) => value }) {
+  const steps = [];
+  const history = [];
+  let lo = 1;
+  let hi = high;
+  let answer = null;
+
+  function snapshot({ title, note, phase, event, mid = null, current = null, final = false, vars = [] }) {
+    steps.push({
+      title, note, codeLines: codeLines[event] || [], vars, final, arr: [], sub: [], highlight: [], mark: [],
+      multiplesIeView: {
+        mode: "binary", kind, target, targetLabel, divisors: [...divisors], formula,
+        intro, phase, event, lo, hi, mid, current: current ? { ...current, terms: (current.terms || []).map((term) => ({ ...term })) } : null,
+        history: history.map((entry) => ({ ...entry })), answer,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Ý tưởng: đếm bao hàm–loại trừ rồi binary search", en: "Idea: count with inclusion–exclusion, then binary search" },
+    note: intro,
+    phase: "intro", event: "intro",
+  });
+  snapshot({
+    title: { vi: `Khoảng đáp án [1, ${hi}]`, en: `Answer range [1, ${hi}]` },
+    note: { vi: `Nếu count(x) đạt mục tiêu ${targetLabel}, mọi số lớn hơn cũng đạt. Tính đơn điệu này cho phép binary search biên trái.`, en: `If count(x) reaches target ${targetLabel}, every larger number also reaches it. This monotonicity lets us binary-search the left boundary.` },
+    phase: "init", event: "init", vars: [{ name: "target", value: targetLabel }, { name: "hi", value: hi }],
+  });
+  while (lo < hi) {
+    const beforeLo = lo;
+    const beforeHi = hi;
+    const mid = Math.floor((lo + hi) / 2);
+    const current = countAt(mid);
+    const passed = Boolean(current.ok);
+    history.push({ lo: beforeLo, hi: beforeHi, mid, count: current.count, label: current.label || String(current.count), passed });
+    snapshot({
+      title: { vi: `Đếm tại x = ${mid}: ${current.label || current.count}`, en: `Count at x = ${mid}: ${current.label || current.count}` },
+      note: current.note,
+      phase: "count", event: "count", mid, current,
+      vars: [{ name: "lo, hi", value: `[${beforeLo}, ${beforeHi}]` }, { name: "mid", value: mid }, { name: "count(mid)", value: current.label || current.count }],
+    });
+    if (passed) hi = mid;
+    else lo = mid + 1;
+    snapshot({
+      title: passed
+        ? { vi: `Đủ điều kiện → hi = ${hi}`, en: `Condition holds → hi = ${hi}` }
+        : { vi: `Chưa đủ → lo = ${lo}`, en: `Not enough → lo = ${lo}` },
+      note: passed
+        ? { vi: `${mid} có thể là đáp án nhưng ta thử nhỏ hơn để tìm giá trị NHỎ NHẤT thỏa điều kiện.`, en: `${mid} can be the answer, but search smaller values for the MINIMUM that works.` }
+        : { vi: `${mid} quá nhỏ, nên mọi x ≤ ${mid} đều bị loại.`, en: `${mid} is too small, so every x ≤ ${mid} is eliminated.` },
+      phase: "move", event: "move", mid, current,
+      vars: [{ name: "new range", value: `[${lo}, ${hi}]` }],
+    });
+  }
+  answer = answerTransform(lo);
+  const finalCurrent = countAt(lo);
+  snapshot({
+    title: { vi: `lo = hi = ${lo} → đáp án ${answer}`, en: `lo = hi = ${lo} → answer ${answer}` },
+    note: { vi: `Đây là số nhỏ nhất đạt điều kiện: x=${lo} đạt, còn x=${lo - 1} không đạt (nếu x>1).`, en: `This is the smallest value that works: x=${lo} works, while x=${lo - 1} does not (when x>1).` },
+    phase: "done", event: "answer", mid: lo, current: finalCurrent, final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+  return { input, answer, steps };
+}
+
+function buildSteps2652(input) {
+  const n = iePositive(input, "n", 50);
+  const divisors = [3, 5, 7];
+  const steps = [];
+  let sum = 0;
+  const included = new Array(n + 1).fill(false);
+  function snapshot({ title, note, event, index = null, final = false }) {
+    steps.push({
+      title, note, codeLines: event === "intro" ? [1, 2] : event === "init" ? [3] : event === "check" ? [4, 5] : event === "add" ? [6, 7] : [8],
+      vars: [{ name: "sum", value: sum }, ...(index === null ? [] : [{ name: "i", value: index }])], final, arr: [], sub: [], highlight: [], mark: [],
+      multiplesIeView: { mode: "sum", kind: "sum-multiples", divisors, target: n, targetLabel: `n = ${n}`, phase: event, event, scanIndex: index, included: [...included], sum, answer: final ? sum : null,
+        formula: "i % 3 == 0 OR i % 5 == 0 OR i % 7 == 0", history: [], current: null, lo: null, hi: null, mid: null },
+    });
+  }
+  snapshot({ title: { vi: "Ý tưởng: OR nghĩa là lấy hợp các tập bội số", en: "Idea: OR means take the union of multiple sets" }, note: { vi: "Một số chỉ được cộng MỘT lần, dù nó chia hết cho nhiều hơn một trong 3, 5, 7.", en: "A number is added only ONCE, even if it is divisible by more than one of 3, 5, and 7." }, event: "intro" });
+  snapshot({ title: { vi: "sum = 0", en: "sum = 0" }, note: { vi: `Duyệt các số từ 1 đến ${n}.`, en: `Scan integers from 1 through ${n}.` }, event: "init" });
+  for (let value = 1; value <= n; value++) {
+    const matches = divisors.filter((divisor) => value % divisor === 0);
+    snapshot({ title: { vi: `Kiểm tra ${value}`, en: `Check ${value}` }, note: matches.length ? { vi: `${value} chia hết cho ${matches.join(" hoặc ")} → sẽ được cộng.`, en: `${value} is divisible by ${matches.join(" or ")} → add it.` } : { vi: `${value} không chia hết cho 3, 5, 7 → bỏ qua.`, en: `${value} is not divisible by 3, 5, or 7 → skip.` }, event: "check", index: value });
+    if (!matches.length) continue;
+    included[value] = true;
+    sum += value;
+    snapshot({ title: { vi: `sum += ${value} → ${sum}`, en: `sum += ${value} → ${sum}` }, note: { vi: "OR chỉ quyết định có cộng hay không; số này không bị cộng lặp lại.", en: "OR only decides whether to add; this number is never added twice." }, event: "add", index: value });
+  }
+  snapshot({ title: { vi: `Trả về ${sum}`, en: `Return ${sum}` }, note: { vi: `Tổng các bội số của 3 hoặc 5 hoặc 7 không vượt quá ${n}.`, en: `Sum of multiples of 3 or 5 or 7 not exceeding ${n}.` }, event: "answer", final: true });
+  return { input, answer: sum, steps };
+}
+
+function buildSteps878(input, params = {}) {
+  const n = iePositive(input, "n");
+  const a = iePositive(params.a, "a");
+  const b = iePositive(params.b, "b");
+  const high = n * Math.min(a, b);
+  if (high > IE_MAX_VALUE) throw new Error("answer range is too large for this visualization");
+  const lcm = ieLcm(a, b);
+  return buildIeBinarySearch({
+    input, target: n, targetLabel: `n = ${n}`, divisors: [a, b], kind: "nth-magical", high,
+    formula: `count(x) = ⌊x/${a}⌋ + ⌊x/${b}⌋ − ⌊x/${lcm}⌋`,
+    intro: { vi: "Các số magical là hợp của bội số a và b. Cộng hai tập sẽ đếm trùng bội chung, nên trừ đi bội của LCM(a,b).", en: "Magical numbers are the union of multiples of a and b. Adding both sets double-counts common multiples, so subtract multiples of LCM(a,b)." },
+    codeLines: { intro: [1, 2], init: [3, 7], count: [4, 5, 8, 9], move: [8, 9, 10, 11], answer: [12] },
+    countAt: (x) => { const data = ieTwoTerms(x, a, b); return { ...data, ok: data.count >= n, label: `${data.count} ${data.count >= n ? "≥" : "<"} ${n}`, note: { vi: `count(${x}) = ${data.count}. ${data.count >= n ? "Đã có ít nhất n magical numbers." : "Chưa đủ n magical numbers."}`, en: `count(${x}) = ${data.count}. ${data.count >= n ? "There are at least n magical numbers." : "There are not yet n magical numbers."}` } }; },
+    answerTransform: (value) => value % 1000000007,
+  });
+}
+
+function buildSteps1201(input, params = {}) {
+  const n = iePositive(input, "n");
+  const a = iePositive(params.a, "a");
+  const b = iePositive(params.b, "b");
+  const c = iePositive(params.c, "c");
+  const high = n * Math.min(a, b, c);
+  if (high > IE_MAX_VALUE) throw new Error("answer range is too large for this visualization");
+  return buildIeBinarySearch({
+    input, target: n, targetLabel: `n = ${n}`, divisors: [a, b, c], kind: "ugly-three", high,
+    formula: "A + B + C − AB − AC − BC + ABC",
+    intro: { vi: "Ugly number là bội của a HOẶC b HOẶC c. Với ba tập, inclusion–exclusion dùng dấu + cho singleton/triple và dấu − cho các cặp để mỗi số chỉ được đếm một lần.", en: "An ugly number is divisible by a OR b OR c. With three sets, inclusion–exclusion adds singletons/triples and subtracts pairs so each number is counted once." },
+    codeLines: { intro: [1, 2], init: [3, 8], count: [4, 5, 9, 10], move: [9, 10, 11, 12], answer: [13] },
+    countAt: (x) => { const data = ieThreeTerms(x, a, b, c); return { ...data, ok: data.count >= n, label: `${data.count} ${data.count >= n ? "≥" : "<"} ${n}`, note: { vi: `Bảy hạng inclusion–exclusion cho count(${x}) = ${data.count}.`, en: `The seven inclusion–exclusion terms give count(${x}) = ${data.count}.` } }; },
+  });
+}
+
+function buildSteps2513(input) {
+  if (!Array.isArray(input) || input.length !== 4) throw new Error("enter divisor1, divisor2, uniqueCnt1, uniqueCnt2");
+  const [divisor1, divisor2, uniqueCnt1, uniqueCnt2] = input.map((value, index) => iePositive(value, ["divisor1", "divisor2", "uniqueCnt1", "uniqueCnt2"][index]));
+  const lcm = ieLcm(divisor1, divisor2);
+  const high = 2 * (uniqueCnt1 + uniqueCnt2) * Math.max(divisor1, divisor2);
+  if (high > IE_MAX_VALUE) throw new Error("answer range is too large for this visualization");
+  return buildIeBinarySearch({
+    input, target: uniqueCnt1 + uniqueCnt2, targetLabel: `cnt1=${uniqueCnt1}, cnt2=${uniqueCnt2}`, divisors: [divisor1, divisor2], kind: "two-arrays", high,
+    formula: `not d1 ≥ ${uniqueCnt1} · not d2 ≥ ${uniqueCnt2} · not lcm ≥ ${uniqueCnt1 + uniqueCnt2}`,
+    intro: { vi: "Một số không chia hết divisor1 chỉ dùng được cho arr1; tương tự divisor2 cho arr2. Số không chia hết LCM(divisor1,divisor2) dùng được cho ÍT NHẤT một mảng, nên cần đủ tổng số phần tử khác nhau.", en: "A number not divisible by divisor1 can serve arr1; likewise divisor2 for arr2. A number not divisible by LCM(divisor1,divisor2) can serve AT LEAST one array, so enough total distinct values are required." },
+    codeLines: { intro: [1, 2], init: [3, 9], count: [4, 5, 10, 11], move: [10, 11, 12, 13], answer: [14] },
+    countAt: (x) => {
+      const forOne = x - Math.floor(x / divisor1);
+      const forTwo = x - Math.floor(x / divisor2);
+      const sharedPool = x - Math.floor(x / lcm);
+      const ok = forOne >= uniqueCnt1 && forTwo >= uniqueCnt2 && sharedPool >= uniqueCnt1 + uniqueCnt2;
+      const terms = [
+        { sign: "+", label: `not divisible by ${divisor1}`, value: forOne, divisor: divisor1 },
+        { sign: "+", label: `not divisible by ${divisor2}`, value: forTwo, divisor: divisor2 },
+        { sign: "+", label: `not divisible by lcm=${lcm}`, value: sharedPool, divisor: lcm },
+      ];
+      return { count: sharedPool, terms, formula: `A=${forOne}/${uniqueCnt1}, B=${forTwo}/${uniqueCnt2}, total=${sharedPool}/${uniqueCnt1 + uniqueCnt2}`, ok, label: ok ? "all three checks ✓" : "a required check fails", note: { vi: ok ? "Cả ba điều kiện đều đủ: có thể chọn hai mảng không giao nhau trong [1..x]." : "Ít nhất một pool còn thiếu; x chưa đủ lớn.", en: ok ? "All three conditions hold: two disjoint arrays can be chosen from [1..x]." : "At least one pool is short; x is not large enough yet." } };
+    },
+  });
+}
+
+function buildSteps3116(input, params = {}) {
+  if (!Array.isArray(input) || !input.length) throw new Error("enter one or more coin denominations");
+  if (input.length > 6) throw new Error("visualization supports at most 6 coin denominations");
+  const coins = input.map((coin) => iePositive(coin, "coin"));
+  if (new Set(coins).size !== coins.length) throw new Error("coin denominations must be distinct");
+  const k = iePositive(params.k, "k");
+  const high = k * Math.min(...coins);
+  if (high > IE_MAX_VALUE) throw new Error("answer range is too large for this visualization");
+  return buildIeBinarySearch({
+    input, target: k, targetLabel: `k = ${k}`, divisors: [...coins], kind: "coin-subsets", high,
+    formula: "Σ singletons − Σ pairs + Σ triples − …",
+    intro: { vi: "Một amount hợp lệ nếu là bội của ÍT NHẤT một coin. Với m coin, duyệt mọi subset khác rỗng: subset lẻ cộng, subset chẵn trừ bội của LCM(subset).", en: "An amount is valid if it is a multiple of AT LEAST one coin. With m coins, enumerate non-empty subsets: odd subsets add, even subsets subtract multiples of LCM(subset)." },
+    codeLines: { intro: [1, 4], init: [5, 16, 25], count: [15, 16, 17, 18, 19, 20, 21, 22, 23], move: [27, 28, 29, 30, 31], answer: [32] },
+    countAt: (x) => { const data = ieCoinTerms(x, coins); return { ...data, ok: data.count >= k, label: `${data.count} ${data.count >= k ? "≥" : "<"} ${k}`, note: { vi: `${data.terms.length} subset tạo count(${x}) = ${data.count}.`, en: `${data.terms.length} subsets produce count(${x}) = ${data.count}.` } }; },
+  });
+}
+
+module.exports = Object.assign(module.exports, {
+  2652: {
+    id: 2652, difficulty: "easy", slug: "sum-multiples", category: { key: "math", vi: "Toán", en: "Math" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }],
+    title: { vi: "Sum Multiples", en: "Sum Multiples" }, titleVi: { vi: "Tổng các bội số", en: "Sum of multiples" },
+    statement: { vi: "Trả về tổng các số nguyên dương ≤ n chia hết cho 3 HOẶC 5 HOẶC 7.", en: "Return the sum of all positive integers ≤ n divisible by 3 OR 5 OR 7." },
+    defaultInput: [10], inputKind: "positive", singleInput: true, maxInput: 50, inputLabel: { vi: "n (1..50)", en: "n (1..50)" }, extraParams: [],
+    approach: [{ vi: "Duyệt 1..n; điều kiện OR đúng nếu ít nhất một phép chia hết đúng.", en: "Scan 1..n; the OR condition holds when at least one divisibility test succeeds." }, { vi: "Mỗi số chỉ cộng một lần, kể cả khi là bội chung.", en: "Add each number once, even if it is a common multiple." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "n tối đa 50 theo đề bài.", en: "The problem bounds n by 50." } },
+    code: ["class Solution:", "    def sumOfMultiples(self, n):", "        total = 0", "        for i in range(1, n + 1):", "            if i % 3 == 0 or i % 5 == 0 or i % 7 == 0:", "                total += i", "        return total"], builder: buildSteps2652,
+  },
+  878: {
+    id: 878, difficulty: "hard", slug: "nth-magical-number", category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }], title: { vi: "Nth Magical Number", en: "Nth Magical Number" }, titleVi: { vi: "Số magical thứ n", en: "Find the nth magical number" },
+    statement: { vi: "Số magical chia hết cho a hoặc b. Tìm số magical thứ n (mod 10^9+7).", en: "A magical number is divisible by a or b. Find the nth magical number (mod 10^9+7)." },
+    defaultInput: [4], inputKind: "positive", singleInput: true, inputLabel: { vi: "n", en: "n" }, extraParams: [{ key: "a", label: { vi: "a", en: "a" }, default: 2, min: 1, max: IE_MAX_INPUT }, { key: "b", label: { vi: "b", en: "b" }, default: 3, min: 1, max: IE_MAX_INPUT }],
+    approach: [{ vi: "count(x)=⌊x/a⌋+⌊x/b⌋−⌊x/lcm(a,b)⌋.", en: "count(x)=⌊x/a⌋+⌊x/b⌋−⌊x/lcm(a,b)⌋." }, { vi: "count(x) không giảm, nên tìm x nhỏ nhất có count(x) ≥ n bằng binary search.", en: "count(x) is non-decreasing, so binary-search the smallest x with count(x) ≥ n." }],
+    complexity: { time: "O(log(n·min(a,b)))", space: "O(1)", note: { vi: "Mỗi lần check chỉ gồm vài phép chia nguyên.", en: "Each check uses only a few integer divisions." } },
+    code: ["class Solution:", "    def nthMagicalNumber(self, n, a, b):", "        lcm = a * b // gcd(a, b)", "        def count(x):", "            return x // a + x // b - x // lcm", "        lo, hi = 1, n * min(a, b)", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if count(mid) >= n:", "                hi = mid", "            else:", "                lo = mid + 1", "        return lo % 1_000_000_007"], builder: buildSteps878,
+  },
+  1201: {
+    id: 1201, difficulty: "medium", slug: "ugly-number-iii", category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }], title: { vi: "Ugly Number III", en: "Ugly Number III" }, titleVi: { vi: "Ugly number thứ n với ba ước", en: "Nth ugly number with three divisors" },
+    statement: { vi: "Ugly number chia hết cho a hoặc b hoặc c. Tìm ugly number thứ n.", en: "An ugly number is divisible by a or b or c. Find the nth ugly number." },
+    defaultInput: [3], inputKind: "positive", singleInput: true, inputLabel: { vi: "n", en: "n" }, extraParams: [{ key: "a", label: { vi: "a", en: "a" }, default: 2, min: 1, max: IE_MAX_INPUT }, { key: "b", label: { vi: "b", en: "b" }, default: 3, min: 1, max: IE_MAX_INPUT }, { key: "c", label: { vi: "c", en: "c" }, default: 5, min: 1, max: IE_MAX_INPUT }],
+    approach: [{ vi: "Dùng 7 hạng inclusion–exclusion cho ba tập bội số.", en: "Use the 7 inclusion–exclusion terms for three sets of multiples." }, { vi: "Binary search x nhỏ nhất có count(x) ≥ n.", en: "Binary-search the smallest x with count(x) ≥ n." }],
+    complexity: { time: "O(log(n·min(a,b,c)))", space: "O(1)", note: { vi: "Mỗi check có đúng 7 phép chia.", en: "Every check has exactly 7 divisions." } },
+    code: ["class Solution:", "    def nthUglyNumber(self, n, a, b, c):", "        ab, ac, bc = lcm(a,b), lcm(a,c), lcm(b,c)", "        abc = lcm(ab, c)", "        def count(x):", "            return x//a + x//b + x//c - x//ab - x//ac - x//bc + x//abc", "        lo, hi = 1, n * min(a,b,c)", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if count(mid) >= n:", "                hi = mid", "            else:", "                lo = mid + 1", "        return lo"], builder: buildSteps1201,
+  },
+  2513: {
+    id: 2513, difficulty: "medium", slug: "minimize-the-maximum-of-two-arrays", category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }], title: { vi: "Minimize the Maximum of Two Arrays", en: "Minimize the Maximum of Two Arrays" }, titleVi: { vi: "Tối thiểu hóa giá trị lớn nhất của hai mảng", en: "Minimize the maximum for two arrays" },
+    statement: { vi: "Chọn uniqueCnt1 số không chia hết divisor1 và uniqueCnt2 số không chia hết divisor2, hai mảng không giao nhau. Tìm maximum nhỏ nhất. Nhập divisor1,divisor2,uniqueCnt1,uniqueCnt2.", en: "Choose uniqueCnt1 numbers not divisible by divisor1 and uniqueCnt2 numbers not divisible by divisor2, with disjoint arrays. Find the smallest possible maximum. Enter divisor1,divisor2,uniqueCnt1,uniqueCnt2." },
+    defaultInput: [2, 7, 1, 3], inputKind: "positive", inputLabel: { vi: "divisor1, divisor2, uniqueCnt1, uniqueCnt2", en: "divisor1, divisor2, uniqueCnt1, uniqueCnt2" }, extraParams: [],
+    approach: [{ vi: "Với x, đếm pool không chia hết divisor1, không chia hết divisor2, và pool không chia hết LCM cho tổng hai mảng.", en: "For x, count the pool not divisible by divisor1, not divisible by divisor2, and not divisible by the LCM for both arrays together." }, { vi: "Cả ba điều kiện đều đơn điệu theo x, nên binary search đáp án.", en: "All three conditions are monotone in x, so binary-search the answer." }],
+    complexity: { time: "O(log answer)", space: "O(1)", note: { vi: "Mỗi check dùng ba phép chia nguyên.", en: "Each check uses three integer divisions." } },
+    code: ["class Solution:", "    def minimizeSet(self, divisor1, divisor2, uniqueCnt1, uniqueCnt2):", "        both = lcm(divisor1, divisor2)", "        def valid(x):", "            for1 = x - x // divisor1", "            for2 = x - x // divisor2", "            shared = x - x // both", "            return for1 >= uniqueCnt1 and for2 >= uniqueCnt2 and shared >= uniqueCnt1 + uniqueCnt2", "        lo, hi = 1, 2 * (uniqueCnt1 + uniqueCnt2) * max(divisor1, divisor2)", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if valid(mid):", "                hi = mid", "            else:", "                lo = mid + 1", "        return lo"], builder: buildSteps2513,
+  },
+  3116: {
+    id: 3116, difficulty: "hard", slug: "kth-smallest-amount-with-single-denomination-combination", category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }], title: { vi: "Kth Smallest Amount With Single Denomination Combination", en: "Kth Smallest Amount With Single Denomination Combination" }, titleVi: { vi: "Amount nhỏ thứ k từ một denomination", en: "Kth smallest amount from one denomination" },
+    statement: { vi: "Một amount hợp lệ nếu là bội của ít nhất một coin, nhưng chỉ dùng một denomination. Tìm amount nhỏ thứ k. Nhập coins; k ở ô riêng.", en: "An amount is valid if it is a multiple of at least one coin, while using only one denomination. Find the kth smallest amount. Enter coins; k is a separate field." },
+    defaultInput: [3, 6, 9], inputKind: "positive", inputLabel: { vi: "coins (dương, tối đa 6 coin)", en: "coins (positive, up to 6 coins)" }, extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 5, min: 1, max: IE_MAX_INPUT }],
+    approach: [{ vi: "Mỗi coin tạo tập bội số. Duyệt mọi subset không rỗng, lấy LCM và cộng/trừ theo parity của subset.", en: "Each coin creates a set of multiples. Enumerate every non-empty subset, use its LCM, and add/subtract by subset parity." }, { vi: "count(x) đơn điệu, nên binary search amount nhỏ nhất có ít nhất k amount hợp lệ.", en: "count(x) is monotone, so binary-search the smallest amount with at least k valid amounts." }],
+    complexity: { time: "O(2^m · log(k·min(coins)))", space: "O(2^m)", note: { vi: "m là số coin; visualization giới hạn m ≤ 6 để thấy được các subset.", en: "m is the number of coins; the visualization limits m ≤ 6 so every subset remains visible." } },
+    code: ["from math import gcd", "", "class Solution:", "    def findKthSmallest(self, coins, k):", "        def lcm(a, b):", "            return a // gcd(a, b) * b", "", "        def lcm_of_selected_coins(mask):", "            lcm_value = 1", "            for i, coin in enumerate(coins):", "                if mask & (1 << i):", "                    lcm_value = lcm(lcm_value, coin)", "            return lcm_value", "", "        def count(x):", "            total = 0", "            for mask in range(1, 1 << len(coins)):", "                lcm_value = lcm_of_selected_coins(mask)", "                if mask.bit_count() % 2:", "                    total += x // lcm_value", "                else:", "                    total -= x // lcm_value", "            return total", "", "        lo, hi = 1, k * min(coins)", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if count(mid) >= k:", "                hi = mid", "            else:", "                lo = mid + 1", "        return lo"], builder: buildSteps3116,
+  },
+});

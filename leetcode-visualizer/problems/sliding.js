@@ -5128,6 +5128,7 @@ module.exports = {
     difficulty: "hard",
     slug: "count-subarrays-with-fixed-bounds",
     category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }],
     title: { vi: "Count Subarrays With Fixed Bounds", en: "Count Subarrays With Fixed Bounds" },
     titleVi: { vi: "Đếm subarray có min=minK và max=maxK (O(n))", en: "Count subarrays whose min=minK and max=maxK (O(n))" },
     statement: {

@@ -820,6 +820,94 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "inclusion-exclusion") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🧮</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Bao hàm – loại trừ · bội số → LCM → Binary Search" : "Inclusion–Exclusion · multiples → LCM → Binary Search"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🌱", name: vi ? "Hợp tập & bội số" : "Unions & multiples", problems: [
+            [2652, "Sum Multiples — điều kiện chia hết OR", null],
+            [878, "Nth Magical Number — 2 tập + LCM + binary search", null],
+            [1201, "Ugly Number III — 3 tập + LCM + binary search", vi ? "★ cực quan trọng" : "★ very important"],
+          ] },
+          { icon: "🪟", name: vi ? "Đếm bằng hiệu hai tập" : "Counting by set difference", problems: [
+            [992, "Subarrays with K Different Integers — atMost(K) − atMost(K−1)", null],
+            [2444, "Count Subarrays With Fixed Bounds — valid ranges", null],
+          ] },
+          { icon: "🚀", name: vi ? "Binary Search trên đáp án" : "Binary search on the answer", problems: [
+            [2513, "Minimize the Maximum of Two Arrays — divisibility + LCM", null],
+            [3116, "Kth Smallest Amount — bitmask + inclusion–exclusion + LCM", vi ? "★ boss cuối" : "★ final boss"],
+          ] },
+        ];
+        const sequence = [2652, 878, 1201, 992, 2444, 2513, 3116];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name, badge]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-ie-problem-id="${id}"><span>#${id}</span><b>${name}${badge ? `<small class="segment-stars">${badge}</small>` : ""}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-ie-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "INCLUSION–EXCLUSION LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Lộ trình Bao hàm – loại trừ" : "Inclusion–Exclusion roadmap";
+        $("trieLearnIntro").textContent = vi
+          ? "Từ điều kiện OR đơn giản, qua LCM và đếm hợp tập, đến binary search trên đáp án cùng bao hàm–loại trừ bitmask."
+          : "Move from a simple OR condition through LCM union counting to binary search on the answer and bitmask inclusion–exclusion.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Bao hàm – loại trừ" : "Close Inclusion–Exclusion learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Nhóm bài theo kỹ thuật" : "Problems grouped by technique"}</h3><p>${vi ? "Học hợp tập trước, rồi dùng hiệu hai tập để đếm, sau đó kết hợp LCM với binary search." : "Learn union counting first, then count with set difference, and finally combine LCM with binary search."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "#1201 là checkpoint then chốt; #3116 là boss cuối tổng hợp bitmask, bao hàm–loại trừ, LCM và binary search." : "#1201 is the key checkpoint; #3116 is the final boss combining bitmasks, inclusion–exclusion, LCM, and binary search."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-ie-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.ieProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "backtracking") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
@@ -17707,6 +17795,58 @@ function renderIslands305View(step) {
   </section>`;
 }
 
+// ---- Inclusion–Exclusion / multiples / binary-search renderer ----
+function renderMultiplesIeView(step) {
+  const view = step.multiplesIeView || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const isSum = view.mode === "sum";
+  const phaseOrder = isSum
+    ? { intro: 0, init: 1, check: 2, add: 2, answer: 3 }
+    : { intro: 0, init: 1, count: 2, move: 3, answer: 4, done: 4 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = isSum
+    ? (vi ? ["Ý tưởng", "Duyệt 1..n", "Kiểm tra OR", "Tổng"] : ["Idea", "Scan 1..n", "Check OR", "Sum"])
+    : (vi ? ["Công thức", "Khoảng", "Đếm mid", "Thu hẹp", "Đáp án"] : ["Formula", "Range", "Count mid", "Narrow", "Answer"]);
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const divisors = Array.isArray(view.divisors) ? view.divisors : [];
+  const divisorCards = divisors.map((divisor, index) => `<span class="mie-divisor c${index % 4}"><small>${vi ? "TẬP BỘI" : "MULTIPLES"}</small><strong>${escapeHtml(divisor)}</strong><em>${vi ? `bội của ${divisor}` : `multiples of ${divisor}`}</em></span>`).join("");
+  const current = view.current;
+  const terms = (current?.terms || []).map((term, index) => `<article class="mie-term ${term.sign === "−" ? "subtract" : "add"}"><small>${escapeHtml(term.sign === "−" ? (vi ? "TRỪ" : "SUBTRACT") : (vi ? "CỘNG" : "ADD"))}</small><strong>${escapeHtml(term.label)}</strong><span>${vi ? "LCM" : "LCM"} = ${escapeHtml(term.divisor)}</span><b>${escapeHtml(term.value)}</b></article>`).join("") || `<span class="mie-empty">${isSum ? (vi ? "Theo dõi từng số ở dưới" : "Follow each number below") : (vi ? "Chọn một mid để bung công thức đếm" : "Choose a mid to expand the counting formula")}</span>`;
+  let main = "";
+  if (isSum) {
+    const n = Number(view.target) || 0;
+    const values = Array.from({ length: n }, (_, index) => index + 1).map((value) => {
+      const chosen = Boolean((view.included || [])[value]);
+      const active = value === view.scanIndex;
+      const multiples = divisors.filter((divisor) => value % divisor === 0).join(", ");
+      return `<span class="mie-number ${chosen ? "included" : ""}${active ? " active" : ""}"><small>${value}</small><b>${chosen ? "+" : "·"}</b><em>${chosen ? (vi ? `bội ${multiples}` : `multiple of ${multiples}`) : ""}</em></span>`;
+    }).join("");
+    main = `<section class="mie-number-grid-section"><header><strong>1 … ${n}</strong><span>${vi ? "xanh = đã cộng đúng một lần" : "green = added exactly once"}</span></header><div class="mie-number-grid">${values}</div></section>`;
+  } else {
+    const bounds = Number.isInteger(view.lo) && Number.isInteger(view.hi)
+      ? `<section class="mie-bounds"><span><small>lo</small><strong>${view.lo}</strong></span><span class="mid"><small>mid</small><strong>${view.mid ?? "—"}</strong></span><span><small>hi</small><strong>${view.hi}</strong></span></section>`
+      : "";
+    const history = (view.history || []).slice(-12).map((entry) => `<span class="mie-history ${entry.passed ? "pass" : "fail"}"><small>[${entry.lo}, ${entry.hi}]</small><b>${entry.mid}</b><em>${escapeHtml(entry.label)}</em><strong>${entry.passed ? "≥" : "<"}</strong></span>`).join("") || `<span class="mie-empty">${vi ? "Chưa có lần check" : "No check yet"}</span>`;
+    main = `${bounds}<section class="mie-terms"><header><strong>${vi ? "COUNT(mid)" : "COUNT(mid)"}</strong><span>${current ? `${vi ? "kết quả" : "result"}: ${escapeHtml(current.label || current.count)}` : (vi ? "chờ mid" : "waiting for a mid")}</span></header><div>${terms}</div></section><section class="mie-history-section"><header><strong>BINARY SEARCH LOG</strong><span>${vi ? "≥ target: giữ nửa trái" : "≥ target: keep left half"}</span></header><div>${history}</div></section>`;
+  }
+  const ready = view.answer !== null && view.answer !== undefined;
+  const detail = isSum
+    ? (vi ? "mỗi số thỏa OR được cộng một lần" : "every value satisfying OR is added once")
+    : (vi ? "x nhỏ nhất thỏa điều kiện count(x)" : "smallest x satisfying count(x)");
+  const summary = vi ? `Bài ${step.problemId || ""}. ${isSum ? "tổng bội số" : "bao hàm–loại trừ và binary search"}.` : `Multiples / inclusion–exclusion visualization.`;
+  el.innerHTML = `<section class="mie-viz ${isSum ? "sum" : "binary"}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="mie-phases">${phases}</div>
+    <section class="mie-rule"><b>${isSum ? "OR" : "I–E"}</b><strong>${escapeHtml(view.formula || "—")}</strong><span>${isSum ? (vi ? "Cùng lúc chia hết nhiều ước vẫn chỉ cộng một lần." : "Divisible by several divisors still means one addition.") : (vi ? "Dấu cộng/trừ loại bỏ việc đếm trùng giữa các tập bội số." : "The plus/minus signs remove double counting between multiple sets.")}</span></section>
+    <section class="mie-divisors"><header><strong>${isSum ? (vi ? "ƯỚC SỐ" : "DIVISORS") : (vi ? "CÁC TẬP BỘI SỐ" : "MULTIPLE SETS")}</strong><span>${escapeHtml(view.targetLabel || "")}</span></header><div>${divisorCards}</div></section>
+    ${main}
+    <section class="mie-answer ${ready ? "ready" : "pending"}"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${ready ? escapeHtml(view.answer) : "…"}</strong><span>${escapeHtml(detail)}</span></section>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -17957,6 +18097,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEqualityEquationsView(step);
+  } else if (step.multiplesIeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMultiplesIeView(step);
   } else if (step.stones947View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
