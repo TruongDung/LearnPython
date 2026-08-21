@@ -1,3 +1,6 @@
+from typing import List
+
+
 class Solution:
     def resultArray(self, nums: List[int]) -> List[int]:
         ar1 = [nums[0]]
