@@ -724,6 +724,102 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "union-find") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🔗</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Union-Find (DSU) · cơ bản → dynamic connectivity → MST" : "Union-Find (DSU) · fundamentals → dynamic connectivity → MST"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🌱", name: vi ? "Nền tảng connectivity" : "Connectivity foundations", problems: [
+            [547, "Number of Provinces — count connected components"],
+            [684, "Redundant Connection — detect a cycle"],
+            [1319, "Number of Operations to Make Network Connected — reuse spare edges"],
+          ] },
+          { icon: "🧩", name: vi ? "Ràng buộc & gộp danh tính" : "Constraints & identity merging", problems: [
+            [990, "Satisfiability of Equality Equations — equality constraints"],
+            [721, "Accounts Merge — shared-email groups"],
+          ] },
+          { icon: "⏱️", name: vi ? "Kết nối theo quan hệ" : "Connectivity by relationship", problems: [
+            [1101, "The Earliest Moment When Everyone Become Friends — chronological unions"],
+            [947, "Most Stones Removed with Same Row or Column — row/column components"],
+            [1061, "Lexicographically Smallest Equivalent String — canonical representatives"],
+          ] },
+          { icon: "🚀", name: vi ? "Dynamic & nâng cao" : "Dynamic & advanced", problems: [
+            [305, "Number of Islands II — online grid unions"],
+            [1579, "Remove Max Number of Edges to Keep Graph Fully Traversable — two DSUs"],
+            [1584, "Min Cost to Connect All Points — Kruskal / MST"],
+          ] },
+        ];
+        const sequence = [547, 684, 1319, 990, 721, 1101, 947, 1061, 305, 1579, 1584];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-dsu-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-dsu-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "UNION-FIND (DSU) LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Lộ trình Union-Find (DSU)" : "Union-Find (DSU) roadmap";
+        $("trieLearnIntro").textContent = vi
+          ? "Học cách nhận diện component, chu trình và cạnh dư trước; sau đó mở rộng sang ràng buộc, quan hệ động, nhiều DSU và MST."
+          : "Learn components, cycles, and redundant edges first; then progress to constraints, dynamic relationships, multiple DSUs, and MST.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Union-Find" : "Close Union-Find learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Nhóm bài theo kỹ thuật" : "Problems grouped by technique"}</h3><p>${vi ? "Mỗi nhóm thêm một biến thể DSU mới vào thao tác find / union cơ bản." : "Each group adds a new DSU variation to the core find / union operations."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Components → cycle → cạnh dư → ràng buộc → gộp → theo thời gian → grid động → hai DSU → MST." : "Components → cycle → spare edges → constraints → merging → time → dynamic grids → two DSUs → MST."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-dsu-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.dsuProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "backtracking") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
@@ -17385,6 +17481,232 @@ function renderBricks803View(step) {
   </section>`;
 }
 
+// ---- 990 Satisfiability of Equality Equations renderer ----
+function renderEqualityEquationsView(step) {
+  const view = step.equalityEquationsView || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseOrder = { intro: 0, init: 1, equalities: 2, inequalities: 3, conflict: 4, done: 4 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["Ý tưởng", "Khởi tạo", "Gộp ==", "Kiểm tra !=", "Kết luận"]
+    : ["Idea", "Initialize", "Merge ==", "Check !=", "Conclusion"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const activeLetters = new Set(view.activeLetters || []);
+  const stateLabels = vi
+    ? { pending: "chờ", waiting: "đợi pass 2", checking: "đang xét", merged: "đã gộp", safe: "hợp lệ", conflict: "mâu thuẫn" }
+    : { pending: "waiting", waiting: "pass 2", checking: "checking", merged: "merged", safe: "fits", conflict: "conflict" };
+  const equations = Array.isArray(view.equations) ? view.equations : [];
+  const equationCards = equations.map((equation, index) => {
+    const state = (view.states || [])[index] || "pending";
+    const classes = ["eq990-equation", state, index === view.activeEquation ? "active" : "", equation.slice(1, 3) === "==" ? "equality" : "inequality"];
+    return `<article class="${classes.filter(Boolean).join(" ")}"><small>#${index + 1}</small><strong><b>${escapeHtml(equation[0])}</b><i>${escapeHtml(equation.slice(1, 3))}</i><b>${escapeHtml(equation[3])}</b></strong><em>${escapeHtml(stateLabels[state] || state)}</em></article>`;
+  }).join("") || `<span class="eq990-empty">${vi ? "Chưa có phương trình" : "No equations"}</span>`;
+
+  const components = (view.components || []).map((component, index) => {
+    const members = component.members || [];
+    const active = members.some((letter) => activeLetters.has(letter));
+    return `<article class="eq990-component c${index % 4}${active ? " active" : ""}"><header><small>${vi ? "ROOT" : "ROOT"}</small><strong>${escapeHtml(component.root)}</strong></header><div>${members.map((letter) => `<b class="${activeLetters.has(letter) ? "focus" : ""}">${escapeHtml(letter)}</b>`).join("<i>=</i>")}</div><em>${vi ? "cùng giá trị" : "same value"}</em></article>`;
+  }).join("") || `<span class="eq990-empty">${vi ? "Chưa có nhóm" : "No groups yet"}</span>`;
+
+  const parentRows = (view.parentRows || []).map((row) => {
+    const active = activeLetters.has(row.letter) || activeLetters.has(row.parent) || activeLetters.has(row.root);
+    return `<span class="eq990-parent ${active ? "active" : ""}"><b>${escapeHtml(row.letter)}</b><i>→</i><strong>${escapeHtml(row.parent)}</strong><em>${vi ? "root" : "root"} ${escapeHtml(row.root)}${row.size === null ? "" : ` · size ${row.size}`}</em></span>`;
+  }).join("") || `<span class="eq990-empty">${vi ? "Chưa có parent" : "No parent data"}</span>`;
+
+  let operation = "";
+  if (view.comparison) {
+    const comparison = view.comparison;
+    operation = `<section class="eq990-operation ${comparison.conflict ? "conflict" : "safe"}"><small>${comparison.conflict ? (vi ? "PHÁT HIỆN MÂU THUẪN" : "CONTRADICTION FOUND") : (vi ? "KIỂM TRA !=" : "CHECK !=")}</small><strong>find(${escapeHtml(comparison.left)}) = ${escapeHtml(comparison.rootLeft)} &nbsp; ${comparison.conflict ? "=" : "≠"} &nbsp; find(${escapeHtml(comparison.right)}) = ${escapeHtml(comparison.rootRight)}</strong><span>${comparison.conflict ? (vi ? "Cùng root → hai chữ đã bị ép bằng nhau, trái với !=." : "Same root → the letters are forced equal, which violates !=.") : (vi ? "Khác root → điều kiện != vẫn đúng." : "Different roots → the != condition still holds.")}</span></section>`;
+  } else if (view.union) {
+    const union = view.union;
+    operation = `<section class="eq990-operation union"><small>UNION(${escapeHtml(union.left)}, ${escapeHtml(union.right)})</small><strong>${escapeHtml(union.rootLeft)} ${union.merged ? "←" : "="} ${escapeHtml(union.rootRight)}</strong><span>${union.merged ? (vi ? "Gộp hai nhóm để điều kiện == đúng." : "Merge two groups so the == condition holds.") : (vi ? "Hai chữ đã có cùng root; không cần gộp lại." : "Both letters already have the same root; no merge is needed.")}</span></section>`;
+  } else {
+    const helper = view.phase === "equalities"
+      ? (vi ? "Pass 1 chỉ tạo các nhóm bị buộc bằng nhau." : "Pass 1 only builds groups forced equal.")
+      : view.phase === "inequalities"
+        ? (vi ? "Pass 2 so sánh root của từng điều kiện !=." : "Pass 2 compares roots for each != condition.")
+        : view.phase === "done"
+          ? (vi ? "Mọi điều kiện đều có thể cùng đúng." : "All conditions can be true together.")
+          : (vi ? "Theo dõi mỗi bước để xem các nhóm thay đổi thế nào." : "Follow each step to see how the groups change.");
+    operation = `<section class="eq990-operation idle"><small>${vi ? "THAO TÁC HIỆN TẠI" : "CURRENT OPERATION"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${escapeHtml(helper)}</span></section>`;
+  }
+
+  const resultReady = typeof view.answer === "boolean";
+  const resultText = resultReady ? (view.answer ? "True" : "False") : "…";
+  const resultDetail = !resultReady
+    ? (vi ? "chưa kết luận" : "not decided yet")
+    : view.answer
+      ? (vi ? "mọi != đều nằm giữa hai nhóm khác nhau" : "every != spans two different groups")
+      : (vi ? "ít nhất một != nằm trong cùng một nhóm" : "at least one != lies inside one group");
+
+  const summary = vi
+    ? `Bài 990. ${equations.length} phương trình, pha ${view.phase || "khởi tạo"}.`
+    : `Problem 990. ${equations.length} equations, ${view.phase || "initialize"} phase.`;
+  el.innerHTML = `<section class="eq990-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="eq990-phases">${phases}</div>
+    <section class="eq990-rule"><b>${vi ? "QUY TẮC" : "RULE"}</b><strong>a == b &nbsp;⇒&nbsp; same DSU group &nbsp;&nbsp;•&nbsp;&nbsp; a != b &nbsp;⇒&nbsp; different DSU groups</strong><span>${vi ? "Hai pass tránh kiểm tra != trước khi mọi quan hệ bằng nhau đã được gộp." : "Two passes prevent checking != before every equality relationship has been merged."}</span></section>
+    <section class="eq990-equations"><header><strong>${vi ? "DANH SÁCH PHƯƠNG TRÌNH" : "EQUATION LIST"}</strong><span>${vi ? "vàng = đang xét · đỏ = mâu thuẫn" : "yellow = current · red = contradiction"}</span></header><div>${equationCards}</div></section>
+    ${operation}
+    <section class="eq990-components"><header><strong>${vi ? "CÁC NHÓM BẮT BUỘC BẰNG NHAU" : "FORCED-EQUAL GROUPS"}</strong><span>${vi ? "mỗi card = một component của DSU" : "each card = one DSU component"}</span></header><div>${components}</div></section>
+    <section class="eq990-parents"><header><strong>PARENT / ROOT</strong><span>${vi ? "mũi tên là parent pointer; root đại diện cả nhóm" : "arrow = parent pointer; root represents the group"}</span></header><div>${parentRows}</div></section>
+    <section class="eq990-answer ${resultReady ? (view.answer ? "possible" : "impossible") : "pending"}"><small>${vi ? "CÓ THỂ THỎA TẤT CẢ?" : "CAN ALL EQUATIONS HOLD?"}</small><strong>${resultText}</strong><span>${escapeHtml(resultDetail)}</span></section>
+  </section>`;
+}
+
+// ---- 947 Most Stones Removed with Same Row or Column renderer ----
+function renderStones947View(step) {
+  const view = step.stones947View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseOrder = { intro: 0, init: 1, connect: 2, done: 3 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = vi ? ["Ý tưởng", "Node hàng/cột", "Nối đá", "Kết quả"] : ["Idea", "Row/column nodes", "Connect stones", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const statusLabels = vi
+    ? { pending: "chờ", active: "đang xét", merged: "đã nối", same: "đã cùng nhóm" }
+    : { pending: "waiting", active: "checking", merged: "connected", same: "same group" };
+  const stones = Array.isArray(view.stones) ? view.stones : [];
+  const stonesHtml = stones.map(([row, col], index) => {
+    const state = (view.stoneStates || [])[index] || "pending";
+    return `<article class="stones947-stone ${state}${index === view.activeStone ? " active" : ""}"><small>#${index + 1}</small><strong>(${row},${col})</strong><span>R${row} ↔ C${col}</span><em>${escapeHtml(statusLabels[state] || state)}</em></article>`;
+  }).join("") || `<span class="stones947-empty">${vi ? "Chưa có đá" : "No stones"}</span>`;
+  const components = (view.components || []).map((component, index) => {
+    const stonesText = (component.stones || []).map((stone) => `#${stone + 1}`).join(" ") || "—";
+    return `<article class="stones947-component c${index % 4}"><header><small>${vi ? "ROOT" : "ROOT"}</small><strong>${escapeHtml(component.root)}</strong></header><div>${(component.members || []).map((member) => `<b>${escapeHtml(member)}</b>`).join("")}</div><em>${vi ? "đá" : "stones"}: ${escapeHtml(stonesText)}</em></article>`;
+  }).join("") || `<span class="stones947-empty">${vi ? "Chưa có component" : "No components"}</span>`;
+  const parentRows = (view.parentRows || []).map((row) => {
+    const isRoot = row.node === row.root;
+    return `<span class="stones947-parent ${isRoot ? "root" : ""}"><b>${escapeHtml(row.node)}</b><i>→</i><strong>${escapeHtml(row.parent)}</strong><em>${vi ? "root" : "root"} ${escapeHtml(row.root)}${row.size === null ? "" : ` · size ${row.size}`}</em></span>`;
+  }).join("") || `<span class="stones947-empty">parent</span>`;
+  const union = view.union;
+  const operation = union
+    ? `<section class="stones947-operation ${union.merged ? "merged" : "same"}"><small>UNION</small><strong>${escapeHtml(union.left)} ↔ ${escapeHtml(union.right)}</strong><span>${union.merged ? (vi ? `Gộp root ${escapeHtml(union.rootLeft)} và ${escapeHtml(union.rootRight)}.` : `Merge roots ${escapeHtml(union.rootLeft)} and ${escapeHtml(union.rootRight)}.`) : (vi ? "Đã có đường nối gián tiếp trong component này." : "An indirect path already exists in this component.")}</span></section>`
+    : `<section class="stones947-operation idle"><small>${vi ? "THAO TÁC" : "OPERATION"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${vi ? "Mỗi đá là một cạnh giữa node hàng và node cột." : "Every stone is an edge between one row node and one column node."}</span></section>`;
+  const ready = Number.isInteger(view.answer);
+  const summary = vi
+    ? `Bài 947. ${stones.length} đá, ${view.groupCount ?? "?"} component.`
+    : `Problem 947. ${stones.length} stones, ${view.groupCount ?? "?"} components.`;
+  el.innerHTML = `<section class="stones947-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="stones947-phases">${phases}</div>
+    <section class="stones947-rule"><b>${vi ? "MÔ HÌNH" : "MODEL"}</b><strong>(row, col) = edge&nbsp; Rrow ↔ Ccol</strong><span>${vi ? "Không có node “đá”: DSU gộp các hàng/cột mà đá nối lại." : "There is no “stone” node: DSU merges the row/column nodes joined by stones."}</span></section>
+    <section class="stones947-stones"><header><strong>STONES = EDGES</strong><span>${vi ? "mỗi thẻ là một cạnh" : "each card is one edge"}</span></header><div>${stonesHtml}</div></section>
+    ${operation}
+    <section class="stones947-components"><header><strong>DSU COMPONENTS</strong><span>${view.groupCount ?? 0} ${vi ? "nhóm hàng/cột" : "row/column groups"}</span></header><div>${components}</div></section>
+    <section class="stones947-parents"><header><strong>PARENT / ROOT</strong><span>${vi ? "size chỉ có nghĩa tại root" : "size matters only at roots"}</span><div>${parentRows}</div></section>
+    <section class="stones947-answer ${ready ? "ready" : "pending"}"><small>${vi ? "ĐÁ CÓ THỂ BỎ" : "REMOVABLE STONES"}</small><strong>${ready ? `${stones.length} − ${view.groupCount} = ${view.answer}` : "…"}</strong><span>${vi ? "mỗi component giữ lại đúng một đá" : "leave exactly one stone in each component"}</span></section>
+  </section>`;
+}
+
+// ---- 1061 Lexicographically Smallest Equivalent String renderer ----
+function renderEquivalent1061View(step) {
+  const view = step.equivalent1061View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseOrder = { intro: 0, init: 1, merge: 2, translate: 3, done: 4 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = vi ? ["Ý tưởng", "Khởi tạo", "Gộp cặp", "Đổi baseStr", "Kết quả"] : ["Idea", "Initialize", "Merge pairs", "Map baseStr", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const stateLabels = vi
+    ? { pending: "chờ", active: "đang xét", merged: "đã gộp", same: "đã tương đương" }
+    : { pending: "waiting", active: "checking", merged: "merged", same: "already equivalent" };
+  const s1 = String(view.s1 || "");
+  const s2 = String(view.s2 || "");
+  const pairs = Array.from({ length: Math.min(s1.length, s2.length) }, (_, index) => {
+    const state = (view.pairStates || [])[index] || "pending";
+    return `<article class="equiv1061-pair ${state}${index === view.activePair ? " active" : ""}"><small>#${index + 1}</small><strong><b>${escapeHtml(s1[index])}</b><i>≈</i><b>${escapeHtml(s2[index])}</b></strong><em>${escapeHtml(stateLabels[state] || state)}</em></article>`;
+  }).join("") || `<span class="equiv1061-empty">${vi ? "Chưa có cặp" : "No pairs"}</span>`;
+  const output = (view.output || []).map((item, index) => `<span class="equiv1061-output ${item.value ? "mapped" : ""}${index === view.activeBaseIndex ? " active" : ""}"><small>${index}</small><b>${escapeHtml(item.source)}</b><i>→</i><strong>${escapeHtml(item.value || "?")}</strong></span>`).join("") || `<span class="equiv1061-empty">baseStr</span>`;
+  const components = (view.components || []).map((component, index) => `<article class="equiv1061-component c${index % 4}"><header><small>SMALLEST ROOT</small><strong>${escapeHtml(component.root)}</strong></header><div>${(component.members || []).map((member) => `<b class="${member === component.root ? "root" : ""}">${escapeHtml(member)}</b>`).join("<i>≈</i>")}</div><em>${vi ? "mọi chữ ánh xạ về root này" : "every member maps to this root"}</em></article>`).join("") || `<span class="equiv1061-empty">${vi ? "Chưa có nhóm" : "No groups"}</span>`;
+  const parents = (view.parentRows || []).map((row) => `<span class="equiv1061-parent ${row.letter === row.root ? "root" : ""}"><b>${escapeHtml(row.letter)}</b><i>→</i><strong>${escapeHtml(row.parent)}</strong><em>${vi ? "root" : "root"} ${escapeHtml(row.root)}</em></span>`).join("") || `<span class="equiv1061-empty">parent</span>`;
+  const union = view.union;
+  const operation = union
+    ? `<section class="equiv1061-operation ${union.merged ? "merged" : "same"}"><small>${union.merged ? (vi ? "GIỮ ROOT NHỎ NHẤT" : "KEEP SMALLEST ROOT") : (vi ? "ĐÃ CÙNG ROOT" : "ALREADY SAME ROOT")}</small><strong>${escapeHtml(union.rootLeft)} &nbsp; ${union.merged ? "→" : "="} &nbsp; ${escapeHtml(union.rootRight)}</strong><span>${union.merged ? (vi ? "Root lớn hơn trỏ về root nhỏ hơn để find() luôn trả về chữ nhỏ nhất." : "The larger root points to the smaller one, so find() always returns the smallest letter.") : (vi ? "Cặp này không thay đổi DSU." : "This pair does not change the DSU.")}</span></section>`
+    : `<section class="equiv1061-operation idle"><small>${vi ? "THAO TÁC" : "OPERATION"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${vi ? "Theo dõi root nhỏ nhất của mỗi nhóm chữ." : "Track the smallest root in each letter group."}</span></section>`;
+  const ready = typeof view.answer === "string";
+  const summary = vi ? `Bài 1061. baseStr ${view.baseStr || ""}.` : `Problem 1061. baseStr ${view.baseStr || ""}.`;
+  el.innerHTML = `<section class="equiv1061-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="equiv1061-phases">${phases}</div>
+    <section class="equiv1061-rule"><b>${vi ? "QUY TẮC" : "RULE"}</b><strong>parent[max(rootA, rootB)] = min(rootA, rootB)</strong><span>${vi ? "Vì root luôn nhỏ nhất, thay thế mỗi chữ chỉ cần gọi find(ch)." : "Because the root is always smallest, replacing a character only needs find(ch)."}</span></section>
+    <section class="equiv1061-pairs"><header><strong>EQUIVALENT PAIRS</strong><span>${vi ? "vàng = đang xét" : "yellow = current"}</span></header><div>${pairs}</div></section>
+    ${operation}
+    <section class="equiv1061-components"><header><strong>EQUIVALENCE GROUPS</strong><span>${vi ? "root được tô đậm" : "the root is emphasized"}</span><div>${components}</div></section>
+    <section class="equiv1061-output-section"><header><strong>MAP baseStr</strong><span>${vi ? "mỗi vị trí gọi find(ch)" : "each position calls find(ch)"}</span><div>${output}</div></section>
+    <details class="equiv1061-parents"><summary>PARENT / ROOT</summary><div>${parents}</div></details>
+    <section class="equiv1061-answer ${ready ? "ready" : "pending"}"><small>${vi ? "CHUỖI NHỎ NHẤT" : "SMALLEST STRING"}</small><strong>${escapeHtml(ready ? view.answer : "…")}</strong><span>${vi ? "mỗi chữ đã dùng đại diện nhỏ nhất của nhóm" : "each character uses its group's smallest representative"}</span></section>
+  </section>`;
+}
+
+// ---- 305 Number of Islands II renderer ----
+function renderIslands305View(step) {
+  const view = step.islands305View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseOrder = { intro: 0, init: 1, add: 2, merge: 3, count: 4, done: 4 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = vi ? ["Ý tưởng", "DSU nước", "Thêm đất", "Nối láng giềng", "Đếm đảo"] : ["Idea", "Water DSU", "Add land", "Join neighbors", "Count islands"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const coordText = (coord) => Array.isArray(coord) ? `(${coord[0]},${coord[1]})` : "—";
+  const components = view.components || [];
+  const componentForCell = new Map();
+  components.forEach((component, index) => (component.members || []).forEach((coord) => componentForCell.set(`${coord[0]},${coord[1]}`, index)));
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const activeCellKey = Array.isArray(view.activeCell) ? view.activeCell.join(",") : "";
+  const activeNeighborKey = Array.isArray(view.activeNeighbor) ? view.activeNeighbor.join(",") : "";
+  const cells = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const node = row * cols + col;
+      const land = Array.isArray(view.parent) && view.parent[node] !== -1;
+      const key = `${row},${col}`;
+      const component = componentForCell.get(key);
+      const root = component === undefined ? null : components[component].root;
+      const classes = ["islands305-cell", land ? "land" : "water", component === undefined ? "" : `c${component % 4}`, key === activeCellKey ? "active" : "", key === activeNeighborKey ? "neighbor" : ""].filter(Boolean).join(" ");
+      cells.push(`<span class="${classes}"><small>${row},${col}</small><b>${land ? "LAND" : "WATER"}</b><em>${land ? `${vi ? "root" : "root"} ${coordText(root)}` : ""}</em></span>`);
+    }
+  }
+  const statusLabels = vi
+    ? { pending: "chờ", active: "đang xét", land: "đất mới", done: "đã ghi", duplicate: "lặp" }
+    : { pending: "waiting", active: "checking", land: "new land", done: "recorded", duplicate: "duplicate" };
+  const timeline = (view.positions || []).map((position, index) => {
+    const status = (view.statuses || [])[index] || "pending";
+    const count = (view.counts || [])[index];
+    return `<span class="islands305-position ${status}${index === view.activeIndex ? " active" : ""}"><small>#${index + 1}</small><b>${escapeHtml(coordText(position))}</b><em>${escapeHtml(statusLabels[status] || status)}</em><strong>${count === null || count === undefined ? "—" : count}</strong></span>`;
+  }).join("") || `<span class="islands305-empty">${vi ? "Chưa có position" : "No positions"}</span>`;
+  const union = view.union;
+  const operation = union
+    ? `<section class="islands305-operation ${union.merged ? "merged" : "same"}"><small>UNION</small><strong>${escapeHtml(coordText(union.from))} ↔ ${escapeHtml(coordText(union.to))}</strong><span>${union.merged ? (vi ? "Hai đảo chạm nhau → giảm islands đi 1." : "Two islands touch → decrease islands by 1.") : (vi ? "Đã cùng một đảo → counter giữ nguyên." : "Already one island → counter stays the same.")}</span></section>`
+    : `<section class="islands305-operation idle"><small>${vi ? "SỰ KIỆN" : "EVENT"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${vi ? "Theo dõi counter islands sau mỗi thay đổi." : "Track the islands counter after every change."}</span></section>`;
+  const componentCards = components.map((component, index) => `<article class="islands305-component c${index % 4}"><header><small>ROOT</small><strong>${escapeHtml(coordText(component.root))}</strong></header><div>${(component.members || []).map((member) => `<b>${escapeHtml(coordText(member))}</b>`).join("")}</div><em>size ${escapeHtml(component.size)}</em></article>`).join("") || `<span class="islands305-empty">${vi ? "Chưa có đảo" : "No islands yet"}</span>`;
+  const parents = (view.parentRows || []).map((row) => `<span class="islands305-parent"><b>${escapeHtml(coordText(row.node))}</b><i>→</i><strong>${escapeHtml(coordText(row.parent))}</strong><em>${vi ? "root" : "root"} ${escapeHtml(coordText(row.root))}${row.size === null ? "" : ` · size ${row.size}`}</em></span>`).join("") || `<span class="islands305-empty">parent = −1 (${vi ? "toàn nước" : "all water"})</span>`;
+  const answer = (view.counts || []).map((count) => count === null || count === undefined ? "—" : count).join(", ");
+  const summary = vi ? `Bài 305. ${rows} × ${cols}, hiện có ${view.islands ?? 0} đảo.` : `Problem 305. ${rows} × ${cols}, currently ${view.islands ?? 0} islands.`;
+  el.innerHTML = `<section class="islands305-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="islands305-phases">${phases}</div>
+    <section class="islands305-rule"><b>${vi ? "QUY TẮC" : "RULE"}</b><strong>new land: islands + 1 &nbsp;•&nbsp; successful union: islands − 1</strong><span>${vi ? "Nước có parent = −1; chỉ các ô đất mới là node DSU hoạt động." : "Water has parent = −1; only land cells are active DSU nodes."}</span></section>
+    <section class="islands305-timeline"><header><strong>POSITIONS → ISLAND COUNT</strong><span>${vi ? "số bên phải = đáp án sau lần thêm" : "right value = answer after that addition"}</span><div>${timeline}</div></section>
+    ${operation}
+    <section class="islands305-grid-section"><header><strong>GRID ${rows} × ${cols}</strong><span>${vi ? "màu giống nhau = cùng component" : "same color = same component"}</span><div class="islands305-grid" style="--islands305-cols:${Math.max(cols, 1)}">${cells.join("")}</div></section>
+    <section class="islands305-components"><header><strong>ACTIVE ISLAND COMPONENTS</strong><span>${view.islands ?? 0} ${vi ? "đảo" : "islands"}</span><div>${componentCards}</div></section>
+    <details class="islands305-parents"><summary>PARENT / ROOT</summary><div>${parents}</div></details>
+    <section class="islands305-answer"><small>${vi ? "ANSWER" : "ANSWER"}</small><strong>[${escapeHtml(answer)}]</strong><span>${vi ? "mỗi phần tử là số đảo sau một position" : "each entry is the island count after one position"}</span></section>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -17629,6 +17951,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBricks803View(step);
+  } else if (step.equalityEquationsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEqualityEquationsView(step);
+  } else if (step.stones947View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStones947View(step);
+  } else if (step.equivalent1061View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEquivalent1061View(step);
+  } else if (step.islands305View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderIslands305View(step);
   } else if (step.parallelCoursesView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

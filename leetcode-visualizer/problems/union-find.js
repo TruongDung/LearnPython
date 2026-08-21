@@ -3436,6 +3436,686 @@ function buildSteps721(input, params) {
   return { original: accounts, answer: result, steps };
 }
 
+// ─── 990: Satisfiability of Equality Equations ───
+// First merge every equality (==), then verify that each inequality (!=)
+// still places its two letters in different DSU components.
+function buildSteps990(input) {
+  const equations = String(input).split(/[;,\n]/).map((value) => value.trim()).filter(Boolean);
+  if (equations.length === 0) throw new Error("enter at least one equation, e.g. a==b,b!=c,c==a");
+  if (equations.length > 60) throw new Error("visualization supports at most 60 equations");
+  equations.forEach((equation) => {
+    if (!/^[a-z](?:==|!=)[a-z]$/.test(equation)) {
+      throw new Error(`invalid equation \"${equation}\"; use exactly a==b or a!=b`);
+    }
+  });
+
+  const letters = [...new Set(equations.flatMap((equation) => [equation[0], equation[3]]))].sort();
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const parent = Array.from({ length: 26 }, (_, index) => index);
+  const size = new Array(26).fill(1);
+  const states = new Array(equations.length).fill("pending");
+  const steps = [];
+  let answer = null;
+
+  const indexOf = (letter) => letter.charCodeAt(0) - 97;
+  const letterOf = (index) => alphabet[index];
+  const rootOf = (index) => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+  const parentSummary = () => `[${letters.map((letter) => `${letter}→${letterOf(parent[indexOf(letter)])}`).join(", ")}]`;
+
+  function components() {
+    const groups = new Map();
+    letters.forEach((letter) => {
+      const root = rootOf(indexOf(letter));
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(letter);
+    });
+    return [...groups.entries()]
+      .map(([root, members]) => ({ root: letterOf(root), members }))
+      .sort((a, b) => a.root.localeCompare(b.root));
+  }
+
+  function snapshot({ title, note, codeLines, phase, activeEquation = null, activeLetters = [], event = "idle",
+    union = null, comparison = null, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      arr: letters.map((letter) => parent[indexOf(letter)]),
+      sub: letters.map((letter) => size[indexOf(letter)]),
+      highlight: activeLetters.map(indexOf),
+      mark: letters.filter((letter) => parent[indexOf(letter)] === indexOf(letter)).map(indexOf),
+      vars: [
+        { name: "pass", value: phase === "equalities" ? "1: merge ==" : phase === "inequalities" || phase === "conflict" ? "2: check !=" : phase },
+        { name: "parent", value: parentSummary() },
+        { name: "components", value: components().map((component) => `{${component.members.join(",")}}`).join(" ") },
+      ],
+      final,
+      equalityEquationsView: {
+        letters: [...letters],
+        equations: [...equations],
+        states: [...states],
+        parentRows: letters.map((letter) => {
+          const index = indexOf(letter);
+          return {
+            letter,
+            parent: letterOf(parent[index]),
+            root: letterOf(rootOf(index)),
+            size: parent[index] === index ? size[index] : null,
+          };
+        }),
+        components: components(),
+        phase,
+        event,
+        activeEquation,
+        activeLetters: [...activeLetters],
+        union: union ? { ...union } : null,
+        comparison: comparison ? { ...comparison } : null,
+        answer,
+      },
+    });
+  }
+
+  function findWithSteps(start, label, activeEquation, phase) {
+    let current = start;
+    snapshot({
+      title: { vi: `find(${label}) — bắt đầu tại ${label}`, en: `find(${label}) — start at ${label}` },
+      note: { vi: `find() đi theo parent pointer cho đến khi gặp root. Root là đại diện của cả nhóm.`, en: `find() follows parent pointers until it reaches a root. That root represents the whole group.` },
+      codeLines: [6, 7], phase, activeEquation, activeLetters: [label], event: "find-start",
+    });
+    while (parent[current] !== current) {
+      const next = parent[current];
+      const grandparent = parent[next];
+      parent[current] = grandparent;
+      snapshot({
+        title: { vi: `Path compression: ${letterOf(current)} → ${letterOf(grandparent)}`, en: `Path compression: ${letterOf(current)} → ${letterOf(grandparent)}` },
+        note: { vi: `${label} chưa là root: ${letterOf(current)} trỏ đến ${letterOf(next)}. Ta cho nó trỏ thẳng gần root hơn để lần sau nhanh hơn.`, en: `${label} is not a root: ${letterOf(current)} points to ${letterOf(next)}. Point it closer to the root so later lookups are faster.` },
+        codeLines: [8, 9], phase, activeEquation, activeLetters: [label, letterOf(next), letterOf(grandparent)], event: "compress",
+      });
+      current = parent[current];
+    }
+    const root = letterOf(current);
+    snapshot({
+      title: { vi: `find(${label}) = ${root}`, en: `find(${label}) = ${root}` },
+      note: { vi: `${root} tự trỏ về chính nó, nên đây là root (đại diện) của nhóm chứa ${label}.`, en: `${root} points to itself, so it is the root (representative) of ${label}'s group.` },
+      codeLines: [7, 10], phase, activeEquation, activeLetters: [label, root], event: "find-result",
+    });
+    return current;
+  }
+
+  snapshot({
+    title: { vi: "Ý tưởng: xử lý == trước, rồi kiểm tra !=", en: "Idea: process == first, then check !=" },
+    note: { vi: "a==b bắt buộc a và b ở CÙNG nhóm. a!=b bắt buộc chúng ở KHÁC nhóm. Nếu một bất đẳng thức có hai đầu cùng root thì mâu thuẫn, đáp án False.", en: "a==b requires a and b to be in the SAME group. a!=b requires DIFFERENT groups. If an inequality's two letters have the same root, the rules contradict and the answer is False." },
+    codeLines: [1, 2], phase: "intro", event: "intro",
+  });
+  snapshot({
+    title: { vi: "Khởi tạo DSU: mỗi chữ là một nhóm", en: "Initialize DSU: each letter is its own group" },
+    note: { vi: `Chỉ hiển thị các chữ xuất hiện trong input: ${letters.join(", ")}. Ban đầu parent[x] = x, nên chưa có hai chữ nào bị buộc bằng nhau.`, en: `Only letters used by the input are shown: ${letters.join(", ")}. Initially parent[x] = x, so no two letters are forced equal yet.` },
+    codeLines: [3, 4], phase: "init", event: "init",
+  });
+  snapshot({
+    title: { vi: "Pass 1: chỉ gộp các phương trình ==", en: "Pass 1: merge equality equations only" },
+    note: { vi: "Không được kiểm tra != quá sớm: một == xuất hiện sau nó vẫn có thể nối hai nhóm lại. Vì vậy ta hoàn tất mọi == trước.", en: "Do not check != too early: a later == could still join its two groups. Finish every == first." },
+    codeLines: [20, 21], phase: "equalities", event: "pass-start",
+  });
+
+  equations.forEach((equation, equationIndex) => {
+    const left = equation[0];
+    const operator = equation.slice(1, 3);
+    const right = equation[3];
+    if (operator === "!=") {
+      states[equationIndex] = "waiting";
+      snapshot({
+        title: { vi: `Pass 1 bỏ qua ${equation}`, en: `Pass 1 skips ${equation}` },
+        note: { vi: "Đây là !=; ta chỉ ghi nhớ nó cho pass 2, sau khi tất cả dấu == đã tạo xong các nhóm.", en: "This is !=; save it for pass 2, after all == equations have formed the groups." },
+        codeLines: [21], phase: "equalities", activeEquation: equationIndex, activeLetters: [left, right], event: "wait-inequality",
+      });
+      return;
+    }
+
+    states[equationIndex] = "checking";
+    snapshot({
+      title: { vi: `Đọc ${equation}: phải cùng nhóm`, en: `Read ${equation}: they must share a group` },
+      note: { vi: `${left}==${right} nghĩa là hai chữ này phải có cùng root. Ta gọi union(${left}, ${right}).`, en: `${left}==${right} means both letters must end with the same root. Call union(${left}, ${right}).` },
+      codeLines: [21, 22], phase: "equalities", activeEquation: equationIndex, activeLetters: [left, right], event: "read-equality",
+    });
+    let rootLeft = findWithSteps(indexOf(left), left, equationIndex, "equalities");
+    let rootRight = findWithSteps(indexOf(right), right, equationIndex, "equalities");
+    if (rootLeft === rootRight) {
+      states[equationIndex] = "merged";
+      snapshot({
+        title: { vi: `${equation}: đã cùng root ${letterOf(rootLeft)}`, en: `${equation}: already has root ${letterOf(rootLeft)}` },
+        note: { vi: "Không cần thay đổi DSU: điều kiện == đã đúng nhờ các phương trình trước.", en: "No DSU change is needed: earlier equations already make this == condition true." },
+        codeLines: [13, 14, 15], phase: "equalities", activeEquation: equationIndex, activeLetters: [left, right], event: "already-merged",
+        union: { left, right, rootLeft: letterOf(rootLeft), rootRight: letterOf(rootRight), merged: false },
+      });
+      return;
+    }
+    if (size[rootLeft] < size[rootRight]) [rootLeft, rootRight] = [rootRight, rootLeft];
+    parent[rootRight] = rootLeft;
+    size[rootLeft] += size[rootRight];
+    states[equationIndex] = "merged";
+    snapshot({
+      title: { vi: `Union: gộp ${equation}`, en: `Union: merge ${equation}` },
+      note: { vi: `Gắn root ${letterOf(rootRight)} vào root ${letterOf(rootLeft)}. Hai nhóm trở thành một: mọi chữ bên trong bây giờ được xem là bằng nhau.`, en: `Attach root ${letterOf(rootRight)} to root ${letterOf(rootLeft)}. The two groups become one: every letter inside is now considered equal.` },
+      codeLines: [16, 17, 18, 19], phase: "equalities", activeEquation: equationIndex, activeLetters: [left, right, letterOf(rootLeft), letterOf(rootRight)], event: "union",
+      union: { left, right, rootLeft: letterOf(rootLeft), rootRight: letterOf(rootRight), merged: true },
+    });
+  });
+
+  snapshot({
+    title: { vi: "Pass 1 hoàn tất: các nhóm == đã cố định", en: "Pass 1 complete: == groups are now fixed" },
+    note: { vi: "Bây giờ mới an toàn để kiểm tra !=. Nếu hai chữ có cùng root thì chúng đã bị các dấu == buộc bằng nhau.", en: "Now it is safe to check !=. If two letters have the same root, == equations have forced them to be equal." },
+    codeLines: [20, 21, 22], phase: "equalities", event: "pass-complete",
+  });
+  snapshot({
+    title: { vi: "Pass 2: mỗi != phải có hai root khác nhau", en: "Pass 2: every != must have two different roots" },
+    note: { vi: "Ta duyệt lại danh sách. Dấu == không cần làm gì nữa; chỉ các dấu != mới có thể tạo ra mâu thuẫn.", en: "Scan the list again. == needs no more work; only != can create a contradiction." },
+    codeLines: [23, 24], phase: "inequalities", event: "pass-start",
+  });
+
+  for (let equationIndex = 0; equationIndex < equations.length; equationIndex++) {
+    const equation = equations[equationIndex];
+    const left = equation[0];
+    const operator = equation.slice(1, 3);
+    const right = equation[3];
+    if (operator === "==") {
+      snapshot({
+        title: { vi: `Pass 2 bỏ qua ${equation}`, en: `Pass 2 skips ${equation}` },
+        note: { vi: "Dấu == đã được xử lý ở pass 1; nhóm của nó đã phản ánh điều kiện này.", en: "This == was handled in pass 1; the current groups already reflect it." },
+        codeLines: [24], phase: "inequalities", activeEquation: equationIndex, activeLetters: [left, right], event: "skip-equality",
+      });
+      continue;
+    }
+
+    states[equationIndex] = "checking";
+    snapshot({
+      title: { vi: `Kiểm tra ${equation}: phải khác nhóm`, en: `Check ${equation}: they must be in different groups` },
+      note: { vi: `Ta so sánh find(${left}) với find(${right}). Cùng root nghĩa là ${left} và ${right} bắt buộc bằng nhau, trái với !=.`, en: `Compare find(${left}) with find(${right}). The same root means ${left} and ${right} are forced equal, which contradicts !=.` },
+      codeLines: [24, 25], phase: "inequalities", activeEquation: equationIndex, activeLetters: [left, right], event: "read-inequality",
+    });
+    const rootLeft = findWithSteps(indexOf(left), left, equationIndex, "inequalities");
+    const rootRight = findWithSteps(indexOf(right), right, equationIndex, "inequalities");
+    const conflict = rootLeft === rootRight;
+    if (conflict) {
+      states[equationIndex] = "conflict";
+      answer = false;
+      snapshot({
+        title: { vi: `MÂU THUẪN: ${equation}`, en: `CONTRADICTION: ${equation}` },
+        note: { vi: `find(${left}) = find(${right}) = ${letterOf(rootLeft)}. Các dấu == đã buộc ${left} bằng ${right}, nhưng ${equation} lại yêu cầu chúng khác nhau → False.`, en: `find(${left}) = find(${right}) = ${letterOf(rootLeft)}. The == equations force ${left} to equal ${right}, but ${equation} requires them to differ → False.` },
+        codeLines: [25, 26], phase: "conflict", activeEquation: equationIndex, activeLetters: [left, right], event: "conflict", final: true,
+        comparison: { left, right, rootLeft: letterOf(rootLeft), rootRight: letterOf(rootRight), conflict: true },
+      });
+      return { input, answer, steps };
+    }
+    states[equationIndex] = "safe";
+    snapshot({
+      title: { vi: `${equation} hợp lệ: ${letterOf(rootLeft)} ≠ ${letterOf(rootRight)}`, en: `${equation} is valid: ${letterOf(rootLeft)} ≠ ${letterOf(rootRight)}` },
+      note: { vi: `${left} và ${right} ở hai nhóm khác nhau, nên điều kiện != này có thể cùng tồn tại với mọi dấu ==.`, en: `${left} and ${right} are in different groups, so this != condition can coexist with every == equation.` },
+      codeLines: [25], phase: "inequalities", activeEquation: equationIndex, activeLetters: [left, right], event: "safe",
+      comparison: { left, right, rootLeft: letterOf(rootLeft), rootRight: letterOf(rootRight), conflict: false },
+    });
+  }
+
+  answer = true;
+  snapshot({
+    title: { vi: "Không có mâu thuẫn → True", en: "No contradictions → True" },
+    note: { vi: "Mỗi != đều có hai root khác nhau. Vì vậy có thể gán giá trị cho các chữ mà không vi phạm điều kiện nào.", en: "Every != has two different roots. Therefore values can be assigned to the letters without violating any condition." },
+    codeLines: [27], phase: "done", event: "success", final: true,
+  });
+  return { input, answer, steps };
+}
+
+// ─── 947: Most Stones Removed with Same Row or Column ───
+function parse947Stones(input) {
+  const raw = String(input || "").trim();
+  if (!raw) throw new Error("enter at least one stone as row,col;row,col");
+  let stones;
+  try {
+    stones = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;|]/).filter(Boolean).map((part) => part.split(",").map((value) => Number(value.trim())));
+  } catch (error) {
+    throw new Error("stones must be coordinates such as 0,0;0,1;1,0");
+  }
+  if (!Array.isArray(stones) || !stones.length || !stones.every((stone) => Array.isArray(stone) && stone.length === 2 && stone.every(Number.isInteger))) {
+    throw new Error("each stone must contain exactly two integer coordinates");
+  }
+  if (stones.length > 18) throw new Error("visualization supports at most 18 stones");
+  const unique = new Set();
+  stones.forEach(([row, col]) => {
+    if (row < 0 || col < 0) throw new Error("stone coordinates must be non-negative");
+    const key = `${row},${col}`;
+    if (unique.has(key)) throw new Error(`duplicate stone at (${key})`);
+    unique.add(key);
+  });
+  return stones.map(([row, col]) => [row, col]);
+}
+
+function buildSteps947(input) {
+  const stones = parse947Stones(input);
+  const rowKey = (row) => `row:${row}`;
+  const colKey = (col) => `col:${col}`;
+  const label = (node) => node.startsWith("row:") ? `R${node.slice(4)}` : `C${node.slice(4)}`;
+  const nodes = [...new Set(stones.flatMap(([row, col]) => [rowKey(row), colKey(col)]))]
+    .sort((left, right) => label(left).localeCompare(label(right), undefined, { numeric: true }));
+  const parent = Object.fromEntries(nodes.map((node) => [node, node]));
+  const size = Object.fromEntries(nodes.map((node) => [node, 1]));
+  const stoneStates = new Array(stones.length).fill("pending");
+  const steps = [];
+  let answer = null;
+
+  const rootOf = (node) => {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+  const find = (node) => {
+    const root = rootOf(node);
+    let current = node;
+    while (parent[current] !== current) {
+      const next = parent[current];
+      parent[current] = root;
+      current = next;
+    }
+    return root;
+  };
+  const componentSnapshot = () => {
+    const buckets = new Map();
+    nodes.forEach((node) => {
+      const root = rootOf(node);
+      if (!buckets.has(root)) buckets.set(root, []);
+      buckets.get(root).push(node);
+    });
+    return [...buckets.entries()].map(([root, members]) => ({
+      root: label(root),
+      members: members.map(label),
+      stones: stones.map(([row, col], index) => rootOf(rowKey(row)) === root ? index : -1).filter((index) => index >= 0),
+    }));
+  };
+  const parentRows = () => nodes.map((node) => {
+    const root = rootOf(node);
+    return { node: label(node), parent: label(parent[node]), root: label(root), size: node === root ? size[node] : null };
+  });
+  const snapshot = ({ title, note, codeLines, phase, event, activeStone = null, union = null, final = false, vars = [] }) => {
+    const components = componentSnapshot();
+    steps.push({
+      title, note, codeLines, vars, final, arr: [], sub: [], highlight: [], mark: [],
+      stones947View: {
+        phase, event, stones: stones.map(([row, col]) => [row, col]), stoneStates: [...stoneStates], activeStone,
+        union: union ? { ...union } : null, components, parentRows: parentRows(), groupCount: components.length,
+        removable: stones.length - components.length, answer,
+      },
+    });
+  };
+
+  snapshot({
+    title: { vi: "Ý tưởng: biến hàng và cột thành node DSU", en: "Idea: turn rows and columns into DSU nodes" },
+    note: { vi: "Mỗi hòn đá (r,c) là một cạnh nối node hàng Rr với node cột Cc. Những hòn đá trong cùng component có thể bị bỏ đi, chừa lại đúng 1 hòn.", en: "Each stone (r,c) is an edge from row node Rr to column node Cc. Stones in one component can be removed until exactly one remains." },
+    codeLines: [1, 2], phase: "intro", event: "intro",
+  });
+  snapshot({
+    title: { vi: "Khởi tạo parent cho mọi hàng / cột xuất hiện", en: "Initialize parent for every used row / column" },
+    note: { vi: `Có ${nodes.length} node hàng/cột và ${stones.length} hòn đá. Ban đầu mỗi node là một component riêng.`, en: `There are ${nodes.length} row/column nodes and ${stones.length} stones. Each node starts in its own component.` },
+    codeLines: [3, 4, 5, 6, 7, 8], phase: "init", event: "init",
+    vars: [{ name: "DSU nodes", value: nodes.map(label).join(", ") }],
+  });
+
+  stones.forEach(([row, col], index) => {
+    const left = rowKey(row);
+    const right = colKey(col);
+    stoneStates[index] = "active";
+    snapshot({
+      title: { vi: `Đọc đá #${index + 1}: (${row}, ${col})`, en: `Read stone #${index + 1}: (${row}, ${col})` },
+      note: { vi: `Đá này tạo cạnh ${label(left)} ↔ ${label(right)}. Ta union hai đầu cạnh để cho DSU biết chúng thuộc cùng component.`, en: `This stone creates edge ${label(left)} ↔ ${label(right)}. Union its endpoints so DSU knows they share a component.` },
+      codeLines: [11, 12], phase: "connect", event: "read-stone", activeStone: index,
+    });
+    const rootLeft = find(left);
+    const rootRight = find(right);
+    const merged = rootLeft !== rootRight;
+    if (merged) {
+      if (size[rootLeft] < size[rootRight]) {
+        parent[rootLeft] = rootRight;
+        size[rootRight] += size[rootLeft];
+      } else {
+        parent[rootRight] = rootLeft;
+        size[rootLeft] += size[rootRight];
+      }
+    }
+    stoneStates[index] = merged ? "merged" : "same";
+    const finalRootLeft = rootOf(left);
+    const finalRootRight = rootOf(right);
+    snapshot({
+      title: merged
+        ? { vi: `Union ${label(rootLeft)} và ${label(rootRight)}`, en: `Union ${label(rootLeft)} and ${label(rootRight)}` }
+        : { vi: `${label(left)} và ${label(right)} đã nối gián tiếp`, en: `${label(left)} and ${label(right)} are already indirectly connected` },
+      note: merged
+        ? { vi: `Gộp hai component. Từ nay các đá nối vào ${label(finalRootLeft)} và ${label(finalRootRight)} thuộc cùng một nhóm.`, en: `Merge the two components. Stones touching ${label(finalRootLeft)} and ${label(finalRootRight)} now belong to one group.` }
+        : { vi: "Cạnh này đóng một chu trình trong component hiện có; nó không tạo thêm component mới.", en: "This edge closes a cycle in the existing component; it does not create a new component." },
+      codeLines: [6, 7, 9, 10], phase: "connect", event: merged ? "union" : "cycle", activeStone: index,
+      union: { left: label(left), right: label(right), rootLeft: label(rootLeft), rootRight: label(rootRight), merged },
+      vars: [{ name: "components", value: componentSnapshot().length }],
+    });
+  });
+
+  const groupCount = componentSnapshot().length;
+  answer = stones.length - groupCount;
+  snapshot({
+    title: { vi: `Kết quả: ${stones.length} − ${groupCount} = ${answer}`, en: `Result: ${stones.length} − ${groupCount} = ${answer}` },
+    note: { vi: `Mỗi component giữ lại 1 hòn đá để component không biến mất. Vì có ${groupCount} component, bỏ được tổng cộng ${answer} hòn.`, en: `Leave one stone in each component so it does not disappear. With ${groupCount} component(s), ${answer} stone(s) can be removed.` },
+    codeLines: [13], phase: "done", event: "answer", final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+  return { input, answer, steps };
+}
+
+// ─── 1061: Lexicographically Smallest Equivalent String ───
+function parse1061Data(input) {
+  const raw = String(input || "").trim();
+  const parts = raw.split(/[;|\n]/).map((part) => part.trim()).filter(Boolean);
+  const values = parts.length === 3 ? parts : raw.split(",").map((part) => part.trim());
+  if (values.length !== 3) throw new Error("enter s1;s2;baseStr, for example parker;morris;parser");
+  const [s1, s2, baseStr] = values;
+  if (!/^[a-z]+$/.test(s1) || !/^[a-z]+$/.test(s2) || !/^[a-z]+$/.test(baseStr)) {
+    throw new Error("s1, s2, and baseStr must contain lowercase English letters only");
+  }
+  if (s1.length !== s2.length) throw new Error("s1 and s2 must have the same length");
+  if (s1.length > 20 || baseStr.length > 24) throw new Error("visualization supports s1/s2 up to 20 and baseStr up to 24 letters");
+  return { s1, s2, baseStr };
+}
+
+function buildSteps1061(input) {
+  const { s1, s2, baseStr } = parse1061Data(input);
+  const letterIndex = (letter) => letter.charCodeAt(0) - 97;
+  const letter = (index) => String.fromCharCode(97 + index);
+  const letters = [...new Set(`${s1}${s2}${baseStr}`)].sort();
+  const parent = Array.from({ length: 26 }, (_, index) => index);
+  const pairStates = new Array(s1.length).fill("pending");
+  const output = baseStr.split("").map((source) => ({ source, value: null }));
+  const steps = [];
+  let answer = null;
+
+  const rootOf = (node) => {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+  const find = (node) => {
+    const root = rootOf(node);
+    let current = node;
+    while (parent[current] !== current) {
+      const next = parent[current];
+      parent[current] = root;
+      current = next;
+    }
+    return root;
+  };
+  const components = () => {
+    const buckets = new Map();
+    letters.forEach((value) => {
+      const root = rootOf(letterIndex(value));
+      if (!buckets.has(root)) buckets.set(root, []);
+      buckets.get(root).push(value);
+    });
+    return [...buckets.entries()].map(([root, members]) => ({ root: letter(root), members }));
+  };
+  const parentRows = () => letters.map((value) => {
+    const node = letterIndex(value);
+    return { letter: value, parent: letter(parent[node]), root: letter(rootOf(node)) };
+  });
+  const snapshot = ({ title, note, codeLines, phase, event, activePair = null, activeBaseIndex = null, union = null, final = false, vars = [] }) => {
+    steps.push({
+      title, note, codeLines, vars, final, arr: [], sub: [], highlight: [], mark: [],
+      equivalent1061View: {
+        phase, event, s1, s2, baseStr, pairStates: [...pairStates], activePair, activeBaseIndex,
+        output: output.map((item) => ({ ...item })), components: components(), parentRows: parentRows(),
+        union: union ? { ...union } : null, answer,
+      },
+    });
+  };
+
+  snapshot({
+    title: { vi: "Ý tưởng: root nhỏ nhất là đại diện của nhóm", en: "Idea: the smallest root represents each group" },
+    note: { vi: "Một cặp tương đương cho phép thay thế qua lại. Khi union, luôn gắn root lớn hơn vào root nhỏ hơn; vì vậy find(ch) trả về chữ nhỏ nhất có thể thay thế cho ch.", en: "An equivalent pair allows substitution both ways. On union, attach the larger root to the smaller root; then find(ch) returns the smallest replacement for ch." },
+    codeLines: [1, 2], phase: "intro", event: "intro",
+  });
+  snapshot({
+    title: { vi: "Khởi tạo 26 chữ cái", en: "Initialize all 26 letters" },
+    note: { vi: `Các chữ xuất hiện trong ví dụ: ${letters.join(", ")}. Ban đầu parent[x] = x, nên mỗi chữ là một nhóm riêng.`, en: `Letters used in this example: ${letters.join(", ")}. Initially parent[x] = x, so each letter has its own group.` },
+    codeLines: [3, 4, 5, 6, 7], phase: "init", event: "init",
+  });
+
+  for (let index = 0; index < s1.length; index++) {
+    const left = s1[index];
+    const right = s2[index];
+    pairStates[index] = "active";
+    snapshot({
+      title: { vi: `Đọc cặp #${index + 1}: ${left} ~ ${right}`, en: `Read pair #${index + 1}: ${left} ~ ${right}` },
+      note: { vi: `Hai chữ này thuộc cùng nhóm tương đương. Ta tìm root của ${left} và ${right}, rồi giữ root nhỏ hơn.`, en: `These letters belong to one equivalence group. Find the roots of ${left} and ${right}, then keep the smaller root.` },
+      codeLines: [8, 9], phase: "merge", event: "read-pair", activePair: index,
+    });
+    const rootLeft = find(letterIndex(left));
+    const rootRight = find(letterIndex(right));
+    const merged = rootLeft !== rootRight;
+    if (merged) parent[Math.max(rootLeft, rootRight)] = Math.min(rootLeft, rootRight);
+    pairStates[index] = merged ? "merged" : "same";
+    snapshot({
+      title: merged
+        ? { vi: `Giữ ${letter(Math.min(rootLeft, rootRight))} làm root nhỏ nhất`, en: `Keep ${letter(Math.min(rootLeft, rootRight))} as the smallest root` }
+        : { vi: `${left} và ${right} đã có cùng root`, en: `${left} and ${right} already share a root` },
+      note: merged
+        ? { vi: `parent[${letter(Math.max(rootLeft, rootRight))}] = ${letter(Math.min(rootLeft, rootRight))}. Từ đây mọi chữ trong nhóm sẽ ánh xạ về ${letter(Math.min(rootLeft, rootRight))}.`, en: `parent[${letter(Math.max(rootLeft, rootRight))}] = ${letter(Math.min(rootLeft, rootRight))}. Every letter in this group now maps to ${letter(Math.min(rootLeft, rootRight))}.` }
+        : { vi: "Không cần đổi parent; cặp này chỉ xác nhận quan hệ đã có.", en: "No parent change is needed; this pair only confirms an existing relationship." },
+      codeLines: [9, 10], phase: "merge", event: merged ? "union" : "already-equivalent", activePair: index,
+      union: { left, right, rootLeft: letter(rootLeft), rootRight: letter(rootRight), merged },
+    });
+  }
+
+  snapshot({
+    title: { vi: `Đổi từng chữ của baseStr = “${baseStr}”`, en: `Translate each character of baseStr = “${baseStr}”` },
+    note: { vi: "Các nhóm đã hoàn tất. Bây giờ find(ch) chính là lựa chọn nhỏ nhất theo thứ tự từ điển cho mỗi vị trí trong baseStr.", en: "The groups are complete. Now find(ch) is the lexicographically smallest choice for each baseStr position." },
+    codeLines: [11], phase: "translate", event: "start-translate",
+  });
+  for (let index = 0; index < baseStr.length; index++) {
+    const source = baseStr[index];
+    const result = letter(find(letterIndex(source)));
+    output[index].value = result;
+    snapshot({
+      title: { vi: `baseStr[${index}] = ${source} → ${result}`, en: `baseStr[${index}] = ${source} → ${result}` },
+      note: { vi: `find(${source}) trả về root nhỏ nhất ${result}; đây là ký tự tối ưu ở vị trí ${index}.`, en: `find(${source}) returns smallest root ${result}; this is the optimal character at position ${index}.` },
+      codeLines: [11], phase: "translate", event: "map-character", activeBaseIndex: index,
+      vars: [{ name: "output so far", value: output.map((item) => item.value || "_").join("") }],
+    });
+  }
+  answer = output.map((item) => item.value).join("");
+  snapshot({
+    title: { vi: `Kết quả nhỏ nhất: “${answer}”`, en: `Smallest result: “${answer}”` },
+    note: { vi: "Mỗi vị trí đã được thay bằng root nhỏ nhất của component tương đương, nên toàn bộ chuỗi là nhỏ nhất theo thứ tự từ điển.", en: "Every position has been replaced by its equivalence component's smallest root, so the whole string is lexicographically smallest." },
+    codeLines: [11], phase: "done", event: "answer", final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+  return { input, answer, steps };
+}
+
+// ─── 305: Number of Islands II ───
+function parse305Data(input) {
+  const raw = String(input || "").trim();
+  if (!raw) throw new Error("enter m,n followed by positions, for example 3,3;0,0;0,1");
+  let rows, cols, positions;
+  if (raw.startsWith("{")) {
+    let data;
+    try { data = JSON.parse(raw); } catch (error) { throw new Error("JSON input must contain m, n, and positions"); }
+    rows = Number(data.m); cols = Number(data.n); positions = data.positions;
+  } else {
+    const parts = raw.split(/[;|]/).map((part) => part.trim()).filter(Boolean);
+    const dimensions = (parts.shift() || "").split(",").map((value) => Number(value.trim()));
+    [rows, cols] = dimensions;
+    positions = parts.map((part) => part.split(",").map((value) => Number(value.trim())));
+  }
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 1 || cols < 1 || rows > 8 || cols > 8) {
+    throw new Error("m and n must be integers from 1 to 8 for this visualization");
+  }
+  if (!Array.isArray(positions) || !positions.every((position) => Array.isArray(position) && position.length === 2 && position.every(Number.isInteger))) {
+    throw new Error("each position must be row,col");
+  }
+  if (positions.length > 24) throw new Error("visualization supports at most 24 positions");
+  positions.forEach(([row, col]) => {
+    if (row < 0 || row >= rows || col < 0 || col >= cols) throw new Error(`position (${row},${col}) is outside the grid`);
+  });
+  return { rows, cols, positions: positions.map(([row, col]) => [row, col]) };
+}
+
+function buildSteps305(input) {
+  const { rows, cols, positions } = parse305Data(input);
+  const total = rows * cols;
+  const parent = new Array(total).fill(-1);
+  const size = new Array(total).fill(0);
+  const statuses = new Array(positions.length).fill("pending");
+  const counts = new Array(positions.length).fill(null);
+  const steps = [];
+  let islands = 0;
+  const id = (row, col) => row * cols + col;
+  const coord = (node) => [Math.floor(node / cols), node % cols];
+  const coordText = (node) => `(${coord(node).join(",")})`;
+
+  const rootOf = (node) => {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+  const find = (node) => {
+    const root = rootOf(node);
+    let current = node;
+    while (parent[current] !== current) {
+      const next = parent[current];
+      parent[current] = root;
+      current = next;
+    }
+    return root;
+  };
+  const componentSnapshot = () => {
+    const buckets = new Map();
+    for (let node = 0; node < total; node++) {
+      if (parent[node] === -1) continue;
+      const root = rootOf(node);
+      if (!buckets.has(root)) buckets.set(root, []);
+      buckets.get(root).push(coord(node));
+    }
+    return [...buckets.entries()].map(([root, members]) => ({ root, members, size: size[root] }));
+  };
+  const parentRows = () => parent.map((value, node) => {
+    if (value === -1) return null;
+    const root = rootOf(node);
+    return { node: coord(node), parent: coord(value), root: coord(root), size: node === root ? size[node] : null };
+  }).filter(Boolean);
+  const snapshot = ({ title, note, codeLines, phase, event, activeIndex = null, activeCell = null, activeNeighbor = null, union = null, final = false, vars = [] }) => {
+    steps.push({
+      title, note, codeLines, vars, final, arr: [...parent], sub: [...size], highlight: [], mark: [],
+      islands305View: {
+        phase, event, rows, cols, positions: positions.map((position) => [...position]), statuses: [...statuses], counts: [...counts],
+        activeIndex, activeCell: activeCell ? [...activeCell] : null, activeNeighbor: activeNeighbor ? [...activeNeighbor] : null,
+        union: union ? { ...union } : null, parent: [...parent], size: [...size], components: componentSnapshot(), parentRows: parentRows(), islands,
+      },
+    });
+  };
+
+  snapshot({
+    title: { vi: "Ý tưởng: thêm đất trực tuyến", en: "Idea: add land online" },
+    note: { vi: "Mỗi lần thêm đất bắt đầu bằng một đảo mới. Chỉ union với bốn hàng xóm đã là đất; mỗi union thành công giảm số đảo đi 1.", en: "Every new land cell starts as one island. Union only with its four land neighbors; every successful union reduces the island count by 1." },
+    codeLines: [1, 2], phase: "intro", event: "intro",
+  });
+  snapshot({
+    title: { vi: `Khởi tạo grid ${rows} × ${cols} và DSU rỗng`, en: `Initialize ${rows} × ${cols} grid and empty DSU` },
+    note: { vi: "parent = −1 nghĩa là nước. Khi một ô trở thành đất, parent[id] = id và size = 1.", en: "parent = −1 means water. When a cell becomes land, parent[id] = id and size = 1." },
+    codeLines: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12], phase: "init", event: "init",
+  });
+
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  positions.forEach(([row, col], index) => {
+    statuses[index] = "active";
+    snapshot({
+      title: { vi: `Thêm vị trí #${index + 1}: (${row},${col})`, en: `Add position #${index + 1}: (${row},${col})` },
+      note: { vi: "Kiểm tra ô này có phải nước hay không. Nếu là nước, nó sẽ tạo một đảo mới trước khi nhìn các hàng xóm.", en: "Check whether this cell is water. If so, it creates a new island before looking at its neighbors." },
+      codeLines: [18, 19], phase: "add", event: "read-position", activeIndex: index, activeCell: [row, col],
+    });
+    const node = id(row, col);
+    if (parent[node] !== -1) {
+      statuses[index] = "duplicate";
+      counts[index] = islands;
+      snapshot({
+        title: { vi: `(${row},${col}) đã là đất → không đổi`, en: `(${row},${col}) is already land → no change` },
+        note: { vi: "Vị trí lặp lại không tạo đảo mới. Ghi lại số đảo hiện tại vào đáp án.", en: "A duplicate position creates no new island. Record the current island count." },
+        codeLines: [20, 21], phase: "add", event: "duplicate", activeIndex: index, activeCell: [row, col],
+      });
+      return;
+    }
+    parent[node] = node;
+    size[node] = 1;
+    islands++;
+    statuses[index] = "land";
+    snapshot({
+      title: { vi: `Đặt (${row},${col}) thành đất: islands = ${islands}`, en: `Make (${row},${col}) land: islands = ${islands}` },
+      note: { vi: "Tạm thời ô mới là một component riêng, nên biến đếm islands tăng 1.", en: "For now the new cell is its own component, so the islands counter increases by 1." },
+      codeLines: [22, 23], phase: "add", event: "new-land", activeIndex: index, activeCell: [row, col],
+      vars: [{ name: "islands", value: islands }],
+    });
+
+    directions.forEach(([dr, dc]) => {
+      const nextRow = row + dr;
+      const nextCol = col + dc;
+      const inside = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+      const activeNeighbor = inside && parent[id(nextRow, nextCol)] !== -1;
+      snapshot({
+        title: { vi: `Xét hàng xóm (${nextRow},${nextCol})`, en: `Check neighbor (${nextRow},${nextCol})` },
+        note: !inside
+          ? { vi: "Ngoài grid → bỏ qua.", en: "Outside the grid → skip." }
+          : activeNeighbor
+            ? { vi: "Đây là đất; có thể cần union hai component.", en: "This is land; the two components may need a union." }
+            : { vi: "Đây là nước; không có cạnh DSU để nối.", en: "This is water; there is no DSU edge to connect." },
+        codeLines: [24, 25], phase: "merge", event: !inside ? "outside" : activeNeighbor ? "land-neighbor" : "water-neighbor", activeIndex: index, activeCell: [row, col], activeNeighbor: inside ? [nextRow, nextCol] : null,
+      });
+      if (!activeNeighbor) return;
+      let rootA = find(node);
+      let rootB = find(id(nextRow, nextCol));
+      const merged = rootA !== rootB;
+      if (merged) {
+        if (size[rootA] < size[rootB]) [rootA, rootB] = [rootB, rootA];
+        parent[rootB] = rootA;
+        size[rootA] += size[rootB];
+        islands--;
+      }
+      snapshot({
+        title: merged
+          ? { vi: `Union hai đảo → islands = ${islands}`, en: `Union the two islands → islands = ${islands}` }
+          : { vi: "Hai ô đã thuộc cùng một đảo", en: "Both cells already belong to one island" },
+        note: merged
+          ? { vi: "Hai component nối liền qua cạnh kề nhau, nên chúng trở thành một đảo và counter giảm 1.", en: "The components touch through adjacent cells, so they become one island and the counter decreases by 1." }
+          : { vi: "Union không đổi counter vì hai ô đã có chung root.", en: "The union does not change the counter because the cells already share a root." },
+        codeLines: [26, 27, 28], phase: "merge", event: merged ? "union" : "same-component", activeIndex: index, activeCell: [row, col], activeNeighbor: [nextRow, nextCol],
+        union: { from: [row, col], to: [nextRow, nextCol], merged }, vars: [{ name: "islands", value: islands }],
+      });
+    });
+    statuses[index] = "done";
+    counts[index] = islands;
+    snapshot({
+      title: { vi: `Ghi đáp án sau vị trí #${index + 1}: ${islands}`, en: `Record answer after position #${index + 1}: ${islands}` },
+      note: { vi: "Danh sách kết quả giữ số đảo sau MỖI lần thêm đất.", en: "The result list stores the island count after EVERY land addition." },
+      codeLines: [29], phase: "count", event: "record", activeIndex: index, activeCell: [row, col],
+    });
+  });
+
+  snapshot({
+    title: { vi: "Hoàn tất: trả về dãy số đảo", en: "Complete: return island counts" },
+    note: { vi: "Đây là đáp án online: mỗi phần tử ứng với trạng thái ngay sau lần thêm đất cùng chỉ số.", en: "This is the online answer: each entry matches the state immediately after the addition at that index." },
+    codeLines: [30], phase: "done", event: "answer", final: true,
+    vars: [{ name: "answer", value: `[${counts.join(", ")}]` }],
+  });
+  return { input, answer: counts, steps };
+}
+
 // ─── 803: Bricks Falling When Hit ───
 function parse803Grid(input) {
   const raw = String(input).trim();
@@ -5108,6 +5788,212 @@ module.exports = {
       "        return [[email_name[g[0]]] + sorted(g) for g in groups.values()]",
     ],
     builder: buildSteps721,
+  },
+  947: {
+    id: 947,
+    difficulty: "medium",
+    slug: "most-stones-removed-with-same-row-or-column",
+    category: UF_CAT,
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Most Stones Removed with Same Row or Column", en: "Most Stones Removed with Same Row or Column" },
+    titleVi: { vi: "Bỏ tối đa đá cùng hàng hoặc cột", en: "Remove maximum stones sharing a row or column" },
+    statement: {
+      vi: "Mỗi đá nằm tại (row,col). Có thể bỏ một đá nếu còn ít nhất một đá khác cùng hàng hoặc cùng cột. Tìm số đá bỏ tối đa. Nhập tọa độ dạng row,col;row,col;...",
+      en: "Each stone lies at (row,col). A stone can be removed if another stone remains in the same row or column. Find the maximum removals. Enter coordinates as row,col;row,col;...",
+    },
+    defaultInput: "0,0;0,1;1,0;1,2;2,1;2,2",
+    inputKind: "string",
+    inputLabel: { vi: "Stones (row,col; row,col; ...)", en: "Stones (row,col; row,col; ...)" },
+    extraParams: [],
+    approach: [
+      { vi: "Không cần coi mỗi đá là node: coi MỖI HÀNG và MỖI CỘT xuất hiện là một node DSU.", en: "Do not make stones the DSU nodes: make every USED ROW and USED COLUMN a DSU node." },
+      { vi: "Một đá (r,c) là cạnh nối row r với column c. Union hai node này cho mỗi đá.", en: "A stone (r,c) is an edge connecting row r to column c. Union these two nodes for each stone." },
+      { vi: "Trong một component có k đá, luôn bỏ được k−1 đá: chỉ cần giữ một đá cuối để component không biến mất.", en: "A component with k stones always allows k−1 removals: keep one final stone so that component remains." },
+      { vi: "Kết quả = số đá − số component DSU (chỉ tính các row/column có xuất hiện).", en: "Answer = stone count − DSU component count (among used rows/columns only)." },
+    ],
+    complexity: { time: "O(N · α(N))", space: "O(N)", note: { vi: "N là số đá; DSU chứa nhiều nhất 2N node hàng/cột.", en: "N is the number of stones; the DSU has at most 2N row/column nodes." } },
+    code: [
+      "class Solution:",
+      "    def removeStones(self, stones):",
+      "        parent = {}",
+      "        def find(x):",
+      "            parent.setdefault(x, x)",
+      "            if parent[x] != x:",
+      "                parent[x] = find(parent[x])",
+      "            return parent[x]",
+      "        def union(a, b):",
+      "            parent[find(a)] = find(b)",
+      "        for row, col in stones:",
+      "            union((\"row\", row), (\"col\", col))",
+      "        return len(stones) - len({find(node) for node in parent})",
+    ],
+    builder: buildSteps947,
+  },
+  1061: {
+    id: 1061,
+    difficulty: "medium",
+    slug: "lexicographically-smallest-equivalent-string",
+    category: UF_CAT,
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Lexicographically Smallest Equivalent String", en: "Lexicographically Smallest Equivalent String" },
+    titleVi: { vi: "Chuỗi tương đương nhỏ nhất theo từ điển", en: "Lexicographically smallest equivalent string" },
+    statement: {
+      vi: "s1[i] và s2[i] là hai chữ tương đương. Thay mỗi chữ của baseStr bằng chữ nhỏ nhất trong nhóm tương đương của nó. Nhập theo thứ tự s1;s2;baseStr.",
+      en: "s1[i] and s2[i] are equivalent letters. Replace every baseStr letter with the smallest letter in its equivalence group. Enter s1;s2;baseStr.",
+    },
+    defaultInput: "parker;morris;parser",
+    inputKind: "string",
+    inputLabel: { vi: "s1;s2;baseStr (vd: parker;morris;parser)", en: "s1;s2;baseStr (e.g. parker;morris;parser)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng 26 node cho a..z. Một cặp s1[i]~s2[i] nghĩa là hai node thuộc cùng component.", en: "Use 26 nodes for a..z. A pair s1[i]~s2[i] means the nodes belong to one component." },
+      { vi: "Để root luôn là chữ nhỏ nhất, union gắn root lớn hơn vào root nhỏ hơn.", en: "To make the root always the smallest letter, union attaches the larger root to the smaller root." },
+      { vi: "Sau khi gộp hết cặp, find(ch) trả về chính lựa chọn nhỏ nhất cho ch.", en: "After merging all pairs, find(ch) directly returns ch's smallest possible replacement." },
+    ],
+    complexity: { time: "O((|s1| + |baseStr|) · α(26))", space: "O(26)", note: { vi: "Chỉ có 26 chữ thường; find/union gần như hằng số.", en: "There are only 26 lowercase letters; find/union are effectively constant time." } },
+    code: [
+      "class Solution:",
+      "    def smallestEquivalentString(self, s1, s2, baseStr):",
+      "        parent = list(range(26))",
+      "        def find(x):",
+      "            if parent[x] != x:",
+      "                parent[x] = find(parent[x])",
+      "            return parent[x]",
+      "        for a, b in zip(s1, s2):",
+      "            ra, rb = find(ord(a)-97), find(ord(b)-97)",
+      "            parent[max(ra, rb)] = min(ra, rb)",
+      "        return ''.join(chr(find(ord(ch)-97)+97) for ch in baseStr)",
+    ],
+    builder: buildSteps1061,
+  },
+  305: {
+    id: 305,
+    difficulty: "hard",
+    slug: "number-of-islands-ii",
+    category: UF_CAT,
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Number of Islands II", en: "Number of Islands II" },
+    titleVi: { vi: "Đếm đảo khi thêm đất liên tiếp", en: "Count islands while adding land" },
+    statement: {
+      vi: "Ban đầu grid m×n toàn nước. Với mỗi position, đổi ô đó thành đất và trả về số đảo sau từng lần thêm. Nhập m,n;row,col;row,col;...",
+      en: "An m×n grid starts as all water. For each position, change that cell to land and return the island count after each addition. Enter m,n;row,col;row,col;...",
+    },
+    defaultInput: "3,3;0,0;0,1;1,2;2,1;1,1",
+    inputKind: "string",
+    inputLabel: { vi: "m,n; positions row,col; ...", en: "m,n; positions row,col; ..." },
+    extraParams: [],
+    approach: [
+      { vi: "DSU có m×n node; parent[id] = −1 nghĩa là ô vẫn là nước.", en: "The DSU has m×n nodes; parent[id] = −1 means the cell is still water." },
+      { vi: "Mỗi ô đất mới tạm tạo một đảo, nên islands tăng 1.", en: "Every newly added land cell temporarily creates one island, so islands increases by 1." },
+      { vi: "Kiểm tra bốn hàng xóm. Nếu hàng xóm là đất và union thành công, hai đảo gộp lại nên islands giảm 1.", en: "Check four neighbors. If a neighbor is land and union succeeds, two islands merge so islands decreases by 1." },
+      { vi: "Ghi islands vào output sau mỗi position: đây là đáp án online.", en: "Append islands after every position: this is the online answer." },
+    ],
+    complexity: { time: "O(P · α(m·n))", space: "O(m·n)", note: { vi: "P là số lần thêm đất; mỗi lần chỉ kiểm tra tối đa bốn hàng xóm.", en: "P is the number of land additions; each checks at most four neighbors." } },
+    code: [
+      "class Solution:",
+      "    def numIslands2(self, m, n, positions):",
+      "        parent = [-1] * (m * n)",
+      "        size = [0] * (m * n)",
+      "        answer, islands = [], 0",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        def union(a, b):",
+      "            ra, rb = find(a), find(b)",
+      "            if ra == rb: return False",
+      "            if size[ra] < size[rb]: ra, rb = rb, ra",
+      "            parent[rb] = ra",
+      "            size[ra] += size[rb]",
+      "            return True",
+      "        for row, col in positions:",
+      "            node = row * n + col",
+      "            if parent[node] != -1:",
+      "                answer.append(islands); continue",
+      "            parent[node] = node; size[node] = 1",
+      "            islands += 1",
+      "            for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):",
+      "                nr, nc = row + dr, col + dc",
+      "                if 0 <= nr < m and 0 <= nc < n and parent[nr*n+nc] != -1:",
+      "                    if union(node, nr*n+nc):",
+      "                        islands -= 1",
+      "            answer.append(islands)",
+      "        return answer",
+    ],
+    builder: buildSteps305,
+  },
+  990: {
+    id: 990,
+    difficulty: "medium",
+    slug: "satisfiability-of-equality-equations",
+    category: UF_CAT,
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Satisfiability of Equality Equations", en: "Satisfiability of Equality Equations" },
+    titleVi: { vi: "Kiểm tra các phương trình bằng / khác (Union-Find)", en: "Check equality / inequality equations (Union-Find)" },
+    statement: {
+      vi: "Cho danh sách phương trình dạng a==b hoặc a!=b. Hãy cho biết có thể gán giá trị cho các biến để TẤT CẢ phương trình cùng đúng không. Nhập các phương trình cách nhau bằng dấu phẩy hoặc chấm phẩy.",
+      en: "Given equations of the form a==b or a!=b, determine whether values can be assigned so that ALL equations are true. Enter equations separated by commas or semicolons.",
+    },
+    defaultInput: "a==b,b!=c,c==a",
+    inputKind: "string",
+    inputLabel: { vi: "Phương trình: a==b,b!=c,c==a", en: "Equations: a==b,b!=c,c==a" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi chữ cái là một node. parent[x] cho biết node cha; root của một node là đại diện của nhóm các chữ buộc phải bằng nhau.", en: "Each letter is a node. parent[x] stores its parent; a node's root represents the group of letters forced to be equal." },
+      { vi: "Pass 1: xử lý TẤT CẢ dấu == trước bằng union(a, b). Như vậy mọi hệ quả bắc cầu cũng nằm chung nhóm: a==b và b==c ⇒ a==c.", en: "Pass 1: process EVERY == first with union(a, b). This also captures transitive consequences: a==b and b==c ⇒ a==c." },
+      { vi: "Pass 2: với mỗi a!=b, so sánh find(a) và find(b). Nếu cùng root thì các dấu == đã ép a và b bằng nhau → mâu thuẫn → False.", en: "Pass 2: for each a!=b, compare find(a) and find(b). If they share a root, == equations have forced a and b equal → contradiction → False." },
+      { vi: "Nếu mọi dấu != có root khác nhau thì không có mâu thuẫn → True. Path compression và union by size giúp các lần find/union gần O(1).", en: "If every != has different roots, there is no contradiction → True. Path compression and union by size make find/union nearly O(1)." },
+    ],
+    complexity: {
+      time: "O(E · α(26)) ≈ O(E)",
+      space: "O(26) ≈ O(1)",
+      note: { vi: "E là số phương trình. Mỗi phương trình được duyệt tối đa hai lần; α là inverse Ackermann, gần như hằng số.", en: "E is the number of equations. Each equation is scanned at most twice; α is inverse Ackermann, effectively constant." },
+    },
+    code: [
+      "class Solution:",
+      "    def equationsPossible(self, equations):",
+      "        parent = list(range(26))",
+      "        size = [1] * 26",
+      "",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "",
+      "        def union(a, b):",
+      "            root_a, root_b = find(a), find(b)",
+      "            if root_a == root_b:",
+      "                return",
+      "            if size[root_a] < size[root_b]:",
+      "                root_a, root_b = root_b, root_a",
+      "            parent[root_b] = root_a",
+      "            size[root_a] += size[root_b]",
+      "",
+      "        for equation in equations:",
+      "            if equation[1:3] == '==':",
+      "                union(ord(equation[0]) - 97, ord(equation[3]) - 97)",
+      "",
+      "        for equation in equations:",
+      "            if equation[1:3] == '!=' and find(ord(equation[0]) - 97) == find(ord(equation[3]) - 97):",
+      "                return False",
+      "        return True",
+    ],
+    builder: buildSteps990,
   },
   547: {
     id: 547,
