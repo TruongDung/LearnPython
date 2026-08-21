@@ -3261,6 +3261,223 @@ function parseMatrix(input) {
   return String(input).split(/[;|]/).map((r) => r.trim()).filter(Boolean).map((r) => r.split(",").map((v) => Number(v.trim())));
 }
 
+const twoDArrayTag = { key: "2d-array", vi: "Mảng 2D", en: "2D Array" };
+
+function parseIntegerMatrix2D(input) {
+  const matrix = parseMatrix(input);
+  if (!matrix.length || !matrix[0].length || !matrix.every((row) => row.length === matrix[0].length && row.every(Number.isInteger))) {
+    throw new Error("enter a non-empty rectangular integer matrix, e.g. 1,2;3,4");
+  }
+  return matrix;
+}
+
+function cloneMatrix2D(matrix) {
+  return matrix.map((row) => [...row]);
+}
+
+function blankMatrix2D(rows, cols) {
+  return Array.from({ length: rows }, () => Array(cols).fill("·"));
+}
+
+function matrixGrid2D(matrix, options = {}) {
+  const safe = matrix.length && matrix[0].length ? matrix : [["·"]];
+  return {
+    dp: safe.map((row) => row.map((value) => value === null || value === undefined ? "·" : value)),
+    text1: " ".repeat(safe.length),
+    text2: " ".repeat(safe[0].length),
+    largeCells: true,
+    ...options,
+  };
+}
+
+function matrixStep2D(matrix, { title, codeLines = [], vars = [], note, final = false, grid = {} }) {
+  return {
+    title,
+    arr: [],
+    highlight: [],
+    mark: [],
+    final,
+    codeLines,
+    vars,
+    note,
+    grid: matrixGrid2D(matrix, grid),
+  };
+}
+
+/** LeetCode 422: Valid Word Square. */
+function buildSteps422(input) {
+  const words = String(input).split(",").map((word) => word.trim()).filter(Boolean);
+  if (!words.length) throw new Error("enter words separated by commas, e.g. ball,area,lead,lady");
+  const width = Math.max(...words.map((word) => word.length));
+  const board = words.map((word) => Array.from({ length: width }, (_, col) => word[col] || "·"));
+  const steps = [];
+  const push = (details) => steps.push(matrixStep2D(board, details));
+
+  push({ title: { vi: "Đặt các từ thành lưới", en: "Place words in a grid" }, codeLines: [3], vars: [{ name: "words", value: `[${words.join(", ")}]` }], note: { vi: "Word square hợp lệ khi ô (r,c) bằng ô đối xứng (c,r).", en: "A word square is valid when cell (r,c) equals its mirrored cell (c,r)." }, grid: { caption: "words[r][c] must equal words[c][r]" } });
+  for (let r = 0; r < words.length; r++) {
+    for (let c = 0; c < words[r].length; c++) {
+      const mirroredExists = c < words.length && r < words[c].length;
+      const same = mirroredExists && words[r][c] === words[c][r];
+      if (!same) {
+        push({ title: { vi: `Lệch tại (${r}, ${c})`, en: `Mismatch at (${r}, ${c})` }, codeLines: [5, 6], final: true, vars: [{ name: "words[r][c]", value: words[r][c] }, { name: "words[c][r]", value: mirroredExists ? words[c][r] : "missing" }, { name: "valid", value: false }], note: { vi: `words[${r}][${c}] không khớp phần tử đối xứng qua đường chéo → False.`, en: `words[${r}][${c}] does not match its diagonal mirror → False.` }, grid: { hlCell: [r, c], pathCells: mirroredExists ? [[c, r]] : [], caption: "Mismatch" } });
+        return { original: words, answer: false, steps };
+      }
+      push({ title: { vi: `So sánh (${r},${c}) với (${c},${r})`, en: `Compare (${r},${c}) with (${c},${r})` }, codeLines: [4, 5], vars: [{ name: "r,c", value: `${r},${c}` }, { name: "character", value: words[r][c] }, { name: "match", value: true }], note: { vi: `'${words[r][c]}' bằng phần tử đối xứng → tiếp tục.`, en: `'${words[r][c]}' equals its mirrored character → continue.` }, grid: { hlCell: [r, c], pathCells: [[c, r]], caption: "Diagonal symmetry" } });
+    }
+  }
+  push({ title: { vi: "Tất cả ô đều đối xứng", en: "All cells are symmetric" }, codeLines: [7], final: true, vars: [{ name: "valid", value: true }], note: { vi: "Mọi cặp (r,c) và (c,r) đều bằng nhau → True.", en: "Every pair (r,c) and (c,r) matches → True." }, grid: { caption: "Valid word square" } });
+  return { original: words, answer: true, steps };
+}
+
+/** LeetCode 566: Reshape the Matrix. */
+function buildSteps566(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const rows = Number(params.r);
+  const cols = Number(params.c);
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows <= 0 || cols <= 0) throw new Error("r and c must be positive integers");
+  const total = matrix.length * matrix[0].length;
+  const steps = [];
+  steps.push(matrixStep2D(matrix, { title: { vi: "Đọc ma trận nguồn", en: "Read the source matrix" }, codeLines: [3], vars: [{ name: "source shape", value: `${matrix.length}×${matrix[0].length}` }, { name: "target shape", value: `${rows}×${cols}` }, { name: "cells", value: total }], note: { vi: "Reshape giữ nguyên thứ tự row-major của mọi phần tử.", en: "Reshape preserves the row-major order of every element." }, grid: { caption: "Source matrix" } }));
+  if (total !== rows * cols) {
+    steps.push(matrixStep2D(matrix, { title: { vi: "Không thể reshape", en: "Cannot reshape" }, codeLines: [4, 5], final: true, vars: [{ name: "source cells", value: total }, { name: "target cells", value: rows * cols }], note: { vi: "Số ô khác nhau nên phải trả về ma trận ban đầu.", en: "The cell counts differ, so return the original matrix." }, grid: { caption: "Return source unchanged" } }));
+    return { original: matrix, answer: matrix, steps };
+  }
+  const result = blankMatrix2D(rows, cols);
+  for (let index = 0; index < total; index++) {
+    const sourceRow = Math.floor(index / matrix[0].length);
+    const sourceCol = index % matrix[0].length;
+    const targetRow = Math.floor(index / cols);
+    const targetCol = index % cols;
+    result[targetRow][targetCol] = matrix[sourceRow][sourceCol];
+    steps.push(matrixStep2D(result, { title: { vi: `Đặt ${matrix[sourceRow][sourceCol]} vào (${targetRow},${targetCol})`, en: `Place ${matrix[sourceRow][sourceCol]} at (${targetRow},${targetCol})` }, codeLines: [6, 7, 8], vars: [{ name: "flat index", value: index }, { name: "source", value: `(${sourceRow},${sourceCol})` }, { name: "target", value: `(${targetRow},${targetCol})` }], note: { vi: `Phần tử thứ ${index} theo thứ tự row-major giữ nguyên vị trí phẳng rồi đổi sang tọa độ mới.`, en: `Item ${index} keeps its row-major flat position, then gets a new coordinate.` }, grid: { hlCell: [targetRow, targetCol], caption: `Result ${rows}×${cols}` } }));
+  }
+  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất reshape", en: "Reshape complete" }, codeLines: [9], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Đã ghi mọi phần tử theo thứ tự ban đầu.", en: "All values were written in their original order." }, grid: { caption: "Reshaped matrix" } }));
+  return { original: matrix, answer: result, steps };
+}
+
+/** LeetCode 766: Toeplitz Matrix. */
+function buildSteps766(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  const steps = [];
+  steps.push(matrixStep2D(matrix, { title: { vi: "Kiểm tra các đường chéo", en: "Check diagonals" }, codeLines: [3], vars: [{ name: "rows, cols", value: `${matrix.length}, ${matrix[0].length}` }], note: { vi: "Mỗi ô (r,c), trừ hàng/cột đầu, phải bằng ô (r−1,c−1).", en: "Every cell (r,c), except the first row/column, must equal (r−1,c−1)." }, grid: { caption: "Compare each cell with its top-left diagonal neighbor" } }));
+  for (let r = 1; r < matrix.length; r++) for (let c = 1; c < matrix[0].length; c++) {
+    const same = matrix[r][c] === matrix[r - 1][c - 1];
+    steps.push(matrixStep2D(matrix, { title: { vi: `So sánh (${r},${c}) với (${r - 1},${c - 1})`, en: `Compare (${r},${c}) with (${r - 1},${c - 1})` }, codeLines: [4, 5], final: !same, vars: [{ name: "current", value: matrix[r][c] }, { name: "top-left", value: matrix[r - 1][c - 1] }, { name: "toeplitz", value: same }], note: { vi: same ? "Hai giá trị bằng nhau → tiếp tục đường chéo." : "Hai giá trị khác nhau → không phải Toeplitz.", en: same ? "The values match → continue along diagonals." : "The values differ → not Toeplitz." }, grid: { hlCell: [r, c], pathCells: [[r - 1, c - 1]], caption: same ? "Diagonal matches" : "Diagonal mismatch" } }));
+    if (!same) return { original: matrix, answer: false, steps };
+  }
+  steps.push(matrixStep2D(matrix, { title: { vi: "Ma trận Toeplitz", en: "Toeplitz matrix" }, codeLines: [6], final: true, vars: [{ name: "toeplitz", value: true }], note: { vi: "Mọi đường chéo từ trái-trên xuống phải-dưới đều có cùng giá trị.", en: "Every top-left to bottom-right diagonal has one value." }, grid: { caption: "All diagonal checks passed" } }));
+  return { original: matrix, answer: true, steps };
+}
+
+/** LeetCode 832: Flipping an Image. */
+function buildSteps832(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  if (!matrix.every((row) => row.every((value) => value === 0 || value === 1))) throw new Error("image cells must be 0 or 1");
+  const result = blankMatrix2D(matrix.length, matrix[0].length);
+  const steps = [matrixStep2D(matrix, { title: { vi: "Reverse rồi invert", en: "Reverse then invert" }, codeLines: [3], vars: [{ name: "rows", value: matrix.length }], note: { vi: "Mỗi hàng được đảo chiều; sau đó 0↔1.", en: "Reverse every row; then flip 0↔1." }, grid: { caption: "Original binary image" } })];
+  for (let r = 0; r < matrix.length; r++) for (let c = 0; c < matrix[0].length; c++) {
+    const targetCol = matrix[0].length - 1 - c;
+    const value = matrix[r][c] ^ 1;
+    result[r][targetCol] = value;
+    steps.push(matrixStep2D(result, { title: { vi: `(${r},${c}) → (${r},${targetCol})`, en: `(${r},${c}) → (${r},${targetCol})` }, codeLines: [4, 5, 6], vars: [{ name: "source", value: matrix[r][c] }, { name: "reversed col", value: targetCol }, { name: "inverted", value }], note: { vi: `Đảo cột ${c} thành ${targetCol}, rồi ${matrix[r][c]} XOR 1 = ${value}.`, en: `Reverse column ${c} to ${targetCol}, then ${matrix[r][c]} XOR 1 = ${value}.` }, grid: { hlCell: [r, targetCol], caption: "Building flipped image" } }));
+  }
+  steps.push(matrixStep2D(result, { title: { vi: "Ảnh sau khi flip", en: "Flipped image" }, codeLines: [7], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Mọi hàng đã được reverse và mọi bit đã invert.", en: "Every row is reversed and every bit is inverted." }, grid: { caption: "Final image" } }));
+  return { original: matrix, answer: result, steps };
+}
+
+/** LeetCode 867: Transpose Matrix. */
+function buildSteps867(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  const result = blankMatrix2D(matrix[0].length, matrix.length);
+  const steps = [matrixStep2D(matrix, { title: { vi: "Transpose: đổi hàng thành cột", en: "Transpose: rows become columns" }, codeLines: [3], vars: [{ name: "source shape", value: `${matrix.length}×${matrix[0].length}` }, { name: "target shape", value: `${matrix[0].length}×${matrix.length}` }], note: { vi: "matrix[r][c] được ghi vào result[c][r].", en: "Write matrix[r][c] into result[c][r]." }, grid: { caption: "Source matrix" } })];
+  for (let r = 0; r < matrix.length; r++) for (let c = 0; c < matrix[0].length; c++) {
+    result[c][r] = matrix[r][c];
+    steps.push(matrixStep2D(result, { title: { vi: `(${r},${c}) → (${c},${r})`, en: `(${r},${c}) → (${c},${r})` }, codeLines: [4, 5], vars: [{ name: "value", value: matrix[r][c] }, { name: "source", value: `(${r},${c})` }, { name: "target", value: `(${c},${r})` }], note: { vi: `Đổi vị trí chỉ số hàng và cột của ${matrix[r][c]}.`, en: `Swap the row and column indexes of ${matrix[r][c]}.` }, grid: { hlCell: [c, r], caption: "Transpose result" } }));
+  }
+  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất transpose", en: "Transpose complete" }, codeLines: [6], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Ma trận kết quả có số hàng/cột hoán đổi.", en: "The result has its row and column counts swapped." }, grid: { caption: "Transposed matrix" } }));
+  return { original: matrix, answer: result, steps };
+}
+
+/** LeetCode 1337: The K Weakest Rows in a Matrix. */
+function buildSteps1337(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const k = Number(params.k);
+  if (!Number.isInteger(k) || k <= 0 || k > matrix.length) throw new Error("k must be between 1 and the number of rows");
+  const steps = [matrixStep2D(matrix, { title: { vi: "Đếm soldiers ở từng hàng", en: "Count soldiers in every row" }, codeLines: [3], vars: [{ name: "k", value: k }], note: { vi: "Hàng yếu hơn có ít soldier hơn; nếu bằng nhau, chỉ số hàng nhỏ hơn đứng trước.", en: "A weaker row has fewer soldiers; ties use the smaller row index." }, grid: { caption: "1 = soldier, 0 = civilian" } })];
+  const strengths = [];
+  for (let r = 0; r < matrix.length; r++) {
+    const soldiers = matrix[r].reduce((sum, value) => sum + value, 0);
+    strengths.push([soldiers, r]);
+    steps.push(matrixStep2D(matrix, { title: { vi: `Hàng ${r}: ${soldiers} soldier`, en: `Row ${r}: ${soldiers} soldiers` }, codeLines: [4, 5], vars: [{ name: "row", value: r }, { name: "soldiers", value: soldiers }, { name: "pairs", value: strengths.map(([count, row]) => `(${count},${row})`).join(" ") }], note: { vi: `Tổng các bit của hàng ${r} là ${soldiers}.`, en: `The sum of row ${r}'s bits is ${soldiers}.` }, grid: { pathCells: matrix[r].map((_, c) => [r, c]), caption: "Counting this row" } }));
+  }
+  strengths.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const answer = strengths.slice(0, k).map(([, row]) => row);
+  steps.push(matrixStep2D(matrix, { title: { vi: `Sắp xếp và lấy ${k} hàng yếu nhất`, en: `Sort and take the ${k} weakest rows` }, codeLines: [6, 7], final: true, vars: [{ name: "sorted (soldiers,row)", value: strengths.map((item) => `(${item[0]},${item[1]})`).join(" ") }, { name: "answer", value: `[${answer.join(", ")}]` }], note: { vi: `Thứ tự sau sắp xếp cho ${k} hàng đầu là [${answer.join(", ")}].`, en: `The first ${k} row indexes after sorting are [${answer.join(", ")}].` }, grid: { pathCells: answer.flatMap((row) => matrix[row].map((_, col) => [row, col])), caption: "Weakest rows highlighted" } }));
+  return { original: matrix, answer, steps };
+}
+
+/** LeetCode 1351: Count Negative Numbers in a Sorted Matrix. */
+function buildSteps1351(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  const steps = [];
+  const visited = [];
+  let row = 0, col = matrix[0].length - 1, count = 0;
+  steps.push(matrixStep2D(matrix, { title: { vi: "Bắt đầu ở góc phải-trên", en: "Start at the top-right corner" }, codeLines: [3], vars: [{ name: "row,col", value: `${row},${col}` }, { name: "count", value: count }], note: { vi: "Nếu gặp số âm, toàn bộ ô phía dưới cùng cột cũng âm; nếu không, đi xuống.", en: "At a negative value, every cell below in that column is negative; otherwise move down." }, grid: { hlCell: [row, col], caption: "Rows and columns are non-increasing" } }));
+  while (row < matrix.length && col >= 0) {
+    const value = matrix[row][col];
+    visited.push([row, col]);
+    if (value < 0) {
+      const added = matrix.length - row;
+      count += added;
+      steps.push(matrixStep2D(matrix, { title: { vi: `${value} âm → +${added}`, en: `${value} is negative → +${added}` }, codeLines: [5, 6, 7], vars: [{ name: "cell", value: `(${row},${col})` }, { name: "added", value: added }, { name: "count", value: count }], note: { vi: `Từ hàng ${row} trở xuống ở cột ${col} đều âm, cộng ${added}; sau đó sang trái.`, en: `Rows ${row} through the bottom in column ${col} are negative, add ${added}; then move left.` }, grid: { hlCell: [row, col], historyCells: visited, pathCells: Array.from({ length: added }, (_, offset) => [row + offset, col]), caption: "Count an entire negative column suffix" } }));
+      col--;
+    } else {
+      steps.push(matrixStep2D(matrix, { title: { vi: `${value} không âm → đi xuống`, en: `${value} is non-negative → move down` }, codeLines: [8], vars: [{ name: "cell", value: `(${row},${col})` }, { name: "count", value: count }], note: { vi: "Cần số nhỏ hơn, nên đi xuống hàng kế tiếp.", en: "We need a smaller value, so move down one row." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Move down" } }));
+      row++;
+    }
+  }
+  steps.push(matrixStep2D(matrix, { title: { vi: `Có ${count} số âm`, en: `${count} negative numbers` }, codeLines: [9], final: true, vars: [{ name: "count", value: count }], note: { vi: "Con trỏ đã ra ngoài ma trận; count là đáp án.", en: "The pointer left the matrix; count is the answer." }, grid: { historyCells: visited, caption: "Finished" } }));
+  return { original: matrix, answer: count, steps };
+}
+
+/** LeetCode 1886: Determine Whether Matrix Can Be Obtained By Rotation. */
+function buildSteps1886(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const target = parseIntegerMatrix2D(params.target);
+  if (matrix.length !== matrix[0].length || target.length !== target[0].length || matrix.length !== target.length) throw new Error("mat and target must be square matrices of the same size");
+  const rotate = (grid) => Array.from({ length: grid.length }, (_, r) => Array.from({ length: grid.length }, (_, c) => grid[grid.length - 1 - c][r]));
+  let current = cloneMatrix2D(matrix);
+  const targetText = JSON.stringify(target);
+  const steps = [];
+  for (let turns = 0; turns < 4; turns++) {
+    const same = current.every((row, r) => row.every((value, c) => value === target[r][c]));
+    steps.push(matrixStep2D(current, { title: { vi: `So sánh sau ${turns * 90}°`, en: `Compare after ${turns * 90}°` }, codeLines: [4, 5], final: same, vars: [{ name: "rotation", value: `${turns * 90}°` }, { name: "matches target", value: same }], note: { vi: same ? "Ma trận hiện tại bằng target → True." : "Chưa bằng target; thử xoay thêm 90°.", en: same ? "The current matrix equals target → True." : "It does not match target yet; try another 90° rotation." }, grid: { caption: `Candidate (${turns * 90}°)`, secondaryCaption: `target = ${targetText}` } }));
+    if (same) return { original: matrix, answer: true, steps };
+    current = rotate(current);
+  }
+  steps.push(matrixStep2D(current, { title: { vi: "Không có rotation phù hợp", en: "No matching rotation" }, codeLines: [6], final: true, vars: [{ name: "answer", value: false }], note: { vi: "Đã kiểm tra 0°, 90°, 180°, 270° đều không bằng target.", en: "0°, 90°, 180°, and 270° all differ from target." }, grid: { caption: "No match", secondaryCaption: `target = ${targetText}` } }));
+  return { original: matrix, answer: false, steps };
+}
+
+/** LeetCode 2022: Convert 1D Array Into 2D Array. */
+function buildSteps2022(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : String(input).split(",").map((value) => Number(value.trim())).filter((value) => !Number.isNaN(value));
+  const rows = Number(params.m), cols = Number(params.n);
+  if (!nums.length || !nums.every(Number.isInteger) || !Number.isInteger(rows) || !Number.isInteger(cols) || rows <= 0 || cols <= 0) throw new Error("enter integer nums and positive m, n");
+  if (nums.length !== rows * cols) {
+    return { original: nums, answer: [], steps: [{ title: { vi: "Kích thước không khớp", en: "Size mismatch" }, arr: nums, highlight: [], mark: [], final: true, codeLines: [3, 4], vars: [{ name: "nums length", value: nums.length }, { name: "m*n", value: rows * cols }], note: { vi: "Không thể chia đủ nums thành m×n ô nên trả về [].", en: "nums cannot fill m×n cells, so return []." } }] };
+  }
+  const result = blankMatrix2D(rows, cols);
+  const steps = [matrixStep2D(result, { title: { vi: "Tạo ma trận m×n rỗng", en: "Create an empty m×n matrix" }, codeLines: [5], vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "m,n", value: `${rows},${cols}` }], note: { vi: "Ghi lần lượt nums theo thứ tự hàng trước, cột sau.", en: "Write nums sequentially, row first then column." }, grid: { caption: "Empty result" } })];
+  for (let index = 0; index < nums.length; index++) {
+    const row = Math.floor(index / cols), col = index % cols;
+    result[row][col] = nums[index];
+    steps.push(matrixStep2D(result, { title: { vi: `nums[${index}] = ${nums[index]} → (${row},${col})`, en: `nums[${index}] = ${nums[index]} → (${row},${col})` }, codeLines: [6, 7], vars: [{ name: "index", value: index }, { name: "row,col", value: `${row},${col}` }], note: { vi: `row = ${index} // ${cols}, col = ${index} % ${cols}.`, en: `row = ${index} // ${cols}, col = ${index} % ${cols}.` }, grid: { hlCell: [row, col], caption: "Filling result" } }));
+  }
+  steps.push(matrixStep2D(result, { title: { vi: "Chuyển đổi hoàn tất", en: "Conversion complete" }, codeLines: [8], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Đã dùng đúng m×n phần tử.", en: "Exactly m×n values were used." }, grid: { caption: "Final 2D array" } }));
+  return { original: nums, answer: result, steps };
+}
+
 /** LeetCode 48: Rotate Image — transpose then reverse rows. */
 function buildSteps48(input) {
   const m = parseMatrix(input);
@@ -7998,6 +8215,7 @@ module.exports = {
   48: {
     id: 48, difficulty: "medium", slug: "rotate-image",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [twoDArrayTag],
     title: { vi: "Rotate Image", en: "Rotate Image" },
     titleVi: { vi: "Xoay ma trận 90° (transpose + reverse)", en: "Rotate matrix 90° (transpose + reverse)" },
     statement: { vi: "Xoay ma trận n×n 90° theo chiều kim đồng hồ, tại chỗ. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Rotate an n×n matrix 90° clockwise, in place. Enter matrix: rows separated by ';', values by ','." },
@@ -8010,6 +8228,7 @@ module.exports = {
   54: {
     id: 54, difficulty: "medium", slug: "spiral-matrix",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [twoDArrayTag],
     title: { vi: "Spiral Matrix", en: "Spiral Matrix" },
     titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
     statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
@@ -8838,6 +9057,7 @@ module.exports = {
     difficulty: "easy",
     slug: "find-winner-on-a-tic-tac-toe-game",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [twoDArrayTag],
     title: { vi: "Find Winner on a Tic Tac Toe Game", en: "Find Winner on a Tic Tac Toe Game" },
     titleVi: { vi: "Tìm người thắng Tic-Tac-Toe", en: "Find Tic-Tac-Toe winner" },
     statement: {
@@ -8886,6 +9106,7 @@ module.exports = {
     difficulty: "easy",
     slug: "shift-2d-grid",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [twoDArrayTag],
     title: { vi: "Shift 2D Grid", en: "Shift 2D Grid" },
     titleVi: { vi: "Dịch grid 2 chiều", en: "Shift a 2D grid" },
     statement: {
@@ -8967,3 +9188,96 @@ module.exports = {
     builder: buildSteps1260,
   },
 };
+
+Object.assign(module.exports, {
+  422: {
+    id: 422, difficulty: "easy", slug: "valid-word-square",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Valid Word Square", en: "Valid Word Square" }, titleVi: { vi: "Kiểm tra word square hợp lệ", en: "Check whether a word square is valid" },
+    statement: { vi: "Cho các từ theo từng hàng. Word square hợp lệ nếu ký tự tại words[r][c] luôn bằng words[c][r]. Nhập các từ cách nhau dấu phẩy.", en: "Given words as rows, a word square is valid when words[r][c] always equals words[c][r]. Enter comma-separated words." },
+    defaultInput: "ball,area,lead,lady", inputKind: "string", inputLabel: { vi: "words (cách nhau dấu phẩy)", en: "words (comma separated)" }, extraParams: [],
+    approach: [{ vi: "Đặt các từ thành lưới ký tự.", en: "Place the words in a character grid." }, { vi: "So sánh từng ô với phần tử đối xứng qua đường chéo chính.", en: "Compare every cell with its mirror across the main diagonal." }],
+    complexity: { time: "O(L)", space: "O(1)", note: { vi: "L là tổng số ký tự trong các từ.", en: "L is the total number of characters." } },
+    code: ["class Solution:", "    def validWordSquare(self, words):", "        for r, word in enumerate(words):", "            for c, ch in enumerate(word):", "                if c >= len(words) or r >= len(words[c]):", "                    return False", "                if ch != words[c][r]:", "                    return False", "        return True"], builder: buildSteps422,
+  },
+  566: {
+    id: 566, difficulty: "easy", slug: "reshape-the-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Reshape the Matrix", en: "Reshape the Matrix" }, titleVi: { vi: "Đổi hình dạng ma trận", en: "Change a matrix's shape" },
+    statement: { vi: "Đổi mat thành ma trận r×c nhưng giữ nguyên thứ tự row-major. Nếu số ô không khớp, trả về mat ban đầu.", en: "Reshape mat into r×c while preserving row-major order. Return mat unchanged when the cell counts differ." },
+    defaultInput: "1,2;3,4", inputKind: "string", inputLabel: { vi: "mat (hàng cách ;)", en: "mat (rows separated by ;)" }, extraParams: [{ key: "r", label: { vi: "r (hàng mới)", en: "r (new rows)" }, default: 1, min: 1 }, { key: "c", label: { vi: "c (cột mới)", en: "c (new columns)" }, default: 4, min: 1 }],
+    approach: [{ vi: "Kiểm tra tổng số ô có bằng r×c không.", en: "Check whether the total cell count equals r×c." }, { vi: "Dùng chỉ số phẳng row-major để ánh xạ ô cũ sang ô mới.", en: "Use a row-major flat index to map each old cell to its new cell." }],
+    complexity: { time: "O(m·n)", space: "O(r·c)", note: { vi: "Mỗi phần tử được ghi một lần vào ma trận kết quả.", en: "Each value is written once to the result matrix." } },
+    code: ["class Solution:", "    def matrixReshape(self, mat, r, c):", "        m, n = len(mat), len(mat[0])", "        if m * n != r * c:", "            return mat", "        result = [[0] * c for _ in range(r)]", "        for index in range(m * n):", "            result[index // c][index % c] = mat[index // n][index % n]", "        return result"], builder: buildSteps566,
+  },
+  766: {
+    id: 766, difficulty: "easy", slug: "toeplitz-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Toeplitz Matrix", en: "Toeplitz Matrix" }, titleVi: { vi: "Kiểm tra ma trận Toeplitz", en: "Check a Toeplitz matrix" },
+    statement: { vi: "Ma trận Toeplitz có mọi đường chéo từ trái-trên xuống phải-dưới cùng một giá trị.", en: "A Toeplitz matrix has one constant value along every top-left to bottom-right diagonal." },
+    defaultInput: "1,2,3,4;5,1,2,3;9,5,1,2", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Bỏ qua hàng và cột đầu tiên.", en: "Skip the first row and first column." }, { vi: "Mỗi matrix[r][c] phải bằng matrix[r−1][c−1].", en: "Every matrix[r][c] must equal matrix[r−1][c−1]." }],
+    complexity: { time: "O(m·n)", space: "O(1)", note: { vi: "So sánh từng ô với hàng xóm trên-trái.", en: "Compare each cell with its top-left neighbor." } },
+    code: ["class Solution:", "    def isToeplitzMatrix(self, matrix):", "        for r in range(1, len(matrix)):", "            for c in range(1, len(matrix[0])):", "                if matrix[r][c] != matrix[r-1][c-1]:", "                    return False", "        return True"], builder: buildSteps766,
+  },
+  832: {
+    id: 832, difficulty: "easy", slug: "flipping-an-image",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Flipping an Image", en: "Flipping an Image" }, titleVi: { vi: "Lật ngang và đảo bit ảnh", en: "Reverse rows and invert image bits" },
+    statement: { vi: "Lật ngang từng hàng của ảnh nhị phân, sau đó đảo mỗi bit 0↔1.", en: "Reverse each row of a binary image, then invert every bit 0↔1." },
+    defaultInput: "1,1,0;1,0,1;0,0,0", inputKind: "string", inputLabel: { vi: "image (0/1; hàng cách ;)", en: "image (0/1; rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Phần tử ở cột c được chuyển tới cột n−1−c.", en: "A value at column c moves to n−1−c." }, { vi: "Dùng XOR 1 để đảo bit: 0^1=1, 1^1=0.", en: "Use XOR 1 to invert: 0^1=1, 1^1=0." }],
+    complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Visualizer dựng ma trận kết quả riêng để từng bước dễ thấy.", en: "The visualizer uses a separate result matrix so each step is visible." } },
+    code: ["class Solution:", "    def flipAndInvertImage(self, image):", "        for row in image:", "            row.reverse()", "            for c in range(len(row)):", "                row[c] ^= 1", "        return image"], builder: buildSteps832,
+  },
+  867: {
+    id: 867, difficulty: "easy", slug: "transpose-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Transpose Matrix", en: "Transpose Matrix" }, titleVi: { vi: "Chuyển vị ma trận", en: "Transpose a matrix" },
+    statement: { vi: "Trả về transpose của matrix: matrix[r][c] trở thành result[c][r].", en: "Return the transpose: matrix[r][c] becomes result[c][r]." },
+    defaultInput: "1,2,3;4,5,6", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Tạo ma trận kết quả có số hàng/cột hoán đổi.", en: "Create a result whose row and column counts are swapped." }, { vi: "Ghi từng phần tử (r,c) vào (c,r).", en: "Write every element from (r,c) into (c,r)." }],
+    complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Mỗi ô được sao chép một lần.", en: "Every cell is copied once." } },
+    code: ["class Solution:", "    def transpose(self, matrix):", "        rows, cols = len(matrix), len(matrix[0])", "        result = [[0] * rows for _ in range(cols)]", "        for r in range(rows):", "            for c in range(cols):", "                result[c][r] = matrix[r][c]", "        return result"], builder: buildSteps867,
+  },
+  1337: {
+    id: 1337, difficulty: "easy", slug: "the-k-weakest-rows-in-a-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "The K Weakest Rows in a Matrix", en: "The K Weakest Rows in a Matrix" }, titleVi: { vi: "K hàng yếu nhất trong ma trận", en: "Find the K weakest matrix rows" },
+    statement: { vi: "1 là soldier và 0 là civilian. Hàng yếu hơn có ít soldier hơn; hòa thì chỉ số hàng nhỏ hơn đứng trước.", en: "1 is a soldier and 0 a civilian. Fewer soldiers means weaker; ties use the smaller row index." },
+    defaultInput: "1,1,0,0,0;1,1,1,1,0;1,0,0,0,0;1,1,0,0,0;1,1,1,1,1", inputKind: "string", inputLabel: { vi: "mat (hàng cách ;)", en: "mat (rows separated by ;)" }, extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3, min: 1 }],
+    approach: [{ vi: "Đếm soldier (tổng các bit) của từng hàng.", en: "Count soldiers (the row's bit sum) in each row." }, { vi: "Sắp xếp cặp (soldiers, rowIndex), rồi lấy k chỉ số đầu.", en: "Sort (soldiers, rowIndex) pairs and take the first k indexes." }],
+    complexity: { time: "O(m·n + m log m)", space: "O(m)", note: { vi: "Mảng pair lưu strength của từng hàng.", en: "A pair array stores every row's strength." } },
+    code: ["class Solution:", "    def kWeakestRows(self, mat, k):", "        strength = []", "        for r, row in enumerate(mat):", "            strength.append((sum(row), r))", "        strength.sort()", "        return [row for _, row in strength[:k]]"], builder: buildSteps1337,
+  },
+  1351: {
+    id: 1351, difficulty: "easy", slug: "count-negative-numbers-in-a-sorted-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Count Negative Numbers in a Sorted Matrix", en: "Count Negative Numbers in a Sorted Matrix" }, titleVi: { vi: "Đếm số âm trong ma trận đã sắp xếp", en: "Count negatives in a sorted matrix" },
+    statement: { vi: "Mỗi hàng và cột đều giảm dần. Đếm số phần tử âm.", en: "Every row and column is non-increasing. Count negative entries." },
+    defaultInput: "4,3,2,-1;3,2,1,-1;1,1,-1,-2;-1,-1,-2,-3", inputKind: "string", inputLabel: { vi: "grid (hàng cách ;)", en: "grid (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Bắt đầu ở góc phải-trên.", en: "Start from the top-right corner." }, { vi: "Nếu âm, cộng mọi ô phía dưới cùng cột rồi đi trái; nếu không âm, đi xuống.", en: "If negative, count all cells below in that column then move left; otherwise move down." }],
+    complexity: { time: "O(m+n)", space: "O(1)", note: { vi: "Con trỏ chỉ đi xuống hoặc sang trái.", en: "The pointer only moves down or left." } },
+    code: ["class Solution:", "    def countNegatives(self, grid):", "        r, c = 0, len(grid[0]) - 1", "        count = 0", "        while r < len(grid) and c >= 0:", "            if grid[r][c] < 0:", "                count += len(grid) - r", "                c -= 1", "            else:", "                r += 1", "        return count"], builder: buildSteps1351,
+  },
+  1886: {
+    id: 1886, difficulty: "easy", slug: "determine-whether-matrix-can-be-obtained-by-rotation",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Determine Whether Matrix Can Be Obtained By Rotation", en: "Determine Whether Matrix Can Be Obtained By Rotation" }, titleVi: { vi: "Kiểm tra target bằng xoay ma trận", en: "Check whether rotation reaches target" },
+    statement: { vi: "Kiểm tra mat sau 0°, 90°, 180° hoặc 270° có thể bằng target không.", en: "Check whether mat can equal target after 0°, 90°, 180°, or 270° rotation." },
+    defaultInput: "0,1;1,0", inputKind: "string", inputLabel: { vi: "mat (vuông; hàng cách ;)", en: "mat (square; rows separated by ;)" }, extraParams: [{ key: "target", type: "string", label: { vi: "target (hàng cách ;)", en: "target (rows separated by ;)" }, default: "1,0;0,1" }],
+    approach: [{ vi: "So sánh mat với target trước khi xoay (0°).", en: "Compare mat with target before rotating (0°)." }, { vi: "Nếu chưa khớp, xoay 90° và lặp tối đa ba lần nữa.", en: "If it does not match, rotate 90° and repeat up to three more times." }],
+    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "Có tối đa bốn lần so sánh/xoay; hệ số 4 là hằng số.", en: "At most four comparisons/rotations; the factor 4 is constant." } },
+    code: ["class Solution:", "    def findRotation(self, mat, target):", "        def rotate(grid):", "            return [list(row) for row in zip(*grid[::-1])]", "        for _ in range(4):", "            if mat == target:", "                return True", "            mat = rotate(mat)", "        return False"], builder: buildSteps1886,
+  },
+  2022: {
+    id: 2022, difficulty: "easy", slug: "convert-1d-array-into-2d-array",
+    category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
+    title: { vi: "Convert 1D Array Into 2D Array", en: "Convert 1D Array Into 2D Array" }, titleVi: { vi: "Chuyển mảng 1D thành 2D", en: "Convert a 1D array into 2D" },
+    statement: { vi: "Tạo mảng m×n từ original theo thứ tự hàng trước. Nếu original không đủ đúng m×n phần tử, trả về [].", en: "Build an m×n array from original in row-major order. Return [] unless original has exactly m×n values." },
+    defaultInput: [1, 2, 3, 4], inputKind: "integer", inputLabel: { vi: "original", en: "original" }, extraParams: [{ key: "m", label: { vi: "m (hàng)", en: "m (rows)" }, default: 2, min: 1 }, { key: "n", label: { vi: "n (cột)", en: "n (columns)" }, default: 2, min: 1 }],
+    approach: [{ vi: "Kiểm tra len(original) == m×n.", en: "Check len(original) == m×n." }, { vi: "Với index i: row=i//n và col=i%n.", en: "For index i: row=i//n and col=i%n." }],
+    complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Mỗi giá trị original được đặt một lần.", en: "Each original value is placed once." } },
+    code: ["class Solution:", "    def construct2DArray(self, original, m, n):", "        if len(original) != m * n:", "            return []", "        result = [[0] * n for _ in range(m)]", "        for index, value in enumerate(original):", "            result[index // n][index % n] = value", "        return result"], builder: buildSteps2022,
+  },
+});

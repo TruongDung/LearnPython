@@ -3031,7 +3031,7 @@ const problems = {
   },
   463: {
     id: 463, difficulty: "easy", slug: "island-perimeter",
-    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
+    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag, { key: "2d-array", vi: "Mảng 2D", en: "2D Array" }],
     title: tr("Island Perimeter", "Island Perimeter"),
     titleVi: tr("Chu vi đảo (đếm cạnh biên)", "Island perimeter (count boundary edges)"),
     statement: tr(

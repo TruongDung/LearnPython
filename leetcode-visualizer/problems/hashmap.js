@@ -6343,6 +6343,7 @@ module.exports = {
     difficulty: "easy",
     slug: "jewels-and-stones",
     category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    tags: [{ key: "2d-array", vi: "Mảng 2D", en: "2D Array" }],
     title: { vi: "Jewels and Stones", en: "Jewels and Stones" },
     titleVi: { vi: "Đá quý và Đá", en: "Jewels and stones" },
     statement: {
