@@ -3546,16 +3546,29 @@ function buildSteps74(input, params = {}) {
 }
 
 /** LeetCode 48: Rotate Image — transpose then reverse rows. */
-function buildSteps48(input) {
+function buildSteps48(input, params) {
   const m = parseMatrix(input);
+  const original = m.map((r) => [...r]);
   const n = m.length;
+  const approach = Number(params && params.approach) || 1;
+  const codeBlock = approach === 2 ? 2 : 1;
   const steps = [];
-  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: n }, (_, i) => String(i)).join(""), text2: Array.from({ length: n }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  gsnap({ title: { vi: "Xoay 90° = transpose + đảo mỗi hàng", en: "Rotate 90° = transpose + reverse rows" }, codeLines: [3], vars: [{ name: "n", value: n }], note: { vi: "Bước 1: hoán vị qua đường chéo chính (transpose). Bước 2: đảo ngược từng hàng.", en: "Step 1: swap across the main diagonal (transpose). Step 2: reverse each row." } });
+  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: n }, (_, i) => String(i)).join(""), text2: Array.from({ length: n }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeBlock: o.codeBlock || codeBlock, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  gsnap({ title: { vi: approach === 2 ? "Cách 2: transpose + swap hai đầu mỗi hàng" : "Cách 1: transpose + row.reverse()", en: approach === 2 ? "Approach 2: transpose + swap row ends" : "Approach 1: transpose + row.reverse()" }, codeLines: [3], vars: [{ name: "n", value: n }], note: { vi: "Bước 1: hoán vị qua đường chéo chính (transpose). Bước 2: đảo ngược từng hàng.", en: "Step 1: swap across the main diagonal (transpose). Step 2: reverse each row." } });
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { [m[i][j], m[j][i]] = [m[j][i], m[i][j]]; gsnap({ title: { vi: `Transpose: swap (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` }, hlCell: [i, j], pathCells: [[j, i]], codeLines: [4, 5, 6], vars: [{ name: "i,j", value: `${i},${j}` }], note: { vi: `Đổi phần tử đối xứng qua đường chéo.`, en: `Swap the elements symmetric about the diagonal.` } }); }
-  for (let i = 0; i < n; i++) { m[i].reverse(); gsnap({ title: { vi: `Đảo hàng ${i}`, en: `Reverse row ${i}` }, hlCell: [i, 0], codeLines: [7, 8], vars: [{ name: "row", value: i }], note: { vi: `Đảo ngược hàng ${i} → hoàn tất xoay hàng này.`, en: `Reverse row ${i} → this row is rotated.` } }); }
-  gsnap({ title: { vi: "Hoàn tất xoay 90°", en: "Rotation 90° complete" }, final: true, codeLines: [8], vars: [{ name: "matrix", value: JSON.stringify(m) }], note: { vi: `Ma trận đã xoay 90° theo chiều kim đồng hồ.`, en: `Matrix rotated 90° clockwise.` } });
-  return { original: m, answer: m, steps };
+  if (approach === 2) {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < Math.floor(n / 2); j++) {
+        const k = n - 1 - j;
+        [m[i][j], m[i][k]] = [m[i][k], m[i][j]];
+        gsnap({ title: { vi: `Đảo hàng ${i}: swap cột ${j} ↔ ${k}`, en: `Reverse row ${i}: swap col ${j} ↔ ${k}` }, hlCell: [i, j], pathCells: [[i, k]], codeLines: [8, 9, 10], vars: [{ name: "i,j", value: `${i},${j}` }, { name: "n-1-j", value: k }], note: { vi: `Đổi hai phần tử đối xứng trong cùng hàng để đảo hàng thủ công.`, en: `Swap symmetric elements in the same row to reverse it manually.` } });
+      }
+    }
+  } else {
+    for (let i = 0; i < n; i++) { m[i].reverse(); gsnap({ title: { vi: `Đảo hàng ${i}`, en: `Reverse row ${i}` }, hlCell: [i, 0], codeLines: [7, 8], vars: [{ name: "row", value: i }], note: { vi: `Đảo ngược hàng ${i} → hoàn tất xoay hàng này.`, en: `Reverse row ${i} → this row is rotated.` } }); }
+  }
+  gsnap({ title: { vi: "Hoàn tất xoay 90°", en: "Rotation 90° complete" }, final: true, codeLines: approach === 2 ? [10] : [8], vars: [{ name: "matrix", value: JSON.stringify(m) }], note: { vi: `Ma trận đã xoay 90° theo chiều kim đồng hồ.`, en: `Matrix rotated 90° clockwise.` } });
+  return { original, answer: m, steps };
 }
 
 /** LeetCode 54: Spiral Matrix. */
@@ -8286,10 +8299,17 @@ module.exports = {
     title: { vi: "Rotate Image", en: "Rotate Image" },
     titleVi: { vi: "Xoay ma trận 90° (transpose + reverse)", en: "Rotate matrix 90° (transpose + reverse)" },
     statement: { vi: "Xoay ma trận n×n 90° theo chiều kim đồng hồ, tại chỗ. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Rotate an n×n matrix 90° clockwise, in place. Enter matrix: rows separated by ';', values by ','." },
-    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
-    approach: [{ vi: "Transpose: đổi phần tử qua đường chéo chính.", en: "Transpose: swap elements across the main diagonal." }, { vi: "Đảo ngược từng hàng → xoay 90° clockwise.", en: "Reverse each row → 90° clockwise rotation." }],
+    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" },
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: transpose + row.reverse()", en: "Approach 1: transpose + row.reverse()" } },
+        { value: "2", label: { vi: "Cách 2: transpose + swap từng cặp", en: "Approach 2: transpose + pair swaps" } },
+      ] },
+    ],
+    approach: [{ vi: "Transpose: đổi phần tử qua đường chéo chính.", en: "Transpose: swap elements across the main diagonal." }, { vi: "Cách 1 dùng row.reverse(); cách 2 đảo mỗi hàng bằng swap matrix[i][j] với matrix[i][n-1-j].", en: "Approach 1 uses row.reverse(); approach 2 reverses each row by swapping matrix[i][j] with matrix[i][n-1-j]." }, { vi: "Sau khi đảo từng hàng → xoay 90° clockwise.", en: "After reversing each row → 90° clockwise rotation." }],
     complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Tại chỗ.", en: "In-place." } },
     code: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for row in matrix:", "            row.reverse()"],
+    code2: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for i in range(n):", "            for j in range(0, n//2):", "                matrix[i][j], matrix[i][n-1-j] = matrix[i][n-1-j], matrix[i][j]"],
     builder: buildSteps48,
   },
   54: {
