@@ -22083,6 +22083,170 @@ module.exports = {
   },
 };
 
+function parseGridMatrix(input) {
+  return String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+}
+
+function bfsGridCells(grid, current = null, visited = new Set(), path = []) {
+  const pathSet = new Set(path.map(([r, c]) => `${r},${c}`));
+  return grid.map((row, r) => row.map((value, c) => {
+    let cls = value === 0 ? "wall" : "empty";
+    if (visited.has(`${r},${c}`)) cls = "visited";
+    if (pathSet.has(`${r},${c}`)) cls = "path";
+    if (current && current[0] === r && current[1] === c) cls = "current";
+    return { label: String(value), cls };
+  }));
+}
+
+function buildSteps675(input) {
+  const forest = parseGridMatrix(input);
+  const rows = forest.length, cols = forest[0].length;
+  const trees = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (forest[r][c] > 1) trees.push([forest[r][c], r, c]);
+  }
+  trees.sort((a, b) => a[0] - b[0]);
+  const steps = [];
+  let total = 0;
+  let start = [0, 0];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  function push(title, codeLines, current, visited, vars, note, final = false) {
+    steps.push({
+      title,
+      arr: trees.map(([h]) => h),
+      sub: trees.map(([, r, c]) => `(${r},${c})`),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      bfsGrid: { rows, cols, cells: bfsGridCells(forest, current, visited || new Set()) },
+    });
+  }
+
+  function bfs(sr, sc, tr, tc, height) {
+    const queue = [[sr, sc, 0]];
+    const seen = new Set([`${sr},${sc}`]);
+    push({ vi: `BFS tới cây ${height} tại (${tr},${tc})`, en: `BFS to tree ${height} at (${tr},${tc})` }, [8, 9], [sr, sc], seen, [{ name: "target", value: `${height}@(${tr},${tc})` }, { name: "total", value: total }], { vi: "Tìm đường ngắn nhất từ vị trí hiện tại tới cây thấp nhất còn lại.", en: "Find the shortest path from the current position to the next lowest tree." });
+    for (let head = 0; head < queue.length; head++) {
+      const [r, c, dist] = queue[head];
+      push({ vi: `Pop (${r},${c}), dist=${dist}`, en: `Pop (${r},${c}), dist=${dist}` }, [10, 11], [r, c], seen, [{ name: "queue size", value: queue.length - head - 1 }, { name: "dist", value: dist }], { vi: "BFS mở rộng theo từng lớp khoảng cách.", en: "BFS expands by distance layers." });
+      if (r === tr && c === tc) return dist;
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || forest[nr][nc] === 0 || seen.has(`${nr},${nc}`)) continue;
+        seen.add(`${nr},${nc}`);
+        queue.push([nr, nc, dist + 1]);
+      }
+    }
+    return -1;
+  }
+
+  for (const [height, tr, tc] of trees) {
+    const dist = bfs(start[0], start[1], tr, tc, height);
+    if (dist < 0) {
+      push({ vi: `Không tới được cây ${height}`, en: `Cannot reach tree ${height}` }, [15, 16], start, new Set(), [{ name: "answer", value: -1 }], { vi: "Một cây bị chặn, nên không thể cắt hết cây.", en: "A tree is blocked, so not all trees can be cut." }, true);
+      return { original: forest, answer: -1, steps };
+    }
+    total += dist;
+    start = [tr, tc];
+    forest[tr][tc] = 1;
+    push({ vi: `Cắt cây ${height}, total=${total}`, en: `Cut tree ${height}, total=${total}` }, [17, 18, 19], start, new Set([`${tr},${tc}`]), [{ name: "distance", value: dist }, { name: "total", value: total }], { vi: "Sau khi cắt, ô này trở thành đất đi được.", en: "After cutting, this cell becomes walkable ground." });
+  }
+  push({ vi: `Tổng bước = ${total}`, en: `Total steps = ${total}` }, [20], start, new Set(), [{ name: "answer", value: total }], { vi: "Đã cắt cây theo thứ tự chiều cao tăng dần.", en: "All trees were cut in increasing height order." }, true);
+  return { original: forest, answer: total, steps };
+}
+
+function buildSteps1284(input) {
+  const mat = parseGridMatrix(input);
+  const rows = mat.length, cols = mat[0].length;
+  const totalBits = rows * cols;
+  const encode = (grid) => {
+    let mask = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c]) mask |= 1 << (r * cols + c);
+    return mask;
+  };
+  const decode = (mask) => Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => (mask >> (r * cols + c)) & 1));
+  const flipMaskAt = (r, c) => {
+    let mask = 0;
+    for (const [dr, dc] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) mask ^= 1 << (nr * cols + nc);
+    }
+    return mask;
+  };
+  const start = encode(mat);
+  const queue = [[start, 0]];
+  const seen = new Set([start]);
+  const steps = [];
+  const TRACE_LIMIT = 180;
+  const masks = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => flipMaskAt(r, c)));
+  function push(mask, title, codeLines, vars, note, final = false, cell = null) {
+    if (steps.length >= TRACE_LIMIT && !final) return;
+    const grid = decode(mask);
+    steps.push({
+      title,
+      arr: [mask],
+      sub: [`mask=${mask}`],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      bfsGrid: { rows, cols, cells: grid.map((row, r) => row.map((v, c) => ({ label: String(v), cls: cell && cell[0] === r && cell[1] === c ? "current" : v ? "visited" : "empty" }))) },
+    });
+  }
+  push(start, { vi: `Start mask=${start}`, en: `Start mask=${start}` }, [3, 4, 5], [{ name: "states", value: 1 }], { vi: "Mỗi trạng thái là bitmask của toàn bộ ma trận.", en: "Each state is one bitmask for the whole matrix." });
+  for (let head = 0; head < queue.length; head++) {
+    const [mask, dist] = queue[head];
+    push(mask, { vi: `Pop mask=${mask}, flips=${dist}`, en: `Pop mask=${mask}, flips=${dist}` }, [6, 7], [{ name: "flips", value: dist }, { name: "queue", value: queue.length - head - 1 }], { vi: "BFS đảm bảo lần đầu tới mask=0 là số flip ít nhất.", en: "BFS guarantees the first time reaching mask=0 is the minimum flips." });
+    if (mask === 0) {
+      push(mask, { vi: `Đạt zero matrix sau ${dist} flips`, en: `Reached zero matrix after ${dist} flips` }, [8, 9], [{ name: "answer", value: dist }], { vi: "Tất cả bit đều bằng 0.", en: "All bits are zero." }, true);
+      return { original: mat, answer: dist, steps };
+    }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const next = mask ^ masks[r][c];
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push([next, dist + 1]);
+      push(next, { vi: `Flip (${r},${c}) → mask=${next}`, en: `Flip (${r},${c}) → mask=${next}` }, [10, 11, 12], [{ name: "new flips", value: dist + 1 }, { name: "seen", value: seen.size }], { vi: "Flip ô hiện tại và 4 hàng xóm.", en: "Flip the current cell and its 4-neighbors." }, false, [r, c]);
+    }
+  }
+  push(queue[queue.length - 1][0], { vi: "Không thể về zero matrix", en: "Cannot reach zero matrix" }, [13], [{ name: "answer", value: -1 }], { vi: "Duyệt hết không gian trạng thái mà không gặp mask=0.", en: "Explored the state space without reaching mask=0." }, true);
+  return { original: mat, answer: -1, steps };
+}
+
+Object.assign(module.exports, {
+  675: {
+    id: 675, difficulty: "hard", slug: "cut-off-trees-for-golf-event",
+    category: { key: "graph", vi: "Đồ thị / BFS", en: "Graph / BFS" },
+    title: { vi: "Cut Off Trees for Golf Event", en: "Cut Off Trees for Golf Event" },
+    titleVi: { vi: "Cắt cây theo chiều cao tăng dần", en: "Cut trees in increasing height order" },
+    statement: { vi: "Đi từ (0,0), cắt cây theo chiều cao tăng dần; mỗi lần dùng BFS tìm đường ngắn nhất tới cây kế tiếp.", en: "Start at (0,0), cut trees in increasing height order; run BFS to the next tree each time." },
+    defaultInput: "1,2,3;0,0,4;7,6,5", inputKind: "string", inputLabel: { vi: "forest", en: "forest" }, extraParams: [],
+    approach: [{ vi: "Sort các cây theo chiều cao.", en: "Sort trees by height." }, { vi: "BFS từ vị trí hiện tại tới cây tiếp theo.", en: "BFS from current position to the next tree." }],
+    complexity: { time: "O(T·R·C)", space: "O(R·C)", note: { vi: "T là số cây; mỗi BFS quét tối đa toàn grid.", en: "T is number of trees; each BFS may scan the whole grid." } },
+    code: ["from collections import deque", "class Solution:", "    def cutOffTree(self, forest):", "        trees = sorted((h,r,c) for r,row in enumerate(forest) for c,h in enumerate(row) if h > 1)", "        sr = sc = ans = 0", "        def bfs(tr, tc):", "            q = deque([(sr, sc, 0)]); seen = {(sr, sc)}", "            while q:", "                r, c, d = q.popleft()", "                if (r, c) == (tr, tc): return d", "                for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):", "                    nr, nc = r+dr, c+dc", "                    if 0 <= nr < len(forest) and 0 <= nc < len(forest[0]) and forest[nr][nc] and (nr,nc) not in seen:", "                        seen.add((nr,nc)); q.append((nr,nc,d+1))", "            return -1", "        for h, tr, tc in trees:", "            d = bfs(tr, tc)", "            if d < 0: return -1", "            ans += d; sr, sc = tr, tc", "        return ans"],
+    builder: buildSteps675,
+  },
+  1284: {
+    id: 1284, difficulty: "hard", slug: "minimum-number-of-flips-to-convert-binary-matrix-to-zero-matrix",
+    category: { key: "graph", vi: "BFS trạng thái", en: "State BFS" },
+    title: { vi: "Minimum Number of Flips to Convert Binary Matrix to Zero Matrix", en: "Minimum Number of Flips to Convert Binary Matrix to Zero Matrix" },
+    titleVi: { vi: "BFS bitmask để đưa ma trận về 0", en: "Bitmask BFS to zero matrix" },
+    statement: { vi: "Mỗi flip đổi ô chọn và 4 hàng xóm. Tìm số flip ít nhất để toàn ma trận thành 0.", en: "Each flip toggles a cell and its 4-neighbors. Find the minimum flips to make all cells 0." },
+    defaultInput: "0,0;0,1", inputKind: "string", inputLabel: { vi: "mat", en: "mat" }, extraParams: [],
+    approach: [{ vi: "Encode ma trận thành bitmask.", en: "Encode the matrix as a bitmask." }, { vi: "BFS trên các mask; cạnh là một phép flip.", en: "BFS over masks; each edge is one flip." }],
+    complexity: { time: "O(R·C·2^(R·C))", space: "O(2^(R·C))", note: { vi: "Phù hợp vì R,C nhỏ.", en: "Works because R,C are small." } },
+    code: ["from collections import deque", "class Solution:", "    def minFlips(self, mat):", "        m, n = len(mat), len(mat[0])", "        start = sum(mat[r][c] << (r*n+c) for r in range(m) for c in range(n))", "        q = deque([(start, 0)]); seen = {start}", "        while q:", "            mask, d = q.popleft()", "            if mask == 0: return d", "            for r in range(m):", "                for c in range(n):", "                    nxt = mask ^ flip_mask(r, c)", "                    if nxt not in seen: seen.add(nxt); q.append((nxt, d+1))", "        return -1"],
+    builder: buildSteps1284,
+  },
+});
+
 Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
   value: buildSteps1631,
 });

@@ -2064,6 +2064,137 @@ function buildSteps84(inputHeights) {
   return { original: [...heights], answer: maxArea, steps };
 }
 
+/** LeetCode 85: Maximal Rectangle — row histograms + monotonic stack. */
+function buildSteps85(input) {
+  const matrix = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => (row.includes(",") ? row.split(",") : [...row]).map((cell) => String(cell).trim()));
+  if (!matrix.length || !matrix[0].length) throw new Error("Enter a binary matrix, e.g. 1,0,1,0,0;1,0,1,1,1");
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const heights = new Array(cols).fill(0);
+  const steps = [];
+  let maxArea = 0;
+  let bestRect = null;
+
+  function rectCells(rect) {
+    if (!rect) return [];
+    const cells = [];
+    for (let r = rect.top; r <= rect.bottom; r++) {
+      for (let c = rect.left; c <= rect.right; c++) cells.push([r, c]);
+    }
+    return cells;
+  }
+
+  function push({ title, codeLines, row = null, col = null, stack = [], popped = null, candidate = null, final = false, vars = [], note }) {
+    const gridStep = matrixStep2D(matrix, {
+      title,
+      codeLines,
+      final,
+      vars: [
+        { name: "heights", value: `[${heights.join(",")}]` },
+        { name: "stack", value: `[${stack.map((i) => `${i}:${i < cols ? heights[i] : 0}`).join(", ")}]` },
+        { name: "max_area", value: maxArea },
+        ...vars,
+      ],
+      note,
+      grid: {
+        hlCell: Number.isInteger(row) && Number.isInteger(col) ? [row, col] : null,
+        pathCells: candidate ? rectCells(candidate) : rectCells(bestRect),
+        caption: "Binary matrix",
+      },
+    });
+    gridStep.arr = [...heights];
+    gridStep.sub = heights.map((_, index) => `[${index}]`);
+    gridStep.highlight = [];
+    if (Number.isInteger(col) && col < cols) gridStep.highlight.push(col);
+    if (Number.isInteger(popped) && popped < cols) gridStep.highlight.push(popped);
+    gridStep.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, offset) => bestRect.left + offset) : [];
+    steps.push(gridStep);
+  }
+
+  push({
+    title: { vi: "Khởi tạo heights = 0", en: "Initialize heights = 0" },
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
+    note: { vi: "Mỗi hàng biến thành một histogram: heights[c] là số lượng '1' liên tiếp kết thúc tại hàng hiện tại.", en: "Each row becomes a histogram: heights[c] is the count of consecutive 1s ending at the current row." },
+  });
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      heights[c] = matrix[r][c] === "1" ? heights[c] + 1 : 0;
+      push({
+        title: { vi: `Cập nhật heights[${c}] tại hàng ${r}`, en: `Update heights[${c}] at row ${r}` },
+        codeLines: [5, 6, 7],
+        row: r,
+        col: c,
+        vars: [{ name: "matrix[r][c]", value: matrix[r][c] }],
+        note: { vi: matrix[r][c] === "1" ? "Gặp 1 nên tăng chiều cao histogram." : "Gặp 0 nên reset chiều cao về 0.", en: matrix[r][c] === "1" ? "A 1 extends the histogram height." : "A 0 resets the height to 0." },
+      });
+    }
+
+    const stack = [];
+    const bars = [...heights, 0];
+    push({
+      title: { vi: `Xử lý histogram của hàng ${r}`, en: `Process row ${r}'s histogram` },
+      codeLines: [8, 9],
+      row: r,
+      vars: [{ name: "row", value: r }],
+      note: { vi: "Thêm cột lính canh 0 ở cuối để xả stack.", en: "Append a sentinel 0 bar to flush the stack." },
+    });
+
+    for (let i = 0; i <= cols; i++) {
+      while (stack.length && bars[stack[stack.length - 1]] >= bars[i]) {
+        const top = stack.pop();
+        const height = bars[top];
+        const left = stack.length ? stack[stack.length - 1] + 1 : 0;
+        const right = i - 1;
+        const width = right - left + 1;
+        const area = height * width;
+        const candidate = height > 0 ? { top: r - height + 1, bottom: r, left, right } : null;
+        if (area > maxArea) {
+          maxArea = area;
+          bestRect = candidate;
+        }
+        push({
+          title: { vi: `Pop cột ${top}: area=${area}`, en: `Pop column ${top}: area=${area}` },
+          codeLines: [10, 11, 12, 13, 14],
+          row: r,
+          col: i < cols ? i : null,
+          stack,
+          popped: top,
+          candidate,
+          vars: [
+            { name: "height", value: height },
+            { name: "left..right", value: `${left}..${right}` },
+            { name: "area", value: area },
+          ],
+          note: { vi: `Cột ${i === cols ? "sentinel" : i} thấp hơn/bằng, nên ${top} tìm được biên phải tại ${right}.`, en: `The ${i === cols ? "sentinel" : `bar ${i}`} is lower/equal, so ${top}'s right boundary is ${right}.` },
+        });
+      }
+      stack.push(i);
+      push({
+        title: { vi: `Push cột ${i === cols ? "sentinel" : i}`, en: `Push ${i === cols ? "sentinel" : `column ${i}`}` },
+        codeLines: [15],
+        row: r,
+        col: i < cols ? i : null,
+        stack,
+        vars: [{ name: "i", value: i === cols ? "sentinel" : i }],
+        note: { vi: "Stack giữ index có chiều cao tăng dần.", en: "The stack keeps indices in increasing height order." },
+      });
+    }
+  }
+
+  push({
+    title: { vi: `Diện tích lớn nhất = ${maxArea}`, en: `Largest area = ${maxArea}` },
+    codeLines: [16],
+    final: true,
+    vars: [{ name: "best rectangle", value: bestRect ? `rows ${bestRect.top}-${bestRect.bottom}, cols ${bestRect.left}-${bestRect.right}` : "none" }],
+    note: { vi: "Hình chữ nhật tốt nhất được tô trên ma trận; histogram cuối hiển thị hàng cuối đã xử lý.", en: "The best rectangle is highlighted on the matrix; the histogram shows the last processed row." },
+  });
+
+  return { original: matrix, answer: maxArea, steps };
+}
+
 /**
  * LeetCode 42: Trapping Rain Water — two pointer approach.
  * left/right pointers move inward; left_max/right_max track the tallest wall
@@ -8816,6 +8947,47 @@ module.exports = {
     ],
     builder: buildSteps84,
   },
+  85: {
+    id: 85,
+    difficulty: "hard",
+    slug: "maximal-rectangle",
+    category: { key: "array", vi: "Mảng / Stack", en: "Array / Stack" },
+    title: { vi: "Maximal Rectangle", en: "Maximal Rectangle" },
+    titleVi: { vi: "Hình chữ nhật toàn 1 lớn nhất", en: "Largest all-1 rectangle" },
+    statement: {
+      vi: "Cho ma trận nhị phân, tìm diện tích hình chữ nhật lớn nhất chỉ gồm các ô 1. Nhập hàng cách ';', cột cách ','.",
+      en: "Given a binary matrix, find the area of the largest rectangle containing only 1s. Enter rows separated by ';', columns by ','.",
+    },
+    defaultInput: "1,0,1,0,0;1,0,1,1,1;1,1,1,1,1;1,0,0,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Quét từng hàng, cập nhật heights[c] = số lượng 1 liên tiếp phía trên kết thúc tại hàng hiện tại.", en: "Scan row by row, updating heights[c] as consecutive 1s ending at the current row." },
+      { vi: "Mỗi hàng trở thành một bài Largest Rectangle in Histogram.", en: "Each row becomes one Largest Rectangle in Histogram problem." },
+      { vi: "Dùng stack tăng dần để pop cột và tính rectangle ứng viên.", en: "Use an increasing stack to pop bars and compute candidate rectangles." },
+    ],
+    complexity: { time: "O(R·C)", space: "O(C)", note: { vi: "Mỗi cột của mỗi hàng được push/pop tối đa một lần.", en: "Each column per row is pushed/popped at most once." } },
+    code: [
+      "class Solution:",
+      "    def maximalRectangle(self, matrix):",
+      "        if not matrix: return 0",
+      "        heights = [0] * len(matrix[0])",
+      "        best = 0",
+      "        for row in matrix:",
+      "            for c, value in enumerate(row):",
+      "                heights[c] = heights[c] + 1 if value == '1' else 0",
+      "            stack = []",
+      "            for i, h in enumerate(heights + [0]):",
+      "                while stack and heights[stack[-1]] >= h:",
+      "                    top = stack.pop()",
+      "                    width = i - stack[-1] - 1 if stack else i",
+      "                    best = max(best, heights[top] * width)",
+      "                stack.append(i)",
+      "        return best",
+    ],
+    builder: buildSteps85,
+  },
   739: {
     id: 739,
     difficulty: "medium",
@@ -9428,6 +9600,100 @@ Object.assign(module.exports, {
     approach: [{ vi: "Kiểm tra len(original) == m×n.", en: "Check len(original) == m×n." }, { vi: "Với index i: row=i//n và col=i%n.", en: "For index i: row=i//n and col=i%n." }],
     complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Mỗi giá trị original được đặt một lần.", en: "Each original value is placed once." } },
     code: ["class Solution:", "    def construct2DArray(self, original, m, n):", "        if len(original) != m * n:", "            return []", "        result = [[0] * n for _ in range(m)]", "        for index, value in enumerate(original):", "            result[index // n][index % n] = value", "        return result"], builder: buildSteps2022,
+  },
+});
+
+function buildSteps363(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const k = Number(params.k ?? 2);
+  const rows = matrix.length, cols = matrix[0].length;
+  const steps = [];
+  let best = -Infinity;
+  let bestRect = null;
+  const rectCells = (rect) => {
+    if (!rect) return [];
+    const cells = [];
+    for (let r = rect.top; r <= rect.bottom; r++) for (let c = rect.left; c <= rect.right; c++) cells.push([r, c]);
+    return cells;
+  };
+  const lowerBound = (arr, target) => {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const value = typeof arr[mid] === "number" ? arr[mid] : arr[mid].sum;
+      if (value < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  function push(title, codeLines, colSums, vars, note, final = false, rect = null) {
+    const step = matrixStep2D(matrix, {
+      title,
+      codeLines,
+      final,
+      vars: [{ name: "k", value: k }, { name: "best", value: best === -Infinity ? "-∞" : best }, ...vars],
+      note,
+      grid: { pathCells: rectCells(rect || bestRect), caption: "Candidate rectangle" },
+    });
+    step.arr = [...colSums];
+    step.sub = colSums.map((_, i) => `[${i}]`);
+    step.highlight = [];
+    step.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, i) => bestRect.left + i) : [];
+    steps.push(step);
+  }
+
+  push({ vi: "Khởi tạo best = -∞", en: "Initialize best = -∞" }, [3], new Array(cols).fill(0), [{ name: "shape", value: `${rows}×${cols}` }], { vi: "Cố định cặp hàng top..bottom, nén tổng theo cột.", en: "Fix top..bottom rows, compress sums by column." });
+  for (let top = 0; top < rows; top++) {
+    const colSums = new Array(cols).fill(0);
+    for (let bottom = top; bottom < rows; bottom++) {
+      for (let c = 0; c < cols; c++) colSums[c] += matrix[bottom][c];
+      push({ vi: `Nén hàng ${top}..${bottom}`, en: `Compress rows ${top}..${bottom}` }, [4, 5, 6], colSums, [{ name: "top,bottom", value: `${top},${bottom}` }, { name: "colSums", value: `[${colSums.join(",")}]` }], { vi: "Bây giờ bài toán thành: max subarray sum no larger than k.", en: "Now the problem becomes max subarray sum no larger than k." });
+      const prefixes = [{ sum: 0, index: 0 }];
+      let prefix = 0;
+      for (let right = 0; right < cols; right++) {
+        prefix += colSums[right];
+        const need = prefix - k;
+        const idx = lowerBound(prefixes, need);
+        let candidate = null;
+        if (idx < prefixes.length) {
+          const prev = prefixes[idx];
+          const sum = prefix - prev.sum;
+          candidate = { top, bottom, left: prev.index, right };
+          if (sum > best) {
+            best = sum;
+            bestRect = candidate;
+          }
+          push({ vi: `right=${right}: candidate=${sum}`, en: `right=${right}: candidate=${sum}` }, [7, 8, 9, 10], colSums, [{ name: "prefix", value: prefix }, { name: "need", value: need }, { name: "sorted prefixes", value: `[${prefixes.map((p) => p.sum).join(",")}]` }, { name: "candidate", value: sum }], { vi: "Tìm prefix nhỏ nhất ≥ prefix-k để subarray sum không vượt quá k.", en: "Find the smallest prefix >= prefix-k so the subarray sum does not exceed k." }, false, candidate);
+        }
+        const insert = lowerBound(prefixes, prefix);
+        prefixes.splice(insert, 0, { sum: prefix, index: right + 1 });
+      }
+    }
+  }
+  push({ vi: `Max sum ≤ ${k} là ${best}`, en: `Max sum <= ${k} is ${best}` }, [11], new Array(cols).fill(0), [{ name: "answer", value: best }], { vi: "Đã thử mọi cặp hàng và mọi đoạn cột bằng prefix sorted list.", en: "All row pairs and column ranges were checked with a sorted prefix list." }, true);
+  return { original: matrix, answer: best, steps };
+}
+
+Object.assign(module.exports, {
+  363: {
+    id: 363,
+    difficulty: "hard",
+    slug: "max-sum-of-rectangle-no-larger-than-k",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Max Sum of Rectangle No Larger Than K", en: "Max Sum of Rectangle No Larger Than K" },
+    titleVi: { vi: "Tổng rectangle lớn nhất không vượt quá k", en: "Max rectangle sum no larger than k" },
+    statement: { vi: "Tìm tổng lớn nhất của một rectangle trong matrix sao cho tổng ≤ k.", en: "Find the largest rectangle sum in matrix such that the sum is <= k." },
+    defaultInput: "1,0,1;0,-2,3",
+    inputKind: "string",
+    inputLabel: { vi: "matrix", en: "matrix" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 2 }],
+    approach: [
+      { vi: "Cố định top/bottom rồi nén tổng từng cột.", en: "Fix top/bottom rows and compress column sums." },
+      { vi: "Trên mảng nén, dùng prefix sum + sorted list để tìm subarray sum lớn nhất ≤ k.", en: "On the compressed array, use prefix sums + sorted list to find the best subarray sum <= k." },
+    ],
+    complexity: { time: "O(R²·C·log C)", space: "O(C)", note: { vi: "Có R² cặp hàng; mỗi cặp xử lý C prefix.", en: "There are R² row pairs; each processes C prefixes." } },
+    code: ["import bisect", "class Solution:", "    def maxSumSubmatrix(self, matrix, k):", "        best = float('-inf')", "        for top in range(len(matrix)):", "            col_sums = [0] * len(matrix[0])", "            for bottom in range(top, len(matrix)):", "                for c in range(len(col_sums)): col_sums[c] += matrix[bottom][c]", "                prefixes = [0]; prefix = 0", "                for value in col_sums:", "                    prefix += value", "                    i = bisect.bisect_left(prefixes, prefix - k)", "                    if i < len(prefixes): best = max(best, prefix - prefixes[i])", "                    bisect.insort(prefixes, prefix)", "        return best"],
+    builder: buildSteps363,
   },
 });
 

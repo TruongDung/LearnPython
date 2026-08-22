@@ -3295,7 +3295,272 @@ function buildSteps131(input) {
   return { original: s, answer: result, steps };
 }
 
+/** LeetCode 37: Sudoku Solver — DFS backtracking with row/col/box sets. */
+function buildSteps37(input) {
+  const rows = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean);
+  const board = rows.map((row) => (
+    row.includes(",")
+      ? row.split(",").map((cell) => cell.trim() || ".")
+      : [...row].map((cell) => cell.trim() || ".")
+  ));
+  if (board.length !== 9 || board.some((row) => row.length !== 9)) {
+    throw new Error("Sudoku board must be 9 rows x 9 columns; use '.' for empty cells.");
+  }
+
+  const original = board.map((row) => [...row]);
+  const rowUsed = Array.from({ length: 9 }, () => new Set());
+  const colUsed = Array.from({ length: 9 }, () => new Set());
+  const boxUsed = Array.from({ length: 9 }, () => new Set());
+  const empties = [];
+  const steps = [];
+  const TRACE_LIMIT = 220;
+  let traceTruncated = false;
+
+  const boxId = (r, c) => Math.floor(r / 3) * 3 + Math.floor(c / 3);
+  const gridOf = () => board.map((row) => row.map((cell) => (cell === "." ? "·" : cell)));
+  const givens = [];
+
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const value = board[r][c];
+      if (value === "." || value === "0") {
+        board[r][c] = ".";
+        empties.push([r, c]);
+      } else {
+        rowUsed[r].add(value);
+        colUsed[c].add(value);
+        boxUsed[boxId(r, c)].add(value);
+        givens.push([r, c]);
+      }
+    }
+  }
+
+  function push(details) {
+    if (steps.length >= TRACE_LIMIT) {
+      traceTruncated = true;
+      if (details.final && steps.length) {
+        steps[steps.length - 1] = {
+          title: details.title,
+          arr: [],
+          grid: {
+            dp: gridOf(),
+            text1: Array.from({ length: 9 }, (_, i) => String(i)),
+            text2: Array.from({ length: 9 }, (_, i) => String(i)),
+            hlCell: details.hlCell || null,
+            pathCells: details.pathCells || [],
+            historyCells: givens,
+            largeCells: true,
+            caption: details.caption || "Sudoku board",
+          },
+          highlight: [],
+          mark: [],
+          final: true,
+          codeLines: details.codeLines || [],
+          vars: details.vars || [],
+          note: details.note,
+        };
+      }
+      return;
+    }
+    steps.push({
+      title: details.title,
+      arr: [],
+      grid: {
+        dp: gridOf(),
+        text1: Array.from({ length: 9 }, (_, i) => String(i)),
+        text2: Array.from({ length: 9 }, (_, i) => String(i)),
+        hlCell: details.hlCell || null,
+        pathCells: details.pathCells || [],
+        historyCells: givens,
+        largeCells: true,
+        caption: details.caption || "Sudoku board",
+      },
+      highlight: [],
+      mark: [],
+      final: details.final || false,
+      codeLines: details.codeLines || [],
+      vars: details.vars || [],
+      note: details.note,
+    });
+  }
+
+  const candidatesAt = (r, c) => {
+    const used = new Set([...rowUsed[r], ...colUsed[c], ...boxUsed[boxId(r, c)]]);
+    return "123456789".split("").filter((digit) => !used.has(digit));
+  };
+
+  function findEmpty() {
+    let best = null;
+    let bestCandidates = null;
+    for (const [r, c] of empties) {
+      if (board[r][c] !== ".") continue;
+      const candidates = candidatesAt(r, c);
+      if (!best || candidates.length < bestCandidates.length) {
+        best = [r, c];
+        bestCandidates = candidates;
+        if (candidates.length === 1) break;
+      }
+    }
+    return best ? { cell: best, candidates: bestCandidates } : null;
+  }
+
+  push({
+    title: { vi: "Khởi tạo Sudoku", en: "Initialize Sudoku" },
+    codeLines: [3, 4, 5, 6],
+    vars: [{ name: "empty cells", value: empties.length }],
+    note: { vi: "Dùng 3 nhóm set để kiểm tra nhanh digit đã xuất hiện trong hàng, cột, và box 3x3.", en: "Use row, column, and 3x3 box sets to test digits quickly." },
+  });
+
+  function solve(depth = 0) {
+    const next = findEmpty();
+    if (!next) {
+      push({
+        title: { vi: "Đã điền xong toàn bộ bảng", en: "Filled the whole board" },
+        codeLines: [27, 28, 29],
+        final: true,
+        vars: [{ name: "solved", value: true }],
+        note: { vi: "Không còn ô trống, bảng hiện tại là nghiệm.", en: "No empty cell remains; the current board is the solution." },
+      });
+      return true;
+    }
+
+    const [[r, c], candidates] = [next.cell, next.candidates];
+    push({
+      title: { vi: `Chọn ô (${r},${c})`, en: `Choose cell (${r},${c})` },
+      codeLines: [27, 30],
+      hlCell: [r, c],
+      pathCells: [[r, c]],
+      vars: [{ name: "depth", value: depth }, { name: "candidates", value: candidates.join("") || "∅" }],
+      note: { vi: "Chọn ô trống có ít ứng viên nhất để giảm nhánh thử.", en: "Pick the empty cell with the fewest candidates to reduce branching." },
+    });
+
+    for (const digit of "123456789") {
+      const box = boxId(r, c);
+      const allowed = !rowUsed[r].has(digit) && !colUsed[c].has(digit) && !boxUsed[box].has(digit);
+      push({
+        title: { vi: `Thử ${digit} tại (${r},${c})`, en: `Try ${digit} at (${r},${c})` },
+        codeLines: [31, 32, 33],
+        hlCell: [r, c],
+        vars: [{ name: "digit", value: digit }, { name: "row/col/box ok", value: allowed }],
+        note: {
+          vi: allowed ? "Digit không đụng hàng/cột/box, có thể đặt tạm." : "Digit đã xuất hiện trong hàng, cột, hoặc box nên bỏ qua.",
+          en: allowed ? "The digit does not conflict with row/col/box, so place it temporarily." : "The digit already appears in the row, column, or box, so skip it.",
+        },
+      });
+      if (!allowed) continue;
+
+      board[r][c] = digit;
+      rowUsed[r].add(digit);
+      colUsed[c].add(digit);
+      boxUsed[box].add(digit);
+      push({
+        title: { vi: `Đặt ${digit} vào (${r},${c})`, en: `Place ${digit} at (${r},${c})` },
+        codeLines: [34, 35],
+        hlCell: [r, c],
+        vars: [{ name: "depth", value: depth }, { name: "placed", value: digit }],
+        note: { vi: "Cập nhật board và các set đánh dấu rồi đi sâu tiếp.", en: "Update the board and marker sets, then recurse." },
+      });
+
+      if (solve(depth + 1)) return true;
+
+      board[r][c] = ".";
+      rowUsed[r].delete(digit);
+      colUsed[c].delete(digit);
+      boxUsed[box].delete(digit);
+      push({
+        title: { vi: `Backtrack (${r},${c})`, en: `Backtrack (${r},${c})` },
+        codeLines: [36],
+        hlCell: [r, c],
+        vars: [{ name: "removed", value: digit }, { name: "depth", value: depth }],
+        note: { vi: "Nhánh này không dẫn tới nghiệm, xóa digit và thử ứng viên khác.", en: "This branch does not solve the board; remove the digit and try another candidate." },
+      });
+    }
+    return false;
+  }
+
+  const solved = solve();
+  const finalBoard = board.map((row) => [...row]);
+  if (!steps.length || !steps[steps.length - 1].final) {
+    push({
+      title: { vi: solved ? "Sudoku đã giải xong" : "Không tìm thấy nghiệm", en: solved ? "Sudoku solved" : "No solution found" },
+      codeLines: [38],
+      final: true,
+      vars: [{ name: "solved", value: solved }, { name: "trace", value: traceTruncated ? "truncated" : "complete" }],
+      note: {
+        vi: `${traceTruncated ? "Trace đã được rút gọn để giữ visualization mượt. " : ""}${solved ? "Bảng cuối là nghiệm hợp lệ." : "Không có cách điền hợp lệ."}`,
+        en: `${traceTruncated ? "The trace was shortened to keep the visualization responsive. " : ""}${solved ? "The final board is a valid solution." : "No valid filling exists."}`,
+      },
+    });
+  }
+
+  return { original, answer: finalBoard, steps };
+}
+
 module.exports = {
+  37: {
+    id: 37,
+    difficulty: "hard",
+    slug: "sudoku-solver",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    title: { vi: "Sudoku Solver", en: "Sudoku Solver" },
+    titleVi: { vi: "Giải Sudoku bằng backtracking", en: "Solve Sudoku with backtracking" },
+    statement: {
+      vi: "Điền bảng Sudoku 9x9 tại chỗ. Dùng '.' cho ô trống; nhập 9 hàng cách nhau bằng ';'.",
+      en: "Fill a 9x9 Sudoku board in place. Use '.' for empty cells; enter 9 rows separated by ';'.",
+    },
+    defaultInput: "53..7....;6..195...;.98....6.;8...6...3;4..8.3..1;7...2...6;.6....28.;...419..5;....8..79",
+    inputKind: "string",
+    inputLabel: { vi: "board (9 hàng cách ;)", en: "board (9 rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Giữ set cho từng hàng, cột, và box 3x3 để kiểm tra digit O(1).", en: "Keep sets for each row, column, and 3x3 box for O(1) digit checks." },
+      { vi: "Chọn ô trống ít ứng viên nhất, thử digit 1..9 hợp lệ, rồi DFS tiếp.", en: "Choose the empty cell with the fewest candidates, try valid digits 1..9, then DFS." },
+      { vi: "Nếu nhánh sai, backtrack: xóa digit khỏi board và các set.", en: "If a branch fails, backtrack by removing the digit from the board and sets." },
+    ],
+    complexity: { time: "O(9^E)", space: "O(E)", note: { vi: "E là số ô trống; set giúp cắt nhánh nhanh.", en: "E is the number of empty cells; sets prune conflicts quickly." } },
+    code: [
+      "class Solution:",
+      "    def solveSudoku(self, board):",
+      "        rows = [set() for _ in range(9)]",
+      "        cols = [set() for _ in range(9)]",
+      "        boxes = [set() for _ in range(9)]",
+      "        empties = []",
+      "        for r in range(9):",
+      "            for c in range(9):",
+      "                if board[r][c] == '.':",
+      "                    empties.append((r, c))",
+      "                else:",
+      "                    b = (r // 3) * 3 + c // 3",
+      "                    rows[r].add(board[r][c]); cols[c].add(board[r][c]); boxes[b].add(board[r][c])",
+      "        def box_id(r, c):",
+      "            return (r // 3) * 3 + c // 3",
+      "        def candidates(r, c):",
+      "            used = rows[r] | cols[c] | boxes[box_id(r, c)]",
+      "            return [d for d in '123456789' if d not in used]",
+      "        def find_empty():",
+      "            best, best_cand = None, None",
+      "            for r, c in empties:",
+      "                if board[r][c] != '.': continue",
+      "                cand = candidates(r, c)",
+      "                if best is None or len(cand) < len(best_cand):",
+      "                    best, best_cand = (r, c), cand",
+      "            return best",
+      "        def backtrack():",
+      "            cell = find_empty()",
+      "            if cell is None:",
+      "                return True",
+      "            r, c = cell",
+      "            for digit in '123456789':",
+      "                b = box_id(r, c)",
+      "                if digit in rows[r] or digit in cols[c] or digit in boxes[b]: continue",
+      "                board[r][c] = digit; rows[r].add(digit); cols[c].add(digit); boxes[b].add(digit)",
+      "                if backtrack(): return True",
+      "                board[r][c] = '.'; rows[r].remove(digit); cols[c].remove(digit); boxes[b].remove(digit)",
+      "            return False",
+      "        backtrack()",
+    ],
+    builder: buildSteps37,
+  },
   79: {
     id: 79, difficulty: "medium", slug: "word-search",
     category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },

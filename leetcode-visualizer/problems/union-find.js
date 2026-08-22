@@ -6666,3 +6666,100 @@ module.exports = {
     builder: buildSteps3532,
   },
 };
+
+function buildSteps1970(input, params = {}) {
+  const rows = Number(params.rows || params.row || 2);
+  const cols = Number(params.cols || params.col || 2);
+  const cells = String(input).split(/[;|]/).map((part) => part.trim()).filter(Boolean)
+    .map((part) => part.split(",").map((value) => Number(value.trim()) - 1));
+  const total = rows * cols;
+  const top = total, bottom = total + 1;
+  const parent = Array.from({ length: total + 2 }, (_, i) => i);
+  const size = new Array(total + 2).fill(1);
+  const open = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const steps = [];
+  const id = (r, c) => r * cols + c;
+  const find = (x) => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+  const union = (a, b) => {
+    let ra = find(a), rb = find(b);
+    if (ra === rb) return false;
+    if (size[ra] < size[rb]) [ra, rb] = [rb, ra];
+    parent[rb] = ra;
+    size[ra] += size[rb];
+    return true;
+  };
+  const connected = () => find(top) === find(bottom);
+  const gridCells = (current = null) => open.map((row, r) => row.map((isOpen, c) => ({
+    label: isOpen ? "O" : "X",
+    cls: current && current[0] === r && current[1] === c ? "current" : isOpen ? "visited" : "wall",
+  })));
+  function push(day, title, codeLines, current, vars, note, final = false) {
+    steps.push({
+      title,
+      arr: parent.slice(0, total),
+      sub: parent.slice(0, total).map((p, i) => `p${i}=${p}`),
+      highlight: current ? [id(current[0], current[1])] : [],
+      mark: [],
+      final,
+      codeLines,
+      vars: [{ name: "day", value: day }, { name: "connected", value: connected() }, ...vars],
+      note,
+      bfsGrid: { rows, cols, cells: gridCells(current) },
+    });
+  }
+
+  push(cells.length, { vi: "Bắt đầu từ ngày cuối: toàn nước", en: "Start from final day: all water" }, [3, 4], null, [{ name: "rows,cols", value: `${rows},${cols}` }], { vi: "Đi ngược thời gian: thêm lại đất, union với hàng xóm đất.", en: "Go backward in time: add land back and union adjacent land cells." });
+  for (let day = cells.length - 1; day >= 0; day--) {
+    const [r, c] = cells[day];
+    open[r][c] = true;
+    const cur = id(r, c);
+    if (r === 0) union(cur, top);
+    if (r === rows - 1) union(cur, bottom);
+    push(day, { vi: `Mở lại ô (${r},${c})`, en: `Open cell (${r},${c})` }, [5, 6, 7], [r, c], [{ name: "cell", value: `(${r},${c})` }], { vi: "Ô bị flood ở ngày này được thêm lại làm đất.", en: "The cell flooded on this day is added back as land." });
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || !open[nr][nc]) continue;
+      union(cur, id(nr, nc));
+      push(day, { vi: `Union với (${nr},${nc})`, en: `Union with (${nr},${nc})` }, [8, 9, 10], [nr, nc], [{ name: "neighbor", value: `(${nr},${nc})` }], { vi: "Kết nối hai ô đất kề nhau.", en: "Connect adjacent land cells." });
+    }
+    if (connected()) {
+      push(day, { vi: `Ngày cuối còn crossing = ${day}`, en: `Latest crossing day = ${day}` }, [11, 12], [r, c], [{ name: "answer", value: day }], { vi: "Khi đi ngược, lần đầu top nối bottom chính là ngày cuối vẫn băng qua được.", en: "In reverse time, the first top-bottom connection is the latest day crossing is possible." }, true);
+      return { original: cells, answer: day, steps };
+    }
+  }
+  push(0, { vi: "Không có ngày crossing", en: "No crossing day" }, [13], null, [{ name: "answer", value: 0 }], { vi: "Không tạo được kết nối trên-dưới.", en: "No top-bottom connection was created." }, true);
+  return { original: cells, answer: 0, steps };
+}
+
+Object.assign(module.exports, {
+  1970: {
+    id: 1970,
+    difficulty: "hard",
+    slug: "last-day-where-you-can-still-cross",
+    category: UF_CAT,
+    title: { vi: "Last Day Where You Can Still Cross", en: "Last Day Where You Can Still Cross" },
+    titleVi: { vi: "Ngày cuối vẫn băng qua được", en: "Latest day where crossing is possible" },
+    statement: { vi: "Các ô bị ngập theo từng ngày. Tìm ngày cuối còn đường đất từ hàng trên xuống hàng dưới. Nhập cells 1-based dạng r,c;r,c.", en: "Cells flood day by day. Find the latest day with a land path from top row to bottom row. Enter 1-based cells as r,c;r,c." },
+    defaultInput: "1,1;2,1;1,2;2,2",
+    inputKind: "string",
+    inputLabel: { vi: "cells (1-based, cách ;)", en: "cells (1-based, separated by ;)" },
+    extraParams: [
+      { key: "rows", label: { vi: "rows", en: "rows" }, default: 2 },
+      { key: "cols", label: { vi: "cols", en: "cols" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Đi ngược từ ngày cuối, thêm lại từng ô đất.", en: "Work backward from the final day, adding land cells back." },
+      { vi: "Union ô đất mới với hàng xóm đất và virtual top/bottom.", en: "Union the new land cell with land neighbors and virtual top/bottom nodes." },
+      { vi: "Lần đầu top nối bottom là đáp án.", en: "The first time top connects to bottom is the answer." },
+    ],
+    complexity: { time: "O(R·C·α(RC))", space: "O(R·C)", note: { vi: "Mỗi ô được thêm và union tối đa 4 lần.", en: "Each cell is added and unioned with at most 4 neighbors." } },
+    code: ["class Solution:", "    def latestDayToCross(self, row, col, cells):", "        parent = list(range(row * col + 2))", "        land = [[False] * col for _ in range(row)]", "        for day in range(len(cells) - 1, -1, -1):", "            r, c = cells[day][0] - 1, cells[day][1] - 1", "            land[r][c] = True", "            union(cell, top/bottom/neighbors)", "            if find(top) == find(bottom):", "                return day", "        return 0"],
+    builder: buildSteps1970,
+  },
+});
