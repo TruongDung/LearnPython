@@ -2407,78 +2407,131 @@ function buildSteps713(nums, params = {}) {
 }
 
 function buildSteps1358(input, params) {
-  const approach = (params && params.approach) || 1;
-  if (approach === 2) return buildSteps1358Last(input);
+  const approach = String((params && params.approach) || "1");
+  if (approach === "2") return buildSteps1358Last(input);
 
   const s = typeof input === "string" ? input : String(input);
   const n = s.length;
+  const chars = s.split("");
+  const bars = chars.map((ch) => ch.charCodeAt(0) - 96);
   const steps = [];
 
   const count = { a: 0, b: 0, c: 0 };
   let left = 0;
   let total = 0;
+  const labels = () => chars.map((ch, i) => `${ch}[${i}]`);
+  const countText = () => `{a:${count.a}, b:${count.b}, c:${count.c}}`;
+  const inWindow = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
+  const suffixFrom = (start) => Array.from({ length: Math.max(0, n - start) }, (_, x) => start + x);
 
   steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: s.split("").map((ch) => ch.charCodeAt(0) - 96), // a=1,b=2,c=3 for bar heights
-    sub: s.split(""),
+    title: { vi: "Cách 1: cửa sổ trượt", en: "Approach 1: sliding window" },
+    arr: bars,
+    sub: labels(),
     highlight: [],
     mark: [],
     codeLines: [3, 4, 5],
+    codeBlock: 1,
     vars: [
       { name: "s", value: s },
       { name: "count", value: "{a:0, b:0, c:0}" },
+      { name: "left", value: 0 },
       { name: "total", value: 0 },
     ],
     note: {
-      vi: `Đếm số substring chứa ít nhất 1 'a', 1 'b', 1 'c'. Dùng cửa sổ trượt: khi cửa sổ hợp lệ → mọi mở rộng sang phải cũng hợp lệ.`,
-      en: `Count substrings containing at least one 'a', 'b', and 'c'. Sliding window: once valid, all extensions to the right are also valid.`,
+      vi: `Giữ window [left..right]. Khi window có đủ a,b,c, mọi substring bắt đầu tại left và kết thúc từ right đến n-1 đều hợp lệ, nên cộng n-right rồi co left.`,
+      en: `Keep window [left..right]. Once it has a,b,c, every substring starting at left and ending from right to n-1 is valid, so add n-right and shrink left.`,
     },
   });
 
-  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
-
   for (let right = 0; right < n; right++) {
     count[s[right]]++;
+    const validAfterAdd = count.a > 0 && count.b > 0 && count.c > 0;
 
-    // Shrink while all three present
+    steps.push({
+      title: { vi: `Thêm s[${right}]='${s[right]}'`, en: `Add s[${right}]='${s[right]}'` },
+      arr: bars,
+      sub: labels(),
+      highlight: inWindow(left, right),
+      mark: [right],
+      codeLines: [6, 7],
+      codeBlock: 1,
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "window", value: s.slice(left, right + 1) },
+        { name: "count", value: countText() },
+        { name: "đủ a,b,c?", value: validAfterAdd },
+        { name: "total", value: total },
+      ],
+      note: validAfterAdd
+        ? { vi: `Window đã đủ cả 3 ký tự, nên bước kế tiếp sẽ cộng đáp án và thử co left.`, en: `The window has all 3 characters, so the next step adds to the answer and tries shrinking left.` }
+        : { vi: `Window chưa đủ a,b,c nên chưa cộng gì. Tiếp tục tăng right.`, en: `The window does not have a,b,c yet, so nothing is added. Continue moving right.` },
+    });
+
     while (count.a >= 1 && count.b >= 1 && count.c >= 1) {
       const added = n - right;
+      const oldLeft = left;
+      const removedChar = s[oldLeft];
       total += added;
 
       steps.push({
-        title: { vi: `Hợp lệ: left=${left}, right=${right}`, en: `Valid: left=${left}, right=${right}` },
-        arr: s.split("").map((ch) => ch.charCodeAt(0) - 96),
-        sub: s.split(""),
+        title: { vi: `Window hợp lệ: cộng ${added}`, en: `Valid window: add ${added}` },
+        arr: bars,
+        sub: labels(),
         highlight: inWindow(left, right),
-        mark: [],
-        codeLines: [6, 7, 8, 9, 10],
+        mark: suffixFrom(right),
+        codeLines: [8, 9],
+        codeBlock: 1,
         vars: [
           { name: "left", value: left },
           { name: "right", value: right },
-          { name: "count", value: `{a:${count.a}, b:${count.b}, c:${count.c}}` },
-          { name: "+substrings", value: `${added} (n - right = ${n} - ${right})` },
+          { name: "window nhỏ nhất", value: s.slice(left, right + 1) },
+          { name: "end hợp lệ", value: `${right}..${n - 1}` },
+          { name: "+", value: `${added} = ${n} - ${right}` },
           { name: "total", value: total },
         ],
         note: {
-          vi: `Cửa sổ [${left}..${right}] chứa cả a,b,c → ${added} substring hợp lệ bắt đầu tại left=${left} (kéo dài đến cuối). total = ${total}. Co left.`,
-          en: `Window [${left}..${right}] has all a,b,c → ${added} valid substrings starting at left=${left} (extend to end). total = ${total}. Shrink left.`,
+          vi: `[${left}..${right}] đã chứa a,b,c. Giữ start=${left}, end có thể là ${right}, ${right + 1}, ..., ${n - 1}; tất cả đều vẫn chứa window này.`,
+          en: `[${left}..${right}] contains a,b,c. With start=${left}, end can be ${right}, ${right + 1}, ..., ${n - 1}; all still contain this window.`,
         },
       });
 
       count[s[left]]--;
       left++;
+
+      steps.push({
+        title: { vi: `Co left: bỏ '${removedChar}' ở ${oldLeft}`, en: `Shrink left: remove '${removedChar}' at ${oldLeft}` },
+        arr: bars,
+        sub: labels(),
+        highlight: inWindow(left, right),
+        mark: [oldLeft],
+        codeLines: [10, 11],
+        codeBlock: 1,
+        vars: [
+          { name: "left", value: `${oldLeft} → ${left}` },
+          { name: "count", value: countText() },
+          { name: "window sau khi co", value: left <= right ? s.slice(left, right + 1) : "" },
+          { name: "còn đủ a,b,c?", value: count.a > 0 && count.b > 0 && count.c > 0 },
+          { name: "total", value: total },
+        ],
+        note: {
+          vi: `Đã đếm xong mọi substring bắt đầu tại ${oldLeft}; dịch left để kiểm tra start tiếp theo còn hợp lệ không.`,
+          en: `Every substring starting at ${oldLeft} has been counted; move left to test whether the next start is still valid.`,
+        },
+      });
     }
   }
 
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
-    arr: s.split("").map((ch) => ch.charCodeAt(0) - 96),
-    sub: s.split(""),
+    arr: bars,
+    sub: labels(),
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [11],
+    codeLines: [12],
+    codeBlock: 1,
     vars: [{ name: "total", value: total }],
     note: {
       vi: `Tổng số substring chứa cả 'a', 'b', 'c' = ${total}.`,
@@ -2497,71 +2550,83 @@ function buildSteps1358(input, params) {
 function buildSteps1358Last(input) {
   const s = typeof input === "string" ? input : String(input);
   const n = s.length;
+  const chars = s.split("");
+  const bars = chars.map((ch) => ch.charCodeAt(0) - 96);
   const steps = [];
   const last = { a: -1, b: -1, c: -1 };
   let res = 0;
+  const labels = () => chars.map((ch, i) => `${ch}[${i}]`);
+  const lastText = () => `{a:${last.a}, b:${last.b}, c:${last.c}}`;
+  const seenIndexes = () => [last.a, last.b, last.c].filter((idx) => idx >= 0);
+  const startCandidates = (end) => Array.from({ length: end + 1 }, (_, x) => x);
 
   steps.push({
-    title: { vi: "Khởi tạo (Last Index)", en: "Initialize (Last Index)" },
-    arr: s.split("").map((ch) => ch.charCodeAt(0) - 96),
-    sub: s.split(""),
+    title: { vi: "Cách 2: lưu vị trí cuối", en: "Approach 2: track last indexes" },
+    arr: bars,
+    sub: labels(),
     highlight: [],
     mark: [],
     codeLines: [3, 4],
+    codeBlock: 2,
     vars: [
       { name: "last", value: "{a:-1, b:-1, c:-1}" },
       { name: "res", value: 0 },
     ],
     note: {
-      vi: `Ý tưởng: last[ch] = vị trí cuối cùng thấy ch.\nKhi cả 3 đã xuất hiện: số substring hợp lệ KẾT THÚC tại i = min(last['a'], last['b'], last['c']) + 1.\n(Vì bất kỳ vị trí bắt đầu nào từ 0..min(last) đều tạo substring chứa cả 3.)`,
-      en: `Idea: last[ch] = last seen position of ch.\nOnce all 3 have appeared: valid substrings ENDING at i = min(last['a'], last['b'], last['c']) + 1.\n(Any start from 0..min(last) yields a substring with all 3.)`,
+      vi: `Quét từng end=i. last[ch] là vị trí gần nhất của mỗi ký tự. Nếu min(last)=m, mọi start từ 0..m đều tạo substring s[start..i] chứa đủ a,b,c.`,
+      en: `Scan each end=i. last[ch] is each character's latest position. If min(last)=m, every start from 0..m makes s[start..i] contain a,b,c.`,
     },
   });
 
   for (let i = 0; i < n; i++) {
     const ch = s[i];
     last[ch] = i;
+    const seenAll = last.a !== -1 && last.b !== -1 && last.c !== -1;
 
-    if (last.a !== -1 && last.b !== -1 && last.c !== -1) {
+    steps.push({
+      title: { vi: `Cập nhật last['${ch}'] = ${i}`, en: `Update last['${ch}'] = ${i}` },
+      arr: bars,
+      sub: labels(),
+      highlight: seenIndexes(),
+      mark: [i],
+      codeLines: [5, 6],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "ch", value: ch },
+        { name: "last", value: lastText() },
+        { name: "đã thấy đủ 3?", value: seenAll },
+        { name: "res", value: res },
+      ],
+      note: seenAll
+        ? { vi: `Đã thấy đủ a,b,c. Bước tiếp theo lấy vị trí nhỏ nhất trong last để biết có bao nhiêu start hợp lệ.`, en: `All a,b,c have appeared. Next, take the minimum last index to count valid starts.` }
+        : { vi: `Chưa đủ cả 3 ký tự, nên chưa có substring kết thúc tại ${i} được cộng.`, en: `Not all 3 characters have appeared, so no substring ending at ${i} is counted yet.` },
+    });
+
+    if (seenAll) {
       const minLast = Math.min(last.a, last.b, last.c);
       const added = minLast + 1;
       res += added;
 
       steps.push({
-        title: { vi: `i=${i} '${ch}': +${added}`, en: `i=${i} '${ch}': +${added}` },
-        arr: s.split("").map((c) => c.charCodeAt(0) - 96),
-        sub: s.split(""),
+        title: { vi: `min(last)=${minLast} → cộng ${added}`, en: `min(last)=${minLast} → add ${added}` },
+        arr: bars,
+        sub: labels(),
         highlight: [last.a, last.b, last.c],
-        mark: [i],
-        codeLines: [5, 6, 7, 8],
+        mark: startCandidates(minLast),
+        codeLines: [7, 8],
+        codeBlock: 2,
         vars: [
           { name: "i", value: i },
-          { name: "last", value: `{a:${last.a}, b:${last.b}, c:${last.c}}` },
+          { name: "last", value: lastText() },
           { name: "min(last)", value: minLast },
-          { name: "+substrings", value: `min(last)+1 = ${added}` },
+          { name: "start hợp lệ", value: `0..${minLast}` },
+          { name: "+", value: added },
           { name: "res", value: res },
         ],
         note: {
-          vi: `last = {a:${last.a}, b:${last.b}, c:${last.c}}. min = ${minLast}.\nSố substring mới = min+1 = ${added} (start từ 0..${minLast} đều hợp lệ).\nres = ${res}.`,
-          en: `last = {a:${last.a}, b:${last.b}, c:${last.c}}. min = ${minLast}.\nNew substrings = min+1 = ${added} (start 0..${minLast} are all valid).\nres = ${res}.`,
-        },
-      });
-    } else {
-      steps.push({
-        title: { vi: `i=${i} '${ch}': chưa đủ 3`, en: `i=${i} '${ch}': not all 3 yet` },
-        arr: s.split("").map((c) => c.charCodeAt(0) - 96),
-        sub: s.split(""),
-        highlight: [i],
-        mark: [],
-        codeLines: [5, 6],
-        vars: [
-          { name: "i", value: i },
-          { name: "last", value: `{a:${last.a}, b:${last.b}, c:${last.c}}` },
-          { name: "res", value: res },
-        ],
-        note: {
-          vi: `Chưa đủ cả 3 ký tự → bỏ qua.`,
-          en: `Not all 3 chars seen yet → skip.`,
+          vi: `Ký tự bắt buộc xa nhất về bên trái nằm ở index ${minLast}. Vì vậy s[0..${i}], s[1..${i}], ..., s[${minLast}..${i}] đều hợp lệ.`,
+          en: `The leftmost required latest character is at index ${minLast}. So s[0..${i}], s[1..${i}], ..., s[${minLast}..${i}] are valid.`,
         },
       });
     }
@@ -2569,12 +2634,13 @@ function buildSteps1358Last(input) {
 
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
-    arr: s.split("").map((c) => c.charCodeAt(0) - 96),
-    sub: s.split(""),
+    arr: bars,
+    sub: labels(),
     highlight: [],
     mark: [],
     final: true,
     codeLines: [9],
+    codeBlock: 2,
     vars: [{ name: "res", value: res }],
     note: {
       vi: `Tổng = ${res}.`,
@@ -4519,14 +4585,27 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Chuỗi s (chỉ a,b,c)", en: "String s (only a,b,c)" },
     extraParams: [
-      { key: "approach", label: { vi: "Cách (1=sliding window, 2=last index)", en: "Approach (1=sliding window, 2=last index)" }, default: 1 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Sliding Window", en: "Approach 1: Sliding Window" } },
+          { value: "2", label: { vi: "Cách 2: Last Index", en: "Approach 2: Last Index" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1: Dùng window [left..right]. Khi window đủ a,b,c, cộng len(s)-right rồi co left để thử start kế tiếp.", en: "Approach 1: Use window [left..right]. When it has a,b,c, add len(s)-right and shrink left to test the next start." },
+      { vi: "Cách 2: Lưu last index của a,b,c. Với mỗi end=i, nếu min(last)=m thì có m+1 start hợp lệ.", en: "Approach 2: Track the last index of a,b,c. For each end=i, if min(last)=m then there are m+1 valid starts." },
     ],
     complexity: {
       time: "O(n)",
       space: "O(1)",
       note: {
-        vi: "Mỗi ký tự được thêm/bỏ khỏi cửa sổ tối đa 1 lần → O(n). Chỉ dùng 3 biến đếm.",
-        en: "Each character added/removed at most once → O(n). Only 3 counters used.",
+        vi: "Cả hai cách đều O(n), O(1). Cách 1 dùng 3 biến đếm + left; Cách 2 dùng 3 last index.",
+        en: "Both approaches are O(n), O(1). Approach 1 uses 3 counters + left; Approach 2 uses 3 last indexes.",
       },
     },
     code: [
@@ -4543,6 +4622,19 @@ module.exports = {
       "                left += 1",
       "        return total",
     ],
+    code2: [
+      "class Solution:",
+      "    def numberOfSubstrings(self, s):",
+      "        last = {'a': -1, 'b': -1, 'c': -1}",
+      "        res = 0",
+      "        for i, ch in enumerate(s):",
+      "            last[ch] = i",
+      "            if min(last.values()) >= 0:",
+      "                res += min(last.values()) + 1",
+      "        return res",
+    ],
+    codeLabel: { vi: "Cách 1: Sliding Window", en: "Approach 1: Sliding Window" },
+    code2Label: { vi: "Cách 2: Last Index", en: "Approach 2: Last Index" },
     builder: buildSteps1358,
   },
   713: {

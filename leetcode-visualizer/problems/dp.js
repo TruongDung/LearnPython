@@ -16543,11 +16543,20 @@ function buildSteps403(input) {
 /**
  * LeetCode 354: Russian Doll Envelopes. Sort (w asc, h desc) → LIS trên chiều cao.
  */
-function buildSteps354(input) {
-  const envs = String(input).split(";").map((p) => p.trim()).filter(Boolean)
+function parseEnvelopes354(input) {
+  return String(input).split(";").map((p) => p.trim()).filter(Boolean)
     .map((p) => p.split(",").map((v) => Number(v.trim())))
     .filter((e) => e.length === 2 && e.every(Number.isFinite))
     .slice(0, 12);
+}
+
+function buildSteps354(input, params) {
+  const approach = String((params && params.approach) || "2");
+  return approach === "1" ? buildSteps354DP(input) : buildSteps354BinarySearch(input);
+}
+
+function buildSteps354DP(input) {
+  const envs = parseEnvelopes354(input);
   // Sort: width ascending, height descending for equal width.
   const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
   const n = sorted.length;
@@ -16565,6 +16574,7 @@ function buildSteps354(input) {
       mark: opts.mark || [],
       final: Boolean(opts.final),
       codeLines: opts.codeLines || [],
+      codeBlock: 1,
       vars: opts.vars || [],
       note: opts.note,
     });
@@ -16617,6 +16627,115 @@ function buildSteps354(input) {
     final: true,
     vars: [{ name: "answer", value: answer }],
     note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}.`, en: `Maximum number of nested envelopes = ${answer}.` },
+  });
+
+  return { original: sorted, answer, steps };
+}
+
+function buildSteps354BinarySearch(input) {
+  const envs = parseEnvelopes354(input);
+  const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
+  const n = sorted.length;
+  const heights = sorted.map((e) => e[1]);
+  const labels = sorted.map((e) => `${e[0]}×${e[1]}`);
+  const tails = [];
+  const steps = [];
+
+  const tailsSub = () => {
+    const sub = Array(Math.max(n, tails.length)).fill("");
+    tails.forEach((v, i) => { sub[i] = `L${i + 1}: ${v}`; });
+    return sub.slice(0, n);
+  };
+
+  steps.push({
+    title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
+    arr: [...heights],
+    sub: Array(n).fill(""),
+    highlight: [],
+    mark: [],
+    codeLines: [5],
+    codeBlock: 2,
+    vars: [
+      { name: "heights", value: `[${heights.join(", ")}]` },
+      { name: "tails", value: "[]" },
+    ],
+    note: {
+      vi: `Sắp rộng tăng, nếu rộng bằng nhau thì cao giảm. Vì vậy 2 phong bì cùng rộng không thể bị LIS đếm nhầm. Sau sort, chỉ cần tìm LIS nghiêm ngặt trên chiều cao.`,
+      en: `Sort width ascending and height descending on ties. That prevents same-width envelopes from being counted by LIS. Now run strict LIS on heights.`,
+    },
+  });
+
+  for (let k = 0; k < n; k++) {
+    const h = heights[k];
+    const label = labels[k];
+    let lo = 0, hi = tails.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (tails[mid] < h) lo = mid + 1;
+      else hi = mid;
+    }
+    const pos = lo;
+    const extended = pos === tails.length;
+    const before = [...tails];
+
+    steps.push({
+      title: { vi: `Xét ${label}: bisect_left(tails, ${h}) = ${pos}`, en: `Process ${label}: bisect_left(tails, ${h}) = ${pos}` },
+      arr: [...heights],
+      sub: tailsSub(),
+      highlight: [k],
+      mark: pos < tails.length ? [pos] : [],
+      codeLines: [7],
+      codeBlock: 2,
+      vars: [
+        { name: "envelope", value: label },
+        { name: "height", value: h },
+        { name: "tails", value: `[${before.join(", ")}]` },
+        { name: "i", value: pos },
+      ],
+      note: extended
+        ? { vi: `${h} lớn hơn mọi đuôi hiện tại → mở thêm một độ dài mới.`, en: `${h} is larger than every current tail → create a longer chain.` }
+        : { vi: `Tìm đuôi đầu tiên ≥ ${h} tại vị trí ${pos}; thay bằng ${h} để giữ đuôi nhỏ nhất cho độ dài ${pos + 1}.`, en: `Find the first tail >= ${h} at index ${pos}; replace it with ${h} to keep the smallest tail for length ${pos + 1}.` },
+    });
+
+    if (extended) tails.push(h);
+    else tails[pos] = h;
+
+    steps.push({
+      title: extended
+        ? { vi: `tails.append(${h})`, en: `tails.append(${h})` }
+        : { vi: `tails[${pos}] = ${h}`, en: `tails[${pos}] = ${h}` },
+      arr: [...heights],
+      sub: tailsSub(),
+      highlight: [k],
+      mark: [pos],
+      codeLines: extended ? [9] : [11],
+      codeBlock: 2,
+      vars: [
+        { name: "tails trước", value: `[${before.join(", ")}]` },
+        { name: "tails sau", value: `[${tails.join(", ")}]` },
+        { name: "answer hiện tại", value: tails.length },
+      ],
+      note: extended
+        ? { vi: `Append ${h}; số phong bì lồng nhau tốt nhất tăng lên ${tails.length}.`, en: `Append ${h}; the best nesting length grows to ${tails.length}.` }
+        : { vi: `Thay đuôi cũ ${before[pos]} bằng ${h}. Độ dài chưa tăng, nhưng đuôi nhỏ hơn giúp dễ nối tiếp hơn.`, en: `Replace old tail ${before[pos]} with ${h}. Length does not grow, but a smaller tail is easier to extend.` },
+    });
+  }
+
+  const answer = tails.length;
+  steps.push({
+    title: { vi: `Kết quả: len(tails) = ${answer}`, en: `Result: len(tails) = ${answer}` },
+    arr: [...heights],
+    sub: tailsSub(),
+    highlight: [],
+    mark: Array.from({ length: answer }, (_, i) => i),
+    final: true,
+    codeLines: [12],
+    codeBlock: 2,
+    vars: [
+      { name: "answer", value: answer },
+      { name: "tails", value: `[${tails.join(", ")}]` },
+    ],
+    note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}. tails dùng để đếm độ dài, không nhất thiết là chuỗi phong bì thật.`, en: `Maximum nested envelopes = ${answer}. tails is a length-counting tool, not necessarily the actual envelope chain.` },
   });
 
   return { original: sorted, answer, steps };
@@ -17771,8 +17890,30 @@ module.exports = {
     defaultInput: "5,4;6,4;6,7;2,3",
     inputKind: "string",
     inputLabel: { vi: "envelopes (w,h; ...)", en: "envelopes (w,h; ...)" },
-    extraParams: [],
-    complexity: { time: "O(n²)", space: "O(n)", note: { vi: "Sắp xếp rồi LIS O(n²) (có thể O(n log n)).", en: "Sort then O(n²) LIS (can be O(n log n))." } },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "2",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" } },
+          { value: "2", label: { vi: "Cách 2: Binary Search O(n log n)", en: "Approach 2: Binary Search O(n log n)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 (O(n²)): sort rộng tăng/cao giảm, rồi làm LIS trên chiều cao bằng dp[i].", en: "Approach 1 (O(n²)): sort width asc/height desc, then run LIS on heights with dp[i]." },
+      { vi: "Cách 2 tối ưu (O(n log n)): sort như trên, sau đó dùng tails[] + bisect_left trên chiều cao.", en: "Optimized approach 2 (O(n log n)): sort the same way, then use tails[] + bisect_left on heights." },
+    ],
+    complexity: {
+      time: "O(n²) / O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Cách tối ưu: sort O(n log n), mỗi chiều cao binary search trong tails O(log n).",
+        en: "Optimized: sort O(n log n), then binary-search each height in tails in O(log n).",
+      },
+    },
     code: [
       "class Solution:",
       "    def maxEnvelopes(self, envelopes):",
@@ -17785,6 +17926,23 @@ module.exports = {
       "                    dp[i] = max(dp[i], dp[j] + 1)",
       "        return max(dp) if n else 0",
     ],
+    code2: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def maxEnvelopes(self, envelopes):",
+      "        envelopes.sort(key=lambda e: (e[0], -e[1]))",
+      "        tails = []",
+      "        for _, h in envelopes:",
+      "            i = bisect_left(tails, h)",
+      "            if i == len(tails):",
+      "                tails.append(h)",
+      "            else:",
+      "                tails[i] = h",
+      "        return len(tails)",
+    ],
+    codeLabel: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" },
+    code2Label: { vi: "Cách 2: Binary Search O(n log n)", en: "Approach 2: Binary Search O(n log n)" },
     builder: buildSteps354,
   },
   1000: {
