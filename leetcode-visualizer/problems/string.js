@@ -9761,7 +9761,207 @@ function buildSteps3170(input) {
   return { original: s, answer, steps };
 }
 
+function normalizeSumGameInput(input) {
+  const raw = String(input ?? "").trim().replace(/[^0-9?]/g, "");
+  const even = raw.length % 2 === 0 ? raw : raw.slice(0, -1);
+  return even || "5023";
+}
+
+/**
+ * LeetCode 1927: Sum Game.
+ *
+ * If the number of question marks is odd, Alice gets the extra move and wins.
+ * Otherwise Bob can force equality exactly when:
+ *   left_sum - right_sum == (right_q - left_q) * 9 / 2
+ */
+function buildSteps1927(input) {
+  const num = normalizeSumGameInput(input);
+  const n = num.length;
+  const half = n / 2;
+  const chars = num.split("");
+  const arr = chars.map((ch) => (ch === "?" ? 10 : Number(ch)));
+  const sub = chars.map((ch, i) => `${ch}[${i}]`);
+  const steps = [];
+  let leftSum = 0;
+  let rightSum = 0;
+  let leftQ = 0;
+  let rightQ = 0;
+
+  steps.push({
+    title: { vi: "Chia chuỗi thành 2 nửa", en: "Split the string into two halves" },
+    arr,
+    sub,
+    highlight: [],
+    mark: [half - 1, half],
+    codeLines: [3, 4],
+    vars: [
+      { name: "num", value: num },
+      { name: "left half", value: num.slice(0, half) },
+      { name: "right half", value: num.slice(half) },
+    ],
+    note: {
+      vi: "Game kết thúc Bob thắng nếu tổng chữ số nửa trái bằng tổng chữ số nửa phải; Alice thắng nếu khác nhau.",
+      en: "At the end Bob wins if the left digit sum equals the right digit sum; Alice wins if they differ.",
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    const ch = chars[i];
+    const side = i < half ? "left" : "right";
+    if (ch === "?") {
+      if (side === "left") leftQ++;
+      else rightQ++;
+    } else if (side === "left") {
+      leftSum += Number(ch);
+    } else {
+      rightSum += Number(ch);
+    }
+
+    steps.push({
+      title: { vi: `Quét ${side}: num[${i}]='${ch}'`, en: `Scan ${side}: num[${i}]='${ch}'` },
+      arr,
+      sub,
+      highlight: [i],
+      mark: side === "left" ? Array.from({ length: half }, (_, k) => k) : Array.from({ length: half }, (_, k) => k + half),
+      codeLines: i < half ? [5, 6, 7, 8] : [9, 10, 11, 12],
+      vars: [
+        { name: "left_sum", value: leftSum },
+        { name: "right_sum", value: rightSum },
+        { name: "left_?", value: leftQ },
+        { name: "right_?", value: rightQ },
+      ],
+      note: ch === "?"
+        ? {
+          vi: `Đây là dấu ?, chưa biết sẽ thành chữ số nào. Chỉ tăng bộ đếm ? của nửa ${side === "left" ? "trái" : "phải"}.`,
+          en: `This is a ?, not a fixed digit yet. Only increment the ? counter for the ${side} half.`,
+        }
+        : {
+          vi: `Đây là chữ số cố định ${ch}, cộng vào tổng của nửa ${side === "left" ? "trái" : "phải"}.`,
+          en: `This fixed digit ${ch} contributes to the ${side} half sum.`,
+        },
+    });
+  }
+
+  const totalQ = leftQ + rightQ;
+  const diff = leftSum - rightSum;
+  const target = ((rightQ - leftQ) * 9) / 2;
+  const oddQuestionMarks = totalQ % 2 === 1;
+  const aliceWins = oddQuestionMarks || diff !== target;
+
+  steps.push({
+    title: { vi: `Tổng số ? = ${totalQ}`, en: `Total ? count = ${totalQ}` },
+    arr,
+    sub,
+    highlight: chars.map((ch, i) => (ch === "?" ? i : -1)).filter((i) => i >= 0),
+    mark: [],
+    codeLines: [14, 15],
+    vars: [
+      { name: "left_sum - right_sum", value: `${leftSum} - ${rightSum} = ${diff}` },
+      { name: "right_? - left_?", value: `${rightQ} - ${leftQ} = ${rightQ - leftQ}` },
+      { name: "total_?", value: totalQ },
+    ],
+    note: oddQuestionMarks
+      ? {
+        vi: "Số dấu ? là lẻ, Alice đi nhiều hơn Bob 1 lượt. Alice luôn dùng lượt thừa để phá thế cân bằng.",
+        en: "The number of ? marks is odd, so Alice gets one more move than Bob. Alice can always use the extra move to break equality.",
+      }
+      : {
+        vi: "Số dấu ? là chẵn, hai người đi số lượt bằng nhau. Khi đó chỉ cần kiểm tra Bob có thể cân bằng tổng hay không.",
+        en: "The number of ? marks is even, so both players move the same number of times. Now check whether Bob can force equal sums.",
+      },
+  });
+
+  if (!oddQuestionMarks) {
+    steps.push({
+      title: { vi: "Điều kiện Bob cân bằng", en: "Bob's equality condition" },
+      arr,
+      sub,
+      highlight: [],
+      mark: [],
+      codeLines: [17],
+      vars: [
+        { name: "diff", value: diff },
+        { name: "(right_? - left_?) * 9 / 2", value: target },
+        { name: "diff == target?", value: diff === target },
+      ],
+      note: {
+        vi: `Bob chỉ ép hòa được nếu phần chênh chữ số cố định diff=${diff} đúng bằng phần bù tối đa trung bình từ dấu ?: ${target}.`,
+        en: `Bob can force a tie only if the fixed digit difference diff=${diff} exactly equals the average max compensation from ? marks: ${target}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: Alice ${aliceWins ? "thắng" : "không thắng"}`, en: `Result: Alice ${aliceWins ? "wins" : "does not win"}` },
+    arr,
+    sub,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18],
+    vars: [{ name: "answer", value: aliceWins }],
+    note: {
+      vi: aliceWins
+        ? "Trả về True vì Alice có chiến thuật làm hai tổng cuối khác nhau."
+        : "Trả về False vì Bob có chiến thuật giữ hai tổng cuối bằng nhau.",
+      en: aliceWins
+        ? "Return True because Alice has a strategy to make the final sums different."
+        : "Return False because Bob has a strategy to keep the final sums equal.",
+    },
+  });
+
+  return { original: num, answer: aliceWins, steps };
+}
+
 module.exports = {
+  1927: {
+    id: 1927,
+    difficulty: "medium",
+    slug: "sum-game",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [{ key: "greedy", vi: "Tham lam", en: "Greedy" }, { key: "game", vi: "Game", en: "Game" }],
+    title: { vi: "Sum Game", en: "Sum Game" },
+    titleVi: { vi: "Trò chơi tổng hai nửa", en: "Sum game" },
+    statement: {
+      vi: "Cho chuỗi số chẵn độ dài gồm chữ số và '?'. Alice và Bob lần lượt thay '?' bằng chữ số, Alice đi trước. Alice thắng nếu tổng nửa trái khác tổng nửa phải; Bob thắng nếu bằng nhau.",
+      en: "Given an even-length string containing digits and '?'. Alice and Bob replace '?' with digits in turns, Alice first. Alice wins if the left-half sum differs from the right-half sum; Bob wins if they are equal.",
+    },
+    defaultInput: "5023",
+    inputKind: "string",
+    inputLabel: { vi: "num (chữ số và ?)", en: "num (digits and ?)" },
+    extraParams: [],
+    approach: [
+      { vi: "Tính left_sum, right_sum và số dấu ? ở mỗi nửa.", en: "Compute left_sum, right_sum, and the number of ? marks in each half." },
+      { vi: "Nếu tổng số ? lẻ, Alice có lượt thừa nên thắng.", en: "If the total number of ? marks is odd, Alice has the extra move and wins." },
+      { vi: "Nếu chẵn, Bob chỉ hòa được khi left_sum-right_sum == (right_?-left_?) * 9 / 2.", en: "If even, Bob can tie only when left_sum-right_sum == (right_?-left_?) * 9 / 2." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Quét chuỗi một lần, chỉ giữ vài biến đếm.", en: "Scan the string once and keep only a few counters." },
+    },
+    code: [
+      "class Solution:",
+      "    def sumGame(self, num: str) -> bool:",
+      "        n = len(num)",
+      "        half = n // 2",
+      "        left_sum = right_sum = 0",
+      "        left_q = right_q = 0",
+      "        for i, ch in enumerate(num):",
+      "            if ch == '?':",
+      "                if i < half: left_q += 1",
+      "                else: right_q += 1",
+      "            else:",
+      "                if i < half: left_sum += int(ch)",
+      "                else: right_sum += int(ch)",
+      "        if (left_q + right_q) % 2 == 1:",
+      "            return True",
+      "        diff = left_sum - right_sum",
+      "        target = (right_q - left_q) * 9 / 2",
+      "        return diff != target",
+    ],
+    builder: buildSteps1927,
+  },
   3170: {
     id: 3170,
     difficulty: "medium",
