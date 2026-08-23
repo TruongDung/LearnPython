@@ -5586,7 +5586,193 @@ function buildSteps3116(input, params = {}) {
   });
 }
 
+/** LeetCode 668: Kth Smallest Number in Multiplication Table. */
+function buildSteps668(input, params = {}) {
+  const m = Number(Array.isArray(input) ? input[0] : input);
+  const n = Number(params.n ?? 3);
+  const k = Number(params.k ?? 5);
+  if (!Number.isInteger(m) || !Number.isInteger(n) || !Number.isInteger(k) || m <= 0 || n <= 0 || k <= 0) {
+    throw new Error("m, n, and k must be positive integers");
+  }
+  if (k > m * n) throw new Error("k must be <= m * n");
+
+  const rows = Math.min(m, 10);
+  const cols = Math.min(n, 10);
+  const table = Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => (r + 1) * (c + 1)));
+  const steps = [];
+  let left = 1;
+  let right = m * n;
+
+  function countLE(x) {
+    let total = 0;
+    const perRow = [];
+    for (let i = 1; i <= m; i++) {
+      const rowCount = Math.min(n, Math.floor(x / i));
+      total += rowCount;
+      perRow.push(rowCount);
+    }
+    return { total, perRow };
+  }
+
+  function gridCells(mid, perRow = []) {
+    return table.map((row, r) => row.map((value, c) => {
+      const withinVisibleCount = c < Math.min(cols, perRow[r] || 0);
+      return {
+        label: String(value),
+        cls: value <= mid && withinVisibleCount ? "visited" : value <= mid ? "path" : "empty",
+      };
+    }));
+  }
+
+  function push({ title, codeLines, mid = null, count = null, perRow = [], vars = [], note, final = false }) {
+    const visibleNote = (m > rows || n > cols)
+      ? { vi: `Chỉ hiển thị góc ${rows}x${cols}; phép đếm vẫn dùng đủ ${m}x${n}.`, en: `Only the ${rows}x${cols} corner is shown; counting still uses the full ${m}x${n} table.` }
+      : null;
+    steps.push({
+      title,
+      arr: Array.from({ length: Math.min(m, 12) }, (_, i) => i + 1),
+      sub: Array.from({ length: Math.min(m, 12) }, (_, i) => `row ${i + 1}`),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        ...(mid === null ? [] : [{ name: "mid", value: mid }]),
+        ...(count === null ? [] : [{ name: `count(<=${mid})`, value: count }]),
+        { name: "k", value: k },
+        ...vars,
+      ],
+      note: visibleNote
+        ? { vi: `${note.vi} ${visibleNote.vi}`, en: `${note.en} ${visibleNote.en}` }
+        : note,
+      bfsGrid: {
+        rows,
+        cols,
+        cells: gridCells(mid ?? 0, perRow),
+      },
+    });
+  }
+
+  push({
+    title: { vi: "Binary search trên giá trị đáp án", en: "Binary search on the answer value" },
+    codeLines: [3, 4],
+    vars: [{ name: "table size", value: `${m}x${n}` }],
+    note: {
+      vi: "Không tạo toàn bộ bảng lớn; chỉ tìm x nhỏ nhất sao cho có ít nhất k số <= x.",
+      en: "Do not build the full large table; find the smallest x with at least k values <= x.",
+    },
+  });
+
+  while (left < right) {
+    const mid = Math.floor((left + right) / 2);
+    const { total, perRow } = countLE(mid);
+    push({
+      title: { vi: `mid=${mid}: count=${total}`, en: `mid=${mid}: count=${total}` },
+      codeLines: [6, 7, 8, 9],
+      mid,
+      count: total,
+      perRow,
+      vars: [
+        { name: "per row", value: perRow.slice(0, 10).map((v, i) => `${i + 1}:${v}`).join(" ") + (m > 10 ? " ..." : "") },
+      ],
+      note: {
+        vi: `Ở hàng i có min(n, mid//i) số <= mid. Tổng ${total} ${total >= k ? ">= k, đáp án có thể nhỏ hơn/bằng mid" : "< k, đáp án phải lớn hơn mid"}.`,
+        en: `In row i there are min(n, mid//i) values <= mid. Total ${total} is ${total >= k ? ">= k, so answer can be <= mid" : "< k, so answer must be > mid"}.`,
+      },
+    });
+    if (total >= k) {
+      right = mid;
+      push({
+        title: { vi: `count >= k → right = ${right}`, en: `count >= k → right = ${right}` },
+        codeLines: [10, 11],
+        mid,
+        count: total,
+        perRow,
+        note: { vi: "Giữ mid trong vùng ứng viên vì mid có thể chính là đáp án.", en: "Keep mid in the candidate range because mid might be the answer." },
+      });
+    } else {
+      left = mid + 1;
+      push({
+        title: { vi: `count < k → left = ${left}`, en: `count < k → left = ${left}` },
+        codeLines: [12, 13],
+        mid,
+        count: total,
+        perRow,
+        note: { vi: "Có quá ít số <= mid, nên loại bỏ mid và mọi số nhỏ hơn.", en: "Too few values are <= mid, so discard mid and everything smaller." },
+      });
+    }
+  }
+
+  const finalCount = countLE(left);
+  push({
+    title: { vi: `Đáp án = ${left}`, en: `Answer = ${left}` },
+    codeLines: [14],
+    mid: left,
+    count: finalCount.total,
+    perRow: finalCount.perRow,
+    vars: [{ name: "answer", value: left }],
+    note: {
+      vi: "left == right là giá trị nhỏ nhất có count(x) >= k.",
+      en: "left == right is the smallest value with count(x) >= k.",
+    },
+    final: true,
+  });
+
+  return { original: { m, n, k }, answer: left, steps };
+}
+
 module.exports = Object.assign(module.exports, {
+  668: {
+    id: 668,
+    difficulty: "hard",
+    slug: "kth-smallest-number-in-multiplication-table",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Kth Smallest Number in Multiplication Table", en: "Kth Smallest Number in Multiplication Table" },
+    titleVi: { vi: "Số nhỏ thứ k trong bảng nhân", en: "Kth smallest in a multiplication table" },
+    statement: {
+      vi: "Bảng m x n có table[i][j] = i*j với i,j bắt đầu từ 1. Tìm số nhỏ thứ k mà không cần tạo toàn bộ bảng.",
+      en: "An m x n table has table[i][j] = i*j with i,j starting from 1. Find the kth smallest number without building the full table.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "m (số hàng)", en: "m (rows)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số cột)", en: "n (columns)" }, default: 3, min: 1 },
+      { key: "k", label: { vi: "k", en: "k" }, default: 5, min: 1 },
+    ],
+    approach: [
+      { vi: "Binary search giá trị x trong [1, m*n].", en: "Binary-search value x in [1, m*n]." },
+      { vi: "count(x) = tổng theo hàng min(n, x//i), tức số phần tử <= x.", en: "count(x) = sum over rows min(n, x//i), the number of values <= x." },
+      { vi: "Tìm x nhỏ nhất sao cho count(x) >= k.", en: "Find the smallest x such that count(x) >= k." },
+    ],
+    complexity: {
+      time: "O(m log(m*n))",
+      space: "O(1)",
+      note: { vi: "Mỗi lần check duyệt m hàng và dùng phép chia nguyên.", en: "Each check scans m rows and uses integer division." },
+    },
+    code: [
+      "class Solution:",
+      "    def findKthNumber(self, m: int, n: int, k: int) -> int:",
+      "        left, right = 1, m * n",
+      "        def count_less_equal(x):",
+      "            count = 0",
+      "            for i in range(1, m + 1):",
+      "                count += min(n, x // i)",
+      "            return count",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            if count_less_equal(mid) >= k:",
+      "                right = mid",
+      "            else:",
+      "                left = mid + 1",
+      "        return left",
+    ],
+    builder: buildSteps668,
+  },
   2652: {
     id: 2652, difficulty: "easy", slug: "sum-multiples", category: { key: "math", vi: "Toán", en: "Math" },
     tags: [{ key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" }],
