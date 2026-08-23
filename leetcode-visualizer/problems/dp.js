@@ -17769,7 +17769,185 @@ function buildSteps673(nums) {
   return { original: [...arr], answer, steps };
 }
 
+function parseNums2771(value) {
+  return (Array.isArray(value) ? value : String(value ?? "").split(","))
+    .map((item) => Number(String(item).trim()))
+    .filter(Number.isFinite)
+    .slice(0, 16);
+}
+
+/**
+ * LeetCode 2771: Longest Non-decreasing Subarray From Two Arrays.
+ *
+ * Rolling DP:
+ *   dp1 = best length ending at i if we pick nums1[i]
+ *   dp2 = best length ending at i if we pick nums2[i]
+ */
+function buildSteps2771(input, params = {}) {
+  const nums1 = parseNums2771(input);
+  const nums2Raw = parseNums2771(params.nums2 ?? "1,2,1");
+  const n = Math.min(nums1.length, nums2Raw.length);
+  const a = nums1.slice(0, n);
+  const b = nums2Raw.slice(0, n);
+  const steps = [];
+  const indexes = Array.from({ length: n }, (_, i) => i);
+  const row = () => a.map((value, i) => `${i}: ${value}/${b[i]}`);
+  const values = () => a.map((value, i) => Math.max(value, b[i]));
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Input rỗng", en: "Empty input" },
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Không có phần tử nào để chọn.", en: "There is no element to choose." },
+    });
+    return { original: { nums1: a, nums2: b }, answer: 0, steps };
+  }
+
+  let dp1 = 1;
+  let dp2 = 1;
+  let answer = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo DP tại i=0", en: "Initialize DP at i=0" },
+    arr: values(),
+    sub: row(),
+    highlight: [0],
+    mark: [0],
+    codeLines: [3, 4],
+    vars: [
+      { name: "nums1", value: `[${a.join(", ")}]` },
+      { name: "nums2", value: `[${b.join(", ")}]` },
+      { name: "dp1", value: "1 (chọn nums1[0])" },
+      { name: "dp2", value: "1 (chọn nums2[0])" },
+      { name: "answer", value: 1 },
+    ],
+    note: {
+      vi: "Ở mỗi index i, ta chọn nums1[i] hoặc nums2[i]. dp1/dp2 lưu độ dài tốt nhất kết thúc tại i theo lựa chọn đó.",
+      en: "At each index i, choose nums1[i] or nums2[i]. dp1/dp2 store the best length ending at i under that choice.",
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const prevDp1 = dp1;
+    const prevDp2 = dp2;
+    let next1 = 1;
+    let next2 = 1;
+
+    const can11 = a[i] >= a[i - 1];
+    const can21 = a[i] >= b[i - 1];
+    const can12 = b[i] >= a[i - 1];
+    const can22 = b[i] >= b[i - 1];
+
+    if (can11) next1 = Math.max(next1, prevDp1 + 1);
+    if (can21) next1 = Math.max(next1, prevDp2 + 1);
+    if (can12) next2 = Math.max(next2, prevDp1 + 1);
+    if (can22) next2 = Math.max(next2, prevDp2 + 1);
+
+    dp1 = next1;
+    dp2 = next2;
+    answer = Math.max(answer, dp1, dp2);
+
+    steps.push({
+      title: { vi: `i=${i}: thử 4 cách nối`, en: `i=${i}: try 4 transitions` },
+      arr: values(),
+      sub: row(),
+      highlight: [i - 1, i],
+      mark: [i],
+      codeLines: [5, 6, 7, 8, 9, 10, 11, 12],
+      vars: [
+        { name: "prev dp1, dp2", value: `${prevDp1}, ${prevDp2}` },
+        { name: `nums1[${i}]`, value: a[i] },
+        { name: `nums2[${i}]`, value: b[i] },
+        { name: "checks", value: [
+          `${can11 ? "✓" : "x"} ${a[i]} >= ${a[i - 1]} (1→1)`,
+          `${can21 ? "✓" : "x"} ${a[i]} >= ${b[i - 1]} (2→1)`,
+          `${can12 ? "✓" : "x"} ${b[i]} >= ${a[i - 1]} (1→2)`,
+          `${can22 ? "✓" : "x"} ${b[i]} >= ${b[i - 1]} (2→2)`,
+        ].join("; ") },
+        { name: "new dp1", value: next1 },
+        { name: "new dp2", value: next2 },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Chọn nums1[${i}]=${a[i]} thì nối được từ lựa chọn trước nào <= ${a[i]} → dp1=${next1}. Chọn nums2[${i}]=${b[i]} → dp2=${next2}.`,
+        en: `Pick nums1[${i}]=${a[i]} from any previous choice <= ${a[i]} → dp1=${next1}. Pick nums2[${i}]=${b[i]} → dp2=${next2}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: values(),
+    sub: row(),
+    highlight: indexes,
+    mark: [],
+    final: true,
+    codeLines: [15],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Độ dài subarray không giảm dài nhất sau khi chọn từng cột là ${answer}.`,
+      en: `The longest non-decreasing subarray length after choosing from each column is ${answer}.`,
+    },
+  });
+
+  return { original: { nums1: a, nums2: b }, answer, steps };
+}
+
 module.exports = {
+  2771: {
+    id: 2771,
+    difficulty: "medium",
+    slug: "longest-non-decreasing-subarray-from-two-arrays",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Longest Non-decreasing Subarray From Two Arrays", en: "Longest Non-decreasing Subarray From Two Arrays" },
+    titleVi: { vi: "Subarray không giảm dài nhất từ hai mảng", en: "Longest non-decreasing subarray from two arrays" },
+    statement: {
+      vi: "Cho nums1 và nums2 cùng độ dài. Tạo nums3 bằng cách tại mỗi i chọn nums1[i] hoặc nums2[i]. Trả về độ dài subarray liên tiếp không giảm dài nhất có thể.",
+      en: "Given nums1 and nums2 with equal length. Build nums3 by choosing nums1[i] or nums2[i] at each index. Return the longest possible non-decreasing contiguous subarray length.",
+    },
+    defaultInput: [2, 3, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums1 (dấu phẩy)", en: "nums1 (comma-separated)" },
+    extraParams: [
+      { key: "nums2", label: { vi: "nums2 (dấu phẩy)", en: "nums2 (comma-separated)" }, type: "string", default: "1,2,1" },
+    ],
+    approach: [
+      { vi: "dp1 = độ dài tốt nhất kết thúc tại i nếu chọn nums1[i]; dp2 = nếu chọn nums2[i].", en: "dp1 = best length ending at i if choosing nums1[i]; dp2 = if choosing nums2[i]." },
+      { vi: "Từ i-1 sang i, thử 4 cạnh nối: 1→1, 2→1, 1→2, 2→2 nếu giá trị không giảm.", en: "From i-1 to i, try four transitions: 1→1, 2→1, 1→2, 2→2 when values are non-decreasing." },
+      { vi: "Mỗi i chỉ cần trạng thái trước đó nên rolling DP dùng O(1) space.", en: "Each i only needs the previous states, so rolling DP uses O(1) space." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Mỗi index kiểm tra 4 chuyển tiếp cố định.", en: "Each index checks four fixed transitions." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxNonDecreasingLength(self, nums1, nums2):",
+      "        dp1 = dp2 = 1",
+      "        answer = 1",
+      "        for i in range(1, len(nums1)):",
+      "            next1 = next2 = 1",
+      "            if nums1[i] >= nums1[i - 1]:",
+      "                next1 = max(next1, dp1 + 1)",
+      "            if nums1[i] >= nums2[i - 1]:",
+      "                next1 = max(next1, dp2 + 1)",
+      "            if nums2[i] >= nums1[i - 1]:",
+      "                next2 = max(next2, dp1 + 1)",
+      "            if nums2[i] >= nums2[i - 1]:",
+      "                next2 = max(next2, dp2 + 1)",
+      "            dp1, dp2 = next1, next2",
+      "            answer = max(answer, dp1, dp2)",
+      "        return answer",
+    ],
+    builder: buildSteps2771,
+  },
   879: {
     id: 879,
     difficulty: "hard",
