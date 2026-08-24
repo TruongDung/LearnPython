@@ -3623,20 +3623,44 @@ function buildSteps1886(input, params = {}) {
       (current[row][col] === target[row][col] ? matches : mismatches).push([row, col]);
     }
     const same = mismatches.length === 0;
-    tested.push({ angle, same });
     snapshot({
-      title: { vi: `So sánh ứng viên sau ${angle}°`, en: `Compare the ${angle}° candidate` },
-      phase: same ? "found" : "compare",
+      title: { vi: `Bắt đầu lượt xoay ${angle}°`, en: `Start the ${angle}° rotation attempt` },
+      phase: "loop",
       angle,
       matches,
       mismatches,
-      codeLines: [5, 6],
-      final: same,
-      vars: [{ name: "rotation", value: `${angle}°` }, { name: "matching cells", value: `${matches.length}/${size * size}` }, { name: "candidate == target", value: same }],
-      note: { vi: same ? `Tất cả ${size * size} ô đều bằng target → True.` : `${mismatches.length} ô khác target, nên ứng viên ${angle}° chưa đạt.` , en: same ? `All ${size * size} cells equal target → True.` : `${mismatches.length} cells differ from target, so the ${angle}° candidate does not match yet.` },
-      decision: { kind: same ? "found" : "compare", matchingCount: matches.length, total: size * size },
+      codeLines: [5],
+      vars: [{ name: "turn", value: turns }, { name: "rotation", value: `${angle}°` }, { name: "candidate", value: "mat" }],
+      note: { vi: `Vòng lặp bắt đầu với ma trận ứng viên ở góc ${angle}°.`, en: `The loop starts with the ${angle}° matrix candidate.` },
+      decision: { kind: "loop", angle },
     });
-    if (same) return { original: matrix, answer: true, steps };
+    tested.push({ angle, same });
+    snapshot({
+      title: { vi: `Kiểm tra ứng viên ${angle}° có bằng target`, en: `Check whether the ${angle}° candidate equals target` },
+      phase: "compare",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [6],
+      vars: [{ name: "candidate == target", value: same }, { name: "matching cells", value: `${matches.length}/${size * size}` }],
+      note: { vi: same ? `Điều kiện đúng: tất cả ${size * size} ô đều khớp target.` : `Điều kiện sai: vẫn còn ${mismatches.length} ô khác target.` , en: same ? `The condition is true: all ${size * size} cells match target.` : `The condition is false: ${mismatches.length} cells still differ from target.` },
+      decision: { kind: "compare", matchingCount: matches.length, total: size * size, same },
+    });
+    if (same) {
+      snapshot({
+        title: { vi: `Ứng viên ${angle}° trùng target → trả về True`, en: `The ${angle}° candidate equals target → return True` },
+        phase: "found",
+        angle,
+        matches,
+        mismatches,
+        codeLines: [7],
+        final: true,
+        vars: [{ name: "answer", value: true }, { name: "rotation", value: `${angle}°` }],
+        note: { vi: "Điều kiện ở dòng trước đúng, nên hàm kết thúc ngay với True.", en: "The previous condition was true, so the function exits immediately with True." },
+        decision: { kind: "found", matchingCount: matches.length, total: size * size },
+      });
+      return { original: matrix, answer: true, steps };
+    }
     if (turns === 3) break;
     snapshot({
       title: { vi: `Xoay ứng viên ${angle}° thành ${angle + 90}°`, en: `Rotate the ${angle}° candidate to ${angle + 90}°` },
@@ -3644,7 +3668,7 @@ function buildSteps1886(input, params = {}) {
       angle,
       matches,
       mismatches,
-      codeLines: [7],
+      codeLines: [8],
       vars: [{ name: "rotation", value: `${angle}° → ${angle + 90}°` }, { name: "move rule", value: "(r,c) → (c,n-1-r)" }],
       note: { vi: "Mỗi giá trị đi theo quy tắc (r,c) → (c,n-1-r) khi xoay 90° theo chiều kim đồng hồ.", en: "Every value follows (r,c) → (c,n-1-r) for a clockwise 90° rotation." },
       decision: { kind: "rotate", fromAngle: angle, toAngle: angle + 90 },
@@ -3660,11 +3684,223 @@ function buildSteps1886(input, params = {}) {
     angle: 270,
     matches,
     mismatches,
-    codeLines: [8],
+    codeLines: [9],
     final: true,
     vars: [{ name: "tested rotations", value: "0°, 90°, 180°, 270°" }, { name: "answer", value: false }],
     note: { vi: "Đã thử đủ bốn hướng; không có ứng viên nào bằng target → False.", en: "All four orientations were tried; none equals target → False." },
     decision: { kind: "missing", matchingCount: matches.length, total: size * size },
+  });
+  return { original: matrix, answer: false, steps };
+}
+
+/** LeetCode 1886, approach 2: compare mat directly with mapped target coordinates. */
+function buildSteps1886Direct(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const target = parseIntegerMatrix2D(params.target);
+  if (matrix.length !== matrix[0].length || target.length !== target[0].length || matrix.length !== target.length) throw new Error("mat and target must be square matrices of the same size");
+  const size = matrix.length;
+  const steps = [];
+  const tested = [];
+  const checks = [
+    { angle: 90, formula: "target[j][n - 1 - i]", map: (row, col) => [col, size - 1 - row], lines: { flag: 5, outer: 6, inner: 7, compare: 8, fail: 9, break: 10, result: 12, return: 13 } },
+    { angle: 180, formula: "target[n - 1 - i][n - 1 - j]", map: (row, col) => [size - 1 - row, size - 1 - col], lines: { flag: 15, outer: 16, inner: 17, compare: 18, fail: 19, break: 20, result: 22, return: 23 } },
+    { angle: 270, formula: "target[n - 1 - j][i]", map: (row, col) => [size - 1 - col, row], lines: { flag: 25, outer: 26, inner: 27, compare: 28, fail: 29, break: 30, result: 32, return: 33 } },
+    { angle: 0, formula: "target[i][j]", map: (row, col) => [row, col], lines: { flag: 35, outer: 36, inner: 37, compare: 38, fail: 39, break: 40, result: 42, return: 43 } },
+  ];
+
+  function snapshot({ title, phase, check, sourceMatches = [], targetMatches = [], sourceMismatches = [], targetMismatches = [], activeSource = null, activeTarget = null, codeLine, vars = [], note, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines: [codeLine],
+      vars,
+      note,
+      rotation1886View: {
+        approach: 2,
+        comparisonMode: "mapped",
+        original: cloneMatrix2D(matrix),
+        current: cloneMatrix2D(matrix),
+        target: cloneMatrix2D(target),
+        size,
+        angle: check ? check.angle : null,
+        phase,
+        matches: sourceMatches.map(([row, col]) => [row, col]),
+        mismatches: sourceMismatches.map(([row, col]) => [row, col]),
+        sourceMatches: sourceMatches.map(([row, col]) => [row, col]),
+        targetMatches: targetMatches.map(([row, col]) => [row, col]),
+        sourceMismatches: sourceMismatches.map(([row, col]) => [row, col]),
+        targetMismatches: targetMismatches.map(([row, col]) => [row, col]),
+        activeSource,
+        activeTarget,
+        mapping: check ? { angle: check.angle, formula: check.formula } : null,
+        tested: tested.map((item) => ({ ...item })),
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: `n = len(mat) = ${size}`, en: `n = len(mat) = ${size}` },
+    phase: "direct-size",
+    codeLine: 3,
+    vars: [{ name: "n", value: size }, { name: "method", value: "direct target mapping" }],
+    note: { vi: "Cách 2 không xoay mat. Thay vào đó, đối chiếu mỗi ô mat với tọa độ tương ứng trên target.", en: "Approach 2 does not rotate mat. Instead, it compares each mat cell with its corresponding target coordinate." },
+    decision: { kind: "direct-size", size },
+  });
+
+  for (const check of checks) {
+    let flag = true;
+    const sourceMatches = [];
+    const targetMatches = [];
+    const sourceMismatches = [];
+    const targetMismatches = [];
+    snapshot({
+      title: { vi: `Kiểm tra ánh xạ xoay ${check.angle}°`, en: `Check the ${check.angle}° rotation mapping` },
+      phase: "direct-reset",
+      check,
+      sourceMatches,
+      targetMatches,
+      sourceMismatches,
+      targetMismatches,
+      codeLine: check.lines.flag,
+      vars: [{ name: "flag", value: true }, { name: "rotation", value: `${check.angle}°` }, { name: "target coordinate", value: check.formula }],
+      note: { vi: `Đặt flag = True trước khi kiểm tra ánh xạ ${check.angle}°.`, en: `Set flag = True before checking the ${check.angle}° mapping.` },
+      decision: { kind: "direct-reset", angle: check.angle, formula: check.formula },
+    });
+
+    for (let row = 0; row < size; row++) {
+      snapshot({
+        title: { vi: `Vòng ngoài: i = ${row}`, en: `Outer loop: i = ${row}` },
+        phase: "direct-outer",
+        check,
+        sourceMatches,
+        targetMatches,
+        sourceMismatches,
+        targetMismatches,
+        codeLine: check.lines.outer,
+        vars: [{ name: "i", value: row }, { name: "flag", value: flag }],
+        note: { vi: `Duyệt hàng ${row} của mat.`, en: `Visit row ${row} of mat.` },
+        decision: { kind: "direct-outer", row, angle: check.angle },
+      });
+      for (let col = 0; col < size; col++) {
+        const [targetRow, targetCol] = check.map(row, col);
+        const sourceValue = matrix[row][col];
+        const targetValue = target[targetRow][targetCol];
+        snapshot({
+          title: { vi: `Vòng trong: j = ${col}`, en: `Inner loop: j = ${col}` },
+          phase: "direct-inner",
+          check,
+          sourceMatches,
+          targetMatches,
+          sourceMismatches,
+          targetMismatches,
+          activeSource: [row, col],
+          activeTarget: [targetRow, targetCol],
+          codeLine: check.lines.inner,
+          vars: [{ name: "i,j", value: `${row},${col}` }, { name: "mat[i][j]", value: sourceValue }, { name: "mapped target", value: `[${targetRow}][${targetCol}]` }],
+          note: { vi: `Chuẩn bị so sánh mat[${row}][${col}] với ${check.formula}.`, en: `Prepare to compare mat[${row}][${col}] with ${check.formula}.` },
+          decision: { kind: "direct-inner", row, col, targetRow, targetCol, angle: check.angle },
+        });
+        const same = sourceValue === targetValue;
+        (same ? sourceMatches : sourceMismatches).push([row, col]);
+        (same ? targetMatches : targetMismatches).push([targetRow, targetCol]);
+        snapshot({
+          title: { vi: `So sánh ${sourceValue} ${same ? "==" : "!="} ${targetValue}`, en: `Compare ${sourceValue} ${same ? "==" : "!="} ${targetValue}` },
+          phase: "direct-compare",
+          check,
+          sourceMatches,
+          targetMatches,
+          sourceMismatches,
+          targetMismatches,
+          activeSource: [row, col],
+          activeTarget: [targetRow, targetCol],
+          codeLine: check.lines.compare,
+          vars: [{ name: "mat[i][j]", value: sourceValue }, { name: check.formula, value: targetValue }, { name: "different", value: !same }],
+          note: { vi: same ? "Hai ô ánh xạ có cùng giá trị, tiếp tục kiểm tra." : "Hai ô ánh xạ khác nhau, flag sẽ trở thành False.", en: same ? "The mapped cells have the same value, so continue checking." : "The mapped cells differ, so flag will become False." },
+          decision: { kind: "direct-compare", sourceValue, targetValue, same, row, col, targetRow, targetCol, angle: check.angle },
+        });
+        if (!same) {
+          flag = false;
+          snapshot({
+            title: { vi: "Phát hiện khác nhau → flag = False", en: "Difference found → flag = False" },
+            phase: "direct-fail",
+            check,
+            sourceMatches,
+            targetMatches,
+            sourceMismatches,
+            targetMismatches,
+            activeSource: [row, col],
+            activeTarget: [targetRow, targetCol],
+            codeLine: check.lines.fail,
+            vars: [{ name: "flag", value: false }, { name: "first mismatch", value: `mat[${row}][${col}] vs target[${targetRow}][${targetCol}]` }],
+            note: { vi: "Chỉ cần một cặp khác nhau là ánh xạ xoay này không thể đúng.", en: "One different pair is enough for this rotation mapping to fail." },
+            decision: { kind: "direct-fail", angle: check.angle, row, col, targetRow, targetCol },
+          });
+          snapshot({
+            title: { vi: "Dừng vòng j hiện tại", en: "Break the current j loop" },
+            phase: "direct-break",
+            check,
+            sourceMatches,
+            targetMatches,
+            sourceMismatches,
+            targetMismatches,
+            activeSource: [row, col],
+            activeTarget: [targetRow, targetCol],
+            codeLine: check.lines.break,
+            vars: [{ name: "flag", value: false }, { name: "break", value: "inner loop" }],
+            note: { vi: "break chỉ thoát vòng j; vòng i vẫn tiếp tục theo đúng code này.", en: "break exits only the j loop; the i loop continues exactly as written." },
+            decision: { kind: "direct-break", angle: check.angle },
+          });
+          break;
+        }
+      }
+    }
+    tested.push({ angle: check.angle, same: flag });
+    snapshot({
+      title: { vi: `Kiểm tra flag của ánh xạ ${check.angle}°`, en: `Check the ${check.angle}° mapping flag` },
+      phase: "direct-result",
+      check,
+      sourceMatches,
+      targetMatches,
+      sourceMismatches,
+      targetMismatches,
+      codeLine: check.lines.result,
+      vars: [{ name: "flag", value: flag }, { name: "checked pairs", value: `${sourceMatches.length + sourceMismatches.length}/${size * size}` }],
+      note: { vi: flag ? "Không có cặp nào khác nhau: điều kiện flag đúng." : "Đã có cặp khác nhau: tiếp tục thử ánh xạ xoay kế tiếp.", en: flag ? "No pair differed: the flag condition is true." : "A pair differed: continue with the next rotation mapping." },
+      decision: { kind: "direct-result", angle: check.angle, flag, checked: sourceMatches.length + sourceMismatches.length, total: size * size },
+    });
+    if (flag) {
+      snapshot({
+        title: { vi: `Ánh xạ ${check.angle}° hợp lệ → trả về True`, en: `The ${check.angle}° mapping is valid → return True` },
+        phase: "found",
+        check,
+        sourceMatches,
+        targetMatches,
+        sourceMismatches,
+        targetMismatches,
+        codeLine: check.lines.return,
+        vars: [{ name: "answer", value: true }, { name: "rotation", value: `${check.angle}°` }],
+        note: { vi: "flag vẫn True, nên target có thể nhận được bằng phép xoay này.", en: "flag is still True, so target can be obtained by this rotation." },
+        decision: { kind: "direct-found", angle: check.angle, matchingCount: sourceMatches.length, total: size * size },
+        final: true,
+      });
+      return { original: matrix, answer: true, steps };
+    }
+  }
+
+  snapshot({
+    title: { vi: "Cả bốn ánh xạ đều thất bại → trả về False", en: "All four mappings fail → return False" },
+    phase: "missing",
+    check: checks.at(-1),
+    codeLine: 45,
+    vars: [{ name: "answer", value: false }, { name: "tested mappings", value: "90°, 180°, 270°, 0°" }],
+    note: { vi: "Không có ánh xạ nào giữ flag = True, nên target không thể nhận được từ mat bằng xoay.", en: "No mapping kept flag = True, so target cannot be obtained from mat by rotation." },
+    decision: { kind: "direct-missing" },
+    final: true,
   });
   return { original: matrix, answer: false, steps };
 }
@@ -10067,10 +10303,70 @@ Object.assign(module.exports, {
     category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
     title: { vi: "Determine Whether Matrix Can Be Obtained By Rotation", en: "Determine Whether Matrix Can Be Obtained By Rotation" }, titleVi: { vi: "Kiểm tra target bằng xoay ma trận", en: "Check whether rotation reaches target" },
     statement: { vi: "Kiểm tra mat sau 0°, 90°, 180° hoặc 270° có thể bằng target không.", en: "Check whether mat can equal target after 0°, 90°, 180°, or 270° rotation." },
-    defaultInput: "0,1;1,0", inputKind: "string", inputLabel: { vi: "mat (vuông; hàng cách ;)", en: "mat (square; rows separated by ;)" }, extraParams: [{ key: "target", type: "string", label: { vi: "target (hàng cách ;)", en: "target (rows separated by ;)" }, default: "1,0;0,1" }],
-    approach: [{ vi: "So sánh mat với target trước khi xoay (0°).", en: "Compare mat with target before rotating (0°)." }, { vi: "Nếu chưa khớp, xoay 90° và lặp tối đa ba lần nữa.", en: "If it does not match, rotate 90° and repeat up to three more times." }],
-    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "Có tối đa bốn lần so sánh/xoay; hệ số 4 là hằng số.", en: "At most four comparisons/rotations; the factor 4 is constant." } },
-    code: ["class Solution:", "    def findRotation(self, mat, target):", "        def rotate(grid):", "            return [list(row) for row in zip(*grid[::-1])]", "        for _ in range(4):", "            if mat == target:", "                return True", "            mat = rotate(mat)", "        return False"], builder: buildSteps1886,
+    defaultInput: "0,1;1,0", inputKind: "string", inputLabel: { vi: "mat (vuông; hàng cách ;)", en: "mat (square; rows separated by ;)" }, extraParams: [
+      { key: "target", type: "string", label: { vi: "target (hàng cách ;)", en: "target (rows separated by ;)" }, default: "1,0;0,1" },
+      { key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: xoay ma trận rồi so sánh", en: "Approach 1: rotate then compare" } },
+        { value: "2", label: { vi: "Cách 2: đối chiếu tọa độ trực tiếp", en: "Approach 2: direct coordinate mapping" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Cách 1: so sánh mat với target ở 0°, rồi xoay mat 90° tối đa ba lần.", en: "Approach 1: compare mat with target at 0°, then rotate mat 90° up to three times." },
+      { vi: "Cách 2: giữ mat cố định và đối chiếu mat[i][j] với tọa độ tương ứng trên target cho 90°, 180°, 270° và 0°.", en: "Approach 2: keep mat fixed and compare mat[i][j] with the corresponding target coordinate for 90°, 180°, 270°, and 0°." },
+    ],
+    complexity: { time: "O(n²)", space: "O(n²) / O(1)", note: { vi: "Cả hai cách tối đa kiểm tra bốn hướng xoay. Cách 1 tạo ma trận xoay mới; Cách 2 chỉ dùng vài biến và ánh xạ chỉ số.", en: "Both approaches check at most four rotations. Approach 1 creates rotated matrices; Approach 2 uses only a few variables and index mappings." } },
+    codeLabel: { vi: "Cách 1: xoay ma trận rồi so sánh", en: "Approach 1: rotate then compare" },
+    code: ["class Solution:", "    def findRotation(self, mat, target):", "        def rotate(grid):", "            return [list(row) for row in zip(*grid[::-1])]", "        for _ in range(4):", "            if mat == target:", "                return True", "            mat = rotate(mat)", "        return False"],
+    code2Label: { vi: "Cách 2: đối chiếu tọa độ trực tiếp", en: "Approach 2: direct coordinate mapping" },
+    code2: [
+      "class Solution:",
+      "    def findRotation(self, mat, target):",
+      "        n = len(mat)",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[j][n - 1 - i]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[n - 1 - i][n - 1 - j]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[n - 1 - j][i]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[i][j]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        return False",
+    ],
+    builder: buildSteps1886,
+    builder2: buildSteps1886Direct,
   },
   2022: {
     id: 2022, difficulty: "easy", slug: "convert-1d-array-into-2d-array",

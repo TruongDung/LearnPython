@@ -36101,6 +36101,7 @@ html, body {
 .rot1886-decision span { color: #cbd5e1; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .rot1886-decision.compare { border-color: #fb7185; background: #3f0d21; }
 .rot1886-decision.compare small { color: #fda4af; }
+.rot1886-decision.loop { border-color: #64748b; background: #111827; }
 .rot1886-decision.rotate { border-color: #38bdf8; background: #082f49; }
 .rot1886-decision.rotate small { color: #7dd3fc; }
 .rot1886-decision.found { border-color: #22c55e; background: #052e1b; }
@@ -36119,11 +36120,14 @@ html, body {
 .rot1886-cell small { color: #94a3b8; font: 700 8px/1 Consolas,monospace; }
 .rot1886-cell strong { color: #f8fafc; font: 800 21px/1 Consolas,monospace; overflow-wrap: anywhere; }
 .rot1886-cell em { min-height: 10px; color: #94a3b8; font: 700 8px/1 Consolas,monospace; font-style: normal; overflow-wrap: anywhere; }
+.rot1886-cell.pending { color: #cbd5e1; border-style: dashed; background: #111827; }
+.rot1886-cell.pending small, .rot1886-cell.pending strong, .rot1886-cell.pending em { color: inherit; }
 .rot1886-cell.same { color: #dcfce7; border-color: #22c55e; background: #052e1b; }
 .rot1886-cell.same small, .rot1886-cell.same strong, .rot1886-cell.same em { color: inherit; }
 .rot1886-cell.different { color: #ffe4e6; border-color: #fb7185; background: #3f0d21; }
 .rot1886-cell.different small, .rot1886-cell.different strong, .rot1886-cell.different em { color: inherit; }
 .rot1886-cell.candidate.different { border-width: 2px; box-shadow: inset 0 0 0 1px #881337; }
+.rot1886-cell.active { z-index: 1; border: 2px solid #38bdf8; box-shadow: 0 0 0 2px #0b1220, 0 0 0 4px #38bdf8; }
 .rot1886-compare-symbol { display: grid; align-content: center; justify-items: center; gap: 4px; color: #7dd3fc; text-align: center; }
 .rot1886-compare-symbol b { color: #7dd3fc; font: 800 28px/1 Consolas,monospace; }
 .rot1886-compare-symbol span { color: #94a3b8; font: 800 8px/1 Consolas,monospace; }
@@ -36150,8 +36154,10 @@ html, body {
 [data-theme="light"] .rot1886-cell { color: #0f172a; border-color: #cbd5e1; background: #f8fafc; }
 [data-theme="light"] .rot1886-cell small, [data-theme="light"] .rot1886-cell em, [data-theme="light"] .rot1886-corner, [data-theme="light"] .rot1886-col, [data-theme="light"] .rot1886-row { color: #475569; }
 [data-theme="light"] .rot1886-cell strong { color: #0f172a; }
+[data-theme="light"] .rot1886-cell.pending { color: #475569; background: #f8fafc; }
 [data-theme="light"] .rot1886-cell.same { color: #166534; border-color: #16a34a; background: #f0fdf4; }
 [data-theme="light"] .rot1886-cell.same small, [data-theme="light"] .rot1886-cell.same strong, [data-theme="light"] .rot1886-cell.same em { color: inherit; }
+[data-theme="light"] .rot1886-cell.active { border-color: #0284c7; box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #38bdf8; }
 [data-theme="light"] .rot1886-angle.active { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #38bdf8; }
 
 @media (max-width: 760px) {

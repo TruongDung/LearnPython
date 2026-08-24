@@ -17704,21 +17704,34 @@ function renderRotation1886View(step) {
   const current = Array.isArray(view.current) ? view.current : [];
   const target = Array.isArray(view.target) ? view.target : [];
   const size = Number(view.size) || current.length;
-  const angle = Number(view.angle) || 0;
+  const directMode = Number(view.approach) === 2 || view.comparisonMode === "mapped";
+  const angle = Number.isInteger(view.angle) ? view.angle : null;
   const phase = String(view.phase || "compare");
   const decision = view.decision || {};
   const matchingCells = new Set((view.matches || []).map(([row, col]) => `${row},${col}`));
+  const sourceMatches = new Set((view.sourceMatches || view.matches || []).map(([row, col]) => `${row},${col}`));
+  const targetMatches = new Set((view.targetMatches || view.matches || []).map(([row, col]) => `${row},${col}`));
+  const sourceMismatches = new Set((view.sourceMismatches || view.mismatches || []).map(([row, col]) => `${row},${col}`));
+  const targetMismatches = new Set((view.targetMismatches || view.mismatches || []).map(([row, col]) => `${row},${col}`));
+  const activeSource = Array.isArray(view.activeSource) ? view.activeSource : null;
+  const activeTarget = Array.isArray(view.activeTarget) ? view.activeTarget : null;
   const tested = new Map((view.tested || []).map((item) => [Number(item.angle), Boolean(item.same)]));
-  const phaseIndex = phase === "found" || phase === "missing" ? 3 : phase === "rotate" ? 1 : 0;
-  const stages = [
+  const phaseIndex = directMode
+    ? (phase === "found" || phase === "missing" ? 3 : phase === "direct-result" ? 2 : ["direct-compare", "direct-fail", "direct-break"].includes(phase) ? 1 : 0)
+    : (phase === "found" || phase === "missing" ? 3 : phase === "rotate" ? 1 : 0);
+  const stages = (directMode ? [
+    { label: vi ? "Ánh xạ tọa độ" : "Map coordinates", detail: "mat[i][j] -> target[...]" },
+    { label: vi ? "So sánh cặp ô" : "Compare cell pair", detail: "== / !=" },
+    { label: vi ? "Kiểm tra flag" : "Check flag", detail: "True / False" },
+  ] : [
     { label: vi ? "So sánh từng ô" : "Compare every cell", detail: "candidate vs target" },
     { label: vi ? "Xoay 90°" : "Rotate 90°", detail: "clockwise" },
     { label: vi ? "Kết luận" : "Conclude", detail: "True / False" },
-  ].map((item, index) => {
+  ]).map((item, index) => {
     const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
     return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
   }).join("");
-  const angleTrack = [0, 90, 180, 270].map((candidateAngle) => {
+  const angleTrack = (directMode ? [90, 180, 270, 0] : [0, 90, 180, 270]).map((candidateAngle) => {
     const result = tested.get(candidateAngle);
     const classes = ["rot1886-angle"];
     if (result === true) classes.push("match");
@@ -17734,8 +17747,32 @@ function renderRotation1886View(step) {
   }).join("");
 
   let decisionHtml;
-  if (decision.kind === "rotate") {
+  if (directMode) {
+    if (decision.kind === "direct-size") {
+      decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "KÍCH THƯỚC" : "SIZE"}</small><strong>n = len(mat) = ${decision.size}</strong><span>${vi ? "Cách 2 giữ mat cố định và dùng n để tính tọa độ tương ứng trên target." : "Approach 2 keeps mat fixed and uses n to calculate corresponding target coordinates."}</span></section>`;
+    } else if (decision.kind === "direct-reset") {
+      decisionHtml = `<section class="rot1886-decision rotate"><small>${vi ? `ÁNH XẠ ${decision.angle}°` : `${decision.angle}° MAPPING`}</small><strong>mat[i][j] &harr; ${escapeHtml(decision.formula)}</strong><span>${vi ? "flag được đặt lại True trước khi kiểm tra toàn bộ cặp tọa độ." : "flag is reset to True before checking every coordinate pair."}</span></section>`;
+    } else if (decision.kind === "direct-outer" || decision.kind === "direct-inner") {
+      const sourceText = decision.kind === "direct-inner" ? `mat[${decision.row}][${decision.col}]` : "mat[i][j]";
+      const targetText = decision.kind === "direct-inner" ? `target[${decision.targetRow}][${decision.targetCol}]` : "target[...]";
+      decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "CHỌN CẶP Ô" : "CHOOSE CELL PAIR"}</small><strong>${escapeHtml(sourceText)} &harr; ${escapeHtml(targetText)}</strong><span>${vi ? "Hai ô viền xanh là cặp sẽ được so sánh ở dòng điều kiện kế tiếp." : "The two blue-outlined cells are the pair checked by the next condition line."}</span></section>`;
+    } else if (decision.kind === "direct-compare") {
+      decisionHtml = `<section class="rot1886-decision ${decision.same ? "found" : "compare"}"><small>${vi ? "ĐIỀU KIỆN" : "CONDITION"}</small><strong>${escapeHtml(String(decision.sourceValue))} ${decision.same ? "==" : "!="} ${escapeHtml(String(decision.targetValue))}</strong><span>${vi ? `mat[${decision.row}][${decision.col}] so với target[${decision.targetRow}][${decision.targetCol}] cho ánh xạ ${decision.angle}°.` : `mat[${decision.row}][${decision.col}] compared with target[${decision.targetRow}][${decision.targetCol}] for the ${decision.angle}° mapping.`}</span></section>`;
+    } else if (decision.kind === "direct-fail") {
+      decisionHtml = `<section class="rot1886-decision compare"><small>FLAG</small><strong>flag = False</strong><span>${vi ? "Cặp ô đang viền xanh khác nhau, nên ánh xạ hiện tại đã thất bại." : "The blue-outlined cells differ, so this mapping has failed."}</span></section>`;
+    } else if (decision.kind === "direct-break") {
+      decisionHtml = `<section class="rot1886-decision loop"><small>BREAK</small><strong>${vi ? "Thoát vòng j hiện tại" : "Exit the current j loop"}</strong><span>${vi ? "Theo code gốc, vòng i vẫn tiếp tục với hàng tiếp theo." : "Per the original code, the i loop still continues with the next row."}</span></section>`;
+    } else if (decision.kind === "direct-result") {
+      decisionHtml = `<section class="rot1886-decision ${decision.flag ? "found" : "compare"}"><small>IF FLAG</small><strong>flag == ${decision.flag ? "True" : "False"}</strong><span>${vi ? (decision.flag ? "Tất cả cặp đã kiểm tra đều bằng nhau, nên chuẩn bị trả về True." : "Có ít nhất một cặp khác nhau, nên chuyển sang ánh xạ kế tiếp.") : (decision.flag ? "Every checked pair is equal, so prepare to return True." : "At least one pair differs, so move to the next mapping.")}</span></section>`;
+    } else if (decision.kind === "direct-found") {
+      decisionHtml = `<section class="rot1886-decision found"><small>${vi ? "ĐÃ TÌM THẤY" : "MATCH FOUND"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "cặp ô đều bằng nhau" : "cell pairs are equal"}</strong><span>${vi ? `Ánh xạ ${decision.angle}° giữ flag = True, nên trả về True.` : `The ${decision.angle}° mapping keeps flag = True, so return True.`}</span></section>`;
+    } else {
+      decisionHtml = `<section class="rot1886-decision missing"><small>${vi ? "KHÔNG CÓ ÁNH XẠ" : "NO MATCHING MAP"}</small><strong>${vi ? "Bốn lần kiểm tra đều làm flag = False" : "All four checks make flag = False"}</strong><span>${vi ? "Không cần tạo matrix xoay để kết luận False." : "No rotated matrix is needed to conclude False."}</span></section>`;
+    }
+  } else if (decision.kind === "rotate") {
     decisionHtml = `<section class="rot1886-decision rotate"><small>${vi ? "QUY TẮC XOAY" : "ROTATION RULE"}</small><strong>current[r][c] &rarr; next[c][n - 1 - r]</strong><span>${vi ? `Xoay ${decision.fromAngle}° theo chiều kim đồng hồ để tạo ứng viên ${decision.toAngle}°.` : `Rotate ${decision.fromAngle}° clockwise to create the ${decision.toAngle}° candidate.`}</span></section>`;
+  } else if (decision.kind === "loop") {
+    decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "VÒNG LẶP" : "LOOP"}</small><strong>for _ in range(4):</strong><span>${vi ? `Bắt đầu lượt thử ứng viên ở góc ${decision.angle}°. Chưa thực hiện phép so sánh ở dòng kế tiếp.` : `Start the ${decision.angle}° candidate attempt. The comparison happens on the next line.`}</span></section>`;
   } else if (decision.kind === "found") {
     decisionHtml = `<section class="rot1886-decision found"><small>${vi ? "ĐÃ TÌM THẤY" : "MATCH FOUND"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "ô đều bằng target" : "cells equal target"}</strong><span>${vi ? `Ứng viên ở góc ${angle}° trùng hoàn toàn với target, nên trả về True.` : `The ${angle}° candidate completely equals target, so return True.`}</span></section>`;
   } else if (decision.kind === "missing") {
@@ -17744,35 +17781,59 @@ function renderRotation1886View(step) {
     decisionHtml = `<section class="rot1886-decision compare"><small>${vi ? "SO SÁNH CÙNG TỌA ĐỘ" : "COMPARE SAME COORDINATES"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "ô đang trùng" : "cells currently match"}</strong><span>${vi ? "Ô xanh có giá trị bằng nhau; ô đỏ cho thấy vị trí vẫn khác target." : "Green cells have equal values; red cells show positions that still differ from target."}</span></section>`;
   }
 
-  const renderBoard = (grid, kind, label, detail) => {
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const renderBoard = (grid, kind, label, detail, matchSet, mismatchSet, activeCell) => {
     const rows = Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, col) => {
-      const matches = matchingCells.has(`${row},${col}`);
-      const classes = ["rot1886-cell", kind, matches ? "same" : "different"];
+      const key = `${row},${col}`;
+      const comparisonReady = decision.kind !== "loop";
+      const matches = matchSet.has(key);
+      const differs = directMode ? mismatchSet.has(key) : !matches;
+      const active = sameCell(activeCell, row, col);
+      const classes = ["rot1886-cell", kind];
+      if (directMode) classes.push(matches ? "same" : differs ? "different" : "pending");
+      else classes.push(comparisonReady ? (matches ? "same" : "different") : "pending");
+      if (active) classes.push("active");
       const value = grid[row]?.[col] ?? "";
-      const tag = matches
-        ? (vi ? "BẰNG" : "EQUAL")
-        : (vi ? "KHÁC" : "DIFFERS");
+      const tag = active
+        ? (vi ? "ĐANG XÉT" : "CHECKING")
+        : matches
+          ? (vi ? "BẰNG" : "EQUAL")
+          : differs
+            ? (vi ? "KHÁC" : "DIFFERS")
+            : (vi ? "CHƯA SO SÁNH" : "NOT COMPARED");
       return `<div class="${classes.join(" ")}"><small>[${row},${col}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
     }).join(""));
     return `<section class="rot1886-board ${kind}"><header><strong>${escapeHtml(label)}</strong><span>${escapeHtml(detail)}</span></header><div class="rot1886-board-scroll"><div class="rot1886-grid" style="--rot1886-cols:${size}"><span class="rot1886-corner">r\\c</span>${Array.from({ length: size }, (_, col) => `<span class="rot1886-col">c=${col}</span>`).join("")}${Array.from({ length: size }, (_, row) => `<span class="rot1886-row">r=${row}</span>${rows[row] || ""}`).join("")}</div></div></section>`;
   };
 
   const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
-  const summary = vi
-    ? `Determine Whether Matrix Can Be Obtained By Rotation: đang xét ứng viên ${angle} độ.`
-    : `Determine Whether Matrix Can Be Obtained By Rotation: viewing the ${angle}-degree candidate.`;
+  const summary = directMode
+    ? (vi ? `Cách 2: đối chiếu mat với target qua ánh xạ ${angle === null ? "chưa chọn" : `${angle} độ`}.` : `Approach 2: compare mat and target through the ${angle === null ? "unselected" : `${angle}-degree`} mapping.`)
+    : (vi ? `Determine Whether Matrix Can Be Obtained By Rotation: đang xét ứng viên ${angle ?? 0} độ.` : `Determine Whether Matrix Can Be Obtained By Rotation: viewing the ${angle ?? 0}-degree candidate.`);
+  const sourceLabel = directMode ? (vi ? "MAT (GIỮ CỐ ĐỊNH)" : "MAT (FIXED SOURCE)") : (vi ? `ỨNG VIÊN ${angle ?? 0}°` : `${angle ?? 0}° CANDIDATE`);
+  const sourceDetail = directMode ? "mat[i][j]" : (vi ? "mat sau xoay" : "rotated mat");
+  const targetDetail = directMode
+    ? (angle === null ? (vi ? "chọn ánh xạ" : "choose a mapping") : (vi ? `tọa độ ${angle}° trên target` : `${angle}° target coordinates`))
+    : (vi ? "ma trận cần đạt" : "desired matrix");
+  const centerSymbol = directMode ? "&rarr;" : phase === "found" ? "=" : "?";
+  const centerText = directMode ? (vi ? "ánh xạ tới" : "maps to") : (vi ? "so với" : "vs");
+  const headerTitle = directMode ? (vi ? "BỐN ÁNH XẠ TRỰC TIẾP" : "FOUR DIRECT MAPPINGS") : (vi ? "BỐN ỨNG VIÊN XOAY" : "FOUR ROTATION CANDIDATES");
+  const headerDetail = directMode ? (vi ? "mat không đổi, chỉ đổi tọa độ target" : "mat stays fixed; only target coordinates change") : (vi ? "mỗi thẻ là một lần so sánh với target" : "each card is compared with target");
+  const legendSame = directMode ? (vi ? "cặp ánh xạ cùng giá trị" : "mapped pair with equal values") : (vi ? "cùng tọa độ, cùng giá trị" : "same coordinate and value");
+  const legendDifferent = directMode ? (vi ? "cặp ánh xạ khác giá trị" : "mapped pair with different values") : (vi ? "cùng tọa độ, khác giá trị" : "same coordinate, different value");
+  const legendActive = directMode ? (vi ? "cặp tọa độ đang xét" : "coordinate pair being checked") : (vi ? "ứng viên đang xét" : "current candidate");
 
   $("treeView").innerHTML = `<section class="rot1886-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="rot1886-stages">${stages}</div>
     <section class="rot1886-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
-    <section class="rot1886-angles"><header><strong>${vi ? "BỐN ỨNG VIÊN XOAY" : "FOUR ROTATION CANDIDATES"}</strong><span>${vi ? "mỗi thẻ là một lần so sánh với target" : "each card is compared with target"}</span></header><div>${angleTrack}</div></section>
+    <section class="rot1886-angles"><header><strong>${headerTitle}</strong><span>${headerDetail}</span></header><div>${angleTrack}</div></section>
     ${decisionHtml}
     <div class="rot1886-layout">
-      ${renderBoard(current, "candidate", vi ? `ỨNG VIÊN ${angle}°` : `${angle}° CANDIDATE`, vi ? "mat sau xoay" : "rotated mat")}
-      <div class="rot1886-compare-symbol" aria-hidden="true"><b>${phase === "found" ? "=" : "?"}</b><span>${vi ? "so với" : "vs"}</span></div>
-      ${renderBoard(target, "target", "TARGET", vi ? "ma trận cần đạt" : "desired matrix")}
+      ${renderBoard(current, "candidate", sourceLabel, sourceDetail, directMode ? sourceMatches : matchingCells, directMode ? sourceMismatches : new Set(), directMode ? activeSource : null)}
+      <div class="rot1886-compare-symbol ${directMode ? "mapped" : ""}" aria-hidden="true"><b>${centerSymbol}</b><span>${centerText}</span></div>
+      ${renderBoard(target, "target", "TARGET", targetDetail, directMode ? targetMatches : matchingCells, directMode ? targetMismatches : new Set(), directMode ? activeTarget : null)}
     </div>
-    <aside class="rot1886-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="same"><i></i>${vi ? "cùng tọa độ, cùng giá trị" : "same coordinate and value"}</span><span class="different"><i></i>${vi ? "cùng tọa độ, khác giá trị" : "same coordinate, different value"}</span><span class="candidate"><i></i>${vi ? "ứng viên đang xét" : "current candidate"}</span></aside>
+    <aside class="rot1886-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="same"><i></i>${legendSame}</span><span class="different"><i></i>${legendDifferent}</span><span class="candidate"><i></i>${legendActive}</span></aside>
   </section>`;
 }
 
