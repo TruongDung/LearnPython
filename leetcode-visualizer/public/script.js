@@ -17374,6 +17374,159 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderRussian354View(step) {
+  const view = step.russian354View || {};
+  const vi = lang === "vi";
+  const approach = Number(view.approach) || 2;
+  const phase = String(view.phase || "sort");
+  const original = Array.isArray(view.original) ? view.original : [];
+  const sorted = Array.isArray(view.sorted) ? view.sorted : [];
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const n = sorted.length;
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : null;
+  const activeChain = new Set(Array.isArray(view.activeChain) ? view.activeChain : []);
+  const bestChain = new Set(Array.isArray(view.bestChain) ? view.bestChain : []);
+  const displayChain = bestChain.size ? bestChain : activeChain;
+  const widthCounts = sorted.reduce((counts, item) => counts.set(item.width, (counts.get(item.width) || 0) + 1), new Map());
+  const tiedWidths = [...widthCounts.entries()].filter(([, count]) => count > 1).map(([width]) => width);
+  const maxWidth = Math.max(1, ...sorted.map((item) => Number(item.width) || 0));
+  const maxHeight = Math.max(1, ...sorted.map((item) => Number(item.height) || 0));
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const stageIndex = phase === "done" ? 3 : phase === "sort" ? 0 : phase === "reduce" ? 1 : 2;
+  const stageLabels = approach === 1
+    ? (vi ? ["Sort w↑, tie h↓", "Lấy dãy chiều cao", "DP so mọi j < i", "Dựng chuỗi tốt nhất"] : ["Sort w↑, ties h↓", "Extract heights", "DP over every j < i", "Rebuild best chain"])
+    : (vi ? ["Sort w↑, tie h↓", "Lấy dãy chiều cao", "Binary search tails", "Dựng chuỗi tốt nhất"] : ["Sort w↑, ties h↓", "Extract heights", "Binary-search tails", "Rebuild best chain"]);
+  const stages = stageLabels.map((label, index) => {
+    const state = phase === "done" || index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const renderEnvelope = (item, index, source) => {
+    const sortedIndex = source === "sorted" ? index : sorted.findIndex((candidate) => candidate.originalIndex === item.originalIndex);
+    const classes = ["rde354-envelope"];
+    if (widthCounts.get(item.width) > 1) classes.push("same-width");
+    if (sortedIndex === currentIndex) classes.push("current");
+    if (sortedIndex === compareIndex) classes.push("compare");
+    if (sortedIndex >= 0 && sortedIndex < Number(view.processedCount || 0)) classes.push("processed");
+    if (displayChain.has(sortedIndex)) classes.push("chain");
+    const shapeWidth = Math.round(46 + (Number(item.width) / maxWidth) * 46);
+    const shapeHeight = Math.round(30 + (Number(item.height) / maxHeight) * 32);
+    const indexText = source === "sorted" ? `s${index} · #${item.originalIndex}` : `#${item.originalIndex}`;
+    return `<span class="${classes.join(" ")}"><small>${indexText}</small><i class="rde354-shape" style="--rde-shape-w:${shapeWidth}%;--rde-shape-h:${shapeHeight}px"><b>w=${escapeHtml(display(item.width))}</b><em>h=${escapeHtml(display(item.height))}</em></i><strong>${escapeHtml(display(item.width))} × ${escapeHtml(display(item.height))}</strong></span>`;
+  };
+  const originalHtml = original.map((item, index) => renderEnvelope(item, index, "original")).join("") || `<em class="rde354-empty">[ ]</em>`;
+  const sortedHtml = sorted.map((item, index) => renderEnvelope(item, index, "sorted")).join("") || `<em class="rde354-empty">[ ]</em>`;
+
+  const tieExample = tiedWidths.length
+    ? tiedWidths.map((width) => {
+      const group = sorted.filter((item) => item.width === width);
+      return `<span><strong>w=${escapeHtml(display(width))}</strong><code>${group.map((item) => item.height).join(" > ")}</code><em>${vi ? "cao giảm" : "height desc"}</em></span>`;
+    }).join("")
+    : `<span><strong>${vi ? "KHÔNG CÓ WIDTH TRÙNG" : "NO WIDTH TIES"}</strong><code>(w↑, h↓)</code><em>${vi ? "quy tắc vẫn giữ nguyên" : "the rule still applies"}</em></span>`;
+
+  const heightHtml = sorted.map((item, index) => {
+    const classes = ["rde354-height"];
+    if (index === currentIndex) classes.push("current");
+    if (index === compareIndex) classes.push("compare");
+    if (widthCounts.get(item.width) > 1) classes.push("same-width");
+    if (displayChain.has(index)) classes.push("chain");
+    if (index < Number(view.processedCount || 0)) classes.push("processed");
+    return `<span class="${classes.join(" ")}"><small>i=${index} · w=${escapeHtml(display(item.width))}</small><strong>${escapeHtml(display(item.height))}</strong><em>h[${index}]</em></span>`;
+  }).join("") || `<em class="rde354-empty">[ ]</em>`;
+
+  let operation = "";
+  let methodBoard = "";
+  if (approach === 1) {
+    const comparison = view.comparison;
+    if (comparison) {
+      const inner = sorted[comparison.inner];
+      const outer = sorted[comparison.outer];
+      const verdict = comparison.canNest ? (comparison.improved ? (vi ? "LỒNG ĐƯỢC · UPDATE" : "FITS · UPDATE") : (vi ? "LỒNG ĐƯỢC · GIỮ DP" : "FITS · KEEP DP")) : (vi ? "KHÔNG LỒNG" : "DOES NOT FIT");
+      operation = `<section class="rde354-compare-rule ${comparison.canNest ? "pass" : "fail"} ${comparison.improved ? "improved" : ""}">
+        <div class="inner"><small>j=${comparison.inner} · ${vi ? "PHONG BÌ TRONG" : "INNER"}</small><strong>${inner.width} × ${inner.height}</strong></div>
+        <div class="checks"><span class="${comparison.widthOk ? "pass" : "fail"}"><small>WIDTH</small><strong>${inner.width} &lt; ${outer.width}</strong><em>${comparison.widthOk ? "✓" : "×"}</em></span><b>AND</b><span class="${comparison.heightOk ? "pass" : "fail"}"><small>HEIGHT</small><strong>${inner.height} &lt; ${outer.height}</strong><em>${comparison.heightOk ? "✓" : "×"}</em></span></div>
+        <div class="outer"><small>i=${comparison.outer} · ${vi ? "PHONG BÌ NGOÀI" : "OUTER"}</small><strong>${outer.width} × ${outer.height}</strong></div>
+        <footer><strong>${escapeHtml(verdict)}</strong><code>${comparison.canNest ? `dp[${comparison.outer}] = max(${comparison.previousDp}, dp[${comparison.inner}] + 1 = ${comparison.candidate}) → ${comparison.resultDp}` : `dp[${comparison.outer}] = ${comparison.resultDp} · skip`}</code></footer>
+      </section>`;
+    } else {
+      operation = `<section class="rde354-fit-rule"><div><small>${vi ? "ĐIỀU KIỆN LỒNG NGHIÊM NGẶT" : "STRICT NESTING RULE"}</small><strong>w<sub>inner</sub> &lt; w<sub>outer</sub> <b>AND</b> h<sub>inner</sub> &lt; h<sub>outer</sub></strong></div><span>${vi ? "Không được bằng nhau ở bất kỳ chiều nào." : "Equality in either dimension is not allowed."}</span></section>`;
+    }
+
+    const dp = Array.isArray(view.dp) ? view.dp : [];
+    const parent = Array.isArray(view.parent) ? view.parent : [];
+    const dpCells = sorted.map((item, index) => {
+      const classes = ["rde354-dp-cell"];
+      if (index === currentIndex) classes.push("current");
+      if (index === compareIndex) classes.push("compare");
+      if (index < Number(view.processedCount || 0)) classes.push("processed");
+      if (displayChain.has(index)) classes.push("chain");
+      return `<span class="${classes.join(" ")}"><small>i=${index} · ${item.width}×${item.height}</small><strong>dp = ${escapeHtml(display(dp[index]))}</strong><em>parent = ${parent[index] >= 0 ? parent[index] : "—"}</em></span>`;
+    }).join("") || `<em class="rde354-empty">dp = [ ]</em>`;
+    methodBoard = `<section class="rde354-method dp"><header><strong>DP · O(n²)</strong><span>dp[i] = 1 + max(dp[j]) ${vi ? "với j lồng vào i" : "for every j that fits i"}</span></header><div>${dpCells}</div></section>`;
+  } else {
+    const tails = Array.isArray(view.tails) ? view.tails : [];
+    const tailIndices = Array.isArray(view.tailIndices) ? view.tailIndices : [];
+    const search = view.search || {};
+    const mutation = view.mutation || null;
+    const visited = new Set(Array.isArray(search.visitedMids) ? search.visitedMids : []);
+    const found = Number.isInteger(search.found) ? search.found : null;
+    const slotCount = Math.max(1, tails.length, found === tails.length ? tails.length + 1 : 0);
+    const tailSlots = Array.from({ length: slotCount }, (_, index) => {
+      const isGhost = index >= tails.length;
+      const envelopeIndex = tailIndices[index];
+      const envelope = sorted[envelopeIndex];
+      const classes = ["rde354-tail-slot"];
+      if (isGhost) classes.push("ghost");
+      if (visited.has(index)) classes.push("visited");
+      if (search.mid === index) classes.push("mid");
+      if (found === index) classes.push("found");
+      if (mutation?.pos === index) classes.push(mutation.type === "append" ? "appended" : "replaced");
+      const inRange = Number.isInteger(search.loBefore) && Number.isInteger(search.hiBefore) && index >= search.loBefore && index < search.hiBefore;
+      if (inRange) classes.push("in-range");
+      return `<span class="${classes.join(" ")}"><small>L${index + 1} · index ${index}</small><strong>${isGhost ? "?" : escapeHtml(display(tails[index]))}</strong><em>${isGhost ? (vi ? "vị trí append" : "append slot") : envelope ? `${envelope.width}×${envelope.height} · s${envelopeIndex}` : "tail"}</em></span>`;
+    }).join("");
+
+    if (phase === "binary-search" && Number.isInteger(search.mid)) {
+      operation = `<section class="rde354-search-step ${search.moveRight ? "right" : "left"}"><header><small>bisect_left · [lo, hi)</small><strong>lo=${search.loBefore} · mid=${search.mid} · hi=${search.hiBefore}</strong></header><div><code>tails[${search.mid}] = ${escapeHtml(display(search.midValue))}</code><b>${search.moveRight ? "<" : "≥"}</b><code>h = ${escapeHtml(display(search.target))}</code><i>&rarr;</i><strong>${search.moveRight ? `lo = ${search.lo}` : `hi = ${search.hi}`}</strong></div><p>${search.moveRight ? (vi ? "Mid quá nhỏ: bỏ cả mid và nửa trái." : "Mid is too small: discard mid and the left half.") : (vi ? "Mid đủ lớn: giữ mid và tìm tiếp bên trái." : "Mid is large enough: keep mid and search left.")}</p></section>`;
+    } else if (phase === "position-found") {
+      operation = `<section class="rde354-search-step found"><header><small>lo = hi</small><strong>bisect_left = ${found}</strong></header><p>${found === tails.length ? (vi ? "Không có tail nào ≥ h: mở thêm một độ dài mới." : "No tail is >= h: open a new length.") : (vi ? `L${found + 1} là ô đầu tiên có tail ≥ h.` : `L${found + 1} is the first slot whose tail is >= h.`)}</p></section>`;
+    } else if (mutation) {
+      operation = `<section class="rde354-mutation ${mutation.type}"><header><small>${mutation.type === "append" ? "EXTEND LIS" : mutation.oldValue === mutation.newValue ? "REFRESH TAIL OWNER" : "REPLACE A TAIL"}</small><strong>${mutation.type === "append" ? `append ${mutation.newValue} at L${mutation.pos + 1}` : `L${mutation.pos + 1}: ${mutation.oldValue} → ${mutation.newValue}`}</strong></header><div><code>[${mutation.before.join(", ")}]</code><i>&rarr;</i><code>[${mutation.after.join(", ")}]</code></div><p>${mutation.type === "append" ? (vi ? "Độ dài LIS tăng 1." : "LIS length grows by 1.") : (vi ? "Độ dài không đổi; tail mới không lớn hơn tail cũ nên vẫn tối ưu cho bước sau." : "Length stays the same; the new tail is no larger than the old one, so it remains optimal for later steps.")}</p></section>`;
+    } else {
+      operation = `<section class="rde354-fit-rule"><div><small>${vi ? "Ý NGHĨA CỦA TAILS" : "TAILS INVARIANT"}</small><strong>tails[L-1] = ${vi ? "đuôi nhỏ nhất của chuỗi dài L" : "smallest tail of a length-L chain"}</strong></div><span>${vi ? "bisect_left giữ LIS tăng nghiêm ngặt." : "bisect_left preserves a strictly increasing LIS."}</span></section>`;
+    }
+
+    methodBoard = `<section class="rde354-method tails"><header><strong>TAILS · O(n log n)</strong><span>${vi ? "mỗi ô đại diện một độ dài, không nhất thiết cùng một chuỗi" : "one slot per length, not necessarily one shared chain"}</span></header><div>${tailSlots}</div><footer><code>lo=${escapeHtml(display(search.lo))}</code><code>mid=${escapeHtml(display(search.mid))}</code><code>hi=${escapeHtml(display(search.hi))}</code><code>target h=${escapeHtml(display(search.target ?? (currentIndex !== null ? heights[currentIndex] : null)))}</code></footer></section>`;
+  }
+
+  const chainIndexes = [...displayChain];
+  const chainHtml = chainIndexes.length
+    ? chainIndexes.map((index, chainIndex) => {
+      const item = sorted[index];
+      if (!item) return "";
+      return `${chainIndex ? `<i>&rarr;</i>` : ""}<span><small>s${index}</small><strong>${item.width} × ${item.height}</strong><em>${chainIndex ? `${sorted[chainIndexes[chainIndex - 1]].width}<${item.width} · ${sorted[chainIndexes[chainIndex - 1]].height}<${item.height}` : (vi ? "bắt đầu" : "start")}</em></span>`;
+    }).join("")
+    : `<em class="rde354-empty">${vi ? "Chuỗi sẽ xuất hiện khi thuật toán chọn predecessor." : "The chain appears after the algorithm chooses predecessors."}</em>`;
+  const chainTitle = phase === "done" ? (vi ? "MỘT CHUỖI TỐI ƯU THẬT" : "ONE REAL OPTIMAL CHAIN") : (vi ? "CHUỖI ĐANG THEO DÕI" : "CURRENT RECONSTRUCTED CHAIN");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Russian Doll Envelopes, cách ${approach}, đã xử lý ${Number(view.processedCount || 0)}/${n}, đáp án ${display(view.answer)}.`
+    : `Russian Doll Envelopes, approach ${approach}, processed ${Number(view.processedCount || 0)}/${n}, answer ${display(view.answer)}.`;
+
+  $("treeView").innerHTML = `<section class="rde354-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rde354-stages">${stages}</div>
+    <div class="rde354-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${vi ? "CÁCH" : "APPROACH"} ${approach}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rde354-sort-rule"><div><small>SORT KEY</small><strong>(width ↑, height ↓)</strong><span>${vi ? "rộng bằng nhau phải xếp cao giảm" : "equal widths must use descending heights"}</span></div><div class="rde354-ties">${tieExample}</div></section>
+    <section class="rde354-orders"><div><header><strong>${vi ? "THỨ TỰ BAN ĐẦU" : "ORIGINAL ORDER"}</strong><span># = input index</span></header><div>${originalHtml}</div></div><b>&rarr;</b><div><header><strong>${vi ? "SAU KHI SORT" : "SORTED ORDER"}</strong><span>s = sorted index</span></header><div>${sortedHtml}</div></div></section>
+    <section class="rde354-heights"><header><strong>HEIGHT SEQUENCE</strong><span>${vi ? `đã xử lý ${Number(view.processedCount || 0)}/${n}` : `${Number(view.processedCount || 0)}/${n} processed`}</span></header><div>${heightHtml}</div></section>
+    ${operation}
+    ${methodBoard}
+    <section class="rde354-chain ${phase === "done" ? "done" : ""}"><header><strong>${chainTitle}</strong><span>${phase === "done" ? `${vi ? "đáp án" : "answer"} = ${display(view.answer)}` : `${displayChain.size} ${vi ? "phong bì" : "envelope(s)"}`}</span></header><div>${chainHtml}</div></section>
+  </section>`;
+}
+
 function renderRotate48View(step) {
   const view = step.rotate48View || {};
   const vi = lang === "vi";
@@ -19054,6 +19207,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromePathView(step);
+  } else if (step.russian354View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRussian354View(step);
   } else if (step.rotate48View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -16555,17 +16555,35 @@ function buildSteps354(input, params) {
   return approach === "1" ? buildSteps354DP(input) : buildSteps354BinarySearch(input);
 }
 
+function traceEnvelope354Chain(parent, end) {
+  const chain = [];
+  const seen = new Set();
+  let current = end;
+  while (Number.isInteger(current) && current >= 0 && !seen.has(current)) {
+    seen.add(current);
+    chain.unshift(current);
+    current = parent[current];
+  }
+  return chain;
+}
+
 function buildSteps354DP(input) {
   const envs = parseEnvelopes354(input);
-  // Sort: width ascending, height descending for equal width.
-  const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
-  const n = sorted.length;
-  const heights = sorted.map((e) => e[1]);
+  const originalItems = envs.map(([width, height], originalIndex) => ({ width, height, originalIndex }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((a, b) => (a.width - b.width) || (b.height - a.height) || (a.originalIndex - b.originalIndex))
+    .map((item, sortedIndex) => ({ ...item, sortedIndex }));
+  const sorted = sortedItems.map((item) => [item.width, item.height]);
+  const n = sortedItems.length;
+  const heights = sortedItems.map((item) => item.height);
   const dp = new Array(n).fill(1);
+  const parent = new Array(n).fill(-1);
   const steps = [];
-  const labels = sorted.map((e) => `${e[0]}×${e[1]}`);
+  const labels = sortedItems.map((item) => `${item.width}×${item.height}`);
 
   const push = (opts) => {
+    const chainEnd = Number.isInteger(opts.chainEnd) ? opts.chainEnd : -1;
     steps.push({
       title: opts.title,
       arr: [...heights],
@@ -16577,56 +16595,138 @@ function buildSteps354DP(input) {
       codeBlock: 1,
       vars: opts.vars || [],
       note: opts.note,
+      russian354View: {
+        approach: 1,
+        phase: opts.phase || "sort",
+        original: originalItems.map((item) => ({ ...item })),
+        sorted: sortedItems.map((item) => ({ ...item })),
+        heights: [...heights],
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        compareIndex: Number.isInteger(opts.compareIndex) ? opts.compareIndex : null,
+        processedCount: Number(opts.processedCount) || 0,
+        comparison: opts.comparison || null,
+        dp: [...dp],
+        parent: [...parent],
+        activeChain: chainEnd >= 0 ? traceEnvelope354Chain(parent, chainEnd) : [],
+        bestChain: Array.isArray(opts.bestChain) ? [...opts.bestChain] : [],
+        answer: opts.answer ?? null,
+      },
     });
   };
 
   push({
+    phase: "sort",
     title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
     codeLines: [3],
     highlight: [],
     note: {
-      vi: `Mẹo: sắp theo chiều RỘNG tăng dần; nếu rộng bằng nhau thì chiều CAO giảm dần (để 2 phong bì cùng rộng không thể lồng nhau → không bị đếm nhầm). Sau đó bài toán trở thành LIS NGHIÊM NGẶT trên dãy chiều cao: [${heights.join(", ")}]. dp[i] = chuỗi lồng dài nhất kết thúc tại i.`,
-      en: `Trick: sort by WIDTH ascending; for equal width sort HEIGHT descending (so same-width envelopes can't nest → no false counting). Then it becomes a STRICT LIS on heights: [${heights.join(", ")}]. dp[i] = longest nesting chain ending at i.`,
+      vi: "Sắp chiều rộng tăng dần. Khi rộng bằng nhau, xếp chiều cao giảm dần để các phong bì cùng rộng không thể cùng xuất hiện trong LIS tăng nghiêm ngặt.",
+      en: "Sort width ascending. On equal widths, sort height descending so same-width envelopes cannot both appear in a strictly increasing LIS.",
+    },
+  });
+
+  push({
+    phase: "reduce",
+    title: { vi: `Bỏ chiều rộng, giữ dãy chiều cao [${heights.join(", ")}]`, en: `Drop widths and keep heights [${heights.join(", ")}]` },
+    codeLines: [4, 5],
+    note: {
+      vi: "Sau quy tắc sort đặc biệt, LIS nghiêm ngặt trên chiều cao tương đương với chuỗi phong bì lồng nhau. Đặt dp[i] = độ dài chuỗi tốt nhất kết thúc tại phong bì i.",
+      en: "After the special sort, a strict LIS on heights is equivalent to a valid nesting chain. Let dp[i] be the best chain ending at envelope i.",
     },
   });
 
   for (let i = 0; i < n; i++) {
+    push({
+      phase: "dp-start",
+      title: { vi: `Bắt đầu i=${i}: dp[${i}] = 1`, en: `Start i=${i}: dp[${i}] = 1` },
+      codeLines: [6, 7],
+      highlight: [i],
+      currentIndex: i,
+      processedCount: i,
+      chainEnd: i,
+      vars: [{ name: "i", value: labels[i] }, { name: `dp[${i}]`, value: dp[i] }],
+      note: { vi: `${labels[i]} tự tạo một chuỗi độ dài 1. Thử mọi j < i để tìm phong bì đứng ngay trước nó.`, en: `${labels[i]} forms a length-1 chain by itself. Try every j < i as its immediate predecessor.` },
+    });
+
     for (let j = 0; j < i; j++) {
-      const extend = heights[j] < heights[i];
-      if (extend && dp[j] + 1 > dp[i]) dp[i] = dp[j] + 1;
+      const widthOk = sortedItems[j].width < sortedItems[i].width;
+      const heightOk = sortedItems[j].height < sortedItems[i].height;
+      const canNest = widthOk && heightOk;
+      const beforeDp = dp[i];
+      const candidate = canNest ? dp[j] + 1 : null;
+      const improved = canNest && candidate > beforeDp;
+      if (improved) {
+        dp[i] = candidate;
+        parent[i] = j;
+      }
       push({
-        title: { vi: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "lồng được" : "không lồng"}`, en: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "can nest" : "cannot"}` },
-        codeLines: extend ? [8, 9] : [8],
+        phase: improved ? "dp-update" : "dp-skip",
+        title: { vi: `So ${labels[j]} → ${labels[i]}: ${canNest ? (improved ? "cập nhật dp" : "lồng được nhưng không tốt hơn") : "không lồng được"}`, en: `Compare ${labels[j]} → ${labels[i]}: ${canNest ? (improved ? "update dp" : "fits but does not improve") : "cannot nest"}` },
+        codeLines: canNest ? [8, 9] : [8],
         highlight: [i],
-        mark: extend ? [j] : [],
+        mark: [j],
+        currentIndex: i,
+        compareIndex: j,
+        processedCount: i,
+        chainEnd: i,
+        comparison: {
+          inner: j,
+          outer: i,
+          widthOk,
+          heightOk,
+          canNest,
+          previousDp: beforeDp,
+          candidate,
+          improved,
+          resultDp: dp[i],
+        },
         vars: [
           { name: "i", value: `${labels[i]}` },
           { name: "j", value: `${labels[j]}` },
-          { name: "cao[j] < cao[i]?", value: extend },
+          { name: "w[j] < w[i]?", value: widthOk },
+          { name: "h[j] < h[i]?", value: heightOk },
           { name: `dp[${i}]`, value: dp[i] },
         ],
         note: {
-          vi: extend
-            ? `${labels[j]} lồng được vào ${labels[i]} (cao ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
-            : `${labels[j]} không lồng vào ${labels[i]} (cao ${heights[j]} ≥ ${heights[i]}) → bỏ qua.`,
-          en: extend
-            ? `${labels[j]} nests into ${labels[i]} (height ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
-            : `${labels[j]} cannot nest into ${labels[i]} (height ${heights[j]} ≥ ${heights[i]}) → skip.`,
+          vi: canNest
+            ? `${labels[j]} nhỏ hơn nghiêm ngặt ở cả hai chiều. Candidate = dp[${j}] + 1 = ${candidate}; ${improved ? `tốt hơn ${beforeDp}, nên parent[${i}] = ${j}` : `không vượt dp[${i}] = ${beforeDp}`}.`
+            : `Cần đồng thời ${sortedItems[j].width} < ${sortedItems[i].width} và ${sortedItems[j].height} < ${sortedItems[i].height}. Có ít nhất một điều kiện sai nên bỏ qua.`,
+          en: canNest
+            ? `${labels[j]} is strictly smaller in both dimensions. Candidate = dp[${j}] + 1 = ${candidate}; it ${improved ? `beats ${beforeDp}, so parent[${i}] = ${j}` : `does not beat dp[${i}] = ${beforeDp}`}.`
+            : `Both ${sortedItems[j].width} < ${sortedItems[i].width} and ${sortedItems[j].height} < ${sortedItems[i].height} are required. At least one condition fails, so skip.`,
         },
       });
     }
+
+    push({
+      phase: "dp-row-done",
+      title: { vi: `Chốt i=${i}: dp[${i}] = ${dp[i]}`, en: `Finish i=${i}: dp[${i}] = ${dp[i]}` },
+      codeLines: [6, 7, 8, 9],
+      highlight: [i],
+      currentIndex: i,
+      processedCount: i + 1,
+      chainEnd: i,
+      vars: [{ name: `dp[${i}]`, value: dp[i] }, { name: `parent[${i}]`, value: parent[i] }],
+      note: { vi: `Chuỗi tốt nhất kết thúc tại ${labels[i]} có ${dp[i]} phong bì.`, en: `The best chain ending at ${labels[i]} contains ${dp[i]} envelopes.` },
+    });
   }
 
   const answer = n ? Math.max(...dp) : 0;
-  const bestIdx = dp.map((v, i) => (v === answer ? i : -1)).filter((i) => i >= 0);
+  const bestEnd = n ? dp.indexOf(answer) : -1;
+  const bestChain = traceEnvelope354Chain(parent, bestEnd);
   push({
+    phase: "done",
     title: { vi: `Kết quả: max(dp) = ${answer}`, en: `Result: max(dp) = ${answer}` },
     codeLines: [10],
-    highlight: bestIdx,
-    mark: bestIdx,
+    highlight: bestChain,
+    mark: bestChain,
     final: true,
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}.`, en: `Maximum number of nested envelopes = ${answer}.` },
+    processedCount: n,
+    chainEnd: bestEnd,
+    bestChain,
+    answer,
+    vars: [{ name: "answer", value: answer }, { name: "chain", value: `[${bestChain.map((index) => labels[index]).join(" → ")}]` }],
+    note: { vi: `max(dp) = ${answer}. Đi ngược parent từ phong bì kết thúc để dựng một chuỗi lồng hợp lệ.`, en: `max(dp) = ${answer}. Follow parent pointers backward from the ending envelope to reconstruct one valid nesting chain.` },
   });
 
   return { original: sorted, answer, steps };
@@ -16634,11 +16734,18 @@ function buildSteps354DP(input) {
 
 function buildSteps354BinarySearch(input) {
   const envs = parseEnvelopes354(input);
-  const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
-  const n = sorted.length;
-  const heights = sorted.map((e) => e[1]);
-  const labels = sorted.map((e) => `${e[0]}×${e[1]}`);
+  const originalItems = envs.map(([width, height], originalIndex) => ({ width, height, originalIndex }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((a, b) => (a.width - b.width) || (b.height - a.height) || (a.originalIndex - b.originalIndex))
+    .map((item, sortedIndex) => ({ ...item, sortedIndex }));
+  const sorted = sortedItems.map((item) => [item.width, item.height]);
+  const n = sortedItems.length;
+  const heights = sortedItems.map((item) => item.height);
+  const labels = sortedItems.map((item) => `${item.width}×${item.height}`);
   const tails = [];
+  const tailIndices = [];
+  const previous = new Array(n).fill(-1);
   const steps = [];
 
   const tailsSub = () => {
@@ -16647,45 +16754,127 @@ function buildSteps354BinarySearch(input) {
     return sub.slice(0, n);
   };
 
-  steps.push({
+  const push = (opts) => {
+    const chainEnd = Number.isInteger(opts.chainEnd) ? opts.chainEnd : -1;
+    steps.push({
+      title: opts.title,
+      arr: [...heights],
+      sub: tailsSub(),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars: opts.vars || [],
+      note: opts.note,
+      russian354View: {
+        approach: 2,
+        phase: opts.phase || "sort",
+        original: originalItems.map((item) => ({ ...item })),
+        sorted: sortedItems.map((item) => ({ ...item })),
+        heights: [...heights],
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        processedCount: Number(opts.processedCount) || 0,
+        tails: [...tails],
+        tailIndices: [...tailIndices],
+        previous: [...previous],
+        search: opts.search || null,
+        mutation: opts.mutation || null,
+        activeChain: chainEnd >= 0 ? traceEnvelope354Chain(previous, chainEnd) : [],
+        bestChain: Array.isArray(opts.bestChain) ? [...opts.bestChain] : [],
+        answer: opts.answer ?? null,
+      },
+    });
+  };
+
+  push({
+    phase: "sort",
     title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
-    arr: [...heights],
-    sub: Array(n).fill(""),
-    highlight: [],
-    mark: [],
     codeLines: [5],
-    codeBlock: 2,
-    vars: [
-      { name: "heights", value: `[${heights.join(", ")}]` },
-      { name: "tails", value: "[]" },
-    ],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }, { name: "tails", value: "[]" }],
     note: {
-      vi: `Sắp rộng tăng, nếu rộng bằng nhau thì cao giảm. Vì vậy 2 phong bì cùng rộng không thể bị LIS đếm nhầm. Sau sort, chỉ cần tìm LIS nghiêm ngặt trên chiều cao.`,
-      en: `Sort width ascending and height descending on ties. That prevents same-width envelopes from being counted by LIS. Now run strict LIS on heights.`,
+      vi: "Sắp rộng tăng, nhưng cao giảm khi cùng rộng. Đây là bước bảo vệ để LIS tăng nghiêm ngặt không chọn hai phong bì có cùng chiều rộng.",
+      en: "Sort width ascending but height descending on ties. This guard prevents a strict LIS from choosing two envelopes with the same width.",
+    },
+  });
+
+  push({
+    phase: "reduce",
+    title: { vi: `Chuyển thành LIS chiều cao [${heights.join(", ")}]`, en: `Reduce to height LIS [${heights.join(", ")}]` },
+    codeLines: [6, 7],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }, { name: "tails", value: "[]" }],
+    note: {
+      vi: "tails[L-1] lưu chiều cao kết thúc NHỎ NHẤT của một chuỗi độ dài L. tails giúp đếm độ dài tối ưu, nhưng bản thân nó không nhất thiết là chuỗi phong bì thật.",
+      en: "tails[L-1] stores the SMALLEST ending height of any length-L chain. tails finds the optimal length, but its values are not necessarily one real envelope chain.",
     },
   });
 
   for (let k = 0; k < n; k++) {
     const h = heights[k];
     const label = labels[k];
-    let lo = 0, hi = tails.length;
+    const before = [...tails];
+    const beforeIndices = [...tailIndices];
+    const visitedMids = [];
+
+    push({
+      phase: "lis-start",
+      title: { vi: `Xét ${label}: tìm vị trí cho h=${h}`, en: `Process ${label}: find a slot for h=${h}` },
+      codeLines: [7, 8],
+      highlight: [k],
+      currentIndex: k,
+      processedCount: k,
+      chainEnd: k,
+      search: { lo: 0, hi: tails.length, mid: null, visitedMids: [], found: tails.length === 0 ? 0 : null },
+      vars: [{ name: "envelope", value: label }, { name: "height", value: h }, { name: "tails", value: `[${tails.join(", ")}]` }],
+      note: { vi: `Dùng bisect_left để tìm ô đầu tiên có tail ≥ ${h}. Khoảng tìm kiếm ban đầu là [0, ${tails.length}).`, en: `Use bisect_left to find the first slot whose tail is >= ${h}. The initial search range is [0, ${tails.length}).` },
+    });
+
+    let lo = 0;
+    let hi = tails.length;
     while (lo < hi) {
+      const loBefore = lo;
+      const hiBefore = hi;
       const mid = (lo + hi) >> 1;
-      if (tails[mid] < h) lo = mid + 1;
+      const midValue = tails[mid];
+      const moveRight = midValue < h;
+      visitedMids.push(mid);
+      if (moveRight) lo = mid + 1;
       else hi = mid;
+
+      push({
+        phase: "binary-search",
+        title: moveRight
+          ? { vi: `tails[${mid}]=${midValue} < ${h} → lo=${lo}`, en: `tails[${mid}]=${midValue} < ${h} → lo=${lo}` }
+          : { vi: `tails[${mid}]=${midValue} ≥ ${h} → hi=${hi}`, en: `tails[${mid}]=${midValue} >= ${h} → hi=${hi}` },
+        codeLines: [8],
+        highlight: [k],
+        mark: [mid],
+        currentIndex: k,
+        processedCount: k,
+        chainEnd: k,
+        search: { loBefore, hiBefore, lo, hi, mid, midValue, target: h, moveRight, visitedMids: [...visitedMids], found: null },
+        vars: [{ name: "lo", value: `${loBefore} → ${lo}` }, { name: "mid", value: mid }, { name: "hi", value: `${hiBefore} → ${hi}` }],
+        note: moveRight
+          ? { vi: `${midValue} còn nhỏ hơn ${h}, nên mọi vị trí ≤ ${mid} đều quá nhỏ. Bỏ nửa trái.`, en: `${midValue} is still smaller than ${h}, so every slot through ${mid} is too small. Discard the left half.` }
+          : { vi: `${midValue} đã ≥ ${h}; vị trí đầu tiên hợp lệ nằm tại ${mid} hoặc bên trái.`, en: `${midValue} is already >= ${h}; the first valid slot is ${mid} or somewhere to its left.` },
+      });
     }
+
     const pos = lo;
     const extended = pos === tails.length;
-    const before = [...tails];
+    const oldValue = extended ? null : tails[pos];
+    const oldEnvelopeIndex = extended ? null : tailIndices[pos];
 
-    steps.push({
-      title: { vi: `Xét ${label}: bisect_left(tails, ${h}) = ${pos}`, en: `Process ${label}: bisect_left(tails, ${h}) = ${pos}` },
-      arr: [...heights],
-      sub: tailsSub(),
+    push({
+      phase: "position-found",
+      title: { vi: `bisect_left(tails, ${h}) = ${pos}`, en: `bisect_left(tails, ${h}) = ${pos}` },
+      codeLines: [8],
       highlight: [k],
       mark: pos < tails.length ? [pos] : [],
-      codeLines: [7],
-      codeBlock: 2,
+      currentIndex: k,
+      processedCount: k,
+      chainEnd: k,
+      search: { lo, hi, mid: null, target: h, visitedMids: [...visitedMids], found: pos },
       vars: [
         { name: "envelope", value: label },
         { name: "height", value: h },
@@ -16693,49 +16882,71 @@ function buildSteps354BinarySearch(input) {
         { name: "i", value: pos },
       ],
       note: extended
-        ? { vi: `${h} lớn hơn mọi đuôi hiện tại → mở thêm một độ dài mới.`, en: `${h} is larger than every current tail → create a longer chain.` }
-        : { vi: `Tìm đuôi đầu tiên ≥ ${h} tại vị trí ${pos}; thay bằng ${h} để giữ đuôi nhỏ nhất cho độ dài ${pos + 1}.`, en: `Find the first tail >= ${h} at index ${pos}; replace it with ${h} to keep the smallest tail for length ${pos + 1}.` },
+        ? { vi: `Vị trí ${pos} nằm ngay sau tails hiện tại, nên ${h} mở chuỗi dài ${pos + 1}.`, en: `Position ${pos} is just after the current tails, so ${h} opens a length-${pos + 1} chain.` }
+        : { vi: `Ô đầu tiên có tail ≥ ${h} là L${pos + 1}. Thay tail cũ để giữ kết thúc nhỏ nhất có thể.`, en: `The first tail >= ${h} is slot L${pos + 1}. Replace its old tail to keep the smallest possible ending.` },
     });
 
+    previous[k] = pos > 0 ? tailIndices[pos - 1] : -1;
     if (extended) tails.push(h);
     else tails[pos] = h;
+    if (extended) tailIndices.push(k);
+    else tailIndices[pos] = k;
 
-    steps.push({
+    push({
+      phase: extended ? "tails-append" : "tails-replace",
       title: extended
         ? { vi: `tails.append(${h})`, en: `tails.append(${h})` }
         : { vi: `tails[${pos}] = ${h}`, en: `tails[${pos}] = ${h}` },
-      arr: [...heights],
-      sub: tailsSub(),
       highlight: [k],
       mark: [pos],
-      codeLines: extended ? [9] : [11],
-      codeBlock: 2,
+      codeLines: extended ? [9, 10] : [11, 12],
+      currentIndex: k,
+      processedCount: k + 1,
+      chainEnd: k,
+      search: { lo: pos, hi: pos, mid: null, target: h, visitedMids: [...visitedMids], found: pos },
+      mutation: {
+        type: extended ? "append" : "replace",
+        pos,
+        oldValue,
+        newValue: h,
+        oldEnvelopeIndex,
+        newEnvelopeIndex: k,
+        before,
+        after: [...tails],
+        beforeIndices,
+        afterIndices: [...tailIndices],
+      },
       vars: [
         { name: "tails trước", value: `[${before.join(", ")}]` },
         { name: "tails sau", value: `[${tails.join(", ")}]` },
         { name: "answer hiện tại", value: tails.length },
       ],
       note: extended
-        ? { vi: `Append ${h}; số phong bì lồng nhau tốt nhất tăng lên ${tails.length}.`, en: `Append ${h}; the best nesting length grows to ${tails.length}.` }
-        : { vi: `Thay đuôi cũ ${before[pos]} bằng ${h}. Độ dài chưa tăng, nhưng đuôi nhỏ hơn giúp dễ nối tiếp hơn.`, en: `Replace old tail ${before[pos]} with ${h}. Length does not grow, but a smaller tail is easier to extend.` },
+        ? { vi: `Append ${h}: độ dài LIS tăng từ ${before.length} lên ${tails.length}. ${pos > 0 ? `Predecessor của ${label} là phong bì đang giữ tail L${pos}.` : `${label} bắt đầu một chuỗi mới.`}`, en: `Append ${h}: LIS length grows from ${before.length} to ${tails.length}. ${pos > 0 ? `The predecessor of ${label} is the envelope holding tail L${pos}.` : `${label} starts a new chain.`}` }
+        : { vi: `Thay ${oldValue} bằng ${h} tại L${pos + 1}. Độ dài giữ nguyên ${tails.length}, nhưng tail mới nhỏ hơn hoặc bằng nên dễ nối tiếp hơn.`, en: `Replace ${oldValue} with ${h} at L${pos + 1}. Length stays ${tails.length}, but the new tail is no larger and therefore easier to extend.` },
     });
   }
 
   const answer = tails.length;
-  steps.push({
+  const bestEnd = answer ? tailIndices[answer - 1] : -1;
+  const bestChain = traceEnvelope354Chain(previous, bestEnd);
+  push({
+    phase: "done",
     title: { vi: `Kết quả: len(tails) = ${answer}`, en: `Result: len(tails) = ${answer}` },
-    arr: [...heights],
-    sub: tailsSub(),
     highlight: [],
-    mark: Array.from({ length: answer }, (_, i) => i),
+    mark: bestChain,
     final: true,
-    codeLines: [12],
-    codeBlock: 2,
+    codeLines: [13],
+    processedCount: n,
+    chainEnd: bestEnd,
+    bestChain,
+    answer,
     vars: [
       { name: "answer", value: answer },
       { name: "tails", value: `[${tails.join(", ")}]` },
+      { name: "chain", value: `[${bestChain.map((index) => labels[index]).join(" → ")}]` },
     ],
-    note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}. tails dùng để đếm độ dài, không nhất thiết là chuỗi phong bì thật.`, en: `Maximum nested envelopes = ${answer}. tails is a length-counting tool, not necessarily the actual envelope chain.` },
+    note: { vi: `len(tails) = ${answer}. Dùng chỉ số predecessor đã lưu để dựng một chuỗi phong bì thật; các giá trị tails riêng lẻ có thể đến từ những chuỗi khác nhau.`, en: `len(tails) = ${answer}. Stored predecessor indexes reconstruct one real envelope chain; individual tails values may come from different chains.` },
   });
 
   return { original: sorted, answer, steps };
@@ -18577,8 +18788,10 @@ module.exports = {
       },
     ],
     approach: [
-      { vi: "Cách 1 (O(n²)): sort rộng tăng/cao giảm, rồi làm LIS trên chiều cao bằng dp[i].", en: "Approach 1 (O(n²)): sort width asc/height desc, then run LIS on heights with dp[i]." },
-      { vi: "Cách 2 tối ưu (O(n log n)): sort như trên, sau đó dùng tails[] + bisect_left trên chiều cao.", en: "Optimized approach 2 (O(n log n)): sort the same way, then use tails[] + bisect_left on heights." },
+      { vi: "Điều kiện lồng là nghiêm ngặt ở CẢ HAI chiều: w nhỏ hơn và h nhỏ hơn; bằng nhau ở một chiều cũng không hợp lệ.", en: "Nesting is strict in BOTH dimensions: width and height must both be smaller; equality in either dimension is invalid." },
+      { vi: "Sort theo (width tăng, height giảm). Height giảm khi width bằng nhau là bước then chốt để LIS không đếm nhầm hai phong bì cùng rộng.", en: "Sort by (width ascending, height descending). Descending heights on width ties are the key guard against counting equal-width envelopes." },
+      { vi: "Cách 1 — DP O(n²): dp[i] là chuỗi dài nhất kết thúc tại i; thử mọi j<i và cập nhật dp[i] = max(dp[i], dp[j]+1) khi j lồng vào i.", en: "Approach 1 — O(n²) DP: dp[i] is the longest chain ending at i; try every j<i and update dp[i] = max(dp[i], dp[j]+1) when j fits i." },
+      { vi: "Cách 2 — O(n log n): tails[L-1] là chiều cao kết thúc nhỏ nhất của chuỗi dài L; bisect_left tìm tail đầu tiên ≥ h để append hoặc thay thế.", en: "Approach 2 — O(n log n): tails[L-1] is the smallest ending height of a length-L chain; bisect_left finds the first tail >= h to append or replace." },
     ],
     complexity: {
       time: "O(n²) / O(n log n)",
