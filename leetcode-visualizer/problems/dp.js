@@ -17899,6 +17899,179 @@ function buildSteps2771(input, params = {}) {
   return { original: { nums1: a, nums2: b }, answer, steps };
 }
 
+/**
+ * LeetCode 1872: Stone Game VIII — beginner-friendly walkthrough.
+ *
+ * The steps tell a story:
+ *  1. Rules: a move merges the leftmost x > 1 stones into one stone worth
+ *     their sum and scores that sum; game ends when one stone remains.
+ *  2. Key insight: merging never changes prefix sums, so every move is just
+ *     "stop merging at index i" and score p[i] = stones[0] + ... + stones[i].
+ *  3. Turn the array into prefix sums in place.
+ *  4. Scan right-to-left with one rolling value:
+ *       best = max(best, p[i] - best)
+ *     where `best` is the score gap the player about to move can secure on
+ *     the un-merged suffix. Taking at i yields p[i] for me minus best for
+ *     my opponent; skipping i keeps the opponent's value as mine.
+ *  5. Answer = f(1): Alice must merge at least 2 stones, so she first stops
+ *     at index >= 1.
+ */
+function buildSteps1872(input) {
+  const stones = Array.isArray(input) ? input.map(Number) : [];
+  const n = stones.length;
+  const original = stones.slice();
+  const valid = n >= 2 && n <= 10 && stones.every((v) => Number.isInteger(v));
+  const steps = [];
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "answer", value: null }],
+      note: {
+        vi: "Cần mảng ít nhất 2 số nguyên (tối đa 10 viên để trực quan), ví dụ: -1,2,-3,4,-5.",
+        en: "Provide an array of at least two integers (at most 10 stones for visualization), e.g. -1,2,-3,4,-5.",
+      },
+    });
+    return { original, answer: null, steps };
+  }
+
+  // ─── Phase 0: rules ───
+  steps.push({
+    title: { vi: "Luật chơi", en: "How the game works" },
+    arr: original.slice(),
+    highlight: [],
+    mark: [0],
+    codeLines: [1, 2, 3],
+    vars: [
+      { name: "stones", value: JSON.stringify(original) },
+      { name: "nước đi", value: "lấy x > 1 viên từ TRÁI" },
+      { name: "điểm", value: "+ tổng các viên lấy" },
+    ],
+    note: {
+      vi: "Mỗi lượt: chọn x > 1, lấy x viên bên trái, cộng TỔNG của chúng vào điểm của mình, rồi đặt 1 viên mới mang giá trị đúng bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Mục tiêu: tối đa hóa (điểm Alice − điểm Bob).",
+      en: "Each turn: choose x > 1, remove that many leftmost stones, add their SUM to your score, then place one new stone worth exactly that sum at the left end. The game ends when a single stone remains. Goal: maximize (Alice's score − Bob's score).",
+    },
+  });
+
+  // ─── Phase 1: why prefix sums ───
+  steps.push({
+    title: { vi: "Chìa khóa: gộp không đổi TỔNG TIỀN TỐ", en: "Key insight: merging never changes prefix sums" },
+    arr: original.slice(),
+    highlight: [],
+    mark: [],
+    codeLines: [],
+    vars: [
+      { name: "một nước đi", value: "= dừng gộp tại vị trí i" },
+      { name: "điểm khi dừng tại i", value: "p[i] = stones[0] + … + stones[i]" },
+    ],
+    note: {
+      vi: "Sau vài nước, hàng đá chỉ gồm các khối tiền tố đã gộp. Vì vậy mỗi nước đi thực chất là 'gộp tiếp tới chỉ số i' và ghi đúng p[i] điểm — bất kể trước đó ai gộp gì. Hãy biến mảng thành mảng tiền tố ngay từ đầu.",
+      en: "After a few moves the row only contains merged prefix blocks. So every move is really 'keep merging up to index i' and it scores exactly p[i] — no matter who merged what before. Convert the array into prefix sums right away.",
+    },
+  });
+
+  // ─── Phase 2: build prefix sums in place ───
+  const p = original.slice();
+  for (let i = 1; i < n; i++) {
+    const prev = p[i];
+    p[i] += p[i - 1];
+    steps.push({
+      title: {
+        vi: `stones[${i}] += stones[${i - 1}] → ${prev} + ${p[i - 1]} = ${p[i]}`,
+        en: `stones[${i}] += stones[${i - 1}] → ${prev} + ${p[i - 1]} = ${p[i]}`,
+      },
+      arr: p.slice(),
+      highlight: [i],
+      mark: Array.from({ length: i }, (_, k) => k),
+      codeLines: [4, 5],
+      vars: [
+        { name: "i", value: i },
+        { name: "stones[i] (mới)", value: p[i] },
+        { name: "p[i] = tổng gốc tới i", value: `${original.slice(0, i + 1).join(" + ")} = ${p[i]}` },
+      ],
+      note: {
+        vi: `Giờ stones[${i}] chính là p[${i}]: tổng của ${i + 1} viên đầu tiên. Các cột xanh lá là tiền tố đã xong.`,
+        en: `stones[${i}] now holds p[${i}]: the sum of the first ${i + 1} stones. Green bars are finished prefixes.`,
+      },
+    });
+  }
+
+  // ─── Phase 3: dp from right to left with one variable ───
+  let best = p[n - 1];
+  steps.push({
+    title: { vi: `Khởi tạo best = p[${n - 1}] = ${best}`, en: `Initialize best = p[${n - 1}] = ${best}` },
+    arr: p.slice(),
+    highlight: [n - 1],
+    mark: [],
+    codeLines: [6],
+    vars: [
+      { name: "best", value: best },
+      { name: "ý nghĩa", value: "lợi thế khi phải gộp TOÀN BỘ phần còn lại" },
+    ],
+    note: {
+      vi: `Nguỵ biện đơn giản nhất: gộp nguyên hàng trong một nước, nhận trọn p[${n - 1}] = ${best}. Đây cũng là giá trị của trạng thái cuối cùng trong quy hoạch động.`,
+      en: `The simplest scenario: merge the whole row in one move and pocket all of p[${n - 1}] = ${best}. This is also the last state of the dynamic program.`,
+    },
+  });
+
+  for (let i = n - 2; i >= 1; i--) {
+    const cand = p[i] - best;
+    const takeWins = cand > best;
+    const newBest = Math.max(best, cand);
+    steps.push({
+      title: {
+        vi: `f(${i}) = max(${best}, ${p[i]} − (${best})) = ${newBest}`,
+        en: `f(${i}) = max(${best}, ${p[i]} − (${best})) = ${newBest}`,
+      },
+      arr: p.slice(),
+      highlight: [i],
+      mark: Array.from({ length: n - 1 - i }, (_, k) => i + 1 + k),
+      codeLines: [7, 8],
+      vars: [
+        { name: "dừng tại i", value: `nhận p[${i}] = ${p[i]}` },
+        { name: "đối thủ giành lại", value: best },
+        { name: "p[i] − best", value: cand },
+        { name: "best (mới)", value: newBest },
+      ],
+      note: takeWins
+        ? {
+          vi: `Nếu dừng mũi gộp tại i: tôi nhận ${p[i]}, đối thủ giành lại tối đa ${best} ⇒ lợi thế ròng ${cand}, tốt hơn ${best} nếu không dừng ⇒ cập nhật best = ${newBest}.`,
+          en: `Stopping the merge at i: I score ${p[i]}, but my opponent recovers up to ${best} ⇒ net edge ${cand}, better than ${best} for not stopping ⇒ update best = ${newBest}.`,
+        }
+        : {
+          vi: `Dừng tại i chỉ cho ${cand} ≤ ${best}: không đáng, giữ nguyên best = ${best}.`,
+          en: `Stopping at i would yield only ${cand} ≤ ${best}: not worth it, keep best = ${best}.`,
+        },
+    });
+    best = newBest;
+  }
+
+  // ─── Phase 4: result ───
+  steps.push({
+    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
+    arr: p.slice(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "answer", value: best },
+      { name: "ý nghĩa", value: "(điểm Alice − điểm Bob) khi cả hai chơi tối ưu" },
+    ],
+    note: {
+      vi: `f(1) = ${best}: Alice phải lấy ít nhất 2 viên nên lựa chọn đầu tiên của cô ấy là dừng gộp ở chỉ số ≥ 1. Alice đảm bảo được chênh lệch ${best} và Bob không thể ép kết quả tốt hơn.`,
+      en: `f(1) = ${best}: Alice must take at least 2 stones, so her first choice is where to stop merging at an index ≥ 1. She secures a gap of ${best}, and Bob cannot force anything better.`,
+    },
+  });
+
+  return { original, answer: best, steps };
+}
+
 module.exports = {
   2771: {
     id: 2771,
@@ -20827,6 +21000,51 @@ module.exports = {
       "        return max(max_sum, circular_sum)",
     ],
     builder: buildSteps918,
+  },
+  1872: {
+    id: 1872,
+    difficulty: "hard",
+    slug: "stone-game-viii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "game", vi: "Game", en: "Game" },
+      { key: "prefix-sum", vi: "Tiền tố", en: "Prefix Sum" },
+    ],
+    title: { vi: "Stone Game VIII", en: "Stone Game VIII" },
+    titleVi: { vi: "Trò chơi đá VIII", en: "Stone game VIII" },
+    statement: {
+      vi: "Alice và Bob lần lượt chơi, Alice đi trước. Mỗi lượt, chọn x > 1 viên bên trái, cộng tổng giá trị của chúng vào điểm của mình rồi đặt một viên mới mang giá trị bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Trả về (điểm Alice − điểm Bob) khi cả hai chơi tối ưu.",
+      en: "Alice and Bob take turns, Alice first. Each turn a player picks x > 1 leftmost stones, adds their sum to their score, and places one new stone worth that sum on the left side. The game ends when exactly one stone remains. Return (Alice's score − Bob's score) under optimal play.",
+    },
+    defaultInput: [-1, 2, -3, 4, -5],
+    inputKind: "integer",
+    inputLabel: { vi: "stones (dấu phẩy)", en: "stones (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Gộp x viên đầu thành 1 viên không đổi tổng tiền tố ⇒ mỗi nước đi chỉ là 'dừng gộp tại i' và ghi p[i] điểm.", en: "Merging the first x stones into one never changes prefix sums ⇒ every move is just 'stop merging at index i' and scores p[i]." },
+      { vi: "Đổi mảng thành tiền tố tại chỗ, rồi quét từ phải sang trái với một biến: best = max(best, p[i] − best).", en: "Turn the array into prefix sums in place, then sweep right-to-left with one rolling variable: best = max(best, p[i] − best)." },
+      { vi: "Đáp án là f(1): Alice phải lấy ít nhất 2 viên nên nước đầu của cô ấy dừng ở chỉ số ≥ 1.", en: "The answer is f(1): Alice must take at least two stones, so her first stop is an index ≥ 1." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Một lượt biến đổi tiền tố và một lượt quét ngược với duy nhất biến best.",
+        en: "One prefix pass plus one reverse sweep keeping only the single variable best.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGameVIII(self, stones: List[int]) -> int:",
+      "        n = len(stones)",
+      "        for i in range(1, n):",
+      "            stones[i] += stones[i - 1]",
+      "        best = stones[-1]",
+      "        for i in range(n - 2, 0, -1):",
+      "            best = max(best, stones[i] - best)",
+      "        return best",
+    ],
+    builder: buildSteps1872,
   },
   1749: {
     id: 1749,
