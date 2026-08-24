@@ -17698,6 +17698,97 @@ function renderRotate48View(step) {
   </section>`;
 }
 
+function renderSetMatrixZeroes73View(step) {
+  const view = step.zero73View || {};
+  const vi = lang === "vi";
+  const original = Array.isArray(view.original) ? view.original : [];
+  const matrix = Array.isArray(view.matrix) ? view.matrix : original;
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const zeroRows = new Set((view.zeroRows || []).map(Number));
+  const zeroCols = new Set((view.zeroCols || []).map(Number));
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const changedCell = Array.isArray(view.changedCell) ? view.changedCell : null;
+  const phase = String(view.phase || "scan");
+  const decision = view.decision || {};
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const phaseIndex = phase === "done" ? 3 : phase === "apply" ? 2 : phase === "mark" ? 1 : 0;
+  const phases = [
+    { label: vi ? "Quét matrix" : "Scan matrix", detail: vi ? "tìm 0 gốc" : "find original zeroes" },
+    { label: vi ? "Lưu marker" : "Store markers", detail: "zero_rows / zero_cols" },
+    { label: vi ? "Đặt thành 0" : "Set to zero", detail: vi ? "hàng OR cột" : "row OR column" },
+  ].map((item, index) => {
+    const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  const markers = (indices, axis) => indices.length
+    ? indices.map((index) => `<span>${axis} = ${escapeHtml(String(index))}</span>`).join("")
+    : `<em>${vi ? "chưa có marker" : "no markers yet"}</em>`;
+  const rowMarkers = [...zeroRows].sort((a, b) => a - b);
+  const colMarkers = [...zeroCols].sort((a, b) => a - b);
+
+  let rule;
+  if (decision.kind === "init") {
+    rule = `<section class="zm73-rule continue"><small>${vi ? "BẮT ĐẦU" : "START"}</small><strong>${vi ? "Lượt 1 chỉ tìm số 0 gốc" : "Pass 1 only looks for original zeroes"}</strong><b>${vi ? "Chưa đổi ô nào trong matrix." : "No matrix cell has changed yet."}</b></section>`;
+  } else if (decision.kind === "scan") {
+    const isZero = Number(decision.value) === 0;
+    rule = `<section class="zm73-rule ${isZero ? "found" : "continue"}"><small>${vi ? "LƯỢT 1 · ĐANG ĐỌC" : "PASS 1 · READING"}</small><strong>matrix[r][c] == 0 ?</strong><b>${isZero ? (vi ? "CÓ → lưu hàng và cột" : "YES → save row and column") : (vi ? "KHÔNG → tiếp tục quét" : "NO → keep scanning")}</b></section>`;
+  } else if (decision.kind === "mark") {
+    rule = `<section class="zm73-rule found"><small>${vi ? "LƯỢT 1 · GHI MARKER" : "PASS 1 · STORE MARKERS"}</small><strong>zero_rows.add(${escapeHtml(String(decision.row))}) &nbsp; + &nbsp; zero_cols.add(${escapeHtml(String(decision.col))})</strong><b>${vi ? "Matrix chưa đổi" : "Matrix is still unchanged"}</b></section>`;
+  } else if (decision.kind === "check" || decision.kind === "apply") {
+    const rowMarked = Boolean(decision.rowMarked);
+    const colMarked = Boolean(decision.colMarked);
+    const becomesZero = decision.kind === "apply" || Boolean(decision.shouldZero);
+    rule = `<section class="zm73-rule ${becomesZero ? "zero" : "keep"}"><small>${vi ? "LƯỢT 2 · QUY TẮC OR" : "PASS 2 · OR RULE"}</small><div><span class="${rowMarked ? "true" : "false"}">r in zero_rows <b>${rowMarked ? "TRUE" : "FALSE"}</b></span><i>OR</i><span class="${colMarked ? "true" : "false"}">c in zero_cols <b>${colMarked ? "TRUE" : "FALSE"}</b></span></div><strong>${becomesZero ? (vi ? "Ít nhất một điều kiện đúng → đặt 0" : "At least one is true → set 0") : (vi ? "Cả hai sai → giữ nguyên" : "Both false → keep value")}</strong></section>`;
+  } else {
+    rule = `<section class="zm73-rule done"><small>${vi ? "HOÀN TẤT" : "COMPLETE"}</small><strong>${vi ? "Marker đã được áp dụng cho toàn bộ matrix." : "Markers have been applied to the entire matrix."}</strong><b>${vi ? "Mỗi 0 mới đều có lý do từ lượt 1" : "Every new zero has a pass-1 reason"}</b></section>`;
+  }
+
+  const cellRows = matrix.map((row, rowIndex) => row.map((value, colIndex) => {
+    const originalValue = original[rowIndex]?.[colIndex];
+    const sourceZero = originalValue === 0;
+    const rowMarked = zeroRows.has(rowIndex);
+    const colMarked = zeroCols.has(colIndex);
+    const affected = rowMarked || colMarked;
+    const active = sameCell(activeCell, rowIndex, colIndex);
+    const changed = sameCell(changedCell, rowIndex, colIndex);
+    const classes = ["zm73-cell"];
+    if (sourceZero) classes.push("source-zero");
+    if (rowMarked) classes.push("marked-row");
+    if (colMarked) classes.push("marked-col");
+    if (affected) classes.push("affected");
+    if (active) classes.push("active");
+    if (changed) classes.push("changed");
+    if (!affected) classes.push("kept");
+    const causes = [rowMarked ? (vi ? `hàng ${rowIndex}` : `row ${rowIndex}`) : "", colMarked ? (vi ? `cột ${colIndex}` : `col ${colIndex}`) : ""].filter(Boolean);
+    const tag = changed
+      ? (vi ? "VỪA → 0" : "NOW → 0")
+      : sourceZero
+        ? (vi ? "0 GỐC" : "ORIGINAL 0")
+        : affected
+          ? causes.join(" + ")
+          : (vi ? "GIỮ" : "KEEP");
+    return `<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+  }));
+
+  const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Set Matrix Zeroes: ${rowMarkers.length} hàng và ${colMarkers.length} cột đã được đánh dấu.`
+    : `Set Matrix Zeroes: ${rowMarkers.length} marked rows and ${colMarkers.length} marked columns.`;
+
+  $("treeView").innerHTML = `<section class="zm73-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="zm73-phases">${phases}</div>
+    <section class="zm73-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="zm73-markers"><header><strong>${vi ? "MARKER LƯỢT 1" : "PASS-1 MARKERS"}</strong><span>${vi ? "chỉ nhớ vị trí, chưa sửa matrix" : "remember positions; do not edit the matrix yet"}</span></header><div><section class="rows"><small>zero_rows</small><div>${markers(rowMarkers, "r")}</div></section><section class="cols"><small>zero_cols</small><div>${markers(colMarkers, "c")}</div></section></div></section>
+    ${rule}
+    <div class="zm73-layout">
+      <section class="zm73-board"><header><strong>${vi ? "MATRIX HIỆN TẠI" : "CURRENT MATRIX"}</strong><span>${rows} × ${cols}</span></header><div class="zm73-grid" style="--zm73-cols:${cols}"><span class="zm73-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="zm73-col ${zeroCols.has(col) ? "marked" : ""}">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="zm73-row ${zeroRows.has(row) ? "marked" : ""}">r=${row}</span>${(cellRows[row] || []).join("")}`).join("")}</div></section>
+      <aside class="zm73-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="source"><i></i>${vi ? "số 0 gốc" : "original zero"}</span><span class="row"><i></i>${vi ? "hàng đã đánh dấu" : "marked row"}</span><span class="col"><i></i>${vi ? "cột đã đánh dấu" : "marked column"}</span><span class="active"><i></i>${vi ? "ô đang xét" : "active cell"}</span><span class="changed"><i></i>${vi ? "ô vừa thành 0" : "just set to 0"}</span></aside>
+    </div>
+  </section>`;
+}
+
 function renderSpiral54View(step) {
   const view = step.spiral54View || {};
   const vi = lang === "vi";
@@ -19271,6 +19362,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRussian354View(step);
+  } else if (step.zero73View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSetMatrixZeroes73View(step);
   } else if (step.rotate48View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

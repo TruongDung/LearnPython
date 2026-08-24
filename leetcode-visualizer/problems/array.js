@@ -3620,37 +3620,110 @@ function buildSteps2022(input, params = {}) {
 
 /** LeetCode 73: Set Matrix Zeroes. */
 function buildSteps73(input) {
-  const matrix = parseIntegerMatrix2D(input);
-  const result = cloneMatrix2D(matrix);
+  const original = parseIntegerMatrix2D(input);
+  const result = cloneMatrix2D(original);
+  const rows = original.length;
+  const cols = original[0].length;
   const zeroRows = new Set();
   const zeroCols = new Set();
   const steps = [];
-  const markerCells = () => [
-    ...[...zeroRows].flatMap((row) => matrix[row].map((_, col) => [row, col])),
-    ...[...zeroCols].flatMap((col) => matrix.map((_, row) => [row, col])),
-  ];
+  const setText = (set) => `{${[...set].join(", ")}}`;
 
-  steps.push(matrixStep2D(matrix, { title: { vi: "Khởi tạo kích thước và marker", en: "Initialize size and markers" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${matrix.length},${matrix[0].length}` }, { name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }], note: { vi: "Ghi lại hàng và cột chứa số 0 trước khi thay đổi ma trận.", en: "Record every row and column containing a zero before changing the matrix." }, grid: { caption: "Original matrix" } }));
-  for (let row = 0; row < matrix.length; row++) for (let col = 0; col < matrix[0].length; col++) {
-    const value = matrix[row][col];
-    steps.push(matrixStep2D(matrix, { title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` }, codeLines: [5, 6, 7], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "value", value }], note: { vi: value === 0 ? "Đây là marker 0; cần lưu hàng và cột." : "Không phải 0, tiếp tục quét.", en: value === 0 ? "This is a zero marker; record its row and column." : "Not a zero; keep scanning." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Scanning" } }));
+  function snapshot({ title, phase, codeLines = [], vars = [], note, activeCell = null, changedCell = null, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      zero73View: {
+        original: cloneMatrix2D(original),
+        matrix: cloneMatrix2D(result),
+        rows,
+        cols,
+        phase,
+        activeCell,
+        changedCell,
+        zeroRows: [...zeroRows],
+        zeroCols: [...zeroCols],
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Lượt 1: quét để tìm các số 0 gốc", en: "Pass 1: scan for original zeroes" },
+    phase: "scan",
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }],
+    note: { vi: "Chỉ ghi lại vị trí 0 vào hai Set. Chưa thay đổi bất kỳ ô nào trong matrix.", en: "Only record original zeroes in two Sets. Do not change any matrix cell yet." },
+    decision: { kind: "init" },
+  });
+
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+    const value = original[row][col];
+    snapshot({
+      title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` },
+      phase: "scan",
+      codeLines: [5, 6, 7],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "value", value }, { name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+      note: { vi: value === 0 ? "Đây là số 0 gốc: cần đánh dấu cả hàng lẫn cột, nhưng vẫn chưa sửa matrix." : "Không phải 0 gốc, tiếp tục quét." , en: value === 0 ? "This is an original zero: mark both its row and column, but do not edit the matrix yet." : "Not an original zero; keep scanning." },
+      activeCell: [row, col],
+      decision: { kind: "scan", value },
+    });
     if (value === 0) {
       zeroRows.add(row);
-      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu hàng ${row}`, en: `Record row ${row}` }, codeLines: [8], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Hàng này sẽ được đặt thành 0 ở lượt hai.", en: "This row will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked row" } }));
       zeroCols.add(col);
-      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu cột ${col}`, en: `Record column ${col}` }, codeLines: [9], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Cột này sẽ được đặt thành 0 ở lượt hai.", en: "This column will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked column" } }));
+      snapshot({
+        title: { vi: `Ghi marker: hàng ${row} và cột ${col}`, en: `Record markers: row ${row} and column ${col}` },
+        phase: "mark",
+        codeLines: [8, 9],
+        vars: [{ name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+        note: { vi: `Đã lưu hàng ${row} và cột ${col}. Lượt hai sẽ dùng hai Set này để quyết định ô nào thành 0.`, en: `Saved row ${row} and column ${col}. Pass 2 will use these Sets to decide which cells become zero.` },
+        activeCell: [row, col],
+        decision: { kind: "mark", row, col },
+      });
     }
   }
-  for (let row = 0; row < result.length; row++) for (let col = 0; col < result[0].length; col++) {
+
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
     const shouldZero = zeroRows.has(row) || zeroCols.has(col);
-    steps.push(matrixStep2D(result, { title: { vi: `Kiểm tra ô (${row},${col})`, en: `Check cell (${row},${col})` }, codeLines: [10, 11, 12], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "r in zero_rows", value: zeroRows.has(row) }, { name: "c in zero_cols", value: zeroCols.has(col) }], note: { vi: shouldZero ? "Ô này thuộc hàng/cột đã đánh dấu nên sẽ đổi thành 0." : "Ô này không thuộc hàng/cột đã đánh dấu nên giữ nguyên.", en: shouldZero ? "This cell belongs to a marked row/column, so it will become 0." : "This cell is not in a marked row/column, so keep it unchanged." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Checking markers" } }));
-    if (!zeroRows.has(row) && !zeroCols.has(col)) continue;
+    snapshot({
+      title: { vi: `Kiểm tra marker cho ô (${row},${col})`, en: `Check markers for cell (${row},${col})` },
+      phase: "apply",
+      codeLines: [10, 11, 12],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "r in zero_rows", value: zeroRows.has(row) }, { name: "c in zero_cols", value: zeroCols.has(col) }],
+      note: { vi: shouldZero ? "Chỉ cần hàng HOẶC cột đã được đánh dấu là ô phải thành 0." : "Cả hàng lẫn cột đều không được đánh dấu, nên giữ nguyên giá trị." , en: shouldZero ? "A marked row OR column is enough: this cell must become zero." : "Neither row nor column is marked, so keep the value." },
+      activeCell: [row, col],
+      decision: { kind: "check", rowMarked: zeroRows.has(row), colMarked: zeroCols.has(col), shouldZero },
+    });
+    if (!shouldZero) continue;
     const before = result[row][col];
     result[row][col] = 0;
-    steps.push(matrixStep2D(result, { title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` }, codeLines: [13], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: `(${row},${col}) thuộc ${zeroRows.has(row) ? "hàng" : "cột"} đã được đánh dấu nên đổi thành 0.`, en: `(${row},${col}) belongs to a marked ${zeroRows.has(row) ? "row" : "column"}, so set it to 0.` }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Applying zero markers" } }));
+    snapshot({
+      title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` },
+      phase: "apply",
+      codeLines: [13],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+      note: { vi: `Ô này nằm trong ${zeroRows.has(row) ? `hàng ${row}` : ""}${zeroRows.has(row) && zeroCols.has(col) ? " và " : ""}${zeroCols.has(col) ? `cột ${col}` : ""} đã đánh dấu, nên đổi thành 0.`, en: `This cell is in the marked ${zeroRows.has(row) ? `row ${row}` : ""}${zeroRows.has(row) && zeroCols.has(col) ? " and " : ""}${zeroCols.has(col) ? `column ${col}` : ""}, so set it to zero.` },
+      activeCell: [row, col],
+      changedCell: [row, col],
+      decision: { kind: "apply", rowMarked: zeroRows.has(row), colMarked: zeroCols.has(col), before },
+    });
   }
-  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" }, codeLines: [14], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Mọi hàng/cột từng chứa 0 đã được đặt thành 0.", en: "Every row or column that contained a zero is now zeroed." }, grid: { pathCells: markerCells(), caption: "Final matrix" } }));
-  return { original: matrix, answer: result, steps };
+  snapshot({
+    title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" },
+    phase: "done",
+    codeLines: [14],
+    final: true,
+    vars: [{ name: "result", value: JSON.stringify(result) }],
+    note: { vi: "Mọi hàng hoặc cột có số 0 gốc đều đã thành 0. Các Set chỉ được dùng để nhớ marker của lượt một.", en: "Every row or column with an original zero is now zero. The Sets were only used to preserve pass-1 markers." },
+    decision: { kind: "done" },
+  });
+  return { original, answer: result, steps };
 }
 
 /** LeetCode 74: Search a 2D Matrix. */
