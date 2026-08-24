@@ -16543,20 +16543,47 @@ function buildSteps403(input) {
 /**
  * LeetCode 354: Russian Doll Envelopes. Sort (w asc, h desc) → LIS trên chiều cao.
  */
-function buildSteps354(input) {
-  const envs = String(input).split(";").map((p) => p.trim()).filter(Boolean)
+function parseEnvelopes354(input) {
+  return String(input).split(";").map((p) => p.trim()).filter(Boolean)
     .map((p) => p.split(",").map((v) => Number(v.trim())))
     .filter((e) => e.length === 2 && e.every(Number.isFinite))
     .slice(0, 12);
-  // Sort: width ascending, height descending for equal width.
-  const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
-  const n = sorted.length;
-  const heights = sorted.map((e) => e[1]);
+}
+
+function buildSteps354(input, params) {
+  const approach = String((params && params.approach) || "2");
+  return approach === "1" ? buildSteps354DP(input) : buildSteps354BinarySearch(input);
+}
+
+function traceEnvelope354Chain(parent, end) {
+  const chain = [];
+  const seen = new Set();
+  let current = end;
+  while (Number.isInteger(current) && current >= 0 && !seen.has(current)) {
+    seen.add(current);
+    chain.unshift(current);
+    current = parent[current];
+  }
+  return chain;
+}
+
+function buildSteps354DP(input) {
+  const envs = parseEnvelopes354(input);
+  const originalItems = envs.map(([width, height], originalIndex) => ({ width, height, originalIndex }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((a, b) => (a.width - b.width) || (b.height - a.height) || (a.originalIndex - b.originalIndex))
+    .map((item, sortedIndex) => ({ ...item, sortedIndex }));
+  const sorted = sortedItems.map((item) => [item.width, item.height]);
+  const n = sortedItems.length;
+  const heights = sortedItems.map((item) => item.height);
   const dp = new Array(n).fill(1);
+  const parent = new Array(n).fill(-1);
   const steps = [];
-  const labels = sorted.map((e) => `${e[0]}×${e[1]}`);
+  const labels = sortedItems.map((item) => `${item.width}×${item.height}`);
 
   const push = (opts) => {
+    const chainEnd = Number.isInteger(opts.chainEnd) ? opts.chainEnd : -1;
     steps.push({
       title: opts.title,
       arr: [...heights],
@@ -16565,58 +16592,361 @@ function buildSteps354(input) {
       mark: opts.mark || [],
       final: Boolean(opts.final),
       codeLines: opts.codeLines || [],
+      codeBlock: 1,
       vars: opts.vars || [],
       note: opts.note,
+      russian354View: {
+        approach: 1,
+        phase: opts.phase || "sort",
+        original: originalItems.map((item) => ({ ...item })),
+        sorted: sortedItems.map((item) => ({ ...item })),
+        heights: [...heights],
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        compareIndex: Number.isInteger(opts.compareIndex) ? opts.compareIndex : null,
+        processedCount: Number(opts.processedCount) || 0,
+        comparison: opts.comparison || null,
+        dp: [...dp],
+        parent: [...parent],
+        activeChain: chainEnd >= 0 ? traceEnvelope354Chain(parent, chainEnd) : [],
+        bestChain: Array.isArray(opts.bestChain) ? [...opts.bestChain] : [],
+        answer: opts.answer ?? null,
+      },
     });
   };
 
   push({
+    phase: "sort",
     title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
     codeLines: [3],
     highlight: [],
     note: {
-      vi: `Mẹo: sắp theo chiều RỘNG tăng dần; nếu rộng bằng nhau thì chiều CAO giảm dần (để 2 phong bì cùng rộng không thể lồng nhau → không bị đếm nhầm). Sau đó bài toán trở thành LIS NGHIÊM NGẶT trên dãy chiều cao: [${heights.join(", ")}]. dp[i] = chuỗi lồng dài nhất kết thúc tại i.`,
-      en: `Trick: sort by WIDTH ascending; for equal width sort HEIGHT descending (so same-width envelopes can't nest → no false counting). Then it becomes a STRICT LIS on heights: [${heights.join(", ")}]. dp[i] = longest nesting chain ending at i.`,
+      vi: "Sắp chiều rộng tăng dần. Khi rộng bằng nhau, xếp chiều cao giảm dần để các phong bì cùng rộng không thể cùng xuất hiện trong LIS tăng nghiêm ngặt.",
+      en: "Sort width ascending. On equal widths, sort height descending so same-width envelopes cannot both appear in a strictly increasing LIS.",
+    },
+  });
+
+  push({
+    phase: "reduce",
+    title: { vi: `Bỏ chiều rộng, giữ dãy chiều cao [${heights.join(", ")}]`, en: `Drop widths and keep heights [${heights.join(", ")}]` },
+    codeLines: [4, 5],
+    note: {
+      vi: "Sau quy tắc sort đặc biệt, LIS nghiêm ngặt trên chiều cao tương đương với chuỗi phong bì lồng nhau. Đặt dp[i] = độ dài chuỗi tốt nhất kết thúc tại phong bì i.",
+      en: "After the special sort, a strict LIS on heights is equivalent to a valid nesting chain. Let dp[i] be the best chain ending at envelope i.",
     },
   });
 
   for (let i = 0; i < n; i++) {
+    push({
+      phase: "dp-start",
+      title: { vi: `Bắt đầu i=${i}: dp[${i}] = 1`, en: `Start i=${i}: dp[${i}] = 1` },
+      codeLines: [6, 7],
+      highlight: [i],
+      currentIndex: i,
+      processedCount: i,
+      chainEnd: i,
+      vars: [{ name: "i", value: labels[i] }, { name: `dp[${i}]`, value: dp[i] }],
+      note: { vi: `${labels[i]} tự tạo một chuỗi độ dài 1. Thử mọi j < i để tìm phong bì đứng ngay trước nó.`, en: `${labels[i]} forms a length-1 chain by itself. Try every j < i as its immediate predecessor.` },
+    });
+
     for (let j = 0; j < i; j++) {
-      const extend = heights[j] < heights[i];
-      if (extend && dp[j] + 1 > dp[i]) dp[i] = dp[j] + 1;
+      const widthOk = sortedItems[j].width < sortedItems[i].width;
+      const heightOk = sortedItems[j].height < sortedItems[i].height;
+      const canNest = widthOk && heightOk;
+      const beforeDp = dp[i];
+      const candidate = canNest ? dp[j] + 1 : null;
+      const improved = canNest && candidate > beforeDp;
+      if (improved) {
+        dp[i] = candidate;
+        parent[i] = j;
+      }
       push({
-        title: { vi: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "lồng được" : "không lồng"}`, en: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "can nest" : "cannot"}` },
-        codeLines: extend ? [8, 9] : [8],
+        phase: improved ? "dp-update" : "dp-skip",
+        title: { vi: `So ${labels[j]} → ${labels[i]}: ${canNest ? (improved ? "cập nhật dp" : "lồng được nhưng không tốt hơn") : "không lồng được"}`, en: `Compare ${labels[j]} → ${labels[i]}: ${canNest ? (improved ? "update dp" : "fits but does not improve") : "cannot nest"}` },
+        codeLines: canNest ? [8, 9] : [8],
         highlight: [i],
-        mark: extend ? [j] : [],
+        mark: [j],
+        currentIndex: i,
+        compareIndex: j,
+        processedCount: i,
+        chainEnd: i,
+        comparison: {
+          inner: j,
+          outer: i,
+          widthOk,
+          heightOk,
+          canNest,
+          previousDp: beforeDp,
+          candidate,
+          improved,
+          resultDp: dp[i],
+        },
         vars: [
           { name: "i", value: `${labels[i]}` },
           { name: "j", value: `${labels[j]}` },
-          { name: "cao[j] < cao[i]?", value: extend },
+          { name: "w[j] < w[i]?", value: widthOk },
+          { name: "h[j] < h[i]?", value: heightOk },
           { name: `dp[${i}]`, value: dp[i] },
         ],
         note: {
-          vi: extend
-            ? `${labels[j]} lồng được vào ${labels[i]} (cao ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
-            : `${labels[j]} không lồng vào ${labels[i]} (cao ${heights[j]} ≥ ${heights[i]}) → bỏ qua.`,
-          en: extend
-            ? `${labels[j]} nests into ${labels[i]} (height ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
-            : `${labels[j]} cannot nest into ${labels[i]} (height ${heights[j]} ≥ ${heights[i]}) → skip.`,
+          vi: canNest
+            ? `${labels[j]} nhỏ hơn nghiêm ngặt ở cả hai chiều. Candidate = dp[${j}] + 1 = ${candidate}; ${improved ? `tốt hơn ${beforeDp}, nên parent[${i}] = ${j}` : `không vượt dp[${i}] = ${beforeDp}`}.`
+            : `Cần đồng thời ${sortedItems[j].width} < ${sortedItems[i].width} và ${sortedItems[j].height} < ${sortedItems[i].height}. Có ít nhất một điều kiện sai nên bỏ qua.`,
+          en: canNest
+            ? `${labels[j]} is strictly smaller in both dimensions. Candidate = dp[${j}] + 1 = ${candidate}; it ${improved ? `beats ${beforeDp}, so parent[${i}] = ${j}` : `does not beat dp[${i}] = ${beforeDp}`}.`
+            : `Both ${sortedItems[j].width} < ${sortedItems[i].width} and ${sortedItems[j].height} < ${sortedItems[i].height} are required. At least one condition fails, so skip.`,
         },
       });
     }
+
+    push({
+      phase: "dp-row-done",
+      title: { vi: `Chốt i=${i}: dp[${i}] = ${dp[i]}`, en: `Finish i=${i}: dp[${i}] = ${dp[i]}` },
+      codeLines: [6, 7, 8, 9],
+      highlight: [i],
+      currentIndex: i,
+      processedCount: i + 1,
+      chainEnd: i,
+      vars: [{ name: `dp[${i}]`, value: dp[i] }, { name: `parent[${i}]`, value: parent[i] }],
+      note: { vi: `Chuỗi tốt nhất kết thúc tại ${labels[i]} có ${dp[i]} phong bì.`, en: `The best chain ending at ${labels[i]} contains ${dp[i]} envelopes.` },
+    });
   }
 
   const answer = n ? Math.max(...dp) : 0;
-  const bestIdx = dp.map((v, i) => (v === answer ? i : -1)).filter((i) => i >= 0);
+  const bestEnd = n ? dp.indexOf(answer) : -1;
+  const bestChain = traceEnvelope354Chain(parent, bestEnd);
   push({
+    phase: "done",
     title: { vi: `Kết quả: max(dp) = ${answer}`, en: `Result: max(dp) = ${answer}` },
     codeLines: [10],
-    highlight: bestIdx,
-    mark: bestIdx,
+    highlight: bestChain,
+    mark: bestChain,
     final: true,
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}.`, en: `Maximum number of nested envelopes = ${answer}.` },
+    processedCount: n,
+    chainEnd: bestEnd,
+    bestChain,
+    answer,
+    vars: [{ name: "answer", value: answer }, { name: "chain", value: `[${bestChain.map((index) => labels[index]).join(" → ")}]` }],
+    note: { vi: `max(dp) = ${answer}. Đi ngược parent từ phong bì kết thúc để dựng một chuỗi lồng hợp lệ.`, en: `max(dp) = ${answer}. Follow parent pointers backward from the ending envelope to reconstruct one valid nesting chain.` },
+  });
+
+  return { original: sorted, answer, steps };
+}
+
+function buildSteps354BinarySearch(input) {
+  const envs = parseEnvelopes354(input);
+  const originalItems = envs.map(([width, height], originalIndex) => ({ width, height, originalIndex }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((a, b) => (a.width - b.width) || (b.height - a.height) || (a.originalIndex - b.originalIndex))
+    .map((item, sortedIndex) => ({ ...item, sortedIndex }));
+  const sorted = sortedItems.map((item) => [item.width, item.height]);
+  const n = sortedItems.length;
+  const heights = sortedItems.map((item) => item.height);
+  const labels = sortedItems.map((item) => `${item.width}×${item.height}`);
+  const tails = [];
+  const tailIndices = [];
+  const previous = new Array(n).fill(-1);
+  const steps = [];
+
+  const tailsSub = () => {
+    const sub = Array(Math.max(n, tails.length)).fill("");
+    tails.forEach((v, i) => { sub[i] = `L${i + 1}: ${v}`; });
+    return sub.slice(0, n);
+  };
+
+  const push = (opts) => {
+    const chainEnd = Number.isInteger(opts.chainEnd) ? opts.chainEnd : -1;
+    steps.push({
+      title: opts.title,
+      arr: [...heights],
+      sub: tailsSub(),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars: opts.vars || [],
+      note: opts.note,
+      russian354View: {
+        approach: 2,
+        phase: opts.phase || "sort",
+        original: originalItems.map((item) => ({ ...item })),
+        sorted: sortedItems.map((item) => ({ ...item })),
+        heights: [...heights],
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        processedCount: Number(opts.processedCount) || 0,
+        tails: [...tails],
+        tailIndices: [...tailIndices],
+        previous: [...previous],
+        search: opts.search || null,
+        mutation: opts.mutation || null,
+        activeChain: chainEnd >= 0 ? traceEnvelope354Chain(previous, chainEnd) : [],
+        bestChain: Array.isArray(opts.bestChain) ? [...opts.bestChain] : [],
+        answer: opts.answer ?? null,
+      },
+    });
+  };
+
+  push({
+    phase: "sort",
+    title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
+    codeLines: [5],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }, { name: "tails", value: "[]" }],
+    note: {
+      vi: "Sắp rộng tăng, nhưng cao giảm khi cùng rộng. Đây là bước bảo vệ để LIS tăng nghiêm ngặt không chọn hai phong bì có cùng chiều rộng.",
+      en: "Sort width ascending but height descending on ties. This guard prevents a strict LIS from choosing two envelopes with the same width.",
+    },
+  });
+
+  push({
+    phase: "reduce",
+    title: { vi: `Chuyển thành LIS chiều cao [${heights.join(", ")}]`, en: `Reduce to height LIS [${heights.join(", ")}]` },
+    codeLines: [6, 7],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }, { name: "tails", value: "[]" }],
+    note: {
+      vi: "tails[L-1] lưu chiều cao kết thúc NHỎ NHẤT của một chuỗi độ dài L. tails giúp đếm độ dài tối ưu, nhưng bản thân nó không nhất thiết là chuỗi phong bì thật.",
+      en: "tails[L-1] stores the SMALLEST ending height of any length-L chain. tails finds the optimal length, but its values are not necessarily one real envelope chain.",
+    },
+  });
+
+  for (let k = 0; k < n; k++) {
+    const h = heights[k];
+    const label = labels[k];
+    const before = [...tails];
+    const beforeIndices = [...tailIndices];
+    const visitedMids = [];
+
+    push({
+      phase: "lis-start",
+      title: { vi: `Xét ${label}: tìm vị trí cho h=${h}`, en: `Process ${label}: find a slot for h=${h}` },
+      codeLines: [7, 8],
+      highlight: [k],
+      currentIndex: k,
+      processedCount: k,
+      chainEnd: k,
+      search: { lo: 0, hi: tails.length, mid: null, visitedMids: [], found: tails.length === 0 ? 0 : null },
+      vars: [{ name: "envelope", value: label }, { name: "height", value: h }, { name: "tails", value: `[${tails.join(", ")}]` }],
+      note: { vi: `Dùng bisect_left để tìm ô đầu tiên có tail ≥ ${h}. Khoảng tìm kiếm ban đầu là [0, ${tails.length}).`, en: `Use bisect_left to find the first slot whose tail is >= ${h}. The initial search range is [0, ${tails.length}).` },
+    });
+
+    let lo = 0;
+    let hi = tails.length;
+    while (lo < hi) {
+      const loBefore = lo;
+      const hiBefore = hi;
+      const mid = (lo + hi) >> 1;
+      const midValue = tails[mid];
+      const moveRight = midValue < h;
+      visitedMids.push(mid);
+      if (moveRight) lo = mid + 1;
+      else hi = mid;
+
+      push({
+        phase: "binary-search",
+        title: moveRight
+          ? { vi: `tails[${mid}]=${midValue} < ${h} → lo=${lo}`, en: `tails[${mid}]=${midValue} < ${h} → lo=${lo}` }
+          : { vi: `tails[${mid}]=${midValue} ≥ ${h} → hi=${hi}`, en: `tails[${mid}]=${midValue} >= ${h} → hi=${hi}` },
+        codeLines: [8],
+        highlight: [k],
+        mark: [mid],
+        currentIndex: k,
+        processedCount: k,
+        chainEnd: k,
+        search: { loBefore, hiBefore, lo, hi, mid, midValue, target: h, moveRight, visitedMids: [...visitedMids], found: null },
+        vars: [{ name: "lo", value: `${loBefore} → ${lo}` }, { name: "mid", value: mid }, { name: "hi", value: `${hiBefore} → ${hi}` }],
+        note: moveRight
+          ? { vi: `${midValue} còn nhỏ hơn ${h}, nên mọi vị trí ≤ ${mid} đều quá nhỏ. Bỏ nửa trái.`, en: `${midValue} is still smaller than ${h}, so every slot through ${mid} is too small. Discard the left half.` }
+          : { vi: `${midValue} đã ≥ ${h}; vị trí đầu tiên hợp lệ nằm tại ${mid} hoặc bên trái.`, en: `${midValue} is already >= ${h}; the first valid slot is ${mid} or somewhere to its left.` },
+      });
+    }
+
+    const pos = lo;
+    const extended = pos === tails.length;
+    const oldValue = extended ? null : tails[pos];
+    const oldEnvelopeIndex = extended ? null : tailIndices[pos];
+
+    push({
+      phase: "position-found",
+      title: { vi: `bisect_left(tails, ${h}) = ${pos}`, en: `bisect_left(tails, ${h}) = ${pos}` },
+      codeLines: [8],
+      highlight: [k],
+      mark: pos < tails.length ? [pos] : [],
+      currentIndex: k,
+      processedCount: k,
+      chainEnd: k,
+      search: { lo, hi, mid: null, target: h, visitedMids: [...visitedMids], found: pos },
+      vars: [
+        { name: "envelope", value: label },
+        { name: "height", value: h },
+        { name: "tails", value: `[${before.join(", ")}]` },
+        { name: "i", value: pos },
+      ],
+      note: extended
+        ? { vi: `Vị trí ${pos} nằm ngay sau tails hiện tại, nên ${h} mở chuỗi dài ${pos + 1}.`, en: `Position ${pos} is just after the current tails, so ${h} opens a length-${pos + 1} chain.` }
+        : { vi: `Ô đầu tiên có tail ≥ ${h} là L${pos + 1}. Thay tail cũ để giữ kết thúc nhỏ nhất có thể.`, en: `The first tail >= ${h} is slot L${pos + 1}. Replace its old tail to keep the smallest possible ending.` },
+    });
+
+    previous[k] = pos > 0 ? tailIndices[pos - 1] : -1;
+    if (extended) tails.push(h);
+    else tails[pos] = h;
+    if (extended) tailIndices.push(k);
+    else tailIndices[pos] = k;
+
+    push({
+      phase: extended ? "tails-append" : "tails-replace",
+      title: extended
+        ? { vi: `tails.append(${h})`, en: `tails.append(${h})` }
+        : { vi: `tails[${pos}] = ${h}`, en: `tails[${pos}] = ${h}` },
+      highlight: [k],
+      mark: [pos],
+      codeLines: extended ? [9, 10] : [11, 12],
+      currentIndex: k,
+      processedCount: k + 1,
+      chainEnd: k,
+      search: { lo: pos, hi: pos, mid: null, target: h, visitedMids: [...visitedMids], found: pos },
+      mutation: {
+        type: extended ? "append" : "replace",
+        pos,
+        oldValue,
+        newValue: h,
+        oldEnvelopeIndex,
+        newEnvelopeIndex: k,
+        before,
+        after: [...tails],
+        beforeIndices,
+        afterIndices: [...tailIndices],
+      },
+      vars: [
+        { name: "tails trước", value: `[${before.join(", ")}]` },
+        { name: "tails sau", value: `[${tails.join(", ")}]` },
+        { name: "answer hiện tại", value: tails.length },
+      ],
+      note: extended
+        ? { vi: `Append ${h}: độ dài LIS tăng từ ${before.length} lên ${tails.length}. ${pos > 0 ? `Predecessor của ${label} là phong bì đang giữ tail L${pos}.` : `${label} bắt đầu một chuỗi mới.`}`, en: `Append ${h}: LIS length grows from ${before.length} to ${tails.length}. ${pos > 0 ? `The predecessor of ${label} is the envelope holding tail L${pos}.` : `${label} starts a new chain.`}` }
+        : { vi: `Thay ${oldValue} bằng ${h} tại L${pos + 1}. Độ dài giữ nguyên ${tails.length}, nhưng tail mới nhỏ hơn hoặc bằng nên dễ nối tiếp hơn.`, en: `Replace ${oldValue} with ${h} at L${pos + 1}. Length stays ${tails.length}, but the new tail is no larger and therefore easier to extend.` },
+    });
+  }
+
+  const answer = tails.length;
+  const bestEnd = answer ? tailIndices[answer - 1] : -1;
+  const bestChain = traceEnvelope354Chain(previous, bestEnd);
+  push({
+    phase: "done",
+    title: { vi: `Kết quả: len(tails) = ${answer}`, en: `Result: len(tails) = ${answer}` },
+    highlight: [],
+    mark: bestChain,
+    final: true,
+    codeLines: [13],
+    processedCount: n,
+    chainEnd: bestEnd,
+    bestChain,
+    answer,
+    vars: [
+      { name: "answer", value: answer },
+      { name: "tails", value: `[${tails.join(", ")}]` },
+      { name: "chain", value: `[${bestChain.map((index) => labels[index]).join(" → ")}]` },
+    ],
+    note: { vi: `len(tails) = ${answer}. Dùng chỉ số predecessor đã lưu để dựng một chuỗi phong bì thật; các giá trị tails riêng lẻ có thể đến từ những chuỗi khác nhau.`, en: `len(tails) = ${answer}. Stored predecessor indexes reconstruct one real envelope chain; individual tails values may come from different chains.` },
   });
 
   return { original: sorted, answer, steps };
@@ -17650,7 +17980,681 @@ function buildSteps673(nums) {
   return { original: [...arr], answer, steps };
 }
 
+function parseNums2771(value) {
+  return (Array.isArray(value) ? value : String(value ?? "").split(","))
+    .map((item) => Number(String(item).trim()))
+    .filter(Number.isFinite)
+    .slice(0, 16);
+}
+
+/**
+ * LeetCode 2771: Longest Non-decreasing Subarray From Two Arrays.
+ *
+ * Rolling DP:
+ *   dp1 = best length ending at i if we pick nums1[i]
+ *   dp2 = best length ending at i if we pick nums2[i]
+ */
+function buildSteps2771(input, params = {}) {
+  const nums1 = parseNums2771(input);
+  const nums2Raw = parseNums2771(params.nums2 ?? "1,2,1");
+  const n = Math.min(nums1.length, nums2Raw.length);
+  const a = nums1.slice(0, n);
+  const b = nums2Raw.slice(0, n);
+  const steps = [];
+  const indexes = Array.from({ length: n }, (_, i) => i);
+  const row = () => a.map((value, i) => `${i}: ${value}/${b[i]}`);
+  const values = () => a.map((value, i) => Math.max(value, b[i]));
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Input rỗng", en: "Empty input" },
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Không có phần tử nào để chọn.", en: "There is no element to choose." },
+    });
+    return { original: { nums1: a, nums2: b }, answer: 0, steps };
+  }
+
+  let dp1 = 1;
+  let dp2 = 1;
+  let answer = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo DP tại i=0", en: "Initialize DP at i=0" },
+    arr: values(),
+    sub: row(),
+    highlight: [0],
+    mark: [0],
+    codeLines: [3, 4],
+    vars: [
+      { name: "nums1", value: `[${a.join(", ")}]` },
+      { name: "nums2", value: `[${b.join(", ")}]` },
+      { name: "dp1", value: "1 (chọn nums1[0])" },
+      { name: "dp2", value: "1 (chọn nums2[0])" },
+      { name: "answer", value: 1 },
+    ],
+    note: {
+      vi: "Ở mỗi index i, ta chọn nums1[i] hoặc nums2[i]. dp1/dp2 lưu độ dài tốt nhất kết thúc tại i theo lựa chọn đó.",
+      en: "At each index i, choose nums1[i] or nums2[i]. dp1/dp2 store the best length ending at i under that choice.",
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const prevDp1 = dp1;
+    const prevDp2 = dp2;
+    let next1 = 1;
+    let next2 = 1;
+
+    const can11 = a[i] >= a[i - 1];
+    const can21 = a[i] >= b[i - 1];
+    const can12 = b[i] >= a[i - 1];
+    const can22 = b[i] >= b[i - 1];
+
+    if (can11) next1 = Math.max(next1, prevDp1 + 1);
+    if (can21) next1 = Math.max(next1, prevDp2 + 1);
+    if (can12) next2 = Math.max(next2, prevDp1 + 1);
+    if (can22) next2 = Math.max(next2, prevDp2 + 1);
+
+    dp1 = next1;
+    dp2 = next2;
+    answer = Math.max(answer, dp1, dp2);
+
+    steps.push({
+      title: { vi: `i=${i}: thử 4 cách nối`, en: `i=${i}: try 4 transitions` },
+      arr: values(),
+      sub: row(),
+      highlight: [i - 1, i],
+      mark: [i],
+      codeLines: [5, 6, 7, 8, 9, 10, 11, 12],
+      vars: [
+        { name: "prev dp1, dp2", value: `${prevDp1}, ${prevDp2}` },
+        { name: `nums1[${i}]`, value: a[i] },
+        { name: `nums2[${i}]`, value: b[i] },
+        { name: "checks", value: [
+          `${can11 ? "✓" : "x"} ${a[i]} >= ${a[i - 1]} (1→1)`,
+          `${can21 ? "✓" : "x"} ${a[i]} >= ${b[i - 1]} (2→1)`,
+          `${can12 ? "✓" : "x"} ${b[i]} >= ${a[i - 1]} (1→2)`,
+          `${can22 ? "✓" : "x"} ${b[i]} >= ${b[i - 1]} (2→2)`,
+        ].join("; ") },
+        { name: "new dp1", value: next1 },
+        { name: "new dp2", value: next2 },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Chọn nums1[${i}]=${a[i]} thì nối được từ lựa chọn trước nào <= ${a[i]} → dp1=${next1}. Chọn nums2[${i}]=${b[i]} → dp2=${next2}.`,
+        en: `Pick nums1[${i}]=${a[i]} from any previous choice <= ${a[i]} → dp1=${next1}. Pick nums2[${i}]=${b[i]} → dp2=${next2}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: values(),
+    sub: row(),
+    highlight: indexes,
+    mark: [],
+    final: true,
+    codeLines: [15],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Độ dài subarray không giảm dài nhất sau khi chọn từng cột là ${answer}.`,
+      en: `The longest non-decreasing subarray length after choosing from each column is ${answer}.`,
+    },
+  });
+
+  return { original: { nums1: a, nums2: b }, answer, steps };
+}
+
+/**
+ * LeetCode 1872: Stone Game VIII — beginner-friendly walkthrough.
+ *
+ * The steps tell a story (concrete game first, algorithm second):
+ *  1. Rules.
+ *  2. Play out ONE full optimal game with minimax: the row visibly shrinks
+ *     after each merge and both scores accumulate, ending at the answer.
+ *  3. Observation drawn from that very game: every move simply stops merging
+ *     at some original index i and scores exactly the prefix sum p[i].
+ *  4. Build prefix sums in place.
+ *  5. Fill an f table cell-by-cell right-to-left; every cell spells out both
+ *     options: stop here and bank p[i] minus what the opponent then gets
+ *     (f[i+1]), or skip this spot entirely.
+ *  6. Trace the table forward — it points at exactly the stops played in the
+ *     demo game, closing the loop between algorithm and real play.
+ *  7. Answer = f(1): Alice must merge at least 2 stones, so her first stop
+ *     is an index >= 1.
+ */
+function buildSteps1872(input) {
+  const stones = Array.isArray(input) ? input.map(Number) : [];
+  const n = stones.length;
+  const original = stones.slice();
+  const valid = n >= 2 && n <= 10 && stones.every((v) => Number.isInteger(v));
+  const steps = [];
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "answer", value: null }],
+      note: {
+        vi: "Cần mảng ít nhất 2 số nguyên (tối đa 10 viên để trực quan), ví dụ: -1,2,-3,4,-5.",
+        en: "Provide an array of at least two integers (at most 10 stones for visualization), e.g. -1,2,-3,4,-5.",
+      },
+    });
+    return { original, answer: null, steps };
+  }
+
+  // Prefix sums (computed once; phase 3 animates this same transformation).
+  const p = original.slice();
+  for (let i = 1; i < n; i++) p[i] += p[i - 1];
+
+  const blankRow = () => new Array(n).fill(null);
+  const rowItems = (values, mergedThrough = -1, takenCount = 0) => values.map((value, index) => {
+    const isMergedPrefix = mergedThrough >= 0 && index === 0;
+    const originalIndex = mergedThrough < 0 ? index : (index === 0 ? null : mergedThrough + index);
+    return {
+      value,
+      label: isMergedPrefix ? `sum[0..${mergedThrough}]` : `stones[${originalIndex}]`,
+      originalIndex,
+      mergedThrough: isMergedPrefix ? mergedThrough : null,
+      taken: index < takenCount,
+    };
+  });
+  const makeView = (overrides = {}) => ({
+    phase: "rules",
+    stones: original.slice(),
+    gameRow: rowItems(original),
+    mover: null,
+    aliceScore: 0,
+    bobScore: 0,
+    currentMove: null,
+    moveLog: [],
+    prefix: blankRow(),
+    prefixReady: [],
+    dp: blankRow(),
+    currentIndex: null,
+    choice: null,
+    traceStops: [],
+    answer: null,
+    ...overrides,
+  });
+
+  // ─── Minimax on the real game (rows are tiny): margin of the player to move ───
+  const marginMemo = new Map();
+  function bestMargin(row) {
+    if (row.length === 1) return 0;
+    const key = row.join("|");
+    if (marginMemo.has(key)) return marginMemo.get(key);
+    let acc = 0;
+    const sums = row.map((v) => (acc += v));
+    let m = -Infinity;
+    for (let x = 2; x <= row.length; x++) {
+      m = Math.max(m, sums[x - 1] - bestMargin([sums[x - 1], ...row.slice(x)]));
+    }
+    marginMemo.set(key, m);
+    return m;
+  }
+
+  function bestMove(row) {
+    let acc = 0;
+    const sums = row.map((v) => (acc += v));
+    let margin = -Infinity;
+    let pickX = row.length;
+    for (let x = 2; x <= row.length; x++) {
+      const value = sums[x - 1] - bestMargin([sums[x - 1], ...row.slice(x)]);
+      if (value > margin) {
+        margin = value;
+        pickX = x;
+      }
+    }
+    return { x: pickX, sum: sums[pickX - 1] };
+  }
+
+  // ─── Phase 0: rules ───
+  steps.push({
+    title: { vi: "Luật chơi", en: "How the game works" },
+    arr: original.slice(),
+    highlight: [],
+    mark: [0],
+    codeLines: [1, 2, 3],
+    stoneGame1872View: makeView({ phase: "rules" }),
+    vars: [
+      { name: "stones", value: JSON.stringify(original) },
+      { name: "nước đi", value: "lấy x > 1 viên từ TRÁI" },
+      { name: "điểm", value: "+ tổng các viên lấy" },
+    ],
+    note: {
+      vi: "Mỗi lượt: chọn x > 1, lấy x viên bên trái, cộng TỔNG của chúng vào điểm của mình, rồi đặt 1 viên mới mang giá trị đúng bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Đáp án bài toán = điểm Alice − điểm Bob. Ngay bước sau, ta sẽ chơi thử trọn một ván tối ưu!",
+      en: "Each turn: choose x > 1, remove that many leftmost stones, add their SUM to your score, then place one new stone worth exactly that sum at the left end. The game ends when a single stone remains. The answer = Alice's score − Bob's score. Next up: we play one full optimal game!",
+    },
+  });
+
+  // ─── Phase 1: play out one optimal game (minimax principal variation) ───
+  let row = original.slice();
+  let aliceScore = 0;
+  let bobScore = 0;
+  const moves = [];
+  while (row.length > 1) {
+    const mover = moves.length % 2 === 0 ? "Alice" : "Bob";
+    const mv = bestMove(row);
+    const taken = row.slice(0, mv.x);
+    const prevCut = moves.length ? moves[moves.length - 1].idx : -1;
+    const stopIdx = prevCut < 0 ? mv.x - 1 : prevCut + mv.x - 1;
+    const currentMove = { mover, x: mv.x, taken: taken.slice(), sum: mv.sum, idx: stopIdx };
+    steps.push({
+      title: {
+        vi: `${mover} lấy ${mv.x} viên đầu: ${taken.join(" + ")} = ${mv.sum} điểm`,
+        en: `${mover} takes the first ${mv.x} stones: ${taken.join(" + ")} = ${mv.sum} points`,
+      },
+      arr: row.slice(),
+      highlight: Array.from({ length: mv.x }, (_, k) => k),
+      mark: [],
+      codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "game-move",
+        gameRow: rowItems(row, prevCut, mv.x),
+        mover,
+        aliceScore,
+        bobScore,
+        currentMove,
+        moveLog: moves.map((move) => ({ ...move })),
+      }),
+      vars: [
+        { name: "người đi", value: mover },
+        { name: "điểm vừa nhận", value: mv.sum },
+      ],
+      note: {
+        vi: `${mover} gộp ${mv.x} viên được tô sáng. Đây là nước tối ưu của ${mover} ở tình thế này — thuật toán bên dưới sẽ chỉ ra CÁCH tìm ra nước đó.`,
+        en: `${mover} merges the highlighted ${mv.x} stones. This is ${mover}'s optimal move in this position — the algorithm below will show HOW such a move is found.`,
+      },
+    });
+    if (mover === "Alice") aliceScore += mv.sum;
+    else bobScore += mv.sum;
+    row = [mv.sum, ...row.slice(mv.x)];
+    moves.push({ ...currentMove, aliceScore, bobScore });
+    steps.push({
+      title: {
+        vi: `Hàng mới có ${row.length} viên: [${row.join(", ")}]`,
+        en: `New row has ${row.length} stones: [${row.join(", ")}]`,
+      },
+      arr: row.slice(),
+      highlight: [],
+      mark: [0],
+      codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "game-merge",
+        gameRow: rowItems(row, stopIdx),
+        mover,
+        aliceScore,
+        bobScore,
+        currentMove,
+        moveLog: moves.map((move) => ({ ...move })),
+      }),
+      vars: [
+        { name: "điểm Alice", value: aliceScore },
+        { name: "điểm Bob", value: bobScore },
+        { name: "hàng đá", value: `[${row.join(", ")}]` },
+      ],
+      note: {
+        vi: `Viên mới giá trị ${mv.sum} đứng đầu hàng. Tổng cả hàng KHÔNG đổi — chỉ có chủ sở hữu điểm là thay đổi.`,
+        en: `The new stone worth ${mv.sum} now leads the row. The grand total never changes — only who owns the points does.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: {
+      vi: `Hết ván! Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}`,
+      en: `Game over! Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}`,
+    },
+    arr: row.slice(),
+    highlight: [],
+    mark: [],
+    codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "game-over",
+      gameRow: rowItems(row, n - 1),
+      aliceScore,
+      bobScore,
+      moveLog: moves.map((move) => ({ ...move })),
+      answer: aliceScore - bobScore,
+    }),
+    vars: [
+      { name: "điểm Alice", value: aliceScore },
+      { name: "điểm Bob", value: bobScore },
+      { name: "chênh lệch", value: aliceScore - bobScore },
+    ],
+    note: {
+      vi: `Chênh lệch ${aliceScore - bobScore} chính là con số đề bài hỏi (khi cả hai chơi tối ưu). Nhưng máy tính không thể thử mọi nước với n lớn — cần thuật toán thông minh hơn.`,
+      en: `The gap ${aliceScore - bobScore} is exactly what the problem asks for (both playing optimally). But a computer cannot brute-force every move for large n — we need something smarter.`,
+    },
+  });
+
+  // ─── Phase 2: bridge — each move was just "stop at index i, take p[i]" ───
+  steps.push({
+    title: { vi: "Quan sát lại: mỗi nước ghi đúng một tổng tiền tố", en: "Look back: every move scores exactly one prefix sum" },
+    arr: original.slice(),
+    highlight: moves.map((m) => m.idx),
+    mark: [],
+    codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "bridge",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+    }),
+    vars: moves.map((m, k) => ({
+      name: `nước ${k + 1} (${k % 2 === 0 ? "Alice" : "Bob"})`,
+      value: `dừng tại i=${m.idx} → +p[${m.idx}] = ${m.sum}`,
+    })),
+    note: {
+      vi: "Gộp tới chỉ số i thì nhận đúng p[i] = stones[0] + … + stones[i], bất kể trước đó ai gộp gì. Vậy thay vì mô phỏng hàng đá biến đổi, ta chỉ cần mảng TIỀN TỐ và luân phiên chọn điểm dừng.",
+      en: "Merging up to index i scores exactly p[i] = stones[0] + … + stones[i], regardless of earlier merges. So instead of simulating a shrinking row, we only need PREFIX SUMS plus players alternately picking stop positions.",
+    },
+  });
+
+  // ─── Phase 3: build prefix sums in place ───
+  const disp = original.slice();
+  steps.push({
+    title: { vi: `Bắt đầu tiền tố: p[0] = stones[0] = ${disp[0]}`, en: `Prefix base: p[0] = stones[0] = ${disp[0]}` },
+    arr: disp.slice(),
+    highlight: [0],
+    mark: [0],
+    codeLines: [3, 4],
+    stoneGame1872View: makeView({
+      phase: "prefix",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: [disp[0], ...new Array(n - 1).fill(null)],
+      prefixReady: [0],
+      currentIndex: 0,
+    }),
+    vars: [
+      { name: "p[0]", value: disp[0] },
+      { name: "ý nghĩa", value: "tổng 1 viên đầu tiên" },
+    ],
+    note: {
+      vi: "Phần tử đầu tiên tự nó đã là một tổng tiền tố. Vì vậy vòng lặp chỉ cần bắt đầu từ i = 1.",
+      en: "The first element is already a prefix sum by itself, so the loop only needs to start at i = 1.",
+    },
+  });
+  for (let i = 1; i < n; i++) {
+    const before = disp[i];
+    disp[i] += disp[i - 1];
+    steps.push({
+      title: {
+        vi: `stones[${i}] += stones[${i - 1}] → ${before} + ${disp[i - 1]} = ${disp[i]}`,
+        en: `stones[${i}] += stones[${i - 1}] → ${before} + ${disp[i - 1]} = ${disp[i]}`,
+      },
+      arr: disp.slice(),
+      highlight: [i],
+      mark: Array.from({ length: i }, (_, k) => k),
+      codeLines: [4, 5],
+      stoneGame1872View: makeView({
+        phase: "prefix",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: disp.map((value, index) => index <= i ? value : null),
+        prefixReady: Array.from({ length: i + 1 }, (_, index) => index),
+        currentIndex: i,
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: "stones[i] (mới)", value: disp[i] },
+        { name: "p[i] = tổng gốc tới i", value: `${original.slice(0, i + 1).join(" + ")} = ${disp[i]}` },
+      ],
+      note: {
+        vi: `Giờ stones[${i}] chính là p[${i}]: tổng của ${i + 1} viên đầu tiên. Các cột xanh lá là tiền tố đã xong.`,
+        en: `stones[${i}] now holds p[${i}]: the sum of the first ${i + 1} stones. Green bars are finished prefixes.`,
+      },
+    });
+  }
+
+  // ─── Phase 4: fill the f table cell-by-cell, right to left ───
+  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
+  const f = new Array(n).fill(null);
+  f[n - 1] = p[n - 1];
+  steps.push({
+    title: { vi: `Ô đầu tiên của bảng: f[${n - 1}] = p[${n - 1}] = ${fmt(p[n - 1])}`, en: `First table cell: f[${n - 1}] = p[${n - 1}] = ${p[n - 1]}` },
+    arr: p.slice(),
+    highlight: [n - 1],
+    mark: [],
+    codeLines: [6],
+    stoneGame1872View: makeView({
+      phase: "dp-base",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      currentIndex: n - 1,
+      choice: { kind: "base", result: f[n - 1] },
+    }),
+    vars: [
+      { name: `f[${n - 1}]`, value: p[n - 1] },
+      { name: "ý nghĩa f(i)", value: "lợi thế tối đa của NGƯỜI SẮP ĐI khi nước kế phải dừng từ i trở đi" },
+    ],
+    note: {
+      vi: `Ta điền bảng f từ phải sang trái. Ô xa nhất: nếu nước kế buộc phải gộp HẾT phần còn lại, người sắp đi ngân trọn p[${n - 1}] = ${fmt(p[n - 1])}.`,
+      en: `We fill table f right-to-left. The furthest cell: if the next move must merge EVERYTHING left, the player to move pockets all of p[${n - 1}] = ${p[n - 1]}.`,
+    },
+  });
+
+  for (let i = n - 2; i >= 1; i--) {
+    const optStop = p[i] - f[i + 1];
+    const optSkip = f[i + 1];
+    f[i] = Math.max(optSkip, optStop);
+    steps.push({
+      title: {
+        vi: `Ô f[${i}]: max(dừng ${fmt(optStop)}, bỏ qua ${fmt(optSkip)}) = ${fmt(f[i])}`,
+        en: `Cell f[${i}]: max(stop ${optStop}, skip ${optSkip}) = ${f[i]}`,
+      },
+      arr: p.slice(),
+      highlight: [i],
+      mark: Array.from({ length: n - 1 - i }, (_, k) => i + 1 + k),
+      codeLines: [7, 8],
+      stoneGame1872View: makeView({
+        phase: "dp",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: p.slice(),
+        prefixReady: Array.from({ length: n }, (_, index) => index),
+        dp: f.slice(),
+        currentIndex: i,
+        choice: {
+          kind: "compare",
+          take: optStop,
+          skip: optSkip,
+          prefixValue: p[i],
+          opponentBest: f[i + 1],
+          result: f[i],
+          picked: optStop === optSkip ? "tie" : optStop > optSkip ? "take" : "skip",
+        },
+      }),
+      vars: [
+        { name: `A · dừng ngay tại ${i}`, value: `tôi +${fmt(p[i])}, đối thủ giành f[${i + 1}]=${fmt(f[i + 1])} ⇒ hiệu ${fmt(optStop)}` },
+        { name: `B · bỏ qua ${i}`, value: `cơ hội vẫn chờ bên phải ⇒ ${fmt(optSkip)}` },
+        { name: `f[${i}] (max A,B)`, value: f[i] },
+      ],
+      note: {
+        vi: `Người sắp đi chỉ có hai kiểu lựa chọn. A) DỪNG tại đây: ngân trọn p[${i}] = ${fmt(p[i])}; phần còn lại thành ván riêng của đối thủ đáng giá f[${i + 1}] = ${fmt(f[i + 1])} cho họ ⇒ hiệu của tôi ${fmt(optStop)}. B) BỎ QUA: quyết định sau, coi như vị trí này không tồn tại ⇒ ${fmt(optSkip)}. Lấy max.`,
+        en: `The player to move has only two kinds of choices. A) STOP here: bank all of p[${i}] = ${p[i]}; the rest becomes the opponent's own game worth f[${i + 1}] = ${f[i + 1]} to them ⇒ my net ${optStop}. B) SKIP: decide later, play as if this spot does not exist ⇒ ${optSkip}. Take the max.`,
+      },
+    });
+  }
+
+  // ─── Phase 5: trace back — the table points at exactly the played moves ───
+  let prevIdx = -1;
+  let turn = 0;
+  const traceStops = [];
+  while (prevIdx < n - 1) {
+    const who = turn === 0 ? "Alice" : "Bob";
+    const lo = prevIdx === -1 ? 1 : prevIdx + 1;
+    let bestJ = lo;
+    let bestVal = -Infinity;
+    for (let j = lo; j <= n - 1; j++) {
+      const opp = j === n - 1 ? 0 : f[j + 1];
+      if (p[j] - opp > bestVal) {
+        bestVal = p[j] - opp;
+        bestJ = j;
+      }
+    }
+    const oppBest = bestJ === n - 1 ? 0 : f[bestJ + 1];
+    const simK = turn < moves.length ? moves[turn] : null;
+    traceStops.push(bestJ);
+    steps.push({
+      title: {
+        vi: `${who} tra bảng → dừng tại ${bestJ}: ngân +${fmt(p[bestJ])}`,
+        en: `${who} reads the table → stop at ${bestJ}: banks ${p[bestJ]}`,
+      },
+      arr: p.slice(),
+      highlight: [bestJ],
+      mark: prevIdx === -1 ? [] : [prevIdx],
+      codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "trace",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: p.slice(),
+        prefixReady: Array.from({ length: n }, (_, index) => index),
+        dp: f.slice(),
+        currentIndex: bestJ,
+        mover: who,
+        traceStops: traceStops.slice(),
+        choice: {
+          kind: "trace",
+          take: bestVal,
+          prefixValue: p[bestJ],
+          opponentBest: oppBest,
+          result: bestVal,
+          picked: "take",
+        },
+      }),
+      vars: [
+        { name: `${who} nhận`, value: `p[${bestJ}] = ${fmt(p[bestJ])}` },
+        { name: "đối thủ giành tối đa", value: oppBest === 0 && bestJ === n - 1 ? "hết ván (0)" : `f[${bestJ + 1}] = ${fmt(oppBest)}` },
+        { name: "hiệu số cho người đi", value: fmt(bestVal) },
+      ],
+      note: {
+        vi: `${who} quét các điểm dừng khả dĩ từ ${lo} và chọn chỗ cho ${fmt(bestVal)} — cao nhất. ${
+          simK && simK.idx === bestJ ? `Đúng là nước ${who} đã chơi ở ván mô phỏng đầu bài!` : ""
+        }`,
+        en: `${who} scans feasible stops from ${lo} and picks the one worth ${bestVal} — the highest. ${
+          simK && simK.idx === bestJ ? `Exactly the move ${who} made in the demo game earlier!` : ""
+        }`,
+      },
+    });
+    prevIdx = bestJ;
+    turn += 1;
+  }
+  steps.push({
+    title: { vi: "Bảng f đã chỉ lại đúng ván chơi!", en: "The f table reproduced the exact game!" },
+    arr: p.slice(),
+    highlight: moves.map((m) => m.idx),
+    mark: [],
+    codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "trace-done",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      traceStops: traceStops.slice(),
+    }),
+    vars: [
+      { name: "điểm dừng tìm được", value: `[${moves.map((m) => m.idx).join(", ")}]` },
+      { name: "ván mô phỏng đầu bài", value: `dừng tại [${moves.map((m) => m.idx).join(", ")}]` },
+    ],
+    note: {
+      vi: "Hai cách hoàn toàn khác nhau — chơi thật từng nước vs điền bảng rồi tra ngược — dẫn tới cùng một lối chơi tối ưu. Đây là bằng chứng trực quan rằng bảng f thực sự mô tả trò chơi.",
+      en: "Two completely different routes — playing the game move-by-move vs filling a table then reading it backwards — lead to the very same optimal line. Visual proof that the f table truly captures the game.",
+    },
+  });
+
+  // ─── Phase 6: result ───
+  steps.push({
+    title: { vi: `Kết quả: f(1) = ${f[1]}`, en: `Result: f(1) = ${f[1]}` },
+    arr: p.slice(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [9],
+    stoneGame1872View: makeView({
+      phase: "done",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      traceStops: traceStops.slice(),
+      answer: f[1],
+      aliceScore,
+      bobScore,
+    }),
+    vars: [
+      { name: "answer", value: f[1] },
+      { name: "ván mô phỏng đầu bài", value: `Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}` },
+    ],
+    note: {
+      vi: `Đáp án là ô f(1): nước đầu tiên của Alice phải lấy ít nhất 2 viên, tức dừng ở chỉ số ≥ 1. Thuật toán trả về ${f[1]}, trùng khớp chênh lệch ván mô phỏng (Alice ${aliceScore}, Bob ${bobScore}).`,
+      en: `The answer is cell f(1): Alice's first move must take at least 2 stones, i.e. stop at an index ≥ 1. The algorithm returns ${f[1]}, matching the simulated gap (Alice ${aliceScore}, Bob ${bobScore}).`,
+    },
+  });
+
+  return { original, answer: f[1], steps };
+}
+
 module.exports = {
+  2771: {
+    id: 2771,
+    difficulty: "medium",
+    slug: "longest-non-decreasing-subarray-from-two-arrays",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Longest Non-decreasing Subarray From Two Arrays", en: "Longest Non-decreasing Subarray From Two Arrays" },
+    titleVi: { vi: "Subarray không giảm dài nhất từ hai mảng", en: "Longest non-decreasing subarray from two arrays" },
+    statement: {
+      vi: "Cho nums1 và nums2 cùng độ dài. Tạo nums3 bằng cách tại mỗi i chọn nums1[i] hoặc nums2[i]. Trả về độ dài subarray liên tiếp không giảm dài nhất có thể.",
+      en: "Given nums1 and nums2 with equal length. Build nums3 by choosing nums1[i] or nums2[i] at each index. Return the longest possible non-decreasing contiguous subarray length.",
+    },
+    defaultInput: [2, 3, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums1 (dấu phẩy)", en: "nums1 (comma-separated)" },
+    extraParams: [
+      { key: "nums2", label: { vi: "nums2 (dấu phẩy)", en: "nums2 (comma-separated)" }, type: "string", default: "1,2,1" },
+    ],
+    approach: [
+      { vi: "dp1 = độ dài tốt nhất kết thúc tại i nếu chọn nums1[i]; dp2 = nếu chọn nums2[i].", en: "dp1 = best length ending at i if choosing nums1[i]; dp2 = if choosing nums2[i]." },
+      { vi: "Từ i-1 sang i, thử 4 cạnh nối: 1→1, 2→1, 1→2, 2→2 nếu giá trị không giảm.", en: "From i-1 to i, try four transitions: 1→1, 2→1, 1→2, 2→2 when values are non-decreasing." },
+      { vi: "Mỗi i chỉ cần trạng thái trước đó nên rolling DP dùng O(1) space.", en: "Each i only needs the previous states, so rolling DP uses O(1) space." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Mỗi index kiểm tra 4 chuyển tiếp cố định.", en: "Each index checks four fixed transitions." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxNonDecreasingLength(self, nums1, nums2):",
+      "        dp1 = dp2 = 1",
+      "        answer = 1",
+      "        for i in range(1, len(nums1)):",
+      "            next1 = next2 = 1",
+      "            if nums1[i] >= nums1[i - 1]:",
+      "                next1 = max(next1, dp1 + 1)",
+      "            if nums1[i] >= nums2[i - 1]:",
+      "                next1 = max(next1, dp2 + 1)",
+      "            if nums2[i] >= nums1[i - 1]:",
+      "                next2 = max(next2, dp1 + 1)",
+      "            if nums2[i] >= nums2[i - 1]:",
+      "                next2 = max(next2, dp2 + 1)",
+      "            dp1, dp2 = next1, next2",
+      "            answer = max(answer, dp1, dp2)",
+      "        return answer",
+    ],
+    builder: buildSteps2771,
+  },
   879: {
     id: 879,
     difficulty: "hard",
@@ -17771,8 +18775,32 @@ module.exports = {
     defaultInput: "5,4;6,4;6,7;2,3",
     inputKind: "string",
     inputLabel: { vi: "envelopes (w,h; ...)", en: "envelopes (w,h; ...)" },
-    extraParams: [],
-    complexity: { time: "O(n²)", space: "O(n)", note: { vi: "Sắp xếp rồi LIS O(n²) (có thể O(n log n)).", en: "Sort then O(n²) LIS (can be O(n log n))." } },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "2",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" } },
+          { value: "2", label: { vi: "Cách 2: Binary Search O(n log n)", en: "Approach 2: Binary Search O(n log n)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Điều kiện lồng là nghiêm ngặt ở CẢ HAI chiều: w nhỏ hơn và h nhỏ hơn; bằng nhau ở một chiều cũng không hợp lệ.", en: "Nesting is strict in BOTH dimensions: width and height must both be smaller; equality in either dimension is invalid." },
+      { vi: "Sort theo (width tăng, height giảm). Height giảm khi width bằng nhau là bước then chốt để LIS không đếm nhầm hai phong bì cùng rộng.", en: "Sort by (width ascending, height descending). Descending heights on width ties are the key guard against counting equal-width envelopes." },
+      { vi: "Cách 1 — DP O(n²): dp[i] là chuỗi dài nhất kết thúc tại i; thử mọi j<i và cập nhật dp[i] = max(dp[i], dp[j]+1) khi j lồng vào i.", en: "Approach 1 — O(n²) DP: dp[i] is the longest chain ending at i; try every j<i and update dp[i] = max(dp[i], dp[j]+1) when j fits i." },
+      { vi: "Cách 2 — O(n log n): tails[L-1] là chiều cao kết thúc nhỏ nhất của chuỗi dài L; bisect_left tìm tail đầu tiên ≥ h để append hoặc thay thế.", en: "Approach 2 — O(n log n): tails[L-1] is the smallest ending height of a length-L chain; bisect_left finds the first tail >= h to append or replace." },
+    ],
+    complexity: {
+      time: "O(n²) / O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Cách tối ưu: sort O(n log n), mỗi chiều cao binary search trong tails O(log n).",
+        en: "Optimized: sort O(n log n), then binary-search each height in tails in O(log n).",
+      },
+    },
     code: [
       "class Solution:",
       "    def maxEnvelopes(self, envelopes):",
@@ -17785,6 +18813,23 @@ module.exports = {
       "                    dp[i] = max(dp[i], dp[j] + 1)",
       "        return max(dp) if n else 0",
     ],
+    code2: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def maxEnvelopes(self, envelopes):",
+      "        envelopes.sort(key=lambda e: (e[0], -e[1]))",
+      "        tails = []",
+      "        for _, h in envelopes:",
+      "            i = bisect_left(tails, h)",
+      "            if i == len(tails):",
+      "                tails.append(h)",
+      "            else:",
+      "                tails[i] = h",
+      "        return len(tails)",
+    ],
+    codeLabel: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" },
+    code2Label: { vi: "Cách 2: Binary Search O(n log n)", en: "Approach 2: Binary Search O(n log n)" },
     builder: buildSteps354,
   },
   1000: {
@@ -20491,6 +21536,51 @@ module.exports = {
       "        return max(max_sum, circular_sum)",
     ],
     builder: buildSteps918,
+  },
+  1872: {
+    id: 1872,
+    difficulty: "hard",
+    slug: "stone-game-viii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "game", vi: "Game", en: "Game" },
+      { key: "prefix-sum", vi: "Tiền tố", en: "Prefix Sum" },
+    ],
+    title: { vi: "Stone Game VIII", en: "Stone Game VIII" },
+    titleVi: { vi: "Trò chơi đá VIII", en: "Stone game VIII" },
+    statement: {
+      vi: "Alice và Bob lần lượt chơi, Alice đi trước. Mỗi lượt, chọn x > 1 viên bên trái, cộng tổng giá trị của chúng vào điểm của mình rồi đặt một viên mới mang giá trị bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Trả về (điểm Alice − điểm Bob) khi cả hai chơi tối ưu.",
+      en: "Alice and Bob take turns, Alice first. Each turn a player picks x > 1 leftmost stones, adds their sum to their score, and places one new stone worth that sum on the left side. The game ends when exactly one stone remains. Return (Alice's score − Bob's score) under optimal play.",
+    },
+    defaultInput: [-1, 2, -3, 4, -5],
+    inputKind: "integer",
+    inputLabel: { vi: "stones (dấu phẩy)", en: "stones (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Gộp x viên đầu thành 1 viên không đổi tổng tiền tố ⇒ mỗi nước đi chỉ là 'dừng gộp tại i' và ghi p[i] điểm.", en: "Merging the first x stones into one never changes prefix sums ⇒ every move is just 'stop merging at index i' and scores p[i]." },
+      { vi: "Đổi mảng thành tiền tố tại chỗ, rồi quét từ phải sang trái với một biến: best = max(best, p[i] − best).", en: "Turn the array into prefix sums in place, then sweep right-to-left with one rolling variable: best = max(best, p[i] − best)." },
+      { vi: "Đáp án là f(1): Alice phải lấy ít nhất 2 viên nên nước đầu của cô ấy dừng ở chỉ số ≥ 1.", en: "The answer is f(1): Alice must take at least two stones, so her first stop is an index ≥ 1." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Một lượt biến đổi tiền tố và một lượt quét ngược với duy nhất biến best.",
+        en: "One prefix pass plus one reverse sweep keeping only the single variable best.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGameVIII(self, stones: List[int]) -> int:",
+      "        n = len(stones)",
+      "        for i in range(1, n):",
+      "            stones[i] += stones[i - 1]",
+      "        best = stones[-1]",
+      "        for i in range(n - 2, 0, -1):",
+      "            best = max(best, stones[i] - best)",
+      "        return best",
+    ],
+    builder: buildSteps1872,
   },
   1749: {
     id: 1749,

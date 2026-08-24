@@ -2064,6 +2064,137 @@ function buildSteps84(inputHeights) {
   return { original: [...heights], answer: maxArea, steps };
 }
 
+/** LeetCode 85: Maximal Rectangle — row histograms + monotonic stack. */
+function buildSteps85(input) {
+  const matrix = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => (row.includes(",") ? row.split(",") : [...row]).map((cell) => String(cell).trim()));
+  if (!matrix.length || !matrix[0].length) throw new Error("Enter a binary matrix, e.g. 1,0,1,0,0;1,0,1,1,1");
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const heights = new Array(cols).fill(0);
+  const steps = [];
+  let maxArea = 0;
+  let bestRect = null;
+
+  function rectCells(rect) {
+    if (!rect) return [];
+    const cells = [];
+    for (let r = rect.top; r <= rect.bottom; r++) {
+      for (let c = rect.left; c <= rect.right; c++) cells.push([r, c]);
+    }
+    return cells;
+  }
+
+  function push({ title, codeLines, row = null, col = null, stack = [], popped = null, candidate = null, final = false, vars = [], note }) {
+    const gridStep = matrixStep2D(matrix, {
+      title,
+      codeLines,
+      final,
+      vars: [
+        { name: "heights", value: `[${heights.join(",")}]` },
+        { name: "stack", value: `[${stack.map((i) => `${i}:${i < cols ? heights[i] : 0}`).join(", ")}]` },
+        { name: "max_area", value: maxArea },
+        ...vars,
+      ],
+      note,
+      grid: {
+        hlCell: Number.isInteger(row) && Number.isInteger(col) ? [row, col] : null,
+        pathCells: candidate ? rectCells(candidate) : rectCells(bestRect),
+        caption: "Binary matrix",
+      },
+    });
+    gridStep.arr = [...heights];
+    gridStep.sub = heights.map((_, index) => `[${index}]`);
+    gridStep.highlight = [];
+    if (Number.isInteger(col) && col < cols) gridStep.highlight.push(col);
+    if (Number.isInteger(popped) && popped < cols) gridStep.highlight.push(popped);
+    gridStep.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, offset) => bestRect.left + offset) : [];
+    steps.push(gridStep);
+  }
+
+  push({
+    title: { vi: "Khởi tạo heights = 0", en: "Initialize heights = 0" },
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
+    note: { vi: "Mỗi hàng biến thành một histogram: heights[c] là số lượng '1' liên tiếp kết thúc tại hàng hiện tại.", en: "Each row becomes a histogram: heights[c] is the count of consecutive 1s ending at the current row." },
+  });
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      heights[c] = matrix[r][c] === "1" ? heights[c] + 1 : 0;
+      push({
+        title: { vi: `Cập nhật heights[${c}] tại hàng ${r}`, en: `Update heights[${c}] at row ${r}` },
+        codeLines: [5, 6, 7],
+        row: r,
+        col: c,
+        vars: [{ name: "matrix[r][c]", value: matrix[r][c] }],
+        note: { vi: matrix[r][c] === "1" ? "Gặp 1 nên tăng chiều cao histogram." : "Gặp 0 nên reset chiều cao về 0.", en: matrix[r][c] === "1" ? "A 1 extends the histogram height." : "A 0 resets the height to 0." },
+      });
+    }
+
+    const stack = [];
+    const bars = [...heights, 0];
+    push({
+      title: { vi: `Xử lý histogram của hàng ${r}`, en: `Process row ${r}'s histogram` },
+      codeLines: [8, 9],
+      row: r,
+      vars: [{ name: "row", value: r }],
+      note: { vi: "Thêm cột lính canh 0 ở cuối để xả stack.", en: "Append a sentinel 0 bar to flush the stack." },
+    });
+
+    for (let i = 0; i <= cols; i++) {
+      while (stack.length && bars[stack[stack.length - 1]] >= bars[i]) {
+        const top = stack.pop();
+        const height = bars[top];
+        const left = stack.length ? stack[stack.length - 1] + 1 : 0;
+        const right = i - 1;
+        const width = right - left + 1;
+        const area = height * width;
+        const candidate = height > 0 ? { top: r - height + 1, bottom: r, left, right } : null;
+        if (area > maxArea) {
+          maxArea = area;
+          bestRect = candidate;
+        }
+        push({
+          title: { vi: `Pop cột ${top}: area=${area}`, en: `Pop column ${top}: area=${area}` },
+          codeLines: [10, 11, 12, 13, 14],
+          row: r,
+          col: i < cols ? i : null,
+          stack,
+          popped: top,
+          candidate,
+          vars: [
+            { name: "height", value: height },
+            { name: "left..right", value: `${left}..${right}` },
+            { name: "area", value: area },
+          ],
+          note: { vi: `Cột ${i === cols ? "sentinel" : i} thấp hơn/bằng, nên ${top} tìm được biên phải tại ${right}.`, en: `The ${i === cols ? "sentinel" : `bar ${i}`} is lower/equal, so ${top}'s right boundary is ${right}.` },
+        });
+      }
+      stack.push(i);
+      push({
+        title: { vi: `Push cột ${i === cols ? "sentinel" : i}`, en: `Push ${i === cols ? "sentinel" : `column ${i}`}` },
+        codeLines: [15],
+        row: r,
+        col: i < cols ? i : null,
+        stack,
+        vars: [{ name: "i", value: i === cols ? "sentinel" : i }],
+        note: { vi: "Stack giữ index có chiều cao tăng dần.", en: "The stack keeps indices in increasing height order." },
+      });
+    }
+  }
+
+  push({
+    title: { vi: `Diện tích lớn nhất = ${maxArea}`, en: `Largest area = ${maxArea}` },
+    codeLines: [16],
+    final: true,
+    vars: [{ name: "best rectangle", value: bestRect ? `rows ${bestRect.top}-${bestRect.bottom}, cols ${bestRect.left}-${bestRect.right}` : "none" }],
+    note: { vi: "Hình chữ nhật tốt nhất được tô trên ma trận; histogram cuối hiển thị hàng cuối đã xử lý.", en: "The best rectangle is highlighted on the matrix; the histogram shows the last processed row." },
+  });
+
+  return { original: matrix, answer: maxArea, steps };
+}
+
 /**
  * LeetCode 42: Trapping Rain Water — two pointer approach.
  * left/right pointers move inward; left_max/right_max track the tallest wall
@@ -3313,19 +3444,28 @@ function buildSteps422(input) {
   const steps = [];
   const push = (details) => steps.push(matrixStep2D(board, details));
 
-  push({ title: { vi: "Đặt các từ thành lưới", en: "Place words in a grid" }, codeLines: [3], vars: [{ name: "words", value: `[${words.join(", ")}]` }], note: { vi: "Word square hợp lệ khi ô (r,c) bằng ô đối xứng (c,r).", en: "A word square is valid when cell (r,c) equals its mirrored cell (c,r)." }, grid: { caption: "words[r][c] must equal words[c][r]" } });
+  push({ title: { vi: "Bắt đầu kiểm tra word square", en: "Start checking the word square" }, codeLines: [2], vars: [{ name: "words", value: `[${words.join(", ")}]` }], note: { vi: "Word square hợp lệ khi ô (r,c) bằng ô đối xứng (c,r).", en: "A word square is valid when cell (r,c) equals its mirrored cell (c,r)." }, grid: { caption: "words[r][c] must equal words[c][r]" } });
   for (let r = 0; r < words.length; r++) {
+    push({ title: { vi: `Duyệt hàng r=${r}`, en: `Visit row r=${r}` }, codeLines: [3], vars: [{ name: "r", value: r }, { name: "word", value: words[r] }], note: { vi: "Lấy từng từ làm một hàng của hình vuông.", en: "Treat each word as one row of the square." }, grid: { pathCells: [[r, 0]], caption: "Outer loop" } });
     for (let c = 0; c < words[r].length; c++) {
+      const ch = words[r][c];
       const mirroredExists = c < words.length && r < words[c].length;
-      const same = mirroredExists && words[r][c] === words[c][r];
-      if (!same) {
-        push({ title: { vi: `Lệch tại (${r}, ${c})`, en: `Mismatch at (${r}, ${c})` }, codeLines: [5, 6], final: true, vars: [{ name: "words[r][c]", value: words[r][c] }, { name: "words[c][r]", value: mirroredExists ? words[c][r] : "missing" }, { name: "valid", value: false }], note: { vi: `words[${r}][${c}] không khớp phần tử đối xứng qua đường chéo → False.`, en: `words[${r}][${c}] does not match its diagonal mirror → False.` }, grid: { hlCell: [r, c], pathCells: mirroredExists ? [[c, r]] : [], caption: "Mismatch" } });
+      const mirroredValue = mirroredExists ? words[c][r] : "missing";
+      const same = mirroredExists && ch === mirroredValue;
+      push({ title: { vi: `Duyệt ô (${r},${c})`, en: `Visit cell (${r},${c})` }, codeLines: [4], vars: [{ name: "c", value: c }, { name: "ch", value: ch }], note: { vi: "Lấy ký tự hiện tại để so với ô đối xứng.", en: "Read the current character before checking its mirror." }, grid: { hlCell: [r, c], pathCells: [], caption: "Inner loop" } });
+      push({ title: { vi: `Kiểm tra ô đối xứng (${c},${r}) có tồn tại không`, en: `Check whether mirror (${c},${r}) exists` }, codeLines: [5], vars: [{ name: "c >= len(words)", value: c >= words.length }, { name: "r >= len(words[c])", value: c < words.length ? r >= words[c].length : "skipped" }], note: { vi: mirroredExists ? "Ô đối xứng tồn tại, tiếp tục so sánh ký tự." : "Ô đối xứng bị thiếu nên không thể là word square.", en: mirroredExists ? "The mirrored cell exists, so compare characters next." : "The mirrored cell is missing, so this is not a valid word square." }, grid: { hlCell: [r, c], pathCells: mirroredExists ? [[c, r]] : [], caption: "Bounds check" } });
+      if (!mirroredExists) {
+        push({ title: { vi: `Thiếu ô đối xứng tại (${c},${r})`, en: `Missing mirror at (${c},${r})` }, codeLines: [6], final: true, vars: [{ name: "words[r][c]", value: ch }, { name: "words[c][r]", value: "missing" }, { name: "valid", value: false }], note: { vi: `words[${c}] không có index ${r} → return False.`, en: `words[${c}] has no index ${r} → return False.` }, grid: { hlCell: [r, c], pathCells: [], caption: "Return False" } });
         return { original: words, answer: false, steps };
       }
-      push({ title: { vi: `So sánh (${r},${c}) với (${c},${r})`, en: `Compare (${r},${c}) with (${c},${r})` }, codeLines: [4, 5], vars: [{ name: "r,c", value: `${r},${c}` }, { name: "character", value: words[r][c] }, { name: "match", value: true }], note: { vi: `'${words[r][c]}' bằng phần tử đối xứng → tiếp tục.`, en: `'${words[r][c]}' equals its mirrored character → continue.` }, grid: { hlCell: [r, c], pathCells: [[c, r]], caption: "Diagonal symmetry" } });
+      push({ title: { vi: `So sánh '${ch}' với '${mirroredValue}'`, en: `Compare '${ch}' with '${mirroredValue}'` }, codeLines: [7], vars: [{ name: "ch", value: ch }, { name: "words[c][r]", value: mirroredValue }, { name: "match", value: same }], note: { vi: same ? "Hai ký tự bằng nhau, tiếp tục." : "Hai ký tự khác nhau nên không hợp lệ.", en: same ? "The characters match, so continue." : "The characters differ, so this is invalid." }, grid: { hlCell: [r, c], pathCells: [[c, r]], caption: "Character compare" } });
+      if (!same) {
+        push({ title: { vi: `Lệch tại (${r},${c})`, en: `Mismatch at (${r},${c})` }, codeLines: [8], final: true, vars: [{ name: "words[r][c]", value: ch }, { name: "words[c][r]", value: mirroredValue }, { name: "valid", value: false }], note: { vi: `words[${r}][${c}] != words[${c}][${r}] → return False.`, en: `words[${r}][${c}] != words[${c}][${r}] → return False.` }, grid: { hlCell: [r, c], pathCells: [[c, r]], caption: "Return False" } });
+        return { original: words, answer: false, steps };
+      }
     }
   }
-  push({ title: { vi: "Tất cả ô đều đối xứng", en: "All cells are symmetric" }, codeLines: [7], final: true, vars: [{ name: "valid", value: true }], note: { vi: "Mọi cặp (r,c) và (c,r) đều bằng nhau → True.", en: "Every pair (r,c) and (c,r) matches → True." }, grid: { caption: "Valid word square" } });
+  push({ title: { vi: "Tất cả ô đều đối xứng", en: "All cells are symmetric" }, codeLines: [9], final: true, vars: [{ name: "valid", value: true }], note: { vi: "Mọi cặp (r,c) và (c,r) đều bằng nhau → True.", en: "Every pair (r,c) and (c,r) matches → True." }, grid: { caption: "Valid word square" } });
   return { original: words, answer: true, steps };
 }
 
@@ -3490,20 +3630,24 @@ function buildSteps73(input) {
     ...[...zeroCols].flatMap((col) => matrix.map((_, row) => [row, col])),
   ];
 
-  steps.push(matrixStep2D(matrix, { title: { vi: "Quét các số 0", en: "Scan for zeroes" }, codeLines: [3, 4], vars: [{ name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }], note: { vi: "Ghi lại hàng và cột chứa số 0 trước khi thay đổi ma trận.", en: "Record every row and column containing a zero before changing the matrix." }, grid: { caption: "Original matrix" } }));
+  steps.push(matrixStep2D(matrix, { title: { vi: "Khởi tạo kích thước và marker", en: "Initialize size and markers" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${matrix.length},${matrix[0].length}` }, { name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }], note: { vi: "Ghi lại hàng và cột chứa số 0 trước khi thay đổi ma trận.", en: "Record every row and column containing a zero before changing the matrix." }, grid: { caption: "Original matrix" } }));
   for (let row = 0; row < matrix.length; row++) for (let col = 0; col < matrix[0].length; col++) {
     const value = matrix[row][col];
-    steps.push(matrixStep2D(matrix, { title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` }, codeLines: [5, 6, 7], vars: [{ name: "row,col", value: `${row},${col}` }, { name: "value", value }], note: { vi: value === 0 ? "Đây là marker 0; cần lưu hàng và cột." : "Không phải 0, tiếp tục quét.", en: value === 0 ? "This is a zero marker; record its row and column." : "Not a zero; keep scanning." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Scanning" } }));
+    steps.push(matrixStep2D(matrix, { title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` }, codeLines: [5, 6, 7], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "value", value }], note: { vi: value === 0 ? "Đây là marker 0; cần lưu hàng và cột." : "Không phải 0, tiếp tục quét.", en: value === 0 ? "This is a zero marker; record its row and column." : "Not a zero; keep scanning." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Scanning" } }));
     if (value === 0) {
-      zeroRows.add(row); zeroCols.add(col);
-      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu hàng ${row}, cột ${col}`, en: `Record row ${row}, column ${col}` }, codeLines: [8], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Mọi ô thuộc hàng hoặc cột này sẽ thành 0 ở lượt hai.", en: "Every cell in this row or column will become zero on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked row and column" } }));
+      zeroRows.add(row);
+      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu hàng ${row}`, en: `Record row ${row}` }, codeLines: [8], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Hàng này sẽ được đặt thành 0 ở lượt hai.", en: "This row will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked row" } }));
+      zeroCols.add(col);
+      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu cột ${col}`, en: `Record column ${col}` }, codeLines: [9], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Cột này sẽ được đặt thành 0 ở lượt hai.", en: "This column will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked column" } }));
     }
   }
   for (let row = 0; row < result.length; row++) for (let col = 0; col < result[0].length; col++) {
+    const shouldZero = zeroRows.has(row) || zeroCols.has(col);
+    steps.push(matrixStep2D(result, { title: { vi: `Kiểm tra ô (${row},${col})`, en: `Check cell (${row},${col})` }, codeLines: [10, 11, 12], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "r in zero_rows", value: zeroRows.has(row) }, { name: "c in zero_cols", value: zeroCols.has(col) }], note: { vi: shouldZero ? "Ô này thuộc hàng/cột đã đánh dấu nên sẽ đổi thành 0." : "Ô này không thuộc hàng/cột đã đánh dấu nên giữ nguyên.", en: shouldZero ? "This cell belongs to a marked row/column, so it will become 0." : "This cell is not in a marked row/column, so keep it unchanged." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Checking markers" } }));
     if (!zeroRows.has(row) && !zeroCols.has(col)) continue;
     const before = result[row][col];
     result[row][col] = 0;
-    steps.push(matrixStep2D(result, { title: { vi: `Đặt result[${row}][${col}] = 0`, en: `Set result[${row}][${col}] = 0` }, codeLines: [10, 11, 12, 13], vars: [{ name: "row,col", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: `(${row},${col}) thuộc ${zeroRows.has(row) ? "hàng" : "cột"} đã được đánh dấu nên đổi thành 0.`, en: `(${row},${col}) belongs to a marked ${zeroRows.has(row) ? "row" : "column"}, so set it to 0.` }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Applying zero markers" } }));
+    steps.push(matrixStep2D(result, { title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` }, codeLines: [13], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: `(${row},${col}) thuộc ${zeroRows.has(row) ? "hàng" : "cột"} đã được đánh dấu nên đổi thành 0.`, en: `(${row},${col}) belongs to a marked ${zeroRows.has(row) ? "row" : "column"}, so set it to 0.` }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Applying zero markers" } }));
   }
   steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" }, codeLines: [14], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Mọi hàng/cột từng chứa 0 đã được đặt thành 0.", en: "Every row or column that contained a zero is now zeroed." }, grid: { pathCells: markerCells(), caption: "Final matrix" } }));
   return { original: matrix, answer: result, steps };
@@ -3546,16 +3690,143 @@ function buildSteps74(input, params = {}) {
 }
 
 /** LeetCode 48: Rotate Image — transpose then reverse rows. */
-function buildSteps48(input) {
+function buildSteps48(input, params) {
   const m = parseMatrix(input);
+  const original = m.map((r) => [...r]);
   const n = m.length;
+  const approach = Number(params && params.approach) || 1;
+  const codeBlock = approach === 2 ? 2 : 1;
   const steps = [];
-  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: n }, (_, i) => String(i)).join(""), text2: Array.from({ length: n }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  gsnap({ title: { vi: "Xoay 90° = transpose + đảo mỗi hàng", en: "Rotate 90° = transpose + reverse rows" }, codeLines: [3], vars: [{ name: "n", value: n }], note: { vi: "Bước 1: hoán vị qua đường chéo chính (transpose). Bước 2: đảo ngược từng hàng.", en: "Step 1: swap across the main diagonal (transpose). Step 2: reverse each row." } });
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { [m[i][j], m[j][i]] = [m[j][i], m[i][j]]; gsnap({ title: { vi: `Transpose: swap (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` }, hlCell: [i, j], pathCells: [[j, i]], codeLines: [4, 5, 6], vars: [{ name: "i,j", value: `${i},${j}` }], note: { vi: `Đổi phần tử đối xứng qua đường chéo.`, en: `Swap the elements symmetric about the diagonal.` } }); }
-  for (let i = 0; i < n; i++) { m[i].reverse(); gsnap({ title: { vi: `Đảo hàng ${i}`, en: `Reverse row ${i}` }, hlCell: [i, 0], codeLines: [7, 8], vars: [{ name: "row", value: i }], note: { vi: `Đảo ngược hàng ${i} → hoàn tất xoay hàng này.`, en: `Reverse row ${i} → this row is rotated.` } }); }
-  gsnap({ title: { vi: "Hoàn tất xoay 90°", en: "Rotation 90° complete" }, final: true, codeLines: [8], vars: [{ name: "matrix", value: JSON.stringify(m) }], note: { vi: `Ma trận đã xoay 90° theo chiều kim đồng hồ.`, en: `Matrix rotated 90° clockwise.` } });
-  return { original: m, answer: m, steps };
+  const totalTransposeSwaps = n * (n - 1) / 2;
+  let transposeSwaps = 0;
+  const reversedRows = [];
+
+  function gsnap(o) {
+    const activeCells = o.activeCells || [];
+    steps.push({
+      title: o.title,
+      arr: [],
+      grid: {
+        dp: m.map((r) => [...r]),
+        text1: Array.from({ length: n }, (_, i) => String(i)).join(""),
+        text2: Array.from({ length: n }, (_, i) => String(i)).join(""),
+        hlCell: activeCells[0] || null,
+        pathCells: activeCells.slice(1),
+        largeCells: true,
+      },
+      rotate48View: {
+        original: original.map((r) => [...r]),
+        matrix: m.map((r) => [...r]),
+        n,
+        approach,
+        phase: o.phase || "init",
+        activeCells: activeCells.map((cell) => [...cell]),
+        activeRow: Number.isInteger(o.activeRow) ? o.activeRow : null,
+        swap: o.swap || null,
+        transposeSwaps,
+        totalTransposeSwaps,
+        reversedRows: [...reversedRows],
+      },
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeBlock,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
+
+  gsnap({
+    phase: "init",
+    title: { vi: approach === 2 ? "Cách 2: transpose + swap từng cặp" : "Cách 1: transpose + row.reverse()", en: approach === 2 ? "Approach 2: transpose + pair swaps" : "Approach 1: transpose + row.reverse()" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }],
+    note: { vi: "Xoay 90° clockwise bằng hai phép biến đổi: transpose qua đường chéo chính, rồi đảo trái-phải từng hàng.", en: "Rotate 90° clockwise with two transforms: transpose across the main diagonal, then reverse every row left-to-right." },
+  });
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const before = [m[i][j], m[j][i]];
+      [m[i][j], m[j][i]] = [m[j][i], m[i][j]];
+      transposeSwaps++;
+      gsnap({
+        phase: "transpose",
+        title: { vi: `Transpose: đổi (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` },
+        activeCells: [[i, j], [j, i]],
+        swap: { kind: "transpose", a: [i, j], b: [j, i], before, after: [m[i][j], m[j][i]] },
+        codeLines: [4, 5, 6],
+        vars: [{ name: "i,j", value: `${i},${j}` }, { name: "swaps", value: `${transposeSwaps}/${totalTransposeSwaps}` }],
+        note: { vi: "Hai ô đối xứng qua đường chéo chính đổi chỗ. Các ô trên đường chéo giữ nguyên.", en: "The two cells mirrored across the main diagonal trade places. Diagonal cells stay fixed." },
+      });
+    }
+  }
+
+  gsnap({
+    phase: "transpose-done",
+    title: { vi: "Transpose hoàn tất", en: "Transpose complete" },
+    codeLines: approach === 2 ? [7, 8] : [7],
+    vars: [{ name: "swaps", value: transposeSwaps }],
+    note: { vi: "Ma trận đã phản chiếu qua đường chéo chính. Bây giờ đảo trái-phải từng hàng để hoàn tất góc xoay.", en: "The matrix is reflected across its main diagonal. Now reverse each row left-to-right to finish the rotation." },
+  });
+
+  if (approach === 2) {
+    for (let i = 0; i < n; i++) {
+      const pairs = Math.floor(n / 2);
+      if (pairs === 0) {
+        reversedRows.push(i);
+        gsnap({
+          phase: "reverse-row",
+          title: { vi: `Hàng ${i} chỉ có một ô`, en: `Row ${i} has one cell` },
+          activeRow: i,
+          codeLines: [7, 8],
+          vars: [{ name: "row", value: i }],
+          note: { vi: "Không có cặp trái-phải nào cần đổi; hàng này đã được đảo xong.", en: "There is no left-right pair to swap; this row is already reversed." },
+        });
+      }
+      for (let j = 0; j < pairs; j++) {
+        const k = n - 1 - j;
+        const before = [m[i][j], m[i][k]];
+        [m[i][j], m[i][k]] = [m[i][k], m[i][j]];
+        if (j === pairs - 1) reversedRows.push(i);
+        gsnap({
+          phase: "reverse-swap",
+          title: { vi: `Đảo hàng ${i}: đổi cột ${j} ↔ ${k}`, en: `Reverse row ${i}: swap columns ${j} ↔ ${k}` },
+          activeCells: [[i, j], [i, k]],
+          activeRow: i,
+          swap: { kind: "reverse", a: [i, j], b: [i, k], before, after: [m[i][j], m[i][k]] },
+          codeLines: [7, 8, 9],
+          vars: [{ name: "i,j", value: `${i},${j}` }, { name: "n-1-j", value: k }],
+          note: { vi: "Đổi một cặp đối xứng trái-phải trong cùng hàng. Khi mọi cặp xong, cả hàng đã đảo ngược.", en: "Swap one mirrored left-right pair in this row. Once every pair is done, the row is reversed." },
+        });
+      }
+    }
+  } else {
+    for (let i = 0; i < n; i++) {
+      const beforeRow = [...m[i]];
+      m[i].reverse();
+      reversedRows.push(i);
+      gsnap({
+        phase: "reverse-row",
+        title: { vi: `row.reverse(): đảo toàn bộ hàng ${i}`, en: `row.reverse(): reverse all of row ${i}` },
+        activeCells: [[i, 0], [i, n - 1]],
+        activeRow: i,
+        swap: { kind: "row-reverse", row: i, beforeRow, afterRow: [...m[i]] },
+        codeLines: [7, 8],
+        vars: [{ name: "row", value: i }, { name: "done", value: `${reversedRows.length}/${n}` }],
+        note: { vi: "Đảo thứ tự từ trái sang phải của cả hàng. Hàng này đã ở đúng vị trí trong ma trận xoay.", en: "Reverse the entire row left-to-right. This row is now in its final rotated position." },
+      });
+    }
+  }
+  gsnap({
+    phase: "done",
+    title: { vi: "Hoàn tất xoay 90° theo chiều kim đồng hồ", en: "90° clockwise rotation complete" },
+    final: true,
+    codeLines: approach === 2 ? [9] : [8],
+    vars: [{ name: "matrix", value: JSON.stringify(m) }],
+    note: { vi: "Mỗi ô ban đầu (r,c) đã đi đến (c,n-1-r). Ma trận được sửa trực tiếp, không cần ma trận phụ.", en: "Every original cell (r,c) moved to (c,n-1-r). The matrix was modified in place with no extra matrix." },
+  });
+  return { original, answer: m, steps };
 }
 
 /** LeetCode 54: Spiral Matrix. */
@@ -3565,20 +3836,93 @@ function buildSteps54(input) {
   const steps = [];
   const result = [];
   const visited = new Set();
-  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: R }, (_, i) => String(i)).join(""), text2: Array.from({ length: C }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: [...visited].map((k) => k.split(",").map(Number)), largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
   let top = 0, bottom = R - 1, left = 0, right = C - 1;
-  gsnap({ title: { vi: "4 biên: top,bottom,left,right", en: "4 bounds: top,bottom,left,right" }, codeLines: [3, 4], vars: [{ name: "R,C", value: `${R},${C}` }], note: { vi: "Đi theo vòng xoắn: →, ↓, ←, ↑, thu hẹp biên sau mỗi cạnh.", en: "Traverse in a spiral: →, ↓, ←, ↑, shrinking the bounds after each edge." } });
-  while (top <= bottom && left <= right) {
-    for (let c = left; c <= right; c++) { result.push(m[top][c]); visited.add(`${top},${c}`); }
-    gsnap({ title: { vi: `Hàng trên ${top}: →`, en: `Top row ${top}: →` }, hlCell: [top, right], codeLines: [5, 6, 7], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi trái→phải hàng ${top}. top++.`, en: `Go left→right on row ${top}. top++.` } });
-    top++;
-    for (let r = top; r <= bottom; r++) { result.push(m[r][right]); visited.add(`${r},${right}`); }
-    gsnap({ title: { vi: `Cột phải ${right}: ↓`, en: `Right col ${right}: ↓` }, hlCell: [bottom, right], codeLines: [8, 9, 10], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi trên→dưới cột ${right}. right--.`, en: `Go top→bottom on col ${right}. right--.` } });
-    right--;
-    if (top <= bottom) { for (let c = right; c >= left; c--) { result.push(m[bottom][c]); visited.add(`${bottom},${c}`); } gsnap({ title: { vi: `Hàng dưới ${bottom}: ←`, en: `Bottom row ${bottom}: ←` }, hlCell: [bottom, left], codeLines: [11, 12, 13], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi phải→trái hàng ${bottom}. bottom--.`, en: `Go right→left on row ${bottom}. bottom--.` } }); bottom--; }
-    if (left <= right) { for (let r = bottom; r >= top; r--) { result.push(m[r][left]); visited.add(`${r},${left}`); } gsnap({ title: { vi: `Cột trái ${left}: ↑`, en: `Left col ${left}: ↑` }, hlCell: [top, left], codeLines: [14, 15, 16], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi dưới→trên cột ${left}. left++.`, en: `Go bottom→top on col ${left}. left++.` } }); left++; }
+  let layer = 0;
+
+  function gsnap(o) {
+    const visitedCells = [...visited].map((key, index) => {
+      const [row, col] = key.split(",").map(Number);
+      return { row, col, value: m[row][col], order: index + 1 };
+    });
+    steps.push({
+      title: o.title,
+      arr: [],
+      grid: {
+        dp: m.map((row) => [...row]),
+        text1: Array.from({ length: R }, (_, i) => String(i)).join(""),
+        text2: Array.from({ length: C }, (_, i) => String(i)).join(""),
+        hlCell: o.hlCell || null,
+        pathCells: visitedCells.map((cell) => [cell.row, cell.col]),
+        largeCells: true,
+      },
+      spiral54View: {
+        matrix: m.map((row) => [...row]),
+        rows: R,
+        cols: C,
+        bounds: { top, bottom, left, right },
+        layer,
+        phase: o.phase || "check-loop",
+        direction: o.direction || null,
+        activeCell: o.hlCell || null,
+        visitedCells,
+        result: result.slice(),
+        boundaryChange: o.boundaryChange || null,
+        guard: o.guard || null,
+        remainingCount: R * C - visited.size,
+      },
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
   }
-  gsnap({ title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, final: true, codeLines: [17], vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Thứ tự xoắn ốc.`, en: `Spiral order.` } });
+
+  gsnap({ title: { vi: "Khởi tạo result và 4 biên", en: "Initialize result and 4 bounds" }, phase: "init", codeLines: [3, 4, 5], vars: [{ name: "R,C", value: `${R},${C}` }, { name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: "Bốn biên bao quanh vùng CHƯA duyệt. Thứ tự mỗi vòng là TOP → RIGHT → BOTTOM → LEFT.", en: "The four bounds enclose the UNVISITED region. Each layer follows TOP → RIGHT → BOTTOM → LEFT." } });
+  while (top <= bottom && left <= right) {
+    gsnap({ title: { vi: `Lớp ${layer + 1}: kiểm tra 4 biên`, en: `Layer ${layer + 1}: check all four bounds` }, phase: "check-loop", direction: "top", codeLines: [6], vars: [{ name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: `top ≤ bottom và left ≤ right nên vùng [${top}..${bottom}] × [${left}..${right}] vẫn còn ô.`, en: `top ≤ bottom and left ≤ right, so region [${top}..${bottom}] × [${left}..${right}] still contains cells.` } });
+    for (let c = left; c <= right; c++) {
+      result.push(m[top][c]);
+      visited.add(`${top},${c}`);
+      gsnap({ title: { vi: `TOP: lấy matrix[${top}][${c}] = ${m[top][c]}`, en: `TOP: take matrix[${top}][${c}] = ${m[top][c]}` }, phase: "scan-top", direction: "top", hlCell: [top, c], codeLines: [7, 8], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trái → phải trên hàng top=${top}, từ c=${left} đến c=${right}.`, en: `Move left → right on row top=${top}, from c=${left} through c=${right}.` } });
+    }
+    const previousTop = top;
+    top++;
+    gsnap({ title: { vi: `Co TOP: ${previousTop} → ${top}`, en: `Shrink TOP: ${previousTop} → ${top}` }, phase: "shrink-top", direction: "top", boundaryChange: { name: "top", from: previousTop, to: top }, codeLines: [9], vars: [{ name: "top", value: top }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Hàng ${previousTop} đã xong, nên top đi xuống hàng ${top}.`, en: `Row ${previousTop} is complete, so top moves down to row ${top}.` } });
+    for (let r = top; r <= bottom; r++) {
+      result.push(m[r][right]);
+      visited.add(`${r},${right}`);
+      gsnap({ title: { vi: `RIGHT: lấy matrix[${r}][${right}] = ${m[r][right]}`, en: `RIGHT: take matrix[${r}][${right}] = ${m[r][right]}` }, phase: "scan-right", direction: "right", hlCell: [r, right], codeLines: [10, 11], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trên → dưới trên cột right=${right}, từ r=${top} đến r=${bottom}.`, en: `Move top → bottom on column right=${right}, from r=${top} through r=${bottom}.` } });
+    }
+    const previousRight = right;
+    right--;
+    gsnap({ title: { vi: `Co RIGHT: ${previousRight} → ${right}`, en: `Shrink RIGHT: ${previousRight} → ${right}` }, phase: "shrink-right", direction: "right", boundaryChange: { name: "right", from: previousRight, to: right }, codeLines: [12], vars: [{ name: "right", value: right }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Cột ${previousRight} đã xong, nên right dịch trái sang cột ${right}.`, en: `Column ${previousRight} is complete, so right moves left to column ${right}.` } });
+    gsnap({ title: { vi: "Có còn hàng BOTTOM không?", en: "Does a BOTTOM row remain?" }, phase: "check-bottom", direction: "bottom", guard: { expression: "top <= bottom", left: top, right: bottom, pass: top <= bottom }, codeLines: [13], vars: [{ name: "top,bottom", value: `${top},${bottom}` }], note: { vi: top <= bottom ? `${top} ≤ ${bottom}: còn hàng bottom=${bottom}, tiếp tục quét phải → trái.` : `${top} > ${bottom}: không còn hàng, phải bỏ qua để tránh lấy trùng.`, en: top <= bottom ? `${top} ≤ ${bottom}: row bottom=${bottom} remains; scan right → left.` : `${top} > ${bottom}: no row remains; skip it to avoid duplicates.` } });
+    if (top <= bottom) {
+      for (let c = right; c >= left; c--) {
+        result.push(m[bottom][c]);
+        visited.add(`${bottom},${c}`);
+        gsnap({ title: { vi: `BOTTOM: lấy matrix[${bottom}][${c}] = ${m[bottom][c]}`, en: `BOTTOM: take matrix[${bottom}][${c}] = ${m[bottom][c]}` }, phase: "scan-bottom", direction: "bottom", hlCell: [bottom, c], codeLines: [14, 15], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi phải → trái trên hàng bottom=${bottom}, từ c=${right} về c=${left}.`, en: `Move right → left on row bottom=${bottom}, from c=${right} back to c=${left}.` } });
+      }
+      const previousBottom = bottom;
+      bottom--;
+      gsnap({ title: { vi: `Co BOTTOM: ${previousBottom} → ${bottom}`, en: `Shrink BOTTOM: ${previousBottom} → ${bottom}` }, phase: "shrink-bottom", direction: "bottom", boundaryChange: { name: "bottom", from: previousBottom, to: bottom }, codeLines: [16], vars: [{ name: "bottom", value: bottom }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Hàng ${previousBottom} đã xong, nên bottom đi lên hàng ${bottom}.`, en: `Row ${previousBottom} is complete, so bottom moves up to row ${bottom}.` } });
+    }
+    gsnap({ title: { vi: "Có còn cột LEFT không?", en: "Does a LEFT column remain?" }, phase: "check-left", direction: "left", guard: { expression: "left <= right", left, right, pass: left <= right }, codeLines: [17], vars: [{ name: "left,right", value: `${left},${right}` }], note: { vi: left <= right ? `${left} ≤ ${right}: còn cột left=${left}, tiếp tục quét dưới → trên.` : `${left} > ${right}: không còn cột, phải bỏ qua để tránh lấy trùng.`, en: left <= right ? `${left} ≤ ${right}: column left=${left} remains; scan bottom → top.` : `${left} > ${right}: no column remains; skip it to avoid duplicates.` } });
+    if (left <= right) {
+      for (let r = bottom; r >= top; r--) {
+        result.push(m[r][left]);
+        visited.add(`${r},${left}`);
+        gsnap({ title: { vi: `LEFT: lấy matrix[${r}][${left}] = ${m[r][left]}`, en: `LEFT: take matrix[${r}][${left}] = ${m[r][left]}` }, phase: "scan-left", direction: "left", hlCell: [r, left], codeLines: [18, 19], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi dưới → trên trên cột left=${left}, từ r=${bottom} về r=${top}.`, en: `Move bottom → top on column left=${left}, from r=${bottom} back to r=${top}.` } });
+      }
+      const previousLeft = left;
+      left++;
+      gsnap({ title: { vi: `Co LEFT: ${previousLeft} → ${left}`, en: `Shrink LEFT: ${previousLeft} → ${left}` }, phase: "shrink-left", direction: "left", boundaryChange: { name: "left", from: previousLeft, to: left }, codeLines: [20], vars: [{ name: "left", value: left }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Cột ${previousLeft} đã xong, nên left dịch phải sang cột ${left}.`, en: `Column ${previousLeft} is complete, so left moves right to column ${left}.` } });
+    }
+    layer++;
+  }
+  gsnap({ title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, phase: "done", final: true, codeLines: [21], vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: "Bốn biên đã giao nhau; mọi ô xuất hiện đúng một lần theo thứ tự xoắn ốc.", en: "The four bounds have crossed; every cell appears exactly once in spiral order." } });
   return { original: m, answer: result, steps };
 }
 
@@ -8286,10 +8630,22 @@ module.exports = {
     title: { vi: "Rotate Image", en: "Rotate Image" },
     titleVi: { vi: "Xoay ma trận 90° (transpose + reverse)", en: "Rotate matrix 90° (transpose + reverse)" },
     statement: { vi: "Xoay ma trận n×n 90° theo chiều kim đồng hồ, tại chỗ. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Rotate an n×n matrix 90° clockwise, in place. Enter matrix: rows separated by ';', values by ','." },
-    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
-    approach: [{ vi: "Transpose: đổi phần tử qua đường chéo chính.", en: "Transpose: swap elements across the main diagonal." }, { vi: "Đảo ngược từng hàng → xoay 90° clockwise.", en: "Reverse each row → 90° clockwise rotation." }],
+    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" },
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: transpose + row.reverse()", en: "Approach 1: transpose + row.reverse()" } },
+        { value: "2", label: { vi: "Cách 2: transpose + swap từng cặp", en: "Approach 2: transpose + pair swaps" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Bước 1 — Transpose: đổi matrix[r][c] với matrix[c][r] ở hai phía đường chéo chính; các ô (i,i) giữ nguyên.", en: "Step 1 — Transpose: swap matrix[r][c] with matrix[c][r] across the main diagonal; cells (i,i) stay fixed." },
+      { vi: "Bước 2 — Reverse rows: Cách 1 gọi row.reverse(); Cách 2 tự đổi matrix[i][j] với matrix[i][n-1-j].", en: "Step 2 — Reverse rows: Approach 1 calls row.reverse(); Approach 2 manually swaps matrix[i][j] with matrix[i][n-1-j]." },
+      { vi: "Ghép hai phép biến đổi: vị trí gốc (r,c) → transpose thành (c,r) → đảo hàng thành (c,n-1-r).", en: "Combine both transforms: original position (r,c) → transpose to (c,r) → row reversal to (c,n-1-r)." },
+      { vi: "Làm trực tiếp trên matrix nên dùng O(1) bộ nhớ phụ; tổng công việc vẫn là O(n²).", en: "All changes happen in the matrix, so auxiliary space is O(1); total work remains O(n²)." },
+    ],
     complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Tại chỗ.", en: "In-place." } },
     code: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for row in matrix:", "            row.reverse()"],
+    code2: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for i in range(n):", "            for j in range(0, n//2):", "                matrix[i][j], matrix[i][n-1-j] = matrix[i][n-1-j], matrix[i][j]"],
     builder: buildSteps48,
   },
   54: {
@@ -8300,9 +8656,36 @@ module.exports = {
     titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
     statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
     defaultInput: "1,2,3,4;5,6,7,8;9,10,11,12", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
-    approach: [{ vi: "Giữ 4 biên top/bottom/left/right.", en: "Keep 4 bounds top/bottom/left/right." }, { vi: "Đi →, ↓, ←, ↑ và thu hẹp biên sau mỗi cạnh.", en: "Go →, ↓, ←, ↑ and shrink a bound after each edge." }],
+    approach: [
+      { vi: "top, right, bottom, left luôn bao quanh đúng vùng CHƯA duyệt.", en: "top, right, bottom, and left always enclose exactly the UNVISITED region." },
+      { vi: "Quét TOP →, RIGHT ↓, BOTTOM ←, LEFT ↑ theo chiều kim đồng hồ.", en: "Scan TOP →, RIGHT ↓, BOTTOM ←, and LEFT ↑ clockwise." },
+      { vi: "Xong TOP/LEFT thì tăng biên; xong RIGHT/BOTTOM thì giảm biên để co vào lớp kế tiếp.", en: "After TOP/LEFT increment the bound; after RIGHT/BOTTOM decrement it to shrink into the next layer." },
+      { vi: "Kiểm tra top <= bottom và left <= right trước hai cạnh cuối để không lấy trùng khi chỉ còn một hàng hoặc một cột.", en: "Check top <= bottom and left <= right before the final two edges to avoid duplicates when only one row or column remains." },
+    ],
     complexity: { time: "O(R·C)", space: "O(1)", note: { vi: "Mỗi ô thăm 1 lần.", en: "Each cell visited once." } },
-    code: ["class Solution:", "    def spiralOrder(self, matrix):", "        res = []; top, bottom = 0, len(matrix)-1", "        left, right = 0, len(matrix[0])-1", "        while top <= bottom and left <= right:", "            for c in range(left, right+1): res.append(matrix[top][c])", "            top += 1", "            for r in range(top, bottom+1): res.append(matrix[r][right])", "            right -= 1", "            if top <= bottom:", "                for c in range(right, left-1, -1): res.append(matrix[bottom][c])", "                bottom -= 1", "            if left <= right:", "                for r in range(bottom, top-1, -1): res.append(matrix[r][left])", "                left += 1", "        return res"],
+    code: [
+      "class Solution:",
+      "    def spiralOrder(self, matrix):",
+      "        res = []",
+      "        top, bottom = 0, len(matrix) - 1",
+      "        left, right = 0, len(matrix[0]) - 1",
+      "        while top <= bottom and left <= right:",
+      "            for c in range(left, right + 1):",
+      "                res.append(matrix[top][c])",
+      "            top += 1",
+      "            for r in range(top, bottom + 1):",
+      "                res.append(matrix[r][right])",
+      "            right -= 1",
+      "            if top <= bottom:",
+      "                for c in range(right, left - 1, -1):",
+      "                    res.append(matrix[bottom][c])",
+      "                bottom -= 1",
+      "            if left <= right:",
+      "                for r in range(bottom, top - 1, -1):",
+      "                    res.append(matrix[r][left])",
+      "                left += 1",
+      "        return res",
+    ],
     builder: buildSteps54,
   },
   189: {
@@ -8733,6 +9116,47 @@ module.exports = {
       "        return max_area",
     ],
     builder: buildSteps84,
+  },
+  85: {
+    id: 85,
+    difficulty: "hard",
+    slug: "maximal-rectangle",
+    category: { key: "array", vi: "Mảng / Stack", en: "Array / Stack" },
+    title: { vi: "Maximal Rectangle", en: "Maximal Rectangle" },
+    titleVi: { vi: "Hình chữ nhật toàn 1 lớn nhất", en: "Largest all-1 rectangle" },
+    statement: {
+      vi: "Cho ma trận nhị phân, tìm diện tích hình chữ nhật lớn nhất chỉ gồm các ô 1. Nhập hàng cách ';', cột cách ','.",
+      en: "Given a binary matrix, find the area of the largest rectangle containing only 1s. Enter rows separated by ';', columns by ','.",
+    },
+    defaultInput: "1,0,1,0,0;1,0,1,1,1;1,1,1,1,1;1,0,0,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Quét từng hàng, cập nhật heights[c] = số lượng 1 liên tiếp phía trên kết thúc tại hàng hiện tại.", en: "Scan row by row, updating heights[c] as consecutive 1s ending at the current row." },
+      { vi: "Mỗi hàng trở thành một bài Largest Rectangle in Histogram.", en: "Each row becomes one Largest Rectangle in Histogram problem." },
+      { vi: "Dùng stack tăng dần để pop cột và tính rectangle ứng viên.", en: "Use an increasing stack to pop bars and compute candidate rectangles." },
+    ],
+    complexity: { time: "O(R·C)", space: "O(C)", note: { vi: "Mỗi cột của mỗi hàng được push/pop tối đa một lần.", en: "Each column per row is pushed/popped at most once." } },
+    code: [
+      "class Solution:",
+      "    def maximalRectangle(self, matrix):",
+      "        if not matrix: return 0",
+      "        heights = [0] * len(matrix[0])",
+      "        best = 0",
+      "        for row in matrix:",
+      "            for c, value in enumerate(row):",
+      "                heights[c] = heights[c] + 1 if value == '1' else 0",
+      "            stack = []",
+      "            for i, h in enumerate(heights + [0]):",
+      "                while stack and heights[stack[-1]] >= h:",
+      "                    top = stack.pop()",
+      "                    width = i - stack[-1] - 1 if stack else i",
+      "                    best = max(best, heights[top] * width)",
+      "                stack.append(i)",
+      "        return best",
+    ],
+    builder: buildSteps85,
   },
   739: {
     id: 739,
@@ -9349,6 +9773,428 @@ Object.assign(module.exports, {
   },
 });
 
+/**
+ * LeetCode 2502: Design Memory Allocator.
+ * Allocation scans left-to-right while tracking the current consecutive-free
+ * streak. The first streak reaching size is the required first-fit block.
+ */
+function buildSteps2502(input, params) {
+  const n = Array.isArray(input) && Number.isInteger(input[0]) ? input[0] : 10;
+  const raw = String((params && params.operations) || "").trim();
+  const operations = raw.split(/\s*[|;]\s*/).filter(Boolean).map((part) => {
+    const tokens = part.replace(/[(),]/g, " ").trim().split(/\s+/);
+    const name = String(tokens[0] || "").toLowerCase();
+    if (name === "allocate") {
+      const size = Number(tokens[1]);
+      const mID = Number(tokens[2]);
+      return {
+        name,
+        size,
+        mID,
+        raw: part,
+        label: `allocate(${tokens[1] ?? "?"}, ${tokens[2] ?? "?"})`,
+        valid: tokens.length === 3 && Number.isInteger(size) && size > 0 && Number.isInteger(mID) && mID > 0,
+      };
+    }
+    const mID = Number(tokens[1]);
+    const freeName = name === "free" || name === "freememory";
+    return {
+      name: freeName ? "free" : name,
+      mID,
+      raw: part,
+      label: `freeMemory(${tokens[1] ?? "?"})`,
+      valid: freeName && tokens.length === 2 && Number.isInteger(mID) && mID > 0,
+    };
+  });
+  const valid = Number.isInteger(n) && n > 0 && n <= 30
+    && operations.length > 0
+    && operations.every((operation) => operation.valid);
+  const memory = new Array(Math.max(1, Math.min(30, Number.isInteger(n) ? n : 10))).fill(0);
+  const results = new Array(operations.length).fill(null);
+  const steps = [];
+
+  const freeRuns = () => {
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i <= memory.length; i += 1) {
+      if (i < memory.length && memory[i] === 0 && start === -1) start = i;
+      if ((i === memory.length || memory[i] !== 0) && start !== -1) {
+        runs.push({ start, end: i - 1, length: i - start });
+        start = -1;
+      }
+    }
+    return runs;
+  };
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    phase,
+    activeOpIndex = -1,
+    completedOps = 0,
+    currentOperation = null,
+    scanIndex = null,
+    streak = 0,
+    candidateRange = null,
+    touched = [],
+    blocker = null,
+    result = null,
+    final = false,
+  }) {
+    const step = {
+      title,
+      codeLines,
+      allocator2502View: {
+        phase,
+        n: memory.length,
+        memory: memory.slice(),
+        operations: operations.map((operation) => operation.label),
+        activeOpIndex,
+        completedOps,
+        results: results.slice(),
+        currentOperation: currentOperation ? { ...currentOperation } : null,
+        scanIndex,
+        streak,
+        candidateRange: candidateRange ? candidateRange.slice() : null,
+        touched: touched.slice(),
+        blocker,
+        freeRuns: freeRuns(),
+        result,
+      },
+      vars: [
+        { name: "memory", value: `[${memory.join(", ")}]` },
+        { name: "free runs", value: freeRuns().map((run) => `[${run.start}..${run.end}] len=${run.length}`).join(" | ") || "none" },
+        { name: "result", value: result === null ? "pending" : result },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input hoặc operations không hợp lệ", en: "Invalid input or operations" },
+      note: {
+        vi: "n phải trong 1..30. Dùng: allocate size mID | free mID.",
+        en: "n must be in 1..30. Use: allocate size mID | free mID.",
+      },
+      codeLines: [1],
+      phase: "invalid",
+      final: true,
+    });
+    return { original: { n, operations: raw }, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: `Khởi tạo ${n} ô nhớ đều FREE`, en: `Initialize ${n} FREE memory cells` },
+    note: {
+      vi: "0 nghĩa là ô trống; số dương là mID đang sở hữu ô đó. allocate luôn phải chọn block trống liên tiếp đầu tiên.",
+      en: "0 means free; a positive number is the mID owning that cell. allocate must always take the first contiguous free block.",
+    },
+    codeLines: [1, 2, 3],
+    phase: "init",
+  });
+
+  operations.forEach((operation, opIndex) => {
+    if (operation.name === "allocate") {
+      let streak = 0;
+      let start = -1;
+      snapshot({
+        title: { vi: `Bắt đầu allocate(size=${operation.size}, mID=${operation.mID})`, en: `Start allocate(size=${operation.size}, mID=${operation.mID})` },
+        note: {
+          vi: "Quét từ địa chỉ 0. Biến free đếm độ dài chuỗi ô trống đang kết thúc tại i.",
+          en: "Scan from address 0. Variable free counts the consecutive free cells ending at i.",
+        },
+        codeLines: [4, 5],
+        phase: "allocate-start",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        currentOperation: operation,
+      });
+
+      for (let i = 0; i < memory.length; i += 1) {
+        const isFree = memory[i] === 0;
+        streak = isFree ? streak + 1 : 0;
+        const candidateStart = streak > 0 ? i - streak + 1 : null;
+        const candidateRange = candidateStart === null ? null : [candidateStart, i];
+        snapshot({
+          title: {
+            vi: isFree ? `i=${i}: FREE → streak=${streak}` : `i=${i}: mID ${memory[i]} chặn → reset streak=0`,
+            en: isFree ? `i=${i}: FREE → streak=${streak}` : `i=${i}: mID ${memory[i]} blocks → reset streak=0`,
+          },
+          note: {
+            vi: isFree
+              ? `Block trống ứng viên hiện là [${candidateStart}..${i}], dài ${streak}/${operation.size}.`
+              : `Không thể đi xuyên qua ô đã cấp phát; bắt đầu tìm block mới sau index ${i}.`,
+            en: isFree
+              ? `The current candidate free block is [${candidateStart}..${i}], length ${streak}/${operation.size}.`
+              : `An allocation cannot cross an occupied cell; start a new candidate after index ${i}.`,
+          },
+          codeLines: isFree ? [6, 7, 8, 11] : [6, 9, 10],
+          phase: isFree && streak === operation.size ? "fit-found" : isFree ? "scan-free" : "scan-blocked",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          currentOperation: operation,
+          scanIndex: i,
+          streak,
+          candidateRange,
+          blocker: isFree ? null : i,
+        });
+        if (streak === operation.size) {
+          start = i - operation.size + 1;
+          break;
+        }
+      }
+
+      if (start === -1) {
+        results[opIndex] = -1;
+        snapshot({
+          title: { vi: "Không có block đủ dài → -1", en: "No free block is long enough → -1" },
+          note: {
+            vi: `Có thể tổng số ô trống vẫn đủ ${operation.size}, nhưng chúng bị phân mảnh nên không tạo thành một block liên tiếp.`,
+            en: `There may be at least ${operation.size} free cells in total, but fragmentation prevents one contiguous block.`,
+          },
+          codeLines: [15],
+          phase: "allocate-fail",
+          activeOpIndex: opIndex,
+          completedOps: opIndex + 1,
+          currentOperation: operation,
+          result: -1,
+        });
+        return;
+      }
+
+      const range = Array.from({ length: operation.size }, (_, offset) => start + offset);
+      range.forEach((index) => { memory[index] = operation.mID; });
+      results[opIndex] = start;
+      snapshot({
+        title: { vi: `Ghi mID ${operation.mID} vào [${start}..${start + operation.size - 1}]`, en: `Write mID ${operation.mID} into [${start}..${start + operation.size - 1}]` },
+        note: {
+          vi: `Đây là block hợp lệ đầu tiên nên allocate trả về địa chỉ bắt đầu ${start}.`,
+          en: `This is the first valid block, so allocate returns its start address ${start}.`,
+        },
+        codeLines: [12, 13, 14],
+        phase: "allocate-write",
+        activeOpIndex: opIndex,
+        completedOps: opIndex + 1,
+        currentOperation: operation,
+        scanIndex: start + operation.size - 1,
+        streak: operation.size,
+        candidateRange: [start, start + operation.size - 1],
+        touched: range,
+        result: start,
+      });
+      return;
+    }
+
+    const matches = memory.map((value, index) => value === operation.mID ? index : -1).filter((index) => index >= 0);
+    snapshot({
+      title: { vi: `freeMemory(${operation.mID}): tìm mọi ô cùng mID`, en: `freeMemory(${operation.mID}): find every matching cell` },
+      note: {
+        vi: matches.length
+          ? `Tìm thấy ${matches.length} ô tại index [${matches.join(", ")}]. Một mID có thể sở hữu nhiều block rời nhau.`
+          : `Không có ô nào thuộc mID ${operation.mID}.`,
+        en: matches.length
+          ? `Found ${matches.length} cells at indices [${matches.join(", ")}]. One mID may own several separate blocks.`
+          : `No cell belongs to mID ${operation.mID}.`,
+      },
+      codeLines: [16, 17, 18, 19],
+      phase: "free-find",
+      activeOpIndex: opIndex,
+      completedOps: opIndex,
+      currentOperation: operation,
+      touched: matches,
+    });
+    matches.forEach((index) => { memory[index] = 0; });
+    results[opIndex] = matches.length;
+    snapshot({
+      title: { vi: `Đặt ${matches.length} ô về FREE → ${matches.length}`, en: `Mark ${matches.length} cells FREE → ${matches.length}` },
+      note: {
+        vi: "Các vùng FREE kề nhau tự hợp thành một run dài hơn; freeMemory trả về số ô vừa giải phóng.",
+        en: "Adjacent FREE regions naturally form a longer run; freeMemory returns the number of released cells.",
+      },
+      codeLines: [20, 21, 22],
+      phase: "free-write",
+      activeOpIndex: opIndex,
+      completedOps: opIndex + 1,
+      currentOperation: operation,
+      touched: matches,
+      result: matches.length,
+    });
+  });
+
+  snapshot({
+    title: { vi: "Hoàn tất mọi operation", en: "All operations complete" },
+    note: {
+      vi: "Mỗi allocate dùng first-fit từ trái sang phải; mỗi freeMemory xóa toàn bộ ô mang đúng mID.",
+      en: "Every allocate uses left-to-right first fit; every freeMemory clears all cells carrying that mID.",
+    },
+    codeLines: [22],
+    phase: "done",
+    activeOpIndex: operations.length,
+    completedOps: operations.length,
+    final: true,
+  });
+  return { original: { n, operations: raw }, answer: results, steps };
+}
+
+Object.assign(module.exports, {
+  2502: {
+    id: 2502,
+    difficulty: "medium",
+    slug: "design-memory-allocator",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Design Memory Allocator", en: "Design Memory Allocator" },
+    titleVi: { vi: "Thiết kế bộ cấp phát bộ nhớ", en: "Design a memory allocator" },
+    statement: {
+      vi: "Thiết kế Allocator cho n ô nhớ. allocate(size, mID) cấp block FREE liên tiếp đầu tiên có độ dài size và trả về index đầu; nếu không có trả -1. freeMemory(mID) giải phóng mọi ô thuộc mID và trả số ô đã giải phóng.",
+      en: "Design Allocator for n memory cells. allocate(size, mID) takes the first contiguous FREE block of length size and returns its start index, or -1. freeMemory(mID) releases every cell owned by mID and returns the released count.",
+    },
+    defaultInput: [10],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 30,
+    inputLabel: { vi: "n (số ô nhớ, tối đa 30)", en: "n (memory cells, max 30)" },
+    extraParams: [{
+      key: "operations",
+      type: "string",
+      label: { vi: "Operations, ngăn cách bằng |", en: "Operations separated by |" },
+      default: "allocate 1 1 | allocate 1 2 | allocate 1 3 | free 2 | allocate 3 4 | allocate 1 1 | allocate 1 1 | free 1",
+    }],
+    approach: [
+      { vi: "Biểu diễn bộ nhớ bằng mảng: 0 là FREE, giá trị dương là mID sở hữu ô.", en: "Represent memory as an array: 0 is FREE and a positive value is the owning mID." },
+      { vi: "allocate quét trái sang phải và đếm streak FREE liên tiếp; streak đầu tiên đạt size chính là first-fit.", en: "allocate scans left-to-right and counts a consecutive FREE streak; the first streak reaching size is the first fit." },
+      { vi: "freeMemory quét toàn mảng, đặt mọi ô bằng mID về 0 và đếm số ô đã xóa.", en: "freeMemory scans all cells, resets every matching mID to 0, and counts released cells." },
+    ],
+    complexity: {
+      time: "O(n) / operation",
+      space: "O(n)",
+      note: { vi: "Mỗi operation quét tối đa n ô; mảng memory có n phần tử.", en: "Each operation scans at most n cells; memory contains n entries." },
+    },
+    code: [
+      "class Allocator:",
+      "    def __init__(self, n: int):",
+      "        self.memory = [0] * n",
+      "    def allocate(self, size: int, mID: int) -> int:",
+      "        free = 0",
+      "        for i in range(len(self.memory)):",
+      "            if self.memory[i] == 0:",
+      "                free += 1",
+      "            else:",
+      "                free = 0",
+      "            if free == size:",
+      "                start = i - size + 1",
+      "                self.memory[start:i + 1] = [mID] * size",
+      "                return start",
+      "        return -1",
+      "    def freeMemory(self, mID: int) -> int:",
+      "        released = 0",
+      "        for i in range(len(self.memory)):",
+      "            if self.memory[i] == mID:",
+      "                self.memory[i] = 0",
+      "                released += 1",
+      "        return released",
+    ],
+    builder: buildSteps2502,
+  },
+});
+
+function buildSteps363(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const k = Number(params.k ?? 2);
+  const rows = matrix.length, cols = matrix[0].length;
+  const steps = [];
+  let best = -Infinity;
+  let bestRect = null;
+  const rectCells = (rect) => {
+    if (!rect) return [];
+    const cells = [];
+    for (let r = rect.top; r <= rect.bottom; r++) for (let c = rect.left; c <= rect.right; c++) cells.push([r, c]);
+    return cells;
+  };
+  const lowerBound = (arr, target) => {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const value = typeof arr[mid] === "number" ? arr[mid] : arr[mid].sum;
+      if (value < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  function push(title, codeLines, colSums, vars, note, final = false, rect = null) {
+    const step = matrixStep2D(matrix, {
+      title,
+      codeLines,
+      final,
+      vars: [{ name: "k", value: k }, { name: "best", value: best === -Infinity ? "-∞" : best }, ...vars],
+      note,
+      grid: { pathCells: rectCells(rect || bestRect), caption: "Candidate rectangle" },
+    });
+    step.arr = [...colSums];
+    step.sub = colSums.map((_, i) => `[${i}]`);
+    step.highlight = [];
+    step.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, i) => bestRect.left + i) : [];
+    steps.push(step);
+  }
+
+  push({ vi: "Khởi tạo best = -∞", en: "Initialize best = -∞" }, [3], new Array(cols).fill(0), [{ name: "shape", value: `${rows}×${cols}` }], { vi: "Cố định cặp hàng top..bottom, nén tổng theo cột.", en: "Fix top..bottom rows, compress sums by column." });
+  for (let top = 0; top < rows; top++) {
+    const colSums = new Array(cols).fill(0);
+    for (let bottom = top; bottom < rows; bottom++) {
+      for (let c = 0; c < cols; c++) colSums[c] += matrix[bottom][c];
+      push({ vi: `Nén hàng ${top}..${bottom}`, en: `Compress rows ${top}..${bottom}` }, [4, 5, 6], colSums, [{ name: "top,bottom", value: `${top},${bottom}` }, { name: "colSums", value: `[${colSums.join(",")}]` }], { vi: "Bây giờ bài toán thành: max subarray sum no larger than k.", en: "Now the problem becomes max subarray sum no larger than k." });
+      const prefixes = [{ sum: 0, index: 0 }];
+      let prefix = 0;
+      for (let right = 0; right < cols; right++) {
+        prefix += colSums[right];
+        const need = prefix - k;
+        const idx = lowerBound(prefixes, need);
+        let candidate = null;
+        if (idx < prefixes.length) {
+          const prev = prefixes[idx];
+          const sum = prefix - prev.sum;
+          candidate = { top, bottom, left: prev.index, right };
+          if (sum > best) {
+            best = sum;
+            bestRect = candidate;
+          }
+          push({ vi: `right=${right}: candidate=${sum}`, en: `right=${right}: candidate=${sum}` }, [7, 8, 9, 10], colSums, [{ name: "prefix", value: prefix }, { name: "need", value: need }, { name: "sorted prefixes", value: `[${prefixes.map((p) => p.sum).join(",")}]` }, { name: "candidate", value: sum }], { vi: "Tìm prefix nhỏ nhất ≥ prefix-k để subarray sum không vượt quá k.", en: "Find the smallest prefix >= prefix-k so the subarray sum does not exceed k." }, false, candidate);
+        }
+        const insert = lowerBound(prefixes, prefix);
+        prefixes.splice(insert, 0, { sum: prefix, index: right + 1 });
+      }
+    }
+  }
+  push({ vi: `Max sum ≤ ${k} là ${best}`, en: `Max sum <= ${k} is ${best}` }, [11], new Array(cols).fill(0), [{ name: "answer", value: best }], { vi: "Đã thử mọi cặp hàng và mọi đoạn cột bằng prefix sorted list.", en: "All row pairs and column ranges were checked with a sorted prefix list." }, true);
+  return { original: matrix, answer: best, steps };
+}
+
+Object.assign(module.exports, {
+  363: {
+    id: 363,
+    difficulty: "hard",
+    slug: "max-sum-of-rectangle-no-larger-than-k",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Max Sum of Rectangle No Larger Than K", en: "Max Sum of Rectangle No Larger Than K" },
+    titleVi: { vi: "Tổng rectangle lớn nhất không vượt quá k", en: "Max rectangle sum no larger than k" },
+    statement: { vi: "Tìm tổng lớn nhất của một rectangle trong matrix sao cho tổng ≤ k.", en: "Find the largest rectangle sum in matrix such that the sum is <= k." },
+    defaultInput: "1,0,1;0,-2,3",
+    inputKind: "string",
+    inputLabel: { vi: "matrix", en: "matrix" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 2 }],
+    approach: [
+      { vi: "Cố định top/bottom rồi nén tổng từng cột.", en: "Fix top/bottom rows and compress column sums." },
+      { vi: "Trên mảng nén, dùng prefix sum + sorted list để tìm subarray sum lớn nhất ≤ k.", en: "On the compressed array, use prefix sums + sorted list to find the best subarray sum <= k." },
+    ],
+    complexity: { time: "O(R²·C·log C)", space: "O(C)", note: { vi: "Có R² cặp hàng; mỗi cặp xử lý C prefix.", en: "There are R² row pairs; each processes C prefixes." } },
+    code: ["import bisect", "class Solution:", "    def maxSumSubmatrix(self, matrix, k):", "        best = float('-inf')", "        for top in range(len(matrix)):", "            col_sums = [0] * len(matrix[0])", "            for bottom in range(top, len(matrix)):", "                for c in range(len(col_sums)): col_sums[c] += matrix[bottom][c]", "                prefixes = [0]; prefix = 0", "                for value in col_sums:", "                    prefix += value", "                    i = bisect.bisect_left(prefixes, prefix - k)", "                    if i < len(prefixes): best = max(best, prefix - prefixes[i])", "                    bisect.insort(prefixes, prefix)", "        return best"],
+    builder: buildSteps363,
+  },
+});
+
 Object.assign(module.exports, {
   73: {
     id: 73, difficulty: "medium", slug: "set-matrix-zeroes",
@@ -9358,7 +10204,22 @@ Object.assign(module.exports, {
     defaultInput: "1,1,1;1,0,1;1,1,1", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
     approach: [{ vi: "Lượt 1: quét matrix, ghi mọi chỉ số hàng và cột chứa 0 vào Set.", en: "Pass 1: scan the matrix and record every row and column that contains a zero." }, { vi: "Lượt 2: ô nào nằm trong hàng hoặc cột đã ghi thì đổi thành 0.", en: "Pass 2: turn a cell to 0 if its row or column was recorded." }],
     complexity: { time: "O(m·n)", space: "O(m+n)", note: { vi: "Mỗi ô được quét tối đa hai lần; các Set chứa tối đa m hàng và n cột.", en: "Each cell is scanned at most twice; the Sets hold at most m rows and n columns." } },
-    code: ["class Solution:", "    def setZeroes(self, matrix):", "        rows, cols = len(matrix), len(matrix[0])", "        zero_rows, zero_cols = set(), set()", "        for r in range(rows):", "            for c in range(cols):", "                if matrix[r][c] == 0:", "                    zero_rows.add(r); zero_cols.add(c)", "        # second pass uses the saved markers", "        for r in range(rows):", "            for c in range(cols):", "                if r in zero_rows or c in zero_cols:", "                    matrix[r][c] = 0", "        return matrix"], builder: buildSteps73,
+    code: [
+      "class Solution:",
+      "    def setZeroes(self, matrix):",
+      "        rows, cols = len(matrix), len(matrix[0])",
+      "        zero_rows, zero_cols = set(), set()",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if matrix[r][c] == 0:",
+      "                    zero_rows.add(r)",
+      "                    zero_cols.add(c)",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if r in zero_rows or c in zero_cols:",
+      "                    matrix[r][c] = 0",
+      "        return matrix",
+    ], builder: buildSteps73,
   },
   74: {
     id: 74, difficulty: "medium", slug: "search-a-2d-matrix",

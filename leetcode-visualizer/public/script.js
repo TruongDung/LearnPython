@@ -59,6 +59,7 @@ const I18N = {
     liveClearBtn: "Clear thân hàm",
     liveResetBtn: "Về code gốc",
     autoTheme: "Tự động",
+    backToTop: "Về đầu trang",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -99,6 +100,7 @@ const I18N = {
     liveClearBtn: "Clear body",
     liveResetBtn: "Reset to original",
     autoTheme: "Auto",
+    backToTop: "Back to top",
   },
 };
 
@@ -152,6 +154,11 @@ function applyStaticStrings() {
     button.setAttribute("aria-label", t()[id]);
     button.title = t()[id];
   });
+  const backToTopButton = $("backToTopBtn");
+  if (backToTopButton) {
+    backToTopButton.setAttribute("aria-label", t().backToTop);
+    backToTopButton.title = t().backToTop;
+  }
   updateThemeButtons();
 }
 
@@ -1290,11 +1297,39 @@ function markActiveChip() {
 }
 
 // ---- Load problem info ----
-$("loadBtn").addEventListener("click", loadProblem);$("problemId").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loadProblem();
+$("loadBtn").addEventListener("click", () => loadProblem({ scrollToEnd: true }));
+$("problemId").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loadProblem({ scrollToEnd: true });
 });
 
-async function loadProblem() {
+function jumpToPageEnd() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const pageEnd = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      window.scrollTo(0, pageEnd);
+      updateBackToTopButton();
+    });
+  });
+}
+
+function updateBackToTopButton() {
+  const button = $("backToTopBtn");
+  if (!button) return;
+  const pageHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+  const distanceFromEnd = pageHeight - (window.scrollY + window.innerHeight);
+  button.classList.toggle("is-visible", window.scrollY > 0 && distanceFromEnd <= 160);
+}
+
+$("backToTopBtn").addEventListener("click", () => {
+  window.scrollTo(0, 0);
+  $("problemId").focus({ preventScroll: true });
+  updateBackToTopButton();
+});
+window.addEventListener("scroll", updateBackToTopButton, { passive: true });
+window.addEventListener("resize", updateBackToTopButton);
+updateBackToTopButton();
+
+async function loadProblem({ scrollToEnd = false } = {}) {
   const id = $("problemId").value.trim();
   searchErrorState = null;
   hide("searchError");
@@ -1331,6 +1366,7 @@ async function loadProblem() {
     hide("vizPanel");
     steps = [];
     stopPlay();
+    if (scrollToEnd) jumpToPageEnd();
   } catch (err) {
     showError("searchError", t().errConn);
   }
@@ -2219,7 +2255,7 @@ function renderBars(step) {
 
     const valEl = document.createElement("div");
     valEl.className = "val";
-    valEl.textContent = val;
+    valEl.textContent = Array.isArray(step.raw) && step.raw[i] !== undefined ? step.raw[i] : val;
 
     const idxEl = document.createElement("div");
     idxEl.className = "idx";
@@ -17396,6 +17432,623 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderRussian354View(step) {
+  const view = step.russian354View || {};
+  const vi = lang === "vi";
+  const approach = Number(view.approach) || 2;
+  const phase = String(view.phase || "sort");
+  const original = Array.isArray(view.original) ? view.original : [];
+  const sorted = Array.isArray(view.sorted) ? view.sorted : [];
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const n = sorted.length;
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : null;
+  const activeChain = new Set(Array.isArray(view.activeChain) ? view.activeChain : []);
+  const bestChain = new Set(Array.isArray(view.bestChain) ? view.bestChain : []);
+  const displayChain = bestChain.size ? bestChain : activeChain;
+  const widthCounts = sorted.reduce((counts, item) => counts.set(item.width, (counts.get(item.width) || 0) + 1), new Map());
+  const tiedWidths = [...widthCounts.entries()].filter(([, count]) => count > 1).map(([width]) => width);
+  const maxWidth = Math.max(1, ...sorted.map((item) => Number(item.width) || 0));
+  const maxHeight = Math.max(1, ...sorted.map((item) => Number(item.height) || 0));
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const stageIndex = phase === "done" ? 3 : phase === "sort" ? 0 : phase === "reduce" ? 1 : 2;
+  const stageLabels = approach === 1
+    ? (vi ? ["Sort w↑, tie h↓", "Lấy dãy chiều cao", "DP so mọi j < i", "Dựng chuỗi tốt nhất"] : ["Sort w↑, ties h↓", "Extract heights", "DP over every j < i", "Rebuild best chain"])
+    : (vi ? ["Sort w↑, tie h↓", "Lấy dãy chiều cao", "Binary search tails", "Dựng chuỗi tốt nhất"] : ["Sort w↑, ties h↓", "Extract heights", "Binary-search tails", "Rebuild best chain"]);
+  const stages = stageLabels.map((label, index) => {
+    const state = phase === "done" || index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const renderEnvelope = (item, index, source) => {
+    const sortedIndex = source === "sorted" ? index : sorted.findIndex((candidate) => candidate.originalIndex === item.originalIndex);
+    const classes = ["rde354-envelope"];
+    if (widthCounts.get(item.width) > 1) classes.push("same-width");
+    if (sortedIndex === currentIndex) classes.push("current");
+    if (sortedIndex === compareIndex) classes.push("compare");
+    if (sortedIndex >= 0 && sortedIndex < Number(view.processedCount || 0)) classes.push("processed");
+    if (displayChain.has(sortedIndex)) classes.push("chain");
+    const shapeWidth = Math.round(46 + (Number(item.width) / maxWidth) * 46);
+    const shapeHeight = Math.round(30 + (Number(item.height) / maxHeight) * 32);
+    const indexText = source === "sorted" ? `s${index} · #${item.originalIndex}` : `#${item.originalIndex}`;
+    return `<span class="${classes.join(" ")}"><small>${indexText}</small><i class="rde354-shape" style="--rde-shape-w:${shapeWidth}%;--rde-shape-h:${shapeHeight}px"><b>w=${escapeHtml(display(item.width))}</b><em>h=${escapeHtml(display(item.height))}</em></i><strong>${escapeHtml(display(item.width))} × ${escapeHtml(display(item.height))}</strong></span>`;
+  };
+  const originalHtml = original.map((item, index) => renderEnvelope(item, index, "original")).join("") || `<em class="rde354-empty">[ ]</em>`;
+  const sortedHtml = sorted.map((item, index) => renderEnvelope(item, index, "sorted")).join("") || `<em class="rde354-empty">[ ]</em>`;
+
+  const tieExample = tiedWidths.length
+    ? tiedWidths.map((width) => {
+      const group = sorted.filter((item) => item.width === width);
+      return `<span><strong>w=${escapeHtml(display(width))}</strong><code>${group.map((item) => item.height).join(" > ")}</code><em>${vi ? "cao giảm" : "height desc"}</em></span>`;
+    }).join("")
+    : `<span><strong>${vi ? "KHÔNG CÓ WIDTH TRÙNG" : "NO WIDTH TIES"}</strong><code>(w↑, h↓)</code><em>${vi ? "quy tắc vẫn giữ nguyên" : "the rule still applies"}</em></span>`;
+
+  const heightHtml = sorted.map((item, index) => {
+    const classes = ["rde354-height"];
+    if (index === currentIndex) classes.push("current");
+    if (index === compareIndex) classes.push("compare");
+    if (widthCounts.get(item.width) > 1) classes.push("same-width");
+    if (displayChain.has(index)) classes.push("chain");
+    if (index < Number(view.processedCount || 0)) classes.push("processed");
+    return `<span class="${classes.join(" ")}"><small>i=${index} · w=${escapeHtml(display(item.width))}</small><strong>${escapeHtml(display(item.height))}</strong><em>h[${index}]</em></span>`;
+  }).join("") || `<em class="rde354-empty">[ ]</em>`;
+
+  let operation = "";
+  let methodBoard = "";
+  if (approach === 1) {
+    const comparison = view.comparison;
+    if (comparison) {
+      const inner = sorted[comparison.inner];
+      const outer = sorted[comparison.outer];
+      const verdict = comparison.canNest ? (comparison.improved ? (vi ? "LỒNG ĐƯỢC · UPDATE" : "FITS · UPDATE") : (vi ? "LỒNG ĐƯỢC · GIỮ DP" : "FITS · KEEP DP")) : (vi ? "KHÔNG LỒNG" : "DOES NOT FIT");
+      operation = `<section class="rde354-compare-rule ${comparison.canNest ? "pass" : "fail"} ${comparison.improved ? "improved" : ""}">
+        <div class="inner"><small>j=${comparison.inner} · ${vi ? "PHONG BÌ TRONG" : "INNER"}</small><strong>${inner.width} × ${inner.height}</strong></div>
+        <div class="checks"><span class="${comparison.widthOk ? "pass" : "fail"}"><small>WIDTH</small><strong>${inner.width} &lt; ${outer.width}</strong><em>${comparison.widthOk ? "✓" : "×"}</em></span><b>AND</b><span class="${comparison.heightOk ? "pass" : "fail"}"><small>HEIGHT</small><strong>${inner.height} &lt; ${outer.height}</strong><em>${comparison.heightOk ? "✓" : "×"}</em></span></div>
+        <div class="outer"><small>i=${comparison.outer} · ${vi ? "PHONG BÌ NGOÀI" : "OUTER"}</small><strong>${outer.width} × ${outer.height}</strong></div>
+        <footer><strong>${escapeHtml(verdict)}</strong><code>${comparison.canNest ? `dp[${comparison.outer}] = max(${comparison.previousDp}, dp[${comparison.inner}] + 1 = ${comparison.candidate}) → ${comparison.resultDp}` : `dp[${comparison.outer}] = ${comparison.resultDp} · skip`}</code></footer>
+      </section>`;
+    } else {
+      operation = `<section class="rde354-fit-rule"><div><small>${vi ? "ĐIỀU KIỆN LỒNG NGHIÊM NGẶT" : "STRICT NESTING RULE"}</small><strong>w<sub>inner</sub> &lt; w<sub>outer</sub> <b>AND</b> h<sub>inner</sub> &lt; h<sub>outer</sub></strong></div><span>${vi ? "Không được bằng nhau ở bất kỳ chiều nào." : "Equality in either dimension is not allowed."}</span></section>`;
+    }
+
+    const dp = Array.isArray(view.dp) ? view.dp : [];
+    const parent = Array.isArray(view.parent) ? view.parent : [];
+    const dpCells = sorted.map((item, index) => {
+      const classes = ["rde354-dp-cell"];
+      if (index === currentIndex) classes.push("current");
+      if (index === compareIndex) classes.push("compare");
+      if (index < Number(view.processedCount || 0)) classes.push("processed");
+      if (displayChain.has(index)) classes.push("chain");
+      return `<span class="${classes.join(" ")}"><small>i=${index} · ${item.width}×${item.height}</small><strong>dp = ${escapeHtml(display(dp[index]))}</strong><em>parent = ${parent[index] >= 0 ? parent[index] : "—"}</em></span>`;
+    }).join("") || `<em class="rde354-empty">dp = [ ]</em>`;
+    methodBoard = `<section class="rde354-method dp"><header><strong>DP · O(n²)</strong><span>dp[i] = 1 + max(dp[j]) ${vi ? "với j lồng vào i" : "for every j that fits i"}</span></header><div>${dpCells}</div></section>`;
+  } else {
+    const tails = Array.isArray(view.tails) ? view.tails : [];
+    const tailIndices = Array.isArray(view.tailIndices) ? view.tailIndices : [];
+    const search = view.search || {};
+    const mutation = view.mutation || null;
+    const visited = new Set(Array.isArray(search.visitedMids) ? search.visitedMids : []);
+    const found = Number.isInteger(search.found) ? search.found : null;
+    const slotCount = Math.max(1, tails.length, found === tails.length ? tails.length + 1 : 0);
+    const tailSlots = Array.from({ length: slotCount }, (_, index) => {
+      const isGhost = index >= tails.length;
+      const envelopeIndex = tailIndices[index];
+      const envelope = sorted[envelopeIndex];
+      const classes = ["rde354-tail-slot"];
+      if (isGhost) classes.push("ghost");
+      if (visited.has(index)) classes.push("visited");
+      if (search.mid === index) classes.push("mid");
+      if (found === index) classes.push("found");
+      if (mutation?.pos === index) classes.push(mutation.type === "append" ? "appended" : "replaced");
+      const inRange = Number.isInteger(search.loBefore) && Number.isInteger(search.hiBefore) && index >= search.loBefore && index < search.hiBefore;
+      if (inRange) classes.push("in-range");
+      return `<span class="${classes.join(" ")}"><small>L${index + 1} · index ${index}</small><strong>${isGhost ? "?" : escapeHtml(display(tails[index]))}</strong><em>${isGhost ? (vi ? "vị trí append" : "append slot") : envelope ? `${envelope.width}×${envelope.height} · s${envelopeIndex}` : "tail"}</em></span>`;
+    }).join("");
+
+    if (phase === "binary-search" && Number.isInteger(search.mid)) {
+      operation = `<section class="rde354-search-step ${search.moveRight ? "right" : "left"}"><header><small>bisect_left · [lo, hi)</small><strong>lo=${search.loBefore} · mid=${search.mid} · hi=${search.hiBefore}</strong></header><div><code>tails[${search.mid}] = ${escapeHtml(display(search.midValue))}</code><b>${search.moveRight ? "<" : "≥"}</b><code>h = ${escapeHtml(display(search.target))}</code><i>&rarr;</i><strong>${search.moveRight ? `lo = ${search.lo}` : `hi = ${search.hi}`}</strong></div><p>${search.moveRight ? (vi ? "Mid quá nhỏ: bỏ cả mid và nửa trái." : "Mid is too small: discard mid and the left half.") : (vi ? "Mid đủ lớn: giữ mid và tìm tiếp bên trái." : "Mid is large enough: keep mid and search left.")}</p></section>`;
+    } else if (phase === "position-found") {
+      operation = `<section class="rde354-search-step found"><header><small>lo = hi</small><strong>bisect_left = ${found}</strong></header><p>${found === tails.length ? (vi ? "Không có tail nào ≥ h: mở thêm một độ dài mới." : "No tail is >= h: open a new length.") : (vi ? `L${found + 1} là ô đầu tiên có tail ≥ h.` : `L${found + 1} is the first slot whose tail is >= h.`)}</p></section>`;
+    } else if (mutation) {
+      operation = `<section class="rde354-mutation ${mutation.type}"><header><small>${mutation.type === "append" ? "EXTEND LIS" : mutation.oldValue === mutation.newValue ? "REFRESH TAIL OWNER" : "REPLACE A TAIL"}</small><strong>${mutation.type === "append" ? `append ${mutation.newValue} at L${mutation.pos + 1}` : `L${mutation.pos + 1}: ${mutation.oldValue} → ${mutation.newValue}`}</strong></header><div><code>[${mutation.before.join(", ")}]</code><i>&rarr;</i><code>[${mutation.after.join(", ")}]</code></div><p>${mutation.type === "append" ? (vi ? "Độ dài LIS tăng 1." : "LIS length grows by 1.") : (vi ? "Độ dài không đổi; tail mới không lớn hơn tail cũ nên vẫn tối ưu cho bước sau." : "Length stays the same; the new tail is no larger than the old one, so it remains optimal for later steps.")}</p></section>`;
+    } else {
+      operation = `<section class="rde354-fit-rule"><div><small>${vi ? "Ý NGHĨA CỦA TAILS" : "TAILS INVARIANT"}</small><strong>tails[L-1] = ${vi ? "đuôi nhỏ nhất của chuỗi dài L" : "smallest tail of a length-L chain"}</strong></div><span>${vi ? "bisect_left giữ LIS tăng nghiêm ngặt." : "bisect_left preserves a strictly increasing LIS."}</span></section>`;
+    }
+
+    methodBoard = `<section class="rde354-method tails"><header><strong>TAILS · O(n log n)</strong><span>${vi ? "mỗi ô đại diện một độ dài, không nhất thiết cùng một chuỗi" : "one slot per length, not necessarily one shared chain"}</span></header><div>${tailSlots}</div><footer><code>lo=${escapeHtml(display(search.lo))}</code><code>mid=${escapeHtml(display(search.mid))}</code><code>hi=${escapeHtml(display(search.hi))}</code><code>target h=${escapeHtml(display(search.target ?? (currentIndex !== null ? heights[currentIndex] : null)))}</code></footer></section>`;
+  }
+
+  const chainIndexes = [...displayChain];
+  const chainHtml = chainIndexes.length
+    ? chainIndexes.map((index, chainIndex) => {
+      const item = sorted[index];
+      if (!item) return "";
+      return `${chainIndex ? `<i>&rarr;</i>` : ""}<span><small>s${index}</small><strong>${item.width} × ${item.height}</strong><em>${chainIndex ? `${sorted[chainIndexes[chainIndex - 1]].width}<${item.width} · ${sorted[chainIndexes[chainIndex - 1]].height}<${item.height}` : (vi ? "bắt đầu" : "start")}</em></span>`;
+    }).join("")
+    : `<em class="rde354-empty">${vi ? "Chuỗi sẽ xuất hiện khi thuật toán chọn predecessor." : "The chain appears after the algorithm chooses predecessors."}</em>`;
+  const chainTitle = phase === "done" ? (vi ? "MỘT CHUỖI TỐI ƯU THẬT" : "ONE REAL OPTIMAL CHAIN") : (vi ? "CHUỖI ĐANG THEO DÕI" : "CURRENT RECONSTRUCTED CHAIN");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Russian Doll Envelopes, cách ${approach}, đã xử lý ${Number(view.processedCount || 0)}/${n}, đáp án ${display(view.answer)}.`
+    : `Russian Doll Envelopes, approach ${approach}, processed ${Number(view.processedCount || 0)}/${n}, answer ${display(view.answer)}.`;
+
+  $("treeView").innerHTML = `<section class="rde354-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rde354-stages">${stages}</div>
+    <div class="rde354-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${vi ? "CÁCH" : "APPROACH"} ${approach}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rde354-sort-rule"><div><small>SORT KEY</small><strong>(width ↑, height ↓)</strong><span>${vi ? "rộng bằng nhau phải xếp cao giảm" : "equal widths must use descending heights"}</span></div><div class="rde354-ties">${tieExample}</div></section>
+    <section class="rde354-orders"><div><header><strong>${vi ? "THỨ TỰ BAN ĐẦU" : "ORIGINAL ORDER"}</strong><span># = input index</span></header><div>${originalHtml}</div></div><b>&rarr;</b><div><header><strong>${vi ? "SAU KHI SORT" : "SORTED ORDER"}</strong><span>s = sorted index</span></header><div>${sortedHtml}</div></div></section>
+    <section class="rde354-heights"><header><strong>HEIGHT SEQUENCE</strong><span>${vi ? `đã xử lý ${Number(view.processedCount || 0)}/${n}` : `${Number(view.processedCount || 0)}/${n} processed`}</span></header><div>${heightHtml}</div></section>
+    ${operation}
+    ${methodBoard}
+    <section class="rde354-chain ${phase === "done" ? "done" : ""}"><header><strong>${chainTitle}</strong><span>${phase === "done" ? `${vi ? "đáp án" : "answer"} = ${display(view.answer)}` : `${displayChain.size} ${vi ? "phong bì" : "envelope(s)"}`}</span></header><div>${chainHtml}</div></section>
+  </section>`;
+}
+
+function renderRotate48View(step) {
+  const view = step.rotate48View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const original = Array.isArray(view.original) ? view.original : [];
+  const n = Number(view.n) || matrix.length;
+  const phase = String(view.phase || "init");
+  const activeCells = Array.isArray(view.activeCells) ? view.activeCells : [];
+  const activeRow = Number.isInteger(view.activeRow) ? view.activeRow : null;
+  const reversedRows = new Set(Array.isArray(view.reversedRows) ? view.reversedRows : []);
+  const swap = view.swap || null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const phaseIndex = phase === "done" ? 2
+    : phase === "transpose-done" || phase.startsWith("reverse") ? 1 : 0;
+  const stageLabels = vi
+    ? ["Transpose qua đường chéo", "Đảo trái-phải từng hàng", "Xoay 90° hoàn tất"]
+    : ["Transpose across diagonal", "Reverse each row", "90° rotation complete"];
+  const stages = stageLabels.map((label, index) => {
+    const state = phase === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    const marker = state === "done" ? "✓" : state === "active" ? "▶" : index + 1;
+    return `<span class="${state} stage-${index + 1}"><small>${marker}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const transposeDone = Number(view.transposeSwaps) || 0;
+  const transposeTotal = Number(view.totalTransposeSwaps) || 0;
+  const rowDone = reversedRows.size;
+  const progress = `<section class="rot48-progress">
+    <div class="transpose"><small>TRANSPOSE SWAPS</small><strong>${transposeDone} / ${transposeTotal}</strong><span>${vi ? "chỉ đổi phía trên đường chéo" : "swap only above the diagonal"}</span></div>
+    <div class="diagonal"><small>MAIN DIAGONAL</small><strong>${n} ${vi ? "ô cố định" : "fixed cells"}</strong><span>(i,i) &rarr; (i,i)</span></div>
+    <div class="reverse"><small>REVERSED ROWS</small><strong>${rowDone} / ${n}</strong><span>${view.approach === 2 ? (vi ? "swap từng cặp" : "pair-by-pair swaps") : "row.reverse()"}</span></div>
+  </section>`;
+
+  const matrixItems = [];
+  matrixItems.push(`<span class="rot48-corner">r\\c</span>`);
+  for (let col = 0; col < n; col++) matrixItems.push(`<span class="rot48-col-label">c=${col}</span>`);
+  matrix.forEach((row, rowIndex) => {
+    matrixItems.push(`<span class="rot48-row-label ${rowIndex === activeRow ? "active" : ""} ${reversedRows.has(rowIndex) ? "done" : ""}">r=${rowIndex}</span>`);
+    row.forEach((value, colIndex) => {
+      const classes = ["rot48-cell"];
+      const isA = sameCell(activeCells[0], rowIndex, colIndex);
+      const isB = sameCell(activeCells[1], rowIndex, colIndex) && !isA;
+      if (rowIndex === colIndex) classes.push("diagonal");
+      if (rowIndex === activeRow) classes.push("active-row");
+      if (reversedRows.has(rowIndex)) classes.push("row-done");
+      if (isA) classes.push("active-a");
+      if (isB) classes.push("active-b");
+      const tag = isA ? "A" : isB ? "B" : rowIndex === colIndex ? "DIAG" : reversedRows.has(rowIndex) ? (vi ? "ĐÚNG CHỖ" : "FINAL") : "";
+      matrixItems.push(`<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(display(value))}</strong><em>${escapeHtml(tag)}</em></div>`);
+    });
+  });
+
+  let operation;
+  if (swap?.kind === "transpose") {
+    operation = `<section class="rot48-operation transpose">
+      <header><small>${vi ? "ĐỔI QUA ĐƯỜNG CHÉO" : "MIRROR SWAP"}</small><strong>matrix[${swap.a[0]}][${swap.a[1]}] ↔ matrix[${swap.b[0]}][${swap.b[1]}]</strong></header>
+      <div><span class="a"><small>A · (${swap.a.join(",")})</small><strong>${escapeHtml(display(swap.before?.[0]))} &rarr; ${escapeHtml(display(swap.after?.[0]))}</strong></span><i>↔</i><span class="b"><small>B · (${swap.b.join(",")})</small><strong>${escapeHtml(display(swap.before?.[1]))} &rarr; ${escapeHtml(display(swap.after?.[1]))}</strong></span></div>
+      <p>${vi ? "A và B có tọa độ đảo ngược nhau, nên chúng đối xứng qua đường chéo chính." : "A and B have reversed coordinates, so they mirror each other across the main diagonal."}</p>
+    </section>`;
+  } else if (swap?.kind === "reverse") {
+    operation = `<section class="rot48-operation reverse">
+      <header><small>${vi ? `ĐẢO HÀNG ${swap.a[0]}` : `REVERSE ROW ${swap.a[0]}`}</small><strong>j=${swap.a[1]} ↔ n-1-j=${swap.b[1]}</strong></header>
+      <div><span class="a"><small>${vi ? "ĐẦU TRÁI" : "LEFT END"} · (${swap.a.join(",")})</small><strong>${escapeHtml(display(swap.before?.[0]))} &rarr; ${escapeHtml(display(swap.after?.[0]))}</strong></span><i>↔</i><span class="b"><small>${vi ? "ĐẦU PHẢI" : "RIGHT END"} · (${swap.b.join(",")})</small><strong>${escapeHtml(display(swap.before?.[1]))} &rarr; ${escapeHtml(display(swap.after?.[1]))}</strong></span></div>
+      <p>${vi ? "Hai ô cùng hàng và cách đều hai mép đổi chỗ; lặp đến giữa hàng." : "Two cells in the same row, equally far from opposite ends, trade places; repeat toward the center."}</p>
+    </section>`;
+  } else if (swap?.kind === "row-reverse") {
+    const before = (swap.beforeRow || []).map(display).join(", ");
+    const after = (swap.afterRow || []).map(display).join(", ");
+    operation = `<section class="rot48-operation reverse row-reverse">
+      <header><small>row.reverse()</small><strong>${vi ? `ĐẢO TOÀN BỘ HÀNG ${swap.row}` : `REVERSE ALL OF ROW ${swap.row}`}</strong></header>
+      <div class="rot48-row-change"><code>[${escapeHtml(before)}]</code><i>&rarr;</i><code>[${escapeHtml(after)}]</code></div>
+      <p>${vi ? "Phần tử ngoài cùng đổi phía trước, rồi tiếp tục vào giữa; Python thực hiện toàn bộ bằng row.reverse()." : "Outer values change sides first, continuing inward; Python performs the whole operation with row.reverse()."}</p>
+    </section>`;
+  } else if (phase === "transpose-done") {
+    operation = `<section class="rot48-operation bridge"><header><small>${vi ? "CHUYỂN PHA" : "PHASE CHANGE"}</small><strong>${vi ? "Transpose xong, bắt đầu đảo từng hàng" : "Transpose done, now reverse every row"}</strong></header><p>${vi ? "Cột của ma trận gốc đã trở thành hàng. Đảo hàng sẽ biến hướng xoay ngược chiều thành đúng 90° clockwise." : "Original columns are now rows. Reversing those rows turns the reflection into a 90° clockwise rotation."}</p></section>`;
+  } else if (phase === "done") {
+    operation = `<section class="rot48-operation done"><header><small>DONE · O(n²) TIME · O(1) SPACE</small><strong>(r,c) &rarr; (c,n-1-r)</strong></header><p>${vi ? "Mọi hàng đã đảo xong và mọi phần tử đang ở tọa độ xoay cuối cùng." : "Every row is reversed and every value is at its final rotated coordinate."}</p></section>`;
+  } else {
+    operation = `<section class="rot48-operation idle"><header><small>${vi ? "HAI PHÉP BIẾN ĐỔI TẠI CHỖ" : "TWO IN-PLACE TRANSFORMS"}</small><strong>transpose &rarr; reverse rows</strong></header><p>${vi ? "Theo dõi đường chéo xanh, cặp A/B đang đổi và các hàng đã hoàn tất." : "Watch the cyan diagonal, the active A/B pair, and rows that have reached their final order."}</p></section>`;
+  }
+
+  const transformCards = `<section class="rot48-map">
+    <header><strong>${vi ? "BẢN ĐỒ TỌA ĐỘ" : "COORDINATE MAP"}</strong><span>${vi ? "vì sao hai bước tạo đúng phép xoay" : "why the two steps equal one rotation"}</span></header>
+    <div>
+      <span class="transpose ${phaseIndex === 0 ? "active" : ""}"><small>1 · TRANSPOSE</small><strong>(r,c) &rarr; (c,r)</strong><em>${vi ? "đổi hàng ↔ cột" : "swap row ↔ column"}</em></span>
+      <i>&rarr;</i>
+      <span class="reverse ${phaseIndex === 1 ? "active" : ""}"><small>2 · REVERSE ROW</small><strong>(c,r) &rarr; (c,n-1-r)</strong><em>${vi ? "lật chỉ số cột" : "flip the column index"}</em></span>
+      <i>=</i>
+      <span class="combined ${phase === "done" ? "active" : ""}"><small>${vi ? "KẾT QUẢ" : "COMBINED"}</small><strong>(r,c) &rarr; (c,n-1-r)</strong><em>90° CLOCKWISE</em></span>
+    </div>
+  </section>`;
+
+  const originalRows = original.map((row, index) => `<span><small>row ${index}</small><code>[${escapeHtml(row.map(display).join(", "))}]</code></span>`).join("");
+  const currentRows = matrix.map((row, index) => `<span class="${reversedRows.has(index) ? "done" : index === activeRow ? "active" : ""}"><small>row ${index}</small><code>[${escapeHtml(row.map(display).join(", "))}]</code></span>`).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Rotate Image: transpose ${transposeDone}/${transposeTotal}, đã đảo ${rowDone}/${n} hàng.`
+    : `Rotate Image: ${transposeDone}/${transposeTotal} transpose swaps, ${rowDone}/${n} rows reversed.`;
+
+  $("treeView").innerHTML = `<section class="rot48-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rot48-stages">${stages}</div>
+    <div class="rot48-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${view.approach === 2 ? (vi ? "CÁCH 2" : "APPROACH 2") : (vi ? "CÁCH 1" : "APPROACH 1")}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    ${progress}
+    ${operation}
+    <div class="rot48-layout">
+      <section class="rot48-board"><header><strong>MATRIX ${n} × ${n}</strong><span>${vi ? "đường chéo chính được giữ cố định" : "main diagonal stays fixed during transpose"}</span></header><div class="rot48-matrix-wrap"><div class="rot48-matrix" style="--rot48-cols:${n}">${matrixItems.join("")}</div></div></section>
+      <aside class="rot48-legend"><strong>${vi ? "ĐỌC MÀU" : "READ THE COLORS"}</strong><span class="diag"><i></i>${vi ? "đường chéo chính" : "main diagonal"}</span><span class="a"><i></i>${vi ? "ô A đang đổi" : "active cell A"}</span><span class="b"><i></i>${vi ? "ô B đang đổi" : "active cell B"}</span><span class="row"><i></i>${vi ? "hàng đã đảo xong" : "reversed row"}</span></aside>
+    </div>
+    ${transformCards}
+    <section class="rot48-compare"><div><header><strong>${vi ? "MA TRẬN GỐC" : "ORIGINAL MATRIX"}</strong><span>input</span></header>${originalRows}</div><i>&rarr;</i><div><header><strong>${phase === "done" ? (vi ? "KẾT QUẢ XOAY" : "ROTATED RESULT") : (vi ? "TRẠNG THÁI HIỆN TẠI" : "CURRENT STATE")}</strong><span>in-place</span></header>${currentRows}</div></section>
+  </section>`;
+}
+
+function renderSpiral54View(step) {
+  const view = step.spiral54View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const bounds = view.bounds || { top: 0, bottom: rows - 1, left: 0, right: cols - 1 };
+  const phase = String(view.phase || "init");
+  const direction = view.direction;
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const visitedCells = Array.isArray(view.visitedCells) ? view.visitedCells : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const visited = new Map(visitedCells.map((cell) => [`${cell.row},${cell.col}`, cell]));
+  const validRegion = bounds.top <= bounds.bottom && bounds.left <= bounds.right;
+  const directions = [
+    { key: "top", label: "TOP", arrow: "→", detail: vi ? "hàng trên" : "top row" },
+    { key: "right", label: "RIGHT", arrow: "↓", detail: vi ? "cột phải" : "right column" },
+    { key: "bottom", label: "BOTTOM", arrow: "←", detail: vi ? "hàng dưới" : "bottom row" },
+    { key: "left", label: "LEFT", arrow: "↑", detail: vi ? "cột trái" : "left column" },
+  ];
+  const activeStage = Math.max(0, directions.findIndex((item) => item.key === direction));
+  const stages = directions.map((item, index) => {
+    const state = phase === "done" || index < activeStage ? "done" : index === activeStage ? "active" : "pending";
+    return `<span class="${state} ${item.key}"><small>${state === "done" ? "✓" : item.arrow}</small><strong>${item.label}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  const boundaryCards = [
+    { key: "top", label: "TOP", value: bounds.top, movement: vi ? "xong hàng → tăng" : "row done → increment" },
+    { key: "right", label: "RIGHT", value: bounds.right, movement: vi ? "xong cột → giảm" : "column done → decrement" },
+    { key: "bottom", label: "BOTTOM", value: bounds.bottom, movement: vi ? "xong hàng → giảm" : "row done → decrement" },
+    { key: "left", label: "LEFT", value: bounds.left, movement: vi ? "xong cột → tăng" : "column done → increment" },
+  ].map((item) => {
+    const changed = view.boundaryChange?.name === item.key;
+    const active = direction === item.key;
+    return `<span class="${item.key} ${active ? "active" : ""} ${changed ? "changed" : ""}"><small>${item.label}</small><strong>${item.key} = ${escapeHtml(String(item.value))}</strong><em>${escapeHtml(item.movement)}</em></span>`;
+  }).join("");
+
+  const cells = matrix.flatMap((row, rowIndex) => row.map((value, colIndex) => {
+    const key = `${rowIndex},${colIndex}`;
+    const visit = visited.get(key);
+    const isActive = activeCell && activeCell[0] === rowIndex && activeCell[1] === colIndex;
+    const inRegion = validRegion
+      && rowIndex >= bounds.top && rowIndex <= bounds.bottom
+      && colIndex >= bounds.left && colIndex <= bounds.right;
+    const classes = ["sm54-cell"];
+    if (visit) classes.push("visited");
+    if (inRegion) classes.push("remaining");
+    if (isActive) classes.push("active");
+    if (validRegion && rowIndex === bounds.top && colIndex >= bounds.left && colIndex <= bounds.right) classes.push("bound-top");
+    if (validRegion && rowIndex === bounds.bottom && colIndex >= bounds.left && colIndex <= bounds.right) classes.push("bound-bottom");
+    if (validRegion && colIndex === bounds.left && rowIndex >= bounds.top && rowIndex <= bounds.bottom) classes.push("bound-left");
+    if (validRegion && colIndex === bounds.right && rowIndex >= bounds.top && rowIndex <= bounds.bottom) classes.push("bound-right");
+    return `<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(String(value))}</strong><em>${visit ? `#${visit.order}` : inRegion ? (vi ? "CHƯA ĐI" : "UNVISITED") : ""}</em></div>`;
+  })).join("");
+
+  const topEdge = `<div class="sm54-edge-label top ${direction === "top" ? "active" : ""}"><span>↓</span><b>TOP = ${escapeHtml(String(bounds.top))}</b></div>`;
+  const bottomEdge = `<div class="sm54-edge-label bottom ${direction === "bottom" ? "active" : ""}"><b>BOTTOM = ${escapeHtml(String(bounds.bottom))}</b><span>↑</span></div>`;
+  const leftEdge = `<div class="sm54-edge-label left ${direction === "left" ? "active" : ""}"><b>LEFT</b><strong>${escapeHtml(String(bounds.left))}</strong><span>→</span></div>`;
+  const rightEdge = `<div class="sm54-edge-label right ${direction === "right" ? "active" : ""}"><span>←</span><b>RIGHT</b><strong>${escapeHtml(String(bounds.right))}</strong></div>`;
+
+  let operation;
+  if (view.boundaryChange) {
+    const change = view.boundaryChange;
+    operation = `<section class="sm54-operation change ${escapeHtml(change.name)}"><small>${vi ? "CO BIÊN" : "SHRINK BOUND"}</small><strong>${String(change.name).toUpperCase()}: ${escapeHtml(String(change.from))} → ${escapeHtml(String(change.to))}</strong><span>${vi ? "Cạnh vừa quét được loại khỏi vùng chưa duyệt." : "The completed edge leaves the unvisited region."}</span></section>`;
+  } else if (view.guard) {
+    const guard = view.guard;
+    operation = `<section class="sm54-operation guard ${guard.pass ? "pass" : "skip"}"><small>${vi ? "ĐIỀU KIỆN CHỐNG TRÙNG" : "DUPLICATE GUARD"}</small><strong>${escapeHtml(guard.expression)} · ${escapeHtml(String(guard.left))} ${guard.pass ? "≤" : ">"} ${escapeHtml(String(guard.right))}</strong><span>${guard.pass ? (vi ? "PASS: cạnh này vẫn còn." : "PASS: this edge still exists.") : (vi ? "SKIP: hai biên đã giao nhau." : "SKIP: the bounds have crossed.")}</span></section>`;
+  } else if (direction) {
+    const formulas = {
+      top: `matrix[top][c] · c: ${bounds.left} → ${bounds.right}`,
+      right: `matrix[r][right] · r: ${bounds.top} → ${bounds.bottom}`,
+      bottom: `matrix[bottom][c] · c: ${bounds.right} → ${bounds.left}`,
+      left: `matrix[r][left] · r: ${bounds.bottom} → ${bounds.top}`,
+    };
+    operation = `<section class="sm54-operation scan ${direction}"><small>${vi ? "CẠNH ĐANG QUÉT" : "ACTIVE EDGE"}</small><strong>${direction.toUpperCase()} ${directions.find((item) => item.key === direction)?.arrow || ""}</strong><code>${escapeHtml(formulas[direction] || "top <= bottom and left <= right")}</code></section>`;
+  } else {
+    operation = `<section class="sm54-operation idle"><small>${phase === "done" ? "DONE" : (vi ? "VÙNG CHƯA DUYỆT" : "UNVISITED REGION")}</small><strong>${phase === "done" ? `${result.length}/${rows * cols}` : `[top..bottom] × [left..right]`}</strong><span>${phase === "done" ? (vi ? "Mọi ô đã được lấy đúng một lần." : "Every cell was taken exactly once.") : (vi ? "Bốn biên bắt đầu ở viền ngoài." : "The four bounds start at the outer rim.")}</span></section>`;
+  }
+
+  const output = result.length
+    ? result.map((value, index) => `<span class="${index === result.length - 1 && activeCell ? "active" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("")
+    : `<em class="sm54-empty">${vi ? "result đang rỗng" : "result is empty"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Spiral Matrix: đã lấy ${result.length}/${rows * cols} ô; top ${bounds.top}, right ${bounds.right}, bottom ${bounds.bottom}, left ${bounds.left}.`
+    : `Spiral Matrix: visited ${result.length}/${rows * cols} cells; top ${bounds.top}, right ${bounds.right}, bottom ${bounds.bottom}, left ${bounds.left}.`;
+
+  $("treeView").innerHTML = `<section class="sm54-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sm54-stages">${stages}</div>
+    <div class="sm54-action"><small>${vi ? "LỚP" : "LAYER"} ${Number(view.layer || 0) + 1} · ${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="sm54-bounds"><header><strong>4 BOUNDS</strong><span>${vi ? "bao quanh vùng CHƯA duyệt" : "enclose the UNVISITED region"}</span></header><div>${boundaryCards}</div></section>
+    ${operation}
+    <div class="sm54-layout">
+      <section class="sm54-board"><header><strong>MATRIX ${rows} × ${cols}</strong><span>${vi ? `còn ${view.remainingCount} ô` : `${view.remainingCount} remaining`}</span></header>${topEdge}<div class="sm54-board-row">${leftEdge}<div class="sm54-grid-wrap"><div class="sm54-grid" style="--sm54-cols:${cols}">${cells}</div></div>${rightEdge}</div>${bottomEdge}</section>
+      <aside class="sm54-legend"><strong>${vi ? "ĐỌC KHUNG" : "READ THE FRAME"}</strong><span class="top"><i></i>TOP · →</span><span class="right"><i></i>RIGHT · ↓</span><span class="bottom"><i></i>BOTTOM · ←</span><span class="left"><i></i>LEFT · ↑</span><span class="visited"><i></i>${vi ? "đã vào result" : "already in result"}</span></aside>
+    </div>
+    <section class="sm54-output"><header><strong>SPIRAL OUTPUT</strong><span>${result.length}/${rows * cols}</span></header><div>${output}</div></section>
+  </section>`;
+}
+
+function renderRandomizedSet380View(step) {
+  const view = step.randomizedSet380View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const values = Array.isArray(view.values) ? view.values : [];
+  const entries = Array.isArray(view.mapEntries) ? view.mapEntries : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const phaseIndex = phase === "init" || phase === "invalid" ? 0
+    : ["insert-check", "insert-reject", "remove-lookup", "remove-reject", "remove-plan"].includes(phase) ? 1
+      : phase === "return" || phase === "done" ? 3 : 2;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Tra hashmap", "Sửa mảng + map", "Trả kết quả"]
+    : ["Initialize", "Hash lookup", "Update array + map", "Return result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    const result = index < view.completedOps ? results[index] : null;
+    return `<span class="${state}"><small>#${index + 1}</small><b>${escapeHtml(operation)}</b><em>${state === "done" ? `→ ${escapeHtml(display(result))}` : state === "active" ? (vi ? "đang chạy" : "running") : ""}</em></span>`;
+  }).join("");
+
+  const ghostSlot = phase === "insert-map" && view.activeArrayIndex === values.length
+    ? `<div class="rs380-cell ghost active"><small>[${values.length}]</small><strong>?</strong><em>${vi ? "sắp append" : "append next"}</em></div>`
+    : "";
+  const arrayHtml = values.map((value, index) => {
+    const classes = ["rs380-cell"];
+    if (index === view.activeArrayIndex) classes.push("active");
+    if (index === view.lastIndex) classes.push("last");
+    if (view.randomPick && index === view.randomPick.index) classes.push("random");
+    return `<div class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(display(value))}</strong><em>${index === view.lastIndex ? "LAST" : index === view.activeArrayIndex ? (vi ? "ĐANG XỬ LÝ" : "ACTIVE") : ""}</em></div>`;
+  }).join("") + ghostSlot;
+  const mapHtml = entries.length ? entries.map((entry) => {
+    const active = entry.value === view.activeValue || entry.value === view.lastValue;
+    return `<div class="rs380-map-row ${active ? "active" : ""}"><strong>${escapeHtml(display(entry.value))}</strong><i>→</i><b>${escapeHtml(display(entry.index))}</b><span>values[${escapeHtml(display(entry.index))}] = ${escapeHtml(display(values[entry.index]))}</span></div>`;
+  }).join("") : `<em class="rs380-empty">{ }</em>`;
+
+  const removePhases = ["remove-plan", "remove-write-last", "remove-map-update", "remove-pop", "return"];
+  const removeStage = removePhases.indexOf(phase);
+  const removeBoard = phase.startsWith("remove") || (phase === "return" && view.lastValue !== null)
+    ? `<section class="rs380-remove"><header><strong>SWAP-DELETE · O(1)</strong><span>${vi ? "không dịch các phần tử ở giữa" : "never shift middle elements"}</span></header><div>
+        <span class="${removeStage === 0 ? "active" : removeStage > 0 ? "done" : ""}"><small>1</small><b>${vi ? "TÌM Ô" : "LOCATE"}</b><em>${display(view.activeArrayIndex)}</em></span>
+        <i>→</i><span class="${removeStage === 1 ? "active" : removeStage > 1 ? "done" : ""}"><small>2</small><b>${vi ? "COPY LAST" : "COPY LAST"}</b><em>${display(view.lastValue)}</em></span>
+        <i>→</i><span class="${removeStage === 2 ? "active" : removeStage > 2 ? "done" : ""}"><small>3</small><b>${vi ? "SỬA MAP" : "REPOINT MAP"}</b><em>${display(view.lastValue)} → ${display(view.activeArrayIndex)}</em></span>
+        <i>→</i><span class="${removeStage >= 3 ? "active" : ""}"><small>4</small><b>POP + DELETE</b><em>O(1)</em></span>
+      </div></section>`
+    : "";
+  const randomBoard = view.randomPick
+    ? `<section class="rs380-random"><small>UNIFORM RANDOM INDEX · seed ${escapeHtml(display(view.seed))}</small><strong>randrange(${view.randomPick.length}) = ${view.randomPick.index}</strong><span>values[${view.randomPick.index}] = <b>${escapeHtml(display(view.randomPick.value))}</b></span></section>`
+    : "";
+  const detail = view.detail || {};
+  const insertBoard = phase.startsWith("insert")
+    ? `<section class="rs380-insert"><small>INSERT ${escapeHtml(display(view.activeValue))}</small><strong>${detail.exists ? (vi ? "ĐÃ TỒN TẠI → FALSE" : "ALREADY PRESENT → FALSE") : `new index = len(values) = ${escapeHtml(display(view.activeArrayIndex))}`}</strong><span>${vi ? "Hashmap chặn duplicate trước khi append." : "The hash map rejects duplicates before append."}</span></section>`
+    : "";
+  const resultHtml = operations.map((operation, index) => index < view.completedOps
+    ? `<span><small>${escapeHtml(operation)}</small><strong>${escapeHtml(display(results[index]))}</strong></span>` : "").join("") || `<em class="rs380-empty">${vi ? "Chưa có output" : "No output yet"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi ? `RandomizedSet có ${values.length} phần tử; invariant ${view.invariantOk ? "đúng" : "đang cập nhật"}.` : `RandomizedSet has ${values.length} values; invariant ${view.invariantOk ? "holds" : "is being updated"}.`;
+
+  $("treeView").innerHTML = `<section class="rs380-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rs380-phases">${phases}</div>
+    <div class="rs380-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rs380-operations"><header><strong>OPERATIONS</strong><span>${view.completedOps}/${operations.length} ${vi ? "hoàn tất" : "complete"}</span></header><div>${operationHtml}</div></section>
+    <section class="rs380-invariant ${view.invariantOk ? "ok" : "updating"}"><strong>index[values[i]] = i</strong><span>${view.invariantOk ? (vi ? "✓ mảng và hashmap đang khớp" : "✓ array and map agree") : (vi ? "↻ trạng thái trung gian giữa hai dòng code" : "↻ intermediate state between two code lines")}</span></section>
+    <div class="rs380-structures">
+      <section class="rs380-array"><header><strong>DENSE ARRAY · values</strong><span>getRandom → random index</span></header><div>${arrayHtml || `<em class="rs380-empty">[ ]</em>`}</div></section>
+      <section class="rs380-map"><header><strong>HASH MAP · index</strong><span>value → array index</span></header><div>${mapHtml}</div></section>
+    </div>
+    ${removeBoard}${randomBoard}${insertBoard}
+    <section class="rs380-results"><header><strong>RETURN LOG</strong><span>True / False / random value</span></header><div>${resultHtml}</div></section>
+  </section>`;
+}
+
+function renderAllocator2502View(step) {
+  const view = step.allocator2502View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const memory = Array.isArray(view.memory) ? view.memory : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const touched = new Set(Array.isArray(view.touched) ? view.touched : []);
+  const candidate = Array.isArray(view.candidateRange) ? view.candidateRange : null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const phaseIndex = phase === "init" || phase === "invalid" ? 0
+    : phase.endsWith("start") ? 0
+      : ["scan-free", "scan-blocked", "fit-found", "free-find"].includes(phase) ? 1
+        : ["allocate-write", "free-write"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Nhận operation", "Quét bộ nhớ", "Ghi / giải phóng", "Trả kết quả"]
+    : ["Read operation", "Scan memory", "Write / release", "Return result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    return `<span class="${state}"><small>#${index + 1}</small><b>${escapeHtml(operation)}</b><em>${state === "done" ? `→ ${escapeHtml(display(results[index]))}` : state === "active" ? (vi ? "đang chạy" : "running") : ""}</em></span>`;
+  }).join("");
+  const cells = memory.map((mID, index) => {
+    const colorIndex = Math.abs(Number(mID)) % 6;
+    const classes = ["alloc2502-cell", mID === 0 ? "free" : `owned c${colorIndex}`];
+    if (index === view.scanIndex) classes.push("scan");
+    if (candidate && index >= candidate[0] && index <= candidate[1]) classes.push("candidate");
+    if (index === view.blocker) classes.push("blocker");
+    if (touched.has(index)) classes.push(phase === "free-find" ? "releasing" : phase === "free-write" ? "released" : "written");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${mID === 0 ? "FREE" : `mID ${escapeHtml(display(mID))}`}</strong><em>${index === view.scanIndex ? "i" : touched.has(index) ? (phase.startsWith("free") ? "FREE" : "WRITE") : ""}</em></div>`;
+  }).join("");
+  const runs = (view.freeRuns || []).map((run) => `<span><small>[${run.start}..${run.end}]</small><strong>${run.length}</strong><em>${vi ? "ô liên tiếp" : "contiguous"}</em></span>`).join("") || `<em class="alloc2502-empty">${vi ? "Không còn block FREE" : "No FREE block remains"}</em>`;
+  const current = view.currentOperation;
+  let request = "";
+  if (current?.name === "allocate") {
+    const enough = view.streak >= current.size;
+    request = `<section class="alloc2502-request allocate"><div><small>REQUEST</small><strong>size=${current.size} · mID=${current.mID}</strong></div><div><small>FREE STREAK</small><strong>${view.streak} / ${current.size}</strong></div><div class="${enough ? "ready" : ""}"><small>FIRST FIT</small><strong>${enough && candidate ? `[${candidate[0]}..${candidate[1]}]` : phase === "allocate-fail" ? "NONE" : "…"}</strong></div><div><small>RETURN</small><strong>${escapeHtml(display(view.result))}</strong></div></section>`;
+  } else if (current?.name === "free") {
+    request = `<section class="alloc2502-request release"><div><small>REQUEST</small><strong>freeMemory(${current.mID})</strong></div><div><small>MATCHED CELLS</small><strong>${touched.size}</strong></div><div><small>RETURN</small><strong>${escapeHtml(display(view.result))}</strong></div></section>`;
+  }
+  const resultHtml = operations.map((operation, index) => index < view.completedOps
+    ? `<span><small>${escapeHtml(operation)}</small><strong>${escapeHtml(display(results[index]))}</strong></span>` : "").join("") || `<em class="alloc2502-empty">${vi ? "Chưa có output" : "No output yet"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi ? `Allocator ${memory.length} ô, ${view.freeRuns?.length || 0} vùng trống.` : `Allocator with ${memory.length} cells and ${view.freeRuns?.length || 0} free runs.`;
+
+  $("treeView").innerHTML = `<section class="alloc2502-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="alloc2502-phases">${phases}</div>
+    <div class="alloc2502-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="alloc2502-operations"><header><strong>OPERATIONS</strong><span>${view.completedOps}/${operations.length} ${vi ? "hoàn tất" : "complete"}</span></header><div>${operationHtml}</div></section>
+    ${request}
+    <section class="alloc2502-memory"><header><strong>MEMORY · ${memory.length} CELLS</strong><span>${vi ? "địa chỉ tăng từ trái sang phải" : "addresses increase left to right"}</span></header><div>${cells}</div></section>
+    <section class="alloc2502-runs"><header><strong>CONTIGUOUS FREE RUNS</strong><span>${vi ? "allocate cần một run đủ dài" : "allocate needs one long-enough run"}</span></header><div>${runs}</div></section>
+    <section class="alloc2502-results"><header><strong>RETURN LOG</strong><span>${vi ? "allocate → start · free → count" : "allocate → start · free → count"}</span></header><div>${resultHtml}</div></section>
+  </section>`;
+}
+
+function renderStoneGame1872View(step) {
+  const view = step.stoneGame1872View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "rules");
+  const stones = Array.isArray(view.stones) ? view.stones : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const moveLog = Array.isArray(view.moveLog) ? view.moveLog : [];
+  const traceStops = new Set(Array.isArray(view.traceStops) ? view.traceStops : []);
+  const moveStops = new Map(moveLog.map((move, index) => [move.idx, { ...move, turn: index + 1 }]));
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const signed = (value) => Number(value) >= 0 ? `+${value}` : String(value);
+  const expression = (values) => (values || []).map((value, index) => {
+    if (index === 0) return String(value);
+    return Number(value) < 0 ? ` − ${Math.abs(value)}` : ` + ${value}`;
+  }).join("");
+
+  const phaseIndex = phase === "rules" ? 0
+    : phase.startsWith("game") ? 1
+      : phase === "bridge" || phase === "prefix" ? 2
+        : phase.startsWith("dp") ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Luật chơi", "Chơi một ván", "Đổi sang prefix", "DP từ phải", "Đối chiếu"]
+    : ["Rules", "Play one game", "Build prefixes", "Right-to-left DP", "Verify"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const action = `<div class="sg1872-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>`;
+
+  const rules = `<section class="sg1872-rules" aria-label="${vi ? "Ba bước của một lượt" : "Three actions in one turn"}">
+    <div><small>1 · CHOOSE</small><strong>x &gt; 1</strong><span>${vi ? "viên ngoài cùng bên trái" : "leftmost stones"}</span></div><i>→</i>
+    <div><small>2 · SCORE</small><strong>sum = Σ picked</strong><span>${vi ? "người đi cộng sum vào điểm" : "the mover adds sum to score"}</span></div><i>→</i>
+    <div><small>3 · MERGE</small><strong>[sum, ...rest]</strong><span>${vi ? "đặt viên tổng về đầu hàng" : "put the sum back on the left"}</span></div>
+  </section>`;
+
+  const gameItems = (Array.isArray(view.gameRow) ? view.gameRow : []).map((item) => {
+    const classes = ["sg1872-stone", item.taken ? "taken" : "", item.mergedThrough !== null ? "merged" : ""].filter(Boolean).join(" ");
+    const tag = item.taken
+      ? (vi ? "ĐANG GỘP" : "PICKED")
+      : item.mergedThrough !== null ? (vi ? "VIÊN TỔNG" : "MERGED SUM") : (vi ? "CÒN LẠI" : "REMAINS");
+    return `<div class="${classes}"><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(display(item.value))}</strong><span>${tag}</span></div>`;
+  }).join("");
+  const currentMove = view.currentMove;
+  const moveEquation = currentMove
+    ? `<section class="sg1872-move-equation ${phase === "game-move" ? "active" : "merged"}"><small>${escapeHtml(currentMove.mover)} · x=${currentMove.x} · ${vi ? `dừng tại index gốc ${currentMove.idx}` : `stop at original index ${currentMove.idx}`}</small><strong>${escapeHtml(expression(currentMove.taken))} = ${escapeHtml(display(currentMove.sum))}</strong><span>${phase === "game-move" ? (vi ? "Những viên viền vàng sẽ biến thành đúng một viên tổng." : "The gold stones will become one merged-sum stone.") : (vi ? `Đã cộng ${signed(currentMove.sum)} điểm và thu hàng đá lại.` : `Added ${signed(currentMove.sum)} points and shrank the row.`)}</span></section>`
+    : "";
+  const scoreDiff = Number(view.aliceScore || 0) - Number(view.bobScore || 0);
+  const gameBoard = `<section class="sg1872-game">
+    <header><strong>${vi ? "HÀNG ĐÁ HIỆN TẠI" : "CURRENT STONE ROW"}</strong><span>${vi ? "hàng ngắn dần sau mỗi lượt" : "the row shrinks after every move"}</span></header>
+    <div class="sg1872-score"><span class="alice ${view.mover === "Alice" ? "turn" : ""}"><small>ALICE</small><strong>${escapeHtml(display(view.aliceScore || 0))}</strong></span><b>${vi ? "hiệu" : "gap"} ${signed(scoreDiff)}</b><span class="bob ${view.mover === "Bob" ? "turn" : ""}"><small>BOB</small><strong>${escapeHtml(display(view.bobScore || 0))}</strong></span></div>
+    <div class="sg1872-row">${gameItems}</div>
+    ${moveEquation}
+  </section>`;
+
+  const timelineItems = moveLog.map((move, index) => `<span class="${move.mover === "Alice" ? "alice" : "bob"}"><small>#${index + 1} · ${escapeHtml(move.mover)}</small><strong>p[${move.idx}] = ${escapeHtml(display(move.sum))}</strong><em>${vi ? `dừng tại i=${move.idx}` : `stop at i=${move.idx}`}</em></span>`).join("");
+  const pendingMove = phase === "game-move" && currentMove
+    ? `<span class="pending ${currentMove.mover === "Alice" ? "alice" : "bob"}"><small>#${moveLog.length + 1} · ${escapeHtml(currentMove.mover)}</small><strong>p[${currentMove.idx}] = ${escapeHtml(display(currentMove.sum))}</strong><em>${vi ? "đang chọn" : "choosing"}</em></span>`
+    : "";
+  const timeline = moveLog.length || pendingMove
+    ? `<section class="sg1872-timeline"><header><strong>${vi ? "TIMELINE ĐIỂM DỪNG" : "STOP-INDEX TIMELINE"}</strong><span>${vi ? "mỗi lượt tương ứng đúng một prefix sum" : "each move maps to exactly one prefix sum"}</span></header><div>${timelineItems}${pendingMove}</div></section>`
+    : "";
+
+  const stateCells = stones.map((value, index) => {
+    const classes = ["sg1872-state-cell"];
+    if (index === view.currentIndex) classes.push("current");
+    if (prefix[index] !== null && prefix[index] !== undefined) classes.push("prefix-ready");
+    if (dp[index] !== null && dp[index] !== undefined) classes.push("dp-ready");
+    if (moveStops.has(index)) classes.push(moveStops.get(index).mover === "Alice" ? "alice-stop" : "bob-stop");
+    if (traceStops.has(index)) classes.push("traced");
+    const move = moveStops.get(index);
+    const marker = traceStops.has(index) ? (vi ? "DP CHỌN" : "DP PICK")
+      : move ? `#${move.turn} ${move.mover}` : "";
+    return `<div class="${classes.join(" ")}">
+      <small>i = ${index}</small>
+      <dl><div><dt>a[i]</dt><dd>${escapeHtml(display(value))}</dd></div><div><dt>p[i]</dt><dd>${escapeHtml(display(prefix[index]))}</dd></div><div><dt>f[i]</dt><dd>${index === 0 ? "×" : escapeHtml(display(dp[index]))}</dd></div></dl>
+      <em>${escapeHtml(marker)}</em>
+    </div>`;
+  }).join("");
+  const stateGrid = `<section class="sg1872-state"><header><strong>stones → prefix p[i] → DP f[i]</strong><span>${vi ? "ô sáng là index đang xử lý" : "the bright cell is the current index"}</span></header><div>${stateCells}</div><footer><span><i class="alice"></i>Alice stop</span><span><i class="bob"></i>Bob stop</span><span><i class="trace"></i>${vi ? "DP lần lại" : "DP trace"}</span></footer></section>`;
+
+  const choice = view.choice;
+  let decision = "";
+  if (choice?.kind === "base") {
+    decision = `<section class="sg1872-base"><small>${vi ? "BASE CASE · CHỈ CÒN MỘT ĐIỂM DỪNG" : "BASE CASE · ONLY ONE STOP REMAINS"}</small><strong>f[${view.currentIndex}] = p[${view.currentIndex}] = ${escapeHtml(display(choice.result))}</strong><span>${vi ? "Người sắp đi buộc phải gộp hết, nên nhận toàn bộ prefix cuối." : "The mover must merge everything, so they receive the final prefix."}</span></section>`;
+  } else if (choice?.kind === "compare") {
+    const tie = choice.take === choice.skip;
+    decision = `<section class="sg1872-decision"><header><strong>f[${view.currentIndex}] = max(TAKE, SKIP)</strong><span>${vi ? "lợi thế tối đa của người sắp đi" : "best margin for the player to move"}</span></header><div>
+      <article class="take ${choice.picked === "take" || tie ? "picked" : ""}"><small>TAKE · ${vi ? "dừng tại i" : "stop at i"}</small><code>p[${view.currentIndex}] − f[${view.currentIndex + 1}]</code><strong>${display(choice.prefixValue)} − (${display(choice.opponentBest)}) = ${display(choice.take)}</strong><span>${vi ? "điểm mình nhận trừ lợi thế tốt nhất của đối thủ" : "my score minus the opponent's best margin"}</span></article>
+      <b>VS</b>
+      <article class="skip ${choice.picked === "skip" || tie ? "picked" : ""}"><small>SKIP · ${vi ? "chưa dừng" : "do not stop yet"}</small><code>f[${view.currentIndex + 1}]</code><strong>${display(choice.skip)}</strong><span>${vi ? "bỏ index này, giữ phương án tốt nhất bên phải" : "ignore this index and keep the best option to its right"}</span></article>
+      <em>→</em><article class="result"><small>${tie ? "TIE · BOTH OPTIMAL" : (vi ? `CHỌN ${choice.picked.toUpperCase()}` : `PICK ${choice.picked.toUpperCase()}`)}</small><strong>f[${view.currentIndex}] = ${display(choice.result)}</strong></article>
+    </div></section>`;
+  } else if (choice?.kind === "trace") {
+    decision = `<section class="sg1872-trace"><small>${escapeHtml(view.mover || "Player")} · ${vi ? "TRA NGƯỢC PHƯƠNG ÁN TỐI ƯU" : "TRACE THE OPTIMAL CHOICE"}</small><strong>${signed(choice.prefixValue)} − (${display(choice.opponentBest)}) = ${display(choice.result)}</strong><span>${vi ? `Dừng tại i=${view.currentIndex}; điểm nhận là p[${view.currentIndex}].` : `Stop at i=${view.currentIndex}; the score gained is p[${view.currentIndex}].`}</span></section>`;
+  }
+
+  const answerKnown = view.answer !== null && view.answer !== undefined;
+  const answer = answerKnown
+    ? `<section class="sg1872-answer ${phase === "done" ? "done" : "preview"}"><small>${phase === "done" ? (vi ? "ĐÁP ÁN · f[1]" : "ANSWER · f[1]") : (vi ? "CHÊNH LỆCH VÁN MẪU" : "DEMO GAME MARGIN")}</small><strong>${escapeHtml(display(view.answer))}</strong><span>${phase === "done" ? `Alice ${display(view.aliceScore)} − Bob ${display(view.bobScore)} = f[1]` : `Alice − Bob = ${display(view.answer)}`}</span></section>`
+    : "";
+  const conceptualRule = phaseIndex >= 2
+    ? `<section class="sg1872-meaning"><strong>f[i]</strong><span>${vi ? "lợi thế lớn nhất người sắp đi có thể đảm bảo khi điểm dừng kế tiếp phải nằm từ i trở đi" : "the largest margin the player to move can guarantee when the next stop must be at i or later"}</span><code>f[i] = max(f[i+1], p[i] − f[i+1])</code></section>`
+    : "";
+  const main = phaseIndex <= 1 ? `${rules}${gameBoard}${timeline}` : `${conceptualRule}${stateGrid}${decision}${timeline}${answer}`;
+  const summary = vi ? `Bài 1872, giai đoạn ${phaseIndex + 1}, ${moveLog.length} nước đã mô phỏng.` : `Problem 1872, phase ${phaseIndex + 1}, ${moveLog.length} moves simulated.`;
+
+  $("treeView").innerHTML = `<section class="sg1872-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sg1872-phases">${phases}</div>
+    ${action}
+    ${main}
+  </section>`;
+}
+
 function renderAbsoluteSubarray1749View(step) {
   const view = step.absoluteSubarrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -18612,6 +19265,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromePathView(step);
+  } else if (step.russian354View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRussian354View(step);
+  } else if (step.rotate48View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotate48View(step);
+  } else if (step.spiral54View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSpiral54View(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -18978,6 +19649,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderElevator4027View(step);
+  } else if (step.randomizedSet380View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRandomizedSet380View(step);
+  } else if (step.allocator2502View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAllocator2502View(step);
+  } else if (step.stoneGame1872View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGame1872View(step);
   } else if (step.absoluteSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
