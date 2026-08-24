@@ -3604,17 +3604,108 @@ function buildSteps2022(input, params = {}) {
   const nums = Array.isArray(input) ? input.map(Number) : String(input).split(",").map((value) => Number(value.trim())).filter((value) => !Number.isNaN(value));
   const rows = Number(params.m), cols = Number(params.n);
   if (!nums.length || !nums.every(Number.isInteger) || !Number.isInteger(rows) || !Number.isInteger(cols) || rows <= 0 || cols <= 0) throw new Error("enter integer nums and positive m, n");
+  const needed = rows * cols;
+  const createView = ({ matrix, phase, activeIndex = null, activeCell = null, placedCount = 0, decision = null }) => ({
+    nums: [...nums],
+    matrix: cloneMatrix2D(matrix),
+    rows,
+    cols,
+    needed,
+    phase,
+    activeIndex,
+    activeCell,
+    placedCount,
+    decision,
+  });
   if (nums.length !== rows * cols) {
-    return { original: nums, answer: [], steps: [{ title: { vi: "Kích thước không khớp", en: "Size mismatch" }, arr: nums, highlight: [], mark: [], final: true, codeLines: [3, 4], vars: [{ name: "nums length", value: nums.length }, { name: "m*n", value: rows * cols }], note: { vi: "Không thể chia đủ nums thành m×n ô nên trả về [].", en: "nums cannot fill m×n cells, so return []." } }] };
+    return {
+      original: nums,
+      answer: [],
+      steps: [{
+        title: { vi: "Kích thước không khớp", en: "Size mismatch" },
+        arr: nums,
+        highlight: [],
+        mark: [],
+        final: true,
+        codeLines: [3, 4],
+        vars: [{ name: "nums length", value: nums.length }, { name: "m*n", value: needed }],
+        note: { vi: "Không thể chia đủ nums thành m×n ô nên trả về [].", en: "nums cannot fill m×n cells, so return []." },
+        convert2022View: createView({
+          matrix: [],
+          phase: "mismatch",
+          decision: { kind: "mismatch", length: nums.length, needed },
+        }),
+      }],
+    };
   }
   const result = blankMatrix2D(rows, cols);
-  const steps = [matrixStep2D(result, { title: { vi: "Tạo ma trận m×n rỗng", en: "Create an empty m×n matrix" }, codeLines: [5], vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "m,n", value: `${rows},${cols}` }], note: { vi: "Ghi lần lượt nums theo thứ tự hàng trước, cột sau.", en: "Write nums sequentially, row first then column." }, grid: { caption: "Empty result" } })];
+  const steps = [];
+  const snapshot = ({ title, phase, codeLines = [], vars = [], note, activeIndex = null, activeCell = null, placedCount = 0, decision = null, final = false }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      convert2022View: createView({ matrix: result, phase, activeIndex, activeCell, placedCount, decision }),
+    });
+  };
+
+  snapshot({
+    title: { vi: "Kiểm tra có đủ ô để đặt mọi phần tử", en: "Check that every value has a destination cell" },
+    phase: "validate",
+    codeLines: [3, 4],
+    vars: [{ name: "len(original)", value: nums.length }, { name: "m*n", value: needed }],
+    note: { vi: `${nums.length} phần tử khớp với ${rows} × ${cols} = ${needed} ô, nên có thể tạo ma trận.`, en: `${nums.length} values match ${rows} × ${cols} = ${needed} cells, so the matrix can be created.` },
+    decision: { kind: "valid", length: nums.length, needed },
+  });
+  snapshot({
+    title: { vi: `Tạo result ${rows} × ${cols} rỗng`, en: `Create an empty ${rows} × ${cols} result` },
+    phase: "init",
+    codeLines: [5],
+    vars: [{ name: "original", value: `[${nums.join(", ")}]` }, { name: "m,n", value: `${rows},${cols}` }],
+    note: { vi: "Các ô sẽ được điền theo hàng: hết một hàng mới sang hàng kế tiếp.", en: "Cells are filled row by row: finish one row before moving to the next." },
+    decision: { kind: "init" },
+  });
   for (let index = 0; index < nums.length; index++) {
     const row = Math.floor(index / cols), col = index % cols;
+    snapshot({
+      title: { vi: `Tính vị trí cho original[${index}] = ${nums[index]}`, en: `Calculate the position for original[${index}] = ${nums[index]}` },
+      phase: "map",
+      codeLines: [6, 7],
+      vars: [{ name: "index", value: index }, { name: "row", value: `${index} // ${cols} = ${row}` }, { name: "col", value: `${index} % ${cols} = ${col}` }],
+      note: { vi: `Chỉ số ${index} được đổi thành hàng ${row}, cột ${col}.`, en: `Index ${index} maps to row ${row}, column ${col}.` },
+      activeIndex: index,
+      activeCell: [row, col],
+      placedCount: index,
+      decision: { kind: "map", index, value: nums[index], row, col },
+    });
     result[row][col] = nums[index];
-    steps.push(matrixStep2D(result, { title: { vi: `nums[${index}] = ${nums[index]} → (${row},${col})`, en: `nums[${index}] = ${nums[index]} → (${row},${col})` }, codeLines: [6, 7], vars: [{ name: "index", value: index }, { name: "row,col", value: `${row},${col}` }], note: { vi: `row = ${index} // ${cols}, col = ${index} % ${cols}.`, en: `row = ${index} // ${cols}, col = ${index} % ${cols}.` }, grid: { hlCell: [row, col], caption: "Filling result" } }));
+    snapshot({
+      title: { vi: `Ghi ${nums[index]} vào result[${row}][${col}]`, en: `Write ${nums[index]} into result[${row}][${col}]` },
+      phase: "place",
+      codeLines: [7],
+      vars: [{ name: "result[row][col]", value: nums[index] }, { name: "đã đặt", value: `${index + 1}/${needed}` }],
+      note: { vi: `Giá trị ở original[${index}] đã vào đúng ô (${row}, ${col}).`, en: `The value from original[${index}] is now in its cell (${row}, ${col}).` },
+      activeIndex: index,
+      activeCell: [row, col],
+      placedCount: index + 1,
+      decision: { kind: "place", index, value: nums[index], row, col },
+    });
   }
-  steps.push(matrixStep2D(result, { title: { vi: "Chuyển đổi hoàn tất", en: "Conversion complete" }, codeLines: [8], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Đã dùng đúng m×n phần tử.", en: "Exactly m×n values were used." }, grid: { caption: "Final 2D array" } }));
+  snapshot({
+    title: { vi: "Chuyển đổi hoàn tất", en: "Conversion complete" },
+    phase: "done",
+    codeLines: [8],
+    final: true,
+    vars: [{ name: "result", value: JSON.stringify(result) }],
+    note: { vi: "Đã dùng đúng m×n phần tử và điền đầy tất cả các ô.", en: "Exactly m×n values were used and every cell is filled." },
+    placedCount: needed,
+    decision: { kind: "done" },
+  });
   return { original: nums, answer: result, steps };
 }
 
@@ -3733,32 +3824,109 @@ function buildSteps74(input, params = {}) {
   if (!Number.isInteger(target)) throw new Error("target must be an integer");
   const rows = matrix.length, cols = matrix[0].length;
   const steps = [];
-  const visited = [];
+  const inspected = [];
   let lo = 0, hi = rows * cols - 1;
   const coord = (index) => [Math.floor(index / cols), index % cols];
 
-  steps.push(matrixStep2D(matrix, { title: { vi: "Binary search trên index phẳng", en: "Binary-search flat indexes" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }], note: { vi: "Thứ tự toàn ma trận cũng tăng dần, nên coi matrix là mảng 1D dài rows×cols.", en: "The entire matrix order is sorted, so treat it as one 1D array of rows×cols values." }, grid: { caption: "Flattened binary search" } }));
+  function snapshot({ title, phase, codeLines = [], vars = [], note, mid = null, decision = null, final = false }) {
+    const activeCell = Number.isInteger(mid) ? coord(mid) : null;
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      search74View: {
+        matrix: cloneMatrix2D(matrix),
+        rows,
+        cols,
+        target,
+        lo,
+        hi,
+        mid,
+        activeCell,
+        inspected: inspected.map((item) => ({ ...item })),
+        phase,
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Trải matrix thành dải chỉ số phẳng", en: "Flatten the matrix into one index range" },
+    phase: "init",
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }],
+    note: { vi: "Vì hàng sau bắt đầu lớn hơn hàng trước kết thúc, toàn bộ matrix có thể xem như một mảng đã sắp xếp từ index 0 đến rows×cols−1.", en: "Because each row starts above the previous row's end, the whole matrix acts like one sorted array from index 0 to rows×cols-1." },
+    decision: { kind: "init" },
+  });
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     const [row, col] = coord(mid);
     const value = matrix[row][col];
-    visited.push([row, col]);
-    steps.push(matrixStep2D(matrix, { title: { vi: `mid = ${mid} → (${row},${col})`, en: `mid = ${mid} → (${row},${col})` }, codeLines: [5, 6, 7], vars: [{ name: "lo,hi", value: `${lo},${hi}` }, { name: "mid", value: mid }, { name: "value", value }], note: { vi: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; đọc giá trị ${value}.`, en: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; read value ${value}.` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Current binary-search midpoint" } }));
+    inspected.push({ index: mid, row, col, value });
+    snapshot({
+      title: { vi: `mid = ${mid} → matrix[${row}][${col}] = ${value}`, en: `mid = ${mid} → matrix[${row}][${col}] = ${value}` },
+      phase: "probe",
+      codeLines: [5, 6, 7],
+      vars: [{ name: "lo,hi", value: `${lo},${hi}` }, { name: "mid", value: mid }, { name: "mid//cols, mid%cols", value: `${row},${col}` }, { name: "value", value }],
+      note: { vi: `Đổi index phẳng ${mid}: row = ${mid} // ${cols} = ${row}, col = ${mid} % ${cols} = ${col}; rồi đọc ${value}.`, en: `Convert flat index ${mid}: row = ${mid} // ${cols} = ${row}, col = ${mid} % ${cols} = ${col}; then read ${value}.` },
+      mid,
+      decision: { kind: "probe", value, row, col },
+    });
     if (value === target) {
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} == target → True`, en: `${value} == target → True` }, codeLines: [8, 9], final: true, vars: [{ name: "target", value: target }, { name: "found", value: true }], note: { vi: `Tìm thấy target tại matrix[${row}][${col}].`, en: `Found target at matrix[${row}][${col}].` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Target found" } }));
+      snapshot({
+        title: { vi: `${value} == target → True`, en: `${value} == target → True` },
+        phase: "found",
+        codeLines: [8, 9],
+        final: true,
+        vars: [{ name: "target", value: target }, { name: "found", value: true }, { name: "position", value: `(${row},${col})` }],
+        note: { vi: `Tìm thấy target tại matrix[${row}][${col}], tương ứng index phẳng ${mid}.`, en: `Found the target at matrix[${row}][${col}], which is flat index ${mid}.` },
+        mid,
+        decision: { kind: "found", value, row, col },
+      });
       return { original: matrix, answer: true, steps };
     }
     if (value < target) {
+      const oldLo = lo;
       const nextLo = mid + 1;
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} < ${target} → lo = ${nextLo}`, en: `${value} < ${target} → lo = ${nextLo}` }, codeLines: [10, 11], vars: [{ name: "old lo", value: lo }, { name: "new lo", value: nextLo }, { name: "hi", value: hi }], note: { vi: "Target phải nằm bên phải mid nên bỏ nửa trái.", en: "The target must be right of mid, so discard the left half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the right half" } }));
       lo = nextLo;
+      snapshot({
+        title: { vi: `${value} < ${target} → lo = ${nextLo}`, en: `${value} < ${target} → lo = ${nextLo}` },
+        phase: "move-right",
+        codeLines: [10, 11],
+        vars: [{ name: "old lo", value: oldLo }, { name: "new lo", value: nextLo }, { name: "hi", value: hi }],
+        note: { vi: `Mọi index từ ${oldLo} đến ${mid} đều có giá trị ≤ ${value}, nên bỏ nửa trái và chỉ giữ khoảng ${lo}..${hi}.`, en: `Every index from ${oldLo} to ${mid} has value <= ${value}, so discard the left half and keep only ${lo}..${hi}.` },
+        mid,
+        decision: { kind: "move-right", value, oldLo, nextLo },
+      });
     } else {
+      const oldHi = hi;
       const nextHi = mid - 1;
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} > ${target} → hi = ${nextHi}`, en: `${value} > ${target} → hi = ${nextHi}` }, codeLines: [12, 13], vars: [{ name: "lo", value: lo }, { name: "old hi", value: hi }, { name: "new hi", value: nextHi }], note: { vi: "Target phải nằm bên trái mid nên bỏ nửa phải.", en: "The target must be left of mid, so discard the right half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the left half" } }));
       hi = nextHi;
+      snapshot({
+        title: { vi: `${value} > ${target} → hi = ${nextHi}`, en: `${value} > ${target} → hi = ${nextHi}` },
+        phase: "move-left",
+        codeLines: [12, 13],
+        vars: [{ name: "lo", value: lo }, { name: "old hi", value: oldHi }, { name: "new hi", value: nextHi }],
+        note: { vi: `Mọi index từ ${mid} đến ${oldHi} đều có giá trị ≥ ${value}, nên bỏ nửa phải và chỉ giữ khoảng ${lo}..${hi}.`, en: `Every index from ${mid} to ${oldHi} has value >= ${value}, so discard the right half and keep only ${lo}..${hi}.` },
+        mid,
+        decision: { kind: "move-left", value, oldHi, nextHi },
+      });
     }
   }
-  steps.push(matrixStep2D(matrix, { title: { vi: "Không tìm thấy target", en: "Target not found" }, codeLines: [14], final: true, vars: [{ name: "target", value: target }, { name: "found", value: false }], note: { vi: "lo đã vượt hi, nên target không tồn tại trong matrix.", en: "lo crossed hi, so the target is not in the matrix." }, grid: { historyCells: visited, caption: "Search finished" } }));
+  snapshot({
+    title: { vi: "Không tìm thấy target", en: "Target not found" },
+    phase: "missing",
+    codeLines: [14],
+    final: true,
+    vars: [{ name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }, { name: "found", value: false }],
+    note: { vi: `lo = ${lo} đã vượt hi = ${hi}; khoảng tìm kiếm rỗng nên target không có trong matrix.`, en: `lo = ${lo} crossed hi = ${hi}; the search range is empty, so the target is not in the matrix.` },
+    decision: { kind: "missing" },
+  });
   return { original: matrix, answer: false, steps };
 }
 
