@@ -2219,7 +2219,7 @@ function renderBars(step) {
 
     const valEl = document.createElement("div");
     valEl.className = "val";
-    valEl.textContent = val;
+    valEl.textContent = Array.isArray(step.raw) && step.raw[i] !== undefined ? step.raw[i] : val;
 
     const idxEl = document.createElement("div");
     idxEl.className = "idx";

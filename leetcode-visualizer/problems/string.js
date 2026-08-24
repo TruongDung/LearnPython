@@ -9768,19 +9768,30 @@ function normalizeSumGameInput(input) {
 }
 
 /**
- * LeetCode 1927: Sum Game.
+ * LeetCode 1927: Sum Game — beginner-friendly walkthrough.
  *
- * If the number of question marks is odd, Alice gets the extra move and wins.
- * Otherwise Bob can force equality exactly when:
- *   left_sum - right_sum == (right_q - left_q) * 9 / 2
+ * The steps tell a story:
+ *  1. Rules: fixed digits never change; only the '?' cells are contested.
+ *  2. One scan collects each half's digit sum and '?' count.
+ *  3. Turn counting: an odd number of '?' gives Alice the extra (last) move,
+ *     and 10 choices minus the single tie-making digit means she always wins.
+ *  4. With an even number of '?', each '?' ends up worth 0..9 wherever it
+ *     sits (average 9/2 = 4.5), so Bob ties exactly when
+ *     diff == (right_q - left_q) * 9 / 2.
  */
 function buildSteps1927(input) {
   const num = normalizeSumGameInput(input);
   const n = num.length;
   const half = n / 2;
   const chars = num.split("");
+  // Numeric bar heights only; '?' uses a placeholder height while `raw`
+  // keeps the honest "?" label for the renderer.
   const arr = chars.map((ch) => (ch === "?" ? 10 : Number(ch)));
+  const raw = chars.slice();
   const sub = chars.map((ch, i) => `${ch}[${i}]`);
+  const leftIdx = Array.from({ length: half }, (_, i) => i);
+  const rightIdx = Array.from({ length: half }, (_, i) => i + half);
+  const questionIdx = chars.map((ch, i) => (ch === "?" ? i : -1)).filter((i) => i >= 0);
   const steps = [];
   let leftSum = 0;
   let rightSum = 0;
@@ -9788,26 +9799,29 @@ function buildSteps1927(input) {
   let rightQ = 0;
 
   steps.push({
-    title: { vi: "Chia chuỗi thành 2 nửa", en: "Split the string into two halves" },
+    title: { vi: "Luật chơi", en: "How the game works" },
     arr,
+    raw,
     sub,
     highlight: [],
     mark: [half - 1, half],
-    codeLines: [3, 4],
+    codeLines: [1, 2],
     vars: [
       { name: "num", value: num },
-      { name: "left half", value: num.slice(0, half) },
-      { name: "right half", value: num.slice(half) },
+      { name: "nửa trái", value: `"${num.slice(0, half)}"` },
+      { name: "nửa phải", value: `"${num.slice(half)}"` },
     ],
     note: {
-      vi: "Game kết thúc Bob thắng nếu tổng chữ số nửa trái bằng tổng chữ số nửa phải; Alice thắng nếu khác nhau.",
-      en: "At the end Bob wins if the left digit sum equals the right digit sum; Alice wins if they differ.",
+      vi: "Chia chuỗi thành 2 nửa. Chữ số đã có là CỐ ĐỊNH, không ai sửa được. Hai người lần lượt điền các dấu '?', Alice đi trước: Alice muốn tổng nửa trái KHÁC tổng nửa phải, Bob muốn hai tổng BẰNG nhau. Ai kiểm soát được các dấu '?' sẽ thắng.",
+      en: "Split the string into two halves. Existing digits are FIXED, nobody can change them. Players alternate filling the '? marks, Alice first: Alice wants the two sums to DIFFER, Bob wants them EQUAL. Whoever controls the ? marks wins.",
     },
   });
 
   for (let i = 0; i < n; i++) {
     const ch = chars[i];
     const side = i < half ? "left" : "right";
+    const sideVi = side === "left" ? "TRÁI" : "PHẢI";
+    const sideEn = side === "left" ? "LEFT" : "RIGHT";
     if (ch === "?") {
       if (side === "left") leftQ++;
       else rightQ++;
@@ -9818,12 +9832,17 @@ function buildSteps1927(input) {
     }
 
     steps.push({
-      title: { vi: `Quét ${side}: num[${i}]='${ch}'`, en: `Scan ${side}: num[${i}]='${ch}'` },
+      title: ch === "?"
+        ? { vi: `num[${i}] = '?' → left_? = ${leftQ}, right_? = ${rightQ}`, en: `num[${i}] = '?' → left_? = ${leftQ}, right_? = ${rightQ}` }
+        : { vi: `num[${i}] = '${ch}' → left_sum = ${leftSum}, right_sum = ${rightSum}`, en: `num[${i}] = '${ch}' → left_sum = ${leftSum}, right_sum = ${rightSum}` },
       arr,
+      raw,
       sub,
       highlight: [i],
-      mark: side === "left" ? Array.from({ length: half }, (_, k) => k) : Array.from({ length: half }, (_, k) => k + half),
-      codeLines: i < half ? [5, 6, 7, 8] : [9, 10, 11, 12],
+      mark: side === "left" ? leftIdx : rightIdx,
+      codeLines: ch === "?"
+        ? (side === "left" ? [7, 8, 9] : [7, 8, 10])
+        : (side === "left" ? [7, 11, 12] : [7, 11, 13]),
       vars: [
         { name: "left_sum", value: leftSum },
         { name: "right_sum", value: rightSum },
@@ -9832,12 +9851,12 @@ function buildSteps1927(input) {
       ],
       note: ch === "?"
         ? {
-          vi: `Đây là dấu ?, chưa biết sẽ thành chữ số nào. Chỉ tăng bộ đếm ? của nửa ${side === "left" ? "trái" : "phải"}.`,
-          en: `This is a ?, not a fixed digit yet. Only increment the ? counter for the ${side} half.`,
+          vi: `'?' nằm ở nửa ${sideVi}. Nó có thể thành bất kỳ chữ số 0–9 nên CHƯA cộng được vào tổng — chỉ tăng bộ đếm dấu ? của nửa ${sideVi}.`,
+          en: `The '?' sits in the ${sideEn} half. It could become any digit 0–9, so we cannot add it to a sum yet — just increment the ${sideEn} half's ? counter.`,
         }
         : {
-          vi: `Đây là chữ số cố định ${ch}, cộng vào tổng của nửa ${side === "left" ? "trái" : "phải"}.`,
-          en: `This fixed digit ${ch} contributes to the ${side} half sum.`,
+          vi: `'${ch}' là chữ số cố định ở nửa ${sideVi} → cộng vào tổng của nửa ${sideVi}.`,
+          en: `'${ch}' is a fixed digit in the ${sideEn} half → add it to that half's sum.`,
         },
     });
   }
@@ -9846,68 +9865,105 @@ function buildSteps1927(input) {
   const diff = leftSum - rightSum;
   const target = ((rightQ - leftQ) * 9) / 2;
   const oddQuestionMarks = totalQ % 2 === 1;
+  const aliceMoves = Math.ceil(totalQ / 2);
+  const bobMoves = Math.floor(totalQ / 2);
   const aliceWins = oddQuestionMarks || diff !== target;
 
   steps.push({
-    title: { vi: `Tổng số ? = ${totalQ}`, en: `Total ? count = ${totalQ}` },
+    title: { vi: `Đếm lượt đi: ${totalQ} dấu '?'`, en: `Count the turns: ${totalQ} question marks` },
     arr,
+    raw,
     sub,
-    highlight: chars.map((ch, i) => (ch === "?" ? i : -1)).filter((i) => i >= 0),
+    highlight: questionIdx,
     mark: [],
-    codeLines: [14, 15],
+    codeLines: oddQuestionMarks ? [14, 15] : [14],
     vars: [
-      { name: "left_sum - right_sum", value: `${leftSum} - ${rightSum} = ${diff}` },
-      { name: "right_? - left_?", value: `${rightQ} - ${leftQ} = ${rightQ - leftQ}` },
-      { name: "total_?", value: totalQ },
+      { name: "tổng số ?", value: totalQ },
+      { name: "lượt của Alice", value: aliceMoves },
+      { name: "lượt của Bob", value: bobMoves },
     ],
     note: oddQuestionMarks
       ? {
-        vi: "Số dấu ? là lẻ, Alice đi nhiều hơn Bob 1 lượt. Alice luôn dùng lượt thừa để phá thế cân bằng.",
-        en: "The number of ? marks is odd, so Alice gets one more move than Bob. Alice can always use the extra move to break equality.",
+        vi: `${totalQ} là số LẺ ⇒ Alice đi ${aliceMoves} lượt, Bob chỉ đi ${bobMoves}. Lượt CUỐI cùng là của Alice: cô ấy có 10 lựa chọn chữ số 0–9 mà chỉ tối đa 1 lựa chọn giữ hai tổng bằng nhau ⇒ Alice chắc chắn thắng, dù chuỗi là gì.`,
+        en: `${totalQ} is ODD ⇒ Alice moves ${aliceMoves} time(s), Bob only ${bobMoves}. The LAST move belongs to Alice: she has 10 digit choices and at most one of them keeps the sums equal ⇒ Alice always wins, whatever the string looks like.`,
       }
-      : {
-        vi: "Số dấu ? là chẵn, hai người đi số lượt bằng nhau. Khi đó chỉ cần kiểm tra Bob có thể cân bằng tổng hay không.",
-        en: "The number of ? marks is even, so both players move the same number of times. Now check whether Bob can force equal sums.",
-      },
+      : (totalQ === 0
+        ? {
+          vi: "Không có dấu '?' nào ⇒ không ai được điền thêm gì. Kết quả quyết định ngay bởi chênh lệch hai tổng hiện tại.",
+          en: "There are no '?' marks ⇒ nobody fills anything. The outcome is decided by the current difference between the two sums.",
+        }
+        : {
+          vi: `${totalQ} là số CHẴN ⇒ mỗi người đúng ${totalQ / 2} lượt, không ai có lượt thừa. Thắng thua giờ nằm ở chỗ các dấu '?' đứng — xem bước kế tiếp.`,
+          en: `${totalQ} is EVEN ⇒ each player moves exactly ${totalQ / 2} time(s), no spare move. Winning now depends on where the ? marks sit — see the next step.`,
+        }),
   });
+
+  if (!oddQuestionMarks && totalQ > 0) {
+    steps.push({
+      title: { vi: "Một dấu '?' đáng giá bao nhiêu?", en: "How much is one '?' worth?" },
+      arr,
+      raw,
+      sub,
+      highlight: questionIdx,
+      mark: [],
+      codeLines: [],
+      vars: [
+        { name: "? ở nửa TRÁI", value: "+0 … +9" },
+        { name: "? ở nửa PHẢI", value: "−9 … 0" },
+        { name: "trung bình mỗi ?", value: "9 ÷ 2 = 4.5" },
+      ],
+      note: {
+        vi: "Ai điền dấu '?' thì chọn được bất kỳ chữ số 0–9. Dấu ? ở nửa trái kéo tổng trái lên 0–9 đơn vị; dấu ? ở nửa phải kéo chênh lệch (trái − phải) xuống 0–9 đơn vị. Vì mọi giá trị 0–9 đều có thể xảy ra, lấy trung bình mỗi dấu ? đáng 9÷2 = 4.5.",
+        en: "Whoever fills a '?' may choose any digit 0–9. A '?' in the left half raises the left sum by 0–9; a '?' in the right half lowers the gap (left − right) by 0–9. Since every value 0–9 is possible, on average one '?' is worth 9÷2 = 4.5.",
+      },
+    });
+  }
 
   if (!oddQuestionMarks) {
     steps.push({
-      title: { vi: "Điều kiện Bob cân bằng", en: "Bob's equality condition" },
+      title: { vi: "Khi nào hai tổng cân bằng?", en: "When can the sums balance?" },
       arr,
+      raw,
       sub,
       highlight: [],
       mark: [],
-      codeLines: [17],
+      codeLines: [16, 17],
       vars: [
-        { name: "diff", value: diff },
-        { name: "(right_? - left_?) * 9 / 2", value: target },
-        { name: "diff == target?", value: diff === target },
+        { name: "diff = trái − phải", value: `${leftSum} − ${rightSum} = ${diff}` },
+        { name: "điểm cân bằng", value: `4.5 × (${rightQ} − ${leftQ}) = ${target}` },
+        { name: "diff == điểm cân bằng?", value: diff === target },
       ],
       note: {
-        vi: `Bob chỉ ép hòa được nếu phần chênh chữ số cố định diff=${diff} đúng bằng phần bù tối đa trung bình từ dấu ?: ${target}.`,
-        en: `Bob can force a tie only if the fixed digit difference diff=${diff} exactly equals the average max compensation from ? marks: ${target}.`,
+        vi: `Hiện tại nửa ${diff >= 0 ? "trái đang hơn" : "phải đang hơn"} ${Math.abs(diff)} điểm. Muốn hai tổng bằng nhau, các dấu '?' phải bù lại đúng lượng này. Trung bình, ${rightQ} dấu ? phải bù được 4.5×${rightQ} và ${leftQ} dấu ? trái bù được 4.5×${leftQ}, nên điểm cân bằng là 4.5 × (${rightQ} − ${leftQ}) = ${target}.`,
+        en: `Right now the ${diff >= 0 ? "left leads" : "right leads"} by ${Math.abs(diff)} points. For a tie, the ? marks must compensate exactly that amount. On average the ${rightQ} right ?s recover 4.5×${rightQ} and the ${leftQ} left ?s recover 4.5×${leftQ}, so the balance point is 4.5 × (${rightQ} − ${leftQ}) = ${target}.`,
       },
     });
   }
 
   steps.push({
-    title: { vi: `Kết quả: Alice ${aliceWins ? "thắng" : "không thắng"}`, en: `Result: Alice ${aliceWins ? "wins" : "does not win"}` },
+    title: { vi: `Kết quả: Alice ${aliceWins ? "THẮNG" : "THUA"}`, en: `Result: Alice ${aliceWins ? "WINS" : "LOSES"}` },
     arr,
+    raw,
     sub,
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [18],
+    codeLines: oddQuestionMarks ? [15] : [18],
     vars: [{ name: "answer", value: aliceWins }],
-    note: {
-      vi: aliceWins
-        ? "Trả về True vì Alice có chiến thuật làm hai tổng cuối khác nhau."
-        : "Trả về False vì Bob có chiến thuật giữ hai tổng cuối bằng nhau.",
-      en: aliceWins
-        ? "Return True because Alice has a strategy to make the final sums different."
-        : "Return False because Bob has a strategy to keep the final sums equal.",
-    },
+    note: oddQuestionMarks
+      ? {
+        vi: "Trả về True: nhờ lượt đi thừa, Alice luôn chọn được chữ số làm hai tổng khác nhau.",
+        en: "Return True: thanks to the spare move, Alice can always pick a digit that makes the sums differ.",
+      }
+      : (diff === target
+        ? {
+          vi: `diff = ${diff} khớp điểm cân bằng ${target}. Bob dùng chiêu "bắt chước": Alice đặt chữ số d vào một nửa, Bob lập tức đặt cũng chữ số d vào nửa đối diện — từng cặp dấu ? triệt tiêu nhau, hai tổng luôn về bằng nhau ⇒ trả về False.`,
+          en: `diff = ${diff} matches the balance point ${target}. Bob mirrors: whenever Alice writes digit d in one half, Bob immediately writes the same digit d in the opposite half — the ? pairs cancel out and the sums stay equal ⇒ return False.`,
+        }
+        : {
+          vi: `diff = ${diff} lệch khỏi điểm cân bằng ${target}. Alice đi trước sẽ khai thác khoảng hụt này để giữ hai tổng lệch nhau mãi ⇒ trả về True.`,
+          en: `diff = ${diff} misses the balance point ${target}. Moving first, Alice exploits this gap to keep the sums apart forever ⇒ return True.`,
+        }),
   });
 
   return { original: num, answer: aliceWins, steps };
@@ -9926,7 +9982,7 @@ module.exports = {
       vi: "Cho chuỗi số chẵn độ dài gồm chữ số và '?'. Alice và Bob lần lượt thay '?' bằng chữ số, Alice đi trước. Alice thắng nếu tổng nửa trái khác tổng nửa phải; Bob thắng nếu bằng nhau.",
       en: "Given an even-length string containing digits and '?'. Alice and Bob replace '?' with digits in turns, Alice first. Alice wins if the left-half sum differs from the right-half sum; Bob wins if they are equal.",
     },
-    defaultInput: "5023",
+    defaultInput: "1?2?",
     inputKind: "string",
     inputLabel: { vi: "num (chữ số và ?)", en: "num (digits and ?)" },
     extraParams: [],
