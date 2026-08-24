@@ -17902,19 +17902,19 @@ function buildSteps2771(input, params = {}) {
 /**
  * LeetCode 1872: Stone Game VIII — beginner-friendly walkthrough.
  *
- * The steps tell a story:
- *  1. Rules: a move merges the leftmost x > 1 stones into one stone worth
- *     their sum and scores that sum; game ends when one stone remains.
- *  2. Key insight: merging never changes prefix sums, so every move is just
- *     "stop merging at index i" and score p[i] = stones[0] + ... + stones[i].
- *  3. Turn the array into prefix sums in place.
- *  4. Scan right-to-left with one rolling value:
- *       best = max(best, p[i] - best)
- *     where `best` is the score gap the player about to move can secure on
- *     the un-merged suffix. Taking at i yields p[i] for me minus best for
- *     my opponent; skipping i keeps the opponent's value as mine.
- *  5. Answer = f(1): Alice must merge at least 2 stones, so she first stops
- *     at index >= 1.
+ * The steps tell a story (concrete game first, algorithm second):
+ *  1. Rules.
+ *  2. Play out ONE full optimal game with minimax: the row visibly shrinks
+ *     after each merge and both scores accumulate, ending at the answer.
+ *  3. Observation drawn from that very game: every move simply stops merging
+ *     at some original index i and scores exactly the prefix sum p[i].
+ *  4. Build prefix sums in place.
+ *  5. Reverse sweep, one tiny step at a time:
+ *       try stopping at i  -> my net is p[i] - best
+ *       compare with skipping -> best = max(best, p[i] - best)
+ *     where `best` is the best gap the player ABOUT TO MOVE can get on the
+ *     un-merged remainder.
+ *  6. Result ties back to the simulated game's final scores.
  */
 function buildSteps1872(input) {
   const stones = Array.isArray(input) ? input.map(Number) : [];
@@ -17940,6 +17940,41 @@ function buildSteps1872(input) {
     return { original, answer: null, steps };
   }
 
+  // Prefix sums (computed once; phase 3 animates this same transformation).
+  const p = original.slice();
+  for (let i = 1; i < n; i++) p[i] += p[i - 1];
+
+  // ─── Minimax on the real game (rows are tiny): margin of the player to move ───
+  const marginMemo = new Map();
+  function bestMargin(row) {
+    if (row.length === 1) return 0;
+    const key = row.join("|");
+    if (marginMemo.has(key)) return marginMemo.get(key);
+    let acc = 0;
+    const sums = row.map((v) => (acc += v));
+    let m = -Infinity;
+    for (let x = 2; x <= row.length; x++) {
+      m = Math.max(m, sums[x - 1] - bestMargin([sums[x - 1], ...row.slice(x)]));
+    }
+    marginMemo.set(key, m);
+    return m;
+  }
+
+  function bestMove(row) {
+    let acc = 0;
+    const sums = row.map((v) => (acc += v));
+    let margin = -Infinity;
+    let pickX = row.length;
+    for (let x = 2; x <= row.length; x++) {
+      const value = sums[x - 1] - bestMargin([sums[x - 1], ...row.slice(x)]);
+      if (value > margin) {
+        margin = value;
+        pickX = x;
+      }
+    }
+    return { x: pickX, sum: sums[pickX - 1] };
+  }
+
   // ─── Phase 0: rules ───
   steps.push({
     title: { vi: "Luật chơi", en: "How the game works" },
@@ -17953,46 +17988,120 @@ function buildSteps1872(input) {
       { name: "điểm", value: "+ tổng các viên lấy" },
     ],
     note: {
-      vi: "Mỗi lượt: chọn x > 1, lấy x viên bên trái, cộng TỔNG của chúng vào điểm của mình, rồi đặt 1 viên mới mang giá trị đúng bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Mục tiêu: tối đa hóa (điểm Alice − điểm Bob).",
-      en: "Each turn: choose x > 1, remove that many leftmost stones, add their SUM to your score, then place one new stone worth exactly that sum at the left end. The game ends when a single stone remains. Goal: maximize (Alice's score − Bob's score).",
+      vi: "Mỗi lượt: chọn x > 1, lấy x viên bên trái, cộng TỔNG của chúng vào điểm của mình, rồi đặt 1 viên mới mang giá trị đúng bằng tổng đó về đầu hàng. Hết cuộc khi còn đúng 1 viên. Đáp án bài toán = điểm Alice − điểm Bob. Ngay bước sau, ta sẽ chơi thử trọn một ván tối ưu!",
+      en: "Each turn: choose x > 1, remove that many leftmost stones, add their SUM to your score, then place one new stone worth exactly that sum at the left end. The game ends when a single stone remains. The answer = Alice's score − Bob's score. Next up: we play one full optimal game!",
     },
   });
 
-  // ─── Phase 1: why prefix sums ───
+  // ─── Phase 1: play out one optimal game (minimax principal variation) ───
+  let row = original.slice();
+  let aliceScore = 0;
+  let bobScore = 0;
+  const moves = [];
+  while (row.length > 1) {
+    const mover = moves.length % 2 === 0 ? "Alice" : "Bob";
+    const mv = bestMove(row);
+    const taken = row.slice(0, mv.x);
+    const prevCut = moves.length ? moves[moves.length - 1].idx : -1;
+    const stopIdx = prevCut + mv.x;
+    steps.push({
+      title: {
+        vi: `${mover} lấy ${mv.x} viên đầu: ${taken.join(" + ")} = ${mv.sum} điểm`,
+        en: `${mover} takes the first ${mv.x} stones: ${taken.join(" + ")} = ${mv.sum} points`,
+      },
+      arr: row.slice(),
+      highlight: Array.from({ length: mv.x }, (_, k) => k),
+      mark: [],
+      codeLines: [],
+      vars: [
+        { name: "người đi", value: mover },
+        { name: "điểm vừa nhận", value: mv.sum },
+      ],
+      note: {
+        vi: `${mover} gộp ${mv.x} viên được tô sáng. Đây là nước tối ưu của ${mover} ở tình thế này — thuật toán bên dưới sẽ chỉ ra CÁCH tìm ra nước đó.`,
+        en: `${mover} merges the highlighted ${mv.x} stones. This is ${mover}'s optimal move in this position — the algorithm below will show HOW such a move is found.`,
+      },
+    });
+    if (mover === "Alice") aliceScore += mv.sum;
+    else bobScore += mv.sum;
+    row = [mv.sum, ...row.slice(mv.x)];
+    moves.push({ idx: stopIdx, sum: mv.sum });
+    steps.push({
+      title: {
+        vi: `Hàng mới có ${row.length} viên: [${row.join(", ")}]`,
+        en: `New row has ${row.length} stones: [${row.join(", ")}]`,
+      },
+      arr: row.slice(),
+      highlight: [],
+      mark: [0],
+      codeLines: [],
+      vars: [
+        { name: "điểm Alice", value: aliceScore },
+        { name: "điểm Bob", value: bobScore },
+        { name: "hàng đá", value: `[${row.join(", ")}]` },
+      ],
+      note: {
+        vi: `Viên mới giá trị ${mv.sum} đứng đầu hàng. Tổng cả hàng KHÔNG đổi — chỉ có chủ sở hữu điểm là thay đổi.`,
+        en: `The new stone worth ${mv.sum} now leads the row. The grand total never changes — only who owns the points does.`,
+      },
+    });
+  }
+
   steps.push({
-    title: { vi: "Chìa khóa: gộp không đổi TỔNG TIỀN TỐ", en: "Key insight: merging never changes prefix sums" },
-    arr: original.slice(),
+    title: {
+      vi: `Hết ván! Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}`,
+      en: `Game over! Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}`,
+    },
+    arr: row.slice(),
     highlight: [],
     mark: [],
     codeLines: [],
     vars: [
-      { name: "một nước đi", value: "= dừng gộp tại vị trí i" },
-      { name: "điểm khi dừng tại i", value: "p[i] = stones[0] + … + stones[i]" },
+      { name: "điểm Alice", value: aliceScore },
+      { name: "điểm Bob", value: bobScore },
+      { name: "chênh lệch", value: aliceScore - bobScore },
     ],
     note: {
-      vi: "Sau vài nước, hàng đá chỉ gồm các khối tiền tố đã gộp. Vì vậy mỗi nước đi thực chất là 'gộp tiếp tới chỉ số i' và ghi đúng p[i] điểm — bất kể trước đó ai gộp gì. Hãy biến mảng thành mảng tiền tố ngay từ đầu.",
-      en: "After a few moves the row only contains merged prefix blocks. So every move is really 'keep merging up to index i' and it scores exactly p[i] — no matter who merged what before. Convert the array into prefix sums right away.",
+      vi: `Chênh lệch ${aliceScore - bobScore} chính là con số đề bài hỏi (khi cả hai chơi tối ưu). Nhưng máy tính không thể thử mọi nước với n lớn — cần thuật toán thông minh hơn.`,
+      en: `The gap ${aliceScore - bobScore} is exactly what the problem asks for (both playing optimally). But a computer cannot brute-force every move for large n — we need something smarter.`,
     },
   });
 
-  // ─── Phase 2: build prefix sums in place ───
-  const p = original.slice();
+  // ─── Phase 2: bridge — each move was just "stop at index i, take p[i]" ───
+  steps.push({
+    title: { vi: "Quan sát lại: mỗi nước ghi đúng một tổng tiền tố", en: "Look back: every move scores exactly one prefix sum" },
+    arr: original.slice(),
+    highlight: moves.map((m) => m.idx),
+    mark: [],
+    codeLines: [],
+    vars: moves.map((m, k) => ({
+      name: `nước ${k + 1} (${k % 2 === 0 ? "Alice" : "Bob"})`,
+      value: `dừng tại i=${m.idx} → +p[${m.idx}] = ${m.sum}`,
+    })),
+    note: {
+      vi: "Gộp tới chỉ số i thì nhận đúng p[i] = stones[0] + … + stones[i], bất kể trước đó ai gộp gì. Vậy thay vì mô phỏng hàng đá biến đổi, ta chỉ cần mảng TIỀN TỐ và luân phiên chọn điểm dừng.",
+      en: "Merging up to index i scores exactly p[i] = stones[0] + … + stones[i], regardless of earlier merges. So instead of simulating a shrinking row, we only need PREFIX SUMS plus players alternately picking stop positions.",
+    },
+  });
+
+  // ─── Phase 3: build prefix sums in place ───
+  const disp = original.slice();
   for (let i = 1; i < n; i++) {
-    const prev = p[i];
-    p[i] += p[i - 1];
+    const before = disp[i];
+    disp[i] += disp[i - 1];
     steps.push({
       title: {
-        vi: `stones[${i}] += stones[${i - 1}] → ${prev} + ${p[i - 1]} = ${p[i]}`,
-        en: `stones[${i}] += stones[${i - 1}] → ${prev} + ${p[i - 1]} = ${p[i]}`,
+        vi: `stones[${i}] += stones[${i - 1}] → ${before} + ${disp[i - 1]} = ${disp[i]}`,
+        en: `stones[${i}] += stones[${i - 1}] → ${before} + ${disp[i - 1]} = ${disp[i]}`,
       },
-      arr: p.slice(),
+      arr: disp.slice(),
       highlight: [i],
       mark: Array.from({ length: i }, (_, k) => k),
       codeLines: [4, 5],
       vars: [
         { name: "i", value: i },
-        { name: "stones[i] (mới)", value: p[i] },
-        { name: "p[i] = tổng gốc tới i", value: `${original.slice(0, i + 1).join(" + ")} = ${p[i]}` },
+        { name: "stones[i] (mới)", value: disp[i] },
+        { name: "p[i] = tổng gốc tới i", value: `${original.slice(0, i + 1).join(" + ")} = ${disp[i]}` },
       ],
       note: {
         vi: `Giờ stones[${i}] chính là p[${i}]: tổng của ${i + 1} viên đầu tiên. Các cột xanh lá là tiền tố đã xong.`,
@@ -18001,7 +18110,8 @@ function buildSteps1872(input) {
     });
   }
 
-  // ─── Phase 3: dp from right to left with one variable ───
+  // ─── Phase 4: dp right-to-left, split into tiny steps ───
+  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
   let best = p[n - 1];
   steps.push({
     title: { vi: `Khởi tạo best = p[${n - 1}] = ${best}`, en: `Initialize best = p[${n - 1}] = ${best}` },
@@ -18011,47 +18121,66 @@ function buildSteps1872(input) {
     codeLines: [6],
     vars: [
       { name: "best", value: best },
-      { name: "ý nghĩa", value: "lợi thế khi phải gộp TOÀN BỘ phần còn lại" },
+      { name: "ý nghĩa", value: "lợi thế tối đa của NGƯỜI SẮP ĐI trên phần chưa gộp" },
     ],
     note: {
-      vi: `Nguỵ biện đơn giản nhất: gộp nguyên hàng trong một nước, nhận trọn p[${n - 1}] = ${best}. Đây cũng là giá trị của trạng thái cuối cùng trong quy hoạch động.`,
-      en: `The simplest scenario: merge the whole row in one move and pocket all of p[${n - 1}] = ${best}. This is also the last state of the dynamic program.`,
+      vi: `Ý nghĩa của best: 'trên phần chưa ai gộp, người SẮP ĐI có thể tạo chênh lệch nhiều nhất là bao nhiêu?'. Trường hợp xa nhất: phải gộp TOÀN BỘ phần còn lại trong một nước ⇒ nhận trọn p[${n - 1}] = ${best}.`,
+      en: `Meaning of best: 'on the un-merged part, what is the biggest gap the player ABOUT TO MOVE can create?'. The furthest case: forced to merge everything left in one move ⇒ pocket all of p[${n - 1}] = ${best}.`,
     },
   });
 
   for (let i = n - 2; i >= 1; i--) {
     const cand = p[i] - best;
     const takeWins = cand > best;
-    const newBest = Math.max(best, cand);
+
     steps.push({
       title: {
-        vi: `f(${i}) = max(${best}, ${p[i]} − (${best})) = ${newBest}`,
-        en: `f(${i}) = max(${best}, ${p[i]} − (${best})) = ${newBest}`,
+        vi: `Thử dừng tại i=${i}: tôi +${fmt(p[i])}, đối thủ +${fmt(best)}`,
+        en: `Try stopping at i=${i}: I gain ${p[i]}, opponent gains ${best}`,
       },
       arr: p.slice(),
       highlight: [i],
       mark: Array.from({ length: n - 1 - i }, (_, k) => i + 1 + k),
-      codeLines: [7, 8],
+      codeLines: [7],
       vars: [
-        { name: "dừng tại i", value: `nhận p[${i}] = ${p[i]}` },
+        { name: "tôi nhận", value: `p[${i}] = ${p[i]}` },
         { name: "đối thủ giành lại", value: best },
-        { name: "p[i] − best", value: cand },
-        { name: "best (mới)", value: newBest },
+        { name: "hiệu số của tôi", value: `${p[i]} − (${best}) = ${cand}` },
+      ],
+      note: {
+        vi: `Nếu dừng mũi gộp tại đây: tôi ghi ngay ${p[i]} điểm; phần chưa gộp còn lại trở thành ván chơi riêng của đối thủ, nơi họ giành được nhiều nhất ${best}. Vậy lựa chọn này đáng giá ${p[i]} − (${best}) = ${cand} cho TÔI.`,
+        en: `If I stop merging here: I immediately bank ${p[i]}; whatever is left becomes my opponent's own game, where they can grab up to ${best}. So this choice is worth ${p[i]} − (${best}) = ${cand} for ME.`,
+      },
+    });
+
+    steps.push({
+      title: {
+        vi: `So sánh: max(${fmt(best)}, ${fmt(cand)}) = ${fmt(Math.max(best, cand))}`,
+        en: `Compare: max(${best}, ${cand}) = ${Math.max(best, cand)}`,
+      },
+      arr: p.slice(),
+      highlight: [i],
+      mark: Array.from({ length: n - 1 - i }, (_, k) => i + 1 + k),
+      codeLines: [8],
+      vars: [
+        { name: "không dừng tại i", value: best },
+        { name: "dừng tại i", value: cand },
+        { name: "best mới", value: Math.max(best, cand) },
       ],
       note: takeWins
         ? {
-          vi: `Nếu dừng mũi gộp tại i: tôi nhận ${p[i]}, đối thủ giành lại tối đa ${best} ⇒ lợi thế ròng ${cand}, tốt hơn ${best} nếu không dừng ⇒ cập nhật best = ${newBest}.`,
-          en: `Stopping the merge at i: I score ${p[i]}, but my opponent recovers up to ${best} ⇒ net edge ${cand}, better than ${best} for not stopping ⇒ update best = ${newBest}.`,
+          vi: `Dừng tốt hơn (${cand} > ${best}) ⇒ người sắp đi sẽ chọn dừng, best mới = ${cand}.`,
+          en: `Stopping wins (${cand} > ${best}) ⇒ the player to move will stop here, so the new best = ${cand}.`,
         }
         : {
-          vi: `Dừng tại i chỉ cho ${cand} ≤ ${best}: không đáng, giữ nguyên best = ${best}.`,
-          en: `Stopping at i would yield only ${cand} ≤ ${best}: not worth it, keep best = ${best}.`,
+          vi: `Dừng không bằng (${cand} ≤ ${best}) ⇒ giữ nguyên best = ${best}: người sắp đi cứ tiếp tục như thể vị trí này không tồn tại.`,
+          en: `Stopping loses (${cand} ≤ ${best}) ⇒ keep best = ${best}: the player to move simply plays as if this position did not exist.`,
         },
     });
-    best = newBest;
+    best = Math.max(best, cand);
   }
 
-  // ─── Phase 4: result ───
+  // ─── Phase 5: result, tied back to the real game ───
   steps.push({
     title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
     arr: p.slice(),
@@ -18061,11 +18190,11 @@ function buildSteps1872(input) {
     codeLines: [9],
     vars: [
       { name: "answer", value: best },
-      { name: "ý nghĩa", value: "(điểm Alice − điểm Bob) khi cả hai chơi tối ưu" },
+      { name: "ván mô phỏng đầu bài", value: `Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}` },
     ],
     note: {
-      vi: `f(1) = ${best}: Alice phải lấy ít nhất 2 viên nên lựa chọn đầu tiên của cô ấy là dừng gộp ở chỉ số ≥ 1. Alice đảm bảo được chênh lệch ${best} và Bob không thể ép kết quả tốt hơn.`,
-      en: `f(1) = ${best}: Alice must take at least 2 stones, so her first choice is where to stop merging at an index ≥ 1. She secures a gap of ${best}, and Bob cannot force anything better.`,
+      vi: `Thuật toán trả về ${best}, trùng khớp chênh lệch của ván mô phỏng (Alice ${aliceScore}, Bob ${bobScore}). Alice đảm bảo được chênh lệch ${best} và Bob không thể làm tốt hơn.`,
+      en: `The algorithm returns ${best}, matching the simulated game's gap (Alice ${aliceScore}, Bob ${bobScore}). Alice secures a gap of ${best}, and Bob cannot do any better.`,
     },
   });
 
