@@ -8299,7 +8299,7 @@ module.exports = {
     title: { vi: "Spiral Matrix", en: "Spiral Matrix" },
     titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
     statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
-    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
+    defaultInput: "1,2,3,4;5,6,7,8;9,10,11,12", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
     approach: [{ vi: "Giữ 4 biên top/bottom/left/right.", en: "Keep 4 bounds top/bottom/left/right." }, { vi: "Đi →, ↓, ←, ↑ và thu hẹp biên sau mỗi cạnh.", en: "Go →, ↓, ←, ↑ and shrink a bound after each edge." }],
     complexity: { time: "O(R·C)", space: "O(1)", note: { vi: "Mỗi ô thăm 1 lần.", en: "Each cell visited once." } },
     code: ["class Solution:", "    def spiralOrder(self, matrix):", "        res = []; top, bottom = 0, len(matrix)-1", "        left, right = 0, len(matrix[0])-1", "        while top <= bottom and left <= right:", "            for c in range(left, right+1): res.append(matrix[top][c])", "            top += 1", "            for r in range(top, bottom+1): res.append(matrix[r][right])", "            right -= 1", "            if top <= bottom:", "                for c in range(right, left-1, -1): res.append(matrix[bottom][c])", "                bottom -= 1", "            if left <= right:", "                for r in range(bottom, top-1, -1): res.append(matrix[r][left])", "                left += 1", "        return res"],

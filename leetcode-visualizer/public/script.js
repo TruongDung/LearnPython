@@ -5007,6 +5007,64 @@ function renderPalindromePartitionView(step) {
   </section>`;
 }
 
+// ---- Jewels and Stones (#771): make each set membership check explicit. ----
+function renderJewelsStonesView(step) {
+  const view = step.jewelsStonesView || {};
+  const vi = lang === "vi";
+  const jewelTypes = Array.isArray(view.jewelTypes) ? view.jewelTypes : [];
+  const stones = Array.from(String(view.stones || ""));
+  const states = Array.isArray(view.stoneStates) ? view.stoneStates : [];
+  const phase = String(view.phase || "init");
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const currentStone = currentIndex === null ? null : String(view.currentStone ?? "");
+  const count = Number(view.count) || 0;
+  const phaseIndex = phase === "done" ? 3 : ["match", "skip"].includes(phase) ? 1 : 0;
+  const phases = (vi ? ["Tạo jewel_set", "Kiểm tra 1 viên", "Cộng kết quả"] : ["Build jewel_set", "Check one stone", "Add result"])
+    .map((label, index) => {
+      const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+    }).join("");
+  const jewelHtml = jewelTypes.length
+    ? jewelTypes.map((type) => `<span><small>${vi ? "loại jewel" : "jewel type"}</small><strong>${escapeHtml(type)}</strong></span>`).join("")
+    : `<em>${vi ? "Không có loại đá quý nào" : "No jewel types"}</em>`;
+  const stoneHtml = stones.length
+    ? stones.map((stone, index) => {
+      const state = states[index] || "waiting";
+      const label = state === "matched" || state === "active-match" ? "+1" : state === "skipped" || state === "active-skip" ? "0" : "?";
+      return `<div class="js771-stone ${escapeHtml(state)}"><small>stones[${index}]</small><strong>${escapeHtml(stone)}</strong><em>${label}</em></div>`;
+    }).join("")
+    : `<em>${vi ? "stones rỗng" : "stones is empty"}</em>`;
+  const gateState = view.isJewel === true ? "match" : view.isJewel === false ? "skip" : "waiting";
+  const gateLabel = gateState === "match" ? (vi ? "CÓ · +1" : "YES · +1") : gateState === "skip" ? (vi ? "KHÔNG · +0" : "NO · +0") : "?";
+  const gateExpression = currentStone === null
+    ? (vi ? "Chọn viên đá tiếp theo để tra set" : "Choose the next stone to look up in the set")
+    : `"${currentStone}" ${view.isJewel ? "∈" : "∉"} jewel_set`;
+  const gateDetail = gateState === "match"
+    ? (vi ? `"${currentStone}" đúng là một loại đá quý, nên count tăng lên ${count}.` : `"${currentStone}" is a jewel type, so count increases to ${count}.`)
+    : gateState === "skip"
+      ? (vi ? `"${currentStone}" không phải đá quý, nên count giữ nguyên ${count}.` : `"${currentStone}" is not a jewel, so count remains ${count}.`)
+      : (vi ? "Set lookup là O(1) trung bình. Hoa và thường là hai ký tự khác nhau: a ≠ A." : "A set lookup is O(1) on average. Uppercase and lowercase are different: a ≠ A.");
+  const actionDetail = phase === "done"
+    ? (vi ? `Đã kiểm tra hết ${stones.length} viên. Mỗi thẻ xanh đóng góp 1 vào đáp án.` : `All ${stones.length} stones were checked. Every green card contributes 1 to the answer.`)
+    : currentIndex === null
+      ? (vi ? "Chuẩn bị set trước, sau đó duyệt lần lượt stones từ trái sang phải." : "Prepare the set, then scan stones left to right.")
+      : (vi ? `Đang xét đúng một viên: stones[${currentIndex}] = "${currentStone}".` : `Examining exactly one stone: stones[${currentIndex}] = "${currentStone}".`);
+  const summary = vi
+    ? `Jewels and Stones. Có ${jewelTypes.length} loại đá quý, đang đếm ${stones.length} viên đá.`
+    : `Jewels and Stones. ${jewelTypes.length} jewel types and ${stones.length} stones to count.`;
+
+  $("treeView").innerHTML = `<section class="js771-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="js771-phases">${phases}</div>
+    <section class="js771-set-section"><header><strong>jewel_set</strong><span>${vi ? "mỗi ký tự = một loại đá quý" : "each character = one jewel type"}</span></header><div class="js771-jewels">${jewelHtml}</div><p>${vi ? "Phân biệt chữ hoa/thường: a và A là hai loại khác nhau." : "Case-sensitive: a and A are two different types."}</p></section>
+    <section class="js771-stones-section"><header><strong>stones</strong><span>${vi ? "xanh = cộng 1 · xám = cộng 0 · vàng = đang xét" : "green = +1 · gray = +0 · yellow = checking"}</span></header><div class="js771-stones">${stoneHtml}</div></section>
+    <div class="js771-bottom-row">
+      <section class="js771-gate ${gateState}"><header><strong>${vi ? "TRA SET" : "SET LOOKUP"}</strong><b>${gateLabel}</b></header><code>${escapeHtml(gateExpression)}</code><span>${escapeHtml(gateDetail)}</span></section>
+      <section class="js771-count"><small>count</small><strong>${count}</strong><span>${vi ? "số stone là jewel" : "stones that are jewels"}</span></section>
+    </div>
+    <div class="js771-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(actionDetail)}</span></div>
+  </section>`;
+}
+
 function renderNonDecreasingSubsequencesView(step) {
   const view = step.nonDecreasingView || {};
   const vi = lang === "vi";
@@ -18836,6 +18894,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitPodiumView(step);
+  } else if (step.jewelsStonesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderJewelsStonesView(step);
   } else if (step.palindromePartitionView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
