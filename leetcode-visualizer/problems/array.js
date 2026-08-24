@@ -3697,21 +3697,135 @@ function buildSteps48(input, params) {
   const approach = Number(params && params.approach) || 1;
   const codeBlock = approach === 2 ? 2 : 1;
   const steps = [];
-  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: n }, (_, i) => String(i)).join(""), text2: Array.from({ length: n }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeBlock: o.codeBlock || codeBlock, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  gsnap({ title: { vi: approach === 2 ? "Cách 2: transpose + swap hai đầu mỗi hàng" : "Cách 1: transpose + row.reverse()", en: approach === 2 ? "Approach 2: transpose + swap row ends" : "Approach 1: transpose + row.reverse()" }, codeLines: [3], vars: [{ name: "n", value: n }], note: { vi: "Bước 1: hoán vị qua đường chéo chính (transpose). Bước 2: đảo ngược từng hàng.", en: "Step 1: swap across the main diagonal (transpose). Step 2: reverse each row." } });
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { [m[i][j], m[j][i]] = [m[j][i], m[i][j]]; gsnap({ title: { vi: `Transpose: swap (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` }, hlCell: [i, j], pathCells: [[j, i]], codeLines: [4, 5, 6], vars: [{ name: "i,j", value: `${i},${j}` }], note: { vi: `Đổi phần tử đối xứng qua đường chéo.`, en: `Swap the elements symmetric about the diagonal.` } }); }
+  const totalTransposeSwaps = n * (n - 1) / 2;
+  let transposeSwaps = 0;
+  const reversedRows = [];
+
+  function gsnap(o) {
+    const activeCells = o.activeCells || [];
+    steps.push({
+      title: o.title,
+      arr: [],
+      grid: {
+        dp: m.map((r) => [...r]),
+        text1: Array.from({ length: n }, (_, i) => String(i)).join(""),
+        text2: Array.from({ length: n }, (_, i) => String(i)).join(""),
+        hlCell: activeCells[0] || null,
+        pathCells: activeCells.slice(1),
+        largeCells: true,
+      },
+      rotate48View: {
+        original: original.map((r) => [...r]),
+        matrix: m.map((r) => [...r]),
+        n,
+        approach,
+        phase: o.phase || "init",
+        activeCells: activeCells.map((cell) => [...cell]),
+        activeRow: Number.isInteger(o.activeRow) ? o.activeRow : null,
+        swap: o.swap || null,
+        transposeSwaps,
+        totalTransposeSwaps,
+        reversedRows: [...reversedRows],
+      },
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeBlock,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
+
+  gsnap({
+    phase: "init",
+    title: { vi: approach === 2 ? "Cách 2: transpose + swap từng cặp" : "Cách 1: transpose + row.reverse()", en: approach === 2 ? "Approach 2: transpose + pair swaps" : "Approach 1: transpose + row.reverse()" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }],
+    note: { vi: "Xoay 90° clockwise bằng hai phép biến đổi: transpose qua đường chéo chính, rồi đảo trái-phải từng hàng.", en: "Rotate 90° clockwise with two transforms: transpose across the main diagonal, then reverse every row left-to-right." },
+  });
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const before = [m[i][j], m[j][i]];
+      [m[i][j], m[j][i]] = [m[j][i], m[i][j]];
+      transposeSwaps++;
+      gsnap({
+        phase: "transpose",
+        title: { vi: `Transpose: đổi (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` },
+        activeCells: [[i, j], [j, i]],
+        swap: { kind: "transpose", a: [i, j], b: [j, i], before, after: [m[i][j], m[j][i]] },
+        codeLines: [4, 5, 6],
+        vars: [{ name: "i,j", value: `${i},${j}` }, { name: "swaps", value: `${transposeSwaps}/${totalTransposeSwaps}` }],
+        note: { vi: "Hai ô đối xứng qua đường chéo chính đổi chỗ. Các ô trên đường chéo giữ nguyên.", en: "The two cells mirrored across the main diagonal trade places. Diagonal cells stay fixed." },
+      });
+    }
+  }
+
+  gsnap({
+    phase: "transpose-done",
+    title: { vi: "Transpose hoàn tất", en: "Transpose complete" },
+    codeLines: approach === 2 ? [7, 8] : [7],
+    vars: [{ name: "swaps", value: transposeSwaps }],
+    note: { vi: "Ma trận đã phản chiếu qua đường chéo chính. Bây giờ đảo trái-phải từng hàng để hoàn tất góc xoay.", en: "The matrix is reflected across its main diagonal. Now reverse each row left-to-right to finish the rotation." },
+  });
+
   if (approach === 2) {
     for (let i = 0; i < n; i++) {
-      for (let j = 0; j < Math.floor(n / 2); j++) {
+      const pairs = Math.floor(n / 2);
+      if (pairs === 0) {
+        reversedRows.push(i);
+        gsnap({
+          phase: "reverse-row",
+          title: { vi: `Hàng ${i} chỉ có một ô`, en: `Row ${i} has one cell` },
+          activeRow: i,
+          codeLines: [7, 8],
+          vars: [{ name: "row", value: i }],
+          note: { vi: "Không có cặp trái-phải nào cần đổi; hàng này đã được đảo xong.", en: "There is no left-right pair to swap; this row is already reversed." },
+        });
+      }
+      for (let j = 0; j < pairs; j++) {
         const k = n - 1 - j;
+        const before = [m[i][j], m[i][k]];
         [m[i][j], m[i][k]] = [m[i][k], m[i][j]];
-        gsnap({ title: { vi: `Đảo hàng ${i}: swap cột ${j} ↔ ${k}`, en: `Reverse row ${i}: swap col ${j} ↔ ${k}` }, hlCell: [i, j], pathCells: [[i, k]], codeLines: [8, 9, 10], vars: [{ name: "i,j", value: `${i},${j}` }, { name: "n-1-j", value: k }], note: { vi: `Đổi hai phần tử đối xứng trong cùng hàng để đảo hàng thủ công.`, en: `Swap symmetric elements in the same row to reverse it manually.` } });
+        if (j === pairs - 1) reversedRows.push(i);
+        gsnap({
+          phase: "reverse-swap",
+          title: { vi: `Đảo hàng ${i}: đổi cột ${j} ↔ ${k}`, en: `Reverse row ${i}: swap columns ${j} ↔ ${k}` },
+          activeCells: [[i, j], [i, k]],
+          activeRow: i,
+          swap: { kind: "reverse", a: [i, j], b: [i, k], before, after: [m[i][j], m[i][k]] },
+          codeLines: [7, 8, 9],
+          vars: [{ name: "i,j", value: `${i},${j}` }, { name: "n-1-j", value: k }],
+          note: { vi: "Đổi một cặp đối xứng trái-phải trong cùng hàng. Khi mọi cặp xong, cả hàng đã đảo ngược.", en: "Swap one mirrored left-right pair in this row. Once every pair is done, the row is reversed." },
+        });
       }
     }
   } else {
-    for (let i = 0; i < n; i++) { m[i].reverse(); gsnap({ title: { vi: `Đảo hàng ${i}`, en: `Reverse row ${i}` }, hlCell: [i, 0], codeLines: [7, 8], vars: [{ name: "row", value: i }], note: { vi: `Đảo ngược hàng ${i} → hoàn tất xoay hàng này.`, en: `Reverse row ${i} → this row is rotated.` } }); }
+    for (let i = 0; i < n; i++) {
+      const beforeRow = [...m[i]];
+      m[i].reverse();
+      reversedRows.push(i);
+      gsnap({
+        phase: "reverse-row",
+        title: { vi: `row.reverse(): đảo toàn bộ hàng ${i}`, en: `row.reverse(): reverse all of row ${i}` },
+        activeCells: [[i, 0], [i, n - 1]],
+        activeRow: i,
+        swap: { kind: "row-reverse", row: i, beforeRow, afterRow: [...m[i]] },
+        codeLines: [7, 8],
+        vars: [{ name: "row", value: i }, { name: "done", value: `${reversedRows.length}/${n}` }],
+        note: { vi: "Đảo thứ tự từ trái sang phải của cả hàng. Hàng này đã ở đúng vị trí trong ma trận xoay.", en: "Reverse the entire row left-to-right. This row is now in its final rotated position." },
+      });
+    }
   }
-  gsnap({ title: { vi: "Hoàn tất xoay 90°", en: "Rotation 90° complete" }, final: true, codeLines: approach === 2 ? [10] : [8], vars: [{ name: "matrix", value: JSON.stringify(m) }], note: { vi: `Ma trận đã xoay 90° theo chiều kim đồng hồ.`, en: `Matrix rotated 90° clockwise.` } });
+  gsnap({
+    phase: "done",
+    title: { vi: "Hoàn tất xoay 90° theo chiều kim đồng hồ", en: "90° clockwise rotation complete" },
+    final: true,
+    codeLines: approach === 2 ? [9] : [8],
+    vars: [{ name: "matrix", value: JSON.stringify(m) }],
+    note: { vi: "Mỗi ô ban đầu (r,c) đã đi đến (c,n-1-r). Ma trận được sửa trực tiếp, không cần ma trận phụ.", en: "Every original cell (r,c) moved to (c,n-1-r). The matrix was modified in place with no extra matrix." },
+  });
   return { original, answer: m, steps };
 }
 
@@ -3722,47 +3836,93 @@ function buildSteps54(input) {
   const steps = [];
   const result = [];
   const visited = new Set();
-  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: R }, (_, i) => String(i)).join(""), text2: Array.from({ length: C }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: [...visited].map((k) => k.split(",").map(Number)), largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
   let top = 0, bottom = R - 1, left = 0, right = C - 1;
-  gsnap({ title: { vi: "Khởi tạo result và 4 biên", en: "Initialize result and 4 bounds" }, codeLines: [3, 4, 5], vars: [{ name: "R,C", value: `${R},${C}` }, { name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: "Đi theo vòng xoắn: →, ↓, ←, ↑, thu hẹp biên sau mỗi cạnh.", en: "Traverse in a spiral: →, ↓, ←, ↑, shrinking the bounds after each edge." } });
+  let layer = 0;
+
+  function gsnap(o) {
+    const visitedCells = [...visited].map((key, index) => {
+      const [row, col] = key.split(",").map(Number);
+      return { row, col, value: m[row][col], order: index + 1 };
+    });
+    steps.push({
+      title: o.title,
+      arr: [],
+      grid: {
+        dp: m.map((row) => [...row]),
+        text1: Array.from({ length: R }, (_, i) => String(i)).join(""),
+        text2: Array.from({ length: C }, (_, i) => String(i)).join(""),
+        hlCell: o.hlCell || null,
+        pathCells: visitedCells.map((cell) => [cell.row, cell.col]),
+        largeCells: true,
+      },
+      spiral54View: {
+        matrix: m.map((row) => [...row]),
+        rows: R,
+        cols: C,
+        bounds: { top, bottom, left, right },
+        layer,
+        phase: o.phase || "check-loop",
+        direction: o.direction || null,
+        activeCell: o.hlCell || null,
+        visitedCells,
+        result: result.slice(),
+        boundaryChange: o.boundaryChange || null,
+        guard: o.guard || null,
+        remainingCount: R * C - visited.size,
+      },
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
+
+  gsnap({ title: { vi: "Khởi tạo result và 4 biên", en: "Initialize result and 4 bounds" }, phase: "init", codeLines: [3, 4, 5], vars: [{ name: "R,C", value: `${R},${C}` }, { name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: "Bốn biên bao quanh vùng CHƯA duyệt. Thứ tự mỗi vòng là TOP → RIGHT → BOTTOM → LEFT.", en: "The four bounds enclose the UNVISITED region. Each layer follows TOP → RIGHT → BOTTOM → LEFT." } });
   while (top <= bottom && left <= right) {
-    gsnap({ title: { vi: `Kiểm tra vòng: top=${top}, bottom=${bottom}, left=${left}, right=${right}`, en: `Check loop: top=${top}, bottom=${bottom}, left=${left}, right=${right}` }, codeLines: [6], vars: [{ name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: "Còn lớp ma trận chưa duyệt nên tiếp tục.", en: "There is still an unvisited layer, so continue." } });
+    gsnap({ title: { vi: `Lớp ${layer + 1}: kiểm tra 4 biên`, en: `Layer ${layer + 1}: check all four bounds` }, phase: "check-loop", direction: "top", codeLines: [6], vars: [{ name: "top,bottom", value: `${top},${bottom}` }, { name: "left,right", value: `${left},${right}` }], note: { vi: `top ≤ bottom và left ≤ right nên vùng [${top}..${bottom}] × [${left}..${right}] vẫn còn ô.`, en: `top ≤ bottom and left ≤ right, so region [${top}..${bottom}] × [${left}..${right}] still contains cells.` } });
     for (let c = left; c <= right; c++) {
       result.push(m[top][c]);
       visited.add(`${top},${c}`);
-      gsnap({ title: { vi: `Append hàng trên: matrix[${top}][${c}]`, en: `Append top row: matrix[${top}][${c}]` }, hlCell: [top, c], codeLines: [7, 8], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trái→phải trên hàng top=${top}.`, en: `Move left→right on top row ${top}.` } });
+      gsnap({ title: { vi: `TOP: lấy matrix[${top}][${c}] = ${m[top][c]}`, en: `TOP: take matrix[${top}][${c}] = ${m[top][c]}` }, phase: "scan-top", direction: "top", hlCell: [top, c], codeLines: [7, 8], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trái → phải trên hàng top=${top}, từ c=${left} đến c=${right}.`, en: `Move left → right on row top=${top}, from c=${left} through c=${right}.` } });
     }
+    const previousTop = top;
     top++;
-    gsnap({ title: { vi: `Thu hẹp biên trên: top=${top}`, en: `Shrink top bound: top=${top}` }, codeLines: [9], vars: [{ name: "top", value: top }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: "Hàng trên đã duyệt xong nên tăng top.", en: "The top row is done, so increment top." } });
+    gsnap({ title: { vi: `Co TOP: ${previousTop} → ${top}`, en: `Shrink TOP: ${previousTop} → ${top}` }, phase: "shrink-top", direction: "top", boundaryChange: { name: "top", from: previousTop, to: top }, codeLines: [9], vars: [{ name: "top", value: top }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Hàng ${previousTop} đã xong, nên top đi xuống hàng ${top}.`, en: `Row ${previousTop} is complete, so top moves down to row ${top}.` } });
     for (let r = top; r <= bottom; r++) {
       result.push(m[r][right]);
       visited.add(`${r},${right}`);
-      gsnap({ title: { vi: `Append cột phải: matrix[${r}][${right}]`, en: `Append right col: matrix[${r}][${right}]` }, hlCell: [r, right], codeLines: [10, 11], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trên→dưới trên cột right=${right}.`, en: `Move top→bottom on right column ${right}.` } });
+      gsnap({ title: { vi: `RIGHT: lấy matrix[${r}][${right}] = ${m[r][right]}`, en: `RIGHT: take matrix[${r}][${right}] = ${m[r][right]}` }, phase: "scan-right", direction: "right", hlCell: [r, right], codeLines: [10, 11], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi trên → dưới trên cột right=${right}, từ r=${top} đến r=${bottom}.`, en: `Move top → bottom on column right=${right}, from r=${top} through r=${bottom}.` } });
     }
+    const previousRight = right;
     right--;
-    gsnap({ title: { vi: `Thu hẹp biên phải: right=${right}`, en: `Shrink right bound: right=${right}` }, codeLines: [12], vars: [{ name: "right", value: right }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: "Cột phải đã duyệt xong nên giảm right.", en: "The right column is done, so decrement right." } });
-    gsnap({ title: { vi: `Kiểm tra còn hàng dưới không`, en: `Check whether bottom row remains` }, codeLines: [13], vars: [{ name: "top,bottom", value: `${top},${bottom}` }], note: { vi: top <= bottom ? "Còn hàng dưới để duyệt phải→trái." : "Không còn hàng dưới, bỏ qua nhánh này.", en: top <= bottom ? "A bottom row remains for right→left traversal." : "No bottom row remains, so skip this branch." } });
+    gsnap({ title: { vi: `Co RIGHT: ${previousRight} → ${right}`, en: `Shrink RIGHT: ${previousRight} → ${right}` }, phase: "shrink-right", direction: "right", boundaryChange: { name: "right", from: previousRight, to: right }, codeLines: [12], vars: [{ name: "right", value: right }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Cột ${previousRight} đã xong, nên right dịch trái sang cột ${right}.`, en: `Column ${previousRight} is complete, so right moves left to column ${right}.` } });
+    gsnap({ title: { vi: "Có còn hàng BOTTOM không?", en: "Does a BOTTOM row remain?" }, phase: "check-bottom", direction: "bottom", guard: { expression: "top <= bottom", left: top, right: bottom, pass: top <= bottom }, codeLines: [13], vars: [{ name: "top,bottom", value: `${top},${bottom}` }], note: { vi: top <= bottom ? `${top} ≤ ${bottom}: còn hàng bottom=${bottom}, tiếp tục quét phải → trái.` : `${top} > ${bottom}: không còn hàng, phải bỏ qua để tránh lấy trùng.`, en: top <= bottom ? `${top} ≤ ${bottom}: row bottom=${bottom} remains; scan right → left.` : `${top} > ${bottom}: no row remains; skip it to avoid duplicates.` } });
     if (top <= bottom) {
       for (let c = right; c >= left; c--) {
         result.push(m[bottom][c]);
         visited.add(`${bottom},${c}`);
-        gsnap({ title: { vi: `Append hàng dưới: matrix[${bottom}][${c}]`, en: `Append bottom row: matrix[${bottom}][${c}]` }, hlCell: [bottom, c], codeLines: [14, 15], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi phải→trái trên hàng bottom=${bottom}.`, en: `Move right→left on bottom row ${bottom}.` } });
+        gsnap({ title: { vi: `BOTTOM: lấy matrix[${bottom}][${c}] = ${m[bottom][c]}`, en: `BOTTOM: take matrix[${bottom}][${c}] = ${m[bottom][c]}` }, phase: "scan-bottom", direction: "bottom", hlCell: [bottom, c], codeLines: [14, 15], vars: [{ name: "c", value: c }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi phải → trái trên hàng bottom=${bottom}, từ c=${right} về c=${left}.`, en: `Move right → left on row bottom=${bottom}, from c=${right} back to c=${left}.` } });
       }
+      const previousBottom = bottom;
       bottom--;
-      gsnap({ title: { vi: `Thu hẹp biên dưới: bottom=${bottom}`, en: `Shrink bottom bound: bottom=${bottom}` }, codeLines: [16], vars: [{ name: "bottom", value: bottom }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: "Hàng dưới đã duyệt xong nên giảm bottom.", en: "The bottom row is done, so decrement bottom." } });
+      gsnap({ title: { vi: `Co BOTTOM: ${previousBottom} → ${bottom}`, en: `Shrink BOTTOM: ${previousBottom} → ${bottom}` }, phase: "shrink-bottom", direction: "bottom", boundaryChange: { name: "bottom", from: previousBottom, to: bottom }, codeLines: [16], vars: [{ name: "bottom", value: bottom }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Hàng ${previousBottom} đã xong, nên bottom đi lên hàng ${bottom}.`, en: `Row ${previousBottom} is complete, so bottom moves up to row ${bottom}.` } });
     }
-    gsnap({ title: { vi: `Kiểm tra còn cột trái không`, en: `Check whether left column remains` }, codeLines: [17], vars: [{ name: "left,right", value: `${left},${right}` }], note: { vi: left <= right ? "Còn cột trái để duyệt dưới→trên." : "Không còn cột trái, bỏ qua nhánh này.", en: left <= right ? "A left column remains for bottom→top traversal." : "No left column remains, so skip this branch." } });
+    gsnap({ title: { vi: "Có còn cột LEFT không?", en: "Does a LEFT column remain?" }, phase: "check-left", direction: "left", guard: { expression: "left <= right", left, right, pass: left <= right }, codeLines: [17], vars: [{ name: "left,right", value: `${left},${right}` }], note: { vi: left <= right ? `${left} ≤ ${right}: còn cột left=${left}, tiếp tục quét dưới → trên.` : `${left} > ${right}: không còn cột, phải bỏ qua để tránh lấy trùng.`, en: left <= right ? `${left} ≤ ${right}: column left=${left} remains; scan bottom → top.` : `${left} > ${right}: no column remains; skip it to avoid duplicates.` } });
     if (left <= right) {
       for (let r = bottom; r >= top; r--) {
         result.push(m[r][left]);
         visited.add(`${r},${left}`);
-        gsnap({ title: { vi: `Append cột trái: matrix[${r}][${left}]`, en: `Append left col: matrix[${r}][${left}]` }, hlCell: [r, left], codeLines: [18, 19], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi dưới→trên trên cột left=${left}.`, en: `Move bottom→top on left column ${left}.` } });
+        gsnap({ title: { vi: `LEFT: lấy matrix[${r}][${left}] = ${m[r][left]}`, en: `LEFT: take matrix[${r}][${left}] = ${m[r][left]}` }, phase: "scan-left", direction: "left", hlCell: [r, left], codeLines: [18, 19], vars: [{ name: "r", value: r }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Đi dưới → trên trên cột left=${left}, từ r=${bottom} về r=${top}.`, en: `Move bottom → top on column left=${left}, from r=${bottom} back to r=${top}.` } });
       }
+      const previousLeft = left;
       left++;
-      gsnap({ title: { vi: `Thu hẹp biên trái: left=${left}`, en: `Shrink left bound: left=${left}` }, codeLines: [20], vars: [{ name: "left", value: left }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: "Cột trái đã duyệt xong nên tăng left.", en: "The left column is done, so increment left." } });
+      gsnap({ title: { vi: `Co LEFT: ${previousLeft} → ${left}`, en: `Shrink LEFT: ${previousLeft} → ${left}` }, phase: "shrink-left", direction: "left", boundaryChange: { name: "left", from: previousLeft, to: left }, codeLines: [20], vars: [{ name: "left", value: left }, { name: "res", value: `[${result.join(",")}]` }], note: { vi: `Cột ${previousLeft} đã xong, nên left dịch phải sang cột ${left}.`, en: `Column ${previousLeft} is complete, so left moves right to column ${left}.` } });
     }
+    layer++;
   }
-  gsnap({ title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, final: true, codeLines: [21], vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Thứ tự xoắn ốc.`, en: `Spiral order.` } });
+  gsnap({ title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, phase: "done", final: true, codeLines: [21], vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: "Bốn biên đã giao nhau; mọi ô xuất hiện đúng một lần theo thứ tự xoắn ốc.", en: "The four bounds have crossed; every cell appears exactly once in spiral order." } });
   return { original: m, answer: result, steps };
 }
 
@@ -8477,7 +8637,12 @@ module.exports = {
         { value: "2", label: { vi: "Cách 2: transpose + swap từng cặp", en: "Approach 2: transpose + pair swaps" } },
       ] },
     ],
-    approach: [{ vi: "Transpose: đổi phần tử qua đường chéo chính.", en: "Transpose: swap elements across the main diagonal." }, { vi: "Cách 1 dùng row.reverse(); cách 2 đảo mỗi hàng bằng swap matrix[i][j] với matrix[i][n-1-j].", en: "Approach 1 uses row.reverse(); approach 2 reverses each row by swapping matrix[i][j] with matrix[i][n-1-j]." }, { vi: "Sau khi đảo từng hàng → xoay 90° clockwise.", en: "After reversing each row → 90° clockwise rotation." }],
+    approach: [
+      { vi: "Bước 1 — Transpose: đổi matrix[r][c] với matrix[c][r] ở hai phía đường chéo chính; các ô (i,i) giữ nguyên.", en: "Step 1 — Transpose: swap matrix[r][c] with matrix[c][r] across the main diagonal; cells (i,i) stay fixed." },
+      { vi: "Bước 2 — Reverse rows: Cách 1 gọi row.reverse(); Cách 2 tự đổi matrix[i][j] với matrix[i][n-1-j].", en: "Step 2 — Reverse rows: Approach 1 calls row.reverse(); Approach 2 manually swaps matrix[i][j] with matrix[i][n-1-j]." },
+      { vi: "Ghép hai phép biến đổi: vị trí gốc (r,c) → transpose thành (c,r) → đảo hàng thành (c,n-1-r).", en: "Combine both transforms: original position (r,c) → transpose to (c,r) → row reversal to (c,n-1-r)." },
+      { vi: "Làm trực tiếp trên matrix nên dùng O(1) bộ nhớ phụ; tổng công việc vẫn là O(n²).", en: "All changes happen in the matrix, so auxiliary space is O(1); total work remains O(n²)." },
+    ],
     complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Tại chỗ.", en: "In-place." } },
     code: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for row in matrix:", "            row.reverse()"],
     code2: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for i in range(n):", "            for j in range(0, n//2):", "                matrix[i][j], matrix[i][n-1-j] = matrix[i][n-1-j], matrix[i][j]"],
@@ -8491,7 +8656,12 @@ module.exports = {
     titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
     statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
     defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
-    approach: [{ vi: "Giữ 4 biên top/bottom/left/right.", en: "Keep 4 bounds top/bottom/left/right." }, { vi: "Đi →, ↓, ←, ↑ và thu hẹp biên sau mỗi cạnh.", en: "Go →, ↓, ←, ↑ and shrink a bound after each edge." }],
+    approach: [
+      { vi: "top, right, bottom, left luôn bao quanh đúng vùng CHƯA duyệt.", en: "top, right, bottom, and left always enclose exactly the UNVISITED region." },
+      { vi: "Quét TOP →, RIGHT ↓, BOTTOM ←, LEFT ↑ theo chiều kim đồng hồ.", en: "Scan TOP →, RIGHT ↓, BOTTOM ←, and LEFT ↑ clockwise." },
+      { vi: "Xong TOP/LEFT thì tăng biên; xong RIGHT/BOTTOM thì giảm biên để co vào lớp kế tiếp.", en: "After TOP/LEFT increment the bound; after RIGHT/BOTTOM decrement it to shrink into the next layer." },
+      { vi: "Kiểm tra top <= bottom và left <= right trước hai cạnh cuối để không lấy trùng khi chỉ còn một hàng hoặc một cột.", en: "Check top <= bottom and left <= right before the final two edges to avoid duplicates when only one row or column remains." },
+    ],
     complexity: { time: "O(R·C)", space: "O(1)", note: { vi: "Mỗi ô thăm 1 lần.", en: "Each cell visited once." } },
     code: [
       "class Solution:",

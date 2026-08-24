@@ -17374,6 +17374,219 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderRotate48View(step) {
+  const view = step.rotate48View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const original = Array.isArray(view.original) ? view.original : [];
+  const n = Number(view.n) || matrix.length;
+  const phase = String(view.phase || "init");
+  const activeCells = Array.isArray(view.activeCells) ? view.activeCells : [];
+  const activeRow = Number.isInteger(view.activeRow) ? view.activeRow : null;
+  const reversedRows = new Set(Array.isArray(view.reversedRows) ? view.reversedRows : []);
+  const swap = view.swap || null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const phaseIndex = phase === "done" ? 2
+    : phase === "transpose-done" || phase.startsWith("reverse") ? 1 : 0;
+  const stageLabels = vi
+    ? ["Transpose qua đường chéo", "Đảo trái-phải từng hàng", "Xoay 90° hoàn tất"]
+    : ["Transpose across diagonal", "Reverse each row", "90° rotation complete"];
+  const stages = stageLabels.map((label, index) => {
+    const state = phase === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    const marker = state === "done" ? "✓" : state === "active" ? "▶" : index + 1;
+    return `<span class="${state} stage-${index + 1}"><small>${marker}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const transposeDone = Number(view.transposeSwaps) || 0;
+  const transposeTotal = Number(view.totalTransposeSwaps) || 0;
+  const rowDone = reversedRows.size;
+  const progress = `<section class="rot48-progress">
+    <div class="transpose"><small>TRANSPOSE SWAPS</small><strong>${transposeDone} / ${transposeTotal}</strong><span>${vi ? "chỉ đổi phía trên đường chéo" : "swap only above the diagonal"}</span></div>
+    <div class="diagonal"><small>MAIN DIAGONAL</small><strong>${n} ${vi ? "ô cố định" : "fixed cells"}</strong><span>(i,i) &rarr; (i,i)</span></div>
+    <div class="reverse"><small>REVERSED ROWS</small><strong>${rowDone} / ${n}</strong><span>${view.approach === 2 ? (vi ? "swap từng cặp" : "pair-by-pair swaps") : "row.reverse()"}</span></div>
+  </section>`;
+
+  const matrixItems = [];
+  matrixItems.push(`<span class="rot48-corner">r\\c</span>`);
+  for (let col = 0; col < n; col++) matrixItems.push(`<span class="rot48-col-label">c=${col}</span>`);
+  matrix.forEach((row, rowIndex) => {
+    matrixItems.push(`<span class="rot48-row-label ${rowIndex === activeRow ? "active" : ""} ${reversedRows.has(rowIndex) ? "done" : ""}">r=${rowIndex}</span>`);
+    row.forEach((value, colIndex) => {
+      const classes = ["rot48-cell"];
+      const isA = sameCell(activeCells[0], rowIndex, colIndex);
+      const isB = sameCell(activeCells[1], rowIndex, colIndex) && !isA;
+      if (rowIndex === colIndex) classes.push("diagonal");
+      if (rowIndex === activeRow) classes.push("active-row");
+      if (reversedRows.has(rowIndex)) classes.push("row-done");
+      if (isA) classes.push("active-a");
+      if (isB) classes.push("active-b");
+      const tag = isA ? "A" : isB ? "B" : rowIndex === colIndex ? "DIAG" : reversedRows.has(rowIndex) ? (vi ? "ĐÚNG CHỖ" : "FINAL") : "";
+      matrixItems.push(`<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(display(value))}</strong><em>${escapeHtml(tag)}</em></div>`);
+    });
+  });
+
+  let operation;
+  if (swap?.kind === "transpose") {
+    operation = `<section class="rot48-operation transpose">
+      <header><small>${vi ? "ĐỔI QUA ĐƯỜNG CHÉO" : "MIRROR SWAP"}</small><strong>matrix[${swap.a[0]}][${swap.a[1]}] ↔ matrix[${swap.b[0]}][${swap.b[1]}]</strong></header>
+      <div><span class="a"><small>A · (${swap.a.join(",")})</small><strong>${escapeHtml(display(swap.before?.[0]))} &rarr; ${escapeHtml(display(swap.after?.[0]))}</strong></span><i>↔</i><span class="b"><small>B · (${swap.b.join(",")})</small><strong>${escapeHtml(display(swap.before?.[1]))} &rarr; ${escapeHtml(display(swap.after?.[1]))}</strong></span></div>
+      <p>${vi ? "A và B có tọa độ đảo ngược nhau, nên chúng đối xứng qua đường chéo chính." : "A and B have reversed coordinates, so they mirror each other across the main diagonal."}</p>
+    </section>`;
+  } else if (swap?.kind === "reverse") {
+    operation = `<section class="rot48-operation reverse">
+      <header><small>${vi ? `ĐẢO HÀNG ${swap.a[0]}` : `REVERSE ROW ${swap.a[0]}`}</small><strong>j=${swap.a[1]} ↔ n-1-j=${swap.b[1]}</strong></header>
+      <div><span class="a"><small>${vi ? "ĐẦU TRÁI" : "LEFT END"} · (${swap.a.join(",")})</small><strong>${escapeHtml(display(swap.before?.[0]))} &rarr; ${escapeHtml(display(swap.after?.[0]))}</strong></span><i>↔</i><span class="b"><small>${vi ? "ĐẦU PHẢI" : "RIGHT END"} · (${swap.b.join(",")})</small><strong>${escapeHtml(display(swap.before?.[1]))} &rarr; ${escapeHtml(display(swap.after?.[1]))}</strong></span></div>
+      <p>${vi ? "Hai ô cùng hàng và cách đều hai mép đổi chỗ; lặp đến giữa hàng." : "Two cells in the same row, equally far from opposite ends, trade places; repeat toward the center."}</p>
+    </section>`;
+  } else if (swap?.kind === "row-reverse") {
+    const before = (swap.beforeRow || []).map(display).join(", ");
+    const after = (swap.afterRow || []).map(display).join(", ");
+    operation = `<section class="rot48-operation reverse row-reverse">
+      <header><small>row.reverse()</small><strong>${vi ? `ĐẢO TOÀN BỘ HÀNG ${swap.row}` : `REVERSE ALL OF ROW ${swap.row}`}</strong></header>
+      <div class="rot48-row-change"><code>[${escapeHtml(before)}]</code><i>&rarr;</i><code>[${escapeHtml(after)}]</code></div>
+      <p>${vi ? "Phần tử ngoài cùng đổi phía trước, rồi tiếp tục vào giữa; Python thực hiện toàn bộ bằng row.reverse()." : "Outer values change sides first, continuing inward; Python performs the whole operation with row.reverse()."}</p>
+    </section>`;
+  } else if (phase === "transpose-done") {
+    operation = `<section class="rot48-operation bridge"><header><small>${vi ? "CHUYỂN PHA" : "PHASE CHANGE"}</small><strong>${vi ? "Transpose xong, bắt đầu đảo từng hàng" : "Transpose done, now reverse every row"}</strong></header><p>${vi ? "Cột của ma trận gốc đã trở thành hàng. Đảo hàng sẽ biến hướng xoay ngược chiều thành đúng 90° clockwise." : "Original columns are now rows. Reversing those rows turns the reflection into a 90° clockwise rotation."}</p></section>`;
+  } else if (phase === "done") {
+    operation = `<section class="rot48-operation done"><header><small>DONE · O(n²) TIME · O(1) SPACE</small><strong>(r,c) &rarr; (c,n-1-r)</strong></header><p>${vi ? "Mọi hàng đã đảo xong và mọi phần tử đang ở tọa độ xoay cuối cùng." : "Every row is reversed and every value is at its final rotated coordinate."}</p></section>`;
+  } else {
+    operation = `<section class="rot48-operation idle"><header><small>${vi ? "HAI PHÉP BIẾN ĐỔI TẠI CHỖ" : "TWO IN-PLACE TRANSFORMS"}</small><strong>transpose &rarr; reverse rows</strong></header><p>${vi ? "Theo dõi đường chéo xanh, cặp A/B đang đổi và các hàng đã hoàn tất." : "Watch the cyan diagonal, the active A/B pair, and rows that have reached their final order."}</p></section>`;
+  }
+
+  const transformCards = `<section class="rot48-map">
+    <header><strong>${vi ? "BẢN ĐỒ TỌA ĐỘ" : "COORDINATE MAP"}</strong><span>${vi ? "vì sao hai bước tạo đúng phép xoay" : "why the two steps equal one rotation"}</span></header>
+    <div>
+      <span class="transpose ${phaseIndex === 0 ? "active" : ""}"><small>1 · TRANSPOSE</small><strong>(r,c) &rarr; (c,r)</strong><em>${vi ? "đổi hàng ↔ cột" : "swap row ↔ column"}</em></span>
+      <i>&rarr;</i>
+      <span class="reverse ${phaseIndex === 1 ? "active" : ""}"><small>2 · REVERSE ROW</small><strong>(c,r) &rarr; (c,n-1-r)</strong><em>${vi ? "lật chỉ số cột" : "flip the column index"}</em></span>
+      <i>=</i>
+      <span class="combined ${phase === "done" ? "active" : ""}"><small>${vi ? "KẾT QUẢ" : "COMBINED"}</small><strong>(r,c) &rarr; (c,n-1-r)</strong><em>90° CLOCKWISE</em></span>
+    </div>
+  </section>`;
+
+  const originalRows = original.map((row, index) => `<span><small>row ${index}</small><code>[${escapeHtml(row.map(display).join(", "))}]</code></span>`).join("");
+  const currentRows = matrix.map((row, index) => `<span class="${reversedRows.has(index) ? "done" : index === activeRow ? "active" : ""}"><small>row ${index}</small><code>[${escapeHtml(row.map(display).join(", "))}]</code></span>`).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Rotate Image: transpose ${transposeDone}/${transposeTotal}, đã đảo ${rowDone}/${n} hàng.`
+    : `Rotate Image: ${transposeDone}/${transposeTotal} transpose swaps, ${rowDone}/${n} rows reversed.`;
+
+  $("treeView").innerHTML = `<section class="rot48-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rot48-stages">${stages}</div>
+    <div class="rot48-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${view.approach === 2 ? (vi ? "CÁCH 2" : "APPROACH 2") : (vi ? "CÁCH 1" : "APPROACH 1")}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    ${progress}
+    ${operation}
+    <div class="rot48-layout">
+      <section class="rot48-board"><header><strong>MATRIX ${n} × ${n}</strong><span>${vi ? "đường chéo chính được giữ cố định" : "main diagonal stays fixed during transpose"}</span></header><div class="rot48-matrix-wrap"><div class="rot48-matrix" style="--rot48-cols:${n}">${matrixItems.join("")}</div></div></section>
+      <aside class="rot48-legend"><strong>${vi ? "ĐỌC MÀU" : "READ THE COLORS"}</strong><span class="diag"><i></i>${vi ? "đường chéo chính" : "main diagonal"}</span><span class="a"><i></i>${vi ? "ô A đang đổi" : "active cell A"}</span><span class="b"><i></i>${vi ? "ô B đang đổi" : "active cell B"}</span><span class="row"><i></i>${vi ? "hàng đã đảo xong" : "reversed row"}</span></aside>
+    </div>
+    ${transformCards}
+    <section class="rot48-compare"><div><header><strong>${vi ? "MA TRẬN GỐC" : "ORIGINAL MATRIX"}</strong><span>input</span></header>${originalRows}</div><i>&rarr;</i><div><header><strong>${phase === "done" ? (vi ? "KẾT QUẢ XOAY" : "ROTATED RESULT") : (vi ? "TRẠNG THÁI HIỆN TẠI" : "CURRENT STATE")}</strong><span>in-place</span></header>${currentRows}</div></section>
+  </section>`;
+}
+
+function renderSpiral54View(step) {
+  const view = step.spiral54View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const bounds = view.bounds || { top: 0, bottom: rows - 1, left: 0, right: cols - 1 };
+  const phase = String(view.phase || "init");
+  const direction = view.direction;
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const visitedCells = Array.isArray(view.visitedCells) ? view.visitedCells : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const visited = new Map(visitedCells.map((cell) => [`${cell.row},${cell.col}`, cell]));
+  const validRegion = bounds.top <= bounds.bottom && bounds.left <= bounds.right;
+  const directions = [
+    { key: "top", label: "TOP", arrow: "→", detail: vi ? "hàng trên" : "top row" },
+    { key: "right", label: "RIGHT", arrow: "↓", detail: vi ? "cột phải" : "right column" },
+    { key: "bottom", label: "BOTTOM", arrow: "←", detail: vi ? "hàng dưới" : "bottom row" },
+    { key: "left", label: "LEFT", arrow: "↑", detail: vi ? "cột trái" : "left column" },
+  ];
+  const activeStage = Math.max(0, directions.findIndex((item) => item.key === direction));
+  const stages = directions.map((item, index) => {
+    const state = phase === "done" || index < activeStage ? "done" : index === activeStage ? "active" : "pending";
+    return `<span class="${state} ${item.key}"><small>${state === "done" ? "✓" : item.arrow}</small><strong>${item.label}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  const boundaryCards = [
+    { key: "top", label: "TOP", value: bounds.top, movement: vi ? "xong hàng → tăng" : "row done → increment" },
+    { key: "right", label: "RIGHT", value: bounds.right, movement: vi ? "xong cột → giảm" : "column done → decrement" },
+    { key: "bottom", label: "BOTTOM", value: bounds.bottom, movement: vi ? "xong hàng → giảm" : "row done → decrement" },
+    { key: "left", label: "LEFT", value: bounds.left, movement: vi ? "xong cột → tăng" : "column done → increment" },
+  ].map((item) => {
+    const changed = view.boundaryChange?.name === item.key;
+    const active = direction === item.key;
+    return `<span class="${item.key} ${active ? "active" : ""} ${changed ? "changed" : ""}"><small>${item.label}</small><strong>${item.key} = ${escapeHtml(String(item.value))}</strong><em>${escapeHtml(item.movement)}</em></span>`;
+  }).join("");
+
+  const cells = matrix.flatMap((row, rowIndex) => row.map((value, colIndex) => {
+    const key = `${rowIndex},${colIndex}`;
+    const visit = visited.get(key);
+    const isActive = activeCell && activeCell[0] === rowIndex && activeCell[1] === colIndex;
+    const inRegion = validRegion
+      && rowIndex >= bounds.top && rowIndex <= bounds.bottom
+      && colIndex >= bounds.left && colIndex <= bounds.right;
+    const classes = ["sm54-cell"];
+    if (visit) classes.push("visited");
+    if (inRegion) classes.push("remaining");
+    if (isActive) classes.push("active");
+    if (validRegion && rowIndex === bounds.top && colIndex >= bounds.left && colIndex <= bounds.right) classes.push("bound-top");
+    if (validRegion && rowIndex === bounds.bottom && colIndex >= bounds.left && colIndex <= bounds.right) classes.push("bound-bottom");
+    if (validRegion && colIndex === bounds.left && rowIndex >= bounds.top && rowIndex <= bounds.bottom) classes.push("bound-left");
+    if (validRegion && colIndex === bounds.right && rowIndex >= bounds.top && rowIndex <= bounds.bottom) classes.push("bound-right");
+    return `<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(String(value))}</strong><em>${visit ? `#${visit.order}` : inRegion ? (vi ? "CHƯA ĐI" : "UNVISITED") : ""}</em></div>`;
+  })).join("");
+
+  const topEdge = `<div class="sm54-edge-label top ${direction === "top" ? "active" : ""}"><span>↓</span><b>TOP = ${escapeHtml(String(bounds.top))}</b></div>`;
+  const bottomEdge = `<div class="sm54-edge-label bottom ${direction === "bottom" ? "active" : ""}"><b>BOTTOM = ${escapeHtml(String(bounds.bottom))}</b><span>↑</span></div>`;
+  const leftEdge = `<div class="sm54-edge-label left ${direction === "left" ? "active" : ""}"><b>LEFT</b><strong>${escapeHtml(String(bounds.left))}</strong><span>→</span></div>`;
+  const rightEdge = `<div class="sm54-edge-label right ${direction === "right" ? "active" : ""}"><span>←</span><b>RIGHT</b><strong>${escapeHtml(String(bounds.right))}</strong></div>`;
+
+  let operation;
+  if (view.boundaryChange) {
+    const change = view.boundaryChange;
+    operation = `<section class="sm54-operation change ${escapeHtml(change.name)}"><small>${vi ? "CO BIÊN" : "SHRINK BOUND"}</small><strong>${String(change.name).toUpperCase()}: ${escapeHtml(String(change.from))} → ${escapeHtml(String(change.to))}</strong><span>${vi ? "Cạnh vừa quét được loại khỏi vùng chưa duyệt." : "The completed edge leaves the unvisited region."}</span></section>`;
+  } else if (view.guard) {
+    const guard = view.guard;
+    operation = `<section class="sm54-operation guard ${guard.pass ? "pass" : "skip"}"><small>${vi ? "ĐIỀU KIỆN CHỐNG TRÙNG" : "DUPLICATE GUARD"}</small><strong>${escapeHtml(guard.expression)} · ${escapeHtml(String(guard.left))} ${guard.pass ? "≤" : ">"} ${escapeHtml(String(guard.right))}</strong><span>${guard.pass ? (vi ? "PASS: cạnh này vẫn còn." : "PASS: this edge still exists.") : (vi ? "SKIP: hai biên đã giao nhau." : "SKIP: the bounds have crossed.")}</span></section>`;
+  } else if (direction) {
+    const formulas = {
+      top: `matrix[top][c] · c: ${bounds.left} → ${bounds.right}`,
+      right: `matrix[r][right] · r: ${bounds.top} → ${bounds.bottom}`,
+      bottom: `matrix[bottom][c] · c: ${bounds.right} → ${bounds.left}`,
+      left: `matrix[r][left] · r: ${bounds.bottom} → ${bounds.top}`,
+    };
+    operation = `<section class="sm54-operation scan ${direction}"><small>${vi ? "CẠNH ĐANG QUÉT" : "ACTIVE EDGE"}</small><strong>${direction.toUpperCase()} ${directions.find((item) => item.key === direction)?.arrow || ""}</strong><code>${escapeHtml(formulas[direction] || "top <= bottom and left <= right")}</code></section>`;
+  } else {
+    operation = `<section class="sm54-operation idle"><small>${phase === "done" ? "DONE" : (vi ? "VÙNG CHƯA DUYỆT" : "UNVISITED REGION")}</small><strong>${phase === "done" ? `${result.length}/${rows * cols}` : `[top..bottom] × [left..right]`}</strong><span>${phase === "done" ? (vi ? "Mọi ô đã được lấy đúng một lần." : "Every cell was taken exactly once.") : (vi ? "Bốn biên bắt đầu ở viền ngoài." : "The four bounds start at the outer rim.")}</span></section>`;
+  }
+
+  const output = result.length
+    ? result.map((value, index) => `<span class="${index === result.length - 1 && activeCell ? "active" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("")
+    : `<em class="sm54-empty">${vi ? "result đang rỗng" : "result is empty"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Spiral Matrix: đã lấy ${result.length}/${rows * cols} ô; top ${bounds.top}, right ${bounds.right}, bottom ${bounds.bottom}, left ${bounds.left}.`
+    : `Spiral Matrix: visited ${result.length}/${rows * cols} cells; top ${bounds.top}, right ${bounds.right}, bottom ${bounds.bottom}, left ${bounds.left}.`;
+
+  $("treeView").innerHTML = `<section class="sm54-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sm54-stages">${stages}</div>
+    <div class="sm54-action"><small>${vi ? "LỚP" : "LAYER"} ${Number(view.layer || 0) + 1} · ${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="sm54-bounds"><header><strong>4 BOUNDS</strong><span>${vi ? "bao quanh vùng CHƯA duyệt" : "enclose the UNVISITED region"}</span></header><div>${boundaryCards}</div></section>
+    ${operation}
+    <div class="sm54-layout">
+      <section class="sm54-board"><header><strong>MATRIX ${rows} × ${cols}</strong><span>${vi ? `còn ${view.remainingCount} ô` : `${view.remainingCount} remaining`}</span></header>${topEdge}<div class="sm54-board-row">${leftEdge}<div class="sm54-grid-wrap"><div class="sm54-grid" style="--sm54-cols:${cols}">${cells}</div></div>${rightEdge}</div>${bottomEdge}</section>
+      <aside class="sm54-legend"><strong>${vi ? "ĐỌC KHUNG" : "READ THE FRAME"}</strong><span class="top"><i></i>TOP · →</span><span class="right"><i></i>RIGHT · ↓</span><span class="bottom"><i></i>BOTTOM · ←</span><span class="left"><i></i>LEFT · ↑</span><span class="visited"><i></i>${vi ? "đã vào result" : "already in result"}</span></aside>
+    </div>
+    <section class="sm54-output"><header><strong>SPIRAL OUTPUT</strong><span>${result.length}/${rows * cols}</span></header><div>${output}</div></section>
+  </section>`;
+}
+
 function renderRandomizedSet380View(step) {
   const view = step.randomizedSet380View || {};
   const vi = lang === "vi";
@@ -18841,6 +19054,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromePathView(step);
+  } else if (step.rotate48View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotate48View(step);
+  } else if (step.spiral54View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSpiral54View(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
