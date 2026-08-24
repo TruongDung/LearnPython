@@ -3587,15 +3587,85 @@ function buildSteps1886(input, params = {}) {
   if (matrix.length !== matrix[0].length || target.length !== target[0].length || matrix.length !== target.length) throw new Error("mat and target must be square matrices of the same size");
   const rotate = (grid) => Array.from({ length: grid.length }, (_, r) => Array.from({ length: grid.length }, (_, c) => grid[grid.length - 1 - c][r]));
   let current = cloneMatrix2D(matrix);
-  const targetText = JSON.stringify(target);
   const steps = [];
+  const tested = [];
+  const size = matrix.length;
+  const snapshot = ({ title, phase, angle, matches, mismatches, codeLines = [], vars = [], note, decision = null, final = false }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      rotation1886View: {
+        original: cloneMatrix2D(matrix),
+        current: cloneMatrix2D(current),
+        target: cloneMatrix2D(target),
+        size,
+        angle,
+        phase,
+        matches: matches.map(([row, col]) => [row, col]),
+        mismatches: mismatches.map(([row, col]) => [row, col]),
+        tested: tested.map((item) => ({ ...item })),
+        decision,
+      },
+    });
+  };
+
   for (let turns = 0; turns < 4; turns++) {
-    const same = current.every((row, r) => row.every((value, c) => value === target[r][c]));
-    steps.push(matrixStep2D(current, { title: { vi: `So sánh sau ${turns * 90}°`, en: `Compare after ${turns * 90}°` }, codeLines: [4, 5], final: same, vars: [{ name: "rotation", value: `${turns * 90}°` }, { name: "matches target", value: same }], note: { vi: same ? "Ma trận hiện tại bằng target → True." : "Chưa bằng target; thử xoay thêm 90°.", en: same ? "The current matrix equals target → True." : "It does not match target yet; try another 90° rotation." }, grid: { caption: `Candidate (${turns * 90}°)`, secondaryCaption: `target = ${targetText}` } }));
+    const angle = turns * 90;
+    const matches = [];
+    const mismatches = [];
+    for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
+      (current[row][col] === target[row][col] ? matches : mismatches).push([row, col]);
+    }
+    const same = mismatches.length === 0;
+    tested.push({ angle, same });
+    snapshot({
+      title: { vi: `So sánh ứng viên sau ${angle}°`, en: `Compare the ${angle}° candidate` },
+      phase: same ? "found" : "compare",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [5, 6],
+      final: same,
+      vars: [{ name: "rotation", value: `${angle}°` }, { name: "matching cells", value: `${matches.length}/${size * size}` }, { name: "candidate == target", value: same }],
+      note: { vi: same ? `Tất cả ${size * size} ô đều bằng target → True.` : `${mismatches.length} ô khác target, nên ứng viên ${angle}° chưa đạt.` , en: same ? `All ${size * size} cells equal target → True.` : `${mismatches.length} cells differ from target, so the ${angle}° candidate does not match yet.` },
+      decision: { kind: same ? "found" : "compare", matchingCount: matches.length, total: size * size },
+    });
     if (same) return { original: matrix, answer: true, steps };
+    if (turns === 3) break;
+    snapshot({
+      title: { vi: `Xoay ứng viên ${angle}° thành ${angle + 90}°`, en: `Rotate the ${angle}° candidate to ${angle + 90}°` },
+      phase: "rotate",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [7],
+      vars: [{ name: "rotation", value: `${angle}° → ${angle + 90}°` }, { name: "move rule", value: "(r,c) → (c,n-1-r)" }],
+      note: { vi: "Mỗi giá trị đi theo quy tắc (r,c) → (c,n-1-r) khi xoay 90° theo chiều kim đồng hồ.", en: "Every value follows (r,c) → (c,n-1-r) for a clockwise 90° rotation." },
+      decision: { kind: "rotate", fromAngle: angle, toAngle: angle + 90 },
+    });
     current = rotate(current);
   }
-  steps.push(matrixStep2D(current, { title: { vi: "Không có rotation phù hợp", en: "No matching rotation" }, codeLines: [6], final: true, vars: [{ name: "answer", value: false }], note: { vi: "Đã kiểm tra 0°, 90°, 180°, 270° đều không bằng target.", en: "0°, 90°, 180°, and 270° all differ from target." }, grid: { caption: "No match", secondaryCaption: `target = ${targetText}` } }));
+  const matches = [];
+  const mismatches = [];
+  for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) (current[row][col] === target[row][col] ? matches : mismatches).push([row, col]);
+  snapshot({
+    title: { vi: "Không có góc xoay phù hợp", en: "No rotation matches" },
+    phase: "missing",
+    angle: 270,
+    matches,
+    mismatches,
+    codeLines: [8],
+    final: true,
+    vars: [{ name: "tested rotations", value: "0°, 90°, 180°, 270°" }, { name: "answer", value: false }],
+    note: { vi: "Đã thử đủ bốn hướng; không có ứng viên nào bằng target → False.", en: "All four orientations were tried; none equals target → False." },
+    decision: { kind: "missing", matchingCount: matches.length, total: size * size },
+  });
   return { original: matrix, answer: false, steps };
 }
 
