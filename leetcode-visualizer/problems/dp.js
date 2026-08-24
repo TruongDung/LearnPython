@@ -17945,6 +17945,37 @@ function buildSteps1872(input) {
   const p = original.slice();
   for (let i = 1; i < n; i++) p[i] += p[i - 1];
 
+  const blankRow = () => new Array(n).fill(null);
+  const rowItems = (values, mergedThrough = -1, takenCount = 0) => values.map((value, index) => {
+    const isMergedPrefix = mergedThrough >= 0 && index === 0;
+    const originalIndex = mergedThrough < 0 ? index : (index === 0 ? null : mergedThrough + index);
+    return {
+      value,
+      label: isMergedPrefix ? `sum[0..${mergedThrough}]` : `stones[${originalIndex}]`,
+      originalIndex,
+      mergedThrough: isMergedPrefix ? mergedThrough : null,
+      taken: index < takenCount,
+    };
+  });
+  const makeView = (overrides = {}) => ({
+    phase: "rules",
+    stones: original.slice(),
+    gameRow: rowItems(original),
+    mover: null,
+    aliceScore: 0,
+    bobScore: 0,
+    currentMove: null,
+    moveLog: [],
+    prefix: blankRow(),
+    prefixReady: [],
+    dp: blankRow(),
+    currentIndex: null,
+    choice: null,
+    traceStops: [],
+    answer: null,
+    ...overrides,
+  });
+
   // ─── Minimax on the real game (rows are tiny): margin of the player to move ───
   const marginMemo = new Map();
   function bestMargin(row) {
@@ -17983,6 +18014,7 @@ function buildSteps1872(input) {
     highlight: [],
     mark: [0],
     codeLines: [1, 2, 3],
+    stoneGame1872View: makeView({ phase: "rules" }),
     vars: [
       { name: "stones", value: JSON.stringify(original) },
       { name: "nước đi", value: "lấy x > 1 viên từ TRÁI" },
@@ -18004,7 +18036,8 @@ function buildSteps1872(input) {
     const mv = bestMove(row);
     const taken = row.slice(0, mv.x);
     const prevCut = moves.length ? moves[moves.length - 1].idx : -1;
-    const stopIdx = prevCut + mv.x;
+    const stopIdx = prevCut < 0 ? mv.x - 1 : prevCut + mv.x - 1;
+    const currentMove = { mover, x: mv.x, taken: taken.slice(), sum: mv.sum, idx: stopIdx };
     steps.push({
       title: {
         vi: `${mover} lấy ${mv.x} viên đầu: ${taken.join(" + ")} = ${mv.sum} điểm`,
@@ -18014,6 +18047,15 @@ function buildSteps1872(input) {
       highlight: Array.from({ length: mv.x }, (_, k) => k),
       mark: [],
       codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "game-move",
+        gameRow: rowItems(row, prevCut, mv.x),
+        mover,
+        aliceScore,
+        bobScore,
+        currentMove,
+        moveLog: moves.map((move) => ({ ...move })),
+      }),
       vars: [
         { name: "người đi", value: mover },
         { name: "điểm vừa nhận", value: mv.sum },
@@ -18026,7 +18068,7 @@ function buildSteps1872(input) {
     if (mover === "Alice") aliceScore += mv.sum;
     else bobScore += mv.sum;
     row = [mv.sum, ...row.slice(mv.x)];
-    moves.push({ idx: stopIdx, sum: mv.sum });
+    moves.push({ ...currentMove, aliceScore, bobScore });
     steps.push({
       title: {
         vi: `Hàng mới có ${row.length} viên: [${row.join(", ")}]`,
@@ -18036,6 +18078,15 @@ function buildSteps1872(input) {
       highlight: [],
       mark: [0],
       codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "game-merge",
+        gameRow: rowItems(row, stopIdx),
+        mover,
+        aliceScore,
+        bobScore,
+        currentMove,
+        moveLog: moves.map((move) => ({ ...move })),
+      }),
       vars: [
         { name: "điểm Alice", value: aliceScore },
         { name: "điểm Bob", value: bobScore },
@@ -18057,6 +18108,14 @@ function buildSteps1872(input) {
     highlight: [],
     mark: [],
     codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "game-over",
+      gameRow: rowItems(row, n - 1),
+      aliceScore,
+      bobScore,
+      moveLog: moves.map((move) => ({ ...move })),
+      answer: aliceScore - bobScore,
+    }),
     vars: [
       { name: "điểm Alice", value: aliceScore },
       { name: "điểm Bob", value: bobScore },
@@ -18075,6 +18134,12 @@ function buildSteps1872(input) {
     highlight: moves.map((m) => m.idx),
     mark: [],
     codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "bridge",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+    }),
     vars: moves.map((m, k) => ({
       name: `nước ${k + 1} (${k % 2 === 0 ? "Alice" : "Bob"})`,
       value: `dừng tại i=${m.idx} → +p[${m.idx}] = ${m.sum}`,
@@ -18087,6 +18152,28 @@ function buildSteps1872(input) {
 
   // ─── Phase 3: build prefix sums in place ───
   const disp = original.slice();
+  steps.push({
+    title: { vi: `Bắt đầu tiền tố: p[0] = stones[0] = ${disp[0]}`, en: `Prefix base: p[0] = stones[0] = ${disp[0]}` },
+    arr: disp.slice(),
+    highlight: [0],
+    mark: [0],
+    codeLines: [3, 4],
+    stoneGame1872View: makeView({
+      phase: "prefix",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: [disp[0], ...new Array(n - 1).fill(null)],
+      prefixReady: [0],
+      currentIndex: 0,
+    }),
+    vars: [
+      { name: "p[0]", value: disp[0] },
+      { name: "ý nghĩa", value: "tổng 1 viên đầu tiên" },
+    ],
+    note: {
+      vi: "Phần tử đầu tiên tự nó đã là một tổng tiền tố. Vì vậy vòng lặp chỉ cần bắt đầu từ i = 1.",
+      en: "The first element is already a prefix sum by itself, so the loop only needs to start at i = 1.",
+    },
+  });
   for (let i = 1; i < n; i++) {
     const before = disp[i];
     disp[i] += disp[i - 1];
@@ -18099,6 +18186,13 @@ function buildSteps1872(input) {
       highlight: [i],
       mark: Array.from({ length: i }, (_, k) => k),
       codeLines: [4, 5],
+      stoneGame1872View: makeView({
+        phase: "prefix",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: disp.map((value, index) => index <= i ? value : null),
+        prefixReady: Array.from({ length: i + 1 }, (_, index) => index),
+        currentIndex: i,
+      }),
       vars: [
         { name: "i", value: i },
         { name: "stones[i] (mới)", value: disp[i] },
@@ -18113,7 +18207,7 @@ function buildSteps1872(input) {
 
   // ─── Phase 4: fill the f table cell-by-cell, right to left ───
   const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
-  const f = new Array(n).fill(0);
+  const f = new Array(n).fill(null);
   f[n - 1] = p[n - 1];
   steps.push({
     title: { vi: `Ô đầu tiên của bảng: f[${n - 1}] = p[${n - 1}] = ${fmt(p[n - 1])}`, en: `First table cell: f[${n - 1}] = p[${n - 1}] = ${p[n - 1]}` },
@@ -18121,6 +18215,15 @@ function buildSteps1872(input) {
     highlight: [n - 1],
     mark: [],
     codeLines: [6],
+    stoneGame1872View: makeView({
+      phase: "dp-base",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      currentIndex: n - 1,
+      choice: { kind: "base", result: f[n - 1] },
+    }),
     vars: [
       { name: `f[${n - 1}]`, value: p[n - 1] },
       { name: "ý nghĩa f(i)", value: "lợi thế tối đa của NGƯỜI SẮP ĐI khi nước kế phải dừng từ i trở đi" },
@@ -18144,6 +18247,23 @@ function buildSteps1872(input) {
       highlight: [i],
       mark: Array.from({ length: n - 1 - i }, (_, k) => i + 1 + k),
       codeLines: [7, 8],
+      stoneGame1872View: makeView({
+        phase: "dp",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: p.slice(),
+        prefixReady: Array.from({ length: n }, (_, index) => index),
+        dp: f.slice(),
+        currentIndex: i,
+        choice: {
+          kind: "compare",
+          take: optStop,
+          skip: optSkip,
+          prefixValue: p[i],
+          opponentBest: f[i + 1],
+          result: f[i],
+          picked: optStop === optSkip ? "tie" : optStop > optSkip ? "take" : "skip",
+        },
+      }),
       vars: [
         { name: `A · dừng ngay tại ${i}`, value: `tôi +${fmt(p[i])}, đối thủ giành f[${i + 1}]=${fmt(f[i + 1])} ⇒ hiệu ${fmt(optStop)}` },
         { name: `B · bỏ qua ${i}`, value: `cơ hội vẫn chờ bên phải ⇒ ${fmt(optSkip)}` },
@@ -18159,6 +18279,7 @@ function buildSteps1872(input) {
   // ─── Phase 5: trace back — the table points at exactly the played moves ───
   let prevIdx = -1;
   let turn = 0;
+  const traceStops = [];
   while (prevIdx < n - 1) {
     const who = turn === 0 ? "Alice" : "Bob";
     const lo = prevIdx === -1 ? 1 : prevIdx + 1;
@@ -18173,6 +18294,7 @@ function buildSteps1872(input) {
     }
     const oppBest = bestJ === n - 1 ? 0 : f[bestJ + 1];
     const simK = turn < moves.length ? moves[turn] : null;
+    traceStops.push(bestJ);
     steps.push({
       title: {
         vi: `${who} tra bảng → dừng tại ${bestJ}: ngân +${fmt(p[bestJ])}`,
@@ -18182,6 +18304,24 @@ function buildSteps1872(input) {
       highlight: [bestJ],
       mark: prevIdx === -1 ? [] : [prevIdx],
       codeLines: [],
+      stoneGame1872View: makeView({
+        phase: "trace",
+        moveLog: moves.map((move) => ({ ...move })),
+        prefix: p.slice(),
+        prefixReady: Array.from({ length: n }, (_, index) => index),
+        dp: f.slice(),
+        currentIndex: bestJ,
+        mover: who,
+        traceStops: traceStops.slice(),
+        choice: {
+          kind: "trace",
+          take: bestVal,
+          prefixValue: p[bestJ],
+          opponentBest: oppBest,
+          result: bestVal,
+          picked: "take",
+        },
+      }),
       vars: [
         { name: `${who} nhận`, value: `p[${bestJ}] = ${fmt(p[bestJ])}` },
         { name: "đối thủ giành tối đa", value: oppBest === 0 && bestJ === n - 1 ? "hết ván (0)" : `f[${bestJ + 1}] = ${fmt(oppBest)}` },
@@ -18205,6 +18345,14 @@ function buildSteps1872(input) {
     highlight: moves.map((m) => m.idx),
     mark: [],
     codeLines: [],
+    stoneGame1872View: makeView({
+      phase: "trace-done",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      traceStops: traceStops.slice(),
+    }),
     vars: [
       { name: "điểm dừng tìm được", value: `[${moves.map((m) => m.idx).join(", ")}]` },
       { name: "ván mô phỏng đầu bài", value: `dừng tại [${moves.map((m) => m.idx).join(", ")}]` },
@@ -18223,6 +18371,17 @@ function buildSteps1872(input) {
     mark: [],
     final: true,
     codeLines: [9],
+    stoneGame1872View: makeView({
+      phase: "done",
+      moveLog: moves.map((move) => ({ ...move })),
+      prefix: p.slice(),
+      prefixReady: Array.from({ length: n }, (_, index) => index),
+      dp: f.slice(),
+      traceStops: traceStops.slice(),
+      answer: f[1],
+      aliceScore,
+      bobScore,
+    }),
     vars: [
       { name: "answer", value: f[1] },
       { name: "ván mô phỏng đầu bài", value: `Alice ${aliceScore} − Bob ${bobScore} = ${aliceScore - bobScore}` },

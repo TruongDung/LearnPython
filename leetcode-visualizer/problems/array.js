@@ -9603,6 +9603,334 @@ Object.assign(module.exports, {
   },
 });
 
+/**
+ * LeetCode 2502: Design Memory Allocator.
+ * Allocation scans left-to-right while tracking the current consecutive-free
+ * streak. The first streak reaching size is the required first-fit block.
+ */
+function buildSteps2502(input, params) {
+  const n = Array.isArray(input) && Number.isInteger(input[0]) ? input[0] : 10;
+  const raw = String((params && params.operations) || "").trim();
+  const operations = raw.split(/\s*[|;]\s*/).filter(Boolean).map((part) => {
+    const tokens = part.replace(/[(),]/g, " ").trim().split(/\s+/);
+    const name = String(tokens[0] || "").toLowerCase();
+    if (name === "allocate") {
+      const size = Number(tokens[1]);
+      const mID = Number(tokens[2]);
+      return {
+        name,
+        size,
+        mID,
+        raw: part,
+        label: `allocate(${tokens[1] ?? "?"}, ${tokens[2] ?? "?"})`,
+        valid: tokens.length === 3 && Number.isInteger(size) && size > 0 && Number.isInteger(mID) && mID > 0,
+      };
+    }
+    const mID = Number(tokens[1]);
+    const freeName = name === "free" || name === "freememory";
+    return {
+      name: freeName ? "free" : name,
+      mID,
+      raw: part,
+      label: `freeMemory(${tokens[1] ?? "?"})`,
+      valid: freeName && tokens.length === 2 && Number.isInteger(mID) && mID > 0,
+    };
+  });
+  const valid = Number.isInteger(n) && n > 0 && n <= 30
+    && operations.length > 0
+    && operations.every((operation) => operation.valid);
+  const memory = new Array(Math.max(1, Math.min(30, Number.isInteger(n) ? n : 10))).fill(0);
+  const results = new Array(operations.length).fill(null);
+  const steps = [];
+
+  const freeRuns = () => {
+    const runs = [];
+    let start = -1;
+    for (let i = 0; i <= memory.length; i += 1) {
+      if (i < memory.length && memory[i] === 0 && start === -1) start = i;
+      if ((i === memory.length || memory[i] !== 0) && start !== -1) {
+        runs.push({ start, end: i - 1, length: i - start });
+        start = -1;
+      }
+    }
+    return runs;
+  };
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    phase,
+    activeOpIndex = -1,
+    completedOps = 0,
+    currentOperation = null,
+    scanIndex = null,
+    streak = 0,
+    candidateRange = null,
+    touched = [],
+    blocker = null,
+    result = null,
+    final = false,
+  }) {
+    const step = {
+      title,
+      codeLines,
+      allocator2502View: {
+        phase,
+        n: memory.length,
+        memory: memory.slice(),
+        operations: operations.map((operation) => operation.label),
+        activeOpIndex,
+        completedOps,
+        results: results.slice(),
+        currentOperation: currentOperation ? { ...currentOperation } : null,
+        scanIndex,
+        streak,
+        candidateRange: candidateRange ? candidateRange.slice() : null,
+        touched: touched.slice(),
+        blocker,
+        freeRuns: freeRuns(),
+        result,
+      },
+      vars: [
+        { name: "memory", value: `[${memory.join(", ")}]` },
+        { name: "free runs", value: freeRuns().map((run) => `[${run.start}..${run.end}] len=${run.length}`).join(" | ") || "none" },
+        { name: "result", value: result === null ? "pending" : result },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input hoặc operations không hợp lệ", en: "Invalid input or operations" },
+      note: {
+        vi: "n phải trong 1..30. Dùng: allocate size mID | free mID.",
+        en: "n must be in 1..30. Use: allocate size mID | free mID.",
+      },
+      codeLines: [1],
+      phase: "invalid",
+      final: true,
+    });
+    return { original: { n, operations: raw }, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: `Khởi tạo ${n} ô nhớ đều FREE`, en: `Initialize ${n} FREE memory cells` },
+    note: {
+      vi: "0 nghĩa là ô trống; số dương là mID đang sở hữu ô đó. allocate luôn phải chọn block trống liên tiếp đầu tiên.",
+      en: "0 means free; a positive number is the mID owning that cell. allocate must always take the first contiguous free block.",
+    },
+    codeLines: [1, 2, 3],
+    phase: "init",
+  });
+
+  operations.forEach((operation, opIndex) => {
+    if (operation.name === "allocate") {
+      let streak = 0;
+      let start = -1;
+      snapshot({
+        title: { vi: `Bắt đầu allocate(size=${operation.size}, mID=${operation.mID})`, en: `Start allocate(size=${operation.size}, mID=${operation.mID})` },
+        note: {
+          vi: "Quét từ địa chỉ 0. Biến free đếm độ dài chuỗi ô trống đang kết thúc tại i.",
+          en: "Scan from address 0. Variable free counts the consecutive free cells ending at i.",
+        },
+        codeLines: [4, 5],
+        phase: "allocate-start",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        currentOperation: operation,
+      });
+
+      for (let i = 0; i < memory.length; i += 1) {
+        const isFree = memory[i] === 0;
+        streak = isFree ? streak + 1 : 0;
+        const candidateStart = streak > 0 ? i - streak + 1 : null;
+        const candidateRange = candidateStart === null ? null : [candidateStart, i];
+        snapshot({
+          title: {
+            vi: isFree ? `i=${i}: FREE → streak=${streak}` : `i=${i}: mID ${memory[i]} chặn → reset streak=0`,
+            en: isFree ? `i=${i}: FREE → streak=${streak}` : `i=${i}: mID ${memory[i]} blocks → reset streak=0`,
+          },
+          note: {
+            vi: isFree
+              ? `Block trống ứng viên hiện là [${candidateStart}..${i}], dài ${streak}/${operation.size}.`
+              : `Không thể đi xuyên qua ô đã cấp phát; bắt đầu tìm block mới sau index ${i}.`,
+            en: isFree
+              ? `The current candidate free block is [${candidateStart}..${i}], length ${streak}/${operation.size}.`
+              : `An allocation cannot cross an occupied cell; start a new candidate after index ${i}.`,
+          },
+          codeLines: isFree ? [6, 7, 8, 11] : [6, 9, 10],
+          phase: isFree && streak === operation.size ? "fit-found" : isFree ? "scan-free" : "scan-blocked",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          currentOperation: operation,
+          scanIndex: i,
+          streak,
+          candidateRange,
+          blocker: isFree ? null : i,
+        });
+        if (streak === operation.size) {
+          start = i - operation.size + 1;
+          break;
+        }
+      }
+
+      if (start === -1) {
+        results[opIndex] = -1;
+        snapshot({
+          title: { vi: "Không có block đủ dài → -1", en: "No free block is long enough → -1" },
+          note: {
+            vi: `Có thể tổng số ô trống vẫn đủ ${operation.size}, nhưng chúng bị phân mảnh nên không tạo thành một block liên tiếp.`,
+            en: `There may be at least ${operation.size} free cells in total, but fragmentation prevents one contiguous block.`,
+          },
+          codeLines: [15],
+          phase: "allocate-fail",
+          activeOpIndex: opIndex,
+          completedOps: opIndex + 1,
+          currentOperation: operation,
+          result: -1,
+        });
+        return;
+      }
+
+      const range = Array.from({ length: operation.size }, (_, offset) => start + offset);
+      range.forEach((index) => { memory[index] = operation.mID; });
+      results[opIndex] = start;
+      snapshot({
+        title: { vi: `Ghi mID ${operation.mID} vào [${start}..${start + operation.size - 1}]`, en: `Write mID ${operation.mID} into [${start}..${start + operation.size - 1}]` },
+        note: {
+          vi: `Đây là block hợp lệ đầu tiên nên allocate trả về địa chỉ bắt đầu ${start}.`,
+          en: `This is the first valid block, so allocate returns its start address ${start}.`,
+        },
+        codeLines: [12, 13, 14],
+        phase: "allocate-write",
+        activeOpIndex: opIndex,
+        completedOps: opIndex + 1,
+        currentOperation: operation,
+        scanIndex: start + operation.size - 1,
+        streak: operation.size,
+        candidateRange: [start, start + operation.size - 1],
+        touched: range,
+        result: start,
+      });
+      return;
+    }
+
+    const matches = memory.map((value, index) => value === operation.mID ? index : -1).filter((index) => index >= 0);
+    snapshot({
+      title: { vi: `freeMemory(${operation.mID}): tìm mọi ô cùng mID`, en: `freeMemory(${operation.mID}): find every matching cell` },
+      note: {
+        vi: matches.length
+          ? `Tìm thấy ${matches.length} ô tại index [${matches.join(", ")}]. Một mID có thể sở hữu nhiều block rời nhau.`
+          : `Không có ô nào thuộc mID ${operation.mID}.`,
+        en: matches.length
+          ? `Found ${matches.length} cells at indices [${matches.join(", ")}]. One mID may own several separate blocks.`
+          : `No cell belongs to mID ${operation.mID}.`,
+      },
+      codeLines: [16, 17, 18, 19],
+      phase: "free-find",
+      activeOpIndex: opIndex,
+      completedOps: opIndex,
+      currentOperation: operation,
+      touched: matches,
+    });
+    matches.forEach((index) => { memory[index] = 0; });
+    results[opIndex] = matches.length;
+    snapshot({
+      title: { vi: `Đặt ${matches.length} ô về FREE → ${matches.length}`, en: `Mark ${matches.length} cells FREE → ${matches.length}` },
+      note: {
+        vi: "Các vùng FREE kề nhau tự hợp thành một run dài hơn; freeMemory trả về số ô vừa giải phóng.",
+        en: "Adjacent FREE regions naturally form a longer run; freeMemory returns the number of released cells.",
+      },
+      codeLines: [20, 21, 22],
+      phase: "free-write",
+      activeOpIndex: opIndex,
+      completedOps: opIndex + 1,
+      currentOperation: operation,
+      touched: matches,
+      result: matches.length,
+    });
+  });
+
+  snapshot({
+    title: { vi: "Hoàn tất mọi operation", en: "All operations complete" },
+    note: {
+      vi: "Mỗi allocate dùng first-fit từ trái sang phải; mỗi freeMemory xóa toàn bộ ô mang đúng mID.",
+      en: "Every allocate uses left-to-right first fit; every freeMemory clears all cells carrying that mID.",
+    },
+    codeLines: [22],
+    phase: "done",
+    activeOpIndex: operations.length,
+    completedOps: operations.length,
+    final: true,
+  });
+  return { original: { n, operations: raw }, answer: results, steps };
+}
+
+Object.assign(module.exports, {
+  2502: {
+    id: 2502,
+    difficulty: "medium",
+    slug: "design-memory-allocator",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Design Memory Allocator", en: "Design Memory Allocator" },
+    titleVi: { vi: "Thiết kế bộ cấp phát bộ nhớ", en: "Design a memory allocator" },
+    statement: {
+      vi: "Thiết kế Allocator cho n ô nhớ. allocate(size, mID) cấp block FREE liên tiếp đầu tiên có độ dài size và trả về index đầu; nếu không có trả -1. freeMemory(mID) giải phóng mọi ô thuộc mID và trả số ô đã giải phóng.",
+      en: "Design Allocator for n memory cells. allocate(size, mID) takes the first contiguous FREE block of length size and returns its start index, or -1. freeMemory(mID) releases every cell owned by mID and returns the released count.",
+    },
+    defaultInput: [10],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 30,
+    inputLabel: { vi: "n (số ô nhớ, tối đa 30)", en: "n (memory cells, max 30)" },
+    extraParams: [{
+      key: "operations",
+      type: "string",
+      label: { vi: "Operations, ngăn cách bằng |", en: "Operations separated by |" },
+      default: "allocate 1 1 | allocate 1 2 | allocate 1 3 | free 2 | allocate 3 4 | allocate 1 1 | allocate 1 1 | free 1",
+    }],
+    approach: [
+      { vi: "Biểu diễn bộ nhớ bằng mảng: 0 là FREE, giá trị dương là mID sở hữu ô.", en: "Represent memory as an array: 0 is FREE and a positive value is the owning mID." },
+      { vi: "allocate quét trái sang phải và đếm streak FREE liên tiếp; streak đầu tiên đạt size chính là first-fit.", en: "allocate scans left-to-right and counts a consecutive FREE streak; the first streak reaching size is the first fit." },
+      { vi: "freeMemory quét toàn mảng, đặt mọi ô bằng mID về 0 và đếm số ô đã xóa.", en: "freeMemory scans all cells, resets every matching mID to 0, and counts released cells." },
+    ],
+    complexity: {
+      time: "O(n) / operation",
+      space: "O(n)",
+      note: { vi: "Mỗi operation quét tối đa n ô; mảng memory có n phần tử.", en: "Each operation scans at most n cells; memory contains n entries." },
+    },
+    code: [
+      "class Allocator:",
+      "    def __init__(self, n: int):",
+      "        self.memory = [0] * n",
+      "    def allocate(self, size: int, mID: int) -> int:",
+      "        free = 0",
+      "        for i in range(len(self.memory)):",
+      "            if self.memory[i] == 0:",
+      "                free += 1",
+      "            else:",
+      "                free = 0",
+      "            if free == size:",
+      "                start = i - size + 1",
+      "                self.memory[start:i + 1] = [mID] * size",
+      "                return start",
+      "        return -1",
+      "    def freeMemory(self, mID: int) -> int:",
+      "        released = 0",
+      "        for i in range(len(self.memory)):",
+      "            if self.memory[i] == mID:",
+      "                self.memory[i] = 0",
+      "                released += 1",
+      "        return released",
+    ],
+    builder: buildSteps2502,
+  },
+});
+
 function buildSteps363(input, params = {}) {
   const matrix = parseIntegerMatrix2D(input);
   const k = Number(params.k ?? 2);

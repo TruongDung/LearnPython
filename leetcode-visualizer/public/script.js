@@ -59,6 +59,7 @@ const I18N = {
     liveClearBtn: "Clear thân hàm",
     liveResetBtn: "Về code gốc",
     autoTheme: "Tự động",
+    backToTop: "Về đầu trang",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -99,6 +100,7 @@ const I18N = {
     liveClearBtn: "Clear body",
     liveResetBtn: "Reset to original",
     autoTheme: "Auto",
+    backToTop: "Back to top",
   },
 };
 
@@ -152,6 +154,11 @@ function applyStaticStrings() {
     button.setAttribute("aria-label", t()[id]);
     button.title = t()[id];
   });
+  const backToTopButton = $("backToTopBtn");
+  if (backToTopButton) {
+    backToTopButton.setAttribute("aria-label", t().backToTop);
+    backToTopButton.title = t().backToTop;
+  }
   updateThemeButtons();
 }
 
@@ -1290,11 +1297,39 @@ function markActiveChip() {
 }
 
 // ---- Load problem info ----
-$("loadBtn").addEventListener("click", loadProblem);$("problemId").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loadProblem();
+$("loadBtn").addEventListener("click", () => loadProblem({ scrollToEnd: true }));
+$("problemId").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loadProblem({ scrollToEnd: true });
 });
 
-async function loadProblem() {
+function jumpToPageEnd() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const pageEnd = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      window.scrollTo(0, pageEnd);
+      updateBackToTopButton();
+    });
+  });
+}
+
+function updateBackToTopButton() {
+  const button = $("backToTopBtn");
+  if (!button) return;
+  const pageHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+  const distanceFromEnd = pageHeight - (window.scrollY + window.innerHeight);
+  button.classList.toggle("is-visible", window.scrollY > 0 && distanceFromEnd <= 160);
+}
+
+$("backToTopBtn").addEventListener("click", () => {
+  window.scrollTo(0, 0);
+  $("problemId").focus({ preventScroll: true });
+  updateBackToTopButton();
+});
+window.addEventListener("scroll", updateBackToTopButton, { passive: true });
+window.addEventListener("resize", updateBackToTopButton);
+updateBackToTopButton();
+
+async function loadProblem({ scrollToEnd = false } = {}) {
   const id = $("problemId").value.trim();
   searchErrorState = null;
   hide("searchError");
@@ -1331,6 +1366,7 @@ async function loadProblem() {
     hide("vizPanel");
     steps = [];
     stopPlay();
+    if (scrollToEnd) jumpToPageEnd();
   } catch (err) {
     showError("searchError", t().errConn);
   }
@@ -17338,6 +17374,257 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderRandomizedSet380View(step) {
+  const view = step.randomizedSet380View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const values = Array.isArray(view.values) ? view.values : [];
+  const entries = Array.isArray(view.mapEntries) ? view.mapEntries : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const phaseIndex = phase === "init" || phase === "invalid" ? 0
+    : ["insert-check", "insert-reject", "remove-lookup", "remove-reject", "remove-plan"].includes(phase) ? 1
+      : phase === "return" || phase === "done" ? 3 : 2;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Tra hashmap", "Sửa mảng + map", "Trả kết quả"]
+    : ["Initialize", "Hash lookup", "Update array + map", "Return result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    const result = index < view.completedOps ? results[index] : null;
+    return `<span class="${state}"><small>#${index + 1}</small><b>${escapeHtml(operation)}</b><em>${state === "done" ? `→ ${escapeHtml(display(result))}` : state === "active" ? (vi ? "đang chạy" : "running") : ""}</em></span>`;
+  }).join("");
+
+  const ghostSlot = phase === "insert-map" && view.activeArrayIndex === values.length
+    ? `<div class="rs380-cell ghost active"><small>[${values.length}]</small><strong>?</strong><em>${vi ? "sắp append" : "append next"}</em></div>`
+    : "";
+  const arrayHtml = values.map((value, index) => {
+    const classes = ["rs380-cell"];
+    if (index === view.activeArrayIndex) classes.push("active");
+    if (index === view.lastIndex) classes.push("last");
+    if (view.randomPick && index === view.randomPick.index) classes.push("random");
+    return `<div class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(display(value))}</strong><em>${index === view.lastIndex ? "LAST" : index === view.activeArrayIndex ? (vi ? "ĐANG XỬ LÝ" : "ACTIVE") : ""}</em></div>`;
+  }).join("") + ghostSlot;
+  const mapHtml = entries.length ? entries.map((entry) => {
+    const active = entry.value === view.activeValue || entry.value === view.lastValue;
+    return `<div class="rs380-map-row ${active ? "active" : ""}"><strong>${escapeHtml(display(entry.value))}</strong><i>→</i><b>${escapeHtml(display(entry.index))}</b><span>values[${escapeHtml(display(entry.index))}] = ${escapeHtml(display(values[entry.index]))}</span></div>`;
+  }).join("") : `<em class="rs380-empty">{ }</em>`;
+
+  const removePhases = ["remove-plan", "remove-write-last", "remove-map-update", "remove-pop", "return"];
+  const removeStage = removePhases.indexOf(phase);
+  const removeBoard = phase.startsWith("remove") || (phase === "return" && view.lastValue !== null)
+    ? `<section class="rs380-remove"><header><strong>SWAP-DELETE · O(1)</strong><span>${vi ? "không dịch các phần tử ở giữa" : "never shift middle elements"}</span></header><div>
+        <span class="${removeStage === 0 ? "active" : removeStage > 0 ? "done" : ""}"><small>1</small><b>${vi ? "TÌM Ô" : "LOCATE"}</b><em>${display(view.activeArrayIndex)}</em></span>
+        <i>→</i><span class="${removeStage === 1 ? "active" : removeStage > 1 ? "done" : ""}"><small>2</small><b>${vi ? "COPY LAST" : "COPY LAST"}</b><em>${display(view.lastValue)}</em></span>
+        <i>→</i><span class="${removeStage === 2 ? "active" : removeStage > 2 ? "done" : ""}"><small>3</small><b>${vi ? "SỬA MAP" : "REPOINT MAP"}</b><em>${display(view.lastValue)} → ${display(view.activeArrayIndex)}</em></span>
+        <i>→</i><span class="${removeStage >= 3 ? "active" : ""}"><small>4</small><b>POP + DELETE</b><em>O(1)</em></span>
+      </div></section>`
+    : "";
+  const randomBoard = view.randomPick
+    ? `<section class="rs380-random"><small>UNIFORM RANDOM INDEX · seed ${escapeHtml(display(view.seed))}</small><strong>randrange(${view.randomPick.length}) = ${view.randomPick.index}</strong><span>values[${view.randomPick.index}] = <b>${escapeHtml(display(view.randomPick.value))}</b></span></section>`
+    : "";
+  const detail = view.detail || {};
+  const insertBoard = phase.startsWith("insert")
+    ? `<section class="rs380-insert"><small>INSERT ${escapeHtml(display(view.activeValue))}</small><strong>${detail.exists ? (vi ? "ĐÃ TỒN TẠI → FALSE" : "ALREADY PRESENT → FALSE") : `new index = len(values) = ${escapeHtml(display(view.activeArrayIndex))}`}</strong><span>${vi ? "Hashmap chặn duplicate trước khi append." : "The hash map rejects duplicates before append."}</span></section>`
+    : "";
+  const resultHtml = operations.map((operation, index) => index < view.completedOps
+    ? `<span><small>${escapeHtml(operation)}</small><strong>${escapeHtml(display(results[index]))}</strong></span>` : "").join("") || `<em class="rs380-empty">${vi ? "Chưa có output" : "No output yet"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi ? `RandomizedSet có ${values.length} phần tử; invariant ${view.invariantOk ? "đúng" : "đang cập nhật"}.` : `RandomizedSet has ${values.length} values; invariant ${view.invariantOk ? "holds" : "is being updated"}.`;
+
+  $("treeView").innerHTML = `<section class="rs380-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rs380-phases">${phases}</div>
+    <div class="rs380-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rs380-operations"><header><strong>OPERATIONS</strong><span>${view.completedOps}/${operations.length} ${vi ? "hoàn tất" : "complete"}</span></header><div>${operationHtml}</div></section>
+    <section class="rs380-invariant ${view.invariantOk ? "ok" : "updating"}"><strong>index[values[i]] = i</strong><span>${view.invariantOk ? (vi ? "✓ mảng và hashmap đang khớp" : "✓ array and map agree") : (vi ? "↻ trạng thái trung gian giữa hai dòng code" : "↻ intermediate state between two code lines")}</span></section>
+    <div class="rs380-structures">
+      <section class="rs380-array"><header><strong>DENSE ARRAY · values</strong><span>getRandom → random index</span></header><div>${arrayHtml || `<em class="rs380-empty">[ ]</em>`}</div></section>
+      <section class="rs380-map"><header><strong>HASH MAP · index</strong><span>value → array index</span></header><div>${mapHtml}</div></section>
+    </div>
+    ${removeBoard}${randomBoard}${insertBoard}
+    <section class="rs380-results"><header><strong>RETURN LOG</strong><span>True / False / random value</span></header><div>${resultHtml}</div></section>
+  </section>`;
+}
+
+function renderAllocator2502View(step) {
+  const view = step.allocator2502View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const memory = Array.isArray(view.memory) ? view.memory : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const touched = new Set(Array.isArray(view.touched) ? view.touched : []);
+  const candidate = Array.isArray(view.candidateRange) ? view.candidateRange : null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const phaseIndex = phase === "init" || phase === "invalid" ? 0
+    : phase.endsWith("start") ? 0
+      : ["scan-free", "scan-blocked", "fit-found", "free-find"].includes(phase) ? 1
+        : ["allocate-write", "free-write"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Nhận operation", "Quét bộ nhớ", "Ghi / giải phóng", "Trả kết quả"]
+    : ["Read operation", "Scan memory", "Write / release", "Return result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    return `<span class="${state}"><small>#${index + 1}</small><b>${escapeHtml(operation)}</b><em>${state === "done" ? `→ ${escapeHtml(display(results[index]))}` : state === "active" ? (vi ? "đang chạy" : "running") : ""}</em></span>`;
+  }).join("");
+  const cells = memory.map((mID, index) => {
+    const colorIndex = Math.abs(Number(mID)) % 6;
+    const classes = ["alloc2502-cell", mID === 0 ? "free" : `owned c${colorIndex}`];
+    if (index === view.scanIndex) classes.push("scan");
+    if (candidate && index >= candidate[0] && index <= candidate[1]) classes.push("candidate");
+    if (index === view.blocker) classes.push("blocker");
+    if (touched.has(index)) classes.push(phase === "free-find" ? "releasing" : phase === "free-write" ? "released" : "written");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${mID === 0 ? "FREE" : `mID ${escapeHtml(display(mID))}`}</strong><em>${index === view.scanIndex ? "i" : touched.has(index) ? (phase.startsWith("free") ? "FREE" : "WRITE") : ""}</em></div>`;
+  }).join("");
+  const runs = (view.freeRuns || []).map((run) => `<span><small>[${run.start}..${run.end}]</small><strong>${run.length}</strong><em>${vi ? "ô liên tiếp" : "contiguous"}</em></span>`).join("") || `<em class="alloc2502-empty">${vi ? "Không còn block FREE" : "No FREE block remains"}</em>`;
+  const current = view.currentOperation;
+  let request = "";
+  if (current?.name === "allocate") {
+    const enough = view.streak >= current.size;
+    request = `<section class="alloc2502-request allocate"><div><small>REQUEST</small><strong>size=${current.size} · mID=${current.mID}</strong></div><div><small>FREE STREAK</small><strong>${view.streak} / ${current.size}</strong></div><div class="${enough ? "ready" : ""}"><small>FIRST FIT</small><strong>${enough && candidate ? `[${candidate[0]}..${candidate[1]}]` : phase === "allocate-fail" ? "NONE" : "…"}</strong></div><div><small>RETURN</small><strong>${escapeHtml(display(view.result))}</strong></div></section>`;
+  } else if (current?.name === "free") {
+    request = `<section class="alloc2502-request release"><div><small>REQUEST</small><strong>freeMemory(${current.mID})</strong></div><div><small>MATCHED CELLS</small><strong>${touched.size}</strong></div><div><small>RETURN</small><strong>${escapeHtml(display(view.result))}</strong></div></section>`;
+  }
+  const resultHtml = operations.map((operation, index) => index < view.completedOps
+    ? `<span><small>${escapeHtml(operation)}</small><strong>${escapeHtml(display(results[index]))}</strong></span>` : "").join("") || `<em class="alloc2502-empty">${vi ? "Chưa có output" : "No output yet"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi ? `Allocator ${memory.length} ô, ${view.freeRuns?.length || 0} vùng trống.` : `Allocator with ${memory.length} cells and ${view.freeRuns?.length || 0} free runs.`;
+
+  $("treeView").innerHTML = `<section class="alloc2502-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="alloc2502-phases">${phases}</div>
+    <div class="alloc2502-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="alloc2502-operations"><header><strong>OPERATIONS</strong><span>${view.completedOps}/${operations.length} ${vi ? "hoàn tất" : "complete"}</span></header><div>${operationHtml}</div></section>
+    ${request}
+    <section class="alloc2502-memory"><header><strong>MEMORY · ${memory.length} CELLS</strong><span>${vi ? "địa chỉ tăng từ trái sang phải" : "addresses increase left to right"}</span></header><div>${cells}</div></section>
+    <section class="alloc2502-runs"><header><strong>CONTIGUOUS FREE RUNS</strong><span>${vi ? "allocate cần một run đủ dài" : "allocate needs one long-enough run"}</span></header><div>${runs}</div></section>
+    <section class="alloc2502-results"><header><strong>RETURN LOG</strong><span>${vi ? "allocate → start · free → count" : "allocate → start · free → count"}</span></header><div>${resultHtml}</div></section>
+  </section>`;
+}
+
+function renderStoneGame1872View(step) {
+  const view = step.stoneGame1872View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "rules");
+  const stones = Array.isArray(view.stones) ? view.stones : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const moveLog = Array.isArray(view.moveLog) ? view.moveLog : [];
+  const traceStops = new Set(Array.isArray(view.traceStops) ? view.traceStops : []);
+  const moveStops = new Map(moveLog.map((move, index) => [move.idx, { ...move, turn: index + 1 }]));
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const signed = (value) => Number(value) >= 0 ? `+${value}` : String(value);
+  const expression = (values) => (values || []).map((value, index) => {
+    if (index === 0) return String(value);
+    return Number(value) < 0 ? ` − ${Math.abs(value)}` : ` + ${value}`;
+  }).join("");
+
+  const phaseIndex = phase === "rules" ? 0
+    : phase.startsWith("game") ? 1
+      : phase === "bridge" || phase === "prefix" ? 2
+        : phase.startsWith("dp") ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Luật chơi", "Chơi một ván", "Đổi sang prefix", "DP từ phải", "Đối chiếu"]
+    : ["Rules", "Play one game", "Build prefixes", "Right-to-left DP", "Verify"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const action = `<div class="sg1872-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>`;
+
+  const rules = `<section class="sg1872-rules" aria-label="${vi ? "Ba bước của một lượt" : "Three actions in one turn"}">
+    <div><small>1 · CHOOSE</small><strong>x &gt; 1</strong><span>${vi ? "viên ngoài cùng bên trái" : "leftmost stones"}</span></div><i>→</i>
+    <div><small>2 · SCORE</small><strong>sum = Σ picked</strong><span>${vi ? "người đi cộng sum vào điểm" : "the mover adds sum to score"}</span></div><i>→</i>
+    <div><small>3 · MERGE</small><strong>[sum, ...rest]</strong><span>${vi ? "đặt viên tổng về đầu hàng" : "put the sum back on the left"}</span></div>
+  </section>`;
+
+  const gameItems = (Array.isArray(view.gameRow) ? view.gameRow : []).map((item) => {
+    const classes = ["sg1872-stone", item.taken ? "taken" : "", item.mergedThrough !== null ? "merged" : ""].filter(Boolean).join(" ");
+    const tag = item.taken
+      ? (vi ? "ĐANG GỘP" : "PICKED")
+      : item.mergedThrough !== null ? (vi ? "VIÊN TỔNG" : "MERGED SUM") : (vi ? "CÒN LẠI" : "REMAINS");
+    return `<div class="${classes}"><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(display(item.value))}</strong><span>${tag}</span></div>`;
+  }).join("");
+  const currentMove = view.currentMove;
+  const moveEquation = currentMove
+    ? `<section class="sg1872-move-equation ${phase === "game-move" ? "active" : "merged"}"><small>${escapeHtml(currentMove.mover)} · x=${currentMove.x} · ${vi ? `dừng tại index gốc ${currentMove.idx}` : `stop at original index ${currentMove.idx}`}</small><strong>${escapeHtml(expression(currentMove.taken))} = ${escapeHtml(display(currentMove.sum))}</strong><span>${phase === "game-move" ? (vi ? "Những viên viền vàng sẽ biến thành đúng một viên tổng." : "The gold stones will become one merged-sum stone.") : (vi ? `Đã cộng ${signed(currentMove.sum)} điểm và thu hàng đá lại.` : `Added ${signed(currentMove.sum)} points and shrank the row.`)}</span></section>`
+    : "";
+  const scoreDiff = Number(view.aliceScore || 0) - Number(view.bobScore || 0);
+  const gameBoard = `<section class="sg1872-game">
+    <header><strong>${vi ? "HÀNG ĐÁ HIỆN TẠI" : "CURRENT STONE ROW"}</strong><span>${vi ? "hàng ngắn dần sau mỗi lượt" : "the row shrinks after every move"}</span></header>
+    <div class="sg1872-score"><span class="alice ${view.mover === "Alice" ? "turn" : ""}"><small>ALICE</small><strong>${escapeHtml(display(view.aliceScore || 0))}</strong></span><b>${vi ? "hiệu" : "gap"} ${signed(scoreDiff)}</b><span class="bob ${view.mover === "Bob" ? "turn" : ""}"><small>BOB</small><strong>${escapeHtml(display(view.bobScore || 0))}</strong></span></div>
+    <div class="sg1872-row">${gameItems}</div>
+    ${moveEquation}
+  </section>`;
+
+  const timelineItems = moveLog.map((move, index) => `<span class="${move.mover === "Alice" ? "alice" : "bob"}"><small>#${index + 1} · ${escapeHtml(move.mover)}</small><strong>p[${move.idx}] = ${escapeHtml(display(move.sum))}</strong><em>${vi ? `dừng tại i=${move.idx}` : `stop at i=${move.idx}`}</em></span>`).join("");
+  const pendingMove = phase === "game-move" && currentMove
+    ? `<span class="pending ${currentMove.mover === "Alice" ? "alice" : "bob"}"><small>#${moveLog.length + 1} · ${escapeHtml(currentMove.mover)}</small><strong>p[${currentMove.idx}] = ${escapeHtml(display(currentMove.sum))}</strong><em>${vi ? "đang chọn" : "choosing"}</em></span>`
+    : "";
+  const timeline = moveLog.length || pendingMove
+    ? `<section class="sg1872-timeline"><header><strong>${vi ? "TIMELINE ĐIỂM DỪNG" : "STOP-INDEX TIMELINE"}</strong><span>${vi ? "mỗi lượt tương ứng đúng một prefix sum" : "each move maps to exactly one prefix sum"}</span></header><div>${timelineItems}${pendingMove}</div></section>`
+    : "";
+
+  const stateCells = stones.map((value, index) => {
+    const classes = ["sg1872-state-cell"];
+    if (index === view.currentIndex) classes.push("current");
+    if (prefix[index] !== null && prefix[index] !== undefined) classes.push("prefix-ready");
+    if (dp[index] !== null && dp[index] !== undefined) classes.push("dp-ready");
+    if (moveStops.has(index)) classes.push(moveStops.get(index).mover === "Alice" ? "alice-stop" : "bob-stop");
+    if (traceStops.has(index)) classes.push("traced");
+    const move = moveStops.get(index);
+    const marker = traceStops.has(index) ? (vi ? "DP CHỌN" : "DP PICK")
+      : move ? `#${move.turn} ${move.mover}` : "";
+    return `<div class="${classes.join(" ")}">
+      <small>i = ${index}</small>
+      <dl><div><dt>a[i]</dt><dd>${escapeHtml(display(value))}</dd></div><div><dt>p[i]</dt><dd>${escapeHtml(display(prefix[index]))}</dd></div><div><dt>f[i]</dt><dd>${index === 0 ? "×" : escapeHtml(display(dp[index]))}</dd></div></dl>
+      <em>${escapeHtml(marker)}</em>
+    </div>`;
+  }).join("");
+  const stateGrid = `<section class="sg1872-state"><header><strong>stones → prefix p[i] → DP f[i]</strong><span>${vi ? "ô sáng là index đang xử lý" : "the bright cell is the current index"}</span></header><div>${stateCells}</div><footer><span><i class="alice"></i>Alice stop</span><span><i class="bob"></i>Bob stop</span><span><i class="trace"></i>${vi ? "DP lần lại" : "DP trace"}</span></footer></section>`;
+
+  const choice = view.choice;
+  let decision = "";
+  if (choice?.kind === "base") {
+    decision = `<section class="sg1872-base"><small>${vi ? "BASE CASE · CHỈ CÒN MỘT ĐIỂM DỪNG" : "BASE CASE · ONLY ONE STOP REMAINS"}</small><strong>f[${view.currentIndex}] = p[${view.currentIndex}] = ${escapeHtml(display(choice.result))}</strong><span>${vi ? "Người sắp đi buộc phải gộp hết, nên nhận toàn bộ prefix cuối." : "The mover must merge everything, so they receive the final prefix."}</span></section>`;
+  } else if (choice?.kind === "compare") {
+    const tie = choice.take === choice.skip;
+    decision = `<section class="sg1872-decision"><header><strong>f[${view.currentIndex}] = max(TAKE, SKIP)</strong><span>${vi ? "lợi thế tối đa của người sắp đi" : "best margin for the player to move"}</span></header><div>
+      <article class="take ${choice.picked === "take" || tie ? "picked" : ""}"><small>TAKE · ${vi ? "dừng tại i" : "stop at i"}</small><code>p[${view.currentIndex}] − f[${view.currentIndex + 1}]</code><strong>${display(choice.prefixValue)} − (${display(choice.opponentBest)}) = ${display(choice.take)}</strong><span>${vi ? "điểm mình nhận trừ lợi thế tốt nhất của đối thủ" : "my score minus the opponent's best margin"}</span></article>
+      <b>VS</b>
+      <article class="skip ${choice.picked === "skip" || tie ? "picked" : ""}"><small>SKIP · ${vi ? "chưa dừng" : "do not stop yet"}</small><code>f[${view.currentIndex + 1}]</code><strong>${display(choice.skip)}</strong><span>${vi ? "bỏ index này, giữ phương án tốt nhất bên phải" : "ignore this index and keep the best option to its right"}</span></article>
+      <em>→</em><article class="result"><small>${tie ? "TIE · BOTH OPTIMAL" : (vi ? `CHỌN ${choice.picked.toUpperCase()}` : `PICK ${choice.picked.toUpperCase()}`)}</small><strong>f[${view.currentIndex}] = ${display(choice.result)}</strong></article>
+    </div></section>`;
+  } else if (choice?.kind === "trace") {
+    decision = `<section class="sg1872-trace"><small>${escapeHtml(view.mover || "Player")} · ${vi ? "TRA NGƯỢC PHƯƠNG ÁN TỐI ƯU" : "TRACE THE OPTIMAL CHOICE"}</small><strong>${signed(choice.prefixValue)} − (${display(choice.opponentBest)}) = ${display(choice.result)}</strong><span>${vi ? `Dừng tại i=${view.currentIndex}; điểm nhận là p[${view.currentIndex}].` : `Stop at i=${view.currentIndex}; the score gained is p[${view.currentIndex}].`}</span></section>`;
+  }
+
+  const answerKnown = view.answer !== null && view.answer !== undefined;
+  const answer = answerKnown
+    ? `<section class="sg1872-answer ${phase === "done" ? "done" : "preview"}"><small>${phase === "done" ? (vi ? "ĐÁP ÁN · f[1]" : "ANSWER · f[1]") : (vi ? "CHÊNH LỆCH VÁN MẪU" : "DEMO GAME MARGIN")}</small><strong>${escapeHtml(display(view.answer))}</strong><span>${phase === "done" ? `Alice ${display(view.aliceScore)} − Bob ${display(view.bobScore)} = f[1]` : `Alice − Bob = ${display(view.answer)}`}</span></section>`
+    : "";
+  const conceptualRule = phaseIndex >= 2
+    ? `<section class="sg1872-meaning"><strong>f[i]</strong><span>${vi ? "lợi thế lớn nhất người sắp đi có thể đảm bảo khi điểm dừng kế tiếp phải nằm từ i trở đi" : "the largest margin the player to move can guarantee when the next stop must be at i or later"}</span><code>f[i] = max(f[i+1], p[i] − f[i+1])</code></section>`
+    : "";
+  const main = phaseIndex <= 1 ? `${rules}${gameBoard}${timeline}` : `${conceptualRule}${stateGrid}${decision}${timeline}${answer}`;
+  const summary = vi ? `Bài 1872, giai đoạn ${phaseIndex + 1}, ${moveLog.length} nước đã mô phỏng.` : `Problem 1872, phase ${phaseIndex + 1}, ${moveLog.length} moves simulated.`;
+
+  $("treeView").innerHTML = `<section class="sg1872-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sg1872-phases">${phases}</div>
+    ${action}
+    ${main}
+  </section>`;
+}
+
 function renderAbsoluteSubarray1749View(step) {
   const view = step.absoluteSubarrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -18914,6 +19201,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderElevator4027View(step);
+  } else if (step.randomizedSet380View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRandomizedSet380View(step);
+  } else if (step.allocator2502View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAllocator2502View(step);
+  } else if (step.stoneGame1872View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGame1872View(step);
   } else if (step.absoluteSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
