@@ -693,27 +693,43 @@ function buildSteps771(input, params) {
   const stones = String(params.stones || "");
   const steps = [];
   const jewelSet = new Set(jewels.split(""));
+  const stoneChars = stones.split("");
+  const makeJewelsView = (phase, currentIndex, isJewel, count) => ({
+    jewels,
+    stones,
+    jewelTypes: [...jewelSet],
+    currentIndex: Number.isInteger(currentIndex) ? currentIndex : null,
+    currentStone: Number.isInteger(currentIndex) ? stoneChars[currentIndex] : null,
+    isJewel: typeof isJewel === "boolean" ? isJewel : null,
+    count,
+    phase,
+    stoneStates: stoneChars.map((stone, index) => {
+      if (index > currentIndex || currentIndex === null) return phase === "done" ? (jewelSet.has(stone) ? "matched" : "skipped") : "waiting";
+      if (index === currentIndex) return isJewel ? "active-match" : "active-skip";
+      return jewelSet.has(stone) ? "matched" : "skipped";
+    }),
+  });
 
   steps.push({
-    title: { vi: "Xây set đá quý", en: "Build jewel set" },
-    arr: stones.split("").map(() => 0),
-    sub: stones.split(""),
+    title: { vi: "Tạo jewel_set từ các loại đá quý", en: "Create jewel_set from jewel types" },
+    arr: stoneChars.map(() => 0),
+    sub: stoneChars,
     highlight: [],
     mark: [],
-    codeLines: [2],
+    codeLines: [3, 4],
     vars: [
       { name: "jewels", value: jewels },
       { name: "stones", value: stones },
       { name: "jewel_set", value: `{${jewels.split("").join(", ")}}` },
     ],
     note: {
-      vi: `Đá quý: "${jewels}" → set = {${jewels.split("").join(", ")}}. Đếm trong "${stones}".`,
-      en: `Jewels: "${jewels}" → set = {${jewels.split("").join(", ")}}. Count in "${stones}".`,
+      vi: `jewel_set = {${jewels.split("").join(", ")}}. Set chỉ lưu LOẠI đá quý; sau đó duyệt từng viên trong stones để đếm.`,
+      en: `jewel_set = {${jewels.split("").join(", ")}}. The set stores JEWEL TYPES; then scan every stone to count matches.`,
     },
+    jewelsStonesView: makeJewelsView("init", null, null, 0),
   });
 
   let count = 0;
-  const stoneChars = stones.split("");
   for (let i = 0; i < stoneChars.length; i++) {
     const s = stoneChars[i];
     const isJewel = jewelSet.has(s);
@@ -725,7 +741,7 @@ function buildSteps771(input, params) {
       sub: stoneChars,
       highlight: [i],
       mark: isJewel ? [i] : [],
-      codeLines: [3, 4, 5, 6],
+      codeLines: [5, 6, 7],
       vars: [
         { name: "i", value: i },
         { name: "stone", value: s },
@@ -734,12 +750,13 @@ function buildSteps771(input, params) {
       ],
       note: {
         vi: isJewel
-          ? `'${s}' ∈ jewel_set → count = ${count}.`
-          : `'${s}' ∉ jewel_set → bỏ qua. count = ${count}.`,
+          ? `Viên stones[${i}] = '${s}' thuộc jewel_set → cộng 1, count = ${count}.`
+          : `Viên stones[${i}] = '${s}' không thuộc jewel_set → không cộng, count vẫn là ${count}.`,
         en: isJewel
-          ? `'${s}' ∈ jewel_set → count = ${count}.`
-          : `'${s}' ∉ jewel_set → skip. count = ${count}.`,
+          ? `stones[${i}] = '${s}' is in jewel_set → add 1, count = ${count}.`
+          : `stones[${i}] = '${s}' is not in jewel_set → do not add, count stays ${count}.`,
       },
+      jewelsStonesView: makeJewelsView(isJewel ? "match" : "skip", i, isJewel, count),
     });
   }
 
@@ -750,12 +767,13 @@ function buildSteps771(input, params) {
     highlight: [],
     mark: stoneChars.map((c, i) => (jewelSet.has(c) ? i : -1)).filter((i) => i >= 0),
     final: true,
-    codeLines: [7],
+    codeLines: [8],
     vars: [{ name: "answer", value: count }],
     note: {
       vi: `Có ${count} viên đá là đá quý trong "${stones}".`,
       en: `There are ${count} jewels among the stones in "${stones}".`,
     },
+    jewelsStonesView: makeJewelsView("done", null, null, count),
   });
 
   return { jewels, stones, answer: count, steps };

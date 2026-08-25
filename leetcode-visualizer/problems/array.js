@@ -3587,15 +3587,321 @@ function buildSteps1886(input, params = {}) {
   if (matrix.length !== matrix[0].length || target.length !== target[0].length || matrix.length !== target.length) throw new Error("mat and target must be square matrices of the same size");
   const rotate = (grid) => Array.from({ length: grid.length }, (_, r) => Array.from({ length: grid.length }, (_, c) => grid[grid.length - 1 - c][r]));
   let current = cloneMatrix2D(matrix);
-  const targetText = JSON.stringify(target);
   const steps = [];
+  const tested = [];
+  const size = matrix.length;
+  const snapshot = ({ title, phase, angle, matches, mismatches, codeLines = [], vars = [], note, decision = null, final = false }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      rotation1886View: {
+        original: cloneMatrix2D(matrix),
+        current: cloneMatrix2D(current),
+        target: cloneMatrix2D(target),
+        size,
+        angle,
+        phase,
+        matches: matches.map(([row, col]) => [row, col]),
+        mismatches: mismatches.map(([row, col]) => [row, col]),
+        tested: tested.map((item) => ({ ...item })),
+        decision,
+      },
+    });
+  };
+
   for (let turns = 0; turns < 4; turns++) {
-    const same = current.every((row, r) => row.every((value, c) => value === target[r][c]));
-    steps.push(matrixStep2D(current, { title: { vi: `So sánh sau ${turns * 90}°`, en: `Compare after ${turns * 90}°` }, codeLines: [4, 5], final: same, vars: [{ name: "rotation", value: `${turns * 90}°` }, { name: "matches target", value: same }], note: { vi: same ? "Ma trận hiện tại bằng target → True." : "Chưa bằng target; thử xoay thêm 90°.", en: same ? "The current matrix equals target → True." : "It does not match target yet; try another 90° rotation." }, grid: { caption: `Candidate (${turns * 90}°)`, secondaryCaption: `target = ${targetText}` } }));
-    if (same) return { original: matrix, answer: true, steps };
+    const angle = turns * 90;
+    const matches = [];
+    const mismatches = [];
+    for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
+      (current[row][col] === target[row][col] ? matches : mismatches).push([row, col]);
+    }
+    const same = mismatches.length === 0;
+    snapshot({
+      title: { vi: `Bắt đầu lượt xoay ${angle}°`, en: `Start the ${angle}° rotation attempt` },
+      phase: "loop",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [5],
+      vars: [{ name: "turn", value: turns }, { name: "rotation", value: `${angle}°` }, { name: "candidate", value: "mat" }],
+      note: { vi: `Vòng lặp bắt đầu với ma trận ứng viên ở góc ${angle}°.`, en: `The loop starts with the ${angle}° matrix candidate.` },
+      decision: { kind: "loop", angle },
+    });
+    tested.push({ angle, same });
+    snapshot({
+      title: { vi: `Kiểm tra ứng viên ${angle}° có bằng target`, en: `Check whether the ${angle}° candidate equals target` },
+      phase: "compare",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [6],
+      vars: [{ name: "candidate == target", value: same }, { name: "matching cells", value: `${matches.length}/${size * size}` }],
+      note: { vi: same ? `Điều kiện đúng: tất cả ${size * size} ô đều khớp target.` : `Điều kiện sai: vẫn còn ${mismatches.length} ô khác target.` , en: same ? `The condition is true: all ${size * size} cells match target.` : `The condition is false: ${mismatches.length} cells still differ from target.` },
+      decision: { kind: "compare", matchingCount: matches.length, total: size * size, same },
+    });
+    if (same) {
+      snapshot({
+        title: { vi: `Ứng viên ${angle}° trùng target → trả về True`, en: `The ${angle}° candidate equals target → return True` },
+        phase: "found",
+        angle,
+        matches,
+        mismatches,
+        codeLines: [7],
+        final: true,
+        vars: [{ name: "answer", value: true }, { name: "rotation", value: `${angle}°` }],
+        note: { vi: "Điều kiện ở dòng trước đúng, nên hàm kết thúc ngay với True.", en: "The previous condition was true, so the function exits immediately with True." },
+        decision: { kind: "found", matchingCount: matches.length, total: size * size },
+      });
+      return { original: matrix, answer: true, steps };
+    }
+    if (turns === 3) break;
+    snapshot({
+      title: { vi: `Xoay ứng viên ${angle}° thành ${angle + 90}°`, en: `Rotate the ${angle}° candidate to ${angle + 90}°` },
+      phase: "rotate",
+      angle,
+      matches,
+      mismatches,
+      codeLines: [8],
+      vars: [{ name: "rotation", value: `${angle}° → ${angle + 90}°` }, { name: "move rule", value: "(r,c) → (c,n-1-r)" }],
+      note: { vi: "Mỗi giá trị đi theo quy tắc (r,c) → (c,n-1-r) khi xoay 90° theo chiều kim đồng hồ.", en: "Every value follows (r,c) → (c,n-1-r) for a clockwise 90° rotation." },
+      decision: { kind: "rotate", fromAngle: angle, toAngle: angle + 90 },
+    });
     current = rotate(current);
   }
-  steps.push(matrixStep2D(current, { title: { vi: "Không có rotation phù hợp", en: "No matching rotation" }, codeLines: [6], final: true, vars: [{ name: "answer", value: false }], note: { vi: "Đã kiểm tra 0°, 90°, 180°, 270° đều không bằng target.", en: "0°, 90°, 180°, and 270° all differ from target." }, grid: { caption: "No match", secondaryCaption: `target = ${targetText}` } }));
+  const matches = [];
+  const mismatches = [];
+  for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) (current[row][col] === target[row][col] ? matches : mismatches).push([row, col]);
+  snapshot({
+    title: { vi: "Không có góc xoay phù hợp", en: "No rotation matches" },
+    phase: "missing",
+    angle: 270,
+    matches,
+    mismatches,
+    codeLines: [9],
+    final: true,
+    vars: [{ name: "tested rotations", value: "0°, 90°, 180°, 270°" }, { name: "answer", value: false }],
+    note: { vi: "Đã thử đủ bốn hướng; không có ứng viên nào bằng target → False.", en: "All four orientations were tried; none equals target → False." },
+    decision: { kind: "missing", matchingCount: matches.length, total: size * size },
+  });
+  return { original: matrix, answer: false, steps };
+}
+
+/** LeetCode 1886, approach 2: compare mat directly with mapped target coordinates. */
+function buildSteps1886Direct(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const target = parseIntegerMatrix2D(params.target);
+  if (matrix.length !== matrix[0].length || target.length !== target[0].length || matrix.length !== target.length) throw new Error("mat and target must be square matrices of the same size");
+  const size = matrix.length;
+  const steps = [];
+  const tested = [];
+  const checks = [
+    { angle: 90, formula: "target[j][n - 1 - i]", map: (row, col) => [col, size - 1 - row], lines: { flag: 5, outer: 6, inner: 7, compare: 8, fail: 9, break: 10, result: 12, return: 13 } },
+    { angle: 180, formula: "target[n - 1 - i][n - 1 - j]", map: (row, col) => [size - 1 - row, size - 1 - col], lines: { flag: 15, outer: 16, inner: 17, compare: 18, fail: 19, break: 20, result: 22, return: 23 } },
+    { angle: 270, formula: "target[n - 1 - j][i]", map: (row, col) => [size - 1 - col, row], lines: { flag: 25, outer: 26, inner: 27, compare: 28, fail: 29, break: 30, result: 32, return: 33 } },
+    { angle: 0, formula: "target[i][j]", map: (row, col) => [row, col], lines: { flag: 35, outer: 36, inner: 37, compare: 38, fail: 39, break: 40, result: 42, return: 43 } },
+  ];
+
+  function snapshot({ title, phase, check, sourceMatches = [], targetMatches = [], sourceMismatches = [], targetMismatches = [], activeSource = null, activeTarget = null, codeLine, vars = [], note, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines: [codeLine],
+      vars,
+      note,
+      rotation1886View: {
+        approach: 2,
+        comparisonMode: "mapped",
+        original: cloneMatrix2D(matrix),
+        current: cloneMatrix2D(matrix),
+        target: cloneMatrix2D(target),
+        size,
+        angle: check ? check.angle : null,
+        phase,
+        matches: sourceMatches.map(([row, col]) => [row, col]),
+        mismatches: sourceMismatches.map(([row, col]) => [row, col]),
+        sourceMatches: sourceMatches.map(([row, col]) => [row, col]),
+        targetMatches: targetMatches.map(([row, col]) => [row, col]),
+        sourceMismatches: sourceMismatches.map(([row, col]) => [row, col]),
+        targetMismatches: targetMismatches.map(([row, col]) => [row, col]),
+        activeSource,
+        activeTarget,
+        mapping: check ? { angle: check.angle, formula: check.formula } : null,
+        tested: tested.map((item) => ({ ...item })),
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: `n = len(mat) = ${size}`, en: `n = len(mat) = ${size}` },
+    phase: "direct-size",
+    codeLine: 3,
+    vars: [{ name: "n", value: size }, { name: "method", value: "direct target mapping" }],
+    note: { vi: "Cách 2 không xoay mat. Thay vào đó, đối chiếu mỗi ô mat với tọa độ tương ứng trên target.", en: "Approach 2 does not rotate mat. Instead, it compares each mat cell with its corresponding target coordinate." },
+    decision: { kind: "direct-size", size },
+  });
+
+  for (const check of checks) {
+    let flag = true;
+    const sourceMatches = [];
+    const targetMatches = [];
+    const sourceMismatches = [];
+    const targetMismatches = [];
+    snapshot({
+      title: { vi: `Kiểm tra ánh xạ xoay ${check.angle}°`, en: `Check the ${check.angle}° rotation mapping` },
+      phase: "direct-reset",
+      check,
+      sourceMatches,
+      targetMatches,
+      sourceMismatches,
+      targetMismatches,
+      codeLine: check.lines.flag,
+      vars: [{ name: "flag", value: true }, { name: "rotation", value: `${check.angle}°` }, { name: "target coordinate", value: check.formula }],
+      note: { vi: `Đặt flag = True trước khi kiểm tra ánh xạ ${check.angle}°.`, en: `Set flag = True before checking the ${check.angle}° mapping.` },
+      decision: { kind: "direct-reset", angle: check.angle, formula: check.formula },
+    });
+
+    for (let row = 0; row < size; row++) {
+      snapshot({
+        title: { vi: `Vòng ngoài: i = ${row}`, en: `Outer loop: i = ${row}` },
+        phase: "direct-outer",
+        check,
+        sourceMatches,
+        targetMatches,
+        sourceMismatches,
+        targetMismatches,
+        codeLine: check.lines.outer,
+        vars: [{ name: "i", value: row }, { name: "flag", value: flag }],
+        note: { vi: `Duyệt hàng ${row} của mat.`, en: `Visit row ${row} of mat.` },
+        decision: { kind: "direct-outer", row, angle: check.angle },
+      });
+      for (let col = 0; col < size; col++) {
+        const [targetRow, targetCol] = check.map(row, col);
+        const sourceValue = matrix[row][col];
+        const targetValue = target[targetRow][targetCol];
+        snapshot({
+          title: { vi: `Vòng trong: j = ${col}`, en: `Inner loop: j = ${col}` },
+          phase: "direct-inner",
+          check,
+          sourceMatches,
+          targetMatches,
+          sourceMismatches,
+          targetMismatches,
+          activeSource: [row, col],
+          activeTarget: [targetRow, targetCol],
+          codeLine: check.lines.inner,
+          vars: [{ name: "i,j", value: `${row},${col}` }, { name: "mat[i][j]", value: sourceValue }, { name: "mapped target", value: `[${targetRow}][${targetCol}]` }],
+          note: { vi: `Chuẩn bị so sánh mat[${row}][${col}] với ${check.formula}.`, en: `Prepare to compare mat[${row}][${col}] with ${check.formula}.` },
+          decision: { kind: "direct-inner", row, col, targetRow, targetCol, angle: check.angle },
+        });
+        const same = sourceValue === targetValue;
+        (same ? sourceMatches : sourceMismatches).push([row, col]);
+        (same ? targetMatches : targetMismatches).push([targetRow, targetCol]);
+        snapshot({
+          title: { vi: `So sánh ${sourceValue} ${same ? "==" : "!="} ${targetValue}`, en: `Compare ${sourceValue} ${same ? "==" : "!="} ${targetValue}` },
+          phase: "direct-compare",
+          check,
+          sourceMatches,
+          targetMatches,
+          sourceMismatches,
+          targetMismatches,
+          activeSource: [row, col],
+          activeTarget: [targetRow, targetCol],
+          codeLine: check.lines.compare,
+          vars: [{ name: "mat[i][j]", value: sourceValue }, { name: check.formula, value: targetValue }, { name: "different", value: !same }],
+          note: { vi: same ? "Hai ô ánh xạ có cùng giá trị, tiếp tục kiểm tra." : "Hai ô ánh xạ khác nhau, flag sẽ trở thành False.", en: same ? "The mapped cells have the same value, so continue checking." : "The mapped cells differ, so flag will become False." },
+          decision: { kind: "direct-compare", sourceValue, targetValue, same, row, col, targetRow, targetCol, angle: check.angle },
+        });
+        if (!same) {
+          flag = false;
+          snapshot({
+            title: { vi: "Phát hiện khác nhau → flag = False", en: "Difference found → flag = False" },
+            phase: "direct-fail",
+            check,
+            sourceMatches,
+            targetMatches,
+            sourceMismatches,
+            targetMismatches,
+            activeSource: [row, col],
+            activeTarget: [targetRow, targetCol],
+            codeLine: check.lines.fail,
+            vars: [{ name: "flag", value: false }, { name: "first mismatch", value: `mat[${row}][${col}] vs target[${targetRow}][${targetCol}]` }],
+            note: { vi: "Chỉ cần một cặp khác nhau là ánh xạ xoay này không thể đúng.", en: "One different pair is enough for this rotation mapping to fail." },
+            decision: { kind: "direct-fail", angle: check.angle, row, col, targetRow, targetCol },
+          });
+          snapshot({
+            title: { vi: "Dừng vòng j hiện tại", en: "Break the current j loop" },
+            phase: "direct-break",
+            check,
+            sourceMatches,
+            targetMatches,
+            sourceMismatches,
+            targetMismatches,
+            activeSource: [row, col],
+            activeTarget: [targetRow, targetCol],
+            codeLine: check.lines.break,
+            vars: [{ name: "flag", value: false }, { name: "break", value: "inner loop" }],
+            note: { vi: "break chỉ thoát vòng j; vòng i vẫn tiếp tục theo đúng code này.", en: "break exits only the j loop; the i loop continues exactly as written." },
+            decision: { kind: "direct-break", angle: check.angle },
+          });
+          break;
+        }
+      }
+    }
+    tested.push({ angle: check.angle, same: flag });
+    snapshot({
+      title: { vi: `Kiểm tra flag của ánh xạ ${check.angle}°`, en: `Check the ${check.angle}° mapping flag` },
+      phase: "direct-result",
+      check,
+      sourceMatches,
+      targetMatches,
+      sourceMismatches,
+      targetMismatches,
+      codeLine: check.lines.result,
+      vars: [{ name: "flag", value: flag }, { name: "checked pairs", value: `${sourceMatches.length + sourceMismatches.length}/${size * size}` }],
+      note: { vi: flag ? "Không có cặp nào khác nhau: điều kiện flag đúng." : "Đã có cặp khác nhau: tiếp tục thử ánh xạ xoay kế tiếp.", en: flag ? "No pair differed: the flag condition is true." : "A pair differed: continue with the next rotation mapping." },
+      decision: { kind: "direct-result", angle: check.angle, flag, checked: sourceMatches.length + sourceMismatches.length, total: size * size },
+    });
+    if (flag) {
+      snapshot({
+        title: { vi: `Ánh xạ ${check.angle}° hợp lệ → trả về True`, en: `The ${check.angle}° mapping is valid → return True` },
+        phase: "found",
+        check,
+        sourceMatches,
+        targetMatches,
+        sourceMismatches,
+        targetMismatches,
+        codeLine: check.lines.return,
+        vars: [{ name: "answer", value: true }, { name: "rotation", value: `${check.angle}°` }],
+        note: { vi: "flag vẫn True, nên target có thể nhận được bằng phép xoay này.", en: "flag is still True, so target can be obtained by this rotation." },
+        decision: { kind: "direct-found", angle: check.angle, matchingCount: sourceMatches.length, total: size * size },
+        final: true,
+      });
+      return { original: matrix, answer: true, steps };
+    }
+  }
+
+  snapshot({
+    title: { vi: "Cả bốn ánh xạ đều thất bại → trả về False", en: "All four mappings fail → return False" },
+    phase: "missing",
+    check: checks.at(-1),
+    codeLine: 45,
+    vars: [{ name: "answer", value: false }, { name: "tested mappings", value: "90°, 180°, 270°, 0°" }],
+    note: { vi: "Không có ánh xạ nào giữ flag = True, nên target không thể nhận được từ mat bằng xoay.", en: "No mapping kept flag = True, so target cannot be obtained from mat by rotation." },
+    decision: { kind: "direct-missing" },
+    final: true,
+  });
   return { original: matrix, answer: false, steps };
 }
 
@@ -3604,53 +3910,217 @@ function buildSteps2022(input, params = {}) {
   const nums = Array.isArray(input) ? input.map(Number) : String(input).split(",").map((value) => Number(value.trim())).filter((value) => !Number.isNaN(value));
   const rows = Number(params.m), cols = Number(params.n);
   if (!nums.length || !nums.every(Number.isInteger) || !Number.isInteger(rows) || !Number.isInteger(cols) || rows <= 0 || cols <= 0) throw new Error("enter integer nums and positive m, n");
+  const needed = rows * cols;
+  const createView = ({ matrix, phase, activeIndex = null, activeCell = null, placedCount = 0, decision = null }) => ({
+    nums: [...nums],
+    matrix: cloneMatrix2D(matrix),
+    rows,
+    cols,
+    needed,
+    phase,
+    activeIndex,
+    activeCell,
+    placedCount,
+    decision,
+  });
   if (nums.length !== rows * cols) {
-    return { original: nums, answer: [], steps: [{ title: { vi: "Kích thước không khớp", en: "Size mismatch" }, arr: nums, highlight: [], mark: [], final: true, codeLines: [3, 4], vars: [{ name: "nums length", value: nums.length }, { name: "m*n", value: rows * cols }], note: { vi: "Không thể chia đủ nums thành m×n ô nên trả về [].", en: "nums cannot fill m×n cells, so return []." } }] };
+    return {
+      original: nums,
+      answer: [],
+      steps: [{
+        title: { vi: "Kích thước không khớp", en: "Size mismatch" },
+        arr: nums,
+        highlight: [],
+        mark: [],
+        final: true,
+        codeLines: [3, 4],
+        vars: [{ name: "nums length", value: nums.length }, { name: "m*n", value: needed }],
+        note: { vi: "Không thể chia đủ nums thành m×n ô nên trả về [].", en: "nums cannot fill m×n cells, so return []." },
+        convert2022View: createView({
+          matrix: [],
+          phase: "mismatch",
+          decision: { kind: "mismatch", length: nums.length, needed },
+        }),
+      }],
+    };
   }
   const result = blankMatrix2D(rows, cols);
-  const steps = [matrixStep2D(result, { title: { vi: "Tạo ma trận m×n rỗng", en: "Create an empty m×n matrix" }, codeLines: [5], vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "m,n", value: `${rows},${cols}` }], note: { vi: "Ghi lần lượt nums theo thứ tự hàng trước, cột sau.", en: "Write nums sequentially, row first then column." }, grid: { caption: "Empty result" } })];
+  const steps = [];
+  const snapshot = ({ title, phase, codeLines = [], vars = [], note, activeIndex = null, activeCell = null, placedCount = 0, decision = null, final = false }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      convert2022View: createView({ matrix: result, phase, activeIndex, activeCell, placedCount, decision }),
+    });
+  };
+
+  snapshot({
+    title: { vi: "Kiểm tra có đủ ô để đặt mọi phần tử", en: "Check that every value has a destination cell" },
+    phase: "validate",
+    codeLines: [3, 4],
+    vars: [{ name: "len(original)", value: nums.length }, { name: "m*n", value: needed }],
+    note: { vi: `${nums.length} phần tử khớp với ${rows} × ${cols} = ${needed} ô, nên có thể tạo ma trận.`, en: `${nums.length} values match ${rows} × ${cols} = ${needed} cells, so the matrix can be created.` },
+    decision: { kind: "valid", length: nums.length, needed },
+  });
+  snapshot({
+    title: { vi: `Tạo result ${rows} × ${cols} rỗng`, en: `Create an empty ${rows} × ${cols} result` },
+    phase: "init",
+    codeLines: [5],
+    vars: [{ name: "original", value: `[${nums.join(", ")}]` }, { name: "m,n", value: `${rows},${cols}` }],
+    note: { vi: "Các ô sẽ được điền theo hàng: hết một hàng mới sang hàng kế tiếp.", en: "Cells are filled row by row: finish one row before moving to the next." },
+    decision: { kind: "init" },
+  });
   for (let index = 0; index < nums.length; index++) {
     const row = Math.floor(index / cols), col = index % cols;
+    snapshot({
+      title: { vi: `Tính vị trí cho original[${index}] = ${nums[index]}`, en: `Calculate the position for original[${index}] = ${nums[index]}` },
+      phase: "map",
+      codeLines: [6, 7],
+      vars: [{ name: "index", value: index }, { name: "row", value: `${index} // ${cols} = ${row}` }, { name: "col", value: `${index} % ${cols} = ${col}` }],
+      note: { vi: `Chỉ số ${index} được đổi thành hàng ${row}, cột ${col}.`, en: `Index ${index} maps to row ${row}, column ${col}.` },
+      activeIndex: index,
+      activeCell: [row, col],
+      placedCount: index,
+      decision: { kind: "map", index, value: nums[index], row, col },
+    });
     result[row][col] = nums[index];
-    steps.push(matrixStep2D(result, { title: { vi: `nums[${index}] = ${nums[index]} → (${row},${col})`, en: `nums[${index}] = ${nums[index]} → (${row},${col})` }, codeLines: [6, 7], vars: [{ name: "index", value: index }, { name: "row,col", value: `${row},${col}` }], note: { vi: `row = ${index} // ${cols}, col = ${index} % ${cols}.`, en: `row = ${index} // ${cols}, col = ${index} % ${cols}.` }, grid: { hlCell: [row, col], caption: "Filling result" } }));
+    snapshot({
+      title: { vi: `Ghi ${nums[index]} vào result[${row}][${col}]`, en: `Write ${nums[index]} into result[${row}][${col}]` },
+      phase: "place",
+      codeLines: [7],
+      vars: [{ name: "result[row][col]", value: nums[index] }, { name: "đã đặt", value: `${index + 1}/${needed}` }],
+      note: { vi: `Giá trị ở original[${index}] đã vào đúng ô (${row}, ${col}).`, en: `The value from original[${index}] is now in its cell (${row}, ${col}).` },
+      activeIndex: index,
+      activeCell: [row, col],
+      placedCount: index + 1,
+      decision: { kind: "place", index, value: nums[index], row, col },
+    });
   }
-  steps.push(matrixStep2D(result, { title: { vi: "Chuyển đổi hoàn tất", en: "Conversion complete" }, codeLines: [8], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Đã dùng đúng m×n phần tử.", en: "Exactly m×n values were used." }, grid: { caption: "Final 2D array" } }));
+  snapshot({
+    title: { vi: "Chuyển đổi hoàn tất", en: "Conversion complete" },
+    phase: "done",
+    codeLines: [8],
+    final: true,
+    vars: [{ name: "result", value: JSON.stringify(result) }],
+    note: { vi: "Đã dùng đúng m×n phần tử và điền đầy tất cả các ô.", en: "Exactly m×n values were used and every cell is filled." },
+    placedCount: needed,
+    decision: { kind: "done" },
+  });
   return { original: nums, answer: result, steps };
 }
 
 /** LeetCode 73: Set Matrix Zeroes. */
 function buildSteps73(input) {
-  const matrix = parseIntegerMatrix2D(input);
-  const result = cloneMatrix2D(matrix);
+  const original = parseIntegerMatrix2D(input);
+  const result = cloneMatrix2D(original);
+  const rows = original.length;
+  const cols = original[0].length;
   const zeroRows = new Set();
   const zeroCols = new Set();
   const steps = [];
-  const markerCells = () => [
-    ...[...zeroRows].flatMap((row) => matrix[row].map((_, col) => [row, col])),
-    ...[...zeroCols].flatMap((col) => matrix.map((_, row) => [row, col])),
-  ];
+  const setText = (set) => `{${[...set].join(", ")}}`;
 
-  steps.push(matrixStep2D(matrix, { title: { vi: "Khởi tạo kích thước và marker", en: "Initialize size and markers" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${matrix.length},${matrix[0].length}` }, { name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }], note: { vi: "Ghi lại hàng và cột chứa số 0 trước khi thay đổi ma trận.", en: "Record every row and column containing a zero before changing the matrix." }, grid: { caption: "Original matrix" } }));
-  for (let row = 0; row < matrix.length; row++) for (let col = 0; col < matrix[0].length; col++) {
-    const value = matrix[row][col];
-    steps.push(matrixStep2D(matrix, { title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` }, codeLines: [5, 6, 7], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "value", value }], note: { vi: value === 0 ? "Đây là marker 0; cần lưu hàng và cột." : "Không phải 0, tiếp tục quét.", en: value === 0 ? "This is a zero marker; record its row and column." : "Not a zero; keep scanning." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Scanning" } }));
+  function snapshot({ title, phase, codeLines = [], vars = [], note, activeCell = null, changedCell = null, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      zero73View: {
+        original: cloneMatrix2D(original),
+        matrix: cloneMatrix2D(result),
+        rows,
+        cols,
+        phase,
+        activeCell,
+        changedCell,
+        zeroRows: [...zeroRows],
+        zeroCols: [...zeroCols],
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Lượt 1: quét để tìm các số 0 gốc", en: "Pass 1: scan for original zeroes" },
+    phase: "scan",
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "zero_rows", value: "{}" }, { name: "zero_cols", value: "{}" }],
+    note: { vi: "Chỉ ghi lại vị trí 0 vào hai Set. Chưa thay đổi bất kỳ ô nào trong matrix.", en: "Only record original zeroes in two Sets. Do not change any matrix cell yet." },
+    decision: { kind: "init" },
+  });
+
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+    const value = original[row][col];
+    snapshot({
+      title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` },
+      phase: "scan",
+      codeLines: [5, 6, 7],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "value", value }, { name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+      note: { vi: value === 0 ? "Đây là số 0 gốc: cần đánh dấu cả hàng lẫn cột, nhưng vẫn chưa sửa matrix." : "Không phải 0 gốc, tiếp tục quét." , en: value === 0 ? "This is an original zero: mark both its row and column, but do not edit the matrix yet." : "Not an original zero; keep scanning." },
+      activeCell: [row, col],
+      decision: { kind: "scan", value },
+    });
     if (value === 0) {
       zeroRows.add(row);
-      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu hàng ${row}`, en: `Record row ${row}` }, codeLines: [8], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Hàng này sẽ được đặt thành 0 ở lượt hai.", en: "This row will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked row" } }));
       zeroCols.add(col);
-      steps.push(matrixStep2D(matrix, { title: { vi: `Lưu cột ${col}`, en: `Record column ${col}` }, codeLines: [9], vars: [{ name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: "Cột này sẽ được đặt thành 0 ở lượt hai.", en: "This column will be zeroed on the second pass." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Marked column" } }));
+      snapshot({
+        title: { vi: `Ghi marker: hàng ${row} và cột ${col}`, en: `Record markers: row ${row} and column ${col}` },
+        phase: "mark",
+        codeLines: [8, 9],
+        vars: [{ name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+        note: { vi: `Đã lưu hàng ${row} và cột ${col}. Lượt hai sẽ dùng hai Set này để quyết định ô nào thành 0.`, en: `Saved row ${row} and column ${col}. Pass 2 will use these Sets to decide which cells become zero.` },
+        activeCell: [row, col],
+        decision: { kind: "mark", row, col },
+      });
     }
   }
-  for (let row = 0; row < result.length; row++) for (let col = 0; col < result[0].length; col++) {
+
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
     const shouldZero = zeroRows.has(row) || zeroCols.has(col);
-    steps.push(matrixStep2D(result, { title: { vi: `Kiểm tra ô (${row},${col})`, en: `Check cell (${row},${col})` }, codeLines: [10, 11, 12], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "r in zero_rows", value: zeroRows.has(row) }, { name: "c in zero_cols", value: zeroCols.has(col) }], note: { vi: shouldZero ? "Ô này thuộc hàng/cột đã đánh dấu nên sẽ đổi thành 0." : "Ô này không thuộc hàng/cột đã đánh dấu nên giữ nguyên.", en: shouldZero ? "This cell belongs to a marked row/column, so it will become 0." : "This cell is not in a marked row/column, so keep it unchanged." }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Checking markers" } }));
-    if (!zeroRows.has(row) && !zeroCols.has(col)) continue;
+    snapshot({
+      title: { vi: `Kiểm tra marker cho ô (${row},${col})`, en: `Check markers for cell (${row},${col})` },
+      phase: "apply",
+      codeLines: [10, 11, 12],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "r in zero_rows", value: zeroRows.has(row) }, { name: "c in zero_cols", value: zeroCols.has(col) }],
+      note: { vi: shouldZero ? "Chỉ cần hàng HOẶC cột đã được đánh dấu là ô phải thành 0." : "Cả hàng lẫn cột đều không được đánh dấu, nên giữ nguyên giá trị." , en: shouldZero ? "A marked row OR column is enough: this cell must become zero." : "Neither row nor column is marked, so keep the value." },
+      activeCell: [row, col],
+      decision: { kind: "check", rowMarked: zeroRows.has(row), colMarked: zeroCols.has(col), shouldZero },
+    });
+    if (!shouldZero) continue;
     const before = result[row][col];
     result[row][col] = 0;
-    steps.push(matrixStep2D(result, { title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` }, codeLines: [13], vars: [{ name: "r,c", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: `{${[...zeroRows].join(", ")}}` }, { name: "zero_cols", value: `{${[...zeroCols].join(", ")}}` }], note: { vi: `(${row},${col}) thuộc ${zeroRows.has(row) ? "hàng" : "cột"} đã được đánh dấu nên đổi thành 0.`, en: `(${row},${col}) belongs to a marked ${zeroRows.has(row) ? "row" : "column"}, so set it to 0.` }, grid: { hlCell: [row, col], pathCells: markerCells(), caption: "Applying zero markers" } }));
+    snapshot({
+      title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` },
+      phase: "apply",
+      codeLines: [13],
+      vars: [{ name: "r,c", value: `${row},${col}` }, { name: "before", value: before }, { name: "zero_rows", value: setText(zeroRows) }, { name: "zero_cols", value: setText(zeroCols) }],
+      note: { vi: `Ô này nằm trong ${zeroRows.has(row) ? `hàng ${row}` : ""}${zeroRows.has(row) && zeroCols.has(col) ? " và " : ""}${zeroCols.has(col) ? `cột ${col}` : ""} đã đánh dấu, nên đổi thành 0.`, en: `This cell is in the marked ${zeroRows.has(row) ? `row ${row}` : ""}${zeroRows.has(row) && zeroCols.has(col) ? " and " : ""}${zeroCols.has(col) ? `column ${col}` : ""}, so set it to zero.` },
+      activeCell: [row, col],
+      changedCell: [row, col],
+      decision: { kind: "apply", rowMarked: zeroRows.has(row), colMarked: zeroCols.has(col), before },
+    });
   }
-  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" }, codeLines: [14], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Mọi hàng/cột từng chứa 0 đã được đặt thành 0.", en: "Every row or column that contained a zero is now zeroed." }, grid: { pathCells: markerCells(), caption: "Final matrix" } }));
-  return { original: matrix, answer: result, steps };
+  snapshot({
+    title: { vi: "Hoàn tất Set Matrix Zeroes", en: "Set Matrix Zeroes complete" },
+    phase: "done",
+    codeLines: [14],
+    final: true,
+    vars: [{ name: "result", value: JSON.stringify(result) }],
+    note: { vi: "Mọi hàng hoặc cột có số 0 gốc đều đã thành 0. Các Set chỉ được dùng để nhớ marker của lượt một.", en: "Every row or column with an original zero is now zero. The Sets were only used to preserve pass-1 markers." },
+    decision: { kind: "done" },
+  });
+  return { original, answer: result, steps };
 }
 
 /** LeetCode 74: Search a 2D Matrix. */
@@ -3660,32 +4130,109 @@ function buildSteps74(input, params = {}) {
   if (!Number.isInteger(target)) throw new Error("target must be an integer");
   const rows = matrix.length, cols = matrix[0].length;
   const steps = [];
-  const visited = [];
+  const inspected = [];
   let lo = 0, hi = rows * cols - 1;
   const coord = (index) => [Math.floor(index / cols), index % cols];
 
-  steps.push(matrixStep2D(matrix, { title: { vi: "Binary search trên index phẳng", en: "Binary-search flat indexes" }, codeLines: [3, 4], vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }], note: { vi: "Thứ tự toàn ma trận cũng tăng dần, nên coi matrix là mảng 1D dài rows×cols.", en: "The entire matrix order is sorted, so treat it as one 1D array of rows×cols values." }, grid: { caption: "Flattened binary search" } }));
+  function snapshot({ title, phase, codeLines = [], vars = [], note, mid = null, decision = null, final = false }) {
+    const activeCell = Number.isInteger(mid) ? coord(mid) : null;
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      search74View: {
+        matrix: cloneMatrix2D(matrix),
+        rows,
+        cols,
+        target,
+        lo,
+        hi,
+        mid,
+        activeCell,
+        inspected: inspected.map((item) => ({ ...item })),
+        phase,
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Trải matrix thành dải chỉ số phẳng", en: "Flatten the matrix into one index range" },
+    phase: "init",
+    codeLines: [3, 4],
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }, { name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }],
+    note: { vi: "Vì hàng sau bắt đầu lớn hơn hàng trước kết thúc, toàn bộ matrix có thể xem như một mảng đã sắp xếp từ index 0 đến rows×cols−1.", en: "Because each row starts above the previous row's end, the whole matrix acts like one sorted array from index 0 to rows×cols-1." },
+    decision: { kind: "init" },
+  });
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     const [row, col] = coord(mid);
     const value = matrix[row][col];
-    visited.push([row, col]);
-    steps.push(matrixStep2D(matrix, { title: { vi: `mid = ${mid} → (${row},${col})`, en: `mid = ${mid} → (${row},${col})` }, codeLines: [5, 6, 7], vars: [{ name: "lo,hi", value: `${lo},${hi}` }, { name: "mid", value: mid }, { name: "value", value }], note: { vi: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; đọc giá trị ${value}.`, en: `mid // ${cols} = ${row}, mid % ${cols} = ${col}; read value ${value}.` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Current binary-search midpoint" } }));
+    inspected.push({ index: mid, row, col, value });
+    snapshot({
+      title: { vi: `mid = ${mid} → matrix[${row}][${col}] = ${value}`, en: `mid = ${mid} → matrix[${row}][${col}] = ${value}` },
+      phase: "probe",
+      codeLines: [5, 6, 7],
+      vars: [{ name: "lo,hi", value: `${lo},${hi}` }, { name: "mid", value: mid }, { name: "mid//cols, mid%cols", value: `${row},${col}` }, { name: "value", value }],
+      note: { vi: `Đổi index phẳng ${mid}: row = ${mid} // ${cols} = ${row}, col = ${mid} % ${cols} = ${col}; rồi đọc ${value}.`, en: `Convert flat index ${mid}: row = ${mid} // ${cols} = ${row}, col = ${mid} % ${cols} = ${col}; then read ${value}.` },
+      mid,
+      decision: { kind: "probe", value, row, col },
+    });
     if (value === target) {
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} == target → True`, en: `${value} == target → True` }, codeLines: [8, 9], final: true, vars: [{ name: "target", value: target }, { name: "found", value: true }], note: { vi: `Tìm thấy target tại matrix[${row}][${col}].`, en: `Found target at matrix[${row}][${col}].` }, grid: { hlCell: [row, col], historyCells: visited, caption: "Target found" } }));
+      snapshot({
+        title: { vi: `${value} == target → True`, en: `${value} == target → True` },
+        phase: "found",
+        codeLines: [8, 9],
+        final: true,
+        vars: [{ name: "target", value: target }, { name: "found", value: true }, { name: "position", value: `(${row},${col})` }],
+        note: { vi: `Tìm thấy target tại matrix[${row}][${col}], tương ứng index phẳng ${mid}.`, en: `Found the target at matrix[${row}][${col}], which is flat index ${mid}.` },
+        mid,
+        decision: { kind: "found", value, row, col },
+      });
       return { original: matrix, answer: true, steps };
     }
     if (value < target) {
+      const oldLo = lo;
       const nextLo = mid + 1;
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} < ${target} → lo = ${nextLo}`, en: `${value} < ${target} → lo = ${nextLo}` }, codeLines: [10, 11], vars: [{ name: "old lo", value: lo }, { name: "new lo", value: nextLo }, { name: "hi", value: hi }], note: { vi: "Target phải nằm bên phải mid nên bỏ nửa trái.", en: "The target must be right of mid, so discard the left half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the right half" } }));
       lo = nextLo;
+      snapshot({
+        title: { vi: `${value} < ${target} → lo = ${nextLo}`, en: `${value} < ${target} → lo = ${nextLo}` },
+        phase: "move-right",
+        codeLines: [10, 11],
+        vars: [{ name: "old lo", value: oldLo }, { name: "new lo", value: nextLo }, { name: "hi", value: hi }],
+        note: { vi: `Mọi index từ ${oldLo} đến ${mid} đều có giá trị ≤ ${value}, nên bỏ nửa trái và chỉ giữ khoảng ${lo}..${hi}.`, en: `Every index from ${oldLo} to ${mid} has value <= ${value}, so discard the left half and keep only ${lo}..${hi}.` },
+        mid,
+        decision: { kind: "move-right", value, oldLo, nextLo },
+      });
     } else {
+      const oldHi = hi;
       const nextHi = mid - 1;
-      steps.push(matrixStep2D(matrix, { title: { vi: `${value} > ${target} → hi = ${nextHi}`, en: `${value} > ${target} → hi = ${nextHi}` }, codeLines: [12, 13], vars: [{ name: "lo", value: lo }, { name: "old hi", value: hi }, { name: "new hi", value: nextHi }], note: { vi: "Target phải nằm bên trái mid nên bỏ nửa phải.", en: "The target must be left of mid, so discard the right half." }, grid: { hlCell: [row, col], historyCells: visited, caption: "Keep the left half" } }));
       hi = nextHi;
+      snapshot({
+        title: { vi: `${value} > ${target} → hi = ${nextHi}`, en: `${value} > ${target} → hi = ${nextHi}` },
+        phase: "move-left",
+        codeLines: [12, 13],
+        vars: [{ name: "lo", value: lo }, { name: "old hi", value: oldHi }, { name: "new hi", value: nextHi }],
+        note: { vi: `Mọi index từ ${mid} đến ${oldHi} đều có giá trị ≥ ${value}, nên bỏ nửa phải và chỉ giữ khoảng ${lo}..${hi}.`, en: `Every index from ${mid} to ${oldHi} has value >= ${value}, so discard the right half and keep only ${lo}..${hi}.` },
+        mid,
+        decision: { kind: "move-left", value, oldHi, nextHi },
+      });
     }
   }
-  steps.push(matrixStep2D(matrix, { title: { vi: "Không tìm thấy target", en: "Target not found" }, codeLines: [14], final: true, vars: [{ name: "target", value: target }, { name: "found", value: false }], note: { vi: "lo đã vượt hi, nên target không tồn tại trong matrix.", en: "lo crossed hi, so the target is not in the matrix." }, grid: { historyCells: visited, caption: "Search finished" } }));
+  snapshot({
+    title: { vi: "Không tìm thấy target", en: "Target not found" },
+    phase: "missing",
+    codeLines: [14],
+    final: true,
+    vars: [{ name: "target", value: target }, { name: "lo,hi", value: `${lo},${hi}` }, { name: "found", value: false }],
+    note: { vi: `lo = ${lo} đã vượt hi = ${hi}; khoảng tìm kiếm rỗng nên target không có trong matrix.`, en: `lo = ${lo} crossed hi = ${hi}; the search range is empty, so the target is not in the matrix.` },
+    decision: { kind: "missing" },
+  });
   return { original: matrix, answer: false, steps };
 }
 
@@ -8655,7 +9202,7 @@ module.exports = {
     title: { vi: "Spiral Matrix", en: "Spiral Matrix" },
     titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
     statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
-    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
+    defaultInput: "1,2,3,4;5,6,7,8;9,10,11,12", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
     approach: [
       { vi: "top, right, bottom, left luôn bao quanh đúng vùng CHƯA duyệt.", en: "top, right, bottom, and left always enclose exactly the UNVISITED region." },
       { vi: "Quét TOP →, RIGHT ↓, BOTTOM ←, LEFT ↑ theo chiều kim đồng hồ.", en: "Scan TOP →, RIGHT ↓, BOTTOM ←, and LEFT ↑ clockwise." },
@@ -9756,10 +10303,70 @@ Object.assign(module.exports, {
     category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
     title: { vi: "Determine Whether Matrix Can Be Obtained By Rotation", en: "Determine Whether Matrix Can Be Obtained By Rotation" }, titleVi: { vi: "Kiểm tra target bằng xoay ma trận", en: "Check whether rotation reaches target" },
     statement: { vi: "Kiểm tra mat sau 0°, 90°, 180° hoặc 270° có thể bằng target không.", en: "Check whether mat can equal target after 0°, 90°, 180°, or 270° rotation." },
-    defaultInput: "0,1;1,0", inputKind: "string", inputLabel: { vi: "mat (vuông; hàng cách ;)", en: "mat (square; rows separated by ;)" }, extraParams: [{ key: "target", type: "string", label: { vi: "target (hàng cách ;)", en: "target (rows separated by ;)" }, default: "1,0;0,1" }],
-    approach: [{ vi: "So sánh mat với target trước khi xoay (0°).", en: "Compare mat with target before rotating (0°)." }, { vi: "Nếu chưa khớp, xoay 90° và lặp tối đa ba lần nữa.", en: "If it does not match, rotate 90° and repeat up to three more times." }],
-    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "Có tối đa bốn lần so sánh/xoay; hệ số 4 là hằng số.", en: "At most four comparisons/rotations; the factor 4 is constant." } },
-    code: ["class Solution:", "    def findRotation(self, mat, target):", "        def rotate(grid):", "            return [list(row) for row in zip(*grid[::-1])]", "        for _ in range(4):", "            if mat == target:", "                return True", "            mat = rotate(mat)", "        return False"], builder: buildSteps1886,
+    defaultInput: "0,1;1,0", inputKind: "string", inputLabel: { vi: "mat (vuông; hàng cách ;)", en: "mat (square; rows separated by ;)" }, extraParams: [
+      { key: "target", type: "string", label: { vi: "target (hàng cách ;)", en: "target (rows separated by ;)" }, default: "1,0;0,1" },
+      { key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: xoay ma trận rồi so sánh", en: "Approach 1: rotate then compare" } },
+        { value: "2", label: { vi: "Cách 2: đối chiếu tọa độ trực tiếp", en: "Approach 2: direct coordinate mapping" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Cách 1: so sánh mat với target ở 0°, rồi xoay mat 90° tối đa ba lần.", en: "Approach 1: compare mat with target at 0°, then rotate mat 90° up to three times." },
+      { vi: "Cách 2: giữ mat cố định và đối chiếu mat[i][j] với tọa độ tương ứng trên target cho 90°, 180°, 270° và 0°.", en: "Approach 2: keep mat fixed and compare mat[i][j] with the corresponding target coordinate for 90°, 180°, 270°, and 0°." },
+    ],
+    complexity: { time: "O(n²)", space: "O(n²) / O(1)", note: { vi: "Cả hai cách tối đa kiểm tra bốn hướng xoay. Cách 1 tạo ma trận xoay mới; Cách 2 chỉ dùng vài biến và ánh xạ chỉ số.", en: "Both approaches check at most four rotations. Approach 1 creates rotated matrices; Approach 2 uses only a few variables and index mappings." } },
+    codeLabel: { vi: "Cách 1: xoay ma trận rồi so sánh", en: "Approach 1: rotate then compare" },
+    code: ["class Solution:", "    def findRotation(self, mat, target):", "        def rotate(grid):", "            return [list(row) for row in zip(*grid[::-1])]", "        for _ in range(4):", "            if mat == target:", "                return True", "            mat = rotate(mat)", "        return False"],
+    code2Label: { vi: "Cách 2: đối chiếu tọa độ trực tiếp", en: "Approach 2: direct coordinate mapping" },
+    code2: [
+      "class Solution:",
+      "    def findRotation(self, mat, target):",
+      "        n = len(mat)",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[j][n - 1 - i]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[n - 1 - i][n - 1 - j]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[n - 1 - j][i]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        flag = True",
+      "        for i in range(n):",
+      "            for j in range(n):",
+      "                if mat[i][j] != target[i][j]:",
+      "                    flag = False",
+      "                    break",
+      "",
+      "        if flag:",
+      "            return True",
+      "",
+      "        return False",
+    ],
+    builder: buildSteps1886,
+    builder2: buildSteps1886Direct,
   },
   2022: {
     id: 2022, difficulty: "easy", slug: "convert-1d-array-into-2d-array",

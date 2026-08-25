@@ -5043,6 +5043,64 @@ function renderPalindromePartitionView(step) {
   </section>`;
 }
 
+// ---- Jewels and Stones (#771): make each set membership check explicit. ----
+function renderJewelsStonesView(step) {
+  const view = step.jewelsStonesView || {};
+  const vi = lang === "vi";
+  const jewelTypes = Array.isArray(view.jewelTypes) ? view.jewelTypes : [];
+  const stones = Array.from(String(view.stones || ""));
+  const states = Array.isArray(view.stoneStates) ? view.stoneStates : [];
+  const phase = String(view.phase || "init");
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const currentStone = currentIndex === null ? null : String(view.currentStone ?? "");
+  const count = Number(view.count) || 0;
+  const phaseIndex = phase === "done" ? 3 : ["match", "skip"].includes(phase) ? 1 : 0;
+  const phases = (vi ? ["Tạo jewel_set", "Kiểm tra 1 viên", "Cộng kết quả"] : ["Build jewel_set", "Check one stone", "Add result"])
+    .map((label, index) => {
+      const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+    }).join("");
+  const jewelHtml = jewelTypes.length
+    ? jewelTypes.map((type) => `<span><small>${vi ? "loại jewel" : "jewel type"}</small><strong>${escapeHtml(type)}</strong></span>`).join("")
+    : `<em>${vi ? "Không có loại đá quý nào" : "No jewel types"}</em>`;
+  const stoneHtml = stones.length
+    ? stones.map((stone, index) => {
+      const state = states[index] || "waiting";
+      const label = state === "matched" || state === "active-match" ? "+1" : state === "skipped" || state === "active-skip" ? "0" : "?";
+      return `<div class="js771-stone ${escapeHtml(state)}"><small>stones[${index}]</small><strong>${escapeHtml(stone)}</strong><em>${label}</em></div>`;
+    }).join("")
+    : `<em>${vi ? "stones rỗng" : "stones is empty"}</em>`;
+  const gateState = view.isJewel === true ? "match" : view.isJewel === false ? "skip" : "waiting";
+  const gateLabel = gateState === "match" ? (vi ? "CÓ · +1" : "YES · +1") : gateState === "skip" ? (vi ? "KHÔNG · +0" : "NO · +0") : "?";
+  const gateExpression = currentStone === null
+    ? (vi ? "Chọn viên đá tiếp theo để tra set" : "Choose the next stone to look up in the set")
+    : `"${currentStone}" ${view.isJewel ? "∈" : "∉"} jewel_set`;
+  const gateDetail = gateState === "match"
+    ? (vi ? `"${currentStone}" đúng là một loại đá quý, nên count tăng lên ${count}.` : `"${currentStone}" is a jewel type, so count increases to ${count}.`)
+    : gateState === "skip"
+      ? (vi ? `"${currentStone}" không phải đá quý, nên count giữ nguyên ${count}.` : `"${currentStone}" is not a jewel, so count remains ${count}.`)
+      : (vi ? "Set lookup là O(1) trung bình. Hoa và thường là hai ký tự khác nhau: a ≠ A." : "A set lookup is O(1) on average. Uppercase and lowercase are different: a ≠ A.");
+  const actionDetail = phase === "done"
+    ? (vi ? `Đã kiểm tra hết ${stones.length} viên. Mỗi thẻ xanh đóng góp 1 vào đáp án.` : `All ${stones.length} stones were checked. Every green card contributes 1 to the answer.`)
+    : currentIndex === null
+      ? (vi ? "Chuẩn bị set trước, sau đó duyệt lần lượt stones từ trái sang phải." : "Prepare the set, then scan stones left to right.")
+      : (vi ? `Đang xét đúng một viên: stones[${currentIndex}] = "${currentStone}".` : `Examining exactly one stone: stones[${currentIndex}] = "${currentStone}".`);
+  const summary = vi
+    ? `Jewels and Stones. Có ${jewelTypes.length} loại đá quý, đang đếm ${stones.length} viên đá.`
+    : `Jewels and Stones. ${jewelTypes.length} jewel types and ${stones.length} stones to count.`;
+
+  $("treeView").innerHTML = `<section class="js771-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="js771-phases">${phases}</div>
+    <section class="js771-set-section"><header><strong>jewel_set</strong><span>${vi ? "mỗi ký tự = một loại đá quý" : "each character = one jewel type"}</span></header><div class="js771-jewels">${jewelHtml}</div><p>${vi ? "Phân biệt chữ hoa/thường: a và A là hai loại khác nhau." : "Case-sensitive: a and A are two different types."}</p></section>
+    <section class="js771-stones-section"><header><strong>stones</strong><span>${vi ? "xanh = cộng 1 · xám = cộng 0 · vàng = đang xét" : "green = +1 · gray = +0 · yellow = checking"}</span></header><div class="js771-stones">${stoneHtml}</div></section>
+    <div class="js771-bottom-row">
+      <section class="js771-gate ${gateState}"><header><strong>${vi ? "TRA SET" : "SET LOOKUP"}</strong><b>${gateLabel}</b></header><code>${escapeHtml(gateExpression)}</code><span>${escapeHtml(gateDetail)}</span></section>
+      <section class="js771-count"><small>count</small><strong>${count}</strong><span>${vi ? "số stone là jewel" : "stones that are jewels"}</span></section>
+    </div>
+    <div class="js771-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(actionDetail)}</span></div>
+  </section>`;
+}
+
 function renderNonDecreasingSubsequencesView(step) {
   const view = step.nonDecreasingView || {};
   const vi = lang === "vi";
@@ -17753,6 +17811,420 @@ function renderRotate48View(step) {
   </section>`;
 }
 
+function renderRotation1886View(step) {
+  const view = step.rotation1886View || {};
+  const vi = lang === "vi";
+  const current = Array.isArray(view.current) ? view.current : [];
+  const target = Array.isArray(view.target) ? view.target : [];
+  const size = Number(view.size) || current.length;
+  const directMode = Number(view.approach) === 2 || view.comparisonMode === "mapped";
+  const angle = Number.isInteger(view.angle) ? view.angle : null;
+  const phase = String(view.phase || "compare");
+  const decision = view.decision || {};
+  const matchingCells = new Set((view.matches || []).map(([row, col]) => `${row},${col}`));
+  const sourceMatches = new Set((view.sourceMatches || view.matches || []).map(([row, col]) => `${row},${col}`));
+  const targetMatches = new Set((view.targetMatches || view.matches || []).map(([row, col]) => `${row},${col}`));
+  const sourceMismatches = new Set((view.sourceMismatches || view.mismatches || []).map(([row, col]) => `${row},${col}`));
+  const targetMismatches = new Set((view.targetMismatches || view.mismatches || []).map(([row, col]) => `${row},${col}`));
+  const activeSource = Array.isArray(view.activeSource) ? view.activeSource : null;
+  const activeTarget = Array.isArray(view.activeTarget) ? view.activeTarget : null;
+  const tested = new Map((view.tested || []).map((item) => [Number(item.angle), Boolean(item.same)]));
+  const phaseIndex = directMode
+    ? (phase === "found" || phase === "missing" ? 3 : phase === "direct-result" ? 2 : ["direct-compare", "direct-fail", "direct-break"].includes(phase) ? 1 : 0)
+    : (phase === "found" || phase === "missing" ? 3 : phase === "rotate" ? 1 : 0);
+  const stages = (directMode ? [
+    { label: vi ? "Ánh xạ tọa độ" : "Map coordinates", detail: "mat[i][j] -> target[...]" },
+    { label: vi ? "So sánh cặp ô" : "Compare cell pair", detail: "== / !=" },
+    { label: vi ? "Kiểm tra flag" : "Check flag", detail: "True / False" },
+  ] : [
+    { label: vi ? "So sánh từng ô" : "Compare every cell", detail: "candidate vs target" },
+    { label: vi ? "Xoay 90°" : "Rotate 90°", detail: "clockwise" },
+    { label: vi ? "Kết luận" : "Conclude", detail: "True / False" },
+  ]).map((item, index) => {
+    const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+  const angleTrack = (directMode ? [90, 180, 270, 0] : [0, 90, 180, 270]).map((candidateAngle) => {
+    const result = tested.get(candidateAngle);
+    const classes = ["rot1886-angle"];
+    if (result === true) classes.push("match");
+    else if (result === false) classes.push("miss");
+    else classes.push("waiting");
+    if (candidateAngle === angle) classes.push("active");
+    const status = result === true
+      ? (vi ? "TRÙNG" : "MATCH")
+      : result === false
+        ? (vi ? "KHÁC" : "DIFFERENT")
+        : (vi ? "CHƯA THỬ" : "NOT TRIED");
+    return `<span class="${classes.join(" ")}"><strong>${candidateAngle}°</strong><em>${status}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (directMode) {
+    if (decision.kind === "direct-size") {
+      decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "KÍCH THƯỚC" : "SIZE"}</small><strong>n = len(mat) = ${decision.size}</strong><span>${vi ? "Cách 2 giữ mat cố định và dùng n để tính tọa độ tương ứng trên target." : "Approach 2 keeps mat fixed and uses n to calculate corresponding target coordinates."}</span></section>`;
+    } else if (decision.kind === "direct-reset") {
+      decisionHtml = `<section class="rot1886-decision rotate"><small>${vi ? `ÁNH XẠ ${decision.angle}°` : `${decision.angle}° MAPPING`}</small><strong>mat[i][j] &harr; ${escapeHtml(decision.formula)}</strong><span>${vi ? "flag được đặt lại True trước khi kiểm tra toàn bộ cặp tọa độ." : "flag is reset to True before checking every coordinate pair."}</span></section>`;
+    } else if (decision.kind === "direct-outer" || decision.kind === "direct-inner") {
+      const sourceText = decision.kind === "direct-inner" ? `mat[${decision.row}][${decision.col}]` : "mat[i][j]";
+      const targetText = decision.kind === "direct-inner" ? `target[${decision.targetRow}][${decision.targetCol}]` : "target[...]";
+      decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "CHỌN CẶP Ô" : "CHOOSE CELL PAIR"}</small><strong>${escapeHtml(sourceText)} &harr; ${escapeHtml(targetText)}</strong><span>${vi ? "Hai ô viền xanh là cặp sẽ được so sánh ở dòng điều kiện kế tiếp." : "The two blue-outlined cells are the pair checked by the next condition line."}</span></section>`;
+    } else if (decision.kind === "direct-compare") {
+      decisionHtml = `<section class="rot1886-decision ${decision.same ? "found" : "compare"}"><small>${vi ? "ĐIỀU KIỆN" : "CONDITION"}</small><strong>${escapeHtml(String(decision.sourceValue))} ${decision.same ? "==" : "!="} ${escapeHtml(String(decision.targetValue))}</strong><span>${vi ? `mat[${decision.row}][${decision.col}] so với target[${decision.targetRow}][${decision.targetCol}] cho ánh xạ ${decision.angle}°.` : `mat[${decision.row}][${decision.col}] compared with target[${decision.targetRow}][${decision.targetCol}] for the ${decision.angle}° mapping.`}</span></section>`;
+    } else if (decision.kind === "direct-fail") {
+      decisionHtml = `<section class="rot1886-decision compare"><small>FLAG</small><strong>flag = False</strong><span>${vi ? "Cặp ô đang viền xanh khác nhau, nên ánh xạ hiện tại đã thất bại." : "The blue-outlined cells differ, so this mapping has failed."}</span></section>`;
+    } else if (decision.kind === "direct-break") {
+      decisionHtml = `<section class="rot1886-decision loop"><small>BREAK</small><strong>${vi ? "Thoát vòng j hiện tại" : "Exit the current j loop"}</strong><span>${vi ? "Theo code gốc, vòng i vẫn tiếp tục với hàng tiếp theo." : "Per the original code, the i loop still continues with the next row."}</span></section>`;
+    } else if (decision.kind === "direct-result") {
+      decisionHtml = `<section class="rot1886-decision ${decision.flag ? "found" : "compare"}"><small>IF FLAG</small><strong>flag == ${decision.flag ? "True" : "False"}</strong><span>${vi ? (decision.flag ? "Tất cả cặp đã kiểm tra đều bằng nhau, nên chuẩn bị trả về True." : "Có ít nhất một cặp khác nhau, nên chuyển sang ánh xạ kế tiếp.") : (decision.flag ? "Every checked pair is equal, so prepare to return True." : "At least one pair differs, so move to the next mapping.")}</span></section>`;
+    } else if (decision.kind === "direct-found") {
+      decisionHtml = `<section class="rot1886-decision found"><small>${vi ? "ĐÃ TÌM THẤY" : "MATCH FOUND"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "cặp ô đều bằng nhau" : "cell pairs are equal"}</strong><span>${vi ? `Ánh xạ ${decision.angle}° giữ flag = True, nên trả về True.` : `The ${decision.angle}° mapping keeps flag = True, so return True.`}</span></section>`;
+    } else {
+      decisionHtml = `<section class="rot1886-decision missing"><small>${vi ? "KHÔNG CÓ ÁNH XẠ" : "NO MATCHING MAP"}</small><strong>${vi ? "Bốn lần kiểm tra đều làm flag = False" : "All four checks make flag = False"}</strong><span>${vi ? "Không cần tạo matrix xoay để kết luận False." : "No rotated matrix is needed to conclude False."}</span></section>`;
+    }
+  } else if (decision.kind === "rotate") {
+    decisionHtml = `<section class="rot1886-decision rotate"><small>${vi ? "QUY TẮC XOAY" : "ROTATION RULE"}</small><strong>current[r][c] &rarr; next[c][n - 1 - r]</strong><span>${vi ? `Xoay ${decision.fromAngle}° theo chiều kim đồng hồ để tạo ứng viên ${decision.toAngle}°.` : `Rotate ${decision.fromAngle}° clockwise to create the ${decision.toAngle}° candidate.`}</span></section>`;
+  } else if (decision.kind === "loop") {
+    decisionHtml = `<section class="rot1886-decision loop"><small>${vi ? "VÒNG LẶP" : "LOOP"}</small><strong>for _ in range(4):</strong><span>${vi ? `Bắt đầu lượt thử ứng viên ở góc ${decision.angle}°. Chưa thực hiện phép so sánh ở dòng kế tiếp.` : `Start the ${decision.angle}° candidate attempt. The comparison happens on the next line.`}</span></section>`;
+  } else if (decision.kind === "found") {
+    decisionHtml = `<section class="rot1886-decision found"><small>${vi ? "ĐÃ TÌM THẤY" : "MATCH FOUND"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "ô đều bằng target" : "cells equal target"}</strong><span>${vi ? `Ứng viên ở góc ${angle}° trùng hoàn toàn với target, nên trả về True.` : `The ${angle}° candidate completely equals target, so return True.`}</span></section>`;
+  } else if (decision.kind === "missing") {
+    decisionHtml = `<section class="rot1886-decision missing"><small>${vi ? "KHÔNG CÓ GÓC PHÙ HỢP" : "NO MATCHING ANGLE"}</small><strong>${vi ? "Đã thử cả bốn hướng xoay" : "All four rotations were tried"}</strong><span>${vi ? `Ứng viên cuối vẫn còn ${decision.total - decision.matchingCount} ô khác target, nên trả về False.` : `The last candidate still has ${decision.total - decision.matchingCount} cells different from target, so return False.`}</span></section>`;
+  } else {
+    decisionHtml = `<section class="rot1886-decision compare"><small>${vi ? "SO SÁNH CÙNG TỌA ĐỘ" : "COMPARE SAME COORDINATES"}</small><strong>${decision.matchingCount}/${decision.total} ${vi ? "ô đang trùng" : "cells currently match"}</strong><span>${vi ? "Ô xanh có giá trị bằng nhau; ô đỏ cho thấy vị trí vẫn khác target." : "Green cells have equal values; red cells show positions that still differ from target."}</span></section>`;
+  }
+
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const renderBoard = (grid, kind, label, detail, matchSet, mismatchSet, activeCell) => {
+    const rows = Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, col) => {
+      const key = `${row},${col}`;
+      const comparisonReady = decision.kind !== "loop";
+      const matches = matchSet.has(key);
+      const differs = directMode ? mismatchSet.has(key) : !matches;
+      const active = sameCell(activeCell, row, col);
+      const classes = ["rot1886-cell", kind];
+      if (directMode) classes.push(matches ? "same" : differs ? "different" : "pending");
+      else classes.push(comparisonReady ? (matches ? "same" : "different") : "pending");
+      if (active) classes.push("active");
+      const value = grid[row]?.[col] ?? "";
+      const tag = active
+        ? (vi ? "ĐANG XÉT" : "CHECKING")
+        : matches
+          ? (vi ? "BẰNG" : "EQUAL")
+          : differs
+            ? (vi ? "KHÁC" : "DIFFERS")
+            : (vi ? "CHƯA SO SÁNH" : "NOT COMPARED");
+      return `<div class="${classes.join(" ")}"><small>[${row},${col}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+    }).join(""));
+    return `<section class="rot1886-board ${kind}"><header><strong>${escapeHtml(label)}</strong><span>${escapeHtml(detail)}</span></header><div class="rot1886-board-scroll"><div class="rot1886-grid" style="--rot1886-cols:${size}"><span class="rot1886-corner">r\\c</span>${Array.from({ length: size }, (_, col) => `<span class="rot1886-col">c=${col}</span>`).join("")}${Array.from({ length: size }, (_, row) => `<span class="rot1886-row">r=${row}</span>${rows[row] || ""}`).join("")}</div></div></section>`;
+  };
+
+  const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = directMode
+    ? (vi ? `Cách 2: đối chiếu mat với target qua ánh xạ ${angle === null ? "chưa chọn" : `${angle} độ`}.` : `Approach 2: compare mat and target through the ${angle === null ? "unselected" : `${angle}-degree`} mapping.`)
+    : (vi ? `Determine Whether Matrix Can Be Obtained By Rotation: đang xét ứng viên ${angle ?? 0} độ.` : `Determine Whether Matrix Can Be Obtained By Rotation: viewing the ${angle ?? 0}-degree candidate.`);
+  const sourceLabel = directMode ? (vi ? "MAT (GIỮ CỐ ĐỊNH)" : "MAT (FIXED SOURCE)") : (vi ? `ỨNG VIÊN ${angle ?? 0}°` : `${angle ?? 0}° CANDIDATE`);
+  const sourceDetail = directMode ? "mat[i][j]" : (vi ? "mat sau xoay" : "rotated mat");
+  const targetDetail = directMode
+    ? (angle === null ? (vi ? "chọn ánh xạ" : "choose a mapping") : (vi ? `tọa độ ${angle}° trên target` : `${angle}° target coordinates`))
+    : (vi ? "ma trận cần đạt" : "desired matrix");
+  const centerSymbol = directMode ? "&rarr;" : phase === "found" ? "=" : "?";
+  const centerText = directMode ? (vi ? "ánh xạ tới" : "maps to") : (vi ? "so với" : "vs");
+  const headerTitle = directMode ? (vi ? "BỐN ÁNH XẠ TRỰC TIẾP" : "FOUR DIRECT MAPPINGS") : (vi ? "BỐN ỨNG VIÊN XOAY" : "FOUR ROTATION CANDIDATES");
+  const headerDetail = directMode ? (vi ? "mat không đổi, chỉ đổi tọa độ target" : "mat stays fixed; only target coordinates change") : (vi ? "mỗi thẻ là một lần so sánh với target" : "each card is compared with target");
+  const legendSame = directMode ? (vi ? "cặp ánh xạ cùng giá trị" : "mapped pair with equal values") : (vi ? "cùng tọa độ, cùng giá trị" : "same coordinate and value");
+  const legendDifferent = directMode ? (vi ? "cặp ánh xạ khác giá trị" : "mapped pair with different values") : (vi ? "cùng tọa độ, khác giá trị" : "same coordinate, different value");
+  const legendActive = directMode ? (vi ? "cặp tọa độ đang xét" : "coordinate pair being checked") : (vi ? "ứng viên đang xét" : "current candidate");
+
+  $("treeView").innerHTML = `<section class="rot1886-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rot1886-stages">${stages}</div>
+    <section class="rot1886-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="rot1886-angles"><header><strong>${headerTitle}</strong><span>${headerDetail}</span></header><div>${angleTrack}</div></section>
+    ${decisionHtml}
+    <div class="rot1886-layout">
+      ${renderBoard(current, "candidate", sourceLabel, sourceDetail, directMode ? sourceMatches : matchingCells, directMode ? sourceMismatches : new Set(), directMode ? activeSource : null)}
+      <div class="rot1886-compare-symbol ${directMode ? "mapped" : ""}" aria-hidden="true"><b>${centerSymbol}</b><span>${centerText}</span></div>
+      ${renderBoard(target, "target", "TARGET", targetDetail, directMode ? targetMatches : matchingCells, directMode ? targetMismatches : new Set(), directMode ? activeTarget : null)}
+    </div>
+    <aside class="rot1886-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="same"><i></i>${legendSame}</span><span class="different"><i></i>${legendDifferent}</span><span class="candidate"><i></i>${legendActive}</span></aside>
+  </section>`;
+}
+
+function renderConvert2022View(step) {
+  const view = step.convert2022View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const needed = Number(view.needed) || rows * cols;
+  const phase = String(view.phase || "validate");
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : null;
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const placedCount = Math.max(0, Number(view.placedCount) || 0);
+  const decision = view.decision || {};
+  const sameCell = (row, col) => activeCell && activeCell[0] === row && activeCell[1] === col;
+  const phaseIndex = phase === "done" ? 3 : phase === "place" ? 2 : phase === "init" || phase === "map" ? 1 : 0;
+  const stages = [
+    { label: vi ? "Kiểm tra số ô" : "Check cell count", detail: "len(original) = m*n" },
+    { label: vi ? "Đổi index" : "Map index", detail: "i -> (i // n, i % n)" },
+    { label: vi ? "Ghi vào matrix" : "Write to matrix", detail: "result[row][col]" },
+  ].map((item, index) => {
+    const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (decision.kind === "mismatch") {
+    decisionHtml = `<section class="c2022-decision mismatch"><small>${vi ? "KHÔNG THỂ TẠO" : "CANNOT CREATE"}</small><strong>len(original) = ${decision.length}, nhưng m*n = ${decision.needed}</strong><span>${vi ? "Số phần tử không khớp số ô cần có, nên thuật toán trả về []." : "The value count does not match the required cells, so the algorithm returns []."}</span></section>`;
+  } else if (decision.kind === "valid") {
+    decisionHtml = `<section class="c2022-decision valid"><small>${vi ? "KÍCH THƯỚC HỢP LỆ" : "VALID SIZE"}</small><strong>len(original) = ${decision.length} = m*n = ${decision.needed}</strong><span>${vi ? "Mỗi giá trị sẽ có đúng một ô đích trong result." : "Each value will have exactly one destination cell in result."}</span></section>`;
+  } else if (decision.kind === "init") {
+    decisionHtml = `<section class="c2022-decision init"><small>${vi ? "MA TRẬN RỖNG" : "EMPTY MATRIX"}</small><strong>result = m hàng × n cột</strong><span>${vi ? "Hàng được điền từ trái sang phải trước, sau đó mới sang hàng kế tiếp." : "Rows fill left to right before moving to the next row."}</span></section>`;
+  } else if (decision.kind === "map") {
+    decisionHtml = `<section class="c2022-decision map"><small>${vi ? "ÁNH XẠ INDEX" : "INDEX MAPPING"}</small><strong>i = ${decision.index}: row = ${decision.index} // ${cols} = ${decision.row}, col = ${decision.index} % ${cols} = ${decision.col}</strong><span>original[${decision.index}] = ${escapeHtml(String(decision.value))} ${vi ? `sẽ đi tới ô (${decision.row}, ${decision.col}).` : `will go to cell (${decision.row}, ${decision.col}).`}</span></section>`;
+  } else if (decision.kind === "place") {
+    decisionHtml = `<section class="c2022-decision place"><small>${vi ? "VỪA GHI" : "JUST WRITTEN"}</small><strong>result[${decision.row}][${decision.col}] = original[${decision.index}] = ${escapeHtml(String(decision.value))}</strong><span>${vi ? "Ô đích đã được điền; tiếp tục với index kế tiếp." : "The destination cell is filled; continue with the next index."}</span></section>`;
+  } else {
+    decisionHtml = `<section class="c2022-decision done"><small>${vi ? "HOÀN TẤT" : "COMPLETE"}</small><strong>${placedCount}/${needed} ${vi ? "ô đã được điền" : "cells filled"}</strong><span>${vi ? "Tất cả phần tử của original đã nằm trong result theo thứ tự hàng." : "Every original value now appears in result in row-major order."}</span></section>`;
+  }
+
+  const sourceTrack = nums.map((value, index) => {
+    const classes = ["c2022-source-cell"];
+    if (index < placedCount) classes.push("placed");
+    if (index === activeIndex) classes.push("active");
+    const tag = index === activeIndex
+      ? (phase === "map" ? (vi ? "ĐANG ĐỔI VỊ TRÍ" : "MAPPING") : (vi ? "VỪA ĐẶT" : "JUST PLACED"))
+      : index < placedCount
+        ? (vi ? "ĐÃ DÙNG" : "USED")
+        : `i = ${index}`;
+    return `<div class="${classes.join(" ")}"><small>i = ${index}</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+  }).join("");
+
+  const matrixRows = rows > 0 && cols > 0 ? Array.from({ length: rows }, (_, row) => Array.from({ length: cols }, (_, col) => {
+    const index = row * cols + col;
+    const written = index < placedCount;
+    const active = sameCell(row, col);
+    const classes = ["c2022-cell"];
+    if (written) classes.push("written");
+    if (active) classes.push("active");
+    const value = matrix[row]?.[col] ?? "·";
+    const tag = active
+      ? (phase === "map" ? (vi ? "Ô ĐÍCH" : "DESTINATION") : (vi ? "VỪA GHI" : "JUST WRITTEN"))
+      : written
+        ? (vi ? "ĐÃ ĐIỀN" : "FILLED")
+        : (vi ? "TRỐNG" : "EMPTY");
+    return `<div class="${classes.join(" ")}"><small>[${row},${col}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+  }).join("")) : [];
+  const board = phase === "mismatch"
+    ? `<section class="c2022-empty-result"><strong>result = []</strong><span>${vi ? "Không có ma trận 2D nào được tạo." : "No 2D matrix is created."}</span></section>`
+    : `<section class="c2022-board"><header><strong>RESULT MATRIX</strong><span>${rows} × ${cols}</span></header><div class="c2022-board-scroll"><div class="c2022-grid" style="--c2022-cols:${cols}"><span class="c2022-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="c2022-col">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="c2022-row">r=${row}</span>${matrixRows[row] || ""}`).join("")}</div></div></section>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = phase === "mismatch"
+    ? (vi ? `Convert 1D Array Into 2D Array: ${nums.length} phần tử không khớp với ${needed} ô.` : `Convert 1D Array Into 2D Array: ${nums.length} values do not match ${needed} cells.`)
+    : (vi ? `Convert 1D Array Into 2D Array: đã điền ${placedCount} trong ${needed} ô.` : `Convert 1D Array Into 2D Array: ${placedCount} of ${needed} cells are filled.`);
+
+  $("treeView").innerHTML = `<section class="c2022-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="c2022-stages">${stages}</div>
+    <section class="c2022-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="c2022-size"><span><small>len(original)</small><strong>${nums.length}</strong></span><b>${phase === "mismatch" ? "!=" : "="}</b><span><small>m × n</small><strong>${rows} × ${cols} = ${needed}</strong></span><em>${phase === "mismatch" ? (vi ? "trả về []" : "return []") : (vi ? "có thể tạo matrix" : "matrix can be created")}</em></section>
+    ${decisionHtml}
+    <div class="c2022-layout">
+      <section class="c2022-source"><header><strong>ORIGINAL 1D</strong><span>${nums.length} ${vi ? "phần tử" : "values"}</span></header><div style="--c2022-values:${Math.max(nums.length, 1)}">${sourceTrack}</div></section>
+      <div class="c2022-arrow" aria-hidden="true"><span>i</span><b>&rarr;</b><small>row, col</small></div>
+      ${board}
+    </div>
+    <aside class="c2022-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="active"><i></i>${vi ? "giá trị và ô đang xét" : "current value and cell"}</span><span class="placed"><i></i>${vi ? "đã đặt vào result" : "already placed"}</span><span class="empty"><i></i>${vi ? "ô result chưa điền" : "empty result cell"}</span></aside>
+  </section>`;
+}
+
+function renderSearchMatrix74View(step) {
+  const view = step.search74View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const total = rows * cols;
+  const lo = Number.isInteger(view.lo) ? view.lo : 0;
+  const hi = Number.isInteger(view.hi) ? view.hi : total - 1;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const target = view.target;
+  const phase = String(view.phase || "init");
+  const decision = view.decision || {};
+  const inspected = new Set((view.inspected || []).map((item) => Number(item.index)));
+  const phaseIndex = phase === "found" || phase === "missing" ? 4 : phase === "move-left" || phase === "move-right" ? 3 : phase === "probe" ? 2 : 0;
+  const stages = [
+    { label: vi ? "Trải phẳng" : "Flatten", detail: "0..m*n-1" },
+    { label: vi ? "Giữ khoảng" : "Keep range", detail: "lo .. hi" },
+    { label: vi ? "Chọn giữa" : "Pick middle", detail: "mid" },
+    { label: vi ? "Bỏ một nửa" : "Discard half", detail: "< / > target" },
+  ].map((item, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+  const inRange = (index) => index >= lo && index <= hi;
+  const positionCards = [
+    { key: "lo", label: "LO", value: lo, detail: vi ? "đầu khoảng" : "range start" },
+    { key: "mid", label: "MID", value: mid, detail: vi ? "điểm thử" : "probe" },
+    { key: "hi", label: "HI", value: hi, detail: vi ? "cuối khoảng" : "range end" },
+  ].map((item) => `<span class="${item.key}"><small>${item.label}</small><strong>${item.value ?? "-"}</strong><em>${escapeHtml(item.detail)}</em></span>`).join("");
+
+  let decisionHtml;
+  if (decision.kind === "init") {
+    decisionHtml = `<section class="s74-decision init"><small>${vi ? "ÁNH XẠ INDEX" : "INDEX MAPPING"}</small><strong>index → (index // cols, index % cols)</strong><span>${vi ? "Binary search dùng chỉ số phẳng, rồi đổi mid trở lại hàng và cột khi cần đọc giá trị." : "Binary search uses a flat index, then maps mid back to a row and column to read a value."}</span></section>`;
+  } else if (decision.kind === "probe") {
+    decisionHtml = `<section class="s74-decision probe"><small>${vi ? "ĐANG SO SÁNH" : "COMPARING"}</small><strong>mid ${mid} → (${decision.row},${decision.col}) → ${decision.value}</strong><span>${decision.value} ${decision.value === target ? "=" : decision.value < target ? "<" : ">"} target ${target}</span></section>`;
+  } else if (decision.kind === "move-right") {
+    decisionHtml = `<section class="s74-decision right"><small>${vi ? "GIỮ NỬA PHẢI" : "KEEP RIGHT HALF"}</small><strong>${decision.value} &lt; ${target} → lo: ${decision.oldLo} → ${decision.nextLo}</strong><span>${vi ? `Bỏ các index ${decision.oldLo}..${mid}; target chỉ có thể ở bên phải.` : `Discard indexes ${decision.oldLo}..${mid}; the target can only be to the right.`}</span></section>`;
+  } else if (decision.kind === "move-left") {
+    decisionHtml = `<section class="s74-decision left"><small>${vi ? "GIỮ NỬA TRÁI" : "KEEP LEFT HALF"}</small><strong>${decision.value} &gt; ${target} → hi: ${decision.oldHi} → ${decision.nextHi}</strong><span>${vi ? `Bỏ các index ${mid}..${decision.oldHi}; target chỉ có thể ở bên trái.` : `Discard indexes ${mid}..${decision.oldHi}; the target can only be to the left.`}</span></section>`;
+  } else if (decision.kind === "found") {
+    decisionHtml = `<section class="s74-decision found"><small>${vi ? "ĐÃ TÌM THẤY" : "FOUND"}</small><strong>${target} == ${decision.value} tại (${decision.row},${decision.col})</strong><span>${vi ? `Index phẳng ${mid} ánh xạ chính xác đến ô target.` : `Flat index ${mid} maps exactly to the target cell.`}</span></section>`;
+  } else {
+    decisionHtml = `<section class="s74-decision missing"><small>${vi ? "KHOẢNG RỖNG" : "EMPTY RANGE"}</small><strong>lo ${lo} &gt; hi ${hi}</strong><span>${vi ? "Không còn index nào để thử, nên target không tồn tại." : "There is no index left to try, so the target is absent."}</span></section>`;
+  }
+
+  const cellClass = (index, kind) => {
+    const classes = [kind];
+    if (!inRange(index)) classes.push("discarded");
+    else classes.push("candidate");
+    if (inspected.has(index)) classes.push("inspected");
+    if (index === lo) classes.push("at-lo");
+    if (index === hi) classes.push("at-hi");
+    if (index === mid) classes.push("mid");
+    if (decision.kind === "found" && index === mid) classes.push("found");
+    return classes.join(" ");
+  };
+  const flatValues = matrix.flat();
+  const flatTrack = flatValues.map((value, index) => {
+    const row = Math.floor(index / cols), col = index % cols;
+    const tag = index === mid ? `mid=${index}` : index === lo ? "lo" : index === hi ? "hi" : `i=${index}`;
+    return `<span class="${cellClass(index, "s74-flat-cell")}"><small>${escapeHtml(tag)}</small><strong>${escapeHtml(String(value))}</strong><em>[${row},${col}]</em></span>`;
+  }).join("");
+  const matrixRows = matrix.map((row, rowIndex) => row.map((value, colIndex) => {
+    const index = rowIndex * cols + colIndex;
+    const tag = decision.kind === "found" && index === mid
+      ? (vi ? "TÌM THẤY" : "FOUND")
+      : index === mid
+        ? `mid=${index}`
+        : !inRange(index)
+          ? (vi ? "BỎ" : "DISCARD")
+          : index === lo
+            ? "LO"
+            : index === hi
+              ? "HI"
+              : (vi ? "GIỮ" : "KEEP");
+    return `<div class="${cellClass(index, "s74-cell")}"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong><em>[${rowIndex},${colIndex}] · ${escapeHtml(tag)}</em></div>`;
+  }));
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Search a 2D Matrix: target ${target}, khoảng index hiện tại ${lo} đến ${hi}.`
+    : `Search a 2D Matrix: target ${target}, current index range ${lo} through ${hi}.`;
+
+  $("treeView").innerHTML = `<section class="s74-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="s74-stages">${stages}</div>
+    <section class="s74-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="s74-range"><header><strong>${vi ? "KHOẢNG TÌM KIẾM PHẲNG" : "FLAT SEARCH RANGE"}</strong><span>target = ${escapeHtml(String(target))}</span></header><div>${positionCards}</div></section>
+    ${decisionHtml}
+    <section class="s74-flat"><header><strong>${vi ? "MATRIX ĐƯỢC TRẢI PHẲNG" : "MATRIX AS ONE SORTED ARRAY"}</strong><span>${total} ${vi ? "index" : "indexes"}</span></header><div>${flatTrack}</div></section>
+    <div class="s74-layout">
+      <section class="s74-board"><header><strong>MATRIX</strong><span>${rows} × ${cols}</span></header><div class="s74-grid" style="--s74-cols:${cols}"><span class="s74-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="s74-col">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="s74-row">r=${row}</span>${(matrixRows[row] || []).join("")}`).join("")}</div></section>
+      <aside class="s74-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="range"><i></i>${vi ? "khoảng còn lại" : "remaining range"}</span><span class="mid"><i></i>${vi ? "mid đang thử" : "midpoint"}</span><span class="discard"><i></i>${vi ? "nửa đã bỏ" : "discarded half"}</span><span class="found"><i></i>${vi ? "target" : "target"}</span></aside>
+    </div>
+  </section>`;
+}
+
+function renderSetMatrixZeroes73View(step) {
+  const view = step.zero73View || {};
+  const vi = lang === "vi";
+  const original = Array.isArray(view.original) ? view.original : [];
+  const matrix = Array.isArray(view.matrix) ? view.matrix : original;
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const zeroRows = new Set((view.zeroRows || []).map(Number));
+  const zeroCols = new Set((view.zeroCols || []).map(Number));
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const changedCell = Array.isArray(view.changedCell) ? view.changedCell : null;
+  const phase = String(view.phase || "scan");
+  const decision = view.decision || {};
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const phaseIndex = phase === "done" ? 3 : phase === "apply" ? 2 : phase === "mark" ? 1 : 0;
+  const phases = [
+    { label: vi ? "Quét matrix" : "Scan matrix", detail: vi ? "tìm 0 gốc" : "find original zeroes" },
+    { label: vi ? "Lưu marker" : "Store markers", detail: "zero_rows / zero_cols" },
+    { label: vi ? "Đặt thành 0" : "Set to zero", detail: vi ? "hàng OR cột" : "row OR column" },
+  ].map((item, index) => {
+    const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  const markers = (indices, axis) => indices.length
+    ? indices.map((index) => `<span>${axis} = ${escapeHtml(String(index))}</span>`).join("")
+    : `<em>${vi ? "chưa có marker" : "no markers yet"}</em>`;
+  const rowMarkers = [...zeroRows].sort((a, b) => a - b);
+  const colMarkers = [...zeroCols].sort((a, b) => a - b);
+
+  let rule;
+  if (decision.kind === "init") {
+    rule = `<section class="zm73-rule continue"><small>${vi ? "BẮT ĐẦU" : "START"}</small><strong>${vi ? "Lượt 1 chỉ tìm số 0 gốc" : "Pass 1 only looks for original zeroes"}</strong><b>${vi ? "Chưa đổi ô nào trong matrix." : "No matrix cell has changed yet."}</b></section>`;
+  } else if (decision.kind === "scan") {
+    const isZero = Number(decision.value) === 0;
+    rule = `<section class="zm73-rule ${isZero ? "found" : "continue"}"><small>${vi ? "LƯỢT 1 · ĐANG ĐỌC" : "PASS 1 · READING"}</small><strong>matrix[r][c] == 0 ?</strong><b>${isZero ? (vi ? "CÓ → lưu hàng và cột" : "YES → save row and column") : (vi ? "KHÔNG → tiếp tục quét" : "NO → keep scanning")}</b></section>`;
+  } else if (decision.kind === "mark") {
+    rule = `<section class="zm73-rule found"><small>${vi ? "LƯỢT 1 · GHI MARKER" : "PASS 1 · STORE MARKERS"}</small><strong>zero_rows.add(${escapeHtml(String(decision.row))}) &nbsp; + &nbsp; zero_cols.add(${escapeHtml(String(decision.col))})</strong><b>${vi ? "Matrix chưa đổi" : "Matrix is still unchanged"}</b></section>`;
+  } else if (decision.kind === "check" || decision.kind === "apply") {
+    const rowMarked = Boolean(decision.rowMarked);
+    const colMarked = Boolean(decision.colMarked);
+    const becomesZero = decision.kind === "apply" || Boolean(decision.shouldZero);
+    rule = `<section class="zm73-rule ${becomesZero ? "zero" : "keep"}"><small>${vi ? "LƯỢT 2 · QUY TẮC OR" : "PASS 2 · OR RULE"}</small><div><span class="${rowMarked ? "true" : "false"}">r in zero_rows <b>${rowMarked ? "TRUE" : "FALSE"}</b></span><i>OR</i><span class="${colMarked ? "true" : "false"}">c in zero_cols <b>${colMarked ? "TRUE" : "FALSE"}</b></span></div><strong>${becomesZero ? (vi ? "Ít nhất một điều kiện đúng → đặt 0" : "At least one is true → set 0") : (vi ? "Cả hai sai → giữ nguyên" : "Both false → keep value")}</strong></section>`;
+  } else {
+    rule = `<section class="zm73-rule done"><small>${vi ? "HOÀN TẤT" : "COMPLETE"}</small><strong>${vi ? "Marker đã được áp dụng cho toàn bộ matrix." : "Markers have been applied to the entire matrix."}</strong><b>${vi ? "Mỗi 0 mới đều có lý do từ lượt 1" : "Every new zero has a pass-1 reason"}</b></section>`;
+  }
+
+  const cellRows = matrix.map((row, rowIndex) => row.map((value, colIndex) => {
+    const originalValue = original[rowIndex]?.[colIndex];
+    const sourceZero = originalValue === 0;
+    const rowMarked = zeroRows.has(rowIndex);
+    const colMarked = zeroCols.has(colIndex);
+    const affected = rowMarked || colMarked;
+    const active = sameCell(activeCell, rowIndex, colIndex);
+    const changed = sameCell(changedCell, rowIndex, colIndex);
+    const classes = ["zm73-cell"];
+    if (sourceZero) classes.push("source-zero");
+    if (rowMarked) classes.push("marked-row");
+    if (colMarked) classes.push("marked-col");
+    if (affected) classes.push("affected");
+    if (active) classes.push("active");
+    if (changed) classes.push("changed");
+    if (!affected) classes.push("kept");
+    const causes = [rowMarked ? (vi ? `hàng ${rowIndex}` : `row ${rowIndex}`) : "", colMarked ? (vi ? `cột ${colIndex}` : `col ${colIndex}`) : ""].filter(Boolean);
+    const tag = changed
+      ? (vi ? "VỪA → 0" : "NOW → 0")
+      : sourceZero
+        ? (vi ? "0 GỐC" : "ORIGINAL 0")
+        : affected
+          ? causes.join(" + ")
+          : (vi ? "GIỮ" : "KEEP");
+    return `<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+  }));
+
+  const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Set Matrix Zeroes: ${rowMarkers.length} hàng và ${colMarkers.length} cột đã được đánh dấu.`
+    : `Set Matrix Zeroes: ${rowMarkers.length} marked rows and ${colMarkers.length} marked columns.`;
+
+  $("treeView").innerHTML = `<section class="zm73-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="zm73-phases">${phases}</div>
+    <section class="zm73-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="zm73-markers"><header><strong>${vi ? "MARKER LƯỢT 1" : "PASS-1 MARKERS"}</strong><span>${vi ? "chỉ nhớ vị trí, chưa sửa matrix" : "remember positions; do not edit the matrix yet"}</span></header><div><section class="rows"><small>zero_rows</small><div>${markers(rowMarkers, "r")}</div></section><section class="cols"><small>zero_cols</small><div>${markers(colMarkers, "c")}</div></section></div></section>
+    ${rule}
+    <div class="zm73-layout">
+      <section class="zm73-board"><header><strong>${vi ? "MATRIX HIỆN TẠI" : "CURRENT MATRIX"}</strong><span>${rows} × ${cols}</span></header><div class="zm73-grid" style="--zm73-cols:${cols}"><span class="zm73-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="zm73-col ${zeroCols.has(col) ? "marked" : ""}">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="zm73-row ${zeroRows.has(row) ? "marked" : ""}">r=${row}</span>${(cellRows[row] || []).join("")}`).join("")}</div></section>
+      <aside class="zm73-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="source"><i></i>${vi ? "số 0 gốc" : "original zero"}</span><span class="row"><i></i>${vi ? "hàng đã đánh dấu" : "marked row"}</span><span class="col"><i></i>${vi ? "cột đã đánh dấu" : "marked column"}</span><span class="active"><i></i>${vi ? "ô đang xét" : "active cell"}</span><span class="changed"><i></i>${vi ? "ô vừa thành 0" : "just set to 0"}</span></aside>
+    </div>
+  </section>`;
+}
+
 function renderSpiral54View(step) {
   const view = step.spiral54View || {};
   const vi = lang === "vi";
@@ -19332,6 +19804,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRussian354View(step);
+  } else if (step.rotation1886View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotation1886View(step);
+  } else if (step.convert2022View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderConvert2022View(step);
+  } else if (step.search74View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSearchMatrix74View(step);
+  } else if (step.zero73View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSetMatrixZeroes73View(step);
   } else if (step.rotate48View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -19626,6 +20122,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitPodiumView(step);
+  } else if (step.jewelsStonesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderJewelsStonesView(step);
   } else if (step.palindromePartitionView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
