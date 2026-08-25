@@ -9976,8 +9976,8 @@ function buildSteps1927(input) {
  * exactly num[i:j]. Base row: dp[0][j] = 1 (the very first number may be any
  * length). Cell (i,j) sums every previous ending k whose number num[k:i] is
  * <= num[i:j] (shorter always smaller; equal lengths compare as strings).
- * Answer = column j=n summed over all starts. The visualization walks
- * column by column, one step per cell.
+ * Answer = column j=n summed over all starts. The visualization walks every
+ * predecessor comparison before writing a cell so the transition is visible.
  */
 function buildSteps1977(input) {
   const raw = String(input ?? "").trim();
@@ -9995,6 +9995,17 @@ function buildSteps1977(input) {
       final: true,
       codeLines: [2],
       vars: [{ name: "answer", value: null }],
+      separate1977View: {
+        phase: "invalid",
+        num: raw,
+        n: raw.length,
+        dp: [],
+        computedCells: [],
+        comparisons: [],
+        splitSample: [],
+        totalSplitCount: 0,
+        answer: null,
+      },
       note: {
         vi: "Cần một chuỗi chỉ gồm chữ số (tối đa 10 ký tự để trực quan), ví dụ: 327.",
         en: "Provide a digit-only string (up to 10 characters for visualization), e.g. 327.",
@@ -10019,6 +10030,21 @@ function buildSteps1977(input) {
     }
   })(0, []);
 
+  const dp = Array.from({ length: n }, () => new Array(n + 1).fill(0));
+  const computed = new Set();
+  const viewFor = (phase, extra = {}) => ({
+    phase,
+    num: raw,
+    n,
+    dp: dp.map((row) => row.slice()),
+    computedCells: Array.from(computed),
+    comparisons: [],
+    splitSample: allSplits.slice(0, 8),
+    totalSplitCount: allSplits.length,
+    answer: null,
+    ...extra,
+  });
+
   // ─── Phase 0: rules + the full list of valid splits ───
   steps.push({
     title: { vi: "Luật tách số", en: "Splitting rules" },
@@ -10031,8 +10057,9 @@ function buildSteps1977(input) {
     vars: [
       { name: "num", value: `"${raw}"` },
       { name: "số các cách tách hợp lệ", value: allSplits.length },
-      ...allSplits.map((s, k) => ({ name: `cách ${k + 1}`, value: `[${s}]` })),
+      ...allSplits.slice(0, 8).map((s, k) => ({ name: `cách ${k + 1}`, value: `[${s}]` })),
     ],
+    separate1977View: viewFor("rules"),
     note: {
       vi: "Chèn dấu phẩy để num thành dãy số nguyên KHÔNG GIẢM, không số bắt đầu bằng 0. Tách thành đúng MỘT số cũng tính là một cách. Mục tiêu: đếm tất cả các cách.",
       en: "Insert commas so num becomes a NON-DECREASING list of integers with no leading zeros. A single number alone also counts as one way. Goal: count every possible way.",
@@ -10050,6 +10077,12 @@ function buildSteps1977(input) {
       final: true,
       codeLines: [5, 6],
       vars: [{ name: "answer", value: 0 }],
+      separate1977View: viewFor("leading-zero-input", {
+        i: 0,
+        j: 1,
+        current: raw[0],
+        answer: 0,
+      }),
       note: {
         vi: "Số ĐẦU TIÊN của mọi cách tách đều bắt đầu tại vị trí 0. Bắt đầu bằng '0' là số 0 dẫn đầu — bất hợp lệ ⇒ đáp án 0 ngay lập tức.",
         en: "The FIRST number of any split starts at position 0. Starting with '0' means a leading zero — illegal ⇒ answer is 0 right away.",
@@ -10072,51 +10105,57 @@ function buildSteps1977(input) {
       { name: "ví dụ", value: `dp[0][${n}] = số cách khi cả chuỗi là 1 số` },
       { name: "đáp án", value: "= tổng cột j = n" },
     ],
+    separate1977View: viewFor("state"),
     note: {
       vi: "Giữ trạng thái theo SỐ CUỐI vì ràng buộc không giảm chỉ liên hệ giữa số trước và số sau. Khi biết dp[i][j], muốn nối thêm số mới chỉ việc so num[i:j] với số kế tiếp.",
       en: "Track the LAST number because the non-decreasing rule only links consecutive numbers. Knowing dp[i][j], extending the split just compares num[i:j] against the next piece.",
     },
   });
 
-  // ─── Phase 2: base row ───
-  steps.push({
-    title: { vi: "Hàng cơ sở: số đầu tiên tuỳ ý độ dài", en: "Base row: the first number may take any length" },
-    arr: Array.from({ length: n }, () => 1),
-    highlight: [],
-    mark: [],
-    codeLines: [9, 10],
-    vars: [
-      { name: "dp[0][j]", value: "= 1 với mọi j = 1..n" },
-      { name: "lý do", value: "chưa có số nào đứng trước nên không bị ràng buộc" },
-    ],
-    note: {
-      vi: "Nếu số cuối bắt đầu ở vị trí 0 thì nó chính là số ĐẦU TIÊN — luôn đúng 1 cách đặt nó, dù dài 1 hay nhiều chữ số. Đây là hạt giống cho cả bảng.",
-      en: "If the last number starts at position 0 it IS the first number — exactly one way to place it, whatever its length. These cells seed the whole table.",
-    },
-  });
+  // ─── Phase 2: seed the base row one cell at a time ───
+  for (let j = 1; j <= n; j++) {
+    dp[0][j] = 1;
+    computed.add(`0:${j}`);
+    steps.push({
+      title: {
+        vi: `Cơ sở dp[0][${j}] = 1: cả "${sub(0, j)}" là số đầu tiên`,
+        en: `Base dp[0][${j}] = 1: "${sub(0, j)}" is the first number`,
+      },
+      arr: Array.from({ length: n }, (_, index) => index < j ? 1 : 0),
+      highlight: [j - 1],
+      mark: [],
+      codeLines: [10],
+      vars: [
+        { name: `num[0:${j}]`, value: `"${sub(0, j)}"` },
+        { name: `dp[0][${j}]`, value: 1 },
+      ],
+      separate1977View: viewFor("base", { i: 0, j, current: sub(0, j) }),
+      note: {
+        vi: `Số cuối bắt đầu tại 0 nên "${sub(0, j)}" cũng là số đầu tiên. Không có số đứng trước để so sánh, vì vậy có đúng 1 cách.`,
+        en: `The last number starts at 0, so "${sub(0, j)}" is also the first number. There is no predecessor to compare, so there is exactly one way.`,
+      },
+    });
+  }
 
-  // ─── Phase 3: fill columns left to right, one step per cell ───
-  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
-  const dp = Array.from({ length: n }, () => new Array(n + 1).fill(0));
-  for (let j = 1; j <= n; j++) dp[0][j] = 1;
+  // ─── Phase 3: compare every predecessor, then write the DP cell ───
 
   for (let j = 2; j <= n; j++) {
     for (let i = 1; i < j; i++) {
       const cur = sub(i, j);
-      const colBars = [];
-      for (let k = 0; k < j; k++) colBars.push(Math.min(dp[k][j], 9));
       if (raw[i] === "0") {
         dp[i][j] = 0;
+        computed.add(`${i}:${j}`);
         steps.push({
           title: { vi: `Bỏ qua dp[${i}][${j}]: "${cur}" có số 0 dẫn đầu`, en: `Skip dp[${i}][${j}]: "${cur}" has a leading zero` },
-          arr: colBars.slice(),
+          arr: raw.split("").map(Number),
           highlight: [i],
           mark: [],
-          codeLines: [13, 14],
+          codeLines: [13],
           vars: [
             { name: "số đang xét", value: `"${cur}"` },
             { name: `dp[${i}][${j}]`, value: 0 },
           ],
+          separate1977View: viewFor("leading-zero", { i, j, current: cur }),
           note: {
             vi: `"${cur}" viết ra sẽ thành số 0 dẫn đầu — bất hợp lệ dù nó lớn hơn bao nhiêu ⇒ dp[${i}][${j}] = 0.`,
             en: `"${cur}" would be a leading-zero integer — illegal no matter how large ⇒ dp[${i}][${j}] = 0.`,
@@ -10124,41 +10163,103 @@ function buildSteps1977(input) {
         });
         continue;
       }
-      const terms = [];
+      const comparisons = [];
       let total = 0;
       for (let k = 0; k < i; k++) {
         const prev = sub(k, i);
-        const ok = cur.length > prev.length || (cur.length === prev.length && prev <= cur);
-        if (ok && dp[k][i] > 0) terms.push({ k, prev, add: dp[k][i], ok });
-        if (ok) total += dp[k][i];
+        const relation = prev.length < cur.length
+          ? "shorter"
+          : prev.length > cur.length ? "longer" : "equal-length";
+        const orderOk = relation === "shorter" || (relation === "equal-length" && prev <= cur);
+        const sourceWays = dp[k][i];
+        const contribution = orderOk ? sourceWays : 0;
+        total = (total + contribution) % MOD;
+        comparisons.push({
+          k,
+          prev,
+          cur,
+          relation,
+          orderOk,
+          sourceWays,
+          contribution,
+          runningTotal: total,
+        });
+        steps.push({
+          title: {
+            vi: orderOk
+              ? `So "${prev}" ≤ "${cur}": nhận +${sourceWays} cách`
+              : `So "${prev}" > "${cur}": không thể nối`,
+            en: orderOk
+              ? `Compare "${prev}" <= "${cur}": take +${sourceWays} ways`
+              : `Compare "${prev}" > "${cur}": cannot append`,
+          },
+          arr: raw.split("").map(Number),
+          highlight: Array.from({ length: j - k }, (_, index) => k + index),
+          mark: [],
+          codeLines: [18],
+          vars: [
+            { name: "previous", value: `num[${k}:${i}] = "${prev}"` },
+            { name: "current", value: `num[${i}:${j}] = "${cur}"` },
+            { name: "thứ tự hợp lệ?", value: orderOk },
+            { name: `dp[${k}][${i}]`, value: sourceWays },
+            { name: "running total", value: total },
+          ],
+          separate1977View: viewFor("compare", {
+            i,
+            j,
+            k,
+            current: cur,
+            previous: prev,
+            relation,
+            orderOk,
+            sourceWays,
+            contribution,
+            runningTotal: total,
+            comparisons: comparisons.map((item) => ({ ...item })),
+          }),
+          note: {
+            vi: relation === "shorter"
+              ? `"${prev}" ít chữ số hơn "${cur}" nên chắc chắn nhỏ hơn. Cộng dp[${k}][${i}] = ${sourceWays} vào tổng đang chạy.`
+              : relation === "longer"
+                ? `"${prev}" nhiều chữ số hơn "${cur}" nên chắc chắn lớn hơn. Không được nối hai đoạn này.`
+                : `Hai số dài bằng nhau nên so trực tiếp chuỗi: "${prev}" ${orderOk ? "≤" : ">"} "${cur}". ${orderOk ? `Cộng ${sourceWays} cách.` : "Không cộng."}`,
+            en: relation === "shorter"
+              ? `"${prev}" has fewer digits than "${cur}", so it is smaller. Add dp[${k}][${i}] = ${sourceWays} to the running total.`
+              : relation === "longer"
+                ? `"${prev}" has more digits than "${cur}", so it is larger. These two pieces cannot connect.`
+                : `The numbers have equal length, so compare their strings: "${prev}" ${orderOk ? "<=" : ">"} "${cur}". ${orderOk ? `Add ${sourceWays} ways.` : "Add nothing."}`,
+          },
+        });
       }
       dp[i][j] = total % MOD;
+      computed.add(`${i}:${j}`);
       steps.push({
         title: {
-          vi: `dp[${i}][${j}]: số "${cur}" nhận ${fmt(dp[i][j])} cách`,
+          vi: `Ghi dp[${i}][${j}] = ${dp[i][j]} cho số cuối "${cur}"`,
           en: `dp[${i}][${j}]: number "${cur}" gets ${dp[i][j]} ways`,
         },
-        arr: colBars.slice(),
+        arr: Array.from({ length: n }, (_, k) => Math.min(dp[k][j], 9)),
         highlight: [i],
         mark: [],
-        codeLines: [15, 16, 17, 18, 19, 20],
+        codeLines: [20],
         vars: [
           { name: "số cuối mới", value: `num[${i}:${j}] = "${cur}"` },
-          ...(terms.length
-            ? terms.map((t) => ({
-              name: `trước là "${t.prev}" (k=${t.k})`,
-              value: `"${t.prev}" ≤ "${cur}" ⇒ +dp[${t.k}][${i}] = ${t.add}`,
-            }))
-            : [{ name: "không có số trước nào nhỏ hơn hoặc bằng", value: 0 }]),
+          ...comparisons.map((item) => ({
+            name: `k=${item.k}: "${item.prev}" ${item.orderOk ? "≤" : ">"} "${cur}"`,
+            value: item.orderOk ? `+${item.sourceWays}` : "+0",
+          })),
           { name: `⇒ dp[${i}][${j}]`, value: dp[i][j] },
         ],
+        separate1977View: viewFor("write", {
+          i,
+          j,
+          current: cur,
+          runningTotal: dp[i][j],
+          comparisons: comparisons.map((item) => ({ ...item })),
+        }),
         note: {
-          vi: terms.length
-            ? `Số đứng ngay trước "${cur}" phải NHỎ HƠN HOẶC BẰNG nó: ngắn hơn thì tự động nhỏ, dài bằng nhau thì so chuỗi. Cộng Ways của mọi kết thúc hợp lệ ở cột ${i}.`
-            : `Không có cách nào để số liền trước nhỏ hơn hoặc bằng "${cur}", nên không có cách tách nào kết thúc bằng số này.`,
-          en: terms.length
-            ? `The number right before "${cur}" must be <= it: shorter is automatically smaller; equal lengths compare as strings. Sum the ways of every valid ending at column ${i}.`
-            : `No arrangement makes the previous number <= "${cur}", so no valid split ends with this number.`,
+          vi: `Đã kiểm tra đủ ${i} điểm bắt đầu k của số đứng trước. Tổng đóng góp là ${dp[i][j]}, nên ghi giá trị này vào ô dp[${i}][${j}].`,
+          en: `All ${i} possible starts k of the previous number have been checked. Their contributions total ${dp[i][j]}, so write that value into dp[${i}][${j}].`,
         },
       });
     }
@@ -10184,6 +10285,14 @@ function buildSteps1977(input) {
       { name: "answer (mod 1e9+7)", value: answer },
       { name: "đối chiếu liệt kê đầu bài", value: allSplits.length },
     ],
+    separate1977View: viewFor("final", {
+      answer,
+      lastColumn: lastColTerms.map((term, i) => ({
+        i,
+        number: sub(i, n),
+        ways: dp[i][n],
+      })),
+    }),
     note: {
       vi: "Mỗi ô của cột cuối tương ứng một cách chọn SỐ CUỐI cùng; cộng hết lại là toàn bộ cách tách. Con số trùng khớp với danh sách liệt kê thủ công ở bước đầu.",
       en: "Each cell in the final column fixes a choice of the VERY LAST number; summing them covers every split. The total matches the manual enumeration from the first step.",
@@ -10193,7 +10302,234 @@ function buildSteps1977(input) {
   return { original: raw, answer, steps };
 }
 
+/**
+ * LeetCode 32: Longest Valid Parentheses — beginner walkthrough with an
+ * index stack.
+ *
+ * The stack always contains one "base" boundary index below every unmatched
+ * '(' index. On ')': pop; if the stack empties this ')' is orphaned and
+ * becomes the new base; otherwise the valid substring ending here stretches
+ * from stack.top+1 to i, so its length is i - stack.top. The green region on
+ * the bars is the best valid range found so far.
+ */
+function buildSteps32(input) {
+  let raw = String(input ?? "").replace(/[^()]/g, "");
+  if (raw.length > 16) raw = raw.slice(0, 16);
+  const s = raw || "()()";
+  const n = s.length;
+  const chars = s.split("");
+  const arr = chars.map((ch) => (ch === "(" ? 10 : 6));
+  const rawLabels = chars.slice();
+  const sub = chars.map((ch, i) => `${ch}[${i}]`);
+  const steps = [];
+  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
+
+  // ─── Phase 0: what "valid" means ───
+  steps.push({
+    title: { vi: "Chuỗi ngoặc hợp lệ là gì?", en: "What counts as valid?" },
+    arr,
+    raw: rawLabels,
+    sub,
+    highlight: [],
+    mark: [],
+    codeLines: [1, 2],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "hợp lệ", value: `"()", "()()", "(())"` },
+      { name: "không hợp lệ", value: `"(", ")(", "(()"` },
+    ],
+    note: {
+      vi: "Đoạn hợp lệ là đoạn con LIÊN TIẾP đóng mở đúng cặp. Cần tìm đoạn dài nhất. Chiến thuật: duyệt từng ký tự với một stack lưu CHỈ SỐ — dưới đáy là mốc ranh giới, phía trên là các '(' chưa được ghép.",
+      en: "A valid part is a CONTIGUOUS substring with correctly paired brackets. We need the longest one. Strategy: scan character by character keeping a stack of INDICES — a base marker at the bottom, unmatched '(' indices above.",
+    },
+  });
+
+  // ─── Phase 1: scan with the index stack ───
+  const stack = [-1];
+  let best = 0;
+  let bestL = -1;
+  let bestR = -1;
+  const bestMark = () => (bestL >= 0 ? Array.from({ length: bestR - bestL + 1 }, (_, k) => bestL + k) : []);
+  const stackStr = () => `[${stack.join(", ")}]`;
+
+  for (let i = 0; i < n; i++) {
+    const ch = chars[i];
+    if (ch === "(") {
+      stack.push(i);
+      steps.push({
+        title: { vi: `s[${i}]='(' → đẩy ${i} vào stack`, en: `s[${i}]='(' → push ${i} onto the stack` },
+        arr,
+        raw: rawLabels,
+        sub,
+        highlight: [i],
+        mark: bestMark(),
+        codeLines: [6, 7],
+        vars: [
+          { name: "stack", value: stackStr() },
+          { name: "best hiện tại", value: fmt(best) },
+          { name: "ý nghĩa", value: `'(' tại ${i} đang chờ một ')' để ghép` },
+        ],
+        note: {
+          vi: `Gặp '(' thì chưa biết nó có được ghép hay không — cứ đẩy chỉ số ${i} lên đỉnh stack để chờ.`,
+          en: `A '(' cannot be judged yet — just push its index ${i} and wait for a matching ')'.`,
+        },
+      });
+    } else {
+      stack.pop();
+      steps.push({
+        title: { vi: `s[${i}]=')' → pop phần tử trên cùng`, en: `s[${i}]=')' → pop the top element` },
+        arr,
+        raw: rawLabels,
+        sub,
+        highlight: [i],
+        mark: bestMark(),
+        codeLines: [8, 9],
+        vars: [
+          { name: "stack sau khi pop", value: stackStr() },
+          { name: "best hiện tại", value: fmt(best) },
+          { name: "vì sao pop", value: "')' cần một '(' để ghép — thử lấy trên đỉnh" },
+        ],
+        note: {
+          vi: `Gặp ')' thì chắc chắn có một cặp vừa khép lại: lấy '(' gần nhất trên đỉnh ra khỏi stack. Phần tử còn lại trên đỉnh sẽ cho biết đoạn hợp lệ bắt đầu từ đâu.`,
+          en: `A ')' closes exactly one pair: pop the nearest '(' from the stack. Whatever remains on top tells us where the valid stretch begins.`,
+        },
+      });
+
+      if (stack.length === 0) {
+        stack.push(i);
+        steps.push({
+          title: { vi: `Stack trống ⇒ ')' tại ${i} vô cứu`, en: `Stack empty ⇒ the ')' at ${i} is orphaned` },
+          arr,
+          raw: rawLabels,
+          sub,
+          highlight: [i],
+          mark: bestMark(),
+          codeLines: [10, 11],
+          vars: [
+            { name: "stack", value: stackStr() },
+            { name: "best hiện tại", value: fmt(best) },
+            { name: "mốc mới", value: String(i) },
+          ],
+          note: {
+            vi: `Pop xong mà stack rỗng nghĩa là ')' này KHÔNG có '(' nào để ghép — mọi đoạn hợp lệ đều phải kết thúc trước vị trí đó. Đẩy ${i} xuống làm mốc ranh giới mới.`,
+            en: `Popping emptied the stack: this ')' has NO '(' left to pair with — any valid substring must end before it. Push ${i} as the new boundary marker.`,
+          },
+        });
+      } else {
+        const length = i - stack[stack.length - 1];
+        const improved = length > best;
+        if (improved) {
+          best = length;
+          bestL = stack[stack.length - 1] + 1;
+          bestR = i;
+        }
+        steps.push({
+          title: improved
+            ? { vi: `Đoạn [${bestL}..${i}] dài ${fmt(length)} ⇒ best = ${fmt(best)}`, en: `Segment [${bestL}..${i}] has length ${length} ⇒ best = ${best}` }
+            : { vi: `Đoạn [${stack[stack.length - 1] + 1}..${i}] dài ${fmt(length)}, chưa vượt best ${fmt(best)}`, en: `Segment [${stack[stack.length - 1] + 1}..${i}] has length ${length}, below best ${best}` },
+          arr,
+          raw: rawLabels,
+          sub,
+          highlight: [i],
+          mark: bestMark(),
+          codeLines: [12, 13],
+          vars: [
+            { name: "đỉnh stack (mốc)", value: String(stack[stack.length - 1]) },
+            { name: "độ dài = i − mốc", value: `${i} − (${stack[stack.length - 1]}) = ${length}` },
+            { name: "best", value: fmt(best) },
+          ],
+          note: improved
+            ? {
+              vi: `Mọi ký tự từ ${bestL} đến ${i} đều nằm trong các cặp đã khép kín ⇒ đoạn dài ${length}. Đây là kỷ lục mới — vùng màu xanh trên chuỗi cập nhật theo.`,
+              en: `Every character from ${bestL} through ${i} sits inside closed pairs ⇒ length ${length}. New record — watch the green region update.`,
+            }
+            : {
+              vi: `Từ mốc ${stack[stack.length - 1]} trở đi đến ${i} đều hợp lệ, dài ${length}, nhưng vẫn thua kỷ lục ${best} nên best giữ nguyên.`,
+              en: `Everything from marker ${stack[stack.length - 1]} up to ${i} is valid, length ${length}, yet the record ${best} stands.`,
+            },
+        });
+      }
+    }
+  }
+
+  // ─── Phase 2: result ───
+  steps.push({
+    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
+    arr,
+    raw: rawLabels,
+    sub,
+    highlight: [],
+    mark: bestMark(),
+    final: true,
+    codeLines: [14],
+    vars: [
+      { name: "answer", value: best },
+      ...(best > 0 ? [{ name: "đoạn dài nhất", value: `"${s.slice(bestL, bestR + 1)}" (tại [${bestL}..${bestR}])` }] : []),
+    ],
+    note: {
+      vi: best > 0
+        ? `Chuỗi con "${s.slice(bestL, bestR + 1)}" tại vị trí [${bestL}..${bestR}] là đoạn hợp lệ dài nhất, gồm ${best} ký tự.`
+        : "Không có ký tự nào ghép được thành cặp ⇒ đáp án 0.",
+      en: best > 0
+        ? `The substring "${s.slice(bestL, bestR + 1)}" at positions [${bestL}..${bestR}] is the longest valid part, ${best} characters long.`
+        : "No characters manage to form a pair ⇒ the answer is 0.",
+    },
+  });
+
+  return { original: s, answer: best, steps };
+}
+
 module.exports = {
+  32: {
+    id: 32,
+    difficulty: "hard",
+    slug: "longest-valid-parentheses",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "stack", vi: "Ngăn xếp", en: "Stack" },
+      { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    ],
+    title: { vi: "Longest Valid Parentheses", en: "Longest Valid Parentheses" },
+    titleVi: { vi: "Chuỗi ngoặc hợp lệ dài nhất", en: "Longest valid parentheses" },
+    statement: {
+      vi: "Cho chuỗi chỉ gồm '(' và ')'. Tìm độ dài đoạn con liên tiếp dài nhất tạo thành chuỗi ngoặc hợp lệ.",
+      en: "Given a string of '(' and ')', find the length of the longest contiguous substring that forms a valid parentheses sequence.",
+    },
+    defaultInput: ")()())",
+    inputKind: "string",
+    inputLabel: { vi: "s (chỉ gồm ( và ))", en: "s ('(' and ')' only)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt từng ký tự với stack lưu chỉ số; đáy stack luôn là một mốc ranh giới, phía trên là các '(' chưa ghép.", en: "Scan once with a stack of indices; the bottom always holds a boundary marker, above sit unmatched '(' indices." },
+      { vi: "Gặp ')': pop. Nếu stack rỗng thì ')' này là mốc ranh giới mới; ngược lại độ dài hợp lệ = i − đỉnh stack.", en: "On ')': pop. If the stack empties, this ')' becomes the new marker; otherwise the valid length is i − stack.top." },
+      { vi: "Cập nhật best mỗi lần đo được đoạn dài hơn; vùng xanh trên chuỗi thể hiện đoạn tốt nhất.", en: "Update best whenever a longer segment appears; the green region highlights the best range found so far." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi chỉ số tối đa đẩy và pop đúng một lần; stack chứa các chỉ số.",
+        en: "Each index is pushed and popped at most once; the stack stores indices.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestValidParentheses(self, s: str) -> int:",
+      "        best = 0",
+      "        stack = [-1]",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '(':",
+      "                stack.append(i)",
+      "            else:",
+      "                stack.pop()",
+      "                if not stack:",
+      "                    stack.append(i)",
+      "                else:",
+      "                    best = max(best, i - stack[-1])",
+      "        return best",
+    ],
+    builder: buildSteps32,
+  },
   1977: {
     id: 1977,
     difficulty: "hard",
@@ -10245,6 +10581,42 @@ module.exports = {
       "                        total += dp[k][i]",
       "                dp[i][j] = total % MOD",
       "        return sum(dp[i][n] for i in range(n)) % MOD",
+    ],
+    code2Label: { vi: "Tối ưu O(n²): LCP + tiền tố", en: "Optimized O(n²): LCP + prefix sums" },
+    code2: [
+      "class Solution:",
+      "    def numberOfCombinations(self, num: str) -> int:",
+      "        MOD = 10 ** 9 + 7",
+      "        n = len(num)",
+      "        if num[0] == '0':",
+      "            return 0",
+      "        # lcp[i][j] = do dai chung dai nhat cua num[i:] va num[j:]",
+      "        lcp = [[0] * (n + 1) for _ in range(n + 1)]",
+      "        for i in range(n - 1, -1, -1):",
+      "            for j in range(n - 1, -1, -1):",
+      "                if num[i] == num[j]:",
+      "                    lcp[i][j] = lcp[i + 1][j + 1] + 1",
+      "        # pre[i][j] = tong dp[i][1..j]; mot o dp lay bang hieu",
+      "        pre = [[0] * (n + 1) for _ in range(n + 1)]",
+      "        for i in range(1, n + 1):",
+      "            acc = 0",
+      "            for j in range(1, i + 1):",
+      "                s = i - j",
+      "                v = 0",
+      "                if num[s] != '0':",
+      "                    if s == 0:",
+      "                        v = 1",
+      "                    else:",
+      "                        m = j - 1 if j - 1 < s else s",
+      "                        v = pre[s][m]",
+      "                        t = s - j",
+      "                        if t >= 0:",
+      "                            x = lcp[s][t]",
+      "                            if x >= j or num[s + x] >= num[t + x]:",
+      "                                v += pre[s][j] - pre[s][j - 1]",
+      "                acc = (acc + v) % MOD",
+      "                pre[i][j] = acc",
+      "        return pre[n][n]",
     ],
     builder: buildSteps1977,
   },

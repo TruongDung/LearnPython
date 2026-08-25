@@ -17543,6 +17543,132 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderSeparate1977View(step) {
+  const view = step.separate1977View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "rules");
+  const num = String(view.num || "");
+  const n = Number(view.n) || num.length;
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const comparisons = Array.isArray(view.comparisons) ? view.comparisons : [];
+  const computed = new Set(Array.isArray(view.computedCells) ? view.computedCells : []);
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  if (phase === "invalid") {
+    $("treeView").innerHTML = `<section class="sep1977-viz invalid" role="img" aria-label="${vi ? "Đầu vào không hợp lệ cho LeetCode 1977" : "Invalid input for LeetCode 1977"}">
+      <section class="sep1977-empty"><strong>${vi ? "Cần chuỗi gồm 1-10 chữ số" : "Enter a string of 1-10 digits"}</strong><code>${escapeHtml(num || "empty")}</code><span>${vi ? "Ví dụ hợp lệ: 327" : "Valid example: 327"}</span></section>
+    </section>`;
+    return;
+  }
+
+  const stageIndex = phase === "final" ? 3
+    : ["compare", "write", "leading-zero"].includes(phase) ? 2
+      : ["state", "base"].includes(phase) ? 1 : 0;
+  const stageLabels = vi
+    ? ["Hiểu luật", "Tạo bảng DP", "So sánh & cộng", "Cộng cột cuối"]
+    : ["Read rules", "Build DP table", "Compare & add", "Sum final column"];
+  const stages = stageLabels.map((label, index) => {
+    const state = index < stageIndex || phase === "final" ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const segmentActive = ["base", "compare", "write", "leading-zero", "leading-zero-input"].includes(phase);
+  const charCells = num.split("").map((digit, index) => {
+    const classes = ["sep1977-digit"];
+    if (phase === "final") classes.push("final");
+    if (segmentActive && Number.isInteger(view.k) && index >= view.k && index < view.i) classes.push("previous");
+    if (segmentActive && Number.isInteger(view.i) && Number.isInteger(view.j) && index >= view.i && index < view.j) classes.push("current");
+    if ((phase === "leading-zero" || phase === "leading-zero-input") && index === view.i) classes.push("zero");
+    const labels = [];
+    if (Number.isInteger(view.k) && index === view.k) labels.push("k");
+    if (Number.isInteger(view.i) && index === view.i) labels.push("i");
+    if (Number.isInteger(view.j) && index === view.j - 1) labels.push("j−1");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(digit)}</strong><em>${labels.join(" · ") || "\u00a0"}</em></span>`;
+  }).join("");
+
+  const tableHead = Array.from({ length: n }, (_, index) => `<span class="sep1977-col-head"><small>j</small>${index + 1}</span>`).join("");
+  const sourceKeys = new Set(comparisons.map((item) => `${item.k}:${view.i}`));
+  const tableRows = Array.from({ length: n }, (_, i) => {
+    const cells = Array.from({ length: n }, (_, offset) => {
+      const j = offset + 1;
+      const validCell = i < j;
+      if (!validCell) return `<span class="sep1977-cell blocked" title="i >= j"><small>—</small><strong>×</strong></span>`;
+      const key = `${i}:${j}`;
+      const classes = ["sep1977-cell"];
+      if (computed.has(key)) classes.push("computed");
+      if (i === view.i && j === view.j) classes.push("active");
+      if (sourceKeys.has(key)) classes.push("source");
+      if (i === view.k && j === view.i) classes.push(view.orderOk ? "source-active accepted" : "source-active rejected");
+      if (phase === "final" && j === n) classes.push("final-column");
+      const value = computed.has(key) ? (dp[i]?.[j] ?? 0) : "·";
+      return `<span class="${classes.join(" ")}" title="dp[${i}][${j}], last = ${escapeHtml(num.slice(i, j))}"><small>${escapeHtml(num.slice(i, j))}</small><strong>${escapeHtml(display(value))}</strong></span>`;
+    }).join("");
+    return `<span class="sep1977-row-head"><small>i</small>${i}</span>${cells}`;
+  }).join("");
+
+  let operation = "";
+  if (phase === "rules") {
+    operation = `<section class="sep1977-rules">
+      <span><strong>1</strong><b>${vi ? "Số dương" : "Positive"}</b><small>${vi ? "không bắt đầu bằng 0" : "no leading zero"}</small></span>
+      <span><strong>2</strong><b>a ≤ b</b><small>${vi ? "dãy không giảm" : "non-decreasing order"}</small></span>
+      <span><strong>3</strong><b>${vi ? "1 số vẫn tính" : "One piece counts"}</b><small>${vi ? `"${escapeHtml(num)}" là một cách` : `"${escapeHtml(num)}" is one split`}</small></span>
+    </section>`;
+  } else if (phase === "state") {
+    operation = `<section class="sep1977-state">
+      <div><small>${vi ? "TIỀN TỐ ĐÃ TÁCH" : "SPLIT PREFIX"}</small><strong>num[0:j]</strong></div>
+      <i>&rarr;</i>
+      <div><small>${vi ? "SỐ CUỐI CHÍNH XÁC" : "EXACT LAST NUMBER"}</small><strong>num[i:j]</strong></div>
+      <code>dp[i][j] = ${vi ? "số cách" : "number of ways"}</code>
+    </section>`;
+  } else if (phase === "base") {
+    operation = `<section class="sep1977-operation base"><div><small>num[0:${view.j}]</small><strong>"${escapeHtml(display(view.current))}"</strong></div><i>&rarr;</i><div><small>${vi ? "KHÔNG CÓ SỐ TRƯỚC" : "NO PREDECESSOR"}</small><strong>dp[0][${view.j}] = 1</strong></div><p>${vi ? "Đây là một số duy nhất, nên luôn tạo đúng một cách tách." : "This is one whole number, so it always creates exactly one split."}</p></section>`;
+  } else if (phase === "compare") {
+    const relationText = view.relation === "shorter"
+      ? (vi ? "Ít chữ số hơn nên nhỏ hơn" : "Fewer digits means smaller")
+      : view.relation === "longer"
+        ? (vi ? "Nhiều chữ số hơn nên lớn hơn" : "More digits means larger")
+        : (vi ? "Dài bằng nhau: so từ trái sang phải" : "Equal length: compare left to right");
+    operation = `<section class="sep1977-operation compare ${view.orderOk ? "accepted" : "rejected"}">
+      <div class="previous"><small>${vi ? "SỐ TRƯỚC" : "PREVIOUS"} · num[${view.k}:${view.i}]</small><strong>${escapeHtml(display(view.previous))}</strong><em>${String(view.previous || "").length} ${vi ? "chữ số" : "digits"}</em></div>
+      <i>${view.orderOk ? "≤" : ">"}</i>
+      <div class="current"><small>${vi ? "SỐ HIỆN TẠI" : "CURRENT"} · num[${view.i}:${view.j}]</small><strong>${escapeHtml(display(view.current))}</strong><em>${String(view.current || "").length} ${vi ? "chữ số" : "digits"}</em></div>
+      <p><b>${view.orderOk ? (vi ? "HỢP LỆ" : "VALID") : (vi ? "LOẠI" : "REJECT")}</b><span>${escapeHtml(relationText)}</span></p>
+      <code>total = ${display(view.runningTotal)} &nbsp; (+${display(view.contribution)} ${vi ? "từ" : "from"} dp[${view.k}][${view.i}])</code>
+    </section>`;
+  } else if (phase === "leading-zero" || phase === "leading-zero-input") {
+    operation = `<section class="sep1977-operation zero"><div><small>${vi ? "ĐOẠN ĐANG XÉT" : "CURRENT PIECE"}</small><strong>"${escapeHtml(display(view.current))}"</strong></div><i>!</i><div><small>${vi ? "BẮT ĐẦU BẰNG 0" : "STARTS WITH 0"}</small><strong>${phase === "leading-zero-input" ? (vi ? "answer = 0" : "answer = 0") : `dp[${view.i}][${view.j}] = 0`}</strong></div><p>${vi ? "Không cần so với số trước: đoạn này đã không hợp lệ." : "No predecessor comparison is needed: this piece is already invalid."}</p></section>`;
+  } else if (phase === "write") {
+    operation = `<section class="sep1977-operation write"><div><small>${vi ? "Ô ĐÍCH" : "TARGET CELL"}</small><strong>dp[${view.i}][${view.j}]</strong></div><i>=</i><div><small>${comparisons.length} ${vi ? "SO SÁNH ĐÃ XONG" : "COMPARISONS DONE"}</small><strong>${display(view.runningTotal)}</strong></div><p>${vi ? `Mọi cách hợp lệ giờ kết thúc bằng "${escapeHtml(display(view.current))}".` : `Every counted split now ends with "${escapeHtml(display(view.current))}".`}</p></section>`;
+  } else if (phase === "final") {
+    const terms = (view.lastColumn || []).map((item) => `dp[${item.i}][${n}]`).join(" + ");
+    operation = `<section class="sep1977-operation final"><div><small>${vi ? "CỘT CUỐI j = n" : "FINAL COLUMN j = n"}</small><strong>${escapeHtml(terms || "—")}</strong></div><i>=</i><div><small>${vi ? "TỔNG SỐ CÁCH" : "TOTAL WAYS"}</small><strong>${display(view.answer)}</strong></div><p>${vi ? "Mỗi hàng chọn một vị trí bắt đầu khác nhau cho số cuối cùng." : "Each row chooses a different start for the final number."}</p></section>`;
+  }
+
+  const contributionRows = comparisons.map((item, index) => {
+    const active = index === comparisons.length - 1 && phase === "compare";
+    return `<span class="${item.orderOk ? "accepted" : "rejected"}${active ? " active" : ""}"><small>k=${item.k}</small><code>"${escapeHtml(item.prev)}" ${item.orderOk ? "≤" : ">"} "${escapeHtml(item.cur)}"</code><b>dp[${item.k}][${view.i}] = ${display(item.sourceWays)}</b><strong>+${display(item.contribution)}</strong></span>`;
+  }).join("") || `<em class="sep1977-none">${vi ? "Chưa có phép so sánh cho ô này" : "No comparison for this cell yet"}</em>`;
+
+  const splitSample = Array.isArray(view.splitSample) ? view.splitSample : [];
+  const splitRows = splitSample.map((split, index) => `<span><small>#${index + 1}</small><code>[${escapeHtml(split)}]</code></span>`).join("");
+  const omitted = Math.max(0, Number(view.totalSplitCount || 0) - splitSample.length);
+  const finalTerms = Array.isArray(view.lastColumn) ? view.lastColumn.map((item) => `<span class="${item.ways > 0 ? "nonzero" : "zero"}"><small>i=${item.i} · last "${escapeHtml(item.number)}"</small><strong>dp[${item.i}][${n}] = ${display(item.ways)}</strong></span>`).join("") : "";
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  $("treeView").innerHTML = `<section class="sep1977-viz" role="img" aria-label="LeetCode 1977 DP visualization, phase ${escapeHtml(phase)}, answer ${display(view.answer)}">
+    <div class="sep1977-stages">${stages}</div>
+    <section class="sep1977-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="sep1977-string"><header><strong>num = "${escapeHtml(num)}"</strong><span>${vi ? "k bắt đầu số trước · i bắt đầu số hiện tại · j là biên phải" : "k starts previous · i starts current · j is the right boundary"}</span></header><div style="--sep1977-n:${Math.max(1, n)}">${charCells}</div><footer><span class="previous"></span>${vi ? "số trước num[k:i]" : "previous num[k:i]"}<span class="current"></span>${vi ? "số hiện tại num[i:j]" : "current num[i:j]"}</footer></section>
+    ${operation}
+    <div class="sep1977-main">
+      <section class="sep1977-table-panel"><header><strong>${vi ? "BẢNG DP" : "DP TABLE"}</strong><span>dp[i][j] · ${vi ? "số cuối = num[i:j]" : "last number = num[i:j]"}</span></header><div class="sep1977-table-scroll"><div class="sep1977-table" style="--sep1977-cols:${Math.max(1, n)}"><span class="sep1977-corner">i / j</span>${tableHead}${tableRows}</div></div><footer><span class="source"></span>${vi ? "nguồn dp[k][i]" : "source dp[k][i]"}<span class="active"></span>${vi ? "ô đích dp[i][j]" : "target dp[i][j]"}<span class="final"></span>${vi ? "cột đáp án" : "answer column"}</footer></section>
+      <section class="sep1977-contributions"><header><strong>${vi ? "ĐÓNG GÓP VÀO Ô ĐÍCH" : "TARGET CELL CONTRIBUTIONS"}</strong><span>${Number.isInteger(view.i) && Number.isInteger(view.j) ? `dp[${view.i}][${view.j}]` : "total = Σ dp[k][i]"}</span></header><div>${contributionRows}</div><footer><small>${vi ? "TỔNG ĐANG CHẠY" : "RUNNING TOTAL"}</small><strong>${display(view.runningTotal ?? (phase === "final" ? view.answer : 0))}</strong></footer></section>
+    </div>
+    ${phase === "final" ? `<section class="sep1977-final-terms"><header><strong>${vi ? "VÌ SAO CỘNG CỘT CUỐI?" : "WHY SUM THE LAST COLUMN?"}</strong><span>${vi ? "Tất cả lựa chọn của số cuối" : "Every possible final number"}</span></header><div>${finalTerms}</div></section>` : ""}
+    ${(phase === "rules" || phase === "final") && splitRows ? `<section class="sep1977-splits"><header><strong>${vi ? "ĐỐI CHIẾU CÁC CÁCH TÁCH" : "VALID SPLIT CHECK"}</strong><span>${display(view.totalSplitCount)} ${vi ? "cách" : "ways"}</span></header><div>${splitRows}${omitted ? `<em>+${omitted} ${vi ? "cách khác" : "more"}</em>` : ""}</div></section>` : ""}
+  </section>`;
+}
+
 function renderMissing3718View(step) {
   const view = step.missing3718View || {};
   const vi = lang === "vi";
@@ -19903,6 +20029,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromePathView(step);
+  } else if (step.separate1977View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSeparate1977View(step);
   } else if (step.missing3718View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
