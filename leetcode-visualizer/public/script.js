@@ -7937,7 +7937,70 @@ function renderMountain1095View(step) {
         <div><span>get() calls</span><strong>${escapeHtml(String(gets))}</strong></div>
         <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${escapeHtml(finished ? String(view.answer) : "-")}</strong></div>
       </div>
-    </div>`;
+  </div>`;
+}
+
+function renderTranspose867View(step) {
+  const view = step.transpose867View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] || []).length;
+  const source = Array.isArray(view.source) ? view.source : null;
+  const target = Array.isArray(view.target) ? view.target : null;
+  const copied = new Set((view.copied || []).map(([row, col]) => `${row},${col}`));
+  const phase = String(view.phase || "rows");
+  const copiedCount = copied.size;
+  const stageIndex = phase === "done" ? 3 : ["row", "column", "copy"].includes(phase) ? 1 : phase === "allocate" ? 0 : 0;
+  const stages = [
+    vi ? "Đọc kích thước" : "Read dimensions",
+    vi ? "Đổi tọa độ" : "Swap coordinates",
+    vi ? "Trả result" : "Return result",
+  ].map((label, index) => {
+    const state = phase === "done" || index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const renderBoard = (data, kind, label, shape) => {
+    const boardRows = data.length;
+    const boardCols = data[0]?.length || 0;
+    const cells = [`<span class="tr867-corner">r\\c</span>`];
+    for (let col = 0; col < boardCols; col++) cells.push(`<span class="tr867-col">c=${col}</span>`);
+    data.forEach((row, rowIndex) => {
+      cells.push(`<span class="tr867-row">r=${rowIndex}</span>`);
+      row.forEach((value, colIndex) => {
+        const isSource = kind === "source" && source && source[0] === rowIndex && source[1] === colIndex;
+        const isTarget = kind === "result" && target && target[0] === rowIndex && target[1] === colIndex;
+        const wasCopied = kind === "source" && copied.has(`${rowIndex},${colIndex}`);
+        const filled = value !== null && value !== undefined;
+        const classes = ["tr867-cell", kind];
+        if (isSource) classes.push("active-source");
+        if (isTarget) classes.push("active-target");
+        if (wasCopied) classes.push("copied");
+        if (!filled) classes.push("empty");
+        cells.push(`<span class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${filled ? escapeHtml(String(value)) : "·"}</strong><em>${isSource ? "SOURCE" : isTarget ? "TARGET" : wasCopied ? "COPIED" : filled ? "" : "EMPTY"}</em></span>`);
+      });
+    });
+    return `<section class="tr867-board ${kind}"><header><strong>${escapeHtml(label)}</strong><span>${shape}</span></header><div class="tr867-grid" style="--tr867-cols:${boardCols + 1}">${cells.join("")}</div></section>`;
+  };
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const mapping = source && target
+    ? `<section class="tr867-map active"><small>${vi ? "PHÉP GÁN ĐANG CHẠY" : "CURRENT ASSIGNMENT"}</small><strong>result[${target[0]}][${target[1]}] = matrix[${source[0]}][${source[1]}] = ${escapeHtml(String(matrix[source[0]][source[1]]))}</strong><span>(${source.join(",")}) &rarr; (${target.join(",")})</span></section>`
+    : `<section class="tr867-map"><small>${vi ? "QUY TẮC CHUYỂN VỊ" : "TRANSPOSE RULE"}</small><strong>result[c][r] = matrix[r][c]</strong><span>(r,c) &rarr; (c,r)</span></section>`;
+  const summary = vi
+    ? `Transpose Matrix: đã sao chép ${copiedCount}/${rows * cols} ô.`
+    : `Transpose Matrix: copied ${copiedCount}/${rows * cols} cells.`;
+
+  $("treeView").innerHTML = `<section class="tr867-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><strong>TRANSPOSE MATRIX</strong><span>${rows} × ${cols} &rarr; ${cols} × ${rows}</span></header>
+    <section class="tr867-stages">${stages}</section>
+    <section class="tr867-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${escapeHtml(phase.toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    ${mapping}
+    <section class="tr867-boards">${renderBoard(matrix, "source", vi ? "MATRIX NGUỒN" : "SOURCE MATRIX", `${rows} × ${cols}`)}<div class="tr867-arrow" aria-hidden="true">&rarr;</div>${renderBoard(result, "result", vi ? "RESULT ĐÍCH" : "TARGET RESULT", `${cols} × ${rows}`)}</section>
+    <section class="tr867-footer"><span><small>${vi ? "ĐÃ SAO CHÉP" : "COPIED"}</small><strong>${copiedCount} / ${rows * cols}</strong></span><span><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><strong>(r,c) &rarr; (c,r)</strong></span><span><small>${vi ? "KÍCH THƯỚC" : "SHAPE"}</small><strong>${cols} × ${rows}</strong></span></section>
+  </section>`;
 }
 
 function renderTiling1240View(step) {
@@ -20894,6 +20957,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderShiftGridView(step);
+  } else if (step.transpose867View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTranspose867View(step);
   } else if (step.grid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

@@ -37139,3 +37139,89 @@ html, body {
   .m1095-cell strong { font-size: 20px; }
   .m1095-pointers { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
+
+/* LeetCode 867: line-by-line matrix transpose. */
+.tree-view:has(.tr867-viz) { min-height: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
+.tr867-viz { display: grid; gap: 11px; width: 100%; min-width: 0; padding: 15px; border: 1px solid #334155; border-radius: 8px; background: #0b1220; color: #e2e8f0; }
+.tr867-viz * { box-sizing: border-box; min-width: 0; }
+.tr867-viz > header, .tr867-board > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 5px 12px; }
+.tr867-viz > header strong, .tr867-board > header strong { color: #f8fafc; font: 800 13px/1 Consolas,monospace; }
+.tr867-viz > header span, .tr867-board > header span { color: #94a3b8; font-size: 10px; }
+.tr867-stages { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.tr867-stages > span { display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 8px; min-height: 48px; padding: 8px 10px; border-bottom: 3px solid #475569; background: #111827; color: #94a3b8; }
+.tr867-stages small { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font: 800 9px/1 Consolas,monospace; }
+.tr867-stages strong { font: 800 11px/1.25 system-ui,sans-serif; }
+.tr867-stages > span.active { border-color: #38bdf8; background: #082f49; color: #e0f2fe; }
+.tr867-stages > span.done { border-color: #22c55e; background: #052e16; color: #bbf7d0; }
+.tr867-action { display: grid; gap: 4px; min-height: 64px; align-content: center; padding: 10px 12px; border-left: 4px solid #38bdf8; background: #082f49; }
+.tr867-action small { color: #7dd3fc; font: 800 9px/1 Consolas,monospace; }
+.tr867-action strong { color: #e0f2fe; font: 800 13px/1.3 system-ui,sans-serif; overflow-wrap: anywhere; }
+.tr867-action span { color: #bae6fd; font-size: 10px; line-height: 1.4; }
+.tr867-map { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 7px 12px; min-height: 54px; padding: 9px 11px; border: 1px solid #a78bfa; background: #1e1b4b; }
+.tr867-map small { color: #c4b5fd; font: 800 8px/1 Consolas,monospace; }
+.tr867-map strong { color: #f5f3ff; font: 800 13px/1.3 Consolas,monospace; overflow-wrap: anywhere; }
+.tr867-map span { color: #ddd6fe; font: 800 11px/1 Consolas,monospace; }
+.tr867-map.active { border-color: #fbbf24; background: #422006; }
+.tr867-map.active small { color: #fde68a; }
+.tr867-map.active strong, .tr867-map.active span { color: #fef3c7; }
+.tr867-boards { display: grid; grid-template-columns: minmax(0,1fr) 28px minmax(0,1fr); align-items: stretch; gap: 9px; }
+.tr867-arrow { display: grid; place-items: center; color: #38bdf8; font: 800 22px/1 Consolas,monospace; }
+.tr867-board { display: grid; align-content: start; gap: 8px; padding: 10px; border: 1px solid #475569; background: #111827; }
+.tr867-grid { display: grid; grid-template-columns: repeat(var(--tr867-cols),minmax(0,1fr)); gap: 4px; }
+.tr867-corner, .tr867-col, .tr867-row { display: grid; min-height: 18px; place-items: center; color: #94a3b8; font: 800 8px/1 Consolas,monospace; }
+.tr867-cell { display: grid; min-height: 76px; align-content: center; justify-items: center; gap: 5px; padding: 6px 3px; border: 1px solid #475569; background: #0f172a; }
+.tr867-cell small { color: #94a3b8; font: 700 8px/1 Consolas,monospace; }
+.tr867-cell strong { color: #f8fafc; font: 800 22px/1 Consolas,monospace; }
+.tr867-cell em { min-height: 9px; color: #94a3b8; font: 800 7px/1 Consolas,monospace; font-style: normal; text-align: center; }
+.tr867-cell.source.copied:not(.active-source) { border-color: #22c55e; background: #052e16; }
+.tr867-cell.source.copied:not(.active-source) strong, .tr867-cell.source.copied:not(.active-source) em { color: #bbf7d0; }
+.tr867-cell.result:not(.empty) { border-color: #22c55e; background: #052e16; }
+.tr867-cell.result:not(.empty) strong { color: #bbf7d0; }
+.tr867-cell.empty { border-style: dashed; background: #111827; }
+.tr867-cell.empty strong { color: #64748b; }
+.tr867-cell.active-source { border: 3px solid #38bdf8; background: #082f49; }
+.tr867-cell.active-source strong { color: #e0f2fe; }
+.tr867-cell.active-source em { color: #7dd3fc; }
+.tr867-cell.active-target { border: 3px solid #fbbf24; background: #422006; }
+.tr867-cell.active-target strong, .tr867-cell.active-target em { color: #fde68a; }
+.tr867-footer { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.tr867-footer > span { display: grid; gap: 4px; min-height: 55px; align-content: center; padding: 8px 10px; border: 1px solid #475569; background: #111827; }
+.tr867-footer small { color: #94a3b8; font: 800 8px/1 Consolas,monospace; }
+.tr867-footer strong { color: #e2e8f0; font: 800 12px/1.3 Consolas,monospace; overflow-wrap: anywhere; }
+.tr867-footer > span:first-child { border-color: #22c55e; background: #052e16; }
+.tr867-footer > span:first-child strong { color: #bbf7d0; font-size: 16px; }
+
+[data-theme="light"] .tr867-viz { border-color: #cbd5e1; background: #ffffff; color: #0f172a; }
+[data-theme="light"] .tr867-viz > header strong, [data-theme="light"] .tr867-board > header strong, [data-theme="light"] .tr867-cell strong { color: #0f172a; }
+[data-theme="light"] .tr867-viz > header span, [data-theme="light"] .tr867-board > header span, [data-theme="light"] .tr867-corner, [data-theme="light"] .tr867-col, [data-theme="light"] .tr867-row, [data-theme="light"] .tr867-cell small, [data-theme="light"] .tr867-cell em, [data-theme="light"] .tr867-footer small { color: #475569; }
+[data-theme="light"] .tr867-stages > span, [data-theme="light"] .tr867-board, [data-theme="light"] .tr867-cell, [data-theme="light"] .tr867-footer > span { border-color: #94a3b8; background: #f8fafc; }
+[data-theme="light"] .tr867-stages > span { color: #475569; }
+[data-theme="light"] .tr867-stages > span.active, [data-theme="light"] .tr867-cell.active-source { border-color: #0284c7; background: #f0f9ff; color: #0c4a6e; }
+[data-theme="light"] .tr867-stages > span.done, [data-theme="light"] .tr867-cell.source.copied:not(.active-source), [data-theme="light"] .tr867-cell.result:not(.empty), [data-theme="light"] .tr867-footer > span:first-child { border-color: #16a34a; background: #f0fdf4; }
+[data-theme="light"] .tr867-action { border-color: #0284c7; background: #f0f9ff; }
+[data-theme="light"] .tr867-action small { color: #0c4a6e; }
+[data-theme="light"] .tr867-action strong { color: #0c4a6e; }
+[data-theme="light"] .tr867-action span { color: #164e63; }
+[data-theme="light"] .tr867-map { border-color: #7c3aed; background: #f5f3ff; }
+[data-theme="light"] .tr867-map small { color: #6d28d9; }
+[data-theme="light"] .tr867-map strong, [data-theme="light"] .tr867-map span { color: #4c1d95; }
+[data-theme="light"] .tr867-map.active, [data-theme="light"] .tr867-cell.active-target { border-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .tr867-map.active small { color: #92400e; }
+[data-theme="light"] .tr867-map.active strong, [data-theme="light"] .tr867-map.active span, [data-theme="light"] .tr867-cell.active-target strong, [data-theme="light"] .tr867-cell.active-target em { color: #92400e; }
+[data-theme="light"] .tr867-cell.source.copied:not(.active-source) strong, [data-theme="light"] .tr867-cell.source.copied:not(.active-source) em, [data-theme="light"] .tr867-cell.result:not(.empty) strong, [data-theme="light"] .tr867-footer > span:first-child strong { color: #166534; }
+[data-theme="light"] .tr867-cell.empty { background: #f8fafc; }
+[data-theme="light"] .tr867-cell.empty strong { color: #64748b; }
+[data-theme="light"] .tr867-cell.active-source strong, [data-theme="light"] .tr867-cell.active-source em { color: #0c4a6e; }
+[data-theme="light"] .tr867-footer strong { color: #0f172a; }
+
+@media (max-width: 720px) {
+  .tr867-boards { grid-template-columns: 1fr; }
+  .tr867-arrow { min-height: 20px; transform: rotate(90deg); }
+}
+@media (max-width: 470px) {
+  .tr867-viz { padding: 10px 8px; }
+  .tr867-stages, .tr867-footer { grid-template-columns: 1fr; }
+  .tr867-map { grid-template-columns: 1fr; }
+  .tr867-cell { min-height: 65px; }
+  .tr867-cell strong { font-size: 19px; }
+}

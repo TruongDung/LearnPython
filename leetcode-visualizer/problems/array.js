@@ -3528,13 +3528,43 @@ function buildSteps832(input) {
 /** LeetCode 867: Transpose Matrix. */
 function buildSteps867(input) {
   const matrix = parseIntegerMatrix2D(input);
-  const result = blankMatrix2D(matrix[0].length, matrix.length);
-  const steps = [matrixStep2D(matrix, { title: { vi: "Transpose: đổi hàng thành cột", en: "Transpose: rows become columns" }, codeLines: [3], vars: [{ name: "source shape", value: `${matrix.length}×${matrix[0].length}` }, { name: "target shape", value: `${matrix[0].length}×${matrix.length}` }], note: { vi: "matrix[r][c] được ghi vào result[c][r].", en: "Write matrix[r][c] into result[c][r]." }, grid: { caption: "Source matrix" } })];
-  for (let r = 0; r < matrix.length; r++) for (let c = 0; c < matrix[0].length; c++) {
-    result[c][r] = matrix[r][c];
-    steps.push(matrixStep2D(result, { title: { vi: `(${r},${c}) → (${c},${r})`, en: `(${r},${c}) → (${c},${r})` }, codeLines: [4, 5], vars: [{ name: "value", value: matrix[r][c] }, { name: "source", value: `(${r},${c})` }, { name: "target", value: `(${c},${r})` }], note: { vi: `Đổi vị trí chỉ số hàng và cột của ${matrix[r][c]}.`, en: `Swap the row and column indexes of ${matrix[r][c]}.` }, grid: { hlCell: [c, r], caption: "Transpose result" } }));
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const result = Array.from({ length: cols }, () => Array(rows).fill(null));
+  const steps = [];
+  const copied = [];
+  const push = ({ line, phase, row = null, col = null, final = false, title, note }) => {
+    const source = row != null && col != null ? [row, col] : null;
+    const target = source ? [col, row] : null;
+    steps.push({
+      title, note, final, arr: [], sub: [], highlight: [], mark: [], codeLines: [line],
+      vars: [
+        { name: "rows", value: rows }, { name: "cols", value: cols },
+        ...(row != null ? [{ name: "r", value: row }] : []),
+        ...(col != null ? [{ name: "c", value: col }] : []),
+        ...(source ? [{ name: "matrix[r][c]", value: matrix[row][col] }, { name: "result[c][r]", value: `result[${col}][${row}]` }] : []),
+        { name: "copied", value: `${copied.length}/${rows * cols}` },
+      ],
+      transpose867View: {
+        matrix: matrix.map((sourceRow) => [...sourceRow]), result: result.map((targetRow) => [...targetRow]),
+        rows, cols, source, target, copied: copied.map((cell) => [...cell]), phase, final,
+      },
+    });
+  };
+
+  push({ line: 3, phase: "rows", title: { vi: `rows = ${rows}`, en: `rows = ${rows}` }, note: { vi: "Đếm số hàng của matrix nguồn.", en: "Count the source matrix rows." } });
+  push({ line: 4, phase: "cols", title: { vi: `cols = ${cols}`, en: `cols = ${cols}` }, note: { vi: "Đếm số cột của matrix nguồn.", en: "Count the source matrix columns." } });
+  push({ line: 5, phase: "allocate", title: { vi: `Tạo result ${cols} × ${rows}`, en: `Allocate result ${cols} × ${rows}` }, note: { vi: "Transpose hoán đổi kích thước: rows × cols trở thành cols × rows. Các ô bắt đầu rỗng.", en: "Transpose swaps the shape: rows × cols becomes cols × rows. Every target cell starts empty." } });
+  for (let r = 0; r < rows; r++) {
+    push({ line: 6, phase: "row", row: r, title: { vi: `Bắt đầu hàng r = ${r}`, en: `Start row r = ${r}` }, note: { vi: `Duyệt lần lượt các cột trong matrix[${r}].`, en: `Visit each column in matrix[${r}].` } });
+    for (let c = 0; c < cols; c++) {
+      push({ line: 7, phase: "column", row: r, col: c, title: { vi: `Chọn c = ${c}`, en: `Choose c = ${c}` }, note: { vi: `Ô nguồn là matrix[${r}][${c}] = ${matrix[r][c]}.`, en: `The source cell is matrix[${r}][${c}] = ${matrix[r][c]}.` } });
+      result[c][r] = matrix[r][c];
+      copied.push([r, c]);
+      push({ line: 8, phase: "copy", row: r, col: c, title: { vi: `Sao chép (${r},${c}) → (${c},${r})`, en: `Copy (${r},${c}) → (${c},${r})` }, note: { vi: `Đổi thứ tự chỉ số: result[${c}][${r}] = matrix[${r}][${c}] = ${matrix[r][c]}.`, en: `Swap the indexes: result[${c}][${r}] = matrix[${r}][${c}] = ${matrix[r][c]}.` } });
+    }
   }
-  steps.push(matrixStep2D(result, { title: { vi: "Hoàn tất transpose", en: "Transpose complete" }, codeLines: [6], final: true, vars: [{ name: "result", value: JSON.stringify(result) }], note: { vi: "Ma trận kết quả có số hàng/cột hoán đổi.", en: "The result has its row and column counts swapped." }, grid: { caption: "Transposed matrix" } }));
+  push({ line: 9, phase: "done", final: true, title: { vi: "return result", en: "return result" }, note: { vi: `Đã sao chép ${rows * cols} ô; result có kích thước ${cols} × ${rows}.`, en: `All ${rows * cols} cells are copied; result has shape ${cols} × ${rows}.` } });
   return { original: matrix, answer: result, steps };
 }
 
@@ -10276,7 +10306,7 @@ Object.assign(module.exports, {
     defaultInput: "1,2,3;4,5,6", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
     approach: [{ vi: "Tạo ma trận kết quả có số hàng/cột hoán đổi.", en: "Create a result whose row and column counts are swapped." }, { vi: "Ghi từng phần tử (r,c) vào (c,r).", en: "Write every element from (r,c) into (c,r)." }],
     complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "Mỗi ô được sao chép một lần.", en: "Every cell is copied once." } },
-    code: ["class Solution:", "    def transpose(self, matrix):", "        rows, cols = len(matrix), len(matrix[0])", "        result = [[0] * rows for _ in range(cols)]", "        for r in range(rows):", "            for c in range(cols):", "                result[c][r] = matrix[r][c]", "        return result"], builder: buildSteps867,
+    code: ["class Solution:", "    def transpose(self, matrix):", "        rows = len(matrix)", "        cols = len(matrix[0])", "        result = [[0] * rows for _ in range(cols)]", "        for r in range(rows):", "            for c in range(cols):", "                result[c][r] = matrix[r][c]", "        return result"], builder: buildSteps867,
   },
   1337: {
     id: 1337, difficulty: "easy", slug: "the-k-weakest-rows-in-a-matrix",
