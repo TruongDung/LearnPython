@@ -1013,6 +1013,117 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "flood-fill") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion flood-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">▦</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Flood Fill · connected components → boundary → DFS + memo" : "Flood Fill · connected components → boundary → DFS + memo"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemNode = ([id, name, note], extraClass = "") => (supportedIds.has(id)
+          ? `<a class="flood-tree-problem ${extraClass}" href="#leetcode-${id}" data-flood-problem-id="${id}" aria-label="Load LeetCode ${id}: ${name}"><span>#${id}</span><strong>${name}</strong>${note ? `<small>${note}</small>` : ""}</a>`
+          : `<span class="flood-tree-problem unavailable ${extraClass}" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><strong>${name}</strong><small>${unavailableText}</small></span>`);
+        const down = `<i class="flood-tree-down" aria-hidden="true">↓</i>`;
+
+        $("trieLearnEyebrow").textContent = "FLOOD FILL LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Từ #733 đến DFS + Memoization" : "From #733 to DFS + Memoization";
+        $("trieLearnIntro").textContent = vi
+          ? "Bắt đầu bằng cách lan trên grid, sau đó tách thành hai nhánh chính: xử lý component và BFS theo level. Từ component, học tiếp boundary flood, thông tin component, reverse traversal và DFS có memo."
+          : "Start with grid traversal, then split into component processing and level-order BFS. From components, continue through boundary flood, component metadata, reverse traversal, and memoized DFS.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Flood Fill" : "Close Flood Fill learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section flood-tree-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Cây lộ trình Flood Fill" : "Flood Fill learning tree"}</h3><p>${vi ? "Học nền tảng trước, rồi chọn nhánh theo dạng output của bài." : "Learn the foundation first, then choose a branch based on the required output."}</p></div></div>
+            <div class="flood-learning-tree">
+              <div class="flood-tree-root">${problemNode([733, "Flood Fill", vi ? "Điểm bắt đầu" : "Starting point"], "root")}</div>
+              ${down}
+              <div class="flood-tree-foundation"><strong>${vi ? "Grid DFS / BFS cơ bản" : "Basic Grid DFS / BFS"}</strong><small>${vi ? "4 hướng · visited · đổi màu hoặc đánh dấu" : "4 directions · visited · recolor or mark"}</small></div>
+              <div class="flood-tree-split" aria-hidden="true"><span></span></div>
+              <div class="flood-tree-branches">
+                <section class="flood-tree-branch components">
+                  <header><strong>Connected Components</strong><small>${vi ? "Đếm, đo và phân loại vùng" : "Count, measure, and classify regions"}</small></header>
+                  <div class="flood-tree-chain">
+                    ${problemNode([200, "Number of Islands", vi ? "Đếm component" : "Count components"])}
+                    ${down}
+                    ${problemNode([695, "Max Area of Island", vi ? "Tích lũy diện tích" : "Accumulate area"])}
+                  </div>
+                  <div class="flood-tree-forks">
+                    <section>
+                      <header><strong>Boundary Flood</strong><small>${vi ? "Lan từ biên để loại vùng mở" : "Flood from the boundary"}</small></header>
+                      <div class="flood-tree-node-grid">
+                        ${problemNode([130, "Surrounded Regions", vi ? "Giữ vùng nối biên" : "Preserve boundary regions"])}
+                        ${problemNode([1020, "Number of Enclaves", vi ? "Xóa đất nối biên" : "Remove boundary land"])}
+                      </div>
+                      ${down}
+                      <header class="flood-tree-subhead"><strong>Reverse Traversal</strong></header>
+                      ${problemNode([417, "Pacific Atlantic Water Flow", vi ? "Đi ngược từ hai biên" : "Traverse backward from both borders"])}
+                      ${down}
+                      <header class="flood-tree-subhead"><strong>DFS + Memoization</strong></header>
+                      ${problemNode([329, "Longest Increasing Path", vi ? "Cache kết quả mỗi ô" : "Cache each cell result"])}
+                    </section>
+                    <section>
+                      <header><strong>Component Info</strong><small>${vi ? "Chu vi, id, kích thước, trạng thái đóng" : "Perimeter, id, size, closed state"}</small></header>
+                      <div class="flood-tree-chain compact">
+                        ${problemNode([463, "Island Perimeter", vi ? "Đếm cạnh biên" : "Count boundary edges"])}
+                        ${problemNode([827, "Making A Large Island", vi ? "Gắn id + size" : "Assign id + size"])}
+                        ${problemNode([1254, "Number of Closed Islands", vi ? "Component có chạm biên?" : "Does the component touch a border?"])}
+                      </div>
+                    </section>
+                  </div>
+                </section>
+                <section class="flood-tree-branch bfs-levels">
+                  <header><strong>BFS Levels</strong><small>${vi ? "Khoảng cách hoặc thời gian lan" : "Distance or propagation time"}</small></header>
+                  <div class="flood-tree-chain">
+                    ${problemNode([994, "Rotting Oranges", vi ? "Multi-source BFS theo phút" : "Multi-source BFS by minute"])}
+                    ${down}
+                    ${problemNode([542, "01 Matrix", vi ? "Khoảng cách tới số 0 gần nhất" : "Distance to the nearest zero"])}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-flood-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.floodProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "backtracking") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";

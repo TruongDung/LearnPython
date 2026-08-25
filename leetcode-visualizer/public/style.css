@@ -36308,3 +36308,69 @@ html, body {
   .rot1886-row, .rot1886-cell { min-height: 64px; }
   .rot1886-cell { min-width: 56px; padding: 6px 3px; }
 }
+
+/* Flood Fill category · branching learning map */
+.flood-learn-suggestion { border-color: rgba(34, 211, 238, .42); background: #102233; }
+.flood-learn-suggestion:hover { border-color: #22d3ee; box-shadow: 0 8px 24px rgba(6, 182, 212, .14); }
+.flood-learn-suggestion .trie-learn-suggestion-icon { background: rgba(34, 211, 238, .14); color: #67e8f9; font: 800 18px/1 Consolas,monospace; }
+.flood-tree-section { min-width: 0; }
+.flood-learning-tree { display: grid; justify-items: stretch; min-width: 0; gap: 0; }
+.flood-tree-root { display: grid; width: min(290px,100%); justify-self: center; }
+.flood-tree-root .flood-tree-problem { border-color: #22d3ee; border-top-width: 3px; background: #083344; }
+.flood-tree-root .flood-tree-problem > span { color: #67e8f9; }
+.flood-tree-down { display: grid; min-height: 24px; place-items: center; color: #67e8f9; font: 800 16px/1 Consolas,monospace; font-style: normal; }
+.flood-tree-foundation { display: grid; width: min(420px,100%); min-height: 58px; justify-self: center; place-content: center; gap: 5px; padding: 9px 12px; border: 1px solid #0891b2; border-radius: 7px; background: #082f49; text-align: center; }
+.flood-tree-foundation strong { color: #cffafe; font-size: 13px; }
+.flood-tree-foundation small { color: #67e8f9; font-size: 9px; }
+.flood-tree-split { position: relative; width: 72%; height: 28px; justify-self: center; }
+.flood-tree-split::before { content: ""; position: absolute; top: 0; left: 50%; height: 14px; border-left: 1px solid #475569; }
+.flood-tree-split::after { content: ""; position: absolute; top: 14px; left: 17%; right: 17%; border-top: 1px solid #475569; }
+.flood-tree-branches { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(220px,.65fr); gap: 12px; min-width: 0; }
+.flood-tree-branch { position: relative; min-width: 0; padding-top: 12px; }
+.flood-tree-branch::before { content: ""; position: absolute; top: 0; left: 50%; height: 12px; border-left: 1px solid #475569; }
+.flood-tree-branch > header, .flood-tree-forks section > header { display: grid; gap: 3px; padding: 8px 10px; border-left: 3px solid #22d3ee; background: #111827; }
+.flood-tree-branch > header strong, .flood-tree-forks section > header strong { color: #ecfeff; font-size: 11px; }
+.flood-tree-branch > header small, .flood-tree-forks section > header small { color: #94a3b8; font-size: 9px; }
+.flood-tree-chain { display: grid; grid-template-columns: minmax(0,1fr); gap: 0; width: min(300px,100%); margin: 10px auto 0; }
+.flood-tree-chain.compact { width: 100%; gap: 7px; }
+.flood-tree-problem { display: grid; grid-template-columns: 46px minmax(0,1fr); gap: 3px 8px; min-width: 0; padding: 9px 10px; border: 1px solid #334155; border-radius: 7px; background: #0f172a; color: #e2e8f0; text-decoration: none; }
+.flood-tree-problem:hover, .flood-tree-problem:focus-visible { border-color: #22d3ee; background: #123044; outline: 2px solid rgba(34,211,238,.3); outline-offset: 2px; }
+.flood-tree-problem > span { grid-row: 1 / 3; color: #67e8f9; font: 800 10px/1.3 Consolas,monospace; }
+.flood-tree-problem > strong { min-width: 0; color: #f8fafc; font-size: 10px; overflow-wrap: anywhere; }
+.flood-tree-problem > small { color: #94a3b8; font-size: 8px; line-height: 1.3; overflow-wrap: anywhere; }
+.flood-tree-problem.unavailable { cursor: not-allowed; opacity: .5; }
+.flood-tree-forks { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 12px; padding-top: 18px; border-top: 1px solid #334155; }
+.flood-tree-forks > section { min-width: 0; }
+.flood-tree-forks section > header { margin-bottom: 8px; border-color: #fbbf24; }
+.flood-tree-forks section > header strong { color: #fef3c7; }
+.flood-tree-forks .flood-tree-subhead { margin: 0 0 8px; border-color: #a78bfa; }
+.flood-tree-forks .flood-tree-subhead strong { color: #ede9fe; }
+.flood-tree-node-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.flood-tree-branch.bfs-levels > header { border-color: #a78bfa; }
+.flood-tree-branch.bfs-levels > header strong { color: #ede9fe; }
+
+[data-theme="light"] .flood-learn-suggestion { border-color: #67e8f9; background: #ecfeff; }
+[data-theme="light"] .flood-tree-root .flood-tree-problem, [data-theme="light"] .flood-tree-foundation { border-color: #0891b2; background: #ecfeff; }
+[data-theme="light"] .flood-tree-foundation strong { color: #164e63; }
+[data-theme="light"] .flood-tree-foundation small { color: #0e7490; }
+[data-theme="light"] .flood-tree-branch > header, [data-theme="light"] .flood-tree-forks section > header { background: #f8fafc; }
+[data-theme="light"] .flood-tree-branch > header strong { color: #164e63; }
+[data-theme="light"] .flood-tree-forks section > header strong { color: #92400e; }
+[data-theme="light"] .flood-tree-forks .flood-tree-subhead strong, [data-theme="light"] .flood-tree-branch.bfs-levels > header strong { color: #5b21b6; }
+[data-theme="light"] .flood-tree-branch > header small, [data-theme="light"] .flood-tree-forks section > header small { color: #475569; }
+[data-theme="light"] .flood-tree-problem { border-color: #cbd5e1; background: #ffffff; color: #0f172a; }
+[data-theme="light"] .flood-tree-problem:hover, [data-theme="light"] .flood-tree-problem:focus-visible { border-color: #0891b2; background: #f0f9ff; }
+[data-theme="light"] .flood-tree-problem > span { color: #0e7490; }
+[data-theme="light"] .flood-tree-problem > strong { color: #0f172a; }
+[data-theme="light"] .flood-tree-problem > small { color: #475569; }
+
+@media (max-width: 760px) {
+  .flood-tree-split { width: 1px; height: 24px; border-left: 1px solid #475569; }
+  .flood-tree-split::before, .flood-tree-split::after, .flood-tree-branch::before { display: none; }
+  .flood-tree-branches { grid-template-columns: 1fr; gap: 14px; }
+  .flood-tree-branch { padding-top: 0; }
+}
+@media (max-width: 500px) {
+  .flood-tree-forks, .flood-tree-node-grid { grid-template-columns: 1fr; }
+  .flood-tree-problem { grid-template-columns: 43px minmax(0,1fr); }
+}
