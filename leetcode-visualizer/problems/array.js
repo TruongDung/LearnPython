@@ -10380,6 +10380,84 @@ Object.assign(module.exports, {
   },
 });
 
+// ─── 689: Maximum Sum of 3 Non-Overlapping Subarrays ───
+function buildSteps689(input, params = {}) {
+  const nums = (Array.isArray(input) ? input : String(input).split(",")).map(Number);
+  const k = Number(params.k || 2);
+  if (!Number.isInteger(k) || k < 1 || nums.length < 3 * k || nums.some((value) => !Number.isFinite(value))) {
+    throw new Error("Use finite nums with length at least 3 * k");
+  }
+  if (nums.length > 24) throw new Error("Visualization supports at most 24 numbers");
+  const n = nums.length;
+  const windowSums = Array.from({ length: n - k + 1 }, (_, start) => nums.slice(start, start + k).reduce((sum, value) => sum + value, 0));
+  const left = new Array(windowSums.length);
+  const right = new Array(windowSums.length);
+  const steps = [];
+  let answer = null;
+
+  function snapshot({ title, note, line, phase, active = -1, middle = -1, candidate = null, final = false }) {
+    steps.push({
+      title, note, codeLines: [line], arr: [...nums], highlight: [], mark: [], final,
+      vars: [
+        { name: "k", value: k },
+        { name: "window sums", value: `[${windowSums.join(", ")}]` },
+        { name: "best", value: answer ? `[${answer.join(", ")}]` : "-" },
+      ],
+      subarray689View: {
+        nums: [...nums], k, windowSums: [...windowSums], left: left.map((value) => value ?? null), right: right.map((value) => value ?? null),
+        active, middle, candidate: candidate ? { ...candidate } : null, answer: answer ? [...answer] : null, phase,
+      },
+    });
+  }
+
+  snapshot({ title: { vi: `Tạo ${windowSums.length} cửa sổ dài k=${k}`, en: `Create ${windowSums.length} windows of length k=${k}` }, note: { vi: "Mỗi windowSums[i] là tổng nums[i..i+k-1]. Ba window không overlap tương đương chọn ba start cách nhau ít nhất k.", en: "windowSums[i] is nums[i..i+k-1]. Three non-overlapping windows have starts at least k apart." }, line: 4, phase: "windows" });
+
+  let best = 0;
+  for (let index = 0; index < windowSums.length; index++) {
+    if (windowSums[index] > windowSums[best]) best = index;
+    left[index] = best;
+    snapshot({ title: { vi: `left[${index}] = ${best}`, en: `left[${index}] = ${best}` }, note: { vi: `Trong các window từ 0..${index}, start ${best} có tổng lớn nhất ${windowSums[best]}.`, en: `Among windows 0..${index}, start ${best} has the largest sum ${windowSums[best]}.` }, line: 8, phase: "left", active: index });
+  }
+
+  best = windowSums.length - 1;
+  for (let index = windowSums.length - 1; index >= 0; index--) {
+    if (windowSums[index] >= windowSums[best]) best = index;
+    right[index] = best;
+    snapshot({ title: { vi: `right[${index}] = ${best}`, en: `right[${index}] = ${best}` }, note: { vi: `Trong các window từ ${index}..cuối, start ${best} là lựa chọn tốt nhất (giữ start nhỏ hơn khi hòa).`, en: `Among windows ${index}..end, start ${best} is best (keep the earlier start on ties).` }, line: 11, phase: "right", active: index });
+  }
+
+  let bestTotal = -Infinity;
+  for (let middle = k; middle <= windowSums.length - k - 1; middle++) {
+    const first = left[middle - k];
+    const third = right[middle + k];
+    const total = windowSums[first] + windowSums[middle] + windowSums[third];
+    const candidate = { first, middle, third, total };
+    if (total > bestTotal) {
+      bestTotal = total;
+      answer = [first, middle, third];
+    }
+    snapshot({ title: { vi: `Thử middle=${middle}: tổng = ${total}`, en: `Try middle=${middle}: total = ${total}` }, note: total === bestTotal && answer && answer[1] === middle ? { vi: `left[${middle - k}]=${first}, middle=${middle}, right[${middle + k}]=${third} tạo kỷ lục ${total}.`, en: `left[${middle - k}]=${first}, middle=${middle}, right[${middle + k}]=${third} make the new best ${total}.` } : { vi: `Tổng ${total} không vượt best ${bestTotal}; giữ đáp án cũ.`, en: `Total ${total} does not beat best ${bestTotal}; keep the earlier answer.` }, line: 15, phase: "combine", active: middle, middle, candidate });
+  }
+  snapshot({ title: { vi: `Kết quả [${answer.join(", ")}]`, en: `Result [${answer.join(", ")}]` }, note: { vi: `Ba subarray bắt đầu tại ${answer.join(", ")} có tổng lớn nhất ${bestTotal}.`, en: `The subarrays starting at ${answer.join(", ")} have the maximum total ${bestTotal}.` }, line: 16, phase: "done", final: true });
+  return { original: [...nums], answer, steps };
+}
+
+Object.assign(module.exports, {
+  689: {
+    id: 689, difficulty: "hard", slug: "maximum-sum-of-3-non-overlapping-subarrays",
+    category: { key: "sliding-window", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Maximum Sum of 3 Non-Overlapping Subarrays", en: "Maximum Sum of 3 Non-Overlapping Subarrays" },
+    titleVi: { vi: "Ba subarray không chồng nhau có tổng lớn nhất", en: "Best three non-overlapping subarrays" },
+    statement: { vi: "Chọn ba subarray độ dài k, không chồng nhau, có tổng lớn nhất. Nếu hòa, trả về bộ chỉ số từ điển nhỏ nhất.", en: "Choose three non-overlapping subarrays of length k with maximum sum. On ties, return the lexicographically smallest starts." },
+    defaultInput: [1, 2, 1, 2, 6, 7, 5, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "k", label: { vi: "k (độ dài mỗi subarray)", en: "k (length of each subarray)" }, default: 2, min: 1 }],
+    approach: [{ vi: "Tính tổng cho mọi cửa sổ độ dài k.", en: "Compute every length-k window sum." }, { vi: "left[i] và right[i] lưu start tốt nhất ở hai phía của i.", en: "left[i] and right[i] store the best start on either side of i." }, { vi: "Cố định cửa sổ giữa rồi ghép với lựa chọn tối ưu bên trái/phải.", en: "Fix the middle window, then combine it with optimal left/right choices." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Ba lượt tuyến tính trên danh sách window.", en: "Three linear passes over the windows." } },
+    code: ["class Solution:", "    def maxSumOfThreeSubarrays(self, nums, k):", "        n = len(nums)", "        sums = [sum(nums[i:i+k]) for i in range(n-k+1)]", "        left = [0] * len(sums)", "        best = 0", "        for i in range(len(sums)):", "            if sums[i] > sums[best]: best = i", "            left[i] = best", "        right = [0] * len(sums); best = len(sums)-1", "        for i in range(len(sums)-1, -1, -1):", "            if sums[i] >= sums[best]: best = i", "            right[i] = best", "        answer = None", "        for mid in range(k, len(sums)-k):", "            candidate = [left[mid-k], mid, right[mid+k]]", "            if answer is None or sum(sums[i] for i in candidate) > sum(sums[i] for i in answer): answer = candidate", "        return answer"],
+    builder: buildSteps689,
+  },
+});
+
 /** LeetCode 3718: Smallest Missing Multiple of K. */
 function buildSteps3718(nums, params) {
   const arr = Array.isArray(nums) ? nums.map(Number) : [];

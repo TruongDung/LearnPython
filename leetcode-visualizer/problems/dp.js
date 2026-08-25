@@ -7492,6 +7492,231 @@ function buildSteps139(input, params) {
 }
 
 /**
+ * LeetCode 140: Word Break II.
+ * DFS tries each dictionary word at `start`; memo[start] stores every valid
+ * sentence for the suffix s[start:].  Unlike Word Break I, a successful
+ * split is not enough: every continuation must be collected.
+ */
+function buildSteps140(input, params = {}) {
+  const s = String(input ?? "").trim();
+  const wordDict = String(params.wordDict || "").split(",").map((word) => word.trim()).filter(Boolean);
+  const wordSet = new Set(wordDict);
+  const n = s.length;
+  const memo = new Map();
+  const callStack = [];
+  const steps = [];
+
+  if (n > 24) throw new Error("Word Break II visualization supports strings up to 24 characters");
+
+  const memoRows = () => Array.from({ length: n }, (_, start) => ({
+    start,
+    suffix: s.slice(start),
+    state: memo.has(start) ? "done" : callStack.includes(start) ? "active" : "waiting",
+    sentences: memo.has(start) ? [...memo.get(start)] : [],
+  }));
+
+  function snapshot({ title, note, codeLine, phase, start = -1, candidate = null, partial = [], final = false, answer = null }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      vars: [
+        { name: "start", value: start >= 0 ? start : "-" },
+        { name: "call stack", value: callStack.length ? `[${callStack.join(" -> ")}]` : "[]" },
+        { name: "memo", value: `{${[...memo.entries()].map(([index, sentences]) => `${index}: ${sentences.length}`).join(", ")}}` },
+      ],
+      wordBreakIIView: {
+        s,
+        wordDict: [...wordDict],
+        memo: memoRows(),
+        callStack: [...callStack],
+        phase,
+        start,
+        candidate: candidate ? { ...candidate } : null,
+        partial: [...partial],
+        answer: answer ? [...answer] : null,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo word set và memo", en: "Initialize word set and memo" },
+    note: {
+      vi: "dfs(start) sẽ trả về TẤT CẢ câu hợp lệ tạo được từ hậu tố s[start:]. memo lưu lại cả danh sách câu, tránh giải cùng một hậu tố nhiều lần.",
+      en: "dfs(start) returns ALL valid sentences for suffix s[start:]. memo stores that full list so the same suffix is never solved twice.",
+    },
+    codeLine: 3,
+    phase: "init",
+  });
+  snapshot({
+    title: { vi: "memo = {}", en: "memo = {}" },
+    note: { vi: "Mỗi key là vị trí start; value là danh sách các câu hoàn chỉnh từ vị trí đó.", en: "Each key is a start position; its value is the completed-sentence list from there." },
+    codeLine: 4,
+    phase: "init",
+  });
+
+  function dfs(start) {
+    callStack.push(start);
+    snapshot({
+      title: { vi: `Gọi dfs(${start}) cho "${s.slice(start)}"`, en: `Call dfs(${start}) for "${s.slice(start)}"` },
+      note: { vi: `Đặt start = ${start}. Ta sẽ thử mọi điểm kết thúc để lấy prefix là một từ trong dict.`, en: `Set start = ${start}. Try every end position whose prefix is a dictionary word.` },
+      codeLine: 5,
+      phase: "call",
+      start,
+    });
+
+    if (start === n) {
+      snapshot({
+        title: { vi: `start = n = ${n}: chạm cuối chuỗi`, en: `start = n = ${n}: reached string end` },
+        note: { vi: "Trả về [\"\"] để caller có thể ghép từ cuối cùng mà không thêm khoảng trắng thừa.", en: "Return [\"\"] so the caller can append its last word without an extra space." },
+        codeLine: 6,
+        phase: "base",
+        start,
+      });
+      snapshot({
+        title: { vi: "return [\"\"]", en: "return [\"\"]" },
+        note: { vi: "Đây là một continuation rỗng nhưng hợp lệ.", en: "This is one valid empty continuation." },
+        codeLine: 7,
+        phase: "return",
+        start,
+      });
+      callStack.pop();
+      return [""];
+    }
+
+    if (memo.has(start)) {
+      const cached = memo.get(start);
+      snapshot({
+        title: { vi: `memo[${start}] đã có ${cached.length} câu`, en: `memo[${start}] already has ${cached.length} sentence(s)` },
+        note: { vi: `Hậu tố "${s.slice(start)}" đã giải xong trước đó, tái sử dụng kết quả thay vì gọi DFS lại.`, en: `Suffix "${s.slice(start)}" was solved earlier, so reuse it instead of recursing again.` },
+        codeLine: 8,
+        phase: "memo-hit",
+        start,
+        partial: cached,
+      });
+      snapshot({
+        title: { vi: `return memo[${start}]`, en: `return memo[${start}]` },
+        note: { vi: `Trả nhanh ${cached.length} câu đã cache.`, en: `Return the ${cached.length} cached sentence(s).` },
+        codeLine: 9,
+        phase: "return",
+        start,
+        partial: cached,
+      });
+      callStack.pop();
+      return cached;
+    }
+
+    const sentences = [];
+    snapshot({
+      title: { vi: `sentences = [] cho start = ${start}`, en: `sentences = [] for start = ${start}` },
+      note: { vi: "Danh sách này sẽ nhận mọi cách hoàn thành hậu tố hiện tại.", en: "This list will receive every way to finish the current suffix." },
+      codeLine: 10,
+      phase: "collect",
+      start,
+    });
+
+    for (let end = start + 1; end <= n; end++) {
+      const word = s.slice(start, end);
+      snapshot({
+        title: { vi: `Thử end = ${end}`, en: `Try end = ${end}` },
+        note: { vi: `Ứng viên hiện tại là s[${start}:${end}] = "${word}".`, en: `The current candidate is s[${start}:${end}] = "${word}".` },
+        codeLine: 11,
+        phase: "try",
+        start,
+        candidate: { start, end, word, inDict: wordSet.has(word) },
+        partial: sentences,
+      });
+      snapshot({
+        title: { vi: `word = "${word}"`, en: `word = "${word}"` },
+        note: { vi: "Cắt chuỗi theo [start:end] để kiểm tra từ điển.", en: "Slice [start:end] before checking the dictionary." },
+        codeLine: 12,
+        phase: "try",
+        start,
+        candidate: { start, end, word, inDict: wordSet.has(word) },
+        partial: sentences,
+      });
+
+      if (!wordSet.has(word)) {
+        snapshot({
+          title: { vi: `"${word}" không thuộc dict`, en: `"${word}" is not in dict` },
+          note: { vi: "Không thể dùng prefix này, nên tiếp tục nới end.", en: "This prefix cannot be used, so extend end and try again." },
+          codeLine: 13,
+          phase: "reject",
+          start,
+          candidate: { start, end, word, inDict: false },
+          partial: sentences,
+        });
+        continue;
+      }
+
+      snapshot({
+        title: { vi: `"${word}" thuộc dict: gọi dfs(${end})`, en: `"${word}" is in dict: call dfs(${end})` },
+        note: { vi: `Giữ "${word}" làm từ đầu, rồi tìm mọi câu hợp lệ cho phần còn lại "${s.slice(end)}".`, en: `Keep "${word}" as the first word, then find every valid sentence for remaining "${s.slice(end)}".` },
+        codeLine: 15,
+        phase: "recurse",
+        start,
+        candidate: { start, end, word, inDict: true },
+        partial: sentences,
+      });
+      const tails = dfs(end);
+      for (const tail of tails) {
+        const sentence = tail ? `${word} ${tail}` : word;
+        sentences.push(sentence);
+        snapshot({
+          title: { vi: `Thêm câu: "${sentence}"`, en: `Append sentence: "${sentence}"` },
+          note: { vi: `Ghép word "${word}" với continuation "${tail}".`, en: `Combine word "${word}" with continuation "${tail}".` },
+          codeLine: 16,
+          phase: "append",
+          start,
+          candidate: { start, end, word, inDict: true, tail, sentence },
+          partial: sentences,
+        });
+      }
+    }
+
+    memo.set(start, [...sentences]);
+    snapshot({
+      title: { vi: `memo[${start}] = ${sentences.length} câu`, en: `memo[${start}] = ${sentences.length} sentence(s)` },
+      note: { vi: `Cache kết quả cho hậu tố "${s.slice(start)}" để lần sau dùng lại ngay.`, en: `Cache the result for suffix "${s.slice(start)}" for instant reuse later.` },
+      codeLine: 17,
+      phase: "memo-save",
+      start,
+      partial: sentences,
+    });
+    snapshot({
+      title: { vi: `return ${sentences.length} câu từ dfs(${start})`, en: `return ${sentences.length} sentence(s) from dfs(${start})` },
+      note: { vi: "Quay về caller để ghép các prefix phía trước.", en: "Return to the caller so it can prepend earlier words." },
+      codeLine: 18,
+      phase: "return",
+      start,
+      partial: sentences,
+    });
+    callStack.pop();
+    return sentences;
+  }
+
+  const answer = dfs(0);
+  snapshot({
+    title: { vi: `Kết quả: ${answer.length} câu`, en: `Result: ${answer.length} sentence(s)` },
+    note: answer.length
+      ? { vi: `dfs(0) đã gom đủ mọi cách tách của "${s}".`, en: `dfs(0) collected every segmentation of "${s}".` }
+      : { vi: `Không có cách tách "${s}" bằng wordDict.`, en: `There is no segmentation of "${s}" using wordDict.` },
+    codeLine: 19,
+    phase: "done",
+    start: 0,
+    partial: answer,
+    answer,
+    final: true,
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
  * LeetCode 132: Palindrome Partitioning II.
  * dp[i] = minimum cuts needed for s[0..i-1] to be split into all palindromes.
  * isPalin[j][i] = true if s[j..i] is a palindrome.
@@ -19517,7 +19742,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 140, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -20607,6 +20832,61 @@ module.exports = {
       "        return dp[n]",
     ],
     builder: buildSteps139,
+  },
+  140: {
+    id: 140,
+    difficulty: "hard",
+    slug: "word-break-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "memoization", vi: "Ghi nhớ", en: "Memoization" },
+      { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    ],
+    title: { vi: "Word Break II", en: "Word Break II" },
+    titleVi: { vi: "Tách chuỗi thành mọi câu hợp lệ", en: "Break a string into every valid sentence" },
+    statement: {
+      vi: "Cho chuỗi s và wordDict. Trả về MỌI câu tạo được bằng cách chèn khoảng trắng, sao cho mỗi từ đều thuộc wordDict. Mỗi từ có thể dùng nhiều lần.",
+      en: "Given a string s and wordDict, return EVERY sentence made by inserting spaces so each word belongs to wordDict. Words may be reused.",
+    },
+    defaultInput: "catsanddog",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "wordDict", type: "string", label: { vi: "wordDict (phẩy ngăn)", en: "wordDict (comma separated)" }, default: "cat,cats,and,sand,dog" },
+    ],
+    approach: [
+      { vi: "Gọi dfs(start) để lấy TẤT CẢ câu hợp lệ tạo từ hậu tố s[start:].", en: "Call dfs(start) to obtain ALL valid sentences from suffix s[start:]." },
+      { vi: "Thử mọi end: nếu word = s[start:end] thuộc từ điển, ghép word với từng câu từ dfs(end).", en: "Try every end: if word = s[start:end] is in the dictionary, prepend it to each sentence from dfs(end)." },
+      { vi: "Memo theo start: một hậu tố có thể được đi tới bởi nhiều prefix khác nhau nhưng chỉ cần giải một lần.", en: "Memoize by start: many prefixes can reach the same suffix, but it is solved only once." },
+    ],
+    complexity: {
+      time: "O(n^2 + output)",
+      space: "O(n + output)",
+      note: { vi: "Số câu có thể tăng theo cấp số mũ; phần output là không thể tránh. Memo loại bỏ việc tính lặp các hậu tố.", en: "The number of sentences can be exponential, which output itself requires. Memoization removes repeated suffix work." },
+    },
+    code: [
+      "class Solution:",
+      "    def wordBreak(self, s, wordDict):",
+      "        words = set(wordDict)",
+      "        memo = {}",
+      "        def dfs(start):",
+      "            if start == len(s):",
+      "                return ['']",
+      "            if start in memo:",
+      "                return memo[start]",
+      "            sentences = []",
+      "            for end in range(start + 1, len(s) + 1):",
+      "                word = s[start:end]",
+      "                if word not in words:",
+      "                    continue",
+      "                for tail in dfs(end):",
+      "                    sentences.append(word + (' ' + tail if tail else ''))",
+      "            memo[start] = sentences",
+      "            return sentences",
+      "        return dfs(0)",
+    ],
+    builder: buildSteps140,
   },
   279: {
     id: 279,
@@ -22864,3 +23144,170 @@ module.exports = {
     builder: buildSteps97,
   },
 };
+
+// ─── 1349: Maximum Students Taking Exam ───
+// Faithful LINE-BY-LINE trace of the row-by-row bitmask DP shown in the UI.
+// dp maps previous-row mask -> best total so far. A candidate mask must fit
+// the row's available seats (L10), avoid both upward diagonals of prev (L12),
+// and then improves nxt[mask] with total + bit_count (L13).
+function buildSteps1349(input) {
+  const seatRows = (Array.isArray(input) ? input : String(input).trim().split(/[;\n]+/))
+    .map((row) => Array.isArray(row) ? row.join("") : String(row).trim())
+    .filter(Boolean);
+  if (!seatRows.length || seatRows.length > 6 || seatRows.some((row) => !/^[.#]+$/.test(row)) || new Set(seatRows.map((r) => r.length)).size !== 1 || seatRows[0].length > 8) {
+    throw new Error("Use 1 to 6 rows of . and #, separated by semicolons; each row must have 1 to 8 seats.");
+  }
+  const rowsCount = seatRows.length;
+  const cols = seatRows[0].length;
+  const fullMask = (1 << cols) - 1;
+
+  // L3–L5 precompute
+  const available = seatRows.map((row) => {
+    let mask = 0;
+    for (let c = 0; c < cols; c++) if (row[c] === ".") mask |= 1 << c;
+    return mask;
+  });
+  const validMasks = [];
+  for (let mask = 0; mask <= fullMask; mask++) {
+    if ((mask & (mask << 1)) === 0) validMasks.push(mask);
+  }
+  const bits = (mask) => mask.toString(2).split("").filter((b) => b === "1").length;
+  const bin = (mask) => mask.toString(2).padStart(cols, "0");
+
+  const steps = [];
+  let dp = new Map([[0, { total: 0, picks: [] }]]);
+
+  function snapshot(line, phase, currentRow, candMask, prevMask, dpMap, title, note, extraVars = [], conflictCols = [], final = false) {
+    const table = [...dpMap.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([mask, st]) => ({ mask, binary: bin(mask), total: st.total }));
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      vars: [
+        ...(currentRow >= 0 ? [{ name: "r", value: currentRow }] : []),
+        ...(candMask != null ? [{ name: "mask", value: `${candMask} (0b${bin(candMask)})` }] : []),
+        ...(prevMask != null ? [{ name: "prev", value: `${prevMask} (0b${bin(prevMask)})` }] : []),
+        ...extraVars,
+        { name: "|dp|", value: table.length },
+        { name: "best total", value: table.length ? table[0].total : 0 },
+        ...(final ? [{ name: "result", value: table.reduce((mx, e) => Math.max(mx, e.total), 0) }] : []),
+      ],
+      students1349View: {
+        seatRows,
+        width: cols,
+        currentRow,
+        candidateMask: candMask,
+        prevMask,
+        accepted: phase === "improve" || phase === "keep",
+        conflictCols,
+        picks: [...(dpMap.get(candMask ?? 0)?.picks ?? [])],
+        states: table,
+        phase,
+        answer: null,
+      },
+    });
+  }
+
+  snapshot(6, "init", -1, 0, 0, dp, {
+    vi: "dp = {0: 0}",
+    en: "dp = {0: 0}",
+  }, {
+    vi: `available[r] = bitmask ghế tốt của từng hàng (${available.map((a) => bin(a)).join(" / ")}); valid liệt kê mọi mask không có hai học sinh kề nhau (${validMasks.length} mask cho ${cols} cột).`,
+    en: `available[r] is each row's good-seat bitmask (${available.map((a) => bin(a)).join(" / ")}); valid lists every mask without adjacent students (${validMasks.length} masks for ${cols} columns).`,
+  });
+
+  for (let r = 0; r < rowsCount; r++) {
+    snapshot(7, "row-start", r, null, null, dp, {
+      vi: `Hàng ${r}: "${seatRows[r]}"`,
+      en: `Row ${r}: "${seatRows[r]}"`,
+    }, {
+      vi: `Ghế trống . được đánh số bit từ trái; available[${r}] = 0b${bin(available[r])}.`,
+      en: `Open seats . map to bits from the left; available[${r}] = 0b${bin(available[r])}.`,
+    });
+
+    const nxt = new Map();
+    let considered = 0;
+    let improved = false;
+    for (const mask of validMasks) {
+      if (mask & ~available[r]) continue; // L10 silently skips unusable masks
+      considered += 1;
+      let bestHere = null;
+      let bestPrev = null;
+      let conflicts = [];
+      for (const [prev, state] of dp) {
+        conflicts = [];
+        const leftDiag = mask & (prev << 1);
+        const rightDiag = mask & (prev >> 1);
+        if (leftDiag | rightDiag) {
+          for (let c = 0; c < cols; c++) {
+            if ((leftDiag >> c) & 1) conflicts.push(c);
+            if ((rightDiag >> c) & 1) conflicts.push(c);
+          }
+          continue; // L12 rejects this pair
+        }
+        const candidate = state.total + bits(mask);
+        if (!bestHere || candidate > bestHere.total) {
+          bestHere = { total: candidate, picks: [...state.picks, mask] };
+          bestPrev = prev;
+        }
+      }
+      if (!bestHere) continue;
+      const known = nxt.get(mask);
+      if (!known || bestHere.total > known.total) {
+        improved = true;
+        nxt.set(mask, bestHere);
+        snapshot(13, "improve", r, mask, bestPrev, nxt, {
+          vi: `Hàng ${r}, mask=0b${bin(mask)}: đặt ${bits(mask)} học sinh → tổng ${bestHere.total}`,
+          en: `Row ${r}, mask=0b${bin(mask)}: seats ${bits(mask)} student(s) → total ${bestHere.total}`,
+        }, {
+          vi: `Không có ai kề nhau trong hàng (mask & mask<<1 = 0), không chéo vào hàng trước từ prev=0b${bin(bestPrev)}. Ghi nxt[0b${bin(mask)}] = ${bestHere.total}.`,
+          en: `No two adjacent in-row students (mask & mask<<1 = 0) and no upward diagonal against prev=0b${bin(bestPrev)}. Record nxt[0b${bin(mask)}] = ${bestHere.total}.`,
+        }, [], [], false);
+      }
+    }
+
+    dp = nxt;
+    const rowBest = [...dp.values()].reduce((mx, s) => Math.max(mx, s.total), 0);
+    snapshot(14, "row-done", r, null, null, dp, {
+      vi: `dp = nxt sau hàng ${r}: ${dp.size} trạng thái, tốt nhất ${rowBest}`,
+      en: `dp = nxt after row ${r}: ${dp.size} states, best ${rowBest}`,
+    }, {
+      vi: `Đã xét ${considered} mask hợp lệ trên hàng này; giữ lại đúng một tổng tốt nhất cho MỖI mask hàng hiện tại.`,
+      en: `Examined ${considered} usable masks on this row; exactly one best total survives per current-row mask.`,
+    });
+  }
+
+  const winnerTotal = [...dp.values()].reduce((mx, s) => Math.max(mx, s.total), 0);
+  const winnerPicks = [...dp.values()].sort((a, b) => b.total - a.total)[0]?.picks ?? [];
+  snapshot(15, "done", rowsCount - 1, null, null, dp, {
+    vi: `Kết quả: ${winnerTotal} học sinh`,
+    en: `Result: ${winnerTotal} students`,
+  }, {
+    vi: `max(dp.values()): một dãy chỗ ngồi tối ưu là [${winnerPicks.map((m) => "0b" + bin(m)).join(", ")}] — không ai nhìn thấy bạn cùng hàng hay chéo phía trên.`,
+    en: `max(dp.values()): one optimal seating is [${winnerPicks.map((m) => "0b" + bin(m)).join(", ")}] — nobody sees a same-row neighbour or an upper diagonal.`,
+  }, [], [], true);
+
+  return { steps, answer: winnerTotal };
+}
+
+Object.assign(module.exports, {
+  1349: {
+    id: 1349, difficulty: "hard", slug: "maximum-students-taking-exam", category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Maximum Students Taking Exam", en: "Maximum Students Taking Exam" },
+    titleVi: { vi: "Nhiều học sinh nhất trong phòng thi", en: "Maximum students taking an exam" },
+    statement: { vi: "Đặt nhiều học sinh nhất vào ghế tốt (.) sao cho không ai nhìn được trái, phải, chéo trên trái hoặc chéo trên phải.", en: "Seat the most students on usable seats (.) so no one can see left, right, upper-left, or upper-right." },
+    defaultInput: "#..#;.##.;#..#", inputKind: "string", inputLabel: { vi: "các hàng . / # (ngăn bằng ;)", en: "rows of . / # (separate with ;)" },
+    approach: [{ vi: "Bitmask mô tả học sinh ở một hàng. DP theo row và mask hàng trước; loại mask có hai học sinh kề nhau hoặc chéo hàng trước.", en: "A bitmask describes students in one row. DP by row and previous-row mask, rejecting horizontal and upward-diagonal conflicts." }],
+    complexity: { time: "O(r · 4^c)", space: "O(2^c)", note: { vi: "Visualization giới hạn r ≤ 6, c ≤ 8 để đọc được các mask.", en: "The visualization limits r ≤ 6 and c ≤ 8 so masks remain readable." } },
+    code: ["class Solution:", "    def maxStudents(self, seats):", "        rows, cols = len(seats), len(seats[0])", "        available = [sum((cell == '.') << c for c, cell in enumerate(row)) for row in seats]", "        valid = [mask for mask in range(1 << cols) if not (mask & (mask << 1))]", "        dp = {0: 0}", "        for r in range(rows):", "            nxt = {}", "            for mask in valid:", "                if mask & ~available[r]: continue", "                for prev, total in dp.items():", "                    if mask & (prev << 1) or mask & (prev >> 1): continue", "                    nxt[mask] = max(nxt.get(mask, 0), total + mask.bit_count())", "            dp = nxt", "        return max(dp.values(), default=0)"],
+    liveArgs: (input) => [(Array.isArray(input) ? input : String(input).split(/[;\n]+/)).map((row) => Array.isArray(row) ? row : String(row).trim())],
+    builder: buildSteps1349,
+  },
+});

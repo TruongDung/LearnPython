@@ -4376,3 +4376,162 @@ module.exports = {
     builder: (input, params) => addBacktrackingDecisionTree(buildSteps784(input, params), 784),
   },
 };
+
+// ─── 1240: Tiling a Rectangle with the Fewest Squares ───
+// Faithful LINE-BY-LINE trace of the skyline backtracking shown in the UI.
+// heights[c] = how many rows of column c are already filled. Always pick the
+// leftmost lowest column, try the largest square that fits first, undo after
+// each recursion, and prune any branch whose count already reaches best.
+function buildSteps1240(input, params = {}) {
+  const rawRows = Number(Array.isArray(input) ? input[0] : input);
+  const rawCols = Number(params.m ?? 3);
+  if (!Number.isInteger(rawRows) || !Number.isInteger(rawCols) || rawRows < 1 || rawCols < 1 || rawRows > 8 || rawCols > 8) {
+    throw new Error("Use integer rectangle sides from 1 to 8 for the visualization.");
+  }
+  const n = Math.min(rawRows, rawCols);
+  const m = Math.max(rawRows, rawCols);
+  const heights = Array(m).fill(0);
+  const placements = []; // current recursion path
+  const steps = [];
+  let best = n * m; // mirrors problem.code exactly
+  let bestLayout = [];
+  const TRACE_LIMIT = 700;
+
+  function snapshot(line, phase, count, title, note, extraVars = [], final = false) {
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...heights],
+      sub: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      vars: [
+        { name: "count", value: count },
+        { name: "low", value: Math.min(...heights) },
+        ...extraVars,
+        { name: "heights", value: `[${heights.join(", ")}]` },
+        { name: "best", value: best },
+        ...(final ? [{ name: "result", value: best }] : []),
+      ],
+      tiling1240View: {
+        n,
+        m,
+        heights: [...heights],
+        placements: placements.map((sq) => ({ ...sq })),
+        bestLayout: bestLayout.map((sq) => ({ ...sq })),
+        best,
+        count,
+        phase,
+      },
+    });
+    return steps.length < TRACE_LIMIT;
+  }
+
+  snapshot(3, "init", 0, {
+    vi: `heights = [0]*${m}, best = ${n * m}`,
+    en: `heights = [0]*${m}, best = ${n * m}`,
+  }, {
+    vi: `Xoay để luôn xử lý ${n}×${m}. heights[c] cho biết cột c đã được lấp bao nhiêu hàng. best khởi đầu bằng n·m (lát toàn 1×1) nên mọi phương án khác đều phải đánh bại con số này.`,
+    en: `Rotated so the frame is ${n}×${m}. heights[c] counts how many rows of column c are filled. best starts at n·m (the all-1×1 tiling); every alternative must beat it.`,
+  });
+
+  function dfs(count) {
+    // L6 pruning check
+    if (count >= best) {
+      snapshot(6, "prune", count, {
+        vi: `count=${count} ≥ best → cắt nhánh`,
+        en: `count=${count} ≥ best → prune this branch`,
+      }, {
+        vi: "Nhánh này không thể tốt hơn đáp án hiện có — quay lại ngay không đặt thêm.",
+        en: "This branch can no longer beat the incumbent answer — abandon it immediately.",
+      });
+      return;
+    }
+    const low = Math.min(...heights);
+    if (low === n) {
+      best = count;
+      bestLayout = placements.map((sq) => ({ ...sq }));
+      snapshot(9, "complete", count, {
+        vi: `low=${n}: LẤP ĐẦY → best = ${count}`,
+        en: `low=${n}: fully tiled → best = ${count}`,
+      }, {
+        vi: `Mọi cột đã đạt chiều cao ${n}. Cập nhật nghiệm tốt nhất gồm ${count} hình vuông và quay lui tiếp.`,
+        en: `Every column reached height ${n}. Record the best layout of ${count} squares and keep backtracking.`,
+      });
+      return;
+    }
+
+    const col = heights.indexOf(low);
+    let run = 0;
+    while (col + run < m && heights[col + run] === low) run += 1;
+    const largest = Math.min(run, n - low);
+    snapshot(13, "choose", count, {
+      vi: `Cột trũng nhất bên trái: col=${col} (low=${low}); chạy dài ${run} cột → thử size từ ${largest} xuống 1`,
+      en: `Leftmost lowest column: col=${col} (low=${low}); run of ${run} columns → try sizes ${largest} down to 1`,
+    }, {
+      vi: `min(run, n-low)=${largest}: vuông không vượt ra ngoài đoạn trũng và không tràn đỉnh hình chữ nhật.`,
+      en: `min(run, n-low)=${largest}: a square may neither cross the low plateau nor overflow the rectangle top.`,
+    });
+
+    for (let size = largest; size >= 1; size -= 1) {
+      for (let j = 0; j < size; j++) heights[col + j] += size;
+      placements.push({ row: low, col, size });
+      if (!snapshot(14, "place", count + 1, {
+        vi: `Đặt ${size}×${size} tại (row=${low}, col=${col})`,
+        en: `Place ${size}×${size} at (row=${low}, col=${col})`,
+      }, {
+        vi: `Tăng ${size} cột từ ${col} lên thêm ${size}; đệ quy sâu hơn với count=${count + 1}.`,
+        en: `Raise ${size} columns starting at ${col} by ${size}; recurse with count=${count + 1}.`,
+      })) return;
+      dfs(count + 1);
+      placements.pop();
+      for (let j = 0; j < size; j++) heights[col + j] -= size;
+      if (!snapshot(16, "undo", count, {
+        vi: `Bỏ ${size}×${size} khỏi (row=${low}, col=${col})`,
+        en: `Remove ${size}×${size} from (row=${low}, col=${col})`,
+      }, {
+        vi: size > 1
+          ? "Quay lui: khôi phục heights để thử kích thước nhỏ hơn."
+          : "Quay lui: hết cỡ để thử — trả lại trạng thái cho nhánh anh em.",
+        en: size > 1
+          ? "Backtrack: restore heights and try the next smaller size."
+          : "Backtrack: last size tried — restore state for the sibling branch.",
+      })) return;
+    }
+  }
+
+  dfs(0);
+  // Degenerate 1×k strips: the optimum EQUALS n·m so the prune at L6 fires
+  // before completion can ever be recorded (same as the real Python code).
+  // The layout is then trivially the strip of unit squares.
+  if (!bestLayout.length) {
+    for (let j = 0; j < m; j++) bestLayout.push({ row: 0, col: j, size: 1 });
+  }
+  snapshot(18, "done", best, {
+    vi: `Kết quả: ${best} hình vuông`,
+    en: `Result: ${best} squares`,
+  }, {
+    vi: `Phương án tối ưu dùng ${best} hình vuông để lát kín ${n}×${m}. Không cách lát nào ít hơn.`,
+    en: `The optimal layout tiles the ${n}×${m} rectangle with ${best} squares. None uses fewer.`,
+  }, [{ name: "layout", value: bestLayout.map((s) => `${s.size}@(${s.row},${s.col})`).join(", ") }], true);
+
+  return { steps, answer: best };
+}
+
+Object.assign(module.exports, {
+  1240: {
+    id: 1240, difficulty: "hard", slug: "tiling-a-rectangle-with-the-fewest-squares", category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Tiling a Rectangle with the Fewest Squares", en: "Tiling a Rectangle with the Fewest Squares" },
+    titleVi: { vi: "Lát hình chữ nhật bằng ít hình vuông nhất", en: "Tile a rectangle with fewest squares" },
+    statement: { vi: "Lát kín hình chữ nhật n × m bằng số hình vuông nguyên ít nhất.", en: "Tile an n × m rectangle using the fewest integer-sided squares." },
+    defaultInput: [2], inputKind: "positive", inputLabel: { vi: "n (số hàng)", en: "n (rows)" }, singleInput: true, maxInput: 8,
+    extraParams: [{ key: "m", type: "number", label: { vi: "m (số cột)", en: "m (columns)" }, default: 3, min: 1, max: 8 }],
+    approach: [{ vi: "Lưu chiều cao đã lấp của mỗi cột. Luôn chọn cột thấp nhất bên trái, thử hình vuông lớn trước và cắt nhánh khi không thể vượt best.", en: "Store filled heights for each column. Always choose the leftmost lowest column, try larger squares first, and prune branches that cannot beat best." }],
+    complexity: { time: "O(branching^min(n,m))", space: "O(m)", note: { vi: "Không gian skyline là m cột; cây tìm kiếm được cắt nhánh mạnh.", en: "The skyline uses m columns; the search tree is heavily pruned." } },
+    code: ["class Solution:", "    def tilingRectangle(self, n, m):", "        heights, best = [0] * m, n * m", "        def dfs(count):", "            nonlocal best", "            if count >= best: return", "            low = min(heights)", "            if low == n:", "                best = count; return", "            col = heights.index(low)", "            run = 0", "            while col + run < m and heights[col + run] == low: run += 1", "            for size in range(min(run, n - low), 0, -1):", "                for j in range(size): heights[col + j] += size", "                dfs(count + 1)", "                for j in range(size): heights[col + j] -= size", "        dfs(0)", "        return best"],
+    liveArgs: (input, params) => [Number(Array.isArray(input) ? input[0] : input), Number(params.m)],
+    builder: buildSteps1240,
+  },
+});

@@ -1847,6 +1847,21 @@ $("playBtn").addEventListener("click", togglePlay);
 
 // ---- Keyboard navigation ----
 document.addEventListener("keydown", (e) => {
+  // Preserve the expected page-navigation behavior for Home and End. The
+  // visualization still exposes dedicated first/last step buttons (⏮/⏭).
+  const tag = (e.target.tagName || "").toLowerCase();
+  if ((e.key === "Home" || e.key === "End") && tag !== "input" && tag !== "textarea") {
+    e.preventDefault();
+    if (e.key === "Home") {
+      window.scrollTo(0, 0);
+    } else {
+      const pageEnd = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      window.scrollTo(0, pageEnd);
+    }
+    updateBackToTopButton();
+    return;
+  }
+
   const visualizationActive = steps.length && !$("vizPanel").classList.contains("hidden");
   if (e.key === "F10" && visualizationActive) {
     e.preventDefault();
@@ -1855,7 +1870,6 @@ document.addEventListener("keydown", (e) => {
   }
 
   // Skip when typing in input fields
-  const tag = (e.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea") return;
   // Only active when visualization is visible
   if (!visualizationActive) return;
@@ -1868,14 +1882,6 @@ document.addEventListener("keydown", (e) => {
     case "ArrowRight":
       e.preventDefault();
       $("nextBtn").click();
-      break;
-    case "Home":
-      e.preventDefault();
-      $("firstBtn").click();
-      break;
-    case "End":
-      e.preventDefault();
-      $("lastBtn").click();
       break;
     case " ":
       e.preventDefault();
@@ -2013,6 +2019,7 @@ function renderCode() {
     split.classList.toggle("problem-648-layout", problemId === 648);
     split.classList.toggle("problem-211-layout", problemId === 211);
     split.classList.toggle("problem-212-layout", problemId === 212);
+    split.classList.toggle("problem-685-layout", problemId === 685);
   }
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
@@ -7675,6 +7682,373 @@ function renderCircularDequeView(step) {
   </div>`;
 }
 
+function renderCalculator772View(step) {
+  const view = step.calculator772View || {};
+  const chars = Array.isArray(view.chars) ? view.chars : String(view.expression || "").split("");
+  const i = Number.isInteger(view.i) ? view.i : -1;
+  const value = view.value === null || view.value === undefined ? "-" : view.value;
+  const numbers = Array.isArray(view.numbers) ? view.numbers : [];
+  const operators = Array.isArray(view.operators) ? view.operators : [];
+  const operation = view.operation || "-";
+  const result = view.result === null || view.result === undefined ? "-" : view.result;
+  const finished = view.result !== null && view.result !== undefined;
+  const allDone = i >= chars.length;
+
+  const stackHtml = (title, items, emptyLabel) => {
+    const cells = items.length
+      ? items
+          .map((item, idx) => {
+            const isTop = idx === items.length - 1;
+            return `<div class="stack-cell${isTop ? " top" : ""}">
+              <span class="stack-cell-content"><span class="stack-value">${escapeHtml(String(item))}</span></span>
+              ${isTop ? `<span class="stack-tag">top</span>` : ""}
+            </div>`;
+          })
+          .join("")
+      : `<div class="stack-empty">${escapeHtml(emptyLabel)}</div>`;
+    return `<div class="stack-panel">
+      <div class="stack-title">${escapeHtml(title)}</div>
+      <div class="stack-container">${cells}</div>
+      <div class="stack-base"></div>
+    </div>`;
+  };
+
+  const kind = (c) =>
+    /^\d$/.test(c) ? "" : c === "(" || c === ")" ? " paren" : " op";
+
+  const charRow = chars
+    .map((c, idx) => {
+      const cls = finished || allDone || (i >= 0 && idx < i)
+        ? " done"
+        : idx === i
+          ? " current"
+          : "";
+      return `<div class="stack-input-token${kind(String(c))}${cls}">
+        <span>${escapeHtml(String(c))}</span><small>${idx}</small>
+      </div>`;
+    })
+    .join("");
+
+  const iLabel = i < 0
+    ? pick({ vi: "–", en: "–" })
+    : i >= chars.length
+      ? `${i} (= len)`
+      : `${i} ('${chars[i]}')`;
+  const exprText = String(view.originalExpression || view.expression || "");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz">
+      <div>
+        <div class="stack-input-label">${escapeHtml(pick({ vi: `Biểu thức: ${exprText} · con trỏ i`, en: `Expression: ${exprText} · pointer i` }))}</div>
+        <div class="stack-input-row calc772-tokens">${charRow || `<div class="stack-empty">${escapeHtml(pick({ vi: "trống", en: "empty" }))}</div>`}</div>
+      </div>
+      <div class="calc772-stacks">
+        ${stackHtml("nums", numbers, pick({ vi: "rỗng", en: "empty" }))}
+        ${stackHtml("ops", operators, pick({ vi: "rỗng", en: "empty" }))}
+        <div class="stack-side">
+          <div class="stack-status">
+            <div><span>i</span><strong>${escapeHtml(iLabel)}</strong></div>
+            <div><span>value</span><strong>${escapeHtml(String(value))}</strong></div>
+            <div><span>${escapeHtml(pick({ vi: "dòng lệnh", en: "statement" }))}</span><strong>${escapeHtml(String(operation))}</strong></div>
+            <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${escapeHtml(String(result))}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCalculator772BView(step) {
+  const view = step.calculator772bView || {};
+  const chars = Array.isArray(view.chars) ? view.chars : String(view.expression || "").split("");
+  const i = Number.isInteger(view.i) ? view.i : -1;
+  const num = view.num === null || view.num === undefined ? "-" : view.num;
+  const prevOp = view.prevOp === null || view.prevOp === undefined ? "-" : view.prevOp;
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const operation = view.operation || "-";
+  const result = view.result === null || view.result === undefined ? "-" : view.result;
+  const finished = view.result !== null && view.result !== undefined;
+
+  const cells = stack.length
+    ? stack
+        .map((item, idx) => {
+          const isTop = idx === stack.length - 1;
+          const isOp = typeof item !== "number";
+          return `<div class="stack-cell${isTop ? " top" : ""}${isOp ? " op-cell" : ""}">
+            <span class="stack-cell-content"><span class="stack-value">${escapeHtml(isOp ? `'${item}'` : String(item))}</span></span>
+            ${isTop ? `<span class="stack-tag">top</span>` : ""}
+          </div>`;
+        })
+        .join("")
+    : `<div class="stack-empty">${escapeHtml(pick({ vi: "rỗng", en: "empty" }))}</div>`;
+
+  const kind = (c) =>
+    /^\d$/.test(c) ? "" : c === "(" || c === ")" ? " paren" : " op";
+
+  const charRow = chars
+    .map((c, idx) => {
+      const cls = finished || (i >= 0 && idx < i) ? " done" : idx === i ? " current" : "";
+      return `<div class="stack-input-token${kind(String(c))}${cls}">
+        <span>${escapeHtml(String(c))}</span><small>${idx}</small>
+      </div>`;
+    })
+    .join("");
+
+  const exprText = String(view.originalExpression || view.expression || "");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz calc772b-viz">
+      <div>
+        <div class="stack-input-label">${escapeHtml(pick({ vi: `Biểu thức: ${exprText} · ký tự ch`, en: `Expression: ${exprText} · char ch` }))}</div>
+        <div class="stack-input-row calc772-tokens">${charRow || `<div class="stack-empty">${escapeHtml(pick({ vi: "trống", en: "empty" }))}</div>`}</div>
+      </div>
+      <div class="calc772-stacks">
+        <div class="stack-panel">
+          <div class="stack-title">stack ${escapeHtml(pick({ vi: "(số có dấu + toán tử)", en: "(signed numbers + ops)" }))}</div>
+          <div class="stack-container">${cells}</div>
+          <div class="stack-base"></div>
+        </div>
+        <div class="stack-side">
+          <div class="stack-status">
+            <div><span>num</span><strong>${escapeHtml(String(num))}</strong></div>
+            <div><span>prev_op</span><strong>${escapeHtml(String(prevOp))}</strong></div>
+            <div><span>${escapeHtml(pick({ vi: "dòng lệnh", en: "statement" }))}</span><strong>${escapeHtml(String(operation))}</strong></div>
+            <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${escapeHtml(String(result))}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+function renderCamera968View(step) {
+  const view = step.camera968View || {};
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const cams = new Set(view.cameraIds || []);
+  const covered = new Set(view.coveredIds || []);
+  const states = view.states || {};
+  const currentId = view.currentId;
+  const answer = view.answer;
+
+  // Tidy layout: x = inorder position, y = depth.
+  const order = [];
+  const inorder = (id) => {
+    if (id == null) return;
+    const nd = nodes.find((n) => n.id === id);
+    if (!nd) return;
+    inorder(nd.leftId);
+    order.push(id);
+    inorder(nd.rightId);
+  };
+  if (nodes.length) inorder(nodes[0].parentId != null ? nodes.find((n) => n.parentId == null).id : nodes[0].id);
+  const xPos = new Map(order.map((id, i) => [id, i]));
+  const maxDepth = Math.max(1, ...nodes.map((n) => n.depth));
+  const W = Math.max(order.length * 64, 240);
+  const H = (maxDepth + 1) * 74 + 30;
+  const px = (nd) => ({ x: ((xPos.get(nd.id) ?? 0) + 0.5) * (W / Math.max(order.length, 1)), y: 36 + nd.depth * 74 });
+
+  const edges = nodes.map((nd) => {
+    const p = px(nd);
+    return [nd.leftId, nd.rightId].map((cid) => {
+      if (cid == null) return "";
+      const child = nodes.find((n) => n.id === cid);
+      const c = px(child);
+      return `<line class="cam968-edge${covered.has(cid) && covered.has(nd.id) ? " lit" : ""}" x1="${p.x}" y1="${p.y}" x2="${c.x}" y2="${c.y}"></line>`;
+    }).join("");
+  }).join("");
+
+  const circles = nodes.map((nd) => {
+    const p = px(nd);
+    const st = states[nd.id];
+    const cls = st === 1 ? "cam" : st === 2 ? "ok" : st === 0 ? "need" : "idle";
+    const icon = st === 1 ? "📷" : "";
+    return `<g class="cam968-node ${cls}${nd.id === currentId ? " current" : ""}" transform="translate(${p.x} ${p.y})">
+      <circle r="21"></circle>
+      <text class="cam968-val" y="4">${escapeHtml(String(nd.val))}</text>
+      ${icon ? `<text class="cam968-icon" x="14" y="-12">${icon}</text>` : ""}
+    </g>`;
+  }).join("");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz cam968-viz">
+      <svg viewBox="0 0 ${W} ${H}" role="img">
+        ${edges}${circles}
+      </svg>
+      <div class="stack-status cam968-status">
+        <div><span>📷 cameras</span><strong>${cams.size}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "đang xử lý", en: "processing" }))}</span><strong>${escapeHtml(currentId != null ? String(nodes.find((n) => n.id === currentId)?.val ?? "-") : "-")}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "được cover", en: "covered" }))}</span><strong>${covered.size}/${nodes.length}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${escapeHtml(answer == null ? "-" : String(answer))}</strong></div>
+      </div>
+      <div class="cam968-legend">
+        <span class="cam968-key need"></span>${escapeHtml(pick({ vi: "cần camera", en: "needs camera" }))}
+        <span class="cam968-key cam"></span>${escapeHtml(pick({ vi: "có camera", en: "has camera" }))}
+        <span class="cam968-key ok"></span>${escapeHtml(pick({ vi: "đã cover", en: "covered" }))}
+      </div>
+    </div>`;
+}
+
+function renderMountain1095View(step) {
+  const view = step.mountain1095View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const target = view.target;
+  const lo = Number.isInteger(view.lo) ? view.lo : -1;
+  const hi = Number.isInteger(view.hi) ? view.hi : -1;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const found = view.found;
+  const peak = view.peak;
+  const gets = view.gets ?? "-";
+  const probed = new Set(view.probed || []);
+  const finished = view.answer !== null && view.answer !== undefined;
+
+  const maxVal = Math.max(...nums, 1);
+  const bars = nums.map((v, idx) => {
+    const inWindow = idx >= lo && idx <= hi;
+    const hPct = Math.max(8, Math.round((v / maxVal) * 100));
+    const cls = [
+      "mtn-bar",
+      idx === mid ? " mid" : "",
+      idx === peak ? " peak" : "",
+      finished && idx === view.answer ? " found" : "",
+      probed.has(idx) ? " probed" : "",
+      !probed.has(idx) ? " hidden-val" : "",
+    ].join("");
+    return `<div class="${cls}">
+      <div class="mtn-fill" style="height:${hPct}%"><span>${escapeHtml(String(v))}</span></div>
+      <small class="${inWindow ? " win" : ""}">${idx}</small>
+    </div>`;
+  }).join("");
+
+  const pointerRow = nums.map((_, idx) => {
+    const tags = [];
+    if (idx === lo) tags.push("lo");
+    if (idx === hi) tags.push("hi");
+    if (idx === mid) tags.push("mid");
+    if (idx === peak) tags.push("▲");
+    return `<div class="mtn-ptr">${tags.map((t2) => `<em>${t2}</em>`).join("")}</div>`;
+  }).join("");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz mtn1095-viz">
+      <div class="mtn-chart">${bars}</div>
+      <div class="mtn-pointers">${pointerRow}</div>
+      <div class="stack-status mtn-status">
+        <div><span>lo</span><strong>${lo}</strong></div>
+        <div><span>hi</span><strong>${hi}</strong></div>
+        <div><span>mid</span><strong>${mid == null ? "-" : mid}</strong></div>
+        <div><span>target</span><strong>${escapeHtml(String(target))}</strong></div>
+        <div><span>get() calls</span><strong>${escapeHtml(String(gets))}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${escapeHtml(finished ? String(view.answer) : "-")}</strong></div>
+      </div>
+    </div>`;
+}
+
+function renderTiling1240View(step) {
+  const view = step.tiling1240View || {};
+  const n = view.n ?? 0;
+  const m = view.m ?? 0;
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const done = view.phase === "done";
+  const placements = done && Array.isArray(view.bestLayout) && view.bestLayout.length
+    ? view.bestLayout
+    : Array.isArray(view.placements) ? view.placements : [];
+
+  // Paint coverage grid.
+  const cover = Array.from({ length: n }, () => Array(m).fill(-1));
+  placements.forEach(({ row, col, size }, sqIndex) => {
+    for (let rr = row; rr < Math.min(n, row + size); rr++) {
+      for (let cc = col; cc < Math.min(m, col + size); cc++) {
+        if (rr >= 0 && rr < n && cc >= 0 && cc < m) cover[rr][cc] = sqIndex;
+      }
+    }
+  });
+
+  const hueOf = (sqIndex) => `hsl(${(sqIndex * 67 + 210) % 360} 65% 52%)`;
+  const grid = Array.from({ length: n }, (_, rr) =>
+    Array.from({ length: m }, (_, cc) => {
+      const owner = cover[rr]?.[cc] ?? -1;
+      const style = owner >= 0 ? `background:${hueOf(owner)}` : "";
+      return `<div class="tlg-cell${owner >= 0 ? " filled" : ""}" style="${style}"></div>`;
+    }).join(""),
+  ).join("");
+
+  const heightsRow = heights.map((h) => `<div class="tlg-h"><span>${h}</span></div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz tlg1240-viz">
+      <div class="tlg-frame">
+        <div class="tlg-grid" style="grid-template-columns:repeat(${m}, 1fr);grid-template-rows:repeat(${n}, 1fr)">${grid}</div>
+        <div class="tlg-heights" style="grid-template-columns:repeat(${m}, 1fr)">${heightsRow}</div>
+      </div>
+      <div class="stack-status tlg-status">
+        <div><span>n × m</span><strong>${n} × ${m}</strong></div>
+        <div><span>count</span><strong>${view.count ?? 0}</strong></div>
+        <div><span>best</span><strong>${view.best == null ? "-" : view.best}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "đặt sẵn", en: "on path" }))}</span><strong>${placements.length}</strong></div>
+      </div>
+    </div>`;
+}
+
+function renderStudents1349View(step) {
+  const view = step.students1349View || {};
+  const seatRows = Array.isArray(view.seatRows) ? view.seatRows : [];
+  const width = view.width ?? 0;
+  const currentRow = Number.isInteger(view.currentRow) ? view.currentRow : -1;
+  const candMask = Number.isInteger(view.candidateMask) ? view.candidateMask : null;
+  const prevMask = Number.isInteger(view.prevMask) ? view.prevMask : 0;
+  const picks = Array.isArray(view.picks) ? view.picks : [];
+  const accepted = Boolean(view.accepted);
+  const finished = view.phase === "done";
+  const bestTotal = Array.isArray(view.states) && view.states.length
+    ? Math.max(...view.states.map((s) => s.total))
+    : 0;
+
+  const bitSet = (mask, c) => Number.isInteger(mask) && ((mask >> c) & 1) === 1;
+
+  const body = seatRows.map((rowText, r) => {
+    let rowMask = null;
+    if (r < currentRow) rowMask = picks[r] ?? 0;
+    else if (r === currentRow && finished) rowMask = picks[r] ?? 0;
+    else if (r === currentRow && candMask != null && accepted) rowMask = candMask;
+    const cells = rowText.split("").map((seat, c) => {
+      const broken = seat === "#";
+      const student = rowMask != null && bitSet(rowMask, c);
+      const diagClash = r === currentRow && !finished && !accepted && candMask != null
+        && bitSet(candMask, c)
+        && (bitSet(prevMask, c - 1) || bitSet(prevMask, c + 1));
+      const cls = [
+        "stu-cell",
+        broken ? " broken" : "",
+        student ? " student" : "",
+        diagClash ? " clash" : "",
+      ].filter(Boolean).join("");
+      return `<div class="${cls}">${broken ? "" : student ? "S" : ""}</div>`;
+    }).join("");
+    const label = `<div class="stu-rowlabel">${r === currentRow ? "▶" : "&nbsp;"} r${r}</div>`;
+    return `<div class="stu-row">${label}<div class="stu-cells" style="grid-template-columns:repeat(${width}, 1fr)">${cells}</div></div>`;
+  }).join("");
+
+  const tableRows = (view.states || []).slice(0, 8).map((s) => {
+    const cls = s.mask === candMask ? " hot" : s.mask === prevMask ? " prev" : "";
+    return `<div class="stu-dprow${cls}"><code>${s.binary}</code><b>${s.total}</b></div>`;
+  }).join("");
+
+  $("treeView").innerHTML = `
+    <div class="calc772-viz stu1349-viz">
+      <div class="stu-board">${body}</div>
+      <div class="stu-side">
+        <div class="stack-input-label">dp {prev_mask → total}</div>
+        <div class="stu-dptable">${tableRows || '<div class="stu-empty">∅</div>'}</div>
+        <div class="stack-status stu-status">
+          <div><span>${escapeHtml(pick({ vi: "hàng", en: "row" }))}</span><strong>${currentRow}</strong></div>
+          <div><span>mask</span><strong>${candMask == null ? "-" : `0b${view.states?.find((s) => s.mask === candMask)?.binary ?? candMask.toString(2)}`}</strong></div>
+          <div><span>prev</span><strong>${Number.isInteger(view.prevMask) ? `0b${binPad(view.prevMask, width)}` : "-"}</strong></div>
+          <div><span>best</span><strong>${bestTotal}</strong></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function binPad(mask, width) {
+  return (mask >>> 0).toString(2).padStart(width, "0").slice(-Math.max(width, 1));
+}
 function renderSentenceView(step) {
   const view = step.sentenceView || {};
   const sentence1 = Array.isArray(view.sentence1) ? view.sentence1 : [];
@@ -18048,6 +18422,215 @@ function renderRotate48View(step) {
   </section>`;
 }
 
+function renderParen32View(step) {
+  const view = step.paren32View || {};
+  const vi = lang === "vi";
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const bestRange = Array.isArray(view.bestRange) ? view.bestRange : null;
+  const candidateRange = Array.isArray(view.candidateRange) ? view.candidateRange : null;
+  const current = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const phase = String(view.phase || "init");
+  const boundary = stack.length ? stack[0] : null;
+  const stackIndexes = new Set(stack.filter((index) => index >= 0));
+  const inRange = (index, range) => range && index >= range[0] && index <= range[1];
+  const phaseIndex = phase === "done" ? 3 : phase === "measure" ? 2 : phase === "scan" ? 1 : 0;
+  const stages = [
+    vi ? "Mốc -1" : "Boundary -1",
+    vi ? "Duyệt ký tự" : "Scan characters",
+    vi ? "Đo đoạn hợp lệ" : "Measure valid span",
+  ].map((label, index) => `<span class="${phaseIndex > index || phaseIndex === 3 ? "done" : phaseIndex === index ? "active" : ""}"><small>${phaseIndex > index || phaseIndex === 3 ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`).join("");
+  const charsHtml = chars.map((char, index) => {
+    const classes = ["p32-char"];
+    if (inRange(index, bestRange)) classes.push("best");
+    if (inRange(index, candidateRange)) classes.push("candidate");
+    if (stackIndexes.has(index)) classes.push("stacked");
+    if (index === boundary) classes.push("boundary");
+    if (index === current) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${index === boundary ? (vi ? "mốc" : "base") : stackIndexes.has(index) ? "(" : ""}</em></span>`;
+  }).join("") || `<span class="p32-empty">${vi ? "chuỗi rỗng" : "empty string"}</span>`;
+  const stackHtml = [...stack].reverse().map((index, reverseIndex) => {
+    const isBoundary = reverseIndex === stack.length - 1;
+    const label = isBoundary ? (index === -1 ? "-1" : `) [${index}]`) : `( [${index}]`;
+    return `<span class="p32-stack-item${isBoundary ? " base" : ""}"><small>${reverseIndex === 0 ? "TOP" : isBoundary ? "BASE" : ""}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("") || `<span class="p32-empty">${vi ? "stack rỗng" : "empty stack"}</span>`;
+
+  let action;
+  if (view.event === "push") action = vi ? `Gặp '(' -> push chỉ số ${current}.` : `Found '(' -> push index ${current}.`;
+  else if (view.event === "pop") action = vi ? `Gặp ')' -> pop một '(' hoặc mốc trên đỉnh.` : `Found ')' -> pop one '(' or the top boundary.`;
+  else if (view.event === "reset") action = vi ? `Stack rỗng: ')' tại ${current} không ghép được, trở thành mốc mới.` : `Stack is empty: ')' at ${current} cannot match, so it becomes the new boundary.`;
+  else if (view.event === "best") action = vi ? `Đo được ${view.decision.length} ký tự và cập nhật best.` : `Measured ${view.decision.length} characters and updated best.`;
+  else if (view.event === "measure") action = vi ? `Đo từ mốc + 1 đến i: ${view.decision.length} ký tự.` : `Measure from boundary + 1 through i: ${view.decision.length} characters.`;
+  else if (view.event === "return") action = vi ? `Trả về best = ${view.best}.` : `Return best = ${view.best}.`;
+  else action = vi ? "Đáy stack là mốc trước đoạn hợp lệ đang xét." : "The bottom of the stack marks the position before the current valid span.";
+
+  const bestText = bestRange ? `${view.s.slice(bestRange[0], bestRange[1] + 1)} [${bestRange[0]}..${bestRange[1]}]` : "-";
+  $("treeView").innerHTML = `<section class="p32-viz" role="img" aria-label="${vi ? "Trực quan hóa Longest Valid Parentheses" : "Longest Valid Parentheses visualization"}">
+    <header><strong>LONGEST VALID PARENTHESES</strong><span>${escapeHtml(phase === "done" ? (vi ? "Hoàn tất" : "Complete") : phase)}</span></header>
+    <section class="p32-stages">${stages}</section>
+    <section class="p32-action"><small>${escapeHtml(view.event || "INIT").toUpperCase()}</small><strong>${escapeHtml(action)}</strong></section>
+    <section class="p32-main">
+      <section class="p32-panel"><header><strong>s</strong><span>${vi ? "xanh = best, vàng = đoạn đang đo" : "green = best, yellow = span being measured"}</span></header><div class="p32-chars" style="--p32-count:${Math.max(chars.length, 1)}">${charsHtml}</div></section>
+      <section class="p32-stack"><header><strong>INDEX STACK</strong><span>${vi ? "đỉnh ở trên" : "top at top"}</span></header><div>${stackHtml}</div></section>
+    </section>
+    <section class="p32-result"><span><small>best</small><strong>${view.best || 0}</strong></span><span><small>${vi ? "đoạn tốt nhất" : "best span"}</small><strong>${escapeHtml(bestText)}</strong></span><span><small>rule</small><strong>length = i - stack[-1]</strong></span></section>
+  </section>`;
+}
+
+function renderWordBreakIIView(step) {
+  const view = step.wordBreakIIView || {};
+  const vi = lang === "vi";
+  const chars = String(view.s || "").split("");
+  const candidate = view.candidate;
+  const memo = Array.isArray(view.memo) ? view.memo : [];
+  const stack = Array.isArray(view.callStack) ? view.callStack : [];
+  const partial = Array.isArray(view.partial) ? view.partial : [];
+  const phaseNames = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    call: vi ? "Gọi DFS" : "DFS call",
+    try: vi ? "Thử từ" : "Try word",
+    reject: vi ? "Không thuộc dict" : "Not in dict",
+    recurse: vi ? "Đệ quy" : "Recurse",
+    base: vi ? "Base case" : "Base case",
+    append: vi ? "Ghép câu" : "Append sentence",
+    "memo-hit": vi ? "Dùng memo" : "Memo hit",
+    "memo-save": vi ? "Lưu memo" : "Save memo",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const charsHtml = chars.map((char, index) => {
+    const classes = ["wb140-char"];
+    if (candidate && index >= candidate.start && index < candidate.end) classes.push(candidate.inDict ? "match" : "reject");
+    if (index === view.start) classes.push("start");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("") || `<span class="wb140-empty">${vi ? "chuỗi rỗng" : "empty string"}</span>`;
+  const wordsHtml = (view.wordDict || []).map((word) => `<span class="wb140-word${candidate && candidate.word === word && candidate.inDict ? " active" : ""}">${escapeHtml(word)}</span>`).join("") || `<span class="wb140-empty">${vi ? "từ điển rỗng" : "empty dictionary"}</span>`;
+  const callHtml = stack.map((start, index) => `<span class="wb140-call${index === stack.length - 1 ? " current" : ""}"><small>${index === 0 ? "ROOT" : `#${index}`}</small><strong>dfs(${start})</strong><em>"${escapeHtml(String(view.s || "").slice(start))}"</em></span>`).join("") || `<span class="wb140-empty">${vi ? "đang ở ngoài dfs" : "outside dfs"}</span>`;
+  const memoHtml = memo.map((entry) => {
+    const classes = ["wb140-memo", entry.state];
+    if (entry.start === view.start) classes.push("current");
+    const count = entry.sentences.length;
+    const preview = count ? entry.sentences.slice(0, 2).map((sentence) => `"${escapeHtml(sentence)}"`).join("<br>") : entry.state === "done" ? (vi ? "không có câu" : "no sentence") : "?";
+    return `<article class="${classes.join(" ")}"><small>memo[${entry.start}]</small><strong>${entry.state === "done" ? count : entry.state === "active" ? "DFS" : "-"}</strong><em>${preview}</em></article>`;
+  }).join("") || `<span class="wb140-empty">memo = {}</span>`;
+  const sentenceHtml = partial.length
+    ? partial.slice(0, 12).map((sentence) => `<span>${escapeHtml(sentence || '""')}</span>`).join("") + (partial.length > 12 ? `<em>+${partial.length - 12}</em>` : "")
+    : `<span class="wb140-empty">${vi ? "chưa có câu hoàn chỉnh" : "no complete sentence yet"}</span>`;
+  let action = "";
+  if (candidate) action = candidate.inDict
+    ? `"${candidate.word}" ∈ dict -> dfs(${candidate.end})`
+    : `"${candidate.word}" ∉ dict`;
+  else if (view.phase === "memo-hit") action = vi ? `Dùng lại memo[${view.start}].` : `Reuse memo[${view.start}].`;
+  else if (view.phase === "base") action = vi ? "Cuối chuỗi trả về continuation rỗng." : "At string end, return the empty continuation.";
+  else if (view.phase === "done") action = `${partial.length} ${vi ? "câu hợp lệ" : "valid sentence(s)"}`;
+  else action = vi ? "Mỗi vị trí start là một bài toán con." : "Each start position is a subproblem.";
+
+  $("treeView").innerHTML = `<section class="wb140-viz" role="img" aria-label="${vi ? "Trực quan hóa Word Break II" : "Word Break II visualization"}">
+    <header><strong>WORD BREAK II</strong><span>${escapeHtml(phaseNames[view.phase] || view.phase || "")}</span></header>
+    <section class="wb140-rule"><b>CORE RULE</b><strong>dfs(start) -> all sentences from s[start:]</strong><span>${vi ? "memo[start] lưu cả danh sách câu, không chỉ True/False." : "memo[start] stores the entire sentence list, not merely True/False."}</span></section>
+    <section class="wb140-panel"><header><strong>WORD DICT</strong></header><div class="wb140-words">${wordsHtml}</div></section>
+    <section class="wb140-panel"><header><strong>s</strong><span>${vi ? "tô màu = word đang thử" : "colored = candidate word"}</span></header><div class="wb140-chars">${charsHtml}</div></section>
+    <section class="wb140-action"><small>${escapeHtml(view.phase || "init").toUpperCase()}</small><strong>${escapeHtml(action)}</strong></section>
+    <section class="wb140-lower">
+      <section class="wb140-panel"><header><strong>CALL STACK</strong><span>${vi ? "lời gọi mới nhất ở cuối" : "newest call at the end"}</span></header><div class="wb140-calls">${callHtml}</div></section>
+      <section class="wb140-panel"><header><strong>memo[start]</strong><span>${vi ? "số câu đã giải xong" : "completed sentence counts"}</span></header><div class="wb140-memos">${memoHtml}</div></section>
+    </section>
+    <section class="wb140-panel wb140-output"><header><strong>${vi ? "CÂU ĐANG GOM" : "SENTENCES BEING COLLECTED"}</strong><span>${partial.length}</span></header><div>${sentenceHtml}</div></section>
+  </section>`;
+}
+
+function renderDirected685View(step) {
+  const view = step.directed685View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const processed = new Set(view.processedIndexes || []);
+  const sameEdge = (left, right) => Array.isArray(left) && Array.isArray(right) && left[0] === right[0] && left[1] === right[1];
+  const nodeCount = Math.max(nodes.length, 1);
+  const size = Math.max(330, Math.min(520, nodeCount * 58));
+  const center = size / 2;
+  const radius = Math.max(86, size / 2 - 72);
+  const positions = new Map(nodes.map((node, index) => {
+    const angle = (Math.PI * 2 * index / nodeCount) - Math.PI / 2;
+    return [node, { x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) }];
+  }));
+  const edgeSvg = edges.map((edge) => {
+    const from = positions.get(edge.u);
+    const to = positions.get(edge.v);
+    if (!from || !to) return "";
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const startX = from.x + ux * 26;
+    const startY = from.y + uy * 26;
+    const endX = to.x - ux * 31;
+    const endY = to.y - uy * 31;
+    const bend = edges.filter((other) => other.u === edge.u && other.v === edge.v).length > 1 ? (edge.index % 2 ? 24 : -24) : 0;
+    const midX = (startX + endX) / 2 - uy * bend;
+    const midY = (startY + endY) / 2 + ux * bend;
+    const curveMidX = (startX + 2 * midX + endX) / 4;
+    const curveMidY = (startY + 2 * midY + endY) / 4;
+    const normalX = -uy;
+    const normalY = ux;
+    const labelOffset = 16;
+    const labelA = { x: curveMidX + normalX * labelOffset, y: curveMidY + normalY * labelOffset };
+    const labelB = { x: curveMidX - normalX * labelOffset, y: curveMidY - normalY * labelOffset };
+    const distToCenter = (point) => (point.x - center) ** 2 + (point.y - center) ** 2;
+    const label = distToCenter(labelA) >= distToCenter(labelB) ? labelA : labelB;
+    const classes = ["rd685-edge"];
+    if (processed.has(edge.index)) classes.push("kept");
+    if (edge.index === activeIndex) classes.push("active");
+    if (edge.index === view.skippedIndex) classes.push("skipped");
+    if (sameEdge([edge.u, edge.v], view.first)) classes.push("first");
+    if (sameEdge([edge.u, edge.v], view.second)) classes.push("second");
+    if (sameEdge([edge.u, edge.v], view.cycle)) classes.push("cycle");
+    if (sameEdge([edge.u, edge.v], view.answer)) classes.push("removed");
+    return `<g><path class="${classes.join(" ")}" d="M ${startX.toFixed(1)} ${startY.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${endX.toFixed(1)} ${endY.toFixed(1)}" marker-end="url(#rd685-arrow)"/><text x="${label.x.toFixed(1)}" y="${label.y.toFixed(1)}" class="rd685-edge-label">#${edge.index}</text></g>`;
+  }).join("");
+  const activeEdge = edges[activeIndex];
+  const nodeSvg = nodes.map((node) => {
+    const position = positions.get(node);
+    const classes = ["rd685-node"];
+    if (activeEdge && (node === activeEdge.u || node === activeEdge.v)) classes.push("active");
+    if (view.first && node === view.first[1]) classes.push("two-parent");
+    return `<g class="${classes.join(" ")}" transform="translate(${position.x.toFixed(1)} ${position.y.toFixed(1)})"><circle r="30"/><text class="rd685-node-value" text-anchor="middle" y="7">${node}</text></g>`;
+  }).join("");
+  const incomingHtml = nodes.map((node) => {
+    const parent = Array.isArray(view.incoming) ? view.incoming[node - 1] : 0;
+    const twoParent = view.first && node === view.first[1];
+    return `<span class="rd685-parent${twoParent ? " conflict" : ""}"><small>node ${node}</small><strong>${parent ? `${parent} -> ${node}` : "ROOT"}</strong></span>`;
+  }).join("");
+  const dsuHtml = nodes.map((node) => {
+    const parent = Array.isArray(view.uf) ? view.uf[node - 1] : node;
+    const root = Array.isArray(view.roots) ? view.roots[node - 1] : node;
+    const active = activeEdge && (node === activeEdge.u || node === activeEdge.v) ? " active" : "";
+    return `<span class="rd685-dsu${active}"><small>${node}</small><strong>p=${parent}</strong><em>root ${root}</em></span>`;
+  }).join("");
+  const phaseIndex = view.phase === "done" ? 3 : ["union-init", "union-check", "union", "skip", "cycle"].includes(view.phase) ? 1 : ["two-parent"].includes(view.phase) ? 0 : 0;
+  const stageHtml = [vi ? "Tìm hai parent" : "Find two parents", vi ? "Bỏ second + DSU" : "Skip second + DSU", vi ? "Chọn cạnh xóa" : "Choose removal"].map((label, index) => `<span class="${view.phase === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><small>${view.phase === "done" || index < phaseIndex ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`).join("");
+  let decision = "";
+  if (view.decision && view.decision.kind === "two-parent") decision = vi ? `Node ${view.decision.node} nhận ${view.decision.first.join(" -> ")} và ${view.decision.second.join(" -> ")}.` : `Node ${view.decision.node} receives ${view.decision.first.join(" -> ")} and ${view.decision.second.join(" -> ")}.`;
+  else if (view.decision && view.decision.kind === "skip") decision = vi ? "Tạm không union cạnh second để phân biệt hai trường hợp." : "Temporarily do not union second to distinguish the two cases.";
+  else if (view.decision && view.decision.kind === "cycle") decision = vi ? `Cạnh ${view.decision.edge.join(" -> ")} nối hai node đã cùng component.` : `Edge ${view.decision.edge.join(" -> ")} joins nodes already in one component.`;
+  else if (view.decision && view.decision.kind === "union") decision = vi ? `Union component ${view.decision.ru} vào ${view.decision.rv}.` : `Union component ${view.decision.ru} into ${view.decision.rv}.`;
+  else if (Array.isArray(view.answer)) decision = vi ? `Cạnh cần xóa: [${view.answer.join(", ")}].` : `Edge to remove: [${view.answer.join(", ")}].`;
+  else decision = vi ? "Quét thứ tự cạnh để ghi nhận parent đầu tiên." : "Scan edges in order to record each first parent.";
+
+  $("treeView").innerHTML = `<section class="rd685-viz" role="img" aria-label="${vi ? "Trực quan hóa Redundant Connection II" : "Redundant Connection II visualization"}">
+    <header><strong>REDUNDANT CONNECTION II</strong><span>${escapeHtml(view.phase || "")}</span></header>
+    <section class="rd685-stages">${stageHtml}</section>
+    <section class="rd685-action"><small>${escapeHtml(view.phase || "init").toUpperCase()}</small><strong>${escapeHtml(decision)}</strong></section>
+    <section class="rd685-graph"><header><strong>${vi ? "ĐỒ THỊ CÓ HƯỚNG" : "DIRECTED GRAPH"}</strong><span>${vi ? "# = vị trí edge trong input" : "# = edge position in input"}</span></header><svg viewBox="0 0 ${size} ${size}" role="img"><defs><marker id="rd685-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z"/></marker></defs>${edgeSvg}${nodeSvg}</svg></section>
+    <section class="rd685-lower">
+      <section class="rd685-panel"><header><strong>INCOMING PARENT</strong></header><div class="rd685-parents">${incomingHtml}</div></section>
+      <section class="rd685-panel"><header><strong>UNION-FIND</strong><span>p / root</span></header><div class="rd685-dsus">${dsuHtml}</div></section>
+    </section>
+    <section class="rd685-legend"><span class="first"></span>${vi ? "first (parent đến trước)" : "first (earlier parent)"}<span class="second"></span>${vi ? "second (bị bỏ tạm)" : "second (temporarily skipped)"}<span class="cycle"></span>cycle<span class="removed"></span>${vi ? "cạnh xóa" : "removal edge"}</section>
+  </section>`;
+}
+
 function renderNary429View(step) {
   const view = step.nary429View || {};
   const vi = lang === "vi";
@@ -20160,6 +20743,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRussian354View(step);
+  } else if (step.paren32View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderParen32View(step);
+  } else if (step.wordBreakIIView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordBreakIIView(step);
+  } else if (step.directed685View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDirected685View(step);
   } else if (step.nary429View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -20328,6 +20929,42 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderQueueView(step);
+  } else if (step.calculator772View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalculator772View(step);
+  } else if (step.calculator772bView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalculator772BView(step);
+  } else if (step.camera968View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCamera968View(step);
+  } else if (step.mountain1095View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMountain1095View(step);
+  } else if (step.tiling1240View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTiling1240View(step);
+  } else if (step.students1349View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStudents1349View(step);
   } else if (step.sentenceView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

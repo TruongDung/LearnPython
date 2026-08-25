@@ -6259,3 +6259,193 @@ module.exports = {
     builder: buildSteps2791,
   },
 };
+
+// ─── 968: Binary Tree Cameras ───
+// Faithful LINE-BY-LINE trace of the greedy post-order DFS shown in the UI.
+// States follow problem.code: 0 = needs a camera, 1 = has a camera, 2 = covered.
+function buildSteps968(input) {
+  const root = parseTree(input);
+  const nodes = [];
+  const collect = (node, parentId = null, depth = 0) => {
+    if (!node) return;
+    nodes.push({ id: node.id, val: node.val, parentId, depth,
+      leftId: node.left ? node.left.id : null, rightId: node.right ? node.right.id : null });
+    collect(node.left, node.id, depth + 1);
+    collect(node.right, node.id, depth + 1);
+  };
+  collect(root);
+  if (!nodes.length) throw new Error("Enter a tree with at least one node.");
+  if (nodes.length > 15) throw new Error("Use a tree with at most 15 nodes for this visualization.");
+
+  const steps = [];
+  let cameras = 0;
+  const camSet = new Set();
+  const stateMap = new Map(); // id -> 0 | 1 | 2
+
+  function coveredList() {
+    const covered = new Set();
+    for (const id of camSet) {
+      covered.add(id);
+      const me = nodes.find((nd) => nd.id === id);
+      if (me.parentId != null) covered.add(me.parentId);
+      if (me.leftId != null) covered.add(me.leftId);
+      if (me.rightId != null) covered.add(me.rightId);
+    }
+    return [...covered];
+  }
+
+  function snapshot(line, phase, currentNode, retState, extraVars, title, note, final = false) {
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      vars: [
+        ...(currentNode ? [{ name: "node", value: currentNode.val }] : []),
+        ...(extraVars || []),
+        ...(retState !== null ? [{ name: "return", value: retState }] : []),
+        { name: "cameras", value: cameras },
+        ...(final ? [{ name: "result", value: cameras }] : []),
+      ],
+      camera968View: {
+        nodes: nodes.map(({ id, val, parentId, leftId, rightId }) => ({ id, val, parentId, leftId, rightId })),
+        cameraIds: [...camSet],
+        coveredIds: coveredList(),
+        states: Object.fromEntries(stateMap),
+        currentId: currentNode ? currentNode.id : null,
+        phase,
+        answer: cameras,
+      },
+    });
+  }
+
+  snapshot(3, "init", null, null, null, {
+    vi: "cameras = 0",
+    en: "cameras = 0",
+  }, {
+    vi: "Chiến lược tham lam: xử lý TỪ DƯỚI LÊN (hậu tự). Trạng thái mỗi node: 0=cần camera, 1=có camera, 2=được cover.",
+    en: "Greedy strategy: process BOTTOM-UP (post-order). Each node returns 0=needs camera, 1=has camera, 2=covered.",
+  });
+
+  function dfs(node) {
+    if (!node) {
+      snapshot(6, "base", null, 2, null, {
+        vi: "node rỗng → return 2",
+        en: "null node → return 2",
+      }, {
+        vi: "Node null coi như ĐÃ được cover nên không bao giờ ép cha đặt camera.",
+        en: "A null child counts as COVERED so it never forces the parent to host a camera.",
+      });
+      return 2;
+    }
+
+    snapshot(4, "call", node, null, null, {
+      vi: `dfs(${node.val})`,
+      en: `dfs(${node.val})`,
+    }, {
+      vi: "Giải quyết hai cây con TRƯỚC rồi mới quyết định tại node này.",
+      en: "Resolve both subtrees FIRST, only then decide at this node.",
+    });
+
+    const leftState = dfs(node.left);
+    const rightState = dfs(node.right);
+    snapshot(7, "states", node, null, [
+      { name: "left", value: leftState },
+      { name: "right", value: rightState },
+    ], {
+      vi: `left=${leftState}, right=${rightState}`,
+      en: `left=${leftState}, right=${rightState}`,
+    }, {
+      vi: "Trạng thái nghĩa: 0 cần camera · 1 có camera · 2 được cover. Dựa vào đó chọn một trong ba nhánh bên dưới.",
+      en: "Meaning: 0 needs a camera · 1 has one · 2 covered. These decide which branch runs next.",
+    });
+
+    if (leftState === 0 || rightState === 0) {
+      cameras += 1;
+      camSet.add(node.id);
+      stateMap.set(node.id, 1);
+      snapshot(9, "place", node, 1, null, {
+        vi: `${leftState === 0 ? "left" : "right"}=0 → đặt camera tại ${node.val}, return 1`,
+        en: `${leftState === 0 ? "left" : "right"}=0 → place camera at ${node.val}, return 1`,
+      }, {
+        vi: "Có con CHƯA được ai cover nên buộc phải đặt camera ngay đây (tối ưu nhất vì camera ở cha không thể cứu con sâu hơn).",
+        en: "One child is UNCOVERED by anybody, so a camera must go here (a grandparent camera could never reach it).",
+      });
+      return 1;
+    }
+    if (leftState === 1 || rightState === 1) {
+      stateMap.set(node.id, 2);
+      snapshot(12, "covered", node, 2, null, {
+        vi: `Con có camera → ${node.val} được cover, return 2`,
+        en: `A child owns a camera → ${node.val} is covered, return 2`,
+      }, {
+        vi: "Tiết kiệm nhất: dùng lại camera của con, KHÔNG đặt thêm.",
+        en: "Cheapest option: reuse the child's camera, place nothing.",
+      });
+      return 2;
+    }
+    stateMap.set(node.id, 0);
+    snapshot(13, "needs", node, 0, null, {
+      vi: `Hai con đều được cover → ${node.val} return 0`,
+      en: `Both children covered → ${node.val} returns 0`,
+    }, {
+      vi: "Chưa ai phủ node này: đẩy quyết định lên CHO CHA xử lý (tham lam để camera càng cao càng ít).",
+      en: "Nobody covers this node yet: defer the choice to ITS PARENT (greedy keeps cameras higher and fewer).",
+    });
+    return 0;
+  }
+
+  const rootState = dfs(root);
+  snapshot(14, "root-check", root, rootState, null, {
+    vi: `dfs(root) = ${rootState}`,
+    en: `dfs(root) = ${rootState}`,
+  }, {
+    vi: rootState === 0
+      ? "Gốc trả về 0 tức chưa được ai phủ."
+      : "Gốc đã được phủ hoặc tự có camera nên kết thúc.",
+    en: rootState === 0
+      ? "The root returned 0, meaning nobody covers it yet."
+      : "The root is already covered or hosts a camera, so we are done.",
+  });
+
+  if (rootState === 0) {
+    cameras += 1;
+    camSet.add(root.id);
+    stateMap.set(root.id, 1);
+    snapshot(15, "place-root", root, null, null, {
+      vi: `Gốc cần camera → đặt tại ${root.val}`,
+      en: `Root needs one → place a camera at ${root.val}`,
+    }, {
+      vi: "Trường hợp duy nhất camera bị đếm sau vòng DFS.",
+      en: "The only case where a camera is added after the DFS finishes.",
+    });
+  }
+
+  snapshot(16, "done", null, null, null, {
+    vi: `Kết quả: ${cameras} camera`,
+    en: `Result: ${cameras} camera${cameras === 1 ? "" : "s"}`,
+  }, {
+    vi: `Toàn bộ ${nodes.length} node đều được quan sát bởi chính nó, cha hoặc con — tối thiểu ${cameras} camera.`,
+    en: `All ${nodes.length} nodes are watched by themselves, a parent, or a child — ${cameras} is minimal.`,
+  }, true);
+
+  return { steps, answer: cameras };
+}
+
+Object.assign(module.exports, {
+  968: {
+    id: 968, difficulty: "hard", slug: "binary-tree-cameras", category: TREE_CAT,
+    title: { vi: "Binary Tree Cameras", en: "Binary Tree Cameras" },
+    titleVi: { vi: "Camera cho cây nhị phân", en: "Binary Tree Cameras" },
+    statement: { vi: "Đặt số camera ít nhất để mọi node được camera ở chính nó, node cha hoặc node con quan sát.", en: "Place the fewest cameras so every node is monitored by itself, its parent, or a child." },
+    defaultInput: "0,0,null,0,0", inputKind: "string", inputLabel: { vi: "cây level-order (null cho node rỗng)", en: "level-order tree (null for an empty node)" },
+    approach: [{ vi: "DFS hậu tự trả về ba trạng thái: cần camera, có camera, hoặc đã được cover. Node chỉ đặt camera khi một con cần nó.", en: "Postorder DFS returns needs-camera, has-camera, or covered. A node gets a camera only when a child needs one." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "h là chiều cao cây do stack đệ quy.", en: "h is the tree height used by recursion." } },
+    code: ["class Solution:", "    def minCameraCover(self, root):", "        cameras = 0", "        def dfs(node):", "            nonlocal cameras", "            if not node: return 2  # covered", "            left, right = dfs(node.left), dfs(node.right)", "            if left == 0 or right == 0:", "                cameras += 1", "                return 1  # camera here", "            if left == 1 or right == 1:", "                return 2  # covered by child", "            return 0  # parent must cover me", "        if dfs(root) == 0:", "            cameras += 1", "        return cameras"],
+    builder: buildSteps968,
+  },
+});

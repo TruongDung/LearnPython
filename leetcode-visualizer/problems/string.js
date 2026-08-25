@@ -10314,7 +10314,7 @@ function buildSteps1977(input) {
  */
 function buildSteps32(input) {
   let raw = String(input ?? "").replace(/[^()]/g, "");
-  if (raw.length > 16) raw = raw.slice(0, 16);
+  if (raw.length > 22) raw = raw.slice(0, 22);
   const s = raw || "()()";
   const n = s.length;
   const chars = s.split("");
@@ -10323,9 +10323,32 @@ function buildSteps32(input) {
   const sub = chars.map((ch, i) => `${ch}[${i}]`);
   const steps = [];
   const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
+  const stack = [-1];
+  let best = 0;
+  let bestL = -1;
+  let bestR = -1;
+  const bestMark = () => (bestL >= 0 ? Array.from({ length: bestR - bestL + 1 }, (_, k) => bestL + k) : []);
+  const stackStr = () => `[${stack.join(", ")}]`;
+  const push32 = (meta, step) => {
+    steps.push({
+      ...step,
+      paren32View: {
+        s,
+        chars: [...chars],
+        phase: meta.phase,
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        stack: [...stack],
+        best,
+        bestRange: bestL >= 0 ? [bestL, bestR] : null,
+        candidateRange: meta.candidateRange || null,
+        event: meta.event || "",
+        decision: meta.decision || null,
+      },
+    });
+  };
 
   // ─── Phase 0: what "valid" means ───
-  steps.push({
+  push32({ phase: "init", event: "boundary" }, {
     title: { vi: "Chuỗi ngoặc hợp lệ là gì?", en: "What counts as valid?" },
     arr,
     raw: rawLabels,
@@ -10345,18 +10368,12 @@ function buildSteps32(input) {
   });
 
   // ─── Phase 1: scan with the index stack ───
-  const stack = [-1];
-  let best = 0;
-  let bestL = -1;
-  let bestR = -1;
-  const bestMark = () => (bestL >= 0 ? Array.from({ length: bestR - bestL + 1 }, (_, k) => bestL + k) : []);
-  const stackStr = () => `[${stack.join(", ")}]`;
 
   for (let i = 0; i < n; i++) {
     const ch = chars[i];
     if (ch === "(") {
       stack.push(i);
-      steps.push({
+      push32({ phase: "scan", currentIndex: i, event: "push", decision: { index: i, char: ch } }, {
         title: { vi: `s[${i}]='(' → đẩy ${i} vào stack`, en: `s[${i}]='(' → push ${i} onto the stack` },
         arr,
         raw: rawLabels,
@@ -10375,8 +10392,8 @@ function buildSteps32(input) {
         },
       });
     } else {
-      stack.pop();
-      steps.push({
+      const popped = stack.pop();
+      push32({ phase: "scan", currentIndex: i, event: "pop", decision: { index: i, char: ch, popped } }, {
         title: { vi: `s[${i}]=')' → pop phần tử trên cùng`, en: `s[${i}]=')' → pop the top element` },
         arr,
         raw: rawLabels,
@@ -10397,7 +10414,7 @@ function buildSteps32(input) {
 
       if (stack.length === 0) {
         stack.push(i);
-        steps.push({
+        push32({ phase: "scan", currentIndex: i, event: "reset", decision: { index: i, char: ch, boundary: i } }, {
           title: { vi: `Stack trống ⇒ ')' tại ${i} vô cứu`, en: `Stack empty ⇒ the ')' at ${i} is orphaned` },
           arr,
           raw: rawLabels,
@@ -10423,7 +10440,8 @@ function buildSteps32(input) {
           bestL = stack[stack.length - 1] + 1;
           bestR = i;
         }
-        steps.push({
+        const candidateRange = [stack[stack.length - 1] + 1, i];
+        push32({ phase: "measure", currentIndex: i, event: improved ? "best" : "measure", candidateRange, decision: { index: i, length, improved, boundary: stack[stack.length - 1] } }, {
           title: improved
             ? { vi: `Đoạn [${bestL}..${i}] dài ${fmt(length)} ⇒ best = ${fmt(best)}`, en: `Segment [${bestL}..${i}] has length ${length} ⇒ best = ${best}` }
             : { vi: `Đoạn [${stack[stack.length - 1] + 1}..${i}] dài ${fmt(length)}, chưa vượt best ${fmt(best)}`, en: `Segment [${stack[stack.length - 1] + 1}..${i}] has length ${length}, below best ${best}` },
@@ -10453,7 +10471,7 @@ function buildSteps32(input) {
   }
 
   // ─── Phase 2: result ───
-  steps.push({
+  push32({ phase: "done", event: "return", candidateRange: bestL >= 0 ? [bestL, bestR] : null, decision: { answer: best } }, {
     title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
     arr,
     raw: rawLabels,
@@ -12864,3 +12882,788 @@ module.exports = {
     },
   },
 };
+
+// ─── 772: Basic Calculator III ───
+// Faithful LINE-BY-LINE trace of the exact Python code shown in the UI.
+// Every step highlights the single source line an interpreter would be on:
+// while-condition checks (L10/L14/L19/L22/L25), digit-by-digit number
+// building (L13→L15), the pop/compute pair inside apply() (L5→L6), i += 1
+// (L24), and so on — in true execution order, so pressing "next" mirrors
+// stepping through the code with a debugger.
+// Unary signs at the start or right after '(' are normalised to '0-x' before
+// the run starts, so the traced code itself needs no special cases.
+// Line numbers refer to problem.code below (26 lines).
+function buildSteps772(input) {
+  const raw = String(input == null ? "2*(5+5*2)/3+(6/2+8)" : input);
+  const compact = raw.replace(/\s+/g, "");
+  if (!compact || compact.length > 80 || !/^[0-9+\-*/()]+$/.test(compact)) {
+    throw new Error("Use digits, +, -, *, /, parentheses (up to 80 characters).");
+  }
+  if (/[+\-*/(/]$/.test(compact)) {
+    throw new Error("Expression cannot end with an operator or '('.");
+  }
+  if (/^[*/]/.test(compact)) {
+    throw new Error("Expression cannot start with '*' or '/'.");
+  }
+  let depth = 0;
+  for (const ch of compact) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    if (depth < 0) break;
+  }
+  if (depth !== 0) throw new Error("Parentheses must be balanced.");
+
+  let expression = "";
+  let prevChar = null;
+  let unaryCount = 0;
+  for (const ch of compact) {
+    if (ch === "+" || ch === "-") {
+      if (prevChar === null || prevChar === "(") {
+        expression += "0";
+        unaryCount += 1;
+      } else if ("+-*/".includes(prevChar)) {
+        throw new Error("A sign directly after another operator (e.g. '*-') is not supported.");
+      }
+    } else if ("+-*/".includes(ch) && "+-*/".includes(prevChar || "")) {
+      throw new Error("Two binary operators in a row are not allowed.");
+    }
+    expression += ch;
+    prevChar = ch;
+  }
+
+  const chars = expression.split("");
+  const n = chars.length;
+  const nums = [];
+  const ops = [];
+  const steps = [];
+  const precedence = (op) => (op === "+" || op === "-" ? 1 : op === "*" || op === "/" ? 2 : 0);
+  const isDigit = (c) => c >= "0" && c <= "9";
+  let value = null;      // mirrors local variable `value` while reading digits
+  let lastOp = "";       // description of the statement just executed
+
+  function snapshot(line, phase, pos, title, note, final = false) {
+    const shownPos = pos >= 0 && pos < n ? pos : -1;
+    steps.push({
+      title,
+      arr: [],
+      sub: chars,
+      highlight: shownPos >= 0 ? [shownPos] : [],
+      mark: [],
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "i", value: pos < 0 ? "-" : pos >= n ? `${pos} (= len(s))` : pos },
+        { name: "s[i]", value: shownPos >= 0 ? `'${chars[shownPos]}'` : "-" },
+        ...(value !== null ? [{ name: "value", value }] : []),
+        { name: "nums", value: `[${nums.join(", ")}]` },
+        { name: "ops", value: `[${ops.join(", ")}]` },
+        ...(lastOp ? [{ name: "statement", value: lastOp }] : []),
+        ...(final ? [{ name: "result", value: nums[0] }] : []),
+      ],
+      note,
+      calculator772View: {
+        expression,
+        originalExpression: raw.trim(),
+        chars,
+        i: pos,
+        value,
+        numbers: [...nums],
+        operators: [...ops],
+        operation: lastOp,
+        phase,
+        result: final ? nums[0] : null,
+      },
+    });
+  }
+
+  // def apply(): L5 pops, L6 computes and pushes. Two separate snapshots so
+  // the debugger lands on each physical line, exactly like the real code.
+  function apply(pos) {
+    if (nums.length < 2 || !ops.length || ops[ops.length - 1] === "(") {
+      throw new Error("Operator is missing a left operand.");
+    }
+    const op = ops.pop();
+    const b = nums.pop();
+    const a = nums.pop();
+    lastOp = `b, a, op = ${b}, ${a}, '${op}'`;
+    snapshot(5, "apply-pop", pos, {
+      vi: `Pop: b=${b}, a=${a}, op='${op}'`,
+      en: `Pop: b=${b}, a=${a}, op='${op}'`,
+    }, {
+      vi: `Dòng 5 pop BÊN PHẢI trước: nums.pop() đầu tiên là b=${b}, lần thứ hai là a=${a}, rồi ops.pop() lấy '${op}'.`,
+      en: `Line 5 pops the RIGHT operand first: the first nums.pop() is b=${b}, the second is a=${a}, then ops.pop() yields '${op}'.`,
+    });
+
+    let result;
+    if (op === "+") result = a + b;
+    else if (op === "-") result = a - b;
+    else if (op === "*") result = a * b;
+    else {
+      if (b === 0) throw new Error("Division by zero is not allowed.");
+      result = Math.trunc(a / b);
+    }
+    nums.push(result);
+    lastOp = `nums.append(${result})`;
+    snapshot(6, "apply-push", pos, {
+      vi: `Tính ${a} ${op} ${b} = ${result} → đẩy vào nums`,
+      en: `Compute ${a} ${op} ${b} = ${result} → push to nums`,
+    }, {
+      vi: op === "/"
+        ? `Phép chia lấy phần nguyên về phía 0: int(${a} / ${b}) = ${result}.`
+        : `Kết quả ${result} được đẩy trở lại đỉnh nums thay cho hai toán hạng vừa pop.`,
+      en: op === "/"
+        ? `Division truncates toward zero: int(${a} / ${b}) = ${result}.`
+        : `The result ${result} replaces the two popped operands on top of nums.`,
+    });
+  }
+
+  if (unaryCount > 0) {
+    snapshot(2, "preprocess", -1, {
+      vi: `Chuẩn hoá dấu một ngôi (${unaryCount} chỗ)`,
+      en: `Normalise unary signs (${unaryCount} spot${unaryCount > 1 ? "s" : ""})`,
+    }, {
+      vi: `Trước khi chạy thuật toán, chèn 0 trước mỗi dấu +/− đứng đầu hoặc ngay sau '(': "${compact}" → "${expression}". Nhờ đó phần còn lại bám sát code hiển thị.`,
+      en: `Before running the algorithm, insert 0 before every +/- at the start or right after '(': "${compact}" → "${expression}". The rest of the trace then follows the displayed code verbatim.`,
+    });
+  }
+
+  lastOp = "";
+  snapshot(3, "init", -1, {
+    vi: "Khởi tạo nums và ops rỗng",
+    en: "Initialize empty nums and ops",
+  }, {
+    vi: "nums giữ toán hạng, ops giữ toán tử và dấu '('. Con trỏ i sẽ duyệt TỪNG KÝ TỰ của biểu thức.",
+    en: "nums holds operands, ops holds operators and '('. Pointer i will walk the expression CHARACTER by CHARACTER.",
+  });
+
+  for (let i = 0; ; ) {
+    if (i === 0) {
+      snapshot(9, "set-i", 0, { vi: "i = 0", en: "i = 0" }, {
+        vi: "Con trỏ bắt đầu tại ký tự đầu tiên của biểu thức.",
+        en: "The pointer starts at the first character of the expression.",
+      });
+    }
+
+    const more = i < n;
+    lastOp = `check: i < len(s) → ${more}`;
+    if (more) {
+      snapshot(10, "loop-check", i, {
+        vi: `while: i=${i} < ${n} → True, s[${i}]='${chars[i]}'`,
+        en: `while: i=${i} < ${n} → True, s[${i}]='${chars[i]}'`,
+      }, {
+        vi: `Vòng lặp chính tiếp tục ở ký tự '${chars[i]}'.`,
+        en: `The main loop continues at character '${chars[i]}'.`,
+      });
+    } else {
+      snapshot(10, "loop-exit", n - 1, {
+        vi: `while: i=${i} = len(s) → False, thoát vòng lặp`,
+        en: `while: i=${i} = len(s) → False, exit the loop`,
+      }, {
+        vi: "Đã duyệt hết biểu thức; chỉ còn các toán tử trong ops phải xử lý.",
+        en: "Every character has been read; only operators left inside ops remain.",
+      });
+      break;
+    }
+
+    const ch = chars[i];
+    if (isDigit(ch)) {
+      lastOp = `check: s[i].isdigit() → True`;
+      snapshot(12, "digit-check", i, {
+        vi: `s[${i}]='${ch}' là chữ số → True`,
+        en: `s[${i}]='${ch}' is a digit → True`,
+      }, {
+        vi: "Rơi vào nhánh đọc số nguyên (có thể nhiều chữ số).",
+        en: "Take the integer-reading branch (numbers may have several digits).",
+      });
+
+      value = 0;
+      lastOp = "value = 0";
+      snapshot(13, "value-init", i, {
+        vi: "value = 0",
+        en: "value = 0",
+      }, {
+        vi: "Bộ tích luỹ bắt đầu từ 0 rồi gom từng chữ số.",
+        en: "The accumulator starts at 0 and gathers one digit at a time.",
+      });
+
+      let firstDigit = true;
+      while (i < n && isDigit(chars[i])) {
+        const d = Number(chars[i]);
+        const before = value;
+        const consumedIndex = i;
+        value = before * 10 + d;
+        i += 1;
+        lastOp = `value = ${before}*10 + ${d} = ${value}; i += 1`;
+        snapshot(15, "accumulate", consumedIndex, {
+          vi: `value = ${before}*10 + ${d} = ${value}; i: ${consumedIndex} → ${i}`,
+          en: `value = ${before}*10 + ${d} = ${value}; i: ${consumedIndex} → ${i}`,
+        }, {
+          vi: firstDigit
+            ? `Gom chữ số đầu tiên: value = ${value}; vòng lặp nhỏ sẽ tiếp tục nếu ký tự kế tiếp vẫn là chữ số.`
+            : `Số nhiều chữ số được xây dần: mỗi vòng nhân 10 rồi cộng chữ số mới.`,
+          en: firstDigit
+            ? `First digit gathered: value = ${value}; the inner loop keeps running while the next character is still a digit.`
+            : `A multi-digit number grows step by step: multiply by 10, add the new digit.`,
+        });
+        firstDigit = false;
+      }
+      const stopChar = i < n ? chars[i] : null;
+      lastOp = "check: s[i].isdigit() → False";
+      snapshot(14, "digit-loop-exit", i >= n ? n - 1 : i, {
+        vi: stopChar === null
+          ? `while nhỏ: hết chuỗi → thoát`
+          : `while nhỏ: s[${i}]='${stopChar}' không phải chữ số → thoát`,
+        en: stopChar === null
+          ? `inner while: end of string → exit`
+          : `inner while: s[${i}]='${stopChar}' is not a digit → exit`,
+      }, {
+        vi: stopChar === null
+          ? "Không còn ký tự nào; số đã đọc xong."
+          : `Gặp '${stopChar}' nên số kết thúc tại giá trị hiện tại.`,
+        en: stopChar === null
+          ? "No characters left; the number is complete."
+          : `Character '${stopChar}' ends the number at its current value.`,
+      });
+
+      const pushedNumber = value;
+      nums.push(pushedNumber);
+      lastOp = `nums.append(${pushedNumber}); continue`;
+      snapshot(16, "push-number", i >= n ? n - 1 : i, {
+        vi: `Đẩy số ${pushedNumber} vào nums; continue`,
+        en: `Push number ${pushedNumber} onto nums; continue`,
+      }, {
+        vi: `Toán hạng hoàn chỉnh ${pushedNumber} vào stack số. continue nhảy về vòng while chính và BỎ QUA dòng i += 1 cuối thân lặp — vì i đã tiến qua các chữ số ở dòng 15 rồi.`,
+        en: `The finished operand ${pushedNumber} joins the number stack. continue jumps back to the main while loop and SKIPS the trailing i += 1 — i already advanced past the digits on line 15.`,
+      });
+      value = null;
+      continue;
+    }
+
+    if (ch === "(") {
+      ops.push("(");
+      lastOp = "ops.append('(')";
+      snapshot(17, "open", i, {
+        vi: `s[${i}]='(' → đẩy '(' vào ops`,
+        en: `s[${i}]='(' → push '(' onto ops`,
+      }, {
+        vi: "'(' đánh dấu đáy của biểu thức con; toán tử bên ngoài bị chặn không rút gọn qua nó.",
+        en: "'(' marks the floor of a sub-expression; outer operators cannot reduce across it.",
+      });
+    } else if (ch === ")") {
+      lastOp = "elif s[i] == ')'";
+      snapshot(18, "close-check", i, {
+        vi: `s[${i}]=')' → nhánh elif`,
+        en: `s[${i}]=')' → elif branch`,
+      }, {
+        vi: "Gặp ')' phải rút gọn mọi toán tử cho tới khi đỉnh ops là '(' tương ứng.",
+        en: "On ')' reduce every operator until the matching '(' sits on top of ops.",
+      });
+
+      while (ops.length && ops[ops.length - 1] !== "(") {
+        const top = ops[ops.length - 1];
+        lastOp = `check: ops[-1] != '(' → True`;
+        snapshot(19, "reduce-close", i, {
+          vi: `ops[-1]='${top}' != '(' → True → apply()`,
+          en: `ops[-1]='${top}' != '(' → True → apply()`,
+        }, {
+          vi: `Còn '${top}' phía trong ngoặc nên chưa được tính; gọi apply().`,
+          en: `Operator '${top}' still sits inside the parenthesis; call apply().`,
+        });
+        apply(i);
+      }
+      lastOp = `check: ops[-1] != '(' → False`;
+      snapshot(19, "close-ready", i, {
+        vi: "ops[-1]='(' → False, dừng rút gọn",
+        en: "ops[-1]='(' → False, stop reducing",
+      }, {
+        vi: "Đỉnh giờ là '(' nên toàn bộ biểu thức con đã được tính xong.",
+        en: "The top is now '(' so the whole sub-expression has been evaluated.",
+      });
+
+      ops.pop();
+      lastOp = "ops.pop()";
+      snapshot(20, "close-pop", i, {
+        vi: "Bỏ '(' khỏi ops",
+        en: "Discard '(' from ops",
+      }, {
+        vi: "'(' đã hết vai trò và bị loại; kết quả biểu thức con nằm trên đỉnh nums.",
+        en: "'(' leaves ops; the sub-expression's result now sits on top of nums.",
+      });
+    } else {
+      lastOp = "else:";
+      snapshot(21, "operator-branch", i, {
+        vi: `s[${i}]='${ch}' là toán tử`,
+        en: `s[${i}]='${ch}' is an operator`,
+      }, {
+        vi: `Chưa được tính ngay: '${ch}' có độ ưu tiên ${precedence(ch)}, phải so với đỉnh ops trước.`,
+        en: `Not applied yet: '${ch}' has precedence ${precedence(ch)} and must first be compared against the top of ops.`,
+      });
+
+      while (ops.length && ops[ops.length - 1] !== "(" && precedence(ops[ops.length - 1]) >= precedence(ch)) {
+        const top = ops[ops.length - 1];
+        lastOp = `check: prec('${top}') >= prec('${ch}') → True`;
+        snapshot(22, "reduce-op", i, {
+          vi: `prec('${top}')=${precedence(top)} ≥ prec('${ch}')=${precedence(ch)} → True → apply()`,
+          en: `prec('${top}')=${precedence(top)} ≥ prec('${ch}')=${precedence(ch)} → True → apply()`,
+        }, {
+          vi: `Toán tử cũ '${top}' ưu tiên không thấp hơn nên PHẢI tính trước để giữ đúng thứ tự phép toán.`,
+          en: `The older operator '${top}' has equal/higher precedence, so it MUST be applied first to keep operator order correct.`,
+        });
+        apply(i);
+      }
+      if (ops.length && ops[ops.length - 1] !== "(") {
+        const top = ops[ops.length - 1];
+        lastOp = `check: prec('${top}') >= prec('${ch}') → False`;
+        snapshot(22, "prec-stop", i, {
+          vi: `prec('${top}')=${precedence(top)} < prec('${ch}')=${precedence(ch)} → False`,
+          en: `prec('${top}')=${precedence(top)} < prec('${ch}')=${precedence(ch)} → False`,
+        }, {
+          vi: `'${ch}' ưu tiên cao hơn '${top}', được phép chờ trên đỉnh để tính trước.`,
+          en: `'${ch}' outranks '${top}' and may wait on top so it applies first.`,
+        });
+      } else if (ops.length) {
+        lastOp = `check: ops[-1] != '(' → False`;
+        snapshot(22, "prec-paren", i, {
+          vi: "ops[-1]='(' → chặn, không rút gọn qua ngoặc",
+          en: "ops[-1]='(' blocks reduction across the parenthesis",
+        }, {
+          vi: "Mọi toán tử ngoài ngoặc phải chờ tới khi gặp ')' mới được tính.",
+          en: "Operators outside must wait until ')' arrives before being applied.",
+        });
+      } else {
+        lastOp = "check: ops non-empty → False";
+        snapshot(22, "prec-empty", i, {
+          vi: "ops rỗng → không cần rút gọn",
+          en: "ops is empty → nothing to reduce",
+        }, {
+          vi: `Không có toán tử cũ nào cạnh tranh, '${ch}' được đẩy xuống luôn.`,
+          en: `No older operator competes, so '${ch}' is simply pushed.`,
+        });
+      }
+
+      ops.push(ch);
+      lastOp = `ops.append('${ch}')`;
+      snapshot(23, "push-op", i, {
+        vi: `Đẩy '${ch}' vào ops`,
+        en: `Push '${ch}' onto ops`,
+      }, {
+        vi: `'${ch}' chờ trên đỉnh ops; operand kế tiếp sẽ là b của nó.`,
+        en: `'${ch}' waits on top of ops; the next operand will become its b.`,
+      });
+    }
+
+    i += 1;
+    lastOp = `i += 1 → ${i}`;
+    snapshot(24, "advance", i >= n ? n - 1 : i, {
+      vi: `i += 1 → i = ${i}`,
+      en: `i += 1 → i = ${i}`,
+    }, {
+      vi: "Cuối thân lặp: chuyển tới ký tự kế tiếp rồi kiểm tra lại điều kiện while.",
+      en: "End of the loop body: move to the next character, then re-check the while condition.",
+    });
+  }
+
+  while (ops.length) {
+    const top = ops[ops.length - 1];
+    lastOp = "check: while ops → True";
+    snapshot(25, "drain-check", n, {
+      vi: `while ops: còn ['...${top}'] → True → apply()`,
+      en: `while ops: [...${top}] remain → True → apply()`,
+    }, {
+      vi: "Hết biểu thức: các toán tử còn sót trong ops được tính theo thứ tự từ đỉnh xuống.",
+      en: "Input exhausted: remaining operators in ops are applied from the top down.",
+    });
+    apply(n);
+  }
+  lastOp = "check: while ops → False";
+  snapshot(25, "drain-done", n, {
+    vi: "while ops → False: ops đã rỗng",
+    en: "while ops → False: ops is empty",
+  }, {
+    vi: "Không còn toán tử nào để xử lý.",
+    en: "No operators remain to process.",
+  });
+
+  if (nums.length !== 1) throw new Error("Expression is incomplete.");
+  lastOp = "return nums[-1]";
+  snapshot(26, "done", n, {
+    vi: `Kết quả: ${compact} = ${nums[0]}`,
+    en: `Result: ${compact} = ${nums[0]}`,
+  }, {
+    vi: `ops rỗng và nums còn đúng một giá trị: đáp án là ${nums[0]}.`,
+    en: `ops is empty and exactly one value remains in nums: the answer is ${nums[0]}.`,
+  }, true);
+
+  return { expression: compact, answer: nums[0], steps };
+}
+
+// ─── 772 · Approach 2: Single mixed stack with resolve() ───
+// Faithful LINE-BY-LINE trace of the second code block shown in the UI.
+// One stack holds BOTH signed integers and saved operator characters:
+//   • '+' appends +num, '-' appends -num (so unary signs work natively),
+//   • '*' / '/' combine num with the stack top immediately,
+//   • '(' saves the pending operator ON the stack, ')' sums its integers
+//     back and re-resolves them with the saved operator.
+// Every step highlights the exact source line being executed (code2 lines).
+function buildSteps772SingleStack(input) {
+  const raw = String(input == null ? "2*(5+5*2)/3+(6/2+8)" : input);
+  const expression = raw.replace(/\s+/g, "");
+  if (!expression || expression.length > 80 || !/^[0-9+\-*/()]+$/.test(expression)) {
+    throw new Error("Use digits, +, -, *, /, parentheses (up to 80 characters).");
+  }
+  if (/[+\-*/(/]$/.test(expression)) {
+    throw new Error("Expression cannot end with an operator or '('.");
+  }
+  if (/^[*/]/.test(expression)) {
+    throw new Error("Expression cannot start with '*' or '/'.");
+  }
+  let depth = 0;
+  for (const ch of expression) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    if (depth < 0) break;
+  }
+  if (depth !== 0) throw new Error("Parentheses must be balanced.");
+  for (let k = 1; k < expression.length; k++) {
+    if ("+-*/".includes(expression[k]) && "+-*/".includes(expression[k - 1])) {
+      throw new Error("A sign directly after another operator (e.g. '*-') is not supported.");
+    }
+  }
+
+  const chars = expression.split("");
+  const n = chars.length;
+  const stack = [];
+  const steps = [];
+  let num = 0;
+  let prevOp = "+";
+  let lastOp = "";
+
+  // code2 line numbers of the action each operator lands on inside resolve().
+  const RESOLVE_LINE = { "+": 5, "-": 7, "*": 9, "/": 11 };
+
+  function stackLabel() {
+    return `[${stack.map((v) => typeof v === "number" ? String(v) : `'${v}'`).join(", ")}]`;
+  }
+
+  function snapshot(line, phase, pos, title, note, final = false) {
+    steps.push({
+      title,
+      arr: [],
+      sub: chars,
+      highlight: pos >= 0 && pos < n ? [pos] : [],
+      mark: [],
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "i", value: pos < 0 ? "-" : `${pos} ('${chars[pos]}')` },
+        { name: "num", value: num },
+        { name: "prev_op", value: `'${prevOp}'` },
+        { name: "stack", value: stackLabel() },
+        ...(lastOp ? [{ name: "statement", value: lastOp }] : []),
+        ...(final ? [{ name: "result", value: num }] : []),
+      ],
+      note,
+      calculator772bView: {
+        expression,
+        originalExpression: raw.trim(),
+        chars,
+        i: pos,
+        num,
+        prevOp,
+        stack: [...stack],
+        operation: lastOp,
+        phase,
+        result: final ? num : null,
+      },
+    });
+  }
+
+  // def resolve(num, op): one decision → exactly one physical line runs.
+  function resolve(pos, op, operand, viaLineLabelVi, viaLineLabelEn) {
+    lastOp = `resolve(${operand}, '${op}')`;
+    if (!(op in RESOLVE_LINE)) {
+      snapshot(3, "resolve-noop", pos, {
+        vi: `resolve(${operand}, '${op}') → không khớp nhánh nào`,
+        en: `resolve(${operand}, '${op}') → no branch matches`,
+      }, {
+        vi: viaLineLabelEn
+          ? `op là dấu ')' vừa đóng ngoặc nên resolve không thay đổi stack.`
+          : `op='${op}' không thuộc +-*/, nên thân if/elif bỏ qua hoàn toàn.`,
+        en: viaLineLabelEn
+          ? `The op is the just-closed ')' marker, so resolve leaves the stack untouched.`
+          : `op='${op}' is not one of +-*/), so the if/elif body is skipped entirely.`,
+      });
+      return;
+    }
+    if (op === "+") {
+      stack.push(operand);
+      snapshot(RESOLVE_LINE[op], "resolve-push", pos, {
+        vi: `op '+' → append(+${operand})`,
+        en: `op '+' → append(+${operand})`,
+      }, {
+        vi: `${viaLineLabelVi} Đợi '+' được thực hiện: đẩy ${operand} (dấu sẵn có) vào stack.`,
+        en: `${viaLineLabelEn} The pending '+' applies: push ${operand} onto the stack.`,
+      });
+    } else if (op === "-") {
+      stack.push(-operand);
+      snapshot(RESOLVE_LINE[op], "resolve-neg", pos, {
+        vi: `op '-' → append(-${operand})`,
+        en: `op '-' → append(-${operand})`,
+      }, {
+        vi: `${viaLineLabelVi} Phép trừ lưu dạng số âm: đẩy ${-operand}. Cộng dồn cuối bài tự xử lý phép trừ.`,
+        en: `${viaLineLabelEn} Subtraction is stored as a negative number: push ${-operand}; the final sum performs it.`,
+      });
+    } else if (op === "*") {
+      const top = stack.pop();
+      stack.push(top * operand);
+      snapshot(RESOLVE_LINE[op], "resolve-mul", pos, {
+        vi: `op '*' → ${top} * ${operand} = ${stack[stack.length - 1]}`,
+        en: `op '*' → ${top} * ${operand} = ${stack[stack.length - 1]}`,
+      }, {
+        vi: `${viaLineLabelVi} Nhân/Chia ưu tiên cao nên gộp NGAY với đỉnh stack (${top}).`,
+        en: `${viaLineLabelEn} * and / bind tighter, so they combine with the stack top (${top}) IMMEDIATELY.`,
+      });
+    } else {
+      const top = stack.pop();
+      if (operand === 0) throw new Error("Division by zero is not allowed.");
+      stack.push(Math.trunc(top / operand));
+      snapshot(RESOLVE_LINE[op], "resolve-div", pos, {
+        vi: `op '/' → int(${top} / ${operand}) = ${stack[stack.length - 1]}`,
+        en: `op '/' → int(${top} / ${operand}) = ${stack[stack.length - 1]}`,
+      }, {
+        vi: `${viaLineLabelVi} Chia lấy phần nguyên về phía 0: int(${top} / ${operand}) = ${stack[stack.length - 1]}.`,
+        en: `${viaLineLabelEn} Division truncates toward zero: int(${top} / ${operand}) = ${stack[stack.length - 1]}.`,
+      });
+    }
+  }
+
+  snapshot(13, "init", -1, {
+    vi: "num = 0, prev_op = '+', stack = []",
+    en: "num = 0, prev_op = '+', stack = []",
+  }, {
+    vi: "num tích luỹ chữ số; prev_op là toán tử đang chờ trước số hiện tại; stack chứa SỐ CÓ DẤU lẫn toán tử đã lưu.",
+    en: "num gathers digits; prev_op is the operator pending before the current number; the stack holds BOTH signed numbers and saved operators.",
+  });
+
+  for (let i = 0; i < n; i++) {
+    const ch = chars[i];
+
+    lastOp = `for ch in s → '${ch}'`;
+    snapshot(14, "iter", i, {
+      vi: `for ch in s: ch = '${ch}'`,
+      en: `for ch in s: ch = '${ch}'`,
+    }, {
+      vi: `Lấy ký tự tiếp theo '${ch}' để phân loại.`,
+      en: `Take the next character '${ch}' and classify it.`,
+    });
+
+    if (ch >= "0" && ch <= "9") {
+      lastOp = "check: ch.isdigit() → True";
+      snapshot(15, "digit-check", i, {
+        vi: `'${ch}' là chữ số → True`,
+        en: `'${ch}' is a digit → True`,
+      }, {
+        vi: "Gom vào num theo cơ chế nhân 10 cộng dồn.",
+        en: "Fold into num with the multiply-by-10 accumulation trick.",
+      });
+      const before = num;
+      num = before * 10 + Number(ch);
+      lastOp = `num = ${before}*10 + ${ch} = ${num}`;
+      snapshot(16, "accumulate", i, {
+        vi: `num = ${before}*10 + ${ch} = ${num}`,
+        en: `num = ${before}*10 + ${ch} = ${num}`,
+      }, {
+        vi: "Số nhiều chữ số được xây dần trong num, chưa đẩy vào stack.",
+        en: "A multi-digit number grows inside num and has not touched the stack yet.",
+      });
+      continue;
+    }
+
+    if (ch === "(") {
+      lastOp = "check: ch == '(' → True";
+      snapshot(17, "open-check", i, {
+        vi: `'(' → nhánh elif`,
+        en: `'(' → elif branch`,
+      }, {
+        vi: "Vào biểu thức con: phải LƯU toán tử đang chờ xuống đáy stack để sau khi ')' còn biết cách ghép kết quả.",
+        en: "Entering a sub-expression: save the pending operator ON the stack so the closing ')' knows how to rejoin the result.",
+      });
+      stack.push(prevOp);
+      lastOp = `stack.append('${prevOp}')`;
+      snapshot(18, "open-save", i, {
+        vi: `Lưu prev_op='${prevOp}' xuống stack`,
+        en: `Save prev_op='${prevOp}' onto the stack`,
+      }, {
+        vi: `Toán tử '${prevOp}' nằm BÊN DƯỚI các số của biểu thức con — nó chính ranh giới khi quét sum ở ')'.`,
+        en: `Operator '${prevOp}' sits BELOW the sub-expression's numbers — it doubles as the boundary when ')' sums downward.`,
+      });
+      num = 0;
+      prevOp = "+";
+      lastOp = "num, prev_op = 0, '+'";
+      snapshot(19, "open-reset", i, {
+        vi: "Reset num=0, prev_op='+' cho biểu thức con",
+        en: "Reset num=0, prev_op='+' for the sub-expression",
+      }, {
+        vi: "Biểu thức con bắt đầu sạch như một bài tính mới.",
+        en: "The sub-expression starts fresh, like a brand-new calculation.",
+      });
+      continue;
+    }
+
+    // ch in "+-*/)" — includes ')' on purpose.
+    lastOp = `check: ch in '+-*/)' → True`;
+    snapshot(20, "op-branch", i, {
+      vi: `'${ch}' ∈ '+-*/)' → nhánh elif`,
+      en: `'${ch}' ∈ '+-*/)' → elif branch`,
+    }, {
+      vi: "Kết thúc một toán hạng: thực thi toán tử đang chờ với num vừa gom.",
+      en: "An operand just ended: apply the pending operator to the gathered num.",
+    });
+
+    const appliedOperand = num;
+    const appliedOp = prevOp;
+    const callerVi = appliedOp === ")"
+      ? "Toán tử đang chờ là ')' nên resolve thành noop."
+      : `Trước khi đổi prev_op, phải giải tỏa prev_op='${appliedOp}' với num=${appliedOperand}.`;
+    const callerEn = appliedOp === ")"
+      ? "The pending op is the ')' marker, so this resolve call is a no-op."
+      : `Before switching prev_op, flush prev_op='${appliedOp}' with num=${appliedOperand}.`;
+    resolve(i, appliedOp, appliedOperand, callerVi, callerEn);
+
+    if (ch === ")") {
+      lastOp = "check: ch == ')' → True";
+      snapshot(22, "close-check", i, {
+        vi: `')' → gom tổng biểu thức con`,
+        en: `')' → fold the sub-expression's total`,
+      }, {
+        vi: "Các số trong ngoặc đã nằm liên tiếp trên đỉnh stack; cộng dồn xuống tới khi gặp toán tử đã lưu.",
+        en: "The parenthesis' numbers sit consecutively on top; sum downward until the saved operator appears.",
+      });
+
+      num = 0;
+      while (stack.length && typeof stack[stack.length - 1] === "number") {
+        const top = stack.pop();
+        num += top;
+        lastOp = `num += ${top} → ${num}`;
+        snapshot(25, "close-sum", i, {
+          vi: `Pop ${top}, num += ${top} = ${num}`,
+          en: `Pop ${top}, num += ${top} = ${num}`,
+        }, {
+          vi: `L23 đã reset num=0; cộng dồn các số cùng mức của biểu thức con (vừa pop ${top}).`,
+          en: `Line 23 reset num to 0; add up same-level sub-expression numbers (just popped ${top}).`,
+        });
+      }
+      if (!stack.length) throw new Error("Parentheses must be balanced.");
+      lastOp = "check: isinstance(stack[-1], int) → False";
+      snapshot(24, "close-sum-done", i, {
+        vi: `Đỉnh là '${stack[stack.length - 1]}' (không phải int) → dừng gom`,
+        en: `Top is '${stack[stack.length - 1]}' (not an int) → stop folding`,
+      }, {
+        vi: `Tổng của biểu thức con vừa đóng là num=${num}.`,
+        en: `The finished sub-expression's total is num=${num}.`,
+      });
+
+      const savedOp = stack.pop();
+      resolve(i, savedOp, num, `Dùng toán tử đã lưu trước '(' ('${savedOp}') ghép tổng ${num} với phần ngoài.`, `Reuse the operator saved before '(' ('${savedOp}') to merge total ${num} with the outer part.`);
+    }
+
+    num = 0;
+    prevOp = ch;
+    lastOp = `num, prev_op = 0, '${ch}'`;
+    snapshot(27, "reset", i, {
+      vi: `num = 0, prev_op = '${ch}'`,
+      en: `num = 0, prev_op = '${ch}'`,
+    }, {
+      vi: ch === ")"
+        ? "prev_op tạm thành ')' — nếu toán tử kế tiếp đến thì resolve(…,')') sẽ là noop, đúng như code."
+        : `'${ch}' trở thành toán tử chờ cho số kế tiếp.`,
+      en: ch === ")"
+        ? "prev_op temporarily becomes ')' — if an operator follows, resolve(…,')') is a harmless no-op, exactly like the code."
+        : `'${ch}' becomes the operator pending before the next number.`,
+    });
+  }
+
+  const finalOperand = num;
+  const finalOp = prevOp;
+  resolve(n - 1, finalOp, finalOperand, "Hết chuỗi: giải tỏa cặp (num, prev_op) cuối cùng.", "Input ended: flush the last (num, prev_op) pair.");
+
+  if (stack.some((v) => typeof v !== "number")) {
+    throw new Error("Expression is incomplete.");
+  }
+  const answer = stack.reduce((a, b) => a + b, 0);
+  lastOp = `return sum(stack) = ${answer}`;
+  snapshot(29, "return", n - 1, {
+    vi: `sum(stack) = ${answer}`,
+    en: `sum(stack) = ${answer}`,
+  }, {
+    vi: `Stack chỉ còn các số có dấu [${stack.join(", ")}]; tổng của chúng chính là đáp án ${answer}.`,
+    en: `Only signed numbers remain [${stack.join(", ")}]; their sum is the answer ${answer}.`,
+  }, true);
+
+  return { expression, answer, steps };
+}
+Object.assign(module.exports, {
+  772: {
+    id: 772, difficulty: "hard", slug: "basic-calculator-iii",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    title: { vi: "Basic Calculator III", en: "Basic Calculator III" },
+    titleVi: { vi: "Máy tính cơ bản III", en: "Basic Calculator III" },
+    statement: { vi: "Tính biểu thức gồm số nguyên, ngoặc và bốn phép toán. Phép chia làm tròn về 0.", en: "Evaluate an expression of integers, parentheses, and four operators. Division truncates toward zero." },
+    defaultInput: "2*(5+5*2)/3+(6/2+8)", inputKind: "string", inputLabel: { vi: "biểu thức", en: "expression" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Hai stack (nums + ops)", en: "Approach 1: Two stacks (nums + ops)" } },
+          { value: "2", label: { vi: "Cách 2: Một stack hỗ hợp + resolve()", en: "Approach 2: Single mixed stack + resolve()" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 — hai stack: nums giữ toán hạng, ops giữ toán tử; rút gọn khi toán tử mới có độ ưu tiên thấp hơn/bằng đỉnh ops hoặc gặp ')'.", en: "Approach 1 — two stacks: nums holds operands, ops holds operators; reduce when the incoming operator has lower/equal precedence than the top of ops or on ')'." },
+      { vi: "Cách 2 — một stack hỗ hợp: '+' đẩy số dương, '-' đẩy số âm (xử lý dấu một ngôi tự nhiên), '*' và '/' gộp ngay với đỉnh stack.", en: "Approach 2 — single mixed stack: '+' pushes the number, '-' pushes its negation (unary signs handled naturally), '*' and '/' combine with the top immediately." },
+      { vi: "Ở cách 2, '(' lưu prev_op xuống stack làm ranh giới; ')' cộng dồn các số cùng mức rồi resolve tổng với toán tử đã lưu đó.", en: "In approach 2, '(' saves prev_op on the stack as a boundary; ')' sums same-level numbers, then resolves that total with the saved operator." },
+      { vi: "Cả hai cách: phép chia int(a / b) làm tròn về phía 0; đáp án là giá trị còn lại (cách 1) hoặc tổng stack (cách 2).", en: "Both ways: division uses int(a / b) truncating toward zero; the answer is the last value (approach 1) or the stack sum (approach 2)." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi token được đẩy và lấy khỏi stack tối đa một lần.", en: "Each token is pushed and popped at most once." } },
+    codeLabel: { vi: "Cách 1: Hai stack (nums + ops)", en: "Approach 1: Two stacks (nums + ops)" },
+    code: ["class Solution:", "    def calculate(self, s):", "        nums, ops = [], []", "        def apply():", "            b, a, op = nums.pop(), nums.pop(), ops.pop()", "            nums.append(a + b if op == '+' else a - b if op == '-' else a * b if op == '*' else int(a / b))", "        def prec(op):", "            return 1 if op in '+-' else 2", "        i = 0", "        while i < len(s):", "            if s[i] == ' ': i += 1; continue", "            if s[i].isdigit():", "                value = 0", "                while i < len(s) and s[i].isdigit():", "                    value = value * 10 + int(s[i]); i += 1", "                nums.append(value); continue", "            if s[i] == '(': ops.append('(')", "            elif s[i] == ')':", "                while ops[-1] != '(': apply()", "                ops.pop()", "            else:", "                while ops and ops[-1] != '(' and prec(ops[-1]) >= prec(s[i]): apply()", "                ops.append(s[i])", "            i += 1", "        while ops: apply()", "        return nums[-1]"],
+    code2Label: { vi: "Cách 2: Một stack hỗ hợp + resolve()", en: "Approach 2: Single mixed stack + resolve()" },
+    code2: [
+      "class Solution:",
+      "    def calculate(self, s: str) -> int:",
+      "        def resolve(num, op):",
+      "            if op == \"+\":",
+      "                stack.append(num)",
+      "            elif op == \"-\":",
+      "                stack.append(-num)",
+      "            elif op == \"*\":",
+      "                stack.append(stack.pop() * num)",
+      "            elif op == \"/\":",
+      "                stack.append(int(stack.pop() / num))",
+      "",
+      "        num, prev_op, stack = 0, \"+\", []",
+      "        for ch in s:",
+      "            if ch.isdigit():",
+      "                num = num * 10 + int(ch)",
+      "            elif ch == \"(\":",
+      "                stack.append(prev_op)",
+      "                num, prev_op = 0, \"+\"",
+      "            elif ch in \"+-*/)\":",
+      "                resolve(num, prev_op)",
+      "                if ch == \")\":",
+      "                    num = 0",
+      "                    while isinstance(stack[-1], int):",
+      "                        num += stack.pop()",
+      "                    resolve(num, stack.pop())",
+      "                num, prev_op = 0, ch",
+      "        resolve(num, prev_op)",
+      "        return sum(stack)",
+    ],
+    builder: buildSteps772,
+    builder2: buildSteps772SingleStack,
+  },
+});
