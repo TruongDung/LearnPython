@@ -24,6 +24,49 @@ function parseTree(input) {
   return nodes[0];
 }
 
+function parseNaryTree(input) {
+  const raw = Array.isArray(input)
+    ? input
+    : String(input).trim().replace(/^\[|\]$/g, "").split(",").map((value) => value.trim());
+  const values = raw.map((value) => {
+    if (value === null || value === undefined || String(value).toLowerCase() === "null" || String(value) === "") return null;
+    const number = Number(value);
+    if (!Number.isInteger(number)) throw new Error("N-ary tree values must be integers or null");
+    return number;
+  });
+  if (!values.length || values[0] === null) return null;
+
+  let nextId = 0;
+  const root = { id: nextId++, val: values[0], children: [], parentId: null, depth: 0 };
+  const queue = [root];
+  let index = 1;
+  if (values[index] === null) index++;
+  while (queue.length && index < values.length) {
+    const parent = queue.shift();
+    while (index < values.length && values[index] !== null) {
+      const child = { id: nextId++, val: values[index], children: [], parentId: parent.id, depth: parent.depth + 1 };
+      parent.children.push(child);
+      queue.push(child);
+      index++;
+    }
+    if (values[index] === null) index++;
+  }
+  if (index < values.length) throw new Error("Invalid N-ary level-order input: too many child groups");
+  return root;
+}
+
+function collectNaryNodes(root) {
+  if (!root) return [];
+  const nodes = [];
+  const queue = [root];
+  while (queue.length) {
+    const node = queue.shift();
+    nodes.push({ id: node.id, value: node.val, parentId: node.parentId, depth: node.depth, children: node.children.map((child) => child.id) });
+    queue.push(...node.children);
+  }
+  return nodes;
+}
+
 function treeToVizNodes(root, hlSet, wordSet) {
   const vizNodes = [];
   let nextX = 0;
@@ -437,6 +480,203 @@ function buildSteps102(input) {
     note: { vi: `Level order hoàn tất.`, en: `Level order complete.` },
   }); fs.final = true; steps.push(fs);
   return { input, answer: JSON.stringify(levels), steps };
+}
+
+// ─── 429: N-ary Tree Level Order Traversal (BFS by level) ───
+function buildSteps429(input) {
+  const root = parseNaryTree(input);
+  const nodes = collectNaryNodes(root);
+  const steps = [];
+  const result = [];
+  const visited = new Set();
+
+  function snapshot429({ title, phase, queue = [], current = null, children = [], currentLevel = [], levelIndex = null, codeLine, vars = [], note, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      nary429View: {
+        nodes,
+        rootId: root ? root.id : null,
+        phase,
+        queueIds: queue.map((node) => node.id),
+        visitedIds: [...visited],
+        currentId: current ? current.id : null,
+        childIds: children.map((node) => node.id),
+        currentLevel: [...currentLevel],
+        result: result.map((level) => [...level]),
+        levelIndex,
+        decision,
+      },
+    });
+  }
+
+  if (!root) {
+    snapshot429({
+      title: { vi: "root rỗng → trả về []", en: "root is empty → return []" },
+      phase: "empty",
+      codeLine: 4,
+      vars: [{ name: "root", value: "None" }, { name: "answer", value: "[]" }],
+      note: { vi: "Không có node nào để duyệt.", en: "There is no node to traverse." },
+      decision: { kind: "empty" },
+      final: true,
+    });
+    return { input, answer: "[]", steps };
+  }
+
+  snapshot429({
+    title: { vi: "Kiểm tra root tồn tại", en: "Check that root exists" },
+    phase: "guard",
+    codeLine: 4,
+    vars: [{ name: "root", value: root.val }],
+    note: { vi: "root có giá trị nên không return sớm.", en: "root has a value, so there is no early return." },
+    decision: { kind: "guard", root: root.val },
+  });
+  snapshot429({
+    title: { vi: "Tạo result = []", en: "Create result = []" },
+    phase: "init-result",
+    codeLine: 6,
+    vars: [{ name: "result", value: "[]" }],
+    note: { vi: "Mỗi tầng hoàn tất sẽ được thêm thành một mảng con vào result.", en: "Each completed level will be appended as a subarray of result." },
+    decision: { kind: "init-result" },
+  });
+
+  let queue = [root];
+  snapshot429({
+    title: { vi: `Đưa root ${root.val} vào queue`, en: `Put root ${root.val} into the queue` },
+    phase: "init-queue",
+    queue,
+    codeLine: 7,
+    vars: [{ name: "queue", value: `[${root.val}]` }],
+    note: { vi: "BFS luôn bắt đầu từ gốc.", en: "BFS always starts from the root." },
+    decision: { kind: "init-queue", root: root.val },
+  });
+
+  let levelIndex = 0;
+  while (queue.length) {
+    snapshot429({
+      title: { vi: `queue còn ${queue.length} node → xử lý tầng ${levelIndex}`, en: `queue has ${queue.length} nodes → process level ${levelIndex}` },
+      phase: "while",
+      queue,
+      levelIndex,
+      codeLine: 8,
+      vars: [{ name: "queue", value: `[${queue.map((node) => node.val).join(", ")}]` }, { name: "level", value: levelIndex }],
+      note: { vi: "Queue không rỗng, nên bắt đầu một lượt BFS mới.", en: "The queue is not empty, so start another BFS level." },
+      decision: { kind: "while", size: queue.length },
+    });
+    const levelSize = queue.length;
+    snapshot429({
+      title: { vi: `level_size = ${levelSize}`, en: `level_size = ${levelSize}` },
+      phase: "level-size",
+      queue,
+      levelIndex,
+      codeLine: 9,
+      vars: [{ name: "level_size", value: levelSize }, { name: "queue before level", value: `[${queue.map((node) => node.val).join(", ")}]` }],
+      note: { vi: "Chỉ xử lý đúng số node đang có trong queue. Các con mới thêm sẽ thuộc tầng sau.", en: "Process exactly the nodes currently in the queue. Newly enqueued children belong to the next level." },
+      decision: { kind: "level-size", size: levelSize },
+    });
+    const currentLevel = [];
+    snapshot429({
+      title: { vi: "Tạo level = []", en: "Create level = []" },
+      phase: "level-init",
+      queue,
+      currentLevel,
+      levelIndex,
+      codeLine: 10,
+      vars: [{ name: "level", value: "[]" }, { name: "level_size", value: levelSize }],
+      note: { vi: "Mảng này chỉ nhận giá trị của tầng hiện tại.", en: "This array receives values from only the current level." },
+      decision: { kind: "level-init", levelIndex },
+    });
+
+    for (let offset = 0; offset < levelSize; offset++) {
+      const next = queue[0];
+      snapshot429({
+        title: { vi: `Lượt ${offset + 1}/${levelSize} của tầng ${levelIndex}`, en: `Pass ${offset + 1}/${levelSize} of level ${levelIndex}` },
+        phase: "for",
+        queue,
+        current: next,
+        currentLevel,
+        levelIndex,
+        codeLine: 11,
+        vars: [{ name: "_", value: offset }, { name: "level_size", value: levelSize }],
+        note: { vi: "Lấy node đầu queue của tầng hiện tại.", en: "Take the first queued node from the current level." },
+        decision: { kind: "for", offset, size: levelSize },
+      });
+      const node = queue.shift();
+      snapshot429({
+        title: { vi: `node = queue.popleft() → ${node.val}`, en: `node = queue.popleft() → ${node.val}` },
+        phase: "dequeue",
+        queue,
+        current: node,
+        currentLevel,
+        levelIndex,
+        codeLine: 12,
+        vars: [{ name: "node", value: node.val }, { name: "queue", value: `[${queue.map((item) => item.val).join(", ")}]` }],
+        note: { vi: `${node.val} rời đầu queue để được xử lý.`, en: `${node.val} leaves the front of the queue for processing.` },
+        decision: { kind: "dequeue", value: node.val },
+      });
+      currentLevel.push(node.val);
+      visited.add(node.id);
+      snapshot429({
+        title: { vi: `Thêm ${node.val} vào level`, en: `Append ${node.val} to level` },
+        phase: "append-value",
+        queue,
+        current: node,
+        currentLevel,
+        levelIndex,
+        codeLine: 13,
+        vars: [{ name: "level", value: `[${currentLevel.join(", ")}]` }, { name: "node.val", value: node.val }],
+        note: { vi: `level của tầng ${levelIndex} hiện là [${currentLevel.join(", ")}].`, en: `level ${levelIndex} is now [${currentLevel.join(", ")}].` },
+        decision: { kind: "append-value", value: node.val },
+      });
+      const children = node.children;
+      queue.push(...children);
+      snapshot429({
+        title: { vi: `Đưa ${children.length} con của ${node.val} vào queue`, en: `Enqueue ${children.length} children of ${node.val}` },
+        phase: "enqueue-children",
+        queue,
+        current: node,
+        children,
+        currentLevel,
+        levelIndex,
+        codeLine: 14,
+        vars: [{ name: "node.children", value: `[${children.map((child) => child.val).join(", ")}]` }, { name: "queue", value: `[${queue.map((item) => item.val).join(", ")}]` }],
+        note: { vi: children.length ? `Các con [${children.map((child) => child.val).join(", ")}] xếp cuối queue cho tầng sau.` : `${node.val} không có con, queue không đổi.`, en: children.length ? `Children [${children.map((child) => child.val).join(", ")}] join the back of the queue for the next level.` : `${node.val} has no children, so the queue is unchanged.` },
+        decision: { kind: "enqueue-children", values: children.map((child) => child.val) },
+      });
+    }
+    result.push([...currentLevel]);
+    snapshot429({
+      title: { vi: `Hoàn tất tầng ${levelIndex} → result.append([${currentLevel.join(", ")}])`, en: `Finish level ${levelIndex} → result.append([${currentLevel.join(", ")}])` },
+      phase: "level-done",
+      queue,
+      currentLevel,
+      levelIndex,
+      codeLine: 15,
+      vars: [{ name: "result", value: JSON.stringify(result) }],
+      note: { vi: `Đã chốt một mảng con cho tầng ${levelIndex}.`, en: `A subarray for level ${levelIndex} is now complete.` },
+      decision: { kind: "level-done", level: [...currentLevel] },
+    });
+    levelIndex++;
+  }
+
+  snapshot429({
+    title: { vi: `BFS hoàn tất → trả về ${JSON.stringify(result)}`, en: `BFS complete → return ${JSON.stringify(result)}` },
+    phase: "done",
+    currentLevel: [],
+    levelIndex,
+    codeLine: 16,
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    note: { vi: "Queue đã rỗng; mọi tầng đã có trong result.", en: "The queue is empty; every level is in result." },
+    decision: { kind: "done" },
+    final: true,
+  });
+  return { input, answer: JSON.stringify(result), steps };
 }
 
 // ─── 112: Path Sum (root-to-leaf) ───
@@ -5106,7 +5346,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2791],
+    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -5248,6 +5488,42 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng → O(n).", en: "Queue holds at most one level → O(n)." } },
     code: ["class Solution:", "    def levelOrder(self, root):", "        if not root: return []", "        res, queue = [], [root]", "        while queue:", "            level = [n.val for n in queue]", "            res.append(level)", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
     builder: buildSteps102,
+  },
+  429: {
+    id: 429, difficulty: "medium", slug: "n-ary-tree-level-order-traversal",
+    category: TREE_CAT,
+    title: { vi: "N-ary Tree Level Order Traversal", en: "N-ary Tree Level Order Traversal" },
+    titleVi: { vi: "Duyệt cây N-ary theo tầng", en: "N-ary tree level-order traversal" },
+    statement: { vi: "Cho gốc của cây N-ary, trả về các giá trị theo từng tầng từ trái sang phải. Nhập theo level-order của LeetCode: null ngăn cách nhóm con của mỗi node, ví dụ 1,null,3,2,4,null,5,6.", en: "Given the root of an N-ary tree, return its values level by level from left to right. Use LeetCode N-ary level order: null separates each node's child group, for example 1,null,3,2,4,null,5,6." },
+    defaultInput: "1,null,3,2,4,null,5,6",
+    inputKind: "string",
+    inputLabel: { vi: "N-ary level-order (null ngăn nhóm con)", en: "N-ary level-order (null separates child groups)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng queue BFS. Lưu level_size trước khi xử lý để biết chính xác bao nhiêu node thuộc tầng hiện tại.", en: "Use a BFS queue. Save level_size before processing so the current level has an exact node count." },
+      { vi: "Mỗi node rời queue sẽ thêm giá trị vào level và đưa tất cả children vào cuối queue cho tầng sau.", en: "Each dequeued node appends its value to level and enqueues all children for the next level." },
+      { vi: "Xử lý xong level_size node thì append level vào result.", en: "After processing level_size nodes, append level to result." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi node vào và ra queue đúng một lần; queue có thể chứa một tầng rộng nhất.", en: "Each node enters and leaves the queue once; the queue can hold the widest level." } },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def levelOrder(self, root):",
+      "        if not root:",
+      "            return []",
+      "        result = []",
+      "        queue = deque([root])",
+      "        while queue:",
+      "            level_size = len(queue)",
+      "            level = []",
+      "            for _ in range(level_size):",
+      "                node = queue.popleft()",
+      "                level.append(node.val)",
+      "                queue.extend(node.children)",
+      "            result.append(level)",
+      "        return result",
+    ],
+    builder: buildSteps429,
   },
   543: {
     id: 543, difficulty: "easy", slug: "diameter-of-binary-tree",

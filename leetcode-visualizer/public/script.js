@@ -18048,6 +18048,119 @@ function renderRotate48View(step) {
   </section>`;
 }
 
+function renderNary429View(step) {
+  const view = step.nary429View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const queueIds = Array.isArray(view.queueIds) ? view.queueIds : [];
+  const visitedIds = new Set(view.visitedIds || []);
+  const childIds = new Set(view.childIds || []);
+  const currentId = Number.isInteger(view.currentId) ? view.currentId : null;
+  const currentLevel = Array.isArray(view.currentLevel) ? view.currentLevel : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const levelIndex = Number.isInteger(view.levelIndex) ? view.levelIndex : null;
+  const phase = String(view.phase || "guard");
+  const decision = view.decision || {};
+  const phaseIndex = phase === "done" || phase === "empty" ? 3 : phase === "level-done" ? 2 : ["for", "dequeue", "append-value", "enqueue-children"].includes(phase) ? 1 : 0;
+  const stages = [
+    { label: vi ? "Khởi tạo queue" : "Initialize queue", detail: "root" },
+    { label: vi ? "Xử lý một tầng" : "Process one level", detail: "popleft + children" },
+    { label: vi ? "Lưu level" : "Store level", detail: "result.append" },
+  ].map((item, index) => {
+    const state = phaseIndex === 3 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (decision.kind === "empty") {
+    decisionHtml = `<section class="n429-decision empty"><small>${vi ? "ROOT RỖNG" : "EMPTY ROOT"}</small><strong>return []</strong><span>${vi ? "Không có node nào cần đưa vào queue." : "There is no node to enqueue."}</span></section>`;
+  } else if (decision.kind === "guard") {
+    decisionHtml = `<section class="n429-decision init"><small>${vi ? "KIỂM TRA" : "GUARD"}</small><strong>root = ${escapeHtml(String(decision.root))}</strong><span>${vi ? "root tồn tại, nên tiếp tục khởi tạo BFS." : "root exists, so BFS initialization continues."}</span></section>`;
+  } else if (decision.kind === "init-result") {
+    decisionHtml = `<section class="n429-decision init"><small>RESULT</small><strong>result = []</strong><span>${vi ? "Mỗi tầng hoàn chỉnh sẽ trở thành một mảng con trong result." : "Each completed level becomes a subarray of result."}</span></section>`;
+  } else if (decision.kind === "init-queue") {
+    decisionHtml = `<section class="n429-decision queue"><small>QUEUE</small><strong>deque([${escapeHtml(String(decision.root))}])</strong><span>${vi ? "Gốc nằm ở FRONT của queue." : "The root is at the FRONT of the queue."}</span></section>`;
+  } else if (decision.kind === "while") {
+    decisionHtml = `<section class="n429-decision queue"><small>WHILE</small><strong>while queue: ${decision.size} ${vi ? "node" : "node(s)"}</strong><span>${vi ? "Bắt đầu xử lý một tầng mới." : "Start processing a new level."}</span></section>`;
+  } else if (decision.kind === "level-size") {
+    decisionHtml = `<section class="n429-decision queue"><small>LEVEL SIZE</small><strong>level_size = ${decision.size}</strong><span>${vi ? "Các node được thêm sau thời điểm này phải chờ sang tầng kế tiếp." : "Nodes added after this point wait for the next level."}</span></section>`;
+  } else if (decision.kind === "level-init") {
+    decisionHtml = `<section class="n429-decision init"><small>LEVEL</small><strong>level = []</strong><span>${vi ? `Bắt đầu gom giá trị cho tầng ${decision.levelIndex}.` : `Start collecting values for level ${decision.levelIndex}.`}</span></section>`;
+  } else if (decision.kind === "for") {
+    decisionHtml = `<section class="n429-decision queue"><small>FOR</small><strong>${decision.offset + 1}/${decision.size}</strong><span>${vi ? "Lặp đúng level_size lần để không lẫn node tầng sau." : "Loop exactly level_size times so next-level nodes do not mix in."}</span></section>`;
+  } else if (decision.kind === "dequeue") {
+    decisionHtml = `<section class="n429-decision current"><small>POP LEFT</small><strong>node = ${escapeHtml(String(decision.value))}</strong><span>${vi ? "Node vừa rời FRONT của queue." : "The node just left the FRONT of the queue."}</span></section>`;
+  } else if (decision.kind === "append-value") {
+    decisionHtml = `<section class="n429-decision current"><small>APPEND VALUE</small><strong>level.append(${escapeHtml(String(decision.value))})</strong><span>${vi ? "Giá trị hiện thuộc mảng của tầng đang xử lý." : "The value now belongs to the level being processed."}</span></section>`;
+  } else if (decision.kind === "enqueue-children") {
+    const values = Array.isArray(decision.values) ? decision.values : [];
+    decisionHtml = `<section class="n429-decision children"><small>EXTEND CHILDREN</small><strong>queue.extend([${values.map((value) => escapeHtml(String(value))).join(", ")}])</strong><span>${values.length ? (vi ? "Các node cyan sẽ được xử lý ở tầng sau." : "The cyan nodes will be processed at the next level.") : (vi ? "Node này không có con, queue không đổi." : "This node has no children, so the queue is unchanged.")}</span></section>`;
+  } else if (decision.kind === "level-done") {
+    const values = Array.isArray(decision.level) ? decision.level : [];
+    decisionHtml = `<section class="n429-decision done"><small>RESULT APPEND</small><strong>result.append([${values.map((value) => escapeHtml(String(value))).join(", ")}])</strong><span>${vi ? "Tầng hiện tại đã được chốt vào output." : "The current level is now committed to the output."}</span></section>`;
+  } else {
+    decisionHtml = `<section class="n429-decision done"><small>COMPLETE</small><strong>return result</strong><span>${vi ? "Queue đã rỗng, nên BFS kết thúc." : "The queue is empty, so BFS is complete."}</span></section>`;
+  }
+
+  const levelsByDepth = new Map();
+  nodes.forEach((node) => {
+    const depth = Number(node.depth) || 0;
+    if (!levelsByDepth.has(depth)) levelsByDepth.set(depth, []);
+    levelsByDepth.get(depth).push(node);
+  });
+  const depths = [...levelsByDepth.keys()].sort((a, b) => a - b);
+  const maxLevelWidth = Math.max(1, ...[...levelsByDepth.values()].map((level) => level.length));
+  const svgWidth = Math.max(400, maxLevelWidth * 94 + 76);
+  const svgHeight = Math.max(150, Math.max(1, depths.length) * 116 + 32);
+  const positions = new Map();
+  depths.forEach((depth) => {
+    const level = levelsByDepth.get(depth) || [];
+    level.forEach((node, index) => positions.set(node.id, { x: ((index + 1) * svgWidth) / (level.length + 1), y: 52 + depth * 116 }));
+  });
+  const edges = nodes.filter((node) => node.parentId !== null && node.parentId !== undefined).map((node) => {
+    const from = positions.get(node.parentId);
+    const to = positions.get(node.id);
+    return from && to ? `<line x1="${from.x}" y1="${from.y + 25}" x2="${to.x}" y2="${to.y - 25}"></line>` : "";
+  }).join("");
+  const treeNodes = nodes.map((node) => {
+    const pos = positions.get(node.id);
+    if (!pos) return "";
+    const classes = ["n429-node"];
+    if (visitedIds.has(node.id)) classes.push("visited");
+    if (queueIds.includes(node.id)) classes.push("queued");
+    if (childIds.has(node.id)) classes.push("child");
+    if (node.id === currentId) classes.push("current");
+    return `<g class="${classes.join(" ")}" transform="translate(${pos.x} ${pos.y})"><circle r="25"></circle><text class="value" text-anchor="middle" y="5">${escapeHtml(String(node.value))}</text><text class="coord" text-anchor="middle" y="43">d=${node.depth}</text></g>`;
+  }).join("");
+  const treeHtml = nodes.length
+    ? `<div class="n429-tree-scroll"><svg class="n429-tree-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(vi ? "Cây N-ary và trạng thái BFS" : "N-ary tree and BFS state")}"><g class="n429-edges">${edges}</g><g class="n429-nodes">${treeNodes}</g></svg></div>`
+    : `<div class="n429-empty-tree">${vi ? "Cây rỗng" : "Empty tree"}</div>`;
+  const queueHtml = queueIds.length ? queueIds.map((id, index) => {
+    const node = nodeById.get(id);
+    return `<span class="${index === 0 ? "front" : ""}"><small>${index === 0 ? "FRONT" : `#${index}`}</small><strong>${escapeHtml(String(node ? node.value : "?"))}</strong></span>`;
+  }).join("") : `<em>${vi ? "queue rỗng" : "queue empty"}</em>`;
+  const outputHtml = result.length ? result.map((level, index) => `<span><small>L${index}</small><strong>[${level.map((value) => escapeHtml(String(value))).join(", ")}]</strong></span>`).join("") : `<em>[ ]</em>`;
+  const currentLevelHtml = currentLevel.length ? `[${currentLevel.map((value) => escapeHtml(String(value))).join(", ")}]` : "[ ]";
+  const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `N-ary Tree Level Order Traversal: queue có ${queueIds.length} node, output có ${result.length} tầng hoàn tất.`
+    : `N-ary Tree Level Order Traversal: queue has ${queueIds.length} nodes and output has ${result.length} completed levels.`;
+
+  $("treeView").innerHTML = `<section class="n429-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="n429-stages">${stages}</div>
+    <section class="n429-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    ${decisionHtml}
+    <section class="n429-tree"><header><strong>${vi ? "CÂY N-ARY" : "N-ARY TREE"}</strong><span>${nodes.length} ${vi ? "node" : "nodes"}</span></header>${treeHtml}</section>
+    <div class="n429-state-grid">
+      <section class="n429-queue"><header><strong>QUEUE</strong><span>${vi ? "trái là FRONT" : "left is FRONT"}</span></header><div>${queueHtml}</div></section>
+      <section class="n429-level"><header><strong>${vi ? `LEVEL ĐANG GOM${levelIndex === null ? "" : ` · ${levelIndex}`}` : `CURRENT LEVEL${levelIndex === null ? "" : ` · ${levelIndex}`}`}</strong><span>level</span></header><strong>${currentLevelHtml}</strong></section>
+      <section class="n429-output"><header><strong>RESULT</strong><span>${result.length} ${vi ? "tầng" : "levels"}</span></header><div>${outputHtml}</div></section>
+    </div>
+    <aside class="n429-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="current"><i></i>${vi ? "node đang xử lý" : "node being processed"}</span><span class="queued"><i></i>${vi ? "đang chờ trong queue" : "waiting in queue"}</span><span class="child"><i></i>${vi ? "con vừa được thêm" : "child just enqueued"}</span><span class="visited"><i></i>${vi ? "đã vào level" : "already added to level"}</span></aside>
+  </section>`;
+}
+
 function renderRotation1886View(step) {
   const view = step.rotation1886View || {};
   const vi = lang === "vi";
@@ -20047,6 +20160,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRussian354View(step);
+  } else if (step.nary429View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNary429View(step);
   } else if (step.rotation1886View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
