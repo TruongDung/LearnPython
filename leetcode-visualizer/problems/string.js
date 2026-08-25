@@ -9969,7 +9969,285 @@ function buildSteps1927(input) {
   return { original: num, answer: aliceWins, steps };
 }
 
+/**
+ * LeetCode 1977: Number of Ways to Separate Numbers — beginner walkthrough.
+ *
+ * dp[i][j] = number of ways to split num[:j] so that the LAST number is
+ * exactly num[i:j]. Base row: dp[0][j] = 1 (the very first number may be any
+ * length). Cell (i,j) sums every previous ending k whose number num[k:i] is
+ * <= num[i:j] (shorter always smaller; equal lengths compare as strings).
+ * Answer = column j=n summed over all starts. The visualization walks
+ * column by column, one step per cell.
+ */
+function buildSteps1977(input) {
+  const raw = String(input ?? "").trim();
+  const valid = /^[0-9]+$/.test(raw) && raw.length >= 1 && raw.length <= 10;
+  const MOD = 1000000007;
+  const n = valid ? raw.length : 0;
+  const steps = [];
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "answer", value: null }],
+      note: {
+        vi: "Cần một chuỗi chỉ gồm chữ số (tối đa 10 ký tự để trực quan), ví dụ: 327.",
+        en: "Provide a digit-only string (up to 10 characters for visualization), e.g. 327.",
+      },
+    });
+    return { original: raw, answer: null, steps };
+  }
+
+  const sub = (a, b) => raw.slice(a, b);
+
+  // Enumerate all valid splits once (for the concrete example step).
+  const allSplits = [];
+  (function walk(pos, acc) {
+    if (pos === n) {
+      allSplits.push(acc.join(", "));
+      return;
+    }
+    for (let end = pos + 1; end <= n; end++) {
+      const piece = sub(pos, end);
+      const prev = acc.length ? Number(acc[acc.length - 1]) : -Infinity;
+      if (piece[0] !== "0" && Number(piece) >= prev) walk(end, acc.concat(piece));
+    }
+  })(0, []);
+
+  // ─── Phase 0: rules + the full list of valid splits ───
+  steps.push({
+    title: { vi: "Luật tách số", en: "Splitting rules" },
+    arr: raw.split("").map(Number),
+    raw: raw.split(""),
+    sub: raw.split("").map((ch, i) => `${ch}[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [1, 2],
+    vars: [
+      { name: "num", value: `"${raw}"` },
+      { name: "số các cách tách hợp lệ", value: allSplits.length },
+      ...allSplits.map((s, k) => ({ name: `cách ${k + 1}`, value: `[${s}]` })),
+    ],
+    note: {
+      vi: "Chèn dấu phẩy để num thành dãy số nguyên KHÔNG GIẢM, không số bắt đầu bằng 0. Tách thành đúng MỘT số cũng tính là một cách. Mục tiêu: đếm tất cả các cách.",
+      en: "Insert commas so num becomes a NON-DECREASING list of integers with no leading zeros. A single number alone also counts as one way. Goal: count every possible way.",
+    },
+  });
+
+  if (raw[0] === "0") {
+    steps.push({
+      title: { vi: "Ký tự đầu là '0' ⇒ không có cách nào", en: "First char is '0' ⇒ zero ways" },
+      arr: raw.split("").map(Number),
+      raw: raw.split(""),
+      sub: raw.split("").map((ch, i) => `${ch}[${i}]`),
+      highlight: [0],
+      mark: [],
+      final: true,
+      codeLines: [5, 6],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Số ĐẦU TIÊN của mọi cách tách đều bắt đầu tại vị trí 0. Bắt đầu bằng '0' là số 0 dẫn đầu — bất hợp lệ ⇒ đáp án 0 ngay lập tức.",
+        en: "The FIRST number of any split starts at position 0. Starting with '0' means a leading zero — illegal ⇒ answer is 0 right away.",
+      },
+    });
+    return { original: raw, answer: 0, steps };
+  }
+
+  // ─── Phase 1: state definition ───
+  steps.push({
+    title: { vi: "Trạng thái quy hoạch động", en: "The DP state" },
+    arr: raw.split("").map(Number),
+    raw: raw.split(""),
+    sub: raw.split("").map((ch, i) => `${ch}[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [7, 8],
+    vars: [
+      { name: "dp[i][j]", value: "số cách tách num[:j], số cuối đúng là num[i:j]" },
+      { name: "ví dụ", value: `dp[0][${n}] = số cách khi cả chuỗi là 1 số` },
+      { name: "đáp án", value: "= tổng cột j = n" },
+    ],
+    note: {
+      vi: "Giữ trạng thái theo SỐ CUỐI vì ràng buộc không giảm chỉ liên hệ giữa số trước và số sau. Khi biết dp[i][j], muốn nối thêm số mới chỉ việc so num[i:j] với số kế tiếp.",
+      en: "Track the LAST number because the non-decreasing rule only links consecutive numbers. Knowing dp[i][j], extending the split just compares num[i:j] against the next piece.",
+    },
+  });
+
+  // ─── Phase 2: base row ───
+  steps.push({
+    title: { vi: "Hàng cơ sở: số đầu tiên tuỳ ý độ dài", en: "Base row: the first number may take any length" },
+    arr: Array.from({ length: n }, () => 1),
+    highlight: [],
+    mark: [],
+    codeLines: [9, 10],
+    vars: [
+      { name: "dp[0][j]", value: "= 1 với mọi j = 1..n" },
+      { name: "lý do", value: "chưa có số nào đứng trước nên không bị ràng buộc" },
+    ],
+    note: {
+      vi: "Nếu số cuối bắt đầu ở vị trí 0 thì nó chính là số ĐẦU TIÊN — luôn đúng 1 cách đặt nó, dù dài 1 hay nhiều chữ số. Đây là hạt giống cho cả bảng.",
+      en: "If the last number starts at position 0 it IS the first number — exactly one way to place it, whatever its length. These cells seed the whole table.",
+    },
+  });
+
+  // ─── Phase 3: fill columns left to right, one step per cell ───
+  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
+  const dp = Array.from({ length: n }, () => new Array(n + 1).fill(0));
+  for (let j = 1; j <= n; j++) dp[0][j] = 1;
+
+  for (let j = 2; j <= n; j++) {
+    for (let i = 1; i < j; i++) {
+      const cur = sub(i, j);
+      const colBars = [];
+      for (let k = 0; k < j; k++) colBars.push(Math.min(dp[k][j], 9));
+      if (raw[i] === "0") {
+        dp[i][j] = 0;
+        steps.push({
+          title: { vi: `Bỏ qua dp[${i}][${j}]: "${cur}" có số 0 dẫn đầu`, en: `Skip dp[${i}][${j}]: "${cur}" has a leading zero` },
+          arr: colBars.slice(),
+          highlight: [i],
+          mark: [],
+          codeLines: [13, 14],
+          vars: [
+            { name: "số đang xét", value: `"${cur}"` },
+            { name: `dp[${i}][${j}]`, value: 0 },
+          ],
+          note: {
+            vi: `"${cur}" viết ra sẽ thành số 0 dẫn đầu — bất hợp lệ dù nó lớn hơn bao nhiêu ⇒ dp[${i}][${j}] = 0.`,
+            en: `"${cur}" would be a leading-zero integer — illegal no matter how large ⇒ dp[${i}][${j}] = 0.`,
+          },
+        });
+        continue;
+      }
+      const terms = [];
+      let total = 0;
+      for (let k = 0; k < i; k++) {
+        const prev = sub(k, i);
+        const ok = cur.length > prev.length || (cur.length === prev.length && prev <= cur);
+        if (ok && dp[k][i] > 0) terms.push({ k, prev, add: dp[k][i], ok });
+        if (ok) total += dp[k][i];
+      }
+      dp[i][j] = total % MOD;
+      steps.push({
+        title: {
+          vi: `dp[${i}][${j}]: số "${cur}" nhận ${fmt(dp[i][j])} cách`,
+          en: `dp[${i}][${j}]: number "${cur}" gets ${dp[i][j]} ways`,
+        },
+        arr: colBars.slice(),
+        highlight: [i],
+        mark: [],
+        codeLines: [15, 16, 17, 18, 19, 20],
+        vars: [
+          { name: "số cuối mới", value: `num[${i}:${j}] = "${cur}"` },
+          ...(terms.length
+            ? terms.map((t) => ({
+              name: `trước là "${t.prev}" (k=${t.k})`,
+              value: `"${t.prev}" ≤ "${cur}" ⇒ +dp[${t.k}][${i}] = ${t.add}`,
+            }))
+            : [{ name: "không có số trước nào nhỏ hơn hoặc bằng", value: 0 }]),
+          { name: `⇒ dp[${i}][${j}]`, value: dp[i][j] },
+        ],
+        note: {
+          vi: terms.length
+            ? `Số đứng ngay trước "${cur}" phải NHỎ HƠN HOẶC BẰNG nó: ngắn hơn thì tự động nhỏ, dài bằng nhau thì so chuỗi. Cộng Ways của mọi kết thúc hợp lệ ở cột ${i}.`
+            : `Không có cách nào để số liền trước nhỏ hơn hoặc bằng "${cur}", nên không có cách tách nào kết thúc bằng số này.`,
+          en: terms.length
+            ? `The number right before "${cur}" must be <= it: shorter is automatically smaller; equal lengths compare as strings. Sum the ways of every valid ending at column ${i}.`
+            : `No arrangement makes the previous number <= "${cur}", so no valid split ends with this number.`,
+        },
+      });
+    }
+  }
+
+  // ─── Phase 4: answer = last column sum ───
+  const lastColTerms = [];
+  let answer = 0;
+  for (let i = 0; i < n; i++) {
+    lastColTerms.push({ name: `dp[${i}][${n}] (cuối là "${sub(i, n)}")`, value: dp[i][n] });
+    answer += dp[i][n];
+  }
+  answer %= MOD;
+  steps.push({
+    title: { vi: `Kết quả: ${answer} cách tách`, en: `Result: ${answer} splits` },
+    arr: Array.from({ length: n }, (_, k) => Math.min(dp[k][n], 9)),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [21],
+    vars: [
+      ...lastColTerms,
+      { name: "answer (mod 1e9+7)", value: answer },
+      { name: "đối chiếu liệt kê đầu bài", value: allSplits.length },
+    ],
+    note: {
+      vi: "Mỗi ô của cột cuối tương ứng một cách chọn SỐ CUỐI cùng; cộng hết lại là toàn bộ cách tách. Con số trùng khớp với danh sách liệt kê thủ công ở bước đầu.",
+      en: "Each cell in the final column fixes a choice of the VERY LAST number; summing them covers every split. The total matches the manual enumeration from the first step.",
+    },
+  });
+
+  return { original: raw, answer, steps };
+}
+
 module.exports = {
+  1977: {
+    id: 1977,
+    difficulty: "hard",
+    slug: "number-of-ways-to-separate-numbers",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [{ key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }],
+    title: { vi: "Number of Ways to Separate Numbers", en: "Number of Ways to Separate Numbers" },
+    titleVi: { vi: "Số cách tách dãy số", en: "Number of ways to separate numbers" },
+    statement: {
+      vi: "Cho chuỗi chữ số num. Chèn dấu phẩy để tách thành một hoặc nhiều số nguyên dương KHÔNG GIẢM và không số nào có số 0 dẫn đầu. Trả về số cách tách khác nhau (mod 1e9+7).",
+      en: "Given a digit string num, insert commas to split it into one or more positive integers that are non-decreasing, none having leading zeros. Return the number of distinct lists (mod 1e9+7).",
+    },
+    defaultInput: "327",
+    inputKind: "string",
+    inputLabel: { vi: "num (chuỗi chữ số)", en: "num (digit string)" },
+    extraParams: [],
+    approach: [
+      { vi: "dp[i][j] = số cách tách tiền tố num[:j] sao cho số cuối đúng là num[i:j]; hàng cơ sở dp[0][j] = 1.", en: "dp[i][j] = ways to split prefix num[:j] whose last number is exactly num[i:j]; base row dp[0][j] = 1." },
+      { vi: "Ô (i,j) cộng mọi điểm kết thúc k với num[k:i] ≤ num[i:j]: ngắn hơn tự động nhỏ, dài bằng nhau so chuỗi.", en: "Cell (i,j) sums every ending k with num[k:i] <= num[i:j]: shorter is smaller automatically, equal lengths compare lexicographically." },
+      { vi: "Đáp án = tổng cột j = n. Bản trực quan dùng O(n³); bản nộp bài tối ưu bằng LCP + tiền tố xuống O(n²).", en: "Answer = sum of column j = n. This visual version is O(n³); the contest solution uses an LCP table plus prefix sums to reach O(n²)." },
+    ],
+    complexity: {
+      time: "O(n³)",
+      space: "O(n²)",
+      note: {
+        vi: "Phiên bản dễ hiểu phục vụ trực quan hóa; giới hạn n ≤ 10 trong visualizer.",
+        en: "Easy-to-follow version chosen for visualization; the visualizer caps n at 10.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numberOfCombinations(self, num: str) -> int:",
+      "        MOD = 10 ** 9 + 7",
+      "        n = len(num)",
+      "        if num[0] == '0':",
+      "            return 0",
+      "        # dp[i][j]: ways to split num[:j] whose last number is num[i:j]",
+      "        dp = [[0] * (n + 1) for _ in range(n)]",
+      "        for j in range(1, n + 1):",
+      "            dp[0][j] = 1",
+      "        for j in range(2, n + 1):",
+      "            for i in range(1, j):",
+      "                if num[i] == '0':",
+      "                    continue",
+      "                total = 0",
+      "                for k in range(i):",
+      "                    prev, cur = num[k:i], num[i:j]",
+      "                    if len(cur) > len(prev) or (len(cur) == len(prev) and prev <= cur):",
+      "                        total += dp[k][i]",
+      "                dp[i][j] = total % MOD",
+      "        return sum(dp[i][n] for i in range(n)) % MOD",
+    ],
+    builder: buildSteps1977,
+  },
   1927: {
     id: 1927,
     difficulty: "medium",
