@@ -18631,6 +18631,73 @@ function renderDirected685View(step) {
   </section>`;
 }
 
+function renderMountain1095View(step) {
+  const view = step.mountain1095View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const phase = String(view.phase || "peak");
+  const lo = Number.isInteger(view.lo) ? view.lo : null;
+  const hi = Number.isInteger(view.hi) ? view.hi : null;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const peak = Number.isInteger(view.peak) ? view.peak : null;
+  const found = Number.isInteger(view.found) ? view.found : null;
+  const rangeActive = (index) => lo !== null && hi !== null && index >= lo && index <= hi;
+  const stageIndex = phase === "done" ? 3
+    : ["desc", "desc-exit", "call-desc"].includes(phase) ? 2
+      : ["asc", "asc-exit", "peak-found"].includes(phase) ? 1 : 0;
+  const probed = new Set(Array.isArray(view.probed) ? view.probed : []);
+  const stages = [
+    vi ? "Tìm đỉnh" : "Find peak",
+    vi ? "Tìm nửa tăng" : "Search rising side",
+    vi ? "Tìm nửa giảm" : "Search falling side",
+  ].map((label, index) => {
+    const state = phase === "done" || index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+  const cells = nums.map((value, index) => {
+    const classes = ["m1095-cell"];
+    if (rangeActive(index)) classes.push("in-range");
+    if (index === mid) classes.push("mid");
+    if (index === peak) classes.push("peak");
+    if (index === found) classes.push("found");
+    if (probed.has(index)) classes.push("probed");
+    if (value === view.target) classes.push("target-value");
+    const tags = [];
+    if (index === lo) tags.push("LO");
+    if (index === mid) tags.push("MID");
+    if (index === hi) tags.push("HI");
+    if (index === peak) tags.push("PEAK");
+    if (index === found) tags.push("FOUND");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tags.join(" · ") || " ")}</em></span>`;
+  }).join("");
+  const mode = phase === "peak" || phase === "peak-exit" || phase === "peak-found"
+    ? `<code>${mid === null ? "compare get(mid) and get(mid + 1)" : `get(mid) ${nums[mid] < nums[mid + 1] ? "<" : "≥"} get(mid + 1)`}</code>`
+    : phase === "asc" || phase === "asc-exit"
+      ? `<code>ascending binary search</code>`
+      : phase === "desc" || phase === "desc-exit"
+        ? `<code>descending binary search</code>`
+        : `<code>return ${found === null ? "-1" : found}</code>`;
+  const targetMatches = nums.map((value, index) => value === view.target ? index : null).filter((index) => index !== null);
+  const answer = view.answer == null ? "—" : String(view.answer);
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const actionText = pick(step.note) || (vi ? "Theo dõi cửa sổ binary search hiện tại." : "Follow the current binary-search window.");
+  const summary = vi
+    ? `Mountain Array: ${phase}, vùng đang xét ${lo ?? "-"} đến ${hi ?? "-"}.`
+    : `Mountain Array: ${phase}, current range ${lo ?? "-"} through ${hi ?? "-"}.`;
+
+  $("treeView").innerHTML = `<section class="m1095-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><strong>FIND IN MOUNTAIN ARRAY</strong><span>${nums.length} ${vi ? "phần tử" : "values"}</span></header>
+    <section class="m1095-stages">${stages}</section>
+    <section class="m1095-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${escapeHtml(phase.toUpperCase())}</small><strong>${escapeHtml(actionText)}</strong></section>
+    <section class="m1095-array"><header><strong>MOUNTAIN ARRAY</strong><span>${vi ? "khung xanh là khoảng binary search hiện tại" : "blue range is the current binary-search interval"}</span></header><div>${cells}</div></section>
+    <section class="m1095-lower">
+      <div class="m1095-rule"><small>${vi ? "ĐIỀU KIỆN ĐANG DÙNG" : "CURRENT RULE"}</small><strong>${mode}</strong><span>${phase === "peak" ? (vi ? "Nếu còn tăng, bỏ nửa trái; nếu đã giảm, giữ nửa trái gồm mid." : "If it still rises, discard the left half; otherwise keep the left half including mid.") : phase === "asc" || phase === "asc-exit" ? (vi ? "Tăng: giá trị nhỏ hơn target thì đi sang phải." : "Ascending: a value below target moves right.") : phase === "desc" || phase === "desc-exit" ? (vi ? "Giảm: giá trị lớn hơn target thì đi sang phải." : "Descending: a value above target moves right.") : (vi ? "Đỉnh đã chia mảng thành hai đoạn đơn điệu." : "The peak splits the array into two monotonic searches.")}</span></div>
+      <div class="m1095-pointers"><span><small>LO</small><strong>${lo ?? "—"}</strong></span><span><small>MID</small><strong>${mid ?? "—"}</strong></span><span><small>HI</small><strong>${hi ?? "—"}</strong></span><span><small>PEAK</small><strong>${peak ?? "?"}</strong></span><span><small>get()</small><strong>${Number(view.gets) || 0}</strong></span></div>
+    </section>
+    <section class="m1095-result"><div><small>TARGET</small><strong>${escapeHtml(String(view.target ?? "?"))}</strong><span>${targetMatches.length ? `${vi ? "xuất hiện tại index" : "appears at index"} ${targetMatches.join(", ")}` : (vi ? "không xuất hiện" : "not present")}</span></div><div><small>${vi ? "KẾT QUẢ" : "RESULT INDEX"}</small><strong>${answer}</strong><span>${found === -1 ? (vi ? "không tìm thấy" : "not found") : found === null ? (vi ? "đang tìm" : "searching") : (vi ? "ưu tiên nửa tăng trước" : "rising side checked first")}</span></div></section>
+  </section>`;
+}
+
 function renderNary429View(step) {
   const view = step.nary429View || {};
   const vi = lang === "vi";
@@ -20755,6 +20822,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderWordBreakIIView(step);
+  } else if (step.mountain1095View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMountain1095View(step);
   } else if (step.directed685View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

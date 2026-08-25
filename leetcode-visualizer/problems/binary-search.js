@@ -5349,8 +5349,8 @@ module.exports = Object.assign(module.exports, {
 
 // ─── 1095: Find in Mountain Array ───
 // Faithful LINE-BY-LINE trace of the three binary searches shown in the UI.
-// Phase 1 climbs to the peak (L3–L8), then search() runs on the ascending
-// half and, if needed, the descending half (L9–L17). Every arr[...] read is
+// Phase 1 climbs to the peak (L6–L13), then search() runs on the ascending
+// half and, if needed, the descending half (L14–L23). Every arr[...] read is
 // counted as a get() because the real problem charges per API access.
 function buildSteps1095(input, params = {}) {
   const nums = (Array.isArray(input) ? input : parseIntegerList(input)).map(Number);
@@ -5381,7 +5381,7 @@ function buildSteps1095(input, params = {}) {
       sub: [],
       highlight: mid != null && mid >= 0 ? [mid] : [],
       mark: found != null && found >= 0 ? [found] : [],
-      codeLines: [line],
+      codeLines: Array.isArray(line) ? line : [line],
       vars: [
         { name: "lo", value: lo },
         { name: "hi", value: hi },
@@ -5410,7 +5410,7 @@ function buildSteps1095(input, params = {}) {
   // ── Phase 1: find the peak ──
   let lo = 0;
   let hi = nums.length - 1;
-  snapshot(3, "peak", lo, hi, null, null, {
+  snapshot(6, "peak", lo, hi, null, null, {
     vi: `lo=0, hi=${hi}`,
     en: `lo=0, hi=${hi}`,
   }, {
@@ -5419,7 +5419,7 @@ function buildSteps1095(input, params = {}) {
   });
 
   while (lo < hi) {
-    snapshot(4, "peak", lo, hi, null, null, {
+    snapshot(7, "peak", lo, hi, null, null, {
       vi: `while lo < hi: ${lo} < ${hi} → True`,
       en: `while lo < hi: ${lo} < ${hi} → True`,
     }, {
@@ -5430,7 +5430,7 @@ function buildSteps1095(input, params = {}) {
     gets += 2;
     probed.add(mid);
     probed.add(mid + 1);
-    snapshot(5, "peak", lo, hi, mid, null, {
+    snapshot([8, 9], "peak", lo, hi, mid, null, {
       vi: `mid = (${lo} + ${hi}) // 2 = ${mid}`,
       en: `mid = (${lo} + ${hi}) // 2 = ${mid}`,
     }, {
@@ -5439,7 +5439,7 @@ function buildSteps1095(input, params = {}) {
     });
     if (nums[mid] < nums[mid + 1]) {
       lo = mid + 1;
-      snapshot(6, "peak", lo, hi, mid, null, {
+      snapshot(10, "peak", lo, hi, mid, null, {
         vi: `${nums[mid]} < ${nums[mid + 1]} → đang lên dốc, lo = ${lo}`,
         en: `${nums[mid]} < ${nums[mid + 1]} → still rising, lo = ${lo}`,
       }, {
@@ -5448,7 +5448,7 @@ function buildSteps1095(input, params = {}) {
       });
     } else {
       hi = mid;
-      snapshot(7, "peak", lo, hi, mid, null, {
+      snapshot(12, "peak", lo, hi, mid, null, {
         vi: `${nums[mid]} ≥ ${nums[mid + 1]} → đã qua đỉnh, hi = ${hi}`,
         en: `${nums[mid]} ≥ ${nums[mid + 1]} → past the peak, hi = ${hi}`,
       }, {
@@ -5457,7 +5457,7 @@ function buildSteps1095(input, params = {}) {
       });
     }
   }
-  snapshot(4, "peak-exit", lo, hi, null, null, {
+  snapshot(7, "peak-exit", lo, hi, null, null, {
     vi: `while: ${lo} < ${hi} → False`,
     en: `while: ${lo} < ${hi} → False`,
   }, {
@@ -5465,7 +5465,7 @@ function buildSteps1095(input, params = {}) {
     en: "lo and hi converged onto a single index.",
   });
   const peak = lo;
-  snapshot(8, "peak-found", peak, peak, peak, null, {
+  snapshot(13, "peak-found", peak, peak, peak, null, {
     vi: `peak = ${peak} (arr[${peak}] = ${nums[peak]})`,
     en: `peak = ${peak} (arr[${peak}] = ${nums[peak]})`,
   }, {
@@ -5473,11 +5473,11 @@ function buildSteps1095(input, params = {}) {
     en: `[0…peak] ascends and [peak…n-1] descends — two monotonic halves ready for binary search.`,
   });
 
-  // ── def search(lo, hi, ascending): L9–L15 ──
+  // ── def search(lo, hi, ascending): L14–L21 ──
   function search(startLo, startHi, ascending, labelVi, labelEn) {
     let sLo = startLo;
     let sHi = startHi;
-    snapshot(16, ascending ? "asc" : "desc", sLo, sHi, null, null, {
+    snapshot(22, ascending ? "asc" : "desc", sLo, sHi, null, null, {
       vi: `${labelVi}: search(${sLo}, ${sHi}, ${ascending})`,
       en: `${labelEn}: search(${sLo}, ${sHi}, ${ascending})`,
     }, {
@@ -5485,7 +5485,7 @@ function buildSteps1095(input, params = {}) {
       en: `Binary search over the ${ascending ? "ASCENDING" : "DESCENDING"} half [${sLo}…${sHi}]. The move condition flips with the ascending flag.`,
     });
     while (sLo <= sHi) {
-      snapshot(10, ascending ? "asc" : "desc", sLo, sHi, null, null, {
+      snapshot(15, ascending ? "asc" : "desc", sLo, sHi, null, null, {
         vi: `while lo <= hi: ${sLo} <= ${sHi} → True`,
         en: `while lo <= hi: ${sLo} <= ${sHi} → True`,
       }, {
@@ -5495,7 +5495,7 @@ function buildSteps1095(input, params = {}) {
       const mid = Math.floor((sLo + sHi) / 2);
       gets += 1;
       probed.add(mid);
-      snapshot(11, ascending ? "asc" : "desc", sLo, sHi, mid, null, {
+      snapshot([16, 17], ascending ? "asc" : "desc", sLo, sHi, mid, null, {
         vi: `mid = ${mid}, arr[mid] = ${nums[mid]}`,
         en: `mid = ${mid}, arr[mid] = ${nums[mid]}`,
       }, {
@@ -5503,7 +5503,7 @@ function buildSteps1095(input, params = {}) {
         en: "One get() call fetches the value at mid.",
       });
       if (nums[mid] === target) {
-        snapshot(12, ascending ? "asc" : "desc", sLo, sHi, mid, mid, {
+        snapshot(18, ascending ? "asc" : "desc", sLo, sHi, mid, mid, {
           vi: `arr[${mid}] == ${target} → TÌM THẤY`,
           en: `arr[${mid}] == ${target} → FOUND`,
         }, {
@@ -5519,7 +5519,7 @@ function buildSteps1095(input, params = {}) {
       const goRight = ascending ? nums[mid] < target : nums[mid] > target;
       if (goRight) {
         sLo = mid + 1;
-        snapshot(13, ascending ? "asc" : "desc", sLo, sHi, mid, null, {
+        snapshot(19, ascending ? "asc" : "desc", sLo, sHi, mid, null, {
           vi: ascending
             ? `${nums[mid]} < ${target} → sang phải, lo = ${sLo}`
             : `${nums[mid]} > ${target} → sang phải, lo = ${sLo}`,
@@ -5532,7 +5532,7 @@ function buildSteps1095(input, params = {}) {
         });
       } else {
         sHi = mid - 1;
-        snapshot(14, ascending ? "asc" : "desc", sLo, sHi, mid, null, {
+        snapshot(20, ascending ? "asc" : "desc", sLo, sHi, mid, null, {
           vi: ascending
             ? `${nums[mid]} > ${target} → sang trái, hi = ${sHi}`
             : `${nums[mid]} < ${target} → sang trái, hi = ${sHi}`,
@@ -5545,7 +5545,7 @@ function buildSteps1095(input, params = {}) {
         });
       }
     }
-    snapshot(15, ascending ? "asc-exit" : "desc-exit", sLo, sHi, null, -1, {
+    snapshot(21, ascending ? "asc-exit" : "desc-exit", sLo, sHi, null, -1, {
       vi: `while → False: return -1 (${labelEn})`,
       en: `while → False: return -1 (${labelEn})`,
     }, {
@@ -5557,7 +5557,7 @@ function buildSteps1095(input, params = {}) {
 
   const left = search(0, peak, true, "Nửa tăng", "ascending half");
   if (left !== -1) {
-    snapshot(17, "done", 0, nums.length - 1, left, left, {
+    snapshot(23, "done", 0, nums.length - 1, left, left, {
       vi: `Kết quả: ${target} nằm tại index ${left}`,
       en: `Result: ${target} sits at index ${left}`,
     }, {
@@ -5567,15 +5567,15 @@ function buildSteps1095(input, params = {}) {
     return { steps, answer: left };
   }
 
-  snapshot(17, "call-desc", 0, nums.length - 1, null, null, {
-    vi: "left = -1 → thử nửa giảm",
-    en: "left = -1 → try the descending half",
+  snapshot(23, "call-desc", 0, nums.length - 1, null, null, {
+    vi: "found = -1 → thử nửa giảm",
+    en: "found = -1 → try the descending half",
   }, {
-    vi: "Toán tử ba ngôi tại dòng 17 chuyển sang search(peak+1, n-1, False).",
-    en: "The line-17 ternary now falls through to search(peak+1, n-1, False).",
+    vi: "Toán tử ba ngôi tại dòng 23 chuyển sang search(peak+1, n-1, False).",
+    en: "The line-23 ternary now falls through to search(peak+1, n-1, False).",
   });
   const right = search(peak + 1, nums.length - 1, false, "Nửa giảm", "descending half");
-  snapshot(17, "done", 0, nums.length - 1, right !== -1 ? right : null, right, {
+  snapshot(23, "done", 0, nums.length - 1, right !== -1 ? right : null, right, {
     vi: right === -1
       ? `Kết quả: ${target} không có trong mảng`
       : `Kết quả: ${target} nằm tại index ${right}`,
@@ -5599,7 +5599,7 @@ Object.assign(module.exports, {
     defaultInput: [1, 2, 3, 4, 5, 3, 1], inputKind: "integer", inputLabel: { vi: "mountain array", en: "mountain array" }, extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 3 }],
     approach: [{ vi: "Binary search đỉnh, sau đó tìm target trên nửa tăng và (nếu cần) nửa giảm với điều kiện so sánh đảo lại.", en: "Binary-search the peak, then search the increasing half and, if needed, the decreasing half with reversed comparisons." }],
     complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Ba lần binary search vẫn là O(log n).", en: "Three binary searches are still O(log n)." } },
-    code: ["class Solution:", "    def findInMountainArray(self, target, arr):", "        lo, hi = 0, len(arr) - 1", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if arr[mid] < arr[mid + 1]: lo = mid + 1", "            else: hi = mid", "        peak = lo", "        def search(lo, hi, ascending):", "            while lo <= hi:", "                mid = (lo + hi) // 2", "                if arr[mid] == target: return mid", "                if (arr[mid] < target) == ascending: lo = mid + 1", "                else: hi = mid - 1", "            return -1", "        left = search(0, peak, True)", "        return left if left != -1 else search(peak + 1, len(arr) - 1, False)"],
+    code: ["class Solution:", "    def findInMountainArray(self, target, mountain_arr):", "        n = mountain_arr.length()", "        def get(i):", "            return mountain_arr.get(i)", "        lo, hi = 0, n - 1", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if get(mid) < get(mid + 1):", "                lo = mid + 1", "            else:", "                hi = mid", "        peak = lo", "        def search(lo, hi, ascending):", "            while lo <= hi:", "                mid = (lo + hi) // 2", "                value = get(mid)", "                if value == target: return mid", "                if (value < target) == ascending: lo = mid + 1", "                else: hi = mid - 1", "            return -1", "        found = search(0, peak, True)", "        return found if found != -1 else search(peak + 1, n - 1, False)"],
     liveArgs: (input, params) => [Number(params.target), Array.isArray(input) ? input : parseIntegerList(input)],
     builder: buildSteps1095,
   },
