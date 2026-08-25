@@ -17374,6 +17374,119 @@ function renderElevator4027View(step) {
   </section>`;
 }
 
+function renderMissing3718View(step) {
+  const view = step.missing3718View || {};
+  const vi = lang === "vi";
+  const approach = Number(view.approach) || 1;
+  const directAns = approach === 2;
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const seen = Array.isArray(view.seen) ? view.seen : [];
+  const checked = Array.isArray(view.checked) ? view.checked : [];
+  const phase = String(view.phase || "init");
+  const k = Number(view.k) || 1;
+  const candidate = Number.isFinite(view.candidate) ? view.candidate : null;
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const counts = nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map());
+  const stageIndex = phase === "missing" || phase === "increment" ? 3 : phase === "present" ? 2 : phase === "enumerate" ? 1 : 0;
+  const stageLabels = directAns
+    ? (vi
+      ? ["Tạo Hash Set", "Đặt ans = k", "Check ans in seen", "ans += k / return"]
+      : ["Build Hash Set", "Set ans = k", "Check ans in seen", "ans += k / return"])
+    : (vi
+      ? ["Tạo Hash Set", "Sinh m × k", "Kiểm tra trong Set", "Bội thiếu đầu tiên"]
+      : ["Build Hash Set", "Generate m × k", "Check membership", "First missing multiple"]);
+  const stages = stageLabels.map((label, index) => {
+    const state = phase === "missing" || index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const inputCells = nums.map((value, index) => {
+    const classes = ["smm3718-num"];
+    if (index < Number(view.inputProgress || 0)) classes.push("processed");
+    if (index === currentIndex) classes.push("current");
+    if (value % k === 0) classes.push("multiple");
+    else classes.push("irrelevant");
+    if (candidate !== null && value === candidate) classes.push("candidate");
+    if (counts.get(value) > 1) classes.push("duplicate");
+    const tag = index === currentIndex ? (vi ? "ĐANG THÊM" : "ADDING")
+      : candidate !== null && value === candidate ? (vi ? "TÌM THẤY" : "MATCH")
+        : value % k === 0 ? `${value / k} × k` : (vi ? "không phải bội" : "not a multiple");
+    return `<span class="${classes.join(" ")}"><small>nums[${index}]</small><strong>${escapeHtml(display(value))}</strong><em>${escapeHtml(tag)}</em>${counts.get(value) > 1 ? `<b>×${counts.get(value)}</b>` : ""}</span>`;
+  }).join("") || `<em class="smm3718-empty">[ ]</em>`;
+
+  const setHtml = seen.length ? seen.map((value) => {
+    const classes = [];
+    if (value % k === 0) classes.push("multiple");
+    if (candidate !== null && value === candidate) classes.push("candidate");
+    if (view.insertion?.value === value) classes.push("inserted");
+    return `<span class="${classes.join(" ")}"><small>${value % k === 0 ? `${value / k}×k` : (vi ? "khác" : "other")}</small><strong>${escapeHtml(display(value))}</strong></span>`;
+  }).join("") : `<em class="smm3718-empty">{ }</em>`;
+
+  const timeline = checked.map((item) => ({ ...item, pending: false }));
+  if (candidate !== null && !timeline.some((item) => item.value === candidate)) {
+    timeline.push({ multiplier: view.multiplier, value: candidate, present: null, pending: true });
+  }
+  const omitted = Math.max(0, timeline.length - 12);
+  const visibleTimeline = timeline.slice(-12);
+  const multipleHtml = `${omitted ? `<em class="smm3718-omitted">… ${omitted} ${vi ? "bội trước" : "earlier"}</em>` : ""}${visibleTimeline.map((item) => {
+    const classes = ["smm3718-multiple"];
+    if (item.pending) classes.push("pending");
+    else if (item.present) classes.push("present");
+    else classes.push("missing");
+    if (item.value === candidate) classes.push("active");
+    const status = item.pending ? (vi ? "SẮP KIỂM TRA" : "CHECK NEXT") : item.present ? "PRESENT" : "MISSING";
+    return `<span class="${classes.join(" ")}"><small>m=${escapeHtml(display(item.multiplier))}</small><code>${escapeHtml(display(item.multiplier))} × ${k}</code><strong>${escapeHtml(display(item.value))}</strong><em>${status}</em></span>`;
+  }).join("")}` || `<em class="smm3718-empty">${vi ? "Chưa sinh bội nào" : "No multiple generated yet"}</em>`;
+
+  let operation;
+  if (phase === "build-set" && view.insertion) {
+    operation = `<section class="smm3718-operation set ${view.insertion.duplicate ? "duplicate" : "added"}"><div><small>SET BUILD · O(1) AVG</small><strong>seen.add(${escapeHtml(display(view.insertion.value))})</strong></div><i>&rarr;</i><div><small>${view.insertion.duplicate ? "ALREADY PRESENT" : "NEW VALUE"}</small><strong>|seen| = ${seen.length}</strong></div><p>${view.insertion.duplicate ? (vi ? "Duplicate được gộp thành một giá trị trong Set." : "The duplicate collapses to one Set value.") : (vi ? "Giá trị đã sẵn sàng cho membership check." : "The value is ready for membership checks.")}</p></section>`;
+  } else if (phase === "increment" && directAns) {
+    operation = `<section class="smm3718-operation increment"><div><small>ANS BEFORE</small><strong>ans = ${escapeHtml(display(view.ansBefore))}</strong></div><i>+</i><div><small>ans += k</small><strong>${escapeHtml(display(view.ansBefore))} + ${k} = ${escapeHtml(display(view.ansAfter))}</strong></div><p>${vi ? `${view.ansAfter} là bội kế tiếp; quay lại kiểm tra while ${view.ansAfter} in seen.` : `${view.ansAfter} is the next multiple; loop back to test while ${view.ansAfter} in seen.`}</p></section>`;
+  } else if (phase === "present" || phase === "missing") {
+    const candidateExpression = directAns
+      ? `ans = ${escapeHtml(display(candidate))}`
+      : `${escapeHtml(display(view.multiplier))} × ${k} = ${escapeHtml(display(candidate))}`;
+    const condition = directAns ? "ans in seen" : "candidate in seen";
+    const detail = view.present
+      ? directAns
+        ? (vi ? `${candidate} có trong Set: chạy ans += k trong thân while.` : `${candidate} is in the Set: execute ans += k in the while body.`)
+        : (vi ? `Có ${candidate} trong Set: tăng multiplier và tiếp tục.` : `${candidate} is in the Set: increment multiplier and continue.`)
+      : directAns
+        ? (vi ? `${candidate} không có trong Set: while dừng và return ans.` : `${candidate} is absent: the while loop stops and returns ans.`)
+        : (vi ? `Không có ${candidate}: trả về ngay vì đây là bội thiếu đầu tiên.` : `${candidate} is absent: return immediately because it is the first missing multiple.`);
+    operation = `<section class="smm3718-operation check ${phase}"><div><small>CANDIDATE</small><strong>${candidateExpression}</strong></div><i>?</i><div><small>${condition}</small><strong>${view.present ? "TRUE" : "FALSE"}</strong></div><p>${detail}</p></section>`;
+  } else if (phase === "enumerate") {
+    operation = directAns
+      ? `<section class="smm3718-operation enumerate"><div><small>${vi ? "BỘI DƯƠNG NHỎ NHẤT" : "SMALLEST POSITIVE MULTIPLE"}</small><strong>k = ${k}</strong></div><i>&rarr;</i><div><small>ans = k</small><strong>ans = ${k}</strong></div><p>${vi ? "ans giữ trực tiếp candidate, nên không cần biến multiplier." : "ans stores the candidate directly, so no multiplier variable is needed."}</p></section>`
+      : `<section class="smm3718-operation enumerate"><div><small>${vi ? "BỘ ĐẾM BẮT ĐẦU TỪ 1" : "COUNTER STARTS AT 1"}</small><strong>multiplier = 1</strong></div><i>&rarr;</i><div><small>candidate = multiplier × k</small><strong>1 × ${k} = ${k}</strong></div><p>${vi ? "0 × k không hợp lệ vì không phải bội dương." : "0 × k is invalid because it is not a positive multiple."}</p></section>`;
+  } else {
+    operation = `<section class="smm3718-operation idle"><div><small>HASH SET</small><strong>seen = set(nums)</strong></div><i>&rarr;</i><div><small>${directAns ? "while ans in seen" : "MEMBERSHIP"}</small><strong>average O(1)</strong></div><p>${vi ? "Xây Set một lần, rồi tái sử dụng cho mọi bội cần kiểm tra." : "Build the Set once, then reuse it for every multiple check."}</p></section>`;
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Bội thiếu của k=${k}; Set có ${seen.length} giá trị, đã kiểm tra ${checked.length} bội, đáp án ${display(view.answer)}.`
+    : `Missing multiple for k=${k}; Set has ${seen.length} values, ${checked.length} multiples checked, answer ${display(view.answer)}.`;
+  const currentFormula = directAns
+    ? phase === "increment"
+      ? `ans += k: ${display(view.ansBefore)} + ${k} = ${display(view.ansAfter)}`
+      : `ans = ${display(candidate)}`
+    : `candidate = m × k = ${display(view.multiplier)} × ${k} = ${display(candidate)}`;
+  $("treeView").innerHTML = `<section class="smm3718-viz approach-${approach}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="smm3718-stages">${stages}</div>
+    <div class="smm3718-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="smm3718-formula"><div><small>APPROACH ${approach} · POSITIVE MULTIPLES OF k=${k}</small><strong>k, 2k, 3k, …</strong></div><div><small>${directAns ? "CURRENT ans" : "CURRENT FORMULA"}</small><strong>${currentFormula}</strong></div></section>
+    <section class="smm3718-input"><header><strong>INPUT · nums</strong><span>${Number(view.inputProgress || 0)}/${nums.length} ${vi ? "đã đưa vào Set" : "inserted into Set"}</span></header><div>${inputCells}</div></section>
+    <section class="smm3718-set"><header><strong>HASH SET · seen</strong><span>${seen.length} ${vi ? "giá trị duy nhất" : "unique value(s)"}</span></header><div>${setHtml}</div></section>
+    ${operation}
+    <section class="smm3718-ladder"><header><strong>${vi ? "CÁC BỘI ĐƯỢC KIỂM TRA THEO THỨ TỰ" : "MULTIPLES CHECKED IN ORDER"}</strong><span>${checked.length}/${view.maxChecks} ${vi ? "lần kiểm tra tối đa" : "maximum checks"}</span></header><div>${multipleHtml}</div></section>
+    <section class="smm3718-proof"><div><small>${vi ? "VÌ SAO LÀ NHỎ NHẤT?" : "WHY IS IT MINIMAL?"}</small><strong>k &lt; 2k &lt; 3k &lt; …</strong><span>${vi ? "Dừng đúng tại FALSE đầu tiên." : "Stop exactly at the first FALSE."}</span></div><div><small>${vi ? "VÌ SAO LUÔN DỪNG?" : "WHY MUST IT STOP?"}</small><strong>${nums.length} ${vi ? "phần tử" : "items"} &lt; ${view.maxChecks} ${vi ? "bội đầu tiên" : "first multiples"}</strong><span>answer ≤ (n+1) × k = ${view.upperBound}</span></div></section>
+    ${phase === "missing" ? `<section class="smm3718-answer"><small>RETURN</small><strong>${escapeHtml(display(view.answer))}</strong><span>${directAns ? "ans" : `${escapeHtml(display(view.multiplier))} × ${k}`}</span></section>` : ""}
+  </section>`;
+}
+
 function renderRussian354View(step) {
   const view = step.russian354View || {};
   const vi = lang === "vi";
@@ -19207,6 +19320,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromePathView(step);
+  } else if (step.missing3718View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMissing3718View(step);
   } else if (step.russian354View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -9773,6 +9773,328 @@ Object.assign(module.exports, {
   },
 });
 
+/** LeetCode 3718: Smallest Missing Multiple of K. */
+function buildSteps3718(nums, params) {
+  const arr = Array.isArray(nums) ? nums.map(Number) : [];
+  const k = Math.max(1, Number(params && params.k) || 1);
+  const seen = new Set();
+  const checked = [];
+  const steps = [];
+  const maxChecks = arr.length + 1;
+
+  function push(opts) {
+    const candidate = Number.isFinite(opts.candidate) ? opts.candidate : null;
+    const matchingIndices = candidate === null
+      ? []
+      : arr.map((value, index) => (value === candidate ? index : -1)).filter((index) => index >= 0);
+    steps.push({
+      title: opts.title,
+      arr: [...arr],
+      sub: arr.map((value) => value % k === 0 ? `${value / k}×k` : "not multiple"),
+      highlight: Number.isInteger(opts.currentIndex) ? [opts.currentIndex] : matchingIndices,
+      mark: arr.map((value, index) => value % k === 0 && seen.has(value) ? index : -1).filter((index) => index >= 0),
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      missing3718View: {
+        approach: 1,
+        phase: opts.phase || "init",
+        nums: [...arr],
+        k,
+        seen: [...seen].sort((a, b) => a - b),
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        insertion: opts.insertion || null,
+        candidate,
+        multiplier: Number.isInteger(opts.multiplier) ? opts.multiplier : null,
+        present: typeof opts.present === "boolean" ? opts.present : null,
+        checked: checked.map((item) => ({ ...item })),
+        setProgress: seen.size,
+        inputProgress: Number(opts.inputProgress) || 0,
+        maxChecks,
+        upperBound: maxChecks * k,
+        answer: opts.answer ?? null,
+      },
+    });
+  }
+
+  push({
+    phase: "init",
+    title: { vi: "Khởi tạo hash set rỗng", en: "Initialize an empty hash set" },
+    codeLines: [4],
+    vars: [{ name: "seen", value: "{}" }, { name: "k", value: k }],
+    note: { vi: "Đưa nums vào Set để mỗi phép kiểm tra candidate có thời gian O(1) trung bình.", en: "Put nums into a Set so each candidate membership check takes O(1) average time." },
+  });
+
+  for (let index = 0; index < arr.length; index++) {
+    const value = arr[index];
+    const duplicate = seen.has(value);
+    seen.add(value);
+    push({
+      phase: "build-set",
+      title: duplicate
+        ? { vi: `nums[${index}] = ${value} đã có trong Set`, en: `nums[${index}] = ${value} is already in the Set` }
+        : { vi: `Thêm nums[${index}] = ${value} vào Set`, en: `Add nums[${index}] = ${value} to the Set` },
+      currentIndex: index,
+      insertion: { value, duplicate },
+      inputProgress: index + 1,
+      codeLines: [4],
+      vars: [{ name: "value", value }, { name: "duplicate?", value: duplicate }, { name: "seen size", value: seen.size }],
+      note: duplicate
+        ? { vi: "Set chỉ giữ một bản sao; duplicate không làm thay đổi việc kiểm tra tồn tại.", en: "A Set keeps one copy; duplicates do not change membership checks." }
+        : { vi: `${value} được thêm vào Set.`, en: `${value} is added to the Set.` },
+    });
+  }
+
+  push({
+    phase: "enumerate",
+    title: { vi: `Bắt đầu từ bội dương đầu tiên: 1 × ${k} = ${k}`, en: `Start at the first positive multiple: 1 × ${k} = ${k}` },
+    candidate: k,
+    multiplier: 1,
+    inputProgress: arr.length,
+    codeLines: [5],
+    vars: [{ name: "multiplier", value: 1 }, { name: "candidate", value: k }],
+    note: { vi: "Bắt đầu multiplier = 1, không phải 0, vì đề bài yêu cầu bội dương.", en: "Start multiplier at 1, not 0, because the problem asks for a positive multiple." },
+  });
+
+  for (let multiplier = 1; multiplier <= maxChecks; multiplier++) {
+    const candidate = multiplier * k;
+    const present = seen.has(candidate);
+    checked.push({ multiplier, value: candidate, present });
+    if (!present) {
+      push({
+        phase: "missing",
+        title: { vi: `${candidate} không có trong Set → đáp án`, en: `${candidate} is absent from the Set → answer` },
+        candidate,
+        multiplier,
+        present,
+        inputProgress: arr.length,
+        final: true,
+        answer: candidate,
+        codeLines: [6, 8],
+        vars: [{ name: "candidate", value: candidate }, { name: "candidate in seen?", value: false }, { name: "answer", value: candidate }],
+        note: { vi: `${candidate} là bội đầu tiên bị thiếu. Vì mọi bội nhỏ hơn đã được kiểm tra theo thứ tự tăng dần, đây chắc chắn là đáp án nhỏ nhất.`, en: `${candidate} is the first missing multiple. Every smaller multiple was checked in increasing order, so this is guaranteed to be the smallest answer.` },
+      });
+      return { original: [...arr], answer: candidate, steps };
+    }
+
+    push({
+      phase: "present",
+      title: { vi: `${candidate} có trong Set → thử bội tiếp theo`, en: `${candidate} is in the Set → try the next multiple` },
+      candidate,
+      multiplier,
+      present,
+      inputProgress: arr.length,
+      codeLines: [6, 7],
+      vars: [{ name: "multiplier", value: multiplier }, { name: "candidate", value: candidate }, { name: "candidate in seen?", value: true }],
+      note: { vi: `${candidate} đã xuất hiện trong nums, nên tăng multiplier từ ${multiplier} lên ${multiplier + 1}.`, en: `${candidate} appears in nums, so increment multiplier from ${multiplier} to ${multiplier + 1}.` },
+    });
+  }
+
+  throw new Error("A missing multiple must exist within n + 1 checks.");
+}
+
+/** LeetCode 3718, approach 2: keep the current multiple directly in ans. */
+function buildSteps3718Ans(nums, params) {
+  const arr = Array.isArray(nums) ? nums.map(Number) : [];
+  const k = Math.max(1, Number(params && params.k) || 1);
+  const seen = new Set();
+  const checked = [];
+  const steps = [];
+  const maxChecks = arr.length + 1;
+
+  function push(opts) {
+    const candidate = Number.isFinite(opts.candidate) ? opts.candidate : null;
+    const matchingIndices = candidate === null
+      ? []
+      : arr.map((value, index) => (value === candidate ? index : -1)).filter((index) => index >= 0);
+    steps.push({
+      title: opts.title,
+      arr: [...arr],
+      sub: arr.map((value) => value % k === 0 ? `${value / k}×k` : "not multiple"),
+      highlight: Number.isInteger(opts.currentIndex) ? [opts.currentIndex] : matchingIndices,
+      mark: arr.map((value, index) => value % k === 0 && seen.has(value) ? index : -1).filter((index) => index >= 0),
+      final: Boolean(opts.final),
+      codeBlock: 2,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      missing3718View: {
+        approach: 2,
+        phase: opts.phase || "init",
+        nums: [...arr],
+        k,
+        seen: [...seen].sort((a, b) => a - b),
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : null,
+        insertion: opts.insertion || null,
+        candidate,
+        multiplier: Number.isInteger(opts.multiplier) ? opts.multiplier : null,
+        ansBefore: Number.isFinite(opts.ansBefore) ? opts.ansBefore : null,
+        ansAfter: Number.isFinite(opts.ansAfter) ? opts.ansAfter : null,
+        present: typeof opts.present === "boolean" ? opts.present : null,
+        checked: checked.map((item) => ({ ...item })),
+        setProgress: seen.size,
+        inputProgress: Number(opts.inputProgress) || 0,
+        maxChecks,
+        upperBound: maxChecks * k,
+        answer: opts.answer ?? null,
+      },
+    });
+  }
+
+  push({
+    phase: "init",
+    title: { vi: "Khởi tạo hash set rỗng", en: "Initialize an empty hash set" },
+    codeLines: [3],
+    vars: [{ name: "seen", value: "{}" }, { name: "k", value: k }],
+    note: { vi: "Mô phỏng seen = set(nums) từng phần tử để thấy rõ Set loại bỏ duplicate.", en: "Build seen = set(nums) one item at a time to show how the Set removes duplicates." },
+  });
+
+  for (let index = 0; index < arr.length; index++) {
+    const value = arr[index];
+    const duplicate = seen.has(value);
+    seen.add(value);
+    push({
+      phase: "build-set",
+      title: duplicate
+        ? { vi: `nums[${index}] = ${value} đã có trong Set`, en: `nums[${index}] = ${value} is already in the Set` }
+        : { vi: `Thêm nums[${index}] = ${value} vào Set`, en: `Add nums[${index}] = ${value} to the Set` },
+      currentIndex: index,
+      insertion: { value, duplicate },
+      inputProgress: index + 1,
+      codeLines: [3],
+      vars: [{ name: "value", value }, { name: "duplicate?", value: duplicate }, { name: "seen size", value: seen.size }],
+      note: duplicate
+        ? { vi: "Set chỉ giữ một bản sao; duplicate không làm thay đổi phép kiểm tra ans in seen.", en: "A Set keeps one copy; duplicates do not change the ans-in-seen check." }
+        : { vi: `${value} được thêm vào Set.`, en: `${value} is added to the Set.` },
+    });
+  }
+
+  let ans = k;
+  push({
+    phase: "enumerate",
+    title: { vi: `Khởi tạo ans = k = ${k}`, en: `Initialize ans = k = ${k}` },
+    candidate: ans,
+    multiplier: 1,
+    inputProgress: arr.length,
+    codeLines: [4],
+    vars: [{ name: "ans", value: ans }, { name: "k", value: k }],
+    note: { vi: "ans luôn là candidate hiện tại và bắt đầu tại bội dương nhỏ nhất k.", en: "ans is always the current candidate and starts at the smallest positive multiple k." },
+  });
+
+  for (let multiplier = 1; multiplier <= maxChecks; multiplier++) {
+    const present = seen.has(ans);
+    checked.push({ multiplier, value: ans, present });
+    if (!present) {
+      push({
+        phase: "missing",
+        title: { vi: `${ans} không có trong Set → return ans`, en: `${ans} is absent from the Set → return ans` },
+        candidate: ans,
+        multiplier,
+        present,
+        inputProgress: arr.length,
+        final: true,
+        answer: ans,
+        codeLines: [5, 7],
+        vars: [{ name: "ans", value: ans }, { name: "ans in seen?", value: false }, { name: "return", value: ans }],
+        note: { vi: `${ans} là bội đầu tiên làm điều kiện while sai, nên được trả về ngay.`, en: `${ans} is the first multiple that makes the while condition false, so it is returned immediately.` },
+      });
+      return { original: [...arr], answer: ans, steps };
+    }
+
+    push({
+      phase: "present",
+      title: { vi: `${ans} có trong Set → vào thân while`, en: `${ans} is in the Set → enter the while body` },
+      candidate: ans,
+      multiplier,
+      present,
+      inputProgress: arr.length,
+      codeLines: [5],
+      vars: [{ name: "ans", value: ans }, { name: "ans in seen?", value: true }],
+      note: { vi: `Điều kiện ${ans} in seen là True, vì vậy cần nhảy sang bội kế tiếp.`, en: `${ans} in seen is True, so advance to the next multiple.` },
+    });
+
+    const previous = ans;
+    ans += k;
+    push({
+      phase: "increment",
+      title: { vi: `Cộng k: ans = ${previous} + ${k} = ${ans}`, en: `Add k: ans = ${previous} + ${k} = ${ans}` },
+      candidate: ans,
+      multiplier: multiplier + 1,
+      ansBefore: previous,
+      ansAfter: ans,
+      inputProgress: arr.length,
+      codeLines: [6],
+      vars: [{ name: "ans before", value: previous }, { name: "k", value: k }, { name: "ans after", value: ans }],
+      note: { vi: "ans += k giữ ans luôn là bội kế tiếp mà không cần biến multiplier.", en: "ans += k keeps ans at the next multiple without a separate multiplier variable." },
+    });
+  }
+
+  throw new Error("A missing multiple must exist within n + 1 checks.");
+}
+
+Object.assign(module.exports, {
+  3718: {
+    id: 3718,
+    difficulty: "easy",
+    slug: "smallest-missing-multiple-of-k",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [{ key: "hash-set", vi: "Hash Set", en: "Hash Set" }],
+    title: { vi: "Smallest Missing Multiple of K", en: "Smallest Missing Multiple of K" },
+    titleVi: { vi: "Bội dương nhỏ nhất của k còn thiếu", en: "Smallest missing positive multiple of k" },
+    statement: {
+      vi: "Cho mảng số nguyên nums và số nguyên dương k. Trả về bội dương nhỏ nhất của k không xuất hiện trong nums.",
+      en: "Given an integer array nums and a positive integer k, return the smallest positive multiple of k that is missing from nums.",
+    },
+    defaultInput: [8, 2, 3, 4, 6],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "k", label: { vi: "k", en: "k" }, type: "number", default: 2 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: multiplier × k", en: "Approach 1: multiplier × k" } },
+          { value: "2", label: { vi: "Cách 2: ans += k", en: "Approach 2: ans += k" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Đưa mọi phần tử của nums vào Hash Set để kiểm tra tồn tại trong O(1) trung bình.", en: "Put every nums value into a Hash Set for O(1) average membership checks." },
+      { vi: "Duyệt các bội dương theo thứ tự k, 2k, 3k, ...; bội đầu tiên không nằm trong Set là đáp án.", en: "Enumerate positive multiples in order k, 2k, 3k, ...; the first one absent from the Set is the answer." },
+      { vi: "Cách 1 lưu multiplier rồi tính multiplier × k. Cách 2 lưu trực tiếp candidate trong ans và nhảy bằng ans += k.", en: "Approach 1 stores a multiplier and computes multiplier × k. Approach 2 stores the candidate directly in ans and advances with ans += k." },
+      { vi: "Chỉ cần tối đa n+1 lần kiểm tra: nums có n phần tử nên không thể chứa đủ n+1 bội khác nhau đầu tiên.", en: "At most n+1 checks are needed: n array elements cannot contain all of the first n+1 distinct multiples." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Tạo Set O(n), rồi kiểm tra nhiều nhất n+1 bội.", en: "Build the Set in O(n), then check at most n+1 multiples." } },
+    code: [
+      "class Solution:",
+      "    def missingMultiple(self, nums, k):",
+      "        # O(1) average membership checks",
+      "        seen = set(nums)",
+      "        multiplier = 1",
+      "        while multiplier * k in seen:",
+      "            multiplier += 1",
+      "        return multiplier * k",
+    ],
+    code2: [
+      "class Solution:",
+      "    def missingMultiple(self, nums: List[int], k: int) -> int:",
+      "        seen = set(nums)",
+      "        ans = k",
+      "        while ans in seen:",
+      "            ans += k",
+      "        return ans",
+    ],
+    codeLabel: { vi: "Cách 1: multiplier × k", en: "Approach 1: multiplier × k" },
+    code2Label: { vi: "Cách 2: ans += k", en: "Approach 2: ans += k" },
+    builder: buildSteps3718,
+    builder2: buildSteps3718Ans,
+  },
+});
+
 /**
  * LeetCode 2502: Design Memory Allocator.
  * Allocation scans left-to-right while tracking the current consecutive-free
