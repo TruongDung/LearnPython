@@ -8109,6 +8109,122 @@ function renderStudents1349View(step) {
     </div>`;
 }
 
+function renderSuperstring943View(step) {
+  const view = step.superstring943View || {};
+  const words = Array.isArray(view.words) ? view.words : [];
+  const overlap = Array.isArray(view.overlap) ? view.overlap : [];
+  const mask = Number.isInteger(view.mask) ? view.mask : 0;
+  const bitOn = (index) => Boolean(mask & (1 << index));
+  const phaseLabel = {
+    prepare: pick({ vi: "Loại word da thua", en: "Prune contained words" }),
+    overlap: pick({ vi: "Do overlap", en: "Measure overlap" }),
+    seed: pick({ vi: "Khoi tao DP", en: "Seed DP" }),
+    update: pick({ vi: "Noi them word", en: "Append word" }),
+    done: pick({ vi: "Hoan tat", en: "Complete" }),
+  }[view.phase] || String(view.phase || "DP");
+
+  const wordCards = words.map((word, index) => {
+    const classes = ["ss943-word", bitOn(index) ? "used" : "", index === view.last ? "source" : "", index === view.next ? "target" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>word[${index}]</small><strong>${escapeHtml(word)}</strong><span>${bitOn(index) ? pick({ vi: "trong mask", en: "in mask" }) : pick({ vi: "chua dung", en: "not used" })}</span></div>`;
+  }).join("");
+
+  const overlapRows = words.map((word, row) => {
+    const cells = words.map((_, col) => {
+      const classes = ["ss943-overlap-cell", row === view.last && col === view.next ? "active" : "", row === col ? "same" : ""].filter(Boolean).join(" ");
+      return `<div class="${classes}">${row === col ? "-" : (overlap[row]?.[col] ?? 0)}</div>`;
+    }).join("");
+    return `<div class="ss943-overlap-row" style="--ss943-cols:${words.length + 1}"><span>W${row}</span>${cells}</div>`;
+  }).join("");
+  const overlapHead = `<div class="ss943-overlap-row ss943-overlap-head" style="--ss943-cols:${words.length + 1}"><span>from / to</span>${words.map((_, index) => `<span>W${index}</span>`).join("")}</div>`;
+
+  const endings = (Array.isArray(view.endings) ? view.endings : []).map((entry) => `<div class="ss943-ending${entry.last === view.next ? " active" : ""}"><small>end W${entry.last}</small><strong>${escapeHtml(String(entry.text))}</strong><span>${entry.length}</span></div>`).join("");
+  const maskText = `0b${mask.toString(2).padStart(Math.max(words.length, 1), "0")}`;
+  const mapping = view.last != null && view.next != null
+    ? `<small>W${view.last} + suffix(W${view.next})</small><strong>${escapeHtml(words[view.last] || "?")} + ${escapeHtml(view.suffix || "")}</strong><span>${escapeHtml(view.candidate || "")}</span>`
+    : `<small>state</small><strong>${escapeHtml(phaseLabel)}</strong><span>${escapeHtml(view.candidate || "")}</span>`;
+
+  $("treeView").innerHTML = `
+    <div class="ss943-viz">
+      <header><strong>SHORTEST SUPERSTRING</strong><span>${escapeHtml(phaseLabel)}</span></header>
+      <div class="ss943-words">${wordCards}</div>
+      <div class="ss943-main">
+        <section class="ss943-panel"><header><strong>OVERLAP TABLE</strong><span>Wrow -> Wcol</span></header><div class="ss943-overlap">${overlapHead}${overlapRows}</div></section>
+        <section class="ss943-panel ss943-state"><header><strong>DP[mask][last]</strong><span>${maskText}</span></header><div class="ss943-map">${mapping}</div><div class="ss943-endings">${endings || `<div class="ss943-empty">${escapeHtml(pick({ vi: "Dang cho state DP", en: "Waiting for a DP state" }))}</div>`}</div></section>
+      </div>
+      <footer><span><small>mask</small><strong>${maskText}</strong></span><span><small>DP states</small><strong>${view.stateCount ?? 0}</strong></span><span class="${view.phase === "done" ? "answer" : ""}"><small>${escapeHtml(pick({ vi: "chuoi hien tai", en: "current string" }))}</small><strong>${escapeHtml(view.answer || view.candidate || "-")}</strong></span></footer>
+    </div>`;
+}
+
+function renderGoodStrings1397View(step) {
+  const view = step.goodStrings1397View || {};
+  const lower = String(view.lower || "");
+  const upper = String(view.upper || "");
+  const evil = String(view.evil || "");
+  const pos = Number.isInteger(view.pos) ? view.pos : 0;
+  const prefix = String(view.prefix || "");
+  const bound = (label, text, kind) => `<div class="good1397-bound ${kind}"><small>${label}</small><div>${[...text].map((char, index) => `<span class="${index === pos ? "cursor" : index < prefix.length ? "fixed" : ""}">${escapeHtml(char)}</span>`).join("")}</div></div>`;
+  const pattern = [...evil].map((char, index) => `<span class="${index < (view.matched || 0) ? "matched" : ""}"><b>${escapeHtml(char)}</b><small>${view.lps?.[index] ?? 0}</small></span>`).join("");
+  const state = [
+    ["pos", pos],
+    ["match", `${view.matched ?? 0}/${evil.length}`],
+    ["low", view.tightLow ? "T" : "F"],
+    ["high", view.tightHigh ? "T" : "F"],
+  ].map(([label, value]) => `<span><small>${label}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("");
+  const memoRows = (Array.isArray(view.memoEntries) ? view.memoEntries : []).map((entry) => `<div class="good1397-memo"><code>(${entry.pos},${entry.matched},${entry.tightLow ? 1 : 0},${entry.tightHigh ? 1 : 0})</code><strong>${entry.value}</strong></div>`).join("");
+  const action = view.phase === "blocked"
+    ? pick({ vi: `Them '${view.char}' se tao evil: bo nhanh.`, en: `Adding '${view.char}' completes evil: skip it.` })
+    : view.phase === "add"
+      ? pick({ vi: `Chon '${view.char}' -> match ${view.nextMatched}; cong vao tong.`, en: `Choose '${view.char}' -> match ${view.nextMatched}; add its count.` })
+      : view.phase === "done"
+        ? pick({ vi: "Da dem xong tat ca good strings.", en: "All good strings are counted." })
+        : pick({ vi: "KMP theo doi prefix evil dang khop.", en: "KMP tracks the matching evil prefix." });
+
+  $("treeView").innerHTML = `
+    <div class="good1397-viz">
+      <header><strong>FIND ALL GOOD STRINGS</strong><span>${escapeHtml(view.phase || "dp")}</span></header>
+      <div class="good1397-bounds">${bound("s1", lower, "lower")}${bound("prefix", `${prefix}${".".repeat(Math.max(0, lower.length - prefix.length))}`, "prefix")}${bound("s2", upper, "upper")}</div>
+      <div class="good1397-main">
+        <section class="good1397-panel"><header><strong>EVIL + KMP LPS</strong><span>matched prefix</span></header><div class="good1397-pattern">${pattern}</div><div class="good1397-action">${escapeHtml(action)}</div><div class="good1397-state">${state}</div></section>
+        <section class="good1397-panel"><header><strong>MEMO STATE</strong><span>${view.memoEntries?.length ?? 0} shown</span></header><div class="good1397-memos">${memoRows || `<div class="good1397-empty">dp(pos, match, low, high)</div>`}</div></section>
+      </div>
+      <footer><span><small>${escapeHtml(pick({ vi: "ky tu dang thu", en: "character tried" }))}</small><strong>${escapeHtml(view.char || "-")}</strong></span><span><small>${escapeHtml(pick({ vi: "tong state", en: "state total" }))}</small><strong>${view.total ?? "-"}</strong></span><span class="${view.phase === "done" ? "answer" : ""}"><small>${escapeHtml(pick({ vi: "good strings", en: "good strings" }))}</small><strong>${view.answer ?? "-"}</strong></span></footer>
+    </div>`;
+}
+
+function renderDistribute1655View(step) {
+  const view = step.distribute1655View || {};
+  const quantity = Array.isArray(view.quantity) ? view.quantity : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const reachable = new Set(Array.isArray(view.reachable) ? view.reachable : []);
+  const selectedMask = view.fromMask != null && view.addMask != null ? view.fromMask | view.addMask : null;
+  const customers = quantity.map((need, index) => {
+    const added = view.addMask != null && (view.addMask & (1 << index));
+    const served = selectedMask != null && (selectedMask & (1 << index));
+    return `<div class="dist1655-customer${added ? " added" : served ? " served" : ""}"><small>C${index}</small><strong>${need}</strong><span>${added ? "+ bucket" : served ? "served" : "need"}</span></div>`;
+  }).join("");
+  const buckets = counts.map((count, index) => `<div class="dist1655-bucket${index === view.bucketIndex ? " active" : index < view.bucketIndex ? " done" : ""}"><small>value group ${index}</small><strong>${count}</strong><span>${index === view.bucketIndex ? "processing" : index < view.bucketIndex ? "used" : "pending"}</span></div>`).join("");
+  const maskRows = Array.from({ length: (view.fullMask ?? 0) + 1 }, (_, mask) => {
+    const on = reachable.has(mask);
+    const active = mask === selectedMask || mask === view.fromMask;
+    return `<div class="dist1655-mask${on ? " reachable" : ""}${active ? " active" : ""}"><code>${mask.toString(2).padStart(quantity.length, "0")}</code><span>${on ? "yes" : "-"}</span></div>`;
+  }).join("");
+  const addedNeeds = view.addMask == null ? [] : quantity.filter((_, index) => view.addMask & (1 << index));
+  const action = view.addMask != null
+    ? `mask ${view.fromMask.toString(2).padStart(quantity.length, "0")} + ${view.addMask.toString(2).padStart(quantity.length, "0")} | need ${addedNeeds.join(" + ") || "0"} = ${view.subsetSums?.[view.addMask] ?? 0}`
+    : pick({ vi: "Moi bit la mot customer da du quantity.", en: "Each bit represents one fully served customer." });
+
+  $("treeView").innerHTML = `
+    <div class="dist1655-viz">
+      <header><strong>DISTRIBUTE REPEATING INTEGERS</strong><span>${escapeHtml(view.phase || "bitmask DP")}</span></header>
+      <div class="dist1655-main">
+        <section class="dist1655-panel"><header><strong>CUSTOMER QUANTITIES</strong><span>bit = customer</span></header><div class="dist1655-customers">${customers}</div><div class="dist1655-action">${escapeHtml(action)}</div></section>
+        <section class="dist1655-panel"><header><strong>FREQUENCY BUCKETS</strong><span>same value count</span></header><div class="dist1655-buckets">${buckets}</div></section>
+      </div>
+      <section class="dist1655-panel dist1655-states"><header><strong>REACHABLE CUSTOMER MASKS</strong><span>${reachable.size} states</span></header><div class="dist1655-mask-grid">${maskRows}</div></section>
+      <footer><span><small>full mask</small><strong>${(view.fullMask ?? 0).toString(2).padStart(quantity.length, "0")}</strong></span><span><small>${escapeHtml(pick({ vi: "bucket hien tai", en: "current bucket" }))}</small><strong>${view.bucketIndex != null && view.bucketIndex >= 0 ? counts[view.bucketIndex] ?? "-" : "-"}</strong></span><span class="${view.phase === "done" ? (view.answer ? "answer yes" : "answer no") : ""}"><small>${escapeHtml(pick({ vi: "ket qua", en: "result" }))}</small><strong>${view.answer == null ? "-" : view.answer ? "TRUE" : "FALSE"}</strong></span></footer>
+    </div>`;
+}
+
 function binPad(mask, width) {
   return (mask >>> 0).toString(2).padStart(width, "0").slice(-Math.max(width, 1));
 }
@@ -21107,6 +21223,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderStudents1349View(step);
+  } else if (step.superstring943View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSuperstring943View(step);
+  } else if (step.goodStrings1397View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGoodStrings1397View(step);
+  } else if (step.distribute1655View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDistribute1655View(step);
   } else if (step.sentenceView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -23311,3 +23311,437 @@ Object.assign(module.exports, {
     builder: buildSteps1349,
   },
 });
+
+// ─── 943: Find the Shortest Superstring ───
+function parseWords943(input) {
+  const items = Array.isArray(input) ? input : String(input ?? "").split(",");
+  return [...new Set(items.map((word) => String(word).trim()).filter(Boolean))];
+}
+
+function buildSteps943(input) {
+  const rawWords = parseWords943(input);
+  const words = rawWords.filter((word, index) => !rawWords.some((other, otherIndex) => otherIndex !== index && other.includes(word)));
+  if (words.length < 2 || words.length > 6 || words.some((word) => !/^[a-z]+$/.test(word) || word.length > 10)) {
+    throw new Error("Use 2 to 6 distinct lowercase words, each up to 10 letters.");
+  }
+  const n = words.length;
+  const overlap = Array.from({ length: n }, () => Array(n).fill(0));
+  const findOverlap = (left, right) => {
+    for (let size = Math.min(left.length, right.length); size > 0; size--) {
+      if (left.endsWith(right.slice(0, size))) return size;
+    }
+    return 0;
+  };
+  const steps = [];
+  const dp = Array.from({ length: 1 << n }, () => Array(n).fill(null));
+  let stateCount = 0;
+  const TRACE_LIMIT = 280;
+  const snapshot = ({ line, phase, mask = null, fromMask = null, last = null, next = null, candidate = null, suffix = "", answer = null, title, note, force = false }) => {
+    if (!force && steps.length >= TRACE_LIMIT) return;
+    const endings = mask == null ? [] : dp[mask].map((text, index) => text == null ? null : { last: index, text, length: text.length }).filter(Boolean);
+    steps.push({
+      title, note, final: phase === "done", arr: [], sub: [], highlight: [], mark: [], codeLines: [line],
+      vars: [
+        { name: "words", value: `[${words.join(", ")}]` },
+        ...(mask != null ? [{ name: "mask", value: `0b${mask.toString(2).padStart(n, "0")}` }] : []),
+        ...(last != null ? [{ name: "last", value: last }] : []),
+        ...(next != null ? [{ name: "next", value: next }] : []),
+        { name: "DP states", value: stateCount },
+      ],
+      superstring943View: { words, rawWords, overlap, mask, fromMask, last, next, candidate, suffix, endings, stateCount, phase, answer, traceTruncated: steps.length >= TRACE_LIMIT },
+    });
+  };
+
+  snapshot({ line: 4, phase: "prepare", title: { vi: "Chuẩn bị các word", en: "Prepare the words" }, note: { vi: "Nếu một word đã nằm trong word khác thì không cần đưa vào superstring lần nữa.", en: "A word already contained in another word does not need another place in the superstring." } });
+  for (let left = 0; left < n; left++) {
+    for (let right = 0; right < n; right++) {
+      if (left === right) continue;
+      overlap[left][right] = findOverlap(words[left], words[right]);
+      snapshot({ line: 7, phase: "overlap", last: left, next: right, suffix: words[right].slice(overlap[left][right]), title: { vi: `overlap(${left}, ${right}) = ${overlap[left][right]}`, en: `overlap(${left}, ${right}) = ${overlap[left][right]}` }, note: { vi: `Nối “${words[left]}” rồi “${words[right]}”: chỉ cần thêm hậu tố “${words[right].slice(overlap[left][right]) || ""}”.`, en: `Append “${words[right]}” after “${words[left]}”: only the suffix “${words[right].slice(overlap[left][right]) || ""}” is new.` } });
+    }
+  }
+  for (let index = 0; index < n; index++) {
+    dp[1 << index][index] = words[index];
+    stateCount++;
+    snapshot({ line: 12, phase: "seed", mask: 1 << index, last: index, title: { vi: `DP chỉ có word ${index}`, en: `Seed DP with word ${index}` }, note: { vi: `mask chỉ bật bit ${index}; superstring kết thúc bằng “${words[index]}”.`, en: `The mask only turns on bit ${index}; the superstring ends in “${words[index]}”.` } });
+  }
+
+  for (let mask = 1; mask < (1 << n); mask++) {
+    for (let last = 0; last < n; last++) {
+      if (dp[mask][last] == null) continue;
+      for (let next = 0; next < n; next++) {
+        if (mask & (1 << next)) continue;
+        const newMask = mask | (1 << next);
+        const suffix = words[next].slice(overlap[last][next]);
+        const candidate = dp[mask][last] + suffix;
+        const current = dp[newMask][next];
+        if (current == null || candidate.length < current.length || (candidate.length === current.length && candidate < current)) {
+          if (current == null) stateCount++;
+          dp[newMask][next] = candidate;
+          snapshot({ line: 20, phase: "update", mask: newMask, fromMask: mask, last, next, candidate, suffix, title: { vi: `Thêm word ${next} sau word ${last}`, en: `Append word ${next} after word ${last}` }, note: { vi: `DP[${newMask.toString(2)}][${next}] = “${candidate}” là cách ngắn nhất hiện có cho subset này.`, en: `DP[${newMask.toString(2)}][${next}] = “${candidate}” is the shortest current string for this subset.` } });
+        }
+      }
+    }
+  }
+  const fullMask = (1 << n) - 1;
+  const answer = dp[fullMask].filter(Boolean).reduce((best, text) => !best || text.length < best.length || (text.length === best.length && text < best) ? text : best, null);
+  snapshot({ line: 21, phase: "done", mask: fullMask, candidate: answer, answer, title: { vi: "Shortest superstring hoàn tất", en: "Shortest superstring complete" }, note: { vi: `Chuỗi ngắn nhất chứa mọi word là “${answer}” (độ dài ${answer.length}).`, en: `The shortest string containing every word is “${answer}” (length ${answer.length}).` }, force: true });
+  return { steps, answer };
+}
+
+// ─── 1397: Find All Good Strings ───
+function buildSteps1397(input, params = {}) {
+  const lower = String(input ?? "").trim();
+  const upper = String(params.s2 ?? "").trim();
+  const evil = String(params.evil ?? "").trim();
+  const n = lower.length;
+  if (!/^[a-z]+$/.test(lower) || !/^[a-z]+$/.test(upper) || !/^[a-z]+$/.test(evil) || n < 1 || n > 6 || upper.length !== n || evil.length > 4 || lower > upper) {
+    throw new Error("Use lowercase s1/s2 of the same length 1 to 6, s1 <= s2, and an evil string up to 4 letters.");
+  }
+  const m = evil.length;
+  const lps = Array(m).fill(0);
+  for (let index = 1, length = 0; index < m;) {
+    if (evil[index] === evil[length]) lps[index++] = ++length;
+    else if (length) length = lps[length - 1];
+    else index++;
+  }
+  const advance = (matched, char) => {
+    let next = matched;
+    while (next > 0 && evil[next] !== char) next = lps[next - 1];
+    if (evil[next] === char) next++;
+    return next;
+  };
+  const MOD = 1000000007;
+  const memo = new Map();
+  const steps = [];
+  const TRACE_LIMIT = 340;
+  let traceTruncated = false;
+  const snapshot = ({ line, phase, pos, matched, tightLow, tightHigh, prefix, char = null, nextMatched = null, total = null, note, force = false }) => {
+    if (!force && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
+    const memoEntries = [...memo.entries()].slice(-14).map(([key, value]) => {
+      const [i, match, lowFlag, highFlag] = key.split("|");
+      return { pos: Number(i), matched: Number(match), tightLow: lowFlag === "1", tightHigh: highFlag === "1", value };
+    });
+    steps.push({
+      title: { vi: `dp(pos=${pos}, match=${matched})`, en: `dp(pos=${pos}, match=${matched})` },
+      note, final: phase === "done", arr: [], sub: [], highlight: [], mark: [], codeLines: [line],
+      vars: [{ name: "pos", value: pos }, { name: "matched evil prefix", value: matched }, { name: "memo states", value: memo.size }, ...(char ? [{ name: "char", value: char }] : []), ...(total != null ? [{ name: "count", value: total }] : [])],
+      goodStrings1397View: { lower, upper, evil, lps, pos, matched, tightLow, tightHigh, prefix, char, nextMatched, total, memoEntries, phase, answer: phase === "done" ? total : null, traceTruncated },
+    });
+  };
+  const keyOf = (pos, matched, tightLow, tightHigh) => `${pos}|${matched}|${tightLow ? 1 : 0}|${tightHigh ? 1 : 0}`;
+  const dfs = (pos, matched, tightLow, tightHigh, prefix) => {
+    const key = keyOf(pos, matched, tightLow, tightHigh);
+    if (memo.has(key)) {
+      snapshot({ line: 14, phase: "memo", pos, matched, tightLow, tightHigh, prefix, total: memo.get(key), note: { vi: "State này đã được tính trước đó, lấy lại từ memo.", en: "This state was computed before, so reuse its memoized count." } });
+      return memo.get(key);
+    }
+    if (pos === n) {
+      snapshot({ line: 15, phase: "base", pos, matched, tightLow, tightHigh, prefix, total: 1, note: { vi: "Đã tạo đủ n ký tự mà chưa khớp evil, nên đây là một good string.", en: "All n characters are built without matching evil, so this is one good string." } });
+      return 1;
+    }
+    const from = tightLow ? lower.charCodeAt(pos) : 97;
+    const to = tightHigh ? upper.charCodeAt(pos) : 122;
+    snapshot({ line: 19, phase: "enter", pos, matched, tightLow, tightHigh, prefix, note: { vi: `Tại pos ${pos}, thử ký tự từ “${String.fromCharCode(from)}” đến “${String.fromCharCode(to)}”.`, en: `At pos ${pos}, try characters from “${String.fromCharCode(from)}” to “${String.fromCharCode(to)}”.` } });
+    let total = 0;
+    for (let code = from; code <= to; code++) {
+      const char = String.fromCharCode(code);
+      const nextMatched = advance(matched, char);
+      if (nextMatched === m) {
+        snapshot({ line: 21, phase: "blocked", pos, matched, tightLow, tightHigh, prefix, char, nextMatched, total, note: { vi: `Thêm “${char}” tạo evil “${evil}”, nên bỏ nhánh này.`, en: `Adding “${char}” completes evil “${evil}”, so reject this branch.` } });
+        continue;
+      }
+      const child = dfs(pos + 1, nextMatched, tightLow && code === from, tightHigh && code === to, prefix + char);
+      total = (total + child) % MOD;
+      snapshot({ line: 22, phase: "add", pos, matched, tightLow, tightHigh, prefix, char, nextMatched, total, note: { vi: `Chọn “${char}” đóng góp ${child}; tổng state hiện tại là ${total}.`, en: `Choosing “${char}” contributes ${child}; the running state total is ${total}.` } });
+    }
+    memo.set(key, total);
+    snapshot({ line: 23, phase: "store", pos, matched, tightLow, tightHigh, prefix, total, note: { vi: "Lưu tổng này vào memo cho state (pos, match, lowerBound, upperBound).", en: "Store this total in memo for the (pos, match, lowerBound, upperBound) state." } });
+    return total;
+  };
+  snapshot({ line: 5, phase: "kmp", pos: 0, matched: 0, tightLow: true, tightHigh: true, prefix: "", note: { vi: `KMP lps cho evil “${evil}” là [${lps.join(", ")}].`, en: `KMP lps for evil “${evil}” is [${lps.join(", ")}].` } });
+  const answer = dfs(0, 0, true, true, "");
+  snapshot({ line: 24, phase: "done", pos: n, matched: 0, tightLow: false, tightHigh: false, prefix: "", total: answer, note: { vi: `Có ${answer} good strings trong [${lower}, ${upper}] không chứa “${evil}”.`, en: `There are ${answer} good strings in [${lower}, ${upper}] that do not contain “${evil}”.` }, force: true });
+  return { steps, answer };
+}
+
+// ─── 1655: Distribute Repeating Integers ───
+function parseIntegerList1655(value, name) {
+  const items = Array.isArray(value) ? value : String(value ?? "").split(",");
+  const values = items.map((item) => Number(String(item).trim()));
+  if (!values.length || values.some((item) => !Number.isInteger(item))) throw new Error(`${name} must be comma-separated integers.`);
+  return values;
+}
+
+function buildSteps1655(input, params = {}) {
+  const nums = parseIntegerList1655(input, "nums");
+  const quantity = parseIntegerList1655(params.quantity ?? "", "quantity").sort((left, right) => right - left);
+  if (nums.length > 16 || quantity.length < 1 || quantity.length > 5 || quantity.some((value) => value < 1 || value > 10)) {
+    throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10). ");
+  }
+  const counts = [...nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map()).values()].sort((left, right) => right - left);
+  const customerCount = quantity.length;
+  const fullMask = (1 << customerCount) - 1;
+  const subsetSums = Array(1 << customerCount).fill(0);
+  for (let mask = 1; mask <= fullMask; mask++) {
+    const bit = mask & -mask;
+    const index = Math.log2(bit);
+    subsetSums[mask] = subsetSums[mask ^ bit] + quantity[index];
+  }
+  const steps = [];
+  const TRACE_LIMIT = 300;
+  let traceTruncated = false;
+  const snapshot = ({ line, phase, bucketIndex = -1, fromMask = null, addMask = null, reachable, title, note, final = false, force = false }) => {
+    if (!force && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
+    steps.push({
+      title, note, final, arr: [], sub: [], highlight: [], mark: [], codeLines: [line],
+      vars: [{ name: "requests", value: `[${quantity.join(", ")}]` }, { name: "frequency buckets", value: `[${counts.join(", ")}]` }, { name: "reachable masks", value: reachable.size }],
+      distribute1655View: { quantity, counts, subsetSums, fullMask, bucketIndex, fromMask, addMask, reachable: [...reachable], phase, answer: final ? reachable.has(fullMask) : null, traceTruncated },
+    });
+  };
+  let reachable = new Set([0]);
+  snapshot({ line: 10, phase: "init", reachable, title: { vi: "Khởi tạo mask 0", en: "Initialize mask 0" }, note: { vi: "Mask 0 nghĩa là chưa customer nào nhận đủ số lượng.", en: "Mask 0 means no customer request is fulfilled yet." } });
+  for (let bucketIndex = 0; bucketIndex < counts.length; bucketIndex++) {
+    const count = counts[bucketIndex];
+    const nextReachable = new Set(reachable);
+    snapshot({ line: 12, phase: "bucket", bucketIndex, reachable, title: { vi: `Xét frequency bucket ${count}`, en: `Process frequency bucket ${count}` }, note: { vi: `Một số có ${count} bản sao có thể cấp cho bất kỳ subset customer nào có tổng request không vượt ${count}.`, en: `A value appearing ${count} times can serve any customer subset whose total request is at most ${count}.` } });
+    for (const mask of reachable) {
+      const rest = fullMask ^ mask;
+      for (let addMask = rest; addMask > 0; addMask = (addMask - 1) & rest) {
+        if (subsetSums[addMask] > count) continue;
+        const newMask = mask | addMask;
+        if (nextReachable.has(newMask)) continue;
+        nextReachable.add(newMask);
+        snapshot({ line: 17, phase: "transition", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: { vi: `Bucket ${count} phục vụ mask ${addMask.toString(2)}`, en: `Bucket ${count} serves mask ${addMask.toString(2)}` }, note: { vi: `Tổng request của subset là ${subsetSums[addMask]} ≤ ${count}; state mới là mask ${newMask.toString(2)}.`, en: `The subset request totals ${subsetSums[addMask]} ≤ ${count}; the new state is mask ${newMask.toString(2)}.` } });
+      }
+    }
+    reachable = nextReachable;
+    snapshot({ line: 19, phase: "bucket-done", bucketIndex, reachable, title: { vi: `Hoàn tất bucket ${count}`, en: `Finish bucket ${count}` }, note: { vi: `${reachable.size} subset customer hiện có thể được phục vụ hoàn toàn.`, en: `${reachable.size} customer subsets can now be fully served.` } });
+    if (reachable.has(fullMask)) break;
+  }
+  snapshot({ line: 20, phase: "done", reachable, final: true, force: true, title: { vi: reachable.has(fullMask) ? "Có thể phân phối" : "Không thể phân phối", en: reachable.has(fullMask) ? "Distribution is possible" : "Distribution is impossible" }, note: { vi: reachable.has(fullMask) ? "Full mask đã reachable: mọi customer đều nhận đủ quantity." : "Full mask không reachable: có ít nhất một customer chưa thể nhận đủ quantity.", en: reachable.has(fullMask) ? "The full mask is reachable: every customer gets enough integers." : "The full mask is unreachable: at least one customer cannot receive enough integers." } });
+  return { steps, answer: reachable.has(fullMask) };
+}
+
+// ─── 1655, approach 2: frequency backtracking with same-size pruning ───
+function buildSteps1655Backtracking(input, params = {}) {
+  const nums = parseIntegerList1655(input, "nums");
+  const quantity = parseIntegerList1655(params.quantity ?? "", "quantity").sort((left, right) => right - left);
+  if (nums.length > 16 || quantity.length < 1 || quantity.length > 5 || quantity.some((value) => value < 1 || value > 10)) {
+    throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10). ");
+  }
+  const counts = [...nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map()).values()].sort((left, right) => right - left);
+  const initialCounts = [...counts];
+  const steps = [];
+  const path = [];
+  const TRACE_LIMIT = 300;
+  let traceTruncated = false;
+  let finalAnswer = null;
+
+  const snapshot = ({ line, phase, idx, candidateIndex = null, seen = new Set(), trial = null, title, note, final = false, force = false }) => {
+    if (!force && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      codeBlock: 2,
+      codeLines: [line],
+      vars: [
+        { name: "sorted quantity", value: `[${quantity.join(", ")}]` },
+        { name: "remaining counts", value: `[${counts.join(", ")}]` },
+        { name: "idx", value: idx },
+        ...(idx < quantity.length ? [{ name: "need", value: quantity[idx] }] : []),
+        { name: "recursion depth", value: path.length },
+      ],
+      distribute1655BacktrackView: {
+        quantity,
+        counts: [...counts],
+        initialCounts,
+        idx,
+        candidateIndex,
+        seen: [...seen],
+        trial,
+        path: path.map((entry) => ({ ...entry })),
+        phase,
+        answer: final ? finalAnswer : null,
+        traceTruncated,
+      },
+    });
+  };
+
+  snapshot({
+    line: 4,
+    phase: "counts",
+    idx: 0,
+    title: { vi: "Chỉ giữ frequency của mỗi số", en: "Keep only frequency buckets" },
+    note: { vi: `nums được gộp thành counts = [${counts.join(", ")}]; giá trị thực của số không còn quan trọng.`, en: `nums becomes counts = [${counts.join(", ")}]; the actual number values no longer matter.` },
+  });
+  snapshot({
+    line: 5,
+    phase: "sort",
+    idx: 0,
+    title: { vi: "Sort quantity giảm dần", en: "Sort quantity descending" },
+    note: { vi: `Xử lý request lớn trước: [${quantity.join(", ")}]. Điều này giúp nhánh không thể đáp ứng bị loại sớm.`, en: `Process the largest requests first: [${quantity.join(", ")}]. This prunes impossible branches earlier.` },
+  });
+
+  const backtrack = (idx) => {
+    if (idx === quantity.length) {
+      snapshot({
+        line: 8,
+        phase: "complete",
+        idx,
+        title: { vi: "Mọi customer đã đủ", en: "Every customer is satisfied" },
+        note: { vi: "Đã đi hết quantity nên nhánh hiện tại thành công.", en: "The quantity list is exhausted, so this branch succeeds." },
+      });
+      return true;
+    }
+
+    const need = quantity[idx];
+    const seen = new Set();
+    snapshot({
+      line: 11,
+      phase: "enter",
+      idx,
+      seen,
+      title: { vi: `backtrack(${idx}): cần ${need}`, en: `backtrack(${idx}): need ${need}` },
+      note: { vi: "seen chỉ cho phép thử một lần cho mỗi remaining-count giống nhau ở depth này.", en: "seen allows just one trial for each identical remaining count at this depth." },
+    });
+
+    for (let bucket = 0; bucket < counts.length; bucket++) {
+      const before = counts[bucket];
+      const enough = before >= need;
+      const duplicate = seen.has(before);
+      snapshot({
+        line: 13,
+        phase: enough && !duplicate ? "consider" : "skip",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        trial: { bucket, before, need, enough, duplicate },
+        title: { vi: `Thử bucket ${bucket}: còn ${before}`, en: `Try bucket ${bucket}: ${before} remaining` },
+        note: !enough
+          ? { vi: `${before} < ${need}, bucket này không đủ cho customer ${idx}.`, en: `${before} < ${need}, so this bucket cannot satisfy customer ${idx}.` }
+          : duplicate
+            ? { vi: `remaining count ${before} đã thử ở depth này; bỏ state đối xứng.`, en: `Remaining count ${before} was already tried here; skip this symmetric state.` }
+            : { vi: `${before} >= ${need} và chưa có trong seen, có thể thử assignment.`, en: `${before} >= ${need} and it is not in seen, so this assignment is worth trying.` },
+      });
+      if (!enough || duplicate) continue;
+
+      seen.add(before);
+      counts[bucket] -= need;
+      path.push({ customer: idx, bucket, need, before, after: counts[bucket] });
+      snapshot({
+        line: 15,
+        phase: "assign",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        trial: { bucket, before, need, enough: true, duplicate: false },
+        title: { vi: `Gán customer ${idx} vào bucket ${bucket}`, en: `Assign customer ${idx} to bucket ${bucket}` },
+        note: { vi: `counts[${bucket}] giảm ${need}: ${before} -> ${counts[bucket]}; gọi backtrack(${idx + 1}).`, en: `counts[${bucket}] loses ${need}: ${before} -> ${counts[bucket]}; recurse to backtrack(${idx + 1}).` },
+      });
+
+      if (backtrack(idx + 1)) {
+        snapshot({
+          line: 17,
+          phase: "success",
+          idx,
+          candidateIndex: bucket,
+          seen,
+          trial: { bucket, before, need, enough: true, duplicate: false },
+          title: { vi: "Nhánh con thành công", en: "Child branch succeeds" },
+          note: { vi: "Không cần thử bucket khác nữa; trả True ngược lên call stack.", en: "No other bucket is needed; return True up the call stack." },
+        });
+        return true;
+      }
+
+      counts[bucket] += need;
+      path.pop();
+      snapshot({
+        line: 18,
+        phase: "undo",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        trial: { bucket, before, need, enough: true, duplicate: false },
+        title: { vi: `Backtrack bucket ${bucket}`, en: `Backtrack bucket ${bucket}` },
+        note: { vi: `Nhánh dưới thất bại, hoàn tác counts[${bucket}] về ${counts[bucket]}.`, en: `The lower branch failed, so restore counts[${bucket}] to ${counts[bucket]}.` },
+      });
+    }
+
+    snapshot({
+      line: 19,
+      phase: "fail",
+      idx,
+      seen,
+      title: { vi: `Không có bucket cho customer ${idx}`, en: `No bucket works for customer ${idx}` },
+      note: { vi: "Tất cả lựa chọn hợp lệ đã thất bại, trả False để caller hoàn tác.", en: "Every valid choice failed, so return False and let the caller undo its assignment." },
+    });
+    return false;
+  };
+
+  finalAnswer = backtrack(0);
+  snapshot({
+    line: 20,
+    phase: "done",
+    idx: quantity.length,
+    title: { vi: finalAnswer ? "Có thể phân phối" : "Không thể phân phối", en: finalAnswer ? "Distribution is possible" : "Distribution is impossible" },
+    note: finalAnswer
+      ? { vi: "Một nhánh đã phân phối đủ quantity cho mọi customer.", en: "One branch satisfies every customer quantity." }
+      : { vi: "Không có cách gán frequency bucket nào đủ cho toàn bộ customer.", en: "No frequency-bucket assignment can satisfy all customers." },
+    final: true,
+    force: true,
+  });
+  return { steps, answer: finalAnswer };
+}
+
+Object.assign(module.exports, {
+  943: {
+    id: 943, difficulty: "hard", slug: "find-the-shortest-superstring", category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }, tags: [{ key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
+    title: { vi: "Find the Shortest Superstring", en: "Find the Shortest Superstring" }, titleVi: { vi: "Superstring ngắn nhất", en: "Shortest superstring" },
+    statement: { vi: "Nối các word theo thứ tự nào đó để chuỗi kết quả chứa mọi word và có độ dài nhỏ nhất.", en: "Order the words so one result contains every word with minimum length." },
+    defaultInput: "alex,loves,leetcode", inputKind: "string", inputLabel: { vi: "words (cách nhau dấu phẩy)", en: "words (comma separated)" },
+    approach: [{ vi: "Tính overlap cho mọi cặp word. DP[mask][last] lưu superstring ngắn nhất đã dùng các bit trong mask và kết thúc ở last.", en: "Compute pair overlaps. DP[mask][last] stores the shortest superstring using mask and ending at last." }],
+    complexity: { time: "O(n²·2^n·L)", space: "O(n·2^n·L)", note: { vi: "L là độ dài word; visualization giới hạn n ≤ 6.", en: "L is word length; the visualization limits n to 6." } },
+    code: ["class Solution:", "    def shortestSuperstring(self, words):", "        words = list(dict.fromkeys(words))", "        words = [w for i, w in enumerate(words) if not any(i != j and w in other for j, other in enumerate(words))]", "        n = len(words)", "        def overlap(a, b):", "            for size in range(min(len(a), len(b)), -1, -1):", "                if a.endswith(b[:size]): return size", "        ov = [[overlap(a, b) for b in words] for a in words]", "        dp = [[None] * n for _ in range(1 << n)]", "        for i, word in enumerate(words):", "            dp[1 << i][i] = word", "        for mask in range(1 << n):", "            for last in range(n):", "                if dp[mask][last] is None: continue", "                for nxt in range(n):", "                    if mask & (1 << nxt): continue", "                    candidate = dp[mask][last] + words[nxt][ov[last][nxt]:]", "                    new_mask = mask | (1 << nxt)", "                    if dp[new_mask][nxt] is None or len(candidate) < len(dp[new_mask][nxt]): dp[new_mask][nxt] = candidate", "        return min((text for text in dp[-1] if text is not None), key=len)"],
+    liveArgs: (input) => [parseWords943(input)], builder: buildSteps943,
+  },
+  1397: {
+    id: 1397, difficulty: "hard", slug: "find-all-good-strings", category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }, tags: [{ key: "kmp", vi: "KMP", en: "KMP" }],
+    title: { vi: "Find All Good Strings", en: "Find All Good Strings" }, titleVi: { vi: "Đếm good strings", en: "Count good strings" },
+    statement: { vi: "Đếm string độ dài n trong [s1, s2] không chứa substring evil.", en: "Count length-n strings in [s1, s2] that do not contain the substring evil." },
+    defaultInput: "aa", inputKind: "string", inputLabel: { vi: "s1 (cận dưới)", en: "s1 (lower bound)" }, extraParams: [{ key: "s2", type: "string", label: { vi: "s2 (cận trên)", en: "s2 (upper bound)" }, default: "da" }, { key: "evil", type: "string", label: { vi: "evil (cấm xuất hiện)", en: "evil (forbidden substring)" }, default: "b" }],
+    approach: [{ vi: "KMP theo dõi bao nhiêu ký tự đầu evil đang khớp. Digit-DP giữ thêm hai cờ tight để string không vượt s1/s2.", en: "KMP tracks how much of evil is currently matched. Digit DP also keeps two tight flags so the string stays within s1/s2." }],
+    complexity: { time: "O(n·|evil|·26·4)", space: "O(n·|evil|·4)", note: { vi: "Visualization giới hạn n ≤ 6, |evil| ≤ 4.", en: "The visualization limits n to 6 and |evil| to 4." } },
+    code: ["from functools import cache", "class Solution:", "    def findGoodStrings(self, n, s1, s2, evil):", "        m = len(evil)", "        lps = [0] * m", "        for i in range(1, m):", "            j = lps[i - 1]", "            while j and evil[i] != evil[j]: j = lps[j - 1]", "            lps[i] = j + (evil[i] == evil[j])", "        def advance(matched, char):", "            while matched and evil[matched] != char: matched = lps[matched - 1]", "            return matched + (evil[matched] == char)", "        @cache", "        def dp(pos, matched, tight_low, tight_high):", "            if pos == n: return 1", "            lo = s1[pos] if tight_low else 'a'", "            hi = s2[pos] if tight_high else 'z'", "            total = 0", "            for char in map(chr, range(ord(lo), ord(hi) + 1)):", "                next_matched = advance(matched, char)", "                if next_matched == m: continue", "                total += dp(pos + 1, next_matched, tight_low and char == lo, tight_high and char == hi)", "            return total % 1_000_000_007", "        return dp(0, 0, True, True)"],
+    liveArgs: (input, params) => [String(input).length, String(input), String(params.s2), String(params.evil)], builder: buildSteps1397,
+  },
+  1655: {
+    id: 1655, difficulty: "hard", slug: "distribute-repeating-integers", category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }, tags: [{ key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
+    title: { vi: "Distribute Repeating Integers", en: "Distribute Repeating Integers" }, titleVi: { vi: "Phân phối số nguyên lặp lại", en: "Distribute repeating integers" },
+    statement: { vi: "Mỗi customer cần quantity[i] bản sao của cùng một số. Kiểm tra có thể đáp ứng toàn bộ customer không.", en: "Each customer needs quantity[i] copies of one equal integer. Decide whether every customer can be satisfied." },
+    defaultInput: "1,1,2,2,3,3,3", inputKind: "string", inputLabel: { vi: "nums (cách nhau dấu phẩy)", en: "nums (comma separated)" }, extraParams: [
+      { key: "quantity", type: "string", label: { vi: "quantity (cách nhau dấu phẩy)", en: "quantity (comma separated)" }, default: "2,3,1" },
+      { key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Bitmask DP theo frequency", en: "Approach 1: frequency bitmask DP" } },
+        { value: "2", label: { vi: "Cách 2: Frequency backtracking", en: "Approach 2: frequency backtracking" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Cách 1: gộp nums thành frequency bucket. Bitmask lưu subset customer đã được phục vụ; một bucket có thể cung cấp cho subset mới nếu tổng quantity không vượt frequency đó.", en: "Approach 1: group nums into frequency buckets. A bitmask stores served customers; one bucket can serve a new subset when its quantity sum fits that frequency." },
+      { vi: "Cách 2: thử gán customer có request lớn nhất trước vào từng frequency bucket đủ chỗ. seen bỏ các bucket đang có cùng remaining-count để không duyệt nhánh đối xứng.", en: "Approach 2: assign the largest customer request first to each frequency bucket with enough room. seen skips buckets with equal remaining counts, avoiding symmetric branches." },
+    ],
+    complexity: { time: "O(f·3^m) / exponential", space: "O(2^m) / O(f+m)", note: { vi: "Cách 1 là bitmask DP; Cách 2 là backtracking có sort + seen pruning. Visualization giới hạn m ≤ 5.", en: "Approach 1 is bitmask DP; approach 2 is backtracking with sort + seen pruning. The visualization limits m to 5." } },
+    codeLabel: { vi: "Cách 1: Bitmask DP theo frequency", en: "Approach 1: frequency bitmask DP" },
+    code: ["from collections import Counter", "class Solution:", "    def canDistribute(self, nums, quantity):", "        needs = sorted(quantity, reverse=True)", "        counts = sorted(Counter(nums).values(), reverse=True)", "        sums = [0] * (1 << len(needs))", "        for mask in range(1, len(sums)):", "            bit = mask & -mask", "            sums[mask] = sums[mask ^ bit] + needs[bit.bit_length() - 1]", "        dp = {0}", "        full = (1 << len(needs)) - 1", "        for count in counts:", "            nxt = set(dp)", "            for mask in dp:", "                rest = full ^ mask; sub = rest", "                while sub:", "                    if sums[sub] <= count: nxt.add(mask | sub)", "                    sub = (sub - 1) & rest", "            dp = nxt", "        return full in dp"],
+    code2Label: { vi: "Cách 2: Frequency backtracking + seen pruning", en: "Approach 2: frequency backtracking + seen pruning" },
+    code2: ["from collections import Counter", "", "class Solution:", "    def canDistribute(self, nums, quantity):", "        counts = list(Counter(nums).values())", "        quantity.sort(reverse=True)", "", "        def backtrack(idx):", "            if idx == len(quantity):", "                return True", "", "            seen = set()", "            for i in range(len(counts)):", "                if counts[i] >= quantity[idx] and counts[i] not in seen:", "                    seen.add(counts[i])", "                    counts[i] -= quantity[idx]", "                    if backtrack(idx + 1):", "                        return True", "                    counts[i] += quantity[idx]", "            return False", "", "        return backtrack(0)"],
+    liveArgs: (input, params) => [parseIntegerList1655(input, "nums"), parseIntegerList1655(params.quantity, "quantity")],
+    builder: buildSteps1655,
+    builder2: buildSteps1655Backtracking,
+  },
+});
