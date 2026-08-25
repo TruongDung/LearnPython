@@ -23524,13 +23524,24 @@ function buildSteps1655(input, params = {}) {
 }
 
 // ─── 1655, approach 2: frequency backtracking with same-size pruning ───
+// Faithful LINE-BY-LINE trace of the second code block shown in the UI.
+// Only frequency buckets matter; quantity is sorted descending so large
+// requests are placed first, and `seen` guarantees each distinct remaining
+// count is tried at most once per customer (symmetry pruning).
+// Step lines refer to code2 numbering (1–22).
 function buildSteps1655Backtracking(input, params = {}) {
   const nums = parseIntegerList1655(input, "nums");
   const quantity = parseIntegerList1655(params.quantity ?? "", "quantity").sort((left, right) => right - left);
   if (nums.length > 16 || quantity.length < 1 || quantity.length > 5 || quantity.some((value) => value < 1 || value > 10)) {
-    throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10). ");
+    throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10).");
   }
-  const counts = [...nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map()).values()].sort((left, right) => right - left);
+
+  const freqMap = nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map());
+  const labels = [...freqMap.keys()];
+  const counts = [...freqMap.values()].sort((left, right) => right - left);
+  // Reorder labels to follow the descending-count order so bucket i keeps its identity.
+  const paired = [...freqMap.entries()].sort((a, b) => b[1] - a[1]);
+  const bucketLabels = paired.map(([value]) => value);
   const initialCounts = [...counts];
   const steps = [];
   const path = [];
@@ -23538,7 +23549,7 @@ function buildSteps1655Backtracking(input, params = {}) {
   let traceTruncated = false;
   let finalAnswer = null;
 
-  const snapshot = ({ line, phase, idx, candidateIndex = null, seen = new Set(), trial = null, title, note, final = false, force = false }) => {
+  const snapshot = ({ line, phase, idx, candidateIndex = null, seen = new Set(), title, note, final = false, force = false }) => {
     if (!force && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
     steps.push({
       title,
@@ -23551,22 +23562,25 @@ function buildSteps1655Backtracking(input, params = {}) {
       codeBlock: 2,
       codeLines: [line],
       vars: [
-        { name: "sorted quantity", value: `[${quantity.join(", ")}]` },
-        { name: "remaining counts", value: `[${counts.join(", ")}]` },
+        { name: "quantity↓", value: `[${quantity.join(", ")}]` },
+        { name: "counts", value: `[${counts.join(", ")}]` },
         { name: "idx", value: idx },
         ...(idx < quantity.length ? [{ name: "need", value: quantity[idx] }] : []),
-        { name: "recursion depth", value: path.length },
+        { name: "seen", value: `{${[...seen].join(", ")}}` },
+        { name: "depth", value: path.length },
+        ...(final ? [{ name: "result", value: finalAnswer }] : []),
       ],
       distribute1655BacktrackView: {
         quantity,
+        bucketLabels,
         counts: [...counts],
         initialCounts,
         idx,
-        candidateIndex,
-        seen: [...seen],
-        trial,
+        activeBucket: candidateIndex,
+        seenCounts: [...seen],
         path: path.map((entry) => ({ ...entry })),
         phase,
+        operation: note ? "" : "",
         answer: final ? finalAnswer : null,
         traceTruncated,
       },
@@ -23574,28 +23588,37 @@ function buildSteps1655Backtracking(input, params = {}) {
   };
 
   snapshot({
-    line: 4,
+    line: 5,
     phase: "counts",
     idx: 0,
-    title: { vi: "Chỉ giữ frequency của mỗi số", en: "Keep only frequency buckets" },
-    note: { vi: `nums được gộp thành counts = [${counts.join(", ")}]; giá trị thực của số không còn quan trọng.`, en: `nums becomes counts = [${counts.join(", ")}]; the actual number values no longer matter.` },
+    title: { vi: "counts = Counter(nums).values()", en: "counts = Counter(nums).values()" },
+    note: {
+      vi: `Chỉ tần suất quan trọng: [${labels.join(",")}] → counts = [${counts.join(", ")}]. Giá trị gốc không còn ý nghĩa.`,
+      en: `Only frequencies matter: values [${labels.join(",")}] become counts = [${counts.join(", ")}].`,
+    },
   });
   snapshot({
-    line: 5,
+    line: 6,
     phase: "sort",
     idx: 0,
-    title: { vi: "Sort quantity giảm dần", en: "Sort quantity descending" },
-    note: { vi: `Xử lý request lớn trước: [${quantity.join(", ")}]. Điều này giúp nhánh không thể đáp ứng bị loại sớm.`, en: `Process the largest requests first: [${quantity.join(", ")}]. This prunes impossible branches earlier.` },
+    title: { vi: "quantity.sort(reverse=True)", en: "quantity.sort(reverse=True)" },
+    note: {
+      vi: `Xử lý yêu cầu LỚN trước: [${quantity.join(", ")}]. Nhánh chết bị phát hiện sớm hơn nên cây quay lui nhỏ đi nhiều.`,
+      en: `Serve the LARGEST requests first: [${quantity.join(", ")}]. Dead branches fail earlier, shrinking the search tree.`,
+    },
   });
 
   const backtrack = (idx) => {
     if (idx === quantity.length) {
       snapshot({
-        line: 8,
+        line: 10,
         phase: "complete",
         idx,
-        title: { vi: "Mọi customer đã đủ", en: "Every customer is satisfied" },
-        note: { vi: "Đã đi hết quantity nên nhánh hiện tại thành công.", en: "The quantity list is exhausted, so this branch succeeds." },
+        title: { vi: `idx=${idx} == ${quantity.length} → return True`, en: `idx=${idx} == ${quantity.length} → return True` },
+        note: {
+          vi: "Toàn bộ customer đã được gán trên nhánh này — thành công!",
+          en: "Every customer got a bucket on this branch — success!",
+        },
       });
       return true;
     }
@@ -23603,12 +23626,26 @@ function buildSteps1655Backtracking(input, params = {}) {
     const need = quantity[idx];
     const seen = new Set();
     snapshot({
-      line: 11,
+      line: 8,
       phase: "enter",
       idx,
       seen,
-      title: { vi: `backtrack(${idx}): cần ${need}`, en: `backtrack(${idx}): need ${need}` },
-      note: { vi: "seen chỉ cho phép thử một lần cho mỗi remaining-count giống nhau ở depth này.", en: "seen allows just one trial for each identical remaining count at this depth." },
+      title: { vi: `backtrack(${idx}): customer cần ${need}`, en: `backtrack(${idx}): customer needs ${need}` },
+      note: {
+        vi: `idx=${idx} < ${quantity.length} nên tiếp tục. Tạo seen=∅ cho depth này.`,
+        en: `idx=${idx} < ${quantity.length}, continue. A fresh seen=∅ starts for this depth.`,
+      },
+    });
+    snapshot({
+      line: 12,
+      phase: "seen-init",
+      idx,
+      seen,
+      title: { vi: "seen = set()", en: "seen = set()" },
+      note: {
+        vi: "seen ghi lại các GIÁ TRỊ remaining đã thử ở depth này: hai bucket cùng số dư là đối xứng, thử cả hai chỉ lãng phí.",
+        en: "seen records REMAINING values already tried at this depth: two buckets with equal leftovers are symmetric, trying both wastes work.",
+      },
     });
 
     for (let bucket = 0; bucket < counts.length; bucket++) {
@@ -23616,45 +23653,52 @@ function buildSteps1655Backtracking(input, params = {}) {
       const enough = before >= need;
       const duplicate = seen.has(before);
       snapshot({
-        line: 13,
-        phase: enough && !duplicate ? "consider" : "skip",
+        line: 14,
+        phase: enough && !duplicate ? "consider" : duplicate ? "skip-seen" : "skip-short",
         idx,
         candidateIndex: bucket,
         seen,
-        trial: { bucket, before, need, enough, duplicate },
-        title: { vi: `Thử bucket ${bucket}: còn ${before}`, en: `Try bucket ${bucket}: ${before} remaining` },
-        note: !enough
-          ? { vi: `${before} < ${need}, bucket này không đủ cho customer ${idx}.`, en: `${before} < ${need}, so this bucket cannot satisfy customer ${idx}.` }
+        title: enough && !duplicate
+          ? { vi: `Bucket ${bucket}: còn ${before} ≥ ${need} ✓`, en: `Bucket ${bucket}: ${before} ≥ ${need} ✓` }
           : duplicate
-            ? { vi: `remaining count ${before} đã thử ở depth này; bỏ state đối xứng.`, en: `Remaining count ${before} was already tried here; skip this symmetric state.` }
-            : { vi: `${before} >= ${need} và chưa có trong seen, có thể thử assignment.`, en: `${before} >= ${need} and it is not in seen, so this assignment is worth trying.` },
+            ? { vi: `Bucket ${bucket}: remaining ${before} đã trong seen → bỏ`, en: `Bucket ${bucket}: remaining ${before} already in seen → skip` }
+            : { vi: `Bucket ${bucket}: còn ${before} < ${need} ✗`, en: `Bucket ${bucket}: ${before} < ${need} ✗` },
+        note: !enough
+          ? { vi: `Không đủ ${need} bản sao cho customer ${idx}.`, en: `Not enough copies for customer ${idx}, who needs ${need}.` }
+          : duplicate
+            ? { vi: "Một bucket khác với cùng số dư đã thất bại/đang thử — cắt cụt nhánh đối xứng.", en: "Another bucket with the same leftover was already tried — prune the symmetric branch." }
+            : { vi: "Đủ hàng và chưa thử mức dư này: tiến hành gán.", en: "Enough stock and this leftover level is untried: proceed with the assignment." },
       });
       if (!enough || duplicate) continue;
 
       seen.add(before);
       counts[bucket] -= need;
-      path.push({ customer: idx, bucket, need, before, after: counts[bucket] });
+      path.push({ customer: idx, bucket, need });
       snapshot({
-        line: 15,
+        line: 16,
         phase: "assign",
         idx,
         candidateIndex: bucket,
         seen,
-        trial: { bucket, before, need, enough: true, duplicate: false },
-        title: { vi: `Gán customer ${idx} vào bucket ${bucket}`, en: `Assign customer ${idx} to bucket ${bucket}` },
-        note: { vi: `counts[${bucket}] giảm ${need}: ${before} -> ${counts[bucket]}; gọi backtrack(${idx + 1}).`, en: `counts[${bucket}] loses ${need}: ${before} -> ${counts[bucket]}; recurse to backtrack(${idx + 1}).` },
+        title: { vi: `Gán customer ${idx} → bucket ${bucket}: ${before} → ${counts[bucket]}`, en: `Assign customer ${idx} → bucket ${bucket}: ${before} → ${counts[bucket]}` },
+        note: {
+          vi: `seen.add(${before}) chặn mọi bucket cùng mức dư này; trừ ${need} rồi gọi backtrack(${idx + 1}).`,
+          en: `seen.add(${before}) blocks every same-leftover bucket; subtract ${need} and call backtrack(${idx + 1}).`,
+        },
       });
 
       if (backtrack(idx + 1)) {
         snapshot({
-          line: 17,
+          line: 18,
           phase: "success",
           idx,
           candidateIndex: bucket,
           seen,
-          trial: { bucket, before, need, enough: true, duplicate: false },
-          title: { vi: "Nhánh con thành công", en: "Child branch succeeds" },
-          note: { vi: "Không cần thử bucket khác nữa; trả True ngược lên call stack.", en: "No other bucket is needed; return True up the call stack." },
+          title: { vi: `backtrack(${idx + 1}) = True → return True`, en: `backtrack(${idx + 1}) = True → return True` },
+          note: {
+            vi: "Nhánh con thành công: dừng vòng lặp và truyền True lên trên.",
+            en: "The child branch succeeded: stop looping and propagate True upward.",
+          },
         });
         return true;
       }
@@ -23662,37 +23706,45 @@ function buildSteps1655Backtracking(input, params = {}) {
       counts[bucket] += need;
       path.pop();
       snapshot({
-        line: 18,
+        line: 19,
         phase: "undo",
         idx,
         candidateIndex: bucket,
         seen,
-        trial: { bucket, before, need, enough: true, duplicate: false },
-        title: { vi: `Backtrack bucket ${bucket}`, en: `Backtrack bucket ${bucket}` },
-        note: { vi: `Nhánh dưới thất bại, hoàn tác counts[${bucket}] về ${counts[bucket]}.`, en: `The lower branch failed, so restore counts[${bucket}] to ${counts[bucket]}.` },
+        title: { vi: `Quay lui: counts[${bucket}] phục hồi ${before}`, en: `Backtrack: counts[${bucket}] restored to ${before}` },
+        note: {
+          vi: "Nhánh dưới thất bại — hoàn nguyên số đã trừ và thử lựa chọn kế tiếp.",
+          en: "The deeper branch failed — undo the subtraction and try the next option.",
+        },
       });
     }
 
     snapshot({
-      line: 19,
+      line: 20,
       phase: "fail",
       idx,
       seen,
-      title: { vi: `Không có bucket cho customer ${idx}`, en: `No bucket works for customer ${idx}` },
-      note: { vi: "Tất cả lựa chọn hợp lệ đã thất bại, trả False để caller hoàn tác.", en: "Every valid choice failed, so return False and let the caller undo its assignment." },
+      title: { vi: `Hết lựa chọn → return False cho customer ${idx}`, en: `Options exhausted → return False for customer ${idx}` },
+      note: {
+        vi: "Không bucket nào tại depth này giúp được; caller sẽ hoàn tác assignment của nó.",
+        en: "No bucket at this depth works; the caller will undo its own assignment.",
+      },
     });
     return false;
   };
 
   finalAnswer = backtrack(0);
   snapshot({
-    line: 20,
+    line: 22,
     phase: "done",
     idx: quantity.length,
-    title: { vi: finalAnswer ? "Có thể phân phối" : "Không thể phân phối", en: finalAnswer ? "Distribution is possible" : "Distribution is impossible" },
+    title: {
+      vi: finalAnswer ? "Kết quả: True — phân phối được" : "Kết quả: False — không thể phân phối",
+      en: finalAnswer ? "Result: True — distribution possible" : "Result: False — impossible",
+    },
     note: finalAnswer
-      ? { vi: "Một nhánh đã phân phối đủ quantity cho mọi customer.", en: "One branch satisfies every customer quantity." }
-      : { vi: "Không có cách gán frequency bucket nào đủ cho toàn bộ customer.", en: "No frequency-bucket assignment can satisfy all customers." },
+      ? { vi: `Một cách gán hợp lệ: customer i lấy từ bucket ${path.map((p) => p.bucket).join(", ")}.`, en: `One valid assignment takes from buckets ${path.map((p) => p.bucket).join(", ")}.` }
+      : { vi: "Mọi nhánh đều bế tắc: không cách chia nào đáp ứng hết quantity.", en: "Every branch dead-ends: no assignment satisfies all quantities." },
     final: true,
     force: true,
   });

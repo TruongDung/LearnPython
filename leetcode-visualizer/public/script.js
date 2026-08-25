@@ -8191,6 +8191,59 @@ function renderGoodStrings1397View(step) {
     </div>`;
 }
 
+function renderDistribute1655BacktrackView(step) {
+  const view = step.distribute1655BacktrackView || {};
+  const quantity = Array.isArray(view.quantity) ? view.quantity : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const initialCounts = Array.isArray(view.initialCounts) ? view.initialCounts : counts;
+  const bucketLabels = Array.isArray(view.bucketLabels) ? view.bucketLabels : counts.map((_, i2) => i2);
+  const idx = Number.isInteger(view.idx) ? view.idx : 0;
+  const activeBucket = Number.isInteger(view.activeBucket) ? view.activeBucket : -1;
+  const seenCounts = new Set(view.seenCounts || []);
+  const path = Array.isArray(view.path) ? view.path : [];
+  const finished = view.answer !== null && view.answer !== undefined;
+  const success = finished && view.answer === true;
+  const maxInitial = Math.max(...initialCounts, 1);
+
+  const bucketOfCustomer = new Map(path.map((p) => [p.customer, p.bucket]));
+  const customerTokens = quantity.map((q, i2) => {
+    const assignedBucket = bucketOfCustomer.has(i2) ? bucketOfCustomer.get(i2) : null;
+    const cls = assignedBucket != null
+      ? " done"
+      : !finished && i2 === idx
+        ? " current"
+        : "";
+    const badge = assignedBucket != null ? `<em>#${assignedBucket}</em>` : "";
+    return `<div class="stack-input-token${cls}"><span>${escapeHtml(String(q))}</span><small>customer ${i2}${badge}</small></div>`;
+  }).join("");
+
+  const buckets = counts.map((remaining, i2) => {
+    const widthPct = Math.round((remaining / maxInitial) * 100);
+    const isSeen = seenCounts.has(remaining);
+    return `<div class="d1655-bucket${i2 === activeBucket ? " active" : ""}">
+      <div class="d1655-bucket-head"><b>#${i2}</b><small>${escapeHtml(pick({ vi: `số ${bucketLabels[i2]}`, en: `num ${bucketLabels[i2]}` }))}</small></div>
+      <div class="d1655-count">${remaining}</div>
+      <div class="d1655-barwrap"><div class="d1655-bar" style="width:${Math.max(widthPct, 6)}%"></div></div>
+      ${isSeen ? `<small class="d1655-seentag">seen ✓</small>` : ""}
+    </div>`;
+  }).join("");
+
+  const needNow = idx < quantity.length ? quantity[idx] : "-";
+  $("treeView").innerHTML = `
+    <div class="calc772-viz d1655-viz">
+      <div>
+        <div class="stack-input-label">${escapeHtml(pick({ vi: `quantity↓ (customer cần) · idx=${idx}`, en: `quantity↓ (customer demands) · idx=${idx}` }))}</div>
+        <div class="stack-input-row">${customerTokens}</div>
+      </div>
+      <div class="d1655-buckets">${buckets}</div>
+      <div class="stack-status">
+        <div><span>need</span><strong>${escapeHtml(String(needNow))}</strong></div>
+        <div><span>seen</span><strong>{${[...seenCounts].join(", ") || " "}}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "đã gán", en: "assigned" }))}</span><strong>${path.length}/${quantity.length}</strong></div>
+        <div><span>${escapeHtml(pick({ vi: "kết quả", en: "result" }))}</span><strong>${success ? "True" : finished ? "False" : "-"}</strong></div>
+      </div>
+    </div>`;
+}
 function renderDistribute1655View(step) {
   const view = step.distribute1655View || {};
   const quantity = Array.isArray(view.quantity) ? view.quantity : [];
@@ -21241,6 +21294,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDistribute1655View(step);
+  } else if (step.distribute1655BacktrackView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDistribute1655BacktrackView(step);
   } else if (step.sentenceView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
