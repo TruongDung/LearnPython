@@ -9751,6 +9751,86 @@ function renderSlidingFreqView(step) {
     </div>`;
 }
 
+function renderExactK992View(step) {
+  const view = step.exactK992View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const leftK = Number.isInteger(view.leftK) ? view.leftK : 0;
+  const leftKm1 = Number.isInteger(view.leftKm1) ? view.leftKm1 : 0;
+  const exactStarts = Array.isArray(view.exactStarts) ? view.exactStarts : [];
+  const vi = lang === "vi";
+  const phaseLabel = {
+    helpers: vi ? "Hai helper add / remove" : "The add / remove helpers",
+    "init-freq": vi ? "Khởi tạo hai map freq" : "Initialize two freq maps",
+    "init-pointers": vi ? "Khởi tạo hai left pointer" : "Initialize two left pointers",
+    right: vi ? "Đọc nums[right]" : "Read nums[right]",
+    "add-k-call": vi ? "Gọi add cho atMost(K)" : "Call add for atMost(K)",
+    "add-k": vi ? "Cập nhật freq atMost(K)" : "Update atMost(K) freq",
+    "add-km1-call": vi ? "Gọi add cho atMost(K-1)" : "Call add for atMost(K-1)",
+    "add-km1": vi ? "Cập nhật freq atMost(K-1)" : "Update atMost(K-1) freq",
+    "shrink-k-check": vi ? "atMost(K) vượt giới hạn" : "atMost(K) exceeds its limit",
+    "remove-k-call": vi ? "Gọi remove cho atMost(K)" : "Call remove for atMost(K)",
+    "remove-k": vi ? "Cập nhật freq atMost(K)" : "Update atMost(K) freq",
+    "remove-k-check": vi ? "Kiểm tra count bằng 0" : "Check whether count is zero",
+    "remove-k-delete": vi ? "Xóa key count bằng 0" : "Delete the zero-count key",
+    "move-k": vi ? "Dịch left_k" : "Move left_k",
+    "shrink-km1-check": vi ? "atMost(K-1) vượt giới hạn" : "atMost(K-1) exceeds its limit",
+    "remove-km1-call": vi ? "Gọi remove cho atMost(K-1)" : "Call remove for atMost(K-1)",
+    "remove-km1": vi ? "Cập nhật freq atMost(K-1)" : "Update atMost(K-1) freq",
+    "remove-km1-check": vi ? "Kiểm tra count bằng 0" : "Check whether count is zero",
+    "remove-km1-delete": vi ? "Xóa key count bằng 0" : "Delete the zero-count key",
+    "move-km1": vi ? "Dịch left_km1" : "Move left_km1",
+    count: vi ? "Đếm subarray đúng K" : "Count exactly-K subarrays",
+    done: vi ? "Hoàn tất" : "Complete",
+  }[view.phase] || String(view.phase || "two windows");
+
+  const windowRow = (name, limit, left, kind) => {
+    const cells = nums.map((value, index) => {
+      const inWindow = right >= 0 && index >= left && index <= right;
+      const classes = [
+        "exact992-cell",
+        inWindow ? "inside" : "outside",
+        index === left && inWindow ? "left" : "",
+        index === right && right >= 0 ? "right" : "",
+        index === view.removingIndex ? "removing" : "",
+        index === right && value === view.activeValue ? "incoming" : "",
+      ].filter(Boolean).join(" ");
+      const pointers = `${index === left && inWindow ? `<span class="exact992-pointer">${name}</span>` : ""}${index === right && right >= 0 ? `<span class="exact992-pointer right">R</span>` : ""}`;
+      return `<div class="exact992-cell-wrap"><div class="exact992-pointer-row">${pointers}</div><div class="${classes}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong></div></div>`;
+    }).join("");
+    return `<section class="exact992-window ${kind}"><header><strong>${name}: atMost(${limit})</strong><span>left = ${left} · distinct = ${kind === "k" ? view.distinctK : view.distinctKm1}</span></header><div class="exact992-cells" style="--exact992-cols:${Math.max(nums.length, 1)}">${cells}</div></section>`;
+  };
+
+  const frequencyRows = (freq, kind) => {
+    const entries = Object.entries(freq || {}).sort(([left], [rightValue]) => Number(left) - Number(rightValue));
+    return entries.length
+      ? entries.map(([value, count]) => `<span class="exact992-freq ${kind}${String(value) === String(view.activeValue) ? " active" : ""}"><small>${escapeHtml(value)}</small><strong>${escapeHtml(String(count))}</strong></span>`).join("")
+      : `<span class="exact992-empty">{}</span>`;
+  };
+  const exactCards = right >= 0 && exactStarts.length
+    ? exactStarts.map((start) => `<div class="exact992-subarray"><small>start ${start}</small><strong>[${escapeHtml(nums.slice(start, right + 1).join(", "))}]</strong><span>[${start}..${right}]</span></div>`).join("")
+    : `<div class="exact992-empty">${vi ? "Chưa có start nào tạo đúng K distinct." : "No start currently gives exactly K distinct values."}</div>`;
+  const currentContribution = right >= 0 ? leftKm1 - leftK : 0;
+  const reason = view.phase === "count"
+    ? (vi ? `Các start từ ${leftK} đến ${leftKm1 - 1} là các subarray mới có exactly ${view.k} distinct.` : `Starts ${leftK} through ${leftKm1 - 1} are the new subarrays with exactly ${view.k} distinct values.`)
+    : view.phase && view.phase.includes("km1")
+      ? (vi ? "Hàng vàng phải giữ tối đa K-1 distinct nên left_km1 thường đi xa hơn." : "The gold row must keep at most K-1 distinct, so left_km1 often moves farther right.")
+      : (vi ? "Hàng xanh giữ tối đa K distinct. Khoảng giữa hai left pointer chính là các start đúng K." : "The blue row keeps at most K distinct. The gap between the two left pointers is exactly-K starts.");
+
+  $("treeView").innerHTML = `
+    <div class="exact992-viz">
+      <header><strong>EXACTLY K DISTINCT = atMost(K) - atMost(K-1)</strong><span>${escapeHtml(phaseLabel)}</span></header>
+      <div class="exact992-rule"><span>valid starts at R</span><strong>[left_k .. left_km1 - 1]</strong><b>${leftKm1} - ${leftK} = ${Math.max(0, currentContribution)}</b></div>
+      <div class="exact992-windows">${windowRow("Lk", view.k, leftK, "k")}${windowRow("Lk-1", Math.max(0, (view.k ?? 0) - 1), leftKm1, "km1")}</div>
+      <div class="exact992-lower">
+        <section class="exact992-panel"><header><strong>FREQ atMost(K)</strong><span>${view.distinctK ?? 0} distinct</span></header><div class="exact992-freqs">${frequencyRows(view.freqK, "k")}</div></section>
+        <section class="exact992-panel"><header><strong>FREQ atMost(K-1)</strong><span>${view.distinctKm1 ?? 0} distinct</span></header><div class="exact992-freqs">${frequencyRows(view.freqKm1, "km1")}</div></section>
+      </div>
+      <section class="exact992-results"><header><strong>${vi ? "SUBARRAY MOI, K DISTINCT" : "NEW EXACT-K SUBARRAYS"}</strong><span>right = ${right >= 0 ? right : "-"}</span></header><div class="exact992-subarrays">${exactCards}</div></section>
+      <footer><span><small>${vi ? "hanh dong" : "action"}</small><strong>${escapeHtml(reason)}</strong></span><span><small>ans</small><strong>${view.ans ?? 0}</strong></span></footer>
+    </div>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -22061,6 +22141,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSubstringConcatView(step);
+  } else if (step.exactK992View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderExactK992View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

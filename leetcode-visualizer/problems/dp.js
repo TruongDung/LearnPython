@@ -2385,7 +2385,7 @@ function buildSteps1749(nums) {
   push({
     title: { vi: "Khởi tạo max_sum = min_sum = 0", en: "Initialize max_sum = min_sum = 0" },
     note: { vi: "Hai global best bắt đầu từ 0 vì đề cho phép subarray rỗng.", en: "Both global best values start at zero because an empty subarray is allowed." },
-    line: 4,
+    line: 5,
   });
 
   for (i = 0; i < n; i++) {
@@ -10624,7 +10624,7 @@ function buildSteps2320(input) {
       vi: "dp[i] = số cách đặt nhà trên i ô đầu (một bên). Với 0 ô: đúng 1 cách (không đặt gì).",
       en: "dp[i] = ways to place houses on the first i plots (one side). With 0 plots there is exactly 1 way (place nothing).",
     },
-    line: 5,
+    line: 6,
     vars: [{ name: "dp[0]", value: 1 }],
   });
 
@@ -10653,7 +10653,7 @@ function buildSteps2320(input) {
         vi: `Ô thứ ${i}: nếu ĐỂ TRỐNG thì còn dp[${i - 1}]=${emptyWays} cách; nếu ĐẶT NHÀ thì ô ${i - 1} phải trống nên còn dp[${i - 2}]=${houseWays} cách. Cộng lại = ${dp[i]}.`,
         en: `Plot ${i}: if EMPTY there are dp[${i - 1}]=${emptyWays} ways; if a HOUSE then plot ${i - 1} must be empty so dp[${i - 2}]=${houseWays} ways. Sum = ${dp[i]}.`,
       },
-      line: 8,
+        line: 9,
       vars: [
         { name: "i", value: i },
         { name: "empty → dp[i-1]", value: emptyWays },
@@ -16699,7 +16699,7 @@ function buildSteps4027(input, params = {}) {
       if (detailed) push({
         title: { vi: "State đạt tới được, tiếp tục mở rộng", en: "The state is reachable; expand it" },
         note: { vi: "Chỉ state có thời gian hữu hạn mới sinh transition.", en: "Only finite-time states generate transitions." },
-        line: 11,
+      line: 12,
       });
       for (let candidate = 0; candidate < m; candidate++) {
         next = candidate;
@@ -16717,7 +16717,7 @@ function buildSteps4027(input, params = {}) {
           if (detailed) push({
             title: { vi: `Bỏ qua #${next}: bit đã là 1`, en: `Skip #${next}: its bit is already 1` },
             note: { vi: "Không phục vụ lại request đã nằm trong mask.", en: "Do not serve a request already included in the mask." },
-            line: 13,
+        line: 14,
           });
           continue;
         }
@@ -16743,7 +16743,7 @@ function buildSteps4027(input, params = {}) {
           note: wait > 0
             ? { vi: `Tới sớm nên phải chờ ${wait} giây.`, en: `Arrival is early, so wait ${wait} second(s).` }
             : { vi: "Không phải chờ; request được phục vụ ngay khi tới.", en: "No waiting; the request is served immediately on arrival." },
-          line: 15,
+        line: 16,
           vars: [{ name: "travel", value: travel }, { name: "arrival", value: arrival }, { name: "wait", value: wait }],
         });
         newMask = mask | (1 << next);
@@ -16763,7 +16763,7 @@ function buildSteps4027(input, params = {}) {
           note: improved
             ? { vi: `Tìm được cách sớm hơn để tới dp[${bits(newMask)}][${next}].`, en: `Found an earlier way to reach dp[${bits(newMask)}][${next}].` }
             : { vi: "Transition này không cải thiện thời gian tốt nhất.", en: "This transition does not improve the best time." },
-          line: 17,
+          line: 18,
         });
         if (!improved) continue;
         dp[at(newMask, next)] = candidateTime;
@@ -16772,7 +16772,7 @@ function buildSteps4027(input, params = {}) {
         push({
           title: { vi: `Ghi dp[${bits(newMask)}][${next}] = ${candidateTime}`, en: `Write dp[${bits(newMask)}][${next}] = ${candidateTime}` },
           note: { vi: "Bảng bitmask nhận thời gian tốt hơn.", en: "The bitmask table receives the improved time." },
-          line: 18,
+        line: 19,
         });
         parent[at(newMask, next)] = last;
         touchRow(newMask, next);
@@ -16780,7 +16780,7 @@ function buildSteps4027(input, params = {}) {
         push({
           title: { vi: `parent[${bits(newMask)}][${next}] = ${last}`, en: `parent[${bits(newMask)}][${next}] = ${last}` },
           note: { vi: `Route tốt nhất tới #${next} đi ngay sau #${last}.`, en: `The best route to #${next} comes immediately after #${last}.` },
-          line: 19,
+      line: 20,
         });
       }
     }
@@ -16794,7 +16794,7 @@ function buildSteps4027(input, params = {}) {
   push({
     title: { vi: `full = ${bits(full)}: mọi request đã xong`, en: `full = ${bits(full)}: every request is served` },
     note: { vi: "Chỉ xét các state có toàn bộ bit bằng 1.", en: "Only states with every bit equal to 1 are final." },
-    line: 20,
+    line: 22,
   });
   bestLast = 0;
   for (let i = 1; i < m; i++) {
