@@ -6078,3 +6078,775 @@ module.exports = Object.assign(module.exports, {
     code: ["from math import gcd", "", "class Solution:", "    def findKthSmallest(self, coins, k):", "        def lcm(a, b):", "            return a // gcd(a, b) * b", "", "        def lcm_of_selected_coins(mask):", "            lcm_value = 1", "            for i, coin in enumerate(coins):", "                if mask & (1 << i):", "                    lcm_value = lcm(lcm_value, coin)", "            return lcm_value", "", "        def count(x):", "            total = 0", "            for mask in range(1, 1 << len(coins)):", "                lcm_value = lcm_of_selected_coins(mask)", "                if mask.bit_count() % 2:", "                    total += x // lcm_value", "                else:", "                    total -= x // lcm_value", "            return total", "", "        lo, hi = 1, k * min(coins)", "        while lo < hi:", "            mid = (lo + hi) // 2", "            if count(mid) >= k:", "                hi = mid", "            else:", "                lo = mid + 1", "        return lo"], builder: buildSteps3116,
   },
 });
+
+/**
+ * LeetCode 352: Data Stream as Disjoint Intervals.
+ *
+ * Design problem driven by an operation stream such as
+ *   SummaryRanges(), addNum(1), getIntervals(), addNum(3), ...
+ * Two approaches share one interval list and produce the same states:
+ *   1 - linear scan that skips far-away intervals, absorbs touching ones
+ *       into a floating [value, value] interval, then inserts the result;
+ *   2 - half-open binary search over interval starts finds the first
+ *       interval with start > value; prev/next decide between covered,
+ *       bridge-merge, extend or plain insert.
+ */
+function parseDataStreamOps352(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+
+  const mapOp = (name, argText) => {
+    const op = String(name || "").toLowerCase();
+    if (op === "summaryranges") return { name: "init" };
+    if (op === "addnum") {
+      const value = Number(String(argText ?? "").replace(/^["']|["']$/g, "").trim());
+      return Number.isInteger(value) ? { name: "add", value } : null;
+    }
+    if (op === "getintervals") return { name: "query" };
+    return null;
+  };
+
+  if (text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed) && parsed.every((row) => Array.isArray(row))) {
+        const ops = parsed.map((row) => mapOp(row[0], row[1])).filter(Boolean);
+        if (ops.length) return ops;
+      }
+    } catch (_error) {
+      // Fall through to text parsing below.
+    }
+  }
+
+  return text
+    .split(/\s*[|;\n]+\s*|\s*,\s*(?=[A-Za-z_]\w*\s*[(])/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const call = part.match(/^([A-Za-z_]\w*)\s*\(\s*(-?\d+)?\s*\)$/);
+      if (call) return mapOp(call[1], call[2]);
+      const bare = part.match(/^([A-Za-z_]\w*)(?:\s+(\d+))?$/);
+      return bare ? mapOp(bare[1], bare[2]) : null;
+    })
+    .filter(Boolean);
+}
+
+function buildSteps352(input, params) {
+  const approach = Number(params && params.approach) === 1 ? 1 : 2;
+  const raw = String(input ?? "").trim();
+  const ops = parseDataStreamOps352(raw);
+  const steps = [];
+  const invalid = raw.length > 0 && ops.length === 0;
+
+  const intervals = []; // sorted, pairwise disjoint [start, end]
+  const results = [];   // snapshots returned by getIntervals()
+  const addedValues = ops.filter((op) => op.name === "add").map((op) => op.value);
+  const domainLo = addedValues.length ? Math.min(...addedValues) - 1 : 0;
+  const domainHi = addedValues.length ? Math.max(...addedValues) + 1 : 9;
+
+  const opLabel = (op) => op.name === "add" ? `addNum(${op.value})` : "getIntervals()";
+  const fmtList = (list) => list.map((iv) => `[${iv[0]},${iv[1]}]`).join(", ");
+
+  function snapshot(opts) {
+    const step = {
+      title: opts.title,
+      codeLines: opts.codeLines || [],
+      codeBlock: approach,
+      dataStream352View: {
+        approach,
+        event: opts.event,
+        ops: ops.filter((op) => op.name !== "init").map(opLabel),
+        activeOpIndex: Number.isInteger(opts.activeOp) ? opts.activeOp : -1,
+        completedOps: Number.isInteger(opts.completed) ? opts.completed : 0,
+        value: opts.value != null ? opts.value : null,
+        intervals: intervals.map((iv) => iv.slice()),
+        bs: opts.bs || null,
+        prevIdx: Number.isInteger(opts.prevIdx) ? opts.prevIdx : null,
+        nextIdx: Number.isInteger(opts.nextIdx) ? opts.nextIdx : null,
+        scanIdx: Number.isInteger(opts.scanIdx) ? opts.scanIdx : null,
+        insertAt: Number.isInteger(opts.insertAt) ? opts.insertAt : null,
+        touched: (opts.touched || []).slice(),
+        removedIdx: Number.isInteger(opts.removedIdx) ? opts.removedIdx : null,
+        newInterval: opts.newInterval ? opts.newInterval.slice() : null,
+        results: results.map((snap) => snap.map((iv) => iv.slice())),
+        returned: opts.returned ? opts.returned.map((iv) => iv.slice()) : null,
+        domainLo,
+        domainHi,
+      },
+      vars: opts.vars || [],
+      note: opts.note,
+    };
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  if (invalid) {
+    snapshot({
+      title: { vi: "Operations không hợp lệ", en: "Invalid operations" },
+      event: "invalid",
+      vars: [],
+      note: {
+        vi: "Dùng dạng SummaryRanges(), addNum(value), getIntervals() ngăn cách bằng dấu phẩy hoặc |.",
+        en: "Use SummaryRanges(), addNum(value), getIntervals() separated by commas or |.",
+      },
+      final: true,
+    });
+    return { original: { operations: raw }, answer: null, steps };
+  }
+
+  if (!ops.length || ops[0].name !== "init") ops.unshift({ name: "init" });
+
+  snapshot({
+    title: { vi: 'SummaryRanges(): danh sách khoảng rỗng', en: "SummaryRanges(): empty interval list" },
+    event: "init",
+    codeLines: approach === 1 ? [4, 5] : [4, 5],
+    vars: [{ name: "self.intervals", value: "[]" }],
+    note: {
+      vi: "Khởi tạo với danh sách các khoảng rời nhau và đã sắp xếp theo start. Mọi giá trị mới phải được nhét vào đúng chỗ mà không phá tính chất này.",
+      en: "Initialize an empty list of sorted disjoint intervals. Every incoming value must be woven in without breaking that invariant.",
+    },
+  });
+
+  ops.forEach((op, opIndex) => {
+    if (op.name === "init") return;
+    const completed = opIndex;
+
+    if (op.name === "query") {
+      const returned = intervals.map((iv) => iv.slice());
+      results.push(returned);
+      snapshot({
+        title: {
+          vi: `getIntervals() → [${fmtList(returned)}]`,
+          en: `getIntervals() → [${fmtList(returned)}]`,
+        },
+        event: "query",
+        activeOp: opIndex,
+        completed: completed + 1,
+        returned,
+        codeLines: approach === 1 ? [20, 21] : [30, 31],
+        vars: [
+          { name: "return", value: `[${fmtList(returned)}]` },
+          { name: "count", value: returned.length },
+        ],
+        note: {
+          vi: "Danh sách luôn rời nhau và sắp xếp theo start nên chỉ cần trả nguyên trạng thái hiện tại.",
+          en: "The list is always disjoint and sorted by start, so the current state is returned as-is.",
+        },
+      });
+      return;
+    }
+
+    const value = op.value;
+    const addNote = {
+      vi: `addNum(${value}): chèn ${value} vào cấu trúc rồi tự động gộp/mở rộng để giữ các khoảng rời nhau.`,
+      en: `addNum(${value}): weave ${value} into the structure, merging or extending so intervals stay disjoint.`,
+    };
+
+    if (approach === 1) {
+      // ---- Approach 1: linear scan ----
+      snapshot({
+        title: { vi: `addNum(${value})`, en: `addNum(${value})` },
+        event: "call-add",
+        activeOp: opIndex,
+        completed,
+        value,
+        codeLines: [7, 8, 9],
+        vars: [{ name: "value", value }, { name: "new_interval", value: `[${value}, ${value}]` }, { name: "i", value: 0 }],
+        note: addNote,
+      });
+
+      const newInterval = [value, value];
+      let i = 0;
+      while (i < intervals.length && intervals[i][1] + 1 < newInterval[0]) {
+        snapshot({
+          title: {
+            vi: `Bỏ qua [${intervals[i][0]}, ${intervals[i][1]}]: end+1 = ${intervals[i][1] + 1} < ${value}`,
+            en: `Skip [${intervals[i][0]}, ${intervals[i][1]}]: end+1 = ${intervals[i][1] + 1} < ${value}`,
+          },
+          event: "skip-scan",
+          activeOp: opIndex,
+          completed,
+          value,
+          scanIdx: i,
+          codeLines: [11, 12],
+          vars: [
+            { name: "i", value: i },
+            { name: "intervals[i]", value: `[${intervals[i][0]}, ${intervals[i][1]}]` },
+            { name: "check", value: `${intervals[i][1] + 1} < ${newInterval[0]} → skip` },
+          ],
+          note: {
+            vi: `Khoảng này kết thúc trước ${value} ít nhất 2 đơn vị nên không thể chạm vào new_interval; dịch con trỏ sang phải.`,
+            en: `This interval ends at least 2 units below ${value}, so it cannot touch new_interval; advance the cursor.`,
+          },
+        });
+        i += 1;
+      }
+
+      while (i < intervals.length && intervals[i][0] <= newInterval[1] + 1) {
+        const cur = intervals[i];
+        snapshot({
+          title: {
+            vi: `Hấp thụ [${cur[0]}, ${cur[1]}]: start = ${cur[0]} ≤ new.end+1 = ${newInterval[1] + 1}`,
+            en: `Absorb [${cur[0]}, ${cur[1]}]: start = ${cur[0]} ≤ new.end+1 = ${newInterval[1] + 1}`,
+          },
+          event: "absorb-check",
+          activeOp: opIndex,
+          completed,
+          value,
+          scanIdx: i,
+          newInterval: newInterval.slice(),
+          codeLines: [14],
+          vars: [
+            { name: "i", value: i },
+            { name: "intervals[i]", value: `[${cur[0]}, ${cur[1]}]` },
+            { name: "check", value: `${cur[0]} ≤ ${newInterval[1] + 1} → absorb` },
+          ],
+          note: {
+            vi: "Khoảng này chồng lấn hoặc chạm mép new_interval, nên nó sẽ bị nuốt vào và xóa khỏi danh sách.",
+            en: "This interval overlaps or touches new_interval, so it will be swallowed and deleted from the list.",
+          },
+        });
+        newInterval[0] = Math.min(newInterval[0], cur[0]);
+        newInterval[1] = Math.max(newInterval[1], cur[1]);
+        intervals.splice(i, 1);
+        snapshot({
+          title: {
+            vi: `new_interval lớn thành [${newInterval[0]}, ${newInterval[1]}]; xoá khoảng cũ tại i=${i}`,
+            en: `new_interval grows to [${newInterval[0]}, ${newInterval[1]}]; old interval at i=${i} deleted`,
+          },
+          event: "absorb-grow",
+          activeOp: opIndex,
+          completed,
+          value,
+          scanIdx: i,
+          newInterval: newInterval.slice(),
+          codeLines: [15, 16, 17],
+          vars: [
+            { name: "i", value: i },
+            { name: "new_interval", value: `[${newInterval[0]}, ${newInterval[1]}]` },
+          ],
+          note: {
+            vi: "Phần tử kế tiếp lại nằm tại i, nên vòng lặp xét tiếp đúng vị trí đó.",
+            en: "The following element slides into index i, so the loop re-examines the same position.",
+          },
+        });
+      }
+
+      intervals.splice(i, 0, newInterval.slice());
+      snapshot({
+        title: {
+          vi: `Chèn new_interval [${newInterval[0]}, ${newInterval[1]}] tại vị trí ${i}`,
+          en: `Insert new_interval [${newInterval[0]}, ${newInterval[1]}] at index ${i}`,
+        },
+        event: "insert-linear",
+        activeOp: opIndex,
+        completed: completed + 1,
+        value,
+        insertAt: i,
+        touched: [i],
+        codeLines: [18],
+        vars: [
+          { name: "i", value: i },
+          { name: "intervals", value: `[${fmtList(intervals)}]` },
+        ],
+        note: {
+          vi: "Sau khi bỏ qua phần quá gần bên trái và nuốt phần chạm mép, chèn khoảng tổng hợp vào đúng chỗ; danh sách vẫn rời nhau.",
+          en: "After skipping the far-left part and absorbing everything touching, the merged interval is spliced back in; the list stays disjoint.",
+        },
+      });
+      return;
+    }
+
+    // ---- Approach 2: binary search over starts ----
+    snapshot({
+      title: { vi: `addNum(${value})`, en: `addNum(${value})` },
+      event: "call-add",
+      activeOp: opIndex,
+      completed,
+      value,
+      codeLines: [7, 8],
+      vars: [{ name: "value", value }],
+      note: addNote,
+    });
+
+    let left = 0;
+    let right = intervals.length;
+    let mid = null;
+
+    snapshot({
+      title: { vi: `left, right = 0, ${right}`, en: `left, right = 0, ${right}` },
+      event: "bs-range",
+      activeOp: opIndex,
+      completed,
+      value,
+      bs: { left, right, mid: null },
+      codeLines: [8],
+      vars: [
+        { name: "left (L)", value: left },
+        { name: "right (R)", value: right },
+        { name: "starts", value: `[${intervals.map((iv) => iv[0]).join(", ")}]` },
+      ],
+      note: {
+        vi: "Tìm index đầu tiên có start > value bằng binary search nửa mở [L, R).",
+        en: "Binary-search the first index whose start > value over the half-open range [L, R).",
+      },
+    });
+
+    while (left < right) {
+      mid = Math.floor((left + right) / 2);
+      const startMid = intervals[mid][0];
+      snapshot({
+        title: { vi: `L=${left} < R=${right} → M=(${left}+${right})//2=${mid}`, en: `L=${left} < R=${right} → M=(${left}+${right})//2=${mid}` },
+        event: "bs-mid",
+        activeOp: opIndex,
+        completed,
+        value,
+        bs: { left, right, mid },
+        codeLines: [9, 10],
+        vars: [
+          { name: "mid (M)", value: mid },
+          { name: "starts[M]", value: startMid },
+        ],
+        note: {
+          vi: `Vòng lặp còn chạy vì vùng [${left}, ${right}) không rỗng.`,
+          en: `The loop continues because the range [${left}, ${right}) is not empty.`,
+        },
+      });
+      const goRight = startMid <= value;
+      snapshot({
+        title: {
+          vi: `starts[M]=${startMid} ${goRight ? "≤" : ">"} value=${value}`,
+          en: `starts[M]=${startMid} ${goRight ? "≤" : ">"} value=${value}`,
+        },
+        event: "bs-compare",
+        activeOp: opIndex,
+        completed,
+        value,
+        bs: { left, right, mid },
+        codeLines: [11],
+        vars: [{ name: "comparison", value: `${startMid} ${goRight ? "≤" : ">"} ${value}` }],
+        note: goRight
+          ? {
+              vi: `start của khoảng giữa không vượt quá ${value}, nên vị trí cần tìm nằm bên phải M.`,
+              en: `The middle interval's start does not exceed ${value}, so the answer lies right of M.`,
+            }
+          : {
+              vi: `start của khoảng giữa vượt quá ${value}, nên M vẫn có thể là đáp án.`,
+              en: `The middle interval's start exceeds ${value}, so M may still be the answer.`,
+            },
+      });
+      if (goRight) {
+        left = mid + 1;
+        snapshot({
+          title: { vi: `left = M + 1 = ${left}`, en: `left = M + 1 = ${left}` },
+          event: "bs-left",
+          activeOp: opIndex,
+          completed,
+          value,
+          bs: { left, right, mid },
+          codeLines: [12],
+          vars: [{ name: "left (L)", value: left }],
+          note: {
+            vi: "Toàn bộ nửa trái kể cả M có start ≤ value nên bị loại khỏi vùng tìm kiếm.",
+            en: "The whole left half including M has start ≤ value, so it leaves the search range.",
+          },
+        });
+      } else {
+        right = mid;
+        snapshot({
+          title: { vi: `right = M = ${right}`, en: `right = M = ${right}` },
+          event: "bs-right",
+          activeOp: opIndex,
+          completed,
+          value,
+          bs: { left, right, mid },
+          codeLines: [14],
+          vars: [{ name: "right (R)", value: right }],
+          note: {
+            vi: "Giữ M trong vùng tìm kiếm vì nó vẫn có thể là index đầu tiên có start > value.",
+            en: "Keep M inside the range because it may still be the first index with start > value.",
+          },
+        });
+      }
+    }
+    mid = null;
+
+    const prevIdx = left > 0 ? left - 1 : null;
+    const nextIdx = left < intervals.length ? left : null;
+    const prev = prevIdx !== null ? intervals[prevIdx].slice() : null;
+    const nxt = nextIdx !== null ? intervals[nextIdx].slice() : null;
+    const neighborVars = [
+      { name: "insert index", value: left },
+      { name: "prev", value: prev ? `[${prev[0]}, ${prev[1]}]` : "None" },
+      { name: "nxt", value: nxt ? `[${nxt[0]}, ${nxt[1]}]` : "None" },
+    ];
+    snapshot({
+      title: {
+        vi: `Vị trí chèn i=${left}; prev=${prev ? `[${prev[0]}, ${prev[1]}]` : "None"}, nxt=${nxt ? `[${nxt[0]}, ${nxt[1]}]` : "None"}`,
+        en: `Insertion point i=${left}; prev=${prev ? `[${prev[0]}, ${prev[1]}]` : "None"}, nxt=${nxt ? `[${nxt[0]}, ${nxt[1]}]` : "None"}`,
+      },
+      event: "neighbors",
+      activeOp: opIndex,
+      completed,
+      value,
+      bs: { left, right, mid: null },
+      prevIdx,
+      nextIdx,
+      codeLines: [16, 17],
+      vars: neighborVars,
+      note: {
+        vi: "prev là khoảng ngay trước vị trí chèn, nxt là khoảng ngay sau; mọi quyết định đều dựa trên hai láng giềng này.",
+        en: "prev is the interval just before the insertion point and nxt the one just after; every decision relies on these two neighbours.",
+      },
+    });
+
+    if (prev && prev[0] <= value && value <= prev[1]) {
+      snapshot({
+        title: {
+          vi: `${value} ∈ prev=[${prev[0]}, ${prev[1]}] → đã được phủ, không đổi gì`,
+          en: `${value} ∈ prev=[${prev[0]}, ${prev[1]}] → already covered, nothing changes`,
+        },
+        event: "covered",
+        activeOp: opIndex,
+        completed: completed + 1,
+        value,
+        prevIdx,
+        nextIdx,
+        touched: [prevIdx],
+        codeLines: [18, 19],
+        vars: [...neighborVars, { name: "action", value: "return" }],
+        note: {
+          vi: "Giá trị nằm trọn trong khoảng bên trái nên danh sách giữ nguyên; chi phí chỉ là O(log n) lần tìm.",
+          en: "The value falls inside the left interval, so the list stays untouched; the cost is only the O(log n) search.",
+        },
+      });
+      return;
+    }
+
+    if (prev && nxt && prev[1] + 1 === value && nxt[0] - 1 === value) {
+      snapshot({
+        title: {
+          vi: `Cầu nối: prev.end+1 = ${prev[1] + 1} = value và nxt.start−1 = ${nxt[0] - 1} = value → gộp cả hai`,
+          en: `Bridge: prev.end+1 = ${prev[1] + 1} = value and nxt.start−1 = ${nxt[0] - 1} = value → merge both`,
+        },
+        event: "bridge-check",
+        activeOp: opIndex,
+        completed,
+        value,
+        prevIdx,
+        nextIdx,
+        codeLines: [20],
+        vars: [...neighborVars, { name: "touch_left", value: true }, { name: "touch_right", value: true }],
+        note: {
+          vi: `${value} vừa nối mũi sau của prev vừa lấp mũi trước của nxt: ba mảnh sẽ hợp nhất thành một khoảng duy nhất.`,
+          en: `${value} caps prev's tail and fills nxt's head at once: all three pieces fuse into a single interval.`,
+        },
+      });
+      intervals[prevIdx][1] = nxt[1];
+      snapshot({
+        title: {
+          vi: `prev kéo dài thành [${intervals[prevIdx][0]}, ${nxt[1]}]`,
+          en: `prev extends to [${intervals[prevIdx][0]}, ${nxt[1]}]`,
+        },
+        event: "bridge-link",
+        activeOp: opIndex,
+        completed,
+        value,
+        prevIdx,
+        nextIdx,
+        touched: [prevIdx, nextIdx],
+        codeLines: [21],
+        vars: [{ name: "prev", value: `[${intervals[prevIdx][0]}, ${intervals[prevIdx][1]}]` }],
+        note: {
+          vi: "Chỉ cần gán end của prev bằng end của nxt; nxt vẫn đang đứng cạnh đó chờ bị xoá.",
+          en: "Assigning prev's end to nxt's end is enough; nxt still sits beside it waiting to be dropped.",
+        },
+      });
+      intervals.splice(nextIdx, 1);
+      snapshot({
+        title: {
+          vi: `splice(${nextIdx}, 1) bỏ nxt → [${fmtList(intervals)}]`,
+          en: `splice(${nextIdx}, 1) drops nxt → [${fmtList(intervals)}]`,
+        },
+        event: "bridge-pop",
+        activeOp: opIndex,
+        completed: completed + 1,
+        value,
+        prevIdx,
+        removedIdx: nextIdx,
+        touched: [prevIdx],
+        codeLines: [22],
+        vars: [{ name: "intervals", value: `[${fmtList(intervals)}]` }],
+        note: {
+          vi: "Ba khoảng [prev], {value}, [nxt] giờ là một khoảng liền mạch; số khoảng giảm đi một.",
+          en: "The three pieces [prev], {value}, [nxt] are now one contiguous interval; the count shrinks by one.",
+        },
+      });
+      return;
+    }
+
+    if (prev && prev[1] + 1 === value) {
+      snapshot({
+        title: {
+          vi: `prev.end+1 = ${prev[1] + 1} = value → mở rộng prev sang phải`,
+          en: `prev.end+1 = ${prev[1] + 1} = value → extend prev to the right`,
+        },
+        event: "extend-prev-check",
+        activeOp: opIndex,
+        completed,
+        value,
+        prevIdx,
+        nextIdx,
+        codeLines: [23],
+        vars: [...neighborVars, { name: "touch_left", value: true }, { name: "touch_right", value: false }],
+        note: {
+          vi: `${value} dính liền mép phải của prev nhưng không chạm nxt, nên chỉ cần kéo dài end của prev.`,
+          en: `${value} sticks to prev's right edge without reaching nxt, so only prev's end needs stretching.`,
+        },
+      });
+      intervals[prevIdx][1] = value;
+      snapshot({
+        title: {
+          vi: `prev trở thành [${intervals[prevIdx][0]}, ${value}]`,
+          en: `prev becomes [${intervals[prevIdx][0]}, ${value}]`,
+        },
+        event: "extend-prev-done",
+        activeOp: opIndex,
+        completed: completed + 1,
+        value,
+        prevIdx,
+        touched: [prevIdx],
+        codeLines: [24],
+        vars: [{ name: "intervals", value: `[${fmtList(intervals)}]` }],
+        note: {
+          vi: "Một phép gán O(1); không khoảng nào phải thêm hay bớt.",
+          en: "A single O(1) assignment; no interval is inserted or removed.",
+        },
+      });
+      return;
+    }
+
+    if (nxt && nxt[0] - 1 === value) {
+      snapshot({
+        title: {
+          vi: `nxt.start−1 = ${nxt[0] - 1} = value → mở rộng nxt sang trái`,
+          en: `nxt.start−1 = ${nxt[0] - 1} = value → extend nxt to the left`,
+        },
+        event: "extend-next-check",
+        activeOp: opIndex,
+        completed,
+        value,
+        prevIdx,
+        nextIdx,
+        codeLines: [25],
+        vars: [...neighborVars, { name: "touch_left", value: false }, { name: "touch_right", value: true }],
+        note: {
+          vi: `${value} dính liền mép trái của nxt nhưng hụt prev một đơn vị, nên hạ start của nxt xuống ${value}.`,
+          en: `${value} touches nxt's left edge but misses prev by one, so lower nxt's start to ${value}.`,
+        },
+      });
+      intervals[nextIdx][0] = value;
+      snapshot({
+        title: {
+          vi: `nxt trở thành [${value}, ${intervals[nextIdx][1]}]`,
+          en: `nxt becomes [${value}, ${intervals[nextIdx][1]}]`,
+        },
+        event: "extend-next-done",
+        activeOp: opIndex,
+        completed: completed + 1,
+        value,
+        nextIdx,
+        touched: [nextIdx],
+        codeLines: [26],
+        vars: [{ name: "intervals", value: `[${fmtList(intervals)}]` }],
+        note: {
+          vi: "Khoảng mới bắt đầu sớm hơn nhưng vẫn rời với prev phía trước.",
+          en: "The interval now starts earlier yet remains disjoint from prev on the left.",
+        },
+      });
+      return;
+    }
+
+    snapshot({
+      title: {
+        vi: `Không chạm khoảng nào → chèn [${value}, ${value}] tại ${left}`,
+        en: `Touches no interval → insert [${value}, ${value}] at ${left}`,
+      },
+      event: "insert-check",
+      activeOp: opIndex,
+      completed,
+      value,
+      prevIdx,
+      nextIdx,
+      insertAt: left,
+      newInterval: [value, value],
+      codeLines: [27, 28],
+      vars: [...neighborVars, { name: "gap", value: `${prev ? prev[1] + 1 : "-∞"} … ${nxt ? nxt[0] - 1 : "+∞"}` }],
+      note: {
+        vi: `${value} đứng cô lập giữa hai láng giềng (hoặc ở biên), nên nó tự lập khoảng mới [${value}, ${value}].`,
+        en: `${value} sits isolated between its neighbours (or at an edge), so it forms its own interval [${value}, ${value}].`,
+      },
+    });
+    intervals.splice(left, 0, [value, value]);
+    snapshot({
+      title: {
+        vi: `Danh sách sau chèn: [${fmtList(intervals)}]`,
+        en: `List after insert: [${fmtList(intervals)}]`,
+      },
+      event: "insert-done",
+      activeOp: opIndex,
+      completed: completed + 1,
+      value,
+      touched: [left],
+      codeLines: [28],
+      vars: [{ name: "intervals", value: `[${fmtList(intervals)}]` }],
+      note: {
+        vi: "Chèn O(n) là điểm yếu của cách dùng mảng; cây cân bằng hoặc danh sách liên kết giúp giảm chi phí chèn.",
+        en: "The O(n) splice is the weak spot of the array layout; balanced trees or linked lists cut the insertion cost.",
+      },
+    });
+  });
+
+  snapshot({
+    title: { vi: "Hoàn tất toàn bộ luồng thao tác", en: "Operation stream complete" },
+    event: "done",
+    activeOp: ops.length,
+    completed: ops.length - 1,
+    codeLines: [],
+    vars: [
+      { name: "final intervals", value: `[${fmtList(intervals)}]` },
+      { name: "queries answered", value: results.length },
+    ],
+    note: approach === 1
+      ? {
+          vi: "Cách 1 duyệt tuyến tính: mỗi addNum tốn O(n) nhưng rất dễ cài đặt và khó sai.",
+          en: "Approach 1 scans linearly: each addNum costs O(n) but the code is trivial to get right.",
+        }
+      : {
+          vi: "Cách 2 tìm vị trí bằng binary search O(log n); phần gộp/mở rộng chỉ đụng tối đa hai láng giềng.",
+          en: "Approach 2 locates the spot with an O(log n) binary search; merging only ever touches the two neighbours.",
+        },
+    final: true,
+  });
+
+  return { original: { operations: raw }, answer: results, steps };
+}
+
+module.exports = Object.assign(module.exports, {
+  352: {
+    id: 352,
+    difficulty: "hard",
+    slug: "data-stream-as-disjoint-intervals",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [
+      { key: "design", vi: "Thiết kế", en: "Design" },
+      { key: "ordered-set", vi: "Tập có thứ tự", en: "Ordered Set" },
+    ],
+    title: { vi: "Data Stream as Disjoint Intervals", en: "Data Stream as Disjoint Intervals" },
+    titleVi: { vi: "Luồng dữ liệu thành các khoảng rời nhau", en: "Summarize a number stream as disjoint intervals" },
+    statement: {
+      vi: "Thiết kế SummaryRanges: addNum(value) thêm một số nguyên vào luồng, getIntervals() trả về các khoảng [start, end] rời nhau phủ toàn bộ số đã thấy, sắp theo start.",
+      en: "Design SummaryRanges: addNum(value) feeds an integer into the stream and getIntervals() reports disjoint [start, end] intervals covering every number seen so far, sorted by start.",
+    },
+    defaultInput: "SummaryRanges(), addNum(1), getIntervals(), addNum(3), getIntervals(), addNum(7), getIntervals(), addNum(2), getIntervals(), addNum(6), getIntervals()",
+    inputKind: "string",
+    inputLabel: { vi: "Operations, ngăn cách bằng dấu phẩy hoặc |", en: "Operations separated by comma or |" },
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        default: 2,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Quét tuyến tính + hấp thụ", en: "Approach 1: Linear scan + absorb" } },
+          { value: 2, label: { vi: "Cách 2: Binary search trên starts", en: "Approach 2: Binary search on starts" } },
+        ],
+      },
+    ],
+    approach: [
+      {
+        vi: "Giữ danh sách các khoảng rời nhau đã sắp xếp; đây là bất biến cần bảo vệ sau mỗi addNum.",
+        en: "Maintain a sorted list of disjoint intervals; that invariant must survive every addNum.",
+      },
+      {
+        vi: "Cách 1: quét từ trái, bỏ qua các khoảng kết thúc trước value−1, hấp thụ mọi khoảng chạm/chứa value thành new_interval rồi chèn lại.",
+        en: "Approach 1: scan from the left, skip intervals ending before value−1, absorb every interval touching value into new_interval, then splice it back in.",
+      },
+      {
+        vi: "Cách 2: binary search index đầu tiên có start > value; dựa vào prev/nxt để quyết định: đã phủ, cầu nối hai bên, mở rộng một bên, hoặc chèn mới.",
+        en: "Approach 2: binary-search the first index with start > value; prev/nxt decide between covered, bridging both sides, extending one side, or inserting fresh.",
+      },
+      {
+        vi: "getIntervals() trả nguyên trạng thái hiện tại vì danh sách luôn chuẩn hóa.",
+        en: "getIntervals() simply returns the current state because the list is always normalized.",
+      },
+    ],
+    complexity: {
+      time: "addNum: O(log n) tìm + O(n) chèn · getIntervals: O(1)",
+      space: "O(n)",
+      note: {
+        vi: "Binary search chỉ trả vị trí; chi phí chèn/xoá trên mảng vẫn O(n). Dùng balanced BST/Skip List thì addNum xuống O(log n) thực thụ.",
+        en: "Binary search only locates the spot; array splicing stays O(n). A balanced BST/skip list makes addNum truly logarithmic.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Quét tuyến tính", en: "Approach 1 · Linear scan" },
+    code2Label: { vi: "Cách 2 · Binary search", en: "Approach 2 · Binary search" },
+    code: [
+      "class SummaryRangesLinear:",
+      "    \"\"\"Approach 1: scan and absorb every touching interval.\"\"\"",
+      "",
+      "    def __init__(self):",
+      "        self.intervals = []",
+      "",
+      "    def addNum(self, value: int) -> None:",
+      "        new_interval = [value, value]",
+      "        i = 0",
+      "        # Skip intervals that end at least 2 below value.",
+      "        while i < len(self.intervals) and self.intervals[i][1] + 1 < new_interval[0]:",
+      "            i += 1",
+      "        # Absorb every overlapping or touching interval.",
+      "        while i < len(self.intervals) and self.intervals[i][0] <= new_interval[1] + 1:",
+      "            new_interval[0] = min(new_interval[0], self.intervals[i][0])",
+      "            new_interval[1] = max(new_interval[1], self.intervals[i][1])",
+      "            del self.intervals[i]",
+      "        self.intervals.insert(i, new_interval)",
+      "",
+      "    def getIntervals(self):",
+      "        return self.intervals",
+    ],
+    code2: [
+      "class SummaryRanges:",
+      "    \"\"\"Approach 2: binary search the insertion point over interval starts.\"\"\"",
+      "",
+      "    def __init__(self):",
+      "        self.intervals = []",
+      "",
+      "    def addNum(self, value: int) -> None:",
+      "        left, right = 0, len(self.intervals)",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            if self.intervals[mid][0] <= value:",
+      "                left = mid + 1",
+      "            else:",
+      "                right = mid",
+      "        # left is now the first index whose start > value",
+      "        prev = self.intervals[left - 1] if left > 0 else None",
+      "        nxt = self.intervals[left] if left < len(self.intervals) else None",
+      "        if prev and prev[0] <= value <= prev[1]:",
+      "            return",
+      "        if prev and nxt and prev[1] + 1 == value == nxt[0] - 1:",
+      "            prev[1] = nxt[1]",
+      "            self.intervals.pop(left)",
+      "        elif prev and prev[1] + 1 == value:",
+      "            prev[1] = value",
+      "        elif nxt and nxt[0] - 1 == value:",
+      "            nxt[0] = value",
+      "        else:",
+      "            self.intervals.insert(left, [value, value])",
+      "",
+      "    def getIntervals(self):",
+      "        return self.intervals",
+    ],
+    builder: buildSteps352,
+  },
+});

@@ -387,6 +387,12 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       ]);
     case 677:
       return designConfig("MapSum", [], parseFunctionOperations(input));
+    case 352: {
+      const operations = parseFunctionOperations(input);
+      if (operations[0] && operations[0].name.toLowerCase() === "summaryranges") operations.shift();
+      const className = Number(codeBlock) === 2 ? "SummaryRanges" : "SummaryRangesLinear";
+      return designConfig(className, [], operations);
+    }
     case 911:
       return designConfig("TopVotedCandidate", [input, parseNumberList(params.times)],
         parseNumberList(params.queries).map((query) => ({ name: "q", args: [query] })));

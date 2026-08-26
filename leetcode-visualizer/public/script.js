@@ -19633,6 +19633,249 @@ function renderRandomizedSet380View(step) {
   </section>`;
 }
 
+// ---- Data Stream as Disjoint Intervals (bai 352) ----
+// Shows the sorted disjoint-interval list three ways at once:
+//  1. a number-line track with coverage bars and the incoming value marker;
+//  2. interval cards (prev/next neighbours, absorbed/removed ghosts);
+//  3. an approach tracker - binary search over starts, or the linear cursor.
+function renderDataStream352View(step) {
+  const view = step.dataStream352View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const approach = Number(view.approach) === 1 ? 1 : 2;
+  const event = String(view.event || "init");
+  const intervals = Array.isArray(view.intervals) ? view.intervals : [];
+  const value = Number.isFinite(view.value) ? view.value : null;
+  const bs = view.bs || null;
+  const prevIdx = Number.isInteger(view.prevIdx) ? view.prevIdx : null;
+  const nextIdx = Number.isInteger(view.nextIdx) ? view.nextIdx : null;
+  const scanIdx = Number.isInteger(view.scanIdx) ? view.scanIdx : null;
+  const insertAt = Number.isInteger(view.insertAt) ? view.insertAt : null;
+  const touched = new Set(Array.isArray(view.touched) ? view.touched : []);
+  const removedIdx = Number.isInteger(view.removedIdx) ? view.removedIdx : null;
+  const newInterval = Array.isArray(view.newInterval) && view.newInterval.length === 2 ? view.newInterval : null;
+  const results = Array.isArray(view.results) ? view.results : [];
+  const returned = Array.isArray(view.returned) ? view.returned : null;
+  const fmtIv = (iv) => `[${iv[0]}, ${iv[1]}]`;
+  const fmtList = (list) => list.map(fmtIv).join(", ");
+
+  // ---- phase header ----
+  const phaseLabels = vi
+    ? (approach === 1
+      ? ["Nhận lệnh addNum", "Quét & bỏ qua", "Hấp thụ & chèn", "Trả getIntervals"]
+      : ["Nhận lệnh addNum", "Binary search vị trí", "Gộp / mở rộng / chèn", "Trả getIntervals"])
+    : (approach === 1
+      ? ["Read addNum call", "Scan & skip", "Absorb & insert", "Return getIntervals"]
+      : ["Read addNum call", "Binary-search position", "Merge / extend / insert", "Return getIntervals"]);
+  let phaseIndex = -1;
+  if (event === "call-add") phaseIndex = 0;
+  else if (/^bs-/.test(event) || event === "skip-scan" || event === "lin-new") phaseIndex = 1;
+  else if (["neighbors", "covered", "bridge-check", "bridge-link", "bridge-pop", "extend-prev-check", "extend-prev-done", "extend-next-check", "extend-next-done", "insert-check", "insert-done", "absorb-check", "absorb-grow", "insert-linear"].includes(event)) phaseIndex = 2;
+  else if (event === "query" || event === "done") phaseIndex = 3;
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  // ---- operation stream chips ----
+  let querySeen = 0;
+  const opChips = (view.ops || []).map((label, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    let resultNote = "";
+    if (state !== "pending" && /^getIntervals/.test(label)) {
+      const snap = results[querySeen];
+      resultNote = snap ? `→ ${snap.length} ${vi ? "khoảng" : "interval(s)"}` : "";
+      querySeen += 1;
+    }
+    return `<span class="dsr352-op ${state}"><small>#${index + 1}</small><b>${escapeHtml(label)}</b>${resultNote ? `<em>${escapeHtml(resultNote)}</em>` : ""}</span>`;
+  }).join("");
+
+  // ---- number line ----
+  const lo = Number.isFinite(view.domainLo) ? view.domainLo : 0;
+  const hiRaw = Number.isFinite(view.domainHi) ? view.domainHi : lo + 9;
+  const hi = Math.max(hiRaw, lo + 1);
+  const span = hi - lo;
+  const posOf = (v) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
+  const widthOf = (s, e) => Math.max(((e - s + 1) / span) * 100, span > 48 ? 0.9 : 3);
+  const tickStep = Math.max(1, Math.round(span / 8));
+  const ticks = [];
+  for (let v = Math.ceil(lo / tickStep) * tickStep; v <= hi; v += tickStep) ticks.push(v);
+  const tickHtml = ticks.map((v) => `<span style="left:${posOf(v)}%"><i></i><em>${v}</em></span>`).join("");
+  const segState = (idx) => removedIdx !== null && idx === removedIdx ? "removed"
+    : touched.has(idx) ? (event.endsWith("-check") || event === "absorb-check" ? "target" : "touched")
+      : idx === prevIdx || idx === nextIdx ? "neighbour" : "";
+  const segsHtml = intervals.map((iv, idx) => `<div class="dsr352-seg ${segState(idx)}${idx % 2 ? " alt" : ""}" style="left:${posOf(iv[0])}%;width:${widthOf(iv[0], iv[1])}%" title="#${idx} · ${escapeHtml(fmtIv(iv))}">${escapeHtml(widthOf(iv[0], iv[1]) > 7 ? `[${iv[0]},${iv[1]}]` : "")}</div>`).join("");
+  const showMarker = value !== null && !["init", "query", "done", "invalid"].includes(event);
+  const markerHtml = showMarker ? `<div class="dsr352-marker${event === "call-add" ? " incoming" : ""}" style="left:${posOf(value)}%"><b>${value}</b><i></i></div>` : "";
+  const ghostHtml = newInterval ? `<div class="dsr352-seg ghost" style="left:${posOf(newInterval[0])}%;width:${widthOf(newInterval[0], newInterval[1])}%">[${newInterval[0]},${newInterval[1]}]</div>` : "";
+
+  // ---- interval cards ----
+  const cardHtml = (iv, idx, extraClass, badge) => `
+    <div class="dsr352-card ${extraClass || ""}">
+      <small>#${idx}${badge ? ` · ${escapeHtml(badge)}` : ""}</small>
+      <strong>[${iv[0]},&hairsp;${iv[1]}]</strong>
+      <em>len ${iv[1] - iv[0] + 1}</em>
+    </div>`;
+  let cardsHtml = intervals.map((iv, idx) => {
+    let badge = "";
+    if (idx === prevIdx) badge = vi ? "trước" : "prev";
+    else if (idx === nextIdx) badge = vi ? "sau" : "nxt";
+    else if (idx === scanIdx) badge = "i";
+    return cardHtml(iv, idx, `${segState(idx)} card`, badge);
+  }).join("");
+  if (removedIdx !== null) {
+    cardsHtml += `<div class="dsr352-card removed ghost-card"><small>#${removedIdx}</small><strong>✕</strong><em>${vi ? "bị xoá" : "deleted"}</em></div>`;
+  }
+  if (newInterval && insertAt !== null) {
+    cardsHtml += `<div class="dsr352-card new ghost-card"><small>@${insertAt}</small><strong>[${newInterval[0]}, ${newInterval[1]}]</strong><em>${vi ? "mới" : "new"}</em></div>`;
+  }
+  if (!cardsHtml.trim()) cardsHtml = `<div class="dsr352-empty">${vi ? "(danh sách rỗng)" : "(list is empty)"}</div>`;
+
+  // ---- approach tracker: binary search over starts / linear cursor ----
+  let trackerHtml = "";
+  if (approach === 2 && bs) {
+    const left = Number.isInteger(bs.left) ? bs.left : null;
+    const right = Number.isInteger(bs.right) ? bs.right : null;
+    const mid = Number.isInteger(bs.mid) ? bs.mid : null;
+    trackerHtml = `<section class="dsr352-bs"><header><strong>STARTS · binary search [L, R)</strong><span>${vi ? "tìm start đầu tiên > " + escapeHtml(String(value)) : "first start > " + escapeHtml(String(value))}</span></header><div>${
+      intervals.map((iv, idx) => {
+        const classes = [];
+        if (left !== null && right !== null) {
+          if (idx < left) classes.push("eliminated");
+          else if (idx >= right) classes.push("candidate");
+          else classes.push("inrange");
+        }
+        if (idx === mid) classes.push("mid");
+        const tags = [];
+        if (idx === left) tags.push("L");
+        if (idx === mid) tags.push("M");
+        if (right !== null && right > left && idx === right - 1) tags.push("R−1");
+        return `<div class="dsr352-bscell ${classes.join(" ")}"><small>[${tags.join("/") || "&nbsp;"}]</small><strong>s=${iv[0]}</strong><em>${iv[0]}..${iv[1]}</em></div>`;
+      }).join("") || `<em class="dsr352-empty">(empty)</em>`
+  }${intervals.length === 0 ? `<div class="dsr352-bscell inrange"><small>[L/R]</small><strong>n=0</strong><em>&nbsp;</em></div>` : ""}</div></section>`;
+  } else if (approach === 1 && (scanIdx !== null || event === "insert-linear")) {
+    trackerHtml = `<section class="dsr352-bs linear"><header><strong>LINEAR CURSOR i</strong><span>${vi ? "bỏ qua khi end+1 < value, hấp thụ khi start ≤ new.end+1" : "skip while end+1 < value, absorb while start ≤ new.end+1"}</span></header><div>${
+      intervals.map((iv, idx) => {
+        const classes = [];
+        if (scanIdx !== null) {
+          if (idx < scanIdx) classes.push("eliminated");
+          else if (idx === scanIdx) classes.push(event.startsWith("absorb") ? "mid absorbing" : "inrange");
+        }
+        return `<div class="dsr352-bscell ${classes.join(" ")}"><small>[${idx === scanIdx ? "i" : "&nbsp;"}]</small><strong>${iv[0]}..${iv[1]}</strong><em>end+1=${iv[1] + 1}</em></div>`;
+      }).join("") || `<em class="dsr352-empty">(empty)</em>`
+  }</div></section>`;
+  }
+
+  // ---- action box ----
+  const prevTxt = prevIdx !== null ? fmtIv(intervals[prevIdx]) : "None";
+  const nxtTxt = nextIdx !== null ? fmtIv(intervals[nextIdx]) : "None";
+  const bsState = bs ? `L=${bs.left}, R=${bs.right}${Number.isInteger(bs.mid) ? `, M=${bs.mid}` : ""}` : "";
+  let actionHtml = "";
+  switch (event) {
+    case "init":
+      actionHtml = `<div class="dsr352-action setup"><small>CONSTRUCTOR</small><strong>self.intervals = []</strong><span>${vi ? "Bắt đầu với danh sách rỗng; bất biến: rời nhau + sắp xếp theo start" : "Start empty; invariant: disjoint + sorted by start"}</span></div>`;
+      break;
+    case "call-add":
+      actionHtml = `<div class="dsr352-action add"><small>ADDNUM</small><strong>value = ${value}</strong><span>${vi ? `Tìm chỗ cho ${value}: có thể rơi vào giữa, dính mép, hoặc tạo khoảng mới` : `Locate ${value}: it may land inside, touch an edge, or form a fresh interval`}</span></div>`;
+      break;
+    case "bs-range":
+      actionHtml = `<div class="dsr352-action search"><small>BINARY SEARCH</small><strong>[L, R) = [${bs.left}, ${bs.right})</strong><span>${vi ? "Mục tiêu: index đầu tiên có start > value" : "Goal: first index whose start > value"}</span></div>`;
+      break;
+    case "bs-mid":
+      actionHtml = `<div class="dsr352-action mid"><small>COMPUTE MID</small><strong>M = ${bs.mid} → starts[M] = ${intervals[bs.mid][0]}</strong><span>${bs.left} ≤ M &lt; ${bs.right}</span></div>`;
+      break;
+    case "bs-compare": {
+      const goRight = intervals[bs.mid][0] <= value;
+      actionHtml = `<div class="dsr352-action compare ${goRight ? "past" : "future"}"><small>COMPARE</small><strong>starts[M]=${intervals[bs.mid][0]} ${goRight ? "≤" : ">"} value=${value}</strong><span>${goRight ? (vi ? "Đáp án nằm bên phải M" : "Answer lies right of M") : (vi ? "M vẫn có thể là đáp án" : "M may still be the answer")}</span></div>`;
+      break;
+    }
+    case "bs-left":
+    case "bs-right":
+      actionHtml = `<div class="dsr352-action move"><small>SHRINK RANGE</small><strong>${event === "bs-left" ? `L = M + 1 = ${bs.left}` : `R = M = ${bs.right}`}</strong><span>${bsState}</span></div>`;
+      break;
+    case "neighbors":
+      actionHtml = `<div class="dsr352-action neighbours"><small>NEIGHBOURS</small><strong>i=${insertAt ?? (bs ? bs.left : "?")} · prev=${escapeHtml(prevTxt)} · nxt=${escapeHtml(nxtTxt)}</strong><span>${vi ? "Chỉ hai láng giềng này quyết định số phận của value" : "Only these two neighbours decide how value lands"}</span></div>`;
+      break;
+    case "covered":
+      actionHtml = `<div class="dsr352-action covered"><small>${vi ? "ĐÃ ĐƯỢC PHỦ" : "ALREADY COVERED"}</small><strong>${escapeHtml(prevTxt)} chứa ${value}</strong><span>${vi ? "return ngay; danh sách không đổi — O(log n)" : "return immediately; list unchanged — O(log n)"}</span></div>`;
+      break;
+    case "bridge-check":
+      actionHtml = `<div class="dsr352-action bridge"><small>BRIDGE</small><strong>${prevTxt} + {${value}} + ${nxtTxt}</strong><span>${vi ? "end+1 == value == start−1 → ba mảnh hợp nhất thành một" : "end+1 == value == start−1 → three pieces fuse into one"}</span></div>`;
+      break;
+    case "bridge-link":
+      actionHtml = `<div class="dsr352-action bridge write"><small>MERGE STEP 1</small><strong>prev.end ← nxt.end</strong><span>${vi ? `prev giờ là [${intervals[prevIdx][0]}, ${intervals[prevIdx][1]}]` : `prev is now [${intervals[prevIdx][0]}, ${intervals[prevIdx][1]}]`}</span></div>`;
+      break;
+    case "bridge-pop":
+      actionHtml = `<div class="dsr352-action bridge done"><small>MERGE STEP 2</small><strong>splice(nxt, 1)</strong><span>${vi ? `Số khoảng giảm: ${fmtList(intervals)}` : `Interval count shrinks: ${fmtList(intervals)}`}</span></div>`;
+      break;
+    case "extend-prev-check":
+    case "extend-prev-done":
+      actionHtml = `<div class="dsr352-action extend right ${event.endsWith("done") ? "write" : ""}"><small>${vi ? "MỞ RỘNG PREV" : "EXTEND PREV"}</small><strong>prev.end+1 == ${value}</strong><span>${vi ? `Kéo dài mép phải của ${prevTxt} tới ${value}` : `Stretch the right edge of ${prevTxt} up to ${value}`}</span></div>`;
+      break;
+    case "extend-next-check":
+    case "extend-next-done":
+      actionHtml = `<div class="dsr352-action extend left ${event.endsWith("done") ? "write" : ""}"><small>${vi ? "MỞ RỘNG NXT" : "EXTEND NXT"}</small><strong>nxt.start−1 == ${value}</strong><span>${vi ? `Hạ mép trái của ${nxtTxt} xuống ${value}` : `Lower the left edge of ${nxtTxt} to ${value}`}</span></div>`;
+      break;
+    case "insert-check":
+    case "insert-done":
+      actionHtml = `<div class="dsr352-action insert ${event.endsWith("done") ? "write" : ""}"><small>INSERT NEW</small><strong>gap: ${prevTxt}.end+1 … ${nxtTxt}.start−1</strong><span>${vi ? `${value} đứng cô lập nên tự lập khoảng [${value}, ${value}] tại index ${insertAt ?? (bs ? bs.left : "?")}` : `${value} sits isolated and forms its own [${value}, ${value}] at index ${insertAt ?? (bs ? bs.left : "?")}`}</span></div>`;
+      break;
+    case "skip-scan":
+      actionHtml = `<div class="dsr352-action skip"><small>SKIP i=${scanIdx}</small><strong>intervals[i].end+1 = ${intervals[scanIdx][1] + 1} &lt; ${value}</strong><span>${vi ? "Quá xa bên trái, không thể chạm new_interval" : "Too far left; it can never touch new_interval"}</span></div>`;
+      break;
+    case "absorb-check":
+      actionHtml = `<div class="dsr352-action absorb"><small>ABSORB i=${scanIdx}</small><strong>${fmtIv(intervals[scanIdx])} chạm new_interval</strong><span>${vi ? "start ≤ new.end+1 → nuốt vào rồi xoá khỏi danh sách" : "start ≤ new.end+1 → swallow it, then delete from the list"}</span></div>`;
+      break;
+    case "absorb-grow":
+      actionHtml = `<div class="dsr352-action absorb grow"><small>NEW_INTERVAL</small><strong>${escapeHtml(fmtIv(newInterval))}</strong><span>${vi ? "min/max mở rộng sau mỗi lần hấp thụ" : "min/max stretch after every absorption"}</span></div>`;
+      break;
+    case "insert-linear":
+      actionHtml = `<div class="dsr352-action insert write"><small>SPLICE @ i=${insertAt}</small><strong>${fmtList(intervals)}</strong><span>${vi ? "Chèn khoảng tổng hợp; danh sách lại rời nhau" : "Splice the merged interval back; the list is disjoint again"}</span></div>`;
+      break;
+    case "query":
+      actionHtml = `<div class="dsr352-action query"><small>GETINTERVALS</small><strong>${returned ? `[${fmtList(returned)}]` : "[]"}</strong><span>${vi ? `${returned ? returned.length : 0} khoảng rời nhau phủ toàn bộ giá trị đã thấy` : `${returned ? returned.length : 0} disjoint intervals cover everything seen so far`}</span></div>`;
+      break;
+    case "done":
+      actionHtml = `<div class="dsr352-action result"><small>COMPLETE</small><strong>${returned || results.length ? `${results.length} × getIntervals()` : ""} ${fmtList(intervals) || "[]"}</strong><span>${approach === 1 ? (vi ? "Cách 1: O(n)/addNum, dễ cài đặt" : "Approach 1: O(n)/addNum, trivially correct") : (vi ? "Cách 2: O(log n) tìm vị trí, chỉ đụng 2 láng giềng" : "Approach 2: O(log n) lookup, touches only two neighbours")}</span></div>`;
+      break;
+    default:
+      actionHtml = `<div class="dsr352-action setup"><small>${escapeHtml(pick(step.title))}</small></div>`;
+  }
+
+  // ---- legend + results log ----
+  const legendHtml = approach === 2
+    ? `<span><i class="lg-elim"></i>${vi ? "đã loại" : "eliminated"}</span><span><i class="lg-range"></i>${vi ? "đang xét" : "in range"}</span><span><i class="lg-touch"></i>${vi ? "láng giềng / bị đụng" : "neighbours / touched"}</span><span><i class="lg-ghost"></i>${vi ? "khoảng mới" : "new interval"}</span>`
+    : `<span><i class="lg-elim"></i>${vi ? "đã bỏ qua" : "skipped"}</span><span><i class="lg-touch"></i>${vi ? "đang quét" : "cursor"}</span><span><i class="lg-ghost"></i>${vi ? "new_interval" : "new_interval"}</span>`;
+  let qCounter = 0;
+  const resultsHtml = (view.ops || []).map((label, index) => {
+    if (!/^getIntervals/.test(label)) return "";
+    const snap = results[qCounter];
+    const completed = index < view.completedOps || event === "done";
+    const active = index === view.activeOpIndex;
+    qCounter += 1;
+    return `<span class="dsr352-res${completed ? " done" : ""}${active ? " active" : ""}"><small>#${qCounter}</small><strong>${completed ? `[${snap ? fmtList(snap) : ""}]` : active ? "…" : "?"}</strong></span>`;
+  }).join("") || `<em class="dsr352-empty">${vi ? "chưa gọi getIntervals" : "no getIntervals yet"}</em>`;
+
+  el.innerHTML = `<section class="dsr352-viz">
+    <div class="dsr352-phases">${phases}</div>
+    <div class="dsr352-ops">${opChips}</div>
+    <section class="dsr352-numberline"><header><strong>${vi ? "TRỤC SỐ" : "NUMBER LINE"} · ${lo}…${hi}</strong><span>${vi ? "thanh màu = khoảng đã gộp" : "bars = merged intervals"}</span></header>
+      <div class="dsr352-track">
+        <div class="dsr352-rail"></div>
+        <div class="dsr352-ticks">${tickHtml}</div>
+        ${segsHtml}
+        ${ghostHtml}
+        ${markerHtml}
+      </div>
+    </section>
+    <section class="dsr352-cards-wrap"><header><strong>${vi ? "DANH SÁCH KHOẢNG" : "INTERVAL LIST"}</strong><span>${vi ? "luôn rời nhau, sắp theo start" : "always disjoint, sorted by start"}</span></header><div class="dsr352-cards">${cardsHtml}</div></section>
+    ${trackerHtml}
+    ${actionHtml}
+    <div class="dsr352-legend">${legendHtml}</div>
+    <section class="dsr352-results"><header><strong>${vi ? "KẾT QUẢ getIntervals()" : "getIntervals() RESULTS"}</strong></header><div>${resultsHtml}</div></section>
+  </section>`;
+}
+
 function renderAllocator2502View(step) {
   const view = step.allocator2502View || {};
   const vi = lang === "vi";
@@ -21552,6 +21795,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderAllocator2502View(step);
+  } else if (step.dataStream352View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDataStream352View(step);
   } else if (step.stoneGame1872View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
