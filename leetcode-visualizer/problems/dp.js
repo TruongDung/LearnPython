@@ -8295,7 +8295,7 @@ function buildSteps62(input, params) {
         gridSnap({
           title: { vi: `dp[${r}][${c}]`, en: `dp[${r}][${c}]` },
           hlCell: [r, c],
-          codeLines: [6, 7],
+          codeLines: [4, 5],
           vars: [
             { name: "r", value: r },
             { name: "c", value: c },
@@ -16536,7 +16536,7 @@ function buildSteps879(input, params) {
     steps.push({
       title: opts.title, arr: [],
       grid: { dp: display(), text1, text2, hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
-      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      highlight: [], mark: [], final: Boolean(opts.final), codeBlock: 2, codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
     });
   };
 
@@ -16598,7 +16598,7 @@ function buildSteps471(input) {
     steps.push({
       title: opts.title, arr: [],
       grid: { dp: display(), text1: chars.slice(1), text2: chars.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
-      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      highlight: [], mark: [], final: Boolean(opts.final), codeBlock: 2, codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
     });
   };
 
@@ -17428,9 +17428,189 @@ function buildSteps1563(input) {
 }
 
 /**
- * LeetCode 887: Super Egg Drop. dp[m][e] = số tầng tối đa kiểm tra được với m lần thử và e quả trứng.
+ * LeetCode 887, approach 1: classic egg/floor DP.
+ * dp[e][f] = minimum drops needed with e eggs and f floors.
  */
 function buildSteps887(input, params) {
+  const k = Math.max(1, Math.min(6, Number(Array.isArray(input) ? input[0] : input) || 2));
+  const nFloors = Math.max(1, Math.min(60, Number((params && params.n) ?? 6)));
+  const dp = Array.from({ length: k + 1 }, () => new Array(nFloors + 1).fill(0));
+  const known = Array.from({ length: k + 1 }, () => new Array(nFloors + 1).fill(false));
+  for (let e = 0; e <= k; e++) known[e][0] = true;
+  for (let f = 0; f <= nFloors; f++) known[0][f] = true;
+
+  const steps = [];
+  const display = () => dp.map((row, e) => row.map((value, f) => (known[e][f] ? String(value) : "·")));
+  const rowLabels = Array.from({ length: k }, (_, idx) => ({
+    index: `e=${idx + 1}`,
+    char: { vi: "trứng", en: idx === 0 ? "egg" : "eggs" },
+  }));
+  const colLabels = Array.from({ length: nFloors }, (_, idx) => ({
+    index: `f=${idx + 1}`,
+    char: { vi: "tầng", en: idx === 0 ? "floor" : "floors" },
+  }));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display(),
+        text1: rowLabels.map((label) => label.index),
+        text2: colLabels.map((label) => label.index),
+        rowLabels,
+        colLabels,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        historyCells: opts.historyCells || [],
+        cellLabels: opts.cellLabels || {},
+        largeCells: true,
+        caption: opts.caption,
+        secondaryCaption: opts.secondaryCaption,
+      },
+      highlight: [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeBlock: 1,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `DP thường: ${k} trứng, ${nFloors} tầng`, en: `Classic DP: ${k} eggs, ${nFloors} floors` },
+    codeLines: [3, 4],
+    hlCell: [0, 0],
+    caption: { vi: "dp[e][f] = số lần thả tối thiểu với e trứng và f tầng", en: "dp[e][f] = minimum drops with e eggs and f floors" },
+    secondaryCaption: { vi: "Mỗi ô thử mọi tầng x làm lần thả đầu tiên.", en: "Each cell tries every floor x as the first drop." },
+    vars: [
+      { name: { vi: "k (trứng)", en: "k (eggs)" }, value: k },
+      { name: { vi: "n (tầng)", en: "n (floors)" }, value: nFloors },
+    ],
+    note: {
+      vi: "Cách DP thường giữ trực tiếp câu hỏi gốc: với e trứng và f tầng, cần ít nhất bao nhiêu lần thả trong trường hợp xấu nhất.",
+      en: "The classic DP keeps the original question directly: with e eggs and f floors, how many drops are needed in the worst case?",
+    },
+  });
+
+  for (let e = 1; e <= k; e++) {
+    for (let f = 1; f <= nFloors; f++) {
+      if (e === 1) {
+        dp[e][f] = f;
+        known[e][f] = true;
+        push({
+          title: { vi: `Một trứng: dp[1][${f}] = ${f}`, en: `One egg: dp[1][${f}] = ${f}` },
+          codeLines: [6, 7],
+          hlCell: [e, f],
+          caption: { vi: `Chỉ có 1 trứng nên phải thử tuần tự ${f} tầng`, en: `With 1 egg, we must test ${f} floors linearly` },
+          secondaryCaption: { vi: "Nếu vỡ thì hết trứng, nên không được nhảy tầng.", en: "If it breaks, no eggs remain, so we cannot skip floors." },
+          vars: [
+            { name: "e", value: e },
+            { name: "f", value: f },
+            { name: `dp[1][${f}]`, value: f },
+          ],
+          note: {
+            vi: `Với một trứng, chiến lược chắc chắn duy nhất là thử từ thấp lên cao: cần ${f} lần.`,
+            en: `With one egg, the only guaranteed strategy is testing bottom-up: ${f} drops are needed.`,
+          },
+        });
+        continue;
+      }
+
+      let best = Infinity;
+      let bestX = 1;
+      let bestBreaks = 0;
+      let bestSurvives = 0;
+      for (let x = 1; x <= f; x++) {
+        const breaks = dp[e - 1][x - 1];
+        const survives = dp[e][f - x];
+        const worst = 1 + Math.max(breaks, survives);
+        if (worst < best) {
+          best = worst;
+          bestX = x;
+          bestBreaks = breaks;
+          bestSurvives = survives;
+        }
+      }
+
+      push({
+        title: { vi: `Tính dp[${e}][${f}]`, en: `Compute dp[${e}][${f}]` },
+        codeLines: [8, 9, 10, 11, 12],
+        hlCell: [e, f],
+        pathCells: [[e - 1, bestX - 1], [e, f - bestX]],
+        cellLabels: {
+          [`${e - 1},${bestX - 1}`]: { vi: "vỡ", en: "breaks" },
+          [`${e},${f - bestX}`]: { vi: "không vỡ", en: "survives" },
+          [`${e},${f}`]: { vi: "đang tính", en: "current" },
+        },
+        caption: { vi: `Thử mọi x trong 1..${f}; tốt nhất x=${bestX}`, en: `Try every x in 1..${f}; best x=${bestX}` },
+        secondaryCaption: {
+          vi: `x=${bestX}: 1 + max(vỡ=${bestBreaks}, không vỡ=${bestSurvives}) = ${best}`,
+          en: `x=${bestX}: 1 + max(breaks=${bestBreaks}, survives=${bestSurvives}) = ${best}`,
+        },
+        vars: [
+          { name: "e", value: e },
+          { name: "f", value: f },
+          { name: "best x", value: bestX },
+          { name: { vi: "vỡ", en: "breaks" }, value: bestBreaks },
+          { name: { vi: "không vỡ", en: "survives" }, value: bestSurvives },
+        ],
+        note: {
+          vi: `Nếu thả ở tầng x=${bestX}: vỡ thì còn ${e - 1} trứng và ${bestX - 1} tầng dưới; không vỡ thì còn ${e} trứng và ${f - bestX} tầng trên. Lấy nhánh xấu nhất, rồi cộng 1 lần thả hiện tại.`,
+          en: `Drop first at x=${bestX}: if it breaks, solve ${bestX - 1} lower floors with ${e - 1} eggs; if it survives, solve ${f - bestX} upper floors with ${e} eggs. Take the worse branch, plus the current drop.`,
+        },
+      });
+
+      dp[e][f] = best;
+      known[e][f] = true;
+      push({
+        title: { vi: `dp[${e}][${f}] = ${best}`, en: `dp[${e}][${f}] = ${best}` },
+        codeLines: [13],
+        hlCell: [e, f],
+        pathCells: [[e - 1, bestX - 1], [e, f - bestX]],
+        cellLabels: {
+          [`${e - 1},${bestX - 1}`]: { vi: "vỡ", en: "breaks" },
+          [`${e},${f - bestX}`]: { vi: "không vỡ", en: "survives" },
+          [`${e},${f}`]: { vi: "đã tính", en: "filled" },
+        },
+        caption: { vi: `Lưu đáp án ô: dp[${e}][${f}] = ${best}`, en: `Store cell answer: dp[${e}][${f}] = ${best}` },
+        secondaryCaption: { vi: "DP thường dễ hiểu nhưng mỗi ô phải thử nhiều x.", en: "Classic DP is direct, but each cell scans many x values." },
+        vars: [
+          { name: `dp[${e}][${f}]`, value: best },
+          { name: "best x", value: bestX },
+        ],
+        note: {
+          vi: `Đây là số lần thả ít nhất trong trường hợp xấu nhất cho ${e} trứng và ${f} tầng.`,
+          en: `This is the minimum worst-case drops for ${e} eggs and ${f} floors.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[k][nFloors];
+  push({
+    title: { vi: `Kết quả: ${answer} lần thả`, en: `Result: ${answer} drops` },
+    codeLines: [14],
+    hlCell: [k, nFloors],
+    bestCell: [k, nFloors],
+    caption: { vi: `dp[${k}][${nFloors}] = ${answer}`, en: `dp[${k}][${nFloors}] = ${answer}` },
+    secondaryCaption: { vi: "Đây là DP thường O(k*n^2). Cách 2 tối ưu bằng cách đổi trạng thái.", en: "This is classic O(k*n^2) DP. Approach 2 optimizes by changing the state." },
+    vars: [{ name: { vi: "đáp án", en: "answer" }, value: answer }],
+    note: {
+      vi: `Với ${k} trứng và ${nFloors} tầng, cần tối thiểu ${answer} lần thả trong trường hợp xấu nhất.`,
+      en: `With ${k} eggs and ${nFloors} floors, the minimum worst-case number of drops is ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { original: { k, n: nFloors }, answer, steps };
+}
+
+/**
+ * LeetCode 887, approach 2: optimized move/egg DP.
+ * dp[m][e] = số tầng tối đa kiểm tra được với m lần thử và e quả trứng.
+ */
+function buildSteps887Moves(input, params) {
   const k = Math.max(1, Math.min(6, Number(Array.isArray(input) ? input[0] : input) || 2));
   const nFloors = Math.max(1, Math.min(60, Number((params && params.n) ?? 6)));
   const maxMoves = nFloors; // upper bound
@@ -17463,7 +17643,7 @@ function buildSteps887(input, params) {
         caption: opts.caption,
         secondaryCaption: opts.secondaryCaption,
       },
-      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      highlight: [], mark: [], final: Boolean(opts.final), codeBlock: 2, codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
     });
   };
 
@@ -19287,9 +19467,42 @@ module.exports = {
     maxInput: 6,
     extraParams: [
       { key: "n", type: "number", label: { vi: "n (số tầng)", en: "n (floors)" }, default: 6 },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách giải", en: "Approach" },
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DP thường O(k*n^2)", en: "Approach 1: Classic DP O(k*n^2)" } },
+          { value: "2", label: { vi: "Cách 2: DP tối ưu theo số lần thả", en: "Approach 2: Moves-based optimized DP" } },
+        ],
+      },
     ],
-    complexity: { time: "O(k × answer)", space: "O(k × answer)", note: { vi: "dp[m][e] tăng m tới khi phủ n tầng.", en: "dp[m][e] increases m until it covers n floors." } },
+    approach: [
+      { vi: "Cách 1: DP thường định nghĩa dp[e][f] là số lần thả tối thiểu với e trứng và f tầng.", en: "Approach 1: classic DP defines dp[e][f] as the minimum drops with e eggs and f floors." },
+      { vi: "Ở mỗi ô dp[e][f], thử tầng thả đầu tiên x. Nếu vỡ dùng dp[e-1][x-1], nếu không vỡ dùng dp[e][f-x], lấy nhánh xấu nhất.", en: "For each dp[e][f], try first drop floor x. If it breaks use dp[e-1][x-1], otherwise use dp[e][f-x], then take the worse branch." },
+      { vi: "Cách 2 đổi trạng thái: dp[m][e] là số tầng tối đa phủ được với m lần thả và e trứng; tăng m tới khi phủ đủ n.", en: "Approach 2 changes the state: dp[m][e] is the maximum floors covered with m drops and e eggs; increase m until it covers n." },
+    ],
+    complexity: { time: "Approach 1: O(k*n^2); Approach 2: O(k*answer)", space: "Approach 1: O(k*n); Approach 2: O(k*answer)", note: { vi: "DP thường bám sát đề nhưng phải thử mọi tầng x. DP tối ưu khó hơn vì đổi câu hỏi sang 'm lần thả phủ được bao nhiêu tầng'.", en: "Classic DP mirrors the problem but scans every x. The optimized DP is harder because it asks 'how many floors can m drops cover?' instead." } },
+    codeLabel: { vi: "Cách 1: DP thường O(k*n^2)", en: "Approach 1: Classic DP O(k*n^2)" },
     code: [
+      "class Solution:",
+      "    def superEggDrop(self, k, n):",
+      "        dp = [[0] * (n + 1) for _ in range(k + 1)]",
+      "        for f in range(n + 1):",
+      "            dp[1][f] = f",
+      "        for e in range(2, k + 1):",
+      "            for f in range(1, n + 1):",
+      "                dp[e][f] = float('inf')",
+      "                for x in range(1, f + 1):",
+      "                    broken = dp[e - 1][x - 1]",
+      "                    survived = dp[e][f - x]",
+      "                    worst = 1 + max(broken, survived)",
+      "                    dp[e][f] = min(dp[e][f], worst)",
+      "        return dp[k][n]",
+    ],
+    code2Label: { vi: "Cách 2: DP tối ưu theo số lần thả", en: "Approach 2: Moves-based optimized DP" },
+    code2: [
       "class Solution:",
       "    def superEggDrop(self, k, n):",
       "        # dp[m][e] = max floors solvable with m moves and e eggs",
@@ -19302,6 +19515,7 @@ module.exports = {
       "        return m",
     ],
     builder: buildSteps887,
+    builder2: buildSteps887Moves,
   },
   1155: {
     id: 1155,
@@ -24193,7 +24407,297 @@ function buildSteps546(input) {
   return { original: boxes, answer, steps };
 }
 
+/**
+ * LeetCode 1531: String Compression II.
+ * Top-down state DP: dfs(i, last, count, k_left).
+ */
+function buildSteps1531(input, params) {
+  const s = String(input ?? "");
+  const k = Number(params?.k ?? 2);
+  if (!s || !/^[a-z]+$/.test(s)) throw new Error("s must be a non-empty lowercase string");
+  if (!Number.isInteger(k) || k < 0) throw new Error("k must be a non-negative integer");
+  if (s.length > 12) throw new Error("Visualization for 1531 supports s length <= 12.");
+
+  const chars = [...s];
+  const n = chars.length;
+  const memo = new Map();
+  const steps = [];
+  const INF = 1_000_000;
+  const TRACE_LIMIT = 180;
+  let memoHits = 0;
+  let truncated = false;
+
+  const displayLast = (last) => last || "∅";
+  const encodeRun = (last, count) => {
+    if (!last || count <= 0) return "";
+    return count === 1 ? last : `${last}${count}`;
+  };
+  const growthCost = (count) => (count === 1 || count === 9 || count === 99 ? 1 : 0);
+  const keyOf = (i, last, count, kLeft) => `${i}|${last || "_"}|${count}|${kLeft}`;
+  const rangeCells = (end) => Array.from({ length: Math.max(0, end) }, (_, idx) => [0, idx + 1]);
+
+  const makeGrid = (i, extra = {}) => {
+    const labels = {};
+    if (i < n) labels[`0,${i + 1}`] = "i";
+    if (extra.action === "delete" && i < n) labels[`0,${i + 1}`] = "delete";
+    if (extra.action === "keep" && i < n) labels[`0,${i + 1}`] = "keep";
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((ch, idx) => ({ index: `i=${idx}`, char: ch })),
+      hlCell: i < n ? [0, i + 1] : null,
+      autoScrollCell: i < n ? [0, i + 1] : null,
+      pathCells: i < n ? [[0, i + 1]] : [],
+      historyCells: rangeCells(i),
+      cellLabels: labels,
+      largeCells: true,
+      caption: extra.caption,
+      secondaryCaption: extra.secondaryCaption,
+    };
+  };
+
+  const snap = (opts) => {
+    if (steps.length >= TRACE_LIMIT && !opts.force) {
+      truncated = true;
+      return;
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.i ?? n, opts),
+      highlight: [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "i", value: opts.i ?? n },
+        { name: "last", value: JSON.stringify(displayLast(opts.last)) },
+        { name: "count", value: opts.count ?? 0 },
+        { name: "k_left", value: opts.kLeft ?? 0 },
+        { name: "run", value: JSON.stringify(encodeRun(opts.last, opts.count || 0)) },
+        { name: "memo size", value: memo.size },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+    });
+  };
+
+  function dfs(i, last, count, kLeft, depth) {
+    const key = keyOf(i, last, count, kLeft);
+    snap({
+      title: { vi: `State (${i}, ${displayLast(last)}, ${count}, ${kLeft})`, en: `State (${i}, ${displayLast(last)}, ${count}, ${kLeft})` },
+      codeLines: [5, 6],
+      i, last, count, kLeft,
+      caption: { vi: `dfs(i=${i}, last=${displayLast(last)}, count=${count}, k_left=${kLeft})`, en: `dfs(i=${i}, last=${displayLast(last)}, count=${count}, k_left=${kLeft})` },
+      secondaryCaption: { vi: "State giữ ký tự run hiện tại và số lần xoá còn lại.", en: "The state carries the current run character and remaining deletions." },
+      vars: [{ name: "depth", value: depth }],
+      note: {
+        vi: "Đây là phần khó của bài: nếu chỉ biết i và k thì chưa đủ; ta cần biết run đang mở để tính chi phí nén khi giữ ký tự tiếp theo.",
+        en: "This is the hard design point: i and k are not enough; we also need the open run to price the next kept character.",
+      },
+    });
+
+    if (kLeft < 0) {
+      snap({
+        title: { vi: "Xoá quá k -> vô hạn", en: "Too many deletions -> infinity" },
+        codeLines: [7, 8],
+        i, last, count, kLeft,
+        caption: { vi: "k_left < 0", en: "k_left < 0" },
+        secondaryCaption: { vi: "Nhánh này không hợp lệ.", en: "This branch is invalid." },
+        vars: [{ name: "return", value: "INF" }],
+        note: { vi: "Không thể dùng nhiều hơn k lần xoá.", en: "We cannot use more than k deletions." },
+      });
+      return INF;
+    }
+
+    if (i === n) {
+      snap({
+        title: { vi: "Hết chuỗi -> 0", en: "End of string -> 0" },
+        codeLines: [9, 10],
+        i, last, count, kLeft,
+        caption: { vi: "Không còn ký tự phía sau", en: "No suffix remains" },
+        secondaryCaption: { vi: "Run hiện tại đã được tính dần khi các ký tự được giữ.", en: "The current run was charged incrementally as characters were kept." },
+        vars: [{ name: "return", value: 0 }],
+        note: { vi: "Không cần thêm ký tự nào vào chuỗi nén.", en: "No more encoded characters are needed." },
+      });
+      return 0;
+    }
+
+    if (memo.has(key)) {
+      memoHits += 1;
+      const value = memo.get(key);
+      snap({
+        title: { vi: `Memo hit -> ${value}`, en: `Memo hit -> ${value}` },
+        codeLines: [12, 13],
+        i, last, count, kLeft,
+        caption: { vi: `memo[${key}] = ${value}`, en: `memo[${key}] = ${value}` },
+        secondaryCaption: { vi: "State này đã được giải, không mở lại cây đệ quy.", en: "This state is already solved, so we do not reopen the recursion tree." },
+        vars: [{ name: "memo hits", value: memoHits }, { name: "return", value }],
+        note: { vi: "Memoization là thứ giữ state DP này không bị exponential.", en: "Memoization is what prevents this state DP from exploding exponentially." },
+      });
+      return value;
+    }
+
+    const ch = chars[i];
+    snap({
+      title: { vi: `Nhánh xoá '${ch}'`, en: `Delete branch for '${ch}'` },
+      codeLines: [14],
+      i, last, count, kLeft,
+      action: "delete",
+      caption: { vi: `Xoá s[${i}]='${ch}', k_left giảm còn ${kLeft - 1}`, en: `Delete s[${i}]='${ch}', k_left becomes ${kLeft - 1}` },
+      secondaryCaption: { vi: "Xoá không đổi run đang mở.", en: "Deleting does not change the open run." },
+      vars: [{ name: "char", value: JSON.stringify(ch) }],
+      note: { vi: "Đây là edge case quan trọng: đôi khi xoá một ký tự ở giữa làm hai run nhập lại và tiết kiệm nhiều hơn.", en: "Important edge case: deleting a middle character may merge runs and save more later." },
+    });
+    const deleteCost = dfs(i + 1, last, count, kLeft - 1, depth + 1);
+
+    let keepAdd;
+    let nextLast;
+    let nextCount;
+    if (ch === last) {
+      keepAdd = growthCost(count);
+      nextLast = last;
+      nextCount = count + 1;
+    } else {
+      keepAdd = 1;
+      nextLast = ch;
+      nextCount = 1;
+    }
+    snap({
+      title: { vi: `Nhánh giữ '${ch}'`, en: `Keep branch for '${ch}'` },
+      codeLines: ch === last ? [15, 16] : [17, 18],
+      i, last, count, kLeft,
+      action: "keep",
+      caption: {
+        vi: ch === last ? `Cùng run: cost tăng ${keepAdd}` : `Bắt đầu run mới '${ch}': cost tăng 1`,
+        en: ch === last ? `Same run: cost increases by ${keepAdd}` : `Start new run '${ch}': cost increases by 1`,
+      },
+      secondaryCaption: {
+        vi: ch === last ? "Độ dài nén chỉ tăng khi count đi qua 1, 9, 99." : "Một ký tự run mới luôn thêm chữ cái vào chuỗi nén.",
+        en: ch === last ? "Encoded length only grows when count crosses 1, 9, or 99." : "A new run always adds its letter to the encoding.",
+      },
+      vars: [
+        { name: "char", value: JSON.stringify(ch) },
+        { name: "add", value: keepAdd },
+        { name: "next run", value: JSON.stringify(encodeRun(nextLast, nextCount)) },
+      ],
+      note: {
+        vi: ch === last
+          ? `Giữ thêm '${ch}' vào run '${last}'. Khi count=${count}, add=${keepAdd}.`
+          : `Giữ '${ch}' làm run mới nên trả thêm 1 ký tự trong chuỗi nén.`,
+        en: ch === last
+          ? `Keep '${ch}' inside run '${last}'. At count=${count}, add=${keepAdd}.`
+          : `Keep '${ch}' as a new run, so the encoded string pays one new letter.`,
+      },
+    });
+    const keepCost = keepAdd + dfs(i + 1, nextLast, nextCount, kLeft, depth + 1);
+    const best = Math.min(deleteCost, keepCost);
+    memo.set(key, best);
+
+    snap({
+      title: { vi: `Chọn min(delete, keep) = ${best}`, en: `Choose min(delete, keep) = ${best}` },
+      codeLines: [19, 20],
+      i, last, count, kLeft,
+      caption: { vi: `min(delete=${deleteCost}, keep=${keepCost}) = ${best}`, en: `min(delete=${deleteCost}, keep=${keepCost}) = ${best}` },
+      secondaryCaption: { vi: `Lưu memo cho state ${key}`, en: `Store memo for state ${key}` },
+      vars: [
+        { name: "delete", value: deleteCost >= INF ? "INF" : deleteCost },
+        { name: "keep", value: keepCost >= INF ? "INF" : keepCost },
+        { name: "return", value: best },
+      ],
+      note: { vi: "State trả về độ dài nén nhỏ nhất của suffix từ i trở đi.", en: "The state returns the shortest encoded length for the suffix starting at i." },
+    });
+    return best;
+  }
+
+  const answer = dfs(0, "", 0, k, 0);
+  snap({
+    title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
+    codeLines: [21],
+    i: n,
+    last: "",
+    count: 0,
+    kLeft: k,
+    caption: { vi: `getLengthOfOptimalCompression(${JSON.stringify(s)}, ${k}) = ${answer}`, en: `getLengthOfOptimalCompression(${JSON.stringify(s)}, ${k}) = ${answer}` },
+    secondaryCaption: truncated
+      ? { vi: "Trace đã được rút gọn; đáp án vẫn được tính đầy đủ.", en: "Trace was truncated; the answer was still computed fully." }
+      : { vi: "Trace đã đi qua các state chính của memoized recursion.", en: "The trace visited the key states of the memoized recursion." },
+    vars: [
+      { name: "answer", value: answer },
+      { name: "memo size", value: memo.size },
+      { name: "memo hits", value: memoHits },
+    ],
+    note: {
+      vi: "Thiết kế state là phần khó nhất: last/count giúp biết khi nào chuỗi nén tăng độ dài.",
+      en: "The state design is the hard part: last/count tells us when the compressed string length grows.",
+    },
+    final: true,
+    force: true,
+  });
+
+  return { original: s, k, answer, steps };
+}
+
 Object.assign(module.exports, {
+  1531: {
+    id: 1531,
+    difficulty: "hard",
+    slug: "string-compression-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "memoization", vi: "Ghi nhớ", en: "Memoization" },
+      { key: "state-dp", vi: "DP trạng thái", en: "State DP" },
+    ],
+    title: { vi: "String Compression II", en: "String Compression II" },
+    titleVi: { vi: "Nén chuỗi II", en: "String Compression II" },
+    statement: {
+      vi: "Cho chuỗi s và số k. Xoá tối đa k ký tự để độ dài run-length encoding của s nhỏ nhất.",
+      en: "Given string s and integer k, delete at most k characters to minimize the length of its run-length encoding.",
+    },
+    defaultInput: "aaabcccd",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường, tối đa 12 ký tự cho visualization)", en: "s (lowercase, up to 12 chars for visualization)" },
+    extraParams: [{ key: "k", label: { vi: "k (số ký tự được xoá)", en: "k (deletions allowed)" }, default: 2, min: 0 }],
+    approach: [
+      { vi: "State: dfs(i, last, count, k_left) = độ dài nén nhỏ nhất cho suffix s[i:] khi run hiện tại là last^count.", en: "State: dfs(i, last, count, k_left) = shortest encoded length for suffix s[i:] when the current run is last^count." },
+      { vi: "Mỗi ký tự có hai nhánh: xoá nó, hoặc giữ nó vào run hiện tại / mở run mới.", en: "Each character has two branches: delete it, or keep it in the current run / start a new run." },
+      { vi: "Edge case khó: giữ ký tự cùng run chỉ tăng độ dài nén khi count là 1, 9, hoặc 99.", en: "Hard edge case: keeping a same-run character only increases encoded length when count is 1, 9, or 99." },
+    ],
+    complexity: {
+      time: "O(n * k * alphabet * n) states in practice",
+      space: "O(n * k * alphabet * n)",
+      note: {
+        vi: "Visualization dùng top-down memo và giới hạn s length <= 12 để trace dễ theo dõi.",
+        en: "The visualization uses top-down memoization and limits s length <= 12 so the trace stays readable.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def getLengthOfOptimalCompression(self, s: str, k: int) -> int:",
+      "        memo = {}",
+      "        def add_len(count):",
+      "            return 1 if count in (1, 9, 99) else 0",
+      "        def dfs(i, last, count, k_left):",
+      "            if k_left < 0:",
+      "                return float('inf')",
+      "            if i == len(s):",
+      "                return 0",
+      "            key = (i, last, count, k_left)",
+      "            if key in memo:",
+      "                return memo[key]",
+      "            delete = dfs(i + 1, last, count, k_left - 1)",
+      "            if s[i] == last:",
+      "                keep = add_len(count) + dfs(i + 1, last, count + 1, k_left)",
+      "            else:",
+      "                keep = 1 + dfs(i + 1, s[i], 1, k_left)",
+      "            memo[key] = min(delete, keep)",
+      "            return memo[key]",
+      "        return dfs(0, '', 0, k)",
+    ],
+    builder: buildSteps1531,
+  },
   546: {
     id: 546,
     difficulty: "hard",

@@ -247,7 +247,8 @@ function buildSteps2904(input, params) {
       highlight: [],
       mark: bestRange(),
       final: Boolean(extra.final),
-      codeLines: [line],
+      codeBlock: 1,
+      codeLines: Array.isArray(line) ? line : [line],
       vars: [
         { name: "k", value: k },
         { name: "left", value: left },
@@ -262,7 +263,7 @@ function buildSteps2904(input, params) {
 
   snap(
     { vi: "Khởi tạo cửa sổ", en: "Initialize the window" },
-    3,
+    [3, 4],
     -1,
     { vi: "left bắt đầu ở 0, ones đếm số bit 1 trong cửa sổ, best ban đầu rỗng.", en: "left starts at 0, ones counts 1-bits in the window, and best starts empty." },
   );
@@ -271,49 +272,55 @@ function buildSteps2904(input, params) {
     const ch = chars[right];
     snap(
       { vi: `Xét s[${right}] = ${ch}`, en: `Inspect s[${right}] = ${ch}` },
-      4,
+      5,
       right,
       { vi: "Mở rộng cạnh phải thêm một ký tự.", en: "Expand the right edge by one character." },
     );
 
     if (ch === "1") {
+      snap(
+        { vi: `s[${right}] là 1`, en: `s[${right}] is 1` },
+        6,
+        right,
+        { vi: "Điều kiện if đúng, nên dòng kế tiếp sẽ tăng ones.", en: "The if condition is true, so the next line increments ones." },
+      );
       ones++;
       snap(
         { vi: `Gặp bit 1 -> ones = ${ones}`, en: `Saw a 1 -> ones = ${ones}` },
-        5,
+        7,
         right,
         { vi: "Cửa sổ có thêm một bit 1.", en: "The window gained one 1-bit." },
       );
-    }
-
-    while (ones > k) {
+    } else {
       snap(
-        { vi: `ones=${ones} > k=${k}`, en: `ones=${ones} > k=${k}` },
+        { vi: `s[${right}] không phải 1`, en: `s[${right}] is not 1` },
         6,
         right,
-        { vi: "Cửa sổ có quá nhiều bit 1 nên phải bỏ bớt từ bên trái.", en: "The window has too many 1-bits, so shrink from the left." },
-        { removing: left, focus: left },
-      );
-      if (chars[left] === "1") ones--;
-      const removed = chars[left];
-      left++;
-      snap(
-        { vi: `Bỏ s[${left - 1}] = ${removed}`, en: `Drop s[${left - 1}] = ${removed}` },
-        7,
-        right,
-        { vi: `Dịch left sang ${left}; ones hiện là ${ones}.`, en: `Move left to ${left}; ones is now ${ones}.` },
-        { vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+        { vi: "Điều kiện if sai, ones giữ nguyên.", en: "The if condition is false, so ones stays unchanged." },
       );
     }
 
     while (ones === k) {
+      snap(
+        { vi: `ones == k == ${k}`, en: `ones == k == ${k}` },
+        8,
+        right,
+        { vi: "Window hiện tại có đúng k bit 1, nên có thể tạo candidate.", en: "The current window has exactly k 1-bits, so it can form a candidate." },
+      );
       const candidate = s.slice(left, right + 1);
+      snap(
+        { vi: `cand = ${candidate}`, en: `cand = ${candidate}` },
+        9,
+        right,
+        { vi: `Candidate hiện tại là s[${left}:${right + 1}] = ${JSON.stringify(candidate)}.`, en: `The current candidate is s[${left}:${right + 1}] = ${JSON.stringify(candidate)}.` },
+        { vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
+      );
       const isBetter = better(candidate);
       snap(
         isBetter
           ? { vi: `Ứng viên tốt hơn: ${candidate}`, en: `Better candidate: ${candidate}` }
           : { vi: `Ứng viên chưa tốt hơn: ${candidate}`, en: `Candidate is not better: ${candidate}` },
-        8,
+        [10, 11, 12],
         right,
         isBetter
           ? { vi: "Window có đúng k bit 1 và ngắn hơn best hiện tại hoặc cùng độ dài nhưng nhỏ hơn theo từ điển.", en: "The window has exactly k 1-bits and is shorter than best, or tied in length but lexicographically smaller." }
@@ -326,25 +333,38 @@ function buildSteps2904(input, params) {
         bestRight = right;
         snap(
           { vi: `best = ${best}`, en: `best = ${best}` },
-          9,
+          13,
           right,
           { vi: "Lưu substring tốt nhất mới.", en: "Save the new best substring." },
         );
       }
 
-      snap(
-        { vi: "Co left để thử ngắn hơn", en: "Shrink left to try shorter" },
-        10,
-        right,
-        { vi: "Khi vẫn đủ k bit 1, ta bỏ cạnh trái để tìm ứng viên ngắn hơn với cùng right.", en: "While the window still has k 1-bits, drop the left edge to seek a shorter candidate at the same right." },
-        { removing: left, focus: left },
-      );
-      if (chars[left] === "1") ones--;
       const removed = chars[left];
+      snap(
+        removed === "1"
+          ? { vi: "s[left] là 1", en: "s[left] is 1" }
+          : { vi: "s[left] không phải 1", en: "s[left] is not 1" },
+        14,
+        right,
+        removed === "1"
+          ? { vi: "Điều kiện if đúng, nên ones sẽ giảm ở dòng tiếp theo.", en: "The if condition is true, so ones decrements on the next line." }
+          : { vi: "Điều kiện if sai, bỏ qua dòng giảm ones.", en: "The if condition is false, so the decrement line is skipped." },
+        { removing: left, focus: left, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+      );
+      if (removed === "1") {
+        ones--;
+        snap(
+          { vi: `s[left] là 1 -> ones = ${ones}`, en: `s[left] is 1 -> ones = ${ones}` },
+          15,
+          right,
+          { vi: "Bỏ bit 1 ở cạnh trái, window sau đó sẽ không còn đủ k bit 1.", en: "Remove the left-edge 1-bit; after this the window no longer has k 1-bits." },
+          { removing: left, focus: left, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+        );
+      }
       left++;
       snap(
         { vi: `left -> ${left}`, en: `left -> ${left}` },
-        11,
+        16,
         right,
         { vi: `Đã bỏ ${JSON.stringify(removed)}; ones = ${ones}.`, en: `Dropped ${JSON.stringify(removed)}; ones = ${ones}.` },
         { vars: [{ name: "removed", value: JSON.stringify(removed) }] },
@@ -354,7 +374,7 @@ function buildSteps2904(input, params) {
 
   snap(
     { vi: `return ${JSON.stringify(best)}`, en: `return ${JSON.stringify(best)}` },
-    12,
+    17,
     chars.length - 1,
     best
       ? { vi: `Substring đẹp ngắn nhất, nhỏ nhất theo từ điển là ${JSON.stringify(best)}.`, en: `The shortest, lexicographically smallest beautiful substring is ${JSON.stringify(best)}.` }
@@ -412,7 +432,7 @@ function buildSteps2904Positions(input, params) {
       secondaryCaption: "Each candidate starts at one_pos[i] and ends at one_pos[i+k-1].",
     };
   };
-  const snap = (title, line, note, extra = {}) => {
+  const snap = (title, lines, note, extra = {}) => {
     steps.push({
       title,
       arr: [],
@@ -420,7 +440,8 @@ function buildSteps2904Positions(input, params) {
       highlight: [],
       mark: bestRange(),
       final: Boolean(extra.final),
-      codeLines: [line],
+      codeBlock: 2,
+      codeLines: Array.isArray(lines) ? lines : [lines],
       vars: [
         { name: "k", value: k },
         { name: "ones", value: `[${onesPos.join(", ")}]` },
@@ -433,14 +454,14 @@ function buildSteps2904Positions(input, params) {
 
   snap(
     { vi: "Khởi tạo danh sách vị trí bit 1", en: "Initialize the 1-position list" },
-    3,
+    [3],
     { vi: "Ta chỉ quan tâm đến vị trí các ký tự '1', vì substring đẹp ngắn nhất luôn bắt đầu và kết thúc bằng '1'.", en: "We only care about positions of '1', because the shortest beautiful substring always starts and ends with '1'." },
   );
 
   for (let i = 0; i < chars.length; i++) {
     snap(
       { vi: `Quét s[${i}] = ${chars[i]}`, en: `Scan s[${i}] = ${chars[i]}` },
-      4,
+      [3],
       { vi: "Duyệt chuỗi một lần để gom vị trí các bit 1.", en: "Scan the string once to collect all 1-bit positions." },
       { focus: i },
     );
@@ -448,7 +469,7 @@ function buildSteps2904Positions(input, params) {
       onesPos.push(i);
       snap(
         { vi: `ones.append(${i})`, en: `ones.append(${i})` },
-        5,
+        [3],
         { vi: `Ghi nhận vị trí ${i}; hiện có ${onesPos.length} bit 1.`, en: `Record position ${i}; we have seen ${onesPos.length} 1-bits.` },
         { focus: i },
       );
@@ -458,7 +479,7 @@ function buildSteps2904Positions(input, params) {
   if (onesPos.length < k) {
     snap(
       { vi: "Không đủ bit 1", en: "Not enough 1-bits" },
-      6,
+      [4, 5],
       { vi: `Chỉ có ${onesPos.length} bit 1, ít hơn k=${k}, nên trả về chuỗi rỗng.`, en: `There are only ${onesPos.length} 1-bits, fewer than k=${k}, so return an empty string.` },
       { final: true },
     );
@@ -474,7 +495,7 @@ function buildSteps2904Positions(input, params) {
       isBetter
         ? { vi: `Ứng viên tốt hơn: ${candidate}`, en: `Better candidate: ${candidate}` }
         : { vi: `Ứng viên chưa tốt hơn: ${candidate}`, en: `Candidate is not better: ${candidate}` },
-      8,
+      [8, 9, 10, 11, 13, 14, 15],
       isBetter
         ? { vi: `Cụm ${k} bit 1 từ ones[${i}] đến ones[${i + k - 1}] tạo substring ngắn hơn best hoặc cùng độ dài nhưng nhỏ hơn theo từ điển.`, en: `The ${k}-bit group from ones[${i}] through ones[${i + k - 1}] gives a shorter substring, or a same-length lexicographically smaller one.` }
         : { vi: `Cụm ${k} bit 1 này tạo candidate nhưng không thắng best hiện tại.`, en: `This ${k}-bit group creates a candidate but does not beat the current best.` },
@@ -496,7 +517,7 @@ function buildSteps2904Positions(input, params) {
       bestRight = right;
       snap(
         { vi: `best = ${best}`, en: `best = ${best}` },
-        9,
+        [16],
         { vi: "Lưu candidate làm đáp án tốt nhất hiện tại.", en: "Save the candidate as the current best answer." },
         { left, right, focus: right },
       );
@@ -505,7 +526,7 @@ function buildSteps2904Positions(input, params) {
 
   snap(
     { vi: `return ${JSON.stringify(best)}`, en: `return ${JSON.stringify(best)}` },
-    10,
+    [18],
     best
       ? { vi: `Substring đẹp ngắn nhất, nhỏ nhất theo từ điển là ${JSON.stringify(best)}.`, en: `The shortest, lexicographically smallest beautiful substring is ${JSON.stringify(best)}.` }
       : { vi: "Không có substring nào chứa đúng k bit 1.", en: "No substring contains exactly k 1-bits." },
@@ -564,15 +585,16 @@ module.exports = {
       "        left = ones = 0",
       "        best = \"\"",
       "        for right, ch in enumerate(s):",
-      "            if ch == \"1\": ones += 1",
-      "            while ones > k:",
-      "                if s[left] == \"1\": ones -= 1",
-      "                left += 1",
+      "            if ch == \"1\":",
+      "                ones += 1",
       "            while ones == k:",
       "                cand = s[left:right + 1]",
-      "                if best == \"\" or len(cand) < len(best) or (len(cand) == len(best) and cand < best):",
+      "                if best == \"\" or len(cand) < len(best) or (",
+      "                    len(cand) == len(best) and cand < best",
+      "                ):",
       "                    best = cand",
-      "                if s[left] == \"1\": ones -= 1",
+      "                if s[left] == \"1\":",
+      "                    ones -= 1",
       "                left += 1",
       "        return best",
     ],
@@ -583,13 +605,18 @@ module.exports = {
       "        ones = [i for i, ch in enumerate(s) if ch == \"1\"]",
       "        if len(ones) < k:",
       "            return \"\"",
+      "",
       "        best = \"\"",
       "        for i in range(len(ones) - k + 1):",
       "            left = ones[i]",
       "            right = ones[i + k - 1]",
       "            cand = s[left:right + 1]",
-      "            if best == \"\" or len(cand) < len(best) or (len(cand) == len(best) and cand < best):",
+      "",
+      "            if best == \"\" or len(cand) < len(best) or (",
+      "                len(cand) == len(best) and cand < best",
+      "            ):",
       "                best = cand",
+      "",
       "        return best",
     ],
     builder: buildSteps2904,
