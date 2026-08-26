@@ -4057,3 +4057,118 @@ module.exports = {
     builder: buildSteps714,
   },
 };
+
+// LeetCode 621: the closed-form schedule length is easier to inspect when
+// the frequency table and the frame it creates are kept visible together.
+function buildSteps621(input, params = {}) {
+  const raw = String(input ?? "").trim().toUpperCase();
+  const tasks = raw.includes(",")
+    ? raw.split(",").map((task) => task.trim()).filter(Boolean)
+    : [...raw.replace(/\s+/g, "")];
+  const n = Number(params.n ?? 2);
+  if (!tasks.length || tasks.length > 18 || tasks.some((task) => !/^[A-Z]$/.test(task)) || !Number.isInteger(n) || n < 0 || n > 8) {
+    throw new Error("Use 1 to 18 uppercase tasks (for example A,A,A,B,B,B) and cooldown n from 0 to 8.");
+  }
+
+  const counts = {};
+  const steps = [];
+  const snapshot = (title, line, note, extra = {}) => steps.push({
+    title,
+    arr: [...tasks],
+    highlight: [],
+    mark: [],
+    codeLines: [line],
+    vars: [
+      { name: "n", value: n },
+      { name: "max_freq", value: extra.maxFreq ?? "-" },
+      { name: "max_count", value: extra.maxCount ?? "-" },
+      { name: "frame", value: extra.frame ?? "-" },
+    ],
+    note,
+    final: Boolean(extra.final),
+    taskSchedulerView: {
+      tasks: [...tasks], counts: { ...counts }, n,
+      maxFreq: extra.maxFreq ?? null, maxCount: extra.maxCount ?? null,
+      frame: extra.frame ?? null, answer: extra.answer ?? null,
+      phase: extra.phase || "setup",
+    },
+  });
+
+  snapshot(
+    { vi: "Đếm tần suất mỗi task", en: "Count each task frequency" }, 5,
+    { vi: "Chỉ tần suất quan trọng: các task cùng chữ có thể đổi chỗ trong lịch.", en: "Only frequencies matter: equal task labels can be rearranged freely." },
+    { phase: "count" },
+  );
+  tasks.forEach((task) => { counts[task] = (counts[task] || 0) + 1; });
+  snapshot(
+    { vi: "freq = Counter(tasks)", en: "freq = Counter(tasks)" }, 5,
+    { vi: `Bảng tần suất có ${Object.keys(counts).length} loại task.`, en: `The frequency table has ${Object.keys(counts).length} task type(s).` },
+    { phase: "frequency" },
+  );
+
+  const maxFreq = Math.max(...Object.values(counts));
+  snapshot(
+    { vi: `max_freq = ${maxFreq}`, en: `max_freq = ${maxFreq}` }, 6,
+    { vi: `Task xuất hiện nhiều nhất có ${maxFreq} bản sao, nên tạo ${maxFreq - 1} khoảng cooldown giữa chúng.`, en: `The most frequent task appears ${maxFreq} times, creating ${maxFreq - 1} cooldown gaps.` },
+    { maxFreq, phase: "max-frequency" },
+  );
+
+  const maxCount = Object.values(counts).filter((count) => count === maxFreq).length;
+  snapshot(
+    { vi: `max_count = ${maxCount}`, en: `max_count = ${maxCount}` }, 7,
+    { vi: `${maxCount} task cùng đạt max_freq; chúng chiếm các ô cuối của khung lịch.`, en: `${maxCount} task(s) tie at max_freq; they occupy the frame's final slots.` },
+    { maxFreq, maxCount, phase: "tie-count" },
+  );
+
+  const frame = (maxFreq - 1) * (n + 1) + maxCount;
+  snapshot(
+    { vi: `frame = (${maxFreq} - 1) × (${n} + 1) + ${maxCount} = ${frame}`, en: `frame = (${maxFreq} - 1) × (${n} + 1) + ${maxCount} = ${frame}` }, 8,
+    { vi: "Mỗi khối có 1 task chủ đạo và n vị trí chờ; block cuối chỉ cần các task đồng hạng.", en: "Each block has one dominant task and n cooling slots; the final block only needs the tied tasks." },
+    { maxFreq, maxCount, frame, phase: "frame" },
+  );
+
+  const answer = Math.max(tasks.length, frame);
+  snapshot(
+    { vi: `return max(${tasks.length}, ${frame}) = ${answer}`, en: `return max(${tasks.length}, ${frame}) = ${answer}` }, 9,
+    { vi: frame > tasks.length ? "Khung cooldown dài hơn số task, nên có idle slot." : "Task còn lại lấp đủ mọi idle slot, nên chỉ cần số task thực tế.", en: frame > tasks.length ? "The cooldown frame is longer than the task count, so idle slots are required." : "Other tasks fill every idle slot, so the real task count is enough." },
+    { maxFreq, maxCount, frame, answer, phase: "done", final: true },
+  );
+  return { original: tasks, n, answer, steps };
+}
+
+Object.assign(module.exports, {
+  621: {
+    id: 621, difficulty: "medium", slug: "task-scheduler",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    tags: [{ key: "counting", vi: "Đếm tần suất", en: "Counting" }],
+    title: { vi: "Task Scheduler", en: "Task Scheduler" },
+    titleVi: { vi: "Lập lịch task có cooldown", en: "Schedule tasks with cooldown" },
+    statement: { vi: "Mỗi task cần 1 đơn vị thời gian. Hai task cùng loại phải cách nhau ít nhất n đơn vị. Tìm thời gian ngắn nhất để hoàn tất tất cả task.", en: "Each task takes one unit. Equal tasks must be separated by at least n intervals. Find the shortest total schedule length." },
+    defaultInput: "A,A,A,B,B,B", inputKind: "string", inputLabel: { vi: "tasks (A,A,A,B,B,B)", en: "tasks (A,A,A,B,B,B)" },
+    extraParams: [{ key: "n", type: "number", label: { vi: "cooldown n", en: "cooldown n" }, default: 2, min: 0 }],
+    approach: [
+      { vi: "Đếm tần suất; max_freq quyết định số hàng cooldown bắt buộc.", en: "Count frequencies; max_freq determines the required cooldown rows." },
+      { vi: "Khung tối thiểu là (max_freq - 1) × (n + 1) + số task đồng hạng max_freq.", en: "The minimum frame is (max_freq - 1) × (n + 1) + the number of tasks tied at max_freq." },
+      { vi: "Lấy max với tổng số task vì task khác có thể lấp các khoảng idle.", en: "Take the maximum with the task count because other tasks can fill idle slots." },
+    ],
+    complexity: { time: "O(T)", space: "O(1)", note: { vi: "Chỉ đếm tối đa 26 chữ cái viết hoa.", en: "Only up to 26 uppercase task labels are counted." } },
+    code: [
+      "from collections import Counter",
+      "",
+      "class Solution:",
+      "    def leastInterval(self, tasks, n):",
+      "        freq = Counter(tasks)",
+      "        max_freq = max(freq.values())",
+      "        max_count = sum(count == max_freq for count in freq.values())",
+      "        frame = (max_freq - 1) * (n + 1) + max_count",
+      "        return max(len(tasks), frame)",
+    ],
+    liveArgs: (input, params) => [
+      String(input ?? "").includes(",")
+        ? String(input).split(",").map((task) => task.trim()).filter(Boolean)
+        : [...String(input ?? "").replace(/\s+/g, "")],
+      Number(params.n ?? 2),
+    ],
+    builder: buildSteps621,
+  },
+});

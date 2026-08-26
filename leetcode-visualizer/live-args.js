@@ -332,12 +332,13 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
     case 155:
     case 346:
     case 362:
+    case 622:
     case 641:
     case 933:
     case 1670: {
       const operations = parseFunctionOperations(input);
       const constructor = operations.shift() || { args: [] };
-      const classNames = { 155: "MinStack", 346: "MovingAverage", 362: "HitCounter", 641: "MyCircularDeque", 933: "RecentCounter", 1670: "FrontMiddleBackQueue" };
+      const classNames = { 155: "MinStack", 346: "MovingAverage", 362: "HitCounter", 622: "MyCircularQueue", 641: "MyCircularDeque", 933: "RecentCounter", 1670: "FrontMiddleBackQueue" };
       return designConfig(classNames[problem.id], constructor.args, operations);
     }
     case 208:

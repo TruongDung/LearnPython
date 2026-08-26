@@ -6837,7 +6837,79 @@ function buildSteps540(input) {
   return { original: [...nums], answer: nums[left], steps };
 }
 
+function buildSteps704(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : parseIntegerList(input);
+  const target = Number(params.target);
+  if (!nums.length || nums.length > 18 || nums.some((value) => !Number.isSafeInteger(value)) || nums.some((value, index) => index && value <= nums[index - 1]) || !Number.isSafeInteger(target)) {
+    throw new Error("Use 1 to 18 strictly increasing integers and an integer target.");
+  }
+  const steps = [];
+  const snapshot = (title, line, note, extra = {}) => steps.push({
+    title, arr: [...nums], highlight: [extra.left, extra.right, extra.mid].filter(Number.isInteger), mark: [], codeLines: [line],
+    vars: [{ name: "left", value: extra.left ?? "-" }, { name: "right", value: extra.right ?? "-" }, { name: "mid", value: extra.mid ?? "-" }, { name: "target", value: target }],
+    note, final: Boolean(extra.final),
+    sequenceTraceView: { kind: "binary-target", nums: [...nums], left: extra.left ?? -1, right: extra.right ?? -1, mid: extra.mid ?? -1, target, comparison: extra.comparison ?? "", phase: extra.phase || "setup", answer: extra.answer ?? null },
+  });
+
+  let left = 0;
+  let right = nums.length - 1;
+  snapshot({ vi: "Khởi tạo vùng tìm kiếm", en: "Initialize search range" }, 3, { vi: "Vì nums đã tăng dần, so sánh với mid sẽ loại được một nửa vùng.", en: "Because nums is sorted, comparing mid discards half of the range." }, { left, right, phase: "setup" });
+  while (left <= right) {
+    snapshot({ vi: `left <= right: ${left} <= ${right}`, en: `left <= right: ${left} <= ${right}` }, 4, { vi: "Vùng [left..right] vẫn còn ứng viên.", en: "Range [left..right] still has a candidate." }, { left, right, phase: "loop" });
+    const mid = Math.floor((left + right) / 2);
+    snapshot({ vi: `mid = (${left} + ${right}) // 2 = ${mid}`, en: `mid = (${left} + ${right}) // 2 = ${mid}` }, 5, { vi: "Chọn phần tử giữa vùng hiện tại.", en: "Choose the current range's middle element." }, { left, right, mid, phase: "mid" });
+    if (nums[mid] === target) {
+      snapshot({ vi: `nums[${mid}] == target → ${nums[mid]} == ${target}`, en: `nums[${mid}] == target → ${nums[mid]} == ${target}` }, 6, { vi: "Đã tìm thấy target tại mid.", en: "The target is found at mid." }, { left, right, mid, comparison: "equal", phase: "found" });
+      snapshot({ vi: `return ${mid}`, en: `return ${mid}` }, 7, { vi: "Chỉ số của target là đáp án.", en: "The target index is the answer." }, { left, right, mid, comparison: "equal", phase: "done", answer: mid, final: true });
+      return { original: nums, target, answer: mid, steps };
+    }
+    if (nums[mid] < target) {
+      snapshot({ vi: `${nums[mid]} < ${target} → True`, en: `${nums[mid]} < ${target} → True` }, 8, { vi: "Mọi giá trị từ left tới mid đều quá nhỏ, bỏ nửa trái.", en: "Every value from left through mid is too small, so discard the left half." }, { left, right, mid, comparison: "too-small", phase: "compare" });
+      left = mid + 1;
+      snapshot({ vi: `left = mid + 1 → ${left}`, en: `left = mid + 1 → ${left}` }, 9, { vi: "Giữ nửa phải còn có thể chứa target.", en: "Keep the right half that may still contain target." }, { left, right, mid, comparison: "too-small", phase: "move-right" });
+    } else {
+      snapshot({ vi: `${nums[mid]} < ${target} → False`, en: `${nums[mid]} < ${target} → False` }, 8, { vi: "nums[mid] lớn hơn target, nên target chỉ có thể ở nửa trái.", en: "nums[mid] is greater than target, so target can only be in the left half." }, { left, right, mid, comparison: "too-large", phase: "compare" });
+      snapshot({ vi: "else", en: "else" }, 10, { vi: "Đi theo nhánh loại nửa phải.", en: "Follow the branch that discards the right half." }, { left, right, mid, comparison: "too-large", phase: "else" });
+      right = mid - 1;
+      snapshot({ vi: `right = mid - 1 → ${right}`, en: `right = mid - 1 → ${right}` }, 11, { vi: "Giữ nửa trái còn có thể chứa target.", en: "Keep the left half that may still contain target." }, { left, right, mid, comparison: "too-large", phase: "move-left" });
+    }
+  }
+  snapshot({ vi: "return -1", en: "return -1" }, 12, { vi: "Vùng tìm kiếm đã rỗng, target không có trong nums.", en: "The search range is empty, so target is absent from nums." }, { left, right, phase: "not-found", answer: -1, final: true });
+  return { original: nums, target, answer: -1, steps };
+}
+
 module.exports = Object.assign(module.exports, {
+  704: {
+    id: 704, difficulty: "easy", slug: "binary-search",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Binary Search", en: "Binary Search" },
+    titleVi: { vi: "Tìm kiếm nhị phân", en: "Binary search in a sorted array" },
+    statement: { vi: "Tìm chỉ số của target trong mảng nums tăng dần, hoặc trả -1 nếu không có.", en: "Find target's index in a sorted increasing array nums, or return -1 when it is absent." },
+    defaultInput: "-1,0,3,5,9,12", inputKind: "integer", inputLabel: { vi: "nums đã sắp xếp", en: "sorted nums" },
+    extraParams: [{ key: "target", type: "number", label: { vi: "target", en: "target" }, default: 9 }],
+    approach: [
+      { vi: "Giữ vùng ứng viên [left..right].", en: "Maintain the candidate range [left..right]." },
+      { vi: "So sánh nums[mid] với target để bỏ nửa chắc chắn không thể chứa target.", en: "Compare nums[mid] with target to discard the half that cannot contain it." },
+    ],
+    complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Mỗi vòng lặp giảm ít nhất một nửa số ứng viên.", en: "Each iteration removes at least half the candidates." } },
+    code: [
+      "class Solution:",
+      "    def search(self, nums, target):",
+      "        left, right = 0, len(nums) - 1",
+      "        while left <= right:",
+      "            mid = (left + right) // 2",
+      "            if nums[mid] == target:",
+      "                return mid",
+      "            if nums[mid] < target:",
+      "                left = mid + 1",
+      "            else:",
+      "                right = mid - 1",
+      "        return -1",
+    ],
+    liveArgs: (input, params) => [Array.isArray(input) ? input.map(Number) : parseIntegerList(input), Number(params.target)],
+    builder: buildSteps704,
+  },
   540: {
     id: 540,
     difficulty: "medium",

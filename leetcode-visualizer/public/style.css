@@ -37974,6 +37974,8 @@ html, body {
 .seqtrace-cell.outside { opacity: .38; }
 .seqtrace-cell.mid { border: 3px solid #7c3aed; background: #f5f3ff; }
 .seqtrace-cell.mid strong, .seqtrace-cell.mid small, .seqtrace-cell.mid em { color: #4c1d95; }
+.seqtrace-cell.mismatch { border: 3px solid #e11d48; background: #fff1f2; }
+.seqtrace-cell.mismatch strong, .seqtrace-cell.mismatch small, .seqtrace-cell.mismatch em { color: #9f1239; }
 .seqtrace-rule { display: grid; gap: 4px; padding: 10px 11px; border-left: 4px solid #7c3aed; background: #f5f3ff; }
 .seqtrace-rule small { color: #6d28d9; font: 800 8px/1 Consolas, monospace; }
 .seqtrace-rule strong { color: #4c1d95; font: 800 13px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
@@ -37998,6 +38000,8 @@ html, body {
 [data-theme="dark"] .seqtrace-cell.inside { border-color: #fbbf24; background: #422006; }
 [data-theme="dark"] .seqtrace-cell.mid { border-color: #a78bfa; background: #1e1b4b; }
 [data-theme="dark"] .seqtrace-cell.mid strong, [data-theme="dark"] .seqtrace-cell.mid small, [data-theme="dark"] .seqtrace-cell.mid em { color: #ede9fe; }
+[data-theme="dark"] .seqtrace-cell.mismatch { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .seqtrace-cell.mismatch strong, [data-theme="dark"] .seqtrace-cell.mismatch small, [data-theme="dark"] .seqtrace-cell.mismatch em { color: #fecdd3; }
 
 @media (max-width: 520px) {
   .seqtrace-viz { padding: 10px 8px; }

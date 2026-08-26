@@ -9937,6 +9937,7 @@ function renderSequenceTraceView(step) {
         classes.push(index >= options.left && index <= options.right ? "inside" : "outside");
       }
       if (Number.isInteger(options.mid) && (index === options.mid || index === options.pairEnd)) classes.push("mid");
+      if (options.mismatch && options.mismatch.has(index)) classes.push("mismatch");
       return classes.join(" ");
     };
     const columns = Math.max(1, Math.min(values.length, 10));
@@ -9947,6 +9948,7 @@ function renderSequenceTraceView(step) {
       if (index === options.mid) labels.push("M");
       if (index === options.pairEnd) labels.push("M+1");
       if (options.pointerIndex === index) labels.push("i");
+      if (options.mismatch && options.mismatch.has(index)) labels.push("X");
       return `<div class="${classesFor(index)}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(labels.join(" / ") || " ")}</em></div>`;
     }).join("")}</div>`;
   };
@@ -9971,6 +9973,72 @@ function renderSequenceTraceView(step) {
         <section class="seqtrace-row target"><header><strong>t · scanned left to right</strong><span>j = ${scanIndex >= 0 ? scanIndex : "—"}</span>${cells(t, { active: scanIndex, matched })}</section>
         <section class="seqtrace-rule"><small>${vi ? "BẤT BIẾN" : "INVARIANT"}</small><strong>matched positions in t spell s[0..i-1]</strong><span>${escapeHtml(message)}</span></section>
         <footer><span><small>${vi ? "ký tự cần tìm" : "next needed"}</small><strong>${escapeHtml(String(waiting))}</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${result}</strong></span></footer>
+      </section>`;
+    return;
+  }
+
+  if (kind === "palindrome-delete") {
+    const chars = Array.isArray(view.chars) ? view.chars : [];
+    const left = Number.isInteger(view.left) ? view.left : -1;
+    const right = Number.isInteger(view.right) ? view.right : -1;
+    const mismatch = Number.isInteger(view.mismatch) && view.mismatch >= 0
+      ? new Set([view.mismatch, right])
+      : new Set();
+    const answer = view.answer == null ? "—" : view.answer ? "TRUE" : "FALSE";
+    const hasChoice = typeof view.skipLeft === "boolean" || typeof view.skipRight === "boolean";
+    const choiceText = hasChoice
+      ? (vi
+        ? `Bỏ s[L] = '${chars[left]}' → ${view.skipLeft ? "palindrome" : "không"}; bỏ s[R] = '${chars[right]}' → ${view.skipRight ? "palindrome" : "không"}.`
+        : `Skip s[L] = '${chars[left]}' → ${view.skipLeft ? "palindrome" : "no"}; skip s[R] = '${chars[right]}' → ${view.skipRight ? "palindrome" : "no"}.`)
+      : (vi ? "Hai đầu khớp thì tiếp tục thu hẹp vào giữa." : "When both ends match, keep shrinking toward the middle.");
+    const phaseText = {
+      setup: vi ? "Khởi tạo hai đầu" : "Initialize endpoints",
+      loop: vi ? "Kiểm tra cặp đối xứng" : "Check mirrored pair",
+      match: vi ? "Cặp ký tự khớp" : "Matching pair",
+      advance: vi ? "Di chuyển vào trong" : "Move inward",
+      mismatch: vi ? "Gặp mismatch" : "Mismatch found",
+      decision: vi ? "Thử bỏ một ký tự" : "Try one deletion",
+      done: vi ? "Đã là palindrome" : "Already a palindrome",
+    }[view.phase] || String(view.phase || "two pointers");
+    $("treeView").innerHTML = `
+      <section class="seqtrace-viz" role="img" aria-label="Valid Palindrome II visualization">
+        <header><strong>VALID PALINDROME II · TWO POINTERS</strong><span>${escapeHtml(phaseText)}</span></header>
+        <section class="seqtrace-row target"><header><strong>s · mirrored comparison</strong><span>L = ${left >= 0 ? left : "—"} · R = ${right >= 0 ? right : "—"}</span>${cells(chars, { left, right, mismatch })}</section>
+        <section class="seqtrace-rule"><small>${vi ? "QUY TẮC" : "RULE"}</small><strong>first mismatch → skip left OR skip right</strong><span>${escapeHtml(choiceText)}</span></section>
+        <footer><span><small>${vi ? "quyết định" : "decision"}</small><strong>${escapeHtml(hasChoice ? choiceText : (vi ? "Chưa cần xóa ký tự." : "No deletion needed yet."))}</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${answer}</strong></span></footer>
+      </section>`;
+    return;
+  }
+
+  if (kind === "binary-target") {
+    const nums = Array.isArray(view.nums) ? view.nums : [];
+    const left = Number.isInteger(view.left) ? view.left : -1;
+    const right = Number.isInteger(view.right) ? view.right : -1;
+    const mid = Number.isInteger(view.mid) ? view.mid : -1;
+    const target = view.target;
+    const answer = view.answer == null ? "—" : String(view.answer);
+    const comparison = {
+      equal: vi ? "nums[M] bằng target: tìm thấy." : "nums[M] equals target: found.",
+      "too-small": vi ? "nums[M] nhỏ hơn target: bỏ nửa trái." : "nums[M] is smaller than target: discard the left half.",
+      "too-large": vi ? "nums[M] lớn hơn target: bỏ nửa phải." : "nums[M] is larger than target: discard the right half.",
+    }[view.comparison] || (vi ? "So sánh target với phần tử giữa để chọn nửa còn lại." : "Compare target with the middle value to choose the remaining half.");
+    const phaseText = {
+      setup: vi ? "Khởi tạo vùng" : "Initialize range",
+      loop: vi ? "Vùng còn ứng viên" : "Candidates remain",
+      mid: vi ? "Tính phần tử giữa" : "Compute midpoint",
+      compare: vi ? "So sánh với target" : "Compare target",
+      "move-right": vi ? "Giữ nửa phải" : "Keep right half",
+      "move-left": vi ? "Giữ nửa trái" : "Keep left half",
+      found: vi ? "Đã tìm thấy" : "Found",
+      done: vi ? "Hoàn tất" : "Complete",
+      "not-found": vi ? "Không tìm thấy" : "Not found",
+    }[view.phase] || "binary search";
+    $("treeView").innerHTML = `
+      <section class="seqtrace-viz" role="img" aria-label="Binary Search visualization">
+        <header><strong>BINARY SEARCH · TARGET ${escapeHtml(String(target))}</strong><span>${escapeHtml(phaseText)}</span></header>
+        <section class="seqtrace-row binary"><header><strong>SORTED NUMS</strong><span>[L..R] = [${left}..${right}]</span>${cells(nums, { left, right, mid })}</section>
+        <section class="seqtrace-rule"><small>${vi ? "SO SÁNH" : "COMPARISON"}</small><strong>${escapeHtml(comparison)}</strong><span>${mid >= 0 ? `nums[${mid}] = ${nums[mid]} · target = ${target}` : (vi ? "Chưa chọn mid." : "No midpoint selected yet.")}</span></section>
+        <footer><span><small>${vi ? "vùng còn lại" : "remaining range"}</small><strong>[${left}..${right}]</strong></span><span class="answer"><small>${vi ? "chỉ số" : "index"}</small><strong>${answer}</strong></span></footer>
       </section>`;
     return;
   }
@@ -10001,6 +10069,39 @@ function renderSequenceTraceView(step) {
       <section class="seqtrace-row binary"><header><strong>SORTED PAIRS</strong><span>[L..R] = [${left}..${right}]</span>${cells(nums, { left, right, mid, pairEnd })}</section>
       <section class="seqtrace-rule"><small>${vi ? "CẶP ĐANG KIỂM TRA" : "PAIR UNDER TEST"}</small><strong>${escapeHtml(pairText)}</strong><span>${vi ? "Cặp nguyên ở chỉ số chẵn nghĩa là phần tử đơn nằm về bên phải; cặp lệch nghĩa là nó nằm ở bên trái hoặc tại mid." : "An intact pair at an even index puts the single value to the right; a broken pair puts it at or to the left of mid."}</span></section>
       <footer><span><small>${vi ? "vùng còn lại" : "remaining range"}</small><strong>[${left}..${right}]</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${answer}</strong></span></footer>
+    </section>`;
+}
+
+function renderTaskSchedulerView(step) {
+  const view = step.taskSchedulerView || {};
+  const vi = lang === "vi";
+  const counts = Object.entries(view.counts || {}).sort(([a], [b]) => a.localeCompare(b));
+  const answer = view.answer == null ? "—" : String(view.answer);
+  const maxFreq = view.maxFreq == null ? "—" : view.maxFreq;
+  const maxCount = view.maxCount == null ? "—" : view.maxCount;
+  const frame = view.frame == null ? "—" : view.frame;
+  const taskCount = Array.isArray(view.tasks) ? view.tasks.length : 0;
+  const slots = view.frame == null
+    ? ""
+    : Array.from({ length: Math.min(Number(view.frame), 24) }, (_, index) => `<div class="seqtrace-cell${index >= taskCount ? " outside" : ""}"><small>slot ${index + 1}</small><strong>${index < taskCount ? "task" : "idle"}</strong><em>${index < taskCount ? "filled" : "cooldown"}</em></div>`).join("");
+  const phaseText = {
+    count: vi ? "Đếm task" : "Count tasks",
+    frequency: vi ? "Bảng tần suất" : "Frequency table",
+    "max-frequency": vi ? "Tần suất lớn nhất" : "Maximum frequency",
+    "tie-count": vi ? "Đếm task đồng hạng" : "Count tied tasks",
+    frame: vi ? "Khung cooldown" : "Cooldown frame",
+    done: vi ? "Thời gian tối thiểu" : "Minimum time",
+  }[view.phase] || String(view.phase || "setup");
+  const freqCells = counts.length
+    ? counts.map(([task, count]) => `<div class="seqtrace-cell${count === view.maxFreq ? " matched" : ""}"><small>task</small><strong>${escapeHtml(task)}</strong><em>freq = ${count}</em></div>`).join("")
+    : `<div class="seqtrace-cell"><small>freq</small><strong>—</strong><em>counting</em></div>`;
+  $("treeView").innerHTML = `
+    <section class="seqtrace-viz" role="img" aria-label="Task Scheduler frequency visualization">
+      <header><strong>TASK SCHEDULER · FREQUENCY FRAME</strong><span>${escapeHtml(phaseText)}</span></header>
+      <section class="seqtrace-row target"><header><strong>FREQUENCY TABLE</strong><span>n = ${view.n ?? 0}</span><div class="seqtrace-cells" style="--seqtrace-cols:${Math.max(1, Math.min(counts.length, 8))}">${freqCells}</div></section>
+      <section class="seqtrace-row binary"><header><strong>MINIMUM COOLDOWN FRAME</strong><span>(max_freq - 1) × (n + 1) + max_count</span><div class="seqtrace-cells" style="--seqtrace-cols:${Math.max(1, Math.min(Number(view.frame) || 1, 10))}">${slots || `<div class="seqtrace-cell"><small>frame</small><strong>—</strong><em>waiting</em></div>`}</div></section>
+      <section class="seqtrace-rule"><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><strong>max(total tasks, frame)</strong><span>max_freq = ${maxFreq} · max_count = ${maxCount} · frame = ${frame}</span></section>
+      <footer><span><small>${vi ? "số task" : "task count"}</small><strong>${taskCount}</strong></span><span class="answer"><small>${vi ? "thời gian" : "time"}</small><strong>${answer}</strong></span></footer>
     </section>`;
 }
 
@@ -22320,6 +22421,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSequenceTraceView(step);
+  } else if (step.taskSchedulerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTaskSchedulerView(step);
   } else if (step.reverse344View || step.smallHashView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

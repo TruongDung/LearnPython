@@ -13760,6 +13760,47 @@ function buildSteps402(input, params = {}) {
 }
 
 Object.assign(module.exports, {
+  622: {
+    id: 622, difficulty: "medium", slug: "design-circular-queue",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    tags: [{ key: "design", vi: "Thiết kế", en: "Design" }, { key: "circular-buffer", vi: "Mảng vòng", en: "Circular Buffer" }],
+    title: { vi: "Design Circular Queue", en: "Design Circular Queue" },
+    titleVi: { vi: "Thiết kế hàng đợi vòng", en: "Design a circular queue" },
+    statement: { vi: "Thiết kế queue cố định kích thước k với các thao tác enQueue, deQueue, Front, Rear, isEmpty và isFull. Nhập chuỗi các thao tác.", en: "Design a fixed-size queue of capacity k with enQueue, deQueue, Front, Rear, isEmpty, and isFull. Enter an operation stream." },
+    defaultInput: "MyCircularQueue(3), enQueue(1), enQueue(2), enQueue(3), enQueue(4), Rear(), isFull(), deQueue(), enQueue(4), Rear()",
+    inputKind: "string", inputLabel: { vi: "operations", en: "operations" }, extraParams: [],
+    approach: [
+      { vi: "Lưu buffer cố định, chỉ số front và size; rear được suy ra từ chúng.", en: "Store a fixed buffer, front, and size; rear is derived from those values." },
+      { vi: "enQueue ghi tại (front + size) % k, nên tự quay về đầu mảng khi cần.", en: "enQueue writes at (front + size) % k, wrapping to the array start when necessary." },
+      { vi: "deQueue xóa front rồi tăng front theo modulo k.", en: "deQueue clears front, then advances front modulo k." },
+    ],
+    complexity: { time: "O(1)", space: "O(k)", note: { vi: "Mỗi operation chỉ đọc hoặc cập nhật vài ô và chỉ số.", en: "Each operation reads or updates only a few slots and indices." } },
+    code: [
+      "class MyCircularQueue:",
+      "    def __init__(self, k):",
+      "        self.data = [None] * k",
+      "        self.k = k",
+      "        self.front = 0",
+      "        self.size = 0",
+      "    def enQueue(self, value):",
+      "        if self.isFull(): return False",
+      "        idx = (self.front + self.size) % self.k",
+      "        self.data[idx] = value; self.size += 1; return True",
+      "    def deQueue(self):",
+      "        if self.isEmpty(): return False",
+      "        self.data[self.front] = None",
+      "        self.front = (self.front + 1) % self.k; self.size -= 1; return True",
+      "    def Front(self):",
+      "        return -1 if self.isEmpty() else self.data[self.front]",
+      "    def Rear(self):",
+      "        return -1 if self.isEmpty() else self.data[(self.front + self.size - 1) % self.k]",
+      "    def isEmpty(self):",
+      "        return self.size == 0",
+      "    def isFull(self):",
+      "        return self.size == self.k",
+    ],
+    builder: buildSteps622,
+  },
   392: {
     id: 392, difficulty: "easy", slug: "is-subsequence",
     category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
@@ -13860,3 +13901,129 @@ Object.assign(module.exports, {
     builder2: buildSteps772SingleStack,
   },
 });
+
+function buildSteps622(input) {
+  const parsed = parseDequeOps641(input);
+  const constructor = parsed[0] && parsed[0].name === "MyCircularQueue" ? parsed[0] : { args: [3] };
+  const k = Number.isInteger(constructor.args[0]) && constructor.args[0] > 0 && constructor.args[0] <= 8 ? constructor.args[0] : 3;
+  const operations = parsed[0] && parsed[0].name === "MyCircularQueue" ? parsed.slice(1) : parsed;
+  const buffer = new Array(k).fill(null);
+  const outputs = [null];
+  const steps = [];
+  let front = 0;
+  let size = 0;
+  let answer = null;
+
+  const rearIndex = () => (size === 0 ? -1 : (front + size - 1) % k);
+  const queueValues = () => Array.from({ length: size }, (_, index) => buffer[(front + index) % k]);
+  const push = (title, line, note, extra = {}) => steps.push({
+    title,
+    circularDequeView: { buffer: [...buffer], front, rear: rearIndex(), size, capacity: k, active: extra.active ?? -1 },
+    highlight: Number.isInteger(extra.active) ? [extra.active] : [],
+    mark: size ? [front, rearIndex()].filter((index, pos, values) => values.indexOf(index) === pos) : [],
+    codeLines: [line],
+    vars: [
+      { name: "queue", value: `[${queueValues().join(", ")}]` },
+      { name: "front", value: front }, { name: "rear", value: rearIndex() },
+      { name: "size", value: size }, { name: "capacity", value: k },
+      { name: "outputs", value: `[${outputs.map((value) => value === null ? "None" : value).join(", ")}]` },
+      ...(extra.vars || []),
+    ],
+    note,
+    final: Boolean(extra.final),
+  });
+
+  push(
+    { vi: `self.data = [None] * ${k}`, en: `self.data = [None] * ${k}` }, 3,
+    { vi: `Tạo ${k} ô cố định; queue rỗng nên front = 0 và size = 0.`, en: `Create ${k} fixed slots; the queue is empty, so front = 0 and size = 0.` },
+  );
+  push({ vi: `self.k = ${k}`, en: `self.k = ${k}` }, 4, { vi: "Lưu capacity để kiểm tra đầy và tính modulo.", en: "Store the capacity for full checks and modulo arithmetic." });
+  push({ vi: "self.front = 0", en: "self.front = 0" }, 5, { vi: "front luôn chỉ ô sẽ được lấy ra đầu tiên.", en: "front always identifies the next value to remove." });
+  push({ vi: "self.size = 0", en: "self.size = 0" }, 6, { vi: "size cho biết queue đang rỗng hay đầy.", en: "size tells whether the queue is empty or full." });
+
+  for (const op of operations) {
+    const value = op.args[0];
+    if (op.name === "enQueue") {
+      const full = size === k;
+      push(
+        { vi: `enQueue(${value}): isFull() → ${full}`, en: `enQueue(${value}): isFull() → ${full}` }, 8,
+        full ? { vi: "Queue đầy nên không thể ghi thêm.", en: "The queue is full, so no value can be written." } : { vi: "Queue còn chỗ, tính ô sau phần tử rear.", en: "The queue has room, so compute the slot after rear." },
+        { vars: [{ name: "value", value }, { name: "isFull()", value: full }] },
+      );
+      if (full) {
+        answer = false;
+        outputs.push(false);
+        continue;
+      }
+      const idx = (front + size) % k;
+      push(
+        { vi: `idx = (${front} + ${size}) % ${k} = ${idx}`, en: `idx = (${front} + ${size}) % ${k} = ${idx}` }, 9,
+        { vi: "Modulo giúp vị trí ghi quay về đầu buffer khi tới cuối.", en: "Modulo lets the write position wrap to the buffer start after its end." },
+        { active: idx, vars: [{ name: "value", value }, { name: "idx", value: idx }] },
+      );
+      buffer[idx] = value;
+      size += 1;
+      answer = true;
+      outputs.push(true);
+      push(
+        { vi: `data[${idx}] = ${value}; size = ${size}; return True`, en: `data[${idx}] = ${value}; size = ${size}; return True` }, 10,
+        { vi: `Ghi ${value} vào buffer, tăng size rồi báo thành công.`, en: `Write ${value} into the buffer, increment size, and report success.` },
+        { active: idx, vars: [{ name: "value", value }] },
+      );
+    } else if (op.name === "deQueue") {
+      const empty = size === 0;
+      push(
+        { vi: `deQueue(): isEmpty() → ${empty}`, en: `deQueue(): isEmpty() → ${empty}` }, 12,
+        empty ? { vi: "Queue rỗng nên không thể xóa.", en: "The queue is empty, so nothing can be removed." } : { vi: "Queue có phần tử tại front để xóa.", en: "The queue has a value at front to remove." },
+        { vars: [{ name: "isEmpty()", value: empty }] },
+      );
+      if (empty) {
+        answer = false;
+        outputs.push(false);
+        continue;
+      }
+      const removedIndex = front;
+      const removed = buffer[removedIndex];
+      buffer[removedIndex] = null;
+      push(
+        { vi: `data[front] = None (xóa ${removed})`, en: `data[front] = None (remove ${removed})` }, 13,
+        { vi: `Xóa giá trị ${removed} ở đầu queue.`, en: `Clear value ${removed} from the queue front.` },
+        { active: removedIndex, vars: [{ name: "removed", value: removed }] },
+      );
+      front = (front + 1) % k;
+      size -= 1;
+      if (size === 0) front = 0;
+      answer = true;
+      outputs.push(true);
+      push(
+        { vi: `front = ${front}; size = ${size}; return True`, en: `front = ${front}; size = ${size}; return True` }, 14,
+        { vi: "Đưa front sang ô kế tiếp theo vòng tròn rồi giảm size.", en: "Advance front circularly to the next slot, then decrement size." },
+        { active: size ? front : -1 },
+      );
+    } else if (op.name === "Front") {
+      answer = size === 0 ? -1 : buffer[front];
+      outputs.push(answer);
+      push({ vi: `Front() → ${answer}`, en: `Front() → ${answer}` }, 16, { vi: size ? `front = ${front}, nên trả data[${front}] = ${answer}.` : "Queue rỗng nên trả -1.", en: size ? `front = ${front}, so return data[${front}] = ${answer}.` : "The queue is empty, so return -1." }, { active: size ? front : -1 });
+    } else if (op.name === "Rear") {
+      const rear = rearIndex();
+      answer = rear < 0 ? -1 : buffer[rear];
+      outputs.push(answer);
+      push({ vi: `Rear() → ${answer}`, en: `Rear() → ${answer}` }, 18, { vi: rear >= 0 ? `rear = ${rear}, nên trả data[${rear}] = ${answer}.` : "Queue rỗng nên trả -1.", en: rear >= 0 ? `rear = ${rear}, so return data[${rear}] = ${answer}.` : "The queue is empty, so return -1." }, { active: rear });
+    } else if (op.name === "isEmpty") {
+      answer = size === 0;
+      outputs.push(answer);
+      push({ vi: `isEmpty() → ${answer}`, en: `isEmpty() → ${answer}` }, 20, { vi: `size == 0 là ${answer}.`, en: `size == 0 is ${answer}.` });
+    } else if (op.name === "isFull") {
+      answer = size === k;
+      outputs.push(answer);
+      push({ vi: `isFull() → ${answer}`, en: `isFull() → ${answer}` }, 22, { vi: `size == k là ${answer}.`, en: `size == k is ${answer}.` });
+    }
+  }
+
+  push(
+    { vi: "Hoàn tất các thao tác", en: "Operation stream complete" }, 22,
+    { vi: `Queue cuối = [${queueValues().join(", ")}].`, en: `Final queue = [${queueValues().join(", ")}].` },
+    { final: true, vars: [{ name: "answer", value: answer === null ? "None" : answer }] },
+  );
+  return { operations: parsed, outputs, answer, steps };
+}

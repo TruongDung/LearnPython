@@ -4593,3 +4593,86 @@ module.exports = {
     builder: buildSteps475,
   },
 };
+
+function buildSteps680(input) {
+  const s = String(input ?? "");
+  if (s.length < 1 || s.length > 18 || /[^a-z]/i.test(s)) {
+    throw new Error("Use a non-empty alphabetic string up to 18 characters.");
+  }
+  const chars = [...s];
+  const steps = [];
+  const isPalindrome = (left, right) => {
+    while (left < right) {
+      if (chars[left] !== chars[right]) return false;
+      left += 1;
+      right -= 1;
+    }
+    return true;
+  };
+  const snapshot = (title, line, note, extra = {}) => steps.push({
+    title, arr: [...chars], highlight: [extra.left, extra.right].filter(Number.isInteger), mark: [], codeLines: [line],
+    vars: [{ name: "left", value: extra.left ?? "-" }, { name: "right", value: extra.right ?? "-" }, { name: "answer", value: extra.answer ?? "-" }],
+    note, final: Boolean(extra.final),
+    sequenceTraceView: {
+      kind: "palindrome-delete", chars: [...chars], left: extra.left ?? -1, right: extra.right ?? -1,
+      mismatch: extra.mismatch ?? -1, skipLeft: extra.skipLeft ?? null, skipRight: extra.skipRight ?? null,
+      phase: extra.phase || "setup", answer: extra.answer ?? null,
+    },
+  });
+
+  let left = 0;
+  let right = chars.length - 1;
+  snapshot({ vi: "Khởi tạo hai đầu", en: "Initialize both ends" }, 8, { vi: "left và right sẽ đi vào giữa để đối xứng từng cặp ký tự.", en: "left and right move toward the middle to compare mirrored characters." }, { left, right, phase: "setup" });
+  while (left < right) {
+    snapshot({ vi: `left < right: ${left} < ${right}`, en: `left < right: ${left} < ${right}` }, 9, { vi: "Vẫn còn một cặp đối xứng cần kiểm tra.", en: "A mirrored pair still needs checking." }, { left, right, phase: "loop" });
+    const equal = chars[left] === chars[right];
+    snapshot({ vi: `'${chars[left]}' == '${chars[right]}' → ${equal}`, en: `'${chars[left]}' == '${chars[right]}' → ${equal}` }, 10, equal ? { vi: "Hai đầu bằng nhau, có thể giữ cả hai.", en: "The ends match, so both can remain." } : { vi: "Đây là mismatch duy nhất ta có thể sửa bằng cách bỏ một ký tự.", en: "This is the one mismatch we may repair by deleting one character." }, { left, right, mismatch: equal ? -1 : left, phase: equal ? "match" : "mismatch" });
+    if (!equal) {
+      const skipLeft = isPalindrome(left + 1, right);
+      const skipRight = isPalindrome(left, right - 1);
+      const answer = skipLeft || skipRight;
+      snapshot({ vi: `Bỏ '${chars[left]}' → ${skipLeft}; bỏ '${chars[right]}' → ${skipRight}`, en: `Skip '${chars[left]}' → ${skipLeft}; skip '${chars[right]}' → ${skipRight}` }, 11, answer ? { vi: "Chỉ cần một trong hai đoạn còn lại là palindrome thì đáp án True.", en: "If either remaining substring is a palindrome, the answer is True." } : { vi: "Cả hai lựa chọn đều thất bại, nên không thể sửa chỉ bằng một lần xóa.", en: "Both deletion choices fail, so one deletion cannot repair the string." }, { left, right, mismatch: left, skipLeft, skipRight, answer, phase: "decision", final: true });
+      return { original: s, answer, steps };
+    }
+    left += 1;
+    right -= 1;
+    snapshot({ vi: `left = ${left}; right = ${right}`, en: `left = ${left}; right = ${right}` }, 12, { vi: "Cặp vừa khớp, thu hẹp vào trong.", en: "The pair matched, so shrink inward." }, { left, right, phase: "advance" });
+  }
+  snapshot({ vi: "return True", en: "return True" }, 13, { vi: "Mọi cặp ký tự đều khớp, không cần xóa ký tự nào.", en: "Every mirrored pair matches, so no deletion is needed." }, { left, right, answer: true, phase: "done", final: true });
+  return { original: s, answer: true, steps };
+}
+
+Object.assign(module.exports, {
+  680: {
+    id: 680, difficulty: "easy", slug: "valid-palindrome-ii",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Valid Palindrome II", en: "Valid Palindrome II" },
+    titleVi: { vi: "Palindrome sau khi bỏ tối đa một ký tự", en: "Palindrome after at most one deletion" },
+    statement: { vi: "Kiểm tra chuỗi có thể thành palindrome sau khi xóa nhiều nhất một ký tự hay không.", en: "Check whether a string can become a palindrome after deleting at most one character." },
+    defaultInput: "abca", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [
+      { vi: "Dùng left/right so sánh hai đầu vào giữa.", en: "Use left/right pointers to compare mirrored characters." },
+      { vi: "Ở mismatch đầu tiên, thử bỏ ký tự tại left hoặc tại right.", en: "At the first mismatch, try skipping the left character or the right character." },
+      { vi: "Nếu một trong hai đoạn còn lại là palindrome thì trả True.", en: "Return True if either remaining range is a palindrome." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ có tối đa hai lượt kiểm tra đoạn sau mismatch đầu tiên.", en: "At most two range checks occur after the first mismatch." } },
+    code: [
+      "class Solution:",
+      "    def validPalindrome(self, s):",
+      "        def is_palindrome(left, right):",
+      "            while left < right:",
+      "                if s[left] != s[right]: return False",
+      "                left += 1; right -= 1",
+      "            return True",
+      "        left, right = 0, len(s) - 1",
+      "        while left < right:",
+      "            if s[left] != s[right]:",
+      "                return is_palindrome(left + 1, right) or is_palindrome(left, right - 1)",
+      "            left += 1; right -= 1",
+      "        return True",
+    ],
+    liveArgs: (input) => [String(input ?? "")],
+    builder: buildSteps680,
+  },
+});
