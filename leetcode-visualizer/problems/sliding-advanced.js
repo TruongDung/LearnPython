@@ -12,7 +12,7 @@ function makeStep(nums, opts) {
     highlight: opts.highlight || [],
     mark: opts.mark || [],
     final: Boolean(opts.final),
-    codeLines: [opts.line],
+    codeLines: opts.codeLines || (Array.isArray(opts.line) ? opts.line : [opts.line]),
     vars: opts.vars || [],
     note: opts.note,
     ...(opts.slidingFreqView ? { slidingFreqView: opts.slidingFreqView } : {}),
@@ -31,32 +31,137 @@ function buildSteps992(input, params) {
   const steps = [];
   const freqK = new Map(); const freqKm1 = new Map();
   let leftK = 0; let leftKm1 = 0; let ans = 0;
-  const snap = (title, line, right = -1, note, extra = {}) => steps.push(makeStep(nums, {
-    title, line, highlight: range(leftK, right), mark: range(leftKm1, right), note,
-    vars: [{ name: "k", value: k }, { name: "leftK", value: leftK }, { name: "leftK-1", value: leftKm1 }, { name: "freqK", value: mapText(freqK) }, { name: "freqK-1", value: mapText(freqKm1) }, { name: "ans", value: ans }, ...(extra.vars || [])],
-    final: extra.final,
-  }));
-  snap({ vi: "Khởi tạo hai frequency maps", en: "Initialize two frequency maps" }, 3, -1, { vi: "Ta tính exactly K = atMost(K) − atMost(K−1) trong cùng một lượt quét.", en: "Compute exactly K as atMost(K) − atMost(K−1) in one pass." });
-  snap({ vi: "leftK = leftK-1 = ans = 0", en: "leftK = leftK-1 = ans = 0" }, 4, -1, { vi: "Hai biên trái quản lý hai cửa sổ khác nhau.", en: "Two left boundaries manage two different windows." });
+  const distinctK = () => freqK.size;
+  const distinctKm1 = () => freqKm1.size;
+  const inc = (freq, value) => freq.set(value, (freq.get(value) || 0) + 1);
+  const dec = (freq, value) => {
+    freq.set(value, freq.get(value) - 1);
+    if (freq.get(value) === 0) freq.delete(value);
+  };
+  const exactStarts = () => range(leftK, leftKm1 - 1);
+  const exactSubarrays = (right) => exactStarts().map((start) => `[${start}..${right}]`);
+  const snap = (title, codeLines, right = -1, note, extra = {}) => {
+    const activeRight = right >= 0 ? right : -1;
+    steps.push(makeStep(nums, {
+      title,
+      codeLines,
+      highlight: activeRight >= leftK ? range(leftK, activeRight) : [],
+      mark: activeRight >= 0 ? exactStarts() : [],
+      note,
+      vars: [
+        { name: "k", value: k },
+        { name: "right", value: activeRight >= 0 ? activeRight : "-" },
+        { name: "left_k", value: leftK },
+        { name: "left_km1", value: leftKm1 },
+        { name: "freq_k", value: mapText(freqK) },
+        { name: "freq_km1", value: mapText(freqKm1) },
+        { name: "distinct_k", value: distinctK() },
+        { name: "distinct_km1", value: distinctKm1() },
+        { name: "exact starts", value: activeRight >= 0 ? `[${exactStarts().join(", ")}]` : "[]" },
+        { name: "ans", value: ans },
+        ...(extra.vars || []),
+      ],
+      final: extra.final,
+    }));
+  };
+  snap(
+    { vi: "Ý tưởng: exactly K = atMost(K) - atMost(K-1)", en: "Idea: exactly K = atMost(K) - atMost(K-1)" },
+    [8, 9],
+    -1,
+    {
+      vi: "Ta chạy hai cửa sổ cùng lúc. Cửa sổ trái `left_k` giữ tối đa K distinct, cửa sổ `left_km1` giữ tối đa K-1 distinct.",
+      en: "Run two windows together. The `left_k` window keeps at most K distinct values; the `left_km1` window keeps at most K-1 distinct values.",
+    },
+  );
+  snap(
+    { vi: "Khởi tạo left_k = left_km1 = ans = 0", en: "Initialize left_k = left_km1 = ans = 0" },
+    [8, 9],
+    -1,
+    {
+      vi: "Khoảng start hợp lệ cho đúng K ở mỗi right sẽ là [left_k .. left_km1 - 1].",
+      en: "For each right, valid starts for exactly K are [left_k .. left_km1 - 1].",
+    },
+  );
   for (let right = 0; right < nums.length; right++) {
     const value = nums[right];
-    snap({ vi: `Xét nums[${right}] = ${value}`, en: `Inspect nums[${right}] = ${value}` }, 5, right, { vi: "Mở rộng cả hai cửa sổ.", en: "Expand both windows." });
-    freqK.set(value, (freqK.get(value) || 0) + 1); freqKm1.set(value, (freqKm1.get(value) || 0) + 1);
-    snap({ vi: `Thêm ${value} vào freqK và freqK-1`, en: `Add ${value} to freqK and freqK-1` }, 6, right, { vi: "Cập nhật đếm của hai cửa sổ atMost.", en: "Update counts for both atMost windows." });
+    snap(
+      { vi: `right=${right}, num=${value}`, en: `right=${right}, num=${value}` },
+      [10],
+      right,
+      { vi: "Mở rộng cả hai cửa sổ bằng phần tử mới.", en: "Expand both windows with the new value." },
+      { vars: [{ name: "num", value }] },
+    );
+    inc(freqK, value); inc(freqKm1, value);
+    snap(
+      { vi: `add ${value} vào cả hai freq`, en: `add ${value} to both freq maps` },
+      [11],
+      right,
+      {
+        vi: "`freq_k` dùng cho atMost(K), `freq_km1` dùng cho atMost(K-1).",
+        en: "`freq_k` serves atMost(K); `freq_km1` serves atMost(K-1).",
+      },
+      { vars: [{ name: "num", value }] },
+    );
     while (freqK.size > k) {
-      snap({ vi: `len(freqK)=${freqK.size} > ${k} → thu hẹp`, en: `len(freqK)=${freqK.size} > ${k} → shrink` }, 7, right, { vi: "Cửa sổ K có quá nhiều giá trị distinct.", en: "The K window has too many distinct values." });
-      const removed = nums[leftK]; freqK.set(removed, freqK.get(removed) - 1); if (freqK.get(removed) === 0) freqK.delete(removed); leftK++;
-      snap({ vi: `Bỏ ${removed}, leftK → ${leftK}`, en: `Remove ${removed}, leftK → ${leftK}` }, 8, right, { vi: "Đưa cửa sổ về tối đa K distinct.", en: "Restore at most K distinct values." });
+      snap(
+        { vi: `freq_k có ${freqK.size} distinct > ${k}`, en: `freq_k has ${freqK.size} distinct > ${k}` },
+        [12],
+        right,
+        { vi: "Cửa sổ atMost(K) đang quá rộng, phải đẩy `left_k` sang phải.", en: "The atMost(K) window is too wide, so move `left_k` right." },
+        { vars: [{ name: "remove", value: nums[leftK] }] },
+      );
+      const removed = nums[leftK];
+      dec(freqK, removed);
+      leftK++;
+      snap(
+        { vi: `remove nums[left_k]=${removed}; left_k=${leftK}`, en: `remove nums[left_k]=${removed}; left_k=${leftK}` },
+        [13, 14],
+        right,
+        { vi: "Sau khi remove, `freq_k` quay về tối đa K distinct.", en: "After removal, `freq_k` is back to at most K distinct values." },
+        { vars: [{ name: "removed", value: removed }] },
+      );
     }
     while (freqKm1.size > k - 1) {
-      snap({ vi: `len(freqK-1)=${freqKm1.size} > ${k - 1} → thu hẹp`, en: `len(freqK-1)=${freqKm1.size} > ${k - 1} → shrink` }, 9, right, { vi: "Cửa sổ K−1 cần giữ tối đa K−1 distinct.", en: "The K−1 window must keep at most K−1 distinct values." });
-      const removed = nums[leftKm1]; freqKm1.set(removed, freqKm1.get(removed) - 1); if (freqKm1.get(removed) === 0) freqKm1.delete(removed); leftKm1++;
-      snap({ vi: `Bỏ ${removed}, leftK-1 → ${leftKm1}`, en: `Remove ${removed}, leftK-1 → ${leftKm1}` }, 10, right, { vi: "Mọi start trong [leftK..leftK-1) tạo đúng K distinct.", en: "Every start in [leftK..leftK-1) creates exactly K distinct values." });
+      snap(
+        { vi: `freq_km1 có ${freqKm1.size} distinct > ${k - 1}`, en: `freq_km1 has ${freqKm1.size} distinct > ${k - 1}` },
+        [15],
+        right,
+        { vi: "Cửa sổ atMost(K-1) cũng cần thu hẹp cho đến khi chỉ còn tối đa K-1 distinct.", en: "The atMost(K-1) window must shrink until it has at most K-1 distinct values." },
+        { vars: [{ name: "remove", value: nums[leftKm1] }] },
+      );
+      const removed = nums[leftKm1];
+      dec(freqKm1, removed);
+      leftKm1++;
+      snap(
+        { vi: `remove nums[left_km1]=${removed}; left_km1=${leftKm1}`, en: `remove nums[left_km1]=${removed}; left_km1=${leftKm1}` },
+        [16, 17],
+        right,
+        {
+          vi: "Khi `left_km1` đi xa hơn, các start trước nó là những start tạo ít nhất K distinct; trừ với `left_k` sẽ ra đúng K.",
+          en: "As `left_km1` moves farther right, starts before it create at least K distinct; subtracting `left_k` leaves exactly K.",
+        },
+        { vars: [{ name: "removed", value: removed }] },
+      );
     }
     const added = leftKm1 - leftK; ans += added;
-    snap({ vi: `ans += leftK-1 - leftK = ${added} → ${ans}`, en: `ans += leftK-1 - leftK = ${added} → ${ans}` }, 11, right, { vi: "Cộng số subarray kết thúc tại right có đúng K giá trị distinct.", en: "Add the number of exactly-K subarrays ending at right." }, { vars: [{ name: "new exact-K subarrays", value: added }] });
+    snap(
+      { vi: `ans += ${leftKm1} - ${leftK} = ${added} -> ${ans}`, en: `ans += ${leftKm1} - ${leftK} = ${added} -> ${ans}` },
+      [18],
+      right,
+      {
+        vi: `Các start trong [${leftK}..${leftKm1 - 1}] tạo subarray kết thúc tại right=${right} có đúng K distinct.`,
+        en: `Starts in [${leftK}..${leftKm1 - 1}] form subarrays ending at right=${right} with exactly K distinct values.`,
+      },
+      { vars: [{ name: "new exact-K subarrays", value: added }, { name: "subarrays", value: exactSubarrays(right).join(" ") || "none" }] },
+    );
   }
-  snap({ vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, 12, nums.length - 1, { vi: "Tổng số subarray có đúng K giá trị distinct.", en: "Total number of subarrays with exactly K distinct values." }, { final: true });
+  snap(
+    { vi: `return ans -> ${ans}`, en: `return ans -> ${ans}` },
+    [19],
+    nums.length - 1,
+    { vi: "Tổng số subarray có đúng K giá trị distinct.", en: "Total number of subarrays with exactly K distinct values." },
+    { final: true },
+  );
   return { original: nums, k, answer: ans, steps };
 }
 
@@ -542,7 +647,11 @@ const stringTag = { key: "string", vi: "Chuỗi", en: "String" };
 const inclusionExclusionTag = { key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" };
 
 module.exports = {
-  992: { id: 992, difficulty: "hard", slug: "subarrays-with-k-different-integers", category, tags: [...arrayTag, inclusionExclusionTag], title: { vi: "Subarrays with K Different Integers", en: "Subarrays with K Different Integers" }, titleVi: { vi: "Subarray có đúng K giá trị khác nhau", en: "Subarrays with exactly K distinct integers" }, statement: { vi: "Đếm subarray có đúng k số nguyên phân biệt.", en: "Count subarrays containing exactly k distinct integers." }, defaultInput: [1, 2, 1, 2, 3], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số distinct chính xác)", en: "k (exact distinct count)" }, default: 2 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Duy trì hai cửa sổ atMost(K) và atMost(K−1).", en: "Maintain atMost(K) and atMost(K−1) windows." } }, code: ["class Solution:", "    def subarraysWithKDistinct(self, nums, k):", "        freq_k = {}; freq_km1 = {}", "        left_k = left_km1 = ans = 0", "        for right, num in enumerate(nums):", "            freq_k[num] += 1; freq_km1[num] += 1", "            while len(freq_k) > k:", "                remove_from(freq_k, left_k)", "            while len(freq_km1) > k - 1:", "                remove_from(freq_k, left_km1)", "            ans += left_km1 - left_k", "        return ans"], builder: buildSteps992 },
+  992: { id: 992, difficulty: "hard", slug: "subarrays-with-k-different-integers", category, tags: [...arrayTag, inclusionExclusionTag], title: { vi: "Subarrays with K Different Integers", en: "Subarrays with K Different Integers" }, titleVi: { vi: "Subarray có đúng K giá trị khác nhau", en: "Subarrays with exactly K distinct integers" }, statement: { vi: "Đếm subarray có đúng k số nguyên phân biệt.", en: "Count subarrays containing exactly k distinct integers." }, defaultInput: [1, 2, 1, 2, 3], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số distinct chính xác)", en: "k (exact distinct count)" }, default: 2 }], approach: [
+    { vi: "Exactly K = atMost(K) - atMost(K-1).", en: "Exactly K = atMost(K) - atMost(K-1)." },
+    { vi: "Chạy hai cửa sổ cùng lúc: `left_k` giữ tối đa K distinct, `left_km1` giữ tối đa K-1 distinct.", en: "Run two windows together: `left_k` keeps at most K distinct values, `left_km1` keeps at most K-1." },
+    { vi: "Với mỗi right, số subarray đúng K kết thúc tại right là `left_km1 - left_k`.", en: "For each right, the number of exactly-K subarrays ending there is `left_km1 - left_k`." },
+  ], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi phần tử được thêm/xóa khỏi mỗi cửa sổ tối đa một lần.", en: "Each element enters and leaves each window at most once." } }, code: ["class Solution:", "    def subarraysWithKDistinct(self, nums, k):", "        def add(freq, x):", "            freq[x] = freq.get(x, 0) + 1", "        def remove(freq, x):", "            freq[x] -= 1", "            if freq[x] == 0: del freq[x]", "        freq_k, freq_km1 = {}, {}", "        left_k = left_km1 = ans = 0", "        for right, num in enumerate(nums):", "            add(freq_k, num); add(freq_km1, num)", "            while len(freq_k) > k:", "                remove(freq_k, nums[left_k])", "                left_k += 1", "            while len(freq_km1) > k - 1:", "                remove(freq_km1, nums[left_km1])", "                left_km1 += 1", "            ans += left_km1 - left_k", "        return ans"], builder: buildSteps992 },
   1248: { id: 1248, difficulty: "medium", slug: "count-number-of-nice-subarrays", category, tags: arrayTag, title: { vi: "Count Number of Nice Subarrays", en: "Count Number of Nice Subarrays" }, titleVi: { vi: "Đếm subarray có đúng K số lẻ", en: "Count subarrays with exactly K odd numbers" }, statement: { vi: "Đếm subarray có đúng k số lẻ.", en: "Count subarrays containing exactly k odd numbers." }, defaultInput: [1, 1, 2, 1, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lẻ chính xác)", en: "k (exact odd count)" }, default: 3 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix đếm số lẻ và frequency map.", en: "Odd-count prefix sums with a frequency map." } }, code: ["class Solution:", "    def numberOfSubarrays(self, nums, k):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num % 2", "            need = prefix - k", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps1248 },
   930: { id: 930, difficulty: "medium", slug: "binary-subarrays-with-sum", category, tags: arrayTag, title: { vi: "Binary Subarrays With Sum", en: "Binary Subarrays With Sum" }, titleVi: { vi: "Đếm subarray nhị phân có tổng bằng Goal", en: "Binary subarrays with sum Goal" }, statement: { vi: "Đếm subarray trong mảng nhị phân có tổng đúng goal.", en: "Count binary subarrays whose sum equals goal." }, defaultInput: [1, 0, 1, 0, 1], inputKind: "binary", inputLabel: { vi: "nums (0 hoặc 1)", en: "nums (0 or 1)" }, extraParams: [{ key: "goal", label: { vi: "goal (tổng chính xác)", en: "goal (exact sum)" }, default: 2 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix sum và frequency map.", en: "Prefix sums and a frequency map." } }, code: ["class Solution:", "    def numSubarraysWithSum(self, nums, goal):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num", "            need = prefix - goal", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps930 },
   2799: { id: 2799, difficulty: "medium", slug: "count-complete-subarrays-in-an-array", category, tags: arrayTag, title: { vi: "Count Complete Subarrays in an Array", en: "Count Complete Subarrays in an Array" }, titleVi: { vi: "Đếm complete subarray", en: "Count complete subarrays" }, statement: { vi: "Đếm subarray chứa mọi giá trị distinct xuất hiện trong toàn mảng.", en: "Count subarrays containing every distinct value from the full array." }, defaultInput: [1, 3, 1, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cửa sổ trượt với frequency map.", en: "Sliding window with a frequency map." } }, code: ["class Solution:", "    def countCompleteSubarrays(self, nums):", "        target = len(set(nums))", "        freq = {}; left = ans = 0", "        for right, num in enumerate(nums):", "            freq[num] = freq.get(num, 0) + 1", "            while len(freq) == target:", "                ans += len(nums) - right", "                remove_from(freq, left); left += 1", "        return ans"], builder: buildSteps2799 },
