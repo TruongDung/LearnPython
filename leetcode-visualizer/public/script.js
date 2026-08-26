@@ -9831,6 +9831,179 @@ function renderExactK992View(step) {
     </div>`;
 }
 
+function renderSmallHashView(step) {
+  const reverse = step.reverse344View || null;
+  const view = step.smallHashView || null;
+  const vi = lang === "vi";
+  const cellRow = (values, options = {}) => {
+    const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : -1;
+    const pointerLabels = options.pointerLabels || {};
+    const marks = new Set(options.marks || []);
+    return `<div class="smallhash-cells">${values.map((value, index) => {
+      const labels = pointerLabels[index] || [];
+      const classes = ["smallhash-cell", index === activeIndex ? "active" : "", marks.has(index) ? "mark" : ""].filter(Boolean).join(" ");
+      return `<div class="${classes}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(labels.join(" / ") || " ")}</em></div>`;
+    }).join("")}</div>`;
+  };
+
+  if (reverse) {
+    const chars = Array.isArray(reverse.chars) ? reverse.chars : [];
+    const left = Number.isInteger(reverse.left) ? reverse.left : -1;
+    const right = Number.isInteger(reverse.right) ? reverse.right : -1;
+    const swapped = Array.isArray(reverse.swapped) ? reverse.swapped : [];
+    const pointers = {};
+    if (left >= 0 && left < chars.length) pointers[left] = ["L"];
+    if (right >= 0 && right < chars.length) pointers[right] = [...(pointers[right] || []), "R"];
+    const summary = reverse.phase === "done"
+      ? (vi ? "Hai con trỏ đã gặp nhau; mảng đã được đảo ngược tại chỗ." : "The pointers met; the array is reversed in place.")
+      : (vi ? "Đổi hai ký tự ở L và R, rồi đưa cả hai con trỏ vào trong." : "Swap the L and R characters, then move both pointers inward.");
+    $("treeView").innerHTML = `
+      <section class="smallhash-viz reverse" role="img" aria-label="Reverse String visualization">
+        <header><strong>REVERSE STRING · TWO POINTERS</strong><span>${escapeHtml(String(reverse.phase || "setup"))}</span></header>
+        <section class="smallhash-row"><header><strong>CHARACTER ARRAY</strong><span>L = ${left} · R = ${right}</span></header>${cellRow(chars, { pointerLabels: pointers, marks: swapped })}</section>
+        <div class="smallhash-rule"><small>${vi ? "QUY TẮC" : "RULE"}</small><strong>while left &lt; right</strong><span>${escapeHtml(summary)}</span></div>
+        <footer><span><small>${vi ? "mảng hiện tại" : "current array"}</small><strong>[${escapeHtml(chars.join(", "))}]</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${reverse.phase === "done" ? escapeHtml(chars.join("")) : "…"}</strong></span></footer>
+      </section>`;
+    return;
+  }
+
+  if (!view) return;
+  const isFirstUnique = view.kind === "first-unique";
+  const isMulti = view.kind === "multiset-intersection";
+  const source = isFirstUnique ? (Array.isArray(view.chars) ? view.chars : []) : (Array.isArray(view.nums1) ? view.nums1 : []);
+  const scan = isFirstUnique ? source : (Array.isArray(view.nums2) ? view.nums2 : []);
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const activeValue = view.activeValue;
+  const counts = Object.entries(view.counts || {}).sort(([left], [right]) => String(left).localeCompare(String(right), undefined, { numeric: true }));
+  const result = Array.isArray(view.result) ? view.result : [];
+  const setValues = Array.isArray(view.seen) ? view.seen : [];
+  const sourceName = isFirstUnique ? "s" : "nums1";
+  const scanName = isFirstUnique ? "s" : "nums2";
+  const cellsForScan = cellRow(scan, {
+    activeIndex,
+    marks: view.found || view.taken || view.unique ? [activeIndex] : [],
+  });
+  const mapContent = isFirstUnique || isMulti
+    ? (counts.length
+      ? `<div class="smallhash-map">${counts.map(([value, count]) => `<span class="${String(value) === String(activeValue) ? "active" : ""}"><small>${escapeHtml(String(value))}</small><strong>${escapeHtml(String(count))}</strong></span>`).join("")}</div>`
+      : `<div class="smallhash-empty">{}</div>`)
+    : (setValues.length
+      ? `<div class="smallhash-map">${setValues.map((value) => `<span class="${String(value) === String(activeValue) ? "active" : ""}"><small>value</small><strong>${escapeHtml(String(value))}</strong></span>`).join("")}</div>`
+      : `<div class="smallhash-empty">{}</div>`);
+  const headline = isFirstUnique
+    ? "FIRST UNIQUE CHARACTER"
+    : isMulti ? "INTERSECTION II · FREQUENCY MAP" : "UNIQUE INTERSECTION · SET";
+  const mapTitle = isFirstUnique ? "COUNTER(s)" : isMulti ? "COUNT REMAINING FROM nums1" : "SEEN = set(nums1)";
+  const resultTitle = isFirstUnique ? (vi ? "CHỈ SỐ ĐẦU TIÊN DUY NHẤT" : "FIRST UNIQUE INDEX") : "RESULT";
+  const actionText = isFirstUnique
+    ? (view.unique
+      ? (vi ? `'${activeValue}' có count = 1 nên đây là ký tự unique đầu tiên.` : `'${activeValue}' has count = 1, so it is the first unique character.`)
+      : (vi ? "Duyệt trái sang phải cho đến khi gặp count = 1." : "Scan left to right until a count of 1 is found."))
+    : isMulti
+      ? (view.taken
+        ? (vi ? `Giữ ${activeValue} rồi giảm count để không dùng quá số bản sao trong nums1.` : `Keep ${activeValue}, then decrement its count so no extra nums1 copy is used.`)
+        : (vi ? "Chỉ thêm khi count của giá trị hiện tại còn dương." : "Add only when the current value's count is still positive."))
+      : (view.found
+        ? (vi ? `${activeValue} xuất hiện ở cả hai mảng; result set tự loại duplicate.` : `${activeValue} appears in both arrays; the result set removes duplicates.`)
+        : (vi ? "Chỉ thêm giá trị nums2 nếu nó nằm trong seen." : "Add a nums2 value only when it belongs to seen."));
+  const answer = isFirstUnique ? (view.answer == null ? "—" : String(view.answer)) : `[${result.join(", ")}]`;
+
+  $("treeView").innerHTML = `
+    <section class="smallhash-viz" role="img" aria-label="${escapeHtml(headline)} visualization">
+      <header><strong>${headline}</strong><span>${escapeHtml(String(view.phase || "setup"))}</span></header>
+      <div class="smallhash-inputs">
+        <section class="smallhash-row"><header><strong>${sourceName}</strong><span>${source.length} values</span></header>${cellRow(source)}</section>
+        ${isFirstUnique ? "" : `<section class="smallhash-row scan"><header><strong>${scanName}</strong><span>${activeIndex >= 0 ? `active = ${activeIndex}` : "waiting"}</span>${cellsForScan}</section>`}
+      </div>
+      ${isFirstUnique ? `<section class="smallhash-row scan"><header><strong>${scanName} · left to right</strong><span>${activeIndex >= 0 ? `i = ${activeIndex}` : "waiting"}</span>${cellsForScan}</section>` : ""}
+      <div class="smallhash-lower">
+        <section class="smallhash-panel"><header><strong>${mapTitle}</strong><span>${isMulti ? "value → remaining" : isFirstUnique ? "char → total" : "membership"}</span>${mapContent}</section>
+        <section class="smallhash-panel result"><header><strong>${resultTitle}</strong><span>${isFirstUnique ? "index" : `${result.length} value(s)`}</span><div class="smallhash-result">${escapeHtml(answer)}</div></section>
+      </div>
+      <footer><small>${vi ? "HÀNH ĐỘNG HIỆN TẠI" : "CURRENT ACTION"}</small><strong>${escapeHtml(actionText)}</strong></footer>
+    </section>`;
+}
+
+function renderSequenceTraceView(step) {
+  const view = step.sequenceTraceView || {};
+  const vi = lang === "vi";
+  const kind = view.kind;
+  const cells = (values, options = {}) => {
+    const classesFor = (index) => {
+      const classes = ["seqtrace-cell"];
+      if (Number.isInteger(options.active) && index === options.active) classes.push("active");
+      if (options.matched && options.matched.has(index)) classes.push("matched");
+      if (Number.isInteger(options.left) && Number.isInteger(options.right)) {
+        classes.push(index >= options.left && index <= options.right ? "inside" : "outside");
+      }
+      if (Number.isInteger(options.mid) && (index === options.mid || index === options.pairEnd)) classes.push("mid");
+      return classes.join(" ");
+    };
+    const columns = Math.max(1, Math.min(values.length, 10));
+    return `<div class="seqtrace-cells" style="--seqtrace-cols:${columns}">${values.map((value, index) => {
+      const labels = [];
+      if (index === options.left) labels.push("L");
+      if (index === options.right) labels.push("R");
+      if (index === options.mid) labels.push("M");
+      if (index === options.pairEnd) labels.push("M+1");
+      if (options.pointerIndex === index) labels.push("i");
+      return `<div class="${classesFor(index)}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(labels.join(" / ") || " ")}</em></div>`;
+    }).join("")}</div>`;
+  };
+
+  if (kind === "subsequence") {
+    const s = Array.isArray(view.s) ? view.s : [];
+    const t = Array.isArray(view.t) ? view.t : [];
+    const nextIndex = Number.isInteger(view.nextIndex) ? view.nextIndex : 0;
+    const scanIndex = Number.isInteger(view.scanIndex) ? view.scanIndex : -1;
+    const matched = new Set(Array.isArray(view.matched) ? view.matched : []);
+    const waiting = nextIndex < s.length ? s[nextIndex] : "done";
+    const result = view.answer == null ? "—" : view.answer ? "TRUE" : "FALSE";
+    const message = view.phase === "done"
+      ? (view.answer
+        ? (vi ? "Mọi ký tự của s đã được đánh dấu theo thứ tự trong t." : "Every s character is marked in order inside t.")
+        : (vi ? `Còn thiếu '${s.slice(nextIndex).join("")}'.` : `Still missing '${s.slice(nextIndex).join("")}'.`))
+      : (vi ? `Đang chờ tìm s[${nextIndex}] = '${waiting}' trong t.` : `Looking for s[${nextIndex}] = '${waiting}' inside t.`);
+    $("treeView").innerHTML = `
+      <section class="seqtrace-viz" role="img" aria-label="Is Subsequence visualization">
+        <header><strong>IS SUBSEQUENCE · TWO POINTERS</strong><span>${escapeHtml(String(view.phase || "setup"))}</span></header>
+        <section class="seqtrace-row"><header><strong>s · chars to match</strong><span>i = ${nextIndex}</span>${cells(s, { pointerIndex: nextIndex < s.length ? nextIndex : -1 })}</section>
+        <section class="seqtrace-row target"><header><strong>t · scanned left to right</strong><span>j = ${scanIndex >= 0 ? scanIndex : "—"}</span>${cells(t, { active: scanIndex, matched })}</section>
+        <section class="seqtrace-rule"><small>${vi ? "BẤT BIẾN" : "INVARIANT"}</small><strong>matched positions in t spell s[0..i-1]</strong><span>${escapeHtml(message)}</span></section>
+        <footer><span><small>${vi ? "ký tự cần tìm" : "next needed"}</small><strong>${escapeHtml(String(waiting))}</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${result}</strong></span></footer>
+      </section>`;
+    return;
+  }
+
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const right = Number.isInteger(view.right) ? view.right : nums.length - 1;
+  const mid = Number.isInteger(view.mid) ? view.mid : -1;
+  const pairEnd = Number.isInteger(view.pairEnd) ? view.pairEnd : -1;
+  const answer = view.answer == null ? "—" : String(view.answer);
+  const phaseText = {
+    setup: vi ? "Khởi tạo vùng tìm kiếm" : "Initialize search range",
+    loop: vi ? "Kiểm tra vòng lặp" : "Check loop",
+    mid: vi ? "Tính mid" : "Compute mid",
+    "align-check": vi ? "Kiểm tra parity của mid" : "Check mid parity",
+    align: vi ? "Căn mid vào đầu cặp" : "Align mid to pair start",
+    compare: vi ? "So sánh cặp" : "Compare pair",
+    "move-left": vi ? "Bỏ nửa trái" : "Discard left half",
+    "move-right": vi ? "Giữ nửa trái" : "Keep left half",
+    done: vi ? "Đã tìm được phần tử đơn" : "Single value found",
+  }[view.phase] || String(view.phase || "binary search");
+  const pairText = mid >= 0 && pairEnd >= 0 && pairEnd < nums.length
+    ? `nums[${mid}] = ${nums[mid]} · nums[${pairEnd}] = ${nums[pairEnd]}`
+    : "align mid to an even pair start";
+  $("treeView").innerHTML = `
+    <section class="seqtrace-viz" role="img" aria-label="Single Element in a Sorted Array visualization">
+      <header><strong>SINGLE ELEMENT · BINARY SEARCH</strong><span>${escapeHtml(phaseText)}</span></header>
+      <section class="seqtrace-row binary"><header><strong>SORTED PAIRS</strong><span>[L..R] = [${left}..${right}]</span>${cells(nums, { left, right, mid, pairEnd })}</section>
+      <section class="seqtrace-rule"><small>${vi ? "CẶP ĐANG KIỂM TRA" : "PAIR UNDER TEST"}</small><strong>${escapeHtml(pairText)}</strong><span>${vi ? "Cặp nguyên ở chỉ số chẵn nghĩa là phần tử đơn nằm về bên phải; cặp lệch nghĩa là nó nằm ở bên trái hoặc tại mid." : "An intact pair at an even index puts the single value to the right; a broken pair puts it at or to the left of mid."}</span></section>
+      <footer><span><small>${vi ? "vùng còn lại" : "remaining range"}</small><strong>[${left}..${right}]</strong></span><span class="answer"><small>${vi ? "kết quả" : "result"}</small><strong>${answer}</strong></span></footer>
+    </section>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -22141,6 +22314,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSubstringConcatView(step);
+  } else if (step.sequenceTraceView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSequenceTraceView(step);
+  } else if (step.reverse344View || step.smallHashView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSmallHashView(step);
   } else if (step.exactK992View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

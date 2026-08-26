@@ -13602,7 +13602,200 @@ function buildSteps772SingleStack(input) {
 
   return { expression, answer, steps };
 }
+// ─── 392 / 402: compact line-by-line string traces ────────────────────────
+function buildSteps392(input, params = {}) {
+  const s = String(input ?? "");
+  const t = String(params.t ?? "");
+  if (!s.length || !t.length || s.length > 14 || t.length > 18) {
+    throw new Error("Use a non-empty s (up to 14 chars) and t (up to 18 chars).");
+  }
+  const steps = [];
+  const matched = [];
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...t],
+    highlight: Number.isInteger(extra.scanIndex) ? [extra.scanIndex] : [],
+    mark: [...matched],
+    codeLines,
+    vars: [{ name: "i", value: extra.i ?? 0 }, { name: "j", value: extra.scanIndex ?? "-" }],
+    note,
+    final: Boolean(extra.final),
+    sequenceTraceView: {
+      kind: "subsequence", s: [...s], t: [...t], nextIndex: extra.i ?? 0,
+      scanIndex: extra.scanIndex ?? -1, matched: [...matched],
+      phase: extra.phase || "setup", answer: extra.answer ?? null,
+    },
+  });
+
+  let i = 0;
+  snap(
+    { vi: "Khởi tạo i = 0", en: "Initialize i = 0" }, [3],
+    { vi: "i trỏ tới ký tự kế tiếp của s mà ta cần tìm trong t.", en: "i points to the next character of s that must be found in t." },
+    { i, phase: "setup" },
+  );
+  for (let scanIndex = 0; scanIndex < t.length; scanIndex++) {
+    const char = t[scanIndex];
+    snap(
+      { vi: `Duyệt t[${scanIndex}] = '${char}'`, en: `Read t[${scanIndex}] = '${char}'` }, [4],
+      { vi: "Duyệt t từ trái sang phải, không bao giờ quay lại.", en: "Scan t from left to right and never move backward." },
+      { i, scanIndex, phase: "read" },
+    );
+    const match = i < s.length && s[i] === char;
+    snap(
+      { vi: `i < len(s) và s[i] == '${char}' → ${match}`, en: `i < len(s) and s[i] == '${char}' → ${match}` }, [5],
+      match
+        ? { vi: `Tìm thấy s[${i}] = '${s[i]}' trong t.`, en: `Found s[${i}] = '${s[i]}' in t.` }
+        : { vi: i < s.length ? `'${char}' không phải ký tự s[${i}] = '${s[i]}' đang cần.` : "Đã khớp hết s; các ký tự còn lại của t không ảnh hưởng." , en: i < s.length ? `'${char}' is not the needed s[${i}] = '${s[i]}'.` : "All of s is already matched; remaining t characters do not matter." },
+      { i, scanIndex, phase: "check" },
+    );
+    if (match) {
+      matched.push(scanIndex);
+      i += 1;
+      snap(
+        { vi: `Khớp xong → i = ${i}`, en: `Match complete → i = ${i}` }, [6],
+        { vi: "Đánh dấu vị trí đã ghép rồi chuyển sang ký tự kế tiếp của s.", en: "Mark the matched position, then advance to the next s character." },
+        { i, scanIndex, phase: "advance" },
+      );
+    }
+  }
+  const answer = i === s.length;
+  snap(
+    { vi: `return i == len(s) → ${answer}`, en: `return i == len(s) → ${answer}` }, [7],
+    answer
+      ? { vi: "Mọi ký tự của s đã được ghép theo đúng thứ tự trong t.", en: "Every s character was matched in order inside t." }
+      : { vi: `Còn thiếu '${s.slice(i)}', nên s không phải subsequence của t.`, en: `Still missing '${s.slice(i)}', so s is not a subsequence of t.` },
+    { i, phase: "done", answer, final: true },
+  );
+  return { original: { s, t }, answer, steps };
+}
+
+function buildSteps402(input, params = {}) {
+  const num = String(input ?? "").trim();
+  const initialK = Number(params.k ?? 0);
+  if (!/^\d+$/.test(num) || num.length > 18 || !Number.isInteger(initialK) || initialK < 0 || initialK > num.length) {
+    throw new Error("Enter a digit string up to 18 characters and an integer k from 0 to len(num).");
+  }
+  const stack = [];
+  const steps = [];
+  let k = initialK;
+  const snapshot = (title, codeLine, note, extra = {}) => steps.push({
+    title,
+    codeLines: [codeLine],
+    vars: [{ name: "k remaining", value: k }, { name: "stack", value: `[${stack.join("")}]` }],
+    note,
+    final: Boolean(extra.final),
+    stackView: {
+      title: "Monotonic increasing digit stack",
+      emptyLabel: "no digits kept yet",
+      items: [...stack], input: [...num], current: extra.index ?? -1,
+      inputLabel: "num (left → right)", expected: extra.digit ?? "",
+      status: [
+        { label: "k remaining", value: k },
+        { label: "top", value: stack.length ? stack.at(-1) : "empty" },
+        { label: "kept digits", value: stack.join("") || "empty" },
+      ],
+    },
+  });
+
+  snapshot(
+    { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" }, 3,
+    { vi: `Ta cần xóa đúng k = ${k} chữ số để số còn lại nhỏ nhất.`, en: `We must remove exactly k = ${k} digits to make the smallest remaining number.` },
+    { index: -1 },
+  );
+  for (let index = 0; index < num.length; index++) {
+    const digit = num[index];
+    snapshot(
+      { vi: `Duyệt digit '${digit}'`, en: `Read digit '${digit}'` }, 4,
+      { vi: "Chữ số mới có thể làm các chữ số lớn ở bên trái trở nên bất lợi.", en: "The new digit may make larger digits on its left unfavorable." },
+      { index, digit },
+    );
+    while (k > 0 && stack.length && stack.at(-1) > digit) {
+      snapshot(
+        { vi: `${stack.at(-1)} > ${digit} và k > 0`, en: `${stack.at(-1)} > ${digit} and k > 0` }, 5,
+        { vi: "Bỏ chữ số lớn hơn ở bên trái để chữ số nhỏ hơn được đứng sớm hơn.", en: "Discard the larger left digit so the smaller digit can appear earlier." },
+        { index, digit },
+      );
+      const removed = stack.pop();
+      snapshot(
+        { vi: `stack.pop() → '${removed}'`, en: `stack.pop() → '${removed}'` }, 6,
+        { vi: `Xóa '${removed}' khỏi kết quả đang dựng.`, en: `Remove '${removed}' from the number being built.` },
+        { index, digit },
+      );
+      k -= 1;
+      snapshot(
+        { vi: `k -= 1 → ${k}`, en: `k -= 1 → ${k}` }, 7,
+        { vi: "Đã sử dụng một lần xóa.", en: "One removal has been spent." },
+        { index, digit },
+      );
+    }
+    stack.push(digit);
+    snapshot(
+      { vi: `stack.append('${digit}')`, en: `stack.append('${digit}')` }, 8,
+      { vi: "Giữ chữ số hiện tại trong stack tăng dần.", en: "Keep the current digit in the increasing stack." },
+      { index, digit },
+    );
+  }
+  if (k > 0) {
+    const removedTail = stack.splice(Math.max(0, stack.length - k));
+    k = 0;
+    snapshot(
+      { vi: `Cắt ${removedTail.length} chữ số cuối`, en: `Trim ${removedTail.length} trailing digit(s)` }, 9,
+      { vi: "Nếu vẫn còn lượt xóa, chữ số cuối luôn là lựa chọn tốt nhất để bỏ.", en: "If removals remain, trailing digits are always the best ones to discard." },
+      { index: num.length - 1 },
+    );
+  } else {
+    snapshot(
+      { vi: "Không cần cắt chữ số cuối", en: "No trailing trim is needed" }, 9,
+      { vi: "k đã bằng 0 nên giữ nguyên stack.", en: "k is already zero, so keep the stack unchanged." },
+      { index: num.length - 1 },
+    );
+  }
+  const answer = stack.join("").replace(/^0+/, "") || "0";
+  snapshot(
+    { vi: `return '${answer}'`, en: `return '${answer}'` }, 10,
+    { vi: "Ghép stack, bỏ các số 0 đứng đầu; nếu rỗng thì trả '0'.", en: "Join the stack, trim leading zeros, and return '0' if it becomes empty." },
+    { index: num.length - 1, final: true },
+  );
+  return { original: num, k: initialK, answer, steps };
+}
+
 Object.assign(module.exports, {
+  392: {
+    id: 392, difficulty: "easy", slug: "is-subsequence",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Is Subsequence", en: "Is Subsequence" },
+    titleVi: { vi: "Kiểm tra chuỗi con theo thứ tự", en: "Check ordered subsequence" },
+    statement: { vi: "Kiểm tra mọi ký tự của s có thể xuất hiện theo đúng thứ tự trong t hay không.", en: "Check whether every s character appears in t in the same order." },
+    defaultInput: "abc", inputKind: "string", inputLabel: { vi: "s", en: "s" },
+    extraParams: [{ key: "t", type: "string", label: { vi: "t", en: "t" }, default: "ahbgdc" }],
+    approach: [
+      { vi: "i luôn trỏ vào ký tự kế tiếp của s cần tìm.", en: "i always points to the next s character that must be found." },
+      { vi: "Quét t một lần; khi t[j] khớp s[i], tăng i.", en: "Scan t once; whenever t[j] matches s[i], increment i." },
+    ],
+    complexity: { time: "O(|t|)", space: "O(1)", note: { vi: "Không cần tạo chuỗi con mới.", en: "No new subsequence needs to be created." } },
+    code: ["class Solution:", "    def isSubsequence(self, s, t):", "        i = 0", "        for j, ch in enumerate(t):", "            if i < len(s) and s[i] == ch:", "                i += 1", "        return i == len(s)"],
+    liveArgs: (input, params) => [String(input ?? ""), String(params.t ?? "")],
+    builder: buildSteps392,
+  },
+  402: {
+    id: 402, difficulty: "medium", slug: "remove-k-digits",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }, { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" }],
+    title: { vi: "Remove K Digits", en: "Remove K Digits" },
+    titleVi: { vi: "Xóa K chữ số để nhỏ nhất", en: "Remove K digits for the smallest number" },
+    statement: { vi: "Xóa đúng k chữ số khỏi num để số còn lại nhỏ nhất; không có số 0 đứng đầu.", en: "Remove exactly k digits from num to make the smallest number, without leading zeros." },
+    defaultInput: "1432219", inputKind: "string", inputLabel: { vi: "num", en: "num" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3, min: 0 }],
+    approach: [
+      { vi: "Dùng stack tăng dần; chữ số lớn hơn ngay trước chữ số mới nhỏ hơn nên bị xóa trước.", en: "Use an increasing stack; a larger digit immediately before a smaller new digit is removed first." },
+      { vi: "Nếu sau lượt quét vẫn còn k, xóa từ cuối stack.", en: "If k remains after scanning, remove from the end of the stack." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi chữ số vào và ra stack nhiều nhất một lần.", en: "Each digit enters and leaves the stack at most once." } },
+    code: ["class Solution:", "    def removeKdigits(self, num, k):", "        stack = []", "        for digit in num:", "            while k and stack and stack[-1] > digit:", "                stack.pop()", "                k -= 1", "            stack.append(digit)", "        stack = stack[:-k] if k else stack", "        return ''.join(stack).lstrip('0') or '0'"],
+    liveArgs: (input, params) => [String(input ?? ""), Number(params.k ?? 0)],
+    builder: buildSteps402,
+  },
   772: {
     id: 772, difficulty: "hard", slug: "basic-calculator-iii",
     category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },

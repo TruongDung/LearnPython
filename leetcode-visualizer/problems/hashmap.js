@@ -7264,7 +7264,479 @@ function buildSteps149(input) {
   return { original: { points: raw }, answer: globalBest.count, steps };
 }
 
+// ─── Small array / hash-map visualizations ────────────────────────────────
+function parseIntegerListSmallHash(value, label) {
+  const values = String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part !== "")
+    .map(Number);
+  if (!values.length || values.some((value) => !Number.isInteger(value))) {
+    throw new Error(`${label} must be a non-empty comma-separated list of integers.`);
+  }
+  return values;
+}
+
+function buildSteps344(input) {
+  const original = [...String(input ?? "")];
+  if (!original.length || original.length > 18) throw new Error("Use 1 to 18 characters so the swap trace stays readable.");
+  const chars = [...original];
+  const steps = [];
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...chars],
+    highlight: [extra.left, extra.right].filter(Number.isInteger),
+    mark: extra.swapped ? [extra.left, extra.right] : [],
+    codeLines,
+    vars: [
+      { name: "left", value: extra.left ?? 0 },
+      { name: "right", value: extra.right ?? chars.length - 1 },
+    ],
+    note,
+    final: Boolean(extra.final),
+    reverse344View: {
+      chars: [...chars],
+      left: extra.left ?? 0,
+      right: extra.right ?? chars.length - 1,
+      phase: extra.phase || "setup",
+      swapped: extra.swapped || null,
+    },
+  });
+
+  let left = 0;
+  let right = chars.length - 1;
+  snap(
+    { vi: "Khởi tạo hai con trỏ", en: "Initialize two pointers" },
+    [3],
+    { vi: "left ở đầu chuỗi, right ở cuối chuỗi.", en: "left starts at the beginning and right at the end." },
+    { left, right, phase: "setup" },
+  );
+  while (left < right) {
+    snap(
+      { vi: `Kiểm tra left < right: ${left} < ${right}`, en: `Check left < right: ${left} < ${right}` },
+      [4],
+      { vi: "Hai con trỏ chưa gặp nhau nên đổi chỗ hai ký tự ở biên.", en: "The pointers have not met, so swap the boundary characters." },
+      { left, right, phase: "check" },
+    );
+    const before = [chars[left], chars[right]];
+    [chars[left], chars[right]] = [chars[right], chars[left]];
+    snap(
+      { vi: `Đổi '${before[0]}' và '${before[1]}'`, en: `Swap '${before[0]}' and '${before[1]}'` },
+      [5],
+      { vi: `s[${left}] và s[${right}] đã được hoán đổi tại chỗ.`, en: `s[${left}] and s[${right}] have been swapped in place.` },
+      { left, right, phase: "swap", swapped: [left, right] },
+    );
+    left += 1;
+    snap(
+      { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+      [6],
+      { vi: "Bỏ qua ký tự bên trái đã đúng vị trí.", en: "Skip the left character now in its final position." },
+      { left, right, phase: "move-left" },
+    );
+    right -= 1;
+    snap(
+      { vi: `right -= 1 → ${right}`, en: `right -= 1 → ${right}` },
+      [7],
+      { vi: "Bỏ qua ký tự bên phải đã đúng vị trí.", en: "Skip the right character now in its final position." },
+      { left, right, phase: "move-right" },
+    );
+  }
+  snap(
+    { vi: "Hai con trỏ gặp nhau", en: "Pointers have met" },
+    [4],
+    { vi: "left không còn nhỏ hơn right; mảng ký tự đã đảo ngược.", en: "left is no longer smaller than right; the character array is reversed." },
+    { left, right, phase: "done", final: true },
+  );
+  return { original, answer: chars, steps };
+}
+
+function buildSteps349(input, params = {}) {
+  const nums1 = parseIntegerListSmallHash(input, "nums1");
+  const nums2 = parseIntegerListSmallHash(params.nums2, "nums2");
+  if (nums1.length > 12 || nums2.length > 12) throw new Error("Use at most 12 values in each array for the visualization.");
+  const seen = new Set(nums1);
+  const result = new Set();
+  const steps = [];
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...nums2],
+    highlight: Number.isInteger(extra.index) ? [extra.index] : [],
+    mark: extra.found && Number.isInteger(extra.index) ? [extra.index] : [],
+    codeLines,
+    vars: [{ name: "seen", value: `{${[...seen].join(", ")}}` }, { name: "result", value: `[${[...result].join(", ")}]` }],
+    note,
+    final: Boolean(extra.final),
+    smallHashView: {
+      kind: "unique-intersection",
+      nums1: [...nums1], nums2: [...nums2], activeIndex: extra.index ?? -1,
+      activeValue: extra.value ?? null, phase: extra.phase || "setup",
+      seen: [...seen], result: [...result], found: Boolean(extra.found),
+    },
+  });
+
+  snap(
+    { vi: "Tạo set từ nums1", en: "Build a set from nums1" }, [3],
+    { vi: "Set tự loại các phần tử trùng trong nums1.", en: "A set automatically removes duplicates from nums1." },
+    { phase: "build" },
+  );
+  snap(
+    { vi: "Khởi tạo result = set()", en: "Initialize result = set()" }, [4],
+    { vi: "result cũng là set, nên mỗi giá trị giao nhau chỉ xuất hiện một lần.", en: "result is also a set, so each intersecting value appears only once." },
+    { phase: "result-init" },
+  );
+  nums2.forEach((value, index) => {
+    snap(
+      { vi: `Duyệt nums2[${index}] = ${value}`, en: `Read nums2[${index}] = ${value}` }, [5],
+      { vi: "Xét từng giá trị của nums2.", en: "Inspect each value in nums2." },
+      { index, value, phase: "read" },
+    );
+    const found = seen.has(value);
+    snap(
+      { vi: `${value} in seen → ${found}`, en: `${value} in seen → ${found}` }, [6],
+      found
+        ? { vi: `${value} có trong nums1 nên thuộc giao.`, en: `${value} is present in nums1, so it belongs to the intersection.` }
+        : { vi: `${value} không có trong nums1 nên bỏ qua.`, en: `${value} is absent from nums1, so skip it.` },
+      { index, value, found, phase: "check" },
+    );
+    if (found) {
+      const alreadyPresent = result.has(value);
+      result.add(value);
+      snap(
+        { vi: `result.add(${value})`, en: `result.add(${value})` }, [7],
+        alreadyPresent
+          ? { vi: `${value} đã có trong result; set giữ đúng một bản sao.`, en: `${value} is already in result; the set keeps one copy.` }
+          : { vi: `Thêm ${value} vào result.`, en: `Add ${value} to result.` },
+        { index, value, found: !alreadyPresent, phase: "add" },
+      );
+    }
+  });
+  snap(
+    { vi: "Trả về result", en: "Return result" }, [8],
+    { vi: "Đây là giao của hai mảng, không có phần tử lặp.", en: "This is the intersection of both arrays, with no duplicates." },
+    { phase: "done", final: true },
+  );
+  return { original: { nums1, nums2 }, answer: [...result], steps };
+}
+
+function buildSteps350(input, params = {}) {
+  const nums1 = parseIntegerListSmallHash(input, "nums1");
+  const nums2 = parseIntegerListSmallHash(params.nums2, "nums2");
+  if (nums1.length > 12 || nums2.length > 12) throw new Error("Use at most 12 values in each array for the visualization.");
+  const counts = new Map();
+  nums1.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+  const result = [];
+  const steps = [];
+  const countObject = () => Object.fromEntries([...counts.entries()].sort(([left], [right]) => left - right));
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...nums2],
+    highlight: Number.isInteger(extra.index) ? [extra.index] : [],
+    mark: extra.taken && Number.isInteger(extra.index) ? [extra.index] : [],
+    codeLines,
+    vars: [{ name: "count", value: JSON.stringify(countObject()) }, { name: "result", value: `[${result.join(", ")}]` }],
+    note,
+    final: Boolean(extra.final),
+    smallHashView: {
+      kind: "multiset-intersection",
+      nums1: [...nums1], nums2: [...nums2], activeIndex: extra.index ?? -1,
+      activeValue: extra.value ?? null, phase: extra.phase || "setup",
+      counts: countObject(), result: [...result], taken: Boolean(extra.taken),
+    },
+  });
+
+  snap(
+    { vi: "count = Counter(nums1)", en: "count = Counter(nums1)" }, [5],
+    { vi: "Lưu số lần còn có thể dùng của mỗi giá trị trong nums1.", en: "Store how many times each nums1 value remains available." },
+    { phase: "count" },
+  );
+  snap(
+    { vi: "Khởi tạo result", en: "Initialize result" }, [6],
+    { vi: "result giữ cả các bản sao hợp lệ.", en: "result retains every valid duplicate." },
+    { phase: "result-init" },
+  );
+  nums2.forEach((value, index) => {
+    snap(
+      { vi: `Duyệt nums2[${index}] = ${value}`, en: `Read nums2[${index}] = ${value}` }, [7],
+      { vi: "Kiểm tra một bản sao từ nums2.", en: "Inspect one copy from nums2." },
+      { index, value, phase: "read" },
+    );
+    const available = counts.get(value) || 0;
+    const taken = available > 0;
+    snap(
+      { vi: `count[${value}] > 0 → ${taken}`, en: `count[${value}] > 0 → ${taken}` }, [8],
+      taken
+        ? { vi: `Còn ${available} bản sao của ${value} trong nums1.`, en: `${available} copy/copies of ${value} remain in nums1.` }
+        : { vi: `Không còn bản sao ${value} nào để ghép.`, en: `No ${value} copy remains to match.` },
+      { index, value, taken, phase: "check" },
+    );
+    if (taken) {
+      result.push(value);
+      snap(
+        { vi: `result.append(${value})`, en: `result.append(${value})` }, [9],
+        { vi: "Giữ bản sao này trong giao đa tập.", en: "Keep this copy in the multiset intersection." },
+        { index, value, taken: true, phase: "append" },
+      );
+      counts.set(value, available - 1);
+      snap(
+        { vi: `count[${value}] -= 1`, en: `count[${value}] -= 1` }, [10],
+        { vi: "Đã dùng một bản sao nên giảm số lượng còn lại.", en: "One copy was used, so decrement the remaining count." },
+        { index, value, taken: true, phase: "decrement" },
+      );
+    }
+  });
+  snap(
+    { vi: "Trả về result", en: "Return result" }, [11],
+    { vi: "Mỗi giá trị xuất hiện bằng min(tần suất ở hai mảng).", en: "Each value appears min(its frequency in the two arrays) times." },
+    { phase: "done", final: true },
+  );
+  return { original: { nums1, nums2 }, answer: result, steps };
+}
+
+function buildSteps387(input) {
+  const chars = [...String(input ?? "")];
+  if (!chars.length || chars.length > 18) throw new Error("Use 1 to 18 characters so the frequency trace stays readable.");
+  const counts = new Map();
+  chars.forEach((char) => counts.set(char, (counts.get(char) || 0) + 1));
+  const steps = [];
+  const countObject = () => Object.fromEntries([...counts.entries()].sort(([left], [right]) => left.localeCompare(right)));
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...chars],
+    highlight: Number.isInteger(extra.index) ? [extra.index] : [],
+    mark: extra.unique && Number.isInteger(extra.index) ? [extra.index] : [],
+    codeLines,
+    vars: [{ name: "count", value: JSON.stringify(countObject()) }, { name: "i", value: extra.index ?? "-" }, { name: "ch", value: extra.char ?? "-" }],
+    note,
+    final: Boolean(extra.final),
+    smallHashView: {
+      kind: "first-unique", chars: [...chars], activeIndex: extra.index ?? -1,
+      activeValue: extra.char ?? null, phase: extra.phase || "setup", counts: countObject(),
+      answer: extra.answer ?? null, unique: Boolean(extra.unique),
+    },
+  });
+
+  snap(
+    { vi: "count = Counter(s)", en: "count = Counter(s)" }, [5],
+    { vi: "Đếm toàn bộ ký tự trước để biết ký tự nào xuất hiện đúng một lần.", en: "Count every character first to know which ones occur exactly once." },
+    { phase: "count" },
+  );
+  for (let index = 0; index < chars.length; index++) {
+    const char = chars[index];
+    snap(
+      { vi: `Duyệt i=${index}, ch='${char}'`, en: `Read i=${index}, ch='${char}'` }, [6],
+      { vi: "Duyệt lại theo thứ tự gốc của chuỗi.", en: "Scan again in the string's original order." },
+      { index, char, phase: "read" },
+    );
+    const unique = counts.get(char) === 1;
+    snap(
+      { vi: `count['${char}'] == 1 → ${unique}`, en: `count['${char}'] == 1 → ${unique}` }, [7],
+      unique
+        ? { vi: `Đây là ký tự duy nhất đầu tiên, tại chỉ số ${index}.`, en: `This is the first unique character, at index ${index}.` }
+        : { vi: `'${char}' xuất hiện ${counts.get(char)} lần nên tiếp tục.`, en: `'${char}' appears ${counts.get(char)} times, so continue.` },
+      { index, char, unique, phase: "check" },
+    );
+    if (unique) {
+      snap(
+        { vi: `return ${index}`, en: `return ${index}` }, [8],
+        { vi: "Vì duyệt trái sang phải, đây chính là chỉ số nhỏ nhất hợp lệ.", en: "Because we scan left to right, this is the smallest valid index." },
+        { index, char, unique: true, phase: "done", answer: index, final: true },
+      );
+      return { original: chars.join(""), answer: index, steps };
+    }
+  }
+  snap(
+    { vi: "Không có ký tự duy nhất", en: "No unique character exists" }, [9],
+    { vi: "Không ký tự nào có tần suất bằng 1.", en: "No character has frequency 1." },
+    { phase: "done", answer: -1, final: true },
+  );
+  return { original: chars.join(""), answer: -1, steps };
+}
+
+function buildSteps496(input, params = {}) {
+  const nums1 = parseIntegerListSmallHash(input, "nums1");
+  const nums2 = parseIntegerListSmallHash(params.nums2, "nums2");
+  if (nums1.length > 10 || nums2.length > 14) throw new Error("Use up to 10 nums1 values and 14 nums2 values for the visualization.");
+  const nextGreater = new Map();
+  const stack = [];
+  const steps = [];
+  const mappingText = () => [...nextGreater.entries()].map(([from, to]) => `${from}->${to}`).join(", ") || "empty";
+  const snap = (title, codeLine, note, extra = {}) => steps.push({
+    title,
+    arr: [...nums2],
+    highlight: Number.isInteger(extra.index) ? [extra.index] : [],
+    mark: extra.resolved ? [extra.index] : [],
+    codeLines: [codeLine],
+    vars: [{ name: "stack", value: `[${stack.join(", ")}]` }, { name: "next_greater", value: `{${mappingText()}}` }],
+    note,
+    final: Boolean(extra.final),
+    stackView: {
+      title: "Monotonic decreasing stack (unresolved values)",
+      emptyLabel: "all seen values are resolved",
+      items: [...stack], input: [...nums2], current: extra.index ?? -1,
+      inputLabel: "nums2 scan (left -> right)", expected: extra.value ?? "",
+      status: [
+        { label: "current", value: extra.value ?? "-" },
+        { label: "top unresolved", value: stack.length ? stack.at(-1) : "empty" },
+        { label: "resolved map", value: mappingText() },
+      ],
+    },
+  });
+
+  snap(
+    { vi: "Khởi tạo next_greater và stack", en: "Initialize next_greater and stack" }, 3,
+    { vi: "Stack giữ các giá trị chưa tìm được phần tử lớn hơn bên phải.", en: "The stack holds values that have not found a greater value on their right." },
+    { index: -1 },
+  );
+  snap(
+    { vi: "stack = []", en: "stack = []" }, 4,
+    { vi: "Đáy tới đỉnh stack luôn giảm dần.", en: "The stack stays decreasing from bottom to top." },
+    { index: -1 },
+  );
+  nums2.forEach((value, index) => {
+    snap(
+      { vi: `Duyệt nums2[${index}] = ${value}`, en: `Read nums2[${index}] = ${value}` }, 5,
+      { vi: "Giá trị hiện tại có thể là next greater cho nhiều phần tử trên stack.", en: "The current value may be the next greater value for several stack entries." },
+      { index, value },
+    );
+    while (stack.length && value > stack.at(-1)) {
+      snap(
+        { vi: `${value} > stack[-1] (${stack.at(-1)})`, en: `${value} > stack[-1] (${stack.at(-1)})` }, 6,
+        { vi: "Đỉnh stack cuối cùng gặp được phần tử lớn hơn đầu tiên ở bên phải.", en: "The stack top has just met its first greater element on the right." },
+        { index, value },
+      );
+      const smaller = stack.pop();
+      nextGreater.set(smaller, value);
+      snap(
+        { vi: `next_greater[${smaller}] = ${value}`, en: `next_greater[${smaller}] = ${value}` }, 7,
+        { vi: `Pop ${smaller} rồi ghi phần tử lớn hơn gần nhất của nó là ${value}.`, en: `Pop ${smaller}, then record ${value} as its nearest greater element.` },
+        { index, value, resolved: true },
+      );
+    }
+    stack.push(value);
+    snap(
+      { vi: `stack.append(${value})`, en: `stack.append(${value})` }, 8,
+      { vi: `${value} còn chờ một phần tử lớn hơn ở bên phải.`, en: `${value} is still waiting for a greater element on its right.` },
+      { index, value },
+    );
+  });
+  const answer = nums1.map((value) => nextGreater.get(value) ?? -1);
+  snap(
+    { vi: `Trả về [${answer.join(", ")}] cho nums1`, en: `Return [${answer.join(", ")}] for nums1` }, 9,
+    { vi: "Những giá trị không có mapping nhận -1.", en: "Values with no recorded mapping receive -1." },
+    { index: -1, final: true },
+  );
+  return { original: { nums1, nums2 }, answer, steps };
+}
+
 Object.assign(module.exports, {
+  344: {
+    id: 344,
+    difficulty: "easy",
+    slug: "reverse-string",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Reverse String", en: "Reverse String" },
+    titleVi: { vi: "Đảo ngược chuỗi tại chỗ", en: "Reverse a string in place" },
+    statement: { vi: "Đảo ngược mảng ký tự tại chỗ bằng hai con trỏ.", en: "Reverse a character array in place using two pointers." },
+    defaultInput: "hello",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "Đặt left ở đầu và right ở cuối mảng ký tự.", en: "Place left at the start and right at the end of the character array." },
+      { vi: "Đổi chỗ hai ký tự biên rồi dịch hai con trỏ vào trong.", en: "Swap the boundary characters, then move both pointers inward." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi ký tự chỉ được đổi chỗ nhiều nhất một lần.", en: "Each character participates in at most one swap." } },
+    code: ["class Solution:", "    def reverseString(self, s):", "        left, right = 0, len(s) - 1", "        while left < right:", "            s[left], s[right] = s[right], s[left]", "            left += 1", "            right -= 1"],
+    liveArgs: (input) => [[...String(input ?? "")]],
+    builder: buildSteps344,
+  },
+  349: {
+    id: 349,
+    difficulty: "easy",
+    slug: "intersection-of-two-arrays",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }, { key: "hash-set", vi: "Hash Set", en: "Hash Set" }],
+    title: { vi: "Intersection of Two Arrays", en: "Intersection of Two Arrays" },
+    titleVi: { vi: "Giao của hai mảng", en: "Unique intersection of two arrays" },
+    statement: { vi: "Trả về các giá trị xuất hiện ở cả nums1 và nums2; mỗi giá trị chỉ một lần.", en: "Return values present in both nums1 and nums2, with each value appearing once." },
+    defaultInput: "1,2,2,1",
+    inputKind: "string",
+    inputLabel: { vi: "nums1 (cách bởi ,)", en: "nums1 (comma separated)" },
+    extraParams: [{ key: "nums2", type: "string", label: { vi: "nums2 (cách bởi ,)", en: "nums2 (comma separated)" }, default: "2,2" }],
+    approach: [
+      { vi: "Đặt mọi giá trị nums1 vào set để kiểm tra membership O(1) trung bình.", en: "Put nums1 values in a set for average O(1) membership checks." },
+      { vi: "Duyệt nums2; nếu giá trị có trong set thì thêm vào result set.", en: "Scan nums2; add values found in the set to a result set." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(m+n)", note: { vi: "Hai set loại bỏ duplicate tự động.", en: "The two sets automatically remove duplicates." } },
+    code: ["class Solution:", "    def intersection(self, nums1, nums2):", "        seen = set(nums1)", "        result = set()", "        for num in nums2:", "            if num in seen:", "                result.add(num)", "        return list(result)"],
+    liveArgs: (input, params) => [parseIntegerListSmallHash(input, "nums1"), parseIntegerListSmallHash(params.nums2, "nums2")],
+    builder: buildSteps349,
+  },
+  350: {
+    id: 350,
+    difficulty: "easy",
+    slug: "intersection-of-two-arrays-ii",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }, { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" }],
+    title: { vi: "Intersection of Two Arrays II", en: "Intersection of Two Arrays II" },
+    titleVi: { vi: "Giao của hai mảng có lặp", en: "Multiset intersection of two arrays" },
+    statement: { vi: "Trả về giao của nums1 và nums2, giữ lại số bản sao bằng tần suất nhỏ hơn ở hai mảng.", en: "Return the multiset intersection, retaining each value min(freq1, freq2) times." },
+    defaultInput: "4,9,5",
+    inputKind: "string",
+    inputLabel: { vi: "nums1 (cách bởi ,)", en: "nums1 (comma separated)" },
+    extraParams: [{ key: "nums2", type: "string", label: { vi: "nums2 (cách bởi ,)", en: "nums2 (comma separated)" }, default: "9,4,9,8,4" }],
+    approach: [
+      { vi: "Đếm tần suất từng giá trị của nums1.", en: "Count each nums1 value's frequency." },
+      { vi: "Khi nums2 có giá trị còn count dương, thêm nó rồi giảm count.", en: "When a nums2 value still has positive count, append it then decrement the count." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(m)", note: { vi: "Hash map giữ số bản sao còn dùng được từ nums1.", en: "The hash map holds remaining usable copies from nums1." } },
+    code: ["from collections import Counter", "", "class Solution:", "    def intersect(self, nums1, nums2):", "        count = Counter(nums1)", "        result = []", "        for num in nums2:", "            if count[num] > 0:", "                result.append(num)", "                count[num] -= 1", "        return result"],
+    liveArgs: (input, params) => [parseIntegerListSmallHash(input, "nums1"), parseIntegerListSmallHash(params.nums2, "nums2")],
+    builder: buildSteps350,
+  },
+  387: {
+    id: 387,
+    difficulty: "easy",
+    slug: "first-unique-character-in-a-string",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }, { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" }],
+    title: { vi: "First Unique Character in a String", en: "First Unique Character in a String" },
+    titleVi: { vi: "Ký tự duy nhất đầu tiên", en: "First non-repeating character" },
+    statement: { vi: "Trả về chỉ số đầu tiên có ký tự xuất hiện đúng một lần, hoặc -1.", en: "Return the first index whose character occurs exactly once, or -1." },
+    defaultInput: "loveleetcode",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "Đếm tần suất toàn bộ ký tự trong s.", en: "Count every character in s." },
+      { vi: "Duyệt lại từ trái sang phải; ký tự đầu tiên có count 1 là đáp án.", en: "Scan left to right again; the first character with count 1 is the answer." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Bảng tần suất ký tự có kích thước giới hạn bởi alphabet.", en: "The character frequency table is bounded by the alphabet." } },
+    code: ["from collections import Counter", "", "class Solution:", "    def firstUniqChar(self, s):", "        count = Counter(s)", "        for i, ch in enumerate(s):", "            if count[ch] == 1:", "                return i", "        return -1"],
+    liveArgs: (input) => [String(input ?? "")],
+    builder: buildSteps387,
+  },
+  496: {
+    id: 496,
+    difficulty: "easy",
+    slug: "next-greater-element-i",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    tags: [{ key: "hashmap", vi: "Hash Map", en: "Hash Map" }, { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" }],
+    title: { vi: "Next Greater Element I", en: "Next Greater Element I" },
+    titleVi: { vi: "Phần tử lớn hơn kế tiếp", en: "Next greater element" },
+    statement: { vi: "Với mỗi giá trị trong nums1, tìm phần tử lớn hơn đầu tiên nằm bên phải nó trong nums2, hoặc -1.", en: "For each nums1 value, find its first greater value to the right in nums2, or -1." },
+    defaultInput: "4,1,2", inputKind: "string", inputLabel: { vi: "nums1 (cách bởi ,)", en: "nums1 (comma separated)" },
+    extraParams: [{ key: "nums2", type: "string", label: { vi: "nums2 (cách bởi ,)", en: "nums2 (comma separated)" }, default: "1,3,4,2" }],
+    approach: [
+      { vi: "Duyệt nums2 và giữ stack giảm dần gồm các giá trị chưa được giải quyết.", en: "Scan nums2 and keep a decreasing stack of unresolved values." },
+      { vi: "Khi num lớn hơn đỉnh stack, nó là next greater của đỉnh đó; pop và lưu mapping.", en: "When num exceeds the stack top, it is that top's next greater value; pop and store the mapping." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(n)", note: { vi: "Mỗi nums2 value được push và pop nhiều nhất một lần.", en: "Every nums2 value is pushed and popped at most once." } },
+    code: ["class Solution:", "    def nextGreaterElement(self, nums1, nums2):", "        next_greater = {}", "        stack = []", "        for num in nums2:", "            while stack and num > stack[-1]:", "                next_greater[stack.pop()] = num", "            stack.append(num)", "        return [next_greater.get(num, -1) for num in nums1]"],
+    liveArgs: (input, params) => [parseIntegerListSmallHash(input, "nums1"), parseIntegerListSmallHash(params.nums2, "nums2")],
+    builder: buildSteps496,
+  },
   149: {
     id: 149,
     difficulty: "hard",

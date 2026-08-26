@@ -6732,7 +6732,131 @@ function buildSteps352(input, params) {
   return { original: { operations: raw }, answer: results, steps };
 }
 
+// ─── 540: binary search on even-aligned duplicate pairs ───────────────────
+function buildSteps540(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  if (!nums.length || nums.length > 17 || nums.some((value) => !Number.isInteger(value)) || nums.some((value, index) => index && value < nums[index - 1])) {
+    throw new Error("Use a sorted array of 1 to 17 integers.");
+  }
+  const frequencies = new Map();
+  nums.forEach((value) => frequencies.set(value, (frequencies.get(value) || 0) + 1));
+  const singles = [...frequencies.entries()].filter(([, count]) => count === 1).map(([value]) => value);
+  const validPairs = [...frequencies.values()].every((count) => count === 1 || count === 2);
+  if (nums.length % 2 !== 1 || singles.length !== 1 || !validPairs) {
+    throw new Error("The array must contain exactly one single value and every other value exactly twice.");
+  }
+  const steps = [];
+  const snap = (title, codeLines, note, extra = {}) => steps.push({
+    title,
+    arr: [...nums],
+    highlight: [extra.left, extra.right, extra.mid, extra.midNext].filter(Number.isInteger),
+    mark: Array.isArray(extra.discarded) ? extra.discarded : [],
+    codeLines,
+    vars: [{ name: "left", value: extra.left }, { name: "right", value: extra.right }, { name: "mid", value: extra.mid ?? "-" }],
+    note,
+    final: Boolean(extra.final),
+    sequenceTraceView: {
+      kind: "single-pair", nums: [...nums], left: extra.left, right: extra.right,
+      mid: extra.mid ?? -1, pairEnd: extra.midNext ?? -1,
+      phase: extra.phase || "setup", answer: extra.answer ?? null,
+    },
+  });
+
+  let left = 0;
+  let right = nums.length - 1;
+  snap(
+    { vi: "Khởi tạo left và right", en: "Initialize left and right" }, [3],
+    { vi: "Trước phần tử đơn, cặp bắt đầu ở chỉ số chẵn; sau nó, cặp lệch sang chỉ số lẻ.", en: "Before the single value, pairs begin at even indices; after it, the pairs shift to odd indices." },
+    { left, right, phase: "setup" },
+  );
+  while (left < right) {
+    snap(
+      { vi: `left < right: ${left} < ${right}`, en: `left < right: ${left} < ${right}` }, [4],
+      { vi: "Khoảng tìm kiếm còn ít nhất hai vị trí.", en: "The search interval still has at least two positions." },
+      { left, right, phase: "loop" },
+    );
+    let mid = Math.floor((left + right) / 2);
+    snap(
+      { vi: `mid = (${left} + ${right}) // 2 = ${mid}`, en: `mid = (${left} + ${right}) // 2 = ${mid}` }, [5],
+      { vi: "Chọn điểm giữa trong đoạn còn lại.", en: "Choose the middle of the remaining interval." },
+      { left, right, mid, phase: "mid" },
+    );
+    if (mid % 2 === 1) {
+      snap(
+        { vi: `mid % 2 == 1 → ${mid} là lẻ`, en: `mid % 2 == 1 → ${mid} is odd` }, [6],
+        { vi: "Lùi về chỉ số chẵn để so sánh đúng một cặp [mid, mid+1].", en: "Move back to an even index so [mid, mid+1] is a complete pair." },
+        { left, right, mid, phase: "align-check" },
+      );
+      mid -= 1;
+      snap(
+        { vi: `mid -= 1 → ${mid}`, en: `mid -= 1 → ${mid}` }, [7],
+        { vi: "mid đã được căn thẳng vào đầu cặp kỳ vọng.", en: "mid is now aligned with an expected pair start." },
+        { left, right, mid, midNext: mid + 1, phase: "align" },
+      );
+    } else {
+      snap(
+        { vi: `mid % 2 == 1 → False`, en: `mid % 2 == 1 → False` }, [6],
+        { vi: "mid đã là chỉ số chẵn, giữ nguyên để kiểm tra cặp.", en: "mid is already even, so keep it as the pair start." },
+        { left, right, mid, midNext: mid + 1, phase: "align" },
+      );
+    }
+    const intactPair = nums[mid] === nums[mid + 1];
+    snap(
+      { vi: `nums[${mid}] == nums[${mid + 1}] → ${intactPair}`, en: `nums[${mid}] == nums[${mid + 1}] → ${intactPair}` }, [8],
+      intactPair
+        ? { vi: "Cặp còn nguyên, nên phần tử đơn phải ở bên phải cặp này.", en: "The pair is intact, so the single value must be to its right." }
+        : { vi: "Cặp bị lệch tại đây, nên phần tử đơn nằm ở mid hoặc bên trái.", en: "The pair breaks here, so the single value lies at mid or to its left." },
+      { left, right, mid, midNext: mid + 1, phase: "compare" },
+    );
+    if (intactPair) {
+      left = mid + 2;
+      snap(
+        { vi: `left = mid + 2 → ${left}`, en: `left = mid + 2 → ${left}` }, [9],
+        { vi: "Bỏ cả cặp nguyên và mọi phần tử bên trái nó.", en: "Discard this intact pair and everything to its left." },
+        { left, right, mid, midNext: mid + 1, phase: "move-left" },
+      );
+    } else {
+      snap(
+        { vi: "else: cặp không nguyên", en: "else: pair is broken" }, [10],
+        { vi: "Nửa phải sau mid không thể chứa phần tử đơn đầu tiên phá vỡ quy luật cặp.", en: "The right half after mid cannot contain the first value that breaks the pair rule." },
+        { left, right, mid, midNext: mid + 1, phase: "else" },
+      );
+      right = mid;
+      snap(
+        { vi: `right = mid → ${right}`, en: `right = mid → ${right}` }, [11],
+        { vi: "Giữ nửa trái, bao gồm mid, để tiếp tục tìm.", en: "Keep the left half, including mid, for the next search." },
+        { left, right, mid, midNext: mid + 1, phase: "move-right" },
+      );
+    }
+  }
+  snap(
+    { vi: `return nums[left] = ${nums[left]}`, en: `return nums[left] = ${nums[left]}` }, [12],
+    { vi: "left và right đã hội tụ tại phần tử không có cặp.", en: "left and right converged on the value without a pair." },
+    { left, right, mid: left, phase: "done", answer: nums[left], final: true },
+  );
+  return { original: [...nums], answer: nums[left], steps };
+}
+
 module.exports = Object.assign(module.exports, {
+  540: {
+    id: 540,
+    difficulty: "medium",
+    slug: "single-element-in-a-sorted-array",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Single Element in a Sorted Array", en: "Single Element in a Sorted Array" },
+    titleVi: { vi: "Phần tử đơn trong mảng đã sắp xếp", en: "Find the unpaired value in a sorted array" },
+    statement: { vi: "Trong mảng đã sắp xếp, mọi giá trị xuất hiện hai lần trừ một giá trị. Tìm giá trị đơn trong O(log n).", en: "In a sorted array, every value appears twice except one. Find the single value in O(log n)." },
+    defaultInput: "1,1,2,3,3,4,4,8,8",
+    inputKind: "integer", inputLabel: { vi: "nums đã sắp xếp", en: "sorted nums" }, extraParams: [],
+    approach: [
+      { vi: "Trước giá trị đơn, cặp bắt đầu ở chỉ số chẵn; sau đó pattern bị lệch.", en: "Before the single value, pairs start at even indices; afterward the pattern shifts." },
+      { vi: "Căn mid về chỉ số chẵn rồi kiểm tra cặp [mid, mid+1].", en: "Align mid to an even index, then inspect the pair [mid, mid+1]." },
+    ],
+    complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Mỗi lần loại bỏ xấp xỉ một nửa đoạn tìm kiếm.", en: "Each iteration discards roughly half the search interval." } },
+    code: ["class Solution:", "    def singleNonDuplicate(self, nums):", "        left, right = 0, len(nums) - 1", "        while left < right:", "            mid = (left + right) // 2", "            if mid % 2 == 1:", "                mid -= 1", "            if nums[mid] == nums[mid + 1]:", "                left = mid + 2", "            else:", "                right = mid", "        return nums[left]"],
+    builder: buildSteps540,
+  },
   352: {
     id: 352,
     difficulty: "hard",
