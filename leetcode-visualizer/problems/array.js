@@ -2069,6 +2069,10 @@ function buildSteps85(input) {
   const matrix = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
     .map((row) => (row.includes(",") ? row.split(",") : [...row]).map((cell) => String(cell).trim()));
   if (!matrix.length || !matrix[0].length) throw new Error("Enter a binary matrix, e.g. 1,0,1,0,0;1,0,1,1,1");
+  if (!matrix.every((row) => row.length === matrix[0].length && row.every((cell) => cell === "0" || cell === "1"))) {
+    throw new Error("Matrix must be rectangular and contain only 0/1.");
+  }
+  if (matrix.length > 8 || matrix[0].length > 8) throw new Error("Visualization for 85 supports matrices up to 8 x 8.");
   const rows = matrix.length;
   const cols = matrix[0].length;
   const heights = new Array(cols).fill(0);
@@ -2085,27 +2089,71 @@ function buildSteps85(input) {
     return cells;
   }
 
-  function push({ title, codeLines, row = null, col = null, stack = [], popped = null, candidate = null, final = false, vars = [], note }) {
+  function stackLabel(stack) {
+    return `[${stack.map((i) => `${i}:${i < cols ? heights[i] : 0}`).join(", ")}]`;
+  }
+
+  function rectLabel(rect, fallback = "none") {
+    return rect ? `rows ${rect.top}-${rect.bottom}, cols ${rect.left}-${rect.right}` : fallback;
+  }
+
+  function labelCells({ row, col, candidate, best, currentLabel }) {
+    const labels = {};
+    if (best) labels[`${best.top},${best.left}`] = { vi: "best", en: "best" };
+    if (candidate) labels[`${candidate.top},${candidate.left}`] = { vi: "cand", en: "cand" };
+    if (Number.isInteger(row) && Number.isInteger(col) && row < rows && col < cols) {
+      labels[`${row},${col}`] = currentLabel || { vi: "đang xét", en: "current" };
+    }
+    return labels;
+  }
+
+  function push({
+    title,
+    codeLines,
+    row = null,
+    col = null,
+    stack = [],
+    popped = null,
+    left = null,
+    right = null,
+    candidate = null,
+    showBest = true,
+    final = false,
+    vars = [],
+    note,
+    caption,
+    secondaryCaption,
+    currentLabel,
+  }) {
+    const visibleRect = candidate || (showBest ? bestRect : null);
+    const span = Number.isInteger(left) && Number.isInteger(right)
+      ? Array.from({ length: Math.max(0, right - left + 1) }, (_, offset) => left + offset)
+      : [];
     const gridStep = matrixStep2D(matrix, {
       title,
       codeLines,
       final,
       vars: [
         { name: "heights", value: `[${heights.join(",")}]` },
-        { name: "stack", value: `[${stack.map((i) => `${i}:${i < cols ? heights[i] : 0}`).join(", ")}]` },
+        { name: "stack", value: stackLabel(stack) },
         { name: "max_area", value: maxArea },
         ...vars,
       ],
       note,
       grid: {
         hlCell: Number.isInteger(row) && Number.isInteger(col) ? [row, col] : null,
-        pathCells: candidate ? rectCells(candidate) : rectCells(bestRect),
-        caption: "Binary matrix",
+        pathCells: rectCells(visibleRect),
+        historyCells: Number.isInteger(row)
+          ? Array.from({ length: row }, (_, r) => matrix[r].map((_, c) => [r, c])).flat()
+          : [],
+        cellLabels: labelCells({ row, col, candidate, best: showBest ? bestRect : null, currentLabel }),
+        caption: caption || { vi: "Ma trận nhị phân", en: "Binary matrix" },
+        secondaryCaption,
       },
     });
     gridStep.arr = [...heights];
     gridStep.sub = heights.map((_, index) => `[${index}]`);
-    gridStep.highlight = [];
+    gridStep.highlight = [...span.filter((i) => i >= 0 && i < cols)];
     if (Number.isInteger(col) && col < cols) gridStep.highlight.push(col);
     if (Number.isInteger(popped) && popped < cols) gridStep.highlight.push(popped);
     gridStep.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, offset) => bestRect.left + offset) : [];
@@ -2114,21 +2162,40 @@ function buildSteps85(input) {
 
   push({
     title: { vi: "Khởi tạo heights = 0", en: "Initialize heights = 0" },
-    codeLines: [3, 4],
+    codeLines: [3, 4, 5],
     vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
-    note: { vi: "Mỗi hàng biến thành một histogram: heights[c] là số lượng '1' liên tiếp kết thúc tại hàng hiện tại.", en: "Each row becomes a histogram: heights[c] is the count of consecutive 1s ending at the current row." },
+    secondaryCaption: { vi: "heights[c] = số lượng 1 liên tiếp kết thúc tại hàng hiện tại.", en: "heights[c] = consecutive 1s ending at the current row." },
+    note: { vi: "Mỗi hàng biến thành một histogram. Sau khi cập nhật heights của hàng r, bài toán trên hàng đó trở thành Largest Rectangle in Histogram.", en: "Each row becomes a histogram. After updating heights for row r, that row becomes a Largest Rectangle in Histogram problem." },
   });
 
   for (let r = 0; r < rows; r++) {
+    push({
+      title: { vi: `Bắt đầu hàng ${r}`, en: `Start row ${r}` },
+      codeLines: [6],
+      row: r,
+      showBest: Boolean(bestRect),
+      vars: [{ name: "row", value: r }],
+      caption: { vi: `Cập nhật histogram cho hàng ${r}`, en: `Update histogram for row ${r}` },
+      secondaryCaption: { vi: "Ô 1 kéo dài cột histogram; ô 0 cắt đứt cột đó.", en: "A 1 extends the histogram bar; a 0 resets that bar." },
+      note: { vi: `Ta chỉ xét các rectangle có đáy nằm tại hàng ${r}.`, en: `Now consider rectangles whose bottom edge is row ${r}.` },
+    });
+
     for (let c = 0; c < cols; c++) {
+      const oldHeight = heights[c];
       heights[c] = matrix[r][c] === "1" ? heights[c] + 1 : 0;
       push({
-        title: { vi: `Cập nhật heights[${c}] tại hàng ${r}`, en: `Update heights[${c}] at row ${r}` },
-        codeLines: [5, 6, 7],
+        title: { vi: `heights[${c}]: ${oldHeight} → ${heights[c]}`, en: `heights[${c}]: ${oldHeight} → ${heights[c]}` },
+        codeLines: [7, 8],
         row: r,
         col: c,
-        vars: [{ name: "matrix[r][c]", value: matrix[r][c] }],
-        note: { vi: matrix[r][c] === "1" ? "Gặp 1 nên tăng chiều cao histogram." : "Gặp 0 nên reset chiều cao về 0.", en: matrix[r][c] === "1" ? "A 1 extends the histogram height." : "A 0 resets the height to 0." },
+        vars: [
+          { name: "matrix[r][c]", value: matrix[r][c] },
+          { name: "old height", value: oldHeight },
+          { name: "new height", value: heights[c] },
+        ],
+        currentLabel: { vi: matrix[r][c] === "1" ? "+1" : "reset", en: matrix[r][c] === "1" ? "+1" : "reset" },
+        secondaryCaption: { vi: `Sau ô (${r},${c}), heights = [${heights.join(", ")}]`, en: `After cell (${r},${c}), heights = [${heights.join(", ")}]` },
+        note: { vi: matrix[r][c] === "1" ? "Gặp 1 nên tăng chiều cao histogram ở cột này." : "Gặp 0 nên không rectangle toàn 1 nào đi xuyên qua ô này; reset về 0.", en: matrix[r][c] === "1" ? "A 1 extends this histogram bar." : "A 0 blocks any all-1 rectangle through this cell, so reset to 0." },
       });
     }
 
@@ -2136,41 +2203,141 @@ function buildSteps85(input) {
     const bars = [...heights, 0];
     push({
       title: { vi: `Xử lý histogram của hàng ${r}`, en: `Process row ${r}'s histogram` },
-      codeLines: [8, 9],
+      codeLines: [9, 10],
       row: r,
       vars: [{ name: "row", value: r }],
-      note: { vi: "Thêm cột lính canh 0 ở cuối để xả stack.", en: "Append a sentinel 0 bar to flush the stack." },
+      caption: { vi: `Histogram đáy ở hàng ${r}`, en: `Histogram ending at row ${r}` },
+      secondaryCaption: { vi: `bars = heights + [0] = [${bars.join(", ")}]`, en: `bars = heights + [0] = [${bars.join(", ")}]` },
+      note: { vi: "Thêm cột sentinel 0 ở cuối để xả stack và tính hết các rectangle còn mở.", en: "Append a sentinel 0 bar to flush the stack and evaluate all still-open rectangles." },
     });
 
     for (let i = 0; i <= cols; i++) {
-      while (stack.length && bars[stack[stack.length - 1]] >= bars[i]) {
+      push({
+        title: i === cols
+          ? { vi: `Duyệt sentinel i=${i}`, en: `Scan sentinel i=${i}` }
+          : { vi: `Duyệt cột i=${i}, height=${bars[i]}`, en: `Scan column i=${i}, height=${bars[i]}` },
+        codeLines: [10],
+        row: r,
+        col: i < cols ? i : null,
+        stack,
+        showBest: Boolean(bestRect),
+        vars: [{ name: "i", value: i === cols ? "sentinel" : i }, { name: "h", value: bars[i] }],
+        secondaryCaption: i === cols
+          ? { vi: "Sentinel height 0 buộc các cột còn lại bị pop.", en: "The height-0 sentinel forces remaining bars to pop." }
+          : { vi: `So sánh height ${bars[i]} với đỉnh stack.`, en: `Compare height ${bars[i]} with the stack top.` },
+        note: { vi: "Stack lưu index các cột có height tăng dần.", en: "The stack stores column indices in increasing height order." },
+      });
+
+      while (true) {
+        const topIndex = stack.length ? stack[stack.length - 1] : null;
+        const shouldPop = topIndex !== null && bars[topIndex] >= bars[i];
+        push({
+          title: { vi: `Kiểm tra while → ${shouldPop}`, en: `Evaluate while → ${shouldPop}` },
+          codeLines: [11],
+          row: r,
+          col: i < cols ? i : null,
+          stack,
+          popped: topIndex,
+          showBest: Boolean(bestRect),
+          vars: topIndex === null
+            ? [{ name: "condition", value: false }]
+            : [
+                { name: "stack[-1]", value: topIndex },
+                { name: `bars[${topIndex}] >= h`, value: `${bars[topIndex]} >= ${bars[i]} → ${shouldPop}` },
+              ],
+          secondaryCaption: shouldPop
+            ? { vi: "Current thấp hơn/bằng đỉnh stack, nên pop để chốt rectangle của đỉnh đó.", en: "Current is lower/equal to the stack top, so pop to close that top bar's rectangle." }
+            : { vi: "Điều kiện sai, có thể push current vào stack.", en: "Condition is false, so current can be pushed." },
+          note: shouldPop
+            ? { vi: `Cột ${i === cols ? "sentinel" : i} là biên phải đầu tiên làm height ${bars[topIndex]} không thể kéo tiếp.`, en: `Column ${i === cols ? "sentinel" : i} is the first right boundary that blocks height ${bars[topIndex]}.` }
+            : topIndex === null
+              ? { vi: "Stack rỗng, không có gì để pop.", en: "The stack is empty; nothing to pop." }
+              : { vi: `Height ${bars[topIndex]} < ${bars[i]}, stack vẫn tăng.`, en: `Height ${bars[topIndex]} < ${bars[i]}, so the stack remains increasing.` },
+        });
+
+        if (!shouldPop) break;
+
         const top = stack.pop();
         const height = bars[top];
+        push({
+          title: { vi: `top = stack.pop() → ${top}`, en: `top = stack.pop() → ${top}` },
+          codeLines: [12],
+          row: r,
+          col: i < cols ? i : null,
+          stack,
+          popped: top,
+          showBest: Boolean(bestRect),
+          vars: [{ name: "top", value: top }, { name: "height", value: height }],
+          secondaryCaption: { vi: `Cột ${top} cao ${height} đã có biên phải là ${i - 1}.`, en: `Column ${top} with height ${height} now has right boundary ${i - 1}.` },
+          note: { vi: "Sau khi pop, đỉnh stack mới sẽ cho biết biên trái gần nhất thấp hơn height này.", en: "After popping, the new stack top gives the nearest lower left boundary for this height." },
+        });
+
         const left = stack.length ? stack[stack.length - 1] + 1 : 0;
         const right = i - 1;
         const width = right - left + 1;
         const area = height * width;
         const candidate = height > 0 ? { top: r - height + 1, bottom: r, left, right } : null;
+        push({
+          title: { vi: `Rectangle ứng viên: ${height} × ${width} = ${area}`, en: `Candidate rectangle: ${height} × ${width} = ${area}` },
+          codeLines: [13],
+          row: r,
+          col: i < cols ? i : null,
+          stack,
+          popped: top,
+          left,
+          right,
+          candidate,
+          showBest: Boolean(bestRect),
+          vars: [
+            { name: "left", value: left },
+            { name: "right", value: right },
+            { name: "width", value: width },
+            { name: "height", value: height },
+            { name: "area", value: area },
+          ],
+          caption: { vi: candidate ? "Rectangle ứng viên trên ma trận" : "Height 0 không tạo rectangle", en: candidate ? "Candidate rectangle on the matrix" : "Height 0 creates no rectangle" },
+          secondaryCaption: candidate
+            ? { vi: `${rectLabel(candidate)} → area ${area}`, en: `${rectLabel(candidate)} → area ${area}` }
+            : { vi: "Sentinel height 0 chỉ dùng để xả stack.", en: "The height-0 sentinel is only used to flush the stack." },
+          note: candidate
+            ? { vi: `Vì đáy rectangle ở hàng ${r}, top = r - height + 1 = ${candidate.top}.`, en: `Because the rectangle bottom is row ${r}, top = r - height + 1 = ${candidate.top}.` }
+            : { vi: "Không cập nhật best với rectangle rỗng.", en: "Do not update best with an empty rectangle." },
+        });
+
+        const previousBest = maxArea;
         if (area > maxArea) {
           maxArea = area;
           bestRect = candidate;
         }
         push({
-          title: { vi: `Pop cột ${top}: area=${area}`, en: `Pop column ${top}: area=${area}` },
-          codeLines: [10, 11, 12, 13, 14],
+          title: area > previousBest
+            ? { vi: `Cập nhật best = ${maxArea}`, en: `Update best = ${maxArea}` }
+            : { vi: `Giữ best = ${maxArea}`, en: `Keep best = ${maxArea}` },
+          codeLines: [14],
           row: r,
           col: i < cols ? i : null,
           stack,
           popped: top,
           candidate,
+          left,
+          right,
           vars: [
+            { name: "old best", value: previousBest },
             { name: "height", value: height },
             { name: "left..right", value: `${left}..${right}` },
             { name: "area", value: area },
+            { name: "best rectangle", value: rectLabel(bestRect) },
           ],
-          note: { vi: `Cột ${i === cols ? "sentinel" : i} thấp hơn/bằng, nên ${top} tìm được biên phải tại ${right}.`, en: `The ${i === cols ? "sentinel" : `bar ${i}`} is lower/equal, so ${top}'s right boundary is ${right}.` },
+          caption: { vi: "So sánh rectangle ứng viên với best hiện tại", en: "Compare candidate rectangle with current best" },
+          secondaryCaption: area > previousBest
+            ? { vi: `${area} > ${previousBest}, lưu rectangle mới.`, en: `${area} > ${previousBest}, store the new rectangle.` }
+            : { vi: `${area} <= ${previousBest}, không đổi best.`, en: `${area} <= ${previousBest}, keep the existing best.` },
+          note: area > previousBest
+            ? { vi: `Best mới là ${rectLabel(bestRect)} với diện tích ${maxArea}.`, en: `The new best is ${rectLabel(bestRect)} with area ${maxArea}.` }
+            : { vi: `Rectangle này không tốt hơn best hiện tại.`, en: `This rectangle does not improve the current best.` },
         });
       }
+
       stack.push(i);
       push({
         title: { vi: `Push cột ${i === cols ? "sentinel" : i}`, en: `Push ${i === cols ? "sentinel" : `column ${i}`}` },
@@ -2178,8 +2345,10 @@ function buildSteps85(input) {
         row: r,
         col: i < cols ? i : null,
         stack,
+        showBest: Boolean(bestRect),
         vars: [{ name: "i", value: i === cols ? "sentinel" : i }],
-        note: { vi: "Stack giữ index có chiều cao tăng dần.", en: "The stack keeps indices in increasing height order." },
+        secondaryCaption: { vi: `stack = ${stackLabel(stack)}`, en: `stack = ${stackLabel(stack)}` },
+        note: { vi: "Sau khi pop hết cột cao hơn/bằng, stack giữ index có chiều cao tăng dần.", en: "After popping every taller/equal bar, the stack keeps indices in increasing height order." },
       });
     }
   }
@@ -2188,7 +2357,11 @@ function buildSteps85(input) {
     title: { vi: `Diện tích lớn nhất = ${maxArea}`, en: `Largest area = ${maxArea}` },
     codeLines: [16],
     final: true,
-    vars: [{ name: "best rectangle", value: bestRect ? `rows ${bestRect.top}-${bestRect.bottom}, cols ${bestRect.left}-${bestRect.right}` : "none" }],
+    vars: [{ name: "best rectangle", value: rectLabel(bestRect) }, { name: "answer", value: maxArea }],
+    caption: { vi: "Best rectangle cuối cùng", en: "Final best rectangle" },
+    secondaryCaption: bestRect
+      ? { vi: `${rectLabel(bestRect)} có area ${maxArea}.`, en: `${rectLabel(bestRect)} has area ${maxArea}.` }
+      : { vi: "Không có ô 1 nào.", en: "No 1-cell exists." },
     note: { vi: "Hình chữ nhật tốt nhất được tô trên ma trận; histogram cuối hiển thị hàng cuối đã xử lý.", en: "The best rectangle is highlighted on the matrix; the histogram shows the last processed row." },
   });
 
