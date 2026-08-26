@@ -10256,8 +10256,6 @@ function buildSteps416(nums) {
  */
 function buildSteps1301(input) {
   const MOD = 1_000_000_007;
-  // Parse: rows separated by |, cells run together ("E23|2X2|12S") or
-  // separated by commas ("E,2,3|2,X,2|1,2,S"). Trim whitespace.
   const rawRows = String(input || "").split("|").map((r) => r.trim()).filter(Boolean);
   const board = rawRows.map((row) => {
     const cells = row.includes(",") ? row.split(",").map((s) => s.trim()) : row.split("");
@@ -10283,45 +10281,56 @@ function buildSteps1301(input) {
       },
     });
     return { original: board, answer: [0, 0], steps };
-  }
+	  }
 
   if (rows === 0 || cols === 0 || board.some((row) => row.length !== cols)) return invalid();
   if (board[0][0] !== "E" || board[rows - 1][cols - 1] !== "S") return invalid();
+  if (!board.every((row) => row.every((cell) => cell === "E" || cell === "S" || cell === "X" || /^[0-9]$/.test(cell)))) return invalid();
+  if (rows > 8 || cols > 8) throw new Error("Visualization for 1301 supports boards up to 8 x 8.");
 
-  // dp[r][c]/cnt[r][c] — dp = -1 means unreachable.
   const dp = Array.from({ length: rows }, () => Array(cols).fill(-1));
   const cnt = Array.from({ length: rows }, () => Array(cols).fill(0));
   dp[rows - 1][cols - 1] = 0;
   cnt[rows - 1][cols - 1] = 1;
 
+  function scoreMeta(r, c) {
+    return dp[r][c] < 0 ? "·" : `${dp[r][c]}|${cnt[r][c]}`;
+  }
+
   function cellLabel(r, c) {
     const raw = board[r][c];
     if (raw === "X") return "■";
-    const s = dp[r][c];
-    const k = cnt[r][c];
-    if (s < 0) return raw; // unreached
-    return `${raw}\n${s}|${k}`;
+    return raw;
   }
 
-  function cellClass(r, c, currentR, currentC, hlPreds) {
+  function sameCell(a, r, c) {
+    return a && a[0] === r && a[1] === c;
+  }
+
+  function cellClass(r, c, currentR, currentC, hlPreds, bestPreds) {
     const raw = board[r][c];
     if (raw === "X") return "wall";
     if (r === currentR && c === currentC) return "current";
-    if (hlPreds && hlPreds.some(([pr, pc]) => pr === r && pc === c)) return "queued";
+    if (bestPreds && bestPreds.some((cell) => sameCell(cell, r, c))) return "visited";
+    if (hlPreds && hlPreds.some((cell) => sameCell(cell, r, c))) return "queued";
     if (raw === "S") return "start";
     if (raw === "E") return "end";
     if (dp[r][c] >= 0) return "visited";
     return "empty";
   }
 
-  function pushStep({ title, currentR, currentC, hlPreds, codeLines, vars, note, final }) {
+  function pushStep({ title, currentR, currentC, hlPreds = [], bestPreds = [], codeLines, vars, note, final }) {
     const cells = board.map((row, r) =>
-      row.map((_, c) => ({ label: cellLabel(r, c), cls: cellClass(r, c, currentR, currentC, hlPreds) }))
+      row.map((_, c) => ({
+        label: cellLabel(r, c),
+        meta: scoreMeta(r, c),
+        cls: cellClass(r, c, currentR, currentC, hlPreds, bestPreds),
+      }))
     );
     steps.push({
       title,
       arr: [],
-      bfsGrid: { rows, cols, cells },
+      bfsGrid: { rows, cols, cells, variant: "max-score-grid" },
       highlight: [],
       mark: [],
       final: !!final,
@@ -10334,7 +10343,7 @@ function buildSteps1301(input) {
   pushStep({
     title: { vi: "Khởi tạo (S = 0, 1 cách)", en: "Initialize (S = 0 score, 1 way)" },
     currentR: rows - 1, currentC: cols - 1,
-    codeLines: [3, 4, 5, 6, 7, 8],
+    codeLines: [3, 4, 5, 6, 7],
     vars: [
       { name: "start (S)", value: `(${rows - 1},${cols - 1})` },
       { name: "end (E)", value: "(0,0)" },
@@ -10348,54 +10357,130 @@ function buildSteps1301(input) {
         `dp[r][c] = max các dp tiền nhiệm + digit tại (r,c); cnt = tổng cnt của tiền nhiệm đạt max đó.`,
       en:
         `Start at S=(${rows - 1},${cols - 1}) with dp=0, cnt=1. Fill the table in reverse order ` +
-        `(bottom-right → top-left). For each cell (r,c) the three possible predecessors are (r+1,c), (r,c+1), (r+1,c+1). ` +
+        `(bottom-right → top-left). For each cell (r,c), the three possible previous cells are (r+1,c), (r,c+1), (r+1,c+1). ` +
         `dp[r][c] = max of predecessor dp + digit at (r,c); cnt = sum of cnts of predecessors achieving that max.`,
     },
   });
 
-  // Walk cells in reverse row-major order (skip S itself).
   for (let r = rows - 1; r >= 0; r--) {
     for (let c = cols - 1; c >= 0; c--) {
-      if (r === rows - 1 && c === cols - 1) continue;
       const raw = board[r][c];
-      if (raw === "X") continue;
+      pushStep({
+        title: { vi: `Xét ô (${r},${c}) = '${raw}'`, en: `Visit cell (${r},${c}) = '${raw}'` },
+        currentR: r, currentC: c,
+        codeLines: [8, 9],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+          { name: "cell", value: raw },
+        ],
+        note: {
+          vi: "Ta duyệt từ dưới-phải lên trên-trái để các ô có thể đi tới tiếp theo đã được tính trước.",
+          en: "We scan from bottom-right to top-left so the next reachable cells are already computed.",
+        },
+      });
+
+      if (r === rows - 1 && c === cols - 1) {
+        pushStep({
+          title: { vi: "Bỏ qua S", en: "Skip S" },
+          currentR: r, currentC: c,
+          codeLines: [10, 11],
+          vars: [{ name: "reason", value: "start cell already initialized" }],
+          note: {
+            vi: "S đã được khởi tạo dp=0, cnt=1 nên không tính lại.",
+            en: "S was already initialized with dp=0, cnt=1, so do not recompute it.",
+          },
+        });
+        continue;
+      }
+
+      if (raw === "X") {
+        pushStep({
+          title: { vi: "Gặp X -> bỏ qua", en: "Obstacle X -> skip" },
+          currentR: r, currentC: c,
+          codeLines: [10, 11],
+          vars: [
+            { name: "dp[r][c]", value: -1 },
+            { name: "cnt[r][c]", value: 0 },
+          ],
+          note: {
+            vi: "Ô chướng ngại không thể đi qua, giữ trạng thái unreachable.",
+            en: "An obstacle cannot be crossed, so it remains unreachable.",
+          },
+        });
+        continue;
+      }
 
       const preds = [];
-      if (r + 1 < rows) preds.push([r + 1, c, "↓"]);
-      if (c + 1 < cols) preds.push([r, c + 1, "→"]);
-      if (r + 1 < rows && c + 1 < cols) preds.push([r + 1, c + 1, "↘"]);
+      if (r + 1 < rows) preds.push({ r: r + 1, c, move: "down", label: "↓" });
+      if (c + 1 < cols) preds.push({ r, c: c + 1, move: "right", label: "→" });
+      if (r + 1 < rows && c + 1 < cols) preds.push({ r: r + 1, c: c + 1, move: "diag", label: "↘" });
 
       let best = -1;
       let ways = 0;
-      const contribs = []; // {pr,pc,arrow,score,count,used}
+      const contribs = [];
 
-      for (const [pr, pc, arrow] of preds) {
-        const s = dp[pr][pc];
-        const k = cnt[pr][pc];
-        contribs.push({ pr, pc, arrow, score: s, count: k, used: false });
-        if (s < 0) continue;
-        if (s > best) {
-          best = s;
-          ways = k;
-        } else if (s === best) {
-          ways = (ways + k) % MOD;
-        }
-      }
-      contribs.forEach((c2) => {
-        c2.used = c2.score === best && best >= 0;
+      pushStep({
+        title: { vi: "Lấy 3 predecessor hợp lệ", en: "Read valid predecessors" },
+        currentR: r, currentC: c,
+        hlPreds: preds.map((p) => [p.r, p.c]),
+        codeLines: [12, 13, 14, 15, 16],
+        vars: [
+          { name: "candidates", value: preds.length ? preds.map((p) => `${p.label}(${p.r},${p.c})=${scoreMeta(p.r, p.c)}`).join(" ") : "none" },
+          { name: "best", value: best },
+          { name: "ways", value: ways },
+        ],
+        note: {
+          vi: "Từ ô hiện tại đi về S theo chiều ngược lại tương ứng với 3 ô đã tính: dưới, phải, dưới-phải.",
+          en: "From the current cell toward S in reverse DP, the already-computed candidates are down, right, and down-right.",
+        },
       });
 
+      for (const pred of preds) {
+        const s = dp[pred.r][pred.c];
+        const k = cnt[pred.r][pred.c];
+        const oldBest = best;
+        const oldWays = ways;
+        let action;
+        if (s < 0) {
+          action = { vi: "bỏ qua vì unreachable", en: "skip because unreachable" };
+        } else if (s > best) {
+          best = s;
+          ways = k;
+          action = { vi: "score lớn hơn -> thay best và ways", en: "higher score -> replace best and ways" };
+        } else if (s === best) {
+          ways = (ways + k) % MOD;
+          action = { vi: "cùng best -> cộng thêm ways", en: "same best -> add ways" };
+        } else {
+          action = { vi: "score nhỏ hơn best -> bỏ qua", en: "lower score than best -> skip" };
+        }
+        contribs.push({ ...pred, score: s, count: k, oldBest, oldWays, best, ways, used: s >= 0 && s === best });
+        pushStep({
+          title: { vi: `Xét ${pred.label} (${pred.r},${pred.c})`, en: `Check ${pred.label} (${pred.r},${pred.c})` },
+          currentR: r, currentC: c,
+          hlPreds: [[pred.r, pred.c]],
+          bestPreds: preds.filter((p) => dp[p.r][p.c] === best && best >= 0).map((p) => [p.r, p.c]),
+          codeLines: s < 0 ? [15, 16] : s > oldBest ? [17, 18] : s === oldBest ? [19, 20] : [17, 19],
+          vars: [
+            { name: "pred score", value: s },
+            { name: "pred cnt", value: k },
+            { name: "best", value: `${oldBest} -> ${best}` },
+            { name: "ways", value: `${oldWays} -> ${ways}` },
+          ],
+          note: action,
+        });
+      }
+
       if (best < 0) {
-        // Unreachable from S
         pushStep({
           title: { vi: `(${r},${c}): không đến được`, en: `(${r},${c}): unreachable` },
           currentR: r, currentC: c,
-          hlPreds: preds.map(([pr, pc]) => [pr, pc]),
-          codeLines: [14, 15, 16, 17, 22, 23],
+          hlPreds: preds.map((p) => [p.r, p.c]),
+          codeLines: [21, 22],
           vars: [
             { name: "cell", value: `(${r},${c})` },
             { name: "char", value: raw },
-            { name: "predecessors", value: contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=${x.score}|${x.count}`).join(" ") },
+            { name: "predecessors", value: contribs.map((x) => `${x.label}(${x.r},${x.c})=${x.score}|${x.count}`).join(" ") || "none" },
             { name: "dp[r][c]", value: -1 },
             { name: "cnt[r][c]", value: 0 },
           ],
@@ -10410,17 +10495,19 @@ function buildSteps1301(input) {
       const digit = /^[0-9]$/.test(raw) ? Number(raw) : 0;
       dp[r][c] = best + digit;
       cnt[r][c] = ways;
+      const winners = preds.filter((p) => dp[p.r][p.c] === best).map((p) => [p.r, p.c]);
 
       pushStep({
         title: { vi: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}` },
         currentR: r, currentC: c,
-        hlPreds: preds.map(([pr, pc]) => [pr, pc]),
-        codeLines: [13, 14, 15, 16, 17, 18, 19, 20, 21, 24, 25],
+        hlPreds: preds.map((p) => [p.r, p.c]),
+        bestPreds: winners,
+        codeLines: [23, 24],
         vars: [
           { name: "cell", value: `(${r},${c})` },
           { name: "char", value: raw },
           { name: "digit", value: digit },
-          { name: "predecessors (score|cnt)", value: contribs.map((x) => `${x.arrow}${x.score < 0 ? "×" : ""}${x.score}|${x.count}${x.used ? "*" : ""}`).join(" ") },
+          { name: "best predecessors", value: winners.map(([wr, wc]) => `(${wr},${wc})`).join(" ") },
           { name: "max predecessor score", value: best },
           { name: "combined cnt", value: ways },
           { name: "dp[r][c]", value: dp[r][c] },
@@ -10429,12 +10516,12 @@ function buildSteps1301(input) {
         note: {
           vi:
             `Ký tự '${raw}' (digit=${digit}). Xét ${preds.length} tiền nhiệm: ` +
-            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (bỏ)" : ""}, cnt ${x.count}`).join("; ") +
+            contribs.map((x) => `${x.label}(${x.r},${x.c})=score ${x.score}${x.score < 0 ? " (bỏ)" : ""}, cnt ${x.count}`).join("; ") +
             `. Max score tiền nhiệm = ${best}, tổng cnt đạt max = ${ways}. ` +
             `Vậy dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
           en:
             `Char '${raw}' (digit=${digit}). ${preds.length} predecessors: ` +
-            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (skip)" : ""}, cnt ${x.count}`).join("; ") +
+            contribs.map((x) => `${x.label}(${x.r},${x.c})=score ${x.score}${x.score < 0 ? " (skip)" : ""}, cnt ${x.count}`).join("; ") +
             `. Max predecessor score = ${best}, combined cnt = ${ways}. ` +
             `So dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
         },
@@ -10450,7 +10537,7 @@ function buildSteps1301(input) {
   pushStep({
     title: { vi: "Kết quả", en: "Result" },
     currentR: 0, currentC: 0,
-    codeLines: reachable ? [28] : [26, 27],
+    codeLines: reachable ? [27] : [25, 26],
     vars: [
       { name: "dp[0][0]", value: finalScore },
       { name: "cnt[0][0]", value: finalCnt },
@@ -22986,8 +23073,14 @@ module.exports = {
     },
     defaultInput: "E23|2X2|12S",
     inputKind: "string",
-    inputLabel: { vi: "board (hàng cách bởi |; chữ liền nhau hoặc cách bởi dấu phẩy)", en: "board (rows split by |; chars run together or comma-separated)" },
+    inputLabel: { vi: "board (hàng cách bởi |; tối đa 8x8 cho visualization)", en: "board (rows split by |; up to 8x8 for visualization)" },
     extraParams: [],
+    approach: [
+      { vi: "Duyệt từ S về E theo thứ tự ngược: dưới-phải lên trên-trái.", en: "Scan in reverse from S toward E: bottom-right to top-left." },
+      { vi: "Mỗi ô nhìn 3 predecessor đã tính: dưới, phải, dưới-phải.", en: "Each cell reads three already-computed predecessors: down, right, and down-right." },
+      { vi: "dp[r][c] giữ max score; cnt[r][c] giữ số đường đạt max score đó.", en: "dp[r][c] stores max score; cnt[r][c] stores the number of paths achieving that score." },
+      { vi: "Nếu nhiều predecessor cùng max score, cộng cnt của chúng modulo 1e9+7.", en: "If multiple predecessors share the max score, add their counts modulo 1e9+7." },
+    ],
     complexity: {
       time: "O(m·n)",
       space: "O(m·n)",

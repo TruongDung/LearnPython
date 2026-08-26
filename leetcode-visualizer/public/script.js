@@ -3211,6 +3211,7 @@ function renderBfsGrid(step) {
   const isPhonePath = variant === "phone-path";
   const isEffortGrid = variant === "effort-grid";
   const isDistinctIslands = variant === "distinct-islands";
+  const isMaxScoreGrid = variant === "max-score-grid";
   const variantClass = isTicTacToe
     ? " tic-tac-toe-grid"
     : isPhonePath
@@ -3219,11 +3220,13 @@ function renderBfsGrid(step) {
         ? " effort-grid"
         : isDistinctIslands
           ? " distinct-islands-grid"
+          : isMaxScoreGrid
+            ? " max-score-grid"
         : "";
   const gridClass = `bfs-grid${variantClass}${isEffortGrid && step.effortView ? " minimax-effort-grid" : ""}`;
   const gridStyle = isTicTacToe
     ? ""
-    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isDistinctIslands ? "58px" : "32px"})"`;
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isDistinctIslands ? "58px" : isMaxScoreGrid ? "74px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
