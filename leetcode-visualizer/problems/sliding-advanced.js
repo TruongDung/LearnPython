@@ -365,6 +365,156 @@ function buildSteps2904(input, params) {
   return { original: s, k, answer: best, steps };
 }
 
+function buildSteps2904Positions(input, params) {
+  const s = String(input ?? "");
+  if (!/^[01]+$/.test(s)) throw new Error("s must be a non-empty binary string");
+  const k = Number(params?.k ?? 2);
+  if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer");
+
+  const chars = [...s];
+  const onesPos = [];
+  const steps = [];
+  let best = "";
+  let bestLeft = -1;
+  let bestRight = -1;
+
+  const addLabel = (labels, index, label) => {
+    if (index < 0 || index >= chars.length) return;
+    const key = `0,${index + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const bestRange = () => bestLeft >= 0 ? range(bestLeft, bestRight) : [];
+  const better = (candidate) => (
+    best === "" || candidate.length < best.length || (candidate.length === best.length && candidate < best)
+  );
+  const makeGrid = (opts = {}) => {
+    const labels = {};
+    for (const index of onesPos) addLabel(labels, index, "1-pos");
+    for (const index of bestRange()) addLabel(labels, index, "best");
+    if (Number.isInteger(opts.left)) addLabel(labels, opts.left, `L=${opts.left}`);
+    if (Number.isInteger(opts.right)) addLabel(labels, opts.right, `R=${opts.right}`);
+    const candidateCells = Number.isInteger(opts.left) && Number.isInteger(opts.right)
+      ? range(opts.left, opts.right)
+      : [];
+    const active = new Set(candidateCells);
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      autoScrollCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      pathCells: candidateCells.map((index) => [0, index + 1]),
+      historyCells: bestRange().filter((index) => !active.has(index)).map((index) => [0, index + 1]),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || `ones positions=[${onesPos.join(", ")}] · best=${JSON.stringify(best)}`,
+      secondaryCaption: "Each candidate starts at one_pos[i] and ends at one_pos[i+k-1].",
+    };
+  };
+  const snap = (title, line, note, extra = {}) => {
+    steps.push({
+      title,
+      arr: [],
+      grid: makeGrid(extra),
+      highlight: [],
+      mark: bestRange(),
+      final: Boolean(extra.final),
+      codeLines: [line],
+      vars: [
+        { name: "k", value: k },
+        { name: "ones", value: `[${onesPos.join(", ")}]` },
+        { name: "best", value: JSON.stringify(best) },
+        ...(extra.vars || []),
+      ],
+      note,
+    });
+  };
+
+  snap(
+    { vi: "Khởi tạo danh sách vị trí bit 1", en: "Initialize the 1-position list" },
+    3,
+    { vi: "Ta chỉ quan tâm đến vị trí các ký tự '1', vì substring đẹp ngắn nhất luôn bắt đầu và kết thúc bằng '1'.", en: "We only care about positions of '1', because the shortest beautiful substring always starts and ends with '1'." },
+  );
+
+  for (let i = 0; i < chars.length; i++) {
+    snap(
+      { vi: `Quét s[${i}] = ${chars[i]}`, en: `Scan s[${i}] = ${chars[i]}` },
+      4,
+      { vi: "Duyệt chuỗi một lần để gom vị trí các bit 1.", en: "Scan the string once to collect all 1-bit positions." },
+      { focus: i },
+    );
+    if (chars[i] === "1") {
+      onesPos.push(i);
+      snap(
+        { vi: `ones.append(${i})`, en: `ones.append(${i})` },
+        5,
+        { vi: `Ghi nhận vị trí ${i}; hiện có ${onesPos.length} bit 1.`, en: `Record position ${i}; we have seen ${onesPos.length} 1-bits.` },
+        { focus: i },
+      );
+    }
+  }
+
+  if (onesPos.length < k) {
+    snap(
+      { vi: "Không đủ bit 1", en: "Not enough 1-bits" },
+      6,
+      { vi: `Chỉ có ${onesPos.length} bit 1, ít hơn k=${k}, nên trả về chuỗi rỗng.`, en: `There are only ${onesPos.length} 1-bits, fewer than k=${k}, so return an empty string.` },
+      { final: true },
+    );
+    return { original: s, k, answer: "", steps };
+  }
+
+  for (let i = 0; i + k - 1 < onesPos.length; i++) {
+    const left = onesPos[i];
+    const right = onesPos[i + k - 1];
+    const candidate = s.slice(left, right + 1);
+    const isBetter = better(candidate);
+    snap(
+      isBetter
+        ? { vi: `Ứng viên tốt hơn: ${candidate}`, en: `Better candidate: ${candidate}` }
+        : { vi: `Ứng viên chưa tốt hơn: ${candidate}`, en: `Candidate is not better: ${candidate}` },
+      8,
+      isBetter
+        ? { vi: `Cụm ${k} bit 1 từ ones[${i}] đến ones[${i + k - 1}] tạo substring ngắn hơn best hoặc cùng độ dài nhưng nhỏ hơn theo từ điển.`, en: `The ${k}-bit group from ones[${i}] through ones[${i + k - 1}] gives a shorter substring, or a same-length lexicographically smaller one.` }
+        : { vi: `Cụm ${k} bit 1 này tạo candidate nhưng không thắng best hiện tại.`, en: `This ${k}-bit group creates a candidate but does not beat the current best.` },
+      {
+        left,
+        right,
+        focus: right,
+        vars: [
+          { name: "i", value: i },
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "candidate", value: JSON.stringify(candidate) },
+        ],
+      },
+    );
+    if (isBetter) {
+      best = candidate;
+      bestLeft = left;
+      bestRight = right;
+      snap(
+        { vi: `best = ${best}`, en: `best = ${best}` },
+        9,
+        { vi: "Lưu candidate làm đáp án tốt nhất hiện tại.", en: "Save the candidate as the current best answer." },
+        { left, right, focus: right },
+      );
+    }
+  }
+
+  snap(
+    { vi: `return ${JSON.stringify(best)}`, en: `return ${JSON.stringify(best)}` },
+    10,
+    best
+      ? { vi: `Substring đẹp ngắn nhất, nhỏ nhất theo từ điển là ${JSON.stringify(best)}.`, en: `The shortest, lexicographically smallest beautiful substring is ${JSON.stringify(best)}.` }
+      : { vi: "Không có substring nào chứa đúng k bit 1.", en: "No substring contains exactly k 1-bits." },
+    { final: true },
+  );
+
+  return { original: s, k, answer: best, steps };
+}
+
 const category = { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" };
 const arrayTag = [{ key: "array", vi: "Mảng", en: "Array" }];
 const stringTag = { key: "string", vi: "Chuỗi", en: "String" };
@@ -388,14 +538,26 @@ module.exports = {
     defaultInput: "100011001",
     inputKind: "string",
     inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
-    extraParams: [{ key: "k", label: { vi: "k (số bit 1 chính xác)", en: "k (exact number of 1s)" }, default: 3, min: 1 }],
-    approach: [
-      { vi: "Dùng cửa sổ trượt và biến ones để đếm số bit 1 trong window.", en: "Use a sliding window and a ones counter for the number of 1-bits in the window." },
-      { vi: "Nếu ones > k, co left cho đến khi window có tối đa k bit 1.", en: "If ones > k, shrink left until the window has at most k 1-bits." },
-      { vi: "Khi ones == k, so sánh candidate với best: ưu tiên ngắn hơn, rồi nhỏ hơn theo từ điển.", en: "When ones == k, compare the candidate with best: shorter first, then lexicographically smaller." },
-      { vi: "Tiếp tục co left trong lúc còn đúng k bit 1 để loại các số 0 thừa ở đầu và tìm substring ngắn nhất.", en: "Keep shrinking while there are exactly k 1-bits to remove extra leading zeros and find the shortest substring." },
+    extraParams: [
+      { key: "k", label: { vi: "k (số bit 1 chính xác)", en: "k (exact number of 1s)" }, default: 3, min: 1 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Cửa sổ trượt", en: "Approach 1: Sliding window" } },
+          { value: "2", label: { vi: "Cách 2: Vị trí các bit 1", en: "Approach 2: Positions of 1-bits" } },
+        ],
+      },
     ],
-    complexity: { time: "O(n^2) worst-case substring compare, O(n) pointer movement", space: "O(1)", note: { vi: "Hai con trỏ chỉ tiến về trước; việc cắt/so sánh substring có thể tốn theo độ dài candidate.", en: "Both pointers move forward only; slicing/comparing substrings can cost the candidate length." } },
+    approach: [
+      { vi: "Cách 1: cửa sổ trượt với biến ones; khi window có đúng k bit 1 thì cập nhật best rồi co left.", en: "Approach 1: sliding window with a ones counter; when the window has exactly k 1-bits, update best and shrink left." },
+      { vi: "Cách 2: gom vị trí mọi bit 1. Mỗi ứng viên được xác định bởi k bit 1 liên tiếp: s[ones[i]..ones[i+k-1]].", en: "Approach 2: collect every 1-bit position. Each candidate is defined by k consecutive 1-bits: s[ones[i]..ones[i+k-1]]." },
+      { vi: "Cách 2 quét chuỗi O(n) để tạo vị trí và chỉ xét O(#ones) ứng viên; ưu tiên ngắn hơn, rồi nhỏ hơn theo từ điển.", en: "Approach 2 scans the string in O(n) to build positions and checks O(#ones) candidates; shorter wins first, then lexicographically smaller." },
+    ],
+    complexity: { time: "Approach 1: O(n²) worst-case slicing/compare; Approach 2: O(n) scan + candidate substring compare", space: "Approach 1: O(1); Approach 2: O(n)", note: { vi: "Cách 2 giảm phần quét xuống tuyến tính bằng cách chỉ xét các cụm k bit 1 liên tiếp. Trong Python, slicing/so sánh chuỗi vẫn có chi phí theo độ dài candidate.", en: "Approach 2 makes the scan linear by checking only groups of k consecutive 1-bits. In Python, slicing/comparing strings still costs the candidate length." } },
+    codeLabel: { vi: "Cách 1: Cửa sổ trượt", en: "Approach 1: Sliding window" },
     code: [
       "class Solution:",
       "    def shortestBeautifulSubstring(self, s: str, k: int) -> str:",
@@ -414,7 +576,24 @@ module.exports = {
       "                left += 1",
       "        return best",
     ],
+    code2Label: { vi: "Cách 2: Vị trí các bit 1", en: "Approach 2: Positions of 1-bits" },
+    code2: [
+      "class Solution:",
+      "    def shortestBeautifulSubstring(self, s: str, k: int) -> str:",
+      "        ones = [i for i, ch in enumerate(s) if ch == \"1\"]",
+      "        if len(ones) < k:",
+      "            return \"\"",
+      "        best = \"\"",
+      "        for i in range(len(ones) - k + 1):",
+      "            left = ones[i]",
+      "            right = ones[i + k - 1]",
+      "            cand = s[left:right + 1]",
+      "            if best == \"\" or len(cand) < len(best) or (len(cand) == len(best) and cand < best):",
+      "                best = cand",
+      "        return best",
+    ],
     builder: buildSteps2904,
+    builder2: buildSteps2904Positions,
   },
 };
 
