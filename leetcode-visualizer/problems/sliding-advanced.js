@@ -194,8 +194,180 @@ function buildSteps567(input, params) {
   return buildStepsFixedMatch(input, params, { patternKey: "s1", defaultPattern: "ab", textLabel: "s2", resultName: "contains permutation", existsOnly: true });
 }
 
+function buildSteps2904(input, params) {
+  const s = String(input ?? "");
+  if (!/^[01]+$/.test(s)) throw new Error("s must be a non-empty binary string");
+  const k = Number(params?.k ?? 2);
+  if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer");
+
+  const chars = [...s];
+  const steps = [];
+  let left = 0;
+  let ones = 0;
+  let best = "";
+  let bestLeft = -1;
+  let bestRight = -1;
+
+  const addLabel = (labels, index, label) => {
+    if (index < 0 || index >= chars.length) return;
+    const key = `0,${index + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const bestRange = () => bestLeft >= 0 ? range(bestLeft, bestRight) : [];
+  const better = (candidate) => (
+    best === "" || candidate.length < best.length || (candidate.length === best.length && candidate < best)
+  );
+  const makeGrid = (right, focus, extra = {}) => {
+    const labels = {};
+    addLabel(labels, left, `left=${left}`);
+    addLabel(labels, right, `right=${right}`);
+    for (const index of bestRange()) addLabel(labels, index, "best");
+    if (Number.isInteger(extra.removing)) addLabel(labels, extra.removing, "drop");
+    const active = new Set(range(left, right));
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hlCell: Number.isInteger(focus) ? [0, focus + 1] : null,
+      autoScrollCell: right >= 0 ? [0, right + 1] : null,
+      pathCells: range(left, right).map((index) => [0, index + 1]),
+      historyCells: bestRange().filter((index) => !active.has(index)).map((index) => [0, index + 1]),
+      cellLabels: labels,
+      largeCells: true,
+      caption: `window=${JSON.stringify(left <= right ? s.slice(left, right + 1) : "")} · ones=${ones}/${k} · best=${JSON.stringify(best)}`,
+      secondaryCaption: "shortest first; lexicographically smallest breaks ties",
+    };
+  };
+  const snap = (title, line, right = -1, note, extra = {}) => {
+    steps.push({
+      title,
+      arr: [],
+      grid: makeGrid(right, Number.isInteger(extra.focus) ? extra.focus : right, extra),
+      highlight: [],
+      mark: bestRange(),
+      final: Boolean(extra.final),
+      codeLines: [line],
+      vars: [
+        { name: "k", value: k },
+        { name: "left", value: left },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "ones", value: ones },
+        { name: "best", value: JSON.stringify(best) },
+        ...(extra.vars || []),
+      ],
+      note,
+    });
+  };
+
+  snap(
+    { vi: "Khởi tạo cửa sổ", en: "Initialize the window" },
+    3,
+    -1,
+    { vi: "left bắt đầu ở 0, ones đếm số bit 1 trong cửa sổ, best ban đầu rỗng.", en: "left starts at 0, ones counts 1-bits in the window, and best starts empty." },
+  );
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    snap(
+      { vi: `Xét s[${right}] = ${ch}`, en: `Inspect s[${right}] = ${ch}` },
+      4,
+      right,
+      { vi: "Mở rộng cạnh phải thêm một ký tự.", en: "Expand the right edge by one character." },
+    );
+
+    if (ch === "1") {
+      ones++;
+      snap(
+        { vi: `Gặp bit 1 -> ones = ${ones}`, en: `Saw a 1 -> ones = ${ones}` },
+        5,
+        right,
+        { vi: "Cửa sổ có thêm một bit 1.", en: "The window gained one 1-bit." },
+      );
+    }
+
+    while (ones > k) {
+      snap(
+        { vi: `ones=${ones} > k=${k}`, en: `ones=${ones} > k=${k}` },
+        6,
+        right,
+        { vi: "Cửa sổ có quá nhiều bit 1 nên phải bỏ bớt từ bên trái.", en: "The window has too many 1-bits, so shrink from the left." },
+        { removing: left, focus: left },
+      );
+      if (chars[left] === "1") ones--;
+      const removed = chars[left];
+      left++;
+      snap(
+        { vi: `Bỏ s[${left - 1}] = ${removed}`, en: `Drop s[${left - 1}] = ${removed}` },
+        7,
+        right,
+        { vi: `Dịch left sang ${left}; ones hiện là ${ones}.`, en: `Move left to ${left}; ones is now ${ones}.` },
+        { vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+      );
+    }
+
+    while (ones === k) {
+      const candidate = s.slice(left, right + 1);
+      const isBetter = better(candidate);
+      snap(
+        isBetter
+          ? { vi: `Ứng viên tốt hơn: ${candidate}`, en: `Better candidate: ${candidate}` }
+          : { vi: `Ứng viên chưa tốt hơn: ${candidate}`, en: `Candidate is not better: ${candidate}` },
+        8,
+        right,
+        isBetter
+          ? { vi: "Window có đúng k bit 1 và ngắn hơn best hiện tại hoặc cùng độ dài nhưng nhỏ hơn theo từ điển.", en: "The window has exactly k 1-bits and is shorter than best, or tied in length but lexicographically smaller." }
+          : { vi: "Window có đúng k bit 1 nhưng không thắng best hiện tại.", en: "The window has exactly k 1-bits but does not beat the current best." },
+        { vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
+      );
+      if (isBetter) {
+        best = candidate;
+        bestLeft = left;
+        bestRight = right;
+        snap(
+          { vi: `best = ${best}`, en: `best = ${best}` },
+          9,
+          right,
+          { vi: "Lưu substring tốt nhất mới.", en: "Save the new best substring." },
+        );
+      }
+
+      snap(
+        { vi: "Co left để thử ngắn hơn", en: "Shrink left to try shorter" },
+        10,
+        right,
+        { vi: "Khi vẫn đủ k bit 1, ta bỏ cạnh trái để tìm ứng viên ngắn hơn với cùng right.", en: "While the window still has k 1-bits, drop the left edge to seek a shorter candidate at the same right." },
+        { removing: left, focus: left },
+      );
+      if (chars[left] === "1") ones--;
+      const removed = chars[left];
+      left++;
+      snap(
+        { vi: `left -> ${left}`, en: `left -> ${left}` },
+        11,
+        right,
+        { vi: `Đã bỏ ${JSON.stringify(removed)}; ones = ${ones}.`, en: `Dropped ${JSON.stringify(removed)}; ones = ${ones}.` },
+        { vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+      );
+    }
+  }
+
+  snap(
+    { vi: `return ${JSON.stringify(best)}`, en: `return ${JSON.stringify(best)}` },
+    12,
+    chars.length - 1,
+    best
+      ? { vi: `Substring đẹp ngắn nhất, nhỏ nhất theo từ điển là ${JSON.stringify(best)}.`, en: `The shortest, lexicographically smallest beautiful substring is ${JSON.stringify(best)}.` }
+      : { vi: "Không có substring nào chứa đúng k bit 1.", en: "No substring contains exactly k 1-bits." },
+    { final: true },
+  );
+
+  return { original: s, k, answer: best, steps };
+}
+
 const category = { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" };
 const arrayTag = [{ key: "array", vi: "Mảng", en: "Array" }];
+const stringTag = { key: "string", vi: "Chuỗi", en: "String" };
 const inclusionExclusionTag = { key: "inclusion-exclusion", vi: "Bao hàm – loại trừ", en: "Inclusion–Exclusion" };
 
 module.exports = {
@@ -204,6 +376,46 @@ module.exports = {
   930: { id: 930, difficulty: "medium", slug: "binary-subarrays-with-sum", category, tags: arrayTag, title: { vi: "Binary Subarrays With Sum", en: "Binary Subarrays With Sum" }, titleVi: { vi: "Đếm subarray nhị phân có tổng bằng Goal", en: "Binary subarrays with sum Goal" }, statement: { vi: "Đếm subarray trong mảng nhị phân có tổng đúng goal.", en: "Count binary subarrays whose sum equals goal." }, defaultInput: [1, 0, 1, 0, 1], inputKind: "binary", inputLabel: { vi: "nums (0 hoặc 1)", en: "nums (0 or 1)" }, extraParams: [{ key: "goal", label: { vi: "goal (tổng chính xác)", en: "goal (exact sum)" }, default: 2 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix sum và frequency map.", en: "Prefix sums and a frequency map." } }, code: ["class Solution:", "    def numSubarraysWithSum(self, nums, goal):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num", "            need = prefix - goal", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps930 },
   2799: { id: 2799, difficulty: "medium", slug: "count-complete-subarrays-in-an-array", category, tags: arrayTag, title: { vi: "Count Complete Subarrays in an Array", en: "Count Complete Subarrays in an Array" }, titleVi: { vi: "Đếm complete subarray", en: "Count complete subarrays" }, statement: { vi: "Đếm subarray chứa mọi giá trị distinct xuất hiện trong toàn mảng.", en: "Count subarrays containing every distinct value from the full array." }, defaultInput: [1, 3, 1, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cửa sổ trượt với frequency map.", en: "Sliding window with a frequency map." } }, code: ["class Solution:", "    def countCompleteSubarrays(self, nums):", "        target = len(set(nums))", "        freq = {}; left = ans = 0", "        for right, num in enumerate(nums):", "            freq[num] = freq.get(num, 0) + 1", "            while len(freq) == target:", "                ans += len(nums) - right", "                remove_from(freq, left); left += 1", "        return ans"], builder: buildSteps2799 },
   2962: { id: 2962, difficulty: "medium", slug: "count-subarrays-where-max-element-appears-at-least-k-times", category, tags: arrayTag, title: { vi: "Count Subarrays Where Max Element Appears at Least K Times", en: "Count Subarrays Where Max Element Appears at Least K Times" }, titleVi: { vi: "Đếm subarray có phần tử lớn nhất xuất hiện ít nhất K lần", en: "Count subarrays where the maximum appears at least K times" }, statement: { vi: "Đếm subarray mà giá trị lớn nhất của toàn mảng xuất hiện ít nhất k lần.", en: "Count subarrays in which the global maximum appears at least k times." }, defaultInput: [1, 3, 2, 3, 3], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lần max xuất hiện)", en: "k (maximum occurrences)" }, default: 2 }], complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ theo dõi số lần maxValue trong cửa sổ.", en: "Track only maxValue occurrences in the window." } }, code: ["class Solution:", "    def countSubarrays(self, nums, k):", "        max_value = max(nums)", "        left = count_max = ans = 0", "        for right, num in enumerate(nums):", "            if num == max_value: count_max += 1", "            while count_max >= k:", "                ans += len(nums) - right", "                if nums[left] == max_value: count_max -= 1", "                left += 1", "        return ans"], builder: buildSteps2962 },
+  2904: {
+    id: 2904,
+    difficulty: "medium",
+    slug: "shortest-and-lexicographically-smallest-beautiful-string",
+    category,
+    tags: [stringTag],
+    title: { vi: "Shortest and Lexicographically Smallest Beautiful String", en: "Shortest and Lexicographically Smallest Beautiful String" },
+    titleVi: { vi: "Chuỗi đẹp ngắn nhất và nhỏ nhất theo từ điển", en: "Shortest and lexicographically smallest beautiful string" },
+    statement: { vi: "Cho chuỗi nhị phân s và số k. Tìm substring ngắn nhất chứa đúng k ký tự '1'; nếu nhiều substring cùng độ dài, trả về substring nhỏ nhất theo từ điển. Nếu không có, trả về chuỗi rỗng.", en: "Given a binary string s and integer k, find the shortest substring containing exactly k '1' characters; if several have the same length, return the lexicographically smallest one. Return an empty string if none exists." },
+    defaultInput: "100011001",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
+    extraParams: [{ key: "k", label: { vi: "k (số bit 1 chính xác)", en: "k (exact number of 1s)" }, default: 3, min: 1 }],
+    approach: [
+      { vi: "Dùng cửa sổ trượt và biến ones để đếm số bit 1 trong window.", en: "Use a sliding window and a ones counter for the number of 1-bits in the window." },
+      { vi: "Nếu ones > k, co left cho đến khi window có tối đa k bit 1.", en: "If ones > k, shrink left until the window has at most k 1-bits." },
+      { vi: "Khi ones == k, so sánh candidate với best: ưu tiên ngắn hơn, rồi nhỏ hơn theo từ điển.", en: "When ones == k, compare the candidate with best: shorter first, then lexicographically smaller." },
+      { vi: "Tiếp tục co left trong lúc còn đúng k bit 1 để loại các số 0 thừa ở đầu và tìm substring ngắn nhất.", en: "Keep shrinking while there are exactly k 1-bits to remove extra leading zeros and find the shortest substring." },
+    ],
+    complexity: { time: "O(n^2) worst-case substring compare, O(n) pointer movement", space: "O(1)", note: { vi: "Hai con trỏ chỉ tiến về trước; việc cắt/so sánh substring có thể tốn theo độ dài candidate.", en: "Both pointers move forward only; slicing/comparing substrings can cost the candidate length." } },
+    code: [
+      "class Solution:",
+      "    def shortestBeautifulSubstring(self, s: str, k: int) -> str:",
+      "        left = ones = 0",
+      "        best = \"\"",
+      "        for right, ch in enumerate(s):",
+      "            if ch == \"1\": ones += 1",
+      "            while ones > k:",
+      "                if s[left] == \"1\": ones -= 1",
+      "                left += 1",
+      "            while ones == k:",
+      "                cand = s[left:right + 1]",
+      "                if best == \"\" or len(cand) < len(best) or (len(cand) == len(best) and cand < best):",
+      "                    best = cand",
+      "                if s[left] == \"1\": ones -= 1",
+      "                left += 1",
+      "        return best",
+    ],
+    builder: buildSteps2904,
+  },
 };
 
 module.exports[438] = { id: 438, difficulty: "medium", slug: "find-all-anagrams-in-a-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Find All Anagrams in a String", en: "Find All Anagrams in a String" }, titleVi: { vi: "Tìm mọi anagram trong chuỗi", en: "Find all anagrams in a string" }, statement: { vi: "Tìm mọi vị trí bắt đầu trong s mà substring là anagram của p.", en: "Find all start indices in s whose substring is an anagram of p." }, defaultInput: "cbaebabacd", inputKind: "string", inputLabel: { vi: "Chuỗi s", en: "String s" }, extraParams: [{ key: "p", type: "string", label: { vi: "Pattern p", en: "Pattern p" }, default: "abc" }], complexity: { time: "O(|s| + |p|)", space: "O(alphabet)", note: { vi: "Fixed window có độ dài bằng p và so sánh frequency map.", en: "Use a fixed window of p's length and compare frequency maps." } }, code: ["class Solution:", "    def findAnagrams(self, s, p):", "        need = Counter(p)", "        window = {}; left = 0; ans = []", "        for right, ch in enumerate(s):", "            window[ch] = window.get(ch, 0) + 1", "            if right - left + 1 > len(p):", "                remove_from(window, s[left])", "                left += 1", "            if right - left + 1 == len(p) and window == need:", "                ans.append(left)", "        return ans"], builder: buildSteps438 };
