@@ -17435,19 +17435,33 @@ function buildSteps887(input, params) {
   const nFloors = Math.max(1, Math.min(60, Number((params && params.n) ?? 6)));
   const maxMoves = nFloors; // upper bound
   const dp = [new Array(k + 1).fill(0)];
+  const known = [new Array(k + 1).fill(true)];
   const steps = [];
+  const display = () => dp.map((row, r) => row.map((v, c) => (known[r] && known[r][c] ? String(v) : "·")));
+  const rowLabels = () => Array.from({ length: Math.max(0, dp.length - 1) }, (_, i) => ({
+    index: `m=${i + 1}`,
+    char: { vi: "lần thả", en: i + 1 === 1 ? "drop" : "drops" },
+  }));
+  const colLabels = Array.from({ length: k }, (_, e) => ({
+    index: `e=${e + 1}`,
+    char: { vi: "trứng", en: e + 1 === 1 ? "egg" : "eggs" },
+  }));
   const push = (opts) => {
-    const rows = dp.length;
     steps.push({
       title: opts.title, arr: [],
       grid: {
-        dp: dp.map((row) => row.map((v) => String(v))),
-        text1: Array.from({ length: rows - 1 }, (_, i) => `m=${i + 1}`),
-        text2: Array.from({ length: k }, (_, e) => `${e + 1} trứng`),
+        dp: display(),
+        text1: rowLabels().map((label) => label.index),
+        text2: colLabels.map((label) => label.index),
+        rowLabels: rowLabels(),
+        colLabels,
         hlCell: opts.hlCell || null,
         pathCells: opts.pathCells || [],
+        historyCells: opts.historyCells || [],
+        cellLabels: opts.cellLabels || {},
         largeCells: true,
         caption: opts.caption,
+        secondaryCaption: opts.secondaryCaption,
       },
       highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
     });
@@ -17455,9 +17469,15 @@ function buildSteps887(input, params) {
 
   push({
     title: { vi: `n=${nFloors} tầng, k=${k} trứng`, en: `n=${nFloors} floors, k=${k} eggs` },
-    codeLines: [4],
-    caption: "dp[m][e] = số tầng tối đa xác định được với m lần thử và e trứng",
-    vars: [{ name: "n (tầng)", value: nFloors }, { name: "k (trứng)", value: k }],
+    codeLines: [3, 4],
+    hlCell: [0, k],
+    caption: { vi: "hàng cơ sở: dp[0][e] = 0 tầng với mọi số trứng", en: "base row: dp[0][e] = 0 floors for every egg count" },
+    secondaryCaption: { vi: "dp[m][e] = số tầng tối đa xử lý chắc chắn với m lần thả và e trứng", en: "dp[m][e] = max floors solvable with m drops and e eggs" },
+    vars: [
+      { name: { vi: "n (tầng)", en: "n (floors)" }, value: nFloors },
+      { name: { vi: "k (trứng)", en: "k (eggs)" }, value: k },
+      { name: { vi: "mục tiêu", en: "target" }, value: `dp[m][${k}] >= ${nFloors}` },
+    ],
     note: {
       vi: `Đảo bài toán: dp[m][e] = số tầng NHIỀU NHẤT có thể xác định chắc chắn với m lần thả và e quả trứng. Thả 1 lần: nếu vỡ → còn e−1 trứng, m−1 lần (các tầng dưới); nếu không vỡ → e trứng, m−1 lần (các tầng trên); cộng 1 tầng đang đứng. dp[m][e] = dp[m−1][e−1] + dp[m−1][e] + 1. Tìm m nhỏ nhất để dp[m][k] ≥ n.`,
       en: `Flip the problem: dp[m][e] = the MOST floors we can determine with m drops and e eggs. One drop: if it breaks → e−1 eggs, m−1 drops (floors below); if not → e eggs, m−1 drops (floors above); plus the current floor. dp[m][e] = dp[m−1][e−1] + dp[m−1][e] + 1. Find the smallest m with dp[m][k] ≥ n.`,
@@ -17468,19 +17488,95 @@ function buildSteps887(input, params) {
   while (dp[m][k] < nFloors && m < maxMoves) {
     m += 1;
     dp[m] = new Array(k + 1).fill(0);
+    known[m] = new Array(k + 1).fill(false);
+    known[m][0] = true;
+    push({
+      title: { vi: `Thêm hàng m=${m}`, en: `Add row m=${m}` },
+      codeLines: [7],
+      hlCell: [m, 0],
+      caption: { vi: `m=${m}: với 0 trứng, ta xác định chắc chắn được 0 tầng`, en: `m=${m}: with 0 eggs we can verify 0 floors` },
+      secondaryCaption: { vi: `Cần dp[${m}][${k}] >= ${nFloors} để dừng`, en: `Need dp[${m}][${k}] >= ${nFloors} to stop` },
+      vars: [
+        { name: { vi: "m (lần thả)", en: "m (drops)" }, value: m },
+        { name: "dp[m][0]", value: 0 },
+        { name: `dp[${m - 1}][${k}]`, value: dp[m - 1][k] },
+      ],
+      note: {
+        vi: `Bắt đầu xét ${m} lần thả. Cột e=0 luôn bằng 0 vì không còn trứng thì không kiểm tra chắc chắn được tầng nào.`,
+        en: `Start evaluating ${m} drops. Column e=0 is always 0 because with no eggs we cannot guarantee any floor.`,
+      },
+    });
     for (let e = 1; e <= k; e++) {
-      dp[m][e] = dp[m - 1][e - 1] + dp[m - 1][e] + 1;
+      const broken = dp[m - 1][e - 1];
+      const survived = dp[m - 1][e];
+      push({
+        title: { vi: `Tính dp[${m}][${e}]`, en: `Compute dp[${m}][${e}]` },
+        codeLines: [8, 9],
+        hlCell: [m, e],
+        pathCells: [[m - 1, e - 1], [m - 1, e]],
+        cellLabels: {
+          [`${m - 1},${e - 1}`]: { vi: "vỡ", en: "breaks" },
+          [`${m - 1},${e}`]: { vi: "không vỡ", en: "survives" },
+          [`${m},${e}`]: { vi: "ô đang tính", en: "next" },
+        },
+        caption: `dp[${m}][${e}] = dp[${m - 1}][${e - 1}] + dp[${m - 1}][${e}] + 1`,
+        secondaryCaption: {
+          vi: `vỡ: ${broken} tầng dưới · không vỡ: ${survived} tầng trên · tầng đang thả: 1`,
+          en: `breaks: ${broken} floors below · survives: ${survived} floors above · current floor: 1`,
+        },
+        vars: [
+          { name: { vi: "m (lần thả)", en: "m (drops)" }, value: m },
+          { name: { vi: "e (trứng)", en: "e (eggs)" }, value: e },
+          { name: { vi: "vỡ", en: "breaks" }, value: broken },
+          { name: { vi: "không vỡ", en: "survives" }, value: survived },
+        ],
+        note: {
+          vi: `Nếu trứng vỡ, còn ${e - 1} trứng và ${m - 1} lần thả nên phủ ${broken} tầng dưới. Nếu không vỡ, còn ${e} trứng và ${m - 1} lần thả nên phủ ${survived} tầng trên. Cộng thêm tầng đang thả.`,
+          en: `If the egg breaks, ${e - 1} eggs and ${m - 1} drops cover ${broken} lower floors. If it survives, ${e} eggs and ${m - 1} drops cover ${survived} upper floors. Add the current floor too.`,
+        },
+      });
+      dp[m][e] = broken + survived + 1;
+      known[m][e] = true;
+      push({
+        title: { vi: `dp[${m}][${e}] = ${dp[m][e]}`, en: `dp[${m}][${e}] = ${dp[m][e]}` },
+        codeLines: [9],
+        hlCell: [m, e],
+        pathCells: [[m - 1, e - 1], [m - 1, e]],
+        cellLabels: {
+          [`${m - 1},${e - 1}`]: { vi: "vỡ", en: "breaks" },
+          [`${m - 1},${e}`]: { vi: "không vỡ", en: "survives" },
+          [`${m},${e}`]: { vi: "đã tính", en: "filled" },
+        },
+        caption: { vi: `${broken} + ${survived} + 1 = ${dp[m][e]} tầng`, en: `${broken} + ${survived} + 1 = ${dp[m][e]} floors` },
+        secondaryCaption: {
+          vi: known[m][k] ? `dp[${m}][${k}] = ${dp[m][k]}` : `dp[${m}][${k}] chưa được tính`,
+          en: known[m][k] ? `dp[${m}][${k}] = ${dp[m][k]}` : `dp[${m}][${k}] is not filled yet`,
+        },
+        vars: [
+          { name: { vi: "m (lần thả)", en: "m (drops)" }, value: m },
+          { name: { vi: "e (trứng)", en: "e (eggs)" }, value: e },
+          { name: `dp[${m}][${e}]`, value: dp[m][e] },
+          { name: { vi: "mục tiêu n", en: "target n" }, value: nFloors },
+        ],
+        note: {
+          vi: `Ô dp[${m}][${e}] giờ nghĩa là: với ${m} lần thả và ${e} trứng, ta chắc chắn xử lý được tối đa ${dp[m][e]} tầng.`,
+          en: `Cell dp[${m}][${e}] now means: with ${m} drops and ${e} eggs, we can guarantee up to ${dp[m][e]} floors.`,
+        },
+      });
     }
     push({
-      title: { vi: `m=${m}: dp[${m}][${k}] = ${dp[m][k]}`, en: `m=${m}: dp[${m}][${k}] = ${dp[m][k]}` },
-      codeLines: [9, 10],
+      title: { vi: `Kiểm tra m=${m}: dp[${m}][${k}] = ${dp[m][k]}`, en: `Check m=${m}: dp[${m}][${k}] = ${dp[m][k]}` },
+      codeLines: [6],
       hlCell: [m, k],
-      pathCells: [[m - 1, k - 1], [m - 1, k]],
+      historyCells: [[m - 1, k]],
       caption: `dp[${m}][${k}] = ${dp[m][k]} ${dp[m][k] >= nFloors ? "≥" : "<"} n=${nFloors}`,
+      secondaryCaption: dp[m][k] >= nFloors
+        ? { vi: "đã phủ đủ số tầng, dừng lại", en: "covered enough floors, stop" }
+        : { vi: "chưa đủ số tầng, cần thêm một lần thả", en: "not enough floors yet, add another move" },
       vars: [
-        { name: "m (lần thử)", value: m },
+        { name: { vi: "m (lần thả)", en: "m (drops)" }, value: m },
         { name: `dp[${m}][${k}]`, value: dp[m][k] },
-        { name: "cần ≥", value: nFloors },
+        { name: { vi: "cần ≥", en: "need ≥" }, value: nFloors },
       ],
       note: {
         vi: `Với ${m} lần thử: dp[${m}][${k}] = dp[${m - 1}][${k - 1}] + dp[${m - 1}][${k}] + 1 = ${dp[m][k]} tầng. ${dp[m][k] >= nFloors ? `Đã ≥ ${nFloors} → dừng, đáp án = ${m}.` : `Còn < ${nFloors} → tăng số lần thử.`}`,
@@ -17492,9 +17588,17 @@ function buildSteps887(input, params) {
   const answer = m;
   push({
     title: { vi: `Kết quả: cần ${answer} lần thử`, en: `Result: need ${answer} drops` },
-    codeLines: [11], hlCell: [answer, k], final: true,
-    caption: `Đáp án = ${answer} lần thử (số lần tối thiểu trong trường hợp xấu nhất)`,
-    vars: [{ name: "answer", value: answer }],
+    codeLines: [10], hlCell: [answer, k], final: true,
+    bestCell: [answer, k],
+    caption: {
+      vi: `Đáp án = ${answer} lần thả (tối thiểu trong trường hợp xấu nhất)`,
+      en: `Answer = ${answer} drops (minimum in the worst case)`,
+    },
+    secondaryCaption: {
+      vi: `dp[${answer}][${k}] = ${dp[answer][k]} phủ được n=${nFloors}`,
+      en: `dp[${answer}][${k}] = ${dp[answer][k]} covers n=${nFloors}`,
+    },
+    vars: [{ name: { vi: "đáp án", en: "answer" }, value: answer }, { name: `dp[${answer}][${k}]`, value: dp[answer][k] }],
     note: {
       vi: `Số lần thả tối thiểu (trường hợp xấu nhất) để chắc chắn tìm được tầng tới hạn với ${k} trứng và ${nFloors} tầng = ${answer}.`,
       en: `Minimum drops (worst case) to be sure of finding the critical floor with ${k} eggs and ${nFloors} floors = ${answer}.`,
@@ -23795,5 +23899,356 @@ Object.assign(module.exports, {
     liveArgs: (input, params) => [parseIntegerList1655(input, "nums"), parseIntegerList1655(params.quantity, "quantity")],
     builder: buildSteps1655,
     builder2: buildSteps1655Backtracking,
+  },
+});
+
+/**
+ * LeetCode 546: Remove Boxes.
+ *
+ * Memoised interval DP over states dp(l, r, k): the best score obtainable
+ * from boxes[l..r] given k extra boxes of colour boxes[l] glued to the LEFT
+ * of l (they will be removed together with l's run one day).
+ *
+ *   direct removal : (k + 1)^2 + dp(l + 1, r, 0)
+ *   attach later   : for every matching m > l
+ *                      dp(m, r, k + 1)          (merge colours at m)
+ *                    + dp(l + 1, m - 1, 0)      (clear the middle first)
+ *
+ * The builder replays the real DFS execution order so the stepper shows the
+ * exact sequence Python evaluates, including memo hits.
+ */
+function parseBoxes546(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+  const valid = (nums) => nums.length > 0 && nums.every((v) => Number.isInteger(v) && v >= 1 && v <= 1000);
+  if (text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed) && valid(parsed.map(Number))) return parsed.map(Number);
+    } catch (_error) {
+      // Fall through to comma parsing.
+    }
+  }
+  const nums = text.split(/[,\s]+/).filter(Boolean).map(Number);
+  return valid(nums) ? nums : null;
+}
+
+function buildSteps546(input) {
+  const raw = String(input ?? "");
+  const boxes = parseBoxes546(raw);
+  const steps = [];
+
+  if (!boxes || boxes.length > 10) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      codeLines: [],
+      removeBoxes546View: {
+        event: "invalid",
+        boxes: Array.isArray(boxes) ? boxes : [],
+        answer: null,
+      },
+      vars: [],
+      note: {
+        vi: "Nhập 1..10 hộp là số nguyên dương, ví dụ: 1,3,2,2,2,3,4,3,1",
+        en: "Enter 1..10 positive integers, e.g. 1,3,2,2,2,3,4,3,1",
+      },
+      final: true,
+    });
+    return { original: raw, answer: null, steps };
+  }
+
+  const n = boxes.length;
+  const memo = new Map();
+  let memoCount = 0;
+  let memoHits = 0;
+
+  function snapshot(opts) {
+    const step = {
+      title: opts.title,
+      codeLines: opts.codeLines || [],
+      removeBoxes546View: {
+        event: opts.event,
+        boxes: boxes.slice(),
+        l: Number.isInteger(opts.l) ? opts.l : null,
+        r: Number.isInteger(opts.r) ? opts.r : null,
+        k: Number.isInteger(opts.k) ? opts.k : null,
+        color: opts.color != null ? opts.color : null,
+        matchMs: (opts.matchMs || []).slice(),
+        curM: Number.isInteger(opts.curM) ? opts.curM : null,
+        options: (opts.options || []).map((option) => ({ ...option })),
+        returnValue: opts.returnValue != null ? opts.returnValue : null,
+        depth: opts.depth || 0,
+        stack: (opts.stack || []).map((frame) => ({ ...frame })),
+        memoCount,
+        memoHits,
+        answer: opts.answer != null ? opts.answer : null,
+      },
+      vars: opts.vars || [],
+      note: opts.note,
+    };
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  const fmtFrame = (frame) => `dp(${frame.l},${frame.r},${frame.k})`;
+
+  snapshot({
+    title: { vi: `removeBoxes([${boxes.join(",")}])`, en: `removeBoxes([${boxes.join(",")}])` },
+    event: "init",
+    stack: [{ l: 0, r: n - 1, k: 0 }],
+    codeLines: [23],
+    vars: [
+      { name: "n", value: n },
+      { name: "state", value: "dp(l, r, k)" },
+    ],
+    note: {
+      vi: "dp(l, r, k): điểm cao nhất gom hết đoạn [l..r] khi đã có k hộp cùng màu boxes[l] dính bên trái l.",
+      en: "dp(l, r, k): best score clearing boxes[l..r] when k same-coloured boxes are already attached to the left of l.",
+    },
+  });
+
+  function simulate(l, r, k, depth, stack) {
+    const frameStack = [...stack, { l, r, k }];
+
+    if (l > r) {
+      snapshot({
+        title: { vi: `dp(${l},${r},${k}): đoạn rỗng → 0`, en: `dp(${l},${r},${k}): empty range → 0` },
+        event: "base-return",
+        l, r, k, depth,
+        stack: frameStack.slice(0, -1),
+        returnValue: 0,
+        codeLines: [10, 11],
+        vars: [{ name: "return", value: 0 }],
+        note: { vi: "Không còn hộp để gom nên trạng thái này worth 0 điểm.", en: "No boxes remain in this range, so the state scores nothing." },
+      });
+      return 0;
+    }
+
+    const key = `${l},${r},${k}`;
+    if (memo.has(key)) {
+      memoHits += 1;
+      const cached = memo.get(key);
+      snapshot({
+        title: { vi: `dp(${l},${r},${k}) có trong memo → ${cached}`, en: `dp(${l},${r},${k}) memoised → ${cached}` },
+        event: "memo-hit",
+        l, r, k, depth,
+        stack: frameStack.slice(0, -1),
+        returnValue: cached,
+        codeLines: [12, 13],
+        vars: [
+          { name: "memo[(l,r,k)]", value: cached },
+          { name: "hits", value: memoHits },
+        ],
+        note: { vi: "Trạng thái đã tính trước đó; lấy ngay kết quả mà không duyệt lại.", en: "This state was solved earlier; reuse it instead of re-expanding." },
+      });
+      return cached;
+    }
+
+    const color = boxes[l];
+    snapshot({
+      title: { vi: `Gọi dp(${l},${r},${k}) — màu gốc ${color}`, en: `Call dp(${l},${r},${k}) — anchor colour ${color}` },
+      event: "enter",
+      l, r, k, color, depth,
+      stack: frameStack,
+      codeLines: [9, 14],
+      vars: [
+        { name: "l..r", value: `[${l}, ${r}]` },
+        { name: "k", value: k },
+        { name: "color", value: color },
+      ],
+      note: {
+        vi: `Có ${k} hộp màu ${color} ảo đang dính ngoài biên trái; chúng sẽ bị xoá chung với nhóm boxes[${l}] vào lúc thuận lợi nhất.`,
+        en: `${k} phantom colour-${color} boxes hang off the left edge; they will be removed together with boxes[${l}]'s run at the best moment.`,
+      },
+    });
+
+    let res = -Infinity;
+    const options = [];
+    const pushOption = (label, value) => {
+      options.push({ label, value });
+      res = Math.max(res, value);
+    };
+
+    const rightAfterRun = simulate(l + 1, r, 0, depth + 1, frameStack);
+    const directScore = (k + 1) * (k + 1) + rightAfterRun;
+    pushOption(`remove now (${k + 1})²`, directScore);
+    snapshot({
+      title: {
+        vi: `Phương án gỡ ngay: (${k + 1})² = ${(k + 1) * (k + 1)} + dp(${l + 1},${r},0) = ${directScore}`,
+        en: `Remove-now plan: (${k + 1})² = ${(k + 1) * (k + 1)} + dp(${l + 1},${r},0) = ${directScore}`,
+      },
+      event: "option-direct",
+      l, r, k, color, depth,
+      stack: frameStack,
+      options: options.slice(),
+      curM: null,
+      codeLines: [15],
+      vars: [
+        { name: `(k+1)²`, value: (k + 1) * (k + 1) },
+        { name: "res", value: res },
+      ],
+      note: {
+        vi: `Gộp k hộp ảo với nhóm đầu thành khối ${(k + 1)} hộp rồi xoá một phát; đoạn còn lại tự gom độc lập.`,
+        en: `Fuse the k phantoms with the leading run into one ${(k + 1)}-box strike, then clear the rest independently.`,
+      },
+    });
+
+    const matchMs = [];
+    for (let m = l + 1; m <= r; m += 1) {
+      if (boxes[m] === color) matchMs.push(m);
+    }
+    if (matchMs.length) {
+      snapshot({
+        title: {
+          vi: `Quét m ∈ (${l}, ${r}] cùng màu ${color}: {${matchMs.join(", ")}}`,
+          en: `Scan m ∈ (${l}, ${r}] with colour ${color}: {${matchMs.join(", ")}}`,
+        },
+        event: "scan-matches",
+        l, r, k, color, depth,
+        stack: frameStack,
+        options: options.slice(),
+        matchMs,
+        codeLines: [16, 17, 18],
+        vars: [{ name: "candidates", value: matchMs.join(", ") || "∅" }],
+        note: {
+          vi: "Những chỗ cùng màu cho phép hoãn việc xoá nhóm hiện tại để gộp lớn hơn sau.",
+          en: "Matching positions let us postpone removing the current run to merge something bigger later.",
+        },
+      });
+    }
+
+    for (const m of matchMs) {
+      const mergedRight = simulate(m, r, k + 1, depth + 1, frameStack);
+      const clearedMiddle = simulate(l + 1, m - 1, 0, depth + 1, frameStack);
+      const splitScore = mergedRight + clearedMiddle;
+      pushOption(`attach m=${m}`, splitScore);
+      snapshot({
+        title: {
+          vi: `Phương án gộp m=${m}: dp(${m},${r},${k + 1}) + dp(${l + 1},${m - 1},0) = ${splitScore}`,
+          en: `Attach plan m=${m}: dp(${m},${r},${k + 1}) + dp(${l + 1},${m - 1},0) = ${splitScore}`,
+        },
+        event: "option-split",
+        l, r, k, color, depth,
+        stack: frameStack,
+        options: options.slice(),
+        curM: m,
+        matchMs,
+        codeLines: [19],
+        vars: [
+          { name: "middle", value: clearedMiddle },
+          { name: "merged", value: mergedRight },
+          { name: "res", value: res },
+        ],
+        note: {
+          vi: `Dọn sạch khoảng giữa trước để boxes[${l}] và boxes[${m}] sát nhau thành ${k + 2} hộp cùng màu.`,
+          en: `Clearing the middle first makes boxes[${l}] and boxes[${m}] adjacent: ${k + 2} same-coloured boxes strong.`,
+        },
+      });
+    }
+
+    memo.set(key, res);
+    memoCount += 1;
+    snapshot({
+      title: {
+        vi: `memo[(${l},${r},${k})] = ${res} → trả ${res}`,
+        en: `memo[(${l},${r},${k})] = ${res} → return ${res}`,
+      },
+      event: "memo-store",
+      l, r, k, color, depth,
+      stack: frameStack.slice(0, -1),
+      options: options.slice(),
+      returnValue: res,
+      codeLines: [20, 21],
+      vars: [
+        { name: "best option", value: options.reduce((best, o) => (o.value > best.value ? o : best), options[0]).label },
+        { name: "memo size", value: memoCount },
+      ],
+      note: {
+        vi: "Chốt giá trị tốt nhất của trạng thái; lần sau gặp lại là ăn ngay.",
+        en: "Freeze the best value for this state; future encounters read it straight away.",
+      },
+    });
+    return res;
+  }
+
+  const answer = simulate(0, n - 1, 0, 0, []);
+
+  snapshot({
+    title: { vi: `Đáp án: ${answer} điểm`, en: `Answer: ${answer} points` },
+    event: "done",
+    stack: [{ l: 0, r: n - 1, k: 0 }],
+    answer,
+    codeLines: [23],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "states", value: memoCount },
+    ],
+    note: {
+      vi: "Mỗi trạng thái O(n³) tính đúng một lần nhờ memoization; thứ tự xoá tối ưu được ghép từ các lựa chọn tốt nhất từng đoạn.",
+      en: "Every O(n³) state is solved exactly once thanks to memoisation; an optimal removal order is stitched from the per-range winners.",
+    },
+    final: true,
+  });
+
+  return { original: boxes, answer, steps };
+}
+
+Object.assign(module.exports, {
+  546: {
+    id: 546,
+    difficulty: "hard",
+    slug: "remove-boxes",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "interval-dp", vi: "DP trên đoạn", en: "Interval DP" },
+      { key: "memoization", vi: "Ghi nhớ", en: "Memoization" },
+    ],
+    title: { vi: "Remove Boxes", en: "Remove Boxes" },
+    titleVi: { vi: "Gỡ hộp ăn điểm", en: "Maximize points by removing same-coloured runs" },
+    statement: {
+      vi: "Chọn vài hộp liên tiếp cùng màu để gỡ, được k×k điểm với k là số hộp gỡ. Gỡ tới khi hết hộp. Tìm tổng điểm lớn nhất.",
+      en: "Remove several consecutive boxes of the same colour to earn k×k points where k is the count removed. Clear the board and maximise the total.",
+    },
+    defaultInput: [1, 3, 2, 2, 2, 3, 4, 3, 1],
+    inputKind: "nonneg",
+    inputLabel: { vi: "boxes (màu các hộp)", en: "boxes (box colours)" },
+    maxInput: 1000,
+    extraParams: [],
+    approach: [
+      { vi: "Trạng thái mở rộng: dp(l, r, k) thêm k hộp cùng màu boxes[l] dính bên trái — chìa khoá xử lý việc gom điểm xa.", en: "Extended state: dp(l, r, k) adds k same-coloured boxes glued left of boxes[l] — the key to long-distance scoring." },
+      { vi: "Hai loại lựa chọn: gỡ nhóm hiện tại ngay (k+1)², hoặc giữ lại để gộp với một vị trí cùng màu m sau khi dọn khoảng giữa.", en: "Two kinds of moves: remove the current run now for (k+1)², or keep it and merge at a matching m after clearing the middle." },
+      { vi: "Memoization giảm từ exponential xuống O(n⁴) trạng thái·chuyển đổi, đủ nhanh với n ≤ 100.", en: "Memoisation cuts exponential search to O(n⁴) state·transition work, fast enough for n ≤ 100." },
+    ],
+    complexity: {
+      time: "O(n⁴)",
+      space: "O(n³)",
+      note: { vi: "Có O(n³) trạng thái (l, r, k ≤ n); mỗi trạng thái quét tối đa n vị trí m.", en: "There are O(n³) (l, r, k) states; each scans up to n attachment positions." },
+    },
+    code: [
+      "from typing import List",
+      "",
+      "",
+      "class Solution:",
+      "    def removeBoxes(self, boxes: List[int]) -> int:",
+      "        n = len(boxes)",
+      "        memo = {}",
+      "",
+      "        def dp(l, r, k):",
+      "            if l > r:",
+      "                return 0",
+      "            if (l, r, k) in memo:",
+      "                return memo[(l, r, k)]",
+      "            color = boxes[l]",
+      "            res = (k + 1) ** 2 + dp(l + 1, r, 0)",
+      "            for m in range(l + 1, r + 1):",
+      "                if boxes[m] != color:",
+      "                    continue",
+      "                res = max(res, dp(m, r, k + 1) + dp(l + 1, m - 1, 0))",
+      "            memo[(l, r, k)] = res",
+      "            return res",
+      "",
+      "        return dp(0, n - 1, 0)",
+    ],
+    builder: buildSteps546,
   },
 });

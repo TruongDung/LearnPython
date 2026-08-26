@@ -2291,7 +2291,8 @@ function renderVars(step, prevStep) {
   const prevValues = {};
   if (prevStep && Array.isArray(prevStep.vars)) {
     prevStep.vars.forEach((v) => {
-      prevValues[v.name] = formatVarValue(v.value);
+      const key = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
+      prevValues[key] = formatVarValue(v.value);
     });
   }
 
@@ -2299,13 +2300,14 @@ function renderVars(step, prevStep) {
     const valStr = formatVarValue(v.value);
     const item = document.createElement("div");
     item.className = opts.watch ? "var-item watch-item" : "var-item";
-    if (prevStep && v.name in prevValues && prevValues[v.name] !== valStr) {
+    const varKey = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
+    if (prevStep && varKey in prevValues && prevValues[varKey] !== valStr) {
       item.classList.add("changed");
     }
 
     const name = document.createElement("span");
     name.className = "var-name";
-    name.textContent = v.name;
+    name.textContent = pick(v.name);
 
     const eq = document.createElement("span");
     eq.className = "var-eq";
@@ -2323,7 +2325,7 @@ function renderVars(step, prevStep) {
       remove.type = "button";
       remove.className = "watch-remove";
       remove.textContent = "x";
-      remove.dataset.removeWatch = v.name;
+      remove.dataset.removeWatch = varKey;
       item.appendChild(remove);
     }
     return item;
@@ -2331,7 +2333,8 @@ function renderVars(step, prevStep) {
 
   const varsByName = {};
   vars.forEach((v) => {
-    varsByName[v.name] = v;
+    const key = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
+    varsByName[key] = v;
   });
 
   if (watchGrid) {
@@ -3368,7 +3371,7 @@ function renderGrid(step) {
   const axisLabelHtml = (label) => {
     if (!label) return "";
     if (typeof label === "object") {
-      return `<span class="axis-index">${escapeXml(label.index || "")}</span><span class="axis-char">${escapeXml(label.char || "")}</span>`;
+      return `<span class="axis-index">${escapeXml(pick(label.index) || "")}</span><span class="axis-char">${escapeXml(pick(label.char) || "")}</span>`;
     }
     return escapeXml(String(label));
   };
@@ -3403,7 +3406,7 @@ function renderGrid(step) {
       if (bestSet.has(`${i},${j}`)) cls += " best";
       if (mutedSet.has(`${i},${j}`)) cls += " muted";
       const key = `${i},${j}`;
-      const fullLabel = labels[key] || "";
+      const fullLabel = pick(labels[key]) || "";
       const label = fullLabel
         ? `<span class="cell-label" title="${escapeXml(fullLabel)}">${escapeXml(fullLabel)}</span>`
         : "";
@@ -3412,9 +3415,11 @@ function renderGrid(step) {
     html += "</tr>";
   }
   html += "</tbody></table>";
-  const captionHtml = caption ? `<div class="dp-grid-caption">${escapeXml(caption)}</div>` : "";
-  const secondaryCaptionHtml = secondaryCaption
-    ? `<div class="dp-grid-caption-secondary">${escapeXml(secondaryCaption)}</div>`
+  const captionText = pick(caption);
+  const secondaryCaptionText = pick(secondaryCaption);
+  const captionHtml = captionText ? `<div class="dp-grid-caption">${escapeXml(captionText)}</div>` : "";
+  const secondaryCaptionHtml = secondaryCaptionText
+    ? `<div class="dp-grid-caption-secondary">${escapeXml(secondaryCaptionText)}</div>`
     : "";
   const gridView = $("gridView");
   gridView.innerHTML = captionHtml + secondaryCaptionHtml + html;
@@ -19633,6 +19638,136 @@ function renderRandomizedSet380View(step) {
   </section>`;
 }
 
+// ---- Remove Boxes visualization (bai 546) ----
+// Replays the memoised interval DP dfs in true execution order: box row with
+// the active window and k phantom boxes, live call stack, option chips and
+// memo statistics.
+function renderRemoveBoxes546View(step) {
+  const view = step.removeBoxes546View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const event = String(view.event || "init");
+  const boxes = Array.isArray(view.boxes) ? view.boxes : [];
+  const l = Number.isInteger(view.l) ? view.l : null;
+  const r = Number.isInteger(view.r) ? view.r : null;
+  const k = Number.isInteger(view.k) ? view.k : null;
+  const curM = Number.isInteger(view.curM) ? view.curM : null;
+  const matchMs = Array.isArray(view.matchMs) ? view.matchMs : [];
+  const options = Array.isArray(view.options) ? view.options : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const bestValue = options.length ? Math.max(...options.map((o) => o.value)) : null;
+
+  // ---- phase header ----
+  const phaseLabels = vi
+    ? ["Gọi dp(l,r,k)", "Quét vị trí cùng màu", "Đánh giá phương án", "Lưu memo & trả"]
+    : ["Call dp(l,r,k)", "Scan matching spots", "Score the options", "Memoise & return"];
+  let phaseIndex = -1;
+  if (event === "enter") phaseIndex = 0;
+  else if (event === "scan-matches") phaseIndex = 1;
+  else if (event === "option-direct" || event === "option-split") phaseIndex = 2;
+  else if (["memo-store", "memo-hit", "base-return"].includes(event)) phaseIndex = 3;
+  else if (event === "done") phaseIndex = 4;
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  // ---- box row ----
+  const boxHtml = (value, idx, extraClass) => `<div class="rb546-box ${extraClass}"><small>${idx}</small><b>${value}</b></div>`;
+  let rowHtml = "";
+  if (k !== null && k > 0 && l !== null && !["init", "done", "invalid"].includes(event)) {
+    rowHtml += `<div class="rb546-ghosts"><span class="rb546-ghost">×${k}</span><i>+</i></div>`;
+  }
+  rowHtml += boxes.map((value, idx) => {
+    const inWindow = l !== null && r !== null && idx >= l && idx <= r;
+    const isCurM = idx === curM && event === "option-split";
+    const classes = [
+      "cell",
+      `c${Math.abs(value) % 6}`,
+      inWindow ? "" : "out",
+      idx === l && inWindow ? "anchor" : "",
+      isCurM ? "merge" : "",
+      event === "option-split" && curM !== null && idx > l && idx < curM && inWindow ? "mid-clear" : "",
+    ].filter(Boolean).join(" ");
+    return boxHtml(value, idx, classes);
+  }).join("");
+  const rowWrap = `<section class="rb546-row-wrap"><header>
+      <strong>${vi ? "HÀNG HỘP" : "BOX ROW"} · ${boxes.length}</strong>
+      <span>${vi ? "mờ = ngoài đoạn đang xét · ×k = hộp ảo bên trái" : "dim = outside range · ×k = phantom left boxes"}</span>
+    </header><div class="rb546-row">${rowHtml}</div></section>`;
+
+  // ---- call stack ----
+  const stackHtml = `<section class="rb546-stack"><header><strong>${vi ? "NGĂN XẾP ĐỆ QUY" : "CALL STACK"}</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header>
+    <div>${stack.map((frame, i) => `
+      <div class="rb546-frame${i === stack.length - 1 ? " current" : ""}"><em>L${i}</em>dp(${frame.l}, ${frame.r}, ${frame.k})</div>`).join("") || `<em class="rb546-empty">(trống)</em>`}
+    </div></section>`;
+
+  // ---- action card ----
+  const optSummary = options.length
+    ? `${vi ? "phương án tốt nhất" : "best option"}: ${options.reduce((a, b) => (b.value > a.value ? b : a)).label} = ${bestValue}`
+    : "";
+  let actText = "";
+  switch (event) {
+    case "init":
+      actText = { tag: "START", text: `dp(0, ${boxes.length - 1}, 0)`, sub: vi ? "Bắt đầu từ toàn bộ hàng hộp, không có hộp ảo nào." : "Start from the full row with zero phantoms." };
+      break;
+    case "enter":
+      actText = { tag: "CALL", text: `dp(${l}, ${r}, ${k}) · colour ${view.color}`, sub: vi ? `Có ${k} hộp màu ${view.color} dính ngoài trái đoạn.` : `${k} colour-${view.color} boxes hang off the left edge.` };
+      break;
+    case "base-return":
+      actText = { tag: "BASE", text: "l > r → return 0", sub: vi ? "Đoạn rỗng không có điểm." : "An empty range scores nothing." };
+      break;
+    case "memo-hit":
+      actText = { tag: "MEMO HIT", text: `dp(${l}, ${r}, ${k}) → ${view.returnValue}`, sub: vi ? "Trạng thái đã tính; trả ngay khỏi duyệt lại." : "Already solved; reuse the cached value." };
+      break;
+    case "scan-matches":
+      actText = { tag: vi ? "QUÉT" : "SCAN", text: `m ∈ {${matchMs.join(", ")}}`, sub: vi ? "Vị trí cùng màu cho phép hoãn gỡ để gộp lớn hơn." : "Matching colours allow postponing the removal to merge bigger." };
+      break;
+    case "option-direct": {
+      const sq = (k + 1) * (k + 1);
+      actText = { tag: vi ? "PHƯƠNG ÁN GỠ NGAY" : "REMOVE NOW", text: `(${k + 1})² = ${sq} + rest → ${bestValue}`, sub: vi ? "Xoá nhóm hiện tại cộng hộp ảo trong một nước." : "Clear the current run plus phantoms in one strike." };
+      break;
+    }
+    case "option-split":
+      actText = { tag: `${vi ? "GỘP TẠI" : "ATTACH"} m=${curM}`, text: `middle + merged → ${options.length ? options[options.length - 1].value : "?"}`, sub: vi ? `Dọn giữa để boxes[${l}] & boxes[${curM}] thành một khối.` : `Clear between so boxes[${l}] and boxes[${curM}] fuse into one block.` };
+      break;
+    case "memo-store":
+      actText = { tag: "MEMOISE", text: `memo[(${l},${r},${k})] = ${view.returnValue}`, sub: optSummary };
+      break;
+    case "done":
+      actText = { tag: "ANSWER", text: String(view.answer ?? ""), sub: vi ? "Tổng điểm lớn nhất gỡ sạch hàng hộp." : "The maximum score to clear the whole row." };
+      break;
+    default:
+      actText = { tag: event.toUpperCase(), text: pick(step.title), sub: pick(step.note) };
+  }
+
+  // ---- option chips ----
+  const optionsHtml = options.length
+    ? `<div class="rb546-options">${options.map((option) => `
+        <span class="rb546-option${option.value === bestValue ? " best" : ""}${option.label.startsWith("remove") ? " direct" : " split"}">
+          <small>${escapeHtml(option.label)}</small><b>${option.value}</b>
+        </span>`).join("")}</div>`
+    : "";
+
+  el.innerHTML = `<section class="rb546-viz">
+    <div class="rb546-phases">${phases}</div>
+    <div class="rb546-top">
+      <div class="rb546-left">
+        ${rowWrap}
+        <div class="rb546-action"><small>${escapeHtml(actText.tag)}</small><strong>${escapeHtml(actText.text)}</strong><span>${escapeHtml(actText.sub)}</span></div>
+        ${optionsHtml}
+      </div>
+      ${stackHtml}
+    </div>
+    <div class="rb546-stats">
+      <span><small>${vi ? "memo đã lưu" : "states stored"}</small><strong>${view.memoCount ?? 0}</strong></span>
+      <span><small>${vi ? "lần trúng memo" : "memo hits"}</small><strong>${view.memoHits ?? 0}</strong></span>
+      <span><small>${vi ? "độ sâu đệ quy" : "recursion depth"}</small><strong>${view.depth ?? 0}</strong></span>
+      <span class="ans"><small>${vi ? "đáp án" : "answer"}</small><strong>${view.answer ?? "…"}</strong></span>
+    </div>
+  </section>`;
+}
+
 // ---- Max Points on a Line visualization (bai 149) ----
 // Plots every point on an aspect-locked grid, then walks the anchor rounds:
 // dashed ray to the scanned point, canonical-slope card, bucket chips and the
@@ -21983,6 +22118,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMaxPoints149View(step);
+  } else if (step.removeBoxes546View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRemoveBoxes546View(step);
   } else if (step.stoneGame1872View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
