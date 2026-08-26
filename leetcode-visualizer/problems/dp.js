@@ -12665,6 +12665,232 @@ function buildSteps516(input) {
 }
 
 /**
+ * LeetCode 730: Count Different Palindromic Subsequences.
+ * Interval DP by boundary character:
+ *   dp[i][j] = number of distinct non-empty palindromic subsequences in s[i..j].
+ * For each c in a..d, find first/last c inside the interval:
+ *   no c      -> +0
+ *   one c     -> +1        ("c")
+ *   two+ c    -> +2 + dp[l+1][r-1]  ("c", "cc", and c + middle + c)
+ */
+function buildSteps730(input) {
+  const s = typeof input === "string" ? input.trim() : String(input ?? "");
+  if (!s || !/^[a-d]+$/.test(s)) throw new Error("s must be a non-empty string using only a, b, c, d");
+  if (s.length > 10) throw new Error("Visualization for 730 supports s length <= 10.");
+
+  const MOD = 1_000_000_007;
+  const chars = ["a", "b", "c", "d"];
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const known = Array.from({ length: n }, () => new Array(n).fill(false));
+  const steps = [];
+
+  const labels = Array.from({ length: n }, (_, idx) => ({ index: `i/j=${idx}`, char: s[idx] }));
+  const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
+  const display = () => {
+    const table = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i <= j) table[i + 1][j + 1] = known[i][j] ? String(dp[i][j]) : "·";
+      }
+    }
+    return table;
+  };
+
+  const snap = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display(),
+        text1: s,
+        text2: s,
+        rowLabels: labels.map(({ char }, idx) => ({ index: `i=${idx}`, char })),
+        colLabels: labels.map(({ char }, idx) => ({ index: `j=${idx}`, char })),
+        hlCell: shift(opts.hlCell || null),
+        pathCells: (opts.pathCells || []).map(shift).filter(Boolean),
+        historyCells: (opts.historyCells || []).map(shift).filter(Boolean),
+        cellLabels: Object.fromEntries(
+          Object.entries(opts.cellLabels || {}).map(([key, value]) => {
+            const [r, c] = key.split(",").map(Number);
+            return [`${r + 1},${c + 1}`, value];
+          })
+        ),
+        largeCells: true,
+        caption: opts.caption,
+        secondaryCaption: opts.secondaryCaption,
+      },
+      highlight: [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  snap({
+    title: { vi: "Khởi tạo interval DP", en: "Initialize interval DP" },
+    codeLines: [3, 4],
+    hlCell: [0, 0],
+    caption: { vi: "dp[i][j] đếm số palindrome subsequence khác nhau trong s[i..j]", en: "dp[i][j] counts distinct palindromic subsequences inside s[i..j]" },
+    secondaryCaption: { vi: "Bài chỉ dùng ký tự a, b, c, d nên ta có thể cộng đóng góp theo từng ký tự biên.", en: "Because s only uses a, b, c, d, we can add each boundary character's contribution." },
+    vars: [
+      { name: "s", value: JSON.stringify(s) },
+      { name: "n", value: n },
+      { name: "MOD", value: MOD },
+    ],
+    note: {
+      vi: "Điểm khó là tránh đếm trùng. Thay vì cộng dp kiểu bao hàm-loại trừ, ta nhóm palindrome theo ký tự ngoài cùng.",
+      en: "The hard part is avoiding duplicates. Instead of inclusion-exclusion, group palindromes by their outermost character.",
+    },
+  });
+
+  for (let len = 1; len <= n; len++) {
+    snap({
+      title: { vi: `Xét các đoạn dài ${len}`, en: `Process length ${len} intervals` },
+      codeLines: [5],
+      caption: { vi: `Tính mọi dp[i][j] với length=${len}`, en: `Compute every dp[i][j] with length=${len}` },
+      secondaryCaption: { vi: "Đoạn ngắn hơn đã có sẵn trước khi đoạn dài hơn cần dùng.", en: "Shorter intervals are ready before longer intervals need them." },
+      vars: [{ name: "length", value: len }],
+      note: {
+        vi: "Interval DP phải đi theo độ dài tăng dần vì công thức có thể dùng dp[l+1][r-1].",
+        en: "Interval DP moves by increasing length because the formula may use dp[l+1][r-1].",
+      },
+    });
+
+    for (let i = 0; i + len <= n; i++) {
+      const j = i + len - 1;
+      let total = 0;
+      snap({
+        title: { vi: `Tính dp[${i}][${j}]`, en: `Compute dp[${i}][${j}]` },
+        codeLines: [7, 8, 9],
+        hlCell: [i, j],
+        caption: { vi: `Đoạn "${s.slice(i, j + 1)}"`, en: `Interval "${s.slice(i, j + 1)}"` },
+        secondaryCaption: { vi: "Thử lần lượt ký tự ngoài cùng c = a, b, c, d.", en: "Try each outer character c = a, b, c, d." },
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "ans", value: total },
+        ],
+        note: {
+          vi: "Mỗi palindrome khác nhau có đúng một ký tự ngoài cùng, nên bốn nhóm này không trùng nhau.",
+          en: "Every distinct palindrome has exactly one outermost character, so these four groups do not overlap.",
+        },
+      });
+
+      for (const ch of chars) {
+        let left = i;
+        let right = j;
+        while (left <= j && s[left] !== ch) left += 1;
+        while (right >= i && s[right] !== ch) right -= 1;
+
+        let add = 0;
+        let reason;
+        let deps = [];
+        let cellLabels = {};
+        if (left > right) {
+          reason = {
+            vi: `Không có '${ch}' trong đoạn này -> cộng 0.`,
+            en: `No '${ch}' appears in this interval -> add 0.`,
+          };
+        } else if (left === right) {
+          add = 1;
+          cellLabels[`${left},${right}`] = { vi: "1 ký tự", en: "single" };
+          reason = {
+            vi: `Chỉ có một '${ch}' -> tạo palindrome "${ch}".`,
+            en: `Only one '${ch}' -> creates palindrome "${ch}".`,
+          };
+        } else {
+          const middle = left + 1 <= right - 1 ? dp[left + 1][right - 1] : 0;
+          add = (2 + middle) % MOD;
+          deps = left + 1 <= right - 1 ? [[left + 1, right - 1]] : [];
+          cellLabels[`${left},${left}`] = { vi: "trái", en: "left" };
+          cellLabels[`${right},${right}`] = { vi: "phải", en: "right" };
+          reason = {
+            vi: `Có ít nhất hai '${ch}': cộng "${ch}", "${ch}${ch}", và '${ch}' + middle + '${ch}'.`,
+            en: `At least two '${ch}': add "${ch}", "${ch}${ch}", and '${ch}' + middle + '${ch}'.`,
+          };
+        }
+
+        snap({
+          title: { vi: `Ký tự biên '${ch}'`, en: `Boundary character '${ch}'` },
+          codeLines: [10, 11, 12, 13, 14, 15, 16],
+          hlCell: [i, j],
+          pathCells: deps,
+          cellLabels,
+          caption: { vi: `first '${ch}' = ${left <= right ? left : "none"}, last '${ch}' = ${left <= right ? right : "none"}`, en: `first '${ch}' = ${left <= right ? left : "none"}, last '${ch}' = ${left <= right ? right : "none"}` },
+          secondaryCaption: reason,
+          vars: [
+            { name: "c", value: JSON.stringify(ch) },
+            { name: "left", value: left <= right ? left : "none" },
+            { name: "right", value: left <= right ? right : "none" },
+            { name: "add", value: add },
+            { name: "ans before", value: total },
+          ],
+          note: reason,
+        });
+
+        total = (total + add) % MOD;
+        snap({
+          title: { vi: `Cộng nhóm '${ch}' -> ans=${total}`, en: `Add '${ch}' group -> ans=${total}` },
+          codeLines: [17],
+          hlCell: [i, j],
+          pathCells: deps,
+          caption: { vi: `ans = (ans + ${add}) % MOD = ${total}`, en: `ans = (ans + ${add}) % MOD = ${total}` },
+          secondaryCaption: { vi: "Giữ modulo để tránh số quá lớn.", en: "Keep modulo to avoid huge numbers." },
+          vars: [
+            { name: "c", value: JSON.stringify(ch) },
+            { name: "add", value: add },
+            { name: "ans", value: total },
+          ],
+          note: {
+            vi: "Vì các nhóm theo ký tự ngoài cùng khác nhau, phép cộng này không đếm trùng.",
+            en: "Because groups are separated by outer character, this addition does not double count.",
+          },
+        });
+      }
+
+      dp[i][j] = total;
+      known[i][j] = true;
+      snap({
+        title: { vi: `Lưu dp[${i}][${j}] = ${total}`, en: `Store dp[${i}][${j}] = ${total}` },
+        codeLines: [18],
+        hlCell: [i, j],
+        caption: { vi: `dp[${i}][${j}] = ${total}`, en: `dp[${i}][${j}] = ${total}` },
+        secondaryCaption: { vi: `Đoạn "${s.slice(i, j + 1)}" có ${total} palindrome subsequence khác nhau.`, en: `Interval "${s.slice(i, j + 1)}" has ${total} distinct palindromic subsequences.` },
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: `dp[${i}][${j}]`, value: total },
+        ],
+        note: {
+          vi: "Ô này giờ có thể được dùng làm middle cho các đoạn lớn hơn.",
+          en: "This cell can now be used as the middle value for larger intervals.",
+        },
+      });
+    }
+  }
+
+  const answer = dp[0][n - 1];
+  snap({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [19],
+    hlCell: [0, n - 1],
+    caption: { vi: `countPalindromicSubsequences(${JSON.stringify(s)}) = ${answer}`, en: `countPalindromicSubsequences(${JSON.stringify(s)}) = ${answer}` },
+    secondaryCaption: { vi: "Đáp án nằm ở dp[0][n-1], toàn bộ chuỗi.", en: "The answer is dp[0][n-1], the whole string." },
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Có ${answer} palindromic subsequence khác nhau trong "${s}".`,
+      en: `There are ${answer} different palindromic subsequences in "${s}".`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 1682: Longest Palindromic Subsequence II.
  * Top-down interval DP:
  *   dfs(i, j, prev) = best good palindrome inside s[i..j],
@@ -23255,6 +23481,62 @@ module.exports = {
       "        return dp[0][n - 1]",
     ],
     builder: buildSteps516,
+  },
+  730: {
+    id: 730,
+    difficulty: "hard",
+    slug: "count-different-palindromic-subsequences",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "interval-dp", vi: "DP trên đoạn", en: "Interval DP" },
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "dedup", vi: "Tránh đếm trùng", en: "Deduplication" },
+    ],
+    title: { vi: "Count Different Palindromic Subsequences", en: "Count Different Palindromic Subsequences" },
+    titleVi: { vi: "Đếm subsequence đối xứng khác nhau", en: "Count different palindromic subsequences" },
+    statement: {
+      vi: "Cho chuỗi s chỉ gồm các ký tự a, b, c, d. Trả về số palindromic subsequence khác nhau, modulo 1e9+7.",
+      en: "Given a string s containing only a, b, c, d, return the number of different non-empty palindromic subsequences modulo 1e9+7.",
+    },
+    defaultInput: "bccb",
+    inputKind: "string",
+    inputLabel: { vi: "s (chỉ gồm a,b,c,d; tối đa 10 ký tự cho visualization)", en: "s (only a,b,c,d; up to 10 chars for visualization)" },
+    extraParams: [],
+    approach: [
+      { vi: "Interval DP: dp[i][j] = số palindrome subsequence khác nhau trong đoạn s[i..j].", en: "Interval DP: dp[i][j] = number of distinct palindromic subsequences inside s[i..j]." },
+      { vi: "Để tránh đếm trùng, chia theo ký tự ngoài cùng c trong {a,b,c,d}.", en: "To avoid duplicates, split by the outermost character c in {a,b,c,d}." },
+      { vi: "Với mỗi c, tìm vị trí đầu tiên l và cuối cùng r của c trong đoạn. Nếu l==r cộng 1; nếu l<r cộng 2 + dp[l+1][r-1].", en: "For each c, find its first position l and last position r in the interval. If l==r add 1; if l<r add 2 + dp[l+1][r-1]." },
+    ],
+    complexity: {
+      time: "O(4 * n^3)",
+      space: "O(n^2)",
+      note: {
+        vi: "Visualization quét tìm l/r trực tiếp cho dễ hiểu. Có thể tối ưu tìm l/r bằng next/prev occurrence.",
+        en: "The visualization scans for l/r directly for clarity. The l/r lookup can be optimized with next/prev occurrence arrays.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countPalindromicSubsequences(self, s: str) -> int:",
+      "        MOD = 10**9 + 7",
+      "        n = len(s)",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for length in range(1, n + 1):",
+      "            for i in range(n - length + 1):",
+      "                j = i + length - 1",
+      "                ans = 0",
+      "                for c in \"abcd\":",
+      "                    left, right = i, j",
+      "                    while left <= j and s[left] != c: left += 1",
+      "                    while right >= i and s[right] != c: right -= 1",
+      "                    if left > right: add = 0",
+      "                    elif left == right: add = 1",
+      "                    else: add = 2 + dp[left + 1][right - 1]",
+      "                    ans = (ans + add) % MOD",
+      "                dp[i][j] = ans",
+      "        return dp[0][n - 1]",
+    ],
+    builder: buildSteps730,
   },
   1682: {
     id: 1682,
