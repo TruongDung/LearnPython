@@ -1,5 +1,7 @@
 """LeetCode 352: Data Stream as Disjoint Intervals."""
 
+from __future__ import annotations
+
 
 class SummaryRanges:
     """Track a stream of integers as sorted disjoint intervals.

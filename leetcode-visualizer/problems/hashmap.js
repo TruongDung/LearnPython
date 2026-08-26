@@ -6900,3 +6900,435 @@ Object.assign(module.exports, {
     builder: buildSteps380,
   },
 });
+
+/**
+ * LeetCode 149: Max Points on a Line.
+ *
+ * For every anchor point we reduce each ray to a neighbour into a canonical
+ * slope fraction (a, b): divide by gcd, flip signs so b >= 0, collapse the
+ * vertical/horizontal special cases. Points sharing one key through the same
+ * anchor are collinear, so the answer is max over anchors of the largest
+ * bucket (+ duplicates + the anchor itself).
+ *
+ * Input format: "x,y; x,y; ..." or JSON "[[x,y], ...]", capped at 10 points
+ * so every anchor round stays readable.
+ */
+function gcd149(x, y) {
+  let a = Math.abs(x);
+  let b = Math.abs(y);
+  while (b) { const t = a % b; a = b; b = t; }
+  return a || 1;
+}
+
+function parsePoints149(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+  const validPair = (pair) => pair.length === 2 && pair.every((v) => Number.isInteger(v) && Math.abs(v) <= 100);
+  if (text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        const pts = parsed.map((row) => Array.isArray(row) ? row.map(Number) : null);
+        return pts.every(validPair) ? pts : [];
+      }
+    } catch (_error) {
+      // Fall through to compact parsing.
+    }
+  }
+  return text
+    .split(/\s*[;\n|]+\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(",").map((v) => Number(v.trim())))
+    .filter(validPair);
+}
+
+function buildSteps149(input) {
+  const raw = String(input ?? "").trim();
+  const points = parsePoints149(raw);
+  const steps = [];
+  const n = points.length;
+  const invalid = raw.length > 0 && (n === 0 || n > 10);
+
+  function snapshot(opts) {
+    const step = {
+      title: opts.title,
+      codeLines: opts.codeLines || [],
+      maxPoints149View: {
+        event: opts.event,
+        points: points.map((pt) => pt.slice()),
+        anchorIdx: Number.isInteger(opts.anchorIdx) ? opts.anchorIdx : null,
+        scanIdx: Number.isInteger(opts.scanIdx) ? opts.scanIdx : null,
+        scanned: (opts.scanned || []).slice(),
+        dy: opts.dy != null ? opts.dy : null,
+        dx: opts.dx != null ? opts.dx : null,
+        g: opts.g != null ? opts.g : null,
+        a: opts.a != null ? opts.a : null,
+        b: opts.b != null ? opts.b : null,
+        key: opts.key != null ? opts.key : null,
+        duplicateCount: opts.duplicateCount || 0,
+        buckets: (opts.buckets || []).map((bucket) => ({ ...bucket })),
+        collinear: (opts.collinear || []).slice(),
+        localBest: opts.localBest ? { ...opts.localBest } : null,
+        globalBest: opts.globalBest ? { ...opts.globalBest } : null,
+        processedAnchors: opts.processedAnchors || 0,
+      },
+      vars: opts.vars || [],
+      note: opts.note,
+    };
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  if (invalid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      event: "invalid",
+      vars: [],
+      note: {
+        vi: "Nhập tối đa 10 điểm dạng x,y; x,y; ... hoặc [[x,y],...]. Tọa độ là số nguyên trong [-100, 100].",
+        en: "Enter up to 10 points as x,y; x,y; ... or [[x,y],...]. Coordinates are integers within [-100, 100].",
+      },
+      final: true,
+    });
+    return { original: { points: raw }, answer: null, steps };
+  }
+
+  const fmtPt = (idx) => `(${points[idx][0]},${points[idx][1]})`;
+  const globalBest = { count: n <= 2 ? n : 1, anchorIdx: n > 0 ? 0 : null, lineKey: null };
+  let processedAnchors = 0;
+  let winningCollinear = points.map((_, idx) => idx);
+
+  snapshot({
+    title: { vi: `Khởi tạo: n = ${n} điểm`, en: `Setup: n = ${n} points` },
+    event: "setup",
+    codeLines: [6, 7],
+    vars: [
+      { name: "n", value: n },
+      { name: "best", value: n <= 2 ? n : 1 },
+    ],
+    note: n <= 2
+      ? { vi: "Với n ≤ 2 luôn tồn tại một đường thẳng qua mọi điểm nên đáp án là n.", en: "With n ≤ 2 one line always passes through every point, so the answer is n." }
+      : { vi: "Chiến lược: mỗi điểm lần lượt làm điểm gốc; phân loại mọi tia đi ra theo hệ số góc đã chuẩn hóa; bucket lớn nhất chính là đường dày nhất qua gốc đó.", en: "Strategy: make each point the anchor; classify every outgoing ray by its reduced slope; the biggest bucket through an anchor is its densest line." },
+  });
+
+  if (n <= 2) {
+    globalBest.count = n;
+    snapshot({
+      title: { vi: `n = ${n} ≤ 2 → trả về ${n}`, en: `n = ${n} ≤ 2 → return ${n}` },
+      event: "done",
+      codeLines: [8],
+      vars: [{ name: "answer", value: n }],
+      globalBest: { ...globalBest },
+      collinear: points.map((_, idx) => idx),
+      note: { vi: "Không cần quét slope khi còn ít hơn 3 điểm.", en: "No slope scan is needed with fewer than three points." },
+      final: true,
+    });
+    return { original: { points: raw }, answer: n, steps };
+  }
+
+  snapshot({
+    title: { vi: "best = 1 (một điểm nào cũng nằm trên một đường)", en: "best = 1 (any single point lies on some line)" },
+    event: "init-best",
+    codeLines: [9],
+    vars: [{ name: "best", value: 1 }],
+    globalBest: { ...globalBest },
+    note: { vi: "Bắt đầu quét từng điểm làm điểm gốc i.", en: "Start scanning every point as anchor i." },
+  });
+
+  for (let i = 0; i < n; i += 1) {
+    const slopes = new Map();
+    let duplicates = 0;
+    const anchorVars = () => [
+      { name: "i (gốc)", value: `${i} ${fmtPt(i)}` },
+      { name: "duplicates", value: duplicates },
+      { name: "buckets", value: slopes.size ? [...slopes.entries()].map(([k, c]) => `${k}×${c}`).join(" | ") : "{}" },
+    ];
+
+    snapshot({
+      title: { vi: `i = ${i}: điểm gốc ${fmtPt(i)} — reset slopes{{}}`, en: `i = ${i}: anchor ${fmtPt(i)} — reset slopes{}` },
+      event: "anchor-start",
+      anchorIdx: i,
+      processedAnchors: i,
+      codeLines: [10, 11, 12],
+      vars: anchorVars(),
+      note: { vi: "Mỗi vòng i phải bắt đầu với bảng slope trống vì các đường qua gốc khác là các đường khác.", en: "Every anchor round starts with an empty slope table because lines through different anchors are different lines." },
+    });
+
+    for (let j = 0; j < n; j += 1) {
+      if (j === i) {
+        snapshot({
+          title: { vi: `j = ${j} trùng gốc → bỏ qua`, en: `j = ${j} is the anchor itself → skip` },
+          event: "skip-self",
+          anchorIdx: i,
+          scanIdx: j,
+          processedAnchors: i,
+          codeLines: [14, 15],
+          vars: anchorVars(),
+          note: { vi: "Tia từ một điểm tới chính nó không xác định hướng.", en: "A ray from a point to itself defines no direction." },
+        });
+        continue;
+      }
+
+      const dy = points[j][1] - points[i][1];
+      const dx = points[j][0] - points[i][0];
+
+      snapshot({
+        title: { vi: `${fmtPt(i)} → ${fmtPt(j)}: dy = ${dy}, dx = ${dx}`, en: `${fmtPt(i)} → ${fmtPt(j)}: dy = ${dy}, dx = ${dx}` },
+        event: "deltas",
+        anchorIdx: i,
+        scanIdx: j,
+        scanned: Array.from({ length: j - (j > i ? 1 : 0) }, (_, k) => k).filter((k) => k !== i && k < j),
+        dy, dx,
+        duplicateCount: duplicates,
+        processedAnchors: i,
+        buckets: [...slopes.entries()].map(([key, count]) => ({ key, count })),
+        codeLines: [16, 17],
+        vars: [{ name: "dy", value: dy }, { name: "dx", value: dx }],
+        note: { vi: "Vector chỉ phương từ gốc tới điểm j; hai điểm cùng vector tỉ lệ tức cùng đường thẳng.", en: "Direction vector from the anchor to j; proportionate vectors share one straight line." },
+      });
+
+      if (dy === 0 && dx === 0) {
+        duplicates += 1;
+        snapshot({
+          title: { vi: `${fmtPt(j)} trùng toạ độ gốc → duplicates = ${duplicates}`, en: `${fmtPt(j)} coincides with the anchor → duplicates = ${duplicates}` },
+          event: "duplicate",
+          anchorIdx: i,
+          scanIdx: j,
+          dy, dx,
+          duplicateCount: duplicates,
+          processedAnchors: i,
+          codeLines: [18, 19, 20],
+          vars: anchorVars(),
+          note: { vi: "Điểm trùng nằm trên mọi đường qua gốc nên được cộng vào kết quả cuối của vòng này.", en: "A coincident point lies on every line through the anchor, so it joins this round's final tally." },
+        });
+        continue;
+      }
+
+      const g = gcd149(dy, dx);
+      let a = dy / g;
+      let b = dx / g;
+      snapshot({
+        title: { vi: `gcd(${Math.abs(dy)}, ${Math.abs(dx)}) = ${g} → (${a}, ${b})`, en: `gcd(${Math.abs(dy)}, ${Math.abs(dx)}) = ${g} → (${a}, ${b})` },
+        event: "gcd-reduce",
+        anchorIdx: i,
+        scanIdx: j,
+        dy, dx, g, a, b,
+        duplicateCount: duplicates,
+        processedAnchors: i,
+        buckets: [...slopes.entries()].map(([key, count]) => ({ key, count })),
+        codeLines: [21, 22],
+        vars: [{ name: "g", value: g }, { name: "(a, b)", value: `(${a}, ${b})` }],
+        note: { vi: "Chia cả hai cho GCD: (2,4) và (1,2) phải rơi vào cùng bucket.", en: "Divide both by their GCD: (2,4) and (1,2) must land in the same bucket." },
+      });
+
+      let canonicalNote;
+      if (b < 0) {
+        a = -a; b = -b;
+        canonicalNote = {
+          vi: "b âm → đảo dấu cả hai để (1,−2) và (−1,2) thành cùng một hướng.",
+          en: "Negative b → flip both signs so (1,−2) and (−1,2) merge into one direction.",
+        };
+        snapshot({
+          title: { vi: `Chuẩn hoá dấu → (${a}, ${b})`, en: `Canonical sign → (${a}, ${b})` },
+          event: "canonical",
+          anchorIdx: i,
+          scanIdx: j,
+          dy, dx, g, a, b,
+          key: `${a}/${b}`,
+          duplicateCount: duplicates,
+          processedAnchors: i,
+          codeLines: [23, 24],
+          vars: [{ name: "(a, b)", value: `(${a}, ${b})` }],
+          note: canonicalNote,
+        });
+      } else if (b === 0) {
+        a = 1; b = 0;
+        snapshot({
+          title: { vi: "Đường thẳng đứng → (1, 0)", en: "Vertical line → (1, 0)" },
+          event: "canonical",
+          anchorIdx: i,
+          scanIdx: j,
+          dy, dx, g: 1, a: 1, b: 0,
+          key: "1/0",
+          duplicateCount: duplicates,
+          processedAnchors: i,
+          codeLines: [25, 26],
+          vars: [{ name: "(a, b)", value: "(1, 0)" }],
+          note: { vi: "dx = 0: mọi điểm cùng hoành độ dùng chung key đứng (1, 0).", en: "dx = 0: all points sharing an x use the vertical key (1, 0)." },
+        });
+      } else if (a === 0) {
+        a = 0; b = 1;
+        snapshot({
+          title: { vi: "Đường ngang → (0, 1)", en: "Horizontal line → (0, 1)" },
+          event: "canonical",
+          anchorIdx: i,
+          scanIdx: j,
+          dy, dx, g: 1, a: 0, b: 1,
+          key: "0/1",
+          duplicateCount: duplicates,
+          processedAnchors: i,
+          codeLines: [27, 28],
+          vars: [{ name: "(a, b)", value: "(0, 1)" }],
+          note: { vi: "dy = 0: ép b về +1 để −0/+0 không tách bucket.", en: "dy = 0: force b to +1 so ±0 does not split the bucket." },
+        });
+      }
+
+      const key = `${a}/${b}`;
+      const newCount = (slopes.get(key) || 0) + 1;
+      slopes.set(key, newCount);
+      snapshot({
+        title: { vi: `slopes["${key}"] = ${newCount}`, en: `slopes["${key}"] = ${newCount}` },
+        event: "bucket-add",
+        anchorIdx: i,
+        scanIdx: j,
+        dy, dx, g, a, b, key,
+        duplicateCount: duplicates,
+        processedAnchors: i,
+        buckets: [...slopes.entries()].map(([bk, count]) => ({ key: bk, count })).sort((x, y) => y.count - x.count || x.key.localeCompare(y.key)),
+        codeLines: [29, 30],
+        vars: anchorVars(),
+        note: { vi: `Bucket "${key}" giờ có ${newCount} tia → ${newCount + 1 + duplicates} điểm trên đường đó kể cả gốc.`, en: `Bucket "${key}" now holds ${newCount} rays → ${newCount + 1 + duplicates} points on that line including the anchor.` },
+      });
+    }
+
+    let bestKey = null;
+    let bestCount = 0;
+    for (const [key, count] of slopes.entries()) {
+      if (count > bestCount) { bestCount = count; bestKey = key; }
+    }
+    const local = bestCount + duplicates + 1;
+    const collinear = bestKey === null ? [i] : [i, ...points.map((_, idx) => idx).filter((idx) => {
+      if (idx === i) return false;
+      const ddy = points[idx][1] - points[i][1];
+      const ddx = points[idx][0] - points[i][0];
+      if (ddy === 0 && ddx === 0) return true;
+      const gg = gcd149(ddy, ddx);
+      let aa = ddy / gg;
+      let bb = ddx / gg;
+      if (bb < 0) { aa = -aa; bb = -bb; }
+      if (bb === 0) { aa = 1; bb = 0; } else if (aa === 0) { bb = 1; }
+      return `${aa}/${bb}` === bestKey;
+    })];
+    const localBest = { key: bestKey, count: local };
+    snapshot({
+      title: {
+        vi: `Gốc ${fmtPt(i)}: đường "${bestKey}" dày nhất → ${local} điểm`,
+        en: `Anchor ${fmtPt(i)}: densest line "${bestKey}" → ${local} points`,
+      },
+      event: "round-best",
+      anchorIdx: i,
+      collinear,
+      localBest,
+      globalBest: { ...globalBest },
+      duplicateCount: duplicates,
+      buckets: [...slopes.entries()].map(([bk, count]) => ({ key: bk, count })).sort((x, y) => y.count - x.count),
+      processedAnchors: i + 1,
+      codeLines: [31],
+      vars: [...anchorVars(), { name: "local", value: local }],
+      note: { vi: "Bucket lớn nhất + duplicates + chính gốc = số điểm nhiều nhất trên một đường qua điểm này.", en: "Largest bucket + duplicates + the anchor itself = densest line through this point." },
+    });
+
+    if (local > globalBest.count) {
+      globalBest.count = local;
+      globalBest.anchorIdx = i;
+      globalBest.lineKey = bestKey;
+      winningCollinear = collinear;
+      snapshot({
+        title: { vi: `best tăng lên ${local} nhờ gốc ${fmtPt(i)}`, en: `best rises to ${local} thanks to anchor ${fmtPt(i)}` },
+        event: "best-update",
+        anchorIdx: i,
+        collinear,
+        localBest,
+        globalBest: { ...globalBest },
+        processedAnchors: i + 1,
+        codeLines: [32],
+        vars: [{ name: "best", value: globalBest.count }],
+        note: { vi: "Cập nhật kỷ lục toàn cục; các vòng sau chỉ có thể sanh bằng hoặc vượt.", en: "Global record updated; later rounds can only tie or beat it." },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Kết quả: ${globalBest.count} điểm thẳng hàng`, en: `Answer: ${globalBest.count} collinear points` },
+    event: "done",
+    collinear: winningCollinear,
+    globalBest: { ...globalBest },
+    processedAnchors: n,
+    codeLines: [33],
+    vars: [{ name: "return", value: globalBest.count }],
+    note: { vi: "Độ phức tạp O(n²) vòng đôi với băm slope; đây cũng là cách truy vết đường thắng.", en: "The O(n²) double loop with slope hashing also reveals the winning line." },
+    final: true,
+  });
+
+  return { original: { points: raw }, answer: globalBest.count, steps };
+}
+
+Object.assign(module.exports, {
+  149: {
+    id: 149,
+    difficulty: "hard",
+    slug: "max-points-on-a-line",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [
+      { key: "geometry", vi: "Hình học", en: "Geometry" },
+      { key: "math", vi: "Toán", en: "Math" },
+    ],
+    title: { vi: "Max Points on a Line", en: "Max Points on a Line" },
+    titleVi: { vi: "Số điểm nhiều nhất trên một đường thẳng", en: "Find the densest straight line through given points" },
+    statement: {
+      vi: "Cho các điểm (x, y) trên mặt phẳng. Trả về số điểm nhiều nhất cùng nằm trên một đường thẳng.",
+      en: "Given (x, y) points on a plane, return the maximum number of points that lie on one straight line.",
+    },
+    defaultInput: "1,1;3,2;5,3;4,1;2,3;1,4",
+    inputKind: "string",
+    inputLabel: { vi: "points (x,y; ...) — tối đa 10 điểm", en: "points (x,y; ...) — up to 10 points" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi điểm lần lượt làm gốc; đếm mỗi tia ra bằng slope chuẩn hóa (a, b) sau khi chia GCD và thống nhất dấu.", en: "Rotate each point as the anchor; count every outgoing ray by its reduced slope (a, b) after GCD division and sign normalization." },
+      { vi: "Bucket lớn nhất qua mỗi gốc (+ điểm trùng + chính gốc) ứng viên cho đáp án.", en: "The largest bucket through each anchor (+ duplicates + the anchor) is that round's candidate." },
+      { vi: "Key đặc biệt: đứng (1, 0), ngang (0, 1); b<0 thì đảo dấu cả cặp để hướng gộp đúng.", en: "Special keys: vertical (1, 0), horizontal (0, 1); negative b flips both signs so directions merge." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n)",
+      note: { vi: "Vòng ngoài chọn gốc, vòng trong quét mọi điểm khác; mỗi vòng chỉ giữ tối đa n−1 bucket slope.", en: "Outer loop picks the anchor, inner loop scans all other points; each round keeps at most n−1 slope buckets." },
+    },
+    code: [
+      "from math import gcd",
+      "",
+      "",
+      "class Solution:",
+      "    def maxPoints(self, points: list[list[int]]) -> int:",
+      "        n = len(points)",
+      "        if n <= 2:",
+      "            return n",
+      "        best = 1",
+      "        for i in range(n):",
+      "            slopes = {}",
+      "            duplicates = 0",
+      "            for j in range(n):",
+      "                if j == i:",
+      "                    continue",
+      "                dy = points[j][1] - points[i][1]",
+      "                dx = points[j][0] - points[i][0]",
+      "                if dy == 0 and dx == 0:",
+      "                    duplicates += 1",
+      "                    continue",
+      "                g = gcd(abs(dy), abs(dx))",
+      "                a, b = dy // g, dx // g",
+      "                if b < 0:",
+      "                    a, b = -a, -b",
+      "                if b == 0:",
+      "                    a, b = 1, 0",
+      "                elif a == 0:",
+      "                    a, b = 0, 1",
+      "                key = (a, b)",
+      "                slopes[key] = slopes.get(key, 0) + 1",
+      "            local = (max(slopes.values()) if slopes else 0) + duplicates + 1",
+      "            best = max(best, local)",
+      "        return best",
+    ],
+    builder: buildSteps149,
+  },
+});

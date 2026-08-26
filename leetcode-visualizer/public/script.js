@@ -19633,6 +19633,182 @@ function renderRandomizedSet380View(step) {
   </section>`;
 }
 
+// ---- Max Points on a Line visualization (bai 149) ----
+// Plots every point on an aspect-locked grid, then walks the anchor rounds:
+// dashed ray to the scanned point, canonical-slope card, bucket chips and the
+// densest line glowing through each anchor.
+function renderMaxPoints149View(step) {
+  const view = step.maxPoints149View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const event = String(view.event || "setup");
+  const points = Array.isArray(view.points) ? view.points : [];
+  const n = points.length;
+  const anchorIdx = Number.isInteger(view.anchorIdx) ? view.anchorIdx : null;
+  const scanIdx = Number.isInteger(view.scanIdx) ? view.scanIdx : null;
+  const scannedSet = new Set(Array.isArray(view.scanned) ? view.scanned : []);
+  const collinearSet = new Set(Array.isArray(view.collinear) ? view.collinear : []);
+  const buckets = Array.isArray(view.buckets) ? view.buckets.slice(0, 8) : [];
+  const key = view.key != null ? String(view.key) : null;
+
+  // ---- phase header ----
+  const phaseLabels = vi
+    ? ["Chọn điểm gốc", "Tính dy / dx", "Chuẩn hoá slope", "Đếm & kết luận"]
+    : ["Pick anchor", "Compute dy / dx", "Reduce slope", "Count & conclude"];
+  let phaseIndex = -1;
+  if (["anchor-start", "skip-self"].includes(event)) phaseIndex = 0;
+  else if (event === "deltas") phaseIndex = 1;
+  else if (["gcd-reduce", "canonical", "duplicate"].includes(event)) phaseIndex = 2;
+  else if (["bucket-add", "round-best", "best-update"].includes(event)) phaseIndex = 3;
+  else if (event === "done") phaseIndex = 4;
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  // ---- plot geometry (aspect-locked so angles stay true) ----
+  const xs = points.map((pt) => pt[0]);
+  const ys = points.map((pt) => pt[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const padX = Math.max(2, (maxX - minX) * 0.14);
+  const padY = Math.max(2, (maxY - minY) * 0.14);
+  const spanX = (maxX - minX) + padX * 2 || 1;
+  const spanY = (maxY - minY) + padY * 2 || 1;
+  const ux = 100 / spanX;
+  const uy = 100 / spanY;
+  const leftOf = (x) => ((x - minX) + padX) * ux;
+  const topOf = (y) => ((maxY + padY) - y) * uy;
+
+  const dotsHtml = points.map((pt, idx) => {
+    const classes = ["mp149-dot"];
+    if (idx === anchorIdx) classes.push("anchor");
+    if (idx === scanIdx) classes.push("scan");
+    else if (scannedSet.has(idx)) classes.push("scanned");
+    if (collinearSet.has(idx) && idx !== anchorIdx && idx !== scanIdx && !scannedSet.has(idx)) classes.push("collinear");
+    return `<div class="${classes.join(" ")}" style="left:${leftOf(pt[0])}%;top:${topOf(pt[1])}%" title="(${pt[0]}, ${pt[1]})"><b>${idx}</b><small>(${pt[0]},${pt[1]})</small></div>`;
+  }).join("");
+
+  const segHtml = [];
+  if (anchorIdx !== null && scanIdx !== null && ["deltas", "gcd-reduce", "canonical", "bucket-add"].includes(event)) {
+    const [x1, y1] = points[anchorIdx];
+    const [x2, y2] = points[scanIdx];
+    const dxU = x2 - x1, dyU = y2 - y1;
+    const lenPct = Math.hypot(dxU, dyU) * ux;
+    const angle = Math.atan2(-dyU * uy, dxU * ux);
+    segHtml.push(`<div class="mp149-segline ray" style="left:${leftOf(x1)}%;top:${topOf(y1)}%;width:${lenPct}%;transform:rotate(${angle}rad)"></div>`);
+  }
+  const lineKey = view.localBest && view.localBest.key ? view.localBest.key : null;
+  const showWinningLine = ["round-best", "best-update"].includes(event) && lineKey;
+  const showFinalLine = event === "done" && view.globalBest && Number.isInteger(view.globalBest.anchorIdx);
+  if (showWinningLine || showFinalLine) {
+    const srcAnchor = showFinalLine ? view.globalBest.anchorIdx : anchorIdx;
+    const dirKey = showFinalLine
+      ? (points.length && view.globalBest.lineKey ? view.globalBest.lineKey : null)
+      : lineKey;
+    if (dirKey) {
+      const [aRaw, bRaw] = dirKey.split("/").map(Number);
+      const dxU = bRaw === 0 ? 0 : bRaw;
+      const dyU = bRaw === 0 ? 1 : aRaw;
+      const lenPct = spanX * ux;
+      const angle = Math.atan2(-dyU * uy, dxU * ux);
+      segHtml.push(`<div class="mp149-segline winning" style="left:${leftOf(points[srcAnchor][0])}%;top:${topOf(points[srcAnchor][1])}%;width:${lenPct}%;transform:translate(-50%, -50%) rotate(${angle}rad)"></div>`);
+    } else if (collinearSet.size >= 2) {
+      const list = [...collinearSet];
+      const [x1, y1] = points[list[0]];
+      const [x2, y2] = points[list[list.length - 1]];
+      const dxU = x2 - x1 || 1e-9, dyU = y2 - y1 || 1e-9;
+      const lenPct = Math.hypot(dxU, dyU) * ux;
+      const angle = Math.atan2(-dyU * uy, dxU * ux);
+      segHtml.push(`<div class="mp149-segline winning" style="left:${leftOf(x1)}%;top:${topOf(y1)}%;width:${lenPct}%;transform-origin:0 0;transform:rotate(${angle}rad)"></div>`);
+    }
+  }
+
+  const plotHtml = `<section class="mp149-plot-wrap">
+    <header><strong>${vi ? "MẶT PHẲNG ĐIỂM" : "POINT PLANE"}</strong><span>${n} ${vi ? "điểm · tỉ lệ trục giữ nguyên" : "points · axes share one scale"}</span></header>
+    <div class="mp149-plot" style="aspect-ratio:${spanX}/${spanY}">
+      <i class="mp149-axis mp149-axis-x"></i><i class="mp149-axis mp149-axis-y"></i>
+      ${segHtml.join("")}
+      ${dotsHtml}
+    </div>
+  </section>`;
+
+  // ---- slope computation card ----
+  let slopeHtml = "";
+  if (view.dy != null && view.dx != null && anchorIdx !== null && scanIdx !== null) {
+    const branchNote =
+      view.b === 0 ? { vi: "dx = 0 → key đứng đặc biệt (1, 0)", en: "dx = 0 → special vertical key (1, 0)" }
+        : view.a === 0 ? { vi: "dy = 0 → key ngang đặc biệt (0, 1)", en: "dy = 0 → special horizontal key (0, 1)" }
+          : { vi: "chia GCD rồi thống nhất dấu để hướng gộp đúng bucket", en: "divide by GCD then normalize signs so equal directions merge" };
+    slopeHtml = `<section class="mp149-slope ${event === "bucket-add" ? "counted" : ""}">
+      <header><strong>${vi ? "HỆ SỐ GÓC" : "SLOPE"} · P<sub>${anchorIdx}</sub>→P<sub>${scanIdx}</sub></strong><span>${escapeHtml(pick(branchNote))}</span></header>
+      <div class="mp149-formula">
+        <span><small>dy</small><b>${view.dy}</b></span>
+        <span><small>dx</small><b>${view.dx}</b></span>
+        <span><small>gcd</small><b>${view.g != null ? view.g : "—"}</b></span>
+        <span><small>(a, b)</small><b>${view.a != null && view.b != null ? `(${view.a}, ${view.b})` : "—"}</b></span>
+        <span class="key"><small>key</small><b>${key != null ? `"${key}"` : "…"}</b></span>
+      </div>
+    </section>`;
+  }
+
+  // ---- bucket chips ----
+  const bucketsHtml = buckets.length
+    ? `<section class="mp149-buckets"><header><strong>SLOPES{}</strong><span>${vi ? "cùng gốc ⇒ cùng bucket ⇒ thẳng hàng" : "one anchor ⇒ same bucket ⇒ collinear"}</span></header><div>${
+      buckets.map((bk) => `<span class="mp149-bucket${bk.key === key ? " active" : ""}${bk.key === (view.localBest && view.localBest.key) ? " best" : ""}"><small>"${escapeHtml(bk.key)}"</small><b>×${bk.count}</b></span>`).join("")
+    }</div></section>`
+    : "";
+
+  // ---- summary cards ----
+  const dupChip = view.duplicateCount > 0
+    ? `<span class="mp149-dup">${vi ? "trùng gốc" : "duplicates"} ×${view.duplicateCount}</span>` : "";
+  const localCard = view.localBest
+    ? `<span class="mp149-stat local"><small>${vi ? "ĐƯỜNG DÀY NHẤT QUA GỐC" : "DENSEST LINE VIA ANCHOR"} P${anchorIdx}</small><strong>"${escapeHtml(view.localBest.key)}" → ${view.localBest.count} ${vi ? "điểm" : "pts"}</strong></span>`
+    : `<span class="mp149-stat"><small>${vi ? "VÒNG GỐC" : "ANCHOR ROUND"}</small><strong>${anchorIdx !== null ? `P${anchorIdx} ${fmtSafe(anchorIdx, points)}` : "—"}</strong></span>`;
+  const globalCard = view.globalBest
+    ? `<span class="mp149-stat global${event === "best-update" || event === "done" ? " hit" : ""}"><small>BEST</small><strong>${view.globalBest.count} ${vi ? "điểm" : "pts"}</strong><em>P${view.globalBest.anchorIdx ?? "?"}</em></span>`
+    : "";
+
+  // ---- action box ----
+  const actionMap = {
+    setup: { tag: "SETUP", text: `n = ${n}`, sub: vi ? "Mỗi vòng chọn một điểm làm gốc và băm mọi tia ra theo slope." : "Each round picks one anchor and hashes every outgoing ray by slope." },
+    invalid: { tag: "INVALID", text: vi ? "Input không hợp lệ" : "Invalid input", sub: vi ? "Dạng đúng: x,y; x,y; ... tối đa 10 điểm." : "Expected: x,y; x,y; ... with up to 10 points." },
+    "init-best": { tag: "INIT", text: "best = 1", sub: vi ? "Một điểm luôn nằm trên ít nhất một đường thẳng." : "A single point always lies on some line." },
+    "anchor-start": { tag: vi ? "GỐC MỚI" : "NEW ANCHOR", text: `i = ${anchorIdx} · P${anchorIdx}${anchorIdx !== null ? fmtSafe(anchorIdx, points) : ""}`, sub: vi ? "Reset slopes{} và duplicates cho vòng này." : "Reset slopes{} and duplicates for this round." },
+    "skip-self": { tag: "SKIP", text: `j == i == ${scanIdx}`, sub: vi ? "Tia từ điểm tới chính nó không có hướng." : "A self-ray has no direction." },
+    deltas: { tag: "Δ", text: `dy=${view.dy}, dx=${view.dx}`, sub: vi ? "Vector chỉ phương thô tới P" + scanIdx + "." : "Raw direction vector toward P" + scanIdx + "." },
+    duplicate: { tag: vi ? "TRÙNG ĐIỂM" : "COINCIDENT", text: `duplicates = ${view.duplicateCount}`, sub: vi ? "Nằm trên mọi đường qua gốc nên cộng thẳng vào tổng." : "Lies on every line through the anchor; added straight to the tally." },
+    "gcd-reduce": { tag: "REDUCE", text: `gcd=${view.g} → (${view.a}, ${view.b})`, sub: vi ? "(2,4) và (1,2) phải chung bucket." : "(2,4) and (1,2) must share a bucket." },
+    canonical: { tag: "CANONICAL", text: `(${view.a}, ${view.b})`, sub: vi ? "Dấu chuẩn hoá; đứng (1,0), ngang (0,1)." : "Signs normalized; vertical (1,0), horizontal (0,1)." },
+    "bucket-add": { tag: "COUNT", text: `slopes["${key}"]++`, sub: vi ? `${view.buckets.find((bk) => bk.key === key)?.count ?? "?"} tia cùng hướng qua gốc.` : `${view.buckets.find((bk) => bk.key === key)?.count ?? "?"} rays share this direction.` },
+    "round-best": { tag: vi ? "KẾT VÒNG" : "ROUND BEST", text: view.localBest ? `"${view.localBest.key}" → ${view.localBest.count}` : "", sub: vi ? "Bucket lớn nhất + trùng + chính gốc." : "Largest bucket + duplicates + the anchor itself." },
+    "best-update": { tag: "BEST ↑", text: `best = ${view.globalBest ? view.globalBest.count : ""}`, sub: vi ? "Kỷ lục toàn cục vừa bị phá." : "The global record was just broken." },
+    done: { tag: "ANSWER", text: `${view.globalBest ? view.globalBest.count : ""}`, sub: vi ? "O(n²): mỗi cặp (gốc, điểm) xử lý đúng một lần với băm slope." : "O(n²): every (anchor, point) pair handled once with slope hashing." },
+  };
+  const act = actionMap[event] || { tag: event.toUpperCase(), text: pick(step.title), sub: pick(step.note) };
+
+  const legendHtml = `<span><i class="lg-anchor"></i>${vi ? "điểm gốc i" : "anchor i"}</span><span><i class="lg-scan"></i>${vi ? "đang xét j" : "scanning j"}</span><span><i class="lg-scanned"></i>${vi ? "đã xét trong vòng" : "processed this round"}</span><span><i class="lg-coll"></i>${vi ? "thẳng hàng với đường thắng" : "on the winning line"}</span>`;
+
+  el.innerHTML = `<section class="mp149-viz">
+    <div class="mp149-phases">${phases}</div>
+    <div class="mp149-top">
+      ${plotHtml}
+      <div class="mp149-side">
+        <div class="mp149-action"><small>${escapeHtml(act.tag)}</small><strong>${escapeHtml(String(act.text))}</strong><span>${escapeHtml(String(act.sub))}</span>${dupChip}</div>
+        ${slopeHtml}
+        ${localCard}
+        ${globalCard}
+      </div>
+    </div>
+    ${bucketsHtml}
+    <div class="mp149-legend">${legendHtml}</div>
+  </section>`;
+}
+
+function fmtSafe(idx, points) {
+  return Array.isArray(points[idx]) ? ` (${points[idx][0]},${points[idx][1]})` : "";
+}
+
 // ---- Data Stream as Disjoint Intervals (bai 352) ----
 // Shows the sorted disjoint-interval list three ways at once:
 //  1. a number-line track with coverage bars and the incoming value marker;
@@ -21801,6 +21977,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDataStream352View(step);
+  } else if (step.maxPoints149View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaxPoints149View(step);
   } else if (step.stoneGame1872View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
