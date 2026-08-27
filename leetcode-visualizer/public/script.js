@@ -10192,6 +10192,69 @@ function renderTaskSchedulerView(step) {
     </section>`;
 }
 
+function renderHappyNumberView(step) {
+  const view = step.happyNumberView || {};
+  const vi = lang === "vi";
+  const slowPath = Array.isArray(view.slowPath) ? view.slowPath : [];
+  const fastPath = Array.isArray(view.fastPath) ? view.fastPath : [];
+  const transform = view.transform || null;
+  const terminal = view.phase === "reached-one" || view.phase === "cycle" || view.phase === "done";
+  const metInCycle = terminal && view.slow === view.fast && view.fast !== 1;
+
+  const phaseLabel = {
+    helper: vi ? "Cách tính số kế tiếp" : "How to compute the next value",
+    "init-slow": vi ? "Đặt con trỏ slow" : "Place the slow pointer",
+    "init-fast": vi ? "Đưa fast đi trước" : "Move fast one step ahead",
+    condition: vi ? "Kiểm tra điều kiện vòng lặp" : "Check the loop condition",
+    "slow-step": vi ? "Slow đi 1 bước" : "Slow moves 1 step",
+    "fast-hop-one": vi ? "Fast đi bước thứ nhất" : "Fast takes its first hop",
+    "fast-hop-two": vi ? "Fast đi bước thứ hai" : "Fast takes its second hop",
+    "reached-one": vi ? "Đã chạm số 1" : "Reached number 1",
+    cycle: vi ? "Đã phát hiện chu kỳ" : "Cycle detected",
+    done: vi ? "Hoàn tất" : "Complete",
+  }[view.phase] || String(view.phase || "setup");
+
+  const lane = (name, path, kind, pointerValue) => {
+    const visible = path.slice(-12);
+    const skipped = path.length - visible.length;
+    const valueCounts = path.reduce((counts, value) => {
+      counts[value] = (counts[value] || 0) + 1;
+      return counts;
+    }, {});
+    const nodes = visible.map((value, index) => {
+      const isLast = index === visible.length - 1;
+      const repeated = valueCounts[value] > 1;
+      const classes = ["happy202-node", kind, isLast ? "current" : "", repeated ? "repeated" : "", metInCycle && isLast ? "meet" : "", value === 1 ? "one" : ""].filter(Boolean).join(" ");
+      const position = skipped + index;
+      return `${index ? `<span class="happy202-arrow" aria-hidden="true">→</span>` : ""}<span class="${classes}"><small>#${position}</small><strong>${escapeHtml(String(value))}</strong>${isLast ? `<em>${name}</em>` : ""}</span>`;
+    }).join("");
+    return `<section class="happy202-lane ${kind}"><header><strong>${name.toUpperCase()}</strong><span>${kind === "slow" ? (vi ? "1 bước / vòng" : "1 step / loop") : (vi ? "2 bước / vòng" : "2 steps / loop")}</span></header><div>${skipped > 0 ? `<span class="happy202-ellipsis">… ${skipped} ${vi ? "giá trị trước" : "earlier"}</span>` : ""}${nodes || `<span class="happy202-empty">${escapeHtml(String(pointerValue))}</span>`}</div></section>`;
+  };
+
+  const equation = transform
+    ? `<section class="happy202-equation"><header><strong>nxt(${escapeHtml(String(transform.value))})</strong><span>${vi ? "tổng bình phương chữ số" : "sum of squared digits"}</span></header><div class="happy202-terms">${(transform.terms || []).map((term, index) => `${index ? `<span class="happy202-op">+</span>` : ""}<span class="happy202-term"><small>digit ${term.digit}</small><strong>${term.digit}²</strong><em>${term.square}</em></span>`).join("")}<span class="happy202-op equals">=</span><span class="happy202-sum"><small>${vi ? "số kế tiếp" : "next value"}</small><strong>${transform.sum}</strong></span></div></section>`
+    : terminal
+      ? `<section class="happy202-equation terminal ${view.answer === false || metInCycle ? "cycle" : "happy"}"><small>${vi ? "ĐIỀU KIỆN DỪNG" : "STOP CONDITION"}</small><strong>${view.fast === 1 ? "fast == 1" : `slow == fast == ${escapeHtml(String(view.fast))}`}</strong><span>${view.fast === 1 ? (vi ? "Dãy đã chạm 1 nên đây là Happy Number." : "The sequence reached 1, so this is a Happy Number.") : (vi ? "Hai con trỏ gặp nhau trong chu kỳ không chứa 1." : "The two pointers met inside a cycle that excludes 1.")}</span></section>`
+    : `<section class="happy202-equation idle"><strong>${vi ? "Chọn một bước chuyển để xem phép tính chữ số." : "Select a transition to inspect its digit calculation."}</strong></section>`;
+
+  const conditionText = view.phase === "cycle"
+    ? (vi ? `slow = fast = ${view.fast}; gặp nhau trước khi chạm 1.` : `slow = fast = ${view.fast}; they met before reaching 1.`)
+    : view.fast === 1
+      ? (vi ? "fast = 1; dãy đã tới đích." : "fast = 1; the sequence reached its goal.")
+      : (vi ? `fast != 1 và slow ${view.slow === view.fast ? "=" : "!="} fast.` : `fast != 1 and slow ${view.slow === view.fast ? "=" : "!="} fast.`);
+  const outcome = view.answer == null ? "—" : view.answer ? "TRUE" : "FALSE";
+  const outcomeClass = view.answer == null ? "pending" : view.answer ? "happy" : "cycle";
+
+  $("treeView").innerHTML = `
+    <section class="happy202-viz" role="img" aria-label="Happy Number Floyd cycle detection visualization">
+      <header><div><small>LEETCODE 202</small><strong>HAPPY NUMBER · FLOYD CYCLE DETECTION</strong></div><span>${escapeHtml(phaseLabel)}</span></header>
+      <div class="happy202-rule"><span><b>SLOW</b>${vi ? "đi 1 bước" : "moves 1 step"}</span><span><b>FAST</b>${vi ? "đi 2 bước" : "moves 2 steps"}</span><strong>${escapeHtml(conditionText)}</strong></div>
+      <div class="happy202-lanes">${lane("slow", slowPath, "slow", view.slow)}${lane("fast", fastPath, "fast", view.fast)}</div>
+      ${equation}
+      <footer><span><small>${vi ? "vị trí hiện tại" : "current positions"}</small><strong>slow = ${escapeHtml(String(view.slow))} · fast = ${escapeHtml(String(view.fast))}</strong></span><span class="${outcomeClass}"><small>isHappy(${escapeHtml(String(view.original))})</small><strong>${outcome}</strong></span></footer>
+    </section>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -22634,6 +22697,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTaskSchedulerView(step);
+  } else if (step.happyNumberView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderHappyNumberView(step);
   } else if (step.reverse344View || step.smallHashView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

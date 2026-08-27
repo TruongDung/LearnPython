@@ -4936,25 +4936,185 @@ function buildSteps219(input, params) {
   return { original: nums, answer, steps };
 }
 
-/** LeetCode 202: Happy Number — Floyd cycle detection on digit-square sums. */
+/** LeetCode 202: Happy Number — detailed Floyd cycle detection trace. */
 function buildSteps202(input) {
   const n0 = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  if (!Number.isSafeInteger(n0) || n0 < 1 || n0 > 999999999) {
+    throw new Error("Enter one positive integer from 1 to 999999999.");
+  }
+
   const steps = [];
-  const next = (x) => { let t = 0; while (x > 0) { const d = x % 10; t += d * d; x = Math.floor(x / 10); } return t; };
-  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  snap({ title: { vi: `n = ${n0}`, en: `n = ${n0}` }, codeLines: [3], vars: [{ name: "n", value: n0 }], note: { vi: "Thay n bằng tổng bình phương các chữ số. Nếu về 1 → happy. Dùng slow/fast phát hiện chu trình.", en: "Replace n with the sum of squares of its digits. If it reaches 1 → happy. Use slow/fast to detect a cycle." } });
-  let slow = n0, fast = next(n0);
-  snap({ title: { vi: `slow=${slow}, fast=${fast}`, en: `slow=${slow}, fast=${fast}` }, codeLines: [4, 5], vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }], note: { vi: `next(${n0}) = tổng bình phương chữ số.`, en: `next(${n0}) = sum of squared digits.` } });
+  const breakdown = (value) => {
+    const digits = String(value).split("").map(Number);
+    const terms = digits.map((digit) => ({ digit, square: digit * digit }));
+    return { value, digits, terms, sum: terms.reduce((total, term) => total + term.square, 0) };
+  };
+  const next = (value) => breakdown(value).sum;
+  let slow = n0;
+  let fast = n0;
+  const slowPath = [n0];
+  const fastPath = [n0];
+
+  function snap(options) {
+    const transform = options.transform || null;
+    steps.push({
+      title: options.title,
+      arr: transform ? [...transform.digits] : String(options.activeValue ?? n0).split("").map(Number),
+      sub: transform ? transform.terms.map((term) => `${term.digit}²`) : [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: options.codeLines || [],
+      vars: [
+        { name: "slow", value: slow },
+        { name: "fast", value: fast },
+        ...(transform ? [{ name: `nxt(${transform.value})`, value: transform.sum }] : []),
+        ...(options.vars || []),
+      ],
+      note: options.note,
+      happyNumberView: {
+        original: n0,
+        slow,
+        fast,
+        slowPath: [...slowPath],
+        fastPath: [...fastPath],
+        transform: transform ? { ...transform, terms: transform.terms.map((term) => ({ ...term })) } : null,
+        mover: options.mover || null,
+        fastHop: options.fastHop ?? null,
+        phase: options.phase || "setup",
+        condition: options.condition ?? null,
+        answer: options.answer ?? null,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: "Định nghĩa nxt(x)", en: "Define nxt(x)" },
+    codeLines: [3, 4, 5, 6, 7, 8, 9],
+    phase: "helper",
+    activeValue: n0,
+    transform: breakdown(n0),
+    note: {
+      vi: "nxt(x) tách từng chữ số, bình phương rồi cộng lại. Đây là cạnh chuyển từ một số sang số kế tiếp.",
+      en: "nxt(x) splits the digits, squares each one, and adds them. This defines one transition to the next number.",
+    },
+  });
+
+  snap({
+    title: { vi: `slow = n = ${n0}`, en: `slow = n = ${n0}` },
+    codeLines: [11],
+    phase: "init-slow",
+    activeValue: n0,
+    mover: "slow",
+    note: {
+      vi: "Con trỏ slow bắt đầu tại n và sẽ đi đúng một cạnh mỗi vòng.",
+      en: "The slow pointer starts at n and moves exactly one transition per loop.",
+    },
+  });
+
+  const firstFastTransform = breakdown(n0);
+  fast = firstFastTransform.sum;
+  fastPath.push(fast);
+  snap({
+    title: { vi: `fast = nxt(${n0}) = ${fast}`, en: `fast = nxt(${n0}) = ${fast}` },
+    codeLines: [12],
+    phase: "init-fast",
+    transform: firstFastTransform,
+    mover: "fast",
+    note: {
+      vi: `Khởi động fast trước một bước: ${firstFastTransform.terms.map((term) => `${term.digit}²`).join(" + ")} = ${fast}.`,
+      en: `Start fast one step ahead: ${firstFastTransform.terms.map((term) => `${term.digit}²`).join(" + ")} = ${fast}.`,
+    },
+  });
+
   let guard = 0;
   while (fast !== 1 && slow !== fast && guard < 100) {
-    guard++;
-    slow = next(slow);
-    fast = next(next(fast));
-    snap({ title: { vi: `slow=${slow}, fast=${fast}`, en: `slow=${slow}, fast=${fast}` }, codeLines: [6, 7, 8], vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }], note: { vi: `slow đi 1 bước, fast đi 2 bước. ${fast === 1 ? "fast=1 → happy!" : slow === fast ? "gặp nhau → có chu trình → không happy" : "tiếp tục"}.`, en: `slow moves 1, fast moves 2. ${fast === 1 ? "fast=1 → happy!" : slow === fast ? "they meet → cycle → not happy" : "continue"}.` } });
+    guard += 1;
+    snap({
+      title: { vi: `${fast} != 1 và ${slow} != ${fast}`, en: `${fast} != 1 and ${slow} != ${fast}` },
+      codeLines: [13],
+      phase: "condition",
+      condition: true,
+      note: {
+        vi: "Chưa chạm 1 và hai con trỏ chưa gặp nhau, nên tiếp tục vòng lặp.",
+        en: "Fast has not reached 1 and the pointers have not met, so continue the loop.",
+      },
+    });
+
+    const slowTransform = breakdown(slow);
+    slow = slowTransform.sum;
+    slowPath.push(slow);
+    snap({
+      title: { vi: `slow = nxt(${slowTransform.value}) = ${slow}`, en: `slow = nxt(${slowTransform.value}) = ${slow}` },
+      codeLines: [14],
+      phase: "slow-step",
+      transform: slowTransform,
+      mover: "slow",
+      note: {
+        vi: `Slow đi một bước: ${slowTransform.terms.map((term) => `${term.digit}²`).join(" + ")} = ${slow}.`,
+        en: `Slow moves one step: ${slowTransform.terms.map((term) => `${term.digit}²`).join(" + ")} = ${slow}.`,
+      },
+    });
+
+    const fastFirstTransform = breakdown(fast);
+    const fastHop = fastFirstTransform.sum;
+    fastPath.push(fastHop);
+    snap({
+      title: { vi: `Fast bước 1: nxt(${fast}) = ${fastHop}`, en: `Fast hop 1: nxt(${fast}) = ${fastHop}` },
+      codeLines: [15],
+      phase: "fast-hop-one",
+      transform: fastFirstTransform,
+      mover: "fast",
+      fastHop,
+      note: {
+        vi: `Nửa đầu của nxt(nxt(fast)): fast tạm đi tới ${fastHop}.`,
+        en: `First half of nxt(nxt(fast)): fast temporarily reaches ${fastHop}.`,
+      },
+    });
+
+    const fastSecondTransform = breakdown(fastHop);
+    fast = fastSecondTransform.sum;
+    fastPath.push(fast);
+    snap({
+      title: { vi: `Fast bước 2: nxt(${fastHop}) = ${fast}`, en: `Fast hop 2: nxt(${fastHop}) = ${fast}` },
+      codeLines: [15],
+      phase: "fast-hop-two",
+      transform: fastSecondTransform,
+      mover: "fast",
+      fastHop,
+      note: {
+        vi: `Fast hoàn tất hai bước và dừng tại ${fast}; slow hiện ở ${slow}.`,
+        en: `Fast completes its two transitions and stops at ${fast}; slow is now at ${slow}.`,
+      },
+    });
   }
-  const answer = fast === 1;
-  snap({ title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` }, final: true, codeLines: [9], vars: [{ name: "answer", value: answer }], note: { vi: answer ? `Về được 1 → là số hạnh phúc.` : `Rơi vào chu trình không chứa 1 → không hạnh phúc.`, en: answer ? `Reached 1 → happy number.` : `Fell into a cycle without 1 → not happy.` } });
-  return { original: n0, answer, steps };
+
+  const reachedOne = fast === 1;
+  snap({
+    title: reachedOne
+      ? { vi: "fast == 1: dừng vòng lặp", en: "fast == 1: stop the loop" }
+      : { vi: `slow == fast == ${slow}: phát hiện chu kỳ`, en: `slow == fast == ${slow}: cycle detected` },
+    codeLines: [13],
+    phase: reachedOne ? "reached-one" : "cycle",
+    condition: false,
+    note: reachedOne
+      ? { vi: "Fast đã chạm 1. Từ 1, nxt(1) vẫn là 1 nên dãy đã đi tới đích.", en: "Fast reached 1. Since nxt(1) remains 1, the sequence has reached its goal." }
+      : { vi: "Slow và fast gặp nhau trước khi thấy 1. Dãy đang lặp trong một chu kỳ không chứa 1.", en: "Slow and fast met before reaching 1. The sequence is repeating in a cycle that excludes 1." },
+  });
+
+  snap({
+    title: { vi: `return fast == 1 → ${reachedOne}`, en: `return fast == 1 → ${reachedOne}` },
+    codeLines: [16],
+    phase: "done",
+    answer: reachedOne,
+    final: true,
+    vars: [{ name: "answer", value: reachedOne }],
+    note: reachedOne
+      ? { vi: `${n0} là Happy Number vì dãy biến đổi chạm 1.`, en: `${n0} is a Happy Number because its sequence reaches 1.` }
+      : { vi: `${n0} không phải Happy Number vì dãy rơi vào chu kỳ.`, en: `${n0} is not a Happy Number because its sequence enters a cycle.` },
+  });
+
+  return { original: n0, answer: reachedOne, steps };
 }
 
 /**
@@ -5179,10 +5339,28 @@ module.exports = {
     title: { vi: "Happy Number", en: "Happy Number" },
     titleVi: { vi: "Số hạnh phúc (phát hiện chu trình)", en: "Happy number (cycle detection)" },
     statement: { vi: "Lặp thay n bằng tổng bình phương các chữ số. Nếu về 1 → hạnh phúc. Nhập n.", en: "Repeatedly replace n with the sum of squares of its digits. If it reaches 1 → happy. Enter n." },
-    defaultInput: [19], inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    defaultInput: [19], inputKind: "integer", inputLabel: { vi: "n", en: "n" }, singleInput: true, extraParams: [],
     approach: [{ vi: "next(x) = tổng bình phương các chữ số.", en: "next(x) = sum of squared digits." }, { vi: "Dùng slow/fast (Floyd) phát hiện chu trình.", en: "Use slow/fast (Floyd) to detect a cycle." }, { vi: "fast==1 → happy; slow==fast → chu trình → không happy.", en: "fast==1 → happy; slow==fast → cycle → not happy." }],
     complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Không cần set nhờ Floyd.", en: "No set needed thanks to Floyd." } },
-    code: ["class Solution:", "    def isHappy(self, n):", "        def nxt(x): return sum(int(d)**2 for d in str(x))", "        slow = n", "        fast = nxt(n)", "        while fast != 1 and slow != fast:", "            slow = nxt(slow)", "            fast = nxt(nxt(fast))", "        return fast == 1"],
+    code: [
+      "class Solution:",
+      "    def isHappy(self, n):",
+      "        def nxt(x):",
+      "            total = 0",
+      "            while x > 0:",
+      "                digit = x % 10",
+      "                total += digit * digit",
+      "                x //= 10",
+      "            return total",
+      "",
+      "        slow = n",
+      "        fast = nxt(n)",
+      "        while fast != 1 and slow != fast:",
+      "            slow = nxt(slow)",
+      "            fast = nxt(nxt(fast))",
+      "        return fast == 1",
+    ],
+    liveArgs: (input) => [Number(Array.isArray(input) ? input[0] : input)],
     builder: buildSteps202,
   },
   217: {

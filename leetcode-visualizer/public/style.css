@@ -38211,3 +38211,119 @@ html, body {
   .th1600-bottom { grid-template-columns: 1fr; }
   .th1600-ops > span { min-width: 108px; }
 }
+
+/* Happy Number (#202): digit-square transforms and Floyd pointer paths. */
+.tree-view:has(.happy202-viz) { padding: 0; border: 0; background: transparent; }
+.happy202-viz { display: grid; gap: 10px; padding: 14px; border: 1px solid #94a3b8; border-radius: 7px; background: #ffffff; color: #0f172a; }
+.happy202-viz > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid #cbd5e1; }
+.happy202-viz > header > div { display: grid; gap: 4px; }
+.happy202-viz > header small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.happy202-viz > header strong { color: #0f172a; font: 800 13px/1.2 Consolas, monospace; }
+.happy202-viz > header > span { color: #475569; font: 700 10px/1.3 system-ui, sans-serif; text-align: right; }
+.happy202-rule { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 7px; padding: 9px 10px; border-left: 4px solid #7c3aed; background: #f5f3ff; }
+.happy202-rule > span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid #c4b5fd; border-radius: 4px; background: #ffffff; color: #5b21b6; font: 700 9px/1.2 system-ui, sans-serif; white-space: nowrap; }
+.happy202-rule > span:first-child { border-color: #7dd3fc; color: #0369a1; }
+.happy202-rule > span:nth-child(2) { border-color: #fcd34d; color: #92400e; }
+.happy202-rule > strong { color: #4c1d95; font: 800 11px/1.35 Consolas, monospace; text-align: right; overflow-wrap: anywhere; }
+.happy202-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.happy202-lane { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 10px; border: 1px solid #94a3b8; background: #f8fafc; }
+.happy202-lane.slow { border-top: 4px solid #0284c7; }
+.happy202-lane.fast { border-top: 4px solid #d97706; }
+.happy202-lane > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; }
+.happy202-lane > header strong { color: #334155; font: 800 11px/1 Consolas, monospace; }
+.happy202-lane > header span { color: #64748b; font: 700 9px/1 system-ui, sans-serif; text-align: right; }
+.happy202-lane > div { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-height: 58px; }
+.happy202-node { display: inline-grid; min-width: 50px; min-height: 50px; place-content: center; justify-items: center; gap: 3px; padding: 5px 7px; border: 1px solid #94a3b8; border-radius: 5px; background: #ffffff; }
+.happy202-node small { color: #64748b; font: 800 7px/1 Consolas, monospace; }
+.happy202-node strong { color: #0f172a; font: 800 17px/1 Consolas, monospace; }
+.happy202-node em { color: #475569; font: 800 8px/1 Consolas, monospace; font-style: normal; text-transform: uppercase; }
+.happy202-node.slow.current { border: 3px solid #0284c7; background: #f0f9ff; }
+.happy202-node.slow.current strong, .happy202-node.slow.current small, .happy202-node.slow.current em { color: #0c4a6e; }
+.happy202-node.fast.current { border: 3px solid #d97706; background: #fffbeb; }
+.happy202-node.fast.current strong, .happy202-node.fast.current small, .happy202-node.fast.current em { color: #92400e; }
+.happy202-node.one { border-color: #16a34a !important; background: #f0fdf4 !important; }
+.happy202-node.one strong, .happy202-node.one small, .happy202-node.one em { color: #166534 !important; }
+.happy202-node.meet, .happy202-node.repeated.current { border-color: #e11d48; background: #fff1f2; }
+.happy202-node.meet strong, .happy202-node.meet small, .happy202-node.meet em, .happy202-node.repeated.current strong, .happy202-node.repeated.current small, .happy202-node.repeated.current em { color: #9f1239; }
+.happy202-arrow { color: #64748b; font: 800 13px/1 Consolas, monospace; }
+.happy202-ellipsis, .happy202-empty { color: #64748b; font: 700 9px/1.3 system-ui, sans-serif; }
+.happy202-equation { display: grid; gap: 9px; padding: 10px; border: 1px solid #94a3b8; border-left: 4px solid #0891b2; background: #f8fafc; }
+.happy202-equation > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid #cbd5e1; }
+.happy202-equation > header strong { color: #0e7490; font: 800 12px/1 Consolas, monospace; }
+.happy202-equation > header span { color: #64748b; font: 700 9px/1.2 system-ui, sans-serif; }
+.happy202-terms { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+.happy202-term, .happy202-sum { display: grid; min-width: 66px; min-height: 62px; place-content: center; justify-items: center; gap: 3px; padding: 6px 8px; border: 1px solid #67e8f9; border-radius: 5px; background: #ecfeff; }
+.happy202-term small, .happy202-sum small { color: #0e7490; font: 800 8px/1 Consolas, monospace; }
+.happy202-term strong { color: #164e63; font: 800 17px/1 Consolas, monospace; }
+.happy202-term em { color: #0e7490; font: 800 10px/1 Consolas, monospace; font-style: normal; }
+.happy202-sum { min-width: 78px; border: 3px solid #16a34a; background: #f0fdf4; }
+.happy202-sum small, .happy202-sum strong { color: #166534; }
+.happy202-sum strong { font: 800 22px/1 Consolas, monospace; }
+.happy202-op { color: #475569; font: 800 17px/1 Consolas, monospace; }
+.happy202-op.equals { color: #166534; }
+.happy202-equation.idle { min-height: 68px; place-items: center; color: #64748b; font: 700 10px/1.35 system-ui, sans-serif; }
+.happy202-equation.terminal { grid-template-columns: auto auto minmax(0, 1fr); align-items: center; min-height: 68px; gap: 8px 14px; }
+.happy202-equation.terminal small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.happy202-equation.terminal strong { color: #0f172a; font: 800 17px/1 Consolas, monospace; }
+.happy202-equation.terminal span { color: #475569; font: 700 10px/1.35 system-ui, sans-serif; }
+.happy202-equation.terminal.happy { border-color: #16a34a; background: #f0fdf4; }
+.happy202-equation.terminal.happy small, .happy202-equation.terminal.happy strong, .happy202-equation.terminal.happy span { color: #166534; }
+.happy202-equation.terminal.cycle { border-color: #e11d48; background: #fff1f2; }
+.happy202-equation.terminal.cycle small, .happy202-equation.terminal.cycle strong, .happy202-equation.terminal.cycle span { color: #9f1239; }
+.happy202-viz > footer { display: grid; grid-template-columns: minmax(0, 1fr) 126px; gap: 8px; }
+.happy202-viz > footer > span { display: grid; min-height: 57px; align-content: center; gap: 4px; padding: 8px 10px; border: 1px solid #94a3b8; background: #f8fafc; }
+.happy202-viz footer small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.happy202-viz footer strong { color: #0f172a; font: 800 14px/1.25 Consolas, monospace; overflow-wrap: anywhere; }
+.happy202-viz footer > .happy { border-color: #16a34a; background: #f0fdf4; text-align: center; }
+.happy202-viz footer > .happy small, .happy202-viz footer > .happy strong { color: #166534; }
+.happy202-viz footer > .cycle { border-color: #e11d48; background: #fff1f2; text-align: center; }
+.happy202-viz footer > .cycle small, .happy202-viz footer > .cycle strong { color: #9f1239; }
+.happy202-viz footer > .pending { text-align: center; }
+
+[data-theme="dark"] .happy202-viz { border-color: #475569; background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .happy202-viz > header, [data-theme="dark"] .happy202-lane > header, [data-theme="dark"] .happy202-equation > header { border-color: #475569; }
+[data-theme="dark"] .happy202-viz > header strong, [data-theme="dark"] .happy202-lane > header strong, [data-theme="dark"] .happy202-node strong, [data-theme="dark"] .happy202-viz footer strong { color: #f8fafc; }
+[data-theme="dark"] .happy202-viz > header small, [data-theme="dark"] .happy202-viz > header > span, [data-theme="dark"] .happy202-lane > header span, [data-theme="dark"] .happy202-node small, [data-theme="dark"] .happy202-node em, [data-theme="dark"] .happy202-viz footer small { color: #94a3b8; }
+[data-theme="dark"] .happy202-rule { background: #1e1b4b; }
+[data-theme="dark"] .happy202-rule > span { border-color: #8b5cf6; background: #0f172a; color: #ddd6fe; }
+[data-theme="dark"] .happy202-rule > span:first-child { border-color: #38bdf8; color: #bae6fd; }
+[data-theme="dark"] .happy202-rule > span:nth-child(2) { border-color: #fbbf24; color: #fde68a; }
+[data-theme="dark"] .happy202-rule > strong { color: #ede9fe; }
+[data-theme="dark"] .happy202-lane, [data-theme="dark"] .happy202-equation, [data-theme="dark"] .happy202-viz > footer > span { border-color: #475569; background: #111827; }
+[data-theme="dark"] .happy202-node { border-color: #64748b; background: #0f172a; }
+[data-theme="dark"] .happy202-node.slow.current { border-color: #38bdf8; background: #082f49; }
+[data-theme="dark"] .happy202-node.slow.current strong, [data-theme="dark"] .happy202-node.slow.current small, [data-theme="dark"] .happy202-node.slow.current em { color: #e0f2fe; }
+[data-theme="dark"] .happy202-node.fast.current { border-color: #fbbf24; background: #422006; }
+[data-theme="dark"] .happy202-node.fast.current strong, [data-theme="dark"] .happy202-node.fast.current small, [data-theme="dark"] .happy202-node.fast.current em { color: #fef3c7; }
+[data-theme="dark"] .happy202-node.one, [data-theme="dark"] .happy202-viz footer > .happy { border-color: #22c55e !important; background: #052e16 !important; }
+[data-theme="dark"] .happy202-node.one strong, [data-theme="dark"] .happy202-node.one small, [data-theme="dark"] .happy202-node.one em, [data-theme="dark"] .happy202-viz footer > .happy small, [data-theme="dark"] .happy202-viz footer > .happy strong { color: #bbf7d0 !important; }
+[data-theme="dark"] .happy202-node.meet, [data-theme="dark"] .happy202-node.repeated.current, [data-theme="dark"] .happy202-viz footer > .cycle { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .happy202-node.meet strong, [data-theme="dark"] .happy202-node.meet small, [data-theme="dark"] .happy202-node.meet em, [data-theme="dark"] .happy202-node.repeated.current strong, [data-theme="dark"] .happy202-node.repeated.current small, [data-theme="dark"] .happy202-node.repeated.current em, [data-theme="dark"] .happy202-viz footer > .cycle small, [data-theme="dark"] .happy202-viz footer > .cycle strong { color: #fecdd3; }
+[data-theme="dark"] .happy202-equation { border-left-color: #22d3ee; }
+[data-theme="dark"] .happy202-equation > header strong { color: #a5f3fc; }
+[data-theme="dark"] .happy202-term { border-color: #0891b2; background: #083344; }
+[data-theme="dark"] .happy202-term small, [data-theme="dark"] .happy202-term em, [data-theme="dark"] .happy202-term strong { color: #cffafe; }
+[data-theme="dark"] .happy202-sum { border-color: #22c55e; background: #052e16; }
+[data-theme="dark"] .happy202-sum small, [data-theme="dark"] .happy202-sum strong { color: #bbf7d0; }
+[data-theme="dark"] .happy202-equation.terminal.happy { border-color: #22c55e; background: #052e16; }
+[data-theme="dark"] .happy202-equation.terminal.happy small, [data-theme="dark"] .happy202-equation.terminal.happy strong, [data-theme="dark"] .happy202-equation.terminal.happy span { color: #bbf7d0; }
+[data-theme="dark"] .happy202-equation.terminal.cycle { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .happy202-equation.terminal.cycle small, [data-theme="dark"] .happy202-equation.terminal.cycle strong, [data-theme="dark"] .happy202-equation.terminal.cycle span { color: #fecdd3; }
+
+@media (max-width: 700px) {
+  .happy202-lanes { grid-template-columns: 1fr; }
+  .happy202-rule { grid-template-columns: repeat(2, auto); }
+  .happy202-rule > strong { grid-column: 1 / -1; text-align: left; }
+}
+@media (max-width: 520px) {
+  .happy202-viz { padding: 10px 8px; }
+  .happy202-viz > header { align-items: start; flex-direction: column; }
+  .happy202-viz > header > span { text-align: left; }
+  .happy202-rule { grid-template-columns: 1fr; }
+  .happy202-rule > span { justify-content: center; }
+  .happy202-rule > strong { grid-column: auto; }
+  .happy202-equation.terminal { grid-template-columns: 1fr; }
+  .happy202-node { min-width: 45px; }
+  .happy202-term, .happy202-sum { min-width: 58px; min-height: 56px; }
+  .happy202-viz > footer { grid-template-columns: 1fr; }
+}
