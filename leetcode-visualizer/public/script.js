@@ -212,7 +212,7 @@ function renderRecentProblems() {
 
     button.addEventListener("click", () => {
       $("problemId").value = problem.id;
-      loadProblem();
+      loadProblem({ scrollToEnd: true });
     });
     container.appendChild(button);
   });
@@ -1277,7 +1277,7 @@ function renderCatalog() {
       }
       chip.addEventListener("click", () => {
         $("problemId").value = p.id;
-        loadProblem();
+        loadProblem({ scrollToEnd: true });
       });
       itemsEl.appendChild(chip);
     });
@@ -1375,7 +1375,7 @@ function renderProblemSearchResults() {
     }
     chip.addEventListener("click", () => {
       $("problemId").value = problem.id;
-      loadProblem();
+      loadProblem({ scrollToEnd: true });
     });
     items.appendChild(chip);
   });
@@ -1426,9 +1426,7 @@ function jumpToPageEnd() {
 function updateBackToTopButton() {
   const button = $("backToTopBtn");
   if (!button) return;
-  const pageHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-  const distanceFromEnd = pageHeight - (window.scrollY + window.innerHeight);
-  button.classList.toggle("is-visible", window.scrollY > 0 && distanceFromEnd <= 160);
+  button.classList.toggle("is-visible", window.scrollY > 0);
 }
 
 $("backToTopBtn").addEventListener("click", () => {
