@@ -5131,6 +5131,7 @@ function renderLexPermutation3720View(step) {
     blocked: vi ? "Không thể khớp" : "Cannot match",
     greater: vi ? "Chọn lớn hơn" : "Choose greater",
     suffix: vi ? "Điền suffix" : "Fill suffix",
+    scan: vi ? "Quét ứng viên" : "Scan candidates",
     backtrack: vi ? "Quay lui" : "Backtrack",
     "no-greater": vi ? "Không thể tăng" : "Cannot increase",
     done: vi ? "Hoàn tất" : "Complete",
