@@ -440,7 +440,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -534,7 +534,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -621,7 +621,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -712,7 +712,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -808,7 +808,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -897,7 +897,7 @@ function renderCatalog() {
             $("problemId").value = problemId;
             await loadProblem();
             const panel = $("problemPanel");
-            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "auto", block: "start" });
           });
         });
         closeButton.onclick = closeDialog;
@@ -995,7 +995,7 @@ function renderCatalog() {
             $("problemId").value = problemId;
             await loadProblem();
             const panel = $("problemPanel");
-            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "auto", block: "start" });
           });
         });
         closeButton.onclick = closeDialog;
@@ -1106,7 +1106,7 @@ function renderCatalog() {
             $("problemId").value = problemId;
             await loadProblem();
             const panel = $("problemPanel");
-            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "auto", block: "start" });
           });
         });
         closeButton.onclick = closeDialog;
@@ -1217,7 +1217,7 @@ function renderCatalog() {
             await loadProblem();
             const panel = $("problemPanel");
             if (panel && !panel.classList.contains("hidden")) {
-              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
             }
           });
         });
@@ -19381,6 +19381,108 @@ function renderMountain1095View(step) {
   </section>`;
 }
 
+function renderThrone1600View(step) {
+  const view = step.throne1600View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const nodeByName = new Map(nodes.map((node) => [node.name, node]));
+  const visited = new Set(view.visited || []);
+  const stack = new Set(view.stack || []);
+  const order = Array.isArray(view.order) ? view.order : [];
+  const orderSet = new Set(order);
+  const activeName = view.activeName || null;
+  const newbornName = view.newbornName || null;
+  const phaseLabels = {
+    constructor: vi ? "Khởi tạo vương triều" : "Initialize dynasty",
+    "birth-call": vi ? "Tìm cha/mẹ" : "Find parent",
+    "birth-add": vi ? "Thêm người con" : "Append child",
+    "death-call": vi ? "Nhận thông báo mất" : "Receive death",
+    "death-mark": vi ? "Đánh dấu đã mất" : "Mark as dead",
+    "query-call": vi ? "Yêu cầu thứ tự" : "Request order",
+    "query-start": vi ? "Tạo order rỗng" : "Create empty order",
+    visit: vi ? "DFS thăm node" : "DFS visits node",
+    "alive-check": vi ? "Người còn sống" : "Person is alive",
+    append: vi ? "Thêm vào kế vị" : "Append to succession",
+    skip: vi ? "Bỏ qua người đã mất" : "Skip dead person",
+    child: vi ? "Chọn con tiếp theo" : "Choose next child",
+    recurse: vi ? "Đi sâu vào nhánh con" : "Descend into child branch",
+    "query-done": vi ? "Hoàn tất preorder" : "Preorder complete",
+    done: vi ? "Hoàn tất operations" : "Operations complete",
+  };
+
+  let nextLeaf = 0;
+  const unitPositions = new Map();
+  const place = (name) => {
+    const node = nodeByName.get(name);
+    if (!node) return 0;
+    const childUnits = (node.children || []).map(place);
+    const unit = childUnits.length ? childUnits.reduce((sum, value) => sum + value, 0) / childUnits.length : nextLeaf++;
+    unitPositions.set(name, unit);
+    return unit;
+  };
+  if (view.kingName && nodeByName.has(view.kingName)) place(view.kingName);
+  const leafSlots = Math.max(nextLeaf, 1);
+  const svgWidth = Math.max(520, leafSlots * 154 + 80);
+  const maxDepth = Math.max(0, ...nodes.map((node) => Number(node.depth) || 0));
+  const svgHeight = Math.max(150, maxDepth * 112 + 116);
+  const positions = new Map();
+  nodes.forEach((node) => {
+    const unit = unitPositions.get(node.name) ?? 0;
+    const x = leafSlots === 1 ? svgWidth / 2 : 70 + (unit * (svgWidth - 140)) / (leafSlots - 1);
+    positions.set(node.name, { x, y: 55 + (Number(node.depth) || 0) * 112 });
+  });
+  const edges = nodes.filter((node) => node.parent !== null).map((node) => {
+    const from = positions.get(node.parent);
+    const to = positions.get(node.name);
+    return from && to ? `<path d="M ${from.x} ${from.y + 25} C ${from.x} ${from.y + 64}, ${to.x} ${to.y - 64}, ${to.x} ${to.y - 25}"></path>` : "";
+  }).join("");
+  const treeNodes = nodes.map((node) => {
+    const position = positions.get(node.name);
+    if (!position) return "";
+    const classes = ["th1600-node"];
+    if (node.name === view.kingName) classes.push("king");
+    if (node.dead) classes.push("dead");
+    if (visited.has(node.name)) classes.push("visited");
+    if (orderSet.has(node.name)) classes.push("ranked");
+    if (stack.has(node.name)) classes.push("stacked");
+    if (node.name === activeName) classes.push("active");
+    if (node.name === newbornName) classes.push("newborn");
+    const rank = order.indexOf(node.name);
+    const meta = node.dead ? "DEAD" : rank >= 0 ? `#${rank + 1}` : node.name === view.kingName ? "KING" : `born ${node.birthOrder}`;
+    return `<g class="${classes.join(" ")}" transform="translate(${position.x} ${position.y})"><rect x="-56" y="-24" width="112" height="48" rx="6"></rect><text class="name ${node.name.length > 10 ? "long" : ""}" text-anchor="middle" y="1">${escapeHtml(node.name)}</text><text class="meta" text-anchor="middle" y="16">${escapeHtml(meta)}</text></g>`;
+  }).join("");
+  const treeHtml = nodes.length
+    ? `<div class="th1600-tree-scroll"><svg viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(vi ? "Cây gia phả và thứ tự kế vị" : "Family tree and inheritance order")}"><g class="th1600-edges">${edges}</g><g>${treeNodes}</g></svg></div>`
+    : "";
+
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.activeOpIndex ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${index + 1}</small><strong>${escapeHtml(operation)}</strong></span>`;
+  }).join("");
+  const orderHtml = order.length
+    ? order.map((name, index) => `<span class="${name === activeName ? "active" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(name)}</strong></span>`).join("")
+    : `<em>${vi ? "chưa có tên" : "no names yet"}</em>`;
+  const stackValues = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stackValues.length
+    ? stackValues.map((name, index) => `<span><small>${index === stackValues.length - 1 ? "TOP" : index}</small><strong>${escapeHtml(name)}</strong></span>`).join("")
+    : `<em>${vi ? "stack rỗng" : "empty stack"}</em>`;
+  const outputs = Array.isArray(view.queryOutputs) ? view.queryOutputs : [];
+  const outputHtml = outputs.length
+    ? outputs.map((output, index) => `<span><small>GET ${index + 1}</small><strong>[${output.map((name) => escapeHtml(name)).join(", ")}]</strong></span>`).join("")
+    : `<em>${vi ? "chưa gọi getInheritanceOrder" : "getInheritanceOrder not called yet"}</em>`;
+
+  $("treeView").innerHTML = `<section class="th1600-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng thứ tự kế vị ngai vàng" : "Throne inheritance simulation")}">
+    <header><div><small>LEETCODE 1600</small><strong>${escapeHtml(phaseLabels[view.phase] || "")}</strong></div><span>${nodes.length} ${vi ? "người" : "people"} · ${nodes.filter((node) => node.dead).length} ${vi ? "đã mất" : "dead"}</span></header>
+    <div class="th1600-ops">${operationHtml}</div>
+    <section class="th1600-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="th1600-tree"><header><strong>${vi ? "CÂY GIA PHẢ" : "FAMILY TREE"}</strong><span>${vi ? "trái → phải là thứ tự sinh" : "left → right follows birth order"}</span></header>${treeHtml}</section>
+    <section class="th1600-order"><header><strong>${view.orderIsPartial ? (vi ? "ORDER ĐANG DỰNG" : "ORDER IN PROGRESS") : (vi ? "THỨ TỰ KẾ VỊ" : "INHERITANCE ORDER")}</strong><span>preorder DFS</span></header><div>${orderHtml}</div></section>
+    <div class="th1600-bottom"><section><header><strong>DFS CALL STACK</strong><span>${stackValues.length}</span></header><div>${stackHtml}</div></section><section><header><strong>${vi ? "KẾT QUẢ QUERY" : "QUERY OUTPUTS"}</strong><span>${outputs.length}</span></header><div>${outputHtml}</div></section></div>
+    <aside class="th1600-legend"><span class="active"><i></i>${vi ? "đang xử lý" : "active"}</span><span class="newborn"><i></i>${vi ? "vừa sinh" : "new birth"}</span><span class="ranked"><i></i>${vi ? "đã vào order" : "in order"}</span><span class="dead"><i></i>${vi ? "đã mất, vẫn giữ nhánh" : "dead, branch retained"}</span></aside>
+  </section>`;
+}
+
 function renderNary429View(step) {
   const view = step.nary429View || {};
   const vi = lang === "vi";
@@ -22078,6 +22180,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDirected685View(step);
+  } else if (step.throne1600View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderThrone1600View(step);
   } else if (step.nary429View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

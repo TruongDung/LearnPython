@@ -6449,3 +6449,366 @@ Object.assign(module.exports, {
     builder: buildSteps968,
   },
 });
+
+function parseThrone1600Operations(input) {
+  const parts = String(input ?? "").split(/\s*[|;\n]\s*/).map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) throw new Error("Enter at least one birth, death, or get operation");
+  if (parts.length > 30) throw new Error("Visualization supports up to 30 operations");
+
+  return parts.map((raw) => {
+    const tokens = raw.replace(/[(),]/g, " ").trim().split(/\s+/).filter(Boolean);
+    const command = String(tokens[0] || "").toLowerCase();
+    if (command === "birth" && tokens.length === 3) return { type: "birth", parent: tokens[1], child: tokens[2], raw };
+    if (command === "death" && tokens.length === 2) return { type: "death", name: tokens[1], raw };
+    if ((command === "get" || command === "getinheritanceorder") && tokens.length === 1) return { type: "get", raw };
+    throw new Error(`Invalid operation: ${raw}`);
+  });
+}
+
+function buildSteps1600(input, params) {
+  const kingName = String(params?.kingName ?? "").trim();
+  if (!/^[a-z]{1,15}$/.test(kingName)) throw new Error("kingName must contain 1 to 15 lowercase letters");
+  const operations = parseThrone1600Operations(input);
+  const people = new Map();
+  const dead = new Set();
+  const results = new Array(operations.length).fill(null);
+  const queryOutputs = [];
+  const steps = [];
+  let nextBirthOrder = 0;
+
+  const createPerson = (name, parent = null) => {
+    const parentNode = parent === null ? null : people.get(parent);
+    const person = {
+      name,
+      parent,
+      children: [],
+      depth: parentNode ? parentNode.depth + 1 : 0,
+      birthOrder: nextBirthOrder++,
+    };
+    people.set(name, person);
+    if (parentNode) parentNode.children.push(name);
+    return person;
+  };
+  createPerson(kingName);
+
+  const currentOrder = () => {
+    const order = [];
+    const dfs = (name) => {
+      if (!dead.has(name)) order.push(name);
+      const person = people.get(name);
+      for (const child of person.children) dfs(child);
+    };
+    dfs(kingName);
+    return order;
+  };
+  const peopleSnapshot = () => [...people.values()].map((person) => ({
+    name: person.name,
+    parent: person.parent,
+    children: [...person.children],
+    depth: person.depth,
+    birthOrder: person.birthOrder,
+    dead: dead.has(person.name),
+  }));
+  const operationLabels = operations.map((operation) => operation.type === "birth"
+    ? `birth(${operation.parent}, ${operation.child})`
+    : operation.type === "death"
+      ? `death(${operation.name})`
+      : "getInheritanceOrder()");
+
+  const push = ({ title, line, note, phase, opIndex = -1, activeName = null, newbornName = null, visited = [], stack = [], order = null, final = false, vars = [] }) => {
+    const shownOrder = order === null ? currentOrder() : [...order];
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      vars: [
+        { name: "dead", value: `{${[...dead].join(", ")}}` },
+        { name: "order", value: JSON.stringify(shownOrder) },
+        ...vars,
+      ],
+      note,
+      final,
+      throne1600View: {
+        kingName,
+        nodes: peopleSnapshot(),
+        operations: operationLabels,
+        activeOpIndex: opIndex,
+        completedOps: Math.max(0, opIndex),
+        phase,
+        activeName,
+        newbornName,
+        visited: [...visited],
+        stack: [...stack],
+        order: shownOrder,
+        orderIsPartial: order !== null && ["query-start", "visit", "alive-check", "append", "skip", "child", "recurse"].includes(phase),
+        queryOutputs: queryOutputs.map((output) => [...output]),
+      },
+    });
+  };
+
+  push({
+    title: { vi: `Lưu king = '${kingName}'`, en: `Store king = '${kingName}'` },
+    line: 5,
+    phase: "constructor",
+    activeName: kingName,
+    note: { vi: "Nhà vua là gốc của cây gia phả và luôn đứng đầu phép duyệt preorder.", en: "The king is the family-tree root and always starts the preorder traversal." },
+    vars: [{ name: "king", value: kingName }],
+  });
+  push({
+    title: { vi: "Tạo children = defaultdict(list)", en: "Create children = defaultdict(list)" },
+    line: 6,
+    phase: "constructor",
+    activeName: kingName,
+    note: { vi: "Danh sách con giữ đúng thứ tự sinh: con lớn tuổi đứng trước.", en: "Each child list preserves birth order: older children come first." },
+  });
+  push({
+    title: { vi: "Tạo dead = set()", en: "Create dead = set()" },
+    line: 7,
+    phase: "constructor",
+    activeName: kingName,
+    note: { vi: "Người mất chỉ bị đánh dấu; họ và hậu duệ vẫn nằm trong cây.", en: "A death only marks the person; they and their descendants stay in the tree." },
+  });
+
+  for (let opIndex = 0; opIndex < operations.length; opIndex++) {
+    const operation = operations[opIndex];
+    if (operation.type === "birth") {
+      const parent = people.get(operation.parent);
+      if (!parent) throw new Error(`Unknown parent: ${operation.parent}`);
+      if (dead.has(operation.parent)) throw new Error(`Parent is not alive: ${operation.parent}`);
+      if (!/^[a-z]{1,15}$/.test(operation.child)) throw new Error(`Invalid child name: ${operation.child}`);
+      if (people.has(operation.child)) throw new Error(`Duplicate person: ${operation.child}`);
+
+      push({
+        title: { vi: `birth('${operation.parent}', '${operation.child}')`, en: `birth('${operation.parent}', '${operation.child}')` },
+        line: 9,
+        phase: "birth-call",
+        opIndex,
+        activeName: operation.parent,
+        note: { vi: `Tìm ${operation.parent} trong cây; con mới sẽ được thêm cuối danh sách children để giữ thứ tự tuổi.`, en: `Find ${operation.parent}; the new child is appended to preserve sibling age order.` },
+      });
+      createPerson(operation.child, operation.parent);
+      push({
+        title: { vi: `Thêm '${operation.child}' sau các con hiện có`, en: `Append '${operation.child}' after existing children` },
+        line: 10,
+        phase: "birth-add",
+        opIndex,
+        activeName: operation.parent,
+        newbornName: operation.child,
+        note: { vi: `${operation.child} trở thành con thứ ${parent.children.length} của ${operation.parent}.`, en: `${operation.child} becomes child ${parent.children.length} of ${operation.parent}.` },
+        vars: [{ name: `children[${operation.parent}]`, value: JSON.stringify(parent.children) }],
+      });
+      continue;
+    }
+
+    if (operation.type === "death") {
+      if (!people.has(operation.name)) throw new Error(`Unknown person: ${operation.name}`);
+      push({
+        title: { vi: `death('${operation.name}')`, en: `death('${operation.name}')` },
+        line: 12,
+        phase: "death-call",
+        opIndex,
+        activeName: operation.name,
+        note: { vi: "Không xóa node khỏi cây vì hậu duệ vẫn giữ vị trí kế vị của nhánh này.", en: "Do not remove the node because descendants keep this branch's place in succession." },
+      });
+      dead.add(operation.name);
+      push({
+        title: { vi: `Đánh dấu '${operation.name}' đã mất`, en: `Mark '${operation.name}' as dead` },
+        line: 13,
+        phase: "death-mark",
+        opIndex,
+        activeName: operation.name,
+        note: { vi: `${operation.name} sẽ bị bỏ qua trong output, nhưng DFS vẫn đi qua các con của họ.`, en: `${operation.name} is skipped in the output, but DFS still visits their children.` },
+      });
+      continue;
+    }
+
+    const order = [];
+    const visited = [];
+    const stack = [];
+    push({
+      title: { vi: "getInheritanceOrder()", en: "getInheritanceOrder()" },
+      line: 15,
+      phase: "query-call",
+      opIndex,
+      note: { vi: "Tạo lại thứ tự hiện tại bằng preorder trên cây gia phả.", en: "Rebuild the current order with a preorder traversal of the family tree." },
+    });
+    push({
+      title: { vi: "order = []", en: "order = []" },
+      line: 16,
+      phase: "query-start",
+      opIndex,
+      order,
+      note: { vi: "Order sẽ nhận người còn sống ngay khi DFS thăm node của họ.", en: "Order receives each living person as soon as DFS visits their node." },
+    });
+    push({
+      title: { vi: `dfs('${kingName}')`, en: `dfs('${kingName}')` },
+      line: 24,
+      phase: "recurse",
+      opIndex,
+      activeName: kingName,
+      stack: [kingName],
+      order,
+      note: { vi: "Preorder luôn bắt đầu từ nhà vua.", en: "Preorder always begins at the king." },
+    });
+
+    const dfs = (name) => {
+      stack.push(name);
+      visited.push(name);
+      push({
+        title: { vi: `Vào dfs('${name}')`, en: `Enter dfs('${name}')` },
+        line: 18,
+        phase: "visit",
+        opIndex,
+        activeName: name,
+        visited,
+        stack,
+        order,
+        note: { vi: `Thăm ${name} trước rồi mới đi qua các con từ lớn đến nhỏ tuổi.`, en: `Visit ${name} before traversing children from oldest to youngest.` },
+      });
+      const alive = !dead.has(name);
+      push({
+        title: { vi: `'${name}' còn sống: ${alive}`, en: `'${name}' is alive: ${alive}` },
+        line: 19,
+        phase: alive ? "alive-check" : "skip",
+        opIndex,
+        activeName: name,
+        visited,
+        stack,
+        order,
+        note: alive
+          ? { vi: "Người này được thêm vào thứ tự kế vị.", en: "This person belongs in the inheritance order." }
+          : { vi: "Bỏ qua tên này trong output, nhưng vẫn phải duyệt các con.", en: "Skip this name in output, but still traverse the children." },
+      });
+      if (alive) {
+        order.push(name);
+        push({
+          title: { vi: `order.append('${name}')`, en: `order.append('${name}')` },
+          line: 20,
+          phase: "append",
+          opIndex,
+          activeName: name,
+          visited,
+          stack,
+          order,
+          note: { vi: `${name} nhận hạng kế vị #${order.length}.`, en: `${name} receives succession rank #${order.length}.` },
+        });
+      }
+      const person = people.get(name);
+      for (const child of person.children) {
+        push({
+          title: { vi: `Con tiếp theo của ${name}: '${child}'`, en: `Next child of ${name}: '${child}'` },
+          line: 21,
+          phase: "child",
+          opIndex,
+          activeName: name,
+          newbornName: child,
+          visited,
+          stack,
+          order,
+          note: { vi: "Danh sách children giữ thứ tự sinh nên DFS tự tạo đúng thứ tự kế vị.", en: "The child list preserves birth order, so DFS naturally produces the correct succession order." },
+        });
+        push({
+          title: { vi: `dfs('${child}')`, en: `dfs('${child}')` },
+          line: 22,
+          phase: "recurse",
+          opIndex,
+          activeName: child,
+          visited,
+          stack: [...stack, child],
+          order,
+          note: { vi: `Đi hết nhánh của ${child} trước khi quay lại anh/chị/em kế tiếp.`, en: `Finish ${child}'s entire branch before returning to the next sibling.` },
+        });
+        dfs(child);
+      }
+      stack.pop();
+    };
+    dfs(kingName);
+    results[opIndex] = [...order];
+    queryOutputs.push([...order]);
+    push({
+      title: { vi: `return [${order.join(", ")}]`, en: `return [${order.join(", ")}]` },
+      line: 25,
+      phase: "query-done",
+      opIndex,
+      visited,
+      order,
+      note: { vi: "Preorder hoàn tất; người đã mất không xuất hiện nhưng nhánh con của họ vẫn giữ nguyên.", en: "Preorder is complete; dead people are absent while their descendant branches remain in place." },
+      vars: [{ name: "return", value: JSON.stringify(order) }],
+    });
+  }
+
+  push({
+    title: { vi: "Hoàn tất toàn bộ operations", en: "All operations complete" },
+    line: 25,
+    phase: "done",
+    opIndex: operations.length,
+    note: { vi: "Cây gia phả, tập dead và các kết quả query đã được cập nhật đầy đủ.", en: "The family tree, dead set, and query results are fully updated." },
+    final: true,
+    vars: [{ name: "results", value: JSON.stringify(results) }],
+  });
+  return { original: input, operations, answer: results, steps };
+}
+
+Object.assign(module.exports, {
+  1600: {
+    id: 1600,
+    difficulty: "medium",
+    slug: "throne-inheritance",
+    category: { key: "binary-tree", vi: "Cây / Thiết kế", en: "Tree / Design" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "design", vi: "Thiết kế", en: "Design" },
+    ],
+    title: { vi: "Throne Inheritance", en: "Throne Inheritance" },
+    titleVi: { vi: "Thứ tự kế vị ngai vàng", en: "Throne inheritance order" },
+    statement: {
+      vi: "Thiết kế hệ thống gia phả hỗ trợ birth, death và trả về thứ tự kế vị hiện tại. Người đã mất bị loại khỏi kết quả nhưng hậu duệ vẫn giữ vị trí trong cây.",
+      en: "Design a family tree supporting birth, death, and the current inheritance order. Dead people are excluded from the result while descendants keep their place in the tree.",
+    },
+    defaultInput: "birth king andy | birth king bob | birth king catherine | birth andy matthew | birth bob alex | birth bob asha | get | death bob | get",
+    inputKind: "string",
+    inputLabel: { vi: "Operations, ngăn cách bằng |", en: "Operations separated by |" },
+    extraParams: [{ key: "kingName", type: "string", label: { vi: "Tên nhà vua", en: "King name" }, default: "king" }],
+    approach: [
+      { vi: "children[parent] lưu các con theo đúng thứ tự sinh. birth chỉ append vào cuối danh sách nên O(1).", en: "children[parent] stores children in birth order. birth appends to the list in O(1)." },
+      { vi: "death chỉ thêm tên vào set dead; không xóa node vì hậu duệ vẫn phải được duyệt.", en: "death only adds a name to the dead set; the node stays because descendants must still be traversed." },
+      { vi: "getInheritanceOrder chạy preorder DFS từ king, thêm người còn sống rồi duyệt từng nhánh con theo thứ tự sinh.", en: "getInheritanceOrder runs preorder DFS from the king, adding living people before traversing child branches in birth order." },
+    ],
+    complexity: {
+      time: "birth O(1), death O(1), get O(n)",
+      space: "O(n)",
+      note: { vi: "Cây và dead set lưu tối đa n người; DFS dùng O(h) stack và output O(n).", en: "The tree and dead set store up to n people; DFS uses O(h) stack and O(n) output." },
+    },
+    code: [
+      "from collections import defaultdict",
+      "",
+      "class ThroneInheritance:",
+      "    def __init__(self, kingName: str):",
+      "        self.king = kingName",
+      "        self.children = defaultdict(list)",
+      "        self.dead = set()",
+      "",
+      "    def birth(self, parentName: str, childName: str) -> None:",
+      "        self.children[parentName].append(childName)",
+      "",
+      "    def death(self, name: str) -> None:",
+      "        self.dead.add(name)",
+      "",
+      "    def getInheritanceOrder(self):",
+      "        order = []",
+      "",
+      "        def dfs(name):",
+      "            if name not in self.dead:",
+      "                order.append(name)",
+      "            for child in self.children[name]:",
+      "                dfs(child)",
+      "",
+      "        dfs(self.king)",
+      "        return order",
+    ],
+    builder: buildSteps1600,
+  },
+});
