@@ -1614,6 +1614,13 @@ function renderExtraParams() {
     wrap.appendChild(label);
     wrap.appendChild(inputEl);
     container.appendChild(wrap);
+
+    if (p.key === "approach") {
+      inputEl.addEventListener("change", () => {
+        resetLiveEditorState();
+        if (steps.length) runViz();
+      });
+    }
   });
 }
 
@@ -5142,14 +5149,16 @@ function renderLexPermutation3720View(step) {
   }).join("");
   const pool = Array.isArray(view.remaining) ? view.remaining : [];
   const poolCells = pool.length
-    ? pool.map((item) => `<span><strong>${escapeHtml(item.char)}</strong><small>x${item.amount}</small></span>`).join("")
+    ? pool.map((item) => `<span class="${item.amount < 0 ? "negative" : ""}"><strong>${escapeHtml(item.char)}</strong><small>x${item.amount}</small></span>`).join("")
     : `<em>${vi ? "rỗng" : "empty"}</em>`;
+  const poolLabel = view.poolLabel || (vi ? "KÝ TỰ CÒN LẠI" : "REMAINING POOL");
+  const poolSummary = view.poolSummary ?? pool.reduce((total, item) => total + item.amount, 0);
   const treeView = $("treeView");
   treeView.innerHTML = `<section class="lex3720-viz" style="--lex3720-cols:${Math.max(target.length, 1)}">
     <header><strong>LEXICOGRAPHIC GREEDY</strong><span>${escapeHtml(phaseText[view.phase] || "")}</span></header>
     <section class="lex3720-row target"><header><strong>TARGET</strong><span>${escapeHtml(target)}</span></header><div class="lex3720-cells">${targetCells}</div></section>
     <section class="lex3720-row output"><header><strong>BUILD</strong><span>${escapeHtml(prefix.join("") || "—")}</span></header><div class="lex3720-cells">${outputCells}</div></section>
-    <section class="lex3720-pool"><header><strong>${vi ? "KÝ TỰ CÒN LẠI" : "REMAINING POOL"}</strong><span>${pool.reduce((total, item) => total + item.amount, 0)}</span></header><div>${poolCells}</div></section>
+    <section class="lex3720-pool"><header><strong>${escapeHtml(poolLabel)}</strong><span>${escapeHtml(String(poolSummary))}</span></header><div>${poolCells}</div></section>
   </section>`;
 }
 

@@ -38093,6 +38093,8 @@ html, body {
 .lex3720-pool > div > span { display: inline-flex; align-items:baseline; gap: 5px; padding: 6px 8px; border: 1px solid #d97706; border-radius: 4px; background: #fffbeb; }
 .lex3720-pool > div strong { color: #92400e; font: 800 17px/1 Consolas, monospace; }
 .lex3720-pool > div small, .lex3720-pool > div em { color: #a16207; font: 800 10px/1 Consolas, monospace; font-style: normal; }
+.lex3720-pool > div > span.negative { border-color: #e11d48; background: #fff1f2; }
+.lex3720-pool > div > span.negative strong, .lex3720-pool > div > span.negative small { color: #9f1239; }
 
 [data-theme="dark"] .lex3720-viz { border-color: #475569; background: #0f172a; color: #e2e8f0; }
 [data-theme="dark"] .lex3720-viz > header, [data-theme="dark"] .lex3720-row > header, [data-theme="dark"] .lex3720-pool > header { border-color: #475569; }
@@ -38109,6 +38111,8 @@ html, body {
 [data-theme="dark"] .lex3720-cell.output.greater, [data-theme="dark"] .lex3720-pool > div > span { border-color: #fbbf24; background: #422006; }
 [data-theme="dark"] .lex3720-cell.output.greater strong, [data-theme="dark"] .lex3720-cell.output.greater small, [data-theme="dark"] .lex3720-pool > div strong { color: #fef3c7; }
 [data-theme="dark"] .lex3720-pool > div small, [data-theme="dark"] .lex3720-pool > div em { color: #fde68a; }
+[data-theme="dark"] .lex3720-pool > div > span.negative { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .lex3720-pool > div > span.negative strong, [data-theme="dark"] .lex3720-pool > div > span.negative small { color: #fecdd3; }
 
 @media (max-width: 520px) {
   .lex3720-viz { padding: 10px 8px; }

@@ -14189,6 +14189,326 @@ function buildSteps3720(input, params) {
   return { original: s, target, answer: "", steps };
 }
 
+function buildSteps3720Array(input, params) {
+  const s = String(input ?? "");
+  const target = String(params?.target ?? "");
+  if (!/^[a-z]+$/.test(s) || !/^[a-z]+$/.test(target) || s.length !== target.length) {
+    throw new Error("s and target must be lowercase strings with the same non-zero length");
+  }
+  if (s.length > 12) throw new Error("Visualization supports strings up to length 12");
+
+  const n = s.length;
+  const count = new Array(26).fill(0);
+  for (const char of s) count[char.charCodeAt(0) - 97]++;
+
+  const steps = [];
+  let matched = 0;
+  const remainingText = () => count.map((amount, code) => amount ? `${String.fromCharCode(97 + code)}x${amount}` : "").filter(Boolean).join(" ");
+  const remainingChars = () => count.flatMap((amount, code) => Array.from({ length: amount }, () => String.fromCharCode(97 + code)));
+  const view = (phase, activeIndex = matched, prefix = target.slice(0, matched).split("")) => ({
+    s,
+    target,
+    prefix,
+    remaining: count.map((amount, code) => amount ? { char: String.fromCharCode(97 + code), amount } : null).filter(Boolean),
+    activeIndex,
+    phase,
+  });
+  const push = ({ title, line, note, phase, activeIndex = matched, prefix, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      lexPermutationView: view(phase, activeIndex, prefix),
+      codeLines: [line],
+      vars: [
+        { name: "matched prefix", value: JSON.stringify(target.slice(0, matched)) },
+        { name: "remaining", value: remainingText() || "empty" },
+        { name: "i", value: activeIndex },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+  const finish = (answer, position) => {
+    push({
+      title: { vi: `return '${answer}'`, en: `return '${answer}'` },
+      line: answer ? 28 : 33,
+      phase: answer ? "done" : "fail",
+      activeIndex: position,
+      prefix: answer.split(""),
+      note: answer
+        ? { vi: "Đây là permutation nhỏ nhất lớn hơn target.", en: "This is the smallest permutation greater than target." }
+        : { vi: "Không có permutation nào của s lớn hơn target.", en: "No permutation of s is greater than target." },
+      final: true,
+      vars: [{ name: "answer", value: JSON.stringify(answer) }],
+    });
+    return { original: s, target, answer, steps };
+  };
+
+  push({
+    title: { vi: "Khởi tạo mảng đếm 26 ký tự", en: "Initialize the 26-character count array" },
+    line: 4,
+    phase: "init",
+    activeIndex: -1,
+    note: { vi: `cnt lưu số lần xuất hiện của mỗi ký tự trong s = ${JSON.stringify(s)}.`, en: `cnt stores each character frequency in s = ${JSON.stringify(s)}.` },
+    vars: [{ name: "target", value: JSON.stringify(target) }],
+  });
+
+  while (matched < n) {
+    const code = target.charCodeAt(matched) - 97;
+    if (count[code] === 0) {
+      push({
+        title: { vi: `Không thể consume target[${matched}] = '${target[matched]}'`, en: `Cannot consume target[${matched}] = '${target[matched]}'` },
+        line: 12,
+        phase: "no-greater",
+        activeIndex: matched,
+        note: { vi: "Ký tự này đã hết trong cnt; phải thử tăng tại vị trí hiện tại hoặc quay lui.", en: "This character is exhausted in cnt; try increasing here or backtrack." },
+      });
+      break;
+    }
+    count[code]--;
+    matched++;
+    push({
+      title: { vi: `Consume '${target[matched - 1]}' vào prefix`, en: `Consume '${target[matched - 1]}' into the prefix` },
+      line: 13,
+      phase: "match",
+      activeIndex: matched - 1,
+      note: { vi: "Giữ prefix bằng target lâu nhất có thể để kết quả nhỏ theo từ điển.", en: "Keep the prefix equal to target for as long as possible to stay lexicographically small." },
+    });
+  }
+
+  let i = matched;
+  push({
+    title: { vi: `Bắt đầu thử tăng từ i = ${i}`, en: `Start trying to increase from i = ${i}` },
+    line: 16,
+    phase: "init",
+    activeIndex: i < n ? i : n - 1,
+    note: { vi: "Bắt đầu ở ký tự chưa khớp được; nếu đã khớp hết thì lùi từ cuối chuỗi.", en: "Start at the first unmatched character; if all matched, backtrack from the end." },
+  });
+
+  while (i >= 0) {
+    if (i < n) {
+      const targetCode = target.charCodeAt(i) - 97;
+      push({
+        title: { vi: `Tìm ký tự nhỏ nhất > '${target[i]}'`, en: `Find the smallest character > '${target[i]}'` },
+        line: 21,
+        phase: "active",
+        activeIndex: i,
+        prefix: target.slice(0, i).split(""),
+        note: { vi: "Quét cnt từ ký tự kế tiếp của target[i] đến 'z'.", en: "Scan cnt from the character after target[i] through 'z'." },
+      });
+
+      let pick = -1;
+      for (let code = targetCode + 1; code < 26; code++) {
+        if (count[code] > 0) {
+          pick = code;
+          break;
+        }
+      }
+      if (pick >= 0) {
+        const char = String.fromCharCode(97 + pick);
+        count[pick]--;
+        const chosenPrefix = [...target.slice(0, i), char];
+        push({
+          title: { vi: `Chọn '${char}' > '${target[i]}'`, en: `Choose '${char}' > '${target[i]}'` },
+          line: 26,
+          phase: "greater",
+          activeIndex: i,
+          prefix: chosenPrefix,
+          note: { vi: `'${char}' là ký tự còn lại nhỏ nhất lớn hơn target[${i}].`, en: `'${char}' is the smallest remaining character greater than target[${i}].` },
+        });
+        const tail = remainingChars();
+        const answer = [...chosenPrefix, ...tail].join("");
+        push({
+          title: { vi: `Ghép suffix tăng dần: '${tail.join("")}'`, en: `Append the sorted suffix: '${tail.join("")}'` },
+          line: 27,
+          phase: "suffix",
+          activeIndex: i,
+          prefix: answer.split(""),
+          note: { vi: "Sau khi đã lớn hơn target, suffix tăng dần tạo đáp án nhỏ nhất.", en: "Once larger than target, an ascending suffix creates the smallest answer." },
+        });
+        return finish(answer, i);
+      }
+      push({
+        title: { vi: `Không có ký tự còn lại > '${target[i]}'`, en: `No remaining character is > '${target[i]}'` },
+        line: 25,
+        phase: "no-greater",
+        activeIndex: i,
+        prefix: target.slice(0, i).split(""),
+        note: { vi: "Vị trí này không thể tăng, nên trả ký tự phía trước về cnt rồi thử tiếp.", en: "This position cannot increase, so restore the previous character to cnt and continue." },
+      });
+    }
+
+    i--;
+    if (i >= 0) {
+      count[target.charCodeAt(i) - 97]++;
+      matched = i;
+      push({
+        title: { vi: `Quay lui: trả '${target[i]}' vào cnt`, en: `Backtrack: restore '${target[i]}' to cnt` },
+        line: 32,
+        phase: "backtrack",
+        activeIndex: i,
+        prefix: target.slice(0, i).split(""),
+        note: { vi: `Đã bỏ target[${i}] khỏi prefix; giờ có thể chọn ký tự lớn hơn ở vị trí này.`, en: `Removed target[${i}] from the prefix; a larger character may now be chosen here.` },
+      });
+    }
+  }
+
+  return finish("", -1);
+}
+
+function buildSteps3720ReverseBalance(input, params) {
+  const s = String(input ?? "");
+  const target = String(params?.target ?? "");
+  if (!/^[a-z]+$/.test(s) || !/^[a-z]+$/.test(target) || s.length !== target.length) {
+    throw new Error("s and target must be lowercase strings with the same non-zero length");
+  }
+  if (s.length > 12) throw new Error("Visualization supports strings up to length 12");
+
+  const n = s.length;
+  const count = new Array(26).fill(0);
+  for (let index = 0; index < n; index++) {
+    count[s.charCodeAt(index) - 97]++;
+    count[target.charCodeAt(index) - 97]--;
+  }
+
+  const steps = [];
+  const countText = () => count.map((amount, code) => amount ? `${String.fromCharCode(97 + code)}${amount > 0 ? "+" : ""}${amount}` : "").filter(Boolean).join(" ");
+  const remainingChars = () => count.flatMap((amount, code) => Array.from({ length: Math.max(amount, 0) }, () => String.fromCharCode(97 + code)));
+  const view = (phase, activeIndex, prefix = []) => ({
+    s,
+    target,
+    prefix,
+    remaining: count.map((amount, code) => amount ? { char: String.fromCharCode(97 + code), amount } : null).filter(Boolean),
+    activeIndex,
+    phase,
+    poolLabel: "CNT DELTA",
+    poolSummary: `min = ${Math.min(...count)}`,
+  });
+  const push = ({ title, line, note, phase, activeIndex, prefix, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      lexPermutationView: view(phase, activeIndex, prefix),
+      codeLines: [line],
+      vars: [
+        { name: "cnt delta", value: countText() || "all zero" },
+        { name: "min(cnt)", value: Math.min(...count) },
+        { name: "i", value: activeIndex },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Khởi tạo cnt = count(s) - count(target)", en: "Initialize cnt = count(s) - count(target)" },
+    line: 7,
+    phase: "init",
+    activeIndex: -1,
+    prefix: [],
+    note: { vi: "Giá trị âm nghĩa là target đang cần nhiều ký tự đó hơn s có. Khi quay từ phải sang trái, ta lần lượt trả ký tự về cnt.", en: "A negative value means target needs more of that character than s provides. Scanning right to left restores characters to cnt." },
+  });
+
+  for (let i = n - 1; i >= 0; i--) {
+    const targetCode = target.charCodeAt(i) - 97;
+    count[targetCode]++;
+    const matchedPrefix = target.slice(0, i).split("");
+    push({
+      title: { vi: `Trả target[${i}] = '${target[i]}' vào cnt`, en: `Restore target[${i}] = '${target[i]}' into cnt` },
+      line: 11,
+      phase: "backtrack",
+      activeIndex: i,
+      prefix: matchedPrefix,
+      note: { vi: `Bây giờ cnt biểu diễn ký tự còn lại sau khi cố giữ prefix target[:${i}].`, en: `cnt now represents the characters left after trying to keep prefix target[:${i}].` },
+    });
+
+    if (Math.min(...count) < 0) {
+      push({
+        title: { vi: `Prefix target[:${i}] chưa khả thi`, en: `Prefix target[:${i}] is not feasible` },
+        line: 13,
+        phase: "no-greater",
+        activeIndex: i,
+        prefix: matchedPrefix,
+        note: { vi: "cnt vẫn có giá trị âm, nên s không đủ ký tự để khớp prefix này. Tiếp tục quay lui sang trái.", en: "cnt still has a negative value, so s cannot match this prefix. Continue backtracking left." },
+      });
+      continue;
+    }
+
+    push({
+      title: { vi: `Tìm ký tự nhỏ nhất > '${target[i]}'`, en: `Find the smallest character > '${target[i]}'` },
+      line: 16,
+      phase: "active",
+      activeIndex: i,
+      prefix: matchedPrefix,
+      note: { vi: "Prefix đã khả thi. Quét từ ký tự ngay sau target[i] để tìm thay thế nhỏ nhất.", en: "The prefix is feasible. Scan from the character after target[i] for the smallest replacement." },
+    });
+
+    let pick = -1;
+    for (let code = targetCode + 1; code < 26; code++) {
+      if (count[code] > 0) {
+        pick = code;
+        break;
+      }
+    }
+    if (pick < 0) {
+      push({
+        title: { vi: `Không có ký tự nào > '${target[i]}'`, en: `No character is > '${target[i]}'` },
+        line: 16,
+        phase: "no-greater",
+        activeIndex: i,
+        prefix: matchedPrefix,
+        note: { vi: "Prefix khả thi nhưng không thể tăng tại vị trí này, nên tiếp tục sang trái.", en: "The prefix is feasible but cannot increase at this position, so continue left." },
+      });
+      continue;
+    }
+
+    const char = String.fromCharCode(97 + pick);
+    count[pick]--;
+    const chosenPrefix = [...target.slice(0, i), char];
+    push({
+      title: { vi: `Thay '${target[i]}' bằng '${char}'`, en: `Replace '${target[i]}' with '${char}'` },
+      line: 18,
+      phase: "greater",
+      activeIndex: i,
+      prefix: chosenPrefix,
+      note: { vi: `'${char}' là ký tự nhỏ nhất còn lại lớn hơn target[${i}].`, en: `'${char}' is the smallest remaining character greater than target[${i}].` },
+    });
+    const tail = remainingChars();
+    const answer = [...chosenPrefix, ...tail].join("");
+    push({
+      title: { vi: `return '${answer}'`, en: `return '${answer}'` },
+      line: 19,
+      phase: "suffix",
+      activeIndex: i,
+      prefix: answer.split(""),
+      note: { vi: "Ghép các ký tự còn lại tăng dần để suffix nhỏ nhất.", en: "Append the remaining characters in ascending order for the smallest suffix." },
+      final: true,
+      vars: [{ name: "answer", value: JSON.stringify(answer) }],
+    });
+    return { original: s, target, answer, steps };
+  }
+
+  push({
+    title: { vi: "return ''", en: "return ''" },
+    line: 21,
+    phase: "fail",
+    activeIndex: -1,
+    prefix: [],
+    note: { vi: "Không có hoán vị nào của s lớn hơn target.", en: "No permutation of s is greater than target." },
+    final: true,
+    vars: [{ name: "answer", value: '""' }],
+  });
+  return { original: s, target, answer: "", steps };
+}
+
 Object.assign(module.exports, {
   3720: {
     id: 3720,
@@ -14208,22 +14528,33 @@ Object.assign(module.exports, {
     defaultInput: "abc",
     inputKind: "string",
     inputLabel: { vi: "s", en: "s" },
-    extraParams: [{ key: "target", type: "string", label: { vi: "target", en: "target" }, default: "bba" }],
+    extraParams: [
+      { key: "target", type: "string", label: { vi: "target", en: "target" }, default: "bba" },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Counter + prefix", en: "Approach 1: Counter + prefix" } },
+          { value: "2", label: { vi: "Cách 2: Mảng đếm 26 ký tự", en: "Approach 2: 26-character count array" } },
+          { value: "3", label: { vi: "Cách 3: Cân bằng cnt từ phải sang trái", en: "Approach 3: Right-to-left cnt balance" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Dùng frequency pool của s và khớp prefix với target lâu nhất có thể.", en: "Use a frequency pool for s and match target's prefix for as long as possible." },
-      { vi: "Tại vị trí đầu tiên phải lớn hơn, chọn ký tự còn lại nhỏ nhất mà lớn hơn target[i].", en: "At the first position that must be larger, choose the smallest remaining character greater than target[i]." },
-      { vi: "Sắp phần còn lại tăng dần để suffix nhỏ nhất. Nếu không thể tăng tại đó, quay lui sang trái.", en: "Sort the remaining characters ascending for the smallest suffix. If that position cannot increase, backtrack left." },
+      { vi: "Cách 1 dùng Counter và mảng prefix; Cách 2 dùng cnt[26]; Cách 3 giữ cnt = count(s) - count(target).", en: "Approach 1 uses Counter and a prefix array; Approach 2 uses cnt[26]; Approach 3 keeps cnt = count(s) - count(target)." },
+      { vi: "Khớp prefix với target lâu nhất có thể, rồi chọn ký tự còn lại nhỏ nhất lớn hơn target[i].", en: "Match target's prefix for as long as possible, then choose the smallest remaining character greater than target[i]." },
+      { vi: "Nếu vị trí đó không tăng được, quay lui sang trái. Sau khi tăng được, xếp suffix tăng dần.", en: "If that position cannot increase, backtrack left. Once it can increase, sort the suffix ascending." },
     ],
     complexity: {
       time: "O(26 · n)",
       space: "O(26)",
       note: { vi: "Mỗi vị trí có thể quét 26 chữ cái để tìm ký tự lớn hơn; frequency pool có 26 ô.", en: "Each position may scan 26 letters to find a larger character; the frequency pool has 26 entries." },
     },
+    codeLabel: { vi: "Cách 1: Counter + prefix", en: "Approach 1: Counter + prefix" },
     code: [
       "from collections import Counter",
       "",
       "class Solution:",
-      "    def lexicographicallySmallestPermutation(self, s, target):",
+      "    def lexGreaterPermutation(self, s: str, target: str) -> str:",
       "        count = Counter(s)",
       "        prefix = []",
       "        i = 0",
@@ -14233,18 +14564,94 @@ Object.assign(module.exports, {
       "            i += 1",
       "",
       "        def finish(i, ch):",
-      "            prefix.append(ch); count[ch] -= 1",
+      "            prefix.append(ch)",
+      "            count[ch] -= 1",
       "            return ''.join(prefix) + ''.join(sorted(count.elements()))",
+      "",
+      "        if i == len(s):",
+      "            i -= 1",
+      "            count[target[i]] += 1",
+      "            prefix.pop()",
       "",
       "        while i >= 0:",
       "            for ch in 'abcdefghijklmnopqrstuvwxyz':",
       "                if ch > target[i] and count[ch]:",
       "                    return finish(i, ch)",
+      "            if i == 0:",
+      "                break",
       "            i -= 1",
-      "            if i >= 0:",
-      "                count[target[i]] += 1; prefix.pop()",
+      "            count[target[i]] += 1",
+      "            prefix.pop()",
       "        return ''",
     ],
+    code2Label: { vi: "Cách 2: Mảng đếm 26 ký tự", en: "Approach 2: 26-character count array" },
+    code2: [
+      "class Solution:",
+      "    def lexGreaterPermutation(self, s: str, target: str) -> str:",
+      "        n = len(s)",
+      "        cnt = [0] * 26",
+      "        for ch in s:",
+      "            cnt[ord(ch) - ord('a')] += 1",
+      "",
+      "        p = 0",
+      "        while p < n:",
+      "            c = ord(target[p]) - ord('a')",
+      "            if cnt[c] == 0:",
+      "                break",
+      "            cnt[c] -= 1",
+      "            p += 1",
+      "",
+      "        i = p",
+      "        while i >= 0:",
+      "            if i < n:",
+      "                t = ord(target[i]) - ord('a')",
+      "                pick = -1",
+      "                for c in range(t + 1, 26):",
+      "                    if cnt[c] > 0:",
+      "                        pick = c",
+      "                        break",
+      "                if pick >= 0:",
+      "                    cnt[pick] -= 1",
+      "                    tail = ''.join(chr(ord('a') + c) * cnt[c] for c in range(26))",
+      "                    return target[:i] + chr(ord('a') + pick) + tail",
+      "",
+      "            i -= 1",
+      "            if i >= 0:",
+      "                cnt[ord(target[i]) - ord('a')] += 1",
+      "        return ''",
+    ],
+    code3Label: { vi: "Cách 3: Cân bằng cnt từ phải sang trái", en: "Approach 3: Right-to-left cnt balance" },
+    code3: [
+      "class Solution:",
+      "    def lexGreaterPermutation(self, s: str, target: str) -> str:",
+      "        cnt = [0] * 26",
+      "",
+      "        for i in range(len(s)):",
+      "            cnt[ord(s[i]) - ord('a')] += 1",
+      "            cnt[ord(target[i]) - ord('a')] -= 1",
+      "",
+      "        for i in range(len(s) - 1, -1, -1):",
+      "            b = ord(target[i]) - ord('a')",
+      "            cnt[b] += 1",
+      "",
+      "            if min(cnt) < 0:",
+      "                continue",
+      "",
+      "            for j in range(b + 1, 26):",
+      "                if cnt[j] > 0:",
+      "                    cnt[j] -= 1",
+      "                    return target[:i] + chr(ord('a') + j) + self.getMinString(cnt)",
+      "",
+      "        return ''",
+      "",
+      "    def getMinString(self, cnt: list[int]) -> str:",
+      "        return ''.join(",
+      "            chr(ord('a') + i) * cnt[i]",
+      "            for i in range(26)",
+      "        )",
+    ],
     builder: buildSteps3720,
+    builder2: buildSteps3720Array,
+    builder3: buildSteps3720ReverseBalance,
   },
 });

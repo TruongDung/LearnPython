@@ -230,11 +230,22 @@ app.post("/api/problem/:id/solve", (req, res) => {
   }
 
   try {
-    const result = (params.approach === 3 || params.approach === "3") && typeof problem.builder3 === "function"
+    const requestedApproach = Number(params.approach) || 1;
+    const codeBlock = requestedApproach === 3 && problem.code3
+      ? 3
+      : requestedApproach === 2 && problem.code2
+        ? 2
+        : 1;
+    const result = requestedApproach === 3 && typeof problem.builder3 === "function"
       ? problem.builder3(input, params)
-      : (params.approach === 2 || params.approach === "2") && typeof problem.builder2 === "function"
+      : requestedApproach === 2 && typeof problem.builder2 === "function"
         ? problem.builder2(input, params)
         : problem.builder(input, params);
+    if (Array.isArray(result.steps)) {
+      result.steps.forEach((step) => {
+        step.codeBlock = step.codeBlock || codeBlock;
+      });
+    }
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: String((err && err.message) || err) });
