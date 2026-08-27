@@ -38010,3 +38010,109 @@ html, body {
   .seqtrace-cell strong { font-size: 17px; }
   .seqtrace-viz > footer { grid-template-columns: 1fr; }
 }
+
+/* Permutations (#46): source choices and the ordered current path. */
+.tree-view:has(.perm46-viz) { padding: 0; border: 0; background: transparent; }
+.perm46-viz { display: grid; gap: 10px; padding: 14px; border: 1px solid #94a3b8; border-radius: 7px; background: #ffffff; color: #0f172a; }
+.perm46-viz > header, .perm46-row > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 7px; border-bottom: 1px solid #cbd5e1; }
+.perm46-viz > header strong, .perm46-row > header strong { color: #0f172a; font: 800 12px/1 Consolas, monospace; }
+.perm46-viz > header span, .perm46-row > header span { color: #64748b; font: 800 9px/1 Consolas, monospace; text-align: right; }
+.perm46-row { display: grid; gap: 8px; padding: 10px; border: 1px solid #94a3b8; background: #f8fafc; }
+.perm46-row.source { border-left: 4px solid #0284c7; }
+.perm46-row.current { border-left: 4px solid #d97706; }
+.perm46-cells { display: grid; grid-template-columns: repeat(var(--perm46-cols), minmax(0, 1fr)); gap: 5px; }
+.perm46-source, .perm46-slot { display: grid; min-height: 64px; align-content: center; justify-items: center; gap: 4px; padding: 5px 3px; border: 1px solid #94a3b8; border-radius: 5px; background: #ffffff; }
+.perm46-source small, .perm46-slot small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.perm46-source strong, .perm46-slot strong { color: #0f172a; font: 800 20px/1 Consolas, monospace; }
+.perm46-source em { min-height: 11px; color: #15803d; font: 800 9px/1 Consolas, monospace; font-style: normal; }
+.perm46-source.used { border-color: #16a34a; background: #f0fdf4; }
+.perm46-source.used strong, .perm46-source.used small, .perm46-source.used em { color: #166534; }
+.perm46-source.active { border: 3px solid #0284c7; background: #f0f9ff; }
+.perm46-source.active strong, .perm46-source.active small, .perm46-source.active em { color: #0c4a6e; }
+.perm46-source.release { border: 3px solid #e11d48; background: #fff1f2; }
+.perm46-source.release strong, .perm46-source.release small, .perm46-source.release em { color: #9f1239; }
+.perm46-slot.filled { border-color: #d97706; background: #fffbeb; }
+.perm46-slot.filled strong, .perm46-slot.filled small { color: #92400e; }
+.perm46-slot.empty { border-style: dashed; }
+.perm46-viz > footer { display: grid; grid-template-columns: minmax(0, 1fr) 108px; gap: 8px; }
+.perm46-viz > footer > span { display: grid; min-height: 58px; align-content: center; gap: 4px; padding: 9px 11px; border: 1px solid #94a3b8; background: #f8fafc; }
+.perm46-viz footer small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.perm46-viz footer strong { color: #0f172a; font: 800 15px/1.25 Consolas, monospace; overflow-wrap: anywhere; }
+.perm46-viz footer .answer { border-color: #16a34a; background: #f0fdf4; text-align: center; }
+.perm46-viz footer .answer strong { color: #166534; font-size: 19px; }
+
+[data-theme="dark"] .perm46-viz { border-color: #475569; background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .perm46-viz > header, [data-theme="dark"] .perm46-row > header { border-color: #475569; }
+[data-theme="dark"] .perm46-viz > header strong, [data-theme="dark"] .perm46-row > header strong, [data-theme="dark"] .perm46-source strong, [data-theme="dark"] .perm46-slot strong, [data-theme="dark"] .perm46-viz footer strong { color: #f8fafc; }
+[data-theme="dark"] .perm46-viz > header span, [data-theme="dark"] .perm46-row > header span, [data-theme="dark"] .perm46-source small, [data-theme="dark"] .perm46-slot small, [data-theme="dark"] .perm46-viz footer small { color: #94a3b8; }
+[data-theme="dark"] .perm46-row, [data-theme="dark"] .perm46-viz > footer > span { border-color: #475569; background: #111827; }
+[data-theme="dark"] .perm46-source, [data-theme="dark"] .perm46-slot { border-color: #64748b; background: #0f172a; }
+[data-theme="dark"] .perm46-source.used, [data-theme="dark"] .perm46-viz footer .answer { border-color: #22c55e; background: #052e16; }
+[data-theme="dark"] .perm46-source.used strong, [data-theme="dark"] .perm46-source.used small, [data-theme="dark"] .perm46-source.used em, [data-theme="dark"] .perm46-viz footer .answer strong { color: #bbf7d0; }
+[data-theme="dark"] .perm46-source.active { border-color: #38bdf8; background: #082f49; }
+[data-theme="dark"] .perm46-source.active strong, [data-theme="dark"] .perm46-source.active small, [data-theme="dark"] .perm46-source.active em { color: #e0f2fe; }
+[data-theme="dark"] .perm46-source.release { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .perm46-source.release strong, [data-theme="dark"] .perm46-source.release small, [data-theme="dark"] .perm46-source.release em { color: #fecdd3; }
+[data-theme="dark"] .perm46-slot.filled { border-color: #fbbf24; background: #422006; }
+[data-theme="dark"] .perm46-slot.filled strong, [data-theme="dark"] .perm46-slot.filled small { color: #fef3c7; }
+
+@media (max-width: 520px) {
+  .perm46-viz { padding: 10px 8px; }
+  .perm46-cells { gap: 4px; }
+  .perm46-source, .perm46-slot { min-height: 56px; }
+  .perm46-source strong, .perm46-slot strong { font-size: 17px; }
+  .perm46-viz > footer { grid-template-columns: 1fr; }
+}
+
+/* Lexicographic greedy trace for #3720. */
+.tree-view:has(.lex3720-viz) { padding: 0; border: 0; background: transparent; }
+.lex3720-viz { display: grid; gap: 10px; padding: 14px; border: 1px solid #94a3b8; border-radius: 7px; background: #ffffff; color: #0f172a; }
+.lex3720-viz > header, .lex3720-row > header, .lex3720-pool > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 7px; border-bottom: 1px solid #cbd5e1; }
+.lex3720-viz > header strong, .lex3720-row > header strong, .lex3720-pool > header strong { color: #0f172a; font: 800 12px/1 Consolas, monospace; }
+.lex3720-viz > header span, .lex3720-row > header span, .lex3720-pool > header span { color: #64748b; font: 800 9px/1 Consolas, monospace; text-align: right; overflow-wrap: anywhere; }
+.lex3720-row, .lex3720-pool { display: grid; gap: 8px; padding: 10px; border: 1px solid #94a3b8; background: #f8fafc; }
+.lex3720-row.target { border-left: 4px solid #0284c7; }
+.lex3720-row.output { border-left: 4px solid #16a34a; }
+.lex3720-pool { border-left: 4px solid #d97706; }
+.lex3720-cells { display: grid; grid-template-columns: repeat(var(--lex3720-cols), minmax(0, 1fr)); gap: 5px; }
+.lex3720-cell { display: grid; min-height: 61px; align-content: center; justify-items: center; gap: 4px; padding: 5px 3px; border: 1px solid #94a3b8; border-radius: 5px; background: #ffffff; }
+.lex3720-cell small { color: #64748b; font: 800 8px/1 Consolas, monospace; }
+.lex3720-cell strong { color: #0f172a; font: 800 20px/1 Consolas, monospace; }
+.lex3720-cell.matched { border-color: #16a34a; background: #f0fdf4; }
+.lex3720-cell.matched strong, .lex3720-cell.matched small { color: #166534; }
+.lex3720-cell.active { border: 3px solid #0284c7; background: #f0f9ff; }
+.lex3720-cell.active strong, .lex3720-cell.active small { color: #0c4a6e; }
+.lex3720-cell.blocked { border: 3px solid #e11d48; background: #fff1f2; }
+.lex3720-cell.blocked strong, .lex3720-cell.blocked small { color: #9f1239; }
+.lex3720-cell.output.filled { border-color: #16a34a; background: #f0fdf4; }
+.lex3720-cell.output.filled strong, .lex3720-cell.output.filled small { color: #166534; }
+.lex3720-cell.output.greater { border: 3px solid #d97706; background: #fffbeb; }
+.lex3720-cell.output.greater strong, .lex3720-cell.output.greater small { color: #92400e; }
+.lex3720-cell.output.empty { border-style: dashed; }
+.lex3720-pool > div { display: flex; flex-wrap: wrap; gap: 5px; min-height: 35px; align-items: center; }
+.lex3720-pool > div > span { display: inline-flex; align-items:baseline; gap: 5px; padding: 6px 8px; border: 1px solid #d97706; border-radius: 4px; background: #fffbeb; }
+.lex3720-pool > div strong { color: #92400e; font: 800 17px/1 Consolas, monospace; }
+.lex3720-pool > div small, .lex3720-pool > div em { color: #a16207; font: 800 10px/1 Consolas, monospace; font-style: normal; }
+
+[data-theme="dark"] .lex3720-viz { border-color: #475569; background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .lex3720-viz > header, [data-theme="dark"] .lex3720-row > header, [data-theme="dark"] .lex3720-pool > header { border-color: #475569; }
+[data-theme="dark"] .lex3720-viz > header strong, [data-theme="dark"] .lex3720-row > header strong, [data-theme="dark"] .lex3720-pool > header strong, [data-theme="dark"] .lex3720-cell strong { color: #f8fafc; }
+[data-theme="dark"] .lex3720-viz > header span, [data-theme="dark"] .lex3720-row > header span, [data-theme="dark"] .lex3720-pool > header span, [data-theme="dark"] .lex3720-cell small { color: #94a3b8; }
+[data-theme="dark"] .lex3720-row, [data-theme="dark"] .lex3720-pool { border-color: #475569; background: #111827; }
+[data-theme="dark"] .lex3720-cell { border-color: #64748b; background: #0f172a; }
+[data-theme="dark"] .lex3720-cell.matched, [data-theme="dark"] .lex3720-cell.output.filled { border-color: #22c55e; background: #052e16; }
+[data-theme="dark"] .lex3720-cell.matched strong, [data-theme="dark"] .lex3720-cell.matched small, [data-theme="dark"] .lex3720-cell.output.filled strong, [data-theme="dark"] .lex3720-cell.output.filled small { color: #bbf7d0; }
+[data-theme="dark"] .lex3720-cell.active { border-color: #38bdf8; background: #082f49; }
+[data-theme="dark"] .lex3720-cell.active strong, [data-theme="dark"] .lex3720-cell.active small { color: #e0f2fe; }
+[data-theme="dark"] .lex3720-cell.blocked { border-color: #fb7185; background: #4c0519; }
+[data-theme="dark"] .lex3720-cell.blocked strong, [data-theme="dark"] .lex3720-cell.blocked small { color: #fecdd3; }
+[data-theme="dark"] .lex3720-cell.output.greater, [data-theme="dark"] .lex3720-pool > div > span { border-color: #fbbf24; background: #422006; }
+[data-theme="dark"] .lex3720-cell.output.greater strong, [data-theme="dark"] .lex3720-cell.output.greater small, [data-theme="dark"] .lex3720-pool > div strong { color: #fef3c7; }
+[data-theme="dark"] .lex3720-pool > div small, [data-theme="dark"] .lex3720-pool > div em { color: #fde68a; }
+
+@media (max-width: 520px) {
+  .lex3720-viz { padding: 10px 8px; }
+  .lex3720-cells { gap: 4px; }
+  .lex3720-cell { min-height: 55px; }
+  .lex3720-cell strong { font-size: 17px; }
+}

@@ -1096,45 +1096,55 @@ function buildSteps46(nums) {
   const current = [];
   const results = [];
   const used = new Array(nums.length).fill(false);
+  let lastSaved = null;
+  const total = nums.reduce((product, _, index) => product * (index + 1), 1);
 
-  steps.push({
+  const snapshot = ({ title, codeLines, phase, activeIndex = null, note, final = false }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "current", value: `[${current.join(", ")}]` },
+        { name: "used", value: used.map((value) => (value ? "T" : "F")).join("") },
+        { name: "saved", value: `${results.length}/${total}` },
+      ],
+      permutation46View: {
+        nums: [...nums],
+        used: [...used],
+        current: [...current],
+        activeIndex,
+        phase,
+        savedCount: results.length,
+        total,
+        lastSaved: lastSaved ? [...lastSaved] : null,
+      },
+      note,
+      final,
+    });
+  };
+
+  snapshot({
     title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: nums.map(() => 0),
-    sub: nums.map(String),
-    highlight: [],
-    mark: [],
     codeLines: [3, 4, 5],
-    vars: [
-      { name: "nums", value: `[${nums.join(", ")}]` },
-      { name: "current", value: "[]" },
-      { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
-    ],
+    phase: "ready",
     note: {
-      vi:
-        `Tìm TẤT CẢ hoán vị của [${nums.join(", ")}].\n` +
-        `Khác Subsets: ở đây THỨ TỰ quan trọng, mỗi hoán vị có ĐỦ n phần tử.\n` +
-        `Dùng used[] để đánh dấu phần tử đã chọn (tránh dùng lại).`,
-      en:
-        `Find ALL permutations of [${nums.join(", ")}].\n` +
-        `Unlike Subsets: ORDER matters here, each permutation uses ALL n elements.\n` +
-        `Use used[] to mark chosen elements (prevent reuse).`,
+      vi: `Bắt đầu với nums = [${nums.join(", ")}]. Mỗi vị trí chỉ được chọn một lần; current ghi lại THỨ TỰ đã chọn.`,
+      en: `Start with nums = [${nums.join(", ")}]. Each index can be chosen once; current records the chosen ORDER.`,
     },
   });
 
   function backtrack() {
     if (current.length === nums.length) {
       results.push([...current]);
-      steps.push({
+      lastSaved = [...current];
+      snapshot({
         title: { vi: `✓ Hoán vị: [${current.join(", ")}]`, en: `✓ Permutation: [${current.join(", ")}]` },
-        arr: nums.map((_, i) => (used[i] ? 1 : 0)),
-        sub: nums.map(String),
-        highlight: [],
-        mark: nums.map((_, i) => i),
         codeLines: [8, 9, 10],
-        vars: [
-          { name: "current", value: `[${current.join(", ")}]` },
-          { name: "count", value: results.length },
-        ],
+        phase: "complete",
         note: {
           vi: `len(current) == ${nums.length} → lưu [${current.join(", ")}]. Tổng: ${results.length} hoán vị.`,
           en: `len(current) == ${nums.length} → save [${current.join(", ")}]. Total: ${results.length} permutations.`,
@@ -1149,19 +1159,11 @@ function buildSteps46(nums) {
       used[i] = true;
       current.push(nums[i]);
 
-      steps.push({
+      snapshot({
         title: { vi: `Chọn nums[${i}] = ${nums[i]}`, en: `Pick nums[${i}] = ${nums[i]}` },
-        arr: nums.map((_, j) => (used[j] ? 1 : 0)),
-        sub: nums.map(String),
-        highlight: [i],
-        mark: [],
         codeLines: [11, 12, 13, 14, 15, 16],
-        vars: [
-          { name: "i", value: i },
-          { name: "nums[i]", value: nums[i] },
-          { name: "current", value: `[${current.join(", ")}]` },
-          { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
-        ],
+        phase: "pick",
+        activeIndex: i,
         note: {
           vi: `nums[${i}]=${nums[i]} chưa dùng → chọn. current = [${current.join(", ")}].`,
           en: `nums[${i}]=${nums[i]} not used → pick. current = [${current.join(", ")}].`,
@@ -1170,24 +1172,17 @@ function buildSteps46(nums) {
 
       backtrack();
 
-      current.pop();
+      const removed = current.pop();
       used[i] = false;
 
-      steps.push({
-        title: { vi: `Quay lui: bỏ ${nums[i]}`, en: `Backtrack: pop ${nums[i]}` },
-        arr: nums.map((_, j) => (used[j] ? 1 : 0)),
-        sub: nums.map(String),
-        highlight: [],
-        mark: [],
+      snapshot({
+        title: { vi: `Quay lui: bỏ ${removed}`, en: `Backtrack: pop ${removed}` },
         codeLines: [17, 18],
-        vars: [
-          { name: "popped", value: nums[i] },
-          { name: "current", value: `[${current.join(", ")}]` },
-          { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
-        ],
+        phase: "backtrack",
+        activeIndex: i,
         note: {
-          vi: `Bỏ ${nums[i]}, used[${i}]=F. Thử phần tử tiếp theo.`,
-          en: `Pop ${nums[i]}, used[${i}]=F. Try next element.`,
+          vi: `Bỏ ${removed}, đánh dấu nums[${i}] là chưa dùng để thử lựa chọn tiếp theo.`,
+          en: `Pop ${removed}, mark nums[${i}] unused, then try the next choice.`,
         },
       });
     }
@@ -1195,25 +1190,167 @@ function buildSteps46(nums) {
 
   backtrack();
 
-  steps.push({
+  snapshot({
     title: { vi: `Kết quả: ${results.length} hoán vị`, en: `Result: ${results.length} permutations` },
-    arr: nums.map(() => 0),
-    sub: nums.map(String),
-    highlight: [],
-    mark: [],
-    final: true,
     codeLines: [20, 21],
-    vars: [
-      { name: "total", value: `${nums.length}! = ${results.length}` },
-      { name: "all", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
-    ],
+    phase: "done",
     note: {
       vi: `Tổng ${results.length} = ${nums.length}! hoán vị.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
       en: `Total ${results.length} = ${nums.length}! permutations.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
     },
+    final: true,
   });
 
   return { original: [...nums], answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 47: Permutations II.
+ * Sort first, then skip an equal value when its left duplicate is unused at
+ * this depth. That keeps one representative branch per repeated value.
+ */
+function buildSteps47(input) {
+  const original = [...input];
+  if (original.length > 8) throw new Error("Visualization supports at most 8 numbers");
+
+  const nums = [...original].sort((a, b) => a - b);
+  const steps = [];
+  const current = [];
+  const results = [];
+  const used = new Array(nums.length).fill(false);
+  const TRACE_LIMIT = 480;
+  let traceTruncated = false;
+
+  const usedText = () => used.map((value) => (value ? "T" : "F")).join("");
+  const resultPreview = () => {
+    const visible = results.slice(0, 10).map((permutation) => `[${permutation.join(",")}]`).join(", ");
+    return results.length > 10 ? `${visible}, ... (${results.length} total)` : visible;
+  };
+  const pushStep = (step) => {
+    if (step.final || steps.length < TRACE_LIMIT) {
+      steps.push(step);
+    } else {
+      traceTruncated = true;
+    }
+  };
+  const snapshot = ({ title, codeLines, highlight = [], mark = [], vars = [], note, final = false }) => {
+    pushStep({
+      title,
+      arr: nums.map((_, index) => (used[index] ? 1 : 0)),
+      sub: nums.map(String),
+      highlight,
+      mark,
+      codeLines,
+      vars: [
+        { name: "current", value: `[${current.join(", ")}]` },
+        { name: "used", value: usedText() },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+
+  snapshot({
+    title: { vi: "Khởi tạo và sắp xếp", en: "Initialize and sort" },
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "input", value: `[${original.join(", ")}]` },
+      { name: "sorted nums", value: `[${nums.join(", ")}]` },
+    ],
+    note: {
+      vi: `Sắp xếp [${original.join(", ")}] thành [${nums.join(", ")}], để các giá trị trùng đứng cạnh nhau. used[] theo dõi từng INDEX, không chỉ giá trị.`,
+      en: `Sort [${original.join(", ")}] into [${nums.join(", ")}], so equal values are adjacent. used[] tracks each INDEX, not just its value.`,
+    },
+  });
+
+  function backtrack() {
+    if (current.length === nums.length) {
+      results.push([...current]);
+      snapshot({
+        title: { vi: `Hoán vị: [${current.join(", ")}]`, en: `Permutation: [${current.join(", ")}]` },
+        codeLines: [9, 10, 11],
+        mark: nums.map((_, index) => index),
+        vars: [{ name: "count", value: results.length }],
+        note: {
+          vi: `current có đủ ${nums.length} phần tử, nên lưu một hoán vị duy nhất. Tổng hiện tại: ${results.length}.`,
+          en: `current has all ${nums.length} elements, so save one unique permutation. Total so far: ${results.length}.`,
+        },
+      });
+      return;
+    }
+
+    for (let i = 0; i < nums.length; i++) {
+      if (used[i]) continue;
+
+      if (i > 0 && nums[i] === nums[i - 1] && !used[i - 1]) {
+        snapshot({
+          title: { vi: `Bỏ qua bản sao nums[${i}] = ${nums[i]}`, en: `Skip duplicate nums[${i}] = ${nums[i]}` },
+          codeLines: [15, 16],
+          highlight: [i - 1, i],
+          mark: nums.map((_, index) => (used[index] ? index : -1)).filter((index) => index >= 0),
+          vars: [
+            { name: "i", value: i },
+            { name: "nums[i]", value: nums[i] },
+            { name: "reason", value: "same value; left copy unused" },
+          ],
+          note: {
+            vi: `nums[${i}] và nums[${i - 1}] đều là ${nums[i]}, nhưng nums[${i - 1}] chưa được dùng. Chọn bản sao bên phải sẽ tạo nhánh trùng, nên bỏ qua.`,
+            en: `nums[${i}] and nums[${i - 1}] are both ${nums[i]}, but the left copy is unused. Choosing the right copy would duplicate a branch, so skip it.`,
+          },
+        });
+        continue;
+      }
+
+      used[i] = true;
+      current.push(nums[i]);
+      snapshot({
+        title: { vi: `Chọn nums[${i}] = ${nums[i]}`, en: `Pick nums[${i}] = ${nums[i]}` },
+        codeLines: [17, 18, 19, 20],
+        highlight: [i],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+        ],
+        note: {
+          vi: `Đánh dấu index ${i} đã dùng và thêm ${nums[i]} vào current, rồi đi sâu hơn.`,
+          en: `Mark index ${i} as used and append ${nums[i]} to current, then recurse deeper.`,
+        },
+      });
+
+      backtrack();
+
+      const removed = current.pop();
+      used[i] = false;
+      snapshot({
+        title: { vi: `Quay lui: bỏ ${removed}`, en: `Backtrack: pop ${removed}` },
+        codeLines: [21, 22],
+        vars: [{ name: "popped", value: removed }],
+        note: {
+          vi: `Khôi phục current và used[${i}] để thử lựa chọn kế tiếp ở cùng level.`,
+          en: `Restore current and used[${i}] to try the next choice at this level.`,
+        },
+      });
+    }
+  }
+
+  backtrack();
+  snapshot({
+    title: { vi: `Kết quả: ${results.length} hoán vị duy nhất`, en: `Result: ${results.length} unique permutations` },
+    codeLines: [24, 25],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "permutations", value: resultPreview() },
+      ...(traceTruncated ? [{ name: "trace", value: `first ${TRACE_LIMIT} steps shown` }] : []),
+    ],
+    note: {
+      vi: `Có ${results.length} hoán vị khác nhau: ${resultPreview()}${traceTruncated ? `\nVisualization chỉ hiển thị ${TRACE_LIMIT} bước đầu để giữ giao diện mượt.` : ""}`,
+      en: `There are ${results.length} distinct permutations: ${resultPreview()}${traceTruncated ? `\nThe visualization shows the first ${TRACE_LIMIT} steps to keep the UI responsive.` : ""}`,
+    },
+    final: true,
+  });
+
+  return { original, answer: results.length, steps };
 }
 
 /**
@@ -4001,6 +4138,65 @@ module.exports = {
       "        return result",
     ],
     builder: (input, params) => addBacktrackingDecisionTree(buildSteps46(input, params), 46),
+  },
+  47: {
+    id: 47,
+    difficulty: "medium",
+    slug: "permutations-ii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    tags: [{ key: "dedup", vi: "Loại trùng", en: "Deduplication" }],
+    title: { vi: "Permutations II", en: "Permutations II" },
+    titleVi: { vi: "Hoán vị không trùng", en: "Unique permutations" },
+    statement: {
+      vi: "Cho mảng nums có thể chứa số trùng nhau, trả về tất cả hoán vị khác nhau theo bất kỳ thứ tự nào.",
+      en: "Given an array nums that may contain duplicates, return all unique permutations in any order.",
+    },
+    defaultInput: [1, 1, 2],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Sắp xếp nums để các phần tử trùng nằm cạnh nhau.", en: "Sort nums so equal values are adjacent." },
+      { vi: "Dùng used[] theo index để mỗi phần tử chỉ được chọn một lần trong một hoán vị.", en: "Use used[] by index so each element is chosen once per permutation." },
+      { vi: "Bỏ nums[i] nếu nó bằng nums[i-1] nhưng nums[i-1] chưa dùng: đó là bản sao ở cùng level.", en: "Skip nums[i] when it equals nums[i-1] and nums[i-1] is unused: it is a same-level duplicate." },
+      { vi: "Khi current có đủ n phần tử, lưu một hoán vị duy nhất.", en: "When current has n elements, save one unique permutation." },
+    ],
+    complexity: {
+      time: "O(n · U)",
+      space: "O(n)",
+      note: {
+        vi: "U là số hoán vị khác nhau. Mỗi hoán vị mất O(n) để copy; sort tốn O(n log n).",
+        en: "U is the number of unique permutations. Copying each permutation costs O(n); sorting costs O(n log n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def permuteUnique(self, nums):",
+      "        nums.sort()",
+      "        result = []",
+      "        current = []",
+      "        used = [False] * len(nums)",
+      "",
+      "        def backtrack():",
+      "            if len(current) == len(nums):",
+      "                result.append(current[:])",
+      "                return",
+      "",
+      "            for i in range(len(nums)):",
+      "                if used[i]:",
+      "                    continue",
+      "                if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:",
+      "                    continue",
+      "",
+      "                used[i] = True",
+      "                current.append(nums[i])",
+      "                backtrack()",
+      "                current.pop()",
+      "                used[i] = False",
+      "",
+      "        backtrack()",
+      "        return result",
+    ],
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps47(input, params), 47),
   },
   77: {
     id: 77,

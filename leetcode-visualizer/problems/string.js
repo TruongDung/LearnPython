@@ -14027,3 +14027,224 @@ function buildSteps622(input) {
   );
   return { operations: parsed, outputs, answer, steps };
 }
+
+function buildSteps3720(input, params) {
+  const s = String(input ?? "");
+  const target = String(params?.target ?? "");
+  if (!/^[a-z]+$/.test(s) || !/^[a-z]+$/.test(target) || s.length !== target.length) {
+    throw new Error("s and target must be lowercase strings with the same non-zero length");
+  }
+  if (s.length > 12) throw new Error("Visualization supports strings up to length 12");
+
+  const n = s.length;
+  const count = new Array(26).fill(0);
+  for (const char of s) count[char.charCodeAt(0) - 97]++;
+  const prefix = [];
+  const steps = [];
+  let index = 0;
+
+  const remainingText = () => count.map((amount, code) => amount ? `${String.fromCharCode(97 + code)}x${amount}` : "").filter(Boolean).join(" ");
+  const remainingChars = () => count.flatMap((amount, code) => Array.from({ length: amount }, () => String.fromCharCode(97 + code)));
+  const view = (phase, activeIndex = index, picked = null) => ({
+    s,
+    target,
+    prefix: [...prefix],
+    remaining: count.map((amount, code) => amount ? { char: String.fromCharCode(97 + code), amount } : null).filter(Boolean),
+    activeIndex,
+    picked,
+    phase,
+  });
+  const push = ({ title, line, note, phase, activeIndex = index, picked = null, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      lexPermutationView: view(phase, activeIndex, picked),
+      codeLines: [line],
+      vars: [
+        { name: "prefix", value: JSON.stringify(prefix.join("")) },
+        { name: "remaining", value: remainingText() || "empty" },
+        { name: "i", value: activeIndex },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+  const firstGreater = (char) => {
+    for (let code = char.charCodeAt(0) - 96; code < 26; code++) {
+      if (count[code]) return String.fromCharCode(97 + code);
+    }
+    return null;
+  };
+  const complete = (position, char) => {
+    count[char.charCodeAt(0) - 97]--;
+    prefix.push(char);
+    push({
+      title: { vi: `Chọn '${char}' > '${target[position]}'`, en: `Choose '${char}' > '${target[position]}'` },
+      line: 13,
+      phase: "greater",
+      activeIndex: position,
+      picked: char,
+      note: { vi: `'${char}' là ký tự nhỏ nhất còn lại lớn hơn target[${position}].`, en: `'${char}' is the smallest remaining character greater than target[${position}].` },
+    });
+    const suffix = remainingChars();
+    prefix.push(...suffix);
+    push({
+      title: { vi: `Điền suffix tăng dần: '${suffix.join("")}'`, en: `Fill the sorted suffix: '${suffix.join("")}'` },
+      line: 14,
+      phase: "suffix",
+      activeIndex: position,
+      picked: char,
+      note: { vi: "Đã lớn hơn target ở vị trí này, nên xếp mọi ký tự còn lại tăng dần để kết quả nhỏ nhất.", en: "The prefix is now greater than target, so sort every remaining character to make the result smallest." },
+    });
+    return prefix.join("");
+  };
+  const tryGreater = (position) => {
+    const char = firstGreater(target[position]);
+    if (char) return complete(position, char);
+    push({
+      title: { vi: `Không có ký tự nào > '${target[position]}'`, en: `No remaining character is > '${target[position]}'` },
+      line: 12,
+      phase: "no-greater",
+      activeIndex: position,
+      note: { vi: "Không thể tăng vị trí này; phải quay lui sang trái.", en: "This position cannot increase; backtrack to the left." },
+    });
+    return "";
+  };
+  const finish = (answer, position) => {
+    push({
+      title: { vi: `return '${answer}'`, en: `return '${answer}'` },
+      line: 15,
+      phase: "done",
+      activeIndex: position,
+      note: { vi: "Đây là permutation nhỏ nhất lớn hơn target.", en: "This is the smallest permutation greater than target." },
+      final: true,
+      vars: [{ name: "answer", value: JSON.stringify(answer) }],
+    });
+    return { original: s, target, answer, steps };
+  };
+
+  push({
+    title: { vi: "Khởi tạo frequency pool", en: "Initialize the frequency pool" },
+    line: 3,
+    phase: "init",
+    note: { vi: `Đếm ký tự của s = ${JSON.stringify(s)}. Cần tìm permutation nhỏ nhất nhưng lớn hơn target = ${JSON.stringify(target)}.`, en: `Count the characters of s = ${JSON.stringify(s)}. Find the smallest permutation greater than target = ${JSON.stringify(target)}.` },
+    vars: [{ name: "s", value: JSON.stringify(s) }, { name: "target", value: JSON.stringify(target) }],
+  });
+
+  while (index < n && count[target[index].charCodeAt(0) - 97] > 0) {
+    const char = target[index];
+    count[char.charCodeAt(0) - 97]--;
+    prefix.push(char);
+    push({
+      title: { vi: `Khớp target[${index}] = '${char}'`, en: `Match target[${index}] = '${char}'` },
+      line: 8,
+      phase: "match",
+      activeIndex: index,
+      picked: char,
+      note: { vi: `Giữ '${char}' vì nó còn trong pool. Khớp prefix càng lâu, đáp án càng nhỏ theo từ điển.`, en: `Keep '${char}' because it remains in the pool. Matching the prefix longer keeps the answer lexicographically smaller.` },
+    });
+    index++;
+  }
+
+  if (index < n) {
+    push({
+      title: { vi: `Không thể khớp '${target[index]}' tại i=${index}`, en: `Cannot match '${target[index]}' at i=${index}` },
+      line: 9,
+      phase: "blocked",
+      activeIndex: index,
+      note: { vi: `Pool không còn '${target[index]}', nên thử ký tự nhỏ nhất lớn hơn nó.`, en: `The pool has no '${target[index]}' left, so try the smallest larger character.` },
+    });
+    const answer = tryGreater(index);
+    if (answer) return finish(answer, index);
+  }
+
+  for (let position = Math.min(index - 1, n - 1); position >= 0; position--) {
+    const restored = prefix.pop();
+    count[restored.charCodeAt(0) - 97]++;
+    push({
+      title: { vi: `Quay lui: trả '${restored}' vào pool`, en: `Backtrack: return '${restored}' to the pool` },
+      line: 17,
+      phase: "backtrack",
+      activeIndex: position,
+      picked: restored,
+      note: { vi: `Bỏ ký tự đã khớp tại vị trí ${position}, rồi thử thay bằng ký tự lớn hơn nhỏ nhất.`, en: `Remove the matched character at position ${position}, then try the smallest larger replacement.` },
+    });
+    const answer = tryGreater(position);
+    if (answer) return finish(answer, position);
+  }
+
+  push({
+    title: { vi: "return ''", en: "return ''" },
+    line: 19,
+    phase: "fail",
+    activeIndex: -1,
+    note: { vi: "Không có permutation nào của s lớn hơn target.", en: "No permutation of s is greater than target." },
+    final: true,
+    vars: [{ name: "answer", value: '""' }],
+  });
+  return { original: s, target, answer: "", steps };
+}
+
+Object.assign(module.exports, {
+  3720: {
+    id: 3720,
+    difficulty: "medium",
+    slug: "lexicographically-smallest-permutation-greater-than-target",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "frequency", vi: "Đếm tần suất", en: "Frequency Count" },
+    ],
+    title: { vi: "Lexicographically Smallest Permutation Greater Than Target", en: "Lexicographically Smallest Permutation Greater Than Target" },
+    titleVi: { vi: "Hoán vị nhỏ nhất lớn hơn target", en: "Smallest permutation greater than target" },
+    statement: {
+      vi: "Cho hai chuỗi thường s và target cùng độ dài. Trả về hoán vị nhỏ nhất theo từ điển của s mà lớn hơn target, hoặc chuỗi rỗng nếu không có.",
+      en: "Given lowercase strings s and target of equal length, return the lexicographically smallest permutation of s strictly greater than target, or an empty string if none exists.",
+    },
+    defaultInput: "abc",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [{ key: "target", type: "string", label: { vi: "target", en: "target" }, default: "bba" }],
+    approach: [
+      { vi: "Dùng frequency pool của s và khớp prefix với target lâu nhất có thể.", en: "Use a frequency pool for s and match target's prefix for as long as possible." },
+      { vi: "Tại vị trí đầu tiên phải lớn hơn, chọn ký tự còn lại nhỏ nhất mà lớn hơn target[i].", en: "At the first position that must be larger, choose the smallest remaining character greater than target[i]." },
+      { vi: "Sắp phần còn lại tăng dần để suffix nhỏ nhất. Nếu không thể tăng tại đó, quay lui sang trái.", en: "Sort the remaining characters ascending for the smallest suffix. If that position cannot increase, backtrack left." },
+    ],
+    complexity: {
+      time: "O(26 · n)",
+      space: "O(26)",
+      note: { vi: "Mỗi vị trí có thể quét 26 chữ cái để tìm ký tự lớn hơn; frequency pool có 26 ô.", en: "Each position may scan 26 letters to find a larger character; the frequency pool has 26 entries." },
+    },
+    code: [
+      "from collections import Counter",
+      "",
+      "class Solution:",
+      "    def lexicographicallySmallestPermutation(self, s, target):",
+      "        count = Counter(s)",
+      "        prefix = []",
+      "        i = 0",
+      "        while i < len(s) and count[target[i]]:",
+      "            prefix.append(target[i])",
+      "            count[target[i]] -= 1",
+      "            i += 1",
+      "",
+      "        def finish(i, ch):",
+      "            prefix.append(ch); count[ch] -= 1",
+      "            return ''.join(prefix) + ''.join(sorted(count.elements()))",
+      "",
+      "        while i >= 0:",
+      "            for ch in 'abcdefghijklmnopqrstuvwxyz':",
+      "                if ch > target[i] and count[ch]:",
+      "                    return finish(i, ch)",
+      "            i -= 1",
+      "            if i >= 0:",
+      "                count[target[i]] += 1; prefix.pop()",
+      "        return ''",
+    ],
+    builder: buildSteps3720,
+  },
+});

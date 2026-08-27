@@ -5074,6 +5074,85 @@ function renderDecisionTree(step) {
   renderTree({ tree: step.decisionTree }, "decisionTreeView");
 }
 
+// ---- Permutations (#46): make choices, current order, and saved results explicit. ----
+function renderPermutation46View(step) {
+  const view = step.permutation46View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const used = Array.isArray(view.used) ? view.used : [];
+  const current = Array.isArray(view.current) ? view.current : [];
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const vi = lang === "vi";
+  const phaseLabels = {
+    ready: vi ? "Sẵn sàng chọn" : "Ready to choose",
+    pick: vi ? "Đang chọn" : "Choosing",
+    complete: vi ? "Đã lưu hoán vị" : "Permutation saved",
+    backtrack: vi ? "Quay lui" : "Backtracking",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const sourceCells = nums.map((value, index) => {
+    const state = index === activeIndex ? (view.phase === "backtrack" ? "release" : "active") : used[index] ? "used" : "free";
+    const label = index === activeIndex
+      ? (view.phase === "backtrack" ? (vi ? "trả lại" : "release") : (vi ? "chọn" : "pick"))
+      : used[index] ? (vi ? "đã dùng" : "used") : (vi ? "còn" : "free");
+    return `<span class="perm46-source ${state}"><small>idx=${index}</small><strong>${escapeHtml(String(value))}</strong><em>${label}</em></span>`;
+  }).join("");
+  const currentSlots = nums.map((_, index) => {
+    const value = index < current.length ? String(current[index]) : "—";
+    return `<span class="perm46-slot ${index < current.length ? "filled" : "empty"}"><small>${vi ? `vị trí ${index + 1}` : `slot ${index + 1}`}</small><strong>${escapeHtml(value)}</strong></span>`;
+  }).join("");
+  const lastSaved = Array.isArray(view.lastSaved) ? `[${view.lastSaved.join(", ")}]` : "—";
+  const savedCount = Number(view.savedCount) || 0;
+  const total = Number(view.total) || 0;
+  const treeView = $("treeView");
+  treeView.innerHTML = `<section class="perm46-viz" style="--perm46-cols:${Math.max(nums.length, 1)}">
+    <header><strong>PERMUTATIONS</strong><span>${escapeHtml(phaseLabels[view.phase] || "")}</span></header>
+    <section class="perm46-row source"><header><strong>NUMS</strong><span>${vi ? "mỗi index dùng một lần" : "each index used once"}</span></header><div class="perm46-cells">${sourceCells}</div></section>
+    <section class="perm46-row current"><header><strong>CURRENT</strong><span>${current.length}/${nums.length}</span></header><div class="perm46-cells">${currentSlots}</div></section>
+    <footer><span><small>${vi ? "VỪA LƯU" : "LAST SAVED"}</small><strong>${escapeHtml(lastSaved)}</strong></span><span class="answer"><small>${vi ? "ĐÃ LƯU" : "SAVED"}</small><strong>${savedCount}/${total}</strong></span></footer>
+  </section>`;
+}
+
+function renderLexPermutation3720View(step) {
+  const view = step.lexPermutationView || {};
+  const target = String(view.target || "");
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const vi = lang === "vi";
+  const phaseText = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    match: vi ? "Khớp prefix" : "Match prefix",
+    blocked: vi ? "Không thể khớp" : "Cannot match",
+    greater: vi ? "Chọn lớn hơn" : "Choose greater",
+    suffix: vi ? "Điền suffix" : "Fill suffix",
+    backtrack: vi ? "Quay lui" : "Backtrack",
+    "no-greater": vi ? "Không thể tăng" : "Cannot increase",
+    done: vi ? "Hoàn tất" : "Complete",
+    fail: vi ? "Không có đáp án" : "No answer",
+  };
+  const targetCells = [...target].map((char, index) => {
+    const state = index === activeIndex ? (view.phase === "backtrack" || view.phase === "no-greater" ? "blocked" : "active") : index < activeIndex ? "matched" : "";
+    return `<span class="lex3720-cell ${state}"><small>i=${index}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("");
+  const outputCells = Array.from({ length: target.length }, (_, index) => {
+    const char = prefix[index] || "—";
+    const state = index === activeIndex && ["greater", "suffix", "done"].includes(view.phase)
+      ? "greater"
+      : index < prefix.length ? "filled" : "empty";
+    return `<span class="lex3720-cell output ${state}"><small>${vi ? `vị trí ${index}` : `slot ${index}`}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("");
+  const pool = Array.isArray(view.remaining) ? view.remaining : [];
+  const poolCells = pool.length
+    ? pool.map((item) => `<span><strong>${escapeHtml(item.char)}</strong><small>x${item.amount}</small></span>`).join("")
+    : `<em>${vi ? "rỗng" : "empty"}</em>`;
+  const treeView = $("treeView");
+  treeView.innerHTML = `<section class="lex3720-viz" style="--lex3720-cols:${Math.max(target.length, 1)}">
+    <header><strong>LEXICOGRAPHIC GREEDY</strong><span>${escapeHtml(phaseText[view.phase] || "")}</span></header>
+    <section class="lex3720-row target"><header><strong>TARGET</strong><span>${escapeHtml(target)}</span></header><div class="lex3720-cells">${targetCells}</div></section>
+    <section class="lex3720-row output"><header><strong>BUILD</strong><span>${escapeHtml(prefix.join("") || "—")}</span></header><div class="lex3720-cells">${outputCells}</div></section>
+    <section class="lex3720-pool"><header><strong>${vi ? "KÝ TỰ CÒN LẠI" : "REMAINING POOL"}</strong><span>${pool.reduce((total, item) => total + item.amount, 0)}</span></header><div>${poolCells}</div></section>
+  </section>`;
+}
+
 // ---- Palindrome Partitioning (#131): show the backtracking state directly. ----
 function renderPalindromePartitionView(step) {
   const view = step.palindromePartitionView || {};
@@ -21443,6 +21522,18 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.permutation46View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPermutation46View(step);
+  } else if (step.lexPermutationView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLexPermutation3720View(step);
   } else if (step.ticketsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
