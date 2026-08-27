@@ -459,18 +459,42 @@ function buildSteps2904(input, params) {
     for (const index of bestRange()) addLabel(labels, index, "best");
     if (Number.isInteger(extra.removing)) addLabel(labels, extra.removing, "drop");
     const active = new Set(range(left, right));
+    const candidateLeft = Number.isInteger(extra.candidateLeft) ? extra.candidateLeft : null;
+    const candidateRight = Number.isInteger(extra.candidateRight) ? extra.candidateRight : null;
+    const candidateCells = candidateLeft !== null && candidateRight !== null
+      ? range(candidateLeft, candidateRight)
+      : [];
+    const bestCells = bestRange();
+    const candidateRow = chars.map((char, index) => candidateCells.includes(index) ? char : "");
+    const bestRow = chars.map((char, index) => bestCells.includes(index) ? char : "");
+    if (candidateCells.length) {
+      labels[`1,${candidateLeft + 1}`] = labels[`1,${candidateLeft + 1}`]
+        ? `${labels[`1,${candidateLeft + 1}`]}\ncand`
+        : "cand";
+    }
+    if (bestCells.length) {
+      labels[`2,${bestLeft + 1}`] = labels[`2,${bestLeft + 1}`]
+        ? `${labels[`2,${bestLeft + 1}`]}\nbest`
+        : "best";
+    }
     return {
-      dp: [["", ...chars]],
+      dp: [["", ...chars], ["", ...candidateRow], ["", ...bestRow]],
       text1: "",
       text2: s,
+      rowLabels: [{ index: "", char: "cand" }, { index: "", char: "best" }],
       colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hideInitialColumn: true,
       hlCell: Number.isInteger(focus) ? [0, focus + 1] : null,
       autoScrollCell: right >= 0 ? [0, right + 1] : null,
-      pathCells: range(left, right).map((index) => [0, index + 1]),
+      pathCells: [
+        ...range(left, right).map((index) => [0, index + 1]),
+        ...candidateCells.map((index) => [1, index + 1]),
+        ...bestCells.map((index) => [2, index + 1]),
+      ],
       historyCells: bestRange().filter((index) => !active.has(index)).map((index) => [0, index + 1]),
       cellLabels: labels,
       largeCells: true,
-      caption: `window=${JSON.stringify(left <= right ? s.slice(left, right + 1) : "")} · ones=${ones}/${k} · best=${JSON.stringify(best)}`,
+      caption: `window=${JSON.stringify(left <= right ? s.slice(left, right + 1) : "")} · candidate=${JSON.stringify(candidateCells.length ? s.slice(candidateLeft, candidateRight + 1) : "")} · ones=${ones}/${k} · best=${JSON.stringify(best)}`,
       secondaryCaption: "shortest first; lexicographically smallest breaks ties",
     };
   };
@@ -541,6 +565,7 @@ function buildSteps2904(input, params) {
         8,
         right,
         { vi: "Window hiện tại có đúng k bit 1, nên có thể tạo candidate.", en: "The current window has exactly k 1-bits, so it can form a candidate." },
+        { candidateLeft: left, candidateRight: right },
       );
       const candidate = s.slice(left, right + 1);
       snap(
@@ -548,7 +573,7 @@ function buildSteps2904(input, params) {
         9,
         right,
         { vi: `Candidate hiện tại là s[${left}:${right + 1}] = ${JSON.stringify(candidate)}.`, en: `The current candidate is s[${left}:${right + 1}] = ${JSON.stringify(candidate)}.` },
-        { vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
+        { candidateLeft: left, candidateRight: right, vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
       );
       const isBetter = better(candidate);
       snap(
@@ -560,7 +585,7 @@ function buildSteps2904(input, params) {
         isBetter
           ? { vi: "Window có đúng k bit 1 và ngắn hơn best hiện tại hoặc cùng độ dài nhưng nhỏ hơn theo từ điển.", en: "The window has exactly k 1-bits and is shorter than best, or tied in length but lexicographically smaller." }
           : { vi: "Window có đúng k bit 1 nhưng không thắng best hiện tại.", en: "The window has exactly k 1-bits but does not beat the current best." },
-        { vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
+        { candidateLeft: left, candidateRight: right, vars: [{ name: "candidate", value: JSON.stringify(candidate) }] },
       );
       if (isBetter) {
         best = candidate;
@@ -571,6 +596,7 @@ function buildSteps2904(input, params) {
           13,
           right,
           { vi: "Lưu substring tốt nhất mới.", en: "Save the new best substring." },
+          { candidateLeft: left, candidateRight: right },
         );
       }
 
@@ -584,7 +610,7 @@ function buildSteps2904(input, params) {
         removed === "1"
           ? { vi: "Điều kiện if đúng, nên ones sẽ giảm ở dòng tiếp theo.", en: "The if condition is true, so ones decrements on the next line." }
           : { vi: "Điều kiện if sai, bỏ qua dòng giảm ones.", en: "The if condition is false, so the decrement line is skipped." },
-        { removing: left, focus: left, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+        { removing: left, focus: left, candidateLeft: left, candidateRight: right, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
       );
       if (removed === "1") {
         ones--;
@@ -593,7 +619,7 @@ function buildSteps2904(input, params) {
           15,
           right,
           { vi: "Bỏ bit 1 ở cạnh trái, window sau đó sẽ không còn đủ k bit 1.", en: "Remove the left-edge 1-bit; after this the window no longer has k 1-bits." },
-          { removing: left, focus: left, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
+          { removing: left, focus: left, candidateLeft: left, candidateRight: right, vars: [{ name: "removed", value: JSON.stringify(removed) }] },
         );
       }
       left++;
@@ -651,19 +677,38 @@ function buildSteps2904Positions(input, params) {
     const candidateCells = Number.isInteger(opts.left) && Number.isInteger(opts.right)
       ? range(opts.left, opts.right)
       : [];
+    const bestCells = bestRange();
     const active = new Set(candidateCells);
+    const candidateRow = chars.map((char, index) => candidateCells.includes(index) ? char : "");
+    const bestRow = chars.map((char, index) => bestCells.includes(index) ? char : "");
+    if (candidateCells.length) {
+      labels[`1,${opts.left + 1}`] = labels[`1,${opts.left + 1}`]
+        ? `${labels[`1,${opts.left + 1}`]}\ncand`
+        : "cand";
+    }
+    if (bestCells.length) {
+      labels[`2,${bestLeft + 1}`] = labels[`2,${bestLeft + 1}`]
+        ? `${labels[`2,${bestLeft + 1}`]}\nbest`
+        : "best";
+    }
     return {
-      dp: [["", ...chars]],
+      dp: [["", ...chars], ["", ...candidateRow], ["", ...bestRow]],
       text1: "",
       text2: s,
+      rowLabels: [{ index: "", char: "cand" }, { index: "", char: "best" }],
       colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hideInitialColumn: true,
       hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
       autoScrollCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
-      pathCells: candidateCells.map((index) => [0, index + 1]),
+      pathCells: [
+        ...candidateCells.map((index) => [0, index + 1]),
+        ...candidateCells.map((index) => [1, index + 1]),
+        ...bestCells.map((index) => [2, index + 1]),
+      ],
       historyCells: bestRange().filter((index) => !active.has(index)).map((index) => [0, index + 1]),
       cellLabels: labels,
       largeCells: true,
-      caption: opts.caption || `ones positions=[${onesPos.join(", ")}] · best=${JSON.stringify(best)}`,
+      caption: opts.caption || `ones positions=[${onesPos.join(", ")}] · candidate=${JSON.stringify(candidateCells.length ? s.slice(opts.left, opts.right + 1) : "")} · best=${JSON.stringify(best)}`,
       secondaryCaption: "Each candidate starts at one_pos[i] and ends at one_pos[i+k-1].",
     };
   };

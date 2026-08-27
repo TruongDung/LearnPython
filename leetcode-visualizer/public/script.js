@@ -3362,7 +3362,7 @@ function renderShiftGridView(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, secondaryCaption, mutedCells } = step.grid;
+  const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, secondaryCaption, mutedCells, hideInitialColumn } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const historySet = new Set((historyCells || []).map(([r, c]) => `${r},${c}`));
   const mutedSet = new Set((mutedCells || []).map(([r, c]) => `${r},${c}`));
@@ -3380,7 +3380,7 @@ function renderGrid(step) {
   };
 
   const hasCellLabels = Object.keys(labels).length > 0 || largeCells;
-  let html = `<table class="dp-grid${hasCellLabels ? " has-cell-labels" : ""}"><thead><tr><th></th><th></th>`;
+  let html = `<table class="dp-grid${hasCellLabels ? " has-cell-labels" : ""}"><thead><tr><th></th>${hideInitialColumn ? "" : "<th></th>"}`;
   for (let j = 0; j < n; j++) {
     const colLabel = colLabels && colLabels[j]
       ? axisLabelHtml(colLabels[j])
@@ -3401,7 +3401,7 @@ function renderGrid(step) {
         ? `<span class="axis-index">i=${i}</span><span class="axis-char">${escapeXml(text1[i - 1])}</span>`
         : escapeXml(text1[i - 1]);
     html += `<td class="row-label">${rowLabel}</td>`;
-    for (let j = 0; j <= n; j++) {
+    for (let j = hideInitialColumn ? 1 : 0; j <= n; j++) {
       let cls = "dp-cell";
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
       if (historySet.has(`${i},${j}`)) cls += " history";
