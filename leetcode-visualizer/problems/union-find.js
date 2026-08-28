@@ -7853,6 +7853,234 @@ function buildSteps924(input, params = {}) {
   return { original: { graph, initial }, answer, steps };
 }
 
+// ─── 928: Minimize Malware Spread II ───
+// Removing a source removes the node from the graph.  Simulate the remaining
+// sources for every candidate and keep the smallest infected total.
+function buildSteps928(input, params = {}) {
+  const { graph, initial } = parse924Data(input, params);
+  const n = graph.length;
+  if (n > 12) throw new Error("the step-by-step visualization supports at most 12 nodes");
+
+  const sortedInitial = [...initial].sort((a, b) => a - b);
+  const rows = sortedInitial.map((node) => ({ node, infectedCount: null, safeNodes: [], status: "waiting" }));
+  const nodes = Array.from({ length: n }, (_, node) => node);
+  const steps = [];
+  let removed = null;
+  let infected = new Set();
+  let stack = [];
+  let current = null;
+  let neighbor = null;
+  let activeEdge = null;
+  let bestNode = sortedInitial[0];
+  let bestInfected = Infinity;
+  let bestInfectedNodes = [];
+  let bestSafeNodes = [];
+
+  const sorted = (values) => [...values].sort((a, b) => a - b);
+  const safeNodes = () => removed === null ? [] : nodes.filter((node) => node !== removed && !infected.has(node));
+  const notation = (values, open = "[", close = "]") => open + sorted(values).join(", ") + close;
+
+  function push(line, phase, event, title, note, vars = [], final = false, activeCandidate = removed) {
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      vars,
+      malware928View: {
+        graph: graph.map((row) => [...row]),
+        n,
+        initial: [...initial],
+        sortedInitial: [...sortedInitial],
+        removed,
+        infected: sorted(infected),
+        safe: safeNodes(),
+        stack: [...stack],
+        current,
+        neighbor,
+        activeEdge: activeEdge ? [...activeEdge] : null,
+        activeCandidate,
+        phase,
+        event,
+        candidateRows: rows.map((row) => ({ ...row, safeNodes: [...row.safeNodes] })),
+        bestNode,
+        bestInfected: Number.isFinite(bestInfected) ? bestInfected : null,
+        bestSafeNodes: [...bestSafeNodes],
+        finalAnswer: final ? bestNode : null,
+      },
+    });
+  }
+
+  push(
+    3,
+    "setup",
+    "read-input",
+    { vi: "n = " + n, en: "n = " + n },
+    { vi: "Đồ thị có " + n + " node; malware ban đầu ở [" + initial.join(", ") + "].", en: "The graph has " + n + " nodes; initial malware sources are [" + initial.join(", ") + "]." },
+    [{ name: "n", value: n }, { name: "initial", value: notation(initial) }],
+    false,
+    null
+  );
+  push(
+    6,
+    "setup",
+    "sort",
+    { vi: "sorted(initial) = " + notation(sortedInitial), en: "sorted(initial) = " + notation(sortedInitial) },
+    { vi: "Duyệt tăng dần và chỉ cập nhật khi ít node nhiễm hơn, nên tie tự giữ index nhỏ nhất.", en: "Scan in ascending order and update only for a strictly smaller infected total, so ties keep the smallest index." },
+    [{ name: "candidates", value: notation(sortedInitial) }],
+    false,
+    null
+  );
+
+  sortedInitial.forEach((candidate, index) => {
+    const row = rows[index];
+    removed = candidate;
+    infected = new Set(initial.filter((node) => node !== removed));
+    stack = [...infected];
+    current = null;
+    neighbor = null;
+    activeEdge = null;
+    row.status = "testing";
+
+    push(
+      7,
+      "trial",
+      "remove",
+      { vi: "Thử xóa node " + removed, en: "Try removing node " + removed },
+      { vi: "Node bị xóa không thể bị lây hoặc truyền malware.", en: "A removed node cannot be infected or transmit malware." },
+      [{ name: "removed", value: removed }]
+    );
+    push(
+      8,
+      "trial",
+      "seed",
+      { vi: "infected = " + notation(infected, "{", "}"), en: "infected = " + notation(infected, "{", "}") },
+      { vi: "Các nguồn ban đầu còn lại là seed của lần thử này.", en: "The remaining initial sources seed this trial." },
+      [{ name: "infected", value: notation(infected, "{", "}") }]
+    );
+    push(
+      9,
+      "trial",
+      "stack-init",
+      { vi: "stack = " + notation(stack), en: "stack = " + notation(stack) },
+      { vi: "Dùng DFS stack để lan từ mọi nguồn còn lại.", en: "Use a DFS stack to spread from every remaining source." },
+      [{ name: "stack", value: notation(stack) }]
+    );
+
+    while (stack.length) {
+      current = stack.pop();
+      neighbor = null;
+      activeEdge = null;
+      push(
+        11,
+        "spread",
+        "pop",
+        { vi: "node = stack.pop() -> " + current, en: "node = stack.pop() -> " + current },
+        { vi: "Lan malware từ node " + current + ".", en: "Spread malware from node " + current + "." },
+        [{ name: "node", value: current }, { name: "stack", value: notation(stack) }]
+      );
+
+      for (let next = 0; next < n; next += 1) {
+        if (next === current || graph[current][next] !== 1) continue;
+        neighbor = next;
+        activeEdge = [current, next];
+        const canSpread = next !== removed && !infected.has(next);
+        push(
+          12,
+          "spread",
+          "edge",
+          { vi: "Kiểm tra cạnh " + current + " - " + next, en: "Inspect edge " + current + " - " + next },
+          canSpread
+            ? { vi: "Node " + next + " chưa nhiễm và chưa bị xóa.", en: "Node " + next + " is uninfected and still present." }
+            : next === removed
+              ? { vi: "Cạnh này bị chặn bởi node đã xóa.", en: "This edge is blocked by the removed node." }
+              : { vi: "Node " + next + " đã nhiễm, nên bỏ qua.", en: "Node " + next + " is already infected, so skip it." },
+          [{ name: "can spread?", value: canSpread }]
+        );
+        if (!canSpread) continue;
+
+        infected.add(next);
+        push(
+          13,
+          "spread",
+          "infect",
+          { vi: "infected.add(" + next + ")", en: "infected.add(" + next + ")" },
+          { vi: "Node " + next + " vừa bị malware lây.", en: "Node " + next + " has just been infected." },
+          [{ name: "infected", value: notation(infected, "{", "}") }]
+        );
+        stack.push(next);
+        push(
+          14,
+          "spread",
+          "push",
+          { vi: "stack.append(" + next + ")", en: "stack.append(" + next + ")" },
+          { vi: "Đưa " + next + " vào stack để mở rộng lần lượt.", en: "Push " + next + " to continue the traversal." },
+          [{ name: "stack", value: notation(stack) }]
+        );
+      }
+    }
+
+    current = null;
+    neighbor = null;
+    activeEdge = null;
+    row.infectedCount = infected.size;
+    row.safeNodes = safeNodes();
+    push(
+      16,
+      "score",
+      "count",
+      { vi: "len(infected) = " + infected.size, en: "len(infected) = " + infected.size },
+      { vi: "Xóa " + removed + " để lại " + infected.size + " node nhiễm; node an toàn: " + (row.safeNodes.length ? row.safeNodes.join(", ") : "không có") + ".", en: "Removing " + removed + " leaves " + infected.size + " infected nodes; safe nodes: " + (row.safeNodes.length ? row.safeNodes.join(", ") : "none") + "." },
+      [{ name: "infected count", value: infected.size }, { name: "safe nodes", value: notation(row.safeNodes) }]
+    );
+
+    const better = infected.size < bestInfected;
+    if (better) {
+      bestNode = removed;
+      bestInfected = infected.size;
+      bestInfectedNodes = sorted(infected);
+      bestSafeNodes = [...row.safeNodes];
+      row.status = "best";
+    } else {
+      row.status = infected.size === bestInfected ? "tie" : "worse";
+    }
+    push(
+      17,
+      "score",
+      better ? "select" : row.status,
+      { vi: "infected < best? " + (better ? "True" : "False"), en: "infected < best? " + (better ? "True" : "False") },
+      better
+        ? { vi: "Node " + removed + " là lựa chọn tốt nhất mới.", en: "Node " + removed + " is the new best choice." }
+        : row.status === "tie"
+          ? { vi: "Hòa với node " + bestNode + "; giữ index nhỏ hơn.", en: "It ties node " + bestNode + "; keep the smaller index." }
+          : { vi: "Không tốt hơn best hiện tại là node " + bestNode + ".", en: "It does not beat current best node " + bestNode + "." },
+      [{ name: "best node", value: bestNode }, { name: "best infected", value: bestInfected }]
+    );
+  });
+
+  removed = bestNode;
+  infected = new Set(bestInfectedNodes);
+  stack = [];
+  current = null;
+  neighbor = null;
+  activeEdge = null;
+  rows.forEach((row) => {
+    if (row.node === bestNode) row.status = "selected";
+  });
+  push(
+    20,
+    "done",
+    "return",
+    { vi: "return " + bestNode, en: "return " + bestNode },
+    { vi: "Xóa node " + bestNode + " để còn ít nhất " + bestInfected + " node nhiễm.", en: "Remove node " + bestNode + " to leave the fewest infected nodes: " + bestInfected + "." },
+    [{ name: "answer", value: bestNode }, { name: "final infected", value: bestInfected }],
+    true,
+    bestNode
+  );
+
+  return { original: { graph, initial }, answer: bestNode, steps };
+}
+
 Object.assign(module.exports, {
   1970: {
     id: 1970,
@@ -8026,6 +8254,69 @@ Object.assign(module.exports, {
       "        return answer",
     ],
     builder: buildSteps924,
+    liveArgs(input, params = {}) {
+      const data = parse924Data(input, params);
+      return [data.graph, data.initial];
+    },
+  },
+  928: {
+    id: 928,
+    difficulty: "hard",
+    slug: "minimize-malware-spread-ii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [UF_CAT],
+    title: { vi: "Minimize Malware Spread II", en: "Minimize Malware Spread II" },
+    titleVi: { vi: "Xóa nguồn malware để chặn lây lan", en: "Remove one malware source to stop the spread" },
+    statement: {
+      vi: "Cho adjacency matrix của đồ thị vô hướng và các node nhiễm ban đầu. Xóa đúng một node trong initial khỏi graph để số node nhiễm còn lại là nhỏ nhất; nếu hòa, chọn index nhỏ nhất.",
+      en: "Given an undirected graph adjacency matrix and initially infected nodes, remove exactly one initial node from the graph to minimize the remaining infected nodes; break ties by smallest index.",
+    },
+    defaultInput: "1,0,0,1,0,1,0,0;0,1,0,0,0,1,0,0;0,0,1,0,0,0,1,0;1,0,0,1,1,0,0,0;0,0,0,1,1,0,0,0;1,1,0,0,0,1,0,0;0,0,1,0,0,0,1,1;0,0,0,0,0,0,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "graph adjacency matrix (hàng cách bởi ;)", en: "graph adjacency matrix (rows separated by ;)" },
+    extraParams: [{
+      key: "initial",
+      type: "string",
+      label: { vi: "initial (node nhiễm, cách bởi dấu phẩy)", en: "initial (infected nodes, comma-separated)" },
+      default: "0,1,2",
+    }],
+    approach: [
+      { vi: "Khác với bài 924, node được chọn bị xóa hẳn nên malware không thể đi xuyên qua node đó.", en: "Unlike 924, the chosen node is completely removed, so malware cannot pass through it." },
+      { vi: "Thử xóa từng node trong initial. Từ các nguồn còn lại, chạy DFS/BFS trên graph nhưng bỏ qua node bị xóa.", en: "Try removing each initial node. Run DFS/BFS from the remaining sources while skipping that removed node." },
+      { vi: "Đếm số node bị lây sau mỗi lần thử. Chọn tổng nhỏ nhất; duyệt index tăng dần và chỉ cập nhật khi tốt hơn để giữ tie-break nhỏ nhất.", en: "Count infected nodes after each trial. Choose the smallest total; scan indices in order and update only on a strict improvement to preserve the tie-break." },
+    ],
+    complexity: {
+      time: "O(k * n²), worst case O(n³)",
+      space: "O(n)",
+      note: { vi: "k là số nguồn ban đầu. Mỗi lần thử duyệt adjacency matrix của n node.", en: "k is the number of initial sources. Each trial traverses the n-node adjacency matrix." },
+    },
+    codeLabel: { vi: "Thử xóa từng nguồn + DFS", en: "Try each removal + DFS" },
+    code: [
+      "class Solution:",
+      "    def minMalwareSpread(self, graph, initial):",
+      "        n = len(graph)",
+      "        best_node = min(initial)",
+      "        best_infected = float('inf')",
+      "",
+      "        for removed in sorted(initial):",
+      "            infected = set(initial)",
+      "            infected.remove(removed)",
+      "            stack = list(infected)",
+      "",
+      "            while stack:",
+      "                node = stack.pop()",
+      "                for neighbor, connected in enumerate(graph[node]):",
+      "                    if connected and neighbor != removed and neighbor not in infected:",
+      "                        infected.add(neighbor)",
+      "                        stack.append(neighbor)",
+      "",
+      "            if len(infected) < best_infected:",
+      "                best_node = removed",
+      "                best_infected = len(infected)",
+      "",
+      "        return best_node",
+    ],
+    builder: buildSteps928,
     liveArgs(input, params = {}) {
       const data = parse924Data(input, params);
       return [data.graph, data.initial];

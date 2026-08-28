@@ -21812,6 +21812,100 @@ function renderBricks803View(step) {
   </section>`;
 }
 
+// ---- 928 Minimize Malware Spread II renderer ----
+function renderMalware928View(step) {
+  const view = step.malware928View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = view.phase === "done" ? 3 : view.phase === "score" ? 2 : view.phase === "spread" ? 1 : 0;
+  const phaseLabels = vi
+    ? ["Chọn node để xóa", "Mô phỏng lan truyền", "So sánh kết quả", "Đáp án"]
+    : ["Choose a removal", "Simulate the spread", "Compare totals", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex || view.phase === "done" ? "done" : index === phaseIndex ? "active" : "pending";
+    return '<span class="' + state + '"><i>' + (state === "done" ? "✓" : index + 1) + '</i><b>' + escapeHtml(label) + '</b></span>';
+  }).join("");
+
+  const n = Number(view.n) || 0;
+  const width = 680;
+  const height = 332;
+  const centerX = width / 2;
+  const centerY = 158;
+  const radius = n <= 2 ? 172 : Math.min(126, 42 + n * 9);
+  const positions = {};
+  for (let node = 0; node < n; node += 1) {
+    const angle = n === 1 ? -Math.PI / 2 : -Math.PI / 2 + node * Math.PI * 2 / n;
+    positions[node] = { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
+  }
+
+  const graph = Array.isArray(view.graph) ? view.graph : [];
+  const activeEdge = Array.isArray(view.activeEdge) ? view.activeEdge : null;
+  let edges = "";
+  for (let from = 0; from < n; from += 1) {
+    for (let to = from + 1; to < n; to += 1) {
+      if (!graph[from] || graph[from][to] !== 1) continue;
+      const a = positions[from];
+      const b = positions[to];
+      const highlighted = activeEdge && ((activeEdge[0] === from && activeEdge[1] === to) || (activeEdge[0] === to && activeEdge[1] === from));
+      edges += '<line class="mal928-edge' + (highlighted ? ' active' : '') + '" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"></line>';
+    }
+  }
+
+  const initial = new Set(view.initial || []);
+  const infected = new Set(view.infected || []);
+  const safe = new Set(view.safe || []);
+  let graphNodes = "";
+  for (let node = 0; node < n; node += 1) {
+    const classes = ["mal928-node"];
+    if (node === view.removed) classes.push("removed");
+    else if (infected.has(node)) classes.push("infected");
+    else if (safe.has(node)) classes.push("safe");
+    if (initial.has(node)) classes.push("source");
+    if (node === view.current) classes.push("current");
+    if (node === view.neighbor) classes.push("neighbor");
+    const point = positions[node];
+    graphNodes += '<g class="' + classes.join(" ") + '" transform="translate(' + point.x + ' ' + point.y + ')"><circle r="23"></circle><text class="node-id" text-anchor="middle" y="5">' + node + '</text></g>';
+  }
+
+  const stateLabel = view.removed === null
+    ? (vi ? "Chưa chọn node để xóa" : "No removal selected yet")
+    : (vi ? "Xóa " + view.removed + " · nhiễm: " + infected.size + " · an toàn: " + safe.size : "Remove " + view.removed + " · infected: " + infected.size + " · safe: " + safe.size);
+  const svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(vi ? "Đồ thị lan truyền malware sau khi xóa một nguồn" : "Malware-spread graph after removing one source") + '"><g>' + edges + '</g><g>' + graphNodes + '</g><g class="mal928-legend"><circle class="infected" cx="78" cy="310" r="7"></circle><text x="91" y="314">' + (vi ? "nhiễm" : "infected") + '</text><circle class="safe" cx="230" cy="310" r="7"></circle><text x="243" y="314">' + (vi ? "an toàn" : "safe") + '</text><circle class="removed" cx="355" cy="310" r="7"></circle><text x="368" y="314">' + (vi ? "đã xóa" : "removed") + '</text><line class="active-line" x1="470" y1="310" x2="494" y2="310"></line><text x="503" y="314">' + (vi ? "cạnh đang xét" : "active edge") + '</text></g></svg>';
+
+  const statusLabels = vi
+    ? { waiting: "chờ", testing: "đang thử", best: "best mới", tie: "hòa", worse: "kém hơn", selected: "đáp án" }
+    : { waiting: "waiting", testing: "testing", best: "new best", tie: "tie", worse: "worse", selected: "answer" };
+  const candidates = (view.candidateRows || []).map((row) => {
+    const active = row.node === view.activeCandidate ? " active" : "";
+    const answer = row.node === view.bestNode ? " answer" : "";
+    const status = row.status || "waiting";
+    const safeText = row.infectedCount === null ? "-" : row.safeNodes.length ? row.safeNodes.join(", ") : "—";
+    return '<div class="mal928-candidate ' + status + active + answer + '"><b>' + row.node + '</b><span>' + (row.infectedCount === null ? "-" : row.infectedCount) + '</span><span>' + escapeHtml(safeText) + '</span><em>' + escapeHtml(statusLabels[status] || status) + '</em></div>';
+  }).join("");
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((node, index) => '<b class="' + (index === stack.length - 1 ? "top" : "") + '"><small>' + (index === stack.length - 1 ? "TOP" : index) + '</small>' + node + '</b>').join("")
+    : '<em>' + (vi ? "stack rỗng" : "empty stack") + '</em>';
+  const currentEdge = activeEdge ? activeEdge[0] + " - " + activeEdge[1] : "—";
+  const ready = view.phase === "done";
+  const bestSafe = (view.bestSafeNodes || []).length ? view.bestSafeNodes.join(", ") : "—";
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "-";
+  const summary = vi
+    ? "Bài 928. Xóa node " + (view.bestNode ?? "—") + " để có ít node nhiễm nhất."
+    : "Problem 928. Remove node " + (view.bestNode ?? "—") + " for the fewest infected nodes.";
+
+  el.innerHTML = '<section class="mal928-viz" role="img" aria-label="' + escapeHtml(summary) + '">' +
+    '<div class="mal928-phases">' + phases + '</div>' +
+    '<section class="mal928-rule"><b>' + (vi ? "QUY TẮC" : "RULE") + '</b><strong>remove one source → spread from the rest</strong><span>' + (vi ? "Tổng node nhiễm nhỏ hơn là tốt hơn; hòa giữ index nhỏ hơn." : "A lower infected total is better; ties keep the smaller index.") + '</span></section>' +
+    '<section class="mal928-action"><small>' + (vi ? "DÒNG" : "LINE") + ' ' + activeLine + '</small><strong>' + escapeHtml(pick(step.title)) + '</strong><span>' + escapeHtml(pick(step.note)) + '</span></section>' +
+    '<section class="mal928-graph"><header><strong>' + (vi ? "MÔ PHỎNG LAN TRUYỀN" : "SPREAD SIMULATION") + '</strong><span>' + escapeHtml(stateLabel) + '</span></header>' + svg + '</section>' +
+    '<div class="mal928-bottom"><section class="mal928-stack"><header><strong>DFS STACK</strong><span>' + stack.length + '</span></header><div>' + stackHtml + '</div><footer>' + (vi ? "cạnh đang xét: " : "active edge: ") + escapeHtml(currentEdge) + '</footer></section>' +
+    '<section class="mal928-score"><header><strong>' + (vi ? "KẾT QUẢ TỪNG LẦN XÓA" : "RESULTS BY REMOVAL") + '</strong><span>' + (vi ? "nhiễm ít nhất thắng" : "fewest infected wins") + '</span></header><div class="mal928-candidate head"><b>' + (vi ? "xóa" : "remove") + '</b><span>' + (vi ? "nhiễm" : "infected") + '</span><span>' + (vi ? "an toàn" : "safe") + '</span><em>' + (vi ? "trạng thái" : "status") + '</em></div>' + candidates + '</section></div>' +
+    '<section class="mal928-answer ' + (ready ? "ready" : "pending") + '"><small>' + (vi ? "XÓA NODE" : "REMOVE NODE") + '</small><strong>' + (ready ? view.finalAnswer : view.bestNode ?? "…") + '</strong><span>' + (ready ? (vi ? "còn " + view.bestInfected + " node nhiễm · an toàn: " + bestSafe : view.bestInfected + " infected remain · safe: " + bestSafe) : (vi ? "đang thử từng nguồn" : "testing each source")) + '</span></section>' +
+    '</section>';
+}
+
 // ---- 924 Minimize Malware Spread renderer ----
 function renderMalware924View(step) {
   const view = step.malware924View || {};
@@ -22577,6 +22671,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBricks803View(step);
+  } else if (step.malware928View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMalware928View(step);
   } else if (step.malware924View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
