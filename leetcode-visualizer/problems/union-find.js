@@ -7013,6 +7013,846 @@ function buildSteps1970(input, params = {}) {
   return { original: cells, answer: 0, steps };
 }
 
+// ─── 2316: Count Unreachable Pairs of Nodes in an Undirected Graph ───
+// Start with every unordered pair unreachable. When Union-Find merges two
+// components of sizes a and b, exactly a*b cross-component pairs become
+// reachable, so subtract that amount from the running answer.
+function buildSteps2316(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+
+  const edges = mstParseMatrix(params.edges, 2, "edges");
+  for (const [u, v] of edges) {
+    if (u < 0 || u >= n || v < 0 || v >= n) {
+      throw new Error(`edge [${u}, ${v}] must use nodes from 0 to ${n - 1}`);
+    }
+  }
+
+  const parent = Array.from({ length: n }, (_, index) => index);
+  const size = new Array(n).fill(1);
+  const totalPairs = n * (n - 1) / 2;
+  let pairs = totalPairs;
+  const steps = [];
+
+  const rootWithoutCompression = (node) => {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+
+  const componentSnapshot = () => {
+    const groups = new Map();
+    for (let node = 0; node < n; node++) {
+      const root = rootWithoutCompression(node);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(node);
+    }
+    return [...groups.entries()]
+      .map(([root, nodes]) => ({ root, nodes, size: nodes.length }))
+      .sort((a, b) => a.nodes[0] - b.nodes[0]);
+  };
+
+  function push({
+    line,
+    phase,
+    title,
+    note,
+    edgeIndex = -1,
+    currentEdge = null,
+    activeNodes = [],
+    activeRoots = [],
+    findPath = [],
+    findLabel = "",
+    pairDelta = 0,
+    merge = null,
+    outcome = "",
+    pairsReady = true,
+    final = false,
+    vars = [],
+  }) {
+    const components = componentSnapshot();
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      vars,
+      countPairs2316View: {
+        n,
+        edges: edges.map((edge) => [...edge]),
+        parent: [...parent],
+        size: [...size],
+        components,
+        totalPairs,
+        pairs,
+        reachablePairs: totalPairs - pairs,
+        pairsReady,
+        phase,
+        edgeIndex,
+        currentEdge: currentEdge ? [...currentEdge] : null,
+        activeNodes: [...activeNodes],
+        activeRoots: [...activeRoots],
+        findPath: [...findPath],
+        findLabel,
+        pairDelta,
+        merge: merge ? {
+          ...merge,
+          leftNodes: [...merge.leftNodes],
+          rightNodes: [...merge.rightNodes],
+        } : null,
+        outcome,
+        answer: final ? pairs : null,
+      },
+    });
+  }
+
+  push({
+    line: 3,
+    phase: "init",
+    pairsReady: false,
+    title: { vi: "Mỗi node bắt đầu là một component", en: "Each node starts in its own component" },
+    note: {
+      vi: `parent = [${parent.join(", ")}]. Chưa có cạnh nào được xử lý.`,
+      en: `parent = [${parent.join(", ")}]. No edge has been processed yet.`,
+    },
+    vars: [{ name: "parent", value: `[${parent.join(", ")}]` }],
+  });
+
+  push({
+    line: 4,
+    phase: "init",
+    pairsReady: false,
+    title: { vi: "Mỗi component ban đầu có size = 1", en: "Every initial component has size = 1" },
+    note: {
+      vi: "size chỉ có ý nghĩa tại root và sẽ giúp tính nhanh số cặp mới được nối.",
+      en: "size matters at roots and lets us count newly connected pairs immediately.",
+    },
+    vars: [{ name: "size", value: `[${size.join(", ")}]` }],
+  });
+
+  push({
+    line: 5,
+    phase: "init",
+    pairsReady: false,
+    title: { vi: "Định nghĩa find(x)", en: "Define find(x)" },
+    note: {
+      vi: "find đi theo parent tới root và dùng path compression để rút ngắn đường đi.",
+      en: "find follows parent pointers to a root and uses path compression to shorten the path.",
+    },
+    vars: [{ name: "find", value: "root + path compression" }],
+  });
+
+  push({
+    line: 10,
+    phase: "total",
+    title: { vi: `Ban đầu có C(${n}, 2) = ${totalPairs} cặp`, en: `Initially C(${n}, 2) = ${totalPairs} pairs` },
+    note: {
+      vi: "Khi chưa xét cạnh nào, mọi cặp node khác nhau đều đang được xem là unreachable.",
+      en: "Before processing edges, every pair of distinct nodes is treated as unreachable.",
+    },
+    vars: [
+      { name: "pairs", value: `${n} * ${n - 1} // 2 = ${totalPairs}` },
+      { name: "reachable", value: 0 },
+    ],
+  });
+
+  const traceFind = (start, label, edgeIndex, currentEdge) => {
+    let x = start;
+    const path = [x];
+    while (true) {
+      const isRoot = parent[x] === x;
+      push({
+        line: 6,
+        phase: "find",
+        edgeIndex,
+        currentEdge,
+        activeNodes: [start, x],
+        activeRoots: isRoot ? [x] : [],
+        findPath: path,
+        findLabel: label,
+        title: { vi: `find(${label}): parent[${x}] ${isRoot ? "==" : "!="} ${x}`, en: `find(${label}): parent[${x}] ${isRoot ? "==" : "!="} ${x}` },
+        note: isRoot
+          ? { vi: `${x} là root, vòng while dừng.`, en: `${x} is a root, so the while loop stops.` }
+          : { vi: `${x} chưa phải root; tiếp tục đi lên parent[${x}] = ${parent[x]}.`, en: `${x} is not a root; continue to parent[${x}] = ${parent[x]}.` },
+        vars: [{ name: "x", value: x }, { name: "parent[x]", value: parent[x] }],
+      });
+      if (isRoot) break;
+
+      const oldParent = parent[x];
+      const grandparent = parent[parent[x]];
+      parent[x] = grandparent;
+      push({
+        line: 7,
+        phase: "find",
+        edgeIndex,
+        currentEdge,
+        activeNodes: [start, x, grandparent],
+        activeRoots: [grandparent],
+        findPath: [...path, grandparent],
+        findLabel: label,
+        title: { vi: `Nén đường: parent[${x}] = ${grandparent}`, en: `Compress path: parent[${x}] = ${grandparent}` },
+        note: {
+          vi: `parent[${x}] đổi từ ${oldParent} thành grandparent ${grandparent}.`,
+          en: `parent[${x}] changes from ${oldParent} to grandparent ${grandparent}.`,
+        },
+        vars: [{ name: "parent", value: `[${parent.join(", ")}]` }],
+      });
+
+      x = parent[x];
+      path.push(x);
+      push({
+        line: 8,
+        phase: "find",
+        edgeIndex,
+        currentEdge,
+        activeNodes: [start, x],
+        findPath: path,
+        findLabel: label,
+        title: { vi: `Đi tiếp tới x = ${x}`, en: `Move upward to x = ${x}` },
+        note: { vi: "Tiếp tục tìm root từ parent mới.", en: "Continue searching from the new parent." },
+        vars: [{ name: "x", value: x }],
+      });
+    }
+
+    push({
+      line: 9,
+      phase: "find",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [start, x],
+      activeRoots: [x],
+      findPath: path,
+      findLabel: label,
+      title: { vi: `find(${label}) trả về root ${x}`, en: `find(${label}) returns root ${x}` },
+      note: { vi: `Root của node ${start} là ${x}.`, en: `The root of node ${start} is ${x}.` },
+      vars: [{ name: `find(${label})`, value: x }],
+    });
+    return x;
+  };
+
+  edges.forEach(([u, v], edgeIndex) => {
+    const currentEdge = [u, v];
+    push({
+      line: 11,
+      phase: "edge",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      title: { vi: `Xét cạnh #${edgeIndex}: (${u}, ${v})`, en: `Inspect edge #${edgeIndex}: (${u}, ${v})` },
+      note: {
+        vi: "Tìm root của hai đầu cạnh để biết cạnh này có nối hai component khác nhau không.",
+        en: "Find both endpoint roots to see whether this edge joins different components.",
+      },
+      vars: [{ name: "u, v", value: `${u}, ${v}` }, { name: "pairs", value: pairs }],
+    });
+
+    const rootU = traceFind(u, "u", edgeIndex, currentEdge);
+    const rootV = traceFind(v, "v", edgeIndex, currentEdge);
+    push({
+      line: 12,
+      phase: "roots",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [rootU, rootV],
+      title: { vi: `ru = ${rootU}, rv = ${rootV}`, en: `ru = ${rootU}, rv = ${rootV}` },
+      note: {
+        vi: rootU === rootV ? "Hai đầu cạnh đã nằm trong cùng component." : "Hai đầu cạnh thuộc hai component khác nhau.",
+        en: rootU === rootV ? "Both endpoints are already in the same component." : "The endpoints belong to different components.",
+      },
+      vars: [{ name: "ru", value: rootU }, { name: "rv", value: rootV }],
+    });
+
+    const sameRoot = rootU === rootV;
+    push({
+      line: 13,
+      phase: "compare",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [rootU, rootV],
+      outcome: sameRoot ? "redundant" : "merge",
+      title: { vi: `ru == rv? ${sameRoot ? "True" : "False"}`, en: `ru == rv? ${sameRoot ? "True" : "False"}` },
+      note: sameRoot
+        ? { vi: "Cạnh này nằm bên trong component hiện có nên không làm thay đổi số cặp.", en: "This edge stays inside an existing component, so the pair count does not change." }
+        : { vi: "Cạnh nối hai component khác nhau, cần union và trừ các cặp vừa reachable.", en: "The edge joins different components, so union them and subtract newly reachable pairs." },
+      vars: [{ name: "same root?", value: sameRoot }, { name: "pairs", value: pairs }],
+    });
+
+    if (sameRoot) {
+      push({
+        line: 14,
+        phase: "skip",
+        edgeIndex,
+        currentEdge,
+        activeNodes: [u, v],
+        activeRoots: [rootU],
+        outcome: "redundant",
+        title: { vi: "Cùng component: continue", en: "Same component: continue" },
+        note: { vi: `Giữ nguyên pairs = ${pairs}.`, en: `Keep pairs = ${pairs}.` },
+        vars: [{ name: "pairs", value: pairs }, { name: "change", value: 0 }],
+      });
+      return;
+    }
+
+    let ru = rootU;
+    let rv = rootV;
+    push({
+      line: 15,
+      phase: "size-check",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [ru, rv],
+      title: { vi: `So sánh size: ${size[ru]} < ${size[rv]}?`, en: `Compare sizes: ${size[ru]} < ${size[rv]}?` },
+      note: {
+        vi: size[ru] < size[rv] ? "Component bên trái nhỏ hơn, đổi hai root để gắn cây nhỏ vào cây lớn." : "ru đã là component lớn hơn hoặc bằng, không cần đổi.",
+        en: size[ru] < size[rv] ? "The left component is smaller; swap roots so the smaller tree attaches to the larger one." : "ru is already at least as large, so no swap is needed.",
+      },
+      vars: [{ name: "size[ru]", value: size[ru] }, { name: "size[rv]", value: size[rv] }],
+    });
+
+    if (size[ru] < size[rv]) {
+      [ru, rv] = [rv, ru];
+      push({
+        line: 16,
+        phase: "swap",
+        edgeIndex,
+        currentEdge,
+        activeNodes: [u, v],
+        activeRoots: [ru, rv],
+        title: { vi: `Đổi root: ru = ${ru}, rv = ${rv}`, en: `Swap roots: ru = ${ru}, rv = ${rv}` },
+        note: { vi: `Root ${rv} của nhóm nhỏ sẽ được gắn vào root ${ru}.`, en: `Root ${rv} of the smaller group will attach to root ${ru}.` },
+        vars: [{ name: "ru, rv", value: `${ru}, ${rv}` }],
+      });
+    }
+
+    const leftNodes = componentSnapshot().find((group) => group.root === ru).nodes;
+    const rightNodes = componentSnapshot().find((group) => group.root === rv).nodes;
+    const leftSize = size[ru];
+    const rightSize = size[rv];
+    const newlyReachable = leftSize * rightSize;
+    const beforePairs = pairs;
+    const merge = { ru, rv, leftSize, rightSize, leftNodes, rightNodes, beforePairs, newlyReachable };
+
+    pairs -= newlyReachable;
+    push({
+      line: 17,
+      phase: "subtract",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [ru, rv],
+      pairDelta: newlyReachable,
+      merge,
+      outcome: "merge",
+      title: { vi: `Trừ ${leftSize} x ${rightSize} = ${newlyReachable} cặp`, en: `Subtract ${leftSize} x ${rightSize} = ${newlyReachable} pairs` },
+      note: {
+        vi: `Mỗi node trong [${leftNodes.join(", ")}] nay đi tới được mỗi node trong [${rightNodes.join(", ")}]. pairs: ${beforePairs} - ${newlyReachable} = ${pairs}.`,
+        en: `Every node in [${leftNodes.join(", ")}] can now reach every node in [${rightNodes.join(", ")}]. pairs: ${beforePairs} - ${newlyReachable} = ${pairs}.`,
+      },
+      vars: [
+        { name: "newly reachable", value: `${leftSize} * ${rightSize} = ${newlyReachable}` },
+        { name: "pairs", value: `${beforePairs} - ${newlyReachable} = ${pairs}` },
+      ],
+    });
+
+    parent[rv] = ru;
+    push({
+      line: 18,
+      phase: "parent",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [ru],
+      pairDelta: newlyReachable,
+      merge,
+      outcome: "merge",
+      title: { vi: `Gắn parent[${rv}] = ${ru}`, en: `Attach parent[${rv}] = ${ru}` },
+      note: { vi: "Hai component đã có chung một root.", en: "The two components now share one root." },
+      vars: [{ name: "parent", value: `[${parent.join(", ")}]` }],
+    });
+
+    size[ru] += size[rv];
+    push({
+      line: 19,
+      phase: "size-update",
+      edgeIndex,
+      currentEdge,
+      activeNodes: [u, v],
+      activeRoots: [ru],
+      pairDelta: newlyReachable,
+      merge,
+      outcome: "merged",
+      title: { vi: `size[${ru}] = ${size[ru]}`, en: `size[${ru}] = ${size[ru]}` },
+      note: {
+        vi: `Component mới chứa ${size[ru]} node; còn ${pairs} cặp unreachable.`,
+        en: `The merged component contains ${size[ru]} nodes; ${pairs} unreachable pairs remain.`,
+      },
+      vars: [{ name: "size", value: `[${size.join(", ")}]` }, { name: "pairs", value: pairs }],
+    });
+  });
+
+  push({
+    line: 20,
+    phase: "done",
+    final: true,
+    title: { vi: `Trả về ${pairs} cặp unreachable`, en: `Return ${pairs} unreachable pairs` },
+    note: {
+      vi: `Các component cuối có kích thước [${componentSnapshot().map((group) => group.size).join(", ")}]. Có ${pairs} cặp node thuộc hai component khác nhau.`,
+      en: `Final component sizes are [${componentSnapshot().map((group) => group.size).join(", ")}]. There are ${pairs} node pairs in different components.`,
+    },
+    vars: [
+      { name: "reachable pairs", value: totalPairs - pairs },
+      { name: "unreachable pairs", value: pairs },
+    ],
+  });
+
+  return { original: { n, edges }, answer: pairs, steps };
+}
+
+// ─── 924: Minimize Malware Spread ───
+function parse924Data(input, params = {}) {
+  const raw = String(input ?? "").trim();
+  let graph;
+  try {
+    graph = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;|]/).filter((row) => row.trim())
+        .map((row) => row.split(",").map((value) => Number(value.trim())));
+  } catch (error) {
+    throw new Error("graph must be JSON or rows separated by ';'");
+  }
+  if (!Array.isArray(graph) || graph.length === 0 || !graph.every((row) => Array.isArray(row) && row.length === graph.length && row.every((value) => value === 0 || value === 1))) {
+    throw new Error("graph must be a non-empty square matrix containing only 0 and 1");
+  }
+  const n = graph.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (graph[i][j] !== graph[j][i]) throw new Error("graph must be symmetric (undirected)");
+    }
+  }
+
+  const initialRaw = String(params.initial ?? "").trim();
+  let initial;
+  try {
+    initial = initialRaw.startsWith("[")
+      ? JSON.parse(initialRaw)
+      : initialRaw.split(",").filter((value) => value.trim()).map((value) => Number(value.trim()));
+  } catch (error) {
+    throw new Error("initial must be JSON or comma-separated node indices");
+  }
+  if (!Array.isArray(initial) || initial.length === 0 || !initial.every(Number.isInteger)) {
+    throw new Error("initial must contain at least one integer node index");
+  }
+  if (new Set(initial).size !== initial.length) throw new Error("initial nodes must be unique");
+  if (initial.some((node) => node < 0 || node >= n)) throw new Error(`initial nodes must be between 0 and ${n - 1}`);
+  return { graph: graph.map((row) => [...row]), initial: [...initial] };
+}
+
+function buildSteps924(input, params = {}) {
+  const { graph, initial } = parse924Data(input, params);
+  const n = graph.length;
+  const parent = Array.from({ length: n }, (_, index) => index);
+  const size = new Array(n).fill(1);
+  const infected = new Array(n).fill(0);
+  const initialSet = new Set(initial);
+  const sortedInitial = [...initial].sort((a, b) => a - b);
+  const scannedPairs = new Set();
+  const candidateRows = sortedInitial.map((node) => ({ node, root: null, sources: null, gain: null, decision: "pending" }));
+  const steps = [];
+  let answer = null;
+  let saved = 0;
+  let infectedReady = false;
+
+  const rootOf = (node) => {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  };
+  const find = (node) => {
+    let x = node;
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+  const componentSnapshot = () => {
+    const groups = new Map();
+    for (let node = 0; node < n; node++) {
+      const root = rootOf(node);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(node);
+    }
+    return [...groups.entries()].map(([root, nodes]) => ({
+      root,
+      nodes,
+      size: nodes.length,
+      initialNodes: nodes.filter((node) => initialSet.has(node)),
+      infectedCount: infectedReady ? infected[root] : null,
+    })).sort((a, b) => a.nodes[0] - b.nodes[0]);
+  };
+
+  function push({
+    line,
+    phase,
+    event,
+    title,
+    note,
+    activePair = null,
+    activeNodes = [],
+    activeRoots = [],
+    activeCandidate = null,
+    candidateDecision = "",
+    final = false,
+    vars = [],
+  }) {
+    const components = componentSnapshot();
+    const spreadBeforeRemoval = infectedReady
+      ? components.reduce((total, component) => total + (component.infectedCount > 0 ? component.size : 0), 0)
+      : null;
+    const selectedRoot = answer !== null ? rootOf(answer) : null;
+    const protectedRoot = selectedRoot !== null && infectedReady && infected[selectedRoot] === 1 && saved > 0 ? selectedRoot : null;
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      vars,
+      malware924View: {
+        graph: graph.map((row) => [...row]),
+        n,
+        initial: [...initial],
+        sortedInitial,
+        parent: [...parent],
+        size: [...size],
+        infected: [...infected],
+        infectedReady,
+        components,
+        scannedPairs: [...scannedPairs],
+        phase,
+        event,
+        activePair: activePair ? [...activePair] : null,
+        activeNodes: [...activeNodes],
+        activeRoots: [...activeRoots],
+        activeCandidate,
+        candidateDecision,
+        candidateRows: candidateRows.map((row) => ({ ...row })),
+        answer,
+        saved,
+        selectedRoot,
+        protectedRoot,
+        spreadBeforeRemoval,
+        spreadAfterRemoval: spreadBeforeRemoval === null ? null : spreadBeforeRemoval - saved,
+        finalAnswer: final ? answer : null,
+      },
+    });
+  }
+
+  push({
+    line: 3,
+    phase: "build",
+    event: "read-n",
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    note: { vi: `Đồ thị có ${n} node, biểu diễn bằng adjacency matrix ${n} x ${n}.`, en: `The graph has ${n} nodes represented by a ${n} x ${n} adjacency matrix.` },
+    vars: [{ name: "n", value: n }, { name: "initial", value: `[${initial.join(", ")}]` }],
+  });
+  push({
+    line: 4,
+    phase: "build",
+    event: "init-parent",
+    title: { vi: "Khởi tạo parent", en: "Initialize parent" },
+    note: { vi: "Mỗi node ban đầu là root của component riêng.", en: "Each node initially roots its own component." },
+    vars: [{ name: "parent", value: `[${parent.join(", ")}]` }],
+  });
+  push({
+    line: 5,
+    phase: "build",
+    event: "init-size",
+    title: { vi: "Khởi tạo size = 1", en: "Initialize size = 1" },
+    note: { vi: "Union by size sẽ giữ kích thước component tại root.", en: "Union by size stores each component size at its root." },
+    vars: [{ name: "size", value: `[${size.join(", ")}]` }],
+  });
+  push({
+    line: 6,
+    phase: "build",
+    event: "define-find",
+    title: { vi: "Định nghĩa find(x)", en: "Define find(x)" },
+    note: { vi: "find trả root và thực hiện path compression.", en: "find returns the root and performs path compression." },
+    vars: [{ name: "find", value: "root + path compression" }],
+  });
+
+  for (let i = 0; i < n; i++) {
+    push({
+      line: 11,
+      phase: "build",
+      event: "row",
+      title: { vi: `Quét hàng i = ${i}`, en: `Scan row i = ${i}` },
+      note: { vi: "Chỉ xét nửa trên của matrix để mỗi cạnh vô hướng được xử lý đúng một lần.", en: "Only scan the upper triangle so each undirected edge is processed once." },
+      activeNodes: [i],
+      vars: [{ name: "i", value: i }],
+    });
+    for (let j = i + 1; j < n; j++) {
+      const pairKey = `${i}-${j}`;
+      push({
+        line: 12,
+        phase: "build",
+        event: "pair",
+        title: { vi: `Xét ô graph[${i}][${j}]`, en: `Inspect graph[${i}][${j}]` },
+        note: { vi: `Ô (${i},${j}) đại diện cạnh vô hướng giữa node ${i} và ${j}.`, en: `Cell (${i},${j}) represents the undirected edge between nodes ${i} and ${j}.` },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        vars: [{ name: "i, j", value: `${i}, ${j}` }],
+      });
+      scannedPairs.add(pairKey);
+      const connected = graph[i][j] === 1;
+      push({
+        line: 13,
+        phase: "build",
+        event: connected ? "edge" : "no-edge",
+        title: { vi: `graph[${i}][${j}] = ${graph[i][j]}`, en: `graph[${i}][${j}] = ${graph[i][j]}` },
+        note: connected
+          ? { vi: `Có cạnh ${i}-${j}; tìm root để union.`, en: `Edge ${i}-${j} exists; find roots before unioning.` }
+          : { vi: "Không có cạnh, chuyển sang cặp tiếp theo.", en: "No edge exists, so move to the next pair." },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        vars: [{ name: `graph[${i}][${j}]`, value: graph[i][j] }],
+      });
+      if (!connected) continue;
+
+      let rootI = find(i);
+      let rootJ = find(j);
+      push({
+        line: 14,
+        phase: "build",
+        event: "roots",
+        title: { vi: `ri = ${rootI}, rj = ${rootJ}`, en: `ri = ${rootI}, rj = ${rootJ}` },
+        note: { vi: `Root của ${i} là ${rootI}; root của ${j} là ${rootJ}.`, en: `Node ${i} has root ${rootI}; node ${j} has root ${rootJ}.` },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        activeRoots: [rootI, rootJ],
+        vars: [{ name: "ri, rj", value: `${rootI}, ${rootJ}` }],
+      });
+      const different = rootI !== rootJ;
+      push({
+        line: 15,
+        phase: "build",
+        event: different ? "different" : "same",
+        title: { vi: `ri != rj? ${different ? "True" : "False"}`, en: `ri != rj? ${different ? "True" : "False"}` },
+        note: different
+          ? { vi: "Hai node thuộc hai component khác nhau, cần gộp.", en: "The nodes belong to different components and must be merged." }
+          : { vi: "Hai node đã cùng component, cạnh này không đổi DSU.", en: "The nodes already share a component, so this edge changes nothing." },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        activeRoots: [rootI, rootJ],
+        vars: [{ name: "different roots?", value: different }],
+      });
+      if (!different) continue;
+
+      push({
+        line: 16,
+        phase: "build",
+        event: "compare-size",
+        title: { vi: `So sánh size ${size[rootI]} và ${size[rootJ]}`, en: `Compare sizes ${size[rootI]} and ${size[rootJ]}` },
+        note: { vi: "Luôn gắn component nhỏ vào component lớn.", en: "Always attach the smaller component to the larger one." },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        activeRoots: [rootI, rootJ],
+        vars: [{ name: "size[ri]", value: size[rootI] }, { name: "size[rj]", value: size[rootJ] }],
+      });
+      if (size[rootI] < size[rootJ]) {
+        [rootI, rootJ] = [rootJ, rootI];
+        push({
+          line: 17,
+          phase: "build",
+          event: "swap",
+          title: { vi: `Đổi root: ri=${rootI}, rj=${rootJ}`, en: `Swap roots: ri=${rootI}, rj=${rootJ}` },
+          note: { vi: `Component root ${rootJ} sẽ gắn vào root ${rootI}.`, en: `Component root ${rootJ} will attach to root ${rootI}.` },
+          activePair: [i, j],
+          activeNodes: [i, j],
+          activeRoots: [rootI, rootJ],
+          vars: [{ name: "ri, rj", value: `${rootI}, ${rootJ}` }],
+        });
+      }
+      parent[rootJ] = rootI;
+      push({
+        line: 18,
+        phase: "build",
+        event: "attach",
+        title: { vi: `parent[${rootJ}] = ${rootI}`, en: `parent[${rootJ}] = ${rootI}` },
+        note: { vi: "Hai component đã có chung root.", en: "Both components now share one root." },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        activeRoots: [rootI],
+        vars: [{ name: "parent", value: `[${parent.join(", ")}]` }],
+      });
+      size[rootI] += size[rootJ];
+      push({
+        line: 19,
+        phase: "build",
+        event: "grow",
+        title: { vi: `size[${rootI}] = ${size[rootI]}`, en: `size[${rootI}] = ${size[rootI]}` },
+        note: { vi: `Component mới có ${size[rootI]} node.`, en: `The merged component now has ${size[rootI]} nodes.` },
+        activePair: [i, j],
+        activeNodes: [i, j],
+        activeRoots: [rootI],
+        vars: [{ name: "size", value: `[${size.join(", ")}]` }],
+      });
+    }
+  }
+
+  infectedReady = true;
+  push({
+    line: 20,
+    phase: "count",
+    event: "init-infected",
+    title: { vi: "Tạo bộ đếm nguồn nhiễm", en: "Create infection-source counters" },
+    note: { vi: "infected[root] sẽ cho biết component có bao nhiêu node nằm trong initial.", en: "infected[root] will count how many initial nodes belong to each component." },
+    vars: [{ name: "infected", value: `[${infected.join(", ")}]` }],
+  });
+  for (const node of initial) {
+    push({
+      line: 21,
+      phase: "count",
+      event: "source",
+      title: { vi: `Xét nguồn nhiễm node ${node}`, en: `Inspect infected source node ${node}` },
+      note: { vi: `Tìm component chứa node ${node}.`, en: `Find the component containing node ${node}.` },
+      activeNodes: [node],
+      activeCandidate: node,
+      vars: [{ name: "node", value: node }],
+    });
+    const root = find(node);
+    infected[root] += 1;
+    push({
+      line: 22,
+      phase: "count",
+      event: "increment",
+      title: { vi: `infected[${root}] = ${infected[root]}`, en: `infected[${root}] = ${infected[root]}` },
+      note: { vi: `Component root ${root} hiện có ${infected[root]} nguồn nhiễm ban đầu.`, en: `Component root ${root} now has ${infected[root]} initial infection source(s).` },
+      activeNodes: [node],
+      activeRoots: [root],
+      activeCandidate: node,
+      vars: [{ name: "root", value: root }, { name: "infected[root]", value: infected[root] }],
+    });
+  }
+
+  answer = Math.min(...initial);
+  push({
+    line: 23,
+    phase: "choose",
+    event: "fallback",
+    title: { vi: `Fallback answer = ${answer}`, en: `Fallback answer = ${answer}` },
+    note: { vi: "Nếu không cứu được component nào, đề bài yêu cầu trả node có index nhỏ nhất.", en: "If no component can be saved, the problem requires the smallest node index." },
+    activeNodes: [answer],
+    activeCandidate: answer,
+    vars: [{ name: "answer", value: answer }],
+  });
+  push({
+    line: 24,
+    phase: "choose",
+    event: "init-saved",
+    title: { vi: "saved = 0", en: "saved = 0" },
+    note: { vi: "saved lưu số node lớn nhất có thể tránh bị lây.", en: "saved tracks the largest number of nodes that can avoid infection." },
+    vars: [{ name: "saved", value: saved }],
+  });
+
+  sortedInitial.forEach((node, candidateIndex) => {
+    candidateRows[candidateIndex].decision = "checking";
+    push({
+      line: 25,
+      phase: "choose",
+      event: "candidate",
+      title: { vi: `Thử xóa node ${node}`, en: `Try removing node ${node}` },
+      note: { vi: "Các candidate được xét theo index tăng dần để xử lý tie-break tự nhiên.", en: "Candidates are checked in increasing index order, which handles ties naturally." },
+      activeNodes: [node],
+      activeCandidate: node,
+      vars: [{ name: "node", value: node }, { name: "current answer", value: answer }],
+    });
+    const root = find(node);
+    candidateRows[candidateIndex].root = root;
+    candidateRows[candidateIndex].sources = infected[root];
+    candidateRows[candidateIndex].gain = infected[root] === 1 ? size[root] : 0;
+    push({
+      line: 26,
+      phase: "choose",
+      event: "candidate-root",
+      title: { vi: `root(${node}) = ${root}`, en: `root(${node}) = ${root}` },
+      note: { vi: `Component này có size=${size[root]} và ${infected[root]} nguồn nhiễm.`, en: `This component has size=${size[root]} and ${infected[root]} infection source(s).` },
+      activeNodes: [node],
+      activeRoots: [root],
+      activeCandidate: node,
+      vars: [{ name: "root", value: root }, { name: "size[root]", value: size[root] }, { name: "infected[root]", value: infected[root] }],
+    });
+
+    const uniqueSource = infected[root] === 1;
+    const better = uniqueSource && size[root] > saved;
+    candidateRows[candidateIndex].decision = better ? "qualifies" : uniqueSource ? "not-better" : "shared";
+    push({
+      line: 27,
+      phase: "choose",
+      event: better ? "qualifies" : uniqueSource ? "tie-or-smaller" : "shared-source",
+      title: { vi: `unique source và size > saved? ${better ? "True" : "False"}`, en: `unique source and size > saved? ${better ? "True" : "False"}` },
+      note: !uniqueSource
+        ? { vi: `Component còn ${infected[root] - 1} nguồn khác sau khi xóa ${node}, nên không cứu được node nào.`, en: `The component still has ${infected[root] - 1} other source(s) after removing ${node}, so no node is saved.` }
+        : better
+          ? { vi: `Node ${node} là nguồn duy nhất và cứu được ${size[root]} node, tốt hơn saved=${saved}.`, en: `Node ${node} is the unique source and saves ${size[root]} nodes, better than saved=${saved}.` }
+          : { vi: `Cứu được ${size[root]} node nhưng không lớn hơn saved=${saved}; giữ answer nhỏ hơn hiện tại.`, en: `It saves ${size[root]} nodes but does not beat saved=${saved}; keep the current smaller answer.` },
+      activeNodes: [node],
+      activeRoots: [root],
+      activeCandidate: node,
+      candidateDecision: candidateRows[candidateIndex].decision,
+      vars: [{ name: "unique source?", value: uniqueSource }, { name: "gain", value: candidateRows[candidateIndex].gain }, { name: "saved", value: saved }],
+    });
+    if (!better) return;
+
+    saved = size[root];
+    candidateRows[candidateIndex].decision = "accepted";
+    push({
+      line: 28,
+      phase: "choose",
+      event: "save",
+      title: { vi: `saved = ${saved}`, en: `saved = ${saved}` },
+      note: { vi: `Đây là số node tránh bị lây nếu xóa nguồn ${node}.`, en: `This many nodes avoid infection when source ${node} is removed.` },
+      activeNodes: [node],
+      activeRoots: [root],
+      activeCandidate: node,
+      candidateDecision: "accepted",
+      vars: [{ name: "saved", value: saved }],
+    });
+    answer = node;
+    push({
+      line: 29,
+      phase: "choose",
+      event: "select",
+      title: { vi: `answer = ${answer}`, en: `answer = ${answer}` },
+      note: { vi: `Node ${answer} đang là lựa chọn tốt nhất.`, en: `Node ${answer} is now the best removal choice.` },
+      activeNodes: [node],
+      activeRoots: [root],
+      activeCandidate: node,
+      candidateDecision: "accepted",
+      vars: [{ name: "answer", value: answer }, { name: "saved", value: saved }],
+    });
+  });
+
+  push({
+    line: 30,
+    phase: "done",
+    event: "done",
+    final: true,
+    title: { vi: `Trả về node ${answer}`, en: `Return node ${answer}` },
+    note: saved > 0
+      ? { vi: `Xóa nguồn ${answer} cứu được ${saved} node; đây là lợi ích lớn nhất.`, en: `Removing source ${answer} saves ${saved} nodes, the largest possible benefit.` }
+      : { vi: `Không component nào có đúng một nguồn nhiễm; trả index nhỏ nhất ${answer}.`, en: `No component has exactly one source, so return the smallest index ${answer}.` },
+    activeNodes: [answer],
+    activeRoots: [rootOf(answer)],
+    activeCandidate: answer,
+    vars: [{ name: "answer", value: answer }, { name: "saved", value: saved }],
+  });
+
+  return { original: { graph, initial }, answer, steps };
+}
+
 Object.assign(module.exports, {
   1970: {
     id: 1970,
@@ -7037,5 +7877,158 @@ Object.assign(module.exports, {
     complexity: { time: "O(R·C·α(RC))", space: "O(R·C)", note: { vi: "Mỗi ô được thêm và union tối đa 4 lần.", en: "Each cell is added and unioned with at most 4 neighbors." } },
     code: ["class Solution:", "    def latestDayToCross(self, row, col, cells):", "        parent = list(range(row * col + 2))", "        land = [[False] * col for _ in range(row)]", "        for day in range(len(cells) - 1, -1, -1):", "            r, c = cells[day][0] - 1, cells[day][1] - 1", "            land[r][c] = True", "            union(cell, top/bottom/neighbors)", "            if find(top) == find(bottom):", "                return day", "        return 0"],
     builder: buildSteps1970,
+  },
+  2316: {
+    id: 2316,
+    difficulty: "medium",
+    slug: "count-unreachable-pairs-of-nodes-in-an-undirected-graph",
+    category: UF_CAT,
+    tags: [{ key: "graph", vi: "Đồ thị", en: "Graph" }],
+    title: {
+      vi: "Count Unreachable Pairs of Nodes in an Undirected Graph",
+      en: "Count Unreachable Pairs of Nodes in an Undirected Graph",
+    },
+    titleVi: {
+      vi: "Đếm cặp node không thể đi tới nhau",
+      en: "Count unreachable pairs of nodes",
+    },
+    statement: {
+      vi: "Cho đồ thị vô hướng gồm n node đánh số 0..n-1 và danh sách edges. Đếm số cặp node khác nhau không có đường đi nối giữa chúng.",
+      en: "Given an undirected graph with n nodes labeled 0..n-1 and an edge list, count pairs of distinct nodes with no path between them.",
+    },
+    defaultInput: [7],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 30,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [{
+      key: "edges",
+      type: "string",
+      label: { vi: "edges: u,v;u,v;... hoặc JSON", en: "edges: u,v;u,v;... or JSON" },
+      default: "0,2;0,5;2,4;1,6;5,4",
+    }],
+    approach: [
+      {
+        vi: "Ban đầu coi tất cả C(n,2) cặp node là unreachable.",
+        en: "Initially treat all C(n,2) node pairs as unreachable.",
+      },
+      {
+        vi: "Dùng Union-Find với size[root]. Với mỗi cạnh, tìm root của hai đầu.",
+        en: "Use Union-Find with size[root]. For each edge, find both endpoint roots.",
+      },
+      {
+        vi: "Nếu hai root khác nhau và component có size a, b thì a*b cặp vừa trở thành reachable; trừ a*b khỏi đáp án rồi union by size.",
+        en: "If the roots differ and component sizes are a and b, exactly a*b pairs become reachable; subtract a*b and union by size.",
+      },
+      {
+        vi: "Nếu hai đầu đã cùng root, cạnh là dư và không thay đổi đáp án.",
+        en: "If both endpoints already share a root, the edge is redundant and the answer stays unchanged.",
+      },
+    ],
+    complexity: {
+      time: "O((n + e) * alpha(n))",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi cạnh thực hiện hai find và tối đa một union; alpha(n) gần như hằng số.",
+        en: "Each edge performs two finds and at most one union; alpha(n) is effectively constant.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countPairs(self, n, edges):",
+      "        parent = list(range(n))",
+      "        size = [1] * n",
+      "        def find(x):",
+      "            while x != parent[x]:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        pairs = n * (n - 1) // 2",
+      "        for u, v in edges:",
+      "            ru, rv = find(u), find(v)",
+      "            if ru == rv:",
+      "                continue",
+      "            if size[ru] < size[rv]:",
+      "                ru, rv = rv, ru",
+      "            pairs -= size[ru] * size[rv]",
+      "            parent[rv] = ru",
+      "            size[ru] += size[rv]",
+      "        return pairs",
+    ],
+    builder: buildSteps2316,
+    liveArgs(input, params = {}) {
+      const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+      return [n, mstParseMatrix(params.edges, 2, "edges")];
+    },
+  },
+  924: {
+    id: 924,
+    difficulty: "hard",
+    slug: "minimize-malware-spread",
+    category: UF_CAT,
+    tags: [{ key: "graph", vi: "Đồ thị", en: "Graph" }],
+    title: { vi: "Minimize Malware Spread", en: "Minimize Malware Spread" },
+    titleVi: { vi: "Giảm thiểu sự lây lan của malware", en: "Minimize malware spread" },
+    statement: {
+      vi: "Cho adjacency matrix của đồ thị vô hướng và danh sách node nhiễm ban đầu. Xóa đúng một node khỏi initial sao cho số node bị nhiễm cuối cùng nhỏ nhất; nếu hòa, chọn index nhỏ nhất.",
+      en: "Given an undirected graph adjacency matrix and initially infected nodes, remove exactly one node from initial to minimize the final infected count; break ties by smallest index.",
+    },
+    defaultInput: "1,1,1,0,0,0,0;1,1,1,0,0,0,0;1,1,1,0,0,0,0;0,0,0,1,1,1,0;0,0,0,1,1,1,0;0,0,0,1,1,1,0;0,0,0,0,0,0,1",
+    inputKind: "string",
+    inputLabel: { vi: "graph adjacency matrix (hàng cách bởi ;)", en: "graph adjacency matrix (rows separated by ;)" },
+    extraParams: [{
+      key: "initial",
+      type: "string",
+      label: { vi: "initial (node nhiễm, cách bởi dấu phẩy)", en: "initial (infected nodes, comma-separated)" },
+      default: "1,3,4",
+    }],
+    approach: [
+      { vi: "Union các node có cạnh để tạo connected components và lưu size tại mỗi root.", en: "Union adjacent nodes into connected components and store each size at its root." },
+      { vi: "Đếm mỗi component chứa bao nhiêu node thuộc initial.", en: "Count how many initial nodes belong to each component." },
+      { vi: "Chỉ component có đúng một nguồn nhiễm mới được cứu khi xóa nguồn đó; số node cứu được bằng size của component.", en: "Only a component with exactly one infection source can be saved by removing it; the saved count equals the component size." },
+      { vi: "Duyệt initial đã sort và chỉ cập nhật khi saved lớn hơn để tự giữ index nhỏ nhất khi hòa.", en: "Scan sorted initial nodes and update only for a strictly larger saved count, naturally preserving the smallest index on ties." },
+    ],
+    complexity: {
+      time: "O(n^2 * alpha(n) + k log k)",
+      space: "O(n)",
+      note: { vi: "Quét nửa adjacency matrix; k là số node nhiễm ban đầu.", en: "Scan half of the adjacency matrix; k is the number of initially infected nodes." },
+    },
+    code: [
+      "class Solution:",
+      "    def minMalwareSpread(self, graph, initial):",
+      "        n = len(graph)",
+      "        parent = list(range(n))",
+      "        size = [1] * n",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        for i in range(n):",
+      "            for j in range(i + 1, n):",
+      "                if graph[i][j]:",
+      "                    ri, rj = find(i), find(j)",
+      "                    if ri != rj:",
+      "                        if size[ri] < size[rj]:",
+      "                            ri, rj = rj, ri",
+      "                        parent[rj] = ri",
+      "                        size[ri] += size[rj]",
+      "        infected = [0] * n",
+      "        for node in initial:",
+      "            infected[find(node)] += 1",
+      "        answer = min(initial)",
+      "        saved = 0",
+      "        for node in sorted(initial):",
+      "            root = find(node)",
+      "            if infected[root] == 1 and size[root] > saved:",
+      "                saved = size[root]",
+      "                answer = node",
+      "        return answer",
+    ],
+    builder: buildSteps924,
+    liveArgs(input, params = {}) {
+      const data = parse924Data(input, params);
+      return [data.graph, data.initial];
+    },
   },
 });

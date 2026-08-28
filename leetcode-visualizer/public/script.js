@@ -21812,6 +21812,231 @@ function renderBricks803View(step) {
   </section>`;
 }
 
+// ---- 924 Minimize Malware Spread renderer ----
+function renderMalware924View(step) {
+  const view = step.malware924View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const chooseTieEvent = ["fallback", "tie-or-smaller"].includes(view.event);
+  const activePhase = view.phase === "done" ? 4 : view.phase === "choose" ? (chooseTieEvent ? 3 : 2) : view.phase === "count" ? 1 : 0;
+  const phaseLabels = vi
+    ? ["Tạo component", "Đếm nguồn nhiễm", "Chấm điểm xóa", "Tie-break index", "Đáp án"]
+    : ["Build components", "Count sources", "Score removals", "Index tie-break", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const activePair = Array.isArray(view.activePair) ? view.activePair : null;
+  const activeNodes = new Set(view.activeNodes || []);
+  const activeRoots = new Set(view.activeRoots || []);
+  const initialSet = new Set(view.initial || []);
+  const scannedPairs = new Set(view.scannedPairs || []);
+  const matrixCells = [];
+  matrixCells.push(`<span class="corner">r/c</span>`);
+  for (let col = 0; col < view.n; col++) matrixCells.push(`<span class="axis${initialSet.has(col) ? " source" : ""}">${col}${initialSet.has(col) ? "*" : ""}</span>`);
+  for (let row = 0; row < view.n; row++) {
+    matrixCells.push(`<span class="axis${initialSet.has(row) ? " source" : ""}">${row}${initialSet.has(row) ? "*" : ""}</span>`);
+    for (let col = 0; col < view.n; col++) {
+      const pairKey = `${Math.min(row, col)}-${Math.max(row, col)}`;
+      const isActive = activePair && ((activePair[0] === row && activePair[1] === col) || (activePair[1] === row && activePair[0] === col));
+      const classes = [
+        row === col ? "diagonal" : view.graph[row][col] === 1 ? "edge" : "zero",
+        scannedPairs.has(pairKey) && row < col ? "scanned" : "",
+        isActive ? "active" : "",
+      ].filter(Boolean).join(" ");
+      matrixCells.push(`<b class="${classes}">${view.graph[row][col]}</b>`);
+    }
+  }
+
+  const components = (view.components || []).map((component, index) => {
+    const sourceCount = component.infectedCount;
+    const hasSource = sourceCount !== null && sourceCount > 0;
+    const unique = sourceCount === 1;
+    const isProtected = component.root === view.protectedRoot;
+    const isSelected = component.root === view.selectedRoot;
+    const classes = ["mal924-component", `c${index % 4}`, hasSource ? "infected" : "clean", unique ? "unique" : "", isProtected ? "protected" : "", isSelected ? "selected" : "", activeRoots.has(component.root) ? "active" : ""].filter(Boolean).join(" ");
+    const nodes = (component.nodes || []).map((node) => {
+      const nodeClasses = [initialSet.has(node) ? "source" : "", node === view.activeCandidate ? "candidate" : "", node === view.answer ? "answer" : "", activeNodes.has(node) ? "active" : ""].filter(Boolean).join(" ");
+      return `<b class="${nodeClasses}"><small>${initialSet.has(node) ? "INFECTED" : "node"}</small>${node}</b>`;
+    }).join("");
+    const status = sourceCount === null
+      ? (vi ? "chưa đếm nguồn" : "sources not counted")
+      : sourceCount === 0
+        ? (vi ? "không bị lây" : "stays clean")
+        : sourceCount === 1
+          ? (vi ? "xóa nguồn duy nhất ⇒ cứu cả nhóm" : "remove unique source ⇒ save group")
+          : (vi ? `${sourceCount} nguồn ⇒ xóa một vẫn bị lây` : `${sourceCount} sources ⇒ one removal is not enough`);
+    return `<article class="${classes}"><header><span><small>ROOT</small><strong>${component.root}</strong></span><em>size=${component.size}</em></header><div>${nodes}</div><footer><strong>${sourceCount === null ? "?" : sourceCount} ${vi ? "nguồn nhiễm" : "source(s)"}</strong><span>${escapeHtml(status)}</span></footer></article>`;
+  }).join("");
+
+  const decisionLabels = vi
+    ? { pending: "chờ", checking: "đang xét", qualifies: "đủ điều kiện", accepted: "chọn", shared: "nhiều nguồn", "not-better": "không tốt hơn" }
+    : { pending: "waiting", checking: "checking", qualifies: "qualifies", accepted: "selected", shared: "multiple sources", "not-better": "not better" };
+  const candidateRows = (view.candidateRows || []).map((candidate) => {
+    const isActive = candidate.node === view.activeCandidate;
+    const isAnswer = candidate.node === view.answer;
+    const decision = candidate.decision || "pending";
+    return `<div class="mal924-candidate ${decision}${isActive ? " active" : ""}${isAnswer ? " answer" : ""}"><b>${candidate.node}</b><span>${candidate.root === null ? "-" : candidate.root}</span><span>${candidate.sources === null ? "-" : candidate.sources}</span><strong>${candidate.gain === null ? "-" : candidate.gain}</strong><em>${escapeHtml(decisionLabels[decision] || decision)}</em></div>`;
+  }).join("");
+
+  const currentRow = (view.candidateRows || []).find((candidate) => candidate.node === view.activeCandidate);
+  let decisionPanel = `<section class="mal924-decision idle"><small>${vi ? "QUY TẮC CỨU COMPONENT" : "COMPONENT-SAVING RULE"}</small><strong>infected[root] == 1</strong><span>${vi ? "Chỉ khi node bị xóa là nguồn duy nhất của component." : "Only when the removed node is its component's unique source."}</span></section>`;
+  if (currentRow && currentRow.root !== null) {
+    const unique = currentRow.sources === 1;
+    const decisionClass = currentRow.decision === "accepted" ? "accepted" : unique ? "eligible" : "blocked";
+    const formula = unique ? `gain = size[root ${currentRow.root}] = ${currentRow.gain}` : `gain = 0 (${currentRow.sources} sources)`;
+    const detail = unique
+      ? (vi ? `Node ${currentRow.node} là nguồn duy nhất; có thể cứu ${currentRow.gain} node.` : `Node ${currentRow.node} is the unique source; removing it can save ${currentRow.gain} nodes.`)
+      : (vi ? `Sau khi xóa ${currentRow.node}, component vẫn còn nguồn nhiễm khác.` : `After removing ${currentRow.node}, another source still infects the component.`);
+    decisionPanel = `<section class="mal924-decision ${decisionClass}"><small>${vi ? "THỬ XÓA" : "TRY REMOVING"} ${currentRow.node}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(detail)}</span></section>`;
+  }
+
+  const dsuCells = (view.parent || []).map((parent, node) => {
+    const rootComponent = (view.components || []).find((component) => component.root === node);
+    const rootSize = rootComponent ? view.size[node] : "-";
+    const sources = view.infectedReady && rootComponent ? view.infected[node] : "-";
+    return `<span class="${rootComponent ? "root" : ""}${activeNodes.has(node) ? " active" : ""}"><small>node ${node}</small><strong>p=${parent}</strong><em>size=${rootSize} · src=${sources}</em></span>`;
+  }).join("");
+
+  const answerReady = view.phase === "done";
+  const spreadKnown = Number.isInteger(view.spreadBeforeRemoval);
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "-";
+  const summary = vi
+    ? `Bài 924. ${view.n} node, initial [${(view.initial || []).join(", ")}], chọn ${view.answer ?? "chưa xác định"}.`
+    : `Problem 924. ${view.n} nodes, initial [${(view.initial || []).join(", ")}], choose ${view.answer ?? "pending"}.`;
+
+  el.innerHTML = `<section class="mal924-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="mal924-phases">${phases}</div>
+    <section class="mal924-rule"><b>${vi ? "MẤU CHỐT" : "KEY TEST"}</b><strong>infected[root] == 1 &nbsp;⇒&nbsp; saved = size[root]</strong><span>${vi ? "Nếu có từ hai nguồn trở lên, xóa một nguồn không ngăn được component bị lây." : "With two or more sources, removing one source cannot stop the component from being infected."}</span></section>
+    <section class="mal924-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <div class="mal924-main">
+      <section class="mal924-matrix"><header><strong>ADJACENCY MATRIX</strong><span>* = ${vi ? "nguồn nhiễm ban đầu" : "initially infected"}</span></header><div class="mal924-matrix-wrap"><div style="--mal924-n:${view.n}">${matrixCells.join("")}</div></div><footer><span><i class="edge"></i>1 = edge</span><span><i class="active"></i>${vi ? "đang xét" : "current pair"}</span><span><i class="source"></i>${vi ? "header nguồn nhiễm" : "infected header"}</span></footer></section>
+      <section class="mal924-components"><header><strong>${vi ? "CONNECTED COMPONENTS" : "CONNECTED COMPONENTS"}</strong><span>${(view.components || []).length} component${(view.components || []).length === 1 ? "" : "s"}</span></header><div>${components}</div></section>
+    </div>
+    ${decisionPanel}
+    <section class="mal924-candidates"><header><strong>${vi ? "CHẤM ĐIỂM TỪNG NODE TRONG initial" : "SCORE EACH NODE IN initial"}</strong><span>${vi ? "duyệt index tăng dần" : "scan in increasing index order"}</span></header><div class="mal924-candidate head"><b>node</b><span>root</span><span>sources</span><strong>gain</strong><em>decision</em></div>${candidateRows}</section>
+    <section class="mal924-metrics"><div><small>${vi ? "NHIỄM TRƯỚC KHI XÓA" : "INFECTED BEFORE REMOVAL"}</small><strong>${spreadKnown ? view.spreadBeforeRemoval : "-"}</strong></div><div class="saved"><small>${vi ? "CỨU ĐƯỢC" : "SAVED"}</small><strong>${view.saved ?? 0}</strong></div><div class="after"><small>${vi ? "NHIỄM SAU KHI XÓA" : "INFECTED AFTER REMOVAL"}</small><strong>${spreadKnown ? view.spreadAfterRemoval : "-"}</strong></div><div class="choice"><small>${vi ? "NODE ĐANG CHỌN" : "CURRENT CHOICE"}</small><strong>${view.answer === null ? "-" : view.answer}</strong></div></section>
+    <details class="mal924-dsu" ${["attach", "grow", "increment"].includes(view.event) ? "open" : ""}><summary>DSU parent / size / infection sources</summary><div>${dsuCells}</div></details>
+    <section class="mal924-answer ${answerReady ? "ready" : "pending"}"><small>${vi ? "XÓA NODE" : "REMOVE NODE"}</small><strong>${answerReady ? view.finalAnswer : "..."}</strong><span>${answerReady ? (view.saved > 0 ? (vi ? `cứu ${view.saved} node khỏi malware` : `save ${view.saved} nodes from malware`) : (vi ? "tie-break bằng index nhỏ nhất" : "smallest-index tie-break")) : (vi ? "đang đánh giá candidate" : "evaluating candidates")}</span></section>
+  </section>`;
+}
+
+// ---- 2316 Count Unreachable Pairs of Nodes renderer ----
+function renderCountPairs2316View(step) {
+  const view = step.countPairs2316View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseOrder = {
+    init: 0,
+    total: 1,
+    edge: 2,
+    find: 2,
+    roots: 2,
+    compare: 2,
+    "size-check": 3,
+    swap: 3,
+    subtract: 3,
+    parent: 3,
+    "size-update": 3,
+    skip: 3,
+    done: 4,
+  };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo DSU", "C(n,2) ban đầu", "Tìm hai root", "Trừ a x b + union", "Đáp án"]
+    : ["Initialize DSU", "Initial C(n,2)", "Find both roots", "Subtract a x b + union", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const edgeIndex = Number.isInteger(view.edgeIndex) ? view.edgeIndex : -1;
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const edgeCards = edges.map((edge, index) => {
+    let state = index < edgeIndex || view.phase === "done" ? "done" : index === edgeIndex ? "active" : "pending";
+    let status = state === "done" ? (vi ? "đã xử lý" : "processed") : state === "active" ? (vi ? "đang xét" : "current") : (vi ? "chờ" : "waiting");
+    if (index === edgeIndex && view.outcome === "redundant") {
+      state += " redundant";
+      status = vi ? "cùng component" : "same component";
+    } else if (index === edgeIndex && view.outcome === "merged") {
+      state += " merged";
+      status = vi ? "đã union" : "unioned";
+    }
+    return `<span class="cp2316-edge ${state}"><small>#${index}</small><strong>${escapeHtml(edge[0])} - ${escapeHtml(edge[1])}</strong><em>${escapeHtml(status)}</em></span>`;
+  }).join("") || `<span class="cp2316-empty">${vi ? "Không có cạnh" : "No edges"}</span>`;
+
+  const activeNodes = new Set(view.activeNodes || []);
+  const activeRoots = new Set(view.activeRoots || []);
+  const mergeNodes = new Set(view.merge ? [...(view.merge.leftNodes || []), ...(view.merge.rightNodes || [])] : []);
+  const components = (view.components || []).map((component, index) => {
+    const isActiveRoot = activeRoots.has(component.root);
+    const isMergeTarget = (component.nodes || []).some((node) => mergeNodes.has(node));
+    const nodeHtml = (component.nodes || []).map((node) => {
+      const classes = [activeNodes.has(node) ? "active" : "", node === component.root ? "root" : ""].filter(Boolean).join(" ");
+      return `<b class="${classes}"><small>node</small>${escapeHtml(node)}</b>`;
+    }).join("");
+    const reachableInside = component.size * (component.size - 1) / 2;
+    return `<article class="cp2316-component c${index % 4}${isActiveRoot ? " active-root" : ""}${isMergeTarget ? " merge-target" : ""}"><header><span><small>ROOT</small><strong>${escapeHtml(component.root)}</strong></span><em>size = ${escapeHtml(component.size)}</em></header><div>${nodeHtml}</div><footer>C(${escapeHtml(component.size)}, 2) = ${escapeHtml(reachableInside)} ${vi ? "cặp reachable bên trong" : "reachable pairs inside"}</footer></article>`;
+  }).join("");
+
+  const findPath = Array.isArray(view.findPath) ? view.findPath : [];
+  const findPanel = findPath.length
+    ? `<section class="cp2316-find"><header><strong>find(${escapeHtml(view.findLabel || "x")})</strong><span>${vi ? "đi theo parent tới root" : "follow parent pointers to the root"}</span></header><div>${findPath.map((node, index) => `<b class="${index === findPath.length - 1 ? "last" : ""}">${escapeHtml(node)}</b>${index < findPath.length - 1 ? "<i>→</i>" : ""}`).join("")}</div></section>`
+    : "";
+
+  let equationLabel = `C(${view.n}, 2)`;
+  let equation = `${view.n} x ${Math.max(0, view.n - 1)} / 2 = ${view.totalPairs}`;
+  let equationDetail = vi ? "mọi cặp bắt đầu là unreachable" : "every pair starts unreachable";
+  let equationClass = "initial";
+  if (view.merge && ["subtract", "parent", "size-update"].includes(view.phase)) {
+    equationLabel = "pairs -= size[ru] x size[rv]";
+    equation = `${view.merge.beforePairs} - (${view.merge.leftSize} x ${view.merge.rightSize}) = ${view.pairs}`;
+    equationDetail = vi
+      ? `${view.merge.leftSize} x ${view.merge.rightSize} = ${view.merge.newlyReachable} cặp vừa có đường đi`
+      : `${view.merge.leftSize} x ${view.merge.rightSize} = ${view.merge.newlyReachable} pairs just became reachable`;
+    equationClass = "subtract";
+  } else if (view.outcome === "redundant") {
+    equationLabel = vi ? "CẠNH DƯ" : "REDUNDANT EDGE";
+    equation = `${view.pairs} - 0 = ${view.pairs}`;
+    equationDetail = vi ? "hai đầu đã cùng root, không có cặp mới" : "both endpoints already share a root; no new pair";
+    equationClass = "redundant";
+  } else if (view.phase === "done") {
+    equationLabel = vi ? "CẶP KHÁC COMPONENT" : "CROSS-COMPONENT PAIRS";
+    equation = `${view.pairs}`;
+    equationDetail = vi ? "đây là các cặp vẫn không có đường đi" : "these pairs still have no path between them";
+    equationClass = "done";
+  }
+
+  const roots = new Set((view.components || []).map((component) => component.root));
+  const dsuCells = (view.parent || []).map((parent, node) => {
+    const classes = [activeNodes.has(node) ? "active" : "", roots.has(node) ? "root" : ""].filter(Boolean).join(" ");
+    const storedSize = roots.has(node) ? view.size[node] : "-";
+    return `<span class="cp2316-dsu-cell ${classes}"><small>node ${node}</small><strong>p=${escapeHtml(parent)}</strong><em>size=${escapeHtml(storedSize)}</em></span>`;
+  }).join("");
+
+  const pairReady = view.pairsReady !== false;
+  const answerReady = view.phase === "done";
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "-";
+  const currentEdgeText = Array.isArray(view.currentEdge) ? `(${view.currentEdge[0]}, ${view.currentEdge[1]})` : "-";
+  const summary = vi
+    ? `Bài 2316. ${view.n} node, ${edges.length} cạnh, còn ${view.pairs} cặp unreachable.`
+    : `Problem 2316. ${view.n} nodes, ${edges.length} edges, ${view.pairs} unreachable pairs remain.`;
+
+  el.innerHTML = `<section class="cp2316-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="cp2316-phases">${phases}</div>
+    <section class="cp2316-rule"><b>${vi ? "Ý TƯỞNG" : "CORE IDEA"}</b><strong>merge size a + size b&nbsp; ⇒ &nbsp;a x b ${vi ? "cặp trở thành reachable" : "pairs become reachable"}</strong><span>${vi ? "Vì mỗi node ở nhóm A vừa nối được tới mọi node ở nhóm B." : "Every node in group A gains a path to every node in group B."}</span></section>
+    <section class="cp2316-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span><em>edge ${escapeHtml(currentEdgeText)}</em></section>
+    <section class="cp2316-edges"><header><strong>EDGE TIMELINE</strong><span>${vi ? "vàng = đang xét - xanh = xong" : "yellow = current - green = done"}</span></header><div>${edgeCards}</div></section>
+    ${findPanel}
+    <section class="cp2316-components"><header><strong>${vi ? "CÁC COMPONENT HIỆN TẠI" : "CURRENT COMPONENTS"}</strong><span>${(view.components || []).length} component${(view.components || []).length === 1 ? "" : "s"}</span></header><div>${components}</div></section>
+    <section class="cp2316-equation ${equationClass}"><small>${escapeHtml(equationLabel)}</small><strong>${escapeHtml(equation)}</strong><span>${escapeHtml(equationDetail)}</span></section>
+    <section class="cp2316-metrics"><div><small>${vi ? "TỔNG CẶP" : "TOTAL PAIRS"}</small><strong>${escapeHtml(view.totalPairs)}</strong><span>C(n,2)</span></div><div class="reachable"><small>REACHABLE</small><strong>${pairReady ? escapeHtml(view.reachablePairs) : "-"}</strong><span>${vi ? "đã nối" : "connected"}</span></div><div class="unreachable"><small>UNREACHABLE</small><strong>${pairReady ? escapeHtml(view.pairs) : "-"}</strong><span>${vi ? "đang còn lại" : "remaining"}</span></div></section>
+    <details class="cp2316-dsu" ${["find", "parent", "size-update"].includes(view.phase) ? "open" : ""}><summary>DSU parent / size ${vi ? "(size chỉ có ý nghĩa tại root)" : "(size matters only at roots)"}</summary><div>${dsuCells}</div></details>
+    <section class="cp2316-answer ${answerReady ? "ready" : "pending"}"><small>${vi ? "ĐÁP ÁN CUỐI" : "FINAL ANSWER"}</small><strong>${answerReady ? escapeHtml(view.answer) : "..."}</strong><span>${answerReady ? (vi ? "cặp node không thể đi tới nhau" : "unreachable node pairs") : (vi ? "tiếp tục xử lý các cạnh" : "keep processing edges")}</span></section>
+  </section>`;
+}
+
 // ---- 990 Satisfiability of Equality Equations renderer ----
 function renderEqualityEquationsView(step) {
   const view = step.equalityEquationsView || {};
@@ -22352,6 +22577,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBricks803View(step);
+  } else if (step.malware924View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMalware924View(step);
+  } else if (step.countPairs2316View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountPairs2316View(step);
   } else if (step.equalityEquationsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
