@@ -19617,6 +19617,201 @@ function renderEmployee690View(step) {
   </section>`;
 }
 
+function renderVideos1311View(step) {
+  const view = step.videos1311View || {};
+  const vi = lang === "vi";
+  const watchedVideos = Array.isArray(view.watchedVideos) ? view.watchedVideos : [];
+  const friends = Array.isArray(view.friends) ? view.friends : [];
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const queueSet = new Set(queue);
+  const visited = new Set(view.visited || []);
+  const targetPeople = new Set(view.peopleAtLevel || []);
+  const counts = view.counts || {};
+  const result = Array.isArray(view.result) ? view.result : [];
+  const beforeSort = Array.isArray(view.beforeSort) ? view.beforeSort : Object.keys(counts);
+  const phase = String(view.phase || "queue-init");
+  const phaseIndex = ["queue-init", "visited-init", "level-start", "dequeue", "inspect-friend", "visit-friend", "enqueue", "skip-friend"].includes(phase) ? 0
+    : phase === "target-level" ? 1
+      : ["counter-init", "collect-person", "count-video"].includes(phase) ? 2 : 3;
+  const stageLabels = vi
+    ? ["BFS theo lớp", `Chốt level ${view.targetLevel}`, "Đếm video", "Sắp xếp kết quả"]
+    : ["Layered BFS", `Lock level ${view.targetLevel}`, "Count videos", "Sort result"];
+  const stages = stageLabels.map((label, index) => {
+    const state = index < phaseIndex || phase === "done" ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+
+  const distances = Array(friends.length).fill(null);
+  if (Number.isInteger(view.id) && friends[view.id]) {
+    distances[view.id] = 0;
+    const bfs = [view.id];
+    for (let head = 0; head < bfs.length; head += 1) {
+      const person = bfs[head];
+      (friends[person] || []).forEach((friend) => {
+        if (distances[friend] === null) {
+          distances[friend] = distances[person] + 1;
+          bfs.push(friend);
+        }
+      });
+    }
+  }
+  const maxDistance = Math.max(0, ...distances.filter((distance) => distance !== null));
+  const columns = Array.from({ length: maxDistance + 1 }, (_, distance) => watchedVideos.map((_, person) => person).filter((person) => distances[person] === distance));
+  const unreachable = watchedVideos.map((_, person) => person).filter((person) => distances[person] === null);
+  if (unreachable.length) columns.push(unreachable);
+  const maxRows = Math.max(1, ...columns.map((column) => column.length));
+  const svgWidth = Math.max(620, columns.length * 170 + 50);
+  const svgHeight = Math.max(190, maxRows * 100 + 66);
+  const positions = new Map();
+  columns.forEach((column, columnIndex) => column.forEach((person, rowIndex) => {
+    const x = 70 + columnIndex * ((svgWidth - 140) / Math.max(columns.length - 1, 1));
+    const gap = svgHeight / (column.length + 1);
+    positions.set(person, { x, y: gap * (rowIndex + 1) });
+  }));
+  const edges = friends.flatMap((neighbors, person) => neighbors.filter((friend) => person < friend).map((friend) => {
+    const from = positions.get(person);
+    const to = positions.get(friend);
+    if (!from || !to) return "";
+    const active = (person === view.activePerson && friend === view.activeFriend) || (friend === view.activePerson && person === view.activeFriend);
+    return `<line class="${active ? "active" : ""}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"></line>`;
+  })).join("");
+  const nodes = watchedVideos.map((videos, person) => {
+    const position = positions.get(person);
+    if (!position) return "";
+    const classes = ["vid1311-node"];
+    if (person === view.id) classes.push("source");
+    if (visited.has(person)) classes.push("visited");
+    if (queueSet.has(person)) classes.push("queued");
+    if (targetPeople.has(person)) classes.push("target");
+    if (person === view.activePerson) classes.push("active");
+    if (person === view.activeFriend) classes.push("friend");
+    const badge = targetPeople.has(person) ? `LEVEL ${view.targetLevel}` : queueSet.has(person) ? "QUEUE" : visited.has(person) ? "SEEN" : "";
+    return `<g class="${classes.join(" ")}" transform="translate(${position.x} ${position.y})"><rect x="-57" y="-29" width="114" height="58" rx="6"></rect><text class="person" text-anchor="middle" y="-5">PERSON ${person}</text><text class="distance" text-anchor="middle" y="12">dist ${distances[person] ?? "∞"}${badge ? ` · ${badge}` : ""}</text></g>`;
+  }).join("");
+  const graphHtml = `<div class="vid1311-graph-scroll"><svg viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(vi ? "Đồ thị bạn bè theo khoảng cách BFS" : "Friend graph grouped by BFS distance")}"><g class="vid1311-edges">${edges}</g><g>${nodes}</g></svg></div>`;
+
+  const queueHtml = queue.length
+    ? queue.map((person, index) => `<span class="${person === view.activePerson ? "active" : ""}"><small>${index === 0 ? "FRONT" : index}</small><strong>${person}</strong><em>dist ${distances[person] ?? "?"}</em></span>`).join("")
+    : `<em>${vi ? "queue rỗng" : "empty queue"}</em>`;
+  const peopleCards = watchedVideos.map((videos, person) => {
+    const classes = [];
+    if (targetPeople.has(person)) classes.push("target");
+    if (person === view.activePerson) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>PERSON ${person}${targetPeople.has(person) ? ` · LEVEL ${view.targetLevel}` : ""}</small><strong>${videos.map((video) => escapeHtml(video)).join(" · ") || "—"}</strong></span>`;
+  }).join("");
+  const frequencyEntries = Object.entries(counts);
+  const frequencyHtml = frequencyEntries.length
+    ? frequencyEntries.map(([video, count]) => `<span class="${video === view.activeVideo ? "active" : ""}"><small>${escapeHtml(video)}</small><strong>${count}</strong><em>${vi ? "lượt" : "view(s)"}</em></span>`).join("")
+    : `<em>${vi ? "chưa đếm video" : "no videos counted yet"}</em>`;
+  const order = phase === "done" ? result : beforeSort;
+  const sortHtml = order.length
+    ? order.map((video, index) => `<span class="${phase === "done" ? "done" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(video)}</strong><em>(${counts[video] ?? "?"}, ${escapeHtml(video)})</em></span>`).join("")
+    : `<em>${vi ? "chưa có ứng viên" : "no candidates yet"}</em>`;
+
+  $("treeView").innerHTML = `<section class="vid1311-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng BFS và xếp hạng video" : "BFS and video ranking simulation")}">
+    <div class="vid1311-stages">${stages}</div>
+    <section class="vid1311-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="vid1311-network"><header><strong>${vi ? "MẠNG BẠN BÈ" : "FRIEND NETWORK"}</strong><span>${vi ? `nguồn ${view.id} · cần đúng khoảng cách ${view.targetLevel}` : `source ${view.id} · exact distance ${view.targetLevel}`}</span></header>${graphHtml}</section>
+    <div class="vid1311-state"><section class="vid1311-queue"><header><strong>BFS QUEUE</strong><span>${queue.length}</span></header><div>${queueHtml}</div></section><section class="vid1311-level"><small>${vi ? "LỚP ĐANG XỬ LÝ" : "CURRENT LAYER"}</small><strong>${view.currentLevel ?? 0} / ${view.targetLevel}</strong><span>level_size = ${view.levelSize ?? "?"}</span></section></div>
+    <section class="vid1311-watch"><header><strong>${vi ? "VIDEO CỦA TỪNG NGƯỜI" : "VIDEOS BY PERSON"}</strong><span>${vi ? "chỉ thẻ xanh được đưa vào Counter" : "only green cards feed the Counter"}</span></header><div>${peopleCards}</div></section>
+    <div class="vid1311-bottom"><section class="vid1311-count"><header><strong>COUNTER</strong><span>${frequencyEntries.length}</span></header><div>${frequencyHtml}</div></section><section class="vid1311-sort"><header><strong>${vi ? "THỨ TỰ (TẦN SUẤT, TÊN)" : "ORDER (FREQUENCY, TITLE)"}</strong><span>${phase === "done" ? "SORTED" : "PENDING"}</span></header><div>${sortHtml}</div></section></div>
+  </section>`;
+}
+
+function renderBombs2101View(step) {
+  const view = step.bombs2101View || {};
+  const vi = lang === "vi";
+  const bombs = Array.isArray(view.bombs) ? view.bombs : [];
+  const graph = Array.isArray(view.graph) ? view.graph : [];
+  const detonated = new Set(view.detonated || []);
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackSet = new Set(stack);
+  const trials = Array.isArray(view.trialCounts) ? view.trialCounts : [];
+  const phase = String(view.phase || "graph-init");
+  const phaseIndex = ["graph-init", "skip-self", "distance-check", "add-edge"].includes(phase) ? 0
+    : phase === "graph-done" ? 1
+      : ["dfs-start", "dfs-pop", "dfs-edge", "dfs-see", "dfs-push", "dfs-skip"].includes(phase) ? 2 : 3;
+  const stages = (vi
+    ? ["Kiểm tra mọi cặp", "Chốt đồ thị có hướng", "DFS từng bom", "Lấy maximum"]
+    : ["Check every pair", "Lock directed graph", "DFS each bomb", "Take maximum"])
+    .map((label, index) => {
+      const state = index < phaseIndex || phase === "done" ? "done" : index === phaseIndex ? "active" : "pending";
+      return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+    }).join("");
+
+  const minX = Math.min(...bombs.map(([x, , r]) => x - r), 0);
+  const maxX = Math.max(...bombs.map(([x, , r]) => x + r), 1);
+  const minY = Math.min(...bombs.map(([, y, r]) => y - r), 0);
+  const maxY = Math.max(...bombs.map(([, y, r]) => y + r), 1);
+  const plotWidth = 720;
+  const plotHeight = 350;
+  const padding = 34;
+  const scale = Math.min((plotWidth - 2 * padding) / Math.max(maxX - minX, 1), (plotHeight - 2 * padding) / Math.max(maxY - minY, 1));
+  const usedWidth = (maxX - minX) * scale;
+  const usedHeight = (maxY - minY) * scale;
+  const offsetX = (plotWidth - usedWidth) / 2;
+  const offsetY = (plotHeight - usedHeight) / 2;
+  const points = bombs.map(([x, y, radius]) => ({
+    x: offsetX + (x - minX) * scale,
+    y: plotHeight - (offsetY + (y - minY) * scale),
+    radius: radius * scale,
+  }));
+  const edgeLines = graph.flatMap((neighbors, from) => neighbors.map((to) => {
+    const a = points[from];
+    const b = points[to];
+    if (!a || !b) return "";
+    const active = from === view.activeBomb && to === view.activeNext;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const endX = b.x - dx / length * 13;
+    const endY = b.y - dy / length * 13;
+    return `<line class="${active ? "active" : ""}" x1="${a.x}" y1="${a.y}" x2="${endX}" y2="${endY}" marker-end="url(#bomb2101-arrow)"></line>`;
+  })).join("");
+  const rings = bombs.map((bomb, index) => {
+    const point = points[index];
+    const classes = ["bomb2101-bomb"];
+    if (index === view.buildI) classes.push("source");
+    if (index === view.buildJ) classes.push("check");
+    if (index === view.activeStart) classes.push("start");
+    if (detonated.has(index)) classes.push("detonated");
+    if (stackSet.has(index)) classes.push("stacked");
+    if (index === view.activeBomb) classes.push("active");
+    if (index === view.activeNext) classes.push("next");
+    return `<g class="${classes.join(" ")}"><circle class="radius" cx="${point.x}" cy="${point.y}" r="${point.radius}"></circle><circle class="center" cx="${point.x}" cy="${point.y}" r="12"></circle><text x="${point.x}" y="${point.y + 4}" text-anchor="middle">${index}</text><text class="coord" x="${point.x}" y="${point.y + 27}" text-anchor="middle">(${bomb[0]},${bomb[1]}) r=${bomb[2]}</text></g>`;
+  }).join("");
+  const plotHtml = `<div class="bomb2101-plot-scroll"><svg viewBox="0 0 ${plotWidth} ${plotHeight}" role="img" aria-label="${escapeHtml(vi ? "Vị trí bom, bán kính thật theo cùng tỉ lệ và cạnh kích nổ" : "Bomb positions, radii at one scale, and detonation edges")}"><defs><marker id="bomb2101-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g class="bomb2101-edges">${edgeLines}</g><g>${rings}</g></svg></div>`;
+
+  const check = view.distanceCheck;
+  const checkHtml = check
+    ? `<section class="bomb2101-check ${check.reaches ? "yes" : "no"}"><small>${check.i} → ${check.j}</small><strong>${check.dx}² + ${check.dy}² = ${check.distanceSquared}</strong><b>${check.reaches ? "≤" : ">"}</b><strong>r${check.i}² = ${check.radiusSquared}</strong><span>${check.reaches ? (vi ? "THÊM CẠNH" : "ADD EDGE") : (vi ? "KHÔNG CÓ CẠNH" : "NO EDGE")}</span></section>`
+    : `<section class="bomb2101-check idle"><small>${vi ? "ĐIỀU KIỆN CẠNH" : "EDGE CONDITION"}</small><strong>distance² ≤ radius²</strong><span>${vi ? "Mỗi chiều được kiểm tra riêng" : "Each direction is checked separately"}</span></section>`;
+  const adjacency = graph.map((neighbors, index) => `<span class="${index === view.activeBomb || index === view.buildI ? "active" : ""}"><small>${index} DETONATES</small><strong>[${neighbors.join(", ")}]</strong></span>`).join("");
+  const stackHtml = stack.length
+    ? stack.map((bomb, index) => `<span class="${bomb === view.activeBomb ? "active" : ""}"><small>${index === stack.length - 1 ? "TOP" : index}</small><strong>${bomb}</strong></span>`).join("")
+    : `<em>${vi ? "stack rỗng" : "empty stack"}</em>`;
+  const seenHtml = detonated.size
+    ? [...detonated].map((bomb) => `<span class="${bomb === view.activeNext ? "next" : ""}"><small>BOMB</small><strong>${bomb}</strong></span>`).join("")
+    : `<em>${vi ? "chưa bắt đầu DFS" : "DFS not started"}</em>`;
+  const trialHtml = bombs.map((_, start) => {
+    const trial = trials.find((entry) => entry.start === start);
+    const active = start === view.activeStart;
+    return `<span class="${active ? "active" : trial ? "done" : "pending"}"><small>START ${start}</small><strong>${trial ? trial.count : active ? detonated.size : "?"}</strong><em>${vi ? "bom" : "bombs"}</em></span>`;
+  }).join("");
+  const ready = Number.isInteger(view.answer);
+
+  $("treeView").innerHTML = `<section class="bomb2101-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng phản ứng dây chuyền bom" : "Bomb chain reaction simulation")}">
+    <div class="bomb2101-stages">${stages}</div>
+    <section class="bomb2101-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="bomb2101-map"><header><strong>${vi ? "BẢN ĐỒ BÁN KÍNH + CẠNH CÓ HƯỚNG" : "RADIUS MAP + DIRECTED EDGES"}</strong><span>${vi ? "vòng tròn dùng cùng một tỉ lệ" : "all circles use the same scale"}</span></header>${plotHtml}</section>
+    ${checkHtml}
+    <section class="bomb2101-adj"><header><strong>ADJACENCY LIST</strong><span>i → graph[i]</span></header><div>${adjacency}</div></section>
+    <div class="bomb2101-dfs"><section><header><strong>DFS STACK</strong><span>${stack.length}</span></header><div>${stackHtml}</div></section><section><header><strong>${vi ? "ĐÃ KÍCH NỔ" : "DETONATED / SEEN"}</strong><span>${detonated.size}</span></header><div>${seenHtml}</div></section></div>
+    <section class="bomb2101-trials"><header><strong>${vi ? "KẾT QUẢ TỪNG ĐIỂM BẮT ĐẦU" : "RESULT BY START BOMB"}</strong><span>best = ${view.best ?? 0}</span></header><div>${trialHtml}</div></section>
+    <section class="bomb2101-answer ${ready ? "ready" : "pending"}"><small>MAXIMUM DETONATION</small><strong>${ready ? view.answer : view.best ?? 0}</strong><span>${ready ? (vi ? "đã thử mọi bom" : "every start tested") : (vi ? "giá trị tốt nhất hiện tại" : "best value so far")}</span></section>
+  </section>`;
+}
+
 function renderThrone1600View(step) {
   const view = step.throne1600View || {};
   const vi = lang === "vi";
@@ -22428,6 +22623,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEmployee690View(step);
+  } else if (step.videos1311View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderVideos1311View(step);
+  } else if (step.bombs2101View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBombs2101View(step);
   } else if (step.throne1600View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -23977,6 +24184,15 @@ class HtmlParser:
     def getUrls(self, url):
         return self.graph.get(url, [])
 
+class Employee:
+    def __init__(self, id, importance, subordinates):
+        self.id = id
+        self.importance = importance
+        self.subordinates = subordinates
+
+    def __repr__(self):
+        return f"Employee(id={self.id}, importance={self.importance})"
+
 def __viz_build_list(values):
     dummy = ListNode()
     tail = dummy
@@ -24049,6 +24265,14 @@ def __viz_materialize(value, context=None):
         return matches if value.get("__viz_type") == "binary_tree_refs" else matches[0]
     if isinstance(value, dict) and value.get("__viz_type") == "linked_list":
         return __viz_build_list(value.get("values", []))
+    if isinstance(value, dict) and value.get("__viz_type") == "employee_list":
+        employees = []
+        for entry in value.get("values", []):
+            if isinstance(entry, dict):
+                employees.append(Employee(entry.get("id"), entry.get("importance"), list(entry.get("subordinates", []))))
+            else:
+                employees.append(Employee(entry[0], entry[1], list(entry[2])))
+        return employees
     if isinstance(value, dict) and value.get("__viz_type") == "graph_node":
         nodes = {index: Node(index) for index in range(1, value.get("n", 0) + 1)}
         for left, right in value.get("edges", []):
@@ -24201,6 +24425,7 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None):
         "ListNode": ListNode,
         "Node": Node,
         "HtmlParser": HtmlParser,
+        "Employee": Employee,
     }
     exec(compiled, ns2)
     sys.settrace(tracer)

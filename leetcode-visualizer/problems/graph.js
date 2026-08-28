@@ -22556,6 +22556,577 @@ Object.assign(module.exports, {
       "",
       "        return dfs(id)",
     ],
+    liveArgs(input, params = {}) {
+      const { employees } = parseEmployees690(input);
+      return [
+        { __viz_type: "employee_list", values: employees },
+        Number(params.id),
+      ];
+    },
     builder: buildSteps690,
+  },
+});
+
+function parseVideos1311(input, params = {}) {
+  let watchedVideos;
+  let friends;
+  try {
+    watchedVideos = typeof input === "string" ? JSON.parse(input) : input;
+    friends = typeof params.friends === "string" ? JSON.parse(params.friends) : params.friends;
+  } catch (error) {
+    throw new Error("watchedVideos and friends must be valid JSON arrays");
+  }
+  if (!Array.isArray(watchedVideos) || !Array.isArray(friends) || watchedVideos.length !== friends.length) {
+    throw new Error("watchedVideos and friends must be arrays with the same length");
+  }
+  const n = watchedVideos.length;
+  if (n < 2 || n > 10) throw new Error("visualization supports 2 to 10 people");
+  watchedVideos.forEach((videos, person) => {
+    if (!Array.isArray(videos) || videos.some((video) => typeof video !== "string" || !video.length)) {
+      throw new Error(`watchedVideos[${person}] must contain non-empty strings`);
+    }
+  });
+  friends.forEach((neighbors, person) => {
+    if (!Array.isArray(neighbors) || neighbors.some((friend) => !Number.isInteger(friend) || friend < 0 || friend >= n || friend === person)) {
+      throw new Error(`friends[${person}] contains an invalid person id`);
+    }
+    if (new Set(neighbors).size !== neighbors.length) throw new Error(`friends[${person}] contains duplicates`);
+  });
+  friends.forEach((neighbors, person) => neighbors.forEach((friend) => {
+    if (!friends[friend].includes(person)) throw new Error(`friendship ${person}-${friend} must be undirected`);
+  }));
+  const id = Number(params.id);
+  const level = Number(params.level);
+  if (!Number.isInteger(id) || id < 0 || id >= n) throw new Error("id must be a valid person index");
+  if (!Number.isInteger(level) || level < 1 || level >= n) throw new Error("level must be between 1 and n - 1");
+  return { watchedVideos, friends, id, level };
+}
+
+function buildSteps1311(input, params = {}) {
+  const { watchedVideos, friends, id, level } = parseVideos1311(input, params);
+  const steps = [];
+  const queue = [id];
+  const visited = new Set([id]);
+  const counts = new Map();
+  let currentLevel = 0;
+  let activePerson = null;
+  let activeFriend = null;
+  let activeVideo = null;
+  let peopleAtLevel = [];
+  let result = [];
+  let levelSize = null;
+
+  const snapshot = (phase, extra = {}) => ({
+    phase,
+    watchedVideos: watchedVideos.map((videos) => [...videos]),
+    friends: friends.map((neighbors) => [...neighbors]),
+    id,
+    targetLevel: level,
+    currentLevel,
+    levelSize,
+    queue: [...queue],
+    visited: [...visited],
+    activePerson,
+    activeFriend,
+    activeVideo,
+    peopleAtLevel: [...peopleAtLevel],
+    counts: Object.fromEntries(counts),
+    result: [...result],
+    ...extra,
+  });
+  const push = ({ title, line, note, phase, final = false, vars = [], extra = {} }) => steps.push({
+    title,
+    arr: [],
+    sub: [],
+    highlight: [],
+    mark: [],
+    videos1311View: snapshot(phase, extra),
+    codeLines: [line],
+    vars: [
+      { name: "level", value: level },
+      { name: "current distance", value: currentLevel },
+      { name: "queue", value: `[${queue.join(", ")}]` },
+      ...vars,
+    ],
+    note,
+    final,
+  });
+
+  push({
+    title: { vi: `queue = deque([${id}])`, en: `queue = deque([${id}])` },
+    line: 5,
+    phase: "queue-init",
+    note: { vi: `BFS bắt đầu từ người ${id}; queue hiện chứa đúng nguồn.`, en: `BFS starts from person ${id}; the queue initially contains only the source.` },
+  });
+  push({
+    title: { vi: `visited = {${id}}`, en: `visited = {${id}}` },
+    line: 6,
+    phase: "visited-init",
+    note: { vi: "Đánh dấu ngay khi enqueue để một người không vào queue nhiều lần.", en: "Mark a person when enqueued so nobody enters the queue twice." },
+  });
+
+  for (let distance = 0; distance < level; distance += 1) {
+    currentLevel = distance;
+    levelSize = queue.length;
+    push({
+      title: { vi: `Bắt đầu lớp khoảng cách ${distance}`, en: `Start distance layer ${distance}` },
+      line: 8,
+      phase: "level-start",
+      note: { vi: `Có ${levelSize} người thuộc lớp ${distance}. Chỉ pop đúng ${levelSize} lần.`, en: `There are ${levelSize} people in layer ${distance}. Pop exactly ${levelSize} times.` },
+      vars: [{ name: "level_size", value: levelSize }],
+    });
+    for (let offset = 0; offset < levelSize; offset += 1) {
+      activePerson = queue.shift();
+      activeFriend = null;
+      push({
+        title: { vi: `person = queue.popleft() → ${activePerson}`, en: `person = queue.popleft() → ${activePerson}` },
+        line: 10,
+        phase: "dequeue",
+        note: { vi: `Lấy người ${activePerson} khỏi đầu queue để duyệt bạn trực tiếp.`, en: `Remove person ${activePerson} from the queue front and inspect direct friends.` },
+        vars: [{ name: "person", value: activePerson }],
+      });
+      for (const friend of friends[activePerson]) {
+        activeFriend = friend;
+        push({
+          title: { vi: `Xét friend = ${friend}`, en: `Inspect friend = ${friend}` },
+          line: 11,
+          phase: "inspect-friend",
+          note: { vi: `Kiểm tra người ${friend} đã được BFS phát hiện hay chưa.`, en: `Check whether BFS has already discovered person ${friend}.` },
+          vars: [{ name: "friend", value: friend }],
+        });
+        if (!visited.has(friend)) {
+          visited.add(friend);
+          push({
+            title: { vi: `visited.add(${friend})`, en: `visited.add(${friend})` },
+            line: 13,
+            phase: "visit-friend",
+            note: { vi: `Lần đầu gặp người ${friend}; khoảng cách ngắn nhất của họ là ${distance + 1}.`, en: `Person ${friend} is discovered for the first time; their shortest distance is ${distance + 1}.` },
+          });
+          queue.push(friend);
+          push({
+            title: { vi: `queue.append(${friend})`, en: `queue.append(${friend})` },
+            line: 14,
+            phase: "enqueue",
+            note: { vi: `Đưa người ${friend} vào cuối queue cho lớp ${distance + 1}.`, en: `Append person ${friend} for distance layer ${distance + 1}.` },
+          });
+        } else {
+          push({
+            title: { vi: `Bỏ qua ${friend}: đã visited`, en: `Skip ${friend}: already visited` },
+            line: 12,
+            phase: "skip-friend",
+            note: { vi: "Không enqueue lại, nhờ vậy BFS giữ đúng khoảng cách ngắn nhất.", en: "Do not enqueue again, preserving shortest BFS distances." },
+          });
+        }
+      }
+    }
+  }
+
+  currentLevel = level;
+  levelSize = queue.length;
+  activePerson = null;
+  activeFriend = null;
+  peopleAtLevel = [...queue];
+  push({
+    title: { vi: `Đã đến đúng level ${level}`, en: `Reached exact level ${level}` },
+    line: 16,
+    phase: "target-level",
+    note: { vi: `Queue hiện chỉ chứa những người có khoảng cách ngắn nhất bằng ${level}: [${peopleAtLevel.join(", ")}].`, en: `The queue now contains exactly the people whose shortest distance is ${level}: [${peopleAtLevel.join(", ")}].` },
+    vars: [{ name: "people at level", value: `[${peopleAtLevel.join(", ")}]` }],
+  });
+  push({
+    title: { vi: "count = Counter()", en: "count = Counter()" },
+    line: 16,
+    phase: "counter-init",
+    note: { vi: "Tạo bảng tần suất video rỗng trước khi gom từ nhóm mục tiêu.", en: "Create an empty video frequency table before collecting from the target group." },
+  });
+
+  for (const person of peopleAtLevel) {
+    activePerson = person;
+    activeVideo = null;
+    push({
+      title: { vi: `Gom video của người ${person}`, en: `Collect person ${person}'s videos` },
+      line: 17,
+      phase: "collect-person",
+      note: { vi: `Danh sách: [${watchedVideos[person].join(", ")}].`, en: `Watch list: [${watchedVideos[person].join(", ")}].` },
+    });
+    for (const video of watchedVideos[person]) {
+      activeVideo = video;
+      counts.set(video, (counts.get(video) || 0) + 1);
+      push({
+        title: { vi: `count["${video}"] = ${counts.get(video)}`, en: `count["${video}"] = ${counts.get(video)}` },
+        line: 18,
+        phase: "count-video",
+        note: { vi: `Tăng tần suất của "${video}" sau khi đọc người ${person}.`, en: `Increment "${video}" after reading person ${person}.` },
+        vars: [{ name: "count", value: JSON.stringify(Object.fromEntries(counts)) }],
+      });
+    }
+  }
+
+  activePerson = null;
+  activeVideo = null;
+  const beforeSort = [...counts.keys()];
+  push({
+    title: { vi: "Sắp xếp theo (frequency, title)", en: "Sort by (frequency, title)" },
+    line: 20,
+    phase: "sort",
+    note: { vi: "Tần suất tăng dần; nếu bằng nhau, tên video tăng dần theo thứ tự từ điển.", en: "Frequency ascending; ties use lexicographical title order." },
+    extra: { beforeSort },
+  });
+  result = beforeSort.sort((a, b) => counts.get(a) - counts.get(b) || a.localeCompare(b));
+  push({
+    title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
+    line: 20,
+    phase: "done",
+    note: { vi: `Kết quả cuối: [${result.join(", ")}].`, en: `Final result: [${result.join(", ")}].` },
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    extra: { beforeSort },
+  });
+  return { original: watchedVideos, friends, id, level, answer: result, steps };
+}
+
+function parseBombs2101(input) {
+  let bombs;
+  try {
+    bombs = typeof input === "string" ? JSON.parse(input) : input;
+  } catch (error) {
+    throw new Error("bombs must be a valid JSON array");
+  }
+  if (!Array.isArray(bombs) || bombs.length < 1 || bombs.length > 10) {
+    throw new Error("visualization supports 1 to 10 bombs");
+  }
+  bombs = bombs.map((bomb, index) => {
+    if (!Array.isArray(bomb) || bomb.length !== 3 || bomb.some((value) => !Number.isInteger(value) || value <= 0)) {
+      throw new Error(`bombs[${index}] must be [x, y, radius] with positive integers`);
+    }
+    return [...bomb];
+  });
+  return bombs;
+}
+
+function buildSteps2101(input) {
+  const bombs = parseBombs2101(input);
+  const n = bombs.length;
+  const graph = Array.from({ length: n }, () => []);
+  const steps = [];
+  let phase = "graph-init";
+  let buildI = null;
+  let buildJ = null;
+  let distanceCheck = null;
+  let activeStart = null;
+  let activeBomb = null;
+  let activeNext = null;
+  let stack = [];
+  let detonated = new Set();
+  const trialCounts = [];
+  let best = 0;
+  let answer = null;
+
+  const snapshot = () => ({
+    phase,
+    bombs: bombs.map((bomb) => [...bomb]),
+    graph: graph.map((neighbors) => [...neighbors]),
+    buildI,
+    buildJ,
+    distanceCheck: distanceCheck ? { ...distanceCheck } : null,
+    activeStart,
+    activeBomb,
+    activeNext,
+    stack: [...stack],
+    detonated: [...detonated],
+    trialCounts: trialCounts.map((trial) => ({ ...trial })),
+    best,
+    answer,
+  });
+  const push = ({ title, line, note, nextPhase = phase, final = false, vars = [] }) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      bombs2101View: snapshot(),
+      codeLines: [line],
+      vars: [
+        { name: "graph", value: JSON.stringify(graph) },
+        { name: "stack", value: `[${stack.join(", ")}]` },
+        { name: "best", value: best },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: `graph = [[] for _ in range(${n})]`, en: `graph = [[] for _ in range(${n})]` },
+    line: 4,
+    note: { vi: "Mỗi danh sách graph[i] sẽ chứa các bom mà bom i trực tiếp kích nổ được.", en: "Each graph[i] list stores bombs directly detonated by bomb i." },
+  });
+  for (let i = 0; i < n; i += 1) {
+    buildI = i;
+    for (let j = 0; j < n; j += 1) {
+      buildJ = j;
+      if (i === j) {
+        distanceCheck = null;
+        push({
+          title: { vi: `Bỏ qua cặp ${i} → ${j}`, en: `Skip pair ${i} → ${j}` },
+          line: 8,
+          nextPhase: "skip-self",
+          note: { vi: "Không cần tạo cạnh từ một bom tới chính nó.", en: "A bomb does not need a directed edge to itself." },
+        });
+        continue;
+      }
+      const [x1, y1, radius] = bombs[i];
+      const [x2, y2] = bombs[j];
+      const dx = x1 - x2;
+      const dy = y1 - y2;
+      const distanceSquared = dx * dx + dy * dy;
+      const radiusSquared = radius * radius;
+      const reaches = distanceSquared <= radiusSquared;
+      distanceCheck = { i, j, dx, dy, distanceSquared, radiusSquared, reaches };
+      push({
+        title: { vi: `Kiểm tra bom ${i} → ${j}`, en: `Check bomb ${i} → ${j}` },
+        line: 11,
+        nextPhase: "distance-check",
+        note: { vi: `${distanceSquared} ${reaches ? "≤" : ">"} ${radiusSquared}, nên ${reaches ? "có" : "không có"} cạnh ${i} → ${j}.`, en: `${distanceSquared} ${reaches ? "≤" : ">"} ${radiusSquared}, so edge ${i} → ${j} ${reaches ? "exists" : "does not exist"}.` },
+        vars: [{ name: "distance²", value: distanceSquared }, { name: "radius²", value: radiusSquared }],
+      });
+      if (reaches) {
+        graph[i].push(j);
+        push({
+          title: { vi: `graph[${i}].append(${j})`, en: `graph[${i}].append(${j})` },
+          line: 12,
+          nextPhase: "add-edge",
+          note: { vi: `Thêm cạnh có hướng ${i} → ${j}; chiều ngược lại phải được kiểm tra riêng.`, en: `Add directed edge ${i} → ${j}; the reverse direction is checked separately.` },
+        });
+      }
+    }
+  }
+
+  buildI = null;
+  buildJ = null;
+  distanceCheck = null;
+  push({
+    title: { vi: "Hoàn tất đồ thị kích nổ", en: "Detonation graph complete" },
+    line: 14,
+    nextPhase: "graph-done",
+    note: { vi: "Bây giờ thử mỗi bom làm điểm bắt đầu và đếm số node DFS đi tới được.", en: "Now try every bomb as the start and count nodes reachable by DFS." },
+  });
+
+  for (let start = 0; start < n; start += 1) {
+    activeStart = start;
+    activeBomb = null;
+    activeNext = null;
+    stack = [start];
+    detonated = new Set([start]);
+    push({
+      title: { vi: `Thử start = ${start}`, en: `Try start = ${start}` },
+      line: 15,
+      nextPhase: "dfs-start",
+      note: { vi: `Kích nổ bom ${start} đầu tiên; seen và stack cùng bắt đầu với ${start}.`, en: `Detonate bomb ${start} first; seen and stack both begin with ${start}.` },
+      vars: [{ name: "start", value: start }],
+    });
+    while (stack.length) {
+      activeBomb = stack.pop();
+      activeNext = null;
+      push({
+        title: { vi: `bomb = stack.pop() → ${activeBomb}`, en: `bomb = stack.pop() → ${activeBomb}` },
+        line: 18,
+        nextPhase: "dfs-pop",
+        note: { vi: `Duyệt các cạnh đi ra từ bom ${activeBomb}: [${graph[activeBomb].join(", ")}].`, en: `Inspect outgoing edges from bomb ${activeBomb}: [${graph[activeBomb].join(", ")}].` },
+      });
+      for (const next of graph[activeBomb]) {
+        activeNext = next;
+        push({
+          title: { vi: `Xét next = ${next}`, en: `Inspect next = ${next}` },
+          line: 19,
+          nextPhase: "dfs-edge",
+          note: { vi: `Cạnh ${activeBomb} → ${next} có thể truyền chuỗi kích nổ.`, en: `Edge ${activeBomb} → ${next} can continue the chain reaction.` },
+        });
+        if (!detonated.has(next)) {
+          detonated.add(next);
+          push({
+            title: { vi: `seen.add(${next})`, en: `seen.add(${next})` },
+            line: 21,
+            nextPhase: "dfs-see",
+            note: { vi: `Bom ${next} vừa được kích nổ lần đầu; tổng hiện tại là ${detonated.size}.`, en: `Bomb ${next} is detonated for the first time; the running total is ${detonated.size}.` },
+          });
+          stack.push(next);
+          push({
+            title: { vi: `stack.append(${next})`, en: `stack.append(${next})` },
+            line: 22,
+            nextPhase: "dfs-push",
+            note: { vi: `Đưa bom ${next} vào stack để tiếp tục lan theo cạnh của nó.`, en: `Push bomb ${next} so its outgoing edges can extend the chain.` },
+          });
+        } else {
+          push({
+            title: { vi: `Bỏ qua ${next}: đã nổ`, en: `Skip ${next}: already detonated` },
+            line: 20,
+            nextPhase: "dfs-skip",
+            note: { vi: "Không xử lý lại node đã seen, tránh vòng lặp trong đồ thị.", en: "Do not revisit a seen node, preventing graph cycles." },
+          });
+        }
+      }
+    }
+    const count = detonated.size;
+    best = Math.max(best, count);
+    trialCounts.push({ start, count, best });
+    activeBomb = null;
+    activeNext = null;
+    push({
+      title: { vi: `start ${start}: ${count} bom, best = ${best}`, en: `start ${start}: ${count} bombs, best = ${best}` },
+      line: 27,
+      nextPhase: "trial-done",
+      note: { vi: `Chuỗi bắt đầu tại ${start} kích nổ ${count}/${n} bom.`, en: `The chain starting at ${start} detonates ${count}/${n} bombs.` },
+      vars: [{ name: "count", value: count }],
+    });
+  }
+  answer = best;
+  activeStart = null;
+  activeBomb = null;
+  activeNext = null;
+  stack = [];
+  detonated = new Set();
+  push({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    line: 28,
+    nextPhase: "done",
+    note: { vi: `Số bom tối đa có thể kích nổ là ${answer}.`, en: `The maximum number of bombs that can be detonated is ${answer}.` },
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+  return { original: bombs, answer, steps };
+}
+
+Object.assign(module.exports, {
+  1311: {
+    id: 1311,
+    difficulty: "medium",
+    slug: "get-watched-videos-by-your-friends",
+    category: { key: "bfs", vi: "BFS", en: "BFS" },
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "sorting", vi: "Sắp xếp", en: "Sorting" },
+    ],
+    title: { vi: "Get Watched Videos by Your Friends", en: "Get Watched Videos by Your Friends" },
+    titleVi: { vi: "Video được xem bởi bạn bè ở đúng level", en: "Videos watched by friends at an exact level" },
+    statement: {
+      vi: "Dùng khoảng cách ngắn nhất trong đồ thị bạn bè để tìm mọi người ở đúng level tính từ id. Gom video họ đã xem rồi sắp xếp theo tần suất tăng dần, hòa thì theo tên.",
+      en: "Find everyone whose shortest friendship distance from id is exactly level. Collect their videos and sort by increasing frequency, breaking ties by title.",
+    },
+    defaultInput: '[["A","B"],["C"],["B","C"],["D"]]',
+    inputKind: "string",
+    inputLabel: { vi: "watchedVideos dạng JSON", en: "watchedVideos as JSON" },
+    extraParams: [
+      { key: "friends", label: { vi: "friends dạng JSON", en: "friends as JSON" }, type: "string", default: "[[1,2],[0,3],[0,3],[1,2]]" },
+      { key: "id", label: { vi: "id bắt đầu", en: "start id" }, default: 0, min: 0 },
+      { key: "level", label: { vi: "level cần lấy", en: "target level" }, default: 1, min: 1 },
+    ],
+    approach: [
+      { vi: "BFS từ id và xử lý từng lớp bằng level_size; sau level vòng lặp, queue chứa đúng các node ở khoảng cách level.", en: "BFS from id one layer at a time using level_size; after level iterations, the queue contains exactly the nodes at that distance." },
+      { vi: "Chỉ đếm video của những người còn trong queue, không đếm toàn bộ visited.", en: "Count videos only from people remaining in the queue, not everyone in visited." },
+      { vi: "Sắp xếp tên video bằng khóa (count[video], video).", en: "Sort video titles with the key (count[video], video)." },
+    ],
+    complexity: {
+      time: "O(V + E + M log M)",
+      space: "O(V + M)",
+      note: { vi: "BFS duyệt tối đa V người và E quan hệ; M là số tiêu đề video khác nhau cần sắp xếp.", en: "BFS visits at most V people and E friendships; M is the number of distinct video titles sorted." },
+    },
+    codeLabel: { vi: "BFS theo level + Counter", en: "Level BFS + Counter" },
+    code: [
+      "from collections import Counter, deque",
+      "",
+      "class Solution:",
+      "    def watchedVideosByFriends(self, watchedVideos, friends, id, level):",
+      "        queue = deque([id])",
+      "        visited = {id}",
+      "",
+      "        for _ in range(level):",
+      "            for _ in range(len(queue)):",
+      "                person = queue.popleft()",
+      "                for friend in friends[person]:",
+      "                    if friend not in visited:",
+      "                        visited.add(friend)",
+      "                        queue.append(friend)",
+      "",
+      "        count = Counter()",
+      "        for person in queue:",
+      "            count.update(watchedVideos[person])",
+      "",
+      "        return sorted(count, key=lambda video: (count[video], video))",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parseVideos1311(input, params);
+      return [parsed.watchedVideos, parsed.friends, parsed.id, parsed.level];
+    },
+    builder: buildSteps1311,
+  },
+  2101: {
+    id: 2101,
+    difficulty: "medium",
+    slug: "detonate-the-maximum-bombs",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "geometry", vi: "Hình học", en: "Geometry" },
+    ],
+    title: { vi: "Detonate the Maximum Bombs", en: "Detonate the Maximum Bombs" },
+    titleVi: { vi: "Kích nổ số bom tối đa", en: "Maximum bomb chain reaction" },
+    statement: {
+      vi: "Bom i kích nổ trực tiếp bom j nếu tâm j nằm trong bán kính i. Chọn một bom ban đầu để số bom nổ qua phản ứng dây chuyền là lớn nhất.",
+      en: "Bomb i directly detonates bomb j when j's center lies within i's radius. Choose one starting bomb to maximize the chain reaction.",
+    },
+    defaultInput: "[[1,2,3],[2,3,1],[3,4,2],[4,5,3],[5,6,4]]",
+    inputKind: "string",
+    inputLabel: { vi: "bombs dạng JSON [x,y,r]", en: "bombs as JSON [x,y,r]" },
+    approach: [
+      { vi: "Với mỗi cặp có thứ tự i, j, thêm cạnh i → j khi (xi-xj)² + (yi-yj)² ≤ ri².", en: "For every ordered pair i, j, add edge i → j when (xi-xj)² + (yi-yj)² ≤ ri²." },
+      { vi: "Cạnh có hướng: i có thể chạm j không đồng nghĩa j có thể chạm i.", en: "Edges are directed: i reaching j does not imply j reaches i." },
+      { vi: "Chạy DFS từ từng bom, đếm seen và lấy giá trị lớn nhất.", en: "Run DFS from each bomb, count seen nodes, and keep the maximum." },
+    ],
+    complexity: {
+      time: "O(n³)",
+      space: "O(n²)",
+      note: { vi: "Dựng đồ thị O(n²); tối đa n lần DFS, mỗi lần O(n + E), nên O(n³) khi đồ thị dày.", en: "Graph construction is O(n²); up to n DFS runs each cost O(n + E), giving O(n³) for a dense graph." },
+    },
+    codeLabel: { vi: "Đồ thị có hướng + DFS từ mọi bom", en: "Directed graph + DFS from every bomb" },
+    code: [
+      "class Solution:",
+      "    def maximumDetonation(self, bombs: List[List[int]]) -> int:",
+      "        n = len(bombs)",
+      "        graph = [[] for _ in range(n)]",
+      "",
+      "        for i, (x1, y1, r1) in enumerate(bombs):",
+      "            for j, (x2, y2, _) in enumerate(bombs):",
+      "                if i != j:",
+      "                    dx = x1 - x2",
+      "                    dy = y1 - y2",
+      "                    if dx * dx + dy * dy <= r1 * r1:",
+      "                        graph[i].append(j)",
+      "",
+      "        def dfs(start):",
+      "            stack = [start]",
+      "            seen = {start}",
+      "            while stack:",
+      "                bomb = stack.pop()",
+      "                for nxt in graph[bomb]:",
+      "                    if nxt not in seen:",
+      "                        seen.add(nxt)",
+      "                        stack.append(nxt)",
+      "            return len(seen)",
+      "",
+      "        answer = 0",
+      "        for start in range(n):",
+      "            answer = max(answer, dfs(start))",
+      "        return answer",
+    ],
+    liveArgs(input) {
+      return [parseBombs2101(input)];
+    },
+    builder: buildSteps2101,
   },
 });
