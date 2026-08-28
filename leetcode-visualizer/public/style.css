@@ -14042,6 +14042,11 @@ button:disabled {
   overflow-y: visible;
 }
 
+/* #2101 benefits from a wider canvas for its radius map and directed graph. */
+@media (min-width: 769px) {
+  .viz-split.problem-2101-layout .viz-left { flex-basis: 36%; }
+}
+
 /* LeetCode 173, 211, 212, 642 and 648: grow the code pane with taller tree/trie debug views. */
 @media (min-width: 769px) {
   .viz-split.problem-173-layout,
@@ -38512,15 +38517,17 @@ html, body {
 .vid1311-action strong, .bomb2101-action strong { color: #0c4a6e; font: 800 11px/1.3 Consolas, monospace; }
 .vid1311-action span, .bomb2101-action span { color: #334155; font: 600 10px/1.4 system-ui, sans-serif; overflow-wrap: anywhere; }
 .vid1311-network, .vid1311-queue, .vid1311-watch, .vid1311-count, .vid1311-sort,
-.bomb2101-map, .bomb2101-adj, .bomb2101-dfs > section, .bomb2101-trials { display: grid; min-width: 0; gap: 8px; padding: 10px; border: 1px solid #cbd5e1; background: #f8fafc; }
+.bomb2101-map, .bomb2101-graph, .bomb2101-adj, .bomb2101-dfs > section, .bomb2101-trials { display: grid; min-width: 0; gap: 8px; padding: 10px; border: 1px solid #cbd5e1; background: #f8fafc; }
 .vid1311-network > header, .vid1311-queue > header, .vid1311-watch > header, .vid1311-count > header, .vid1311-sort > header,
-.bomb2101-map > header, .bomb2101-adj > header, .bomb2101-dfs header, .bomb2101-trials > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.bomb2101-map > header, .bomb2101-graph > header, .bomb2101-adj > header, .bomb2101-dfs header, .bomb2101-trials > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .vid1311-network header strong, .vid1311-queue header strong, .vid1311-watch header strong, .vid1311-count header strong, .vid1311-sort header strong,
-.bomb2101-map header strong, .bomb2101-adj header strong, .bomb2101-dfs header strong, .bomb2101-trials header strong { color: #334155; font: 800 10px/1 Consolas, monospace; }
+.bomb2101-map header strong, .bomb2101-graph header strong, .bomb2101-adj header strong, .bomb2101-dfs header strong, .bomb2101-trials header strong { color: #334155; font: 800 10px/1 Consolas, monospace; }
 .vid1311-network header span, .vid1311-queue header span, .vid1311-watch header span, .vid1311-count header span, .vid1311-sort header span,
-.bomb2101-map header span, .bomb2101-adj header span, .bomb2101-dfs header span, .bomb2101-trials header span { color: #64748b; font: 800 8px/1.2 Consolas, monospace; text-align: right; }
-.vid1311-graph-scroll, .bomb2101-plot-scroll { min-height: 190px; overflow-x: auto; background: #ffffff; }
-.vid1311-graph-scroll svg, .bomb2101-plot-scroll svg { display: block; min-width: 100%; height: auto; }
+.bomb2101-map header span, .bomb2101-graph header span, .bomb2101-adj header span, .bomb2101-dfs header span, .bomb2101-trials header span { color: #64748b; font: 800 8px/1.2 Consolas, monospace; text-align: right; }
+.vid1311-graph-scroll, .bomb2101-plot-scroll, .bomb2101-chain-scroll { min-height: 190px; overflow-x: auto; background: #ffffff; }
+.bomb2101-plot-scroll { min-height: 300px; }
+.bomb2101-chain-scroll { min-height: 310px; }
+.vid1311-graph-scroll svg, .bomb2101-plot-scroll svg, .bomb2101-chain-scroll svg { display: block; min-width: 100%; height: auto; }
 .vid1311-edges line { stroke: #94a3b8; stroke-width: 2; }
 .vid1311-edges line.active { stroke: #d97706; stroke-width: 5; }
 .vid1311-node rect { fill: #ffffff; stroke: #64748b; stroke-width: 1.5; }
@@ -38557,13 +38564,12 @@ html, body {
 .vid1311-sort > div > span.done { border-color: #16a34a; background: #f0fdf4; }
 
 /* Directed reachability and geometry trace for #2101. */
-.bomb2101-edges line { stroke: #64748b; stroke-width: 2; opacity: .78; }
-.bomb2101-edges line.active { stroke: #d97706; stroke-width: 5; opacity: 1; }
-.bomb2101-edges marker path { fill: #64748b; }
+.bomb2101-map-relation line { stroke: #d97706; stroke-width: 4; stroke-dasharray: 8 5; opacity: .9; }
+.bomb2101-map-relation marker path { fill: #d97706; }
+#bomb2101-map-arrow path { fill: #d97706; }
 .bomb2101-bomb .radius { fill: rgba(14, 165, 233, .055); stroke: #38bdf8; stroke-width: 1.5; }
 .bomb2101-bomb .center { fill: #ffffff; stroke: #334155; stroke-width: 2; }
-.bomb2101-bomb text { fill: #0f172a; font: 900 11px/1 Consolas, monospace; }
-.bomb2101-bomb .coord { fill: #475569; font-size: 8px; }
+.bomb2101-bomb text { fill: #0f172a; font: 900 12px/1 Consolas, monospace; }
 .bomb2101-bomb.source .radius { fill: rgba(124, 58, 237, .11); stroke: #7c3aed; stroke-width: 3; }
 .bomb2101-bomb.check .center { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 4; }
 .bomb2101-bomb.start .center { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 4; }
@@ -38571,6 +38577,28 @@ html, body {
 .bomb2101-bomb.stacked .center { fill: #ecfeff; stroke: #0891b2; stroke-width: 4; }
 .bomb2101-bomb.active .center { fill: #fffbeb; stroke: #d97706; stroke-width: 5; }
 .bomb2101-bomb.next .center { fill: #fff1f2; stroke: #e11d48; stroke-width: 5; }
+.bomb2101-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(106px, 1fr)); gap: 6px; }
+.bomb2101-data-item { display: grid; min-width: 0; gap: 3px; padding: 7px 9px; border-left: 3px solid #64748b; background: #ffffff; }
+.bomb2101-data-item small { color: #64748b; font: 800 7px/1 Consolas, monospace; }
+.bomb2101-data-item strong { color: #334155; font: 800 11px/1 Consolas, monospace; }
+.bomb2101-data-item em { color: #0284c7; font: 800 9px/1 Consolas, monospace; font-style: normal; }
+.bomb2101-data-item.source, .bomb2101-data-item.start { border-color: #7c3aed; background: #f5f3ff; }
+.bomb2101-data-item.check, .bomb2101-data-item.next { border-color: #e11d48; background: #fff1f2; }
+.bomb2101-data-item.active { border-color: #d97706; background: #fffbeb; }
+.bomb2101-data-item.detonated { box-shadow: inset 0 -3px #16a34a; }
+.bomb2101-chain-edges path { fill: none; stroke: #64748b; stroke-width: 2.5; opacity: .82; }
+.bomb2101-chain-edges path.active { stroke: #d97706; stroke-width: 5; opacity: 1; }
+.bomb2101-chain-edges marker path { fill: #64748b; stroke: none; }
+#bomb2101-graph-arrow path { fill: #64748b; }
+.bomb2101-chain-node circle { fill: #ffffff; stroke: #334155; stroke-width: 2.5; }
+.bomb2101-chain-node .id { fill: #0f172a; font: 900 16px/1 Consolas, monospace; }
+.bomb2101-chain-node .degree { fill: #64748b; font: 800 9px/1 Consolas, monospace; }
+.bomb2101-chain-node.source circle, .bomb2101-chain-node.start circle { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 4; }
+.bomb2101-chain-node.check circle { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 4; }
+.bomb2101-chain-node.detonated circle { fill: #f0fdf4; stroke: #16a34a; stroke-width: 4; }
+.bomb2101-chain-node.stacked circle { fill: #ecfeff; stroke: #0891b2; stroke-width: 5; }
+.bomb2101-chain-node.active circle { fill: #fffbeb; stroke: #d97706; stroke-width: 6; }
+.bomb2101-chain-node.next circle { fill: #fff1f2; stroke: #e11d48; stroke-width: 6; }
 .bomb2101-check { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto minmax(110px, 1fr) auto; align-items: center; gap: 8px 12px; padding: 9px 11px; border-left: 4px solid #64748b; background: #f8fafc; }
 .bomb2101-check small { color: #475569; font: 900 10px/1 Consolas, monospace; }
 .bomb2101-check strong { color: #334155; font: 800 12px/1.2 Consolas, monospace; }
@@ -38596,7 +38624,7 @@ html, body {
 [data-theme="dark"] .vid1311-viz, [data-theme="dark"] .bomb2101-viz { border-color: #475569; background: #0f172a; color: #e2e8f0; }
 [data-theme="dark"] .vid1311-stages > span, [data-theme="dark"] .bomb2101-stages > span,
 [data-theme="dark"] .vid1311-network, [data-theme="dark"] .vid1311-queue, [data-theme="dark"] .vid1311-watch, [data-theme="dark"] .vid1311-count, [data-theme="dark"] .vid1311-sort,
-[data-theme="dark"] .bomb2101-map, [data-theme="dark"] .bomb2101-adj, [data-theme="dark"] .bomb2101-dfs > section, [data-theme="dark"] .bomb2101-trials, [data-theme="dark"] .bomb2101-answer { border-color: #475569; background: #111827; }
+[data-theme="dark"] .bomb2101-map, [data-theme="dark"] .bomb2101-graph, [data-theme="dark"] .bomb2101-adj, [data-theme="dark"] .bomb2101-dfs > section, [data-theme="dark"] .bomb2101-trials, [data-theme="dark"] .bomb2101-answer { border-color: #475569; background: #111827; }
 [data-theme="dark"] .vid1311-stages > span.done, [data-theme="dark"] .bomb2101-stages > span.done,
 [data-theme="dark"] .vid1311-watch > div > span.target, [data-theme="dark"] .vid1311-sort > div > span.done,
 [data-theme="dark"] .bomb2101-trials > div > span.done, [data-theme="dark"] .bomb2101-answer.ready { border-color: #22c55e; background: #052e16; }
@@ -38607,8 +38635,8 @@ html, body {
 [data-theme="dark"] .vid1311-action small, [data-theme="dark"] .vid1311-action strong, [data-theme="dark"] .bomb2101-action small, [data-theme="dark"] .bomb2101-action strong { color: #e0f2fe; }
 [data-theme="dark"] .vid1311-action span, [data-theme="dark"] .bomb2101-action span { color: #bae6fd; }
 [data-theme="dark"] .vid1311-network header strong, [data-theme="dark"] .vid1311-queue header strong, [data-theme="dark"] .vid1311-watch header strong, [data-theme="dark"] .vid1311-count header strong, [data-theme="dark"] .vid1311-sort header strong,
-[data-theme="dark"] .bomb2101-map header strong, [data-theme="dark"] .bomb2101-adj header strong, [data-theme="dark"] .bomb2101-dfs header strong, [data-theme="dark"] .bomb2101-trials header strong { color: #e2e8f0; }
-[data-theme="dark"] .vid1311-graph-scroll, [data-theme="dark"] .bomb2101-plot-scroll,
+[data-theme="dark"] .bomb2101-map header strong, [data-theme="dark"] .bomb2101-graph header strong, [data-theme="dark"] .bomb2101-adj header strong, [data-theme="dark"] .bomb2101-dfs header strong, [data-theme="dark"] .bomb2101-trials header strong { color: #e2e8f0; }
+[data-theme="dark"] .vid1311-graph-scroll, [data-theme="dark"] .bomb2101-plot-scroll, [data-theme="dark"] .bomb2101-chain-scroll,
 [data-theme="dark"] .vid1311-queue > div > span, [data-theme="dark"] .vid1311-watch > div > span, [data-theme="dark"] .vid1311-count > div > span, [data-theme="dark"] .vid1311-sort > div > span,
 [data-theme="dark"] .bomb2101-adj > div > span, [data-theme="dark"] .bomb2101-dfs section > div > span, [data-theme="dark"] .bomb2101-trials > div > span { background: #0f172a; }
 [data-theme="dark"] .vid1311-node rect { fill: #0f172a; stroke: #64748b; }
@@ -38619,6 +38647,11 @@ html, body {
 [data-theme="dark"] .vid1311-node.target rect { fill: #052e16; }
 [data-theme="dark"] .vid1311-node.active rect { fill: #422006; }
 [data-theme="dark"] .bomb2101-bomb .center { fill: #0f172a; stroke: #cbd5e1; }
+[data-theme="dark"] .bomb2101-data-item { background: #0f172a; }
+[data-theme="dark"] .bomb2101-data-item strong { color: #e2e8f0; }
+[data-theme="dark"] .bomb2101-chain-node circle { fill: #0f172a; stroke: #cbd5e1; }
+[data-theme="dark"] .bomb2101-chain-node .id { fill: #f8fafc; }
+[data-theme="dark"] .bomb2101-chain-node .degree { fill: #94a3b8; }
 [data-theme="dark"] .bomb2101-check.idle { background: #111827; }
 [data-theme="dark"] .bomb2101-check.yes { background: #052e16; }
 [data-theme="dark"] .bomb2101-check.no { background: #4c0519; }

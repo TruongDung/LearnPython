@@ -2025,6 +2025,7 @@ function renderCode() {
     split.classList.toggle("problem-211-layout", problemId === 211);
     split.classList.toggle("problem-212-layout", problemId === 212);
     split.classList.toggle("problem-685-layout", problemId === 685);
+    split.classList.toggle("problem-2101-layout", problemId === 2101);
   }
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
@@ -19622,42 +19623,50 @@ function renderVideos1311View(step) {
   const vi = lang === "vi";
   const watchedVideos = Array.isArray(view.watchedVideos) ? view.watchedVideos : [];
   const friends = Array.isArray(view.friends) ? view.friends : [];
+  const isDfs = view.algorithm === "dfs";
   const queue = Array.isArray(view.queue) ? view.queue : [];
-  const queueSet = new Set(queue);
+  const callStack = Array.isArray(view.callStack) ? view.callStack : [];
+  const stackPeople = callStack.map((frame) => frame.person);
+  const queueSet = new Set(isDfs ? stackPeople : queue);
   const visited = new Set(view.visited || []);
   const targetPeople = new Set(view.peopleAtLevel || []);
   const counts = view.counts || {};
   const result = Array.isArray(view.result) ? view.result : [];
   const beforeSort = Array.isArray(view.beforeSort) ? view.beforeSort : Object.keys(counts);
   const phase = String(view.phase || "queue-init");
-  const phaseIndex = ["queue-init", "visited-init", "level-start", "dequeue", "inspect-friend", "visit-friend", "enqueue", "skip-friend"].includes(phase) ? 0
-    : phase === "target-level" ? 1
-      : ["counter-init", "collect-person", "count-video"].includes(phase) ? 2 : 3;
-  const stageLabels = vi
-    ? ["BFS theo lớp", `Chốt level ${view.targetLevel}`, "Đếm video", "Sắp xếp kết quả"]
-    : ["Layered BFS", `Lock level ${view.targetLevel}`, "Count videos", "Sort result"];
+  const phaseIndex = isDfs
+    ? (["distance-init", "dfs-start", "dfs-call", "distance-check", "distance-update", "level-check", "level-stop", "inspect-friend", "dfs-recurse", "dfs-prune", "dfs-return"].includes(phase) ? 0
+      : ["counter-init", "scan-person", "skip-person"].includes(phase) ? 1
+        : phase === "count-video" ? 2 : 3)
+    : (["queue-init", "visited-init", "level-start", "dequeue", "inspect-friend", "visit-friend", "enqueue", "skip-friend"].includes(phase) ? 0
+      : phase === "target-level" ? 1
+        : ["counter-init", "collect-person", "count-video"].includes(phase) ? 2 : 3);
+  const stageLabels = isDfs
+    ? (vi ? ["DFS cập nhật distance", `Lọc level ${view.targetLevel}`, "Đếm video", "Sắp xếp kết quả"] : ["DFS improves distance", `Filter level ${view.targetLevel}`, "Count videos", "Sort result"])
+    : (vi ? ["BFS theo lớp", `Chốt level ${view.targetLevel}`, "Đếm video", "Sắp xếp kết quả"] : ["Layered BFS", `Lock level ${view.targetLevel}`, "Count videos", "Sort result"]);
   const stages = stageLabels.map((label, index) => {
     const state = index < phaseIndex || phase === "done" ? "done" : index === phaseIndex ? "active" : "pending";
     return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
   }).join("");
 
-  const distances = Array(friends.length).fill(null);
+  const layoutDistances = Array(friends.length).fill(null);
   if (Number.isInteger(view.id) && friends[view.id]) {
-    distances[view.id] = 0;
+    layoutDistances[view.id] = 0;
     const bfs = [view.id];
     for (let head = 0; head < bfs.length; head += 1) {
       const person = bfs[head];
       (friends[person] || []).forEach((friend) => {
-        if (distances[friend] === null) {
-          distances[friend] = distances[person] + 1;
+        if (layoutDistances[friend] === null) {
+          layoutDistances[friend] = layoutDistances[person] + 1;
           bfs.push(friend);
         }
       });
     }
   }
-  const maxDistance = Math.max(0, ...distances.filter((distance) => distance !== null));
-  const columns = Array.from({ length: maxDistance + 1 }, (_, distance) => watchedVideos.map((_, person) => person).filter((person) => distances[person] === distance));
-  const unreachable = watchedVideos.map((_, person) => person).filter((person) => distances[person] === null);
+  const displayDistances = isDfs && Array.isArray(view.distance) ? view.distance : layoutDistances;
+  const maxDistance = Math.max(0, ...layoutDistances.filter((distance) => distance !== null));
+  const columns = Array.from({ length: maxDistance + 1 }, (_, distance) => watchedVideos.map((_, person) => person).filter((person) => layoutDistances[person] === distance));
+  const unreachable = watchedVideos.map((_, person) => person).filter((person) => layoutDistances[person] === null);
   if (unreachable.length) columns.push(unreachable);
   const maxRows = Math.max(1, ...columns.map((column) => column.length));
   const svgWidth = Math.max(620, columns.length * 170 + 50);
@@ -19685,14 +19694,18 @@ function renderVideos1311View(step) {
     if (targetPeople.has(person)) classes.push("target");
     if (person === view.activePerson) classes.push("active");
     if (person === view.activeFriend) classes.push("friend");
-    const badge = targetPeople.has(person) ? `LEVEL ${view.targetLevel}` : queueSet.has(person) ? "QUEUE" : visited.has(person) ? "SEEN" : "";
-    return `<g class="${classes.join(" ")}" transform="translate(${position.x} ${position.y})"><rect x="-57" y="-29" width="114" height="58" rx="6"></rect><text class="person" text-anchor="middle" y="-5">PERSON ${person}</text><text class="distance" text-anchor="middle" y="12">dist ${distances[person] ?? "∞"}${badge ? ` · ${badge}` : ""}</text></g>`;
+    const badge = targetPeople.has(person) ? `LEVEL ${view.targetLevel}` : queueSet.has(person) ? (isDfs ? "STACK" : "QUEUE") : visited.has(person) ? (isDfs ? "KNOWN" : "SEEN") : "";
+    return `<g class="${classes.join(" ")}" transform="translate(${position.x} ${position.y})"><rect x="-57" y="-29" width="114" height="58" rx="6"></rect><text class="person" text-anchor="middle" y="-5">PERSON ${person}</text><text class="distance" text-anchor="middle" y="12">dist ${displayDistances[person] ?? "∞"}${badge ? ` · ${badge}` : ""}</text></g>`;
   }).join("");
-  const graphHtml = `<div class="vid1311-graph-scroll"><svg viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(vi ? "Đồ thị bạn bè theo khoảng cách BFS" : "Friend graph grouped by BFS distance")}"><g class="vid1311-edges">${edges}</g><g>${nodes}</g></svg></div>`;
+  const graphHtml = `<div class="vid1311-graph-scroll"><svg viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(isDfs ? (vi ? "Đồ thị bạn bè và distance đang được DFS cập nhật" : "Friend graph with distances being improved by DFS") : (vi ? "Đồ thị bạn bè theo khoảng cách BFS" : "Friend graph grouped by BFS distance"))}"><g class="vid1311-edges">${edges}</g><g>${nodes}</g></svg></div>`;
 
-  const queueHtml = queue.length
-    ? queue.map((person, index) => `<span class="${person === view.activePerson ? "active" : ""}"><small>${index === 0 ? "FRONT" : index}</small><strong>${person}</strong><em>dist ${distances[person] ?? "?"}</em></span>`).join("")
-    : `<em>${vi ? "queue rỗng" : "empty queue"}</em>`;
+  const queueHtml = isDfs
+    ? (callStack.length
+      ? callStack.map((frame, index) => `<span class="${index === callStack.length - 1 ? "active" : ""}"><small>${index === callStack.length - 1 ? "TOP" : index}</small><strong>dfs(${frame.person}, ${frame.depth})</strong><em>dist[${frame.person}] = ${displayDistances[frame.person] ?? "∞"}</em></span>`).join("")
+      : `<em>${vi ? "call stack rỗng" : "empty call stack"}</em>`)
+    : (queue.length
+      ? queue.map((person, index) => `<span class="${person === view.activePerson ? "active" : ""}"><small>${index === 0 ? "FRONT" : index}</small><strong>${person}</strong><em>dist ${displayDistances[person] ?? "?"}</em></span>`).join("")
+      : `<em>${vi ? "queue rỗng" : "empty queue"}</em>`);
   const peopleCards = watchedVideos.map((videos, person) => {
     const classes = [];
     if (targetPeople.has(person)) classes.push("target");
@@ -19708,11 +19721,11 @@ function renderVideos1311View(step) {
     ? order.map((video, index) => `<span class="${phase === "done" ? "done" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(video)}</strong><em>(${counts[video] ?? "?"}, ${escapeHtml(video)})</em></span>`).join("")
     : `<em>${vi ? "chưa có ứng viên" : "no candidates yet"}</em>`;
 
-  $("treeView").innerHTML = `<section class="vid1311-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng BFS và xếp hạng video" : "BFS and video ranking simulation")}">
+  $("treeView").innerHTML = `<section class="vid1311-viz ${isDfs ? "dfs" : "bfs"}" role="img" aria-label="${escapeHtml(isDfs ? (vi ? "Mô phỏng DFS distance và xếp hạng video" : "DFS distance and video ranking simulation") : (vi ? "Mô phỏng BFS và xếp hạng video" : "BFS and video ranking simulation"))}">
     <div class="vid1311-stages">${stages}</div>
     <section class="vid1311-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     <section class="vid1311-network"><header><strong>${vi ? "MẠNG BẠN BÈ" : "FRIEND NETWORK"}</strong><span>${vi ? `nguồn ${view.id} · cần đúng khoảng cách ${view.targetLevel}` : `source ${view.id} · exact distance ${view.targetLevel}`}</span></header>${graphHtml}</section>
-    <div class="vid1311-state"><section class="vid1311-queue"><header><strong>BFS QUEUE</strong><span>${queue.length}</span></header><div>${queueHtml}</div></section><section class="vid1311-level"><small>${vi ? "LỚP ĐANG XỬ LÝ" : "CURRENT LAYER"}</small><strong>${view.currentLevel ?? 0} / ${view.targetLevel}</strong><span>level_size = ${view.levelSize ?? "?"}</span></section></div>
+    <div class="vid1311-state"><section class="vid1311-queue"><header><strong>${isDfs ? "DFS CALL STACK" : "BFS QUEUE"}</strong><span>${isDfs ? callStack.length : queue.length}</span></header><div>${queueHtml}</div></section><section class="vid1311-level"><small>${isDfs ? (vi ? "DEPTH ĐANG THỬ" : "CURRENT DEPTH") : (vi ? "LỚP ĐANG XỬ LÝ" : "CURRENT LAYER")}</small><strong>${view.currentLevel ?? 0} / ${view.targetLevel}</strong><span>${isDfs ? `old dist = ${view.previousDistance ?? "∞"}` : `level_size = ${view.levelSize ?? "?"}`}</span></section></div>
     <section class="vid1311-watch"><header><strong>${vi ? "VIDEO CỦA TỪNG NGƯỜI" : "VIDEOS BY PERSON"}</strong><span>${vi ? "chỉ thẻ xanh được đưa vào Counter" : "only green cards feed the Counter"}</span></header><div>${peopleCards}</div></section>
     <div class="vid1311-bottom"><section class="vid1311-count"><header><strong>COUNTER</strong><span>${frequencyEntries.length}</span></header><div>${frequencyHtml}</div></section><section class="vid1311-sort"><header><strong>${vi ? "THỨ TỰ (TẦN SUẤT, TÊN)" : "ORDER (FREQUENCY, TITLE)"}</strong><span>${phase === "done" ? "SORTED" : "PENDING"}</span></header><div>${sortHtml}</div></section></div>
   </section>`;
@@ -19756,21 +19769,8 @@ function renderBombs2101View(step) {
     y: plotHeight - (offsetY + (y - minY) * scale),
     radius: radius * scale,
   }));
-  const edgeLines = graph.flatMap((neighbors, from) => neighbors.map((to) => {
-    const a = points[from];
-    const b = points[to];
-    if (!a || !b) return "";
-    const active = from === view.activeBomb && to === view.activeNext;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const endX = b.x - dx / length * 13;
-    const endY = b.y - dy / length * 13;
-    return `<line class="${active ? "active" : ""}" x1="${a.x}" y1="${a.y}" x2="${endX}" y2="${endY}" marker-end="url(#bomb2101-arrow)"></line>`;
-  })).join("");
-  const rings = bombs.map((bomb, index) => {
-    const point = points[index];
-    const classes = ["bomb2101-bomb"];
+  const stateClasses = (index, base) => {
+    const classes = [base];
     if (index === view.buildI) classes.push("source");
     if (index === view.buildJ) classes.push("check");
     if (index === view.activeStart) classes.push("start");
@@ -19778,9 +19778,55 @@ function renderBombs2101View(step) {
     if (stackSet.has(index)) classes.push("stacked");
     if (index === view.activeBomb) classes.push("active");
     if (index === view.activeNext) classes.push("next");
-    return `<g class="${classes.join(" ")}"><circle class="radius" cx="${point.x}" cy="${point.y}" r="${point.radius}"></circle><circle class="center" cx="${point.x}" cy="${point.y}" r="12"></circle><text x="${point.x}" y="${point.y + 4}" text-anchor="middle">${index}</text><text class="coord" x="${point.x}" y="${point.y + 27}" text-anchor="middle">(${bomb[0]},${bomb[1]}) r=${bomb[2]}</text></g>`;
+    return classes;
+  };
+  const relationFrom = Number.isInteger(view.buildI) ? view.buildI : view.activeBomb;
+  const relationTo = Number.isInteger(view.buildJ) ? view.buildJ : view.activeNext;
+  const relationLine = Number.isInteger(relationFrom) && Number.isInteger(relationTo) && relationFrom !== relationTo && points[relationFrom] && points[relationTo]
+    ? `<line class="pair" x1="${points[relationFrom].x}" y1="${points[relationFrom].y}" x2="${points[relationTo].x}" y2="${points[relationTo].y}" marker-end="url(#bomb2101-map-arrow)"></line>`
+    : "";
+  const rings = bombs.map((bomb, index) => {
+    const point = points[index];
+    return `<g class="${stateClasses(index, "bomb2101-bomb").join(" ")}"><circle class="radius" cx="${point.x}" cy="${point.y}" r="${point.radius}"></circle><circle class="center" cx="${point.x}" cy="${point.y}" r="14"></circle><text x="${point.x}" y="${point.y + 4}" text-anchor="middle">${index}</text></g>`;
   }).join("");
-  const plotHtml = `<div class="bomb2101-plot-scroll"><svg viewBox="0 0 ${plotWidth} ${plotHeight}" role="img" aria-label="${escapeHtml(vi ? "Vị trí bom, bán kính thật theo cùng tỉ lệ và cạnh kích nổ" : "Bomb positions, radii at one scale, and detonation edges")}"><defs><marker id="bomb2101-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g class="bomb2101-edges">${edgeLines}</g><g>${rings}</g></svg></div>`;
+  const plotHtml = `<div class="bomb2101-plot-scroll"><svg viewBox="0 0 ${plotWidth} ${plotHeight}" role="img" aria-label="${escapeHtml(vi ? "Vị trí tâm bom và bán kính thật theo cùng tỉ lệ" : "Bomb centers and radii at one scale")}"><defs><marker id="bomb2101-map-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g class="bomb2101-map-relation">${relationLine}</g><g>${rings}</g></svg></div>`;
+  const bombDataHtml = bombs.map((bomb, index) => `<span class="${stateClasses(index, "bomb2101-data-item").join(" ")}"><small>BOMB ${index}</small><strong>(${bomb[0]}, ${bomb[1]})</strong><em>r = ${bomb[2]}</em></span>`).join("");
+
+  const chainWidth = 720;
+  const chainHeight = 340;
+  const chainCenter = { x: chainWidth / 2, y: chainHeight / 2 };
+  const chainRadius = bombs.length <= 2 ? 150 : 122;
+  const chainPoints = bombs.map((_, index) => {
+    if (bombs.length === 1) return { ...chainCenter };
+    const angle = bombs.length === 2 ? (index === 0 ? Math.PI : 0) : -Math.PI / 2 + index * Math.PI * 2 / bombs.length;
+    return { x: chainCenter.x + Math.cos(angle) * chainRadius, y: chainCenter.y + Math.sin(angle) * chainRadius };
+  });
+  const chainEdges = graph.flatMap((neighbors, from) => neighbors.map((to) => {
+    const a = chainPoints[from];
+    const b = chainPoints[to];
+    if (!a || !b) return "";
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length;
+    const uy = dy / length;
+    const startX = a.x + ux * 27;
+    const startY = a.y + uy * 27;
+    const endX = b.x - ux * 31;
+    const endY = b.y - uy * 31;
+    const reciprocal = (graph[to] || []).includes(from);
+    const bend = reciprocal ? 24 : 0;
+    const controlX = (a.x + b.x) / 2 - uy * bend;
+    const controlY = (a.y + b.y) / 2 + ux * bend;
+    const active = (from === view.activeBomb && to === view.activeNext) || (from === view.buildI && to === view.buildJ);
+    return `<path class="${active ? "active" : ""}" d="M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}" marker-end="url(#bomb2101-graph-arrow)"></path>`;
+  })).join("");
+  const chainNodes = bombs.map((_, index) => {
+    const point = chainPoints[index];
+    const outDegree = (graph[index] || []).length;
+    return `<g class="${stateClasses(index, "bomb2101-chain-node").join(" ")}" transform="translate(${point.x} ${point.y})"><circle r="24"></circle><text class="id" text-anchor="middle" y="5">${index}</text><text class="degree" text-anchor="middle" y="43">out: ${outDegree}</text></g>`;
+  }).join("");
+  const chainHtml = `<div class="bomb2101-chain-scroll"><svg viewBox="0 0 ${chainWidth} ${chainHeight}" role="img" aria-label="${escapeHtml(vi ? "Đồ thị kích nổ có hướng với các node giãn đều" : "Directed detonation graph with evenly spaced nodes")}"><defs><marker id="bomb2101-graph-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g class="bomb2101-chain-edges">${chainEdges}</g><g>${chainNodes}</g></svg></div>`;
 
   const check = view.distanceCheck;
   const checkHtml = check
@@ -19803,7 +19849,8 @@ function renderBombs2101View(step) {
   $("treeView").innerHTML = `<section class="bomb2101-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng phản ứng dây chuyền bom" : "Bomb chain reaction simulation")}">
     <div class="bomb2101-stages">${stages}</div>
     <section class="bomb2101-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
-    <section class="bomb2101-map"><header><strong>${vi ? "BẢN ĐỒ BÁN KÍNH + CẠNH CÓ HƯỚNG" : "RADIUS MAP + DIRECTED EDGES"}</strong><span>${vi ? "vòng tròn dùng cùng một tỉ lệ" : "all circles use the same scale"}</span></header>${plotHtml}</section>
+    <section class="bomb2101-map"><header><strong>${vi ? "1. BẢN ĐỒ HÌNH HỌC" : "1. GEOMETRY MAP"}</strong><span>${vi ? "tâm + bán kính thật, cùng một tỉ lệ" : "centers + true radii at one scale"}</span></header>${plotHtml}<div class="bomb2101-data">${bombDataHtml}</div></section>
+    <section class="bomb2101-graph"><header><strong>${vi ? "2. ĐỒ THỊ KÍCH NỔ CÓ HƯỚNG" : "2. DIRECTED DETONATION GRAPH"}</strong><span>${vi ? "node được giãn đều để đọc cạnh i → j" : "nodes are spread out to clarify i → j"}</span></header>${chainHtml}</section>
     ${checkHtml}
     <section class="bomb2101-adj"><header><strong>ADJACENCY LIST</strong><span>i → graph[i]</span></header><div>${adjacency}</div></section>
     <div class="bomb2101-dfs"><section><header><strong>DFS STACK</strong><span>${stack.length}</span></header><div>${stackHtml}</div></section><section><header><strong>${vi ? "ĐÃ KÍCH NỔ" : "DETONATED / SEEN"}</strong><span>${detonated.size}</span></header><div>${seenHtml}</div></section></div>

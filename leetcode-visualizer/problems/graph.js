@@ -22785,6 +22785,231 @@ function buildSteps1311(input, params = {}) {
   return { original: watchedVideos, friends, id, level, answer: result, steps };
 }
 
+function buildSteps1311Dfs(input, params = {}) {
+  const { watchedVideos, friends, id, level } = parseVideos1311(input, params);
+  const steps = [];
+  const distance = Array(friends.length).fill(Infinity);
+  const callStack = [];
+  const counts = new Map();
+  let activePerson = null;
+  let activeFriend = null;
+  let activeVideo = null;
+  let activeDepth = null;
+  let previousDistance = null;
+  let result = [];
+
+  const finiteDistance = () => distance.map((value) => Number.isFinite(value) ? value : null);
+  const peopleAtLevel = () => distance.map((value, person) => value === level ? person : null).filter((person) => person !== null);
+  const snapshot = (phase, extra = {}) => ({
+    algorithm: "dfs",
+    phase,
+    watchedVideos: watchedVideos.map((videos) => [...videos]),
+    friends: friends.map((neighbors) => [...neighbors]),
+    id,
+    targetLevel: level,
+    currentLevel: activeDepth,
+    levelSize: null,
+    queue: [],
+    visited: distance.map((value, person) => Number.isFinite(value) ? person : null).filter((person) => person !== null),
+    peopleAtLevel: peopleAtLevel(),
+    distance: finiteDistance(),
+    callStack: callStack.map((frame) => ({ ...frame })),
+    activePerson,
+    activeFriend,
+    activeVideo,
+    activeDepth,
+    previousDistance,
+    counts: Object.fromEntries(counts),
+    result: [...result],
+    ...extra,
+  });
+  const push = ({ title, line, note, phase, final = false, vars = [], extra = {} }) => steps.push({
+    title,
+    arr: [],
+    sub: [],
+    highlight: [],
+    mark: [],
+    videos1311View: snapshot(phase, extra),
+    codeLines: [line],
+    vars: [
+      { name: "level", value: level },
+      { name: "distance", value: `[${finiteDistance().map((value) => value === null ? "inf" : value).join(", ")}]` },
+      { name: "call stack", value: callStack.length ? callStack.map((frame) => `dfs(${frame.person}, ${frame.depth})`).join(" -> ") : "[]" },
+      ...vars,
+    ],
+    note,
+    final,
+  });
+
+  push({
+    title: { vi: `distance = [inf] * ${friends.length}`, en: `distance = [inf] * ${friends.length}` },
+    line: 7,
+    phase: "distance-init",
+    note: { vi: "Chưa biết khoảng cách ngắn nhất tới bất kỳ người nào.", en: "No shortest distance is known for any person yet." },
+  });
+
+  const dfs = (person, depth) => {
+    callStack.push({ person, depth });
+    activePerson = person;
+    activeDepth = depth;
+    activeFriend = null;
+    previousDistance = Number.isFinite(distance[person]) ? distance[person] : null;
+    push({
+      title: { vi: `Gọi dfs(${person}, ${depth})`, en: `Call dfs(${person}, ${depth})` },
+      line: 9,
+      phase: "dfs-call",
+      note: { vi: `Thử đi tới người ${person} bằng đường dài ${depth}.`, en: `Try reaching person ${person} with a path of length ${depth}.` },
+      vars: [{ name: "person", value: person }, { name: "depth", value: depth }],
+    });
+
+    const oldDistance = distance[person];
+    previousDistance = Number.isFinite(oldDistance) ? oldDistance : null;
+    push({
+      title: { vi: `${depth} >= distance[${person}] (${Number.isFinite(oldDistance) ? oldDistance : "inf"})?`, en: `${depth} >= distance[${person}] (${Number.isFinite(oldDistance) ? oldDistance : "inf"})?` },
+      line: 10,
+      phase: "distance-check",
+      note: { vi: depth >= oldDistance ? "Đường này không tốt hơn khoảng cách đã biết." : "Đây là lần đầu hoặc là một đường đi ngắn hơn.", en: depth >= oldDistance ? "This path is not better than the known distance." : "This is the first path or a shorter path." },
+    });
+    if (depth >= oldDistance) {
+      push({
+        title: { vi: `return khỏi dfs(${person}, ${depth})`, en: `Return from dfs(${person}, ${depth})` },
+        line: 11,
+        phase: "dfs-prune",
+        note: { vi: `Giữ distance[${person}] = ${oldDistance}; không mở rộng nhánh này.`, en: `Keep distance[${person}] = ${oldDistance}; do not expand this branch.` },
+      });
+      callStack.pop();
+      return;
+    }
+
+    distance[person] = depth;
+    push({
+      title: { vi: `distance[${person}] = ${depth}`, en: `distance[${person}] = ${depth}` },
+      line: 13,
+      phase: "distance-update",
+      note: { vi: previousDistance === null ? `Ghi nhận khoảng cách đầu tiên tới người ${person}.` : `Cải thiện khoảng cách người ${person}: ${previousDistance} → ${depth}.`, en: previousDistance === null ? `Record the first distance to person ${person}.` : `Improve person ${person}'s distance: ${previousDistance} → ${depth}.` },
+    });
+
+    push({
+      title: { vi: `${depth} == level (${level})?`, en: `${depth} == level (${level})?` },
+      line: 15,
+      phase: "level-check",
+      note: { vi: depth === level ? "Đã tới độ sâu cần tìm, không đi sâu hơn." : "Chưa tới level mục tiêu, tiếp tục duyệt bạn bè.", en: depth === level ? "The target depth is reached, so do not go deeper." : "The target level is not reached; continue through friends." },
+    });
+    if (depth === level) {
+      push({
+        title: { vi: `Dừng nhánh tại người ${person}`, en: `Stop branch at person ${person}` },
+        line: 16,
+        phase: "level-stop",
+        note: { vi: `Người ${person} hiện có distance đúng bằng level ${level}.`, en: `Person ${person} currently has distance exactly equal to level ${level}.` },
+      });
+      callStack.pop();
+      return;
+    }
+
+    for (const friend of friends[person]) {
+      activePerson = person;
+      activeDepth = depth;
+      activeFriend = friend;
+      push({
+        title: { vi: `Xét friend = ${friend}`, en: `Inspect friend = ${friend}` },
+        line: 18,
+        phase: "inspect-friend",
+        note: { vi: `Từ người ${person}, thử đường tới ${friend} với depth ${depth + 1}.`, en: `From person ${person}, try reaching ${friend} at depth ${depth + 1}.` },
+      });
+      push({
+        title: { vi: `dfs(${friend}, ${depth + 1})`, en: `dfs(${friend}, ${depth + 1})` },
+        line: 19,
+        phase: "dfs-recurse",
+        note: { vi: "Tạo recursive frame mới; frame hiện tại tạm dừng.", en: "Create a new recursive frame while the current frame pauses." },
+      });
+      dfs(friend, depth + 1);
+    }
+
+    activePerson = person;
+    activeDepth = depth;
+    activeFriend = null;
+    push({
+      title: { vi: `Hoàn tất dfs(${person}, ${depth})`, en: `Finish dfs(${person}, ${depth})` },
+      line: 18,
+      phase: "dfs-return",
+      note: { vi: `Đã thử mọi bạn trực tiếp của người ${person}; quay lại frame trước.`, en: `Every direct friend of person ${person} has been tried; return to the previous frame.` },
+    });
+    callStack.pop();
+  };
+
+  push({
+    title: { vi: `dfs(${id}, 0)`, en: `dfs(${id}, 0)` },
+    line: 21,
+    phase: "dfs-start",
+    note: { vi: `Bắt đầu tại id ${id} với khoảng cách 0.`, en: `Start at id ${id} with distance 0.` },
+  });
+  dfs(id, 0);
+
+  activePerson = null;
+  activeFriend = null;
+  activeDepth = null;
+  previousDistance = null;
+  push({
+    title: { vi: "count = Counter()", en: "count = Counter()" },
+    line: 23,
+    phase: "counter-init",
+    note: { vi: `DFS đã chốt distance; những người ở level ${level} là [${peopleAtLevel().join(", ")}].`, en: `DFS has settled distances; people at level ${level} are [${peopleAtLevel().join(", ")}].` },
+  });
+
+  for (let person = 0; person < friends.length; person += 1) {
+    activePerson = person;
+    activeDepth = distance[person];
+    push({
+      title: { vi: `Xét person = ${person}`, en: `Inspect person = ${person}` },
+      line: 24,
+      phase: "scan-person",
+      note: { vi: `distance[${person}] = ${Number.isFinite(distance[person]) ? distance[person] : "inf"}.`, en: `distance[${person}] = ${Number.isFinite(distance[person]) ? distance[person] : "inf"}.` },
+    });
+    if (distance[person] !== level) {
+      push({
+        title: { vi: `Bỏ qua người ${person}`, en: `Skip person ${person}` },
+        line: 25,
+        phase: "skip-person",
+        note: { vi: `Khoảng cách không bằng level ${level}, nên video của người này không được đếm.`, en: `The distance is not level ${level}, so this person's videos are not counted.` },
+      });
+      continue;
+    }
+    for (const video of watchedVideos[person]) {
+      activeVideo = video;
+      counts.set(video, (counts.get(video) || 0) + 1);
+      push({
+        title: { vi: `count["${video}"] = ${counts.get(video)}`, en: `count["${video}"] = ${counts.get(video)}` },
+        line: 26,
+        phase: "count-video",
+        note: { vi: `Người ${person} ở đúng level; tăng tần suất "${video}".`, en: `Person ${person} is at the exact level; increment "${video}".` },
+      });
+    }
+    activeVideo = null;
+  }
+
+  activePerson = null;
+  activeDepth = null;
+  const beforeSort = [...counts.keys()];
+  push({
+    title: { vi: "Sắp xếp theo (frequency, title)", en: "Sort by (frequency, title)" },
+    line: 28,
+    phase: "sort",
+    note: { vi: "Phần xếp hạng giống Cách 1: tần suất tăng dần, sau đó tên tăng dần.", en: "Ranking matches Approach 1: frequency ascending, then title ascending." },
+    extra: { beforeSort },
+  });
+  result = beforeSort.sort((a, b) => counts.get(a) - counts.get(b) || a.localeCompare(b));
+  push({
+    title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
+    line: 28,
+    phase: "done",
+    note: { vi: `Kết quả DFS tham khảo: [${result.join(", ")}].`, en: `Reference DFS result: [${result.join(", ")}].` },
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    extra: { beforeSort },
+  });
+  return { original: watchedVideos, friends, id, level, answer: result, steps };
+}
+
 function parseBombs2101(input) {
   let bombs;
   try {
@@ -23021,21 +23246,25 @@ Object.assign(module.exports, {
     inputKind: "string",
     inputLabel: { vi: "watchedVideos dạng JSON", en: "watchedVideos as JSON" },
     extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: BFS theo level (khuyên dùng)", en: "Approach 1: Level BFS (recommended)" } },
+        { value: "2", label: { vi: "Cách 2: DFS + khoảng cách (tham khảo)", en: "Approach 2: DFS + distances (reference)" } },
+      ] },
       { key: "friends", label: { vi: "friends dạng JSON", en: "friends as JSON" }, type: "string", default: "[[1,2],[0,3],[0,3],[1,2]]" },
       { key: "id", label: { vi: "id bắt đầu", en: "start id" }, default: 0, min: 0 },
       { key: "level", label: { vi: "level cần lấy", en: "target level" }, default: 1, min: 1 },
     ],
     approach: [
-      { vi: "BFS từ id và xử lý từng lớp bằng level_size; sau level vòng lặp, queue chứa đúng các node ở khoảng cách level.", en: "BFS from id one layer at a time using level_size; after level iterations, the queue contains exactly the nodes at that distance." },
-      { vi: "Chỉ đếm video của những người còn trong queue, không đếm toàn bộ visited.", en: "Count videos only from people remaining in the queue, not everyone in visited." },
-      { vi: "Sắp xếp tên video bằng khóa (count[video], video).", en: "Sort video titles with the key (count[video], video)." },
+      { vi: "Cách 1 (khuyên dùng): BFS xử lý từng lớp bằng level_size; sau level vòng lặp, queue chứa đúng các node ở khoảng cách ngắn nhất bằng level.", en: "Approach 1 (recommended): process BFS one layer at a time with level_size; after level iterations, the queue contains exactly nodes whose shortest distance equals level." },
+      { vi: "Cách 2 (tham khảo): DFS lưu distance nhỏ nhất. Chỉ mở rộng khi depth mới nhỏ hơn distance[person], và dừng nhánh khi depth == level.", en: "Approach 2 (reference): DFS stores shortest distances. Expand only when a new depth improves distance[person], and stop a branch when depth == level." },
+      { vi: "Cả hai cách chỉ đếm video ở đúng level rồi sắp xếp bằng khóa (count[video], video).", en: "Both approaches count videos at the exact level, then sort with the key (count[video], video)." },
     ],
     complexity: {
-      time: "O(V + E + M log M)",
+      time: "BFS O(V + E + M log M); DFS worst O(VE + M log M)",
       space: "O(V + M)",
-      note: { vi: "BFS duyệt tối đa V người và E quan hệ; M là số tiêu đề video khác nhau cần sắp xếp.", en: "BFS visits at most V people and E friendships; M is the number of distinct video titles sorted." },
+      note: { vi: "BFS duyệt mỗi người/cạnh một lần. DFS có thể quay lại một người khi tìm được khoảng cách ngắn hơn, nên chỉ dùng để tham khảo.", en: "BFS visits each person/edge once. DFS may revisit a person when it finds a shorter distance, so it is included as a reference approach." },
     },
-    codeLabel: { vi: "BFS theo level + Counter", en: "Level BFS + Counter" },
+    codeLabel: { vi: "Cách 1: BFS theo level + Counter", en: "Approach 1: Level BFS + Counter" },
     code: [
       "from collections import Counter, deque",
       "",
@@ -23058,11 +23287,43 @@ Object.assign(module.exports, {
       "",
       "        return sorted(count, key=lambda video: (count[video], video))",
     ],
+    code2Label: { vi: "Cách 2: DFS + distance (tham khảo)", en: "Approach 2: DFS + distance (reference)" },
+    code2: [
+      "from collections import Counter",
+      "from math import inf",
+      "",
+      "class Solution:",
+      "    def watchedVideosByFriends(self, watchedVideos, friends, id, level):",
+      "        n = len(friends)",
+      "        distance = [inf] * n",
+      "",
+      "        def dfs(person, depth):",
+      "            if depth >= distance[person]:",
+      "                return",
+      "",
+      "            distance[person] = depth",
+      "",
+      "            if depth == level:",
+      "                return",
+      "",
+      "            for friend in friends[person]:",
+      "                dfs(friend, depth + 1)",
+      "",
+      "        dfs(id, 0)",
+      "",
+      "        count = Counter()",
+      "        for person in range(n):",
+      "            if distance[person] == level:",
+      "                count.update(watchedVideos[person])",
+      "",
+      "        return sorted(count, key=lambda video: (count[video], video))",
+    ],
     liveArgs(input, params = {}) {
       const parsed = parseVideos1311(input, params);
       return [parsed.watchedVideos, parsed.friends, parsed.id, parsed.level];
     },
     builder: buildSteps1311,
+    builder2: buildSteps1311Dfs,
   },
   2101: {
     id: 2101,
