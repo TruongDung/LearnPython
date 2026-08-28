@@ -5161,6 +5161,71 @@ function renderLexPermutation3720View(step) {
   </section>`;
 }
 
+function renderPalindromicPermutation3734View(step) {
+  const view = step.palindrome3734View || {};
+  const target = String(view.target || "");
+  const source = String(view.s || "");
+  const middle = String(view.middle || "");
+  const candidate = String(view.candidate || "");
+  const draft = Array.isArray(view.draft) ? view.draft : [];
+  const shown = candidate ? [...candidate] : Array.from({ length: target.length }, (_, index) => draft[index] || "");
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const halfLength = Math.floor(target.length / 2);
+  const vi = lang === "vi";
+  const phaseText = {
+    count: vi ? "Đếm ký tự" : "Count characters",
+    invalid: vi ? "Không tạo được palindrome" : "Palindrome impossible",
+    split: vi ? "Tách thành các cặp" : "Split into pairs",
+    match: vi ? "Khớp nửa trái" : "Match left half",
+    blocked: vi ? "Prefix bị chặn" : "Prefix blocked",
+    compare: vi ? "So sánh toàn palindrome" : "Compare full palindrome",
+    scan: vi ? "Quét cặp lớn hơn" : "Scan larger pairs",
+    greater: vi ? "Đã tăng nửa trái" : "Left half increased",
+    suffix: vi ? "Điền suffix nhỏ nhất" : "Fill smallest suffix",
+    backtrack: vi ? "Quay lui nửa trái" : "Backtrack left half",
+    done: vi ? "Hoàn tất" : "Complete",
+    fail: vi ? "Không có đáp án" : "No answer",
+  };
+  const targetCells = [...target].map((char, index) => {
+    const mirror = target.length - 1 - activeIndex;
+    const state = index === activeIndex ? "active" : index === mirror && activeIndex >= 0 ? "mirror-active" : "";
+    return `<span class="pal3734-cell ${state}"><small>i=${index}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("");
+  const palindromeCells = shown.map((char, index) => {
+    const isCenter = target.length % 2 === 1 && index === halfLength;
+    const side = isCenter ? "center" : index < halfLength ? "left" : "right";
+    const mirror = target.length - 1 - activeIndex;
+    const isActive = index === activeIndex || (activeIndex >= 0 && index === mirror);
+    let state = char ? "filled" : "empty";
+    if (isActive) state += " active";
+    if (candidate && view.phase === "done") state += " done";
+    if (view.phase === "backtrack" && isActive) state += " release";
+    const label = isCenter
+      ? (vi ? "tâm" : "center")
+      : index < halfLength
+        ? (vi ? `trái ${index}` : `left ${index}`)
+        : (vi ? `gương ${target.length - 1 - index}` : `mirror ${target.length - 1 - index}`);
+    return `<span class="pal3734-cell build ${side} ${state}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(char || "—")}</strong></span>`;
+  }).join("");
+  const remaining = Array.isArray(view.remaining) ? view.remaining : [];
+  const pairCells = remaining.length
+    ? remaining.map((item) => `<span><strong>${escapeHtml(item.char)}</strong><small>× ${item.amount} ${vi ? "cặp" : "pair"}${item.amount === 1 ? "" : "s"}</small></span>`).join("")
+    : `<em>${vi ? "không còn cặp" : "no pairs remain"}</em>`;
+  const sourceCounts = Array.isArray(view.fullCount) ? view.fullCount : [];
+  const sourceSummary = sourceCounts.map((item) => `${item.char}×${item.amount}`).join("  ");
+  const relation = candidate ? (candidate > target ? ">" : candidate === target ? "=" : "<") : "?";
+  const relationState = candidate ? (candidate > target ? "greater" : "not-greater") : "pending";
+  const treeView = $("treeView");
+  treeView.innerHTML = `<section class="pal3734-viz" style="--pal3734-cols:${Math.max(target.length, 1)}">
+    <header><strong>PALINDROMIC GREEDY</strong><span>${escapeHtml(phaseText[view.phase] || "")}</span></header>
+    <section class="pal3734-source"><span><small>SOURCE</small><strong>${escapeHtml(source)}</strong></span><span><small>${vi ? "TẦN SUẤT" : "FREQUENCY"}</small><strong>${escapeHtml(sourceSummary || "—")}</strong></span><span><small>${vi ? "KÝ TỰ GIỮA" : "CENTER"}</small><strong>${escapeHtml(middle || (vi ? "không có" : "none"))}</strong></span></section>
+    <section class="pal3734-row target"><header><strong>TARGET</strong><span>${escapeHtml(target)}</span></header><div class="pal3734-cells">${targetCells}</div></section>
+    <section class="pal3734-row palindrome"><header><strong>${vi ? "PALINDROME ĐANG DỰNG" : "PALINDROME BUILD"}</strong><span>${vi ? "nửa phải = phản chiếu nửa trái" : "right half = mirror of left half"}</span></header><div class="pal3734-cells">${palindromeCells}</div></section>
+    <section class="pal3734-pool"><header><strong>${vi ? "POOL NỬA TRÁI" : "LEFT-HALF POOL"}</strong><span>${vi ? "mỗi phần tử đặt vào hai ô" : "each item fills two slots"}</span></header><div>${pairCells}</div></section>
+    <footer><span><small>${vi ? "SO SÁNH TOÀN CHUỖI" : "FULL-STRING COMPARISON"}</small><strong>${escapeHtml(candidate || (vi ? "chưa dựng xong" : "not complete"))}</strong></span><b class="${relationState}">${escapeHtml(relation)}</b><span><small>TARGET</small><strong>${escapeHtml(target)}</strong></span></footer>
+  </section>`;
+}
+
 // ---- Palindrome Partitioning (#131): show the backtracking state directly. ----
 function renderPalindromePartitionView(step) {
   const view = step.palindromePartitionView || {};
@@ -21707,6 +21772,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLexPermutation3720View(step);
+  } else if (step.palindrome3734View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPalindromicPermutation3734View(step);
   } else if (step.ticketsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

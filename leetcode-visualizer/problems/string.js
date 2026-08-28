@@ -13902,6 +13902,453 @@ Object.assign(module.exports, {
   },
 });
 
+function buildSteps3734(input, params) {
+  const s = String(input ?? "");
+  const target = String(params?.target ?? "");
+  if (!/^[a-z]+$/.test(s) || !/^[a-z]+$/.test(target) || s.length !== target.length) {
+    throw new Error("s and target must be lowercase strings with the same non-zero length");
+  }
+  if (s.length > 14) throw new Error("Visualization supports strings up to length 14");
+
+  const n = s.length;
+  const middleIndex = Math.floor(n / 2);
+  const fullCount = new Array(26).fill(0);
+  const half = new Array(26).fill(0);
+  const left = [];
+  const steps = [];
+  let middle = "";
+  let i = 0;
+
+  const pool = () => half.map((amount, code) => amount > 0
+    ? { char: String.fromCharCode(97 + code), amount }
+    : null).filter(Boolean);
+  const palindromeFrom = (leftHalf) => `${leftHalf.join("")}${middle}${[...leftHalf].reverse().join("")}`;
+  const draftPalindrome = (leftHalf) => {
+    const result = new Array(n).fill("");
+    leftHalf.forEach((char, index) => {
+      result[index] = char;
+      result[n - 1 - index] = char;
+    });
+    if (middle) result[middleIndex] = middle;
+    return result;
+  };
+  const push = ({ title, line, note, phase, activeIndex = i, candidate = "", final = false, vars = [] }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      palindrome3734View: {
+        s,
+        target,
+        left: [...left],
+        middle,
+        draft: draftPalindrome(left),
+        candidate,
+        remaining: pool(),
+        fullCount: fullCount.map((amount, code) => amount > 0
+          ? { char: String.fromCharCode(97 + code), amount }
+          : null).filter(Boolean),
+        phase,
+        activeIndex,
+      },
+      codeLines: [line],
+      vars: [
+        { name: "left", value: JSON.stringify(left.join("")) },
+        { name: "middle", value: JSON.stringify(middle) },
+        { name: "i", value: i },
+        { name: "half pool", value: pool().map((item) => `${item.char}x${item.amount}`).join(" ") || "empty" },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "cnt = [0] * 26", en: "cnt = [0] * 26" },
+    line: 4,
+    phase: "count",
+    activeIndex: -1,
+    note: { vi: "Đếm toàn bộ ký tự của s trước khi tách thành các cặp đối xứng.", en: "Count every character in s before splitting them into mirrored pairs." },
+  });
+  for (let index = 0; index < n; index++) {
+    const char = s[index];
+    const code = char.charCodeAt(0) - 97;
+    fullCount[code]++;
+    push({
+      title: { vi: `Đếm s[${index}] = '${char}'`, en: `Count s[${index}] = '${char}'` },
+      line: 6,
+      phase: "count",
+      activeIndex: -1,
+      note: { vi: `cnt['${char}'] = ${fullCount[code]}.`, en: `cnt['${char}'] = ${fullCount[code]}.` },
+      vars: [{ name: `cnt['${char}']`, value: fullCount[code] }],
+    });
+  }
+
+  const odd = [];
+  for (let code = 0; code < 26; code++) {
+    if (fullCount[code] % 2 === 1) odd.push(code);
+  }
+  push({
+    title: { vi: `odd = ${odd.length}`, en: `odd = ${odd.length}` },
+    line: 8,
+    phase: odd.length > 1 ? "invalid" : "split",
+    activeIndex: -1,
+    note: odd.length > 1
+      ? { vi: "Có hơn một ký tự mang tần suất lẻ, nên không thể xếp thành palindrome.", en: "More than one character has an odd frequency, so no palindrome can be formed." }
+      : { vi: "Có tối đa một tần suất lẻ, nên tồn tại hoán vị palindrome.", en: "At most one frequency is odd, so a palindromic permutation exists." },
+    vars: [{ name: "odd chars", value: odd.map((code) => String.fromCharCode(97 + code)).join("") || "none" }],
+  });
+  if (odd.length > 1) {
+    push({
+      title: { vi: "return ''", en: "return ''" },
+      line: 10,
+      phase: "fail",
+      activeIndex: -1,
+      note: { vi: "Dừng ngay vì s không có bất kỳ hoán vị palindrome nào.", en: "Stop because s has no palindromic permutation." },
+      final: true,
+      vars: [{ name: "answer", value: '""' }],
+    });
+    return { original: s, target, answer: "", steps };
+  }
+
+  middle = odd.length ? String.fromCharCode(97 + odd[0]) : "";
+  for (let code = 0; code < 26; code++) half[code] = Math.floor(fullCount[code] / 2);
+  push({
+    title: { vi: `middle = ${middle ? `'${middle}'` : "''"}`, en: `middle = ${middle ? `'${middle}'` : "''"}` },
+    line: 12,
+    phase: "split",
+    activeIndex: -1,
+    note: middle
+      ? { vi: `'${middle}' là ký tự lẻ duy nhất nên phải nằm chính giữa.`, en: `'${middle}' is the only odd-frequency character, so it must occupy the center.` }
+      : { vi: "Độ dài chẵn nên palindrome không có ô giữa.", en: "The length is even, so the palindrome has no center slot." },
+  });
+  push({
+    title: { vi: "half = cnt // 2", en: "half = cnt // 2" },
+    line: 13,
+    phase: "split",
+    activeIndex: -1,
+    note: { vi: "Mỗi ký tự trong half đại diện cho một cặp: một ô bên trái và ô phản chiếu bên phải.", en: "Each character in half represents a pair: one left slot and its mirrored right slot." },
+  });
+
+  const m = Math.floor(n / 2);
+  i = 0;
+  push({
+    title: { vi: `m = ${m}; i = 0`, en: `m = ${m}; i = 0` },
+    line: 19,
+    phase: "match",
+    activeIndex: m ? 0 : -1,
+    note: { vi: "Chỉ cần xây nửa trái; nửa phải luôn được phản chiếu tự động.", en: "Only the left half must be built; the right half is always mirrored automatically." },
+  });
+
+  while (i < m && half[target.charCodeAt(i) - 97] > 0) {
+    const char = target[i];
+    push({
+      title: { vi: `Có thể giữ target[${i}] = '${char}'`, en: `Can keep target[${i}] = '${char}'` },
+      line: 21,
+      phase: "match",
+      activeIndex: i,
+      note: { vi: `half['${char}'] > 0, nên giữ prefix bằng target lâu nhất có thể.`, en: `half['${char}'] > 0, so keep the prefix equal to target for as long as possible.` },
+    });
+    left.push(char);
+    push({
+      title: { vi: `left.append('${char}')`, en: `left.append('${char}')` },
+      line: 22,
+      phase: "match",
+      activeIndex: i,
+      note: { vi: `Đặt '${char}' ở cả vị trí ${i} và ${n - 1 - i}.`, en: `Place '${char}' at both positions ${i} and ${n - 1 - i}.` },
+    });
+    half[char.charCodeAt(0) - 97]--;
+    push({
+      title: { vi: `half['${char}'] -= 1`, en: `half['${char}'] -= 1` },
+      line: 23,
+      phase: "match",
+      activeIndex: i,
+      note: { vi: `Đã sử dụng một cặp '${char}'.`, en: `One mirrored '${char}' pair has been used.` },
+    });
+    i++;
+    push({
+      title: { vi: `i += 1 → ${i}`, en: `i += 1 → ${i}` },
+      line: 24,
+      phase: "match",
+      activeIndex: i < m ? i : -1,
+      note: { vi: i < m ? "Chuyển sang ô tiếp theo của nửa trái." : "Đã khớp hết nửa trái." , en: i < m ? "Move to the next left-half slot." : "The entire left half is matched." },
+    });
+  }
+
+  push({
+    title: i === m
+      ? { vi: "Đã khớp toàn bộ nửa trái", en: "The entire left half is matched" }
+      : { vi: `Không thể giữ target[${i}]`, en: `Cannot keep target[${i}]` },
+    line: 26,
+    phase: i === m ? "compare" : "blocked",
+    activeIndex: i < m ? i : -1,
+    note: i === m
+      ? { vi: "Dựng palindrome hoàn chỉnh rồi mới biết nó có thực sự lớn hơn target hay không.", en: "Build the full palindrome to determine whether it is actually greater than target." }
+      : { vi: `Cặp '${target[i]}' không còn trong half; thử tăng ngay tại vị trí này.`, en: `No '${target[i]}' pair remains in half; try increasing at this position.` },
+  });
+
+  if (i === m) {
+    const candidate = palindromeFrom(left);
+    push({
+      title: { vi: `candidate = '${candidate}'`, en: `candidate = '${candidate}'` },
+      line: 27,
+      phase: "compare",
+      activeIndex: -1,
+      candidate,
+      note: { vi: `Phản chiếu left='${left.join("")}' qua middle để tạo candidate.`, en: `Mirror left='${left.join("")}' around middle to form the candidate.` },
+      vars: [{ name: "candidate > target", value: candidate > target }],
+    });
+    if (candidate > target) {
+      push({
+        title: { vi: `return '${candidate}'`, en: `return '${candidate}'` },
+        line: 29,
+        phase: "done",
+        activeIndex: -1,
+        candidate,
+        note: { vi: "Nửa trái bằng target nhưng phần giữa/phải làm palindrome lớn hơn; đây là đáp án nhỏ nhất.", en: "The left half matches target, while the center/right makes the palindrome greater; this is the smallest answer." },
+        final: true,
+        vars: [{ name: "answer", value: JSON.stringify(candidate) }],
+      });
+      return { original: s, target, answer: candidate, steps };
+    }
+
+    i--;
+    push({
+      title: { vi: `candidate <= target, i = ${i}`, en: `candidate <= target, i = ${i}` },
+      line: 30,
+      phase: "backtrack",
+      activeIndex: i,
+      candidate,
+      note: { vi: "Candidate chưa đủ lớn, nên phải tìm hoán vị nửa trái kế tiếp.", en: "The candidate is not large enough, so find the next left-half permutation." },
+    });
+    if (i < 0) {
+      push({
+        title: { vi: "return ''", en: "return ''" },
+        line: 31,
+        phase: "fail",
+        activeIndex: -1,
+        candidate,
+        note: { vi: "Không có ô nào trong nửa trái để tăng.", en: "There is no left-half slot that can be increased." },
+        final: true,
+        vars: [{ name: "answer", value: '""' }],
+      });
+      return { original: s, target, answer: "", steps };
+    }
+    const restored = target[i];
+    half[restored.charCodeAt(0) - 97]++;
+    push({
+      title: { vi: `half['${restored}'] += 1`, en: `half['${restored}'] += 1` },
+      line: 32,
+      phase: "backtrack",
+      activeIndex: i,
+      note: { vi: `Trả cặp '${restored}' về pool trước khi chọn lại vị trí ${i}.`, en: `Restore the '${restored}' pair before choosing position ${i} again.` },
+    });
+    left.pop();
+    push({
+      title: { vi: "left.pop()", en: "left.pop()" },
+      line: 33,
+      phase: "backtrack",
+      activeIndex: i,
+      note: { vi: `Bỏ cặp tại vị trí ${i} khỏi palindrome tạm thời.`, en: `Remove the pair at position ${i} from the draft palindrome.` },
+    });
+  }
+
+  while (i >= 0) {
+    const targetCode = target.charCodeAt(i) - 97;
+    push({
+      title: { vi: `Thử tăng vị trí ${i}`, en: `Try to increase position ${i}` },
+      line: 35,
+      phase: "scan",
+      activeIndex: i,
+      note: { vi: `Tìm cặp nhỏ nhất lớn hơn '${target[i]}'.`, en: `Find the smallest available pair greater than '${target[i]}'.` },
+    });
+
+    let pick = -1;
+    for (let code = targetCode + 1; code < 26; code++) {
+      const char = String.fromCharCode(97 + code);
+      const available = half[code] > 0;
+      push({
+        title: { vi: `Kiểm tra '${char}': ${available ? "còn cặp" : "hết"}`, en: `Check '${char}': ${available ? "available" : "empty"}` },
+        line: 38,
+        phase: available ? "greater" : "scan",
+        activeIndex: i,
+        note: available
+          ? { vi: `'${char}' là ký tự nhỏ nhất lớn hơn '${target[i]}' còn trong half.`, en: `'${char}' is the smallest character greater than '${target[i]}' remaining in half.` }
+          : { vi: `half['${char}'] = 0, tiếp tục quét.`, en: `half['${char}'] = 0, so continue scanning.` },
+        vars: [{ name: "next", value: char }, { name: "half[next]", value: half[code] }],
+      });
+      if (available) {
+        pick = code;
+        break;
+      }
+    }
+
+    if (pick >= 0) {
+      const char = String.fromCharCode(97 + pick);
+      left.push(char);
+      half[pick]--;
+      push({
+        title: { vi: `Chọn '${char}' tại vị trí ${i}`, en: `Choose '${char}' at position ${i}` },
+        line: 40,
+        phase: "greater",
+        activeIndex: i,
+        note: { vi: "Từ vị trí này, palindrome chắc chắn lớn hơn target; suffix có thể điền nhỏ nhất.", en: "From this position onward, the palindrome is guaranteed greater than target, so the suffix can be minimized." },
+      });
+
+      for (let code = 0; code < 26; code++) {
+        const amount = half[code];
+        if (amount <= 0) continue;
+        const tailChar = String.fromCharCode(97 + code);
+        for (let count = 0; count < amount; count++) left.push(tailChar);
+        half[code] = 0;
+        push({
+          title: { vi: `Suffix thêm '${tailChar}' × ${amount}`, en: `Append '${tailChar}' × ${amount} to suffix` },
+          line: 41,
+          phase: "suffix",
+          activeIndex: i,
+          note: { vi: "Điền half theo thứ tự a → z để palindrome hoàn chỉnh nhỏ nhất.", en: "Fill the half from a → z to make the completed palindrome as small as possible." },
+        });
+      }
+      const answer = palindromeFrom(left);
+      push({
+        title: { vi: `return '${answer}'`, en: `return '${answer}'` },
+        line: 42,
+        phase: "done",
+        activeIndex: i,
+        candidate: answer,
+        note: { vi: "Phản chiếu nửa trái hoàn chỉnh để nhận palindrome nhỏ nhất lớn hơn target.", en: "Mirror the completed left half to obtain the smallest palindrome greater than target." },
+        final: true,
+        vars: [{ name: "answer", value: JSON.stringify(answer) }],
+      });
+      return { original: s, target, answer, steps };
+    }
+
+    i--;
+    push({
+      title: { vi: `Không tăng được, i = ${i}`, en: `Cannot increase, i = ${i}` },
+      line: 43,
+      phase: "backtrack",
+      activeIndex: i,
+      note: i >= 0
+        ? { vi: "Lùi sang trái để thử một vị trí có ảnh hưởng từ điển lớn hơn.", en: "Move left to try an earlier lexicographic position." }
+        : { vi: "Đã đi qua đầu nửa trái.", en: "Moved past the start of the left half." },
+    });
+    if (i >= 0) {
+      const restored = target[i];
+      half[restored.charCodeAt(0) - 97]++;
+      left.pop();
+      push({
+        title: { vi: `Hoàn tác cặp '${restored}'`, en: `Restore the '${restored}' pair` },
+        line: 46,
+        phase: "backtrack",
+        activeIndex: i,
+        note: { vi: `Trả '${restored}' vào half và xóa nó khỏi left.`, en: `Return '${restored}' to half and remove it from left.` },
+      });
+    }
+  }
+
+  push({
+    title: { vi: "return ''", en: "return ''" },
+    line: 47,
+    phase: "fail",
+    activeIndex: -1,
+    note: { vi: "Không còn vị trí nào có thể tăng, nên không tồn tại đáp án.", en: "No position can be increased, so no answer exists." },
+    final: true,
+    vars: [{ name: "answer", value: '""' }],
+  });
+  return { original: s, target, answer: "", steps };
+}
+
+Object.assign(module.exports, {
+  3734: {
+    id: 3734,
+    difficulty: "hard",
+    slug: "lexicographically-smallest-palindromic-permutation-greater-than-target",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "frequency", vi: "Đếm tần suất", en: "Frequency Count" },
+      { key: "palindrome", vi: "Palindrome", en: "Palindrome" },
+    ],
+    title: { vi: "Lexicographically Smallest Palindromic Permutation Greater Than Target", en: "Lexicographically Smallest Palindromic Permutation Greater Than Target" },
+    titleVi: { vi: "Hoán vị palindrome nhỏ nhất lớn hơn target", en: "Smallest palindromic permutation greater than target" },
+    statement: {
+      vi: "Cho s và target gồm chữ thường, cùng độ dài. Trả về hoán vị palindrome nhỏ nhất theo từ điển của s mà lớn hơn target, hoặc chuỗi rỗng nếu không tồn tại.",
+      en: "Given equal-length lowercase strings s and target, return the lexicographically smallest palindromic permutation of s strictly greater than target, or an empty string if none exists.",
+    },
+    defaultInput: "baba",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "target", type: "string", label: { vi: "target", en: "target" }, default: "abba" },
+    ],
+    approach: [
+      { vi: "Palindrome tồn tại khi có tối đa một tần suất lẻ. Ký tự lẻ nằm giữa; mỗi cnt[ch] // 2 tạo một cặp đối xứng.", en: "A palindrome exists when at most one frequency is odd. The odd character occupies the center; each cnt[ch] // 2 creates a mirrored pair." },
+      { vi: "Mọi palindrome được quyết định bởi nửa trái, nên khớp nửa trái với target lâu nhất có thể rồi dựng toàn chuỗi để so sánh.", en: "Every palindrome is determined by its left half, so match that half with target as long as possible, then build the whole string for comparison." },
+      { vi: "Nếu chưa lớn hơn, quay lui từ phải sang trái, tăng ký tự đầu tiên có thể và điền phần còn lại tăng dần.", en: "If it is not greater, backtrack right-to-left, increase the first possible character, and fill the remainder in ascending order." },
+    ],
+    complexity: {
+      time: "O(26 · n)",
+      space: "O(n + 26)",
+      note: { vi: "Mỗi vị trí nửa trái quét tối đa 26 chữ cái; kết quả và nửa trái cần O(n) bộ nhớ.", en: "Each left-half position scans at most 26 letters; the answer and left half require O(n) memory." },
+    },
+    codeLabel: { vi: "Nửa trái tham lam + quay lui", en: "Greedy left half + backtracking" },
+    code: [
+      "class Solution:",
+      "    def lexPalindromicPermutation(self, s: str, target: str) -> str:",
+      "        n = len(s)",
+      "        cnt = [0] * 26",
+      "        for ch in s:",
+      "            cnt[ord(ch) - ord('a')] += 1",
+      "",
+      "        odd = [i for i in range(26) if cnt[i] % 2]",
+      "        if len(odd) > 1:",
+      "            return ''",
+      "",
+      "        middle = chr(ord('a') + odd[0]) if odd else ''",
+      "        half = [amount // 2 for amount in cnt]",
+      "        m = n // 2",
+      "",
+      "        def build(left):",
+      "            return left + middle + left[::-1]",
+      "",
+      "        left = []",
+      "        i = 0",
+      "        while i < m and half[ord(target[i]) - ord('a')]:",
+      "            left.append(target[i])",
+      "            half[ord(target[i]) - ord('a')] -= 1",
+      "            i += 1",
+      "",
+      "        if i == m:",
+      "            candidate = build(''.join(left))",
+      "            if candidate > target:",
+      "                return candidate",
+      "            i -= 1",
+      "            if i < 0: return ''",
+      "            half[ord(target[i]) - ord('a')] += 1",
+      "            left.pop()",
+      "",
+      "        while i >= 0:",
+      "            current = ord(target[i]) - ord('a')",
+      "            for nxt in range(current + 1, 26):",
+      "                if half[nxt]:",
+      "                    left.append(chr(ord('a') + nxt))",
+      "                    half[nxt] -= 1",
+      "                    tail = ''.join(chr(ord('a') + c) * half[c] for c in range(26))",
+      "                    return build(''.join(left) + tail)",
+      "            i -= 1",
+      "            if i >= 0:",
+      "                half[ord(target[i]) - ord('a')] += 1",
+      "                left.pop()",
+      "        return ''",
+    ],
+    builder: buildSteps3734,
+  },
+});
+
 function buildSteps622(input) {
   const parsed = parseDequeOps641(input);
   const constructor = parsed[0] && parsed[0].name === "MyCircularQueue" ? parsed[0] : { args: [3] };
