@@ -22254,3 +22254,308 @@ Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
 Object.defineProperty(module.exports, "__buildSteps695v2", {
   value: buildSteps695v2,
 });
+
+function parseEmployees690(input) {
+  let raw;
+  try {
+    raw = typeof input === "string" ? JSON.parse(input) : input;
+  } catch (_error) {
+    throw new Error("Enter employees as JSON, e.g. [[1,5,[2,3]],[2,3,[]],[3,3,[]]]");
+  }
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 12) {
+    throw new Error("Visualization supports 1 to 12 employees");
+  }
+
+  const employees = raw.map((item) => {
+    if (!Array.isArray(item) || item.length !== 3) {
+      throw new Error("Each employee must be [id, importance, [subordinate ids]]");
+    }
+    const [id, importance, subordinates] = item;
+    if (!Number.isInteger(id) || id < 1 || !Number.isInteger(importance) || importance < -100 || importance > 100 || !Array.isArray(subordinates)) {
+      throw new Error("Employee id must be positive, importance must be -100..100, and subordinates must be an array");
+    }
+    if (subordinates.some((subordinate) => !Number.isInteger(subordinate) || subordinate < 1)) {
+      throw new Error(`Employee ${id} has an invalid subordinate id`);
+    }
+    if (new Set(subordinates).size !== subordinates.length) {
+      throw new Error(`Employee ${id} lists the same subordinate more than once`);
+    }
+    return { id, importance, subordinates: [...subordinates] };
+  });
+
+  const byId = new Map();
+  employees.forEach((employee) => {
+    if (byId.has(employee.id)) throw new Error(`Employee id ${employee.id} is duplicated`);
+    byId.set(employee.id, employee);
+  });
+
+  const parent = new Map();
+  employees.forEach((employee) => employee.subordinates.forEach((subordinate) => {
+    if (!byId.has(subordinate)) throw new Error(`Subordinate id ${subordinate} does not exist`);
+    if (subordinate === employee.id) throw new Error(`Employee ${employee.id} cannot manage themselves`);
+    if (parent.has(subordinate)) throw new Error(`Employee ${subordinate} has more than one direct leader`);
+    parent.set(subordinate, employee.id);
+  }));
+
+  const state = new Map();
+  const visit = (id) => {
+    if (state.get(id) === 1) throw new Error("The employee hierarchy must not contain a cycle");
+    if (state.get(id) === 2) return;
+    state.set(id, 1);
+    byId.get(id).subordinates.forEach(visit);
+    state.set(id, 2);
+  };
+  employees.forEach((employee) => visit(employee.id));
+  return { employees, byId, parent };
+}
+
+function buildSteps690(input, params = {}) {
+  const { employees, byId, parent } = parseEmployees690(input);
+  const targetId = Number(params.id);
+  if (!Number.isInteger(targetId) || !byId.has(targetId)) {
+    throw new Error("id must identify an employee in the input");
+  }
+
+  const steps = [];
+  const callStack = [];
+  const frameTotals = new Map();
+  const returnedTotals = new Map();
+  const returnLog = [];
+  const mappedIds = [];
+  let activeId = null;
+  let activeChild = null;
+  let answer = null;
+
+  const roots = employees.filter((employee) => !parent.has(employee.id)).map((employee) => employee.id);
+  const depth = new Map();
+  const setDepth = (id, value) => {
+    depth.set(id, value);
+    byId.get(id).subordinates.forEach((child) => setDepth(child, value + 1));
+  };
+  roots.forEach((root) => setDepth(root, 0));
+  const reachable = new Set();
+  const markReachable = (id) => {
+    if (reachable.has(id)) return;
+    reachable.add(id);
+    byId.get(id).subordinates.forEach(markReachable);
+  };
+  markReachable(targetId);
+
+  const snapshot = (phase) => ({
+    phase,
+    targetId,
+    employees: employees.map((employee) => ({
+      ...employee,
+      parentId: parent.get(employee.id) ?? null,
+      depth: depth.get(employee.id) ?? 0,
+    })),
+    roots: [...roots],
+    reachable: [...reachable],
+    mappedIds: [...mappedIds],
+    callStack: [...callStack],
+    frameTotals: Object.fromEntries(frameTotals),
+    returnedTotals: Object.fromEntries(returnedTotals),
+    returnLog: returnLog.map((entry) => ({ ...entry })),
+    activeId,
+    activeChild,
+    answer,
+  });
+  const push = ({ title, line, note, phase, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      employee690View: snapshot(phase),
+      codeLines: [line],
+      vars: [
+        { name: "id", value: targetId },
+        { name: "call stack", value: callStack.length ? callStack.map((id) => `dfs(${id})`).join(" -> ") : "[]" },
+        { name: "frame totals", value: JSON.stringify(Object.fromEntries(frameTotals)) },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Tạo employee_by_id", en: "Build employee_by_id" },
+    line: 3,
+    phase: "map-init",
+    note: { vi: "Hash map cho phép tìm thông tin nhân viên theo id trong O(1).", en: "The hash map provides O(1) employee lookup by id." },
+    vars: [{ name: "employees", value: employees.length }],
+  });
+  employees.forEach((employee) => {
+    mappedIds.push(employee.id);
+    activeId = employee.id;
+    push({
+      title: { vi: `employee_by_id[${employee.id}] = employee`, en: `employee_by_id[${employee.id}] = employee` },
+      line: 3,
+      phase: "map-entry",
+      note: { vi: `Lưu nhân viên #${employee.id}: importance ${employee.importance}, cấp dưới [${employee.subordinates.join(", ")}].`, en: `Store employee #${employee.id}: importance ${employee.importance}, subordinates [${employee.subordinates.join(", ")}].` },
+      vars: [{ name: "mapped", value: mappedIds.length }],
+    });
+  });
+
+  activeId = targetId;
+  push({
+    title: { vi: `return dfs(${targetId})`, en: `return dfs(${targetId})` },
+    line: 12,
+    phase: "start",
+    note: { vi: `Chỉ duyệt cây con bắt đầu tại nhân viên #${targetId}; các nhánh khác không đóng góp.`, en: `Only traverse the subtree rooted at employee #${targetId}; other branches do not contribute.` },
+  });
+
+  const dfs = (employeeId) => {
+    callStack.push(employeeId);
+    activeId = employeeId;
+    activeChild = null;
+    push({
+      title: { vi: `Gọi dfs(${employeeId})`, en: `Call dfs(${employeeId})` },
+      line: 5,
+      phase: "call",
+      note: { vi: `Tạo stack frame mới cho nhân viên #${employeeId}.`, en: `Create a new stack frame for employee #${employeeId}.` },
+      vars: [{ name: "employee_id", value: employeeId }],
+    });
+
+    const employee = byId.get(employeeId);
+    push({
+      title: { vi: `employee = employee_by_id[${employeeId}]`, en: `employee = employee_by_id[${employeeId}]` },
+      line: 6,
+      phase: "lookup",
+      note: { vi: `Lấy importance ${employee.importance} và ${employee.subordinates.length} cấp dưới trực tiếp.`, en: `Read importance ${employee.importance} and ${employee.subordinates.length} direct subordinate(s).` },
+      vars: [{ name: "subordinates", value: `[${employee.subordinates.join(", ")}]` }],
+    });
+
+    frameTotals.set(employeeId, employee.importance);
+    push({
+      title: { vi: `total = ${employee.importance}`, en: `total = ${employee.importance}` },
+      line: 7,
+      phase: "own",
+      note: { vi: `Subtotal của frame dfs(${employeeId}) bắt đầu bằng importance của chính nhân viên này.`, en: `The dfs(${employeeId}) frame subtotal starts with this employee's own importance.` },
+      vars: [{ name: "total", value: employee.importance }],
+    });
+
+    if (employee.subordinates.length === 0) {
+      push({
+        title: { vi: "Không có subordinate", en: "No subordinates" },
+        line: 8,
+        phase: "leaf",
+        note: { vi: `Nhân viên #${employeeId} là lá; vòng for không chạy.`, en: `Employee #${employeeId} is a leaf, so the loop has no iterations.` },
+      });
+    }
+
+    for (const subordinateId of employee.subordinates) {
+      activeId = employeeId;
+      activeChild = subordinateId;
+      push({
+        title: { vi: `subordinate_id = ${subordinateId}`, en: `subordinate_id = ${subordinateId}` },
+        line: 8,
+        phase: "child",
+        note: { vi: `Chuẩn bị tính toàn bộ importance của nhánh cấp dưới #${subordinateId}.`, en: `Prepare to calculate the complete importance of subordinate #${subordinateId}'s branch.` },
+        vars: [{ name: "subordinate_id", value: subordinateId }],
+      });
+      push({
+        title: { vi: `Gọi dfs(${subordinateId})`, en: `Call dfs(${subordinateId})` },
+        line: 9,
+        phase: "recurse",
+        note: { vi: `Tạm dừng frame #${employeeId} và đi sâu vào #${subordinateId}.`, en: `Pause frame #${employeeId} and descend into #${subordinateId}.` },
+      });
+
+      const childTotal = dfs(subordinateId);
+      activeId = employeeId;
+      activeChild = subordinateId;
+      const before = frameTotals.get(employeeId);
+      frameTotals.set(employeeId, before + childTotal);
+      push({
+        title: { vi: `total += ${childTotal} → ${before + childTotal}`, en: `total += ${childTotal} → ${before + childTotal}` },
+        line: 9,
+        phase: "add",
+        note: { vi: `dfs(${subordinateId}) trả ${childTotal}; cộng vào subtotal của #${employeeId}.`, en: `dfs(${subordinateId}) returned ${childTotal}; add it to employee #${employeeId}'s subtotal.` },
+        vars: [{ name: "child total", value: childTotal }, { name: "total", value: before + childTotal }],
+      });
+    }
+
+    activeId = employeeId;
+    activeChild = null;
+    const total = frameTotals.get(employeeId);
+    returnedTotals.set(employeeId, total);
+    returnLog.push({ id: employeeId, total });
+    push({
+      title: { vi: `return ${total} từ dfs(${employeeId})`, en: `return ${total} from dfs(${employeeId})` },
+      line: 10,
+      phase: "return",
+      note: { vi: `Importance của #${employeeId} cùng toàn bộ cấp dưới là ${total}.`, en: `Employee #${employeeId} and all descendants contribute ${total}.` },
+      vars: [{ name: "return", value: total }],
+    });
+    callStack.pop();
+    frameTotals.delete(employeeId);
+    return total;
+  };
+
+  answer = dfs(targetId);
+  activeId = targetId;
+  activeChild = null;
+  push({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    line: 12,
+    phase: "done",
+    note: { vi: `Tổng importance của nhân viên #${targetId} và toàn bộ cấp dưới là ${answer}.`, en: `The total importance of employee #${targetId} and all subordinates is ${answer}.` },
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+  return { original: employees, id: targetId, answer, steps };
+}
+
+Object.assign(module.exports, {
+  690: {
+    id: 690,
+    difficulty: "medium",
+    slug: "employee-importance",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    tags: [
+      { key: "hash-map", vi: "Hash Map", en: "Hash Map" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "tree", vi: "Cây", en: "Tree" },
+    ],
+    title: { vi: "Employee Importance", en: "Employee Importance" },
+    titleVi: { vi: "Tổng mức độ quan trọng của nhân viên", en: "Employee subtree importance" },
+    statement: {
+      vi: "Mỗi nhân viên có id, importance và danh sách cấp dưới trực tiếp. Với một id, tính tổng importance của nhân viên đó cùng mọi cấp dưới trực tiếp và gián tiếp.",
+      en: "Each employee has an id, importance value, and direct subordinates. Given an id, return the total importance of that employee and every direct or indirect subordinate.",
+    },
+    defaultInput: "[[1,5,[2,3]],[2,3,[]],[3,3,[]]]",
+    inputKind: "string",
+    inputLabel: { vi: "employees dạng JSON", en: "employees as JSON" },
+    extraParams: [
+      { key: "id", label: { vi: "id cần tính", en: "target id" }, default: 1, min: 1 },
+    ],
+    approach: [
+      { vi: "Tạo Hash Map id → Employee để mỗi lần DFS tra thông tin trong O(1).", en: "Build an id → Employee hash map for O(1) lookup during DFS." },
+      { vi: "dfs(id) bắt đầu với importance của chính nhân viên, sau đó cộng dfs(subordinate) cho từng cấp dưới trực tiếp.", en: "dfs(id) starts with the employee's own importance, then adds dfs(subordinate) for every direct subordinate." },
+      { vi: "Mỗi nhân viên trong cây con được duyệt đúng một lần; các nhánh không thuộc id mục tiêu bị bỏ qua.", en: "Each employee in the target subtree is visited exactly once; unrelated branches are skipped." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Hash Map chứa n nhân viên; DFS dùng tối đa O(h) call stack và duyệt tối đa n node.", en: "The hash map stores n employees; DFS uses up to O(h) call stack and visits at most n nodes." },
+    },
+    codeLabel: { vi: "DFS đệ quy + Hash Map", en: "Recursive DFS + Hash Map" },
+    code: [
+      "class Solution:",
+      "    def getImportance(self, employees: List['Employee'], id: int) -> int:",
+      "        employee_by_id = {employee.id: employee for employee in employees}",
+      "",
+      "        def dfs(employee_id):",
+      "            employee = employee_by_id[employee_id]",
+      "            total = employee.importance",
+      "            for subordinate_id in employee.subordinates:",
+      "                total += dfs(subordinate_id)",
+      "            return total",
+      "",
+      "        return dfs(id)",
+    ],
+    builder: buildSteps690,
+  },
+});

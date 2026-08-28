@@ -19507,6 +19507,116 @@ function renderMountain1095View(step) {
   </section>`;
 }
 
+function renderEmployee690View(step) {
+  const view = step.employee690View || {};
+  const vi = lang === "vi";
+  const employees = Array.isArray(view.employees) ? view.employees : [];
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const roots = Array.isArray(view.roots) ? view.roots : [];
+  const reachable = new Set(view.reachable || []);
+  const mapped = new Set(view.mappedIds || []);
+  const callStack = Array.isArray(view.callStack) ? view.callStack : [];
+  const stackSet = new Set(callStack);
+  const frameTotals = view.frameTotals || {};
+  const returnedTotals = view.returnedTotals || {};
+  const activeId = view.activeId;
+  const activeChild = view.activeChild;
+  const phaseIndex = ["map-init", "map-entry"].includes(view.phase) ? 0
+    : view.phase === "start" ? 1
+      : ["call", "lookup", "own", "child", "recurse", "leaf"].includes(view.phase) ? 2
+        : view.phase === "add" ? 3 : 4;
+  const stages = (vi
+    ? ["Tạo Hash Map", "Chọn id", "DFS cây con", "Cộng subtotal", "Trả kết quả"]
+    : ["Build Hash Map", "Choose id", "DFS subtree", "Add subtotals", "Return result"])
+    .map((label, index) => {
+      const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+      return `<span class="${state}"><small>${state === "done" ? "OK" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+    }).join("");
+
+  let nextLeaf = 0;
+  const units = new Map();
+  const place = (id) => {
+    const employee = employeeById.get(id);
+    if (!employee) return nextLeaf++;
+    const childUnits = (employee.subordinates || []).map(place);
+    const unit = childUnits.length ? childUnits.reduce((sum, value) => sum + value, 0) / childUnits.length : nextLeaf++;
+    units.set(id, unit);
+    return unit;
+  };
+  roots.forEach(place);
+  employees.forEach((employee) => {
+    if (!units.has(employee.id)) place(employee.id);
+  });
+  const leafSlots = Math.max(nextLeaf, 1);
+  const svgWidth = Math.max(540, leafSlots * 150 + 80);
+  const maxDepth = Math.max(0, ...employees.map((employee) => Number(employee.depth) || 0));
+  const svgHeight = Math.max(170, maxDepth * 120 + 130);
+  const positions = new Map();
+  employees.forEach((employee) => {
+    const unit = units.get(employee.id) ?? 0;
+    const x = leafSlots === 1 ? svgWidth / 2 : 70 + unit * (svgWidth - 140) / (leafSlots - 1);
+    positions.set(employee.id, { x, y: 60 + (Number(employee.depth) || 0) * 120 });
+  });
+  const edges = employees.filter((employee) => employee.parentId !== null).map((employee) => {
+    const from = positions.get(employee.parentId);
+    const to = positions.get(employee.id);
+    if (!from || !to) return "";
+    const classes = [reachable.has(employee.id) ? "reachable" : "outside", employee.id === activeChild ? "active" : ""];
+    return `<path class="${classes.join(" ")}" d="M ${from.x} ${from.y + 29} C ${from.x} ${from.y + 68}, ${to.x} ${to.y - 68}, ${to.x} ${to.y - 29}"></path>`;
+  }).join("");
+  const nodes = employees.map((employee) => {
+    const position = positions.get(employee.id);
+    if (!position) return "";
+    const classes = ["emp690-node"];
+    if (!reachable.has(employee.id)) classes.push("outside");
+    if (mapped.has(employee.id)) classes.push("mapped");
+    if (stackSet.has(employee.id)) classes.push("stacked");
+    if (Object.prototype.hasOwnProperty.call(returnedTotals, employee.id)) classes.push("returned");
+    if (employee.id === view.targetId) classes.push("target");
+    if (employee.id === activeChild) classes.push("child");
+    if (employee.id === activeId) classes.push("active");
+    const hasReturned = Object.prototype.hasOwnProperty.call(returnedTotals, employee.id);
+    const hasFrame = Object.prototype.hasOwnProperty.call(frameTotals, employee.id);
+    const subtotal = hasReturned ? returnedTotals[employee.id] : hasFrame ? frameTotals[employee.id] : null;
+    const meta = subtotal === null ? `${employee.importance >= 0 ? "+" : ""}${employee.importance}` : `total ${subtotal}`;
+    return `<g class="${classes.join(" ")}" transform="translate(${position.x} ${position.y})"><rect x="-59" y="-29" width="118" height="58" rx="6"></rect><text class="id" text-anchor="middle" y="-3">#${escapeHtml(employee.id)}</text><text class="importance" text-anchor="middle" y="16">${escapeHtml(meta)}</text></g>`;
+  }).join("");
+  const treeHtml = `<div class="emp690-tree-scroll"><svg viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(vi ? "Cây quản lý nhân viên và trạng thái DFS" : "Employee hierarchy and DFS state")}"><g class="emp690-edges">${edges}</g><g>${nodes}</g></svg></div>`;
+
+  const stackHtml = callStack.length
+    ? callStack.map((id, index) => {
+      const total = Object.prototype.hasOwnProperty.call(frameTotals, id) ? frameTotals[id] : "?";
+      return `<span class="${id === activeId ? "active" : ""}"><small>${index === callStack.length - 1 ? "TOP" : index}</small><strong>dfs(${escapeHtml(id)})</strong><em>total = ${escapeHtml(total)}</em></span>`;
+    }).join("")
+    : `<em>${vi ? "call stack rỗng" : "empty call stack"}</em>`;
+  const activeEmployee = employeeById.get(activeId);
+  const childReturns = activeEmployee
+    ? (activeEmployee.subordinates || []).filter((id) => Object.prototype.hasOwnProperty.call(returnedTotals, id)).map((id) => ({ id, total: returnedTotals[id] }))
+    : [];
+  const ownImportance = activeEmployee ? activeEmployee.importance : null;
+  const activeTotal = Object.prototype.hasOwnProperty.call(frameTotals, activeId)
+    ? frameTotals[activeId]
+    : Object.prototype.hasOwnProperty.call(returnedTotals, activeId) ? returnedTotals[activeId] : null;
+  const formulaTerms = ownImportance === null
+    ? `<em>${vi ? "chưa vào DFS" : "DFS has not started"}</em>`
+    : [`<span class="own"><small>${vi ? "BẢN THÂN" : "OWN"}</small><strong>${escapeHtml(ownImportance)}</strong></span>`, ...childReturns.map((entry) => `<b>+</b><span class="child"><small>dfs(${escapeHtml(entry.id)})</small><strong>${escapeHtml(entry.total)}</strong></span>`)].join("");
+  const returns = Array.isArray(view.returnLog) ? view.returnLog : [];
+  const returnHtml = returns.length
+    ? returns.map((entry) => `<span class="${entry.id === activeId ? "active" : ""}"><small>dfs(${escapeHtml(entry.id)})</small><strong>${escapeHtml(entry.total)}</strong></span>`).join("")
+    : `<em>${vi ? "chưa có frame return" : "no frame has returned"}</em>`;
+  const ready = Number.isInteger(view.answer);
+
+  $("treeView").innerHTML = `<section class="emp690-viz" role="img" aria-label="${escapeHtml(vi ? "Mô phỏng Employee Importance" : "Employee Importance simulation")}">
+    <div class="emp690-stages">${stages}</div>
+    <section class="emp690-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="emp690-tree"><header><strong>${vi ? "SƠ ĐỒ NHÂN VIÊN" : "EMPLOYEE HIERARCHY"}</strong><span>${vi ? `tính từ id #${view.targetId}` : `calculate from id #${view.targetId}`}</span></header>${treeHtml}</section>
+    <div class="emp690-state"><section class="emp690-stack"><header><strong>DFS CALL STACK</strong><span>${callStack.length}</span></header><div>${stackHtml}</div></section><section class="emp690-formula"><header><strong>${vi ? "SUBTOTAL CỦA FRAME" : "FRAME SUBTOTAL"}</strong><span>${activeId === null ? "—" : `dfs(${escapeHtml(activeId)})`}</span></header><div>${formulaTerms}</div><footer><small>total</small><strong>${activeTotal === null ? "?" : escapeHtml(activeTotal)}</strong></footer></section></div>
+    <section class="emp690-returns"><header><strong>${vi ? "CÁC GIÁ TRỊ ĐÃ RETURN" : "RETURNED VALUES"}</strong><span>${returns.length}</span></header><div>${returnHtml}</div></section>
+    <section class="emp690-answer ${ready ? "ready" : "pending"}"><small>${vi ? "TOTAL IMPORTANCE" : "TOTAL IMPORTANCE"}</small><strong>${ready ? escapeHtml(view.answer) : "…"}</strong><span>${ready ? `dfs(${escapeHtml(view.targetId)})` : (vi ? "đang cộng cây con" : "accumulating subtree")}</span></section>
+    <aside class="emp690-legend"><span class="active"><i></i>${vi ? "đang chạy" : "active"}</span><span class="child"><i></i>${vi ? "sắp gọi đệ quy" : "next recursive call"}</span><span class="returned"><i></i>${vi ? "đã tính xong" : "returned"}</span><span class="outside"><i></i>${vi ? "ngoài cây con" : "outside subtree"}</span></aside>
+  </section>`;
+}
+
 function renderThrone1600View(step) {
   const view = step.throne1600View || {};
   const vi = lang === "vi";
@@ -22312,6 +22422,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDirected685View(step);
+  } else if (step.employee690View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEmployee690View(step);
   } else if (step.throne1600View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
