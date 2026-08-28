@@ -8081,6 +8081,265 @@ function buildSteps928(input, params = {}) {
   return { original: { graph, initial }, answer: bestNode, steps };
 }
 
+// ─── 261: Graph Valid Tree ───
+function parse261Data(input, params = {}) {
+  const n = Number(params.n);
+  if (!Number.isInteger(n) || n < 1 || n > 12) {
+    throw new Error("n must be an integer from 1 to 12 for the step-by-step visualization");
+  }
+
+  const raw = String(input ?? "").trim();
+  let edges;
+  try {
+    edges = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw
+        ? raw.split(";").map((part) => part.trim()).filter(Boolean).map((part) => part.split(",").map((value) => Number(value.trim())))
+        : [];
+  } catch (_error) {
+    throw new Error("edges must be JSON or pairs formatted as u,v;u,v");
+  }
+  if (!Array.isArray(edges) || edges.some((edge) => !Array.isArray(edge) || edge.length !== 2 || edge.some((node) => !Number.isInteger(node) || node < 0 || node >= n))) {
+    throw new Error("each edge must be [u, v] with node indices from 0 to n - 1");
+  }
+  const unique = new Set();
+  for (const [u, v] of edges) {
+    if (u === v) throw new Error("self-loops are not valid tree edges");
+    const key = Math.min(u, v) + "-" + Math.max(u, v);
+    if (unique.has(key)) throw new Error("duplicate undirected edges are not supported");
+    unique.add(key);
+  }
+  return { n, edges: edges.map(([u, v]) => [u, v]) };
+}
+
+function buildSteps261(input, params = {}) {
+  const { n, edges } = parse261Data(input, params);
+  let parent = [];
+  let parentReady = false;
+  const accepted = new Set();
+  const steps = [];
+  let rejected = null;
+  let components = n;
+
+  function rootOf(node) {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  }
+
+  function connectedNodes() {
+    if (!parentReady) return [];
+    const counts = new Map();
+    for (let node = 0; node < n; node += 1) {
+      const root = rootOf(node);
+      counts.set(root, (counts.get(root) || 0) + 1);
+    }
+    return Array.from({ length: n }, (_, node) => counts.get(rootOf(node)) > 1 ? node : -1).filter((node) => node >= 0);
+  }
+
+  function snapshot({ title, note, codeLines, activeIndex = null, roots = null, findState = null, final = false, answer = null }) {
+    const activeEdge = Number.isInteger(activeIndex) ? edges[activeIndex] : null;
+    const activeNodes = [...(activeEdge || []), ...(findState ? [findState.node] : [])];
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [...parent],
+      sub: Array.from({ length: n }, (_, node) => String(node)),
+      highlight: activeEdge || [],
+      mark: [],
+      vars: [
+        { name: "edges", value: "[" + edges.map((edge) => "[" + edge.join(", ") + "]").join(", ") + "]" },
+        { name: "parent", value: parentReady ? "[" + parent.join(", ") + "]" : "not initialized" },
+        { name: "components", value: components },
+        ...(roots ? [{ name: "roots", value: "find(" + activeEdge[0] + ")=" + roots.u + ", find(" + activeEdge[1] + ")=" + roots.v }] : []),
+        ...(findState ? [{ name: "find call", value: findState.name + ": node=" + findState.node + ", parent[node]=" + parent[findState.node] }] : []),
+        ...(answer === null ? [] : [{ name: "answer", value: answer }]),
+      ],
+      graph: {
+        nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: parentReady ? "p=" + parent[node] : "p=—" })),
+        edges: edges.map(([u, v], index) => ({
+          u,
+          v,
+          undirected: true,
+          kind: index === rejected ? "reject" : accepted.has(index) ? "accept" : "",
+        })),
+        hlNodes: activeNodes,
+        hlEdges: activeEdge ? [[activeEdge[0], activeEdge[1]]] : [],
+        visitedNodes: connectedNodes(),
+        restrictedNodes: rejected === null ? [] : edges[rejected],
+        caption: {
+          vi: "Xanh = cạnh được giữ · đỏ = cạnh tạo cycle · vàng = cạnh đang xét",
+          en: "Green = kept edge · red = cycle edge · amber = current edge",
+        },
+      },
+    });
+  }
+
+  function traceFind(start, name, activeIndex) {
+    let node = start;
+    while (parent[node] !== node) {
+      snapshot({
+        title: { vi: "while parent[" + node + "] != " + node + " -> True", en: "while parent[" + node + "] != " + node + " -> True" },
+        note: { vi: "Node " + node + " chưa là root, nên thực hiện path compression.", en: "Node " + node + " is not a root, so perform path compression." },
+        codeLines: [8],
+        activeIndex,
+        findState: { name, node },
+      });
+      const oldParent = parent[node];
+      const grandparent = parent[oldParent];
+      parent[node] = grandparent;
+      snapshot({
+        title: { vi: "parent[" + node + "] = parent[parent[" + node + "]] -> " + grandparent, en: "parent[" + node + "] = parent[parent[" + node + "]] -> " + grandparent },
+        note: { vi: "Nén đường đi: cho " + node + " trỏ thẳng lên ông/bà " + grandparent + ".", en: "Path compression: point " + node + " directly to grandparent " + grandparent + "." },
+        codeLines: [9],
+        activeIndex,
+        findState: { name, node },
+      });
+      node = parent[node];
+      snapshot({
+        title: { vi: "node = parent[node] -> " + node, en: "node = parent[node] -> " + node },
+        note: { vi: "Tiếp tục kiểm tra từ node cha mới.", en: "Continue the search from the updated parent." },
+        codeLines: [10],
+        activeIndex,
+        findState: { name, node },
+      });
+    }
+
+    snapshot({
+      title: { vi: "while parent[" + node + "] != " + node + " -> False", en: "while parent[" + node + "] != " + node + " -> False" },
+      note: { vi: "Node " + node + " là root của component hiện tại.", en: "Node " + node + " is the current component root." },
+      codeLines: [8],
+      activeIndex,
+      findState: { name, node },
+    });
+    snapshot({
+      title: { vi: "return " + node, en: "return " + node },
+      note: { vi: "find trả về root " + node + " cho " + name + ".", en: "find returns root " + node + " for " + name + "." },
+      codeLines: [11],
+      activeIndex,
+      findState: { name, node },
+    });
+    return node;
+  }
+
+  snapshot({
+    title: { vi: "Bắt đầu validTree(n, edges)", en: "Enter validTree(n, edges)" },
+    note: {
+      vi: "Nhận n = " + n + " và " + edges.length + " cạnh để kiểm tra graph có phải tree hay không.",
+      en: "Receive n = " + n + " and " + edges.length + " edge(s) to test whether the graph is a tree.",
+    },
+    codeLines: [2],
+  });
+  snapshot({
+    title: { vi: "len(edges) != n - 1 ?", en: "len(edges) != n - 1 ?" },
+    note: {
+      vi: "Một tree với n node bắt buộc có đúng n - 1 cạnh.",
+      en: "A tree with n nodes must have exactly n - 1 edges.",
+    },
+    codeLines: [3],
+  });
+
+  if (edges.length !== n - 1) {
+    snapshot({
+      title: { vi: "len(edges) != n - 1 -> False", en: "len(edges) != n - 1 -> False" },
+      note: {
+        vi: "Có " + edges.length + " cạnh nhưng tree " + n + " node cần đúng " + (n - 1) + " cạnh. Không thể là tree.",
+        en: "There are " + edges.length + " edges, but a " + n + "-node tree needs exactly " + (n - 1) + ". It cannot be a tree.",
+      },
+      codeLines: [3, 4],
+      final: true,
+      answer: false,
+    });
+    return { original: { n, edges }, answer: false, steps };
+  }
+
+  parent = Array.from({ length: n }, (_, node) => node);
+  parentReady = true;
+  snapshot({
+    title: { vi: "parent = list(range(n))", en: "parent = list(range(n))" },
+    note: { vi: "Mỗi node bắt đầu là root của component riêng.", en: "Each node begins as the root of its own component." },
+    codeLines: [6],
+  });
+  snapshot({
+    title: { vi: "def find(node):", en: "def find(node):" },
+    note: { vi: "Định nghĩa hàm find với path compression; thân hàm sẽ chạy khi find được gọi.", en: "Define find with path compression; its body runs when find is called." },
+    codeLines: [7],
+  });
+
+  for (let index = 0; index < edges.length; index += 1) {
+    const [u, v] = edges[index];
+    snapshot({
+      title: { vi: "for u, v in edges: [" + u + ", " + v + "]", en: "for u, v in edges: [" + u + ", " + v + "]" },
+      note: { vi: "Bắt đầu một vòng lặp mới với cạnh [" + u + ", " + v + "].", en: "Start a new loop iteration with edge [" + u + ", " + v + "]." },
+      codeLines: [12],
+      activeIndex: index,
+    });
+    snapshot({
+      title: { vi: "root_u, root_v = find(" + u + "), find(" + v + ")", en: "root_u, root_v = find(" + u + "), find(" + v + ")" },
+      note: { vi: "Dòng này gọi find(" + u + ") trước, sau đó gọi find(" + v + ").", en: "This line calls find(" + u + ") first, then find(" + v + ")." },
+      codeLines: [13],
+      activeIndex: index,
+    });
+    const rootU = traceFind(u, "root_u", index);
+    const rootV = traceFind(v, "root_v", index);
+    snapshot({
+      title: { vi: "root_u, root_v = " + rootU + ", " + rootV, en: "root_u, root_v = " + rootU + ", " + rootV },
+      note: { vi: "Cả hai lời gọi find đã trả về; dòng 13 hoàn tất phép gán hai root.", en: "Both find calls have returned; line 13 completes the two-root assignment." },
+      codeLines: [13],
+      activeIndex: index,
+      roots: { u: rootU, v: rootV },
+    });
+    snapshot({
+      title: { vi: "root_u == root_v ?", en: "root_u == root_v ?" },
+      note: rootU === rootV
+        ? { vi: rootU + " == " + rootV + ", cạnh này sẽ tạo cycle.", en: rootU + " == " + rootV + ", so this edge would create a cycle." }
+        : { vi: rootU + " != " + rootV + ", hai component vẫn tách rời.", en: rootU + " != " + rootV + ", so the components are still separate." },
+      codeLines: [14],
+      activeIndex: index,
+      roots: { u: rootU, v: rootV },
+    });
+
+    if (rootU === rootV) {
+      rejected = index;
+      snapshot({
+        title: { vi: "Cycle -> return False", en: "Cycle -> return False" },
+        note: { vi: "Cạnh [" + u + ", " + v + "] đóng cycle, vì vậy graph không phải tree.", en: "Edge [" + u + ", " + v + "] closes a cycle, so the graph is not a tree." },
+        codeLines: [15],
+        activeIndex: index,
+        roots: { u: rootU, v: rootV },
+        final: true,
+        answer: false,
+      });
+      return { original: { n, edges }, answer: false, steps };
+    }
+
+    parent[rootU] = rootV;
+    accepted.add(index);
+    components -= 1;
+    snapshot({
+      title: { vi: "parent[" + rootU + "] = " + rootV, en: "parent[" + rootU + "] = " + rootV },
+      note: { vi: "Giữ cạnh [" + u + ", " + v + "] và gộp hai component. Còn " + components + " component.", en: "Keep edge [" + u + ", " + v + "] and merge the two components. " + components + " component(s) remain." },
+      codeLines: [16],
+      activeIndex: index,
+      roots: { u: rootU, v: rootV },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Không có cycle -> return True", en: "No cycle -> return True" },
+    note: {
+      vi: "Đã có đúng n - 1 cạnh và không cạnh nào tạo cycle, nên graph liên thông và là tree.",
+      en: "The graph has exactly n - 1 edges and no edge created a cycle, so it is connected and is a tree.",
+    },
+    codeLines: [18],
+    final: true,
+    answer: true,
+  });
+  return { original: { n, edges }, answer: true, steps };
+}
+
 Object.assign(module.exports, {
   1970: {
     id: 1970,
@@ -8320,6 +8579,67 @@ Object.assign(module.exports, {
     liveArgs(input, params = {}) {
       const data = parse924Data(input, params);
       return [data.graph, data.initial];
+    },
+  },
+  261: {
+    id: 261,
+    difficulty: "medium",
+    premium: true,
+    slug: "graph-valid-tree",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [UF_CAT],
+    title: { vi: "Graph Valid Tree", en: "Graph Valid Tree" },
+    titleVi: { vi: "Kiểm tra đồ thị có phải cây", en: "Check whether an undirected graph is a tree" },
+    statement: {
+      vi: "Cho n node 0..n-1 và danh sách cạnh vô hướng. Trả về True khi graph liên thông và không có chu trình.",
+      en: "Given n nodes numbered 0 through n-1 and an undirected edge list, return True when the graph is connected and has no cycle.",
+    },
+    defaultInput: "0,1;0,2;0,3;1,4",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh u,v;u,v (cách bởi ;)", en: "Edges u,v;u,v (separated by ;)" },
+    extraParams: [{
+      key: "n",
+      label: { vi: "n (số node)", en: "n (number of nodes)" },
+      default: 5,
+      min: 1,
+      max: 12,
+    }],
+    approach: [
+      { vi: "Một tree có n node phải có đúng n - 1 cạnh. Nếu khác số cạnh này thì trả False ngay.", en: "A tree with n nodes must have exactly n - 1 edges. Any other edge count returns False immediately." },
+      { vi: "Dùng Union-Find xử lý từng cạnh. Nếu hai đầu đã cùng root, cạnh đó tạo cycle nên trả False.", en: "Process each edge with Union-Find. If both endpoints already share a root, that edge creates a cycle, so return False." },
+      { vi: "Có n - 1 cạnh mà không cycle thì graph bắt buộc liên thông, nên trả True.", en: "With n - 1 edges and no cycle, the graph must be connected, so return True." },
+    ],
+    complexity: {
+      time: "O((n + e) * alpha(n))",
+      space: "O(n)",
+      note: { vi: "Union-Find với path compression có thời gian gần như hằng số cho mỗi find/union.", en: "Union-Find with path compression makes each find/union nearly constant time." },
+    },
+    codeLabel: { vi: "Union-Find: kiểm tra cycle", en: "Union-Find: detect a cycle" },
+    code: [
+      "class Solution:",
+      "    def validTree(self, n, edges):",
+      "        if len(edges) != n - 1:",
+      "            return False",
+      "",
+      "        parent = list(range(n))",
+      "        def find(node):",
+      "            while parent[node] != node:",
+      "                parent[node] = parent[parent[node]]",
+      "                node = parent[node]",
+      "            return node",
+      "",
+      "        for u, v in edges:",
+      "            root_u, root_v = find(u), find(v)",
+      "            if root_u == root_v:",
+      "                return False",
+      "            parent[root_u] = root_v",
+      "",
+      "        return True",
+    ],
+    builder: buildSteps261,
+    liveArgs(input, params = {}) {
+      const data = parse261Data(input, params);
+      return [data.n, data.edges];
     },
   },
 });
