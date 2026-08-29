@@ -36127,11 +36127,11 @@ html, body {
 
 /* LeetCode 354: Russian Doll Envelopes, DP and binary-search LIS */
 .tree-view:has(.rde354-viz) { min-height: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
-.viz-split:has(.rde354-viz) { flex-direction: column; align-items: stretch; }
+.viz-split:has(.rde354-viz) { flex-direction: row; align-items: flex-start; }
 .viz-split:has(.rde354-viz) .viz-left,
-.viz-split:has(.rde354-viz) .viz-right { flex: none; width: 100%; }
+.viz-split:has(.rde354-viz) .viz-right { flex: 1 1 0; width: 50%; }
 .viz-right:has(.rde354-viz) { max-height: none; overflow: visible; }
-.rde354-viz { display: grid; gap: 16px; width: 100%; min-width: min(100%, 680px); padding: 22px; border: 1px solid #334155; border-radius: 8px; background: #0b1220; color: #e5e7eb; }
+.rde354-viz { display: grid; gap: 16px; width: 100%; min-width: 0; padding: 22px; border: 1px solid #334155; border-radius: 8px; background: #0b1220; color: #e5e7eb; }
 .rde354-viz * { box-sizing: border-box; }
 .rde354-stages { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
 .rde354-stages > span { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; align-items: center; min-height: 66px; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #111827; }
@@ -36174,9 +36174,9 @@ html, body {
 .rde354-ties code { color: #fef3c7; font: 800 13px/1 Consolas,monospace; }
 .rde354-ties em { color: #94a3b8; font-size: 11px; font-style: normal; }
 
-.rde354-orders { display: grid; grid-template-columns: minmax(0,1fr) 38px minmax(0,1fr); gap: 11px; align-items: stretch; }
+.rde354-orders { display: grid; grid-template-columns: minmax(0,1fr); gap: 11px; align-items: stretch; }
 .rde354-orders > div, .rde354-heights, .rde354-method, .rde354-chain { min-width: 0; overflow: hidden; border: 1px solid #334155; border-radius: 8px; background: #0f172a; }
-.rde354-orders > b { align-self: center; color: #94a3b8; font: 800 25px/1 Consolas,monospace; text-align: center; }
+.rde354-orders > b { align-self: center; color: #94a3b8; font: 800 25px/1 Consolas,monospace; text-align: center; transform: rotate(90deg); }
 .rde354-orders header, .rde354-heights > header, .rde354-method > header, .rde354-chain > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; padding: 12px 14px; border-bottom: 1px solid #334155; }
 .rde354-orders header strong, .rde354-heights > header strong, .rde354-method > header strong, .rde354-chain > header strong { color: #f8fafc; font: 800 12px/1 Consolas,monospace; }
 .rde354-orders header span, .rde354-heights > header span, .rde354-method > header span, .rde354-chain > header span { color: #8292a8; font-size: 11px; }
