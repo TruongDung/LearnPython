@@ -11442,3 +11442,241 @@ Object.assign(module.exports, {
     code: ["class Solution:", "    def searchMatrix(self, matrix, target):", "        rows, cols = len(matrix), len(matrix[0])", "        lo, hi = 0, rows * cols - 1", "        while lo <= hi:", "            mid = (lo + hi) // 2", "            value = matrix[mid // cols][mid % cols]", "            if value == target:", "                return True", "            elif value < target:", "                lo = mid + 1", "            else:", "                hi = mid - 1", "        return False"], builder: buildSteps74,
   },
 });
+
+/**
+ * LeetCode 2948: Make Lexicographically Smallest Array by Swapping Elements.
+ * Adjacent values in sorted order form a swappable component while their gap
+ * is at most limit. Inside one component, sorted values go to sorted indices.
+ */
+function buildSteps2948(input, params = {}) {
+  const original = Array.isArray(input) ? input.map(Number) : [];
+  const limit = Number(params.limit ?? 2);
+  const steps = [];
+  const pairs = original
+    .map((value, index) => ({ value, index }))
+    .sort((a, b) => a.value - b.value || a.index - b.index);
+  const groups = [];
+  let groupStart = 0;
+
+  for (let i = 1; i <= pairs.length; i++) {
+    const boundary = i === pairs.length || pairs[i].value - pairs[i - 1].value > limit;
+    if (!boundary) continue;
+    const members = pairs.slice(groupStart, i);
+    groups.push({
+      id: groups.length,
+      start: groupStart,
+      end: i - 1,
+      values: members.map((pair) => pair.value),
+      indices: members.map((pair) => pair.index).sort((a, b) => a - b),
+    });
+    groupStart = i;
+  }
+
+  const pairGroup = new Array(pairs.length).fill(0);
+  groups.forEach((group) => {
+    for (let i = group.start; i <= group.end; i++) pairGroup[i] = group.id;
+  });
+  const answer = new Array(original.length).fill(null);
+  const assignedIndices = new Set();
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    phase,
+    scanIndex = null,
+    gap = null,
+    sameGroup = null,
+    revealedThrough = -1,
+    activeGroup = null,
+    assignment = null,
+    final = false,
+  }) {
+    const step = {
+      title,
+      codeLines,
+      lexSwap2948View: {
+        phase,
+        original: original.slice(),
+        limit,
+        sortedPairs: pairs.map((pair, position) => ({ ...pair, group: pairGroup[position], position })),
+        groups: groups.map((group) => ({ ...group, values: group.values.slice(), indices: group.indices.slice() })),
+        answer: answer.slice(),
+        assignedIndices: [...assignedIndices].sort((a, b) => a - b),
+        scanIndex,
+        gap,
+        sameGroup,
+        revealedThrough,
+        activeGroup,
+        assignment,
+      },
+      vars: [
+        { name: "limit", value: limit },
+        { name: "sorted values", value: `[${pairs.map((pair) => pair.value).join(", ")}]` },
+        { name: "answer", value: `[${answer.map((value) => value ?? "_").join(", ")}]` },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!original.length || !Number.isFinite(limit) || limit < 0 || original.some((value) => !Number.isFinite(value))) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: { vi: "nums phải có số và limit phải không âm.", en: "nums must contain numbers and limit must be non-negative." },
+      codeLines: [3],
+      phase: "invalid",
+      final: true,
+    });
+    return { original, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Giữ lại value và index ban đầu", en: "Keep each value with its original index" },
+    note: {
+      vi: "Index quyết định vị trí trong đáp án; value quyết định phần tử nào có thể nối với nhau bằng swap.",
+      en: "Indices determine answer positions; values determine which elements are connected by swaps.",
+    },
+    codeLines: [3],
+    phase: "input",
+  });
+
+  snapshot({
+    title: { vi: "Sắp xếp các cặp theo value", en: "Sort pairs by value" },
+    note: {
+      vi: "Sau khi sort, chỉ cần kiểm tra gap giữa hai value kề nhau.",
+      en: "After sorting, only gaps between adjacent values need to be checked.",
+    },
+    codeLines: [3],
+    phase: "sorted",
+    revealedThrough: 0,
+  });
+
+  if (pairs.length === 1) {
+    snapshot({
+      title: { vi: "Chỉ có một nhóm", en: "There is one component" },
+      note: { vi: "Một phần tử tự tạo thành một nhóm hoán đổi.", en: "A single value forms its own swap component." },
+      codeLines: [5, 6, 7, 8, 9],
+      phase: "groups-ready",
+      revealedThrough: 0,
+      activeGroup: 0,
+    });
+  } else {
+    for (let i = 1; i < pairs.length; i++) {
+      const currentGap = pairs[i].value - pairs[i - 1].value;
+      const connected = currentGap <= limit;
+      snapshot({
+        title: connected
+          ? { vi: `${pairs[i].value} - ${pairs[i - 1].value} = ${currentGap} ≤ ${limit}: cùng nhóm`, en: `${pairs[i].value} - ${pairs[i - 1].value} = ${currentGap} <= ${limit}: same group` }
+          : { vi: `${pairs[i].value} - ${pairs[i - 1].value} = ${currentGap} > ${limit}: nhóm mới`, en: `${pairs[i].value} - ${pairs[i - 1].value} = ${currentGap} > ${limit}: new group` },
+        note: connected
+          ? { vi: "Hai value kề nhau swap được; quan hệ bắc cầu nối toàn bộ nhóm.", en: "These adjacent values can swap; transitivity connects the entire component." }
+          : { vi: "Không có value trung gian để vượt qua gap này, nên hai phía không thể đổi chỗ cho nhau.", en: "No intermediate value bridges this gap, so the two sides cannot exchange positions." },
+        codeLines: [6, 7, 8],
+        phase: "scan-gap",
+        scanIndex: i,
+        gap: currentGap,
+        sameGroup: connected,
+        revealedThrough: i,
+        activeGroup: pairGroup[i],
+      });
+    }
+
+    snapshot({
+      title: { vi: `Tạo được ${groups.length} nhóm hoán đổi`, en: `Built ${groups.length} swap component(s)` },
+      note: {
+        vi: "Trong mỗi nhóm, mọi value có thể đi đến mọi index nhờ chuỗi swap hợp lệ.",
+        en: "Within a component, every value can reach every index through valid swaps.",
+      },
+      codeLines: [5, 6, 7, 8, 9],
+      phase: "groups-ready",
+      revealedThrough: pairs.length - 1,
+    });
+  }
+
+  groups.forEach((group) => {
+    group.indices.forEach((index, rank) => {
+      const value = group.values[rank];
+      answer[index] = value;
+      assignedIndices.add(index);
+      snapshot({
+        title: { vi: `Gán value ${value} vào index ${index}`, en: `Place value ${value} at index ${index}` },
+        note: {
+          vi: `Trong nhóm ${group.id + 1}, value nhỏ thứ ${rank + 1} đi vào index nhỏ thứ ${rank + 1}.`,
+          en: `In component ${group.id + 1}, the ${rank + 1}${rank === 0 ? "st" : rank === 1 ? "nd" : rank === 2 ? "rd" : "th"} smallest value goes to the matching smallest index.`,
+        },
+        codeLines: [10, 11, 12, 13],
+        phase: "assign",
+        revealedThrough: pairs.length - 1,
+        activeGroup: group.id,
+        assignment: { group: group.id, index, value, rank },
+      });
+    });
+  });
+
+  snapshot({
+    title: { vi: `Đáp án nhỏ nhất: [${answer.join(", ")}]`, en: `Lexicographically smallest: [${answer.join(", ")}]` },
+    note: {
+      vi: "Mỗi nhóm đã đặt các value nhỏ nhất vào các index nhỏ nhất, nên không thể cải thiện vị trí đầu tiên nào nữa.",
+      en: "Each component puts its smallest values at its smallest indices, so no earlier position can be improved.",
+    },
+    codeLines: [14, 15],
+    phase: "done",
+    revealedThrough: pairs.length - 1,
+    final: true,
+  });
+
+  return { original, answer, steps };
+}
+
+Object.assign(module.exports, {
+  2948: {
+    id: 2948,
+    difficulty: "medium",
+    slug: "make-lexicographically-smallest-array-by-swapping-elements",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "sorting", vi: "Sắp xếp", en: "Sorting" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    ],
+    title: { vi: "Make Lexicographically Smallest Array by Swapping Elements", en: "Make Lexicographically Smallest Array by Swapping Elements" },
+    titleVi: { vi: "Tạo mảng nhỏ nhất theo thứ tự từ điển bằng phép đổi chỗ", en: "Build the lexicographically smallest array with swaps" },
+    statement: {
+      vi: "Được swap nums[i] và nums[j] nếu |nums[i]-nums[j]| ≤ limit. Hãy thực hiện tùy ý số lần để thu được mảng nhỏ nhất theo thứ tự từ điển.",
+      en: "Swap nums[i] and nums[j] when |nums[i]-nums[j]| <= limit. Perform any number of swaps to obtain the lexicographically smallest array.",
+    },
+    defaultInput: [1, 5, 3, 9, 8],
+    inputKind: "array",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "limit", label: { vi: "limit", en: "limit" }, default: 2 }],
+    approach: [
+      { vi: "Sort các cặp (value, index). Gap kề nhau ≤ limit tạo cùng một nhóm liên thông.", en: "Sort (value, index) pairs. Adjacent gaps <= limit form one connected component." },
+      { vi: "Trong mỗi nhóm, sort index rồi ghép value nhỏ nhất với index nhỏ nhất.", en: "Within each component, sort indices and pair the smallest values with the smallest indices." },
+      { vi: "Các nhóm bị ngăn bởi gap > limit nên không thể trao đổi value qua ranh giới.", en: "A gap > limit prevents values from crossing that component boundary." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: { vi: "Sort value và index chi phối thời gian.", en: "Sorting values and indices dominates the running time." },
+    },
+    code: [
+      "class Solution:",
+      "    def lexicographicallySmallestArray(self, nums, limit):",
+      "        pairs = sorted((value, index) for index, value in enumerate(nums))",
+      "        answer = nums[:]",
+      "        start = 0",
+      "        while start < len(nums):",
+      "            end = start + 1",
+      "            while end < len(nums) and pairs[end][0] - pairs[end - 1][0] <= limit:",
+      "                end += 1",
+      "            indices = sorted(index for _, index in pairs[start:end])",
+      "            values = [value for value, _ in pairs[start:end]]",
+      "            for index, value in zip(indices, values):",
+      "                answer[index] = value",
+      "            start = end",
+      "        return answer",
+    ],
+    builder: buildSteps2948,
+  },
+});

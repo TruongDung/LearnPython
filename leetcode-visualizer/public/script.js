@@ -20664,6 +20664,79 @@ function renderRandomizedSet380View(step) {
   </section>`;
 }
 
+function renderLexSwap2948View(step) {
+  const view = step.lexSwap2948View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "input");
+  const original = Array.isArray(view.original) ? view.original : [];
+  const sortedPairs = Array.isArray(view.sortedPairs) ? view.sortedPairs : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const assigned = new Set(Array.isArray(view.assignedIndices) ? view.assignedIndices : []);
+  const assignment = view.assignment || null;
+  const phaseIndex = phase === "input" || phase === "invalid" ? 0
+    : phase === "sorted" || phase === "scan-gap" ? 1
+      : phase === "groups-ready" ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Giữ index", "Tạo nhóm bằng gap", "Ghép value với index", "Đáp án"]
+    : ["Keep indices", "Build groups by gap", "Pair values with indices", "Answer"];
+  const stages = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
+  }).join("");
+  const originalCells = original.map((value, index) => {
+    const active = assignment && assignment.index === index;
+    return `<span class="${active ? "active" : ""}"><small>idx ${index}</small><strong>${escapeHtml(String(value))}</strong><em>${active ? (vi ? "đích đang gán" : "assignment target") : "original"}</em></span>`;
+  }).join("");
+  const sortedLane = sortedPairs.map((pair, position) => {
+    const isScan = view.scanIndex === position;
+    const revealed = position <= Number(view.revealedThrough);
+    const groupClass = revealed ? `g${pair.group % 6}` : "unrevealed";
+    const previous = sortedPairs[position - 1];
+    const gap = previous ? pair.value - previous.value : null;
+    const gapState = isScan ? (view.sameGroup ? "pass active" : "break active") : revealed && position > 0 ? (pair.group === previous.group ? "pass" : "break") : "";
+    const connector = position > 0 ? `<i class="lsa2948-gap ${gapState}"><b>Δ ${gap}</b><small>${isScan ? (view.sameGroup ? `≤ ${view.limit}` : `> ${view.limit}`) : ""}</small></i>` : "";
+    return `${connector}<span class="lsa2948-pair ${groupClass} ${isScan ? "active" : ""}"><small>sorted[${position}]</small><strong>${escapeHtml(String(pair.value))}</strong><em>from idx ${pair.index}</em><b>G${pair.group + 1}</b></span>`;
+  }).join("");
+  const groupHtml = groups.map((group) => {
+    const active = view.activeGroup === group.id;
+    const visible = phaseIndex >= 2 || phase === "scan-gap" && group.end <= Number(view.revealedThrough);
+    return `<article class="lsa2948-group g${group.id % 6} ${active ? "active" : ""} ${visible ? "" : "muted"}">
+      <header><strong>GROUP ${group.id + 1}</strong><span>${group.values.length} ${vi ? "phần tử" : "value(s)"}</span></header>
+      <div><small>${vi ? "VALUES ĐÃ SORT" : "SORTED VALUES"}</small><b>[${group.values.map((value) => escapeHtml(String(value))).join(", ")}]</b></div>
+      <div><small>${vi ? "INDICES ĐÃ SORT" : "SORTED INDICES"}</small><b>[${group.indices.join(", ")}]</b></div>
+    </article>`;
+  }).join("");
+  const resultCells = original.map((_, index) => {
+    const value = answer[index];
+    const active = assignment && assignment.index === index;
+    const filled = assigned.has(index);
+    return `<span class="${filled ? "filled" : ""} ${active ? "active" : ""}"><small>idx ${index}</small><strong>${value === null || value === undefined ? "_" : escapeHtml(String(value))}</strong><em>${active ? `← ${escapeHtml(String(assignment.value))}` : filled ? "fixed" : (vi ? "chưa gán" : "pending")}</em></span>`;
+  }).join("");
+  const gapBoard = phase === "scan-gap"
+    ? `<section class="lsa2948-decision ${view.sameGroup ? "pass" : "break"}"><small>${vi ? "KIỂM TRA RANH GIỚI" : "BOUNDARY CHECK"}</small><strong>${sortedPairs[view.scanIndex]?.value} - ${sortedPairs[view.scanIndex - 1]?.value} = ${view.gap}</strong><span>${view.sameGroup ? `≤ limit ${view.limit} · ${vi ? "nối cùng nhóm" : "connect"}` : `> limit ${view.limit} · ${vi ? "cắt sang nhóm mới" : "split"}`}</span></section>`
+    : "";
+  const assignmentBoard = assignment
+    ? `<section class="lsa2948-assignment"><span><small>${vi ? "VALUE NHỎ THỨ" : "VALUE RANK"} ${assignment.rank + 1}</small><strong>${escapeHtml(String(assignment.value))}</strong></span><i>→</i><span><small>GROUP ${assignment.group + 1}</small><strong>${vi ? "có thể swap tự do" : "freely swappable"}</strong></span><i>→</i><span><small>${vi ? "INDEX NHỎ THỨ" : "INDEX RANK"} ${assignment.rank + 1}</small><strong>${assignment.index}</strong></span></section>`
+    : "";
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Bài 2948: ${groups.length} nhóm hoán đổi, đã gán ${assigned.size}/${original.length} vị trí.`
+    : `Problem 2948: ${groups.length} swap groups, ${assigned.size}/${original.length} positions assigned.`;
+
+  $("treeView").innerHTML = `<section class="lsa2948-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="lsa2948-stages">${stages}</div>
+    <div class="lsa2948-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="lsa2948-rule"><strong>|a - b| ≤ limit</strong><span>${vi ? "Gap kề nhau nối thành component nhờ tính bắc cầu" : "Adjacent gaps create a component through transitivity"}</span><b>limit = ${escapeHtml(String(view.limit))}</b></section>
+    <section class="lsa2948-row"><header><strong>ORIGINAL · value + index</strong><span>${vi ? "index không bị mất khi sort" : "indices survive sorting"}</span></header><div style="--lsa2948-count:${original.length}">${originalCells}</div></section>
+    <section class="lsa2948-sorted"><header><strong>SORT BY VALUE</strong><span>${vi ? "đọc gap từ trái sang phải" : "scan gaps left to right"}</span></header><div>${sortedLane}</div></section>
+    ${gapBoard}
+    <section class="lsa2948-groups"><header><strong>SWAP COMPONENTS</strong><span>${vi ? "value nhỏ ↔ index nhỏ" : "small value ↔ small index"}</span></header><div>${groupHtml}</div></section>
+    ${assignmentBoard}
+    <section class="lsa2948-row result"><header><strong>LEXICOGRAPHIC RESULT</strong><span>${assigned.size}/${original.length} ${vi ? "vị trí đã gán" : "assigned"}</span></header><div style="--lsa2948-count:${original.length}">${resultCells}</div></section>
+  </section>`;
+}
+
 function renderRandomizedCollection381View(step) {
   const view = step.randomizedCollection381View || {};
   const vi = lang === "vi";
@@ -23640,6 +23713,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRandomizedCollection381View(step);
+  } else if (step.lexSwap2948View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLexSwap2948View(step);
   } else if (step.allocator2502View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
