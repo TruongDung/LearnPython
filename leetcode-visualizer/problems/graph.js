@@ -13407,7 +13407,7 @@ function buildSteps332Approach2(input) {
     },
     highlight: [], mark: [],
     codeBlock: 2,
-    codeLines: [5, 6, 7],
+      codeLines: [6],
     vars: [{ name: "tickets", value: `[${tickets.map(([s, d]) => `(${s},${d})`).join(", ")}]` }],
     note: {
       vi:
@@ -22564,6 +22564,705 @@ Object.assign(module.exports, {
       ];
     },
     builder: buildSteps690,
+  },
+});
+
+/**
+ * LeetCode 882: Reachable Nodes In Subdivided Graph.
+ * Run Dijkstra on original nodes with edge cost cnt + 1, then count reachable
+ * subdivision nodes from the remaining move budget at both edge endpoints.
+ */
+function buildSteps882(input, params = {}) {
+  const raw = String(input || "").trim();
+  const n = Number(params.n ?? 3);
+  const maxMoves = Number(params.maxMoves ?? 6);
+  let parsedEdges;
+  try {
+    parsedEdges = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;,]/).map((edge) => edge.trim()).filter(Boolean).map((edge) => edge.split("-").map(Number));
+  } catch (_error) {
+    parsedEdges = [];
+  }
+  const edges = Array.isArray(parsedEdges) ? parsedEdges.map((edge, index) => ({
+    index,
+    u: Number(edge[0]),
+    v: Number(edge[1]),
+    cnt: Number(edge[2]),
+    cost: Number(edge[2]) + 1,
+  })) : [];
+  const valid = Number.isInteger(n) && n >= 1 && n <= 10
+    && Number.isInteger(maxMoves) && maxMoves >= 0
+    && edges.length <= 16
+    && edges.every(({ u, v, cnt }) => Number.isInteger(u) && Number.isInteger(v)
+      && u >= 0 && u < n && v >= 0 && v < n && u !== v && Number.isInteger(cnt) && cnt >= 0);
+  const steps = [];
+  const nodes = Array.from({ length: Math.max(0, n) }, (_, node) => node);
+  const graph = Array.from({ length: Math.max(0, n) }, () => []);
+  const dist = new Array(Math.max(0, n)).fill(Infinity);
+  const heap = [];
+  const finalized = new Set();
+  const countedEdges = new Set();
+  let originalCount = 0;
+  let newCount = 0;
+
+  if (valid) {
+    for (const edge of edges) {
+      graph[edge.u].push({ to: edge.v, cost: edge.cost, edgeIndex: edge.index });
+      graph[edge.v].push({ to: edge.u, cost: edge.cost, edgeIndex: edge.index });
+    }
+  }
+
+  const formatDistance = (value) => value === Infinity ? "∞" : value;
+  const remainingAt = (node) => Number.isFinite(dist[node]) ? Math.max(0, maxMoves - dist[node]) : 0;
+  const edgeRows = () => edges.map((edge) => {
+    const fromU = remainingAt(edge.u);
+    const fromV = remainingAt(edge.v);
+    const reachable = Math.min(edge.cnt, fromU + fromV);
+    return {
+      ...edge,
+      fromU,
+      fromV,
+      reachable,
+      counted: countedEdges.has(edge.index),
+    };
+  });
+  const heapSort = () => heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    phase,
+    currentNode = null,
+    activeEdgeIndex = null,
+    candidate = null,
+    oldDistance = null,
+    improves = null,
+    edgeContribution = null,
+    final = false,
+  }) {
+    const activeEdge = activeEdgeIndex === null ? null : edges[activeEdgeIndex];
+    const view = {
+      phase,
+      n,
+      maxMoves,
+      distances: nodes.map((node) => ({
+        node,
+        value: formatDistance(dist[node]),
+        remaining: remainingAt(node),
+        finalized: finalized.has(node),
+        current: node === currentNode,
+        reachable: dist[node] <= maxMoves,
+      })),
+      heap: heap.map(([distance, node], index) => ({ distance, node, index })),
+      finalized: [...finalized],
+      edgeRows: edgeRows(),
+      currentNode,
+      activeEdgeIndex,
+      activeEdge,
+      candidate,
+      oldDistance: oldDistance === Infinity ? "∞" : oldDistance,
+      improves,
+      edgeContribution,
+      originalCount,
+      newCount,
+      total: originalCount + newCount,
+    };
+    const step = {
+      title,
+      codeLines,
+      graph: {
+        nodes: nodes.map((node) => ({ id: node, label: String(node), dist: formatDistance(dist[node]) })),
+        edges: edges.map((edge) => ({ u: edge.u, v: edge.v, w: `${edge.cnt}+1`, undirected: true })),
+        hlNodes: currentNode === null ? [] : [currentNode, ...(activeEdge ? [activeEdge.u === currentNode ? activeEdge.v : activeEdge.u] : [])],
+        hlEdges: activeEdge ? [[activeEdge.u, activeEdge.v]] : [],
+        visitedNodes: [...finalized],
+        annotations: { 0: "source" },
+        dimUnfocused: true,
+      },
+      reachable882View: view,
+      vars: [
+        { name: "dist", value: `[${dist.map(formatDistance).join(", ")}]` },
+        { name: "original", value: originalCount },
+        { name: "subdivided", value: newCount },
+        { name: "answer", value: originalCount + newCount },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: {
+        vi: "Nhập tối đa 16 cạnh dạng u-v-cnt; node nằm trong 0..n-1 và cnt không âm.",
+        en: "Enter at most 16 edges as u-v-cnt; nodes must be in 0..n-1 and cnt must be non-negative.",
+      },
+      codeLines: [5],
+      phase: "invalid",
+      final: true,
+    });
+    return { original: raw, edges: [], n, maxMoves, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Nén mỗi chuỗi thành một cạnh có cost cnt + 1", en: "Compress each chain into one edge of cost cnt + 1" },
+    note: {
+      vi: "Đi từ original node u tới v phải qua cnt node mới và thêm một bước cuối vào v.",
+      en: "Moving from original node u to v crosses cnt new nodes plus one final step into v.",
+    },
+    codeLines: [5, 6, 7, 8, 9],
+    phase: "build",
+  });
+
+  dist[0] = 0;
+  heap.push([0, 0]);
+  snapshot({
+    title: { vi: "Khởi tạo Dijkstra từ node 0", en: "Initialize Dijkstra from node 0" },
+    note: { vi: "dist[0] = 0; các original node khác bắt đầu ở ∞.", en: "dist[0] = 0; every other original node starts at ∞." },
+    codeLines: [10, 11, 12],
+    phase: "init",
+    currentNode: 0,
+  });
+
+  while (heap.length) {
+    heapSort();
+    const [distance, node] = heap.shift();
+    if (distance !== dist[node]) {
+      snapshot({
+        title: { vi: `Bỏ heap entry cũ (${distance}, ${node})`, en: `Skip stale heap entry (${distance}, ${node})` },
+        note: { vi: `dist[${node}] hiện đã nhỏ hơn ${distance}.`, en: `dist[${node}] is already smaller than ${distance}.` },
+        codeLines: [14, 15, 16],
+        phase: "stale",
+        currentNode: node,
+      });
+      continue;
+    }
+
+    finalized.add(node);
+    snapshot({
+      title: { vi: `Pop node ${node} với distance ${distance}`, en: `Pop node ${node} at distance ${distance}` },
+      note: { vi: `Khoảng cách ngắn nhất tới original node ${node} đã được chốt.`, en: `The shortest distance to original node ${node} is finalized.` },
+      codeLines: [13, 14, 15],
+      phase: "pop",
+      currentNode: node,
+    });
+
+    for (const neighbor of graph[node]) {
+      const edge = edges[neighbor.edgeIndex];
+      const candidate = distance + neighbor.cost;
+      const oldDistance = dist[neighbor.to];
+      const improves = candidate < oldDistance;
+      snapshot({
+        title: { vi: `Thử ${node} → ${neighbor.to}: ${distance} + ${neighbor.cost} = ${candidate}`, en: `Try ${node} → ${neighbor.to}: ${distance} + ${neighbor.cost} = ${candidate}` },
+        note: improves
+          ? { vi: `${candidate} nhỏ hơn dist[${neighbor.to}] = ${formatDistance(oldDistance)}.`, en: `${candidate} improves dist[${neighbor.to}] = ${formatDistance(oldDistance)}.` }
+          : { vi: `${candidate} không cải thiện dist[${neighbor.to}] = ${formatDistance(oldDistance)}.`, en: `${candidate} does not improve dist[${neighbor.to}] = ${formatDistance(oldDistance)}.` },
+        codeLines: [17, 18, 19],
+        phase: "relax",
+        currentNode: node,
+        activeEdgeIndex: edge.index,
+        candidate,
+        oldDistance,
+        improves,
+      });
+      if (!improves) continue;
+
+      dist[neighbor.to] = candidate;
+      heap.push([candidate, neighbor.to]);
+      heapSort();
+      snapshot({
+        title: { vi: `Cập nhật dist[${neighbor.to}] = ${candidate}`, en: `Update dist[${neighbor.to}] = ${candidate}` },
+        note: { vi: `Đưa (${candidate}, ${neighbor.to}) vào min-heap.`, en: `Push (${candidate}, ${neighbor.to}) into the min-heap.` },
+        codeLines: [20, 21],
+        phase: "update",
+        currentNode: node,
+        activeEdgeIndex: edge.index,
+        candidate,
+        oldDistance,
+        improves: true,
+      });
+    }
+  }
+
+  originalCount = dist.filter((distance) => distance <= maxMoves).length;
+  snapshot({
+    title: { vi: `${originalCount} original node reachable`, en: `${originalCount} original node(s) are reachable` },
+    note: {
+      vi: `Chỉ đếm original node có dist ≤ maxMoves = ${maxMoves}.`,
+      en: `Count original nodes whose dist <= maxMoves = ${maxMoves}.`,
+    },
+    codeLines: [22],
+    phase: "count-original",
+  });
+
+  edges.forEach((edge) => {
+    const fromU = remainingAt(edge.u);
+    const fromV = remainingAt(edge.v);
+    const contribution = Math.min(edge.cnt, fromU + fromV);
+    countedEdges.add(edge.index);
+    newCount += contribution;
+    snapshot({
+      title: { vi: `Cạnh ${edge.u}-${edge.v}: thêm ${contribution}/${edge.cnt} node mới`, en: `Edge ${edge.u}-${edge.v}: add ${contribution}/${edge.cnt} new nodes` },
+      note: {
+        vi: `min(${edge.cnt}, remaining[${edge.u}] ${fromU} + remaining[${edge.v}] ${fromV}) = ${contribution}.`,
+        en: `min(${edge.cnt}, remaining[${edge.u}] ${fromU} + remaining[${edge.v}] ${fromV}) = ${contribution}.`,
+      },
+      codeLines: [23, 24, 25, 26],
+      phase: "count-edge",
+      activeEdgeIndex: edge.index,
+      edgeContribution: contribution,
+    });
+  });
+
+  const answer = originalCount + newCount;
+  snapshot({
+    title: { vi: `Tổng reachable nodes = ${originalCount} + ${newCount} = ${answer}`, en: `Total reachable nodes = ${originalCount} + ${newCount} = ${answer}` },
+    note: { vi: "Mỗi original node và mỗi subdivided node được đếm đúng một lần.", en: "Every original and subdivided node is counted exactly once." },
+    codeLines: [27],
+    phase: "done",
+    final: true,
+  });
+
+  return {
+    original: raw,
+    edges: edges.map(({ u, v, cnt }) => [u, v, cnt]),
+    n,
+    maxMoves,
+    answer,
+    steps,
+  };
+}
+
+Object.assign(module.exports, {
+  882: {
+    id: 882,
+    difficulty: "hard",
+    slug: "reachable-nodes-in-subdivided-graph",
+    category: { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "counting", vi: "Đếm", en: "Counting" },
+    ],
+    title: { vi: "Reachable Nodes In Subdivided Graph", en: "Reachable Nodes In Subdivided Graph" },
+    titleVi: { vi: "Đếm node đi tới được trong đồ thị chia nhỏ", en: "Count reachable nodes in a subdivided graph" },
+    statement: {
+      vi: "Cạnh [u,v,cnt] được thay bằng cnt node mới và cnt+1 cạnh đơn vị. Từ node 0 với tối đa maxMoves bước, đếm tất cả original node và node mới có thể tới được.",
+      en: "Edge [u,v,cnt] becomes cnt new nodes and cnt+1 unit edges. Starting at node 0 with at most maxMoves moves, count every reachable original and new node.",
+    },
+    defaultInput: "0-1-10,0-2-1,1-2-2",
+    inputKind: "string",
+    inputLabel: { vi: "edges (u-v-cnt, cách bởi dấu phẩy)", en: "edges (u-v-cnt, comma separated)" },
+    extraParams: [
+      { key: "maxMoves", label: { vi: "maxMoves", en: "maxMoves" }, default: 6, min: 0 },
+      { key: "n", label: { vi: "n (số original node)", en: "n (original nodes)" }, default: 3, min: 1 },
+    ],
+    approach: [
+      { vi: "Xem mỗi cạnh [u,v,cnt] giữa original nodes có trọng số cnt+1 rồi chạy Dijkstra từ node 0.", en: "Treat [u,v,cnt] as an original-node edge of weight cnt+1, then run Dijkstra from node 0." },
+      { vi: "Original node u reachable khi dist[u] ≤ maxMoves; số bước còn lại ở u là max(0, maxMoves-dist[u]).", en: "Original node u is reachable when dist[u] <= maxMoves; its remaining budget is max(0, maxMoves-dist[u])." },
+      { vi: "Trên cạnh [u,v,cnt], số node mới reachable là min(cnt, remaining[u] + remaining[v]).", en: "For edge [u,v,cnt], reachable new nodes equal min(cnt, remaining[u] + remaining[v])." },
+    ],
+    complexity: {
+      time: "O((V + E) log V)",
+      space: "O(V + E)",
+      note: { vi: "Dijkstra chi phối; lượt đếm cuối duyệt mỗi cạnh một lần.", en: "Dijkstra dominates; the final counting pass visits every edge once." },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def reachableNodes(self, edges, maxMoves, n):",
+      "        graph = [[] for _ in range(n)]",
+      "        for u, v, cnt in edges:",
+      "            cost = cnt + 1",
+      "            graph[u].append((v, cost))",
+      "            graph[v].append((u, cost))",
+      "        dist = [float('inf')] * n",
+      "        dist[0] = 0",
+      "        heap = [(0, 0)]",
+      "        while heap:",
+      "            d, u = heapq.heappop(heap)",
+      "            if d > dist[u]:",
+      "                continue",
+      "            for v, cost in graph[u]:",
+      "                new_dist = d + cost",
+      "                if new_dist < dist[v]:",
+      "                    dist[v] = new_dist",
+      "                    heapq.heappush(heap, (new_dist, v))",
+      "        answer = sum(d <= maxMoves for d in dist)",
+      "        for u, v, cnt in edges:",
+      "            from_u = max(0, maxMoves - dist[u])",
+      "            from_v = max(0, maxMoves - dist[v])",
+      "            answer += min(cnt, from_u + from_v)",
+      "        return answer",
+    ],
+    builder: buildSteps882,
+  },
+});
+
+/**
+ * LeetCode 499: The Maze III.
+ * Dijkstra orders states by (distance, path). A roll stops at a wall or as
+ * soon as it reaches the hole, which may happen before the next wall.
+ */
+function buildSteps499(input, params = {}) {
+  const maze = parseIslandGrid(input).map((row) => row.map(Number));
+  const rows = maze.length;
+  const cols = rows ? maze[0].length : 0;
+  const ball = [Number(params.ballR ?? 4), Number(params.ballC ?? 3)];
+  const hole = [Number(params.holeR ?? 0), Number(params.holeC ?? 1)];
+  const steps = [];
+  const inBounds = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
+  const valid = rows > 0 && rows <= 8 && cols > 0 && cols <= 8
+    && maze.every((row) => row.length === cols && row.every((cell) => cell === 0 || cell === 1))
+    && ball.every(Number.isInteger) && hole.every(Number.isInteger)
+    && inBounds(ball[0], ball[1]) && inBounds(hole[0], hole[1])
+    && maze[ball[0]][ball[1]] === 0 && maze[hole[0]][hole[1]] === 0
+    && (ball[0] !== hole[0] || ball[1] !== hole[1]);
+  const key = (r, c) => `${r},${c}`;
+  const dirs = [
+    { dr: 1, dc: 0, letter: "d", name: { vi: "xuống", en: "down" } },
+    { dr: 0, dc: -1, letter: "l", name: { vi: "trái", en: "left" } },
+    { dr: 0, dc: 1, letter: "r", name: { vi: "phải", en: "right" } },
+    { dr: -1, dc: 0, letter: "u", name: { vi: "lên", en: "up" } },
+  ];
+  const dist = Array.from({ length: Math.max(rows, 0) }, () => new Array(Math.max(cols, 0)).fill(Infinity));
+  const paths = Array.from({ length: Math.max(rows, 0) }, () => new Array(Math.max(cols, 0)).fill(null));
+  const heap = [];
+  const settled = new Set();
+  let answer = "impossible";
+
+  const stateCompare = (a, b) => a[0] - b[0] || a[1].localeCompare(b[1]) || a[2] - b[2] || a[3] - b[3];
+  const heapRows = () => [...heap].sort(stateCompare).map(([distance, path, r, c], index) => ({
+    distance, path, r, c, index,
+  }));
+  const bestRows = () => {
+    const result = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (Number.isFinite(dist[r][c])) result.push({ r, c, distance: dist[r][c], path: paths[r][c], settled: settled.has(key(r, c)) });
+      }
+    }
+    return result.sort((a, b) => a.distance - b.distance || a.path.localeCompare(b.path));
+  };
+  const traceRoute = (path) => {
+    if (!path || path === "impossible") return [];
+    let [r, c] = ball;
+    const cells = [[r, c]];
+    for (const letter of path) {
+      const dir = dirs.find((item) => item.letter === letter);
+      while (inBounds(r + dir.dr, c + dir.dc) && maze[r + dir.dr][c + dir.dc] === 0) {
+        r += dir.dr;
+        c += dir.dc;
+        cells.push([r, c]);
+        if (r === hole[0] && c === hole[1]) return cells;
+      }
+    }
+    return cells;
+  };
+
+  function snapshot({
+    title,
+    note,
+    phase,
+    codeLines,
+    current = null,
+    direction = null,
+    rollPath = [],
+    stop = null,
+    candidate = null,
+    incumbent = null,
+    accepted = null,
+    fellIntoHole = false,
+    stale = false,
+    final = false,
+  }) {
+    const view = {
+      maze,
+      rows,
+      cols,
+      ball,
+      hole,
+      phase,
+      current,
+      direction,
+      rollPath,
+      stop,
+      candidate,
+      incumbent,
+      accepted,
+      fellIntoHole,
+      stale,
+      heap: heapRows(),
+      best: bestRows(),
+      settled: [...settled],
+      answer,
+      finalRoute: final ? traceRoute(answer) : [],
+    };
+    const step = {
+      title,
+      codeLines,
+      maze499View: view,
+      vars: [
+        { name: "heap", value: `[${view.heap.map((item) => `(${item.distance}, '${item.path}', ${item.r}, ${item.c})`).join(", ")}]` },
+        { name: "candidate", value: candidate ? `(${candidate.distance}, '${candidate.path}')` : "-" },
+        { name: "answer", value: answer },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: {
+        vi: "Visualization hỗ trợ maze 1..8 hàng/cột; ball và hole phải là hai ô trống khác nhau.",
+        en: "The visualization supports a 1..8 row/column maze; ball and hole must be distinct empty cells.",
+      },
+      phase: "invalid",
+      codeLines: [5],
+      final: true,
+    });
+    return { original: maze, maze, ball, hole, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Mỗi state là (distance, path, row, col)", en: "Each state is (distance, path, row, col)" },
+    note: {
+      vi: "Heap so sánh distance trước; nếu bằng nhau, path nhỏ hơn theo từ điển được pop trước.",
+      en: "The heap compares distance first; ties are broken by the lexicographically smaller path.",
+    },
+    phase: "model",
+    codeLines: [6],
+    current: ball,
+  });
+
+  dist[ball[0]][ball[1]] = 0;
+  paths[ball[0]][ball[1]] = "";
+  heap.push([0, "", ball[0], ball[1]]);
+  snapshot({
+    title: { vi: "Đưa ball vào min-heap", en: "Push the ball into the min-heap" },
+    note: { vi: "Tại ball: distance = 0 và path là chuỗi rỗng.", en: "At the ball: distance = 0 and path is empty." },
+    phase: "init",
+    codeLines: [8],
+    current: ball,
+  });
+
+  let guard = 0;
+  while (heap.length && guard++ < 800) {
+    heap.sort(stateCompare);
+    const [distance, path, r, c] = heap.shift();
+    const stale = distance !== dist[r][c] || path !== paths[r][c];
+    snapshot({
+      title: stale
+        ? { vi: `Bỏ state cũ (${distance}, '${path}', ${r}, ${c})`, en: `Skip stale state (${distance}, '${path}', ${r}, ${c})` }
+        : { vi: `Pop (${distance}, '${path}', ${r}, ${c})`, en: `Pop (${distance}, '${path}', ${r}, ${c})` },
+      note: stale
+        ? { vi: "Ô này đã có cặp (distance, path) tốt hơn.", en: "This cell already has a better (distance, path) pair." }
+        : { vi: "Đây là state nhỏ nhất hiện tại theo thứ tự (distance, path).", en: "This is the smallest current state under (distance, path) ordering." },
+      phase: stale ? "stale" : "pop",
+      codeLines: stale ? [12] : [11],
+      current: [r, c],
+      stale,
+    });
+    if (stale) continue;
+
+    settled.add(key(r, c));
+    if (r === hole[0] && c === hole[1]) {
+      answer = path;
+      snapshot({
+        title: { vi: `Hole được pop: trả '${path}'`, en: `The hole is popped: return '${path}'` },
+        note: {
+          vi: "Vì heap ưu tiên (distance, path), đây vừa là đường ngắn nhất vừa nhỏ nhất theo từ điển.",
+          en: "Because the heap prioritizes (distance, path), this is both shortest and lexicographically smallest.",
+        },
+        phase: "done",
+        codeLines: [14],
+        current: [r, c],
+        final: true,
+      });
+      break;
+    }
+
+    for (const dir of dirs) {
+      let nr = r;
+      let nc = c;
+      let rolled = 0;
+      let fellIntoHole = false;
+      const rollPath = [];
+      while (inBounds(nr + dir.dr, nc + dir.dc) && maze[nr + dir.dr][nc + dir.dc] === 0) {
+        nr += dir.dr;
+        nc += dir.dc;
+        rolled += 1;
+        rollPath.push([nr, nc]);
+        if (nr === hole[0] && nc === hole[1]) {
+          fellIntoHole = true;
+          break;
+        }
+      }
+      const newDistance = distance + rolled;
+      const newPath = path + dir.letter;
+      const candidate = { distance: newDistance, path: newPath, r: nr, c: nc, rolled };
+      const incumbent = Number.isFinite(dist[nr][nc])
+        ? { distance: dist[nr][nc], path: paths[nr][nc], r: nr, c: nc }
+        : null;
+      snapshot({
+        title: fellIntoHole
+          ? { vi: `Lăn '${dir.letter}' ${rolled} ô và rơi vào hole`, en: `Roll '${dir.letter}' ${rolled} cells and fall into the hole` }
+          : { vi: `Lăn '${dir.letter}' ${rolled} ô tới (${nr},${nc})`, en: `Roll '${dir.letter}' ${rolled} cells to (${nr},${nc})` },
+        note: rolled === 0
+          ? { vi: "Hướng này bị chặn ngay, không tạo state mới.", en: "This direction is blocked immediately, so it creates no new state." }
+          : fellIntoHole
+            ? { vi: "Gặp hole thì bóng dừng ngay, không tiếp tục lăn tới tường.", en: "The ball stops immediately at the hole instead of continuing to the wall." }
+            : { vi: "Bóng chỉ dừng khi ô kế tiếp là tường hoặc vượt biên.", en: "The ball stops only when the next cell is a wall or outside the maze." },
+        phase: "roll",
+        codeLines: [fellIntoHole ? 21 : 18],
+        current: [r, c],
+        direction: dir,
+        rollPath,
+        stop: [nr, nc],
+        candidate,
+        incumbent,
+        fellIntoHole,
+      });
+      if (rolled === 0) continue;
+
+      const accepted = newDistance < dist[nr][nc]
+        || (newDistance === dist[nr][nc] && (paths[nr][nc] === null || newPath < paths[nr][nc]));
+      snapshot({
+        title: accepted
+          ? { vi: `Nhận (${newDistance}, '${newPath}')`, en: `Accept (${newDistance}, '${newPath}')` }
+          : { vi: `Giữ (${dist[nr][nc]}, '${paths[nr][nc]}')`, en: `Keep (${dist[nr][nc]}, '${paths[nr][nc]}')` },
+        note: accepted
+          ? incumbent && newDistance === incumbent.distance
+            ? { vi: `'${newPath}' nhỏ hơn '${incumbent.path}' theo từ điển nên thắng tie.`, en: `'${newPath}' is lexicographically smaller than '${incumbent.path}', so it wins the tie.` }
+            : { vi: "Candidate có distance nhỏ hơn nên trở thành best mới.", en: "The candidate has a shorter distance, so it becomes the new best." }
+          : { vi: "Candidate không tốt hơn cặp best hiện tại.", en: "The candidate does not improve the current best pair." },
+        phase: "compare",
+        codeLines: [25],
+        current: [r, c],
+        direction: dir,
+        rollPath,
+        stop: [nr, nc],
+        candidate,
+        incumbent,
+        accepted,
+        fellIntoHole,
+      });
+      if (!accepted) continue;
+
+      dist[nr][nc] = newDistance;
+      paths[nr][nc] = newPath;
+      heap.push([newDistance, newPath, nr, nc]);
+      snapshot({
+        title: { vi: `Push (${newDistance}, '${newPath}', ${nr}, ${nc})`, en: `Push (${newDistance}, '${newPath}', ${nr}, ${nc})` },
+        note: { vi: "Heap sẽ tiếp tục sắp theo distance rồi path.", en: "The heap continues to order states by distance, then path." },
+        phase: "push",
+        codeLines: [27],
+        current: [nr, nc],
+        direction: dir,
+        rollPath,
+        stop: [nr, nc],
+        candidate,
+        incumbent,
+        accepted: true,
+        fellIntoHole,
+      });
+    }
+  }
+
+  if (answer === "impossible") {
+    snapshot({
+      title: { vi: "Heap rỗng: impossible", en: "The heap is empty: impossible" },
+      note: { vi: "Không có stopping state nào có thể đưa bóng vào hole.", en: "No reachable stopping state can roll the ball into the hole." },
+      phase: "impossible",
+      codeLines: [28],
+      final: true,
+    });
+  }
+
+  return { original: maze, maze, ball, hole, answer, steps };
+}
+
+Object.assign(module.exports, {
+  499: {
+    id: 499,
+    difficulty: "hard",
+    premium: true,
+    slug: "the-maze-iii",
+    category: { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+    ],
+    title: { vi: "The Maze III", en: "The Maze III" },
+    titleVi: { vi: "Bóng lăn vào hole với path nhỏ nhất", en: "Roll the ball into the hole with the smallest path" },
+    statement: {
+      vi: "Bóng lăn tới khi gặp tường, nhưng sẽ dừng ngay nếu đi qua hole. Trả path có distance nhỏ nhất; nếu nhiều path cùng distance, trả path nhỏ nhất theo từ điển. Trả 'impossible' nếu không thể tới hole.",
+      en: "The ball rolls until hitting a wall, but stops immediately when it passes over the hole. Return the shortest path; among equal distances, return the lexicographically smallest path. Return 'impossible' if the hole is unreachable.",
+    },
+    defaultInput: "0,0,0,0,0|1,1,0,0,1|0,0,0,0,0|0,1,0,0,1|0,1,0,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Maze 0/1 (hàng cách '|')", en: "0/1 maze (rows separated by '|')" },
+    extraParams: [
+      { key: "ballR", label: { vi: "ball row", en: "ball row" }, default: 4, min: 0 },
+      { key: "ballC", label: { vi: "ball col", en: "ball col" }, default: 3, min: 0 },
+      { key: "holeR", label: { vi: "hole row", en: "hole row" }, default: 0, min: 0 },
+      { key: "holeC", label: { vi: "hole col", en: "hole col" }, default: 1, min: 0 },
+    ],
+    approach: [
+      { vi: "Dijkstra dùng state (distance, path, row, col), nên heap tự ưu tiên distance nhỏ nhất rồi path nhỏ nhất theo từ điển.", en: "Dijkstra uses state (distance, path, row, col), so the heap prioritizes minimum distance and then the lexicographically smallest path." },
+      { vi: "Từ mỗi stopping position, lăn theo d, l, r, u; dừng khi gặp tường hoặc ngay khi rơi vào hole.", en: "From each stopping position, roll in d, l, r, u order; stop at a wall or immediately upon falling into the hole." },
+      { vi: "Chỉ cập nhật một ô khi cặp (newDistance, newPath) nhỏ hơn cặp best hiện tại.", en: "Update a cell only when (newDistance, newPath) is smaller than its current best pair." },
+    ],
+    complexity: {
+      time: "O(mn · max(m,n) · log(mn))",
+      space: "O(mn)",
+      note: { vi: "Mỗi stopping state thử 4 lượt lăn; mỗi lượt có thể đi qua tối đa max(m,n) ô.", en: "Each stopping state tries four rolls, each crossing at most max(m,n) cells." },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def findShortestWay(self, maze, ball, hole):",
+      "        m, n = len(maze), len(maze[0])",
+      "        directions = [(1, 0, 'd'), (0, -1, 'l'), (0, 1, 'r'), (-1, 0, 'u')]",
+      "        best = {(ball[0], ball[1]): (0, '')}",
+      "        heap = [(0, '', ball[0], ball[1])]",
+      "",
+      "        while heap:",
+      "            distance, path, row, col = heapq.heappop(heap)",
+      "            if (distance, path) != best[(row, col)]:",
+      "                continue",
+      "            if [row, col] == hole:",
+      "                return path",
+      "            for dr, dc, letter in directions:",
+      "                nr, nc, steps = row, col, 0",
+      "                while 0 <= nr + dr < m and 0 <= nc + dc < n and maze[nr + dr][nc + dc] == 0:",
+      "                    nr, nc = nr + dr, nc + dc",
+      "                    steps += 1",
+      "                    if [nr, nc] == hole:",
+      "                        break",
+      "                candidate = (distance + steps, path + letter)",
+      "                state = (nr, nc)",
+      "                if steps and candidate < best.get(state, (float('inf'), '')):",
+      "                    best[state] = candidate",
+      "                    heapq.heappush(heap, (*candidate, nr, nc))",
+      "        return 'impossible'",
+    ],
+    liveArgs(input, params = {}) {
+      return [
+        parseIslandGrid(input).map((row) => row.map(Number)),
+        [Number(params.ballR), Number(params.ballC)],
+        [Number(params.holeR), Number(params.holeC)],
+      ];
+    },
+    builder: buildSteps499,
   },
 });
 

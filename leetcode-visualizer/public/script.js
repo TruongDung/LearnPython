@@ -6665,6 +6665,218 @@ function renderNetworkDelayView(step) {
   renderGraph(step, "networkDelayGraph");
 }
 
+function renderReachable882View(step) {
+  const view = step.reachable882View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "build");
+  const distances = Array.isArray(view.distances) ? view.distances : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const edgeRows = Array.isArray(view.edgeRows) ? view.edgeRows : [];
+  const activeStage = phase === "build" ? 0
+    : ["init", "pop", "stale", "relax", "update"].includes(phase) ? 1
+      : phase === "count-original" ? 2 : 3;
+  const stageLabels = vi
+    ? ["1. Nén cạnh", "2. Dijkstra node gốc", "3. Đếm node gốc", "4. Đếm node mới"]
+    : ["1. Compress edges", "2. Dijkstra original nodes", "3. Count originals", "4. Count new nodes"];
+  const stages = stageLabels.map((label, index) => {
+    const state = index < activeStage ? "is-done" : index === activeStage ? "is-active" : "";
+    return `<span class="${state}">${index < activeStage ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const distanceHtml = distances.map((item) => {
+    const classes = ["network-delay-dist"];
+    if (item.node === 0) classes.push("is-source");
+    if (item.finalized) classes.push("is-finalized");
+    if (item.current) classes.push("is-current");
+    return `<div class="${classes.join(" ")}"><small>node ${item.node}</small><strong>${escapeHtml(String(item.value))}</strong><em>${item.reachable ? `${vi ? "còn" : "left"} ${item.remaining}` : (vi ? "ngoài budget" : "over budget")}</em></div>`;
+  }).join("");
+  const heapHtml = heap.length
+    ? heap.map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}"><small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `[${index}]`}</small><strong>(${item.distance}, ${item.node})</strong><em>distance, node</em></div>`).join("")
+    : `<span class="network-delay-empty">${vi ? "heap rỗng" : "empty heap"}</span>`;
+  const ledgerHtml = edgeRows.map((edge) => {
+    const active = edge.index === view.activeEdgeIndex;
+    const visibleCount = Math.min(edge.cnt, 14);
+    const leftReach = Math.min(edge.cnt, edge.fromU);
+    const rightReach = Math.min(edge.cnt, edge.fromV);
+    const dots = visibleCount
+      ? Array.from({ length: visibleCount }, (_, visualIndex) => {
+          const actualIndex = edge.cnt <= 14 ? visualIndex : Math.floor(visualIndex * edge.cnt / visibleCount);
+          const fromU = edge.counted && actualIndex < leftReach;
+          const fromV = edge.counted && actualIndex >= edge.cnt - rightReach;
+          const state = fromU && fromV ? "both" : fromU ? "from-u" : fromV ? "from-v" : "unreached";
+          return `<i class="${state}" title="subdivision ${actualIndex + 1}">${actualIndex + 1}</i>`;
+        }).join("")
+      : `<em>${vi ? "không có node mới" : "no new nodes"}</em>`;
+    const extra = edge.cnt > visibleCount ? `<b class="reachable882-more">+${edge.cnt - visibleCount}</b>` : "";
+    return `<article class="reachable882-edge ${active ? "active" : ""} ${edge.counted ? "counted" : "pending"}">
+      <header><strong>${edge.u} ⟷ ${edge.v}</strong><span>cnt=${edge.cnt} · cost=${edge.cnt}+1</span></header>
+      <div class="reachable882-chain"><b>${edge.u}</b><span>${dots}${extra}</span><b>${edge.v}</b></div>
+      <footer><span><small>from ${edge.u}</small><strong>${edge.fromU}</strong></span><i>+</i><span><small>from ${edge.v}</small><strong>${edge.fromV}</strong></span><i>→</i><span class="total"><small>${vi ? "NODE MỚI" : "NEW NODES"}</small><strong>${edge.counted ? edge.reachable : "?"}/${edge.cnt}</strong></span></footer>
+    </article>`;
+  }).join("");
+  let actionMain = "";
+  let actionDetail = "";
+  let outcomeClass = "";
+  const edge = view.activeEdge;
+  if (phase === "build") {
+    actionMain = "weight = cnt + 1";
+    actionDetail = vi ? "Nén chuỗi node mới để Dijkstra chỉ chạy trên original nodes." : "Compress each new-node chain so Dijkstra runs only on original nodes.";
+  } else if (phase === "init") {
+    actionMain = "dist[0] = 0";
+    actionDetail = vi ? `Bắt đầu với maxMoves = ${view.maxMoves}.` : `Start with maxMoves = ${view.maxMoves}.`;
+  } else if (phase === "pop") {
+    actionMain = `pop node ${view.currentNode}`;
+    actionDetail = vi ? "Khoảng cách nhỏ nhất của node này đã được chốt." : "This node's shortest distance is finalized.";
+  } else if (phase === "stale") {
+    actionMain = vi ? "Bỏ heap entry cũ" : "Skip stale heap entry";
+    actionDetail = vi ? "Một đường ngắn hơn đã được lưu trước đó." : "A shorter route was stored earlier.";
+    outcomeClass = "is-rejected";
+  } else if (phase === "relax" && edge) {
+    actionMain = `${view.candidate} < ${view.oldDistance} → ${view.improves ? "True" : "False"}`;
+    actionDetail = vi
+      ? `Cạnh ${edge.u}-${edge.v} có cost ${edge.cnt}+1 = ${edge.cost}.`
+      : `Edge ${edge.u}-${edge.v} costs ${edge.cnt}+1 = ${edge.cost}.`;
+    outcomeClass = view.improves ? "is-accepted" : "is-rejected";
+  } else if (phase === "update" && edge) {
+    const target = edge.u === view.currentNode ? edge.v : edge.u;
+    actionMain = `dist[${target}] = ${view.candidate}`;
+    actionDetail = vi ? "Cập nhật khoảng cách và push trạng thái mới vào heap." : "Update the distance and push the improved state into the heap.";
+    outcomeClass = "is-accepted";
+  } else if (phase === "count-original") {
+    actionMain = `${view.originalCount} original node${view.originalCount === 1 ? "" : "s"}`;
+    actionDetail = `dist[u] ≤ maxMoves (${view.maxMoves})`;
+    outcomeClass = "is-accepted";
+  } else if (phase === "count-edge" && edge) {
+    const row = edgeRows[edge.index];
+    actionMain = `min(${edge.cnt}, ${row.fromU} + ${row.fromV}) = ${view.edgeContribution}`;
+    actionDetail = vi ? `Budget còn lại tiến vào cạnh từ hai đầu ${edge.u} và ${edge.v}.` : `Remaining budgets enter the edge from endpoints ${edge.u} and ${edge.v}.`;
+    outcomeClass = "is-accepted";
+  } else {
+    actionMain = `${view.originalCount} + ${view.newCount} = ${view.total}`;
+    actionDetail = vi ? "Original nodes + subdivided nodes reachable." : "Reachable original nodes plus reachable subdivided nodes.";
+    outcomeClass = "is-accepted";
+  }
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Bài 882: ${view.originalCount} node gốc, ${view.newCount} node mới, tổng ${view.total}.`
+    : `Problem 882: ${view.originalCount} original, ${view.newCount} new, total ${view.total}.`;
+
+  $("treeView").innerHTML = `<section class="network-delay-viz reachable882-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="network-delay-phases">${stages}</div>
+    <div class="reachable882-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="reachable882-equation"><strong>edge cost = cnt + 1</strong><span>${vi ? "Dijkstra tìm dist tới original nodes" : "Dijkstra finds dist to original nodes"}</span><b>new = min(cnt, left[u] + left[v])</b></section>
+    <div class="network-delay-workspace">
+      <div id="reachable882Graph" class="network-delay-graph"></div>
+      <div class="network-delay-state">
+        <div class="network-delay-section-head"><strong>dist + remaining</strong><span>remaining[u] = max(0, ${view.maxMoves} - dist[u])</span></div>
+        <div class="network-delay-distances">${distanceHtml}</div>
+        <div class="network-delay-section-head"><strong>min-heap</strong><span>${vi ? "distance nhỏ nhất trước" : "smallest distance first"}</span></div>
+        <div class="network-delay-heap">${heapHtml}</div>
+      </div>
+    </div>
+    <div class="reachable882-metrics"><span><small>ORIGINAL</small><strong>${view.originalCount}</strong></span><i>+</i><span><small>SUBDIVIDED</small><strong>${view.newCount}</strong></span><i>=</i><span class="total"><small>TOTAL</small><strong>${view.total}</strong></span></div>
+    <div class="network-delay-action ${outcomeClass}"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <section class="reachable882-ledger"><header><strong>SUBDIVISION LEDGER</strong><span>${vi ? "xanh: từ u · hồng: từ v · tím: gặp nhau" : "green: from u · pink: from v · violet: overlap"}</span></header><div>${ledgerHtml}</div></section>
+  </section>`;
+  renderGraph(step, "reachable882Graph");
+}
+
+function renderMaze499View(step) {
+  const view = step.maze499View || {};
+  const vi = lang === "vi";
+  const maze = view.maze || [];
+  const rows = view.rows || maze.length;
+  const cols = view.cols || (maze[0] ? maze[0].length : 0);
+  const cellKey = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const currentKey = cellKey(view.current);
+  const stopKey = cellKey(view.stop);
+  const ballKey = cellKey(view.ball);
+  const holeKey = cellKey(view.hole);
+  const rolling = new Set((view.rollPath || []).map(cellKey));
+  const route = new Set((view.finalRoute || []).map(cellKey));
+  const settled = new Set(view.settled || []);
+  const directionLetter = view.direction && view.direction.letter;
+  const phases = vi
+    ? ["1. Lăn tới điểm dừng", "2. Dijkstra (dist, path)", "3. Rơi vào hole"]
+    : ["1. Roll to a stop", "2. Dijkstra (dist, path)", "3. Fall into the hole"];
+  const phaseIndex = ["model", "init"].includes(view.phase)
+    ? 0
+    : ["done", "impossible"].includes(view.phase) ? 2 : 1;
+  const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : ""} ${index < phaseIndex ? "done" : ""}">${index < phaseIndex ? "✓ " : ""}${label}</span>`).join("");
+
+  let cells = "";
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${r},${c}`;
+      const classes = ["maze499-cell", maze[r][c] === 1 ? "wall" : "open"];
+      if (settled.has(key)) classes.push("settled");
+      if (route.has(key)) classes.push("route");
+      if (rolling.has(key)) classes.push("rolling");
+      if (key === stopKey) classes.push("stop");
+      if (key === currentKey) classes.push("current");
+      if (key === ballKey) classes.push("ball");
+      if (key === holeKey) classes.push("hole");
+      const marker = key === ballKey
+        ? `<strong>B</strong><small>${vi ? "BALL" : "BALL"}</small>`
+        : key === holeKey
+          ? `<strong>H</strong><small>HOLE</small>`
+          : maze[r][c] === 1
+            ? `<strong>×</strong>`
+            : route.has(key) ? `<strong>•</strong>` : "";
+      cells += `<div class="${classes.join(" ")}"><i>${r},${c}</i>${marker}</div>`;
+    }
+  }
+
+  const heap = view.heap || [];
+  const heapHtml = heap.length
+    ? heap.slice(0, 8).map((item, index) => `<div class="maze499-state ${index === 0 ? "top" : ""}"><span>#${index + 1}</span><b>${item.distance}</b><code>'${escapeHtml(item.path || "∅")}'</code><em>(${item.r},${item.c})</em></div>`).join("")
+    : `<div class="maze499-empty">${vi ? "heap rỗng" : "empty heap"}</div>`;
+  const best = view.best || [];
+  const bestHtml = best.length
+    ? best.slice(0, 9).map((item) => `<div class="maze499-best-state ${item.settled ? "settled" : ""}"><span>(${item.r},${item.c})</span><b>${item.distance}</b><code>'${escapeHtml(item.path || "∅")}'</code></div>`).join("")
+    : `<div class="maze499-empty">${vi ? "chưa có best state" : "no best state yet"}</div>`;
+  const dirs = [
+    ["d", "↓", vi ? "xuống" : "down"],
+    ["l", "←", vi ? "trái" : "left"],
+    ["r", "→", vi ? "phải" : "right"],
+    ["u", "↑", vi ? "lên" : "up"],
+  ];
+  const dirsHtml = dirs.map(([letter, arrow, name]) => `<span class="${letter === directionLetter ? "active" : ""}"><b>${letter}</b><i>${arrow}</i><small>${name}</small></span>`).join("");
+  const candidate = view.candidate;
+  const incumbent = view.incumbent;
+  const comparisonHtml = candidate
+    ? `<section class="maze499-comparison ${view.accepted === true ? "accepted" : view.accepted === false ? "rejected" : "pending"}">
+        <div><small>CANDIDATE</small><strong>(${candidate.distance}, '${escapeHtml(candidate.path)}')</strong><span>stop (${candidate.r},${candidate.c}) · +${candidate.rolled}</span></div>
+        <b class="maze499-compare-symbol">${view.accepted === true ? "<" : view.accepted === false ? "≥" : "?"}</b>
+        <div><small>CURRENT BEST</small><strong>${incumbent ? `(${incumbent.distance}, '${escapeHtml(incumbent.path)}')` : "(∞, —)"}</strong><span>${view.accepted === true ? (vi ? "candidate thắng" : "candidate wins") : view.accepted === false ? (vi ? "giữ best cũ" : "keep current best") : (vi ? "chuẩn bị so sánh" : "ready to compare")}</span></div>
+      </section>`
+    : `<section class="maze499-rule"><code>(distance₁, path₁) &lt; (distance₂, path₂)</code><span>${vi ? "so distance trước, path sau" : "compare distance first, then path"}</span></section>`;
+  const rollSummary = candidate
+    ? `<span><small>${vi ? "LĂN" : "ROLL"}</small><strong>'${escapeHtml(directionLetter || "-")}' · ${candidate.rolled} ${vi ? "ô" : "cells"}</strong></span><i>→</i><span><small>${view.fellIntoHole ? "HOLE" : (vi ? "ĐIỂM DỪNG" : "STOP")}</small><strong>(${candidate.r},${candidate.c})</strong></span>`
+    : `<span><small>ORDER</small><strong>d &lt; l &lt; r &lt; u</strong></span><i>→</i><span><small>HEAP KEY</small><strong>(distance, path)</strong></span>`;
+  const finished = ["done", "impossible"].includes(view.phase);
+  const answerText = !finished ? "—" : view.answer === "impossible" ? "impossible" : `'${view.answer}'`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : step.codeLines;
+  const summary = vi
+    ? `Bài 499: heap có ${heap.length} state, kết quả ${answerText}.`
+    : `Problem 499: heap has ${heap.length} states, result ${answerText}.`;
+
+  $("treeView").innerHTML = `<section class="maze499-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="maze499-phases">${phaseHtml}</div>
+    <header class="maze499-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></header>
+    <div class="maze499-roll-summary">${rollSummary}</div>
+    <div class="maze499-workspace">
+      <section class="maze499-maze-panel"><header><strong>MAZE</strong><span>B = ball · H = hole</span></header><div class="maze499-grid" style="--maze499-cols:${cols}">${cells}</div><footer><span><i class="ball"></i>ball</span><span><i class="hole"></i>hole</span><span><i class="rolling"></i>${vi ? "đang lăn" : "rolling"}</span><span><i class="route"></i>${vi ? "đường cuối" : "final route"}</span></footer></section>
+      <section class="maze499-state-panel">
+        <div class="maze499-directions"><header><strong>DIRECTION ORDER</strong><span>${vi ? "thứ tự từ điển" : "lexicographic order"}</span></header><div>${dirsHtml}</div></div>
+        <div class="maze499-heap"><header><strong>MIN-HEAP</strong><span>(distance, path, row, col)</span></header><div>${heapHtml}</div></div>
+      </section>
+    </div>
+    ${comparisonHtml}
+    <section class="maze499-best"><header><strong>BEST STOPPING STATES</strong><span>${vi ? "mỗi ô lưu cặp tốt nhất" : "best pair stored for each cell"}</span></header><div>${bestHtml}</div></section>
+    <div class="maze499-result ${finished ? "visible" : ""}"><small>RESULT</small><strong>${escapeHtml(answerText)}</strong><span>${view.phase === "done" ? (vi ? "shortest + lexicographically smallest" : "shortest + lexicographically smallest") : view.phase === "impossible" ? (vi ? "hole không tới được" : "the hole is unreachable") : (vi ? "chưa kết thúc" : "not finished")}</span></div>
+  </section>`;
+}
+
 function renderPathExistsDfsView(step) {
   const view = step.pathExistsDfsView || {};
   const vi = lang === "vi";
@@ -23083,6 +23295,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNetworkDelayView(step);
+  } else if (step.reachable882View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReachable882View(step);
+  } else if (step.maze499View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaze499View(step);
   } else if (step.pathExistsDfsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
