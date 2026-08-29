@@ -36127,9 +36127,9 @@ html, body {
 
 /* LeetCode 354: Russian Doll Envelopes, DP and binary-search LIS */
 .tree-view:has(.rde354-viz) { min-height: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
-.viz-split:has(.rde354-viz) { align-items: start; }
-.viz-split:has(.rde354-viz) .viz-left { flex: 0 1 34%; }
-.viz-split:has(.rde354-viz) .viz-right { flex: 1 1 66%; }
+.viz-split:has(.rde354-viz) { flex-direction: column; align-items: stretch; }
+.viz-split:has(.rde354-viz) .viz-left,
+.viz-split:has(.rde354-viz) .viz-right { flex: none; width: 100%; }
 .viz-right:has(.rde354-viz) { max-height: none; overflow: visible; }
 .rde354-viz { display: grid; gap: 16px; width: 100%; min-width: min(100%, 680px); padding: 22px; border: 1px solid #334155; border-radius: 8px; background: #0b1220; color: #e5e7eb; }
 .rde354-viz * { box-sizing: border-box; }
@@ -36180,7 +36180,7 @@ html, body {
 .rde354-orders header, .rde354-heights > header, .rde354-method > header, .rde354-chain > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; padding: 12px 14px; border-bottom: 1px solid #334155; }
 .rde354-orders header strong, .rde354-heights > header strong, .rde354-method > header strong, .rde354-chain > header strong { color: #f8fafc; font: 800 12px/1 Consolas,monospace; }
 .rde354-orders header span, .rde354-heights > header span, .rde354-method > header span, .rde354-chain > header span { color: #8292a8; font-size: 11px; }
-.rde354-orders > div > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(128px,1fr)); gap: 10px; padding: 12px; }
+.rde354-orders > div > div { display: grid; grid-template-columns: repeat(4,minmax(112px,1fr)); gap: 10px; padding: 12px; overflow-x: auto; overscroll-behavior-inline: contain; }
 .rde354-envelope { display: grid; min-width: 0; min-height: 172px; align-content: space-between; justify-items: center; gap: 8px; padding: 10px; border: 1px solid #475569; border-top: 4px solid #64748b; border-radius: 7px; background: #111827; text-align: center; }
 .rde354-envelope > small { justify-self: start; color: #94a3b8; font: 700 11px/1 Consolas,monospace; }
 .rde354-envelope > strong { color: #e2e8f0; font: 800 16px/1 Consolas,monospace; }
