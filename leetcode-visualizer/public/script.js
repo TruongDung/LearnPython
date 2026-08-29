@@ -20664,6 +20664,105 @@ function renderRandomizedSet380View(step) {
   </section>`;
 }
 
+function renderRandomizedCollection381View(step) {
+  const view = step.randomizedCollection381View || {};
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const values = Array.isArray(view.values) ? view.values : [];
+  const entries = Array.isArray(view.indexEntries) ? view.indexEntries : [];
+  const probabilities = Array.isArray(view.probabilities) ? view.probabilities : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const detail = view.detail || {};
+  const needsSwap = detail.needsSwap !== undefined
+    ? detail.needsSwap
+    : detail.removeIndex !== undefined && detail.lastIndex !== undefined
+      ? detail.removeIndex !== detail.lastIndex
+      : null;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const phaseIndex = phase === "init" || phase === "invalid" ? 0
+    : ["insert-check", "remove-lookup", "remove-reject", "remove-take-index", "remove-plan"].includes(phase) ? 1
+      : phase === "return" || phase === "done" ? 3 : 2;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Chọn occurrence", "Sửa array + index sets", "Trả kết quả"]
+    : ["Initialize", "Choose occurrence", "Update array + index sets", "Return result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const operationHtml = operations.map((operation, index) => {
+    const state = index < view.completedOps ? "done" : index === view.activeOpIndex ? "active" : "pending";
+    const result = index < view.completedOps ? results[index] : null;
+    return `<span class="${state}"><small>#${index + 1}</small><b>${escapeHtml(operation)}</b><em>${state === "done" ? `→ ${escapeHtml(display(result))}` : state === "active" ? (vi ? "đang chạy" : "running") : ""}</em></span>`;
+  }).join("");
+
+  const ghostSlot = phase === "insert-index" && view.activeArrayIndex === values.length
+    ? `<div class="rs380-cell ghost active"><small>[${values.length}]</small><strong>?</strong><em>${vi ? "sắp append" : "append next"}</em></div>`
+    : "";
+  const arrayHtml = values.map((value, index) => {
+    const classes = ["rs380-cell"];
+    if (index === view.activeArrayIndex) classes.push("active");
+    if (index === view.lastIndex) classes.push("last");
+    if (view.randomPick && index === view.randomPick.index) classes.push("random");
+    const occurrence = values.slice(0, index + 1).filter((item) => item === value).length;
+    return `<div class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(display(value))}</strong><em>occurrence #${occurrence}${index === view.lastIndex ? " · LAST" : ""}</em></div>`;
+  }).join("") + ghostSlot;
+  const mapHtml = entries.length ? entries.map((entry) => {
+    const active = entry.value === view.activeValue || entry.value === view.lastValue;
+    const slots = Array.isArray(entry.indices) ? entry.indices : [];
+    const checks = slots.map((index) => `values[${index}]=${display(values[index])}`).join(" · ") || (vi ? "set tạm rỗng" : "temporarily empty set");
+    return `<div class="rc381-map-row ${active ? "active" : ""}"><strong>${escapeHtml(display(entry.value))}</strong><i>→</i><b>{${slots.map((index) => escapeHtml(display(index))).join(", ")}}</b><span>${escapeHtml(checks)}</span></div>`;
+  }).join("") : `<em class="rs380-empty">{ }</em>`;
+  const probabilityHtml = probabilities.length ? probabilities.map((entry) => {
+    const ratio = entry.total ? entry.count / entry.total : 0;
+    return `<span class="${entry.value === view.activeValue ? "active" : ""}"><small>VALUE ${escapeHtml(display(entry.value))}</small><strong>${entry.count}/${entry.total}</strong><em>${Math.round(ratio * 100)}%</em><i style="--rc381-prob:${ratio}"></i></span>`;
+  }).join("") : `<em class="rs380-empty">${vi ? "Collection rỗng" : "Empty collection"}</em>`;
+
+  const removePhases = ["remove-take-index", "remove-plan", "remove-copy-last", "remove-index-old", "remove-index-new", "remove-no-swap", "remove-pop", "remove-clean-key", "remove-keep-key", "return"];
+  const removeStageRaw = removePhases.indexOf(phase);
+  const removeStage = removeStageRaw < 0 ? -1
+    : removeStageRaw <= 1 ? removeStageRaw
+      : removeStageRaw === 2 ? 2
+        : removeStageRaw <= 4 ? 3
+          : removeStageRaw === 5 ? 3
+            : removeStageRaw === 6 ? 4 : 5;
+  const isRemoveReturn = phase === "return" && detail.removeIndex !== undefined;
+  const removeBoard = phase.startsWith("remove") || isRemoveReturn
+    ? `<section class="rc381-remove"><header><strong>REMOVE ONE OCCURRENCE · SWAP-DELETE</strong><span>${vi ? "không splice, không dịch mảng" : "no splice and no array shifting"}</span></header><div>
+        <span class="${removeStage === 0 ? "active" : removeStage > 0 ? "done" : ""}"><small>1</small><b>${vi ? "LẤY INDEX" : "TAKE INDEX"}</b><em>${display(detail.removeIndex)}</em></span>
+        <span class="${removeStage === 1 ? "active" : removeStage > 1 ? "done" : ""}"><small>2</small><b>${vi ? "ĐỌC LAST" : "READ LAST"}</b><em>${display(view.lastValue)} @ ${display(view.lastIndex)}</em></span>
+        <span class="${removeStage === 2 ? "active" : removeStage > 2 ? "done" : ""}"><small>3</small><b>${vi ? "LẤP LỖ" : "FILL HOLE"}</b><em>${needsSwap === true ? `${display(view.lastValue)} → ${display(detail.removeIndex)}` : needsSwap === false ? "SKIP" : "—"}</em></span>
+        <span class="${removeStage === 3 ? "active" : removeStage > 3 ? "done" : ""}"><small>4</small><b>${vi ? "CHUYỂN INDEX" : "MOVE INDEX"}</b><em>${needsSwap === true ? `${display(view.lastIndex)} → ${display(detail.removeIndex)}` : needsSwap === false ? "SKIP" : "—"}</em></span>
+        <span class="${removeStage === 4 ? "active" : removeStage > 4 ? "done" : ""}"><small>5</small><b>POP LAST</b><em>O(1)</em></span>
+        <span class="${removeStage >= 5 ? "active" : ""}"><small>6</small><b>${vi ? "DỌN KEY RỖNG" : "CLEAN EMPTY KEY"}</b><em>${detail.keyDeleted === true ? "DELETE" : detail.keyDeleted === false ? "KEEP" : "CHECK"}</em></span>
+      </div></section>`
+    : "";
+  const randomBoard = view.randomPick
+    ? `<section class="rs380-random"><small>UNIFORM OCCURRENCE INDEX · seed ${escapeHtml(display(view.seed))}</small><strong>randrange(${view.randomPick.length}) = ${view.randomPick.index}</strong><span>values[${view.randomPick.index}] = <b>${escapeHtml(display(view.randomPick.value))}</b></span></section>`
+    : "";
+  const insertBoard = phase.startsWith("insert") || (phase === "return" && detail.isNew !== undefined)
+    ? `<section class="rs380-insert"><small>INSERT ${escapeHtml(display(view.activeValue))} · DUPLICATES ALLOWED</small><strong>${detail.isNew ? (vi ? "CHƯA CÓ → RETURN TRUE" : "ABSENT → RETURN TRUE") : (vi ? "ĐÃ CÓ → VẪN APPEND, RETURN FALSE" : "PRESENT → APPEND ANYWAY, RETURN FALSE")}</strong><span>${vi ? "Return cho biết value có mới hay không, không cho biết insert có xảy ra hay không." : "The return value reports whether val was new, not whether insertion happened."}</span></section>`
+    : "";
+  const resultHtml = operations.map((operation, index) => index < view.completedOps
+    ? `<span><small>${escapeHtml(operation)}</small><strong>${escapeHtml(display(results[index]))}</strong></span>` : "").join("") || `<em class="rs380-empty">${vi ? "Chưa có output" : "No output yet"}</em>`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi ? `RandomizedCollection có ${values.length} occurrence; invariant ${view.invariantOk ? "đúng" : "đang cập nhật"}.` : `RandomizedCollection has ${values.length} occurrences; invariant ${view.invariantOk ? "holds" : "is being updated"}.`;
+
+  $("treeView").innerHTML = `<section class="rs380-viz rc381-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rs380-phases">${phases}</div>
+    <div class="rs380-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rs380-operations"><header><strong>OPERATIONS</strong><span>${view.completedOps}/${operations.length} ${vi ? "hoàn tất" : "complete"}</span></header><div>${operationHtml}</div></section>
+    <section class="rs380-invariant ${view.invariantOk ? "ok" : "updating"}"><strong>i ∈ indices[values[i]]</strong><span>${view.invariantOk ? (vi ? "✓ mọi occurrence và index set khớp hai chiều" : "✓ every occurrence and index set agree both ways") : (vi ? "↻ trạng thái trung gian của swap-delete" : "↻ intermediate swap-delete state")}</span></section>
+    <div class="rs380-structures">
+      <section class="rs380-array"><header><strong>DENSE ARRAY · values</strong><span>${values.length} ${vi ? "occurrence" : "occurrence(s)"}</span></header><div>${arrayHtml || `<em class="rs380-empty">[ ]</em>`}</div></section>
+      <section class="rs380-map rc381-map"><header><strong>HASH MAP · indices</strong><span>value → set of array indices</span></header><div>${mapHtml}</div></section>
+    </div>
+    <section class="rc381-probability"><header><strong>${vi ? "XÁC SUẤT THEO OCCURRENCE" : "OCCURRENCE-WEIGHTED PROBABILITY"}</strong><span>${vi ? "mỗi ô values có cùng xác suất" : "every values slot is equally likely"}</span></header><div>${probabilityHtml}</div></section>
+    ${removeBoard}${randomBoard}${insertBoard}
+    <section class="rs380-results"><header><strong>RETURN LOG</strong><span>True / False / random value</span></header><div>${resultHtml}</div></section>
+  </section>`;
+}
+
 // ---- Remove Boxes visualization (bai 546) ----
 // Replays the memoised interval DP dfs in true execution order: box row with
 // the active window and k phantom boxes, live call stack, option chips and
@@ -23535,6 +23634,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRandomizedSet380View(step);
+  } else if (step.randomizedCollection381View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRandomizedCollection381View(step);
   } else if (step.allocator2502View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

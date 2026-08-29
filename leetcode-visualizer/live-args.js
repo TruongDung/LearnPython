@@ -365,6 +365,8 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       return designConfig("NumArray", [input], parseSpaceOperations(params.operations));
     case 355:
       return designConfig("Twitter", [], parseFunctionOperations(input));
+    case 381:
+      return designConfig("RandomizedCollection", [], parseSpaceOperations(input));
     case 432:
       return designConfig("AllOne", [], parseSpaceOperations(input));
     case 588: {

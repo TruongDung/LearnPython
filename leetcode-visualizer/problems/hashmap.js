@@ -7023,6 +7023,438 @@ function buildSteps380(input, params) {
   return { original: raw, answer: results, steps };
 }
 
+/**
+ * LeetCode 381: Insert Delete GetRandom O(1) - Duplicates allowed.
+ * values keeps every occurrence while indices[value] stores every slot that
+ * currently contains that value. remove() traces the full swap-delete update.
+ */
+function buildSteps381(input, params = {}) {
+  const raw = String(input || "").trim();
+  const seed = Number.isInteger(params.seed) ? params.seed : 11;
+  const operations = raw.split(/\s*[|;]\s*/).filter(Boolean).map((part) => {
+    const tokens = part.replace(/[(),]/g, " ").trim().split(/\s+/);
+    const name = String(tokens[0] || "").toLowerCase();
+    const value = tokens.length > 1 ? Number(tokens[1]) : null;
+    const valid = name === "getrandom"
+      ? tokens.length === 1
+      : (name === "insert" || name === "remove") && tokens.length === 2 && Number.isInteger(value);
+    return {
+      name,
+      value,
+      valid,
+      label: name === "getrandom" ? "getRandom()" : `${name}(${tokens[1] ?? "?"})`,
+    };
+  });
+  const commandsValid = operations.length > 0 && operations.length <= 16 && operations.every((operation) => operation.valid);
+  const values = [];
+  const indices = new Map();
+  const results = new Array(operations.length).fill(null);
+  const steps = [];
+  let randomState = (seed >>> 0) || 1;
+
+  const ensureSet = (value) => {
+    if (!indices.has(value)) indices.set(value, new Set());
+    return indices.get(value);
+  };
+  const indexEntries = () => [...indices.entries()]
+    .map(([value, slots]) => ({ value, indices: [...slots].sort((a, b) => a - b) }))
+    .sort((a, b) => a.value - b.value);
+  const invariantOk = () => {
+    let totalIndices = 0;
+    for (const [value, slots] of indices) {
+      totalIndices += slots.size;
+      for (const index of slots) {
+        if (index < 0 || index >= values.length || values[index] !== value) return false;
+      }
+    }
+    if (totalIndices !== values.length) return false;
+    return values.every((value, index) => indices.has(value) && indices.get(value).has(index));
+  };
+  const probabilityEntries = () => {
+    const counts = new Map();
+    values.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+    return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([value, count]) => ({ value, count, total: values.length }));
+  };
+  const randomIndex = () => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return Math.floor((randomState / 4294967296) * values.length);
+  };
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    phase,
+    activeOpIndex = -1,
+    completedOps = 0,
+    activeValue = null,
+    activeArrayIndex = null,
+    lastIndex = null,
+    lastValue = null,
+    randomPick = null,
+    result = null,
+    detail = null,
+    final = false,
+  }) {
+    const entries = indexEntries();
+    const step = {
+      title,
+      codeLines,
+      randomizedCollection381View: {
+        phase,
+        operations: operations.map((operation) => operation.label),
+        activeOpIndex,
+        completedOps,
+        results: results.slice(),
+        values: values.slice(),
+        indexEntries: entries,
+        probabilities: probabilityEntries(),
+        invariantOk: invariantOk(),
+        activeValue,
+        activeArrayIndex,
+        lastIndex,
+        lastValue,
+        randomPick,
+        result,
+        detail,
+        seed,
+      },
+      vars: [
+        { name: "values", value: `[${values.join(", ")}]` },
+        { name: "indices", value: `{${entries.map((entry) => `${entry.value}:{${entry.indices.join(",")}}`).join(", ")}}` },
+        { name: "invariant", value: invariantOk() ? "i in indices[values[i]]" : "temporarily updating" },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!commandsValid) {
+    snapshot({
+      title: { vi: "Operations không hợp lệ", en: "Invalid operations" },
+      note: {
+        vi: "Dùng tối đa 16 thao tác theo cú pháp: insert 1 | remove 1 | getRandom.",
+        en: "Use at most 16 operations: insert 1 | remove 1 | getRandom.",
+      },
+      codeLines: [5],
+      phase: "invalid",
+      final: true,
+    });
+    return { original: raw, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo RandomizedCollection rỗng", en: "Initialize an empty RandomizedCollection" },
+    note: {
+      vi: "values lưu mọi occurrence; indices[value] là tập hợp tất cả vị trí đang chứa value.",
+      en: "values stores every occurrence; indices[value] is the set of every slot currently containing value.",
+    },
+    codeLines: [5, 6, 7],
+    phase: "init",
+  });
+
+  operations.forEach((operation, opIndex) => {
+    const value = operation.value;
+    if (operation.name === "insert") {
+      const slots = ensureSet(value);
+      const isNew = slots.size === 0;
+      snapshot({
+        title: { vi: `insert(${value}): is_new = ${isNew}`, en: `insert(${value}): is_new = ${isNew}` },
+        note: {
+          vi: isNew ? `${value} chưa có occurrence nào, nhưng vẫn sẽ được append như mọi lần insert.` : `${value} đã tồn tại: vẫn append duplicate, chỉ có giá trị return là False.`,
+          en: isNew ? `${value} has no occurrence yet, and will be appended.` : `${value} already exists: append the duplicate anyway, but return False.`,
+        },
+        codeLines: [9, 10],
+        phase: "insert-check",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        activeArrayIndex: values.length,
+        detail: { isNew },
+      });
+
+      const newIndex = values.length;
+      slots.add(newIndex);
+      snapshot({
+        title: { vi: `indices[${value}].add(${newIndex})`, en: `indices[${value}].add(${newIndex})` },
+        note: {
+          vi: `Index set đã giữ chỗ ${newIndex}; ô values[${newIndex}] sẽ xuất hiện ở dòng kế tiếp.`,
+          en: `The index set reserves slot ${newIndex}; values[${newIndex}] appears on the next line.`,
+        },
+        codeLines: [11],
+        phase: "insert-index",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        activeArrayIndex: newIndex,
+        detail: { isNew, newIndex },
+      });
+
+      values.push(value);
+      results[opIndex] = isNew;
+      snapshot({
+        title: { vi: `values.append(${value}) → ${isNew}`, en: `values.append(${value}) → ${isNew}` },
+        note: {
+          vi: `Occurrence mới nằm ở ô ${newIndex}; invariant được khôi phục.`,
+          en: `The new occurrence is stored at slot ${newIndex}; the invariant is restored.`,
+        },
+        codeLines: [12, 13],
+        phase: "return",
+        activeOpIndex: opIndex,
+        completedOps: opIndex + 1,
+        activeValue: value,
+        activeArrayIndex: newIndex,
+        result: isNew,
+        detail: { isNew, newIndex },
+      });
+      return;
+    }
+
+    if (operation.name === "remove") {
+      const slots = indices.get(value);
+      const exists = Boolean(slots && slots.size);
+      snapshot({
+        title: { vi: `remove(${value}): kiểm tra index set`, en: `remove(${value}): check its index set` },
+        note: {
+          vi: exists ? `indices[${value}] = {${[...slots].sort((a, b) => a - b).join(", ")}}; chỉ xóa một occurrence.` : `${value} không có occurrence nào nên trả False.`,
+          en: exists ? `indices[${value}] = {${[...slots].sort((a, b) => a - b).join(", ")}}; remove only one occurrence.` : `${value} has no occurrence, so return False.`,
+        },
+        codeLines: [15, 16],
+        phase: exists ? "remove-lookup" : "remove-reject",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        detail: { exists },
+      });
+      if (!exists) {
+        results[opIndex] = false;
+        snapshot({
+          title: { vi: `remove(${value}) → False`, en: `remove(${value}) → False` },
+          note: { vi: "Collection không thay đổi.", en: "The collection is unchanged." },
+          codeLines: [17],
+          phase: "return",
+          activeOpIndex: opIndex,
+          completedOps: opIndex + 1,
+          activeValue: value,
+          result: false,
+          detail: { exists: false },
+        });
+        return;
+      }
+
+      const removeIndex = Math.min(...slots);
+      slots.delete(removeIndex);
+      snapshot({
+        title: { vi: `Lấy occurrence index ${removeIndex}`, en: `Take occurrence index ${removeIndex}` },
+        note: {
+          vi: `Python set.pop() có thể lấy bất kỳ index nào; demo chọn index nhỏ nhất để kết quả lặp lại được.`,
+          en: `Python set.pop() may take any index; the demo chooses the smallest one for repeatability.`,
+        },
+        codeLines: [19],
+        phase: "remove-take-index",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        activeArrayIndex: removeIndex,
+        detail: { exists: true, removeIndex },
+      });
+
+      const lastIndex = values.length - 1;
+      const lastValue = values[lastIndex];
+      snapshot({
+        title: { vi: `last = values[${lastIndex}] = ${lastValue}`, en: `last = values[${lastIndex}] = ${lastValue}` },
+        note: {
+          vi: removeIndex === lastIndex ? "Occurrence cần xóa đang ở cuối, nên không cần swap." : `Di chuyển ${lastValue} từ ô ${lastIndex} vào lỗ ${removeIndex}.`,
+          en: removeIndex === lastIndex ? "The removed occurrence is already last, so no swap is needed." : `Move ${lastValue} from slot ${lastIndex} into hole ${removeIndex}.`,
+        },
+        codeLines: [20, 21],
+        phase: "remove-plan",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        activeArrayIndex: removeIndex,
+        lastIndex,
+        lastValue,
+        detail: { removeIndex, lastIndex, needsSwap: removeIndex !== lastIndex },
+      });
+
+      if (removeIndex !== lastIndex) {
+        values[removeIndex] = lastValue;
+        snapshot({
+          title: { vi: `values[${removeIndex}] = ${lastValue}`, en: `values[${removeIndex}] = ${lastValue}` },
+          note: {
+            vi: "Giá trị cuối đã lấp lỗ, nhưng index set của nó vẫn còn trỏ tới ô cuối.",
+            en: "The last value fills the hole, but its index set still points to the final slot.",
+          },
+          codeLines: [23, 24],
+          phase: "remove-copy-last",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          activeArrayIndex: removeIndex,
+          lastIndex,
+          lastValue,
+          detail: { removeIndex, lastIndex, needsSwap: true },
+        });
+
+        const lastSlots = ensureSet(lastValue);
+        lastSlots.delete(lastIndex);
+        snapshot({
+          title: { vi: `indices[${lastValue}].remove(${lastIndex})`, en: `indices[${lastValue}].remove(${lastIndex})` },
+          note: { vi: "Bỏ vị trí cũ của phần tử vừa di chuyển.", en: "Remove the moved value's old slot." },
+          codeLines: [25],
+          phase: "remove-index-old",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          activeArrayIndex: removeIndex,
+          lastIndex,
+          lastValue,
+          detail: { removeIndex, lastIndex, needsSwap: true },
+        });
+
+        lastSlots.add(removeIndex);
+        snapshot({
+          title: { vi: `indices[${lastValue}].add(${removeIndex})`, en: `indices[${lastValue}].add(${removeIndex})` },
+          note: {
+            vi: `Index set của ${lastValue} giờ trỏ tới vị trí mới ${removeIndex}.`,
+            en: `${lastValue}'s index set now points to its new slot ${removeIndex}.`,
+          },
+          codeLines: [26],
+          phase: "remove-index-new",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          activeArrayIndex: removeIndex,
+          lastIndex,
+          lastValue,
+          detail: { removeIndex, lastIndex, needsSwap: true },
+        });
+      } else {
+        snapshot({
+          title: { vi: "Bỏ qua khối swap", en: "Skip the swap block" },
+          note: { vi: "remove_index == last_index, nên ba dòng cập nhật phần tử di chuyển không chạy.", en: "remove_index == last_index, so the three moved-value update lines do not run." },
+          codeLines: [23],
+          phase: "remove-no-swap",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          activeArrayIndex: removeIndex,
+          lastIndex,
+          lastValue,
+          detail: { removeIndex, lastIndex, needsSwap: false },
+        });
+      }
+
+      values.pop();
+      snapshot({
+        title: { vi: "values.pop() trong O(1)", en: "values.pop() in O(1)" },
+        note: { vi: `Mảng dày đặc còn [${values.join(", ")}].`, en: `The dense array is now [${values.join(", ")}].` },
+        codeLines: [28],
+        phase: "remove-pop",
+        activeOpIndex: opIndex,
+        completedOps: opIndex,
+        activeValue: value,
+        activeArrayIndex: removeIndex < values.length ? removeIndex : null,
+        lastIndex,
+        lastValue,
+        detail: { removeIndex, lastIndex, needsSwap: removeIndex !== lastIndex },
+      });
+
+      if (slots.size === 0) {
+        indices.delete(value);
+        snapshot({
+          title: { vi: `del indices[${value}]`, en: `del indices[${value}]` },
+          note: { vi: `Không còn occurrence ${value}; xóa key rỗng khỏi hashmap.`, en: `No ${value} occurrence remains; delete the empty hash-map key.` },
+          codeLines: [29, 30],
+          phase: "remove-clean-key",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          lastValue,
+          detail: { removeIndex, lastIndex, keyDeleted: true },
+        });
+      } else {
+        snapshot({
+          title: { vi: `Giữ indices[${value}]`, en: `Keep indices[${value}]` },
+          note: { vi: `Vẫn còn occurrence tại {${[...slots].sort((a, b) => a - b).join(", ")}}, nên không xóa key.`, en: `Occurrences remain at {${[...slots].sort((a, b) => a - b).join(", ")}}, so keep the key.` },
+          codeLines: [29],
+          phase: "remove-keep-key",
+          activeOpIndex: opIndex,
+          completedOps: opIndex,
+          activeValue: value,
+          lastValue,
+          detail: { removeIndex, lastIndex, keyDeleted: false },
+        });
+      }
+
+      results[opIndex] = true;
+      snapshot({
+        title: { vi: `remove(${value}) → True`, en: `remove(${value}) → True` },
+        note: { vi: "Đúng một occurrence đã bị xóa và invariant được khôi phục.", en: "Exactly one occurrence was removed and the invariant is restored." },
+        codeLines: [31],
+        phase: "return",
+        activeOpIndex: opIndex,
+        completedOps: opIndex + 1,
+        activeValue: value,
+        lastValue,
+        result: true,
+        detail: { removeIndex, lastIndex },
+      });
+      return;
+    }
+
+    if (values.length === 0) {
+      results[opIndex] = null;
+      snapshot({
+        title: { vi: "getRandom() khi collection rỗng", en: "getRandom() on an empty collection" },
+        note: { vi: "LeetCode đảm bảo trường hợp này không xảy ra.", en: "LeetCode guarantees this case does not occur." },
+        codeLines: [33, 34],
+        phase: "random-empty",
+        activeOpIndex: opIndex,
+        completedOps: opIndex + 1,
+        result: null,
+      });
+      return;
+    }
+
+    const pickedIndex = randomIndex();
+    const pickedValue = values[pickedIndex];
+    results[opIndex] = pickedValue;
+    snapshot({
+      title: { vi: `getRandom(): index ${pickedIndex} → ${pickedValue}`, en: `getRandom(): index ${pickedIndex} → ${pickedValue}` },
+      note: {
+        vi: `Mỗi ô có xác suất 1/${values.length}; vì ${pickedValue} xuất hiện ${values.filter((item) => item === pickedValue).length} lần nên xác suất của value tỷ lệ với số occurrence.`,
+        en: `Every slot has probability 1/${values.length}; because ${pickedValue} appears ${values.filter((item) => item === pickedValue).length} times, its probability is proportional to occurrence count.`,
+      },
+      codeLines: [33, 34],
+      phase: "random-pick",
+      activeOpIndex: opIndex,
+      completedOps: opIndex + 1,
+      activeValue: pickedValue,
+      activeArrayIndex: pickedIndex,
+      randomPick: { index: pickedIndex, value: pickedValue, length: values.length },
+      result: pickedValue,
+    });
+  });
+
+  snapshot({
+    title: { vi: "Hoàn tất mọi operation", en: "All operations complete" },
+    note: {
+      vi: "Mảng dày đặc hỗ trợ random theo occurrence; các index set giúp insert/remove trung bình O(1).",
+      en: "The dense array provides occurrence-weighted random picks; index sets keep insert/remove average O(1).",
+    },
+    codeLines: [34],
+    phase: "done",
+    activeOpIndex: operations.length,
+    completedOps: operations.length,
+    final: true,
+  });
+
+  return { original: raw, answer: results, steps };
+}
+
 Object.assign(module.exports, {
   380: {
     id: 380,
@@ -7076,6 +7508,75 @@ Object.assign(module.exports, {
       "        return random.choice(self.values)",
     ],
     builder: buildSteps380,
+  },
+  381: {
+    id: 381,
+    difficulty: "hard",
+    slug: "insert-delete-getrandom-o1-duplicates-allowed",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "design", vi: "Thiết kế", en: "Design" },
+      { key: "randomized", vi: "Ngẫu nhiên", en: "Randomized" },
+    ],
+    title: { vi: "Insert Delete GetRandom O(1) - Duplicates allowed", en: "Insert Delete GetRandom O(1) - Duplicates allowed" },
+    titleVi: { vi: "RandomizedCollection cho phép phần tử trùng", en: "RandomizedCollection with duplicate occurrences" },
+    statement: {
+      vi: "Thiết kế multiset hỗ trợ insert, remove một occurrence và getRandom trong O(1) trung bình. Mỗi occurrence có xác suất được chọn bằng nhau, nên value xuất hiện nhiều lần có xác suất lớn hơn.",
+      en: "Design a multiset supporting insert, removal of one occurrence, and getRandom in average O(1). Every occurrence is equally likely, so repeated values have proportionally higher probability.",
+    },
+    defaultInput: "insert 1 | insert 1 | insert 2 | getRandom | remove 1 | getRandom",
+    inputKind: "string",
+    inputLabel: { vi: "Operations, ngăn cách bằng |", en: "Operations separated by |" },
+    extraParams: [{ key: "seed", label: { vi: "Seed cho demo random", en: "Random demo seed" }, default: 11 }],
+    approach: [
+      { vi: "values lưu mọi occurrence liên tiếp; getRandom chọn đều một index nên tự động tạo xác suất theo số lần xuất hiện.", en: "values stores every occurrence densely; choosing a uniform index automatically weights values by occurrence count." },
+      { vi: "indices[value] là một set chứa mọi index của value, cho phép lấy một occurrence bất kỳ trong O(1) trung bình.", en: "indices[value] is a set of every slot containing value, allowing any occurrence to be found in average O(1)." },
+      { vi: "remove dùng swap-delete: đưa phần tử cuối vào lỗ, chuyển index của phần tử đó từ last_index sang remove_index, rồi pop.", en: "remove uses swap-delete: move the final value into the hole, transfer its index from last_index to remove_index, then pop." },
+    ],
+    complexity: {
+      time: "O(1) average / operation",
+      space: "O(n)",
+      note: { vi: "Mỗi occurrence xuất hiện một lần trong values và đúng một index set.", en: "Every occurrence appears once in values and in exactly one index set." },
+    },
+    codeLabel: { vi: "Array + Hash Map of Sets", en: "Array + Hash Map of Sets" },
+    code: [
+      "import random",
+      "from collections import defaultdict",
+      "",
+      "class RandomizedCollection:",
+      "    def __init__(self):",
+      "        self.values = []",
+      "        self.indices = defaultdict(set)",
+      "",
+      "    def insert(self, val: int) -> bool:",
+      "        is_new = not self.indices[val]",
+      "        self.indices[val].add(len(self.values))",
+      "        self.values.append(val)",
+      "        return is_new",
+      "",
+      "    def remove(self, val: int) -> bool:",
+      "        if not self.indices[val]:",
+      "            return False",
+      "",
+      "        remove_index = self.indices[val].pop()",
+      "        last_index = len(self.values) - 1",
+      "        last_value = self.values[-1]",
+      "",
+      "        if remove_index != last_index:",
+      "            self.values[remove_index] = last_value",
+      "            self.indices[last_value].remove(last_index)",
+      "            self.indices[last_value].add(remove_index)",
+      "",
+      "        self.values.pop()",
+      "        if not self.indices[val]:",
+      "            del self.indices[val]",
+      "        return True",
+      "",
+      "    def getRandom(self) -> int:",
+      "        return random.choice(self.values)",
+    ],
+    builder: buildSteps381,
   },
 });
 

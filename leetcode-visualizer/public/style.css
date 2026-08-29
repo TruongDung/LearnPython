@@ -35300,6 +35300,31 @@ html, body {
 .rs380-results strong, .alloc2502-results strong { color: #86efac; font: 800 13px/1 Consolas, monospace; }
 .rs380-empty, .alloc2502-empty { color: #8292a8; font-size: 10px; font-style: normal; }
 
+.rc381-map-row { display: grid; grid-template-columns: minmax(30px,.45fr) auto minmax(58px,.8fr) minmax(0,1.8fr); align-items: center; gap: 6px; padding: 8px; border-left: 3px solid #64748b; background: #111c2f; }
+.rc381-map-row.active { border-color: #38bdf8; background: rgba(56,189,248,.1); }
+.rc381-map-row strong, .rc381-map-row b { color: #f8fafc; font: 800 13px/1.2 Consolas, monospace; text-align: center; overflow-wrap: anywhere; }
+.rc381-map-row i { color: #38bdf8; font-style: normal; text-align: center; }
+.rc381-map-row span { min-width: 0; color: #9cadc1; font: 700 8px/1.3 Consolas, monospace; overflow-wrap: anywhere; }
+.rc381-probability { display: grid; min-width: 0; gap: 8px; }
+.rc381-probability > header, .rc381-remove > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; }
+.rc381-probability > header strong, .rc381-remove > header strong { color: #d8e2ef; font-size: 11px; }
+.rc381-probability > header span, .rc381-remove > header span { color: #8fa0b5; font-size: 9px; }
+.rc381-probability > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(104px,1fr)); gap: 6px; }
+.rc381-probability > div > span { position: relative; display: grid; grid-template-columns: 1fr auto; min-width: 0; gap: 4px 8px; padding: 8px 9px 12px; overflow: hidden; border: 1px solid #334155; border-radius: 6px; background: #111c2f; }
+.rc381-probability > div > span.active { border-color: #22c55e; background: rgba(34,197,94,.1); }
+.rc381-probability small { color: #94a3b8; font: 800 8px/1 Consolas, monospace; }
+.rc381-probability strong { color: #f8fafc; font: 900 14px/1 Consolas, monospace; }
+.rc381-probability em { grid-column: 1 / -1; color: #86efac; font: 800 9px/1 Consolas, monospace; font-style: normal; }
+.rc381-probability i { position: absolute; left: 0; bottom: 0; width: calc(var(--rc381-prob) * 100%); height: 4px; background: #22c55e; }
+.rc381-remove { display: grid; gap: 8px; }
+.rc381-remove > div { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 6px; }
+.rc381-remove > div > span { display: grid; min-width: 0; min-height: 68px; place-content: center; gap: 4px; padding: 7px; border: 1px solid #475569; border-radius: 6px; background: #111c2f; text-align: center; }
+.rc381-remove > div > span.active { border: 3px solid #f59e0b; background: rgba(245,158,11,.12); }
+.rc381-remove > div > span.done { border-color: #22c55e; }
+.rc381-remove small { color: #8292a8; font: 800 8px/1 Consolas, monospace; }
+.rc381-remove b { color: #f8fafc; font: 800 9px/1.2 system-ui, sans-serif; overflow-wrap: anywhere; }
+.rc381-remove em { color: #9cadc1; font: 700 8px/1.2 Consolas, monospace; font-style: normal; overflow-wrap: anywhere; }
+
 .alloc2502-request { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
 .alloc2502-request.release { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .alloc2502-request > div { display: grid; min-width: 0; min-height: 58px; place-content: center; gap: 4px; padding: 8px; border-bottom: 3px solid #475569; background: #111c2f; text-align: center; }
@@ -35342,6 +35367,13 @@ html, body {
 [data-theme="light"] .rs380-invariant.updating strong { color: #92400e; }
 [data-theme="light"] .rs380-cell.active, [data-theme="light"] .rs380-remove > div > span.active, [data-theme="light"] .alloc2502-cell.scan, [data-theme="light"] .alloc2502-cell.releasing { border-color: #d97706; background: #fffbeb; }
 [data-theme="light"] .rs380-cell.random, [data-theme="light"] .alloc2502-cell.written, [data-theme="light"] .alloc2502-cell.released { border-color: #16a34a; background: #f0fdf4; }
+[data-theme="light"] .rc381-map-row, [data-theme="light"] .rc381-probability > div > span, [data-theme="light"] .rc381-remove > div > span { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .rc381-map-row.active { border-color: #0284c7; background: #f0f9ff; }
+[data-theme="light"] .rc381-map-row strong, [data-theme="light"] .rc381-map-row b, [data-theme="light"] .rc381-probability > header strong, [data-theme="light"] .rc381-probability strong, [data-theme="light"] .rc381-remove > header strong, [data-theme="light"] .rc381-remove b { color: #0f172a; }
+[data-theme="light"] .rc381-map-row span, [data-theme="light"] .rc381-probability > header span, [data-theme="light"] .rc381-remove > header span, [data-theme="light"] .rc381-remove em { color: #475569; }
+[data-theme="light"] .rc381-probability em { color: #166534; }
+[data-theme="light"] .rc381-probability > div > span.active { border-color: #16a34a; background: #f0fdf4; }
+[data-theme="light"] .rc381-remove > div > span.active { border-color: #d97706; background: #fffbeb; }
 [data-theme="light"] .alloc2502-cell.owned.c0 { border-color: #0284c7; background: #f0f9ff; }
 [data-theme="light"] .alloc2502-cell.owned.c1 { border-color: #db2777; background: #fdf2f8; }
 [data-theme="light"] .alloc2502-cell.owned.c2 { border-color: #7c3aed; background: #f5f3ff; }
@@ -35357,12 +35389,16 @@ html, body {
   .rs380-structures { grid-template-columns: 1fr; }
   .rs380-remove > div { grid-template-columns: 1fr; }
   .rs380-remove > div > i { transform: rotate(90deg); text-align: center; }
+  .rc381-remove > div { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .alloc2502-request { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 430px) {
   .rs380-array > div { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .rs380-map-row { grid-template-columns: minmax(26px,.5fr) auto minmax(26px,.5fr); }
   .rs380-map-row span { grid-column: 1 / -1; text-align: center; }
+  .rc381-map-row { grid-template-columns: minmax(26px,.45fr) auto minmax(54px,.8fr); }
+  .rc381-map-row span { grid-column: 1 / -1; text-align: center; }
+  .rc381-remove > div { grid-template-columns: 1fr; }
   .alloc2502-request, .alloc2502-request.release { grid-template-columns: 1fr; }
   .alloc2502-memory > div { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
