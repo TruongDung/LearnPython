@@ -19305,6 +19305,20 @@ function renderRussian354View(step) {
     return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(label)}</strong></span>`;
   }).join("");
 
+  const currentEnvelope = currentIndex !== null ? sorted[currentIndex] : null;
+  const currentSummary = currentEnvelope
+    ? `${currentEnvelope.width} × ${currentEnvelope.height} · h=${currentEnvelope.height}`
+    : (vi ? "Chưa xét phong bì cụ thể" : "No specific envelope yet");
+  const ruleSummary = approach === 1
+    ? (vi ? "DP thử mọi phong bì trước đó: chỉ update khi cả width và height đều nhỏ hơn." : "DP checks every earlier envelope: update only when both width and height are smaller.")
+    : (vi ? "LIS trên height dùng bisect_left: tìm tail đầu tiên >= h để append hoặc thay thế." : "Height LIS uses bisect_left: find the first tail >= h to append or replace.");
+  const legend = [
+    { className: "current", label: vi ? "đang xét" : "current" },
+    { className: "compare", label: vi ? "đang so" : "compare" },
+    { className: "same-width", label: vi ? "width trùng" : "same width" },
+    { className: "chain", label: vi ? "trong chuỗi" : "in chain" },
+  ].map((item) => `<span><i class="${item.className}"></i>${escapeHtml(item.label)}</span>`).join("");
+
   const renderEnvelope = (item, index, source) => {
     const sortedIndex = source === "sorted" ? index : sorted.findIndex((candidate) => candidate.originalIndex === item.originalIndex);
     const classes = ["rde354-envelope"];
@@ -19313,8 +19327,8 @@ function renderRussian354View(step) {
     if (sortedIndex === compareIndex) classes.push("compare");
     if (sortedIndex >= 0 && sortedIndex < Number(view.processedCount || 0)) classes.push("processed");
     if (displayChain.has(sortedIndex)) classes.push("chain");
-    const shapeWidth = Math.round(46 + (Number(item.width) / maxWidth) * 46);
-    const shapeHeight = Math.round(30 + (Number(item.height) / maxHeight) * 32);
+    const shapeWidth = Math.round(48 + (Number(item.width) / maxWidth) * 48);
+    const shapeHeight = Math.round(54 + (Number(item.height) / maxHeight) * 72);
     const indexText = source === "sorted" ? `s${index} · #${item.originalIndex}` : `#${item.originalIndex}`;
     return `<span class="${classes.join(" ")}"><small>${indexText}</small><i class="rde354-shape" style="--rde-shape-w:${shapeWidth}%;--rde-shape-h:${shapeHeight}px"><b>w=${escapeHtml(display(item.width))}</b><em>h=${escapeHtml(display(item.height))}</em></i><strong>${escapeHtml(display(item.width))} × ${escapeHtml(display(item.height))}</strong></span>`;
   };
@@ -19419,7 +19433,13 @@ function renderRussian354View(step) {
 
   $("treeView").innerHTML = `<section class="rde354-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="rde354-stages">${stages}</div>
+    <section class="rde354-overview">
+      <div><small>${vi ? "ĐANG NHÌN" : "CURRENT"}</small><strong>${escapeHtml(currentSummary)}</strong><span>${escapeHtml(pick(step.title))}</span></div>
+      <div><small>${vi ? "SORT ĐỂ KHỬ BẪY" : "SORT GUARD"}</small><strong>${vi ? "w tăng, h giảm khi w bằng" : "w asc, h desc on ties"}</strong><span>${vi ? "Nhờ vậy hai phong bì cùng width không thể bị LIS đếm nhầm." : "This prevents equal-width envelopes from being counted together by LIS."}</span></div>
+      <div><small>${vi ? "LUẬT CHÍNH" : "MAIN RULE"}</small><strong>${approach === 1 ? "dp[i]" : "tails[L-1]"}</strong><span>${escapeHtml(ruleSummary)}</span></div>
+    </section>
     <div class="rde354-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"} · ${vi ? "CÁCH" : "APPROACH"} ${approach}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="rde354-legend">${legend}</div>
     <section class="rde354-sort-rule"><div><small>SORT KEY</small><strong>(width ↑, height ↓)</strong><span>${vi ? "rộng bằng nhau phải xếp cao giảm" : "equal widths must use descending heights"}</span></div><div class="rde354-ties">${tieExample}</div></section>
     <section class="rde354-orders"><div><header><strong>${vi ? "THỨ TỰ BAN ĐẦU" : "ORIGINAL ORDER"}</strong><span># = input index</span></header><div>${originalHtml}</div></div><b>&rarr;</b><div><header><strong>${vi ? "SAU KHI SORT" : "SORTED ORDER"}</strong><span>s = sorted index</span></header><div>${sortedHtml}</div></div></section>
     <section class="rde354-heights"><header><strong>HEIGHT SEQUENCE</strong><span>${vi ? `đã xử lý ${Number(view.processedCount || 0)}/${n}` : `${Number(view.processedCount || 0)}/${n} processed`}</span></header><div>${heightHtml}</div></section>
