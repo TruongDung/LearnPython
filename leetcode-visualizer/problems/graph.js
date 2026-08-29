@@ -23266,6 +23266,464 @@ Object.assign(module.exports, {
   },
 });
 
+function parseWeightedEdgesDijkstra(input) {
+  if (Array.isArray(input)) return input.map((edge) => edge.map(Number));
+  const text = String(input || "").trim();
+  if (!text) return [];
+  if (text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed.map((edge) => edge.map(Number)) : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+  const rows = text.includes(";") || text.includes("|")
+    ? text.split(/[;|]/)
+    : text.includes("-") ? text.split(",") : [text];
+  return rows.map((row) => row.trim()).filter(Boolean).map((row) => row.split(row.includes("-") ? "-" : ",").map(Number));
+}
+
+/** LeetCode 1786: Dijkstra from n, then bottom-up DP by distance. */
+function buildSteps1786(input, params = {}) {
+  const edges = parseWeightedEdgesDijkstra(input);
+  const n = Number(params.n ?? 5);
+  const nodes = Array.from({ length: Number.isInteger(n) && n > 0 ? n : 0 }, (_, index) => index + 1);
+  const valid = Number.isInteger(n) && n >= 2 && n <= 9 && edges.length >= 1 && edges.length <= 18
+    && edges.every((edge) => edge.length === 3 && edge.every(Number.isFinite)
+      && Number.isInteger(edge[0]) && Number.isInteger(edge[1])
+      && edge[0] >= 1 && edge[0] <= n && edge[1] >= 1 && edge[1] <= n
+      && edge[0] !== edge[1] && Number.isInteger(edge[2]) && edge[2] > 0);
+  const graph = Array.from({ length: Math.max(0, n + 1) }, () => []);
+  const dist = new Array(Math.max(0, n + 1)).fill(Infinity);
+  const ways = new Array(Math.max(0, n + 1)).fill(0);
+  const heap = [];
+  const settled = new Set();
+  const MOD = 1_000_000_007;
+  const steps = [];
+  if (valid) {
+    edges.forEach(([u, v, w], index) => {
+      graph[u].push({ to: v, w, index });
+      graph[v].push({ to: u, w, index });
+    });
+  }
+  const fmt = (value) => value === Infinity ? "∞" : value;
+  const heapSort = () => heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const restrictedEdges = () => edges.flatMap(([u, v, w], index) => {
+    if (!Number.isFinite(dist[u]) || !Number.isFinite(dist[v]) || dist[u] === dist[v]) return [];
+    const from = dist[u] > dist[v] ? u : v;
+    const to = from === u ? v : u;
+    return [{ index, from, to, w }];
+  });
+
+  function snapshot({ title, note, phase, codeLine, currentNode = null, activeEdge = null, candidate = null, oldDistance = null, improves = null, dpSource = null, dpTarget = null, contribution = null, order = [], final = false }) {
+    const restricted = restrictedEdges();
+    const graphHighlights = activeEdge ? [[activeEdge.u, activeEdge.v]] : [];
+    const step = {
+      title,
+      codeLines: [codeLine],
+      graph: {
+        nodes: nodes.map((id) => ({ id, label: String(id), dist: fmt(dist[id]) })),
+        edges: edges.map(([u, v, w]) => ({ u, v, w, undirected: true })),
+        hlNodes: [currentNode, dpSource, dpTarget].filter((value, index, list) => value !== null && list.indexOf(value) === index),
+        hlEdges: graphHighlights,
+        visitedNodes: [...settled],
+        annotations: { [n]: "target", 1: "start" },
+        dimUnfocused: Boolean(currentNode || activeEdge),
+      },
+      restricted1786View: {
+        phase,
+        n,
+        distances: nodes.map((node) => ({ node, value: fmt(dist[node]), settled: settled.has(node), current: node === currentNode })),
+        ways: nodes.map((node) => ({ node, value: ways[node], source: node === dpSource, target: node === dpTarget })),
+        heap: heap.map(([distance, node], index) => ({ distance, node, index })),
+        restrictedEdges: restricted,
+        currentNode,
+        activeEdge,
+        candidate,
+        oldDistance: oldDistance === Infinity ? "∞" : oldDistance,
+        improves,
+        dpSource,
+        dpTarget,
+        contribution,
+        order,
+        answer: ways[1],
+      },
+      vars: [
+        { name: "dist", value: `[${nodes.map((node) => fmt(dist[node])).join(", ")}]` },
+        { name: "ways", value: `[${nodes.map((node) => ways[node]).join(", ")}]` },
+        { name: "answer", value: ways[1] },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: { vi: "Nhập 1..18 cạnh u,v,w với node 1..n và trọng số dương; visualization hỗ trợ n ≤ 9.", en: "Enter 1..18 u,v,w edges using nodes 1..n and positive weights; the visualization supports n <= 9." },
+      phase: "invalid", codeLine: 6, final: true,
+    });
+    return { original: edges, edges, n, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Dựng đồ thị vô hướng", en: "Build the undirected graph" },
+    note: { vi: "Mỗi cạnh được lưu theo cả hai chiều để chạy Dijkstra từ node n.", en: "Store every edge in both directions before running Dijkstra from node n." },
+    phase: "build", codeLine: 7,
+  });
+  dist[n] = 0;
+  heap.push([0, n]);
+  snapshot({
+    title: { vi: `Bắt đầu Dijkstra từ node ${n}`, en: `Start Dijkstra from node ${n}` },
+    note: { vi: "dist[x] sẽ là khoảng cách ngắn nhất từ x tới node cuối.", en: "dist[x] becomes the shortest distance from x to the last node." },
+    phase: "dijkstra", codeLine: 12, currentNode: n,
+  });
+
+  while (heap.length) {
+    heapSort();
+    const [distance, u] = heap.shift();
+    if (distance !== dist[u]) {
+      snapshot({
+        title: { vi: `Bỏ state cũ (${distance}, ${u})`, en: `Skip stale state (${distance}, ${u})` },
+        note: { vi: `dist[${u}] hiện nhỏ hơn ${distance}.`, en: `dist[${u}] is already smaller than ${distance}.` },
+        phase: "stale", codeLine: 16, currentNode: u,
+      });
+      continue;
+    }
+    settled.add(u);
+    snapshot({
+      title: { vi: `Chốt dist[${u}] = ${distance}`, en: `Finalize dist[${u}] = ${distance}` },
+      note: { vi: "Node có distance nhỏ nhất được pop và chốt trước.", en: "The node with the smallest distance is popped and finalized first." },
+      phase: "dijkstra", codeLine: 14, currentNode: u,
+    });
+    for (const { to: v, w } of graph[u]) {
+      const candidate = distance + w;
+      const oldDistance = dist[v];
+      const improves = candidate < oldDistance;
+      if (improves) {
+        dist[v] = candidate;
+        heap.push([candidate, v]);
+        heapSort();
+      }
+      snapshot({
+        title: improves
+          ? { vi: `Cập nhật dist[${v}] = ${candidate}`, en: `Update dist[${v}] = ${candidate}` }
+          : { vi: `Giữ dist[${v}] = ${fmt(oldDistance)}`, en: `Keep dist[${v}] = ${fmt(oldDistance)}` },
+        note: improves
+          ? { vi: `${distance} + ${w} tốt hơn khoảng cách cũ.`, en: `${distance} + ${w} improves the previous distance.` }
+          : { vi: `${distance} + ${w} không tạo đường ngắn hơn.`, en: `${distance} + ${w} does not produce a shorter route.` },
+        phase: "relax", codeLine: 20, currentNode: u, activeEdge: { u, v, w }, candidate, oldDistance, improves,
+      });
+    }
+  }
+
+  const order = [...nodes].sort((a, b) => dist[a] - dist[b] || a - b);
+  snapshot({
+    title: { vi: "Hướng mỗi cạnh từ dist cao xuống dist thấp", en: "Orient every edge from higher dist to lower dist" },
+    note: { vi: "Restricted path chỉ được đi xuống dốc distance; các cạnh bằng distance không hợp lệ.", en: "A restricted path only moves downhill in distance; equal-distance edges are not allowed." },
+    phase: "orient", codeLine: 24, order,
+  });
+
+  ways[n] = 1;
+  snapshot({
+    title: { vi: `ways[${n}] = 1`, en: `ways[${n}] = 1` },
+    note: { vi: "Có đúng một cách đứng sẵn tại node đích.", en: "There is one way to already be at the destination." },
+    phase: "dp", codeLine: 25, dpSource: n, order,
+  });
+  for (const u of order) {
+    snapshot({
+      title: { vi: `Xử lý DP tại node ${u}`, en: `Process DP at node ${u}` },
+      note: { vi: `ways[${u}] = ${ways[u]} được truyền ngược lên các node có dist lớn hơn.`, en: `ways[${u}] = ${ways[u]} propagates backward to neighbors with larger dist.` },
+      phase: "dp", codeLine: 27, dpSource: u, order,
+    });
+    for (const { to: v, w } of graph[u]) {
+      if (!(dist[v] > dist[u])) continue;
+      const before = ways[v];
+      ways[v] = (ways[v] + ways[u]) % MOD;
+      snapshot({
+        title: { vi: `ways[${v}] = ${before} + ${ways[u]} = ${ways[v]}`, en: `ways[${v}] = ${before} + ${ways[u]} = ${ways[v]}` },
+        note: { vi: `Restricted edge là ${v} → ${u} vì dist[${v}] > dist[${u}].`, en: `The restricted edge is ${v} → ${u} because dist[${v}] > dist[${u}].` },
+        phase: "dp-update", codeLine: 30, activeEdge: { u: v, v: u, w }, dpSource: u, dpTarget: v, contribution: ways[u], order,
+      });
+    }
+  }
+  snapshot({
+    title: { vi: `Có ${ways[1]} restricted paths`, en: `There are ${ways[1]} restricted paths` },
+    note: { vi: "ways[1] là số đường từ node 1 tới n luôn giảm strictly theo dist.", en: "ways[1] counts paths from node 1 to n whose dist values strictly decrease." },
+    phase: "done", codeLine: 31, dpSource: 1, order, final: true,
+  });
+  return { original: edges, edges, n, answer: ways[1], steps };
+}
+
+/** LeetCode 2203: Dijkstra from two sources and from dest on reversed edges. */
+function buildSteps2203(input, params = {}) {
+  const edges = parseWeightedEdgesDijkstra(input);
+  const n = Number(params.n ?? 6);
+  const src1 = Number(params.src1 ?? 0);
+  const src2 = Number(params.src2 ?? 1);
+  const dest = Number(params.dest ?? 5);
+  const nodes = Array.from({ length: Number.isInteger(n) && n > 0 ? n : 0 }, (_, index) => index);
+  const valid = Number.isInteger(n) && n >= 3 && n <= 9 && edges.length >= 1 && edges.length <= 20
+    && [src1, src2, dest].every((node) => Number.isInteger(node) && node >= 0 && node < n)
+    && new Set([src1, src2, dest]).size === 3
+    && edges.every((edge) => edge.length === 3 && edge.every(Number.isFinite)
+      && Number.isInteger(edge[0]) && Number.isInteger(edge[1])
+      && edge[0] >= 0 && edge[0] < n && edge[1] >= 0 && edge[1] < n
+      && edge[0] !== edge[1] && Number.isInteger(edge[2]) && edge[2] > 0);
+  const graph = Array.from({ length: Math.max(0, n) }, () => []);
+  const reverse = Array.from({ length: Math.max(0, n) }, () => []);
+  const dist1 = new Array(Math.max(0, n)).fill(Infinity);
+  const dist2 = new Array(Math.max(0, n)).fill(Infinity);
+  const toDest = new Array(Math.max(0, n)).fill(Infinity);
+  const parent1 = new Array(Math.max(0, n)).fill(null);
+  const parent2 = new Array(Math.max(0, n)).fill(null);
+  const nextToDest = new Array(Math.max(0, n)).fill(null);
+  const steps = [];
+  let bestMeeting = null;
+  let answer = Infinity;
+  if (valid) edges.forEach(([u, v, w], index) => {
+    graph[u].push({ to: v, w, index, originalU: u, originalV: v });
+    reverse[v].push({ to: u, w, index, originalU: u, originalV: v });
+  });
+  const fmt = (value) => value === Infinity ? "∞" : value;
+  const runLabels = {
+    src1: { vi: `Từ src1=${src1}`, en: `From src1=${src1}` },
+    src2: { vi: `Từ src2=${src2}`, en: `From src2=${src2}` },
+    dest: { vi: `Tới dest=${dest}`, en: `To dest=${dest}` },
+  };
+  const pathEdges = () => {
+    if (bestMeeting === null) return [];
+    const result = [];
+    const addSourcePath = (parent, meeting) => {
+      let cur = meeting;
+      while (parent[cur] !== null) {
+        result.push([parent[cur], cur]);
+        cur = parent[cur];
+      }
+    };
+    addSourcePath(parent1, bestMeeting);
+    addSourcePath(parent2, bestMeeting);
+    let cur = bestMeeting;
+    while (nextToDest[cur] !== null) {
+      result.push([cur, nextToDest[cur]]);
+      cur = nextToDest[cur];
+    }
+    return result;
+  };
+  const combineRows = () => nodes.map((node) => {
+    const reachable = [dist1[node], dist2[node], toDest[node]].every(Number.isFinite);
+    return { node, d1: fmt(dist1[node]), d2: fmt(dist2[node]), d3: fmt(toDest[node]), total: reachable ? dist1[node] + dist2[node] + toDest[node] : "∞", best: node === bestMeeting };
+  });
+
+  function snapshot({ title, note, phase, codeLine, activeRun = null, heap = [], settled = [], currentNode = null, activeEdge = null, candidate = null, oldDistance = null, improves = null, combineNode = null, final = false }) {
+    const highlights = final ? pathEdges() : activeEdge ? [[activeEdge.originalU, activeEdge.originalV]] : [];
+    const step = {
+      title,
+      codeLines: [codeLine],
+      graph: {
+        nodes: nodes.map((id) => ({ id, label: String(id) })),
+        edges: edges.map(([u, v, w]) => ({ u, v, w })),
+        hlNodes: [currentNode, combineNode, bestMeeting].filter((value, index, list) => value !== null && list.indexOf(value) === index),
+        hlEdges: highlights,
+        visitedNodes: settled,
+        annotations: { [src1]: "src1", [src2]: "src2", [dest]: "dest" },
+        dimUnfocused: Boolean(currentNode || activeEdge || final),
+      },
+      multiDijkstra2203View: {
+        phase, n, src1, src2, dest, activeRun, runLabel: activeRun ? runLabels[activeRun] : null,
+        distances: {
+          src1: nodes.map((node) => ({ node, value: fmt(dist1[node]) })),
+          src2: nodes.map((node) => ({ node, value: fmt(dist2[node]) })),
+          dest: nodes.map((node) => ({ node, value: fmt(toDest[node]) })),
+        },
+        heap: heap.map(([distance, node], index) => ({ distance, node, index })),
+        settled,
+        currentNode,
+        activeEdge,
+        candidate,
+        oldDistance: oldDistance === Infinity ? "∞" : oldDistance,
+        improves,
+        combineNode,
+        combineRows: combineRows(),
+        bestMeeting,
+        answer: answer === Infinity ? "∞" : answer,
+        pathEdges: pathEdges(),
+      },
+      vars: [
+        { name: "meeting", value: bestMeeting === null ? "-" : bestMeeting },
+        { name: "minimum", value: answer === Infinity ? "∞" : answer },
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: { vi: "Nhập tối đa 20 cạnh có hướng u,v,w; visualization hỗ trợ 3 ≤ n ≤ 9 và ba endpoint khác nhau.", en: "Enter at most 20 directed u,v,w edges; the visualization supports 3 <= n <= 9 and three distinct endpoints." },
+      phase: "invalid", codeLine: 5, final: true,
+    });
+    return { original: edges, edges, n, src1, src2, dest, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: "Dựng graph và reverse graph", en: "Build graph and reversed graph" },
+    note: { vi: "Reverse graph biến khoảng cách x → dest thành Dijkstra từ dest → x.", en: "The reversed graph turns distance x → dest into Dijkstra distance dest → x." },
+    phase: "build", codeLine: 8,
+  });
+
+  function runDijkstra(start, adjacency, distances, parent, activeRun, reversed) {
+    const heap = [[0, start]];
+    const settled = new Set();
+    distances[start] = 0;
+    snapshot({
+      title: activeRun === "dest"
+        ? { vi: `Dijkstra từ dest=${dest} trên reverse graph`, en: `Dijkstra from dest=${dest} on the reversed graph` }
+        : { vi: `Dijkstra từ ${activeRun}=${start}`, en: `Dijkstra from ${activeRun}=${start}` },
+      note: activeRun === "dest"
+        ? { vi: "Kết quả là khoảng cách từ mọi node đi tới dest trong graph gốc.", en: "The result is every node's distance to dest in the original graph." }
+        : { vi: "Tính khoảng cách ngắn nhất từ source này tới mọi node.", en: "Compute shortest distances from this source to every node." },
+      phase: "dijkstra", codeLine: activeRun === "src1" ? 23 : activeRun === "src2" ? 24 : 25, activeRun, heap, settled: [], currentNode: start,
+    });
+    while (heap.length) {
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const [distance, u] = heap.shift();
+      if (distance !== distances[u]) continue;
+      settled.add(u);
+      snapshot({
+        title: { vi: `${runLabels[activeRun].vi}: chốt node ${u} = ${distance}`, en: `${runLabels[activeRun].en}: finalize node ${u} = ${distance}` },
+        note: { vi: "Pop state có distance nhỏ nhất trong heap.", en: "Pop the state with the smallest distance in the heap." },
+        phase: "dijkstra", codeLine: 14, activeRun, heap, settled: [...settled], currentNode: u,
+      });
+      for (const edge of adjacency[u]) {
+        const v = edge.to;
+        const candidate = distance + edge.w;
+        const oldDistance = distances[v];
+        const improves = candidate < oldDistance;
+        if (improves) {
+          distances[v] = candidate;
+          parent[v] = u;
+          heap.push([candidate, v]);
+          heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        }
+        snapshot({
+          title: improves
+            ? { vi: `Cập nhật ${activeRun}[${v}] = ${candidate}`, en: `Update ${activeRun}[${v}] = ${candidate}` }
+            : { vi: `Giữ ${activeRun}[${v}] = ${fmt(oldDistance)}`, en: `Keep ${activeRun}[${v}] = ${fmt(oldDistance)}` },
+          note: reversed
+            ? { vi: `Relax reverse ${u} → ${v}, tương ứng cạnh gốc ${edge.originalU} → ${edge.originalV}.`, en: `Relax reversed ${u} → ${v}, corresponding to original edge ${edge.originalU} → ${edge.originalV}.` }
+            : { vi: `Thử cạnh ${u} → ${v} với candidate ${distance} + ${edge.w}.`, en: `Try edge ${u} → ${v} with candidate ${distance} + ${edge.w}.` },
+          phase: "relax", codeLine: 19, activeRun, heap, settled: [...settled], currentNode: u,
+          activeEdge: { u, v, w: edge.w, originalU: edge.originalU, originalV: edge.originalV, reversed }, candidate, oldDistance, improves,
+        });
+      }
+    }
+  }
+
+  runDijkstra(src1, graph, dist1, parent1, "src1", false);
+  runDijkstra(src2, graph, dist2, parent2, "src2", false);
+  runDijkstra(dest, reverse, toDest, nextToDest, "dest", true);
+
+  for (const node of nodes) {
+    const reachable = [dist1[node], dist2[node], toDest[node]].every(Number.isFinite);
+    const total = reachable ? dist1[node] + dist2[node] + toDest[node] : Infinity;
+    const improves = total < answer;
+    if (improves) {
+      answer = total;
+      bestMeeting = node;
+    }
+    snapshot({
+      title: reachable
+        ? { vi: `Meet tại ${node}: ${dist1[node]} + ${dist2[node]} + ${toDest[node]} = ${total}`, en: `Meet at ${node}: ${dist1[node]} + ${dist2[node]} + ${toDest[node]} = ${total}` }
+        : { vi: `Node ${node} không nối đủ ba phần`, en: `Node ${node} cannot connect all three parts` },
+      note: improves
+        ? { vi: `Node ${node} trở thành meeting point tốt nhất.`, en: `Node ${node} becomes the best meeting point.` }
+        : { vi: "Giữ minimum hiện tại.", en: "Keep the current minimum." },
+      phase: "combine", codeLine: 28, combineNode: node, improves,
+    });
+  }
+  const result = answer === Infinity ? -1 : answer;
+  snapshot({
+    title: result === -1
+      ? { vi: "Không tồn tại subgraph hợp lệ", en: "No valid subgraph exists" }
+      : { vi: `Minimum weight = ${result}, gặp tại node ${bestMeeting}`, en: `Minimum weight = ${result}, meeting at node ${bestMeeting}` },
+    note: result === -1
+      ? { vi: "Không node nào reachable từ cả hai source và đồng thời đi tới dest.", en: "No node is reachable from both sources and can also reach dest." }
+      : { vi: "Hai đường source dùng chung phần suffix từ meeting point tới dest nên phần đó chỉ được tính một lần.", en: "Both source paths share the suffix from the meeting point to dest, so that suffix is counted once." },
+    phase: "done", codeLine: 30, combineNode: bestMeeting, final: true,
+  });
+  return { original: edges, edges, n, src1, src2, dest, answer: result, steps };
+}
+
+Object.assign(module.exports, {
+  1786: {
+    id: 1786,
+    difficulty: "medium",
+    slug: "number-of-restricted-paths-from-first-to-last-node",
+    category: { key: "dijkstra", vi: "Dijkstra + DP", en: "Dijkstra + DP" },
+    tags: [{ key: "graph", vi: "Đồ thị", en: "Graph" }, { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }],
+    title: { vi: "Number of Restricted Paths From First to Last Node", en: "Number of Restricted Paths From First to Last Node" },
+    titleVi: { vi: "Đếm đường restricted từ node đầu tới node cuối", en: "Count restricted paths from first to last node" },
+    statement: {
+      vi: "Trong đồ thị vô hướng có trọng số, restricted path từ 1 tới n phải làm distanceToLastNode giảm nghiêm ngặt ở mỗi bước. Đếm số đường như vậy modulo 10^9+7.",
+      en: "In a weighted undirected graph, a restricted path from 1 to n must strictly decrease distanceToLastNode at every step. Count such paths modulo 10^9+7.",
+    },
+    defaultInput: "1,2,3;1,3,3;2,3,1;1,4,2;5,2,2;3,5,1;5,4,10",
+    inputKind: "string",
+    inputLabel: { vi: "edges (u,v,w; ...)", en: "edges (u,v,w; ...)" },
+    extraParams: [{ key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 5, min: 2, max: 9 }],
+    approach: [
+      { vi: "Chạy Dijkstra từ node n để tính dist[x] = khoảng cách ngắn nhất từ x tới n.", en: "Run Dijkstra from node n to compute dist[x], the shortest distance from x to n." },
+      { vi: "Một cạnh u → v chỉ hợp lệ trong restricted path khi dist[u] > dist[v].", en: "An edge u → v is allowed in a restricted path only when dist[u] > dist[v]." },
+      { vi: "Sắp node theo dist tăng dần và DP ngược từ n: ways[v] += ways[u] khi dist[v] > dist[u].", en: "Sort nodes by increasing dist and propagate DP backward from n: ways[v] += ways[u] when dist[v] > dist[u]." },
+    ],
+    complexity: { time: "O((V + E) log V)", space: "O(V + E)", note: { vi: "Dijkstra chi phối; lượt DP duyệt mỗi cạnh hai chiều một lần.", en: "Dijkstra dominates; the DP pass scans each undirected edge from both endpoints once." } },
+    code: [
+      "import heapq", "", "class Solution:", "    def countRestrictedPaths(self, n, edges):", "        MOD = 10**9 + 7", "        graph = [[] for _ in range(n + 1)]", "        for u, v, weight in edges:", "            graph[u].append((v, weight))", "            graph[v].append((u, weight))", "", "        dist = [float('inf')] * (n + 1)", "        dist[n] = 0", "        heap = [(0, n)]", "        while heap:", "            distance, u = heapq.heappop(heap)", "            if distance != dist[u]:", "                continue", "            for v, weight in graph[u]:", "                candidate = distance + weight", "                if candidate < dist[v]:", "                    dist[v] = candidate", "                    heapq.heappush(heap, (candidate, v))", "", "        order = sorted(range(1, n + 1), key=lambda node: dist[node])", "        ways = [0] * (n + 1)", "        ways[n] = 1", "        for u in order:", "            for v, _ in graph[u]:", "                if dist[v] > dist[u]:", "                    ways[v] = (ways[v] + ways[u]) % MOD", "        return ways[1]",
+    ],
+    liveArgs(input, params = {}) { return [Number(params.n), parseWeightedEdgesDijkstra(input)]; },
+    builder: buildSteps1786,
+  },
+  2203: {
+    id: 2203,
+    difficulty: "hard",
+    slug: "minimum-weighted-subgraph-with-the-required-paths",
+    category: { key: "dijkstra", vi: "Multiple Dijkstra", en: "Multiple Dijkstra" },
+    tags: [{ key: "graph", vi: "Đồ thị", en: "Graph" }, { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
+    title: { vi: "Minimum Weighted Subgraph With the Required Paths", en: "Minimum Weighted Subgraph With the Required Paths" },
+    titleVi: { vi: "Subgraph nhỏ nhất nối hai nguồn tới đích", en: "Minimum subgraph connecting two sources to a destination" },
+    statement: {
+      vi: "Trong đồ thị có hướng có trọng số, tìm subgraph có tổng trọng số nhỏ nhất sao cho src1 và src2 đều đi tới dest. Không tồn tại thì trả -1.",
+      en: "In a weighted directed graph, find the minimum-weight subgraph in which both src1 and src2 can reach dest. Return -1 if none exists.",
+    },
+    defaultInput: "0,2,2;0,5,6;1,0,3;1,4,5;2,1,1;2,3,3;2,3,4;3,4,2;4,5,1",
+    inputKind: "string",
+    inputLabel: { vi: "directed edges (u,v,w; ...)", en: "directed edges (u,v,w; ...)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 6, min: 3, max: 9 },
+      { key: "src1", label: { vi: "src1", en: "src1" }, default: 0, min: 0 },
+      { key: "src2", label: { vi: "src2", en: "src2" }, default: 1, min: 0 },
+      { key: "dest", label: { vi: "dest", en: "dest" }, default: 5, min: 0 },
+    ],
+    approach: [
+      { vi: "Chạy Dijkstra từ src1 và src2 trên graph gốc.", en: "Run Dijkstra from src1 and src2 on the original graph." },
+      { vi: "Đảo mọi cạnh rồi chạy Dijkstra từ dest để có khoảng cách từ mỗi node đi tới dest.", en: "Reverse every edge and run Dijkstra from dest to obtain each node's distance to dest." },
+      { vi: "Thử mỗi node x làm điểm nhập chung: dist1[x] + dist2[x] + toDest[x]; lấy tổng nhỏ nhất.", en: "Try every node x as the shared meeting point: dist1[x] + dist2[x] + toDest[x]; take the minimum." },
+    ],
+    complexity: { time: "O((V + E) log V)", space: "O(V + E)", note: { vi: "Ba lần Dijkstra chỉ nhân hằng số 3; graph và reverse graph dùng O(V+E).", en: "Three Dijkstra runs add only a constant factor of 3; graph and reversed graph use O(V+E)." } },
+    code: [
+      "import heapq", "", "class Solution:", "    def minimumWeight(self, n, edges, src1, src2, dest):", "        graph = [[] for _ in range(n)]", "        reverse = [[] for _ in range(n)]", "        for u, v, weight in edges:", "            graph[u].append((v, weight))", "            reverse[v].append((u, weight))", "", "        def dijkstra(start, adjacency):", "            dist = [float('inf')] * n", "            dist[start] = 0", "            heap = [(0, start)]", "            while heap:", "                distance, u = heapq.heappop(heap)", "                if distance != dist[u]:", "                    continue", "                for v, weight in adjacency[u]:", "                    candidate = distance + weight", "                    if candidate < dist[v]:", "                        dist[v] = candidate", "                        heapq.heappush(heap, (candidate, v))", "            return dist", "", "        from_src1 = dijkstra(src1, graph)", "        from_src2 = dijkstra(src2, graph)", "        to_dest = dijkstra(dest, reverse)", "        answer = min(a + b + c for a, b, c in zip(from_src1, from_src2, to_dest))", "        return -1 if answer == float('inf') else answer",
+    ],
+    liveArgs(input, params = {}) { return [Number(params.n), parseWeightedEdgesDijkstra(input), Number(params.src1), Number(params.src2), Number(params.dest)]; },
+    builder: buildSteps2203,
+  },
+});
+
 function parseVideos1311(input, params = {}) {
   let watchedVideos;
   let friends;

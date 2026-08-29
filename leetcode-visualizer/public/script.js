@@ -6877,6 +6877,104 @@ function renderMaze499View(step) {
   </section>`;
 }
 
+function renderRestricted1786View(step) {
+  const view = step.restricted1786View || {};
+  const vi = lang === "vi";
+  const phases = vi
+    ? ["1. Dựng graph", "2. Dijkstra từ n", "3. Hướng cạnh", "4. DP đếm đường"]
+    : ["1. Build graph", "2. Dijkstra from n", "3. Orient edges", "4. Count with DP"];
+  const phaseIndex = view.phase === "build" || view.phase === "invalid" ? 0
+    : ["dijkstra", "stale", "relax"].includes(view.phase) ? 1
+      : view.phase === "orient" ? 2 : 3;
+  const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : ""} ${index < phaseIndex ? "done" : ""}">${index < phaseIndex ? "✓ " : ""}${label}</span>`).join("");
+  const distances = view.distances || [];
+  const ways = view.ways || [];
+  const distanceHtml = distances.map((item) => `<div class="restricted1786-dist ${item.current ? "current" : ""} ${item.settled ? "settled" : ""}"><small>node ${item.node}</small><strong>${escapeHtml(item.value)}</strong><span>${item.settled ? (vi ? "đã chốt" : "settled") : "dist"}</span></div>`).join("");
+  const waysHtml = ways.map((item) => `<div class="restricted1786-way ${item.source ? "source" : ""} ${item.target ? "target" : ""}"><small>node ${item.node}</small><strong>${item.value}</strong><span>ways[${item.node}]</span></div>`).join("");
+  const heap = view.heap || [];
+  const heapHtml = heap.length
+    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>#${index + 1}</small><strong>(${item.distance}, ${item.node})</strong></span>`).join("")
+    : `<em>${vi ? "heap rỗng" : "empty heap"}</em>`;
+  const restricted = view.restrictedEdges || [];
+  const restrictedHtml = restricted.length
+    ? restricted.map((edge) => `<span class="${view.activeEdge && ((view.activeEdge.u === edge.from && view.activeEdge.v === edge.to) || (view.activeEdge.v === edge.from && view.activeEdge.u === edge.to)) ? "active" : ""}"><b>${edge.from}</b><i>→</i><b>${edge.to}</b><small>${view.distances.find((item) => item.node === edge.from)?.value} &gt; ${view.distances.find((item) => item.node === edge.to)?.value}</small></span>`).join("")
+    : `<em>${vi ? "chờ Dijkstra hoàn tất" : "waiting for Dijkstra"}</em>`;
+  const order = view.order || [];
+  const orderHtml = order.length ? order.map((node, index) => `<span class="${node === view.dpSource ? "active" : ""} ${node === view.dpTarget ? "target" : ""}"><small>${index}</small><b>${node}</b><em>d=${distances.find((item) => item.node === node)?.value}</em></span>`).join("") : "";
+  let formula;
+  if (view.phase === "relax" && view.activeEdge) {
+    formula = `<strong>${view.currentNode} → ${view.activeEdge.v}</strong><span>${view.candidate} &lt; ${escapeHtml(view.oldDistance)} → ${view.improves ? "True" : "False"}</span>`;
+  } else if (view.phase === "dp-update") {
+    formula = `<strong>ways[${view.dpTarget}] += ways[${view.dpSource}]</strong><span>+${view.contribution} · dist[${view.dpTarget}] &gt; dist[${view.dpSource}]</span>`;
+  } else {
+    formula = `<strong>dist[u] &gt; dist[v]</strong><span>${vi ? "chỉ đi từ cao xuống thấp" : "move only from higher to lower"}</span>`;
+  }
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : step.codeLines;
+  const summary = vi ? `Bài 1786: ways[1] = ${view.answer}.` : `Problem 1786: ways[1] = ${view.answer}.`;
+  $("treeView").innerHTML = `<section class="restricted1786-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="restricted1786-phases">${phaseHtml}</div>
+    <header class="restricted1786-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></header>
+    <div class="restricted1786-formula">${formula}</div>
+    <div class="restricted1786-workspace">
+      <section class="restricted1786-graph"><header><strong>WEIGHTED GRAPH</strong><span>start = 1 · target = ${view.n}</span></header><div id="restricted1786Graph"></div></section>
+      <section class="restricted1786-state"><header><strong>DIJKSTRA STATE</strong><span>${vi ? "khoảng cách tới node cuối" : "distance to last node"}</span></header><div class="restricted1786-distances">${distanceHtml}</div><div class="restricted1786-heap"><header><strong>MIN-HEAP</strong><span>(distance, node)</span></header><div>${heapHtml}</div></div></section>
+    </div>
+    <section class="restricted1786-slopes"><header><strong>RESTRICTED DIRECTIONS</strong><span>${vi ? "mũi tên luôn giảm dist" : "arrows strictly decrease dist"}</span></header><div>${restrictedHtml}</div></section>
+    ${orderHtml ? `<section class="restricted1786-order"><header><strong>DP ORDER</strong><span>${vi ? "dist tăng dần để truyền ways ngược lên" : "increasing dist for backward propagation"}</span></header><div>${orderHtml}</div></section>` : ""}
+    <section class="restricted1786-ways"><header><strong>WAYS</strong><span>mod 10⁹+7</span></header><div>${waysHtml}</div></section>
+    <div class="restricted1786-result ${view.phase === "done" ? "visible" : ""}"><small>ANSWER</small><strong>${view.answer}</strong><span>${vi ? "restricted paths từ 1 tới n" : "restricted paths from 1 to n"}</span></div>
+  </section>`;
+  renderGraph(step, "restricted1786Graph");
+}
+
+function renderMultiDijkstra2203View(step) {
+  const view = step.multiDijkstra2203View || {};
+  const vi = lang === "vi";
+  const phases = vi
+    ? ["1. Dựng graph", "2. Từ src1", "3. Từ src2", "4. Tới dest", "5. Ghép"]
+    : ["1. Build graph", "2. From src1", "3. From src2", "4. To dest", "5. Combine"];
+  const phaseIndex = view.phase === "build" || view.phase === "invalid" ? 0
+    : view.activeRun === "src1" ? 1 : view.activeRun === "src2" ? 2 : view.activeRun === "dest" ? 3 : 4;
+  const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : ""} ${index < phaseIndex ? "done" : ""}">${index < phaseIndex ? "✓ " : ""}${label}</span>`).join("");
+  const distanceGroups = [
+    ["src1", `FROM SRC1 · ${view.src1}`, view.distances?.src1 || []],
+    ["src2", `FROM SRC2 · ${view.src2}`, view.distances?.src2 || []],
+    ["dest", `TO DEST · ${view.dest}`, view.distances?.dest || []],
+  ];
+  const distancesHtml = distanceGroups.map(([key, label, values]) => `<section class="multi2203-dist-group ${view.activeRun === key ? "active" : ""}"><header><strong>${label}</strong><span>${key === "dest" ? (vi ? "reverse graph" : "reversed graph") : (vi ? "graph gốc" : "original graph")}</span></header><div>${values.map((item) => `<span class="${item.node === view.currentNode && view.activeRun === key ? "current" : ""}"><small>${item.node}</small><b>${escapeHtml(item.value)}</b></span>`).join("")}</div></section>`).join("");
+  const heap = view.heap || [];
+  const heapHtml = heap.length
+    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>#${index + 1}</small><b>(${item.distance}, ${item.node})</b></span>`).join("")
+    : `<em>${vi ? "heap rỗng" : "empty heap"}</em>`;
+  const rows = view.combineRows || [];
+  const combineHtml = rows.map((row) => `<div class="${row.node === view.combineNode ? "active" : ""} ${row.best ? "best" : ""}"><strong>${row.node}</strong><span>${escapeHtml(row.d1)}</span><i>+</i><span>${escapeHtml(row.d2)}</span><i>+</i><span>${escapeHtml(row.d3)}</span><b>${escapeHtml(row.total)}</b></div>`).join("");
+  let action;
+  if (view.phase === "relax" && view.activeEdge) {
+    action = `<strong>${view.activeRun === "dest" ? `${view.activeEdge.u} ⇢ ${view.activeEdge.v} (reversed)` : `${view.activeEdge.u} → ${view.activeEdge.v}`}</strong><span>${view.candidate} &lt; ${escapeHtml(view.oldDistance)} → ${view.improves ? "update" : "keep"}</span>`;
+  } else if (view.phase === "combine" && view.combineNode !== null) {
+    const row = rows.find((item) => item.node === view.combineNode);
+    action = `<strong>meet = ${view.combineNode}</strong><span>${escapeHtml(row?.d1)} + ${escapeHtml(row?.d2)} + ${escapeHtml(row?.d3)} = ${escapeHtml(row?.total)}</span>`;
+  } else if (view.phase === "done") {
+    action = `<strong>meeting point = ${view.bestMeeting ?? "—"}</strong><span>minimum = ${escapeHtml(view.answer)}</span>`;
+  } else {
+    action = `<strong>d1[x] + d2[x] + toDest[x]</strong><span>${vi ? "suffix tới dest chỉ tính một lần" : "count the shared suffix only once"}</span>`;
+  }
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : step.codeLines;
+  const summary = vi ? `Bài 2203: minimum = ${view.answer}.` : `Problem 2203: minimum = ${view.answer}.`;
+  $("treeView").innerHTML = `<section class="multi2203-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="multi2203-phases">${phaseHtml}</div>
+    <header class="multi2203-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></header>
+    <div class="multi2203-action">${action}</div>
+    <div class="multi2203-workspace">
+      <section class="multi2203-graph"><header><strong>DIRECTED GRAPH</strong><span>src1=${view.src1} · src2=${view.src2} · dest=${view.dest}</span></header><div id="multi2203Graph"></div></section>
+      <section class="multi2203-runs">${distancesHtml}<div class="multi2203-heap"><header><strong>ACTIVE HEAP</strong><span>${escapeHtml(pick(view.runLabel) || "—")}</span></header><div>${heapHtml}</div></div></section>
+    </div>
+    <section class="multi2203-combine"><header><strong>TRY EVERY MEETING NODE</strong><span>d1[x] + d2[x] + toDest[x]</span></header><div class="multi2203-combine-head"><b>x</b><span>d1</span><i></i><span>d2</span><i></i><span>toDest</span><strong>total</strong></div><div>${combineHtml}</div></section>
+    <div class="multi2203-result ${view.phase === "done" ? "visible" : ""}"><small>MINIMUM WEIGHT</small><strong>${view.phase === "done" && view.answer === "∞" ? -1 : escapeHtml(view.answer)}</strong><span>${view.bestMeeting === null ? (vi ? "chưa có meeting point" : "no meeting point yet") : `meet at node ${view.bestMeeting}`}</span></div>
+  </section>`;
+  renderGraph(step, "multi2203Graph");
+}
+
 function renderPathExistsDfsView(step) {
   const view = step.pathExistsDfsView || {};
   const vi = lang === "vi";
@@ -23307,6 +23405,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMaze499View(step);
+  } else if (step.restricted1786View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRestricted1786View(step);
+  } else if (step.multiDijkstra2203View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMultiDijkstra2203View(step);
   } else if (step.pathExistsDfsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
