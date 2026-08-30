@@ -553,6 +553,128 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "monotonic-stack") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion monotonic-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">↕</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Monotonic Stack · next greater → contribution → hard" : "Monotonic Stack · next greater → contribution → hard"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          {
+            icon: "01",
+            name: vi ? "Nền tảng: next greater / warmer day" : "Foundation: next greater / warmer day",
+            problems: [[496, "Next Greater Element I"], [503, "Next Greater Element II"], [739, "Daily Temperatures"], [1019, "Next Greater Node In Linked List"]],
+          },
+          {
+            icon: "02",
+            name: vi ? "Next smaller / discount / cleanup" : "Next smaller / discount / cleanup",
+            problems: [[1475, "Final Prices With a Special Discount"], [2487, "Remove Nodes From Linked List"], [2289, "Steps to Make Array Non-decreasing"], [581, "Shortest Unsorted Continuous Subarray"]],
+          },
+          {
+            icon: "03",
+            name: vi ? "Greedy stack trên string/subsequence" : "Greedy stack on strings/subsequences",
+            problems: [[316, "Remove Duplicate Letters"], [1081, "Smallest Subsequence"], [402, "Remove K Digits"], [1673, "Most Competitive Subsequence"], [2030, "Smallest K-Length Subsequence"]],
+          },
+          {
+            icon: "04",
+            name: vi ? "Span, ramp, chunk" : "Span, ramp, chunks",
+            problems: [[901, "Online Stock Span"], [962, "Maximum Width Ramp"], [769, "Max Chunks To Make Sorted"], [768, "Max Chunks To Make Sorted II"], [1124, "Longest Well-Performing Interval"]],
+          },
+          {
+            icon: "05",
+            name: vi ? "Histogram và rectangle" : "Histogram and rectangles",
+            problems: [[84, "Largest Rectangle in Histogram"], [85, "Maximal Rectangle"], [42, "Trapping Rain Water"], [1504, "Count Submatrices With All Ones"]],
+          },
+          {
+            icon: "06",
+            name: vi ? "Contribution: mỗi phần tử làm min/max" : "Contribution: each element as min/max",
+            problems: [[907, "Sum of Subarray Minimums"], [2104, "Sum of Subarray Ranges"], [1856, "Maximum Subarray Min-Product"], [2281, "Sum of Total Strength of Wizards"], [2334, "Subarray With Elements Greater Than Varying Threshold"]],
+          },
+          {
+            icon: "07",
+            name: vi ? "Tree, queue, car fleet" : "Tree, queue, car fleet",
+            problems: [[654, "Maximum Binary Tree"], [1008, "Construct BST from Preorder"], [853, "Car Fleet"], [1776, "Car Fleet II"], [1944, "Visible People in a Queue"]],
+          },
+          {
+            icon: "08",
+            name: vi ? "Advanced / offline query / DP" : "Advanced / offline query / DP",
+            problems: [[975, "Odd Even Jump"], [1526, "Minimum Number of Increments"], [1793, "Maximum Score of a Good Subarray"], [2454, "Next Greater Element IV"], [2617, "Minimum Visited Cells in a Grid"], [2736, "Maximum Sum Queries"], [2818, "Apply Operations to Maximize Score"], [2940, "Find Building Where Alice and Bob Can Meet"], [2945, "Maximum Non-decreasing Array Length"]],
+          },
+          {
+            icon: "P",
+            name: vi ? "Premium nên biết" : "Premium to know",
+            problems: [[255, "Verify Preorder Sequence in BST"], [1762, "Buildings With an Ocean View"], [1950, "Maximum of Minimum Values"], [2282, "Visible People in a Grid"], [2297, "Jump Game VIII"], [2345, "Visible Mountains"], [2832, "Maximal Range Each Element Is Maximum"], [2863, "Semi-Decreasing Subarrays"], [1063, "Number of Valid Subarrays"], [2355, "Maximum Number of Books"]],
+          },
+        ];
+        const sequence = [496, 503, 739, 1475, 901, 316, 402, 84, 907, 2104, 962, 456, 654, 853, 1856, 1944, 2454, 2281, 2736, 2940];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-monotonic-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`;
+        const roadmapItem = (id) => supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-monotonic-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`;
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card monotonic-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "MONOTONIC STACK LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "9 nhóm Monotonic Stack nên học" : "9 Monotonic Stack groups to learn";
+        $("trieLearnIntro").textContent = vi
+          ? "Học theo câu hỏi stack trả lời: phần tử lớn hơn/nhỏ hơn kế tiếp, span, contribution, histogram, rồi offline query và DP."
+          : "Learn by the question the stack answers: next greater/smaller, span, contribution, histogram, then offline queries and DP.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Monotonic Stack" : "Close Monotonic Stack learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section monotonic-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Nhóm bài theo pattern" : "Problems grouped by pattern"}</h3><p>${vi ? "Bắt đầu với next greater; các bài hard dùng cùng ý tưởng nhưng thêm contribution, sort hoặc DP." : "Start with next greater; hard problems reuse the same idea with contribution, sorting, or DP."}</p></div></div>
+            <div class="sliding-pattern-grid monotonic-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap monotonic-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự học đề xuất" : "Recommended learning order"}</h3><p>${vi ? "Đi từ stack giảm cơ bản tới contribution và query hard." : "Move from basic decreasing stacks to contribution and hard query patterns."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-monotonic-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.monotonicProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "segment-tree") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";

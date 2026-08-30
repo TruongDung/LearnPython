@@ -33041,6 +33041,18 @@ html, body {
 [data-theme="light"] .sliding-roadmap { border-color: #a7f3d0; background: linear-gradient(120deg, #ecfdf5, #ecfeff); }
 @media (max-width: 700px) { .sliding-pattern-grid { grid-template-columns: 1fr; } }
 
+.monotonic-learn-suggestion { border-color: rgba(56, 189, 248, .38); background: linear-gradient(120deg, rgba(56, 189, 248, .09), rgba(168, 85, 247, .07)); }
+.monotonic-learn-suggestion:hover { border-color: #38bdf8; box-shadow: 0 8px 24px rgba(56, 189, 248, .14); }
+.monotonic-learn-suggestion .trie-learn-suggestion-icon { background: rgba(56, 189, 248, .15); color: #bae6fd; font: 900 18px/1 Consolas, monospace; }
+.monotonic-pattern-card summary > span { border-color: rgba(56, 189, 248, .52); color: #7dd3fc; }
+.monotonic-pattern-card summary > strong { color: #e0f2fe; }
+.monotonic-roadmap { margin-top: 20px; border-color: rgba(56, 189, 248, .38); background: linear-gradient(120deg, rgba(56, 189, 248, .09), rgba(168, 85, 247, .07)); }
+[data-theme="light"] .monotonic-learn-suggestion { border-color: #7dd3fc; background: linear-gradient(120deg, #f0f9ff, #faf5ff); }
+[data-theme="light"] .monotonic-learn-suggestion .trie-learn-suggestion-icon { color: #0369a1; background: #e0f2fe; }
+[data-theme="light"] .monotonic-pattern-card summary > span { border-color: #38bdf8; background: #f0f9ff; color: #0369a1; }
+[data-theme="light"] .monotonic-pattern-card summary > strong { color: #075985; }
+[data-theme="light"] .monotonic-roadmap { border-color: #7dd3fc; background: linear-gradient(120deg, #f0f9ff, #faf5ff); }
+
 /* Segment Tree category · Learning Map */
 .segment-learn-suggestion {
   border-color: rgba(168, 85, 247, .44);
