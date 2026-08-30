@@ -8307,6 +8307,120 @@ function buildSteps496(input, params = {}) {
   return { original: { nums1, nums2 }, answer, steps };
 }
 
+function buildSteps503(input) {
+  const nums = parseIntegerListSmallHash(input, "nums");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers for the circular stack visualization.");
+  const n = nums.length;
+  const answer = Array(n).fill(-1);
+  const stack = [];
+  const steps = [];
+
+  const stackLabel = () => `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]`;
+  const answerLabel = () => `[${answer.join(", ")}]`;
+  const stackItems = () => stack.map((index) => ({ value: nums[index], detail: `index ${index}` }));
+  const sub = () => nums.map((_, index) => `i=${index} · next=${answer[index]}`);
+
+  const snap = (title, codeLines, note, extra = {}) => {
+    const realIndex = Number.isInteger(extra.index) ? extra.index : -1;
+    const pass = Number.isInteger(extra.pass) ? extra.pass : 0;
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: realIndex >= 0 ? [realIndex] : [],
+      mark: Number.isInteger(extra.resolvedIndex) ? [extra.resolvedIndex] : (extra.final ? answer.map((value, index) => value !== -1 ? index : -1).filter((index) => index >= 0) : []),
+      codeLines,
+      vars: [
+        { name: "i", value: Number.isInteger(extra.i) ? extra.i : "-" },
+        { name: "idx", value: realIndex >= 0 ? realIndex : "-" },
+        { name: "pass", value: pass === 0 ? "first" : "second" },
+        { name: "stack", value: stackLabel() },
+        { name: "answer", value: answerLabel() },
+      ],
+      note,
+      final: Boolean(extra.final),
+      stackView: {
+        title: "Monotonic decreasing stack (unresolved indices)",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: [...nums],
+        current: realIndex,
+        inputLabel: "nums scanned twice by i % n",
+        expected: realIndex >= 0 ? nums[realIndex] : "",
+        status: [
+          { label: "circular i", value: Number.isInteger(extra.i) ? extra.i : "-" },
+          { label: "idx = i % n", value: realIndex >= 0 ? realIndex : "-" },
+          { label: "top unresolved", value: top === null ? "empty" : `${top}:${nums[top]}` },
+          { label: "answer", value: answerLabel() },
+        ],
+      },
+    });
+  };
+
+  snap(
+    { vi: "answer = [-1] * n", en: "answer = [-1] * n" }, [3],
+    { vi: "Mặc định mỗi index chưa có phần tử lớn hơn kế tiếp. Nếu không tìm thấy sau 2 vòng, giữ -1.", en: "Every index starts unresolved. If no greater value appears after two passes, it stays -1." },
+  );
+  snap(
+    { vi: "stack = []", en: "stack = []" }, [4],
+    { vi: "Stack giữ index chưa tìm được next greater; giá trị trên stack giảm dần.", en: "The stack stores unresolved indices; their values stay decreasing." },
+  );
+
+  for (let i = 0; i < 2 * n; i++) {
+    const idx = i % n;
+    const pass = i < n ? 0 : 1;
+    snap(
+      { vi: `i=${i}, idx=${idx}, nums[idx]=${nums[idx]}`, en: `i=${i}, idx=${idx}, nums[idx]=${nums[idx]}` }, [5, 6],
+      pass === 0
+        ? { vi: "Vòng đầu: vừa so sánh, vừa push index mới vào stack.", en: "First pass: compare, then push new indices onto the stack." }
+        : { vi: "Vòng hai: chỉ dùng các phần tử đầu mảng để giải quyết index còn chờ.", en: "Second pass: reuse front values only to resolve indices still waiting." },
+      { i, index: idx, pass },
+    );
+
+    while (stack.length && nums[stack.at(-1)] < nums[idx]) {
+      const top = stack.at(-1);
+      snap(
+        { vi: `${nums[top]} < ${nums[idx]} → pop index ${top}`, en: `${nums[top]} < ${nums[idx]} → pop index ${top}` }, [7],
+        { vi: `nums[${idx}] là phần tử lớn hơn đầu tiên gặp được khi đi vòng tròn từ index ${top}.`, en: `nums[${idx}] is the first greater value found while moving circularly from index ${top}.` },
+        { i, index: idx, pass },
+      );
+      const resolved = stack.pop();
+      answer[resolved] = nums[idx];
+      snap(
+        { vi: `answer[${resolved}] = ${nums[idx]}`, en: `answer[${resolved}] = ${nums[idx]}` }, [8],
+        { vi: `Ghi kết quả cho index ${resolved}; index này không cần nằm trong stack nữa.`, en: `Record the result for index ${resolved}; it no longer needs to stay in the stack.` },
+        { i, index: idx, pass, resolvedIndex: resolved },
+      );
+    }
+
+    if (i < n) {
+      stack.push(idx);
+      snap(
+        { vi: `push index ${idx}`, en: `push index ${idx}` }, [9, 10],
+        { vi: `Index ${idx} vẫn cần chờ phần tử lớn hơn ở bên phải vòng tròn.`, en: `Index ${idx} still waits for a greater value to its circular right.` },
+        { i, index: idx, pass },
+      );
+    } else {
+      snap(
+        { vi: "Vòng hai không push lại", en: "Do not push during second pass" }, [9],
+        { vi: "Nếu push ở vòng hai, ta sẽ lặp vô hạn logic; vòng hai chỉ để giải quyết phần còn lại.", en: "Pushing during the second pass would repeat the logic forever; this pass only resolves leftovers." },
+        { i, index: idx, pass },
+      );
+    }
+  }
+
+  snap(
+    { vi: `Trả về ${answerLabel()}`, en: `Return ${answerLabel()}` }, [11],
+    stack.length
+      ? { vi: `Các index còn lại [${stack.join(", ")}] không có phần tử lớn hơn trong toàn bộ vòng tròn.`, en: `Remaining indices [${stack.join(", ")}] have no greater value anywhere around the circle.` }
+      : { vi: "Mọi index đã tìm được next greater.", en: "Every index found a next greater value." },
+    { i: 2 * n, index: -1, pass: 1, final: true },
+  );
+
+  return { original: nums, answer, steps };
+}
+
 Object.assign(module.exports, {
   344: {
     id: 344,
@@ -8415,6 +8529,65 @@ Object.assign(module.exports, {
     code: ["class Solution:", "    def nextGreaterElement(self, nums1, nums2):", "        next_greater = {}", "        stack = []", "        for num in nums2:", "            while stack and num > stack[-1]:", "                next_greater[stack.pop()] = num", "            stack.append(num)", "        return [next_greater.get(num, -1) for num in nums1]"],
     liveArgs: (input, params) => [parseIntegerListSmallHash(input, "nums1"), parseIntegerListSmallHash(params.nums2, "nums2")],
     builder: buildSteps496,
+  },
+  503: {
+    id: 503,
+    difficulty: "medium",
+    slug: "next-greater-element-ii",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }, { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" }],
+    title: { vi: "Next Greater Element II", en: "Next Greater Element II" },
+    titleVi: { vi: "Phần tử lớn hơn kế tiếp II", en: "Next greater element II" },
+    statement: {
+      vi: "Cho mảng tròn nums, với mỗi index tìm phần tử lớn hơn đầu tiên khi đi sang phải theo vòng tròn; nếu không có thì trả về -1.",
+      en: "Given a circular array nums, find the first greater element to the right for each index while wrapping around; return -1 if none exists.",
+    },
+    defaultInput: "1,2,1",
+    inputKind: "string",
+    inputLabel: { vi: "nums (cách bởi ,)", en: "nums (comma separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt 2*n bước và dùng idx = i % n để mô phỏng mảng tròn.", en: "Scan 2*n steps and use idx = i % n to simulate the circular array." },
+      { vi: "Stack lưu index chưa có next greater, theo giá trị giảm dần.", en: "The stack stores unresolved indices in decreasing value order." },
+      { vi: "Chỉ push index trong vòng đầu; vòng hai chỉ giúp các index còn lại nhìn thấy phần đầu mảng.", en: "Push indices only during the first pass; the second pass only lets leftover indices see the array's front." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Mỗi index được push một lần và pop nhiều nhất một lần; vòng lặp chạy 2n bước.", en: "Each index is pushed once and popped at most once; the loop runs 2n steps." },
+    },
+    code: [
+      "class Solution:",
+      "    def nextGreaterElements(self, nums):",
+      "        answer = [-1] * len(nums)",
+      "        stack = []",
+      "        for i in range(2 * len(nums)):",
+      "            idx = i % len(nums)",
+      "            while stack and nums[stack[-1]] < nums[idx]:",
+      "                answer[stack.pop()] = nums[idx]",
+      "            if i < len(nums):",
+      "                stack.append(idx)",
+      "        return answer",
+    ],
+    codeCsharp: [
+      "public class Solution {",
+      "    public int[] NextGreaterElements(int[] nums) {",
+      "        int n = nums.Length;",
+      "        int[] answer = Enumerable.Repeat(-1, n).ToArray();",
+      "        Stack<int> stack = new Stack<int>();",
+      "        for (int i = 0; i < 2 * n; i++) {",
+      "            int idx = i % n;",
+      "            while (stack.Count > 0 && nums[stack.Peek()] < nums[idx]) {",
+      "                answer[stack.Pop()] = nums[idx];",
+      "            }",
+      "            if (i < n) stack.Push(idx);",
+      "        }",
+      "        return answer;",
+      "    }",
+      "}",
+    ],
+    liveArgs: (input) => [parseIntegerListSmallHash(input, "nums")],
+    builder: buildSteps503,
   },
   149: {
     id: 149,
