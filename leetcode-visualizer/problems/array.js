@@ -1764,6 +1764,214 @@ function buildSteps1464(nums) {
 }
 
 /**
+ * LeetCode 2091: Removing Minimum and Maximum From Array.
+ *
+ * Find the indices of the unique minimum and maximum, then compare the three
+ * possible deletion plans: all from the front, all from the back, or one from
+ * each end.
+ */
+function buildSteps2091(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = nums.length;
+  const steps = [];
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Mảng rỗng", en: "Empty array" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "n", value: 0 }],
+      note: { vi: "Không có phần tử để xóa.", en: "There are no elements to remove." },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  let minIdx = 0;
+  let maxIdx = 0;
+
+  const idxSub = nums.map((_, i) => `[${i}]`);
+  const marks = () => [...new Set([minIdx, maxIdx])];
+
+  steps.push({
+    title: { vi: "Khởi tạo min/max tại index 0", en: "Initialize min/max at index 0" },
+    arr: [...nums],
+    sub: idxSub,
+    highlight: [0],
+    mark: marks(),
+    codeLines: [3],
+    vars: [
+      { name: "n", value: n },
+      { name: "min_idx", value: minIdx },
+      { name: "max_idx", value: maxIdx },
+    ],
+    note: {
+      vi: "Mảng có các phần tử khác nhau, nên min và max cuối cùng sẽ có index duy nhất.",
+      en: "All values are distinct, so the final min and max each have a unique index.",
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const oldMin = minIdx;
+    const oldMax = maxIdx;
+    if (nums[i] < nums[minIdx]) minIdx = i;
+    if (nums[i] > nums[maxIdx]) maxIdx = i;
+    const changedMin = minIdx !== oldMin;
+    const changedMax = maxIdx !== oldMax;
+
+    steps.push({
+      title: {
+        vi: `Xét nums[${i}] = ${nums[i]}`,
+        en: `Check nums[${i}] = ${nums[i]}`,
+      },
+      arr: [...nums],
+      sub: idxSub,
+      highlight: [i],
+      mark: marks(),
+      codeLines: [5, 6, 7, 8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "min_idx", value: minIdx },
+        { name: "nums[min_idx]", value: nums[minIdx] },
+        { name: "max_idx", value: maxIdx },
+        { name: "nums[max_idx]", value: nums[maxIdx] },
+      ],
+      note: {
+        vi: changedMin
+          ? `${nums[i]} nhỏ hơn min cũ ${nums[oldMin]} → cập nhật min_idx = ${i}.`
+          : changedMax
+            ? `${nums[i]} lớn hơn max cũ ${nums[oldMax]} → cập nhật max_idx = ${i}.`
+            : `${nums[i]} không đổi min/max hiện tại.`,
+        en: changedMin
+          ? `${nums[i]} is smaller than old min ${nums[oldMin]} → update min_idx = ${i}.`
+          : changedMax
+            ? `${nums[i]} is larger than old max ${nums[oldMax]} → update max_idx = ${i}.`
+            : `${nums[i]} does not change the current min/max.`,
+      },
+    });
+  }
+
+  let left = Math.min(minIdx, maxIdx);
+  let right = Math.max(minIdx, maxIdx);
+  steps.push({
+    title: { vi: `Sắp xếp index: left=${left}, right=${right}`, en: `Order indices: left=${left}, right=${right}` },
+    arr: [...nums],
+    sub: idxSub,
+    highlight: [left, right],
+    mark: [left, right],
+    codeLines: [10],
+    vars: [
+      { name: "min_idx", value: minIdx },
+      { name: "max_idx", value: maxIdx },
+      { name: "left", value: left },
+      { name: "right", value: right },
+    ],
+    note: {
+      vi: "Gọi left là index nhỏ hơn và right là index lớn hơn để viết công thức gọn.",
+      en: "Let left be the smaller index and right be the larger index so the formulas stay simple.",
+    },
+  });
+
+  const fromFront = right + 1;
+  const fromBack = n - left;
+  const bothEnds = left + 1 + n - right;
+  const answer = Math.min(fromFront, fromBack, bothEnds);
+  const bestPlan = answer === fromFront
+    ? "front"
+    : answer === fromBack
+      ? "back"
+      : "both";
+
+  const plans = [
+    {
+      key: "front",
+      value: fromFront,
+      line: 11,
+      highlight: Array.from({ length: right + 1 }, (_, i) => i),
+      title: { vi: `Từ đầu: right + 1 = ${fromFront}`, en: `From front: right + 1 = ${fromFront}` },
+      note: {
+        vi: `Xóa từ đầu tới index ${right} sẽ chắc chắn xóa cả min và max.`,
+        en: `Deleting from the front through index ${right} removes both min and max.`,
+      },
+    },
+    {
+      key: "back",
+      value: fromBack,
+      line: 12,
+      highlight: Array.from({ length: n - left }, (_, i) => left + i),
+      title: { vi: `Từ cuối: n - left = ${fromBack}`, en: `From back: n - left = ${fromBack}` },
+      note: {
+        vi: `Xóa từ cuối lùi về index ${left} sẽ chắc chắn xóa cả min và max.`,
+        en: `Deleting from the back down to index ${left} removes both min and max.`,
+      },
+    },
+    {
+      key: "both",
+      value: bothEnds,
+      line: 13,
+      highlight: [
+        ...Array.from({ length: left + 1 }, (_, i) => i),
+        ...Array.from({ length: n - right }, (_, i) => right + i),
+      ],
+      title: { vi: `Hai đầu: left + 1 + n - right = ${bothEnds}`, en: `Both ends: left + 1 + n - right = ${bothEnds}` },
+      note: {
+        vi: `Xóa một cực trị từ đầu và cực trị còn lại từ cuối: ${left + 1} + ${n - right}.`,
+        en: `Delete one extreme from the front and the other from the back: ${left + 1} + ${n - right}.`,
+      },
+    },
+  ];
+
+  plans.forEach((plan) => {
+    steps.push({
+      title: plan.title,
+      arr: [...nums],
+      sub: idxSub,
+      highlight: plan.highlight,
+      mark: [left, right],
+      codeLines: [plan.line],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "front", value: fromFront },
+        { name: "back", value: fromBack },
+        { name: "both", value: bothEnds },
+      ],
+      note: plan.note,
+    });
+  });
+
+  steps.push({
+    title: { vi: `Đáp án: min(${fromFront}, ${fromBack}, ${bothEnds}) = ${answer}`, en: `Answer: min(${fromFront}, ${fromBack}, ${bothEnds}) = ${answer}` },
+    arr: [...nums],
+    sub: idxSub,
+    highlight: plans.find((plan) => plan.key === bestPlan).highlight,
+    mark: [left, right],
+    final: true,
+    codeLines: [14],
+    vars: [
+      { name: "best plan", value: bestPlan },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: bestPlan === "front"
+        ? `Cách ít nhất là xóa ${answer} phần tử từ đầu.`
+        : bestPlan === "back"
+          ? `Cách ít nhất là xóa ${answer} phần tử từ cuối.`
+          : `Cách ít nhất là xóa từ cả hai đầu, tổng ${answer} phần tử.`,
+      en: bestPlan === "front"
+        ? `The minimum is deleting ${answer} element(s) from the front.`
+        : bestPlan === "back"
+          ? `The minimum is deleting ${answer} element(s) from the back.`
+          : `The minimum is deleting from both ends, ${answer} element(s) total.`,
+    },
+  });
+
+  return { original: nums, answer, steps };
+}
+
+/**
  * LeetCode 84: Largest Rectangle in Histogram.
  *
  * Given heights of bars in a histogram, find the area of the largest
@@ -10173,6 +10381,70 @@ module.exports = {
       "        return (first - 1) * (second - 1)",
     ],
     builder: buildSteps1464,
+  },
+  2091: {
+    id: 2091,
+    difficulty: "medium",
+    slug: "removing-minimum-and-maximum-from-array",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Removing Minimum and Maximum From Array", en: "Removing Minimum and Maximum From Array" },
+    titleVi: { vi: "Xóa phần tử nhỏ nhất và lớn nhất khỏi mảng", en: "Remove minimum and maximum from array" },
+    statement: {
+      vi: "Cho mảng nums gồm các số nguyên phân biệt. Mỗi bước chỉ được xóa phần tử đầu hoặc cuối. Trả về số bước ít nhất để xóa cả phần tử nhỏ nhất và lớn nhất.",
+      en: "Given an array nums of distinct integers. In one operation, delete either the first or last element. Return the minimum deletions needed to remove both the minimum and maximum elements.",
+    },
+    defaultInput: [2, 10, 7, 5, 4, 1, 8, 6],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Quét một lần để tìm index của minimum và maximum.", en: "Scan once to find the indices of the minimum and maximum values." },
+      { vi: "Đặt left = index nhỏ hơn, right = index lớn hơn.", en: "Let left be the smaller index and right be the larger index." },
+      { vi: "So sánh 3 cách: xóa hết từ đầu tới right, xóa hết từ cuối tới left, hoặc xóa từ cả hai đầu.", en: "Compare 3 choices: delete from the front through right, delete from the back through left, or delete from both ends." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Một lần quét để tìm min/max; sau đó chỉ tính 3 công thức.",
+        en: "One scan finds min/max; afterward only three formulas are evaluated.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minimumDeletions(self, nums: List[int]) -> int:",
+      "        n = len(nums)",
+      "        min_idx = max_idx = 0",
+      "        for i in range(1, n):",
+      "            if nums[i] < nums[min_idx]:",
+      "                min_idx = i",
+      "            if nums[i] > nums[max_idx]:",
+      "                max_idx = i",
+      "        left, right = sorted((min_idx, max_idx))",
+      "        front = right + 1",
+      "        back = n - left",
+      "        both = left + 1 + n - right",
+      "        return min(front, back, both)",
+    ],
+    codeCsharp: [
+      "public class Solution {",
+      "    public int MinimumDeletions(int[] nums) {",
+      "        int n = nums.Length;",
+      "        int minIdx = 0, maxIdx = 0;",
+      "        for (int i = 1; i < n; i++) {",
+      "            if (nums[i] < nums[minIdx]) minIdx = i;",
+      "            if (nums[i] > nums[maxIdx]) maxIdx = i;",
+      "        }",
+      "        int left = Math.Min(minIdx, maxIdx);",
+      "        int right = Math.Max(minIdx, maxIdx);",
+      "        int front = right + 1;",
+      "        int back = n - left;",
+      "        int both = left + 1 + n - right;",
+      "        return Math.Min(front, Math.Min(back, both));",
+      "    }",
+      "}",
+    ],
+    builder: buildSteps2091,
   },
   1299: {
     id: 1299,
