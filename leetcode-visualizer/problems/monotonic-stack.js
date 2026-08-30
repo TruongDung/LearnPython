@@ -228,6 +228,140 @@ function nextGreaterNodes(nums) {
   return ans;
 }
 
+function buildSteps1019(input) {
+  const values = parseNums(input, "head");
+  if (values.length > 14) throw new Error("Use up to 14 linked-list nodes so the stack trace stays readable.");
+  const answer = Array(values.length).fill(0);
+  const stack = [];
+  const steps = [];
+
+  const stackLabel = () => `[${stack.map((index) => `${index}:${values[index]}`).join(", ")}]`;
+  const answerLabel = () => arrText(answer);
+  const nodeSub = () => values.map((_, index) => `node ${index} · ans=${answer[index]}`);
+  const stackItems = () => stack.map((index) => ({ value: values[index], detail: `node ${index}` }));
+  const linkedListText = () => values.map((value, index) => `${index}:${value}`).join(" -> ");
+
+  const snap = ({ title, line, note, current = -1, compare = null, resolved = null, final = false }) => {
+    const highlight = new Set();
+    if (Number.isInteger(current) && current >= 0) highlight.add(current);
+    if (Number.isInteger(compare) && compare >= 0) highlight.add(compare);
+    steps.push({
+      title,
+      arr: [...values],
+      sub: nodeSub(),
+      highlight: [...highlight],
+      mark: Number.isInteger(resolved)
+        ? [resolved]
+        : final
+          ? answer.map((value, index) => value > 0 ? index : -1).filter((index) => index >= 0)
+          : [...stack],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "linked list", value: linkedListText() },
+        { name: "stack", value: stackLabel() },
+        { name: "answer", value: answerLabel() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Monotonic decreasing stack (nodes waiting for a greater value)",
+        emptyLabel: "no node is waiting",
+        items: stackItems(),
+        input: [...values],
+        current,
+        inputLabel: "linked list values copied into an array",
+        expected: current >= 0 ? values[current] : "",
+        status: [
+          { label: "current node", value: current >= 0 ? `${current}:${values[current]}` : "-" },
+          { label: "stack top", value: stack.length ? `${stack.at(-1)}:${values[stack.at(-1)]}` : "empty" },
+          { label: "answer", value: answerLabel() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Chuyển linked list thành array", "Copy linked list into an array"),
+    line: [3, 4, 5, 6],
+    note: text(
+      "Linked list không truy cập index nhanh, nên ta copy value sang array để dùng stack theo index.",
+      "A linked list has no fast index access, so copy node values into an array and store indices in the stack.",
+    ),
+  });
+
+  snap({
+    title: text("answer toàn 0, stack rỗng", "answer starts as all 0, stack is empty"),
+    line: [7, 8],
+    note: text(
+      "0 nghĩa là node này chưa tìm thấy node lớn hơn ở bên phải.",
+      "0 means this node has not found a greater node to its right yet.",
+    ),
+  });
+
+  for (let i = 0; i < values.length; i++) {
+    snap({
+      title: text(`Đọc node ${i}: value = ${values[i]}`, `Read node ${i}: value = ${values[i]}`),
+      line: 9,
+      current: i,
+      note: text(
+        `Node hiện tại có thể là next greater cho các node nhỏ hơn đang nằm trên stack.`,
+        `The current node may be the next greater value for smaller nodes waiting on the stack.`,
+      ),
+    });
+
+    while (stack.length && values[stack.at(-1)] < values[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`${values[top]} < ${values[i]} nên node ${top} được giải quyết`, `${values[top]} < ${values[i]}, so node ${top} is resolved`),
+        line: 10,
+        current: i,
+        compare: top,
+        note: text(
+          `Vì node ${i} là node lớn hơn đầu tiên ta gặp sau node ${top}, đáp án của node ${top} chính là ${values[i]}.`,
+          `Because node ${i} is the first greater node encountered after node ${top}, node ${top}'s answer is ${values[i]}.`,
+        ),
+      });
+      const resolved = stack.pop();
+      answer[resolved] = values[i];
+      snap({
+        title: text(`answer[${resolved}] = ${values[i]}`, `answer[${resolved}] = ${values[i]}`),
+        line: 11,
+        current: i,
+        resolved,
+        note: text(
+          `Pop node ${resolved} khỏi stack vì nó đã có next greater.`,
+          `Pop node ${resolved} from the stack because its next greater value is known.`,
+        ),
+      });
+    }
+
+    stack.push(i);
+    snap({
+      title: text(`Push node ${i} vào stack`, `Push node ${i} onto the stack`),
+      line: 12,
+      current: i,
+      note: text(
+        `Node ${i} chờ một node lớn hơn xuất hiện ở phía sau. Stack vẫn giảm dần theo value.`,
+        `Node ${i} waits for a greater node later in the list. The stack remains decreasing by value.`,
+      ),
+    });
+  }
+
+  snap({
+    title: text(`Return ${answerLabel()}`, `Return ${answerLabel()}`),
+    line: 13,
+    final: true,
+    note: stack.length
+      ? text(
+          `Các node còn lại trong stack [${stack.join(", ")}] không có node lớn hơn ở bên phải nên giữ 0.`,
+          `Nodes still in the stack [${stack.join(", ")}] have no greater node to the right, so they keep 0.`,
+        )
+      : text("Mọi node đều đã được giải quyết.", "Every node has been resolved."),
+  });
+
+  return { original: values, answer, steps };
+}
+
 function longestWPI(nums) {
   const prefix = [0];
   nums.forEach((h) => prefix.push(prefix.at(-1) + (h > 8 ? 1 : -1)));
@@ -810,7 +944,70 @@ module.exports = {
   907: simpleProblem({ id: 907, difficulty: "medium", slug: "sum-of-subarray-minimums", name: "Sum of Subarray Minimums", viName: "Tổng minimum của mọi subarray", statement: text("Tính tổng min của mọi subarray.", "Return the sum of every subarray's minimum."), defaultInput: "3,1,2,4", solver: arrayBuilder(sumSubarrayMins) }),
   962: simpleProblem({ id: 962, difficulty: "medium", slug: "maximum-width-ramp", name: "Maximum Width Ramp", viName: "Ramp rộng nhất", statement: text("Tìm max j-i sao cho i<j và nums[i] <= nums[j].", "Find max j-i with i<j and nums[i] <= nums[j]."), defaultInput: "6,0,8,2,1,5", solver: arrayBuilder(maxWidthRamp) }),
   1008: simpleProblem({ id: 1008, difficulty: "medium", slug: "construct-binary-search-tree-from-preorder-traversal", name: "Construct BST from Preorder Traversal", viName: "Dựng BST từ preorder", statement: text("Dựng BST từ preorder traversal.", "Construct a BST from preorder traversal."), defaultInput: "8,5,1,7,10,12", tags: [arrayTag, treeTag, monoTag], solver: arrayBuilder(bstPreorder) }),
-  1019: simpleProblem({ id: 1019, difficulty: "medium", slug: "next-greater-node-in-linked-list", name: "Next Greater Node In Linked List", viName: "Node lớn hơn kế tiếp trong linked list", statement: text("Với mỗi node, tìm giá trị node lớn hơn kế tiếp.", "For each node, find the next node with a greater value."), defaultInput: "2,1,5", tags: [arrayTag, linkedListTag, monoTag], solver: arrayBuilder(nextGreaterNodes) }),
+  1019: {
+    id: 1019,
+    difficulty: "medium",
+    slug: "next-greater-node-in-linked-list",
+    category,
+    tags: [arrayTag, linkedListTag, monoTag],
+    title: text("Next Greater Node In Linked List"),
+    titleVi: text("Node lớn hơn kế tiếp trong linked list", "Next greater node in linked list"),
+    statement: text(
+      "Với mỗi node trong linked list, tìm giá trị node đầu tiên ở bên phải có value lớn hơn. Nếu không có thì trả về 0.",
+      "For each node in a linked list, find the first node to its right with a greater value. Return 0 if none exists.",
+    ),
+    defaultInput: "2,1,5",
+    inputKind: "string",
+    inputLabel: text("linked list values (cách bởi ,)", "linked list values (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Copy linked list sang array values để có index.", "Copy the linked list into a values array so we can use indices."),
+      text("Stack giữ index của các node chưa tìm thấy node lớn hơn; value trên stack giảm dần.", "The stack stores indices of nodes still waiting for a greater node; stack values are decreasing."),
+      text("Khi values[i] lớn hơn node ở đỉnh stack, values[i] là next greater đầu tiên của node đó.", "When values[i] is greater than the stack top node, values[i] is that node's first next greater value."),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text("Mỗi node được copy một lần, push một lần và pop nhiều nhất một lần.", "Each node is copied once, pushed once, and popped at most once."),
+    },
+    code: [
+      "class Solution:",
+      "    def nextLargerNodes(self, head):",
+      "        values = []",
+      "        while head:",
+      "            values.append(head.val)",
+      "            head = head.next",
+      "        answer = [0] * len(values)",
+      "        stack = []",
+      "        for i, value in enumerate(values):",
+      "            while stack and values[stack[-1]] < value:",
+      "                answer[stack.pop()] = value",
+      "            stack.append(i)",
+      "        return answer",
+    ],
+    codeCsharp: [
+      "public class Solution {",
+      "    public int[] NextLargerNodes(ListNode head) {",
+      "        List<int> values = new List<int>();",
+      "        while (head != null) {",
+      "            values.Add(head.val);",
+      "            head = head.next;",
+      "        }",
+      "        int[] answer = new int[values.Count];",
+      "        Stack<int> stack = new Stack<int>();",
+      "        for (int i = 0; i < values.Count; i++) {",
+      "            while (stack.Count > 0 && values[stack.Peek()] < values[i]) {",
+      "                answer[stack.Pop()] = values[i];",
+      "            }",
+      "            stack.Push(i);",
+      "        }",
+      "        return answer;",
+      "    }",
+      "}",
+    ],
+    liveArgs: (input) => [{ __viz_type: "linked_list", values: parseNums(input, "head") }],
+    builder: buildSteps1019,
+  },
   1124: simpleProblem({ id: 1124, difficulty: "medium", slug: "longest-well-performing-interval", name: "Longest Well-Performing Interval", viName: "Khoảng làm việc tốt dài nhất", statement: text("Ngày mệt là hours > 8; tìm interval dài nhất có ngày mệt nhiều hơn ngày không mệt.", "A tiring day has hours > 8; find the longest interval with more tiring than non-tiring days."), defaultInput: "9,9,6,0,6,6,9", inputLabel: text("hours", "hours"), solver: arrayBuilder(longestWPI) }),
   1130: simpleProblem({ id: 1130, difficulty: "medium", slug: "minimum-cost-tree-from-leaf-values", name: "Minimum Cost Tree From Leaf Values", viName: "Cây chi phí nhỏ nhất từ leaf", statement: text("Ghép leaf để tổng non-leaf value nhỏ nhất.", "Combine leaves so the sum of non-leaf values is minimized."), defaultInput: "6,2,4", solver: arrayBuilder(mctFromLeafValues) }),
   1504: simpleProblem({ id: 1504, difficulty: "medium", slug: "count-submatrices-with-all-ones", name: "Count Submatrices With All Ones", viName: "Đếm submatrix toàn 1", statement: text("Đếm mọi submatrix chỉ chứa số 1.", "Count all submatrices containing only ones."), defaultInput: "1,0,1;1,1,0;1,1,0", inputLabel: text("mat (hàng cách ;)", "mat (rows separated by ;)"), solver: countSubmatrices }),
