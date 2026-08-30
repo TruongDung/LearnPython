@@ -657,6 +657,316 @@ function createMaximumNumber(input, params = {}) {
   return { original: nums1, answer: best, steps: genericSteps({ nums: nums1, title: text("Tạo số lớn nhất", "Create maximum number"), answer: best, note: text("Dùng monotonic stack để lấy subsequence lớn nhất từ từng mảng rồi merge tham lam.", "Use monotonic stacks to pick best subsequences from both arrays, then greedily merge.") }) };
 }
 
+function buildSteps321(input, params = {}) {
+  const nums1 = parseNums(input, "nums1");
+  const nums2 = parseNums(params.nums2 ?? "9,1,2,5,8,3", "nums2");
+  const k = Number(params.k ?? 5);
+  if (!Number.isInteger(k) || k < 1 || k > nums1.length + nums2.length) {
+    throw new Error("k must be between 1 and nums1.length + nums2.length.");
+  }
+  if (nums1.length + nums2.length > 14) {
+    throw new Error("Use up to 14 total digits so the visualization stays readable.");
+  }
+
+  const combined = [...nums1, ...nums2];
+  const sourceSub = [
+    ...nums1.map((_, index) => `nums1[${index}]`),
+    ...nums2.map((_, index) => `nums2[${index}]`),
+  ];
+  const steps = [];
+  let best = [];
+  let activeStack = [];
+  let stage = "";
+  let currentCandidate = [];
+
+  const labelSeq = (seq) => `[${seq.join(", ")}]`;
+  const isGreater = (a, i, b, j) => {
+    while (i < a.length && j < b.length && a[i] === b[j]) {
+      i++;
+      j++;
+    }
+    return j === b.length || (i < a.length && a[i] > b[j]);
+  };
+  const status = (extra = []) => [
+    { label: "split", value: stage || "-" },
+    { label: "stack", value: labelSeq(activeStack) },
+    { label: "candidate", value: labelSeq(currentCandidate) },
+    { label: "best", value: best.length ? labelSeq(best) : "[]" },
+    ...extra,
+  ];
+  const addStep = ({ title, line, note, highlight = [], mark = [], stack = activeStack, extraStatus = [], final = false }) => {
+    steps.push({
+      title,
+      arr: combined,
+      sub: sourceSub,
+      highlight,
+      mark,
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "nums1", value: labelSeq(nums1) },
+        { name: "nums2", value: labelSeq(nums2) },
+        { name: "k", value: k },
+        { name: "best", value: best.length ? labelSeq(best) : "[]" },
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Greedy monotonic stack / merge state",
+        emptyLabel: "empty",
+        input: combined,
+        inputLabel: "nums1 followed by nums2",
+        current: highlight.length ? highlight[0] : -1,
+        expected: stack.length ? stack.at(-1) : "",
+        items: stack.map((value, index) => ({ value, detail: `pos ${index}` })),
+        status: status(extraStatus),
+      },
+    });
+  };
+
+  const pickMax = (nums, size, label, offset) => {
+    const dropStart = nums.length - size;
+    let drop = dropStart;
+    const stack = [];
+    activeStack = stack;
+    addStep({
+      title: text(`Chọn ${size} digit tốt nhất từ ${label}`, `Pick best ${size} digit(s) from ${label}`),
+      line: [3, 4, 5],
+      note: text(
+        `Có thể bỏ tối đa ${dropStart} digit. Stack giữ subsequence lớn nhất theo thứ tự.`,
+        `We may drop up to ${dropStart} digit(s). The stack keeps the lexicographically largest subsequence in order.`,
+      ),
+      extraStatus: [{ label: "drop left", value: drop }],
+    });
+
+    nums.forEach((digit, index) => {
+      addStep({
+        title: text(`${label}[${index}] = ${digit}`, `${label}[${index}] = ${digit}`),
+        line: 6,
+        highlight: [offset + index],
+        stack,
+        note: text(
+          `Digit hiện tại có thể đẩy các digit nhỏ hơn phía trước ra khỏi stack nếu vẫn còn quyền bỏ.`,
+          `The current digit can remove smaller previous digits if we still have drops left.`,
+        ),
+        extraStatus: [{ label: "drop left", value: drop }],
+      });
+      while (drop > 0 && stack.length && stack.at(-1) < digit) {
+        const removed = stack.at(-1);
+        addStep({
+          title: text(`${removed} < ${digit} và còn drop`, `${removed} < ${digit} and drops remain`),
+          line: 7,
+          highlight: [offset + index],
+          stack,
+          note: text(
+            `Pop ${removed}: bỏ digit nhỏ hơn bên trái giúp số tạo ra lớn hơn.`,
+            `Pop ${removed}: removing the smaller left digit makes the final number larger.`,
+          ),
+          extraStatus: [{ label: "drop left", value: drop }],
+        });
+        stack.pop();
+        drop--;
+        addStep({
+          title: text(`pop ${removed}, drop còn ${drop}`, `pop ${removed}, drop left ${drop}`),
+          line: 8,
+          highlight: [offset + index],
+          stack,
+          note: text(
+            `Sau khi pop, thử tiếp với đỉnh stack mới.`,
+            `After popping, compare the current digit with the new stack top.`,
+          ),
+          extraStatus: [{ label: "drop left", value: drop }],
+        });
+      }
+      stack.push(digit);
+      addStep({
+        title: text(`Push ${digit}`, `Push ${digit}`),
+        line: 9,
+        highlight: [offset + index],
+        stack,
+        note: text(
+          `Giữ ${digit} trong subsequence ứng viên của ${label}.`,
+          `Keep ${digit} in ${label}'s candidate subsequence.`,
+        ),
+        extraStatus: [{ label: "drop left", value: drop }],
+      });
+    });
+
+    const picked = stack.slice(0, size);
+    activeStack = picked;
+    addStep({
+      title: text(`${label} chọn ${labelSeq(picked)}`, `${label} picks ${labelSeq(picked)}`),
+      line: 10,
+      stack: picked,
+      note: text(
+        `Nếu stack còn dài, chỉ lấy ${size} digit đầu vì subsequence cần đúng độ dài.`,
+        `If the stack is longer, keep only the first ${size} digit(s) because the subsequence needs the exact length.`,
+      ),
+      extraStatus: [{ label: `${label} pick`, value: labelSeq(picked) }],
+    });
+    return picked;
+  };
+
+  const merge = (left, right) => {
+    const result = [];
+    let i = 0;
+    let j = 0;
+    currentCandidate = result;
+    activeStack = [];
+    addStep({
+      title: text(`Merge ${labelSeq(left)} và ${labelSeq(right)}`, `Merge ${labelSeq(left)} and ${labelSeq(right)}`),
+      line: [14, 15, 16],
+      note: text(
+        `Mỗi bước chọn suffix còn lại lớn hơn theo thứ tự từ điển.`,
+        `At each step, choose the lexicographically larger remaining suffix.`,
+      ),
+      extraStatus: [{ label: "left", value: labelSeq(left) }, { label: "right", value: labelSeq(right) }],
+    });
+    while (i < left.length || j < right.length) {
+      const takeLeft = isGreater(left, i, right, j);
+      const digit = takeLeft ? left[i++] : right[j++];
+      result.push(digit);
+      activeStack = [...result];
+      addStep({
+        title: text(`Lấy ${digit} từ ${takeLeft ? "nums1-pick" : "nums2-pick"}`, `Take ${digit} from ${takeLeft ? "nums1-pick" : "nums2-pick"}`),
+        line: takeLeft ? [17, 18, 19, 20] : [17, 21, 22, 23],
+        stack: result,
+        note: text(
+          takeLeft
+            ? `Suffix bên trái lớn hơn hoặc hòa nhưng tốt hơn, nên lấy digit bên trái.`
+            : `Suffix bên phải lớn hơn, nên lấy digit bên phải.`,
+          takeLeft
+            ? `The left suffix is larger or wins the tie, so take from the left.`
+            : `The right suffix is larger, so take from the right.`,
+        ),
+        extraStatus: [{ label: "merged", value: labelSeq(result) }],
+      });
+    }
+    addStep({
+      title: text(`Candidate = ${labelSeq(result)}`, `Candidate = ${labelSeq(result)}`),
+      line: 24,
+      stack: result,
+      note: text(
+        `Đây là số tốt nhất cho cách chia digit hiện tại.`,
+        `This is the best number for the current split.`,
+      ),
+      extraStatus: [{ label: "candidate", value: labelSeq(result) }],
+    });
+    return result;
+  };
+  const pickQuiet = (nums, size) => {
+    let drop = nums.length - size;
+    const stack = [];
+    nums.forEach((digit) => {
+      while (drop > 0 && stack.length && stack.at(-1) < digit) {
+        stack.pop();
+        drop--;
+      }
+      stack.push(digit);
+    });
+    return stack.slice(0, size);
+  };
+  const mergeQuiet = (left, right) => {
+    const result = [];
+    let i = 0;
+    let j = 0;
+    while (i < left.length || j < right.length) {
+      result.push(isGreater(left, i, right, j) ? left[i++] : right[j++]);
+    }
+    return result;
+  };
+
+  const minTake1 = Math.max(0, k - nums2.length);
+  const maxTake1 = Math.min(k, nums1.length);
+  addStep({
+    title: text("Thử mọi cách chia k digit", "Try every split of k digits"),
+    line: [25, 26],
+    note: text(
+      `Lấy i digit từ nums1 và ${k}-i digit từ nums2, với i từ ${minTake1} đến ${maxTake1}.`,
+      `Take i digits from nums1 and ${k}-i digits from nums2, with i from ${minTake1} to ${maxTake1}.`,
+    ),
+  });
+
+  const splitResults = [];
+  for (let take1 = minTake1; take1 <= maxTake1; take1++) {
+    const take2 = k - take1;
+    const leftPick = pickQuiet(nums1, take1);
+    const rightPick = pickQuiet(nums2, take2);
+    const candidate = mergeQuiet(leftPick, rightPick);
+    const improves = isGreater(candidate, 0, best, 0);
+    if (improves) best = candidate;
+    splitResults.push({ take1, take2, leftPick, rightPick, candidate, improves });
+    currentCandidate = candidate;
+    activeStack = candidate;
+    stage = `nums1:${take1}, nums2:${take2}`;
+    addStep({
+      title: text(
+        `Split ${take1}+${take2}: candidate ${labelSeq(candidate)}`,
+        `Split ${take1}+${take2}: candidate ${labelSeq(candidate)}`,
+      ),
+      line: [26, 27, 28],
+      stack: candidate,
+      note: text(
+        improves
+          ? `Candidate này tốt hơn best hiện tại, nên tạm giữ làm best.`
+          : `Candidate này không vượt qua best hiện tại.`,
+        improves
+          ? `This candidate beats the current best, so keep it as best for now.`
+          : `This candidate does not beat the current best.`,
+      ),
+      extraStatus: [
+        { label: "nums1 pick", value: labelSeq(leftPick) },
+        { label: "nums2 pick", value: labelSeq(rightPick) },
+        { label: "candidate", value: labelSeq(candidate) },
+      ],
+    });
+  }
+
+  const winning = splitResults.find((item) => item.candidate.length === best.length && item.candidate.every((digit, index) => digit === best[index])) || splitResults.at(-1);
+  stage = `nums1:${winning.take1}, nums2:${winning.take2}`;
+  currentCandidate = [];
+  activeStack = [];
+  addStep({
+    title: text("Bung chi tiết split thắng", "Zoom into the winning split"),
+    line: 26,
+    note: text(
+      `Split thắng là lấy ${winning.take1} digit từ nums1 và ${winning.take2} digit từ nums2.`,
+      `The winning split takes ${winning.take1} digit(s) from nums1 and ${winning.take2} digit(s) from nums2.`,
+    ),
+    extraStatus: [{ label: "winning split", value: stage }],
+  });
+  const leftPick = pickMax(nums1, winning.take1, "nums1", 0);
+  const rightPick = pickMax(nums2, winning.take2, "nums2", nums1.length);
+  const candidate = merge(leftPick, rightPick);
+  currentCandidate = candidate;
+  activeStack = candidate;
+  addStep({
+    title: text(`${labelSeq(candidate)} là best cuối cùng`, `${labelSeq(candidate)} is the final best`),
+    line: [27, 28],
+    stack: candidate,
+    note: text(
+      `Candidate của split thắng khớp best sau khi so tất cả split.`,
+      `The winning split's candidate matches the best after comparing every split.`,
+    ),
+    extraStatus: [{ label: "candidate", value: labelSeq(candidate) }],
+  });
+
+  currentCandidate = best;
+  activeStack = best;
+  addStep({
+    title: text(`Return ${labelSeq(best)}`, `Return ${labelSeq(best)}`),
+    line: 28,
+    stack: best,
+    final: true,
+    note: text(
+      `Sau khi thử mọi split hợp lệ, best là số lớn nhất độ dài ${k}.`,
+      `After all valid splits, best is the largest number of length ${k}.`,
+    ),
+    extraStatus: [{ label: "answer", value: labelSeq(best) }],
+  });
+
+  return { original: { nums1, nums2, k }, answer: best, steps };
+}
+
 function smallestSubsequenceWithLetter(input, params = {}) {
   const s = String(input ?? "leet");
   const k = Number(params.k ?? 3);
@@ -1027,7 +1337,110 @@ module.exports = {
   1944: simpleProblem({ id: 1944, difficulty: "hard", slug: "number-of-visible-people-in-a-queue", name: "Number of Visible People in a Queue", viName: "Số người nhìn thấy trong hàng đợi", statement: text("Với mỗi người, đếm số người bên phải họ nhìn thấy.", "For each person, count visible people to their right."), defaultInput: "10,6,8,5,11,9", solver: arrayBuilder(canSeePersonsCount) }),
   2334: simpleProblem({ id: 2334, difficulty: "hard", slug: "subarray-with-elements-greater-than-varying-threshold", name: "Subarray With Elements Greater Than Varying Threshold", viName: "Subarray vượt threshold biến đổi", statement: text("Tìm size k sao cho mọi phần tử trong subarray > threshold/k.", "Find a size k where every subarray element is greater than threshold/k."), defaultInput: "1,3,4,3,1", extraParams: [{ key: "threshold", label: text("threshold", "threshold"), default: 6, min: 0 }], solver: arrayBuilder(validSubarraySize) }),
   2454: simpleProblem({ id: 2454, difficulty: "hard", slug: "next-greater-element-iv", name: "Next Greater Element IV", viName: "Phần tử lớn hơn thứ hai", statement: text("Với mỗi index, tìm phần tử lớn hơn thứ hai ở bên phải.", "For each index, find the second greater element to its right."), defaultInput: "2,4,0,9,6", solver: arrayBuilder(secondGreater) }),
-  321: simpleProblem({ id: 321, difficulty: "hard", slug: "create-maximum-number", name: "Create Maximum Number", viName: "Tạo số lớn nhất", statement: text("Chọn k chữ số từ hai mảng để tạo số lớn nhất.", "Choose k digits from two arrays to create the maximum number."), defaultInput: "3,4,6,5", inputLabel: text("nums1", "nums1"), extraParams: [{ key: "nums2", type: "string", label: text("nums2", "nums2"), default: "9,1,2,5,8,3" }, { key: "k", label: text("k", "k"), default: 5, min: 1 }], solver: createMaximumNumber }),
+  321: {
+    id: 321,
+    difficulty: "hard",
+    slug: "create-maximum-number",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Create Maximum Number"),
+    titleVi: text("Tạo số lớn nhất", "Create maximum number"),
+    statement: text(
+      "Chọn tổng cộng k digit từ nums1 và nums2 để tạo số lớn nhất. Thứ tự tương đối của digit trong từng mảng phải được giữ nguyên.",
+      "Choose k total digits from nums1 and nums2 to create the largest possible number. The relative order of digits from each array must be preserved.",
+    ),
+    defaultInput: "3,4,6,5",
+    inputKind: "string",
+    inputLabel: text("nums1 digits", "nums1 digits"),
+    extraParams: [
+      { key: "nums2", type: "string", label: text("nums2 digits", "nums2 digits"), default: "9,1,2,5,8,3" },
+      { key: "k", label: text("k", "k"), default: 5, min: 1 },
+    ],
+    approach: [
+      text("Thử mọi split: lấy i digit từ nums1 và k-i digit từ nums2.", "Try every split: take i digits from nums1 and k-i digits from nums2."),
+      text("Với mỗi mảng, dùng monotonic stack để chọn subsequence lớn nhất đúng độ dài.", "For each array, use a monotonic stack to pick the largest subsequence of the exact length."),
+      text("Merge hai subsequence bằng cách luôn chọn suffix còn lại lớn hơn theo thứ tự từ điển.", "Merge the two subsequences by always taking from the lexicographically larger remaining suffix."),
+    ],
+    complexity: {
+      time: "O(k(m+n)^2)",
+      space: "O(m+n)",
+      note: text(
+        "Có nhiều cách tối ưu/triển khai khác nhau; visualization dùng input nhỏ để thấy rõ pick + merge + compare.",
+        "There are several optimized implementations; this visualization uses small inputs to make pick + merge + compare clear.",
+      ),
+    },
+    code: [
+      "class Solution:",
+      "    def maxNumber(self, nums1, nums2, k):",
+      "        def pick(nums, size):",
+      "            drop = len(nums) - size",
+      "            stack = []",
+      "            for digit in nums:",
+      "                while drop and stack and stack[-1] < digit:",
+      "                    stack.pop(); drop -= 1",
+      "                stack.append(digit)",
+      "            return stack[:size]",
+      "        def greater(a, i, b, j):",
+      "            while i < len(a) and j < len(b) and a[i] == b[j]:",
+      "                i += 1; j += 1",
+      "            return j == len(b) or (i < len(a) and a[i] > b[j])",
+      "        def merge(a, b):",
+      "            ans = []",
+      "            i = j = 0",
+      "            while i < len(a) or j < len(b):",
+      "                if greater(a, i, b, j):",
+      "                    ans.append(a[i]); i += 1",
+      "                else:",
+      "                    ans.append(b[j]); j += 1",
+      "            return ans",
+      "        best = []",
+      "        for i in range(max(0, k-len(nums2)), min(k, len(nums1)) + 1):",
+      "            candidate = merge(pick(nums1, i), pick(nums2, k-i))",
+      "            if greater(candidate, 0, best, 0): best = candidate",
+      "        return best",
+    ],
+    codeCsharp: [
+      "public class Solution {",
+      "    public int[] MaxNumber(int[] nums1, int[] nums2, int k) {",
+      "        List<int> best = new List<int>();",
+      "        int start = Math.Max(0, k - nums2.Length);",
+      "        int end = Math.Min(k, nums1.Length);",
+      "        for (int i = start; i <= end; i++) {",
+      "            var candidate = Merge(Pick(nums1, i), Pick(nums2, k - i));",
+      "            if (Greater(candidate, 0, best, 0)) best = candidate;",
+      "        }",
+      "        return best.ToArray();",
+      "    }",
+      "    private List<int> Pick(int[] nums, int size) {",
+      "        int drop = nums.Length - size;",
+      "        List<int> stack = new List<int>();",
+      "        foreach (int digit in nums) {",
+      "            while (drop > 0 && stack.Count > 0 && stack[stack.Count - 1] < digit) {",
+      "                stack.RemoveAt(stack.Count - 1);",
+      "                drop--;",
+      "            }",
+      "            stack.Add(digit);",
+      "        }",
+      "        return stack.GetRange(0, size);",
+      "    }",
+      "    private bool Greater(List<int> a, int i, List<int> b, int j) {",
+      "        while (i < a.Count && j < b.Count && a[i] == b[j]) { i++; j++; }",
+      "        return j == b.Count || (i < a.Count && a[i] > b[j]);",
+      "    }",
+      "    private List<int> Merge(List<int> a, List<int> b) {",
+      "        List<int> ans = new List<int>();",
+      "        int i = 0, j = 0;",
+      "        while (i < a.Count || j < b.Count) {",
+      "            if (Greater(a, i, b, j)) ans.Add(a[i++]);",
+      "            else ans.Add(b[j++]);",
+      "        }",
+      "        return ans;",
+      "    }",
+      "}",
+    ],
+    liveArgs: (input, params) => [parseNums(input, "nums1"), parseNums(params.nums2, "nums2"), Number(params.k)],
+    builder: buildSteps321,
+  },
   2030: simpleProblem({ id: 2030, difficulty: "hard", slug: "smallest-k-length-subsequence-with-occurrences-of-a-letter", name: "Smallest K-Length Subsequence With Occurrences of a Letter", viName: "Subsequence độ dài k nhỏ nhất có đủ ký tự", statement: text("Tìm subsequence nhỏ nhất độ dài k chứa letter ít nhất repetition lần.", "Find the smallest subsequence of length k containing letter at least repetition times."), defaultInput: "leet", inputKind: "string", inputLabel: text("s", "s"), tags: [stringTag, monoTag], extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 1 }, { key: "letter", type: "string", label: text("letter", "letter"), default: "e" }, { key: "repetition", label: text("repetition", "repetition"), default: 1, min: 1 }], solver: (input, params) => { const answer = smallestSubsequenceWithLetter(input, params); return { original: String(input ?? ""), answer, steps: genericSteps({ nums: [...String(input ?? "")].map((_, i) => i), title: text(`answer = ${answer}`, `answer = ${answer}`), answer, note: text("Stack tham lam, nhưng luôn giữ đủ chỗ và đủ số lần của letter.", "A greedy stack while reserving enough slots and occurrences for letter.") }) }; } }),
   2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),
