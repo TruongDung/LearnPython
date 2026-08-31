@@ -50,29 +50,91 @@ function parseMatrix(value, label = "matrix") {
 
 function genericSteps({ nums, title, answer, note, vars = [], highlights = [], marks = [], sub = null }) {
   const arr = Array.isArray(nums) ? nums : [];
-  return [
+  const labels = sub || arr.map((_, index) => `[${index}]`);
+  const steps = [
     {
       title: text("Nhận diện monotonic stack", "Identify the monotonic stack pattern"),
       arr: [...arr],
-      sub: sub || arr.map((_, index) => `[${index}]`),
+      sub: labels,
       highlight: [],
       mark: [],
       codeLines: [1],
-      vars: [{ name: "n", value: arr.length }],
+      vars: [{ name: "n", value: arr.length }, ...vars],
       note: text("Ta giữ stack đơn điệu để mỗi phần tử chỉ vào/ra stack một lần.", "Keep a monotonic stack so each element enters and leaves the stack at most once."),
-    },
-    {
-      title,
-      arr: [...arr],
-      sub: sub || arr.map((_, index) => `[${index}]`),
-      highlight: highlights,
-      mark: marks,
-      final: true,
-      codeLines: [1],
-      vars: [{ name: "answer", value: Array.isArray(answer) ? arrText(answer) : answer }, ...vars],
-      note,
+      stackView: {
+        title: "Pattern trace",
+        emptyLabel: "algorithm state shown in variables",
+        items: [],
+        input: [...arr],
+        current: -1,
+        inputLabel: "input values",
+        expected: "",
+        status: [
+          { label: "n", value: arr.length },
+          { label: "answer", value: Array.isArray(answer) ? arrText(answer) : answer },
+        ],
+      },
     },
   ];
+  arr.forEach((value, index) => {
+    steps.push({
+      title: text(`Xét input[${index}] = ${value}`, `Inspect input[${index}] = ${value}`),
+      arr: [...arr],
+      sub: labels,
+      highlight: [index],
+      mark: marks,
+      codeLines: [3, 4, 5],
+      vars: [
+        { name: "i", value: index },
+        { name: "value", value },
+        { name: "answer", value: Array.isArray(answer) ? arrText(answer) : answer },
+        ...vars,
+      ],
+      note: text(
+        "Step này cho thấy phần tử đang được thuật toán stack/greedy xử lý trong lượt quét chính.",
+        "This step shows the element being processed by the stack/greedy algorithm during the main scan.",
+      ),
+      stackView: {
+        title: "Input scan",
+        emptyLabel: "see variables for compact state",
+        items: arr.slice(0, index + 1).map((item, itemIndex) => ({ value: item, detail: `seen input[${itemIndex}]` })),
+        input: [...arr],
+        current: index,
+        inputLabel: "input values",
+        expected: value,
+        status: [
+          { label: "current", value: `${value} at ${index}` },
+          { label: "processed", value: `${index + 1}/${arr.length}` },
+          { label: "answer", value: Array.isArray(answer) ? arrText(answer) : answer },
+        ],
+      },
+    });
+  });
+  steps.push({
+    title,
+    arr: [...arr],
+    sub: labels,
+    highlight: highlights,
+    mark: marks,
+    final: true,
+    codeLines: [6, 7],
+    vars: [{ name: "answer", value: Array.isArray(answer) ? arrText(answer) : answer }, ...vars],
+    note,
+    stackView: {
+      title: "Final result",
+      emptyLabel: "done",
+      items: [],
+      input: [...arr],
+      current: -1,
+      inputLabel: "input values",
+      expected: "",
+      status: [
+        { label: "answer", value: Array.isArray(answer) ? arrText(answer) : answer },
+        { label: "steps", value: steps.length + 1 },
+      ],
+    },
+  });
+  return steps;
 }
 
 function arrayBuilder(solver, noteFactory = null) {
@@ -270,6 +332,161 @@ function removeDuplicateLetters(input) {
     used.add(ch);
   });
   return stack.join("");
+}
+
+function buildSteps316(input) {
+  const s = String(input ?? "");
+  if (!s || s.length > 18) throw new Error("Use a non-empty string up to 18 characters for the visualization.");
+  const chars = [...s];
+  const last = new Map();
+  const stack = [];
+  const used = new Set();
+  const steps = [];
+  chars.forEach((ch, i) => last.set(ch, i));
+
+  const stackText = () => stack.join("") || "empty";
+  const usedText = () => `{${[...used].sort().join(", ")}}`;
+  const lastText = () => `{${[...last.entries()].map(([ch, i]) => `${ch}:${i}`).join(", ")}}`;
+  const sub = () => chars.map((ch, i) => `${ch} @ ${i}${used.has(ch) ? " · used" : ""}`);
+  const stackItems = () => stack.map((ch) => ({ value: ch, detail: `last=${last.get(ch)}` }));
+  const snap = ({ title, line, note, current = -1, final = false, removed = "" }) => {
+    const top = stack.length ? stack.at(-1) : "";
+    steps.push({
+      title,
+      arr: chars.map((ch) => ch.charCodeAt(0)),
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: stack.map((ch) => chars.findIndex((c, index) => c === ch && index <= last.get(ch))),
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "ch", value: current >= 0 ? chars[current] : "-" },
+        { name: "stack", value: stackText() },
+        { name: "used", value: usedText() },
+        { name: "last", value: lastText() },
+        ...(removed ? [{ name: "removed", value: removed }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Monotonic character stack (smallest distinct result)",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "s scanned left to right",
+        expected: current >= 0 ? chars[current] : "",
+        status: [
+          { label: "current char", value: current >= 0 ? `${chars[current]} @ ${current}` : "-" },
+          { label: "top", value: top || "empty" },
+          { label: "used", value: usedText() },
+          { label: "answer so far", value: stackText() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-5: last, stack, used", "Lines 3-5: last, stack, used"),
+    line: [3, 4, 5],
+    note: text(
+      "last cho biết mỗi ký tự còn xuất hiện lại ở đâu. used đảm bảo mỗi ký tự chỉ nằm trong stack một lần.",
+      "last tells where each character appears again. used ensures each character appears in the stack only once.",
+    ),
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    snap({
+      title: text(`Dòng 6: i=${i}, ch='${ch}'`, `Line 6: i=${i}, ch='${ch}'`),
+      line: 6,
+      current: i,
+      note: text(
+        `Ta muốn stack nhỏ theo thứ tự từ điển, nhưng vẫn phải giữ đủ mỗi ký tự khác nhau.`,
+        `We want a lexicographically small stack while still keeping every distinct character.`,
+      ),
+    });
+
+    if (used.has(ch)) {
+      snap({
+        title: text(`Dòng 7-8: '${ch}' đã dùng, bỏ qua`, `Lines 7-8: '${ch}' is already used, skip`),
+        line: [7, 8],
+        current: i,
+        note: text(
+          `'${ch}' đã có trong stack, nếu thêm nữa sẽ vi phạm điều kiện mỗi ký tự đúng một lần.`,
+          `'${ch}' is already in the stack; adding it again would break the exactly-once rule.`,
+        ),
+      });
+      continue;
+    }
+
+    while (stack.length && ch < stack.at(-1) && i < last.get(stack.at(-1))) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 9: '${ch}' < '${top}' và '${top}' còn xuất hiện sau`, `Line 9: '${ch}' < '${top}' and '${top}' appears later`),
+        line: 9,
+        current: i,
+        note: text(
+          `Pop '${top}' để '${ch}' đứng sớm hơn, vì '${top}' vẫn còn bản sao ở index ${last.get(top)}.`,
+          `Pop '${top}' so '${ch}' can appear earlier, because '${top}' still appears again at index ${last.get(top)}.`,
+        ),
+      });
+      const removed = stack.pop();
+      used.delete(removed);
+      snap({
+        title: text(`Dòng 10: remove '${removed}' khỏi used`, `Line 10: remove '${removed}' from used`),
+        line: 10,
+        current: i,
+        removed,
+        note: text(
+          `Sau khi pop, '${removed}' không còn trong stack nên xóa khỏi used để có thể thêm lại sau.`,
+          `After popping, '${removed}' is no longer in the stack, so remove it from used so it can be added later.`,
+        ),
+      });
+    }
+
+    const topAfter = stack.at(-1);
+    snap({
+      title: text(
+        !topAfter ? "Dòng 9: dừng while vì stack rỗng" : `Dòng 9: dừng while, không được pop '${topAfter}'`,
+        !topAfter ? "Line 9: stop while because stack is empty" : `Line 9: stop while; cannot pop '${topAfter}'`,
+      ),
+      line: 9,
+      current: i,
+      note: text(
+        !topAfter
+          ? "Không còn ký tự nào trong stack để so sánh."
+          : `Không pop '${topAfter}' vì một trong ba điều kiện sai: top không lớn hơn ch, hoặc top không còn xuất hiện phía sau.`,
+        !topAfter
+          ? "No character remains in the stack to compare."
+          : `Do not pop '${topAfter}' because one of the three conditions is false: top is not larger, or top does not appear later.`,
+      ),
+    });
+
+    stack.push(ch);
+    used.add(ch);
+    snap({
+      title: text(`Dòng 11-12: push '${ch}' và add used`, `Lines 11-12: push '${ch}' and add used`),
+      line: [11, 12],
+      current: i,
+      note: text(
+        `Stack hiện là '${stackText()}'.`,
+        `The stack is now '${stackText()}'.`,
+      ),
+    });
+  }
+
+  const answer = stack.join("");
+  snap({
+    title: text(`Dòng 13: return '${answer}'`, `Line 13: return '${answer}'`),
+    line: 13,
+    final: true,
+    note: text(
+      "Stack chứa mỗi ký tự khác nhau đúng một lần và nhỏ nhất theo thứ tự từ điển.",
+      "The stack contains each distinct character exactly once and is lexicographically smallest.",
+    ),
+  });
+
+  return { original: s, answer, steps };
 }
 
 function pattern132(nums) {
@@ -514,6 +731,102 @@ function maxChunks(nums) {
   return chunks;
 }
 
+function buildSteps769(input) {
+  const nums = parseNums(input, "arr");
+  if (nums.length > 16) throw new Error("Use up to 16 values so the chunk trace stays readable.");
+  let maxSoFar = -Infinity;
+  let chunks = 0;
+  const steps = [];
+  const chunkEnds = [];
+
+  const chunkText = () => chunkEnds.length ? chunkEnds.join(", ") : "none";
+  const sub = () => nums.map((value, index) => `i=${index} · ${value}${chunkEnds.includes(index) ? " · cut" : ""}`);
+  const snap = ({ title, line, note, current = -1, final = false }) => {
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: [...chunkEnds],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "maxSoFar", value: maxSoFar === -Infinity ? "-∞" : maxSoFar },
+        { name: "chunks", value: chunks },
+        { name: "chunk ends", value: chunkText() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Permutation chunks by prefix maximum",
+        emptyLabel: "no chunk cut yet",
+        items: chunkEnds.map((index) => ({ value: index, detail: `chunk ends at ${index}` })),
+        input: [...nums],
+        current,
+        inputLabel: "arr scanned left to right",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current", value: current >= 0 ? `${nums[current]} at ${current}` : "-" },
+          { label: "maxSoFar", value: maxSoFar === -Infinity ? "-∞" : maxSoFar },
+          { label: "can cut?", value: current >= 0 ? `${maxSoFar} == ${current}` : "-" },
+          { label: "chunks", value: chunks },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: maxSoFar = -inf, chunks = 0", "Lines 3-4: maxSoFar = -inf, chunks = 0"),
+    line: [3, 4],
+    note: text(
+      "Vì arr là permutation của 0..n-1, khi max prefix bằng đúng index i thì prefix [0..i] chứa đủ các số 0..i và có thể tách thành một chunk.",
+      "Because arr is a permutation of 0..n-1, when the prefix max equals index i, prefix [0..i] contains exactly values 0..i and can be cut as a chunk.",
+    ),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    snap({
+      title: text(`Dòng 5: xét i=${i}, arr[i]=${nums[i]}`, `Line 5: read i=${i}, arr[i]=${nums[i]}`),
+      line: 5,
+      current: i,
+      note: text("Cập nhật maximum của prefix đang xét.", "Update the maximum value in the current prefix."),
+    });
+    maxSoFar = Math.max(maxSoFar, nums[i]);
+    snap({
+      title: text(`Dòng 6: maxSoFar = ${maxSoFar}`, `Line 6: maxSoFar = ${maxSoFar}`),
+      line: 6,
+      current: i,
+      note: text(`Prefix tới i=${i} cần chứa đủ các value từ 0 đến ${i}; điều này xảy ra khi maxSoFar == i.`, `The prefix through i=${i} must contain all values from 0 to ${i}; that happens when maxSoFar == i.`),
+    });
+    if (maxSoFar === i) {
+      chunks += 1;
+      chunkEnds.push(i);
+      snap({
+        title: text(`Dòng 7-8: maxSoFar == i, cắt chunk #${chunks}`, `Lines 7-8: maxSoFar == i, cut chunk #${chunks}`),
+        line: [7, 8],
+        current: i,
+        note: text(`Sort riêng chunk kết thúc tại ${i}; nó sẽ khớp đoạn sorted tương ứng.`, `Sorting the chunk ending at ${i} matches the corresponding sorted segment.`),
+      });
+    } else {
+      snap({
+        title: text("Dòng 7: chưa cắt chunk", "Line 7: cannot cut yet"),
+        line: 7,
+        current: i,
+        note: text(`maxSoFar=${maxSoFar} khác i=${i}, nên prefix còn thiếu/đang chứa value vượt ra ngoài đoạn này.`, `maxSoFar=${maxSoFar} differs from i=${i}, so the prefix is still missing values or contains values beyond this segment.`),
+      });
+    }
+  }
+
+  snap({
+    title: text(`Dòng 9: return ${chunks}`, `Line 9: return ${chunks}`),
+    line: 9,
+    final: true,
+    note: text(`Có thể chia tối đa ${chunks} chunk.`, `The maximum number of chunks is ${chunks}.`),
+  });
+
+  return { original: nums, answer: chunks, steps };
+}
+
 function carFleet(input, params = {}) {
   const cars = parsePairs(input, "cars");
   const target = Number(params.target ?? 12);
@@ -541,6 +854,114 @@ function stockSpan(input) {
   return { original: prices, answer, steps: genericSteps({ nums: prices, title: text("Stock spans", "Stock spans"), answer, note: text("Stack giảm dần theo giá; span nhảy về ngày có giá cao hơn gần nhất.", "The stack decreases by price; span jumps back to the nearest previous higher price.") }) };
 }
 
+function buildSteps901(input) {
+  const prices = parseNums(input, "prices");
+  if (prices.length > 16) throw new Error("Use up to 16 prices so the span stack stays readable.");
+  const stack = [];
+  const answer = [];
+  const steps = [];
+
+  const stackText = () => `[${stack.map(([price, index]) => `${price}@${index}`).join(", ")}]`;
+  const answerText = () => arrText(answer);
+  const sub = () => prices.map((price, index) => `day=${index} · price=${price} · span=${answer[index] ?? "?"}`);
+  const stackItems = () => stack.map(([price, index]) => ({ value: price, detail: `day ${index}` }));
+  const snap = ({ title, line, note, current = -1, resolved = null, span = null, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...prices],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: resolved != null ? [resolved[1]] : [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "day", value: current >= 0 ? current : "-" },
+        { name: "price", value: current >= 0 ? prices[current] : "-" },
+        { name: "span", value: span ?? "-" },
+        { name: "stack", value: stackText() },
+        { name: "answer", value: answerText() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Monotonic decreasing price stack",
+        emptyLabel: "no previous higher price",
+        items: stackItems(),
+        input: [...prices],
+        current,
+        inputLabel: "prices by day",
+        expected: current >= 0 ? prices[current] : "",
+        status: [
+          { label: "current price", value: current >= 0 ? prices[current] : "-" },
+          { label: "stack top", value: top ? `${top[0]} at day ${top[1]}` : "empty" },
+          { label: "top <= current?", value: top && current >= 0 ? `${top[0]} <= ${prices[current]}` : "-" },
+          { label: "answer", value: answerText() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: stack rỗng, answer rỗng", "Lines 3-4: empty stack and answer"),
+    line: [3, 4],
+    note: text("Stack giữ các ngày trước có giá lớn hơn giá hiện tại gần nhất.", "The stack keeps previous days that may be the nearest higher price."),
+  });
+
+  for (let i = 0; i < prices.length; i++) {
+    const price = prices[i];
+    snap({
+      title: text(`Dòng 5: day ${i}, price=${price}`, `Line 5: day ${i}, price=${price}`),
+      line: 5,
+      current: i,
+      note: text("Các ngày có giá <= hôm nay được tính vào span và không thể chặn ngày sau nữa.", "Days with price <= today are included in the span and cannot block future days."),
+    });
+    while (stack.length && stack.at(-1)[0] <= price) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 6: ${top[0]} <= ${price}, pop day ${top[1]}`, `Line 6: ${top[0]} <= ${price}, pop day ${top[1]}`),
+        line: 6,
+        current: i,
+        resolved: top,
+        note: text(`Day ${top[1]} có giá không cao hơn hôm nay, nên nằm trong span của hôm nay.`, `Day ${top[1]}'s price is not higher than today, so it belongs inside today's span.`),
+      });
+      stack.pop();
+    }
+    const span = stack.length ? i - stack.at(-1)[1] : i + 1;
+    answer.push(span);
+    snap({
+      title: text(`Dòng 8-9: span = ${span}, append vào answer`, `Lines 8-9: span = ${span}, append to answer`),
+      line: [8, 9],
+      current: i,
+      span,
+      note: text(
+        stack.length
+          ? `Giá cao hơn gần nhất còn lại ở day ${stack.at(-1)[1]}, nên span = ${i} - ${stack.at(-1)[1]}.`
+          : `Không còn giá cao hơn bên trái, nên span phủ từ day 0 tới day ${i}.`,
+        stack.length
+          ? `The nearest remaining higher price is day ${stack.at(-1)[1]}, so span = ${i} - ${stack.at(-1)[1]}.`
+          : `No higher price remains on the left, so the span covers day 0 through day ${i}.`,
+      ),
+    });
+    stack.push([price, i]);
+    snap({
+      title: text(`Dòng 10: push [${price}, ${i}]`, `Line 10: push [${price}, ${i}]`),
+      line: 10,
+      current: i,
+      span,
+      note: text("Giữ hôm nay để làm mốc giá cao hơn cho các ngày sau.", "Keep today as a possible higher-price boundary for future days."),
+    });
+  }
+
+  snap({
+    title: text(`Dòng 11: return ${answerText()}`, `Line 11: return ${answerText()}`),
+    line: 11,
+    final: true,
+    note: text("Mỗi span là số ngày liên tiếp gần nhất có giá <= ngày hiện tại.", "Each span is the number of consecutive recent days with price <= the current day."),
+  });
+
+  return { original: prices, answer, steps };
+}
+
 function sumSubarrayMins(nums) {
   const mod = 1000000007, stack = [];
   let ans = 0, dot = 0;
@@ -566,6 +987,127 @@ function maxWidthRamp(nums) {
     while (stack.length && nums[stack.at(-1)] <= nums[j]) ans = Math.max(ans, j - stack.pop());
   }
   return ans;
+}
+
+function buildSteps962(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 16) throw new Error("Use up to 16 numbers so the ramp stack stays readable.");
+  const stack = [];
+  const steps = [];
+  let answer = 0;
+  let phase = "build candidates";
+
+  const stackText = () => `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]`;
+  const stackItems = () => stack.map((index) => ({ value: nums[index], detail: `index ${index}` }));
+  const sub = () => nums.map((value, index) => `i=${index} · ${value}`);
+  const snap = ({ title, line, note, current = -1, compare = -1, resolved = -1, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: [current, compare].filter((index) => index >= 0),
+      mark: resolved >= 0 ? [resolved] : [...stack],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "phase", value: phase },
+        { name: "answer", value: answer },
+        { name: "stack", value: stackText() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: phase === "build candidates" ? "Candidate left indices with decreasing values" : "Scan right endpoints and resolve ramps",
+        emptyLabel: "no candidate left index",
+        items: stackItems(),
+        input: [...nums],
+        current,
+        inputLabel: phase === "build candidates" ? "left endpoints" : "right endpoints",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current", value: current >= 0 ? `${nums[current]} at ${current}` : "-" },
+          { label: "stack top", value: top == null ? "empty" : `${nums[top]} at ${top}` },
+          { label: "answer", value: answer },
+          { label: "ramp check", value: top != null && current >= 0 ? `${nums[top]} <= ${nums[current]}` : "-" },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: stack ứng viên, answer = 0", "Lines 3-4: candidate stack, answer = 0"),
+    line: [3, 4],
+    note: text("Chỉ index có value nhỏ hơn mọi value trước đó mới đáng làm left endpoint.", "Only indices with values smaller than all previous values are useful left endpoints."),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const shouldPush = !stack.length || nums[i] < nums[stack.at(-1)];
+    snap({
+      title: text(`Dòng 5: xét left candidate i=${i}`, `Line 5: check left candidate i=${i}`),
+      line: 5,
+      current: i,
+      note: text(
+        shouldPush
+          ? `${nums[i]} nhỏ hơn mọi candidate trước đó, push i=${i}.`
+          : `${nums[i]} không nhỏ hơn candidate top, nên index này không giúp tạo ramp rộng hơn.`,
+        shouldPush
+          ? `${nums[i]} is smaller than every previous candidate, so push i=${i}.`
+          : `${nums[i]} is not smaller than the candidate top, so this index cannot create a wider ramp.`,
+      ),
+    });
+    if (shouldPush) stack.push(i);
+    snap({
+      title: text(shouldPush ? `Dòng 6: push ${i}` : "Dòng 6: không push", shouldPush ? `Line 6: push ${i}` : "Line 6: do not push"),
+      line: shouldPush ? [6, 7] : 6,
+      current: i,
+      note: text(`Stack candidate hiện là ${stackText()}.`, `Candidate stack is now ${stackText()}.`),
+    });
+  }
+
+  phase = "scan rights";
+  snap({
+    title: text("Dòng 8: bắt đầu quét j từ phải sang trái", "Line 8: scan j from right to left"),
+    line: 8,
+    note: text("Quét từ phải giúp ramp đầu tiên tìm được cho left candidate thường là rộng nhất.", "Scanning from the right lets a candidate left endpoint find its widest ramp first."),
+  });
+
+  for (let j = nums.length - 1; j >= 0; j--) {
+    snap({
+      title: text(`Dòng 8: j=${j}, nums[j]=${nums[j]}`, `Line 8: j=${j}, nums[j]=${nums[j]}`),
+      line: 8,
+      current: j,
+      note: text("Nếu nums[left] <= nums[j], ta có ramp hợp lệ.", "If nums[left] <= nums[j], we have a valid ramp."),
+    });
+    while (stack.length && nums[stack.at(-1)] <= nums[j]) {
+      const left = stack.at(-1);
+      const width = j - left;
+      answer = Math.max(answer, width);
+      snap({
+        title: text(`Dòng 9-10: ramp (${left}, ${j}) width=${width}`, `Lines 9-10: ramp (${left}, ${j}) width=${width}`),
+        line: [9, 10],
+        current: j,
+        compare: left,
+        resolved: left,
+        note: text(`nums[${left}]=${nums[left]} <= nums[${j}]=${nums[j]}, cập nhật answer=${answer}.`, `nums[${left}]=${nums[left]} <= nums[${j}]=${nums[j]}, update answer=${answer}.`),
+      });
+      stack.pop();
+      snap({
+        title: text(`Dòng 11: pop left ${left}`, `Line 11: pop left ${left}`),
+        line: 11,
+        current: j,
+        note: text("Vì đang quét j từ phải sang trái, left này đã thấy j xa nhất có thể; pop để khỏi xét lại.", "Because j scans right to left, this left endpoint has found its farthest possible j; pop it."),
+      });
+    }
+  }
+
+  snap({
+    title: text(`Dòng 12: return ${answer}`, `Line 12: return ${answer}`),
+    line: 12,
+    final: true,
+    note: text(`Maximum width ramp là ${answer}.`, `The maximum width ramp is ${answer}.`),
+  });
+
+  return { original: nums, answer, steps };
 }
 
 function bstPreorder(nums) {
@@ -732,6 +1274,128 @@ function longestWPI(nums) {
   return ans;
 }
 
+function buildSteps1124(input) {
+  const hours = parseNums(input, "hours");
+  if (hours.length > 16) throw new Error("Use up to 16 days so the prefix stack stays readable.");
+  const prefix = [0];
+  const stack = [];
+  const steps = [];
+  let answer = 0;
+  let phase = "prefix";
+
+  const prefixText = () => arrText(prefix);
+  const stackText = () => `[${stack.map((index) => `${index}:${prefix[index]}`).join(", ")}]`;
+  const stackItems = () => stack.map((index) => ({ value: prefix[index], detail: `prefix index ${index}` }));
+  const sub = () => hours.map((h, i) => `day=${i} · ${h}${h > 8 ? " tiring" : " ok"}`);
+  const snap = ({ title, line, note, current = -1, compare = -1, resolved = -1, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...hours],
+      sub: sub(),
+      highlight: current > 0 ? [current - 1] : current >= 0 && current < hours.length ? [current] : [],
+      mark: resolved >= 0 ? [Math.max(0, resolved - 1)] : [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "phase", value: phase },
+        { name: "prefix", value: prefixText() },
+        { name: "stack", value: stackText() },
+        { name: "answer", value: answer },
+      ],
+      note,
+      final,
+      stackView: {
+        title: phase === "prefix" ? "Build score prefix (+1 tiring, -1 non-tiring)" : phase === "build stack" ? "Decreasing prefix minima stack" : "Resolve widest positive-score intervals",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: phase === "prefix" ? [...hours] : [...prefix],
+        current,
+        inputLabel: phase === "prefix" ? "hours by day" : "prefix score indices",
+        expected: phase === "prefix" ? (current > 0 ? hours[current - 1] : "") : (current >= 0 ? prefix[current] : ""),
+        status: [
+          { label: "current", value: phase === "prefix" ? (current > 0 ? `day ${current - 1}` : "-") : (current >= 0 ? `prefix ${current}:${prefix[current]}` : "-") },
+          { label: "stack top", value: top == null ? "empty" : `${top}:${prefix[top]}` },
+          { label: "answer", value: answer },
+          { label: "check", value: top != null && current >= 0 && phase === "scan rights" ? `${prefix[current]} > ${prefix[top]}` : "-" },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3: prefix = [0]", "Line 3: prefix = [0]"),
+    line: 3,
+    note: text("Ngày mệt hours > 8 tính +1, ngày không mệt tính -1. Interval tốt khi prefix[j] > prefix[i].", "A tiring day hours > 8 counts +1, otherwise -1. An interval is well-performing when prefix[j] > prefix[i]."),
+  });
+  for (let i = 0; i < hours.length; i++) {
+    const delta = hours[i] > 8 ? 1 : -1;
+    prefix.push(prefix.at(-1) + delta);
+    snap({
+      title: text(`Dòng 4-5: day ${i}, delta=${delta}, prefix=${prefix.at(-1)}`, `Lines 4-5: day ${i}, delta=${delta}, prefix=${prefix.at(-1)}`),
+      line: [4, 5],
+      current: i + 1,
+      note: text(`hours[${i}]=${hours[i]} ${hours[i] > 8 ? "mệt" : "không mệt"}, nên cộng ${delta}.`, `hours[${i}]=${hours[i]} is ${hours[i] > 8 ? "tiring" : "non-tiring"}, so add ${delta}.`),
+    });
+  }
+
+  phase = "build stack";
+  snap({
+    title: text("Dòng 6: xây stack prefix giảm", "Line 6: build decreasing prefix stack"),
+    line: 6,
+    note: text("Chỉ prefix nhỏ kỷ lục mới đáng làm điểm bắt đầu i cho interval dài.", "Only record-low prefix values are useful start indices for long intervals."),
+  });
+  for (let i = 0; i < prefix.length; i++) {
+    const shouldPush = !stack.length || prefix[i] < prefix[stack.at(-1)];
+    if (shouldPush) stack.push(i);
+    snap({
+      title: text(shouldPush ? `Dòng 7-9: push prefix index ${i}` : `Dòng 7-8: không push index ${i}`, shouldPush ? `Lines 7-9: push prefix index ${i}` : `Lines 7-8: do not push index ${i}`),
+      line: shouldPush ? [7, 8, 9] : [7, 8],
+      current: i,
+      note: text(
+        shouldPush
+          ? `prefix[${i}]=${prefix[i]} là mức thấp mới, có thể tạo interval tốt dài hơn về sau.`
+          : `prefix[${i}]=${prefix[i]} không thấp hơn top, nên index sớm hơn/top tốt hơn cho độ dài.`,
+        shouldPush
+          ? `prefix[${i}]=${prefix[i]} is a new low and may make a longer interval later.`
+          : `prefix[${i}]=${prefix[i]} is not lower than the top; an earlier/top index is better for width.`,
+      ),
+    });
+  }
+
+  phase = "scan rights";
+  for (let j = prefix.length - 1; j >= 0; j--) {
+    snap({
+      title: text(`Dòng 11: j=${j}, prefix[j]=${prefix[j]}`, `Line 11: j=${j}, prefix[j]=${prefix[j]}`),
+      line: 11,
+      current: j,
+      note: text("Nếu prefix[j] > prefix[i], đoạn days i..j-1 có nhiều ngày mệt hơn ngày không mệt.", "If prefix[j] > prefix[i], days i..j-1 have more tiring than non-tiring days."),
+    });
+    while (stack.length && prefix[j] > prefix[stack.at(-1)]) {
+      const i = stack.at(-1);
+      const width = j - i;
+      answer = Math.max(answer, width);
+      snap({
+        title: text(`Dòng 12-13: interval (${i}, ${j}) dài ${width}`, `Lines 12-13: interval (${i}, ${j}) length ${width}`),
+        line: [12, 13],
+        current: j,
+        compare: i,
+        resolved: i,
+        note: text(`prefix[${j}]=${prefix[j]} > prefix[${i}]=${prefix[i]}, cập nhật answer=${answer}.`, `prefix[${j}]=${prefix[j]} > prefix[${i}]=${prefix[i]}, update answer=${answer}.`),
+      });
+      stack.pop();
+    }
+  }
+
+  snap({
+    title: text(`Dòng 14: return ${answer}`, `Line 14: return ${answer}`),
+    line: 14,
+    final: true,
+    note: text(`Longest well-performing interval có độ dài ${answer}.`, `The longest well-performing interval has length ${answer}.`),
+  });
+
+  return { original: hours, answer, steps };
+}
+
 function mctFromLeafValues(nums) {
   const stack = [Infinity];
   let cost = 0;
@@ -790,6 +1454,125 @@ function mostCompetitive(nums, params = {}) {
     if (stack.length < k) stack.push(num);
   });
   return stack;
+}
+
+function buildSteps1673(input, params = {}) {
+  const nums = parseNums(input, "nums");
+  const k = Number(params.k ?? 2);
+  if (!Number.isInteger(k) || k < 1 || k > nums.length) throw new Error("k must be an integer from 1 to nums.length.");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers so the competitive stack stays readable.");
+  const stack = [];
+  const steps = [];
+  let drop = nums.length - k;
+
+  const stackText = () => arrText(stack);
+  const sub = () => nums.map((num, index) => `i=${index} · ${num}`);
+  const stackItems = () => stack.map((value, index) => ({ value, detail: `stack[${index}]` }));
+  const snap = ({ title, line, note, current = -1, removed = null, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "k", value: k },
+        { name: "drop", value: drop },
+        { name: "stack", value: stackText() },
+        ...(removed != null ? [{ name: "removed", value: removed }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Monotonic increasing stack (most competitive subsequence)",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: [...nums],
+        current,
+        inputLabel: "nums scanned left to right",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current num", value: current >= 0 ? nums[current] : "-" },
+          { label: "top", value: top ?? "empty" },
+          { label: "drop budget", value: drop },
+          { label: "stack", value: stackText() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text(`Dòng 3-4: drop = n-k = ${drop}`, `Lines 3-4: drop = n-k = ${drop}`),
+    line: [3, 4],
+    note: text(
+      `Ta được bỏ ${drop} phần tử để subsequence còn đúng độ dài k=${k}.`,
+      `We may remove ${drop} elements so the remaining subsequence has length k=${k}.`,
+    ),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const num = nums[i];
+    snap({
+      title: text(`Dòng 5: xét nums[${i}] = ${num}`, `Line 5: read nums[${i}] = ${num}`),
+      line: 5,
+      current: i,
+      note: text(
+        "Nếu num nhỏ hơn đỉnh stack và vẫn còn quyền drop, đưa num lên sớm hơn sẽ tạo subsequence nhỏ hơn.",
+        "If num is smaller than the stack top and we still have drop budget, placing num earlier makes the subsequence smaller.",
+      ),
+    });
+
+    while (drop > 0 && stack.length && stack.at(-1) > num) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 6: drop>0 và ${top} > ${num}`, `Line 6: drop>0 and ${top} > ${num}`),
+        line: 6,
+        current: i,
+        note: text(
+          `Có thể bỏ ${top} để ${num} đứng trước, làm kết quả cạnh tranh hơn.`,
+          `We can remove ${top} so ${num} appears earlier, making the result more competitive.`,
+        ),
+      });
+      const removed = stack.pop();
+      drop -= 1;
+      snap({
+        title: text(`Dòng 7: pop ${removed}, drop = ${drop}`, `Line 7: pop ${removed}, drop = ${drop}`),
+        line: 7,
+        current: i,
+        removed,
+        note: text(
+          `Đã dùng một quyền drop. Stack hiện là ${stackText()}.`,
+          `Spent one drop. The stack is now ${stackText()}.`,
+        ),
+      });
+    }
+
+    stack.push(num);
+    snap({
+      title: text(`Dòng 8: push ${num}`, `Line 8: push ${num}`),
+      line: 8,
+      current: i,
+      note: text(
+        "Giữ num trong stack. Nếu stack dài hơn k ở cuối, ta lấy k phần tử đầu.",
+        "Keep num in the stack. If the stack is longer than k at the end, take the first k values.",
+      ),
+    });
+  }
+
+  const answer = stack.slice(0, k);
+  snap({
+    title: text(`Dòng 9: return ${arrText(answer)}`, `Line 9: return ${arrText(answer)}`),
+    line: 11,
+    final: true,
+    note: text(
+      `Lấy k=${k} phần tử đầu của stack để có subsequence cạnh tranh nhất.`,
+      `Take the first k=${k} stack values to get the most competitive subsequence.`,
+    ),
+  });
+
+  return { original: nums, answer, steps };
 }
 
 function maxSumMinProduct(nums) {
@@ -1164,6 +1947,95 @@ function maxChunksII(nums) {
     stack.push(mx);
   });
   return stack.length;
+}
+
+function buildSteps768(input) {
+  const nums = parseNums(input, "arr");
+  if (nums.length > 16) throw new Error("Use up to 16 values so the chunk stack stays readable.");
+  const stack = [];
+  const steps = [];
+
+  const stackText = () => arrText(stack);
+  const stackItems = () => stack.map((value, index) => ({ value, detail: `chunk ${index + 1} max` }));
+  const sub = () => nums.map((value, index) => `i=${index} · ${value}`);
+  const snap = ({ title, line, note, current = -1, mx = null, removed = null, final = false }) => {
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "mx", value: mx ?? "-" },
+        { name: "stack chunk maxes", value: stackText() },
+        ...(removed != null ? [{ name: "merged popped max", value: removed }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Chunk stack (each item is a chunk maximum)",
+        emptyLabel: "no chunk yet",
+        items: stackItems(),
+        input: [...nums],
+        current,
+        inputLabel: "arr scanned left to right",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current", value: current >= 0 ? nums[current] : "-" },
+          { label: "top chunk max", value: stack.length ? stack.at(-1) : "empty" },
+          { label: "chunks", value: stack.length },
+          { label: "mx being merged", value: mx ?? "-" },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3: stack chunk rỗng", "Line 3: empty chunk stack"),
+    line: 3,
+    note: text("Với duplicate, mỗi stack item là max của một chunk đã dựng.", "With duplicates, each stack item is the maximum of one chunk built so far."),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    let mx = nums[i];
+    snap({
+      title: text(`Dòng 4-5: xét arr[${i}] = ${nums[i]}, mx=${mx}`, `Lines 4-5: read arr[${i}] = ${nums[i]}, mx=${mx}`),
+      line: [4, 5],
+      current: i,
+      mx,
+      note: text("Tạm xem giá trị hiện tại bắt đầu một chunk mới.", "Temporarily treat the current value as the start of a new chunk."),
+    });
+    while (stack.length && stack.at(-1) > nums[i]) {
+      const removed = stack.pop();
+      mx = Math.max(mx, removed);
+      snap({
+        title: text(`Dòng 6-7: pop chunk max ${removed}, mx=${mx}`, `Lines 6-7: pop chunk max ${removed}, mx=${mx}`),
+        line: [6, 7],
+        current: i,
+        mx,
+        removed,
+        note: text(`Vì chunk trước có max ${removed} > ${nums[i]}, current không thể tách riêng; phải merge chunk lại.`, `Because the previous chunk max ${removed} > ${nums[i]}, current cannot be separated; merge the chunks.`),
+      });
+    }
+    stack.push(mx);
+    snap({
+      title: text(`Dòng 8: push merged max ${mx}`, `Line 8: push merged max ${mx}`),
+      line: 8,
+      current: i,
+      mx,
+      note: text(`Stack hiện có ${stack.length} chunk, mỗi chunk đại diện bằng max của nó.`, `The stack now has ${stack.length} chunk(s), each represented by its maximum.`),
+    });
+  }
+
+  snap({
+    title: text(`Dòng 9: return ${stack.length}`, `Line 9: return ${stack.length}`),
+    line: 9,
+    final: true,
+    note: text(`Số chunk tối đa là số item còn trong stack: ${stack.length}.`, `The maximum chunk count is the number of items left in the stack: ${stack.length}.`),
+  });
+
+  return { original: nums, answer: stack.length, steps };
 }
 
 function oddEvenJump(nums) {
@@ -1635,6 +2507,203 @@ function smallestSubsequenceWithLetter(input, params = {}) {
   return stack.join("");
 }
 
+function buildSteps2030(input, params = {}) {
+  const s = String(input ?? "leet");
+  const k = Number(params.k ?? 3);
+  const letter = String(params.letter ?? "e")[0] || "e";
+  const repetition = Number(params.repetition ?? 1);
+  if (!s || s.length > 18) throw new Error("Use a non-empty string up to 18 characters for the visualization.");
+  if (!Number.isInteger(k) || k < 1 || k > s.length) throw new Error("k must be an integer from 1 to len(s).");
+  const totalLetter = [...s].filter((ch) => ch === letter).length;
+  if (!Number.isInteger(repetition) || repetition < 0 || repetition > k || repetition > totalLetter) {
+    throw new Error("repetition must be between 0 and k, and no more than the number of letter occurrences.");
+  }
+
+  const chars = [...s];
+  const stack = [];
+  const steps = [];
+  let remainLetter = totalLetter;
+  let needLetter = repetition;
+
+  const stackText = () => stack.join("") || "empty";
+  const sub = () => chars.map((ch, index) => `${ch} @ ${index}${ch === letter ? " · letter" : ""}`);
+  const stackItems = () => stack.map((ch, index) => ({ value: ch, detail: `stack[${index}]${ch === letter ? ", required" : ""}` }));
+  const snap = ({ title, line, note, current = -1, removed = "", final = false }) => {
+    const top = stack.length ? stack.at(-1) : "";
+    steps.push({
+      title,
+      arr: chars.map((ch) => ch.charCodeAt(0)),
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "k", value: k },
+        { name: "letter", value: letter },
+        { name: "needLetter", value: needLetter },
+        { name: "remainLetter", value: remainLetter },
+        { name: "stack", value: stackText() },
+        ...(removed ? [{ name: "removed", value: removed }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Constrained monotonic stack (length k + required letter count)",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "s scanned left to right",
+        expected: current >= 0 ? chars[current] : "",
+        status: [
+          { label: "current char", value: current >= 0 ? `${chars[current]} @ ${current}` : "-" },
+          { label: "top", value: top || "empty" },
+          { label: "slots left", value: k - stack.length },
+          { label: "need / remain", value: `${needLetter} / ${remainLetter}` },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-5: đếm letter và khởi tạo stack", "Lines 3-5: count letters and initialize stack"),
+    line: [3, 4, 5],
+    note: text(
+      `Cần kết quả dài k=${k} và chứa '${letter}' ít nhất ${repetition} lần. Ban đầu còn ${remainLetter} ký tự '${letter}' phía trước.`,
+      `Need a result of length k=${k} containing '${letter}' at least ${repetition} times. Initially ${remainLetter} '${letter}' characters remain ahead.`,
+    ),
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    snap({
+      title: text(`Dòng 6: i=${i}, ch='${ch}'`, `Line 6: i=${i}, ch='${ch}'`),
+      line: 6,
+      current: i,
+      note: text(
+        "Vẫn dùng stack tăng để nhỏ theo từ điển, nhưng mỗi pop/push phải đảm bảo đủ độ dài k và đủ số letter.",
+        "Still use an increasing stack for lexicographic order, but every pop/push must preserve length k and required letters.",
+      ),
+    });
+
+    while (
+      stack.length &&
+      stack.at(-1) > ch &&
+      stack.length - 1 + chars.length - i >= k &&
+      (stack.at(-1) !== letter || remainLetter > needLetter)
+    ) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 7: có thể pop '${top}' trước '${ch}'`, `Line 7: can pop '${top}' before '${ch}'`),
+        line: 7,
+        current: i,
+        note: text(
+          `Pop hợp lệ vì '${top}' > '${ch}', vẫn còn đủ ký tự để đạt length k, và nếu top là '${letter}' thì vẫn còn đủ '${letter}' phía sau.`,
+          `The pop is valid because '${top}' > '${ch}', enough characters remain to reach length k, and if top is '${letter}', enough '${letter}' remain later.`,
+        ),
+      });
+      const removed = stack.pop();
+      if (removed === letter) needLetter += 1;
+      snap({
+        title: text(`Dòng 8-9: pop '${removed}'${removed === letter ? ", needLetter tăng" : ""}`, `Lines 8-9: pop '${removed}'${removed === letter ? ", needLetter increases" : ""}`),
+        line: [8, 9],
+        current: i,
+        removed,
+        note: text(
+          removed === letter
+            ? `Vừa pop một '${letter}', nên vẫn cần thêm ${needLetter} ký tự '${letter}' trong phần còn lại.`
+            : `Pop '${removed}' để '${ch}' có cơ hội đứng sớm hơn.`,
+          removed === letter
+            ? `Popped one '${letter}', so the remaining result still needs ${needLetter} '${letter}' character(s).`
+            : `Pop '${removed}' so '${ch}' can appear earlier.`,
+        ),
+      });
+    }
+
+    if (stack.length < k) {
+      snap({
+        title: text(`Dòng 10: stack còn chỗ (${stack.length}/${k})`, `Line 10: stack still has room (${stack.length}/${k})`),
+        line: 10,
+        current: i,
+        note: text(
+          "Chỉ khi stack chưa đủ k ký tự ta mới cân nhắc push ch hiện tại.",
+          "Only when the stack has fewer than k characters do we consider pushing the current character.",
+        ),
+      });
+      if (ch === letter) {
+        stack.push(ch);
+        needLetter -= 1;
+        snap({
+          title: text(`Dòng 11-13: push required letter '${ch}'`, `Lines 11-13: push required letter '${ch}'`),
+          line: [11, 12, 13],
+          current: i,
+          note: text(
+            `Push '${letter}' và giảm needLetter còn ${needLetter}.`,
+            `Push '${letter}' and decrease needLetter to ${needLetter}.`,
+          ),
+        });
+      } else if (k - stack.length > needLetter) {
+        stack.push(ch);
+        snap({
+          title: text(`Dòng 14-15: push '${ch}' vì còn dư slot`, `Lines 14-15: push '${ch}' because there is a spare slot`),
+          line: [14, 15],
+          current: i,
+          note: text(
+            `Sau khi push '${ch}', vẫn còn ${k - stack.length} slot cho ${needLetter} ký tự '${letter}' bắt buộc.`,
+            `After pushing '${ch}', ${k - stack.length} slot(s) remain for ${needLetter} required '${letter}' character(s).`,
+          ),
+        });
+      } else {
+        snap({
+          title: text(`Dòng 14: skip '${ch}' để giữ slot cho '${letter}'`, `Line 14: skip '${ch}' to reserve slots for '${letter}'`),
+          line: 14,
+          current: i,
+          note: text(
+            `Không push '${ch}' vì mọi slot còn lại phải dành cho ${needLetter} ký tự '${letter}' bắt buộc.`,
+            `Do not push '${ch}' because every remaining slot must be reserved for ${needLetter} required '${letter}' character(s).`,
+          ),
+        });
+      }
+    } else {
+      snap({
+        title: text("Dòng 10: stack đã đủ k, không push", "Line 10: stack already has k characters, do not push"),
+        line: 10,
+        current: i,
+        note: text(
+          "Stack đã đủ độ dài k, nên chỉ dùng các ký tự sau để xét pop nếu có lợi và hợp lệ.",
+          "The stack already has length k, so later characters can only trigger valid pops.",
+        ),
+      });
+    }
+
+    if (ch === letter) {
+      remainLetter -= 1;
+      snap({
+        title: text(`Dòng 16-17: đã đi qua một '${letter}', remainLetter = ${remainLetter}`, `Lines 16-17: passed one '${letter}', remainLetter = ${remainLetter}`),
+        line: [16, 17],
+        current: i,
+        note: text(
+          `Giảm số '${letter}' còn lại phía sau current index.`,
+          `Decrease the number of '${letter}' characters remaining after the current index.`,
+        ),
+      });
+    }
+  }
+
+  const answer = stack.join("");
+  snap({
+    title: text(`Dòng 18: return '${answer}'`, `Line 18: return '${answer}'`),
+    line: 18,
+    final: true,
+    note: text(
+      `Kết quả dài ${answer.length}, nhỏ nhất theo từ điển và chứa '${letter}' đủ yêu cầu.`,
+      `The result has length ${answer.length}, is lexicographically smallest, and satisfies the '${letter}' requirement.`,
+    ),
+  });
+
+  return { original: s, answer, steps };
+}
+
 function totalStrength(nums) {
   let ans = 0;
   for (let i = 0; i < nums.length; i++) {
@@ -1929,7 +2998,46 @@ module.exports = {
     liveArgs: (input) => [parseNums(input, "prices")],
     builder: buildSteps1475,
   },
-  316: simpleProblem({ id: 316, difficulty: "medium", slug: "remove-duplicate-letters", name: "Remove Duplicate Letters", viName: "Xóa chữ trùng để nhỏ nhất", statement: text("Xóa ký tự trùng để mỗi ký tự xuất hiện một lần và kết quả nhỏ nhất theo thứ tự từ điển.", "Remove duplicate letters so every letter appears once and the result is lexicographically smallest."), defaultInput: "cbacdcbc", inputKind: "string", inputLabel: text("s", "s"), tags: [stringTag, monoTag], solver: (input) => { const answer = removeDuplicateLetters(input); return { original: String(input ?? ""), answer, steps: genericSteps({ nums: [...String(input ?? "")].map((_, i) => i), title: text(`answer = ${answer}`, `answer = ${answer}`), answer, note: text("Stack giữ chuỗi tăng theo từ điển, chỉ pop khi ký tự đó còn xuất hiện phía sau.", "The stack keeps a lexicographically small sequence and pops only when that character appears again later.") }) }; } }),
+  316: {
+    id: 316,
+    difficulty: "medium",
+    slug: "remove-duplicate-letters",
+    category,
+    tags: [stringTag, monoTag],
+    title: text("Remove Duplicate Letters"),
+    titleVi: text("Xóa chữ trùng để nhỏ nhất", "Remove duplicate letters for the smallest result"),
+    statement: text(
+      "Xóa ký tự trùng sao cho mỗi ký tự khác nhau xuất hiện đúng một lần và kết quả nhỏ nhất theo thứ tự từ điển.",
+      "Remove duplicate letters so each distinct character appears exactly once and the result is lexicographically smallest.",
+    ),
+    defaultInput: "cbacdcbc",
+    inputKind: "string",
+    inputLabel: text("s", "s"),
+    extraParams: [],
+    approach: [
+      text("Tính last index của mỗi ký tự để biết ký tự nào còn có thể thêm lại sau.", "Compute each character's last index to know whether it can be added again later."),
+      text("Stack tăng theo thứ tự từ điển; pop top lớn hơn ch nếu top vẫn còn xuất hiện phía sau.", "Keep an increasing lexicographic stack; pop a larger top if it appears again later."),
+      text("used đảm bảo mỗi ký tự chỉ xuất hiện một lần trong stack.", "used ensures each character appears only once in the stack."),
+    ],
+    complexity: { time: "O(n)", space: "O(k)", note: text("Mỗi ký tự được push/pop nhiều nhất một lần; k là số ký tự khác nhau.", "Each character is pushed/popped at most once; k is the number of distinct characters.") },
+    code: [
+      "class Solution:",
+      "    def removeDuplicateLetters(self, s):",
+      "        last = {ch: i for i, ch in enumerate(s)}",
+      "        stack = []",
+      "        used = set()",
+      "        for i, ch in enumerate(s):",
+      "            if ch in used:",
+      "                continue",
+      "            while stack and ch < stack[-1] and i < last[stack[-1]]:",
+      "                used.remove(stack.pop())",
+      "            stack.append(ch)",
+      "            used.add(ch)",
+      "        return ''.join(stack)",
+    ],
+    liveArgs: (input) => [String(input ?? "")],
+    builder: buildSteps316,
+  },
   456: simpleProblem({ id: 456, difficulty: "medium", slug: "132-pattern", name: "132 Pattern", viName: "Mẫu 132", statement: text("Kiểm tra có i < j < k sao cho nums[i] < nums[k] < nums[j].", "Check whether i < j < k exists with nums[i] < nums[k] < nums[j]."), defaultInput: "3,1,4,2", solver: arrayBuilder(pattern132) }),
   581: {
     id: 581,
@@ -1975,11 +3083,111 @@ module.exports = {
     builder: buildSteps581,
   },
   654: simpleProblem({ id: 654, difficulty: "medium", slug: "maximum-binary-tree", name: "Maximum Binary Tree", viName: "Cây nhị phân maximum", statement: text("Dựng Maximum Binary Tree từ mảng distinct.", "Construct the Maximum Binary Tree from a distinct array."), defaultInput: "3,2,1,6,0,5", tags: [arrayTag, treeTag, monoTag], solver: arrayBuilder(maxBinaryTree, (nums, answer) => text(`Root của cây là ${answer}.`, `The tree root is ${answer}.`)) }),
-  769: simpleProblem({ id: 769, difficulty: "medium", slug: "max-chunks-to-make-sorted", name: "Max Chunks To Make Sorted", viName: "Số chunk tối đa để sort", statement: text("Chia permutation thành nhiều chunk nhất để sort từng chunk rồi ghép lại thành sorted.", "Split a permutation into the maximum number of chunks that sort independently into the sorted array."), defaultInput: "1,0,2,3,4", solver: arrayBuilder(maxChunks) }),
+  769: {
+    id: 769,
+    difficulty: "medium",
+    slug: "max-chunks-to-make-sorted",
+    category,
+    tags: [arrayTag],
+    title: text("Max Chunks To Make Sorted"),
+    titleVi: text("Số chunk tối đa để sort", "Max chunks to make sorted"),
+    statement: text("Chia permutation thành nhiều chunk nhất để sort từng chunk rồi ghép lại thành sorted.", "Split a permutation into the maximum number of chunks that sort independently into the sorted array."),
+    defaultInput: "1,0,2,3,4",
+    inputKind: "string",
+    inputLabel: text("arr (permutation, cách bởi ,)", "arr (permutation, comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Vì arr là permutation 0..n-1, prefix [0..i] tách được khi max(prefix) == i.", "Because arr is a permutation of 0..n-1, prefix [0..i] can be cut when max(prefix) == i."),
+      text("Mỗi lần maxSoFar == i, sort chunk hiện tại sẽ đặt đúng các số 0..i.", "Whenever maxSoFar == i, sorting the current chunk places exactly values 0..i."),
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: text("Một lượt quét, chỉ giữ maxSoFar và chunks.", "Single scan, keeping only maxSoFar and chunks.") },
+    code: [
+      "class Solution:",
+      "    def maxChunksToSorted(self, arr):",
+      "        max_so_far = -1",
+      "        chunks = 0",
+      "        for i, value in enumerate(arr):",
+      "            max_so_far = max(max_so_far, value)",
+      "            if max_so_far == i:",
+      "                chunks += 1",
+      "        return chunks",
+    ],
+    liveArgs: (input) => [parseNums(input, "arr")],
+    builder: buildSteps769,
+  },
   853: simpleProblem({ id: 853, difficulty: "medium", slug: "car-fleet", name: "Car Fleet", viName: "Đoàn xe", statement: text("Đếm số đoàn xe tới target.", "Count how many car fleets reach the target."), defaultInput: "10,2;8,4;0,1;5,1;3,3", inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"), extraParams: [{ key: "target", label: text("target", "target"), default: 12, min: 1 }], solver: (input, params) => { const cars = parsePairs(input); const answer = carFleet(input, params); return { original: cars.flat(), answer, steps: genericSteps({ nums: cars.map((p) => p[0]), title: text("Đếm fleet", "Count fleets"), answer, note: text("Duyệt xe từ gần target về xa; stack thời gian đến giữ các fleet chậm nhất.", "Scan cars from nearest to farthest; arrival times form the fleet stack.") }) }; } }),
-  901: simpleProblem({ id: 901, difficulty: "medium", slug: "online-stock-span", name: "Online Stock Span", viName: "Stock span online", statement: text("Mỗi giá mới trả về số ngày liên tiếp gần nhất có giá <= hôm nay.", "For each new price, return consecutive previous days with price <= today."), defaultInput: "100,80,60,70,60,75,85", inputLabel: text("prices", "prices"), solver: stockSpan }),
+  901: {
+    id: 901,
+    difficulty: "medium",
+    slug: "online-stock-span",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Online Stock Span"),
+    titleVi: text("Stock span online", "Online stock span"),
+    statement: text("Mỗi giá mới trả về số ngày liên tiếp gần nhất có giá <= hôm nay.", "For each new price, return consecutive previous days with price <= today."),
+    defaultInput: "100,80,60,70,60,75,85",
+    inputKind: "string",
+    inputLabel: text("prices", "prices"),
+    extraParams: [],
+    approach: [
+      text("Stack giảm dần theo giá, lưu [price, day].", "Keep a decreasing stack of [price, day]."),
+      text("Pop mọi ngày có price <= hôm nay vì chúng nằm trong span hôm nay.", "Pop every day whose price <= today's price because it belongs to today's span."),
+      text("Sau khi pop, span là khoảng cách tới ngày có giá cao hơn gần nhất, hoặc i+1 nếu không có.", "After popping, span is the distance to the nearest higher price day, or i+1 if none exists."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi price được push/pop nhiều nhất một lần.", "Each price is pushed/popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def stockSpans(self, prices):",
+      "        stack = []",
+      "        answer = []",
+      "        for i, price in enumerate(prices):",
+      "            while stack and stack[-1][0] <= price:",
+      "                stack.pop()",
+      "            span = i - stack[-1][1] if stack else i + 1",
+      "            answer.append(span)",
+      "            stack.append([price, i])",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "prices")],
+    builder: buildSteps901,
+  },
   907: simpleProblem({ id: 907, difficulty: "medium", slug: "sum-of-subarray-minimums", name: "Sum of Subarray Minimums", viName: "Tổng minimum của mọi subarray", statement: text("Tính tổng min của mọi subarray.", "Return the sum of every subarray's minimum."), defaultInput: "3,1,2,4", solver: arrayBuilder(sumSubarrayMins) }),
-  962: simpleProblem({ id: 962, difficulty: "medium", slug: "maximum-width-ramp", name: "Maximum Width Ramp", viName: "Ramp rộng nhất", statement: text("Tìm max j-i sao cho i<j và nums[i] <= nums[j].", "Find max j-i with i<j and nums[i] <= nums[j]."), defaultInput: "6,0,8,2,1,5", solver: arrayBuilder(maxWidthRamp) }),
+  962: {
+    id: 962,
+    difficulty: "medium",
+    slug: "maximum-width-ramp",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Maximum Width Ramp"),
+    titleVi: text("Ramp rộng nhất", "Maximum width ramp"),
+    statement: text("Tìm max j-i sao cho i<j và nums[i] <= nums[j].", "Find max j-i with i<j and nums[i] <= nums[j]."),
+    defaultInput: "6,0,8,2,1,5",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Lượt trái: stack lưu candidate left indices có value giảm dần.", "Left pass: stack stores candidate left indices with decreasing values."),
+      text("Lượt phải: quét j từ phải sang trái; nếu nums[left] <= nums[j], cập nhật width.", "Right pass: scan j from right to left; if nums[left] <= nums[j], update width."),
+      text("Khi left đã gặp j xa nhất của nó, pop left khỏi stack.", "Once a left index meets its farthest possible j, pop it from the stack."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi index được push/pop nhiều nhất một lần.", "Each index is pushed/popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def maxWidthRamp(self, nums):",
+      "        stack = []",
+      "        answer = 0",
+      "        for i, value in enumerate(nums):",
+      "            if not stack or value < nums[stack[-1]]:",
+      "                stack.append(i)",
+      "        for j in range(len(nums) - 1, -1, -1):",
+      "            while stack and nums[stack[-1]] <= nums[j]:",
+      "                answer = max(answer, j - stack[-1])",
+      "                stack.pop()",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps962,
+  },
   1008: simpleProblem({ id: 1008, difficulty: "medium", slug: "construct-binary-search-tree-from-preorder-traversal", name: "Construct BST from Preorder Traversal", viName: "Dựng BST từ preorder", statement: text("Dựng BST từ preorder traversal.", "Construct a BST from preorder traversal."), defaultInput: "8,5,1,7,10,12", tags: [arrayTag, treeTag, monoTag], solver: arrayBuilder(bstPreorder) }),
   1019: {
     id: 1019,
@@ -2045,11 +3253,80 @@ module.exports = {
     liveArgs: (input) => [{ __viz_type: "linked_list", values: parseNums(input, "head") }],
     builder: buildSteps1019,
   },
-  1124: simpleProblem({ id: 1124, difficulty: "medium", slug: "longest-well-performing-interval", name: "Longest Well-Performing Interval", viName: "Khoảng làm việc tốt dài nhất", statement: text("Ngày mệt là hours > 8; tìm interval dài nhất có ngày mệt nhiều hơn ngày không mệt.", "A tiring day has hours > 8; find the longest interval with more tiring than non-tiring days."), defaultInput: "9,9,6,0,6,6,9", inputLabel: text("hours", "hours"), solver: arrayBuilder(longestWPI) }),
+  1124: {
+    id: 1124,
+    difficulty: "medium",
+    slug: "longest-well-performing-interval",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Longest Well-Performing Interval"),
+    titleVi: text("Khoảng làm việc tốt dài nhất", "Longest well-performing interval"),
+    statement: text("Ngày mệt là hours > 8; tìm interval dài nhất có ngày mệt nhiều hơn ngày không mệt.", "A tiring day has hours > 8; find the longest interval with more tiring than non-tiring days."),
+    defaultInput: "9,9,6,0,6,6,9",
+    inputKind: "string",
+    inputLabel: text("hours", "hours"),
+    extraParams: [],
+    approach: [
+      text("Đổi mỗi ngày thành +1 nếu hours>8, ngược lại -1; interval tốt khi tổng > 0.", "Convert each day to +1 if hours>8, otherwise -1; an interval is good when its sum > 0."),
+      text("Dùng prefix; cần prefix[j] > prefix[i] để đoạn i..j-1 tốt.", "Use prefix sums; need prefix[j] > prefix[i] for interval i..j-1 to be good."),
+      text("Stack lưu prefix minima giảm dần, rồi quét j từ phải để lấy width lớn nhất.", "The stack stores decreasing prefix minima, then scan j from the right to get the widest interval."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi prefix index được push/pop nhiều nhất một lần.", "Each prefix index is pushed/popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def longestWPI(self, hours):",
+      "        prefix = [0]",
+      "        for h in hours:",
+      "            prefix.append(prefix[-1] + (1 if h > 8 else -1))",
+      "        stack = []",
+      "        for i, score in enumerate(prefix):",
+      "            if not stack or score < prefix[stack[-1]]:",
+      "                stack.append(i)",
+      "        answer = 0",
+      "        for j in range(len(prefix) - 1, -1, -1):",
+      "            while stack and prefix[j] > prefix[stack[-1]]:",
+      "                answer = max(answer, j - stack.pop())",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "hours")],
+    builder: buildSteps1124,
+  },
   1130: simpleProblem({ id: 1130, difficulty: "medium", slug: "minimum-cost-tree-from-leaf-values", name: "Minimum Cost Tree From Leaf Values", viName: "Cây chi phí nhỏ nhất từ leaf", statement: text("Ghép leaf để tổng non-leaf value nhỏ nhất.", "Combine leaves so the sum of non-leaf values is minimized."), defaultInput: "6,2,4", solver: arrayBuilder(mctFromLeafValues) }),
   1504: simpleProblem({ id: 1504, difficulty: "medium", slug: "count-submatrices-with-all-ones", name: "Count Submatrices With All Ones", viName: "Đếm submatrix toàn 1", statement: text("Đếm mọi submatrix chỉ chứa số 1.", "Count all submatrices containing only ones."), defaultInput: "1,0,1;1,1,0;1,1,0", inputLabel: text("mat (hàng cách ;)", "mat (rows separated by ;)"), solver: countSubmatrices }),
   1574: simpleProblem({ id: 1574, difficulty: "medium", slug: "shortest-subarray-to-be-removed-to-make-array-sorted", name: "Shortest Subarray to be Removed to Make Array Sorted", viName: "Xóa subarray ngắn nhất để mảng sorted", statement: text("Xóa một đoạn liên tục ngắn nhất để phần còn lại không giảm.", "Remove the shortest continuous segment so the remaining array is nondecreasing."), defaultInput: "1,2,3,10,4,2,3,5", solver: arrayBuilder(findLengthOfShortestSubarray) }),
-  1673: simpleProblem({ id: 1673, difficulty: "medium", slug: "find-the-most-competitive-subsequence", name: "Find the Most Competitive Subsequence", viName: "Subsequence cạnh tranh nhất", statement: text("Tìm subsequence độ dài k nhỏ nhất theo thứ tự từ điển.", "Find the lexicographically smallest subsequence of length k."), defaultInput: "3,5,2,6", extraParams: [{ key: "k", label: text("k", "k"), default: 2, min: 1 }], solver: arrayBuilder(mostCompetitive) }),
+  1673: {
+    id: 1673,
+    difficulty: "medium",
+    slug: "find-the-most-competitive-subsequence",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Find the Most Competitive Subsequence"),
+    titleVi: text("Subsequence cạnh tranh nhất", "Most competitive subsequence"),
+    statement: text("Tìm subsequence độ dài k nhỏ nhất theo thứ tự từ điển.", "Find the lexicographically smallest subsequence of length k."),
+    defaultInput: "3,5,2,6",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [{ key: "k", label: text("k", "k"), default: 2, min: 1 }],
+    approach: [
+      text("drop = n-k là số phần tử được phép bỏ.", "drop = n-k is the number of elements we may remove."),
+      text("Khi num nhỏ hơn top và còn drop, pop top để num đứng sớm hơn.", "When num is smaller than the top and drop remains, pop the top so num appears earlier."),
+      text("Cuối cùng lấy k phần tử đầu của stack.", "Take the first k stack values at the end."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi phần tử được push và pop nhiều nhất một lần.", "Each value is pushed and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def mostCompetitive(self, nums, k):",
+      "        drop = len(nums) - k",
+      "        stack = []",
+      "        for num in nums:",
+      "            while drop and stack and stack[-1] > num:",
+      "                stack.pop(); drop -= 1",
+      "            stack.append(num)",
+      "        return stack[:k]",
+    ],
+    liveArgs: (input, params) => [parseNums(input, "nums"), Number(params.k)],
+    builder: buildSteps1673,
+  },
   1856: simpleProblem({ id: 1856, difficulty: "medium", slug: "maximum-subarray-min-product", name: "Maximum Subarray Min-Product", viName: "Min-product lớn nhất", statement: text("Tối đa hóa min(subarray) * sum(subarray).", "Maximize min(subarray) * sum(subarray)."), defaultInput: "1,2,3,2", solver: arrayBuilder(maxSumMinProduct) }),
   2104: simpleProblem({ id: 2104, difficulty: "medium", slug: "sum-of-subarray-ranges", name: "Sum of Subarray Ranges", viName: "Tổng range của mọi subarray", statement: text("Tổng (max-min) của mọi subarray.", "Sum max-min over every subarray."), defaultInput: "1,2,3", solver: arrayBuilder(subArrayRanges) }),
   2289: {
@@ -2136,7 +3413,39 @@ module.exports = {
   },
   2865: simpleProblem({ id: 2865, difficulty: "medium", slug: "beautiful-towers-i", name: "Beautiful Towers I", viName: "Beautiful Towers I", statement: text("Chọn peak và giảm độ cao hai phía để tổng height lớn nhất.", "Choose a peak and lower both sides to maximize total height."), defaultInput: "5,3,4,1,1", solver: arrayBuilder(beautifulTowers) }),
   2866: simpleProblem({ id: 2866, difficulty: "medium", slug: "beautiful-towers-ii", name: "Beautiful Towers II", viName: "Beautiful Towers II", statement: text("Phiên bản lớn của Beautiful Towers dùng stack/prefix sum.", "Larger Beautiful Towers variant using stack/prefix sums."), defaultInput: "6,5,3,9,2,7", solver: arrayBuilder(beautifulTowers) }),
-  768: simpleProblem({ id: 768, difficulty: "hard", slug: "max-chunks-to-make-sorted-ii", name: "Max Chunks To Make Sorted II", viName: "Số chunk tối đa để sort II", statement: text("Chia mảng có duplicate thành nhiều chunk nhất để sort từng chunk rồi ghép lại sorted.", "Split an array with duplicates into the maximum number of chunks that sort independently."), defaultInput: "5,4,3,2,1", solver: arrayBuilder(maxChunksII) }),
+  768: {
+    id: 768,
+    difficulty: "hard",
+    slug: "max-chunks-to-make-sorted-ii",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Max Chunks To Make Sorted II"),
+    titleVi: text("Số chunk tối đa để sort II", "Max chunks to make sorted II"),
+    statement: text("Chia mảng có duplicate thành nhiều chunk nhất để sort từng chunk rồi ghép lại sorted.", "Split an array with duplicates into the maximum number of chunks that sort independently."),
+    defaultInput: "5,4,3,2,1",
+    inputKind: "string",
+    inputLabel: text("arr (cách bởi ,)", "arr (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Stack lưu max của từng chunk hiện có.", "The stack stores the maximum value of each current chunk."),
+      text("Nếu chunk trước có max > current, current không thể đứng ở chunk riêng; phải merge.", "If the previous chunk max > current, current cannot be a separate chunk; merge chunks."),
+      text("Số item còn trong stack là số chunk tối đa.", "The number of items left in the stack is the maximum chunk count."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi chunk max được push/pop nhiều nhất một lần.", "Each chunk max is pushed/popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def maxChunksToSorted(self, arr):",
+      "        stack = []",
+      "        for value in arr:",
+      "            mx = value",
+      "            while stack and stack[-1] > value:",
+      "                mx = max(mx, stack.pop())",
+      "            stack.append(mx)",
+      "        return len(stack)",
+    ],
+    liveArgs: (input) => [parseNums(input, "arr")],
+    builder: buildSteps768,
+  },
   975: simpleProblem({ id: 975, difficulty: "hard", slug: "odd-even-jump", name: "Odd Even Jump", viName: "Nhảy chẵn lẻ", statement: text("Đếm start index có thể tới cuối bằng luật nhảy odd/even.", "Count starting indices that can reach the end using odd/even jump rules."), defaultInput: "10,13,12,14,15", solver: arrayBuilder(oddEvenJump) }),
   1526: simpleProblem({ id: 1526, difficulty: "hard", slug: "minimum-number-of-increments-on-subarrays-to-form-a-target-array", name: "Minimum Number of Increments on Subarrays to Form a Target Array", viName: "Số increment subarray ít nhất", statement: text("Tạo target từ zero array bằng increment subarray ít nhất.", "Form target from a zero array using the fewest subarray increments."), defaultInput: "1,2,3,2,1", solver: arrayBuilder(minIncrementsTarget) }),
   1776: simpleProblem({ id: 1776, difficulty: "hard", slug: "car-fleet-ii", name: "Car Fleet II", viName: "Đoàn xe II", statement: text("Với mỗi xe, tính thời điểm va chạm với xe phía trước.", "For each car, compute when it collides with a car ahead."), defaultInput: "1,2;2,1;4,3;7,2", inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"), solver: (input) => { const cars = parsePairs(input); const answer = carFleetII(input); return { original: cars.flat(), answer, steps: genericSteps({ nums: cars.map((p) => p[0]), title: text("Collision times", "Collision times"), answer, note: text("Stack giữ xe phía trước còn có thể là va chạm đầu tiên.", "The stack keeps front cars that can still be the first collision.") }) }; } }),
@@ -2248,7 +3557,55 @@ module.exports = {
     liveArgs: (input, params) => [parseNums(input, "nums1"), parseNums(params.nums2, "nums2"), Number(params.k)],
     builder: buildSteps321,
   },
-  2030: simpleProblem({ id: 2030, difficulty: "hard", slug: "smallest-k-length-subsequence-with-occurrences-of-a-letter", name: "Smallest K-Length Subsequence With Occurrences of a Letter", viName: "Subsequence độ dài k nhỏ nhất có đủ ký tự", statement: text("Tìm subsequence nhỏ nhất độ dài k chứa letter ít nhất repetition lần.", "Find the smallest subsequence of length k containing letter at least repetition times."), defaultInput: "leet", inputKind: "string", inputLabel: text("s", "s"), tags: [stringTag, monoTag], extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 1 }, { key: "letter", type: "string", label: text("letter", "letter"), default: "e" }, { key: "repetition", label: text("repetition", "repetition"), default: 1, min: 1 }], solver: (input, params) => { const answer = smallestSubsequenceWithLetter(input, params); return { original: String(input ?? ""), answer, steps: genericSteps({ nums: [...String(input ?? "")].map((_, i) => i), title: text(`answer = ${answer}`, `answer = ${answer}`), answer, note: text("Stack tham lam, nhưng luôn giữ đủ chỗ và đủ số lần của letter.", "A greedy stack while reserving enough slots and occurrences for letter.") }) }; } }),
+  2030: {
+    id: 2030,
+    difficulty: "hard",
+    slug: "smallest-k-length-subsequence-with-occurrences-of-a-letter",
+    category,
+    tags: [stringTag, monoTag],
+    title: text("Smallest K-Length Subsequence With Occurrences of a Letter"),
+    titleVi: text("Subsequence độ dài k nhỏ nhất có đủ ký tự", "Smallest k-length subsequence with required letters"),
+    statement: text(
+      "Tìm subsequence nhỏ nhất theo thứ tự từ điển, có độ dài k và chứa letter ít nhất repetition lần.",
+      "Find the lexicographically smallest subsequence of length k that contains letter at least repetition times.",
+    ),
+    defaultInput: "leet",
+    inputKind: "string",
+    inputLabel: text("s", "s"),
+    extraParams: [
+      { key: "k", label: text("k", "k"), default: 3, min: 1 },
+      { key: "letter", type: "string", label: text("letter", "letter"), default: "e" },
+      { key: "repetition", label: text("repetition", "repetition"), default: 1, min: 1 },
+    ],
+    approach: [
+      text("Stack tăng để kết quả nhỏ theo từ điển.", "Use an increasing stack to make the result lexicographically small."),
+      text("Chỉ pop khi vẫn đủ ký tự để đạt length k và vẫn đủ letter bắt buộc.", "Pop only when enough characters remain to reach length k and enough required letters remain."),
+      text("Khi không còn dư slot, skip ký tự thường để dành chỗ cho letter.", "When no spare slot remains, skip non-required characters to reserve space for letter."),
+    ],
+    complexity: { time: "O(n)", space: "O(k)", note: text("Mỗi ký tự được push/pop nhiều nhất một lần.", "Each character is pushed/popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def smallestSubsequence(self, s, k, letter, repetition):",
+      "        remain = s.count(letter)",
+      "        need = repetition",
+      "        stack = []",
+      "        for i, ch in enumerate(s):",
+      "            while stack and stack[-1] > ch and len(stack)-1 + len(s)-i >= k and (stack[-1] != letter or remain > need):",
+      "                removed = stack.pop()",
+      "                if removed == letter: need += 1",
+      "            if len(stack) < k:",
+      "                if ch == letter:",
+      "                    stack.append(ch)",
+      "                    need -= 1",
+      "                elif k - len(stack) > need:",
+      "                    stack.append(ch)",
+      "            if ch == letter:",
+      "                remain -= 1",
+      "        return ''.join(stack)",
+    ],
+    liveArgs: (input, params) => [String(input ?? ""), Number(params.k), String(params.letter ?? "e")[0] || "e", Number(params.repetition)],
+    builder: buildSteps2030,
+  },
   2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),
   2736: simpleProblem({ id: 2736, difficulty: "hard", slug: "maximum-sum-queries", name: "Maximum Sum Queries", viName: "Query tổng lớn nhất", statement: text("Với mỗi query [x,y], tìm max nums1[i]+nums2[i] khi nums1[i]>=x và nums2[i]>=y.", "For each query [x,y], maximize nums1[i]+nums2[i] with nums1[i]>=x and nums2[i]>=y."), defaultInput: "4,3,1,2", inputLabel: text("nums1", "nums1"), extraParams: [{ key: "nums2", type: "string", label: text("nums2", "nums2"), default: "2,4,9,5" }, { key: "queries", type: "string", label: text("queries (x,y; ...)", "queries (x,y; ...)"), default: "4,1;1,3;2,5" }], solver: maximumSumQueries }),
