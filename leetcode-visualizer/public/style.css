@@ -14052,6 +14052,31 @@ button:disabled {
   .viz-split.problem-2101-layout .viz-left { flex-basis: 36%; }
 }
 
+/* #2058 has a long linked-list trace. Keep code and visualization as separate
+   rows so the list can use the full panel width. */
+@media (min-width: 769px) {
+  .viz-split.problem-2058-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .viz-split.problem-2058-layout .viz-left,
+  .viz-split.problem-2058-layout .viz-right {
+    flex: none;
+    width: 100%;
+  }
+
+  .viz-split.problem-2058-layout .code-panel {
+    position: relative;
+    max-height: 360px;
+  }
+
+  .viz-split.problem-2058-layout .tree-view {
+    min-height: 180px;
+    overflow-x: auto;
+  }
+}
+
 /* LeetCode 173, 211, 212, 642 and 648: grow the code pane with taller tree/trie debug views. */
 @media (min-width: 769px) {
   .viz-split.problem-173-layout,

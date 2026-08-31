@@ -2147,6 +2147,7 @@ function renderCode() {
     split.classList.toggle("problem-211-layout", problemId === 211);
     split.classList.toggle("problem-212-layout", problemId === 212);
     split.classList.toggle("problem-685-layout", problemId === 685);
+    split.classList.toggle("problem-2058-layout", problemId === 2058);
     split.classList.toggle("problem-2101-layout", problemId === 2101);
   }
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);

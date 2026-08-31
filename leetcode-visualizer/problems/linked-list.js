@@ -3783,7 +3783,10 @@ function buildSteps2058(input) {
   const n = values.length;
   const codeLines = {
     guard: [3, 4],
-    init: [5, 6, 7, 8, 9],
+    initCritical: [5],
+    initDistance: [6, 7],
+    initIndex: [8],
+    bindNodes: [9],
     window: [10],
     peak: [11],
     valley: [12],
@@ -3872,17 +3875,63 @@ function buildSteps2058(input) {
   }
 
   snap({
-    title: { vi: "Ý tưởng: trượt cửa sổ 3 node", en: "Idea: slide a 3-node window" },
-    highlight: [0, 1, 2],
-    centerIdx: 1,
-    codeLines: codeLines.init,
+    title: { vi: "Dòng 5: chưa có critical point nào", en: "Line 5: no critical point yet" },
+    highlight: [],
+    centerIdx: null,
+    codeLines: codeLines.initCritical,
     vars: [
-      { name: "prev, curr, next", value: `${values[0]}, ${values[1]}, ${values[2]}` },
-      { name: "rule", value: "peak OR valley" },
+      { name: "first", value: "None" },
+      { name: "prev_critical", value: "None" },
     ],
     note: {
-      vi: "Mỗi lần chỉ xét node giữa curr. curr là critical nếu nó là đỉnh: prev < curr > next, hoặc là đáy: prev > curr < next.",
-      en: "A node is critical if it is a local peak or a local valley. Head and tail are skipped because each lacks one neighbor.",
+      vi: "Ở dòng này ta chỉ chuẩn bị biến để nhớ critical point đầu tiên và critical point gần nhất. Chưa gắn con trỏ vào node nào, nên linked list chỉ hiện head/tail.",
+      en: "This line only prepares variables for the first and latest critical points. No scanning pointers are assigned yet.",
+    },
+  });
+
+  snap({
+    title: { vi: "Dòng 6-7: chuẩn bị min/max distance", en: "Lines 6-7: prepare min/max distance" },
+    highlight: [],
+    centerIdx: null,
+    codeLines: codeLines.initDistance,
+    vars: [
+      { name: "min_dist", value: "∞" },
+      { name: "max_dist", value: -1 },
+    ],
+    note: {
+      vi: "min_dist bắt đầu là vô cực để lần gặp cặp critical đầu tiên có thể lấy min. max_dist bắt đầu là -1 vì chưa có đủ hai critical point.",
+      en: "min_dist starts at infinity so the first valid pair can replace it. max_dist starts at -1 because no pair exists yet.",
+    },
+  });
+
+  snap({
+    title: { vi: "Dòng 8: idx bắt đầu từ 1", en: "Line 8: idx starts at 1" },
+    highlight: [1],
+    centerIdx: null,
+    codeLines: codeLines.initIndex,
+    vars: [
+      { name: "idx", value: 1 },
+      { name: "why index 1?", value: "head index 0 cannot be critical" },
+    ],
+    note: {
+      vi: "Critical point không thể là head, nên node đầu tiên có thể xét là index 1. Lúc này mới chỉ biết chỉ số, chưa gán prev/curr trong code.",
+      en: "The head cannot be critical, so the first eligible index is 1. The code still has not bound prev/curr yet.",
+    },
+  });
+
+  snap({
+    title: { vi: "Dòng 9: gắn prev_node và curr vào list", en: "Line 9: bind prev_node and curr" },
+    highlight: [0, 1, 2],
+    centerIdx: 1,
+    codeLines: codeLines.bindNodes,
+    vars: [
+      { name: "prev_node", value: `head → ${values[0]}` },
+      { name: "curr", value: `head.next → ${values[1]}` },
+      { name: "curr.next", value: values[2] },
+    ],
+    note: {
+      vi: "Từ dòng này con trỏ mới thật sự được gắn vào node: prev_node ở head, curr ở node kế tiếp, và curr.next là hàng xóm bên phải để kiểm tra peak/valley.",
+      en: "Only now are the pointers bound to nodes: prev_node is head, curr is the next node, and curr.next is the right neighbor.",
     },
   });
 
