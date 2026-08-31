@@ -7373,9 +7373,11 @@ function renderLinkedList(step) {
   svg += `<rect x="${nullX}" y="${nodeY + 4}" width="36" height="${boxH - 8}" rx="4" fill="none" stroke="${arrowColor}" stroke-dasharray="4 2" />`;
   svg += `<text x="${nullX+18}" y="${nodeY+boxH/2}" dy="0.35em" text-anchor="middle" font-size="11" fill="${subColor}">null</text>`;
 
+  const hasCustomLabels = nodes.some((node) => typeof node.label === "string" && node.label.length > 0);
+
   // Random arrows (curved below)
   for (let i = 0; i < n; i++) {
-    const rIdx = nodes[i].randomIdx;
+    const rIdx = Number.isInteger(nodes[i].randomIdx) ? nodes[i].randomIdx : -1;
     if (rIdx < 0) continue; // null random
     const fromX = nodeX(i) + boxW / 2;
     const fromY = nodeY + boxH;
@@ -7398,13 +7400,17 @@ function renderLinkedList(step) {
     svg += `<line x1="${x}" y1="${y + boxH/2}" x2="${x + boxW}" y2="${y + boxH/2}" stroke="${stroke}" stroke-width="0.5" opacity="0.5" />`;
     // Value (top half — centered, large)
     svg += `<text x="${x + boxW/2}" y="${y + boxH/4}" dy="0.35em" text-anchor="middle" font-size="14" font-weight="700" fill="${textColor}">${nodes[i].val}</text>`;
-    // "random → target" label (bottom half)
-    const rTarget = nodes[i].randomIdx >= 0 ? nodes[nodes[i].randomIdx].val : "∅";
-    svg += `<text x="${x + 8}" y="${y + 3*boxH/4}" dy="0.35em" font-size="10" fill="${randomColor}">rand→${rTarget}</text>`;
+    // Bottom label: custom pointer/role label when provided; otherwise random pointer text.
+    const bottomLabel = hasCustomLabels
+      ? (nodes[i].label || "")
+      : `rand→${nodes[i].randomIdx >= 0 ? nodes[nodes[i].randomIdx].val : "∅"}`;
+    svg += `<text x="${x + boxW/2}" y="${y + 3*boxH/4}" dy="0.35em" text-anchor="middle" font-size="10" font-weight="700" fill="${hasCustomLabels ? subColor : randomColor}">${escapeHtml(bottomLabel)}</text>`;
     // Small dot at right edge top (next pointer origin)
     svg += `<circle cx="${x + boxW - 8}" cy="${y + boxH/4}" r="4" fill="${arrowColor}" opacity="0.5" />`;
     // Small dot at bottom center (random pointer origin)
-    svg += `<circle cx="${x + boxW/2}" cy="${y + boxH}" r="3" fill="${randomColor}" opacity="0.6" />`;
+    if (!hasCustomLabels) {
+      svg += `<circle cx="${x + boxW/2}" cy="${y + boxH}" r="3" fill="${randomColor}" opacity="0.6" />`;
+    }
   }
 
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
