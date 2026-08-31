@@ -8238,13 +8238,26 @@ function buildSteps496(input, params = {}) {
   const nextGreater = new Map();
   const stack = [];
   const steps = [];
-  const answer = Array(nums1.length).fill("?");
+  const result = [];
   const nums2Sub = () => nums2.map((value, index) => `nums2[${index}] = ${value}`);
-  const nums1Sub = () => nums1.map((value, index) => `nums1[${index}] = ${value} · ans=${answer[index]}`);
+  const nums1Sub = () => nums1.map((value, index) => `nums1[${index}] = ${value} · result=${result[index] ?? "?"}`);
   const mappingText = () => [...nextGreater.entries()].map(([from, to]) => `${from}->${to}`).join(", ") || "empty";
-  const stackText = () => `[${stack.map((item) => `${item.value}@${item.index}`).join(", ")}]`;
+  const stackText = () => `[${stack.map((item) => `${item.value}@nums2[${item.index}]`).join(", ")}]`;
+  const resultText = () => `[${nums1.map((_, index) => result[index] ?? "?").join(", ")}]`;
   const stackItems = () => stack.map((item) => ({ value: item.value, detail: `nums2[${item.index}]` }));
-  const snap = ({ title, codeLines, note, phase = "scan", index = -1, value = "", compareIndex = -1, resolved = null, lookupIndex = -1, final = false }) => {
+  const snap = ({
+    title,
+    codeLines,
+    note,
+    phase = "build map",
+    index = -1,
+    value = "",
+    compareIndex = -1,
+    resolved = null,
+    lookupIndex = -1,
+    lookupValue = "",
+    final = false,
+  }) => {
     const readingNums1 = phase === "lookup" || phase === "answer";
     const arr = readingNums1 ? nums1 : nums2;
     const highlight = [];
@@ -8257,13 +8270,14 @@ function buildSteps496(input, params = {}) {
       arr: [...arr],
       sub: readingNums1 ? nums1Sub() : nums2Sub(),
       highlight,
-      mark: resolved ? [resolved.index] : final ? answer.map((item, i) => item !== -1 ? i : -1).filter((i) => i >= 0) : stack.map((item) => item.index),
+      mark: resolved ? [resolved.index] : final ? result.map((item, i) => item !== -1 ? i : -1).filter((i) => i >= 0) : stack.map((item) => item.index),
       codeLines,
       vars: [
         { name: "phase", value: phase },
         { name: "stack", value: stackText() },
         { name: "next_greater", value: `{${mappingText()}}` },
-        { name: "answer", value: `[${answer.join(", ")}]` },
+        { name: "result", value: resultText() },
+        ...(lookupValue !== "" ? [{ name: "current nums1 value", value: lookupValue }] : []),
       ],
       note,
       final: Boolean(final),
@@ -8279,116 +8293,178 @@ function buildSteps496(input, params = {}) {
           { label: "current nums2 value", value: value || "-" },
           { label: "stack top", value: top ? `${top.value}@${top.index}` : "empty" },
           { label: "resolved map", value: mappingText() },
-          { label: "nums1 answer", value: `[${answer.join(", ")}]` },
+          { label: "nums1 result", value: resultText() },
         ],
       },
     });
   };
 
   snap({
-    title: { vi: "Mục tiêu: tạo map từ nums2 trước", en: "Goal: build a map from nums2 first" },
-    codeLines: [3, 4],
+    title: { vi: "Dòng 3: tạo map rỗng", en: "Line 3: create an empty map" },
+    codeLines: [3],
     note: {
-      vi: "nums1 là subset của nums2. Ta xử lý nums2 một lần để biết mỗi giá trị trỏ tới next greater nào.",
-      en: "nums1 is a subset of nums2. Process nums2 once to know each value's next greater value.",
+      vi: "`next_greater[x]` sẽ lưu phần tử lớn hơn đầu tiên nằm bên phải x trong nums2. Ban đầu chưa biết gì nên map rỗng.",
+      en: "`next_greater[x]` will store the first greater value to the right of x in nums2. Initially nothing is known.",
     },
   });
   snap({
-    title: { vi: "Stack giảm dần: giá trị nào còn chờ?", en: "Decreasing stack: which values are still waiting?" },
+    title: { vi: "Dòng 4: tạo stack rỗng", en: "Line 4: create an empty stack" },
     codeLines: [4],
     note: {
-      vi: "Nếu giá trị mới lớn hơn đỉnh stack, nó giải quyết đỉnh stack. Nếu không, giá trị mới cũng phải chờ.",
-      en: "If a new value is greater than the stack top, it resolves that top. Otherwise, the new value must wait too.",
+      vi: "Stack giữ các giá trị trong nums2 chưa tìm được next greater. Stack giảm dần để khi gặp số lớn hơn, ta giải quyết từ đỉnh xuống.",
+      en: "The stack stores nums2 values still waiting for a next greater value. It stays decreasing so a larger incoming value resolves items from the top downward.",
     },
   });
   nums2.forEach((value, index) => {
     snap({
-      title: { vi: `Đọc nums2[${index}] = ${value}`, en: `Read nums2[${index}] = ${value}` },
+      title: { vi: `Dòng 5: lấy num = nums2[${index}] = ${value}`, en: `Line 5: read num = nums2[${index}] = ${value}` },
       codeLines: [5],
       index,
       value,
       note: {
-        vi: `${value} nhìn sang stack: mọi giá trị nhỏ hơn nó ở đỉnh stack sẽ nhận ${value} làm next greater.`,
-        en: `${value} looks at the stack: every smaller value on top receives ${value} as its next greater.`,
+        vi: `Bắt đầu một vòng lặp mới trong nums2. num hiện tại là ${value}; nó có thể là next greater cho vài số đứng trước nó.`,
+        en: `Start a new nums2 loop iteration. The current num is ${value}; it may be the next greater value for earlier numbers.`,
       },
     });
     while (stack.length && value > stack.at(-1).value) {
       const top = stack.at(-1);
       snap({
-        title: { vi: `${value} > ${top.value}: tìm thấy next greater`, en: `${value} > ${top.value}: next greater found` },
+        title: { vi: `Dòng 6: ${value} > stack[-1] (${top.value})`, en: `Line 6: ${value} > stack[-1] (${top.value})` },
         codeLines: [6],
         index,
         value,
         compareIndex: top.index,
         note: {
-          vi: `Vì ${value} là phần tử đầu tiên bên phải lớn hơn ${top.value}, ta có thể giải quyết ${top.value}.`,
-          en: `Because ${value} is the first greater value to the right of ${top.value}, ${top.value} is resolved.`,
+          vi: `Điều kiện while đúng. Vì ${top.value} nằm bên trái ${value}, và chưa có số nào trước đó giải quyết nó, ${value} chính là next greater đầu tiên của ${top.value}.`,
+          en: `The while condition is true. Since ${top.value} is left of ${value} and has not been resolved earlier, ${value} is the first greater value for ${top.value}.`,
         },
       });
       const resolved = stack.pop();
-      nextGreater.set(resolved.value, value);
       snap({
-        title: { vi: `map[${resolved.value}] = ${value}`, en: `map[${resolved.value}] = ${value}` },
+        title: { vi: `Dòng 7: pop ${resolved.value} khỏi stack`, en: `Line 7: pop ${resolved.value} from the stack` },
         codeLines: [7],
         index,
         value,
         resolved,
         note: {
-          vi: `Pop ${resolved.value}@${resolved.index} khỏi stack và lưu mapping ${resolved.value} -> ${value}.`,
-          en: `Pop ${resolved.value}@${resolved.index} from the stack and store mapping ${resolved.value} -> ${value}.`,
+          vi: `Ta lấy ${resolved.value} ra khỏi stack vì đã tìm được đáp án cho nó. Sau pop, stack còn ${stackText()}.`,
+          en: `Remove ${resolved.value} from the stack because its answer is now known. After popping, the stack is ${stackText()}.`,
+        },
+      });
+      nextGreater.set(resolved.value, value);
+      snap({
+        title: { vi: `Dòng 8: next_greater[${resolved.value}] = ${value}`, en: `Line 8: next_greater[${resolved.value}] = ${value}` },
+        codeLines: [8],
+        index,
+        value,
+        resolved,
+        note: {
+          vi: `Ghi vào map: khi nums1 hỏi về ${resolved.value}, ta trả ${value}.`,
+          en: `Store the map entry: when nums1 asks about ${resolved.value}, return ${value}.`,
         },
       });
     }
+    const topAfterPops = stack.at(-1);
+    snap({
+      title: {
+        vi: topAfterPops ? `Dòng 6: dừng while vì ${value} <= ${topAfterPops.value}` : "Dòng 6: dừng while vì stack rỗng",
+        en: topAfterPops ? `Line 6: stop while because ${value} <= ${topAfterPops.value}` : "Line 6: stop while because stack is empty",
+      },
+      codeLines: [6],
+      index,
+      value,
+      compareIndex: topAfterPops ? topAfterPops.index : -1,
+      note: {
+        vi: topAfterPops
+          ? `Đỉnh stack hiện là ${topAfterPops.value}, không nhỏ hơn ${value}, nên ${value} chưa giải quyết được nó. Stack vẫn giảm dần.`
+          : "Không còn giá trị nào đang chờ mà nhỏ hơn num hiện tại.",
+        en: topAfterPops
+          ? `The stack top is now ${topAfterPops.value}, not smaller than ${value}, so ${value} cannot resolve it. The stack remains decreasing.`
+          : "No waiting value smaller than the current num remains.",
+      },
+    });
     stack.push({ value, index });
     snap({
-      title: { vi: `Push ${value} vào stack`, en: `Push ${value} onto the stack` },
-      codeLines: [8],
+      title: { vi: `Dòng 9: stack.append(${value})`, en: `Line 9: stack.append(${value})` },
+      codeLines: [9],
       index,
       value,
       note: {
-        vi: `${value} bây giờ cũng đang chờ một phần tử lớn hơn ở bên phải.`,
-        en: `${value} is now also waiting for a greater value to its right.`,
+        vi: `${value} cũng phải chờ phần tử lớn hơn ở bên phải. Nếu sau này gặp số lớn hơn ${value}, nó sẽ bị pop và được ghi vào map.`,
+        en: `${value} must also wait for a greater value to its right. If a larger value appears later, ${value} will be popped and mapped.`,
       },
     });
   });
   snap({
-    title: { vi: "nums2 đã xử lý xong", en: "nums2 scan is finished" },
-    codeLines: [9],
+    title: { vi: "Kết thúc vòng nums2: map đã sẵn sàng", en: "Finished nums2 loop: the map is ready" },
+    codeLines: [5, 6, 7, 8, 9],
     note: {
       vi: stack.length
-        ? `Các giá trị còn trong stack [${stack.map((item) => item.value).join(", ")}] không có phần tử lớn hơn bên phải, nên mặc định là -1.`
-        : "Mọi giá trị trong nums2 đều đã được giải quyết.",
+        ? `Các giá trị còn trong stack [${stack.map((item) => item.value).join(", ")}] không có phần tử lớn hơn bên phải. Chúng không xuất hiện trong map, nên khi tra sẽ nhận -1.`
+        : "Mọi giá trị trong nums2 đều đã có mapping next greater.",
       en: stack.length
-        ? `Values still in the stack [${stack.map((item) => item.value).join(", ")}] have no greater value to their right, so their default is -1.`
-        : "Every value in nums2 has been resolved.",
+        ? `Values still in the stack [${stack.map((item) => item.value).join(", ")}] have no greater value to their right. They are absent from the map, so lookup returns -1.`
+        : "Every value in nums2 has a next greater mapping.",
+    },
+  });
+  snap({
+    title: { vi: "Dòng 10: result = []", en: "Line 10: result = []" },
+    codeLines: [10],
+    phase: "lookup",
+    note: {
+      vi: "Ta tạo mảng kết quả rỗng. Từ đây mỗi bước duyệt nums1 sẽ append đúng một đáp án vào result.",
+      en: "Create an empty result array. From here, each nums1 iteration appends exactly one answer to result.",
     },
   });
   nums1.forEach((value, index) => {
     const found = nextGreater.get(value) ?? -1;
-    answer[index] = found;
     snap({
-      title: { vi: `nums1[${index}] = ${value} -> ${found}`, en: `nums1[${index}] = ${value} -> ${found}` },
-      codeLines: [9],
+      title: { vi: `Dòng 11: lấy num = nums1[${index}] = ${value}`, en: `Line 11: read num = nums1[${index}] = ${value}` },
+      codeLines: [11],
       phase: "lookup",
       lookupIndex: index,
+      lookupValue: value,
+      note: {
+        vi: `Bây giờ mới trả lời cho nums1. Vì nums1 là subset của nums2, chỉ cần tra map đã xây từ nums2.`,
+        en: `Now answer nums1. Since nums1 is a subset of nums2, just look up the map built from nums2.`,
+      },
+    });
+    snap({
+      title: { vi: `Dòng 12: tra map cho ${value} -> ${found}`, en: `Line 12: lookup ${value} -> ${found}` },
+      codeLines: [12],
+      phase: "lookup",
+      lookupIndex: index,
+      lookupValue: value,
       note: {
         vi: found === -1
-          ? `${value} không có trong map, nghĩa là không có next greater trong nums2.`
-          : `Tra map thấy ${value} có next greater là ${found}.`,
+          ? `${value} không có key trong next_greater, nghĩa là bên phải nó trong nums2 không có số nào lớn hơn. Dùng default -1.`
+          : `next_greater[${value}] = ${found}, nên đáp án của nums1[${index}] là ${found}.`,
         en: found === -1
-          ? `${value} is not in the map, so it has no next greater value in nums2.`
-          : `The map says ${value}'s next greater value is ${found}.`,
+          ? `${value} has no key in next_greater, meaning no greater value exists to its right in nums2. Use default -1.`
+          : `next_greater[${value}] = ${found}, so the answer for nums1[${index}] is ${found}.`,
+      },
+    });
+    result[index] = found;
+    snap({
+      title: { vi: `Dòng 12: append ${found} vào result`, en: `Line 12: append ${found} to result` },
+      codeLines: [12],
+      phase: "lookup",
+      lookupIndex: index,
+      lookupValue: value,
+      note: {
+        vi: `result hiện tại là ${resultText()}. Vị trí result[${index}] luôn tương ứng với nums1[${index}].`,
+        en: `The current result is ${resultText()}. result[${index}] always corresponds to nums1[${index}].`,
       },
     });
   });
   snap({
-    title: { vi: `Trả về [${answer.join(", ")}] cho nums1`, en: `Return [${answer.join(", ")}] for nums1` },
-    codeLines: [9],
+    title: { vi: `Dòng 13: return ${resultText()}`, en: `Line 13: return ${resultText()}` },
+    codeLines: [13],
     phase: "answer",
     final: true,
-    note: { vi: "Mỗi vị trí trong answer tương ứng cùng vị trí trong nums1.", en: "Each answer position corresponds to the same position in nums1." },
+    note: { vi: "Mỗi phần tử trong result là next greater của phần tử cùng vị trí trong nums1.", en: "Each result value is the next greater value for the nums1 value at the same position." },
   });
-  return { original: { nums1, nums2 }, answer, steps };
+  return { original: { nums1, nums2 }, answer: result, steps };
 }
 
 function buildSteps503(input) {
@@ -8608,9 +8684,24 @@ Object.assign(module.exports, {
     approach: [
       { vi: "Duyệt nums2 và giữ stack giảm dần gồm các giá trị chưa được giải quyết.", en: "Scan nums2 and keep a decreasing stack of unresolved values." },
       { vi: "Khi num lớn hơn đỉnh stack, nó là next greater của đỉnh đó; pop và lưu mapping.", en: "When num exceeds the stack top, it is that top's next greater value; pop and store the mapping." },
+      { vi: "Duyệt nums1 ở cuối: mỗi value chỉ cần tra next_greater.get(value, -1).", en: "Scan nums1 at the end: each value only needs next_greater.get(value, -1)." },
     ],
     complexity: { time: "O(m+n)", space: "O(n)", note: { vi: "Mỗi nums2 value được push và pop nhiều nhất một lần.", en: "Every nums2 value is pushed and popped at most once." } },
-    code: ["class Solution:", "    def nextGreaterElement(self, nums1, nums2):", "        next_greater = {}", "        stack = []", "        for num in nums2:", "            while stack and num > stack[-1]:", "                next_greater[stack.pop()] = num", "            stack.append(num)", "        return [next_greater.get(num, -1) for num in nums1]"],
+    code: [
+      "class Solution:",
+      "    def nextGreaterElement(self, nums1, nums2):",
+      "        next_greater = {}",
+      "        stack = []",
+      "        for num in nums2:",
+      "            while stack and num > stack[-1]:",
+      "                smaller = stack.pop()",
+      "                next_greater[smaller] = num",
+      "            stack.append(num)",
+      "        result = []",
+      "        for num in nums1:",
+      "            result.append(next_greater.get(num, -1))",
+      "        return result",
+    ],
     liveArgs: (input, params) => [parseIntegerListSmallHash(input, "nums1"), parseIntegerListSmallHash(params.nums2, "nums2")],
     builder: buildSteps496,
   },
