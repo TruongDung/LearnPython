@@ -93,6 +93,171 @@ function finalPrices(nums) {
   return ans;
 }
 
+function buildSteps1475(input) {
+  const prices = parseNums(input, "prices");
+  if (prices.length > 14) throw new Error("Use up to 14 prices so the discount stack stays readable.");
+  const answer = [...prices];
+  const stack = [];
+  const steps = [];
+
+  const answerText = () => arrText(answer);
+  const stackText = () => `[${stack.map((index) => `${index}:${prices[index]}`).join(", ")}]`;
+  const priceSub = () => prices.map((price, index) => `i=${index} · price=${price} · final=${answer[index]}`);
+  const stackItems = () => stack.map((index) => ({ value: prices[index], detail: `index ${index}` }));
+
+  const snap = ({ title, line, note, current = -1, compare = -1, resolved = -1, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    const highlight = [];
+    if (current >= 0) highlight.push(current);
+    if (compare >= 0 && compare !== current) highlight.push(compare);
+    steps.push({
+      title,
+      arr: [...prices],
+      sub: priceSub(),
+      highlight,
+      mark: resolved >= 0
+        ? [resolved]
+        : final
+          ? answer.map((value, index) => value !== prices[index] ? index : -1).filter((index) => index >= 0)
+          : [...stack],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "price", value: current >= 0 ? prices[current] : "-" },
+        { name: "stack", value: stackText() },
+        { name: "answer", value: answerText() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Monotonic increasing stack (prices waiting for discount)",
+        emptyLabel: "no price is waiting",
+        items: stackItems(),
+        input: [...prices],
+        current,
+        inputLabel: "prices scanned from left to right",
+        expected: current >= 0 ? prices[current] : "",
+        status: [
+          { label: "current price", value: current >= 0 ? `${prices[current]} at index ${current}` : "-" },
+          { label: "stack top", value: top == null ? "empty" : `${prices[top]} at index ${top}` },
+          { label: "condition", value: top == null || current < 0 ? "-" : `${prices[top]} >= ${prices[current]}` },
+          { label: "final prices", value: answerText() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3: copy prices sang answer", "Line 3: copy prices into answer"),
+    line: 3,
+    note: text(
+      "Ban đầu chưa biết discount của ai, nên final price tạm thời bằng giá gốc.",
+      "Initially no discount is known, so each final price starts as the original price.",
+    ),
+  });
+  snap({
+    title: text("Dòng 4: stack rỗng", "Line 4: empty stack"),
+    line: 4,
+    note: text(
+      "Stack lưu index của các món bên trái chưa tìm được món giảm giá đầu tiên ở bên phải. Giá trong stack tăng dần từ dưới lên trên.",
+      "The stack stores left-side indices still waiting for their first discount to the right. Prices in the stack increase from bottom to top.",
+    ),
+  });
+
+  for (let i = 0; i < prices.length; i++) {
+    snap({
+      title: text(`Dòng 5: xét prices[${i}] = ${prices[i]}`, `Line 5: read prices[${i}] = ${prices[i]}`),
+      line: 5,
+      current: i,
+      note: text(
+        `Món hiện tại có giá ${prices[i]}. Nó có thể là discount cho các món trước đó có giá >= ${prices[i]}.`,
+        `The current item costs ${prices[i]}. It can discount earlier items whose price is >= ${prices[i]}.`,
+      ),
+    });
+
+    while (stack.length && prices[stack.at(-1)] >= prices[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 6: ${prices[top]} >= ${prices[i]} nên có discount`, `Line 6: ${prices[top]} >= ${prices[i]}, discount found`),
+        line: 6,
+        current: i,
+        compare: top,
+        note: text(
+          `Index ${top} đang chờ discount. Vì index ${i} là món đầu tiên bên phải có giá <= ${prices[top]}, ta dùng ${prices[i]} làm discount.`,
+          `Index ${top} is waiting for a discount. Because index ${i} is the first price to the right that is <= ${prices[top]}, use ${prices[i]} as the discount.`,
+        ),
+      });
+      const resolved = stack.pop();
+      snap({
+        title: text(`Dòng 7: pop index ${resolved}`, `Line 7: pop index ${resolved}`),
+        line: 7,
+        current: i,
+        resolved,
+        note: text(
+          `Lấy index ${resolved} ra khỏi stack vì ta đã biết discount của nó.`,
+          `Remove index ${resolved} from the stack because its discount is now known.`,
+        ),
+      });
+      const before = answer[resolved];
+      answer[resolved] = prices[resolved] - prices[i];
+      snap({
+        title: text(`Dòng 8: answer[${resolved}] = ${prices[resolved]} - ${prices[i]} = ${answer[resolved]}`, `Line 8: answer[${resolved}] = ${prices[resolved]} - ${prices[i]} = ${answer[resolved]}`),
+        line: 8,
+        current: i,
+        resolved,
+        note: text(
+          `Final price của index ${resolved} đổi từ ${before} thành ${answer[resolved]}.`,
+          `The final price at index ${resolved} changes from ${before} to ${answer[resolved]}.`,
+        ),
+      });
+    }
+
+    const topAfter = stack.at(-1);
+    snap({
+      title: text(
+        topAfter == null ? "Dòng 6: dừng while vì stack rỗng" : `Dòng 6: dừng while vì ${prices[topAfter]} < ${prices[i]}`,
+        topAfter == null ? "Line 6: stop while because stack is empty" : `Line 6: stop while because ${prices[topAfter]} < ${prices[i]}`,
+      ),
+      line: 6,
+      current: i,
+      compare: topAfter ?? -1,
+      note: text(
+        topAfter == null
+          ? "Không còn món bên trái nào có thể dùng giá hiện tại làm discount."
+          : `Đỉnh stack hiện có giá ${prices[topAfter]}, nhỏ hơn ${prices[i]}, nên giá hiện tại không thể giảm cho nó.`,
+        topAfter == null
+          ? "No earlier waiting item can use the current price as a discount."
+          : `The stack top is ${prices[topAfter]}, smaller than ${prices[i]}, so the current price cannot discount it.`,
+      ),
+    });
+
+    stack.push(i);
+    snap({
+      title: text(`Dòng 9: stack.append(${i})`, `Line 9: stack.append(${i})`),
+      line: 9,
+      current: i,
+      note: text(
+        `Index ${i} vào stack để chờ món đầu tiên bên phải có giá <= ${prices[i]}.`,
+        `Index ${i} enters the stack and waits for the first future price <= ${prices[i]}.`,
+      ),
+    });
+  }
+
+  snap({
+    title: text(`Dòng 10: return ${answerText()}`, `Line 10: return ${answerText()}`),
+    line: 10,
+    final: true,
+    note: stack.length
+      ? text(
+          `Các index còn trong stack [${stack.join(", ")}] không có discount bên phải, nên giữ nguyên giá gốc.`,
+          `Remaining stack indices [${stack.join(", ")}] have no discount to the right, so they keep their original prices.`,
+        )
+      : text("Mọi món đều đã được xét xong.", "Every item has been processed."),
+  });
+
+  return { original: prices, answer, steps };
+}
+
 function removeDuplicateLetters(input) {
   const s = String(input ?? "");
   const last = {};
@@ -131,6 +296,201 @@ function shortestUnsorted(nums) {
     stack.push(i);
   }
   return right > left ? right - left + 1 : 0;
+}
+
+function buildSteps581(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers so the two stack passes stay readable.");
+  const stack = [];
+  const steps = [];
+  let left = nums.length;
+  let right = 0;
+  let phase = "left pass";
+
+  const stackText = () => `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]`;
+  const boundaryText = () => left === nums.length || right === 0 ? "not decided" : `[${left}, ${right}]`;
+  const stackItems = () => stack.map((index) => ({ value: nums[index], detail: `index ${index}` }));
+  const sub = () => nums.map((value, index) => {
+    const inside = right > left && index >= left && index <= right ? "sort" : "";
+    return `i=${index} · ${value}${inside ? ` · ${inside}` : ""}`;
+  });
+  const snap = ({ title, line, note, current = -1, compare = -1, resolved = -1, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    const highlight = [];
+    if (current >= 0) highlight.push(current);
+    if (compare >= 0 && compare !== current) highlight.push(compare);
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight,
+      mark: resolved >= 0
+        ? [resolved]
+        : right > left
+          ? Array.from({ length: right - left + 1 }, (_, offset) => left + offset)
+          : [...stack],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "phase", value: phase },
+        { name: "stack", value: stackText() },
+        { name: "left", value: left === nums.length ? "n" : left },
+        { name: "right", value: right },
+        { name: "window", value: boundaryText() },
+      ],
+      note,
+      final,
+      stackView: {
+        title: phase === "left pass"
+          ? "Left pass: find earliest broken index"
+          : "Right pass: find latest broken index",
+        emptyLabel: "empty stack",
+        items: stackItems(),
+        input: [...nums],
+        current,
+        inputLabel: phase === "left pass"
+          ? "scan left to right, stack keeps increasing indices"
+          : "scan right to left, stack keeps decreasing indices",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current", value: current >= 0 ? `${nums[current]} at ${current}` : "-" },
+          { label: "stack top", value: top == null ? "empty" : `${nums[top]} at ${top}` },
+          { label: "left", value: left === nums.length ? "n" : left },
+          { label: "right", value: right },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: khởi tạo left, right, stack", "Lines 3-4: initialize left, right, stack"),
+    line: [3, 4],
+    note: text(
+      "Mục tiêu là tìm đoạn nhỏ nhất [left..right] mà nếu sort đoạn đó thì toàn mảng sẽ tăng không giảm.",
+      "Goal: find the smallest window [left..right] such that sorting only that window makes the whole array nondecreasing.",
+    ),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    snap({
+      title: text(`Dòng 5: lượt trái, i=${i}, nums[i]=${nums[i]}`, `Line 5: left pass, i=${i}, nums[i]=${nums[i]}`),
+      line: 5,
+      current: i,
+      note: text(
+        "Lượt trái phát hiện phần tử lớn hơn nằm bên trái một số nhỏ hơn. Index bị pop có thể là biên trái cần sort.",
+        "The left pass detects a larger value sitting before a smaller value. A popped index may be the left boundary of the sort window.",
+      ),
+    });
+    while (stack.length && nums[stack.at(-1)] > nums[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 6: ${nums[top]} > ${nums[i]} nên pop`, `Line 6: ${nums[top]} > ${nums[i]}, so pop`),
+        line: 6,
+        current: i,
+        compare: top,
+        note: text(
+          `nums[${top}] = ${nums[top]} đứng trước nums[${i}] = ${nums[i]} nhưng lớn hơn, nên index ${top} nằm trong vùng sai thứ tự.`,
+          `nums[${top}] = ${nums[top]} is before nums[${i}] = ${nums[i]} but greater, so index ${top} belongs to the unsorted region.`,
+        ),
+      });
+      const popped = stack.pop();
+      left = Math.min(left, popped);
+      snap({
+        title: text(`Dòng 7-8: left = min(left, ${popped}) = ${left}`, `Lines 7-8: left = min(left, ${popped}) = ${left}`),
+        line: [7, 8],
+        current: i,
+        resolved: popped,
+        note: text(
+          `Cập nhật left về index sớm nhất từng bị phá thứ tự.`,
+          `Update left to the earliest index whose order was broken.`,
+        ),
+      });
+    }
+    stack.push(i);
+    snap({
+      title: text(`Dòng 9: push index ${i}`, `Line 9: push index ${i}`),
+      line: 9,
+      current: i,
+      note: text(
+        "Stack giữ các index có value tăng dần. Nếu số nhỏ hơn xuất hiện sau này, nó sẽ pop các index sai thứ tự.",
+        "The stack keeps indices with increasing values. If a smaller number appears later, it will pop out-of-order indices.",
+      ),
+    });
+  }
+
+  stack.length = 0;
+  phase = "right pass";
+  snap({
+    title: text("Dòng 10: reset stack cho lượt phải", "Line 10: reset stack for the right pass"),
+    line: 10,
+    note: text(
+      "Lượt phải làm điều ngược lại: tìm phần tử nhỏ hơn nằm bên phải một số lớn hơn để xác định biên right.",
+      "The right pass does the opposite: find a smaller value on the right of a larger value to determine the right boundary.",
+    ),
+  });
+
+  for (let i = nums.length - 1; i >= 0; i--) {
+    snap({
+      title: text(`Dòng 11: lượt phải, i=${i}, nums[i]=${nums[i]}`, `Line 11: right pass, i=${i}, nums[i]=${nums[i]}`),
+      line: 11,
+      current: i,
+      note: text(
+        "Nếu nums[i] lớn hơn các phần tử đang chờ bên phải, các index đó cần nằm trong đoạn sort.",
+        "If nums[i] is greater than waiting values to its right, those indices must be inside the sort window.",
+      ),
+    });
+    while (stack.length && nums[stack.at(-1)] < nums[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 12: ${nums[top]} < ${nums[i]} nên pop`, `Line 12: ${nums[top]} < ${nums[i]}, so pop`),
+        line: 12,
+        current: i,
+        compare: top,
+        note: text(
+          `nums[${i}] = ${nums[i]} đứng trước nums[${top}] = ${nums[top]} nhưng lớn hơn, nên index ${top} xác nhận biên phải có thể mở rộng.`,
+          `nums[${i}] = ${nums[i]} is before nums[${top}] = ${nums[top]} but greater, so index ${top} can extend the right boundary.`,
+        ),
+      });
+      const popped = stack.pop();
+      right = Math.max(right, popped);
+      snap({
+        title: text(`Dòng 13: right = max(right, ${popped}) = ${right}`, `Line 13: right = max(right, ${popped}) = ${right}`),
+        line: 13,
+        current: i,
+        resolved: popped,
+        note: text(
+          "Cập nhật right về index xa nhất bên phải bị phá thứ tự.",
+          "Update right to the farthest right index whose order was broken.",
+        ),
+      });
+    }
+    stack.push(i);
+    snap({
+      title: text(`Dòng 14: push index ${i}`, `Line 14: push index ${i}`),
+      line: 14,
+      current: i,
+      note: text(
+        "Stack lượt phải giữ các index có value giảm dần khi nhìn từ phải sang trái.",
+        "The right-pass stack keeps indices with decreasing values while scanning from right to left.",
+      ),
+    });
+  }
+
+  const answer = right > left ? right - left + 1 : 0;
+  snap({
+    title: text(`Dòng 16: return ${answer}`, `Line 16: return ${answer}`),
+    line: 16,
+    final: true,
+    note: text(
+      answer === 0
+        ? "Không tìm thấy cặp sai thứ tự, mảng đã tăng không giảm."
+        : `Sort đoạn [${left}..${right}] có độ dài ${answer}; mọi phần tử ngoài đoạn đã đúng vị trí tương đối.`,
+      answer === 0
+        ? "No broken pair was found, so the array is already nondecreasing."
+        : `Sorting window [${left}..${right}] of length ${answer} fixes the array; everything outside already has correct relative order.`,
+    ),
+  });
+
+  return { original: nums, answer, steps };
 }
 
 function maxBinaryTree(nums) {
@@ -487,6 +847,291 @@ function removeNodes(nums) {
     stack.push(num);
   });
   return stack;
+}
+
+function buildSteps2289(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers so the days stack stays readable.");
+  const stack = [];
+  const steps = [];
+  let answer = 0;
+
+  const stackText = () => `[${stack.map((item) => `${item.value}:${item.days}d`).join(", ")}]`;
+  const stackItems = () => stack.map((item) => ({ value: item.value, detail: `${item.days} step(s)` }));
+  const sub = () => nums.map((value, index) => `i=${index} · ${value}`);
+  const snap = ({ title, line, note, current = -1, compareTop = null, popped = null, days = null, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: final ? [] : stack.map((_, index) => index),
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "num", value: current >= 0 ? nums[current] : "-" },
+        { name: "days", value: days ?? "-" },
+        { name: "answer", value: answer },
+        { name: "stack", value: stackText() },
+        ...(popped ? [{ name: "popped", value: `${popped.value}:${popped.days}d` }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Stack of survivors (value + removal step)",
+        emptyLabel: "no previous survivor",
+        items: stackItems(),
+        input: [...nums],
+        current,
+        inputLabel: "scan left to right",
+        expected: current >= 0 ? nums[current] : "",
+        status: [
+          { label: "current num", value: current >= 0 ? nums[current] : "-" },
+          { label: "stack top", value: top ? `${top.value}, ${top.days} step(s)` : "empty" },
+          { label: "while check", value: top && current >= 0 ? `${top.value} <= ${nums[current]}` : "-" },
+          { label: "answer", value: answer },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: stack rỗng, answer = 0", "Lines 3-4: empty stack, answer = 0"),
+    line: [3, 4],
+    note: text(
+      "Mỗi phần tử trong stack là [value, days]: value này sẽ bị xóa sau bao nhiêu step, hoặc 0 nếu sống mãi tới lúc này.",
+      "Each stack item is [value, days]: how many steps before this value is removed, or 0 if it survives so far.",
+    ),
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    let days = 0;
+    snap({
+      title: text(`Dòng 5-6: xét nums[${i}] = ${nums[i]}, days = 0`, `Lines 5-6: read nums[${i}] = ${nums[i]}, days = 0`),
+      line: [5, 6],
+      current: i,
+      days,
+      note: text(
+        "days tạm thời là thời điểm nums[i] có thể bị xóa. Ta sẽ tăng nó dựa trên các phần tử nhỏ hơn hoặc bằng ở bên trái.",
+        "days is the possible removal step for nums[i]. It will be updated from smaller-or-equal values on the left.",
+      ),
+    });
+
+    while (stack.length && stack.at(-1).value <= nums[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 7: ${top.value} <= ${nums[i]} nên pop`, `Line 7: ${top.value} <= ${nums[i]}, so pop`),
+        line: 7,
+        current: i,
+        days,
+        compareTop: top,
+        note: text(
+          `${nums[i]} lớn hơn hoặc bằng ${top.value}, nên ${top.value} không thể là phần tử bên trái làm ${nums[i]} bị xóa. Nhưng days của nó vẫn ảnh hưởng dây chuyền.`,
+          `${nums[i]} is greater than or equal to ${top.value}, so ${top.value} cannot delete ${nums[i]}. Its days still affect the chain reaction.`,
+        ),
+      });
+      const removed = stack.pop();
+      days = Math.max(days, removed.days);
+      snap({
+        title: text(`Dòng 8: days = max(days, ${removed.days}) = ${days}`, `Line 8: days = max(days, ${removed.days}) = ${days}`),
+        line: 8,
+        current: i,
+        days,
+        popped: removed,
+        note: text(
+          "Nếu phần tử bị pop chỉ biến mất sau nhiều vòng, nums[i] cũng phải chờ ít nhất lâu như vậy trước khi so được với phần tử lớn hơn bên trái.",
+          "If the popped value disappears only after several rounds, nums[i] must wait at least that long before comparing with the larger value to the left.",
+        ),
+      });
+    }
+
+    const topAfter = stack.at(-1);
+    days = stack.length ? days + 1 : 0;
+    snap({
+      title: text(
+        stack.length ? `Dòng 9: còn ${topAfter.value} > ${nums[i]}, days = ${days}` : "Dòng 9: stack rỗng, days = 0",
+        stack.length ? `Line 9: ${topAfter.value} > ${nums[i]} remains, days = ${days}` : "Line 9: stack empty, days = 0",
+      ),
+      line: 9,
+      current: i,
+      days,
+      note: text(
+        stack.length
+          ? `${nums[i]} sẽ bị ${topAfter.value} ở bên trái xóa sau ${days} step.`
+          : `${nums[i]} không có phần tử lớn hơn còn sống ở bên trái, nên nó không bị xóa.`,
+        stack.length
+          ? `${nums[i]} will be removed by the surviving larger left value ${topAfter.value} after ${days} step(s).`
+          : `${nums[i]} has no surviving larger value to its left, so it is not removed.`,
+      ),
+    });
+
+    answer = Math.max(answer, days);
+    snap({
+      title: text(`Dòng 10: answer = max(answer, ${days}) = ${answer}`, `Line 10: answer = max(answer, ${days}) = ${answer}`),
+      line: 10,
+      current: i,
+      days,
+      note: text(
+        "answer là số step lớn nhất cần chờ trong toàn bộ mảng.",
+        "answer is the largest removal step needed anywhere in the array.",
+      ),
+    });
+
+    stack.push({ value: nums[i], days });
+    snap({
+      title: text(`Dòng 11: push [${nums[i]}, ${days}]`, `Line 11: push [${nums[i]}, ${days}]`),
+      line: 11,
+      current: i,
+      days,
+      note: text(
+        `Đưa nums[${i}] vào stack cùng thời điểm bị xóa của nó.`,
+        `Push nums[${i}] together with its removal step.`,
+      ),
+    });
+  }
+
+  snap({
+    title: text(`Dòng 12: return ${answer}`, `Line 12: return ${answer}`),
+    line: 12,
+    final: true,
+    note: text(
+      `Sau ${answer} step, không còn cặp kề nhau nào có nums[i-1] > nums[i].`,
+      `After ${answer} step(s), no adjacent pair remains with nums[i-1] > nums[i].`,
+    ),
+  });
+
+  return { original: nums, answer, steps };
+}
+
+function buildSteps2487(input) {
+  const values = parseNums(input, "head");
+  if (values.length > 14) throw new Error("Use up to 14 linked-list nodes so the removal stack stays readable.");
+  const stack = [];
+  const steps = [];
+
+  const stackText = () => `[${stack.join(", ")}]`;
+  const stackItems = () => stack.map((value, index) => ({ value, detail: `kept position ${index}` }));
+  const sub = () => values.map((value, index) => `node ${index} · ${value}`);
+  const snap = ({ title, line, note, current = -1, removedValue = null, final = false }) => {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title,
+      arr: [...values],
+      sub: sub(),
+      highlight: current >= 0 ? [current] : [],
+      mark: [],
+      codeLines: Array.isArray(line) ? line : [line],
+      vars: [
+        { name: "current node", value: current >= 0 ? `${current}:${values[current]}` : "-" },
+        { name: "stack kept nodes", value: stackText() },
+        ...(removedValue != null ? [{ name: "removed", value: removedValue }] : []),
+      ],
+      note,
+      final,
+      stackView: {
+        title: "Kept nodes stack (remove smaller nodes when a bigger right node appears)",
+        emptyLabel: "no kept node yet",
+        items: stackItems(),
+        input: [...values],
+        current,
+        inputLabel: "linked-list values scanned left to right",
+        expected: current >= 0 ? values[current] : "",
+        status: [
+          { label: "current value", value: current >= 0 ? values[current] : "-" },
+          { label: "stack top", value: top ?? "empty" },
+          { label: "remove check", value: top != null && current >= 0 ? `${top} < ${values[current]}` : "-" },
+          { label: "kept so far", value: stackText() },
+        ],
+      },
+    });
+  };
+
+  snap({
+    title: text("Dòng 3-4: stack rỗng, curr = head", "Lines 3-4: empty stack, curr = head"),
+    line: [3, 4],
+    note: text(
+      "Stack giữ các node sẽ còn lại nếu chỉ xét prefix hiện tại. Khi gặp node lớn hơn, các node nhỏ hơn bên trái phải bị xóa.",
+      "The stack stores nodes that would remain after scanning the current prefix. When a larger node appears, smaller left nodes must be removed.",
+    ),
+  });
+
+  for (let i = 0; i < values.length; i++) {
+    snap({
+      title: text(`Dòng 5: xét node ${i}, value = ${values[i]}`, `Line 5: read node ${i}, value = ${values[i]}`),
+      line: 5,
+      current: i,
+      note: text(
+        `Nếu stack có node nhỏ hơn ${values[i]} ở đỉnh, node đó có một node lớn hơn ở bên phải nên phải xóa.`,
+        `If the stack top is smaller than ${values[i]}, that top has a greater node to its right and must be removed.`,
+      ),
+    });
+
+    while (stack.length && stack.at(-1) < values[i]) {
+      const top = stack.at(-1);
+      snap({
+        title: text(`Dòng 6: ${top} < ${values[i]} nên xóa`, `Line 6: ${top} < ${values[i]}, so remove it`),
+        line: 6,
+        current: i,
+        note: text(
+          `Node value ${top} bị xóa vì node hiện tại ${values[i]} nằm bên phải và lớn hơn nó.`,
+          `Node value ${top} is removed because the current node ${values[i]} is to its right and greater.`,
+        ),
+      });
+      const removed = stack.pop();
+      snap({
+        title: text(`Dòng 7: pop ${removed}`, `Line 7: pop ${removed}`),
+        line: 7,
+        current: i,
+        removedValue: removed,
+        note: text(
+          `Sau khi pop, tiếp tục kiểm tra đỉnh mới vì ${values[i]} cũng có thể xóa nhiều node liên tiếp.`,
+          `After popping, keep checking the new top because ${values[i]} may remove several nodes in a row.`,
+        ),
+      });
+    }
+
+    const topAfter = stack.at(-1);
+    snap({
+      title: text(
+        topAfter == null ? "Dòng 6: dừng while vì stack rỗng" : `Dòng 6: dừng while vì ${topAfter} >= ${values[i]}`,
+        topAfter == null ? "Line 6: stop while because stack is empty" : `Line 6: stop while because ${topAfter} >= ${values[i]}`,
+      ),
+      line: 6,
+      current: i,
+      note: text(
+        topAfter == null
+          ? "Không còn node bên trái nào nhỏ hơn node hiện tại."
+          : `Node ${topAfter} không bị xóa bởi ${values[i]} vì nó không nhỏ hơn node hiện tại.`,
+        topAfter == null
+          ? "No left node smaller than the current node remains."
+          : `Node ${topAfter} is not removed by ${values[i]} because it is not smaller than the current node.`,
+      ),
+    });
+
+    stack.push(values[i]);
+    snap({
+      title: text(`Dòng 8-9: push ${values[i]} rồi curr = curr.next`, `Lines 8-9: push ${values[i]}, then curr = curr.next`),
+      line: [8, 9],
+      current: i,
+      note: text(
+        `Giữ node ${values[i]} lại cho tới khi có node lớn hơn ở bên phải xuất hiện.`,
+        `Keep node ${values[i]} unless a greater node appears to its right later.`,
+      ),
+    });
+  }
+
+  snap({
+    title: text(`Dòng 10-16: nối lại list và return ${stackText()}`, `Lines 10-16: rebuild the list and return ${stackText()}`),
+    line: [10, 11, 12, 13, 14, 15, 16],
+    final: true,
+    note: text(
+      "Các value còn trong stack chính là linked list sau khi xóa node có node lớn hơn bên phải.",
+      "Values left in the stack are the linked list after removing nodes that have a greater node to their right.",
+    ),
+  });
+
+  return { original: values, answer: [...stack], steps };
 }
 
 function beautifulTowers(nums) {
@@ -1243,10 +1888,92 @@ function simpleProblem({ id, difficulty, slug, name, viName, statement, defaultI
 }
 
 module.exports = {
-  1475: simpleProblem({ id: 1475, difficulty: "easy", slug: "final-prices-with-a-special-discount-in-a-shop", name: "Final Prices With a Special Discount in a Shop", viName: "Giá cuối cùng sau giảm giá", statement: text("Với mỗi giá, trừ đi giá đầu tiên bên phải nhỏ hơn hoặc bằng nó.", "For each price, subtract the first price to its right that is less than or equal to it."), defaultInput: "8,4,6,2,3", solver: arrayBuilder(finalPrices) }),
+  1475: {
+    id: 1475,
+    difficulty: "easy",
+    slug: "final-prices-with-a-special-discount-in-a-shop",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Final Prices With a Special Discount in a Shop"),
+    titleVi: text("Giá cuối cùng sau giảm giá", "Final prices after special discount"),
+    statement: text(
+      "Với mỗi giá prices[i], tìm giá đầu tiên prices[j] ở bên phải sao cho j > i và prices[j] <= prices[i], rồi trừ prices[j]. Nếu không có thì giữ nguyên giá.",
+      "For each prices[i], find the first prices[j] to its right with j > i and prices[j] <= prices[i], then subtract prices[j]. If none exists, keep the price unchanged.",
+    ),
+    defaultInput: "8,4,6,2,3",
+    inputKind: "string",
+    inputLabel: text("prices (cách bởi ,)", "prices (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Copy prices sang answer; giá nào chưa có discount thì tạm giữ nguyên.", "Copy prices into answer; any item without a discount temporarily keeps its original price."),
+      text("Duyệt trái sang phải, stack lưu index các giá chưa tìm được discount.", "Scan left to right; the stack stores indices whose discount has not been found."),
+      text("Khi prices[i] <= prices[stack[-1]], prices[i] là discount đầu tiên cho index ở đỉnh stack.", "When prices[i] <= prices[stack[-1]], prices[i] is the first discount for the index at the stack top."),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text("Mỗi index được push một lần và pop nhiều nhất một lần.", "Each index is pushed once and popped at most once."),
+    },
+    code: [
+      "class Solution:",
+      "    def finalPrices(self, prices):",
+      "        answer = prices[:]",
+      "        stack = []",
+      "        for i, price in enumerate(prices):",
+      "            while stack and prices[stack[-1]] >= price:",
+      "                j = stack.pop()",
+      "                answer[j] = prices[j] - price",
+      "            stack.append(i)",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "prices")],
+    builder: buildSteps1475,
+  },
   316: simpleProblem({ id: 316, difficulty: "medium", slug: "remove-duplicate-letters", name: "Remove Duplicate Letters", viName: "Xóa chữ trùng để nhỏ nhất", statement: text("Xóa ký tự trùng để mỗi ký tự xuất hiện một lần và kết quả nhỏ nhất theo thứ tự từ điển.", "Remove duplicate letters so every letter appears once and the result is lexicographically smallest."), defaultInput: "cbacdcbc", inputKind: "string", inputLabel: text("s", "s"), tags: [stringTag, monoTag], solver: (input) => { const answer = removeDuplicateLetters(input); return { original: String(input ?? ""), answer, steps: genericSteps({ nums: [...String(input ?? "")].map((_, i) => i), title: text(`answer = ${answer}`, `answer = ${answer}`), answer, note: text("Stack giữ chuỗi tăng theo từ điển, chỉ pop khi ký tự đó còn xuất hiện phía sau.", "The stack keeps a lexicographically small sequence and pops only when that character appears again later.") }) }; } }),
   456: simpleProblem({ id: 456, difficulty: "medium", slug: "132-pattern", name: "132 Pattern", viName: "Mẫu 132", statement: text("Kiểm tra có i < j < k sao cho nums[i] < nums[k] < nums[j].", "Check whether i < j < k exists with nums[i] < nums[k] < nums[j]."), defaultInput: "3,1,4,2", solver: arrayBuilder(pattern132) }),
-  581: simpleProblem({ id: 581, difficulty: "medium", slug: "shortest-unsorted-continuous-subarray", name: "Shortest Unsorted Continuous Subarray", viName: "Subarray ngắn nhất cần sort", statement: text("Tìm độ dài đoạn liên tục ngắn nhất cần sort để cả mảng tăng dần.", "Find the shortest continuous segment that must be sorted so the whole array becomes nondecreasing."), defaultInput: "2,6,4,8,10,9,15", solver: arrayBuilder(shortestUnsorted) }),
+  581: {
+    id: 581,
+    difficulty: "medium",
+    slug: "shortest-unsorted-continuous-subarray",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Shortest Unsorted Continuous Subarray"),
+    titleVi: text("Subarray ngắn nhất cần sort", "Shortest subarray that must be sorted"),
+    statement: text(
+      "Tìm độ dài đoạn liên tục ngắn nhất mà nếu sort đoạn đó thì toàn bộ mảng tăng không giảm.",
+      "Find the shortest continuous subarray that, if sorted, makes the whole array nondecreasing.",
+    ),
+    defaultInput: "2,6,4,8,10,9,15",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Lượt trái dùng stack tăng để tìm index sớm nhất bị một số nhỏ hơn bên phải phá thứ tự.", "The left pass uses an increasing stack to find the earliest index broken by a smaller value to its right."),
+      text("Lượt phải dùng stack giảm để tìm index xa nhất bên phải bị một số lớn hơn bên trái phá thứ tự.", "The right pass uses a decreasing stack to find the farthest right index broken by a larger value to its left."),
+      text("Nếu right > left thì đáp án là right-left+1; ngược lại mảng đã sorted.", "If right > left, the answer is right-left+1; otherwise the array is already sorted."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi index được push/pop nhiều nhất một lần trong mỗi lượt.", "Each index is pushed/popped at most once in each pass.") },
+    code: [
+      "class Solution:",
+      "    def findUnsortedSubarray(self, nums):",
+      "        left, right = len(nums), 0",
+      "        stack = []",
+      "        for i, num in enumerate(nums):",
+      "            while stack and nums[stack[-1]] > num:",
+      "                j = stack.pop()",
+      "                left = min(left, j)",
+      "            stack.append(i)",
+      "        stack = []",
+      "        for i in range(len(nums) - 1, -1, -1):",
+      "            while stack and nums[stack[-1]] < nums[i]:",
+      "                j = stack.pop()",
+      "                right = max(right, j)",
+      "            stack.append(i)",
+      "        return right - left + 1 if right > left else 0",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps581,
+  },
   654: simpleProblem({ id: 654, difficulty: "medium", slug: "maximum-binary-tree", name: "Maximum Binary Tree", viName: "Cây nhị phân maximum", statement: text("Dựng Maximum Binary Tree từ mảng distinct.", "Construct the Maximum Binary Tree from a distinct array."), defaultInput: "3,2,1,6,0,5", tags: [arrayTag, treeTag, monoTag], solver: arrayBuilder(maxBinaryTree, (nums, answer) => text(`Root của cây là ${answer}.`, `The tree root is ${answer}.`)) }),
   769: simpleProblem({ id: 769, difficulty: "medium", slug: "max-chunks-to-make-sorted", name: "Max Chunks To Make Sorted", viName: "Số chunk tối đa để sort", statement: text("Chia permutation thành nhiều chunk nhất để sort từng chunk rồi ghép lại thành sorted.", "Split a permutation into the maximum number of chunks that sort independently into the sorted array."), defaultInput: "1,0,2,3,4", solver: arrayBuilder(maxChunks) }),
   853: simpleProblem({ id: 853, difficulty: "medium", slug: "car-fleet", name: "Car Fleet", viName: "Đoàn xe", statement: text("Đếm số đoàn xe tới target.", "Count how many car fleets reach the target."), defaultInput: "10,2;8,4;0,1;5,1;3,3", inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"), extraParams: [{ key: "target", label: text("target", "target"), default: 12, min: 1 }], solver: (input, params) => { const cars = parsePairs(input); const answer = carFleet(input, params); return { original: cars.flat(), answer, steps: genericSteps({ nums: cars.map((p) => p[0]), title: text("Đếm fleet", "Count fleets"), answer, note: text("Duyệt xe từ gần target về xa; stack thời gian đến giữ các fleet chậm nhất.", "Scan cars from nearest to farthest; arrival times form the fleet stack.") }) }; } }),
@@ -1325,8 +2052,88 @@ module.exports = {
   1673: simpleProblem({ id: 1673, difficulty: "medium", slug: "find-the-most-competitive-subsequence", name: "Find the Most Competitive Subsequence", viName: "Subsequence cạnh tranh nhất", statement: text("Tìm subsequence độ dài k nhỏ nhất theo thứ tự từ điển.", "Find the lexicographically smallest subsequence of length k."), defaultInput: "3,5,2,6", extraParams: [{ key: "k", label: text("k", "k"), default: 2, min: 1 }], solver: arrayBuilder(mostCompetitive) }),
   1856: simpleProblem({ id: 1856, difficulty: "medium", slug: "maximum-subarray-min-product", name: "Maximum Subarray Min-Product", viName: "Min-product lớn nhất", statement: text("Tối đa hóa min(subarray) * sum(subarray).", "Maximize min(subarray) * sum(subarray)."), defaultInput: "1,2,3,2", solver: arrayBuilder(maxSumMinProduct) }),
   2104: simpleProblem({ id: 2104, difficulty: "medium", slug: "sum-of-subarray-ranges", name: "Sum of Subarray Ranges", viName: "Tổng range của mọi subarray", statement: text("Tổng (max-min) của mọi subarray.", "Sum max-min over every subarray."), defaultInput: "1,2,3", solver: arrayBuilder(subArrayRanges) }),
-  2289: simpleProblem({ id: 2289, difficulty: "medium", slug: "steps-to-make-array-non-decreasing", name: "Steps to Make Array Non-decreasing", viName: "Số bước để mảng không giảm", statement: text("Mỗi bước xóa nums[i] nếu nums[i-1] > nums[i]; trả số bước đến khi ổn định.", "Each step removes nums[i] if nums[i-1] > nums[i]; return steps until stable."), defaultInput: "5,3,4,4,7,3,6,11,8,5,11", solver: arrayBuilder(totalSteps) }),
-  2487: simpleProblem({ id: 2487, difficulty: "medium", slug: "remove-nodes-from-linked-list", name: "Remove Nodes From Linked List", viName: "Xóa node có node lớn hơn bên phải", statement: text("Xóa mọi node có node phía sau giá trị lớn hơn.", "Remove every node that has a greater value to its right."), defaultInput: "5,2,13,3,8", tags: [linkedListTag, monoTag], solver: arrayBuilder(removeNodes) }),
+  2289: {
+    id: 2289,
+    difficulty: "medium",
+    slug: "steps-to-make-array-non-decreasing",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Steps to Make Array Non-decreasing"),
+    titleVi: text("Số bước để mảng không giảm", "Steps to make array non-decreasing"),
+    statement: text(
+      "Mỗi step xóa đồng thời mọi nums[i] nếu nums[i-1] > nums[i]. Trả số step cần để mảng trở thành non-decreasing.",
+      "In each step, simultaneously remove every nums[i] where nums[i-1] > nums[i]. Return the number of steps needed until the array is non-decreasing.",
+    ),
+    defaultInput: "5,3,4,4,7,3,6,11,8,5,11",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Stack lưu cặp [value, days] cho các phần tử còn sống khi quét từ trái sang phải.", "The stack stores [value, days] for survivors while scanning left to right."),
+      text("Pop các value <= num vì chúng không thể xóa num; days của chúng vẫn tạo độ trễ dây chuyền.", "Pop values <= num because they cannot remove num; their days still create chain-reaction delay."),
+      text("Nếu còn value lớn hơn bên trái, num bị xóa sau max popped days + 1; nếu stack rỗng thì days = 0.", "If a larger left value remains, num is removed after max popped days + 1; if the stack is empty, days = 0."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi phần tử được push và pop nhiều nhất một lần.", "Each element is pushed and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def totalSteps(self, nums):",
+      "        stack = []",
+      "        answer = 0",
+      "        for num in nums:",
+      "            days = 0",
+      "            while stack and stack[-1][0] <= num:",
+      "                days = max(days, stack.pop()[1])",
+      "            days = days + 1 if stack else 0",
+      "            answer = max(answer, days)",
+      "            stack.append([num, days])",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps2289,
+  },
+  2487: {
+    id: 2487,
+    difficulty: "medium",
+    slug: "remove-nodes-from-linked-list",
+    category,
+    tags: [linkedListTag, monoTag],
+    title: text("Remove Nodes From Linked List"),
+    titleVi: text("Xóa node có node lớn hơn bên phải", "Remove nodes with a greater node on the right"),
+    statement: text(
+      "Xóa mọi node trong linked list nếu bên phải nó tồn tại node có value lớn hơn.",
+      "Remove every node in the linked list that has a greater value somewhere to its right.",
+    ),
+    defaultInput: "5,2,13,3,8",
+    inputKind: "string",
+    inputLabel: text("linked list values (cách bởi ,)", "linked list values (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Quét values từ trái sang phải, stack giữ các node hiện vẫn được giữ lại.", "Scan values left to right; the stack stores nodes currently kept."),
+      text("Khi gặp value lớn hơn đỉnh stack, đỉnh đó chắc chắn phải xóa vì có node lớn hơn ở bên phải.", "When the current value is greater than the stack top, that top must be removed because a greater node exists to its right."),
+      text("Các value còn trong stack là linked list sau khi xóa.", "Values left in the stack form the linked list after removals."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi node vào stack một lần và bị pop nhiều nhất một lần.", "Each node enters the stack once and is popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def removeNodes(self, head):",
+      "        stack = []",
+      "        curr = head",
+      "        while curr:",
+      "            while stack and stack[-1].val < curr.val:",
+      "                stack.pop()",
+      "            stack.append(curr)",
+      "            curr = curr.next",
+      "        dummy = ListNode(0)",
+      "        tail = dummy",
+      "        for node in stack:",
+      "            tail.next = node",
+      "            tail = node",
+      "        tail.next = None",
+      "        return dummy.next",
+    ],
+    liveArgs: (input) => [{ __viz_type: "linked_list", values: parseNums(input, "head") }],
+    builder: buildSteps2487,
+  },
   2865: simpleProblem({ id: 2865, difficulty: "medium", slug: "beautiful-towers-i", name: "Beautiful Towers I", viName: "Beautiful Towers I", statement: text("Chọn peak và giảm độ cao hai phía để tổng height lớn nhất.", "Choose a peak and lower both sides to maximize total height."), defaultInput: "5,3,4,1,1", solver: arrayBuilder(beautifulTowers) }),
   2866: simpleProblem({ id: 2866, difficulty: "medium", slug: "beautiful-towers-ii", name: "Beautiful Towers II", viName: "Beautiful Towers II", statement: text("Phiên bản lớn của Beautiful Towers dùng stack/prefix sum.", "Larger Beautiful Towers variant using stack/prefix sums."), defaultInput: "6,5,3,9,2,7", solver: arrayBuilder(beautifulTowers) }),
   768: simpleProblem({ id: 768, difficulty: "hard", slug: "max-chunks-to-make-sorted-ii", name: "Max Chunks To Make Sorted II", viName: "Số chunk tối đa để sort II", statement: text("Chia mảng có duplicate thành nhiều chunk nhất để sort từng chunk rồi ghép lại sorted.", "Split an array with duplicates into the maximum number of chunks that sort independently."), defaultInput: "5,4,3,2,1", solver: arrayBuilder(maxChunksII) }),

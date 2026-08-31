@@ -8282,15 +8282,19 @@ function buildSteps496(input, params = {}) {
       note,
       final: Boolean(final),
       stackView: {
-        title: "Monotonic decreasing stack (nums2 values waiting for next greater)",
+        title: readingNums1
+          ? "Lookup nums1 values in the resolved map"
+          : "Monotonic decreasing stack (nums2 values waiting for next greater)",
         emptyLabel: "no unresolved nums2 value",
         items: stackItems(),
-        input: [...nums2],
-        current: readingNums1 ? -1 : index,
-        inputLabel: "nums2 scan builds value -> next greater map",
-        expected: value,
+        input: readingNums1 ? [...nums1] : [...nums2],
+        current: readingNums1 ? lookupIndex : index,
+        inputLabel: readingNums1
+          ? "nums1 lookup uses value -> next greater map"
+          : "nums2 scan builds value -> next greater map",
+        expected: readingNums1 ? lookupValue : value,
         status: [
-          { label: "current nums2 value", value: value || "-" },
+          { label: readingNums1 ? "current nums1 value" : "current nums2 value", value: (readingNums1 ? lookupValue : value) || "-" },
           { label: "stack top", value: top ? `${top.value}@${top.index}` : "empty" },
           { label: "resolved map", value: mappingText() },
           { label: "nums1 result", value: resultText() },
