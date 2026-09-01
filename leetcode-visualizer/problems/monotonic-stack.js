@@ -2923,6 +2923,322 @@ function maximumBooks(nums) {
   return best;
 }
 
+function buildSteps3113(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 18) throw new Error("Use up to 18 numbers so the stack trace stays readable.");
+  const steps = [];
+  const stack = [];
+  let ans = 0;
+  const codeLines = {
+    init: [3, 4],
+    loop: [5],
+    pop: [6, 7],
+    pushNew: [8, 9],
+    mergeEqual: [10, 11],
+    add: [12],
+    done: [13],
+  };
+  const sub = nums.map((value, index) => `i=${index} · ${value}`);
+  const stackItems = () => stack.map((entry) => ({ value: entry.value, detail: `count=${entry.count}` }));
+  const stackText = () => `[${stack.map((entry) => `${entry.value}×${entry.count}`).join(", ")}]`;
+
+  function snap(o) {
+    const top = stack.length ? stack.at(-1) : null;
+    steps.push({
+      title: o.title,
+      arr: [...nums],
+      sub,
+      highlight: Number.isInteger(o.index) ? [o.index] : [],
+      mark: stack.flatMap((entry) => entry.indices || []),
+      codeLines: o.codeLines || [],
+      vars: [
+        { name: "i", value: Number.isInteger(o.index) ? o.index : "-" },
+        { name: "x", value: Number.isInteger(o.index) ? nums[o.index] : "-" },
+        { name: "stack", value: stackText() },
+        { name: "top", value: top ? `${top.value}×${top.count}` : "empty" },
+        { name: "ans", value: ans },
+        ...(o.vars || []),
+      ],
+      note: o.note,
+      final: o.final || false,
+      stackView: {
+        title: "Monotonic decreasing stack: value × equal-count",
+        emptyLabel: "stack empty",
+        items: stackItems(),
+        input: [...nums],
+        current: Number.isInteger(o.index) ? o.index : -1,
+        inputLabel: "nums",
+        expected: Number.isInteger(o.index) ? nums[o.index] : "",
+        status: [
+          { label: "answer", value: ans },
+          { label: "top", value: top ? `${top.value}×${top.count}` : "empty" },
+          { label: "meaning", value: "same boundary maximums still alive" },
+        ],
+      },
+    });
+  }
+
+  snap({
+    title: text("Dòng 3-4: stack rỗng, ans = 0", "Lines 3-4: empty stack, ans = 0"),
+    codeLines: codeLines.init,
+    note: text(
+      "Stack giảm dần theo value. Mỗi entry value×count nghĩa là có count điểm bắt đầu cùng value còn có thể ghép với value hiện tại.",
+      "The stack is decreasing by value. Each value×count entry means count equal-value starts can still pair with the current value.",
+    ),
+  });
+
+  nums.forEach((x, i) => {
+    snap({
+      title: text(`Dòng 5: xét nums[${i}] = ${x}`, `Line 5: inspect nums[${i}] = ${x}`),
+      index: i,
+      codeLines: codeLines.loop,
+      note: text(
+        "Ta muốn x làm boundary maximum bên phải. Mọi value nhỏ hơn x trên stack bị x chặn, không thể ghép qua x nữa.",
+        "We want x to be the right boundary maximum. Any smaller value on top is blocked by x and cannot pair across it.",
+      ),
+    });
+
+    while (stack.length && stack.at(-1).value < x) {
+      const removed = stack.pop();
+      snap({
+        title: text(`Dòng 6-7: pop ${removed.value} vì ${removed.value} < ${x}`, `Lines 6-7: pop ${removed.value} because ${removed.value} < ${x}`),
+        index: i,
+        codeLines: codeLines.pop,
+        vars: [{ name: "removed", value: `${removed.value}×${removed.count}` }],
+        note: text(
+          `${x} lớn hơn ${removed.value}, nên subarray đi qua ${x} sẽ có maximum là ${x}; ${removed.value} không còn làm boundary maximum được.`,
+          `${x} is larger than ${removed.value}, so a subarray crossing ${x} has maximum ${x}; ${removed.value} can no longer be the boundary maximum.`,
+        ),
+      });
+    }
+
+    if (!stack.length || stack.at(-1).value > x) {
+      stack.push({ value: x, count: 1, indices: [i] });
+      snap({
+        title: text(`Dòng 8-9: push nhóm mới ${x}×1`, `Lines 8-9: push new group ${x}×1`),
+        index: i,
+        codeLines: codeLines.pushNew,
+        vars: [{ name: "new valid subarray", value: `[${i},${i}]` }],
+        note: text(
+          `Không có top bằng ${x}. Chỉ subarray một phần tử [${i},${i}] chắc chắn hợp lệ.`,
+          `There is no top equal to ${x}. Only the single-element subarray [${i},${i}] is guaranteed valid.`,
+        ),
+      });
+    } else {
+      stack.at(-1).count += 1;
+      stack.at(-1).indices.push(i);
+      snap({
+        title: text(`Dòng 10-11: gặp lại ${x}, tăng count`, `Lines 10-11: see ${x} again, increment count`),
+        index: i,
+        codeLines: codeLines.mergeEqual,
+        vars: [{ name: "equal boundaries", value: stack.at(-1).count }],
+        note: text(
+          `Top cũng là ${x}. Vì mọi số nhỏ hơn đã bị pop, mỗi ${x} còn sống tạo một subarray hợp lệ kết thúc tại i.`,
+          `The top is also ${x}. Since smaller values were popped, every surviving ${x} forms a valid subarray ending at i.`,
+        ),
+      });
+    }
+
+    ans += stack.at(-1).count;
+    snap({
+      title: text(`Dòng 12: ans += ${stack.at(-1).count} → ${ans}`, `Line 12: ans += ${stack.at(-1).count} → ${ans}`),
+      index: i,
+      codeLines: codeLines.add,
+      vars: [{ name: "new valid subarrays ending here", value: stack.at(-1).count }],
+      note: text(
+        "Cộng số boundary bên trái có cùng value với x và không bị phần tử lớn hơn chắn giữa đường.",
+        "Add the number of left boundaries equal to x that are not separated by a larger element.",
+      ),
+    });
+  });
+
+  snap({
+    title: text(`Kết quả: ${ans}`, `Result: ${ans}`),
+    codeLines: codeLines.done,
+    note: text("Mỗi phần tử được push một lần và pop tối đa một lần, nên O(n).", "Each element is pushed once and popped at most once, so the scan is O(n)."),
+    final: true,
+  });
+  return { original: nums, answer: ans, steps };
+}
+
+function dominanceBounds3430(nums, wantMin) {
+  const n = nums.length;
+  const left = Array(n).fill(-1);
+  const right = Array(n).fill(n);
+  let stack = [];
+  for (let i = 0; i < n; i++) {
+    while (stack.length && (wantMin ? nums[stack.at(-1)] > nums[i] : nums[stack.at(-1)] < nums[i])) stack.pop();
+    left[i] = stack.length ? stack.at(-1) : -1;
+    stack.push(i);
+  }
+  stack = [];
+  for (let i = n - 1; i >= 0; i--) {
+    while (stack.length && (wantMin ? nums[stack.at(-1)] >= nums[i] : nums[stack.at(-1)] <= nums[i])) stack.pop();
+    right[i] = stack.length ? stack.at(-1) : n;
+    stack.push(i);
+  }
+  return { left, right };
+}
+
+function boundedPairCount(leftChoices, rightChoices, k) {
+  let count = 0;
+  for (let left = 1; left <= leftChoices; left++) {
+    count += Math.max(0, Math.min(rightChoices, k - left + 1));
+  }
+  return count;
+}
+
+function compute3430(nums, k, wantMin) {
+  const { left, right } = dominanceBounds3430(nums, wantMin);
+  let total = 0;
+  const rows = nums.map((value, i) => {
+    const leftChoices = i - left[i];
+    const rightChoices = right[i] - i;
+    const count = boundedPairCount(leftChoices, rightChoices, k);
+    const contribution = value * count;
+    total += contribution;
+    return { i, value, left: left[i], right: right[i], leftChoices, rightChoices, count, contribution };
+  });
+  return { total, rows };
+}
+
+function buildSteps3430(input, params = {}) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers so the contribution table stays readable.");
+  const k = Math.max(1, Math.min(nums.length, Number(params.k) || 2));
+  const minPart = compute3430(nums, k, true);
+  const maxPart = compute3430(nums, k, false);
+  const answer = minPart.total + maxPart.total;
+  const steps = [];
+  const sub = nums.map((value, index) => `i=${index} · ${value}`);
+  const codeLines = {
+    helper: [3, 4],
+    bounds: [5, 6, 7, 8, 9, 10, 11, 12],
+    count: [14, 15, 16, 17, 18, 19, 20],
+    combine: [22, 23, 24, 25, 26, 27, 28, 29],
+  };
+
+  function tableRows(rows, current) {
+    return rows.map((row) => ({
+      value: row.value,
+      detail: `i=${row.i} L=${row.left} R=${row.right} count=${row.count}${row.i === current ? " ← current" : ""}`,
+    }));
+  }
+
+  function snap(o) {
+    const rows = o.rows || [];
+    steps.push({
+      title: o.title,
+      arr: [...nums],
+      sub,
+      highlight: Number.isInteger(o.index) ? [o.index] : [],
+      mark: Number.isInteger(o.index) ? [o.index] : [],
+      codeLines: o.codeLines || [],
+      vars: [
+        { name: "k", value: k },
+        { name: "minSum", value: minPart.total },
+        { name: "maxSum", value: maxPart.total },
+        { name: "answer", value: answer },
+        ...(o.vars || []),
+      ],
+      note: o.note,
+      final: o.final || false,
+      stackView: {
+        title: o.stackTitle || "Contribution rows",
+        emptyLabel: "no rows yet",
+        items: tableRows(rows, o.index),
+        input: [...nums],
+        current: Number.isInteger(o.index) ? o.index : -1,
+        inputLabel: "nums",
+        expected: Number.isInteger(o.index) ? nums[o.index] : "",
+        status: [
+          { label: "mode", value: o.mode || "-" },
+          { label: "k", value: k },
+          { label: "partial", value: o.partial ?? "-" },
+        ],
+      },
+    });
+  }
+
+  snap({
+    title: text("Ý tưởng: cộng contribution của min và max", "Idea: add min and max contributions"),
+    codeLines: codeLines.helper,
+    vars: [{ name: "valid subarray length", value: `<= ${k}` }],
+    note: text(
+      "Mỗi index đóng góp value * số subarray dài không quá k mà nó là minimum, cộng thêm value * số subarray mà nó là maximum.",
+      "Each index contributes value * the number of length-at-most-k subarrays where it is the minimum, plus the same idea for maximum.",
+    ),
+  });
+
+  let runningMin = 0;
+  minPart.rows.forEach((row) => {
+    runningMin += row.contribution;
+    snap({
+      title: text(`MIN i=${row.i}: ${row.value} thống trị ${row.count} subarray`, `MIN i=${row.i}: ${row.value} owns ${row.count} subarrays`),
+      index: row.i,
+      rows: minPart.rows.slice(0, row.i + 1),
+      mode: "minimum",
+      partial: runningMin,
+      codeLines: codeLines.bounds.concat(codeLines.count),
+      vars: [
+        { name: "prev smaller/equal", value: row.left },
+        { name: "next smaller", value: row.right },
+        { name: "left choices", value: row.leftChoices },
+        { name: "right choices", value: row.rightChoices },
+        { name: "bounded count", value: row.count },
+        { name: "contribution", value: `${row.value} * ${row.count} = ${row.contribution}` },
+      ],
+      note: text(
+        `Với minimum, biên trái dừng ở phần tử <= ${row.value}, biên phải dừng ở phần tử < ${row.value}. Chỉ đếm cặp left/right tạo độ dài <= k.`,
+        `For minimum, the left boundary stops at <= ${row.value}, the right boundary stops at < ${row.value}. Count only left/right pairs whose length is <= k.`,
+      ),
+      stackTitle: "Minimum contribution rows",
+    });
+  });
+
+  let runningMax = 0;
+  maxPart.rows.forEach((row) => {
+    runningMax += row.contribution;
+    snap({
+      title: text(`MAX i=${row.i}: ${row.value} thống trị ${row.count} subarray`, `MAX i=${row.i}: ${row.value} owns ${row.count} subarrays`),
+      index: row.i,
+      rows: maxPart.rows.slice(0, row.i + 1),
+      mode: "maximum",
+      partial: runningMax,
+      codeLines: codeLines.bounds.concat(codeLines.count),
+      vars: [
+        { name: "prev greater/equal", value: row.left },
+        { name: "next greater", value: row.right },
+        { name: "left choices", value: row.leftChoices },
+        { name: "right choices", value: row.rightChoices },
+        { name: "bounded count", value: row.count },
+        { name: "contribution", value: `${row.value} * ${row.count} = ${row.contribution}` },
+      ],
+      note: text(
+        `Với maximum, biên trái dừng ở phần tử >= ${row.value}, biên phải dừng ở phần tử > ${row.value}. Cách tie-break này tránh đếm trùng khi có số bằng nhau.`,
+        `For maximum, the left boundary stops at >= ${row.value}, the right boundary stops at > ${row.value}. This tie-break avoids double counting equal values.`,
+      ),
+      stackTitle: "Maximum contribution rows",
+    });
+  });
+
+  snap({
+    title: text(`Kết quả: ${minPart.total} + ${maxPart.total} = ${answer}`, `Result: ${minPart.total} + ${maxPart.total} = ${answer}`),
+    codeLines: codeLines.combine,
+    vars: [
+      { name: "sum of minimums", value: minPart.total },
+      { name: "sum of maximums", value: maxPart.total },
+    ],
+    note: text(
+      "Bài hỏi tổng minimum + maximum trên mọi subarray có độ dài tối đa k.",
+      "The problem asks for minimum + maximum over every subarray whose length is at most k.",
+    ),
+    final: true,
+  });
+
+  return { original: nums, answer, steps };
+}
+
 function simpleProblem({ id, difficulty, slug, name, viName, statement, defaultInput, inputKind = "string", inputLabel = null, tags = [arrayTag, monoTag], premium = false, solver, extraParams = [], complexity = null }) {
   return {
     id,
@@ -3605,6 +3921,101 @@ module.exports = {
     ],
     liveArgs: (input, params) => [String(input ?? ""), Number(params.k), String(params.letter ?? "e")[0] || "e", Number(params.repetition)],
     builder: buildSteps2030,
+  },
+  3113: {
+    id: 3113,
+    difficulty: "hard",
+    slug: "find-the-number-of-subarrays-where-boundary-elements-are-maximum",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Find the Number of Subarrays Where Boundary Elements Are Maximum"),
+    titleVi: text("Đếm subarray có hai biên là maximum", "Find the Number of Subarrays Where Boundary Elements Are Maximum"),
+    statement: text(
+      "Đếm số subarray mà phần tử đầu và phần tử cuối đều bằng maximum của subarray đó.",
+      "Count subarrays whose first and last elements are both equal to the maximum element in that subarray.",
+    ),
+    defaultInput: "1,4,3,3,2",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    approach: [
+      text("Giữ stack giảm dần theo value; value nhỏ hơn số hiện tại bị pop vì đã bị số lớn hơn chắn.", "Keep a decreasing stack by value; smaller values are popped because the current larger value blocks them."),
+      text("Mỗi entry lưu value và count số value bằng nhau còn sống trên stack.", "Each entry stores a value and how many equal values are still alive on the stack."),
+      text("Khi gặp lại cùng value ở top, tăng count; count đó chính là số subarray hợp lệ kết thúc tại vị trí hiện tại.", "When the top has the same value, increment its count; that count is the number of valid subarrays ending at the current position."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi phần tử được push một lần và pop tối đa một lần.", "Each element is pushed once and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def numberOfSubarrays(self, nums):",
+      "        stack = []",
+      "        ans = 0",
+      "        for x in nums:",
+      "            while stack and stack[-1][0] < x:",
+      "                stack.pop()",
+      "            if not stack or stack[-1][0] > x:",
+      "                stack.append([x, 1])",
+      "            else:",
+      "                stack[-1][1] += 1",
+      "            ans += stack[-1][1]",
+      "        return ans",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps3113,
+  },
+  3430: {
+    id: 3430,
+    difficulty: "hard",
+    slug: "maximum-and-minimum-sums-of-at-most-size-k-subarrays",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Maximum and Minimum Sums of at Most Size K Subarrays"),
+    titleVi: text("Tổng max và min của subarray dài tối đa k", "Maximum and Minimum Sums of at Most Size K Subarrays"),
+    statement: text(
+      "Tính tổng min(subarray) + max(subarray) trên mọi subarray có độ dài không quá k.",
+      "Compute the sum of min(subarray) + max(subarray) over all subarrays whose length is at most k.",
+    ),
+    defaultInput: "1,2,3",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [{ key: "k", label: text("k (độ dài tối đa)", "k (maximum size)"), default: 2, min: 1 }],
+    approach: [
+      text("Tính riêng tổng contribution của minimum và maximum.", "Compute minimum and maximum contributions separately."),
+      text("Dùng monotonic stack để tìm prev/next boundary nơi nums[i] còn là min hoặc max duy nhất theo tie-break.", "Use monotonic stacks to find prev/next boundaries where nums[i] owns the min or max role under a tie-break."),
+      text("Với leftChoices và rightChoices, chỉ đếm các cặp tạo subarray có độ dài <= k.", "Given leftChoices and rightChoices, count only pairs that form subarrays of length <= k."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Boundary dùng stack O(n); visualization đếm bounded pairs trực tiếp để dễ nhìn.", "Boundaries use O(n) stacks; the visualization counts bounded pairs directly for readability.") },
+    code: [
+      "class Solution:",
+      "    def minMaxSubarraySum(self, nums, k):",
+      "        def bounds(is_min):",
+      "            left, right, stack = [-1] * len(nums), [len(nums)] * len(nums), []",
+      "            for i, x in enumerate(nums):",
+      "                while stack and ((nums[stack[-1]] > x) if is_min else (nums[stack[-1]] < x)): stack.pop()",
+      "                left[i] = stack[-1] if stack else -1",
+      "                stack.append(i)",
+      "            stack = []",
+      "            for i in range(len(nums) - 1, -1, -1):",
+      "                while stack and ((nums[stack[-1]] >= nums[i]) if is_min else (nums[stack[-1]] <= nums[i])): stack.pop()",
+      "                right[i] = stack[-1] if stack else len(nums)",
+      "                stack.append(i)",
+      "            return left, right",
+      "        def count_pairs(a, b):",
+      "            m = min(a, k)",
+      "            full = max(0, min(m, k - b + 1))",
+      "            total = full * b",
+      "            t = m - full",
+      "            total += t * (k + 1) - (full + 1 + m) * t // 2",
+      "            return total",
+      "        def calc(is_min):",
+      "            left, right = bounds(is_min)",
+      "            total = 0",
+      "            for i, x in enumerate(nums):",
+      "                a, b = i - left[i], right[i] - i",
+      "                total += x * count_pairs(a, b)",
+      "            return total",
+      "        return calc(True) + calc(False)",
+    ],
+    liveArgs: (input, params) => [parseNums(input, "nums"), Number(params.k)],
+    builder: buildSteps3430,
   },
   2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),
