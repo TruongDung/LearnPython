@@ -7503,6 +7503,180 @@ function renderPathExistsBfsView(step) {
   renderGraph(step, "path1971BfsGraph");
 }
 
+function renderSubsets78BitmaskView(step) {
+  const view = step.subsets78BitmaskView || step.subsets90BitmaskView || {};
+  const vi = lang === "vi";
+  const duplicateMode = Boolean(view.duplicateMode);
+  const values = Array.isArray(view.values) ? view.values : [];
+  const n = Number.isInteger(view.n) ? view.n : values.length;
+  const mask = Number.isInteger(view.mask) ? view.mask : 0;
+  const totalMasks = Number.isInteger(view.totalMasks) ? view.totalMasks : (1 << n);
+  const currentBit = Number.isInteger(view.currentBit) ? view.currentBit : null;
+  const subset = Array.isArray(view.subset) ? view.subset : [];
+  const recentSubsets = Array.isArray(view.recentSubsets) ? view.recentSubsets : [];
+  const phaseGroup = duplicateMode
+    ? (view.phase === "setup" ? "sort" : view.phase === "mask" ? "mask" : ["check", "choose"].includes(view.phase) ? "bits" : view.phase === "dedupe" ? "dedupe" : "result")
+    : (view.phase === "setup" ? "count" : view.phase === "mask" ? "mask" : ["check", "choose"].includes(view.phase) ? "bits" : view.phase === "save" ? "save" : "done");
+  const phaseLabels = duplicateMode
+    ? [["sort", vi ? "1. Sắp xếp" : "1. Sort"], ["mask", vi ? "2. Chọn mask" : "2. Choose mask"], ["bits", vi ? "3. Đọc bit" : "3. Read bits"], ["dedupe", vi ? "4. Khử trùng" : "4. Dedupe"], ["result", vi ? "5. Lưu / return" : "5. Save / return"]]
+    : [["count", vi ? "1. Đếm mask" : "1. Count masks"], ["mask", vi ? "2. Chọn mask" : "2. Choose mask"], ["bits", vi ? "3. Đọc bit" : "3. Read bits"], ["save", vi ? "4. Lưu subset" : "4. Save subset"], ["done", vi ? "5. Hoàn tất" : "5. Done"]];
+  const phaseHtml = phaseLabels.map(([key, label]) => `<span class="${phaseGroup === key ? "active" : ""}">${label}</span>`).join("");
+  const selectedAt = (index) => Boolean(mask & (1 << index));
+
+  const bitCells = Array.from({ length: n }, (_, displayIndex) => {
+    const index = n - 1 - displayIndex;
+    const selected = selectedAt(index);
+    return `<div class="sub78-bit ${selected ? "on" : "off"}${currentBit === index ? " current" : ""}">
+      <small>bit ${index}</small><strong>${selected ? 1 : 0}</strong>
+    </div>`;
+  }).join("") || `<div class="sub78-empty">${vi ? "Không có bit nào để đọc" : "No bits to read"}</div>`;
+
+  const elementsHtml = values.map((value, index) => {
+    const selected = selectedAt(index);
+    const state = selected
+      ? (vi ? "1 → chọn" : "1 → choose")
+      : (vi ? "0 → bỏ qua" : "0 → skip");
+    return `<div class="sub78-element ${selected ? "selected" : "skipped"}${currentBit === index ? " current" : ""}">
+      <small>nums[${index}] · bit ${index}</small>
+      <strong>${escapeHtml(String(value))}</strong>
+      <span>${state}</span>
+    </div>`;
+  }).join("") || `<div class="sub78-empty">${vi ? "nums rỗng tạo ra subset []" : "An empty nums still produces []"}</div>`;
+
+  const recentHtml = recentSubsets.length
+    ? recentSubsets.map((item, index) => {
+      const number = Math.max(0, Number(view.generatedCount || 0) - recentSubsets.length + index + 1);
+      return `<div class="sub78-saved${view.justSaved && index === recentSubsets.length - 1 ? " fresh" : ""}"><small>#${number}</small><strong>${escapeHtml(`[${item.join(", ")}]`)}</strong></div>`;
+    }).join("")
+    : `<div class="sub78-empty">${vi ? "Chưa lưu subset nào" : "No subset saved yet"}</div>`;
+  const generatedCount = Math.min(Number(view.generatedCount) || 0, totalMasks);
+  const progress = totalMasks ? Math.round((generatedCount / totalMasks) * 100) : 100;
+  const currentDecision = duplicateMode && view.phase === "dedupe"
+    ? (view.duplicate
+      ? (vi ? `Candidate [${subset.join(", ")}] trùng mask ${view.duplicateOf} → bỏ qua.` : `Candidate [${subset.join(", ")}] duplicates mask ${view.duplicateOf} → skip.`)
+      : (vi ? `Candidate [${subset.join(", ")}] chưa có key trong seen → sẽ lưu.` : `Candidate [${subset.join(", ")}] has a new seen key → save it.`))
+    : currentBit === null
+    ? (view.phase === "done"
+      ? (vi ? `Đã xét tất cả ${totalMasks} mask.` : `All ${totalMasks} masks have been processed.`)
+      : (vi ? "Mỗi bit quyết định một phần tử có thuộc subset hay không." : "Each bit decides whether one element belongs to the subset."))
+    : (vi
+      ? `Đang xét bit ${currentBit}: ${selectedAt(currentBit) ? "1 nên chọn" : "0 nên bỏ qua"} nums[${currentBit}].`
+      : `Checking bit ${currentBit}: ${selectedAt(currentBit) ? "1, so choose" : "0, so skip"} nums[${currentBit}].`);
+  const summary = vi
+    ? `Bitmask ${mask} trên ${n} phần tử; đã lưu ${generatedCount} trên ${totalMasks} subset.`
+    : `Bitmask ${mask} across ${n} elements; ${generatedCount} of ${totalMasks} subsets are saved.`;
+  const duplicateHtml = duplicateMode
+    ? `<section class="sub78-dedupe-panel ${view.phase === "dedupe" && view.duplicate ? "duplicate" : ""}">
+        <header><strong>SEEN · UNIQUE KEYS</strong><span>${vi ? "subset có cùng giá trị chỉ lưu một lần" : "equal-value subsets save once"}</span></header>
+        <div><small>${vi ? "candidate" : "candidate"}</small><code>${escapeHtml(`[${subset.join(", ")}]`)}</code></div>
+        <div><small>${vi ? "trạng thái" : "status"}</small><strong>${view.phase === "dedupe" && view.duplicate ? (vi ? `TRÙNG · mask ${view.duplicateOf}` : `DUPLICATE · mask ${view.duplicateOf}`) : (vi ? "KEY MỚI" : "NEW KEY")}</strong><span>${vi ? `${Number(view.skippedDuplicates) || 0} mask trùng đã bỏ` : `${Number(view.skippedDuplicates) || 0} duplicate mask(s) skipped`}</span></div>
+      </section>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="sub78-viz${duplicateMode ? " duplicate-mode" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sub78-phases">${phaseHtml}</div>
+    <section class="sub78-mask-panel">
+      <header><strong>${duplicateMode ? "BITMASK → CANDIDATE" : "BITMASK → SUBSET"}</strong><span>${vi ? "bit phải nhất là bit 0" : "rightmost bit is bit 0"}</span></header>
+      <div class="sub78-mask-readout"><small>mask</small><strong>${mask}</strong><code>0b${escapeHtml(String(view.bits || mask.toString(2).padStart(n || 1, "0")))}</code></div>
+      <div class="sub78-bit-row">${bitCells}</div>
+      <div class="sub78-decision">${escapeHtml(currentDecision)}</div>
+    </section>
+    <section class="sub78-elements-panel">
+      <header><strong>NUMS ↔ BITS</strong><span>${vi ? "bit i = 1 chọn nums[i]" : "bit i = 1 selects nums[i]"}</span></header>
+      <div class="sub78-elements">${elementsHtml}</div>
+    </section>
+    ${duplicateHtml}
+    <div class="sub78-lower">
+      <section class="sub78-subset-panel">
+        <header><strong>${vi ? "SUBSET ĐANG TẠO" : "CURRENT SUBSET"}</strong><span>${subset.length} ${vi ? "phần tử" : "element(s)"}</span></header>
+        <code>${escapeHtml(`[${subset.join(", ")}]`)}</code>
+      </section>
+      <section class="sub78-saved-panel">
+        <header><strong>${vi ? "SUBSETS ĐÃ LƯU" : "SAVED SUBSETS"}</strong><span>${generatedCount}/${totalMasks}${duplicateMode ? ` · −${Number(view.skippedDuplicates) || 0}` : ""}</span></header>
+        <div class="sub78-progress" role="progressbar" aria-label="Saved subsets" aria-valuenow="${generatedCount}" aria-valuemin="0" aria-valuemax="${totalMasks}"><span style="width:${progress}%"></span></div>
+        <div class="sub78-saved-list">${recentHtml}</div>
+      </section>
+    </div>
+    <div class="sub78-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
+}
+
+function renderSubsets90BitmaskView(step) {
+  renderSubsets78BitmaskView(step);
+}
+
+function renderBinaryWatch401View(step) {
+  const view = step.binaryWatch401View || {};
+  const vi = lang === "vi";
+  const mask = Number.isInteger(view.mask) ? view.mask : 0;
+  const hour = Number.isInteger(view.hour) ? view.hour : 0;
+  const minute = Number.isInteger(view.minute) ? view.minute : 0;
+  const turnedOn = Number.isInteger(view.turnedOn) ? view.turnedOn : 0;
+  const valid = Boolean(view.valid);
+  const phaseGroup = view.phase === "setup"
+    ? "setup"
+    : view.phase === "decode"
+      ? "decode"
+      : view.phase === "reject"
+        ? "validate"
+        : view.phase === "save"
+          ? "save"
+          : "done";
+  const phases = [
+    ["setup", vi ? "1. Chọn số LED" : "1. Set LED count"],
+    ["decode", vi ? "2. Tách mask" : "2. Decode mask"],
+    ["validate", vi ? "3. Kiểm tra giờ" : "3. Validate time"],
+    ["save", vi ? "4. Lưu thời gian" : "4. Save time"],
+    ["done", vi ? "5. Return" : "5. Return"],
+  ].map(([key, label]) => `<span class="${phaseGroup === key ? "active" : ""}">${label}</span>`).join("");
+  const isOn = (bit) => Boolean(mask & (1 << bit));
+  const ledHtml = (bits, group) => bits.map((bit) => {
+    const value = bit < 4 ? (1 << bit) : (1 << (bit - 4));
+    return `<div class="watch401-led ${isOn(bit) ? "on" : "off"}">
+      <small>bit ${bit}</small><strong>${value}</strong><span>${isOn(bit) ? "1" : "0"}</span>
+    </div>`;
+  }).join("");
+  const timeText = `${hour}:${String(minute).padStart(2, "0")}`;
+  const recentTimes = Array.isArray(view.recentTimes) ? view.recentTimes : [];
+  const timesHtml = recentTimes.length
+    ? recentTimes.map((time, index) => `<span class="watch401-time${view.justSaved && index === recentTimes.length - 1 ? " fresh" : ""}">${escapeHtml(String(time))}</span>`).join("")
+    : `<span class="watch401-empty">${vi ? "Chưa có thời gian hợp lệ" : "No valid time yet"}</span>`;
+  const resultCount = Number(view.resultCount) || 0;
+  const candidateCount = Number(view.candidateCount) || 0;
+  const checkedCount = Number(view.checkedCount) || 0;
+  const rejectedCount = Number(view.rejectedCount) || 0;
+  const summary = vi
+    ? `Mask ${mask} bật ${view.litCount || 0} LED, giải mã thành ${timeText}.`
+    : `Mask ${mask} lights ${view.litCount || 0} LEDs and decodes to ${timeText}.`;
+
+  $("treeView").innerHTML = `<section class="watch401-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="watch401-phases">${phases}</div>
+    <section class="watch401-overview">
+      <div><small>turnedOn</small><strong>${turnedOn}</strong><span>${vi ? "LED phải bật" : "LEDs required"}</span></div>
+      <div><small>mask</small><strong>${mask}</strong><code>0b${escapeHtml(String(view.bits || mask.toString(2).padStart(10, "0")))}</code></div>
+      <div><small>${vi ? "đã xét" : "checked"}</small><strong>${checkedCount}/${candidateCount}</strong><span>${rejectedCount} ${vi ? "bị loại" : "rejected"}</span></div>
+    </section>
+    <section class="watch401-led-panel">
+      <header><strong>10 LEDS → TIME</strong><span>${vi ? "4 bit giờ · 6 bit phút" : "4 hour bits · 6 minute bits"}</span></header>
+      <div class="watch401-led-groups">
+        <section><header><strong>HOUR</strong><span>8 · 4 · 2 · 1</span></header><div class="watch401-led-row">${ledHtml([3, 2, 1, 0], "hour")}</div></section>
+        <section><header><strong>MINUTE</strong><span>32 · 16 · 8 · 4 · 2 · 1</span></header><div class="watch401-led-row">${ledHtml([9, 8, 7, 6, 5, 4], "minute")}</div></section>
+      </div>
+    </section>
+    <section class="watch401-decode ${valid ? "valid" : "invalid"}">
+      <div><small>hour = mask &amp; 0b1111</small><strong>${hour}</strong></div>
+      <b>:</b>
+      <div><small>minute = mask &gt;&gt; 4</small><strong>${String(minute).padStart(2, "0")}</strong></div>
+      <aside><strong>${valid ? timeText : (vi ? "KHÔNG HỢP LỆ" : "INVALID")}</strong><span>${valid ? (vi ? "hour &lt; 12 và minute &lt; 60" : "hour &lt; 12 and minute &lt; 60") : (vi ? "mask bị bỏ qua" : "mask is skipped")}</span></aside>
+    </section>
+    <section class="watch401-results">
+      <header><strong>${vi ? "THỜI GIAN ĐÃ LƯU" : "SAVED TIMES"}</strong><span>${resultCount} ${vi ? "hợp lệ" : "valid"}</span></header>
+      <div>${timesHtml}</div>
+    </section>
+    <div class="watch401-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
+}
+
 function renderCriticalPoints2058View(step) {
   const view = step.criticalPoints2058View || {};
   const vi = lang === "vi";
@@ -24423,6 +24597,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.remove("hidden");
     renderBfsGrid(step);
+  } else if (step.subsets90BitmaskView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSubsets90BitmaskView(step);
+  } else if (step.subsets78BitmaskView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSubsets78BitmaskView(step);
   } else if (step.criticalPoints2058View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

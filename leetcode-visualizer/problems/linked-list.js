@@ -4081,7 +4081,6 @@ module.exports = {
       space: "O(1)",
       note: { vi: "Chỉ cần một lượt quét và vài biến chỉ số.", en: "Only one scan and a few index variables are needed." },
     },
-    debugMode: "semantic",
     code: [
       "class Solution:",
       "    def nodesBetweenCriticalPoints(self, head: Optional[ListNode]) -> List[int]:",
