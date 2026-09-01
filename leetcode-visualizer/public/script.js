@@ -7503,6 +7503,151 @@ function renderPathExistsBfsView(step) {
   renderGraph(step, "path1971BfsGraph");
 }
 
+function renderCriticalPoints2058View(step) {
+  const view = step.criticalPoints2058View || {};
+  const vi = lang === "vi";
+  const values = Array.isArray(view.values) ? view.values : [];
+  const points = Array.isArray(view.points) ? view.points : [];
+  const pointByIndex = new Map(points.map((point) => [point.index, point]));
+  const comparison = view.comparison;
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const phaseGroup = view.phase === "rule"
+    ? "rule"
+    : view.phase === "inspect" || view.phase === "move"
+      ? "inspect"
+      : view.phase === "record"
+        ? "record"
+        : view.phase === "distance"
+          ? "distance"
+          : "result";
+  const phaseHtml = [
+    ["rule", vi ? "1. Quy tắc" : "1. Rule"],
+    ["inspect", vi ? "2. Xét bộ ba" : "2. Inspect triple"],
+    ["record", vi ? "3. Lưu critical" : "3. Save critical"],
+    ["distance", vi ? "4. Tính khoảng cách" : "4. Update distances"],
+    ["result", vi ? "5. Kết quả" : "5. Result"],
+  ].map(([key, label]) => `<span class="${phaseGroup === key ? "active" : ""}">${label}</span>`).join("");
+
+  const listHtml = values.map((value, index) => {
+    const point = pointByIndex.get(index);
+    const roles = [];
+    if (current > 0 && current < values.length - 1) {
+      if (index === current - 1) roles.push("prev");
+      if (index === current) roles.push("curr");
+      if (index === current + 1) roles.push("next");
+    }
+    const isCandidate = index === current && comparison && comparison.isCritical && !point;
+    const classes = ["cp2058-node"];
+    if (index <= Number(view.inspectedThrough)) classes.push("seen");
+    if (roles.length) classes.push("in-window");
+    if (index === current) classes.push("current");
+    if (point) classes.push("critical", point.type);
+    if (isCandidate) classes.push("candidate", comparison.type);
+    if (index === view.newCritical) classes.push("new-critical");
+
+    let label = vi ? "node thường" : "normal node";
+    if (index === 0) label = "HEAD";
+    if (index === values.length - 1) label = "TAIL";
+    if (point) label = `C${point.order} · ${point.type.toUpperCase()}`;
+    if (isCandidate) label = vi ? `${comparison.type.toUpperCase()} · sắp lưu` : `${comparison.type.toUpperCase()} · save next`;
+
+    const node = `<div class="cp2058-node-wrap">
+      <div class="cp2058-pointer-slot">${roles.map((role) => `<span class="${role}">${role}</span>`).join("")}</div>
+      <div class="${classes.join(" ")}">
+        <small>index ${index}</small>
+        <strong>${escapeHtml(String(value))}</strong>
+        <span>${escapeHtml(label)}</span>
+      </div>
+    </div>`;
+    return index < values.length - 1 ? `${node}<b class="cp2058-next" aria-hidden="true">→</b>` : node;
+  }).join("");
+
+  let comparisonHtml;
+  if (comparison) {
+    const verdict = comparison.isPeak
+      ? (vi ? "PEAK: lớn hơn cả hai bên" : "PEAK: greater than both sides")
+      : comparison.isValley
+        ? (vi ? "VALLEY: nhỏ hơn cả hai bên" : "VALLEY: smaller than both sides")
+        : (vi ? "KHÔNG CRITICAL: không thỏa cả hai quy tắc" : "NOT CRITICAL: neither rule passes");
+    comparisonHtml = `<div class="cp2058-triple">
+        <span><small>prev</small><strong>${comparison.left}</strong></span>
+        <b>←</b>
+        <span class="curr"><small>curr</small><strong>${comparison.current}</strong></span>
+        <b>→</b>
+        <span><small>next</small><strong>${comparison.right}</strong></span>
+      </div>
+      <div class="cp2058-tests">
+        <div class="${comparison.isPeak ? "pass" : "fail"}"><span>PEAK</span><code>${comparison.current} &gt; ${comparison.left} AND ${comparison.current} &gt; ${comparison.right}</code><strong>${comparison.isPeak ? "TRUE" : "FALSE"}</strong></div>
+        <div class="${comparison.isValley ? "pass valley" : "fail"}"><span>VALLEY</span><code>${comparison.current} &lt; ${comparison.left} AND ${comparison.current} &lt; ${comparison.right}</code><strong>${comparison.isValley ? "TRUE" : "FALSE"}</strong></div>
+      </div>
+      <div class="cp2058-verdict ${comparison.type}"><strong>${escapeHtml(verdict)}</strong><span>${comparison.isCritical ? (vi ? "Node curr là critical point." : "The curr node is a critical point.") : (vi ? "Bỏ qua node curr và dịch cửa sổ." : "Skip curr and slide the window.")}</span></div>`;
+  } else if (view.phase === "result") {
+    comparisonHtml = `<div class="cp2058-no-comparison done"><strong>${vi ? "Đã xét xong mọi node giữa" : "All middle nodes are processed"}</strong><span>${vi ? "Head và tail luôn bị loại khỏi phép kiểm tra." : "Head and tail are always excluded from the check."}</span></div>`;
+  } else {
+    comparisonHtml = `<div class="cp2058-no-comparison"><strong>${vi ? "Chỉ kiểm tra node curr ở giữa" : "Only inspect the middle curr node"}</strong><span>prev &lt; curr &gt; next = PEAK</span><span>prev &gt; curr &lt; next = VALLEY</span></div>`;
+  }
+
+  const timelineHtml = points.length
+    ? points.map((point, index) => {
+        const chip = `<div class="cp2058-point ${point.type}${point.index === view.newCritical ? " fresh" : ""}"><small>C${point.order}</small><strong>index ${point.index}</strong><span>value ${point.value} · ${point.type}</span></div>`;
+        if (index === points.length - 1) return chip;
+        const gap = points[index + 1].index - point.index;
+        return `${chip}<div class="cp2058-gap"><span>${vi ? "khoảng cách" : "distance"}</span><strong>${points[index + 1].index} − ${point.index} = ${gap}</strong></div>`;
+      }).join("")
+    : `<div class="cp2058-empty">${vi ? "Chưa tìm thấy critical point" : "No critical point found yet"}</div>`;
+
+  const valueOrDash = (value) => value == null || value < 0 ? "—" : value;
+  const minLabel = view.minDistance == null ? "∞" : view.minDistance;
+  const maxLabel = view.maxDistance == null
+    ? (view.span == null ? "—" : `${view.span}*`)
+    : view.maxDistance;
+  const maxHint = view.maxDistance == null && view.span != null
+    ? (vi ? "span hiện tại" : "current span")
+    : (vi ? "critical đầu → cuối" : "first → last critical");
+
+  let formulaHtml = `<strong>${vi ? "Cần ít nhất 2 critical point để có khoảng cách" : "At least 2 critical points are needed for a distance"}</strong>`;
+  if (view.latestGap != null) {
+    const previousMin = view.previousMin == null ? "∞" : view.previousMin;
+    formulaHtml = `<div><small>${vi ? "GAP MỚI" : "NEW GAP"}</small><strong>index hiện tại − prev_critical = ${view.latestGap}</strong></div>
+      <div><small>MIN</small><strong>min(${previousMin}, ${view.latestGap}) = ${minLabel}</strong></div>
+      <div><small>${vi ? "SPAN TỪ CRITICAL ĐẦU" : "SPAN FROM FIRST CRITICAL"}</small><strong>${view.span}</strong></div>`;
+  } else if (Array.isArray(view.answer)) {
+    formulaHtml = view.answer[0] === -1
+      ? `<div><small>${vi ? "KHÔNG ĐỦ MỘT CẶP" : "NO VALID PAIR"}</small><strong>return [-1, -1]</strong></div>`
+      : `<div><small>MIN</small><strong>${view.answer[0]}</strong><span>${vi ? "gap nhỏ nhất giữa hai C liên tiếp" : "smallest adjacent C gap"}</span></div>
+        <div><small>MAX</small><strong>${view.prevCritical} − ${view.firstCritical} = ${view.answer[1]}</strong><span>${vi ? "critical cuối − critical đầu" : "last critical − first critical"}</span></div>
+        <div class="answer"><small>RETURN</small><strong>[${view.answer.join(", ")}]</strong></div>`;
+  } else if (points.length >= 2) {
+    const previousPoint = points.at(-2);
+    const lastPoint = points.at(-1);
+    const savedGap = lastPoint.index - previousPoint.index;
+    formulaHtml = `<div><small>${vi ? "GAP GẦN NHẤT" : "LATEST SAVED GAP"}</small><strong>${lastPoint.index} − ${previousPoint.index} = ${savedGap}</strong></div>
+      <div><small>MIN ${vi ? "HIỆN TẠI" : "SO FAR"}</small><strong>${minLabel}</strong></div>
+      <div><small>${vi ? "SPAN TỪ CRITICAL ĐẦU" : "SPAN FROM FIRST CRITICAL"}</small><strong>${view.span}</strong></div>`;
+  }
+
+  const summary = vi
+    ? `Linked list có ${values.length} node và đã tìm thấy ${points.length} critical point.`
+    : `The linked list has ${values.length} nodes and ${points.length} critical point(s) have been found.`;
+
+  $("treeView").innerHTML = `<section class="cp2058-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="cp2058-phases">${phaseHtml}</div>
+    <div class="cp2058-rule"><strong>${vi ? "Critical point là node giữa" : "A critical point is a middle node"}</strong><span><b>PEAK</b> ${vi ? "lớn hơn cả hai bên" : "greater than both sides"}</span><span><b>VALLEY</b> ${vi ? "nhỏ hơn cả hai bên" : "smaller than both sides"}</span><em>HEAD / TAIL: ${vi ? "không xét" : "excluded"}</em></div>
+    <section class="cp2058-list-section"><header><strong>LINKED LIST</strong><span>${vi ? "nhãn prev · curr · next nằm ngay trên node" : "prev · curr · next labels sit above their nodes"}</span></header><div class="cp2058-list">${listHtml}</div></section>
+    <div class="cp2058-learning">
+      <section class="cp2058-compare"><header><strong>${vi ? "A. NODE HIỆN TẠI CÓ CRITICAL KHÔNG?" : "A. IS THE CURRENT NODE CRITICAL?"}</strong></header>${comparisonHtml}</section>
+      <section class="cp2058-state"><header><strong>${vi ? "B. CÁC CRITICAL ĐÃ LƯU" : "B. SAVED CRITICAL POINTS"}</strong></header><div class="cp2058-timeline">${timelineHtml}</div><div class="cp2058-metrics">
+        <div><small>first_critical</small><strong>${valueOrDash(view.firstCritical)}</strong></div>
+        <div><small>prev_critical</small><strong>${valueOrDash(view.prevCritical)}</strong></div>
+        <div><small>min_distance</small><strong>${minLabel}</strong></div>
+        <div><small>max_distance</small><strong>${maxLabel}</strong><span>${maxHint}</span></div>
+      </div></section>
+    </div>
+    <section class="cp2058-formula">${formulaHtml}</section>
+    <div class="cp2058-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
+}
+
 // ---- Linked List renderer (horizontal box nodes with next arrows + curved random arrows) ----
 function renderLinkedList(step) {
   const { nodes, hlIdx, markIdx } = step.linkedList;
@@ -24278,6 +24423,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.remove("hidden");
     renderBfsGrid(step);
+  } else if (step.criticalPoints2058View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCriticalPoints2058View(step);
   } else if (step.linkedList) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -3781,39 +3781,35 @@ function buildSteps2058(input) {
   const values = parseListValues2058(input);
   const steps = [];
   const n = values.length;
-  const codeLines = {
-    initPrev: [3],
-    initCurr: [4],
-    initIndex: [5],
-    initFirst: [7],
-    initPrevCritical: [8],
-    initMinDistance: [9],
-    loop: [11],
-    nextNode: [12],
-    critical: [14, 15, 16, 17, 18],
-    decision: [20],
-    firstCheck: [21],
-    firstAssign: [22],
-    distance: [23, 24, 25, 26, 27],
-    prevCritical: [29],
-    move: [31, 32, 33],
-    finalCheck: [35],
-    finalBad: [36],
-    maxDistance: [38],
-    finalGood: [40],
-  };
-
   const criticalPoints = [];
   let firstCritical = -1;
   let prevCritical = -1;
   let minDistance = Infinity;
   let maxDistance = null;
 
+  function classify(index) {
+    if (index <= 0 || index >= n - 1) return null;
+    const left = values[index - 1];
+    const current = values[index];
+    const right = values[index + 1];
+    const isPeak = current > left && current > right;
+    const isValley = current < left && current < right;
+    return {
+      left,
+      current,
+      right,
+      isPeak,
+      isValley,
+      isCritical: isPeak || isValley,
+      type: isPeak ? "peak" : isValley ? "valley" : "normal",
+    };
+  }
+
   function labels(centerIdx) {
     const sub = {};
     if (n > 0) sub[0] = "head";
     if (n > 1) sub[n - 1] = "tail";
-    if (centerIdx != null) {
+    if (Number.isInteger(centerIdx) && centerIdx > 0 && centerIdx < n - 1) {
       sub[centerIdx - 1] = "prev";
       sub[centerIdx] = "curr";
       sub[centerIdx + 1] = "next";
@@ -3834,20 +3830,53 @@ function buildSteps2058(input) {
   }
 
   function snap(opts) {
+    const centerIdx = Number.isInteger(opts.centerIdx) ? opts.centerIdx : -1;
+    const comparison = opts.phase === "rule" ? null : classify(centerIdx);
+    const points = criticalPoints.map((index, order) => ({
+      order: order + 1,
+      index,
+      value: values[index],
+      type: classify(index).type,
+    }));
+    const span = points.length >= 2
+      ? points.at(-1).index - points[0].index
+      : null;
+
     steps.push({
       title: opts.title,
       arr: values,
       highlight: opts.highlight || [],
       mark: criticalPoints.slice(),
-      sub: labels(opts.centerIdx),
+      sub: labels(centerIdx),
       linkedList: {
-        nodes: linkedNodes(opts.centerIdx),
+        nodes: linkedNodes(centerIdx),
         hlIdx: opts.highlight || [],
         markIdx: criticalPoints.slice(),
       },
+      criticalPoints2058View: {
+        phase: opts.phase || "inspect",
+        values: values.slice(),
+        current: centerIdx,
+        inspectedThrough: Number.isInteger(opts.inspectedThrough)
+          ? opts.inspectedThrough
+          : Math.max(0, centerIdx),
+        comparison,
+        points,
+        firstCritical,
+        prevCritical,
+        minDistance: minDistance === Infinity ? null : minDistance,
+        maxDistance,
+        span,
+        latestGap: opts.latestGap ?? null,
+        previousMin: opts.previousMin == null || opts.previousMin === Infinity
+          ? null
+          : opts.previousMin,
+        newCritical: Number.isInteger(opts.newCritical) ? opts.newCritical : -1,
+        answer: opts.answer || null,
+      },
       codeLines: opts.codeLines || [],
       vars: [
-        { name: "index", value: opts.centerIdx == null ? "-" : opts.centerIdx },
+        { name: "index", value: centerIdx < 0 ? "-" : centerIdx },
         { name: "first_critical", value: firstCritical },
         { name: "prev_critical", value: prevCritical },
         { name: "min_distance", value: minDistance === Infinity ? "∞" : minDistance },
@@ -3860,329 +3889,140 @@ function buildSteps2058(input) {
   }
 
   snap({
-    title: { vi: "Dòng 3: prev = head", en: "Line 3: prev = head" },
-    highlight: [0],
-    centerIdx: null,
-    codeLines: codeLines.initPrev,
-    vars: [{ name: "prev", value: `head → ${values[0]}` }],
-    note: {
-      vi: "Con trỏ prev bắt đầu tại head, index 0.",
-      en: "The prev pointer starts at the head, index 0.",
-    },
-  });
-
-  snap({
-    title: { vi: "Dòng 4: curr = head.next", en: "Line 4: curr = head.next" },
-    highlight: [0, 1],
-    centerIdx: 1,
-    codeLines: codeLines.initCurr,
+    title: { vi: "Bước 1: đặt cửa sổ prev · curr · next", en: "Step 1: place the prev · curr · next window" },
+    highlight: n > 2 ? [0, 1, 2] : values.map((_, index) => index),
+    centerIdx: n > 2 ? 1 : -1,
+    phase: "rule",
+    codeLines: [3, 4, 5, 7, 8, 9],
     vars: [
-      { name: "prev", value: `head → ${values[0]}` },
-      { name: "curr", value: `head.next → ${values[1]}` },
+      { name: "window", value: n > 2 ? `${values[0]}, ${values[1]}, ${values[2]}` : "not enough middle nodes" },
+      { name: "rule", value: "only curr can be critical" },
     ],
     note: {
-      vi: "curr bắt đầu tại node thứ hai, là vị trí đầu tiên có thể trở thành critical point.",
-      en: "curr starts at the second node, the first position eligible to be a critical point.",
-    },
-  });
-
-  snap({
-    title: { vi: "Dòng 5: index = 1", en: "Line 5: index = 1" },
-    highlight: [1],
-    centerIdx: 1,
-    codeLines: codeLines.initIndex,
-    vars: [{ name: "index", value: 1 }],
-    note: {
-      vi: "curr đang ở index 1, nên biến index cũng bắt đầu bằng 1.",
-      en: "curr is at index 1, so index also starts at 1.",
-    },
-  });
-
-  snap({
-    title: { vi: "Dòng 7: first_critical = -1", en: "Line 7: first_critical = -1" },
-    highlight: [],
-    centerIdx: 1,
-    codeLines: codeLines.initFirst,
-    note: {
-      vi: "-1 cho biết chưa tìm thấy critical point đầu tiên.",
-      en: "-1 means the first critical point has not been found yet.",
-    },
-  });
-
-  snap({
-    title: { vi: "Dòng 8: prev_critical = -1", en: "Line 8: prev_critical = -1" },
-    highlight: [],
-    centerIdx: 1,
-    codeLines: codeLines.initPrevCritical,
-    note: {
-      vi: "Chưa có critical point gần nhất để tính khoảng cách.",
-      en: "There is no previous critical point for a distance calculation yet.",
-    },
-  });
-
-  snap({
-    title: { vi: "Dòng 9: min_distance = ∞", en: "Line 9: min_distance = ∞" },
-    highlight: [],
-    centerIdx: 1,
-    codeLines: codeLines.initMinDistance,
-    note: {
-      vi: "Khoảng cách nhỏ nhất bắt đầu là vô cực để cặp critical đầu tiên luôn cập nhật được nó.",
-      en: "The minimum distance starts at infinity so the first critical pair always replaces it.",
+      vi: "Chỉ node curr ở giữa mới được kiểm tra. Head và tail không thể là critical point vì thiếu một hàng xóm.",
+      en: "Only the middle curr node is tested. Head and tail cannot be critical because each is missing one neighbor.",
     },
   });
 
   for (let i = 1; i < n - 1; i++) {
-    const prev = values[i - 1];
-    const curr = values[i];
-    const next = values[i + 1];
-    const isPeak = curr > prev && curr > next;
-    const isValley = curr < prev && curr < next;
-    const isCritical = isPeak || isValley;
+    const result = classify(i);
+    const { left, current, right, isPeak, isValley, isCritical } = result;
 
     snap({
-      title: { vi: `Dòng 11: curr.next tồn tại tại index ${i}`, en: `Line 11: curr.next exists at index ${i}` },
-      highlight: [i, i + 1],
-      centerIdx: i,
-      codeLines: codeLines.loop,
-      vars: [{ name: "curr.next", value: `${values[i + 1]} (index ${i + 1})` }],
-      note: {
-        vi: "curr chưa phải tail, nên vòng lặp tiếp tục và curr vẫn có đủ hai hàng xóm để kiểm tra.",
-        en: "curr is not the tail, so the loop continues and curr still has two neighbors to compare.",
+      title: {
+        vi: `Bước 2: xét node index ${i} — ${isPeak ? "PEAK" : isValley ? "VALLEY" : "không critical"}`,
+        en: `Step 2: inspect node ${i} — ${isPeak ? "PEAK" : isValley ? "VALLEY" : "not critical"}`,
       },
-    });
-
-    snap({
-      title: { vi: `Dòng 12: next_node = curr.next`, en: `Line 12: next_node = curr.next` },
-      highlight: [i, i + 1],
-      centerIdx: i,
-      codeLines: codeLines.nextNode,
-      vars: [{ name: "next_node", value: `${next} (index ${i + 1})` }],
-      note: {
-        vi: `next_node trỏ tới node bên phải của curr, có giá trị ${next}.`,
-        en: `next_node points to curr's right neighbor, whose value is ${next}.`,
-      },
-    });
-
-    snap({
-      title: { vi: `Dòng 14-18: is_critical = ${isCritical}`, en: `Lines 14-18: is_critical = ${isCritical}` },
       highlight: [i - 1, i, i + 1],
       centerIdx: i,
-      codeLines: codeLines.critical,
+      inspectedThrough: i,
+      phase: "inspect",
+      codeLines: [11, 12, 14, 15, 16, 17, 18],
       vars: [
-        { name: "peak test", value: `${curr} > ${prev} and ${curr} > ${next} = ${isPeak}` },
-        { name: "valley test", value: `${curr} < ${prev} and ${curr} < ${next} = ${isValley}` },
+        { name: "peak test", value: `${current} > ${left} and ${current} > ${right} = ${isPeak}` },
+        { name: "valley test", value: `${current} < ${left} and ${current} < ${right} = ${isValley}` },
         { name: "is_critical", value: isCritical },
       ],
       note: {
         vi: isPeak
-          ? `${prev} < ${curr} > ${next}: node ${i} là local maximum.`
+          ? `${left} < ${current} > ${right}: curr lớn hơn cả hai hàng xóm, nên đây là local maximum.`
           : isValley
-            ? `${prev} > ${curr} < ${next}: node ${i} là local minimum.`
-            : `Node ${i} không lớn hơn cả hai bên và cũng không nhỏ hơn cả hai bên.`,
+            ? `${left} > ${current} < ${right}: curr nhỏ hơn cả hai hàng xóm, nên đây là local minimum.`
+            : `${current} không lớn hơn cả hai bên và cũng không nhỏ hơn cả hai bên, nên không lưu node này.`,
         en: isPeak
-          ? `${prev} < ${curr} > ${next}: node ${i} is a local maximum.`
+          ? `${left} < ${current} > ${right}: curr is greater than both neighbors, so it is a local maximum.`
           : isValley
-            ? `${prev} > ${curr} < ${next}: node ${i} is a local minimum.`
-            : `Node ${i} is neither greater than both neighbors nor smaller than both neighbors.`,
+            ? `${left} > ${current} < ${right}: curr is smaller than both neighbors, so it is a local minimum.`
+            : `${current} is neither greater than both neighbors nor smaller than both, so this node is not saved.`,
       },
     });
 
     if (!isCritical) {
       snap({
-        title: { vi: `Dòng 20: node ${i} không phải critical`, en: `Line 20: node ${i} is not critical` },
-        highlight: [i - 1, i, i + 1],
-        centerIdx: i,
-        codeLines: codeLines.decision,
-        vars: [
-          { name: "is_critical", value: false },
-          { name: "reason", value: `${curr} is between/equal to its neighbors` },
-        ],
-        note: {
-          vi: "Không cập nhật critical point hay khoảng cách. Ta chỉ trượt cửa sổ sang phải một node.",
-          en: "Do not update distances. Just slide the window to the next triple.",
-        },
-      });
-      snap({
-        title: { vi: "Dòng 31-33: trượt prev/curr và tăng index", en: "Lines 31-33: advance prev/curr and index" },
+        title: { vi: `Bỏ qua index ${i}, rồi trượt cửa sổ sang phải`, en: `Skip index ${i}, then slide the window right` },
         highlight: i + 2 < n ? [i, i + 1, i + 2] : [i, i + 1],
-        centerIdx: i + 1 < n - 1 ? i + 1 : null,
-        codeLines: codeLines.move,
-        vars: [
-          { name: "next window", value: i + 1 < n - 1 ? `${values[i]}, ${values[i + 1]}, ${values[i + 2]}` : "end of list" },
-        ],
+        centerIdx: i,
+        inspectedThrough: i,
+        phase: "move",
+        codeLines: [20, 31, 32, 33],
+        vars: [{ name: "saved?", value: "no — distances unchanged" }],
         note: {
           vi: i + 1 < n - 1
-            ? `Cửa sổ kế tiếp sẽ xét node ${i + 1}.`
-            : "curr.next đã tới tail/null, vòng lặp sắp kết thúc.",
+            ? `Không có biến khoảng cách nào thay đổi. Bước kế tiếp xét curr tại index ${i + 1}.`
+            : "Không có biến khoảng cách nào thay đổi. Đã xét xong node giữa cuối cùng.",
           en: i + 1 < n - 1
-            ? `The next window will check node ${i + 1}.`
-            : "curr.next has reached the tail/null, so the loop is about to finish.",
+            ? `No distance state changes. The next step inspects curr at index ${i + 1}.`
+            : "No distance state changes. The final middle node has been inspected.",
         },
       });
       continue;
     }
 
-    const kind = isPeak ? "peak" : "valley";
-    let distanceToPrev = null;
-    snap({
-      title: {
-        vi: `Dòng 20: node ${i} là critical (${isPeak ? "peak" : "valley"})`,
-        en: `Line 20: node ${i} is critical (${kind})`,
-      },
-      highlight: [i - 1, i, i + 1],
-      centerIdx: i,
-      codeLines: codeLines.decision,
-      vars: [
-        { name: "type", value: kind },
-        { name: "critical index", value: i },
-      ],
-      note: {
-        vi: isPeak
-          ? `Node ${i} là peak vì ${prev} < ${curr} > ${next}.`
-          : `Node ${i} là valley vì ${prev} > ${curr} < ${next}.`,
-        en: isPeak
-          ? `Node ${i} is a peak because ${prev} < ${curr} > ${next}.`
-          : `Node ${i} is a valley because ${prev} > ${curr} < ${next}.`,
-      },
-    });
-
-    snap({
-      title: {
-        vi: `Dòng 21: first_critical == -1 → ${firstCritical === -1}`,
-        en: `Line 21: first_critical == -1 → ${firstCritical === -1}`,
-      },
-      highlight: [i],
-      centerIdx: i,
-      codeLines: codeLines.firstCheck,
-      vars: [{ name: "first_critical", value: firstCritical }],
-      note: {
-        vi: firstCritical === -1
-          ? "Đây là critical point đầu tiên, nên lưu index hiện tại."
-          : "Đã có critical point đầu tiên, nên tính gap với critical gần nhất.",
-        en: firstCritical === -1
-          ? "This is the first critical point, so store the current index."
-          : "A first critical point already exists, so compute the gap to the latest one.",
-      },
-    });
-
     if (firstCritical === -1) {
       firstCritical = i;
+      prevCritical = i;
       criticalPoints.push(i);
       snap({
-        title: { vi: `Dòng 22: first_critical = ${i}`, en: `Line 22: first_critical = ${i}` },
+        title: { vi: `Lưu critical point đầu tiên C1 tại index ${i}`, en: `Save the first critical point C1 at index ${i}` },
         highlight: [i],
         centerIdx: i,
-        codeLines: codeLines.firstAssign,
+        inspectedThrough: i,
+        phase: "record",
+        newCritical: i,
+        codeLines: [20, 21, 22, 29, 31, 32, 33],
         vars: [
           { name: "critical points", value: `[${criticalPoints.join(", ")}]` },
-          { name: "why no distance yet?", value: "need 2 critical points" },
+          { name: "distance", value: "chưa có — cần 2 critical points" },
         ],
         note: {
-          vi: `Đây là critical point đầu tiên. Chưa thể tính khoảng cách vì cần một cặp critical point.`,
-          en: `This is the first critical point. No distance can be computed until a pair exists.`,
+          vi: `Gán cả first_critical và prev_critical bằng ${i}. Chưa tính được khoảng cách vì mới chỉ có một critical point.`,
+          en: `Set both first_critical and prev_critical to ${i}. A distance needs two critical points, so none is available yet.`,
         },
       });
     } else {
-      distanceToPrev = i - prevCritical;
-      minDistance = Math.min(minDistance, distanceToPrev);
+      const previousPoint = prevCritical;
+      const previousMin = minDistance;
+      const distanceToPrev = i - previousPoint;
+      minDistance = Math.min(previousMin, distanceToPrev);
       criticalPoints.push(i);
+      prevCritical = i;
       snap({
-        title: { vi: `Dòng 23-27: cập nhật min_distance với critical ${i}`, en: `Lines 23-27: update min_distance with critical ${i}` },
+        title: { vi: `Critical mới tại ${i}: gap = ${i} − ${previousPoint} = ${distanceToPrev}`, en: `New critical at ${i}: gap = ${i} − ${previousPoint} = ${distanceToPrev}` },
         highlight: [i, criticalPoints.at(-2)],
         centerIdx: i,
-        codeLines: codeLines.distance,
+        inspectedThrough: i,
+        phase: "distance",
+        latestGap: distanceToPrev,
+        previousMin,
+        newCritical: i,
+        codeLines: [20, 21, 23, 24, 25, 26, 27, 29, 31, 32, 33],
         vars: [
-          { name: "gap to previous", value: `${i} - ${criticalPoints.at(-2)} = ${distanceToPrev}` },
-          { name: "min_distance", value: minDistance },
+          { name: "gap to previous", value: `${i} - ${previousPoint} = ${distanceToPrev}` },
+          { name: "min update", value: `min(${previousMin === Infinity ? "∞" : previousMin}, ${distanceToPrev}) = ${minDistance}` },
           { name: "critical points", value: `[${criticalPoints.join(", ")}]` },
         ],
         note: {
-          vi: "min_distance chỉ cần so với khoảng cách tới critical point liền trước.",
-          en: "min_distance only needs to compare the gap to the immediately previous critical point.",
+          vi: `Khoảng cách nhỏ nhất chỉ cần so với critical liền trước. Khoảng từ critical đầu tới điểm này hiện là ${i} − ${firstCritical} = ${i - firstCritical}.`,
+          en: `The minimum only compares adjacent critical points. The span from the first critical to this one is now ${i} − ${firstCritical} = ${i - firstCritical}.`,
         },
       });
     }
-
-    prevCritical = i;
-    snap({
-      title: {
-        vi: `Dòng 29: prev_critical = ${i}`,
-        en: `Line 29: prev_critical = ${i}`,
-      },
-      highlight: [i],
-      centerIdx: i,
-      codeLines: codeLines.prevCritical,
-      vars: [
-        { name: "critical points", value: `[${criticalPoints.join(", ")}]` },
-        { name: "distance to previous critical", value: distanceToPrev == null ? "first critical" : distanceToPrev },
-      ],
-      note: {
-        vi: "Cập nhật prev_critical để critical kế tiếp tính gap = index - prev_critical.",
-        en: "Update prev_critical so the next critical point can compute index - prev_critical.",
-      },
-    });
-
-    snap({
-      title: { vi: "Dòng 31-33: trượt cửa sổ sang phải", en: "Lines 31-33: slide the window right" },
-      highlight: i + 2 < n ? [i, i + 1, i + 2] : [i, i + 1],
-      centerIdx: i + 1 < n - 1 ? i + 1 : null,
-      codeLines: codeLines.move,
-      vars: [
-        { name: "next window", value: i + 1 < n - 1 ? `${values[i]}, ${values[i + 1]}, ${values[i + 2]}` : "end of list" },
-      ],
-      note: {
-        vi: i + 1 < n - 1
-          ? `Dịch prev=curr, curr=curr.next và tăng index. Cửa sổ mới xét node ${i + 1}.`
-          : "Đã xử lý node giữa cuối cùng; sau bước này vòng lặp kết thúc.",
-        en: i + 1 < n - 1
-          ? `Move prev=curr, curr=curr.next, and increment index. The next window checks node ${i + 1}.`
-          : "The last middle node has been processed; after this the loop ends.",
-      },
-    });
   }
-
-  snap({
-    title: { vi: "Dòng 11: curr.next không còn tồn tại", en: "Line 11: curr.next no longer exists" },
-    highlight: [n - 1],
-    centerIdx: null,
-    codeLines: codeLines.loop,
-    vars: [{ name: "curr", value: `tail → ${values[n - 1]}` }],
-    note: {
-      vi: "curr đã tới tail nên vòng lặp kết thúc. Head và tail không được xét làm critical point.",
-      en: "curr has reached the tail, so the loop ends. The head and tail are never critical points.",
-    },
-  });
-
-  snap({
-    title: {
-      vi: `Dòng 35: min_distance == ∞ → ${minDistance === Infinity}`,
-      en: `Line 35: min_distance == ∞ → ${minDistance === Infinity}`,
-    },
-    highlight: criticalPoints,
-    centerIdx: null,
-    codeLines: codeLines.finalCheck,
-    vars: [{ name: "critical points", value: `[${criticalPoints.join(", ")}]` }],
-    note: {
-      vi: minDistance === Infinity
-        ? "Không có cặp critical point nào, nên min_distance vẫn là vô cực."
-        : "Đã có ít nhất hai critical point, nên tiếp tục tính max_distance.",
-      en: minDistance === Infinity
-        ? "No critical-point pair exists, so min_distance is still infinity."
-        : "At least two critical points exist, so continue to compute max_distance.",
-    },
-  });
 
   if (minDistance === Infinity) {
     const answer = [-1, -1];
     snap({
-      title: { vi: "Dòng 36: return [-1, -1]", en: "Line 36: return [-1, -1]" },
+      title: { vi: "Kết thúc: chưa đủ hai critical point", en: "Finish: fewer than two critical points" },
       highlight: criticalPoints,
-      centerIdx: null,
-      codeLines: codeLines.finalBad,
+      centerIdx: -1,
+      inspectedThrough: n - 1,
+      phase: "result",
+      answer,
+      codeLines: [35, 36],
       vars: [{ name: "answer", value: "[-1, -1]" }],
       note: {
-        vi: "Cần ít nhất hai critical point để tạo một khoảng cách hợp lệ.",
-        en: "At least two critical points are required to form a valid distance.",
+        vi: `Chỉ tìm thấy ${criticalPoints.length} critical point. Không thể tạo một cặp nên trả về [-1, -1].`,
+        en: `Only ${criticalPoints.length} critical point(s) were found. No pair exists, so return [-1, -1].`,
       },
       final: true,
     });
@@ -4190,31 +4030,24 @@ function buildSteps2058(input) {
   }
 
   maxDistance = prevCritical - firstCritical;
-  snap({
-    title: { vi: `Dòng 38: max_distance = ${maxDistance}`, en: `Line 38: max_distance = ${maxDistance}` },
-    highlight: [firstCritical, prevCritical],
-    centerIdx: null,
-    codeLines: codeLines.maxDistance,
-    vars: [{ name: "calculation", value: `${prevCritical} - ${firstCritical} = ${maxDistance}` }],
-    note: {
-      vi: "Khoảng cách lớn nhất luôn nằm giữa critical point đầu tiên và critical point cuối cùng.",
-      en: "The maximum distance is always between the first and last critical points.",
-    },
-  });
-
   const answer = [minDistance, maxDistance];
   snap({
-    title: { vi: `Dòng 40: return [${answer.join(", ")}]`, en: `Line 40: return [${answer.join(", ")}]` },
+    title: { vi: `Kết quả: [min, max] = [${answer.join(", ")}]`, en: `Result: [min, max] = [${answer.join(", ")}]` },
     highlight: criticalPoints,
-    centerIdx: null,
-    codeLines: codeLines.finalGood,
+    centerIdx: -1,
+    inspectedThrough: n - 1,
+    phase: "result",
+    answer,
+    codeLines: [35, 38, 40],
     vars: [
       { name: "critical points", value: `[${criticalPoints.join(", ")}]` },
+      { name: "min calculation", value: "minimum adjacent critical gap" },
+      { name: "max calculation", value: `${prevCritical} - ${firstCritical} = ${maxDistance}` },
       { name: "answer", value: `[${answer.join(", ")}]` },
     ],
     note: {
-      vi: "Trả về min_distance giữa hai critical liên tiếp và max_distance từ critical đầu tới critical cuối.",
-      en: "Return the minimum consecutive critical gap and the distance from the first to the last critical point.",
+      vi: `min = ${minDistance} từ khoảng cách nhỏ nhất giữa hai critical liên tiếp. max = ${prevCritical} − ${firstCritical} = ${maxDistance} từ critical đầu tới critical cuối.`,
+      en: `min = ${minDistance} from the smallest adjacent critical gap. max = ${prevCritical} − ${firstCritical} = ${maxDistance} from the first to the last critical point.`,
     },
     final: true,
   });
@@ -4248,6 +4081,7 @@ module.exports = {
       space: "O(1)",
       note: { vi: "Chỉ cần một lượt quét và vài biến chỉ số.", en: "Only one scan and a few index variables are needed." },
     },
+    debugMode: "semantic",
     code: [
       "class Solution:",
       "    def nodesBetweenCriticalPoints(self, head: Optional[ListNode]) -> List[int]:",
