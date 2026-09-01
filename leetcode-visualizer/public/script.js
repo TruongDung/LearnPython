@@ -3341,6 +3341,7 @@ function renderBfsGrid(step) {
   const isEffortGrid = variant === "effort-grid";
   const isDistinctIslands = variant === "distinct-islands";
   const isMaxScoreGrid = variant === "max-score-grid";
+  const isClassroomGrid = variant === "classroom-grid";
   const variantClass = isTicTacToe
     ? " tic-tac-toe-grid"
     : isPhonePath
@@ -3351,11 +3352,13 @@ function renderBfsGrid(step) {
           ? " distinct-islands-grid"
           : isMaxScoreGrid
             ? " max-score-grid"
-        : "";
+            : isClassroomGrid
+              ? " classroom-grid"
+              : "";
   const gridClass = `bfs-grid${variantClass}${isEffortGrid && step.effortView ? " minimax-effort-grid" : ""}`;
   const gridStyle = isTicTacToe
     ? ""
-    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isDistinctIslands ? "58px" : isMaxScoreGrid ? "74px" : "32px"})"`;
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isDistinctIslands ? "58px" : isMaxScoreGrid ? "74px" : isClassroomGrid ? "58px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -3386,6 +3389,17 @@ function renderBfsGrid(step) {
           <span><strong class="eg-legend-small">⏱99</strong> ${lang === "vi" ? "= thời điểm phòng sẵn sàng (cố định)" : "= room ready time (fixed)"}</span>
           ${hasParity ? `<span><i class="eg-swatch eg-swatch-even"></i>${lang === "vi" ? "bước tới tốn 1s" : "step costs 1s"}</span><span><i class="eg-swatch eg-swatch-odd"></i>${lang === "vi" ? "bước tới tốn 2s" : "step costs 2s"}</span>` : ""}
         </div>`;
+  }
+  if (isClassroomGrid) {
+    html += `<div class="classroom-grid-legend">
+      <span><i class="start"></i>S</span>
+      <span><i class="litter"></i>L</span>
+      <span><i class="reset"></i>R</span>
+      <span><i class="wall"></i>X</span>
+      <span><i class="queued"></i>${lang === "vi" ? "frontier" : "frontier"}</span>
+      <span><i class="current"></i>${lang === "vi" ? "đang pop" : "current"}</span>
+      <span><i class="path"></i>${lang === "vi" ? "vừa thêm" : "new state"}</span>
+    </div>`;
   }
   const guideHtml = step.distinctIslandView ? distinctIslandGuideHtml(step.distinctIslandView) : "";
   const effortGuide = step.effortView ? effortGuideHtml(step.effortView) : "";

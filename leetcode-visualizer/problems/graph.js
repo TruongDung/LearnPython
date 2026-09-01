@@ -24382,6 +24382,370 @@ function buildSteps2101(input) {
   return { original: bombs, answer, steps };
 }
 
+function parseClassroom3568(input) {
+  let rows = [];
+  if (Array.isArray(input)) {
+    rows = input.map((row) => Array.isArray(row) ? row.join("") : String(row));
+  } else {
+    const raw = String(input || "").trim();
+    if (!raw) rows = ["S.L", "..R", "..L"];
+    else {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) rows = parsed.map((row) => Array.isArray(row) ? row.join("") : String(row));
+      } catch (_) {
+        rows = raw.split(/[|;\n]+/).map((row) => row.trim()).filter(Boolean);
+      }
+    }
+  }
+  rows = rows.map((row) => row.replace(/[\s,]+/g, ""));
+  const cols = rows[0] ? rows[0].length : 0;
+  const validChars = new Set(["S", "L", "R", "X", "."]);
+  const valid = rows.length > 0 && cols > 0 && rows.every((row) => row.length === cols && [...row].every((ch) => validChars.has(ch)));
+  return { grid: rows.map((row) => [...row]), valid };
+}
+
+function buildSteps3568(input, params = {}) {
+  const { grid, valid } = parseClassroom3568(input);
+  const rows = grid.length;
+  const cols = rows ? grid[0].length : 0;
+  const maxEnergy = Math.max(1, Number(params.energy) || 4);
+  const steps = [];
+  const codeLines = {
+    scan: [5, 6, 7, 8, 9, 10],
+    init: [11, 12, 13],
+    pop: [14, 15],
+    done: [16, 17],
+    dirs: [18, 19],
+    bounds: [20, 21],
+    energy: [22, 23],
+    reset: [24, 25],
+    litter: [24, 26],
+    seen: [27, 28],
+    enqueue: [29],
+    fail: [30],
+  };
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "classroom-grid", cells: [[{ label: "!", cls: "current" }]] },
+      codeLines: [4],
+      vars: [{ name: "answer", value: "invalid grid" }],
+      note: {
+        vi: "Nhập grid dạng S.L|..R|..L hoặc JSON [\"S.L\",\"..R\",\"..L\"]. Ký tự hợp lệ: S, L, R, X, .",
+        en: "Enter a grid like S.L|..R|..L or JSON [\"S.L\",\"..R\",\"..L\"]. Valid symbols: S, L, R, X, .",
+      },
+      final: true,
+    });
+    return { original: grid, answer: null, steps };
+  }
+
+  let start = null;
+  const litters = [];
+  const litterIndex = new Map();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === "S") start = [r, c];
+      if (grid[r][c] === "L") {
+        litterIndex.set(`${r},${c}`, litters.length);
+        litters.push([r, c]);
+      }
+    }
+  }
+
+  if (!start || litters.length > 10) {
+    steps.push({
+      title: { vi: "Grid thiếu S hoặc quá nhiều L", en: "Missing S or too many L cells" },
+      arr: [],
+      bfsGrid: { rows: Math.max(1, rows), cols: Math.max(1, cols), variant: "classroom-grid", cells: rows && cols ? makeClassroom3568Cells(grid, litterIndex) : [[{ label: "!", cls: "current" }]] },
+      codeLines: codeLines.scan,
+      vars: [{ name: "S exists", value: Boolean(start) }, { name: "L count", value: litters.length }],
+      note: { vi: "Bài yêu cầu đúng một S và tối đa 10 ô L để dùng bitmask.", en: "The problem requires one S and at most 10 litter cells for bitmasking." },
+      final: true,
+    });
+    return { original: grid, answer: null, steps };
+  }
+
+  const allMask = (1 << litters.length) - 1;
+  const queue = [[start[0], start[1], maxEnergy, 0, 0]];
+  const seen = new Set([`${start[0]},${start[1]},${maxEnergy},0`]);
+  const frontier = new Set([`${start[0]},${start[1]}`]);
+  const expanded = new Set();
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const stepLimit = 240;
+  let head = 0;
+  let answer = -1;
+  let truncated = false;
+
+  function maskText(mask) {
+    if (!litters.length) return "none";
+    return litters.map((_, i) => (mask & (1 << i)) ? `L${i}` : `__`).join(" ");
+  }
+
+  function queueText() {
+    const upcoming = queue.slice(head, head + 5).map(([r, c, e, mask, moves]) => `(${r},${c}) E=${e} ${mask.toString(2).padStart(litters.length, "0")} d=${moves}`);
+    return `[${upcoming.join(", ")}${queue.length - head > 5 ? ", ..." : ""}]`;
+  }
+
+  function snap(o) {
+    if (steps.length >= stepLimit) {
+      truncated = true;
+      return;
+    }
+    steps.push({
+      title: o.title,
+      arr: [],
+      bfsGrid: {
+        rows,
+        cols,
+        variant: "classroom-grid",
+        cells: makeClassroom3568Cells(grid, litterIndex, {
+          current: o.current,
+          neighbor: o.neighbor,
+          enqueued: o.enqueued,
+          expanded,
+          frontier,
+          collectedMask: Number.isInteger(o.mask) ? o.mask : null,
+        }),
+      },
+      codeLines: o.codeLines || [],
+      highlight: [],
+      mark: [],
+      vars: [
+        { name: "moves", value: o.moves ?? "-" },
+        { name: "energy", value: o.energy ?? "-" },
+        { name: "collected mask", value: Number.isInteger(o.mask) ? `${o.mask.toString(2).padStart(litters.length, "0")} (${maskText(o.mask)})` : "-" },
+        { name: "queue size", value: Math.max(0, queue.length - head) },
+        { name: "queue front", value: queueText() },
+        ...(o.vars || []),
+      ],
+      note: o.note,
+      final: o.final || false,
+    });
+  }
+
+  snap({
+    title: { vi: "Quét grid: tìm S và đánh số rác", en: "Scan grid: find S and number litter" },
+    codeLines: codeLines.scan,
+    current: start,
+    energy: maxEnergy,
+    mask: 0,
+    moves: 0,
+    vars: [
+      { name: "start", value: `(${start[0]},${start[1]})` },
+      { name: "litter cells", value: litters.map(([r, c], i) => `L${i}@(${r},${c})`).join(", ") || "none" },
+      { name: "target mask", value: allMask.toString(2).padStart(litters.length, "0") },
+    ],
+    note: { vi: "Mỗi ô L được gán một bit. Khi nhặt L đó, bật bit tương ứng trong mask.", en: "Each L gets one bit. Collecting it turns on that bit in the mask." },
+  });
+
+  if (allMask === 0) {
+    answer = 0;
+    snap({
+      title: { vi: "Không có rác cần nhặt → 0", en: "No litter to collect → 0" },
+      codeLines: codeLines.done,
+      current: start,
+      energy: maxEnergy,
+      mask: 0,
+      moves: 0,
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Mask mục tiêu bằng 0, tức đã sạch ngay từ đầu.", en: "The target mask is 0, so everything is already clean." },
+      final: true,
+    });
+    return { original: grid, answer, steps };
+  }
+
+  snap({
+    title: { vi: "Khởi tạo queue BFS", en: "Initialize BFS queue" },
+    codeLines: codeLines.init,
+    current: start,
+    energy: maxEnergy,
+    mask: 0,
+    moves: 0,
+    note: { vi: "State không chỉ là vị trí. Ta phải nhớ cả energy còn lại và mask rác đã nhặt.", en: "A state is not just position. It also includes remaining energy and collected-litter mask." },
+  });
+
+  while (head < queue.length) {
+    const [r, c, energy, mask, moves] = queue[head++];
+    frontier.delete(`${r},${c}`);
+    expanded.add(`${r},${c}`);
+
+    snap({
+      title: { vi: `Pop state (${r},${c}), E=${energy}`, en: `Pop state (${r},${c}), E=${energy}` },
+      codeLines: codeLines.pop,
+      current: [r, c],
+      energy,
+      mask,
+      moves,
+      note: { vi: "BFS pop theo thứ tự số bước tăng dần, nên lần đầu đạt allMask là đáp án ngắn nhất.", en: "BFS pops states by increasing move count, so the first allMask state is optimal." },
+    });
+
+    if (mask === allMask) {
+      answer = moves;
+      snap({
+        title: { vi: `Đã nhặt đủ rác → ${moves} bước`, en: `All litter collected → ${moves} moves` },
+        codeLines: codeLines.done,
+        current: [r, c],
+        energy,
+        mask,
+        moves,
+        vars: [{ name: "answer", value: answer }],
+        note: { vi: "Mask hiện tại bằng target mask, trả về số bước của state này.", en: "The current mask equals the target mask, so return this state's move count." },
+        final: true,
+      });
+      return { original: grid, answer, steps };
+    }
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      snap({
+        title: { vi: `Thử đi tới (${nr},${nc})`, en: `Try moving to (${nr},${nc})` },
+        codeLines: codeLines.dirs,
+        current: [r, c],
+        neighbor: [nr, nc],
+        energy,
+        mask,
+        moves,
+        vars: [{ name: "direction", value: `(${dr},${dc})` }],
+        note: { vi: "Mỗi lần di chuyển tốn 1 energy. Sau đó nếu đáp xuống R thì energy được nạp đầy.", en: "Each move costs 1 energy. After landing on R, energy refills to full." },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      const blocked = !inBounds || grid[nr][nc] === "X";
+      if (blocked) {
+        snap({
+          title: { vi: `Không thể vào (${nr},${nc})`, en: `Cannot enter (${nr},${nc})` },
+          codeLines: codeLines.bounds,
+          current: [r, c],
+          neighbor: inBounds ? [nr, nc] : null,
+          energy,
+          mask,
+          moves,
+          vars: [{ name: "reason", value: inBounds ? "obstacle X" : "out of bounds" }],
+          note: { vi: "Bỏ qua vì ô ngoài grid hoặc là vật cản X.", en: "Skip because the cell is out of bounds or an obstacle X." },
+        });
+        continue;
+      }
+
+      if (energy === 0) {
+        snap({
+          title: { vi: "Hết energy nên không đi tiếp", en: "No energy left to move" },
+          codeLines: codeLines.energy,
+          current: [r, c],
+          neighbor: [nr, nc],
+          energy,
+          mask,
+          moves,
+          note: { vi: "Phải có ít nhất 1 energy để bước sang ô kế tiếp. Nếu muốn hồi energy, cần đã đứng trên R từ trước.", en: "A move requires at least 1 energy. To refill, the state must already be able to reach an R cell." },
+        });
+        continue;
+      }
+
+      let nextEnergy = energy - 1;
+      let nextMask = mask;
+      const cell = grid[nr][nc];
+      const extraVars = [{ name: "cell", value: cell }];
+      let lines = codeLines.energy;
+      let note = { vi: `Bước vào (${nr},${nc}) tốn 1 energy: ${energy} → ${nextEnergy}.`, en: `Moving into (${nr},${nc}) costs 1 energy: ${energy} → ${nextEnergy}.` };
+
+      if (cell === "R") {
+        nextEnergy = maxEnergy;
+        lines = codeLines.reset;
+        extraVars.push({ name: "reset", value: `${energy - 1} → ${maxEnergy}` });
+        note = { vi: `Ô R nạp lại energy đầy: sau khi tốn 1, energy trở về ${maxEnergy}.`, en: `R refills energy to full after the move cost, so energy becomes ${maxEnergy}.` };
+      }
+
+      if (cell === "L") {
+        const bit = litterIndex.get(`${nr},${nc}`);
+        nextMask = mask | (1 << bit);
+        lines = codeLines.litter;
+        extraVars.push({ name: "collect", value: `L${bit}: ${mask.toString(2).padStart(litters.length, "0")} → ${nextMask.toString(2).padStart(litters.length, "0")}` });
+        note = { vi: `Đáp xuống L${bit}, bật bit ${bit}. Rác đã nhặt được ghi trong mask, không cần xóa ô khỏi grid.`, en: `Landing on L${bit} turns on bit ${bit}. The mask records collected litter; the grid does not need mutation.` };
+      }
+
+      const key = `${nr},${nc},${nextEnergy},${nextMask}`;
+      if (seen.has(key)) {
+        snap({
+          title: { vi: "State này đã thấy rồi", en: "State already seen" },
+          codeLines: codeLines.seen,
+          current: [r, c],
+          neighbor: [nr, nc],
+          energy: nextEnergy,
+          mask: nextMask,
+          moves: moves + 1,
+          vars: [...extraVars, { name: "state key", value: key }],
+          note: { vi: "Cùng vị trí, cùng energy, cùng mask thì tương lai giống hệt nhau. Bỏ qua để tránh vòng lặp.", en: "Same position, energy, and mask means the future is identical. Skip it to avoid loops." },
+        });
+        continue;
+      }
+
+      seen.add(key);
+      queue.push([nr, nc, nextEnergy, nextMask, moves + 1]);
+      frontier.add(`${nr},${nc}`);
+      snap({
+        title: { vi: `Enqueue (${nr},${nc}), E=${nextEnergy}`, en: `Enqueue (${nr},${nc}), E=${nextEnergy}` },
+        codeLines: lines.concat(codeLines.enqueue),
+        current: [r, c],
+        enqueued: [nr, nc],
+        energy: nextEnergy,
+        mask: nextMask,
+        moves: moves + 1,
+        vars: [...extraVars, { name: "new state", value: key }],
+        note,
+      });
+    }
+  }
+
+  answer = -1;
+  if (truncated) {
+    steps.push({
+      title: { vi: "BFS tiếp tục chạy ngầm", en: "BFS continues off-screen" },
+      arr: [],
+      bfsGrid: { rows, cols, variant: "classroom-grid", cells: makeClassroom3568Cells(grid, litterIndex, { expanded, frontier }) },
+      codeLines: codeLines.fail,
+      vars: [{ name: "recorded steps", value: stepLimit }, { name: "answer", value: answer }],
+      note: { vi: "Visualization giới hạn số frame để trình duyệt không quá nặng; thuật toán vẫn chạy tới khi queue rỗng.", en: "The visualization caps frames to keep the browser responsive; the algorithm still runs until the queue is empty." },
+    });
+  }
+  steps.push({
+    title: { vi: "Queue rỗng → không thể nhặt hết", en: "Queue empty → impossible" },
+    arr: [],
+    bfsGrid: { rows, cols, variant: "classroom-grid", cells: makeClassroom3568Cells(grid, litterIndex, { expanded, frontier }) },
+    codeLines: codeLines.fail,
+    vars: [{ name: "answer", value: -1 }],
+    note: { vi: "Không còn state nào để mở rộng mà vẫn chưa đạt allMask.", en: "No states remain and allMask was never reached." },
+    final: true,
+  });
+  return { original: grid, answer, steps };
+}
+
+function makeClassroom3568Cells(grid, litterIndex, opts = {}) {
+  const currentKey = opts.current ? `${opts.current[0]},${opts.current[1]}` : "";
+  const neighborKey = opts.neighbor ? `${opts.neighbor[0]},${opts.neighbor[1]}` : "";
+  const enqueuedKey = opts.enqueued ? `${opts.enqueued[0]},${opts.enqueued[1]}` : "";
+  const expanded = opts.expanded || new Set();
+  const frontier = opts.frontier || new Set();
+  const mask = Number.isInteger(opts.collectedMask) ? opts.collectedMask : null;
+  return grid.map((row, r) => row.map((ch, c) => {
+    const key = `${r},${c}`;
+    const litterBit = litterIndex.get(key);
+    const isCollected = Number.isInteger(litterBit) && mask != null && (mask & (1 << litterBit));
+    let cls = ch === "X" ? "wall" : ch === "S" ? "start" : ch === "R" ? "reset" : ch === "L" ? "litter" : "empty";
+    if (expanded.has(key) && ch !== "X") cls += " visited";
+    if (frontier.has(key) && ch !== "X") cls += " queued";
+    if (neighborKey === key && ch !== "X") cls += " neighbor";
+    if (enqueuedKey === key && ch !== "X") cls += " path";
+    if (currentKey === key && ch !== "X") cls += " current";
+    if (isCollected) cls += " collected";
+    const label = ch === "L" && Number.isInteger(litterBit) ? `L${litterBit}` : ch;
+    const meta = ch === "R" ? "reset" : isCollected ? "done" : key === currentKey ? "now" : key === enqueuedKey ? "add" : "";
+    return { label, meta, cls };
+  }));
+}
+
 Object.assign(module.exports, {
   1311: {
     id: 1311,
@@ -24481,6 +24845,78 @@ Object.assign(module.exports, {
     },
     builder: buildSteps1311,
     builder2: buildSteps1311Dfs,
+  },
+  3568: {
+    id: 3568,
+    difficulty: "medium",
+    slug: "minimum-moves-to-clean-the-classroom",
+    category: { key: "bfs", vi: "BFS trạng thái", en: "State BFS" },
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "bitmask", vi: "Bitmask", en: "Bitmask" },
+    ],
+    title: { vi: "Minimum Moves to Clean the Classroom", en: "Minimum Moves to Clean the Classroom" },
+    titleVi: { vi: "Số bước ít nhất để dọn sạch lớp học", en: "Minimum moves to clean the classroom" },
+    statement: {
+      vi: "Grid có S là điểm bắt đầu, L là rác cần nhặt, R là ô nạp lại energy, X là vật cản. Mỗi bước tốn 1 energy. Trả về số bước ít nhất để nhặt hết rác, hoặc -1 nếu không thể.",
+      en: "The grid has S as the start, L as litter, R as an energy reset cell, and X as an obstacle. Each move costs 1 energy. Return the fewest moves to collect all litter, or -1 if impossible.",
+    },
+    defaultInput: "S.L|..R|..L",
+    inputKind: "string",
+    inputLabel: { vi: "classroom grid, hàng cách bởi |", en: "classroom grid, rows separated by |" },
+    extraParams: [
+      { key: "energy", label: { vi: "energy tối đa", en: "maximum energy" }, default: 3, min: 1 },
+    ],
+    approach: [
+      { vi: "Đánh số mỗi ô L thành một bit trong mask; mask cho biết đã nhặt rác nào.", en: "Number each L cell as one bit in a mask; the mask records which litter cells are collected." },
+      { vi: "BFS trên state (row, col, energy, mask), không chỉ trên vị trí.", en: "Run BFS over state (row, col, energy, mask), not just over position." },
+      { vi: "Mỗi bước trừ 1 energy; nếu đáp xuống R thì energy trở lại đầy.", en: "Each move spends 1 energy; landing on R refills energy to full." },
+      { vi: "State trùng cả vị trí, energy và mask mới được xem là đã thăm.", en: "A state is visited only when position, energy, and mask are all identical." },
+    ],
+    complexity: {
+      time: "O(m * n * energy * 2^L)",
+      space: "O(m * n * energy * 2^L)",
+      note: { vi: "Có tối đa m*n vị trí, energy+1 mức năng lượng và 2^L mask rác.", en: "There are at most m*n positions, energy+1 energy levels, and 2^L litter masks." },
+    },
+    codeLabel: { vi: "BFS state: vị trí + energy + mask", en: "State BFS: position + energy + mask" },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def minMoves(self, classroom, energy):",
+      "        start, litter = None, []",
+      "        for r, row in enumerate(classroom):",
+      "            for c, ch in enumerate(row):",
+      "                if ch == 'S': start = (r, c)",
+      "                if ch == 'L': litter.append((r, c))",
+      "        idx = {pos: i for i, pos in enumerate(litter)}",
+      "        full = (1 << len(litter)) - 1",
+      "        q = deque([(start[0], start[1], energy, 0, 0)])",
+      "        seen = {(start[0], start[1], energy, 0)}",
+      "        while q:",
+      "            r, c, e, mask, moves = q.popleft()",
+      "            if mask == full:",
+      "                return moves",
+      "            for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):",
+      "                nr, nc = r + dr, c + dc",
+      "                if not (0 <= nr < len(classroom) and 0 <= nc < len(classroom[0])) or classroom[nr][nc] == 'X':",
+      "                    continue",
+      "                if e == 0:",
+      "                    continue",
+      "                ne, nmask = e - 1, mask",
+      "                if classroom[nr][nc] == 'R': ne = energy",
+      "                if classroom[nr][nc] == 'L': nmask |= 1 << idx[(nr, nc)]",
+      "                state = (nr, nc, ne, nmask)",
+      "                if state not in seen:",
+      "                    seen.add(state); q.append((nr, nc, ne, nmask, moves + 1))",
+      "        return -1",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parseClassroom3568(input);
+      return [parsed.grid.map((row) => row.join("")), Math.max(1, Number(params.energy) || 4)];
+    },
+    builder: buildSteps3568,
   },
   2101: {
     id: 2101,
