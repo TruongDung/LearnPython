@@ -1614,7 +1614,7 @@ function jumpToCatalogGroup(groupKey) {
     const target = [...group.querySelectorAll(".prob-chip")]
       .find((chip) => Number(chip.dataset.id) === Number(currentProblemId));
     const destination = target || group;
-    destination.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    destination.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
     if (!target) return;
     target.classList.remove("catalog-jump-target");
     requestAnimationFrame(() => target.classList.add("catalog-jump-target"));
@@ -2037,7 +2037,7 @@ async function runViz() {
     show("vizPanel");
     renderCode();
     renderStep();
-    $("vizPanel").scrollIntoView({ behavior: "smooth" });
+    $("vizPanel").scrollIntoView({ behavior: "auto", block: "start" });
   } catch (err) {
     showError("runError", t().errConn);
   }
