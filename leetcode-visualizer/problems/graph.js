@@ -24906,6 +24906,1372 @@ function makeClassroom3568Cells(grid, litterIndex, opts = {}) {
   }));
 }
 
+// ─── 1361: Validate Binary Tree Nodes ───
+function parseChildArray1361(value, label, n) {
+  const raw = String(value ?? "").trim();
+  let children;
+  try {
+    children = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(",").map((item) => Number(item.trim()));
+  } catch (_error) {
+    throw new Error(label + " must be a JSON array or comma-separated integers");
+  }
+
+  if (!Array.isArray(children) || children.length !== n || children.some((child) =>
+    !Number.isInteger(child) || child < -1 || child >= n,
+  )) {
+    throw new Error(label + " must contain exactly " + n + " integers from -1 to " + (n - 1));
+  }
+  return children;
+}
+
+function parse1361Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 12) {
+    throw new Error("n must be an integer from 1 to 12 for the step-by-step visualization");
+  }
+  return {
+    n,
+    leftChild: parseChildArray1361(params.leftChild, "leftChild", n),
+    rightChild: parseChildArray1361(params.rightChild, "rightChild", n),
+  };
+}
+
+function buildSteps1361(input, params = {}) {
+  const { n, leftChild, rightChild } = parse1361Data(input, params);
+  const steps = [];
+  const indegree = Array(n).fill(0);
+  const seen = new Set();
+  const stack = [];
+  let root = null;
+  const edges = [];
+
+  for (let parent = 0; parent < n; parent += 1) {
+    if (leftChild[parent] !== -1) edges.push({ u: parent, v: leftChild[parent], side: "L" });
+    if (rightChild[parent] !== -1) edges.push({ u: parent, v: rightChild[parent], side: "R" });
+  }
+
+  function graphState({ hlNodes = [], hlEdges = [], restrictedNodes = [] } = {}) {
+    const annotations = {};
+    if (root !== null) annotations[root] = "root";
+    for (const node of stack) {
+      annotations[node] = annotations[node] ? annotations[node] + ", stack" : "stack";
+    }
+
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({
+        id: node,
+        label: String(node),
+        sub: "in=" + indegree[node],
+      })),
+      edges: edges.map((edge) => ({
+        u: edge.u,
+        v: edge.v,
+        w: edge.side,
+      })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...seen],
+      restrictedNodes,
+      annotations,
+      caption: {
+        vi: "L/R là cạnh con trái/phải · vàng = đang xét · xanh = đã thăm · đỏ = cấu trúc không hợp lệ",
+        en: "L/R labels left/right child edges · amber = current · green = visited · red = invalid structure",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, restrictedNodes, final = false, answer = null, extraVars = [] }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges, restrictedNodes }),
+      vars: [
+        { name: "n", value: n },
+        { name: "leftChild", value: "[" + leftChild.join(", ") + "]" },
+        { name: "rightChild", value: "[" + rightChild.join(", ") + "]" },
+        { name: "indegree", value: "[" + indegree.join(", ") + "]" },
+        { name: "root", value: root === null ? "not chosen" : root },
+        { name: "stack", value: "[" + stack.join(", ") + "]" },
+        { name: "seen", value: "{" + [...seen].join(", ") + "}" },
+        ...extraVars,
+        ...(answer === null ? [] : [{ name: "answer", value: answer }]),
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "Bắt đầu validateBinaryTreeNodes", en: "Start validateBinaryTreeNodes" },
+    note: {
+      vi: "Một binary tree hợp lệ cần: mỗi node có tối đa một cha, đúng một root, và tất cả node phải đi tới được từ root.",
+      en: "A valid binary tree needs at most one parent per node, exactly one root, and every node reachable from that root.",
+    },
+    codeLines: [2, 3],
+  });
+
+  for (const edge of edges) {
+    const edgeLabel = edge.u + " → " + edge.v + " (" + edge.side + ")";
+    snapshot({
+      title: { vi: "Xét cạnh " + edgeLabel, en: "Inspect edge " + edgeLabel },
+      note: {
+        vi: "Đây là một child pointer khác -1, nên node " + edge.v + " nhận thêm một cha.",
+        en: "This child pointer is not -1, so node " + edge.v + " receives one more parent.",
+      },
+      codeLines: [4, 5],
+      hlNodes: [edge.u, edge.v],
+      hlEdges: [[edge.u, edge.v]],
+    });
+
+    indegree[edge.v] += 1;
+    snapshot({
+      title: { vi: "indegree[" + edge.v + "] += 1 → " + indegree[edge.v], en: "indegree[" + edge.v + "] += 1 → " + indegree[edge.v] },
+      note: {
+        vi: "indegree[" + edge.v + "] cho biết có bao nhiêu node đang trỏ tới " + edge.v + ".",
+        en: "indegree[" + edge.v + "] records how many nodes point to " + edge.v + ".",
+      },
+      codeLines: [6],
+      hlNodes: [edge.v],
+      hlEdges: [[edge.u, edge.v]],
+    });
+
+    if (indegree[edge.v] > 1) {
+      snapshot({
+        title: { vi: "indegree[" + edge.v + "] > 1 → return False", en: "indegree[" + edge.v + "] > 1 → return False" },
+        note: {
+          vi: "Node " + edge.v + " có nhiều hơn một cha, nên không thể là binary tree.",
+          en: "Node " + edge.v + " has more than one parent, so this cannot be a binary tree.",
+        },
+        codeLines: [7, 8],
+        hlNodes: [edge.u, edge.v],
+        hlEdges: [[edge.u, edge.v]],
+        restrictedNodes: [edge.v],
+        final: true,
+        answer: false,
+      });
+      return { original: { n, leftChild, rightChild }, answer: false, steps };
+    }
+  }
+
+  const roots = Array.from({ length: n }, (_, node) => node).filter((node) => indegree[node] === 0);
+  snapshot({
+    title: { vi: "roots = các node có indegree = 0", en: "roots = nodes with indegree = 0" },
+    note: {
+      vi: "Không node nào trỏ tới các node này. Candidate root: [" + roots.join(", ") + "].",
+      en: "No node points to these nodes. Candidate root(s): [" + roots.join(", ") + "].",
+    },
+    codeLines: [9],
+    hlNodes: roots,
+    extraVars: [{ name: "roots", value: "[" + roots.join(", ") + "]" }],
+  });
+
+  if (roots.length !== 1) {
+    snapshot({
+      title: { vi: "len(roots) != 1 → return False", en: "len(roots) != 1 → return False" },
+      note: {
+        vi: roots.length === 0
+          ? "Không có root (thường do cycle), nên không thể tạo tree."
+          : "Có " + roots.length + " root; một tree phải có đúng một root.",
+        en: roots.length === 0
+          ? "There is no root (usually because of a cycle), so no tree can be formed."
+          : "There are " + roots.length + " roots; a tree must have exactly one root.",
+      },
+      codeLines: [10, 11],
+      hlNodes: roots,
+      restrictedNodes: roots.length ? roots : Array.from({ length: n }, (_, node) => node),
+      final: true,
+      answer: false,
+      extraVars: [{ name: "roots", value: "[" + roots.join(", ") + "]" }],
+    });
+    return { original: { n, leftChild, rightChild }, answer: false, steps };
+  }
+
+  root = roots[0];
+  snapshot({
+    title: { vi: "root = roots[0] = " + root, en: "root = roots[0] = " + root },
+    note: { vi: "Node " + root + " là root duy nhất.", en: "Node " + root + " is the only root." },
+    codeLines: [12],
+    hlNodes: [root],
+  });
+  stack.push(root);
+  snapshot({
+    title: { vi: "seen = set(); stack = [root]", en: "seen = set(); stack = [root]" },
+    note: { vi: "Dùng DFS iterative từ root để xác nhận mọi node đều reachable.", en: "Use iterative DFS from the root to verify every node is reachable." },
+    codeLines: [13, 14],
+    hlNodes: [root],
+  });
+
+  while (stack.length) {
+    const node = stack.pop();
+    snapshot({
+      title: { vi: "node = stack.pop() = " + node, en: "node = stack.pop() = " + node },
+      note: { vi: "Lấy node " + node + " ra để duyệt các child của nó.", en: "Pop node " + node + " to traverse its children." },
+      codeLines: [15, 16],
+      hlNodes: [node],
+    });
+
+    if (seen.has(node)) {
+      snapshot({
+        title: { vi: "node đã có trong seen → return False", en: "node is already in seen → return False" },
+        note: { vi: "DFS quay lại node " + node + ", chứng tỏ có cycle.", en: "DFS reached node " + node + " again, proving a cycle." },
+        codeLines: [17, 18],
+        hlNodes: [node],
+        restrictedNodes: [node],
+        final: true,
+        answer: false,
+      });
+      return { original: { n, leftChild, rightChild }, answer: false, steps };
+    }
+
+    seen.add(node);
+    snapshot({
+      title: { vi: "seen.add(" + node + ")", en: "seen.add(" + node + ")" },
+      note: { vi: "Đánh dấu node " + node + " đã reachable từ root.", en: "Mark node " + node + " as reachable from the root." },
+      codeLines: [19],
+      hlNodes: [node],
+    });
+
+    for (const childInfo of [{ node: leftChild[node], side: "L" }, { node: rightChild[node], side: "R" }]) {
+      const child = childInfo.node;
+      if (child === -1) continue;
+      snapshot({
+        title: { vi: "Xét child " + child + " của node " + node, en: "Inspect child " + child + " of node " + node },
+        note: { vi: "Child " + child + " khác -1 nên sẽ được đưa vào stack.", en: "Child " + child + " is not -1, so it will be pushed onto the stack." },
+        codeLines: [20, 21],
+        hlNodes: [node, child],
+        hlEdges: [[node, child]],
+      });
+      stack.push(child);
+      snapshot({
+        title: { vi: "stack.append(" + child + ")", en: "stack.append(" + child + ")" },
+        note: { vi: "Đã lên lịch DFS cho child " + child + ".", en: "Scheduled DFS for child " + child + "." },
+        codeLines: [22],
+        hlNodes: [child],
+        hlEdges: [[node, child]],
+      });
+    }
+  }
+
+  const answer = seen.size === n;
+  const unreachable = Array.from({ length: n }, (_, node) => node).filter((node) => !seen.has(node));
+  snapshot({
+    title: { vi: "return len(seen) == n → " + answer, en: "return len(seen) == n → " + answer },
+    note: answer
+      ? { vi: "Đã thăm đủ " + n + " node từ root; cấu trúc là một binary tree hợp lệ.", en: "All " + n + " nodes are reachable from the root; the structure is a valid binary tree." }
+      : { vi: "Các node [" + unreachable.join(", ") + "] không reachable từ root, nên cấu trúc không phải một tree duy nhất.", en: "Nodes [" + unreachable.join(", ") + "] are not reachable from the root, so the structure is not one tree." },
+    codeLines: [23],
+    restrictedNodes: unreachable,
+    final: true,
+    answer,
+    extraVars: [{ name: "reachable nodes", value: seen.size + "/" + n }],
+  });
+
+  return { original: { n, leftChild, rightChild }, answer, steps };
+}
+
+// ─── 802: Find Eventual Safe States ───
+function parseAdjacency802(input) {
+  let graph;
+  try {
+    graph = JSON.parse(String(input ?? "").trim());
+  } catch (_error) {
+    throw new Error("graph must be a JSON adjacency list, for example [[1,2],[2],[]]");
+  }
+  if (!Array.isArray(graph) || graph.length < 1 || graph.length > 12 || graph.some((neighbors) => !Array.isArray(neighbors))) {
+    throw new Error("graph must be an adjacency list with 1 to 12 node arrays");
+  }
+  const n = graph.length;
+  if (graph.some((neighbors) => neighbors.some((node) => !Number.isInteger(node) || node < 0 || node >= n))) {
+    throw new Error("every neighbor must be a node index from 0 to n - 1");
+  }
+  return graph.map((neighbors) => [...neighbors]);
+}
+
+function buildSteps802(input) {
+  const graph = parseAdjacency802(input);
+  const n = graph.length;
+  const reverse = Array.from({ length: n }, () => []);
+  const outdegree = graph.map((neighbors) => neighbors.length);
+  const queue = [];
+  const safe = new Set();
+  const steps = [];
+
+  function graphState({ hlNodes = [], hlEdges = [], restrictedNodes = [] } = {}) {
+    const annotations = {};
+    for (const node of queue) annotations[node] = "queue";
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "out=" + outdegree[node] })),
+      edges: graph.flatMap((neighbors, node) => neighbors.map((next) => ({ u: node, v: next }))),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...safe],
+      restrictedNodes,
+      annotations,
+      caption: {
+        vi: "Số dưới node = outdegree còn lại · queue = terminal/safe vừa phát hiện · xanh = safe",
+        en: "Number under node = remaining outdegree · queue = newly found terminal/safe node · green = safe",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "graph", value: JSON.stringify(graph) },
+        { name: "outdegree", value: "[" + outdegree.join(", ") + "]" },
+        { name: "queue", value: "[" + queue.join(", ") + "]" },
+        { name: "safe", value: "[" + [...safe].sort((a, b) => a - b).join(", ") + "]" },
+        ...(answer === null ? [] : [{ name: "answer", value: "[" + answer.join(", ") + "]" }]),
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "Dựng reverse graph và outdegree", en: "Build reverse graph and outdegree" },
+    note: {
+      vi: "Một node là eventual safe nếu mọi đường đi từ nó cuối cùng tới terminal node. Ta đi ngược từ terminal node để lần lượt loại các cạnh đi ra.",
+      en: "A node is eventually safe if every path from it ends at a terminal node. Work backward from terminal nodes, removing outgoing edges one by one.",
+    },
+    codeLines: [3, 4, 5],
+  });
+
+  for (let node = 0; node < n; node += 1) {
+    for (const next of graph[node]) reverse[next].push(node);
+  }
+  snapshot({
+    title: { vi: "reverse graph đã hoàn tất", en: "Reverse graph complete" },
+    note: { vi: "reverse[x] chứa các node trỏ tới x, để khi x an toàn ta có thể cập nhật các predecessor.", en: "reverse[x] stores nodes pointing to x, so once x is safe we can update its predecessors." },
+    codeLines: [5, 6, 7],
+  });
+
+  for (let node = 0; node < n; node += 1) {
+    if (outdegree[node] === 0) queue.push(node);
+  }
+  snapshot({
+    title: { vi: "Đưa terminal node vào queue", en: "Enqueue terminal nodes" },
+    note: { vi: "Các node [" + queue.join(", ") + "] có outdegree = 0 nên chắc chắn safe.", en: "Nodes [" + queue.join(", ") + "] have outdegree 0, so they are certainly safe." },
+    codeLines: [8],
+    hlNodes: [...queue],
+  });
+
+  while (queue.length) {
+    const node = queue.shift();
+    snapshot({
+      title: { vi: "node = queue.popleft() = " + node, en: "node = queue.popleft() = " + node },
+      note: { vi: "Lấy node safe " + node + " để xử lý các cạnh đi vào nó.", en: "Pop safe node " + node + " and process edges entering it." },
+      codeLines: [9, 10],
+      hlNodes: [node],
+    });
+    safe.add(node);
+    snapshot({
+      title: { vi: "safe.append(" + node + ")", en: "safe.append(" + node + ")" },
+      note: { vi: "Node " + node + " được đánh dấu safe.", en: "Mark node " + node + " as safe." },
+      codeLines: [11],
+      hlNodes: [node],
+    });
+
+    for (const previous of reverse[node]) {
+      snapshot({
+        title: { vi: "Xét predecessor " + previous + " → " + node, en: "Inspect predecessor " + previous + " → " + node },
+        note: { vi: "Vì " + node + " đã safe, cạnh " + previous + " → " + node + " không còn là một lối đi tới cycle.", en: "Because " + node + " is safe, edge " + previous + " → " + node + " no longer leads toward a cycle." },
+        codeLines: [12],
+        hlNodes: [previous, node],
+        hlEdges: [[previous, node]],
+      });
+      outdegree[previous] -= 1;
+      snapshot({
+        title: { vi: "outdegree[" + previous + "] -= 1 → " + outdegree[previous], en: "outdegree[" + previous + "] -= 1 → " + outdegree[previous] },
+        note: { vi: "Giảm số cạnh đi ra chưa được chứng minh safe của node " + previous + ".", en: "Decrease the number of not-yet-proven-safe outgoing edges of node " + previous + "." },
+        codeLines: [13],
+        hlNodes: [previous],
+        hlEdges: [[previous, node]],
+      });
+      if (outdegree[previous] === 0) {
+        queue.push(previous);
+        snapshot({
+          title: { vi: "outdegree = 0 → queue.append(" + previous + ")", en: "outdegree = 0 → queue.append(" + previous + ")" },
+          note: { vi: "Mọi cạnh đi ra của " + previous + " giờ đều dẫn tới node safe, nên " + previous + " cũng safe.", en: "All outgoing edges from " + previous + " now lead to safe nodes, so " + previous + " is safe too." },
+          codeLines: [14, 15],
+          hlNodes: [previous],
+        });
+      }
+    }
+  }
+
+  const answer = [...safe].sort((a, b) => a - b);
+  const unsafe = Array.from({ length: n }, (_, node) => node).filter((node) => !safe.has(node));
+  snapshot({
+    title: { vi: "return sorted(safe) → [" + answer.join(", ") + "]", en: "return sorted(safe) → [" + answer.join(", ") + "]" },
+    note: unsafe.length
+      ? { vi: "Các node [" + unsafe.join(", ") + "] không bị loại hết, nên chúng nằm trong hoặc có thể đi vào cycle.", en: "Nodes [" + unsafe.join(", ") + "] were not removed, so they are in or can reach a cycle." }
+      : { vi: "Mọi node đều được loại từ terminal node, nên tất cả đều safe.", en: "Every node was removed starting from a terminal node, so all nodes are safe." },
+    codeLines: [16],
+    hlNodes: unsafe,
+    final: true,
+    answer,
+  });
+
+  return { original: graph, answer, steps };
+}
+
+// ─── 2360: Longest Cycle in a Graph ───
+function parseFunctionalGraph(input, label, allowMissing) {
+  const raw = String(input ?? "").trim();
+  let edges;
+  try {
+    edges = raw.startsWith("[") ? JSON.parse(raw) : raw.split(",").map((item) => Number(item.trim()));
+  } catch (_error) {
+    throw new Error(label + " must be a JSON array or comma-separated integers");
+  }
+  if (!Array.isArray(edges) || edges.length < 1 || edges.length > 12 || edges.some((next) =>
+    !Number.isInteger(next) || next < (allowMissing ? -1 : 0) || next >= edges.length,
+  )) {
+    throw new Error(label + " must contain 1 to 12 valid node indices" + (allowMissing ? " or -1" : ""));
+  }
+  return [...edges];
+}
+
+function buildSteps2360(input) {
+  const edges = parseFunctionalGraph(input, "edges", true);
+  const n = edges.length;
+  const visited = Array(n).fill(false);
+  const steps = [];
+  let answer = -1;
+  let bestCycle = [];
+  let position = new Map();
+
+  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {};
+    for (const [node, depth] of position) annotations[node] = "path d=" + depth;
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node) })),
+      edges: edges.flatMap((next, node) => next === -1 ? [] : [{ u: node, v: next }]),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visited.map((value, node) => value ? node : -1).filter((node) => node !== -1),
+      annotations,
+      caption: {
+        vi: "Xanh = đã xử lý toàn cục · path d=k = vị trí k trong lần đi hiện tại · vàng = cycle/edge đang xét",
+        en: "Green = globally processed · path d=k = position k in the current walk · amber = current cycle/edge",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "edges", value: "[" + edges.join(", ") + "]" },
+        { name: "position", value: "{" + [...position].map(([node, depth]) => node + ":" + depth).join(", ") + "}" },
+        { name: "longest", value: answer },
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "visited = [False] * n; longest = -1", en: "visited = [False] * n; longest = -1" },
+    note: { vi: "Mỗi node có nhiều nhất một cạnh đi ra. visited tránh đi lại các nhánh đã xử lý; position chỉ theo dõi lần đi hiện tại.", en: "Each node has at most one outgoing edge. visited avoids reprocessing finished branches; position tracks only the current walk." },
+    codeLines: [3, 4],
+  });
+
+  for (let start = 0; start < n; start += 1) {
+    if (visited[start]) continue;
+    position = new Map();
+    let node = start;
+    snapshot({
+      title: { vi: "Bắt đầu walk từ node " + start, en: "Start walk from node " + start },
+      note: { vi: "Node " + start + " chưa được xử lý, nên tạo position rỗng cho lần walk này.", en: "Node " + start + " is unprocessed, so start a fresh position map for this walk." },
+      codeLines: [5, 6, 7],
+      hlNodes: [start],
+    });
+
+    while (node !== -1 && !visited[node]) {
+      const current = node;
+      snapshot({
+        title: { vi: "Đang ở node " + current, en: "At node " + current },
+        note: { vi: "Node chưa visited, nên lưu depth của nó trong lần walk này.", en: "The node is not globally visited, so record its depth in this walk." },
+        codeLines: [8],
+        hlNodes: [current],
+      });
+      visited[current] = true;
+      position.set(current, position.size);
+      snapshot({
+        title: { vi: "visited[" + current + "] = True; position[" + current + "] = " + position.get(current), en: "visited[" + current + "] = True; position[" + current + "] = " + position.get(current) },
+        note: { vi: "Đánh dấu xử lý toàn cục và lưu vị trí để nếu quay lại sẽ đo được độ dài cycle.", en: "Mark it globally processed and store its position so a return can measure a cycle length." },
+        codeLines: [9, 10],
+        hlNodes: [current],
+      });
+      node = edges[current];
+      snapshot({
+        title: { vi: "node = edges[" + current + "] → " + node, en: "node = edges[" + current + "] → " + node },
+        note: node === -1 ? { vi: "Node này không có cạnh đi ra, lần walk kết thúc.", en: "This node has no outgoing edge, so the walk ends." } : { vi: "Đi theo cạnh " + current + " → " + node + ".", en: "Follow edge " + current + " → " + node + "." },
+        codeLines: [11],
+        hlNodes: node === -1 ? [current] : [current, node],
+        hlEdges: node === -1 ? [] : [[current, node]],
+      });
+    }
+
+    if (node !== -1 && position.has(node)) {
+      const cycleLength = position.size - position.get(node);
+      const cycle = [...position].filter(([, depth]) => depth >= position.get(node)).map(([current]) => current);
+      if (cycleLength > answer) {
+        answer = cycleLength;
+        bestCycle = cycle;
+      }
+      snapshot({
+        title: { vi: "Quay lại node " + node + " → cycle dài " + cycleLength, en: "Returned to node " + node + " → cycle length " + cycleLength },
+        note: { vi: "node " + node + " có position " + position.get(node) + ", còn walk dài " + position.size + "; cycle = [" + cycle.join(", ") + "].", en: "node " + node + " has position " + position.get(node) + " while this walk has length " + position.size + "; cycle = [" + cycle.join(", ") + "]." },
+        codeLines: [12, 13],
+        hlNodes: cycle,
+      });
+    } else {
+      snapshot({
+        title: { vi: "Walk kết thúc mà không tạo cycle mới", en: "Walk ended without a new cycle" },
+        note: node === -1 ? { vi: "Đã đi tới -1.", en: "The walk reached -1." } : { vi: "Walk chạm node đã được xử lý từ lần trước.", en: "The walk reached a node processed by an earlier walk." },
+        codeLines: [12],
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "return longest → " + answer, en: "return longest → " + answer },
+    note: answer === -1
+      ? { vi: "Không có cycle trong graph.", en: "The graph has no cycle." }
+      : { vi: "Cycle dài nhất là [" + bestCycle.join(", ") + "] với " + answer + " node.", en: "The longest cycle is [" + bestCycle.join(", ") + "] with " + answer + " node(s)." },
+    codeLines: [14],
+    hlNodes: bestCycle,
+    final: true,
+  });
+  return { original: edges, answer, steps };
+}
+
+// ─── 2876: Count Visited Nodes in a Directed Graph ───
+function buildSteps2876(input) {
+  const edges = parseFunctionalGraph(input, "edges", false);
+  const n = edges.length;
+  const indegree = Array(n).fill(0);
+  const queue = [];
+  const removed = [];
+  const pruned = new Set();
+  const cycleNodes = new Set();
+  const answer = Array(n).fill(0);
+  const steps = [];
+
+  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {};
+    for (const node of queue) annotations[node] = "queue";
+    for (const node of cycleNodes) annotations[node] = annotations[node] ? annotations[node] + ", cycle" : "cycle";
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "in=" + indegree[node] + ", ans=" + (answer[node] || "?") })),
+      edges: edges.map((next, node) => ({ u: node, v: next })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...pruned],
+      annotations,
+      caption: {
+        vi: "Xanh = node bị tỉa bởi Kahn · cycle = node còn lại trong cycle · số dưới node hiển thị indegree và đáp án",
+        en: "Green = node pruned by Kahn · cycle = node remaining in a cycle · numbers under a node show indegree and answer",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [...answer],
+      sub: answer.map((value) => value || "?"),
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "edges", value: "[" + edges.join(", ") + "]" },
+        { name: "indegree", value: "[" + indegree.join(", ") + "]" },
+        { name: "queue", value: "[" + queue.join(", ") + "]" },
+        { name: "removed", value: "[" + removed.join(", ") + "]" },
+        { name: "answer", value: "[" + answer.join(", ") + "]" },
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "Tính indegree", en: "Compute indegree" },
+    note: { vi: "Mỗi node có đúng một cạnh đi ra. Kahn sẽ tỉa các node không thể nằm trong cycle trước.", en: "Every node has exactly one outgoing edge. Kahn first prunes nodes that cannot be in a cycle." },
+    codeLines: [3, 4, 5],
+  });
+  for (const next of edges) indegree[next] += 1;
+  snapshot({
+    title: { vi: "indegree đã hoàn tất", en: "Indegree complete" },
+    note: { vi: "Node có indegree 0 không thể thuộc một directed cycle.", en: "A node with indegree 0 cannot belong to a directed cycle." },
+    codeLines: [4, 5],
+  });
+
+  for (let node = 0; node < n; node += 1) if (indegree[node] === 0) queue.push(node);
+  snapshot({
+    title: { vi: "Đưa mọi node indegree = 0 vào queue", en: "Enqueue every indegree-0 node" },
+    note: { vi: "Queue ban đầu: [" + queue.join(", ") + "].", en: "Initial queue: [" + queue.join(", ") + "]." },
+    codeLines: [6],
+    hlNodes: [...queue],
+  });
+
+  while (queue.length) {
+    const node = queue.shift();
+    removed.push(node);
+    pruned.add(node);
+    snapshot({
+      title: { vi: "Pop " + node + " và thêm vào removed", en: "Pop " + node + " and append to removed" },
+      note: { vi: "Node " + node + " không nằm trong cycle. Lưu thứ tự tỉa để tính DP ngược sau này.", en: "Node " + node + " is not in a cycle. Save pruning order for reverse DP later." },
+      codeLines: [7, 8],
+      hlNodes: [node],
+    });
+    const next = edges[node];
+    indegree[next] -= 1;
+    snapshot({
+      title: { vi: "indegree[" + next + "] -= 1 → " + indegree[next], en: "indegree[" + next + "] -= 1 → " + indegree[next] },
+      note: { vi: "Bỏ cạnh " + node + " → " + next + " khỏi graph còn lại.", en: "Remove edge " + node + " → " + next + " from the remaining graph." },
+      codeLines: [9, 10],
+      hlNodes: [node, next],
+      hlEdges: [[node, next]],
+    });
+    if (indegree[next] === 0) {
+      queue.push(next);
+      snapshot({
+        title: { vi: "indegree = 0 → queue.append(" + next + ")", en: "indegree = 0 → queue.append(" + next + ")" },
+        note: { vi: "Node " + next + " cũng không thể ở cycle sau khi các cạnh đi vào đã bị tỉa.", en: "Node " + next + " also cannot be in a cycle once its incoming edges have been pruned." },
+        codeLines: [11, 12],
+        hlNodes: [next],
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "Các node còn lại là cycle", en: "Remaining nodes are cycles" },
+    note: { vi: "Sau Kahn, các node có indegree > 0 nằm đúng trong các directed cycle.", en: "After Kahn, nodes with indegree above 0 are exactly the directed-cycle nodes." },
+    codeLines: [14, 15],
+  });
+  for (let start = 0; start < n; start += 1) {
+    if (indegree[start] === 0 || cycleNodes.has(start)) continue;
+    const cycle = [];
+    let node = start;
+    while (!cycleNodes.has(node)) {
+      cycleNodes.add(node);
+      cycle.push(node);
+      node = edges[node];
+    }
+    for (const current of cycle) answer[current] = cycle.length;
+    snapshot({
+      title: { vi: "Cycle [" + cycle.join(", ") + "] có độ dài " + cycle.length, en: "Cycle [" + cycle.join(", ") + "] has length " + cycle.length },
+      note: { vi: "Bắt đầu từ bất kỳ node nào trong cycle cũng thăm đúng " + cycle.length + " node rồi quay lại.", en: "Starting from any node in this cycle visits exactly " + cycle.length + " nodes before returning." },
+      codeLines: [16, 17, 18, 19, 20],
+      hlNodes: cycle,
+    });
+  }
+
+  for (let index = removed.length - 1; index >= 0; index -= 1) {
+    const node = removed[index];
+    const next = edges[node];
+    answer[node] = 1 + answer[next];
+    snapshot({
+      title: { vi: "answer[" + node + "] = 1 + answer[" + next + "] → " + answer[node], en: "answer[" + node + "] = 1 + answer[" + next + "] → " + answer[node] },
+      note: { vi: "Tính ngược theo thứ tự tỉa: từ " + node + " ta thăm chính nó rồi mọi node mà " + next + " thăm được.", en: "Process pruning order in reverse: from " + node + " visit itself plus every node reachable from " + next + "." },
+      codeLines: [21, 22],
+      hlNodes: [node, next],
+      hlEdges: [[node, next]],
+    });
+  }
+
+  snapshot({
+    title: { vi: "return answer", en: "return answer" },
+    note: { vi: "Mỗi answer[i] là số node khác nhau nhìn thấy khi bắt đầu tại i.", en: "Each answer[i] is the number of distinct nodes seen when starting at i." },
+    codeLines: [23],
+    final: true,
+  });
+  return { original: edges, answer, steps };
+}
+
+// ─── 1462: Course Schedule IV ───
+function parsePairs1462(value, label, n) {
+  const raw = String(value ?? "").trim();
+  let pairs;
+  try {
+    pairs = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(";").filter(Boolean).map((item) => item.split(",").map((part) => Number(part.trim())));
+  } catch (_error) {
+    throw new Error(label + " must be a JSON array of pairs or pairs formatted as a,b;a,b");
+  }
+  if (!Array.isArray(pairs) || pairs.some((pair) => !Array.isArray(pair) || pair.length !== 2 || pair.some((node) => !Number.isInteger(node) || node < 0 || node >= n))) {
+    throw new Error(label + " must contain pairs [a, b] with node indices from 0 to " + (n - 1));
+  }
+  return pairs.map(([from, to]) => [from, to]);
+}
+
+function parse1462Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 8) {
+    throw new Error("n must be an integer from 1 to 8 for the step-by-step visualization");
+  }
+  return {
+    n,
+    prerequisites: parsePairs1462(params.prerequisites, "prerequisites", n),
+    queries: parsePairs1462(params.queries, "queries", n),
+  };
+}
+
+function buildSteps1462(input, params = {}) {
+  const { n, prerequisites, queries } = parse1462Data(input, params);
+  const direct = Array.from({ length: n }, () => Array(n).fill(false));
+  const reach = Array.from({ length: n }, () => Array(n).fill(false));
+  const steps = [];
+
+  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
+    const edges = [];
+    for (let from = 0; from < n; from += 1) {
+      for (let to = 0; to < n; to += 1) {
+        if (direct[from][to]) edges.push({ u: from, v: to });
+        else if (reach[from][to]) edges.push({ u: from, v: to, kind: "accept", w: "path" });
+      }
+    }
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({
+        id: node,
+        label: String(node),
+        sub: "reaches=" + reach[node].filter(Boolean).length,
+      })),
+      edges,
+      hlNodes,
+      hlEdges,
+      caption: {
+        vi: "Mũi tên xám = prerequisite trực tiếp · mũi tên xanh = prerequisite suy ra qua một đường đi · vàng = đang xét",
+        en: "Gray arrows = direct prerequisites · green arrows = prerequisites inferred through a path · amber = current check",
+      },
+    };
+  }
+
+  function matrixText() {
+    return reach.map((row) => row.map((value) => value ? "1" : "0").join(" ")).join(" | ");
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "prerequisites", value: JSON.stringify(prerequisites) },
+        { name: "reach matrix", value: matrixText() },
+        ...(answer === null ? [] : [{ name: "answers", value: "[" + answer.map((value) => String(value)).join(", ") + "]" }]),
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "reach = [[False] * n for _ in range(n)]", en: "reach = [[False] * n for _ in range(n)]" },
+    note: { vi: "reach[a][b] sẽ là True khi a là prerequisite trực tiếp hoặc gián tiếp của b.", en: "reach[a][b] will be True when a is a direct or indirect prerequisite of b." },
+    codeLines: [3],
+  });
+
+  for (const [from, to] of prerequisites) {
+    direct[from][to] = true;
+    reach[from][to] = true;
+    snapshot({
+      title: { vi: "reach[" + from + "][" + to + "] = True", en: "reach[" + from + "][" + to + "] = True" },
+      note: { vi: from + " phải học trước " + to + ", nên đây là prerequisite trực tiếp.", en: from + " must be taken before " + to + ", so this is a direct prerequisite." },
+      codeLines: [4, 5],
+      hlNodes: [from, to],
+      hlEdges: [[from, to]],
+    });
+  }
+
+  for (let via = 0; via < n; via += 1) {
+    snapshot({
+      title: { vi: "Thử node trung gian via = " + via, en: "Try intermediate node via = " + via },
+      note: { vi: "Tìm mọi cặp course có thể nối qua " + via + ".", en: "Find every pair of courses that can be connected through " + via + "." },
+      codeLines: [6],
+      hlNodes: [via],
+    });
+    for (let from = 0; from < n; from += 1) {
+      if (!reach[from][via]) continue;
+      for (let to = 0; to < n; to += 1) {
+        if (!reach[via][to] || reach[from][to]) continue;
+        reach[from][to] = true;
+        snapshot({
+          title: { vi: from + " → " + via + " → " + to + " nên reach[" + from + "][" + to + "] = True", en: from + " → " + via + " → " + to + " makes reach[" + from + "][" + to + "] = True" },
+          note: { vi: from + " là prerequisite của " + via + " và " + via + " là prerequisite của " + to + "; vì vậy " + from + " cũng là prerequisite gián tiếp của " + to + ".", en: from + " is a prerequisite of " + via + " and " + via + " is a prerequisite of " + to + "; therefore " + from + " is an indirect prerequisite of " + to + "." },
+          codeLines: [7, 8, 10, 11, 12],
+          hlNodes: [from, via, to],
+          hlEdges: [[from, via], [via, to], [from, to]],
+        });
+      }
+    }
+  }
+
+  const answer = [];
+  for (const [from, to] of queries) {
+    const result = reach[from][to];
+    answer.push(result);
+    snapshot({
+      title: { vi: "Query [" + from + ", " + to + "] → " + result, en: "Query [" + from + ", " + to + "] → " + result },
+      note: result
+        ? { vi: "Có đường prerequisite từ " + from + " tới " + to + ".", en: "There is a prerequisite path from " + from + " to " + to + "." }
+        : { vi: "Không có đường prerequisite từ " + from + " tới " + to + ".", en: "There is no prerequisite path from " + from + " to " + to + "." },
+      codeLines: [13],
+      hlNodes: [from, to],
+      hlEdges: result ? [[from, to]] : [],
+    });
+  }
+
+  snapshot({
+    title: { vi: "return answers", en: "return answers" },
+    note: { vi: "Kết quả theo đúng thứ tự queries.", en: "Results are returned in the same order as queries." },
+    codeLines: [13],
+    final: true,
+    answer,
+  });
+  return { original: { n, prerequisites, queries }, answer, steps };
+}
+
+// ─── 2050: Parallel Courses III ───
+function parseJson2050(value, label) {
+  try {
+    return JSON.parse(String(value ?? "").trim());
+  } catch (_error) {
+    throw new Error(label + " must be valid JSON");
+  }
+}
+
+function parse2050Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 10) {
+    throw new Error("n must be an integer from 1 to 10 for the step-by-step visualization");
+  }
+  const relations = parseJson2050(params.relations, "relations");
+  const time = parseJson2050(params.time, "time");
+  if (!Array.isArray(relations) || relations.some((relation) => !Array.isArray(relation) || relation.length !== 2 || relation.some((course) => !Number.isInteger(course) || course < 1 || course > n))) {
+    throw new Error("relations must contain [before, after] pairs with course numbers from 1 to n");
+  }
+  if (!Array.isArray(time) || time.length !== n || time.some((duration) => !Number.isInteger(duration) || duration < 1)) {
+    throw new Error("time must contain exactly n positive integers");
+  }
+  return { n, relations: relations.map(([before, after]) => [before, after]), time: [...time] };
+}
+
+function buildSteps2050(input, params = {}) {
+  const { n, relations, time } = parse2050Data(input, params);
+  const graph = Array.from({ length: n + 1 }, () => []);
+  const indegree = Array(n + 1).fill(0);
+  const finish = [0, ...time];
+  const queue = [];
+  const completed = new Set();
+  const steps = [];
+
+  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {};
+    for (const course of queue) annotations[course] = "queue";
+    return {
+      nodes: Array.from({ length: n }, (_, index) => {
+        const course = index + 1;
+        return {
+          id: course,
+          label: "C" + course,
+          sub: "t=" + time[index] + " · end=" + finish[course] + " · in=" + indegree[course],
+        };
+      }),
+      edges: relations.map(([before, after]) => ({ u: before, v: after })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...completed],
+      annotations,
+      caption: {
+        vi: "Số dưới course = thời lượng · thời điểm hoàn tất sớm nhất · indegree còn lại; xanh = đã hoàn tất",
+        en: "Text below course = duration · earliest finish time · remaining indegree; green = completed",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: finish.slice(1),
+      sub: time.map((duration) => "t=" + duration),
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "relations", value: JSON.stringify(relations) },
+        { name: "indegree", value: "[" + indegree.slice(1).join(", ") + "]" },
+        { name: "finish", value: "[" + finish.slice(1).join(", ") + "]" },
+        { name: "queue", value: "[" + queue.join(", ") + "]" },
+        ...(answer === null ? [] : [{ name: "answer", value: answer }]),
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "Dựng graph, indegree và finish", en: "Build graph, indegree, and finish" },
+    note: { vi: "finish[course] bắt đầu bằng thời lượng riêng của course. Khi prerequisite hoàn tất, ta cập nhật finish của course kế tiếp bằng thời điểm muộn nhất trong các prerequisite.", en: "finish[course] starts at the course's own duration. When a prerequisite finishes, update the next course with the latest prerequisite completion time." },
+    codeLines: [4, 5, 6],
+  });
+  for (const [before, after] of relations) {
+    graph[before].push(after);
+    indegree[after] += 1;
+    snapshot({
+      title: { vi: "Thêm quan hệ C" + before + " → C" + after, en: "Add relation C" + before + " → C" + after },
+      note: { vi: "C" + before + " phải hoàn tất trước khi C" + after + " có thể bắt đầu; indegree[C" + after + "] tăng lên " + indegree[after] + ".", en: "C" + before + " must finish before C" + after + " can start; indegree[C" + after + "] becomes " + indegree[after] + "." },
+      codeLines: [7, 8, 9],
+      hlNodes: [before, after],
+      hlEdges: [[before, after]],
+    });
+  }
+  for (let course = 1; course <= n; course += 1) if (indegree[course] === 0) queue.push(course);
+  snapshot({
+    title: { vi: "Đưa course indegree = 0 vào queue", en: "Enqueue indegree-0 courses" },
+    note: { vi: "Các course [" + queue.join(", ") + "] không có prerequisite, nên có thể bắt đầu ngay tại thời điểm 0.", en: "Courses [" + queue.join(", ") + "] have no prerequisites, so they can start at time 0." },
+    codeLines: [10],
+    hlNodes: [...queue],
+  });
+
+  while (queue.length) {
+    const course = queue.shift();
+    completed.add(course);
+    snapshot({
+      title: { vi: "Pop C" + course + " (hoàn tất lúc " + finish[course] + ")", en: "Pop C" + course + " (finishes at " + finish[course] + ")" },
+      note: { vi: "C" + course + " đã có mọi prerequisite. Thời điểm hoàn tất sớm nhất của nó là " + finish[course] + ".", en: "C" + course + " has every prerequisite satisfied. Its earliest finish time is " + finish[course] + "." },
+      codeLines: [11, 12],
+      hlNodes: [course],
+    });
+
+    for (const next of graph[course]) {
+      const candidate = finish[course] + time[next - 1];
+      const previous = finish[next];
+      finish[next] = Math.max(finish[next], candidate);
+      snapshot({
+        title: { vi: "finish[C" + next + "] = max(" + previous + ", " + finish[course] + " + " + time[next - 1] + ") → " + finish[next], en: "finish[C" + next + "] = max(" + previous + ", " + finish[course] + " + " + time[next - 1] + ") → " + finish[next] },
+        note: { vi: "Nếu C" + next + " có nhiều prerequisite, nó chỉ bắt đầu sau prerequisite hoàn tất muộn nhất. Candidate từ C" + course + " là " + candidate + ".", en: "If C" + next + " has multiple prerequisites, it starts after the latest one finishes. The candidate through C" + course + " is " + candidate + "." },
+        codeLines: [13, 14],
+        hlNodes: [course, next],
+        hlEdges: [[course, next]],
+      });
+      indegree[next] -= 1;
+      snapshot({
+        title: { vi: "indegree[C" + next + "] -= 1 → " + indegree[next], en: "indegree[C" + next + "] -= 1 → " + indegree[next] },
+        note: { vi: "Đã hoàn tất một prerequisite của C" + next + ".", en: "One prerequisite of C" + next + " has finished." },
+        codeLines: [15],
+        hlNodes: [next],
+        hlEdges: [[course, next]],
+      });
+      if (indegree[next] === 0) {
+        queue.push(next);
+        snapshot({
+          title: { vi: "indegree = 0 → queue.append(C" + next + ")", en: "indegree = 0 → queue.append(C" + next + ")" },
+          note: { vi: "Mọi prerequisite của C" + next + " đã hoàn tất, nên course này sẵn sàng được xử lý.", en: "Every prerequisite of C" + next + " has finished, so this course is ready to process." },
+          codeLines: [16, 17],
+          hlNodes: [next],
+        });
+      }
+    }
+  }
+
+  const answer = Math.max(...finish.slice(1));
+  snapshot({
+    title: { vi: "return max(finish) → " + answer, en: "return max(finish) → " + answer },
+    note: { vi: "Tổng thời gian tối thiểu để hoàn tất mọi course là thời điểm hoàn tất muộn nhất.", en: "The minimum total time to finish every course is the latest finish time." },
+    codeLines: [18],
+    final: true,
+    answer,
+  });
+  return { original: { n, relations, time }, answer, steps };
+}
+
+// ─── 2115: Find All Possible Recipes from Given Supplies ───
+function parseStringList2115(value, label) {
+  let values;
+  try {
+    values = JSON.parse(String(value ?? "").trim());
+  } catch (_error) {
+    throw new Error(label + " must be a JSON array of strings");
+  }
+  if (!Array.isArray(values) || values.some((item) => typeof item !== "string" || !item.trim())) {
+    throw new Error(label + " must be a JSON array of non-empty strings");
+  }
+  return values.map((item) => item.trim());
+}
+
+function parse2115Data(input, params = {}) {
+  const recipes = parseStringList2115(input, "recipes");
+  const ingredients = parseJson2050(params.ingredients, "ingredients");
+  const supplies = parseStringList2115(params.supplies, "supplies");
+  if (recipes.length > 8 || new Set(recipes).size !== recipes.length) {
+    throw new Error("recipes must contain 1 to 8 unique names for the step-by-step visualization");
+  }
+  if (!Array.isArray(ingredients) || ingredients.length !== recipes.length || ingredients.some((parts) => !Array.isArray(parts) || parts.some((item) => typeof item !== "string" || !item.trim()))) {
+    throw new Error("ingredients must be a JSON array of string arrays with one entry per recipe");
+  }
+  const cleanedIngredients = ingredients.map((parts) => parts.map((item) => item.trim()));
+  const items = new Set([...recipes, ...supplies, ...cleanedIngredients.flat()]);
+  if (items.size > 18) throw new Error("use at most 18 distinct recipe/ingredient names for the step-by-step visualization");
+  return { recipes, ingredients: cleanedIngredients, supplies: [...new Set(supplies)] };
+}
+
+function buildSteps2115(input, params = {}) {
+  const { recipes, ingredients, supplies } = parse2115Data(input, params);
+  const need = Object.fromEntries(recipes.map((recipe, index) => [recipe, ingredients[index].length]));
+  const dependents = new Map();
+  const recipeSet = new Set(recipes);
+  const items = new Set([...recipes, ...supplies, ...ingredients.flat()]);
+  const queue = [...supplies];
+  const available = new Set(supplies);
+  const made = [];
+  const madeSet = new Set();
+  const steps = [];
+
+  for (let index = 0; index < recipes.length; index += 1) {
+    for (const ingredient of ingredients[index]) {
+      if (!dependents.has(ingredient)) dependents.set(ingredient, []);
+      dependents.get(ingredient).push(recipes[index]);
+    }
+  }
+
+  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {};
+    for (const item of queue) annotations[item] = "queue";
+    for (const recipe of madeSet) annotations[recipe] = annotations[recipe] ? annotations[recipe] + ", recipe" : "recipe";
+    const edges = [];
+    for (const [ingredient, recipeList] of dependents) {
+      for (const recipe of recipeList) edges.push({ u: ingredient, v: recipe });
+    }
+    return {
+      nodes: [...items].sort().map((item) => ({
+        id: item,
+        label: item,
+        sub: recipeSet.has(item) ? "need=" + need[item] : available.has(item) ? "available" : "ingredient",
+      })),
+      edges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...available],
+      annotations,
+      caption: {
+        vi: "Mũi tên = nguyên liệu → công thức · xanh = đang available · need = số nguyên liệu còn thiếu · queue = item mới có thể dùng",
+        en: "Arrows = ingredient → recipe · green = available · need = ingredients still missing · queue = newly usable item",
+      },
+    };
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      graph: graphState({ hlNodes, hlEdges }),
+      vars: [
+        { name: "queue", value: "[" + queue.join(", ") + "]" },
+        { name: "need", value: "{" + recipes.map((recipe) => recipe + ":" + need[recipe]).join(", ") + "}" },
+        { name: "made", value: "[" + made.join(", ") + "]" },
+        ...(answer === null ? [] : [{ name: "answer", value: "[" + answer.join(", ") + "]" }]),
+      ],
+    });
+  }
+
+  snapshot({
+    title: { vi: "Dựng dependency graph", en: "Build dependency graph" },
+    note: { vi: "Mỗi cạnh đi từ ingredient tới recipe cần nó. need[recipe] bắt đầu bằng số nguyên liệu phải có.", en: "Every edge goes from an ingredient to a recipe needing it. need[recipe] starts as the number of required ingredients." },
+    codeLines: [4, 5, 6, 7],
+  });
+
+  for (const recipe of recipes) {
+    if (need[recipe] !== 0 || madeSet.has(recipe)) continue;
+    madeSet.add(recipe);
+    made.push(recipe);
+    if (!available.has(recipe)) {
+      available.add(recipe);
+      queue.push(recipe);
+    }
+    snapshot({
+      title: { vi: "" + recipe + " không cần nguyên liệu → có thể làm ngay", en: recipe + " needs no ingredients → make it immediately" },
+      note: { vi: recipe + " được thêm vào answer và có thể trở thành nguyên liệu cho công thức khác.", en: recipe + " is added to the answer and can become an ingredient for another recipe." },
+      codeLines: [10, 11, 12],
+      hlNodes: [recipe],
+    });
+  }
+  snapshot({
+    title: { vi: "Khởi tạo queue bằng supplies", en: "Initialize queue from supplies" },
+    note: { vi: "Các supplies [" + supplies.join(", ") + "] có sẵn từ đầu và sẽ lần lượt mở khóa recipe phụ thuộc vào chúng.", en: "Supplies [" + supplies.join(", ") + "] are available initially and will unlock dependent recipes one by one." },
+    codeLines: [8, 9],
+    hlNodes: [...supplies],
+  });
+
+  while (queue.length) {
+    const ingredient = queue.shift();
+    snapshot({
+      title: { vi: "ingredient = queue.popleft() = " + ingredient, en: "ingredient = queue.popleft() = " + ingredient },
+      note: { vi: ingredient + " hiện có sẵn; cập nhật tất cả recipe cần nó.", en: ingredient + " is now available; update every recipe needing it." },
+      codeLines: [13, 14],
+      hlNodes: [ingredient],
+    });
+    for (const recipe of dependents.get(ingredient) || []) {
+      need[recipe] -= 1;
+      snapshot({
+        title: { vi: "need[" + recipe + "] -= 1 → " + need[recipe], en: "need[" + recipe + "] -= 1 → " + need[recipe] },
+        note: { vi: ingredient + " đáp ứng một nguyên liệu của " + recipe + ".", en: ingredient + " satisfies one ingredient of " + recipe + "." },
+        codeLines: [15, 16],
+        hlNodes: [ingredient, recipe],
+        hlEdges: [[ingredient, recipe]],
+      });
+      if (need[recipe] === 0 && !madeSet.has(recipe)) {
+        madeSet.add(recipe);
+        made.push(recipe);
+        if (!available.has(recipe)) {
+          available.add(recipe);
+          queue.push(recipe);
+        }
+        snapshot({
+          title: { vi: "need = 0 → làm được " + recipe, en: "need = 0 → can make " + recipe },
+          note: { vi: "Đủ mọi nguyên liệu, nên " + recipe + " được thêm vào answer và cũng trở thành một item available.", en: "All ingredients are ready, so " + recipe + " joins the answer and becomes an available item too." },
+          codeLines: [17, 18, 19, 20],
+          hlNodes: [recipe],
+        });
+      }
+    }
+  }
+
+  snapshot({
+    title: { vi: "return made", en: "return made" },
+    note: { vi: "Queue đã rỗng; mọi recipe không có trong made vẫn thiếu ít nhất một ingredient không thể tạo được.", en: "The queue is empty; every recipe not in made still misses at least one unavailable ingredient." },
+    codeLines: [21],
+    final: true,
+    answer: made,
+  });
+  return { original: { recipes, ingredients, supplies }, answer: made, steps };
+}
+
+// ─── 2192: All Ancestors of a Node in a Directed Acyclic Graph ───
+function parse2192Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 10) throw new Error("n must be an integer from 1 to 10 for the step-by-step visualization");
+  return { n, edges: parsePairs1462(params.edges, "edges", n) };
+}
+
+function buildSteps2192(input, params = {}) {
+  const { n, edges } = parse2192Data(input, params);
+  const graph = Array.from({ length: n }, () => []);
+  const indegree = Array(n).fill(0);
+  const ancestors = Array.from({ length: n }, () => new Set());
+  const queue = [];
+  const processed = new Set();
+  const steps = [];
+
+  function state({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {};
+    for (const node of queue) annotations[node] = "queue";
+    return {
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "anc=" + ancestors[node].size + " · in=" + indegree[node] })),
+      edges: edges.map(([from, to]) => ({ u: from, v: to })),
+      hlNodes, hlEdges, visitedNodes: [...processed], annotations,
+      caption: { vi: "anc = số tổ tiên đã biết · in = indegree còn lại · xanh = đã xử lý topo", en: "anc = known ancestor count · in = remaining indegree · green = topologically processed" },
+    };
+  }
+  function snap(title, note, codeLines, opts = {}) {
+    steps.push({ title, note, codeLines, final: Boolean(opts.final), arr: [], highlight: [], mark: [], graph: state(opts), vars: [
+      { name: "indegree", value: "[" + indegree.join(", ") + "]" },
+      { name: "queue", value: "[" + queue.join(", ") + "]" },
+      { name: "ancestors", value: "[" + ancestors.map((set) => "{" + [...set].sort((a, b) => a - b).join(",") + "}").join("; ") + "]" },
+      ...(opts.answer ? [{ name: "answer", value: JSON.stringify(opts.answer) }] : []),
+    ] });
+  }
+
+  snap({ vi: "Dựng adjacency list và indegree", en: "Build adjacency list and indegree" }, { vi: "Duyệt theo topo để khi u được xử lý, toàn bộ tổ tiên của u đã sẵn sàng truyền cho con.", en: "Traverse topologically so when u is processed, all of u's ancestors are ready to pass to its children." }, [3, 4, 5]);
+  for (const [from, to] of edges) { graph[from].push(to); indegree[to] += 1; }
+  for (let node = 0; node < n; node += 1) if (indegree[node] === 0) queue.push(node);
+  snap({ vi: "Đưa node indegree = 0 vào queue", en: "Enqueue indegree-0 nodes" }, { vi: "Queue ban đầu: [" + queue.join(", ") + "].", en: "Initial queue: [" + queue.join(", ") + "]." }, [6], { hlNodes: [...queue] });
+
+  while (queue.length) {
+    const node = queue.shift();
+    processed.add(node);
+    snap({ vi: "Pop node " + node, en: "Pop node " + node }, { vi: "Đã biết đủ tổ tiên của " + node + ": {" + [...ancestors[node]].sort((a, b) => a - b).join(", ") + "}.", en: "All ancestors of " + node + " are known: {" + [...ancestors[node]].sort((a, b) => a - b).join(", ") + "}." }, [7, 8], { hlNodes: [node] });
+    for (const next of graph[node]) {
+      ancestors[next].add(node);
+      for (const ancestor of ancestors[node]) ancestors[next].add(ancestor);
+      snap({ vi: "Truyền tổ tiên từ " + node + " sang " + next, en: "Pass ancestors from " + node + " to " + next }, { vi: "ancestors[" + next + "] = {" + [...ancestors[next]].sort((a, b) => a - b).join(", ") + "}.", en: "ancestors[" + next + "] = {" + [...ancestors[next]].sort((a, b) => a - b).join(", ") + "}." }, [9, 10], { hlNodes: [node, next], hlEdges: [[node, next]] });
+      indegree[next] -= 1;
+      if (indegree[next] === 0) {
+        queue.push(next);
+        snap({ vi: "indegree[" + next + "] = 0 → enqueue", en: "indegree[" + next + "] = 0 → enqueue" }, { vi: "Mọi predecessor của " + next + " đã truyền tổ tiên xong.", en: "All predecessors of " + next + " have finished passing ancestors." }, [11, 12], { hlNodes: [next] });
+      }
+    }
+  }
+  const answer = ancestors.map((set) => [...set].sort((a, b) => a - b));
+  snap({ vi: "return ancestors", en: "return ancestors" }, { vi: "Mỗi danh sách đã được sort tăng dần theo yêu cầu.", en: "Each list is sorted ascending as required." }, [13], { final: true, answer });
+  return { original: { n, edges }, answer, steps };
+}
+
+// ─── 2392: Build a Matrix With Conditions ───
+function parseOneBasedPairs2392(value, label, k) {
+  const pairs = parseJson2050(value, label);
+  if (!Array.isArray(pairs) || pairs.some((pair) => !Array.isArray(pair) || pair.length !== 2 || pair.some((number) => !Number.isInteger(number) || number < 1 || number > k))) {
+    throw new Error(label + " must contain [a, b] pairs with values from 1 to k");
+  }
+  return pairs.map(([from, to]) => [from, to]);
+}
+
+function parse2392Data(input, params = {}) {
+  const k = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(k) || k < 1 || k > 7) throw new Error("k must be an integer from 1 to 7 for the step-by-step visualization");
+  return { k, rowConditions: parseOneBasedPairs2392(params.rowConditions, "rowConditions", k), colConditions: parseOneBasedPairs2392(params.colConditions, "colConditions", k) };
+}
+
+function buildSteps2392(input, params = {}) {
+  const { k, rowConditions, colConditions } = parse2392Data(input, params);
+  const steps = [];
+
+  function topo(conditions, axis) {
+    const graph = Array.from({ length: k + 1 }, () => []);
+    const indegree = Array(k + 1).fill(0);
+    for (const [from, to] of conditions) { graph[from].push(to); indegree[to] += 1; }
+    const queue = [];
+    for (let value = 1; value <= k; value += 1) if (indegree[value] === 0) queue.push(value);
+    const order = [];
+    const done = new Set();
+    const view = (hlNodes = [], hlEdges = []) => ({
+      nodes: Array.from({ length: k }, (_, index) => ({ id: index + 1, label: String(index + 1), sub: "in=" + indegree[index + 1] })),
+      edges: conditions.map(([from, to]) => ({ u: from, v: to })), hlNodes, hlEdges, visitedNodes: [...done],
+      annotations: Object.fromEntries(queue.map((value) => [value, "queue"])),
+      caption: { vi: "Topo sort cho điều kiện " + axis + " · xanh = đã lấy vào thứ tự", en: "Topological sort for " + axis + " conditions · green = added to order" },
+    });
+    const snap = (title, note, lines, opts = {}) => steps.push({ title, note, codeLines: lines, final: Boolean(opts.final), arr: [], highlight: [], mark: [], graph: view(opts.hlNodes, opts.hlEdges), vars: [
+      { name: axis + " queue", value: "[" + queue.join(", ") + "]" }, { name: axis + " order", value: "[" + order.join(", ") + "]" }, { name: "indegree", value: "[" + indegree.slice(1).join(", ") + "]" },
+    ] });
+    snap({ vi: "Topo sort điều kiện " + axis, en: "Topological sort for " + axis + " conditions" }, { vi: "Các node indegree 0 ban đầu: [" + queue.join(", ") + "].", en: "Initial indegree-0 nodes: [" + queue.join(", ") + "]." }, [3, 4, 5], { hlNodes: [...queue] });
+    while (queue.length) {
+      const value = queue.shift(); order.push(value); done.add(value);
+      snap({ vi: "Lấy " + value + " vào " + axis + " order", en: "Add " + value + " to " + axis + " order" }, { vi: "order = [" + order.join(", ") + "].", en: "order = [" + order.join(", ") + "]." }, [6, 7], { hlNodes: [value] });
+      for (const next of graph[value]) { indegree[next] -= 1; if (indegree[next] === 0) queue.push(next); }
+    }
+    return order.length === k ? order : null;
+  }
+
+  const rowOrder = topo(rowConditions, "row");
+  if (!rowOrder) return { original: { k, rowConditions, colConditions }, answer: [], steps: [...steps, { title: { vi: "Row conditions có cycle", en: "Row conditions contain a cycle" }, note: { vi: "Không thể tạo matrix vì row order không tồn tại.", en: "No matrix can be built because a row order does not exist." }, final: true, codeLines: [8], arr: [], highlight: [], mark: [], vars: [{ name: "answer", value: "[]" }] }] };
+  const colOrder = topo(colConditions, "column");
+  if (!colOrder) return { original: { k, rowConditions, colConditions }, answer: [], steps: [...steps, { title: { vi: "Column conditions có cycle", en: "Column conditions contain a cycle" }, note: { vi: "Không thể tạo matrix vì column order không tồn tại.", en: "No matrix can be built because a column order does not exist." }, final: true, codeLines: [9], arr: [], highlight: [], mark: [], vars: [{ name: "answer", value: "[]" }] }] };
+
+  const rowPos = Array(k + 1); const colPos = Array(k + 1);
+  rowOrder.forEach((value, index) => { rowPos[value] = index; });
+  colOrder.forEach((value, index) => { colPos[value] = index; });
+  const matrix = Array.from({ length: k }, () => Array(k).fill(0));
+  function matrixStep(value, final = false) {
+    const dp = [[0, ...Array(k).fill(0)], ...matrix.map((row) => [0, ...row])];
+    steps.push({
+      title: value === null ? { vi: "Khởi tạo matrix", en: "Initialize matrix" } : { vi: "Đặt " + value + " tại [" + rowPos[value] + ", " + colPos[value] + "]", en: "Place " + value + " at [" + rowPos[value] + ", " + colPos[value] + "]" },
+      note: value === null ? { vi: "row order = [" + rowOrder.join(", ") + "], column order = [" + colOrder.join(", ") + "].", en: "row order = [" + rowOrder.join(", ") + "], column order = [" + colOrder.join(", ") + "]." } : { vi: "Vị trí hàng/cột của " + value + " đồng thời thỏa cả hai bộ điều kiện.", en: "This row/column position for " + value + " satisfies both condition sets." },
+      codeLines: value === null ? [10, 11] : [12, 13], final, arr: [], highlight: [], mark: [],
+      grid: { dp, text1: [], text2: [], rowLabels: Array.from({ length: k }, (_, index) => String(index)), colLabels: Array.from({ length: k }, (_, index) => String(index)), hlCell: value === null ? null : [rowPos[value] + 1, colPos[value] + 1], largeCells: true, caption: { vi: "Matrix kết quả; hàng/cột đánh số từ 0", en: "Result matrix; rows/columns are 0-indexed" } },
+      vars: [{ name: "row order", value: "[" + rowOrder.join(", ") + "]" }, { name: "column order", value: "[" + colOrder.join(", ") + "]" }, ...(final ? [{ name: "answer", value: JSON.stringify(matrix) }] : [])],
+    });
+  }
+  matrixStep(null);
+  for (let value = 1; value <= k; value += 1) { matrix[rowPos[value]][colPos[value]] = value; matrixStep(value, value === k); }
+  return { original: { k, rowConditions, colConditions }, answer: matrix, steps };
+}
+
+// ─── 1376: Time Needed to Inform All Employees ───
+function parse1376Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 12) throw new Error("n must be an integer from 1 to 12 for the step-by-step visualization");
+  const headID = Number(params.headID);
+  const manager = parseJson2050(params.manager, "manager");
+  const informTime = parseJson2050(params.informTime, "informTime");
+  if (!Number.isInteger(headID) || headID < 0 || headID >= n || !Array.isArray(manager) || manager.length !== n || manager.some((boss) => !Number.isInteger(boss) || boss < -1 || boss >= n) || manager[headID] !== -1) throw new Error("manager must have n values from -1 to n - 1, with manager[headID] = -1");
+  if (!Array.isArray(informTime) || informTime.length !== n || informTime.some((minutes) => !Number.isInteger(minutes) || minutes < 0)) throw new Error("informTime must contain n non-negative integers");
+  return { n, headID, manager: [...manager], informTime: [...informTime] };
+}
+
+function buildSteps1376(input, params = {}) {
+  const { n, headID, manager, informTime } = parse1376Data(input, params);
+  const children = Array.from({ length: n }, () => []);
+  for (let employee = 0; employee < n; employee += 1) if (manager[employee] !== -1) children[manager[employee]].push(employee);
+  const arrival = Array(n).fill(null); arrival[headID] = 0;
+  const queue = [[headID, 0]]; const informed = new Set(); const steps = []; let answer = 0;
+  function state({ hlNodes = [], hlEdges = [] } = {}) {
+    const annotations = {}; for (const [employee] of queue) annotations[employee] = "queue";
+    return { nodes: Array.from({ length: n }, (_, employee) => ({ id: employee, label: "E" + employee, sub: "tell=" + informTime[employee] + " · at=" + (arrival[employee] ?? "—") })), edges: manager.flatMap((boss, employee) => boss === -1 ? [] : [{ u: boss, v: employee }]), hlNodes, hlEdges, visitedNodes: [...informed], annotations, caption: { vi: "tell = thời gian manager báo tin · at = thời điểm nhân viên nhận tin · xanh = đã báo tin", en: "tell = manager's informing time · at = time employee receives news · green = has informed reports" } };
+  }
+  function snap(title, note, lines, opts = {}) { steps.push({ title, note, codeLines: lines, final: Boolean(opts.final), arr: [], highlight: [], mark: [], graph: state(opts), vars: [{ name: "queue", value: "[" + queue.map(([employee, minute]) => "(" + employee + "," + minute + ")").join(", ") + "]" }, { name: "answer", value: answer }] }); }
+  snap({ vi: "Dựng cây manager → employee", en: "Build manager → employee tree" }, { vi: "BFS lan thông tin từ head E" + headID + ".", en: "BFS propagates information from head E" + headID + "." }, [3, 4, 5], { hlNodes: [headID] });
+  while (queue.length) {
+    const [managerId, minute] = queue.shift(); informed.add(managerId); answer = Math.max(answer, minute);
+    snap({ vi: "E" + managerId + " nhận tin lúc " + minute, en: "E" + managerId + " receives news at " + minute }, { vi: "E" + managerId + " mất " + informTime[managerId] + " phút để báo cho direct reports.", en: "E" + managerId + " takes " + informTime[managerId] + " minutes to inform direct reports." }, [6, 7, 8], { hlNodes: [managerId] });
+    for (const employee of children[managerId]) { arrival[employee] = minute + informTime[managerId]; queue.push([employee, arrival[employee]]); snap({ vi: "E" + managerId + " → E" + employee + " lúc " + arrival[employee], en: "E" + managerId + " → E" + employee + " at " + arrival[employee] }, { vi: "Employee nhận tin sau thời gian báo của manager.", en: "The employee receives news after the manager's informing time." }, [9, 10], { hlNodes: [managerId, employee], hlEdges: [[managerId, employee]] }); }
+  }
+  snap({ vi: "return answer = " + answer, en: "return answer = " + answer }, { vi: "Đây là thời điểm muộn nhất bất kỳ employee nhận tin.", en: "This is the latest time any employee receives news." }, [11], { final: true, hlNodes: [headID] });
+  return { original: { n, headID, manager, informTime }, answer, steps };
+}
+
+// ─── 1519: Number of Nodes in the Sub-Tree With the Same Label ───
+function parse1519Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 12) throw new Error("n must be an integer from 1 to 12 for the step-by-step visualization");
+  const edges = parsePairs1462(params.edges, "edges", n);
+  const labels = String(params.labels ?? "").trim();
+  if (edges.length !== n - 1 || edges.some(([from, to]) => from === to) || labels.length !== n || /[^a-z]/.test(labels)) throw new Error("edges must describe a tree with n - 1 non-self edges and labels must be n lowercase letters");
+  return { n, edges, labels };
+}
+
+function buildSteps1519(input, params = {}) {
+  const { n, edges, labels } = parse1519Data(input, params);
+  const graph = Array.from({ length: n }, () => []);
+  for (const [from, to] of edges) { graph[from].push(to); graph[to].push(from); }
+  const parent = Array(n).fill(-1); parent[0] = -2; const order = [0];
+  for (let index = 0; index < order.length; index += 1) for (const next of graph[order[index]]) if (next !== parent[order[index]]) { parent[next] = order[index]; order.push(next); }
+  if (order.length !== n) throw new Error("edges must form one connected tree");
+  const count = Array.from({ length: n }, () => Array(26).fill(0)); const answer = Array(n).fill(0); const processed = new Set(); const steps = [];
+  function state({ hlNodes = [], hlEdges = [] } = {}) { return { nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: node + " (" + labels[node] + ")", sub: "same=" + answer[node] + " · p=" + (parent[node] < 0 ? "root" : parent[node]) })), edges: edges.map(([from, to]) => ({ u: from, v: to, undirected: true })), hlNodes, hlEdges, visitedNodes: [...processed], caption: { vi: "same = số node cùng nhãn trong subtree · xanh = subtree đã tổng hợp", en: "same = same-label count in subtree · green = subtree aggregated" } }; }
+  function snap(title, note, lines, opts = {}) { steps.push({ title, note, codeLines: lines, final: Boolean(opts.final), arr: [...answer], sub: labels.split(""), highlight: [], mark: [], graph: state(opts), vars: [{ name: "postorder", value: "[" + [...order].reverse().join(", ") + "]" }, { name: "answer", value: "[" + answer.join(", ") + "]" }] }); }
+  snap({ vi: "Dựng parent và thứ tự postorder", en: "Build parent links and postorder" }, { vi: "Xử lý node từ lá về root để mỗi child đã có bảng đếm trước khi cộng vào parent.", en: "Process nodes from leaves to root so each child's counts are ready before adding them to its parent." }, [3, 4, 5]);
+  for (let index = order.length - 1; index >= 0; index -= 1) {
+    const node = order[index]; const labelIndex = labels.charCodeAt(node) - 97; count[node][labelIndex] += 1; answer[node] = count[node][labelIndex]; processed.add(node);
+    snap({ vi: "Tổng hợp subtree của " + node + " → same = " + answer[node], en: "Aggregate subtree of " + node + " → same = " + answer[node] }, { vi: "Node " + node + " mang nhãn '" + labels[node] + "'; các child đã truyền count lên trước đó.", en: "Node " + node + " has label '" + labels[node] + "'; its children already passed counts upward." }, [10, 11, 12], { hlNodes: [node] });
+    const boss = parent[node];
+    if (boss >= 0) { for (let letter = 0; letter < 26; letter += 1) count[boss][letter] += count[node][letter]; snap({ vi: "Truyền count từ " + node + " lên parent " + boss, en: "Pass counts from " + node + " to parent " + boss }, { vi: "Parent nhận toàn bộ tần suất nhãn của subtree child.", en: "The parent receives every label frequency from the child subtree." }, [8, 9], { hlNodes: [node, boss], hlEdges: [[node, boss]] }); }
+  }
+  snap({ vi: "return answer", en: "return answer" }, { vi: "answer[i] là số node có nhãn labels[i] trong subtree của i.", en: "answer[i] is the number of nodes with labels[i] in i's subtree." }, [13], { final: true, hlNodes: [0] });
+  return { original: { n, edges, labels }, answer, steps };
+}
+
 Object.assign(module.exports, {
   1311: {
     id: 1311,
@@ -25081,6 +26447,678 @@ Object.assign(module.exports, {
       return [parsed.grid.map((row) => row.join("")), Math.max(1, Number(params.energy) || 4)];
     },
     builder: buildSteps3568,
+  },
+  802: {
+    id: 802,
+    difficulty: "medium",
+    slug: "find-eventual-safe-states",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
+    ],
+    title: { vi: "Find Eventual Safe States", en: "Find Eventual Safe States" },
+    titleVi: { vi: "Tìm các trạng thái cuối cùng an toàn", en: "Find eventual safe states" },
+    statement: {
+      vi: "Cho đồ thị có hướng dưới dạng adjacency list. Một node là safe nếu mọi đường đi bắt đầu từ nó cuối cùng kết thúc ở terminal node, không rơi vào cycle. Trả về các safe node theo thứ tự tăng dần.",
+      en: "Given a directed graph as an adjacency list, a node is safe if every path starting there eventually ends at a terminal node instead of a cycle. Return all safe nodes in ascending order.",
+    },
+    defaultInput: "[[1,2],[2,3],[5],[0],[5],[],[]]",
+    inputKind: "string",
+    inputLabel: { vi: "graph adjacency list dạng JSON", en: "graph adjacency list as JSON" },
+    approach: [
+      { vi: "Đảo chiều cạnh. Với mỗi node, outdegree đếm số cạnh còn có thể dẫn tới cycle.", en: "Reverse every edge. For each node, outdegree counts outgoing edges that could still lead to a cycle." },
+      { vi: "Terminal node có outdegree = 0 nên chắc chắn safe; đưa chúng vào queue.", en: "A terminal node has outdegree 0, so it is certainly safe; enqueue all of them." },
+      { vi: "Khi một safe node được lấy ra, giảm outdegree của các predecessor. Predecessor về 0 cũng trở thành safe.", en: "When a safe node is popped, decrease its predecessors' outdegrees. A predecessor reaching 0 becomes safe too." },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V + E)",
+      note: { vi: "Mỗi node vào queue tối đa một lần và mỗi cạnh được xem đúng một lần qua reverse graph.", en: "Each node enters the queue at most once, and each edge is processed once through the reverse graph." },
+    },
+    codeLabel: { vi: "Reverse graph + Kahn BFS", en: "Reverse graph + Kahn BFS" },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def eventualSafeNodes(self, graph: List[List[int]]) -> List[int]:",
+      "        n = len(graph)",
+      "        reverse = [[] for _ in range(n)]",
+      "        outdegree = [0] * n",
+      "        for node, neighbors in enumerate(graph):",
+      "            outdegree[node] = len(neighbors)",
+      "            for nxt in neighbors:",
+      "                reverse[nxt].append(node)",
+      "        queue = deque(node for node in range(n) if outdegree[node] == 0)",
+      "        safe = []",
+      "        while queue:",
+      "            node = queue.popleft()",
+      "            safe.append(node)",
+      "            for previous in reverse[node]:",
+      "                outdegree[previous] -= 1",
+      "                if outdegree[previous] == 0:",
+      "                    queue.append(previous)",
+      "        return sorted(safe)",
+    ],
+    liveArgs(input) {
+      return [parseAdjacency802(input)];
+    },
+    builder: buildSteps802,
+  },
+  2360: {
+    id: 2360,
+    difficulty: "hard",
+    slug: "longest-cycle-in-a-graph",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "cycle", vi: "Chu trình", en: "Cycle Detection" },
+    ],
+    title: { vi: "Longest Cycle in a Graph", en: "Longest Cycle in a Graph" },
+    titleVi: { vi: "Chu trình dài nhất trong đồ thị", en: "Longest cycle in a graph" },
+    statement: {
+      vi: "edges[i] là node mà i trỏ tới, hoặc -1 nếu i không có cạnh đi ra. Mỗi node có nhiều nhất một cạnh đi ra. Trả về độ dài cycle dài nhất, hoặc -1 nếu không có cycle.",
+      en: "edges[i] is the node i points to, or -1 if i has no outgoing edge. Every node has at most one outgoing edge. Return the longest cycle length, or -1 if none exists.",
+    },
+    defaultInput: "[3,3,4,2,3]",
+    inputKind: "string",
+    inputLabel: { vi: "edges dạng JSON hoặc số cách bởi ,", en: "edges as JSON or comma-separated integers" },
+    approach: [
+      { vi: "Duyệt từ mỗi node chưa xử lý. visited là trạng thái toàn cục để không lặp lại nhánh cũ.", en: "Walk from each unprocessed node. visited is global state that prevents reprocessing old branches." },
+      { vi: "Trong một lần walk, position lưu depth của từng node. Chỉ khi quay lại node có trong position hiện tại mới tìm được cycle mới.", en: "Within one walk, position stores each node's depth. Only returning to a node in the current position map finds a new cycle." },
+      { vi: "Độ dài cycle bằng số node trong walk trừ position của node vừa quay lại.", en: "The cycle length equals the walk size minus the position of the node reached again." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Mỗi node được đánh dấu visited và xử lý tối đa một lần.", en: "Every node is marked visited and processed at most once." },
+    },
+    codeLabel: { vi: "DFS walk + vị trí trong đường đi", en: "DFS walk + path positions" },
+    code: [
+      "class Solution:",
+      "    def longestCycle(self, edges: List[int]) -> int:",
+      "        visited = [False] * len(edges)",
+      "        longest = -1",
+      "        for start in range(len(edges)):",
+      "            if visited[start]:",
+      "                continue",
+      "            position = {}",
+      "            node = start",
+      "            while node != -1 and not visited[node]:",
+      "                visited[node] = True",
+      "                position[node] = len(position)",
+      "                node = edges[node]",
+      "            if node != -1 and node in position:",
+      "                longest = max(longest, len(position) - position[node])",
+      "        return longest",
+    ],
+    liveArgs(input) {
+      return [parseFunctionalGraph(input, "edges", true)];
+    },
+    builder: buildSteps2360,
+  },
+  2876: {
+    id: 2876,
+    difficulty: "hard",
+    slug: "count-visited-nodes-in-a-directed-graph",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    ],
+    title: { vi: "Count Visited Nodes in a Directed Graph", en: "Count Visited Nodes in a Directed Graph" },
+    titleVi: { vi: "Đếm node đã thăm trong đồ thị có hướng", en: "Count visited nodes in a directed graph" },
+    statement: {
+      vi: "edges[i] là node duy nhất mà i trỏ tới. Với mỗi node i, hãy đếm số node khác nhau được thăm khi bắt đầu ở i và liên tục đi theo cạnh đi ra.",
+      en: "edges[i] is the single node that i points to. For every node i, count distinct nodes visited when starting at i and continuously following outgoing edges.",
+    },
+    defaultInput: "[1,2,0,0]",
+    inputKind: "string",
+    inputLabel: { vi: "edges dạng JSON hoặc số cách bởi ,", en: "edges as JSON or comma-separated integers" },
+    approach: [
+      { vi: "Dùng Kahn tỉa mọi node indegree = 0. Các node còn lại sau khi tỉa nằm trong directed cycle.", en: "Use Kahn to prune every indegree-0 node. Nodes remaining afterward belong to directed cycles." },
+      { vi: "Mỗi node trong một cycle có đáp án bằng độ dài cycle đó.", en: "Every node in a cycle has an answer equal to that cycle's length." },
+      { vi: "Duyệt ngược thứ tự bị tỉa: answer[node] = 1 + answer[edges[node]].", en: "Process the pruned order in reverse: answer[node] = 1 + answer[edges[node]]." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Kahn, nhận diện cycle và DP ngược đều đi qua mỗi node tối đa một lần.", en: "Kahn, cycle detection, and reverse DP each visit every node at most once." },
+    },
+    codeLabel: { vi: "Kahn pruning + cycle + reverse DP", en: "Kahn pruning + cycles + reverse DP" },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def countVisitedNodes(self, edges: List[int]) -> List[int]:",
+      "        n = len(edges)",
+      "        indegree = [0] * n",
+      "        for nxt in edges:",
+      "            indegree[nxt] += 1",
+      "        queue = deque(node for node in range(n) if indegree[node] == 0)",
+      "        removed = []",
+      "        while queue:",
+      "            node = queue.popleft()",
+      "            removed.append(node)",
+      "            nxt = edges[node]",
+      "            indegree[nxt] -= 1",
+      "            if indegree[nxt] == 0:",
+      "                queue.append(nxt)",
+      "        answer = [0] * n",
+      "        for start in range(n):",
+      "            if indegree[start] == 0 or answer[start] != 0:",
+      "                continue",
+      "            cycle, node = [], start",
+      "            while answer[node] == 0:",
+      "                cycle.append(node)",
+      "                answer[node] = -1",
+      "                node = edges[node]",
+      "            for node in cycle:",
+      "                answer[node] = len(cycle)",
+      "        for node in reversed(removed):",
+      "            answer[node] = 1 + answer[edges[node]]",
+      "        return answer",
+    ],
+    liveArgs(input) {
+      return [parseFunctionalGraph(input, "edges", false)];
+    },
+    builder: buildSteps2876,
+  },
+  2192: {
+    id: 2192,
+    difficulty: "medium",
+    slug: "all-ancestors-of-a-node-in-a-directed-acyclic-graph",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "set", vi: "Set", en: "Set" },
+    ],
+    title: { vi: "All Ancestors of a Node in a Directed Acyclic Graph", en: "All Ancestors of a Node in a Directed Acyclic Graph" },
+    titleVi: { vi: "Mọi tổ tiên của mỗi node trong DAG", en: "All ancestors of every node in a DAG" },
+    statement: {
+      vi: "Cho DAG có n node 0..n-1 và các cạnh [u, v]. Với mỗi node i, trả về mọi node có đường đi tới i, theo thứ tự tăng dần.",
+      en: "Given a DAG with n nodes 0..n-1 and edges [u, v], return for every node i all nodes that have a path to i, in ascending order.",
+    },
+    defaultInput: [8],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 10,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [{ key: "edges", type: "string", label: { vi: "edges dạng JSON [[u,v],...]", en: "edges as JSON [[u,v],...]" }, default: "[[0,3],[0,4],[1,3],[2,4],[2,7],[3,5],[3,6],[3,7],[4,6]]" }],
+    approach: [
+      { vi: "Duyệt DAG theo thứ tự topo. Khi xử lý u, toàn bộ tổ tiên của u đã được xác định.", en: "Traverse the DAG in topological order. When processing u, every ancestor of u is already known." },
+      { vi: "Với mỗi cạnh u → v, thêm u và ancestors[u] vào ancestors[v].", en: "For every edge u → v, add u and ancestors[u] to ancestors[v]." },
+      { vi: "Kahn đảm bảo chỉ enqueue v sau khi mọi predecessor đã truyền xong tập tổ tiên của mình.", en: "Kahn enqueues v only after all predecessors have finished passing their ancestor sets." },
+    ],
+    complexity: { time: "O((V + E) · V)", space: "O(V²)", note: { vi: "Mỗi cạnh có thể sao chép tối đa V tổ tiên vào Set đích.", en: "Each edge can copy up to V ancestors into its destination Set." } },
+    codeLabel: { vi: "Kahn topo sort + Set propagation", en: "Kahn topo sort + Set propagation" },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def getAncestors(self, n: int, edges: List[List[int]]) -> List[List[int]]:",
+      "        graph = [[] for _ in range(n)]; indegree = [0] * n",
+      "        for u, v in edges: graph[u].append(v); indegree[v] += 1",
+      "        ancestors = [set() for _ in range(n)]",
+      "        queue = deque(i for i in range(n) if indegree[i] == 0)",
+      "        while queue:",
+      "            u = queue.popleft()",
+      "            for v in graph[u]:",
+      "                ancestors[v].update(ancestors[u]); ancestors[v].add(u)",
+      "                indegree[v] -= 1",
+      "                if indegree[v] == 0: queue.append(v)",
+      "        return [sorted(items) for items in ancestors]",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse2192Data(input, params); return [parsed.n, parsed.edges]; },
+    builder: buildSteps2192,
+  },
+  2392: {
+    id: 2392,
+    difficulty: "hard",
+    slug: "build-a-matrix-with-conditions",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "matrix", vi: "Ma trận", en: "Matrix" },
+    ],
+    title: { vi: "Build a Matrix With Conditions", en: "Build a Matrix With Conditions" },
+    titleVi: { vi: "Xây dựng ma trận theo điều kiện hàng và cột", en: "Build a matrix from row and column conditions" },
+    statement: {
+      vi: "Đặt các số 1..k vào ma trận k×k sao cho [a,b] trong rowConditions nghĩa là a ở hàng trước b; tương tự cho colConditions. Trả về [] nếu một trong hai bộ điều kiện có cycle.",
+      en: "Place 1..k in a k×k matrix so [a,b] in rowConditions puts a in a row before b, and likewise for colConditions. Return [] if either condition set has a cycle.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 7,
+    inputLabel: { vi: "k - kích thước ma trận", en: "k - matrix size" },
+    extraParams: [
+      { key: "rowConditions", type: "string", label: { vi: "rowConditions dạng JSON", en: "rowConditions as JSON" }, default: "[[1,2],[3,2]]" },
+      { key: "colConditions", type: "string", label: { vi: "colConditions dạng JSON", en: "colConditions as JSON" }, default: "[[2,1],[3,2]]" },
+    ],
+    approach: [
+      { vi: "Chạy topo sort độc lập cho rowConditions và colConditions.", en: "Run topological sort independently for rowConditions and colConditions." },
+      { vi: "Nếu một topo order không đủ k số, bộ điều kiện đó có cycle nên không thể dựng matrix.", en: "If either topological order lacks k values, that condition set has a cycle and no matrix can be built." },
+      { vi: "Đặt mỗi số x tại matrix[rowPos[x]][colPos[x]].", en: "Place each value x at matrix[rowPos[x]][colPos[x]]." },
+    ],
+    complexity: { time: "O(k + R + C + k²)", space: "O(k + R + C + k²)", note: { vi: "R/C là số điều kiện hàng/cột; k² là ma trận kết quả.", en: "R/C are row/column condition counts; k² is the output matrix." } },
+    codeLabel: { vi: "Hai topo sort + ánh xạ vị trí", en: "Two topological sorts + position mapping" },
+    code: [
+      "class Solution:",
+      "    def buildMatrix(self, k: int, rowConditions: List[List[int]], colConditions: List[List[int]]) -> List[List[int]]:",
+      "        def topo(conditions):",
+      "            graph = [[] for _ in range(k + 1)]; indegree = [0] * (k + 1)",
+      "            for a, b in conditions: graph[a].append(b); indegree[b] += 1",
+      "            queue = [x for x in range(1, k + 1) if indegree[x] == 0]; order = []",
+      "            while queue:",
+      "                x = queue.pop(0); order.append(x)",
+      "                for nxt in graph[x]:",
+      "                    indegree[nxt] -= 1",
+      "                    if indegree[nxt] == 0: queue.append(nxt)",
+      "            return order if len(order) == k else []",
+      "        rows, cols = topo(rowConditions), topo(colConditions)",
+      "        if not rows or not cols: return []",
+      "        row_pos = {value: i for i, value in enumerate(rows)}; col_pos = {value: i for i, value in enumerate(cols)}",
+      "        matrix = [[0] * k for _ in range(k)]",
+      "        for value in range(1, k + 1): matrix[row_pos[value]][col_pos[value]] = value",
+      "        return matrix",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse2392Data(input, params); return [parsed.k, parsed.rowConditions, parsed.colConditions]; },
+    builder: buildSteps2392,
+  },
+  1376: {
+    id: 1376,
+    difficulty: "medium",
+    slug: "time-needed-to-inform-all-employees",
+    category: { key: "tree", vi: "Cây", en: "Tree" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
+    ],
+    title: { vi: "Time Needed to Inform All Employees", en: "Time Needed to Inform All Employees" },
+    titleVi: { vi: "Thời gian báo tin cho toàn bộ nhân viên", en: "Time to inform all employees" },
+    statement: {
+      vi: "manager[i] là manager của employee i; headID có manager -1. informTime[i] là thời gian employee i báo cho direct reports. Tìm thời gian tối thiểu để mọi employee nhận tin.",
+      en: "manager[i] is employee i's manager; headID has manager -1. informTime[i] is the time employee i needs to inform direct reports. Find the minimum time for every employee to receive the news.",
+    },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 12,
+    inputLabel: { vi: "n - số nhân viên", en: "n - number of employees" },
+    extraParams: [
+      { key: "headID", label: { vi: "headID", en: "headID" }, default: 2, min: 0 },
+      { key: "manager", type: "string", label: { vi: "manager dạng JSON", en: "manager as JSON" }, default: "[2,2,-1,2,2,2]" },
+      { key: "informTime", type: "string", label: { vi: "informTime dạng JSON", en: "informTime as JSON" }, default: "[0,0,1,0,0,0]" },
+    ],
+    approach: [
+      { vi: "Đảo mảng manager thành cây manager → direct reports.", en: "Turn the manager array into a manager → direct reports tree." },
+      { vi: "BFS từ head, giữ (employee, thời điểm nhận tin). Child nhận tin ở time + informTime[manager].", en: "BFS from the head, keeping (employee, receive time). A child receives news at time + informTime[manager]." },
+      { vi: "Thời điểm lớn nhất trong quá trình BFS là đáp án.", en: "The largest receive time during BFS is the answer." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi employee/cạnh manager được xử lý một lần.", en: "Each employee and manager edge is processed once." } },
+    codeLabel: { vi: "BFS theo cây manager", en: "BFS over the manager tree" },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def numOfMinutes(self, n: int, headID: int, manager: List[int], informTime: List[int]) -> int:",
+      "        children = [[] for _ in range(n)]",
+      "        for employee, boss in enumerate(manager):",
+      "            if boss != -1: children[boss].append(employee)",
+      "        queue = deque([(headID, 0)]); answer = 0",
+      "        while queue:",
+      "            employee, minute = queue.popleft(); answer = max(answer, minute)",
+      "            for report in children[employee]:",
+      "                queue.append((report, minute + informTime[employee]))",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse1376Data(input, params); return [parsed.n, parsed.headID, parsed.manager, parsed.informTime]; },
+    builder: buildSteps1376,
+  },
+  1519: {
+    id: 1519,
+    difficulty: "medium",
+    slug: "number-of-nodes-in-the-sub-tree-with-the-same-label",
+    category: { key: "tree", vi: "Cây", en: "Tree" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "counting", vi: "Counting", en: "Counting" },
+    ],
+    title: { vi: "Number of Nodes in the Sub-Tree With the Same Label", en: "Number of Nodes in the Sub-Tree With the Same Label" },
+    titleVi: { vi: "Số node cùng nhãn trong subtree", en: "Same-label nodes in each subtree" },
+    statement: {
+      vi: "Cho cây vô hướng n node root tại 0 và chuỗi labels. Với mỗi node i, trả về số node trong subtree của i có nhãn bằng labels[i].",
+      en: "Given an undirected n-node tree rooted at 0 and a labels string, return for every node i the number of nodes in i's subtree whose label equals labels[i].",
+    },
+    defaultInput: [7],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 12,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [
+      { key: "edges", type: "string", label: { vi: "edges dạng JSON", en: "edges as JSON" }, default: "[[0,1],[0,2],[1,4],[1,5],[2,3],[2,6]]" },
+      { key: "labels", type: "string", label: { vi: "labels", en: "labels" }, default: "abaedcd" },
+    ],
+    approach: [
+      { vi: "Root cây tại 0 và xử lý node theo postorder, từ lá về root.", en: "Root the tree at 0 and process nodes in postorder, from leaves back to root." },
+      { vi: "Mỗi node duy trì tần suất 26 nhãn trong subtree. Child truyền toàn bộ bảng đếm lên parent.", en: "Each node maintains frequencies of 26 labels in its subtree. A child passes its whole count table to its parent." },
+      { vi: "Sau khi cộng chính node, answer[node] là tần suất nhãn labels[node].", en: "After adding the node itself, answer[node] is the frequency of labels[node]." },
+    ],
+    complexity: { time: "O(26n)", space: "O(26n)", note: { vi: "Mỗi cạnh truyền mảng 26 phần tử một lần.", en: "Each edge passes a 26-element array once." } },
+    codeLabel: { vi: "DFS postorder + frequency counts", en: "Postorder DFS + frequency counts" },
+    code: [
+      "class Solution:",
+      "    def countSubTrees(self, n: int, edges: List[List[int]], labels: str) -> List[int]:",
+      "        graph = [[] for _ in range(n)]",
+      "        for u, v in edges: graph[u].append(v); graph[v].append(u)",
+      "        answer = [0] * n",
+      "        def dfs(node: int, parent: int) -> List[int]:",
+      "            count = [0] * 26",
+      "            for child in graph[node]:",
+      "                if child == parent: continue",
+      "                child_count = dfs(child, node)",
+      "                for i in range(26): count[i] += child_count[i]",
+      "            index = ord(labels[node]) - ord('a'); count[index] += 1",
+      "            answer[node] = count[index]",
+      "            return count",
+      "        dfs(0, -1)",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse1519Data(input, params); return [parsed.n, parsed.edges, parsed.labels]; },
+    builder: buildSteps1519,
+  },
+  2050: {
+    id: 2050,
+    difficulty: "hard",
+    slug: "parallel-courses-iii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    ],
+    title: { vi: "Parallel Courses III", en: "Parallel Courses III" },
+    titleVi: { vi: "Các khóa học song song III", en: "Parallel courses III" },
+    statement: {
+      vi: "Có n khóa học, relations [a, b] nghĩa là phải hoàn tất a trước khi bắt đầu b, và time[i] là thời lượng khóa i+1. Có thể học song song mọi khóa đủ prerequisite. Trả về thời gian tối thiểu hoàn tất tất cả.",
+      en: "There are n courses, relation [a, b] means a must finish before b starts, and time[i] is the duration of course i+1. Any course with prerequisites met can run in parallel. Return the minimum time to finish all courses.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 10,
+    inputLabel: { vi: "n - số khóa học", en: "n - number of courses" },
+    extraParams: [
+      {
+        key: "relations",
+        type: "string",
+        label: { vi: "relations dạng JSON [[a,b],...] (1-based)", en: "relations as JSON [[a,b],...] (1-based)" },
+        default: "[[1,3],[2,3]]",
+      },
+      {
+        key: "time",
+        type: "string",
+        label: { vi: "time dạng JSON", en: "time as JSON" },
+        default: "[3,2,5]",
+      },
+    ],
+    approach: [
+      { vi: "Dùng Kahn topological sort. Course indegree = 0 có thể bắt đầu ngay và vào queue.", en: "Use Kahn topological sort. A course with indegree 0 can start immediately and enters the queue." },
+      { vi: "finish[v] là thời điểm v hoàn tất sớm nhất. Qua cạnh u → v, cập nhật finish[v] = max(finish[v], finish[u] + time[v]).", en: "finish[v] is v's earliest completion time. Along u → v, update finish[v] = max(finish[v], finish[u] + time[v])." },
+      { vi: "Lấy max(finish) vì các course có thể chạy song song; chỉ đường prerequisite chậm nhất quyết định tổng thời gian.", en: "Take max(finish) because courses run in parallel; only the slowest prerequisite chain determines total time." },
+    ],
+    complexity: {
+      time: "O(n + r)",
+      space: "O(n + r)",
+      note: { vi: "Mỗi course vào queue tối đa một lần và mỗi relation được xử lý một lần.", en: "Each course enters the queue at most once and every relation is processed once." },
+    },
+    codeLabel: { vi: "Kahn topological sort + DP thời gian", en: "Kahn topological sort + time DP" },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def minimumTime(self, n: int, relations: List[List[int]], time: List[int]) -> int:",
+      "        graph = [[] for _ in range(n + 1)]",
+      "        indegree = [0] * (n + 1)",
+      "        finish = [0] + time[:]",
+      "        for before, after in relations:",
+      "            graph[before].append(after); indegree[after] += 1",
+      "        queue = deque(course for course in range(1, n + 1) if indegree[course] == 0)",
+      "        while queue:",
+      "            course = queue.popleft()",
+      "            for nxt in graph[course]:",
+      "                finish[nxt] = max(finish[nxt], finish[course] + time[nxt - 1])",
+      "                indegree[nxt] -= 1",
+      "                if indegree[nxt] == 0:",
+      "                    queue.append(nxt)",
+      "        return max(finish)",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parse2050Data(input, params);
+      return [parsed.n, parsed.relations, parsed.time];
+    },
+    builder: buildSteps2050,
+  },
+  2115: {
+    id: 2115,
+    difficulty: "medium",
+    slug: "find-all-possible-recipes-from-given-supplies",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị dependency", en: "Dependency Graph" },
+      { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" },
+      { key: "hash-map", vi: "Hash Map", en: "Hash Map" },
+    ],
+    title: { vi: "Find All Possible Recipes from Given Supplies", en: "Find All Possible Recipes from Given Supplies" },
+    titleVi: { vi: "Tìm mọi công thức có thể làm từ supplies", en: "Find recipes possible from supplies" },
+    statement: {
+      vi: "Mỗi recipe cần một danh sách ingredients. Một recipe đã làm cũng có thể dùng như ingredient cho recipe khác. Trả về mọi recipe có thể làm từ supplies ban đầu và các recipe mở khóa được.",
+      en: "Every recipe requires a list of ingredients. A completed recipe can itself be used as an ingredient for another recipe. Return every recipe that can be made from initial supplies and unlocked recipes.",
+    },
+    defaultInput: '["bread","sandwich","burger"]',
+    inputKind: "string",
+    inputLabel: { vi: "recipes dạng JSON", en: "recipes as JSON" },
+    extraParams: [
+      {
+        key: "ingredients",
+        type: "string",
+        label: { vi: "ingredients dạng JSON", en: "ingredients as JSON" },
+        default: '[["yeast","flour"],["bread","meat"],["sandwich","bread","meat"]]',
+      },
+      {
+        key: "supplies",
+        type: "string",
+        label: { vi: "supplies dạng JSON", en: "supplies as JSON" },
+        default: '["yeast","flour","meat"]',
+      },
+    ],
+    approach: [
+      { vi: "Đảo góc nhìn dependency: tạo cạnh ingredient → recipe cần ingredient đó, và need[recipe] là số ingredient còn thiếu.", en: "Reverse the dependency view: create ingredient → recipe edges, and let need[recipe] count missing ingredients." },
+      { vi: "Bắt đầu BFS từ mọi supply. Mỗi item available giảm need cho các recipe phụ thuộc vào nó.", en: "Start BFS from every supply. Each available item decreases need for recipes depending on it." },
+      { vi: "Khi need về 0, recipe được làm, thêm vào answer và queue để nó có thể mở khóa recipe khác.", en: "When need reaches 0, make the recipe, add it to the answer and queue it so it can unlock other recipes." },
+    ],
+    complexity: {
+      time: "O(R + I + S)",
+      space: "O(R + I + S)",
+      note: { vi: "R là số recipe, I là tổng số ingredient occurrence, S là số supply. Mỗi cạnh dependency được xử lý một lần.", en: "R is the number of recipes, I is total ingredient occurrences, and S is supplies. Each dependency edge is processed once." },
+    },
+    codeLabel: { vi: "Dependency graph + Kahn BFS", en: "Dependency graph + Kahn BFS" },
+    code: [
+      "from collections import defaultdict, deque",
+      "",
+      "class Solution:",
+      "    def findAllRecipes(self, recipes: List[str], ingredients: List[List[str]], supplies: List[str]) -> List[str]:",
+      "        need = {recipe: len(parts) for recipe, parts in zip(recipes, ingredients)}",
+      "        dependents = defaultdict(list)",
+      "        for recipe, parts in zip(recipes, ingredients):",
+      "            for ingredient in parts:",
+      "                dependents[ingredient].append(recipe)",
+      "        queue = deque(supplies)",
+      "        made = []",
+      "        for recipe in recipes:",
+      "            if need[recipe] == 0:",
+      "                made.append(recipe); queue.append(recipe)",
+      "        while queue:",
+      "            ingredient = queue.popleft()",
+      "            for recipe in dependents[ingredient]:",
+      "                need[recipe] -= 1",
+      "                if need[recipe] == 0:",
+      "                    made.append(recipe); queue.append(recipe)",
+      "        return made",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parse2115Data(input, params);
+      return [parsed.recipes, parsed.ingredients, parsed.supplies];
+    },
+    builder: buildSteps2115,
+  },
+  1462: {
+    id: 1462,
+    difficulty: "medium",
+    slug: "course-schedule-iv",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "floyd-warshall", vi: "Floyd–Warshall", en: "Floyd–Warshall" },
+      { key: "transitive-closure", vi: "Bắc cầu", en: "Transitive Closure" },
+    ],
+    title: { vi: "Course Schedule IV", en: "Course Schedule IV" },
+    titleVi: { vi: "Lịch học IV (quan hệ tiên quyết)", en: "Course schedule IV (prerequisite reachability)" },
+    statement: {
+      vi: "Cho n môn học và các cặp [a, b] nghĩa là phải học a trước b. Với mỗi query [u, v], hãy kiểm tra u có là prerequisite trực tiếp hoặc gián tiếp của v hay không.",
+      en: "Given n courses and pairs [a, b] meaning a must be taken before b, determine for every query [u, v] whether u is a direct or indirect prerequisite of v.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 8,
+    inputLabel: { vi: "n - số môn học", en: "n - number of courses" },
+    extraParams: [
+      {
+        key: "prerequisites",
+        type: "string",
+        label: { vi: "prerequisites dạng JSON [[a,b],...]", en: "prerequisites as JSON [[a,b],...]" },
+        default: "[[0,1],[1,2],[2,3]]",
+      },
+      {
+        key: "queries",
+        type: "string",
+        label: { vi: "queries dạng JSON [[u,v],...]", en: "queries as JSON [[u,v],...]" },
+        default: "[[0,3],[1,3],[3,0]]",
+      },
+    ],
+    approach: [
+      { vi: "Dùng reach[a][b] để lưu a có là prerequisite của b hay không; khởi tạo bằng các cạnh trực tiếp.", en: "Use reach[a][b] to record whether a is a prerequisite of b; initialize it from direct edges." },
+      { vi: "Floyd–Warshall thử từng môn via làm node trung gian. Nếu a → via và via → b thì a → b.", en: "Floyd–Warshall tries each course as an intermediate node. If a → via and via → b, then a → b." },
+      { vi: "Sau transitive closure, mỗi query [u, v] trả lời trực tiếp bằng reach[u][v].", en: "After transitive closure, each query [u, v] is answered directly by reach[u][v]." },
+    ],
+    complexity: {
+      time: "O(n³ + q)",
+      space: "O(n²)",
+      note: { vi: "Floyd–Warshall tính toàn bộ quan hệ prerequisite; sau đó mỗi query chỉ mất O(1).", en: "Floyd–Warshall computes every prerequisite relationship; each query is then O(1)." },
+    },
+    codeLabel: { vi: "Floyd–Warshall transitive closure", en: "Floyd–Warshall transitive closure" },
+    code: [
+      "class Solution:",
+      "    def checkIfPrerequisite(self, n: int, prerequisites: List[List[int]], queries: List[List[int]]) -> List[bool]:",
+      "        reach = [[False] * n for _ in range(n)]",
+      "        for before, after in prerequisites:",
+      "            reach[before][after] = True",
+      "        for via in range(n):",
+      "            for before in range(n):",
+      "                if not reach[before][via]:",
+      "                    continue",
+      "                for after in range(n):",
+      "                    if reach[via][after]:",
+      "                        reach[before][after] = True",
+      "        return [reach[before][after] for before, after in queries]",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parse1462Data(input, params);
+      return [parsed.n, parsed.prerequisites, parsed.queries];
+    },
+    builder: buildSteps1462,
+  },
+  1361: {
+    id: 1361,
+    difficulty: "medium",
+    slug: "validate-binary-tree-nodes",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+    ],
+    title: { vi: "Validate Binary Tree Nodes", en: "Validate Binary Tree Nodes" },
+    titleVi: { vi: "Kiểm tra các node có tạo thành binary tree", en: "Validate a binary-tree structure" },
+    statement: {
+      vi: "Có n node đánh số 0..n-1. leftChild[i] và rightChild[i] là child trái/phải của node i, hoặc -1 nếu không có. Kiểm tra tất cả các node có tạo thành đúng một binary tree hợp lệ hay không.",
+      en: "There are n nodes labeled 0..n-1. leftChild[i] and rightChild[i] are node i's left/right children, or -1 when absent. Determine whether all nodes form exactly one valid binary tree.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 12,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [
+      {
+        key: "leftChild",
+        type: "string",
+        label: { vi: "leftChild (JSON hoặc các số cách bởi ,)", en: "leftChild (JSON or comma-separated integers)" },
+        default: "[1,-1,3,-1]",
+      },
+      {
+        key: "rightChild",
+        type: "string",
+        label: { vi: "rightChild (JSON hoặc các số cách bởi ,)", en: "rightChild (JSON or comma-separated integers)" },
+        default: "[2,-1,-1,-1]",
+      },
+    ],
+    approach: [
+      { vi: "Đếm indegree của từng node qua toàn bộ child pointer. Nếu một node có indegree > 1 thì nó có nhiều cha, không thể là tree.", en: "Count every node's indegree across all child pointers. An indegree above 1 means a node has multiple parents, so it cannot be a tree." },
+      { vi: "Các node có indegree = 0 là candidate root. Một binary tree hợp lệ phải có đúng một root.", en: "Nodes with indegree 0 are root candidates. A valid binary tree must have exactly one root." },
+      { vi: "Chạy DFS từ root, đánh dấu seen. Kết quả chỉ true khi đã thăm đủ n node; phần còn lại là component rời hoặc cycle không nối với root.", en: "Run DFS from the root and mark seen nodes. The result is true only when all n nodes are visited; leftovers form a disconnected component or cycle." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Quét mỗi child pointer một lần, sau đó DFS mỗi node tối đa một lần.", en: "Each child pointer is scanned once, then DFS visits each node at most once." },
+    },
+    codeLabel: { vi: "Indegree + DFS iterative", en: "Indegree + iterative DFS" },
+    code: [
+      "class Solution:",
+      "    def validateBinaryTreeNodes(self, n: int, leftChild: List[int], rightChild: List[int]) -> bool:",
+      "        indegree = [0] * n",
+      "        for child in leftChild + rightChild:",
+      "            if child != -1:",
+      "                indegree[child] += 1",
+      "                if indegree[child] > 1:",
+      "                    return False",
+      "        roots = [node for node in range(n) if indegree[node] == 0]",
+      "        if len(roots) != 1:",
+      "            return False",
+      "        root = roots[0]",
+      "        seen = set()",
+      "        stack = [root]",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            if node in seen:",
+      "                return False",
+      "            seen.add(node)",
+      "            for child in (leftChild[node], rightChild[node]):",
+      "                if child != -1:",
+      "                    stack.append(child)",
+      "        return len(seen) == n",
+    ],
+    liveArgs(input, params = {}) {
+      const parsed = parse1361Data(input, params);
+      return [parsed.n, parsed.leftChild, parsed.rightChild];
+    },
+    builder: buildSteps1361,
   },
   2101: {
     id: 2101,
