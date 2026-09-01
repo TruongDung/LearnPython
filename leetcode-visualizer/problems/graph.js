@@ -24415,15 +24415,17 @@ function buildSteps3568(input, params = {}) {
     scan: [5, 6, 7, 8, 9, 10],
     init: [11, 12, 13],
     pop: [14, 15],
-    done: [16, 17],
-    dirs: [18, 19],
-    bounds: [20, 21],
-    energy: [22, 23],
-    reset: [24, 25],
-    litter: [24, 26],
-    seen: [27, 28],
-    enqueue: [29],
-    fail: [30],
+    stale: [16, 17],
+    done: [18, 19],
+    dirs: [20, 21],
+    bounds: [22, 23],
+    energy: [24, 25],
+    spend: [26],
+    reset: [26, 27],
+    litter: [26, 28],
+    seen: [29, 30, 31],
+    enqueue: [32, 33],
+    fail: [34],
   };
 
   if (!valid) {
@@ -24470,7 +24472,10 @@ function buildSteps3568(input, params = {}) {
 
   const allMask = (1 << litters.length) - 1;
   const queue = [[start[0], start[1], maxEnergy, 0, 0]];
-  const seen = new Set([`${start[0]},${start[1]},${maxEnergy},0`]);
+  const startKey = `${start[0]},${start[1]},${maxEnergy},0`;
+  const bestEnergy = new Map([[`${start[0]},${start[1]},0`, maxEnergy]]);
+  const parent = new Map([[startKey, null]]);
+  const statePosition = new Map([[startKey, start]]);
   const frontier = new Set([`${start[0]},${start[1]}`]);
   const expanded = new Set();
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -24489,11 +24494,29 @@ function buildSteps3568(input, params = {}) {
     return `[${upcoming.join(", ")}${queue.length - head > 5 ? ", ..." : ""}]`;
   }
 
+  function binaryMask(mask) {
+    return mask.toString(2).padStart(litters.length, "0");
+  }
+
+  function routeTo(key) {
+    const route = [];
+    let cursor = key;
+    while (cursor) {
+      route.push(statePosition.get(cursor));
+      cursor = parent.get(cursor);
+    }
+    return route.reverse().filter(Boolean);
+  }
+
   function snap(o) {
-    if (steps.length >= stepLimit) {
+    if (steps.length >= stepLimit && !o.final) {
       truncated = true;
       return;
     }
+    const stateMask = Number.isInteger(o.stateMask) ? o.stateMask : o.mask;
+    const stateEnergy = Number.isInteger(o.stateEnergy) ? o.stateEnergy : o.energy;
+    const statePos = o.statePosition || o.current || null;
+    const route = o.route || [];
     steps.push({
       title: o.title,
       arr: [],
@@ -24508,7 +24531,35 @@ function buildSteps3568(input, params = {}) {
           expanded,
           frontier,
           collectedMask: Number.isInteger(o.mask) ? o.mask : null,
+          route,
         }),
+      },
+      classroomView: {
+        phase: o.phase || "bfs",
+        maxEnergy,
+        targetMask: binaryMask(allMask),
+        state: statePos ? {
+          position: statePos,
+          energy: Number.isInteger(stateEnergy) ? stateEnergy : null,
+          mask: Number.isInteger(stateMask) ? binaryMask(stateMask) : null,
+          moves: o.stateMoves ?? o.moves ?? null,
+        } : null,
+        candidate: o.candidate || null,
+        litters: litters.map(([r, c], i) => ({
+          id: `L${i}`,
+          position: [r, c],
+          collected: Number.isInteger(o.mask) && Boolean(o.mask & (1 << i)),
+        })),
+        queue: queue.slice(head, head + 4).map(([r, c, e, stateMaskValue, stateMoves]) => ({
+          position: [r, c],
+          energy: e,
+          mask: binaryMask(stateMaskValue),
+          moves: stateMoves,
+        })),
+        queueRemaining: Math.max(0, queue.length - head),
+        verdict: o.verdict || "",
+        reason: o.reason || "",
+        route,
       },
       codeLines: o.codeLines || [],
       highlight: [],
@@ -24528,6 +24579,7 @@ function buildSteps3568(input, params = {}) {
 
   snap({
     title: { vi: "Quét grid: tìm S và đánh số rác", en: "Scan grid: find S and number litter" },
+    phase: "map",
     codeLines: codeLines.scan,
     current: start,
     energy: maxEnergy,
@@ -24559,6 +24611,7 @@ function buildSteps3568(input, params = {}) {
 
   snap({
     title: { vi: "Khởi tạo queue BFS", en: "Initialize BFS queue" },
+    phase: "state",
     codeLines: codeLines.init,
     current: start,
     energy: maxEnergy,
@@ -24569,11 +24622,13 @@ function buildSteps3568(input, params = {}) {
 
   while (head < queue.length) {
     const [r, c, energy, mask, moves] = queue[head++];
+    const currentStateKey = `${r},${c},${energy},${mask}`;
     frontier.delete(`${r},${c}`);
     expanded.add(`${r},${c}`);
 
     snap({
       title: { vi: `Pop state (${r},${c}), E=${energy}`, en: `Pop state (${r},${c}), E=${energy}` },
+      phase: "bfs",
       codeLines: codeLines.pop,
       current: [r, c],
       energy,
@@ -24582,15 +24637,41 @@ function buildSteps3568(input, params = {}) {
       note: { vi: "BFS pop theo thứ tự số bước tăng dần, nên lần đầu đạt allMask là đáp án ngắn nhất.", en: "BFS pops states by increasing move count, so the first allMask state is optimal." },
     });
 
+    const currentDominanceKey = `${r},${c},${mask}`;
+    const currentBestEnergy = bestEnergy.get(currentDominanceKey) ?? energy;
+    if (energy < currentBestEnergy) {
+      snap({
+        title: { vi: `Bỏ state cũ trong queue: E=${energy} < ${currentBestEnergy}`, en: `Skip stale queued state: E=${energy} < ${currentBestEnergy}` },
+        codeLines: codeLines.stale,
+        current: [r, c],
+        energy,
+        mask,
+        moves,
+        verdict: "dominated",
+        reason: {
+          vi: `Sau khi state này được enqueue, ta đã tìm thấy cùng vị trí và mask với ${currentBestEnergy} pin.`,
+          en: `After this state was enqueued, the same position and mask were reached with ${currentBestEnergy} energy.`,
+        },
+        vars: [{ name: "queued energy", value: energy }, { name: "best energy now", value: currentBestEnergy }],
+        note: { vi: "State pin thấp đã lỗi thời nên không cần thử 4 hướng của nó.", en: "The lower-energy state is stale, so its four neighbors do not need expansion." },
+      });
+      continue;
+    }
+
     if (mask === allMask) {
       answer = moves;
+      const route = routeTo(currentStateKey);
       snap({
         title: { vi: `Đã nhặt đủ rác → ${moves} bước`, en: `All litter collected → ${moves} moves` },
+        phase: "result",
         codeLines: codeLines.done,
         current: [r, c],
         energy,
         mask,
         moves,
+        route,
+        verdict: "success",
+        reason: { vi: "mask hiện tại = mask mục tiêu", en: "current mask = target mask" },
         vars: [{ name: "answer", value: answer }],
         note: { vi: "Mask hiện tại bằng target mask, trả về số bước của state này.", en: "The current mask equals the target mask, so return this state's move count." },
         final: true,
@@ -24609,6 +24690,17 @@ function buildSteps3568(input, params = {}) {
         energy,
         mask,
         moves,
+        candidate: {
+          position: [nr, nc],
+          cell: nr >= 0 && nr < rows && nc >= 0 && nc < cols ? grid[nr][nc] : "outside",
+          energyBefore: energy,
+          energyAfter: energy > 0 ? energy - 1 : 0,
+          maskBefore: binaryMask(mask),
+          maskAfter: binaryMask(mask),
+          status: "checking",
+        },
+        verdict: "checking",
+        reason: { vi: "Kiểm tra biên, vật cản và pin trước", en: "Check bounds, obstacles, and energy first" },
         vars: [{ name: "direction", value: `(${dr},${dc})` }],
         note: { vi: "Mỗi lần di chuyển tốn 1 energy. Sau đó nếu đáp xuống R thì energy được nạp đầy.", en: "Each move costs 1 energy. After landing on R, energy refills to full." },
       });
@@ -24624,6 +24716,19 @@ function buildSteps3568(input, params = {}) {
           energy,
           mask,
           moves,
+          candidate: {
+            position: [nr, nc],
+            cell: inBounds ? "X" : "outside",
+            energyBefore: energy,
+            energyAfter: energy,
+            maskBefore: binaryMask(mask),
+            maskAfter: binaryMask(mask),
+            status: "rejected",
+          },
+          verdict: "rejected",
+          reason: inBounds
+            ? { vi: "Ô X là vật cản", en: "X is an obstacle" }
+            : { vi: "Ô nằm ngoài grid", en: "Cell is outside the grid" },
           vars: [{ name: "reason", value: inBounds ? "obstacle X" : "out of bounds" }],
           note: { vi: "Bỏ qua vì ô ngoài grid hoặc là vật cản X.", en: "Skip because the cell is out of bounds or an obstacle X." },
         });
@@ -24639,6 +24744,17 @@ function buildSteps3568(input, params = {}) {
           energy,
           mask,
           moves,
+          candidate: {
+            position: [nr, nc],
+            cell: grid[nr][nc],
+            energyBefore: energy,
+            energyAfter: energy,
+            maskBefore: binaryMask(mask),
+            maskAfter: binaryMask(mask),
+            status: "rejected",
+          },
+          verdict: "rejected",
+          reason: { vi: "Cần 1 energy để di chuyển", en: "Moving requires 1 energy" },
           note: { vi: "Phải có ít nhất 1 energy để bước sang ô kế tiếp. Nếu muốn hồi energy, cần đã đứng trên R từ trước.", en: "A move requires at least 1 energy. To refill, the state must already be able to reach an R cell." },
         });
         continue;
@@ -24648,7 +24764,7 @@ function buildSteps3568(input, params = {}) {
       let nextMask = mask;
       const cell = grid[nr][nc];
       const extraVars = [{ name: "cell", value: cell }];
-      let lines = codeLines.energy;
+      let lines = codeLines.spend;
       let note = { vi: `Bước vào (${nr},${nc}) tốn 1 energy: ${energy} → ${nextEnergy}.`, en: `Moving into (${nr},${nc}) costs 1 energy: ${energy} → ${nextEnergy}.` };
 
       if (cell === "R") {
@@ -24667,22 +24783,46 @@ function buildSteps3568(input, params = {}) {
       }
 
       const key = `${nr},${nc},${nextEnergy},${nextMask}`;
-      if (seen.has(key)) {
+      const dominanceKey = `${nr},${nc},${nextMask}`;
+      const previousBestEnergy = bestEnergy.get(dominanceKey) ?? -1;
+      if (previousBestEnergy >= nextEnergy) {
         snap({
-          title: { vi: "State này đã thấy rồi", en: "State already seen" },
+          title: { vi: `Bỏ state yếu hơn: E=${nextEnergy} ≤ ${previousBestEnergy}`, en: `Prune weaker state: E=${nextEnergy} ≤ ${previousBestEnergy}` },
           codeLines: codeLines.seen,
           current: [r, c],
           neighbor: [nr, nc],
           energy: nextEnergy,
           mask: nextMask,
           moves: moves + 1,
-          vars: [...extraVars, { name: "state key", value: key }],
-          note: { vi: "Cùng vị trí, cùng energy, cùng mask thì tương lai giống hệt nhau. Bỏ qua để tránh vòng lặp.", en: "Same position, energy, and mask means the future is identical. Skip it to avoid loops." },
+          stateEnergy: energy,
+          stateMask: mask,
+          stateMoves: moves,
+          candidate: {
+            position: [nr, nc],
+            cell,
+            energyBefore: energy,
+            energyAfter: nextEnergy,
+            maskBefore: binaryMask(mask),
+            maskAfter: binaryMask(nextMask),
+            status: "dominated",
+          },
+          verdict: "dominated",
+          reason: {
+            vi: `Đã tới (${nr},${nc}) với cùng mask nhưng còn ${previousBestEnergy} pin. State mới chỉ có ${nextEnergy} pin nên không thể tốt hơn.`,
+            en: `The same cell and mask were reached with ${previousBestEnergy} energy. The new state has only ${nextEnergy}, so it cannot do better.`,
+          },
+          vars: [...extraVars, { name: "best key", value: dominanceKey }, { name: "best energy", value: previousBestEnergy }],
+          note: {
+            vi: "BFS đã đến state cũ sớm hơn hoặc cùng số bước. Cùng vị trí và mask, nhiều pin hơn luôn dominate ít pin hơn.",
+            en: "BFS reached the old state in no more moves. At the same position and mask, more energy always dominates less energy.",
+          },
         });
         continue;
       }
 
-      seen.add(key);
+      bestEnergy.set(dominanceKey, nextEnergy);
+      parent.set(key, currentStateKey);
+      statePosition.set(key, [nr, nc]);
       queue.push([nr, nc, nextEnergy, nextMask, moves + 1]);
       frontier.add(`${nr},${nc}`);
       snap({
@@ -24693,7 +24833,25 @@ function buildSteps3568(input, params = {}) {
         energy: nextEnergy,
         mask: nextMask,
         moves: moves + 1,
-        vars: [...extraVars, { name: "new state", value: key }],
+        stateEnergy: energy,
+        stateMask: mask,
+        stateMoves: moves,
+        candidate: {
+          position: [nr, nc],
+          cell,
+          energyBefore: energy,
+          energyAfter: nextEnergy,
+          maskBefore: binaryMask(mask),
+          maskAfter: binaryMask(nextMask),
+          status: "accepted",
+        },
+        verdict: "accepted",
+        reason: cell === "R"
+          ? { vi: "Đi được và R nạp pin đầy", en: "Valid move and R refills the battery" }
+          : cell === "L"
+            ? { vi: "Đi được và cập nhật mask rác", en: "Valid move and the litter mask updates" }
+            : { vi: "State mới, thêm vào cuối queue", en: "New state, append it to the queue" },
+        vars: [...extraVars, { name: "best[(row,col,mask)]", value: nextEnergy }],
         note,
       });
     }
@@ -24729,6 +24887,7 @@ function makeClassroom3568Cells(grid, litterIndex, opts = {}) {
   const expanded = opts.expanded || new Set();
   const frontier = opts.frontier || new Set();
   const mask = Number.isInteger(opts.collectedMask) ? opts.collectedMask : null;
+  const route = new Set((opts.route || []).map(([r, c]) => `${r},${c}`));
   return grid.map((row, r) => row.map((ch, c) => {
     const key = `${r},${c}`;
     const litterBit = litterIndex.get(key);
@@ -24738,6 +24897,7 @@ function makeClassroom3568Cells(grid, litterIndex, opts = {}) {
     if (frontier.has(key) && ch !== "X") cls += " queued";
     if (neighborKey === key && ch !== "X") cls += " neighbor";
     if (enqueuedKey === key && ch !== "X") cls += " path";
+    if (route.has(key) && ch !== "X") cls += " route";
     if (currentKey === key && ch !== "X") cls += " current";
     if (isCollected) cls += " collected";
     const label = ch === "L" && Number.isInteger(litterBit) ? `L${litterBit}` : ch;
@@ -24871,15 +25031,15 @@ Object.assign(module.exports, {
     approach: [
       { vi: "Đánh số mỗi ô L thành một bit trong mask; mask cho biết đã nhặt rác nào.", en: "Number each L cell as one bit in a mask; the mask records which litter cells are collected." },
       { vi: "BFS trên state (row, col, energy, mask), không chỉ trên vị trí.", en: "Run BFS over state (row, col, energy, mask), not just over position." },
+      { vi: "Với mỗi (row, col, mask), chỉ giữ energy lớn nhất. State có ít pin hơn bị state cũ dominate và được bỏ ngay.", en: "For each (row, col, mask), keep only the greatest remaining energy. A lower-energy state is dominated and pruned." },
       { vi: "Mỗi bước trừ 1 energy; nếu đáp xuống R thì energy trở lại đầy.", en: "Each move spends 1 energy; landing on R refills energy to full." },
-      { vi: "State trùng cả vị trí, energy và mask mới được xem là đã thăm.", en: "A state is visited only when position, energy, and mask are all identical." },
     ],
     complexity: {
       time: "O(m * n * energy * 2^L)",
       space: "O(m * n * energy * 2^L)",
-      note: { vi: "Có tối đa m*n vị trí, energy+1 mức năng lượng và 2^L mask rác.", en: "There are at most m*n positions, energy+1 energy levels, and 2^L litter masks." },
+      note: { vi: "Worst case vẫn có các lần cải thiện energy, nhưng best[(r,c,mask)] loại hầu hết state yếu hơn và tránh TLE do lưu mọi mức pin.", en: "The worst case can still improve energy repeatedly, but best[(r,c,mask)] prunes weaker states instead of storing every energy level." },
     },
-    codeLabel: { vi: "BFS state: vị trí + energy + mask", en: "State BFS: position + energy + mask" },
+    codeLabel: { vi: "BFS + dominance pruning theo energy", en: "BFS + energy dominance pruning" },
     code: [
       "from collections import deque",
       "",
@@ -24893,9 +25053,11 @@ Object.assign(module.exports, {
       "        idx = {pos: i for i, pos in enumerate(litter)}",
       "        full = (1 << len(litter)) - 1",
       "        q = deque([(start[0], start[1], energy, 0, 0)])",
-      "        seen = {(start[0], start[1], energy, 0)}",
+      "        best = {(start[0], start[1], 0): energy}",
       "        while q:",
       "            r, c, e, mask, moves = q.popleft()",
+      "            if e < best[(r, c, mask)]:",
+      "                continue",
       "            if mask == full:",
       "                return moves",
       "            for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):",
@@ -24907,9 +25069,11 @@ Object.assign(module.exports, {
       "                ne, nmask = e - 1, mask",
       "                if classroom[nr][nc] == 'R': ne = energy",
       "                if classroom[nr][nc] == 'L': nmask |= 1 << idx[(nr, nc)]",
-      "                state = (nr, nc, ne, nmask)",
-      "                if state not in seen:",
-      "                    seen.add(state); q.append((nr, nc, ne, nmask, moves + 1))",
+      "                state = (nr, nc, nmask)",
+      "                if ne <= best.get(state, -1):",
+      "                    continue",
+      "                best[state] = ne",
+      "                q.append((nr, nc, ne, nmask, moves + 1))",
       "        return -1",
     ],
     liveArgs(input, params = {}) {

@@ -3239,6 +3239,306 @@ function buildSteps3430(input, params = {}) {
   return { original: nums, answer, steps };
 }
 
+function buildStepsArrayHoppingScore(input, params = {}) {
+  const nums = parseNums(input, "nums");
+  if (nums.length < 2) throw new Error("nums must contain at least 2 numbers.");
+  if (nums.length > 18) throw new Error("Use up to 18 numbers so the suffix-max trace stays readable.");
+  const steps = [];
+  const suffixLeaders = [];
+  let ans = 0;
+  let mx = 0;
+  const sub = nums.map((value, index) => `i=${index} · ${value}`);
+  const codeLines = { init: [3, 4], loop: [5], updateMax: [6], add: [7], done: [8] };
+
+  function stackItems() {
+    return suffixLeaders
+      .slice()
+      .reverse()
+      .map((entry) => ({ value: entry.value, detail: `best landing from i<=${entry.fromIndex}` }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      arr: [...nums],
+      sub,
+      highlight: Number.isInteger(o.index) ? [o.index] : [],
+      mark: suffixLeaders.map((entry) => entry.index),
+      codeLines: o.codeLines || [],
+      vars: [
+        { name: "i", value: Number.isInteger(o.index) ? o.index : "-" },
+        { name: "nums[i]", value: Number.isInteger(o.index) ? nums[o.index] : "-" },
+        { name: "mx suffix", value: mx },
+        { name: "ans", value: ans },
+        ...(o.vars || []),
+      ],
+      note: o.note,
+      final: o.final || false,
+      stackView: {
+        title: "Suffix maximum choices",
+        emptyLabel: "no landing candidate yet",
+        items: stackItems(),
+        input: [...nums],
+        current: Number.isInteger(o.index) ? o.index : -1,
+        inputLabel: "nums",
+        expected: Number.isInteger(o.index) ? nums[o.index] : "",
+        status: [
+          { label: "current suffix max", value: mx || "-" },
+          { label: "score so far", value: ans },
+          { label: "rule", value: "add best destination for each unit distance" },
+        ],
+      },
+    });
+  }
+
+  snap({
+    title: text("Dòng 3-4: ans = 0, mx = 0", "Lines 3-4: ans = 0, mx = 0"),
+    codeLines: codeLines.init,
+    note: text(
+      "Score của một hop dùng value ở điểm đáp: (j - i) * nums[j]. Vì vậy với mỗi đơn vị khoảng cách, ta muốn đáp vào giá trị lớn nhất còn ở bên phải.",
+      "A hop uses the destination value: (j - i) * nums[j]. So for each unit of distance, we want the largest value still available to the right.",
+    ),
+  });
+
+  for (let i = nums.length - 1; i > 0; i--) {
+    snap({
+      title: text(`Dòng 5: xét điểm đáp ứng viên i=${i}`, `Line 5: inspect landing candidate i=${i}`),
+      index: i,
+      codeLines: codeLines.loop,
+      note: text(
+        `Ta quét từ phải sang trái. Sau khi xử lý i=${i}, mx là điểm đáp tốt nhất cho mọi vị trí ở bên trái i.`,
+        `Scan from right to left. After processing i=${i}, mx is the best landing value for positions to its left.`,
+      ),
+    });
+
+    const before = mx;
+    mx = Math.max(mx, nums[i]);
+    if (mx !== before) suffixLeaders.push({ index: i, value: nums[i], fromIndex: i - 1 });
+    snap({
+      title: text(`Dòng 6: mx = max(${before}, ${nums[i]}) = ${mx}`, `Line 6: mx = max(${before}, ${nums[i]}) = ${mx}`),
+      index: i,
+      codeLines: codeLines.updateMax,
+      vars: [{ name: "new best landing?", value: mx !== before }],
+      note: text(
+        mx !== before
+          ? `${nums[i]} trở thành suffix maximum mới. Những hop từ bên trái nên kéo tới cụm có value này nếu có thể.`
+          : `${nums[i]} không vượt mx hiện tại, nên không thay đổi điểm đáp tốt nhất.`,
+        mx !== before
+          ? `${nums[i]} becomes the new suffix maximum. Hops from the left prefer this value when possible.`
+          : `${nums[i]} does not beat the current mx, so the best landing value stays unchanged.`,
+      ),
+    });
+
+    ans += mx;
+    snap({
+      title: text(`Dòng 7: ans += ${mx} → ${ans}`, `Line 7: ans += ${mx} → ${ans}`),
+      index: i,
+      codeLines: codeLines.add,
+      vars: [{ name: "unit segment", value: `[${i - 1}, ${i}] contributes ${mx}` }],
+      note: text(
+        `Cộng mx cho đoạn đơn vị từ ${i - 1} sang ${i}. Gom các đoạn đơn vị có cùng max suffix tương đương với một hop dài tối ưu.`,
+        `Add mx for the unit segment from ${i - 1} to ${i}. Grouping unit segments with the same suffix max is equivalent to an optimal long hop.`,
+      ),
+    });
+  }
+
+  snap({
+    title: text(`Kết quả: ${ans}`, `Result: ${ans}`),
+    codeLines: codeLines.done,
+    vars: [{ name: "answer", value: ans }],
+    note: text(
+      "Tổng các suffix maximum từ index 1 đến n-1 chính là score tối đa.",
+      "The sum of suffix maximums from index 1 to n-1 is the maximum score.",
+    ),
+    final: true,
+  });
+  return { original: nums, answer: ans, steps };
+}
+
+function buildSteps3359(input, params = {}) {
+  const grid = parseMatrix(input, "grid");
+  if (grid.length > 8 || grid[0].length > 8) throw new Error("Use a grid up to 8x8 so the matrix trace stays readable.");
+  const k = Number(params.k) || 3;
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const dp = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const stacks = Array.from({ length: cols }, () => [{ width: 0, row: -1, acc: 0 }]);
+  const steps = [];
+  let ans = 0;
+  const codeLines = {
+    init: [3, 4, 5, 6],
+    loop: [7, 8],
+    reset: [9, 10, 11],
+    width: [13, 14, 15],
+    pop: [16, 17],
+    count: [18, 19, 20, 21],
+    done: [22],
+  };
+
+  function displayGrid() {
+    return grid.map((row, r) => row.map((value, c) => `${value}\n${dp[r][c] ? `w=${dp[r][c]}` : ""}`));
+  }
+
+  function stackText(col) {
+    return stacks[col].map((item) => `w${item.width}@r${item.row}:acc${item.acc}`).join(" | ");
+  }
+
+  function stackItems(col) {
+    return stacks[col].map((item) => ({ value: item.width, detail: `row=${item.row}, acc=${item.acc}` }));
+  }
+
+  function snap(o) {
+    const col = Number.isInteger(o.col) ? o.col : 0;
+    steps.push({
+      title: o.title,
+      arr: grid.flat(),
+      grid: {
+        dp: displayGrid(),
+        hlCell: Number.isInteger(o.row) && Number.isInteger(o.col) ? [o.row, o.col] : null,
+        pathCells: o.pathCells || [],
+        caption: `grid value / valid row width, k=${k}`,
+        largeCells: true,
+      },
+      codeLines: o.codeLines || [],
+      highlight: [],
+      mark: [],
+      vars: [
+        { name: "cell", value: Number.isInteger(o.row) && Number.isInteger(o.col) ? `(${o.row},${o.col}) = ${grid[o.row][o.col]}` : "-" },
+        { name: "k", value: k },
+        { name: "width dp", value: Number.isInteger(o.row) && Number.isInteger(o.col) ? dp[o.row][o.col] : "-" },
+        { name: `stack col ${col}`, value: stackText(col) },
+        { name: "ans", value: ans },
+        ...(o.vars || []),
+      ],
+      note: o.note,
+      final: o.final || false,
+      stackView: {
+        title: `Column ${col} monotonic stack`,
+        emptyLabel: "sentinel only",
+        items: stackItems(col),
+        input: grid.map((row) => row[col]),
+        current: Number.isInteger(o.row) ? o.row : -1,
+        inputLabel: `grid[*][${col}]`,
+        expected: Number.isInteger(o.row) ? grid[o.row][col] : "",
+        status: [
+          { label: "answer", value: ans },
+          { label: "k", value: k },
+          { label: "meaning", value: "nondecreasing widths down this column" },
+        ],
+      },
+    });
+  }
+
+  snap({
+    title: text("Dòng 3-6: chuẩn bị dp width và stack theo cột", "Lines 3-6: prepare width dp and one stack per column"),
+    codeLines: codeLines.init,
+    note: text(
+      "dp[i][j] = số đoạn liên tiếp kết thúc tại (i,j) trên cùng hàng, vừa <= k vừa không tăng từ trái qua phải.",
+      "dp[i][j] = number of contiguous row segments ending at (i,j) that are <= k and non-increasing from left to right.",
+    ),
+  });
+
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      snap({
+        title: text(`Dòng 7-8: xét ô (${i},${j})`, `Lines 7-8: inspect cell (${i},${j})`),
+        row: i,
+        col: j,
+        codeLines: codeLines.loop,
+        note: text(
+          "Một submatrix hợp lệ cần mọi ô <= k, và trong từng hàng của submatrix các giá trị phải không tăng.",
+          "A valid submatrix needs every cell <= k, and each row inside it must be non-increasing.",
+        ),
+      });
+
+      if (grid[i][j] > k) {
+        stacks[j] = [{ width: 0, row: i, acc: 0 }];
+        dp[i][j] = 0;
+        snap({
+          title: text(`Dòng 9-11: ${grid[i][j]} > k, reset cột ${j}`, `Lines 9-11: ${grid[i][j]} > k, reset column ${j}`),
+          row: i,
+          col: j,
+          codeLines: codeLines.reset,
+          vars: [{ name: "reason", value: `${grid[i][j]} > ${k}` }],
+          note: text(
+            "Ô này không thể nằm trong submatrix nào, nên stack của cột bị reset với sentinel ở row hiện tại.",
+            "This cell cannot belong to any valid submatrix, so this column stack resets with a sentinel at the current row.",
+          ),
+        });
+        continue;
+      }
+
+      dp[i][j] = 1;
+      const canExtend = j > 0 && grid[i][j - 1] <= k && grid[i][j - 1] >= grid[i][j];
+      if (canExtend) dp[i][j] += dp[i][j - 1];
+      const width = dp[i][j];
+      snap({
+        title: text(`Dòng 13-15: width tại (${i},${j}) = ${width}`, `Lines 13-15: width at (${i},${j}) = ${width}`),
+        row: i,
+        col: j,
+        pathCells: Array.from({ length: width }, (_, t) => [i, j - t]),
+        codeLines: codeLines.width,
+        vars: [{ name: "extend from left?", value: canExtend }],
+        note: text(
+          canExtend
+            ? `Vì ${grid[i][j - 1]} >= ${grid[i][j]} và ô trái <= k, đoạn hàng được kéo dài sang trái.`
+            : "Không kéo dài được từ trái, nên width chỉ là 1.",
+          canExtend
+            ? `Because ${grid[i][j - 1]} >= ${grid[i][j]} and the left cell is <= k, the row segment extends left.`
+            : "Cannot extend from the left, so width is only 1.",
+        ),
+      });
+
+      while (stacks[j].length && width < stacks[j].at(-1).width) {
+        const removed = stacks[j].pop();
+        snap({
+          title: text(`Dòng 16-17: pop width ${removed.width}`, `Lines 16-17: pop width ${removed.width}`),
+          row: i,
+          col: j,
+          codeLines: codeLines.pop,
+          vars: [{ name: "removed", value: `w=${removed.width}, row=${removed.row}, acc=${removed.acc}` }],
+          note: text(
+            `Width hiện tại ${width} nhỏ hơn, nên những hàng phía trên không thể giữ width lớn hơn khi kéo xuống row ${i}.`,
+            `Current width ${width} is smaller, so rows above cannot keep a larger width when extended down to row ${i}.`,
+          ),
+        });
+      }
+
+      const top = stacks[j].at(-1);
+      const height = i - top.row;
+      const newSubmatrices = width * height;
+      const accumulated = top.acc + newSubmatrices;
+      ans += accumulated;
+      stacks[j].push({ width, row: i, acc: accumulated });
+      snap({
+        title: text(`Dòng 18-21: cộng ${accumulated} submatrix`, `Lines 18-21: add ${accumulated} submatrices`),
+        row: i,
+        col: j,
+        codeLines: codeLines.count,
+        vars: [
+          { name: "height", value: `${i} - ${top.row} = ${height}` },
+          { name: "new width * height", value: `${width} * ${height} = ${newSubmatrices}` },
+          { name: "accumulated", value: `${top.acc} + ${newSubmatrices} = ${accumulated}` },
+        ],
+        note: text(
+          "Stack giữ các width tăng dần theo chiều xuống. accumulated là số submatrix hợp lệ kết thúc tại ô hiện tại trong cột này.",
+          "The stack keeps widths nondecreasing downward. accumulated is the number of valid submatrices ending at this cell in this column.",
+        ),
+      });
+    }
+  }
+
+  snap({
+    title: text(`Kết quả: ${ans}`, `Result: ${ans}`),
+    codeLines: codeLines.done,
+    vars: [{ name: "answer", value: ans }],
+    note: text("Đã cộng mọi submatrix hợp lệ theo điểm kết thúc dưới-phải.", "All valid submatrices have been counted by their bottom-right endpoint."),
+    final: true,
+  });
+
+  return { original: grid, answer: ans, steps };
+}
+
 function simpleProblem({ id, difficulty, slug, name, viName, statement, defaultInput, inputKind = "string", inputLabel = null, tags = [arrayTag, monoTag], premium = false, solver, extraParams = [], complexity = null }) {
   return {
     id,
@@ -4016,6 +4316,126 @@ module.exports = {
     ],
     liveArgs: (input, params) => [parseNums(input, "nums"), Number(params.k)],
     builder: buildSteps3430,
+  },
+  3205: {
+    id: 3205,
+    difficulty: "medium",
+    slug: "maximum-array-hopping-score-i",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    premium: true,
+    title: text("Maximum Array Hopping Score I"),
+    titleVi: text("Maximum Array Hopping Score I", "Maximum Array Hopping Score I"),
+    statement: text(
+      "Bắt đầu từ index 0, nhảy tới index lớn hơn cho tới cuối mảng. Điểm mỗi hop i→j là (j-i)*nums[j]. Tìm tổng điểm lớn nhất.",
+      "Start at index 0 and hop to larger indices until reaching the end. Each hop i→j scores (j-i)*nums[j]. Find the maximum total score.",
+    ),
+    defaultInput: "1,5,8",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    approach: [
+      text("Vì điểm dùng value ở điểm đáp, mỗi đoạn khoảng cách nên trả bằng suffix maximum bên phải.", "Because the score uses the landing value, each unit distance should be paid by the suffix maximum to its right."),
+      text("Quét từ phải sang trái, giữ mx = max(nums[i..n-1]) và cộng mx vào answer.", "Scan right to left, keep mx = max(nums[i..n-1]), and add mx to the answer."),
+      text("Các đoạn liên tiếp có cùng mx có thể gộp thành một hop dài tối ưu.", "Consecutive unit segments with the same mx can be grouped into one optimal long hop."),
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: text("Chỉ cần một lượt quét từ phải qua trái.", "Only one right-to-left scan is needed.") },
+    code: [
+      "class Solution:",
+      "    def maxScore(self, nums):",
+      "        ans = 0",
+      "        mx = 0",
+      "        for i in range(len(nums) - 1, 0, -1):",
+      "            mx = max(mx, nums[i])",
+      "            ans += mx",
+      "        return ans",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildStepsArrayHoppingScore,
+  },
+  3221: {
+    id: 3221,
+    difficulty: "medium",
+    slug: "maximum-array-hopping-score-ii",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    premium: true,
+    title: text("Maximum Array Hopping Score II"),
+    titleVi: text("Maximum Array Hopping Score II", "Maximum Array Hopping Score II"),
+    statement: text(
+      "Bắt đầu từ index 0, nhảy tới index lớn hơn cho tới cuối mảng. Điểm mỗi hop i→j là (j-i)*nums[j]. Tìm tổng điểm lớn nhất.",
+      "Start at index 0 and hop to larger indices until reaching the end. Each hop i→j scores (j-i)*nums[j]. Find the maximum total score.",
+    ),
+    defaultInput: "4,5,2,8,9,1,3",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    approach: [
+      text("Bài II dùng cùng insight với 3205: điểm được quyết định bởi giá trị điểm đáp tốt nhất ở suffix.", "Problem II uses the same insight as 3205: the score is determined by the best landing value in the suffix."),
+      text("Tổng tối ưu bằng tổng suffix maximum từ index 1 tới n-1.", "The optimal score equals the sum of suffix maximums from index 1 to n-1."),
+      text("Có thể nhìn như monotonic stack các suffix leader hoặc đơn giản là biến mx khi quét ngược.", "This can be viewed as a monotonic stack of suffix leaders or simply as an mx variable in a reverse scan."),
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: text("Chỉ cần một lượt quét từ phải qua trái.", "Only one right-to-left scan is needed.") },
+    code: [
+      "class Solution:",
+      "    def maxScore(self, nums):",
+      "        ans = 0",
+      "        mx = 0",
+      "        for i in range(len(nums) - 1, 0, -1):",
+      "            mx = max(mx, nums[i])",
+      "            ans += mx",
+      "        return ans",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildStepsArrayHoppingScore,
+  },
+  3359: {
+    id: 3359,
+    difficulty: "hard",
+    slug: "find-sorted-submatrices-with-maximum-element-at-most-k",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    premium: true,
+    title: text("Find Sorted Submatrices With Maximum Element at Most K"),
+    titleVi: text("Đếm sorted submatrix có max không quá k", "Find Sorted Submatrices With Maximum Element at Most K"),
+    statement: text(
+      "Đếm submatrix có mọi phần tử <= k và mỗi hàng trong submatrix được sắp theo thứ tự không tăng.",
+      "Count submatrices where every element is <= k and each row inside the submatrix is sorted in non-increasing order.",
+    ),
+    defaultInput: "4,3,2,1;8,7,6,1",
+    inputKind: "string",
+    inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"),
+    extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 1 }],
+    approach: [
+      text("Tính dp[i][j] = width hợp lệ dài nhất kết thúc tại ô (i,j) trên cùng hàng.", "Compute dp[i][j] = longest valid width ending at cell (i,j) in the same row."),
+      text("Với mỗi cột j, dùng stack tăng theo width để đếm các submatrix có góc phải-dưới tại (i,j).", "For each column j, use a stack increasing by width to count submatrices whose bottom-right corner is (i,j)."),
+      text("Nếu grid[i][j] > k thì reset stack của cột vì mọi submatrix đi qua ô đó đều invalid.", "If grid[i][j] > k, reset that column's stack because any submatrix crossing it is invalid."),
+    ],
+    complexity: { time: "O(mn)", space: "O(mn)", note: text("Mỗi ô vào/ra stack cột tối đa một lần.", "Each cell enters/leaves its column stack at most once.") },
+    code: [
+      "class Solution:",
+      "    def countSubmatrices(self, grid, k):",
+      "        m, n = len(grid), len(grid[0])",
+      "        dp = [[0] * n for _ in range(m)]",
+      "        stacks = [[(0, -1, 0)] for _ in range(n)]",
+      "        ans = 0",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if grid[i][j] > k:",
+      "                    stacks[j] = [(0, i, 0)]",
+      "                    continue",
+      "                dp[i][j] = 1",
+      "                if j and grid[i][j - 1] <= k and grid[i][j - 1] >= grid[i][j]:",
+      "                    dp[i][j] += dp[i][j - 1]",
+      "                width = dp[i][j]",
+      "                while width < stacks[j][-1][0]:",
+      "                    stacks[j].pop()",
+      "                height = i - stacks[j][-1][1]",
+      "                add = stacks[j][-1][2] + width * height",
+      "                ans += add",
+      "                stacks[j].append((width, i, add))",
+      "        return ans",
+    ],
+    liveArgs: (input, params) => [parseMatrix(input, "grid"), Number(params.k)],
+    builder: buildSteps3359,
   },
   2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),

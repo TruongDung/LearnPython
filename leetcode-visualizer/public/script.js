@@ -3332,6 +3332,70 @@ function renderRottingOrangesView(step) {
   </section>`;
 }
 
+function classroomGuideHtml(view) {
+  if (!view) return "";
+  const vi = lang === "vi";
+  const phases = [
+    ["map", vi ? "1. Đọc bản đồ" : "1. Read map"],
+    ["state", vi ? "2. Hiểu state" : "2. Understand state"],
+    ["bfs", vi ? "3. BFS từng bước" : "3. Run BFS"],
+    ["result", vi ? "4. Đường ngắn nhất" : "4. Shortest path"],
+  ];
+  const phaseHtml = phases.map(([key, label]) => `<span class="${view.phase === key ? "active" : ""}">${label}</span>`).join("");
+  const state = view.state;
+  const batteryHtml = state && Number.isInteger(state.energy)
+    ? `<div class="classroom-battery" aria-label="${vi ? "năng lượng" : "energy"} ${state.energy}/${view.maxEnergy}"><i style="--energy-level:${Math.max(0, Math.min(100, (state.energy / view.maxEnergy) * 100))}%"></i></div>`
+    : `<strong>—</strong>`;
+  const stateHtml = state
+    ? `<div class="classroom-state-tuple">
+        <span><small>${vi ? "VỊ TRÍ" : "POSITION"}</small><strong>(${state.position.join(",")})</strong></span>
+        <span><small>${vi ? "PIN" : "ENERGY"}</small>${batteryHtml}<em>${state.energy ?? "—"}/${view.maxEnergy}</em></span>
+        <span><small>MASK</small><strong>${state.mask ?? "—"}</strong></span>
+        <span><small>${vi ? "SỐ BƯỚC" : "MOVES"}</small><strong>${state.moves ?? "—"}</strong></span>
+      </div>`
+    : `<div class="classroom-state-empty">${vi ? "Đang chuẩn bị state đầu tiên" : "Preparing the first state"}</div>`;
+  const candidate = view.candidate;
+  const candidateStatus = candidate ? candidate.status || "checking" : "idle";
+  const candidateHtml = candidate
+    ? `<div class="classroom-candidate ${candidateStatus}">
+        <div><small>${vi ? "THỬ Ô" : "TRY CELL"}</small><strong>(${candidate.position.join(",")}) · ${escapeHtml(candidate.cell)}</strong></div>
+        <div class="classroom-transition"><span>E: ${candidate.energyBefore}</span><b>→</b><span>${candidate.energyAfter}</span></div>
+        <div class="classroom-transition"><span>mask: ${candidate.maskBefore}</span><b>→</b><span>${candidate.maskAfter}</span></div>
+      </div>`
+    : `<div class="classroom-candidate idle"><span>${vi ? "Chưa thử ô hàng xóm" : "No neighbor checked yet"}</span></div>`;
+  const verdictLabels = {
+    checking: vi ? "ĐANG KIỂM TRA" : "CHECKING",
+    rejected: vi ? "BỎ NHÁNH" : "REJECT",
+    dominated: vi ? "STATE YẾU HƠN" : "DOMINATED",
+    accepted: vi ? "THÊM QUEUE" : "ENQUEUE",
+    success: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+  const verdict = view.verdict || "checking";
+  const reason = view.reason ? pick(view.reason) : (vi ? "BFS lấy state ở đầu queue và thử 4 hướng." : "BFS takes the front state and tries four directions.");
+  const litterHtml = view.litters.length
+    ? view.litters.map((item) => `<span class="${item.collected ? "done" : ""}"><i>${item.collected ? "✓" : ""}</i><strong>${item.id}</strong><small>@(${item.position.join(",")})</small></span>`).join("")
+    : `<em>${vi ? "Không có rác" : "No litter"}</em>`;
+  const queueHtml = view.queue.length
+    ? view.queue.map((item, index) => `<span><b>${index === 0 ? "FRONT" : `+${index}`}</b><strong>(${item.position.join(",")})</strong><small>E=${item.energy} · mask=${item.mask} · d=${item.moves}</small></span>`).join("")
+    : `<em>${vi ? "queue đang rỗng" : "queue is empty"}</em>`;
+  const routeHtml = view.route && view.route.length
+    ? `<section class="classroom-route"><header><strong>${vi ? "ĐƯỜNG ĐI NGẮN NHẤT" : "SHORTEST PATH"}</strong><span>${view.route.length - 1} ${vi ? "bước" : "moves"}</span></header><div>${view.route.map((pos, index) => `<span><small>${index}</small><strong>(${pos.join(",")})</strong></span>`).join("<b>→</b>")}</div></section>`
+    : "";
+
+  return `<section class="classroom-guide">
+    <div class="classroom-phases">${phaseHtml}</div>
+    <div class="classroom-rule"><strong>state = (row, col, energy, mask)</strong><span>${vi ? "Cùng vị trí + mask, chỉ giữ state có pin nhiều nhất." : "For the same position + mask, keep only the state with the most energy."}</span></div>
+    <div class="classroom-guide-main">
+      <section><header><strong>${vi ? "STATE ĐANG XỬ LÝ" : "CURRENT STATE"}</strong><span>${vi ? "lấy từ đầu queue" : "taken from queue front"}</span></header>${stateHtml}</section>
+      <section><header><strong>${vi ? "MỘT BƯỚC DI CHUYỂN" : "ONE MOVE"}</strong><span>${vi ? "tốn 1 pin trước, rồi mới áp dụng L/R" : "spend 1 energy, then apply L/R"}</span></header>${candidateHtml}</section>
+    </div>
+    <div class="classroom-decision ${verdict}"><strong>${verdictLabels[verdict] || verdictLabels.checking}</strong><span>${escapeHtml(reason)}</span></div>
+    <section class="classroom-litter"><header><strong>${vi ? "RÁC CẦN NHẶT" : "LITTER CHECKLIST"}</strong><span>target mask = ${view.targetMask}</span></header><div>${litterHtml}</div></section>
+    <section class="classroom-queue"><header><strong>QUEUE</strong><span>${view.queueRemaining} ${vi ? "state đang chờ" : "states waiting"}</span></header><div>${queueHtml}</div></section>
+    ${routeHtml}
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -3403,7 +3467,8 @@ function renderBfsGrid(step) {
   }
   const guideHtml = step.distinctIslandView ? distinctIslandGuideHtml(step.distinctIslandView) : "";
   const effortGuide = step.effortView ? effortGuideHtml(step.effortView) : "";
-  el.innerHTML = guideHtml + effortGuide + html;
+  const classroomGuide = step.classroomView ? classroomGuideHtml(step.classroomView) : "";
+  el.innerHTML = guideHtml + effortGuide + classroomGuide + html;
 }
 
 // ---- Shift 2D Grid renderer ----
