@@ -29673,6 +29673,33 @@ select option {
 [data-theme="light"] .classroom-queue > div > span small { color: #475569; }
 [data-theme="light"] .classroom-state-empty,
 [data-theme="light"] .classroom-candidate.idle { color: #64748b; }
+[data-theme="light"] .classroom-decision {
+  border-left-color: #6d28d9;
+  background: #f3e8ff;
+}
+[data-theme="light"] .classroom-decision strong { color: #5b21b6; }
+[data-theme="light"] .classroom-decision span { color: #4c1d95; }
+[data-theme="light"] .classroom-decision.accepted,
+[data-theme="light"] .classroom-decision.success {
+  border-left-color: #15803d;
+  background: #ecfdf5;
+}
+[data-theme="light"] .classroom-decision.accepted strong,
+[data-theme="light"] .classroom-decision.success strong,
+[data-theme="light"] .classroom-decision.accepted span,
+[data-theme="light"] .classroom-decision.success span { color: #166534; }
+[data-theme="light"] .classroom-decision.rejected {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+[data-theme="light"] .classroom-decision.rejected strong,
+[data-theme="light"] .classroom-decision.rejected span { color: #991b1b; }
+[data-theme="light"] .classroom-decision.dominated {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+[data-theme="light"] .classroom-decision.dominated strong,
+[data-theme="light"] .classroom-decision.dominated span { color: #92400e; }
 [data-theme="light"] .classroom-litter > div > span { border-color: #94a3b8; }
 [data-theme="light"] .classroom-litter > div > span strong { color: #0e7490; }
 [data-theme="light"] .classroom-route > div > span strong { color: #115e59; }
