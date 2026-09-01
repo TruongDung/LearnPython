@@ -15,6 +15,8 @@ let debugWatches = [];
 let searchErrorState = null;
 let themeMode = "manual";
 let themeAutoTimer = null;
+let activeCatalogJumpKey = null;
+let catalogJumpHighlightTimer = null;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 
@@ -60,6 +62,8 @@ const I18N = {
     liveResetBtn: "Về code gốc",
     autoTheme: "Tự động",
     backToTop: "Về đầu trang",
+    catalogJumpNav: "Đi tới bài hiện tại trong một tag",
+    jumpToTag: (tag, id) => `Đi tới tag ${tag}, tại bài #${id}`,
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -101,6 +105,8 @@ const I18N = {
     liveResetBtn: "Reset to original",
     autoTheme: "Auto",
     backToTop: "Back to top",
+    catalogJumpNav: "Jump to this problem in a tag",
+    jumpToTag: (tag, id) => `Go to ${tag}, problem #${id}`,
   },
 };
 
@@ -159,6 +165,8 @@ function applyStaticStrings() {
     backToTopButton.setAttribute("aria-label", t().backToTop);
     backToTopButton.title = t().backToTop;
   }
+  const catalogJumpNav = $("catalogJumpNav");
+  if (catalogJumpNav) catalogJumpNav.setAttribute("aria-label", t().catalogJumpNav);
   updateThemeButtons();
 }
 
@@ -247,6 +255,7 @@ function renderCatalog() {
   catalogData.forEach((group) => {
     const groupEl = document.createElement("div");
     groupEl.className = "cat-group";
+    groupEl.dataset.groupKey = group.key;
 
     const titleEl = document.createElement("div");
     titleEl.className = "cat-title";
@@ -1415,6 +1424,7 @@ function renderCatalog() {
     groupEl.appendChild(itemsEl);
     container.appendChild(groupEl);
   });
+  renderCatalogJumpNav();
 }
 
 function normalizeProblemSearch(value) {
@@ -1529,6 +1539,90 @@ function markActiveChip() {
     });
 }
 
+function catalogGroupsForCurrentProblem() {
+  if (!catalogData || !currentProblemId) return [];
+  const matching = catalogData.filter((group) =>
+    (group.problems || []).some((problem) => Number(problem.id) === Number(currentProblemId)),
+  );
+  if (!problemData) return matching;
+
+  const preferredKeys = [
+    ...(problemData.tags || []).map((tag) => tag && tag.key),
+    problemData.category && problemData.category.key,
+  ].filter(Boolean);
+  const order = new Map(preferredKeys.map((key, index) => [key, index]));
+  return matching.sort((a, b) => {
+    const aOrder = order.has(a.key) ? order.get(a.key) : preferredKeys.length;
+    const bOrder = order.has(b.key) ? order.get(b.key) : preferredKeys.length;
+    return aOrder - bOrder;
+  });
+}
+
+function renderCatalogJumpNav() {
+  const nav = $("catalogJumpNav");
+  if (!nav) return;
+  nav.innerHTML = "";
+  nav.setAttribute("aria-label", t().catalogJumpNav);
+
+  catalogGroupsForCurrentProblem().forEach((group) => {
+    const label = String(pick(group));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "catalog-jump-btn" + (activeCatalogJumpKey === group.key ? " is-active" : "");
+    button.dataset.groupKey = group.key;
+    button.setAttribute("aria-label", t().jumpToTag(label, currentProblemId));
+    button.title = t().jumpToTag(label, currentProblemId);
+
+    const icon = document.createElement("span");
+    icon.className = "catalog-jump-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "#";
+    const textLabel = document.createElement("span");
+    textLabel.className = "catalog-jump-label";
+    textLabel.textContent = label;
+    button.append(icon, textLabel);
+    button.addEventListener("click", () => jumpToCatalogGroup(group.key));
+    nav.appendChild(button);
+  });
+  updateBackToTopButton();
+}
+
+function jumpToCatalogGroup(groupKey) {
+  if (!currentProblemId) return;
+  if (normalizeProblemSearch(problemSearchQuery)) {
+    problemSearchQuery = "";
+    $("problemKeyword").value = "";
+    renderProblemSearchResults();
+  }
+
+  activeCatalogJumpKey = groupKey;
+  $("catalogJumpNav")?.querySelectorAll(".catalog-jump-btn").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.groupKey === groupKey);
+  });
+
+  requestAnimationFrame(() => {
+    const group = [...document.querySelectorAll("#catalog .cat-group")]
+      .find((item) => item.dataset.groupKey === groupKey);
+    if (!group) return;
+    const items = group.querySelector(".cat-items");
+    const toggle = group.querySelector(".cat-toggle");
+    if (items && items.classList.contains("collapsed")) {
+      items.classList.remove("collapsed");
+      if (toggle) toggle.textContent = "−";
+    }
+
+    const target = [...group.querySelectorAll(".prob-chip")]
+      .find((chip) => Number(chip.dataset.id) === Number(currentProblemId));
+    const destination = target || group;
+    destination.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    if (!target) return;
+    target.classList.remove("catalog-jump-target");
+    requestAnimationFrame(() => target.classList.add("catalog-jump-target"));
+    clearTimeout(catalogJumpHighlightTimer);
+    catalogJumpHighlightTimer = setTimeout(() => target.classList.remove("catalog-jump-target"), 1700);
+  });
+}
+
 // ---- Load problem info ----
 $("loadBtn").addEventListener("click", () => loadProblem({ scrollToEnd: true }));
 $("problemId").addEventListener("keydown", (e) => {
@@ -1547,8 +1641,10 @@ function jumpToPageEnd() {
 
 function updateBackToTopButton() {
   const button = $("backToTopBtn");
-  if (!button) return;
-  button.classList.toggle("is-visible", window.scrollY > 0);
+  const jumpNav = $("catalogJumpNav");
+  const visible = window.scrollY > 0;
+  if (button) button.classList.toggle("is-visible", visible);
+  if (jumpNav) jumpNav.classList.toggle("is-visible", visible && jumpNav.childElementCount > 0);
 }
 
 $("backToTopBtn").addEventListener("click", () => {
@@ -1582,6 +1678,7 @@ async function loadProblem({ scrollToEnd = false } = {}) {
 
     const problemChanged = currentProblemId !== data.id;
     currentProblemId = data.id;
+    if (problemChanged) activeCatalogJumpKey = null;
     localStorage.setItem("lastProblemId", data.id);
     problemData = data;
     resetLiveEditorState();
@@ -1633,6 +1730,7 @@ function renderProblem() {
   const tagsHover = createProblemTagsHover(problemData.tags, true);
   if (tagsHover) tagsEl.appendChild(tagsHover);
   tagsEl.classList.toggle("hidden", !tagsHover);
+  renderCatalogJumpNav();
 
   $("problemTitleVi").textContent = pick(problemData.titleVi);
   const statementEl = $("problemStatement");
@@ -8298,6 +8396,307 @@ function queueViewHtml(view, compact = false) {
 
 function renderQueueView(step) {
   $("treeView").innerHTML = queueViewHtml(step.queueView || {});
+}
+
+function renderMaxNonDecreasingView(step) {
+  const view = step.maxNonDecreasingView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const last = Array.isArray(view.last) ? view.last : [];
+  const need = Array.isArray(view.need) ? view.need : [];
+  const deque = Array.isArray(view.deque) ? view.deque : [];
+  const partition = Array.isArray(view.partition) ? view.partition : [];
+  const phases = [
+    ["prefix", vi ? "1. Tính prefix" : "1. Prefix sums"],
+    ["choose", vi ? "2. Chọn điểm cắt" : "2. Choose cut"],
+    ["update", vi ? "3. Cập nhật DP" : "3. Update DP"],
+    ["deque", vi ? "4. Giữ deque đơn điệu" : "4. Maintain deque"],
+    ["result", vi ? "5. Kết quả" : "5. Result"],
+  ];
+  const phaseHtml = phases.map(([key, label]) => `<span class="${view.phase === key ? "active" : ""}">${label}</span>`).join("");
+  const dequeSet = new Set(deque);
+  const prefixHtml = prefix.map((value, index) => {
+    const classes = ["ndp-prefix-cell"];
+    if (index === view.current) classes.push("current");
+    if (index === view.chosen) classes.push("chosen");
+    if (index === view.compare) classes.push("compare");
+    if (index === view.removed) classes.push("removed");
+    if (dequeSet.has(index)) classes.push("queued");
+    const solved = view.phase !== "prefix" && index <= (view.processed || 0);
+    return `<div class="${classes.join(" ")}">
+      <small>i = ${index}</small>
+      <strong>P = ${value ?? "—"}</strong>
+      <span>dp = ${solved ? dp[index] : "—"}</span>
+      <span>last = ${solved ? last[index] : "—"}</span>
+      <em>need = ${solved ? need[index] : "—"}</em>
+    </div>`;
+  }).join("");
+  const dequeHtml = deque.length
+    ? deque.map((index, position) => {
+        const classes = ["ndp-deque-token"];
+        if (index === view.chosen) classes.push("chosen");
+        if (index === view.compare) classes.push("compare");
+        return `<div class="${classes.join(" ")}">
+          <div>${position === 0 ? "FRONT" : ""}${position === deque.length - 1 ? `${position === 0 ? " · " : ""}REAR` : ""}</div>
+          <strong>j = ${index}</strong>
+          <span>need = ${need[index]}</span>
+          <small>dp ${dp[index]} · last ${last[index]}</small>
+        </div>`;
+      }).join("<b class=\"ndp-arrow\">→</b>")
+    : `<em class="ndp-empty">${vi ? "deque đang rỗng trước khi push candidate mới" : "deque is empty before pushing the new candidate"}</em>`;
+  let equationHtml = `<span>${vi ? "Chưa chọn đoạn mới" : "No new segment selected yet"}</span>`;
+  if (view.segment) {
+    const segment = view.segment;
+    const valid = segment.sum >= segment.previousLast;
+    equationHtml = `<div><small>${vi ? "ĐOẠN MỚI" : "NEW SEGMENT"}</small><strong>nums[${segment.start}..${segment.end - 1}]</strong></div>
+      <div><small>${vi ? "TỔNG ĐOẠN" : "SEGMENT SUM"}</small><strong>P[${segment.end}] - P[${segment.start}] = ${segment.sum}</strong></div>
+      <div class="${valid ? "valid" : "invalid"}"><small>${vi ? "ĐIỀU KIỆN KHÔNG GIẢM" : "NONDECREASING CHECK"}</small><strong>${segment.sum} ≥ last[${segment.start}] = ${segment.previousLast} ${valid ? "✓" : "×"}</strong></div>`;
+  } else if (view.compare >= 0 && view.current > 0) {
+    equationHtml = `<div><small>${vi ? "CANDIDATE KẾ TIẾP" : "NEXT CANDIDATE"}</small><strong>j = ${view.compare}</strong></div>
+      <div><small>${vi ? "KIỂM TRA HỢP LỆ" : "VALIDITY CHECK"}</small><strong>need[${view.compare}] = ${need[view.compare]} ≤ P[${view.current}] = ${prefix[view.current]}</strong></div>`;
+  }
+  const partitionHtml = partition.length
+    ? `<section class="ndp-partition"><header><strong>${vi ? "MỘT CÁCH CHIA TỐI ƯU" : "ONE OPTIMAL PARTITION"}</strong><span>${partition.length} ${vi ? "đoạn" : "segments"}</span></header><div>${partition.map((part, index) => `<span><small>${vi ? "đoạn" : "segment"} ${index + 1}</small><strong>[${part.values.join(", ")}]</strong><em>sum = ${part.sum}</em></span>`).join("<b>≤</b>")}</div></section>`
+    : "";
+  const summary = vi
+    ? `DP prefix và deque đơn điệu cho ${nums.length} phần tử; đang xử lý prefix ${view.current || 0}.`
+    : `Prefix DP and monotonic deque for ${nums.length} values; processing prefix ${view.current || 0}.`;
+
+  $("treeView").innerHTML = `<section class="ndp-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ndp-phases">${phaseHtml}</div>
+    <div class="ndp-rule"><strong>need[j] = prefix[j] + last[j]</strong><span>${vi ? "Có thể nối j → i khi prefix[i] ≥ need[j]." : "Cut j can extend to i when prefix[i] ≥ need[j]."}</span></div>
+    <section class="ndp-prefix"><header><strong>PREFIX STATE TABLE</strong><span>${vi ? "ô tím: i hiện tại · viền xanh: candidate trong deque" : "purple: current i · green border: deque candidate"}</span></header><div>${prefixHtml}</div></section>
+    <section class="ndp-equation">${equationHtml}</section>
+    <section class="ndp-deque"><header><strong>MONOTONIC DEQUE</strong><span>${vi ? "need tăng dần từ FRONT tới REAR" : "need increases from FRONT to REAR"}</span></header><div>${dequeHtml}</div></section>
+    ${partitionHtml}
+    <div class="ndp-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
+}
+
+function renderBoundaryMaxView(step) {
+  const view = step.boundaryMaxView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const equalStarts = new Set(Array.isArray(view.equalStarts) ? view.equalStarts : []);
+  const poppedIndices = new Set(view.popped && Array.isArray(view.popped.indices) ? view.popped.indices : []);
+  const newRanges = Array.isArray(view.newRanges) ? view.newRanges : [];
+  const allRanges = Array.isArray(view.allRanges) ? view.allRanges : [];
+  const aliveIndices = new Set(stack.flatMap((entry) => Array.isArray(entry.indices) ? entry.indices : []));
+  const phaseGroup = view.phase === "rule"
+    ? "rule"
+    : view.phase === "inspect" || view.phase === "pop"
+      ? "filter"
+      : view.phase === "push" || view.phase === "match"
+        ? "pair"
+        : view.phase === "count"
+          ? "add"
+          : "result";
+  const phases = [
+    ["rule", vi ? "1. Hiểu điều kiện" : "1. Understand rule"],
+    ["filter", vi ? "2. Pop số nhỏ" : "2. Pop smaller"],
+    ["pair", vi ? "3. Ghép hai biên" : "3. Pair boundaries"],
+    ["add", vi ? "4. Cộng đoạn mới" : "4. Add new ranges"],
+    ["result", vi ? "5. Kết quả" : "5. Result"],
+  ].map(([key, label]) => `<span class="${phaseGroup === key ? "active" : ""}">${label}</span>`).join("");
+
+  const inputHtml = nums.map((value, index) => {
+    const classes = ["bmax-number"];
+    let tag = index < current ? (vi ? "đã xét" : "seen") : "";
+    if (aliveIndices.has(index)) classes.push("alive");
+    if (poppedIndices.has(index)) {
+      classes.push("popped");
+      tag = "POP";
+    }
+    if (equalStarts.has(index)) {
+      classes.push("left-boundary");
+      tag = vi ? "BIÊN TRÁI" : "LEFT";
+    }
+    if (index === current) {
+      classes.push("current");
+      tag = vi ? "BIÊN PHẢI" : "RIGHT";
+    }
+    return `<div class="${classes.join(" ")}"><small>i = ${index}</small><strong>${escapeHtml(String(value))}</strong><span>${tag}</span></div>`;
+  }).join("");
+
+  const stackHtml = stack.length
+    ? stack.map((entry, index) => {
+        const isTop = index === stack.length - 1;
+        const indices = Array.isArray(entry.indices) ? entry.indices : [];
+        return `<div class="bmax-stack-group${isTop ? " top" : ""}">
+          <small>${isTop ? "TOP" : vi ? "NHÓM" : "GROUP"}</small>
+          <strong>value = ${escapeHtml(String(entry.value))}</strong>
+          <span>count = ${escapeHtml(String(entry.count))}</span>
+          <em>index: ${indices.map((item) => escapeHtml(String(item))).join(", ")}</em>
+        </div>`;
+      }).join("<b class=\"bmax-stack-arrow\">→</b>")
+    : `<em class="bmax-empty">${vi ? "Stack đang rỗng" : "The stack is empty"}</em>`;
+
+  const rangeChip = (range, fresh = false) => {
+    const values = Array.isArray(range.values) ? range.values : [];
+    return `<span class="bmax-range${fresh ? " fresh" : ""}">
+      <small>[${range.start}..${range.end}]</small>
+      <strong>[${values.map((value) => escapeHtml(String(value))).join(", ")}]</strong>
+    </span>`;
+  };
+  const newRangesHtml = newRanges.length
+    ? newRanges.map((range) => rangeChip(range, true)).join("")
+    : `<em class="bmax-empty">${view.phase === "rule"
+      ? (vi ? "Chưa xét phần tử nào" : "No value processed yet")
+      : view.phase === "result"
+        ? (vi ? "Đã duyệt xong toàn bộ mảng" : "The full array has been processed")
+        : (vi ? "Chưa tạo đoạn mới ở bước này" : "No new range in this step")}</em>`;
+  const allRangesHtml = allRanges.length
+    ? allRanges.map((range) => rangeChip(range)).join("")
+    : `<em class="bmax-empty">${vi ? "Danh sách đang rỗng" : "The list is empty"}</em>`;
+  const poppedHtml = view.popped
+    ? `<div class="bmax-pop-note"><small>POP</small><strong>${view.popped.value} × ${view.popped.count}</strong><span>${vi ? `bị chặn bởi nums[${current}] = ${nums[current]}` : `blocked by nums[${current}] = ${nums[current]}`}</span></div>`
+    : "";
+  const equation = view.phase === "count"
+    ? `<strong>${view.ansBefore} + ${view.added} = ${view.ansAfter}</strong><span>${vi ? "ans trước + số đoạn mới = ans sau" : "previous ans + new ranges = next ans"}</span>`
+    : view.phase === "result"
+      ? `<strong>ans = ${view.ansAfter}</strong><span>${vi ? "Tổng số subarray hợp lệ" : "Total valid subarrays"}</span>`
+      : `<strong>ans = ${view.ansAfter}</strong><span>${vi ? "Chỉ tăng ở bước 4" : "Only changes in step 4"}</span>`;
+  const summary = vi
+    ? `Đếm subarray có hai biên là maximum; đáp án hiện tại ${view.ansAfter}.`
+    : `Counting subarrays whose boundaries are maximum; current answer ${view.ansAfter}.`;
+
+  $("treeView").innerHTML = `<section class="bmax-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="bmax-phases">${phases}</div>
+    <div class="bmax-rule">
+      <strong>nums[L] = nums[R] = max(nums[L..R])</strong>
+      <span>${vi ? "Mỗi [i..i] luôn hợp lệ. Muốn có đoạn dài hơn, tìm biên trái cùng giá trị và không có số lớn hơn nằm giữa." : "Every [i..i] is valid. For a longer range, find an equal left boundary with no larger value in between."}</span>
+    </div>
+    <section class="bmax-input"><header><strong>nums</strong><span>${vi ? "vàng: biên trái · tím: biên phải · đỏ: vừa bị pop" : "yellow: left · purple: right · red: just popped"}</span></header><div>${inputHtml}</div></section>
+    <div class="bmax-work">
+      <section class="bmax-stack"><header><strong>${vi ? "STACK GIẢM DẦN" : "DECREASING STACK"}</strong><span>${vi ? "đáy → top" : "bottom → top"}</span></header><div>${stackHtml}</div>${poppedHtml}</section>
+      <section class="bmax-new"><header><strong>${vi ? "SUBARRAY MỚI KẾT THÚC TẠI i" : "NEW SUBARRAYS ENDING AT i"}</strong><span>${newRanges.length} ${vi ? "đoạn" : "ranges"}</span></header><div class="bmax-ranges">${newRangesHtml}</div><div class="bmax-equation">${equation}</div></section>
+    </div>
+    <section class="bmax-all"><header><strong>${vi ? "TẤT CẢ ĐOẠN ĐÃ ĐẾM" : "ALL COUNTED RANGES"}</strong><span>${allRanges.length} = ans</span></header><div class="bmax-ranges">${allRangesHtml}</div></section>
+    <div class="bmax-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
+}
+
+function renderSortedSubmatrixView(step) {
+  const view = step.sortedSubmatrixView || {};
+  const vi = lang === "vi";
+  const grid = Array.isArray(view.grid) ? view.grid : [];
+  const widths = Array.isArray(view.widths) ? view.widths : [];
+  const endpointAdds = Array.isArray(view.endpointAdds) ? view.endpointAdds : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const current = Array.isArray(view.current) ? view.current : null;
+  const currentRow = current ? current[0] : -1;
+  const currentCol = current ? current[1] : -1;
+  const rows = grid.length;
+  const cols = grid[0]?.length || 0;
+  const segmentCells = new Set((view.rowSegment || []).map((cell) => `${cell[0]}:${cell[1]}`));
+  const phaseGroup = view.phase === "width"
+    ? "width"
+    : view.phase === "pop"
+      ? "stack"
+      : view.phase === "count"
+        ? "count"
+        : view.phase === "result"
+          ? "result"
+          : "condition";
+  const phases = [
+    ["condition", vi ? "1. Kiểm tra ô" : "1. Check cell"],
+    ["width", vi ? "2. Tính row width" : "2. Compute row width"],
+    ["stack", vi ? "3. Cập nhật stack cột" : "3. Update column stack"],
+    ["count", vi ? "4. Đếm theo góc phải-dưới" : "4. Count by bottom-right"],
+    ["result", vi ? "5. Kết quả" : "5. Result"],
+  ].map(([key, label]) => `<span class="${phaseGroup === key ? "active" : ""}">${label}</span>`).join("");
+
+  const matrixHtml = grid.flatMap((rowValues, row) => rowValues.map((value, col) => {
+    const width = widths[row]?.[col] || 0;
+    const contribution = endpointAdds[row]?.[col] || 0;
+    const classes = ["sortmat-cell"];
+    if (value > view.k) classes.push("blocked");
+    else if (width > 0) classes.push("ready");
+    if (col === view.activeColumn) classes.push("active-column");
+    if (segmentCells.has(`${row}:${col}`)) classes.push("row-segment");
+    if (row === currentRow && col === currentCol) classes.push("current");
+    return `<div class="${classes.join(" ")}">
+      <small>[${row},${col}]</small>
+      <strong>${escapeHtml(String(value))}</strong>
+      <span>${value > view.k ? `> k` : width ? `width = ${width}` : "width = —"}</span>
+      <em>${contribution ? `+${contribution} rect` : ""}</em>
+    </div>`;
+  })).join("");
+
+  const stackHtml = stack.length
+    ? stack.map((item, index) => {
+        const sentinel = item.width === 0;
+        const isTop = index === stack.length - 1;
+        return `<div class="sortmat-stack-item${sentinel ? " sentinel" : ""}${isTop ? " top" : ""}">
+          <small>${sentinel ? "SENTINEL" : isTop ? "TOP" : vi ? "NHÓM" : "GROUP"}</small>
+          <strong>width = ${item.width}</strong>
+          <span>row = ${item.row}</span>
+          <em>acc = ${item.acc}</em>
+        </div>`;
+      }).join("<b class=\"sortmat-arrow\">→</b>")
+    : `<em class="sortmat-empty">${vi ? "Chọn một ô để xem stack của cột" : "Select a cell to see its column stack"}</em>`;
+  const poppedHtml = view.popped
+    ? `<div class="sortmat-popped"><small>POP</small><strong>width ${view.popped.width}</strong><span>${vi ? `vì width hiện tại nhỏ hơn ${view.popped.width}` : `because the current width is smaller than ${view.popped.width}`}</span></div>`
+    : "";
+
+  const candidateHtml = candidates.length
+    ? candidates.map((candidate) => `<div class="sortmat-candidate">
+        <small>${vi ? "hàng trên" : "top"} = ${candidate.top} → ${vi ? "hàng dưới" : "bottom"} = ${candidate.bottom}</small>
+        <strong>min width = ${candidate.minWidth}</strong>
+        <span>${candidate.choices} ${vi ? "cách chọn biên trái" : "left-boundary choices"}</span>
+      </div>`).join("")
+    : `<em class="sortmat-empty">${view.phase === "result"
+      ? (vi ? "Đã đếm xong mọi góc phải-dưới" : "Every bottom-right corner has been counted")
+      : view.blocked
+        ? (vi ? "Ô bị chặn nên đóng góp 0" : "Blocked cell contributes 0")
+        : (vi ? "Các top row sẽ xuất hiện ở bước đếm" : "Top rows appear during the counting step")}</em>`;
+  const rectangles = candidates.flatMap((candidate) => candidate.rectangles || []);
+  const rectangleHtml = rectangles.length
+    ? rectangles.map((rectangle) => `<span class="sortmat-rectangle">
+        <small>${vi ? "hàng" : "rows"} ${rectangle.top}..${rectangle.bottom}</small>
+        <strong>${vi ? "cột" : "cols"} ${rectangle.left}..${rectangle.right}</strong>
+      </span>`).join("")
+    : `<em class="sortmat-empty">${vi ? "Chưa có rectangle mới ở frame này" : "No new rectangle in this frame"}</em>`;
+
+  let equationHtml = `<strong>ans = ${view.ansAfter}</strong><span>${vi ? "Đáp án chỉ tăng ở bước 4" : "The answer changes only in step 4"}</span>`;
+  if (view.formula) {
+    const f = view.formula;
+    equationHtml = `<div><small>${vi ? "ĐÓNG GÓP TẠI Ô" : "ENDING HERE"}</small><strong>${f.inherited} + ${f.width} × ${f.height} = ${f.added}</strong><span>top.acc + width × height</span></div>
+      <div><small>${vi ? "ĐÁP ÁN TÍCH LŨY" : "RUNNING ANSWER"}</small><strong>${view.ansBefore} + ${view.added} = ${view.ansAfter}</strong><span>ans + endingHere</span></div>`;
+  } else if (view.phase === "width" && current) {
+    equationHtml = `<strong>width[${currentRow}][${currentCol}] = ${widths[currentRow]?.[currentCol] || 0}</strong><span>${view.canExtend ? (vi ? "nối được với suffix bên trái" : "extends the suffix on the left") : (vi ? "bắt đầu suffix mới" : "starts a new suffix")}</span>`;
+  } else if (view.phase === "reset" && current) {
+    equationHtml = `<strong>${grid[currentRow][currentCol]} > k=${view.k} → width = 0</strong><span>${vi ? "reset stack cột hiện tại" : "reset the current column stack"}</span>`;
+  } else if (view.phase === "pop" && view.popped) {
+    equationHtml = `<strong>${widths[currentRow]?.[currentCol] || 0} < ${view.popped.width} → POP</strong><span>${vi ? "hàng dưới thu hẹp mọi rectangle kéo xuống" : "the lower row narrows every rectangle extended downward"}</span>`;
+  } else if (view.phase === "result") {
+    equationHtml = `<strong>ans = ${view.ansAfter}</strong><span>${vi ? "Tổng tất cả số +rect trong ma trận" : "Sum of every +rect value in the matrix"}</span>`;
+  }
+
+  const currentLabel = current
+    ? `(${currentRow},${currentCol}) = ${grid[currentRow][currentCol]}`
+    : "—";
+  const summary = vi
+    ? `Đếm sorted submatrix với k=${view.k}; đáp án hiện tại ${view.ansAfter}.`
+    : `Counting sorted submatrices with k=${view.k}; current answer ${view.ansAfter}.`;
+
+  $("treeView").innerHTML = `<section class="sortmat-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sortmat-phases">${phases}</div>
+    <div class="sortmat-rule"><strong>width[r][c] = ${vi ? "suffix không tăng dài nhất kết thúc tại c" : "longest non-increasing suffix ending at c"}</strong><span>${vi ? "Cố định góc phải-dưới: mỗi cách chọn hàng trên cùng đóng góp min(width) từ hàng đó xuống hàng dưới." : "Fix the bottom-right corner: each top row contributes the minimum width among the rectangle's rows."}</span></div>
+    <div class="sortmat-main">
+      <section class="sortmat-matrix"><header><strong>GRID / ROW WIDTH / +RECT</strong><span>k = ${view.k} · ${vi ? "viền tím: ô hiện tại" : "purple: current cell"}</span></header><div style="--sortmat-cols:${cols}">${matrixHtml}</div></section>
+      <section class="sortmat-state"><header><strong>${vi ? "TRẠNG THÁI HIỆN TẠI" : "CURRENT STATE"}</strong><span>${currentLabel}</span></header><div class="sortmat-equation">${equationHtml}</div><div class="sortmat-legend"><span><i class="segment"></i>${vi ? "row suffix" : "row suffix"}</span><span><i class="column"></i>${vi ? "cột đang xét" : "active column"}</span><span><i class="blocked"></i>${vi ? "giá trị > k" : "value > k"}</span></div></section>
+    </div>
+    <section class="sortmat-stack"><header><strong>${vi ? `STACK TĂNG CỦA CỘT ${view.activeColumn >= 0 ? view.activeColumn : "—"}` : `INCREASING STACK FOR COLUMN ${view.activeColumn >= 0 ? view.activeColumn : "—"}`}</strong><span>${vi ? "đáy → top · acc = số rectangle kết thúc trong cột" : "bottom → top · acc = rectangles ending in this column"}</span></header><div>${stackHtml}</div>${poppedHtml}</section>
+    <section class="sortmat-candidates"><header><strong>${vi ? "MỖI HÀNG TRÊN CÙNG ĐÓNG GÓP min(width)" : "EACH TOP ROW CONTRIBUTES min(width)"}</strong><span>${candidates.reduce((sum, item) => sum + item.choices, 0)} ${vi ? "rectangle mới" : "new rectangles"}</span></header><div>${candidateHtml}</div></section>
+    <section class="sortmat-rectangles"><header><strong>${vi ? "CÁC RECTANGLE VỪA ĐƯỢC CỘNG" : "RECTANGLES ADDED IN THIS STEP"}</strong><span>${rectangles.length}</span></header><div>${rectangleHtml}</div></section>
+    <div class="sortmat-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+  </section>`;
 }
 
 function renderCircularDequeView(step) {
@@ -23915,6 +24314,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderHistogramRectangleView(step);
+  } else if (step.maxNonDecreasingView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaxNonDecreasingView(step);
+  } else if (step.boundaryMaxView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBoundaryMaxView(step);
+  } else if (step.sortedSubmatrixView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSortedSubmatrixView(step);
   } else if (step.stackView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

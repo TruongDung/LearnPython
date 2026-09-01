@@ -2804,17 +2804,259 @@ function maxNonDecreasingLength(nums) {
   const n = nums.length;
   const prefix = [0];
   nums.forEach((num) => prefix.push(prefix.at(-1) + num));
-  const dp = Array.from({ length: n + 1 }, () => new Map());
-  dp[0].set(0, 0);
-  for (let end = 1; end <= n; end++) {
-    for (let start = 0; start < end; start++) {
-      const sum = prefix[end] - prefix[start];
-      for (const [last, count] of dp[start]) {
-        if (sum >= Number(last)) dp[end].set(sum, Math.max(dp[end].get(sum) || 0, count + 1));
-      }
-    }
+  const dp = Array(n + 1).fill(0);
+  const last = Array(n + 1).fill(0);
+  const need = Array(n + 1).fill(0);
+  const deque = [0];
+  for (let i = 1; i <= n; i++) {
+    while (deque.length > 1 && need[deque[1]] <= prefix[i]) deque.shift();
+    const j = deque[0];
+    dp[i] = dp[j] + 1;
+    last[i] = prefix[i] - prefix[j];
+    need[i] = prefix[i] + last[i];
+    while (deque.length && need[deque.at(-1)] >= need[i]) deque.pop();
+    deque.push(i);
   }
-  return Math.max(...dp[n].values());
+  return dp[n];
+}
+
+function buildSteps2945(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 12) throw new Error("Use up to 12 numbers so the DP table and deque stay readable.");
+  if (nums.some((num) => num <= 0)) throw new Error("nums must contain positive integers.");
+
+  const n = nums.length;
+  const prefix = Array(n + 1).fill(null);
+  const dp = Array(n + 1).fill(0);
+  const last = Array(n + 1).fill(0);
+  const need = Array(n + 1).fill(0);
+  const parent = Array(n + 1).fill(-1);
+  const deque = [];
+  const steps = [];
+
+  const snapshot = ({
+    title,
+    codeLines,
+    note,
+    phase,
+    current = 0,
+    processed = 0,
+    chosen = -1,
+    compare = -1,
+    removed = -1,
+    action = "",
+    segment = null,
+    partition = [],
+    final = false,
+  }) => {
+    const highlight = segment
+      ? Array.from({ length: segment.end - segment.start }, (_, offset) => segment.start + offset)
+      : current > 0 ? [current - 1] : [];
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((value, index) => {
+        const prefixIndex = index + 1;
+        const dpText = prefixIndex <= processed ? dp[prefixIndex] : "_";
+        return `i=${index} · P[${prefixIndex}]=${prefix[prefixIndex] ?? "_"} · dp=${dpText}`;
+      }),
+      highlight,
+      mark: segment ? [segment.start, segment.end - 1] : [],
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      vars: [
+        { name: "i", value: current || "-" },
+        { name: "prefix[i]", value: current >= 0 ? prefix[current] ?? "-" : "-" },
+        { name: "chosen j", value: chosen >= 0 ? chosen : "-" },
+        { name: "dp[i]", value: current >= 0 ? dp[current] : "-" },
+        { name: "last[i]", value: current >= 0 ? last[current] : "-" },
+        { name: "need[i]", value: current >= 0 ? need[current] : "-" },
+        { name: "deque", value: `[${deque.join(", ")}]` },
+      ],
+      note,
+      final,
+      maxNonDecreasingView: {
+        phase,
+        nums: [...nums],
+        prefix: [...prefix],
+        dp: [...dp],
+        last: [...last],
+        need: [...need],
+        deque: [...deque],
+        current,
+        processed,
+        chosen,
+        compare,
+        removed,
+        action,
+        segment: segment ? { ...segment } : null,
+        partition: partition.map((part) => ({ ...part, values: [...part.values] })),
+      },
+    });
+  };
+
+  prefix[0] = 0;
+  snapshot({
+    title: text("Bắt đầu prefix[0] = 0", "Start with prefix[0] = 0"),
+    codeLines: 6,
+    note: text(
+      "prefix[i] là tổng i phần tử đầu. Tổng đoạn nums[j..i-1] sẽ bằng prefix[i] - prefix[j].",
+      "prefix[i] is the sum of the first i values. Segment nums[j..i-1] has sum prefix[i] - prefix[j].",
+    ),
+    phase: "prefix",
+  });
+
+  for (let i = 1; i <= n; i++) {
+    prefix[i] = prefix[i - 1] + nums[i - 1];
+    snapshot({
+      title: text(`prefix[${i}] = ${prefix[i - 1]} + ${nums[i - 1]} = ${prefix[i]}`, `prefix[${i}] = ${prefix[i - 1]} + ${nums[i - 1]} = ${prefix[i]}`),
+      codeLines: 8,
+      note: text(
+        `Bây giờ mọi đoạn kết thúc trước index ${i} đều tính sum trong O(1).`,
+        `Every segment ending before index ${i} can now get its sum in O(1).`,
+      ),
+      phase: "prefix",
+      current: i,
+    });
+  }
+
+  deque.push(0);
+  snapshot({
+    title: text("Khởi tạo deque với prefix rỗng j = 0", "Initialize the deque with empty prefix j = 0"),
+    codeLines: 13,
+    note: text(
+      "Candidate 0 nghĩa là chưa tạo đoạn nào: dp[0] = last[0] = need[0] = 0.",
+      "Candidate 0 means no segment exists yet: dp[0] = last[0] = need[0] = 0.",
+    ),
+    phase: "choose",
+  });
+
+  for (let i = 1; i <= n; i++) {
+    snapshot({
+      title: text(`Xử lý prefix i = ${i}, P[i] = ${prefix[i]}`, `Process prefix i = ${i}, P[i] = ${prefix[i]}`),
+      codeLines: 14,
+      note: text(
+        "Ta cần tìm điểm cắt j sao cho đoạn mới có sum >= last[j]. Tương đương P[i] >= need[j].",
+        "Find a cut j whose new segment sum is at least last[j]. Equivalently, P[i] >= need[j].",
+      ),
+      phase: "choose",
+      current: i,
+      processed: i - 1,
+    });
+
+    while (deque.length > 1 && need[deque[1]] <= prefix[i]) {
+      const nextCandidate = deque[1];
+      const removed = deque.shift();
+      snapshot({
+        title: text(`Pop front j=${removed}: j=${nextCandidate} cũng hợp lệ và cho dp không nhỏ hơn`, `Pop front j=${removed}: j=${nextCandidate} is also valid with no smaller dp`),
+        codeLines: [15, 16],
+        note: text(
+          `need[${nextCandidate}] = ${need[nextCandidate]} <= P[${i}] = ${prefix[i]}. Candidate ${nextCandidate} nằm muộn hơn nên dp của nó không nhỏ hơn candidate ${removed}.`,
+          `need[${nextCandidate}] = ${need[nextCandidate]} <= P[${i}] = ${prefix[i]}. The later candidate ${nextCandidate} has no smaller dp than ${removed}.`,
+        ),
+        phase: "choose",
+        current: i,
+        processed: i - 1,
+        compare: nextCandidate,
+        removed,
+        action: "pop-front",
+      });
+    }
+
+    const j = deque[0];
+    snapshot({
+      title: text(`Chọn j = ${j} ở FRONT`, `Choose j = ${j} at the FRONT`),
+      codeLines: 17,
+      note: text(
+        `Đoạn mới là nums[${j}..${i - 1}], sum = P[${i}] - P[${j}] = ${prefix[i] - prefix[j]}.`,
+        `The new segment is nums[${j}..${i - 1}], sum = P[${i}] - P[${j}] = ${prefix[i] - prefix[j]}.`,
+      ),
+      phase: "update",
+      current: i,
+      processed: i - 1,
+      chosen: j,
+      action: "choose",
+      segment: { start: j, end: i, sum: prefix[i] - prefix[j], previousLast: last[j] },
+    });
+
+    dp[i] = dp[j] + 1;
+    last[i] = prefix[i] - prefix[j];
+    need[i] = prefix[i] + last[i];
+    parent[i] = j;
+    snapshot({
+      title: text(`dp[${i}] = ${dp[i]}, last[${i}] = ${last[i]}, need[${i}] = ${need[i]}`, `dp[${i}] = ${dp[i]}, last[${i}] = ${last[i]}, need[${i}] = ${need[i]}`),
+      codeLines: [18, 19, 20, 21],
+      note: text(
+        `Từ cách chia tối ưu của prefix ${j}, thêm đoạn sum ${last[i]}. need[${i}] là prefix nhỏ nhất ở tương lai để nối thêm một đoạn không giảm.`,
+        `Extend the optimal partition of prefix ${j} with segment sum ${last[i]}. need[${i}] is the smallest future prefix that can append another nondecreasing segment.`,
+      ),
+      phase: "update",
+      current: i,
+      processed: i,
+      chosen: j,
+      action: "update",
+      segment: { start: j, end: i, sum: last[i], previousLast: last[j] },
+    });
+
+    while (deque.length && need[deque.at(-1)] >= need[i]) {
+      const removed = deque.pop();
+      snapshot({
+        title: text(`Pop rear j=${removed}: need ${need[removed]} >= ${need[i]}`, `Pop rear j=${removed}: need ${need[removed]} >= ${need[i]}`),
+        codeLines: [22, 23],
+        note: text(
+          `Candidate i=${i} mới hơn, dp không nhỏ hơn và threshold need=${need[i]} dễ đạt hơn hoặc bằng. Vì vậy j=${removed} không còn hữu ích.`,
+          `Candidate i=${i} is later, has no smaller dp, and its need=${need[i]} is no harder to reach. Candidate j=${removed} is dominated.`,
+        ),
+        phase: "deque",
+        current: i,
+        processed: i,
+        chosen: j,
+        removed,
+        action: "pop-rear",
+        segment: { start: j, end: i, sum: last[i], previousLast: last[j] },
+      });
+    }
+
+    deque.push(i);
+    snapshot({
+      title: text(`Push i=${i} vào REAR`, `Push i=${i} at the REAR`),
+      codeLines: 24,
+      note: text(
+        "Deque tiếp tục tăng theo need; FRONT là điểm cắt tốt nhất đang dùng được cho prefix tiếp theo.",
+        "The deque remains increasing by need; FRONT is the best usable cut for the next prefix.",
+      ),
+      phase: "deque",
+      current: i,
+      processed: i,
+      chosen: j,
+      action: "push",
+      segment: { start: j, end: i, sum: last[i], previousLast: last[j] },
+    });
+  }
+
+  const partition = [];
+  for (let end = n; end > 0;) {
+    const start = parent[end];
+    partition.push({ start, end, values: nums.slice(start, end), sum: prefix[end] - prefix[start] });
+    end = start;
+  }
+  partition.reverse();
+  snapshot({
+    title: text(`Kết quả = ${dp[n]} đoạn`, `Result = ${dp[n]} segments`),
+    codeLines: 25,
+    note: text(
+      `Một cách chia tối ưu có các tổng [${partition.map((part) => part.sum).join(", ")}], là dãy không giảm dài ${dp[n]}.`,
+      `One optimal partition has sums [${partition.map((part) => part.sum).join(", ")}], a nondecreasing sequence of length ${dp[n]}.`,
+    ),
+    phase: "result",
+    current: n,
+    processed: n,
+    chosen: parent[n],
+    action: "result",
+    partition,
+    final: true,
+  });
+
+  return { original: nums, answer: dp[n], steps };
 }
 
 function oceanView(nums) {
@@ -2925,9 +3167,10 @@ function maximumBooks(nums) {
 
 function buildSteps3113(input) {
   const nums = parseNums(input, "nums");
-  if (nums.length > 18) throw new Error("Use up to 18 numbers so the stack trace stays readable.");
+  if (nums.length > 14) throw new Error("Use up to 14 numbers so every valid subarray stays readable.");
   const steps = [];
   const stack = [];
+  const allRanges = [];
   let ans = 0;
   const codeLines = {
     init: [3, 4],
@@ -2939,21 +3182,21 @@ function buildSteps3113(input) {
     done: [13],
   };
   const sub = nums.map((value, index) => `i=${index} · ${value}`);
-  const stackItems = () => stack.map((entry) => ({ value: entry.value, detail: `count=${entry.count}` }));
   const stackText = () => `[${stack.map((entry) => `${entry.value}×${entry.count}`).join(", ")}]`;
 
   function snap(o) {
     const top = stack.length ? stack.at(-1) : null;
+    const current = Number.isInteger(o.index) ? o.index : -1;
     steps.push({
       title: o.title,
       arr: [...nums],
       sub,
-      highlight: Number.isInteger(o.index) ? [o.index] : [],
+      highlight: current >= 0 ? [current] : [],
       mark: stack.flatMap((entry) => entry.indices || []),
       codeLines: o.codeLines || [],
       vars: [
-        { name: "i", value: Number.isInteger(o.index) ? o.index : "-" },
-        { name: "x", value: Number.isInteger(o.index) ? nums[o.index] : "-" },
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "x", value: current >= 0 ? nums[current] : "-" },
         { name: "stack", value: stackText() },
         { name: "top", value: top ? `${top.value}×${top.count}` : "empty" },
         { name: "ans", value: ans },
@@ -2961,19 +3204,22 @@ function buildSteps3113(input) {
       ],
       note: o.note,
       final: o.final || false,
-      stackView: {
-        title: "Monotonic decreasing stack: value × equal-count",
-        emptyLabel: "stack empty",
-        items: stackItems(),
-        input: [...nums],
-        current: Number.isInteger(o.index) ? o.index : -1,
-        inputLabel: "nums",
-        expected: Number.isInteger(o.index) ? nums[o.index] : "",
-        status: [
-          { label: "answer", value: ans },
-          { label: "top", value: top ? `${top.value}×${top.count}` : "empty" },
-          { label: "meaning", value: "same boundary maximums still alive" },
-        ],
+      boundaryMaxView: {
+        phase: o.phase || "rule",
+        nums: [...nums],
+        current,
+        stack: stack.map((entry) => ({
+          value: entry.value,
+          count: entry.count,
+          indices: [...entry.indices],
+        })),
+        popped: o.popped ? { ...o.popped, indices: [...o.popped.indices] } : null,
+        equalStarts: [...(o.equalStarts || [])],
+        newRanges: (o.newRanges || []).map((range) => ({ ...range, values: [...range.values] })),
+        allRanges: allRanges.map((range) => ({ ...range, values: [...range.values] })),
+        ansBefore: Number.isInteger(o.ansBefore) ? o.ansBefore : ans,
+        added: Number.isInteger(o.added) ? o.added : 0,
+        ansAfter: ans,
       },
     });
   }
@@ -2981,9 +3227,10 @@ function buildSteps3113(input) {
   snap({
     title: text("Dòng 3-4: stack rỗng, ans = 0", "Lines 3-4: empty stack, ans = 0"),
     codeLines: codeLines.init,
+    phase: "rule",
     note: text(
-      "Stack giảm dần theo value. Mỗi entry value×count nghĩa là có count điểm bắt đầu cùng value còn có thể ghép với value hiện tại.",
-      "The stack is decreasing by value. Each value×count entry means count equal-value starts can still pair with the current value.",
+      "Mỗi phần tử tự tạo một subarray hợp lệ [i..i]. Stack giúp tìm thêm các biên trái bằng x mà không có số lớn hơn x nằm giữa.",
+      "Every value creates a valid singleton [i..i]. The stack finds earlier equal left boundaries with no larger value between them.",
     ),
   });
 
@@ -2992,9 +3239,10 @@ function buildSteps3113(input) {
       title: text(`Dòng 5: xét nums[${i}] = ${x}`, `Line 5: inspect nums[${i}] = ${x}`),
       index: i,
       codeLines: codeLines.loop,
+      phase: "inspect",
       note: text(
-        "Ta muốn x làm boundary maximum bên phải. Mọi value nhỏ hơn x trên stack bị x chặn, không thể ghép qua x nữa.",
-        "We want x to be the right boundary maximum. Any smaller value on top is blocked by x and cannot pair across it.",
+        `Luôn có [${i}..${i}]. Bây giờ tìm các vị trí trước đó cũng bằng ${x} để tạo thêm subarray hợp lệ.`,
+        `The singleton [${i}..${i}] always works. Now find earlier positions also equal to ${x} for more valid subarrays.`,
       ),
     });
 
@@ -3004,10 +3252,12 @@ function buildSteps3113(input) {
         title: text(`Dòng 6-7: pop ${removed.value} vì ${removed.value} < ${x}`, `Lines 6-7: pop ${removed.value} because ${removed.value} < ${x}`),
         index: i,
         codeLines: codeLines.pop,
+        phase: "pop",
+        popped: removed,
         vars: [{ name: "removed", value: `${removed.value}×${removed.count}` }],
         note: text(
-          `${x} lớn hơn ${removed.value}, nên subarray đi qua ${x} sẽ có maximum là ${x}; ${removed.value} không còn làm boundary maximum được.`,
-          `${x} is larger than ${removed.value}, so a subarray crossing ${x} has maximum ${x}; ${removed.value} can no longer be the boundary maximum.`,
+          `${x} lớn hơn ${removed.value}. Các vị trí ${removed.indices.join(", ")} không thể ghép qua i=${i}, vì ${x} sẽ lớn hơn hai phần tử biên.`,
+          `${x} is larger than ${removed.value}. Indices ${removed.indices.join(", ")} cannot pair across i=${i}, because ${x} would exceed both boundaries.`,
         ),
       });
     }
@@ -3018,36 +3268,53 @@ function buildSteps3113(input) {
         title: text(`Dòng 8-9: push nhóm mới ${x}×1`, `Lines 8-9: push new group ${x}×1`),
         index: i,
         codeLines: codeLines.pushNew,
+        phase: "push",
+        equalStarts: [],
+        newRanges: [{ start: i, end: i, values: [x] }],
         vars: [{ name: "new valid subarray", value: `[${i},${i}]` }],
         note: text(
-          `Không có top bằng ${x}. Chỉ subarray một phần tử [${i},${i}] chắc chắn hợp lệ.`,
-          `There is no top equal to ${x}. Only the single-element subarray [${i},${i}] is guaranteed valid.`,
+          `Không còn value ${x} ở top, nên tạo nhóm mới. Lúc này chỉ có singleton [${i}..${i}].`,
+          `No value ${x} remains on top, so start a new group. For now only singleton [${i}..${i}] is valid.`,
         ),
       });
     } else {
+      const equalStarts = [...stack.at(-1).indices];
       stack.at(-1).count += 1;
       stack.at(-1).indices.push(i);
+      const pendingRanges = [...equalStarts, i].map((start) => ({ start, end: i, values: nums.slice(start, i + 1) }));
       snap({
         title: text(`Dòng 10-11: gặp lại ${x}, tăng count`, `Lines 10-11: see ${x} again, increment count`),
         index: i,
         codeLines: codeLines.mergeEqual,
+        phase: "match",
+        equalStarts,
+        newRanges: pendingRanges,
         vars: [{ name: "equal boundaries", value: stack.at(-1).count }],
         note: text(
-          `Top cũng là ${x}. Vì mọi số nhỏ hơn đã bị pop, mỗi ${x} còn sống tạo một subarray hợp lệ kết thúc tại i.`,
-          `The top is also ${x}. Since smaller values were popped, every surviving ${x} forms a valid subarray ending at i.`,
+          `Tìm thấy ${equalStarts.length} biên trái cùng bằng ${x} tại index ${equalStarts.join(", ")}. Cộng thêm singleton tại i=${i} nên count = ${stack.at(-1).count}.`,
+          `Found ${equalStarts.length} equal left ${x} boundary at ${equalStarts.join(", ")}. Include the singleton at i=${i}, so count = ${stack.at(-1).count}.`,
         ),
       });
     }
 
-    ans += stack.at(-1).count;
+    const newRanges = stack.at(-1).indices.map((start) => ({ start, end: i, values: nums.slice(start, i + 1) }));
+    const ansBefore = ans;
+    const added = newRanges.length;
+    ans += added;
+    allRanges.push(...newRanges);
     snap({
-      title: text(`Dòng 12: ans += ${stack.at(-1).count} → ${ans}`, `Line 12: ans += ${stack.at(-1).count} → ${ans}`),
+      title: text(`Dòng 12: ans = ${ansBefore} + ${added} = ${ans}`, `Line 12: ans = ${ansBefore} + ${added} = ${ans}`),
       index: i,
       codeLines: codeLines.add,
-      vars: [{ name: "new valid subarrays ending here", value: stack.at(-1).count }],
+      phase: "count",
+      equalStarts: stack.at(-1).indices.filter((start) => start !== i),
+      newRanges,
+      ansBefore,
+      added,
+      vars: [{ name: "new valid subarrays ending here", value: added }],
       note: text(
-        "Cộng số boundary bên trái có cùng value với x và không bị phần tử lớn hơn chắn giữa đường.",
-        "Add the number of left boundaries equal to x that are not separated by a larger element.",
+        `Các đoạn mới đều kết thúc tại i=${i}: ${newRanges.map((range) => `[${range.start}..${range.end}]`).join(", ")}.`,
+        `Every new range ends at i=${i}: ${newRanges.map((range) => `[${range.start}..${range.end}]`).join(", ")}.`,
       ),
     });
   });
@@ -3055,6 +3322,8 @@ function buildSteps3113(input) {
   snap({
     title: text(`Kết quả: ${ans}`, `Result: ${ans}`),
     codeLines: codeLines.done,
+    phase: "result",
+    ansBefore: ans,
     note: text("Mỗi phần tử được push một lần và pop tối đa một lần, nên O(n).", "Each element is pushed once and popped at most once, so the scan is O(n)."),
     final: true,
   });
@@ -3362,6 +3631,7 @@ function buildSteps3359(input, params = {}) {
   const rows = grid.length;
   const cols = grid[0].length;
   const dp = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const endpointAdds = Array.from({ length: rows }, () => Array(cols).fill(0));
   const stacks = Array.from({ length: cols }, () => [{ width: 0, row: -1, acc: 0 }]);
   const steps = [];
   let ans = 0;
@@ -3375,56 +3645,77 @@ function buildSteps3359(input, params = {}) {
     done: [22],
   };
 
-  function displayGrid() {
-    return grid.map((row, r) => row.map((value, c) => `${value}\n${dp[r][c] ? `w=${dp[r][c]}` : ""}`));
-  }
-
   function stackText(col) {
+    if (col < 0 || col >= cols) return "-";
     return stacks[col].map((item) => `w${item.width}@r${item.row}:acc${item.acc}`).join(" | ");
   }
 
-  function stackItems(col) {
-    return stacks[col].map((item) => ({ value: item.width, detail: `row=${item.row}, acc=${item.acc}` }));
+  function endingCandidates(row, col) {
+    if (row < 0 || col < 0 || dp[row][col] === 0) return [];
+    const candidates = [];
+    let minWidth = Infinity;
+    for (let top = row; top >= 0; top--) {
+      if (dp[top][col] === 0) break;
+      minWidth = Math.min(minWidth, dp[top][col]);
+      candidates.push({
+        top,
+        bottom: row,
+        right: col,
+        minWidth,
+        choices: minWidth,
+        rectangles: Array.from({ length: minWidth }, (_, offset) => ({
+          top,
+          bottom: row,
+          left: col - offset,
+          right: col,
+        })),
+      });
+    }
+    return candidates;
   }
 
   function snap(o) {
-    const col = Number.isInteger(o.col) ? o.col : 0;
+    const row = Number.isInteger(o.row) ? o.row : -1;
+    const col = Number.isInteger(o.col) ? o.col : -1;
+    const activeStack = col >= 0 ? stacks[col] : [];
     steps.push({
       title: o.title,
       arr: grid.flat(),
-      grid: {
-        dp: displayGrid(),
-        hlCell: Number.isInteger(o.row) && Number.isInteger(o.col) ? [o.row, o.col] : null,
-        pathCells: o.pathCells || [],
-        caption: `grid value / valid row width, k=${k}`,
-        largeCells: true,
-      },
       codeLines: o.codeLines || [],
       highlight: [],
       mark: [],
       vars: [
-        { name: "cell", value: Number.isInteger(o.row) && Number.isInteger(o.col) ? `(${o.row},${o.col}) = ${grid[o.row][o.col]}` : "-" },
+        { name: "cell", value: row >= 0 && col >= 0 ? `(${row},${col}) = ${grid[row][col]}` : "-" },
         { name: "k", value: k },
-        { name: "width dp", value: Number.isInteger(o.row) && Number.isInteger(o.col) ? dp[o.row][o.col] : "-" },
+        { name: "width dp", value: row >= 0 && col >= 0 ? dp[row][col] : "-" },
         { name: `stack col ${col}`, value: stackText(col) },
         { name: "ans", value: ans },
         ...(o.vars || []),
       ],
       note: o.note,
       final: o.final || false,
-      stackView: {
-        title: `Column ${col} monotonic stack`,
-        emptyLabel: "sentinel only",
-        items: stackItems(col),
-        input: grid.map((row) => row[col]),
-        current: Number.isInteger(o.row) ? o.row : -1,
-        inputLabel: `grid[*][${col}]`,
-        expected: Number.isInteger(o.row) ? grid[o.row][col] : "",
-        status: [
-          { label: "answer", value: ans },
-          { label: "k", value: k },
-          { label: "meaning", value: "nondecreasing widths down this column" },
-        ],
+      sortedSubmatrixView: {
+        phase: o.phase || "rule",
+        grid: grid.map((values) => [...values]),
+        widths: dp.map((values) => [...values]),
+        endpointAdds: endpointAdds.map((values) => [...values]),
+        k,
+        current: row >= 0 && col >= 0 ? [row, col] : null,
+        rowSegment: (o.rowSegment || []).map((cell) => [...cell]),
+        activeColumn: col,
+        columnWidths: col >= 0 ? dp.map((values) => values[col]) : [],
+        stack: activeStack.map((item) => ({ ...item })),
+        popped: o.popped ? { ...o.popped } : null,
+        blocked: Boolean(o.blocked),
+        canExtend: Boolean(o.canExtend),
+        candidates: (o.candidates || []).map((candidate) => ({
+          ...candidate,
+          rectangles: candidate.rectangles.map((rectangle) => ({ ...rectangle })),
+        })),
+        formula: o.formula ? { ...o.formula } : null,
+        added: Number.isInteger(o.added) ? o.added : 0,
+        ansBefore: Number.isInteger(o.ansBefore) ? o.ansBefore : ans,
+        ansAfter: ans,
       },
     });
   }
@@ -3432,9 +3723,10 @@ function buildSteps3359(input, params = {}) {
   snap({
     title: text("Dòng 3-6: chuẩn bị dp width và stack theo cột", "Lines 3-6: prepare width dp and one stack per column"),
     codeLines: codeLines.init,
+    phase: "rule",
     note: text(
-      "dp[i][j] = số đoạn liên tiếp kết thúc tại (i,j) trên cùng hàng, vừa <= k vừa không tăng từ trái qua phải.",
-      "dp[i][j] = number of contiguous row segments ending at (i,j) that are <= k and non-increasing from left to right.",
+      "width[i][j] là độ dài suffix hợp lệ dài nhất trên hàng i, kết thúc tại cột j: mọi số <= k và không tăng từ trái sang phải.",
+      "width[i][j] is the longest valid row suffix ending at column j: every value is <= k and values are non-increasing left to right.",
     ),
   });
 
@@ -3445,9 +3737,10 @@ function buildSteps3359(input, params = {}) {
         row: i,
         col: j,
         codeLines: codeLines.loop,
+        phase: "inspect",
         note: text(
-          "Một submatrix hợp lệ cần mọi ô <= k, và trong từng hàng của submatrix các giá trị phải không tăng.",
-          "A valid submatrix needs every cell <= k, and each row inside it must be non-increasing.",
+          `Trước hết kiểm tra ${grid[i][j]} <= k=${k}. Nếu hợp lệ, ta sẽ tính đoạn không tăng dài nhất kết thúc tại ô này.`,
+          `First check ${grid[i][j]} <= k=${k}. If valid, compute the longest non-increasing row suffix ending here.`,
         ),
       });
 
@@ -3459,10 +3752,12 @@ function buildSteps3359(input, params = {}) {
           row: i,
           col: j,
           codeLines: codeLines.reset,
+          phase: "reset",
+          blocked: true,
           vars: [{ name: "reason", value: `${grid[i][j]} > ${k}` }],
           note: text(
-            "Ô này không thể nằm trong submatrix nào, nên stack của cột bị reset với sentinel ở row hiện tại.",
-            "This cell cannot belong to any valid submatrix, so this column stack resets with a sentinel at the current row.",
+            `Ô (${i},${j}) bị loại vì ${grid[i][j]} > ${k}. Không rectangle hợp lệ nào được đi qua hàng này tại cột phải ${j}, nên reset stack cột.`,
+            `Cell (${i},${j}) is blocked because ${grid[i][j]} > ${k}. No valid rectangle can cross this row at right column ${j}, so reset the column stack.`,
           ),
         });
         continue;
@@ -3476,16 +3771,18 @@ function buildSteps3359(input, params = {}) {
         title: text(`Dòng 13-15: width tại (${i},${j}) = ${width}`, `Lines 13-15: width at (${i},${j}) = ${width}`),
         row: i,
         col: j,
-        pathCells: Array.from({ length: width }, (_, t) => [i, j - t]),
+        rowSegment: Array.from({ length: width }, (_, t) => [i, j - t]),
         codeLines: codeLines.width,
+        phase: "width",
+        canExtend,
         vars: [{ name: "extend from left?", value: canExtend }],
         note: text(
           canExtend
-            ? `Vì ${grid[i][j - 1]} >= ${grid[i][j]} và ô trái <= k, đoạn hàng được kéo dài sang trái.`
-            : "Không kéo dài được từ trái, nên width chỉ là 1.",
+            ? `Ô trái ${grid[i][j - 1]} >= ${grid[i][j]} và cũng <= k, nên width = width bên trái + 1 = ${width}.`
+            : `Không thể nối với ô trái, nên chỉ có đoạn một ô và width = ${width}.`,
           canExtend
-            ? `Because ${grid[i][j - 1]} >= ${grid[i][j]} and the left cell is <= k, the row segment extends left.`
-            : "Cannot extend from the left, so width is only 1.",
+            ? `Left value ${grid[i][j - 1]} >= ${grid[i][j]} and is also <= k, so width = left width + 1 = ${width}.`
+            : `Cannot extend from the left, so only the single cell remains and width = ${width}.`,
         ),
       });
 
@@ -3496,10 +3793,13 @@ function buildSteps3359(input, params = {}) {
           row: i,
           col: j,
           codeLines: codeLines.pop,
+          phase: "pop",
+          rowSegment: Array.from({ length: width }, (_, t) => [i, j - t]),
+          popped: removed,
           vars: [{ name: "removed", value: `w=${removed.width}, row=${removed.row}, acc=${removed.acc}` }],
           note: text(
-            `Width hiện tại ${width} nhỏ hơn, nên những hàng phía trên không thể giữ width lớn hơn khi kéo xuống row ${i}.`,
-            `Current width ${width} is smaller, so rows above cannot keep a larger width when extended down to row ${i}.`,
+            `Width mới ${width} nhỏ hơn ${removed.width}. Với mọi rectangle kéo xuống row ${i}, hàng hiện tại giới hạn chiều rộng còn ${width}, nên pop nhóm rộng hơn.`,
+            `New width ${width} is smaller than ${removed.width}. Any rectangle extended to row ${i} is capped at width ${width}, so pop the wider group.`,
           ),
         });
       }
@@ -3508,6 +3808,9 @@ function buildSteps3359(input, params = {}) {
       const height = i - top.row;
       const newSubmatrices = width * height;
       const accumulated = top.acc + newSubmatrices;
+      const candidates = endingCandidates(i, j);
+      const ansBefore = ans;
+      endpointAdds[i][j] = accumulated;
       ans += accumulated;
       stacks[j].push({ width, row: i, acc: accumulated });
       snap({
@@ -3515,14 +3818,26 @@ function buildSteps3359(input, params = {}) {
         row: i,
         col: j,
         codeLines: codeLines.count,
+        phase: "count",
+        rowSegment: Array.from({ length: width }, (_, t) => [i, j - t]),
+        candidates,
+        ansBefore,
+        added: accumulated,
+        formula: {
+          inherited: top.acc,
+          width,
+          height,
+          block: newSubmatrices,
+          added: accumulated,
+        },
         vars: [
           { name: "height", value: `${i} - ${top.row} = ${height}` },
           { name: "new width * height", value: `${width} * ${height} = ${newSubmatrices}` },
           { name: "accumulated", value: `${top.acc} + ${newSubmatrices} = ${accumulated}` },
         ],
         note: text(
-          "Stack giữ các width tăng dần theo chiều xuống. accumulated là số submatrix hợp lệ kết thúc tại ô hiện tại trong cột này.",
-          "The stack keeps widths nondecreasing downward. accumulated is the number of valid submatrices ending at this cell in this column.",
+          `Có ${accumulated} rectangle mới có góc phải-dưới tại (${i},${j}). Mỗi cách chọn hàng trên cùng đóng góp min(width) từ hàng đó tới hàng ${i}.`,
+          `There are ${accumulated} new rectangles with bottom-right corner (${i},${j}). Each top row contributes the minimum width from that row through ${i}.`,
         ),
       });
     }
@@ -3531,6 +3846,8 @@ function buildSteps3359(input, params = {}) {
   snap({
     title: text(`Kết quả: ${ans}`, `Result: ${ans}`),
     codeLines: codeLines.done,
+    phase: "result",
+    ansBefore: ans,
     vars: [{ name: "answer", value: ans }],
     note: text("Đã cộng mọi submatrix hợp lệ theo điểm kết thúc dưới-phải.", "All valid submatrices have been counted by their bottom-right endpoint."),
     final: true,
@@ -4400,13 +4717,14 @@ module.exports = {
       "Đếm submatrix có mọi phần tử <= k và mỗi hàng trong submatrix được sắp theo thứ tự không tăng.",
       "Count submatrices where every element is <= k and each row inside the submatrix is sorted in non-increasing order.",
     ),
-    defaultInput: "4,3,2,1;8,7,6,1",
+    defaultInput: "3,2,2,1;4,3,1,1;3,3,2,1",
     inputKind: "string",
     inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"),
     extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 1 }],
     approach: [
-      text("Tính dp[i][j] = width hợp lệ dài nhất kết thúc tại ô (i,j) trên cùng hàng.", "Compute dp[i][j] = longest valid width ending at cell (i,j) in the same row."),
-      text("Với mỗi cột j, dùng stack tăng theo width để đếm các submatrix có góc phải-dưới tại (i,j).", "For each column j, use a stack increasing by width to count submatrices whose bottom-right corner is (i,j)."),
+      text("Tính width[i][j] = suffix không tăng dài nhất trên hàng i, kết thúc tại (i,j), với mọi giá trị <= k.", "Compute width[i][j] = longest non-increasing row suffix ending at (i,j), with every value <= k."),
+      text("Cố định góc phải-dưới (i,j): mỗi cách chọn hàng trên cùng đóng góp min(width) từ hàng đó tới i.", "Fix bottom-right corner (i,j): each top row contributes the minimum width from that row through i."),
+      text("Stack tăng theo width gom nhanh các giá trị minimum đó để tổng thời gian là O(mn).", "An increasing width stack aggregates those minimums in O(mn) total time."),
       text("Nếu grid[i][j] > k thì reset stack của cột vì mọi submatrix đi qua ô đó đều invalid.", "If grid[i][j] > k, reset that column's stack because any submatrix crossing it is invalid."),
     ],
     complexity: { time: "O(mn)", space: "O(mn)", note: text("Mỗi ô vào/ra stack cột tối đa một lần.", "Each cell enters/leaves its column stack at most once.") },
@@ -4442,7 +4760,68 @@ module.exports = {
   2736: simpleProblem({ id: 2736, difficulty: "hard", slug: "maximum-sum-queries", name: "Maximum Sum Queries", viName: "Query tổng lớn nhất", statement: text("Với mỗi query [x,y], tìm max nums1[i]+nums2[i] khi nums1[i]>=x và nums2[i]>=y.", "For each query [x,y], maximize nums1[i]+nums2[i] with nums1[i]>=x and nums2[i]>=y."), defaultInput: "4,3,1,2", inputLabel: text("nums1", "nums1"), extraParams: [{ key: "nums2", type: "string", label: text("nums2", "nums2"), default: "2,4,9,5" }, { key: "queries", type: "string", label: text("queries (x,y; ...)", "queries (x,y; ...)"), default: "4,1;1,3;2,5" }], solver: maximumSumQueries }),
   2818: simpleProblem({ id: 2818, difficulty: "hard", slug: "apply-operations-to-maximize-score", name: "Apply Operations to Maximize Score", viName: "Tối đa hóa score bằng thao tác", statement: text("Dùng prime score và số subarray mà mỗi index thống trị để chọn giá trị lớn nhất.", "Use prime score and each index's dominance span to choose the largest values."), defaultInput: "8,3,9,3,8", extraParams: [{ key: "k", label: text("k", "k"), default: 2, min: 1 }], solver: arrayBuilder(maximumScoreAfterOperations) }),
   2940: simpleProblem({ id: 2940, difficulty: "hard", slug: "find-building-where-alice-and-bob-can-meet", name: "Find Building Where Alice and Bob Can Meet", viName: "Tòa nhà Alice và Bob gặp nhau", statement: text("Với mỗi query, tìm tòa nhà trái nhất mà cả hai có thể tới.", "For each query, find the leftmost building both people can reach."), defaultInput: "6,4,8,5,2,7", inputLabel: text("heights", "heights"), extraParams: [{ key: "queries", type: "string", label: text("queries (a,b; ...)", "queries (a,b; ...)"), default: "0,1;0,2;2,4" }], solver: leftmostBuildingQueries }),
-  2945: simpleProblem({ id: 2945, difficulty: "hard", slug: "find-maximum-non-decreasing-array-length", name: "Find Maximum Non-decreasing Array Length", viName: "Độ dài mảng không giảm lớn nhất", statement: text("Gộp subarray thành tổng sao cho dãy tổng không giảm và số đoạn là lớn nhất.", "Merge subarrays into sums so the sum sequence is nondecreasing and has maximum length."), defaultInput: "5,2,2", solver: arrayBuilder(maxNonDecreasingLength) }),
+  2945: {
+    id: 2945,
+    difficulty: "hard",
+    slug: "find-maximum-non-decreasing-array-length",
+    category,
+    tags: [
+      arrayTag,
+      monoTag,
+      { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" },
+      { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    ],
+    title: text("Find Maximum Non-decreasing Array Length"),
+    titleVi: text("Độ dài mảng không giảm lớn nhất", "Find Maximum Non-decreasing Array Length"),
+    statement: text(
+      "Có thể thay một subarray bằng tổng của nó. Hãy chia nums thành nhiều đoạn liên tiếp nhất sao cho tổng các đoạn tạo thành một dãy không giảm.",
+      "You may replace any subarray by its sum. Partition nums into as many contiguous segments as possible so their sums form a nondecreasing sequence.",
+    ),
+    defaultInput: "4,3,2,6",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    approach: [
+      text("prefix[i] cho tổng i phần tử đầu; sum của đoạn j..i-1 là prefix[i] - prefix[j].", "prefix[i] stores the first i values; segment j..i-1 has sum prefix[i] - prefix[j]."),
+      text("dp[i] là số đoạn lớn nhất cho prefix i; last[i] là tổng đoạn cuối trong cách chia đó.", "dp[i] is the maximum segment count for prefix i; last[i] is the final segment sum in that partition."),
+      text("Để nối từ j tới i, cần prefix[i] - prefix[j] >= last[j], hay prefix[i] >= need[j] = prefix[j] + last[j].", "To extend j to i, require prefix[i] - prefix[j] >= last[j], or prefix[i] >= need[j] = prefix[j] + last[j]."),
+      text("Deque giữ candidate tăng theo need. Pop FRONT để chọn candidate hợp lệ mới nhất; pop REAR khi candidate mới dominate candidate cũ.", "The deque keeps candidates increasing by need. Pop FRONT to choose the latest valid candidate; pop REAR when the new candidate dominates an older one."),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text("Mỗi prefix index được push một lần và pop khỏi deque tối đa một lần.", "Each prefix index is pushed once and removed from the deque at most once."),
+    },
+    codeLabel: text("DP + prefix sum + monotonic deque", "DP + prefix sum + monotonic deque"),
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def findMaximumLength(self, nums):",
+      "        n = len(nums)",
+      "        prefix = [0] * (n + 1)",
+      "        for i, value in enumerate(nums, 1):",
+      "            prefix[i] = prefix[i - 1] + value",
+      "        dp = [0] * (n + 1)",
+      "        last = [0] * (n + 1)",
+      "        need = [0] * (n + 1)",
+      "        parent = [-1] * (n + 1)",
+      "        q = deque([0])",
+      "        for i in range(1, n + 1):",
+      "            while len(q) > 1 and need[q[1]] <= prefix[i]:",
+      "                q.popleft()",
+      "            j = q[0]",
+      "            dp[i] = dp[j] + 1",
+      "            last[i] = prefix[i] - prefix[j]",
+      "            need[i] = prefix[i] + last[i]",
+      "            parent[i] = j",
+      "            while q and need[q[-1]] >= need[i]:",
+      "                q.pop()",
+      "            q.append(i)",
+      "        return dp[n]",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps2945,
+  },
   255: simpleProblem({ id: 255, difficulty: "medium", slug: "verify-preorder-sequence-in-binary-search-tree", name: "Verify Preorder Sequence in Binary Search Tree", viName: "Kiểm tra preorder BST", statement: text("Premium: kiểm tra dãy có thể là preorder của BST không.", "Premium: check whether a sequence can be a BST preorder traversal."), defaultInput: "5,2,1,3,6", tags: [arrayTag, treeTag, monoTag], premium: true, solver: arrayBuilder(bstPreorder) }),
   1762: simpleProblem({ id: 1762, difficulty: "medium", slug: "buildings-with-an-ocean-view", name: "Buildings With an Ocean View", viName: "Tòa nhà nhìn ra biển", statement: text("Premium: trả index các tòa nhà cao hơn mọi tòa bên phải.", "Premium: return indices taller than every building to their right."), defaultInput: "4,2,3,1", premium: true, solver: arrayBuilder(oceanView) }),
   1950: simpleProblem({ id: 1950, difficulty: "medium", slug: "maximum-of-minimum-values-in-all-subarrays", name: "Maximum of Minimum Values in All Subarrays", viName: "Maximum của minimum theo độ dài", statement: text("Premium: với mỗi độ dài window, tìm minimum lớn nhất.", "Premium: for every window length, find the maximum among window minimums."), defaultInput: "10,20,50,10,70,30", premium: true, solver: arrayBuilder(maximumOfMinimums) }),

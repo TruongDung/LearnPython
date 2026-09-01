@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0c0a1a" />
     <title>LeetCode Visualizer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><rect x='5' y='17' width='5' height='10' rx='1.5' fill='%23f8fafc'/><rect x='13' y='10' width='5' height='17' rx='1.5' fill='%23fbbf24'/><rect x='21' y='5' width='5' height='22' rx='1.5' fill='%23f8fafc'/></svg>" />
-    <link rel="stylesheet" href="style.css?v=20260830-backtop-v1" />
+    <link rel="stylesheet" href="style.css?v=20260901-tag-jump-v1" />
   </head>
   <body>
     <div class="app">
@@ -189,6 +189,8 @@
       </section>
     </div>
 
+    <nav id="catalogJumpNav" class="catalog-jump-nav" aria-label="Jump to this problem in a tag"></nav>
+
     <button id="backToTopBtn" class="back-to-top" type="button" aria-label="Back to top" title="Back to top">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="miter">
         <path d="M12 20V5" />
@@ -197,7 +199,7 @@
     </button>
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
-    <script src="script.js?v=20260830-backtop-v1"></script>
+    <script src="script.js?v=20260901-tag-jump-v1"></script>
     <script>
       (() => {
         const removeDuplicatePrefixSumViews = () => {
