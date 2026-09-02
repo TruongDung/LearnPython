@@ -930,7 +930,169 @@ function buildSteps78(nums) {
     },
   });
 
-  return { original: [...nums], answer: results.length, steps };
+  return { original: [...nums], answer: results, steps };
+}
+
+/**
+ * Generate steps for LeetCode 78: Subsets, using bitmasks.
+ * Bit i of mask directly answers whether nums[i] belongs to the subset.
+ */
+function buildSteps78Bitmask(nums) {
+  if (!Array.isArray(nums) || nums.some((value) => !Number.isInteger(value))) {
+    throw new Error("Enter nums as integers.");
+  }
+  if (nums.length > 6) {
+    throw new Error("Bitmask visualization supports at most 6 numbers.");
+  }
+
+  const n = nums.length;
+  const totalMasks = 1 << n;
+  const steps = [];
+  const generated = [];
+  const bits = (mask) => mask.toString(2).padStart(n || 1, "0");
+  const subsetText = (subset) => `[${subset.join(", ")}]`;
+  const snapshot = (phase, mask, currentBit, subset, extra = {}) => ({
+    subsets78BitmaskView: {
+      values: [...nums],
+      n,
+      totalMasks,
+      mask,
+      bits: bits(mask),
+      currentBit,
+      subset: [...subset],
+      generatedCount: generated.length,
+      recentSubsets: generated.slice(-8).map((item) => [...item]),
+      ...extra,
+      phase,
+    },
+  });
+
+  steps.push({
+    title: { vi: `Có 2^${n} = ${totalMasks} mask`, en: `There are 2^${n} = ${totalMasks} masks` },
+    arr: nums.map(() => 0),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "n", value: n },
+      { name: "all masks", value: `0 … ${totalMasks - 1}` },
+    ],
+    note: {
+      vi: `Mỗi mask từ 0 đến ${totalMasks - 1} biểu diễn đúng một tập con. Bit i = 1 nghĩa là chọn nums[i].`,
+      en: `Each mask from 0 to ${totalMasks - 1} represents exactly one subset. Bit i = 1 means choose nums[i].`,
+    },
+    ...snapshot("setup", 0, null, []),
+  });
+
+  for (let mask = 0; mask < totalMasks; mask += 1) {
+    const subset = [];
+    steps.push({
+      title: { vi: `mask = ${mask} (0b${bits(mask)})`, en: `mask = ${mask} (0b${bits(mask)})` },
+      arr: nums.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+      sub: nums.map(String),
+      highlight: [],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: "mask", value: `${mask} = 0b${bits(mask)}` },
+        { name: "subset", value: "[]" },
+      ],
+      note: {
+        vi: `Đọc ${n} bit của mask. Bắt đầu subset rỗng trước khi xét từng bit.`,
+        en: `Read the ${n} bits of this mask. Start with an empty subset before checking each bit.`,
+      },
+      ...snapshot("mask", mask, null, subset),
+    });
+
+    for (let i = 0; i < n; i += 1) {
+      const selected = Boolean(mask & (1 << i));
+      steps.push({
+        title: {
+          vi: `Kiểm tra bit ${i}: ${(selected ? "1 → chọn" : "0 → bỏ qua")}`,
+          en: `Check bit ${i}: ${(selected ? "1 → choose" : "0 → skip")}`,
+        },
+        arr: nums.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [i],
+        mark: subset.map((value) => nums.indexOf(value)),
+        codeLines: [8],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "mask & (1 << i)", value: selected ? "non-zero → true" : "0 → false" },
+        ],
+        note: {
+          vi: `Bit ${i} của 0b${bits(mask)} là ${selected ? 1 : 0}; ${selected ? `nums[${i}] = ${nums[i]} sẽ được thêm.` : `không thêm nums[${i}] = ${nums[i]}.`}`,
+          en: `Bit ${i} of 0b${bits(mask)} is ${selected ? 1 : 0}; ${selected ? `nums[${i}] = ${nums[i]} will be added.` : `do not add nums[${i}] = ${nums[i]}.`}`,
+        },
+        ...snapshot("check", mask, i, subset, { selected }),
+      });
+
+      if (selected) {
+        subset.push(nums[i]);
+        steps.push({
+          title: { vi: `Thêm ${nums[i]} vào subset`, en: `Append ${nums[i]} to subset` },
+          arr: nums.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+          sub: nums.map(String),
+          highlight: [i],
+          mark: subset.map((value) => nums.indexOf(value)),
+          codeLines: [9],
+          vars: [
+            { name: "subset", value: subsetText(subset) },
+            { name: "chosen bit", value: `bit ${i} = 1` },
+          ],
+          note: {
+            vi: `Vì bit ${i} = 1, đưa nums[${i}] = ${nums[i]} vào subset hiện tại.`,
+            en: `Because bit ${i} = 1, put nums[${i}] = ${nums[i]} in the current subset.`,
+          },
+          ...snapshot("choose", mask, i, subset, { selected: true }),
+        });
+      }
+    }
+
+    generated.push([...subset]);
+    steps.push({
+      title: { vi: `Lưu ${subsetText(subset)}`, en: `Save ${subsetText(subset)}` },
+      arr: nums.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+      sub: nums.map(String),
+      highlight: [],
+      mark: subset.map((value) => nums.indexOf(value)),
+      codeLines: [10],
+      vars: [
+        { name: "mask", value: mask },
+        { name: "saved subset", value: subsetText(subset) },
+        { name: "result count", value: generated.length },
+      ],
+      note: {
+        vi: `Mask ${mask} sinh ra ${subsetText(subset)}. Mỗi mask chỉ sinh một subset nên không có trùng lặp.`,
+        en: `Mask ${mask} produces ${subsetText(subset)}. Each mask produces one subset, so there are no duplicates.`,
+      },
+      ...snapshot("save", mask, null, subset, { justSaved: true }),
+    });
+  }
+
+  steps.push({
+    title: { vi: `Hoàn tất ${totalMasks} subsets`, en: `Finished ${totalMasks} subsets` },
+    arr: nums.map(() => 1),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [11],
+    final: true,
+    vars: [
+      { name: "total", value: `2^${n} = ${totalMasks}` },
+      { name: "result count", value: generated.length },
+    ],
+    note: {
+      vi: `Đã duyệt hết ${totalMasks} mask, vì vậy có đủ ${totalMasks} tập con.`,
+      en: `All ${totalMasks} masks were processed, so all ${totalMasks} subsets are present.`,
+    },
+    ...snapshot("done", totalMasks - 1, null, nums, { justSaved: false }),
+  });
+
+  return { original: [...nums], answer: generated, steps };
 }
 
 /**
@@ -1084,7 +1246,199 @@ function buildSteps90(nums) {
     },
   });
 
-  return { original: [...nums], answer: results.length, steps };
+  return { original: [...nums], answer: results, steps };
+}
+
+/**
+ * Generate steps for LeetCode 90: Subsets II using masks plus a seen set.
+ * Sorting makes equal-value subsets serialize to the same key, even if their
+ * selected source indices differ.
+ */
+function buildSteps90Bitmask(nums) {
+  if (!Array.isArray(nums) || nums.some((value) => !Number.isInteger(value))) {
+    throw new Error("Enter nums as integers.");
+  }
+  if (nums.length > 6) {
+    throw new Error("Bitmask visualization supports at most 6 numbers.");
+  }
+
+  const sorted = [...nums].sort((a, b) => a - b);
+  const n = sorted.length;
+  const totalMasks = 1 << n;
+  const steps = [];
+  const generated = [];
+  const seen = new Map();
+  let skippedDuplicates = 0;
+  const bits = (mask) => mask.toString(2).padStart(n || 1, "0");
+  const subsetText = (subset) => `[${subset.join(", ")}]`;
+  const indicesFor = (mask) => sorted.flatMap((_, index) => (mask & (1 << index)) ? [index] : []);
+  const snapshot = (phase, mask, currentBit, subset, extra = {}) => ({
+    subsets90BitmaskView: {
+      values: [...sorted],
+      n,
+      totalMasks,
+      mask,
+      bits: bits(mask),
+      currentBit,
+      subset: [...subset],
+      generatedCount: generated.length,
+      recentSubsets: generated.slice(-8).map((item) => [...item]),
+      duplicateMode: true,
+      skippedDuplicates,
+      ...extra,
+      phase,
+    },
+  });
+
+  steps.push({
+    title: { vi: `Sắp xếp: [${sorted.join(", ")}]`, en: `Sort: [${sorted.join(", ")}]` },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: sorted.map((_, index) => index),
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "nums (sorted)", value: `[${sorted.join(", ")}]` },
+      { name: "seen", value: "{}" },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi: "Sắp xếp để hai subset có cùng giá trị tạo ra cùng một key. seen sẽ chặn key đã gặp.",
+      en: "Sort so subsets with the same values produce the same key. seen will reject a key already encountered.",
+    },
+    ...snapshot("setup", 0, null, []),
+  });
+
+  for (let mask = 0; mask < totalMasks; mask += 1) {
+    const subset = [];
+    const selectedIndices = indicesFor(mask);
+    steps.push({
+      title: { vi: `mask = ${mask} (0b${bits(mask)})`, en: `mask = ${mask} (0b${bits(mask)})` },
+      arr: sorted.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+      sub: sorted.map(String),
+      highlight: [],
+      mark: [],
+      codeLines: [6, 7],
+      vars: [
+        { name: "mask", value: `${mask} = 0b${bits(mask)}` },
+        { name: "subset", value: "[]" },
+      ],
+      note: {
+        vi: "Mỗi mask chọn một tổ hợp index. Các index khác nhau vẫn có thể tạo ra cùng subset giá trị.",
+        en: "Each mask chooses a combination of indices. Different indices can still produce the same value subset.",
+      },
+      ...snapshot("mask", mask, null, subset),
+    });
+
+    for (let i = 0; i < n; i += 1) {
+      const selected = Boolean(mask & (1 << i));
+      steps.push({
+        title: { vi: `Kiểm tra bit ${i}: ${selected ? "1 → chọn" : "0 → bỏ qua"}`, en: `Check bit ${i}: ${selected ? "1 → choose" : "0 → skip"}` },
+        arr: sorted.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+        sub: sorted.map(String),
+        highlight: [i],
+        mark: subset.map((value, index) => selectedIndices[index]).filter(Number.isInteger),
+        codeLines: [9],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: sorted[i] },
+          { name: "bit", value: selected ? 1 : 0 },
+        ],
+        note: {
+          vi: `Bit ${i} là ${selected ? 1 : 0}; ${selected ? `chọn nums[${i}] = ${sorted[i]}.` : `bỏ qua nums[${i}] = ${sorted[i]}.`}`,
+          en: `Bit ${i} is ${selected ? 1 : 0}; ${selected ? `choose nums[${i}] = ${sorted[i]}.` : `skip nums[${i}] = ${sorted[i]}.`}`,
+        },
+        ...snapshot("check", mask, i, subset, { selected }),
+      });
+
+      if (selected) {
+        subset.push(sorted[i]);
+        steps.push({
+          title: { vi: `Thêm ${sorted[i]} vào candidate`, en: `Append ${sorted[i]} to candidate` },
+          arr: sorted.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+          sub: sorted.map(String),
+          highlight: [i],
+          mark: indicesFor(mask).filter((index) => index <= i),
+          codeLines: [10],
+          vars: [{ name: "subset", value: subsetText(subset) }],
+          note: {
+            vi: `Bit ${i} = 1 nên candidate trở thành ${subsetText(subset)}.`,
+            en: `Bit ${i} = 1, so the candidate becomes ${subsetText(subset)}.`,
+          },
+          ...snapshot("choose", mask, i, subset, { selected: true }),
+        });
+      }
+    }
+
+    const key = subset.join("|");
+    const duplicate = seen.has(key);
+    const duplicateOf = duplicate ? seen.get(key) : null;
+    steps.push({
+      title: duplicate
+        ? { vi: `Trùng ${subsetText(subset)} → bỏ qua`, en: `Duplicate ${subsetText(subset)} → skip` }
+        : { vi: `Key mới cho ${subsetText(subset)}`, en: `New key for ${subsetText(subset)}` },
+      arr: sorted.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+      sub: sorted.map(String),
+      highlight: duplicate ? selectedIndices : [],
+      mark: selectedIndices,
+      codeLines: [11, 12],
+      vars: [
+        { name: "key", value: `(${subset.join(", ")})` },
+        { name: "key in seen", value: duplicate },
+        { name: "first mask", value: duplicate ? duplicateOf : "—" },
+      ],
+      note: duplicate
+        ? { vi: `Mask ${mask} cũng tạo ${subsetText(subset)}, nhưng mask ${duplicateOf} đã lưu subset này → skip.`, en: `Mask ${mask} also creates ${subsetText(subset)}, but mask ${duplicateOf} already saved it → skip.` }
+        : { vi: `Key (${subset.join(", ")}) chưa có trong seen, nên có thể lưu subset.`, en: `Key (${subset.join(", ")}) is not in seen yet, so this subset can be saved.` },
+      ...snapshot("dedupe", mask, null, subset, { duplicate, duplicateOf }),
+    });
+
+    if (duplicate) {
+      skippedDuplicates += 1;
+      continue;
+    }
+
+    seen.set(key, mask);
+    generated.push([...subset]);
+    steps.push({
+      title: { vi: `Lưu unique ${subsetText(subset)}`, en: `Save unique ${subsetText(subset)}` },
+      arr: sorted.map((_, index) => ((mask & (1 << index)) ? 1 : 0)),
+      sub: sorted.map(String),
+      highlight: [],
+      mark: selectedIndices,
+      codeLines: [13, 14],
+      vars: [
+        { name: "seen size", value: seen.size },
+        { name: "result count", value: generated.length },
+      ],
+      note: {
+        vi: `Đánh dấu key trong seen và lưu ${subsetText(subset)} một lần duy nhất.`,
+        en: `Mark the key in seen and save ${subsetText(subset)} exactly once.`,
+      },
+      ...snapshot("save", mask, null, subset, { justSaved: true, duplicate: false }),
+    });
+  }
+
+  steps.push({
+    title: { vi: `Return ${generated.length} unique subsets`, en: `Return ${generated.length} unique subsets` },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [15],
+    final: true,
+    vars: [
+      { name: "unique subsets", value: generated.length },
+      { name: "skipped duplicate masks", value: skippedDuplicates },
+    ],
+    note: {
+      vi: `Đã xét ${totalMasks} mask, bỏ ${skippedDuplicates} mask tạo subset trùng, còn ${generated.length} subset duy nhất.`,
+      en: `Processed ${totalMasks} masks, skipped ${skippedDuplicates} masks that produced duplicates, and kept ${generated.length} unique subsets.`,
+    },
+    ...snapshot("done", totalMasks - 1, null, [], { duplicate: false }),
+  });
+
+  return { original: [...nums], answer: generated, steps };
 }
 
 /**
@@ -4267,7 +4621,7 @@ module.exports = {
     slug: "subsets",
     category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
     title: { vi: "Subsets", en: "Subsets" },
-    titleVi: { vi: "Tất cả tập con (Power Set)", en: "All subsets (power set)" },
+    titleVi: { vi: "Tất cả tập con: Bitmask và Backtracking", en: "All subsets: bitmasks and backtracking" },
     statement: {
       vi:
         "Cho mảng số nguyên nums (các phần tử khác nhau), trả về TẤT CẢ các tập con (power set). " +
@@ -4278,22 +4632,41 @@ module.exports = {
     },
     defaultInput: [1, 2, 3],
     inputKind: "integer",
-    extraParams: [],
+    extraParams: [
+      { key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Bitmask", en: "Approach 1: Bitmask" } },
+        { value: "2", label: { vi: "Cách 2: Backtracking", en: "Approach 2: Backtracking" } },
+      ] },
+    ],
+    tags: [{ key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
     approach: [
-      { vi: "Mỗi tập con là một dãy 'chọn / không chọn' cho từng phần tử → có 2ⁿ tập.", en: "Each subset is a 'pick / skip' choice per element → 2ⁿ subsets total." },
-      { vi: "Backtracking: tại mỗi bước, lưu current ngay (mọi node đều là kết quả), rồi thử thêm từng phần tử kế tiếp.", en: "Backtracking: at each step, save current immediately (every node is a valid subset), then try adding each next element." },
-      { vi: "Dùng tham số start để chỉ chọn phần tử sau index hiện tại, tránh trùng.", en: "Use a start index parameter to only pick elements after the current index, avoiding duplicates." },
-      { vi: "Sau khi đệ quy → pop để quay lui và thử nhánh khác.", en: "After recursing → pop to backtrack and try the next branch." },
+      { vi: "Cách 1 — Bitmask: có 2ⁿ mask từ 0 đến 2ⁿ − 1. Bit i = 1 nghĩa là chọn nums[i].", en: "Approach 1 — Bitmask: there are 2ⁿ masks from 0 to 2ⁿ − 1. Bit i = 1 means choose nums[i]." },
+      { vi: "Cách 2 — Backtracking: lưu current ở mỗi node, rồi thêm từng phần tử sau start; pop khi quay lui.", en: "Approach 2 — Backtracking: save current at every node, then add each element after start; pop when backtracking." },
     ],
     complexity: {
       time: "O(n · 2ⁿ)",
-      space: "O(n)",
+      space: "O(n) auxiliary",
       note: {
-        vi: "Có 2ⁿ tập con, mỗi tập mất O(n) để copy. Đệ quy sâu nhất n tầng → O(n) stack.",
-        en: "There are 2ⁿ subsets, each costs O(n) to copy. Recursion depth at most n → O(n) stack.",
+        vi: "Cả hai cách đều sinh 2ⁿ subset. Bitmask quét n bit cho mỗi mask; backtracking dùng stack sâu nhất n. Visualization Bitmask giới hạn n ≤ 6.",
+        en: "Both approaches generate 2ⁿ subsets. Bitmask scans n bits per mask; backtracking has recursion depth at most n. The bitmask visualization limits n to 6.",
       },
     },
+    codeLabel: { vi: "Cách 1: Bitmask", en: "Approach 1: Bitmask" },
     code: [
+      "class Solution:",
+      "    def subsets(self, nums):",
+      "        result = []",
+      "        n = len(nums)",
+      "        for mask in range(1 << n):",
+      "            subset = []",
+      "            for i in range(n):",
+      "                if mask & (1 << i):",
+      "                    subset.append(nums[i])",
+      "            result.append(subset)",
+      "        return result",
+    ],
+    code2Label: { vi: "Cách 2: Backtracking", en: "Approach 2: Backtracking" },
+    code2: [
       "class Solution:",
       "    def subsets(self, nums):",
       "        result = []",
@@ -4309,7 +4682,8 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: (input, params) => addBacktrackingDecisionTree(buildSteps78(input, params), 78),
+    builder: buildSteps78Bitmask,
+    builder2: (input, params) => addBacktrackingDecisionTree(buildSteps78(input, params), 78),
   },
   90: {
     id: 90,
@@ -4317,7 +4691,7 @@ module.exports = {
     slug: "subsets-ii",
     category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
     title: { vi: "Subsets II", en: "Subsets II" },
-    titleVi: { vi: "Tất cả tập con (có phần tử trùng)", en: "All subsets with duplicates" },
+    titleVi: { vi: "Tập con có trùng: Bitmask + khử trùng", en: "Subsets with duplicates: bitmask dedupe" },
     statement: {
       vi:
         "Cho mảng số nguyên nums (CÓ THỂ chứa phần tử trùng), trả về TẤT CẢ các tập con (power set). " +
@@ -4328,22 +4702,45 @@ module.exports = {
     },
     defaultInput: [1, 2, 2],
     inputKind: "integer",
-    extraParams: [],
+    extraParams: [
+      { key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Bitmask + seen", en: "Approach 1: Bitmask + seen" } },
+        { value: "2", label: { vi: "Cách 2: Backtracking + skip", en: "Approach 2: Backtracking + skip" } },
+      ] },
+    ],
+    tags: [{ key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
     approach: [
-      { vi: "Giống bài 78 nhưng nums có phần tử trùng → các tập con dễ bị trùng.", en: "Same as 78 but nums may have duplicates → subsets can repeat." },
-      { vi: "Bước 1: SẮP XẾP nums để các phần tử trùng nằm cạnh nhau.", en: "Step 1: SORT nums so duplicates are adjacent." },
-      { vi: "Bước 2: Khi duyệt for ở mỗi level, BỎ QUA i > start nếu nums[i] == nums[i-1] (chỉ dùng bản đầu tiên).", en: "Step 2: In the for-loop at each level, SKIP if i > start and nums[i] == nums[i-1] (only use the first copy)." },
-      { vi: "Cách này đảm bảo: ở cùng một level, mỗi giá trị chỉ được thử đúng 1 lần.", en: "This ensures: at the same level, each value is tried exactly once." },
+      { vi: "Cách 1 — Bitmask + seen: mỗi mask tạo candidate subset; sắp xếp trước để những candidate cùng giá trị có cùng key và chỉ lưu key mới.", en: "Approach 1 — Bitmask + seen: each mask creates a candidate subset; sort first so candidates with equal values have one key and only new keys are saved." },
+      { vi: "Cách 2 — Backtracking + skip: ở cùng level, bỏ qua nums[i] nếu nó bằng nums[i − 1] và i > start.", en: "Approach 2 — Backtracking + skip: at the same level, skip nums[i] when it equals nums[i − 1] and i > start." },
     ],
     complexity: {
       time: "O(n · 2ⁿ)",
-      space: "O(n)",
+      space: "O(n · 2ⁿ)",
       note: {
-        vi: "Sắp xếp O(n log n). Tối đa 2ⁿ tập con, mỗi tập O(n) để copy.",
-        en: "Sort O(n log n). At most 2ⁿ subsets, each O(n) to copy.",
+        vi: "Cách Bitmask dùng seen để khử trùng candidate; backtracking dùng O(n) stack. Cả hai có output có thể đạt O(n·2ⁿ). Visualization Bitmask giới hạn n ≤ 6.",
+        en: "The bitmask approach uses seen to deduplicate candidates; backtracking uses an O(n) stack. Both can have O(n·2ⁿ) output. The bitmask visualization limits n to 6.",
       },
     },
+    codeLabel: { vi: "Cách 1: Bitmask + seen", en: "Approach 1: Bitmask + seen" },
     code: [
+      "class Solution:",
+      "    def subsetsWithDup(self, nums):",
+      "        nums.sort()",
+      "        result = []",
+      "        seen = set()",
+      "        for mask in range(1 << len(nums)):",
+      "            subset = []",
+      "            for i in range(len(nums)):",
+      "                if mask & (1 << i):",
+      "                    subset.append(nums[i])",
+      "            key = tuple(subset)",
+      "            if key not in seen:",
+      "                seen.add(key)",
+      "                result.append(subset)",
+      "        return result",
+    ],
+    code2Label: { vi: "Cách 2: Backtracking + skip duplicates", en: "Approach 2: Backtracking + skip duplicates" },
+    code2: [
       "class Solution:",
       "    def subsetsWithDup(self, nums):",
       "        nums.sort()",
@@ -4362,7 +4759,8 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: (input, params) => addBacktrackingDecisionTree(buildSteps90(input, params), 90),
+    builder: buildSteps90Bitmask,
+    builder2: (input, params) => addBacktrackingDecisionTree(buildSteps90(input, params), 90),
   },
   39: {
     id: 39,
@@ -4716,7 +5114,201 @@ function buildSteps1240(input, params = {}) {
   return { steps, answer: best };
 }
 
+/** LeetCode 401: Binary Watch — 4 hour LEDs and 6 minute LEDs form one mask. */
+function buildSteps401(input) {
+  const turnedOn = Number(Array.isArray(input) ? input[0] : input);
+  if (!Number.isInteger(turnedOn) || turnedOn < 0 || turnedOn > 10) {
+    throw new Error("turnedOn must be an integer from 0 to 10.");
+  }
+
+  const TOTAL_MASKS = 1 << 10;
+  const steps = [];
+  const times = [];
+  const popcount = (mask) => {
+    let count = 0;
+    let value = mask;
+    while (value) {
+      count += value & 1;
+      value >>>= 1;
+    }
+    return count;
+  };
+  const bitString = (mask) => mask.toString(2).padStart(10, "0");
+  const formatTime = (hour, minute) => `${hour}:${String(minute).padStart(2, "0")}`;
+  const matchingMasks = Array.from({ length: TOTAL_MASKS }, (_, mask) => mask).filter((mask) => popcount(mask) === turnedOn);
+  let checkedCount = 0;
+  let rejectedCount = 0;
+  let lastMask = 0;
+  const snapshot = (phase, mask, hour, minute, valid, extra = {}) => ({
+    binaryWatch401View: {
+      turnedOn,
+      mask,
+      bits: bitString(mask),
+      hour,
+      minute,
+      valid,
+      litCount: popcount(mask),
+      checkedCount,
+      candidateCount: matchingMasks.length,
+      resultCount: times.length,
+      rejectedCount,
+      recentTimes: times.slice(-12),
+      ...extra,
+      phase,
+    },
+  });
+
+  steps.push({
+    title: { vi: `Cần đúng ${turnedOn} LED bật`, en: `Need exactly ${turnedOn} LED(s) on` },
+    arr: Array(10).fill(0),
+    sub: ["H3", "H2", "H1", "H0", "M5", "M4", "M3", "M2", "M1", "M0"],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "turnedOn", value: turnedOn },
+      { name: "candidate masks", value: matchingMasks.length },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi: `Đồng hồ có 10 LED: 4 bit thấp là giờ, 6 bit cao là phút. Chỉ xét ${matchingMasks.length} mask có đúng ${turnedOn} bit bật.`,
+      en: `The watch has 10 LEDs: the low 4 bits are hours and the high 6 bits are minutes. Only ${matchingMasks.length} masks have exactly ${turnedOn} lit bits.`,
+    },
+    ...snapshot("setup", 0, 0, 0, true),
+  });
+
+  for (const mask of matchingMasks) {
+    const hour = mask & 0b1111;
+    const minute = mask >> 4;
+    const valid = hour < 12 && minute < 60;
+    checkedCount += 1;
+    lastMask = mask;
+    steps.push({
+      title: { vi: `Mask ${mask}: ${bitString(mask)}`, en: `Mask ${mask}: ${bitString(mask)}` },
+      arr: Array.from({ length: 10 }, (_, bit) => ((mask & (1 << bit)) ? 1 : 0)),
+      sub: ["H0", "H1", "H2", "H3", "M0", "M1", "M2", "M3", "M4", "M5"],
+      highlight: Array.from({ length: 10 }, (_, bit) => ((mask & (1 << bit)) ? bit : -1)).filter((bit) => bit >= 0),
+      mark: [],
+      codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "mask", value: `0b${bitString(mask)}` },
+        { name: "set bits", value: turnedOn },
+        { name: "hour", value: hour },
+        { name: "minute", value: minute },
+      ],
+      note: {
+        vi: `Tách 4 bit giờ thành ${hour} và 6 bit phút thành ${minute}.`,
+        en: `Split the 4 hour bits into ${hour} and the 6 minute bits into ${minute}.`,
+      },
+      ...snapshot("decode", mask, hour, minute, valid),
+    });
+
+    if (!valid) {
+      rejectedCount += 1;
+      steps.push({
+        title: { vi: `${hour}:${String(minute).padStart(2, "0")} không hợp lệ`, en: `${hour}:${String(minute).padStart(2, "0")} is invalid` },
+        arr: Array.from({ length: 10 }, (_, bit) => ((mask & (1 << bit)) ? 1 : 0)),
+        sub: ["H0", "H1", "H2", "H3", "M0", "M1", "M2", "M3", "M4", "M5"],
+        highlight: [],
+        mark: [],
+        codeLines: [9],
+        vars: [{ name: "valid", value: false }],
+        note: {
+          vi: `Giờ phải < 12 và phút phải < 60. ${hour}:${String(minute).padStart(2, "0")} bị loại.`,
+          en: `Hours must be < 12 and minutes must be < 60. ${hour}:${String(minute).padStart(2, "0")} is rejected.`,
+        },
+        ...snapshot("reject", mask, hour, minute, false),
+      });
+      continue;
+    }
+
+    const time = formatTime(hour, minute);
+    times.push(time);
+    steps.push({
+      title: { vi: `Lưu thời gian ${time}`, en: `Save time ${time}` },
+      arr: Array.from({ length: 10 }, (_, bit) => ((mask & (1 << bit)) ? 1 : 0)),
+      sub: ["H0", "H1", "H2", "H3", "M0", "M1", "M2", "M3", "M4", "M5"],
+      highlight: [],
+      mark: [],
+      codeLines: [9, 10],
+      vars: [
+        { name: "time", value: time },
+        { name: "result count", value: times.length },
+      ],
+      note: {
+        vi: `${hour} < 12 và ${minute} < 60, nên ${time} là thời gian hợp lệ.`,
+        en: `${hour} < 12 and ${minute} < 60, so ${time} is a valid time.`,
+      },
+      ...snapshot("save", mask, hour, minute, true, { justSaved: true }),
+    });
+  }
+
+  steps.push({
+    title: { vi: `Return ${times.length} thời gian`, en: `Return ${times.length} time(s)` },
+    arr: Array.from({ length: 10 }, (_, bit) => ((lastMask & (1 << bit)) ? 1 : 0)),
+    sub: ["H0", "H1", "H2", "H3", "M0", "M1", "M2", "M3", "M4", "M5"],
+    highlight: [],
+    mark: [],
+    codeLines: [11],
+    final: true,
+    vars: [
+      { name: "valid times", value: times.length },
+      { name: "rejected masks", value: rejectedCount },
+    ],
+    note: {
+      vi: `Đã xét ${matchingMasks.length} mask đủ ${turnedOn} LED; có ${times.length} thời gian hợp lệ.`,
+      en: `Checked ${matchingMasks.length} masks with ${turnedOn} LEDs on; ${times.length} times are valid.`,
+    },
+    ...snapshot("done", lastMask, lastMask & 0b1111, lastMask >> 4, (lastMask & 0b1111) < 12 && (lastMask >> 4) < 60),
+  });
+
+  return { original: turnedOn, answer: times, steps };
+}
+
 Object.assign(module.exports, {
+  401: {
+    id: 401,
+    difficulty: "easy",
+    slug: "binary-watch",
+    category: { key: "bitmask", vi: "Bitmask", en: "Bitmask" },
+    tags: [{ key: "math", vi: "Toán", en: "Math" }],
+    title: { vi: "Binary Watch", en: "Binary Watch" },
+    titleVi: { vi: "Đồng hồ nhị phân bằng Bitmask", en: "Binary watch with bitmasks" },
+    statement: {
+      vi: "Đồng hồ có 4 LED giờ và 6 LED phút. Trả về mọi thời gian có đúng turnedOn LED bật.",
+      en: "A watch has 4 hour LEDs and 6 minute LEDs. Return every time with exactly turnedOn LEDs on.",
+    },
+    defaultInput: [1],
+    inputKind: "integer",
+    inputLabel: { vi: "turnedOn (0 đến 10)", en: "turnedOn (0 to 10)" },
+    singleInput: true,
+    maxInput: 10,
+    extraParams: [],
+    approach: [
+      { vi: "Gộp 4 LED giờ và 6 LED phút thành một mask 10 bit. 4 bit thấp là giờ; 6 bit cao là phút.", en: "Combine the 4 hour LEDs and 6 minute LEDs into one 10-bit mask. The low 4 bits are hours; the high 6 bits are minutes." },
+      { vi: "Chỉ giữ mask có bit_count bằng turnedOn, rồi tách hour = mask & 0b1111 và minute = mask >> 4.", en: "Keep only masks whose bit_count equals turnedOn, then decode hour = mask & 0b1111 and minute = mask >> 4." },
+      { vi: "Một mask hợp lệ khi hour < 12 và minute < 60.", en: "A mask is valid when hour < 12 and minute < 60." },
+    ],
+    complexity: {
+      time: "O(2¹⁰)",
+      space: "O(1) auxiliary",
+      note: { vi: "Chỉ có 1.024 mask LED cố định; không tính danh sách thời gian trả về.", en: "There are only 1,024 fixed LED masks, excluding the returned time list." },
+    },
+    code: [
+      "class Solution:",
+      "    def readBinaryWatch(self, turnedOn):",
+      "        result = []",
+      "        for mask in range(1 << 10):",
+      "            if mask.bit_count() != turnedOn:",
+      "                continue",
+      "            hour = mask & 0b1111",
+      "            minute = mask >> 4",
+      "            if hour < 12 and minute < 60:",
+      "                result.append(f\"{hour}:{minute:02d}\")",
+      "        return result",
+    ],
+    builder: buildSteps401,
+  },
   1240: {
     id: 1240, difficulty: "hard", slug: "tiling-a-rectangle-with-the-fewest-squares", category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
     title: { vi: "Tiling a Rectangle with the Fewest Squares", en: "Tiling a Rectangle with the Fewest Squares" },
