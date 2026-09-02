@@ -19377,6 +19377,91 @@ function renderMinCostStairsView(step) {
   </section>`;
 }
 
+function renderAdvancedBitmaskView(step) {
+  const view = step.advancedBitmaskView || {};
+  const vi = lang === "vi";
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stageIndex) ? view.stageIndex : 0;
+  const modeLabels = {
+    "word-product": vi ? "TỪ → MASK CHỮ CÁI" : "WORDS → LETTER MASKS",
+    arrangement: vi ? "BACKTRACKING + USED MASK" : "BACKTRACKING + USED MASK",
+    "k-subsets": vi ? "BUCKETS + USED MASK" : "BUCKETS + USED MASK",
+    team: vi ? "SKILL MASK + DP" : "SKILL MASK + DP",
+    "gcd-pairs": vi ? "GHÉP CẶP + MEMO" : "PAIRING + MEMO",
+    "xor-assignment": vi ? "GHÉP XOR + DP" : "XOR ASSIGNMENT + DP",
+  };
+  const toneClass = (value) => String(value || "").replace(/[^a-z0-9_-]/gi, "");
+  const phasesHtml = stages.map((stage, index) => {
+    const state = index === stageIndex ? "active" : index < stageIndex ? "done" : "";
+    const label = pick(stage).replace(/^\d+\.\s*/, "");
+    return `<span class="${state}"><b>${index < stageIndex ? "✓" : index + 1}</b><em>${escapeHtml(label)}</em></span>`;
+  }).join("");
+
+  const lanesHtml = (Array.isArray(view.lanes) ? view.lanes : []).map((lane) => {
+    const items = Array.isArray(lane.items) ? lane.items : [];
+    const itemsHtml = items.map((item) => `<article class="abm-item ${toneClass(item.state)}">
+      <header><small>${escapeHtml(String(item.label || ""))}</small>${item.badge !== undefined ? `<span>${escapeHtml(String(item.badge))}</span>` : ""}</header>
+      <strong>${escapeHtml(String(item.value ?? ""))}</strong>
+      <p>${escapeHtml(String(item.sub || ""))}</p>
+    </article>`).join("");
+    return `<section class="abm-lane">
+      <header><strong>${escapeHtml(pick(lane.title))}</strong><span>${escapeHtml(pick(lane.hint))}</span></header>
+      <div class="abm-items">${itemsHtml || `<p class="abm-empty">${vi ? "Chưa có dữ liệu" : "No data yet"}</p>`}</div>
+    </section>`;
+  }).join("");
+
+  const masks = Array.isArray(view.masks) ? view.masks : [];
+  const masksHtml = masks.length ? `<section class="abm-mask-panel">
+    <header><strong>${vi ? "BITMASK ĐANG DÙNG" : "CURRENT BITMASKS"}</strong><span>${vi ? "nhãn ở trên · trạng thái bit ở dưới" : "labels above · bit state below"}</span></header>
+    <div>${masks.map((mask) => {
+      const bits = Array.isArray(mask.bits) ? mask.bits : [];
+      return `<article class="abm-mask ${toneClass(mask.tone)}">
+        <header><small>${escapeHtml(pick(mask.title))}</small><code>${escapeHtml(String(mask.value ?? 0))}<sub>10</sub></code></header>
+        <div class="abm-bits">${bits.map((bit) => `<i class="${bit.on ? "on" : "off"} ${toneClass(bit.state)}"><small>${escapeHtml(String(bit.label ?? ""))}</small><b>${bit.on ? "1" : "0"}</b></i>`).join("")}</div>
+      </article>`;
+    }).join("")}</div>
+  </section>` : "";
+
+  const operation = view.operation;
+  const operationHtml = operation ? `<section class="abm-operation ${toneClass(operation.status)}">
+    <small>${escapeHtml(pick(operation.eyebrow))}</small>
+    <strong>${escapeHtml(String(operation.formula || ""))}</strong>
+    <span>${escapeHtml(pick(operation.detail))}</span>
+  </section>` : "";
+
+  const states = view.states;
+  const statesHtml = states ? `<section class="abm-states">
+    <header><strong>${escapeHtml(pick(states.title))}</strong><span>${escapeHtml(pick(states.hint))}</span></header>
+    <div>${(Array.isArray(states.items) ? states.items : []).map((item) => `<article class="abm-state ${toneClass(item.state)}">
+      <header><code>${escapeHtml(String(item.label || ""))}</code>${item.mask !== undefined ? `<small>mask ${escapeHtml(String(item.mask))}</small>` : ""}</header>
+      <strong>${escapeHtml(String(item.value ?? ""))}</strong>
+      <span>${escapeHtml(String(item.sub || ""))}</span>
+    </article>`).join("") || `<p class="abm-empty">${vi ? "Chưa có state nào được lưu" : "No state has been stored yet"}</p>`}</div>
+  </section>` : "";
+
+  const result = view.result;
+  const resultHtml = result ? `<section class="abm-result ${toneClass(result.status)}">
+    <small>${escapeHtml(pick(result.label))}</small>
+    <strong>${escapeHtml(String(result.value ?? ""))}</strong>
+    <span>${escapeHtml(String(result.detail || ""))}</span>
+  </section>` : "";
+  const traceNotice = view.traceTruncated
+    ? `<p class="abm-trace-note">${vi ? "Ví dụ lớn: chỉ hiển thị một phần trace để nút Prev/Next vẫn chạy mượt; kết quả vẫn được tính đầy đủ." : "Large example: only part of the trace is shown so Prev/Next stays responsive; the result is still fully computed."}</p>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="abm-viz" role="img" aria-label="${escapeHtml(modeLabels[view.mode] || "Advanced bitmask visualization")}">
+    <header><div><small>BITMASK WORKSHOP · #${escapeHtml(String(view.problemId || ""))}</small><strong>${escapeHtml(modeLabels[view.mode] || "ADVANCED BITMASK")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="abm-phases">${phasesHtml}</div>
+    <section class="abm-rule"><b>${vi ? "Ý NGHĨA CỦA MASK" : "WHAT THE MASK MEANS"}</b><strong>${escapeHtml(pick(view.rule))}</strong></section>
+    ${lanesHtml}
+    ${masksHtml}
+    ${operationHtml}
+    ${statesHtml}
+    ${resultHtml}
+    ${traceNotice}
+  </section>`;
+}
+
 function renderBitmaskBasicsView(step) {
   const view = step.bitmaskBasicsView || {};
   const vi = lang === "vi";
@@ -24202,6 +24287,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinCostStairsView(step);
+  } else if (step.advancedBitmaskView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAdvancedBitmaskView(step);
   } else if (step.bitmaskBasicsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

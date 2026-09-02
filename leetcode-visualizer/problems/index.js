@@ -46,7 +46,8 @@ const MONOTONIC_STACK_IDS = new Set([
 ]);
 const BITMASK_TAG = { key: "bitmask", vi: "Bitmask", en: "Bitmask" };
 const BITMASK_IDS = new Set([
-  78, 136, 191, 231, 268, 338, 461, 476, 693, 868, 1342, 2220,
+  78, 136, 191, 231, 268, 318, 338, 461, 476, 526, 693, 698, 868,
+  1125, 1342, 1799, 1879, 2220,
 ]);
 
 for (const [catKey, mod] of Object.entries(categories)) {
