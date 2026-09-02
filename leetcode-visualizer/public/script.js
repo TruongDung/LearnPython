@@ -1917,18 +1917,44 @@ function expandStepsLineByLine(rawSteps) {
     const lines = Array.isArray(step.codeLines)
       ? step.codeLines.filter((line) => Number.isInteger(line))
       : [];
+    const isCriticalPointsDebug = Number(problemData && problemData.id) === 2058;
+
+    const decorateLine = (line, isFinal) => {
+      if (!isCriticalPointsDebug) {
+        return {
+          ...step,
+          codeLines: [line],
+          final: isFinal,
+        };
+      }
+
+      const title = step.title || {};
+      const titleVi = typeof title === "object" ? (title.vi || title.en || "") : String(title);
+      const titleEn = typeof title === "object" ? (title.en || title.vi || "") : String(title);
+      return {
+        ...step,
+        title: {
+          vi: `Dòng ${line}: ${titleVi}`,
+          en: `Line ${line}: ${titleEn}`,
+        },
+        debugLine: line,
+        criticalPoints2058View: step.criticalPoints2058View
+          ? { ...step.criticalPoints2058View, debugLine: line }
+          : step.criticalPoints2058View,
+        codeLines: [line],
+        final: isFinal,
+      };
+    };
 
     if (lines.length <= 1) {
-      expanded.push(step);
+      expanded.push(lines.length === 1
+        ? decorateLine(lines[0], Boolean(step.final))
+        : step);
       return;
     }
 
     lines.forEach((line, idx) => {
-      expanded.push({
-        ...step,
-        codeLines: [line],
-        final: Boolean(step.final && idx === lines.length - 1),
-      });
+      expanded.push(decorateLine(line, Boolean(step.final && idx === lines.length - 1)));
     });
   });
   return expanded;
@@ -7503,14 +7529,87 @@ function renderPathExistsBfsView(step) {
   renderGraph(step, "path1971BfsGraph");
 }
 
+function criticalPoints2058LineExplanation(view, vi) {
+  const line = Number(view.debugLine);
+  const comparison = view.comparison;
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const value = current >= 0 && Array.isArray(view.values) ? view.values[current] : null;
+  const bool = (result) => String(Boolean(result)).toLowerCase();
+  const messages = {
+    3: vi ? "Gắn prev vào head (node index 0). Chưa gắn curr hay next_node." : "Point prev to head (node index 0). curr and next_node are not assigned yet.",
+    4: vi ? "Gắn curr vào head.next (node index 1). Đây là node giữa đầu tiên có thể được xét." : "Point curr to head.next (node index 1), the first eligible middle node.",
+    5: vi ? "index = 1 vì curr hiện đang đứng tại node index 1." : "Set index = 1 because curr currently points to node 1.",
+    7: vi ? "-1 nghĩa là chưa lưu critical point đầu tiên." : "-1 means the first critical point has not been saved yet.",
+    8: vi ? "-1 nghĩa là chưa có critical point gần nhất để tính gap." : "-1 means there is no previous critical point for a gap yet.",
+    9: vi ? "Khởi tạo min_distance = ∞ để gap hợp lệ đầu tiên luôn cập nhật được min." : "Initialize min_distance to infinity so the first valid gap always replaces it.",
+    11: vi ? "Kiểm tra curr.next. Nếu còn node bên phải thì curr có đủ hai hàng xóm và vòng lặp tiếp tục." : "Check curr.next. If a right node exists, curr has two neighbors and the loop continues.",
+    12: vi ? `Gắn next_node vào node ngay bên phải curr${current >= 0 ? ` (index ${current + 1})` : ""}.` : `Point next_node to the node immediately right of curr${current >= 0 ? ` (index ${current + 1})` : ""}.`,
+    14: vi ? "Bắt đầu tính is_critical từ hai phép kiểm tra PEAK và VALLEY." : "Begin computing is_critical from the PEAK and VALLEY checks.",
+    15: comparison
+      ? (vi ? `PEAK: ${comparison.current} > ${comparison.left} và ${comparison.current} > ${comparison.right} → ${bool(comparison.isPeak)}.` : `PEAK: ${comparison.current} > ${comparison.left} and ${comparison.current} > ${comparison.right} → ${bool(comparison.isPeak)}.`)
+      : (vi ? "Kiểm tra curr có lớn hơn cả hai hàng xóm không." : "Check whether curr is greater than both neighbors."),
+    16: vi ? "Toán tử or: chỉ cần PEAK hoặc VALLEY đúng thì node là critical." : "The or operator means either PEAK or VALLEY is enough to make the node critical.",
+    17: comparison
+      ? (vi ? `VALLEY: ${comparison.current} < ${comparison.left} và ${comparison.current} < ${comparison.right} → ${bool(comparison.isValley)}.` : `VALLEY: ${comparison.current} < ${comparison.left} and ${comparison.current} < ${comparison.right} → ${bool(comparison.isValley)}.`)
+      : (vi ? "Kiểm tra curr có nhỏ hơn cả hai hàng xóm không." : "Check whether curr is smaller than both neighbors."),
+    18: comparison
+      ? (vi ? `Kết thúc biểu thức: is_critical = ${bool(comparison.isCritical)}.` : `Finish the expression: is_critical = ${bool(comparison.isCritical)}.`)
+      : (vi ? "Kết thúc biểu thức is_critical." : "Finish the is_critical expression."),
+    20: comparison
+      ? (vi ? `Rẽ nhánh theo is_critical = ${bool(comparison.isCritical)}${value == null ? "" : ` của node ${value}`}.` : `Branch on is_critical = ${bool(comparison.isCritical)}${value == null ? "" : ` for node ${value}`}.`)
+      : (vi ? "Chỉ vào khối này khi curr là critical point." : "Enter this block only when curr is a critical point."),
+    21: vi ? "Kiểm tra đây có phải critical point đầu tiên hay không." : "Check whether this is the first critical point.",
+    22: vi ? `Lưu index ${current} vào first_critical.` : `Save index ${current} as first_critical.`,
+    23: vi ? "Đã có critical đầu tiên, nên chuyển sang tính khoảng cách với critical gần nhất." : "A first critical already exists, so compute the gap to the nearest previous critical.",
+    24: vi ? "Bắt đầu cập nhật min_distance bằng giá trị nhỏ hơn." : "Begin updating min_distance with the smaller value.",
+    25: vi ? "Đối số thứ nhất là min_distance tốt nhất đã tìm thấy trước đó." : "The first argument is the best min_distance found so far.",
+    26: vi ? "Đối số thứ hai là gap = index hiện tại − prev_critical." : "The second argument is gap = current index − prev_critical.",
+    27: vi ? `Gán kết quả min vào min_distance${view.minDistance == null ? "" : ` = ${view.minDistance}`}.` : `Assign the minimum back to min_distance${view.minDistance == null ? "" : ` = ${view.minDistance}`}.`,
+    29: vi ? `Cập nhật prev_critical = ${current} để critical kế tiếp tính gap với node này.` : `Set prev_critical = ${current} so the next critical point measures its gap from this node.`,
+    31: vi ? "Dịch prev tới vị trí curr hiện tại." : "Move prev to curr's current position.",
+    32: vi ? "Dịch curr sang node kế tiếp; cửa sổ tiến sang phải một node." : "Move curr to the next node; the window advances one position right.",
+    33: vi ? "Tăng index thêm 1 để index tiếp tục khớp với vị trí curr." : "Increment index so it stays aligned with curr's position.",
+    35: vi ? "Nếu min_distance vẫn là ∞ thì chưa từng có một cặp critical hợp lệ." : "If min_distance is still infinity, no valid critical-point pair was ever formed.",
+    36: vi ? "Không đủ hai critical point: trả về [-1, -1]." : "There are fewer than two critical points, so return [-1, -1].",
+    38: vi ? `Tính max_distance = critical cuối − critical đầu${view.maxDistance == null ? "" : ` = ${view.maxDistance}`}.` : `Compute max_distance = last critical − first critical${view.maxDistance == null ? "" : ` = ${view.maxDistance}`}.`,
+    40: Array.isArray(view.answer)
+      ? (vi ? `Trả về [min_distance, max_distance] = [${view.answer.join(", ")}].` : `Return [min_distance, max_distance] = [${view.answer.join(", ")}].`)
+      : (vi ? "Trả về hai khoảng cách đã tính." : "Return the two computed distances."),
+  };
+  return messages[line] || "";
+}
+
 function renderCriticalPoints2058View(step) {
   const view = step.criticalPoints2058View || {};
   const vi = lang === "vi";
   const values = Array.isArray(view.values) ? view.values : [];
   const points = Array.isArray(view.points) ? view.points : [];
   const pointByIndex = new Map(points.map((point) => [point.index, point]));
-  const comparison = view.comparison;
   const current = Number.isInteger(view.current) ? view.current : -1;
+  const debugLine = Number(view.debugLine);
+  const hasDebugLine = Number.isInteger(debugLine) && debugLine > 0;
+  let pointerPrev = current > 0 ? current - 1 : -1;
+  let pointerCurr = current;
+  let pointerNext = current > 0 && current < values.length - 1 ? current + 1 : -1;
+
+  if (hasDebugLine && view.phase === "rule") {
+    pointerPrev = debugLine >= 3 ? 0 : -1;
+    pointerCurr = debugLine >= 4 ? 1 : -1;
+    pointerNext = -1;
+  } else if (hasDebugLine && debugLine === 11) {
+    pointerNext = -1;
+  } else if (hasDebugLine && debugLine === 31) {
+    pointerPrev = current;
+    pointerCurr = current;
+  } else if (hasDebugLine && (debugLine === 32 || debugLine === 33)) {
+    pointerPrev = current;
+    pointerCurr = current >= 0 && current + 1 < values.length ? current + 1 : -1;
+    pointerNext = -1;
+  }
+
+  const comparison = !hasDebugLine || (debugLine >= 14 && debugLine <= 29)
+    ? view.comparison
+    : null;
   const phaseGroup = view.phase === "rule"
     ? "rule"
     : view.phase === "inspect" || view.phase === "move"
@@ -7531,16 +7630,14 @@ function renderCriticalPoints2058View(step) {
   const listHtml = values.map((value, index) => {
     const point = pointByIndex.get(index);
     const roles = [];
-    if (current > 0 && current < values.length - 1) {
-      if (index === current - 1) roles.push("prev");
-      if (index === current) roles.push("curr");
-      if (index === current + 1) roles.push("next");
-    }
+    if (index === pointerPrev) roles.push("prev");
+    if (index === pointerCurr) roles.push("curr");
+    if (index === pointerNext) roles.push("next");
     const isCandidate = index === current && comparison && comparison.isCritical && !point;
     const classes = ["cp2058-node"];
     if (index <= Number(view.inspectedThrough)) classes.push("seen");
     if (roles.length) classes.push("in-window");
-    if (index === current) classes.push("current");
+    if (index === pointerCurr) classes.push("current");
     if (point) classes.push("critical", point.type);
     if (isCandidate) classes.push("candidate", comparison.type);
     if (index === view.newCritical) classes.push("new-critical");
@@ -7630,6 +7727,8 @@ function renderCriticalPoints2058View(step) {
     ? `Linked list có ${values.length} node và đã tìm thấy ${points.length} critical point.`
     : `The linked list has ${values.length} nodes and ${points.length} critical point(s) have been found.`;
 
+  const lineExplanation = criticalPoints2058LineExplanation(view, vi);
+
   $("treeView").innerHTML = `<section class="cp2058-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="cp2058-phases">${phaseHtml}</div>
     <div class="cp2058-rule"><strong>${vi ? "Critical point là node giữa" : "A critical point is a middle node"}</strong><span><b>PEAK</b> ${vi ? "lớn hơn cả hai bên" : "greater than both sides"}</span><span><b>VALLEY</b> ${vi ? "nhỏ hơn cả hai bên" : "smaller than both sides"}</span><em>HEAD / TAIL: ${vi ? "không xét" : "excluded"}</em></div>
@@ -7644,7 +7743,7 @@ function renderCriticalPoints2058View(step) {
       </div></section>
     </div>
     <section class="cp2058-formula">${formulaHtml}</section>
-    <div class="cp2058-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="cp2058-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(lineExplanation || pick(step.note))}</span></div>
   </section>`;
 }
 
