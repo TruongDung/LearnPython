@@ -24983,6 +24983,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.remove("hidden");
     renderBfsGrid(step);
+  } else if (step.binaryWatch401View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBinaryWatch401View(step);
   } else if (step.subsets90BitmaskView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

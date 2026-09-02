@@ -1373,6 +1373,7 @@ function buildSteps90Bitmask(nums) {
     const key = subset.join("|");
     const duplicate = seen.has(key);
     const duplicateOf = duplicate ? seen.get(key) : null;
+    if (duplicate) skippedDuplicates += 1;
     steps.push({
       title: duplicate
         ? { vi: `Trùng ${subsetText(subset)} → bỏ qua`, en: `Duplicate ${subsetText(subset)} → skip` }
@@ -1394,7 +1395,6 @@ function buildSteps90Bitmask(nums) {
     });
 
     if (duplicate) {
-      skippedDuplicates += 1;
       continue;
     }
 

@@ -24245,6 +24245,7 @@ function buildSteps1655(input, params = {}) {
     });
   };
   let reachable = new Set([0]);
+  snapshot({ line: 4, phase: "sort-needs", reachable, title: { vi: "needs = sorted(quantity, reverse=True)", en: "needs = sorted(quantity, reverse=True)" }, note: { vi: `Sắp quantity giảm dần: [${quantity.join(", ")}].`, en: `Sort quantity descending: [${quantity.join(", ")}].` } });
   snapshot({
     line: 5,
     phase: "compress",
@@ -24265,20 +24266,41 @@ function buildSteps1655(input, params = {}) {
       en: `Original quantity [${originalQuantity.join(", ")}] is processed largest-first as [${quantity.join(", ")}]. sums[mask] is the total copies required by all customers whose bits are on.`,
     },
   });
+  for (let sumMask = 1; sumMask <= fullMask; sumMask++) {
+    const bit = sumMask & -sumMask;
+    const index = Math.log2(bit);
+    snapshot({ line: 7, phase: "sum-loop", addMask: sumMask, reachable, title: { vi: `Tạo sums cho mask ${sumMask.toString(2)}`, en: `Build sums for mask ${sumMask.toString(2)}` }, note: { vi: "Duyệt từng customer-subset mask.", en: "Iterate over each customer-subset mask." } });
+    snapshot({ line: 8, phase: "lowest-bit", addMask: sumMask, reachable, title: { vi: `bit = ${bit.toString(2)}`, en: `bit = ${bit.toString(2)}` }, note: { vi: `bit thấp nhất thuộc customer ${index}.`, en: `The lowest bit belongs to customer ${index}.` } });
+    snapshot({ line: 9, phase: "sum-write", addMask: sumMask, reachable, title: { vi: `sums[${sumMask.toString(2)}] = ${subsetSums[sumMask]}`, en: `sums[${sumMask.toString(2)}] = ${subsetSums[sumMask]}` }, note: { vi: `Tổng request của mask này là ${subsetSums[sumMask]}.`, en: `This mask's total request is ${subsetSums[sumMask]}.` } });
+  }
   snapshot({ line: 10, phase: "init", reachable, title: { vi: "Khởi tạo mask 0", en: "Initialize mask 0" }, note: { vi: "Mask 0 nghĩa là chưa customer nào nhận đủ số lượng.", en: "Mask 0 means no customer request is fulfilled yet." } });
+  snapshot({ line: 11, phase: "full-mask", reachable, title: { vi: `full = ${fullMask.toString(2)}`, en: `full = ${fullMask.toString(2)}` }, note: { vi: "full mask có mọi customer bit = 1; đây là state mục tiêu.", en: "The full mask sets every customer bit to 1; it is the target state." } });
   for (let bucketIndex = 0; bucketIndex < counts.length; bucketIndex++) {
     const count = counts[bucketIndex];
     const nextReachable = new Set(reachable);
     snapshot({ line: 12, phase: "bucket", bucketIndex, reachable, title: { vi: `Xét frequency bucket ${count}`, en: `Process frequency bucket ${count}` }, note: { vi: `Một số có ${count} bản sao có thể cấp cho bất kỳ subset customer nào có tổng request không vượt ${count}.`, en: `A value appearing ${count} times can serve any customer subset whose total request is at most ${count}.` } });
+    snapshot({ line: 13, phase: "copy-states", bucketIndex, reachable: nextReachable, title: { vi: "nxt = set(dp)", en: "nxt = set(dp)" }, note: { vi: "Mọi state cũ vẫn reachable nếu không dùng bucket này.", en: "Every old state stays reachable when this bucket is unused." } });
     for (const mask of reachable) {
       const rest = fullMask ^ mask;
+      snapshot({ line: 14, phase: "state-loop", bucketIndex, fromMask: mask, reachable: nextReachable, title: { vi: `for mask = ${mask.toString(2)}`, en: `for mask = ${mask.toString(2)}` }, note: { vi: "Thử mở rộng một state customer đã được phục vụ.", en: "Try extending one already-served customer state." } });
+      snapshot({ line: 15, phase: "rest", bucketIndex, fromMask: mask, reachable: nextReachable, title: { vi: `rest = ${rest.toString(2)}`, en: `rest = ${rest.toString(2)}` }, note: { vi: "rest giữ các customer chưa được phục vụ trong state này.", en: "rest keeps customers not yet served in this state." } });
       for (let addMask = rest; addMask > 0; addMask = (addMask - 1) & rest) {
-        if (subsetSums[addMask] > count) continue;
+        snapshot({ line: 16, phase: "submask-loop", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: { vi: `Thử submask ${addMask.toString(2)}`, en: `Try submask ${addMask.toString(2)}` }, note: { vi: "Liệt kê mọi subset không rỗng của rest.", en: "Enumerate every non-empty subset of rest." } });
+        const canServe = subsetSums[addMask] <= count;
+        snapshot({ line: 17, phase: canServe ? "fit" : "too-large", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: canServe ? { vi: `${subsetSums[addMask]} ≤ ${count} → có thể cấp`, en: `${subsetSums[addMask]} ≤ ${count} → fits` } : { vi: `${subsetSums[addMask]} > ${count} → bỏ`, en: `${subsetSums[addMask]} > ${count} → skip` }, note: canServe ? { vi: "Bucket đủ số lượng cho customer-subset này.", en: "The bucket has enough copies for this customer subset." } : { vi: "Tổng request vượt frequency bucket, không thể thêm state.", en: "The request sum exceeds this frequency bucket, so it cannot add a state." } });
+        if (!canServe) {
+          const nextSub = (addMask - 1) & rest;
+          snapshot({ line: 18, phase: "next-submask", bucketIndex, fromMask: mask, addMask: nextSub, reachable: nextReachable, title: { vi: `sub = (sub - 1) & rest → ${nextSub.toString(2)}`, en: `sub = (sub - 1) & rest → ${nextSub.toString(2)}` }, note: { vi: "Chuyển sang submask kế tiếp của rest.", en: "Advance to the next submask of rest." } });
+          continue;
+        }
         const newMask = mask | addMask;
-        if (nextReachable.has(newMask)) continue;
-        nextReachable.add(newMask);
-        parent.set(newMask, { fromMask: mask, addMask, bucketIndex });
-        snapshot({ line: 17, phase: "transition", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: { vi: `Bucket ${count} phục vụ mask ${addMask.toString(2)}`, en: `Bucket ${count} serves mask ${addMask.toString(2)}` }, note: { vi: `Tổng request của subset là ${subsetSums[addMask]} ≤ ${count}; state mới là mask ${newMask.toString(2)}.`, en: `The subset request totals ${subsetSums[addMask]} ≤ ${count}; the new state is mask ${newMask.toString(2)}.` } });
+        if (!nextReachable.has(newMask)) {
+          nextReachable.add(newMask);
+          parent.set(newMask, { fromMask: mask, addMask, bucketIndex });
+          snapshot({ line: 17, phase: "transition", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: { vi: `Thêm state ${newMask.toString(2)}`, en: `Add state ${newMask.toString(2)}` }, note: { vi: `Bucket ${count} phục vụ mask ${addMask.toString(2)} nên state mới là ${newMask.toString(2)}.`, en: `Bucket ${count} serves mask ${addMask.toString(2)}, producing state ${newMask.toString(2)}.` } });
+        }
+        const nextSub = (addMask - 1) & rest;
+        snapshot({ line: 18, phase: "next-submask", bucketIndex, fromMask: mask, addMask: nextSub, reachable: nextReachable, title: { vi: `sub = (sub - 1) & rest → ${nextSub.toString(2)}`, en: `sub = (sub - 1) & rest → ${nextSub.toString(2)}` }, note: { vi: "Chuyển sang submask kế tiếp của rest.", en: "Advance to the next submask of rest." } });
       }
     }
     reachable = nextReachable;
@@ -24375,7 +24397,22 @@ function buildSteps1655Backtracking(input, params = {}) {
   });
 
   const backtrack = (idx) => {
-    if (idx === quantity.length) {
+    const complete = idx === quantity.length;
+    snapshot({
+      line: 8,
+      phase: "call",
+      idx,
+      title: { vi: `Gọi backtrack(${idx})`, en: `Call backtrack(${idx})` },
+      note: { vi: "Mỗi lời gọi xử lý đúng một customer ở vị trí idx.", en: "Each call processes exactly one customer at position idx." },
+    });
+    snapshot({
+      line: 9,
+      phase: "base-check",
+      idx,
+      title: complete ? { vi: `idx == ${quantity.length} ? Đúng`, en: `idx == ${quantity.length}? True` } : { vi: `idx == ${quantity.length} ? Sai`, en: `idx == ${quantity.length}? False` },
+      note: complete ? { vi: "Đã gán xong toàn bộ customer, sắp return True.", en: "Every customer is assigned, so return True next." } : { vi: "Vẫn còn customer cần gán, tiếp tục vào thân hàm.", en: "Customers remain to assign, so continue into the function body." },
+    });
+    if (complete) {
       snapshot({
         line: 10,
         phase: "complete",
@@ -24392,17 +24429,6 @@ function buildSteps1655Backtracking(input, params = {}) {
     const need = quantity[idx];
     const seen = new Set();
     snapshot({
-      line: 8,
-      phase: "enter",
-      idx,
-      seen,
-      title: { vi: `backtrack(${idx}): customer cần ${need}`, en: `backtrack(${idx}): customer needs ${need}` },
-      note: {
-        vi: `idx=${idx} < ${quantity.length} nên tiếp tục. Tạo seen=∅ cho depth này.`,
-        en: `idx=${idx} < ${quantity.length}, continue. A fresh seen=∅ starts for this depth.`,
-      },
-    });
-    snapshot({
       line: 12,
       phase: "seen-init",
       idx,
@@ -24416,6 +24442,15 @@ function buildSteps1655Backtracking(input, params = {}) {
 
     for (let bucket = 0; bucket < counts.length; bucket++) {
       const before = counts[bucket];
+      snapshot({
+        line: 13,
+        phase: "loop-bucket",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        title: { vi: `for i = ${bucket}: xét bucket ${bucket}`, en: `for i = ${bucket}: inspect bucket ${bucket}` },
+        note: { vi: `Vòng lặp thử frequency bucket ${bucket} cho customer cần ${need}.`, en: `The loop tries frequency bucket ${bucket} for the customer needing ${need}.` },
+      });
       const enough = before >= need;
       const duplicate = seen.has(before);
       snapshot({
@@ -24438,6 +24473,15 @@ function buildSteps1655Backtracking(input, params = {}) {
       if (!enough || duplicate) continue;
 
       seen.add(before);
+      snapshot({
+        line: 15,
+        phase: "seen-add",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        title: { vi: `seen.add(${before})`, en: `seen.add(${before})` },
+        note: { vi: `Đã thử bucket có số dư ${before}; bucket khác cùng số dư sẽ bị cắt nhánh ở depth này.`, en: `A bucket with remaining ${before} is now tried; another bucket with the same remainder is pruned at this depth.` },
+      });
       counts[bucket] -= need;
       path.push({ customer: idx, bucket, need });
       snapshot({
@@ -24453,6 +24497,15 @@ function buildSteps1655Backtracking(input, params = {}) {
         },
       });
 
+      snapshot({
+        line: 17,
+        phase: "recurse",
+        idx,
+        candidateIndex: bucket,
+        seen,
+        title: { vi: `if backtrack(${idx + 1})`, en: `if backtrack(${idx + 1})` },
+        note: { vi: `Đi sâu để gán customer kế tiếp sau khi bucket ${bucket} đã bị trừ ${need}.`, en: `Recurse to assign the next customer after bucket ${bucket} is reduced by ${need}.` },
+      });
       if (backtrack(idx + 1)) {
         snapshot({
           line: 18,
@@ -24558,6 +24611,7 @@ Object.assign(module.exports, {
     code: ["from collections import Counter", "class Solution:", "    def canDistribute(self, nums, quantity):", "        needs = sorted(quantity, reverse=True)", "        counts = sorted(Counter(nums).values(), reverse=True)", "        sums = [0] * (1 << len(needs))", "        for mask in range(1, len(sums)):", "            bit = mask & -mask", "            sums[mask] = sums[mask ^ bit] + needs[bit.bit_length() - 1]", "        dp = {0}", "        full = (1 << len(needs)) - 1", "        for count in counts:", "            nxt = set(dp)", "            for mask in dp:", "                rest = full ^ mask; sub = rest", "                while sub:", "                    if sums[sub] <= count: nxt.add(mask | sub)", "                    sub = (sub - 1) & rest", "            dp = nxt", "        return full in dp"],
     code2Label: { vi: "Cách 2: Frequency backtracking + seen pruning", en: "Approach 2: frequency backtracking + seen pruning" },
     code2: ["from collections import Counter", "", "class Solution:", "    def canDistribute(self, nums, quantity):", "        counts = list(Counter(nums).values())", "        quantity.sort(reverse=True)", "", "        def backtrack(idx):", "            if idx == len(quantity):", "                return True", "", "            seen = set()", "            for i in range(len(counts)):", "                if counts[i] >= quantity[idx] and counts[i] not in seen:", "                    seen.add(counts[i])", "                    counts[i] -= quantity[idx]", "                    if backtrack(idx + 1):", "                        return True", "                    counts[i] += quantity[idx]", "            return False", "", "        return backtrack(0)"],
+    debugMode: "line-by-line",
     liveArgs: (input, params) => [parseIntegerList1655(input, "nums"), parseIntegerList1655(params.quantity, "quantity")],
     builder: buildSteps1655,
     builder2: buildSteps1655Backtracking,

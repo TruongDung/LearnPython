@@ -15177,6 +15177,103 @@ button:disabled {
   .sub78-viz header span { text-align: left; }
 }
 
+/* LeetCode 401: decode one 10-bit mask as hour LEDs plus minute LEDs. */
+.watch401-viz { display: grid; gap: 14px; width: 100%; min-width: 0; padding: 18px; color: #e2e8f0; background: radial-gradient(circle at top right, rgba(250, 204, 21, .14), transparent 30%), #10131d; border: 1px solid #303747; border-radius: 10px; }
+.watch401-viz header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.watch401-viz header strong { color: #f8fafc; font-size: 12px; letter-spacing: .02em; }
+.watch401-viz header span { color: #b8c2d1; font-size: 11px; text-align: right; }
+.watch401-phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.watch401-phases span { min-height: 32px; display: flex; align-items: center; justify-content: center; padding: 5px; color: #94a3b8; background: #171c28; border: 1px solid #303747; border-radius: 6px; font-size: 10px; font-weight: 800; text-align: center; }
+.watch401-phases span.active { color: #fef3c7; background: #713f12; border-color: #facc15; box-shadow: 0 0 0 2px rgba(250, 204, 21, .1); }
+.watch401-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.watch401-overview > div { min-width: 0; display: grid; gap: 3px; padding: 10px; background: #171c28; border: 1px solid #303747; border-radius: 7px; }
+.watch401-overview small { color: #94a3b8; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.watch401-overview strong { color: #f8fafc; font-size: 18px; }
+.watch401-overview span { color: #cbd5e1; font-size: 10px; }
+.watch401-overview code { color: #fde68a; font-size: 11px; overflow-wrap: anywhere; }
+.watch401-led-panel,
+.watch401-results { display: grid; gap: 10px; padding: 13px; background: #171c28; border: 1px solid #303747; border-radius: 8px; }
+.watch401-led-groups { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.2fr); gap: 12px; }
+.watch401-led-groups > section { display: grid; gap: 8px; min-width: 0; padding: 10px; background: #0f172a; border: 1px solid #3b4354; border-radius: 7px; }
+.watch401-led-groups > section header strong { color: #cbd5e1; font-size: 11px; }
+.watch401-led-groups > section header span { color: #94a3b8; font-size: 10px; }
+.watch401-led-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.watch401-led { width: 45px; min-height: 62px; display: grid; place-items: center; align-content: center; gap: 2px; color: #94a3b8; background: #1e293b; border: 1px solid #475569; border-radius: 50%; }
+.watch401-led small { font-size: 9px; font-weight: 800; }
+.watch401-led strong { color: #cbd5e1; font-size: 16px; }
+.watch401-led span { color: #64748b; font-size: 10px; font-weight: 800; }
+.watch401-led.on { color: #fef3c7; background: #854d0e; border-color: #facc15; box-shadow: 0 0 12px rgba(250, 204, 21, .28); }
+.watch401-led.on strong,
+.watch401-led.on span { color: #fef08a; }
+.watch401-decode { display: grid; grid-template-columns: minmax(110px, 1fr) 24px minmax(110px, 1fr) minmax(190px, 1.3fr); align-items: stretch; gap: 8px; padding: 12px; background: #171c28; border: 1px solid #303747; border-radius: 8px; }
+.watch401-decode > div,
+.watch401-decode aside { display: grid; align-content: center; gap: 3px; padding: 9px 10px; background: #0f172a; border-left: 3px solid #facc15; }
+.watch401-decode small { color: #94a3b8; font-size: 10px; }
+.watch401-decode > div strong { color: #f8fafc; font-size: 23px; }
+.watch401-decode > b { align-self: center; color: #facc15; font-size: 22px; text-align: center; }
+.watch401-decode aside { border-left-color: #22c55e; }
+.watch401-decode aside strong { color: #86efac; font-size: 17px; }
+.watch401-decode aside span { color: #cbd5e1; font-size: 10px; }
+.watch401-decode.invalid aside { border-left-color: #fb7185; }
+.watch401-decode.invalid aside strong { color: #fda4af; }
+.watch401-results > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.watch401-time { min-width: 54px; padding: 6px 8px; color: #e2e8f0; background: #0f172a; border: 1px solid #3b4354; border-radius: 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; text-align: center; }
+.watch401-time.fresh { color: #fef3c7; background: #713f12; border-color: #facc15; }
+.watch401-empty { padding: 7px 9px; color: #94a3b8; background: #0f172a; border-left: 3px solid #64748b; font-size: 11px; }
+.watch401-action { display: grid; gap: 4px; padding: 10px 12px; background: #1e293b; border-left: 3px solid #facc15; }
+.watch401-action strong { color: #f8fafc; font-size: 12px; }
+.watch401-action span { color: #cbd5e1; font-size: 11px; line-height: 1.45; }
+
+[data-theme="light"] .watch401-viz { color: #1e293b; background: radial-gradient(circle at top right, rgba(250, 204, 21, .16), transparent 30%), #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .watch401-viz header strong,
+[data-theme="light"] .watch401-overview strong,
+[data-theme="light"] .watch401-decode > div strong,
+[data-theme="light"] .watch401-action strong { color: #0f172a; }
+[data-theme="light"] .watch401-viz header span,
+[data-theme="light"] .watch401-overview small,
+[data-theme="light"] .watch401-overview span,
+[data-theme="light"] .watch401-led-groups > section header span,
+[data-theme="light"] .watch401-decode small,
+[data-theme="light"] .watch401-decode aside span,
+[data-theme="light"] .watch401-empty,
+[data-theme="light"] .watch401-action span { color: #475569; }
+[data-theme="light"] .watch401-phases span,
+[data-theme="light"] .watch401-overview > div,
+[data-theme="light"] .watch401-led-panel,
+[data-theme="light"] .watch401-results,
+[data-theme="light"] .watch401-decode { background: #ffffff; border-color: #cbd5e1; }
+[data-theme="light"] .watch401-phases span { color: #475569; }
+[data-theme="light"] .watch401-phases span.active { color: #713f12; background: #fefce8; border-color: #eab308; }
+[data-theme="light"] .watch401-overview code { color: #a16207; }
+[data-theme="light"] .watch401-led-groups > section,
+[data-theme="light"] .watch401-decode > div,
+[data-theme="light"] .watch401-decode aside,
+[data-theme="light"] .watch401-time,
+[data-theme="light"] .watch401-empty { background: #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .watch401-led-groups > section header strong,
+[data-theme="light"] .watch401-led strong { color: #334155; }
+[data-theme="light"] .watch401-led { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+[data-theme="light"] .watch401-led span { color: #64748b; }
+[data-theme="light"] .watch401-led.on { color: #713f12; background: #fefce8; border-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, .2); }
+[data-theme="light"] .watch401-led.on strong,
+[data-theme="light"] .watch401-led.on span { color: #854d0e; }
+[data-theme="light"] .watch401-decode aside strong { color: #047857; }
+[data-theme="light"] .watch401-decode.invalid aside strong { color: #be123c; }
+[data-theme="light"] .watch401-time { color: #334155; }
+[data-theme="light"] .watch401-time.fresh { color: #713f12; background: #fefce8; border-color: #eab308; }
+[data-theme="light"] .watch401-action { background: #f1f5f9; border-color: #eab308; }
+
+@media (max-width: 680px) {
+  .watch401-viz { padding: 12px; }
+  .watch401-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .watch401-overview,
+  .watch401-led-groups,
+  .watch401-decode { grid-template-columns: 1fr; }
+  .watch401-decode > b { display: none; }
+  .watch401-viz header { align-items: flex-start; flex-direction: column; }
+  .watch401-viz header span { text-align: left; }
+}
+
 /* LeetCode 2058: teach the three-node window and both distance formulas in one view. */
 .cp2058-viz {
   width: 100%;
