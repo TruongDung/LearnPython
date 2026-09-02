@@ -9742,35 +9742,150 @@ function renderDistribute1655BacktrackView(step) {
 }
 function renderDistribute1655View(step) {
   const view = step.distribute1655View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const originalQuantity = Array.isArray(view.originalQuantity) ? view.originalQuantity : [];
   const quantity = Array.isArray(view.quantity) ? view.quantity : [];
-  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const requestOrder = Array.isArray(view.requestOrder) ? view.requestOrder : quantity.map((_, index) => index);
+  const groups = Array.isArray(view.groups)
+    ? view.groups
+    : (Array.isArray(view.counts) ? view.counts.map((count, index) => ({ value: index, count })) : []);
   const reachable = new Set(Array.isArray(view.reachable) ? view.reachable : []);
-  const selectedMask = view.fromMask != null && view.addMask != null ? view.fromMask | view.addMask : null;
-  const customers = quantity.map((need, index) => {
-    const added = view.addMask != null && (view.addMask & (1 << index));
-    const served = selectedMask != null && (selectedMask & (1 << index));
-    return `<div class="dist1655-customer${added ? " added" : served ? " served" : ""}"><small>C${index}</small><strong>${need}</strong><span>${added ? "+ bucket" : served ? "served" : "need"}</span></div>`;
+  const assignments = Array.isArray(view.assignments) ? view.assignments : [];
+  const fullMask = Number.isInteger(view.fullMask) ? view.fullMask : (1 << quantity.length) - 1;
+  const fromMask = Number.isInteger(view.fromMask) ? view.fromMask : 0;
+  const addMask = Number.isInteger(view.addMask) ? view.addMask : 0;
+  const newMask = Number.isInteger(view.newMask) ? view.newMask : (fromMask | addMask);
+  const isTransition = view.phase === "transition" && addMask > 0;
+  const currentBucket = Number.isInteger(view.bucketIndex) && view.bucketIndex >= 0 ? groups[view.bucketIndex] : null;
+  const currentUsed = addMask > 0 && Array.isArray(view.subsetSums) ? view.subsetSums[addMask] || 0 : 0;
+  const phaseMap = { compress: 0, "subset-sums": 1, init: 1, bucket: 2, transition: 3, "bucket-done": 4, done: 5 };
+  const phaseIndex = phaseMap[view.phase] ?? 0;
+  const phaseLabels = [
+    vi ? "Gom số giống nhau" : "Group equal values",
+    vi ? "Hiểu mask" : "Understand masks",
+    vi ? "Chọn bucket" : "Pick a bucket",
+    vi ? "Thử nhóm khách" : "Try customers",
+    vi ? "Lưu state" : "Save states",
+    vi ? "Kết luận" : "Decide",
+  ];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const assignmentByBucket = new Map(assignments.map((assignment) => [assignment.bucketIndex, assignment]));
+  const customerAssignment = new Map();
+  assignments.forEach((assignment) => (assignment.customerSlots || []).forEach((slot) => customerAssignment.set(slot, assignment)));
+  const customerHtml = quantity.map((need, slot) => {
+    const originalIndex = requestOrder[slot] ?? slot;
+    const added = isTransition && Boolean(addMask & (1 << slot));
+    const servedBefore = Boolean(fromMask & (1 << slot));
+    const servedAfter = view.phase === "done" ? Boolean(fullMask & (1 << slot)) : Boolean(newMask & (1 << slot));
+    const assignment = customerAssignment.get(slot);
+    const classes = ["dteach-customer"];
+    if (servedBefore || (view.phase === "done" && servedAfter)) classes.push("served");
+    if (added) classes.push("assigning");
+    const tokens = Array.from({ length: need }, () => "<i></i>").join("");
+    let status = vi ? "chưa được phục vụ" : "waiting";
+    if (added && currentBucket) status = vi ? `nhận số ${currentBucket.value}` : `gets value ${currentBucket.value}`;
+    else if (assignment) status = vi ? `nhận số ${assignment.value}` : `gets value ${assignment.value}`;
+    else if (servedBefore) status = vi ? "đã đủ" : "fulfilled";
+    return `<article class="${classes.join(" ")}">
+      <header><strong>C${originalIndex}</strong><span>bit ${slot}</span></header>
+      <div><b>${need}</b><small>${vi ? "bản sao bằng nhau" : "equal copies"}</small></div>
+      <div class="dteach-demand" aria-label="${need} copies">${tokens}</div>
+      <footer>${escapeHtml(status)}</footer>
+    </article>`;
   }).join("");
-  const buckets = counts.map((count, index) => `<div class="dist1655-bucket${index === view.bucketIndex ? " active" : index < view.bucketIndex ? " done" : ""}"><small>value group ${index}</small><strong>${count}</strong><span>${index === view.bucketIndex ? "processing" : index < view.bucketIndex ? "used" : "pending"}</span></div>`).join("");
-  const maskRows = Array.from({ length: (view.fullMask ?? 0) + 1 }, (_, mask) => {
-    const on = reachable.has(mask);
-    const active = mask === selectedMask || mask === view.fromMask;
-    return `<div class="dist1655-mask${on ? " reachable" : ""}${active ? " active" : ""}"><code>${mask.toString(2).padStart(quantity.length, "0")}</code><span>${on ? "yes" : "-"}</span></div>`;
+
+  const bucketsHtml = groups.map((group, index) => {
+    const assignment = assignmentByBucket.get(index);
+    const active = index === view.bucketIndex;
+    const done = index < view.bucketIndex || Boolean(assignment) || view.phase === "done";
+    const used = active && isTransition ? currentUsed : assignment ? assignment.used : 0;
+    const copies = Array.from({ length: group.count }, (_, copyIndex) => `<i class="${copyIndex < used ? "used" : ""}">${escapeHtml(String(group.value))}</i>`).join("");
+    const assignedNames = assignment
+      ? assignment.customerSlots.map((slot) => `C${requestOrder[slot] ?? slot}`).join(" + ")
+      : "";
+    const status = active
+      ? (vi ? "bucket đang xét" : "current bucket")
+      : assignment
+        ? `${vi ? "giao cho" : "assigned to"} ${assignedNames}`
+        : done
+          ? (vi ? "đã xét" : "processed")
+          : (vi ? "chưa xét" : "pending");
+    return `<article class="dteach-bucket${active ? " active" : ""}${done ? " done" : ""}">
+      <header><small>${vi ? "GIÁ TRỊ" : "VALUE"}</small><strong>${escapeHtml(String(group.value))}</strong></header>
+      <div class="dteach-copies">${copies}</div>
+      <footer><b>${group.count} ${vi ? "bản sao" : "copies"}</b><span>${escapeHtml(status)}</span></footer>
+    </article>`;
   }).join("");
-  const addedNeeds = view.addMask == null ? [] : quantity.filter((_, index) => view.addMask & (1 << index));
-  const action = view.addMask != null
-    ? `mask ${view.fromMask.toString(2).padStart(quantity.length, "0")} + ${view.addMask.toString(2).padStart(quantity.length, "0")} | need ${addedNeeds.join(" + ") || "0"} = ${view.subsetSums?.[view.addMask] ?? 0}`
-    : pick({ vi: "Moi bit la mot customer da du quantity.", en: "Each bit represents one fully served customer." });
+
+  const maskCode = (mask) => mask.toString(2).padStart(quantity.length, "0");
+  const maskNames = (mask) => quantity
+    .map((_, slot) => (mask & (1 << slot) ? `C${requestOrder[slot] ?? slot}` : null))
+    .filter(Boolean);
+  const maskBox = (label, mask, tone) => {
+    const bitCells = quantity.map((_, slot) => {
+      const on = Boolean(mask & (1 << slot));
+      return `<i class="${on ? "on" : ""}"><small>C${requestOrder[slot] ?? slot}</small><b>${on ? 1 : 0}</b></i>`;
+    }).join("");
+    const names = maskNames(mask);
+    return `<div class="dteach-mask ${tone}" style="--dteach-bits:${Math.max(quantity.length, 1)}"><header><small>${escapeHtml(label)}</small><code>${maskCode(mask)}</code></header><div>${bitCells}</div><footer>${names.length ? escapeHtml(names.join(" + ")) : (vi ? "chưa có customer" : "no customers yet")}</footer></div>`;
+  };
+  let transitionHtml = "";
+  if (isTransition) {
+    const fits = currentBucket && currentUsed <= currentBucket.count;
+    transitionHtml = `<section class="dteach-transition">
+      <header><strong>${vi ? "PHÉP CHUYỂN DP ĐANG THỰC HIỆN" : "CURRENT DP TRANSITION"}</strong><span>${vi ? "mỗi bit 1 là một customer đã đủ" : "each 1-bit is a fulfilled customer"}</span></header>
+      <div class="dteach-mask-equation">${maskBox(vi ? "ĐÃ PHỤC VỤ" : "SERVED BEFORE", fromMask, "before")}<b>+</b>${maskBox(vi ? "GIAO BUCKET NÀY" : "ASSIGN THIS BUCKET", addMask, "adding")}<b>=</b>${maskBox(vi ? "STATE MỚI" : "NEW STATE", newMask, "after")}</div>
+      <div class="dteach-capacity ${fits ? "fits" : "fails"}"><small>${vi ? "NHU CẦU NHÓM ĐƯỢC CHỌN" : "SELECTED DEMAND"}</small><strong>${quantity.filter((_, slot) => addMask & (1 << slot)).join(" + ")} = ${currentUsed}</strong><span>${fits ? "≤" : ">"} ${currentBucket ? currentBucket.count : 0} ${vi ? "bản sao có sẵn" : "available copies"}</span><b>${fits ? (vi ? "VỪA → LƯU STATE" : "FITS → SAVE STATE") : (vi ? "KHÔNG VỪA" : "DOES NOT FIT")}</b></div>
+    </section>`;
+  } else {
+    const focusMask = view.phase === "done" ? fullMask : 0;
+    const guidance = {
+      compress: vi ? "Một customer phải nhận cùng một giá trị, vì vậy chỉ số lượng trong từng nhóm mới quan trọng." : "A customer must receive one equal value, so only each value group's frequency matters.",
+      "subset-sums": vi ? "Bit i ứng với customer được xử lý ở slot i. Bật nhiều bit nghĩa là thử dùng cùng một bucket cho nhiều customer." : "Bit i represents the customer in slot i. Turning on several bits means trying one bucket for several customers.",
+      init: vi ? "DP bắt đầu ở mask 000...0: chưa ai được phục vụ." : "DP starts at mask 000...0: nobody is fulfilled.",
+      bucket: currentBucket ? (vi ? `Đang thử bucket số ${currentBucket.value}, có ${currentBucket.count} bản sao.` : `Trying value ${currentBucket.value}'s bucket with ${currentBucket.count} copies.`) : "",
+      "bucket-done": vi ? "Các state màu xanh là những nhóm customer đã có cách phân phối hợp lệ sau bucket này." : "Green states are customer subsets with a valid distribution after this bucket.",
+      done: view.answer ? (vi ? "Full mask đã xuất hiện: mọi customer đều được phục vụ." : "The full mask is reachable: every customer is fulfilled.") : (vi ? "Full mask vẫn chưa xuất hiện sau mọi bucket." : "The full mask is still unreachable after every bucket."),
+    }[view.phase] || pick(step.note);
+    transitionHtml = `<section class="dteach-explain"><div>${maskBox(view.phase === "done" ? "FULL MASK" : "START MASK", focusMask, view.phase === "done" ? (view.answer ? "after" : "failed") : "before")}</div><p>${escapeHtml(guidance)}</p></section>`;
+  }
+
+  const reachableMasks = [...reachable].sort((left, right) => left - right);
+  if (!reachable.has(fullMask)) reachableMasks.push(fullMask);
+  const statesHtml = reachableMasks.map((mask) => {
+    const target = mask === fullMask;
+    const active = mask === newMask && isTransition;
+    const names = maskNames(mask);
+    const status = target
+      ? reachable.has(mask) ? "FULL ✓" : (vi ? "FULL · chưa đạt" : "FULL · not reached")
+      : reachable.has(mask) ? (vi ? "đạt được" : "reachable") : (vi ? "chưa đạt" : "not yet");
+    return `<article class="dteach-state${reachable.has(mask) ? " reachable" : ""}${target ? " target" : ""}${active ? " active" : ""}"><code>${maskCode(mask)}</code><strong>${names.length ? escapeHtml(names.join(", ")) : "∅"}</strong><span>${escapeHtml(status)}</span></article>`;
+  }).join("");
+
+  const planHtml = view.phase === "done" && view.answer && assignments.length
+    ? `<section class="dteach-plan"><header><strong>${vi ? "MỘT CÁCH PHÂN PHỐI HỢP LỆ" : "ONE VALID DISTRIBUTION"}</strong><span>${vi ? "được dựng ngược từ parent của full mask" : "reconstructed from the full mask's parents"}</span></header><div>${assignments.map((assignment) => {
+      const customers = assignment.customerSlots.map((slot) => `C${requestOrder[slot] ?? slot} (${quantity[slot]})`).join(" + ");
+      return `<article><b>${escapeHtml(String(assignment.value))} × ${assignment.capacity}</b><span>→</span><strong>${escapeHtml(customers)}</strong><small>${assignment.used}/${assignment.capacity} ${vi ? "đã dùng" : "used"}</small></article>`;
+    }).join("")}</div></section>`
+    : "";
+  const inputGroups = groups.map((group) => `${group.value} × ${group.count}`).join(" · ");
 
   $("treeView").innerHTML = `
-    <div class="dist1655-viz">
-      <header><strong>DISTRIBUTE REPEATING INTEGERS</strong><span>${escapeHtml(view.phase || "bitmask DP")}</span></header>
-      <div class="dist1655-main">
-        <section class="dist1655-panel"><header><strong>CUSTOMER QUANTITIES</strong><span>bit = customer</span></header><div class="dist1655-customers">${customers}</div><div class="dist1655-action">${escapeHtml(action)}</div></section>
-        <section class="dist1655-panel"><header><strong>FREQUENCY BUCKETS</strong><span>same value count</span></header><div class="dist1655-buckets">${buckets}</div></section>
+    <div class="dist1655-viz dist1655-teach" role="img" aria-label="${escapeHtml(vi ? "Trực quan hóa Distribute Repeating Integers" : "Distribute Repeating Integers visualization")}">
+      <header><div><small>BITMASK DP · #1655</small><strong>DISTRIBUTE REPEATING INTEGERS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+      <div class="dteach-phases">${phases}</div>
+      <section class="dteach-rule"><b>${vi ? "ĐIỀU KIỆN QUAN TRỌNG" : "KEY CONDITION"}</b><strong>${vi ? "Mỗi customer phải nhận đủ quantity[i] bản sao của CÙNG MỘT giá trị." : "Each customer needs quantity[i] copies of ONE equal value."}</strong></section>
+      <section class="dteach-compress"><div><small>nums</small><code>[${escapeHtml(nums.join(", "))}]</code></div><b>→</b><div><small>${vi ? "frequency buckets" : "frequency buckets"}</small><strong>${escapeHtml(inputGroups)}</strong></div></section>
+      <div class="dteach-main">
+        <section class="dteach-section"><header><strong>${vi ? "CUSTOMER · quantity GỐC" : "CUSTOMERS · ORIGINAL quantity"}</strong><span>[${escapeHtml(originalQuantity.join(", "))}] → ${vi ? "xử lý nhu cầu lớn trước" : "largest demand first"}</span></header><div class="dteach-customers">${customerHtml}</div></section>
+        <section class="dteach-section"><header><strong>${vi ? "BUCKET · CÁC SỐ BẰNG NHAU" : "BUCKETS · EQUAL VALUES"}</strong><span>${groups.length} ${vi ? "giá trị khác nhau" : "distinct values"}</span></header><div class="dteach-buckets">${bucketsHtml}</div></section>
       </div>
-      <section class="dist1655-panel dist1655-states"><header><strong>REACHABLE CUSTOMER MASKS</strong><span>${reachable.size} states</span></header><div class="dist1655-mask-grid">${maskRows}</div></section>
-      <footer><span><small>full mask</small><strong>${(view.fullMask ?? 0).toString(2).padStart(quantity.length, "0")}</strong></span><span><small>${escapeHtml(pick({ vi: "bucket hien tai", en: "current bucket" }))}</small><strong>${view.bucketIndex != null && view.bucketIndex >= 0 ? counts[view.bucketIndex] ?? "-" : "-"}</strong></span><span class="${view.phase === "done" ? (view.answer ? "answer yes" : "answer no") : ""}"><small>${escapeHtml(pick({ vi: "ket qua", en: "result" }))}</small><strong>${view.answer == null ? "-" : view.answer ? "TRUE" : "FALSE"}</strong></span></footer>
+      ${transitionHtml}
+      <section class="dteach-section dteach-states"><header><strong>${vi ? "CÁC MASK ĐÃ CÓ CÁCH PHÂN PHỐI" : "MASKS WITH A VALID DISTRIBUTION"}</strong><span>${reachable.size}/${fullMask + 1} states · target ${maskCode(fullMask)}</span></header><div>${statesHtml}</div></section>
+      ${planHtml}
+      <section class="dteach-result${view.phase === "done" ? view.answer ? " success" : " failure" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${view.answer == null ? (vi ? "Đang tính" : "Computing") : view.answer ? "TRUE" : "FALSE"}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     </div>`;
 }
 
@@ -19262,6 +19377,81 @@ function renderMinCostStairsView(step) {
   </section>`;
 }
 
+function renderBitmaskBasicsView(step) {
+  const view = step.bitmaskBasicsView || {};
+  const vi = lang === "vi";
+  const rows = Array.isArray(view.rows) ? view.rows : [];
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stageIndex) ? view.stageIndex : 0;
+  const activeBit = Number.isInteger(view.activeBit) ? view.activeBit : -1;
+  const width = Number.isInteger(view.width) ? view.width : Math.max(1, ...rows.map((row) => String(row.bits || "").length));
+  const modeLabels = {
+    "xor-fold": vi ? "XOR TRIỆT TIÊU CẶP" : "PAIR-CANCELING XOR",
+    popcount: vi ? "ĐẾM BIT 1" : "COUNT SET BITS",
+    "power-of-two": vi ? "KIỂM TRA LŨY THỪA 2" : "POWER OF TWO CHECK",
+    "xor-distance": vi ? "XOR TÌM BIT KHÁC" : "XOR DIFFERENCE",
+    complement: vi ? "LẬT BIT BẰNG MASK" : "FLIP BITS WITH A MASK",
+    alternating: vi ? "KIỂM TRA BIT XEN KẼ" : "ALTERNATING BITS",
+    "binary-gap": vi ? "ĐO KHOẢNG CÁCH BIT" : "MEASURE BINARY GAP",
+    "reduce-zero": vi ? "DỊCH BIT VỀ 0" : "SHIFT DOWN TO ZERO",
+  };
+  const phasesHtml = stages.map((stage, index) => {
+    const state = index === stageIndex ? "active" : index < stageIndex ? "done" : "";
+    const label = pick(stage).replace(/^\d+\.\s*/, "");
+    return `<span class="${state}"><b>${index < stageIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const rowsHtml = rows.map((row, rowIndex) => {
+    const rawBits = String(row.bits || "").padStart(width, "0");
+    const bitsHtml = rawBits.split("").map((bit, displayIndex) => {
+      const bitIndex = rawBits.length - 1 - displayIndex;
+      const classes = ["bmb-bit", bit === "1" ? "on" : "off"];
+      if (activeBit === bitIndex) classes.push("active");
+      return `<span class="${classes.join(" ")}"><small>${bitIndex}</small><strong>${bit}</strong></span>`;
+    }).join("");
+    const tone = row.tone ? ` ${escapeHtml(String(row.tone))}` : "";
+    return `<div class="bmb-row${tone}">
+      <div class="bmb-row-label"><small>${escapeHtml(String(row.label || `row ${rowIndex + 1}`))}</small><strong>${escapeHtml(String(row.value ?? ""))}</strong></div>
+      <div class="bmb-bits" aria-label="${escapeHtml(rawBits)}">${bitsHtml}</div>
+    </div>`;
+  }).join("") || `<div class="bmb-empty">${vi ? "Chưa có hàng bit" : "No bit row yet"}</div>`;
+
+  const progress = view.progress;
+  const progressHtml = progress
+    ? (() => {
+      const total = Math.max(0, Number(progress.total) || 0);
+      const current = Math.max(0, Number(progress.current) || 0);
+      const percent = total === 0 ? 100 : Math.min(100, Math.round((current / total) * 100));
+      return `<section class="bmb-progress"><div><small>${escapeHtml(pick(progress.label))}</small><strong>${current}/${total}</strong></div><span role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${current}"><i style="width:${percent}%"></i></span></section>`;
+    })()
+    : "";
+
+  const trail = Array.isArray(view.trail) ? view.trail.slice(-8) : [];
+  const trailHtml = trail.length
+    ? `<section class="bmb-trail"><header><strong>${vi ? "DẤU VẾT TỪNG BƯỚC" : "STEP TRACE"}</strong><span>${vi ? "mới nhất ở bên phải" : "newest on the right"}</span></header><div>${trail.map((item) => `<article><small>${escapeHtml(String(item.label || ""))}</small><strong>${escapeHtml(String(item.value ?? ""))}</strong><code>${escapeHtml(String(item.bits || ""))}</code></article>`).join("")}</div></section>`
+    : "";
+
+  const result = view.result;
+  const resultHtml = result
+    ? `<section class="bmb-result ${escapeHtml(String(result.status || ""))}"><small>${escapeHtml(pick(result.label))}</small><strong>${escapeHtml(String(result.value))}</strong>${result.bits ? `<code>${escapeHtml(String(result.bits))}<sub>2</sub></code>` : ""}</section>`
+    : "";
+  const activeHint = activeBit >= 0
+    ? (vi ? `Viền vàng đang đánh dấu bit ${activeBit}.` : `The amber outline marks bit ${activeBit}.`)
+    : (vi ? "Các hàng đã được căn theo cùng vị trí bit." : "Rows are aligned by bit position.");
+  const aria = `${modeLabels[view.mode] || "Bitmask"}. ${pick(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="bmb-viz" role="img" aria-label="${escapeHtml(aria)}">
+    <header><div><small>BITMASK LAB · #${escapeHtml(String(view.problemId || ""))}</small><strong>${escapeHtml(modeLabels[view.mode] || "BITMASK")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="bmb-phases">${phasesHtml}</div>
+    <section class="bmb-rule"><b>${vi ? "QUY TẮC" : "CORE RULE"}</b><strong>${escapeHtml(pick(view.rule))}</strong></section>
+    <section class="bmb-board"><header><strong>${vi ? "CĂN THEO VỊ TRÍ BIT" : "BIT-POSITION ALIGNMENT"}</strong><span>${escapeHtml(activeHint)}</span></header><div class="bmb-board-scroll">${rowsHtml}</div></section>
+    ${view.expression ? `<section class="bmb-operation"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT OPERATION"}</small><strong>${escapeHtml(pick(view.expression))}</strong><span>${escapeHtml(pick(step.note))}</span></section>` : ""}
+    ${progressHtml}
+    ${trailHtml}
+    ${resultHtml}
+  </section>`;
+}
+
 function renderCountBitsView(step) {
   const view = step.countBitsView || {};
   const vi = lang === "vi";
@@ -24012,6 +24202,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinCostStairsView(step);
+  } else if (step.bitmaskBasicsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBitmaskBasicsView(step);
   } else if (step.countBitsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

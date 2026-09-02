@@ -24168,11 +24168,20 @@ function parseIntegerList1655(value, name) {
 
 function buildSteps1655(input, params = {}) {
   const nums = parseIntegerList1655(input, "nums");
-  const quantity = parseIntegerList1655(params.quantity ?? "", "quantity").sort((left, right) => right - left);
+  const originalQuantity = parseIntegerList1655(params.quantity ?? "", "quantity");
+  const requests = originalQuantity
+    .map((need, originalIndex) => ({ need, originalIndex }))
+    .sort((left, right) => right.need - left.need || left.originalIndex - right.originalIndex);
+  const quantity = requests.map((request) => request.need);
+  const requestOrder = requests.map((request) => request.originalIndex);
   if (nums.length > 16 || quantity.length < 1 || quantity.length > 5 || quantity.some((value) => value < 1 || value > 10)) {
     throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10). ");
   }
-  const counts = [...nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map()).values()].sort((left, right) => right - left);
+  const frequency = nums.reduce((map, value) => map.set(value, (map.get(value) || 0) + 1), new Map());
+  const groups = [...frequency.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((left, right) => right.count - left.count || left.value - right.value);
+  const counts = groups.map((group) => group.count);
   const customerCount = quantity.length;
   const fullMask = (1 << customerCount) - 1;
   const subsetSums = Array(1 << customerCount).fill(0);
@@ -24184,15 +24193,78 @@ function buildSteps1655(input, params = {}) {
   const steps = [];
   const TRACE_LIMIT = 300;
   let traceTruncated = false;
+  const parent = new Map();
+  const buildAssignments = (mask) => {
+    const assignments = [];
+    let cursor = mask;
+    while (cursor !== 0 && parent.has(cursor)) {
+      const edge = parent.get(cursor);
+      assignments.unshift({
+        bucketIndex: edge.bucketIndex,
+        value: groups[edge.bucketIndex].value,
+        capacity: groups[edge.bucketIndex].count,
+        customerSlots: quantity.map((_, index) => index).filter((index) => edge.addMask & (1 << index)),
+        addMask: edge.addMask,
+        used: subsetSums[edge.addMask],
+      });
+      cursor = edge.fromMask;
+    }
+    return assignments;
+  };
   const snapshot = ({ line, phase, bucketIndex = -1, fromMask = null, addMask = null, reachable, title, note, final = false, force = false }) => {
     if (!force && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
+    const newMask = fromMask != null && addMask != null ? fromMask | addMask : null;
     steps.push({
       title, note, final, arr: [], sub: [], highlight: [], mark: [], codeLines: [line],
-      vars: [{ name: "requests", value: `[${quantity.join(", ")}]` }, { name: "frequency buckets", value: `[${counts.join(", ")}]` }, { name: "reachable masks", value: reachable.size }],
-      distribute1655View: { quantity, counts, subsetSums, fullMask, bucketIndex, fromMask, addMask, reachable: [...reachable], phase, answer: final ? reachable.has(fullMask) : null, traceTruncated },
+      vars: [
+        { name: "needs↓", value: `[${quantity.join(", ")}]` },
+        { name: "frequency buckets", value: `[${counts.join(", ")}]` },
+        { name: "reachable masks", value: reachable.size },
+        ...(bucketIndex >= 0 ? [{ name: "current bucket", value: `${groups[bucketIndex].value} × ${groups[bucketIndex].count}` }] : []),
+        ...(addMask != null ? [{ name: "subset need", value: subsetSums[addMask] }] : []),
+      ],
+      distribute1655View: {
+        nums: [...nums],
+        originalQuantity: [...originalQuantity],
+        quantity: [...quantity],
+        requestOrder: [...requestOrder],
+        groups: groups.map((group) => ({ ...group })),
+        counts: [...counts],
+        subsetSums: [...subsetSums],
+        fullMask,
+        bucketIndex,
+        fromMask,
+        addMask,
+        newMask,
+        reachable: [...reachable],
+        phase,
+        answer: final ? reachable.has(fullMask) : null,
+        assignments: final && reachable.has(fullMask) ? buildAssignments(fullMask) : [],
+        traceTruncated,
+      },
     });
   };
   let reachable = new Set([0]);
+  snapshot({
+    line: 5,
+    phase: "compress",
+    reachable,
+    title: { vi: "Bước 1: Gom các số giống nhau", en: "Step 1: Group equal values" },
+    note: {
+      vi: `${nums.join(", ")} được nén thành ${groups.map((group) => `${group.value} × ${group.count}`).join("; ")}. Mỗi nhóm là một bucket riêng vì customer chỉ được nhận các số bằng nhau.`,
+      en: `${nums.join(", ")} compresses into ${groups.map((group) => `${group.value} × ${group.count}`).join("; ")}. Each group is a separate bucket because a customer must receive equal values.`,
+    },
+  });
+  snapshot({
+    line: 6,
+    phase: "subset-sums",
+    reachable,
+    title: { vi: "Bước 2: Mỗi mask là một nhóm customer", en: "Step 2: Each mask is a customer subset" },
+    note: {
+      vi: `quantity gốc [${originalQuantity.join(", ")}] được xét theo nhu cầu giảm dần [${quantity.join(", ")}]. sums[mask] cho biết tổng số bản sao cần để phục vụ toàn bộ customer bật bit trong mask.`,
+      en: `Original quantity [${originalQuantity.join(", ")}] is processed largest-first as [${quantity.join(", ")}]. sums[mask] is the total copies required by all customers whose bits are on.`,
+    },
+  });
   snapshot({ line: 10, phase: "init", reachable, title: { vi: "Khởi tạo mask 0", en: "Initialize mask 0" }, note: { vi: "Mask 0 nghĩa là chưa customer nào nhận đủ số lượng.", en: "Mask 0 means no customer request is fulfilled yet." } });
   for (let bucketIndex = 0; bucketIndex < counts.length; bucketIndex++) {
     const count = counts[bucketIndex];
@@ -24205,6 +24277,7 @@ function buildSteps1655(input, params = {}) {
         const newMask = mask | addMask;
         if (nextReachable.has(newMask)) continue;
         nextReachable.add(newMask);
+        parent.set(newMask, { fromMask: mask, addMask, bucketIndex });
         snapshot({ line: 17, phase: "transition", bucketIndex, fromMask: mask, addMask, reachable: nextReachable, title: { vi: `Bucket ${count} phục vụ mask ${addMask.toString(2)}`, en: `Bucket ${count} serves mask ${addMask.toString(2)}` }, note: { vi: `Tổng request của subset là ${subsetSums[addMask]} ≤ ${count}; state mới là mask ${newMask.toString(2)}.`, en: `The subset request totals ${subsetSums[addMask]} ≤ ${count}; the new state is mask ${newMask.toString(2)}.` } });
       }
     }

@@ -3316,6 +3316,23 @@ function buildSteps66(input) {
 function buildSteps136(input) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
   const steps = [];
+  const hasNegative = nums.some((value) => value < 0);
+  const width = hasNegative
+    ? 32
+    : Math.max(4, ...nums.map((value) => Math.abs(value).toString(2).length));
+  const bits = (value) => (Number(value) >>> 0).toString(2).padStart(32, "0").slice(-width);
+  const row = (label, value, tone = "") => ({ label, value, bits: bits(value), tone });
+  const stages = [
+    { vi: "1. Khởi tạo", en: "1. Initialize" },
+    { vi: "2. Lấy số kế", en: "2. Read next" },
+    { vi: "3. XOR", en: "3. XOR" },
+    { vi: "4. Kết quả", en: "4. Result" },
+  ];
+  const rule = {
+    vi: "a ^ a = 0 và a ^ 0 = a: mỗi cặp bằng nhau tự triệt tiêu.",
+    en: "a ^ a = 0 and a ^ 0 = a: every equal pair cancels itself.",
+  };
+  const trail = [];
   let result = 0;
   steps.push({
     title: { vi: "result = 0", en: "result = 0" },
@@ -3323,16 +3340,32 @@ function buildSteps136(input) {
     codeLines: [3],
     vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "result", value: 0 }],
     note: { vi: "XOR có tính: a^a=0 và a^0=a. Nên XOR mọi phần tử → các cặp triệt tiêu, còn lại số xuất hiện 1 lần.", en: "XOR properties: a^a=0 and a^0=a. XOR all elements → pairs cancel, leaving the single number." },
+    bitmaskBasicsView: {
+      problemId: 136, mode: "xor-fold", phase: "setup", stages, stageIndex: 0, rule, width,
+      rows: [row("result", 0, "result")], activeBit: -1,
+      expression: { vi: "Bắt đầu với 0; XOR lần lượt từng nums[i].", en: "Start at 0, then XOR each nums[i] in order." },
+      progress: { current: 0, total: nums.length, label: { vi: "phần tử đã gộp", en: "values folded" } },
+      trail: [], result: null,
+    },
   });
   for (let i = 0; i < nums.length; i++) {
     const prev = result;
     result ^= nums[i];
+    trail.push({ label: `i=${i}`, value: result, bits: bits(result) });
     steps.push({
       title: { vi: `result ^= ${nums[i]} → ${result}`, en: `result ^= ${nums[i]} → ${result}` },
       arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [],
       codeLines: [4, 5],
       vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "result", value: result }],
-      note: { vi: `${prev} XOR ${nums[i]} = ${result}.`, en: `${prev} XOR ${nums[i]} = ${result}.` },
+      note: { vi: `${prev} XOR ${nums[i]} = ${result}. Các số xuất hiện lần hai sẽ xóa dấu vết XOR của lần đầu.`, en: `${prev} XOR ${nums[i]} = ${result}. A value's second occurrence removes the XOR trace left by its first.` },
+      bitmaskBasicsView: {
+        problemId: 136, mode: "xor-fold", phase: "xor", stages, stageIndex: 2, rule, width,
+        rows: [row("result trước", prev, "source"), row(`nums[${i}]`, nums[i], "active"), row("result mới", result, "result")],
+        activeBit: -1,
+        expression: { vi: `${prev} ^ ${nums[i]} = ${result}`, en: `${prev} ^ ${nums[i]} = ${result}` },
+        progress: { current: i + 1, total: nums.length, label: { vi: "phần tử đã gộp", en: "values folded" } },
+        trail: [...trail], result: null,
+      },
     });
   }
   steps.push({
@@ -3341,6 +3374,14 @@ function buildSteps136(input) {
     codeLines: [6],
     vars: [{ name: "answer", value: result }],
     note: { vi: `Số xuất hiện đúng 1 lần = ${result}.`, en: `The number appearing once = ${result}.` },
+    bitmaskBasicsView: {
+      problemId: 136, mode: "xor-fold", phase: "done", stages, stageIndex: 3, rule, width,
+      rows: [row("XOR toàn mảng", result, "result")], activeBit: -1,
+      expression: { vi: `Mọi cặp đã thành 0; chỉ còn ${result}.`, en: `Every pair became 0; only ${result} remains.` },
+      progress: { current: nums.length, total: nums.length, label: { vi: "phần tử đã gộp", en: "values folded" } },
+      trail,
+      result: { label: { vi: "SỐ XUẤT HIỆN 1 LẦN", en: "SINGLE NUMBER" }, value: result, bits: bits(result), status: "success" },
+    },
   });
   return { original: nums, answer: result, steps };
 }

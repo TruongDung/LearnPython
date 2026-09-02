@@ -2578,12 +2578,66 @@ function buildSteps231(input) {
   const n = Number(Array.isArray(input) ? input[0] : String(input).trim());
   const steps = [];
   const bin = (v) => (v < 0 ? "-" : "") + Math.abs(v).toString(2);
-  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  snap({ title: { vi: `n = ${n}`, en: `n = ${n}` }, codeLines: [3], vars: [{ name: "n", value: n }, { name: "n (binary)", value: bin(n) }], note: { vi: "Lũy thừa của 2 có ĐÚNG 1 bit 1. Khi đó n & (n-1) xóa bit đó → 0.", en: "A power of two has EXACTLY one set bit. Then n & (n-1) clears it → 0." } });
-  if (n <= 0) { snap({ title: { vi: `n ≤ 0 → False`, en: `n ≤ 0 → False` }, final: true, codeLines: [4], vars: [{ name: "answer", value: false }], note: { vi: "Số ≤ 0 không phải lũy thừa của 2.", en: "Non-positive is not a power of two." } }); return { original: n, answer: false, steps }; }
+  const width = n < 0 ? 32 : Math.max(4, Math.abs(n).toString(2).length);
+  const bits = (value) => (Number(value) >>> 0).toString(2).padStart(32, "0").slice(-width);
+  const row = (label, value, tone = "") => ({ label, value, bits: bits(value), tone });
+  const stages = [
+    { vi: "1. Kiểm tra n", en: "1. Check n" },
+    { vi: "2. Tính n - 1", en: "2. Compute n - 1" },
+    { vi: "3. AND", en: "3. AND" },
+    { vi: "4. Kết luận", en: "4. Decide" },
+  ];
+  const rule = {
+    vi: "Lũy thừa của 2 có đúng một bit 1; n & (n-1) sẽ xóa bit đó.",
+    en: "A power of two has exactly one 1-bit; n & (n-1) clears that bit.",
+  };
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [], highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+      bitmaskBasicsView: {
+        problemId: 231, mode: "power-of-two", phase: o.phase, stages,
+        stageIndex: o.stageIndex, rule, width, rows: o.rows || [], activeBit: -1,
+        expression: o.expression || null, progress: null, trail: [], result: o.result || null,
+      },
+    });
+  }
+  snap({
+    title: { vi: `n = ${n}`, en: `n = ${n}` }, phase: "setup", stageIndex: 0,
+    codeLines: [3], vars: [{ name: "n", value: n }, { name: "n (binary)", value: bin(n) }],
+    rows: [row("n", n, "source")],
+    expression: { vi: "Trước hết n phải dương; sau đó mới áp dụng bit trick.", en: "First n must be positive; then apply the bit trick." },
+    note: { vi: "Lũy thừa của 2 có ĐÚNG 1 bit 1. Khi đó n & (n-1) xóa bit đó → 0.", en: "A power of two has EXACTLY one set bit. Then n & (n-1) clears it → 0." },
+  });
+  if (n <= 0) {
+    snap({
+      title: { vi: `n ≤ 0 → False`, en: `n ≤ 0 → False` }, phase: "done", stageIndex: 3,
+      final: true, codeLines: [4], vars: [{ name: "answer", value: false }], rows: [row("n", n, "danger")],
+      expression: { vi: "Điều kiện n > 0 sai, nên không cần thực hiện AND.", en: "The n > 0 condition fails, so no AND operation is needed." },
+      result: { label: { vi: "LŨY THỪA CỦA 2?", en: "POWER OF TWO?" }, value: "False", status: "danger" },
+      note: { vi: "Số ≤ 0 không phải lũy thừa của 2.", en: "Non-positive is not a power of two." },
+    });
+    return { original: n, answer: false, steps };
+  }
   const andVal = n & (n - 1);
   const answer = andVal === 0;
-  snap({ title: { vi: `n & (n-1) = ${bin(n)} & ${bin(n - 1)} = ${andVal}`, en: `n & (n-1) = ${bin(n)} & ${bin(n - 1)} = ${andVal}` }, final: true, codeLines: [4], vars: [{ name: "n", value: `${n} (${bin(n)})` }, { name: "n-1", value: `${n - 1} (${bin(n - 1)})` }, { name: "n & (n-1)", value: andVal }, { name: "answer", value: answer }], note: { vi: answer ? `Kết quả = 0 → n có 1 bit duy nhất → là lũy thừa của 2.` : `Kết quả ≠ 0 → n có nhiều bit → KHÔNG phải lũy thừa của 2.`, en: answer ? `Result = 0 → n has a single bit → it IS a power of two.` : `Result ≠ 0 → n has multiple bits → NOT a power of two.` } });
+  snap({
+    title: { vi: `n & (n-1) = ${andVal}`, en: `n & (n-1) = ${andVal}` }, phase: "and", stageIndex: 2,
+    codeLines: [4],
+    vars: [{ name: "n", value: `${n} (${bin(n)})` }, { name: "n-1", value: `${n - 1} (${bin(n - 1)})` }, { name: "n & (n-1)", value: andVal }, { name: "answer", value: answer }],
+    rows: [row("n", n, "source"), row("n - 1", n - 1, "active"), row("AND", andVal, answer ? "result" : "danger")],
+    expression: { vi: `${bits(n)} & ${bits(n - 1)} = ${bits(andVal)} → ${answer ? "bằng 0" : "khác 0"}.`, en: `${bits(n)} & ${bits(n - 1)} = ${bits(andVal)} → ${answer ? "equals 0" : "is not 0"}.` },
+    note: { vi: answer ? `Kết quả = 0 → n có 1 bit duy nhất → là lũy thừa của 2.` : `Kết quả ≠ 0 → n có nhiều bit → KHÔNG phải lũy thừa của 2.`, en: answer ? `Result = 0 → n has a single bit → it IS a power of two.` : `Result ≠ 0 → n has multiple bits → NOT a power of two.` },
+  });
+  snap({
+    title: { vi: answer ? `${andVal} = 0 → True` : `${andVal} ≠ 0 → False`, en: answer ? `${andVal} = 0 → True` : `${andVal} ≠ 0 → False` },
+    phase: "done", stageIndex: 3, final: true, codeLines: [4],
+    vars: [{ name: "answer", value: answer }],
+    rows: [row("n", n, "source"), row("n & (n - 1)", andVal, answer ? "result" : "danger")],
+    expression: { vi: answer ? "AND bằng 0: n chỉ có đúng một bit 1." : "AND vẫn khác 0: sau khi xóa một bit 1 vẫn còn bit 1 khác.", en: answer ? "AND is 0: n had exactly one set bit." : "AND is non-zero: another 1-bit remains after clearing one." },
+    result: { label: { vi: "LŨY THỪA CỦA 2?", en: "POWER OF TWO?" }, value: answer ? "True" : "False", status: answer ? "success" : "danger" },
+    note: { vi: answer ? `${n} là lũy thừa của 2.` : `${n} không phải lũy thừa của 2.`, en: answer ? `${n} is a power of two.` : `${n} is not a power of two.` },
+  });
   return { original: n, answer, steps };
 }
 

@@ -6199,7 +6199,7 @@ module.exports = {
     difficulty: "hard",
     slug: "count-paths-that-can-form-a-palindrome-in-a-tree",
     category: TREE_CAT,
-    tags: [{ key: "bit-manipulation", vi: "Bitmask", en: "Bitmask" }, { key: "hashmap", vi: "Hash Map", en: "Hash Map" }],
+    tags: [{ key: "bitmask", vi: "Bitmask", en: "Bitmask" }, { key: "hashmap", vi: "Hash Map", en: "Hash Map" }],
     title: { vi: "Count Paths That Can Form a Palindrome in a Tree", en: "Count Paths That Can Form a Palindrome in a Tree" },
     titleVi: { vi: "Đếm đường đi có thể tạo palindrome trong cây", en: "Count tree paths that can form a palindrome" },
     statement: {

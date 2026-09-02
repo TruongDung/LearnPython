@@ -30,6 +30,7 @@ const categories = {
   "binary-lifting": require("./binary-lifting"),
   "binary-search": require("./binary-search"),
   "monotonic-stack": require("./monotonic-stack"),
+  bitmask: require("./bitmask"),
 };
 
 const SUPPORTED = {};
@@ -42,6 +43,10 @@ const MONOTONIC_STACK_IDS = new Set([
   84, 85, 321, 768, 975, 1526, 1776, 1793, 1944, 2281, 2334, 2454, 2617,
   2736, 2818, 2940, 2945, 1063, 2030, 2355,
   3113, 3205, 3221, 3359, 3430,
+]);
+const BITMASK_TAG = { key: "bitmask", vi: "Bitmask", en: "Bitmask" };
+const BITMASK_IDS = new Set([
+  78, 136, 191, 231, 268, 338, 461, 476, 693, 868, 1342, 2220,
 ]);
 
 for (const [catKey, mod] of Object.entries(categories)) {
@@ -61,6 +66,15 @@ for (const id of MONOTONIC_STACK_IDS) {
   const tags = Array.isArray(problem.tags) ? problem.tags : [];
   if (!tags.some((tag) => tag && tag.key === MONOTONIC_STACK_TAG.key)) {
     problem.tags = [...tags, MONOTONIC_STACK_TAG];
+  }
+}
+
+for (const id of BITMASK_IDS) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some((tag) => tag && tag.key === BITMASK_TAG.key)) {
+    problem.tags = [...tags, BITMASK_TAG];
   }
 }
 
