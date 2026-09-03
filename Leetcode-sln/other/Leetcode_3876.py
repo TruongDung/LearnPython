@@ -1,5 +1,8 @@
+from typing import List
+
+
 class Solution:
-    def uniformArray(self, nums1: list[int]) -> bool:
+    def uniformArray(self, nums1: List[int]) -> bool:
         min_value = min(nums1)
         is_even = True
         for num in nums1:
