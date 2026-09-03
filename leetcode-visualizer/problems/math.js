@@ -3266,7 +3266,135 @@ function buildSteps850(input) {
   return { original: rectangles, answer: Number(area), steps };
 }
 
-// ─── 1739: Building Boxes ───────────────────────────────────────────────────
+// ─── 1739 Approach 2: simulate layer-by-layer with height/floor/total ────────
+function buildSteps1739Approach2(input) {
+  const n = Array.isArray(input) ? input[0] : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 100000) throw new Error("n must be at most 100000");
+
+  const steps = [];
+  let height = 0, total = 0, floor = 0;
+
+  const snap = (o) => steps.push({ ...o });
+
+  snap({
+    title: { vi: `n = ${n} — Cách 2: mô phỏng từng tầng`, en: `n = ${n} — Approach 2: simulate layer by layer` },
+    note: {
+      vi: "Tăng height từng bước. Mỗi tầng mới thêm floor += height (thêm hàng mới vào sàn), total += floor. Tiếp tục cho đến khi total ≥ n.",
+      en: "Increment height step by step. Each new layer adds floor += height (a new row to the base), total += floor. Continue until total ≥ n.",
+    },
+    arr: [n], highlight: [], mark: [], codeLines: [2, 3, 4],
+    vars: [{ name: "height", value: 0 }, { name: "floor", value: 0 }, { name: "total", value: 0 }],
+    buildingBoxesView: { phase: "init", k: 0, total: 0, floor: 0, n, remainder: n, extraFloor: 0, complete: false },
+  });
+
+  // Phase 1 — grow height until total >= n
+  while (total < n) {
+    height++;
+    floor += height;
+    total += floor;
+    snap({
+      title: { vi: `height=${height}: floor+=${height} → ${floor}, total+=${floor} → ${total}`, en: `height=${height}: floor+=${height} → ${floor}, total+=${floor} → ${total}` },
+      note: {
+        vi: `Thêm hàng ${height} vào đế tháp: floor = ${floor}, total = ${total}. ${total >= n ? `total ≥ ${n} → dừng vòng lặp.` : `Chưa đủ ${n} hộp, tiếp tục.`}`,
+        en: `Add row ${height} to the base: floor = ${floor}, total = ${total}. ${total >= n ? `total ≥ ${n} → exit loop.` : `Not yet ${n} boxes, continue.`}`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "height", value: height },
+        { name: "floor", value: floor },
+        { name: "total", value: total },
+        { name: "remaining", value: Math.max(0, n - total) },
+      ],
+      buildingBoxesView: { phase: "layer", k: height, total: Math.min(total, n), floor, n, remainder: Math.max(0, n - total), extraFloor: 0, complete: total >= n },
+    });
+  }
+
+  // Check exact fit
+  if (total === n) {
+    snap({
+      title: { vi: `total == n == ${n} → trả về floor = ${floor}`, en: `total == n == ${n} → return floor = ${floor}` },
+      note: {
+        vi: `Tháp vừa khớp chính xác n hộp. Không cần ô sàn thêm. Đáp án = ${floor}.`,
+        en: `The pyramid holds exactly n boxes. No extra floor cell needed. Answer = ${floor}.`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [9, 10], final: true,
+      vars: [{ name: "answer", value: floor }, { name: "total", value: total }, { name: "floor", value: floor }],
+      buildingBoxesView: { phase: "done", k: height, total, floor, n, remainder: 0, extraFloor: 0, complete: true },
+    });
+    return { input, answer: floor, steps };
+  }
+
+  // Roll back one layer
+  total -= floor;
+  floor -= height;
+  const kFull = height - 1;
+
+  snap({
+    title: { vi: `Lui lại 1 tầng: total -= ${floor + height} → ${total}, floor -= ${height} → ${floor}`, en: `Undo last layer: total -= ${floor + height} → ${total}, floor -= ${height} → ${floor}` },
+    note: {
+      vi: `Tháp ${kFull} tầng (không phải ${height}) là tháp đầy đủ cuối cùng chứa ≤ ${n} hộp. Còn ${n - total} hộp dư cần được đỡ bằng các ô sàn lẻ.`,
+      en: `The ${kFull}-layer (not ${height}) pyramid is the last full pyramid with ≤ ${n} boxes. ${n - total} boxes remain and need individual floor cells.`,
+    },
+    arr: [n], highlight: [], mark: [], codeLines: [11, 12],
+    vars: [
+      { name: "height (rolled back)", value: kFull },
+      { name: "floor (rolled back)", value: floor },
+      { name: "total (rolled back)", value: total },
+      { name: "remaining", value: n - total },
+    ],
+    buildingBoxesView: { phase: "between", k: kFull, total, floor, n, remainder: n - total, extraFloor: 0, complete: false },
+  });
+
+  // Phase 2 — add floor cells one by one
+  let x = 0, extraFloor = 0;
+
+  snap({
+    title: { vi: `Bước 2: thêm ô sàn lẻ — còn ${n - total} hộp`, en: `Step 2: add individual floor cells — ${n - total} boxes remaining` },
+    note: {
+      vi: "Mỗi ô sàn lẻ ở hàng x có thể đỡ thêm x hộp phía trên. Tăng x từ 1 cho đến khi total ≥ n.",
+      en: "Each extra floor cell in row x supports x more boxes above. Increment x from 1 until total ≥ n.",
+    },
+    arr: [n], highlight: [], mark: [], codeLines: [14, 15],
+    vars: [{ name: "remaining", value: n - total }, { name: "floor so far", value: floor }],
+    buildingBoxesView: { phase: "extra-init", k: kFull, total, floor, n, remainder: n - total, extraFloor: 0, complete: false },
+  });
+
+  while (total < n) {
+    x++;
+    total += x;
+    floor++;
+    extraFloor++;
+    snap({
+      title: { vi: `x=${x}: total += ${x} → ${total}, floor++ → ${floor}`, en: `x=${x}: total += ${x} → ${total}, floor++ → ${floor}` },
+      note: {
+        vi: `Ô sàn lẻ thứ ${extraFloor} ở hàng x=${x} đỡ thêm ${x} hộp. total = ${total}${total >= n ? ` ≥ ${n} → xong!` : ` < ${n}, tiếp tục.`}`,
+        en: `Extra floor cell ${extraFloor} at row x=${x} supports ${x} boxes. total = ${total}${total >= n ? ` ≥ ${n} → done!` : ` < ${n}, continue.`}`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [15, 16, 17],
+      vars: [
+        { name: "x", value: x },
+        { name: `+${x} boxes`, value: `total → ${total}` },
+        { name: "floor", value: floor },
+        { name: "remaining", value: Math.max(0, n - total) },
+      ],
+      buildingBoxesView: { phase: "extra", k: kFull, total: Math.min(total, n), floor, n, remainder: Math.max(0, n - total), extraFloor, complete: total >= n },
+    });
+  }
+
+  snap({
+    title: { vi: `Kết quả: ${floor} ô sàn`, en: `Answer: ${floor} floor cells` },
+    note: {
+      vi: `Tháp ${kFull} tầng đầy đủ + ${extraFloor} ô sàn lẻ = ${floor} ô. Chứa ≥ ${n} hộp.`,
+      en: `Full ${kFull}-layer pyramid + ${extraFloor} extra floor cells = ${floor} cells. Holds ≥ ${n} boxes.`,
+    },
+    arr: [n], highlight: [], mark: [], final: true, codeLines: [18],
+    vars: [{ name: "answer", value: floor }, { name: "total", value: total }, { name: "n", value: n }],
+    buildingBoxesView: { phase: "done", k: kFull, total, floor, n, remainder: 0, extraFloor, complete: true },
+  });
+
+  return { input, answer: floor, steps };
+}
 function buildSteps1739(input) {
   const n = Array.isArray(input) ? input[0] : Number(input);
   if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
@@ -4295,6 +4423,30 @@ module.exports = {
       "            floor += 1",
       "        return floor",
     ],
+    codeLabel: { vi: "Cách 1: Greedy công thức k*(k+1)*(k+2)/6", en: "Approach 1: Greedy formula k*(k+1)*(k+2)/6" },
+    code2Label: { vi: "Cách 2: Mô phỏng tăng height từng bước", en: "Approach 2: Simulate height increment" },
+    code2: [
+      "class Solution:",
+      "    def minimumBoxes(self, n: int) -> int:",
+      "        height = 0",
+      "        total = 0",
+      "        floor = 0",
+      "        while total < n:",
+      "            height += 1",
+      "            floor += height",
+      "            total += floor",
+      "        if total == n:",
+      "            return floor",
+      "        total -= floor",
+      "        floor -= height",
+      "        x = 0",
+      "        while total < n:",
+      "            x += 1",
+      "            total += x",
+      "            floor += 1",
+      "        return floor",
+    ],
     builder: buildSteps1739,
+    builder2: buildSteps1739Approach2,
   },
 };

@@ -16,7 +16,7 @@ class Allocator:
                 start = i - size + 1
                 for j in range(start, i + 1):
                     self.arr[j] = mID
-                return start       
+                return start
 
         return -1
 
