@@ -41978,3 +41978,66 @@ html, body {
   .abm-result { grid-template-columns: 1fr auto; }
   .abm-result span { grid-column: 1 / -1; }
 }
+
+/* LeetCode 1739 · Building Boxes · pyramid floor visualization */
+.bb-viz { display: grid; gap: 14px; padding: 18px; color: #e2e8f0; background: radial-gradient(circle at 10% 0, rgba(99,102,241,.12), transparent 36%), #0b1220; border: 1px solid #29364a; border-radius: 16px; }
+.bb-phases { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.bb-phases span { min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px; color: #94a3b8; background: rgba(15,23,42,.76); border: 1px solid #334155; border-radius: 10px; font-size: 11px; text-align: center; }
+.bb-phases span.active { color: #c7d2fe; background: rgba(79,70,229,.28); border-color: #6366f1; }
+.bb-phases span.done { color: #86efac; background: rgba(6,78,59,.28); border-color: #10b981; }
+.bb-phases span b { font-weight: 700; }
+.bb-main { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.bb-layers { border: 1px solid #334155; border-radius: 12px; background: rgba(15,23,42,.55); padding: 12px; }
+.bb-layers header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.bb-layers header strong { color: #c7d2fe; font-size: 11px; letter-spacing: .04em; }
+.bb-layers header span { color: #94a3b8; font-size: 10px; }
+.bb-layer-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.bb-layer { border: 1px solid #475569; border-radius: 10px; background: #111c2f; padding: 8px 10px; display: grid; gap: 6px; place-items: center; min-width: 68px; }
+.bb-layer header { width: 100%; }
+.bb-layer header small { color: #94a3b8; font: 700 9px "SFMono-Regular", Consolas, monospace; }
+.bb-layer footer { display: flex; align-items: baseline; gap: 4px; }
+.bb-layer footer b { color: #f8fafc; font: 800 18px "SFMono-Regular", Consolas, monospace; }
+.bb-layer footer em { color: #94a3b8; font: 700 9px "SFMono-Regular", Consolas, monospace; font-style: normal; }
+.bb-layer.full { border-color: rgba(99,102,241,.5); background: rgba(49,46,129,.22); }
+.bb-layer.partial { border-color: rgba(245,158,11,.5); background: rgba(120,53,15,.22); }
+.bb-layer.active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.2); }
+.bb-triangle { display: block; }
+.bb-dot { fill: #334155; }
+.bb-dot.upper { fill: #6366f1; }
+.bb-dot.floor { fill: #f59e0b; }
+.bb-dot-label { fill: #64748b; font: 700 8px "SFMono-Regular", Consolas, monospace; }
+.bb-empty { color: #64748b; font-size: 11px; font-style: italic; }
+.bb-side { display: grid; gap: 12px; align-content: start; }
+.bb-stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.bb-stat-grid > div { padding: 8px; border: 1px solid #334155; border-radius: 9px; background: rgba(15,23,42,.6); text-align: center; }
+.bb-stat-grid small { display: block; color: #94a3b8; font-size: 9px; letter-spacing: .04em; margin-bottom: 3px; }
+.bb-stat-grid strong { color: #f8fafc; font: 800 18px "SFMono-Regular", Consolas, monospace; }
+.bb-stat-grid strong em { color: #64748b; font-size: 12px; font-style: normal; }
+.bb-progress { border: 1px solid #334155; border-radius: 10px; background: rgba(15,23,42,.55); padding: 10px; }
+.bb-progress header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.bb-progress header strong { color: #cbd5e1; font-size: 11px; }
+.bb-progress header span { color: #94a3b8; font-size: 10px; }
+.bb-progress-bar { height: 8px; border-radius: 4px; background: #1e293b; overflow: hidden; }
+.bb-progress-fill { height: 100%; border-radius: 4px; background: #6366f1; transition: width .2s; }
+.bb-progress-fill.complete { background: #10b981; }
+.bb-formula { border: 1px solid #334155; border-radius: 10px; background: rgba(15,23,42,.55); padding: 10px; }
+.bb-formula header { margin-bottom: 6px; }
+.bb-formula header strong { color: #cbd5e1; font-size: 11px; }
+.bb-formula code { display: block; color: #fbbf24; font: 700 11px "SFMono-Regular", Consolas, monospace; margin-bottom: 4px; word-break: break-all; }
+.bb-formula span { color: #94a3b8; font-size: 10px; }
+.bb-answer { border: 1px solid #334155; border-radius: 10px; background: rgba(15,23,42,.55); padding: 10px; text-align: center; }
+.bb-answer small { display: block; color: #94a3b8; font-size: 9px; letter-spacing: .04em; margin-bottom: 4px; }
+.bb-answer strong { display: block; color: #f8fafc; font: 800 28px "SFMono-Regular", Consolas, monospace; margin-bottom: 4px; }
+.bb-answer span { color: #94a3b8; font-size: 10px; }
+.bb-answer.complete { border-color: #10b981; background: rgba(6,78,59,.22); }
+.bb-answer.complete strong { color: #86efac; }
+.bb-answer.complete span { color: #6ee7b7; }
+@media (max-width: 680px) { .bb-main { grid-template-columns: 1fr; } .bb-phases { grid-template-columns: repeat(2,1fr); } }
+[data-theme="light"] .bb-viz { color: #1e293b; background: radial-gradient(circle at 10% 0, rgba(99,102,241,.08), transparent 36%), #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .bb-phases span, [data-theme="light"] .bb-layers, [data-theme="light"] .bb-layer, [data-theme="light"] .bb-stat-grid > div, [data-theme="light"] .bb-progress, [data-theme="light"] .bb-formula, [data-theme="light"] .bb-answer { background: #fff; border-color: #cbd5e1; color: #334155; }
+[data-theme="light"] .bb-phases span.active { background: #eef2ff; border-color: #6366f1; color: #3730a3; }
+[data-theme="light"] .bb-phases span.done { background: #f0fdf4; border-color: #10b981; color: #166534; }
+[data-theme="light"] .bb-dot { fill: #cbd5e1; } [data-theme="light"] .bb-dot.upper { fill: #6366f1; } [data-theme="light"] .bb-dot.floor { fill: #f59e0b; }
+[data-theme="light"] .bb-formula code { color: #b45309; } [data-theme="light"] .bb-stat-grid strong { color: #0f172a; }
+[data-theme="light"] .bb-answer strong { color: #0f172a; } [data-theme="light"] .bb-answer.complete strong { color: #166534; }
+[data-theme="light"] .bb-progress-bar { background: #e2e8f0; }

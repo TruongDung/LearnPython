@@ -3266,6 +3266,129 @@ function buildSteps850(input) {
   return { original: rectangles, answer: Number(area), steps };
 }
 
+// ─── 1739: Building Boxes ───────────────────────────────────────────────────
+function buildSteps1739(input) {
+  const n = Array.isArray(input) ? input[0] : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 100000) throw new Error("n must be at most 100000");
+
+  const steps = [];
+
+  // ── layer info for display ────────────────────────────────────────────────
+  // Layer k (1-indexed from bottom) has triangular number T(k) = k*(k+1)/2 boxes
+  // and a floor footprint of T(k) cells arranged as a right-isosceles triangle.
+  //
+  // View: for each step we store a `buildingBoxesView` with layer data
+  // so the renderer can draw a 2D triangle footprint of each layer.
+
+  function triNum(k) { return k * (k + 1) / 2; }
+  function fullPyramidTotal(k) { return k * (k + 1) * (k + 2) / 6; }
+
+  // Step 1 — find k (full pyramid layers)
+  let k = 0, total = 0, floor = 0;
+
+  const snap = (o) => steps.push({ ...o });
+
+  snap({
+    title: { vi: `n = ${n} hộp cần đặt vào góc phòng`, en: `n = ${n} boxes to place in a room corner` },
+    note: {
+      vi: "Xây hình tháp tam giác 3D. Tầng k từ đỉnh có T(k) = k*(k+1)/2 hộp; sàn tháp k tầng cần T(k) ô. Bước 1: tìm số tầng tháp đầy đủ.",
+      en: "Build a 3D triangular pyramid in a corner. Layer k from top holds T(k) = k*(k+1)/2 boxes; a k-layer pyramid needs T(k) floor cells. Step 1: find the number of full layers.",
+    },
+    arr: [n], highlight: [], mark: [], codeLines: [3, 4], vars: [{ name: "n", value: n }],
+    buildingBoxesView: { phase: "init", k: 0, total: 0, floor: 0, n, remainder: n, extraFloor: 0, complete: false },
+  });
+
+  while (total + triNum(k + 1) <= n) {
+    k++;
+    const layerBoxes = triNum(k);
+    total += layerBoxes;
+    floor += k;
+    snap({
+      title: { vi: `Tầng ${k}: thêm T(${k}) = ${layerBoxes} hộp → total = ${total}, floor = ${floor}`, en: `Layer ${k}: add T(${k}) = ${layerBoxes} boxes → total = ${total}, floor = ${floor}` },
+      note: {
+        vi: `Tầng ${k} có T(${k}) = ${k}×${k + 1}/2 = ${layerBoxes} hộp. Sàn tháp ${k} tầng cần ${floor} ô (T(${k}) = ${triNum(k)}).`,
+        en: `Layer ${k} holds T(${k}) = ${k}×${k + 1}/2 = ${layerBoxes} boxes. The ${k}-layer pyramid needs ${floor} floor cells (T(${k}) = ${triNum(k)}).`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [4, 5, 6, 7],
+      vars: [
+        { name: "k", value: k },
+        { name: `T(${k})`, value: layerBoxes },
+        { name: "total", value: total },
+        { name: "floor", value: floor },
+        { name: "remaining", value: n - total },
+      ],
+      buildingBoxesView: { phase: "layer", k, total, floor, n, remainder: n - total, extraFloor: 0, complete: false },
+    });
+  }
+
+  // Summarise full-pyramid phase
+  if (k > 0) {
+    snap({
+      title: { vi: `Tháp ${k} tầng chứa ${total}/${n} hộp, sàn = ${floor}`, en: `${k}-layer pyramid holds ${total}/${n} boxes, floor = ${floor}` },
+      note: {
+        vi: `Thêm tầng ${k + 1} sẽ cần T(${k + 1}) = ${triNum(k + 1)} hộp nữa → total = ${total + triNum(k + 1)} > ${n}. Chuyển sang bước 2.`,
+        en: `Adding layer ${k + 1} would need T(${k + 1}) = ${triNum(k + 1)} more boxes → total = ${total + triNum(k + 1)} > ${n}. Move to step 2.`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [8, 9],
+      vars: [{ name: "k (final)", value: k }, { name: "total", value: total }, { name: "floor", value: floor }, { name: "remainder", value: n - total }],
+      buildingBoxesView: { phase: "between", k, total, floor, n, remainder: n - total, extraFloor: 0, complete: false },
+    });
+  }
+
+  // Step 2 — add individual floor boxes
+  let j = 0, extraFloor = 0;
+  const remainder0 = n - total;
+
+  if (remainder0 > 0) {
+    snap({
+      title: { vi: `Bước 2: còn ${remainder0} hộp dư, thêm từng ô sàn`, en: `Step 2: ${remainder0} boxes remaining, add floor cells one by one` },
+      note: {
+        vi: "Mỗi ô sàn mới ở hàng j có thể đỡ thêm j hộp phía trên. Tăng j từ 1 đến khi bù đủ phần dư.",
+        en: "Each new floor cell in row j can support j additional boxes above. Increase j from 1 until the remainder is covered.",
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [9, 10],
+      vars: [{ name: "remainder", value: remainder0 }, { name: "floor so far", value: floor }],
+      buildingBoxesView: { phase: "extra-init", k, total, floor, n, remainder: remainder0, extraFloor: 0, complete: false },
+    });
+  }
+
+  while (total < n) {
+    j++;
+    total += j;
+    floor++;
+    extraFloor++;
+    snap({
+      title: { vi: `Ô sàn thứ ${extraFloor} (hàng j=${j}): +${j} hộp → total = ${Math.min(total, n)}, floor = ${floor}`, en: `Extra floor cell ${extraFloor} (row j=${j}): +${j} boxes → total = ${Math.min(total, n)}, floor = ${floor}` },
+      note: {
+        vi: `Ô sàn ở hàng j=${j} của tầng ${k + 1} đỡ thêm ${j} hộp. total = ${total}${total >= n ? ` ≥ ${n} → đủ rồi!` : ` < ${n}, tiếp tục.`}`,
+        en: `Floor cell at row j=${j} of layer ${k + 1} supports ${j} additional boxes. total = ${total}${total >= n ? ` ≥ ${n} → done!` : ` < ${n}, continue.`}`,
+      },
+      arr: [n], highlight: [], mark: [], codeLines: [10, 11, 12, 13],
+      vars: [
+        { name: "j", value: j },
+        { name: `+${j} boxes`, value: `total → ${total}` },
+        { name: "floor", value: floor },
+        { name: "remaining", value: Math.max(0, n - total) },
+      ],
+      buildingBoxesView: { phase: "extra", k, total: Math.min(total, n), floor, n, remainder: Math.max(0, n - total), extraFloor, complete: total >= n },
+    });
+  }
+
+  snap({
+    title: { vi: `Kết quả: ${floor} ô sàn`, en: `Answer: ${floor} floor cells` },
+    note: {
+      vi: `Tháp ${k} tầng đầy đủ (sàn T(${k}) = ${triNum(k)} ô) + ${extraFloor} ô sàn riêng lẻ = ${floor} ô. Đủ chứa ≥ ${n} hộp.`,
+      en: `Full ${k}-layer pyramid (floor T(${k}) = ${triNum(k)} cells) + ${extraFloor} individual floor cells = ${floor} cells. Supports ≥ ${n} boxes.`,
+    },
+    arr: [n], highlight: [], mark: [], final: true, codeLines: [14],
+    vars: [{ name: "answer", value: floor }, { name: "total", value: total }, { name: "n", value: n }],
+    buildingBoxesView: { phase: "done", k, total, floor, n, remainder: 0, extraFloor, complete: true },
+  });
+
+  return { input, answer: floor, steps };
+}
+
 module.exports = {
   850: {
     id: 850,
@@ -4126,5 +4249,52 @@ module.exports = {
       "        return a",
     ],
     builder: buildSteps1979,
+  },
+  1739: {
+    id: 1739,
+    difficulty: "hard",
+    slug: "building-boxes",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [{ key: "greedy", vi: "Tham lam", en: "Greedy" }, { key: "math", vi: "Toán học", en: "Math" }],
+    title: { vi: "Building Boxes", en: "Building Boxes" },
+    titleVi: { vi: "Đặt hộp vào góc tường (hình tam giác 3D)", en: "Minimum floor boxes for a 3D corner pyramid" },
+    statement: {
+      vi: "Bạn có n hộp và cần đặt chúng vào góc phòng (ba mặt tường). Mỗi hộp ở tầng trên phải có hộp đỡ bên dưới hoặc tường. Trả về số hộp TỐI THIỂU cần đặt lên SÀN để chứa đủ n hộp.",
+      en: "You have n boxes to place in a room corner (three walls). Every box above the ground needs support from boxes below or walls. Return the MINIMUM number of boxes touching the FLOOR to accommodate all n boxes.",
+    },
+    defaultInput: [10],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 100000,
+    inputLabel: { vi: "n — số hộp", en: "n — number of boxes" },
+    extraParams: [],
+    approach: [
+      { vi: "Hình tháp lý tưởng: tầng k từ đỉnh xuống chứa T(k) = k*(k+1)/2 hộp; sàn tầng k chiếm T(k) ô. Tổng hộp k tầng = T(1)+T(2)+…+T(k) = k*(k+1)*(k+2)/6.", en: "Ideal pyramid: layer k from the top holds T(k) = k*(k+1)/2 boxes; the floor footprint of layer k is T(k) cells. Total boxes in k layers = T(1)+T(2)+…+T(k) = k*(k+1)*(k+2)/6." },
+      { vi: "Bước 1 — tìm k: tăng k cho đến khi tổng ≥ n. Tháp k tầng cần sàn T(k) = k*(k+1)/2 ô.", en: "Step 1 — find k: increase k until the total ≥ n. A k-layer pyramid needs floor footprint T(k) = k*(k+1)/2 cells." },
+      { vi: "Bước 2 — thêm hộp sàn riêng lẻ: nếu còn n − total(k−1) hộp dư, mỗi hộp sàn mới ở hàng j có thể đỡ thêm j hộp phía trên. Tăng j từ 1 cho đến khi bù đủ phần dư.", en: "Step 2 — add individual floor boxes: for each remaining n − total(k−1) box, a new floor box in row j can support j additional boxes. Increase j from 1 until the remainder is covered." },
+    ],
+    complexity: {
+      time: "O(n^(1/3))",
+      space: "O(1)",
+      note: { vi: "k ≈ ∛(6n); vòng lặp bước 2 cũng ngắn theo bậc k.", en: "k ≈ ∛(6n); the step-2 loop is also short on the order of k." },
+    },
+    code: [
+      "class Solution:",
+      "    def minimumBoxes(self, n: int) -> int:",
+      "        # Step 1: find k layers of the full pyramid",
+      "        k, total, floor = 0, 0, 0",
+      "        while total + (k + 1) * (k + 2) // 2 <= n:",
+      "            k += 1",
+      "            total += k * (k + 1) // 2",
+      "            floor += k",
+      "        # Step 2: add individual floor boxes for the remainder",
+      "        j = 0",
+      "        while total < n:",
+      "            j += 1",
+      "            total += j",
+      "            floor += 1",
+      "        return floor",
+    ],
+    builder: buildSteps1739,
   },
 };

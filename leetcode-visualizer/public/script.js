@@ -6392,6 +6392,97 @@ function renderStoneGameIVView(step) {
   </section>`;
 }
 
+// ---- 1739 Building Boxes renderer ----
+function renderBuildingBoxesView(step) {
+  const view = step.buildingBoxesView || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 1;
+  const k = Number(view.k) || 0;
+  const floor = Number(view.floor) || 0;
+  const total = Number(view.total) || 0;
+  const remainder = Number(view.remainder) || 0;
+  const extraFloor = Number(view.extraFloor) || 0;
+  const complete = !!view.complete;
+
+  // Phase strip
+  const phaseIndex = { init: 0, layer: 1, between: 1, "extra-init": 2, extra: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["0 · Khởi tạo", "1 · Tháp đầy đủ (Step 1)", "2 · Ô sàn dư (Step 2)", "3 · Hoàn tất"]
+    : ["0 · Init", "1 · Full pyramid (Step 1)", "2 · Extra floor cells (Step 2)", "3 · Done"];
+  const phases = phaseLabels.map((label, i) => {
+    const cls = i < phaseIndex ? "done" : i === phaseIndex ? "active" : "pending";
+    return `<span class="${cls}">${i < phaseIndex ? "✓" : i === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // Layer cards — one per full pyramid layer, plus partial layer if extraFloor > 0
+  function triNum(x) { return x * (x + 1) / 2; }
+  const layerCards = [];
+  for (let lyr = 1; lyr <= k + (extraFloor > 0 ? 1 : 0); lyr++) {
+    const isFull = lyr <= k;
+    const boxes = isFull ? triNum(lyr) : extraFloor;
+    const floorCells = isFull ? lyr : extraFloor;
+    const isActive = (view.phase === "layer" && lyr === k) || (view.phase === "extra" && lyr === k + 1) || (view.phase === "done" && lyr === k + extraFloor);
+    const cls = isActive ? "bb-layer active" : (lyr <= k ? "bb-layer full" : "bb-layer partial");
+    // Draw a small triangle footprint with SVG dots
+    const size = Math.min(isFull ? lyr : extraFloor, 7); // cap display at 7 rows
+    const dotSpacing = 10;
+    const svgW = size * dotSpacing + 6;
+    const svgH = size * dotSpacing + 6;
+    let dots = "";
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col <= row; col++) {
+        const x = 3 + col * dotSpacing;
+        const y = 3 + row * dotSpacing;
+        const isFloor = (row === size - 1) || (!isFull);
+        dots += `<circle cx="${x}" cy="${y}" r="3.5" class="${isFloor ? "bb-dot floor" : "bb-dot upper"}"></circle>`;
+      }
+    }
+    const truncated = (isFull ? lyr : extraFloor) > 7 ? `<text x="${svgW / 2}" y="${svgH - 1}" text-anchor="middle" class="bb-dot-label">…${isFull ? lyr : extraFloor} rows</text>` : "";
+    layerCards.push(`<article class="${cls}"><header><small>${isFull ? (vi ? `Tầng ${lyr}` : `Layer ${lyr}`) : (vi ? "Tầng dở (dư)" : "Partial layer")}</small></header><svg class="bb-triangle" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}">${dots}${truncated}</svg><footer><b>${boxes}</b><em>${vi ? "hộp" : "boxes"}</em></footer></article>`);
+  }
+
+  // Summary panels
+  const progressPct = Math.min(100, Math.round(total / n * 100));
+  const formulaText = k > 0
+    ? `k*(k+1)*(k+2)/6 = ${k}×${k + 1}×${k + 2}/6 = ${k * (k + 1) * (k + 2) / 6}`
+    : "0";
+  const answerClass = complete ? "bb-answer complete" : "bb-answer";
+
+  $("treeView").innerHTML = `<section class="bb-viz" role="img" aria-label="${vi ? "Trực quan hóa Building Boxes" : "Building Boxes visualization"}">
+    <div class="bb-phases">${phases}</div>
+    <div class="bb-main">
+      <section class="bb-layers">
+        <header><strong>${vi ? "CÁC TẦNG THÁP" : "PYRAMID LAYERS"}</strong><span>${vi ? "mỗi tầng = tam giác đều" : "each layer = equilateral triangle"}</span></header>
+        <div class="bb-layer-row">${layerCards.join("") || `<em class="bb-empty">${vi ? "chưa có tầng nào" : "no layers yet"}</em>`}</div>
+      </section>
+      <aside class="bb-side">
+        <section class="bb-stat-grid">
+          <div><small>${vi ? "TẦNG ĐẦY" : "FULL LAYERS"}</small><strong>${k}</strong></div>
+          <div><small>${vi ? "Ô SÀN ĐẦY" : "PYRAMID FLOOR"}</small><strong>${triNum(k)}</strong></div>
+          <div><small>${vi ? "Ô SÀN DƯ" : "EXTRA FLOOR"}</small><strong>${extraFloor}</strong></div>
+          <div><small>${vi ? "TỔNG SÀN" : "TOTAL FLOOR"}</small><strong>${floor}</strong></div>
+          <div><small>${vi ? "TỔNG HỘP" : "BOXES HELD"}</small><strong>${total}<em>/${n}</em></strong></div>
+          <div><small>${vi ? "CÒN DƯ" : "REMAINING"}</small><strong>${remainder}</strong></div>
+        </section>
+        <section class="bb-progress">
+          <header><strong>${vi ? "TIẾN ĐỘ" : "PROGRESS"}</strong><span>${progressPct}%</span></header>
+          <div class="bb-progress-bar"><div class="bb-progress-fill ${complete ? "complete" : ""}" style="width:${progressPct}%"></div></div>
+        </section>
+        <section class="bb-formula">
+          <header><strong>${vi ? "CÔNG THỨC k TẦNG" : "k LAYERS FORMULA"}</strong></header>
+          <code>${escapeHtml(formulaText)}</code>
+          <span>${vi ? `T(${k}) = ${k}×${k + 1}/2 = ${triNum(k)} ô sàn` : `T(${k}) = ${k}×${k + 1}/2 = ${triNum(k)} floor cells`}</span>
+        </section>
+        <section class="${answerClass}">
+          <small>${vi ? "ĐÁP ÁN — số ô SÀN tối thiểu" : "ANSWER — minimum FLOOR cells"}</small>
+          <strong>${complete ? floor : "—"}</strong>
+          <span>${complete ? (vi ? `${floor} ô sàn chứa ≥ ${n} hộp` : `${floor} floor cells hold ≥ ${n} boxes`) : (vi ? "đang tính…" : "computing…")}</span>
+        </section>
+      </aside>
+    </div>
+  </section>`;
+}
+
 function renderRectangleAreaView(step) {
   const view = step.rectangleAreaView;
   const vi = lang === "vi";
@@ -24719,6 +24810,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRectangleAreaView(step);
+  } else if (step.buildingBoxesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBuildingBoxesView(step);
   } else if (step.networkDelayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
