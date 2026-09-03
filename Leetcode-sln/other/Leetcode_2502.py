@@ -5,14 +5,18 @@ class Allocator:
 
     def allocate(self, size: int, mID: int) -> int:
         n = len(self.arr)
+        count_0 = 0
         for i in range(n):
-            count = 0
-            while count < size:
-                self.arr[i] = mID
-                count += 1
-            break
+            if self.arr[i] == 0:
+                count_0 += 1
+            else:
+                count_0 = 0
 
-        print(self.arr)
+            if count_0 == size:
+                start = i - size + 1
+                for j in range(start, i + 1):
+                    self.arr[j] = mID
+                return start       
 
         return -1
 
@@ -27,3 +31,6 @@ class Allocator:
 all = Allocator(10)
 all.allocate(1,1)
 all.allocate(1,2)
+all.allocate(1,3)
+all.freeMemory(2)
+all.allocate(3,4)
