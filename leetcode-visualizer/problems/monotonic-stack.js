@@ -3140,6 +3140,175 @@ function maximalRangeMaximum(nums) {
   return ans;
 }
 
+function buildSteps2832(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 14) throw new Error("Use at most 14 numbers so the stack stays readable.");
+  const n = nums.length;
+  const steps = [];
+  const ans = Array(n).fill(0);
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const stackText = (st) =>
+    st.length ? `[${st.map((idx) => `${idx}(${nums[idx]})`).join(", ")}]` : "[]";
+  const ansText = () => `[${ans.join(", ")}]`;
+  const makeSub = (st, cur) =>
+    nums.map((_, idx) => {
+      const inStack = st.includes(idx);
+      const resolved = ans[idx] > 0;
+      if (idx === cur && cur >= 0) return `i=${idx} ← current`;
+      if (resolved) return `i=${idx} · range=${ans[idx]}`;
+      if (inStack) return `i=${idx} · pending`;
+      return `i=${idx}`;
+    });
+
+  // ── step helper ──────────────────────────────────────────────────────────
+  function snap({ title, note, codeLines, cur = -1, resolved = [], vars = [], final = false, stack: st }) {
+    const hlIdx = cur >= 0 && cur < n ? [cur] : [];
+    steps.push({
+      title,
+      note,
+      codeLines,
+      arr: [...nums],
+      sub: makeSub(st, cur),
+      highlight: hlIdx,
+      mark: [...resolved],
+      vars,
+      final,
+    });
+  }
+
+  // ── initial step ─────────────────────────────────────────────────────────
+  const stack = [];
+  const resolved = [];
+
+  snap({
+    title: text(`Mảng có ${n} phần tử`, `Array of ${n} elements`),
+    note: text(
+      "Với mỗi index i, ta cần tìm range [l, r] lớn nhất sao cho nums[i] là MAXIMUM TUYỆT ĐỐI trong đó. " +
+      "Dùng stack giảm dần: mỗi phần tử được pop khi có phần tử lớn hơn xuất hiện bên phải.",
+      "For each index i, find the largest range [l, r] where nums[i] is the STRICT MAXIMUM. " +
+      "Use a decreasing stack: a bar is popped when a larger bar appears to its right.",
+    ),
+    codeLines: [1, 2],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "n", value: n }],
+    stack: [...stack],
+  });
+
+  snap({
+    title: text("Khởi tạo stack rỗng + ans = [0, …, 0]", "Initialize empty stack + ans = [0, …, 0]"),
+    note: text(
+      "Stack lưu INDEX các phần tử còn chờ biết biên phải (theo thứ tự giảm dần giá trị). " +
+      "ans[i] sẽ là độ dài range lớn nhất mà nums[i] là max.",
+      "The stack stores INDICES of bars waiting for their right boundary (decreasing by value). " +
+      "ans[i] will be the length of the largest range where nums[i] is the maximum.",
+    ),
+    codeLines: [3, 4],
+    vars: [{ name: "stack", value: stackText(stack) }, { name: "ans", value: ansText() }],
+    stack: [...stack],
+  });
+
+  // ── main loop: i = 0..n (i == n is the sentinel) ─────────────────────────
+  for (let i = 0; i <= n; i++) {
+    const cur = i === n ? Infinity : nums[i];
+    const isSentinel = i === n;
+
+    snap({
+      title: isSentinel
+        ? text("i = n: sentinel +∞ để flush stack còn lại", "i = n: sentinel +∞ to flush the remaining stack")
+        : text(`i = ${i}: xét nums[${i}] = ${cur}`, `i = ${i}: process nums[${i}] = ${cur}`),
+      note: isSentinel
+        ? text(
+            "Thêm sentinel +∞ vào cuối để buộc pop tất cả phần tử còn trong stack và tính ans cho chúng.",
+            "Append a sentinel +∞ at the end to force-pop all remaining stack entries and compute their ans.",
+          )
+        : text(
+            `nums[${i}] = ${cur}. Nếu nums[${i}] lớn hơn đỉnh stack thì đỉnh đó biết được biên PHẢI của nó.`,
+            `nums[${i}] = ${cur}. If nums[${i}] is larger than the stack top, that top now knows its RIGHT boundary.`,
+          ),
+      codeLines: [5],
+      cur: isSentinel ? -1 : i,
+      vars: [
+        { name: "i", value: isSentinel ? "n (sentinel)" : i },
+        { name: "stack", value: stackText(stack) },
+        { name: "ans", value: ansText() },
+      ],
+      stack: [...stack],
+      resolved: [...resolved],
+    });
+
+    // pop loop
+    while (stack.length && nums[stack.at(-1)] < cur) {
+      const mid = stack.pop();
+      const left = stack.length ? stack.at(-1) : -1;
+      ans[mid] = i - left - 1;
+      resolved.push(mid);
+
+      snap({
+        title: text(
+          `Pop i=${mid} (val=${nums[mid]}): biên PHẢI = ${i - 1}, biên TRÁI = ${left}`,
+          `Pop i=${mid} (val=${nums[mid]}): RIGHT boundary = ${i - 1}, LEFT boundary = ${left}`,
+        ),
+        note: text(
+          `nums[${mid}]=${nums[mid]} < nums[${isSentinel ? "∞" : i}]=${isSentinel ? "∞" : cur}. ` +
+          `Biên phải là ${i - 1} (index trước phần tử lớn hơn). ` +
+          `Biên trái là ${left < 0 ? "-1 (hết mảng)" : `${left} (đỉnh stack còn lại)`}. ` +
+          `ans[${mid}] = ${i} - ${left} - 1 = ${ans[mid]}.`,
+          `nums[${mid}]=${nums[mid]} < nums[${isSentinel ? "∞" : i}]=${isSentinel ? "∞" : cur}. ` +
+          `Right boundary is ${i - 1} (index before the larger bar). ` +
+          `Left boundary is ${left < 0 ? "-1 (start of array)" : `${left} (remaining stack top)`}. ` +
+          `ans[${mid}] = ${i} - ${left} - 1 = ${ans[mid]}.`,
+        ),
+        codeLines: [6, 7, 8],
+        cur: isSentinel ? -1 : i,
+        vars: [
+          { name: `pop mid=${mid}`, value: nums[mid] },
+          { name: `left boundary`, value: left < 0 ? "-1" : `${left} (val=${nums[left]})` },
+          { name: `ans[${mid}]`, value: ans[mid] },
+          { name: "stack", value: stackText(stack) },
+          { name: "ans", value: ansText() },
+        ],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+    }
+
+    if (!isSentinel) {
+      stack.push(i);
+      snap({
+        title: text(`Push i=${i} (val=${cur}) vào stack`, `Push i=${i} (val=${cur}) onto the stack`),
+        note: text(
+          `nums[${i}] = ${cur} không phá tính giảm dần của stack → push vào để chờ biên phải.`,
+          `nums[${i}] = ${cur} does not break the decreasing order → push and wait for the right boundary.`,
+        ),
+        codeLines: [9],
+        cur: i,
+        vars: [
+          { name: "push i", value: i },
+          { name: "stack", value: stackText(stack) },
+        ],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+    }
+  }
+
+  // ── final step ───────────────────────────────────────────────────────────
+  snap({
+    title: text(`Kết quả: ans = [${ans.join(", ")}]`, `Result: ans = [${ans.join(", ")}]`),
+    note: text(
+      `ans[i] = độ dài range lớn nhất mà nums[i] là max. Phần tử có giá trị lớn hơn có range rộng hơn.`,
+      `ans[i] = length of the largest range where nums[i] is the maximum. Larger values have wider ranges.`,
+    ),
+    codeLines: [10],
+    vars: [{ name: "ans", value: ansText() }],
+    stack: [...stack],
+    resolved: [...Array.from({ length: n }, (_, i) => i)],
+    final: true,
+  });
+
+  return { original: nums, answer: ans, steps };
+}
+
 function validSubarrays(nums) {
   const stack = [];
   let ans = 0;
@@ -4828,7 +4997,63 @@ module.exports = {
   2282: simpleProblem({ id: 2282, difficulty: "medium", slug: "number-of-people-that-can-be-seen-in-a-grid", name: "Number of People That Can Be Seen in a Grid", viName: "Số người nhìn thấy trong grid", statement: text("Premium: đếm người nhìn thấy sang phải và xuống dưới trong grid.", "Premium: count visible people to the right and downward in a grid."), defaultInput: "3,1,4;2,5,1;6,2,3", inputLabel: text("heights grid", "heights grid"), premium: true, solver: visiblePeopleGrid }),
   2297: simpleProblem({ id: 2297, difficulty: "medium", slug: "jump-game-viii", name: "Jump Game VIII", viName: "Jump Game VIII", statement: text("Premium: bài graph/DP dùng stack đơn điệu để dựng cạnh nhảy hữu ích.", "Premium: graph/DP problem using monotonic stacks to build useful jump edges."), defaultInput: "3,2,4,4,1", premium: true, solver: arrayBuilder(jumpGameVIII) }),
   2345: simpleProblem({ id: 2345, difficulty: "medium", slug: "finding-the-number-of-visible-mountains", name: "Finding the Number of Visible Mountains", viName: "Đếm núi nhìn thấy", statement: text("Premium: đếm núi không bị núi khác che hoàn toàn.", "Premium: count mountains not fully covered by another mountain."), defaultInput: "2,2;6,3;5,4", inputLabel: text("peaks (x,y; ...)", "peaks (x,y; ...)"), premium: true, solver: visibleMountains }),
-  2832: simpleProblem({ id: 2832, difficulty: "medium", slug: "maximal-range-that-each-element-is-maximum-in-it", name: "Maximal Range That Each Element Is Maximum in It", viName: "Range lớn nhất mà mỗi phần tử là maximum", statement: text("Premium: với mỗi index, tìm range lớn nhất nơi nó là maximum.", "Premium: for each index, find the largest range where it is the maximum."), defaultInput: "1,5,4,3,6", premium: true, solver: arrayBuilder(maximalRangeMaximum) }),
+  2832: {
+    id: 2832,
+    difficulty: "medium",
+    premium: true,
+    slug: "maximal-range-that-each-element-is-maximum-in-it",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    title: text("Maximal Range That Each Element Is Maximum in It"),
+    titleVi: text("Range lớn nhất mà mỗi phần tử là maximum", "Maximal range where each element is the maximum"),
+    statement: text(
+      "Cho mảng nums. Với mỗi index i, trả về độ dài range [l, r] lớn nhất sao cho nums[i] là phần tử lớn nhất trong nums[l..r]. Kết quả là mảng ans có ans[i] = độ dài range đó.",
+      "Given an array nums. For each index i, return the length of the largest range [l, r] such that nums[i] is the maximum element in nums[l..r]. Return array ans where ans[i] is that length.",
+    ),
+    defaultInput: "1,5,4,3,6",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    approach: [
+      text(
+        "Dùng stack GIẢM DẦN lưu index (theo giá trị giảm). Mỗi phần tử được pop khi có phần tử LỚN HƠN xuất hiện bên phải.",
+        "Use a DECREASING stack of indices (by value). A bar is popped when a LARGER bar appears to its right.",
+      ),
+      text(
+        "Khi pop index mid: biên PHẢI = index hiện tại - 1; biên TRÁI = đỉnh stack còn lại (hoặc -1 nếu stack rỗng). ans[mid] = right - left boundary.",
+        "When popping index mid: RIGHT boundary = current index - 1; LEFT boundary = remaining stack top (or -1 if empty). ans[mid] = right - left boundary.",
+      ),
+      text(
+        "Thêm sentinel +∞ ở cuối (i = n) để flush hết stack và tính ans cho các phần tử chưa được giải quyết.",
+        "Append a sentinel +∞ at the end (i = n) to flush the stack and compute ans for all unresolved entries.",
+      ),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text(
+        "Mỗi index được push và pop tối đa một lần → O(n) tổng thể.",
+        "Each index is pushed and popped at most once → O(n) overall.",
+      ),
+    },
+    code: [
+      "class Solution:",
+      "    def maximalRange(self, nums):",
+      "        n = len(nums)",
+      "        ans, stack = [0] * n, []",
+      "        for i in range(n + 1):",
+      "            cur = nums[i] if i < n else float('inf')",
+      "            while stack and nums[stack[-1]] < cur:",
+      "                mid = stack.pop()",
+      "                left = stack[-1] if stack else -1",
+      "                ans[mid] = i - left - 1",
+      "            if i < n:",
+      "                stack.append(i)",
+      "        return ans",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps2832,
+  },
   2863: simpleProblem({ id: 2863, difficulty: "medium", slug: "maximum-length-of-semi-decreasing-subarrays", name: "Maximum Length of Semi-Decreasing Subarrays", viName: "Subarray semi-decreasing dài nhất", statement: text("Premium: tìm subarray dài nhất có đầu lớn hơn cuối.", "Premium: find the longest subarray whose first value is greater than its last value."), defaultInput: "7,6,5,8,4", premium: true, solver: arrayBuilder(maximumLengthSemiDecreasing) }),
   1063: simpleProblem({ id: 1063, difficulty: "hard", slug: "number-of-valid-subarrays", name: "Number of Valid Subarrays", viName: "Số valid subarray", statement: text("Premium: đếm subarray mà phần tử đầu là minimum của subarray.", "Premium: count subarrays where the first element is the subarray minimum."), defaultInput: "1,4,2,5,3", premium: true, solver: arrayBuilder(validSubarrays) }),
   2355: simpleProblem({ id: 2355, difficulty: "hard", slug: "maximum-number-of-books-you-can-take", name: "Maximum Number of Books You Can Take", viName: "Số sách tối đa có thể lấy", statement: text("Premium: chọn đoạn sách, mỗi bước sang trái lấy ít hơn ít nhất 1 quyển.", "Premium: choose a book segment where moving left takes at least one fewer book each shelf."), defaultInput: "8,5,2,7,9", premium: true, solver: arrayBuilder(maximumBooks) }),
