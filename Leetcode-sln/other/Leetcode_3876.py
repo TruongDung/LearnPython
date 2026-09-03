@@ -3,16 +3,17 @@ class Solution:
         min_value = min(nums1)
         is_even = True
         for num in nums1:
-            if num%2 != 0:
+            if num % 2 != 0:
                 is_even = False
 
         if is_even:
             return True
 
-        if min_value %2 != 0:
+        if min_value % 2 != 0:
             return True
 
         return False
 
+
 sol = Solution()
-print(sol.uniformArray([2,3]))
+print(sol.uniformArray([2, 3]))
