@@ -8494,6 +8494,140 @@ function renderKokoSpeedView(step) {
   </div>`;
 }
 
+// ---- 3161 Block Placement Queries renderer ----
+function renderBlockQueriesView(step) {
+  const view = step.blockQueriesView || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 10;
+  const obstacles = Array.isArray(view.obstacles) ? view.obstacles : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const curQ = view.currentQuery;
+  const curQIdx = Number(view.queryIndex ?? -1);
+
+  // ── Phase strip ──────────────────────────────────────────────────────────
+  const phaseIndex = { init: 0, preinsert: 0, build: 1, "reverse-start": 2, type1: 2, type2: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["0 · Khởi tạo", "1 · Xây Fenwick", "2 · Duyệt ngược", "3 · Xong"]
+    : ["0 · Init", "1 · Build Fenwick", "2 · Reverse scan", "3 · Done"];
+  const phases = phaseLabels.map((label, i) => {
+    const cls = i < phaseIndex ? "done" : i === phaseIndex ? "active" : "pending";
+    return `<span class="${cls}">${i < phaseIndex ? "✓" : i === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Number line ─────────────────────────────────────────────────────────
+  const displayN = Math.min(n, 30);
+  const cellW = 26;
+  const svgW = (displayN + 1) * cellW + 20;
+  const svgH = 78;
+  const obsSet = new Set(obstacles);
+  const prevObs = view.prevObs !== null && view.prevObs !== undefined ? Number(view.prevObs) : -1;
+  const nextObs = view.nextObs !== null && view.nextObs !== undefined ? Number(view.nextObs) : -1;
+  const curX = curQ ? curQ[1] : -1;
+  const fenwickQuery = view.fenwickQuery !== null && view.fenwickQuery !== undefined ? Number(view.fenwickQuery) : -1;
+
+  let cells = "";
+  for (let pos = 0; pos <= displayN; pos++) {
+    const cx = 10 + pos * cellW;
+    const isObs = obsSet.has(pos);
+    const isCurX = pos === curX && curQ;
+    const isPrev = pos === prevObs;
+    const isNext = pos === nextObs;
+    const isFenwickQ = pos === fenwickQuery;
+    const isSentinel = pos === 0 || pos === n;
+    let cls = "bq-cell";
+    if (isSentinel) cls += " sentinel";
+    if (isObs) cls += " obstacle";
+    if (isPrev) cls += " prev-obs";
+    if (isNext) cls += " next-obs";
+    if (isCurX) cls += " cur-x";
+    if (isFenwickQ && !isPrev) cls += " fenwick-q";
+    cells += `<g class="${cls}" transform="translate(${cx},30)">
+      <rect x="-10" y="-14" width="20" height="28" rx="4"></rect>
+      <text class="bq-pos" x="0" y="5">${pos}</text>
+      ${isObs ? `<circle class="bq-obs-dot" cx="0" cy="-20" r="5"></circle>` : ""}
+    </g>`;
+  }
+  if (displayN < n) {
+    cells += `<text x="${10 + (displayN + 0.5) * cellW}" y="34" class="bq-ellipsis">…${n}</text>`;
+  }
+
+  // highlight range [0..curX] for type-2 queries
+  let rangeRect = "";
+  if (curQ && curQ[0] === 2 && curX >= 0 && curX <= displayN) {
+    rangeRect = `<rect x="0" y="16" width="${10 + curX * cellW + 10}" height="28" rx="4" class="bq-range"></rect>`;
+  }
+
+  const linesvg = `<svg class="bq-line" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="${vi ? "Trục số với chướng ngại vật" : "Number line with obstacles"}">${rangeRect}${cells}</svg>`;
+
+  // ── Query list ─────────────────────────────────────────────────────────
+  const type2Indices = queries.map((q, i) => q[0] === 2 ? i : -1).filter((i) => i >= 0);
+  let ansIdx = 0;
+  const qChips = queries.map((q, i) => {
+    const isActive = i === curQIdx;
+    const type = q[0];
+    let state = "pending";
+    let ansLabel = "";
+    if (type === 2) {
+      const answeredSoFar = answers.length;
+      const thisRank = type2Indices.indexOf(i);
+      if (thisRank < answeredSoFar) {
+        state = answers[thisRank] ? "true" : "false";
+        ansLabel = answers[thisRank] ? " → T" : " → F";
+      }
+    }
+    const cls = `bq-qchip ${type === 1 ? "t1" : "t2"} ${state} ${isActive ? "active" : ""}`;
+    const label = type === 1 ? `[1,${q[1]}]` : `[2,${q[1]},${q[2]}]`;
+    return `<span class="${cls}"><small>#${i}</small><b>${escapeHtml(label)}${ansLabel}</b></span>`;
+  }).join("");
+
+  // ── Decision panel ────────────────────────────────────────────────────
+  let decisionHtml = "";
+  if (curQ) {
+    if (curQ[0] === 1) {
+      decisionHtml = `<section class="bq-decision t1">
+        <small>${vi ? "LOẠI 1 · XÓA (ngược)" : "TYPE 1 · REMOVE (reversed)"}</small>
+        <strong>x = ${curQ[1]}</strong>
+        <div class="bq-formula">prev = ${prevObs} &nbsp;|&nbsp; next = ${nextObs} &nbsp;|&nbsp; gap = ${nextObs - prevObs}</div>
+        <p>${vi ? `maximize(${nextObs}, ${nextObs - prevObs}) trên Fenwick` : `maximize(${nextObs}, ${nextObs - prevObs}) on Fenwick`}</p>
+      </section>`;
+    } else {
+      const sz = curQ[2];
+      const directGap = curX - prevObs;
+      const fw = view.fenwickResult ?? 0;
+      const ansClass = view.queryAnswer ? "bq-decision t2 true" : "bq-decision t2 false";
+      decisionHtml = `<section class="${ansClass}">
+        <small>${vi ? "LOẠI 2 · TRUY VẤN" : "TYPE 2 · QUERY"}</small>
+        <strong>x=${curQ[1]}, sz=${sz}</strong>
+        <div class="bq-formula">prev=${prevObs} &nbsp;|&nbsp; x−prev=${directGap} &nbsp;|&nbsp; fenwick.get(${fenwickQuery})=${fw}</div>
+        <p>(${fw} ≥ ${sz}) OR (${directGap} ≥ ${sz}) = <b>${view.queryAnswer ? "TRUE ✓" : "FALSE ✗"}</b></p>
+      </section>`;
+    }
+  }
+
+  // ── Answers so far ────────────────────────────────────────────────────
+  const answersHtml = answers.length
+    ? answers.map((a, i) => `<span class="bq-ans ${a ? "true" : "false"}">${a ? "T" : "F"}</span>`).join("")
+    : `<em class="bq-empty">${vi ? "chưa có đáp án" : "no answers yet"}</em>`;
+
+  // ── Obstacles list ────────────────────────────────────────────────────
+  const obsHtml = obstacles.map((o) => {
+    const cls = o === prevObs ? "bq-obs-chip prev" : o === nextObs ? "bq-obs-chip next" : "bq-obs-chip";
+    return `<span class="${cls}">${o}</span>`;
+  }).join("");
+
+  $("treeView").innerHTML = `<section class="bq-viz">
+    <div class="bq-phases">${phases}</div>
+    <section class="bq-line-wrap"><header><strong>${vi ? "TRỤC SỐ" : "NUMBER LINE"}</strong><span>${vi ? "■=chướng ngại vật · vàng=vị trí hiện tại · xanh=prev_obs" : "■=obstacle · amber=current x · green=prev_obs"}</span></header>${linesvg}</section>
+    <div class="bq-main">
+      <section class="bq-queries"><header><strong>${vi ? "DANH SÁCH TRUY VẤN" : "QUERY LIST"}</strong><span>${vi ? "duyệt ngược i→0" : "processed i→0"}</span></header><div class="bq-qlist">${qChips}</div></section>
+      <section class="bq-obstacles"><header><strong>${vi ? "SORTED OBSTACLES" : "SORTED OBSTACLES"}</strong><span>${obstacles.length}</span></header><div class="bq-obs-row">${obsHtml}</div></section>
+      ${decisionHtml}
+      <section class="bq-answers"><header><strong>${vi ? "KẾT QUẢ TYPE-2" : "TYPE-2 ANSWERS"}</strong></header><div class="bq-ans-row">${answersHtml}</div></section>
+    </div>
+  </section>`;
+}
+
 function renderSqrtBinaryView(step) {
   const view = step.sqrtBinaryView;
   const el = $("treeView");
@@ -25134,6 +25268,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSqrtBinaryView(step);
+  } else if (step.blockQueriesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBlockQueriesView(step);
   } else if (step.histogramRectangleView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

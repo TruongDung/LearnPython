@@ -7046,3 +7046,313 @@ module.exports = Object.assign(module.exports, {
     builder: buildSteps352,
   },
 });
+
+// ─── 3161: Block Placement Queries ──────────────────────────────────────────
+//
+// We simulate the REVERSE-scan approach step by step:
+//   - Sentinel obstacles 0 and N are always present.
+//   - All type-1 queries are added to the sorted obstacle set up front.
+//   - Then queries are scanned in REVERSE:
+//       * type-1 → "remove" the obstacle (it hasn't been placed yet in forward
+//                  time) and recompute the gap between its two neighbours.
+//       * type-2 → answer using fenwick.get(prev_obstacle) >= sz OR x−prev >= sz
+//
+// The Fenwick tree stores MAX gap in any prefix [0..i].
+
+function parseQueries3161(raw, label = "queries") {
+  const text = String(raw ?? "").trim();
+  if (!text) throw new Error(`${label} is required`);
+  const rows = text.includes("[")
+    ? (JSON.parse(text))
+    : text.split(/[;\n]/).filter((r) => r.trim()).map((r) => r.split(",").map(Number));
+  if (!Array.isArray(rows) || rows.some((r) => !Array.isArray(r) || r.length < 2 || r.some((v) => !Number.isInteger(v)))) {
+    throw new Error(`${label} must be rows of integers like [[1,2],[2,3,1]] or 1,2;2,3,1`);
+  }
+  rows.forEach((r, idx) => {
+    if (r[0] !== 1 && r[0] !== 2) throw new Error(`query ${idx}: type must be 1 or 2`);
+    if (r[0] === 2 && r.length < 3) throw new Error(`query ${idx}: type-2 needs [2, x, sz]`);
+    if (r.some((v) => v < 0)) throw new Error(`query ${idx}: all values must be non-negative`);
+  });
+  return rows.map((r) => r.map(Number));
+}
+
+function buildSteps3161(input, params = {}) {
+  const queries = parseQueries3161(params.queries ?? "1,2;2,3,3;2,3,1;2,2,2", "queries");
+  if (queries.length > 16) throw new Error("Use at most 16 queries for readable visualization.");
+
+  const N = Math.max(50000, queries.reduce((m, q) => Math.max(m, q[1], q[0] === 2 ? q[1] + q[2] : 0), 0) + 1);
+  const steps = [];
+
+  // ── Fenwick max-tree ──────────────────────────────────────────────────────
+  const fenwick = new Array(N + 2).fill(0);
+  function fenwickMaximize(i, val) {
+    for (; i <= N; i += i & -i) fenwick[i] = Math.max(fenwick[i], val);
+  }
+  function fenwickGet(i) {
+    let res = 0;
+    for (; i > 0; i -= i & -i) res = Math.max(res, fenwick[i]);
+    return res;
+  }
+
+  // ── Sorted obstacle set ───────────────────────────────────────────────────
+  const obstacleSet = new Set([0, N]);
+  let sortedObs = () => [...obstacleSet].sort((a, b) => a - b);
+
+  // Phase 0 — collect all type-1 x values and insert into obstacleSet
+  queries.forEach((q) => { if (q[0] === 1) obstacleSet.add(q[1]); });
+
+  const initialObs = sortedObs();
+  const gapText = (obs) => {
+    const a = obs || sortedObs();
+    return a.length < 2 ? "[]"
+      : a.slice(1).map((v, i) => `${a[i]}–${v}:${v - a[i]}`).join(" ");
+  };
+
+  // ── Intro ─────────────────────────────────────────────────────────────────
+  function snap(o) {
+    const obs = sortedObs();
+    steps.push({
+      title: o.title, note: o.note, codeLines: o.codeLines,
+      arr: [], highlight: [], mark: [], vars: o.vars || [], final: o.final || false,
+      blockQueriesView: {
+        phase: o.phase,
+        n: N,
+        obstacles: [...obs],
+        fenwick: fenwick.slice(0, Math.min(N + 1, 20)),
+        queries,
+        queryIndex: o.queryIndex ?? -1,
+        currentQuery: o.currentQuery ?? null,
+        prevObs: o.prevObs ?? null,
+        nextObs: o.nextObs ?? null,
+        gapUpdated: o.gapUpdated ?? null,
+        queryAnswer: o.queryAnswer ?? null,
+        answers: [...(o.answers || [])],
+        fenwickQuery: o.fenwickQuery ?? null,
+        fenwickResult: o.fenwickResult ?? null,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `${queries.length} truy vấn trên trục số [0, ${N}]`, en: `${queries.length} queries on number line [0, ${N}]` },
+    note: {
+      vi: `Có 2 loại truy vấn: 1=[thêm chướng ngại vật tại x], 2=[kiểm tra có thể đặt block kích thước sz trong [0,x] không?]. Thuật toán: duyệt NGƯỢC + Fenwick max-tree lưu gap lớn nhất theo prefix.`,
+      en: `Two query types: 1=[add obstacle at x], 2=[can a block of size sz fit in [0,x]?]. Algorithm: process in REVERSE + Fenwick max-tree storing the max gap in each prefix.`,
+    },
+    codeLines: [1, 2], phase: "init",
+    vars: [
+      { name: "N (sentinel)", value: N },
+      { name: "queries", value: queries.length },
+      { name: "type-1 count", value: queries.filter((q) => q[0] === 1).length },
+      { name: "type-2 count", value: queries.filter((q) => q[0] === 2).length },
+    ],
+    answers: [],
+  });
+
+  snap({
+    title: { vi: "Pre-insert tất cả chướng ngại vật từ truy vấn type-1", en: "Pre-insert all obstacles from type-1 queries" },
+    note: {
+      vi: `Nhóm lại tất cả chướng ngại vật type-1 để biết trạng thái ban đầu. Sau đó sẽ XÓA từng cái khi duyệt ngược (= chưa được thêm vào ở thời điểm đó). Obstacles: [${initialObs.join(", ")}].`,
+      en: `Collect all type-1 obstacles upfront as the initial state. We will REMOVE each one as we process in reverse (= not yet placed at that point). Obstacles: [${initialObs.join(", ")}].`,
+    },
+    codeLines: [3, 4, 5, 6], phase: "preinsert",
+    vars: [{ name: "obstacles", value: `[${initialObs.join(", ")}]` }, { name: "sentinels", value: `0, ${N}` }],
+    answers: [],
+  });
+
+  // Phase 1 — build initial Fenwick from consecutive gaps
+  for (let i = 0; i < initialObs.length - 1; i++) {
+    const x1 = initialObs[i], x2 = initialObs[i + 1];
+    fenwickMaximize(x2, x2 - x1);
+  }
+
+  snap({
+    title: { vi: "Xây Fenwick max-tree từ các gap ban đầu", en: "Build Fenwick max-tree from initial gaps" },
+    note: {
+      vi: `Fenwick[i] = max gap trong prefix [0..i]. Với mỗi cặp (obs[j], obs[j+1]), gọi maximize(obs[j+1], gap). fenwick.get(x) = max gap trong [0..x].`,
+      en: `Fenwick[i] = max gap in prefix [0..i]. For each pair (obs[j], obs[j+1]) call maximize(obs[j+1], gap). fenwick.get(x) = max gap in [0..x].`,
+    },
+    codeLines: [7, 8, 9], phase: "build",
+    vars: [{ name: "initial gaps", value: gapText(initialObs) }],
+    answers: [],
+  });
+
+  // Phase 2 — process queries in reverse
+  const answers = [];
+  const revOrder = [...queries.keys()].reverse();
+
+  snap({
+    title: { vi: "Bắt đầu duyệt truy vấn theo thứ tự NGƯỢC", en: "Start processing queries in REVERSE order" },
+    note: {
+      vi: "Duyệt ngược để biến type-1 thành thao tác XÓA (phục hồi trạng thái trước khi obstacle được thêm). Type-2 được trả lời dựa trên trạng thái lúc đó.",
+      en: "Reverse processing turns type-1 into REMOVE operations (restoring the state before the obstacle was placed). Type-2 queries are answered based on the state at that point.",
+    },
+    codeLines: [10], phase: "reverse-start",
+    vars: [{ name: "process order", value: `i = ${queries.length - 1} → 0` }],
+    answers: [],
+  });
+
+  for (const i of revOrder) {
+    const q = queries[i];
+    const type = q[0], x = q[1];
+    const obs = sortedObs();
+
+    if (type === 1) {
+      // Find neighbours (x is in the set now; remove it after this step)
+      const idx = obs.indexOf(x);
+      const prev = obs[idx - 1] ?? 0;
+      const next = obs[idx + 1] ?? N;
+
+      snap({
+        title: { vi: `i=${i}: Truy vấn 1 [thêm x=${x}] — NGƯỢC = XÓA x=${x}`, en: `i=${i}: Query 1 [add x=${x}] — REVERSED = REMOVE x=${x}` },
+        note: {
+          vi: `Duyệt ngược nghĩa là tại thời điểm này obstacle x=${x} chưa tồn tại. Xóa nó khỏi sorted set và cập nhật gap giữa prev=${prev} và next=${next}: gap = ${next - prev}. Gọi fenwick.maximize(${next}, ${next - prev}).`,
+          en: `In reverse, obstacle x=${x} doesn't exist yet. Remove it from the sorted set and update the gap between prev=${prev} and next=${next}: gap = ${next - prev}. Call fenwick.maximize(${next}, ${next - prev}).`,
+        },
+        codeLines: [11, 12, 13, 14, 15],
+        phase: "type1",
+        queryIndex: i, currentQuery: [...q],
+        prevObs: prev, nextObs: next,
+        gapUpdated: next - prev,
+        vars: [
+          { name: "i", value: i },
+          { name: "type", value: 1 },
+          { name: "x", value: x },
+          { name: "prev obs", value: prev },
+          { name: "next obs", value: next },
+          { name: "new gap", value: next - prev },
+        ],
+        answers: [...answers].reverse(),
+      });
+
+      obstacleSet.delete(x);
+      fenwickMaximize(next, next - prev);
+
+    } else {
+      // Type 2: check if block of size sz fits in [0, x]
+      const sz = q[2];
+      const obs2 = sortedObs();
+      const prevIdx = obs2.filter((v) => v <= x).length - 1;
+      const prev = obs2[prevIdx];
+      const directGap = x - prev;
+      const fenwickVal = fenwickGet(prev);
+      const answer = fenwickVal >= sz || directGap >= sz;
+      answers.unshift(answer);
+
+      snap({
+        title: { vi: `i=${i}: Truy vấn 2 [x=${x}, sz=${sz}] → ${answer ? "true" : "false"}`, en: `i=${i}: Query 2 [x=${x}, sz=${sz}] → ${answer ? "true" : "false"}` },
+        note: {
+          vi: `prev_obs ≤ x: prev=${prev}. Gap trực tiếp: x−prev = ${directGap}. Max gap trong [0..${prev}] = fenwick.get(${prev}) = ${fenwickVal}. Trả lời: (${fenwickVal} ≥ ${sz}) OR (${directGap} ≥ ${sz}) = ${answer}.`,
+          en: `Largest obstacle ≤ x: prev=${prev}. Direct gap: x−prev = ${directGap}. Max gap in [0..${prev}] = fenwick.get(${prev}) = ${fenwickVal}. Answer: (${fenwickVal} ≥ ${sz}) OR (${directGap} ≥ ${sz}) = ${answer}.`,
+        },
+        codeLines: [16, 17, 18, 19, 20],
+        phase: "type2",
+        queryIndex: i, currentQuery: [...q],
+        prevObs: prev, nextObs: null,
+        gapUpdated: null,
+        queryAnswer: answer,
+        fenwickQuery: prev,
+        fenwickResult: fenwickVal,
+        vars: [
+          { name: "i", value: i },
+          { name: "type", value: 2 },
+          { name: "x", value: x },
+          { name: "sz", value: sz },
+          { name: "prev obs", value: prev },
+          { name: "x − prev", value: directGap },
+          { name: `fenwick.get(${prev})`, value: fenwickVal },
+          { name: "answer", value: String(answer) },
+        ],
+        answers: [...answers].reverse().length ? [...answers] : [],
+      });
+    }
+  }
+
+  const finalAnswers = [...answers];
+  snap({
+    title: { vi: `Kết quả: [${finalAnswers.map((v) => String(v)).join(", ")}]`, en: `Result: [${finalAnswers.map((v) => String(v)).join(", ")}]` },
+    note: {
+      vi: "Các câu trả lời type-2 đã được thu thập theo thứ tự ngược và đảo lại thành đúng thứ tự đề.",
+      en: "Type-2 answers were collected in reverse order and flipped back to the original order.",
+    },
+    codeLines: [21], phase: "done", final: true,
+    vars: [{ name: "answer", value: `[${finalAnswers.map((v) => String(v)).join(", ")}]` }],
+    answers: finalAnswers,
+  });
+
+  return { input, answer: finalAnswers, steps };
+}
+
+Object.assign(module.exports, {
+  3161: {
+    id: 3161,
+    difficulty: "hard",
+    slug: "block-placement-queries",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [
+      { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
+      { key: "segment-tree", vi: "Segment Tree / Fenwick Tree", en: "Segment Tree / Fenwick Tree" },
+      { key: "sorted-set", vi: "Sorted Set", en: "Sorted Set" },
+    ],
+    title: { vi: "Block Placement Queries", en: "Block Placement Queries" },
+    titleVi: { vi: "Truy vấn đặt block (Sorted Set + Fenwick max-tree)", en: "Block placement queries (Sorted Set + Fenwick max-tree)" },
+    statement: {
+      vi: "Cho dãy truy vấn trên trục số nguyên không âm. Truy vấn type 1 [1,x]: thêm chướng ngại vật tại x. Truy vấn type 2 [2,x,sz]: trả lời TRUE nếu có thể đặt block kích thước sz hoàn toàn trong [0,x] mà không chạm chướng ngại vật (được phép chạm). Điểm 0 luôn có chướng ngại vật ảo.",
+      en: "Given queries on the non-negative integer line. Type 1 [1,x]: add an obstacle at x. Type 2 [2,x,sz]: return TRUE if a block of size sz can be placed entirely in [0,x] without overlapping any obstacle (touching is allowed). There is always a virtual obstacle at 0.",
+    },
+    defaultInput: [1],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n (không dùng trực tiếp, dùng extraParams)", en: "n (unused; configure queries below)" },
+    extraParams: [
+      {
+        key: "queries", type: "string",
+        label: { vi: "queries: type,x[,sz]; ... hoặc JSON [[1,2],[2,3,1],...]", en: "queries: type,x[,sz]; ... or JSON [[1,2],[2,3,1],...]" },
+        default: "1,2;2,3,3;2,3,1;2,2,2",
+      },
+    ],
+    approach: [
+      { vi: "Sentinel 0 và N luôn là chướng ngại vật. Pre-insert tất cả type-1 vào sorted set.", en: "Sentinels 0 and N are always obstacles. Pre-insert all type-1 positions into a sorted set." },
+      { vi: "Xây Fenwick max-tree: fenwick[i] lưu max gap của prefix [0..i]. Gọi maximize(obs_next, obs_next − obs_prev) cho mỗi cặp liên tiếp.", en: "Build a Fenwick max-tree: fenwick[i] stores the max gap in prefix [0..i]. Call maximize(obs_next, obs_next − obs_prev) for every consecutive pair." },
+      { vi: "Duyệt NGƯỢC: type-1 trở thành XÓA obstacle (và cập nhật gap giữa 2 hàng xóm), type-2 trả lời bằng fenwick.get(prev_obs) >= sz OR x − prev_obs >= sz.", en: "Process in REVERSE: type-1 becomes REMOVE (update gap between neighbours), type-2 answers with fenwick.get(prev_obs) >= sz OR x − prev_obs >= sz." },
+      { vi: "Đảo ngược mảng đáp án để lấy đúng thứ tự.", en: "Reverse the answer array to restore original query order." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: { vi: "Mỗi truy vấn thực hiện O(log N) trên Fenwick tree và bisect trên sorted set.", en: "Each query does O(log N) on the Fenwick tree and a bisect on the sorted set." },
+    },
+    code: [
+      "from sortedcontainers import SortedList",
+      "",
+      "class Solution:",
+      "    def getResults(self, queries):",
+      "        N = min(50000, len(queries) * 3)",
+      "        tree = FenwickTree(N + 1)",
+      "        obstacles = SortedList([0, N])",
+      "        for q in queries:",
+      "            if q[0] == 1:",
+      "                obstacles.add(q[1])",
+      "        for x1, x2 in pairwise(obstacles):",
+      "            tree.maximize(x2, x2 - x1)",
+      "        ans = []",
+      "        for q in reversed(queries):",
+      "            if q[0] == 1:",
+      "                x = q[1]",
+      "                i = obstacles.index(x)",
+      "                nxt, prv = obstacles[i+1], obstacles[i-1]",
+      "                obstacles.remove(x)",
+      "                tree.maximize(nxt, nxt - prv)",
+      "            else:",
+      "                x, sz = q[1], q[2]",
+      "                i = obstacles.bisect_right(x)",
+      "                prv = obstacles[i - 1]",
+      "                ans.append(tree.get(prv) >= sz or x - prv >= sz)",
+      "        return ans[::-1]",
+    ],
+    liveArgs(input, params = {}) {
+      return [parseQueries3161(params.queries ?? "1,2;2,3,1;2,3,2", "queries")];
+    },
+    builder: buildSteps3161,
+  },
+});

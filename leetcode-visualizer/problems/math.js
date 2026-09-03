@@ -3388,7 +3388,7 @@ function buildSteps1739Approach2(input) {
       vi: `Tháp ${kFull} tầng đầy đủ + ${extraFloor} ô sàn lẻ = ${floor} ô. Chứa ≥ ${n} hộp.`,
       en: `Full ${kFull}-layer pyramid + ${extraFloor} extra floor cells = ${floor} cells. Holds ≥ ${n} boxes.`,
     },
-    arr: [n], highlight: [], mark: [], final: true, codeLines: [18],
+    arr: [n], highlight: [], mark: [], final: true, codeLines: [19],
     vars: [{ name: "answer", value: floor }, { name: "total", value: total }, { name: "n", value: n }],
     buildingBoxesView: { phase: "done", k: kFull, total, floor, n, remainder: 0, extraFloor, complete: true },
   });
@@ -3509,7 +3509,7 @@ function buildSteps1739(input) {
       vi: `Tháp ${k} tầng đầy đủ (sàn T(${k}) = ${triNum(k)} ô) + ${extraFloor} ô sàn riêng lẻ = ${floor} ô. Đủ chứa ≥ ${n} hộp.`,
       en: `Full ${k}-layer pyramid (floor T(${k}) = ${triNum(k)} cells) + ${extraFloor} individual floor cells = ${floor} cells. Supports ≥ ${n} boxes.`,
     },
-    arr: [n], highlight: [], mark: [], final: true, codeLines: [14],
+    arr: [n], highlight: [], mark: [], final: true, codeLines: [15],
     vars: [{ name: "answer", value: floor }, { name: "total", value: total }, { name: "n", value: n }],
     buildingBoxesView: { phase: "done", k, total, floor, n, remainder: 0, extraFloor, complete: true },
   });
