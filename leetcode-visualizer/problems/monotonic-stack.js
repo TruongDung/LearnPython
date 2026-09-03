@@ -2111,6 +2111,196 @@ function canSeePersonsCount(nums) {
   return ans;
 }
 
+function buildSteps1944(input) {
+  const heights = parseNums(input, "heights");
+  if (heights.length > 14) throw new Error("Use at most 14 people so the stack stays readable.");
+  const n = heights.length;
+  const ans = Array(n).fill(0);
+  const steps = [];
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const stackText = (st) => st.length ? `[${st.map((v) => v).join(", ")}]` : "[]";
+  const ansText = () => `[${ans.join(", ")}]`;
+  const makeSub = (st, cur) =>
+    heights.map((_, idx) => {
+      if (idx === cur) return `i=${idx} ← current`;
+      if (ans[idx] > 0) return `i=${idx} · sees=${ans[idx]}`;
+      return `i=${idx}`;
+    });
+
+  // ── snap helper ───────────────────────────────────────────────────────────
+  function snap({ title, note, codeLines, cur = -1, resolved = [], vars = [], final = false, stack: st }) {
+    steps.push({
+      title, note, codeLines,
+      arr: [...heights],
+      sub: makeSub(st, cur),
+      highlight: cur >= 0 && cur < n ? [cur] : [],
+      mark: [...resolved],
+      vars, final,
+    });
+  }
+
+  // ── init steps ────────────────────────────────────────────────────────────
+  const stack = [];
+  const resolved = [];
+
+  snap({
+    title: text(`${n} người trong hàng, quét từ PHẢI sang TRÁI`, `${n} people in a queue, scan from RIGHT to LEFT`),
+    note: text(
+      "Person i nhìn thấy person j (j > i) nếu không có ai cao hơn hoặc bằng max(heights[i], heights[j]) ở giữa. " +
+      "Quét từ phải, dùng stack GIẢM DẦN lưu các người còn có thể bị nhìn thấy từ bên trái.",
+      "Person i can see person j (j > i) if no one between them is taller than or equal to max(heights[i], heights[j]). " +
+      "Scan right to left with a DECREASING stack of heights still visible from the left.",
+    ),
+    codeLines: [1, 2],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }, { name: "n", value: n }],
+    stack: [...stack],
+  });
+
+  snap({
+    title: text("Khởi tạo stack rỗng + ans = [0,…,0]", "Initialize empty stack + ans = [0,…,0]"),
+    note: text(
+      "Stack lưu chiều cao các người bên phải theo thứ tự GIẢM DẦN. " +
+      "ans[i] = số người person i nhìn thấy sang phải.",
+      "The stack holds heights of people to the right in DECREASING order. " +
+      "ans[i] = number of people that person i can see to the right.",
+    ),
+    codeLines: [3, 4],
+    vars: [{ name: "stack", value: stackText(stack) }, { name: "ans", value: ansText() }],
+    stack: [...stack],
+  });
+
+  // ── main loop: i = n-1 down to 0 ─────────────────────────────────────────
+  for (let i = n - 1; i >= 0; i--) {
+    snap({
+      title: text(`i = ${i}: person ${i} cao ${heights[i]}`, `i = ${i}: person ${i} height ${heights[i]}`),
+      note: text(
+        `heights[${i}] = ${heights[i]}. Person ${i} nhìn qua các người bên phải. ` +
+        `Stack hiện tại (từ đỉnh): ${stackText(stack)}.`,
+        `heights[${i}] = ${heights[i]}. Person ${i} looks right. ` +
+        `Current stack (top first): ${stackText(stack)}.`,
+      ),
+      codeLines: [5],
+      cur: i,
+      vars: [
+        { name: "i", value: i },
+        { name: "heights[i]", value: heights[i] },
+        { name: "stack", value: stackText(stack) },
+        { name: "ans", value: ansText() },
+      ],
+      stack: [...stack],
+      resolved: [...resolved],
+    });
+
+    // pop shorter people — person i sees each one directly
+    while (stack.length && heights[i] > stack.at(-1)) {
+      const popped = stack.pop();
+      ans[i]++;
+      snap({
+        title: text(
+          `Person ${i} (${heights[i]}) nhìn thấy người cao ${popped} → pop, ans[${i}]++`,
+          `Person ${i} (${heights[i]}) sees person height ${popped} → pop, ans[${i}]++`,
+        ),
+        note: text(
+          `heights[${i}] = ${heights[i]} > đỉnh stack ${popped}. ` +
+          `Person ${i} cao hơn → nhìn thấy người này VÀ nhìn xuyên qua họ. Pop để tiếp tục kiểm tra.`,
+          `heights[${i}] = ${heights[i]} > stack top ${popped}. ` +
+          `Person ${i} is taller → sees this person AND can see past them. Pop to keep checking.`,
+        ),
+        codeLines: [6, 7, 8],
+        cur: i,
+        vars: [
+          { name: "popped height", value: popped },
+          { name: `ans[${i}]`, value: ans[i] },
+          { name: "stack", value: stackText(stack) },
+        ],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+    }
+
+    // if someone taller (or equal) remains on the stack, person i sees exactly that one
+    if (stack.length) {
+      ans[i]++;
+      snap({
+        title: text(
+          `Person ${i} còn thấy người cao ${stack.at(-1)} (cao hơn hoặc bằng) → ans[${i}]++`,
+          `Person ${i} also sees taller/equal person height ${stack.at(-1)} → ans[${i}]++`,
+        ),
+        note: text(
+          `Còn người cao ${stack.at(-1)} ≥ heights[${i}] = ${heights[i]} ở đầu stack. ` +
+          `Person ${i} nhìn thấy họ nhưng KHÔNG nhìn xuyên qua. ans[${i}] = ${ans[i]}.`,
+          `There is a person height ${stack.at(-1)} ≥ heights[${i}] = ${heights[i]} at the stack top. ` +
+          `Person ${i} sees them but CANNOT see past. ans[${i}] = ${ans[i]}.`,
+        ),
+        codeLines: [9, 10],
+        cur: i,
+        vars: [
+          { name: "taller top", value: stack.at(-1) },
+          { name: `ans[${i}]`, value: ans[i] },
+          { name: "stack", value: stackText(stack) },
+        ],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+    } else {
+      snap({
+        title: text(
+          `Stack rỗng → person ${i} không thấy ai thêm (ans[${i}] = ${ans[i]})`,
+          `Stack empty → person ${i} sees no one else (ans[${i}] = ${ans[i]})`,
+        ),
+        note: text(
+          `Không còn ai bên phải người ${i}. ans[${i}] = tổng số người cao hơn đã bị pop = ${ans[i]}.`,
+          `No one remains to the right of person ${i}. ans[${i}] = total shorter people popped = ${ans[i]}.`,
+        ),
+        codeLines: [9],
+        cur: i,
+        vars: [{ name: `ans[${i}]`, value: ans[i] }, { name: "stack", value: "[]" }],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+    }
+
+    // push current person onto the stack
+    stack.push(heights[i]);
+    resolved.push(i);
+    snap({
+      title: text(`Push heights[${i}] = ${heights[i]} vào stack`, `Push heights[${i}] = ${heights[i]} onto the stack`),
+      note: text(
+        `Person ${i} đã được tính. Push ${heights[i]} để người bên trái (i < ${i}) có thể nhìn thấy.`,
+        `Person ${i} is resolved. Push ${heights[i]} so people to the left (i < ${i}) can see them.`,
+      ),
+      codeLines: [11],
+      cur: i,
+      vars: [
+        { name: "push", value: heights[i] },
+        { name: "stack", value: stackText(stack) },
+        { name: "ans", value: ansText() },
+      ],
+      stack: [...stack],
+      resolved: [...resolved],
+    });
+  }
+
+  // ── final step ────────────────────────────────────────────────────────────
+  snap({
+    title: text(`Kết quả: ans = [${ans.join(", ")}]`, `Result: ans = [${ans.join(", ")}]`),
+    note: text(
+      `ans[i] = số người person i nhìn thấy sang phải. ` +
+      `Người cao hơn chặn tầm nhìn; người thấp hơn bị nhìn xuyên qua.`,
+      `ans[i] = number of people person i can see to the right. ` +
+      `Taller people block the view; shorter people are seen through.`,
+    ),
+    codeLines: [12],
+    vars: [{ name: "ans", value: ansText() }],
+    stack: [...stack],
+    resolved: [...Array.from({ length: n }, (_, i) => i)],
+    final: true,
+  });
+
+  return { original: heights, answer: ans, steps };
+}
+
 function validSubarraySize(nums, params = {}) {
   const threshold = Number(params.threshold ?? 6);
   const stack = [];
@@ -4552,7 +4742,65 @@ module.exports = {
   1526: simpleProblem({ id: 1526, difficulty: "hard", slug: "minimum-number-of-increments-on-subarrays-to-form-a-target-array", name: "Minimum Number of Increments on Subarrays to Form a Target Array", viName: "Số increment subarray ít nhất", statement: text("Tạo target từ zero array bằng increment subarray ít nhất.", "Form target from a zero array using the fewest subarray increments."), defaultInput: "1,2,3,2,1", solver: arrayBuilder(minIncrementsTarget) }),
   1776: simpleProblem({ id: 1776, difficulty: "hard", slug: "car-fleet-ii", name: "Car Fleet II", viName: "Đoàn xe II", statement: text("Với mỗi xe, tính thời điểm va chạm với xe phía trước.", "For each car, compute when it collides with a car ahead."), defaultInput: "1,2;2,1;4,3;7,2", inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"), solver: (input) => { const cars = parsePairs(input); const answer = carFleetII(input); return { original: cars.flat(), answer, steps: genericSteps({ nums: cars.map((p) => p[0]), title: text("Collision times", "Collision times"), answer, note: text("Stack giữ xe phía trước còn có thể là va chạm đầu tiên.", "The stack keeps front cars that can still be the first collision.") }) }; } }),
   1793: simpleProblem({ id: 1793, difficulty: "hard", slug: "maximum-score-of-a-good-subarray", name: "Maximum Score of a Good Subarray", viName: "Điểm lớn nhất của good subarray", statement: text("Subarray phải chứa k; score = min * length.", "The subarray must contain k; score = min * length."), defaultInput: "1,4,3,7,4,5", extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 0 }], solver: arrayBuilder(maximumScore) }),
-  1944: simpleProblem({ id: 1944, difficulty: "hard", slug: "number-of-visible-people-in-a-queue", name: "Number of Visible People in a Queue", viName: "Số người nhìn thấy trong hàng đợi", statement: text("Với mỗi người, đếm số người bên phải họ nhìn thấy.", "For each person, count visible people to their right."), defaultInput: "10,6,8,5,11,9", solver: arrayBuilder(canSeePersonsCount) }),
+  1944: {
+    id: 1944,
+    difficulty: "hard",
+    slug: "number-of-visible-people-in-a-queue",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Number of Visible People in a Queue"),
+    titleVi: text("Số người nhìn thấy trong hàng đợi", "Number of visible people in a queue"),
+    statement: text(
+      "Có n người đứng trong hàng. heights[i] là chiều cao người thứ i. Person i nhìn thấy person j (j > i) nếu không có ai ở giữa cao hơn hoặc bằng max(heights[i], heights[j]). Với mỗi i, đếm số người nhìn thấy sang phải.",
+      "There are n people in a queue. heights[i] is the height of person i. Person i can see person j (j > i) if no one between them has a height >= max(heights[i], heights[j]). For each i, count how many people they can see to the right.",
+    ),
+    defaultInput: "10,6,8,5,11,9",
+    inputKind: "string",
+    inputLabel: text("heights (cách bởi ,)", "heights (comma separated)"),
+    extraParams: [],
+    approach: [
+      text(
+        "Quét từ PHẢI sang TRÁI, dùng stack GIẢM DẦN lưu chiều cao các người còn nhìn thấy được từ bên trái.",
+        "Scan RIGHT to LEFT using a DECREASING stack of heights still visible from the left.",
+      ),
+      text(
+        "Với person i: pop mọi người thấp hơn (heights[i] > đỉnh stack) — mỗi lần pop là 1 người nhìn thấy trực tiếp.",
+        "For person i: pop everyone shorter (heights[i] > stack top) — each pop counts as 1 directly visible person.",
+      ),
+      text(
+        "Sau vòng pop, nếu stack còn người (cao hơn hoặc bằng), cộng thêm 1 — đây là người chặn tầm nhìn, vẫn nhìn thấy được nhưng không xuyên qua.",
+        "After the pop loop, if someone taller/equal remains on the stack, add 1 more — this person blocks the view but is still visible.",
+      ),
+      text(
+        "Push heights[i] vào stack để các người bên trái sau đó có thể thấy person i.",
+        "Push heights[i] onto the stack so people further left can see person i.",
+      ),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text(
+        "Mỗi người được push và pop tối đa một lần.",
+        "Each person is pushed and popped at most once.",
+      ),
+    },
+    code: [
+      "class Solution:",
+      "    def canSeePersonsCount(self, heights):",
+      "        n = len(heights)",
+      "        ans, stack = [0] * n, []",
+      "        for i in range(n - 1, -1, -1):",
+      "            while stack and heights[i] > stack[-1]:",
+      "                ans[i] += 1",
+      "                stack.pop()",
+      "            if stack:",
+      "                ans[i] += 1",
+      "            stack.append(heights[i])",
+      "        return ans",
+    ],
+    liveArgs: (input) => [parseNums(input, "heights")],
+    builder: buildSteps1944,
+  },
   2334: simpleProblem({ id: 2334, difficulty: "hard", slug: "subarray-with-elements-greater-than-varying-threshold", name: "Subarray With Elements Greater Than Varying Threshold", viName: "Subarray vượt threshold biến đổi", statement: text("Tìm size k sao cho mọi phần tử trong subarray > threshold/k.", "Find a size k where every subarray element is greater than threshold/k."), defaultInput: "1,3,4,3,1", extraParams: [{ key: "threshold", label: text("threshold", "threshold"), default: 6, min: 0 }], solver: arrayBuilder(validSubarraySize) }),
   2454: simpleProblem({ id: 2454, difficulty: "hard", slug: "next-greater-element-iv", name: "Next Greater Element IV", viName: "Phần tử lớn hơn thứ hai", statement: text("Với mỗi index, tìm phần tử lớn hơn thứ hai ở bên phải.", "For each index, find the second greater element to its right."), defaultInput: "2,4,0,9,6", solver: arrayBuilder(secondGreater) }),
   321: {
