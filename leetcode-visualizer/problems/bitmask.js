@@ -782,19 +782,22 @@ function buildSteps1125(input, params = {}) {
   const fullMask = (1 << reqSkills.length) - 1;
   const dp = new Map([[0, []]]);
   const steps = [];
+  const TRACE_LIMIT = 360;
+  let traceTruncated = false;
   const stages = [
-    { vi: "1. Mã hóa skill", en: "1. Encode skills" },
-    { vi: "2. Chọn người", en: "2. Pick a person" },
-    { vi: "3. OR mask", en: "3. OR masks" },
-    { vi: "4. Giữ team nhỏ", en: "4. Keep smaller team" },
-    { vi: "5. Kết quả", en: "5. Result" },
+    { vi: "1. Đánh chỉ số skill", en: "1. Index skills" },
+    { vi: "2. Khởi tạo DP", en: "2. Initialize DP" },
+    { vi: "3. Mã hóa một người", en: "3. Encode a person" },
+    { vi: "4. Cập nhật mask DP", en: "4. Update DP mask" },
+    { vi: "5. Trả team", en: "5. Return team" },
   ];
   const rule = {
     vi: "dp[mask] lưu team nhỏ nhất phủ đúng các skill trong mask. OR thêm skill của một người.",
     en: "dp[mask] stores the smallest team covering mask. OR in one person's skills.",
   };
 
-  const snapshot = ({ phase, personIndex = -1, fromMask = 0, newMask = 0, team = [], updated = false, line, title, note, final = false }) => {
+  const snapshot = ({ phase, personIndex = -1, personMask = 0, fromMask = 0, newMask = 0, team = [], updated = false, line, title, note, final = false }) => {
+    if (!final && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
     const peopleItems = people.map((skills, index) => ({
       label: `P${index}`,
       value: skills.length,
@@ -811,44 +814,58 @@ function buildSteps1125(input, params = {}) {
     }));
     addAdvancedStep(steps, {
       problemId: 1125, mode: "team", phase, stages,
-      stageIndex: phase === "encode" ? 0 : phase === "person" ? 1 : phase === "update" ? 3 : 4,
+      stageIndex: phase === "skill-index" ? 0 : phase === "dp-init" ? 1 : ["person-loop", "person-mask", "skill-loop", "skill-add"].includes(phase) ? 2 : ["dp-loop", "merge", "candidate", "compare", "save"].includes(phase) ? 3 : 4,
       rule, title, note, final, codeLines: [line],
-      vars: [{ name: "person", value: personIndex }, { name: "from mask", value: fromMask.toString(2).padStart(reqSkills.length, "0") }, { name: "new mask", value: newMask.toString(2).padStart(reqSkills.length, "0") }, { name: "dp states", value: dp.size }],
+      traceTruncated,
+      vars: [{ name: "person", value: personIndex < 0 ? "-" : `P${personIndex}` }, { name: "person mask", value: personMask.toString(2).padStart(reqSkills.length, "0") }, { name: "from mask", value: fromMask.toString(2).padStart(reqSkills.length, "0") }, { name: "new mask", value: newMask.toString(2).padStart(reqSkills.length, "0") }, { name: "dp states", value: dp.size }],
       lanes: [
         { title: { vi: "REQUIRED SKILLS", en: "REQUIRED SKILLS" }, hint: { vi: "mỗi skill là một bit", en: "one bit per skill" }, items: reqSkills.map((skill, index) => ({ label: skill, value: index, sub: `bit ${index}`, state: newMask & (1 << index) ? "success" : "" })) },
         { title: { vi: "PEOPLE", en: "PEOPLE" }, hint: { vi: "badge = skill mask", en: "badge = skill mask" }, items: peopleItems },
       ],
       masks: personIndex < 0 ? [{ title: "FULL SKILLS", value: fullMask, bits: reqSkills.map((skill) => ({ label: skill, on: true })), tone: final ? "success" : "source" }] : [
         { title: { vi: "ĐÃ PHỦ", en: "COVERED" }, value: fromMask, bits: reqSkills.map((skill, index) => ({ label: skill, on: Boolean(fromMask & (1 << index)) })), tone: "source" },
-        { title: `P${personIndex}`, value: peopleMasks[personIndex], bits: reqSkills.map((skill, index) => ({ label: skill, on: Boolean(peopleMasks[personIndex] & (1 << index)) })), tone: "active" },
+        { title: `P${personIndex}`, value: personMask, bits: reqSkills.map((skill, index) => ({ label: skill, on: Boolean(personMask & (1 << index)) })), tone: "active" },
         { title: { vi: "SAU OR", en: "AFTER OR" }, value: newMask, bits: reqSkills.map((skill, index) => ({ label: skill, on: Boolean(newMask & (1 << index)) })), tone: updated ? "success" : "muted" },
       ],
-      operation: personIndex < 0 ? null : {
+      operation: ["merge", "candidate", "compare", "save"].includes(phase) ? {
         eyebrow: { vi: "THÊM NGƯỜI VÀO TEAM", en: "ADD PERSON TO TEAM" },
-        formula: `${fromMask.toString(2).padStart(reqSkills.length, "0")} | ${peopleMasks[personIndex].toString(2).padStart(reqSkills.length, "0")} = ${newMask.toString(2).padStart(reqSkills.length, "0")}`,
+        formula: `${fromMask.toString(2).padStart(reqSkills.length, "0")} | ${personMask.toString(2).padStart(reqSkills.length, "0")} = ${newMask.toString(2).padStart(reqSkills.length, "0")}`,
         detail: updated ? { vi: `Team mới [${team.map((index) => `P${index}`).join(", ")}] nhỏ hơn team cũ của mask này.`, en: `New team [${team.map((index) => `P${index}`).join(", ")}] is smaller for this mask.` } : { vi: "State này đã có team bằng hoặc nhỏ hơn, nên không cập nhật.", en: "This state already has an equal or smaller team, so skip the update." },
         status: updated ? "success" : "muted",
-      },
+      } : null,
       states: { title: { vi: "DP: TEAM NHỎ NHẤT CHO MỖI MASK", en: "DP: SMALLEST TEAM PER MASK" }, hint: { vi: `${dp.size} state`, en: `${dp.size} states` }, items: dpItems },
       result: final ? { label: { vi: "SMALLEST TEAM", en: "SMALLEST TEAM" }, value: `[${(dp.get(fullMask) || []).join(", ")}]`, detail: `${(dp.get(fullMask) || []).length} people`, status: dp.has(fullMask) ? "success" : "danger" } : null,
     });
   };
 
+  snapshot({ phase: "skill-index", line: 3, title: { vi: "index = {skill: i ...}", en: "index = {skill: i ...}" }, note: { vi: `Gán từng required skill vào một bit: ${reqSkills.map((skill, index) => `${skill}→${index}`).join(", ")}.`, en: `Assign each required skill to one bit: ${reqSkills.map((skill, index) => `${skill}→${index}`).join(", ")}.` } });
+  snapshot({ phase: "dp-init", line: 4, title: { vi: "dp = {0: []}", en: "dp = {0: []}" }, note: { vi: "Mask 0 chưa phủ skill nào, nên team rỗng là cách nhỏ nhất.", en: "Mask 0 covers no skills, so the empty team is its smallest team." } });
   for (let personIndex = 0; personIndex < people.length; personIndex++) {
-    snapshot({ phase: "encode", personIndex, fromMask: 0, newMask: peopleMasks[personIndex], line: 5, title: { vi: `P${personIndex} → skill mask`, en: `P${personIndex} → skill mask` }, note: { vi: `P${personIndex} có các skill: ${people[personIndex].join(", ") || "không có skill cần thiết"}.`, en: `P${personIndex} has: ${people[personIndex].join(", ") || "no required skills"}.` } });
-  }
-  for (let personIndex = 0; personIndex < people.length; personIndex++) {
-    const personMask = peopleMasks[personIndex];
-    if (personMask === 0) continue;
+    let personMask = 0;
+    snapshot({ phase: "person-loop", personIndex, personMask, fromMask: 0, newMask: 0, line: 5, title: { vi: `for person = P${personIndex}`, en: `for person = P${personIndex}` }, note: { vi: `Bắt đầu đọc skills của P${personIndex}.`, en: `Start reading P${personIndex}'s skills.` } });
+    snapshot({ phase: "person-mask", personIndex, personMask, fromMask: 0, newMask: 0, line: 6, title: { vi: "person_mask = 0", en: "person_mask = 0" }, note: { vi: "Mask tạm của người này bắt đầu bằng 0.", en: "This person's temporary mask starts at 0." } });
+    for (const skill of people[personIndex]) {
+      const beforeMask = personMask;
+      const known = skillIndex.has(skill);
+      const skillBit = known ? 1 << skillIndex.get(skill) : 0;
+      snapshot({ phase: "skill-loop", personIndex, personMask, fromMask: beforeMask, newMask: beforeMask, line: 7, title: { vi: `for skill = ${skill}`, en: `for skill = ${skill}` }, note: { vi: `Đọc từng skill của P${personIndex}.`, en: `Read one skill from P${personIndex}.` } });
+      if (known) personMask |= skillBit;
+      snapshot({ phase: "skill-add", personIndex, personMask, fromMask: beforeMask, newMask: personMask, line: 8, title: known ? { vi: `${skill} → bật bit ${skillIndex.get(skill)}`, en: `${skill} → set bit ${skillIndex.get(skill)}` } : { vi: `${skill} không thuộc req_skills`, en: `${skill} is not required` }, note: known ? { vi: `${beforeMask.toString(2).padStart(reqSkills.length, "0")} | ${skillBit.toString(2).padStart(reqSkills.length, "0")} = ${personMask.toString(2).padStart(reqSkills.length, "0")}.`, en: `${beforeMask.toString(2).padStart(reqSkills.length, "0")} | ${skillBit.toString(2).padStart(reqSkills.length, "0")} = ${personMask.toString(2).padStart(reqSkills.length, "0")}.` } : { vi: "Bỏ qua skill không cần thiết; mask không đổi.", en: "Ignore a non-required skill; the mask stays unchanged." } });
+    }
     const entries = [...dp.entries()];
-    snapshot({ phase: "person", personIndex, fromMask: 0, newMask: personMask, line: 9, title: { vi: `Xét P${personIndex}`, en: `Process P${personIndex}` }, note: { vi: "Thử thêm người này vào từng team hiện có.", en: "Try adding this person to every existing team." } });
     for (const [mask, members] of entries) {
       const newMask = mask | personMask;
       const candidate = [...members, personIndex];
       const current = dp.get(newMask);
       const updated = !current || candidate.length < current.length;
-      if (updated) dp.set(newMask, candidate);
-      snapshot({ phase: "update", personIndex, fromMask: mask, newMask, team: candidate, updated, line: 12, title: { vi: updated ? `Cập nhật mask ${newMask.toString(2)}` : `Không cần cập nhật mask ${newMask.toString(2)}`, en: updated ? `Update mask ${newMask.toString(2)}` : `Keep existing mask ${newMask.toString(2)}` }, note: updated ? { vi: "Đây là team đầu tiên hoặc nhỏ hơn cho mask mới.", en: "This is the first or a smaller team for the new mask." } : { vi: "Team hiện có đã tốt hơn.", en: "The existing team is already better." } });
+      snapshot({ phase: "dp-loop", personIndex, personMask, fromMask: mask, newMask: mask, team: members, line: 9, title: { vi: `for mask = ${mask.toString(2).padStart(reqSkills.length, "0")}`, en: `for mask = ${mask.toString(2).padStart(reqSkills.length, "0")}` }, note: { vi: `Đọc team hiện tại [${members.map((index) => `P${index}`).join(", ")}].`, en: `Read the current team [${members.map((index) => `P${index}`).join(", ")}].` } });
+      snapshot({ phase: "merge", personIndex, personMask, fromMask: mask, newMask, team: members, line: 10, title: { vi: `new_mask = ${newMask.toString(2).padStart(reqSkills.length, "0")}`, en: `new_mask = ${newMask.toString(2).padStart(reqSkills.length, "0")}` }, note: { vi: "OR các skill đã phủ với skill của người đang xét.", en: "OR the covered skills with the current person's skills." } });
+      snapshot({ phase: "candidate", personIndex, personMask, fromMask: mask, newMask, team: candidate, line: 11, title: { vi: `candidate = [${candidate.map((index) => `P${index}`).join(", ")}]`, en: `candidate = [${candidate.map((index) => `P${index}`).join(", ")}]` }, note: { vi: "Tạo team ứng viên bằng cách thêm người hiện tại.", en: "Create a candidate team by appending the current person." } });
+      snapshot({ phase: "compare", personIndex, personMask, fromMask: mask, newMask, team: candidate, updated, line: 12, title: updated ? { vi: "Candidate tốt hơn → cập nhật", en: "Candidate is better → update" } : { vi: "Team cũ nhỏ hơn hoặc bằng → giữ lại", en: "Existing team is no larger → keep it" }, note: updated ? { vi: "Mask này chưa có team hoặc candidate ngắn hơn.", en: "This mask has no team yet, or the candidate is shorter." } : { vi: "Không ghi đè team nhỏ nhất hiện có.", en: "Do not overwrite the existing smallest team." } });
+      if (updated) {
+        dp.set(newMask, candidate);
+        snapshot({ phase: "save", personIndex, personMask, fromMask: mask, newMask, team: candidate, updated: true, line: 13, title: { vi: `dp[${newMask.toString(2).padStart(reqSkills.length, "0")}] = candidate`, en: `dp[${newMask.toString(2).padStart(reqSkills.length, "0")}] = candidate` }, note: { vi: "Lưu team ngắn nhất mới cho mask này.", en: "Save the new smallest team for this mask." } });
+      }
     }
   }
   const answer = dp.get(fullMask) || [];
@@ -1138,6 +1155,7 @@ module.exports = {
     approach: [{ vi: "Mỗi skill là một bit; mỗi người có một skill mask.", en: "Each skill is a bit; each person has a skill mask." }, { vi: "dp[mask] giữ team nhỏ nhất phủ mask đó.", en: "dp[mask] keeps the smallest team covering that mask." }],
     complexity: { time: "O(p·2ˢ)", space: "O(2ˢ)", note: { vi: "p là số người, s là số skill.", en: "p is people count and s is skill count." } },
     code: ["class Solution:", "    def smallestSufficientTeam(self, req_skills, people):", "        index = {skill: i for i, skill in enumerate(req_skills)}", "        dp = {0: []}", "        for person, skills in enumerate(people):", "            person_mask = 0", "            for skill in skills:", "                if skill in index: person_mask |= 1 << index[skill]", "            for mask, team in list(dp.items()):", "                new_mask = mask | person_mask", "                candidate = team + [person]", "                if new_mask not in dp or len(candidate) < len(dp[new_mask]):", "                    dp[new_mask] = candidate", "        return dp[(1 << len(req_skills)) - 1]"],
+    debugMode: "line-by-line",
     liveArgs: (input, params = {}) => [parseWordArray(input, "req_skills"), parsePeople1125(params.people)], builder: buildSteps1125,
   },
   1799: {
