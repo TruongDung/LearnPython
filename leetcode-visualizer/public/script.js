@@ -7976,9 +7976,13 @@ function renderValidSubarrays1063View(step) {
   const contributions = Array.isArray(view.contributions) ? view.contributions : [];
   const starts = Array.isArray(view.currentStarts) ? view.currentStarts : [];
   const current = Number.isInteger(view.current) ? view.current : -1;
+  const comparedIndex = Number.isInteger(view.comparedIndex) ? view.comparedIndex : -1;
   const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const poppedThisRound = Array.isArray(view.poppedThisRound) ? view.poppedThisRound : [];
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
-  const phaseLabels = vi ? ["Duy trì stack", "Cộng contribution", "Kết quả"] : ["Maintain stack", "Add contribution", "Result"];
+  const phaseLabels = vi
+    ? ["Đọc right endpoint", "Pop start sai", "Push index i", "Cộng len(stack)", "Kết quả"]
+    : ["Read right endpoint", "Pop invalid starts", "Push index i", "Add stack length", "Result"];
   const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
   const cells = nums.map((value, index) => {
     const contribution = contributions[index];
@@ -7996,7 +8000,10 @@ function renderValidSubarrays1063View(step) {
   }).join("");
   const stackText = stack.length ? stack.map((index) => `${index}:${nums[index]}`).join("  →  ") : "[]";
   const ranges = current >= 0 && starts.length
-    ? starts.map((start) => `<span><b>[${start}..${current}]</b><small>${nums.slice(start, current + 1).join(", ")}</small></span>`).join("")
+    ? starts.map((start) => {
+      const values = nums.slice(start, current + 1);
+      return `<span><b>[${start}..${current}]</b><small>${values.join(", ")} · min = ${Math.min(...values)} = first</small></span>`;
+    }).join("")
     : `<em>${vi ? "Push index hiện tại để tạo các range hợp lệ." : "Push the current index to create valid ranges."}</em>`;
   let running = 0;
   const contributionRows = nums.map((_, index) => {
@@ -8012,18 +8019,268 @@ function renderValidSubarrays1063View(step) {
     ? `answer = ${view.answer - (contributions[current] ?? 0)} + ${contributions[current] ?? 0} = ${view.answer}`
     : (view.action || (vi ? "Giữ stack theo thứ tự value không giảm." : "Keep the stack in non-decreasing value order."));
   const isFinal = view.phase === "done";
+  const isComparing = current >= 0 && comparedIndex >= 0 && ["while", "pop"].includes(view.phase);
+  const shouldPop = isComparing && nums[comparedIndex] > nums[current];
+  const comparisonHtml = isComparing ? `<section class="vs1063-compare ${shouldPop ? "remove" : "keep"}">
+    <div><small>stack top · index ${comparedIndex}</small><strong>${nums[comparedIndex]}</strong></div>
+    <b>${shouldPop ? ">" : "≤"}</b>
+    <div><small>nums[${current}] · current</small><strong>${nums[current]}</strong></div>
+    <p><b>${shouldPop ? "POP" : "KEEP"}</b><span>${shouldPop ? (vi ? `Start ${comparedIndex} không thể còn là minimum tới index ${current}.` : `Start ${comparedIndex} can no longer be the minimum through index ${current}.`) : (vi ? `Start ${comparedIndex} vẫn là minimum hợp lệ.` : `Start ${comparedIndex} remains a valid minimum.`)}</span></p>
+  </section>` : "";
+  const poppedHtml = poppedThisRound.length
+    ? poppedThisRound.map((index) => `<span><b>${index}:${nums[index]}</b><small>${vi ? `loại range [${index}..${current}]` : `reject range [${index}..${current}]`}</small></span>`).join("")
+    : `<em>${vi ? "Chưa pop start nào tại right endpoint này." : "No start has been popped at this right endpoint."}</em>`;
 
   $("treeView").innerHTML = `<section class="vs1063-viz" role="img" aria-label="Number of Valid Subarrays visualization">
     <header><div><small>MONOTONIC STACK · #1063</small><strong>NUMBER OF VALID SUBARRAYS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="vs1063-phases">${phases}</div>
     <section class="vs1063-rule"><b>${vi ? "KHI NÀO MỘT RANGE HỢP LỆ?" : "WHEN IS A RANGE VALID?"}</b><strong>${escapeHtml(rule)}</strong><span>${vi ? "Vì vậy, khi gặp value nhỏ hơn, mọi start có value lớn hơn phải bị loại khỏi stack." : "Therefore, when a smaller value appears, every start with a larger value must leave the stack."}</span></section>
     <section class="vs1063-metrics"><div><small>right endpoint i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>value</small><strong>${current >= 0 ? nums[current] : "—"}</strong></div><div><small>len(stack)</small><strong>${stack.length}</strong></div><div class="answer"><small>answer</small><strong>${view.answer ?? 0}</strong></div></section>
-    <section class="vs1063-stack"><header><strong>${vi ? "MONOTONIC STACK (INDEX : VALUE)" : "MONOTONIC STACK (INDEX : VALUE)"}</strong><span>${vi ? "từ đáy → đỉnh" : "bottom → top"}</span></header><code>${escapeHtml(stackText)}</code><p>${vi ? "Mỗi index trong stack là một start index vẫn có thể tạo valid subarray tới right endpoint hiện tại." : "Each index in the stack is a start index that can still form a valid subarray to the current right endpoint."}</p></section>
+    ${comparisonHtml}
+    <section class="vs1063-stack"><header><strong>${vi ? "MONOTONIC STACK (INDEX : VALUE)" : "MONOTONIC STACK (INDEX : VALUE)"}</strong><span>${vi ? "từ đáy → đỉnh" : "bottom → top"}</span></header><code>${escapeHtml(stackText)}</code><p>${vi ? "Mỗi index trong stack là một start index vẫn có thể tạo valid subarray tới right endpoint hiện tại." : "Each index in the stack is a start index that can still form a valid subarray to the current right endpoint."}</p><div class="vs1063-popped"><small>${vi ? "ĐÃ POP TẠI i NÀY" : "POPPED AT THIS i"}</small><div>${poppedHtml}</div></div></section>
     <section class="vs1063-grid-wrap"><header><strong>${vi ? "ARRAY + ĐÓNG GÓP" : "ARRAY + CONTRIBUTION"}</strong><span>${vi ? "tím = current · xanh = start hợp lệ · đỏ = vừa pop" : "purple = current · blue = valid start · red = just popped"}</span></header><div class="vs1063-grid" style="--vs1063-count:${Math.max(nums.length, 1)}">${cells}</div></section>
     <section class="vs1063-ranges"><header><strong>${vi ? `VALID SUBARRAY KẾT THÚC Ở i = ${current >= 0 ? current : "—"}` : `VALID SUBARRAYS ENDING AT i = ${current >= 0 ? current : "—"}`}</strong><span>${starts.length ? `${starts.length} ${vi ? "range" : "range(s)"}` : ""}</span></header><div>${ranges}</div></section>
     <section class="vs1063-contributions"><header><strong>${vi ? "CỘNG DỒN THEO RIGHT ENDPOINT" : "ACCUMULATED BY RIGHT ENDPOINT"}</strong><span>${vi ? "mỗi +k là len(stack) sau khi push" : "each +k is len(stack) after push"}</span></header><div>${contributionRows}</div></section>
     <section class="vs1063-formula"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(stepFormula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     <footer class="vs1063-result ${isFinal ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${isFinal ? view.answer : "…"}</strong><span>${isFinal ? (vi ? "Tổng tất cả contribution là số valid subarray." : "The sum of all contributions is the number of valid subarrays.") : (vi ? "answer sẽ được cập nhật sau khi stack hợp lệ." : "answer is updated after the stack is valid.")}</span></footer>
+  </section>`;
+}
+
+function renderVisibleMountains2345View(step) {
+  const view = step.visibleMountains2345View || {};
+  const vi = lang === "vi";
+  const peaks = Array.isArray(view.peaks) ? view.peaks : [];
+  const intervals = Array.isArray(view.intervals) ? view.intervals : [];
+  const sorted = Array.isArray(view.sorted) ? view.sorted : [];
+  const converted = Array.isArray(view.converted) ? view.converted : [];
+  const duplicateCounts = Array.isArray(view.duplicateCounts) ? view.duplicateCounts : [];
+  const states = Array.isArray(view.states) ? view.states : [];
+  const coveredBy = Array.isArray(view.coveredBy) ? view.coveredBy : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const currentInterval = current >= 0 ? intervals[current] : null;
+  const phaseLabels = vi
+    ? ["Đổi interval", "Tìm duplicate", "Sort hai biên", "Sweep phủ", "Kết quả"]
+    : ["Make intervals", "Find duplicates", "Sort endpoints", "Coverage sweep", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const minLeft = intervals.length ? Math.min(...intervals.map((interval) => interval.left)) : 0;
+  const maxRight = intervals.length ? Math.max(...intervals.map((interval) => interval.right)) : 1;
+  const domainSpan = Math.max(1, maxRight - minLeft);
+  const position = (value) => ((value - minLeft) / domainSpan) * 100;
+  const stateLabel = (state, index) => {
+    if (state === "visible") return vi ? "VISIBLE" : "VISIBLE";
+    if (state === "covered") return vi ? `BỊ CHE bởi i=${coveredBy[index]}` : `COVERED by i=${coveredBy[index]}`;
+    if (state === "duplicate") return vi ? "TRÙNG · KHÔNG VISIBLE" : "DUPLICATE · NOT VISIBLE";
+    return vi ? "chưa sweep" : "not swept";
+  };
+  const tracks = sorted.map((interval, sortedIndex) => {
+    const state = states[interval.index] || "pending";
+    const classes = ["vm2345-track", state];
+    if (interval.index === current) classes.push("current");
+    const left = position(interval.left);
+    const width = Math.max(2, position(interval.right) - left);
+    const peak = ((interval.x - interval.left) / Math.max(1, interval.right - interval.left)) * 100;
+    return `<article class="${classes.join(" ")}"><header><small>SORT #${sortedIndex + 1}</small><b>i=${interval.index}</b><span>peak (${interval.x},${interval.y})</span></header><div class="vm2345-axis"><i class="vm2345-shape" style="left:${left}%;width:${width}%"><b style="left:${peak}%">${interval.y}</b></i><span class="left" style="left:${left}%">${interval.left}</span><span class="right" style="left:${left + width}%">${interval.right}</span></div><footer><code>[${interval.left}, ${interval.right}]</code><strong>${stateLabel(state, interval.index)}</strong></footer></article>`;
+  }).join("");
+  const cards = intervals.map((interval) => {
+    const state = states[interval.index] || "pending";
+    const classes = ["vm2345-card", state];
+    if (interval.index === current) classes.push("current");
+    const duplicateKnown = phaseIndex >= 1;
+    return `<article class="${classes.join(" ")}"><header><small>MOUNTAIN</small><strong>i=${interval.index}</strong></header><div><span><small>peak</small><b>(${interval.x},${interval.y})</b></span><span><small>interval</small><b>${converted[interval.index] ? `[${interval.left},${interval.right}]` : "?"}</b></span></div><footer><small>frequency</small><b>${duplicateKnown ? duplicateCounts[interval.index] : "?"}</b><em>${stateLabel(state, interval.index)}</em></footer></article>`;
+  }).join("");
+  const orderHtml = sorted.map((interval, index) => `<span class="${index === view.sortedPosition ? "current" : ""} ${states[interval.index] || "pending"}"><small>#${index + 1} · i=${interval.index}</small><b>[${interval.left}, ${interval.right}]</b></span>`).join("<i>→</i>");
+  const previous = view.previousFarthest;
+  const extendsRight = currentInterval && (previous == null || currentInterval.right > previous);
+  let decision = extendsRight ? "EXTENDS" : "COVERED";
+  if (current >= 0 && duplicateCounts[current] > 1 && String(view.action).includes("DUPLICATE")) decision = "DUPLICATE";
+  if (current >= 0 && states[current] === "visible") decision = "VISIBLE";
+  const compareHtml = view.phase === "sweep" && currentInterval ? `<section class="vm2345-compare ${decision.toLowerCase()}"><div><small>CURRENT RIGHT</small><strong>${currentInterval.right}</strong></div><b>${extendsRight ? ">" : "≤"}</b><div><small>PREVIOUS farthestRight</small><strong>${previous == null ? "−∞" : previous}</strong></div><p><b>${decision}</b><span>${decision === "COVERED" ? (vi ? `Interval nằm trọn trong mountain i=${view.farthestOwner}.` : `The interval lies completely inside mountain i=${view.farthestOwner}.`) : decision === "DUPLICATE" ? (vi ? "Interval có thể mở rộng biên nhưng mountain giống nhau che phủ lẫn nhau." : "The interval may extend the boundary, but identical mountains cover one another.") : decision === "VISIBLE" ? (vi ? "Interval mở rộng biên và là duy nhất, nên được cộng vào đáp án." : "The interval extends the boundary and is unique, so it is counted.") : (vi ? "Interval chưa bị che; tiếp theo kiểm tra duplicate." : "The interval is not covered; next check whether it is duplicated.")}</span></p></section>` : "";
+  const formula = view.formula || view.action || "(x, y) → [x − y, x + y]";
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="vm2345-viz" role="img" aria-label="Finding the Number of Visible Mountains visualization">
+    <header><div><small>INTERVAL COVERAGE · SORTING · #2345</small><strong>VISIBLE MOUNTAINS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="vm2345-phases">${phases}</div>
+    <section class="vm2345-rule"><b>${vi ? "MOUNTAIN TRỞ THÀNH INTERVAL" : "A MOUNTAIN BECOMES AN INTERVAL"}</b><div><span><small>LEFT FOOT</small><strong>x − y</strong></span><i>←</i><span class="peak"><small>PEAK</small><strong>(x, y)</strong></span><i>→</i><span><small>RIGHT FOOT</small><strong>x + y</strong></span></div><p>${vi ? "Mountain A che B khi leftA ≤ leftB và rightB ≤ rightA." : "Mountain A covers B when leftA ≤ leftB and rightB ≤ rightA."}</p></section>
+    <section class="vm2345-metrics"><div><small>${vi ? "mountain hiện tại" : "current mountain"}</small><strong>${current >= 0 ? `i=${current}` : "—"}</strong></div><div><small>interval</small><strong>${currentInterval ? `[${currentInterval.left},${currentInterval.right}]` : "—"}</strong></div><div><small>farthestRight</small><strong>${view.farthestRight == null ? "−∞" : view.farthestRight}</strong></div><div class="answer"><small>visible count</small><strong>${view.visible ?? 0}</strong></div></section>
+    <section class="vm2345-cards-wrap"><header><strong>${vi ? "PEAK → INTERVAL → TRẠNG THÁI" : "PEAK → INTERVAL → STATUS"}</strong><span>${vi ? "frequency > 1 nghĩa là duplicate" : "frequency > 1 means duplicate"}</span></header><div style="--vm2345-count:${Math.max(intervals.length, 1)}">${cards}</div></section>
+    <section class="vm2345-order"><header><strong>${vi ? "THỨ TỰ SWEEP" : "SWEEP ORDER"}</strong><span>left ↑ · right ↓</span></header><div>${orderHtml}</div></section>
+    <section class="vm2345-map"><header><strong>${vi ? "BẢN ĐỒ VÙNG PHỦ" : "COVERAGE MAP"}</strong><span>domain [${minLeft}, ${maxRight}]</span></header><div>${tracks}</div></section>
+    ${compareHtml}
+    <section class="vm2345-formula"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="vm2345-result ${final ? "done" : ""}"><small>${vi ? "SỐ MOUNTAIN VISIBLE" : "VISIBLE MOUNTAINS"}</small><strong>${final ? view.visible : "…"}</strong><span>${final ? (vi ? "Chỉ interval duy nhất và không bị interval trước chứa mới được đếm." : "Only unique intervals not contained by an earlier interval are counted.") : (vi ? "Sort biến bài toán che phủ 2D thành một lần so sánh farthestRight." : "Sorting turns 2D coverage into a single farthestRight comparison.")}</span></footer>
+  </section>`;
+}
+
+function renderMaximumSumQueries2736View(step) {
+  const view = step.maximumSumQueries2736View || {};
+  const vi = lang === "vi";
+  const nums1 = Array.isArray(view.nums1) ? view.nums1 : [];
+  const nums2 = Array.isArray(view.nums2) ? view.nums2 : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const points = Array.isArray(view.points) ? view.points : [];
+  const orderedQueries = Array.isArray(view.orderedQueries) ? view.orderedQueries : [];
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const pointStates = Array.isArray(view.pointStates) ? view.pointStates : [];
+  const frontier = Array.isArray(view.frontier) ? view.frontier : [];
+  const currentQuery = Number.isInteger(view.currentQuery) ? view.currentQuery : -1;
+  const currentPoint = Number.isInteger(view.currentPoint) ? view.currentPoint : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const currentQueryData = currentQuery >= 0 ? queries[currentQuery] : null;
+  const currentPointData = currentPoint >= 0 ? { a: nums1[currentPoint], b: nums2[currentPoint], sum: nums1[currentPoint] + nums2[currentPoint], index: currentPoint } : null;
+  const phaseLabels = vi
+    ? ["Sort offline", "Lọc theo x", "Giữ frontier", "Tìm theo y", "Trả kết quả"]
+    : ["Offline sort", "Filter by x", "Keep frontier", "Search by y", "Return answers"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const pointCards = points.map((point, sortedIndex) => {
+    const state = pointStates[point.index] || "pending";
+    const classes = ["msq2736-point", state];
+    if (point.index === currentPoint) classes.push("current");
+    return `<article class="${classes.join(" ")}">
+      <header><small>SORT #${sortedIndex + 1}</small><strong>i=${point.index}</strong></header>
+      <div><span><small>nums1 · a</small><b>${point.a}</b></span><span><small>nums2 · b</small><b>${point.b}</b></span></div>
+      <footer><small>a + b</small><strong>${point.sum}</strong></footer>
+      <em>${state === "pending" ? (vi ? "chưa kích hoạt" : "pending") : state === "candidate" ? (vi ? "đang xét" : "candidate") : state === "frontier" ? (vi ? "trên frontier" : "on frontier") : (vi ? "bị dominate" : "dominated")}</em>
+    </article>`;
+  }).join("");
+  const queryRank = new Map(orderedQueries.map((query, index) => [query.index, index + 1]));
+  const queryCards = queries.map(([x, y], index) => {
+    const classes = ["msq2736-query"];
+    if (index === currentQuery) classes.push("current");
+    if (answers[index] != null) classes.push("answered");
+    return `<article class="${classes.join(" ")}"><header><small>OFFLINE #${queryRank.get(index) || "?"}</small><strong>q${index}</strong></header><div><span><small>x</small><b>${x}</b></span><span><small>y</small><b>${y}</b></span></div><footer><small>answer[${index}]</small><strong>${answers[index] == null ? "?" : answers[index]}</strong></footer></article>`;
+  }).join("");
+  const frontierHtml = frontier.length
+    ? frontier.map((entry, index) => `<span class="${index === view.mid ? "mid" : ""} ${index === view.foundPosition ? "found" : ""}"><small>pos ${index} · i=${entry.index}</small><b>b=${entry.b}</b><strong>sum=${entry.sum}</strong></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Frontier đang trống" : "The frontier is empty"}</em>`;
+  let comparisonHtml = "";
+  if (view.phase === "frontier" && currentPointData) {
+    const compared = view.comparedEntry;
+    const isPop = String(view.action).includes("POP");
+    const isDiscard = String(view.action).includes("DISCARD");
+    const field = isPop ? "sum" : "b";
+    const leftValue = compared ? compared[field] : "empty";
+    const rightValue = currentPointData[field];
+    const symbol = compared ? (isPop ? "≤" : compared.b < currentPointData.b ? "<" : "≥") : "→";
+    const decision = isPop ? "POP" : isDiscard ? "DISCARD" : "APPEND";
+    comparisonHtml = `<section class="msq2736-compare ${decision.toLowerCase()}"><div><small>${compared ? `FRONTIER TOP · ${field}` : "FRONTIER"}</small><strong>${leftValue}</strong></div><b>${symbol}</b><div><small>${`CURRENT i=${currentPoint} · ${field}`}</small><strong>${rightValue}</strong></div><p><b>${decision}</b><span>${isPop ? (vi ? "Tổng mới tốt hơn nên point cũ không còn cần thiết." : "The new sum is better, so the old point is no longer needed.") : isDiscard ? (vi ? "Point trên frontier đã có b và sum tốt hơn current." : "A frontier point already has a better b and sum than current.") : (vi ? "Current mở rộng frontier tới ngưỡng b lớn hơn." : "Current extends the frontier to a larger b threshold.")}</span></p></section>`;
+  }
+  const lo = Number.isInteger(view.lo) ? view.lo : -1;
+  const hi = Number.isInteger(view.hi) ? view.hi : -1;
+  const mid = Number.isInteger(view.mid) ? view.mid : -1;
+  const searchCells = frontier.map((entry, index) => {
+    const classes = [];
+    if (lo >= 0 && index >= lo && index < hi) classes.push("inside");
+    if (index === mid) classes.push("mid");
+    if (index === view.foundPosition) classes.push("found");
+    return `<span class="${classes.join(" ")}"><small>pos ${index}</small><b>${entry.b}</b><em>sum ${entry.sum}</em></span>`;
+  }).join("");
+  const searchHtml = `<section class="msq2736-search ${view.phase === "search" ? "active" : ""}"><header><div><small>BINARY SEARCH ON b</small><strong>${currentQueryData ? `first b ≥ y=${currentQueryData[1]}` : (vi ? "Chờ query" : "Waiting for a query")}</strong></div><span>lo ${lo >= 0 ? lo : "—"} · mid ${mid >= 0 ? mid : "—"} · hi ${hi >= 0 ? hi : "—"}</span></header><div>${searchCells || `<em>${vi ? "Chưa có point đủ điều kiện x." : "No point passes the x constraint yet."}</em>`}</div><p>${vi ? "Vì b tăng dần, phần màu xanh là khoảng còn có thể chứa vị trí đầu tiên b ≥ y. Sum trên frontier giảm dần, nên vị trí đầu tiên cũng cho tổng lớn nhất." : "Because b increases, the blue cells are the remaining search range for the first b ≥ y. Frontier sums decrease, so that first position also gives the largest sum."}</p></section>`;
+  const formula = view.formula || view.action || (vi ? "Sort theo x để biến điều kiện 2D thành một lần quét + binary search." : "Sort by x to turn the 2D condition into one scan plus binary search.");
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="msq2736-viz" role="img" aria-label="Maximum Sum Queries visualization">
+    <header><div><small>OFFLINE QUERY · PARETO FRONTIER · #2736</small><strong>MAXIMUM SUM QUERIES</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="msq2736-phases">${phases}</div>
+    <section class="msq2736-rule"><b>${vi ? "MỖI QUERY LÀ HAI BỘ LỌC" : "EVERY QUERY HAS TWO FILTERS"}</b><div><span><small>FILTER 1</small><strong>a = nums1[i] ≥ x</strong><em>${vi ? "xử lý bằng sort + pointer" : "handled by sort + pointer"}</em></span><i>THEN</i><span><small>FILTER 2</small><strong>b = nums2[i] ≥ y</strong><em>${vi ? "xử lý bằng frontier + binary search" : "handled by frontier + binary search"}</em></span></div></section>
+    <section class="msq2736-metrics"><div><small>${vi ? "query hiện tại" : "current query"}</small><strong>${currentQueryData ? `q${currentQuery}` : "—"}</strong></div><div><small>${vi ? "ngưỡng (x,y)" : "threshold (x,y)"}</small><strong>${currentQueryData ? `(${currentQueryData.join(",")})` : "—"}</strong></div><div><small>${vi ? "point đã kích hoạt" : "activated points"}</small><strong>${view.pointCursor ?? 0}/${points.length}</strong></div><div><small>frontier size</small><strong>${frontier.length}</strong></div></section>
+    <section class="msq2736-points"><header><strong>${vi ? "POINT ĐÃ SORT THEO nums1 GIẢM DẦN" : "POINTS SORTED BY DESCENDING nums1"}</strong><span>${vi ? "xanh = frontier · đỏ = dominated · tím = current" : "green = frontier · red = dominated · purple = current"}</span></header><div style="--msq2736-count:${Math.max(points.length, 1)}">${pointCards}</div></section>
+    <section class="msq2736-queries"><header><strong>${vi ? "QUERY GỐC + THỨ TỰ OFFLINE" : "ORIGINAL QUERIES + OFFLINE ORDER"}</strong><span>${vi ? "answer vẫn ghi về q index gốc" : "answers return to original q indices"}</span></header><div style="--msq2736-query-count:${Math.max(queries.length, 1)}">${queryCards}</div></section>
+    <section class="msq2736-frontier"><header><strong>PARETO FRONTIER: b ↑ · sum ↓</strong><span>${vi ? "mỗi point còn lại đều hữu ích" : "every remaining point is useful"}</span></header><div>${frontierHtml}</div></section>
+    ${comparisonHtml}
+    ${searchHtml}
+    <section class="msq2736-formula"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="msq2736-result ${final ? "done" : ""}"><small>ANSWERS IN ORIGINAL QUERY ORDER</small><strong>[${answers.map((answer) => answer == null ? "?" : answer).join(", ")}]</strong><span>${final ? (vi ? "Mỗi kết quả đã được trả về đúng query_index ban đầu." : "Every result has been restored to its original query_index.") : (vi ? "Query được xử lý theo x giảm dần, nhưng vị trí output không đổi." : "Queries are processed by descending x, while output positions stay unchanged.")}</span></footer>
+  </section>`;
+}
+
+function renderMaximizeScore2818View(step) {
+  const view = step.maximizeScore2818View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const factors = Array.isArray(view.factors) ? view.factors : [];
+  const scores = Array.isArray(view.scores) ? view.scores : [];
+  const left = Array.isArray(view.left) ? view.left : [];
+  const right = Array.isArray(view.right) ? view.right : [];
+  const uses = Array.isArray(view.uses) ? view.uses : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const order = Array.isArray(view.order) ? view.order : [];
+  const history = Array.isArray(view.greedyHistory) ? view.greedyHistory : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const compared = Number.isInteger(view.compared) ? view.compared : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Prime score", "Tìm hai biên", "Đếm subarray", "Chọn greedy", "Kết quả"]
+    : ["Prime scores", "Find boundaries", "Count subarrays", "Greedy picks", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const usedIndices = new Set(history.map((entry) => entry.index));
+  const cards = nums.map((value, index) => {
+    const classes = ["ms2818-card"];
+    if (index === current) classes.push("current");
+    if (index === compared) classes.push("compared");
+    if (index === popped) classes.push("popped");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (usedIndices.has(index)) classes.push("used");
+    const knownFactors = Array.isArray(factors[index]);
+    const factorText = knownFactors ? (factors[index].length ? `{ ${factors[index].join(", ")} }` : "{ }") : "?";
+    return `<article class="${classes.join(" ")}">
+      <header><small>INDEX</small><strong>${index}</strong></header>
+      <div class="ms2818-value"><small>nums[i]</small><b>${escapeHtml(String(value))}</b></div>
+      <div class="ms2818-factors"><small>${vi ? "prime khác nhau" : "distinct primes"}</small><code>${escapeHtml(factorText)}</code></div>
+      <div class="ms2818-score"><small>prime score</small><b>${scores[index] == null ? "?" : scores[index]}</b></div>
+      <div class="ms2818-bounds"><span><small>left ≥</small><b>${left[index] == null ? "?" : left[index]}</b></span><span><small>right &gt;</small><b>${right[index] == null ? "?" : right[index]}</b></span></div>
+      <footer><small>${vi ? "số lần được chọn" : "selection capacity"}</small><b>${uses[index] == null ? "?" : uses[index]}</b></footer>
+    </article>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((index, position) => `<span class="${position === stack.length - 1 ? "top" : ""}"><b>i=${index}</b><small>score ${scores[index]}</small></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack đang trống" : "The stack is empty"}</em>`;
+  const hasComparison = view.phase === "boundary" && current >= 0 && compared >= 0;
+  const topScore = hasComparison ? scores[compared] : null;
+  const currentScore = current >= 0 ? scores[current] : null;
+  const relation = hasComparison ? (topScore < currentScore ? "<" : topScore === currentScore ? "=" : ">") : "?";
+  const willPop = hasComparison && topScore < currentScore;
+  const comparisonHtml = hasComparison ? `<section class="ms2818-compare ${willPop ? "pop" : "keep"}">
+    <div><small>STACK TOP · i=${compared}</small><strong>${topScore}</strong></div>
+    <b>${relation}</b>
+    <div><small>CURRENT · i=${current}</small><strong>${currentScore}</strong></div>
+    <p><b>${willPop ? "POP" : "KEEP"}</b><span>${willPop ? (vi ? "Current là next strictly-greater prime score của top." : "Current is the top index's next strictly-greater prime score.") : topScore === currentScore ? (vi ? "Bằng nhau nên giữ index bên trái để thắng tie." : "Equal scores stay so the earlier index wins the tie.") : (vi ? "Top mạnh hơn nên current không thể mở rộng qua nó." : "The top is stronger, so current cannot extend past it.")}</span></p>
+  </section>` : "";
+  const orderHtml = order.map((index, rank) => {
+    const used = history.find((entry) => entry.index === index);
+    const classes = [];
+    if (index === current && view.phase === "greedy") classes.push("current");
+    if (used) classes.push("used");
+    return `<span class="${classes.join(" ")}"><small>#${rank + 1} · i=${index}</small><b>${nums[index]}</b><em>${uses[index] == null ? "?" : `${uses[index]}×`}</em></span>`;
+  }).join("");
+  const historyHtml = history.length
+    ? history.map((entry, index) => `<div class="${index === history.length - 1 ? "latest" : ""}"><span><small>${vi ? "chọn index" : "pick index"}</small><b>${entry.index}</b></span><span><small>value</small><b>${entry.value}</b></span><span><small>take</small><b>${entry.take}/${entry.capacity}</b></span><code>${entry.answerBefore} × ${entry.value}^${entry.take} = ${entry.answerAfter}</code><span><small>k left</small><b>${entry.kAfter}</b></span></div>`).join("")
+    : `<p>${vi ? "Các phép nhân sẽ xuất hiện khi chuyển sang bước greedy." : "Multiplications appear when the greedy phase begins."}</p>`;
+  const defaultFormula = view.phase === "prime"
+    ? "primeScore(x) = number of distinct prime factors of x"
+    : view.phase === "boundary"
+      ? "left = previous score ≥ current · right = next score > current"
+      : view.phase === "count"
+        ? "uses[i] = (i − left[i]) × (right[i] − i)"
+        : view.phase === "greedy"
+          ? "take = min(k, uses[i]) · answer ×= nums[i]^take"
+          : `maximum score = ${view.answer ?? 1}`;
+  const formula = view.formula || view.action || defaultFormula;
+  const isFinal = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="ms2818-viz" role="img" aria-label="Apply Operations to Maximize Score visualization">
+    <header><div><small>PRIME SCORE · MONOTONIC STACK · GREEDY · #2818</small><strong>APPLY OPERATIONS TO MAXIMIZE SCORE</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ms2818-phases">${phases}</div>
+    <section class="ms2818-rule"><b>${vi ? "LUẬT CHỌN TRONG MỘT SUBARRAY" : "SELECTION RULE INSIDE ONE SUBARRAY"}</b><strong>${vi ? "Prime score lớn nhất thắng; nếu hòa, index nhỏ nhất thắng." : "Highest prime score wins; the smallest index wins a tie."}</strong><span>${vi ? "Vì vậy hai dấu ở biên khác nhau: previous ≥ nhưng next >." : "That is why the two boundaries differ: previous ≥ but next >."}</span></section>
+    <section class="ms2818-metrics"><div><small>${vi ? "index hiện tại" : "current index"}</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>prime score</small><strong>${currentScore == null ? "—" : currentScore}</strong></div><div><small>k remaining</small><strong>${view.kRemaining ?? view.kInitial ?? "—"}</strong></div><div class="answer"><small>score product</small><strong>${view.answer ?? 1}</strong></div></section>
+    <section class="ms2818-cards-wrap"><header><strong>${vi ? "MỖI INDEX KIỂM SOÁT BAO NHIÊU SUBARRAY?" : "HOW MANY SUBARRAYS DOES EACH INDEX CONTROL?"}</strong><span>${vi ? "tím = current · viền xanh = đang trong stack" : "purple = current · blue edge = in stack"}</span></header><div class="ms2818-cards" style="--ms2818-count:${Math.max(nums.length, 1)}">${cards}</div></section>
+    <section class="ms2818-stack"><header><strong>${vi ? "STACK PRIME SCORE KHÔNG TĂNG" : "NON-INCREASING PRIME-SCORE STACK"}</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header><div>${stackHtml}</div><p>${vi ? "Chỉ pop khi score(top) < score(current). Dấu bằng phải ở lại để index bên trái thắng tie." : "Pop only when score(top) < score(current). Equality must stay so the earlier index wins the tie."}</p></section>
+    ${comparisonHtml}
+    <section class="ms2818-formula"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="ms2818-greedy"><header><strong>${vi ? "THỨ TỰ GREEDY THEO VALUE" : "GREEDY ORDER BY VALUE"}</strong><span>${vi ? "mỗi chip: value và số lần tối đa" : "each chip: value and maximum uses"}</span></header><div class="ms2818-order">${orderHtml}</div><div class="ms2818-history">${historyHtml}</div></section>
+    <footer class="ms2818-result ${isFinal ? "done" : ""}"><small>MAXIMUM SCORE</small><strong>${isFinal ? view.answer : "…"}</strong><span>${isFinal ? (vi ? `Đã dùng đủ ${view.kInitial} operation.` : `All ${view.kInitial} operations have been used.`) : (vi ? "Hoàn tất prime score và contribution trước khi chọn value." : "Finish prime scores and contributions before selecting values.")}</span></footer>
   </section>`;
 }
 
@@ -8035,8 +8292,11 @@ function renderMinIncrements1526View(step) {
   const current = Number.isInteger(view.current) ? view.current : -1;
   const previous = Number.isFinite(view.previous) ? view.previous : 0;
   const delta = Number.isFinite(view.delta) ? view.delta : 0;
+  const operations = Array.isArray(view.operations) ? view.operations : [];
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
-  const phaseLabels = vi ? ["Layer đầu tiên", "Chỉ cộng khi tăng", "Đáp án"] : ["First layers", "Add only on rises", "Answer"];
+  const phaseLabels = vi
+    ? ["Hiểu operation", "So với bên trái", "Mở layer mới", "Kết quả"]
+    : ["Understand operation", "Compare with left", "Open new layers", "Result"];
   const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
   const maxHeight = Math.max(1, ...target);
   const bars = target.map((value, index) => {
@@ -8066,6 +8326,19 @@ function renderMinIncrements1526View(step) {
     if (known) running += value;
     return `<div class="${index === current ? "current" : ""}"><small>i = ${index}</small><b>${known ? (value > 0 ? `+${value}` : "+0") : "?"}</b><span>${known ? `sum = ${running}` : ""}</span></div>`;
   }).join("");
+  const comparisonHtml = current >= 0 ? `<section class="mi1526-compare ${delta > 0 ? "rise" : "reuse"}">
+    <div><small>${current === 0 ? (vi ? "CHIỀU CAO BAN ĐẦU" : "STARTING HEIGHT") : `target[${current - 1}]`}</small><strong>${previous}</strong></div>
+    <b>${delta > 0 ? "<" : "≥"}</b>
+    <div><small>target[${current}]</small><strong>${target[current]}</strong></div>
+    <p><b>${delta > 0 ? `+${delta}` : "+0"}</b><span>${delta > 0 ? (vi ? "layer mới phải bắt đầu tại đây" : "new layer(s) must start here") : (vi ? "layer cũ đủ dùng; có thể kết thúc layer dư" : "old layers are enough; extra layers may end")}</span></p>
+  </section>` : "";
+  const knownOperations = operations.filter((operation) => operation.known);
+  const operationsHtml = knownOperations.length
+    ? knownOperations.map((operation) => `<article class="mi1526-operation ${operation.active ? "active" : ""}">
+      <header><small>OP ${operation.index + 1}</small><strong>+1 · [${operation.start}..${operation.end}]</strong><span>layer ${operation.level}</span></header>
+      <div style="--mi1526-count:${Math.max(target.length, 1)}">${target.map((value, index) => `<i class="${index >= operation.start && index <= operation.end ? "inside" : "outside"}"><small>${index}</small><b>${index >= operation.start && index <= operation.end ? "+1" : "·"}</b></i>`).join("")}</div>
+    </article>`).join("")
+    : `<p>${vi ? "Các operation cụ thể sẽ xuất hiện khi một layer mới được mở." : "Concrete operations appear as each new layer is opened."}</p>`;
   const formula = current === 0 && view.phase === "init"
     ? `answer = target[0] = ${target[0]}`
     : view.phase === "add"
@@ -8081,8 +8354,10 @@ function renderMinIncrements1526View(step) {
     <section class="mi1526-rule"><b>${vi ? "QUY TẮC GREEDY" : "GREEDY RULE"}</b><strong>answer = target[0] + Σ max(0, target[i] − target[i−1])</strong><span>${vi ? "Layer cũ được kéo dài qua i miễn là target[i] không đòi hỏi chiều cao lớn hơn target[i−1]." : "Old layers extend through i as long as target[i] does not demand more height than target[i−1]."}</span></section>
     <section class="mi1526-metrics"><div><small>i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>previous height</small><strong>${current >= 0 ? previous : "—"}</strong></div><div><small>target[i]</small><strong>${current >= 0 ? target[current] : "—"}</strong></div><div class="delta ${delta > 0 ? "rise" : ""}"><small>new layers</small><strong>${current >= 0 ? (delta > 0 ? `+${delta}` : "+0") : "—"}</strong></div><div class="answer"><small>answer</small><strong>${view.answer ?? 0}</strong></div></section>
     <section class="mi1526-chart"><header><strong>${vi ? "CÁC LAYER CỦA TARGET" : "TARGET LAYERS"}</strong><span>${vi ? "xanh lá = layer mới ở index hiện tại · tím = index đang xét" : "green = new layer at current index · purple = current index"}</span></header><div class="mi1526-bars" style="--mi1526-count:${Math.max(target.length, 1)}">${bars}</div></section>
+    ${comparisonHtml}
     <section class="mi1526-active"><header><strong>${vi ? `LAYER ĐANG PHỦ INDEX ${current >= 0 ? current : "—"}` : `LAYERS COVERING INDEX ${current >= 0 ? current : "—"}`}</strong><span>${current >= 0 ? `${target[current]} ${vi ? "layer" : "layer(s)"}` : ""}</span></header><div>${activeLayers}</div></section>
     <section class="mi1526-contributions"><header><strong>${vi ? "ĐÓNG GÓP VÀO ĐÁP ÁN" : "ANSWER CONTRIBUTIONS"}</strong><span>${vi ? "chỉ positive rise mới làm tổng tăng" : "only positive rises increase the total"}</span></header><div>${contributionsHtml}</div></section>
+    <section class="mi1526-plan"><header><strong>${vi ? "CÁC OPERATION SUBARRAY ĐÃ MỞ" : "OPENED SUBARRAY OPERATIONS"}</strong><span>${knownOperations.length}/${view.answer ?? 0} ${vi ? "operation đang được tính" : "counted operations"}</span></header><div>${operationsHtml}</div></section>
     <section class="mi1526-formula"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     <footer class="mi1526-result ${final ? "done" : ""}"><small>${vi ? "SỐ OPERATION ÍT NHẤT" : "MINIMUM OPERATIONS"}</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "Mỗi layer mới tương ứng với đúng một operation subarray phải mở thêm." : "Every new layer corresponds to exactly one additional subarray operation.") : (vi ? "Đếm layer mới tại mỗi rise để hoàn tất đáp án." : "Count new layers at each rise to complete the answer.")}</span></footer>
   </section>`;
@@ -25555,6 +25830,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderValidSubarrays1063View(step);
+  } else if (step.visibleMountains2345View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderVisibleMountains2345View(step);
+  } else if (step.maximumSumQueries2736View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximumSumQueries2736View(step);
+  } else if (step.maximizeScore2818View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximizeScore2818View(step);
   } else if (step.minIncrements1526View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

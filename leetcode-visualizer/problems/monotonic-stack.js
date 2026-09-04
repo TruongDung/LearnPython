@@ -2171,12 +2171,20 @@ function buildSteps1526(input) {
     throw new Error("Use 1 to 10 integers from 0 to 12 for this visualization.");
   }
   const contributions = Array(n).fill(null);
+  const operationPlan = [];
+  for (let start = 0; start < n; start++) {
+    const previousHeight = start === 0 ? 0 : target[start - 1];
+    for (let level = previousHeight + 1; level <= target[start]; level++) {
+      let end = start;
+      while (end + 1 < n && target[end + 1] >= level) end += 1;
+      operationPlan.push({ start, end, level });
+    }
+  }
   const steps = [];
-  let answer = target[0];
-  contributions[0] = target[0];
+  let answer = 0;
 
   const snapshot = ({ phase, line, current = -1, previous = 0, delta = 0, action = "", final = false, title, note }) => {
-    const phaseIndex = ["setup", "init"].includes(phase) ? 0 : ["loop", "check", "add"].includes(phase) ? 1 : 2;
+    const phaseIndex = phase === "setup" ? 0 : ["loop", "check"].includes(phase) ? 1 : ["init", "add"].includes(phase) ? 2 : 3;
     steps.push({
       title,
       note,
@@ -2195,12 +2203,20 @@ function buildSteps1526(input) {
       minIncrements1526View: {
         target: [...target], contributions: [...contributions], answer,
         phase, phaseIndex, current, previous, delta, action,
+        operations: operationPlan.map((operation, index) => ({
+          ...operation,
+          index,
+          known: contributions[operation.start] != null,
+          active: operation.start === current && contributions[operation.start] != null,
+        })),
       },
     });
   };
 
   snapshot({ phase: "setup", line: 1, title: text("Tạo lớp Solution", "Create the Solution class"), note: text("Mỗi operation chọn một subarray rồi tăng tất cả phần tử của nó thêm 1.", "Each operation chooses a subarray and increments every element in it by 1.") });
   snapshot({ phase: "setup", line: 2, title: text(`Nhận target có ${n} phần tử`, `Receive target with ${n} values`), note: text("Ta xây target từ mảng toàn số 0 và đếm số operation ít nhất.", "Build target from an all-zero array and count the fewest operations.") });
+  answer = target[0];
+  contributions[0] = target[0];
   snapshot({ phase: "init", line: 3, current: 0, previous: 0, delta: target[0], action: `answer = ${target[0]}`, title: text(`answer = target[0] = ${target[0]}`, `answer = target[0] = ${target[0]}`), note: text(`Cần ${target[0]} layer operation mới để nâng phần tử đầu từ 0 lên ${target[0]}.`, `Need ${target[0]} new operation layers to raise the first value from 0 to ${target[0]}.`) });
 
   for (let current = 1; current < n; current++) {
@@ -2208,13 +2224,12 @@ function buildSteps1526(input) {
     const delta = target[current] - previous;
     snapshot({ phase: "loop", line: 4, current, previous, delta, action: `i = ${current}`, title: text(`Xét target[${current}] = ${target[current]}`, `Inspect target[${current}] = ${target[current]}`), note: text("Các layer đang có có thể tiếp tục phủ index này; chỉ chiều cao vượt previous mới cần operation mới.", "Existing layers can continue through this index; only height above previous needs new operations.") });
     const isRise = target[current] > previous;
+    if (!isRise) contributions[current] = 0;
     snapshot({ phase: "check", line: 5, current, previous, delta, action: `${target[current]} > ${previous} is ${isRise}`, title: text(isRise ? `${target[current]} > ${previous} → có rise` : `${target[current]} ≤ ${previous} → không thêm layer`, isRise ? `${target[current]} > ${previous} → a rise` : `${target[current]} ≤ ${previous} → no new layer`), note: text(isRise ? `Thiếu ${delta} layer ở index ${current}.` : "Các operation đã mở trước đó đủ để tạo chiều cao hiện tại; layer dư có thể kết thúc tại index trước.", isRise ? `${delta} new layers are missing at index ${current}.` : "Earlier operations already cover this height; extra layers can end at the previous index.") });
     if (isRise) {
       answer += delta;
       contributions[current] = delta;
       snapshot({ phase: "add", line: 6, current, previous, delta, action: `+${delta}`, title: text(`answer += ${delta} → ${answer}`, `answer += ${delta} → ${answer}`), note: text(`Bắt đầu ${delta} operation subarray mới tại index ${current}; chúng có thể kéo dài sang phải khi cần.`, `Start ${delta} new subarray operations at index ${current}; they can extend right when needed.`) });
-    } else {
-      contributions[current] = 0;
     }
   }
 
@@ -3193,16 +3208,291 @@ function maximumSumQueries(input, params = {}) {
   return { original: nums1, answer, steps: genericSteps({ nums: nums1, title: text("Maximum sum queries", "Maximum sum queries"), answer, note: text("Bản tối ưu sort query và dùng stack đơn điệu trên các điểm Pareto.", "The optimized solution sorts queries and maintains a monotonic stack of Pareto-best points.") }) };
 }
 
+function buildSteps2736(input, params = {}) {
+  const nums1 = parseNums(input, "nums1");
+  const nums2 = parseNums(params.nums2 ?? "2,4,9,5", "nums2");
+  const queries = parsePairs(params.queries ?? "4,1;1,3;2,5", "queries");
+  if (nums1.length !== nums2.length) throw new Error("nums1 and nums2 must have the same length.");
+  if (nums1.length > 8 || queries.length > 8) throw new Error("Use up to 8 points and 8 queries so the frontier stays readable.");
+
+  const points = nums1
+    .map((a, index) => ({ a, b: nums2[index], sum: a + nums2[index], index }))
+    .sort((first, second) => second.a - first.a || second.b - first.b || first.index - second.index);
+  const orderedQueries = queries
+    .map(([x, y], index) => ({ x, y, index }))
+    .sort((first, second) => second.x - first.x || first.index - second.index);
+  const answers = Array(queries.length).fill(null);
+  const pointStates = Array(nums1.length).fill("pending");
+  const frontier = [];
+  const steps = [];
+  let pointCursor = 0;
+
+  const snapshot = ({
+    phase,
+    codeLines,
+    title,
+    note,
+    currentQuery = -1,
+    currentPoint = -1,
+    comparedEntry = null,
+    poppedEntry = null,
+    queryOrderPosition = -1,
+    lo = -1,
+    hi = -1,
+    mid = -1,
+    foundPosition = -1,
+    action = "",
+    formula = "",
+    final = false,
+  }) => {
+    const phaseIndex = phase === "sort" ? 0
+      : phase === "activate" ? 1
+        : phase === "frontier" ? 2
+          : phase === "search" ? 3 : 4;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...nums1],
+      sub: nums1.map((value, index) => `i=${index} · (${value}, ${nums2[index]}) · sum=${value + nums2[index]}`),
+      highlight: currentPoint >= 0 ? [currentPoint] : [],
+      mark: frontier.map((entry) => entry.index),
+      codeLines,
+      vars: [
+        { name: "query", value: currentQuery >= 0 ? `q${currentQuery} = [${queries[currentQuery].join(", ")}]` : "—" },
+        { name: "point cursor", value: `${pointCursor}/${points.length}` },
+        { name: "frontier", value: `[${frontier.map((entry) => `(${entry.b},${entry.sum})`).join(", ")}]` },
+        { name: "answer", value: `[${answers.map((value) => value ?? "?").join(", ")}]` },
+      ],
+      maximumSumQueries2736View: {
+        nums1: [...nums1],
+        nums2: [...nums2],
+        queries: queries.map((query) => [...query]),
+        points: points.map((point) => ({ ...point })),
+        orderedQueries: orderedQueries.map((query) => ({ ...query })),
+        answers: [...answers],
+        pointStates: [...pointStates],
+        frontier: frontier.map((entry) => ({ ...entry })),
+        phase,
+        phaseIndex,
+        currentQuery,
+        currentPoint,
+        comparedEntry: comparedEntry ? { ...comparedEntry } : null,
+        poppedEntry: poppedEntry ? { ...poppedEntry } : null,
+        queryOrderPosition,
+        pointCursor,
+        lo,
+        hi,
+        mid,
+        foundPosition,
+        action,
+        formula,
+      },
+    });
+  };
+
+  snapshot({
+    phase: "sort",
+    codeLines: [1, 2, 3, 4],
+    title: text("Bước 1: sort điểm và query theo x giảm dần", "Step 1: sort points and queries by descending x"),
+    note: text("Khi xử lý query [x,y], mọi điểm đã kích hoạt đều chắc chắn có nums1 >= x.", "When query [x,y] is processed, every activated point already satisfies nums1 >= x."),
+    action: `points by nums1 ↓ · queries by x ↓`,
+  });
+  snapshot({
+    phase: "sort",
+    codeLines: [5, 6, 7],
+    title: text("Khởi tạo answer, frontier và point cursor", "Initialize answer, frontier, and point cursor"),
+    note: text("Frontier sẽ chỉ giữ các điểm chưa bị điểm khác tốt hơn ở cả nums2 và tổng.", "The frontier keeps only points not beaten by another point in both nums2 and total sum."),
+    action: "answer = [? ...] · frontier = [] · point = 0",
+  });
+
+  for (let queryPosition = 0; queryPosition < orderedQueries.length; queryPosition++) {
+    const query = orderedQueries[queryPosition];
+    snapshot({
+      phase: "activate",
+      codeLines: [9],
+      currentQuery: query.index,
+      queryOrderPosition: queryPosition,
+      title: text(`Xử lý q${query.index} = [${query.x}, ${query.y}]`, `Process q${query.index} = [${query.x}, ${query.y}]`),
+      note: text(`Chỉ kích hoạt point có nums1 >= ${query.x}; sau đó tìm nums2 >= ${query.y}.`, `Activate only points with nums1 >= ${query.x}; then search for nums2 >= ${query.y}.`),
+      action: `need a ≥ ${query.x} and b ≥ ${query.y}`,
+    });
+
+    while (pointCursor < points.length && points[pointCursor].a >= query.x) {
+      const point = points[pointCursor];
+      pointStates[point.index] = "candidate";
+      snapshot({
+        phase: "activate",
+        codeLines: [10, 11, 12],
+        currentQuery: query.index,
+        currentPoint: point.index,
+        queryOrderPosition: queryPosition,
+        title: text(`Kích hoạt point i=${point.index}: (${point.a}, ${point.b})`, `Activate point i=${point.index}: (${point.a}, ${point.b})`),
+        note: text(`${point.a} >= query.x ${query.x}, nên point này đủ điều kiện theo trục nums1.`, `${point.a} >= query.x ${query.x}, so this point passes the nums1 constraint.`),
+        action: `${point.a} ≥ ${query.x} · sum = ${point.a} + ${point.b} = ${point.sum}`,
+        formula: `value = ${point.a} + ${point.b} = ${point.sum}`,
+      });
+
+      while (frontier.length && frontier.at(-1).sum <= point.sum) {
+        const top = frontier.at(-1);
+        snapshot({
+          phase: "frontier",
+          codeLines: [13],
+          currentQuery: query.index,
+          currentPoint: point.index,
+          comparedEntry: top,
+          queryOrderPosition: queryPosition,
+          title: text(`${top.sum} <= ${point.sum}: point mới dominate đỉnh`, `${top.sum} <= ${point.sum}: the new point dominates the top`),
+          note: text(`Point mới có tổng không nhỏ hơn; sau bước kiểm tra b, đỉnh cũ không thể cho đáp án tốt hơn.`, `The new point has no smaller sum; after the b-order check, the old top can never produce a better answer.`),
+          action: `${top.sum} ≤ ${point.sum} → POP frontier top`,
+        });
+        const poppedEntry = frontier.pop();
+        pointStates[poppedEntry.index] = "dominated";
+        snapshot({
+          phase: "frontier",
+          codeLines: [14],
+          currentQuery: query.index,
+          currentPoint: point.index,
+          comparedEntry: poppedEntry,
+          poppedEntry,
+          queryOrderPosition: queryPosition,
+          title: text(`Loại point i=${poppedEntry.index} khỏi frontier`, `Remove point i=${poppedEntry.index} from the frontier`),
+          note: text(`Không query nào cần giữ tổng ${poppedEntry.sum} khi đã có ứng viên tổng ${point.sum} tốt hơn.`, `No query needs sum ${poppedEntry.sum} once candidate sum ${point.sum} is available.`),
+          action: `pop (b=${poppedEntry.b}, sum=${poppedEntry.sum})`,
+        });
+      }
+
+      const top = frontier.at(-1);
+      const shouldAppend = !top || top.b < point.b;
+      snapshot({
+        phase: "frontier",
+        codeLines: [15],
+        currentQuery: query.index,
+        currentPoint: point.index,
+        comparedEntry: top ?? null,
+        queryOrderPosition: queryPosition,
+        title: text(shouldAppend ? "Point mới mở rộng frontier theo nums2" : "Point mới bị dominate", shouldAppend ? "The new point extends the frontier by nums2" : "The new point is dominated"),
+        note: text(shouldAppend ? `nums2 ${point.b} lớn hơn b cuối frontier, nên point này hữu ích cho query y lớn.` : `Đỉnh frontier đã có nums2 >= ${point.b} và tổng lớn hơn, nên bỏ point mới.`, shouldAppend ? `nums2 ${point.b} is larger than the frontier's last b, so this point helps queries with larger y.` : `The frontier top already has nums2 >= ${point.b} and a larger sum, so discard the new point.`),
+        action: top ? `${top.b} ${shouldAppend ? "<" : ">="} ${point.b} → ${shouldAppend ? "APPEND" : "DISCARD"}` : "frontier empty → APPEND",
+      });
+      if (shouldAppend) {
+        frontier.push({ ...point });
+        pointStates[point.index] = "frontier";
+        snapshot({
+          phase: "frontier",
+          codeLines: [16],
+          currentQuery: query.index,
+          currentPoint: point.index,
+          queryOrderPosition: queryPosition,
+          title: text(`Append (b=${point.b}, sum=${point.sum})`, `Append (b=${point.b}, sum=${point.sum})`),
+          note: text("Trên frontier, b tăng dần còn sum giảm dần; đó là cấu trúc Pareto cần để binary search.", "Along the frontier, b increases while sum decreases; that Pareto structure supports binary search."),
+          action: `frontier.push((${point.b}, ${point.sum}))`,
+        });
+      } else {
+        pointStates[point.index] = "dominated";
+      }
+      pointCursor++;
+      snapshot({
+        phase: "activate",
+        codeLines: [17],
+        currentQuery: query.index,
+        currentPoint: point.index,
+        queryOrderPosition: queryPosition,
+        title: text(`Di chuyển point cursor tới ${pointCursor}`, `Move the point cursor to ${pointCursor}`),
+        note: text("Mỗi point chỉ được kích hoạt và xử lý frontier đúng một lần.", "Each point is activated and processed by the frontier exactly once."),
+        action: `point = ${pointCursor}`,
+      });
+    }
+
+    let lo = 0;
+    let hi = frontier.length;
+    snapshot({
+      phase: "search",
+      codeLines: [19],
+      currentQuery: query.index,
+      queryOrderPosition: queryPosition,
+      lo,
+      hi,
+      title: text(`Binary search b đầu tiên >= ${query.y}`, `Binary search for the first b >= ${query.y}`),
+      note: text("Frontier đã tăng theo b, nên có thể tìm vị trí đầu tiên thỏa query.y.", "The frontier is ordered by b, so we can find the first position satisfying query.y."),
+      action: `lo = 0 · hi = ${hi}`,
+    });
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const moveRight = frontier[mid].b < query.y;
+      snapshot({
+        phase: "search",
+        codeLines: [20, 21, 22],
+        currentQuery: query.index,
+        comparedEntry: frontier[mid],
+        queryOrderPosition: queryPosition,
+        lo,
+        hi,
+        mid,
+        title: text(`So sánh frontier[${mid}].b = ${frontier[mid].b} với y = ${query.y}`, `Compare frontier[${mid}].b = ${frontier[mid].b} with y = ${query.y}`),
+        note: text(moveRight ? "b còn nhỏ hơn y, loại nửa trái kể cả mid." : "b đã đủ lớn, giữ mid và tìm tiếp bên trái.", moveRight ? "b is still below y, so discard the left half through mid." : "b is large enough; keep mid and continue searching left."),
+        action: `${frontier[mid].b} ${moveRight ? "<" : ">="} ${query.y} → ${moveRight ? "lo = mid + 1" : "hi = mid"}`,
+      });
+      if (moveRight) lo = mid + 1;
+      else hi = mid;
+      snapshot({
+        phase: "search",
+        codeLines: moveRight ? [23] : [24, 25],
+        currentQuery: query.index,
+        queryOrderPosition: queryPosition,
+        lo,
+        hi,
+        mid,
+        title: text(`Khoảng tìm kiếm còn [${lo}, ${hi})`, `Search range is now [${lo}, ${hi})`),
+        note: text("Tiếp tục cho tới khi lo == hi.", "Continue until lo equals hi."),
+        action: `lo=${lo} · hi=${hi}`,
+      });
+    }
+    if (lo < frontier.length) answers[query.index] = frontier[lo].sum;
+    else answers[query.index] = -1;
+    snapshot({
+      phase: "search",
+      codeLines: [26, 27],
+      currentQuery: query.index,
+      comparedEntry: lo < frontier.length ? frontier[lo] : null,
+      queryOrderPosition: queryPosition,
+      lo,
+      hi,
+      foundPosition: lo < frontier.length ? lo : -1,
+      title: text(`answer[q${query.index}] = ${answers[query.index]}`, `answer[q${query.index}] = ${answers[query.index]}`),
+      note: text(lo < frontier.length ? `Frontier[${lo}] là point đầu tiên có b >= ${query.y}; vì sum giảm dần, đây cũng là tổng lớn nhất hợp lệ.` : "Không có point nào thỏa cả hai ngưỡng, nên đáp án là -1.", lo < frontier.length ? `Frontier[${lo}] is the first point with b >= ${query.y}; because sums decrease, it also has the maximum valid sum.` : "No point satisfies both thresholds, so the answer is -1."),
+      action: lo < frontier.length ? `first b ≥ ${query.y} → sum ${answers[query.index]}` : `no b ≥ ${query.y} → -1`,
+      formula: `answer[${query.index}] = ${answers[query.index]}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    codeLines: [28],
+    final: true,
+    title: text(`Return [${answers.join(", ")}]`, `Return [${answers.join(", ")}]`),
+    note: text("Dù query được xử lý offline theo x giảm dần, query_index đưa từng kết quả về đúng vị trí ban đầu.", "Although queries are processed offline by descending x, query_index restores every result to its original position."),
+    action: `return [${answers.join(", ")}]`,
+    formula: `answer = [${answers.join(", ")}]`,
+  });
+  return { original: [...nums1], answer: [...answers], steps };
+}
+
 function primeScore(num) {
-  let x = num, count = 0;
+  return primeFactors(num).length;
+}
+
+function primeFactors(num) {
+  let x = num;
+  const factors = [];
   for (let p = 2; p * p <= x; p++) {
     if (x % p === 0) {
-      count++;
+      factors.push(p);
       while (x % p === 0) x /= p;
     }
   }
-  if (x > 1) count++;
-  return count;
+  if (x > 1) factors.push(x);
+  return factors;
 }
 
 function maximumScoreAfterOperations(nums, params = {}) {
@@ -3215,15 +3505,292 @@ function maximumScoreAfterOperations(nums, params = {}) {
     stack.push(i);
   }
   const order = [...Array(nums.length).keys()].sort((a, b) => nums[b] - nums[a]);
-  let ans = 1;
+  const mod = 1000000007n;
+  const modPow = (base, exponent) => {
+    let value = BigInt(base) % mod;
+    let power = exponent;
+    let result = 1n;
+    while (power > 0) {
+      if (power % 2 === 1) result = result * value % mod;
+      value = value * value % mod;
+      power = Math.floor(power / 2);
+    }
+    return result;
+  };
+  let ans = 1n;
   for (const i of order) {
     const count = (i - left[i]) * (right[i] - i);
     const take = Math.min(k, count);
-    ans *= nums[i] ** take;
+    ans = ans * modPow(nums[i], take) % mod;
     k -= take;
     if (k === 0) break;
   }
-  return ans;
+  return Number(ans);
+}
+
+function buildSteps2818(input, params = {}) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 8) throw new Error("Use up to 8 numbers so every boundary and greedy choice stays readable.");
+  if (nums.some((num) => num < 1)) throw new Error("nums must contain positive integers.");
+  const totalSubarrays = nums.length * (nums.length + 1) / 2;
+  const kInitial = Number(params.k ?? 2);
+  if (!Number.isInteger(kInitial) || kInitial < 1 || kInitial > totalSubarrays) {
+    throw new Error(`k must be an integer from 1 to ${totalSubarrays}.`);
+  }
+
+  const n = nums.length;
+  const allFactors = nums.map(primeFactors);
+  const scores = Array(n).fill(null);
+  const knownFactors = Array(n).fill(null);
+  const left = Array(n).fill(null);
+  const right = Array(n).fill(null);
+  const uses = Array(n).fill(null);
+  const stack = [];
+  const greedyHistory = [];
+  const order = [...Array(n).keys()].sort((a, b) => nums[b] - nums[a] || a - b);
+  const steps = [];
+  const mod = 1000000007n;
+  let kRemaining = kInitial;
+  let answer = 1n;
+
+  const modPow = (base, exponent) => {
+    let value = BigInt(base) % mod;
+    let power = exponent;
+    let result = 1n;
+    while (power > 0) {
+      if (power % 2 === 1) result = result * value % mod;
+      value = value * value % mod;
+      power = Math.floor(power / 2);
+    }
+    return result;
+  };
+
+  const snapshot = ({
+    phase,
+    codeLines,
+    title,
+    note,
+    current = -1,
+    compared = -1,
+    popped = -1,
+    take = 0,
+    answerBefore = answer,
+    action = "",
+    formula = "",
+    final = false,
+  }) => {
+    const phaseIndex = phase === "prime" ? 0
+      : phase === "boundary" ? 1
+        : phase === "count" ? 2
+          : phase === "greedy" ? 3 : 4;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...nums],
+      sub: nums.map((value, index) => `i=${index} · value=${value} · score=${scores[index] ?? "?"}`),
+      highlight: current >= 0 ? [current] : [],
+      mark: stack.filter((index) => index !== current),
+      codeLines,
+      vars: [
+        { name: "i", value: current >= 0 ? current : "—" },
+        { name: "prime score", value: current >= 0 ? scores[current] ?? "?" : "—" },
+        { name: "stack", value: `[${stack.join(", ")}]` },
+        { name: "k remaining", value: kRemaining },
+        { name: "answer", value: Number(answer) },
+      ],
+      maximizeScore2818View: {
+        nums: [...nums],
+        factors: knownFactors.map((items) => items ? [...items] : null),
+        scores: [...scores],
+        left: [...left],
+        right: [...right],
+        uses: [...uses],
+        stack: [...stack],
+        order: [...order],
+        greedyHistory: greedyHistory.map((entry) => ({ ...entry })),
+        phase,
+        phaseIndex,
+        current,
+        compared,
+        popped,
+        take,
+        kInitial,
+        kRemaining,
+        answer: Number(answer),
+        answerBefore: Number(answerBefore),
+        action,
+        formula,
+      },
+    });
+  };
+
+  snapshot({
+    phase: "prime",
+    codeLines: [3, 5],
+    title: text("Bước 1: prime score là gì?", "Step 1: what is a prime score?"),
+    note: text("Prime score chỉ đếm các thừa số nguyên tố khác nhau, không đếm số lần lặp.", "Prime score counts distinct prime factors, not repeated copies."),
+    action: "prime score = number of distinct prime factors",
+  });
+  for (let i = 0; i < n; i++) {
+    knownFactors[i] = [...allFactors[i]];
+    scores[i] = allFactors[i].length;
+    const factorText = allFactors[i].length ? `{${allFactors[i].join(", ")}}` : "{}";
+    snapshot({
+      phase: "prime",
+      codeLines: [5, 6, 7, 8, 9, 10, 11, 12, 13, 15],
+      current: i,
+      title: text(`nums[${i}] = ${nums[i]} có prime score ${scores[i]}`, `nums[${i}] = ${nums[i]} has prime score ${scores[i]}`),
+      note: text(`${nums[i]} có các thừa số nguyên tố khác nhau ${factorText}, nên score = ${scores[i]}.`, `${nums[i]} has distinct prime factors ${factorText}, so score = ${scores[i]}.`),
+      action: `${nums[i]} → ${factorText} → score ${scores[i]}`,
+      formula: `primeScore(${nums[i]}) = |${factorText}| = ${scores[i]}`,
+    });
+  }
+
+  snapshot({
+    phase: "boundary",
+    codeLines: [16, 17, 18],
+    title: text("Bước 2: tìm vùng mà mỗi index được chọn", "Step 2: find the region controlled by each index"),
+    note: text("Stack giữ prime score không tăng. Score bằng nhau không pop vì index bên trái thắng khi hòa.", "The stack keeps non-increasing prime scores. Equal scores stay because the leftmost index wins a tie."),
+    action: "left uses ≥ · right uses >",
+  });
+  for (let i = 0; i < n; i++) {
+    snapshot({
+      phase: "boundary",
+      codeLines: [20],
+      current: i,
+      compared: stack.at(-1) ?? -1,
+      title: text(`Quét i = ${i}, score = ${scores[i]}`, `Scan i = ${i}, score = ${scores[i]}`),
+      note: text("So sánh current với đỉnh stack để tìm next strictly greater prime score.", "Compare the current index with the stack top to find the next strictly greater prime score."),
+      action: `inspect index ${i}`,
+    });
+    while (stack.length && scores[stack.at(-1)] < scores[i]) {
+      const top = stack.at(-1);
+      snapshot({
+        phase: "boundary",
+        codeLines: [21],
+        current: i,
+        compared: top,
+        title: text(`${scores[top]} < ${scores[i]} nên phải pop`, `${scores[top]} < ${scores[i]}, so pop`),
+        note: text(`Index ${i} là vị trí đầu tiên bên phải có prime score lớn hơn index ${top}.`, `Index ${i} is the first position to the right with a larger prime score than index ${top}.`),
+        action: `${scores[top]} < ${scores[i]} → POP`,
+      });
+      const popped = stack.pop();
+      right[popped] = i;
+      snapshot({
+        phase: "boundary",
+        codeLines: [22],
+        current: i,
+        compared: popped,
+        popped,
+        title: text(`right[${popped}] = ${i}`, `right[${popped}] = ${i}`),
+        note: text(`Vùng của index ${popped} dừng trước index ${i}.`, `The region controlled by index ${popped} stops before index ${i}.`),
+        action: `pop ${popped}; right[${popped}] = ${i}`,
+        formula: `right[${popped}] = ${i}`,
+      });
+    }
+    const top = stack.at(-1);
+    if (top != null) {
+      snapshot({
+        phase: "boundary",
+        codeLines: [21],
+        current: i,
+        compared: top,
+        title: text(scores[top] === scores[i] ? "Score bằng nhau: giữ index bên trái" : "Đỉnh stack có score lớn hơn: dừng pop", scores[top] === scores[i] ? "Equal scores: keep the earlier index" : "Stack top has a larger score: stop popping"),
+        note: text(scores[top] === scores[i] ? `Index ${top} thắng mọi tie với index ${i}, nên nó là biên trái của i.` : `Index ${top} chặn vùng của index ${i} ở bên trái.`, scores[top] === scores[i] ? `Index ${top} wins every tie against index ${i}, so it becomes i's left boundary.` : `Index ${top} blocks index ${i}'s region on the left.`),
+        action: `${scores[top]} ${scores[top] === scores[i] ? "=" : ">"} ${scores[i]} → KEEP`,
+      });
+    }
+    left[i] = top ?? -1;
+    snapshot({
+      phase: "boundary",
+      codeLines: [23],
+      current: i,
+      compared: top ?? -1,
+      title: text(`left[${i}] = ${left[i]}`, `left[${i}] = ${left[i]}`),
+      note: text("Biên trái là previous index có prime score lớn hơn hoặc bằng current.", "The left boundary is the previous index with a prime score greater than or equal to the current score."),
+      action: `left[${i}] = ${left[i]}`,
+      formula: `left[${i}] = previous score ≥ ${scores[i]} = ${left[i]}`,
+    });
+    stack.push(i);
+    snapshot({
+      phase: "boundary",
+      codeLines: [24],
+      current: i,
+      title: text(`Push index ${i} vào stack`, `Push index ${i} onto the stack`),
+      note: text("Index này chờ một prime score lớn hơn xuất hiện bên phải.", "This index now waits for a larger prime score on its right."),
+      action: `push ${i}:${scores[i]}`,
+    });
+  }
+  for (const index of stack) if (right[index] == null) right[index] = n;
+  snapshot({
+    phase: "boundary",
+    codeLines: [20, 21, 22, 23, 24],
+    title: text("Hoàn tất hai biên", "Both boundaries are complete"),
+    note: text(`Các index còn trong stack không gặp score lớn hơn bên phải, nên right = n = ${n}.`, `Indices left in the stack never meet a larger score on the right, so right = n = ${n}.`),
+    action: `unresolved right boundaries → ${n}`,
+  });
+
+  for (let i = 0; i < n; i++) {
+    uses[i] = (i - left[i]) * (right[i] - i);
+    snapshot({
+      phase: "count",
+      codeLines: [26],
+      current: i,
+      title: text(`Index ${i} được chọn bởi ${uses[i]} subarray`, `Index ${i} is selected by ${uses[i]} subarrays`),
+      note: text(`${i - left[i]} cách chọn đầu trái × ${right[i] - i} cách chọn đầu phải.`, `${i - left[i]} left-end choices × ${right[i] - i} right-end choices.`),
+      action: `${i - left[i]} × ${right[i] - i} = ${uses[i]}`,
+      formula: `(${i} - ${left[i]}) × (${right[i]} - ${i}) = ${uses[i]}`,
+    });
+  }
+
+  snapshot({
+    phase: "greedy",
+    codeLines: [27, 28],
+    title: text("Bước 4: ưu tiên value lớn nhất", "Step 4: prioritize the largest value"),
+    note: text("Mỗi index có uses[i] subarray riêng để dùng. Ta lấy các value lớn nhất trước.", "Each index owns uses[i] distinct subarrays. Consume the largest values first."),
+    action: `order = [${order.map((i) => `${i}:${nums[i]}`).join(", ")}]`,
+  });
+  for (const i of order) {
+    if (kRemaining === 0) break;
+    const take = Math.min(kRemaining, uses[i]);
+    snapshot({
+      phase: "greedy",
+      codeLines: [28, 29],
+      current: i,
+      take,
+      title: text(`Xét value ${nums[i]} tại index ${i}`, `Inspect value ${nums[i]} at index ${i}`),
+      note: text(`Có thể chọn value này tối đa ${uses[i]} lần; còn ${kRemaining} operation.`, `This value can be selected at most ${uses[i]} times; ${kRemaining} operations remain.`),
+      action: `take = min(${kRemaining}, ${uses[i]}) = ${take}`,
+      formula: `take = min(k=${kRemaining}, uses[${i}]=${uses[i]}) = ${take}`,
+    });
+    const before = answer;
+    answer = answer * modPow(nums[i], take) % mod;
+    kRemaining -= take;
+    greedyHistory.push({ index: i, value: nums[i], capacity: uses[i], take, answerBefore: Number(before), answerAfter: Number(answer), kAfter: kRemaining });
+    snapshot({
+      phase: "greedy",
+      codeLines: [30, 31, 32, 33],
+      current: i,
+      take,
+      answerBefore: before,
+      title: text(`Nhân ${nums[i]}^${take} → ${Number(answer)}`, `Multiply by ${nums[i]}^${take} → ${Number(answer)}`),
+      note: text(`Đã dùng ${take} operation, còn k = ${kRemaining}. Mọi phép nhân đều lấy modulo 1,000,000,007.`, `Used ${take} operations; k = ${kRemaining} remains. Every multiplication is modulo 1,000,000,007.`),
+      action: `${Number(before)} × ${nums[i]}^${take} mod MOD = ${Number(answer)}`,
+      formula: `answer = ${Number(before)} × ${nums[i]}^${take} mod 1,000,000,007 = ${Number(answer)}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    codeLines: [34],
+    final: true,
+    title: text(`Return ${Number(answer)}`, `Return ${Number(answer)}`),
+    note: text("Đã dùng đủ k operation với các giá trị lớn nhất có thể chọn.", "All k operations have been spent on the largest selectable values."),
+    action: `return ${Number(answer)}`,
+    formula: `maximum score = ${Number(answer)}`,
+  });
+  return { original: [...nums], answer: Number(answer), steps };
 }
 
 function leftmostBuildingQueries(input, params = {}) {
@@ -3556,6 +4123,226 @@ function visibleMountains(input) {
   return { original: peaks.flat(), answer: count, steps: genericSteps({ nums: peaks.map((p) => p[1]), title: text("Visible mountains", "Visible mountains"), answer: count, note: text("Biến mỗi núi thành interval [x-y, x+y]; stack/sort loại interval bị che.", "Convert each mountain to [x-y, x+y]; sorting plus stack removes covered intervals.") }) };
 }
 
+function buildSteps2345(input) {
+  const peaks = parsePairs(input, "peaks");
+  if (peaks.length > 8) throw new Error("Use up to 8 mountains so every coverage interval stays readable.");
+  if (peaks.some(([, y]) => y <= 0)) throw new Error("Every mountain height y must be positive.");
+
+  const intervals = peaks.map(([x, y], index) => ({
+    index,
+    x,
+    y,
+    left: x - y,
+    right: x + y,
+  }));
+  const frequencies = new Map();
+  for (const interval of intervals) {
+    const key = `${interval.left},${interval.right}`;
+    frequencies.set(key, (frequencies.get(key) || 0) + 1);
+  }
+  const duplicateCounts = intervals.map((interval) => frequencies.get(`${interval.left},${interval.right}`));
+  const sorted = [...intervals].sort((first, second) => first.left - second.left || second.right - first.right || first.index - second.index);
+  const converted = Array(peaks.length).fill(false);
+  const states = Array(peaks.length).fill("pending");
+  const coveredBy = Array(peaks.length).fill(null);
+  const steps = [];
+  let farthestRight = null;
+  let farthestOwner = -1;
+  let visible = 0;
+
+  const snapshot = ({
+    phase,
+    codeLines,
+    title,
+    note,
+    current = -1,
+    sortedPosition = -1,
+    previousFarthest = farthestRight,
+    action = "",
+    formula = "",
+    final = false,
+  }) => {
+    const phaseIndex = phase === "convert" ? 0
+      : phase === "duplicates" ? 1
+        : phase === "sort" ? 2
+          : phase === "sweep" ? 3 : 4;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: peaks.map(([, y]) => y),
+      sub: peaks.map(([x, y], index) => `i=${index} · peak=(${x},${y}) · interval=[${x - y},${x + y}]`),
+      highlight: current >= 0 ? [current] : [],
+      mark: states.map((state, index) => state === "visible" ? index : -1).filter((index) => index >= 0),
+      codeLines,
+      vars: [
+        { name: "mountain", value: current >= 0 ? `i=${current} · (${peaks[current].join(",")})` : "—" },
+        { name: "farthest right", value: farthestRight ?? "—" },
+        { name: "cover owner", value: farthestOwner >= 0 ? `i=${farthestOwner}` : "—" },
+        { name: "visible", value: visible },
+      ],
+      visibleMountains2345View: {
+        peaks: peaks.map((peak) => [...peak]),
+        intervals: intervals.map((interval) => ({ ...interval })),
+        sorted: sorted.map((interval) => ({ ...interval })),
+        converted: [...converted],
+        duplicateCounts: [...duplicateCounts],
+        states: [...states],
+        coveredBy: [...coveredBy],
+        phase,
+        phaseIndex,
+        current,
+        sortedPosition,
+        farthestRight,
+        previousFarthest,
+        farthestOwner,
+        visible,
+        action,
+        formula,
+      },
+    });
+  };
+
+  snapshot({
+    phase: "convert",
+    codeLines: [1, 3, 4, 5],
+    title: text("Bước 1: đổi mountain thành interval", "Step 1: convert each mountain into an interval"),
+    note: text("Mountain có peak (x,y) chạm mặt đất tại x-y và x+y, nên toàn bộ vùng phủ là [x-y, x+y].", "A mountain with peak (x,y) meets the ground at x-y and x+y, so its full coverage is [x-y, x+y]."),
+    action: "(x, y) → [x − y, x + y]",
+  });
+  for (const interval of intervals) {
+    converted[interval.index] = true;
+    snapshot({
+      phase: "convert",
+      codeLines: [5],
+      current: interval.index,
+      title: text(`Peak (${interval.x},${interval.y}) → [${interval.left},${interval.right}]`, `Peak (${interval.x},${interval.y}) → [${interval.left},${interval.right}]`),
+      note: text(`Biên trái = ${interval.x}-${interval.y}=${interval.left}; biên phải = ${interval.x}+${interval.y}=${interval.right}.`, `Left = ${interval.x}-${interval.y}=${interval.left}; right = ${interval.x}+${interval.y}=${interval.right}.`),
+      action: `(${interval.x}, ${interval.y}) → [${interval.left}, ${interval.right}]`,
+      formula: `[x-y, x+y] = [${interval.left}, ${interval.right}]`,
+    });
+  }
+
+  snapshot({
+    phase: "duplicates",
+    codeLines: [6],
+    title: text("Bước 2: đếm mountain trùng nhau", "Step 2: count duplicate mountains"),
+    note: text("Hai interval giống hệt nhau che phủ lẫn nhau, nên không interval nào trong nhóm duplicate được tính visible.", "Identical intervals cover one another, so no mountain in a duplicate group is counted as visible."),
+    action: "frequency = Counter(intervals)",
+  });
+  for (const interval of intervals) {
+    const count = duplicateCounts[interval.index];
+    snapshot({
+      phase: "duplicates",
+      codeLines: [6],
+      current: interval.index,
+      title: text(`[${interval.left},${interval.right}] xuất hiện ${count} lần`, `[${interval.left},${interval.right}] appears ${count} time(s)`),
+      note: text(count > 1 ? "Mountain này thuộc nhóm duplicate và sẽ không được cộng vào visible." : "Interval là duy nhất, nên vẫn có thể visible nếu không bị interval khác chứa.", count > 1 ? "This mountain belongs to a duplicate group and cannot be counted as visible." : "This interval is unique, so it can still be visible if no other interval contains it."),
+      action: `frequency[(${interval.left},${interval.right})] = ${count}`,
+    });
+  }
+
+  snapshot({
+    phase: "sort",
+    codeLines: [7],
+    title: text("Bước 3: sort left tăng, right giảm", "Step 3: sort left ascending, right descending"),
+    note: text("Nếu hai mountain có cùng left, mountain vươn xa hơn phải đứng trước để che mountain ngắn hơn ngay trong lúc sweep.", "If two mountains share the same left, the one reaching farther right must come first so it covers the shorter one during the sweep."),
+    action: "sort key = (left ↑, right ↓)",
+    formula: sorted.map((interval) => `[${interval.left},${interval.right}]`).join(" → "),
+  });
+
+  snapshot({
+    phase: "sweep",
+    codeLines: [8, 9],
+    title: text("Bước 4: quét và giữ farthestRight", "Step 4: sweep while tracking farthestRight"),
+    note: text("Sau khi sort, mọi interval trước current đều bắt đầu không muộn hơn current. Vì vậy chỉ cần biết biên phải xa nhất.", "After sorting, every previous interval starts no later than current. Therefore, only the farthest right endpoint is needed."),
+    action: "visible = 0 · farthestRight = −∞",
+  });
+  for (let position = 0; position < sorted.length; position++) {
+    const interval = sorted[position];
+    const previousFarthest = farthestRight;
+    const extendsRight = farthestRight == null || interval.right > farthestRight;
+    snapshot({
+      phase: "sweep",
+      codeLines: [10, 11],
+      current: interval.index,
+      sortedPosition: position,
+      previousFarthest,
+      title: text(`Xét interval [${interval.left},${interval.right}]`, `Inspect interval [${interval.left},${interval.right}]`),
+      note: text(extendsRight ? `right ${interval.right} vượt farthestRight ${farthestRight ?? "-∞"}, nên không bị interval trước chứa.` : `right ${interval.right} không vượt farthestRight ${farthestRight}; interval này bị che hoàn toàn.`, extendsRight ? `right ${interval.right} exceeds farthestRight ${farthestRight ?? "-∞"}, so no previous interval contains it.` : `right ${interval.right} does not exceed farthestRight ${farthestRight}; this interval is fully covered.`),
+      action: `${interval.right} ${extendsRight ? ">" : "≤"} ${farthestRight ?? "−∞"}`,
+      formula: `right=${interval.right} ${extendsRight ? ">" : "≤"} farthestRight=${farthestRight ?? "−∞"}`,
+    });
+
+    if (!extendsRight) {
+      states[interval.index] = duplicateCounts[interval.index] > 1 ? "duplicate" : "covered";
+      coveredBy[interval.index] = farthestOwner;
+      snapshot({
+        phase: "sweep",
+        codeLines: [11],
+        current: interval.index,
+        sortedPosition: position,
+        previousFarthest,
+        title: text(`Mountain i=${interval.index} bị che bởi i=${farthestOwner}`, `Mountain i=${interval.index} is covered by i=${farthestOwner}`),
+        note: text(duplicateCounts[interval.index] > 1 ? "Mountain trùng nhau che phủ lẫn nhau; duplicate không visible." : `Interval nằm trọn trong vùng đã phủ tới ${farthestRight}.`, duplicateCounts[interval.index] > 1 ? "Identical mountains cover one another; duplicates are not visible." : `The interval lies completely inside coverage ending at ${farthestRight}.`),
+        action: duplicateCounts[interval.index] > 1 ? "DUPLICATE → not visible" : "COVERED → not visible",
+      });
+      continue;
+    }
+
+    if (duplicateCounts[interval.index] === 1) {
+      visible++;
+      states[interval.index] = "visible";
+      snapshot({
+        phase: "sweep",
+        codeLines: [12, 13],
+        current: interval.index,
+        sortedPosition: position,
+        previousFarthest,
+        title: text(`Mountain i=${interval.index} visible: count = ${visible}`, `Mountain i=${interval.index} is visible: count = ${visible}`),
+        note: text("Interval mở rộng vùng phủ và chỉ xuất hiện một lần, nên mountain này được nhìn thấy.", "The interval extends coverage and occurs once, so this mountain is visible."),
+        action: `frequency = 1 → visible = ${visible}`,
+      });
+    } else {
+      states[interval.index] = "duplicate";
+      snapshot({
+        phase: "sweep",
+        codeLines: [12],
+        current: interval.index,
+        sortedPosition: position,
+        previousFarthest,
+        title: text(`Mountain i=${interval.index} mở rộng biên nhưng là duplicate`, `Mountain i=${interval.index} extends the boundary but is duplicated`),
+        note: text(`Interval xuất hiện ${duplicateCounts[interval.index]} lần, nên các mountain giống nhau che phủ lẫn nhau.`, `The interval appears ${duplicateCounts[interval.index]} times, so the identical mountains cover one another.`),
+        action: `frequency = ${duplicateCounts[interval.index]} → +0 visible`,
+      });
+    }
+    farthestRight = interval.right;
+    farthestOwner = interval.index;
+    snapshot({
+      phase: "sweep",
+      codeLines: [14],
+      current: interval.index,
+      sortedPosition: position,
+      previousFarthest,
+      title: text(`farthestRight = ${farthestRight}`, `farthestRight = ${farthestRight}`),
+      note: text(`Mountain i=${interval.index} hiện là interval vươn xa nhất sang phải.`, `Mountain i=${interval.index} now reaches farthest to the right.`),
+      action: `farthestRight = ${interval.right}`,
+      formula: `farthestRight: ${previousFarthest ?? "−∞"} → ${farthestRight}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    codeLines: [15],
+    final: true,
+    title: text(`Return ${visible}`, `Return ${visible}`),
+    note: text("Chỉ các interval duy nhất và mở rộng farthestRight mới được tính visible.", "Only unique intervals that extend farthestRight are counted as visible."),
+    action: `return ${visible}`,
+    formula: `visible mountains = ${visible}`,
+  });
+  return { original: peaks.flat(), answer: visible, steps };
+}
+
 function maximumLengthSemiDecreasing(nums) {
   const stack = [];
   for (let i = 0; i < nums.length; i++) if (!stack.length || nums[i] > nums[stack.at(-1)]) stack.push(i);
@@ -3767,10 +4554,12 @@ function buildSteps1063(input) {
   const steps = [];
   let answer = 0;
 
-  const snapshot = ({ phase, line, current = -1, popped = -1, currentStarts = [], action = "", final = false, title, note }) => {
-    const phaseIndex = ["setup", "scan", "while", "pop", "push"].includes(phase) ? 0
-      : phase === "count" ? 1
-        : phase === "done" ? 2 : 0;
+  const snapshot = ({ phase, line, current = -1, comparedIndex = -1, popped = -1, poppedThisRound = [], currentStarts = [], action = "", final = false, title, note }) => {
+    const phaseIndex = ["setup", "scan"].includes(phase) ? 0
+      : ["while", "pop"].includes(phase) ? 1
+        : phase === "push" ? 2
+          : phase === "count" ? 3
+            : phase === "done" ? 4 : 0;
     steps.push({
       title,
       note,
@@ -3782,12 +4571,14 @@ function buildSteps1063(input) {
       codeLines: [line],
       vars: [
         { name: "i", value: current >= 0 ? `${current} : ${nums[current]}` : "—" },
+        { name: "stack top", value: comparedIndex >= 0 ? `${comparedIndex} : ${nums[comparedIndex]}` : "—" },
         { name: "stack", value: `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]` },
+        { name: "popped at i", value: `[${poppedThisRound.join(", ")}]` },
         { name: "answer", value: answer },
       ],
       validSubarrays1063View: {
         nums: [...nums], stack: [...stack], contributions: [...contributions], answer,
-        phase, phaseIndex, current, popped, currentStarts: [...currentStarts], action,
+        phase, phaseIndex, current, comparedIndex, popped, poppedThisRound: [...poppedThisRound], currentStarts: [...currentStarts], action,
       },
     });
   };
@@ -3798,22 +4589,24 @@ function buildSteps1063(input) {
   snapshot({ phase: "setup", line: 4, title: text("Khởi tạo answer = 0", "Initialize answer = 0"), note: text("answer sẽ cộng số valid subarray kết thúc tại từng index i.", "answer accumulates the valid subarrays ending at each index i.") });
 
   for (let current = 0; current < n; current++) {
-    snapshot({ phase: "scan", line: 5, current, title: text(`Xét right endpoint i = ${current}`, `Inspect right endpoint i = ${current}`), note: text(`Mọi subarray mới đều kết thúc tại ${current} (value ${nums[current]}).`, `Every new subarray ends at ${current} (value ${nums[current]}).`) });
+    const poppedThisRound = [];
+    snapshot({ phase: "scan", line: 5, current, comparedIndex: stack.at(-1) ?? -1, poppedThisRound, title: text(`Xét right endpoint i = ${current}`, `Inspect right endpoint i = ${current}`), note: text(`Mọi subarray mới đều kết thúc tại ${current} (value ${nums[current]}).`, `Every new subarray ends at ${current} (value ${nums[current]}).`) });
     while (true) {
       const top = stack.at(-1);
       const shouldPop = top != null && nums[top] > nums[current];
-      snapshot({ phase: "while", line: 6, current, action: top == null ? "stack is empty" : `${nums[top]} > ${nums[current]} is ${shouldPop}`, title: text(shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Kiểm tra điều kiện pop", shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Check the pop condition"), note: text(top == null ? "Stack rỗng nên không còn left endpoint nào cần loại." : shouldPop ? `Index ${top} không thể là minimum của subarray kéo dài tới ${current}.` : `Đỉnh stack ${top} vẫn ≤ value hiện tại nên còn hợp lệ.`, top == null ? "The stack is empty, so no left endpoint remains to remove." : shouldPop ? `Index ${top} cannot be the minimum of a subarray extended to ${current}.` : `Stack top ${top} is still ≤ the current value, so it remains valid.`) });
+      snapshot({ phase: "while", line: 6, current, comparedIndex: top ?? -1, poppedThisRound, action: top == null ? "stack is empty" : `${nums[top]} > ${nums[current]} is ${shouldPop}`, title: text(shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Kiểm tra điều kiện pop", shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Check the pop condition"), note: text(top == null ? "Stack rỗng nên không còn left endpoint nào cần loại." : shouldPop ? `Index ${top} không thể là minimum của subarray kéo dài tới ${current}.` : `Đỉnh stack ${top} vẫn ≤ value hiện tại nên còn hợp lệ.`, top == null ? "The stack is empty, so no left endpoint remains to remove." : shouldPop ? `Index ${top} cannot be the minimum of a subarray extended to ${current}.` : `Stack top ${top} is still ≤ the current value, so it remains valid.`) });
       if (!shouldPop) break;
       const popped = stack.pop();
-      snapshot({ phase: "pop", line: 7, current, popped, action: `pop ${popped}:${nums[popped]}`, title: text(`pop index ${popped}`, `pop index ${popped}`), note: text(`Vì ${nums[popped]} > ${nums[current]}, subarray bắt đầu ở ${popped} sẽ không còn hợp lệ nếu kết thúc tại ${current}.`, `Because ${nums[popped]} > ${nums[current]}, a subarray starting at ${popped} is no longer valid when it ends at ${current}.`) });
+      poppedThisRound.push(popped);
+      snapshot({ phase: "pop", line: 7, current, comparedIndex: popped, popped, poppedThisRound, action: `pop ${popped}:${nums[popped]}`, title: text(`pop index ${popped}`, `pop index ${popped}`), note: text(`Vì ${nums[popped]} > ${nums[current]}, subarray bắt đầu ở ${popped} sẽ không còn hợp lệ nếu kết thúc tại ${current}.`, `Because ${nums[popped]} > ${nums[current]}, a subarray starting at ${popped} is no longer valid when it ends at ${current}.`) });
     }
     stack.push(current);
     const currentStarts = [...stack];
-    snapshot({ phase: "push", line: 8, current, currentStarts, action: `push ${current}:${nums[current]}`, title: text(`push index ${current}`, `push index ${current}`), note: text("Các index trong stack chính là các start index của valid subarray kết thúc tại i.", "Indices in the stack are exactly the start indices of valid subarrays ending at i.") });
+    snapshot({ phase: "push", line: 8, current, poppedThisRound, currentStarts, action: `push ${current}:${nums[current]}`, title: text(`push index ${current}`, `push index ${current}`), note: text("Các index trong stack chính là các start index của valid subarray kết thúc tại i.", "Indices in the stack are exactly the start indices of valid subarrays ending at i.") });
     const contribution = stack.length;
     answer += contribution;
     contributions[current] = contribution;
-    snapshot({ phase: "count", line: 9, current, currentStarts, action: `+${contribution}`, title: text(`answer += ${contribution} → ${answer}`, `answer += ${contribution} → ${answer}`), note: text(`${contribution} index trong stack tạo ${contribution} valid subarray kết thúc tại ${current}.`, `${contribution} indices in the stack create ${contribution} valid subarrays ending at ${current}.`) });
+    snapshot({ phase: "count", line: 9, current, poppedThisRound, currentStarts, action: `+${contribution}`, title: text(`answer += ${contribution} → ${answer}`, `answer += ${contribution} → ${answer}`), note: text(`${contribution} index trong stack tạo ${contribution} valid subarray kết thúc tại ${current}.`, `${contribution} indices in the stack create ${contribution} valid subarrays ending at ${current}.`) });
   }
 
   snapshot({ phase: "done", line: 10, final: true, title: text(`return ${answer}`, `return ${answer}`), note: text("Tổng các contribution chính là số valid subarray.", "The sum of all contributions is the number of valid subarrays.") });
@@ -5610,8 +6403,137 @@ module.exports = {
   },
   2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),
-  2736: simpleProblem({ id: 2736, difficulty: "hard", slug: "maximum-sum-queries", name: "Maximum Sum Queries", viName: "Query tổng lớn nhất", statement: text("Với mỗi query [x,y], tìm max nums1[i]+nums2[i] khi nums1[i]>=x và nums2[i]>=y.", "For each query [x,y], maximize nums1[i]+nums2[i] with nums1[i]>=x and nums2[i]>=y."), defaultInput: "4,3,1,2", inputLabel: text("nums1", "nums1"), extraParams: [{ key: "nums2", type: "string", label: text("nums2", "nums2"), default: "2,4,9,5" }, { key: "queries", type: "string", label: text("queries (x,y; ...)", "queries (x,y; ...)"), default: "4,1;1,3;2,5" }], solver: maximumSumQueries }),
-  2818: simpleProblem({ id: 2818, difficulty: "hard", slug: "apply-operations-to-maximize-score", name: "Apply Operations to Maximize Score", viName: "Tối đa hóa score bằng thao tác", statement: text("Dùng prime score và số subarray mà mỗi index thống trị để chọn giá trị lớn nhất.", "Use prime score and each index's dominance span to choose the largest values."), defaultInput: "8,3,9,3,8", extraParams: [{ key: "k", label: text("k", "k"), default: 2, min: 1 }], solver: arrayBuilder(maximumScoreAfterOperations) }),
+  2736: {
+    id: 2736,
+    difficulty: "hard",
+    slug: "maximum-sum-queries",
+    category,
+    tags: [arrayTag, monoTag, { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" }, { key: "sorting", vi: "Sắp xếp", en: "Sorting" }],
+    title: text("Maximum Sum Queries"),
+    titleVi: text("Query tổng lớn nhất", "Maximum Sum Queries"),
+    statement: text(
+      "Mỗi index i tạo point (nums1[i], nums2[i]). Với query [x,y], tìm tổng nums1[i]+nums2[i] lớn nhất trong các point có nums1[i] >= x và nums2[i] >= y; trả -1 nếu không có.",
+      "Each index i forms a point (nums1[i], nums2[i]). For query [x,y], find the largest nums1[i]+nums2[i] among points with nums1[i] >= x and nums2[i] >= y; return -1 if none exists.",
+    ),
+    defaultInput: "4,3,1,2",
+    inputKind: "string",
+    inputLabel: text("nums1 (cách bởi ,)", "nums1 (comma separated)"),
+    extraParams: [
+      { key: "nums2", type: "string", label: text("nums2 (cách bởi ,)", "nums2 (comma separated)"), default: "2,4,9,5" },
+      { key: "queries", type: "string", label: text("queries (x,y; ...)", "queries (x,y; ...)"), default: "4,1;1,3;2,5" },
+    ],
+    approach: [
+      text("Ghép nums1[i], nums2[i] thành point (a,b,sum), rồi sort point theo a giảm dần.", "Combine nums1[i], nums2[i] into points (a,b,sum), then sort points by descending a."),
+      text("Sort query theo x giảm dần. Trước mỗi query, kích hoạt mọi point có a >= x.", "Sort queries by descending x. Before each query, activate every point with a >= x."),
+      text("Frontier đơn điệu chỉ giữ point Pareto hữu ích: b tăng dần và sum giảm dần; point bị dominate sẽ bị pop hoặc bỏ qua.", "The monotonic frontier keeps only useful Pareto points: b increases and sum decreases; dominated points are popped or skipped."),
+      text("Binary search b đầu tiên >= y trên frontier; sum tại đó là đáp án lớn nhất. Ghi vào query_index để phục hồi thứ tự ban đầu.", "Binary search the first frontier b >= y; its sum is maximal. Write it to query_index to restore original order."),
+    ],
+    complexity: {
+      time: "O((n + q) log(n + q))",
+      space: "O(n + q)",
+      note: text("Sort point/query, mỗi point vào-ra frontier tối đa một lần, và mỗi query binary search frontier.", "Sort points and queries, push/pop each point at most once, and binary search the frontier for every query."),
+    },
+    codeLabel: text("Offline queries + Pareto frontier + binary search", "Offline queries + Pareto frontier + binary search"),
+    code: [
+      "class Solution:",
+      "    def maximumSumQueries(self, nums1, nums2, queries):",
+      "        points = sorted(zip(nums1, nums2), reverse=True)",
+      "        ordered_queries = sorted(((x, y, i) for i, (x, y) in enumerate(queries)), key=lambda item: -item[0])",
+      "        answer = [-1] * len(queries)",
+      "        frontier = []",
+      "        point = 0",
+      "",
+      "        for x, y, query_index in ordered_queries:",
+      "            while point < len(points) and points[point][0] >= x:",
+      "                a, b = points[point]",
+      "                value = a + b",
+      "                while frontier and frontier[-1][1] <= value:",
+      "                    frontier.pop()",
+      "                if not frontier or frontier[-1][0] < b:",
+      "                    frontier.append((b, value))",
+      "                point += 1",
+      "",
+      "            lo, hi = 0, len(frontier)",
+      "            while lo < hi:",
+      "                mid = (lo + hi) // 2",
+      "                if frontier[mid][0] < y:",
+      "                    lo = mid + 1",
+      "                else:",
+      "                    hi = mid",
+      "            if lo < len(frontier):",
+      "                answer[query_index] = frontier[lo][1]",
+      "        return answer",
+    ],
+    liveArgs: (input, params) => [parseNums(input, "nums1"), parseNums(params.nums2, "nums2"), parsePairs(params.queries, "queries")],
+    builder: buildSteps2736,
+  },
+  2818: {
+    id: 2818,
+    difficulty: "hard",
+    slug: "apply-operations-to-maximize-score",
+    category,
+    tags: [arrayTag, monoTag, { key: "greedy", vi: "Tham lam", en: "Greedy" }, { key: "math", vi: "Toán", en: "Math" }],
+    title: text("Apply Operations to Maximize Score"),
+    titleVi: text("Áp dụng thao tác để tối đa hóa score", "Apply Operations to Maximize Score"),
+    statement: text(
+      "Chọn tối đa k subarray chưa dùng. Trong mỗi subarray, lấy phần tử có nhiều thừa số nguyên tố khác nhau nhất; nếu hòa, lấy index nhỏ nhất. Nhân score với các phần tử được chọn để score lớn nhất.",
+      "Choose up to k unused subarrays. From each one, select the element with the most distinct prime factors; ties go to the smallest index. Maximize the product of all selected values.",
+    ),
+    defaultInput: "8,3,9,3,8",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [{ key: "k", label: text("Số operation k", "Number of operations k"), default: 2, min: 1 }],
+    approach: [
+      text("Tính prime score của mỗi số: số lượng thừa số nguyên tố khác nhau.", "Compute every value's prime score: its number of distinct prime factors."),
+      text("Dùng stack prime score không tăng để tìm previous >= ở trái và next > ở phải. Bất đối xứng này xử lý luật index nhỏ nhất khi hòa.", "Use a non-increasing prime-score stack to find previous >= on the left and next > on the right. This asymmetry enforces the smallest-index tie rule."),
+      text("Index i được chọn trong (i-left[i])*(right[i]-i) subarray.", "Index i is selected in (i-left[i])*(right[i]-i) subarrays."),
+      text("Sort index theo nums[i] giảm dần, dùng tối đa số subarray của mỗi index cho tới khi hết k.", "Sort indices by nums[i] descending and consume each index's subarray capacity until k reaches zero."),
+    ],
+    complexity: {
+      time: "O(n√M + n log n)",
+      space: "O(n)",
+      note: text("Mỗi số được phân tích tới căn bậc hai; sau đó quét stack tuyến tính và sort các index theo value.", "Factor each value up to its square root, then scan a linear stack and sort indices by value."),
+    },
+    codeLabel: text("Prime score + monotonic stack + greedy", "Prime score + monotonic stack + greedy"),
+    code: [
+      "class Solution:",
+      "    def maximumScore(self, nums, k):",
+      "        MOD = 10**9 + 7",
+      "",
+      "        def prime_score(value):",
+      "            score, factor = 0, 2",
+      "            while factor * factor <= value:",
+      "                if value % factor == 0:",
+      "                    score += 1",
+      "                    while value % factor == 0:",
+      "                        value //= factor",
+      "                factor += 1",
+      "            return score + (value > 1)",
+      "",
+      "        scores = [prime_score(value) for value in nums]",
+      "        n = len(nums)",
+      "        left, right = [-1] * n, [n] * n",
+      "        stack = []",
+      "",
+      "        for i in range(n):",
+      "            while stack and scores[stack[-1]] < scores[i]:",
+      "                right[stack.pop()] = i",
+      "            left[i] = stack[-1] if stack else -1",
+      "            stack.append(i)",
+      "",
+      "        uses = [(i - left[i]) * (right[i] - i) for i in range(n)]",
+      "        answer = 1",
+      "        for i in sorted(range(n), key=lambda i: -nums[i]):",
+      "            take = min(k, uses[i])",
+      "            answer = answer * pow(nums[i], take, MOD) % MOD",
+      "            k -= take",
+      "            if k == 0:",
+      "                break",
+      "        return answer",
+    ],
+    liveArgs: (input, params) => [parseNums(input, "nums"), Number(params.k)],
+    builder: buildSteps2818,
+  },
   2940: simpleProblem({ id: 2940, difficulty: "hard", slug: "find-building-where-alice-and-bob-can-meet", name: "Find Building Where Alice and Bob Can Meet", viName: "Tòa nhà Alice và Bob gặp nhau", statement: text("Với mỗi query, tìm tòa nhà trái nhất mà cả hai có thể tới.", "For each query, find the leftmost building both people can reach."), defaultInput: "6,4,8,5,2,7", inputLabel: text("heights", "heights"), extraParams: [{ key: "queries", type: "string", label: text("queries (a,b; ...)", "queries (a,b; ...)"), default: "0,1;0,2;2,4" }], solver: leftmostBuildingQueries }),
   2945: {
     id: 2945,
@@ -5680,7 +6602,55 @@ module.exports = {
   1950: simpleProblem({ id: 1950, difficulty: "medium", slug: "maximum-of-minimum-values-in-all-subarrays", name: "Maximum of Minimum Values in All Subarrays", viName: "Maximum của minimum theo độ dài", statement: text("Premium: với mỗi độ dài window, tìm minimum lớn nhất.", "Premium: for every window length, find the maximum among window minimums."), defaultInput: "10,20,50,10,70,30", premium: true, solver: arrayBuilder(maximumOfMinimums) }),
   2282: simpleProblem({ id: 2282, difficulty: "medium", slug: "number-of-people-that-can-be-seen-in-a-grid", name: "Number of People That Can Be Seen in a Grid", viName: "Số người nhìn thấy trong grid", statement: text("Premium: đếm người nhìn thấy sang phải và xuống dưới trong grid.", "Premium: count visible people to the right and downward in a grid."), defaultInput: "3,1,4;2,5,1;6,2,3", inputLabel: text("heights grid", "heights grid"), premium: true, solver: visiblePeopleGrid }),
   2297: simpleProblem({ id: 2297, difficulty: "medium", slug: "jump-game-viii", name: "Jump Game VIII", viName: "Jump Game VIII", statement: text("Premium: bài graph/DP dùng stack đơn điệu để dựng cạnh nhảy hữu ích.", "Premium: graph/DP problem using monotonic stacks to build useful jump edges."), defaultInput: "3,2,4,4,1", premium: true, solver: arrayBuilder(jumpGameVIII) }),
-  2345: simpleProblem({ id: 2345, difficulty: "medium", slug: "finding-the-number-of-visible-mountains", name: "Finding the Number of Visible Mountains", viName: "Đếm núi nhìn thấy", statement: text("Premium: đếm núi không bị núi khác che hoàn toàn.", "Premium: count mountains not fully covered by another mountain."), defaultInput: "2,2;6,3;5,4", inputLabel: text("peaks (x,y; ...)", "peaks (x,y; ...)"), premium: true, solver: visibleMountains }),
+  2345: {
+    id: 2345,
+    difficulty: "medium",
+    premium: true,
+    slug: "finding-the-number-of-visible-mountains",
+    category,
+    tags: [arrayTag, monoTag, { key: "sorting", vi: "Sắp xếp", en: "Sorting" }, premiumTag],
+    title: text("Finding the Number of Visible Mountains"),
+    titleVi: text("Đếm số mountain nhìn thấy", "Finding the Number of Visible Mountains"),
+    statement: text(
+      "Mỗi peak (x,y) tạo một mountain có hai sườn dốc 45°. Một mountain visible nếu không có mountain khác che phủ toàn bộ nó. Đếm số mountain visible; các mountain trùng nhau che phủ lẫn nhau.",
+      "Each peak (x,y) forms a mountain with 45-degree sides. A mountain is visible when no other mountain completely covers it. Count visible mountains; identical mountains cover one another.",
+    ),
+    defaultInput: "2,2;6,3;5,4",
+    inputKind: "string",
+    inputLabel: text("peaks (x,y; ...)", "peaks (x,y; ...)"),
+    extraParams: [],
+    approach: [
+      text("Đổi peak (x,y) thành interval mặt đất [x-y, x+y]. Mountain A che B đúng khi interval A chứa interval B.", "Convert peak (x,y) into ground interval [x-y, x+y]. Mountain A covers B exactly when A's interval contains B's interval."),
+      text("Đếm frequency của interval để loại tất cả mountain trùng nhau.", "Count interval frequencies so every duplicated mountain can be excluded."),
+      text("Sort theo left tăng; nếu left bằng nhau thì right giảm để mountain rộng hơn đứng trước.", "Sort by ascending left; for equal left, sort by descending right so the wider mountain comes first."),
+      text("Quét farthestRight: right <= farthestRight nghĩa là bị che; right lớn hơn chỉ visible khi interval xuất hiện đúng một lần.", "Sweep farthestRight: right <= farthestRight means covered; a larger right is visible only when its interval occurs once."),
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: text("Sort các interval; Counter và lượt sweep đều tuyến tính.", "Sort the intervals; frequency counting and the sweep are linear."),
+    },
+    codeLabel: text("Interval sorting + farthest-right sweep", "Interval sorting + farthest-right sweep"),
+    code: [
+      "from collections import Counter",
+      "",
+      "class Solution:",
+      "    def visibleMountains(self, peaks):",
+      "        intervals = [(x - y, x + y) for x, y in peaks]",
+      "        frequency = Counter(intervals)",
+      "        intervals.sort(key=lambda interval: (interval[0], -interval[1]))",
+      "        visible = 0",
+      "        farthest_right = float('-inf')",
+      "        for left, right in intervals:",
+      "            if right > farthest_right:",
+      "                if frequency[(left, right)] == 1:",
+      "                    visible += 1",
+      "                farthest_right = right",
+      "        return visible",
+    ],
+    liveArgs: (input) => [parsePairs(input, "peaks")],
+    builder: buildSteps2345,
+  },
   2832: {
     id: 2832,
     difficulty: "medium",
