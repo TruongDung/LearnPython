@@ -16,7 +16,7 @@ class Solution:
         for i, val in enumerate(instability_arr):
             if val <= k:
                 return i
-            
+
         return -1
 
 sol = Solution()
