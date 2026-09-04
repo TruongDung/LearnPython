@@ -7844,6 +7844,317 @@ function renderBinaryWatch401View(step) {
   </section>`;
 }
 
+function renderStable3903View(step) {
+  const view = step.stable3903View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const right = Array.isArray(view.right) ? view.right : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const gaps = Array.isArray(view.gaps) ? view.gaps : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const k = Number.isFinite(view.k) ? view.k : 0;
+  const suffixBuilt = new Set(Array.isArray(view.suffixBuilt) ? view.suffixBuilt : []);
+  const phaseOrder = { size: 0, "suffix-init": 0, "suffix-loop": 0, "suffix-write": 0, "prefix-init": 1, "forward-loop": 1, "prefix-write": 1, check: 1, found: 2, "not-found": 2 };
+  const phaseIndex = phaseOrder[view.phase] ?? 0;
+  const phases = (vi ? ["1. Suffix min ←", "2. Prefix max →", "3. Đáp án"] : ["1. Suffix min ←", "2. Prefix max →", "3. Answer"]).map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const isChecking = ["check", "found"].includes(view.phase);
+  const cells = nums.map((value, index) => {
+    const suffixKnown = suffixBuilt.has(index);
+    const prefixKnown = Number.isFinite(prefix[index]);
+    const gapKnown = Number.isFinite(gaps[index]);
+    const classes = ["stable3903-cell"];
+    if (index === current) classes.push("active");
+    if (index < current && isChecking) classes.push("scanned");
+    if (index === view.answer) classes.push("answer");
+    return `<article class="${classes.join(" ")}">
+      <header><small>index</small><strong>${index}</strong></header>
+      <div class="stable3903-value"><small>nums</small><b>${escapeHtml(String(value))}</b></div>
+      <div class="stable3903-row suffix ${suffixKnown ? "known" : "pending"}"><small>suffix min</small><b>${suffixKnown ? escapeHtml(String(right[index])) : "?"}</b></div>
+      <div class="stable3903-row prefix ${prefixKnown ? "known" : "pending"}"><small>prefix max</small><b>${prefixKnown ? escapeHtml(String(prefix[index])) : "?"}</b></div>
+      <div class="stable3903-row gap ${gapKnown ? "known" : "pending"}"><small>gap</small><b>${gapKnown ? escapeHtml(String(gaps[index])) : "?"}</b></div>
+    </article>`;
+  }).join("");
+  const leftRange = current >= 0 ? `nums[0..${current}]` : "—";
+  const rightRange = current >= 0 ? `nums[${current}..${Math.max(0, nums.length - 1)}]` : "—";
+  const formula = isChecking
+    ? `max(${leftRange}) ${Number.isFinite(view.prefixMax) ? `= ${view.prefixMax}` : ""} − min(${rightRange}) ${current >= 0 ? `= ${right[current]}` : ""} = ${view.gap ?? "?"}`
+    : view.phase.startsWith("suffix")
+      ? (current >= 0 && current < nums.length - 1 ? `right[${current}] = min(nums[${current}], right[${current + 1}]) = ${right[current]}` : `right[n − 1] = nums[n − 1] = ${right[nums.length - 1] ?? "?"}`)
+      : (vi ? "Sẵn sàng kiểm tra: prefix max − suffix min" : "Ready to check: prefix max − suffix min");
+  const decision = view.stable === true
+    ? (vi ? `Ổn định: gap ≤ k (${k})` : `Stable: gap ≤ k (${k})`)
+    : view.stable === false
+      ? (vi ? `Chưa ổn định: gap > k (${k})` : `Not stable: gap > k (${k})`)
+      : (vi ? `Ngưỡng k = ${k}` : `Threshold k = ${k}`);
+  const result = view.answer >= 0
+    ? (vi ? `Đáp án nhỏ nhất: index ${view.answer}` : `Smallest answer: index ${view.answer}`)
+    : view.phase === "not-found"
+      ? (vi ? "Không có index ổn định → −1" : "No stable index → −1")
+      : (vi ? "Đang tính…" : "Computing…");
+
+  $("treeView").innerHTML = `<section class="stable3903-viz" role="img" aria-label="Smallest Stable Index visualization">
+    <header><div><small>ARRAY BOUNDARIES · #3903</small><strong>SMALLEST STABLE INDEX</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="stable3903-phases">${phases}</div>
+    <section class="stable3903-rule"><b>${vi ? "CÂU HỎI Ở MỖI INDEX i" : "QUESTION AT EVERY INDEX i"}</b><strong>max(nums[0..i]) − min(nums[i..n−1]) ≤ k ?</strong><span>${vi ? "Hai đoạn gặp nhau tại i; màu xanh là min bên phải, màu cam là max bên trái." : "The two ranges overlap at i; blue is the right minimum and amber is the left maximum."}</span></section>
+    <section class="stable3903-metrics"><div><small>i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>prefix max</small><strong>${view.prefixMax ?? "—"}</strong></div><div><small>suffix min</small><strong>${current >= 0 && suffixBuilt.has(current) ? right[current] : "—"}</strong></div><div class="${view.stable === true ? "yes" : view.stable === false ? "no" : ""}"><small>gap vs k</small><strong>${view.gap ?? "—"} ${view.gap != null ? (view.stable ? "≤" : ">") : ""} ${k}</strong></div></section>
+    <section class="stable3903-ranges"><span class="left">${escapeHtml(leftRange)} → ${vi ? "lấy MAX" : "take MAX"}</span><b>−</b><span class="right">${escapeHtml(rightRange)} → ${vi ? "lấy MIN" : "take MIN"}</span></section>
+    <section class="stable3903-grid-wrap"><header><strong>${vi ? "BẢNG THEO INDEX" : "INDEX TABLE"}</strong><span>${vi ? "tím = index đang xét · xanh = đáp án" : "purple = current index · green = answer"}</span></header><div class="stable3903-grid" style="--stable3903-count:${Math.max(nums.length, 1)}">${cells}</div></section>
+    <section class="stable3903-formula ${view.stable === true ? "yes" : view.stable === false ? "no" : ""}"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(decision)}</span></section>
+    <footer class="stable3903-result ${view.answer >= 0 ? "yes" : view.phase === "not-found" ? "no" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${escapeHtml(result)}</strong><span>${escapeHtml(pick(step.note))}</span></footer>
+  </section>`;
+}
+
+function renderOddEven975View(step) {
+  const view = step.oddEven975View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const oddNext = Array.isArray(view.oddNext) ? view.oddNext : [];
+  const evenNext = Array.isArray(view.evenNext) ? view.evenNext : [];
+  const oddGood = Array.isArray(view.oddGood) ? view.oddGood : [];
+  const evenGood = Array.isArray(view.evenGood) ? view.evenGood : [];
+  const oddKnown = Array.isArray(view.oddKnown) ? view.oddKnown : [];
+  const evenKnown = Array.isArray(view.evenKnown) ? view.evenKnown : [];
+  const order = Array.isArray(view.order) ? view.order : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const stageIndex = Number.isInteger(view.stageIndex) ? view.stageIndex : 0;
+  const phaseLabels = vi
+    ? ["Odd next", "Even next", "DP từ phải", "Đếm start"]
+    : ["Odd next", "Even next", "DP from right", "Count starts"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < stageIndex ? "done" : index === stageIndex ? "active" : ""}"><b>${index < stageIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const endpoint = (target) => target >= 0 ? `${target} : ${nums[target]}` : "—";
+  const booleanCell = (known, value) => known ? `<b class="${value ? "yes" : "no"}">${value ? "True" : "False"}</b>` : "<b class=\"unknown\">?</b>";
+  const cells = nums.map((value, index) => {
+    const classes = ["oe975-cell"];
+    if (index === current) classes.push("current");
+    if (index === popped) classes.push("linked");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (view.answer != null && oddGood[index]) classes.push("good-start");
+    return `<article class="${classes.join(" ")}">
+      <header><small>index</small><strong>${index}</strong></header>
+      <div class="oe975-value"><small>arr[${index}]</small><b>${escapeHtml(String(value))}</b></div>
+      <div class="oe975-next odd"><small>odd next</small><b>${escapeHtml(endpoint(oddNext[index] ?? -1))}</b></div>
+      <div class="oe975-next even"><small>even next</small><b>${escapeHtml(endpoint(evenNext[index] ?? -1))}</b></div>
+      <div class="oe975-dp"><span><small>odd</small>${booleanCell(Boolean(oddKnown[index]), Boolean(oddGood[index]))}</span><span><small>even</small>${booleanCell(Boolean(evenKnown[index]), Boolean(evenGood[index]))}</span></div>
+    </article>`;
+  }).join("");
+  const isBuilding = view.jumpType === "odd" || view.jumpType === "even";
+  const jumpName = view.jumpType === "even" ? "even" : "odd";
+  const rule = view.jumpType === "even"
+    ? (vi ? "Even jump: chọn value LỚN NHẤT ≤ arr[i], hòa thì index nhỏ nhất." : "Even jump: choose the LARGEST value ≤ arr[i], then the smallest index.")
+    : (vi ? "Odd jump: chọn value NHỎ NHẤT ≥ arr[i], hòa thì index nhỏ nhất." : "Odd jump: choose the SMALLEST value ≥ arr[i], then the smallest index.");
+  const orderText = order.length ? order.map((index) => `${index}:${nums[index]}`).join("  →  ") : "—";
+  const stackText = stack.length ? stack.map((index) => `${index}:${nums[index]}`).join(" · ") : "[]";
+  const dpFormula = current >= 0 && view.phase === "odd-dp"
+    ? (oddNext[current] < 0 ? `odd[${current}] = False (no odd next)` : `odd[${current}] = even[${oddNext[current]}] = ${oddGood[current]}`)
+    : current >= 0 && view.phase === "even-dp"
+      ? (evenNext[current] < 0 ? `even[${current}] = False (no even next)` : `even[${current}] = odd[${evenNext[current]}] = ${evenGood[current]}`)
+      : (vi ? "Mỗi trạng thái lấy kết quả của trạng thái đối nghịch tại điểm đến." : "Each state takes the opposite-jump result at its destination.");
+  const startIndices = oddGood.map((good, index) => good ? index : -1).filter((index) => index >= 0);
+  const final = view.answer != null;
+  const action = view.action || (isBuilding
+    ? (vi ? `Đang dựng ${jumpName} next bằng stack.` : `Building ${jumpName} next with the stack.`)
+    : (vi ? "Đang tính trạng thái DP." : "Computing DP states."));
+
+  $("treeView").innerHTML = `<section class="oe975-viz" role="img" aria-label="Odd Even Jump visualization">
+    <header><div><small>MONOTONIC STACK + DP · #975</small><strong>ODD EVEN JUMP</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="oe975-phases">${phases}</div>
+    <section class="oe975-rule"><b>${isBuilding ? `${jumpName.toUpperCase()} JUMP RULE` : (vi ? "Ý NGHĨA DP" : "DP MEANING")}</b><strong>${escapeHtml(isBuilding ? rule : "odd[i] = even[oddNext[i]]   ·   even[i] = odd[evenNext[i]]")}</strong><span>${vi ? "Mỗi card cho biết điểm đến ưu tiên và liệu có thể tới index cuối hay không." : "Each card shows the preferred destination and whether it can reach the last index."}</span></section>
+    <section class="oe975-stack-wrap"><header><strong>${isBuilding ? (vi ? `THỨ TỰ SORT CHO ${jumpName.toUpperCase()} JUMP` : `SORTED ORDER FOR ${jumpName.toUpperCase()} JUMP`) : (vi ? "DP QUÉT TỪ PHẢI SANG TRÁI" : "DP SCANS RIGHT TO LEFT")}</strong><span>${isBuilding ? (vi ? "index:value" : "index:value") : (vi ? "điểm đến luôn ở bên phải" : "destinations are always to the right")}</span></header><code>${escapeHtml(isBuilding ? orderText : nums.map((value, index) => `${index}:${value}`).join("  ←  "))}</code><div><small>${vi ? "STACK HIỆN TẠI" : "CURRENT STACK"}</small><strong>${escapeHtml(isBuilding ? stackText : "—")}</strong></div></section>
+    <section class="oe975-grid-wrap"><header><strong>${vi ? "BẢNG INDEX" : "INDEX TABLE"}</strong><span>${vi ? "xanh = odd next · cam = even next · tím = index đang xét" : "blue = odd next · orange = even next · purple = current index"}</span></header><div class="oe975-grid" style="--oe975-count:${Math.max(nums.length, 1)}">${cells}</div></section>
+    <section class="oe975-formula ${view.phase === "odd-dp" || view.phase === "even-dp" ? "active" : ""}"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(isBuilding ? action : dpFormula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="oe975-result ${final ? "done" : ""}"><small>${vi ? "GOOD START INDICES" : "GOOD START INDICES"}</small><strong>${final ? `${view.answer}  ·  { ${startIndices.join(", ")} }` : "…"}</strong><span>${final ? (vi ? "Chỉ odd[i] = True được phép bắt đầu, vì jump đầu tiên là odd jump." : "Only odd[i] = True can start, because the first jump is odd.") : (vi ? "Màu xanh lá chỉ xuất hiện sau khi đã hoàn tất đếm." : "Green starts appear after the count is complete.")}</span></footer>
+  </section>`;
+}
+
+function renderValidSubarrays1063View(step) {
+  const view = step.validSubarrays1063View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const contributions = Array.isArray(view.contributions) ? view.contributions : [];
+  const starts = Array.isArray(view.currentStarts) ? view.currentStarts : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi ? ["Duy trì stack", "Cộng contribution", "Kết quả"] : ["Maintain stack", "Add contribution", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const cells = nums.map((value, index) => {
+    const contribution = contributions[index];
+    const classes = ["vs1063-cell"];
+    if (index === current) classes.push("current");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (index === popped) classes.push("popped");
+    if (starts.includes(index)) classes.push("valid-start");
+    return `<article class="${classes.join(" ")}">
+      <header><small>index</small><strong>${index}</strong></header>
+      <div class="vs1063-value"><small>nums[${index}]</small><b>${escapeHtml(String(value))}</b></div>
+      <div class="vs1063-status"><small>${stack.includes(index) ? (vi ? "trong stack" : "in stack") : index === popped ? (vi ? "đã pop" : "popped") : (vi ? "không hoạt động" : "inactive")}</small><b>${stack.includes(index) ? "✓" : index === popped ? "×" : "·"}</b></div>
+      <div class="vs1063-add"><small>${vi ? "contribution" : "contribution"}</small><b>${Number.isInteger(contribution) ? `+${contribution}` : "?"}</b></div>
+    </article>`;
+  }).join("");
+  const stackText = stack.length ? stack.map((index) => `${index}:${nums[index]}`).join("  →  ") : "[]";
+  const ranges = current >= 0 && starts.length
+    ? starts.map((start) => `<span><b>[${start}..${current}]</b><small>${nums.slice(start, current + 1).join(", ")}</small></span>`).join("")
+    : `<em>${vi ? "Push index hiện tại để tạo các range hợp lệ." : "Push the current index to create valid ranges."}</em>`;
+  let running = 0;
+  const contributionRows = nums.map((_, index) => {
+    const addition = contributions[index];
+    const known = Number.isInteger(addition);
+    if (known) running += addition;
+    return `<div class="${index === current ? "current" : ""}"><small>i = ${index}</small><b>${known ? `+${addition}` : "?"}</b><span>${known ? `sum = ${running}` : ""}</span></div>`;
+  }).join("");
+  const rule = vi
+    ? "nums[left] phải ≤ mọi phần tử trong nums[left..right]."
+    : "nums[left] must be ≤ every element in nums[left..right].";
+  const stepFormula = view.phase === "count" && current >= 0
+    ? `answer = ${view.answer - (contributions[current] ?? 0)} + ${contributions[current] ?? 0} = ${view.answer}`
+    : (view.action || (vi ? "Giữ stack theo thứ tự value không giảm." : "Keep the stack in non-decreasing value order."));
+  const isFinal = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="vs1063-viz" role="img" aria-label="Number of Valid Subarrays visualization">
+    <header><div><small>MONOTONIC STACK · #1063</small><strong>NUMBER OF VALID SUBARRAYS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="vs1063-phases">${phases}</div>
+    <section class="vs1063-rule"><b>${vi ? "KHI NÀO MỘT RANGE HỢP LỆ?" : "WHEN IS A RANGE VALID?"}</b><strong>${escapeHtml(rule)}</strong><span>${vi ? "Vì vậy, khi gặp value nhỏ hơn, mọi start có value lớn hơn phải bị loại khỏi stack." : "Therefore, when a smaller value appears, every start with a larger value must leave the stack."}</span></section>
+    <section class="vs1063-metrics"><div><small>right endpoint i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>value</small><strong>${current >= 0 ? nums[current] : "—"}</strong></div><div><small>len(stack)</small><strong>${stack.length}</strong></div><div class="answer"><small>answer</small><strong>${view.answer ?? 0}</strong></div></section>
+    <section class="vs1063-stack"><header><strong>${vi ? "MONOTONIC STACK (INDEX : VALUE)" : "MONOTONIC STACK (INDEX : VALUE)"}</strong><span>${vi ? "từ đáy → đỉnh" : "bottom → top"}</span></header><code>${escapeHtml(stackText)}</code><p>${vi ? "Mỗi index trong stack là một start index vẫn có thể tạo valid subarray tới right endpoint hiện tại." : "Each index in the stack is a start index that can still form a valid subarray to the current right endpoint."}</p></section>
+    <section class="vs1063-grid-wrap"><header><strong>${vi ? "ARRAY + ĐÓNG GÓP" : "ARRAY + CONTRIBUTION"}</strong><span>${vi ? "tím = current · xanh = start hợp lệ · đỏ = vừa pop" : "purple = current · blue = valid start · red = just popped"}</span></header><div class="vs1063-grid" style="--vs1063-count:${Math.max(nums.length, 1)}">${cells}</div></section>
+    <section class="vs1063-ranges"><header><strong>${vi ? `VALID SUBARRAY KẾT THÚC Ở i = ${current >= 0 ? current : "—"}` : `VALID SUBARRAYS ENDING AT i = ${current >= 0 ? current : "—"}`}</strong><span>${starts.length ? `${starts.length} ${vi ? "range" : "range(s)"}` : ""}</span></header><div>${ranges}</div></section>
+    <section class="vs1063-contributions"><header><strong>${vi ? "CỘNG DỒN THEO RIGHT ENDPOINT" : "ACCUMULATED BY RIGHT ENDPOINT"}</strong><span>${vi ? "mỗi +k là len(stack) sau khi push" : "each +k is len(stack) after push"}</span></header><div>${contributionRows}</div></section>
+    <section class="vs1063-formula"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(stepFormula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="vs1063-result ${isFinal ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${isFinal ? view.answer : "…"}</strong><span>${isFinal ? (vi ? "Tổng tất cả contribution là số valid subarray." : "The sum of all contributions is the number of valid subarrays.") : (vi ? "answer sẽ được cập nhật sau khi stack hợp lệ." : "answer is updated after the stack is valid.")}</span></footer>
+  </section>`;
+}
+
+function renderMinIncrements1526View(step) {
+  const view = step.minIncrements1526View || {};
+  const vi = lang === "vi";
+  const target = Array.isArray(view.target) ? view.target : [];
+  const contributions = Array.isArray(view.contributions) ? view.contributions : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const previous = Number.isFinite(view.previous) ? view.previous : 0;
+  const delta = Number.isFinite(view.delta) ? view.delta : 0;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi ? ["Layer đầu tiên", "Chỉ cộng khi tăng", "Đáp án"] : ["First layers", "Add only on rises", "Answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const maxHeight = Math.max(1, ...target);
+  const bars = target.map((value, index) => {
+    const isProcessed = contributions[index] != null;
+    const layers = Array.from({ length: maxHeight }, (_, offset) => {
+      const level = maxHeight - offset;
+      const filled = level <= value;
+      const newLayer = index === current && filled && level > previous;
+      return `<i class="${filled ? "filled" : ""} ${isProcessed ? "known" : ""} ${newLayer ? "new" : ""}">${filled ? level : ""}</i>`;
+    }).join("");
+    const classes = ["mi1526-bar"];
+    if (index === current) classes.push("current");
+    if (isProcessed) classes.push("processed");
+    return `<article class="${classes.join(" ")}"><header><small>index</small><strong>${index}</strong></header><div class="mi1526-layers">${layers}</div><footer><small>target</small><b>${value}</b></footer></article>`;
+  }).join("");
+  const activeLayers = current >= 0
+    ? Array.from({ length: target[current] }, (_, offset) => {
+      const level = offset + 1;
+      const isNew = level > previous;
+      return `<span class="${isNew ? "new" : "continue"}"><b>L${level}</b><small>${isNew ? (vi ? `bắt đầu tại i=${current}` : `starts at i=${current}`) : (vi ? "kéo dài từ trái" : "continues from left")}</small></span>`;
+    }).join("") || `<em>${vi ? "Không có layer nào tại index này." : "There are no layers at this index."}</em>`
+    : `<em>${vi ? "Chọn một index để xem các layer." : "Select an index to inspect its layers."}</em>`;
+  let running = 0;
+  const contributionsHtml = target.map((_, index) => {
+    const value = contributions[index];
+    const known = Number.isInteger(value);
+    if (known) running += value;
+    return `<div class="${index === current ? "current" : ""}"><small>i = ${index}</small><b>${known ? (value > 0 ? `+${value}` : "+0") : "?"}</b><span>${known ? `sum = ${running}` : ""}</span></div>`;
+  }).join("");
+  const formula = current === 0 && view.phase === "init"
+    ? `answer = target[0] = ${target[0]}`
+    : view.phase === "add"
+      ? `answer = ${view.answer - delta} + (${target[current]} − ${previous}) = ${view.answer}`
+      : view.phase === "check" && current >= 0
+        ? delta > 0 ? `target[${current}] − target[${current - 1}] = ${target[current]} − ${previous} = +${delta}` : `target[${current}] ≤ target[${current - 1}] → +0 new layers`
+        : view.action || (vi ? "Các layer hiện có có thể tiếp tục sang phải." : "Existing layers can continue to the right.");
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="mi1526-viz" role="img" aria-label="Minimum Number of Increments visualization">
+    <header><div><small>GREEDY · LAYER COUNTING · #1526</small><strong>MINIMUM SUBARRAY INCREMENTS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mi1526-phases">${phases}</div>
+    <section class="mi1526-rule"><b>${vi ? "QUY TẮC GREEDY" : "GREEDY RULE"}</b><strong>answer = target[0] + Σ max(0, target[i] − target[i−1])</strong><span>${vi ? "Layer cũ được kéo dài qua i miễn là target[i] không đòi hỏi chiều cao lớn hơn target[i−1]." : "Old layers extend through i as long as target[i] does not demand more height than target[i−1]."}</span></section>
+    <section class="mi1526-metrics"><div><small>i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>previous height</small><strong>${current >= 0 ? previous : "—"}</strong></div><div><small>target[i]</small><strong>${current >= 0 ? target[current] : "—"}</strong></div><div class="delta ${delta > 0 ? "rise" : ""}"><small>new layers</small><strong>${current >= 0 ? (delta > 0 ? `+${delta}` : "+0") : "—"}</strong></div><div class="answer"><small>answer</small><strong>${view.answer ?? 0}</strong></div></section>
+    <section class="mi1526-chart"><header><strong>${vi ? "CÁC LAYER CỦA TARGET" : "TARGET LAYERS"}</strong><span>${vi ? "xanh lá = layer mới ở index hiện tại · tím = index đang xét" : "green = new layer at current index · purple = current index"}</span></header><div class="mi1526-bars" style="--mi1526-count:${Math.max(target.length, 1)}">${bars}</div></section>
+    <section class="mi1526-active"><header><strong>${vi ? `LAYER ĐANG PHỦ INDEX ${current >= 0 ? current : "—"}` : `LAYERS COVERING INDEX ${current >= 0 ? current : "—"}`}</strong><span>${current >= 0 ? `${target[current]} ${vi ? "layer" : "layer(s)"}` : ""}</span></header><div>${activeLayers}</div></section>
+    <section class="mi1526-contributions"><header><strong>${vi ? "ĐÓNG GÓP VÀO ĐÁP ÁN" : "ANSWER CONTRIBUTIONS"}</strong><span>${vi ? "chỉ positive rise mới làm tổng tăng" : "only positive rises increase the total"}</span></header><div>${contributionsHtml}</div></section>
+    <section class="mi1526-formula"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="mi1526-result ${final ? "done" : ""}"><small>${vi ? "SỐ OPERATION ÍT NHẤT" : "MINIMUM OPERATIONS"}</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "Mỗi layer mới tương ứng với đúng một operation subarray phải mở thêm." : "Every new layer corresponds to exactly one additional subarray operation.") : (vi ? "Đếm layer mới tại mỗi rise để hoàn tất đáp án." : "Count new layers at each rise to complete the answer.")}</span></footer>
+  </section>`;
+}
+
+function renderCarFleet1776View(step) {
+  const view = step.carFleet1776View || {};
+  const vi = lang === "vi";
+  const cars = Array.isArray(view.cars) ? view.cars : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const resolved = Array.isArray(view.resolved) ? view.resolved : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const candidate = Number.isInteger(view.candidate) ? view.candidate : -1;
+  const potential = Number.isFinite(view.potential) && view.potential >= 0 ? view.potential : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi ? ["Khởi tạo", "Lọc fleet bằng stack", "Collision time"] : ["Initialize", "Filter fleets with stack", "Collision times"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const timeText = (value) => value < 0 || !Number.isFinite(value) ? "−1" : Number(value.toFixed(3)).toString();
+  const positions = cars.map(([position]) => position);
+  const minPosition = positions.length ? Math.min(...positions) : 0;
+  const maxPosition = positions.length ? Math.max(...positions) : minPosition + 1;
+  const span = Math.max(1, maxPosition - minPosition);
+  const roadCars = cars.map(([position, speed], index) => {
+    const left = 4 + ((position - minPosition) / span) * 92;
+    const classes = ["cf1776-road-car"];
+    if (index === current) classes.push("current");
+    if (index === candidate) classes.push("candidate");
+    if (stack.includes(index)) classes.push("in-stack");
+    return `<div class="${classes.join(" ")}" style="left:${left.toFixed(2)}%"><b>C${index}</b><small>p ${position} · v ${speed}</small></div>`;
+  }).join("");
+  const carCards = cars.map(([position, speed], index) => {
+    const classes = ["cf1776-car-card"];
+    if (index === current) classes.push("current");
+    if (index === candidate) classes.push("candidate");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (resolved[index]) classes.push(answer[index] >= 0 ? "will-hit" : "no-hit");
+    const collision = resolved[index] ? timeText(answer[index]) : "?";
+    return `<article class="${classes.join(" ")}"><header><small>CAR</small><strong>C${index}</strong></header><div><small>position</small><b>${position}</b></div><div><small>speed</small><b>${speed}</b></div><footer><small>${vi ? "collision time" : "collision time"}</small><b>${collision}</b></footer></article>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((index) => `<span class="${index === candidate ? "top" : ""}"><b>C${index}</b><small>p=${cars[index][0]} · v=${cars[index][1]}</small></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack trống" : "Stack is empty"}</em>`;
+  const reasonText = view.reason === "too-slow"
+    ? (vi ? `speed(C${current}) ≤ speed(C${candidate}): không thể bắt kịp → pop candidate.` : `speed(C${current}) ≤ speed(C${candidate}): cannot catch → pop candidate.`)
+    : view.reason === "candidate-collides-first"
+      ? (vi ? `C${candidate} va chạm ở t=${timeText(answer[candidate])} trước khi C${current} tới ở t=${timeText(potential)} → pop.` : `C${candidate} collides at t=${timeText(answer[candidate])} before C${current} arrives at t=${timeText(potential)} → pop.`)
+      : view.reason === "valid"
+        ? (vi ? `C${candidate} vẫn tồn tại đến t=${timeText(potential)} → đây là fleet va chạm đầu tiên.` : `C${candidate} still exists at t=${timeText(potential)} → it is the first collision fleet.`)
+        : view.reason === "collision"
+          ? (vi ? `C${current} bắt C${candidate} tại t=${timeText(potential)}.` : `C${current} catches C${candidate} at t=${timeText(potential)}.`)
+          : view.reason === "continue"
+            ? (vi ? "Tiếp tục kiểm tra candidate kế tiếp trên stack." : "Continue with the next stack candidate.")
+            : (view.reason || (vi ? "Quét từ phải sang trái để fleet phía trước được giải trước." : "Scan right-to-left so front fleets are solved first."));
+  const decisionClass = ["too-slow", "candidate-collides-first"].includes(view.reason) ? "reject" : ["valid", "collision"].includes(view.reason) ? "accept" : "";
+  const answerRows = cars.map((_, index) => `<div class="${index === current ? "current" : ""}"><small>C${index}</small><b>${resolved[index] ? timeText(answer[index]) : "?"}</b><span>${resolved[index] ? (answer[index] < 0 ? (vi ? "không va chạm" : "no collision") : `t = ${timeText(answer[index])}`) : (vi ? "chưa xử lý" : "pending")}</span></div>`).join("");
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="cf1776-viz" role="img" aria-label="Car Fleet II visualization">
+    <header><div><small>MONOTONIC STACK · COLLISION TIMES · #1776</small><strong>CAR FLEET II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cf1776-phases">${phases}</div>
+    <section class="cf1776-rule"><b>${vi ? "QUY TẮC LOẠI CANDIDATE" : "CANDIDATE ELIMINATION RULE"}</b><strong>pop j if speed[i] ≤ speed[j]  OR  catch(i,j) ≥ answer[j]</strong><span>${vi ? "Candidate bị loại khi không thể bị bắt kịp, hoặc nó nhập fleet khác trước khi xe hiện tại tới." : "Discard a candidate when it cannot be caught, or when it joins another fleet before the current car reaches it."}</span></section>
+    <section class="cf1776-road"><header><strong>${vi ? "ĐƯỜNG: POSITION TĂNG SANG PHẢI" : "ROAD: POSITION INCREASES TO THE RIGHT"}</strong><span>${vi ? "tím = current · cam = candidate · xanh = trong stack" : "purple = current · amber = candidate · blue = in stack"}</span></header><div class="cf1776-road-line"><i></i>${roadCars}</div></section>
+    <section class="cf1776-metrics"><div><small>current car</small><strong>${current >= 0 ? `C${current}` : "—"}</strong></div><div><small>candidate</small><strong>${candidate >= 0 ? `C${candidate}` : "—"}</strong></div><div><small>potential catch</small><strong>${potential >= 0 ? `t = ${timeText(potential)}` : "—"}</strong></div><div><small>stack size</small><strong>${stack.length}</strong></div></section>
+    <section class="cf1776-stack"><header><strong>${vi ? "STACK FLEET CÒN ỨNG VIÊN" : "STACK OF REMAINING FLEET CANDIDATES"}</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header><div>${stackHtml}</div></section>
+    <section class="cf1776-cars"><header><strong>${vi ? "TRẠNG THÁI TỪNG XE" : "CAR STATES"}</strong><span>${vi ? "t = thời điểm va chạm đầu tiên" : "t = first collision time"}</span></header><div class="cf1776-car-grid" style="--cf1776-count:${Math.max(cars.length, 1)}">${carCards}</div></section>
+    <section class="cf1776-decision ${decisionClass}"><small>${vi ? "QUYẾT ĐỊNH HIỆN TẠI" : "CURRENT DECISION"}</small><strong>${escapeHtml(reasonText)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="cf1776-answer"><header><strong>${vi ? "ANSWER THEO CAR" : "ANSWER BY CAR"}</strong><span>${vi ? "−1 = không va chạm" : "−1 = no collision"}</span></header><div>${answerRows}</div></section>
+    <footer class="cf1776-result ${final ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${final ? `[${answer.map(timeText).join(", ")}]` : "…"}</strong><span>${final ? (vi ? "Mỗi giá trị là collision time đầu tiên, làm tròn để hiển thị." : "Each value is the first collision time, rounded for display.") : (vi ? "Từng collision time được xác định khi quét ngược qua các xe." : "Collision times are resolved while scanning backward through the cars.")}</span></footer>
+  </section>`;
+}
+
 function renderCriticalPoints2058View(step) {
   const view = step.criticalPoints2058View || {};
   const vi = lang === "vi";
@@ -25232,6 +25543,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSubsets78BitmaskView(step);
+  } else if (step.oddEven975View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderOddEven975View(step);
+  } else if (step.validSubarrays1063View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderValidSubarrays1063View(step);
+  } else if (step.minIncrements1526View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinIncrements1526View(step);
+  } else if (step.stable3903View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStable3903View(step);
   } else if (step.criticalPoints2058View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

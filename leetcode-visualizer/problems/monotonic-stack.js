@@ -2059,10 +2059,168 @@ function oddEvenJump(nums) {
   return odd.filter(Boolean).length;
 }
 
+function buildSteps975(input) {
+  const nums = parseNums(input, "arr");
+  const n = nums.length;
+  if (n < 1 || n > 9) throw new Error("Use 1 to 9 integers for this visualization.");
+  const oddNext = Array(n).fill(-1);
+  const evenNext = Array(n).fill(-1);
+  const oddGood = Array(n).fill(false);
+  const evenGood = Array(n).fill(false);
+  const oddKnown = Array(n).fill(false);
+  const evenKnown = Array(n).fill(false);
+  const steps = [];
+  const stages = [
+    { vi: "1. Odd next", en: "1. Odd next" },
+    { vi: "2. Even next", en: "2. Even next" },
+    { vi: "3. DP từ phải", en: "3. DP from right" },
+    { vi: "4. Đếm start", en: "4. Count starts" },
+  ];
+  const bits = (index) => index < 0 ? "—" : `${index}:${nums[index]}`;
+  const snapshot = ({ phase, line, jumpType = null, order = [], stack = [], current = -1, popped = -1, action = "", final = false, answer = null, title, note }) => {
+    const nextForType = jumpType === "odd" ? oddNext : jumpType === "even" ? evenNext : [];
+    const stageIndex = ["odd-call", "odd-init", "odd-order", "odd-while", "odd-link", "odd-push", "odd-return", "odd-ready"].includes(phase) ? 0
+      : ["even-call", "even-init", "even-order", "even-while", "even-link", "even-push", "even-return", "even-ready"].includes(phase) ? 1
+        : ["dp-init", "terminal", "dp-loop", "odd-dp", "even-dp"].includes(phase) ? 2 : 3;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...nums],
+      sub: nums.map((_, index) => index),
+      highlight: current >= 0 ? [current] : [],
+      mark: answer == null ? [] : oddGood.map((good, index) => good ? index : -1).filter((index) => index >= 0),
+      codeLines: [line],
+      vars: [
+        { name: "current", value: bits(current) },
+        { name: "stack", value: `[${stack.map(bits).join(", ")}]` },
+        { name: "odd next", value: `[${oddNext.join(", ")}]` },
+        { name: "even next", value: `[${evenNext.join(", ")}]` },
+      ],
+      oddEven975View: {
+        nums: [...nums], oddNext: [...oddNext], evenNext: [...evenNext], oddGood: [...oddGood], evenGood: [...evenGood], oddKnown: [...oddKnown], evenKnown: [...evenKnown],
+        stages, stageIndex, phase, jumpType, order: [...order], stack: [...stack], current, popped, action, answer,
+        nextForType: [...nextForType],
+      },
+    });
+  };
+
+  snapshot({ phase: "setup", line: 1, title: text("Tạo lớp Solution", "Create the Solution class"), note: text("Bài toán cần đếm các index có thể tới cuối mảng khi jump đầu tiên là odd jump.", "The task is to count indices that can reach the end when the first jump is odd.") });
+  snapshot({ phase: "setup", line: 2, title: text(`Nhận arr có ${n} phần tử`, `Receive arr with ${n} values`), note: text("Mỗi index vừa có một trạng thái odd vừa có một trạng thái even, vì lượt jump kế tiếp thay đổi.", "Each index has both an odd and an even state because the next jump type alternates.") });
+  snapshot({ phase: "setup", line: 3, title: text(`n = ${n}`, `n = ${n}`), note: text("Odd jump chọn giá trị nhỏ nhất ≥ hiện tại; even jump chọn giá trị lớn nhất ≤ hiện tại. Nếu bằng nhau, chọn index nhỏ nhất.", "Odd jump chooses the smallest value ≥ current; even jump chooses the largest value ≤ current. Ties use the smallest index.") });
+
+  const makeNext = (jumpType, order, target, callLine) => {
+    const name = jumpType === "odd" ? "Odd" : "Even";
+    const stack = [];
+    snapshot({ phase: `${jumpType}-call`, line: 4, jumpType, order, stack, title: text(`${name}: gọi make_next`, `${name}: call make_next`), note: text("Dùng thứ tự sort để stack nối mỗi index với index bên phải hợp lệ gần nhất.", "Use a sorted order so the stack links each index to the nearest valid index on its right.") });
+    snapshot({ phase: `${jumpType}-init`, line: 5, jumpType, order, stack, title: text(`${name}: nxt = [-1] × n, stack = []`, `${name}: nxt = [-1] × n, stack = []`), note: text("-1 nghĩa là chưa có điểm đến hợp lệ.", "-1 means that no valid destination has been found yet.") });
+    for (const index of order) {
+      snapshot({ phase: `${jumpType}-order`, line: 6, jumpType, order, stack, current: index, title: text(`${name}: xét index ${index} (value ${nums[index]})`, `${name}: inspect index ${index} (value ${nums[index]})`), note: text("Order đã sort theo value, rồi index, để bảo đảm đúng luật chọn jump.", "The order is sorted by value then index, which enforces this jump rule.") });
+      while (stack.length) {
+        const top = stack.at(-1);
+        const willLink = index > top;
+        snapshot({ phase: `${jumpType}-while`, line: 7, jumpType, order, stack, current: index, action: willLink ? `${index} > ${top}` : `${index} ≤ ${top}`, title: text(willLink ? `${index} ở bên phải ${top} → nối` : `${index} không ở bên phải ${top} → dừng pop`, willLink ? `${index} is right of ${top} → link` : `${index} is not right of ${top} → stop popping`), note: text(willLink ? "Index hiện tại là điểm đến đầu tiên hợp lệ của đỉnh stack." : "Không thể dùng index hiện tại để nối đỉnh stack.", willLink ? "The current index is the first valid destination for the stack top." : "The current index cannot link the stack top.") });
+        if (!willLink) break;
+        const from = stack.pop();
+        target[from] = index;
+        snapshot({ phase: `${jumpType}-link`, line: 8, jumpType, order, stack, current: index, popped: from, action: `${from} → ${index}`, title: text(`${name} next[${from}] = ${index}`, `${name} next[${from}] = ${index}`), note: text(`Từ index ${from} (value ${nums[from]}) sẽ nhảy đến ${index} (value ${nums[index]}).`, `Index ${from} (value ${nums[from]}) jumps to ${index} (value ${nums[index]}).`) });
+      }
+      stack.push(index);
+      snapshot({ phase: `${jumpType}-push`, line: 9, jumpType, order, stack, current: index, title: text(`push ${index} vào stack`, `push ${index} onto stack`), note: text("Chờ một index lớn hơn xuất hiện ở bên phải để hoàn tất next jump.", "Wait for a larger index on the right to complete this next jump.") });
+    }
+    snapshot({ phase: `${jumpType}-return`, line: 10, jumpType, order, stack, title: text(`return ${name.toLowerCase()} next`, `return ${name.toLowerCase()} next`), note: text("Các index còn trên stack không có điểm đến hợp lệ.", "Indices left in the stack have no valid destination.") });
+    snapshot({ phase: `${jumpType}-ready`, line: callLine, jumpType, order, stack, title: text(`${name} next đã sẵn sàng`, `${name} next is ready`), note: text(`next = [${target.join(", ")}].`, `next = [${target.join(", ")}].`) });
+  };
+
+  const oddOrder = Array.from({ length: n }, (_, index) => index).sort((left, right) => nums[left] - nums[right] || left - right);
+  makeNext("odd", oddOrder, oddNext, 11);
+  const evenOrder = Array.from({ length: n }, (_, index) => index).sort((left, right) => nums[right] - nums[left] || left - right);
+  makeNext("even", evenOrder, evenNext, 12);
+
+  snapshot({ phase: "dp-init", line: 13, title: text("Khởi tạo odd = False", "Initialize odd = False"), note: text("odd[i] nghĩa là bắt đầu tại i bằng odd jump có thể tới cuối.", "odd[i] means starting at i with an odd jump can reach the end.") });
+  snapshot({ phase: "dp-init", line: 14, title: text("Khởi tạo even = False", "Initialize even = False"), note: text("even[i] lưu khả năng tới cuối khi lượt jump tiếp theo là even.", "even[i] stores whether the end is reachable when the next jump is even.") });
+  oddGood[n - 1] = true;
+  evenGood[n - 1] = true;
+  oddKnown[n - 1] = true;
+  evenKnown[n - 1] = true;
+  snapshot({ phase: "terminal", line: 15, current: n - 1, title: text(`Index cuối ${n - 1} luôn tốt`, `Last index ${n - 1} is always good`), note: text("Đã đứng ở cuối mảng nên không cần nhảy nữa.", "Already at the end, so no jump is needed.") });
+  for (let index = n - 2; index >= 0; index--) {
+    snapshot({ phase: "dp-loop", line: 16, current: index, title: text(`DP tại index ${index}`, `DP at index ${index}`), note: text("Tính từ phải sang trái vì mọi điểm đến đều nằm bên phải.", "Compute right-to-left because every destination lies to the right.") });
+    oddGood[index] = oddNext[index] !== -1 && evenGood[oddNext[index]];
+    oddKnown[index] = true;
+    snapshot({ phase: "odd-dp", line: 17, current: index, jumpType: "odd", action: oddNext[index] === -1 ? "no odd next" : `odd[${index}] = even[${oddNext[index]}]`, title: text(`odd[${index}] = ${oddGood[index]}`, `odd[${index}] = ${oddGood[index]}`), note: text(oddNext[index] === -1 ? "Không có odd jump hợp lệ." : `Odd jump đi đến ${oddNext[index]}, sau đó cần even[${oddNext[index]}] = ${evenGood[oddNext[index]]}.`, oddNext[index] === -1 ? "There is no valid odd jump." : `The odd jump goes to ${oddNext[index]}, then requires even[${oddNext[index]}] = ${evenGood[oddNext[index]]}.`) });
+    evenGood[index] = evenNext[index] !== -1 && oddGood[evenNext[index]];
+    evenKnown[index] = true;
+    snapshot({ phase: "even-dp", line: 18, current: index, jumpType: "even", action: evenNext[index] === -1 ? "no even next" : `even[${index}] = odd[${evenNext[index]}]`, title: text(`even[${index}] = ${evenGood[index]}`, `even[${index}] = ${evenGood[index]}`), note: text(evenNext[index] === -1 ? "Không có even jump hợp lệ." : `Even jump đi đến ${evenNext[index]}, sau đó cần odd[${evenNext[index]}] = ${oddGood[evenNext[index]]}.`, evenNext[index] === -1 ? "There is no valid even jump." : `The even jump goes to ${evenNext[index]}, then requires odd[${evenNext[index]}] = ${oddGood[evenNext[index]]}.`) });
+  }
+  const answer = oddGood.filter(Boolean).length;
+  snapshot({ phase: "done", line: 19, final: true, answer, title: text(`Có ${answer} start index tốt`, `${answer} good start indices`), note: text(`Chỉ các index có odd[i]=True mới có thể bắt đầu bằng odd jump và đi tới cuối.`, `Only indices with odd[i]=True can start with an odd jump and reach the end.`) });
+  return { original: [...nums], answer, steps };
+}
+
 function minIncrementsTarget(nums) {
   let ans = nums[0] || 0;
   for (let i = 1; i < nums.length; i++) if (nums[i] > nums[i - 1]) ans += nums[i] - nums[i - 1];
   return ans;
+}
+
+function buildSteps1526(input) {
+  const target = parseNums(input, "target");
+  const n = target.length;
+  if (n < 1 || n > 10 || target.some((value) => value < 0 || value > 12)) {
+    throw new Error("Use 1 to 10 integers from 0 to 12 for this visualization.");
+  }
+  const contributions = Array(n).fill(null);
+  const steps = [];
+  let answer = target[0];
+  contributions[0] = target[0];
+
+  const snapshot = ({ phase, line, current = -1, previous = 0, delta = 0, action = "", final = false, title, note }) => {
+    const phaseIndex = ["setup", "init"].includes(phase) ? 0 : ["loop", "check", "add"].includes(phase) ? 1 : 2;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...target],
+      sub: target.map((_, index) => `index ${index}`),
+      highlight: current >= 0 ? [current] : [],
+      mark: contributions.map((value, index) => value != null && index !== current ? index : -1).filter((index) => index >= 0),
+      codeLines: [line],
+      vars: [
+        { name: "i", value: current >= 0 ? current : "—" },
+        { name: "previous", value: current >= 0 ? previous : "—" },
+        { name: "delta", value: current >= 0 ? delta : "—" },
+        { name: "answer", value: answer },
+      ],
+      minIncrements1526View: {
+        target: [...target], contributions: [...contributions], answer,
+        phase, phaseIndex, current, previous, delta, action,
+      },
+    });
+  };
+
+  snapshot({ phase: "setup", line: 1, title: text("Tạo lớp Solution", "Create the Solution class"), note: text("Mỗi operation chọn một subarray rồi tăng tất cả phần tử của nó thêm 1.", "Each operation chooses a subarray and increments every element in it by 1.") });
+  snapshot({ phase: "setup", line: 2, title: text(`Nhận target có ${n} phần tử`, `Receive target with ${n} values`), note: text("Ta xây target từ mảng toàn số 0 và đếm số operation ít nhất.", "Build target from an all-zero array and count the fewest operations.") });
+  snapshot({ phase: "init", line: 3, current: 0, previous: 0, delta: target[0], action: `answer = ${target[0]}`, title: text(`answer = target[0] = ${target[0]}`, `answer = target[0] = ${target[0]}`), note: text(`Cần ${target[0]} layer operation mới để nâng phần tử đầu từ 0 lên ${target[0]}.`, `Need ${target[0]} new operation layers to raise the first value from 0 to ${target[0]}.`) });
+
+  for (let current = 1; current < n; current++) {
+    const previous = target[current - 1];
+    const delta = target[current] - previous;
+    snapshot({ phase: "loop", line: 4, current, previous, delta, action: `i = ${current}`, title: text(`Xét target[${current}] = ${target[current]}`, `Inspect target[${current}] = ${target[current]}`), note: text("Các layer đang có có thể tiếp tục phủ index này; chỉ chiều cao vượt previous mới cần operation mới.", "Existing layers can continue through this index; only height above previous needs new operations.") });
+    const isRise = target[current] > previous;
+    snapshot({ phase: "check", line: 5, current, previous, delta, action: `${target[current]} > ${previous} is ${isRise}`, title: text(isRise ? `${target[current]} > ${previous} → có rise` : `${target[current]} ≤ ${previous} → không thêm layer`, isRise ? `${target[current]} > ${previous} → a rise` : `${target[current]} ≤ ${previous} → no new layer`), note: text(isRise ? `Thiếu ${delta} layer ở index ${current}.` : "Các operation đã mở trước đó đủ để tạo chiều cao hiện tại; layer dư có thể kết thúc tại index trước.", isRise ? `${delta} new layers are missing at index ${current}.` : "Earlier operations already cover this height; extra layers can end at the previous index.") });
+    if (isRise) {
+      answer += delta;
+      contributions[current] = delta;
+      snapshot({ phase: "add", line: 6, current, previous, delta, action: `+${delta}`, title: text(`answer += ${delta} → ${answer}`, `answer += ${delta} → ${answer}`), note: text(`Bắt đầu ${delta} operation subarray mới tại index ${current}; chúng có thể kéo dài sang phải khi cần.`, `Start ${delta} new subarray operations at index ${current}; they can extend right when needed.`) });
+    } else {
+      contributions[current] = 0;
+    }
+  }
+
+  const last = n - 1;
+  snapshot({ phase: "done", line: 7, current: last, previous: last > 0 ? target[last - 1] : 0, delta: last > 0 ? target[last] - target[last - 1] : target[0], final: true, title: text(`return ${answer}`, `return ${answer}`), note: text("Tổng mọi positive rise (kể cả target[0] so với 0) là số operation tối thiểu.", "The sum of all positive rises, including target[0] above 0, is the minimum number of operations.") });
+  return { original: [...target], answer, steps };
 }
 
 function carFleetII(input) {
@@ -2084,6 +2242,96 @@ function carFleetII(input) {
     stack.push(i);
   }
   return ans.map((v) => v < 0 ? -1 : Number(v.toFixed(5)));
+}
+
+function buildSteps1776(input) {
+  const cars = parsePairs(input, "cars");
+  const n = cars.length;
+  if (n < 1 || n > 7 || cars.some(([position, speed], index) => position < 0 || speed < 1 || (index > 0 && position <= cars[index - 1][0]))) {
+    throw new Error("Use 1 to 7 cars as position,speed with strictly increasing non-negative positions and positive speeds.");
+  }
+  const answer = Array(n).fill(-1);
+  const resolved = Array(n).fill(false);
+  const stack = [];
+  const steps = [];
+  const timeText = (value) => value < 0 || !Number.isFinite(value) ? "—" : Number(value.toFixed(3)).toString();
+
+  const snapshot = ({ phase, line, current = -1, candidate = -1, potential = -1, reason = "", final = false, title, note }) => {
+    const phaseIndex = ["setup", "init"].includes(phase) ? 0 : ["scan", "candidate", "speed-check", "pop-speed", "time", "time-check", "pop-time", "break", "collision", "push"].includes(phase) ? 1 : 2;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: cars.map(([position]) => position),
+      sub: cars.map(([position, speed], index) => `car ${index} · p=${position} · v=${speed}`),
+      highlight: [current, candidate].filter((index) => index >= 0),
+      mark: resolved.map((known, index) => known ? index : -1).filter((index) => index >= 0),
+      codeLines: [line],
+      vars: [
+        { name: "i", value: current >= 0 ? `car ${current}` : "—" },
+        { name: "stack", value: `[${stack.map((index) => `C${index}`).join(", ")}]` },
+        { name: "collision", value: `[${answer.map(timeText).join(", ")}]` },
+      ],
+      carFleet1776View: {
+        cars: cars.map((car) => [...car]), answer: [...answer], resolved: [...resolved], stack: [...stack],
+        phase, phaseIndex, current, candidate, potential, reason,
+      },
+    });
+  };
+
+  snapshot({ phase: "setup", line: 1, title: text("Tạo lớp Solution", "Create the Solution class"), note: text("Với mỗi xe, tìm thời điểm nó đụng fleet đầu tiên phía trước; không va chạm thì trả về −1.", "For each car, find when it hits the first fleet ahead; return −1 if it never collides.") });
+  snapshot({ phase: "setup", line: 2, title: text(`Nhận ${n} xe theo position tăng dần`, `Receive ${n} cars in increasing position order`), note: text("Ta quét từ phải sang trái để collision time của các xe phía trước đã biết trước khi xét xe hiện tại.", "Scan right-to-left so collision times of front cars are known before processing the current car.") });
+  snapshot({ phase: "init", line: 3, title: text(`n = ${n}`, `n = ${n}`), note: text("Index lớn hơn nghĩa là xe nằm xa hơn về phía trước trên đường.", "A larger index means a car is farther ahead on the road.") });
+  snapshot({ phase: "init", line: 4, title: text("answer = [−1] × n", "answer = [−1] × n"), note: text("−1 là giá trị tạm thời: chưa biết hoặc không có collision.", "−1 is the temporary value for unknown or no collision.") });
+  snapshot({ phase: "init", line: 5, title: text("stack = []", "stack = []"), note: text("Stack giữ những fleet phía trước vẫn có thể là collision đầu tiên của xe bên trái.", "The stack keeps front fleets that can still be the first collision for a car on the left.") });
+
+  for (let current = n - 1; current >= 0; current--) {
+    const [position, speed] = cars[current];
+    snapshot({ phase: "scan", line: 6, current, title: text(`Quét car ${current} từ phải sang trái`, `Scan car ${current} from right to left`), note: text(`car ${current}: position ${position}, speed ${speed}.`, `car ${current}: position ${position}, speed ${speed}.`) });
+    snapshot({ phase: "scan", line: 7, current, title: text(`position = ${position}, speed = ${speed}`, `position = ${position}, speed = ${speed}`), note: text("Chỉ xe hiện tại nhanh hơn fleet phía trước mới có thể bắt kịp nó.", "The current car must be faster than a front fleet to catch it.") });
+    let handled = false;
+    while (stack.length) {
+      snapshot({ phase: "candidate", line: 8, current, candidate: stack.at(-1), title: text("Stack không rỗng → kiểm tra candidate", "Stack is non-empty → inspect candidate"), note: text("Đỉnh stack là fleet phía trước gần nhất còn có thể dùng.", "The stack top is the nearest remaining usable fleet ahead.") });
+      const candidate = stack.at(-1);
+      snapshot({ phase: "candidate", line: 9, current, candidate, title: text(`j = stack[-1] = car ${candidate}`, `j = stack[-1] = car ${candidate}`), note: text(`Candidate có position ${cars[candidate][0]}, speed ${cars[candidate][1]}.`, `The candidate has position ${cars[candidate][0]}, speed ${cars[candidate][1]}.`) });
+      if (speed <= cars[candidate][1]) {
+        snapshot({ phase: "speed-check", line: 10, current, candidate, reason: "too-slow", title: text(`${speed} ≤ ${cars[candidate][1]} → không thể bắt kịp`, `${speed} ≤ ${cars[candidate][1]} → cannot catch`), note: text("Xe hiện tại không nhanh hơn candidate; candidate không thể là collision của xe này hoặc xe nào xa hơn bên trái có tốc độ không phù hợp.", "The current car is not faster than the candidate, so this candidate cannot be its collision target.") });
+        stack.pop();
+        snapshot({ phase: "pop-speed", line: 11, current, candidate, reason: "too-slow", title: text(`pop car ${candidate}`, `pop car ${candidate}`), note: text("Bỏ candidate và thử fleet chậm hơn / xa hơn kế tiếp trên stack.", "Discard the candidate and try the next slower or farther fleet on the stack.") });
+        snapshot({ phase: "pop-speed", line: 12, current, candidate, reason: "continue", title: text("continue while", "continue while"), note: text("Quay lại kiểm tra đỉnh stack mới.", "Go back to inspect the new stack top.") });
+        continue;
+      }
+      const potential = (cars[candidate][0] - position) / (speed - cars[candidate][1]);
+      snapshot({ phase: "time", line: 13, current, candidate, potential, title: text(`t = ${timeText(potential)}`, `t = ${timeText(potential)}`), note: text(`Nếu candidate giữ speed hiện tại, car ${current} sẽ bắt kịp sau ${timeText(potential)} đơn vị thời gian.`, `If the candidate keeps its speed, car ${current} catches it after ${timeText(potential)} time units.`) });
+      const candidateCrashesFirst = answer[candidate] > 0 && potential >= answer[candidate];
+      snapshot({ phase: "time-check", line: 14, current, candidate, potential, reason: candidateCrashesFirst ? "candidate-collides-first" : "valid", title: text(candidateCrashesFirst ? `${timeText(potential)} ≥ collision[j] ${timeText(answer[candidate])} → pop` : "Candidate vẫn còn trước khi ta chạm nó", candidateCrashesFirst ? `${timeText(potential)} ≥ collision[j] ${timeText(answer[candidate])} → pop` : "The candidate still exists when we reach it"), note: text(candidateCrashesFirst ? `car ${candidate} đã đụng fleet khác tại t=${timeText(answer[candidate])}, trước hoặc đúng lúc car ${current} tới; cần bỏ nó để tìm fleet sau va chạm.` : "Thời điểm bắt kịp xảy ra trước collision của candidate (hoặc candidate không bao giờ va chạm), nên đây là fleet đầu tiên hợp lệ.", candidateCrashesFirst ? `car ${candidate} collides with another fleet at t=${timeText(answer[candidate])}, before or when car ${current} arrives; discard it to find the post-collision fleet.` : "Catch-up happens before the candidate's own collision (or it never collides), so this is the first valid fleet.") });
+      if (candidateCrashesFirst) {
+        stack.pop();
+        snapshot({ phase: "pop-time", line: 15, current, candidate, potential, reason: "candidate-collides-first", title: text(`pop car ${candidate}`, `pop car ${candidate}`), note: text("Candidate sẽ đổi thành fleet khác quá sớm, nên không còn là đích va chạm trực tiếp.", "The candidate joins another fleet too early, so it is no longer the direct collision target.") });
+        snapshot({ phase: "pop-time", line: 16, current, candidate, potential, reason: "continue", title: text("continue while", "continue while"), note: text("Tìm candidate kế tiếp phía trước.", "Find the next candidate ahead.") });
+        continue;
+      }
+      snapshot({ phase: "break", line: 17, current, candidate, potential, reason: "valid", title: text("break: tìm được collision đầu tiên", "break: first collision found"), note: text("Đỉnh stack hiện tại là fleet đầu tiên mà car hiện tại thực sự đụng.", "The current stack top is the first fleet the current car actually collides with.") });
+      handled = true;
+      break;
+    }
+    if (stack.length) {
+      const candidate = stack.at(-1);
+      snapshot({ phase: "collision", line: 18, current, candidate, title: text("Stack còn candidate", "A candidate remains on the stack"), note: text("Tính collision time với candidate này.", "Compute the collision time with this candidate.") });
+      snapshot({ phase: "collision", line: 19, current, candidate, title: text(`j = car ${candidate}`, `j = car ${candidate}`), note: text("Dùng tốc độ và position của hai xe / fleet này.", "Use the positions and speeds of these two cars/fleets.") });
+      const collisionTime = (cars[candidate][0] - position) / (speed - cars[candidate][1]);
+      answer[current] = Number(collisionTime.toFixed(5));
+      resolved[current] = true;
+      snapshot({ phase: "collision", line: 20, current, candidate, potential: collisionTime, reason: "collision", title: text(`answer[${current}] = ${timeText(collisionTime)}`, `answer[${current}] = ${timeText(collisionTime)}`), note: text(`car ${current} sẽ đụng fleet có car ${candidate} ở t=${timeText(collisionTime)}.`, `car ${current} hits the fleet containing car ${candidate} at t=${timeText(collisionTime)}.`) });
+    } else {
+      resolved[current] = true;
+    }
+    stack.push(current);
+    snapshot({ phase: "push", line: 21, current, candidate: handled ? stack.at(-2) : -1, title: text(`push car ${current} vào stack`, `push car ${current} onto stack`), note: text(answer[current] < 0 ? "Không có fleet chậm hơn hợp lệ phía trước, nên collision time là −1." : "Xe / fleet hiện tại trở thành candidate cho các xe phía sau bên trái.", answer[current] < 0 ? "No valid slower fleet remains ahead, so collision time is −1." : "This car/fleet now becomes a candidate for cars farther left.") });
+  }
+
+  snapshot({ phase: "done", line: 22, final: true, title: text("return answer", "return answer"), note: text("Mỗi answer[i] là thời điểm car i va chạm fleet đầu tiên phía trước, hoặc −1 nếu không va chạm.", "Each answer[i] is when car i collides with the first front fleet, or −1 if it never collides.") });
+  return { original: cars.flat(), answer: [...answer], steps };
 }
 
 function maximumScore(nums, params = {}) {
@@ -3510,6 +3758,68 @@ function validSubarrays(nums) {
   return ans;
 }
 
+function buildSteps1063(input) {
+  const nums = parseNums(input, "nums");
+  const n = nums.length;
+  if (n < 1 || n > 10) throw new Error("Use 1 to 10 integers for this visualization.");
+  const stack = [];
+  const contributions = Array(n).fill(null);
+  const steps = [];
+  let answer = 0;
+
+  const snapshot = ({ phase, line, current = -1, popped = -1, currentStarts = [], action = "", final = false, title, note }) => {
+    const phaseIndex = ["setup", "scan", "while", "pop", "push"].includes(phase) ? 0
+      : phase === "count" ? 1
+        : phase === "done" ? 2 : 0;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...nums],
+      sub: nums.map((_, index) => `index ${index}`),
+      highlight: current >= 0 ? [current] : [],
+      mark: stack.filter((index) => index !== current),
+      codeLines: [line],
+      vars: [
+        { name: "i", value: current >= 0 ? `${current} : ${nums[current]}` : "—" },
+        { name: "stack", value: `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]` },
+        { name: "answer", value: answer },
+      ],
+      validSubarrays1063View: {
+        nums: [...nums], stack: [...stack], contributions: [...contributions], answer,
+        phase, phaseIndex, current, popped, currentStarts: [...currentStarts], action,
+      },
+    });
+  };
+
+  snapshot({ phase: "setup", line: 1, title: text("Tạo lớp Solution", "Create the Solution class"), note: text("Đếm các subarray mà phần tử đầu tiên là giá trị nhỏ nhất trong subarray.", "Count subarrays whose first element is the smallest value in that subarray.") });
+  snapshot({ phase: "setup", line: 2, title: text(`Nhận nums có ${n} phần tử`, `Receive nums with ${n} values`), note: text("Ta quét từng right endpoint và đếm số left endpoint hợp lệ cho endpoint đó.", "Scan each right endpoint and count the valid left endpoints for it.") });
+  snapshot({ phase: "setup", line: 3, title: text("Khởi tạo stack = []", "Initialize stack = []"), note: text("Stack lưu index theo giá trị không giảm; mỗi index trong stack là một left endpoint còn hợp lệ.", "The stack stores indices in non-decreasing value order; each is still a valid left endpoint.") });
+  snapshot({ phase: "setup", line: 4, title: text("Khởi tạo answer = 0", "Initialize answer = 0"), note: text("answer sẽ cộng số valid subarray kết thúc tại từng index i.", "answer accumulates the valid subarrays ending at each index i.") });
+
+  for (let current = 0; current < n; current++) {
+    snapshot({ phase: "scan", line: 5, current, title: text(`Xét right endpoint i = ${current}`, `Inspect right endpoint i = ${current}`), note: text(`Mọi subarray mới đều kết thúc tại ${current} (value ${nums[current]}).`, `Every new subarray ends at ${current} (value ${nums[current]}).`) });
+    while (true) {
+      const top = stack.at(-1);
+      const shouldPop = top != null && nums[top] > nums[current];
+      snapshot({ phase: "while", line: 6, current, action: top == null ? "stack is empty" : `${nums[top]} > ${nums[current]} is ${shouldPop}`, title: text(shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Kiểm tra điều kiện pop", shouldPop ? `nums[${top}] = ${nums[top]} > ${nums[current]} = ${nums[current]} → pop` : "Check the pop condition"), note: text(top == null ? "Stack rỗng nên không còn left endpoint nào cần loại." : shouldPop ? `Index ${top} không thể là minimum của subarray kéo dài tới ${current}.` : `Đỉnh stack ${top} vẫn ≤ value hiện tại nên còn hợp lệ.`, top == null ? "The stack is empty, so no left endpoint remains to remove." : shouldPop ? `Index ${top} cannot be the minimum of a subarray extended to ${current}.` : `Stack top ${top} is still ≤ the current value, so it remains valid.`) });
+      if (!shouldPop) break;
+      const popped = stack.pop();
+      snapshot({ phase: "pop", line: 7, current, popped, action: `pop ${popped}:${nums[popped]}`, title: text(`pop index ${popped}`, `pop index ${popped}`), note: text(`Vì ${nums[popped]} > ${nums[current]}, subarray bắt đầu ở ${popped} sẽ không còn hợp lệ nếu kết thúc tại ${current}.`, `Because ${nums[popped]} > ${nums[current]}, a subarray starting at ${popped} is no longer valid when it ends at ${current}.`) });
+    }
+    stack.push(current);
+    const currentStarts = [...stack];
+    snapshot({ phase: "push", line: 8, current, currentStarts, action: `push ${current}:${nums[current]}`, title: text(`push index ${current}`, `push index ${current}`), note: text("Các index trong stack chính là các start index của valid subarray kết thúc tại i.", "Indices in the stack are exactly the start indices of valid subarrays ending at i.") });
+    const contribution = stack.length;
+    answer += contribution;
+    contributions[current] = contribution;
+    snapshot({ phase: "count", line: 9, current, currentStarts, action: `+${contribution}`, title: text(`answer += ${contribution} → ${answer}`, `answer += ${contribution} → ${answer}`), note: text(`${contribution} index trong stack tạo ${contribution} valid subarray kết thúc tại ${current}.`, `${contribution} indices in the stack create ${contribution} valid subarrays ending at ${current}.`) });
+  }
+
+  snapshot({ phase: "done", line: 10, final: true, title: text(`return ${answer}`, `return ${answer}`), note: text("Tổng các contribution chính là số valid subarray.", "The sum of all contributions is the number of valid subarrays.") });
+  return { original: [...nums], answer, steps };
+}
+
 function maximumBooks(nums) {
   let best = 0;
   for (let r = 0; r < nums.length; r++) {
@@ -4738,9 +5048,135 @@ module.exports = {
     liveArgs: (input) => [parseNums(input, "arr")],
     builder: buildSteps768,
   },
-  975: simpleProblem({ id: 975, difficulty: "hard", slug: "odd-even-jump", name: "Odd Even Jump", viName: "Nhảy chẵn lẻ", statement: text("Đếm start index có thể tới cuối bằng luật nhảy odd/even.", "Count starting indices that can reach the end using odd/even jump rules."), defaultInput: "10,13,12,14,15", solver: arrayBuilder(oddEvenJump) }),
-  1526: simpleProblem({ id: 1526, difficulty: "hard", slug: "minimum-number-of-increments-on-subarrays-to-form-a-target-array", name: "Minimum Number of Increments on Subarrays to Form a Target Array", viName: "Số increment subarray ít nhất", statement: text("Tạo target từ zero array bằng increment subarray ít nhất.", "Form target from a zero array using the fewest subarray increments."), defaultInput: "1,2,3,2,1", solver: arrayBuilder(minIncrementsTarget) }),
-  1776: simpleProblem({ id: 1776, difficulty: "hard", slug: "car-fleet-ii", name: "Car Fleet II", viName: "Đoàn xe II", statement: text("Với mỗi xe, tính thời điểm va chạm với xe phía trước.", "For each car, compute when it collides with a car ahead."), defaultInput: "1,2;2,1;4,3;7,2", inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"), solver: (input) => { const cars = parsePairs(input); const answer = carFleetII(input); return { original: cars.flat(), answer, steps: genericSteps({ nums: cars.map((p) => p[0]), title: text("Collision times", "Collision times"), answer, note: text("Stack giữ xe phía trước còn có thể là va chạm đầu tiên.", "The stack keeps front cars that can still be the first collision.") }) }; } }),
+  975: {
+    id: 975,
+    difficulty: "hard",
+    slug: "odd-even-jump",
+    category,
+    tags: [arrayTag, monoTag, { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" }],
+    title: text("Odd Even Jump"),
+    titleVi: text("Nhảy lẻ chẵn", "Odd Even Jump"),
+    statement: text(
+      "Từ index i, odd jump đi tới index j > i có arr[j] nhỏ nhất nhưng ≥ arr[i]; even jump đi tới arr[j] lớn nhất nhưng ≤ arr[i]. Nếu hòa, chọn j nhỏ nhất. Đếm các start index đi được đến cuối.",
+      "From index i, an odd jump goes to j > i with the smallest arr[j] that is ≥ arr[i]; an even jump goes to the largest arr[j] that is ≤ arr[i]. Break ties by the smallest j. Count starts that can reach the end.",
+    ),
+    defaultInput: "10,13,12,14,15",
+    inputKind: "string",
+    inputLabel: text("arr (cách bởi ,)", "arr (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Sort index theo value tăng (odd) hoặc giảm (even), rồi dùng monotonic stack để tạo điểm đến next bên phải.", "Sort indices by increasing value (odd) or decreasing value (even), then use a monotonic stack to construct the next destination to the right."),
+      text("oddNext[i] và evenNext[i] là chính xác điểm đến ưu tiên của mỗi loại jump; index còn lại trên stack không có điểm đến.", "oddNext[i] and evenNext[i] are the exact preferred destinations; indices left on the stack have no destination."),
+      text("DP từ phải sang trái: odd[i] cần even[oddNext[i]], còn even[i] cần odd[evenNext[i]].", "DP right-to-left: odd[i] requires even[oddNext[i]], while even[i] requires odd[evenNext[i]]."),
+    ],
+    complexity: { time: "O(n log n)", space: "O(n)", note: text("Hai lần sort tốn O(n log n); mỗi index vào và ra stack nhiều nhất một lần.", "The two sorts cost O(n log n); every index enters and exits a stack at most once.") },
+    code: [
+      "class Solution:",
+      "    def oddEvenJumps(self, arr):",
+      "        n = len(arr)",
+      "        def make_next(order):",
+      "            nxt, stack = [-1] * n, []",
+      "            for i in order:",
+      "                while stack and i > stack[-1]:",
+      "                    nxt[stack.pop()] = i",
+      "                stack.append(i)",
+      "            return nxt",
+      "        odd_next = make_next(sorted(range(n), key=lambda i: (arr[i], i)))",
+      "        even_next = make_next(sorted(range(n), key=lambda i: (-arr[i], i)))",
+      "        odd = [False] * n",
+      "        even = [False] * n",
+      "        odd[-1] = even[-1] = True",
+      "        for i in range(n - 2, -1, -1):",
+      "            odd[i] = odd_next[i] != -1 and even[odd_next[i]]",
+      "            even[i] = even_next[i] != -1 and odd[even_next[i]]",
+      "        return sum(odd)",
+    ],
+    liveArgs: (input) => [parseNums(input, "arr")],
+    builder: buildSteps975,
+  },
+  1526: {
+    id: 1526,
+    difficulty: "hard",
+    slug: "minimum-number-of-increments-on-subarrays-to-form-a-target-array",
+    category,
+    tags: [arrayTag, { key: "greedy", vi: "Tham lam", en: "Greedy" }],
+    title: text("Minimum Number of Increments on Subarrays to Form a Target Array"),
+    titleVi: text("Số lần increment subarray ít nhất để tạo target", "Minimum Number of Increments on Subarrays to Form a Target Array"),
+    statement: text(
+      "Bắt đầu bằng mảng toàn số 0. Mỗi operation chọn một subarray rồi tăng toàn bộ phần tử của nó thêm 1. Tìm số operation ít nhất để tạo target.",
+      "Start with an all-zero array. Each operation chooses a subarray and increments all its elements by 1. Find the fewest operations needed to form target.",
+    ),
+    defaultInput: "1,2,3,2,1",
+    inputKind: "string",
+    inputLabel: text("target (cách bởi ,)", "target (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("target[0] cần target[0] operation, vì chiều cao đầu tiên phải được xây từ 0.", "target[0] needs target[0] operations because the first height must be built from 0."),
+      text("Từ i > 0, operation cũ có thể kéo dài từ i−1 sang i. Chỉ khi target[i] > target[i−1] mới cần mở layer mới.", "For i > 0, existing operations can extend from i−1 to i. Open new layers only when target[i] > target[i−1]."),
+      text("Cộng mọi positive rise: target[0] + Σ max(0, target[i] − target[i−1]).", "Add every positive rise: target[0] + Σ max(0, target[i] − target[i−1])."),
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: text("Chỉ cần so sánh mỗi phần tử với phần tử đứng trước.", "Only compare each value with the preceding value.") },
+    code: [
+      "class Solution:",
+      "    def minNumberOperations(self, target):",
+      "        answer = target[0]",
+      "        for i in range(1, len(target)):",
+      "            if target[i] > target[i - 1]:",
+      "                answer += target[i] - target[i - 1]",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "target")],
+    builder: buildSteps1526,
+  },
+  1776: {
+    id: 1776,
+    difficulty: "hard",
+    slug: "car-fleet-ii",
+    category,
+    tags: [arrayTag, monoTag],
+    title: text("Car Fleet II"),
+    titleVi: text("Đoàn xe II", "Car Fleet II"),
+    statement: text(
+      "Cars được cho theo position tăng dần. Với mỗi car, trả về thời điểm nó va chạm fleet đầu tiên phía trước; nếu không va chạm, trả về −1.",
+      "Cars are given in increasing position order. For each car, return when it collides with the first fleet ahead; return −1 if it never collides.",
+    ),
+    defaultInput: "1,2;2,1;4,3;7,2",
+    inputKind: "string",
+    inputLabel: text("cars (position,speed; ...)", "cars (position,speed; ...)"),
+    extraParams: [],
+    approach: [
+      text("Quét từ phải sang trái. Stack chứa các fleet phía trước vẫn có thể là collision đầu tiên cho car bên trái.", "Scan right-to-left. The stack contains front fleets that can still be the first collision for a car on the left."),
+      text("Pop candidate nếu car hiện tại không nhanh hơn candidate, vì không thể bắt kịp nó.", "Pop a candidate when the current car is not faster, because it cannot catch it."),
+      text("Nếu current sẽ bắt candidate sau collision time của candidate, candidate đã nhập vào fleet khác quá sớm; pop tiếp. Candidate còn lại là collision đầu tiên.", "If current catches a candidate after that candidate's collision time, the candidate already joined another fleet; pop again. The remaining candidate is the first collision."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi car được push một lần và pop nhiều nhất một lần.", "Each car is pushed once and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def getCollisionTimes(self, cars):",
+      "        n = len(cars)",
+      "        answer = [-1.0] * n",
+      "        stack = []",
+      "        for i in range(n - 1, -1, -1):",
+      "            position, speed = cars[i]",
+      "            while stack:",
+      "                j = stack[-1]",
+      "                if speed <= cars[j][1]:",
+      "                    stack.pop()",
+      "                    continue",
+      "                t = (cars[j][0] - position) / (speed - cars[j][1])",
+      "                if answer[j] > 0 and t >= answer[j]:",
+      "                    stack.pop()",
+      "                    continue",
+      "                break",
+      "            if stack:",
+      "                j = stack[-1]",
+      "                answer[i] = (cars[j][0] - position) / (speed - cars[j][1])",
+      "            stack.append(i)",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parsePairs(input, "cars")],
+    builder: buildSteps1776,
+  },
   1793: simpleProblem({ id: 1793, difficulty: "hard", slug: "maximum-score-of-a-good-subarray", name: "Maximum Score of a Good Subarray", viName: "Điểm lớn nhất của good subarray", statement: text("Subarray phải chứa k; score = min * length.", "The subarray must contain k; score = min * length."), defaultInput: "1,4,3,7,4,5", extraParams: [{ key: "k", label: text("k", "k"), default: 3, min: 0 }], solver: arrayBuilder(maximumScore) }),
   1944: {
     id: 1944,
@@ -5303,6 +5739,43 @@ module.exports = {
     builder: buildSteps2832,
   },
   2863: simpleProblem({ id: 2863, difficulty: "medium", slug: "maximum-length-of-semi-decreasing-subarrays", name: "Maximum Length of Semi-Decreasing Subarrays", viName: "Subarray semi-decreasing dài nhất", statement: text("Premium: tìm subarray dài nhất có đầu lớn hơn cuối.", "Premium: find the longest subarray whose first value is greater than its last value."), defaultInput: "7,6,5,8,4", premium: true, solver: arrayBuilder(maximumLengthSemiDecreasing) }),
-  1063: simpleProblem({ id: 1063, difficulty: "hard", slug: "number-of-valid-subarrays", name: "Number of Valid Subarrays", viName: "Số valid subarray", statement: text("Premium: đếm subarray mà phần tử đầu là minimum của subarray.", "Premium: count subarrays where the first element is the subarray minimum."), defaultInput: "1,4,2,5,3", premium: true, solver: arrayBuilder(validSubarrays) }),
+  1063: {
+    id: 1063,
+    difficulty: "hard",
+    slug: "number-of-valid-subarrays",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    premium: true,
+    title: text("Number of Valid Subarrays"),
+    titleVi: text("Số lượng valid subarray", "Number of Valid Subarrays"),
+    statement: text(
+      "Đếm subarray không rỗng sao cho phần tử đầu tiên là giá trị nhỏ nhất của toàn bộ subarray.",
+      "Count non-empty subarrays where the first element is the smallest value in the entire subarray.",
+    ),
+    defaultInput: "1,4,2,5,3",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Với mỗi right endpoint i, valid subarray được xác định bởi các left endpoint có nums[left] ≤ mọi value tới i.", "For each right endpoint i, valid subarrays are determined by left endpoints whose nums[left] is ≤ every value through i."),
+      text("Giữ index trong monotonic stack không giảm. Khi current nhỏ hơn đỉnh, đỉnh không thể tiếp tục là minimum nên bị pop.", "Keep indices in a non-decreasing monotonic stack. When current is smaller than the top, that top can no longer remain the minimum, so pop it."),
+      text("Sau khi push i, từng index trong stack tạo đúng một valid subarray kết thúc ở i; cộng len(stack).", "After pushing i, every index in the stack creates exactly one valid subarray ending at i; add len(stack)."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi index được push đúng một lần và pop nhiều nhất một lần.", "Each index is pushed once and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def validSubarrays(self, nums):",
+      "        stack = []",
+      "        answer = 0",
+      "        for i, value in enumerate(nums):",
+      "            while stack and nums[stack[-1]] > value:",
+      "                stack.pop()",
+      "            stack.append(i)",
+      "            answer += len(stack)",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps1063,
+  },
   2355: simpleProblem({ id: 2355, difficulty: "hard", slug: "maximum-number-of-books-you-can-take", name: "Maximum Number of Books You Can Take", viName: "Số sách tối đa có thể lấy", statement: text("Premium: chọn đoạn sách, mỗi bước sang trái lấy ít hơn ít nhất 1 quyển.", "Premium: choose a book segment where moving left takes at least one fewer book each shelf."), defaultInput: "8,5,2,7,9", premium: true, solver: arrayBuilder(maximumBooks) }),
 };

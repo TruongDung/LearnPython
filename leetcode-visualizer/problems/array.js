@@ -11952,127 +11952,62 @@ function buildSteps3903(nums, params) {
   const k = params && params.k !== undefined ? params.k : 3;
   const n = nums.length;
   const steps = [];
-
-  // ── Phase 1: build suffix-min array ──────────────────────────────────────
-  const right = new Array(n).fill(0);
-  right[n - 1] = nums[n - 1];
-
-  steps.push({
-    title: { vi: "Xây dựng mảng suffix-min", en: "Build suffix-min array" },
-    arr: [...nums],
-    highlight: [n - 1],
-    mark: [],
-    sub: right.map((v, i) => (i === n - 1 ? v : "?")),
-    codeLines: [3, 4],
-    vars: [
-      { name: "n", value: n },
-      { name: "k", value: k },
-      { name: "right[n-1]", value: right[n - 1] },
-    ],
-    note: {
-      vi: `right[${n - 1}] = nums[${n - 1}] = ${nums[n - 1]}. Duyệt từ phải sang trái để ghi nhớ min của suffix.`,
-      en: `right[${n - 1}] = nums[${n - 1}] = ${nums[n - 1]}. Traverse right-to-left to record the suffix minimum.`,
-    },
-  });
-
-  for (let i = n - 2; i >= 0; i--) {
-    right[i] = Math.min(right[i + 1], nums[i]);
-    steps.push({
-      title: { vi: `Suffix-min: i = ${i}`, en: `Suffix-min: i = ${i}` },
-      arr: [...nums],
-      highlight: [i],
-      mark: [],
-      sub: right.map((v, j) => (j >= i ? v : "?")),
-      codeLines: [5],
-      vars: [
-        { name: "i", value: i },
-        { name: "nums[i]", value: nums[i] },
-        { name: "right[i+1]", value: right[i + 1] },
-        { name: "right[i]", value: right[i] },
-      ],
-      note: {
-        vi: `right[${i}] = min(${nums[i]}, ${right[i + 1]}) = ${right[i]}.`,
-        en: `right[${i}] = min(${nums[i]}, ${right[i + 1]}) = ${right[i]}.`,
-      },
-    });
-  }
-
-  // ── Phase 2: forward sweep ────────────────────────────────────────────────
-  let prefixMax = 0;
+  const right = Array(n).fill(nums[n - 1]);
+  const prefix = Array(n).fill(null);
+  const gaps = Array(n).fill(null);
   let answer = -1;
-  const stableMarks = [];
 
-  steps.push({
-    title: { vi: "Bắt đầu duyệt từ trái", en: "Start forward sweep" },
-    arr: [...nums],
-    highlight: [],
-    mark: [],
-    sub: right.map((v) => v),
-    codeLines: [6, 7],
-    vars: [
-      { name: "prefixMax", value: 0 },
-      { name: "k", value: k },
-    ],
-    note: {
-      vi: `Duyệt từ trái: cập nhật prefixMax và tính instability[i] = prefixMax − right[i].`,
-      en: `Sweep left to right: update prefixMax and compute instability[i] = prefixMax − right[i].`,
-    },
-  });
-
-  for (let i = 0; i < n; i++) {
-    prefixMax = Math.max(prefixMax, nums[i]);
-    const instability = prefixMax - right[i];
-    const stable = instability <= k;
-    if (stable && answer === -1) {
-      answer = i;
-      stableMarks.push(i);
-    }
-
+  const snapshot = ({ phase, line, current = -1, suffixReadyFrom = n, prefixMax = null, gap = null, stable = null, final = false, title, note }) => {
+    const suffixBuilt = phase === "suffix-init" ? [n - 1] : Array.from({ length: n - suffixReadyFrom }, (_, offset) => suffixReadyFrom + offset);
     steps.push({
-      title: {
-        vi: `Kiểm tra i = ${i}: instability = ${instability}`,
-        en: `Check i = ${i}: instability = ${instability}`,
-      },
+      title,
+      note,
+      final,
       arr: [...nums],
-      highlight: [i],
-      mark: [...stableMarks],
-      sub: right.map((v) => v),
-      codeLines: [8, 9, 10],
+      sub: right.map((value, index) => suffixBuilt.includes(index) ? value : "?"),
+      highlight: current >= 0 ? [current] : [],
+      mark: answer >= 0 ? [answer] : [],
+      codeLines: [line],
       vars: [
-        { name: "i", value: i },
-        { name: "nums[i]", value: nums[i] },
-        { name: "prefixMax", value: prefixMax },
-        { name: "right[i]", value: right[i] },
-        { name: "instability", value: instability },
-        { name: `≤ k (${k})?`, value: stable ? "yes ✓" : "no" },
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "k", value: k },
+        { name: "prefix max", value: prefixMax ?? "-" },
+        { name: "suffix min", value: current >= 0 ? right[current] : "-" },
+        { name: "gap", value: gap ?? "-" },
       ],
-      note: {
-        vi: `prefixMax=${prefixMax}, right[${i}]=${right[i]} → instability=${instability} ${stable ? `≤ ${k} ✓ — đây là chỉ số ổn định đầu tiên!` : `> ${k} — tiếp tục.`}`,
-        en: `prefixMax=${prefixMax}, right[${i}]=${right[i]} → instability=${instability} ${stable ? `≤ ${k} ✓ — this is the first stable index!` : `> ${k} — continue.`}`,
+      stable3903View: {
+        nums: [...nums], k, right: [...right], prefix: [...prefix], gaps: [...gaps],
+        current, suffixReadyFrom, suffixBuilt, prefixMax, gap, stable, answer, phase,
       },
-      ...(stable ? { final: true } : {}),
     });
+  };
 
-    if (stable) break;
+  snapshot({ phase: "size", line: 3, title: { vi: "n = len(nums)", en: "n = len(nums)" }, note: { vi: `Có ${n} vị trí; mỗi vị trí i sẽ so sánh max bên trái với min bên phải.`, en: `There are ${n} positions; each i compares the left maximum with the right minimum.` } });
+  snapshot({ phase: "suffix-init", line: 4, current: n - 1, suffixReadyFrom: n - 1, title: { vi: "Khởi tạo suffix-min từ cuối mảng", en: "Seed suffix minimum from the last value" }, note: { vi: `right được tạo từ nums[-1]=${nums[n - 1]}; chỉ right[${n - 1}] đã là suffix-min hoàn chỉnh.`, en: `right is seeded with nums[-1]=${nums[n - 1]}; only right[${n - 1}] is already a final suffix minimum.` } });
+  for (let i = n - 2; i >= 0; i--) {
+    snapshot({ phase: "suffix-loop", line: 5, current: i, suffixReadyFrom: i + 1, title: { vi: `Duyệt suffix tại i = ${i}`, en: `Visit suffix index i = ${i}` }, note: { vi: `So sánh nums[${i}] với suffix-min đã biết ở right[${i + 1}].`, en: `Compare nums[${i}] with the known suffix minimum right[${i + 1}].` } });
+    right[i] = Math.min(right[i + 1], nums[i]);
+    snapshot({ phase: "suffix-write", line: 6, current: i, suffixReadyFrom: i, title: { vi: `right[${i}] = ${right[i]}`, en: `right[${i}] = ${right[i]}` }, note: { vi: `min(${nums[i]}, ${right[i + 1]}) = ${right[i]}. Đây là min của nums[${i}..${n - 1}].`, en: `min(${nums[i]}, ${right[i + 1]}) = ${right[i]}. This is the minimum of nums[${i}..${n - 1}].` } });
   }
 
-  if (answer === -1) {
-    steps.push({
-      title: { vi: "Không tìm thấy chỉ số ổn định", en: "No stable index found" },
-      arr: [...nums],
-      highlight: [],
-      mark: [],
-      sub: right.map((v) => v),
-      codeLines: [11],
-      vars: [{ name: "answer", value: -1 }],
-      note: {
-        vi: `Không có chỉ số nào có instability ≤ ${k}. Trả về −1.`,
-        en: `No index has instability ≤ ${k}. Return −1.`,
-      },
-      final: true,
-    });
+  let prefixMax = 0;
+  snapshot({ phase: "prefix-init", line: 7, prefixMax, title: { vi: "left = 0", en: "left = 0" }, note: { vi: "Bắt đầu quét từ trái; left sẽ luôn là max của đoạn đã đi qua.", en: "Start the left-to-right scan; left will always be the maximum of the visited prefix." } });
+  for (let i = 0; i < n; i++) {
+    snapshot({ phase: "forward-loop", line: 8, current: i, suffixReadyFrom: 0, prefixMax, title: { vi: `Duyệt i = ${i}`, en: `Visit i = ${i}` }, note: { vi: `Chuẩn bị mở rộng prefix bằng nums[${i}]=${nums[i]}.`, en: `Prepare to extend the prefix with nums[${i}]=${nums[i]}.` } });
+    prefixMax = Math.max(prefixMax, nums[i]);
+    prefix[i] = prefixMax;
+    snapshot({ phase: "prefix-write", line: 9, current: i, suffixReadyFrom: 0, prefixMax, title: { vi: `left = max(left, ${nums[i]}) = ${prefixMax}`, en: `left = max(left, ${nums[i]}) = ${prefixMax}` }, note: { vi: `max(nums[0..${i}]) = ${prefixMax}.`, en: `max(nums[0..${i}]) = ${prefixMax}.` } });
+    const gap = prefixMax - right[i];
+    gaps[i] = gap;
+    const stable = gap <= k;
+    snapshot({ phase: "check", line: 10, current: i, suffixReadyFrom: 0, prefixMax, gap, stable, title: { vi: `${gap} ${stable ? "≤" : ">"} ${k}`, en: `${gap} ${stable ? "≤" : ">"} ${k}` }, note: { vi: `instability[${i}] = max(nums[0..${i}]) − min(nums[${i}..${n - 1}]) = ${prefixMax} − ${right[i]} = ${gap}.`, en: `instability[${i}] = max(nums[0..${i}]) − min(nums[${i}..${n - 1}]) = ${prefixMax} − ${right[i]} = ${gap}.` } });
+    if (stable) {
+      answer = i;
+      snapshot({ phase: "found", line: 11, current: i, suffixReadyFrom: 0, prefixMax, gap, stable: true, final: true, title: { vi: `return ${i}`, en: `return ${i}` }, note: { vi: `Đây là i đầu tiên có instability ≤ k, nên là đáp án nhỏ nhất.`, en: `This is the first i with instability ≤ k, so it is the smallest answer.` } });
+      break;
+    }
   }
-
+  if (answer === -1) snapshot({ phase: "not-found", line: 12, suffixReadyFrom: 0, prefixMax, final: true, title: { vi: "return -1", en: "return -1" }, note: { vi: `Không có index nào có instability ≤ ${k}.`, en: `No index has instability ≤ ${k}.` } });
   return { original: [...nums], answer, steps };
 }
 
