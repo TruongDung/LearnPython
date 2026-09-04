@@ -11943,6 +11943,192 @@ function buildSteps2948(input, params = {}) {
   return { original, answer, steps };
 }
 
+/**
+ * LeetCode 3903: Smallest Stable Index I.
+ * instability[i] = max(nums[0..i]) - min(nums[i..n-1])
+ * Return the smallest i where instability[i] <= k.
+ */
+function buildSteps3903(nums, params) {
+  const k = params && params.k !== undefined ? params.k : 3;
+  const n = nums.length;
+  const steps = [];
+
+  // ── Phase 1: build suffix-min array ──────────────────────────────────────
+  const right = new Array(n).fill(0);
+  right[n - 1] = nums[n - 1];
+
+  steps.push({
+    title: { vi: "Xây dựng mảng suffix-min", en: "Build suffix-min array" },
+    arr: [...nums],
+    highlight: [n - 1],
+    mark: [],
+    sub: right.map((v, i) => (i === n - 1 ? v : "?")),
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "k", value: k },
+      { name: "right[n-1]", value: right[n - 1] },
+    ],
+    note: {
+      vi: `right[${n - 1}] = nums[${n - 1}] = ${nums[n - 1]}. Duyệt từ phải sang trái để ghi nhớ min của suffix.`,
+      en: `right[${n - 1}] = nums[${n - 1}] = ${nums[n - 1]}. Traverse right-to-left to record the suffix minimum.`,
+    },
+  });
+
+  for (let i = n - 2; i >= 0; i--) {
+    right[i] = Math.min(right[i + 1], nums[i]);
+    steps.push({
+      title: { vi: `Suffix-min: i = ${i}`, en: `Suffix-min: i = ${i}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      sub: right.map((v, j) => (j >= i ? v : "?")),
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "right[i+1]", value: right[i + 1] },
+        { name: "right[i]", value: right[i] },
+      ],
+      note: {
+        vi: `right[${i}] = min(${nums[i]}, ${right[i + 1]}) = ${right[i]}.`,
+        en: `right[${i}] = min(${nums[i]}, ${right[i + 1]}) = ${right[i]}.`,
+      },
+    });
+  }
+
+  // ── Phase 2: forward sweep ────────────────────────────────────────────────
+  let prefixMax = 0;
+  let answer = -1;
+  const stableMarks = [];
+
+  steps.push({
+    title: { vi: "Bắt đầu duyệt từ trái", en: "Start forward sweep" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    sub: right.map((v) => v),
+    codeLines: [6, 7],
+    vars: [
+      { name: "prefixMax", value: 0 },
+      { name: "k", value: k },
+    ],
+    note: {
+      vi: `Duyệt từ trái: cập nhật prefixMax và tính instability[i] = prefixMax − right[i].`,
+      en: `Sweep left to right: update prefixMax and compute instability[i] = prefixMax − right[i].`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    prefixMax = Math.max(prefixMax, nums[i]);
+    const instability = prefixMax - right[i];
+    const stable = instability <= k;
+    if (stable && answer === -1) {
+      answer = i;
+      stableMarks.push(i);
+    }
+
+    steps.push({
+      title: {
+        vi: `Kiểm tra i = ${i}: instability = ${instability}`,
+        en: `Check i = ${i}: instability = ${instability}`,
+      },
+      arr: [...nums],
+      highlight: [i],
+      mark: [...stableMarks],
+      sub: right.map((v) => v),
+      codeLines: [8, 9, 10],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "prefixMax", value: prefixMax },
+        { name: "right[i]", value: right[i] },
+        { name: "instability", value: instability },
+        { name: `≤ k (${k})?`, value: stable ? "yes ✓" : "no" },
+      ],
+      note: {
+        vi: `prefixMax=${prefixMax}, right[${i}]=${right[i]} → instability=${instability} ${stable ? `≤ ${k} ✓ — đây là chỉ số ổn định đầu tiên!` : `> ${k} — tiếp tục.`}`,
+        en: `prefixMax=${prefixMax}, right[${i}]=${right[i]} → instability=${instability} ${stable ? `≤ ${k} ✓ — this is the first stable index!` : `> ${k} — continue.`}`,
+      },
+      ...(stable ? { final: true } : {}),
+    });
+
+    if (stable) break;
+  }
+
+  if (answer === -1) {
+    steps.push({
+      title: { vi: "Không tìm thấy chỉ số ổn định", en: "No stable index found" },
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      sub: right.map((v) => v),
+      codeLines: [11],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: `Không có chỉ số nào có instability ≤ ${k}. Trả về −1.`,
+        en: `No index has instability ≤ ${k}. Return −1.`,
+      },
+      final: true,
+    });
+  }
+
+  return { original: [...nums], answer, steps };
+}
+
+Object.assign(module.exports, {
+  3903: {
+    id: 3903,
+    difficulty: "easy",
+    slug: "smallest-stable-index-i",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Smallest Stable Index I", en: "Smallest Stable Index I" },
+    titleVi: { vi: "Chỉ số ổn định nhỏ nhất I", en: "Smallest stable index I" },
+    statement: {
+      vi: "Với mỗi chỉ số i, định nghĩa instability[i] = max(nums[0..i]) − min(nums[i..n−1]). Trả về chỉ số nhỏ nhất i mà instability[i] ≤ k. Nếu không tồn tại, trả về −1.",
+      en: "For each index i, define instability[i] = max(nums[0..i]) − min(nums[i..n−1]). Return the smallest i such that instability[i] ≤ k. If none exists, return −1.",
+    },
+    defaultInput: [5, 0, 1, 4],
+    inputKind: "nonneg",
+    extraParams: [
+      {
+        key: "k",
+        label: { vi: "Ngưỡng k", en: "Threshold k" },
+        default: 3,
+        min: 0,
+      },
+    ],
+    approach: [
+      { vi: "Precompute right[i] = min(nums[i..n−1]) bằng cách duyệt từ phải sang trái.", en: "Precompute right[i] = min(nums[i..n−1]) by traversing right-to-left." },
+      { vi: "Duyệt từ trái, duy trì prefixMax. Tính instability = prefixMax − right[i].", en: "Sweep left, maintaining prefixMax. Compute instability = prefixMax − right[i]." },
+      { vi: "Trả về chỉ số đầu tiên có instability ≤ k, hoặc −1.", en: "Return the first index with instability ≤ k, or −1." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Một lần duyệt để tính suffix-min, một lần duyệt để tìm kết quả. O(n) bộ nhớ cho mảng right[].",
+        en: "One pass to build suffix-min, one pass to find the answer. O(n) space for the right[] array.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def firstStableIndex(self, nums, k):",
+      "        n = len(nums)",
+      "        right = [nums[-1]] * n",
+      "        for i in range(n - 2, -1, -1):",
+      "            right[i] = min(right[i + 1], nums[i])",
+      "        left = 0",
+      "        for i, x in enumerate(nums):",
+      "            left = max(left, x)",
+      "            if left - right[i] <= k:",
+      "                return i",
+      "        return -1",
+    ],
+    builder: buildSteps3903,
+  },
+});
+
 Object.assign(module.exports, {
   2948: {
     id: 2948,
