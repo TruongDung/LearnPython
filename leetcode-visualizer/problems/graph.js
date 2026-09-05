@@ -26272,7 +26272,1044 @@ function buildSteps1519(input, params = {}) {
   return { original: { n, edges, labels }, answer, steps };
 }
 
+function parseTreeEdgesLesson(value, n, label = "edges") {
+  let edges;
+  try {
+    edges = Array.isArray(value) ? value : JSON.parse(String(value ?? "").trim());
+  } catch (_error) {
+    throw new Error(label + " must be a JSON array such as [[0,1],[1,2]]");
+  }
+  if (!Array.isArray(edges) || edges.length !== n - 1 || edges.some((edge) =>
+    !Array.isArray(edge) || edge.length !== 2 || edge.some((node) => !Number.isInteger(node) || node < 0 || node >= n) || edge[0] === edge[1],
+  )) {
+    throw new Error(label + " must contain exactly n - 1 valid non-self edges");
+  }
+  const unique = new Set();
+  for (const [from, to] of edges) {
+    const key = from < to ? from + ":" + to : to + ":" + from;
+    if (unique.has(key)) throw new Error(label + " must not contain duplicate undirected edges");
+    unique.add(key);
+  }
+  const adjacency = Array.from({ length: n }, () => []);
+  for (const [from, to] of edges) {
+    adjacency[from].push(to);
+    adjacency[to].push(from);
+  }
+  const seen = new Set([0]);
+  const queue = [0];
+  for (let index = 0; index < queue.length; index += 1) {
+    for (const next of adjacency[queue[index]]) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  if (seen.size !== n) throw new Error(label + " must form one connected tree");
+  return edges.map(([from, to]) => [from, to]);
+}
+
+function rootTreeLesson(n, edges, root = 0) {
+  const adjacency = Array.from({ length: n }, () => []);
+  for (const [from, to] of edges) {
+    adjacency[from].push(to);
+    adjacency[to].push(from);
+  }
+  adjacency.forEach((neighbors) => neighbors.sort((a, b) => a - b));
+  const parent = Array(n).fill(-1);
+  const depth = Array(n).fill(0);
+  const children = Array.from({ length: n }, () => []);
+  const order = [root];
+  parent[root] = -2;
+  for (let index = 0; index < order.length; index += 1) {
+    const node = order[index];
+    for (const next of adjacency[node]) {
+      if (next === parent[node]) continue;
+      if (parent[next] !== -1) continue;
+      parent[next] = node;
+      depth[next] = depth[node] + 1;
+      children[node].push(next);
+      order.push(next);
+    }
+  }
+  parent[root] = -1;
+  return { adjacency, parent, depth, children, order };
+}
+
+function treeLessonPositions(depth) {
+  const levels = [];
+  depth.forEach((value, node) => {
+    if (!levels[value]) levels[value] = [];
+    levels[value].push(node);
+  });
+  const maxDepth = Math.max(0, ...depth);
+  const positions = {};
+  for (let level = 0; level < levels.length; level += 1) {
+    const nodes = levels[level] || [];
+    nodes.forEach((node, index) => {
+      positions[node] = {
+        x: (index + 1) / (nodes.length + 1),
+        y: maxDepth === 0 ? 0.5 : level / maxDepth,
+      };
+    });
+  }
+  return { positions, height: Math.max(300, (maxDepth + 1) * 105) };
+}
+
+function makeTreeLessonView({ problemId, phaseIndex, phases, rule, metrics, nodeRows, edgeRows, formula, explanation, current = -1, parent = -1, child = -1, answer = null }) {
+  return {
+    problemId,
+    phaseIndex,
+    phases,
+    rule,
+    metrics,
+    nodeRows,
+    edgeRows,
+    formula,
+    explanation,
+    current,
+    parent,
+    child,
+    answer,
+  };
+}
+
+// ─── 2246: Longest Path With Different Adjacent Characters ───
+function parse2246Data(input, params = {}) {
+  let parent;
+  try {
+    parent = Array.isArray(input) ? input : JSON.parse(String(input ?? "").trim());
+  } catch (_error) {
+    throw new Error("parent must be a JSON array such as [-1,0,0,1]");
+  }
+  const labels = String(params.labels ?? "").trim();
+  const n = Array.isArray(parent) ? parent.length : 0;
+  if (n < 1 || n > 10 || parent[0] !== -1 || parent.some((boss, node) =>
+    !Number.isInteger(boss) || (node > 0 && (boss < 0 || boss >= n || boss === node)),
+  )) {
+    throw new Error("parent must describe a rooted tree with 1 to 10 nodes and parent[0] = -1");
+  }
+  if (labels.length !== n || /[^a-z]/.test(labels)) throw new Error("labels must contain one lowercase letter per node");
+  const children = Array.from({ length: n }, () => []);
+  for (let node = 1; node < n; node += 1) children[parent[node]].push(node);
+  const order = [0];
+  for (let index = 0; index < order.length; index += 1) order.push(...children[order[index]]);
+  if (order.length !== n || new Set(order).size !== n) throw new Error("parent must form one connected tree rooted at node 0");
+  return { n, parent: [...parent], labels, children, order };
+}
+
+function buildSteps2246(input, params = {}) {
+  const { n, parent, labels, children, order } = parse2246Data(input, params);
+  const edges = Array.from({ length: n - 1 }, (_, index) => [parent[index + 1], index + 1]);
+  const rooted = rootTreeLesson(n, edges);
+  const layout = treeLessonPositions(rooted.depth);
+  const down = Array(n).fill(null);
+  const processed = new Set();
+  const edgeStatus = new Map();
+  const steps = [];
+  let answer = 1;
+  let current = -1;
+  let currentChild = -1;
+  let longest = 0;
+  let second = 0;
+  const phases = [
+    { vi: "Dựng cây", en: "Build tree" },
+    { vi: "Postorder DP", en: "Postorder DP" },
+    { vi: "Ghép 2 nhánh", en: "Join two arms" },
+    { vi: "Kết quả", en: "Result" },
+  ];
+
+  function graphState(hlNodes = [], hlEdges = []) {
+    return {
+      layout: "flow",
+      positions: layout.positions,
+      width: 720,
+      height: layout.height,
+      nodes: Array.from({ length: n }, (_, node) => ({
+        id: node,
+        label: node + ":" + labels[node],
+        sub: "down=" + (down[node] ?? "?"),
+      })),
+      edges: edges.map(([from, to]) => ({
+        u: from,
+        v: to,
+        w: labels[from] === labels[to] ? "same ×" : "different ✓",
+      })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...processed],
+      caption: {
+        vi: "down[u] = nhánh hợp lệ dài nhất đi xuống từ u · cạnh same bị chặn",
+        en: "down[u] = longest valid downward arm from u · same-character edges are blocked",
+      },
+    };
+  }
+
+  function snapshot(title, note, codeLines, phaseIndex, options = {}) {
+    const nodeRows = Array.from({ length: n }, (_, node) => ({
+      id: node,
+      label: node + " · '" + labels[node] + "'",
+      state: node === current ? "current" : processed.has(node) ? "done" : "",
+      values: [
+        { label: { vi: "down", en: "down" }, value: down[node] ?? "?" },
+        { label: { vi: "parent", en: "parent" }, value: parent[node] },
+      ],
+    }));
+    const edgeRows = edges.map(([from, to]) => ({
+      from,
+      to,
+      label: labels[from] + " → " + labels[to],
+      value: labels[from] === labels[to] ? { vi: "BLOCK", en: "BLOCK" } : { vi: "DÙNG ĐƯỢC", en: "USABLE" },
+      state: edgeStatus.get(from + ":" + to) || (labels[from] === labels[to] ? "blocked" : ""),
+    }));
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final: Boolean(options.final),
+      arr: [...down],
+      sub: labels.split(""),
+      highlight: current >= 0 ? [current] : [],
+      mark: [...processed],
+      graph: graphState(options.hlNodes || (current >= 0 ? [current] : []), options.hlEdges || []),
+      treeDpLessonView: makeTreeLessonView({
+        problemId: 2246,
+        phaseIndex,
+        phases,
+        rule: {
+          vi: "Tại u, chỉ giữ 2 down[child] lớn nhất có ký tự khác s[u]. Path xuyên qua u = 1 + top1 + top2.",
+          en: "At u, keep the two largest down[child] values whose characters differ from s[u]. A path through u is 1 + top1 + top2.",
+        },
+        metrics: [
+          { label: { vi: "node", en: "node" }, value: current < 0 ? "—" : current + ":" + labels[current] },
+          { label: { vi: "nhánh dài nhất", en: "top arm" }, value: longest },
+          { label: { vi: "nhánh thứ hai", en: "second arm" }, value: second },
+          { label: { vi: "best toàn cục", en: "global best" }, value: answer, state: "answer" },
+        ],
+        nodeRows,
+        edgeRows,
+        formula: options.formula || "pathThrough = 1 + top1 + top2",
+        explanation: note,
+        current,
+        parent: current >= 0 ? parent[current] : -1,
+        child: currentChild,
+        answer: options.final ? answer : null,
+      }),
+      vars: [
+        { name: "postorder", value: "[" + [...order].reverse().join(", ") + "]" },
+        { name: "node", value: current < 0 ? "—" : current },
+        { name: "top1", value: longest },
+        { name: "top2", value: second },
+        { name: "down", value: "[" + down.map((value) => value ?? "?").join(", ") + "]" },
+        { name: "answer", value: answer },
+      ],
+    });
+  }
+
+  snapshot(
+    { vi: "Dựng children và thứ tự postorder", en: "Build children and postorder" },
+    { vi: "Child phải được tính down trước parent, nên xử lý thứ tự đảo [" + [...order].reverse().join(", ") + "].", en: "Each child's down value must be ready before its parent, so process [" + [...order].reverse().join(", ") + "]." },
+    [3, 4, 5, 7, 8, 9, 10, 11, 12],
+    0,
+  );
+
+  for (const node of [...order].reverse()) {
+    current = node;
+    currentChild = -1;
+    longest = 0;
+    second = 0;
+    snapshot(
+      { vi: "Bắt đầu node " + node + " ('" + labels[node] + "')", en: "Start node " + node + " ('" + labels[node] + "')" },
+      { vi: "Đặt top1 = top2 = 0 rồi kiểm tra từng child.", en: "Reset top1 = top2 = 0, then inspect every child." },
+      [15, 16],
+      1,
+    );
+    for (const child of children[node]) {
+      currentChild = child;
+      const edgeKey = node + ":" + child;
+      if (labels[child] === labels[node]) {
+        edgeStatus.set(edgeKey, "blocked");
+        snapshot(
+          { vi: "Ký tự giống nhau: bỏ cạnh " + node + " → " + child, en: "Same character: skip edge " + node + " → " + child },
+          { vi: "s[" + node + "] = s[" + child + "] = '" + labels[node] + "', nên path hợp lệ không thể đi qua cạnh này.", en: "s[" + node + "] = s[" + child + "] = '" + labels[node] + "', so a valid path cannot cross this edge." },
+          [17, 18, 19],
+          1,
+          { hlNodes: [node, child], hlEdges: [[node, child]], formula: "same character → continue" },
+        );
+        continue;
+      }
+      edgeStatus.set(edgeKey, "active");
+      const arm = down[child];
+      snapshot(
+        { vi: "Child " + child + " cho arm = " + arm, en: "Child " + child + " offers arm = " + arm },
+        { vi: "Hai ký tự khác nhau, nên down[" + child + "] có thể nối vào node " + node + ".", en: "The characters differ, so down[" + child + "] can connect to node " + node + "." },
+        [17, 18, 20],
+        1,
+        { hlNodes: [node, child], hlEdges: [[node, child]], formula: "arm = down[" + child + "] = " + arm },
+      );
+      if (arm > longest) {
+        second = longest;
+        longest = arm;
+        edgeStatus.set(edgeKey, "chosen");
+        snapshot(
+          { vi: "arm mới đứng hạng 1", en: "The new arm becomes #1" },
+          { vi: "Dời top1 cũ xuống top2, rồi gán top1 = " + arm + ".", en: "Move the old top1 into top2, then set top1 = " + arm + "." },
+          [21, 22],
+          1,
+          { hlNodes: [node, child], hlEdges: [[node, child]], formula: "top2, top1 = oldTop1, " + arm },
+        );
+      } else if (arm > second) {
+        second = arm;
+        edgeStatus.set(edgeKey, "chosen");
+        snapshot(
+          { vi: "arm mới đứng hạng 2", en: "The new arm becomes #2" },
+          { vi: "Giữ top1 và cập nhật top2 = " + arm + ".", en: "Keep top1 and update top2 = " + arm + "." },
+          [23, 24],
+          1,
+          { hlNodes: [node, child], hlEdges: [[node, child]], formula: "top2 = " + arm },
+        );
+      }
+    }
+    currentChild = -1;
+    down[node] = 1 + longest;
+    const through = 1 + longest + second;
+    answer = Math.max(answer, through);
+    processed.add(node);
+    snapshot(
+      { vi: "Chốt node " + node + ": down=" + down[node] + ", path=" + through, en: "Finish node " + node + ": down=" + down[node] + ", path=" + through },
+      { vi: "Parent chỉ dùng được một nhánh dài nhất; đáp án toàn cục có thể ghép hai nhánh qua node này.", en: "The parent can use only one best arm; the global path may join two arms through this node." },
+      [25, 26],
+      2,
+      { formula: "down[" + node + "] = 1 + " + longest + " = " + down[node] + "; best = max(best, 1 + " + longest + " + " + second + ") = " + answer },
+    );
+  }
+
+  current = -1;
+  currentChild = -1;
+  longest = 0;
+  second = 0;
+  snapshot(
+    { vi: "Return " + answer, en: "Return " + answer },
+    { vi: "Độ dài path hợp lệ lớn nhất là " + answer + " node.", en: "The longest valid path contains " + answer + " nodes." },
+    [27],
+    3,
+    { final: true, formula: "answer = " + answer, hlNodes: [] },
+  );
+  return { original: { parent, labels }, answer, steps };
+}
+
+// ─── 834: Sum of Distances in Tree ───
+function parse834Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 10) throw new Error("n must be an integer from 1 to 10 for the step-by-step visualization");
+  return { n, edges: parseTreeEdgesLesson(params.edges, n) };
+}
+
+function buildSteps834(input, params = {}) {
+  const { n, edges } = parse834Data(input, params);
+  const rooted = rootTreeLesson(n, edges);
+  const layout = treeLessonPositions(rooted.depth);
+  const count = Array(n).fill(1);
+  const answer = Array(n).fill(0);
+  const processed = new Set();
+  const steps = [];
+  let current = -1;
+  let currentParent = -1;
+  const phases = [
+    { vi: "Root tại 0", en: "Root at 0" },
+    { vi: "Gom subtree", en: "Collect subtrees" },
+    { vi: "Reroot", en: "Reroot" },
+    { vi: "Kết quả", en: "Result" },
+  ];
+
+  function graphState(hlNodes = [], hlEdges = []) {
+    return {
+      layout: "flow",
+      positions: layout.positions,
+      width: 720,
+      height: layout.height,
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "count=" + count[node] + " · sum=" + answer[node] })),
+      edges: edges.map(([from, to]) => ({ u: from, v: to, undirected: true })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...processed],
+      caption: { vi: "count = kích thước subtree · sum = tổng khoảng cách từ node hiện tại", en: "count = subtree size · sum = distance sum from the current node" },
+    };
+  }
+
+  function snapshot(title, note, codeLines, phaseIndex, options = {}) {
+    const nodeRows = Array.from({ length: n }, (_, node) => ({
+      id: node,
+      label: "node " + node,
+      state: node === current ? "current" : processed.has(node) ? "done" : "",
+      values: [
+        { label: { vi: "subtree", en: "subtree" }, value: count[node] },
+        { label: { vi: "distance sum", en: "distance sum" }, value: answer[node] },
+        { label: { vi: "parent", en: "parent" }, value: rooted.parent[node] },
+      ],
+    }));
+    const edgeRows = edges.map(([from, to]) => {
+      const parent = rooted.parent[to] === from ? from : rooted.parent[from] === to ? to : from;
+      const child = parent === from ? to : from;
+      return { from: parent, to: child, label: { vi: "cạnh cây", en: "tree edge" }, value: "depth " + rooted.depth[child], state: current === child && currentParent === parent ? "active" : "" };
+    });
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final: Boolean(options.final),
+      arr: [...answer],
+      sub: count.map((value) => "size=" + value),
+      highlight: current >= 0 ? [current] : [],
+      mark: [...processed],
+      graph: graphState(options.hlNodes || (current >= 0 ? [current] : []), options.hlEdges || []),
+      treeDpLessonView: makeTreeLessonView({
+        problemId: 834,
+        phaseIndex,
+        phases,
+        rule: {
+          vi: "Lượt 1 gom size và distance sum về root 0. Lượt 2 đổi root qua cạnh parent→child trong O(1).",
+          en: "Pass 1 collects sizes and distance sums at root 0. Pass 2 moves the root across each parent→child edge in O(1).",
+        },
+        metrics: [
+          { label: { vi: "node", en: "node" }, value: current < 0 ? "—" : current },
+          { label: { vi: "parent", en: "parent" }, value: currentParent < 0 ? "—" : currentParent },
+          { label: { vi: "subtree size", en: "subtree size" }, value: current < 0 ? "—" : count[current] },
+          { label: { vi: "answer hiện tại", en: "current answer" }, value: current < 0 ? "—" : answer[current], state: "answer" },
+        ],
+        nodeRows,
+        edgeRows,
+        formula: options.formula || "answer[child] = answer[parent] - count[child] + (n - count[child])",
+        explanation: note,
+        current,
+        parent: currentParent,
+        answer: options.final ? [...answer] : null,
+      }),
+      vars: [
+        { name: "order", value: "[" + rooted.order.join(", ") + "]" },
+        { name: "count", value: "[" + count.join(", ") + "]" },
+        { name: "answer", value: "[" + answer.join(", ") + "]" },
+      ],
+    });
+  }
+
+  snapshot(
+    { vi: "Root cây tại node 0", en: "Root the tree at node 0" },
+    { vi: "Parent = [" + rooted.parent.join(", ") + "], preorder = [" + rooted.order.join(", ") + "].", en: "Parent = [" + rooted.parent.join(", ") + "], preorder = [" + rooted.order.join(", ") + "]." },
+    [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+    0,
+  );
+
+  for (const node of [...rooted.order].reverse()) {
+    if (node === 0) continue;
+    current = node;
+    currentParent = rooted.parent[node];
+    snapshot(
+      { vi: "Gom subtree " + node + " vào parent " + currentParent, en: "Merge subtree " + node + " into parent " + currentParent },
+      { vi: "Mọi node trong subtree " + node + " xa parent thêm đúng 1 cạnh.", en: "Every node in subtree " + node + " is exactly one edge farther from its parent." },
+      [16, 17],
+      1,
+      { hlNodes: [currentParent, node], hlEdges: [[currentParent, node]], formula: "count[parent] += count[child]; sum[parent] += sum[child] + count[child]" },
+    );
+    count[currentParent] += count[node];
+    answer[currentParent] += answer[node] + count[node];
+    processed.add(node);
+    snapshot(
+      { vi: "count[" + currentParent + "]=" + count[currentParent] + ", sum[" + currentParent + "]=" + answer[currentParent], en: "count[" + currentParent + "]=" + count[currentParent] + ", sum[" + currentParent + "]=" + answer[currentParent] },
+      { vi: "Đã cộng distance nội bộ của child và +1 cho từng node trong child subtree.", en: "Added the child's internal distances and +1 for every node in its subtree." },
+      [18, 19],
+      1,
+      { hlNodes: [currentParent, node], hlEdges: [[currentParent, node]], formula: "sum[" + currentParent + "] += " + (answer[node]) + " + " + count[node] + " → " + answer[currentParent] },
+    );
+  }
+  processed.add(0);
+  current = 0;
+  currentParent = -1;
+  snapshot(
+    { vi: "Lượt 1 xong: answer[0] = " + answer[0], en: "Pass 1 complete: answer[0] = " + answer[0] },
+    { vi: "Đây là tổng khoảng cách từ root 0 tới mọi node.", en: "This is the sum of distances from root 0 to every node." },
+    [19],
+    1,
+    { formula: "answer[0] = " + answer[0] },
+  );
+
+  processed.clear();
+  processed.add(0);
+  for (const node of rooted.order.slice(1)) {
+    current = node;
+    currentParent = rooted.parent[node];
+    const outside = n - count[node];
+    snapshot(
+      { vi: "Đổi root " + currentParent + " → " + node, en: "Move root " + currentParent + " → " + node },
+      { vi: count[node] + " node trong subtree gần hơn 1; " + outside + " node bên ngoài xa hơn 1.", en: count[node] + " subtree nodes become 1 closer; " + outside + " outside nodes become 1 farther." },
+      [20, 21],
+      2,
+      { hlNodes: [currentParent, node], hlEdges: [[currentParent, node]], formula: answer[currentParent] + " - " + count[node] + " + " + outside },
+    );
+    answer[node] = answer[currentParent] - count[node] + outside;
+    processed.add(node);
+    snapshot(
+      { vi: "answer[" + node + "] = " + answer[node], en: "answer[" + node + "] = " + answer[node] },
+      { vi: "Đã có tổng khoảng cách khi coi node " + node + " là root.", en: "The distance sum with node " + node + " as root is now known." },
+      [22],
+      2,
+      { hlNodes: [currentParent, node], hlEdges: [[currentParent, node]], formula: "answer[" + node + "] = " + answer[currentParent] + " - " + count[node] + " + " + outside + " = " + answer[node] },
+    );
+  }
+  current = -1;
+  currentParent = -1;
+  snapshot(
+    { vi: "Return [" + answer.join(", ") + "]", en: "Return [" + answer.join(", ") + "]" },
+    { vi: "Mỗi node đã làm root đúng một lần mà không cần chạy lại DFS.", en: "Every node became the root once without rerunning DFS." },
+    [23],
+    3,
+    { final: true, formula: "answer = [" + answer.join(", ") + "]", hlNodes: [] },
+  );
+  return { original: { n, edges }, answer, steps };
+}
+
+// ─── 2858: Minimum Edge Reversals So Every Node Is Reachable ───
+function parse2858Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 2 || n > 10) throw new Error("n must be an integer from 2 to 10 for the step-by-step visualization");
+  return { n, edges: parseTreeEdgesLesson(params.edges, n) };
+}
+
+function buildSteps2858(input, params = {}) {
+  const { n, edges } = parse2858Data(input, params);
+  const rooted = rootTreeLesson(n, edges);
+  const layout = treeLessonPositions(rooted.depth);
+  const original = new Set(edges.map(([from, to]) => from + ":" + to));
+  const edgeCost = Array(n).fill(0);
+  const answer = Array(n).fill(null);
+  const processed = new Set();
+  const countedEdges = new Set();
+  const steps = [];
+  let current = -1;
+  let currentParent = -1;
+  let initial = 0;
+  const phases = [
+    { vi: "Root thử tại 0", en: "Try root 0" },
+    { vi: "Đếm đảo cạnh", en: "Count reversals" },
+    { vi: "Reroot mọi node", en: "Reroot all nodes" },
+    { vi: "Kết quả", en: "Result" },
+  ];
+
+  function originalDirection(a, b) {
+    return original.has(a + ":" + b) ? [a, b] : [b, a];
+  }
+  function graphState(hlNodes = [], hlEdges = []) {
+    return {
+      layout: "flow",
+      positions: layout.positions,
+      width: 720,
+      height: layout.height,
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "ans=" + (answer[node] ?? "?") })),
+      edges: edges.map(([from, to]) => ({ u: from, v: to, w: "original" })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...processed],
+      caption: { vi: "Mũi tên = hướng gốc · ans[r] = số cạnh tối thiểu phải đảo để r đi tới mọi node", en: "Arrow = original direction · ans[r] = minimum reversals for r to reach every node" },
+    };
+  }
+  function snapshot(title, note, codeLines, phaseIndex, options = {}) {
+    const nodeRows = Array.from({ length: n }, (_, node) => ({
+      id: node,
+      label: "root " + node,
+      state: node === current ? "current" : answer[node] != null ? "done" : "",
+      values: [
+        { label: { vi: "answer", en: "answer" }, value: answer[node] ?? "?" },
+        { label: { vi: "parent@0", en: "parent@0" }, value: rooted.parent[node] },
+        { label: { vi: "edge cost", en: "edge cost" }, value: node === 0 ? "—" : edgeCost[node] },
+      ],
+    }));
+    const edgeRows = edges.map(([from, to]) => {
+      const key = from + ":" + to;
+      const child = rooted.parent[to] === from ? to : rooted.parent[from] === to ? from : -1;
+      const parent = child === to ? from : to;
+      const isActive = current >= 0 && ((current === child && currentParent === parent) || (current === parent && currentParent === child));
+      return { from, to, label: { vi: "hướng gốc", en: "original" }, value: child < 0 ? "—" : "cost@0=" + edgeCost[child], state: isActive ? "active" : countedEdges.has(key) ? "done" : "" };
+    });
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final: Boolean(options.final),
+      arr: answer.map((value) => value ?? "?"),
+      sub: edgeCost.map((value, node) => node === 0 ? "root" : "cost=" + value),
+      highlight: current >= 0 ? [current] : [],
+      mark: [...processed],
+      graph: graphState(options.hlNodes || (current >= 0 ? [current] : []), options.hlEdges || []),
+      treeDpLessonView: makeTreeLessonView({
+        problemId: 2858,
+        phaseIndex,
+        phases,
+        rule: {
+          vi: "Tính ans[0] một lần. Khi chuyển root qua một cạnh, đáp án chỉ đổi +1 hoặc -1 tùy hướng mũi tên gốc.",
+          en: "Compute ans[0] once. Moving the root across one edge changes the answer by only +1 or -1 based on the original arrow.",
+        },
+        metrics: [
+          { label: { vi: "root hiện tại", en: "current root" }, value: current < 0 ? "0" : current },
+          { label: { vi: "parent trong cây@0", en: "parent in tree@0" }, value: currentParent < 0 ? "—" : currentParent },
+          { label: { vi: "cost cạnh", en: "edge cost" }, value: current <= 0 ? "—" : edgeCost[current] },
+          { label: { vi: "reversal@0", en: "reversals@0" }, value: initial, state: "answer" },
+        ],
+        nodeRows,
+        edgeRows,
+        formula: options.formula || "ans[child] = ans[parent] + (original parent→child ? +1 : -1)",
+        explanation: note,
+        current,
+        parent: currentParent,
+        answer: options.final ? [...answer] : null,
+      }),
+      vars: [
+        { name: "parent@0", value: "[" + rooted.parent.join(", ") + "]" },
+        { name: "edge_cost", value: "[" + edgeCost.join(", ") + "]" },
+        { name: "answer", value: "[" + answer.map((value) => value ?? "?").join(", ") + "]" },
+      ],
+    });
+  }
+
+  snapshot(
+    { vi: "Root cây tạm thời tại 0", en: "Temporarily root the tree at 0" },
+    { vi: "cost=0 nếu đi parent→child đúng theo mũi tên gốc; cost=1 nếu phải đảo mũi tên.", en: "cost=0 when parent→child follows the original arrow; cost=1 when that arrow must be reversed." },
+    [3, 4, 5, 6, 7, 8, 9],
+    0,
+  );
+  for (const node of rooted.order.slice(1)) {
+    current = node;
+    currentParent = rooted.parent[node];
+    const direction = originalDirection(currentParent, node);
+    edgeCost[node] = direction[0] === currentParent ? 0 : 1;
+    const edgeKey = direction[0] + ":" + direction[1];
+    countedEdges.add(edgeKey);
+    initial += edgeCost[node];
+    snapshot(
+      { vi: "Cạnh " + direction[0] + " → " + direction[1] + ": cost=" + edgeCost[node], en: "Edge " + direction[0] + " → " + direction[1] + ": cost=" + edgeCost[node] },
+      edgeCost[node]
+        ? { vi: "Từ root 0 cần đi " + currentParent + " → " + node + ", ngược mũi tên gốc nên cộng 1 reversal.", en: "Root 0 needs " + currentParent + " → " + node + ", opposite the original arrow, so add 1 reversal." }
+        : { vi: "Từ root 0 đi đúng hướng mũi tên gốc, không cần đảo.", en: "Traversal from root 0 follows the original arrow, so no reversal is needed." },
+      [10, 11, 12, 13, 14],
+      1,
+      { hlNodes: [currentParent, node], hlEdges: [direction], formula: "initial += " + edgeCost[node] + " → " + initial },
+    );
+  }
+  answer[0] = initial;
+  processed.add(0);
+  current = 0;
+  currentParent = -1;
+  snapshot(
+    { vi: "answer[0] = " + initial, en: "answer[0] = " + initial },
+    { vi: "Đã biết số reversal khi bắt đầu từ node 0; các root khác sẽ suy ra trong O(1) mỗi cạnh.", en: "The reversal count for root 0 is known; every other root follows in O(1) per edge." },
+    [15, 16],
+    1,
+    { formula: "answer[0] = sum(edge_cost) = " + initial },
+  );
+  for (const node of rooted.order.slice(1)) {
+    current = node;
+    currentParent = rooted.parent[node];
+    const direction = originalDirection(currentParent, node);
+    const delta = edgeCost[node] === 0 ? 1 : -1;
+    snapshot(
+      { vi: "Reroot " + currentParent + " → " + node, en: "Reroot " + currentParent + " → " + node },
+      delta === 1
+        ? { vi: "Mũi tên gốc parent→child từng đúng, nhưng khi child làm root nó trở thành sai: +1.", en: "The original parent→child arrow was correct, but becomes wrong when child is root: +1." }
+        : { vi: "Mũi tên gốc child→parent từng sai, nhưng khi child làm root nó trở thành đúng: -1.", en: "The original child→parent arrow was wrong, but becomes correct when child is root: -1." },
+      [17, 18, 19],
+      2,
+      { hlNodes: [currentParent, node], hlEdges: [direction], formula: "answer[" + node + "] = " + answer[currentParent] + (delta > 0 ? " + 1" : " - 1") },
+    );
+    answer[node] = answer[currentParent] + delta;
+    processed.add(node);
+    snapshot(
+      { vi: "answer[" + node + "] = " + answer[node], en: "answer[" + node + "] = " + answer[node] },
+      { vi: "Chỉ cạnh nối hai root đổi vai trò; mọi cạnh khác giữ nguyên contribution.", en: "Only the edge joining the two roots changes role; every other edge keeps its contribution." },
+      [20],
+      2,
+      { hlNodes: [currentParent, node], hlEdges: [direction], formula: "answer[" + node + "] = " + answer[node] },
+    );
+  }
+  current = -1;
+  currentParent = -1;
+  snapshot(
+    { vi: "Return [" + answer.join(", ") + "]", en: "Return [" + answer.join(", ") + "]" },
+    { vi: "Mỗi phần tử là số reversal tối thiểu khi chọn node đó làm điểm bắt đầu.", en: "Each entry is the minimum reversal count when that node is the starting point." },
+    [21],
+    3,
+    { final: true, formula: "answer = [" + answer.join(", ") + "]", hlNodes: [] },
+  );
+  return { original: { n, edges }, answer, steps };
+}
+
+// ─── 1466: Reorder Routes to Make All Paths Lead to City Zero ───
+function parse1466Data(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 2 || n > 10) throw new Error("n must be an integer from 2 to 10 for the step-by-step visualization");
+  return { n, connections: parseTreeEdgesLesson(params.connections, n, "connections") };
+}
+
+function buildSteps1466(input, params = {}) {
+  const { n, connections } = parse1466Data(input, params);
+  const rooted = rootTreeLesson(n, connections);
+  const layout = treeLessonPositions(rooted.depth);
+  const original = new Set(connections.map(([from, to]) => from + ":" + to));
+  const seen = new Set([0]);
+  const counted = new Map();
+  const steps = [];
+  let answer = 0;
+  let current = 0;
+  let currentParent = -1;
+  const phases = [
+    { vi: "Root tại thủ đô 0", en: "Root at capital 0" },
+    { vi: "DFS từng cạnh", en: "DFS each edge" },
+    { vi: "Đếm cạnh sai", en: "Count wrong arrows" },
+    { vi: "Kết quả", en: "Result" },
+  ];
+
+  function originalDirection(a, b) {
+    return original.has(a + ":" + b) ? [a, b] : [b, a];
+  }
+  function graphState(hlNodes = [], hlEdges = []) {
+    return {
+      layout: "flow",
+      positions: layout.positions,
+      width: 720,
+      height: layout.height,
+      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: node === 0 ? "0 ★" : String(node), sub: node === 0 ? "capital" : "" })),
+      edges: connections.map(([from, to]) => ({ u: from, v: to, w: counted.get(from + ":" + to) === 1 ? "REVERSE" : counted.has(from + ":" + to) ? "KEEP" : "original" })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...seen],
+      caption: { vi: "Mũi tên phải hướng về thủ đô 0 · REVERSE = đang đi ra xa 0", en: "Every arrow must point toward capital 0 · REVERSE = currently points away from 0" },
+    };
+  }
+  function snapshot(title, note, codeLines, phaseIndex, options = {}) {
+    const nodeRows = Array.from({ length: n }, (_, node) => ({
+      id: node,
+      label: node === 0 ? "city 0 · capital" : "city " + node,
+      state: node === current ? "current" : seen.has(node) ? "done" : "",
+      values: [
+        { label: { vi: "parent", en: "parent" }, value: rooted.parent[node] },
+        { label: { vi: "depth", en: "depth" }, value: rooted.depth[node] },
+      ],
+    }));
+    const edgeRows = connections.map(([from, to]) => ({
+      from,
+      to,
+      label: { vi: "hướng gốc", en: "original" },
+      value: counted.has(from + ":" + to) ? (counted.get(from + ":" + to) ? { vi: "ĐẢO", en: "REVERSE" } : { vi: "GIỮ", en: "KEEP" }) : "?",
+      state: counted.has(from + ":" + to) ? (counted.get(from + ":" + to) ? "blocked" : "done") : "",
+    }));
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final: Boolean(options.final),
+      arr: connections.map(([from, to]) => from + "→" + to),
+      highlight: current >= 0 ? [current] : [],
+      mark: [...seen],
+      graph: graphState(options.hlNodes || [current], options.hlEdges || []),
+      treeDpLessonView: makeTreeLessonView({
+        problemId: 1466,
+        phaseIndex,
+        phases,
+        rule: {
+          vi: "Root cây tại 0 rồi đi từ 0 ra ngoài. Nếu mũi tên gốc cùng chiều ta đang đi, nó đang trỏ xa thủ đô và phải đảo.",
+          en: "Root the tree at 0 and walk outward. If an original arrow follows that walk, it points away from the capital and must be reversed.",
+        },
+        metrics: [
+          { label: { vi: "city hiện tại", en: "current city" }, value: current },
+          { label: { vi: "parent", en: "parent" }, value: currentParent < 0 ? "—" : currentParent },
+          { label: { vi: "đã thăm", en: "visited" }, value: seen.size + "/" + n },
+          { label: { vi: "cần đảo", en: "reversals" }, value: answer, state: "answer" },
+        ],
+        nodeRows,
+        edgeRows,
+        formula: options.formula || "answer += 1 when original edge points parent → child",
+        explanation: note,
+        current,
+        parent: currentParent,
+        answer: options.final ? answer : null,
+      }),
+      vars: [
+        { name: "seen", value: "{" + [...seen].join(", ") + "}" },
+        { name: "city", value: current },
+        { name: "answer", value: answer },
+      ],
+    });
+  }
+
+  snapshot(
+    { vi: "Root cây tại thủ đô 0", en: "Root the tree at capital 0" },
+    { vi: "Duyệt ra xa 0 theo cạnh vô hướng, nhưng luôn giữ lại hướng mũi tên gốc để quyết định KEEP hay REVERSE.", en: "Walk outward from 0 through the undirected tree while preserving each original arrow to decide KEEP or REVERSE." },
+    [3, 4, 5, 6, 7, 8],
+    0,
+    { hlNodes: [0] },
+  );
+
+  for (const node of rooted.order) {
+    current = node;
+    currentParent = rooted.parent[node];
+    snapshot(
+      { vi: "DFS tại city " + node, en: "DFS at city " + node },
+      { vi: "Kiểm tra từng neighbor chưa thăm của city " + node + ".", en: "Inspect each unvisited neighbor of city " + node + "." },
+      [9, 10, 11],
+      1,
+      { hlNodes: [node] },
+    );
+    for (const child of rooted.children[node]) {
+      const direction = originalDirection(node, child);
+      const mustReverse = direction[0] === node;
+      const key = direction[0] + ":" + direction[1];
+      snapshot(
+        { vi: "Xét đường " + direction[0] + " → " + direction[1], en: "Inspect road " + direction[0] + " → " + direction[1] },
+        mustReverse
+          ? { vi: "DFS đi " + node + " → " + child + " và mũi tên cũng đi ra xa 0, nên phải đảo.", en: "DFS moves " + node + " → " + child + " and the arrow also points away from 0, so reverse it." }
+          : { vi: "Mũi tên " + child + " → " + node + " đã hướng về thủ đô, nên giữ nguyên.", en: "Arrow " + child + " → " + node + " already points toward the capital, so keep it." },
+        [11, 12],
+        1,
+        { hlNodes: [node, child], hlEdges: [direction], formula: mustReverse ? "cost = 1 (REVERSE)" : "cost = 0 (KEEP)" },
+      );
+      counted.set(key, mustReverse ? 1 : 0);
+      if (mustReverse) answer += 1;
+      seen.add(child);
+      snapshot(
+        { vi: (mustReverse ? "REVERSE" : "KEEP") + ": answer = " + answer, en: (mustReverse ? "REVERSE" : "KEEP") + ": answer = " + answer },
+        mustReverse
+          ? { vi: "Cộng 1 vì đây là cạnh duy nhất trên đường từ subtree này về 0 nhưng đang sai hướng.", en: "Add 1 because this unique route from the subtree to 0 currently points the wrong way." }
+          : { vi: "Không cộng vì đường đã đưa subtree về phía 0.", en: "Add nothing because the road already leads the subtree toward 0." },
+        [13, 14],
+        2,
+        { hlNodes: [node, child], hlEdges: [direction], formula: "answer += " + (mustReverse ? 1 : 0) + " → " + answer },
+      );
+    }
+  }
+  current = -1;
+  currentParent = -1;
+  snapshot(
+    { vi: "Return " + answer, en: "Return " + answer },
+    { vi: "Cần đảo " + answer + " đường để mọi city đi được về thủ đô 0.", en: answer + " roads must be reversed so every city can reach capital 0." },
+    [15],
+    3,
+    { final: true, formula: "minimum reversals = " + answer, hlNodes: [] },
+  );
+  return { original: { n, connections }, answer, steps };
+}
+
 Object.assign(module.exports, {
+  2246: {
+    id: 2246,
+    difficulty: "hard",
+    slug: "longest-path-with-different-adjacent-characters",
+    category: { key: "tree", vi: "Cây", en: "Tree" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    ],
+    title: { vi: "Longest Path With Different Adjacent Characters", en: "Longest Path With Different Adjacent Characters" },
+    titleVi: { vi: "Đường dài nhất có ký tự kề nhau khác nhau", en: "Longest path with different adjacent characters" },
+    statement: {
+      vi: "Cây root tại 0 được cho bởi parent và mỗi node mang một ký tự. Tìm số node trên path dài nhất sao cho hai node kề nhau luôn có ký tự khác nhau.",
+      en: "A tree rooted at 0 is described by parent and each node has a character. Return the number of nodes in the longest path whose adjacent nodes always have different characters.",
+    },
+    defaultInput: "[-1,0,0,1,1,2]",
+    inputKind: "string",
+    inputLabel: { vi: "parent dạng JSON", en: "parent as JSON" },
+    extraParams: [{ key: "labels", type: "string", label: { vi: "s - ký tự của các node", en: "s - node characters" }, default: "abacbe" }],
+    approach: [
+      { vi: "Dựng children và xử lý node theo postorder để down[child] có trước down[parent].", en: "Build children and process nodes in postorder so down[child] is ready before down[parent]." },
+      { vi: "Bỏ child có cùng ký tự với parent. Trong các child còn lại, giữ hai down lớn nhất.", en: "Skip children sharing the parent's character. Keep the two largest down values among the rest." },
+      { vi: "down[u] = 1 + top1; path tốt nhất xuyên qua u = 1 + top1 + top2.", en: "down[u] = 1 + top1; the best path through u is 1 + top1 + top2." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi node và cạnh được xử lý một lần.", en: "Every node and edge is processed once." } },
+    codeLabel: { vi: "Postorder tree DP + hai nhánh tốt nhất", en: "Postorder tree DP + two best arms" },
+    code: [
+      "class Solution:",
+      "    def longestPath(self, parent, s):",
+      "        n = len(parent)",
+      "        children = [[] for _ in range(n)]",
+      "        for node in range(1, n):",
+      "            children[parent[node]].append(node)",
+      "        order, stack = [], [0]",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            order.append(node)",
+      "            stack.extend(children[node])",
+      "        down = [1] * n",
+      "        answer = 1",
+      "        for node in reversed(order):",
+      "            longest = second = 0",
+      "            for child in children[node]:",
+      "                if s[child] == s[node]:",
+      "                    continue",
+      "                arm = down[child]",
+      "                if arm > longest:",
+      "                    second, longest = longest, arm",
+      "                elif arm > second:",
+      "                    second = arm",
+      "            down[node] = 1 + longest",
+      "            answer = max(answer, 1 + longest + second)",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse2246Data(input, params); return [parsed.parent, parsed.labels]; },
+    builder: buildSteps2246,
+  },
+  834: {
+    id: 834,
+    difficulty: "hard",
+    slug: "sum-of-distances-in-tree",
+    category: { key: "tree", vi: "Cây", en: "Tree" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "rerooting", vi: "Rerooting DP", en: "Rerooting DP" },
+    ],
+    title: { vi: "Sum of Distances in Tree", en: "Sum of Distances in Tree" },
+    titleVi: { vi: "Tổng khoảng cách từ từng node trong cây", en: "Sum of distances from every tree node" },
+    statement: { vi: "Với mỗi node i trong cây vô hướng, tính tổng khoảng cách từ i tới tất cả node còn lại.", en: "For every node i in an undirected tree, compute the sum of distances from i to every other node." },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 10,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [{ key: "edges", type: "string", label: { vi: "edges dạng JSON", en: "edges as JSON" }, default: "[[0,1],[0,2],[2,3],[2,4],[2,5]]" }],
+    approach: [
+      { vi: "Root tại 0. Postorder tính count[u] và tổng khoảng cách trong subtree của u.", en: "Root at 0. A postorder pass computes count[u] and the distance sum within u's subtree." },
+      { vi: "Sau lượt đầu, answer[0] là tổng khoảng cách từ root 0.", en: "After the first pass, answer[0] is the distance sum from root 0." },
+      { vi: "Reroot parent→child: count[child] node gần hơn 1, n-count[child] node xa hơn 1.", en: "Reroot parent→child: count[child] nodes become 1 closer and n-count[child] nodes become 1 farther." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Hai lượt qua mỗi cạnh của cây.", en: "Two passes across each tree edge." } },
+    codeLabel: { vi: "Hai lượt DFS rerooting", en: "Two-pass rerooting DFS" },
+    code: [
+      "class Solution:",
+      "    def sumOfDistancesInTree(self, n, edges):",
+      "        graph = [[] for _ in range(n)]",
+      "        for a, b in edges:",
+      "            graph[a].append(b)",
+      "            graph[b].append(a)",
+      "        parent, order = [-1] * n, [0]",
+      "        for node in order:",
+      "            for nxt in graph[node]:",
+      "                if nxt == parent[node]:",
+      "                    continue",
+      "                parent[nxt] = node",
+      "                order.append(nxt)",
+      "        count = [1] * n",
+      "        answer = [0] * n",
+      "        for node in reversed(order[1:]):",
+      "            p = parent[node]",
+      "            count[p] += count[node]",
+      "            answer[p] += answer[node] + count[node]",
+      "        for node in order[1:]:",
+      "            p = parent[node]",
+      "            answer[node] = answer[p] - count[node] + (n - count[node])",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse834Data(input, params); return [parsed.n, parsed.edges]; },
+    builder: buildSteps834,
+  },
+  2858: {
+    id: 2858,
+    difficulty: "hard",
+    slug: "minimum-edge-reversals-so-every-node-is-reachable",
+    category: { key: "tree", vi: "Cây", en: "Tree" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "rerooting", vi: "Rerooting DP", en: "Rerooting DP" },
+    ],
+    title: { vi: "Minimum Edge Reversals So Every Node Is Reachable", en: "Minimum Edge Reversals So Every Node Is Reachable" },
+    titleVi: { vi: "Số cạnh tối thiểu cần đảo cho từng điểm bắt đầu", en: "Minimum reversals for every starting node" },
+    statement: { vi: "Các cạnh có hướng tạo thành cây nếu bỏ hướng. Với từng node làm điểm bắt đầu, tính số cạnh ít nhất phải đảo để node đó đi tới mọi node khác.", en: "The directed edges form a tree when directions are ignored. For every starting node, find the minimum reversals needed to reach every other node." },
+    defaultInput: [4],
+    inputKind: "positive",
+    singleInput: true,
+    minInput: 2,
+    maxInput: 10,
+    inputLabel: { vi: "n - số node", en: "n - number of nodes" },
+    extraParams: [{ key: "edges", type: "string", label: { vi: "directed edges dạng JSON", en: "directed edges as JSON" }, default: "[[2,0],[2,1],[1,3]]" }],
+    approach: [
+      { vi: "Root tạm tại 0; gán cost 0 cho cạnh đi đúng hướng parent→child và cost 1 nếu phải đảo.", en: "Temporarily root at 0; assign cost 0 when an edge follows parent→child and cost 1 when it must be reversed." },
+      { vi: "answer[0] là tổng cost của mọi cạnh.", en: "answer[0] is the sum of all edge costs." },
+      { vi: "Reroot qua một cạnh: cost 0 trở thành +1, còn cost 1 trở thành -1.", en: "Across one reroot edge, cost 0 becomes +1 while cost 1 becomes -1." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Một lượt lấy answer[0], một lượt reroot.", en: "One pass finds answer[0], and one pass reroots." } },
+    codeLabel: { vi: "Đánh dấu hướng cạnh + rerooting", en: "Edge direction costs + rerooting" },
+    code: [
+      "class Solution:",
+      "    def minEdgeReversals(self, n, edges):",
+      "        graph = [[] for _ in range(n)]",
+      "        for u, v in edges:",
+      "            graph[u].append((v, 0))",
+      "            graph[v].append((u, 1))",
+      "        parent = [-1] * n",
+      "        edge_cost = [0] * n",
+      "        order = [0]",
+      "        for node in order:",
+      "            for nxt, cost in graph[node]:",
+      "                if nxt == parent[node]:",
+      "                    continue",
+      "                parent[nxt] = node",
+      "                edge_cost[nxt] = cost",
+      "                order.append(nxt)",
+      "        answer = [0] * n",
+      "        answer[0] = sum(edge_cost)",
+      "        for node in order[1:]:",
+      "            p = parent[node]",
+      "            answer[node] = answer[p] + (1 if edge_cost[node] == 0 else -1)",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse2858Data(input, params); return [parsed.n, parsed.edges]; },
+    builder: buildSteps2858,
+  },
+  1466: {
+    id: 1466,
+    difficulty: "medium",
+    slug: "reorder-routes-to-make-all-paths-lead-to-the-city-zero",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "graph", vi: "Đồ thị có hướng", en: "Directed Graph" },
+    ],
+    title: { vi: "Reorder Routes to Make All Paths Lead to the City Zero", en: "Reorder Routes to Make All Paths Lead to the City Zero" },
+    titleVi: { vi: "Đảo đường để mọi thành phố tới được thủ đô 0", en: "Reorder roads so every city reaches capital 0" },
+    statement: { vi: "Các đường một chiều tạo thành cây nếu bỏ hướng. Đảo ít đường nhất để mọi thành phố đi được tới thành phố 0.", en: "The one-way roads form a tree when directions are ignored. Reverse as few roads as possible so every city can reach city 0." },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    minInput: 2,
+    maxInput: 10,
+    inputLabel: { vi: "n - số thành phố", en: "n - number of cities" },
+    extraParams: [{ key: "connections", type: "string", label: { vi: "connections dạng JSON", en: "connections as JSON" }, default: "[[0,1],[1,3],[2,3],[4,0],[4,5]]" }],
+    approach: [
+      { vi: "Xem đường như vô hướng để DFS từ thủ đô 0, nhưng lưu lại hướng gốc của mỗi cạnh.", en: "Treat roads as undirected for DFS from capital 0 while preserving every original direction." },
+      { vi: "Khi DFS đi parent→child, cạnh gốc cùng chiều đang trỏ xa 0 nên phải đảo; cạnh ngược chiều đã trỏ về 0.", en: "When DFS walks parent→child, an original arrow in the same direction points away from 0 and must be reversed; the opposite arrow already points toward 0." },
+      { vi: "Cây có đúng một path về 0, nên quyết định trên từng cạnh là độc lập và tối ưu.", en: "A tree has one unique path to 0, so each edge decision is independent and optimal." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "DFS xem mỗi cạnh một lần.", en: "DFS inspects every edge once." } },
+    codeLabel: { vi: "DFS + cost hướng cạnh", en: "DFS + edge-direction cost" },
+    code: [
+      "class Solution:",
+      "    def minReorder(self, n, connections):",
+      "        graph = [[] for _ in range(n)]",
+      "        for a, b in connections:",
+      "            graph[a].append((b, 1))",
+      "            graph[b].append((a, 0))",
+      "        answer = 0",
+      "        stack = [(0, -1)]",
+      "        while stack:",
+      "            city, parent = stack.pop()",
+      "            for nxt, cost in graph[city]:",
+      "                if nxt == parent:",
+      "                    continue",
+      "                answer += cost",
+      "                stack.append((nxt, city))",
+      "        return answer",
+    ],
+    liveArgs(input, params = {}) { const parsed = parse1466Data(input, params); return [parsed.n, parsed.connections]; },
+    builder: buildSteps1466,
+  },
   1311: {
     id: 1311,
     difficulty: "medium",

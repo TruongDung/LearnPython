@@ -6698,6 +6698,55 @@ function renderRectangleAreaView(step) {
   </section>`;
 }
 
+function renderTreeDpLessonView(step) {
+  const view = step.treeDpLessonView || {};
+  const vi = lang === "vi";
+  const phases = Array.isArray(view.phases) ? view.phases : [];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const metrics = Array.isArray(view.metrics) ? view.metrics : [];
+  const nodeRows = Array.isArray(view.nodeRows) ? view.nodeRows : [];
+  const edgeRows = Array.isArray(view.edgeRows) ? view.edgeRows : [];
+  const display = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return value === null || value === undefined ? "—" : String(value);
+  };
+  const problemNames = {
+    2246: vi ? "PATH KHÁC KÝ TỰ" : "DIFFERENT-CHARACTER PATH",
+    834: vi ? "TỔNG KHOẢNG CÁCH" : "DISTANCE SUMS",
+    2858: vi ? "REROOT HƯỚNG CẠNH" : "EDGE-DIRECTION REROOTING",
+    1466: vi ? "ĐƯỜNG VỀ THỦ ĐÔ" : "ROADS TO THE CAPITAL",
+  };
+  const phaseHtml = phases.map((phase, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(display(phase))}</span>`).join("");
+  const metricHtml = metrics.map((metric) => `<div class="${escapeHtml(metric.state || "")}"><small>${escapeHtml(display(metric.label))}</small><strong>${escapeHtml(display(metric.value))}</strong></div>`).join("");
+  const nodeHtml = nodeRows.map((row) => {
+    const values = (row.values || []).map((item) => `<span class="${escapeHtml(item.state || "")}"><small>${escapeHtml(display(item.label))}</small><b>${escapeHtml(display(item.value))}</b></span>`).join("");
+    return `<article class="tdp-node ${escapeHtml(row.state || "")}"><header><small>#${escapeHtml(row.id)}</small><strong>${escapeHtml(display(row.label))}</strong></header><div>${values}</div></article>`;
+  }).join("");
+  const edgeHtml = edgeRows.length
+    ? edgeRows.map((edge) => `<div class="tdp-edge ${escapeHtml(edge.state || "")}"><strong>${escapeHtml(edge.from)} <i>→</i> ${escapeHtml(edge.to)}</strong><span>${escapeHtml(display(edge.label))}</span><b>${escapeHtml(display(edge.value))}</b></div>`).join("")
+    : `<em>${vi ? "Bài này chưa có cạnh." : "This example has no edges."}</em>`;
+  const resultText = view.answer === null || view.answer === undefined ? "…" : display(view.answer);
+  const currentLink = view.current >= 0
+    ? `${vi ? "node" : "node"} ${view.current}${view.parent >= 0 ? ` · parent ${view.parent}` : ""}${view.child >= 0 ? ` · child ${view.child}` : ""}`
+    : (vi ? "không có node đang chạy" : "no active node");
+
+  $("treeView").innerHTML = `<section class="tdp-viz">
+    <header><div><small>TREE DP · DFS · #${escapeHtml(view.problemId)}</small><strong>${escapeHtml(problemNames[view.problemId] || "TREE STEP VISUALIZATION")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="tdp-phases">${phaseHtml}</div>
+    <section class="tdp-rule"><b>${vi ? "Ý TƯỞNG CỐT LÕI" : "CORE IDEA"}</b><strong>${escapeHtml(display(view.rule))}</strong></section>
+    <section class="tdp-metrics">${metricHtml}</section>
+    <div class="tdp-main">
+      <section class="tdp-graph-wrap"><header><strong>${vi ? "CÂY VÀ HƯỚNG CẠNH" : "TREE AND EDGE DIRECTIONS"}</strong><span>${escapeHtml(currentLink)}</span></header><div id="treeDpLessonGraph" class="tdp-graph"></div></section>
+      <section class="tdp-edges"><header><strong>${vi ? "TRẠNG THÁI TỪNG CẠNH" : "EDGE-BY-EDGE STATE"}</strong><span>${vi ? "đọc theo mũi tên gốc" : "read by original arrow"}</span></header><div>${edgeHtml}</div></section>
+    </div>
+    <section class="tdp-nodes"><header><strong>${vi ? "BẢNG DP CỦA TỪNG NODE" : "PER-NODE DP TABLE"}</strong><span>${vi ? "tím = đang xử lý · xanh = đã chốt" : "purple = active · green = resolved"}</span></header><div style="--tdp-node-count:${Math.max(nodeRows.length, 1)}">${nodeHtml}</div></section>
+    <section class="tdp-formula"><small>${vi ? "DÒNG TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(display(view.formula))}</strong><span>${escapeHtml(display(view.explanation))}</span></section>
+    <footer class="tdp-result ${view.answer === null || view.answer === undefined ? "" : "done"}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${escapeHtml(resultText)}</strong><span>${view.answer === null || view.answer === undefined ? (vi ? "Dùng Next để theo dõi từng cập nhật." : "Use Next to follow each update.") : (vi ? "Đã hoàn tất toàn bộ các lượt DFS/DP." : "All DFS/DP passes are complete.")}</span></footer>
+  </section>`;
+  renderGraph(step, "treeDpLessonGraph");
+}
+
 // ---- Graph renderer (directed weighted graph) ----
 function renderGraph(step, targetId = "treeView") {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
@@ -25807,6 +25856,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTree(step);
+  } else if (step.treeDpLessonView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTreeDpLessonView(step);
   } else if (step.graph) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

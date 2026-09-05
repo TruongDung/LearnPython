@@ -42207,6 +42207,93 @@ html, body {
   .ts2281-compare > p { grid-template-columns: 44px 1fr; }
 }
 
+/* Shared step-by-step tree DP lesson for 2246, 834, 2858, and 1466. */
+.tdp-viz { display: grid; gap: 12px; width: 100%; min-width: 0; padding: 16px; color: #172033; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
+.tdp-viz > header, .tdp-graph-wrap > header, .tdp-edges > header, .tdp-nodes > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.tdp-viz > header > div { display: grid; gap: 2px; }
+.tdp-viz > header small, .tdp-rule > b, .tdp-formula small, .tdp-result small { color: #6d28d9; font-size: 9px; font-weight: 800; letter-spacing: 0; }
+.tdp-viz > header strong { color: #172033; font-size: 14px; letter-spacing: 0; }
+.tdp-viz > header > span { max-width: 48%; color: #475569; font-size: 11px; line-height: 1.45; text-align: right; }
+.tdp-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.tdp-phases span { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 36px; padding: 6px; color: #475569; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 10px; font-weight: 750; letter-spacing: 0; text-align: center; }
+.tdp-phases span b { display: grid; flex: 0 0 18px; width: 18px; height: 18px; place-items: center; color: #fff; background: #64748b; border-radius: 50%; font-size: 9px; }
+.tdp-phases span.active { color: #5b21b6; background: #f5f3ff; border-color: #8b5cf6; }
+.tdp-phases span.active b { background: #7c3aed; }
+.tdp-phases span.done { color: #166534; background: #f0fdf4; border-color: #22c55e; }
+.tdp-phases span.done b { background: #16a34a; }
+.tdp-rule, .tdp-graph-wrap, .tdp-edges, .tdp-nodes, .tdp-formula, .tdp-result { min-width: 0; padding: 11px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; }
+.tdp-rule { display: grid; gap: 5px; border-left: 3px solid #7c3aed; }
+.tdp-rule strong { color: #172033; font-size: 11px; line-height: 1.5; }
+.tdp-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.tdp-metrics > div { display: grid; gap: 3px; min-width: 0; padding: 9px 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px; }
+.tdp-metrics small { color: #64748b; font-size: 8px; text-transform: uppercase; }
+.tdp-metrics strong { color: #172033; font: 700 14px Consolas, monospace; overflow-wrap: anywhere; }
+.tdp-metrics .answer { border-color: #86efac; background: #f0fdf4; }
+.tdp-metrics .answer strong { color: #166534; }
+.tdp-main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(210px, .75fr); gap: 10px; }
+.tdp-graph-wrap, .tdp-edges, .tdp-nodes { display: grid; gap: 9px; overflow: hidden; }
+.tdp-graph-wrap > header strong, .tdp-edges > header strong, .tdp-nodes > header strong { color: #172033; font-size: 11px; letter-spacing: 0; }
+.tdp-graph-wrap > header span, .tdp-edges > header span, .tdp-nodes > header span { color: #64748b; font-size: 9px; text-align: right; }
+.tdp-graph { min-width: 0; overflow-x: auto; }
+.tdp-graph .graph-caption { margin-bottom: 7px; color: #475569; }
+.tdp-graph .graph-svg { display: block; max-height: 430px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; }
+.tdp-edges > div { display: grid; gap: 5px; align-content: start; max-height: 430px; overflow-y: auto; }
+.tdp-edge { display: grid; grid-template-columns: 54px minmax(0, 1fr) 52px; gap: 5px; align-items: center; min-width: 0; padding: 7px 6px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; }
+.tdp-edge strong { min-width: 0; color: #172033; font: 700 11px Consolas, monospace; overflow-wrap: anywhere; }
+.tdp-edge strong i { color: #7c3aed; font-style: normal; }
+.tdp-edge span { min-width: 0; color: #64748b; font-size: 8px; overflow-wrap: anywhere; }
+.tdp-edge > b { min-width: 0; color: #475569; font: 700 8px Consolas, monospace; text-align: right; overflow-wrap: anywhere; }
+.tdp-edge.active { border-color: #8b5cf6; background: #f5f3ff; box-shadow: inset 3px 0 #7c3aed; }
+.tdp-edge.done, .tdp-edge.chosen { border-color: #86efac; background: #f0fdf4; }
+.tdp-edge.done > b, .tdp-edge.chosen > b { color: #166534; }
+.tdp-edge.blocked { border-color: #fda4af; background: #fff1f2; }
+.tdp-edge.blocked > b { color: #be123c; }
+.tdp-nodes > div { display: grid; grid-template-columns: repeat(var(--tdp-node-count, 1), minmax(118px, 1fr)); gap: 7px; overflow-x: auto; padding: 3px; }
+.tdp-node { display: grid; gap: 7px; min-width: 118px; padding: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 7px; }
+.tdp-node.current { border-color: #7c3aed; box-shadow: 0 0 0 2px #ede9fe; }
+.tdp-node.done { border-bottom: 3px solid #16a34a; }
+.tdp-node > header { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; }
+.tdp-node > header small { color: #7e22ce; font: 700 9px Consolas, monospace; }
+.tdp-node > header strong { color: #172033; font-size: 10px; text-align: right; overflow-wrap: anywhere; }
+.tdp-node > div { display: grid; gap: 4px; }
+.tdp-node > div span { display: flex; align-items: baseline; justify-content: space-between; gap: 5px; padding: 4px 5px; background: #fff; border: 1px solid #e2e8f0; border-radius: 5px; }
+.tdp-node > div small { color: #64748b; font-size: 8px; }
+.tdp-node > div b { color: #334155; font: 700 10px Consolas, monospace; overflow-wrap: anywhere; }
+.tdp-formula, .tdp-result { display: grid; gap: 4px; }
+.tdp-formula { border-left: 3px solid #f59e0b; }
+.tdp-formula strong { color: #172033; font: 700 12px Consolas, monospace; line-height: 1.45; overflow-wrap: anywhere; }
+.tdp-formula span, .tdp-result span { color: #475569; font-size: 10px; line-height: 1.5; }
+.tdp-result { border-left: 3px solid #0284c7; }
+.tdp-result strong { color: #172033; font: 800 17px Consolas, monospace; overflow-wrap: anywhere; }
+.tdp-result.done { border-color: #22c55e; background: #f0fdf4; }
+.tdp-result.done strong { color: #166534; }
+
+[data-theme="dark"] .tdp-viz { color: #e2e8f0; background: #0f172a; border-color: #475569; }
+[data-theme="dark"] .tdp-viz > header strong, [data-theme="dark"] .tdp-rule strong, [data-theme="dark"] .tdp-graph-wrap > header strong, [data-theme="dark"] .tdp-edges > header strong, [data-theme="dark"] .tdp-nodes > header strong, [data-theme="dark"] .tdp-formula strong, [data-theme="dark"] .tdp-result strong, [data-theme="dark"] .tdp-metrics strong, [data-theme="dark"] .tdp-node > header strong, [data-theme="dark"] .tdp-edge strong { color: #e2e8f0; }
+[data-theme="dark"] .tdp-viz > header > span, [data-theme="dark"] .tdp-graph-wrap > header span, [data-theme="dark"] .tdp-edges > header span, [data-theme="dark"] .tdp-nodes > header span, [data-theme="dark"] .tdp-formula span, [data-theme="dark"] .tdp-result span { color: #cbd5e1; }
+[data-theme="dark"] .tdp-rule, [data-theme="dark"] .tdp-graph-wrap, [data-theme="dark"] .tdp-edges, [data-theme="dark"] .tdp-nodes, [data-theme="dark"] .tdp-formula, [data-theme="dark"] .tdp-result, [data-theme="dark"] .tdp-metrics > div { background: #111827; border-color: #475569; }
+[data-theme="dark"] .tdp-phases span, [data-theme="dark"] .tdp-node, [data-theme="dark"] .tdp-edge, [data-theme="dark"] .tdp-node > div span { color: #cbd5e1; background: #0f172a; border-color: #475569; }
+[data-theme="dark"] .tdp-graph .graph-svg { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .tdp-graph .graph-caption, [data-theme="dark"] .tdp-node > div small, [data-theme="dark"] .tdp-edge span, [data-theme="dark"] .tdp-edge > b { color: #cbd5e1; }
+[data-theme="dark"] .tdp-node > div b { color: #e2e8f0; }
+[data-theme="dark"] .tdp-edge.active { background: #2e1065; border-color: #8b5cf6; }
+[data-theme="dark"] .tdp-edge.done, [data-theme="dark"] .tdp-edge.chosen, [data-theme="dark"] .tdp-result.done { background: #052e16; border-color: #22c55e; }
+[data-theme="dark"] .tdp-edge.blocked { background: #4c0519; border-color: #e11d48; }
+
+@media (max-width: 820px) {
+  .tdp-main { grid-template-columns: 1fr; }
+  .tdp-edges > div { max-height: none; }
+}
+
+@media (max-width: 620px) {
+  .tdp-viz { padding: 11px 7px; }
+  .tdp-viz > header, .tdp-graph-wrap > header, .tdp-edges > header, .tdp-nodes > header { flex-direction: column; }
+  .tdp-viz > header > span { max-width: none; text-align: left; }
+  .tdp-phases, .tdp-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tdp-nodes > div { grid-template-columns: repeat(var(--tdp-node-count, 1), 126px); }
+  .tdp-edge { grid-template-columns: 54px minmax(0, 1fr) 52px; }
+}
+
 /* LeetCode 2818: prime-score boundaries, subarray capacity, then greedy picks. */
 .ms2818-viz {
   display: grid;
