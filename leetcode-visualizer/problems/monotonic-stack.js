@@ -2376,43 +2376,56 @@ function canSeePersonsCount(nums) {
 
 function buildSteps1944(input) {
   const heights = parseNums(input, "heights");
-  if (heights.length > 14) throw new Error("Use at most 14 people so the stack stays readable.");
+  if (heights.length > 12) throw new Error("Use at most 12 people so the queue stays readable.");
   const n = heights.length;
   const ans = Array(n).fill(0);
   const steps = [];
 
-  // ── helpers ──────────────────────────────────────────────────────────────
-  const stackText = (st) => st.length ? `[${st.map((v) => v).join(", ")}]` : "[]";
+  const stackText = (st) => st.length ? `[${st.map((index) => `${index}:${heights[index]}`).join(", ")}]` : "[]";
   const ansText = () => `[${ans.join(", ")}]`;
-  const makeSub = (st, cur) =>
+  const makeSub = (cur, visible = []) =>
     heights.map((_, idx) => {
       if (idx === cur) return `i=${idx} ← current`;
+      if (visible.includes(idx)) return `i=${idx} · visible now`;
       if (ans[idx] > 0) return `i=${idx} · sees=${ans[idx]}`;
       return `i=${idx}`;
     });
 
-  // ── snap helper ───────────────────────────────────────────────────────────
-  function snap({ title, note, codeLines, cur = -1, resolved = [], vars = [], final = false, stack: st }) {
+  function snap({ title, note, codeLines, phase = "rule", phaseIndex = 0, cur = -1, compared = -1, popped = -1, blocker = -1, visible = [], resolved = [], vars = [], final = false, stack: st }) {
     steps.push({
       title, note, codeLines,
       arr: [...heights],
-      sub: makeSub(st, cur),
+      sub: makeSub(cur, visible),
       highlight: cur >= 0 && cur < n ? [cur] : [],
       mark: [...resolved],
       vars, final,
+      visibleQueue1944View: {
+        heights: [...heights],
+        answer: [...ans],
+        stack: [...st],
+        resolved: [...resolved],
+        visible: [...visible],
+        phase,
+        phaseIndex,
+        current: cur,
+        compared,
+        popped,
+        blocker,
+        action: title,
+        explanation: note,
+      },
     });
   }
 
-  // ── init steps ────────────────────────────────────────────────────────────
   const stack = [];
   const resolved = [];
 
   snap({
     title: text(`${n} người trong hàng, quét từ PHẢI sang TRÁI`, `${n} people in a queue, scan from RIGHT to LEFT`),
     note: text(
-      "Person i nhìn thấy person j (j > i) nếu không có ai cao hơn hoặc bằng max(heights[i], heights[j]) ở giữa. " +
+      "Person i nhìn thấy person j khi mọi người nằm giữa đều thấp hơn cả hai đầu mút. " +
       "Quét từ phải, dùng stack GIẢM DẦN lưu các người còn có thể bị nhìn thấy từ bên trái.",
-      "Person i can see person j (j > i) if no one between them is taller than or equal to max(heights[i], heights[j]). " +
+      "Person i can see person j when everyone between them is shorter than both endpoints. " +
       "Scan right to left with a DECREASING stack of heights still visible from the left.",
     ),
     codeLines: [1, 2],
@@ -2423,9 +2436,9 @@ function buildSteps1944(input) {
   snap({
     title: text("Khởi tạo stack rỗng + ans = [0,…,0]", "Initialize empty stack + ans = [0,…,0]"),
     note: text(
-      "Stack lưu chiều cao các người bên phải theo thứ tự GIẢM DẦN. " +
+      "Stack lưu index người bên phải; chiều cao tại các index giảm dần từ đáy tới đỉnh. " +
       "ans[i] = số người person i nhìn thấy sang phải.",
-      "The stack holds heights of people to the right in DECREASING order. " +
+      "The stack holds person indices; their heights decrease from bottom to top. " +
       "ans[i] = number of people that person i can see to the right.",
     ),
     codeLines: [3, 4],
@@ -2433,8 +2446,8 @@ function buildSteps1944(input) {
     stack: [...stack],
   });
 
-  // ── main loop: i = n-1 down to 0 ─────────────────────────────────────────
   for (let i = n - 1; i >= 0; i--) {
+    const visible = [];
     snap({
       title: text(`i = ${i}: person ${i} cao ${heights[i]}`, `i = ${i}: person ${i} height ${heights[i]}`),
       note: text(
@@ -2444,6 +2457,8 @@ function buildSteps1944(input) {
         `Current stack (top first): ${stackText(stack)}.`,
       ),
       codeLines: [5],
+      phase: "select",
+      phaseIndex: 1,
       cur: i,
       vars: [
         { name: "i", value: i },
@@ -2455,25 +2470,52 @@ function buildSteps1944(input) {
       resolved: [...resolved],
     });
 
-    // pop shorter people — person i sees each one directly
-    while (stack.length && heights[i] > stack.at(-1)) {
-      const popped = stack.pop();
-      ans[i]++;
+    while (stack.length && heights[i] > heights[stack.at(-1)]) {
+      const poppedIndex = stack.at(-1);
       snap({
         title: text(
-          `Person ${i} (${heights[i]}) nhìn thấy người cao ${popped} → pop, ans[${i}]++`,
-          `Person ${i} (${heights[i]}) sees person height ${popped} → pop, ans[${i}]++`,
+          `${heights[i]} > ${heights[poppedIndex]}: person ${poppedIndex} thấp hơn`,
+          `${heights[i]} > ${heights[poppedIndex]}: person ${poppedIndex} is shorter`,
         ),
         note: text(
-          `heights[${i}] = ${heights[i]} > đỉnh stack ${popped}. ` +
-          `Person ${i} cao hơn → nhìn thấy người này VÀ nhìn xuyên qua họ. Pop để tiếp tục kiểm tra.`,
-          `heights[${i}] = ${heights[i]} > stack top ${popped}. ` +
-          `Person ${i} is taller → sees this person AND can see past them. Pop to keep checking.`,
+          `Person ${poppedIndex} là người thấp hơn gần nhất còn lộ ra trên skyline. Person ${i} chắc chắn nhìn thấy họ.`,
+          `Person ${poppedIndex} is the nearest shorter person still exposed on the skyline. Person ${i} definitely sees them.`,
+        ),
+        codeLines: [6],
+        phase: "compare",
+        phaseIndex: 2,
+        cur: i,
+        compared: poppedIndex,
+        visible,
+        vars: [
+          { name: "current", value: `${i}:${heights[i]}` },
+          { name: "stack top", value: `${poppedIndex}:${heights[poppedIndex]}` },
+          { name: "comparison", value: `${heights[i]} > ${heights[poppedIndex]}` },
+        ],
+        stack: [...stack],
+        resolved: [...resolved],
+      });
+      stack.pop();
+      ans[i]++;
+      visible.push(poppedIndex);
+      snap({
+        title: text(
+          `Nhìn thấy person ${poppedIndex} → pop, ans[${i}] = ${ans[i]}`,
+          `See person ${poppedIndex} → pop, ans[${i}] = ${ans[i]}`,
+        ),
+        note: text(
+          `Pop person ${poppedIndex} vì chiều cao ${heights[poppedIndex]} không thể chặn person ${i}. Tiếp tục nhìn đỉnh stack mới.`,
+          `Pop person ${poppedIndex} because height ${heights[poppedIndex]} cannot block person ${i}. Continue with the new stack top.`,
         ),
         codeLines: [6, 7, 8],
+        phase: "pop",
+        phaseIndex: 2,
         cur: i,
+        compared: poppedIndex,
+        popped: poppedIndex,
+        visible,
         vars: [
-          { name: "popped height", value: popped },
+          { name: "popped person", value: `${poppedIndex}:${heights[poppedIndex]}` },
           { name: `ans[${i}]`, value: ans[i] },
           { name: "stack", value: stackText(stack) },
         ],
@@ -2482,24 +2524,28 @@ function buildSteps1944(input) {
       });
     }
 
-    // if someone taller (or equal) remains on the stack, person i sees exactly that one
     if (stack.length) {
+      const blockerIndex = stack.at(-1);
       ans[i]++;
+      visible.push(blockerIndex);
       snap({
         title: text(
-          `Person ${i} còn thấy người cao ${stack.at(-1)} (cao hơn hoặc bằng) → ans[${i}]++`,
-          `Person ${i} also sees taller/equal person height ${stack.at(-1)} → ans[${i}]++`,
+          `Thấy blocker person ${blockerIndex} (${heights[blockerIndex]}) → ans[${i}] = ${ans[i]}`,
+          `See blocker person ${blockerIndex} (${heights[blockerIndex]}) → ans[${i}] = ${ans[i]}`,
         ),
         note: text(
-          `Còn người cao ${stack.at(-1)} ≥ heights[${i}] = ${heights[i]} ở đầu stack. ` +
-          `Person ${i} nhìn thấy họ nhưng KHÔNG nhìn xuyên qua. ans[${i}] = ${ans[i]}.`,
-          `There is a person height ${stack.at(-1)} ≥ heights[${i}] = ${heights[i]} at the stack top. ` +
-          `Person ${i} sees them but CANNOT see past. ans[${i}] = ${ans[i]}.`,
+          `Person ${blockerIndex} cao ${heights[blockerIndex]} > ${heights[i]}. Person ${i} nhìn thấy người này, nhưng tầm nhìn dừng tại đây nên KHÔNG pop.`,
+          `Person ${blockerIndex} has height ${heights[blockerIndex]} > ${heights[i]}. Person ${i} sees them, but the view stops here, so do NOT pop.`,
         ),
         codeLines: [9, 10],
+        phase: "blocker",
+        phaseIndex: 3,
         cur: i,
+        compared: blockerIndex,
+        blocker: blockerIndex,
+        visible,
         vars: [
-          { name: "taller top", value: stack.at(-1) },
+          { name: "blocker", value: `${blockerIndex}:${heights[blockerIndex]}` },
           { name: `ans[${i}]`, value: ans[i] },
           { name: "stack", value: stackText(stack) },
         ],
@@ -2517,24 +2563,29 @@ function buildSteps1944(input) {
           `No one remains to the right of person ${i}. ans[${i}] = total shorter people popped = ${ans[i]}.`,
         ),
         codeLines: [9],
+        phase: "blocker",
+        phaseIndex: 3,
         cur: i,
+        visible,
         vars: [{ name: `ans[${i}]`, value: ans[i] }, { name: "stack", value: "[]" }],
         stack: [...stack],
         resolved: [...resolved],
       });
     }
 
-    // push current person onto the stack
-    stack.push(heights[i]);
+    stack.push(i);
     resolved.push(i);
     snap({
-      title: text(`Push heights[${i}] = ${heights[i]} vào stack`, `Push heights[${i}] = ${heights[i]} onto the stack`),
+      title: text(`Push person ${i} (${heights[i]}) vào stack`, `Push person ${i} (${heights[i]}) onto the stack`),
       note: text(
-        `Person ${i} đã được tính. Push ${heights[i]} để người bên trái (i < ${i}) có thể nhìn thấy.`,
-        `Person ${i} is resolved. Push ${heights[i]} so people to the left (i < ${i}) can see them.`,
+        `Person ${i} đã được tính xong. Stack chỉ giữ skyline còn có thể được người bên trái nhìn thấy.`,
+        `Person ${i} is resolved. The stack keeps only the skyline that people farther left may still see.`,
       ),
       codeLines: [11],
+      phase: "push",
+      phaseIndex: 4,
       cur: i,
+      visible,
       vars: [
         { name: "push", value: heights[i] },
         { name: "stack", value: stackText(stack) },
@@ -2545,7 +2596,6 @@ function buildSteps1944(input) {
     });
   }
 
-  // ── final step ────────────────────────────────────────────────────────────
   snap({
     title: text(`Kết quả: ans = [${ans.join(", ")}]`, `Result: ans = [${ans.join(", ")}]`),
     note: text(
@@ -2555,6 +2605,8 @@ function buildSteps1944(input) {
       `Taller people block the view; shorter people are seen through.`,
     ),
     codeLines: [12],
+    phase: "done",
+    phaseIndex: 4,
     vars: [{ name: "ans", value: ansText() }],
     stack: [...stack],
     resolved: [...Array.from({ length: n }, (_, i) => i)],
@@ -3217,7 +3269,7 @@ function buildSteps2281(input) {
       sub: strength.map((value, index) => `i=${index} · strength=${value} · L=${left[index] ?? "?"} · R=${right[index] ?? "?"}`),
       highlight: current >= 0 ? [current] : [],
       mark: stack.filter((index) => index !== current),
-      codeLines,
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
       vars: [
         { name: "i", value: current >= 0 ? current : "—" },
         { name: "stack", value: `[${stack.map((index) => `${index}:${strength[index]}`).join(", ")}]` },
@@ -4455,6 +4507,285 @@ function maximumOfMinimums(nums) {
   for (let i = 0; i < n; i++) ans[right[i] - left[i] - 2] = Math.max(ans[right[i] - left[i] - 2], nums[i]);
   for (let i = n - 2; i >= 0; i--) ans[i] = Math.max(ans[i], ans[i + 1]);
   return ans;
+}
+
+function buildSteps1950(input) {
+  const nums = parseNums(input, "nums");
+  if (nums.length > 12) throw new Error("Use up to 12 numbers so every boundary and window-size bucket stays readable.");
+  if (nums.some((value) => value <= 0)) throw new Error("nums must contain positive integers.");
+
+  const n = nums.length;
+  const left = Array(n).fill(-1);
+  const right = Array(n).fill(n);
+  const leftKnown = Array(n).fill(false);
+  const rightKnown = Array(n).fill(false);
+  const answer = Array(n).fill(0);
+  const stack = [];
+  const steps = [];
+
+  const stackText = () => `[${stack.map((index) => `${index}:${nums[index]}`).join(", ")}]`;
+  const snap = ({
+    phase,
+    title,
+    note,
+    codeLines,
+    current = -1,
+    compared = -1,
+    popped = -1,
+    activeLength = 0,
+    ownerRange = null,
+    bucketBefore = null,
+    sourceLength = 0,
+    finalizedFrom = n + 1,
+    action = "",
+    final = false,
+  }) => {
+    const highlight = [current, compared, popped].filter((index, position, all) => index >= 0 && all.indexOf(index) === position);
+    const phaseIndex = phase.startsWith("boundary") || phase === "rule"
+      ? 0
+      : phase.startsWith("bucket")
+        ? 1
+        : phase.startsWith("fill")
+          ? 2
+          : 3;
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((value, index) => {
+        const l = leftKnown[index] ? left[index] : "?";
+        const r = rightKnown[index] ? right[index] : "?";
+        return `i=${index} · value=${value} · L=${l} · R=${r}`;
+      }),
+      highlight,
+      mark: leftKnown.map((known, index) => known && rightKnown[index] ? index : -1).filter((index) => index >= 0),
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      final,
+      vars: [
+        { name: "i", value: current >= 0 ? current : "-" },
+        { name: "stack", value: stackText() },
+        { name: "left", value: arrText(left.map((value, index) => leftKnown[index] ? value : "?")) },
+        { name: "right", value: arrText(right.map((value, index) => rightKnown[index] ? value : "?")) },
+        { name: "answer", value: arrText(answer) },
+      ],
+      note,
+      maxMin1950View: {
+        phase,
+        phaseIndex,
+        nums: [...nums],
+        left: [...left],
+        right: [...right],
+        leftKnown: [...leftKnown],
+        rightKnown: [...rightKnown],
+        stack: [...stack],
+        answer: [...answer],
+        current,
+        compared,
+        popped,
+        activeLength,
+        ownerRange: ownerRange ? { ...ownerRange } : null,
+        bucketBefore,
+        sourceLength,
+        finalizedFrom,
+        action,
+        explanation: note,
+      },
+    });
+  };
+
+  snap({
+    phase: "rule",
+    title: text("Mục tiêu: đáp án theo từng độ dài cửa sổ", "Goal: one answer for every window size"),
+    note: text(
+      "Mỗi nums[i] sẽ sở hữu khoảng lớn nhất mà nó vẫn là minimum. Độ dài khoảng đó cho biết bucket mà nums[i] có thể cập nhật.",
+      "Each nums[i] owns the widest interval where it remains the minimum. That interval length identifies the bucket it can update.",
+    ),
+    codeLines: [2, 3, 4, 5],
+    action: "span(i) = right[i] - left[i] - 1",
+  });
+
+  for (let i = 0; i < n; i++) {
+    snap({
+      phase: "boundary-select",
+      title: text(`Xét i=${i}, nums[i]=${nums[i]}`, `Visit i=${i}, nums[i]=${nums[i]}`),
+      note: text(
+        "Stack tăng dần theo value. Ta loại các value lớn hơn hoặc bằng current vì current là biên nhỏ hơn gần nhất bên phải của chúng.",
+        "The stack is increasing by value. Remove values greater than or equal to current because current is their nearest smaller boundary on the right.",
+      ),
+      codeLines: 6,
+      current: i,
+      action: `current = ${i}:${nums[i]}`,
+    });
+
+    while (stack.length) {
+      const top = stack.at(-1);
+      snap({
+        phase: "boundary-compare",
+        title: text(`So sánh stack top ${nums[top]} với current ${nums[i]}`, `Compare stack top ${nums[top]} with current ${nums[i]}`),
+        note: nums[top] >= nums[i]
+          ? text(`${nums[top]} ≥ ${nums[i]}, nên index ${top} phải rời stack.`, `${nums[top]} ≥ ${nums[i]}, so index ${top} must leave the stack.`)
+          : text(`${nums[top]} < ${nums[i]}, nên index ${top} chính là previous smaller của i=${i}.`, `${nums[top]} < ${nums[i]}, so index ${top} is the previous smaller boundary for i=${i}.`),
+        codeLines: 7,
+        current: i,
+        compared: top,
+        action: `${nums[top]} ${nums[top] >= nums[i] ? "≥" : "<"} ${nums[i]}`,
+      });
+      if (nums[top] < nums[i]) break;
+
+      const removed = stack.pop();
+      right[removed] = i;
+      rightKnown[removed] = true;
+      snap({
+        phase: "boundary-pop",
+        title: text(`Pop index ${removed}; right[${removed}] = ${i}`, `Pop index ${removed}; right[${removed}] = ${i}`),
+        note: text(
+          `Index ${i} là vị trí đầu tiên bên phải có value ≤ nums[${removed}], nên khoảng của ${removed} không thể đi qua đây.`,
+          `Index ${i} is the first position on the right with value ≤ nums[${removed}], so ${removed}'s interval cannot cross it.`,
+        ),
+        codeLines: 8,
+        current: i,
+        popped: removed,
+        action: `right[${removed}] = ${i}`,
+      });
+    }
+
+    left[i] = stack.length ? stack.at(-1) : -1;
+    leftKnown[i] = true;
+    snap({
+      phase: "boundary-left",
+      title: text(`left[${i}] = ${left[i]}`, `left[${i}] = ${left[i]}`),
+      note: left[i] === -1
+        ? text("Stack rỗng: không có phần tử nhỏ hơn ở bên trái, dùng biên giả -1.", "The stack is empty: there is no smaller value on the left, so use sentinel -1.")
+        : text(`Đỉnh stack index ${left[i]} có value ${nums[left[i]]} < ${nums[i]}.`, `Stack top index ${left[i]} has value ${nums[left[i]]} < ${nums[i]}.`),
+      codeLines: 9,
+      current: i,
+      compared: left[i],
+      action: `left[${i}] = ${left[i]}`,
+    });
+
+    stack.push(i);
+    snap({
+      phase: "boundary-push",
+      title: text(`Push index ${i} vào stack`, `Push index ${i} onto the stack`),
+      note: text("Stack lại tăng dần; đỉnh là candidate gần nhất cho index tiếp theo.", "The stack is increasing again; its top is the nearest candidate for the next index."),
+      codeLines: 10,
+      current: i,
+      action: `push ${i}:${nums[i]}`,
+    });
+  }
+
+  stack.forEach((index) => { rightKnown[index] = true; });
+  snap({
+    phase: "boundary-done",
+    title: text("Hoàn tất hai biên L và R", "Both L and R boundaries are ready"),
+    note: text(
+      `Các index còn trong stack không gặp value nhỏ hơn hoặc bằng ở bên phải, nên giữ biên giả R=n=${n}.`,
+      `Indices still on the stack never meet a smaller-or-equal value on the right, so their sentinel boundary remains R=n=${n}.`,
+    ),
+    codeLines: [4, 8, 9, 10],
+    action: "Every index now has L and R",
+  });
+
+  snap({
+    phase: "bucket-init",
+    title: text("Tạo một bucket cho mỗi window size", "Create one bucket for every window size"),
+    note: text("answer[len-1] lưu minimum lớn nhất đã biết cho các cửa sổ dài len.", "answer[len-1] stores the largest known minimum for windows of length len."),
+    codeLines: 11,
+    action: `answer = ${arrText(answer)}`,
+  });
+
+  for (let i = 0; i < n; i++) {
+    const size = right[i] - left[i] - 1;
+    const ownerRange = { start: left[i] + 1, end: right[i] - 1, length: size };
+    snap({
+      phase: "bucket-span",
+      title: text(`i=${i} làm minimum trên đoạn [${ownerRange.start}..${ownerRange.end}]`, `i=${i} is minimum on [${ownerRange.start}..${ownerRange.end}]`),
+      note: text(
+        `Hai biên ${left[i]} và ${right[i]} chặn nums[${i}]=${nums[i]}; độ dài lớn nhất là ${right[i]} - ${left[i]} - 1 = ${size}.`,
+        `Boundaries ${left[i]} and ${right[i]} stop nums[${i}]=${nums[i]}; its maximum length is ${right[i]} - ${left[i]} - 1 = ${size}.`,
+      ),
+      codeLines: 13,
+      current: i,
+      activeLength: size,
+      ownerRange,
+      action: `size = ${right[i]} - (${left[i]}) - 1 = ${size}`,
+    });
+
+    const before = answer[size - 1];
+    answer[size - 1] = Math.max(answer[size - 1], nums[i]);
+    snap({
+      phase: "bucket-write",
+      title: text(`Bucket len=${size}: max(${before}, ${nums[i]}) = ${answer[size - 1]}`, `Bucket len=${size}: max(${before}, ${nums[i]}) = ${answer[size - 1]}`),
+      note: text(
+        `nums[${i}] là một candidate cho minimum lớn nhất của window dài ${size}.`,
+        `nums[${i}] is a candidate for the largest minimum among windows of length ${size}.`,
+      ),
+      codeLines: 14,
+      current: i,
+      activeLength: size,
+      ownerRange,
+      bucketBefore: before,
+      action: `answer[${size - 1}] = ${answer[size - 1]}`,
+    });
+  }
+
+  snap({
+    phase: "fill-start",
+    title: text("Các bucket còn trống cần được lan truyền", "Missing buckets need right-to-left propagation"),
+    note: text(
+      "Nếu một value là minimum của cửa sổ dài hơn, nó cũng xuất hiện trong một cửa sổ ngắn hơn. Vì vậy lấy max với bucket ngay bên phải.",
+      "If a value is the minimum of a longer window, it also belongs to a shorter window. Therefore take the maximum with the bucket immediately to the right.",
+    ),
+    codeLines: 15,
+    finalizedFrom: n,
+    action: "answer[len] = max(answer[len], answer[len + 1])",
+  });
+
+  for (let index = n - 2; index >= 0; index--) {
+    const length = index + 1;
+    const before = answer[index];
+    const source = answer[index + 1];
+    snap({
+      phase: "fill-compare",
+      title: text(`So sánh bucket len=${length} với len=${length + 1}`, `Compare bucket len=${length} with len=${length + 1}`),
+      note: text(
+        `Giữ candidate tốt hơn giữa ${before} và ${source}.`,
+        `Keep the better candidate between ${before} and ${source}.`,
+      ),
+      codeLines: 16,
+      activeLength: length,
+      sourceLength: length + 1,
+      finalizedFrom: length + 1,
+      bucketBefore: before,
+      action: `max(${before}, ${source})`,
+    });
+    answer[index] = Math.max(before, source);
+    snap({
+      phase: "fill-write",
+      title: text(`answer cho window dài ${length} = ${answer[index]}`, `answer for window length ${length} = ${answer[index]}`),
+      note: text(
+        `Bucket len=${length} đã hoàn tất; tiếp tục dịch sang trái.`,
+        `The len=${length} bucket is final; continue one position to the left.`,
+      ),
+      codeLines: 16,
+      activeLength: length,
+      sourceLength: length + 1,
+      finalizedFrom: length,
+      bucketBefore: before,
+      action: `answer[${index}] = ${answer[index]}`,
+    });
+  }
+
+  snap({
+    phase: "done",
+    title: text(`Kết quả = ${arrText(answer)}`, `Result = ${arrText(answer)}`),
+    note: text("Vị trí j trong answer tương ứng window size j+1.", "Position j in answer corresponds to window size j+1."),
+    codeLines: 17,
+    finalizedFrom: 1,
+    action: `return ${arrText(answer)}`,
+    final: true,
+  });
+
+  return { original: nums, answer, steps };
 }
 
 function visiblePeopleGrid(input) {
@@ -6351,8 +6682,8 @@ module.exports = {
     title: text("Number of Visible People in a Queue"),
     titleVi: text("Số người nhìn thấy trong hàng đợi", "Number of visible people in a queue"),
     statement: text(
-      "Có n người đứng trong hàng. heights[i] là chiều cao người thứ i. Person i nhìn thấy person j (j > i) nếu không có ai ở giữa cao hơn hoặc bằng max(heights[i], heights[j]). Với mỗi i, đếm số người nhìn thấy sang phải.",
-      "There are n people in a queue. heights[i] is the height of person i. Person i can see person j (j > i) if no one between them has a height >= max(heights[i], heights[j]). For each i, count how many people they can see to the right.",
+      "Có n người đứng trong hàng. Person i nhìn thấy person j ở bên phải khi mọi người nằm giữa đều thấp hơn cả hai đầu mút. Với mỗi i, đếm số người nhìn thấy sang phải.",
+      "There are n people in a queue. Person i can see person j to the right when everyone between them is shorter than both endpoints. Count how many people each person sees to the right.",
     ),
     defaultInput: "10,6,8,5,11,9",
     inputKind: "string",
@@ -6360,8 +6691,8 @@ module.exports = {
     extraParams: [],
     approach: [
       text(
-        "Quét từ PHẢI sang TRÁI, dùng stack GIẢM DẦN lưu chiều cao các người còn nhìn thấy được từ bên trái.",
-        "Scan RIGHT to LEFT using a DECREASING stack of heights still visible from the left.",
+        "Quét từ PHẢI sang TRÁI, dùng stack lưu index của skyline; chiều cao giảm dần từ đáy tới đỉnh.",
+        "Scan RIGHT to LEFT using a stack of skyline indices; heights decrease from bottom to top.",
       ),
       text(
         "Với person i: pop mọi người thấp hơn (heights[i] > đỉnh stack) — mỗi lần pop là 1 người nhìn thấy trực tiếp.",
@@ -6372,8 +6703,8 @@ module.exports = {
         "After the pop loop, if someone taller/equal remains on the stack, add 1 more — this person blocks the view but is still visible.",
       ),
       text(
-        "Push heights[i] vào stack để các người bên trái sau đó có thể thấy person i.",
-        "Push heights[i] onto the stack so people further left can see person i.",
+        "Push index i vào stack để luôn biết chính xác person nào đang ở skyline.",
+        "Push index i so the stack always identifies the exact person on the skyline.",
       ),
     ],
     complexity: {
@@ -6390,12 +6721,12 @@ module.exports = {
       "        n = len(heights)",
       "        ans, stack = [0] * n, []",
       "        for i in range(n - 1, -1, -1):",
-      "            while stack and heights[i] > stack[-1]:",
+      "            while stack and heights[i] > heights[stack[-1]]:",
       "                ans[i] += 1",
       "                stack.pop()",
       "            if stack:",
       "                ans[i] += 1",
-      "            stack.append(heights[i])",
+      "            stack.append(i)",
       "        return ans",
     ],
     liveArgs: (input) => [parseNums(input, "heights")],
@@ -7031,7 +7362,55 @@ module.exports = {
   },
   255: simpleProblem({ id: 255, difficulty: "medium", slug: "verify-preorder-sequence-in-binary-search-tree", name: "Verify Preorder Sequence in Binary Search Tree", viName: "Kiểm tra preorder BST", statement: text("Premium: kiểm tra dãy có thể là preorder của BST không.", "Premium: check whether a sequence can be a BST preorder traversal."), defaultInput: "5,2,1,3,6", tags: [arrayTag, treeTag, monoTag], premium: true, solver: arrayBuilder(bstPreorder) }),
   1762: simpleProblem({ id: 1762, difficulty: "medium", slug: "buildings-with-an-ocean-view", name: "Buildings With an Ocean View", viName: "Tòa nhà nhìn ra biển", statement: text("Premium: trả index các tòa nhà cao hơn mọi tòa bên phải.", "Premium: return indices taller than every building to their right."), defaultInput: "4,2,3,1", premium: true, solver: arrayBuilder(oceanView) }),
-  1950: simpleProblem({ id: 1950, difficulty: "medium", slug: "maximum-of-minimum-values-in-all-subarrays", name: "Maximum of Minimum Values in All Subarrays", viName: "Maximum của minimum theo độ dài", statement: text("Premium: với mỗi độ dài window, tìm minimum lớn nhất.", "Premium: for every window length, find the maximum among window minimums."), defaultInput: "10,20,50,10,70,30", premium: true, solver: arrayBuilder(maximumOfMinimums) }),
+  1950: {
+    id: 1950,
+    difficulty: "medium",
+    slug: "maximum-of-minimum-values-in-all-subarrays",
+    category,
+    tags: [arrayTag, monoTag, premiumTag],
+    title: text("Maximum of Minimum Values in All Subarrays"),
+    titleVi: text("Maximum của minimum theo mọi độ dài", "Maximum of Minimum Values in All Subarrays"),
+    statement: text(
+      "Với mỗi độ dài window từ 1 đến n, lấy minimum của từng subarray có độ dài đó rồi trả về minimum lớn nhất.",
+      "For every window length from 1 through n, take each subarray minimum and return the largest of those minimums.",
+    ),
+    defaultInput: "10,20,50,10,70,30",
+    inputKind: "string",
+    inputLabel: text("nums (cách bởi ,)", "nums (comma separated)"),
+    extraParams: [],
+    premium: true,
+    approach: [
+      text("Dùng stack tăng để tìm previous smaller L và next smaller-or-equal R cho mỗi index.", "Use an increasing stack to find previous-smaller L and next-smaller-or-equal R for every index."),
+      text("nums[i] là minimum trên khoảng lớn nhất [L+1..R-1], có độ dài R-L-1.", "nums[i] is the minimum on its widest interval [L+1..R-1], whose length is R-L-1."),
+      text("Cập nhật bucket của độ dài đó, sau đó lan truyền từ window dài về ngắn để lấp mọi bucket.", "Update that length's bucket, then propagate from longer windows to shorter windows to fill every bucket."),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text("Mỗi index được push và pop tối đa một lần; hai vòng còn lại đều tuyến tính.", "Each index is pushed and popped at most once; both remaining passes are linear."),
+    },
+    code: [
+      "class Solution:",
+      "    def findMaximums(self, nums):",
+      "        n = len(nums)",
+      "        left, right = [-1] * n, [n] * n",
+      "        stack = []",
+      "        for i in range(n):",
+      "            while stack and nums[stack[-1]] >= nums[i]:",
+      "                right[stack.pop()] = i",
+      "            left[i] = stack[-1] if stack else -1",
+      "            stack.append(i)",
+      "        answer = [0] * n",
+      "        for i, value in enumerate(nums):",
+      "            size = right[i] - left[i] - 1",
+      "            answer[size - 1] = max(answer[size - 1], value)",
+      "        for i in range(n - 2, -1, -1):",
+      "            answer[i] = max(answer[i], answer[i + 1])",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "nums")],
+    builder: buildSteps1950,
+  },
   2282: simpleProblem({ id: 2282, difficulty: "medium", slug: "number-of-people-that-can-be-seen-in-a-grid", name: "Number of People That Can Be Seen in a Grid", viName: "Số người nhìn thấy trong grid", statement: text("Premium: đếm người nhìn thấy sang phải và xuống dưới trong grid.", "Premium: count visible people to the right and downward in a grid."), defaultInput: "3,1,4;2,5,1;6,2,3", inputLabel: text("heights grid", "heights grid"), premium: true, solver: visiblePeopleGrid }),
   2297: simpleProblem({ id: 2297, difficulty: "medium", slug: "jump-game-viii", name: "Jump Game VIII", viName: "Jump Game VIII", statement: text("Premium: bài graph/DP dùng stack đơn điệu để dựng cạnh nhảy hữu ích.", "Premium: graph/DP problem using monotonic stacks to build useful jump edges."), defaultInput: "3,2,4,4,1", premium: true, solver: arrayBuilder(jumpGameVIII) }),
   2345: {

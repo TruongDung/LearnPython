@@ -2087,7 +2087,12 @@ $("nextBtn").addEventListener("click", () => {
   const breakpointIndex = findBreakpointStep(stepIndex, 1);
   if (breakpointIndex >= 0) stepIndex = breakpointIndex;
   else if (stepIndex < steps.length - 1) stepIndex++;
-  renderStep();
+  try {
+    renderStep();
+  } catch (error) {
+    $("treeView").innerHTML = `<pre id="mm1950GlobalDebugError">${escapeHtml(error.stack || error.message)}</pre>`;
+    throw error;
+  }
 });
 $("lastBtn").addEventListener("click", () => {
   stopPlay();
@@ -8092,6 +8097,178 @@ function renderValidSubarrays1063View(step) {
     <section class="vs1063-contributions"><header><strong>${vi ? "CỘNG DỒN THEO RIGHT ENDPOINT" : "ACCUMULATED BY RIGHT ENDPOINT"}</strong><span>${vi ? "mỗi +k là len(stack) sau khi push" : "each +k is len(stack) after push"}</span></header><div>${contributionRows}</div></section>
     <section class="vs1063-formula"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(stepFormula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     <footer class="vs1063-result ${isFinal ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${isFinal ? view.answer : "…"}</strong><span>${isFinal ? (vi ? "Tổng tất cả contribution là số valid subarray." : "The sum of all contributions is the number of valid subarrays.") : (vi ? "answer sẽ được cập nhật sau khi stack hợp lệ." : "answer is updated after the stack is valid.")}</span></footer>
+  </section>`;
+}
+
+function renderVisibleQueue1944View(step) {
+  const view = step.visibleQueue1944View || {};
+  const vi = lang === "vi";
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const resolved = Array.isArray(view.resolved) ? view.resolved : [];
+  const visible = Array.isArray(view.visible) ? view.visible : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const compared = Number.isInteger(view.compared) ? view.compared : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const blocker = Number.isInteger(view.blocker) ? view.blocker : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const maxHeight = Math.max(1, ...heights);
+  const phaseLabels = vi
+    ? ["Hiểu luật nhìn", "Chọn person i", "Pop người thấp", "Dừng ở blocker", "Push / Kết quả"]
+    : ["Visibility rule", "Choose person i", "Pop shorter", "Stop at blocker", "Push / Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const people = heights.map((height, index) => {
+    const classes = ["vq1944-person"];
+    if (resolved.includes(index)) classes.push("resolved");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (visible.includes(index)) classes.push("visible");
+    if (index === current) classes.push("current");
+    if (index === compared) classes.push("compared");
+    if (index === popped) classes.push("popped");
+    if (index === blocker) classes.push("blocker");
+    const barHeight = 44 + Math.round((height / maxHeight) * 72);
+    let status = resolved.includes(index) ? (vi ? "đã tính" : "resolved") : (vi ? "chưa quét" : "not scanned");
+    if (stack.includes(index)) status = "STACK";
+    if (visible.includes(index)) status = vi ? "NHÌN THẤY" : "VISIBLE";
+    if (index === current) status = "CURRENT";
+    if (index === popped) status = "POP";
+    if (index === blocker) status = "BLOCKER";
+    return `<article class="${classes.join(" ")}"><div class="vq1944-height-zone"><div class="vq1944-height" style="height:${barHeight}px"><b>${height}</b></div></div><header><small>person</small><strong>${index}</strong></header><footer><span>${escapeHtml(status)}</span><b>ans ${answer[index] ?? 0}</b></footer></article>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((index, position) => `<span class="${position === stack.length - 1 ? "top" : ""}"><small>person ${index}</small><b>${heights[index]}</b>${position === stack.length - 1 ? "<em>TOP</em>" : ""}</span>`).join("<i>→</i>")
+    : `<p>${vi ? "Stack rỗng" : "Empty stack"}</p>`;
+  const sightHtml = current >= 0 && visible.length
+    ? visible.map((target) => `<span class="${target === blocker ? "blocker" : "shorter"}"><small>${current} → ${target}</small><b>${heights[current]} ${target === blocker ? "≤" : ">"} ${heights[target]}</b><em>${target === blocker ? (vi ? "thấy rồi dừng" : "see, then stop") : (vi ? "thấy rồi pop" : "see, then pop")}</em></span>`).join("")
+    : `<p>${current < 0 ? (vi ? "Chọn một person để bắt đầu nhìn sang phải." : "Choose a person to begin looking right.") : (vi ? "Chưa thấy người nào ở bước này." : "No person has been seen in this step yet.")}</p>`;
+  const hasComparison = current >= 0 && compared >= 0;
+  const currentHeight = current >= 0 ? heights[current] : null;
+  const comparedHeight = compared >= 0 ? heights[compared] : null;
+  const relation = hasComparison ? (currentHeight > comparedHeight ? ">" : "<") : "?";
+  const decision = popped >= 0 || view.phase === "compare" || view.phase === "pop"
+    ? "SEE + POP"
+    : blocker >= 0
+      ? "SEE + STOP"
+      : stack.length === 0 && current >= 0
+        ? "NO BLOCKER"
+        : "WAIT";
+  const comparison = hasComparison ? `<section class="vq1944-compare ${popped >= 0 || view.phase === "pop" || view.phase === "compare" ? "pop" : blocker >= 0 ? "stop" : ""}"><div><small>CURRENT · person ${current}</small><strong>${currentHeight}</strong></div><b>${relation}</b><div><small>STACK TOP · person ${compared}</small><strong>${comparedHeight}</strong></div><p><b>${decision}</b><span>${popped >= 0 || view.phase === "pop" || view.phase === "compare" ? (vi ? "Người thấp hơn được nhìn thấy và bị loại để tiếp tục nhìn xa hơn." : "The shorter person is visible and removed so the scan can continue farther.") : blocker >= 0 ? (vi ? "Người cao hơn đầu tiên được nhìn thấy, nhưng chặn mọi người phía sau." : "The first taller person is visible, but blocks everyone behind them.") : ""}</span></p></section>` : "";
+  const ledger = heights.map((height, index) => `<span class="${index === current ? "current" : resolved.includes(index) ? "done" : ""}"><small>person ${index} · h=${height}</small><b>${resolved.includes(index) || index === current ? answer[index] : "?"}</b></span>`).join("");
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="vq1944-viz" role="img" aria-label="Number of Visible People in a Queue visualization">
+    <header><div><small>MONOTONIC DECREASING STACK · #1944</small><strong>VISIBLE PEOPLE IN A QUEUE</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="vq1944-phases">${phases}</div>
+    <section class="vq1944-rule"><b>${vi ? "HAI TRƯỜNG HỢP ĐƯỢC NHÌN THẤY" : "TWO VISIBLE CASES"}</b><div><span><strong>1</strong><b>${vi ? "Thấp hơn current" : "Shorter than current"}</b><small>${vi ? "Thấy → cộng 1 → pop → nhìn tiếp" : "See → add 1 → pop → continue"}</small></span><span><strong>2</strong><b>${vi ? "Cao hơn đầu tiên" : "First taller person"}</b><small>${vi ? "Thấy → cộng 1 → dừng, không pop" : "See → add 1 → stop, do not pop"}</small></span></div></section>
+    <section class="vq1944-metrics"><div><small>current person</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>current height</small><strong>${currentHeight ?? "—"}</strong></div><div><small>${vi ? "đã thấy lúc này" : "visible now"}</small><strong>${visible.length}</strong></div><div class="answer"><small>answer[current]</small><strong>${current >= 0 ? answer[current] : "—"}</strong></div></section>
+    ${comparison}
+    <section class="vq1944-queue"><header><strong>${vi ? "HÀNG NGƯỜI · QUÉT TỪ PHẢI SANG TRÁI" : "QUEUE · SCAN RIGHT TO LEFT"}</strong><span>${vi ? "← hướng quét · chiều cao cột theo heights[i]" : "← scan direction · column height follows heights[i]"}</span></header><div style="--vq1944-count:${Math.max(heights.length, 1)}">${people}</div></section>
+    <div class="vq1944-panels"><section class="vq1944-stack"><header><strong>SKYLINE STACK</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header><div>${stackHtml}</div><p>${vi ? "Chỉ những person chưa bị che hoàn toàn mới còn trong stack." : "Only people who are not completely hidden remain in the stack."}</p></section><section class="vq1944-sight"><header><strong>${vi ? "ĐƯỜNG NHÌN CỦA CURRENT" : "CURRENT LINE OF SIGHT"}</strong><span>${current >= 0 ? `person ${current}` : "—"}</span></header><div>${sightHtml}</div></section></div>
+    <section class="vq1944-ledger"><header><strong>${vi ? "KẾT QUẢ TỪNG PERSON" : "ANSWER PER PERSON"}</strong><span>answer[i] = visible people to the right</span></header><div style="--vq1944-count:${Math.max(heights.length, 1)}">${ledger}</div></section>
+    <section class="vq1944-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(view.action))}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="vq1944-result ${final ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${final ? `[${answer.join(", ")}]` : "…"}</strong><span>${final ? (vi ? "Mỗi person vào stack một lần và bị pop nhiều nhất một lần." : "Each person enters the stack once and is popped at most once.") : (vi ? "Theo dõi stack top để biết nhìn tiếp hay dừng." : "Watch the stack top to decide whether to continue or stop.")}</span></footer>
+  </section>`;
+}
+
+function renderMaxMin1950View(step) {
+  const view = step.maxMin1950View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Array.isArray(view.left) ? view.left : [];
+  const right = Array.isArray(view.right) ? view.right : [];
+  const leftKnown = Array.isArray(view.leftKnown) ? view.leftKnown : [];
+  const rightKnown = Array.isArray(view.rightKnown) ? view.rightKnown : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const compared = Number.isInteger(view.compared) ? view.compared : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const activeLength = Number.isInteger(view.activeLength) ? view.activeLength : 0;
+  const sourceLength = Number.isInteger(view.sourceLength) ? view.sourceLength : 0;
+  const finalizedFrom = Number.isInteger(view.finalizedFrom) ? view.finalizedFrom : nums.length + 1;
+  const ownerRange = view.ownerRange && Number.isInteger(view.ownerRange.start) ? view.ownerRange : null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Tìm biên L / R", "Ghi bucket theo span", "Lan từ dài → ngắn", "Kết quả"]
+    : ["Find L / R bounds", "Write span bucket", "Long → short fill", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const cards = nums.map((value, index) => {
+    const classes = ["mm1950-card"];
+    const bounded = Boolean(leftKnown[index] && rightKnown[index]);
+    if (bounded) classes.push("bounded");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (index === current) classes.push("current");
+    if (index === compared) classes.push("compared");
+    if (index === popped) classes.push("popped");
+    const span = bounded ? right[index] - left[index] - 1 : "?";
+    let status = bounded ? (vi ? "ĐỦ HAI BIÊN" : "BOUNDS READY") : (vi ? "ĐANG TÌM BIÊN" : "FINDING BOUNDS");
+    if (stack.includes(index)) status = "IN STACK";
+    if (index === current) status = "CURRENT";
+    if (index === compared) status = "STACK TOP";
+    if (index === popped) status = "POPPED";
+    return `<article class="${classes.join(" ")}"><header><small>INDEX</small><strong>${index}</strong></header><div class="mm1950-value"><small>nums[${index}]</small><b>${value}</b></div><div class="mm1950-bounds"><span><small>L · prev &lt;</small><b>${leftKnown[index] ? left[index] : "?"}</b></span><span><small>R · next ≤</small><b>${rightKnown[index] ? right[index] : "?"}</b></span></div><div class="mm1950-span"><small>R − L − 1</small><b>${span}</b></div><footer>${escapeHtml(status)}</footer></article>`;
+  }).join("");
+
+  const stackHtml = stack.length
+    ? stack.map((index, position) => `<span class="${position === stack.length - 1 ? "top" : ""}"><small>i=${index}</small><b>${nums[index]}</b>${position === stack.length - 1 ? "<em>TOP</em>" : ""}</span>`).join("<i>→</i>")
+    : `<p>${vi ? "Stack rỗng" : "Empty stack"}</p>`;
+  const comparisonIndex = compared >= 0 ? compared : popped;
+  const showComparison = current >= 0 && comparisonIndex >= 0 && ["boundary-compare", "boundary-pop"].includes(view.phase);
+  const shouldPop = showComparison && nums[comparisonIndex] >= nums[current];
+  const comparison = showComparison ? `<section class="mm1950-compare ${shouldPop ? "pop" : "keep"}"><div><small>STACK TOP · i=${comparisonIndex}</small><strong>${nums[comparisonIndex]}</strong></div><b>${shouldPop ? "≥" : "<"}</b><div><small>CURRENT · i=${current}</small><strong>${nums[current]}</strong></div><p><b>${shouldPop ? "POP" : "KEEP"}</b><span>${shouldPop ? (vi ? "Current là next smaller-or-equal của stack top; chốt R rồi pop." : "Current is the stack top's next smaller-or-equal value; set R and pop.") : (vi ? "Stack top nhỏ hơn current; đây là previous smaller L." : "The stack top is smaller than current; it becomes previous-smaller L.")}</span></p></section>` : "";
+
+  const rangeCells = nums.map((value, index) => {
+    const classes = ["mm1950-range-cell"];
+    if (ownerRange && index >= ownerRange.start && index <= ownerRange.end) classes.push("inside");
+    if (index === current) classes.push("owner");
+    if (index === compared) classes.push("compared");
+    if (index === popped) classes.push("popped");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${value}</b>${ownerRange && index === current ? `<em>${vi ? "MINIMUM" : "MINIMUM"}</em>` : ""}</span>`;
+  }).join("");
+  const rangeTitle = ownerRange
+    ? `[${ownerRange.start}..${ownerRange.end}] · length ${ownerRange.length}`
+    : current >= 0
+      ? (vi ? `Đang tìm khoảng cho i=${current}` : `Finding the interval for i=${current}`)
+      : (vi ? "Chưa chọn owner" : "No owner selected");
+  const boundarySummary = ownerRange
+    ? `<span class="left"><small>L · previous smaller</small><b>${left[current]}</b></span><i>owned interval</i><span class="right"><small>R · next smaller/equal</small><b>${right[current]}</b></span>`
+    : `<p>${vi ? "Sau khi có cả L và R, vùng màu xanh sẽ là khoảng lớn nhất mà nums[i] làm minimum." : "Once both L and R are known, the green region is the widest interval where nums[i] is the minimum."}</p>`;
+
+  const buckets = answer.map((value, index) => {
+    const length = index + 1;
+    const classes = ["mm1950-bucket"];
+    if (length === activeLength) classes.push("active");
+    if (length === sourceLength) classes.push("source");
+    if (length >= finalizedFrom) classes.push("finalized");
+    const shown = value === 0 && view.phase !== "done" ? "—" : value;
+    return `<span class="${classes.join(" ")}"><small>WINDOW SIZE</small><strong>${length}</strong><b>${shown}</b><em>${vi ? "max của minimum" : "max of minima"}</em></span>`;
+  }).join("");
+
+  const currentValue = current >= 0 ? nums[current] : null;
+  const currentLeft = current >= 0 && leftKnown[current] ? left[current] : null;
+  const currentRight = current >= 0 && rightKnown[current] ? right[current] : null;
+  const currentSpan = currentLeft != null && currentRight != null ? currentRight - currentLeft - 1 : null;
+  let formula = view.action || "span(i) = R - L - 1";
+  if (view.phase === "bucket-span" && ownerRange) formula = `size = ${right[current]} − (${left[current]}) − 1 = ${ownerRange.length}`;
+  if (view.phase === "bucket-write" && ownerRange) formula = `answer[${ownerRange.length - 1}] = max(${view.bucketBefore}, ${nums[current]}) = ${answer[ownerRange.length - 1]}`;
+  if (view.phase.startsWith("fill") && activeLength > 0 && sourceLength > 0) formula = `answer[${activeLength - 1}] = max(${view.bucketBefore}, answer[${sourceLength - 1}]) = ${answer[activeLength - 1]}`;
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="mm1950-viz" role="img" aria-label="Maximum of Minimum Values in All Subarrays visualization">
+    <header><div><small>MONOTONIC BOUNDARIES · #1950</small><strong>MAXIMUM OF MINIMUMS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mm1950-phases">${phases}</div>
+    <section class="mm1950-rule"><b>${vi ? "MỖI VALUE SỞ HỮU MỘT KHOẢNG" : "EACH VALUE OWNS AN INTERVAL"}</b><strong>nums[i] is minimum on [L + 1 .. R − 1]</strong><div><span><small>L</small><b>previous strictly smaller</b></span><i>←</i><span class="owner"><small>i</small><b>nums[i]</b></span><i>→</i><span><small>R</small><b>next smaller or equal</b></span></div><p>maximum window size = R − L − 1</p></section>
+    <section class="mm1950-metrics"><div><small>current i</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>nums[i]</small><strong>${currentValue ?? "—"}</strong></div><div><small>L</small><strong>${currentLeft ?? "—"}</strong></div><div><small>R</small><strong>${currentRight ?? "—"}</strong></div><div class="span"><small>max window</small><strong>${currentSpan ?? (activeLength || "—")}</strong></div></section>
+    ${comparison}
+    <section class="mm1950-cards-wrap"><header><strong>${vi ? "BIÊN CỦA TỪNG INDEX" : "BOUNDARIES FOR EVERY INDEX"}</strong><span>${vi ? "stack tăng dần theo value" : "stack increases by value"}</span></header><div style="--mm1950-count:${Math.max(nums.length, 1)}">${cards}</div></section>
+    <section class="mm1950-stack"><header><strong>MONOTONIC INCREASING STACK</strong><span>${vi ? "đáy → đỉnh · index:value" : "bottom → top · index:value"}</span></header><div>${stackHtml}</div><p>${vi ? "Khi top ≥ current, top bị pop và current trở thành biên R của top." : "When top ≥ current, pop top and use current as top's R boundary."}</p></section>
+    <section class="mm1950-interval"><header><strong>${vi ? "KHOẢNG MÀ CURRENT LÀ MINIMUM" : "INTERVAL WHERE CURRENT IS THE MINIMUM"}</strong><span>${escapeHtml(rangeTitle)}</span></header><div class="mm1950-range" style="--mm1950-count:${Math.max(nums.length, 1)}">${rangeCells}</div><footer>${boundarySummary}</footer></section>
+    <section class="mm1950-buckets"><header><strong>${vi ? "ĐÁP ÁN THEO WINDOW SIZE" : "ANSWER BY WINDOW SIZE"}</strong><span>${vi ? "bucket k nằm tại answer[k−1]" : "bucket k lives at answer[k−1]"}</span></header><div style="--mm1950-count:${Math.max(nums.length, 1)}">${buckets}</div></section>
+    <section class="mm1950-fill-rule"><b>${vi ? "VÌ SAO LAN TỪ PHẢI SANG TRÁI?" : "WHY FILL FROM RIGHT TO LEFT?"}</b><span>${vi ? "Minimum hợp lệ cho window dài k+1 cũng là candidate cho một window ngắn k. Do đó answer[k] = max(answer[k], answer[k+1])." : "A minimum valid for a window of length k+1 is also a candidate for a shorter window k. Therefore answer[k] = max(answer[k], answer[k+1])."}</span></section>
+    <section class="mm1950-action"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="mm1950-result ${final ? "done" : ""}"><small>WINDOW SIZE 1 → n</small><strong>${final ? `[${answer.join(", ")}]` : "…"}</strong><span>${final ? (vi ? "Mỗi vị trí answer[k−1] là minimum lớn nhất trong mọi window dài k." : "Each answer[k−1] is the largest minimum among all windows of length k.") : (vi ? "Hoàn tất biên, ghi span bucket, rồi backfill." : "Finish boundaries, write span buckets, then backfill.")}</span></footer>
   </section>`;
 }
 
@@ -25958,6 +26135,23 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderOddEven975View(step);
+  } else if (step.visibleQueue1944View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderVisibleQueue1944View(step);
+  } else if (step.maxMin1950View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    try {
+      renderMaxMin1950View(step);
+    } catch (error) {
+      $("treeView").innerHTML = `<pre id="mm1950DebugError">${escapeHtml(error.stack || error.message)}</pre>`;
+      throw error;
+    }
   } else if (step.validSubarrays1063View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
