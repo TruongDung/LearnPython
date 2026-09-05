@@ -8046,6 +8046,85 @@ function renderValidSubarrays1063View(step) {
   </section>`;
 }
 
+function renderTotalStrength2281View(step) {
+  const view = step.totalStrength2281View || {};
+  const vi = lang === "vi";
+  const strength = Array.isArray(view.strength) ? view.strength : [];
+  const left = Array.isArray(view.left) ? view.left : [];
+  const right = Array.isArray(view.right) ? view.right : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const prefix2 = Array.isArray(view.prefix2) ? view.prefix2 : [];
+  const contributions = Array.isArray(view.contributions) ? view.contributions : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const ownedRanges = Array.isArray(view.ownedRanges) ? view.ownedRanges : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const compared = Number.isInteger(view.compared) ? view.compared : -1;
+  const popped = Number.isInteger(view.popped) ? view.popped : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Biên trái <", "Biên phải ≤", "Hai prefix", "Contribution", "Kết quả"]
+    : ["Left boundary <", "Right boundary ≤", "Two prefixes", "Contribution", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const cards = strength.map((value, index) => {
+    const classes = ["ts2281-card"];
+    if (index === current) classes.push("current");
+    if (index === compared) classes.push("compared");
+    if (index === popped) classes.push("popped");
+    if (stack.includes(index)) classes.push("in-stack");
+    if (contributions[index] != null) classes.push("resolved");
+    const l = left[index];
+    const r = right[index];
+    return `<article class="${classes.join(" ")}"><header><small>INDEX</small><strong>${index}</strong></header><div class="ts2281-value"><small>strength</small><b>${value}</b></div><div class="ts2281-bounds"><span><small>left &lt;</small><b>${l == null ? "?" : l}</b></span><span><small>right ≤</small><b>${r == null ? "?" : r}</b></span></div><div class="ts2281-choices"><small>${vi ? "số subarray sở hữu" : "owned subarrays"}</small><b>${l == null || r == null ? "?" : `${index - l}×${r - index}=${(index - l) * (r - index)}`}</b></div><footer><small>contribution</small><strong>${contributions[index] == null ? "?" : contributions[index]}</strong></footer></article>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((index, position) => `<span class="${position === stack.length - 1 ? "top" : ""}"><b>i=${index}</b><small>${strength[index]}</small></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack đang trống" : "The stack is empty"}</em>`;
+  const isBoundary = view.phase === "left" || view.phase === "right";
+  const hasComparison = isBoundary && current >= 0 && compared >= 0;
+  const topValue = hasComparison ? strength[compared] : null;
+  const currentValue = current >= 0 ? strength[current] : null;
+  const popCondition = view.phase === "left" ? topValue >= currentValue : topValue > currentValue;
+  const relation = !hasComparison ? "?" : topValue === currentValue ? "=" : topValue > currentValue ? ">" : "<";
+  const actionText = String(view.action || "");
+  const isPoppedStep = actionText.includes("POP") || popped >= 0;
+  const comparisonHtml = hasComparison ? `<section class="ts2281-compare ${popCondition || isPoppedStep ? "pop" : "keep"}"><div><small>STACK TOP · i=${compared}</small><strong>${topValue}</strong></div><b>${relation}</b><div><small>CURRENT · i=${current}</small><strong>${currentValue}</strong></div><p><b>${popCondition || isPoppedStep ? "POP" : "KEEP"}</b><span>${view.phase === "left" ? (popCondition || isPoppedStep ? (vi ? "Biên trái cần strictly smaller, nên giá trị bằng cũng phải pop." : "The left boundary must be strictly smaller, so equality is popped too.") : (vi ? "Top nhỏ hơn current, đây là candidate biên trái." : "The top is smaller than current, so it is a left-boundary candidate.")) : (popCondition || isPoppedStep ? (vi ? "Biên phải cần smaller-or-equal; chỉ giá trị lớn hơn mới bị pop." : "The right boundary needs smaller-or-equal; only larger values are popped.") : topValue === currentValue ? (vi ? "Giá trị bằng được KEEP làm biên phải để tránh đếm trùng." : "Equality is KEPT as the right boundary to avoid double counting.") : (vi ? "Top nhỏ hơn current nên là candidate biên phải." : "The top is smaller than current, so it is a right-boundary candidate."))}</span></p></section>` : "";
+  const prefixCards = Array.from({ length: strength.length + 2 }, (_, index) => `<span class="${index === view.prefixIndex ? "current" : ""}"><small>k=${index}</small><b>P ${index < prefix.length && prefix[index] != null ? prefix[index] : "—"}</b><strong>PP ${prefix2[index] != null ? prefix2[index] : "?"}</strong></span>`).join("");
+  const hasOwnedRegion = current >= 0 && left[current] != null && right[current] != null;
+  const ownerCells = strength.map((value, index) => {
+    const inside = hasOwnedRegion && index > left[current] && index < right[current];
+    const classes = [];
+    if (inside) classes.push("inside");
+    if (index === current) classes.push("owner");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${value}</b></span>`;
+  }).join("");
+  const rangeHtml = ownedRanges.length
+    ? ownedRanges.map((range) => `<span><small>[${range.start}..${range.end}]</small><b>sum ${range.sum}</b></span>`).join("")
+    : `<em>${vi ? "Chọn một wizard ở phase contribution để xem các subarray do nó sở hữu." : "Select a wizard during the contribution phase to see its owned subarrays."}</em>`;
+  const rightSums = view.rightSums;
+  const leftSums = view.leftSums;
+  const ownedSums = view.ownedSums;
+  const formulaBlocks = `<div class="positive"><small>${vi ? "KHỐI DƯƠNG" : "POSITIVE BLOCK"}</small><b>${rightSums == null ? "?" : rightSums}</b><span>(PP[R+1] − PP[i+1]) × (i−L)</span></div><i>−</i><div class="negative"><small>${vi ? "KHỐI TRỪ" : "SUBTRACTED BLOCK"}</small><b>${leftSums == null ? "?" : leftSums}</b><span>(PP[i+1] − PP[L+1]) × (R−i)</span></div><i>=</i><div class="owned"><small>${vi ? "TỔNG CÁC SUBARRAY SUM" : "OWNED SUBARRAY SUMS"}</small><b>${ownedSums == null ? "?" : ownedSums}</b><span>${current >= 0 ? `× minimum ${strength[current]}` : "× minimum"}</span></div>`;
+  const ledger = contributions.map((value, index) => `<span class="${index === current ? "current" : ""}"><small>i=${index} · min ${strength[index]}</small><b>${value == null ? "?" : `+${value}`}</b></span>`).join("");
+  const formula = view.formula || view.action || (vi ? "Tìm hai biên trước, sau đó dùng PP để cộng các subarray sum." : "Find both boundaries, then use PP to sum the owned subarray sums.");
+  const final = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="ts2281-viz" role="img" aria-label="Sum of Total Strength of Wizards visualization">
+    <header><div><small>MONOTONIC BOUNDARIES · PREFIX OF PREFIX · #2281</small><strong>SUM OF TOTAL STRENGTH</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ts2281-phases">${phases}</div>
+    <section class="ts2281-rule"><b>${vi ? "ĐỔI TỪ DUYỆT SUBARRAY SANG CONTRIBUTION" : "SWITCH FROM SUBARRAYS TO CONTRIBUTIONS"}</b><strong>contribution(i) = strength[i] × Σ sum(subarray owned by i)</strong><span>${vi ? "Biên bất đối xứng left < và right ≤ đảm bảo mỗi subarray có đúng một owner khi minimum bị trùng." : "Asymmetric left < and right ≤ boundaries give every subarray exactly one owner when minima tie."}</span></section>
+    <section class="ts2281-metrics"><div><small>${vi ? "wizard hiện tại" : "current wizard"}</small><strong>${current >= 0 ? `i=${current}` : "—"}</strong></div><div><small>minimum value</small><strong>${currentValue == null ? "—" : currentValue}</strong></div><div><small>${vi ? "vùng sở hữu" : "ownership region"}</small><strong>${hasOwnedRegion ? `[${left[current] + 1}..${right[current] - 1}]` : "—"}</strong></div><div class="answer"><small>running answer</small><strong>${view.total ?? 0}</strong></div></section>
+    <section class="ts2281-cards-wrap"><header><strong>${vi ? "BIÊN VÀ CONTRIBUTION CỦA TỪNG WIZARD" : "EACH WIZARD'S BOUNDARIES AND CONTRIBUTION"}</strong><span>${vi ? "viền xanh = trong stack · tím = current" : "blue edge = in stack · purple = current"}</span></header><div style="--ts2281-count:${Math.max(strength.length, 1)}">${cards}</div></section>
+    <section class="ts2281-stack"><header><strong>${view.phase === "right" ? (vi ? "STACK TÌM NEXT ≤" : "STACK FOR NEXT ≤") : (vi ? "STACK TÌM PREVIOUS <" : "STACK FOR PREVIOUS <")}</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header><div>${stackHtml}</div><p>${vi ? "Tie rule: trái pop ≥, phải chỉ pop >. Hai phía không được dùng cùng một dấu." : "Tie rule: the left pass pops ≥, while the right pass pops only >. The two sides must not use the same comparison."}</p></section>
+    ${comparisonHtml}
+    <section class="ts2281-prefix"><header><div><small>TWO PREFIX ARRAYS</small><strong>P[k] = Σ strength[0..k−1] · PP[k] = Σ P[0..k−1]</strong></div><span>${vi ? "PP cộng một dải P trong O(1)" : "PP sums a range of P in O(1)"}</span></header><div>${prefixCards}</div></section>
+    <section class="ts2281-owner"><header><strong>${vi ? "CÁC SUBARRAY DO CURRENT MINIMUM SỞ HỮU" : "SUBARRAYS OWNED BY THE CURRENT MINIMUM"}</strong><span>${hasOwnedRegion ? `${view.leftCount ?? "?"} left × ${view.rightCount ?? "?"} right = ${ownedRanges.length}` : ""}</span></header><div class="ts2281-owner-array" style="--ts2281-count:${Math.max(strength.length, 1)}">${ownerCells}</div><div class="ts2281-ranges">${rangeHtml}</div></section>
+    <section class="ts2281-blocks">${formulaBlocks}</section>
+    <section class="ts2281-formula"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="ts2281-ledger"><header><strong>${vi ? "SỔ CONTRIBUTION" : "CONTRIBUTION LEDGER"}</strong><span>Σ contribution mod 1,000,000,007</span></header><div>${ledger}</div></section>
+    <footer class="ts2281-result ${final ? "done" : ""}"><small>TOTAL STRENGTH OF ALL SUBARRAYS</small><strong>${final ? view.total : "…"}</strong><span>${final ? (vi ? "Mỗi subarray đã được tính đúng một lần qua minimum owner của nó." : "Every subarray has been counted exactly once through its minimum owner.") : (vi ? "Hoàn tất hai biên và hai prefix trước khi cộng contribution." : "Complete both boundaries and both prefixes before adding contributions.")}</span></footer>
+  </section>`;
+}
+
 function renderVisibleMountains2345View(step) {
   const view = step.visibleMountains2345View || {};
   const vi = lang === "vi";
@@ -25830,6 +25909,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderValidSubarrays1063View(step);
+  } else if (step.totalStrength2281View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTotalStrength2281View(step);
   } else if (step.visibleMountains2345View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

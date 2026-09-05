@@ -3170,6 +3170,377 @@ function totalStrength(nums) {
   return ans;
 }
 
+function buildSteps2281(input) {
+  const strength = parseNums(input, "strength");
+  if (strength.length > 7) throw new Error("Use up to 7 wizards so every owned subarray stays readable.");
+  if (strength.some((value) => value < 1 || value > 1000000)) throw new Error("Each strength must be between 1 and 1,000,000 for this visualization.");
+
+  const n = strength.length;
+  const left = Array(n).fill(null);
+  const right = Array(n).fill(null);
+  const prefix = Array(n + 1).fill(null);
+  const prefix2 = Array(n + 2).fill(null);
+  const contributions = Array(n).fill(null);
+  const stack = [];
+  const steps = [];
+  const mod = 1000000007;
+  let total = 0;
+
+  const snapshot = ({
+    phase,
+    codeLines,
+    title,
+    note,
+    current = -1,
+    compared = -1,
+    popped = -1,
+    prefixIndex = -1,
+    ownedRanges = [],
+    leftCount = null,
+    rightCount = null,
+    rightSums = null,
+    leftSums = null,
+    ownedSums = null,
+    action = "",
+    formula = "",
+    final = false,
+  }) => {
+    const phaseIndex = phase === "left" ? 0
+      : phase === "right" ? 1
+        : phase === "prefix" ? 2
+          : phase === "contribution" ? 3 : 4;
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...strength],
+      sub: strength.map((value, index) => `i=${index} · strength=${value} · L=${left[index] ?? "?"} · R=${right[index] ?? "?"}`),
+      highlight: current >= 0 ? [current] : [],
+      mark: stack.filter((index) => index !== current),
+      codeLines,
+      vars: [
+        { name: "i", value: current >= 0 ? current : "—" },
+        { name: "stack", value: `[${stack.map((index) => `${index}:${strength[index]}`).join(", ")}]` },
+        { name: "range", value: current >= 0 && left[current] != null && right[current] != null ? `[${left[current] + 1}, ${right[current] - 1}]` : "—" },
+        { name: "answer", value: total },
+      ],
+      totalStrength2281View: {
+        strength: [...strength],
+        left: [...left],
+        right: [...right],
+        prefix: [...prefix],
+        prefix2: [...prefix2],
+        contributions: [...contributions],
+        stack: [...stack],
+        phase,
+        phaseIndex,
+        current,
+        compared,
+        popped,
+        prefixIndex,
+        ownedRanges: ownedRanges.map((range) => ({ ...range })),
+        leftCount,
+        rightCount,
+        rightSums,
+        leftSums,
+        ownedSums,
+        total,
+        action,
+        formula,
+      },
+    });
+  };
+
+  snapshot({
+    phase: "left",
+    codeLines: [1, 3, 4, 5, 6, 7],
+    title: text("Bước 1: tìm previous strictly-smaller", "Step 1: find the previous strictly-smaller value"),
+    note: text("Pop khi top >= current, nên phần tử còn lại ở đỉnh phải nhỏ hơn current thật sự.", "Pop while top >= current, so the remaining top must be strictly smaller than current."),
+    action: "left[i] = previous index with strength < strength[i]",
+  });
+  for (let i = 0; i < n; i++) {
+    snapshot({
+      phase: "left",
+      codeLines: [8],
+      current: i,
+      compared: stack.at(-1) ?? -1,
+      title: text(`Quét trái → phải tại i=${i}`, `Scan left → right at i=${i}`),
+      note: text("Stack tăng dần theo strength và chứa candidate cho biên trái.", "The stack increases by strength and stores candidates for the left boundary."),
+      action: `current = ${strength[i]}`,
+    });
+    while (stack.length && strength[stack.at(-1)] >= strength[i]) {
+      const top = stack.at(-1);
+      snapshot({
+        phase: "left",
+        codeLines: [9],
+        current: i,
+        compared: top,
+        title: text(`${strength[top]} >= ${strength[i]} nên pop`, `${strength[top]} >= ${strength[i]}, so pop`),
+        note: text(`Index ${top} không thể là previous strictly-smaller của index ${i}.`, `Index ${top} cannot be the previous strictly-smaller index for ${i}.`),
+        action: `${strength[top]} ≥ ${strength[i]} → POP`,
+      });
+      const popped = stack.pop();
+      snapshot({
+        phase: "left",
+        codeLines: [10],
+        current: i,
+        compared: popped,
+        popped,
+        title: text(`Pop index ${popped}`, `Pop index ${popped}`),
+        note: text("Tiếp tục nhìn sâu hơn trong stack để tìm giá trị nhỏ hơn thật sự.", "Continue deeper in the stack to find a truly smaller value."),
+        action: `stack.pop() → i=${popped}`,
+      });
+    }
+    left[i] = stack.at(-1) ?? -1;
+    snapshot({
+      phase: "left",
+      codeLines: [11],
+      current: i,
+      compared: stack.at(-1) ?? -1,
+      title: text(`left[${i}] = ${left[i]}`, `left[${i}] = ${left[i]}`),
+      note: text(left[i] < 0 ? "Không có giá trị nhỏ hơn ở bên trái, dùng sentinel -1." : `strength[${left[i]}]=${strength[left[i]]} là giá trị nhỏ hơn gần nhất.`, left[i] < 0 ? "There is no smaller value on the left, so use sentinel -1." : `strength[${left[i]}]=${strength[left[i]]} is the nearest smaller value.`),
+      action: `left[${i}] = ${left[i]}`,
+    });
+    stack.push(i);
+    snapshot({
+      phase: "left",
+      codeLines: [12],
+      current: i,
+      title: text(`Push index ${i}`, `Push index ${i}`),
+      note: text("Current trở thành candidate biên trái cho các index phía sau.", "Current becomes a left-boundary candidate for later indices."),
+      action: `push ${i}:${strength[i]}`,
+    });
+  }
+
+  stack.length = 0;
+  snapshot({
+    phase: "right",
+    codeLines: [13, 14],
+    title: text("Bước 2: tìm next smaller-or-equal", "Step 2: find the next smaller-or-equal value"),
+    note: text("Lần này chỉ pop khi top > current; giá trị bằng nhau được giữ để làm biên phải và tránh đếm trùng subarray.", "This pass pops only when top > current; equal values stay as right boundaries so subarrays are not counted twice."),
+    action: "right[i] = next index with strength ≤ strength[i]",
+  });
+  for (let i = n - 1; i >= 0; i--) {
+    snapshot({
+      phase: "right",
+      codeLines: [15],
+      current: i,
+      compared: stack.at(-1) ?? -1,
+      title: text(`Quét phải → trái tại i=${i}`, `Scan right → left at i=${i}`),
+      note: text("Stack tăng dần khi nhìn theo hướng quét ngược.", "The stack is increasing when viewed in the reverse scan direction."),
+      action: `current = ${strength[i]}`,
+    });
+    while (stack.length && strength[stack.at(-1)] > strength[i]) {
+      const top = stack.at(-1);
+      snapshot({
+        phase: "right",
+        codeLines: [16],
+        current: i,
+        compared: top,
+        title: text(`${strength[top]} > ${strength[i]} nên pop`, `${strength[top]} > ${strength[i]}, so pop`),
+        note: text(`Index ${top} lớn hơn current nên không thể là next smaller-or-equal.`, `Index ${top} is larger than current, so it cannot be the next smaller-or-equal boundary.`),
+        action: `${strength[top]} > ${strength[i]} → POP`,
+      });
+      const popped = stack.pop();
+      snapshot({
+        phase: "right",
+        codeLines: [17],
+        current: i,
+        compared: popped,
+        popped,
+        title: text(`Pop index ${popped}`, `Pop index ${popped}`),
+        note: text("Tiếp tục tìm index gần nhất có strength nhỏ hơn hoặc bằng.", "Continue searching for the nearest index with a smaller or equal strength."),
+        action: `stack.pop() → i=${popped}`,
+      });
+    }
+    if (stack.length && strength[stack.at(-1)] === strength[i]) {
+      snapshot({
+        phase: "right",
+        codeLines: [16],
+        current: i,
+        compared: stack.at(-1),
+        title: text("Strength bằng nhau: KEEP làm biên phải", "Equal strengths: KEEP as the right boundary"),
+        note: text(`Index ${stack.at(-1)} nhận các subarray bên phải; index ${i} dừng trước nó để mỗi subarray chỉ có một owner.`, `Index ${stack.at(-1)} owns the right-side subarrays; index ${i} stops before it so every subarray has one owner.`),
+        action: `${strength[stack.at(-1)]} = ${strength[i]} → KEEP`,
+      });
+    }
+    right[i] = stack.at(-1) ?? n;
+    snapshot({
+      phase: "right",
+      codeLines: [18],
+      current: i,
+      compared: stack.at(-1) ?? -1,
+      title: text(`right[${i}] = ${right[i]}`, `right[${i}] = ${right[i]}`),
+      note: text(right[i] === n ? `Không có smaller-or-equal bên phải, dùng sentinel n=${n}.` : `strength[${right[i]}]=${strength[right[i]]} chặn vùng sở hữu ở bên phải.`, right[i] === n ? `There is no smaller-or-equal value on the right, so use sentinel n=${n}.` : `strength[${right[i]}]=${strength[right[i]]} stops the ownership region on the right.`),
+      action: `right[${i}] = ${right[i]}`,
+    });
+    stack.push(i);
+    snapshot({
+      phase: "right",
+      codeLines: [19],
+      current: i,
+      title: text(`Push index ${i}`, `Push index ${i}`),
+      note: text("Current trở thành candidate biên phải cho các index phía trước.", "Current becomes a right-boundary candidate for earlier indices."),
+      action: `push ${i}:${strength[i]}`,
+    });
+  }
+
+  stack.length = 0;
+  prefix[0] = 0;
+  snapshot({
+    phase: "prefix",
+    codeLines: [20],
+    prefixIndex: 0,
+    title: text("Bước 3A: prefix sum P", "Step 3A: prefix sum P"),
+    note: text("P[k] là tổng k wizard đầu tiên; sum(l..r) = P[r+1] - P[l].", "P[k] is the sum of the first k wizards; sum(l..r) = P[r+1] - P[l]."),
+    action: "P[0] = 0",
+  });
+  for (let i = 0; i < n; i++) {
+    prefix[i + 1] = prefix[i] + strength[i];
+    snapshot({
+      phase: "prefix",
+      codeLines: [20],
+      current: i,
+      prefixIndex: i + 1,
+      title: text(`P[${i + 1}] = ${prefix[i + 1]}`, `P[${i + 1}] = ${prefix[i + 1]}`),
+      note: text(`Cộng strength[${i}]=${strength[i]} vào prefix trước đó.`, `Add strength[${i}]=${strength[i]} to the previous prefix.`),
+      action: `${prefix[i]} + ${strength[i]} = ${prefix[i + 1]}`,
+      formula: `P[${i + 1}] = P[${i}] + strength[${i}] = ${prefix[i + 1]}`,
+    });
+  }
+
+  prefix2[0] = 0;
+  snapshot({
+    phase: "prefix",
+    codeLines: [21],
+    prefixIndex: 0,
+    title: text("Bước 3B: prefix-of-prefix PP", "Step 3B: prefix-of-prefix PP"),
+    note: text("PP cho phép cộng nhanh nhiều giá trị P liên tiếp, chính là nhiều subarray sum cùng lúc.", "PP quickly sums consecutive P values, which represents many subarray sums at once."),
+    action: "PP[0] = 0",
+  });
+  for (let k = 0; k <= n; k++) {
+    prefix2[k + 1] = prefix2[k] + prefix[k];
+    snapshot({
+      phase: "prefix",
+      codeLines: [21],
+      prefixIndex: k + 1,
+      title: text(`PP[${k + 1}] = ${prefix2[k + 1]}`, `PP[${k + 1}] = ${prefix2[k + 1]}`),
+      note: text(`PP cộng thêm P[${k}]=${prefix[k]}.`, `PP adds P[${k}]=${prefix[k]}.`),
+      action: `${prefix2[k]} + P[${k}](${prefix[k]}) = ${prefix2[k + 1]}`,
+      formula: `PP[${k + 1}] = PP[${k}] + P[${k}] = ${prefix2[k + 1]}`,
+    });
+  }
+
+  snapshot({
+    phase: "contribution",
+    codeLines: [22],
+    title: text("Bước 4: tính contribution của từng minimum", "Step 4: compute each minimum's contribution"),
+    note: text("Mỗi subarray được gán cho đúng một index minimum nhờ hai tie rule bất đối xứng.", "Each subarray is assigned to exactly one minimum index by the asymmetric tie rules."),
+    action: "contribution = minimum × sum(all owned subarray sums)",
+  });
+  for (let i = 0; i < n; i++) {
+    const l = left[i];
+    const r = right[i];
+    const leftCount = i - l;
+    const rightCount = r - i;
+    const ownedRanges = [];
+    for (let start = l + 1; start <= i; start++) {
+      for (let end = i; end < r; end++) {
+        ownedRanges.push({ start, end, sum: prefix[end + 1] - prefix[start] });
+      }
+    }
+    snapshot({
+      phase: "contribution",
+      codeLines: [23, 24],
+      current: i,
+      ownedRanges,
+      leftCount,
+      rightCount,
+      title: text(`Wizard i=${i} sở hữu ${leftCount}×${rightCount} subarray`, `Wizard i=${i} owns ${leftCount}×${rightCount} subarrays`),
+      note: text(`Chọn start trong [${l + 1},${i}] và end trong [${i},${r - 1}].`, `Choose start in [${l + 1},${i}] and end in [${i},${r - 1}].`),
+      action: `${leftCount} left choices × ${rightCount} right choices = ${ownedRanges.length}`,
+      formula: `L=${l}, i=${i}, R=${r} → ${ownedRanges.length} owned subarrays`,
+    });
+
+    const rightSums = (prefix2[r + 1] - prefix2[i + 1]) * leftCount;
+    snapshot({
+      phase: "contribution",
+      codeLines: [25],
+      current: i,
+      ownedRanges,
+      leftCount,
+      rightCount,
+      rightSums,
+      title: text(`Khối dương = ${rightSums}`, `Positive block = ${rightSums}`),
+      note: text("Cộng các P[end+1] ở phía phải, rồi nhân số cách chọn start.", "Sum the right-side P[end+1] values, then multiply by the number of start choices."),
+      action: `(PP[${r + 1}] - PP[${i + 1}]) × ${leftCount} = ${rightSums}`,
+      formula: `rightBlock = (${prefix2[r + 1]} - ${prefix2[i + 1]}) × ${leftCount} = ${rightSums}`,
+    });
+
+    const leftSums = (prefix2[i + 1] - prefix2[l + 1]) * rightCount;
+    snapshot({
+      phase: "contribution",
+      codeLines: [26],
+      current: i,
+      ownedRanges,
+      leftCount,
+      rightCount,
+      rightSums,
+      leftSums,
+      title: text(`Khối trừ = ${leftSums}`, `Subtracted block = ${leftSums}`),
+      note: text("Mỗi subarray sum là P[end+1] - P[start], nên phải trừ các P[start] ở phía trái.", "Every subarray sum is P[end+1] - P[start], so the left-side P[start] values must be subtracted."),
+      action: `(PP[${i + 1}] - PP[${l + 1}]) × ${rightCount} = ${leftSums}`,
+      formula: `leftBlock = (${prefix2[i + 1]} - ${prefix2[l + 1]}) × ${rightCount} = ${leftSums}`,
+    });
+
+    const ownedSums = rightSums - leftSums;
+    const contribution = strength[i] * ownedSums;
+    contributions[i] = contribution;
+    snapshot({
+      phase: "contribution",
+      codeLines: [27],
+      current: i,
+      ownedRanges,
+      leftCount,
+      rightCount,
+      rightSums,
+      leftSums,
+      ownedSums,
+      title: text(`Contribution i=${i}: ${strength[i]} × ${ownedSums} = ${contribution}`, `Contribution i=${i}: ${strength[i]} × ${ownedSums} = ${contribution}`),
+      note: text(`Tổng trực tiếp các owned subarray sum cũng bằng ${ownedRanges.reduce((sum, range) => sum + range.sum, 0)}.`, `Directly summing the owned subarray sums also gives ${ownedRanges.reduce((sum, range) => sum + range.sum, 0)}.`),
+      action: `${strength[i]} × (${rightSums} - ${leftSums}) = ${contribution}`,
+      formula: `contribution[${i}] = ${strength[i]} × ${ownedSums} = ${contribution}`,
+    });
+    total = (total + contribution) % mod;
+    snapshot({
+      phase: "contribution",
+      codeLines: [28],
+      current: i,
+      ownedRanges,
+      leftCount,
+      rightCount,
+      rightSums,
+      leftSums,
+      ownedSums,
+      title: text(`answer = ${total}`, `answer = ${total}`),
+      note: text("Cộng contribution vào tổng và lấy modulo 1,000,000,007.", "Add the contribution to the total modulo 1,000,000,007."),
+      action: `answer = (answer + ${contribution}) mod MOD = ${total}`,
+      formula: `answer = ${total}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    codeLines: [29],
+    final: true,
+    title: text(`Return ${total}`, `Return ${total}`),
+    note: text("Tổng contribution của mọi index bằng tổng sức mạnh của mọi subarray.", "The sum of every index contribution equals the total strength of all subarrays."),
+    action: `return ${total}`,
+    formula: `total strength = ${total}`,
+  });
+  return { original: [...strength], answer: total, steps };
+}
+
 function minimumVisitedCells(input) {
   const grid = parseMatrix(input);
   const rows = grid.length, cols = grid[0].length;
@@ -6401,7 +6772,68 @@ module.exports = {
     liveArgs: (input, params) => [parseMatrix(input, "grid"), Number(params.k)],
     builder: buildSteps3359,
   },
-  2281: simpleProblem({ id: 2281, difficulty: "hard", slug: "sum-of-total-strength-of-wizards", name: "Sum of Total Strength of Wizards", viName: "Tổng sức mạnh wizard", statement: text("Tổng min(subarray) * sum(subarray) trên mọi subarray.", "Sum min(subarray) * sum(subarray) over every subarray."), defaultInput: "1,3,1,2", solver: arrayBuilder(totalStrength) }),
+  2281: {
+    id: 2281,
+    difficulty: "hard",
+    slug: "sum-of-total-strength-of-wizards",
+    category,
+    tags: [arrayTag, monoTag, { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" }],
+    title: text("Sum of Total Strength of Wizards"),
+    titleVi: text("Tổng sức mạnh của các nhóm wizard", "Sum of Total Strength of Wizards"),
+    statement: text(
+      "Với mỗi subarray liên tiếp, total strength bằng giá trị nhỏ nhất nhân tổng các phần tử trong subarray. Tính tổng total strength của mọi subarray theo modulo 1,000,000,007.",
+      "For every contiguous subarray, total strength is its minimum value multiplied by its element sum. Return the total over all subarrays modulo 1,000,000,007.",
+    ),
+    defaultInput: "1,3,1,2",
+    inputKind: "string",
+    inputLabel: text("strength (cách bởi ,)", "strength (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Gán mỗi subarray cho đúng một index minimum: previous strictly-smaller ở trái, next smaller-or-equal ở phải.", "Assign each subarray to exactly one minimum index: previous strictly-smaller on the left and next smaller-or-equal on the right."),
+      text("Với minimum i và biên (L,R), có (i-L)*(R-i) subarray do i sở hữu.", "For minimum i with boundaries (L,R), it owns (i-L)*(R-i) subarrays."),
+      text("Prefix P tính một subarray sum; prefix-of-prefix PP cộng nhanh tất cả subarray sum do i sở hữu.", "Prefix P computes one subarray sum; prefix-of-prefix PP quickly sums every subarray sum owned by i."),
+      text("Contribution của i là strength[i] nhân hiệu giữa khối prefix bên phải và khối prefix bên trái.", "Index i contributes strength[i] times the difference between the right and left prefix blocks."),
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: text("Mỗi index vào-ra hai stack tối đa một lần; các prefix và contribution đều được tính tuyến tính.", "Each index enters and leaves each stack at most once; prefixes and contributions are linear."),
+    },
+    codeLabel: text("Monotonic boundaries + prefix-of-prefix", "Monotonic boundaries + prefix-of-prefix"),
+    code: [
+      "from itertools import accumulate",
+      "",
+      "class Solution:",
+      "    def totalStrength(self, strength):",
+      "        MOD = 10**9 + 7",
+      "        n = len(strength)",
+      "        left, stack = [-1] * n, []",
+      "        for i, value in enumerate(strength):",
+      "            while stack and strength[stack[-1]] >= value:",
+      "                stack.pop()",
+      "            left[i] = stack[-1] if stack else -1",
+      "            stack.append(i)",
+      "        right = [n] * n",
+      "        stack = []",
+      "        for i in range(n - 1, -1, -1):",
+      "            while stack and strength[stack[-1]] > strength[i]:",
+      "                stack.pop()",
+      "            right[i] = stack[-1] if stack else n",
+      "            stack.append(i)",
+      "        prefix = [0] + list(accumulate(strength))",
+      "        prefix2 = [0] + list(accumulate(prefix))",
+      "        answer = 0",
+      "        for i, value in enumerate(strength):",
+      "            left_i, right_i = left[i], right[i]",
+      "            right_sums = (prefix2[right_i + 1] - prefix2[i + 1]) * (i - left_i)",
+      "            left_sums = (prefix2[i + 1] - prefix2[left_i + 1]) * (right_i - i)",
+      "            contribution = value * (right_sums - left_sums)",
+      "            answer = (answer + contribution) % MOD",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseNums(input, "strength")],
+    builder: buildSteps2281,
+  },
   2617: simpleProblem({ id: 2617, difficulty: "hard", slug: "minimum-number-of-visited-cells-in-a-grid", name: "Minimum Number of Visited Cells in a Grid", viName: "Số ô thăm ít nhất trong grid", statement: text("Từ mỗi ô được nhảy sang phải hoặc xuống tối đa grid[r][c] bước.", "From each cell, jump right or down up to grid[r][c] cells."), defaultInput: "3,4,2,1;4,2,3,1;2,1,0,0", inputLabel: text("grid (hàng cách ;)", "grid (rows separated by ;)"), solver: minimumVisitedCells }),
   2736: {
     id: 2736,
