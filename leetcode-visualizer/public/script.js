@@ -25508,6 +25508,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCalendar729View(step);
+  } else if (step.rangeModuleView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeModuleView(step);
   } else if (step.calendarView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -28607,6 +28613,85 @@ function renderCalendar731View(step) {
     <section class="mc731-lists"><article><header><strong>calendar</strong><span>${calendar.length} ${vi ? 'booking đã nhận' : 'accepted'}</span></header>${axis}<div>${calendarRows}</div></article><article class="doubles"><header><strong>doubles</strong><span>${vi ? 'danger zones: request không được chạm' : 'danger zones: requests must not touch'}</span></header>${axis}<div>${doubleRows}</div></article></section>
     <section class="mc731-action"><small>${vi ? 'DÒNG CODE HIỆN TẠI' : 'CURRENT CODE ACTION'}</small><strong>${escapeHtml(action)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
     <footer class="mc731-results ${final ? 'done' : ''}"><header><strong>${vi ? 'KẾT QUẢ THEO THỨ TỰ GỌI' : 'RESULTS IN CALL ORDER'}</strong><span>${final ? `[${results.join(', ')}]` : vi ? 'đang xử lý…' : 'in progress…'}</span></header><div>${resultCells}</div></footer>
+  </section>`;
+}
+
+function renderRangeModuleView(step) {
+  const v = step.rangeModuleView, vi = lang === 'vi';
+  const labels = vi
+    ? { init: 'Khởi tạo', request: 'Đọc lệnh', search: 'Tìm kiếm nhị phân', bound: 'Tìm được vị trí chèn', boundary: 'Chọn mốc biên', applied: 'Đã cập nhật', result: 'Kết quả truy vấn', done: 'Hoàn tất' }
+    : { init: 'Initialize', request: 'Read operation', search: 'Binary search', bound: 'Insertion index found', boundary: 'Choose endpoints', applied: 'Updated', result: 'Query result', done: 'Complete' };
+  const method = v.current && v.current[0];
+  const query = method === 'queryRange';
+  const outcome = v.phase === 'result' ? v.results[v.callIndex] : null;
+  const rangeText = points => points.length
+    ? points.filter((_, index) => index % 2 === 0).map((left, index) => `[${left}, ${points[index * 2 + 1]})`).join(' ∪ ')
+    : (vi ? 'Rỗng ∅' : 'Empty ∅');
+  const tracked = (points, left) => {
+    for (let index = 0; index < points.length; index += 2) {
+      if (points[index] <= left && left < points[index + 1]) return true;
+    }
+    return false;
+  };
+  const trackRow = (points, label, requestOnly = false) => {
+    const cells = v.coordinates.slice(0, -1).map((left, index) => {
+      const right = v.coordinates[index + 1];
+      const requested = v.current && v.current[1] <= left && right <= v.current[2];
+      const covered = tracked(points, left);
+      const gap = !requestOnly && outcome === false && requested && !covered;
+      const state = requestOnly
+        ? (requested ? (query ? 'query' : method === 'addRange' ? 'add' : 'remove') : '')
+        : covered ? 'covered' : gap ? 'gap' : '';
+      const detail = requestOnly
+        ? (requested ? (vi ? 'trong lệnh hiện tại' : 'in current operation') : (vi ? 'ngoài lệnh' : 'outside operation'))
+        : covered ? (vi ? 'đang theo dõi' : 'tracked') : (vi ? 'chưa theo dõi' : 'untracked');
+      return `<span class="rm715-cell ${state}" title="[${left}, ${right}): ${detail}">${requestOnly ? (requested ? '•' : '') : covered ? '✓' : gap ? '×' : '·'}</span>`;
+    }).join('');
+    return `<div class="rm715-row"><strong>${escapeHtml(label)}</strong><div class="rm715-track">${cells}</div></div>`;
+  };
+  const axis = v.coordinates.map((value, index) => `<span style="left:${100 * index / (v.coordinates.length - 1)}%">${value}</span>`).join('');
+  const searchPoints = v.phase === 'applied' ? v.before : v.points;
+  const endpointCards = [...searchPoints, null].map((value, index) => {
+    const markers = [];
+    if (index === v.i) markers.push('i');
+    if (index === v.j) markers.push('j');
+    if (v.binary) {
+      for (const key of ['lo', 'mid', 'hi']) if (v.binary[key] === index) markers.push(key);
+    }
+    const sliced = v.replacement !== null && index >= v.i && index < v.j;
+    const current = v.binary && index === v.binary.mid;
+    return `<div class="rm715-point${current ? ' mid' : ''}${sliced ? ' sliced' : ''}${value === null ? ' sentinel' : ''}"><small>${index}</small><b>${value === null ? '∅' : value}</b><span>${value === null ? 'len' : index % 2 === 0 ? (vi ? 'mở [' : 'start [') : (vi ? 'đóng )' : 'end )')}</span><em>${markers.join(' · ') || ' '}</em></div>`;
+  }).join('');
+  const bounds = v.current ? `<div class="rm715-bounds"><div><small>i = bisect_${query ? 'right' : 'left'}(points, ${v.current[1]})</small><strong>${v.i ?? '?'}</strong><span>${vi ? 'Đếm mốc' : 'Count endpoints'} ${query ? '≤' : '&lt;'} left</span></div><div><small>j = bisect_${query ? 'left' : 'right'}(points, ${v.current[2]})</small><strong>${v.j ?? '?'}</strong><span>${vi ? 'Đếm mốc' : 'Count endpoints'} ${query ? '&lt;' : '≤'} right</span></div></div>` : '';
+  let action = 'points = []';
+  if (v.binary) action = `${v.binary.variable} = bisect_${v.binary.side}(points, ${v.binary.target}) · lo = ${v.binary.lo}, hi = ${v.binary.hi}${v.binary.mid == null ? '' : `, mid = ${v.binary.mid}`}`;
+  else if (query) action = `i == j and i % 2 == 1${outcome == null ? '' : ` → ${outcome}`}`;
+  else if (v.replacement !== null) action = `points[${v.i}:${v.j}] = ${JSON.stringify(v.replacement)}`;
+  else if (v.current) action = `${method}(${v.current[1]}, ${v.current[2]})`;
+  else if (v.phase === 'done') action = `points = ${JSON.stringify(v.points)}`;
+  const calls = v.operations.map(([name, left, right], index) => {
+    const completed = index < v.results.length;
+    const state = index === v.callIndex ? 'current' : completed ? 'complete' : '';
+    const result = completed ? String(v.results[index]) : (vi ? 'chờ' : 'pending');
+    return `<li class="${state}"><small>#${index + 1}</small><code>${name}(${left}, ${right})</code><b class="${completed && typeof v.results[index] === 'boolean' ? v.results[index] ? 'yes' : 'no' : ''}">${result}</b></li>`;
+  }).join('');
+  $('treeView').innerHTML = `<section class="rm715-viz" aria-label="${vi ? 'Trực quan hóa Range Module' : 'Range Module visualization'}">
+    <header><div><small>BINARY SEARCH · #715</small><h3>Range Module</h3></div><span>${escapeHtml(labels[v.phase])}</span></header>
+    <p class="rm715-invariant">${vi ? 'Mốc chẵn mở vùng, mốc lẻ đóng vùng. Khoảng [left, right) chứa mọi số thực từ left đến trước right.' : 'Even-indexed endpoints start coverage; odd-indexed endpoints end it. [left, right) contains every real number from left up to, but excluding, right.'}</p>
+    <section class="rm715-coverage"><h4>${vi ? 'Vùng được theo dõi' : 'Tracked ranges'}</h4>
+      <p>${vi ? 'Trục nén: các mốc cách đều để thấy rõ khoảng hẹp. Độ dài hiển thị không theo tỷ lệ.' : 'Compressed axis: endpoints are equally spaced to reveal narrow gaps. Displayed lengths are not proportional.'}</p>
+      <div class="rm715-scroll" tabindex="0" role="region" aria-label="${vi ? 'Trục vùng theo dõi, có thể cuộn ngang' : 'Coverage axis, horizontally scrollable'}"><div class="rm715-scale" style="width:${Math.max(340, (v.coordinates.length - 1) * 68)}px">
+        <div class="rm715-axis">${axis}</div>
+        ${v.current ? trackRow(v.before, vi ? 'Trước lệnh' : 'Before operation') + trackRow([], `${method} [${v.current[1]}, ${v.current[2]})`, true) : ''}
+        ${trackRow(v.points, vi ? 'Hiện tại · points' : 'Current · points')}
+      </div></div>
+      <p class="rm715-legend"><span class="covered">✓ ${vi ? 'Đang theo dõi' : 'Tracked'}</span><span>· ${vi ? 'Chưa theo dõi' : 'Untracked'}</span><span class="gap">× ${vi ? 'Phần truy vấn còn thiếu' : 'Uncovered part of query'}</span></p>
+      <code class="rm715-ranges">${escapeHtml(rangeText(v.points))}</code>
+    </section>
+    <section class="rm715-endpoints"><h4>${v.phase === 'applied' ? (vi ? 'points trước khi thay lát cắt' : 'points before slice replacement') : 'points'}</h4><p>${vi ? 'Index ở trên; giá trị mốc ở giữa; i và j là vị trí chèn. ∅ là vị trí ngay sau phần tử cuối, không phải mốc thật.' : 'Index above, endpoint value in the middle; i and j are insertion positions. ∅ is the slot after the last element, not an actual endpoint.'}</p><div class="rm715-point-list">${endpointCards}</div>${bounds}</section>
+    <section class="rm715-action${outcome === true ? ' yes' : outcome === false ? ' no' : ''}" aria-live="polite"><code>${escapeHtml(action)}</code><p>${escapeHtml(pick(v.explanation))}</p>${v.phase === 'applied' ? `<strong>points → ${escapeHtml(JSON.stringify(v.points))}</strong>` : ''}</section>
+    <section class="rm715-calls"><h4>${vi ? 'Lệnh và kết quả' : 'Operations and results'}</h4><ol>${calls || `<li>${vi ? 'Chưa có lệnh.' : 'No operations.'}</li>`}</ol><p>${vi ? 'add/remove trả null; tự khởi tạo RangeModule(), không thêm null cho constructor.' : 'Add/remove return null; RangeModule() is automatic, so no constructor null is included.'}</p></section>
+    <footer><strong>${vi ? 'Kết quả' : 'Results'}</strong><code>${escapeHtml(JSON.stringify(v.results))}</code></footer>
   </section>`;
 }
 
