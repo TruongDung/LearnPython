@@ -11,7 +11,7 @@
 // can statically detect and include all category files.
 
 const categories = {
-  dp: require("./dp"),
+  dp: Object.assign(require("./dp"), require("./good-subsequences")),
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing")),
   graph: require("./graph"),
   math: require("./math"),
