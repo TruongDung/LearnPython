@@ -25496,6 +25496,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.goodSubseqView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGoodSubseqView(step);
   } else if (step.permutation46View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -28386,3 +28392,28 @@ $("liveResetBtn") && $("liveResetBtn").addEventListener("click", async () => {
 });
 
 initLiveEditorResize();
+
+function renderGoodSubseqView(step) {
+  const v = step.goodSubseqView;
+  const vi = lang === "vi";
+  const chips = (values, repeated = []) => values.length
+    ? values.map(value => `<code class="ugs-chip${repeated.includes(value) ? " is-repeat" : ""}">${escapeHtml(value)}</code>`).join("")
+    : `<span>${vi ? "Rỗng" : "Empty"} ∅</span>`;
+  const tr = v.transition;
+  const bits = [...v.chars].map((bit, offset) => {
+    const i = v.start + offset;
+    return `<div class="ugs-bit${i === v.index ? " is-current" : i < v.index ? " is-read" : ""}"><small>${i}</small><strong>${bit}</strong></div>`;
+  }).join("");
+  const bucket = (bit, count) => `<section class="ugs-bucket${tr && tr.bit === bit ? " is-updated" : ""}">
+    <h3>end${bit} <strong>${count}</strong></h3><p>${vi ? "Bắt đầu bằng 1 · kết thúc bằng" : "Starts with 1 · ends in"} ${bit}</p>
+    <div class="ugs-set">${v.buckets ? chips(v.buckets[bit], tr && tr.bit === bit ? tr.repeated : []) : (vi ? "Chỉ hiển thị số đếm khi n > 10" : "Counts only for n > 10")}</div></section>`;
+  $("treeView").innerHTML = `<section class="ugs-view" aria-label="${vi ? "Đếm dãy con tốt" : "Good subsequence counts"}">
+    <div class="ugs-bits">${v.start ? "…" : ""}${bits}${v.start + v.chars.length < v.length ? "…" : ""}</div>
+    ${tr && tr.skipped ? `<p>${vi ? `Đã tính thêm ${tr.skipped} ký tự giữa các bước hiển thị.` : `Computed ${tr.skipped} intervening characters between displayed steps.`}</p>` : ""}
+    <div class="ugs-formula">${tr ? `<code>end${tr.bit} ← (${tr.old[0]} + ${tr.old[1]}${tr.bit ? " + 1" : ""}) % MOD = ${tr.bit ? v.end1 : v.end0}</code><p>${tr.bit ? (vi ? "+1 tạo chuỗi đơn 1" : "+1 creates the singleton 1") : (vi ? "Ghi nhận chuỗi đơn 0 riêng: hasZero = 1" : "Record singleton 0 separately: hasZero = 1")}</p>` : `<code>${v.phase === "done" ? "return (end0 + end1 + hasZero) % MOD" : "end0 = end1 = hasZero = 0"}</code>`}</div>
+    <div class="ugs-buckets">${bucket(0, v.end0)}${bucket(1, v.end1)}</div>
+    ${tr && v.buckets ? `<div class="ugs-replace"><strong>${vi ? "Nhóm cũ đã nằm trong nhóm mới" : "Old bucket is included in the new bucket"}</strong><div class="ugs-set">${chips(tr.previous, tr.repeated)}</div><p>${vi ? "Các chuỗi tô vàng đã được tạo lại. Không cộng chúng lần nữa. Nhóm còn lại giữ nguyên." : "Amber strings were generated again. Do not add them twice. The other bucket stays unchanged."}</p></div>` : ""}
+    <div class="ugs-zero"><code>hasZero = ${v.hasZero}</code><span>${v.hasZero ? (vi ? 'Thêm đúng một chuỗi "0"' : 'Include exactly one string "0"') : (vi ? 'Chưa có chuỗi "0"' : 'No string "0" yet')}</span></div>
+    <div class="ugs-total"><span>${vi ? "Tổng số dãy con tốt" : "Total good subsequences"}</span><strong>${v.end0} + ${v.end1} + ${v.hasZero} ≡ ${v.total}</strong><small>modulo 1,000,000,007</small></div>
+  </section>`;
+}
