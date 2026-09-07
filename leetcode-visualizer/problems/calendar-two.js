@@ -2,46 +2,279 @@ const both = (vi, en) => ({ vi, en });
 const { parseBookings } = require('./calendar')[729];
 
 function buildSteps731(input) {
-  const bookings = parseBookings(input), calendar = [], doubles = [], answer = [], steps = [];
-  const maximum = Math.max(1, ...bookings.flat());
-  const snap = (phase, current, compared, doubleCompared, codeLines, note, intersection = null) => steps.push({
-    title: both('My Calendar II · bước ' + (steps.length + 1), 'My Calendar II · step ' + (steps.length + 1)),
-    codeLines, note,
-    vars: [{ name: 'calendar', value: JSON.stringify(calendar) }, { name: 'doubles', value: JSON.stringify(doubles) }, { name: 'results', value: JSON.stringify(answer) }],
-    calendarView: { problemId: 731, phase, current: current && [...current], compared, doubleCompared,
-      calendar: calendar.map(p => [...p]), doubles: doubles.map(p => [...p]), results: [...answer],
-      intersection: intersection && [...intersection], maximum, minimum: 0 },
+  const bookings = parseBookings(input);
+  const calendar = [];
+  const doubles = [];
+  const answer = [];
+  const steps = [];
+  const endpoints = bookings.flat();
+  const rawMinimum = endpoints.length ? Math.min(...endpoints) : 0;
+  const rawMaximum = endpoints.length ? Math.max(...endpoints) : 1;
+  const padding = Math.max(1, Math.ceil((rawMaximum - rawMinimum) * 0.08));
+  const minimum = Math.max(0, rawMinimum - padding);
+  const maximum = rawMaximum + padding;
+
+  const makeCoverage = (current, requestApplied) => {
+    const points = new Set([minimum, maximum]);
+    for (const entry of calendar) {
+      points.add(entry.range[0]);
+      points.add(entry.range[1]);
+    }
+    if (current) {
+      points.add(current[0]);
+      points.add(current[1]);
+    }
+    const sorted = [...points].sort((a, b) => a - b);
+    const segments = [];
+    for (let i = 0; i + 1 < sorted.length; i += 1) {
+      const start = sorted[i];
+      const end = sorted[i + 1];
+      if (start === end) continue;
+      const middle = (start + end) / 2;
+      const base = calendar.reduce((count, entry) => count + (entry.range[0] <= middle && middle < entry.range[1] ? 1 : 0), 0);
+      const requestCovers = Boolean(current && current[0] <= middle && middle < current[1]);
+      const proposed = base + (!requestApplied && requestCovers ? 1 : 0);
+      segments.push({ start, end, base, proposed, requestCovers });
+    }
+    return segments;
+  };
+
+  const snap = ({
+    phase,
+    currentCall = -1,
+    compared = -1,
+    doubleCompared = -1,
+    codeLines,
+    note,
+    checkStart = null,
+    checkEnd = null,
+    overlap = null,
+    intersection = null,
+    justAddedCalendar = -1,
+    justAddedDouble = -1,
+    requestApplied = false,
+    final = false,
+  }) => {
+    const current = currentCall >= 0 ? bookings[currentCall] : null;
+    const phaseIndex = phase === 'init' || phase === 'request'
+      ? 0
+      : phase === 'check-double' || phase === 'doubles-safe'
+        ? 1
+        : phase === 'check-calendar' || phase === 'add-double'
+          ? 2
+          : phase === 'append'
+            ? 3
+            : 4;
+    const callStates = bookings.map((range, index) => ({
+      index,
+      range: [...range],
+      state: index < answer.length
+        ? (answer[index] ? 'accepted' : 'rejected')
+        : index === currentCall ? 'current' : 'pending',
+    }));
+    steps.push({
+      title: both(
+        phase === 'done' ? 'Hoàn tất My Calendar II' : current ? `book(${current[0]}, ${current[1]}) · ${phase}` : 'Khởi tạo My Calendar II',
+        phase === 'done' ? 'My Calendar II complete' : current ? `book(${current[0]}, ${current[1]}) · ${phase}` : 'Initialize My Calendar II',
+      ),
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      final,
+      note,
+      vars: [
+        { name: 'calendar', value: JSON.stringify(calendar.map(entry => entry.range)) },
+        { name: 'doubles', value: JSON.stringify(doubles.map(entry => entry.range)) },
+        { name: 'results', value: JSON.stringify(answer) },
+      ],
+      calendar731View: {
+        phase,
+        phaseIndex,
+        bookings: bookings.map(range => [...range]),
+        callStates,
+        currentCall,
+        current: current && [...current],
+        compared,
+        doubleCompared,
+        calendar: calendar.map(entry => ({ range: [...entry.range], callIndex: entry.callIndex })),
+        doubles: doubles.map(entry => ({ range: [...entry.range], sourceCalls: [...entry.sourceCalls] })),
+        results: [...answer],
+        checkStart,
+        checkEnd,
+        overlap,
+        intersection: intersection && [...intersection],
+        justAddedCalendar,
+        justAddedDouble,
+        requestApplied,
+        coverage: makeCoverage(current, requestApplied),
+        minimum,
+        maximum,
+        explanation: note,
+      },
+    });
+  };
+
+  snap({
+    phase: 'init',
+    codeLines: [3, 4],
+    requestApplied: true,
+    note: both(
+      'calendar lưu mọi lịch đã nhận. doubles chỉ lưu các đoạn đã được phủ đúng hai lần; request chạm doubles sẽ tạo triple booking.',
+      'calendar stores every accepted booking. doubles stores only regions already covered twice; touching doubles would create a triple booking.',
+    ),
   });
-  snap('init', null, -1, -1, [3, 4], both('calendar lưu lịch đã nhận; doubles lưu các vùng đã có hai lịch.', 'calendar stores accepted bookings; doubles stores regions already booked twice.'));
-  for (const current of bookings) {
+
+  for (let currentCall = 0; currentCall < bookings.length; currentCall += 1) {
+    const current = bookings[currentCall];
     const [start, end] = current;
-    snap('request', current, -1, -1, [6], both('Trước tiên kiểm tra các vùng đặt hai lần. Chưa thay đổi dữ liệu.', 'First check double-booked regions. Do not change any data yet.'));
+    snap({
+      phase: 'request',
+      currentCall,
+      codeLines: 6,
+      note: both(
+        `Nhận request [${start}, ${end}). Chưa thay đổi calendar hoặc doubles.`,
+        `Receive request [${start}, ${end}). Neither calendar nor doubles changes yet.`,
+      ),
+    });
+
     let rejected = false;
-    for (let j = 0; j < doubles.length; j++) {
-      const [s, e] = doubles[j];
-      const overlaps = start < e && s < end;
-      snap('check-double', current, -1, j, [7, 8], both(`${start} < ${e} và ${s} < ${end}: ${overlaps}. Giao với doubles sẽ tạo ba lịch.`, `${start} < ${e} and ${s} < ${end}: ${overlaps}. Overlapping doubles would create a triple booking.`));
-      if (overlaps) {
-        rejected = true; answer.push(false);
-        snap('rejected', current, -1, j, [9], both('Từ chối: cả calendar và doubles giữ nguyên.', 'Reject: both calendar and doubles remain unchanged.'));
+    for (let doubleCompared = 0; doubleCompared < doubles.length; doubleCompared += 1) {
+      const [s, e] = doubles[doubleCompared].range;
+      const checkStart = start < e;
+      const checkEnd = s < end;
+      const overlap = checkStart && checkEnd;
+      const intersection = overlap ? [Math.max(start, s), Math.min(end, e)] : null;
+      snap({
+        phase: 'check-double',
+        currentCall,
+        doubleCompared,
+        codeLines: [7, 8],
+        checkStart,
+        checkEnd,
+        overlap,
+        intersection,
+        note: overlap
+          ? both(
+            `Request giao danger zone [${s}, ${e}) trên [${intersection[0]}, ${intersection[1]}): nếu thêm sẽ có ba lịch cùng lúc.`,
+            `The request meets danger zone [${s}, ${e}) on [${intersection[0]}, ${intersection[1]}): accepting it would create three simultaneous bookings.`,
+          )
+          : both(
+            `Request không giao danger zone [${s}, ${e}); tiếp tục kiểm tra.`,
+            `The request does not overlap danger zone [${s}, ${e}); continue checking.`,
+          ),
+      });
+      if (overlap) {
+        rejected = true;
+        answer.push(false);
+        snap({
+          phase: 'rejected',
+          currentCall,
+          doubleCompared,
+          codeLines: 9,
+          checkStart,
+          checkEnd,
+          overlap: true,
+          intersection,
+          note: both(
+            'Từ chối request trước khi sửa dữ liệu. calendar và doubles đều giữ nguyên.',
+            'Reject before mutating data. Both calendar and doubles remain unchanged.',
+          ),
+        });
         break;
       }
     }
     if (rejected) continue;
-    for (let j = 0; j < calendar.length; j++) {
-      const [s, e] = calendar[j];
-      const overlaps = start < e && s < end;
-      snap('compare', current, j, -1, [10, 11], both(`${start} < ${e} và ${s} < ${end}: ${overlaps}. Giao với một lịch là hợp lệ.`, `${start} < ${e} and ${s} < ${end}: ${overlaps}. Overlapping a single booking is allowed.`));
-      if (overlaps) {
-        const intersection = [Math.max(start, s), Math.min(end, e)];
-        doubles.push(intersection);
-        snap('add-double', current, j, doubles.length - 1, [12], both(`Lưu vùng giao [${intersection}): max hai start, min hai end.`, `Save intersection [${intersection}): max of starts, min of ends.`), intersection);
+
+    snap({
+      phase: 'doubles-safe',
+      currentCall,
+      codeLines: 10,
+      note: both(
+        'Request đã vượt qua mọi danger zone: nó không thể tạo triple booking. Bây giờ mới tìm các vùng double mới.',
+        'The request passed every danger zone, so it cannot create a triple booking. Now find new double-booked regions.',
+      ),
+    });
+
+    for (let compared = 0; compared < calendar.length; compared += 1) {
+      const [s, e] = calendar[compared].range;
+      const checkStart = start < e;
+      const checkEnd = s < end;
+      const overlap = checkStart && checkEnd;
+      const intersection = overlap ? [Math.max(start, s), Math.min(end, e)] : null;
+      snap({
+        phase: 'check-calendar',
+        currentCall,
+        compared,
+        codeLines: [10, 11],
+        checkStart,
+        checkEnd,
+        overlap,
+        intersection,
+        note: overlap
+          ? both(
+            `Request giao lịch #${calendar[compared].callIndex + 1}; phần chung [${intersection[0]}, ${intersection[1]}) sẽ trở thành danger zone mới.`,
+            `The request overlaps booking #${calendar[compared].callIndex + 1}; shared region [${intersection[0]}, ${intersection[1]}) becomes a new danger zone.`,
+          )
+          : both(
+            `Không giao lịch #${calendar[compared].callIndex + 1}; không tạo vùng double.`,
+            `No overlap with booking #${calendar[compared].callIndex + 1}; no double region is created.`,
+          ),
+      });
+      if (overlap) {
+        doubles.push({ range: intersection, sourceCalls: [calendar[compared].callIndex, currentCall] });
+        snap({
+          phase: 'add-double',
+          currentCall,
+          compared,
+          doubleCompared: doubles.length - 1,
+          codeLines: 12,
+          checkStart,
+          checkEnd,
+          overlap: true,
+          intersection,
+          justAddedDouble: doubles.length - 1,
+          note: both(
+            `Lưu [${intersection[0]}, ${intersection[1]}) vào doubles. Request sau này không được giao vùng này.`,
+            `Store [${intersection[0]}, ${intersection[1]}) in doubles. Future requests may not overlap this region.`,
+          ),
+        });
       }
     }
-    calendar.push([...current]); answer.push(true);
-    snap('accepted', current, -1, -1, [13, 14], both('Nhận lịch: không có thời điểm nào bị đặt ba lần.', 'Accept: no time is booked three times.'));
+
+    calendar.push({ range: [...current], callIndex: currentCall });
+    snap({
+      phase: 'append',
+      currentCall,
+      justAddedCalendar: calendar.length - 1,
+      codeLines: 13,
+      requestApplied: true,
+      note: both(
+        `Đã cập nhật doubles an toàn; thêm [${start}, ${end}) vào calendar.`,
+        `The doubles list is safely updated; append [${start}, ${end}) to calendar.`,
+      ),
+    });
+    answer.push(true);
+    snap({
+      phase: 'accepted',
+      currentCall,
+      justAddedCalendar: calendar.length - 1,
+      codeLines: 14,
+      requestApplied: true,
+      note: both(
+        `book(${start}, ${end}) trả True. Không thời điểm nào bị phủ ba lần.`,
+        `book(${start}, ${end}) returns True. No moment is covered three times.`,
+      ),
+    });
   }
-  snap('done', null, -1, -1, [], both('Kết quả theo thứ tự gọi book; doubles dùng để kiểm tra lịch tiếp theo.', 'Results in book call order; doubles protects against future triple bookings.'));
+
+  snap({
+    phase: 'done',
+    codeLines: [],
+    requestApplied: true,
+    final: true,
+    note: both(
+      'calendar chứa lịch đã nhận; doubles tiếp tục bảo vệ mọi request tương lai khỏi triple booking.',
+      'calendar contains accepted bookings; doubles keeps protecting future requests from triple booking.',
+    ),
+  });
   return { original: bookings, answer, steps };
 }
 

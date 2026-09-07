@@ -12,27 +12,232 @@ function parseBookings(input) {
 }
 
 function buildSteps729(input) {
-  const bookings = parseBookings(input), calendar = [], answer = [], steps = [];
-  const snap = (phase, current, compared, codeLines, note) => steps.push({
-    title: both('Lịch đặt chỗ · ' + phase, 'Booking calendar · ' + phase), codeLines, note,
-    vars: [{ name: 'calendar', value: JSON.stringify(calendar) }, { name: 'results', value: JSON.stringify(answer) }],
-    calendarView: { phase, current: current && [...current], compared, calendar: calendar.map(p => [...p]), results: [...answer],
-      maximum: Math.max(1, ...bookings.flat()), minimum: Math.min(0, ...bookings.flat()) },
+  const bookings = parseBookings(input);
+  const calendar = [];
+  const answer = [];
+  const steps = [];
+  const rawMinimum = Math.min(...bookings.flat());
+  const rawMaximum = Math.max(...bookings.flat());
+  const padding = Math.max(1, Math.ceil((rawMaximum - rawMinimum) * 0.08));
+  const minimum = Math.max(0, rawMinimum - padding);
+  const maximum = rawMaximum + padding;
+
+  const snap = ({
+    phase,
+    currentCall = -1,
+    compared = -1,
+    codeLines,
+    note,
+    checkStart = null,
+    checkEnd = null,
+    activeCheck = '',
+    overlap = null,
+    intersection = null,
+    relationship = '',
+    justAdded = -1,
+    final = false,
+  }) => {
+    const current = currentCall >= 0 ? bookings[currentCall] : null;
+    const phaseIndex = phase === 'init' || phase === 'request'
+      ? 0
+      : phase === 'select' || phase === 'check-start' || phase === 'check-end'
+        ? 1
+        : phase === 'decision'
+          ? 2
+          : 3;
+    const callStates = bookings.map((range, index) => ({
+      index,
+      range: [...range],
+      state: index < answer.length
+        ? (answer[index] ? 'accepted' : 'rejected')
+        : index === currentCall ? 'current' : 'pending',
+    }));
+    steps.push({
+      title: both(
+        phase === 'done' ? 'Hoàn tất mọi lần book' : current ? `book(${current[0]}, ${current[1]}) · ${phase}` : 'Khởi tạo MyCalendar',
+        phase === 'done' ? 'All book calls complete' : current ? `book(${current[0]}, ${current[1]}) · ${phase}` : 'Initialize MyCalendar',
+      ),
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      final,
+      note,
+      vars: [
+        { name: 'start', value: current ? current[0] : '-' },
+        { name: 'end', value: current ? current[1] : '-' },
+        { name: 'calendar', value: JSON.stringify(calendar.map(entry => entry.range)) },
+        { name: 'results', value: JSON.stringify(answer) },
+      ],
+      calendar729View: {
+        phase,
+        phaseIndex,
+        bookings: bookings.map(range => [...range]),
+        callStates,
+        currentCall,
+        current: current && [...current],
+        compared,
+        calendar: calendar.map(entry => ({ range: [...entry.range], callIndex: entry.callIndex })),
+        results: [...answer],
+        checkStart,
+        checkEnd,
+        activeCheck,
+        overlap,
+        intersection: intersection && [...intersection],
+        relationship,
+        justAdded,
+        minimum,
+        maximum,
+        explanation: note,
+      },
+    });
+  };
+
+  snap({
+    phase: 'init',
+    codeLines: 3,
+    note: both(
+      'calendar bắt đầu rỗng. Mỗi khoảng dùng dạng [start, end): lấy start nhưng không lấy end.',
+      'calendar starts empty. Every interval is [start, end): start is included, end is excluded.',
+    ),
   });
-  snap('init', null, -1, [3], both('Lịch ban đầu rỗng.', 'The calendar starts empty.'));
-  for (const current of bookings) {
+
+  for (let currentCall = 0; currentCall < bookings.length; currentCall += 1) {
+    const current = bookings[currentCall];
     const [start, end] = current;
-    snap('request', current, -1, [5], both('Kiểm tra từng lịch đã nhận.', 'Check each accepted booking.'));
+    snap({
+      phase: 'request',
+      currentCall,
+      codeLines: 5,
+      note: both(
+        `Nhận yêu cầu [${start}, ${end}). Chưa sửa calendar; trước tiên phải kiểm tra mọi lịch đã nhận.`,
+        `Receive [${start}, ${end}). Do not mutate calendar yet; first check every accepted booking.`,
+      ),
+    });
+
     let conflict = false;
-    for (let j = 0; j < calendar.length; j++) {
-      const [s, e] = calendar[j];
-      conflict = start < e && s < end;
-      snap('compare', current, j, [6, 7], both(`${start} < ${e} và ${s} < ${end}: ${conflict}.`, `${start} < ${e} and ${s} < ${end}: ${conflict}.`));
-      if (conflict) { answer.push(false); snap('rejected', current, j, [8], both('Có giao nhau: trả False, giữ nguyên lịch.', 'Overlap: return False and leave the calendar unchanged.')); break; }
+    for (let compared = 0; compared < calendar.length; compared += 1) {
+      const [s, e] = calendar[compared].range;
+      snap({
+        phase: 'select',
+        currentCall,
+        compared,
+        codeLines: 6,
+        note: both(
+          `Lấy lịch #${calendar[compared].callIndex + 1} [${s}, ${e}) để so sánh với request.`,
+          `Select booking #${calendar[compared].callIndex + 1} [${s}, ${e}) and compare it with the request.`,
+        ),
+      });
+
+      const checkStart = start < e;
+      snap({
+        phase: 'check-start',
+        currentCall,
+        compared,
+        codeLines: 7,
+        checkStart,
+        activeCheck: 'start',
+        note: both(
+          `${start} < ${e} là ${checkStart}. Start của request phải nằm trước end của lịch cũ.`,
+          `${start} < ${e} is ${checkStart}. The request start must be before the existing booking's end.`,
+        ),
+      });
+
+      const checkEnd = s < end;
+      snap({
+        phase: 'check-end',
+        currentCall,
+        compared,
+        codeLines: 7,
+        checkStart,
+        checkEnd,
+        activeCheck: 'end',
+        note: both(
+          `${s} < ${end} là ${checkEnd}. Start của lịch cũ phải nằm trước end của request.`,
+          `${s} < ${end} is ${checkEnd}. The existing booking's start must be before the request end.`,
+        ),
+      });
+
+      conflict = checkStart && checkEnd;
+      const intersectionStart = Math.max(start, s);
+      const intersectionEnd = Math.min(end, e);
+      const relationship = conflict ? 'overlap' : end <= s ? 'before' : 'after';
+      const intersection = conflict ? [intersectionStart, intersectionEnd] : null;
+      snap({
+        phase: 'decision',
+        currentCall,
+        compared,
+        codeLines: 7,
+        checkStart,
+        checkEnd,
+        activeCheck: 'and',
+        overlap: conflict,
+        intersection,
+        relationship,
+        note: conflict
+          ? both(
+            `Cả hai điều kiện đều True nên có phần giao [${intersectionStart}, ${intersectionEnd}).`,
+            `Both conditions are True, so the intervals intersect on [${intersectionStart}, ${intersectionEnd}).`,
+          )
+          : both(
+            relationship === 'before'
+              ? `${end} ≤ ${s}: request kết thúc trước hoặc vừa chạm start của lịch cũ.`
+              : `${e} ≤ ${start}: lịch cũ kết thúc trước hoặc vừa chạm start của request.`,
+            relationship === 'before'
+              ? `${end} ≤ ${s}: the request ends before or exactly at the existing start.`
+              : `${e} ≤ ${start}: the existing booking ends before or exactly at the request start.`,
+          ),
+      });
+
+      if (conflict) {
+        answer.push(false);
+        snap({
+          phase: 'rejected',
+          currentCall,
+          compared,
+          codeLines: 8,
+          checkStart,
+          checkEnd,
+          overlap: true,
+          intersection,
+          relationship,
+          note: both(
+            `Từ chối [${start}, ${end}) và giữ nguyên calendar.`,
+            `Reject [${start}, ${end}) and leave calendar unchanged.`,
+          ),
+        });
+        break;
+      }
     }
-    if (!conflict) { calendar.push([...current]); answer.push(true); snap('accepted', current, -1, [9, 10], both('Không giao nhau: lưu lịch và trả True.', 'No overlap: save the booking and return True.')); }
+
+    if (conflict) continue;
+    calendar.push({ range: [...current], callIndex: currentCall });
+    snap({
+      phase: 'append',
+      currentCall,
+      justAdded: calendar.length - 1,
+      codeLines: 9,
+      note: both(
+        `Mọi lịch cũ đều pass. Thêm [${start}, ${end}) vào calendar.`,
+        `Every accepted booking passed. Append [${start}, ${end}) to calendar.`,
+      ),
+    });
+    answer.push(true);
+    snap({
+      phase: 'accepted',
+      currentCall,
+      justAdded: calendar.length - 1,
+      codeLines: 10,
+      note: both(
+        `book(${start}, ${end}) trả True. Calendar hiện có ${calendar.length} lịch.`,
+        `book(${start}, ${end}) returns True. Calendar now contains ${calendar.length} booking(s).`,
+      ),
+    });
   }
-  snap('done', null, -1, [], both('Kết quả theo thứ tự gọi book.', 'Results in book call order.'));
+
+  snap({
+    phase: 'done',
+    codeLines: [],
+    note: both('Kết quả theo đúng thứ tự gọi book.', 'Results are listed in book-call order.'),
+    final: true,
+  });
   return { original: bookings, answer, steps };
 }
 

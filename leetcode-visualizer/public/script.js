@@ -25496,6 +25496,18 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.calendar731View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalendar731View(step);
+  } else if (step.calendar729View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalendar729View(step);
   } else if (step.calendarView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -28421,6 +28433,180 @@ function renderGoodSubseqView(step) {
     ${tr && v.buckets ? `<div class="ugs-replace"><strong>${vi ? "Nhóm cũ đã nằm trong nhóm mới" : "Old bucket is included in the new bucket"}</strong><div class="ugs-set">${chips(tr.previous, tr.repeated)}</div><p>${vi ? "Các chuỗi tô vàng đã được tạo lại. Không cộng chúng lần nữa. Nhóm còn lại giữ nguyên." : "Amber strings were generated again. Do not add them twice. The other bucket stays unchanged."}</p></div>` : ""}
     <div class="ugs-zero"><code>hasZero = ${v.hasZero}</code><span>${v.hasZero ? (vi ? 'Thêm đúng một chuỗi "0"' : 'Include exactly one string "0"') : (vi ? 'Chưa có chuỗi "0"' : 'No string "0" yet')}</span></div>
     <div class="ugs-total"><span>${vi ? "Tổng số dãy con tốt" : "Total good subsequences"}</span><strong>${v.end0} + ${v.end1} + ${v.hasZero} ≡ ${v.total}</strong><small>modulo 1,000,000,007</small></div>
+  </section>`;
+}
+
+function renderCalendar729View(step) {
+  const view = step.calendar729View || {};
+  const vi = lang === 'vi';
+  const current = Array.isArray(view.current) ? view.current : null;
+  const calendar = Array.isArray(view.calendar) ? view.calendar : [];
+  const calls = Array.isArray(view.callStates) ? view.callStates : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const minimum = Number(view.minimum || 0);
+  const maximum = Number(view.maximum || minimum + 1);
+  const span = Math.max(1, maximum - minimum);
+  const comparedEntry = Number.isInteger(view.compared) && view.compared >= 0 ? calendar[view.compared] : null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const final = view.phase === 'done';
+  const rejected = view.phase === 'rejected';
+  const accepted = view.phase === 'accepted';
+  const phases = (vi
+    ? ['Nhận request', 'So với lịch cũ', 'Kết luận overlap', 'Lưu / Trả về']
+    : ['Read request', 'Compare old booking', 'Decide overlap', 'Save / Return'])
+    .map((label, index) => `<span class="${index < phaseIndex ? 'done' : index === phaseIndex ? 'active' : ''}"><b>${index < phaseIndex ? '✓' : index + 1}</b>${escapeHtml(label)}</span>`).join('');
+
+  const position = (value) => 100 * (value - minimum) / span;
+  const rangeBar = (range, state) => {
+    if (!Array.isArray(range)) return '';
+    const left = Math.max(0, Math.min(100, position(range[0])));
+    const width = Math.max(1.2, Math.min(100 - left, 100 * (range[1] - range[0]) / span));
+    return `<span class="mc729-bar ${state}" style="left:${left}%;width:${width}%"><i></i></span>`;
+  };
+  const timelineRow = (range, label, state, detail = '') => `<div class="mc729-timeline-row"><header><strong>${escapeHtml(label)}</strong><span>[${range[0]}, ${range[1]})${detail ? ` · ${escapeHtml(detail)}` : ''}</span></header><div class="mc729-track">${rangeBar(range, state)}</div></div>`;
+
+  const callCards = calls.map((call) => {
+    const stateLabel = call.state === 'accepted' ? 'TRUE' : call.state === 'rejected' ? 'FALSE' : call.state === 'current' ? 'CURRENT' : vi ? 'chờ' : 'pending';
+    return `<article class="mc729-call ${call.state}"><small>book #${call.index + 1}</small><strong>[${call.range[0]}, ${call.range[1]})</strong><span>${stateLabel}</span></article>`;
+  }).join('');
+
+  const boolValue = (value) => value == null ? '?' : value ? 'TRUE' : 'FALSE';
+  const conditionA = current && comparedEntry ? `${current[0]} < ${comparedEntry.range[1]}` : 'start < old_end';
+  const conditionB = current && comparedEntry ? `${comparedEntry.range[0]} < ${current[1]}` : 'old_start < end';
+  const conditions = `<section class="mc729-conditions"><header><strong>${vi ? 'HAI ĐIỀU KIỆN ĐỀU PHẢI TRUE' : 'BOTH CONDITIONS MUST BE TRUE'}</strong><span>overlap = A AND B</span></header><div><article class="${view.activeCheck === 'start' ? 'active' : ''} ${view.checkStart === true ? 'pass' : view.checkStart === false ? 'fail' : ''}"><small>A · request bắt đầu trước old kết thúc</small><b>${escapeHtml(conditionA)}</b><strong>${boolValue(view.checkStart)}</strong></article><i>AND</i><article class="${view.activeCheck === 'end' ? 'active' : ''} ${view.checkEnd === true ? 'pass' : view.checkEnd === false ? 'fail' : ''}"><small>B · old bắt đầu trước request kết thúc</small><b>${escapeHtml(conditionB)}</b><strong>${boolValue(view.checkEnd)}</strong></article><i>=</i><article class="decision ${view.overlap === true ? 'conflict' : view.overlap === false ? 'safe' : ''}"><small>OVERLAP?</small><b>A AND B</b><strong>${boolValue(view.overlap)}</strong></article></div></section>`;
+
+  let relationshipText = vi ? 'Chưa so sánh hai khoảng.' : 'No interval pair is being compared yet.';
+  if (view.relationship === 'overlap' && view.intersection) relationshipText = vi
+    ? `Có thời gian chung [${view.intersection[0]}, ${view.intersection[1]}). Request phải bị từ chối.`
+    : `They share [${view.intersection[0]}, ${view.intersection[1]}). The request must be rejected.`;
+  if (view.relationship === 'before' && current && comparedEntry) relationshipText = vi
+    ? `${current[1]} ≤ ${comparedEntry.range[0]}: request nằm trước hoặc chỉ chạm biên trái.`
+    : `${current[1]} ≤ ${comparedEntry.range[0]}: the request is before or only touches the left boundary.`;
+  if (view.relationship === 'after' && current && comparedEntry) relationshipText = vi
+    ? `${comparedEntry.range[1]} ≤ ${current[0]}: lịch cũ nằm trước hoặc chỉ chạm biên phải.`
+    : `${comparedEntry.range[1]} ≤ ${current[0]}: the old booking is before or only touches the right boundary.`;
+
+  const comparisonRows = current
+    ? `${timelineRow(current, vi ? 'REQUEST MỚI' : 'NEW REQUEST', rejected ? 'rejected' : 'request')}${comparedEntry ? timelineRow(comparedEntry.range, `${vi ? 'LỊCH CŨ' : 'OLD BOOKING'} #${comparedEntry.callIndex + 1}`, 'compared') : ''}${view.intersection ? timelineRow(view.intersection, vi ? 'PHẦN GIAO' : 'INTERSECTION', 'intersection', vi ? 'thời gian bị đặt hai lần' : 'double-booked time') : ''}`
+    : `<p>${vi ? 'Chọn một request để bắt đầu.' : 'Select a request to begin.'}</p>`;
+
+  const calendarRows = calendar.length
+    ? calendar.map((entry, index) => timelineRow(entry.range, `${vi ? 'LỊCH' : 'BOOKING'} #${entry.callIndex + 1}`, index === view.compared ? 'compared' : index === view.justAdded ? 'added' : 'accepted')).join('')
+    : `<p>${vi ? 'Calendar đang rỗng.' : 'The calendar is empty.'}</p>`;
+  const resultCells = calls.map((call) => `<span class="${call.state}"><small>#${call.index + 1}</small><b>${call.state === 'accepted' ? 'true' : call.state === 'rejected' ? 'false' : '—'}</b></span>`).join('');
+
+  let action = vi ? 'Khởi tạo calendar = []' : 'Initialize calendar = []';
+  if (view.phase === 'request') action = vi ? 'Chưa thêm request; bắt đầu quét calendar.' : 'Do not add the request yet; start scanning calendar.';
+  if (view.phase === 'select') action = vi ? 'Lấy một lịch đã nhận để kiểm tra.' : 'Pick one accepted booking to inspect.';
+  if (view.phase === 'check-start') action = `A: ${conditionA} → ${boolValue(view.checkStart)}`;
+  if (view.phase === 'check-end') action = `B: ${conditionB} → ${boolValue(view.checkEnd)}`;
+  if (view.phase === 'decision') action = `${boolValue(view.checkStart)} AND ${boolValue(view.checkEnd)} → ${boolValue(view.overlap)}`;
+  if (view.phase === 'append') action = `calendar.append((${current[0]}, ${current[1]}))`;
+  if (rejected) action = 'return False · calendar unchanged';
+  if (accepted) action = 'return True';
+  if (final) action = `results = [${results.join(', ')}]`;
+
+  $('treeView').innerHTML = `<section class="mc729-viz" role="img" aria-label="My Calendar I overlap visualization">
+    <header><div><small>INTERVAL DESIGN · #729</small><strong>MY CALENDAR I</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mc729-phases">${phases}</div>
+    <section class="mc729-half-open"><div><span class="closed-dot"></span><strong>start</strong><i></i><strong>end</strong><span class="open-dot"></span></div><p><b>[start, end)</b><span>${vi ? 'Lấy start · không lấy end · hai lịch chạm tại end/start vẫn hợp lệ.' : 'Include start · exclude end · bookings touching at end/start are valid.'}</span></p></section>
+    <section class="mc729-calls"><header><strong>${vi ? 'CÁC LẦN GỌI BOOK' : 'BOOK CALLS'}</strong><span>${results.filter(Boolean).length} ${vi ? 'đã nhận' : 'accepted'} · ${results.filter(value => !value).length} ${vi ? 'từ chối' : 'rejected'}</span></header><div>${callCards}</div></section>
+    ${conditions}
+    <section class="mc729-compare"><header><strong>${vi ? 'CÙNG MỘT TRỤC THỜI GIAN' : 'ONE SHARED TIME AXIS'}</strong><span>${minimum} → ${maximum}</span></header><div class="mc729-axis"><span>${minimum}</span><span>${Math.round((minimum + maximum) / 2)}</span><span>${maximum}</span></div>${comparisonRows}<footer class="${view.overlap === true ? 'conflict' : view.overlap === false ? 'safe' : ''}">${escapeHtml(relationshipText)}</footer></section>
+    <section class="mc729-calendar"><header><strong>CALENDAR</strong><span>${calendar.length} ${vi ? 'lịch đã lưu' : 'saved booking(s)'}</span></header><div class="mc729-axis"><span>${minimum}</span><span>${Math.round((minimum + maximum) / 2)}</span><span>${maximum}</span></div><div>${calendarRows}</div></section>
+    <section class="mc729-action"><small>${vi ? 'DÒNG CODE HIỆN TẠI' : 'CURRENT CODE ACTION'}</small><strong>${escapeHtml(action)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="mc729-results ${final ? 'done' : ''}"><header><strong>${vi ? 'KẾT QUẢ THEO THỨ TỰ GỌI' : 'RESULTS IN CALL ORDER'}</strong><span>${final ? `[${results.join(', ')}]` : vi ? 'đang xử lý…' : 'in progress…'}</span></header><div>${resultCells}</div></footer>
+  </section>`;
+}
+
+function renderCalendar731View(step) {
+  const view = step.calendar731View || {};
+  const vi = lang === 'vi';
+  const current = Array.isArray(view.current) ? view.current : null;
+  const calendar = Array.isArray(view.calendar) ? view.calendar : [];
+  const doubles = Array.isArray(view.doubles) ? view.doubles : [];
+  const calls = Array.isArray(view.callStates) ? view.callStates : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const coverage = Array.isArray(view.coverage) ? view.coverage : [];
+  const minimum = Number.isFinite(view.minimum) ? view.minimum : 0;
+  const maximum = Number.isFinite(view.maximum) ? view.maximum : minimum + 1;
+  const span = Math.max(1, maximum - minimum);
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const checkingDouble = view.phase === 'check-double' || view.phase === 'rejected';
+  const comparedEntry = checkingDouble
+    ? (Number.isInteger(view.doubleCompared) && view.doubleCompared >= 0 ? doubles[view.doubleCompared] : null)
+    : (Number.isInteger(view.compared) && view.compared >= 0 ? calendar[view.compared] : null);
+  const comparedRange = comparedEntry && comparedEntry.range;
+  const final = view.phase === 'done';
+  const rejected = view.phase === 'rejected';
+  const accepted = view.phase === 'accepted';
+
+  const phases = (vi
+    ? ['Nhận request', 'Chặn phủ 3 lần', 'Tạo vùng phủ 2', 'Lưu booking', 'Kết quả']
+    : ['Read request', 'Block triple', 'Build doubles', 'Save booking', 'Result'])
+    .map((label, index) => `<span class="${index < phaseIndex ? 'done' : index === phaseIndex ? 'active' : ''}"><b>${index < phaseIndex ? '✓' : index + 1}</b>${escapeHtml(label)}</span>`).join('');
+
+  const position = (value) => 100 * (value - minimum) / span;
+  const rangeBar = (range, state, text = '') => {
+    if (!Array.isArray(range)) return '';
+    const left = Math.max(0, Math.min(100, position(range[0])));
+    const width = Math.max(1, Math.min(100 - left, 100 * (range[1] - range[0]) / span));
+    return `<span class="mc731-bar ${state}" style="left:${left}%;width:${width}%"><i>${escapeHtml(text)}</i></span>`;
+  };
+  const timelineRow = (range, label, state, detail = '') => `<div class="mc731-timeline-row"><header><strong>${escapeHtml(label)}</strong><span>[${range[0]}, ${range[1]})${detail ? ` · ${escapeHtml(detail)}` : ''}</span></header><div class="mc731-track">${rangeBar(range, state)}</div></div>`;
+  const axis = `<div class="mc731-axis"><span>${minimum}</span><span>${Math.round((minimum + maximum) / 2)}</span><span>${maximum}</span></div>`;
+
+  const callCards = calls.map((call) => {
+    const stateLabel = call.state === 'accepted' ? 'TRUE' : call.state === 'rejected' ? 'FALSE' : call.state === 'current' ? 'CURRENT' : vi ? 'chờ' : 'pending';
+    return `<article class="mc731-call ${call.state}"><small>book #${call.index + 1}</small><strong>[${call.range[0]}, ${call.range[1]})</strong><span>${stateLabel}</span></article>`;
+  }).join('');
+
+  const boolValue = (value) => value == null ? '?' : value ? 'TRUE' : 'FALSE';
+  const targetName = checkingDouble ? (vi ? 'DANGER ZONE' : 'DANGER ZONE') : (vi ? 'LỊCH ĐÃ NHẬN' : 'ACCEPTED BOOKING');
+  const conditionA = current && comparedRange ? `${current[0]} < ${comparedRange[1]}` : 'start < old_end';
+  const conditionB = current && comparedRange ? `${comparedRange[0]} < ${current[1]}` : 'old_start < end';
+  const conditionPanel = `<section class="mc731-check ${checkingDouble ? 'guard' : 'build'}"><header><div><small>${checkingDouble ? (vi ? 'BƯỚC CHẶN TRIPLE' : 'TRIPLE GUARD') : (vi ? 'BƯỚC TẠO DOUBLE' : 'BUILD DOUBLES')}</small><strong>${current ? `[${current[0]}, ${current[1]})` : 'request'} ${comparedRange ? `vs [${comparedRange[0]}, ${comparedRange[1]})` : `vs ${checkingDouble ? 'doubles' : 'calendar'}`}</strong></div><span>${targetName}</span></header><div class="mc731-conditions"><article class="${view.checkStart === true ? 'pass' : view.checkStart === false ? 'fail' : ''}"><small>A</small><b>${escapeHtml(conditionA)}</b><strong>${boolValue(view.checkStart)}</strong></article><i>AND</i><article class="${view.checkEnd === true ? 'pass' : view.checkEnd === false ? 'fail' : ''}"><small>B</small><b>${escapeHtml(conditionB)}</b><strong>${boolValue(view.checkEnd)}</strong></article><i>=</i><article class="decision ${view.overlap === true ? 'hit' : view.overlap === false ? 'miss' : ''}"><small>OVERLAP?</small><b>A AND B</b><strong>${boolValue(view.overlap)}</strong></article></div>${view.intersection ? `<footer class="${rejected ? 'danger' : 'double'}"><b>[${view.intersection[0]}, ${view.intersection[1]})</b><span>${rejected ? (vi ? 'đã có 2 lịch; request sẽ tạo lịch thứ 3' : 'already has 2 bookings; request would be the 3rd') : (vi ? 'phần giao được thêm vào doubles' : 'intersection added to doubles')}</span></footer>` : ''}</section>`;
+
+  const coverageRow = (key, label) => `<div class="mc731-coverage-row"><strong>${escapeHtml(label)}</strong><div class="mc731-coverage-track">${coverage.map((segment) => {
+    const left = Math.max(0, Math.min(100, position(segment.start)));
+    const width = Math.max(0.8, Math.min(100 - left, 100 * (segment.end - segment.start) / span));
+    const level = Number(segment[key] || 0);
+    return `<span class="level-${Math.min(3, level)}${segment.requestCovers && key === 'proposed' ? ' request-zone' : ''}" style="left:${left}%;width:${width}%" title="[${segment.start}, ${segment.end}) = ${level}x"><b>${level}×</b></span>`;
+  }).join('')}</div></div>`;
+  const maximumProposed = coverage.reduce((best, segment) => Math.max(best, Number(segment.proposed || 0)), 0);
+  const coverageStatus = maximumProposed >= 3
+    ? (vi ? 'Có vùng 3×: phải từ chối' : 'A 3× region exists: reject')
+    : (vi ? 'Không vùng nào vượt 2×' : 'No region exceeds 2×');
+
+  const calendarRows = calendar.length
+    ? calendar.map((entry, index) => timelineRow(entry.range, `${vi ? 'BOOKING' : 'BOOKING'} #${entry.callIndex + 1}`, index === view.compared ? 'compared' : index === view.justAddedCalendar ? 'added' : 'accepted')).join('')
+    : `<p>${vi ? 'Chưa có booking nào được nhận.' : 'No accepted booking yet.'}</p>`;
+  const doubleRows = doubles.length
+    ? doubles.map((entry, index) => timelineRow(entry.range, `D${index + 1}`, index === view.doubleCompared ? (rejected ? 'triple' : 'compared') : index === view.justAddedDouble ? 'new-double' : 'double', `${vi ? 'từ book' : 'from books'} #${entry.sourceCalls.map(value => value + 1).join(' + #')}`)).join('')
+    : `<p>${vi ? 'Chưa có vùng nào bị phủ hai lần.' : 'No region is covered twice yet.'}</p>`;
+  const resultCells = calls.map((call) => `<span class="${call.state}"><small>#${call.index + 1}</small><b>${call.state === 'accepted' ? 'true' : call.state === 'rejected' ? 'false' : '—'}</b></span>`).join('');
+
+  let action = vi ? 'calendar = [] · doubles = []' : 'calendar = [] · doubles = []';
+  if (view.phase === 'request') action = vi ? 'Chưa sửa dữ liệu; kiểm tra doubles trước.' : 'Do not mutate data; inspect doubles first.';
+  if (view.phase === 'check-double') action = `for danger in doubles: ${conditionA} AND ${conditionB}`;
+  if (view.phase === 'doubles-safe') action = vi ? 'Không tạo triple; bắt đầu so với từng booking cũ.' : 'No triple is possible; compare every accepted booking.';
+  if (view.phase === 'check-calendar') action = `for old in calendar: ${conditionA} AND ${conditionB}`;
+  if (view.phase === 'add-double' && view.intersection) action = `doubles.append((${view.intersection[0]}, ${view.intersection[1]}))`;
+  if (view.phase === 'append' && current) action = `calendar.append((${current[0]}, ${current[1]}))`;
+  if (rejected) action = vi ? 'return False · calendar và doubles giữ nguyên' : 'return False · calendar and doubles stay unchanged';
+  if (accepted) action = 'return True';
+  if (final) action = `results = [${results.join(', ')}]`;
+
+  $('treeView').innerHTML = `<section class="mc731-viz" role="img" aria-label="My Calendar II double and triple booking visualization">
+    <header><div><small>INTERVAL DESIGN · #731</small><strong>MY CALENDAR II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mc731-phases">${phases}</div>
+    <section class="mc731-model"><article><small>calendar</small><strong>${vi ? 'Mọi booking đã nhận' : 'Every accepted booking'}</strong><span>${calendar.length} ${vi ? 'khoảng' : 'interval(s)'}</span></article><i>${vi ? 'overlap tạo' : 'overlap creates'}</i><article class="double"><small>doubles</small><strong>${vi ? 'Các vùng đã phủ 2 lần' : 'Regions already covered 2×'}</strong><span>${doubles.length} danger zone(s)</span></article><i>${vi ? 'request chạm' : 'request touches'}</i><article class="triple"><small>TRIPLE</small><strong>${vi ? 'Phủ 3 lần: cấm' : 'Covered 3×: forbidden'}</strong><span>return False</span></article></section>
+    <section class="mc731-calls"><header><strong>${vi ? 'CÁC LẦN GỌI BOOK' : 'BOOK CALLS'}</strong><span>${results.filter(Boolean).length} ${vi ? 'đã nhận' : 'accepted'} · ${results.filter(value => !value).length} ${vi ? 'từ chối' : 'rejected'}</span></header><div>${callCards}</div></section>
+    ${conditionPanel}
+    <section class="mc731-coverage ${maximumProposed >= 3 ? 'danger' : 'safe'}"><header><div><strong>${vi ? 'SỐ LỊCH PHỦ TRÊN CÙNG TRỤC THỜI GIAN' : 'COVERAGE ON ONE SHARED TIME AXIS'}</strong><span>${vi ? 'Đỏ 3× là triple booking' : 'Red 3× means triple booking'}</span></div><b>${escapeHtml(coverageStatus)}</b></header>${axis}${coverageRow('base', vi ? 'HIỆN TẠI' : 'CURRENT')}${coverageRow('proposed', vi ? '+ REQUEST' : '+ REQUEST')}</section>
+    <section class="mc731-lists"><article><header><strong>calendar</strong><span>${calendar.length} ${vi ? 'booking đã nhận' : 'accepted'}</span></header>${axis}<div>${calendarRows}</div></article><article class="doubles"><header><strong>doubles</strong><span>${vi ? 'danger zones: request không được chạm' : 'danger zones: requests must not touch'}</span></header>${axis}<div>${doubleRows}</div></article></section>
+    <section class="mc731-action"><small>${vi ? 'DÒNG CODE HIỆN TẠI' : 'CURRENT CODE ACTION'}</small><strong>${escapeHtml(action)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="mc731-results ${final ? 'done' : ''}"><header><strong>${vi ? 'KẾT QUẢ THEO THỨ TỰ GỌI' : 'RESULTS IN CALL ORDER'}</strong><span>${final ? `[${results.join(', ')}]` : vi ? 'đang xử lý…' : 'in progress…'}</span></header><div>${resultCells}</div></footer>
   </section>`;
 }
 

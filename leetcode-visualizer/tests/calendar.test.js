@@ -20,11 +20,11 @@ test('trace matches an independent occupied-unit oracle and preserves snapshots'
   });
   const result = p.builder(JSON.stringify(bookings));
   assert.deepEqual(result.answer, expected);
-  assert.deepEqual(result.steps[0].calendarView.calendar, []);
+  assert.deepEqual(result.steps[0].calendar729View.calendar, []);
   for (let i=1; i<result.steps.length; i++) {
     const step = result.steps[i];
     assert.ok(step.codeLines.every(n => n >= 1 && n <= p.code.length));
-    if (step.calendarView.phase === 'rejected') assert.deepEqual(step.calendarView.calendar, result.steps[i-1].calendarView.calendar);
+    if (step.calendar729View.phase === 'rejected') assert.deepEqual(step.calendar729View.calendar, result.steps[i-1].calendar729View.calendar);
   }
 });
 test('validation and design runner use the same booking input', () => {

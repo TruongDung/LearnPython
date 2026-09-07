@@ -15,11 +15,11 @@ test('731 example, duplicates, touching boundaries and rejected-state preservati
   // Rejected [5,15) must not leave a spurious [5,10) double region.
   const r = p.builder('[[0,10],[10,20],[10,20],[5,15],[0,10]]');
   assert.deepEqual(r.answer, [true,true,true,false,true]);
-  for (let i=1;i<r.steps.length;i++) if (r.steps[i].calendarView.phase === 'rejected') {
-    assert.deepEqual(r.steps[i].calendarView.calendar,r.steps[i-1].calendarView.calendar);
-    assert.deepEqual(r.steps[i].calendarView.doubles,r.steps[i-1].calendarView.doubles);
+  for (let i=1;i<r.steps.length;i++) if (r.steps[i].calendar731View.phase === 'rejected') {
+    assert.deepEqual(r.steps[i].calendar731View.calendar,r.steps[i-1].calendar731View.calendar);
+    assert.deepEqual(r.steps[i].calendar731View.doubles,r.steps[i-1].calendar731View.doubles);
   }
-  assert.deepEqual(r.steps[0].calendarView.doubles, []);
+  assert.deepEqual(r.steps[0].calendar731View.doubles, []);
 });
 
 test('731 deterministic random traces match independent per-unit occupancy', () => {
@@ -36,8 +36,8 @@ test('731 deterministic random traces match independent per-unit occupancy', () 
     }
     const r=p.builder(JSON.stringify(bookings));
     assert.deepEqual(r.answer,expected);
-    const final=r.steps.at(-1).calendarView;
-    for(let t=0;t<20;t++)assert.equal(final.doubles.some(([s,e])=>s<=t&&t<e),occupancy[t]===2);
+    const final=r.steps.at(-1).calendar731View;
+    for(let t=0;t<20;t++)assert.equal(final.doubles.some(({range:[s,e]})=>s<=t&&t<e),occupancy[t]===2);
     for(const step of r.steps) assert.ok(step.codeLines.every(n=>n>=1&&n<=p.code.length));
   }
 });
@@ -50,18 +50,24 @@ test('731 validates input and configures the correct Python design class', () =>
   assert.deepEqual(config.operations.map(o=>o.args),JSON.parse(p.defaultInput));
   assert.ok(config.operations.every(o=>o.name==='book'));
   const source=p.code.join('\n')+'\nc=MyCalendarTwo()\nassert [c.book(s,e) for s,e in '+p.defaultInput+'] == [True,True,True,False,True,True]\n';
-  const run=spawnSync('python',['-c',source],{encoding:'utf8'});
+  const run=spawnSync('python3',['-c',source],{encoding:'utf8'});
   assert.equal(run.status,0,run.stderr);
 });
 
-test('shared timeline renders every example phase in both languages for 729 and 731', () => {
+test('custom calendar timelines render every example phase in both languages', () => {
   const source=fs.readFileSync(require.resolve('../public/script.js'),'utf8');
-  const element={}; const context={lang:'en',$:()=>element,escapeHtml:String};
+  const element={}; const context={lang:'en',$:()=>element,escapeHtml:String,pick:value=>value && typeof value==='object' ? value[context.lang] : value};
   vm.createContext(context);
-  vm.runInContext(source.slice(source.indexOf('function renderCalendarView(step)')),context);
+  const loadFunction = (name) => {
+    const start=source.indexOf(`function ${name}(`);
+    const end=source.indexOf('\nfunction ',start+10);
+    vm.runInContext(source.slice(start,end<0?source.length:end),context);
+  };
+  loadFunction('renderCalendar729View');
+  loadFunction('renderCalendar731View');
   for(const id of [729,731])for(const lang of ['en','vi'])for(const step of SUPPORTED[id].builder(SUPPORTED[id].defaultInput).steps) {
     context.lang=lang;context.step=step;
-    vm.runInContext('renderCalendarView(step)',context);
+    vm.runInContext(id===731?'renderCalendar731View(step)':'renderCalendar729View(step)',context);
     assert.ok(element.innerHTML.includes(id===731?'My Calendar II':'My Calendar I'));
     assert.ok(!element.innerHTML.includes('undefined'));
     if(id===731)assert.ok(element.innerHTML.includes('doubles'));
