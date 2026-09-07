@@ -1121,6 +1121,165 @@ function bstPreorder(nums) {
   return "valid preorder";
 }
 
+function buildSteps255(input) {
+  const preorder = parseNums(input, "preorder");
+  if (preorder.length > 14) throw new Error("Use up to 14 values so the BST ancestor path stays readable.");
+  if (new Set(preorder).size !== preorder.length) throw new Error("preorder values must be distinct.");
+
+  const stack = [];
+  const accepted = [];
+  const lowerHistory = [];
+  const steps = [];
+  let lower = -Infinity;
+
+  const snap = ({ phase, title, note, codeLines, current = -1, compared = null, popped = null, lowerBefore = lower, currentPops = [], valid = null, action = "", final = false }) => {
+    const phaseIndex = phase === "rule" ? 0 : phase === "check" || phase === "reject" ? 1 : phase === "compare" || phase === "pop" ? 2 : 3;
+    const related = [current, compared == null ? -1 : preorder.indexOf(compared), popped == null ? -1 : preorder.indexOf(popped)];
+    steps.push({
+      title,
+      arr: [...preorder],
+      sub: preorder.map((value, index) => `i=${index} · value=${value}`),
+      highlight: related.filter((index, position) => index >= 0 && related.indexOf(index) === position),
+      mark: [...accepted],
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      final,
+      vars: [
+        { name: "value", value: current >= 0 ? preorder[current] : "-" },
+        { name: "lower_bound", value: Number.isFinite(lower) ? lower : "-inf" },
+        { name: "stack", value: arrText(stack) },
+      ],
+      note,
+      bstPreorder255View: {
+        phase,
+        phaseIndex,
+        preorder: [...preorder],
+        stack: [...stack],
+        accepted: [...accepted],
+        lower: Number.isFinite(lower) ? lower : null,
+        lowerBefore: Number.isFinite(lowerBefore) ? lowerBefore : null,
+        lowerHistory: lowerHistory.map((item) => ({ ...item })),
+        current,
+        compared,
+        popped,
+        currentPops: [...currentPops],
+        valid,
+        action,
+        explanation: note,
+      },
+    });
+  };
+
+  snap({
+    phase: "rule",
+    title: text("Preorder đi theo root, left, rồi right", "Preorder visits root, then left, then right"),
+    note: text(
+      "Stack là đường ancestor đang mở. lower_bound là root gần nhất mà ta đã đi sang nhánh phải; mọi value sau đó phải lớn hơn hàng rào này.",
+      "The stack is the open ancestor path. lower_bound is the latest root whose right subtree we entered; every later value must stay above this barrier.",
+    ),
+    codeLines: [2, 3, 4],
+    action: "Every future value must be > lower_bound",
+  });
+
+  for (let i = 0; i < preorder.length; i++) {
+    const value = preorder[i];
+    const currentPops = [];
+    snap({
+      phase: "check",
+      title: text(`Kiểm tra preorder[${i}] = ${value}`, `Check preorder[${i}] = ${value}`),
+      note: Number.isFinite(lower)
+        ? text(`So sánh ${value} với lower_bound=${lower}.`, `Compare ${value} with lower_bound=${lower}.`)
+        : text("Chưa có lower bound vì chưa rời nhánh trái của root nào.", "There is no lower bound yet because no root's left subtree has been closed."),
+      codeLines: [5, 6],
+      current: i,
+      valid: value > lower,
+      action: Number.isFinite(lower) ? `${value} ${value > lower ? ">" : "<"} ${lower}` : `${value} > -∞`,
+    });
+
+    if (value < lower) {
+      snap({
+        phase: "reject",
+        title: text(`${value} < lower_bound ${lower}: preorder không hợp lệ`, `${value} < lower_bound ${lower}: invalid preorder`),
+        note: text(
+          `Ta đã đi vào nhánh phải của ${lower}, nên không thể quay lại gặp value nhỏ hơn ${lower}.`,
+          `We already entered ${lower}'s right subtree, so a later value smaller than ${lower} cannot appear.`,
+        ),
+        codeLines: 7,
+        current: i,
+        valid: false,
+        action: "return False",
+        final: true,
+      });
+      return { original: preorder, answer: false, steps };
+    }
+
+    while (stack.length) {
+      const top = stack.at(-1);
+      snap({
+        phase: "compare",
+        title: text(`So sánh current ${value} với ancestor ${top}`, `Compare current ${value} with ancestor ${top}`),
+        note: value > top
+          ? text(`${value} > ${top}: nhánh trái của ${top} đã xong; pop để đi sang phải.`, `${value} > ${top}: ${top}'s left subtree is complete; pop it and move right.`)
+          : text(`${value} < ${top}: current vẫn ở nhánh trái của ${top}; dừng pop.`, `${value} < ${top}: current remains in ${top}'s left subtree; stop popping.`),
+        codeLines: 8,
+        current: i,
+        compared: top,
+        currentPops,
+        valid: true,
+        action: `${value} ${value > top ? ">" : "<"} stack_top ${top}`,
+      });
+      if (value < top) break;
+
+      const lowerBefore = lower;
+      const removed = stack.pop();
+      lower = removed;
+      currentPops.push(removed);
+      lowerHistory.push({ current: value, popped: removed, lower });
+      snap({
+        phase: "pop",
+        title: text(`Pop ${removed}; lower_bound = ${removed}`, `Pop ${removed}; lower_bound = ${removed}`),
+        note: text(
+          `Đã đóng nhánh trái của ${removed}. Từ đây, mọi value phải > ${removed}.`,
+          `${removed}'s left subtree is closed. From now on, every value must be > ${removed}.`,
+        ),
+        codeLines: 9,
+        current: i,
+        compared: removed,
+        popped: removed,
+        lowerBefore,
+        currentPops,
+        valid: true,
+        action: `lower_bound: ${Number.isFinite(lowerBefore) ? lowerBefore : "-∞"} → ${lower}`,
+      });
+    }
+
+    stack.push(value);
+    accepted.push(i);
+    snap({
+      phase: "push",
+      title: text(`Push ${value} vào ancestor path`, `Push ${value} onto the ancestor path`),
+      note: currentPops.length
+        ? text(`Sau khi leo qua [${currentPops.join(", ")}], ${value} mở path mới trong nhánh phải.`, `After climbing past [${currentPops.join(", ")}], ${value} opens a new path in the right subtree.`)
+        : text(`${value} tiếp tục path đi xuống nhánh trái.`, `${value} continues the path down the left subtree.`),
+      codeLines: 10,
+      current: i,
+      currentPops,
+      valid: true,
+      action: `stack.append(${value})`,
+    });
+  }
+
+  snap({
+    phase: "done",
+    title: text("Không value nào rơi xuống dưới lower_bound", "No value fell below lower_bound"),
+    note: text("Toàn bộ sequence tuân theo preorder của một BST.", "The entire sequence follows a valid BST preorder traversal."),
+    codeLines: 11,
+    valid: true,
+    action: "return True",
+    final: true,
+  });
+  return { original: preorder, answer: true, steps };
+}
+
 function nextGreaterNodes(nums) {
   const ans = Array(nums.length).fill(0), stack = [];
   nums.forEach((value, i) => {
@@ -7360,7 +7519,45 @@ module.exports = {
     liveArgs: (input) => [parseNums(input, "nums")],
     builder: buildSteps2945,
   },
-  255: simpleProblem({ id: 255, difficulty: "medium", slug: "verify-preorder-sequence-in-binary-search-tree", name: "Verify Preorder Sequence in Binary Search Tree", viName: "Kiểm tra preorder BST", statement: text("Premium: kiểm tra dãy có thể là preorder của BST không.", "Premium: check whether a sequence can be a BST preorder traversal."), defaultInput: "5,2,1,3,6", tags: [arrayTag, treeTag, monoTag], premium: true, solver: arrayBuilder(bstPreorder) }),
+  255: {
+    id: 255,
+    difficulty: "medium",
+    slug: "verify-preorder-sequence-in-binary-search-tree",
+    category,
+    tags: [arrayTag, treeTag, monoTag, premiumTag],
+    premium: true,
+    title: text("Verify Preorder Sequence in Binary Search Tree"),
+    titleVi: text("Kiểm tra preorder của BST", "Verify Preorder Sequence in Binary Search Tree"),
+    statement: text(
+      "Cho một dãy số nguyên phân biệt. Kiểm tra dãy có thể là preorder traversal của một binary search tree hay không.",
+      "Given a sequence of distinct integers, determine whether it can be the preorder traversal of a binary search tree.",
+    ),
+    defaultInput: "5,2,1,3,6",
+    inputKind: "string",
+    inputLabel: text("preorder (cách bởi ,)", "preorder (comma separated)"),
+    extraParams: [],
+    approach: [
+      text("Stack lưu đường ancestor hiện tại từ root xuống node gần nhất.", "The stack stores the current ancestor path from the root to the nearest node."),
+      text("Khi current lớn hơn stack top, ta đã rời left subtree của top; pop top và dùng nó làm lower_bound mới.", "When current is greater than the stack top, top's left subtree is complete; pop top and make it the new lower_bound."),
+      text("Nếu một value sau đó nhỏ hơn lower_bound, nó quay lại phía trái của subtree đã đóng nên preorder không hợp lệ.", "If a later value is smaller than lower_bound, it returns to the left side of a closed subtree, so the preorder is invalid."),
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: text("Mỗi value được push một lần và pop nhiều nhất một lần.", "Each value is pushed once and popped at most once.") },
+    code: [
+      "class Solution:",
+      "    def verifyPreorder(self, preorder):",
+      "        lower_bound = float('-inf')",
+      "        stack = []",
+      "        for value in preorder:",
+      "            if value < lower_bound:",
+      "                return False",
+      "            while stack and value > stack[-1]:",
+      "                lower_bound = stack.pop()",
+      "            stack.append(value)",
+      "        return True",
+    ],
+    liveArgs: (input) => [parseNums(input, "preorder")],
+    builder: buildSteps255,
+  },
   1762: simpleProblem({ id: 1762, difficulty: "medium", slug: "buildings-with-an-ocean-view", name: "Buildings With an Ocean View", viName: "Tòa nhà nhìn ra biển", statement: text("Premium: trả index các tòa nhà cao hơn mọi tòa bên phải.", "Premium: return indices taller than every building to their right."), defaultInput: "4,2,3,1", premium: true, solver: arrayBuilder(oceanView) }),
   1950: {
     id: 1950,

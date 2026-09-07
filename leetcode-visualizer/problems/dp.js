@@ -24005,6 +24005,271 @@ Object.assign(module.exports, {
   },
 });
 
+function buildSteps940(input) {
+  const s = String(input ?? "").trim();
+  if (!/^[a-z]+$/.test(s)) throw new Error("Use a non-empty string of lowercase English letters.");
+  if (s.length > 12) throw new Error("Use up to 12 characters so the distinct subsequences stay readable.");
+
+  const MOD = 1_000_000_007;
+  const dp = Array(s.length + 1).fill(null);
+  const lastCount = {};
+  const lastIndex = {};
+  const distinct = new Set([""]);
+  const steps = [];
+  let total = 1;
+  dp[0] = 1;
+
+  const sample = (values, limit = 18) => {
+    const ordered = [...values].sort((first, second) => first.length - second.length || first.localeCompare(second));
+    if (ordered.length <= limit) return ordered;
+    const side = Math.floor(limit / 2);
+    return [...ordered.slice(0, side), ...ordered.slice(-side)];
+  };
+
+  const snap = ({
+    phase,
+    title,
+    note,
+    codeLines,
+    current = -1,
+    processedThrough = current - 1,
+    previousIndex = -1,
+    oldTotal = total,
+    doubled = total * 2,
+    duplicateCount = 0,
+    newTotal = null,
+    oldValues = [...distinct],
+    takeValues = [],
+    duplicateValues = [],
+    action = "",
+    final = false,
+  }) => {
+    const phaseIndex = phase === "init" ? 0 : phase === "read" || phase === "double" ? 1 : phase === "subtract" ? 2 : 3;
+    steps.push({
+      title,
+      arr: [...s],
+      sub: [...s].map((ch, index) => `i=${index} · '${ch}'`),
+      highlight: [current, previousIndex].filter((index, position, values) => index >= 0 && values.indexOf(index) === position),
+      mark: Array.from({ length: Math.max(0, processedThrough + 1) }, (_, index) => index),
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLines],
+      final,
+      vars: [
+        { name: "ch", value: current >= 0 ? `'${s[current]}'` : "-" },
+        { name: "total", value: newTotal ?? oldTotal },
+        { name: "last", value: JSON.stringify(lastCount) },
+        { name: "dp", value: JSON.stringify(dp) },
+      ],
+      note,
+      distinctSubseq940View: {
+        phase,
+        phaseIndex,
+        s,
+        current,
+        processedThrough,
+        previousIndex,
+        currentChar: current >= 0 ? s[current] : "",
+        dp: [...dp],
+        lastCounts: { ...lastCount },
+        lastIndices: { ...lastIndex },
+        oldTotal,
+        doubled,
+        duplicateCount,
+        newTotal,
+        oldCount: oldValues.length,
+        takeCount: takeValues.length,
+        distinctCount: distinct.size,
+        oldExamples: sample(oldValues),
+        takeExamples: sample(takeValues),
+        duplicateExamples: sample(duplicateValues),
+        distinctExamples: sample(distinct),
+        action,
+        explanation: note,
+      },
+    });
+  };
+
+  snap({
+    phase: "init",
+    title: { vi: "Bắt đầu với subsequence rỗng", en: "Start with the empty subsequence" },
+    note: {
+      vi: "total luôn tính cả subsequence rỗng để mỗi ký tự có thể được nối vào một lựa chọn hợp lệ. Cuối cùng mới trừ 1.",
+      en: "total includes the empty subsequence so every character can be appended to a valid choice. We subtract the empty one only at the end.",
+    },
+    codeLines: [3, 4, 5],
+    processedThrough: -1,
+    action: "dp[0] = total = 1  (empty subsequence)",
+  });
+
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    const oldTotal = total;
+    const oldValues = [...distinct];
+    const takeValues = oldValues.map((value) => value + ch);
+    const duplicateValues = takeValues.filter((value) => distinct.has(value));
+    const duplicateCount = lastCount[ch] || 0;
+    const previousIndex = lastIndex[ch] ?? -1;
+    const doubled = (oldTotal * 2) % MOD;
+    const candidateTotal = (oldTotal * 2 - duplicateCount + MOD) % MOD;
+
+    snap({
+      phase: "read",
+      title: { vi: `Đọc s[${i}] = '${ch}'`, en: `Read s[${i}] = '${ch}'` },
+      note: previousIndex >= 0
+        ? { vi: `'${ch}' đã xuất hiện tại index ${previousIndex}; lần cũ sẽ tạo ra ${duplicateCount} kết quả trùng.`, en: `'${ch}' appeared at index ${previousIndex}; that earlier occurrence will cause ${duplicateCount} duplicate result(s).` }
+        : { vi: `'${ch}' chưa từng xuất hiện nên chưa có nhóm trùng phải loại.`, en: `'${ch}' has not appeared before, so there is no duplicate group to remove.` },
+      codeLines: [6, 7],
+      current: i,
+      previousIndex,
+      oldTotal,
+      doubled,
+      duplicateCount,
+      oldValues,
+      takeValues,
+      duplicateValues,
+      action: `previous = total = ${oldTotal}`,
+    });
+
+    snap({
+      phase: "double",
+      title: { vi: `${oldTotal} lựa chọn cũ → skip hoặc take '${ch}'`, en: `${oldTotal} old choices → skip or take '${ch}'` },
+      note: {
+        vi: `Mỗi subsequence cũ tạo hai lựa chọn: giữ nguyên (skip) hoặc nối '${ch}' (take), nên tạm thời có 2 × ${oldTotal} = ${oldTotal * 2}.`,
+        en: `Every old subsequence creates two choices: keep it (skip) or append '${ch}' (take), giving 2 × ${oldTotal} = ${oldTotal * 2} before deduplication.`,
+      },
+      codeLines: 8,
+      current: i,
+      previousIndex,
+      oldTotal,
+      doubled,
+      duplicateCount,
+      oldValues,
+      takeValues,
+      duplicateValues,
+      action: `2 × ${oldTotal} = ${oldTotal * 2}`,
+    });
+
+    snap({
+      phase: "subtract",
+      title: duplicateCount > 0
+        ? { vi: `Trừ ${duplicateCount} kết quả do '${ch}' cũ đã tạo`, en: `Subtract ${duplicateCount} result(s) made by the previous '${ch}'` }
+        : { vi: `Không có '${ch}' cũ: trừ 0`, en: `No previous '${ch}': subtract 0` },
+      note: duplicateCount > 0
+        ? { vi: `last['${ch}'] = ${duplicateCount}: đây chính là số subsequence tồn tại trước lần '${ch}' trước, và tất cả chúng bị tạo lại ở lần này.`, en: `last['${ch}'] = ${duplicateCount}: these are exactly the subsequences that existed before the previous '${ch}', so this occurrence creates them again.` }
+        : { vi: `Đây là lần đầu gặp '${ch}', vì vậy mọi kết quả take đều mới.`, en: `This is the first '${ch}', so every take result is new.` },
+      codeLines: 8,
+      current: i,
+      previousIndex,
+      oldTotal,
+      doubled,
+      duplicateCount,
+      newTotal: candidateTotal,
+      oldValues,
+      takeValues,
+      duplicateValues,
+      action: `${oldTotal * 2} - ${duplicateCount} = ${oldTotal * 2 - duplicateCount}`,
+    });
+
+    total = candidateTotal;
+    lastCount[ch] = oldTotal;
+    lastIndex[ch] = i;
+    for (const value of takeValues) distinct.add(value);
+    dp[i + 1] = total;
+
+    snap({
+      phase: "commit",
+      title: { vi: `Lưu dp[${i + 1}] = ${total}`, en: `Store dp[${i + 1}] = ${total}` },
+      note: {
+        vi: `Cập nhật last['${ch}'] = ${oldTotal} để lần '${ch}' tiếp theo biết phải loại bao nhiêu kết quả trùng.`,
+        en: `Set last['${ch}'] = ${oldTotal}, so the next '${ch}' knows how many duplicate results to remove.`,
+      },
+      codeLines: [8, 9],
+      current: i,
+      processedThrough: i,
+      previousIndex,
+      oldTotal,
+      doubled,
+      duplicateCount,
+      newTotal: total,
+      oldValues,
+      takeValues,
+      duplicateValues,
+      action: `total = ${total}; last['${ch}'] = ${oldTotal}`,
+    });
+  }
+
+  const answer = (total - 1 + MOD) % MOD;
+  snap({
+    phase: "done",
+    title: { vi: `Bỏ subsequence rỗng: ${total} - 1 = ${answer}`, en: `Remove the empty subsequence: ${total} - 1 = ${answer}` },
+    note: {
+      vi: `dp[n] tính cả ∅; đề bài chỉ đếm subsequence không rỗng nên đáp án là ${answer}.`,
+      en: `dp[n] includes ∅; the problem counts only non-empty subsequences, so the answer is ${answer}.`,
+    },
+    codeLines: 10,
+    current: -1,
+    processedThrough: s.length - 1,
+    oldTotal: total,
+    doubled: total,
+    duplicateCount: 1,
+    newTotal: answer,
+    oldValues: [...distinct],
+    action: `return (${total} - 1) % MOD = ${answer}`,
+    final: true,
+  });
+
+  return { original: s, answer, steps };
+}
+
+Object.assign(module.exports, {
+  940: {
+    id: 940,
+    difficulty: "hard",
+    slug: "distinct-subsequences-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "hash-map", vi: "Hash Map", en: "Hash Map" },
+    ],
+    title: { vi: "Distinct Subsequences II", en: "Distinct Subsequences II" },
+    titleVi: { vi: "Đếm subsequence phân biệt II", en: "Count distinct subsequences II" },
+    statement: {
+      vi: "Cho chuỗi s gồm chữ thường. Trả về số subsequence không rỗng khác nhau, modulo 10^9 + 7.",
+      en: "Given a lowercase string s, return the number of distinct non-empty subsequences modulo 10^9 + 7.",
+    },
+    defaultInput: "aba",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường, tối đa 12 ký tự cho visualization)", en: "s (lowercase, up to 12 chars for visualization)" },
+    extraParams: [],
+    approach: [
+      { vi: "Giữ total là số subsequence phân biệt của prefix đã đọc, có tính cả subsequence rỗng.", en: "Let total count distinct subsequences of the processed prefix, including the empty subsequence." },
+      { vi: "Với ký tự ch, mỗi kết quả cũ có hai lựa chọn skip/take nên số lượng tạm thời tăng gấp đôi.", en: "For character ch, every old result has skip/take choices, so the temporary count doubles." },
+      { vi: "Nếu ch đã xuất hiện, trừ last[ch]: số kết quả bị tạo lại bởi lần xuất hiện trước của ch.", en: "If ch appeared before, subtract last[ch], the number of results recreated from ch's previous occurrence." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Thuật toán chỉ giữ 26 giá trị last. Visualization tạo thêm ví dụ subsequence cho input ngắn.",
+        en: "The algorithm stores only 26 last values. The visualization additionally builds examples for the short input.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def distinctSubseqII(self, s: str) -> int:",
+      "        MOD = 10**9 + 7",
+      "        total = 1  # includes the empty subsequence",
+      "        last = {}",
+      "        for ch in s:",
+      "            previous = total",
+      "            total = (2 * total - last.get(ch, 0)) % MOD",
+      "            last[ch] = previous",
+      "        return (total - 1) % MOD",
+    ],
+    liveArgs: (input) => [String(input)],
+    builder: buildSteps940,
+  },
+});
+
 // ─── 943: Find the Shortest Superstring ───
 function parseWords943(input) {
   const items = Array.isArray(input) ? input : String(input ?? "").split(",");

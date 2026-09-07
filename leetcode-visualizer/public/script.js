@@ -2087,12 +2087,7 @@ $("nextBtn").addEventListener("click", () => {
   const breakpointIndex = findBreakpointStep(stepIndex, 1);
   if (breakpointIndex >= 0) stepIndex = breakpointIndex;
   else if (stepIndex < steps.length - 1) stepIndex++;
-  try {
-    renderStep();
-  } catch (error) {
-    $("treeView").innerHTML = `<pre id="mm1950GlobalDebugError">${escapeHtml(error.stack || error.message)}</pre>`;
-    throw error;
-  }
+  renderStep();
 });
 $("lastBtn").addEventListener("click", () => {
   stopPlay();
@@ -8269,6 +8264,158 @@ function renderMaxMin1950View(step) {
     <section class="mm1950-fill-rule"><b>${vi ? "VÌ SAO LAN TỪ PHẢI SANG TRÁI?" : "WHY FILL FROM RIGHT TO LEFT?"}</b><span>${vi ? "Minimum hợp lệ cho window dài k+1 cũng là candidate cho một window ngắn k. Do đó answer[k] = max(answer[k], answer[k+1])." : "A minimum valid for a window of length k+1 is also a candidate for a shorter window k. Therefore answer[k] = max(answer[k], answer[k+1])."}</span></section>
     <section class="mm1950-action"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
     <footer class="mm1950-result ${final ? "done" : ""}"><small>WINDOW SIZE 1 → n</small><strong>${final ? `[${answer.join(", ")}]` : "…"}</strong><span>${final ? (vi ? "Mỗi vị trí answer[k−1] là minimum lớn nhất trong mọi window dài k." : "Each answer[k−1] is the largest minimum among all windows of length k.") : (vi ? "Hoàn tất biên, ghi span bucket, rồi backfill." : "Finish boundaries, write span buckets, then backfill.")}</span></footer>
+  </section>`;
+}
+
+function renderDistinctSubseq940View(step) {
+  const view = step.distinctSubseq940View || {};
+  const vi = lang === "vi";
+  const s = String(view.s || "");
+  const chars = [...s];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const previousIndex = Number.isInteger(view.previousIndex) ? view.previousIndex : -1;
+  const processedThrough = Number.isInteger(view.processedThrough) ? view.processedThrough : -1;
+  const currentChar = view.currentChar || "";
+  const oldTotal = Number(view.oldTotal || 0);
+  const doubled = Number(view.doubled || 0);
+  const duplicateCount = Number(view.duplicateCount || 0);
+  const newTotal = Number.isFinite(view.newTotal) ? view.newTotal : null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const lastCounts = view.lastCounts && typeof view.lastCounts === "object" ? view.lastCounts : {};
+  const lastIndices = view.lastIndices && typeof view.lastIndices === "object" ? view.lastIndices : {};
+  const phaseLabels = vi
+    ? ["Tính cả ∅", "Skip hoặc take", "Loại duplicate", "Lưu / Kết quả"]
+    : ["Include ∅", "Skip or take", "Remove duplicates", "Store / Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const formatSubsequence = (value) => value === "" ? "∅" : value;
+  const examples = (values, total, emptyText) => {
+    const list = Array.isArray(values) ? values : [];
+    if (!list.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    const hidden = Math.max(0, Number(total || list.length) - list.length);
+    return `${list.map((value) => `<span>${escapeHtml(formatSubsequence(value))}</span>`).join("")}${hidden ? `<em>+${hidden} ${vi ? "khác" : "more"}</em>` : ""}`;
+  };
+
+  const charCards = chars.map((ch, index) => {
+    const classes = ["ds940-char"];
+    if (index <= processedThrough) classes.push("processed");
+    if (index === previousIndex) classes.push("previous");
+    if (index === current) classes.push("current");
+    let status = index <= processedThrough ? (vi ? "đã xử lý" : "processed") : (vi ? "chưa đọc" : "unread");
+    if (index === previousIndex) status = vi ? "lần trước" : "previous same";
+    if (index === current) status = "CURRENT";
+    return `<article class="${classes.join(" ")}"><small>index ${index}</small><strong>${escapeHtml(ch)}</strong><span>${escapeHtml(status)}</span></article>`;
+  }).join("");
+
+  const dpCells = dp.map((value, index) => `<span class="${index === current + 1 && current >= 0 ? "current" : value != null ? "known" : ""}"><small>dp[${index}]</small><b>${value == null ? "?" : value}</b><em>${index === 0 ? "∅" : escapeHtml(s.slice(0, index))}</em></span>`).join("");
+  const lastEntries = Object.entries(lastCounts);
+  const lastTable = lastEntries.length
+    ? lastEntries.map(([ch, count]) => `<span class="${ch === currentChar ? "current" : ""}"><b>'${escapeHtml(ch)}'</b><strong>${count}</strong><small>${vi ? "trước index" : "before index"} ${lastIndices[ch] ?? "?"}</small></span>`).join("")
+    : `<p>${vi ? "Chưa ký tự nào được lưu." : "No character has been stored yet."}</p>`;
+
+  let formula = "total = 1";
+  if (view.phase === "read") formula = `previous = ${oldTotal}`;
+  if (view.phase === "double") formula = `2 × ${oldTotal} = ${oldTotal * 2}`;
+  if (view.phase === "subtract") formula = `${oldTotal * 2} − ${duplicateCount} = ${oldTotal * 2 - duplicateCount}`;
+  if (view.phase === "commit") formula = `total = (2 × ${oldTotal} − ${duplicateCount}) mod M = ${newTotal}`;
+  if (view.phase === "done") formula = `${oldTotal} − 1 empty = ${newTotal}`;
+  const final = view.phase === "done";
+  const duplicateTitle = duplicateCount > 0
+    ? (vi ? `TRÙNG DO '${currentChar}' TRƯỚC ĐÓ` : `DUPLICATES FROM THE PREVIOUS '${currentChar}'`)
+    : (vi ? "KHÔNG CÓ DUPLICATE" : "NO DUPLICATES");
+  const rulePanel = final
+    ? `<section class="ds940-rule finish"><b>${vi ? "BỎ KẾT QUẢ RỖNG" : "REMOVE THE EMPTY RESULT"}</b><div><span><small>${vi ? "TÍNH CẢ ∅" : "INCLUDING ∅"}</small><strong>${oldTotal}</strong></span><i>−</i><span class="duplicate"><small>EMPTY</small><strong>1</strong></span><i>=</i><span class="result"><small>${vi ? "KHÔNG RỖNG" : "NON-EMPTY"}</small><strong>${newTotal}</strong></span></div><p>answer = (total − 1) mod M</p></section>`
+    : `<section class="ds940-rule"><b>${vi ? "MỘT CÔNG THỨC, BA Ý" : "ONE FORMULA, THREE IDEAS"}</b><div><span><small>SKIP</small><strong>${oldTotal}</strong></span><i>+</i><span><small>TAKE '${escapeHtml(currentChar || "?")}'</small><strong>${oldTotal}</strong></span><i>−</i><span class="duplicate"><small>DUPLICATE</small><strong>${duplicateCount}</strong></span><i>=</i><span class="result"><small>NEW TOTAL</small><strong>${newTotal ?? "?"}</strong></span></div><p>new_total = 2 × old_total − last[ch]</p></section>`;
+  const metricsPanel = final
+    ? `<section class="ds940-metrics final"><div><small>${vi ? "total tính cả ∅" : "total including ∅"}</small><strong>${oldTotal}</strong></div><div class="subtract"><small>empty</small><strong>− 1</strong></div><div class="answer"><small>answer</small><strong>${newTotal}</strong></div></section>`
+    : `<section class="ds940-metrics"><div><small>old total</small><strong>${oldTotal || "—"}</strong></div><div><small>after × 2</small><strong>${doubled || "—"}</strong></div><div class="subtract"><small>last['${escapeHtml(currentChar || "?")}']</small><strong>− ${duplicateCount}</strong></div><div class="answer"><small>new total</small><strong>${newTotal ?? "—"}</strong></div></section>`;
+  const choicePanel = final ? "" : `<section class="ds940-choice"><header><strong>${vi ? "VÌ SAO NHÂN ĐÔI?" : "WHY DOES THE COUNT DOUBLE?"}</strong><span>${currentChar ? `${vi ? "ký tự hiện tại" : "current character"} '${escapeHtml(currentChar)}'` : "—"}</span></header><div><article><header><b>SKIP</b><span>${view.oldCount || 0} ${vi ? "kết quả giữ nguyên" : "unchanged results"}</span></header><div>${examples(view.oldExamples, view.oldCount, vi ? "Chưa có nhóm skip." : "No skip group yet.")}</div></article><i>+</i><article class="take"><header><b>TAKE</b><span>${view.takeCount || 0} ${vi ? `kết quả nối '${currentChar}'` : `results append '${currentChar}'`}</span></header><div>${examples(view.takeExamples, view.takeCount, vi ? "Chưa đọc ký tự." : "No character has been read.")}</div></article></div></section>`;
+  const duplicatePanel = final ? "" : `<section class="ds940-duplicates ${duplicateCount > 0 ? "has-duplicates" : ""}"><header><strong>${escapeHtml(duplicateTitle)}</strong><span>subtract = last['${escapeHtml(currentChar || "?")}'] = ${duplicateCount}</span></header><div>${examples(view.duplicateExamples, duplicateCount, vi ? "Mọi kết quả TAKE đều mới." : "Every TAKE result is new.")}</div><p>${duplicateCount > 0 ? (vi ? `Những chuỗi này đã tồn tại, nên chỉ được đếm một lần.` : "These strings already exist, so each must be counted only once.") : (vi ? "Ký tự chưa xuất hiện trước đó nên không tạo lại kết quả cũ." : "The character has not appeared before, so it recreates no old result.")}</p></section>`;
+
+  $("treeView").innerHTML = `<section class="ds940-viz" role="img" aria-label="Distinct Subsequences II dynamic programming visualization">
+    <header><div><small>DYNAMIC PROGRAMMING · #940</small><strong>DISTINCT SUBSEQUENCES II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ds940-phases">${phases}</div>
+    ${rulePanel}${metricsPanel}
+    <section class="ds940-string"><header><strong>INPUT STRING</strong><span>${vi ? "xanh lá = đã xử lý · cam = lần giống trước" : "green = processed · amber = previous same character"}</span></header><div style="--ds940-count:${Math.max(chars.length, 1)}">${charCards}</div></section>
+    ${choicePanel}${duplicatePanel}
+    <section class="ds940-dp"><header><strong>DP BY PREFIX</strong><span>${vi ? "dp[i] có tính cả ∅" : "dp[i] includes ∅"}</span></header><div>${dpCells}</div></section>
+    <section class="ds940-last"><header><strong>LAST CONTRIBUTION</strong><span>last[ch] = total ${vi ? "trước lần ch trước" : "before the previous ch"}</span></header><div>${lastTable}</div></section>
+    <section class="ds940-distinct"><header><strong>${vi ? "TẬP PHÂN BIỆT HIỆN TẠI" : "CURRENT DISTINCT SET"}</strong><span>${view.distinctCount || 0} ${vi ? "kể cả ∅" : "including ∅"}</span></header><div>${examples(view.distinctExamples, view.distinctCount, vi ? "Chưa có dữ liệu." : "No data yet.")}</div></section>
+    <section class="ds940-action"><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="ds940-result ${final ? "done" : ""}"><small>${vi ? "ĐÁP ÁN KHÔNG TÍNH ∅" : "ANSWER EXCLUDING ∅"}</small><strong>${final ? newTotal : "…"}</strong><span>${final ? (vi ? `Có ${newTotal} subsequence không rỗng khác nhau trong '${s}'.` : `There are ${newTotal} distinct non-empty subsequences of '${s}'.`) : (vi ? "Tính cả ∅ trong DP; chỉ trừ nó tại dòng return." : "Keep ∅ inside DP and remove it only at return.")}</span></footer>
+  </section>`;
+}
+
+function renderBstPreorder255View(step) {
+  const view = step.bstPreorder255View || {};
+  const vi = lang === "vi";
+  const preorder = Array.isArray(view.preorder) ? view.preorder : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const accepted = Array.isArray(view.accepted) ? view.accepted : [];
+  const history = Array.isArray(view.lowerHistory) ? view.lowerHistory : [];
+  const currentPops = Array.isArray(view.currentPops) ? view.currentPops : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const compared = Number.isFinite(view.compared) ? view.compared : null;
+  const popped = Number.isFinite(view.popped) ? view.popped : null;
+  const lower = Number.isFinite(view.lower) ? view.lower : null;
+  const currentValue = current >= 0 ? preorder[current] : null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Hiểu lower bound", "Kiểm tra current", "Pop ancestor", "Push / Kết quả"]
+    : ["Understand bound", "Check current", "Pop ancestors", "Push / Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const sequence = preorder.map((value, index) => {
+    const classes = ["vp255-item"];
+    const invalid = view.phase === "reject" && index === current;
+    if (accepted.includes(index)) classes.push("accepted");
+    if (stack.includes(value)) classes.push("in-stack");
+    if (index === current) classes.push("current");
+    if (value === compared) classes.push("compared");
+    if (value === popped) classes.push("popped");
+    if (invalid) classes.push("invalid");
+    let status = index > current && current >= 0 ? (vi ? "chưa đọc" : "unread") : (vi ? "đang chờ" : "waiting");
+    if (accepted.includes(index)) status = vi ? "đã nhận" : "accepted";
+    if (stack.includes(value)) status = "ANCESTOR";
+    if (index === current) status = "CURRENT";
+    if (value === popped) status = "POPPED";
+    if (invalid) status = "INVALID";
+    return `<article class="${classes.join(" ")}"><small>index ${index}</small><strong>${value}</strong><span>${escapeHtml(status)}</span></article>`;
+  }).join("");
+
+  const stackHtml = stack.length
+    ? stack.map((value, index) => `<span class="${index === stack.length - 1 ? "top" : ""}"><small>${index === 0 ? "ROOT / ANCESTOR" : "ANCESTOR"}</small><b>${value}</b>${index === stack.length - 1 ? "<em>TOP</em>" : ""}</span>`).join("<i>→</i>")
+    : `<p>${vi ? "Ancestor path đang trống" : "The ancestor path is empty"}</p>`;
+  const popsHtml = currentPops.length
+    ? currentPops.map((value, index) => `<span><small>POP #${index + 1}</small><b>${value}</b><em>lower = ${value}</em></span>`).join("<i>→</i>")
+    : `<p>${vi ? "Current chưa leo qua ancestor nào." : "Current has not climbed past an ancestor."}</p>`;
+  const historyHtml = history.length
+    ? history.map((item) => `<span class="${item.current === currentValue ? "current" : ""}"><small>${item.current} &gt; ${item.popped}</small><b>lower = ${item.lower}</b></span>`).join("")
+    : `<p>${vi ? "lower_bound vẫn là −∞." : "lower_bound is still −∞."}</p>`;
+
+  const passesBound = currentValue == null || lower == null || currentValue > lower;
+  const gate = currentValue == null ? "WAIT" : passesBound ? "PASS" : "INVALID";
+  const gateHtml = `<section class="vp255-gate ${gate.toLowerCase()}"><div class="forbidden"><small>${vi ? "VÙNG CẤM" : "FORBIDDEN"}</small><strong>${lower == null ? "none yet" : `value ≤ ${lower}`}</strong><span>${vi ? "Không được quay lại left subtree đã đóng" : "Cannot return to a closed left subtree"}</span></div><b>| lower_bound = ${lower ?? "−∞"} |</b><div class="allowed"><small>${vi ? "VÙNG HỢP LỆ" : "ALLOWED"}</small><strong>${lower == null ? "all values" : `value > ${lower}`}</strong><span>${currentValue == null ? "current = —" : `current = ${currentValue} · ${gate}`}</span></div></section>`;
+
+  const showCompare = currentValue != null && compared != null && (view.phase === "compare" || view.phase === "pop");
+  const climbs = showCompare && currentValue > compared;
+  const compareHtml = showCompare ? `<section class="vp255-compare ${climbs ? "pop" : "stay"}"><div><small>CURRENT</small><strong>${currentValue}</strong></div><b>${climbs ? ">" : "<"}</b><div><small>STACK TOP</small><strong>${compared}</strong></div><p><b>${climbs ? "POP + MOVE RIGHT" : "STOP + MOVE LEFT"}</b><span>${climbs ? (vi ? `Đóng left subtree của ${compared}; lower_bound tăng lên ${popped ?? compared}.` : `Close ${compared}'s left subtree; raise lower_bound to ${popped ?? compared}.`) : (vi ? `${currentValue} vẫn thuộc left subtree của ${compared}.` : `${currentValue} remains in ${compared}'s left subtree.`)}</span></p></section>` : "";
+  const isFinal = view.phase === "done" || view.phase === "reject";
+  const isValid = view.phase === "done";
+
+  $("treeView").innerHTML = `<section class="vp255-viz" role="img" aria-label="Verify Preorder Sequence in Binary Search Tree visualization">
+    <header><div><small>MONOTONIC ANCESTOR STACK · #255</small><strong>VERIFY BST PREORDER</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="vp255-phases">${phases}</div>
+    <section class="vp255-rule"><b>PREORDER = ROOT → LEFT → RIGHT</b><div><span><small>1</small><strong>${vi ? "Stack giữ ancestor path" : "Stack keeps ancestor path"}</strong></span><i>→</i><span><small>2</small><strong>${vi ? "Pop nghĩa là rẽ phải" : "A pop means move right"}</strong></span><i>→</i><span><small>3</small><strong>${vi ? "Node bị pop thành lower bound" : "Popped node becomes lower bound"}</strong></span></div><p>${vi ? "Sau khi rẽ phải khỏi node x, mọi value về sau bắt buộc phải > x." : "After moving into node x's right subtree, every later value must be greater than x."}</p></section>
+    <section class="vp255-metrics"><div><small>input index</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>current value</small><strong>${currentValue ?? "—"}</strong></div><div class="${gate.toLowerCase()}"><small>lower_bound</small><strong>${lower ?? "−∞"}</strong></div><div><small>stack depth</small><strong>${stack.length}</strong></div></section>
+    ${gateHtml}${compareHtml}
+    <section class="vp255-sequence"><header><strong>PREORDER SEQUENCE</strong><span>${vi ? "đọc từ trái sang phải" : "read left to right"}</span></header><div style="--vp255-count:${Math.max(preorder.length, 1)}">${sequence}</div></section>
+    <section class="vp255-stack"><header><strong>${vi ? "ANCESTOR PATH ĐANG MỞ" : "OPEN ANCESTOR PATH"}</strong><span>${vi ? "root → node gần nhất" : "root → nearest node"}</span></header><div>${stackHtml}</div><p>${vi ? "Đỉnh stack là ancestor đầu tiên current phải so sánh." : "The stack top is the first ancestor compared with current."}</p></section>
+    <section class="vp255-climb"><header><strong>${vi ? "CURRENT ĐÃ LEO QUA" : "ANCESTORS CLIMBED BY CURRENT"}</strong><span>${currentValue == null ? "—" : `current ${currentValue}`}</span></header><div>${popsHtml}</div></section>
+    <section class="vp255-history"><header><strong>${vi ? "LỊCH SỬ NÂNG LOWER BOUND" : "LOWER-BOUND HISTORY"}</strong><span>${history.length} pop(s)</span></header><div>${historyHtml}</div></section>
+    <section class="vp255-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(view.action || "value must stay above lower_bound")}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
+    <footer class="vp255-result ${isFinal ? (isValid ? "valid" : "invalid") : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${isFinal ? (isValid ? "TRUE · VALID PREORDER" : "FALSE · INVALID PREORDER") : "…"}</strong><span>${isFinal ? (isValid ? (vi ? "Mọi value đều nằm đúng phía của lower_bound." : "Every value stayed on the valid side of lower_bound.") : (vi ? `preorder[${current}] = ${currentValue} nhỏ hơn lower_bound ${lower}.` : `preorder[${current}] = ${currentValue} is below lower_bound ${lower}.`)) : (vi ? "Tiếp tục kiểm tra current, ancestor stack và hàng rào." : "Continue checking current, the ancestor stack, and the barrier.")}</span></footer>
   </section>`;
 }
 
@@ -26146,12 +26293,19 @@ function renderStep() {
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
-    try {
-      renderMaxMin1950View(step);
-    } catch (error) {
-      $("treeView").innerHTML = `<pre id="mm1950DebugError">${escapeHtml(error.stack || error.message)}</pre>`;
-      throw error;
-    }
+    renderMaxMin1950View(step);
+  } else if (step.distinctSubseq940View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDistinctSubseq940View(step);
+  } else if (step.bstPreorder255View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBstPreorder255View(step);
   } else if (step.validSubarrays1063View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
