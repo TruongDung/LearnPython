@@ -326,7 +326,8 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
   const words = (value) => String(value).split(",").map((item) => item.trim()).filter(Boolean);
   switch (problem.id) {
     case 729:
-      return designConfig("MyCalendar", [], problem.parseBookings(input).map(args => ({ name: "book", args })));
+    case 731:
+      return designConfig(problem.id === 731 ? "MyCalendarTwo" : "MyCalendar", [], problem.parseBookings(input).map(args => ({ name: "book", args })));
     case 146:
       return designConfig("LRUCache", [params.capacity], parseSpaceOperations(input));
     case 173:
