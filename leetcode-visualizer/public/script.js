@@ -25496,6 +25496,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.calendarView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalendarView(step);
   } else if (step.goodSubseqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -28416,4 +28422,22 @@ function renderGoodSubseqView(step) {
     <div class="ugs-zero"><code>hasZero = ${v.hasZero}</code><span>${v.hasZero ? (vi ? 'Thêm đúng một chuỗi "0"' : 'Include exactly one string "0"') : (vi ? 'Chưa có chuỗi "0"' : 'No string "0" yet')}</span></div>
     <div class="ugs-total"><span>${vi ? "Tổng số dãy con tốt" : "Total good subsequences"}</span><strong>${v.end0} + ${v.end1} + ${v.hasZero} ≡ ${v.total}</strong><small>modulo 1,000,000,007</small></div>
   </section>`;
+}
+
+function renderCalendarView(step) {
+  const v = step.calendarView, vi = lang === 'vi';
+  const row = (pair, label, state) => {
+    const left = 100 * (pair[0] - v.minimum) / (v.maximum - v.minimum);
+    const width = 100 * (pair[1] - pair[0]) / (v.maximum - v.minimum);
+    return `<div class="cal729-row"><span>${escapeHtml(label)} <b>[${pair[0]}, ${pair[1]})</b></span><div class="cal729-track"><div class="cal729-bar ${state}" style="left:${left}%;width:${width}%"></div></div></div>`;
+  };
+  const labels = vi ? {init:'Khởi tạo',request:'Lịch mới',compare:'So sánh',accepted:'Đã nhận · true',rejected:'Từ chối · false',done:'Hoàn tất'} : {init:'Initialize',request:'New request',compare:'Compare',accepted:'Accepted · true',rejected:'Rejected · false',done:'Complete'};
+  $('treeView').innerHTML = `<section class="cal729-view"><h3>My Calendar I · ${labels[v.phase]}</h3>
+    <p>${vi ? 'Khoảng [start,end): lấy start, không lấy end. Chạm biên được phép.' : 'Intervals [start,end): include start, exclude end. Touching endpoints are allowed.'}</p>
+    <div class="cal729-formula"><code>start &lt; e &amp;&amp; s &lt; end</code></div>
+    <p>${vi ? 'Xanh: đã nhận · Vàng: đang so sánh · Tím: lịch mới · Đỏ: từ chối' : 'Green: accepted · Amber: comparing · Purple: request · Red: rejected'}</p>
+    <div class="cal729-axis"><span>${v.minimum}</span><span>${v.maximum}</span></div>
+    ${v.current ? row(v.current, vi ? 'Lịch mới' : 'Request', v.phase === 'rejected' ? 'rejected' : 'request') : ''}
+    <div class="cal729-bookings">${v.calendar.map((p,i) => row(p, '#' + (i+1), i === v.compared ? 'compared' : 'accepted')).join('') || `<p>${vi ? 'Lịch rỗng' : 'Empty calendar'}</p>`}</div>
+    <p><strong>${vi ? 'Kết quả' : 'Results'}:</strong> <code>${escapeHtml(JSON.stringify(v.results))}</code></p></section>`;
 }

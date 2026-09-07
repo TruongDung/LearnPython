@@ -43890,3 +43890,17 @@ html, body {
 .ugs-total strong { font-size: 1.2rem; }
 .ugs-total small { font-size: .85rem; }
 @media (max-width: 600px) { .ugs-buckets { grid-template-columns: 1fr; } }
+
+/* 729: half-open booking intervals, sharing one time scale. */
+.cal729-view { width:100%; padding:16px; box-sizing:border-box; }
+.cal729-formula { padding:12px; border:1px solid #8b5cf6; border-radius:8px; }
+.cal729-axis { display:flex; justify-content:space-between; margin:16px 0 8px; font:12px monospace; }
+.cal729-row { margin:12px 0; }
+.cal729-row > span { display:block; margin-bottom:5px; font-size:13px; }
+.cal729-track { height:22px; position:relative; background:rgba(128,128,128,.15); border-radius:3px; }
+.cal729-bar { position:absolute; height:100%; min-width:2px; box-sizing:border-box; border-left:3px solid currentColor; border-right:3px dashed currentColor; }
+.cal729-bar.accepted { background:#10b981; color:#065f46; }
+.cal729-bar.request { background:#a78bfa; color:#6d28d9; }
+.cal729-bar.compared { background:#fbbf24; color:#92400e; }
+.cal729-bar.rejected { background:#f87171; color:#991b1b; }
+.cal729-bookings { max-height:420px; overflow:auto; }
