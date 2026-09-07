@@ -16,7 +16,7 @@ const categories = {
   graph: require("./graph"),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
-  array: Object.assign(require("./array"), require("./calendar")),
+  array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two")),
   trie: require("./trie"),
   hashmap: require("./hashmap"),
   greedy: require("./greedy"),

@@ -28426,18 +28426,24 @@ function renderGoodSubseqView(step) {
 
 function renderCalendarView(step) {
   const v = step.calendarView, vi = lang === 'vi';
+  const isTwo = v.problemId === 731;
   const row = (pair, label, state) => {
     const left = 100 * (pair[0] - v.minimum) / (v.maximum - v.minimum);
     const width = 100 * (pair[1] - pair[0]) / (v.maximum - v.minimum);
     return `<div class="cal729-row"><span>${escapeHtml(label)} <b>[${pair[0]}, ${pair[1]})</b></span><div class="cal729-track"><div class="cal729-bar ${state}" style="left:${left}%;width:${width}%"></div></div></div>`;
   };
   const labels = vi ? {init:'Khởi tạo',request:'Lịch mới',compare:'So sánh',accepted:'Đã nhận · true',rejected:'Từ chối · false',done:'Hoàn tất'} : {init:'Initialize',request:'New request',compare:'Compare',accepted:'Accepted · true',rejected:'Rejected · false',done:'Complete'};
-  $('treeView').innerHTML = `<section class="cal729-view"><h3>My Calendar I · ${labels[v.phase]}</h3>
+  labels['check-double'] = vi ? 'Kiểm tra vùng đặt hai lần' : 'Check double-booked regions';
+  labels['add-double'] = vi ? 'Thêm vùng đặt hai lần' : 'Add double-booked region';
+  $('treeView').innerHTML = `<section class="cal729-view"><h3>My Calendar ${isTwo ? 'II' : 'I'} · ${labels[v.phase]}</h3>
+    ${isTwo ? `<p>${vi ? 'Cho phép hai lịch cùng lúc. Lịch mới giao với doubles sẽ tạo ba lịch và bị từ chối.' : 'Double bookings are allowed. A request overlapping doubles would create a triple booking and is rejected.'}</p>` : ''}
     <p>${vi ? 'Khoảng [start,end): lấy start, không lấy end. Chạm biên được phép.' : 'Intervals [start,end): include start, exclude end. Touching endpoints are allowed.'}</p>
     <div class="cal729-formula"><code>start &lt; e &amp;&amp; s &lt; end</code></div>
-    <p>${vi ? 'Xanh: đã nhận · Vàng: đang so sánh · Tím: lịch mới · Đỏ: từ chối' : 'Green: accepted · Amber: comparing · Purple: request · Red: rejected'}</p>
+    <p>${vi ? 'Xanh: đã nhận · Vàng: đang so sánh · Tím: lịch mới · Đỏ: từ chối' : 'Green: accepted · Amber: comparing · Purple: request · Red: rejected'}${isTwo ? (vi ? ' · Vùng doubles cũng dùng màu tím' : ' · Doubles regions also use purple') : ''}</p>
     <div class="cal729-axis"><span>${v.minimum}</span><span>${v.maximum}</span></div>
     ${v.current ? row(v.current, vi ? 'Lịch mới' : 'Request', v.phase === 'rejected' ? 'rejected' : 'request') : ''}
+    <h4>${vi ? 'Lịch đã nhận' : 'Accepted bookings'}</h4>
     <div class="cal729-bookings">${v.calendar.map((p,i) => row(p, '#' + (i+1), i === v.compared ? 'compared' : 'accepted')).join('') || `<p>${vi ? 'Lịch rỗng' : 'Empty calendar'}</p>`}</div>
+    ${isTwo ? `<h4>${vi ? 'Vùng đặt hai lần · doubles' : 'Double-booked regions · doubles'}</h4><div class="cal729-bookings">${v.doubles.map((p,i) => row(p, 'D' + (i+1), i === v.doubleCompared ? (v.phase === 'rejected' ? 'rejected' : 'compared') : 'request')).join('') || `<p>${vi ? 'Chưa có vùng đặt hai lần' : 'No double-booked regions yet'}</p>`}</div>${v.intersection ? `<p><code>[max(start,s), min(end,e)) = [${v.intersection[0]}, ${v.intersection[1]})</code></p>` : ''}` : ''}
     <p><strong>${vi ? 'Kết quả' : 'Results'}:</strong> <code>${escapeHtml(JSON.stringify(v.results))}</code></p></section>`;
 }
