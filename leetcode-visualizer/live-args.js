@@ -325,6 +325,8 @@ function designConfig(className, constructorArgs, operations) {
 function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
   const words = (value) => String(value).split(",").map((item) => item.trim()).filter(Boolean);
   switch (problem.id) {
+    case 715:
+      return designConfig("RangeModule", [], problem.parseRangeOperations(input).map(([name, ...args]) => ({ name, args })));
     case 729:
     case 731:
       return designConfig(problem.id === 731 ? "MyCalendarTwo" : "MyCalendar", [], problem.parseBookings(input).map(args => ({ name: "book", args })));
