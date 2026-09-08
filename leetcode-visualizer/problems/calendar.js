@@ -245,7 +245,7 @@ module.exports = {
   729: {
     id: 729, difficulty: 'medium', slug: 'my-calendar-i',
     category: { key: 'array', vi: 'Mảng', en: 'Array' },
-    tags: [{ key: 'design', vi: 'Thiết kế', en: 'Design' }],
+    tags: [{ key: 'segment-tree', vi: 'Segment Tree', en: 'Segment Tree' }],
     title: both('My Calendar I', 'My Calendar I'), titleVi: both('Lịch không trùng giờ', 'Calendar without double bookings'),
     statement: both('Cài đặt MyCalendar.book(start, end). Chỉ nhận lịch [start,end) nếu không giao với lịch đã nhận. Trả true nếu nhận, false nếu từ chối.',
       'Implement MyCalendar.book(start, end). Accept [start,end) only if it overlaps no accepted booking. Return true when accepted, false when rejected.'),

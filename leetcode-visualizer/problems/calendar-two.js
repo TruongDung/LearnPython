@@ -282,7 +282,7 @@ module.exports = {
   731: {
     id: 731, difficulty: 'medium', slug: 'my-calendar-ii',
     category: { key: 'array', vi: 'Mảng', en: 'Array' },
-    tags: [{ key: 'design', vi: 'Thiết kế', en: 'Design' }],
+    tags: [{ key: 'segment-tree', vi: 'Segment Tree', en: 'Segment Tree' }],
     title: both('My Calendar II', 'My Calendar II'), titleVi: both('Cho phép hai lịch trùng giờ', 'Allow double bookings'),
     statement: both('Cài đặt MyCalendarTwo.book(start,end). Cho phép hai lịch cùng lúc nhưng từ chối lịch tạo ba lịch cùng lúc. Khoảng [start,end) không bao gồm end.', 'Implement MyCalendarTwo.book(start,end). Allow double bookings but reject any request that creates a triple booking. Intervals [start,end) exclude end.'),
     defaultInput: '[[10,20],[50,60],[10,40],[5,15],[5,10],[25,55]]', inputKind: 'string', extraParams: [],

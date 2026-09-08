@@ -7,6 +7,10 @@ const { SUPPORTED } = require('../problems');
 const { prepareDesignLiveRun } = require('../live-args');
 const p = SUPPORTED[731];
 
+test('731 is grouped under Segment Tree', () => {
+  assert.deepEqual(p.tags.map(tag => tag.key), ['segment-tree']);
+});
+
 test('731 example, duplicates, touching boundaries and rejected-state preservation', () => {
   assert.deepEqual(p.builder(p.defaultInput).answer, [true,true,true,false,true,true]);
   assert.deepEqual(p.builder('[[10,20],[10,20],[10,20],[20,30],[0,10],[5,25]]').answer, [true,true,false,true,true,false]);

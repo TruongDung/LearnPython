@@ -7893,6 +7893,65 @@ function renderBinaryWatch401View(step) {
   </section>`;
 }
 
+function renderCountCommas3870View(step) {
+  const view = step.countCommas3870View || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const threshold = Number(view.threshold) || 1000;
+  const noCommaCount = Number(view.noCommaCount) || 0;
+  const commaCount = Number(view.commaCount) || 0;
+  const answer = Number(view.answer) || 0;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const formatNumber = (value) => Number(value).toLocaleString("en-US");
+  const phaseLabels = vi
+    ? ["1. Đọc đoạn", "2. Tìm mốc", "3. Đếm số", "4. Kết quả"]
+    : ["1. Read range", "2. Find threshold", "3. Count values", "4. Answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const samples = (Array.isArray(view.samples) ? view.samples : []).map((sample) => {
+    const state = sample.inRange ? (sample.commas ? "with-comma" : "no-comma") : "outside";
+    const status = sample.inRange
+      ? sample.commas
+        ? (vi ? "1 dấu phẩy" : "1 comma")
+        : (vi ? "0 dấu phẩy" : "0 commas")
+      : (vi ? "ngoài đoạn" : "outside range");
+    return `<article class="cc3870-sample ${state}"><small>${sample.value}</small><strong>${escapeHtml(String(sample.formatted))}</strong><span>${escapeHtml(status)}</span></article>`;
+  }).join("");
+  const conditionText = view.condition == null
+    ? (vi ? "chưa kiểm tra" : "not checked")
+    : view.condition
+      ? "TRUE"
+      : "FALSE";
+  const currentFormula = view.calculation || (view.phase === "threshold"
+    ? `${n} < ${threshold} → ${conditionText}`
+    : (vi ? "Chưa cần tính" : "No calculation yet"));
+  const rightRange = commaCount > 0 ? `[1,000, ${formatNumber(n)}]` : "∅";
+  const rightDescription = commaCount > 0
+    ? (vi ? `${formatNumber(commaCount)} số × 1 dấu phẩy` : `${formatNumber(commaCount)} values x 1 comma`)
+    : (vi ? "n chưa chạm mốc 1,000" : "n does not reach 1,000");
+  const finalLabel = view.final
+    ? `${vi ? "Tổng" : "Total"}: ${formatNumber(answer)}`
+    : (vi ? "Đang tính..." : "Computing...");
+
+  $("treeView").innerHTML = `<section class="cc3870-viz" role="img" aria-label="Count Commas in Range visualization">
+    <header><div><small>COUNTING · #3870</small><strong>COUNT COMMAS IN RANGE</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cc3870-phases">${phases}</div>
+    <section class="cc3870-rule">
+      <div><small>${vi ? "KHÔNG CÓ DẤU PHẨY" : "NO COMMA"}</small><strong>999</strong></div>
+      <i>→</i>
+      <div class="threshold"><small>${vi ? "SỐ ĐẦU TIÊN CÓ DẤU PHẨY" : "FIRST COMMA"}</small><strong>1,000</strong></div>
+      <p>${vi ? "Dấu phẩy xuất hiện khi số có từ 4 chữ số." : "Comma formatting starts when a number has 4 digits."}</p>
+    </section>
+    <section class="cc3870-range">
+      <article class="plain"><header><small>${vi ? "ĐOẠN KHÔNG ĐÓNG GÓP" : "ZERO-CONTRIBUTION RANGE"}</small><strong>[1, ${formatNumber(noCommaCount)}]</strong></header><div><b>${formatNumber(noCommaCount)}</b><span>${vi ? "số" : "values"}</span><em>× 0</em></div><footer>${vi ? "Mỗi số dùng 0 dấu phẩy" : "Each value uses 0 commas"}</footer></article>
+      <div class="cc3870-divider"><span>999</span><b>|</b><span>1,000</span></div>
+      <article class="qualified ${commaCount ? "has-values" : "empty"}"><header><small>${vi ? "ĐOẠN CÓ ĐÓNG GÓP" : "CONTRIBUTING RANGE"}</small><strong>${rightRange}</strong></header><div><b>${formatNumber(commaCount)}</b><span>${vi ? "số" : "values"}</span><em>× 1</em></div><footer>${escapeHtml(rightDescription)}</footer></article>
+    </section>
+    <section class="cc3870-examples"><header><strong>${vi ? "NHÌN QUANH MỐC 1,000" : "LOOK AROUND 1,000"}</strong><span>${vi ? "số xám chỉ để so sánh, không thuộc [1, n]" : "gray values are reference-only, outside [1, n]"}</span></header><div>${samples}</div></section>
+    <section class="cc3870-calculation ${view.final ? "done" : ""}"><div><small>${vi ? "DÒNG CODE HIỆN TẠI" : "CURRENT CODE LINE"}</small><strong>${escapeHtml(currentFormula)}</strong><span>${escapeHtml(pick(step.note))}</span></div><aside><small>answer</small><strong>${view.final ? formatNumber(answer) : "?"}</strong></aside></section>
+    <footer class="cc3870-result ${view.final ? "done" : ""}"><code>max(0, n - 999)</code><strong>${escapeHtml(finalLabel)}</strong></footer>
+  </section>`;
+}
+
 function renderStable3903View(step) {
   const view = step.stable3903View || {};
   const vi = lang === "vi";
@@ -26372,6 +26431,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinIncrements1526View(step);
+  } else if (step.countCommas3870View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountCommas3870View(step);
   } else if (step.stable3903View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

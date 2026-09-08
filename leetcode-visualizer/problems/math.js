@@ -1208,6 +1208,139 @@ function buildSteps3867(nums) {
 }
 
 /**
+ * LeetCode 3870: Count Commas in Range.
+ * Under n <= 100000, only values from 1000 onward contain a comma,
+ * and each of those values contains exactly one comma.
+ */
+function buildSteps3870(input) {
+  if (Array.isArray(input) && input.length !== 1) {
+    throw new Error("n must contain exactly one integer");
+  }
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 100000) {
+    throw new Error("n must be an integer from 1 to 100000");
+  }
+
+  const threshold = 1000;
+  const noCommaCount = Math.min(n, threshold - 1);
+  const commaCount = Math.max(0, n - threshold + 1);
+  const answer = commaCount;
+  const steps = [];
+  const formatNumber = (value) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sampleValues = n < threshold
+    ? [Math.max(1, n - 2), Math.max(1, n - 1), n, threshold]
+    : [998, 999, 1000, Math.min(n, 1001), n];
+  const samples = [...new Set(sampleValues)].map((value) => ({
+    value,
+    formatted: formatNumber(value),
+    commas: value >= threshold ? 1 : 0,
+    inRange: value <= n,
+  }));
+
+  function addStep({ phase, phaseIndex, title, note, codeLines, condition = null, calculation = "", final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [n],
+      sub: ["n"],
+      highlight: final ? [] : [0],
+      mark: final ? [0] : [],
+      vars: [
+        { name: "n", value: n },
+        { name: "n < 1000", value: condition == null ? "?" : condition },
+        { name: "numbers_with_comma", value: phaseIndex < 2 ? "?" : commaCount },
+        { name: "answer", value: final ? answer : "?" },
+      ],
+      countCommas3870View: {
+        phase,
+        phaseIndex,
+        n,
+        threshold,
+        noCommaCount,
+        commaCount,
+        answer,
+        condition,
+        calculation,
+        samples,
+        final,
+      },
+    });
+  }
+
+  addStep({
+    phase: "read",
+    phaseIndex: 0,
+    title: { vi: `Đọc n = ${n}`, en: `Read n = ${n}` },
+    note: {
+      vi: `Ta cần đếm mọi dấu phẩy xuất hiện khi viết các số từ 1 đến ${n}. Không cần duyệt từng số nếu tìm được mốc bắt đầu có dấu phẩy.`,
+      en: `We need to count every comma used from 1 through ${n}. We can avoid scanning each number by finding the first value that needs a comma.`,
+    },
+    codeLines: [2],
+  });
+
+  const belowThreshold = n < threshold;
+  addStep({
+    phase: "threshold",
+    phaseIndex: 1,
+    title: { vi: `${n} < 1000 là ${belowThreshold ? "đúng" : "sai"}`, en: `${n} < 1000 is ${belowThreshold ? "true" : "false"}` },
+    note: {
+      vi: "Các số từ 1 đến 999 có tối đa ba chữ số nên không dùng dấu phẩy. Số 1,000 là số đầu tiên dùng một dấu phẩy.",
+      en: "Values from 1 through 999 have at most three digits and need no comma. The first value with a comma is 1,000.",
+    },
+    codeLines: [3],
+    condition: belowThreshold,
+  });
+
+  if (belowThreshold) {
+    addStep({
+      phase: "answer",
+      phaseIndex: 3,
+      title: { vi: "Không có số nào đạt 1,000", en: "No value reaches 1,000" },
+      note: {
+        vi: `Đoạn [1, ${n}] nằm hoàn toàn trước 1,000, vì vậy tổng số dấu phẩy là 0.`,
+        en: `The entire range [1, ${n}] is before 1,000, so the total comma count is 0.`,
+      },
+      codeLines: [4],
+      condition: true,
+      calculation: "0",
+      final: true,
+    });
+    return { original: n, n, answer, steps };
+  }
+
+  addStep({
+    phase: "count",
+    phaseIndex: 2,
+    title: { vi: `Đếm đoạn [1000, ${n}]`, en: `Count the range [1000, ${n}]` },
+    note: {
+      vi: `Đếm hai đầu: ${n} - 1000 + 1 = ${commaCount} số. Với n ≤ 100,000, mỗi số trong đoạn này có đúng một dấu phẩy.`,
+      en: `Inclusive count: ${n} - 1000 + 1 = ${commaCount} values. With n <= 100,000, each value in this range has exactly one comma.`,
+    },
+    codeLines: [5],
+    condition: false,
+    calculation: `${n} - 1000 + 1 = ${commaCount}`,
+  });
+
+  addStep({
+    phase: "answer",
+    phaseIndex: 3,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: {
+      vi: `${commaCount} số có dấu phẩy × 1 dấu phẩy mỗi số = ${answer}.`,
+      en: `${commaCount} comma-formatted values x 1 comma each = ${answer}.`,
+    },
+    codeLines: [6],
+    condition: false,
+    calculation: `${commaCount} × 1 = ${answer}`,
+    final: true,
+  });
+
+  return { original: n, n, answer, steps };
+}
+
+/**
  * LeetCode 3312: Sorted GCD Pair Queries.
  *
  * Key idea:
@@ -4005,6 +4138,48 @@ module.exports = {
       "        return answer",
     ],
     builder: buildSteps3867,
+  },
+  3870: {
+    id: 3870,
+    difficulty: "easy",
+    slug: "count-commas-in-range",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [{ key: "counting", vi: "Đếm", en: "Counting" }],
+    title: { vi: "Count Commas in Range", en: "Count Commas in Range" },
+    titleVi: { vi: "Đếm dấu phẩy trong đoạn số", en: "Count commas across a number range" },
+    statement: {
+      vi: "Cho số nguyên n. Hãy trả về tổng số dấu phẩy cần dùng khi viết tất cả số nguyên từ 1 đến n theo định dạng chuẩn, với một dấu phẩy sau mỗi nhóm ba chữ số tính từ phải sang trái.",
+      en: "Given an integer n, return the total number of commas used when writing every integer from 1 through n in standard formatting, with a comma after every three digits from right to left.",
+    },
+    defaultInput: [1002],
+    inputKind: "positive",
+    inputLabel: { vi: "n (1 đến 100000)", en: "n (1 to 100000)" },
+    singleInput: true,
+    maxInput: 100000,
+    extraParams: [],
+    approach: [
+      { vi: "Nhận ra 1,000 là số đầu tiên cần dấu phẩy; 1 đến 999 không đóng góp.", en: "Observe that 1,000 is the first value needing a comma; 1 through 999 contribute nothing." },
+      { vi: "Nếu n < 1,000 thì trả về 0 ngay.", en: "If n < 1,000, return 0 immediately." },
+      { vi: "Nếu không, đoạn [1,000, n] có n - 1,000 + 1 = n - 999 số.", en: "Otherwise, the inclusive range [1,000, n] contains n - 1,000 + 1 = n - 999 values." },
+      { vi: "Do n ≤ 100,000, mỗi số trong đoạn đó có đúng một dấu phẩy, nên số lượng cũng chính là đáp án.", en: "Because n <= 100,000, each of those values has exactly one comma, so that count is the answer." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: {
+        vi: "Chỉ so sánh và thực hiện một phép trừ; không duyệt qua các số từ 1 đến n.",
+        en: "Only one comparison and subtraction are needed; the algorithm never scans the values from 1 through n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countCommas(self, n: int) -> int:",
+      "        if n < 1000:",
+      "            return 0",
+      "        numbers_with_comma = n - 1000 + 1",
+      "        return numbers_with_comma",
+    ],
+    builder: buildSteps3870,
   },
   50: {
     id: 50,

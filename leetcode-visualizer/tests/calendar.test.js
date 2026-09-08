@@ -3,6 +3,9 @@ const { test } = require('node:test');
 const { SUPPORTED } = require('../problems');
 const { prepareDesignLiveRun } = require('../live-args');
 const p = SUPPORTED[729];
+test('729 is grouped under Segment Tree', () => {
+  assert.deepEqual(p.tags.map(tag => tag.key), ['segment-tree']);
+});
 test('example, adjacent endpoints, duplicate and containment bookings', () => {
   assert.deepEqual(p.builder(p.defaultInput).answer, [true, false, true]);
   assert.deepEqual(p.builder('[[10,20],[10,20],[12,18],[0,30],[0,10],[20,30],[5,15]]').answer, [true,false,false,false,true,true,false]);
