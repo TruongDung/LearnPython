@@ -1234,6 +1234,207 @@ function buildSteps1022(input) {
   return { input, answer: total, steps };
 }
 
+// ─── 1080: Insufficient Nodes in Root to Leaf Paths ───
+function buildSteps1080(input, params) {
+  const root = parseTree(input);
+  const limit = Number(params && params.limit);
+  if (!Number.isInteger(limit)) throw new Error("limit must be an integer");
+
+  const steps = [];
+  const kept = new Set();
+  const pruned = new Set();
+
+  // Keep the original shape in every frame. Nodes that have been removed are
+  // painted as pruned instead of disappearing, so the decision remains visible.
+  function addStep({ title, current = null, codeLines = [], vars = [], note, annotations = {}, final = false }) {
+    const frame = snapshot(root, {
+      title,
+      hlSet: current ? new Set([current.id]) : undefined,
+      wordSet: kept,
+      annotations,
+      codeLines,
+      vars: [
+        ...vars,
+        { name: "kept", value: kept.size },
+        { name: "pruned", value: pruned.size },
+      ],
+      note,
+    });
+    frame.tree.nodes.forEach((node) => { node.isPruned = pruned.has(node.id); });
+    if (final) frame.final = true;
+    steps.push(frame);
+  }
+
+  function serializeResult(node) {
+    if (!node || !kept.has(node.id)) return "[]";
+    const values = [];
+    const queue = [node];
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current) {
+        values.push(null);
+        continue;
+      }
+      values.push(current.val);
+      queue.push(current.left && kept.has(current.left.id) ? current.left : null);
+      queue.push(current.right && kept.has(current.right.id) ? current.right : null);
+    }
+    while (values.length && values[values.length - 1] === null) values.pop();
+    return JSON.stringify(values);
+  }
+
+  if (!root) {
+    addStep({
+      title: { vi: "Cây rỗng → trả về None", en: "Empty tree → return None" },
+      codeLines: [2, 12],
+      vars: [{ name: "root", value: "None" }, { name: "answer", value: "[]" }],
+      note: { vi: "Không có đường root-to-leaf nào để giữ lại.", en: "There is no root-to-leaf path to retain." },
+      final: true,
+    });
+    return { input, limit, answer: "[]", steps };
+  }
+
+  addStep({
+    title: { vi: "Giữ một node nếu còn đường đi đạt limit", en: "Keep a node only if a path can reach limit" },
+    codeLines: [2, 3],
+    vars: [{ name: "limit", value: limit }, { name: "rule", value: "keep leaf when path_sum ≥ limit" }],
+    note: {
+      vi: "Duyệt hậu tự. Lá được giữ khi tổng từ root đến lá ≥ limit. Node bên trong chỉ được giữ nếu ít nhất một con còn sống.",
+      en: "Use postorder DFS. A leaf survives when its root-to-leaf sum is at least limit. An internal node survives only if at least one child survives.",
+    },
+  });
+
+  function dfs(node, pathSum, pathValues) {
+    if (!node) return false;
+    const total = pathSum + node.val;
+    const path = [...pathValues, node.val];
+    const pathText = path.join(" → ");
+    const isLeaf = !node.left && !node.right;
+
+    addStep({
+      title: { vi: `Vào dfs(${node.val})`, en: `Enter dfs(${node.val})` },
+      current: node,
+      codeLines: [3, 6, 7],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "path", value: pathText },
+        { name: "path_sum", value: total },
+        { name: "is leaf", value: isLeaf },
+      ],
+      annotations: { [node.id]: { label: `sum = ${total}`, kind: "" } },
+      note: {
+        vi: `Cộng ${node.val}: tổng đường ${pathText} = ${total}.`,
+        en: `Add ${node.val}: path sum ${pathText} = ${total}.`,
+      },
+    });
+
+    if (isLeaf) {
+      const survives = total >= limit;
+      if (survives) kept.add(node.id);
+      else pruned.add(node.id);
+      addStep({
+        title: survives
+          ? { vi: `Lá ${node.val}: ${total} ≥ ${limit} → GIỮ`, en: `Leaf ${node.val}: ${total} ≥ ${limit} → KEEP` }
+          : { vi: `Lá ${node.val}: ${total} < ${limit} → CẮT`, en: `Leaf ${node.val}: ${total} < ${limit} → PRUNE` },
+        current: node,
+        codeLines: [7, 8],
+        vars: [
+          { name: "path_sum", value: total },
+          { name: "limit", value: limit },
+          { name: "return", value: survives ? node.val : "None" },
+        ],
+        annotations: { [node.id]: { label: survives ? "KEEP" : "PRUNE", kind: "" } },
+        note: survives
+          ? { vi: "Đây là một đường đi hợp lệ, nên trả node về cho cha.", en: "This is a sufficient path, so return the node to its parent." }
+          : { vi: "Mọi đường qua lá này đều không đủ, nên trả None cho cha.", en: "This leaf's path is insufficient, so return None to its parent." },
+      });
+      return survives;
+    }
+
+    addStep({
+      title: { vi: `Duyệt con trái của ${node.val}`, en: `Explore ${node.val}'s left child` },
+      current: node,
+      codeLines: [9],
+      vars: [
+        { name: "path_sum", value: total },
+        { name: "left child", value: node.left ? node.left.val : "None" },
+      ],
+      note: node.left
+        ? { vi: `Phải biết nhánh trái của ${node.val} có đường hợp lệ không.`, en: `First determine whether ${node.val}'s left branch has a sufficient path.` }
+        : { vi: "Không có con trái nên lời gọi sẽ trả None.", en: "There is no left child, so this call returns None." },
+    });
+    const leftKept = dfs(node.left, total, path);
+    addStep({
+      title: { vi: `Con trái của ${node.val} trả ${leftKept ? "node" : "None"}`, en: `${node.val}'s left child returns ${leftKept ? "node" : "None"}` },
+      current: node,
+      codeLines: [9],
+      vars: [{ name: "left result", value: leftKept ? "kept" : "None" }, { name: "path_sum", value: total }],
+      note: leftKept
+        ? { vi: "Nhánh trái có ít nhất một lá đủ điều kiện.", en: "The left branch contains at least one sufficient leaf." }
+        : { vi: "Nhánh trái không còn đường hợp lệ.", en: "No sufficient path remains in the left branch." },
+    });
+
+    addStep({
+      title: { vi: `Duyệt con phải của ${node.val}`, en: `Explore ${node.val}'s right child` },
+      current: node,
+      codeLines: [10],
+      vars: [
+        { name: "path_sum", value: total },
+        { name: "right child", value: node.right ? node.right.val : "None" },
+      ],
+      note: node.right
+        ? { vi: `Tiếp tục kiểm tra nhánh phải của ${node.val}.`, en: `Continue by checking ${node.val}'s right branch.` }
+        : { vi: "Không có con phải nên lời gọi sẽ trả None.", en: "There is no right child, so this call returns None." },
+    });
+    const rightKept = dfs(node.right, total, path);
+    addStep({
+      title: { vi: `Con phải của ${node.val} trả ${rightKept ? "node" : "None"}`, en: `${node.val}'s right child returns ${rightKept ? "node" : "None"}` },
+      current: node,
+      codeLines: [10],
+      vars: [{ name: "right result", value: rightKept ? "kept" : "None" }, { name: "path_sum", value: total }],
+      note: rightKept
+        ? { vi: "Nhánh phải có ít nhất một lá đủ điều kiện.", en: "The right branch contains at least one sufficient leaf." }
+        : { vi: "Nhánh phải không còn đường hợp lệ.", en: "No sufficient path remains in the right branch." },
+    });
+
+    const survives = leftKept || rightKept;
+    if (survives) kept.add(node.id);
+    else pruned.add(node.id);
+    addStep({
+      title: survives
+        ? { vi: `Node ${node.val}: còn con sống → GIỮ`, en: `Node ${node.val}: a child survives → KEEP` }
+        : { vi: `Node ${node.val}: hai con đều None → CẮT`, en: `Node ${node.val}: both children are None → PRUNE` },
+      current: node,
+      codeLines: [11],
+      vars: [
+        { name: "left", value: leftKept ? "node" : "None" },
+        { name: "right", value: rightKept ? "node" : "None" },
+        { name: "return", value: survives ? node.val : "None" },
+      ],
+      annotations: { [node.id]: { label: survives ? "KEEP" : "PRUNE", kind: "" } },
+      note: survives
+        ? { vi: "Ít nhất một đường đi xuống vẫn đạt limit, nên giữ node hiện tại làm cầu nối.", en: "At least one downward path still reaches limit, so keep this node as the connection." }
+        : { vi: "Mọi lá bên dưới đều bị cắt; node này cũng không nằm trên đường hợp lệ nào.", en: "Every leaf below was pruned, so this node lies on no sufficient root-to-leaf path." },
+    });
+    return survives;
+  }
+
+  const rootKept = dfs(root, 0, []);
+  const answer = rootKept ? serializeResult(root) : "[]";
+  addStep({
+    title: rootKept
+      ? { vi: "Hoàn tất: cây đã được cắt", en: "Complete: tree pruned" }
+      : { vi: "Hoàn tất: không còn đường hợp lệ", en: "Complete: no sufficient path remains" },
+    codeLines: [12],
+    vars: [{ name: "answer", value: answer }, { name: "limit", value: limit }],
+    note: rootKept
+      ? { vi: `Các node xanh tạo thành cây trả về: ${answer}.`, en: `The green nodes form the returned tree: ${answer}.` }
+      : { vi: "Tất cả đường root-to-leaf đều có tổng nhỏ hơn limit, nên trả về None.", en: "Every root-to-leaf path has a sum below limit, so return None." },
+    final: true,
+  });
+  return { input, limit, answer, steps };
+}
+
 // ─── 226: Invert Binary Tree ───
 function buildSteps226(input) {
   const root = parseTree(input); const steps = [];
@@ -5614,6 +5815,40 @@ module.exports = {
       "        return self.max_sum",
     ],
     builder: buildSteps124,
+  },
+  1080: {
+    id: 1080, difficulty: "medium", slug: "insufficient-nodes-in-root-to-leaf-paths",
+    category: TREE_CAT,
+    title: { vi: "Insufficient Nodes in Root to Leaf Paths", en: "Insufficient Nodes in Root to Leaf Paths" },
+    titleVi: { vi: "Cắt các node không đủ tổng root-to-leaf", en: "Prune nodes without a sufficient root-to-leaf sum" },
+    statement: {
+      vi: "Cho root và limit. Một node là không đủ nếu mọi đường root-to-leaf đi qua node đó đều có tổng nhỏ hơn limit. Xóa mọi node không đủ và trả về cây còn lại. Nhập cây theo level-order.",
+      en: "Given root and limit, a node is insufficient when every root-to-leaf path through it has sum less than limit. Delete all insufficient nodes and return the remaining tree. Enter the tree in level order.",
+    },
+    defaultInput: "1,2,-3,-5,null,4,null",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "limit", label: { vi: "limit", en: "limit" }, default: -1, allowNegative: true }],
+    approach: [
+      { vi: "DFS hậu tự mang theo path_sum từ root. Tại lá: giữ khi path_sum ≥ limit, ngược lại trả None.", en: "Use postorder DFS carrying the root-to-node path_sum. At a leaf, keep it when path_sum ≥ limit; otherwise return None." },
+      { vi: "Gán lại left và right bằng kết quả đệ quy. Nếu cả hai đều None, node hiện tại không thuộc đường hợp lệ nào nên cũng trả None.", en: "Assign left and right to their recursive results. If both are None, the current node belongs to no sufficient path and also returns None." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được duyệt một lần; h là chiều cao cây do stack đệ quy.", en: "Each node is visited once; h is the tree height used by the recursion stack." } },
+    code: [
+      "class Solution:",
+      "    def sufficientSubset(self, root, limit):",
+      "        def dfs(node, path_sum):",
+      "            if not node:",
+      "                return None",
+      "            path_sum += node.val",
+      "            if not node.left and not node.right:",
+      "                return node if path_sum >= limit else None",
+      "            node.left = dfs(node.left, path_sum)",
+      "            node.right = dfs(node.right, path_sum)",
+      "            return node if node.left or node.right else None",
+      "        return dfs(root, 0)",
+    ],
+    builder: buildSteps1080,
   },
   1022: {
     id: 1022, difficulty: "easy", slug: "sum-of-root-to-leaf-binary-numbers",
