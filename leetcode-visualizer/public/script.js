@@ -15814,6 +15814,74 @@ function renderSkylineView(step) {
   </div>`;
 }
 
+// ---- Closed-interval sorting and merging (#56) ----
+function renderMergeIntervalsView(step) {
+  const view = step.mergeIntervalsView;
+  const vi = lang === "vi";
+  const { intervals, merged, currentIndex, previousLast, phase } = view;
+  const current = currentIndex === null ? null : intervals[currentIndex];
+  const min = Math.min(...intervals.map((interval) => interval.start));
+  const max = Math.max(...intervals.map((interval) => interval.end));
+  // A point interval still gets a visible, centered endpoint marker.
+  const low = min === max ? min - 1 : min;
+  const high = min === max ? max + 1 : max;
+  const percent = (value) => (2 + 96 * (value - low) / (high - low)).toFixed(4);
+  const pairText = ([start, end]) => `[${start}, ${end}]`;
+  const applied = phase === "append" || phase === "merge";
+
+  function row(pair, label, state, description, extension = null) {
+    const [start, end] = pair;
+    const extensionBar = extension !== null && end > extension
+      ? `<i class="mi56-extension" style="left:${percent(extension)}%;width:${(96 * (end - extension) / (high - low)).toFixed(4)}%"></i>` : "";
+    return `<div class="mi56-row ${state}" role="listitem" aria-label="${escapeHtml(description)}">
+      <span class="mi56-label"><small>${escapeHtml(label)}</small><code>${pairText(pair)}</code></span>
+      <div class="mi56-track" aria-hidden="true">
+        <i class="mi56-bar" style="left:${percent(start)}%;width:${(96 * (end - start) / (high - low)).toFixed(4)}%"></i>
+        ${extensionBar}
+        <i class="mi56-endpoint" style="left:${percent(start)}%"></i>
+        <i class="mi56-endpoint" style="left:${percent(end)}%"></i>
+      </div>
+    </div>`;
+  }
+
+  const inputs = intervals.map(({ id, start, end }, i) => {
+    const active = i === currentIndex;
+    const state = active ? "current" : i < view.processed ? "processed" : "pending";
+    const status = active ? (vi ? "đang xét" : "current") : i < view.processed ? (vi ? "đã xử lý" : "processed") : (vi ? "chờ" : "pending");
+    return row([start, end], `${active ? "▶ " : i < view.processed ? "✓ " : ""}#${id + 1}`, state, `#${id + 1}: ${pairText([start, end])}, ${status}`);
+  }).join("");
+  const output = merged.length ? merged.map((pair, i) => {
+    const last = i === merged.length - 1;
+    const target = last && current;
+    return row(pair, `merged[${i}]`, `result${target ? " target" : ""}`, `${pairText(pair)}${target ? (vi ? ", đoạn cuối đang xét" : ", last interval under comparison") : ""}`,
+      last && phase === "merge" ? previousLast[1] : null);
+  }).join("") : `<p class="mi56-empty">merged = []</p>`;
+
+  let decision = vi ? "Sắp xếp theo start trước khi duyệt." : "Sort by start before scanning.";
+  if (phase === "init") decision = vi ? "merged = [] · sẵn sàng duyệt" : "merged = [] · ready to scan";
+  if (current) {
+    decision = !previousLast
+      ? (vi ? "merged rỗng → thêm đoạn đầu tiên" : "merged is empty → append the first interval")
+      : `start ${current.start} ${current.start > previousLast[1] ? ">" : "≤"} ${previousLast[1]} ${vi ? "(end cũ)" : "(last end)"} → ${current.start > previousLast[1] ? (vi ? "thêm mới" : "append") : (vi ? "gộp" : "merge")}`;
+    if (phase === "inspect") decision = vi ? "So sánh start với điểm cuối của merged[-1]." : "Compare start with the end of merged[-1].";
+    if (phase === "merge") decision = `end = max(${previousLast[1]}, ${current.end}) = ${merged[merged.length - 1][1]}`;
+  }
+  if (phase === "done") decision = vi ? `${intervals.length} đoạn đầu vào → ${merged.length} đoạn không chồng lấn` : `${intervals.length} input intervals → ${merged.length} non-overlapping intervals`;
+  const update = applied
+    ? `<div class="mi56-update"><span>${phase === "append" ? "merged.append" : "merged[-1]"}</span><code>${phase === "merge" ? `${pairText(previousLast)} → ` : ""}${pairText(merged[merged.length - 1])}</code></div>` : "";
+  const ticks = [low, low + (high - low) / 2, high].map((value, i) => `<span class="tick-${i}" style="left:${percent(value)}%">${Number(value.toFixed(1))}</span>`).join("");
+  const orderLabel = phase === "input" ? (vi ? "Thứ tự đầu vào" : "Input order") : (vi ? "Đã sắp theo start ↑" : "Sorted by start ↑");
+  $("treeView").innerHTML = `<section class="mi56-viz" aria-label="${vi ? "Trực quan hóa gộp đoạn" : "Merge intervals visualization"}">
+    <header class="mi56-heading"><strong>${orderLabel}</strong><span>${vi ? "# = vị trí ban đầu" : "# = original position"}</span></header>
+    <div class="mi56-axis"><span>${vi ? "Tọa độ" : "Position"}</span><div>${ticks}</div></div>
+    <div class="mi56-lanes" role="list" aria-label="${orderLabel}">${inputs}</div>
+    <div class="mi56-decision" aria-live="polite"><strong>${escapeHtml(decision)}</strong>${update}</div>
+    <header class="mi56-heading"><strong>${phase === "done" ? (vi ? "Kết quả" : "Result") : "merged"}</strong><span>${vi ? "Cùng thang tọa độ" : "Same coordinate scale"}</span></header>
+    <div class="mi56-lanes" role="list" aria-label="${vi ? "Các đoạn đã gộp" : "Merged intervals"}">${output}</div>
+    <div class="mi56-legend"><span><i class="current"></i>${vi ? "Đang xét" : "Current"}</span><span><i class="result"></i>${vi ? "Đã gộp" : "Merged"}</span><span>${vi ? "● Đoạn đóng: chạm đầu mút cũng gộp" : "● Closed endpoints: touching also merges"}</span></div>
+  </section>`;
+}
+
 // ---- Meeting-room allocation timeline (#253) ----
 function renderMeetingRoomsTimelineView(step) {
   const view = step.meetingRoomsTimelineView;
@@ -25975,6 +26043,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCyclicSortView(step);
+  } else if (step.mergeIntervalsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMergeIntervalsView(step);
   } else if (step.meetingRoomsTimelineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

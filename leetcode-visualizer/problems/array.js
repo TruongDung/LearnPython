@@ -3185,81 +3185,103 @@ function buildSteps31(input) {
   return { original: input, answer: nums, steps };
 }
 
-/**
- * LeetCode 56: Merge Intervals — sort by start, merge overlaps.
- * Code lines (1-indexed):
- *  1  class Solution:
- *  2      def merge(self, intervals):
- *  3          intervals.sort(key=lambda x: x[0])
- *  4          merged = []
- *  5          for start, end in intervals:
- *  6              if not merged or start > merged[-1][1]: merged.append([start, end])
- *  7              else: merged[-1][1] = max(merged[-1][1], end)
- *  8          return merged
- */
-function buildSteps56(input, params) {
-  // intervals: "1-3,2-6,8-10,15-18"
-  const raw = params && params.intervals !== undefined ? String(params.intervals) : String(input);
-  const intervals = raw.split(",").map((p) => p.trim()).filter(Boolean).map((p) => p.split("-").map((x) => Number(x.trim())));
-  intervals.sort((a, b) => a[0] - b[0]);
-  const steps = [];
-  const merged = [];
-
-  const fmt = (arr) => `[${arr.map(([s, e]) => `[${s},${e}]`).join(", ")}]`;
-
-  steps.push({
-    title: { vi: "Sắp xếp theo điểm bắt đầu", en: "Sort by start" },
-    arr: [], highlight: [], mark: [],
-    codeLines: [3, 4],
-    vars: [{ name: "intervals (sorted)", value: fmt(intervals) }, { name: "merged", value: "[]" }],
-    note: {
-      vi: "Sắp các đoạn theo điểm bắt đầu tăng dần. Duyệt và gộp nếu chồng lấn với đoạn cuối trong merged.",
-      en: "Sort intervals by start ascending. Scan and merge if overlapping the last interval in merged.",
-    },
-  });
-
-  for (const [start, end] of intervals) {
-    if (!merged.length || start > merged[merged.length - 1][1]) {
-      merged.push([start, end]);
-      steps.push({
-        title: { vi: `[${start},${end}] không chồng → thêm mới`, en: `[${start},${end}] no overlap → append` },
-        arr: [], highlight: [], mark: [],
-        codeLines: [5, 6],
-        vars: [{ name: "current", value: `[${start},${end}]` }, { name: "merged", value: fmt(merged) }],
-        note: {
-          vi: merged.length === 1
-            ? `Đoạn đầu tiên → thêm [${start},${end}] vào merged.`
-            : `start=${start} > end đoạn cuối=${merged[merged.length - 2] ? merged[merged.length - 2][1] : ""} → không chồng lấn → thêm đoạn mới.`,
-          en: merged.length === 1
-            ? `First interval → append [${start},${end}] to merged.`
-            : `start=${start} > previous end → no overlap → append a new interval.`,
-        },
-      });
+// LeetCode 56 uses closed intervals: a shared endpoint counts as overlap.
+function parseMergeIntervals56(input, params = {}) {
+  const raw = params.intervals === undefined ? input : params.intervals;
+  const message = "Enter 1–40 intervals as 1-3,2-6 or [[1,3],[2,6]], with integer endpoints 0 ≤ start ≤ end ≤ 10000.";
+  let intervals = raw;
+  if (typeof raw === "string") {
+    const text = raw.trim();
+    if (text.startsWith("[")) {
+      try { intervals = JSON.parse(text); } catch { throw new Error(message); }
     } else {
-      const old = merged[merged.length - 1][1];
-      merged[merged.length - 1][1] = Math.max(old, end);
-      steps.push({
-        title: { vi: `[${start},${end}] chồng → mở rộng end → ${merged[merged.length - 1][1]}`, en: `[${start},${end}] overlaps → extend end → ${merged[merged.length - 1][1]}` },
-        arr: [], highlight: [], mark: [],
-        codeLines: [5, 7],
-        vars: [{ name: "current", value: `[${start},${end}]` }, { name: "merged", value: fmt(merged) }],
-        note: {
-          vi: `start=${start} ≤ end đoạn cuối=${old} → chồng lấn → mở rộng end = max(${old}, ${end}) = ${merged[merged.length - 1][1]}.`,
-          en: `start=${start} ≤ last end=${old} → overlap → extend end = max(${old}, ${end}) = ${merged[merged.length - 1][1]}.`,
-        },
+      intervals = text.split(",").map((part) => {
+        const match = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+        if (!match) throw new Error(message);
+        return [Number(match[1]), Number(match[2])];
       });
     }
   }
+  if (!Array.isArray(intervals) || intervals.length < 1 || intervals.length > 40 ||
+      intervals.some((pair) => !Array.isArray(pair) || pair.length !== 2 ||
+        pair.some((value) => !Number.isInteger(value) || value < 0 || value > 10000) || pair[0] > pair[1])) {
+    throw new Error(message);
+  }
+  return intervals.map((pair) => [...pair]);
+}
 
-  steps.push({
-    title: { vi: `Kết quả: ${fmt(merged)}`, en: `Result: ${fmt(merged)}` },
-    arr: [], highlight: [], mark: [], final: true,
-    codeLines: [8],
-    vars: [{ name: "answer", value: fmt(merged) }],
-    note: { vi: `Các đoạn sau khi gộp: ${fmt(merged)}.`, en: `Intervals after merging: ${fmt(merged)}.` },
-  });
+function buildSteps56(input, params = {}) {
+  const original = parseMergeIntervals56(input, params);
+  const intervals = original.map(([start, end], id) => ({ id, start, end }));
+  const steps = [], merged = [];
+  let processed = 0;
+  const fmt = (pairs) => JSON.stringify(pairs);
+  function add(phase, line, title, note, currentIndex = null, previousLast = null, decision = null) {
+    const current = currentIndex === null ? null : intervals[currentIndex];
+    steps.push({
+      title, note, arr: [], highlight: [], mark: [], codeLines: [line], final: phase === "done",
+      vars: [
+        ...(current ? [{ name: "start", value: current.start }, { name: "end", value: current.end }] : []),
+        ...(previousLast ? [{ name: "previous end", value: previousLast[1] }] : []),
+        { name: "merged", value: fmt(merged) },
+      ],
+      mergeIntervalsView: {
+        phase, currentIndex, processed, decision,
+        intervals: intervals.map((interval) => ({ ...interval })),
+        merged: merged.map((pair) => [...pair]),
+        previousLast: previousLast ? [...previousLast] : null,
+      },
+    });
+  }
+  add("input", 2,
+    { vi: "Các đoạn theo thứ tự đầu vào", en: "Intervals in input order" },
+    { vi: "Mỗi hàng là một đoạn đóng [start, end]. Hai đoạn chạm đầu mút cũng phải gộp.", en: "Each row is a closed interval [start, end]. Intervals sharing an endpoint must also merge." });
+  intervals.sort((a, b) => a.start - b.start);
+  add("sort", 3,
+    { vi: "Sắp xếp theo start tăng dần", en: "Sort by start, ascending" },
+    { vi: "Nhãn # giữ vị trí ban đầu. Sau khi sắp xếp, chỉ cần so sánh với đoạn cuối trong merged.", en: "The # labels retain original positions. After sorting, compare each interval with only the last interval in merged." });
+  add("init", 4,
+    { vi: "Khởi tạo merged = []", en: "Initialize merged = []" },
+    { vi: "Chưa có đoạn nào trong kết quả.", en: "No intervals have been added to the result yet." });
 
-  return { original: intervals, answer: merged, steps };
+  for (let i = 0; i < intervals.length; i++) {
+    const { start, end } = intervals[i];
+    const previousLast = merged.length ? [...merged[merged.length - 1]] : null;
+    add("inspect", 5,
+      { vi: `Xét [${start}, ${end}]`, en: `Inspect [${start}, ${end}]` },
+      { vi: "Đoạn đang xét được tô cam; đoạn cuối trong merged có khung nổi bật.", en: "The current interval is orange; the last merged interval is outlined below." }, i, previousLast);
+    const decision = !previousLast ? "empty" : start > previousLast[1] ? "gap" : "overlap";
+    add("compare", 6,
+      decision === "empty"
+        ? { vi: "merged rỗng → thêm đoạn đầu tiên", en: "merged is empty → append the first interval" }
+        : decision === "gap"
+          ? { vi: `${start} > ${previousLast[1]} → có khoảng trống`, en: `${start} > ${previousLast[1]} → a gap exists` }
+          : { vi: `${start} ≤ ${previousLast[1]} → gộp hai đoạn`, en: `${start} ≤ ${previousLast[1]} → merge the intervals` },
+      decision === "empty"
+        ? { vi: "not merged là True, nên không truy cập merged[-1].", en: "not merged is True, so merged[-1] is not accessed." }
+        : decision === "gap"
+          ? { vi: "Đoạn mới bắt đầu sau điểm cuối cũ, nên tạo một đoạn riêng.", en: "The new interval starts after the old end, so it begins a separate interval." }
+          : { vi: "Chồng lấn, chứa nhau hoặc chạm đầu mút đều đi vào nhánh gộp.", en: "Overlap, containment, and touching endpoints all take the merge branch." }, i, previousLast, decision);
+    processed = i + 1;
+    if (decision !== "overlap") {
+      merged.push([start, end]);
+      add("append", 7,
+        { vi: `Thêm [${start}, ${end}] vào merged`, en: `Append [${start}, ${end}] to merged` },
+        { vi: "Giữ nguyên mọi đoạn trước đó; chỉ thêm một đoạn ở cuối.", en: "Keep the earlier intervals and append a new interval at the end." }, i, previousLast, decision);
+    } else {
+      const nextEnd = Math.max(previousLast[1], end);
+      merged[merged.length - 1][1] = nextEnd;
+      add("merge", 9,
+        nextEnd === previousLast[1]
+          ? { vi: "Đoạn mới đã nằm trong đoạn cũ → giữ nguyên", en: "The new interval is contained → keep the existing end" }
+          : { vi: `Mở rộng đoạn cuối đến ${nextEnd}`, en: `Extend the last interval to ${nextEnd}` },
+        { vi: `Giữ start = ${previousLast[0]}; end = max(${previousLast[1]}, ${end}) = ${nextEnd}.`, en: `Keep start = ${previousLast[0]}; end = max(${previousLast[1]}, ${end}) = ${nextEnd}.` }, i, previousLast, decision);
+    }
+  }
+  add("done", 10,
+    { vi: `Kết quả: ${fmt(merged)}`, en: `Result: ${fmt(merged)}` },
+    { vi: "Các đoạn kết quả không chồng lấn và phủ đúng toàn bộ các đoạn ban đầu.", en: "The result intervals do not overlap and cover exactly the original intervals." });
+  return { original, answer: merged, steps };
 }
 
 /** LeetCode 66: Plus One — add 1 with carry from the least significant digit. */
@@ -9940,15 +9962,16 @@ module.exports = {
     difficulty: "medium",
     slug: "merge-intervals",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [{ key: "sorting", vi: "Sắp xếp", en: "Sorting" }, { key: "interval", vi: "Đoạn", en: "Interval" }],
     title: { vi: "Merge Intervals", en: "Merge Intervals" },
     titleVi: { vi: "Gộp đoạn chồng lấn (sort + merge)", en: "Merge overlapping intervals (sort + merge)" },
     statement: {
-      vi: "Cho danh sách đoạn [start,end]. Gộp mọi đoạn chồng lấn. Nhập các đoạn dạng start-end, cách nhau dấu phẩy.",
-      en: "Given intervals [start,end], merge all overlapping ones. Enter intervals as start-end separated by commas.",
+      vi: "Cho các đoạn đóng [start,end], gộp các đoạn chồng lấn để kết quả phủ đúng các đoạn ban đầu. Chạm đầu mút cũng được gộp. Nhập 1–40 đoạn dạng 1-3,2-6 hoặc [[1,3],[2,6]].",
+      en: "Merge overlapping closed intervals [start,end] into non-overlapping intervals covering the original input. Touching endpoints also merge. Enter 1–40 intervals as 1-3,2-6 or [[1,3],[2,6]].",
     },
     defaultInput: "1-3,2-6,8-10,15-18",
     inputKind: "string",
-    inputLabel: { vi: "Đoạn (start-end, cách bởi ,)", en: "Intervals (start-end, comma separated)" },
+    inputLabel: { vi: "Đoạn (start-end hoặc mảng JSON)", en: "Intervals (start-end or JSON array)" },
     extraParams: [],
     approach: [
       { vi: "Sắp các đoạn theo điểm bắt đầu.", en: "Sort intervals by start." },
@@ -9962,10 +9985,13 @@ module.exports = {
       "        intervals.sort(key=lambda x: x[0])",
       "        merged = []",
       "        for start, end in intervals:",
-      "            if not merged or start > merged[-1][1]: merged.append([start, end])",
-      "            else: merged[-1][1] = max(merged[-1][1], end)",
+      "            if not merged or start > merged[-1][1]:",
+      "                merged.append([start, end])",
+      "            else:",
+      "                merged[-1][1] = max(merged[-1][1], end)",
       "        return merged",
     ],
+    liveArgs: (input, params) => [parseMergeIntervals56(input, params)],
     builder: buildSteps56,
   },
   41: {
