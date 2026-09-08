@@ -9,6 +9,10 @@ const p = SUPPORTED[715];
 const build = operations => p.builder(JSON.stringify(operations));
 const finalPoints = result => result.steps.at(-1).rangeModuleView.points;
 
+test('715 is included in the Segment Tree catalog', () => {
+  assert.ok(p.tags.some(tag => tag.key === 'segment-tree'));
+});
+
 test('715 example splits coverage and queries half-open boundaries without mutation', () => {
   const result = p.builder(p.defaultInput);
   assert.deepEqual(result.answer, [null, null, true, false, true]);

@@ -141,7 +141,11 @@ module.exports = {
   715: {
     id: 715, difficulty: 'hard', slug: 'range-module',
     category: { key: 'binary-search', vi: 'Tìm kiếm nhị phân', en: 'Binary Search' },
-    tags: [{ key: 'design', vi: 'Thiết kế', en: 'Design' }, { key: 'array', vi: 'Mảng', en: 'Array' }],
+    tags: [
+      { key: 'design', vi: 'Thiết kế', en: 'Design' },
+      { key: 'array', vi: 'Mảng', en: 'Array' },
+      { key: 'segment-tree', vi: 'Segment Tree', en: 'Segment Tree' },
+    ],
     title: both('Range Module', 'Range Module'),
     titleVi: both('Thêm, xóa và kiểm tra vùng được theo dõi', 'Add, remove, and query tracked ranges'),
     statement: both(
