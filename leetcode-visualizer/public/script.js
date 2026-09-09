@@ -13554,6 +13554,59 @@ function renderHappyNumberView(step) {
     </section>`;
 }
 
+// ---- In-place array rotation visualization (LeetCode 189) ----
+function renderRotateArray189View(step) {
+  const v = step.rotateArray189View, vi = lang === "vi";
+  const n = v.nums.length, effectiveK = v.requestedK % n;
+  const split = n - effectiveK, done = v.event === "done";
+  const labels = vi ? ["Đảo toàn bộ", "Đảo k phần tử đầu", "Đảo phần còn lại"] : ["Reverse all", "Reverse first k", "Reverse the rest"];
+  const phases = labels.map((label, i) => `<span class="${v.phase === i + 1 && !done ? "active" : v.phase > i + 1 || done && effectiveK ? "complete" : ""}">${i + 1} · ${label}</span>`).join("");
+  const values = list => `[${list.join(", ")}]`;
+  const block = (name, list) => `<span class="ra189-original-${name.toLowerCase()}"><b>${name}</b><code>${escapeHtml(values(list))}</code></span>`;
+  const cellWidth = Math.max(58, Math.max(...v.nums.map(value => String(value).length)) * 9 + 20);
+  const cells = v.nums.map((value, i) => {
+    const group = v.ids[i] < split ? "A" : "B";
+    const inRange = v.range && i >= v.range[0] && i <= v.range[1];
+    const lo = i === v.lo, hi = i === v.hi;
+    const pointer = lo && hi ? "lo = hi" : lo ? "lo" : hi ? "hi" : "";
+    const active = (lo || hi) && v.lo < v.hi;
+    const label = `nums[${i}] = ${value}, ${group}, ${vi ? "từ vị trí" : "from index"} ${v.ids[i]}${pointer ? `, ${pointer}` : ""}`;
+    return `<div class="ra189-cell group-${group.toLowerCase()}${inRange ? " in-range" : ""}${active ? " pointer" : ""}${done ? " done" : ""}" role="listitem" aria-label="${escapeHtml(label)}">
+      <small>[${i}]</small><strong>${escapeHtml(value)}</strong><span>${group} · #${v.ids[i]}</span><em>${pointer || "&nbsp;"}</em>
+    </div>`;
+  }).join("");
+  let action = `k = ${v.requestedK} % ${n} = ${effectiveK}`;
+  let detail = vi ? "Mỗi vòng đủ n bước giữ nguyên mảng." : "Every full turn of n steps leaves the array unchanged.";
+  if (v.range) {
+    action = `reverse(${v.range[0]}, ${v.range[1]})`;
+    detail = vi ? "Khung nhạt đánh dấu đoạn đang đảo; lo và hi đi vào giữa." : "Shaded cells mark the reversal range; lo and hi move inward.";
+  }
+  if (v.event === "check") {
+    action = `${v.lo} < ${v.hi} → ${v.lo < v.hi ? "True" : "False"}`;
+    detail = v.lo < v.hi ? (vi ? "Sẵn sàng hoán đổi cặp con trỏ." : "Ready to swap the pointer pair.") : (vi ? "Con trỏ đã gặp hoặc vượt nhau → dừng đảo." : "Pointers meet or cross → stop reversing.");
+  } else if (v.event === "swap") {
+    action = `nums[${v.lo}] ↔ nums[${v.hi}]`;
+    detail = `${v.before[0]}, ${v.before[1]} → ${v.nums[v.lo]}, ${v.nums[v.hi]}`;
+  } else if (v.event === "move") {
+    action = `lo = ${v.lo} · hi = ${v.hi}`;
+    detail = vi ? "Thu hẹp đoạn chưa đảo từ cả hai phía." : "Shrink the unreversed range from both ends.";
+  } else if (v.event === "reversed") {
+    detail = vi ? "Đoạn này đã đảo xong." : "This range is now reversed.";
+  } else if (done) {
+    action = effectiveK ? "A + B → B + A" : "k % n = 0";
+    detail = effectiveK ? (vi ? "Xong: nums đã được sửa tại chỗ." : "Done: nums has been modified in place.") : (vi ? "Không đổi; không cần hoán đổi." : "Unchanged; no swaps are needed.");
+  }
+  $("treeView").innerHTML = `<section class="ra189-viz" aria-label="${vi ? "Xoay mảng bằng ba lần đảo" : "Rotate array with three reversals"}">
+    <header class="ra189-heading"><strong>${vi ? "Xoay phải" : "Rotate right"} ${effectiveK} →</strong><span>k: ${v.requestedK} % ${n} = ${effectiveK}</span></header>
+    <div class="ra189-original"><span>${vi ? "Ban đầu" : "Original"}</span>${block("A", v.original.slice(0, split))}${block("B", v.original.slice(split))}</div>
+    <div class="ra189-phases">${phases}</div>
+    <div class="ra189-array-heading"><strong>nums${done ? (vi ? " · kết quả" : " · result") : ""}</strong><span>${v.range ? `[${v.range[0]}, ${v.range[1]}]` : "A + B → B + A"}</span></div>
+    <div class="ra189-array" role="list" aria-label="nums" style="--ra189-cell-width:${cellWidth}px">${cells}</div>
+    <div class="ra189-action" aria-live="polite"><strong>${escapeHtml(action)}</strong><span>${escapeHtml(detail)}</span></div>
+    <div class="ra189-legend"><span class="group-a">A · ${vi ? "nhóm đầu" : "original prefix"}</span><span class="group-b">B · ${vi ? "k phần tử cuối" : "last k elements"}</span><span>${vi ? "# = chỉ số ban đầu" : "# = original index"}</span></div>
+  </section>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -26480,6 +26533,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGcdPairsView(step);
+  } else if (step.rotateArray189View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotateArray189View(step);
   } else if (step.rotatedSearchView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
