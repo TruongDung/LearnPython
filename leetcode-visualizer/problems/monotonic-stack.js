@@ -4375,16 +4375,190 @@ function buildSteps2818(input, params = {}) {
   return { original: [...nums], answer: Number(answer), steps };
 }
 
-function leftmostBuildingQueries(input, params = {}) {
+function parseBuildingQueries2940(input, params = {}) {
   const heights = parseNums(input, "heights");
-  const queries = parsePairs(params.queries ?? "0,1;0,2;2,4", "queries");
-  const answer = queries.map(([a, b]) => {
-    if (a > b) [a, b] = [b, a];
-    if (a === b || heights[a] < heights[b]) return b;
-    for (let i = b + 1; i < heights.length; i++) if (heights[i] > heights[a]) return i;
-    return -1;
+  const queries = parsePairs(params.queries ?? "0,1;0,3;2,4;3,4;2,2", "queries");
+  if (heights.length > 16) throw new Error("Use at most 16 buildings so the visualization stays readable.");
+  if (queries.length > 12) throw new Error("Use at most 12 queries so the visualization stays readable.");
+  if (heights.some((height) => height < 1 || height > 1000000000)) {
+    throw new Error("Each building height must be between 1 and 10^9.");
+  }
+  if (queries.some(([a, b]) => a < 0 || b < 0 || a >= heights.length || b >= heights.length)) {
+    throw new Error(`Each query index must be between 0 and ${heights.length - 1}.`);
+  }
+  return { heights, queries };
+}
+
+function buildSteps2940(input, params = {}) {
+  const { heights, queries } = parseBuildingQueries2940(input, params);
+  const waiting = Array.from({ length: heights.length }, () => []);
+  const answers = Array(queries.length).fill(null);
+  const heap = [];
+  const steps = [];
+  const queryRecords = queries.map(([a, b], index) => {
+    const left = Math.min(a, b);
+    const right = Math.max(a, b);
+    return {
+      index, a, b, left, right,
+      threshold: heights[left],
+      state: "unseen",
+      kind: null,
+      answer: null,
+    };
   });
-  return { original: heights, answer, steps: genericSteps({ nums: heights, title: text("Leftmost meeting buildings", "Leftmost meeting buildings"), answer, note: text("Bản tối ưu xử lý query offline bằng stack giảm dần các tòa nhà ứng viên.", "The optimized solution processes queries offline with a decreasing stack of candidate buildings.") }) };
+
+  function snapshot({ phase, phaseIndex, event, codeLines, title, note, currentQuery = -1, currentBuilding = -1, comparedQuery = -1, operation = "", final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [...heights],
+      sub: heights.map((_, index) => `[${index}]`),
+      highlight: currentBuilding >= 0 ? [currentBuilding] : [],
+      mark: final ? answers.filter((value) => value >= 0) : [],
+      vars: [
+        { name: "building", value: currentBuilding >= 0 ? currentBuilding : "?" },
+        { name: "height", value: currentBuilding >= 0 ? heights[currentBuilding] : "?" },
+        { name: "heap", value: `[${heap.map((item) => `(>${item.threshold}, q${item.query})`).join(", ")}]` },
+        { name: "answer", value: `[${answers.map((value) => value == null ? "?" : value).join(", ")}]` },
+      ],
+      buildingMeet2940View: {
+        phase,
+        phaseIndex,
+        event,
+        heights: [...heights],
+        queries: queryRecords.map((record) => ({ ...record })),
+        answers: [...answers],
+        heap: heap.map((item) => ({ ...item })),
+        waiting: waiting.map((list) => [...list]),
+        currentQuery,
+        currentBuilding,
+        comparedQuery,
+        operation,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "classify", phaseIndex: 0, event: "intro", codeLines: [5, 6, 7],
+    title: text("Tách query dễ và query phải chờ", "Separate immediate and waiting queries"),
+    note: text(
+      "Sau khi đưa a về bên trái b: nếu a == b thì đã gặp nhau; nếu heights[a] < heights[b] thì Alice đi thẳng tới b. Các query còn lại phải tìm một tòa bên phải b cao hơn heights[a].",
+      "After normalizing a to the left of b: a == b is already a meeting; if heights[a] < heights[b], Alice moves directly to b. Every remaining query needs a building right of b taller than heights[a].",
+    ),
+    operation: "easy query → answer now · hard query → wait at right endpoint",
+  });
+
+  for (const record of queryRecords) {
+    const { index, left, right } = record;
+    if (left === right) {
+      answers[index] = right;
+      record.answer = right;
+      record.state = "answered";
+      record.kind = "same";
+      snapshot({
+        phase: "classify", phaseIndex: 0, event: "same", codeLines: [9, 10, 11, 12, 13], currentQuery: index,
+        title: text(`q${index}: đã ở cùng building ${right}`, `q${index}: already together at building ${right}`),
+        note: text("Alice và Bob bắt đầu ở cùng một tòa nhà, nên đây chắc chắn là đáp án trái nhất.", "Alice and Bob start in the same building, so it is certainly the leftmost answer."),
+        operation: `a = b = ${right} → answer[${index}] = ${right}`,
+      });
+    } else if (heights[left] < heights[right]) {
+      answers[index] = right;
+      record.answer = right;
+      record.state = "answered";
+      record.kind = "direct";
+      snapshot({
+        phase: "classify", phaseIndex: 0, event: "direct", codeLines: [9, 10, 11, 12, 13], currentQuery: index,
+        title: text(`q${index}: gặp ngay tại building ${right}`, `q${index}: meet directly at building ${right}`),
+        note: text(
+          `Building ${right} nằm bên phải và cao hơn building ${left}, nên người ở ${left} đi thẳng tới ${right}; người còn lại đã đứng ở đó.`,
+          `Building ${right} is to the right and taller than building ${left}, so the person at ${left} moves directly there while the other is already there.`,
+        ),
+        operation: `${heights[left]} < ${heights[right]} → answer[${index}] = ${right}`,
+      });
+    } else {
+      record.state = "waiting";
+      record.kind = "offline";
+      waiting[right].push(index);
+      snapshot({
+        phase: "classify", phaseIndex: 0, event: "wait", codeLines: [14, 15], currentQuery: index,
+        title: text(`q${index}: chờ sau building ${right}`, `q${index}: wait after building ${right}`),
+        note: text(
+          `Building ${right} không cao hơn building ${left}. Query này cần tòa đầu tiên k > ${right} với heights[k] > ${heights[left]}.`,
+          `Building ${right} is not taller than building ${left}. This query needs the first k > ${right} with heights[k] > ${heights[left]}.`,
+        ),
+        operation: `waitAt[${right}].push((height > ${heights[left]}, q${index}))`,
+      });
+    }
+  }
+
+  snapshot({
+    phase: "scan", phaseIndex: 1, event: "scan-start", codeLines: [17, 18],
+    title: text("Quét building từ trái sang phải", "Scan buildings from left to right"),
+    note: text("Heap giữ các query đã đi qua right endpoint nhưng vẫn đang chờ một tòa đủ cao.", "The heap stores queries whose right endpoint has been passed but which still wait for a tall-enough building."),
+    operation: "heap key = required height · smallest requirement on top",
+  });
+
+  for (let building = 0; building < heights.length; building++) {
+    const height = heights[building];
+    snapshot({
+      phase: "scan", phaseIndex: 1, event: "visit", codeLines: [18, 19], currentBuilding: building,
+      title: text(`Xét building ${building}, height ${height}`, `Visit building ${building}, height ${height}`),
+      note: text("Trước hết giải các query đang ở heap. Query mới kết thúc tại building này chỉ được kích hoạt sau đó, để đáp án luôn nằm strictly bên phải.", "Resolve the existing heap first. Queries ending at this building activate afterward, keeping every offline answer strictly to the right."),
+      operation: `building=${building} · height=${height} · resolve while threshold < height`,
+    });
+
+    while (heap.length && heap[0].threshold < height) {
+      const item = heap.shift();
+      answers[item.query] = building;
+      queryRecords[item.query].answer = building;
+      queryRecords[item.query].state = "answered";
+      snapshot({
+        phase: "resolve", phaseIndex: 2, event: "resolve", codeLines: [19, 20, 21],
+        currentBuilding: building, currentQuery: item.query, comparedQuery: item.query,
+        title: text(`q${item.query} gặp nhau tại building ${building}`, `q${item.query} meets at building ${building}`),
+        note: text(
+          `${height} > ${item.threshold}, nên cả hai có thể tới building ${building}. Vì ta quét từ trái sang phải, đây là tòa hợp lệ đầu tiên.`,
+          `${height} > ${item.threshold}, so both people can reach building ${building}. Because the scan is left-to-right, this is the first valid building.`,
+        ),
+        operation: `${height} > required ${item.threshold} → pop q${item.query} → answer=${building}`,
+      });
+    }
+
+    for (const queryIndex of waiting[building]) {
+      heap.push({ threshold: queryRecords[queryIndex].threshold, query: queryIndex });
+      heap.sort((first, second) => first.threshold - second.threshold || first.query - second.query);
+      queryRecords[queryIndex].state = "heap";
+      snapshot({
+        phase: "resolve", phaseIndex: 2, event: "activate", codeLines: [22, 23],
+        currentBuilding: building, currentQuery: queryIndex,
+        title: text(`Kích hoạt q${queryIndex} sau building ${building}`, `Activate q${queryIndex} after building ${building}`),
+        note: text(
+          `Từ building tiếp theo trở đi, q${queryIndex} sẽ được giải bởi tòa đầu tiên cao hơn ${queryRecords[queryIndex].threshold}.`,
+          `Starting with the next building, q${queryIndex} will be resolved by the first height greater than ${queryRecords[queryIndex].threshold}.`,
+        ),
+        operation: `heappush((required=${queryRecords[queryIndex].threshold}, q${queryIndex}))`,
+      });
+    }
+  }
+
+  for (const record of queryRecords) {
+    if (answers[record.index] != null) continue;
+    answers[record.index] = -1;
+    record.answer = -1;
+    record.state = "unreachable";
+  }
+
+  snapshot({
+    phase: "done", phaseIndex: 3, event: "done", codeLines: [24], final: true,
+    title: text(`Trả về [${answers.join(", ")}]`, `Return [${answers.join(", ")}]`),
+    note: text("Query còn trong heap không gặp tòa nào đủ cao ở bên phải nên nhận -1. Kết quả được giữ theo đúng thứ tự query ban đầu.", "Queries left in the heap found no tall-enough building to the right and receive -1. Answers remain in the original query order."),
+    operation: `answer = [${answers.join(", ")}]`,
+  });
+
+  return { original: [...heights], queries: queries.map((query) => [...query]), answer: [...answers], steps };
 }
 
 function maxNonDecreasingLength(nums) {
@@ -7456,7 +7630,65 @@ module.exports = {
     liveArgs: (input, params) => [parseNums(input, "nums"), Number(params.k)],
     builder: buildSteps2818,
   },
-  2940: simpleProblem({ id: 2940, difficulty: "hard", slug: "find-building-where-alice-and-bob-can-meet", name: "Find Building Where Alice and Bob Can Meet", viName: "Tòa nhà Alice và Bob gặp nhau", statement: text("Với mỗi query, tìm tòa nhà trái nhất mà cả hai có thể tới.", "For each query, find the leftmost building both people can reach."), defaultInput: "6,4,8,5,2,7", inputLabel: text("heights", "heights"), extraParams: [{ key: "queries", type: "string", label: text("queries (a,b; ...)", "queries (a,b; ...)"), default: "0,1;0,2;2,4" }], solver: leftmostBuildingQueries }),
+  2940: {
+    id: 2940,
+    difficulty: "hard",
+    slug: "find-building-where-alice-and-bob-can-meet",
+    category,
+    tags: [arrayTag, monoTag, { key: "heap", vi: "Heap", en: "Heap" }, { key: "offline-query", vi: "Query offline", en: "Offline Query" }],
+    title: text("Find Building Where Alice and Bob Can Meet"),
+    titleVi: text("Tìm tòa nhà Alice và Bob có thể gặp nhau", "Find Building Where Alice and Bob Can Meet"),
+    statement: text(
+      "heights[i] là chiều cao building i. Một người chỉ có thể đi từ i sang j khi i < j và heights[i] < heights[j]. Với mỗi query [a,b], tìm index nhỏ nhất của building mà Alice và Bob đều có thể tới; trả về -1 nếu không tồn tại.",
+      "heights[i] is the height of building i. A person can move from i to j only when i < j and heights[i] < heights[j]. For each query [a,b], find the smallest building index both Alice and Bob can reach, or -1 if none exists.",
+    ),
+    defaultInput: "6,4,8,5,2,7",
+    inputKind: "string",
+    inputLabel: text("heights (tối đa 16 số)", "heights (up to 16 values)"),
+    extraParams: [{ key: "queries", type: "string", label: text("queries dạng a,b; c,d (tối đa 12)", "queries as a,b; c,d (up to 12)"), default: "0,1;0,3;2,4;3,4;2,2" }],
+    approach: [
+      text("Chuẩn hóa mỗi query để a ≤ b.", "Normalize every query so a ≤ b."),
+      text("Nếu a == b hoặc heights[a] < heights[b], đáp án là b ngay.", "If a == b or heights[a] < heights[b], the answer is immediately b."),
+      text("Query còn lại cần building đầu tiên k > b có heights[k] > heights[a]; gắn query vào waitAt[b].", "Every remaining query needs the first k > b with heights[k] > heights[a]; attach it to waitAt[b]."),
+      text("Quét building từ trái sang phải. Min-heap giữ threshold của query đã kích hoạt; height hiện tại giải mọi threshold nhỏ hơn nó.", "Scan buildings left-to-right. A min-heap stores thresholds of activated queries; the current height resolves every smaller threshold."),
+    ],
+    complexity: {
+      time: "O((n + q) log q)",
+      space: "O(n + q)",
+      note: text("Mỗi query được đưa vào và lấy khỏi heap nhiều nhất một lần.", "Each query enters and leaves the heap at most once."),
+    },
+    code: [
+      "from heapq import heappush, heappop",
+      "",
+      "class Solution:",
+      "    def leftmostBuildingQueries(self, heights, queries):",
+      "        n = len(heights)",
+      "        wait_at = [[] for _ in range(n)]",
+      "        answer = [-1] * len(queries)",
+      "",
+      "        for query_index, (a, b) in enumerate(queries):",
+      "            if a > b:",
+      "                a, b = b, a",
+      "            if a == b or heights[a] < heights[b]:",
+      "                answer[query_index] = b",
+      "            else:",
+      "                wait_at[b].append((heights[a], query_index))",
+      "",
+      "        heap = []",
+      "        for building, height in enumerate(heights):",
+      "            while heap and heap[0][0] < height:",
+      "                _, query_index = heappop(heap)",
+      "                answer[query_index] = building",
+      "            for item in wait_at[building]:",
+      "                heappush(heap, item)",
+      "        return answer",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseBuildingQueries2940(input, params);
+      return [parsed.heights, parsed.queries];
+    },
+    builder: buildSteps2940,
+  },
   2945: {
     id: 2945,
     difficulty: "hard",

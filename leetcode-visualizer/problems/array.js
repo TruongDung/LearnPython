@@ -12237,3 +12237,334 @@ Object.assign(module.exports, {
     builder: buildSteps2948,
   },
 });
+
+function parsePourWater755Input(input, params = {}) {
+  if (!Array.isArray(input) || input.length === 0 || !input.every(Number.isInteger)) {
+    throw new Error("heights must be a non-empty array of integers.");
+  }
+  if (input.length > 16) {
+    throw new Error("Use at most 16 terrain columns so the visualization stays readable.");
+  }
+  if (input.some((height) => height < 0 || height > 1000000)) {
+    throw new Error("Each terrain height must be between 0 and 10^6.");
+  }
+  const volume = Number(params.volume ?? 4);
+  const source = Number(params.k ?? 3);
+  if (!Number.isInteger(volume) || volume < 0 || volume > 24) {
+    throw new Error("volume must be an integer between 0 and 24 for the visualization.");
+  }
+  if (!Number.isInteger(source) || source < 0 || source >= input.length) {
+    throw new Error(`k must be an integer between 0 and ${input.length - 1}.`);
+  }
+  return { terrain: [...input], volume, source };
+}
+
+function buildSteps755(input, params = {}) {
+  const { terrain, volume, source } = parsePourWater755Input(input, params);
+  const heights = [...terrain];
+  const water = Array(terrain.length).fill(0);
+  const steps = [];
+
+  function snapshot({
+    phase,
+    phaseIndex,
+    event,
+    codeLines,
+    title,
+    note,
+    dropNumber = 0,
+    current = source,
+    best = source,
+    candidate = -1,
+    compared = -1,
+    canMove = null,
+    direction = "stay",
+    path = [source],
+    operation = "",
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [...heights],
+      highlight: current >= 0 ? [current] : [],
+      mark: water.map((amount, index) => amount > 0 ? index : -1).filter((index) => index >= 0),
+      vars: [
+        { name: "drop", value: `${dropNumber}/${volume}` },
+        { name: "k", value: source },
+        { name: "best", value: best },
+        { name: "heights", value: `[${heights.join(", ")}]` },
+      ],
+      pourWater755View: {
+        phase,
+        phaseIndex,
+        event,
+        terrain: [...terrain],
+        heights: [...heights],
+        water: [...water],
+        volume,
+        source,
+        dropNumber,
+        current,
+        best,
+        candidate,
+        compared,
+        canMove,
+        direction,
+        path: [...path],
+        operation,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "setup",
+    phaseIndex: 0,
+    event: "intro",
+    codeLines: [3, 4, 5],
+    title: { vi: "Thả từng giọt tại k", en: "Release each drop at k" },
+    note: {
+      vi: "Mỗi giọt thử tìm một vị trí thấp hơn ở bên trái. Chỉ khi không tìm được, nó mới thử bên phải; nếu cả hai phía đều không thấp hơn, giọt nằm lại tại k.",
+      en: "Each drop first searches for a lower position on the left. Only if none exists does it search right; if neither side is lower, it stays at k.",
+    },
+    operation: "priority: lower left → lower right → source k",
+  });
+
+  for (let drop = 1; drop <= volume; drop += 1) {
+    let best = source;
+    let path = [source];
+    snapshot({
+      phase: "drop",
+      phaseIndex: 0,
+      event: "drop-start",
+      codeLines: [4, 5],
+      title: { vi: `Giọt ${drop} bắt đầu tại k = ${source}`, en: `Drop ${drop} starts at k = ${source}` },
+      note: { vi: "Đặt best tại nguồn rồi quét sang trái trước.", en: "Set best to the source, then scan left first." },
+      dropNumber: drop,
+      best,
+      path,
+      operation: `drop ${drop}: best = k = ${source}`,
+    });
+
+    for (let index = source - 1; index >= 0; index -= 1) {
+      const canMove = heights[index] <= heights[index + 1];
+      if (canMove) {
+        path.push(index);
+        if (heights[index] < heights[best]) best = index;
+      }
+      snapshot({
+        phase: "left",
+        phaseIndex: 1,
+        event: "left-check",
+        codeLines: canMove ? [7, 8, 10, 11] : [7, 8, 9],
+        title: canMove
+          ? { vi: `Có thể đi trái tới index ${index}`, en: `Can move left to index ${index}` }
+          : { vi: `Bị chặn bên trái tại index ${index}`, en: `Blocked on the left at index ${index}` },
+        note: canMove
+          ? {
+            vi: `${heights[index]} ≤ ${heights[index + 1]}; tiếp tục quét. best hiện là index ${best}, cao ${heights[best]}.`,
+            en: `${heights[index]} ≤ ${heights[index + 1]}; continue scanning. best is now index ${best}, height ${heights[best]}.`,
+          }
+          : {
+            vi: `${heights[index]} > ${heights[index + 1]}; giọt không thể leo qua vách này.`,
+            en: `${heights[index]} > ${heights[index + 1]}; the drop cannot climb this wall.`,
+          },
+        dropNumber: drop,
+        current: index + 1,
+        best,
+        candidate: index,
+        compared: index + 1,
+        canMove,
+        direction: "left",
+        path,
+        operation: `${heights[index]} ${canMove ? "≤" : ">"} ${heights[index + 1]} → ${canMove ? `best=${best}` : "stop left"}`,
+      });
+      if (!canMove) break;
+    }
+
+    if (best !== source) {
+      heights[best] += 1;
+      water[best] += 1;
+      snapshot({
+        phase: "settle",
+        phaseIndex: 3,
+        event: "settle-left",
+        codeLines: [12, 13, 14],
+        title: { vi: `Giọt ${drop} đọng tại index ${best}`, en: `Drop ${drop} settles at index ${best}` },
+        note: {
+          vi: "Đã tìm thấy chỗ thấp hơn bên trái nên không cần xét bên phải.",
+          en: "A lower place was found on the left, so the right side is not considered.",
+        },
+        dropNumber: drop,
+        current: best,
+        best,
+        direction: "left",
+        path,
+        operation: `heights[${best}] += 1 → ${heights[best]}`,
+      });
+      continue;
+    }
+
+    best = source;
+    path = [source];
+    snapshot({
+      phase: "right",
+      phaseIndex: 2,
+      event: "right-start",
+      codeLines: [12, 16],
+      title: { vi: "Không có chỗ thấp hơn bên trái", en: "No lower position on the left" },
+      note: { vi: "Giọt quay lại k và bắt đầu tìm sang phải.", en: "The drop returns to k and starts searching right." },
+      dropNumber: drop,
+      best,
+      direction: "right",
+      path,
+      operation: `reset best = k = ${source}`,
+    });
+
+    for (let index = source + 1; index < heights.length; index += 1) {
+      const canMove = heights[index] <= heights[index - 1];
+      if (canMove) {
+        path.push(index);
+        if (heights[index] < heights[best]) best = index;
+      }
+      snapshot({
+        phase: "right",
+        phaseIndex: 2,
+        event: "right-check",
+        codeLines: canMove ? [16, 17, 19, 20] : [16, 17, 18],
+        title: canMove
+          ? { vi: `Có thể đi phải tới index ${index}`, en: `Can move right to index ${index}` }
+          : { vi: `Bị chặn bên phải tại index ${index}`, en: `Blocked on the right at index ${index}` },
+        note: canMove
+          ? {
+            vi: `${heights[index]} ≤ ${heights[index - 1]}; tiếp tục quét. best hiện là index ${best}, cao ${heights[best]}.`,
+            en: `${heights[index]} ≤ ${heights[index - 1]}; continue scanning. best is now index ${best}, height ${heights[best]}.`,
+          }
+          : {
+            vi: `${heights[index]} > ${heights[index - 1]}; giọt không thể leo qua vách này.`,
+            en: `${heights[index]} > ${heights[index - 1]}; the drop cannot climb this wall.`,
+          },
+        dropNumber: drop,
+        current: index - 1,
+        best,
+        candidate: index,
+        compared: index - 1,
+        canMove,
+        direction: "right",
+        path,
+        operation: `${heights[index]} ${canMove ? "≤" : ">"} ${heights[index - 1]} → ${canMove ? `best=${best}` : "stop right"}`,
+      });
+      if (!canMove) break;
+    }
+
+    heights[best] += 1;
+    water[best] += 1;
+    snapshot({
+      phase: "settle",
+      phaseIndex: 3,
+      event: best === source ? "settle-source" : "settle-right",
+      codeLines: [21],
+      title: best === source
+        ? { vi: `Giọt ${drop} nằm lại tại nguồn`, en: `Drop ${drop} stays at the source` }
+        : { vi: `Giọt ${drop} đọng tại index ${best}`, en: `Drop ${drop} settles at index ${best}` },
+      note: best === source
+        ? { vi: "Không phía nào có vị trí thấp hơn k.", en: "Neither side has a position lower than k." }
+        : { vi: "Không có chỗ bên trái; đây là vị trí thấp nhất có thể tới bên phải.", en: "No lower place exists on the left; this is the lowest reachable position on the right." },
+      dropNumber: drop,
+      current: best,
+      best,
+      direction: best === source ? "stay" : "right",
+      path,
+      operation: `heights[${best}] += 1 → ${heights[best]}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    phaseIndex: 4,
+    event: "done",
+    codeLines: [22],
+    title: { vi: `Kết quả [${heights.join(", ")}]`, en: `Result [${heights.join(", ")}]` },
+    note: {
+      vi: `Đã đặt đủ ${volume} giọt; phần màu xanh cho biết lượng nước nằm trên từng cột địa hình.`,
+      en: `All ${volume} drops have settled; the blue part shows the water resting above each terrain column.`,
+    },
+    dropNumber: volume,
+    current: -1,
+    best: source,
+    path: [],
+    operation: `return [${heights.join(", ")}]`,
+    final: true,
+  });
+
+  return { original: [...terrain], volume, k: source, answer: [...heights], steps };
+}
+
+Object.assign(module.exports, {
+  755: {
+    id: 755,
+    difficulty: "medium",
+    premium: true,
+    slug: "pour-water",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "simulation", vi: "Mô phỏng", en: "Simulation" },
+    ],
+    title: { vi: "Pour Water", en: "Pour Water" },
+    titleVi: { vi: "Rót nước lên địa hình", en: "Pour Water" },
+    statement: {
+      vi: "Cho địa hình heights, thả volume đơn vị nước từng giọt tại index k. Mỗi giọt ưu tiên chảy tới vị trí thấp hơn bên trái, nếu không có thì tìm bên phải, nếu vẫn không có thì nằm lại tại k. Trả về chiều cao cuối cùng.",
+      en: "Given terrain heights, release volume units of water one drop at a time at index k. Each drop prefers a lower position on the left, then the right, and otherwise stays at k. Return the final heights.",
+    },
+    defaultInput: [2, 1, 1, 2, 1, 2, 2],
+    inputKind: "nonneg",
+    inputLabel: { vi: "heights (tối đa 16 cột)", en: "heights (up to 16 columns)" },
+    extraParams: [
+      { key: "volume", type: "number", label: { vi: "volume (số giọt, tối đa 24)", en: "volume (drops, up to 24)" }, default: 4, min: 0, max: 24 },
+      { key: "k", type: "number", label: { vi: "k (index thả nước)", en: "k (release index)" }, default: 3, min: 0 },
+    ],
+    approach: [
+      { vi: "Với mỗi giọt, quét từ k sang trái qua các cột không cao hơn cột vừa đi qua; ghi nhớ vị trí thấp nhất.", en: "For each drop, scan left from k through columns no higher than the previous one; remember the lowest position." },
+      { vi: "Nếu tìm được vị trí thấp hơn k, đặt giọt ở đó ngay vì bên trái luôn được ưu tiên.", en: "If a position lower than k is found, place the drop there immediately because the left side has priority." },
+      { vi: "Nếu không, quét tương tự sang phải; cuối cùng tăng chiều cao tại vị trí tốt nhất hoặc ngay tại k.", en: "Otherwise scan right in the same way; finally increase the best position or k itself." },
+    ],
+    complexity: {
+      time: "O(volume × n)",
+      space: "O(1)",
+      note: { vi: "Không tính mảng kết quả; mỗi giọt quét tối đa toàn bộ địa hình.", en: "Excluding the returned array; each drop scans the terrain at most once per direction." },
+    },
+    code: [
+      "class Solution:",
+      "    def pourWater(self, heights, volume, k):",
+      "        n = len(heights)",
+      "        for _ in range(volume):",
+      "            best = k",
+      "",
+      "            for i in range(k - 1, -1, -1):",
+      "                if heights[i] > heights[i + 1]:",
+      "                    break",
+      "                if heights[i] < heights[best]:",
+      "                    best = i",
+      "            if best != k:",
+      "                heights[best] += 1",
+      "                continue",
+      "",
+      "            for i in range(k + 1, n):",
+      "                if heights[i] > heights[i - 1]:",
+      "                    break",
+      "                if heights[i] < heights[best]:",
+      "                    best = i",
+      "            heights[best] += 1",
+      "        return heights",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parsePourWater755Input(input, params);
+      return [[...parsed.terrain], parsed.volume, parsed.source];
+    },
+    builder: buildSteps755,
+  },
+});

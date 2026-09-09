@@ -25523,3 +25523,237 @@ Object.assign(module.exports, {
     builder: buildSteps546,
   },
 });
+
+function parseChampagne799Input(input, params = {}) {
+  if (!Array.isArray(input) || input.length !== 1 || !Number.isInteger(input[0])) {
+    throw new Error("poured must be provided as one integer.");
+  }
+  const poured = input[0];
+  const queryRow = Number(params.query_row ?? 2);
+  const queryGlass = Number(params.query_glass ?? 1);
+  if (poured < 0 || poured > 1000000000) {
+    throw new Error("poured must be between 0 and 10^9.");
+  }
+  if (!Number.isInteger(queryRow) || queryRow < 0 || queryRow > 12) {
+    throw new Error("query_row must be an integer between 0 and 12 for the visualization.");
+  }
+  if (!Number.isInteger(queryGlass) || queryGlass < 0 || queryGlass > queryRow) {
+    throw new Error(`query_glass must be an integer between 0 and query_row (${queryRow}).`);
+  }
+  return { poured, queryRow, queryGlass };
+}
+
+function buildSteps799(input, params = {}) {
+  const { poured, queryRow, queryGlass } = parseChampagne799Input(input, params);
+  const tower = Array.from({ length: queryRow + 1 }, (_, row) => Array(row + 1).fill(0));
+  const processed = Array.from({ length: queryRow + 1 }, (_, row) => Array(row + 1).fill(false));
+  const steps = [];
+  tower[0][0] = poured;
+
+  function snapshot({
+    phase,
+    phaseIndex,
+    event,
+    codeLines,
+    title,
+    note,
+    currentRow = -1,
+    currentGlass = -1,
+    rawAmount = null,
+    overflow = null,
+    receiving = [],
+    operation = "",
+    answer = null,
+    final = false,
+  }) {
+    const flat = tower.flat();
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: flat.map((amount) => Math.min(1, amount)),
+      highlight: [],
+      mark: [],
+      vars: [
+        { name: "poured", value: poured },
+        { name: "cell", value: currentRow >= 0 ? `(${currentRow}, ${currentGlass})` : "?" },
+        { name: "raw", value: rawAmount == null ? "?" : Number(rawAmount.toFixed(5)) },
+        { name: "overflow / child", value: overflow == null ? "?" : Number(overflow.toFixed(5)) },
+      ],
+      champagne799View: {
+        phase,
+        phaseIndex,
+        event,
+        poured,
+        queryRow,
+        queryGlass,
+        tower: tower.map((row) => [...row]),
+        processed: processed.map((row) => [...row]),
+        currentRow,
+        currentGlass,
+        rawAmount,
+        overflow,
+        receiving: receiving.map((cell) => [...cell]),
+        operation,
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "pour",
+    phaseIndex: 0,
+    event: "intro",
+    codeLines: [3, 4],
+    title: { vi: `Rót ${poured} cup vào ly (0, 0)`, en: `Pour ${poured} cup(s) into glass (0, 0)` },
+    note: {
+      vi: "Mảng DP giữ lượng champagne thô đi vào mỗi ly. Phần vượt quá sức chứa 1 cup mới tiếp tục chảy xuống.",
+      en: "The DP table stores the raw champagne entering each glass. Only the amount beyond its one-cup capacity flows downward.",
+    },
+    rawAmount: poured,
+    operation: `tower[0][0] = ${poured}`,
+  });
+
+  for (let row = 0; row < queryRow; row += 1) {
+    for (let glass = 0; glass <= row; glass += 1) {
+      const rawAmount = tower[row][glass];
+      const overflow = Math.max(0, (rawAmount - 1) / 2);
+      snapshot({
+        phase: "inspect",
+        phaseIndex: 1,
+        event: "inspect",
+        codeLines: [6, 7, 8],
+        title: { vi: `Xét ly (${row}, ${glass})`, en: `Inspect glass (${row}, ${glass})` },
+        note: rawAmount > 1
+          ? {
+            vi: `Ly nhận ${Number(rawAmount.toFixed(5))} cup, giữ lại 1 và có ${Number((rawAmount - 1).toFixed(5))} cup dư.`,
+            en: `The glass receives ${Number(rawAmount.toFixed(5))} cups, keeps 1, and has ${Number((rawAmount - 1).toFixed(5))} cups of excess.`,
+          }
+          : {
+            vi: `Ly chỉ nhận ${Number(rawAmount.toFixed(5))} cup, chưa đầy nên không có phần tràn.`,
+            en: `The glass receives only ${Number(rawAmount.toFixed(5))} cups, so it is not over capacity and has no overflow.`,
+          },
+        currentRow: row,
+        currentGlass: glass,
+        rawAmount,
+        overflow,
+        operation: `max(0, (${Number(rawAmount.toFixed(5))} − 1) / 2) = ${Number(overflow.toFixed(5))}`,
+      });
+
+      if (overflow > 0) {
+        tower[row + 1][glass] += overflow;
+        tower[row + 1][glass + 1] += overflow;
+      }
+      processed[row][glass] = true;
+      snapshot({
+        phase: "flow",
+        phaseIndex: 2,
+        event: overflow > 0 ? "split" : "hold",
+        codeLines: overflow > 0 ? [9, 10, 11] : [9],
+        title: overflow > 0
+          ? { vi: `Chia đôi xuống hàng ${row + 1}`, en: `Split equally into row ${row + 1}` }
+          : { vi: "Không có champagne chảy xuống", en: "No champagne flows downward" },
+        note: overflow > 0
+          ? {
+            vi: `Mỗi ly con (${row + 1}, ${glass}) và (${row + 1}, ${glass + 1}) nhận thêm ${Number(overflow.toFixed(5))} cup.`,
+            en: `Each child glass, (${row + 1}, ${glass}) and (${row + 1}, ${glass + 1}), receives ${Number(overflow.toFixed(5))} more cups.`,
+          }
+          : {
+            vi: "Ly giữ toàn bộ lượng đã nhận vì lượng đó không vượt quá 1 cup.",
+            en: "The glass retains everything it received because the amount does not exceed one cup.",
+          },
+        currentRow: row,
+        currentGlass: glass,
+        rawAmount,
+        overflow,
+        receiving: overflow > 0 ? [[row + 1, glass], [row + 1, glass + 1]] : [],
+        operation: overflow > 0
+          ? `tower[${row + 1}][${glass}] += ${Number(overflow.toFixed(5))} · tower[${row + 1}][${glass + 1}] += ${Number(overflow.toFixed(5))}`
+          : "overflow = 0 → keep everything here",
+      });
+    }
+  }
+
+  const rawAnswer = tower[queryRow][queryGlass];
+  const answer = Math.min(1, rawAnswer);
+  snapshot({
+    phase: "done",
+    phaseIndex: 3,
+    event: "done",
+    codeLines: [13],
+    title: { vi: `Ly (${queryRow}, ${queryGlass}) đầy ${Number(answer.toFixed(5))}`, en: `Glass (${queryRow}, ${queryGlass}) is ${Number(answer.toFixed(5))} full` },
+    note: {
+      vi: `DP ghi nhận ${Number(rawAnswer.toFixed(5))} cup đi vào ly đích; kết quả bị chặn ở 1 vì mỗi ly chỉ chứa tối đa 1 cup.`,
+      en: `DP records ${Number(rawAnswer.toFixed(5))} cups entering the target; the result is capped at 1 because every glass holds at most one cup.`,
+    },
+    currentRow: queryRow,
+    currentGlass: queryGlass,
+    rawAmount: rawAnswer,
+    overflow: Math.max(0, (rawAnswer - 1) / 2),
+    operation: `min(1, ${Number(rawAnswer.toFixed(5))}) = ${Number(answer.toFixed(5))}`,
+    answer,
+    final: true,
+  });
+
+  return { original: [poured], poured, queryRow, queryGlass, answer, steps };
+}
+
+Object.assign(module.exports, {
+  799: {
+    id: 799,
+    difficulty: "medium",
+    slug: "champagne-tower",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" },
+      { key: "simulation", vi: "Mô phỏng", en: "Simulation" },
+    ],
+    title: { vi: "Champagne Tower", en: "Champagne Tower" },
+    titleVi: { vi: "Tháp champagne", en: "Champagne Tower" },
+    statement: {
+      vi: "Các ly xếp thành tháp, mỗi ly chứa tối đa 1 cup. Rót poured cup vào ly trên cùng; phần dư của mỗi ly chảy đều xuống hai ly ngay bên dưới. Trả về độ đầy của ly query_glass tại hàng query_row.",
+      en: "Glasses form a tower and each holds at most one cup. Pour poured cups into the top glass; each glass splits its excess evenly into the two glasses below. Return how full query_glass is in query_row.",
+    },
+    defaultInput: [4],
+    inputKind: "nonneg",
+    singleInput: true,
+    maxInput: 1000000000,
+    inputLabel: { vi: "poured (số cup đã rót)", en: "poured (cups poured)" },
+    extraParams: [
+      { key: "query_row", type: "number", label: { vi: "query_row (0–12)", en: "query_row (0–12)" }, default: 2, min: 0, max: 12 },
+      { key: "query_glass", type: "number", label: { vi: "query_glass", en: "query_glass" }, default: 1, min: 0 },
+    ],
+    approach: [
+      { vi: "Đặt toàn bộ poured vào tower[0][0]; tower[r][c] là lượng thô chảy vào ly, có thể lớn hơn 1.", en: "Put all poured champagne into tower[0][0]; tower[r][c] is the raw amount entering a glass and may exceed 1." },
+      { vi: "Với mỗi ly, phần mỗi ly con nhận là max(0, (tower[r][c] − 1) / 2).", en: "For every glass, each child receives max(0, (tower[r][c] − 1) / 2)." },
+      { vi: "Lan truyền lần lượt theo hàng tới query_row rồi trả về min(1, tower[query_row][query_glass]).", en: "Propagate row by row through query_row, then return min(1, tower[query_row][query_glass])." },
+    ],
+    complexity: {
+      time: "O(query_row²)",
+      space: "O(query_row²)",
+      note: { vi: "Có 1 + 2 + … + query_row ly cần xử lý.", en: "There are 1 + 2 + … + query_row glasses to process." },
+    },
+    code: [
+      "class Solution:",
+      "    def champagneTower(self, poured, query_row, query_glass):",
+      "        tower = [[0.0] * (query_row + 2) for _ in range(query_row + 1)]",
+      "        tower[0][0] = float(poured)",
+      "",
+      "        for row in range(query_row):",
+      "            for glass in range(row + 1):",
+      "                overflow = max(0.0, (tower[row][glass] - 1.0) / 2.0)",
+      "                if overflow > 0:",
+      "                    tower[row + 1][glass] += overflow",
+      "                    tower[row + 1][glass + 1] += overflow",
+      "",
+      "        return min(1.0, tower[query_row][query_glass])",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseChampagne799Input(input, params);
+      return [parsed.poured, parsed.queryRow, parsed.queryGlass];
+    },
+    builder: buildSteps799,
+  },
+});

@@ -8903,6 +8903,205 @@ function renderMaximumSumQueries2736View(step) {
   </section>`;
 }
 
+function renderBuildingMeet2940View(step) {
+  const view = step.buildingMeet2940View || {};
+  const vi = lang === "vi";
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const currentBuilding = Number.isInteger(view.currentBuilding) ? view.currentBuilding : -1;
+  const currentQuery = Number.isInteger(view.currentQuery) ? view.currentQuery : -1;
+  const visualQueryIndex = currentQuery >= 0 ? currentQuery : (heap[0]?.query ?? -1);
+  const activeQuery = visualQueryIndex >= 0 ? queries[visualQueryIndex] : null;
+  const maxHeight = Math.max(...heights, 1);
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Phân loại query", "2. Quét building →", "3. Heap giải query", "4. Kết quả"]
+    : ["1. Classify queries", "2. Scan buildings →", "3. Resolve with heap", "4. Results"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const canReach = (start, destination) => destination === start || (destination > start && heights[destination] > heights[start]);
+  const meeting = activeQuery && Number.isInteger(activeQuery.answer) && activeQuery.answer >= 0
+    ? activeQuery.answer
+    : -1;
+  const buildingCards = heights.map((height, index) => {
+    const alice = activeQuery && index === activeQuery.a;
+    const bob = activeQuery && index === activeQuery.b;
+    const bothCanReach = activeQuery && canReach(activeQuery.a, index) && canReach(activeQuery.b, index);
+    const classes = [
+      "bm2940-building",
+      index === currentBuilding ? "current" : "",
+      index < currentBuilding ? "scanned" : "",
+      alice ? "alice" : "",
+      bob ? "bob" : "",
+      bothCanReach ? "reachable" : "",
+      index === meeting ? "meeting" : "",
+    ].filter(Boolean).join(" ");
+    const people = `${alice ? '<i class="alice">A</i>' : ""}${bob ? '<i class="bob">B</i>' : ""}${index === meeting ? '<i class="meet">✓</i>' : ""}` || "<i></i>";
+    return `<article class="${classes}"><div class="bm2940-people">${people}</div><div class="bm2940-tower" style="--bm2940-height:${Math.max(16, Math.round((height / maxHeight) * 100))}%"><strong>${height}</strong></div><footer><small>index</small><b>${index}</b></footer></article>`;
+  }).join("");
+
+  const stateLabels = vi
+    ? { unseen: "chưa xét", waiting: "chờ tới b", heap: "trong heap", answered: "đã có đáp án", unreachable: "không thể gặp" }
+    : { unseen: "unseen", waiting: "waiting at b", heap: "in heap", answered: "answered", unreachable: "unreachable" };
+  const queryCards = queries.map((query) => {
+    const classes = ["bm2940-query", query.state, query.index === visualQueryIndex ? "current" : ""].filter(Boolean).join(" ");
+    const decision = query.kind === "same"
+      ? (vi ? "cùng vị trí" : "same start")
+      : query.kind === "direct"
+        ? `${heights[query.left]} < ${heights[query.right]}`
+        : query.kind === "offline"
+          ? `need height > ${query.threshold}`
+          : (vi ? "chưa phân loại" : "not classified");
+    return `<article class="${classes}"><header><strong>q${query.index}</strong><span>${escapeHtml(stateLabels[query.state] || query.state)}</span></header><div><span><small>A</small><b>${query.a}</b></span><i>·</i><span><small>B</small><b>${query.b}</b></span><em>→ [${query.left}, ${query.right}]</em></div><p>${escapeHtml(decision)}</p><footer><small>answer[${query.index}]</small><strong>${query.answer == null ? "?" : query.answer}</strong></footer></article>`;
+  }).join("");
+
+  const heapCards = heap.length
+    ? heap.map((item, index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? "MIN / TOP" : `heap ${index}`}</small><b>q${item.query}</b><strong>height &gt; ${item.threshold}</strong></span>`).join("")
+    : `<em>${vi ? "Heap đang trống" : "The heap is empty"}</em>`;
+  const waitingCount = queries.filter((query) => query.state === "waiting").length;
+  const answeredCount = answers.filter((answer) => answer != null).length;
+  const topQuery = heap.length ? queries[heap[0].query] : null;
+  const comparedQuery = view.comparedQuery >= 0 ? queries[view.comparedQuery] : topQuery;
+  const comparison = currentBuilding >= 0 && comparedQuery
+    ? `<section class="bm2940-compare ${heights[currentBuilding] > comparedQuery.threshold ? "pass" : "wait"}"><div><small>CURRENT HEIGHT</small><strong>${heights[currentBuilding]}</strong><span>building ${currentBuilding}</span></div><b>${heights[currentBuilding] > comparedQuery.threshold ? ">" : "≤"}</b><div><small>REQUIRED HEIGHT</small><strong>${comparedQuery.threshold}</strong><span>q${comparedQuery.index}</span></div><p>${heights[currentBuilding] > comparedQuery.threshold ? (vi ? "PASS → đây là building gặp nhau trái nhất cho query ở heap." : "PASS → this is the leftmost meeting building for the heap query.") : (vi ? "CHƯA ĐỦ CAO → query tiếp tục nằm trong heap." : "NOT TALL ENOUGH → the query remains in the heap.")}</p></section>`
+    : "";
+  const formula = view.operation || "k > right and heights[k] > threshold";
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 2940, đang xử lý ${visualQueryIndex >= 0 ? `query ${visualQueryIndex}` : "các query"}, tại building ${currentBuilding >= 0 ? currentBuilding : "chưa bắt đầu"}.`
+    : `Problem 2940, processing ${visualQueryIndex >= 0 ? `query ${visualQueryIndex}` : "queries"} at building ${currentBuilding >= 0 ? currentBuilding : "not started"}.`;
+
+  $("treeView").innerHTML = `<section class="bm2940-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>OFFLINE QUERY · MIN-HEAP · #2940</small><strong>LEFTMOST MEETING BUILDING</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="bm2940-phases">${phases}</div>
+    <section class="bm2940-rule"><b>${vi ? "KHI NÀO ĐI ĐƯỢC?" : "WHEN CAN A PERSON MOVE?"}</b><div><span><small>ĐI SANG PHẢI</small><strong>i &lt; j</strong></span><i>AND</i><span><small>TÒA ĐÍCH CAO HƠN</small><strong>heights[i] &lt; heights[j]</strong></span></div><p>${vi ? "Query khó sau khi chuẩn hóa cần tòa đầu tiên k > b và heights[k] > heights[a]." : "After normalization, a hard query needs the first k > b with heights[k] > heights[a]."}</p></section>
+    <section class="bm2940-metrics"><div><small>scan index</small><strong>${currentBuilding >= 0 ? currentBuilding : "—"}</strong></div><div><small>${vi ? "query đang nhìn" : "focused query"}</small><strong>${visualQueryIndex >= 0 ? `q${visualQueryIndex}` : "—"}</strong></div><div><small>${vi ? "đang chờ kích hoạt" : "waiting to activate"}</small><strong>${waitingCount}</strong></div><div><small>heap size</small><strong>${heap.length}</strong></div><div><small>${vi ? "đã trả lời" : "answered"}</small><strong>${answeredCount}/${queries.length}</strong></div></section>
+    <section class="bm2940-skyline"><header><strong>${vi ? "DÃY BUILDING" : "BUILDING SKYLINE"}</strong><span>${vi ? "A/B = vị trí bắt đầu · ✓ = nơi gặp" : "A/B = starting positions · ✓ = meeting"}</span></header><div style="--bm2940-count:${Math.max(heights.length, 1)}">${buildingCards}</div></section>
+    <section class="bm2940-queries"><header><strong>${vi ? "TRẠNG THÁI CÁC QUERY" : "QUERY STATES"}</strong><span>${vi ? "output luôn theo thứ tự q ban đầu" : "output stays in original query order"}</span></header><div style="--bm2940-query-count:${Math.max(queries.length, 1)}">${queryCards}</div></section>
+    <section class="bm2940-heap"><header><strong>MIN-HEAP · REQUIRED HEIGHT</strong><span>${vi ? "threshold nhỏ nhất ở đầu" : "smallest threshold first"}</span></header><div>${heapCards}</div><p>${vi ? "Chỉ query đã đi qua right endpoint mới được vào heap." : "A query enters the heap only after its right endpoint has been passed."}</p></section>
+    ${comparison}
+    <section class="bm2940-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="bm2940-result ${final ? "done" : ""}"><small>ANSWERS IN ORIGINAL QUERY ORDER</small><strong>[${answers.map((answer) => answer == null ? "?" : answer).join(", ")}]</strong><span>${final ? (vi ? "Query còn mắc trong heap nhận -1 vì không còn building nào bên phải." : "Queries left in the heap receive -1 because no buildings remain to the right.") : (vi ? "Mỗi answer được ghi về đúng query index ban đầu." : "Each answer is written back to its original query index.")}</span></footer>
+  </section>`;
+}
+
+function renderPourWater755View(step) {
+  const view = step.pourWater755View || {};
+  const vi = lang === "vi";
+  const terrain = Array.isArray(view.terrain) ? view.terrain : [];
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const water = Array.isArray(view.water) ? view.water : [];
+  const path = Array.isArray(view.path) ? view.path : [];
+  const source = Number.isInteger(view.source) ? view.source : 0;
+  const maxHeight = Math.max(1, ...heights);
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Thả giọt", "2. Tìm bên trái", "3. Tìm bên phải", "4. Giọt đọng", "5. Kết quả"]
+    : ["1. Release drop", "2. Search left", "3. Search right", "4. Settle", "5. Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const pathSet = new Set(path);
+
+  const columns = heights.map((height, index) => {
+    const classes = [
+      "pw755-column",
+      index === source ? "source" : "",
+      index === view.current ? "current" : "",
+      index === view.best ? "best" : "",
+      index === view.candidate ? "candidate" : "",
+      pathSet.has(index) ? "path" : "",
+      water[index] > 0 ? "wet" : "",
+    ].filter(Boolean).join(" ");
+    const terrainHeight = Math.max(terrain[index] > 0 ? 7 : 0, Math.round((terrain[index] / maxHeight) * 124));
+    const waterHeight = Math.max(water[index] > 0 ? 7 : 0, Math.round(((water[index] || 0) / maxHeight) * 124));
+    return `<article class="${classes}">
+      <div class="pw755-drop">${index === source ? "💧" : ""}</div>
+      <div class="pw755-stack"><i class="water" style="height:${waterHeight}px">${water[index] > 0 ? `<b>+${water[index]}</b>` : ""}</i><i class="earth" style="height:${terrainHeight}px"><b>${terrain[index]}</b></i></div>
+      <footer><small>i</small><strong>${index}</strong><span>${height}</span></footer>
+    </article>`;
+  }).join("");
+
+  const route = path.length
+    ? path.map((index, position) => `<span class="${index === view.best ? "best" : ""}"><small>${position === 0 ? "START" : view.direction === "left" ? "←" : "→"}</small><b>i=${index}</b><em>h=${heights[index]}</em></span>`).join("<i>›</i>")
+    : `<em>${vi ? "Không còn giọt đang di chuyển." : "No drop is currently moving."}</em>`;
+  const hasComparison = Number.isInteger(view.candidate) && view.candidate >= 0 && Number.isInteger(view.compared) && view.compared >= 0;
+  const comparison = hasComparison
+    ? `<section class="pw755-compare ${view.canMove ? "pass" : "blocked"}"><div><small>${vi ? "CỘT KẾ TIẾP" : "NEXT COLUMN"} · i=${view.candidate}</small><strong>${heights[view.candidate]}</strong></div><b>${view.canMove ? "≤" : ">"}</b><div><small>${vi ? "CỘT VỪA ĐI QUA" : "PREVIOUS COLUMN"} · i=${view.compared}</small><strong>${heights[view.compared]}</strong></div><p><b>${view.canMove ? (vi ? "ĐI ĐƯỢC" : "CAN MOVE") : (vi ? "BỊ CHẶN" : "BLOCKED")}</b><span>${view.canMove ? (vi ? "Giọt không phải leo lên nên có thể tiếp tục." : "The drop does not climb, so it may continue.") : (vi ? "Giọt không thể chảy lên một cột cao hơn." : "The drop cannot flow uphill onto a taller column.")}</span></p></section>`
+    : "";
+  const totalWater = water.reduce((sum, amount) => sum + amount, 0);
+  const final = Boolean(view.final);
+
+  $("treeView").innerHTML = `<section class="pw755-viz" role="img" aria-label="Pour Water simulation, drop ${view.dropNumber || 0} of ${view.volume || 0}">
+    <header><div><small>GREEDY SIMULATION · #755</small><strong>POUR WATER</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="pw755-phases">${phases}</div>
+    <section class="pw755-rule"><b>${vi ? "THỨ TỰ ƯU TIÊN CỦA MỖI GIỌT" : "PRIORITY FOR EACH DROP"}</b><div><span><small>1</small><strong>${vi ? "Chỗ thấp hơn bên trái" : "Lower place on the left"}</strong></span><i>→</i><span><small>2</small><strong>${vi ? "Chỗ thấp hơn bên phải" : "Lower place on the right"}</strong></span><i>→</i><span><small>3</small><strong>${vi ? "Nằm lại tại k" : "Stay at k"}</strong></span></div></section>
+    <section class="pw755-metrics"><div><small>${vi ? "giọt hiện tại" : "current drop"}</small><strong>${view.dropNumber || 0}/${view.volume || 0}</strong></div><div><small>source k</small><strong>${source}</strong></div><div><small>direction</small><strong>${String(view.direction || "—").toUpperCase()}</strong></div><div><small>best index</small><strong>${Number.isInteger(view.best) ? view.best : "—"}</strong></div><div><small>${vi ? "nước đã đọng" : "settled water"}</small><strong>${totalWater}</strong></div></section>
+    <section class="pw755-terrain"><header><strong>${vi ? "MẶT CẮT ĐỊA HÌNH" : "TERRAIN CROSS-SECTION"}</strong><span>${vi ? "nâu = đất · xanh = nước · viền tím = best" : "brown = terrain · blue = water · purple edge = best"}</span></header><div style="--pw755-count:${Math.max(terrain.length, 1)}">${columns}</div></section>
+    <section class="pw755-route"><header><strong>${vi ? "ĐƯỜNG ĐI CỦA GIỌT" : "DROP ROUTE"}</strong><span>${vi ? "best chỉ đổi khi tìm thấy độ cao thấp hơn" : "best changes only at a strictly lower height"}</span></header><div>${route}</div></section>
+    ${comparison}
+    <section class="pw755-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(view.operation || "release at k")}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="pw755-result ${final ? "done" : ""}"><small>FINAL HEIGHTS</small><strong>[${heights.join(", ")}]</strong><span>${final ? (vi ? `Đã đặt đủ ${view.volume} giọt.` : `All ${view.volume} drops have settled.`) : (vi ? "Mỗi lần đọng làm chiều cao tại vị trí đó tăng 1." : "Each settled drop increases that position by one.")}</span></footer>
+  </section>`;
+}
+
+function renderChampagne799View(step) {
+  const view = step.champagne799View || {};
+  const vi = lang === "vi";
+  const tower = Array.isArray(view.tower) ? view.tower : [];
+  const processed = Array.isArray(view.processed) ? view.processed : [];
+  const receiving = new Set((view.receiving || []).map((cell) => `${cell[0]}:${cell[1]}`));
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Rót vào đỉnh", "2. Xét từng ly", "3. Chia phần tràn", "4. Đọc đáp án"]
+    : ["1. Pour at top", "2. Inspect glasses", "3. Split overflow", "4. Read answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const format = (amount) => {
+    if (!Number.isFinite(amount)) return "0";
+    const rounded = Number(amount.toFixed(3));
+    return String(rounded);
+  };
+
+  const rows = tower.map((row, rowIndex) => {
+    const glasses = row.map((amount, glassIndex) => {
+      const fill = Math.max(0, Math.min(100, amount * 100));
+      const isCurrent = rowIndex === view.currentRow && glassIndex === view.currentGlass;
+      const isQuery = rowIndex === view.queryRow && glassIndex === view.queryGlass;
+      const classes = [
+        "ct799-glass",
+        processed[rowIndex]?.[glassIndex] ? "processed" : "",
+        isCurrent ? "current" : "",
+        isQuery ? "query" : "",
+        receiving.has(`${rowIndex}:${glassIndex}`) ? "receiving" : "",
+        amount >= 1 ? "full" : amount > 0 ? "partial" : "empty",
+      ].filter(Boolean).join(" ");
+      return `<article class="${classes}"><div class="ct799-cup"><i style="height:${fill}%"></i><b>${format(Math.min(1, amount))}</b></div><footer><small>(${rowIndex},${glassIndex})</small><span>raw ${format(amount)}</span></footer></article>`;
+    }).join("");
+    return `<div class="ct799-row"><small>ROW ${rowIndex}</small><div>${glasses}</div></div>`;
+  }).join("");
+
+  const hasCurrent = Number.isInteger(view.currentRow) && view.currentRow >= 0;
+  const rawAmount = Number.isFinite(view.rawAmount) ? view.rawAmount : 0;
+  const overflow = Number.isFinite(view.overflow) ? view.overflow : 0;
+  const calculation = hasCurrent
+    ? `<section class="ct799-calc ${overflow > 0 ? "overflow" : "hold"}"><div><small>RAW IN</small><strong>${format(rawAmount)}</strong><span>cup</span></div><b>− 1</b><div><small>${vi ? "PHẦN DƯ" : "EXCESS"}</small><strong>${format(Math.max(0, rawAmount - 1))}</strong><span>cup</span></div><b>÷ 2</b><div><small>${vi ? "MỖI LY CON" : "EACH CHILD"}</small><strong>${format(overflow)}</strong><span>cup</span></div></section>`
+    : "";
+  const filledCount = tower.flat().filter((amount) => amount >= 1).length;
+  const final = Boolean(view.final);
+  const shownAnswer = final ? format(view.answer) : "…";
+
+  $("treeView").innerHTML = `<section class="ct799-viz" role="img" aria-label="Champagne Tower visualization for row ${view.queryRow}, glass ${view.queryGlass}">
+    <header><div><small>DYNAMIC PROGRAMMING · FLOW SIMULATION · #799</small><strong>CHAMPAGNE TOWER</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ct799-phases">${phases}</div>
+    <section class="ct799-rule"><b>${vi ? "MỖI LY CHỈ GIỮ 1 CUP" : "EACH GLASS HOLDS ONE CUP"}</b><div><span><small>RAW AMOUNT</small><strong>tower[r][c]</strong></span><i>→</i><span><small>OVERFLOW TO EACH CHILD</small><strong>max(0, (raw − 1) / 2)</strong></span></div></section>
+    <section class="ct799-metrics"><div><small>poured</small><strong>${view.poured ?? 0}</strong></div><div><small>target</small><strong>(${view.queryRow}, ${view.queryGlass})</strong></div><div><small>${vi ? "ly hiện tại" : "current glass"}</small><strong>${hasCurrent ? `(${view.currentRow}, ${view.currentGlass})` : "—"}</strong></div><div><small>${vi ? "ly đầy" : "full glasses"}</small><strong>${filledCount}</strong></div></section>
+    <section class="ct799-tower"><header><strong>${vi ? "THÁP CHAMPAGNE" : "CHAMPAGNE TOWER"}</strong><span>${vi ? "viền tím = ly đích · xanh sáng = đang nhận" : "purple edge = target · bright blue = receiving"}</span></header><div>${rows}</div></section>
+    ${calculation}
+    <section class="ct799-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(view.operation || "tower[0][0] = poured")}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="ct799-result ${final ? "done" : ""}"><small>FULLNESS AT (${view.queryRow}, ${view.queryGlass})</small><strong>${shownAnswer}</strong><span>${final ? (vi ? "Kết quả luôn nằm trong đoạn [0, 1]." : "The result is always capped to [0, 1].") : (vi ? "Xử lý xong một hàng trước khi đi xuống hàng tiếp theo." : "Finish one row before moving to the next.")}</span></footer>
+  </section>`;
+}
+
 function renderMaximizeScore2818View(step) {
   const view = step.maximizeScore2818View || {};
   const vi = lang === "vi";
@@ -26696,6 +26895,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMaximumSumQueries2736View(step);
+  } else if (step.buildingMeet2940View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBuildingMeet2940View(step);
+  } else if (step.pourWater755View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPourWater755View(step);
+  } else if (step.champagne799View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderChampagne799View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
