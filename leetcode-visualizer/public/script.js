@@ -20,6 +20,7 @@ let catalogJumpHighlightTimer = null;
 let codeSnippetBlurred = true;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
+const CODE_SNIPPET_BLURRED_KEY = "leetcodeCodeSnippetBlurred";
 
 // ---- UI strings by language ----
 const I18N = {
@@ -27683,6 +27684,7 @@ function formatPythonRuntimeError(err) {
 
 // Initialize
 applyStaticStrings();
+setCodeSnippetBlurred(readCodeSnippetBlurPreference());
 loadCatalog();
 
 // Restore last opened problem from localStorage
@@ -29000,7 +29002,7 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
-  setCodeSnippetBlurred(true);
+  setCodeSnippetBlurred(readCodeSnippetBlurPreference());
   clearTimeout(liveCopyResetTimer);
   liveCopyResetTimer = null;
   if ($("liveCopyBtn")) {
@@ -29026,7 +29028,7 @@ function setLiveMode(on) {
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
   if (!on) {
-    setCodeSnippetBlurred(true);
+    setCodeSnippetBlurred(readCodeSnippetBlurPreference());
     // Restore the canned visualization exactly as it was before entering live mode.
     renderCode();
     if (problemData) {
@@ -29045,15 +29047,20 @@ function updateCodeBlurButton() {
   button.dataset.tooltip = label;
 }
 
-function setCodeSnippetBlurred(on) {
+function readCodeSnippetBlurPreference() {
+  return localStorage.getItem(CODE_SNIPPET_BLURRED_KEY) !== "false";
+}
+
+function setCodeSnippetBlurred(on, persist = false) {
   codeSnippetBlurred = Boolean(on);
   const panel = $("codePanel");
   if (panel) panel.classList.toggle("is-blurred", codeSnippetBlurred);
+  if (persist) localStorage.setItem(CODE_SNIPPET_BLURRED_KEY, String(codeSnippetBlurred));
   updateCodeBlurButton();
 }
 
 $("codeBlurBtn") && $("codeBlurBtn").addEventListener("click", () => {
-  setCodeSnippetBlurred(!codeSnippetBlurred);
+  setCodeSnippetBlurred(!codeSnippetBlurred, true);
 });
 
 $("liveEditBtn") && $("liveEditBtn").addEventListener("click", async () => {
