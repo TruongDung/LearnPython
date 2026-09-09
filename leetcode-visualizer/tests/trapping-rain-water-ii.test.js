@@ -13,7 +13,7 @@ const examples = [
 ];
 
 test('407 returns the expected water for examples and simple basins', () => {
-  assert.equal(problem.debugMode, 'semantic');
+  assert.equal(problem.debugMode, 'line-by-line');
   for (const example of examples) {
     const result = problem.builder(example.input);
     assert.equal(result.answer, example.answer);
@@ -76,4 +76,23 @@ test('407 clearer renderer covers every phase in English and Vietnamese', () => 
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
+});
+
+test('407 expands semantic snapshots so only one code line is active per debug step', () => {
+  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const start = source.indexOf('function shouldUseLineByLineDebug()');
+  const end = source.indexOf('\n// ---- Run algorithm ----', start);
+  const context = {
+    problemData: { id: 407, debugMode: problem.debugMode },
+    debugBreakpoints: new Set(),
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(start, end), context);
+
+  const raw = problem.builder(examples[0].input).steps;
+  const expanded = context.expandStepsLineByLine(raw);
+  assert.equal(context.shouldUseLineByLineDebug(), true);
+  assert.ok(expanded.length > raw.length);
+  assert.ok(expanded.every(step => !step.codeLines || step.codeLines.length <= 1));
+  assert.equal(expanded.filter(step => step.final).length, 1);
 });

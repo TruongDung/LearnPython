@@ -18401,7 +18401,7 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Bản đồ độ cao (hàng cách ;)", en: "Elevation map (rows separated by ;)" },
     extraParams: [],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     approach: [
       { vi: "Tưởng tượng đi từ NGOÀI bản đồ vào: mọi đường nước thoát ra ngoài đều phải qua một ô biên, nên đưa toàn bộ biên vào heap trước.", en: "Imagine moving inward from OUTSIDE the map: every escape path crosses a border cell, so seed the heap with the entire border." },
       { vi: "Heap là vòng biên đang chờ quanh vùng chưa thấy. Luôn pop ô có mức thấp nhất — đường nước dễ thoát nhất hiện tại.", en: "The heap is the waiting boundary around unseen land. Always pop its lowest cell—the easiest current escape route." },
