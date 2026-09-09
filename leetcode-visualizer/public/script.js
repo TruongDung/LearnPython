@@ -8077,6 +8077,78 @@ function renderCountCommas3870View(step) {
   </section>`;
 }
 
+function renderCountCommas3871View(step) {
+  const view = step.countCommas3871View || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const layers = Array.isArray(view.layers) ? view.layers : [];
+  const formatNumber = (value) => Number(value).toLocaleString("en-US");
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Nhìn quy luật", "2. Kiểm tra mốc", "3. Cộng một tầng", "4. Kết quả"]
+    : ["1. See the pattern", "2. Check threshold", "3. Add one layer", "4. Answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const groups = formatNumber(n).split(",");
+  const numberGroups = groups.map((group, index) => `${index ? '<i aria-hidden="true">,</i>' : ""}<span class="${index === 0 ? "leading" : ""}"><small>${index === 0 ? (vi ? "nhóm đầu" : "leading group") : `${vi ? "nhóm" : "group"} ${index}`}</small><strong>${escapeHtml(group)}</strong></span>`).join("");
+  const commaCountInN = Math.max(0, groups.length - 1);
+
+  const layerRows = layers.map((layer) => {
+    const statusText = {
+      pending: vi ? "chờ" : "waiting",
+      checking: vi ? "đang kiểm tra" : "checking",
+      adding: vi ? "đang cộng" : "adding",
+      blocked: vi ? "chưa đạt" : "not reached",
+      done: vi ? "đã cộng" : "added",
+      skipped: vi ? "bỏ qua" : "skipped",
+    }[layer.status] || "";
+    const range = layer.reached
+      ? `[${formatNumber(layer.threshold)}, ${formatNumber(n)}]`
+      : "∅";
+    const contribution = layer.reached ? `+${formatNumber(layer.contribution)}` : "+0";
+    return `<article class="cc3871-layer ${escapeHtml(layer.status || "pending")}">
+      <div class="cc3871-layer-index"><small>${vi ? "TẦNG" : "LAYER"}</small><strong>+1</strong><span>${vi ? `dấu phẩy thứ ${layer.commaNumber}` : `comma #${layer.commaNumber}`}</span></div>
+      <div class="cc3871-threshold"><small>threshold</small><strong>${formatNumber(layer.threshold)}</strong><span>n ${layer.reached ? "≥" : "<"} threshold</span></div>
+      <div class="cc3871-range"><small>${vi ? "ĐOẠN ĐÓNG GÓP" : "CONTRIBUTING RANGE"}</small><strong>${escapeHtml(range)}</strong><span>${layer.reached ? `${formatNumber(layer.contribution)} ${vi ? "số" : "values"} × 1` : (vi ? "không có số nào" : "no values")}</span></div>
+      <div class="cc3871-contribution"><small>${escapeHtml(statusText)}</small><strong>${escapeHtml(contribution)}</strong></div>
+    </article>`;
+  }).join("");
+
+  let formula = "total = 0, threshold = 1,000";
+  if (view.event === "check" && view.currentIndex >= 0) {
+    const threshold = layers[view.currentIndex]?.threshold || 1000;
+    formula = `${formatNumber(threshold)} ≤ ${formatNumber(n)} → ${view.condition ? "TRUE" : "FALSE"}`;
+  } else if (view.event === "add" && view.currentIndex >= 0) {
+    const threshold = layers[view.currentIndex]?.threshold || 1000;
+    formula = `${formatNumber(view.before)} + (${formatNumber(n)} − ${formatNumber(threshold)} + 1) = ${formatNumber(view.total)}`;
+  } else if (view.event === "answer") {
+    formula = `return ${formatNumber(view.answer)}`;
+  }
+  const currentThreshold = view.currentIndex >= 0 ? layers[view.currentIndex]?.threshold : null;
+  const currentHint = view.event === "add"
+    ? (vi ? "Mỗi số từ threshold đến n nhận thêm đúng 1 dấu phẩy." : "Every value from threshold through n receives exactly 1 extra comma.")
+    : view.event === "check" && view.condition === false
+      ? (vi ? "Dừng: các mốc sau còn lớn hơn nữa." : "Stop: every later threshold is even larger.")
+      : (vi ? "Mỗi mốc lũy thừa của 1,000 là một tầng độc lập." : "Each power-of-1,000 threshold is an independent layer.");
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 3871 với n bằng ${formatNumber(n)}. Tổng hiện tại ${formatNumber(view.total)} dấu phẩy.`
+    : `Problem 3871 with n ${formatNumber(n)}. Current total ${formatNumber(view.total)} commas.`;
+
+  $("treeView").innerHTML = `<section class="cc3871-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>COUNTING · #3871</small><strong>COUNT COMMAS IN RANGE II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cc3871-phases">${phases}</div>
+    <section class="cc3871-number">
+      <header><strong>n = ${formatNumber(n)}</strong><span>${commaCountInN} ${vi ? "dấu phẩy trong riêng số n" : "comma(s) in n itself"}</span></header>
+      <div class="cc3871-number-groups">${numberGroups}</div>
+    </section>
+    <section class="cc3871-rule"><small>${vi ? "CÔNG THỨC TẦNG" : "LAYER FORMULA"}</small><strong>contribution = max(0, n − threshold + 1)</strong><span>${vi ? "Đạt thêm một mốc → mọi số từ mốc đó đến n có thêm một dấu phẩy." : "Reaching one more threshold gives every value from there through n one extra comma."}</span></section>
+    <section class="cc3871-layers"><header><strong>${vi ? "5 MỐC CÓ THỂ CÓ" : "5 POSSIBLE THRESHOLDS"}</strong><span>1,000 → 1,000,000 → … → 10<sup>15</sup></span></header><div>${layerRows}</div></section>
+    <section class="cc3871-calculation ${final ? "done" : ""}"><div><small>${vi ? "PHÉP TÍNH HIỆN TẠI" : "CURRENT CALCULATION"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(currentHint)}${currentThreshold ? ` ${vi ? "Mốc" : "Threshold"}: ${formatNumber(currentThreshold)}.` : ""}</span></div><aside><small>total</small><strong>${formatNumber(view.total)}</strong></aside></section>
+    <footer class="cc3871-answer ${final ? "done" : ""}"><code>Σ max(0, n − 10<sup>3k</sup> + 1)</code><span><small>ANSWER</small><strong>${final ? formatNumber(view.answer) : "?"}</strong></span></footer>
+  </section>`;
+}
+
 function renderStable3903View(step) {
   const view = step.stable3903View || {};
   const vi = lang === "vi";
@@ -26642,6 +26714,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCountCommas3870View(step);
+  } else if (step.countCommas3871View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountCommas3871View(step);
   } else if (step.stable3903View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -44605,6 +44605,149 @@ html, body {
   .mc731-coverage-row { grid-template-columns:1fr; gap:4px; }
 }
 
+/* LeetCode 3871: Count Commas in Range II */
+.cc3871-viz {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
+  box-sizing: border-box;
+  color: #172033;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+.cc3871-viz * { box-sizing: border-box; }
+.cc3871-viz > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.cc3871-viz > header > div { display: grid; gap: 4px; }
+.cc3871-viz > header small { color: #7c3aed; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.cc3871-viz > header strong { color: #0f172a; font-size: 19px; line-height: 1.2; }
+.cc3871-viz > header > span { max-width: 45%; color: #475569; font-size: 12px; font-weight: 750; text-align: right; }
+
+.cc3871-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; }
+.cc3871-phases span { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 7px; color: #64748b; background: #fff; border-right: 1px solid #e2e8f0; font-size: 10px; font-weight: 800; text-align: center; }
+.cc3871-phases span:last-child { border-right: 0; }
+.cc3871-phases b { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border-radius: 50%; background: #94a3b8; color: #fff; }
+.cc3871-phases span.active { color: #5b21b6; background: #ede9fe; }
+.cc3871-phases span.active b { background: #7c3aed; }
+.cc3871-phases span.done { color: #166534; background: #f0fdf4; }
+.cc3871-phases span.done b { background: #16a34a; }
+
+.cc3871-number,
+.cc3871-layers { display: grid; gap: 10px; padding: 13px; background: #fff; border: 1px solid #cbd5e1; border-radius: 9px; }
+.cc3871-number > header,
+.cc3871-layers > header { display: flex; justify-content: space-between; gap: 12px; color: #475569; font-size: 11px; }
+.cc3871-number > header strong,
+.cc3871-layers > header strong { color: #0f172a; font-size: 11px; letter-spacing: .06em; }
+.cc3871-number-groups { display: flex; align-items: end; justify-content: center; gap: 6px; min-width: 0; overflow-x: auto; padding: 6px; }
+.cc3871-number-groups > span { display: grid; min-width: 58px; padding: 8px; place-items: center; border: 1px solid #a78bfa; border-radius: 7px; background: #f5f3ff; }
+.cc3871-number-groups > span small { color: #6d28d9; font-size: 8px; font-weight: 800; }
+.cc3871-number-groups > span strong { color: #4c1d95; font: 900 20px Consolas, monospace; }
+.cc3871-number-groups > i { color: #7c3aed; font: 900 25px Consolas, monospace; }
+
+.cc3871-rule { display: grid; grid-template-columns: auto minmax(220px, auto) 1fr; align-items: center; gap: 8px 14px; padding: 12px; border: 1px solid #f59e0b; border-left-width: 5px; border-radius: 8px; background: #fffbeb; }
+.cc3871-rule small { color: #92400e; font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.cc3871-rule strong { color: #78350f; font: 900 13px Consolas, monospace; }
+.cc3871-rule span { color: #713f12; font-size: 11px; line-height: 1.45; }
+
+.cc3871-layers > div { display: grid; gap: 7px; }
+.cc3871-layer { display: grid; grid-template-columns: 88px minmax(130px, 1fr) minmax(160px, 1.45fr) 88px; align-items: stretch; gap: 7px; padding: 7px; border: 1px solid #dbe3ef; border-radius: 8px; background: #f8fafc; opacity: .68; }
+.cc3871-layer > div { display: grid; align-content: center; gap: 3px; min-width: 0; padding: 7px; border-radius: 6px; background: #fff; }
+.cc3871-layer small { color: #64748b; font-size: 8px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.cc3871-layer strong { color: #0f172a; font: 800 12px Consolas, monospace; overflow-wrap: anywhere; }
+.cc3871-layer span { color: #64748b; font-size: 9px; }
+.cc3871-layer-index { text-align: center; }
+.cc3871-layer-index strong { color: #7c3aed; font-size: 20px; }
+.cc3871-contribution { text-align: center; }
+.cc3871-contribution strong { color: #64748b; font-size: 15px; }
+.cc3871-layer.checking,
+.cc3871-layer.adding { border-color: #8b5cf6; background: #ede9fe; opacity: 1; box-shadow: 0 0 0 1px rgba(124, 58, 237, .16); }
+.cc3871-layer.adding .cc3871-contribution strong { color: #6d28d9; }
+.cc3871-layer.done { border-color: #86efac; background: #f0fdf4; opacity: 1; }
+.cc3871-layer.done .cc3871-contribution strong { color: #15803d; }
+.cc3871-layer.blocked { border-style: dashed; border-color: #f59e0b; background: #fffbeb; opacity: 1; }
+.cc3871-layer.blocked .cc3871-contribution strong { color: #b45309; }
+.cc3871-layer.skipped { opacity: .38; }
+
+.cc3871-calculation { display: grid; grid-template-columns: minmax(0, 1fr) 105px; gap: 10px; padding: 12px; border: 1px solid #8b5cf6; border-left-width: 5px; border-radius: 8px; background: #f5f3ff; }
+.cc3871-calculation > div { display: grid; align-content: center; gap: 5px; min-width: 0; }
+.cc3871-calculation small { color: #6d28d9; font-size: 9px; font-weight: 900; letter-spacing: .07em; }
+.cc3871-calculation > div strong { color: #4c1d95; font: 900 14px Consolas, monospace; overflow-wrap: anywhere; }
+.cc3871-calculation > div span { color: #475569; font-size: 10px; line-height: 1.45; }
+.cc3871-calculation aside { display: grid; place-items: center; align-content: center; padding: 8px; border: 1px solid #c4b5fd; border-radius: 7px; background: #fff; }
+.cc3871-calculation aside strong { color: #4c1d95; font: 900 17px Consolas, monospace; overflow-wrap: anywhere; }
+.cc3871-calculation.done { border-color: #22c55e; background: #f0fdf4; }
+.cc3871-calculation.done > div strong,
+.cc3871-calculation.done aside strong { color: #166534; }
+
+.cc3871-answer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+.cc3871-answer code { color: #6d28d9; font-size: 12px; font-weight: 850; }
+.cc3871-answer > span { display: flex; align-items: baseline; gap: 9px; }
+.cc3871-answer small { color: #64748b; font-size: 9px; font-weight: 900; }
+.cc3871-answer strong { color: #0f172a; font: 900 17px Consolas, monospace; }
+.cc3871-answer.done { border-color: #22c55e; background: #dcfce7; }
+.cc3871-answer.done strong { color: #14532d; }
+.tree-view:has(> .cc3871-viz) { min-width: 0; }
+
+[data-theme="dark"] .cc3871-viz { color: #e2e8f0; background: #0f172a; border-color: #475569; }
+[data-theme="dark"] .cc3871-viz > header strong,
+[data-theme="dark"] .cc3871-number > header strong,
+[data-theme="dark"] .cc3871-layers > header strong,
+[data-theme="dark"] .cc3871-layer strong,
+[data-theme="dark"] .cc3871-answer strong { color: #f8fafc; }
+[data-theme="dark"] .cc3871-viz > header > span,
+[data-theme="dark"] .cc3871-number > header,
+[data-theme="dark"] .cc3871-layers > header,
+[data-theme="dark"] .cc3871-layer span,
+[data-theme="dark"] .cc3871-calculation > div span { color: #cbd5e1; }
+[data-theme="dark"] .cc3871-phases,
+[data-theme="dark"] .cc3871-number,
+[data-theme="dark"] .cc3871-layers,
+[data-theme="dark"] .cc3871-answer { background: #111827; border-color: #475569; }
+[data-theme="dark"] .cc3871-phases span,
+[data-theme="dark"] .cc3871-layer,
+[data-theme="dark"] .cc3871-layer > div,
+[data-theme="dark"] .cc3871-calculation aside { background: #1e293b; border-color: #475569; }
+[data-theme="dark"] .cc3871-phases span.active,
+[data-theme="dark"] .cc3871-layer.checking,
+[data-theme="dark"] .cc3871-layer.adding { color: #ddd6fe; background: #2e1065; border-color: #8b5cf6; }
+[data-theme="dark"] .cc3871-phases span.done,
+[data-theme="dark"] .cc3871-layer.done,
+[data-theme="dark"] .cc3871-calculation.done,
+[data-theme="dark"] .cc3871-answer.done { color: #bbf7d0; background: #052e16; border-color: #22c55e; }
+[data-theme="dark"] .cc3871-layer.blocked { background: #451a03; border-color: #f59e0b; }
+[data-theme="dark"] .cc3871-number-groups > span { background: #2e1065; border-color: #8b5cf6; }
+[data-theme="dark"] .cc3871-number-groups > span strong { color: #ede9fe; }
+[data-theme="dark"] .cc3871-rule { background: #451a03; border-color: #f59e0b; }
+[data-theme="dark"] .cc3871-rule strong { color: #fde68a; }
+[data-theme="dark"] .cc3871-rule span { color: #fef3c7; }
+[data-theme="dark"] .cc3871-calculation { background: #2e1065; border-color: #8b5cf6; }
+[data-theme="dark"] .cc3871-calculation > div strong,
+[data-theme="dark"] .cc3871-calculation aside strong { color: #ede9fe; }
+[data-theme="dark"] .cc3871-answer code { color: #c4b5fd; }
+[data-theme="dark"] .cc3871-answer.done strong { color: #bbf7d0; }
+
+@media (max-width: 760px) {
+  .cc3871-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc3871-phases span:nth-child(2) { border-right: 0; }
+  .cc3871-phases span:nth-child(-n+2) { border-bottom: 1px solid #cbd5e1; }
+  .cc3871-rule { grid-template-columns: 1fr; }
+  .cc3871-layer { grid-template-columns: 74px minmax(120px, 1fr) minmax(145px, 1.35fr) 78px; min-width: 520px; }
+  .cc3871-layers > div { overflow-x: auto; }
+}
+
+@media (max-width: 500px) {
+  .cc3871-viz { padding: 11px 8px; }
+  .cc3871-viz > header { flex-direction: column; gap: 6px; }
+  .cc3871-viz > header > span { max-width: none; text-align: left; }
+  .cc3871-number > header,
+  .cc3871-layers > header,
+  .cc3871-answer { align-items: flex-start; flex-direction: column; }
+  .cc3871-calculation { grid-template-columns: 1fr; }
+  .cc3871-calculation aside { min-height: 58px; }
+}
+
 /* LeetCode 3870: Count Commas in Range */
 .cc3870-viz { container-type:inline-size; display:grid; gap:16px; width:100%; min-width:0; padding:20px; color:#172033; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; }
 .cc3870-viz * { box-sizing:border-box; letter-spacing:0; }

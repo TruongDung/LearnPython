@@ -1341,6 +1341,153 @@ function buildSteps3870(input) {
 }
 
 /**
+ * LeetCode 3871: Count Commas in Range II.
+ * Every threshold 10^(3k) contributes one additional comma to each value
+ * in the inclusive range [10^(3k), n].
+ */
+function buildSteps3871(input) {
+  if (Array.isArray(input) && input.length !== 1) {
+    throw new Error("n must contain exactly one integer");
+  }
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isSafeInteger(n) || n < 1 || n > 1000000000000000) {
+    throw new Error("n must be an integer from 1 to 10^15");
+  }
+
+  const thresholds = [1000, 1000000, 1000000000, 1000000000000, 1000000000000000];
+  const layers = thresholds.map((threshold, index) => ({
+    index,
+    threshold,
+    commaNumber: index + 1,
+    reached: n >= threshold,
+    contribution: Math.max(0, n - threshold + 1),
+  }));
+  const answer = layers.reduce((sum, layer) => sum + layer.contribution, 0);
+  const steps = [];
+  let total = 0;
+
+  function layerSnapshot(currentIndex, event, processedCount, condition) {
+    return layers.map((layer, index) => {
+      let status = "pending";
+      if (event === "answer") status = layer.reached ? "done" : "skipped";
+      else if (index < processedCount) status = "done";
+      else if (index === currentIndex) {
+        status = event === "add" ? "adding" : condition === false ? "blocked" : "checking";
+      }
+      return { ...layer, status };
+    });
+  }
+
+  function addStep({ event, phaseIndex, title, note, codeLines, currentIndex = -1, processedCount = 0, condition = null, contribution = 0, before = total, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [n],
+      sub: ["n"],
+      highlight: final ? [] : [0],
+      mark: final ? [0] : [],
+      vars: [
+        { name: "n", value: n },
+        { name: "threshold", value: currentIndex >= 0 ? thresholds[currentIndex] : 1000 },
+        { name: "contribution", value: event === "add" ? contribution : "?" },
+        { name: "total", value: total },
+      ],
+      countCommas3871View: {
+        event,
+        phaseIndex,
+        n,
+        currentIndex,
+        processedCount,
+        condition,
+        contribution,
+        before,
+        total,
+        answer,
+        layers: layerSnapshot(currentIndex, event, processedCount, condition),
+        final,
+      },
+    });
+  }
+
+  addStep({
+    event: "setup",
+    phaseIndex: 0,
+    title: { vi: `Bắt đầu với n = ${n.toLocaleString("en-US")}`, en: `Start with n = ${n.toLocaleString("en-US")}` },
+    note: {
+      vi: "Mỗi mốc 1,000^k tạo thêm một dấu phẩy cho tất cả số từ mốc đó đến n. Ta chỉ cần duyệt tối đa 5 mốc, không duyệt từng số.",
+      en: "Each 1,000^k threshold adds one more comma to every value from that threshold through n. We scan at most five thresholds, never every number.",
+    },
+    codeLines: [3, 4],
+  });
+
+  let processedCount = 0;
+  for (let index = 0; index < layers.length; index++) {
+    const layer = layers[index];
+    const reached = layer.reached;
+    addStep({
+      event: "check",
+      phaseIndex: 1,
+      currentIndex: index,
+      processedCount,
+      condition: reached,
+      title: reached
+        ? { vi: `${n.toLocaleString("en-US")} đã chạm mốc ${layer.threshold.toLocaleString("en-US")}`, en: `${n.toLocaleString("en-US")} reaches ${layer.threshold.toLocaleString("en-US")}` }
+        : { vi: `${n.toLocaleString("en-US")} chưa chạm mốc ${layer.threshold.toLocaleString("en-US")}`, en: `${n.toLocaleString("en-US")} does not reach ${layer.threshold.toLocaleString("en-US")}` },
+      note: reached
+        ? {
+            vi: `Mọi số trong [${layer.threshold.toLocaleString("en-US")}, ${n.toLocaleString("en-US")}] đều có ít nhất ${layer.commaNumber} dấu phẩy, nên mốc này có đóng góp.`,
+            en: `Every value in [${layer.threshold.toLocaleString("en-US")}, ${n.toLocaleString("en-US")}] has at least ${layer.commaNumber} comma(s), so this layer contributes.`,
+          }
+        : {
+            vi: "Mốc này chưa đạt; mọi mốc lớn hơn cũng chưa đạt, nên dừng vòng lặp.",
+            en: "This threshold is not reached; every larger threshold is also unreachable, so the loop stops.",
+          },
+      codeLines: [5],
+    });
+    if (!reached) break;
+
+    const before = total;
+    total += layer.contribution;
+    processedCount = index + 1;
+    addStep({
+      event: "add",
+      phaseIndex: 2,
+      currentIndex: index,
+      processedCount,
+      condition: true,
+      contribution: layer.contribution,
+      before,
+      title: { vi: `Cộng ${layer.contribution.toLocaleString("en-US")} từ mốc này`, en: `Add ${layer.contribution.toLocaleString("en-US")} from this layer` },
+      note: {
+        vi: `Đoạn đóng [${layer.threshold.toLocaleString("en-US")}, ${n.toLocaleString("en-US")}] có ${n.toLocaleString("en-US")} - ${layer.threshold.toLocaleString("en-US")} + 1 = ${layer.contribution.toLocaleString("en-US")} số. Mỗi số đóng góp thêm đúng 1 dấu phẩy ở tầng này.`,
+        en: `The inclusive range [${layer.threshold.toLocaleString("en-US")}, ${n.toLocaleString("en-US")}] contains ${n.toLocaleString("en-US")} - ${layer.threshold.toLocaleString("en-US")} + 1 = ${layer.contribution.toLocaleString("en-US")} values. Each contributes exactly one extra comma at this layer.`,
+      },
+      codeLines: [6, 7],
+    });
+  }
+
+  addStep({
+    event: "answer",
+    phaseIndex: 3,
+    currentIndex: -1,
+    processedCount,
+    contribution: 0,
+    before: total,
+    final: true,
+    title: { vi: `Trả về ${answer.toLocaleString("en-US")}`, en: `Return ${answer.toLocaleString("en-US")}` },
+    note: {
+      vi: `Cộng đóng góp của ${processedCount} mốc đã đạt được tổng cộng ${answer.toLocaleString("en-US")} dấu phẩy.`,
+      en: `Adding the contributions from ${processedCount} reached threshold(s) gives ${answer.toLocaleString("en-US")} commas in total.`,
+    },
+    codeLines: [8],
+  });
+
+  return { original: n, n, answer, steps };
+}
+
+/**
  * LeetCode 3312: Sorted GCD Pair Queries.
  *
  * Key idea:
@@ -4180,6 +4327,50 @@ module.exports = {
       "        return numbers_with_comma",
     ],
     builder: buildSteps3870,
+  },
+  3871: {
+    id: 3871,
+    difficulty: "medium",
+    slug: "count-commas-in-range-ii",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [{ key: "counting", vi: "Đếm", en: "Counting" }],
+    title: { vi: "Count Commas in Range II", en: "Count Commas in Range II" },
+    titleVi: { vi: "Đếm dấu phẩy theo từng mốc nghìn", en: "Count commas by thousand-power thresholds" },
+    statement: {
+      vi: "Cho số nguyên n. Trả về tổng số dấu phẩy dùng khi viết tất cả số từ 1 đến n theo định dạng chuẩn: cứ mỗi ba chữ số tính từ phải sang trái thì chèn một dấu phẩy.",
+      en: "Given an integer n, return the total number of commas used when writing every integer from 1 through n in standard formatting, inserting a comma after every three digits from the right.",
+    },
+    defaultInput: [1000002],
+    inputKind: "positive",
+    inputLabel: { vi: "n (1 đến 10^15)", en: "n (1 to 10^15)" },
+    singleInput: true,
+    maxInput: 1000000000000000,
+    extraParams: [],
+    approach: [
+      { vi: "Xem mỗi mốc 10^3, 10^6, 10^9, ... như một tầng dấu phẩy mới.", en: "Treat each threshold 10^3, 10^6, 10^9, ... as one additional comma layer." },
+      { vi: "Nếu threshold ≤ n, mọi số trong [threshold, n] đóng góp thêm đúng một dấu phẩy.", en: "When threshold ≤ n, every value in [threshold, n] contributes exactly one extra comma." },
+      { vi: "Số phần tử trong đoạn đóng đó là n - threshold + 1; cộng vào total.", en: "That inclusive range contains n - threshold + 1 values; add it to total." },
+      { vi: "Nhân threshold với 1,000 và lặp cho tới khi vượt n.", en: "Multiply threshold by 1,000 and repeat until it exceeds n." },
+    ],
+    complexity: {
+      time: "O(log₁₀₀₀ n)",
+      space: "O(1)",
+      note: {
+        vi: "Với n ≤ 10^15 chỉ có tối đa 5 mốc cần xét.",
+        en: "With n ≤ 10^15, at most five thresholds are checked.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countCommas(self, n: int) -> int:",
+      "        total = 0",
+      "        threshold = 1000",
+      "        while threshold <= n:",
+      "            total += n - threshold + 1",
+      "            threshold *= 1000",
+      "        return total",
+    ],
+    builder: buildSteps3871,
   },
   50: {
     id: 50,
