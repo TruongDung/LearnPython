@@ -109,3 +109,19 @@ test('56 renders every phase in English and Vietnamese without invalid bar coord
     }
   }
 });
+
+test('the code toolbar can blur and reveal the #56 snippet beside Edit & run code', () => {
+  const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
+  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const editButton = html.indexOf('id="liveEditBtn"');
+  const blurButton = html.indexOf('id="codeBlurBtn"');
+
+  assert.ok(editButton >= 0 && blurButton > editButton);
+  assert.match(html.slice(editButton, blurButton + 80), /liveEditBtn[\s\S]*codeBlurBtn/);
+  assert.match(html.slice(editButton, blurButton), /code-toolbar-icon-btn[\s\S]*<svg/);
+  assert.match(html.slice(blurButton, blurButton + 1400), /code-blur-off-icon[\s\S]*code-blur-on-icon/);
+  assert.match(css, /\.code-panel\.is-blurred[\s\S]*filter:\s*blur\(5px\)/);
+  assert.match(script, /codeBlurBtn[\s\S]*setCodeSnippetBlurred\(!codeSnippetBlurred\)/);
+  assert.match(script, /aria-pressed/);
+});

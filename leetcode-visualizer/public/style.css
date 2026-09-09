@@ -1346,12 +1346,14 @@ button:disabled {
 
 .code-mode-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-bottom: 6px;
 }
 
 .live-edit-btn,
+.code-blur-btn,
 .live-exit-btn,
 .live-run-btn,
 .live-copy-btn,
@@ -1375,6 +1377,54 @@ button:disabled {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
+.code-blur-btn {
+  border-color: rgba(34, 211, 238, 0.42);
+  background: rgba(34, 211, 238, 0.09);
+  color: #67e8f9;
+}
+
+.code-toolbar-icon-btn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.code-toolbar-icon-btn svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
+.code-blur-on-icon {
+  display: none !important;
+}
+
+.code-blur-btn[aria-pressed="true"] .code-blur-off-icon {
+  display: none;
+}
+
+.code-blur-btn[aria-pressed="true"] .code-blur-on-icon {
+  display: block !important;
+}
+
+.code-blur-btn[aria-pressed="true"] {
+  border-color: rgba(251, 191, 36, 0.48);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
+}
+
+[data-theme="light"] .code-blur-btn {
+  border-color: rgba(8, 145, 178, 0.4);
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+[data-theme="light"] .code-blur-btn[aria-pressed="true"] {
+  border-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .live-run-btn,
 .live-clear-btn,
 .live-reset-btn {
@@ -1384,6 +1434,7 @@ button:disabled {
 }
 
 .live-edit-btn:hover,
+.code-blur-btn:hover,
 .live-run-btn:hover,
 .live-copy-btn:hover {
   background: rgba(99, 102, 241, 0.22);
@@ -15058,6 +15109,19 @@ button:disabled {
   /* Belt-and-braces: keep iOS Safari from auto-inflating long lines. */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+.code-panel > .code-lang-block,
+.code-panel > .code-lang-tabs {
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+.code-panel.is-blurred > .code-lang-block,
+.code-panel.is-blurred > .code-lang-tabs {
+  filter: blur(5px);
+  opacity: 0.58;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* #685 has a compact, 25-line implementation: show all of it without an

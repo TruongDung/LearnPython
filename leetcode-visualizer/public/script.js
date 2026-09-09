@@ -17,6 +17,7 @@ let themeMode = "manual";
 let themeAutoTimer = null;
 let activeCatalogJumpKey = null;
 let catalogJumpHighlightTimer = null;
+let codeSnippetBlurred = false;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 
@@ -54,7 +55,9 @@ const I18N = {
     premiumLabel: "LeetCode Premium",
     premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
     clearRecent: "Xóa",
-    liveEditBtn: "✎ Sửa & chạy code",
+    liveEditBtn: "Sửa & chạy code",
+    codeBlurBtn: "Làm mờ code",
+    codeRevealBtn: "Hiện code",
     liveExitBtn: "Đóng editor",
     liveRunBtn: "Chạy code của tôi",
     liveCopyBtn: "Sao chép code",
@@ -97,7 +100,9 @@ const I18N = {
     premiumLabel: "LeetCode Premium",
     premiumHidden: "LeetCode description hidden because this is a Premium problem.",
     clearRecent: "Clear",
-    liveEditBtn: "✎ Edit & run code",
+    liveEditBtn: "Edit & run code",
+    codeBlurBtn: "Blur code",
+    codeRevealBtn: "Reveal code",
     liveExitBtn: "Exit editor",
     liveRunBtn: "Run my code",
     liveCopyBtn: "Copy code",
@@ -167,6 +172,12 @@ function applyStaticStrings() {
   }
   const catalogJumpNav = $("catalogJumpNav");
   if (catalogJumpNav) catalogJumpNav.setAttribute("aria-label", t().catalogJumpNav);
+  const liveEditButton = $("liveEditBtn");
+  if (liveEditButton) {
+    liveEditButton.setAttribute("aria-label", t().liveEditBtn);
+    liveEditButton.title = t().liveEditBtn;
+  }
+  updateCodeBlurButton();
   updateThemeButtons();
 }
 
@@ -2282,9 +2293,11 @@ function renderCode() {
   panel.innerHTML = "";
   if (code.length === 0 && !code2 && !code3 && !codeCsharp) {
     panel.classList.add("hidden");
+    $("codeBlurBtn").classList.add("hidden");
     return;
   }
   panel.classList.remove("hidden");
+  $("codeBlurBtn").classList.toggle("hidden", liveMode);
 
   // ── Language tabs (Python | C#) ──
   if (codeCsharp) {
@@ -28426,6 +28439,7 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
+  setCodeSnippetBlurred(false);
   clearTimeout(liveCopyResetTimer);
   liveCopyResetTimer = null;
   if ($("liveCopyBtn")) {
@@ -28436,6 +28450,7 @@ function resetLiveEditorState() {
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
   $("liveEditBtn").classList.remove("hidden");
+  $("codeBlurBtn").classList.remove("hidden");
   $("liveVarsView").classList.add("hidden");
   hide("liveError");
   $("liveStatus").textContent = "";
@@ -28445,6 +28460,7 @@ function setLiveMode(on) {
   liveMode = on;
   setLiveEditorLayoutMode(on);
   $("liveEditBtn").classList.toggle("hidden", on);
+  $("codeBlurBtn").classList.toggle("hidden", on);
   $("liveExitBtn").classList.toggle("hidden", !on);
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
@@ -28458,7 +28474,28 @@ function setLiveMode(on) {
   }
 }
 
+function updateCodeBlurButton() {
+  const button = $("codeBlurBtn");
+  if (!button) return;
+  const label = codeSnippetBlurred ? t().codeRevealBtn : t().codeBlurBtn;
+  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-pressed", String(codeSnippetBlurred));
+  button.title = label;
+}
+
+function setCodeSnippetBlurred(on) {
+  codeSnippetBlurred = Boolean(on);
+  const panel = $("codePanel");
+  if (panel) panel.classList.toggle("is-blurred", codeSnippetBlurred);
+  updateCodeBlurButton();
+}
+
+$("codeBlurBtn") && $("codeBlurBtn").addEventListener("click", () => {
+  setCodeSnippetBlurred(!codeSnippetBlurred);
+});
+
 $("liveEditBtn") && $("liveEditBtn").addEventListener("click", async () => {
+  setCodeSnippetBlurred(false);
   setLiveMode(true);
   try {
     await ensureMonacoEditor();
