@@ -13558,8 +13558,10 @@ function renderHappyNumberView(step) {
 function renderRotateArray189View(step) {
   const v = step.rotateArray189View, vi = lang === "vi";
   const n = v.nums.length, effectiveK = v.requestedK % n;
-  const split = n - effectiveK, done = v.event === "done";
-  const labels = vi ? ["Đảo toàn bộ", "Đảo k phần tử đầu", "Đảo phần còn lại"] : ["Reverse all", "Reverse first k", "Reverse the rest"];
+  const split = n - effectiveK, done = Boolean(step.final), slicing = v.approach === 2;
+  const labels = slicing
+    ? (vi ? ["Chuẩn hóa k", "Tạo hai slice", "Gán nums[:]"] : ["Normalize k", "Build two slices", "Assign nums[:]"])
+    : (vi ? ["Đảo toàn bộ", "Đảo k phần tử đầu", "Đảo phần còn lại"] : ["Reverse all", "Reverse first k", "Reverse the rest"]);
   const phases = labels.map((label, i) => `<span class="${v.phase === i + 1 && !done ? "active" : v.phase > i + 1 || done && effectiveK ? "complete" : ""}">${i + 1} · ${label}</span>`).join("");
   const values = list => `[${list.join(", ")}]`;
   const block = (name, list) => `<span class="ra189-original-${name.toLowerCase()}"><b>${name}</b><code>${escapeHtml(values(list))}</code></span>`;
@@ -13592,14 +13594,30 @@ function renderRotateArray189View(step) {
     detail = vi ? "Thu hẹp đoạn chưa đảo từ cả hai phía." : "Shrink the unreversed range from both ends.";
   } else if (v.event === "reversed") {
     detail = vi ? "Đoạn này đã đảo xong." : "This range is now reversed.";
+  } else if (v.event === "slice-left") {
+    action = `nums[-k:] → ${values(v.leftSlice)}`;
+    detail = effectiveK ? (vi ? "Lấy suffix gồm k phần tử cuối." : "Take the suffix containing the last k elements.") : (vi ? "-0 bằng 0 nên lấy toàn bộ nums." : "-0 equals 0, so this takes all of nums.");
+  } else if (v.event === "slice-right") {
+    action = `nums[:-k] → ${values(v.rightSlice)}`;
+    detail = effectiveK ? (vi ? "Lấy prefix đứng sau suffix trong kết quả." : "Take the prefix that follows the suffix in the result.") : (vi ? "Slice đến -0 là rỗng." : "A slice ending at -0 is empty.");
+  } else if (v.event === "assigned") {
+    action = "nums[:] = nums[-k:] + nums[:-k]";
+    detail = vi ? "Sửa đúng list nums ban đầu; biểu thức bên phải dùng O(n) bộ nhớ tạm." : "Mutate the original nums list; the right-hand expression uses O(n) temporary space.";
   } else if (done) {
     action = effectiveK ? "A + B → B + A" : "k % n = 0";
     detail = effectiveK ? (vi ? "Xong: nums đã được sửa tại chỗ." : "Done: nums has been modified in place.") : (vi ? "Không đổi; không cần hoán đổi." : "Unchanged; no swaps are needed.");
   }
-  $("treeView").innerHTML = `<section class="ra189-viz" aria-label="${vi ? "Xoay mảng bằng ba lần đảo" : "Rotate array with three reversals"}">
-    <header class="ra189-heading"><strong>${vi ? "Xoay phải" : "Rotate right"} ${effectiveK} →</strong><span>k: ${v.requestedK} % ${n} = ${effectiveK}</span></header>
+  const slices = slicing ? `<div class="ra189-slices">
+    <span><small>nums[-k:]</small><code>${v.leftSlice ? escapeHtml(values(v.leftSlice)) : "—"}</code></span>
+    <b>+</b>
+    <span><small>nums[:-k]</small><code>${v.rightSlice ? escapeHtml(values(v.rightSlice)) : "—"}</code></span>
+    <b>→ nums[:]</b>
+  </div>` : "";
+  $("treeView").innerHTML = `<section class="ra189-viz" aria-label="${slicing ? (vi ? "Xoay mảng bằng slicing" : "Rotate array with slicing") : (vi ? "Xoay mảng bằng ba lần đảo" : "Rotate array with three reversals")}">
+    <header class="ra189-heading"><strong>${slicing ? (vi ? "Cách 2 · Slicing" : "Approach 2 · Slicing") : (vi ? "Cách 1 · Đảo 3 lần" : "Approach 1 · Three reversals")}</strong><span>${vi ? "Xoay phải" : "Rotate right"} ${effectiveK} · k: ${v.requestedK} % ${n} = ${effectiveK}</span></header>
     <div class="ra189-original"><span>${vi ? "Ban đầu" : "Original"}</span>${block("A", v.original.slice(0, split))}${block("B", v.original.slice(split))}</div>
     <div class="ra189-phases">${phases}</div>
+    ${slices}
     <div class="ra189-array-heading"><strong>nums${done ? (vi ? " · kết quả" : " · result") : ""}</strong><span>${v.range ? `[${v.range[0]}, ${v.range[1]}]` : "A + B → B + A"}</span></div>
     <div class="ra189-array" role="list" aria-label="nums" style="--ra189-cell-width:${cellWidth}px">${cells}</div>
     <div class="ra189-action" aria-live="polite"><strong>${escapeHtml(action)}</strong><span>${escapeHtml(detail)}</span></div>

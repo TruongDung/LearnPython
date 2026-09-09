@@ -5057,20 +5057,78 @@ function parseRotateArray189(input, params = {}) {
   return { nums, k };
 }
 
+function buildSteps189Slicing(original, requestedK) {
+  const arr = [...original], n = arr.length;
+  let ids = arr.map((_, i) => i), k = requestedK;
+  const steps = [];
+  let leftSlice = null, rightSlice = null;
+
+  function add(event, line, title, note, final = false) {
+    steps.push({
+      title, note, codeBlock: 2, codeLines: [line], arr: [...arr],
+      sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: [], final,
+      vars: [
+        { name: "n", value: n }, { name: "k", value: k },
+        ...(leftSlice ? [{ name: "nums[-k:]", value: JSON.stringify(leftSlice) }] : []),
+        ...(rightSlice ? [{ name: "nums[:-k]", value: JSON.stringify(rightSlice) }] : []),
+        { name: "nums", value: JSON.stringify(arr) },
+      ],
+      rotateArray189View: {
+        original: [...original], nums: [...arr], ids: [...ids], requestedK, k,
+        approach: 2, phase: event === "input" ? 0 : event === "normalize" ? 1 : event === "assigned" ? 3 : 2,
+        event, range: null, lo: null, hi: null, before: null,
+        leftSlice: leftSlice ? [...leftSlice] : null,
+        rightSlice: rightSlice ? [...rightSlice] : null,
+      },
+    });
+  }
+
+  add("input", 3,
+    { vi: "Cách 2 · Xoay bằng slicing", en: "Approach 2 · Rotate with slicing" },
+    { vi: "Giữ nguyên đối tượng nums bằng cách gán vào toàn bộ slice nums[:].", en: "Preserve the nums object by assigning through the full slice nums[:]." });
+  k %= n;
+  add("normalize", 3,
+    { vi: `k = ${requestedK} % ${n} = ${k}`, en: `k = ${requestedK} % ${n} = ${k}` },
+    { vi: "Chuẩn hóa k để bỏ các vòng xoay đầy đủ.", en: "Normalize k to discard complete rotations." });
+
+  // Python treats -0 as 0: nums[-0:] is the full list and nums[:-0] is empty.
+  leftSlice = k === 0 ? [...arr] : arr.slice(n - k);
+  add("slice-left", 4,
+    { vi: `nums[-${k}:] → [${leftSlice.join(", ")}]`, en: `nums[-${k}:] → [${leftSlice.join(", ")}]` },
+    { vi: k === 0 ? "Vì -0 bằng 0, slice này lấy toàn bộ nums." : "Lấy k phần tử cuối để đưa lên đầu.", en: k === 0 ? "Because -0 equals 0, this slice contains all of nums." : "Take the last k elements for the new front." });
+  rightSlice = k === 0 ? [] : arr.slice(0, n - k);
+  add("slice-right", 4,
+    { vi: `nums[:-${k}] → [${rightSlice.join(", ")}]`, en: `nums[:-${k}] → [${rightSlice.join(", ")}]` },
+    { vi: k === 0 ? "nums[:-0] là slice rỗng." : "Lấy phần prefix còn lại để nối phía sau.", en: k === 0 ? "nums[:-0] is an empty slice." : "Take the remaining prefix for the new back." });
+
+  const split = n - k;
+  const nextIds = k === 0 ? [...ids] : ids.slice(split).concat(ids.slice(0, split));
+  const rotated = leftSlice.concat(rightSlice);
+  arr.splice(0, arr.length, ...rotated);
+  ids = nextIds;
+  add("assigned", 4,
+    { vi: "Gán B + A vào nums[:]", en: "Assign B + A into nums[:]" },
+    { vi: "RHS tạo list mới O(n); slice assignment chép các phần tử vào chính đối tượng nums ban đầu.", en: "The RHS creates an O(n) list; slice assignment copies its elements into the original nums object." }, true);
+  return { original: [...original], answer: arr, steps };
+}
+
 function buildSteps189(input, params = {}) {
   const { nums: original, k: requestedK } = parseRotateArray189(input, params);
+  const approach = Number(params.approach || 1);
+  if (![1, 2].includes(approach)) throw new Error("Approach must be 1 or 2.");
+  if (approach === 2) return buildSteps189Slicing(original, requestedK);
   const arr = [...original], ids = arr.map((_, i) => i), n = arr.length;
   const steps = [];
   let k = requestedK, phase = 0;
   function add(event, line, title, note, range = null, lo = null, hi = null, before = null) {
     steps.push({
-      title, note, codeLines: [line], arr: [...arr], sub: arr.map((_, i) => `[${i}]`),
+      title, note, codeBlock: 1, codeLines: [line], arr: [...arr], sub: arr.map((_, i) => `[${i}]`),
       highlight: lo !== null && hi !== null && lo < hi ? [lo, hi] : [], mark: [], final: event === "done",
       vars: [{ name: "n", value: n }, { name: "k", value: k },
         ...(lo !== null ? [{ name: "lo", value: lo }, { name: "hi", value: hi }] : []),
         { name: "nums", value: JSON.stringify(arr) }],
       rotateArray189View: {
-        original: [...original], nums: [...arr], ids: [...ids], requestedK, k,
+        original: [...original], nums: [...arr], ids: [...ids], requestedK, k, approach: 1,
         phase, event, range: range ? [...range] : null, lo, hi, before,
       },
     });
@@ -10041,9 +10099,19 @@ module.exports = {
     titleVi: { vi: "Xoay mảng phải k bước (mẹo đảo ngược)", en: "Rotate array right by k (reverse trick)" },
     statement: { vi: "Xoay mảng sang phải k bước, tại chỗ. Nhập nums; k trong tham số.", en: "Rotate the array right by k steps, in place. Enter nums; k as a parameter." },
     defaultInput: [1, 2, 3, 4, 5, 6, 7], inputKind: "integer", inputLabel: { vi: "nums (tối đa 24 số)", en: "nums (up to 24 values)" },
-    extraParams: [{ key: "k", label: { vi: "k (bước sang phải)", en: "k (steps to the right)" }, default: 3, min: 0, max: 100000 }],
-    approach: [{ vi: "k %= n.", en: "k %= n." }, { vi: "Đảo toàn bộ mảng.", en: "Reverse the whole array." }, { vi: "Đảo k phần tử đầu.", en: "Reverse the first k." }, { vi: "Đảo phần còn lại.", en: "Reverse the rest." }],
-    complexity: { time: "O(n)", space: "O(1)", note: { vi: "3 lần đảo, tại chỗ.", en: "Three reversals, in-place." } },
+    extraParams: [
+      { key: "k", label: { vi: "k (bước sang phải)", en: "k (steps to the right)" }, default: 3, min: 0, max: 100000 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: đảo 3 lần · O(1) space", en: "Approach 1: three reversals · O(1) space" } },
+        { value: "2", label: { vi: "Cách 2: slicing · O(n) space", en: "Approach 2: slicing · O(n) space" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Cách 1 — chuẩn hóa k, rồi đảo toàn bộ mảng, đảo k phần tử đầu và đảo phần còn lại; O(n) time, O(1) extra space.", en: "Approach 1 — normalize k, then reverse the whole array, the first k elements, and the rest; O(n) time and O(1) extra space." },
+      { vi: "Cách 2 — nums[-k:] lấy suffix, nums[:-k] lấy prefix; ghép hai slice thành thứ tự mới.", en: "Approach 2 — nums[-k:] takes the suffix and nums[:-k] takes the prefix; concatenate them in the new order." },
+      { vi: "Gán vào nums[:] giữ nguyên đối tượng list, nhưng slicing và phép cộng tạo list tạm nên dùng O(n) bộ nhớ phụ.", en: "Assigning to nums[:] preserves the list object, but slicing and concatenation create temporary lists, so auxiliary space is O(n)." },
+    ],
+    complexity: { time: "O(n)", space: "O(1) / O(n)", note: { vi: "Cách 1: O(1); Cách 2: O(n) do các slice tạm.", en: "Approach 1: O(1); Approach 2: O(n) for temporary slices." } },
     code: [
       "class Solution:",
       "    def rotate(self, nums, k):",
@@ -10058,6 +10126,14 @@ module.exports = {
       "        reverse(0, n - 1)",
       "        reverse(0, k - 1)",
       "        reverse(k, n - 1)",
+    ],
+    codeLabel: { vi: "Cách 1 · Đảo 3 lần", en: "Approach 1 · Three reversals" },
+    code2Label: { vi: "Cách 2 · Slicing", en: "Approach 2 · Slicing" },
+    code2: [
+      "class Solution:",
+      "    def rotate(self, nums, k):",
+      "        k = k % len(nums)",
+      "        nums[:] = nums[-k:] + nums[:-k]",
     ],
     liveArgs: (input, params) => {
       const { nums, k } = parseRotateArray189(input, params);
