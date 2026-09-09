@@ -70,12 +70,39 @@ for case in json.load(sys.stdin):
   assert.deepEqual(problem.liveArgs([1, 2, 3], { k: 8 }), [[1, 2, 3], 8]);
 });
 
+test('189 approach 2 uses the two Python slices and preserves the nums object', () => {
+  for (const { nums, k } of cases) {
+    const result = problem.builder(nums, { k, approach: 2 });
+    const normalized = k % nums.length;
+    assert.deepEqual(result.answer, expected(nums, k));
+    assert.ok(result.steps.every(step => step.codeBlock === 2));
+    assert.ok(result.steps.every(step => step.rotateArray189View.approach === 2));
+    assert.deepEqual(result.steps.at(-1).rotateArray189View.leftSlice, normalized ? nums.slice(-normalized) : nums);
+    assert.deepEqual(result.steps.at(-1).rotateArray189View.rightSlice, normalized ? nums.slice(0, -normalized) : []);
+    assert.equal(result.steps.at(-1).final, true);
+  }
+
+  const payload = cases.map(({ nums, k }) => ({ args: problem.liveArgs(nums, { k, approach: 2 }), expected: expected(nums, k) }));
+  const code = problem.code2.join('\n') + `
+import json, sys
+for case in json.load(sys.stdin):
+    nums, k = case['args']
+    alias = nums
+    result = Solution().rotate(nums, k)
+    assert result is None
+    assert alias is nums and alias == case['expected'], (nums, case)
+`;
+  const python = spawnSync('python', ['-c', code], { input: JSON.stringify(payload), encoding: 'utf8' });
+  assert.equal(python.status, 0, python.stderr);
+});
+
 test('189 visualization and live code validate numbers and k consistently', () => {
   for (const nums of [[], [1.5], [NaN], [null], [true], [2147483648], [-2147483649], Array(25).fill(1), '', '1,,2', '1,no,2']) {
     assert.throws(() => problem.builder(nums, { k: 1 }));
     assert.throws(() => problem.liveArgs(nums, { k: 1 }));
   }
   for (const k of [-1, 0.5, NaN, null, 100001]) assert.throws(() => problem.builder([1, 2, 3], { k }));
+  for (const approach of [-1, 3, 'no']) assert.throws(() => problem.builder([1, 2, 3], { k: 1, approach }));
 });
 
 test('189 renders all reversal phases, pointer crossings, and no-op rotations in both languages', () => {
@@ -90,6 +117,12 @@ test('189 renders all reversal phases, pointer crossings, and no-op rotations in
     for (const { nums, k } of cases.slice(0, 7)) for (const step of problem.builder(nums, { k }).steps) {
       context.renderRotateArray189View(step);
       assert.match(element.innerHTML, /ra189-array/);
+      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+      assert.equal((element.innerHTML.match(/role="listitem"/g) || []).length, nums.length);
+    }
+    for (const { nums, k } of cases.slice(0, 7)) for (const step of problem.builder(nums, { k, approach: 2 }).steps) {
+      context.renderRotateArray189View(step);
+      assert.match(element.innerHTML, /ra189-slices/);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
       assert.equal((element.innerHTML.match(/role="listitem"/g) || []).length, nums.length);
     }

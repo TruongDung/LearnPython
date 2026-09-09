@@ -292,6 +292,11 @@
 .ra189-phases > span { padding: 7px 9px; border: 1px solid var(--ra-border); border-radius: 6px; font-size: 12px; color: var(--ra-muted); }
 .ra189-phases > .active { border-color: var(--ra-pointer); color: var(--ra-pointer); background: var(--ra-surface); }
 .ra189-phases > .complete { color: var(--ra-b); }
+.ra189-slices { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto; align-items: center; gap: 8px; }
+.ra189-slices > span { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid var(--ra-border); border-radius: 7px; background: var(--ra-surface); }
+.ra189-slices small { color: var(--ra-muted); font: 11px Consolas, monospace; }
+.ra189-slices code { color: var(--ra-text); overflow-wrap: anywhere; }
+.ra189-slices > b { color: var(--ra-pointer); font: 600 12px Consolas, monospace; }
 .ra189-array { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--ra189-cell-width), 1fr)); gap: 8px; }
 .ra189-cell { display: grid; gap: 6px; padding: 8px 4px 5px; border: 1px solid var(--ra-border); border-radius: 7px; background: var(--ra-surface); text-align: center; min-width: 0; }
 .ra189-cell.in-range { background: var(--ra-range); }
@@ -308,6 +313,8 @@
 .tree-view:has(> .ra189-viz) { min-width: 0; }
 @media (max-width: 480px) {
   .ra189-phases { display: grid; grid-template-columns: 1fr; }
+  .ra189-slices { grid-template-columns: 1fr; }
+  .ra189-slices > b { text-align: center; }
   .ra189-array { gap: 7px; }
 }
 
