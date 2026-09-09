@@ -17,7 +17,7 @@ let themeMode = "manual";
 let themeAutoTimer = null;
 let activeCatalogJumpKey = null;
 let catalogJumpHighlightTimer = null;
-let codeSnippetBlurred = false;
+let codeSnippetBlurred = true;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 
@@ -175,7 +175,7 @@ function applyStaticStrings() {
   const liveEditButton = $("liveEditBtn");
   if (liveEditButton) {
     liveEditButton.setAttribute("aria-label", t().liveEditBtn);
-    liveEditButton.title = t().liveEditBtn;
+    liveEditButton.dataset.tooltip = t().liveEditBtn;
   }
   updateCodeBlurButton();
   updateThemeButtons();
@@ -5417,6 +5417,118 @@ function renderKeypadHeapView(step) {
 
 function renderDecisionTree(step) {
   renderTree({ tree: step.decisionTree }, "decisionTreeView");
+}
+
+// ---- Next Permutation (#31): expose the four-part greedy recipe. ----
+function renderNextPermutation31View(step) {
+  const view = step.nextPermutationView || {};
+  const arr = Array.isArray(view.arr) ? view.arr : [];
+  const original = Array.isArray(view.original) ? view.original : [];
+  const vi = lang === "vi";
+  const phaseIndex = { pivot: 0, successor: 1, swap: 2, reverse: 3, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? [
+        ["Tìm pivot", "cặp tăng đầu tiên từ phải"],
+        ["Tìm successor", "số nhỏ nhất > pivot"],
+        ["Đổi chỗ", "tăng ít nhất có thể"],
+        ["Đảo suffix", "làm phần đuôi nhỏ nhất"],
+      ]
+    : [
+        ["Find pivot", "first rise from the right"],
+        ["Find successor", "smallest value > pivot"],
+        ["Swap", "make the smallest increase"],
+        ["Reverse suffix", "make the tail smallest"],
+      ];
+  const phases = phaseLabels.map(([label, detail], index) => {
+    const skipped = view.hasPivot === false && (index === 1 || index === 2) && phaseIndex >= 3;
+    const state = skipped ? "skipped" : phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    const marker = skipped ? "—" : state === "done" ? "✓" : index + 1;
+    return `<span class="${state}"><i>${marker}</i><b>${escapeHtml(label)}</b><small>${skipped ? (vi ? "bỏ qua" : "skipped") : escapeHtml(detail)}</small></span>`;
+  }).join("");
+
+  const scanPair = Array.isArray(view.scanPair) ? view.scanPair : [];
+  const reversePair = Array.isArray(view.reversePair) ? view.reversePair : [];
+  const changed = Array.isArray(view.changed) ? view.changed : [];
+  const cells = arr.map((value, index) => {
+    const classes = [
+      "np31-cell",
+      Number.isInteger(view.suffixStart) && index >= view.suffixStart ? "suffix" : "prefix",
+      index === view.pivot ? "pivot" : "",
+      index === view.successor ? "successor" : "",
+      index === view.candidate && view.event === "successor-check" ? "candidate" : "",
+      scanPair.includes(index) ? "scanning" : "",
+      reversePair.includes(index) ? "reversing" : "",
+      changed.includes(index) ? "changed" : "",
+      view.phase === "done" ? "finished" : "",
+    ].filter(Boolean).join(" ");
+    let role = "";
+    if (index === view.pivot) role = "pivot · i";
+    if (index === view.successor) role = "successor · j";
+    if (index === view.candidate && view.event === "successor-check") role = vi ? "đang thử · j" : "candidate · j";
+    if (reversePair[0] === index) role = "left";
+    if (reversePair[1] === index) role = "right";
+    return `<span class="${classes}"><small>index ${index}</small><strong>${escapeHtml(value)}</strong><em>${role || "&nbsp;"}</em></span>`;
+  }).join("");
+
+  let action = vi ? "Bắt đầu từ bên phải để thay đổi mảng ít nhất." : "Start from the right to change the array as little as possible.";
+  let reason = vi ? "Giữ prefix bên trái càng lâu thì số mới càng gần số cũ." : "Keeping a longer left prefix makes the new number closer to the old one.";
+  if (view.event === "pivot-check") {
+    action = vi ? "Cặp này vẫn giảm dần → dịch i sang trái." : "This pair is still descending → move i left.";
+    reason = vi ? "Ta chưa thể tăng tại vị trí này." : "We cannot increase the permutation at this position yet.";
+  } else if (view.event === "pivot-found") {
+    action = vi ? `nums[${view.pivot}] là pivot.` : `nums[${view.pivot}] is the pivot.`;
+    reason = vi ? "Đây là vị trí ngoài cùng bên phải có thể tăng." : "This is the rightmost position that can be increased.";
+  } else if (view.event === "no-pivot") {
+    action = vi ? "Không có cặp tăng → bỏ qua successor và swap." : "There is no rising pair → skip successor and pivot swap.";
+    reason = vi ? "Mảng đang là hoán vị lớn nhất; đảo toàn bộ để quay về nhỏ nhất." : "The array is the largest permutation; reverse all of it to wrap to the smallest.";
+  } else if (view.event === "successor-check") {
+    action = vi ? `Ứng viên tại j=${view.candidate} chưa lớn hơn pivot.` : `Candidate at j=${view.candidate} is not greater than the pivot.`;
+    reason = vi ? "Dịch j sang trái cho tới khi gặp một giá trị lớn hơn." : "Move j left until a greater value appears.";
+  } else if (view.event === "successor-found") {
+    action = vi ? `nums[${view.successor}] là successor.` : `nums[${view.successor}] is the successor.`;
+    reason = vi ? "Đi từ phải trên suffix giảm dần đảm bảo đây là số lớn hơn nhỏ nhất." : "Scanning the descending suffix from the right guarantees the smallest greater value.";
+  } else if (view.event === "swap") {
+    action = vi ? `Đổi pivot tại ${view.pivot} với successor tại ${view.successor}.` : `Swap the pivot at ${view.pivot} with the successor at ${view.successor}.`;
+    reason = vi ? "Prefix vừa tăng lên mức nhỏ nhất có thể." : "The prefix has now increased by the smallest possible amount.";
+  } else if (view.event === "reverse-start") {
+    action = vi ? `Đảo đoạn từ index ${view.suffixStart} đến cuối.` : `Reverse from index ${view.suffixStart} to the end.`;
+    reason = vi ? "Suffix giảm dần là lớn nhất; đảo lại sẽ thành tăng dần và nhỏ nhất." : "A descending suffix is largest; reversing it makes it ascending and smallest.";
+  } else if (view.event === "reverse-swap") {
+    action = vi ? `Đổi hai đầu suffix: ${reversePair[0]} ↔ ${reversePair[1]}.` : `Swap the suffix ends: ${reversePair[0]} ↔ ${reversePair[1]}.`;
+    reason = vi ? "Tiếp tục thu hai con trỏ vào giữa." : "Continue moving both pointers toward the middle.";
+  } else if (view.event === "done") {
+    action = vi ? "Hoán vị kế tiếp đã hoàn thành." : "The next permutation is complete.";
+    reason = vi ? "Pivot tăng ít nhất + suffix nhỏ nhất = đáp án liền sau theo thứ tự từ điển." : "Smallest pivot increase + smallest suffix = the immediate next lexicographic order.";
+  }
+
+  const comparison = view.comparison
+    ? `<div class="np31-comparison ${view.comparison.result ? "yes" : "no"}"><small>${vi ? "SO SÁNH" : "COMPARISON"}</small><strong>${escapeHtml(view.comparison.left)} ${escapeHtml(view.comparison.operator)} ${escapeHtml(view.comparison.right)}</strong><b>${view.comparison.result ? (vi ? "ĐÚNG" : "YES") : (vi ? "CHƯA" : "NO")}</b></div>`
+    : "";
+  const transition = Array.isArray(view.before)
+    ? `<div class="np31-transition"><code>[${view.before.map(escapeHtml).join(", ")}]</code><i>→</i><code>[${arr.map(escapeHtml).join(", ")}]</code></div>`
+    : "";
+  const suffixLabel = Number.isInteger(view.suffixStart)
+    ? `${vi ? "suffix bắt đầu tại" : "suffix starts at"} index ${view.suffixStart}`
+    : (vi ? "chưa xác định suffix" : "suffix not identified yet");
+  const summary = vi
+    ? `Bài 31. Mảng hiện tại ${arr.join(", ")}. ${action}`
+    : `Problem 31. Current array ${arr.join(", ")}. ${action}`;
+
+  $("treeView").innerHTML = `<section class="np31-viz phase-${escapeHtml(view.phase || "pivot")}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="np31-phases">${phases}</div>
+    <section class="np31-rule"><b>${vi ? "MỤC TIÊU" : "GOAL"}</b><strong>${vi ? "Tạo số lớn hơn gần nhất" : "Build the nearest greater order"}</strong><span>${vi ? "Thay đổi bên phải trước, tăng pivot ít nhất, rồi làm suffix nhỏ nhất." : "Change the right side first, raise the pivot minimally, then minimize the suffix."}</span></section>
+    <section class="np31-array-card">
+      <header><strong>NUMS</strong><span>${escapeHtml(suffixLabel)}</span></header>
+      <div class="np31-cells-wrap"><div class="np31-cells" style="--np31-count:${Math.max(arr.length, 1)}">${cells}</div></div>
+      <div class="np31-array-legend"><span class="pivot"><i></i>pivot</span><span class="successor"><i></i>successor</span><span class="suffix"><i></i>suffix</span></div>
+    </section>
+    <section class="np31-explanation">
+      <div class="np31-action"><small>${vi ? "ĐANG LÀM" : "ACTION"}</small><strong>${escapeHtml(action)}</strong><span>${escapeHtml(reason)}</span></div>
+      ${comparison}
+    </section>
+    ${transition}
+    <footer class="np31-result ${view.phase === "done" ? "ready" : "pending"}"><span><small>${vi ? "BAN ĐẦU" : "ORIGINAL"}</small><strong>[${original.map(escapeHtml).join(", ")}]</strong></span><i>→</i><span><small>${vi ? "HIỆN TẠI" : "CURRENT"}</small><strong>[${arr.map(escapeHtml).join(", ")}]</strong></span></footer>
+  </section>`;
 }
 
 // ---- Permutations (#46): make choices, current order, and saved results explicit. ----
@@ -25666,6 +25778,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGoodSubseqView(step);
+  } else if (step.nextPermutationView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNextPermutation31View(step);
   } else if (step.permutation46View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -28439,7 +28557,7 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
-  setCodeSnippetBlurred(false);
+  setCodeSnippetBlurred(true);
   clearTimeout(liveCopyResetTimer);
   liveCopyResetTimer = null;
   if ($("liveCopyBtn")) {
@@ -28465,6 +28583,7 @@ function setLiveMode(on) {
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
   if (!on) {
+    setCodeSnippetBlurred(true);
     // Restore the canned visualization exactly as it was before entering live mode.
     renderCode();
     if (problemData) {
@@ -28480,7 +28599,7 @@ function updateCodeBlurButton() {
   const label = codeSnippetBlurred ? t().codeRevealBtn : t().codeBlurBtn;
   button.setAttribute("aria-label", label);
   button.setAttribute("aria-pressed", String(codeSnippetBlurred));
-  button.title = label;
+  button.dataset.tooltip = label;
 }
 
 function setCodeSnippetBlurred(on) {

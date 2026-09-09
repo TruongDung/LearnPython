@@ -3104,81 +3104,178 @@ function buildSteps41(input) {
  */
 function buildSteps31(input) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const original = [...nums];
   const n = nums.length;
   const steps = [];
 
   steps.push({
-    title: { vi: "Tìm pivot từ phải sang", en: "Find the pivot from the right" },
+    title: { vi: "Bước 1: tìm pivot từ phải sang trái", en: "Step 1: find the pivot from right to left" },
     arr: [...nums], sub: nums.map((_, i) => `[${i}]`),
     highlight: [], mark: [],
     codeLines: [3, 4],
-    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
+    vars: [{ name: "i", value: n - 2 }, { name: "nums", value: `[${nums.join(", ")}]` }],
+    nextPermutationView: {
+      phase: "pivot", event: "start", original: [...original], arr: [...nums],
+      pivot: null, successor: null, scanPair: [], suffixStart: n > 0 ? n - 1 : 0,
+    },
     note: {
-      vi:
-        "Hoán vị kế tiếp: tìm i lớn nhất mà nums[i] < nums[i+1] (điểm 'giảm' đầu tiên từ phải).\n" +
-        "Nếu không có → mảng đang giảm dần → hoán vị lớn nhất → đảo ngược thành nhỏ nhất.",
-      en:
-        "Next permutation: find the largest i with nums[i] < nums[i+1] (first 'ascent' from the right).\n" +
-        "If none → array is descending → the largest permutation → reverse to the smallest.",
+      vi: "Ta muốn tăng số càng ít càng tốt, nên giữ nguyên phần bên trái lâu nhất có thể. Hãy đi từ phải sang trái để tìm cặp đầu tiên nums[i] < nums[i+1].",
+      en: "We want the smallest possible increase, so keep the left side unchanged as long as possible. Scan right-to-left for the first pair nums[i] < nums[i+1].",
     },
   });
 
   let i = n - 2;
-  while (i >= 0 && nums[i] >= nums[i + 1]) i--;
+  while (i >= 0) {
+    const found = nums[i] < nums[i + 1];
+    steps.push({
+      title: found
+        ? { vi: `Tìm thấy pivot i=${i}`, en: `Pivot found at i=${i}` }
+        : { vi: `${nums[i]} ≥ ${nums[i + 1]}: tiếp tục sang trái`, en: `${nums[i]} ≥ ${nums[i + 1]}: keep moving left` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i, i + 1], mark: found ? [i] : [],
+      codeLines: [4, 5],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "nums[i+1]", value: nums[i + 1] },
+      ],
+      nextPermutationView: {
+        phase: "pivot", event: found ? "pivot-found" : "pivot-check", original: [...original], arr: [...nums],
+        pivot: found ? i : null, successor: null, scanPair: [i, i + 1], suffixStart: i + 1,
+        comparison: { left: nums[i], operator: found ? "<" : "≥", right: nums[i + 1], result: found },
+      },
+      note: found
+        ? {
+            vi: `${nums[i]} < ${nums[i + 1]}, nên index ${i} là vị trí ngoài cùng bên phải còn có thể tăng. Đoạn sau pivot đang giảm dần.`,
+            en: `${nums[i]} < ${nums[i + 1]}, so index ${i} is the rightmost position that can still increase. The suffix after it is descending.`,
+          }
+        : {
+            vi: `${nums[i]} không nhỏ hơn ${nums[i + 1]}, nên cặp này vẫn thuộc suffix giảm dần. Giảm i và kiểm tra tiếp.`,
+            en: `${nums[i]} is not smaller than ${nums[i + 1]}, so this pair is still part of the descending suffix. Decrement i and continue.`,
+          },
+    });
+    if (found) break;
+    i--;
+  }
 
-  steps.push({
-    title: { vi: i >= 0 ? `Pivot tại i=${i} (nums[i]=${nums[i]})` : "Không có pivot (mảng giảm dần)", en: i >= 0 ? `Pivot at i=${i} (nums[i]=${nums[i]})` : "No pivot (descending array)" },
-    arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
-    highlight: i >= 0 ? [i, i + 1] : [], mark: i >= 0 ? [i] : [],
-    codeLines: [4, 5],
-    vars: [{ name: "i", value: i }],
-    note: {
-      vi: i >= 0
-        ? `Tìm thấy pivot: nums[${i}]=${nums[i]} < nums[${i + 1}]=${nums[i + 1]}. Phần sau i đang giảm dần.`
-        : `Không tìm thấy pivot → mảng đã là hoán vị lớn nhất. Đảo ngược toàn bộ.`,
-      en: i >= 0
-        ? `Pivot found: nums[${i}]=${nums[i]} < nums[${i + 1}]=${nums[i + 1]}. The suffix after i is descending.`
-        : `No pivot found → the array is the largest permutation. Reverse everything.`,
-    },
-  });
+  if (i < 0) {
+    steps.push({
+      title: { vi: "Không có pivot: đây là hoán vị lớn nhất", en: "No pivot: this is the largest permutation" },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: nums.map((_, index) => index), mark: [], codeLines: [4, 5],
+      vars: [{ name: "i", value: -1 }],
+      nextPermutationView: {
+        phase: "pivot", event: "no-pivot", original: [...original], arr: [...nums],
+        pivot: -1, successor: null, scanPair: [], suffixStart: 0, hasPivot: false,
+      },
+      note: {
+        vi: "Toàn bộ mảng giảm dần, nghĩa là đã ở hoán vị lớn nhất. Không cần tìm successor hay swap pivot; chỉ cần đảo cả mảng để quay về hoán vị nhỏ nhất.",
+        en: "The whole array is descending, so it is already the largest permutation. Skip successor and pivot swap; reverse the whole array to return to the smallest permutation.",
+      },
+    });
+  }
 
   if (i >= 0) {
     let j = n - 1;
-    while (nums[j] <= nums[i]) j--;
-    steps.push({
-      title: { vi: `Tìm j=${j}: nums[j]=${nums[j]} là số nhỏ nhất > nums[i]`, en: `Find j=${j}: nums[j]=${nums[j]} is the smallest > nums[i]` },
-      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
-      highlight: [i, j], mark: [j],
-      codeLines: [6, 7],
-      vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "nums[j]", value: nums[j] }],
-      note: { vi: `Từ phải, tìm số đầu tiên > nums[${i}]=${nums[i]} → nums[${j}]=${nums[j]}.`, en: `From the right, find the first value > nums[${i}]=${nums[i]} → nums[${j}]=${nums[j]}.` },
-    });
+    while (j > i) {
+      const found = nums[j] > nums[i];
+      steps.push({
+        title: found
+          ? { vi: `Tìm thấy successor j=${j}`, en: `Successor found at j=${j}` }
+          : { vi: `${nums[j]} ≤ pivot ${nums[i]}: dịch j sang trái`, en: `${nums[j]} ≤ pivot ${nums[i]}: move j left` },
+        arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+        highlight: [i, j], mark: found ? [j] : [i], codeLines: [6, 7],
+        vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "nums[j]", value: nums[j] }],
+        nextPermutationView: {
+          phase: "successor", event: found ? "successor-found" : "successor-check", original: [...original], arr: [...nums],
+          pivot: i, pivotValue: nums[i], successor: found ? j : null, candidate: j, scanPair: [i, j], suffixStart: i + 1, hasPivot: true,
+          comparison: { left: nums[j], operator: found ? ">" : "≤", right: nums[i], result: found },
+        },
+        note: found
+          ? {
+              vi: `Đi từ phải sang trái, ${nums[j]} là phần tử đầu tiên lớn hơn pivot ${nums[i]}. Vì suffix đang giảm dần, đây chính là số lớn hơn nhỏ nhất.`,
+              en: `Scanning from the right, ${nums[j]} is the first value greater than pivot ${nums[i]}. Because the suffix is descending, it is the smallest greater value.`,
+            }
+          : {
+              vi: `${nums[j]} chưa đủ lớn để thay pivot ${nums[i]}; tiếp tục dịch j sang trái.`,
+              en: `${nums[j]} is not large enough to replace pivot ${nums[i]}; keep moving j left.`,
+            },
+      });
+      if (found) break;
+      j--;
+    }
+    const beforeSwap = [...nums];
     [nums[i], nums[j]] = [nums[j], nums[i]];
     steps.push({
-      title: { vi: `Swap nums[${i}] ↔ nums[${j}]`, en: `Swap nums[${i}] ↔ nums[${j}]` },
+      title: { vi: `Bước 3: đổi pivot ${beforeSwap[i]} với ${beforeSwap[j]}`, en: `Step 3: swap pivot ${beforeSwap[i]} with ${beforeSwap[j]}` },
       arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
       highlight: [i, j], mark: [i],
       codeLines: [8],
       vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
-      note: { vi: `Đổi chỗ để tăng vị trí i lên giá trị nhỏ nhất có thể lớn hơn.`, en: `Swap so position i increases to the smallest possible larger value.` },
+      nextPermutationView: {
+        phase: "swap", event: "swap", original: [...original], before: beforeSwap, arr: [...nums],
+        pivot: i, pivotValue: beforeSwap[i], successor: j, scanPair: [], changed: [i, j], suffixStart: i + 1, hasPivot: true,
+      },
+      note: {
+        vi: `Đổi ${beforeSwap[i]} ↔ ${beforeSwap[j]} làm vị trí ${i} tăng lên mức nhỏ nhất có thể. Bây giờ chỉ cần làm suffix nhỏ nhất.`,
+        en: `Swapping ${beforeSwap[i]} ↔ ${beforeSwap[j]} raises position ${i} by the smallest possible amount. Now minimize the suffix.`,
+      },
     });
   }
 
-  // reverse suffix
   let left = i + 1, right = n - 1;
-  const suffix = [...Array(Math.max(0, n - (i + 1)))].map((_, k) => i + 1 + k);
-  while (left < right) { [nums[left], nums[right]] = [nums[right], nums[left]]; left++; right--; }
+  const suffixStart = i + 1;
+  const suffix = [...Array(Math.max(0, n - suffixStart))].map((_, k) => suffixStart + k);
+  steps.push({
+    title: { vi: `Bước 4: đảo suffix từ index ${suffixStart}`, en: `Step 4: reverse the suffix from index ${suffixStart}` },
+    arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+    highlight: suffix, mark: [], codeLines: [9],
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    nextPermutationView: {
+      phase: "reverse", event: "reverse-start", original: [...original], arr: [...nums],
+      pivot: i, successor: null, scanPair: [], reversePair: left < right ? [left, right] : [], suffixStart, hasPivot: i >= 0,
+    },
+    note: {
+      vi: "Suffix hiện đang ở thứ tự giảm dần (lớn nhất). Đảo nó thành tăng dần để phần đuôi nhỏ nhất có thể.",
+      en: "The suffix is currently descending (largest). Reverse it into ascending order to make the tail as small as possible.",
+    },
+  });
+
+  while (left < right) {
+    const beforeReverse = [...nums];
+    [nums[left], nums[right]] = [nums[right], nums[left]];
+    steps.push({
+      title: { vi: `Đổi hai đầu suffix: index ${left} ↔ ${right}`, en: `Swap suffix ends: index ${left} ↔ ${right}` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: [left, right], mark: suffix, codeLines: [9],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "nums", value: `[${nums.join(", ")}]` }],
+      nextPermutationView: {
+        phase: "reverse", event: "reverse-swap", original: [...original], before: beforeReverse, arr: [...nums],
+        pivot: i, successor: null, scanPair: [], reversePair: [left, right], changed: [left, right], suffixStart, hasPivot: i >= 0,
+      },
+      note: {
+        vi: `Đổi nums[${left}]=${beforeReverse[left]} với nums[${right}]=${beforeReverse[right]}, rồi thu hai con trỏ vào giữa.`,
+        en: `Swap nums[${left}]=${beforeReverse[left]} with nums[${right}]=${beforeReverse[right]}, then move both pointers inward.`,
+      },
+    });
+    left++;
+    right--;
+  }
 
   steps.push({
-    title: { vi: `Đảo ngược phần sau i (từ ${i + 1})`, en: `Reverse the suffix after i (from ${i + 1})` },
+    title: { vi: "Hoàn tất: đây là hoán vị kế tiếp", en: "Done: this is the next permutation" },
     arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
-    highlight: suffix, mark: suffix,
+    highlight: [], mark: nums.map((_, index) => index),
     final: true,
     codeLines: [9],
     vars: [{ name: "answer", value: `[${nums.join(", ")}]` }],
+    nextPermutationView: {
+      phase: "done", event: "done", original: [...original], arr: [...nums],
+      pivot: i, successor: null, scanPair: [], reversePair: [], suffixStart, hasPivot: i >= 0, answer: [...nums],
+    },
     note: {
-      vi: `Đảo ngược đoạn sau i để nó tăng dần (nhỏ nhất). Kết quả: [${nums.join(", ")}].`,
-      en: `Reverse the suffix so it becomes ascending (smallest). Result: [${nums.join(", ")}].`,
+      vi: `Kết quả [${nums.join(", ")}] lớn hơn mảng ban đầu ít nhất có thể: prefix giữ lâu nhất, pivot tăng ít nhất, suffix nhỏ nhất.`,
+      en: `Result [${nums.join(", ")}] is the smallest possible array greater than the original: longest unchanged prefix, smallest pivot increase, smallest suffix.`,
     },
   });
 

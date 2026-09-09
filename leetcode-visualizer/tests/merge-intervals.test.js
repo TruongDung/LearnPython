@@ -121,7 +121,12 @@ test('the code toolbar can blur and reveal the #56 snippet beside Edit & run cod
   assert.match(html.slice(editButton, blurButton + 80), /liveEditBtn[\s\S]*codeBlurBtn/);
   assert.match(html.slice(editButton, blurButton), /code-toolbar-icon-btn[\s\S]*<svg/);
   assert.match(html.slice(blurButton, blurButton + 1400), /code-blur-off-icon[\s\S]*code-blur-on-icon/);
+  assert.match(html.slice(editButton, blurButton + 180), /data-tooltip="Edit &amp; run code"[\s\S]*data-tooltip="Reveal code"/);
+  assert.match(html.slice(blurButton, blurButton + 1800), /aria-pressed="true"[\s\S]*class="code-panel is-blurred"/);
+  assert.match(css, /\.code-toolbar-icon-btn:hover::after[\s\S]*visibility:\s*visible/);
   assert.match(css, /\.code-panel\.is-blurred[\s\S]*filter:\s*blur\(5px\)/);
   assert.match(script, /codeBlurBtn[\s\S]*setCodeSnippetBlurred\(!codeSnippetBlurred\)/);
+  assert.match(script, /let codeSnippetBlurred = true/);
+  assert.match(script, /function resetLiveEditorState\(\)[\s\S]*setCodeSnippetBlurred\(true\)/);
   assert.match(script, /aria-pressed/);
 });
