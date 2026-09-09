@@ -8987,6 +8987,71 @@ function renderBuildingMeet2940View(step) {
   </section>`;
 }
 
+function renderProductExcept238View(step) {
+  const view = step.productExcept238View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Array.isArray(view.leftProducts) ? view.leftProducts : [];
+  const right = Array.isArray(view.rightProducts) ? view.rightProducts : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const current = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Tách trái × phải", "2. Prefix trái → phải", "3. Suffix phải → trái", "4. Kết quả"]
+    : ["1. Split left × right", "2. Prefix left → right", "3. Suffix right → left", "4. Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const show = (value) => value == null ? "?" : String(value);
+
+  const cards = nums.map((value, index) => {
+    const classes = [
+      "pes238-card",
+      index === current ? "current excluded" : "",
+      left[index] != null ? "has-left" : "",
+      right[index] != null ? "has-right" : "",
+      value === 0 ? "zero" : "",
+    ].filter(Boolean).join(" ");
+    return `<article class="${classes}">
+      <header><small>INDEX</small><strong>${index}</strong></header>
+      <div class="pes238-number"><small>nums[i]</small><b>${value}</b><em>${index === current ? (vi ? "BỎ SỐ NÀY" : "EXCLUDE THIS") : ""}</em></div>
+      <div class="pes238-parts"><span class="left"><small>LEFT</small><b>${show(left[index])}</b></span><i>×</i><span class="right"><small>RIGHT</small><b>${show(right[index])}</b></span></div>
+      <footer><small>answer[${index}]</small><strong>${right[index] == null ? "?" : show(answer[index])}</strong></footer>
+    </article>`;
+  }).join("");
+
+  const factors = nums.map((value, index) => {
+    let side = "neutral";
+    if (current >= 0 && index < current) side = "left";
+    if (current >= 0 && index > current) side = "right";
+    if (index === current) side = "excluded";
+    return `<span class="${side}"><small>i=${index}</small><b>${value}</b><em>${side === "left" ? "LEFT" : side === "right" ? "RIGHT" : side === "excluded" ? "×" : ""}</em></span>`;
+  }).join("");
+
+  let calculation = "";
+  if (current >= 0 && view.direction === "prefix") {
+    calculation = `<section class="pes238-calc prefix"><div><small>${vi ? "PREFIX TRƯỚC i" : "PREFIX BEFORE i"}</small><strong>${show(view.runningBefore)}</strong><span>${vi ? `lưu vào LEFT(${current})` : `stored as LEFT(${current})`}</span></div><b>×</b><div class="excluded"><small>nums[${current}]</small><strong>${nums[current]}</strong><span>${vi ? "nhân sau khi lưu" : "multiply after storing"}</span></div><b>=</b><div><small>${vi ? "PREFIX CHO i KẾ" : "PREFIX FOR NEXT i"}</small><strong>${show(view.runningAfter)}</strong><span>${show(view.runningBefore)} × ${nums[current]}</span></div></section>`;
+  } else if (current >= 0 && view.direction === "suffix") {
+    calculation = `<section class="pes238-calc suffix"><div><small>LEFT(${current})</small><strong>${show(left[current])}</strong><span>${vi ? "đã lưu ở lượt 1" : "saved in pass 1"}</span></div><b>×</b><div><small>RIGHT(${current})</small><strong>${show(right[current])}</strong><span>${vi ? "suffix trước nums[i]" : "suffix before nums[i]"}</span></div><b>=</b><div class="answer"><small>answer[${current}]</small><strong>${show(answer[current])}</strong><span>${vi ? "không chứa nums[i]" : "does not contain nums[i]"}</span></div></section>`;
+  }
+
+  const prefixCells = nums.map((_, index) => `<span class="${left[index] != null ? "known" : ""} ${index === current && view.direction === "prefix" ? "current" : ""}"><small>i=${index}</small><b>${show(left[index])}</b></span>`).join("");
+  const suffixCells = nums.map((_, index) => `<span class="${right[index] != null ? "known" : ""} ${index === current && view.direction === "suffix" ? "current" : ""}"><small>i=${index}</small><b>${show(right[index])}</b></span>`).join("");
+  const resolved = right.filter((value) => value != null).length;
+  const final = Boolean(view.final);
+
+  $("treeView").innerHTML = `<section class="pes238-viz" role="img" aria-label="Product of Array Except Self visualization">
+    <header><div><small>PREFIX PRODUCT · TWO PASSES · #238</small><strong>PRODUCT EXCEPT SELF</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="pes238-phases">${phases}</div>
+    <section class="pes238-rule"><b>${vi ? "Ý TƯỞNG CHÍNH TẠI MỖI INDEX i" : "THE CORE IDEA AT EVERY INDEX i"}</b><div><span class="left"><small>${vi ? "TÍCH BÊN TRÁI" : "PRODUCT ON THE LEFT"}</small><strong>nums[0] · … · nums[i−1]</strong></span><i>×</i><span class="right"><small>${vi ? "TÍCH BÊN PHẢI" : "PRODUCT ON THE RIGHT"}</small><strong>nums[i+1] · … · nums[n−1]</strong></span><i>=</i><span class="answer"><small>ANSWER</small><strong>answer[i]</strong></span></div><p>${vi ? "nums[i] không xuất hiện ở vế trái lẫn vế phải, nên tự động bị loại mà không cần phép chia." : "nums[i] appears in neither side, so it is excluded automatically without division."}</p></section>
+    <section class="pes238-metrics"><div><small>direction</small><strong>${view.direction === "prefix" ? "LEFT → RIGHT" : view.direction === "suffix" ? "RIGHT → LEFT" : "—"}</strong></div><div><small>${vi ? "index hiện tại" : "current index"}</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>${vi ? "tích đang chạy" : "running product"}</small><strong>${current >= 0 ? show(view.runningAfter) : "—"}</strong></div><div><small>${vi ? "đáp án hoàn chỉnh" : "completed answers"}</small><strong>${resolved}/${nums.length}</strong></div></section>
+    <section class="pes238-factors"><header><strong>${vi ? "SỐ NÀO ĐƯỢC NHÂN CHO INDEX HIỆN TẠI?" : "WHICH VALUES MULTIPLY INTO THE CURRENT INDEX?"}</strong><span>${vi ? "xanh lá = trái · xanh dương = phải · đỏ = bị loại" : "green = left · blue = right · red = excluded"}</span></header><div>${factors}</div></section>
+    <section class="pes238-cards-wrap"><header><strong>${vi ? "BẢNG LEFT × RIGHT" : "LEFT × RIGHT TABLE"}</strong><span>${vi ? "mỗi cột tương ứng một index" : "each column represents one index"}</span></header><div style="--pes238-count:${Math.max(nums.length, 1)}">${cards}</div></section>
+    <section class="pes238-sweeps"><div><header><strong>PREFIX · LEFT</strong><span>0 → ${Math.max(0, nums.length - 1)}</span></header><div>${prefixCells}</div></div><div><header><strong>SUFFIX · RIGHT</strong><span>${Math.max(0, nums.length - 1)} → 0</span></header><div>${suffixCells}</div></div></section>
+    ${calculation}
+    <section class="pes238-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(view.expression || "answer[i] = LEFT(i) × RIGHT(i)")}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="pes238-result ${final ? "done" : ""}"><small>ANSWER</small><strong>[${answer.map((value, index) => right[index] == null && !final ? "?" : show(value)).join(", ")}]</strong><span>${final ? (vi ? "Hai lượt duyệt, không phép chia, dùng O(1) bộ nhớ phụ ngoài output." : "Two passes, no division, and O(1) auxiliary space beyond the output.") : (vi ? "LEFT được điền trước; RIGHT hoàn tất từng đáp án khi quét ngược." : "LEFT is stored first; RIGHT completes each answer during the reverse pass.")}</span></footer>
+  </section>`;
+}
+
 function renderPourWater755View(step) {
   const view = step.pourWater755View || {};
   const vi = lang === "vi";
@@ -26901,6 +26966,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBuildingMeet2940View(step);
+  } else if (step.productExcept238View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderProductExcept238View(step);
   } else if (step.pourWater755View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

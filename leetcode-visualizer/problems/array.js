@@ -5063,17 +5063,177 @@ function buildSteps189(input, params) {
 
 /** LeetCode 238: Product of Array Except Self — prefix × suffix. */
 function buildSteps238(input) {
-  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const nums = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
+  if (nums.length === 0 || !nums.every(Number.isInteger)) {
+    throw new Error("nums must be a non-empty array of integers.");
+  }
+  if (nums.length > 12) {
+    throw new Error("Use at most 12 values so the visualization stays readable.");
+  }
   const n = nums.length;
-  const ans = new Array(n).fill(1);
+  const leftProducts = Array(n).fill(null);
+  const rightProducts = Array(n).fill(null);
+  const answer = Array(n).fill(null);
   const steps = [];
-  steps.push({ title: { vi: "answer = [1,...]", en: "answer = [1,...]" }, arr: [...nums], sub: ans.map(String), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }], note: { vi: "answer[i] = tích prefix (bên trái) × tích suffix (bên phải), không dùng phép chia.", en: "answer[i] = prefix product (left) × suffix product (right), without division." } });
+
+  function snapshot({
+    phase,
+    phaseIndex,
+    event,
+    codeLines,
+    title,
+    note,
+    currentIndex = -1,
+    direction = "none",
+    runningBefore = 1,
+    runningAfter = 1,
+    expression = "",
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: [...nums],
+      sub: answer.map((value) => value == null ? "?" : String(value)),
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: final ? Array.from({ length: n }, (_, index) => index) : [],
+      vars: [
+        { name: "i", value: currentIndex >= 0 ? currentIndex : "?" },
+        { name: "prefix", value: direction === "prefix" ? runningAfter : "—" },
+        { name: "suffix", value: direction === "suffix" ? runningAfter : "—" },
+        { name: "answer", value: `[${answer.map((value) => value == null ? "?" : value).join(", ")}]` },
+      ],
+      productExcept238View: {
+        phase,
+        phaseIndex,
+        event,
+        nums: [...nums],
+        leftProducts: [...leftProducts],
+        rightProducts: [...rightProducts],
+        answer: [...answer],
+        currentIndex,
+        direction,
+        runningBefore,
+        runningAfter,
+        expression,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "idea",
+    phaseIndex: 0,
+    event: "intro",
+    codeLines: [3, 4],
+    title: { vi: "Tách tích thành bên trái × bên phải", en: "Split the product into left × right" },
+    note: {
+      vi: "Tại index i, bỏ qua nums[i]. Ta chỉ cần tích mọi số nằm trước i và tích mọi số nằm sau i.",
+      en: "At index i, skip nums[i]. We only need the product of values before i and the product of values after i.",
+    },
+    expression: "answer[i] = LEFT(i) × RIGHT(i)",
+  });
+
   let prefix = 1;
-  for (let i = 0; i < n; i++) { ans[i] = prefix; prefix *= nums[i]; steps.push({ title: { vi: `prefix pass i=${i}: answer[${i}]=${ans[i]}`, en: `prefix pass i=${i}: answer[${i}]=${ans[i]}` }, arr: [...nums], sub: ans.map(String), highlight: [i], mark: [], codeLines: [4, 5, 6], vars: [{ name: "i", value: i }, { name: "prefix (after)", value: prefix }, { name: "answer", value: `[${ans.join(",")}]` }], note: { vi: `answer[${i}] = tích các phần tử bên TRÁI = ${ans[i]}. prefix nhân nums[${i}] → ${prefix}.`, en: `answer[${i}] = product of elements to the LEFT = ${ans[i]}. prefix ×= nums[${i}] → ${prefix}.` } }); }
+  snapshot({
+    phase: "prefix",
+    phaseIndex: 1,
+    event: "prefix-start",
+    codeLines: [6, 7],
+    title: { vi: "Lượt 1: đi từ trái sang phải", en: "Pass 1: move left to right" },
+    note: {
+      vi: "prefix bắt đầu bằng 1. Luôn ghi prefix vào ô hiện tại trước khi nhân nums[i], nên prefix không chứa chính nums[i].",
+      en: "prefix starts at 1. Store it at the current index before multiplying by nums[i], so it never contains nums[i] itself.",
+    },
+    direction: "prefix",
+    runningBefore: prefix,
+    runningAfter: prefix,
+    expression: "store prefix first → then prefix ×= nums[i]",
+  });
+
+  for (let i = 0; i < n; i += 1) {
+    const before = prefix;
+    leftProducts[i] = before;
+    answer[i] = before;
+    prefix *= nums[i];
+    snapshot({
+      phase: "prefix",
+      phaseIndex: 1,
+      event: "prefix-cell",
+      codeLines: [7, 8, 9],
+      title: { vi: `LEFT(${i}) = ${before}`, en: `LEFT(${i}) = ${before}` },
+      note: {
+        vi: `Ghi ${before} vào answer[${i}] trước. Sau đó mới đưa nums[${i}] = ${nums[i]} vào prefix cho index kế tiếp.`,
+        en: `Store ${before} in answer[${i}] first. Only then include nums[${i}] = ${nums[i]} in the prefix for the next index.`,
+      },
+      currentIndex: i,
+      direction: "prefix",
+      runningBefore: before,
+      runningAfter: prefix,
+      expression: `answer[${i}] = ${before} · prefix: ${before} × ${nums[i]} = ${prefix}`,
+    });
+  }
+
   let suffix = 1;
-  for (let i = n - 1; i >= 0; i--) { ans[i] *= suffix; suffix *= nums[i]; steps.push({ title: { vi: `suffix pass i=${i}: answer[${i}]=${ans[i]}`, en: `suffix pass i=${i}: answer[${i}]=${ans[i]}` }, arr: [...nums], sub: ans.map(String), highlight: [i], mark: [], codeLines: [7, 8, 9], vars: [{ name: "i", value: i }, { name: "suffix (after)", value: suffix }, { name: "answer", value: `[${ans.join(",")}]` }], note: { vi: `answer[${i}] ×= tích bên PHẢI → ${ans[i]}. suffix nhân nums[${i}] → ${suffix}.`, en: `answer[${i}] ×= product to the RIGHT → ${ans[i]}. suffix ×= nums[${i}] → ${suffix}.` } }); }
-  steps.push({ title: { vi: `Kết quả: [${ans.join(",")}]`, en: `Result: [${ans.join(",")}]` }, arr: [...nums], sub: ans.map(String), highlight: [], mark: Array.from({ length: n }, (_, i) => i), final: true, codeLines: [10], vars: [{ name: "answer", value: `[${ans.join(",")}]` }], note: { vi: "Tích mọi phần tử trừ chính nó.", en: "Product of all elements except self." } });
-  return { original: nums, answer: ans, steps };
+  snapshot({
+    phase: "suffix",
+    phaseIndex: 2,
+    event: "suffix-start",
+    codeLines: [11, 12],
+    title: { vi: "Lượt 2: đi từ phải sang trái", en: "Pass 2: move right to left" },
+    note: {
+      vi: "suffix cũng bắt đầu bằng 1. Tại mỗi index, nhân LEFT đã lưu với suffix hiện tại để ra đáp án hoàn chỉnh.",
+      en: "suffix also starts at 1. At each index, multiply the saved LEFT value by the current suffix to complete the answer.",
+    },
+    direction: "suffix",
+    runningBefore: suffix,
+    runningAfter: suffix,
+    expression: "answer[i] = saved LEFT(i) × current RIGHT(i)",
+  });
+
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const before = suffix;
+    rightProducts[i] = before;
+    const combined = leftProducts[i] * before;
+    answer[i] = combined === 0 ? 0 : combined;
+    suffix *= nums[i];
+    snapshot({
+      phase: "suffix",
+      phaseIndex: 2,
+      event: "suffix-cell",
+      codeLines: [12, 13, 14],
+      title: { vi: `answer[${i}] = ${answer[i]}`, en: `answer[${i}] = ${answer[i]}` },
+      note: {
+        vi: `LEFT(${i}) = ${leftProducts[i]} và RIGHT(${i}) = ${before}; chính nums[${i}] = ${nums[i]} không nằm trong tích.`,
+        en: `LEFT(${i}) = ${leftProducts[i]} and RIGHT(${i}) = ${before}; nums[${i}] = ${nums[i]} itself is absent from the product.`,
+      },
+      currentIndex: i,
+      direction: "suffix",
+      runningBefore: before,
+      runningAfter: suffix,
+      expression: `${leftProducts[i]} × ${before} = ${answer[i]} · suffix: ${before} × ${nums[i]} = ${suffix}`,
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    phaseIndex: 3,
+    event: "done",
+    codeLines: [16],
+    title: { vi: `Kết quả [${answer.join(", ")}]`, en: `Result [${answer.join(", ")}]` },
+    note: {
+      vi: "Mỗi ô là tích bên trái nhân tích bên phải. Không dùng phép chia nên vẫn xử lý đúng khi mảng có số 0.",
+      en: "Every cell is its left product times its right product. No division is used, so zeros are handled correctly.",
+    },
+    expression: `return [${answer.join(", ")}]`,
+    final: true,
+  });
+
+  return { original: [...nums], answer: [...answer], steps };
 }
 
 /** LeetCode 128: Longest Consecutive Sequence — hash set, only start at run heads. */
@@ -9822,13 +9982,45 @@ module.exports = {
   238: {
     id: 238, difficulty: "medium", slug: "product-of-array-except-self",
     category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "prefix-product", vi: "Tích prefix", en: "Prefix Product" },
+    ],
     title: { vi: "Product of Array Except Self", en: "Product of Array Except Self" },
     titleVi: { vi: "Tích trừ chính nó (prefix × suffix)", en: "Product except self (prefix × suffix)" },
     statement: { vi: "answer[i] = tích mọi phần tử trừ nums[i], KHÔNG dùng phép chia. Nhập nums cách nhau dấu phẩy.", en: "answer[i] = product of all elements except nums[i], WITHOUT division. Enter nums comma-separated." },
-    defaultInput: [1, 2, 3, 4], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
-    approach: [{ vi: "Lượt 1: answer[i] = tích các phần tử bên trái (prefix).", en: "Pass 1: answer[i] = product of elements to the left (prefix)." }, { vi: "Lượt 2: nhân thêm tích các phần tử bên phải (suffix).", en: "Pass 2: multiply by the product of elements to the right (suffix)." }],
+    defaultInput: [1, 2, 3, 4], inputKind: "integer", inputLabel: { vi: "nums (tối đa 12 số)", en: "nums (up to 12 values)" }, extraParams: [],
+    approach: [
+      { vi: "Ở index i, đáp án được tách thành tích mọi số bên trái i nhân tích mọi số bên phải i.", en: "At index i, split the answer into the product left of i times the product right of i." },
+      { vi: "Lượt trái → phải ghi prefix vào answer[i] trước khi nhân nums[i], nên chính nums[i] bị loại.", en: "The left-to-right pass stores prefix in answer[i] before multiplying nums[i], excluding nums[i] itself." },
+      { vi: "Lượt phải → trái nhân answer[i] với suffix hiện tại, rồi mới đưa nums[i] vào suffix cho index kế tiếp.", en: "The right-to-left pass multiplies answer[i] by the current suffix, then includes nums[i] for the next index." },
+    ],
     complexity: { time: "O(n)", space: "O(1)", note: { vi: "Không tính mảng output.", en: "Excluding the output array." } },
-    code: ["class Solution:", "    def productExceptSelf(self, nums):", "        n = len(nums); answer = [1]*n", "        prefix = 1", "        for i in range(n):", "            answer[i] = prefix; prefix *= nums[i]", "        suffix = 1", "        for i in range(n-1, -1, -1):", "            answer[i] *= suffix; suffix *= nums[i]", "        return answer"],
+    code: [
+      "class Solution:",
+      "    def productExceptSelf(self, nums):",
+      "        n = len(nums)",
+      "        answer = [1] * n",
+      "",
+      "        prefix = 1",
+      "        for i in range(n):",
+      "            answer[i] = prefix",
+      "            prefix *= nums[i]",
+      "",
+      "        suffix = 1",
+      "        for i in range(n - 1, -1, -1):",
+      "            answer[i] *= suffix",
+      "            suffix *= nums[i]",
+      "",
+      "        return answer",
+    ],
+    liveArgs: (input) => {
+      const nums = Array.isArray(input) ? [...input] : [];
+      if (nums.length === 0 || nums.length > 12 || !nums.every(Number.isInteger)) {
+        throw new Error("nums must contain between 1 and 12 integers.");
+      }
+      return [nums];
+    },
     builder: buildSteps238,
   },
   128: {
