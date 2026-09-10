@@ -15710,7 +15710,7 @@ function renderTrappingRainView(step) {
     </div>`;
 }
 
-function renderTrapRain2View(step) {
+function renderTrapRain2ViewLegacy(step) {
   const view = step.trapRain2View || {};
   const vi = lang === "vi";
   const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
@@ -15804,6 +15804,180 @@ function renderTrapRain2View(step) {
       <span><i class="water"></i>${vi ? "có nước" : "water"}</span>
     </div>
   </div>`;
+}
+
+function renderTrapRain2View(step) {
+  const view = step.trapRain2View || {};
+  const vi = lang === "vi";
+  const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
+  const waterAt = Array.isArray(view.waterAt) ? view.waterAt : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const settled = Array.isArray(view.settled) ? view.settled : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const rows = Number.isInteger(view.rows) ? view.rows : heightMap.length;
+  const cols = Number.isInteger(view.cols) ? view.cols : (heightMap[0] || []).length;
+  const popped = view.popped || null;
+  const neighbor = view.neighbor || null;
+  const phase = String(view.phase || "init");
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : (phase === "init" ? 0 : phase === "pop" ? 1 : phase === "done" ? 3 : 2);
+  const phaseLabels = vi
+    ? ["1. Đưa biên vào heap", "2. Pop tường thấp nhất", "3. Mở ô hàng xóm", "4. Tổng nước"]
+    : ["1. Add border to heap", "2. Pop lowest wall", "3. Open a neighbor", "4. Total water"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const cellKey = (cell) => cell ? `${cell.r}:${cell.c}` : "";
+  const poppedKey = cellKey(popped);
+  const neighborKey = cellKey(neighbor);
+  const heapRanks = new Map(heap.map((cell, index) => [cellKey(cell), index + 1]));
+
+  const cells = heightMap.map((row, r) => row.map((ground, c) => {
+    const key = `${r}:${c}`;
+    const water = Number(waterAt[r]?.[c]) || 0;
+    const surface = ground + water;
+    const border = r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
+    const isVisited = Boolean(visited[r]?.[c]);
+    const isSettled = Boolean(settled[r]?.[c]);
+    const rank = heapRanks.get(key);
+    const classes = [
+      "trw407-cell",
+      border ? "border" : "interior",
+      !isVisited ? "unvisited" : "",
+      isVisited && !isSettled ? "frontier" : "",
+      isSettled ? "settled" : "",
+      key === poppedKey ? "popped" : "",
+      key === neighborKey ? "neighbor" : "",
+      water > 0 ? "wet" : "",
+    ].filter(Boolean).join(" ");
+    const state = key === neighborKey
+      ? (vi ? "ĐANG MỞ" : "OPENING")
+      : key === poppedKey
+        ? "POPPED"
+        : rank
+          ? `HEAP #${rank}`
+          : isSettled
+            ? (vi ? "ĐÃ CHỐT" : "SETTLED")
+            : border
+              ? "BORDER"
+              : (vi ? "CHƯA THĂM" : "UNVISITED");
+    return `<article class="${classes}">
+      <header><small>[${r},${c}]</small><span>${state}</span></header>
+      <div class="trw407-levels"><span class="ground"><small>${vi ? "đất" : "ground"}</small><strong>${ground}</strong></span><i>+</i><span class="water"><small>${vi ? "nước" : "water"}</small><strong>${water}</strong></span></div>
+      <footer><small>${vi ? "mặt nước / tường" : "surface / wall"}</small><strong>${surface}</strong></footer>
+    </article>`;
+  }).join("")).join("");
+
+  const heapItems = heap.length
+    ? heap.map((item, index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? "MIN / NEXT" : `#${index + 1}`}</small><strong>wall ${item.wall}</strong><em>(${item.r}, ${item.c})</em></span>`).join("")
+    : `<em>${vi ? "Heap đã trống" : "The heap is empty"}</em>`;
+  const hiddenHeap = Number(view.heapSize || 0) > heap.length ? `<b class="trw407-more">+${Number(view.heapSize) - heap.length}</b>` : "";
+  const hasNeighbor = neighbor && Number.isFinite(view.wall) && Number.isFinite(view.cellHeight);
+  const trapped = Number(view.trapped) || 0;
+  const comparison = hasNeighbor
+    ? `<section class="trw407-comparison ${trapped > 0 ? "fill" : "raise"}">
+        <div><small>${vi ? "TƯỜNG THẤP NHẤT" : "LOWEST BOUNDARY"}</small><strong>${view.wall}</strong><span>(${popped.r}, ${popped.c})</span></div>
+        <b>${view.wall > view.cellHeight ? ">" : "≤"}</b>
+        <div><small>${vi ? "ĐỘ CAO HÀNG XÓM" : "NEIGHBOR GROUND"}</small><strong>${view.cellHeight}</strong><span>(${neighbor.r}, ${neighbor.c})</span></div>
+        <p><span><small>${vi ? "NƯỚC GIỮ Ở Ô" : "WATER IN CELL"}</small><strong>max(0, ${view.wall} − ${view.cellHeight}) = ${trapped}</strong></span><i>→</i><span><small>${vi ? "TƯỜNG MỚI ĐƯA VÀO HEAP" : "NEW WALL PUSHED TO HEAP"}</small><strong>max(${view.wall}, ${view.cellHeight}) = ${view.newWall}</strong></span></p>
+      </section>`
+    : "";
+  const activeAction = phase === "init"
+    ? (vi ? "Biên thông với bên ngoài nên không thể tự giữ nước. Dùng toàn bộ vòng biên làm tường khởi đầu." : "The border leaks outside, so it cannot hold water by itself. Use the whole border as the initial wall.")
+    : phase === "pop"
+      ? (vi ? "Lấy tường thấp nhất trước: nếu nước có thể thoát, nó sẽ thoát qua điểm thấp nhất này." : "Take the lowest wall first: if water can escape, it escapes through this lowest point.")
+      : phase === "done"
+        ? (vi ? "Mọi ô đã được mở từ ngoài vào trong; tổng nước đã được cộng đúng một lần cho mỗi ô." : "Every cell has been opened from the outside inward; each cell's water was added exactly once.")
+        : trapped > 0
+          ? (vi ? `Ô thấp hơn tường ${view.wall}, nên đổ đầy ${trapped} đơn vị tới cùng mặt nước ${view.newWall}.` : `The cell is below wall ${view.wall}, so add ${trapped} units up to surface ${view.newWall}.`)
+          : (vi ? `Ô cao ${view.cellHeight} không thấp hơn tường; không có nước và chính ô này trở thành tường mới.` : `Ground ${view.cellHeight} is not below the wall; add no water and use this cell as the new wall.`);
+  const totalBefore = Number(view.waterBefore) || 0;
+  const total = Number(view.total) || 0;
+  const final = Boolean(step.final || phase === "done");
+
+  $("treeView").innerHTML = `<section class="trw407-viz" role="img" aria-label="Trapping Rain Water II visualization">
+    <header><div><small>MIN-HEAP · FLOOD FROM BORDER · #407</small><strong>TRAPPING RAIN WATER II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="trw407-phases">${phases}</div>
+    <section class="trw407-model"><b>${vi ? "HÌNH DUNG NHƯ MỞ BẢN ĐỒ TỪ NGOÀI VÀO" : "IMAGINE OPENING THE MAP FROM OUTSIDE IN"}</b><div><span><small>1</small><strong>${vi ? "Vòng biên" : "Border ring"}</strong><em>${vi ? "nơi nước có thể thoát" : "where water can escape"}</em></span><i>→</i><span><small>2</small><strong>${vi ? "Tường thấp nhất" : "Lowest wall"}</strong><em>${vi ? "min-heap chọn trước" : "min-heap picks first"}</em></span><i>→</i><span><small>3</small><strong>${vi ? "Ô bên trong" : "Inner neighbor"}</strong><em>${vi ? "đổ nước hoặc nâng tường" : "fill water or raise wall"}</em></span></div></section>
+    <section class="trw407-metrics"><div><small>${vi ? "tổng nước" : "total water"}</small><strong>${total}</strong></div><div><small>${vi ? "tường đang xét" : "current wall"}</small><strong>${view.wall ?? "—"}</strong></div><div><small>${vi ? "ô đã phát hiện" : "discovered cells"}</small><strong>${view.visitedCount ?? 0}/${rows * cols}</strong></div><div><small>${vi ? "ô đã chốt" : "settled cells"}</small><strong>${view.settledCount ?? 0}/${rows * cols}</strong></div><div><small>heap size</small><strong>${view.heapSize ?? 0}</strong></div></section>
+    <section class="trw407-map"><header><strong>${vi ? "BẢN ĐỒ NHÌN TỪ TRÊN" : "TOP-DOWN HEIGHT MAP"}</strong><span>${vi ? "mỗi ô tách riêng độ cao đất + nước = mặt nước/tường" : "each cell separates ground + water = surface/wall"}</span></header><div class="trw407-grid" style="--trw407-cols:${Math.max(cols, 1)}">${cells}</div></section>
+    <section class="trw407-heap"><header><strong>MIN-HEAP · FRONTIER</strong><span>${vi ? "phần tử đầu là đường thoát thấp nhất còn lại" : "the first item is the lowest remaining escape wall"}</span></header><div>${heapItems}${hiddenHeap}</div></section>
+    ${comparison}
+    <section class="trw407-action"><small>${String(view.event || phase).toUpperCase()}</small><strong>${escapeHtml(activeAction)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="trw407-running"><span><small>${vi ? "TỔNG TRƯỚC" : "TOTAL BEFORE"}</small><strong>${totalBefore}</strong></span><i>+</i><span><small>${vi ? "NƯỚC Ở Ô NÀY" : "WATER IN THIS CELL"}</small><strong>${hasNeighbor ? trapped : 0}</strong></span><i>=</i><span><small>${vi ? "TỔNG HIỆN TẠI" : "CURRENT TOTAL"}</small><strong>${total}</strong></span></section>
+    <footer class="trw407-result ${final ? "done" : ""}"><small>TOTAL TRAPPED WATER</small><strong>${final ? total : "…"}</strong><span>${final ? (vi ? "Kết quả là tổng phần nước màu xanh trong các ô bên trong." : "The answer is the sum of the blue water values in all interior cells.") : (vi ? "Min-heap bảo đảm không dùng một bức tường cao giả tạo khi vẫn còn đường thoát thấp hơn." : "The min-heap prevents using an artificially high wall while a lower escape route remains.")}</span></footer>
+  </section>`;
+}
+
+function renderAverageSubtree2265View(step) {
+  const view = step.averageSubtree2265View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const currentId = view.current;
+  const formula = view.formula || null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. DFS trái → phải", "2. Gộp sum + count", "3. So sánh trung bình", "4. Trả kết quả"]
+    : ["1. DFS left → right", "2. Combine sum + count", "3. Compare average", "4. Return result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const treeWidth = Math.max(560, (maxX + 1) * 96);
+  const treeHeight = Math.max(240, (maxDepth + 1) * 112 + 40);
+  const xOffset = Math.max(52, (treeWidth - maxX * 96) / 2);
+  const xOf = (node) => xOffset + (Number(node.x) || 0) * 96;
+  const yOf = (node) => 52 + (Number(node.y) || 0) * 108;
+  const edges = nodes.filter((node) => node.parentId !== null && nodeMap.has(node.parentId)).map((node) => {
+    const parent = nodeMap.get(node.parentId);
+    return `<line x1="${xOf(parent)}" y1="${yOf(parent) + 27}" x2="${xOf(node)}" y2="${yOf(node) - 27}" />`;
+  }).join("");
+  const treeNodes = nodes.map((node) => {
+    const isCurrent = node.id === currentId;
+    const state = String(node.state || "unvisited");
+    const stateLabel = state === "match"
+      ? (vi ? "KHỚP" : "MATCH")
+      : state === "miss"
+        ? (vi ? "KHÔNG KHỚP" : "NO MATCH")
+        : state === "combine"
+          ? (vi ? "ĐANG GỘP" : "COMBINE")
+          : state === "waiting"
+            ? (vi ? "CHỜ CON" : "WAITING")
+            : (vi ? "CHƯA THĂM" : "UNVISITED");
+    const details = node.sum === null || node.sum === undefined
+      ? "sum ?, count ?"
+      : `sum ${node.sum} · n ${node.count} · avg ${node.average}`;
+    return `<g class="as2265-node ${escapeHtml(state)} ${isCurrent ? "current" : ""}" transform="translate(${xOf(node)} ${yOf(node)})">
+      <circle r="28"></circle>
+      <text class="value" text-anchor="middle" y="6">${escapeHtml(String(node.value))}</text>
+      <text class="state" text-anchor="middle" y="44">${escapeHtml(stateLabel)}</text>
+      <text class="stats" text-anchor="middle" y="59">${escapeHtml(details)}</text>
+    </g>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((id, index) => {
+      const node = nodeMap.get(id);
+      return `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${node ? node.value : "?"}</strong></span>`;
+    }).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã trống" : "The stack is empty"}</em>`;
+  const formulaHtml = formula
+    ? `<section class="as2265-formula ${formula.match === true ? "match" : formula.match === false ? "miss" : ""}">
+        <header><strong>${vi ? `TÍNH SUBTREE TẠI NODE ${formula.nodeValue}` : `COMPUTE SUBTREE AT NODE ${formula.nodeValue}`}</strong><span>${vi ? "con trái + node + con phải" : "left child + node + right child"}</span></header>
+        <div class="sum-row"><span><small>LEFT SUM</small><strong>${formula.leftSum}</strong></span><i>+</i><span><small>NODE</small><strong>${formula.nodeValue}</strong></span><i>+</i><span><small>RIGHT SUM</small><strong>${formula.rightSum}</strong></span><b>=</b><span class="total"><small>SUBTREE SUM</small><strong>${formula.sum}</strong></span></div>
+        <div class="count-row"><span><small>LEFT COUNT</small><strong>${formula.leftCount}</strong></span><i>+</i><span><small>NODE</small><strong>1</strong></span><i>+</i><span><small>RIGHT COUNT</small><strong>${formula.rightCount}</strong></span><b>=</b><span class="total"><small>SUBTREE COUNT</small><strong>${formula.count}</strong></span></div>
+        <div class="compare"><span><small>${vi ? "TRUNG BÌNH LÀM TRÒN XUỐNG" : "FLOOR AVERAGE"}</small><strong>${formula.sum} // ${formula.count} = ${formula.average}</strong></span><b>${formula.nodeValue} ${formula.nodeValue === formula.average ? "=" : "≠"} ${formula.average}</b><span class="verdict">${formula.match === null ? (vi ? "Chờ so sánh" : "Ready to compare") : formula.match ? (vi ? "+1 vào answer" : "+1 to answer") : (vi ? "+0 vào answer" : "+0 to answer")}</span></div>
+      </section>`
+    : `<section class="as2265-rule"><b>POSTORDER</b><div><span><strong>LEFT</strong><small>(sum, count)</small></span><i>→</i><span><strong>RIGHT</strong><small>(sum, count)</small></span><i>→</i><span><strong>NODE</strong><small>floor(sum / count)</small></span></div><p>${vi ? "Tại sao phải đi từ lá lên? Vì node cha chỉ tính được trung bình sau khi đã biết tổng và số lượng của cả hai cây con." : "Why work upward from leaves? A parent can compute its average only after both child sums and counts are known."}</p></section>`;
+  const final = Boolean(step.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="as2265-viz" role="img" aria-label="Count Nodes Equal to Average of Subtree visualization">
+    <header><div><small>POSTORDER DFS · TREE · #2265</small><strong>${vi ? "NODE = TRUNG BÌNH SUBTREE" : "NODE = SUBTREE AVERAGE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="as2265-phases">${phases}</div>
+    <section class="as2265-summary"><div><small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small><strong>${currentId === null || currentId === undefined ? "—" : nodeMap.get(currentId)?.value ?? "—"}</strong></div><div><small>${vi ? "ĐÃ TÍNH XONG" : "PROCESSED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div class="answer"><small>ANSWER</small><strong>${view.answer || 0}</strong></div></section>
+    <section class="as2265-tree"><header><strong>${vi ? "CÂY TÍNH TỪ DƯỚI LÊN" : "TREE COMPUTED BOTTOM-UP"}</strong><span>${vi ? "xanh lá = khớp · đỏ = không khớp · cam = hiện tại" : "green = match · red = no match · orange = current"}</span></header><div><svg viewBox="0 0 ${treeWidth} ${treeHeight}" style="min-width:${treeWidth}px" aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section>
+    <section class="as2265-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "node cha chờ hai cây con trả về" : "parents wait for both children to return"}</span></header><div>${stackHtml}</div></section>
+    ${formulaHtml}
+    <section class="as2265-action"><small>${escapeHtml(String(view.event || "postorder").toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="as2265-result ${final ? "done" : ""}"><small>${vi ? "SỐ NODE THỎA" : "MATCHING NODES"}</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "Mỗi node xanh có node.val = floor(subtree_sum / subtree_count)." : "Every green node has node.val = floor(subtree_sum / subtree_count).") : (vi ? "Leaf luôn khớp vì trung bình của một giá trị chính là nó." : "A leaf always matches because the average of one value is itself.")}</span></footer>
+  </section>`;
 }
 
 function renderMissingIntegerView(step) {
@@ -26882,6 +27056,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTrapRain2View(step);
+  } else if (step.averageSubtree2265View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAverageSubtree2265View(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

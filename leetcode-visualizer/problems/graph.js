@@ -15718,13 +15718,55 @@ function buildSteps864(input) {
  */
 function buildSteps407(input) {
   const heightMap = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
-    .map((row) => row.split(",").map((v) => Number(v.trim())));
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
   const steps = [];
 
+  if (
+    heightMap.length === 0
+    || heightMap[0].length === 0
+    || heightMap.some((row) => row.length !== heightMap[0].length)
+    || heightMap.some((row) => row.some((height) => !Number.isInteger(height) || height < 0 || height > 20000))
+  ) {
+    throw new Error("heightMap must be a rectangular grid of integers between 0 and 20000.");
+  }
+  if (heightMap.length > 8 || heightMap[0].length > 8) {
+    throw new Error("Use at most an 8×8 grid so the visualization stays readable.");
+  }
+
   if (heightMap.length < 3 || heightMap[0].length < 3) {
+    const rows = heightMap.length;
+    const cols = heightMap[0].length;
+    const waterAt = Array.from({ length: rows }, () => Array(cols).fill(0));
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(true));
+    const settled = Array.from({ length: rows }, () => Array(cols).fill(true));
     steps.push({
       title: { vi: "Lưới < 3×3 → không giữ được nước → 0", en: "Grid < 3×3 → no water → 0" },
-      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "0", cls: "empty" }]] },
+      arr: [],
+      trapRain2View: {
+        heightMap: heightMap.map((row) => [...row]),
+        waterAt,
+        visited,
+        settled,
+        rows,
+        cols,
+        heap: [],
+        heapSize: 0,
+        popped: null,
+        neighbor: null,
+        phase: "done",
+        phaseIndex: 3,
+        event: "too-small",
+        wall: null,
+        cellHeight: null,
+        trapped: 0,
+        newWall: null,
+        total: 0,
+        waterBefore: 0,
+        visitedCount: rows * cols,
+        settledCount: rows * cols,
+        decision: "no interior cell exists",
+        status: [],
+      },
       final: true, codeLines: [4, 5], vars: [{ name: "answer", value: 0 }],
       note: { vi: "Cần ít nhất 3×3. Nhập dạng 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1", en: "Need at least 3×3. Enter like 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1" },
     });
@@ -15734,6 +15776,7 @@ function buildSteps407(input) {
   const rows = heightMap.length;
   const cols = heightMap[0].length;
   const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const settled = Array.from({ length: rows }, () => Array(cols).fill(false));
   const waterAt = Array.from({ length: rows }, () => Array(cols).fill(0));
   const heap = [];
 
@@ -15750,22 +15793,30 @@ function buildSteps407(input) {
 
   function makeTrapRain2View(opts = {}) {
     const sortedHeap = [...heap].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    const phase = opts.phase || "init";
+    const phaseIndex = phase === "init" ? 0 : phase === "pop" ? 1 : phase === "done" ? 3 : 2;
     return {
       heightMap: heightMap.map((row) => [...row]),
       waterAt: waterAt.map((row) => [...row]),
       visited: visited.map((row) => [...row]),
+      settled: settled.map((row) => [...row]),
       rows,
       cols,
       heap: sortedHeap.slice(0, 12).map(([wall, r, c]) => ({ wall, r, c })),
       heapSize: heap.length,
       popped: opts.popped || null,
       neighbor: opts.neighbor || null,
-      phase: opts.phase || "init",
+      phase,
+      phaseIndex,
+      event: opts.event || phase,
       wall: opts.wall ?? null,
       cellHeight: opts.cellHeight ?? null,
       trapped: opts.trapped ?? null,
       newWall: opts.newWall ?? null,
       total: opts.total ?? 0,
+      waterBefore: opts.waterBefore ?? opts.total ?? 0,
+      visitedCount: visited.flat().filter(Boolean).length,
+      settledCount: settled.flat().filter(Boolean).length,
       decision: opts.decision || "",
       status: opts.status || [],
     };
@@ -15848,6 +15899,7 @@ function buildSteps407(input) {
   while (heap.length && guard < 200) {
     guard += 1;
     const [height, r, c] = hpop();
+    settled[r][c] = true;
     const verbose = guard <= 80;
 
     if (verbose) {
@@ -15857,9 +15909,11 @@ function buildSteps407(input) {
         codeLines: [20, 21],
         view: {
           phase: "pop",
+          event: "pop-lowest-wall",
           popped: { r, c, wall: height },
           wall: height,
           total: water,
+          waterBefore: water,
           decision: "min-heap pops the smallest boundary",
           status: [
             { label: "popped", value: `(${r},${c})` },
@@ -15883,6 +15937,7 @@ function buildSteps407(input) {
       const nr = r + dr, nc = c + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || visited[nr][nc]) continue;
       visited[nr][nc] = true;
+      const waterBefore = water;
       const trapped = Math.max(0, height - heightMap[nr][nc]);
       water += trapped;
       waterAt[nr][nc] = trapped;
@@ -15896,6 +15951,7 @@ function buildSteps407(input) {
           codeLines: [22, 23, 24, 25, 27, 28, 29, 30, 31],
           view: {
             phase: trapped > 0 ? "trap" : "push",
+            event: trapped > 0 ? "trap-neighbor" : "raise-boundary",
             popped: { r, c, wall: height },
             neighbor: { r: nr, c: nc },
             wall: height,
@@ -15903,6 +15959,7 @@ function buildSteps407(input) {
             trapped,
             newWall: newHeight,
             total: water,
+            waterBefore,
             decision: `max(0, ${height} - ${heightMap[nr][nc]}) = ${trapped}`,
             status: [
               { label: "from wall", value: `(${r},${c})` },

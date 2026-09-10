@@ -5547,7 +5547,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2791],
+    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -6682,6 +6682,241 @@ Object.assign(module.exports, {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "h là chiều cao cây do stack đệ quy.", en: "h is the tree height used by recursion." } },
     code: ["class Solution:", "    def minCameraCover(self, root):", "        cameras = 0", "        def dfs(node):", "            nonlocal cameras", "            if not node: return 2  # covered", "            left, right = dfs(node.left), dfs(node.right)", "            if left == 0 or right == 0:", "                cameras += 1", "                return 1  # camera here", "            if left == 1 or right == 1:", "                return 2  # covered by child", "            return 0  # parent must cover me", "        if dfs(root) == 0:", "            cameras += 1", "        return cameras"],
     builder: buildSteps968,
+  },
+});
+
+function parseAverageSubtree2265(input) {
+  const raw = Array.isArray(input)
+    ? input
+    : String(input ?? "").trim().replace(/^\[|\]$/g, "").split(",").map((item) => item.trim());
+  if (!raw.length || raw.every((item) => item === "")) throw new Error("Enter a non-empty binary tree");
+  const values = raw.map((item) => {
+    if (item === null || String(item).toLowerCase() === "null" || String(item) === "") return null;
+    const value = Number(item);
+    if (!Number.isInteger(value) || value < 0 || value > 1000) throw new Error("Tree values must be integers from 0 to 1000, or null");
+    return value;
+  });
+  if (values[0] === null) throw new Error("The root cannot be null");
+
+  let nextId = 0;
+  const root = { id: nextId++, val: values[0], left: null, right: null };
+  const queue = [root];
+  let index = 1;
+  while (queue.length && index < values.length) {
+    const parent = queue.shift();
+    if (values[index] !== null) {
+      parent.left = { id: nextId++, val: values[index], left: null, right: null };
+      queue.push(parent.left);
+    }
+    index++;
+    if (index < values.length && values[index] !== null) {
+      parent.right = { id: nextId++, val: values[index], left: null, right: null };
+      queue.push(parent.right);
+    }
+    index++;
+  }
+  if (index < values.length && values.slice(index).some((value) => value !== null)) throw new Error("Invalid level-order tree: values remain after all parents are null");
+  if (nextId > 31) throw new Error("Visualization supports at most 31 tree nodes");
+  return root;
+}
+
+function buildSteps2265(input) {
+  const root = parseAverageSubtree2265(input);
+  const layout = treeToVizNodes(root, null, null);
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
+
+  const steps = [];
+  const stack = [];
+  const stats = new Map();
+  let answer = 0;
+
+  const makeView = ({ phase = "postorder", phaseIndex = 0, event = "start", current = null, formula = null } = {}) => ({
+    phase,
+    phaseIndex,
+    event,
+    nodes: layout.map((item) => {
+      const node = nodeById.get(item.id);
+      const stat = stats.get(item.id) || {};
+      return {
+        id: item.id,
+        parentId: item.parentId,
+        x: item.x,
+        y: item.y,
+        value: node.val,
+        sum: stat.sum ?? null,
+        count: stat.count ?? null,
+        average: stat.average ?? null,
+        match: stat.match ?? null,
+        state: stat.state || (stack.includes(item.id) ? "waiting" : "unvisited"),
+      };
+    }),
+    stack: [...stack],
+    current: current === null ? null : current.id,
+    formula,
+    answer,
+    processed: [...stats.values()].filter((stat) => stat.match !== null).length,
+    totalNodes: layout.length,
+  });
+
+  const push = ({ title, note, codeLines, final = false, ...viewOptions }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "stack", value: `[${stack.map((id) => nodeById.get(id).val).join(", ")}]` },
+        { name: "answer", value: answer },
+      ],
+      note,
+      averageSubtree2265View: makeView(viewOptions),
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Mục tiêu: tính từ lá lên gốc", en: "Goal: compute from leaves up to the root" },
+    note: { vi: "Mỗi node cần tổng và số node của cả hai cây con, vì vậy ta dùng DFS hậu thứ tự: trái → phải → node.", en: "Each node needs the sum and size of both child subtrees, so use postorder DFS: left → right → node." },
+    codeLines: [3, 5],
+    event: "start",
+  });
+
+  function dfs(node) {
+    if (!node) return { sum: 0, count: 0 };
+    stack.push(node.id);
+    stats.set(node.id, { state: "waiting", sum: null, count: null, average: null, match: null });
+    push({
+      title: { vi: `Vào node ${node.val}: tính hai cây con trước`, en: `Enter node ${node.val}: compute both children first` },
+      note: { vi: `Node ${node.val} đang chờ kết quả từ bên trái và bên phải.`, en: `Node ${node.val} waits for results from its left and right children.` },
+      codeLines: [5, 7, 10],
+      event: "enter",
+      current: node,
+    });
+
+    const left = dfs(node.left);
+    const right = dfs(node.right);
+    const sum = left.sum + right.sum + node.val;
+    const count = left.count + right.count + 1;
+    const average = Math.floor(sum / count);
+    const formula = {
+      nodeValue: node.val,
+      leftSum: left.sum,
+      leftCount: left.count,
+      rightSum: right.sum,
+      rightCount: right.count,
+      sum,
+      count,
+      average,
+      match: null,
+    };
+    stats.set(node.id, { state: "combine", sum, count, average, match: null });
+    push({
+      title: { vi: `Gộp subtree của node ${node.val}`, en: `Combine node ${node.val}'s subtree` },
+      note: { vi: `Tổng = ${left.sum} + ${node.val} + ${right.sum} = ${sum}; số node = ${left.count} + 1 + ${right.count} = ${count}.`, en: `Sum = ${left.sum} + ${node.val} + ${right.sum} = ${sum}; count = ${left.count} + 1 + ${right.count} = ${count}.` },
+      codeLines: [10, 11, 12, 13, 14],
+      phase: "combine",
+      phaseIndex: 1,
+      event: "combine",
+      current: node,
+      formula,
+    });
+
+    const match = node.val === average;
+    if (match) answer++;
+    stats.set(node.id, { state: match ? "match" : "miss", sum, count, average, match });
+    push({
+      title: match
+        ? { vi: `${node.val} = floor(${sum}/${count}) = ${average} → cộng 1`, en: `${node.val} = floor(${sum}/${count}) = ${average} → add 1` }
+        : { vi: `${node.val} ≠ floor(${sum}/${count}) = ${average} → không cộng`, en: `${node.val} ≠ floor(${sum}/${count}) = ${average} → do not add` },
+      note: match
+        ? { vi: `Node ${node.val} thỏa điều kiện; answer tăng thành ${answer}.`, en: `Node ${node.val} matches; answer increases to ${answer}.` }
+        : { vi: `Trung bình làm tròn xuống là ${average}, khác giá trị node ${node.val}.`, en: `The floor average is ${average}, different from node value ${node.val}.` },
+      codeLines: match ? [14, 16, 17] : [14, 16],
+      phase: "compare",
+      phaseIndex: 2,
+      event: match ? "match" : "miss",
+      current: node,
+      formula: { ...formula, match },
+    });
+    stack.pop();
+    return { sum, count };
+  }
+
+  dfs(root);
+  push({
+    title: { vi: `Hoàn tất: ${answer} node thỏa điều kiện`, en: `Done: ${answer} matching nodes` },
+    note: { vi: "Mỗi node được tính đúng một lần; các node màu xanh là những node có giá trị bằng trung bình subtree của chính nó.", en: "Each node is computed once; green nodes have a value equal to their own subtree average." },
+    codeLines: [21, 22],
+    phase: "done",
+    phaseIndex: 3,
+    event: "done",
+    final: true,
+  });
+  return { input, answer, steps };
+}
+
+Object.assign(module.exports, {
+  2265: {
+    id: 2265,
+    difficulty: "medium",
+    slug: "count-nodes-equal-to-average-of-subtree",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS hậu thứ tự", en: "Postorder DFS" },
+    ],
+    title: { vi: "Count Nodes Equal to Average of Subtree", en: "Count Nodes Equal to Average of Subtree" },
+    titleVi: { vi: "Đếm node bằng trung bình subtree", en: "Count nodes equal to subtree average" },
+    statement: {
+      vi: "Đếm số node có giá trị bằng trung bình làm tròn xuống của mọi giá trị trong subtree gốc tại node đó.",
+      en: "Count nodes whose value equals the floor average of every value in the subtree rooted at that node.",
+    },
+    defaultInput: "4,8,5,0,1,null,6",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS hậu thứ tự để nhận (sum, count) từ cây trái và cây phải trước khi xử lý node hiện tại.", en: "Run postorder DFS to receive (sum, count) from the left and right subtrees before processing the current node." },
+      { vi: "Gộp: subtree_sum = left_sum + node.val + right_sum; subtree_count = left_count + 1 + right_count.", en: "Combine: subtree_sum = left_sum + node.val + right_sum; subtree_count = left_count + 1 + right_count." },
+      { vi: "So sánh node.val với subtree_sum // subtree_count; nếu bằng nhau thì tăng answer.", en: "Compare node.val with subtree_sum // subtree_count; increment answer when they are equal." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Mỗi node được thăm một lần; h là chiều cao stack đệ quy.", en: "Each node is visited once; h is the recursive stack height." },
+    },
+    code: [
+      "class Solution:",
+      "    def averageOfSubtree(self, root):",
+      "        answer = 0",
+      "",
+      "        def dfs(node):",
+      "            nonlocal answer",
+      "            if not node:",
+      "                return (0, 0)",
+      "",
+      "            left_sum, left_count = dfs(node.left)",
+      "            right_sum, right_count = dfs(node.right)",
+      "            subtree_sum = left_sum + node.val + right_sum",
+      "            subtree_count = left_count + 1 + right_count",
+      "            average = subtree_sum // subtree_count",
+      "",
+      "            if node.val == average:",
+      "                answer += 1",
+      "",
+      "            return (subtree_sum, subtree_count)",
+      "",
+      "        dfs(root)",
+      "        return answer",
+    ],
+    builder: buildSteps2265,
   },
 });
 
