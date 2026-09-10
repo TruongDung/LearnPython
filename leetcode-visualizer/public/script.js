@@ -16094,6 +16094,95 @@ function renderAverageSubtree2265View(step) {
   </section>`;
 }
 
+function renderMaximumAverage1120View(step) {
+  const view = step.maximumAverage1120View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const ranking = Array.isArray(view.ranking) ? view.ranking : [];
+  const currentId = view.current;
+  const bestNodeId = view.bestNode;
+  const bestSubtreeIds = new Set(Array.isArray(view.bestSubtreeIds) ? view.bestSubtreeIds : []);
+  const formula = view.formula || null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const short = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "—";
+  const precise = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(5) : "—";
+  const phaseLabels = vi
+    ? ["1. DFS từ lá lên", "2. Tính sum / count", "3. So với best", "4. Maximum average"]
+    : ["1. DFS from leaves", "2. Compute sum / count", "3. Compare with best", "4. Maximum average"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const horizontalGap = 112;
+  const contentWidth = maxX * horizontalGap;
+  const treeWidth = Math.max(360, contentWidth + 192);
+  const treeHeight = Math.max(220, (maxDepth + 1) * 112 + 72);
+  const xOffset = (treeWidth - contentWidth) / 2;
+  const xOf = (node) => xOffset + (Number(node.x) || 0) * horizontalGap;
+  const yOf = (node) => 64 + (Number(node.y) || 0) * 112;
+  const fitTreeToFrame = nodes.length <= 15;
+  const edges = nodes.filter((node) => node.parentId !== null && nodeMap.has(node.parentId)).map((node) => {
+    const parent = nodeMap.get(node.parentId);
+    const isBestEdge = bestSubtreeIds.has(node.id) && bestSubtreeIds.has(parent.id);
+    return `<line class="${isBestEdge ? "best" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 27}" x2="${xOf(node)}" y2="${yOf(node) - 27}" />`;
+  }).join("");
+  const treeNodes = nodes.map((node) => {
+    const isCurrent = node.id === currentId;
+    const isBestRoot = node.id === bestNodeId;
+    const state = String(node.state || "unvisited");
+    const stateLabel = isBestRoot
+      ? (vi ? "BEST ROOT" : "BEST ROOT")
+      : state === "checked"
+        ? (vi ? "ĐÃ SO SÁNH" : "CHECKED")
+        : state === "combine"
+          ? (vi ? "ĐANG TÍNH" : "COMPUTE")
+          : state === "waiting"
+            ? (vi ? "CHỜ CON" : "WAITING")
+            : (vi ? "CHƯA THĂM" : "UNVISITED");
+    const details = node.average === null || node.average === undefined
+      ? "sum ?, n ?, avg ?"
+      : `sum ${node.sum} / n ${node.count} · avg ${short(node.average)}`;
+    return `<g class="as2265-node ma1120-node ${escapeHtml(state)} ${isCurrent ? "current" : ""} ${isBestRoot ? "best-root" : ""} ${bestSubtreeIds.has(node.id) ? "best-subtree" : ""}" transform="translate(${xOf(node)} ${yOf(node)})">
+      <circle r="28"></circle>
+      <text class="value" text-anchor="middle" y="6">${escapeHtml(String(node.value))}</text>
+      <text class="state" text-anchor="middle" y="47">${escapeHtml(stateLabel)}</text>
+      <text class="stats" text-anchor="middle" y="66">${escapeHtml(details)}</text>
+    </g>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((id, index) => {
+      const node = nodeMap.get(id);
+      return `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${node ? node.value : "?"}</strong></span>`;
+    }).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã trống" : "The stack is empty"}</em>`;
+  const formulaHtml = formula
+    ? `<section class="as2265-formula ma1120-formula ${formula.updated === true ? "update" : formula.updated === false ? "keep" : ""}">
+        <header><strong>${vi ? `ỨNG VIÊN: SUBTREE GỐC ${formula.nodeValue}` : `CANDIDATE: SUBTREE ROOTED AT ${formula.nodeValue}`}</strong><span>${vi ? "gộp con trái + node + con phải" : "combine left child + node + right child"}</span></header>
+        <div class="sum-row"><span><small>LEFT SUM</small><strong>${formula.leftSum}</strong></span><i>+</i><span><small>NODE</small><strong>${formula.nodeValue}</strong></span><i>+</i><span><small>RIGHT SUM</small><strong>${formula.rightSum}</strong></span><b>=</b><span class="total"><small>SUBTREE SUM</small><strong>${formula.sum}</strong></span></div>
+        <div class="count-row"><span><small>LEFT COUNT</small><strong>${formula.leftCount}</strong></span><i>+</i><span><small>NODE</small><strong>1</strong></span><i>+</i><span><small>RIGHT COUNT</small><strong>${formula.rightCount}</strong></span><b>=</b><span class="total"><small>SUBTREE COUNT</small><strong>${formula.count}</strong></span></div>
+        <div class="compare"><span><small>CANDIDATE AVERAGE</small><strong>${formula.sum} / ${formula.count} = ${precise(formula.average)}</strong></span><b>${formula.updated === null ? "?" : formula.firstCandidate ? "INIT" : formula.updated ? ">" : "≤"}</b><span><small>BEST BEFORE</small><strong>${formula.firstCandidate ? "—" : precise(formula.bestBefore)}</strong></span></div>
+        <div class="ma1120-decision"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${formula.updated === null ? (vi ? "Đã tính candidate, tiếp theo so với best" : "Candidate ready; compare it with best next") : formula.updated ? (vi ? `Cập nhật best = ${precise(formula.bestAfter)}` : `Update best = ${precise(formula.bestAfter)}`) : (vi ? `Giữ best = ${precise(formula.bestAfter)}` : `Keep best = ${precise(formula.bestAfter)}`)}</strong></div>
+      </section>`
+    : `<section class="as2265-rule ma1120-rule"><b>POSTORDER DFS</b><div><span><strong>LEFT</strong><small>(sum, count)</small></span><i>→</i><span><strong>RIGHT</strong><small>(sum, count)</small></span><i>→</i><span><strong>NODE</strong><small>average = sum / count</small></span></div><p>${vi ? "Mỗi node đại diện cho một subtree. Tính từ lá lên để có đủ sum và count, rồi giữ average lớn nhất." : "Every node represents one subtree. Work upward from leaves to get sum and count, then retain the largest average."}</p></section>`;
+  const rankingHtml = ranking.length
+    ? ranking.map((item, index) => `<article class="${item.id === bestNodeId ? "best" : ""}"><small>#${index + 1} · ROOT ${item.value}</small><strong>${precise(item.average)}</strong><span>${item.sum} / ${item.count}</span></article>`).join("")
+    : `<em>${vi ? "Chưa có subtree nào được tính" : "No subtree has been computed yet"}</em>`;
+  const final = Boolean(step.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="as2265-viz ma1120-viz" role="img" aria-label="Maximum Average Subtree visualization">
+    <header><div><small>POSTORDER DFS · TREE · #1120</small><strong>MAXIMUM AVERAGE SUBTREE</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="as2265-phases ma1120-phases">${phases}</div>
+    <section class="as2265-summary ma1120-summary"><div><small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small><strong>${currentId === null || currentId === undefined ? "—" : nodeMap.get(currentId)?.value ?? "—"}</strong></div><div><small>${vi ? "ĐÃ TÍNH XONG" : "PROCESSED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div class="answer"><small>BEST AVERAGE</small><strong>${precise(view.best)}</strong></div></section>
+    <section class="as2265-tree ma1120-tree"><header><strong>${vi ? "TÍNH AVERAGE TỪ DƯỚI LÊN" : "AVERAGES COMPUTED BOTTOM-UP"}</strong><span>${vi ? "vàng = subtree tốt nhất · cam = node hiện tại" : "gold = best subtree · orange = current node"}</span></header><div><svg class="as2265-tree-svg ${fitTreeToFrame ? "fit" : "scroll"}" viewBox="0 0 ${treeWidth} ${treeHeight}" preserveAspectRatio="xMidYMin meet" ${fitTreeToFrame ? "" : `style="min-width:${treeWidth}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section>
+    <section class="as2265-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "node cha chờ sum và count từ các con" : "parents wait for child sums and counts"}</span></header><div>${stackHtml}</div></section>
+    ${formulaHtml}
+    <section class="ma1120-ranking"><header><strong>${vi ? "XẾP HẠNG SUBTREE ĐÃ TÍNH" : "COMPUTED SUBTREE RANKING"}</strong><span>${vi ? "sắp theo average giảm dần" : "sorted by descending average"}</span></header><div>${rankingHtml}</div></section>
+    <section class="as2265-action"><small>${escapeHtml(String(view.event || "postorder").toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="as2265-result ma1120-result ${final ? "done" : ""}"><small>MAXIMUM AVERAGE</small><strong>${final ? precise(view.best) : "…"}</strong><span>${final ? (vi ? `Subtree tốt nhất có gốc ${nodeMap.get(bestNodeId)?.value ?? "—"} và được tô vàng trên cây.` : `The best subtree is rooted at ${nodeMap.get(bestNodeId)?.value ?? "—"} and highlighted in gold.`) : (vi ? "Mỗi node được so sánh đúng một lần sau khi hai cây con hoàn tất." : "Each node is compared once after both child subtrees finish.")}</span></footer>
+  </section>`;
+}
+
 function renderMissingIntegerView(step) {
   const view = step.missingIntegerView || {};
   const vi = lang === "vi";
@@ -27182,6 +27271,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderAverageSubtree2265View(step);
+  } else if (step.maximumAverage1120View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximumAverage1120View(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

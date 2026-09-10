@@ -5547,7 +5547,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 1120, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -6685,7 +6685,7 @@ Object.assign(module.exports, {
   },
 });
 
-function parseAverageSubtree2265(input) {
+function parseAverageSubtreeInput(input, { maxValue = 1000, maxNodes = 31 } = {}) {
   const raw = Array.isArray(input)
     ? input
     : String(input ?? "").trim().replace(/^\[|\]$/g, "").split(",").map((item) => item.trim());
@@ -6693,7 +6693,7 @@ function parseAverageSubtree2265(input) {
   const values = raw.map((item) => {
     if (item === null || String(item).toLowerCase() === "null" || String(item) === "") return null;
     const value = Number(item);
-    if (!Number.isInteger(value) || value < 0 || value > 1000) throw new Error("Tree values must be integers from 0 to 1000, or null");
+    if (!Number.isInteger(value) || value < 0 || value > maxValue) throw new Error(`Tree values must be integers from 0 to ${maxValue}, or null`);
     return value;
   });
   if (values[0] === null) throw new Error("The root cannot be null");
@@ -6716,12 +6716,185 @@ function parseAverageSubtree2265(input) {
     index++;
   }
   if (index < values.length && values.slice(index).some((value) => value !== null)) throw new Error("Invalid level-order tree: values remain after all parents are null");
-  if (nextId > 31) throw new Error("Visualization supports at most 31 tree nodes");
+  if (nextId > maxNodes) throw new Error(`Visualization supports at most ${maxNodes} tree nodes`);
   return root;
 }
 
+function buildSteps1120(input) {
+  const root = parseAverageSubtreeInput(input, { maxValue: 100000, maxNodes: 31 });
+  const layout = treeToVizNodes(root, null, null);
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
+
+  const steps = [];
+  const stack = [];
+  const stats = new Map();
+  let best = 0;
+  let bestNode = null;
+
+  const subtreeIds = (node) => {
+    const ids = [];
+    (function collect(current) {
+      if (!current) return;
+      ids.push(current.id);
+      collect(current.left);
+      collect(current.right);
+    })(node);
+    return ids;
+  };
+
+  const makeView = ({ phase = "postorder", phaseIndex = 0, event = "start", current = null, formula = null } = {}) => ({
+    phase,
+    phaseIndex,
+    event,
+    nodes: layout.map((item) => {
+      const node = nodeById.get(item.id);
+      const stat = stats.get(item.id) || {};
+      return {
+        id: item.id,
+        parentId: item.parentId,
+        x: item.x,
+        y: item.y,
+        value: node.val,
+        sum: stat.sum ?? null,
+        count: stat.count ?? null,
+        average: stat.average ?? null,
+        state: stat.state || (stack.includes(item.id) ? "waiting" : "unvisited"),
+      };
+    }),
+    stack: [...stack],
+    current: current === null ? null : current.id,
+    formula,
+    best,
+    bestNode: bestNode === null ? null : bestNode.id,
+    bestSubtreeIds: bestNode === null ? [] : subtreeIds(bestNode),
+    processed: [...stats.values()].filter((stat) => stat.average !== null).length,
+    totalNodes: layout.length,
+    ranking: [...stats.entries()]
+      .filter(([, stat]) => stat.average !== null)
+      .map(([id, stat]) => ({ id, value: nodeById.get(id).val, sum: stat.sum, count: stat.count, average: stat.average }))
+      .sort((a, b) => b.average - a.average || a.id - b.id),
+  });
+
+  const push = ({ title, note, codeLines, final = false, ...viewOptions }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "stack", value: `[${stack.map((id) => nodeById.get(id).val).join(", ")}]` },
+        { name: "best", value: Number(best.toFixed(5)) },
+      ],
+      note,
+      maximumAverage1120View: makeView(viewOptions),
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Tìm average của mọi subtree từ dưới lên", en: "Compute every subtree average from the bottom up" },
+    note: { vi: "DFS hậu thứ tự trả về (sum, count). Mỗi node tạo ra đúng một ứng viên average để so với best.", en: "Postorder DFS returns (sum, count). Every node produces one average candidate to compare with best." },
+    codeLines: [3, 5],
+    event: "start",
+  });
+
+  function dfs(node) {
+    if (!node) return { sum: 0, count: 0 };
+    stack.push(node.id);
+    stats.set(node.id, { state: "waiting", sum: null, count: null, average: null });
+    push({
+      title: { vi: `Vào node ${node.val}: chờ hai subtree con`, en: `Enter node ${node.val}: wait for both child subtrees` },
+      note: { vi: `Chưa thể tính average tại ${node.val} cho đến khi cây trái và cây phải trả về sum, count.`, en: `The average at ${node.val} cannot be computed until both children return their sum and count.` },
+      codeLines: [5, 7, 10],
+      event: "enter",
+      current: node,
+    });
+
+    const left = dfs(node.left);
+    const right = dfs(node.right);
+    const sum = left.sum + node.val + right.sum;
+    const count = left.count + 1 + right.count;
+    const average = sum / count;
+    const bestBefore = best;
+    const formula = {
+      nodeValue: node.val,
+      leftSum: left.sum,
+      leftCount: left.count,
+      rightSum: right.sum,
+      rightCount: right.count,
+      sum,
+      count,
+      average,
+      bestBefore,
+      bestAfter: best,
+      firstCandidate: bestNode === null,
+      updated: null,
+    };
+    stats.set(node.id, { state: "combine", sum, count, average });
+    push({
+      title: { vi: `Subtree ${node.val}: average = ${sum} / ${count}`, en: `Subtree ${node.val}: average = ${sum} / ${count}` },
+      note: { vi: `Gộp hai con với node ${node.val}: sum = ${sum}, count = ${count}, average = ${average.toFixed(5)}.`, en: `Combine both children with node ${node.val}: sum = ${sum}, count = ${count}, average = ${average.toFixed(5)}.` },
+      codeLines: [10, 11, 12, 13, 14],
+      phase: "combine",
+      phaseIndex: 1,
+      event: "combine",
+      current: node,
+      formula,
+    });
+
+    const firstCandidate = bestNode === null;
+    const updated = firstCandidate || average > best;
+    if (updated) {
+      if (bestNode !== null) {
+        const oldBest = stats.get(bestNode.id);
+        stats.set(bestNode.id, { ...oldBest, state: "checked" });
+      }
+      best = average;
+      bestNode = node;
+    }
+    stats.set(node.id, { state: updated ? "best" : "checked", sum, count, average });
+    push({
+      title: updated
+        ? firstCandidate
+          ? { vi: `Ứng viên đầu tiên ${average.toFixed(5)} → khởi tạo best`, en: `First candidate ${average.toFixed(5)} → initialize best` }
+          : { vi: `${average.toFixed(5)} > best ${bestBefore.toFixed(5)} → cập nhật`, en: `${average.toFixed(5)} > best ${bestBefore.toFixed(5)} → update` }
+        : { vi: `${average.toFixed(5)} ≤ best ${bestBefore.toFixed(5)} → giữ nguyên`, en: `${average.toFixed(5)} ≤ best ${bestBefore.toFixed(5)} → keep it` },
+      note: updated
+        ? { vi: `Subtree gốc ${node.val} đang có average lớn nhất: ${best.toFixed(5)}.`, en: `The subtree rooted at ${node.val} now has the largest average: ${best.toFixed(5)}.` }
+        : { vi: `Ứng viên ${average.toFixed(5)} không vượt qua best ${best.toFixed(5)}.`, en: `Candidate ${average.toFixed(5)} does not beat best ${best.toFixed(5)}.` },
+      codeLines: [14, 15],
+      phase: "compare",
+      phaseIndex: 2,
+      event: updated ? "new-best" : "keep-best",
+      current: node,
+      formula: { ...formula, bestAfter: best, firstCandidate, updated },
+    });
+    stack.pop();
+    return { sum, count };
+  }
+
+  dfs(root);
+  push({
+    title: { vi: `Maximum average = ${best.toFixed(5)}`, en: `Maximum average = ${best.toFixed(5)}` },
+    note: { vi: `Subtree màu vàng có gốc ${bestNode.val} và average lớn nhất ${best.toFixed(5)}.`, en: `The gold subtree rooted at ${bestNode.val} has the maximum average ${best.toFixed(5)}.` },
+    codeLines: [19, 20],
+    phase: "done",
+    phaseIndex: 3,
+    event: "done",
+    final: true,
+  });
+  return { input, answer: best, steps };
+}
+
 function buildSteps2265(input) {
-  const root = parseAverageSubtree2265(input);
+  const root = parseAverageSubtreeInput(input, { maxValue: 1000, maxNodes: 31 });
   const layout = treeToVizNodes(root, null, null);
   const nodeById = new Map();
   (function indexNodes(node) {
@@ -6863,6 +7036,59 @@ function buildSteps2265(input) {
 }
 
 Object.assign(module.exports, {
+  1120: {
+    id: 1120,
+    difficulty: "medium",
+    slug: "maximum-average-subtree",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS hậu thứ tự", en: "Postorder DFS" },
+    ],
+    title: { vi: "Maximum Average Subtree", en: "Maximum Average Subtree" },
+    titleVi: { vi: "Subtree có trung bình lớn nhất", en: "Maximum average subtree" },
+    statement: {
+      vi: "Cho gốc của cây nhị phân, trả về giá trị trung bình lớn nhất trong tất cả các subtree. Trung bình của subtree bằng tổng giá trị chia cho số node của subtree đó.",
+      en: "Given the root of a binary tree, return the maximum average value among all of its subtrees. A subtree average is its value sum divided by its node count.",
+    },
+    defaultInput: "5,6,1",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng DFS hậu thứ tự để lấy (sum, count) của cây trái và cây phải trước.", en: "Use postorder DFS to obtain the left and right (sum, count) pairs first." },
+      { vi: "Tại mỗi node, gộp subtree_sum và subtree_count rồi tính average = subtree_sum / subtree_count.", en: "At each node, combine subtree_sum and subtree_count, then compute average = subtree_sum / subtree_count." },
+      { vi: "So sánh average của mỗi subtree với best toàn cục và giữ giá trị lớn nhất.", en: "Compare each subtree average with the global best and keep the maximum." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Mỗi node được xử lý một lần; h là chiều cao stack đệ quy.", en: "Each node is processed once; h is the recursive stack height." },
+    },
+    code: [
+      "class Solution:",
+      "    def maximumAverageSubtree(self, root):",
+      "        best = 0.0",
+      "",
+      "        def dfs(node):",
+      "            nonlocal best",
+      "            if not node:",
+      "                return (0, 0)",
+      "",
+      "            left_sum, left_count = dfs(node.left)",
+      "            right_sum, right_count = dfs(node.right)",
+      "            subtree_sum = left_sum + node.val + right_sum",
+      "            subtree_count = left_count + 1 + right_count",
+      "            average = subtree_sum / subtree_count",
+      "            best = max(best, average)",
+      "",
+      "            return (subtree_sum, subtree_count)",
+      "",
+      "        dfs(root)",
+      "        return best",
+    ],
+    builder: buildSteps1120,
+  },
   2265: {
     id: 2265,
     difficulty: "medium",

@@ -129,3 +129,15 @@ test('407 custom renderer handles every step in English and Vietnamese', () => {
     }
   }
 });
+
+test('407 height map fits its frame instead of forcing max-content width', () => {
+  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const start = css.indexOf('/* ---- Trapping Rain Water II: outside-in flood model (#407) ---- */');
+  const end = css.indexOf('/* ---- Count Nodes Equal to Average of Subtree (#2265) ---- */', start);
+  const styles = css.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(styles, /\.trw407-grid\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/);
+  assert.match(styles, /grid-template-columns:\s*repeat\(var\(--trw407-cols\),\s*minmax\(112px,\s*1fr\)\);/);
+  assert.doesNotMatch(styles, /\.trw407-grid\s*\{[\s\S]*?min-width:\s*max-content;/);
+});
