@@ -45,6 +45,7 @@ function bruteMaximumAverage(values) {
 test('1120 is registered with the O(n) postorder solution', () => {
   assert.equal(problem.id, 1120);
   assert.equal(problem.difficulty, 'medium');
+  assert.equal(problem.premium, true);
   assert.equal(problem.slug, 'maximum-average-subtree');
   assert.equal(problem.complexity.time, 'O(n)');
   assert.equal(problem.complexity.space, 'O(h)');

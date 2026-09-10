@@ -4330,7 +4330,102 @@ function renderBstIteratorView(step) {
   renderTree(step, "bstiTree");
 }
 
+function renderInsufficient1080View(step) {
+  const view = step.insufficient1080View || {};
+  const vi = lang === "vi";
+  const localPick = (value) => typeof pick === "function" ? pick(value) : value?.[lang] ?? value?.en ?? value?.vi ?? value ?? "";
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Đi xuống và cộng", "2. Quyết định ở lá", "3. Quay lên và cắt", "4. Cây kết quả"]
+    : ["1. Descend and add", "2. Decide at leaves", "3. Backtrack and prune", "4. Result tree"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const path = Array.isArray(view.path) ? view.path : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const decision = view.decision || { type: "rule" };
+  const currentPath = path.length
+    ? path.map((node, index) => `<span class="${index === path.length - 1 ? "current" : ""}"><small>${index === 0 ? "ROOT" : `LEVEL ${index}`}</small><strong>${escapeHtml(node.value)}</strong></span>`).join("<i>→</i>")
+    : `<em>${vi ? "DFS đã quay về khỏi gốc" : "DFS has returned from the root"}</em>`;
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>Σ = ${escapeHtml(frame.pathSum)}</small><em>${escapeHtml(frame.stage || "WAIT")}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Stack trống" : "Empty stack"}</li>`;
+
+  let decisionClass = "neutral";
+  let decisionLabel = vi ? "QUY TẮC" : "RULE";
+  let decisionFormula = "leaf: path_sum ≥ limit · parent: left OR right";
+  let decisionText = vi
+    ? "Chỉ lá mới kiểm tra tổng đường đi; node cha giữ lại khi ít nhất một nhánh con còn sống."
+    : "Only a leaf checks the path sum; a parent remains when at least one child branch survives.";
+  if (decision.type === "enter") {
+    decisionLabel = vi ? "CỘNG NODE VÀO ĐƯỜNG ĐI" : "ADD NODE TO THE PATH";
+    decisionFormula = `${decision.previousSum} + (${decision.nodeValue}) = ${decision.pathSum}`;
+    decisionText = vi ? "Mang tổng mới xuống các node con." : "Carry the new sum down to both children.";
+  } else if (decision.type === "call") {
+    decisionLabel = vi ? `ĐI XUỐNG NHÁNH ${decision.side === "left" ? "TRÁI" : "PHẢI"}` : `DESCEND INTO THE ${String(decision.side || "").toUpperCase()} BRANCH`;
+    decisionFormula = decision.childValue === null ? "dfs(None) → None" : `dfs(${decision.childValue}, path_sum)`;
+    decisionText = decision.childValue === null
+      ? (vi ? "Nhánh rỗng trả None ngay." : "An empty branch immediately returns None.")
+      : (vi ? "Chưa quyết định node cha cho đến khi nhánh con trả về." : "The parent cannot be decided until the child returns.");
+  } else if (decision.type === "leaf") {
+    decisionClass = decision.survives ? "keep" : "prune";
+    decisionLabel = vi ? "LÁ: SO TỔNG VỚI LIMIT" : "LEAF: COMPARE SUM WITH LIMIT";
+    decisionFormula = `${decision.pathSum} ${decision.survives ? "≥" : "<"} ${decision.limit} → ${decision.survives ? "KEEP" : "PRUNE"}`;
+    decisionText = decision.survives
+      ? (vi ? "Đường root → leaf này đủ lớn, nên giữ lá." : "This root-to-leaf path reaches the limit, so keep the leaf.")
+      : (vi ? "Đường root → leaf này không đủ, nên lá trả None." : "This root-to-leaf path is too small, so the leaf returns None.");
+  } else if (decision.type === "child-return") {
+    decisionClass = decision.survives ? "keep" : "prune";
+    const side = decision.side === "left" ? (vi ? "TRÁI" : "LEFT") : (vi ? "PHẢI" : "RIGHT");
+    decisionLabel = vi ? `NHÁNH ${side} ĐÃ TRẢ VỀ` : `${side} BRANCH RETURNED`;
+    decisionFormula = `${decision.side} = ${decision.survives ? "node" : "None"}`;
+    decisionText = decision.survives
+      ? (vi ? "Nhánh này có ít nhất một đường đủ limit." : "This branch contains at least one sufficient path.")
+      : (vi ? "Nhánh này không còn đường hợp lệ." : "This branch has no sufficient path left.");
+  } else if (decision.type === "parent") {
+    decisionClass = decision.survives ? "keep" : "prune";
+    decisionLabel = vi ? "NODE CHA: GỘP KẾT QUẢ HAI CON" : "PARENT: COMBINE BOTH CHILD RESULTS";
+    decisionFormula = `${decision.leftSurvives ? "KEEP" : "None"} OR ${decision.rightSurvives ? "KEEP" : "None"} → ${decision.survives ? "KEEP" : "PRUNE"}`;
+    decisionText = decision.survives
+      ? (vi ? "Ít nhất một con sống, nên node cha vẫn nằm trên một đường hợp lệ." : "At least one child survives, so the parent still lies on a sufficient path.")
+      : (vi ? "Cả hai con đều None, nên node cha cũng phải bị cắt." : "Both children are None, so the parent must also be pruned.");
+  } else if (decision.type === "done") {
+    decisionClass = decision.survives ? "keep" : "prune";
+    decisionLabel = vi ? "HOÀN TẤT" : "COMPLETE";
+    decisionFormula = decision.survives ? "root returned node" : "root returned None";
+    decisionText = decision.survives
+      ? (vi ? "Các node xanh tạo thành cây kết quả." : "The green nodes form the result tree.")
+      : (vi ? "Không có đường root-to-leaf nào đạt limit." : "No root-to-leaf path reaches the limit.");
+  }
+
+  const decided = Number(view.decided) || 0;
+  const totalNodes = Number(view.totalNodes) || 0;
+  const keptCount = Array.isArray(view.keptIds) ? view.keptIds.length : 0;
+  const prunedCount = Array.isArray(view.prunedIds) ? view.prunedIds.length : 0;
+  const final = Boolean(step.final || decision.type === "done");
+
+  $("treeView").innerHTML = `<section class="is1080-viz" role="img" aria-label="Insufficient Nodes in Root to Leaf Paths visualization">
+    <header><div><small>POSTORDER DFS · PRUNING · #1080</small><strong>INSUFFICIENT NODES</strong></div><span>${escapeHtml(localPick(step.title))}</span></header>
+    <div class="is1080-phases">${phases}</div>
+    <section class="is1080-rule"><div><small>${vi ? "QUYẾT ĐỊNH Ở LÁ" : "LEAF DECISION"}</small><code>path_sum ≥ limit ? KEEP : PRUNE</code></div><i>→</i><div><small>${vi ? "QUYẾT ĐỊNH Ở NODE CHA" : "PARENT DECISION"}</small><code>left OR right ? KEEP : PRUNE</code></div></section>
+    <section class="is1080-summary"><div><small>LIMIT</small><strong>${escapeHtml(view.limit)}</strong></div><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${view.currentValue === null || view.currentValue === undefined ? "—" : escapeHtml(view.currentValue)}</strong></div><div><small>PATH SUM</small><strong>${view.pathSum === null || view.pathSum === undefined ? "—" : escapeHtml(view.pathSum)}</strong></div><div><small>${vi ? "ĐÃ QUYẾT ĐỊNH" : "DECIDED"}</small><strong>${decided}/${totalNodes}</strong></div><div class="keep"><small>KEEP</small><strong>${keptCount}</strong></div><div class="prune"><small>PRUNE</small><strong>${prunedCount}</strong></div></section>
+    <div class="is1080-layout">
+      <section class="is1080-tree-card"><header><strong>${vi ? "CÂY GỐC — KHÔNG LÀM NODE BIẾN MẤT GIỮA CHỪNG" : "ORIGINAL TREE — NODES STAY VISIBLE WHILE DECIDING"}</strong><span>${vi ? "cam = hiện tại · xanh = giữ · đỏ = cắt" : "orange = current · green = keep · red = prune"}</span></header><div id="is1080Tree" class="is1080-tree"></div><footer><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="keep"></i>keep</span><span><i class="prune"></i>prune</span><span><i class="waiting"></i>${vi ? "chưa quyết định" : "undecided"}</span></footer></section>
+      <aside class="is1080-side">
+        <section class="is1080-path"><header><strong>${vi ? "ĐƯỜNG ROOT → NODE HIỆN TẠI" : "ROOT → CURRENT NODE PATH"}</strong><span>${vi ? "Σ nằm dưới mỗi node" : "Σ is shown under each node"}</span></header><div>${currentPath}</div></section>
+        <section class="is1080-decision ${decisionClass}"><small>${escapeHtml(decisionLabel)}</small><code>${escapeHtml(decisionFormula)}</code><p>${escapeHtml(decisionText)}</p></section>
+        <section class="is1080-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "dòng cuối đang chạy" : "last row is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="is1080-action"><small>${escapeHtml(String(view.event || "dfs").toUpperCase())}</small><strong>${escapeHtml(localPick(step.title))}</strong><span>${escapeHtml(localPick(step.note))}</span></section>
+    <footer class="is1080-result ${final ? "done" : ""}"><small>${vi ? "CÂY TRẢ VỀ" : "RETURNED TREE"}</small><strong>${final ? escapeHtml(view.resultTree || "[]") : "…"}</strong><span>${final ? (vi ? "Chỉ các node xanh còn lại trong kết quả." : "Only green nodes remain in the result.") : (vi ? "Quyết định được truyền từ lá ngược lên gốc." : "Decisions propagate from leaves back to the root.")}</span></footer>
+  </section>`;
+  renderTree(step, "is1080Tree");
+}
+
 function renderTree(step, targetId = "treeView") {
+  if (step.insufficient1080View && targetId === "treeView") {
+    renderInsufficient1080View(step);
+    return;
+  }
   if (step.pathSumView && targetId === "treeView") {
     const view = step.pathSumView || {};
     const vi = lang === "vi";

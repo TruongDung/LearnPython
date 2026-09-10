@@ -1235,18 +1235,76 @@ function buildSteps1022(input) {
 }
 
 // ─── 1080: Insufficient Nodes in Root to Leaf Paths ───
+function parseTree1080(input) {
+  const raw = Array.isArray(input)
+    ? input
+    : String(input ?? "").trim().replace(/^\[|\]$/g, "").split(",").map((value) => value.trim());
+  if (!raw.length || raw.every((value) => value === "")) return null;
+  const values = raw.map((value) => {
+    if (value === null || String(value).toLowerCase() === "null" || String(value) === "") return null;
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < -100000 || number > 100000) {
+      throw new Error("Tree values must be integers between -100000 and 100000, or null");
+    }
+    return number;
+  });
+  if (values[0] === null) return null;
+
+  const root = { id: 0, val: values[0], left: null, right: null };
+  const queue = [root];
+  let index = 1;
+  while (queue.length && index < values.length) {
+    const parent = queue.shift();
+    if (values[index] !== null) {
+      parent.left = { id: index, val: values[index], left: null, right: null };
+      queue.push(parent.left);
+    }
+    index++;
+    if (index < values.length && values[index] !== null) {
+      parent.right = { id: index, val: values[index], left: null, right: null };
+      queue.push(parent.right);
+    }
+    index++;
+  }
+  if (index < values.length && values.slice(index).some((value) => value !== null)) {
+    throw new Error("Invalid level-order tree: values remain after all parents are null");
+  }
+  return root;
+}
+
 function buildSteps1080(input, params) {
-  const root = parseTree(input);
+  const root = parseTree1080(input);
   const limit = Number(params && params.limit);
   if (!Number.isInteger(limit)) throw new Error("limit must be an integer");
 
   const steps = [];
   const kept = new Set();
   const pruned = new Set();
+  const stack = [];
+  const pathSums = new Map();
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
 
   // Keep the original shape in every frame. Nodes that have been removed are
   // painted as pruned instead of disappearing, so the decision remains visible.
-  function addStep({ title, current = null, codeLines = [], vars = [], note, annotations = {}, final = false }) {
+  function addStep({
+    title,
+    current = null,
+    codeLines = [],
+    vars = [],
+    note,
+    annotations = {},
+    final = false,
+    event = "intro",
+    phaseIndex = 0,
+    decision = null,
+    resultTree = null,
+  }) {
     const frame = snapshot(root, {
       title,
       hlSet: current ? new Set([current.id]) : undefined,
@@ -1260,9 +1318,33 @@ function buildSteps1080(input, params) {
       ],
       note,
     });
-    frame.tree.nodes.forEach((node) => { node.isPruned = pruned.has(node.id); });
+    frame.tree.showLevels = false;
+    frame.tree.nodes.forEach((node) => {
+      node.isPruned = pruned.has(node.id);
+      if (pathSums.has(node.id)) node.sub = `Σ=${pathSums.get(node.id)}`;
+    });
+    frame.insufficient1080View = {
+      event,
+      phaseIndex,
+      limit,
+      currentId: current ? current.id : null,
+      currentValue: current ? current.val : null,
+      pathSum: current && pathSums.has(current.id) ? pathSums.get(current.id) : null,
+      path: stack.map((entry) => ({ id: entry.id, value: entry.value })),
+      stack: stack.map((entry) => ({ ...entry })),
+      keptIds: [...kept],
+      prunedIds: [...pruned],
+      decided: kept.size + pruned.size,
+      totalNodes: nodeById.size,
+      decision,
+      resultTree,
+    };
     if (final) frame.final = true;
     steps.push(frame);
+  }
+
+  function setStackStage(stage) {
+    if (stack.length) stack[stack.length - 1].stage = stage;
   }
 
   function serializeResult(node) {
@@ -1289,6 +1371,10 @@ function buildSteps1080(input, params) {
       codeLines: [2, 12],
       vars: [{ name: "root", value: "None" }, { name: "answer", value: "[]" }],
       note: { vi: "Không có đường root-to-leaf nào để giữ lại.", en: "There is no root-to-leaf path to retain." },
+      event: "done",
+      phaseIndex: 3,
+      decision: { type: "done", survives: false },
+      resultTree: "[]",
       final: true,
     });
     return { input, limit, answer: "[]", steps };
@@ -1302,6 +1388,9 @@ function buildSteps1080(input, params) {
       vi: "Duyệt hậu tự. Lá được giữ khi tổng từ root đến lá ≥ limit. Node bên trong chỉ được giữ nếu ít nhất một con còn sống.",
       en: "Use postorder DFS. A leaf survives when its root-to-leaf sum is at least limit. An internal node survives only if at least one child survives.",
     },
+    event: "intro",
+    phaseIndex: 0,
+    decision: { type: "rule" },
   });
 
   function dfs(node, pathSum, pathValues) {
@@ -1310,6 +1399,8 @@ function buildSteps1080(input, params) {
     const path = [...pathValues, node.val];
     const pathText = path.join(" → ");
     const isLeaf = !node.left && !node.right;
+    pathSums.set(node.id, total);
+    stack.push({ id: node.id, value: node.val, pathSum: total, stage: "DESCEND" });
 
     addStep({
       title: { vi: `Vào dfs(${node.val})`, en: `Enter dfs(${node.val})` },
@@ -1326,12 +1417,16 @@ function buildSteps1080(input, params) {
         vi: `Cộng ${node.val}: tổng đường ${pathText} = ${total}.`,
         en: `Add ${node.val}: path sum ${pathText} = ${total}.`,
       },
+      event: "enter",
+      phaseIndex: 0,
+      decision: { type: "enter", previousSum: pathSum, nodeValue: node.val, pathSum: total },
     });
 
     if (isLeaf) {
       const survives = total >= limit;
       if (survives) kept.add(node.id);
       else pruned.add(node.id);
+      setStackStage("LEAF DECISION");
       addStep({
         title: survives
           ? { vi: `Lá ${node.val}: ${total} ≥ ${limit} → GIỮ`, en: `Leaf ${node.val}: ${total} ≥ ${limit} → KEEP` }
@@ -1347,10 +1442,15 @@ function buildSteps1080(input, params) {
         note: survives
           ? { vi: "Đây là một đường đi hợp lệ, nên trả node về cho cha.", en: "This is a sufficient path, so return the node to its parent." }
           : { vi: "Mọi đường qua lá này đều không đủ, nên trả None cho cha.", en: "This leaf's path is insufficient, so return None to its parent." },
+        event: survives ? "keep-leaf" : "prune-leaf",
+        phaseIndex: 1,
+        decision: { type: "leaf", pathSum: total, limit, survives },
       });
+      stack.pop();
       return survives;
     }
 
+    setStackStage("CALL LEFT");
     addStep({
       title: { vi: `Duyệt con trái của ${node.val}`, en: `Explore ${node.val}'s left child` },
       current: node,
@@ -1362,8 +1462,12 @@ function buildSteps1080(input, params) {
       note: node.left
         ? { vi: `Phải biết nhánh trái của ${node.val} có đường hợp lệ không.`, en: `First determine whether ${node.val}'s left branch has a sufficient path.` }
         : { vi: "Không có con trái nên lời gọi sẽ trả None.", en: "There is no left child, so this call returns None." },
+      event: "call-left",
+      phaseIndex: 0,
+      decision: { type: "call", side: "left", childValue: node.left ? node.left.val : null },
     });
     const leftKept = dfs(node.left, total, path);
+    setStackStage("LEFT RETURNED");
     addStep({
       title: { vi: `Con trái của ${node.val} trả ${leftKept ? "node" : "None"}`, en: `${node.val}'s left child returns ${leftKept ? "node" : "None"}` },
       current: node,
@@ -1372,8 +1476,12 @@ function buildSteps1080(input, params) {
       note: leftKept
         ? { vi: "Nhánh trái có ít nhất một lá đủ điều kiện.", en: "The left branch contains at least one sufficient leaf." }
         : { vi: "Nhánh trái không còn đường hợp lệ.", en: "No sufficient path remains in the left branch." },
+      event: "left-return",
+      phaseIndex: 2,
+      decision: { type: "child-return", side: "left", survives: leftKept },
     });
 
+    setStackStage("CALL RIGHT");
     addStep({
       title: { vi: `Duyệt con phải của ${node.val}`, en: `Explore ${node.val}'s right child` },
       current: node,
@@ -1385,8 +1493,12 @@ function buildSteps1080(input, params) {
       note: node.right
         ? { vi: `Tiếp tục kiểm tra nhánh phải của ${node.val}.`, en: `Continue by checking ${node.val}'s right branch.` }
         : { vi: "Không có con phải nên lời gọi sẽ trả None.", en: "There is no right child, so this call returns None." },
+      event: "call-right",
+      phaseIndex: 0,
+      decision: { type: "call", side: "right", childValue: node.right ? node.right.val : null },
     });
     const rightKept = dfs(node.right, total, path);
+    setStackStage("RIGHT RETURNED");
     addStep({
       title: { vi: `Con phải của ${node.val} trả ${rightKept ? "node" : "None"}`, en: `${node.val}'s right child returns ${rightKept ? "node" : "None"}` },
       current: node,
@@ -1395,11 +1507,15 @@ function buildSteps1080(input, params) {
       note: rightKept
         ? { vi: "Nhánh phải có ít nhất một lá đủ điều kiện.", en: "The right branch contains at least one sufficient leaf." }
         : { vi: "Nhánh phải không còn đường hợp lệ.", en: "No sufficient path remains in the right branch." },
+      event: "right-return",
+      phaseIndex: 2,
+      decision: { type: "child-return", side: "right", survives: rightKept },
     });
 
     const survives = leftKept || rightKept;
     if (survives) kept.add(node.id);
     else pruned.add(node.id);
+    setStackStage("RETURN TO PARENT");
     addStep({
       title: survives
         ? { vi: `Node ${node.val}: còn con sống → GIỮ`, en: `Node ${node.val}: a child survives → KEEP` }
@@ -1415,7 +1531,11 @@ function buildSteps1080(input, params) {
       note: survives
         ? { vi: "Ít nhất một đường đi xuống vẫn đạt limit, nên giữ node hiện tại làm cầu nối.", en: "At least one downward path still reaches limit, so keep this node as the connection." }
         : { vi: "Mọi lá bên dưới đều bị cắt; node này cũng không nằm trên đường hợp lệ nào.", en: "Every leaf below was pruned, so this node lies on no sufficient root-to-leaf path." },
+      event: survives ? "keep-parent" : "prune-parent",
+      phaseIndex: 2,
+      decision: { type: "parent", leftSurvives: leftKept, rightSurvives: rightKept, survives },
     });
+    stack.pop();
     return survives;
   }
 
@@ -1430,6 +1550,10 @@ function buildSteps1080(input, params) {
     note: rootKept
       ? { vi: `Các node xanh tạo thành cây trả về: ${answer}.`, en: `The green nodes form the returned tree: ${answer}.` }
       : { vi: "Tất cả đường root-to-leaf đều có tổng nhỏ hơn limit, nên trả về None.", en: "Every root-to-leaf path has a sum below limit, so return None." },
+    event: "done",
+    phaseIndex: 3,
+    decision: { type: "done", survives: rootKept },
+    resultTree: answer,
     final: true,
   });
   return { input, limit, answer, steps };
@@ -5547,7 +5671,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 1120, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 1120, 1973, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -6893,6 +7017,159 @@ function buildSteps1120(input) {
   return { input, answer: best, steps };
 }
 
+function buildSteps1973(input) {
+  const root = parseAverageSubtreeInput(input, { maxValue: 100000, maxNodes: 31 });
+  const layout = treeToVizNodes(root, null, null);
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
+
+  const steps = [];
+  const stack = [];
+  const stats = new Map();
+  let answer = 0;
+
+  const makeView = ({ phase = "postorder", phaseIndex = 0, event = "start", current = null, formula = null } = {}) => ({
+    phase,
+    phaseIndex,
+    event,
+    nodes: layout.map((item) => {
+      const node = nodeById.get(item.id);
+      const stat = stats.get(item.id) || {};
+      return {
+        id: item.id,
+        parentId: item.parentId,
+        x: item.x,
+        y: item.y,
+        value: node.val,
+        leftSum: stat.leftSum ?? null,
+        rightSum: stat.rightSum ?? null,
+        descendantSum: stat.descendantSum ?? null,
+        subtreeSum: stat.subtreeSum ?? null,
+        match: stat.match ?? null,
+        state: stat.state || (stack.includes(item.id) ? "waiting" : "unvisited"),
+      };
+    }),
+    stack: [...stack],
+    current: current === null ? null : current.id,
+    formula,
+    answer,
+    processed: [...stats.values()].filter((stat) => stat.match !== null).length,
+    totalNodes: layout.length,
+    results: [...stats.entries()]
+      .filter(([, stat]) => stat.match !== null)
+      .map(([id, stat]) => ({
+        id,
+        value: nodeById.get(id).val,
+        descendantSum: stat.descendantSum,
+        subtreeSum: stat.subtreeSum,
+        match: stat.match,
+      })),
+  });
+
+  const push = ({ title, note, codeLines, final = false, ...viewOptions }) => {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "stack", value: `[${stack.map((id) => nodeById.get(id).val).join(", ")}]` },
+        { name: "answer", value: answer },
+      ],
+      note,
+      descendantSum1973View: makeView(viewOptions),
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Tính tổng subtree từ lá lên gốc", en: "Compute subtree sums from leaves to root" },
+    note: {
+      vi: "DFS hậu thứ tự để mỗi node nhận tổng của cây trái và cây phải. Tổng hậu duệ không bao gồm chính node hiện tại.",
+      en: "Postorder DFS lets each node receive its left and right subtree sums. The descendant sum excludes the current node itself.",
+    },
+    codeLines: [4, 7],
+    event: "start",
+  });
+
+  function dfs(node) {
+    if (!node) return 0;
+    stack.push(node.id);
+    stats.set(node.id, { state: "waiting", leftSum: null, rightSum: null, descendantSum: null, subtreeSum: null, match: null });
+    push({
+      title: { vi: `Node ${node.val} chờ tổng từ hai cây con`, en: `Node ${node.val} waits for both child sums` },
+      note: {
+        vi: `Chưa thể kiểm tra ${node.val}; cần chạy DFS bên trái và bên phải trước.`,
+        en: `${node.val} cannot be checked yet; run DFS on the left and right children first.`,
+      },
+      codeLines: [4, 7, 8],
+      event: "enter",
+      current: node,
+    });
+
+    const leftSum = dfs(node.left);
+    const rightSum = dfs(node.right);
+    const descendantSum = leftSum + rightSum;
+    const subtreeSum = node.val + descendantSum;
+    const formula = { nodeValue: node.val, leftSum, rightSum, descendantSum, subtreeSum, match: null };
+    stats.set(node.id, { state: "combine", leftSum, rightSum, descendantSum, subtreeSum, match: null });
+    push({
+      title: { vi: `Hậu duệ của ${node.val}: ${leftSum} + ${rightSum} = ${descendantSum}`, en: `Descendants of ${node.val}: ${leftSum} + ${rightSum} = ${descendantSum}` },
+      note: {
+        vi: `Cây trái trả ${leftSum}, cây phải trả ${rightSum}. Vì không tính chính node ${node.val}, descendant_sum = ${descendantSum}.`,
+        en: `The left subtree returns ${leftSum} and the right returns ${rightSum}. Excluding node ${node.val}, descendant_sum = ${descendantSum}.`,
+      },
+      codeLines: [8, 9, 10],
+      phase: "combine",
+      phaseIndex: 1,
+      event: "combine",
+      current: node,
+      formula,
+    });
+
+    const match = node.val === descendantSum;
+    if (match) answer++;
+    stats.set(node.id, { state: match ? "match" : "miss", leftSum, rightSum, descendantSum, subtreeSum, match });
+    push({
+      title: match
+        ? { vi: `${node.val} = ${descendantSum} → MATCH, cộng 1`, en: `${node.val} = ${descendantSum} → MATCH, add 1` }
+        : { vi: `${node.val} ≠ ${descendantSum} → không cộng`, en: `${node.val} ≠ ${descendantSum} → do not add` },
+      note: match
+        ? { vi: `Giá trị node bằng đúng tổng tất cả hậu duệ; answer = ${answer}.`, en: `The node value equals the sum of every descendant; answer = ${answer}.` }
+        : { vi: `Giá trị node ${node.val} khác descendant_sum ${descendantSum}.`, en: `Node value ${node.val} differs from descendant_sum ${descendantSum}.` },
+      codeLines: match ? [10, 11, 12] : [10, 11],
+      phase: "compare",
+      phaseIndex: 2,
+      event: match ? "match" : "miss",
+      current: node,
+      formula: { ...formula, match },
+    });
+    stack.pop();
+    return subtreeSum;
+  }
+
+  dfs(root);
+  push({
+    title: { vi: `Hoàn tất: ${answer} node thỏa điều kiện`, en: `Complete: ${answer} matching nodes` },
+    note: {
+      vi: "Các node màu xanh có node.val bằng tổng của toàn bộ hậu duệ bên dưới.",
+      en: "Green nodes have node.val equal to the sum of every descendant below them.",
+    },
+    codeLines: [15, 16],
+    phase: "done",
+    phaseIndex: 3,
+    event: "done",
+    final: true,
+  });
+  return { input, answer, steps };
+}
+
 function buildSteps2265(input) {
   const root = parseAverageSubtreeInput(input, { maxValue: 1000, maxNodes: 31 });
   const layout = treeToVizNodes(root, null, null);
@@ -7036,9 +7313,60 @@ function buildSteps2265(input) {
 }
 
 Object.assign(module.exports, {
+  1973: {
+    id: 1973,
+    difficulty: "medium",
+    premium: true,
+    slug: "count-nodes-equal-to-sum-of-descendants",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS hậu thứ tự", en: "Postorder DFS" },
+    ],
+    title: { vi: "Count Nodes Equal to Sum of Descendants", en: "Count Nodes Equal to Sum of Descendants" },
+    titleVi: { vi: "Đếm node bằng tổng các hậu duệ", en: "Count nodes equal to descendant sum" },
+    statement: {
+      vi: "Cho gốc của cây nhị phân, đếm số node có giá trị bằng tổng giá trị của tất cả hậu duệ. Tổng hậu duệ không bao gồm chính node đó.",
+      en: "Given the root of a binary tree, count nodes whose value equals the sum of all descendant values. The descendant sum excludes the node itself.",
+    },
+    defaultInput: "10,3,4,2,1",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS hậu thứ tự: tính tổng subtree trái và phải trước.", en: "Use postorder DFS: compute the left and right subtree sums first." },
+      { vi: "descendant_sum = left_sum + right_sum; không cộng node hiện tại vào phép so sánh.", en: "descendant_sum = left_sum + right_sum; do not include the current node in the comparison." },
+      { vi: "Nếu node.val == descendant_sum thì tăng answer, sau đó trả node.val + descendant_sum cho cha.", en: "If node.val == descendant_sum, increment answer, then return node.val + descendant_sum to the parent." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Mỗi node được xử lý một lần; h là chiều cao stack đệ quy.", en: "Each node is processed once; h is the recursive stack height." },
+    },
+    code: [
+      "class Solution:",
+      "    def equalToDescendants(self, root):",
+      "        answer = 0",
+      "        def dfs(node):",
+      "            nonlocal answer",
+      "            if not node:",
+      "                return 0",
+      "            left_sum = dfs(node.left)",
+      "            right_sum = dfs(node.right)",
+      "            descendant_sum = left_sum + right_sum",
+      "            if node.val == descendant_sum:",
+      "                answer += 1",
+      "            return node.val + descendant_sum",
+      "",
+      "        dfs(root)",
+      "        return answer",
+    ],
+    builder: buildSteps1973,
+  },
   1120: {
     id: 1120,
     difficulty: "medium",
+    premium: true,
     slug: "maximum-average-subtree",
     category: TREE_CAT,
     tags: [
