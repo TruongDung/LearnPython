@@ -34277,7 +34277,7 @@ html, body {
 .is1080-tree-card header strong, .is1080-path header strong, .is1080-stack header strong { color: #f8fafc; font-size: 12px; font-weight: 900; letter-spacing: .04em; }
 .is1080-tree-card header span, .is1080-path header span, .is1080-stack header span { color: #94a3b8; font-size: 12px; text-align: right; }
 .is1080-tree { display: grid; min-height: 360px; padding: 18px 12px; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 40%, rgba(45,212,191,.08), transparent 58%); }
-.is1080-tree .tree-svg { display: block; width: 100% !important; max-width: 760px; height: auto !important; margin: auto; }
+.is1080-tree .tree-svg { display: block; width: 100% !important; max-width: 560px; height: auto !important; margin: auto; }
 .is1080-tree .tree-sub { fill: #cbd5e1; font-size: 12px; font-weight: 850; }
 .is1080-tree .tree-node.word circle, .is1080-tree .tree-node.word rect { fill: rgba(22,163,74,.22); stroke: #22c55e; }
 .is1080-tree .tree-node.pruned circle, .is1080-tree .tree-node.pruned rect { fill: rgba(220,38,38,.2); stroke: #ef4444; stroke-dasharray: 5 3; }
