@@ -27904,7 +27904,7 @@ select option {
 
 .rotting-status small {
   color: #94a3b8;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -28004,13 +28004,13 @@ select option {
 .rotting-cell > small {
   color: #64748b;
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .rotting-cell > em {
   min-height: 10px;
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
   font-style: normal;
   font-weight: 800;
 }
@@ -28191,7 +28191,7 @@ select option {
 .rotting-lane > label {
   color: #fbbf24;
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -28209,7 +28209,7 @@ select option {
 
 .rotting-lane > div > b {
   color: #64748b;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .rotting-queue-chip {
@@ -28227,7 +28227,7 @@ select option {
   grid-row: 1 / 3;
   align-self: center;
   color: #fbbf24;
-  font-size: 7px;
+  font-size: 8px;
 }
 
 .rotting-queue-chip strong {
@@ -28238,7 +28238,7 @@ select option {
 
 .rotting-queue-chip em {
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
   font-style: normal;
 }
 
@@ -28312,7 +28312,7 @@ select option {
 .rotting-direction small,
 .rotting-direction em {
   color: #64748b;
-  font-size: 6px;
+  font-size: 8px;
   font-style: normal;
 }
 
@@ -28358,7 +28358,7 @@ select option {
 
 .rotting-coordinate small {
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 800;
 }
 
@@ -28403,12 +28403,12 @@ select option {
   border: 1px solid #64748b;
   border-radius: 50%;
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
 }
 
 .rotting-checks > span small {
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
 }
 
 .rotting-checks > span strong {
@@ -28437,7 +28437,7 @@ select option {
 
 .rotting-checks > em {
   color: #c4b5fd;
-  font-size: 8px;
+  font-size: 9px;
   font-style: normal;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -28498,7 +28498,7 @@ select option {
 
 .rotting-timeline small {
   color: #94a3b8;
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 800;
 }
 
@@ -28510,7 +28510,7 @@ select option {
 .rotting-timeline em {
   max-width: 100%;
   color: #64748b;
-  font-size: 7px;
+  font-size: 8px;
   font-style: normal;
   overflow-wrap: anywhere;
 }
@@ -28619,27 +28619,56 @@ select option {
 .rotting-legend .source { border-color: #22d3ee; background: rgba(8, 145, 178, 0.3); }
 .rotting-legend .empty { border-color: #64748b; background: rgba(71, 85, 105, 0.3); }
 
+[data-theme="light"] .rotting-phases { border-color: #cbd5e1; }
+[data-theme="light"] .rotting-phases span { color: #475569; }
 [data-theme="light"] .rotting-phases span.is-active { color: #0f172a; }
+[data-theme="light"] .rotting-phases span.is-done { color: #047857; }
 [data-theme="light"] .rotting-status > span,
 [data-theme="light"] .rotting-cell,
 [data-theme="light"] .rotting-queue-section,
 [data-theme="light"] .rotting-directions-section,
 [data-theme="light"] .rotting-timeline > span { border-color: #cbd5e1; background: #ffffff; }
+[data-theme="light"] .rotting-status small,
+[data-theme="light"] .rotting-grid-section > header,
+[data-theme="light"] .rotting-queue-section > header,
+[data-theme="light"] .rotting-directions-section > header,
+[data-theme="light"] .rotting-timeline-section > header,
+[data-theme="light"] .rotting-cell > small,
+[data-theme="light"] .rotting-cell > em,
+[data-theme="light"] .rotting-queue-chip em,
+[data-theme="light"] .rotting-coordinate small,
+[data-theme="light"] .rotting-timeline small,
+[data-theme="light"] .rotting-timeline em,
+[data-theme="light"] .rotting-result small,
+[data-theme="light"] .rotting-action span { color: #475569; }
+[data-theme="light"] .rotting-grid-section > header strong,
+[data-theme="light"] .rotting-queue-section > header strong,
+[data-theme="light"] .rotting-directions-section > header strong,
+[data-theme="light"] .rotting-timeline-section > header strong { color: #1e293b; }
 [data-theme="light"] .rotting-status strong,
 [data-theme="light"] .rotting-queue-chip strong,
 [data-theme="light"] .rotting-coordinate strong,
 [data-theme="light"] .rotting-timeline strong,
 [data-theme="light"] .rotting-result span,
 [data-theme="light"] .rotting-action strong { color: #0f172a; }
-[data-theme="light"] .rotting-cell.is-empty { background: #f8fafc; }
+[data-theme="light"] .rotting-status i { background: #d8e0ea; }
+[data-theme="light"] .rotting-cell.is-empty { opacity: 1; background: #f1f5f9; }
+[data-theme="light"] .rotting-empty-mark { border-color: #94a3b8; color: #64748b; }
 [data-theme="light"] .rotting-cell.is-frontier { border-color: #d97706; background: #fffbeb; }
 [data-theme="light"] .rotting-cell.is-next-frontier { border-color: #8b5cf6; background: #f5f3ff; }
 [data-theme="light"] .rotting-cell.is-newly-rotten { border-color: #059669; background: #ecfdf5; }
 [data-theme="light"] .rotting-lane + .rotting-lane { border-color: #e2e8f0; }
+[data-theme="light"] .rotting-lane > div > b,
+[data-theme="light"] .rotting-lane-empty { color: #475569; }
+[data-theme="light"] .rotting-lane > label { color: #b45309; }
+[data-theme="light"] .rotting-lane.next > label { color: #6d28d9; }
 [data-theme="light"] .rotting-queue-chip { border-color: #d97706; background: #fffbeb; }
 [data-theme="light"] .rotting-queue-chip.is-next { border-color: #8b5cf6; background: #f5f3ff; }
+[data-theme="light"] .rotting-queue-chip.is-processed { opacity: 0.56; }
 [data-theme="light"] .rotting-direction { border-color: #cbd5e1; background: #f8fafc; }
 [data-theme="light"] .rotting-direction strong { color: #334155; }
+[data-theme="light"] .rotting-direction small,
+[data-theme="light"] .rotting-direction em { color: #526278; }
 [data-theme="light"] .rotting-direction.is-active { border-color: #0891b2; background: #ecfeff; }
 [data-theme="light"] .rotting-direction.is-active strong,
 [data-theme="light"] .rotting-direction.is-active small,
@@ -28649,12 +28678,25 @@ select option {
 [data-theme="light"] .rotting-neighbor-check.is-fail { background: #fef2f2; }
 [data-theme="light"] .rotting-checks { background: #e2e8f0; }
 [data-theme="light"] .rotting-checks > span,
-[data-theme="light"] .rotting-checks > em { background: #f8fafc; }
+[data-theme="light"] .rotting-checks > em { background: #ffffff; }
+[data-theme="light"] .rotting-coordinate i,
+[data-theme="light"] .rotting-checks > span small { color: #475569; }
+[data-theme="light"] .rotting-checks > span b { border-color: #64748b; color: #475569; }
+[data-theme="light"] .rotting-checks > span strong { color: #1e293b; }
+[data-theme="light"] .rotting-checks > span.pass b,
+[data-theme="light"] .rotting-checks > span.pass strong { color: #047857; }
+[data-theme="light"] .rotting-checks > span.fail b,
+[data-theme="light"] .rotting-checks > span.fail strong { color: #b91c1c; }
+[data-theme="light"] .rotting-checks > em { color: #6d28d9; }
 [data-theme="light"] .rotting-rule { background: #fffbeb; }
+[data-theme="light"] .rotting-rule strong { color: #b45309; }
+[data-theme="light"] .rotting-rule span { color: #475569; }
 [data-theme="light"] .rotting-timeline > span.is-current { border-color: #d97706; background: #fffbeb; }
 [data-theme="light"] .rotting-timeline > span.is-next { border-color: #8b5cf6; background: #f5f3ff; }
 [data-theme="light"] .rotting-result { background: #ecfdf5; }
 [data-theme="light"] .rotting-result.is-impossible { background: #fef2f2; }
+[data-theme="light"] .rotting-result strong { color: #047857; }
+[data-theme="light"] .rotting-result.is-impossible strong { color: #b91c1c; }
 [data-theme="light"] .rotting-action { background: #ecfeff; }
 [data-theme="light"] .rotting-legend { color: #475569; }
 
