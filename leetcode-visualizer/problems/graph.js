@@ -25436,6 +25436,7 @@ function buildSteps2360(input) {
   let answer = -1;
   let bestCycle = [];
   let position = new Map();
+  let activeStart = null;
 
   function graphState({ hlNodes = [], hlEdges = [] } = {}) {
     const annotations = {};
@@ -25454,7 +25455,20 @@ function buildSteps2360(input) {
     };
   }
 
-  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false }) {
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    hlNodes,
+    hlEdges,
+    final = false,
+    event = "init",
+    current = null,
+    next = null,
+    cycle = [],
+    cycleLength = null,
+    repeatAt = null,
+  }) {
     steps.push({
       title,
       note,
@@ -25464,6 +25478,21 @@ function buildSteps2360(input) {
       highlight: [],
       mark: [],
       graph: graphState({ hlNodes, hlEdges }),
+      cycle2360View: {
+        edges: [...edges],
+        visited: [...visited],
+        path: [...position].map(([node, depth]) => ({ node, depth })),
+        event,
+        start: activeStart,
+        current,
+        next,
+        cycle: [...cycle],
+        cycleLength,
+        repeatAt,
+        longest: answer,
+        bestCycle: [...bestCycle],
+        final,
+      },
       vars: [
         { name: "edges", value: "[" + edges.join(", ") + "]" },
         { name: "position", value: "{" + [...position].map(([node, depth]) => node + ":" + depth).join(", ") + "}" },
@@ -25476,17 +25505,21 @@ function buildSteps2360(input) {
     title: { vi: "visited = [False] * n; longest = -1", en: "visited = [False] * n; longest = -1" },
     note: { vi: "Mỗi node có nhiều nhất một cạnh đi ra. visited tránh đi lại các nhánh đã xử lý; position chỉ theo dõi lần đi hiện tại.", en: "Each node has at most one outgoing edge. visited avoids reprocessing finished branches; position tracks only the current walk." },
     codeLines: [3, 4],
+    event: "init",
   });
 
   for (let start = 0; start < n; start += 1) {
     if (visited[start]) continue;
     position = new Map();
+    activeStart = start;
     let node = start;
     snapshot({
       title: { vi: "Bắt đầu walk từ node " + start, en: "Start walk from node " + start },
       note: { vi: "Node " + start + " chưa được xử lý, nên tạo position rỗng cho lần walk này.", en: "Node " + start + " is unprocessed, so start a fresh position map for this walk." },
-      codeLines: [5, 6, 7],
+      codeLines: [5, 6, 7, 8, 9],
       hlNodes: [start],
+      event: "start",
+      current: start,
     });
 
     while (node !== -1 && !visited[node]) {
@@ -25494,24 +25527,31 @@ function buildSteps2360(input) {
       snapshot({
         title: { vi: "Đang ở node " + current, en: "At node " + current },
         note: { vi: "Node chưa visited, nên lưu depth của nó trong lần walk này.", en: "The node is not globally visited, so record its depth in this walk." },
-        codeLines: [8],
+        codeLines: [10],
         hlNodes: [current],
+        event: "inspect",
+        current,
       });
       visited[current] = true;
       position.set(current, position.size);
       snapshot({
         title: { vi: "visited[" + current + "] = True; position[" + current + "] = " + position.get(current), en: "visited[" + current + "] = True; position[" + current + "] = " + position.get(current) },
         note: { vi: "Đánh dấu xử lý toàn cục và lưu vị trí để nếu quay lại sẽ đo được độ dài cycle.", en: "Mark it globally processed and store its position so a return can measure a cycle length." },
-        codeLines: [9, 10],
+        codeLines: [11, 12],
         hlNodes: [current],
+        event: "record",
+        current,
       });
       node = edges[current];
       snapshot({
         title: { vi: "node = edges[" + current + "] → " + node, en: "node = edges[" + current + "] → " + node },
         note: node === -1 ? { vi: "Node này không có cạnh đi ra, lần walk kết thúc.", en: "This node has no outgoing edge, so the walk ends." } : { vi: "Đi theo cạnh " + current + " → " + node + ".", en: "Follow edge " + current + " → " + node + "." },
-        codeLines: [11],
+        codeLines: [13],
         hlNodes: node === -1 ? [current] : [current, node],
         hlEdges: node === -1 ? [] : [[current, node]],
+        event: "follow",
+        current,
+        next: node,
       });
     }
 
@@ -25525,26 +25565,38 @@ function buildSteps2360(input) {
       snapshot({
         title: { vi: "Quay lại node " + node + " → cycle dài " + cycleLength, en: "Returned to node " + node + " → cycle length " + cycleLength },
         note: { vi: "node " + node + " có position " + position.get(node) + ", còn walk dài " + position.size + "; cycle = [" + cycle.join(", ") + "].", en: "node " + node + " has position " + position.get(node) + " while this walk has length " + position.size + "; cycle = [" + cycle.join(", ") + "]." },
-        codeLines: [12, 13],
+        codeLines: [14, 15],
         hlNodes: cycle,
+        event: "cycle",
+        current: node,
+        next: node,
+        cycle,
+        cycleLength,
+        repeatAt: position.get(node),
       });
     } else {
       snapshot({
         title: { vi: "Walk kết thúc mà không tạo cycle mới", en: "Walk ended without a new cycle" },
         note: node === -1 ? { vi: "Đã đi tới -1.", en: "The walk reached -1." } : { vi: "Walk chạm node đã được xử lý từ lần trước.", en: "The walk reached a node processed by an earlier walk." },
-        codeLines: [12],
+        codeLines: [14],
+        event: "stop",
+        current: node,
       });
     }
   }
 
+  activeStart = null;
   snapshot({
     title: { vi: "return longest → " + answer, en: "return longest → " + answer },
     note: answer === -1
       ? { vi: "Không có cycle trong graph.", en: "The graph has no cycle." }
       : { vi: "Cycle dài nhất là [" + bestCycle.join(", ") + "] với " + answer + " node.", en: "The longest cycle is [" + bestCycle.join(", ") + "] with " + answer + " node(s)." },
-    codeLines: [14],
+    codeLines: [16],
     hlNodes: bestCycle,
     final: true,
+    event: "done",
+    cycle: bestCycle,
+    cycleLength: answer,
   });
   return { original: edges, answer, steps };
 }
@@ -27657,6 +27709,7 @@ Object.assign(module.exports, {
       note: { vi: "Mỗi node được đánh dấu visited và xử lý tối đa một lần.", en: "Every node is marked visited and processed at most once." },
     },
     codeLabel: { vi: "DFS walk + vị trí trong đường đi", en: "DFS walk + path positions" },
+    debugMode: "line-by-line",
     code: [
       "class Solution:",
       "    def longestCycle(self, edges: List[int]) -> int:",

@@ -6968,6 +6968,152 @@ function renderTreeDpLessonView(step) {
   renderGraph(step, "treeDpLessonGraph");
 }
 
+function renderCycle2360View(step) {
+  const view = step.cycle2360View || {};
+  const vi = lang === "vi";
+  const localPick = (value) => typeof pick === "function" ? pick(value) : value?.[lang] ?? value?.en ?? value?.vi ?? value ?? "";
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const path = Array.isArray(view.path) ? view.path : [];
+  const cycle = Array.isArray(view.cycle) ? view.cycle : [];
+  const bestCycle = Array.isArray(view.bestCycle) ? view.bestCycle : [];
+  const event = String(view.event || "init");
+  const current = Number.isInteger(view.current) ? view.current : null;
+  const next = Number.isInteger(view.next) ? view.next : null;
+  const start = Number.isInteger(view.start) ? view.start : null;
+  const longest = Number.isInteger(view.longest) ? view.longest : -1;
+  const repeatAt = Number.isInteger(view.repeatAt) ? view.repeatAt : null;
+  const cycleLength = Number.isInteger(view.cycleLength) ? view.cycleLength : null;
+  const final = Boolean(view.final || step.final || event === "done");
+  const pathDepth = new Map(path.map((item) => [item.node, item.depth]));
+  const activeCycle = new Set(cycle.length ? cycle : (final ? bestCycle : []));
+
+  const phaseIndex = ["init", "start"].includes(event)
+    ? 0
+    : ["inspect", "record"].includes(event)
+      ? 1
+      : event === "follow"
+        ? 2
+        : 3;
+  const phaseLabels = vi
+    ? ["Chọn điểm bắt đầu", "Ghi vị trí trong walk", "Đi theo mũi tên", "Kiểm tra có quay lại"]
+    : ["Choose a start", "Record path position", "Follow the arrow", "Check for a repeat"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = final || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}"><b>${final || index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const pathParts = path.map((item, index) => {
+    const inCycle = activeCycle.has(item.node);
+    const isCurrent = item.node === current;
+    return `${index ? "<i>→</i>" : ""}<span class="${inCycle ? "cycle" : ""} ${isCurrent ? "current" : ""}"><b>${item.node}</b><small>position ${item.depth}</small></span>`;
+  });
+  const shouldAppendNext = next !== null && (event === "follow" || event === "cycle") && (!path.length || path[path.length - 1].node !== next || pathDepth.has(next));
+  if (shouldAppendNext) {
+    const repeats = pathDepth.has(next);
+    pathParts.push(`<i>→</i><span class="next ${repeats ? "repeat" : ""}"><b>${next}</b><small>${repeats ? `${vi ? "LẶP position" : "REPEATS position"} ${pathDepth.get(next)}` : (vi ? "node tiếp theo" : "next node")}</small></span>`);
+  } else if (event === "follow" && view.next === -1) {
+    pathParts.push(`<i>→</i><span class="sink"><b>−1</b><small>${vi ? "hết đường" : "dead end"}</small></span>`);
+  }
+  const pathHtml = pathParts.length
+    ? pathParts.join("")
+    : `<em>${vi ? "Walk mới chưa ghi node nào" : "The new walk has no recorded nodes yet"}</em>`;
+
+  const nodeCards = edges.map((target, node) => {
+    const classes = [
+      "lc2360-node",
+      pathDepth.has(node) ? "in-path" : "",
+      activeCycle.has(node) ? "cycle" : "",
+      visited[node] ? "visited" : "",
+      node === current ? "current" : "",
+      node === next ? "next" : "",
+      target === -1 ? "sink" : "",
+    ].filter(Boolean).join(" ");
+    let status = vi ? "chưa thăm" : "unvisited";
+    if (activeCycle.has(node)) status = vi ? "trong cycle" : "in cycle";
+    else if (pathDepth.has(node)) status = `position ${pathDepth.get(node)}`;
+    else if (visited[node]) status = vi ? "đã xử lý trước" : "processed earlier";
+    return `<article class="${classes}">
+      <header><small>NODE</small><strong>${node}</strong></header>
+      <div><small>edges[${node}]</small><b>→ ${target}</b></div>
+      <footer>${escapeHtml(status)}</footer>
+    </article>`;
+  }).join("");
+
+  let focusHtml;
+  if (event === "cycle") {
+    focusHtml = `<section class="lc2360-focus cycle-found">
+      <small>${vi ? "TÌM THẤY CYCLE" : "CYCLE FOUND"}</small>
+      <strong>${vi ? `Node ${current} đã có trong current walk tại position ${repeatAt}` : `Node ${current} is already in the current walk at position ${repeatAt}`}</strong>
+      <div class="lc2360-formula"><span><small>${vi ? "ĐỘ DÀI WALK" : "WALK LENGTH"}</small><b>${path.length}</b></span><i>−</i><span><small>${vi ? "POSITION LẶP" : "REPEAT POSITION"}</small><b>${repeatAt}</b></span><i>=</i><span class="answer"><small>${vi ? "ĐỘ DÀI CYCLE" : "CYCLE LENGTH"}</small><b>${cycleLength}</b></span></div>
+      <p>${vi ? "Chỉ phần path từ position bị lặp trở đi thuộc cycle." : "Only the path segment starting at the repeated position belongs to the cycle."}</p>
+    </section>`;
+  } else if (event === "stop") {
+    const hitDeadEnd = current === -1;
+    focusHtml = `<section class="lc2360-focus no-cycle">
+      <small>${vi ? "KHÔNG CÓ CYCLE MỚI" : "NO NEW CYCLE"}</small>
+      <strong>${hitDeadEnd
+        ? (vi ? "Walk đi tới −1 nên kết thúc" : "The walk reached −1 and stops")
+        : (vi ? `Node ${current} đã visited nhưng không nằm trong current walk` : `Node ${current} was visited earlier but is not in this current walk`)}</strong>
+      <p>${vi ? "Một node visited từ walk cũ không tạo cycle cho walk hiện tại." : "A node visited by an older walk does not create a cycle in the current walk."}</p>
+    </section>`;
+  } else if (event === "done") {
+    focusHtml = `<section class="lc2360-focus done">
+      <small>${vi ? "HOÀN TẤT" : "DONE"}</small>
+      <strong>${longest === -1 ? (vi ? "Không tìm thấy cycle" : "No cycle was found") : (vi ? `Cycle dài nhất: ${bestCycle.join(" → ")} → ${bestCycle[0]}` : `Longest cycle: ${bestCycle.join(" → ")} → ${bestCycle[0]}`)}</strong>
+      <div class="lc2360-final-answer"><span>${vi ? "Độ dài lớn nhất" : "Longest length"}</span><b>${longest}</b></div>
+    </section>`;
+  } else if (event === "follow") {
+    focusHtml = `<section class="lc2360-focus follow">
+      <small>${vi ? "ĐI THEO ĐÚNG MỘT CẠNH" : "FOLLOW THE ONLY OUTGOING EDGE"}</small>
+      <strong><code>node = edges[${current}] = ${view.next}</code></strong>
+      <div class="lc2360-edge-focus"><span>${current}</span><i>→</i><span>${view.next}</span></div>
+      <p>${view.next === -1
+        ? (vi ? "−1 nghĩa là không còn cạnh để đi." : "−1 means there is no outgoing edge.")
+        : pathDepth.has(view.next)
+          ? (vi ? `Node ${view.next} đã nằm trong current walk: bước kế tiếp sẽ tính cycle.` : `Node ${view.next} is already in the current walk: the next step measures the cycle.`)
+          : (vi ? `Tiếp tục walk tại node ${view.next}.` : `Continue the walk at node ${view.next}.`)}</p>
+    </section>`;
+  } else if (event === "record") {
+    const depth = pathDepth.get(current);
+    focusHtml = `<section class="lc2360-focus record">
+      <small>${vi ? "GHI VỊ TRÍ TRONG WALK HIỆN TẠI" : "RECORD POSITION IN THIS WALK"}</small>
+      <strong><code>position[${current}] = ${depth}</code></strong>
+      <p>${vi ? "Nếu quay lại node này, position cho biết cycle bắt đầu ở đâu." : "If the walk returns here, this position tells us where the cycle begins."}</p>
+    </section>`;
+  } else if (event === "inspect") {
+    focusHtml = `<section class="lc2360-focus inspect">
+      <small>${vi ? "KIỂM TRA ĐIỀU KIỆN WHILE" : "CHECK THE WHILE CONDITION"}</small>
+      <strong><code>node != -1 and not visited[node]</code></strong>
+      <p>${vi ? `Node ${current} hợp lệ và chưa visited, nên có thể ghi vào current walk.` : `Node ${current} is valid and unvisited, so record it in the current walk.`}</p>
+    </section>`;
+  } else if (event === "start") {
+    focusHtml = `<section class="lc2360-focus start">
+      <small>${vi ? "WALK MỚI" : "NEW WALK"}</small>
+      <strong>${vi ? `Bắt đầu từ node ${start} với position rỗng` : `Start at node ${start} with an empty position map`}</strong>
+      <p><code>position = {}</code><code>node = ${start}</code></p>
+    </section>`;
+  } else {
+    focusHtml = `<section class="lc2360-focus init">
+      <small>${vi ? "HAI LOẠI BỘ NHỚ" : "TWO KINDS OF MEMORY"}</small>
+      <strong>${vi ? "Đừng nhầm visited với position" : "Do not confuse visited with position"}</strong>
+      <div class="lc2360-memory"><span><b>visited</b><small>${vi ? "đã xử lý ở bất kỳ walk nào" : "processed in any walk"}</small></span><span><b>position</b><small>${vi ? "chỉ thuộc current walk" : "only in the current walk"}</small></span></div>
+    </section>`;
+  }
+
+  $("treeView").innerHTML = `<section class="lc2360-viz" role="img" aria-label="Longest Cycle in a Graph visualization">
+    <header><div><small>#2360 · FUNCTIONAL GRAPH</small><strong>${vi ? "TÌM CYCLE BẰNG VỊ TRÍ TRONG CURRENT WALK" : "FIND A CYCLE WITH CURRENT-WALK POSITIONS"}</strong></div><span>${escapeHtml(localPick(step.title))}</span></header>
+    <section class="lc2360-rule"><b>${vi ? "QUY TẮC QUAN TRỌNG NHẤT" : "THE MOST IMPORTANT RULE"}</b><strong>${vi ? "Quay lại node trong CURRENT PATH → có cycle" : "Return to a node in the CURRENT PATH → cycle"}</strong><span>${vi ? "Chỉ visited nhưng không nằm trong current path → không phải cycle mới" : "Visited earlier but absent from the current path → no new cycle"}</span></section>
+    <div class="lc2360-phases">${phases}</div>
+    <section class="lc2360-metrics"><div><small>START</small><strong>${start ?? "—"}</strong></div><div><small>${vi ? "CURRENT PATH" : "CURRENT PATH"}</small><strong>${path.length}</strong></div><div><small>${vi ? "LONGEST" : "LONGEST"}</small><strong>${longest}</strong></div></section>
+    ${focusHtml}
+    <section class="lc2360-path"><header><strong>${vi ? "CURRENT WALK" : "CURRENT WALK"}</strong><span>${vi ? "position tăng từ 0" : "position starts at 0"}</span></header><div>${pathHtml}</div></section>
+    <section class="lc2360-map"><header><strong>${vi ? "MỖI NODE TRỎ TỚI ĐÂU?" : "WHERE DOES EACH NODE POINT?"}</strong><span>${vi ? "mỗi node có tối đa một mũi tên đi ra" : "each node has at most one outgoing arrow"}</span></header><div>${nodeCards}</div></section>
+    <div class="lc2360-legend"><span><i class="current"></i>${vi ? "node hiện tại" : "current"}</span><span><i class="path"></i>${vi ? "trong current path" : "current path"}</span><span><i class="cycle"></i>cycle</span><span><i class="visited"></i>${vi ? "đã xử lý trước" : "visited earlier"}</span></div>
+    <footer class="lc2360-result ${final ? "done" : ""}"><small>${vi ? "KẾT QUẢ HIỆN TẠI" : "RUNNING ANSWER"}</small><strong>${longest}</strong><span>${escapeHtml(localPick(step.note))}</span></footer>
+  </section>`;
+}
+
 // ---- Graph renderer (directed weighted graph) ----
 function renderGraph(step, targetId = "treeView") {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
@@ -27518,6 +27664,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTreeDpLessonView(step);
+  } else if (step.cycle2360View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCycle2360View(step);
   } else if (step.graph) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
