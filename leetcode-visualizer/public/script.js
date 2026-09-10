@@ -16032,11 +16032,14 @@ function renderAverageSubtree2265View(step) {
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
   const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
-  const treeWidth = Math.max(560, (maxX + 1) * 96);
-  const treeHeight = Math.max(240, (maxDepth + 1) * 112 + 40);
-  const xOffset = Math.max(52, (treeWidth - maxX * 96) / 2);
-  const xOf = (node) => xOffset + (Number(node.x) || 0) * 96;
-  const yOf = (node) => 52 + (Number(node.y) || 0) * 108;
+  const horizontalGap = 112;
+  const contentWidth = maxX * horizontalGap;
+  const treeWidth = Math.max(360, contentWidth + 192);
+  const treeHeight = Math.max(220, (maxDepth + 1) * 112 + 72);
+  const xOffset = (treeWidth - contentWidth) / 2;
+  const xOf = (node) => xOffset + (Number(node.x) || 0) * horizontalGap;
+  const yOf = (node) => 64 + (Number(node.y) || 0) * 112;
+  const fitTreeToFrame = nodes.length <= 15;
   const edges = nodes.filter((node) => node.parentId !== null && nodeMap.has(node.parentId)).map((node) => {
     const parent = nodeMap.get(node.parentId);
     return `<line x1="${xOf(parent)}" y1="${yOf(parent) + 27}" x2="${xOf(node)}" y2="${yOf(node) - 27}" />`;
@@ -16083,7 +16086,7 @@ function renderAverageSubtree2265View(step) {
     <header><div><small>POSTORDER DFS · TREE · #2265</small><strong>${vi ? "NODE = TRUNG BÌNH SUBTREE" : "NODE = SUBTREE AVERAGE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="as2265-phases">${phases}</div>
     <section class="as2265-summary"><div><small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small><strong>${currentId === null || currentId === undefined ? "—" : nodeMap.get(currentId)?.value ?? "—"}</strong></div><div><small>${vi ? "ĐÃ TÍNH XONG" : "PROCESSED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div class="answer"><small>ANSWER</small><strong>${view.answer || 0}</strong></div></section>
-    <section class="as2265-tree"><header><strong>${vi ? "CÂY TÍNH TỪ DƯỚI LÊN" : "TREE COMPUTED BOTTOM-UP"}</strong><span>${vi ? "xanh lá = khớp · đỏ = không khớp · cam = hiện tại" : "green = match · red = no match · orange = current"}</span></header><div><svg viewBox="0 0 ${treeWidth} ${treeHeight}" style="min-width:${treeWidth}px" aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section>
+    <section class="as2265-tree"><header><strong>${vi ? "CÂY TÍNH TỪ DƯỚI LÊN" : "TREE COMPUTED BOTTOM-UP"}</strong><span>${vi ? "xanh lá = khớp · đỏ = không khớp · cam = hiện tại" : "green = match · red = no match · orange = current"}</span></header><div><svg class="as2265-tree-svg ${fitTreeToFrame ? "fit" : "scroll"}" viewBox="0 0 ${treeWidth} ${treeHeight}" preserveAspectRatio="xMidYMin meet" ${fitTreeToFrame ? "" : `style="min-width:${treeWidth}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section>
     <section class="as2265-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "node cha chờ hai cây con trả về" : "parents wait for both children to return"}</span></header><div>${stackHtml}</div></section>
     ${formulaHtml}
     <section class="as2265-action"><small>${escapeHtml(String(view.event || "postorder").toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>

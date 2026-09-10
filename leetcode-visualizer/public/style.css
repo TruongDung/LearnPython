@@ -46334,8 +46334,10 @@ html, body {
 .as2265-summary .answer strong { color: #15803d; }
 .as2265-tree { display: grid; gap: 8px; overflow: hidden; }
 .as2265-tree > header span { max-width: 56%; text-align: right; }
-.as2265-tree > div { min-width: 0; overflow-x: auto; }
-.as2265-tree svg { display: block; width: 100%; min-height: 240px; }
+.as2265-tree > div { min-width: 0; overflow-x: auto; padding: 0 8px; }
+.as2265-tree svg { display: block; width: 100%; height: auto; min-height: 0; overflow: visible; }
+.as2265-tree svg.fit { min-width: 0; }
+.as2265-tree svg.scroll { width: auto; min-height: 240px; }
 .as2265-tree .edges line { stroke: #94a3b8; stroke-width: 2; }
 .as2265-node circle { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 2; }
 .as2265-node text { font-family: Inter, system-ui, sans-serif; }

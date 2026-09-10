@@ -134,6 +134,8 @@ test('2265 custom renderer handles every step in English and Vietnamese', () => 
         context.renderAverageSubtree2265View(step);
         assert.match(element.innerHTML, /as2265-viz/);
         assert.match(element.innerHTML, /as2265-tree/);
+        assert.match(element.innerHTML, /as2265-tree-svg fit/);
+        assert.doesNotMatch(element.innerHTML, /as2265-tree-svg fit[^>]*min-width/);
         assert.match(element.innerHTML, /as2265-stack/);
         assert.doesNotMatch(element.innerHTML, /NaN|undefined|Infinity/);
       }
