@@ -46719,3 +46719,126 @@ html, body {
   .ma1120-decision { flex-direction: column; align-items: flex-start; }
   .ma1120-decision strong { text-align: left; }
 }
+
+/* ---- Count Nodes Equal to Sum of Descendants (#1973) ---- */
+.ds1973-phases span.active { color: #0f766e; background: #f0fdfa; }
+.ds1973-phases span.active b { background: #0d9488; }
+.ds1973-summary .answer { background: #ecfdf5; border-color: #34d399; }
+.ds1973-summary .answer strong { color: #047857; }
+.ds1973-tree .edges line.match { stroke: #22c55e; stroke-width: 3; }
+.ds1973-node.combine circle { fill: #ecfeff; stroke: #06b6d4; }
+.ds1973-node.combine .state { fill: #0e7490; }
+.ds1973-formula { background: #f0fdfa; border-color: #2dd4bf; }
+.ds1973-formula > header span { max-width: 58%; text-align: right; }
+.ds1973-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.15fr);
+  gap: 8px;
+  align-items: center;
+}
+.ds1973-sum > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  place-items: center;
+  padding: 10px 6px;
+  background: #fff;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+}
+.ds1973-sum > span.total { background: #ccfbf1; border-color: #14b8a6; }
+.ds1973-sum strong { color: #0f172a; font-size: 19px; }
+.ds1973-sum > i,
+.ds1973-sum > b { color: #0d9488; font-size: 20px; font-style: normal; font-weight: 950; text-align: center; }
+.ds1973-formula .compare { border-color: #5eead4; }
+.ds1973-formula .compare strong { color: #0f766e; }
+.ds1973-return {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+}
+.ds1973-return small { color: #0f766e; font-size: 11px; font-weight: 900; }
+.ds1973-return strong { color: #0f172a; font: 900 16px "SFMono-Regular", Consolas, monospace; }
+.ds1973-return span { color: #475569; font-size: 12px; text-align: right; }
+.ds1973-formula.match .ds1973-return { background: #dcfce7; border-color: #22c55e; }
+.ds1973-formula.miss .ds1973-return { background: #ffedd5; border-color: #fb923c; }
+.ds1973-rule { background: #f0fdfa; border-color: #2dd4bf; }
+.ds1973-rule > b,
+.ds1973-rule > div > i { color: #0d9488; }
+.ds1973-results {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.ds1973-results > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ds1973-results > header strong { color: #0f172a; font-size: 13px; }
+.ds1973-results > header span { color: #64748b; font-size: 12px; }
+.ds1973-results > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
+.ds1973-results article {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.ds1973-results article small { color: #64748b; font-size: 10px; font-weight: 900; }
+.ds1973-results article strong { color: #0f172a; font-size: 16px; }
+.ds1973-results article span { color: #475569; font-size: 12px; }
+.ds1973-results article.match { background: #f0fdf4; border-color: #22c55e; }
+.ds1973-results article.match strong { color: #15803d; }
+.ds1973-results article.miss { background: #fff7ed; border-color: #fb923c; }
+.ds1973-results article.miss strong { color: #9a3412; }
+.ds1973-results > div > em { color: #64748b; font-size: 12px; }
+.ds1973-result.done { background: #ecfdf5; border-color: #34d399; }
+.ds1973-result.done > strong { color: #047857; }
+
+[data-theme="dark"] .ds1973-phases span.active { color: #99f6e4; background: #042f2e; }
+[data-theme="dark"] .ds1973-summary .answer,
+[data-theme="dark"] .ds1973-result.done { background: #052e16; border-color: #22c55e; }
+[data-theme="dark"] .ds1973-summary .answer strong,
+[data-theme="dark"] .ds1973-result.done > strong { color: #86efac; }
+[data-theme="dark"] .ds1973-tree .edges line.match { stroke: #22c55e; }
+[data-theme="dark"] .ds1973-node.combine circle { fill: #083344; stroke: #06b6d4; }
+[data-theme="dark"] .ds1973-node.combine .state { fill: #67e8f9; }
+[data-theme="dark"] .ds1973-formula,
+[data-theme="dark"] .ds1973-rule { background: #042f2e; border-color: #14b8a6; }
+[data-theme="dark"] .ds1973-sum > span,
+[data-theme="dark"] .ds1973-return { background: #111827; border-color: #0f766e; }
+[data-theme="dark"] .ds1973-sum > span.total { background: #134e4a; border-color: #2dd4bf; }
+[data-theme="dark"] .ds1973-sum strong,
+[data-theme="dark"] .ds1973-return strong { color: #f8fafc; }
+[data-theme="dark"] .ds1973-return span { color: #cbd5e1; }
+[data-theme="dark"] .ds1973-formula.match .ds1973-return { background: #052e16; border-color: #22c55e; }
+[data-theme="dark"] .ds1973-formula.miss .ds1973-return { background: #431407; border-color: #fb923c; }
+[data-theme="dark"] .ds1973-results { background: #111827; border-color: #475569; }
+[data-theme="dark"] .ds1973-results > header strong,
+[data-theme="dark"] .ds1973-results article strong { color: #f8fafc; }
+[data-theme="dark"] .ds1973-results > header span,
+[data-theme="dark"] .ds1973-results article span { color: #cbd5e1; }
+[data-theme="dark"] .ds1973-results article { background: #1e293b; border-color: #475569; }
+[data-theme="dark"] .ds1973-results article.match { background: #052e16; border-color: #22c55e; }
+[data-theme="dark"] .ds1973-results article.match strong { color: #86efac; }
+[data-theme="dark"] .ds1973-results article.miss { background: #431407; border-color: #fb923c; }
+[data-theme="dark"] .ds1973-results article.miss strong { color: #fdba74; }
+
+@container (max-width: 560px) {
+  .ds1973-formula > header,
+  .ds1973-results > header,
+  .ds1973-return { grid-template-columns: 1fr; flex-direction: column; align-items: flex-start; }
+  .ds1973-formula > header span { max-width: none; text-align: left; }
+  .ds1973-sum { grid-template-columns: 1fr; }
+  .ds1973-sum > i,
+  .ds1973-sum > b { transform: rotate(90deg); }
+  .ds1973-return span { text-align: left; }
+}

@@ -16278,6 +16278,88 @@ function renderMaximumAverage1120View(step) {
   </section>`;
 }
 
+function renderDescendantSum1973View(step) {
+  const view = step.descendantSum1973View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const currentId = view.current;
+  const formula = view.formula || null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. DFS xuống hai con", "2. Cộng tổng hai subtree", "3. So sánh node", "4. Trả số lượng"]
+    : ["1. DFS into children", "2. Add both subtree sums", "3. Compare the node", "4. Return the count"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const horizontalGap = 118;
+  const contentWidth = maxX * horizontalGap;
+  const treeWidth = Math.max(360, contentWidth + 204);
+  const treeHeight = Math.max(220, (maxDepth + 1) * 116 + 76);
+  const xOffset = (treeWidth - contentWidth) / 2;
+  const xOf = (node) => xOffset + (Number(node.x) || 0) * horizontalGap;
+  const yOf = (node) => 66 + (Number(node.y) || 0) * 116;
+  const fitTreeToFrame = nodes.length <= 15;
+  const edges = nodes.filter((node) => node.parentId !== null && nodeMap.has(node.parentId)).map((node) => {
+    const parent = nodeMap.get(node.parentId);
+    return `<line class="${node.state === "match" ? "match" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 27}" x2="${xOf(node)}" y2="${yOf(node) - 27}" />`;
+  }).join("");
+  const treeNodes = nodes.map((node) => {
+    const isCurrent = node.id === currentId;
+    const state = String(node.state || "unvisited");
+    const stateLabel = state === "match"
+      ? "MATCH"
+      : state === "miss"
+        ? (vi ? "KHÔNG KHỚP" : "NO MATCH")
+        : state === "combine"
+          ? (vi ? "ĐANG CỘNG" : "ADDING")
+          : state === "waiting"
+            ? (vi ? "CHỜ CON" : "WAITING")
+            : (vi ? "CHƯA THĂM" : "UNVISITED");
+    const details = node.descendantSum === null || node.descendantSum === undefined
+      ? "descendants = ?"
+      : `desc ${node.descendantSum} · subtree ${node.subtreeSum}`;
+    return `<g class="as2265-node ds1973-node ${escapeHtml(state)} ${isCurrent ? "current" : ""}" transform="translate(${xOf(node)} ${yOf(node)})">
+      <circle r="28"></circle>
+      <text class="value" text-anchor="middle" y="6">${escapeHtml(String(node.value))}</text>
+      <text class="state" text-anchor="middle" y="47">${escapeHtml(stateLabel)}</text>
+      <text class="stats" text-anchor="middle" y="66">${escapeHtml(details)}</text>
+    </g>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((id, index) => {
+      const node = nodeMap.get(id);
+      return `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${node ? node.value : "?"}</strong></span>`;
+    }).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã trống" : "The stack is empty"}</em>`;
+  const formulaHtml = formula
+    ? `<section class="as2265-formula ds1973-formula ${formula.match === true ? "match" : formula.match === false ? "miss" : ""}">
+        <header><strong>${vi ? `TÍNH TẠI NODE ${formula.nodeValue}` : `COMPUTE AT NODE ${formula.nodeValue}`}</strong><span>${vi ? "chỉ cộng hậu duệ, không cộng node hiện tại" : "add descendants only; exclude the current node"}</span></header>
+        <div class="ds1973-sum"><span><small>LEFT SUBTREE SUM</small><strong>${formula.leftSum}</strong></span><i>+</i><span><small>RIGHT SUBTREE SUM</small><strong>${formula.rightSum}</strong></span><b>=</b><span class="total"><small>DESCENDANT SUM</small><strong>${formula.descendantSum}</strong></span></div>
+        <div class="compare"><span><small>NODE.VALUE</small><strong>${formula.nodeValue}</strong></span><b>${formula.match === null ? "?" : formula.match ? "=" : "≠"}</b><span><small>DESCENDANT SUM</small><strong>${formula.descendantSum}</strong></span></div>
+        <div class="ds1973-return"><small>${vi ? "TRẢ VỀ CHO CHA" : "RETURN TO PARENT"}</small><strong>${formula.nodeValue} + ${formula.descendantSum} = ${formula.subtreeSum}</strong><span>${formula.match === null ? (vi ? "Đã có tổng, bước sau mới so sánh" : "The sum is ready; compare in the next step") : formula.match ? (vi ? "MATCH → answer + 1" : "MATCH → answer + 1") : (vi ? "Không match → answer giữ nguyên" : "No match → answer stays unchanged")}</span></div>
+      </section>`
+    : `<section class="as2265-rule ds1973-rule"><b>POSTORDER DFS</b><div><span><strong>LEFT</strong><small>subtree sum</small></span><i>+</i><span><strong>RIGHT</strong><small>subtree sum</small></span><i>→</i><span><strong>COMPARE</strong><small>node vs descendants</small></span></div><p>${vi ? "Điểm dễ nhầm: descendant sum không chứa chính node hiện tại. Lá luôn có descendant sum = 0, nên chỉ lá mang giá trị 0 mới match." : "Key detail: the descendant sum excludes the current node. Every leaf has descendant sum = 0, so only a zero-valued leaf matches."}</p></section>`;
+  const resultsHtml = results.length
+    ? results.map((item) => `<article class="${item.match ? "match" : "miss"}"><small>NODE ${item.value}</small><strong>${item.value} ${item.match ? "=" : "≠"} ${item.descendantSum}</strong><span>${item.match ? "+1" : "+0"} · return ${item.subtreeSum}</span></article>`).join("")
+    : `<em>${vi ? "Chưa có node nào được tính xong" : "No node has finished yet"}</em>`;
+  const final = Boolean(step.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="as2265-viz ds1973-viz" role="img" aria-label="Count Nodes Equal to Sum of Descendants visualization">
+    <header><div><small>POSTORDER DFS · TREE · #1973 · PREMIUM</small><strong>${vi ? "NODE = TỔNG HẬU DUỆ" : "NODE = DESCENDANT SUM"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="as2265-phases ds1973-phases">${phases}</div>
+    <section class="as2265-summary ds1973-summary"><div><small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small><strong>${currentId === null || currentId === undefined ? "—" : nodeMap.get(currentId)?.value ?? "—"}</strong></div><div><small>${vi ? "ĐÃ TÍNH XONG" : "PROCESSED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div class="answer"><small>MATCHING NODES</small><strong>${view.answer || 0}</strong></div></section>
+    <section class="as2265-tree ds1973-tree"><header><strong>${vi ? "TÍNH TỪ LÁ LÊN GỐC" : "COMPUTE FROM LEAVES TO ROOT"}</strong><span>${vi ? "xanh = match · đỏ = không match · cam = hiện tại" : "green = match · red = no match · orange = current"}</span></header><div><svg class="as2265-tree-svg ${fitTreeToFrame ? "fit" : "scroll"}" viewBox="0 0 ${treeWidth} ${treeHeight}" preserveAspectRatio="xMidYMin meet" ${fitTreeToFrame ? "" : `style="min-width:${treeWidth}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section>
+    <section class="as2265-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "node cha chờ tổng subtree từ hai con" : "parents wait for both child subtree sums"}</span></header><div>${stackHtml}</div></section>
+    ${formulaHtml}
+    <section class="ds1973-results"><header><strong>${vi ? "CÁC NODE ĐÃ SO SÁNH" : "COMPLETED COMPARISONS"}</strong><span>node.val ? descendant_sum</span></header><div>${resultsHtml}</div></section>
+    <section class="as2265-action"><small>${escapeHtml(String(view.event || "postorder").toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="as2265-result ds1973-result ${final ? "done" : ""}"><small>${vi ? "SỐ NODE THỎA" : "MATCHING NODES"}</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "Mỗi node xanh có node.val = tổng của tất cả hậu duệ." : "Every green node has node.val equal to the sum of all descendants.") : (vi ? "Lá có descendant sum = 0; node cha nhận tổng đầy đủ của từng subtree con." : "A leaf has descendant sum 0; a parent receives each child's complete subtree sum.")}</span></footer>
+  </section>`;
+}
+
 function renderMissingIntegerView(step) {
   const view = step.missingIntegerView || {};
   const vi = lang === "vi";
@@ -27360,6 +27442,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTrapRain2View(step);
+  } else if (step.descendantSum1973View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDescendantSum1973View(step);
   } else if (step.averageSubtree2265View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
