@@ -125,8 +125,11 @@ test('the code toolbar can blur and reveal the #56 snippet beside Edit & run cod
   assert.match(html.slice(blurButton, blurButton + 1800), /aria-pressed="true"[\s\S]*class="code-panel is-blurred"/);
   assert.match(css, /\.code-toolbar-icon-btn:hover::after[\s\S]*visibility:\s*visible/);
   assert.match(css, /\.code-panel\.is-blurred[\s\S]*filter:\s*blur\(5px\)/);
-  assert.match(script, /codeBlurBtn[\s\S]*setCodeSnippetBlurred\(!codeSnippetBlurred\)/);
+  assert.match(script, /codeBlurBtn[\s\S]*setCodeSnippetBlurred\(!codeSnippetBlurred, true\)/);
   assert.match(script, /let codeSnippetBlurred = true/);
-  assert.match(script, /function resetLiveEditorState\(\)[\s\S]*setCodeSnippetBlurred\(true\)/);
+  assert.match(script, /CODE_SNIPPET_BLURRED_KEY = "leetcodeCodeSnippetBlurred"/);
+  assert.match(script, /function readCodeSnippetBlurPreference\(\)[\s\S]*localStorage\.getItem\(CODE_SNIPPET_BLURRED_KEY\)/);
+  assert.match(script, /function resetLiveEditorState\(\)[\s\S]*setCodeSnippetBlurred\(readCodeSnippetBlurPreference\(\)\)/);
+  assert.match(script, /if \(persist\) localStorage\.setItem\(CODE_SNIPPET_BLURRED_KEY, String\(codeSnippetBlurred\)\)/);
   assert.match(script, /aria-pressed/);
 });

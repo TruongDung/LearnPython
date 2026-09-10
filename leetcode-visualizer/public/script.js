@@ -20,6 +20,7 @@ let catalogJumpHighlightTimer = null;
 let codeSnippetBlurred = true;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
+const CODE_SNIPPET_BLURRED_KEY = "leetcodeCodeSnippetBlurred";
 
 // ---- UI strings by language ----
 const I18N = {
@@ -13554,6 +13555,77 @@ function renderHappyNumberView(step) {
     </section>`;
 }
 
+// ---- In-place array rotation visualization (LeetCode 189) ----
+function renderRotateArray189View(step) {
+  const v = step.rotateArray189View, vi = lang === "vi";
+  const n = v.nums.length, effectiveK = v.requestedK % n;
+  const split = n - effectiveK, done = Boolean(step.final), slicing = v.approach === 2;
+  const labels = slicing
+    ? (vi ? ["Chuẩn hóa k", "Tạo hai slice", "Gán nums[:]"] : ["Normalize k", "Build two slices", "Assign nums[:]"])
+    : (vi ? ["Đảo toàn bộ", "Đảo k phần tử đầu", "Đảo phần còn lại"] : ["Reverse all", "Reverse first k", "Reverse the rest"]);
+  const phases = labels.map((label, i) => `<span class="${v.phase === i + 1 && !done ? "active" : v.phase > i + 1 || done && effectiveK ? "complete" : ""}">${i + 1} · ${label}</span>`).join("");
+  const values = list => `[${list.join(", ")}]`;
+  const block = (name, list) => `<span class="ra189-original-${name.toLowerCase()}"><b>${name}</b><code>${escapeHtml(values(list))}</code></span>`;
+  const cellWidth = Math.max(58, Math.max(...v.nums.map(value => String(value).length)) * 9 + 20);
+  const cells = v.nums.map((value, i) => {
+    const group = v.ids[i] < split ? "A" : "B";
+    const inRange = v.range && i >= v.range[0] && i <= v.range[1];
+    const lo = i === v.lo, hi = i === v.hi;
+    const pointer = lo && hi ? "lo = hi" : lo ? "lo" : hi ? "hi" : "";
+    const active = (lo || hi) && v.lo < v.hi;
+    const label = `nums[${i}] = ${value}, ${group}, ${vi ? "từ vị trí" : "from index"} ${v.ids[i]}${pointer ? `, ${pointer}` : ""}`;
+    return `<div class="ra189-cell group-${group.toLowerCase()}${inRange ? " in-range" : ""}${active ? " pointer" : ""}${done ? " done" : ""}" role="listitem" aria-label="${escapeHtml(label)}">
+      <small>[${i}]</small><strong>${escapeHtml(value)}</strong><span>${group} · #${v.ids[i]}</span><em>${pointer || "&nbsp;"}</em>
+    </div>`;
+  }).join("");
+  let action = `k = ${v.requestedK} % ${n} = ${effectiveK}`;
+  let detail = vi ? "Mỗi vòng đủ n bước giữ nguyên mảng." : "Every full turn of n steps leaves the array unchanged.";
+  if (v.range) {
+    action = `reverse(${v.range[0]}, ${v.range[1]})`;
+    detail = vi ? "Khung nhạt đánh dấu đoạn đang đảo; lo và hi đi vào giữa." : "Shaded cells mark the reversal range; lo and hi move inward.";
+  }
+  if (v.event === "check") {
+    action = `${v.lo} < ${v.hi} → ${v.lo < v.hi ? "True" : "False"}`;
+    detail = v.lo < v.hi ? (vi ? "Sẵn sàng hoán đổi cặp con trỏ." : "Ready to swap the pointer pair.") : (vi ? "Con trỏ đã gặp hoặc vượt nhau → dừng đảo." : "Pointers meet or cross → stop reversing.");
+  } else if (v.event === "swap") {
+    action = `nums[${v.lo}] ↔ nums[${v.hi}]`;
+    detail = `${v.before[0]}, ${v.before[1]} → ${v.nums[v.lo]}, ${v.nums[v.hi]}`;
+  } else if (v.event === "move") {
+    action = `lo = ${v.lo} · hi = ${v.hi}`;
+    detail = vi ? "Thu hẹp đoạn chưa đảo từ cả hai phía." : "Shrink the unreversed range from both ends.";
+  } else if (v.event === "reversed") {
+    detail = vi ? "Đoạn này đã đảo xong." : "This range is now reversed.";
+  } else if (v.event === "slice-left") {
+    action = `nums[-k:] → ${values(v.leftSlice)}`;
+    detail = effectiveK ? (vi ? "Lấy suffix gồm k phần tử cuối." : "Take the suffix containing the last k elements.") : (vi ? "-0 bằng 0 nên lấy toàn bộ nums." : "-0 equals 0, so this takes all of nums.");
+  } else if (v.event === "slice-right") {
+    action = `nums[:-k] → ${values(v.rightSlice)}`;
+    detail = effectiveK ? (vi ? "Lấy prefix đứng sau suffix trong kết quả." : "Take the prefix that follows the suffix in the result.") : (vi ? "Slice đến -0 là rỗng." : "A slice ending at -0 is empty.");
+  } else if (v.event === "assigned") {
+    action = "nums[:] = nums[-k:] + nums[:-k]";
+    detail = vi ? "Sửa đúng list nums ban đầu; biểu thức bên phải dùng O(n) bộ nhớ tạm." : "Mutate the original nums list; the right-hand expression uses O(n) temporary space.";
+  } else if (done) {
+    action = effectiveK ? "A + B → B + A" : "k % n = 0";
+    detail = effectiveK ? (vi ? "Xong: nums đã được sửa tại chỗ." : "Done: nums has been modified in place.") : (vi ? "Không đổi; không cần hoán đổi." : "Unchanged; no swaps are needed.");
+  }
+  const slices = slicing ? `<div class="ra189-slices">
+    <span><small>nums[-k:]</small><code>${v.leftSlice ? escapeHtml(values(v.leftSlice)) : "—"}</code></span>
+    <b>+</b>
+    <span><small>nums[:-k]</small><code>${v.rightSlice ? escapeHtml(values(v.rightSlice)) : "—"}</code></span>
+    <b>→ nums[:]</b>
+  </div>` : "";
+  $("treeView").innerHTML = `<section class="ra189-viz" aria-label="${slicing ? (vi ? "Xoay mảng bằng slicing" : "Rotate array with slicing") : (vi ? "Xoay mảng bằng ba lần đảo" : "Rotate array with three reversals")}">
+    <header class="ra189-heading"><strong>${slicing ? (vi ? "Cách 2 · Slicing" : "Approach 2 · Slicing") : (vi ? "Cách 1 · Đảo 3 lần" : "Approach 1 · Three reversals")}</strong><span>${vi ? "Xoay phải" : "Rotate right"} ${effectiveK} · k: ${v.requestedK} % ${n} = ${effectiveK}</span></header>
+    <div class="ra189-original"><span>${vi ? "Ban đầu" : "Original"}</span>${block("A", v.original.slice(0, split))}${block("B", v.original.slice(split))}</div>
+    <div class="ra189-phases">${phases}</div>
+    ${slices}
+    <div class="ra189-array-heading"><strong>nums${done ? (vi ? " · kết quả" : " · result") : ""}</strong><span>${v.range ? `[${v.range[0]}, ${v.range[1]}]` : "A + B → B + A"}</span></div>
+    <div class="ra189-array" role="list" aria-label="nums" style="--ra189-cell-width:${cellWidth}px">${cells}</div>
+    <div class="ra189-action" aria-live="polite"><strong>${escapeHtml(action)}</strong><span>${escapeHtml(detail)}</span></div>
+    <div class="ra189-legend"><span class="group-a">A · ${vi ? "nhóm đầu" : "original prefix"}</span><span class="group-b">B · ${vi ? "k phần tử cuối" : "last k elements"}</span><span>${vi ? "# = chỉ số ban đầu" : "# = original index"}</span></div>
+  </section>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -15715,92 +15787,130 @@ function renderTrapRain2ViewLegacy(step) {
   const vi = lang === "vi";
   const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
   const waterAt = Array.isArray(view.waterAt) ? view.waterAt : [];
+  const surfaceAt = Array.isArray(view.surfaceAt) ? view.surfaceAt : [];
   const visited = Array.isArray(view.visited) ? view.visited : [];
+  const processed = Array.isArray(view.processed) ? view.processed : [];
   const rows = Number.isInteger(view.rows) ? view.rows : heightMap.length;
   const cols = Number.isInteger(view.cols) ? view.cols : (heightMap[0] || []).length;
   const heap = Array.isArray(view.heap) ? view.heap : [];
+  const frontier = Array.isArray(view.frontier) ? view.frontier : heap;
   const popped = view.popped || null;
   const neighbor = view.neighbor || null;
-  const status = Array.isArray(view.status) ? view.status : [];
   const phase = String(view.phase || "init");
   const keyOf = (cell) => cell ? `${cell.r},${cell.c}` : "";
   const poppedKey = keyOf(popped);
   const neighborKey = keyOf(neighbor);
-  const maxLevel = Math.max(1, ...heightMap.flat().map((value) => Number(value) || 0), Number(view.wall) || 0, Number(view.newWall) || 0);
+  const frontierKeys = new Set(frontier.map(keyOf));
+  const maxLevel = Math.max(1, ...heightMap.flat().map((value) => Number(value) || 0), ...surfaceAt.flat().map((value) => Number(value) || 0));
+  const stage = phase === "init" ? 1 : phase === "pop" ? 2 : phase === "done" ? 4 : 3;
+  const stageLabels = vi
+    ? ["Đưa biên vào heap", "Pop mức thấp nhất", "Xét ô kề và cập nhật"]
+    : ["Seed heap with border", "Pop the lowest level", "Check and update neighbor"];
+  const stagesHtml = stageLabels.map((label, index) => {
+    const number = index + 1;
+    const state = stage > number ? "complete" : stage === number ? "active" : "";
+    return `<span class="${state}"><b>${number}</b>${escapeHtml(label)}</span>`;
+  }).join("");
 
   const cellsHtml = heightMap.map((row, r) => row.map((height, c) => {
     const cellKey = `${r},${c}`;
     const water = Number((waterAt[r] || [])[c]) || 0;
+    const surface = Number((surfaceAt[r] || [])[c]) || Number(height) + water;
     const isVisited = Boolean((visited[r] || [])[c]);
+    const isProcessed = Boolean((processed[r] || [])[c]);
+    const isFrontier = frontierKeys.has(cellKey);
     const isBorder = r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
     const classes = ["rain2-cell"];
     if (isBorder) classes.push("is-border");
     if (isVisited) classes.push("is-visited");
+    if (isProcessed) classes.push("is-processed");
+    if (isFrontier) classes.push("is-frontier");
     if (cellKey === poppedKey) classes.push("is-popped");
     if (cellKey === neighborKey) classes.push("is-neighbor");
     if (water > 0) classes.push("has-water");
-    const heightPct = Math.max(12, ((Number(height) || 0) / maxLevel) * 100);
-    const waterPct = water > 0 ? Math.max(16, (water / maxLevel) * 100) : 0;
-    return `<div class="${classes.join(" ")}" style="--rain2-height:${heightPct}%;--rain2-water:${waterPct}%">
-      <span class="rain2-coord">[${r},${c}]</span>
+    const heightPct = Math.max(8, ((Number(height) || 0) / maxLevel) * 100);
+    const waterPct = water > 0 ? Math.max(8, (water / maxLevel) * 100) : 0;
+    const stateLabel = cellKey === neighborKey
+      ? (vi ? "ĐANG XÉT" : "CHECK")
+      : cellKey === poppedKey
+        ? "POP MIN"
+        : isFrontier
+          ? (isBorder ? (vi ? "BIÊN · HEAP" : "BORDER · HEAP") : "IN HEAP")
+          : isProcessed
+            ? (vi ? "ĐÃ XONG" : "DONE")
+            : (vi ? "CHƯA THẤY" : "UNSEEN");
+    const accessible = vi
+      ? `Ô ${r},${c}: đất ${height}, mực hiệu dụng ${surface}, nước ${water}, ${stateLabel}`
+      : `Cell ${r},${c}: ground ${height}, effective level ${surface}, water ${water}, ${stateLabel}`;
+    return `<div class="${classes.join(" ")}" aria-label="${escapeHtml(accessible)}" style="--rain2-height:${heightPct}%;--rain2-water:${waterPct}%">
+      <span class="rain2-coord">(${r},${c})</span>
       <div class="rain2-column">
-        ${water > 0 ? `<i class="rain2-water">+${escapeHtml(String(water))}</i>` : ""}
+        ${water > 0 ? `<i class="rain2-water"><small>water</small><b>+${escapeHtml(String(water))}</b></i>` : ""}
         <b>${escapeHtml(String(height))}</b>
       </div>
+      <span class="rain2-cell-state">${escapeHtml(stateLabel)}</span>
     </div>`;
   }).join("")).join("");
 
   const heapHtml = heap.length
     ? heap.map((item, index) => `<span class="${index === 0 ? "is-top" : ""}">
-        <small>${index === 0 ? "TOP" : `#${index + 1}`}</small>
-        <strong>${escapeHtml(String(item.wall))}</strong>
+        <small>${index === 0 ? (vi ? "THẤP NHẤT" : "LOWEST") : `#${index + 1}`}</small>
+        <strong>${vi ? "mức" : "level"} ${escapeHtml(String(item.wall))}</strong>
         <em>(${escapeHtml(String(item.r))},${escapeHtml(String(item.c))})</em>
       </span>`).join("")
     : `<span class="rain2-heap-empty">∅</span>`;
   const moreHeap = view.heapSize > heap.length ? `<small class="rain2-more">+${escapeHtml(String(view.heapSize - heap.length))}</small>` : "";
 
-  const formula = view.trapped === null || view.trapped === undefined
-    ? (vi ? "Chờ xét ô hàng xóm" : "Waiting for a neighbor")
-    : `max(0, ${view.wall} - ${view.cellHeight}) = ${view.trapped}`;
-  const mainAction = phase === "init"
-    ? (vi ? "Đưa toàn bộ biên vào min-heap" : "Push all border cells into the min-heap")
-    : phase === "pop"
-      ? (vi ? `Pop tường thấp nhất (${popped?.r},${popped?.c})` : `Pop lowest wall (${popped?.r},${popped?.c})`)
-      : phase === "done"
-        ? (vi ? "Hoàn tất xử lý tất cả ô" : "All cells processed")
-        : (vi ? `Xét hàng xóm (${neighbor?.r},${neighbor?.c})` : `Check neighbor (${neighbor?.r},${neighbor?.c})`);
-  const detail = phase === "trap"
-    ? (vi ? "Ô thấp hơn tường biên nên giữ được nước." : "The cell is lower than the boundary, so it traps water.")
-    : phase === "push"
-      ? (vi ? "Ô không thấp hơn tường biên, chỉ trở thành tường mới." : "The cell is not lower than the boundary, so it becomes a new wall.")
-      : phase === "pop"
-        ? (vi ? "Heap luôn cho ta mức tường thấp nhất đang bao quanh vùng chưa thăm." : "The heap gives the lowest wall around the unvisited area.")
-        : (vi ? "Biên không giữ nước, nhưng dùng làm tường ban đầu." : "Border cells hold no water, but they are the initial walls.");
-
-  const statusHtml = status.map((item) => `<span><small>${escapeHtml(String(item.label ?? ""))}</small><strong>${escapeHtml(String(item.value ?? "-"))}</strong></span>`).join("");
+  let lessonTitle, lessonText, equationHtml;
+  if (phase === "init") {
+    lessonTitle = vi ? "Bắt đầu từ nơi nước có thể thoát ra" : "Start where water can escape";
+    lessonText = vi ? "Mọi đường thoát ra ngoài đều đi qua ô biên. Vì vậy biên là vòng tường đầu tiên của vùng chưa xét." : "Every path to the outside crosses a border cell, so the border is the first wall around unseen land.";
+    equationHtml = `<div class="rain2-flow"><span>OUTSIDE</span><b>→</b><span>${vi ? "Ô BIÊN" : "BORDER"}</span><b>→</b><span>MIN-HEAP</span></div>`;
+  } else if (phase === "pop") {
+    lessonTitle = vi ? `Mở đường thoát thấp nhất: (${popped?.r},${popped?.c})` : `Open the lowest escape route: (${popped?.r},${popped?.c})`;
+    lessonText = vi ? `Mức ${view.wall} là mực nước an toàn hiện tại. Ta dùng nó để kiểm tra lần lượt các ô kề chưa thấy.` : `Level ${view.wall} is the current safe waterline. Use it to inspect each unseen neighbor.`;
+    equationHtml = `<div class="rain2-flow"><span>heap min</span><b>→</b><span>(${popped?.r},${popped?.c})</span><b>→</b><span>${vi ? "mức" : "level"} ${view.wall}</span></div>`;
+  } else if (phase === "done") {
+    lessonTitle = vi ? `Hoàn tất: giữ được ${view.total} đơn vị nước` : `Complete: ${view.total} units of water`;
+    lessonText = vi ? "Mọi ô đã được xử lý từ đường thoát thấp nhất vào trong. Không còn vùng chưa xét." : "Every cell was reached inward from the lowest available escape route. No unseen region remains.";
+    equationHtml = `<div class="rain2-result-equation"><span>${vi ? "ĐÁP ÁN" : "ANSWER"}</span><strong>${escapeHtml(String(view.total ?? 0))}</strong></div>`;
+  } else {
+    const catches = Number(view.trapped) > 0;
+    lessonTitle = vi
+      ? `${popped?.r},${popped?.c} ${view.direction || "→"} ${neighbor?.r},${neighbor?.c}: ${catches ? "có nước" : "không có nước"}`
+      : `${popped?.r},${popped?.c} ${view.direction || "→"} ${neighbor?.r},${neighbor?.c}: ${catches ? "water is trapped" : "no water"}`;
+    lessonText = catches
+      ? (vi ? `Đất ${view.cellHeight} thấp hơn đường thoát ${view.wall}; nước lấp phần chênh lệch và mực hiệu dụng trở thành ${view.newWall}.` : `Ground ${view.cellHeight} is below escape level ${view.wall}; water fills the gap and the effective level becomes ${view.newWall}.`)
+      : (vi ? `Đất ${view.cellHeight} cao ít nhất bằng đường thoát ${view.wall}; không có khoảng trống để giữ nước.` : `Ground ${view.cellHeight} is at least as high as escape level ${view.wall}; there is no gap to fill.`);
+    equationHtml = `<div class="rain2-equation">
+      <span><small>${vi ? "ĐƯỜNG THOÁT" : "ESCAPE LEVEL"}</small><strong>${view.wall}</strong></span>
+      <b>−</b>
+      <span><small>${vi ? "MẶT ĐẤT" : "GROUND"}</small><strong>${view.cellHeight}</strong></span>
+      <b>=</b>
+      <span class="${catches ? "positive" : "zero"}"><small>${vi ? "NƯỚC THÊM" : "WATER ADDED"}</small><strong>${view.trapped}</strong></span>
+    </div><div class="rain2-total-equation">${vi ? "Tổng" : "Total"}: ${view.waterBefore} + ${view.trapped} = <b>${view.total}</b> · ${vi ? "đẩy lại với mức" : "push back at level"} <b>${view.newWall}</b></div>`;
+  }
 
   $("treeView").innerHTML = `<div class="rain2-viz phase-${escapeHtml(phase)}">
+    <div class="rain2-story">${stagesHtml}</div>
     <div class="rain2-summary">
       <span><small>${vi ? "Tổng nước" : "Total water"}</small><strong>${escapeHtml(String(view.total ?? 0))}</strong></span>
-      <span><small>${vi ? "Tường hiện tại" : "Current wall"}</small><strong>${escapeHtml(String(view.wall ?? "-"))}</strong></span>
-      <span><small>${vi ? "Nước thêm" : "Added water"}</small><strong>${escapeHtml(String(view.trapped ?? "-"))}</strong></span>
+      <span><small>${vi ? "Đang chờ trong heap" : "Waiting in heap"}</small><strong>${escapeHtml(String(view.heapSize ?? 0))}</strong></span>
+      <span><small>${vi ? "Đã xử lý" : "Processed"}</small><strong>${escapeHtml(String(view.processedCount ?? 0))}/${escapeHtml(String(view.totalCells ?? rows * cols))}</strong></span>
     </div>
+    <section class="rain2-lesson"><header><small>${vi ? "ĐANG LÀM GÌ?" : "WHAT IS HAPPENING?"}</small><strong>${escapeHtml(lessonTitle)}</strong></header><p>${escapeHtml(lessonText)}</p>${equationHtml}</section>
     <div class="rain2-layout">
       <section class="rain2-grid-card">
-        <header><strong>HEIGHT MAP</strong><span>${vi ? "xanh = nước, vàng = ô đang xét" : "blue = water, yellow = active cell"}</span></header>
-        <div class="rain2-grid" style="--rain2-cols:${Math.max(1, cols)}">${cellsHtml}</div>
+        <header><strong>${vi ? "BẢN ĐỒ: ĐẤT + NƯỚC" : "MAP: GROUND + WATER"}</strong><span>${vi ? "số trong khối = độ cao đất" : "number in block = ground height"}</span></header>
+        <div class="rain2-grid" role="grid" style="--rain2-cols:${Math.max(1, cols)}">${cellsHtml}</div>
       </section>
-      <aside class="rain2-side">
-        <div class="rain2-action"><small>${escapeHtml(phase.toUpperCase())}</small><strong>${escapeHtml(mainAction)}</strong><span>${escapeHtml(detail)}</span></div>
-        <div class="rain2-formula"><small>${vi ? "Công thức" : "Formula"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(String(view.decision || ""))}</span></div>
-        <div class="rain2-heap"><header><strong>MIN-HEAP</strong><small>${vi ? "wall thấp nhất đứng đầu" : "lowest wall first"}</small></header><div>${heapHtml}${moreHeap}</div></div>
-        <div class="rain2-status">${statusHtml}</div>
-      </aside>
+      <aside class="rain2-heap"><header><strong>${vi ? "BIÊN ĐANG CHỜ (MIN-HEAP)" : "WAITING BOUNDARY (MIN-HEAP)"}</strong><small>${vi ? "minh họa đã sắp từ thấp → cao" : "shown sorted low → high"}</small></header><div>${heapHtml}${moreHeap}</div></aside>
     </div>
     <div class="rain2-legend">
-      <span><i class="border"></i>${vi ? "biên/đã thăm" : "border/visited"}</span>
-      <span><i class="popped"></i>${vi ? "vừa pop" : "popped"}</span>
-      <span><i class="neighbor"></i>${vi ? "hàng xóm" : "neighbor"}</span>
+      <span><i class="frontier"></i>${vi ? "đang chờ trong heap" : "waiting in heap"}</span>
+      <span><i class="popped"></i>${vi ? "đường thấp nhất vừa pop" : "lowest route popped"}</span>
+      <span><i class="neighbor"></i>${vi ? "ô đang kiểm tra" : "cell being checked"}</span>
+      <span><i class="processed"></i>${vi ? "đã xử lý" : "processed"}</span>
       <span><i class="water"></i>${vi ? "có nước" : "water"}</span>
     </div>
   </div>`;
@@ -15809,10 +15919,11 @@ function renderTrapRain2ViewLegacy(step) {
 function renderTrapRain2View(step) {
   const view = step.trapRain2View || {};
   const vi = lang === "vi";
+  const localPick = (value) => typeof pick === "function" ? pick(value) : value?.[lang] ?? value?.en ?? value?.vi ?? value ?? "";
   const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
   const waterAt = Array.isArray(view.waterAt) ? view.waterAt : [];
   const visited = Array.isArray(view.visited) ? view.visited : [];
-  const settled = Array.isArray(view.settled) ? view.settled : [];
+  const settled = Array.isArray(view.settled) ? view.settled : (Array.isArray(view.processed) ? view.processed : []);
   const heap = Array.isArray(view.heap) ? view.heap : [];
   const rows = Number.isInteger(view.rows) ? view.rows : heightMap.length;
   const cols = Number.isInteger(view.cols) ? view.cols : (heightMap[0] || []).length;
@@ -15859,7 +15970,7 @@ function renderTrapRain2View(step) {
               ? "BORDER"
               : (vi ? "CHƯA THĂM" : "UNVISITED");
     return `<article class="${classes}">
-      <header><small>[${r},${c}]</small><span>${state}</span></header>
+      <header><small>[${r},${c}]</small><span class="rain2-cell-state">${state}</span></header>
       <div class="trw407-levels"><span class="ground"><small>${vi ? "đất" : "ground"}</small><strong>${ground}</strong></span><i>+</i><span class="water"><small>${vi ? "nước" : "water"}</small><strong>${water}</strong></span></div>
       <footer><small>${vi ? "mặt nước / tường" : "surface / wall"}</small><strong>${surface}</strong></footer>
     </article>`;
@@ -15893,14 +16004,14 @@ function renderTrapRain2View(step) {
   const final = Boolean(step.final || phase === "done");
 
   $("treeView").innerHTML = `<section class="trw407-viz" role="img" aria-label="Trapping Rain Water II visualization">
-    <header><div><small>MIN-HEAP · FLOOD FROM BORDER · #407</small><strong>TRAPPING RAIN WATER II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
-    <div class="trw407-phases">${phases}</div>
+    <header><div><small>MIN-HEAP · FLOOD FROM BORDER · #407</small><strong>TRAPPING RAIN WATER II</strong></div><span>${escapeHtml(localPick(step.title))}</span></header>
+    <div class="trw407-phases rain2-story">${phases}</div>
     <section class="trw407-model"><b>${vi ? "HÌNH DUNG NHƯ MỞ BẢN ĐỒ TỪ NGOÀI VÀO" : "IMAGINE OPENING THE MAP FROM OUTSIDE IN"}</b><div><span><small>1</small><strong>${vi ? "Vòng biên" : "Border ring"}</strong><em>${vi ? "nơi nước có thể thoát" : "where water can escape"}</em></span><i>→</i><span><small>2</small><strong>${vi ? "Tường thấp nhất" : "Lowest wall"}</strong><em>${vi ? "min-heap chọn trước" : "min-heap picks first"}</em></span><i>→</i><span><small>3</small><strong>${vi ? "Ô bên trong" : "Inner neighbor"}</strong><em>${vi ? "đổ nước hoặc nâng tường" : "fill water or raise wall"}</em></span></div></section>
     <section class="trw407-metrics"><div><small>${vi ? "tổng nước" : "total water"}</small><strong>${total}</strong></div><div><small>${vi ? "tường đang xét" : "current wall"}</small><strong>${view.wall ?? "—"}</strong></div><div><small>${vi ? "ô đã phát hiện" : "discovered cells"}</small><strong>${view.visitedCount ?? 0}/${rows * cols}</strong></div><div><small>${vi ? "ô đã chốt" : "settled cells"}</small><strong>${view.settledCount ?? 0}/${rows * cols}</strong></div><div><small>heap size</small><strong>${view.heapSize ?? 0}</strong></div></section>
     <section class="trw407-map"><header><strong>${vi ? "BẢN ĐỒ NHÌN TỪ TRÊN" : "TOP-DOWN HEIGHT MAP"}</strong><span>${vi ? "mỗi ô tách riêng độ cao đất + nước = mặt nước/tường" : "each cell separates ground + water = surface/wall"}</span></header><div class="trw407-grid" style="--trw407-cols:${Math.max(cols, 1)}">${cells}</div></section>
     <section class="trw407-heap"><header><strong>MIN-HEAP · FRONTIER</strong><span>${vi ? "phần tử đầu là đường thoát thấp nhất còn lại" : "the first item is the lowest remaining escape wall"}</span></header><div>${heapItems}${hiddenHeap}</div></section>
     ${comparison}
-    <section class="trw407-action"><small>${String(view.event || phase).toUpperCase()}</small><strong>${escapeHtml(activeAction)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="trw407-action"><small>${String(view.event || phase).toUpperCase()}</small><strong>${escapeHtml(activeAction)}</strong><span>${escapeHtml(localPick(step.note))}</span></section>
     <section class="trw407-running"><span><small>${vi ? "TỔNG TRƯỚC" : "TOTAL BEFORE"}</small><strong>${totalBefore}</strong></span><i>+</i><span><small>${vi ? "NƯỚC Ở Ô NÀY" : "WATER IN THIS CELL"}</small><strong>${hasNeighbor ? trapped : 0}</strong></span><i>=</i><span><small>${vi ? "TỔNG HIỆN TẠI" : "CURRENT TOTAL"}</small><strong>${total}</strong></span></section>
     <footer class="trw407-result ${final ? "done" : ""}"><small>TOTAL TRAPPED WATER</small><strong>${final ? total : "…"}</strong><span>${final ? (vi ? "Kết quả là tổng phần nước màu xanh trong các ô bên trong." : "The answer is the sum of the blue water values in all interior cells.") : (vi ? "Min-heap bảo đảm không dùng một bức tường cao giả tạo khi vẫn còn đường thoát thấp hơn." : "The min-heap prevents using an artificially high wall while a lower escape route remains.")}</span></footer>
   </section>`;
@@ -26654,6 +26765,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGcdPairsView(step);
+  } else if (step.rotateArray189View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotateArray189View(step);
   } else if (step.rotatedSearchView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -27786,6 +27903,7 @@ function formatPythonRuntimeError(err) {
 
 // Initialize
 applyStaticStrings();
+setCodeSnippetBlurred(readCodeSnippetBlurPreference());
 loadCatalog();
 
 // Restore last opened problem from localStorage
@@ -29103,7 +29221,7 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
-  setCodeSnippetBlurred(true);
+  setCodeSnippetBlurred(readCodeSnippetBlurPreference());
   clearTimeout(liveCopyResetTimer);
   liveCopyResetTimer = null;
   if ($("liveCopyBtn")) {
@@ -29129,7 +29247,7 @@ function setLiveMode(on) {
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
   if (!on) {
-    setCodeSnippetBlurred(true);
+    setCodeSnippetBlurred(readCodeSnippetBlurPreference());
     // Restore the canned visualization exactly as it was before entering live mode.
     renderCode();
     if (problemData) {
@@ -29148,15 +29266,20 @@ function updateCodeBlurButton() {
   button.dataset.tooltip = label;
 }
 
-function setCodeSnippetBlurred(on) {
+function readCodeSnippetBlurPreference() {
+  return localStorage.getItem(CODE_SNIPPET_BLURRED_KEY) !== "false";
+}
+
+function setCodeSnippetBlurred(on, persist = false) {
   codeSnippetBlurred = Boolean(on);
   const panel = $("codePanel");
   if (panel) panel.classList.toggle("is-blurred", codeSnippetBlurred);
+  if (persist) localStorage.setItem(CODE_SNIPPET_BLURRED_KEY, String(codeSnippetBlurred));
   updateCodeBlurButton();
 }
 
 $("codeBlurBtn") && $("codeBlurBtn").addEventListener("click", () => {
-  setCodeSnippetBlurred(!codeSnippetBlurred);
+  setCodeSnippetBlurred(!codeSnippetBlurred, true);
 });
 
 $("liveEditBtn") && $("liveEditBtn").addEventListener("click", async () => {

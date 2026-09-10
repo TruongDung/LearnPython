@@ -15745,14 +15745,21 @@ function buildSteps407(input) {
       trapRain2View: {
         heightMap: heightMap.map((row) => [...row]),
         waterAt,
+        surfaceAt: heightMap.map((row) => [...row]),
         visited,
         settled,
+        processed: settled.map((row) => [...row]),
         rows,
         cols,
         heap: [],
+        frontier: [],
         heapSize: 0,
+        discoveredCount: rows * cols,
+        processedCount: rows * cols,
+        totalCells: rows * cols,
         popped: null,
         neighbor: null,
+        direction: "",
         phase: "done",
         phaseIndex: 3,
         event: "too-small",
@@ -15776,9 +15783,12 @@ function buildSteps407(input) {
   const rows = heightMap.length;
   const cols = heightMap[0].length;
   const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const settled = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const processed = Array.from({ length: rows }, () => Array(cols).fill(false));
   const waterAt = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const surfaceAt = heightMap.map((row) => [...row]);
   const heap = [];
+  let discoveredCount = 0;
+  let processedCount = 0;
 
   function makeCells(cur) {
     return heightMap.map((row, r) =>
@@ -15798,14 +15808,21 @@ function buildSteps407(input) {
     return {
       heightMap: heightMap.map((row) => [...row]),
       waterAt: waterAt.map((row) => [...row]),
+      surfaceAt: surfaceAt.map((row) => [...row]),
       visited: visited.map((row) => [...row]),
-      settled: settled.map((row) => [...row]),
+      processed: processed.map((row) => [...row]),
+      settled: processed.map((row) => [...row]),
       rows,
       cols,
-      heap: sortedHeap.slice(0, 12).map(([wall, r, c]) => ({ wall, r, c })),
+      heap: sortedHeap.slice(0, 8).map(([wall, r, c]) => ({ wall, r, c })),
+      frontier: sortedHeap.map(([wall, r, c]) => ({ wall, r, c })),
       heapSize: heap.length,
+      discoveredCount,
+      processedCount,
+      totalCells: rows * cols,
       popped: opts.popped || null,
       neighbor: opts.neighbor || null,
+      direction: opts.direction || "",
       phase,
       phaseIndex,
       event: opts.event || phase,
@@ -15816,7 +15833,7 @@ function buildSteps407(input) {
       total: opts.total ?? 0,
       waterBefore: opts.waterBefore ?? opts.total ?? 0,
       visitedCount: visited.flat().filter(Boolean).length,
-      settledCount: settled.flat().filter(Boolean).length,
+      settledCount: processed.flat().filter(Boolean).length,
       decision: opts.decision || "",
       status: opts.status || [],
     };
@@ -15861,6 +15878,7 @@ function buildSteps407(input) {
       if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) {
         hpush([heightMap[r][c], r, c]);
         visited[r][c] = true;
+        discoveredCount += 1;
       }
     }
   }
@@ -15871,7 +15889,7 @@ function buildSteps407(input) {
     view: {
       phase: "init",
       total: 0,
-      decision: "border cells enter heap first",
+      decision: "outside → border → inside",
       status: [
         { label: "border cells", value: heap.length },
         { label: "water", value: 0 },
@@ -15884,11 +15902,11 @@ function buildSteps407(input) {
     ],
     note: {
       vi:
-        `Nước bị giới hạn bởi TƯỜNG THẤP NHẤT xung quanh. Bắt đầu từ biên (không giữ được nước) và tiến vào trong.\n` +
-        `Min-heap luôn lấy ô có "mức tường" thấp nhất trước. Nhãn ô = "cao độ+nước💧".`,
+        `Hãy tưởng tượng nước tràn từ NGOÀI bản đồ vào. Mọi đường thoát đều đi qua biên, nên ta đưa toàn bộ ô biên vào heap trước.\n` +
+        `Heap giữ "đường thoát" đang bao quanh vùng chưa xét; luôn mở đường thấp nhất trước.`,
       en:
-        `Water is bounded by the LOWEST surrounding wall. Start from the border (holds no water) and move inward.\n` +
-        `The min-heap always pops the lowest boundary height first. Cell label = "height+water💧".`,
+        `Imagine water flooding in from OUTSIDE the map. Every escape path crosses the border, so all border cells enter the heap first.\n` +
+        `The heap is the escape boundary around unseen land; always open its lowest point first.`,
     },
   });
 
@@ -15896,10 +15914,11 @@ function buildSteps407(input) {
   let water = 0;
   let guard = 0;
 
-  while (heap.length && guard < 200) {
+  while (heap.length) {
     guard += 1;
     const [height, r, c] = hpop();
-    settled[r][c] = true;
+    processed[r][c] = true;
+    processedCount += 1;
     const verbose = guard <= 80;
 
     if (verbose) {
@@ -15927,8 +15946,8 @@ function buildSteps407(input) {
           { name: "total water", value: water },
         ],
         note: {
-          vi: `Lấy ô biên thấp nhất hiện tại từ heap: (${r},${c}) với mức tường ${height}. Mức này là giới hạn an toàn để xét các ô kề bên trong.`,
-          en: `Pop the current lowest boundary from the heap: (${r},${c}) with wall level ${height}. This level safely bounds its inner neighbors.`,
+          vi: `Pop (${r},${c}) vì đây là đường thoát thấp nhất hiện tại: mức ${height}. Nếu ô kề thấp hơn ${height}, nước ở đó không thể thoát ra ngoài và sẽ dâng tới mức ${height}.`,
+          en: `Pop (${r},${c}) because it is the current lowest escape route at level ${height}. A lower neighbor cannot drain outside, so water there rises to level ${height}.`,
         },
       });
     }
@@ -15937,11 +15956,13 @@ function buildSteps407(input) {
       const nr = r + dr, nc = c + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || visited[nr][nc]) continue;
       visited[nr][nc] = true;
-      const waterBefore = water;
+      discoveredCount += 1;
       const trapped = Math.max(0, height - heightMap[nr][nc]);
+      const waterBefore = water;
       water += trapped;
       waterAt[nr][nc] = trapped;
       const newHeight = Math.max(height, heightMap[nr][nc]);
+      surfaceAt[nr][nc] = newHeight;
       hpush([newHeight, nr, nc]);
 
       if (verbose) {
@@ -15954,12 +15975,13 @@ function buildSteps407(input) {
             event: trapped > 0 ? "trap-neighbor" : "raise-boundary",
             popped: { r, c, wall: height },
             neighbor: { r: nr, c: nc },
+            direction: dr === -1 ? "↑" : dr === 1 ? "↓" : dc === -1 ? "←" : "→",
             wall: height,
             cellHeight: heightMap[nr][nc],
             trapped,
             newWall: newHeight,
-            total: water,
             waterBefore,
+            total: water,
             decision: `max(0, ${height} - ${heightMap[nr][nc]}) = ${trapped}`,
             status: [
               { label: "from wall", value: `(${r},${c})` },
@@ -15975,8 +15997,12 @@ function buildSteps407(input) {
             { name: "total water", value: water },
           ],
           note: {
-            vi: `Ô (${nr},${nc}) cao ${heightMap[nr][nc]}. Tường bao quanh thấp nhất = ${height}. Nước giữ = max(0, ${height}-${heightMap[nr][nc]}) = ${trapped}. Đẩy ô với mức tường mới = max(${height},${heightMap[nr][nc]}) = ${newHeight}.`,
-            en: `Cell (${nr},${nc}) height ${heightMap[nr][nc]}. Lowest surrounding wall = ${height}. Trapped = max(0, ${height}-${heightMap[nr][nc]}) = ${trapped}. Push with new boundary = max(${height},${heightMap[nr][nc]}) = ${newHeight}.`,
+            vi: trapped > 0
+              ? `Đất cao ${heightMap[nr][nc]} thấp hơn đường thoát ${height}, nên nước dâng thêm ${trapped} tới mức ${newHeight}. Đưa ô này vào heap với mức hiệu dụng ${newHeight}.`
+              : `Đất cao ${heightMap[nr][nc]} không thấp hơn đường thoát ${height}, nên không giữ nước. Chính ô đất này trở thành biên mới ở mức ${newHeight}.`,
+            en: trapped > 0
+              ? `Ground ${heightMap[nr][nc]} is below escape level ${height}, so ${trapped} unit(s) fill it to level ${newHeight}. Add this cell to the heap at effective level ${newHeight}.`
+              : `Ground ${heightMap[nr][nc]} is not below escape level ${height}, so it traps no water. The ground itself becomes the new boundary at level ${newHeight}.`,
           },
         });
       }
@@ -15991,7 +16017,7 @@ function buildSteps407(input) {
     view: {
       phase: "done",
       total: water,
-      decision: "all reachable cells processed",
+      decision: `${processedCount}/${rows * cols} cells processed`,
       status: [{ label: "answer", value: water }],
     },
     vars: [{ name: "answer (water)", value: water }],
@@ -18434,11 +18460,12 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Bản đồ độ cao (hàng cách ;)", en: "Elevation map (rows separated by ;)" },
     extraParams: [],
+    debugMode: "line-by-line",
     approach: [
-      { vi: "Mức nước tại một ô bị chặn bởi TƯỜNG THẤP NHẤT bao quanh. Bắt đầu từ biên (không giữ nước).", en: "Water level at a cell is bounded by the LOWEST surrounding wall. Start from the border (holds no water)." },
-      { vi: "Min-heap chứa (mức tường, r, c). Luôn xử lý ô có mức tường thấp nhất trước.", en: "Min-heap holds (boundary height, r, c). Always process the lowest boundary first." },
-      { vi: "Với ô hàng xóm chưa thăm: nước giữ = max(0, mức tường - độ cao ô).", en: "For an unvisited neighbor: trapped water = max(0, boundary height - cell height)." },
-      { vi: "Đẩy hàng xóm vào heap với mức tường mới = max(mức tường, độ cao ô).", en: "Push the neighbor with a new boundary = max(boundary, cell height)." },
+      { vi: "Tưởng tượng đi từ NGOÀI bản đồ vào: mọi đường nước thoát ra ngoài đều phải qua một ô biên, nên đưa toàn bộ biên vào heap trước.", en: "Imagine moving inward from OUTSIDE the map: every escape path crosses a border cell, so seed the heap with the entire border." },
+      { vi: "Heap là vòng biên đang chờ quanh vùng chưa thấy. Luôn pop ô có mức thấp nhất — đường nước dễ thoát nhất hiện tại.", en: "The heap is the waiting boundary around unseen land. Always pop its lowest cell—the easiest current escape route." },
+      { vi: "Nếu ô kề thấp hơn mức vừa pop, phần chênh lệch trở thành nước: max(0, mức thoát − độ cao đất).", en: "If a neighbor is below the popped level, the gap becomes water: max(0, escape level − ground height)." },
+      { vi: "Đưa ô kề vào heap với mức hiệu dụng max(mức thoát, độ cao đất), rồi tiếp tục tiến dần vào trong.", en: "Push the neighbor at effective level max(escape level, ground height), then continue moving inward." },
     ],
     complexity: {
       time: "O(rows·cols·log(rows·cols))",
