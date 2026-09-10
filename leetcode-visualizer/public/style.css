@@ -46342,8 +46342,8 @@ html, body {
 .as2265-node circle { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 2; }
 .as2265-node text { font-family: Inter, system-ui, sans-serif; }
 .as2265-node .value { fill: #0f172a; font-size: 18px; font-weight: 900; }
-.as2265-node .state { fill: #64748b; font-size: 8px; font-weight: 900; }
-.as2265-node .stats { fill: #64748b; font-size: 9px; font-weight: 750; }
+.as2265-node .state { fill: #64748b; font-size: 11.5px; font-weight: 900; letter-spacing: .02em; }
+.as2265-node .stats { fill: #475569; font-size: 10.5px; font-weight: 800; }
 .as2265-node.waiting circle { fill: #eff6ff; stroke: #60a5fa; }
 .as2265-node.combine circle { fill: #f5f3ff; stroke: #8b5cf6; }
 .as2265-node.match circle { fill: #dcfce7; stroke: #22c55e; }

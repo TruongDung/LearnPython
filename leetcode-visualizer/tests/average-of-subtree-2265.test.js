@@ -113,6 +113,7 @@ test('2265 accepts bracketed input and validates values and visualization size',
 
 test('2265 custom renderer handles every step in English and Vietnamese', () => {
   const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
   const start = script.indexOf('function renderAverageSubtree2265View(step)');
   const end = script.indexOf('\nfunction renderMissingIntegerView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -126,6 +127,8 @@ test('2265 custom renderer handles every step in English and Vietnamese', () => 
   };
   vm.createContext(context);
   vm.runInContext(script.slice(start, end), context);
+  assert.match(styles, /\.as2265-node \.state \{[^}]*font-size: 11\.5px/s);
+  assert.match(styles, /\.as2265-node \.stats \{[^}]*font-size: 10\.5px/s);
 
   for (const language of ['en', 'vi']) {
     context.lang = language;

@@ -16062,8 +16062,8 @@ function renderAverageSubtree2265View(step) {
     return `<g class="as2265-node ${escapeHtml(state)} ${isCurrent ? "current" : ""}" transform="translate(${xOf(node)} ${yOf(node)})">
       <circle r="28"></circle>
       <text class="value" text-anchor="middle" y="6">${escapeHtml(String(node.value))}</text>
-      <text class="state" text-anchor="middle" y="44">${escapeHtml(stateLabel)}</text>
-      <text class="stats" text-anchor="middle" y="59">${escapeHtml(details)}</text>
+      <text class="state" text-anchor="middle" y="47">${escapeHtml(stateLabel)}</text>
+      <text class="stats" text-anchor="middle" y="66">${escapeHtml(details)}</text>
     </g>`;
   }).join("");
   const stackHtml = stack.length
