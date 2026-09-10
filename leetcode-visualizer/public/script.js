@@ -16011,7 +16011,7 @@ function renderTrapRain2ViewLegacy(step) {
   </div>`;
 }
 
-function renderTrapRain2View(step) {
+function renderTrapRain2ViewDetailedLegacy(step) {
   const view = step.trapRain2View || {};
   const vi = lang === "vi";
   const localPick = (value) => typeof pick === "function" ? pick(value) : value?.[lang] ?? value?.en ?? value?.vi ?? value ?? "";
@@ -16109,6 +16109,148 @@ function renderTrapRain2View(step) {
     <section class="trw407-action"><small>${String(view.event || phase).toUpperCase()}</small><strong>${escapeHtml(activeAction)}</strong><span>${escapeHtml(localPick(step.note))}</span></section>
     <section class="trw407-running"><span><small>${vi ? "TỔNG TRƯỚC" : "TOTAL BEFORE"}</small><strong>${totalBefore}</strong></span><i>+</i><span><small>${vi ? "NƯỚC Ở Ô NÀY" : "WATER IN THIS CELL"}</small><strong>${hasNeighbor ? trapped : 0}</strong></span><i>=</i><span><small>${vi ? "TỔNG HIỆN TẠI" : "CURRENT TOTAL"}</small><strong>${total}</strong></span></section>
     <footer class="trw407-result ${final ? "done" : ""}"><small>TOTAL TRAPPED WATER</small><strong>${final ? total : "…"}</strong><span>${final ? (vi ? "Kết quả là tổng phần nước màu xanh trong các ô bên trong." : "The answer is the sum of the blue water values in all interior cells.") : (vi ? "Min-heap bảo đảm không dùng một bức tường cao giả tạo khi vẫn còn đường thoát thấp hơn." : "The min-heap prevents using an artificially high wall while a lower escape route remains.")}</span></footer>
+  </section>`;
+}
+
+function renderTrapRain2View(step) {
+  const view = step.trapRain2View || {};
+  const vi = lang === "vi";
+  const localPick = (value) => typeof pick === "function" ? pick(value) : value?.[lang] ?? value?.en ?? value?.vi ?? value ?? "";
+  const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
+  const waterAt = Array.isArray(view.waterAt) ? view.waterAt : [];
+  const surfaceAt = Array.isArray(view.surfaceAt) ? view.surfaceAt : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const settled = Array.isArray(view.settled) ? view.settled : (Array.isArray(view.processed) ? view.processed : []);
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const rows = Number.isInteger(view.rows) ? view.rows : heightMap.length;
+  const cols = Number.isInteger(view.cols) ? view.cols : (heightMap[0] || []).length;
+  const popped = view.popped || null;
+  const neighbor = view.neighbor || null;
+  const phase = String(view.phase || "init");
+  const total = Number(view.total) || 0;
+  const wall = Number.isFinite(view.wall) ? Number(view.wall) : null;
+  const ground = Number.isFinite(view.cellHeight) ? Number(view.cellHeight) : null;
+  const trapped = Number(view.trapped) || 0;
+  const newWall = Number.isFinite(view.newWall) ? Number(view.newWall) : null;
+  const isDecision = (phase === "trap" || phase === "push") && neighbor && wall !== null && ground !== null;
+  const isDone = Boolean(step.final || phase === "done");
+  const cellKey = (cell) => cell ? `${cell.r}:${cell.c}` : "";
+  const poppedKey = cellKey(popped);
+  const neighborKey = cellKey(neighbor);
+  const heapRanks = new Map(heap.map((cell, index) => [cellKey(cell), index + 1]));
+
+  const phaseStep = phase === "init" ? 0 : phase === "pop" ? 1 : isDone ? 3 : 2;
+  const phaseLabels = vi
+    ? ["Bắt đầu từ biên", "Lấy tường thấp nhất", "Kiểm tra 1 hàng xóm"]
+    : ["Start at the border", "Take the lowest wall", "Check one neighbor"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseStep ? "done" : index === phaseStep ? "active" : "";
+    return `<span class="${state}"><b>${index < phaseStep ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`;
+  }).join("");
+
+  let focusHtml;
+  if (isDone) {
+    focusHtml = `<section class="trw407-focus done">
+      <small>${vi ? "HOÀN TẤT" : "DONE"}</small>
+      <strong>${vi ? "Không còn ô nào để mở" : "No cells remain to open"}</strong>
+      <div class="trw407-answer"><span>${vi ? "Tổng nước" : "Total water"}</span><b>${total}</b></div>
+      <p>${vi ? "Cộng tất cả phần nước màu xanh trên bản đồ." : "Add every blue water amount shown on the map."}</p>
+    </section>`;
+  } else if (isDecision) {
+    const catchesWater = trapped > 0;
+    focusHtml = `<section class="trw407-focus decision ${catchesWater ? "fill" : "dry"}">
+      <small>${vi ? "CHỈ NHÌN PHÉP TÍNH NÀY" : "ONLY WATCH THIS CALCULATION"}</small>
+      <strong>${catchesWater
+        ? (vi ? `Ô (${neighbor.r},${neighbor.c}) thấp hơn tường nên giữ được nước` : `Cell (${neighbor.r},${neighbor.c}) is lower than the wall, so it holds water`)
+        : (vi ? `Ô (${neighbor.r},${neighbor.c}) không thấp hơn tường nên không giữ nước` : `Cell (${neighbor.r},${neighbor.c}) is not below the wall, so it holds no water`)}</strong>
+      <div class="trw407-formula">
+        <span><small>${vi ? "TƯỜNG THẤP NHẤT" : "LOWEST WALL"}</small><b>${wall}</b></span>
+        <i>−</i>
+        <span><small>${vi ? "ĐẤT HÀNG XÓM" : "NEIGHBOR GROUND"}</small><b>${ground}</b></span>
+        <i>=</i>
+        <span class="water"><small>${vi ? "NƯỚC THÊM" : "WATER ADDED"}</small><b>${trapped}</b></span>
+      </div>
+      <p><code>water = max(0, ${wall} − ${ground}) = ${trapped}</code><span>${vi ? "Đưa ô này vào heap với level" : "Push this cell back with level"} <b>max(${wall}, ${ground}) = ${newWall}</b></span></p>
+    </section>`;
+  } else if (phase === "pop" && popped) {
+    focusHtml = `<section class="trw407-focus pop">
+      <small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small>
+      <strong>${vi ? "Lấy đường thoát thấp nhất ra khỏi heap" : "Remove the lowest escape wall from the heap"}</strong>
+      <div class="trw407-pop-flow"><span><small>POP</small><b>(${popped.r},${popped.c})</b></span><i>→</i><span><small>${vi ? "LEVEL TƯỜNG" : "WALL LEVEL"}</small><b>${wall}</b></span><i>→</i><span><small>${vi ? "TIẾP THEO" : "NEXT"}</small><b>${vi ? "xét 4 hàng xóm" : "check 4 neighbors"}</b></span></div>
+      <p>${vi ? "Nếu một hàng xóm thấp hơn level này, phần chênh lệch chính là nước." : "If a neighbor is lower than this level, the difference is water."}</p>
+    </section>`;
+  } else {
+    focusHtml = `<section class="trw407-focus start">
+      <small>${vi ? "KHỞI TẠO" : "SETUP"}</small>
+      <strong>${vi ? "Biên là nơi nước thoát ra ngoài" : "The border is where water escapes"}</strong>
+      <div class="trw407-start-flow"><span>${vi ? "Tất cả ô biên" : "All border cells"}</span><i>→</i><span>MIN-HEAP</span><i>→</i><span>${vi ? "thấp nhất đi trước" : "lowest first"}</span></div>
+      <p>${vi ? "Ta mở bản đồ từ ngoài vào trong, luôn đi qua bức tường thấp nhất trước." : "Open the map from the outside inward, always through the lowest wall first."}</p>
+    </section>`;
+  }
+
+  const cells = heightMap.map((row, r) => row.map((height, c) => {
+    const key = `${r}:${c}`;
+    const water = Number(waterAt[r]?.[c]) || 0;
+    const storedSurface = Number(surfaceAt[r]?.[c]);
+    const surface = Number.isFinite(storedSurface) ? storedSurface : height + water;
+    const border = r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
+    const isVisited = Boolean(visited[r]?.[c]);
+    const isSettled = Boolean(settled[r]?.[c]);
+    const rank = heapRanks.get(key);
+    const isPopped = key === poppedKey;
+    const isNeighbor = key === neighborKey;
+    const classes = [
+      "trw407-cell",
+      border ? "border" : "interior",
+      !isVisited ? "unvisited" : "",
+      isVisited && !isSettled ? "frontier" : "",
+      isSettled ? "settled" : "",
+      isPopped ? "popped" : "",
+      isNeighbor ? "neighbor" : "",
+      water > 0 ? "wet" : "",
+    ].filter(Boolean).join(" ");
+    const state = isNeighbor
+      ? (vi ? "ĐANG XÉT" : "CHECK")
+      : isPopped
+        ? "POP"
+        : rank === 1
+          ? "NEXT"
+          : rank
+            ? `WAIT ${rank}`
+            : isSettled
+              ? (vi ? "XONG" : "DONE")
+              : border
+                ? "BORDER"
+                : (vi ? "CHƯA MỞ" : "UNSEEN");
+    const accessible = vi
+      ? `Ô ${r},${c}: đất ${height}, nước ${water}, level ${surface}, trạng thái ${state}`
+      : `Cell ${r},${c}: ground ${height}, water ${water}, level ${surface}, state ${state}`;
+    return `<article class="${classes}" aria-label="${escapeHtml(accessible)}">
+      <header><small>[${r},${c}]</small><span class="trw407-cell-state rain2-cell-state">${escapeHtml(state)}</span></header>
+      <div class="trw407-layers">
+        <span class="water"><small>${vi ? "nước" : "water"}</small><strong>${water > 0 ? `+${water}` : "0"}</strong></span>
+        <span class="ground"><small>${vi ? "đất" : "ground"}</small><strong>${height}</strong></span>
+      </div>
+      <footer><small>level</small><strong>${surface}</strong></footer>
+    </article>`;
+  }).join("")).join("");
+
+  const heapItems = heap.length
+    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? (vi ? "TIẾP THEO" : "NEXT") : `#${index + 1}`}</small><strong>${item.wall}</strong><em>(${item.r},${item.c})</em></span>`).join("")
+    : `<em>${vi ? "Heap đã trống" : "The heap is empty"}</em>`;
+  const hiddenHeap = Number(view.heapSize || 0) > 8 ? `<b class="trw407-more">+${Number(view.heapSize) - 8}</b>` : "";
+  const nextWall = heap[0]?.wall ?? wall ?? "—";
+
+  $("treeView").innerHTML = `<section class="trw407-viz simple" role="img" aria-label="Trapping Rain Water II visualization">
+    <header><div><small>#407 · MIN-HEAP + BFS</small><strong>${vi ? "NƯỚC BỊ GIỮ BỞI TƯỜNG THẤP NHẤT" : "WATER IS LIMITED BY THE LOWEST WALL"}</strong></div><span>${escapeHtml(localPick(step.title))}</span></header>
+    <section class="trw407-rule"><b>${vi ? "QUY TẮC DUY NHẤT" : "THE ONE RULE"}</b><code>water = max(0, lowest wall − neighbor ground)</code></section>
+    <div class="trw407-phases rain2-story">${phases}</div>
+    <section class="trw407-metrics"><div><small>${vi ? "TỔNG NƯỚC" : "TOTAL WATER"}</small><strong>💧 ${total}</strong></div><div><small>${vi ? "TƯỜNG THẤP NHẤT TIẾP THEO" : "NEXT LOWEST WALL"}</small><strong>${nextWall}</strong></div><div><small>${vi ? "ĐÃ XỬ LÝ" : "PROCESSED"}</small><strong>${view.settledCount ?? 0}/${rows * cols}</strong></div></section>
+    ${focusHtml}
+    <section class="trw407-map"><header><strong>${vi ? "BẢN ĐỒ ĐẤT + NƯỚC" : "GROUND + WATER MAP"}</strong><span>${vi ? "cam = vừa pop · xanh lá = đang xét · xanh dương = có nước" : "orange = popped · green = checking · blue = water"}</span></header><div class="trw407-grid" style="--trw407-cols:${Math.max(cols, 1)}">${cells}</div></section>
+    <section class="trw407-heap"><header><strong>MIN-HEAP</strong><span>${vi ? "Ô đầu tiên là tường thấp nhất sẽ lấy tiếp" : "The first cell is the next lowest wall"}</span></header><div>${heapItems}${hiddenHeap}</div></section>
+    <div class="trw407-legend"><span><i class="popped"></i>${vi ? "vừa pop" : "popped"}</span><span><i class="neighbor"></i>${vi ? "đang xét" : "checking"}</span><span><i class="water"></i>${vi ? "có nước" : "has water"}</span><span><i class="frontier"></i>${vi ? "đang trong heap" : "in heap"}</span></div>
+    <footer class="trw407-result ${isDone ? "done" : ""}"><small>${vi ? "KẾT QUẢ HIỆN TẠI" : "RUNNING ANSWER"}</small><strong>${total}</strong><span>${isDone ? (vi ? "Đã mở hết bản đồ từ ngoài vào trong." : "The whole map has been opened from outside inward.") : (vi ? "Mỗi ô chỉ được mở một lần; tổng chỉ tăng khi đất thấp hơn tường." : "Each cell opens once; the total grows only when ground is below the wall.")}</span></footer>
   </section>`;
 }
 

@@ -100,7 +100,7 @@ test('407 validates shape, height range, and visualization size', () => {
   assert.throws(() => problem.builder(Array.from({ length: 9 }, () => '1').join(';')), /at most an 8×8 grid/);
 });
 
-test('407 custom renderer handles every step in English and Vietnamese', () => {
+test('407 simplified renderer handles every step in English and Vietnamese', () => {
   const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
   const start = script.indexOf('function renderTrapRain2View(step)');
   const end = script.indexOf('\nfunction renderAverageSubtree2265View(step)', start);
@@ -123,7 +123,10 @@ test('407 custom renderer handles every step in English and Vietnamese', () => {
         context.renderTrapRain2View(step);
         assert.match(element.innerHTML, /trw407-viz/);
         assert.match(element.innerHTML, /trw407-map/);
-        assert.match(element.innerHTML, /trw407-running/);
+        assert.match(element.innerHTML, /trw407-rule/);
+        assert.match(element.innerHTML, /trw407-focus/);
+        assert.match(element.innerHTML, /trw407-result/);
+        assert.match(element.innerHTML, /water = max\(0,/);
         assert.doesNotMatch(element.innerHTML, /NaN|undefined|Infinity/);
       }
     }

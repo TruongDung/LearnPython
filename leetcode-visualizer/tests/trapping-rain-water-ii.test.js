@@ -57,7 +57,7 @@ for case in json.load(sys.stdin):
   assert.equal(python.status, 0, python.stderr);
 });
 
-test('407 clearer renderer covers every phase in English and Vietnamese', () => {
+test('407 simplified renderer teaches one rule in every phase and language', () => {
   const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
   const start = source.indexOf('function renderTrapRain2View(step)');
   const end = source.indexOf('\nfunction renderMissingIntegerView', start);
@@ -73,9 +73,19 @@ test('407 clearer renderer covers every phase in English and Vietnamese', () => 
       assert.match(element.innerHTML, /rain2-story/);
       assert.match(element.innerHTML, /rain2-cell-state/);
       assert.match(element.innerHTML, /MIN-HEAP/);
+      assert.match(element.innerHTML, /trw407-rule/);
+      assert.match(element.innerHTML, /trw407-focus/);
+      assert.match(element.innerHTML, /water = max\(0,/);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
+});
+
+test('407 compact cell CSS keeps the level visible instead of clipping it', () => {
+  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  assert.match(css, /\.trw407-viz\.simple \.trw407-grid \{[\s\S]*?minmax\(78px, 1fr\)/);
+  assert.match(css, /\.trw407-viz\.simple \.trw407-cell \{[\s\S]*?overflow: visible;/);
+  assert.match(css, /\.trw407-viz\.simple \.trw407-cell > footer \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;/);
 });
 
 test('407 expands semantic snapshots so only one code line is active per debug step', () => {
