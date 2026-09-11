@@ -9294,6 +9294,79 @@ function renderProductExcept238View(step) {
   </section>`;
 }
 
+function renderUniqueEven3483View(step) {
+  const view = step.uniqueEven3483View || {};
+  const vi = lang === "vi";
+  const digits = Array.isArray(view.digits) ? view.digits : [];
+  const numbers = Array.isArray(view.numbers) ? view.numbers : [];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1. Hàng trăm", "2. Hàng chục", "3. Hàng đơn vị", "4. Thêm vào set", "5. Kết quả"]
+    : ["1. Hundreds", "2. Tens", "3. Ones", "4. Add to set", "5. Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const digitCards = digits.map((digit, index) => {
+    let role = "";
+    let roleLabel = "";
+    if (index === view.i) { role = "hundreds"; roleLabel = vi ? "TRĂM" : "HUNDREDS"; }
+    else if (index === view.j) { role = "tens"; roleLabel = vi ? "CHỤC" : "TENS"; }
+    else if (index === view.k) { role = "ones"; roleLabel = vi ? "ĐƠN VỊ" : "ONES"; }
+    const rejected = (view.reason === "leading-zero" && index === view.i)
+      || (view.reason === "odd-ones" && index === view.k);
+    return `<article class="ue3483-digit ${role} ${rejected ? "rejected" : ""}">
+      <small>INDEX ${index}</small><strong>${escapeHtml(digit)}</strong><span>${roleLabel || (vi ? "CHƯA CHỌN" : "AVAILABLE")}</span>
+    </article>`;
+  }).join("");
+
+  const slot = (name, index, symbol) => {
+    const chosen = Number.isInteger(index) && index >= 0 && index < digits.length;
+    return `<div class="ue3483-slot ${chosen ? "filled" : "empty"}"><small>${escapeHtml(name)}</small><strong>${chosen ? escapeHtml(digits[index]) : "—"}</strong><span>${chosen ? `digits[${index}]` : symbol}</span></div>`;
+  };
+  const slots = [
+    slot(vi ? "HÀNG TRĂM" : "HUNDREDS", view.i, "× 100"),
+    slot(vi ? "HÀNG CHỤC" : "TENS", view.j, "× 10"),
+    slot(vi ? "HÀNG ĐƠN VỊ" : "ONES", view.k, "× 1"),
+  ].join("<i>+</i>");
+
+  const hasCandidate = Number.isInteger(view.candidate);
+  const candidateFormula = hasCandidate
+    ? `${digits[view.i]} × 100 + ${digits[view.j]} × 10 + ${digits[view.k]} = ${view.candidate}`
+    : (vi ? "Chọn đủ 3 vị trí để tạo ứng viên" : "Choose all 3 places to form a candidate");
+  const decisionLabels = {
+    intro: vi ? "QUY TẮC" : "RULES",
+    choose: vi ? "ĐANG CHỌN" : "CHOOSING",
+    reject: vi ? "LOẠI" : "REJECT",
+    add: vi ? "THÊM SỐ MỚI" : "ADD NEW NUMBER",
+    duplicate: vi ? "TRÙNG — KHÔNG TĂNG COUNT" : "DUPLICATE — COUNT UNCHANGED",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+  const decisionDetails = {
+    "leading-zero": vi ? "Hàng trăm bằng 0 → không phải số có 3 chữ số." : "Hundreds digit is 0 → not a three-digit number.",
+    "odd-ones": vi ? "Hàng đơn vị lẻ → số tạo được không chẵn." : "The ones digit is odd → the formed number is not even.",
+    "already-in-set": vi ? "Số này đã có trong set nên không đếm lại." : "This number is already in the set, so it is not counted again.",
+    "new-number": vi ? "Đủ 3 chữ số, không có số 0 đầu và hàng đơn vị chẵn." : "Three digits, no leading zero, and an even ones digit.",
+  };
+  const decision = String(view.decision || "choose");
+  const recentNumbers = numbers.length > 40 ? numbers.slice(-40) : numbers;
+  const hiddenCount = numbers.length - recentNumbers.length;
+  const setItems = recentNumbers.length
+    ? `${hiddenCount > 0 ? `<span class="more">+${hiddenCount} ${vi ? "số trước" : "earlier"}</span>` : ""}${recentNumbers.map((number) => `<span class="${number === view.candidate ? "current" : ""}">${escapeHtml(number)}</span>`).join("")}`
+    : `<em>${vi ? "Set đang rỗng" : "The set is empty"}</em>`;
+  const final = Boolean(view.final || step.final);
+
+  $("treeView").innerHTML = `<section class="ue3483-viz" role="img" aria-label="Unique three-digit even numbers visualization">
+    <header><div><small>ENUMERATION · HASH SET · #3483</small><strong>UNIQUE 3-DIGIT EVEN NUMBERS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ue3483-phases">${phases}</div>
+    <section class="ue3483-rule"><b>${vi ? "BA ĐIỀU KIỆN" : "THREE CONDITIONS"}</b><div><span><strong>1</strong>${vi ? "3 index khác nhau" : "3 different indices"}</span><span><strong>2</strong>${vi ? "hàng trăm ≠ 0" : "hundreds ≠ 0"}</span><span><strong>3</strong>${vi ? "hàng đơn vị chẵn" : "even ones digit"}</span></div></section>
+    <section class="ue3483-metrics"><div><small>${vi ? "bộ ba đã thử" : "triples tried"}</small><strong>${view.attempts || 0}</strong></div><div><small>${vi ? "ứng viên chẵn" : "even candidates"}</small><strong>${view.evenCandidates || 0}</strong></div><div><small>${vi ? "ứng viên trùng" : "duplicates"}</small><strong>${view.duplicateCandidates || 0}</strong></div><div class="answer"><small>${vi ? "số khác nhau" : "distinct numbers"}</small><strong>${numbers.length}</strong></div></section>
+    <section class="ue3483-digits"><header><strong>${vi ? "CÁC DIGIT TRONG INPUT" : "INPUT DIGITS"}</strong><span>${vi ? "Mỗi thẻ là một index nên các digit giống nhau vẫn là hai bản sao riêng" : "Each card is an index, so equal digits remain separate copies"}</span></header><div>${digitCards}</div></section>
+    <section class="ue3483-builder"><div class="ue3483-slots">${slots}</div><code>${escapeHtml(candidateFormula)}</code></section>
+    <section class="ue3483-decision ${decision}"><small>${escapeHtml(decisionLabels[decision] || decisionLabels.choose)}</small><strong>${hasCandidate ? escapeHtml(view.candidate) : "—"}</strong><span>${escapeHtml(decisionDetails[view.reason] || pick(step.note))}</span></section>
+    <section class="ue3483-set"><header><strong>SET · ${numbers.length}</strong><span>${vi ? "Không chứa phần tử trùng" : "Contains no duplicates"}</span></header><div>${setItems}</div></section>
+    <footer class="ue3483-result ${final ? "done" : ""}"><small>ANSWER = len(numbers)</small><strong>${final ? numbers.length : "…"}</strong><span>${final ? (vi ? "Kích thước set là số lượng kết quả phân biệt." : "The set size is the number of distinct results.") : escapeHtml(pick(step.note))}</span></footer>
+  </section>`;
+}
+
 function renderPourWater755View(step) {
   const view = step.pourWater755View || {};
   const vi = lang === "vi";
@@ -27844,6 +27917,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderProductExcept238View(step);
+  } else if (step.uniqueEven3483View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderUniqueEven3483View(step);
   } else if (step.pourWater755View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

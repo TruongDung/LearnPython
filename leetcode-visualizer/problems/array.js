@@ -12922,3 +12922,238 @@ Object.assign(module.exports, {
     builder: buildSteps755,
   },
 });
+
+// ─── 3483: Unique 3-Digit Even Numbers ───
+function parseDigits3483(input) {
+  const digits = Array.isArray(input)
+    ? input.map(Number)
+    : String(input ?? "").split(",").map((value) => Number(value.trim()));
+  if (digits.length < 3 || digits.length > 10) {
+    throw new Error("digits must contain between 3 and 10 values.");
+  }
+  if (!digits.every((digit) => Number.isInteger(digit) && digit >= 0 && digit <= 9)) {
+    throw new Error("Every value in digits must be an integer between 0 and 9.");
+  }
+  return digits;
+}
+
+function buildSteps3483(input) {
+  const digits = parseDigits3483(input);
+  const numbers = new Set();
+  const steps = [];
+  let attempts = 0;
+  let evenCandidates = 0;
+  let duplicateCandidates = 0;
+
+  function addStep({
+    event,
+    phaseIndex,
+    title,
+    note,
+    codeLines,
+    i = -1,
+    j = -1,
+    k = -1,
+    candidate = null,
+    decision = "choose",
+    reason = "",
+    final = false,
+  }) {
+    const selected = [i, j, k].filter((index) => Number.isInteger(index) && index >= 0);
+    const sortedNumbers = [...numbers].sort((a, b) => a - b);
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [...digits],
+      sub: digits.map((_, index) => `i=${index}`),
+      highlight: selected,
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "hundreds", value: i >= 0 ? digits[i] : "—" },
+        { name: "tens", value: j >= 0 ? digits[j] : "—" },
+        { name: "ones", value: k >= 0 ? digits[k] : "—" },
+        { name: "candidate", value: candidate ?? "—" },
+        { name: "distinct", value: numbers.size },
+      ],
+      uniqueEven3483View: {
+        event,
+        phaseIndex,
+        digits: [...digits],
+        i,
+        j,
+        k,
+        candidate,
+        decision,
+        reason,
+        attempts,
+        evenCandidates,
+        duplicateCandidates,
+        numbers: sortedNumbers,
+        final,
+      },
+    });
+  }
+
+  addStep({
+    event: "intro",
+    phaseIndex: 0,
+    decision: "intro",
+    title: { vi: "Chọn ba digit ở ba index khác nhau", en: "Choose three digits from three different indices" },
+    note: {
+      vi: "Hàng trăm không được là 0, hàng đơn vị phải chẵn, và set loại các số bị tạo lặp lại.",
+      en: "The hundreds digit cannot be 0, the ones digit must be even, and a set removes repeated numbers.",
+    },
+    codeLines: [3],
+  });
+
+  for (let i = 0; i < digits.length; i += 1) {
+    if (digits[i] === 0) {
+      addStep({
+        event: "reject-leading-zero",
+        phaseIndex: 0,
+        i,
+        decision: "reject",
+        reason: "leading-zero",
+        title: { vi: `Bỏ digits[${i}] = 0 ở hàng trăm`, en: `Reject digits[${i}] = 0 in the hundreds place` },
+        note: { vi: "Số có ba chữ số không thể bắt đầu bằng 0.", en: "A three-digit number cannot start with 0." },
+        codeLines: [5],
+      });
+      continue;
+    }
+
+    addStep({
+      event: "choose-hundreds",
+      phaseIndex: 0,
+      i,
+      decision: "choose",
+      title: { vi: `Chọn ${digits[i]} làm hàng trăm`, en: `Choose ${digits[i]} for the hundreds place` },
+      note: { vi: `Khóa index ${i}; hai vị trí sau phải dùng index khác.`, en: `Lock index ${i}; the next two places must use different indices.` },
+      codeLines: [4],
+    });
+
+    for (let j = 0; j < digits.length; j += 1) {
+      if (j === i) continue;
+      addStep({
+        event: "choose-tens",
+        phaseIndex: 1,
+        i,
+        j,
+        decision: "choose",
+        title: { vi: `Chọn ${digits[j]} làm hàng chục`, en: `Choose ${digits[j]} for the tens place` },
+        note: { vi: `Đã dùng index ${i} và ${j}; hàng đơn vị phải lấy index còn lại.`, en: `Indices ${i} and ${j} are used; the ones place must use another index.` },
+        codeLines: [6],
+      });
+
+      for (let k = 0; k < digits.length; k += 1) {
+        if (k === i || k === j) continue;
+        attempts += 1;
+        if (digits[k] % 2 !== 0) {
+          addStep({
+            event: "reject-odd-ones",
+            phaseIndex: 2,
+            i,
+            j,
+            k,
+            decision: "reject",
+            reason: "odd-ones",
+            title: { vi: `Bỏ hàng đơn vị ${digits[k]} vì là số lẻ`, en: `Reject odd ones digit ${digits[k]}` },
+            note: { vi: "Một số chẵn bắt buộc kết thúc bằng 0, 2, 4, 6 hoặc 8.", en: "An even number must end in 0, 2, 4, 6, or 8." },
+            codeLines: [9],
+          });
+          continue;
+        }
+
+        evenCandidates += 1;
+        const candidate = digits[i] * 100 + digits[j] * 10 + digits[k];
+        const isDuplicate = numbers.has(candidate);
+        if (isDuplicate) duplicateCandidates += 1;
+        else numbers.add(candidate);
+        addStep({
+          event: isDuplicate ? "duplicate" : "add-number",
+          phaseIndex: 3,
+          i,
+          j,
+          k,
+          candidate,
+          decision: isDuplicate ? "duplicate" : "add",
+          reason: isDuplicate ? "already-in-set" : "new-number",
+          title: isDuplicate
+            ? { vi: `${candidate} đã có trong set`, en: `${candidate} is already in the set` }
+            : { vi: `Thêm ${candidate} vào set`, en: `Add ${candidate} to the set` },
+          note: isDuplicate
+            ? { vi: "Các index khác nhau vẫn có thể tạo cùng một số khi input chứa digit lặp.", en: "Different indices can still form the same number when the input contains repeated digits." }
+            : { vi: `${digits[i]}×100 + ${digits[j]}×10 + ${digits[k]} = ${candidate}; đây là số chẵn ba chữ số mới.`, en: `${digits[i]}×100 + ${digits[j]}×10 + ${digits[k]} = ${candidate}; this is a new three-digit even number.` },
+          codeLines: [10],
+        });
+      }
+    }
+  }
+
+  addStep({
+    event: "done",
+    phaseIndex: 4,
+    decision: "done",
+    final: true,
+    title: { vi: `Có ${numbers.size} số chẵn khác nhau`, en: `${numbers.size} distinct even numbers` },
+    note: {
+      vi: `Set chứa ${numbers.size} số hợp lệ; kích thước của set chính là đáp án.`,
+      en: `The set contains ${numbers.size} valid numbers; its size is the answer.`,
+    },
+    codeLines: [11],
+  });
+
+  return { original: [...digits], answer: numbers.size, numbers: [...numbers].sort((a, b) => a - b), steps };
+}
+
+Object.assign(module.exports, {
+  3483: {
+    id: 3483,
+    difficulty: "easy",
+    slug: "unique-3-digit-even-numbers",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "hash-set", vi: "Hash Set", en: "Hash Set" },
+      { key: "enumeration", vi: "Liệt kê", en: "Enumeration" },
+    ],
+    title: { vi: "Unique 3-Digit Even Numbers", en: "Unique 3-Digit Even Numbers" },
+    titleVi: { vi: "Đếm các số chẵn 3 chữ số phân biệt", en: "Unique three-digit even numbers" },
+    statement: {
+      vi: "Cho mảng digits. Đếm có bao nhiêu số chẵn ba chữ số phân biệt có thể tạo ra. Mỗi bản sao của một digit chỉ được dùng một lần trong mỗi số và không được có số 0 ở đầu.",
+      en: "Given digits, count the distinct three-digit even numbers that can be formed. Each copy of a digit may be used only once per number, and leading zeros are not allowed.",
+    },
+    defaultInput: [1, 2, 3, 4],
+    inputKind: "nonneg",
+    inputLabel: { vi: "digits (3 đến 10 chữ số, mỗi số từ 0 đến 9)", en: "digits (3 to 10 values, each from 0 to 9)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng ba vòng lặp để chọn ba index khác nhau cho hàng trăm, hàng chục và hàng đơn vị.", en: "Use three loops to select distinct indices for the hundreds, tens, and ones places." },
+      { vi: "Bỏ hàng trăm bằng 0 và hàng đơn vị lẻ; các lựa chọn còn lại luôn tạo số chẵn có ba chữ số.", en: "Reject a zero hundreds digit and an odd ones digit; every remaining choice forms a three-digit even number." },
+      { vi: "Thêm số tạo được vào set để tự động loại kết quả trùng khi digits chứa nhiều bản sao giống nhau.", en: "Insert each formed number into a set to remove duplicates caused by repeated digits." },
+    ],
+    complexity: {
+      time: "O(n³)",
+      space: "O(u)",
+      note: {
+        vi: "n ≤ 10 và u là số kết quả khác nhau; có nhiều nhất 450 số chẵn có ba chữ số.",
+        en: "n ≤ 10 and u is the number of distinct results; at most 450 three-digit even numbers exist.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def totalNumbers(self, digits):",
+      "        numbers = set()",
+      "        for i in range(len(digits)):",
+      "            if digits[i] == 0: continue",
+      "            for j in range(len(digits)):",
+      "                if j == i: continue",
+      "                for k in range(len(digits)):",
+      "                    if k == i or k == j or digits[k] % 2: continue",
+      "                    numbers.add(100 * digits[i] + 10 * digits[j] + digits[k])",
+      "        return len(numbers)",
+    ],
+    liveArgs: (input) => [parseDigits3483(input)],
+    builder: buildSteps3483,
+  },
+});
