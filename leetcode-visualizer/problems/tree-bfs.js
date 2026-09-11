@@ -132,7 +132,7 @@ function levelTokens(nodes, extras = {}) {
 function makeStep({
   problemId, mode, root, title, note, codeLines, stage = 0, event = "level",
   queue = [], rows = [], active = [], done = [], selected = [], bad = [], sub = {}, annotations = {},
-  cards = [], formula = null, queueNote = null, status = "checking", final = false, vars = [], result = null,
+  cards = [], formula = null, queueTitle = null, queueNote = null, status = "checking", final = false, vars = [], result = null,
 }) {
   return {
     title, note, codeLines, vars, final,
@@ -151,7 +151,7 @@ function makeStep({
         };
       }),
       rows: rows.map((row) => ({ ...row, values: (row.values || []).map((value) => ({ ...value })) })),
-      cards, formula, queueNote, result,
+      cards, formula, queueTitle, queueNote, result,
     },
   };
 }
@@ -898,25 +898,243 @@ function build662(input) {
 function build117(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: [], steps: [emptyResult(117, "next-pointers", root, "[]", 3)] };
-  const levels = levelsOf(root), steps = [introStep(117, "next-pointers", root,
-    { vi: "Dùng dummy để nối một tầng bất kỳ", en: "Use a dummy node to link any level" },
-    { vi: "Đi ngang tầng hiện tại bằng next; append mọi child tồn tại vào chuỗi của tầng sau. Cây không cần hoàn hảo.", en: "Walk the current level through next pointers; append every existing child to the next-level chain. The tree need not be perfect." })];
-  const rows = [], done = new Set(), sub = {}, chains = [];
-  levels.forEach((level, index) => {
-    const chain = level.map((node) => node.val).join(" → ") + " → #";
-    chains.push(chain);
-    level.forEach((node, i) => { done.add(node.id); sub[node.id] = `next → ${i + 1 < level.length ? level[i + 1].val : "#"}`; });
-    rows.push({ level: index, values: levelTokens(level, { meta: level.map((node, i) => `next → ${i + 1 < level.length ? level[i + 1].val : "#"}`), tones: level.map(() => "success") }), metric: { label: "chain", value: chain } });
-    steps.push(makeStep({
-      problemId: 117, mode: "next-pointers", root, stage: 2, event: "connect", rows, queue: levels[index + 1] || [], active: level.map((node) => node.id), done, sub,
-      title: { vi: `Nối tầng ${index}: ${chain}`, en: `Connect level ${index}: ${chain}` },
-      note: { vi: "Con trỏ next chỉ nối các node cùng tầng; node cuối luôn trỏ # (null).", en: "A next pointer links only nodes on the same level; the last node always points to # (null)." },
-      codeLines: [8, 9, 10, 11], cards: [{ label: "level", value: index }, { label: "next chain", value: chain, tone: "success" }],
-    }));
+  const levels = levelsOf(root);
+  const steps = [];
+  const completedRows = [];
+  const processed = new Set();
+  const sub = { [root.id]: "next → #" };
+  const nextMap = new Map([[root.id, null]]);
+  const chains = [];
+  let current = root;
+  let level = 0;
+  let dummyReady = false;
+  let dummyNext = null;
+  let tail = null;
+  let side = "—";
+  let child = null;
+  let nextChain = [];
+
+  const pointerValue = (node, fallback = "#") => node ? node.val : fallback;
+  const currentNext = () => current ? (nextMap.get(current.id) || null) : null;
+  const chainText = (nodes) => nodes.length ? `${nodes.map((node) => node.val).join(" → ")} → #` : "∅";
+  const chainSnapshot = () => nextChain.map((node, index) => {
+    const labels = [];
+    if (node.id === dummyNext?.id) labels.push("HEAD");
+    if (node.id === tail?.id) labels.push("TAIL");
+    return {
+      node,
+      role: "next-level",
+      label: labels.length ? labels.join(" / ") : "LINKED",
+      meta: `next → ${pointerValue(nextMap.get(node.id) || null)}`,
+    };
   });
-  steps.push(makeStep({ problemId: 117, mode: "next-pointers", root, stage: 3, event: "done", status: "success", final: true, rows, done, sub,
-    title: { vi: "Mọi next pointer đã được nối", en: "All next pointers are connected" }, note: { vi: "Đọc từng hàng theo mũi tên xanh để kiểm tra kết quả.", en: "Read each green row left to right to verify the result." }, codeLines: [14],
-    cards: [{ label: { vi: "SỐ TẦNG", en: "LEVELS" }, value: levels.length, tone: "success" }], result: chains }));
+  const varsSnapshot = () => [
+    { name: "current", value: pointerValue(current) },
+    { name: "current.next", value: current ? pointerValue(currentNext()) : "—" },
+    { name: "dummy", value: dummyReady ? "Node(0)" : "—" },
+    { name: "dummy.next", value: dummyReady ? pointerValue(dummyNext) : "—" },
+    { name: "tail", value: dummyReady ? (tail ? tail.val : "dummy") : "—" },
+    { name: "child", value: side === "—" ? "—" : pointerValue(child) },
+    { name: "next chain", value: chainText(nextChain) },
+  ];
+  const rowFor = (nodes, rowLevel, scanIndex = -1, complete = false) => ({
+    level: rowLevel,
+    status: complete ? "sorted" : undefined,
+    values: nodes.map((node, index) => ({
+      id: node.id,
+      value: node.val,
+      tone: complete || index < scanIndex ? "success" : index === scanIndex ? "warning" : "neutral",
+      meta: sub[node.id] || "next → ?",
+    })),
+    metric: { label: "next chain", value: chainText(nodes) },
+  });
+  const debugStep = ({
+    nodes = null, scanIndex = -1, complete = false, title, note, codeLine, event,
+    stage = 1, formula = null, active = [], status = "checking", final = false, result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, rowFor(nodes, level, scanIndex, complete)]
+      : completedRows;
+    steps.push(makeStep({
+      problemId: 117, mode: "next-pointers", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: chainSnapshot(),
+      queueTitle: { vi: "CHUỖI TẦNG KẾ", en: "NEXT-LEVEL CHAIN" },
+      queueNote: { vi: "dummy.next = HEAD · tail = con trỏ cuối", en: "dummy.next = HEAD · tail = last pointer" },
+      active, done: processed, selected: nextChain.map((node) => node.id), sub,
+      formula, vars: varsSnapshot(),
+      cards: [
+        { label: "level", value: level },
+        { label: "current", value: pointerValue(current), tone: current ? "warning" : "neutral" },
+        { label: "side", value: side },
+        { label: "child", value: side === "—" ? "—" : pointerValue(child) },
+        { label: "dummy.next", value: dummyReady ? pointerValue(dummyNext) : "—", tone: dummyNext ? "success" : "neutral" },
+        { label: "tail", value: dummyReady ? (tail ? tail.val : "dummy") : "—", tone: tail ? "success" : "neutral" },
+      ],
+    }));
+  };
+
+  debugStep({
+    nodes: levels[0], scanIndex: 0, stage: 0, event: "init-current", codeLine: 3,
+    title: { vi: `Bắt đầu với current = root = ${root.val}`, en: `Start with current = root = ${root.val}` },
+    note: { vi: "current đi ngang một tầng bằng các con trỏ next; ban đầu root.next là #.", en: "current walks across one level through next pointers; initially root.next is #." },
+    formula: `current = root = ${root.val}`,
+    active: [root.id],
+  });
+
+  while (current) {
+    const currentLevel = levels[level];
+    debugStep({
+      nodes: currentLevel, scanIndex: 0, stage: 0, event: "outer-while", codeLine: 4,
+      title: { vi: `current = ${current.val}: xử lý tầng ${level}`, en: `current = ${current.val}: process level ${level}` },
+      note: { vi: "Điều kiện while ngoài là True, nên ta sẽ tạo chuỗi next cho tầng ngay bên dưới.", en: "The outer while condition is true, so build the next-pointer chain one level below." },
+      formula: `current is not None → True`,
+      active: [current.id],
+    });
+
+    dummyReady = true;
+    dummyNext = null;
+    tail = null;
+    side = "—";
+    child = null;
+    nextChain = [];
+    debugStep({
+      nodes: currentLevel, scanIndex: 0, stage: 0, event: "new-dummy", codeLine: 5,
+      title: { vi: "Tạo dummy mới cho tầng kế", en: "Create a fresh dummy for the next level" },
+      note: { vi: "dummy là mốc giả; dummy.next sẽ giữ HEAD của chuỗi mới.", en: "dummy is a sentinel; dummy.next will hold the new chain's HEAD." },
+      formula: "dummy = Node(0) · dummy.next = #",
+      active: [current.id],
+    });
+    debugStep({
+      nodes: currentLevel, scanIndex: 0, stage: 0, event: "init-tail", codeLine: 6,
+      title: { vi: "Cho tail bắt đầu tại dummy", en: "Point tail at dummy" },
+      note: { vi: "Mỗi child hợp lệ sẽ được nối sau tail, rồi tail tiến tới child đó.", en: "Each existing child is linked after tail, then tail advances to that child." },
+      formula: "tail = dummy",
+      active: [current.id],
+    });
+
+    let scanIndex = 0;
+    while (current) {
+      const scanning = current;
+      debugStep({
+        nodes: currentLevel, scanIndex, event: "inner-while", codeLine: 7,
+        title: { vi: `Quét current = ${scanning.val}`, en: `Scan current = ${scanning.val}` },
+        note: { vi: `Node ${scanning.val} có thể đóng góp tối đa hai child vào chuỗi tầng kế.`, en: `Node ${scanning.val} can contribute up to two children to the next-level chain.` },
+        formula: `current = ${scanning.val} → while True`,
+        active: [scanning.id],
+      });
+
+      for (const childSide of ["left", "right"]) {
+        side = childSide;
+        child = scanning[childSide];
+        debugStep({
+          nodes: currentLevel, scanIndex, event: "inspect-child", codeLine: 8,
+          title: { vi: `Lấy child ${childSide}: ${pointerValue(child)}`, en: `Read ${childSide} child: ${pointerValue(child)}` },
+          note: { vi: `Vòng for luôn kiểm tra con trái trước, rồi mới đến con phải của ${scanning.val}.`, en: `The for-loop always checks ${scanning.val}'s left child before its right child.` },
+          formula: `child = current.${childSide} = ${pointerValue(child)}`,
+          active: [scanning.id, ...(child ? [child.id] : [])],
+        });
+        debugStep({
+          nodes: currentLevel, scanIndex, event: child ? "child-check" : "skip-child", codeLine: 9,
+          title: child
+            ? { vi: `Child ${child.val} tồn tại`, en: `Child ${child.val} exists` }
+            : { vi: `${scanning.val}.${childSide} là # — bỏ qua`, en: `${scanning.val}.${childSide} is # — skip it` },
+          note: child
+            ? { vi: "Điều kiện True: nối child này vào cuối chuỗi đang xây.", en: "The condition is true: append this child to the chain being built." }
+            : { vi: "Điều kiện False: không đổi dummy.next, tail hay chuỗi tầng kế.", en: "The condition is false: dummy.next, tail, and the next-level chain stay unchanged." },
+          formula: `bool(child) = ${child ? "True" : "False"}`,
+          active: [scanning.id, ...(child ? [child.id] : [])],
+        });
+
+        if (child) {
+          const previousTail = tail;
+          if (!dummyNext) dummyNext = child;
+          else nextMap.set(previousTail.id, child);
+          if (!nextChain.some((node) => node.id === child.id)) nextChain.push(child);
+          nextMap.set(child.id, null);
+          if (previousTail) sub[previousTail.id] = `next → ${child.val}`;
+          sub[child.id] = "next → #";
+          debugStep({
+            nodes: currentLevel, scanIndex, stage: 2, event: "link-child", codeLine: 10,
+            title: previousTail
+              ? { vi: `Nối ${previousTail.val}.next → ${child.val}`, en: `Link ${previousTail.val}.next → ${child.val}` }
+              : { vi: `Nối dummy.next → ${child.val}`, en: `Link dummy.next → ${child.val}` },
+            note: previousTail
+              ? { vi: `Chuỗi tầng kế hiện là ${chainText(nextChain)}; tail vẫn còn đứng ở ${previousTail.val} cho tới dòng kế.`, en: `The next-level chain is now ${chainText(nextChain)}; tail still points to ${previousTail.val} until the next line.` }
+              : { vi: `${child.val} trở thành HEAD được giữ bởi dummy.next; tail vẫn còn ở dummy cho tới dòng kế.`, en: `${child.val} becomes the HEAD stored in dummy.next; tail remains at dummy until the next line.` },
+            formula: previousTail ? `tail.next = child → ${previousTail.val}.next = ${child.val}` : `tail.next = child → dummy.next = ${child.val}`,
+            active: [scanning.id, child.id],
+          });
+
+          tail = child;
+          debugStep({
+            nodes: currentLevel, scanIndex, stage: 2, event: "move-tail", codeLine: 11,
+            title: { vi: `Di chuyển tail tới ${child.val}`, en: `Move tail to ${child.val}` },
+            note: { vi: "tail luôn chỉ node cuối của chuỗi để lần nối kế tiếp là O(1).", en: "tail always points at the chain's last node, making the next append O(1)." },
+            formula: `tail = child = ${child.val}`,
+            active: [scanning.id, child.id],
+          });
+        }
+      }
+
+      side = "—";
+      child = null;
+      const nextCurrent = nextMap.get(scanning.id) || null;
+      processed.add(scanning.id);
+      current = nextCurrent;
+      scanIndex += 1;
+      debugStep({
+        nodes: currentLevel, scanIndex: Math.min(scanIndex, currentLevel.length - 1), event: "advance-current", codeLine: 12,
+        title: current
+          ? { vi: `Đi ngang: current = ${current.val}`, en: `Move right: current = ${current.val}` }
+          : { vi: `Sau ${scanning.val} là #`, en: `After ${scanning.val} comes #` },
+        note: current
+          ? { vi: `Dùng con trỏ ${scanning.val}.next để sang node kế cùng tầng — không dùng queue.`, en: `Use ${scanning.val}.next to reach the next node on the same level—no queue is used.` }
+          : { vi: "Đã đi hết tầng hiện tại; vòng while bên trong sẽ dừng.", en: "The current level is exhausted, so the inner while loop will stop." },
+        formula: `current = ${scanning.val}.next = ${pointerValue(nextCurrent)}`,
+        active: current ? [current.id] : [],
+      });
+    }
+
+    debugStep({
+      nodes: currentLevel, scanIndex: currentLevel.length, complete: true, event: "inner-stop", codeLine: 7,
+      title: { vi: `Đã quét xong tầng ${level}`, en: `Finished scanning level ${level}` },
+      note: { vi: `current = #; chuỗi vừa tạo cho tầng dưới là ${chainText(nextChain)}.`, en: `current = #; the chain just built for the level below is ${chainText(nextChain)}.` },
+      formula: "current is not None → False",
+    });
+
+    const completedChain = chainText(currentLevel);
+    chains.push(completedChain);
+    completedRows.push(rowFor(currentLevel, level, currentLevel.length, true));
+    current = dummyNext;
+    level += 1;
+    side = "—";
+    child = null;
+    debugStep({
+      stage: 2, event: "descend", codeLine: 13,
+      title: current
+        ? { vi: `Xuống tầng kế: current = ${current.val}`, en: `Descend: current = ${current.val}` }
+        : { vi: "dummy.next = #: không còn tầng kế", en: "dummy.next = #: there is no next level" },
+      note: current
+        ? { vi: `HEAD ${current.val} mở chuỗi ${chainText(nextChain)}; vòng ngoài sẽ xử lý chuỗi này.`, en: `HEAD ${current.val} starts ${chainText(nextChain)}; the outer loop will process this chain.` }
+        : { vi: "Tầng vừa quét không có child nào, nên thuật toán sắp kết thúc.", en: "The scanned level has no children, so the algorithm is about to finish." },
+      formula: `current = dummy.next = ${pointerValue(current)}`,
+      active: current ? [current.id] : [],
+    });
+  }
+
+  debugStep({
+    stage: 0, event: "outer-stop", codeLine: 4,
+    title: { vi: "current = #: thoát vòng while ngoài", en: "current = #: exit the outer while loop" },
+    note: { vi: "Không còn tầng nào cần xây next pointer.", en: "No level remains to have its next pointers built." },
+    formula: "current is not None → False",
+  });
+  debugStep({
+    stage: 3, event: "done", codeLine: 14, status: "success", final: true, result: chains,
+    title: { vi: "Trả về root với mọi next pointer đã nối", en: "Return root with every next pointer connected" },
+    note: { vi: "Đọc từng hàng trong bảng: mỗi node trỏ sang node kế bên phải, node cuối trỏ #.", en: "Read each board row: every node points to its right neighbor, and the last node points to #." },
+    formula: `return root · ${chains.join(" · ")}`,
+  });
   return { input, answer: chains, steps };
 }
 

@@ -5245,7 +5245,7 @@ function renderBfsLevelView(step) {
       <section class="bl-tree-panel"><header><strong>${vi ? "CÂY · MỖI HÀNG LÀ MỘT LEVEL" : "TREE · EACH ROW IS ONE LEVEL"}</strong><span>${vi ? "cam = đang xét · xanh = đã xử lý" : "amber = current · green = processed"}</span></header><div id="bfsLevelTree" class="bl-tree"></div></section>
       <section class="bl-board"><header><strong>${vi ? "BẢNG THEO TẦNG" : "LEVEL BOARD"}</strong><span>${vi ? "đọc từ trái sang phải" : "read left to right"}</span></header><div class="bl-rows">${rowHtml}</div></section>
     </div>
-    <section class="bl-queue"><header><strong>QUEUE</strong><span>${escapeHtml(view.queueNote ? text(view.queueNote) : (vi ? "front được lấy ra trước" : "front is removed first"))}</span></header><div>${queueHtml}</div></section>
+    <section class="bl-queue"><header><strong>${escapeHtml(view.queueTitle ? text(view.queueTitle) : "QUEUE")}</strong><span>${escapeHtml(view.queueNote ? text(view.queueNote) : (vi ? "front được lấy ra trước" : "front is removed first"))}</span></header><div>${queueHtml}</div></section>
     ${view.formula ? `<section class="bl-formula"><small>${vi ? "PHÉP TÍNH / ĐIỀU KIỆN" : "COMPUTATION / CONDITION"}</small><code>${escapeHtml(text(view.formula))}</code></section>` : ""}
     ${cardsHtml}
     <div class="bl-legend" aria-hidden="true"><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="done"></i>${vi ? "đã xử lý / chọn" : "processed / selected"}</span><span><i class="bad"></i>${vi ? "vi phạm" : "violation"}</span></div>

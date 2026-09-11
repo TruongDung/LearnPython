@@ -138,6 +138,29 @@ test('117 links sparse levels and terminates every chain with null', () => {
   assert.deepEqual(SUPPORTED[117].builder('[]').answer, []);
 });
 
+test('117 debugs dummy, tail, child checks, links, and level descent one line at a time', () => {
+  const run = SUPPORTED[117].builder('1,2,3,4,5,null,7');
+  const events = run.steps.map(step => step.bfsLevelView.event);
+  for (const event of ['init-current', 'outer-while', 'new-dummy', 'init-tail', 'inner-while', 'inspect-child', 'child-check', 'skip-child', 'link-child', 'move-tail', 'advance-current', 'inner-stop', 'descend', 'outer-stop', 'done']) {
+    assert.ok(events.includes(event), event);
+  }
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'inspect-child').length, 12);
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'link-child').length, 5);
+
+  const linkSeven = run.steps.find(step => step.bfsLevelView.formula === 'tail.next = child → 5.next = 7');
+  assert.ok(linkSeven);
+  assert.deepEqual(linkSeven.bfsLevelView.queue.map(item => item.value), [4, 5, 7]);
+  assert.deepEqual(linkSeven.bfsLevelView.queue.map(item => item.label), ['HEAD', 'TAIL', 'LINKED']);
+  assert.equal(linkSeven.tree.nodes.find(node => node.label === '5').sub, 'next → 7');
+  assert.deepEqual(linkSeven.bfsLevelView.queueTitle, { vi: 'CHUỖI TẦNG KẾ', en: 'NEXT-LEVEL CHAIN' });
+
+  const descend = run.steps.find(step => step.bfsLevelView.event === 'descend' && step.vars.find(variable => variable.name === 'current').value === 4);
+  assert.ok(descend);
+  assert.equal(descend.vars.find(variable => variable.name === 'dummy.next').value, 4);
+  assert.equal(run.steps.at(-1).bfsLevelView.result.at(-1), '4 → 5 → 7 → #');
+});
+
 test('1609 shows both passing rows and the first parity/order violation', () => {
   assert.equal(SUPPORTED[1609].builder('1,10,4,3,null,7,9,12,8,6,null,null,2').answer, true);
   const parityFailure = SUPPORTED[1609].builder('5,4,2,3,3,7');
