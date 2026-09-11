@@ -68,6 +68,9 @@ const I18N = {
     backToTop: "Về đầu trang",
     catalogJumpNav: "Đi tới bài hiện tại trong một tag",
     jumpToTag: (tag, id) => `Đi tới tag ${tag}, tại bài #${id}`,
+    quickJumpLabel: "Đi nhanh đến bài LeetCode",
+    quickJumpPlaceholder: "Nhập số bài",
+    quickJumpBtn: "Mở",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -113,6 +116,9 @@ const I18N = {
     backToTop: "Back to top",
     catalogJumpNav: "Jump to this problem in a tag",
     jumpToTag: (tag, id) => `Go to ${tag}, problem #${id}`,
+    quickJumpLabel: "Jump to LeetCode problem",
+    quickJumpPlaceholder: "Problem number",
+    quickJumpBtn: "Go",
   },
 };
 
@@ -173,6 +179,16 @@ function applyStaticStrings() {
   }
   const catalogJumpNav = $("catalogJumpNav");
   if (catalogJumpNav) catalogJumpNav.setAttribute("aria-label", t().catalogJumpNav);
+  const quickProblemInput = $("quickProblemId");
+  if (quickProblemInput) quickProblemInput.placeholder = t().quickJumpPlaceholder;
+  const quickProblemError = $("quickProblemError");
+  if (quickProblemError && !quickProblemError.classList.contains("hidden")) {
+    if (searchErrorState?.type === "unsupported") {
+      quickProblemError.textContent = t().unsupportedProblem(searchErrorState.id);
+    } else if (!quickProblemInput?.value.trim()) {
+      quickProblemError.textContent = t().errEmptyId;
+    }
+  }
   const liveEditButton = $("liveEditBtn");
   if (liveEditButton) {
     liveEditButton.setAttribute("aria-label", t().liveEditBtn);
@@ -1573,8 +1589,13 @@ function catalogGroupsForCurrentProblem() {
 function renderCatalogJumpNav() {
   const nav = $("catalogJumpNav");
   if (!nav) return;
-  nav.innerHTML = "";
+  nav.querySelectorAll(".catalog-jump-btn").forEach((button) => button.remove());
   nav.setAttribute("aria-label", t().catalogJumpNav);
+
+  const quickProblemInput = $("quickProblemId");
+  if (quickProblemInput && document.activeElement !== quickProblemInput && quickProblemInput.getAttribute("aria-invalid") !== "true") {
+    quickProblemInput.value = currentProblemId || "";
+  }
 
   catalogGroupsForCurrentProblem().forEach((group) => {
     const label = String(pick(group));
@@ -1641,6 +1662,29 @@ $("problemId").addEventListener("keydown", (e) => {
   if (e.key === "Enter") loadProblem({ scrollToEnd: true });
 });
 
+$("quickProblemForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const input = $("quickProblemId");
+  const error = $("quickProblemError");
+  const button = $("quickProblemBtn");
+  $("problemId").value = input.value.trim();
+  input.removeAttribute("aria-invalid");
+  hide("quickProblemError");
+  button.disabled = true;
+  try {
+    const loaded = await loadProblem({ scrollToEnd: true });
+    if (loaded) {
+      input.value = currentProblemId;
+      return;
+    }
+    input.setAttribute("aria-invalid", "true");
+    error.textContent = $("searchError").textContent || t().errLoad;
+    show("quickProblemError");
+  } finally {
+    button.disabled = false;
+  }
+});
+
 function jumpToPageEnd() {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1656,7 +1700,7 @@ function updateBackToTopButton() {
   const jumpNav = $("catalogJumpNav");
   const visible = window.scrollY > 0;
   if (button) button.classList.toggle("is-visible", visible);
-  if (jumpNav) jumpNav.classList.toggle("is-visible", visible && jumpNav.childElementCount > 0);
+  if (jumpNav) jumpNav.classList.toggle("is-visible", visible && Boolean(jumpNav.querySelector(".catalog-jump-btn")));
 }
 
 $("backToTopBtn").addEventListener("click", () => {
@@ -1673,7 +1717,8 @@ async function loadProblem({ scrollToEnd = false } = {}) {
   searchErrorState = null;
   hide("searchError");
   if (!id) {
-    return showError("searchError", t().errEmptyId);
+    showError("searchError", t().errEmptyId);
+    return false;
   }
 
   try {
@@ -1683,9 +1728,10 @@ async function loadProblem({ scrollToEnd = false } = {}) {
       if (data.code === "UNSUPPORTED_PROBLEM") {
         searchErrorState = { type: "unsupported", id: data.problemId ?? id };
         renderSearchError();
-        return;
+        return false;
       }
-      return showError("searchError", data.error || t().errLoad);
+      showError("searchError", data.error || t().errLoad);
+      return false;
     }
 
     const problemChanged = currentProblemId !== data.id;
@@ -1693,6 +1739,12 @@ async function loadProblem({ scrollToEnd = false } = {}) {
     if (problemChanged) activeCatalogJumpKey = null;
     localStorage.setItem("lastProblemId", data.id);
     problemData = data;
+    const quickProblemInput = $("quickProblemId");
+    if (quickProblemInput) {
+      quickProblemInput.value = data.id;
+      quickProblemInput.removeAttribute("aria-invalid");
+    }
+    hide("quickProblemError");
     resetLiveEditorState();
     saveRecentProblem(data);
     if (problemChanged) $("extraParams").innerHTML = "";
@@ -1707,8 +1759,10 @@ async function loadProblem({ scrollToEnd = false } = {}) {
     steps = [];
     stopPlay();
     if (scrollToEnd) jumpToPageEnd();
+    return true;
   } catch (err) {
     showError("searchError", t().errConn);
+    return false;
   }
 }
 
@@ -5144,7 +5198,18 @@ function renderBfsLevelView(step) {
   }).join("");
   const queue = Array.isArray(view.queue) ? view.queue : [];
   const queueHtml = queue.length
-    ? queue.map((item, index) => `<span><small>${index === 0 ? "FRONT" : `#${index}`}</small><strong>${escapeHtml(text(item.value))}</strong></span>`).join('<i aria-hidden="true">→</i>')
+    ? queue.map((item, index) => {
+      const role = item.role === "current-level" ? "current-level" : item.role === "next-level" ? "next-level" : "";
+      const label = item.label
+        ? text(item.label)
+        : role === "next-level"
+          ? "NEXT"
+          : index === 0
+            ? "FRONT"
+            : role === "current-level" ? "THIS LEVEL" : `#${index}`;
+      const queueLabel = item.meta ? `${label} · ${text(item.meta)}` : label;
+      return `<span class="${role}"><small>${escapeHtml(queueLabel)}</small><strong>${escapeHtml(text(item.value))}</strong></span>`;
+    }).join('<i aria-hidden="true">→</i>')
     : `<em>∅</em>`;
   const valueTokens = (values) => (Array.isArray(values) ? values : []).map((item) => `<span class="bl-token ${escapeHtml(item.tone || "neutral")}">
     <strong>${escapeHtml(text(item.value))}</strong>${item.meta ? `<small>${escapeHtml(text(item.meta))}</small>` : ""}
@@ -5180,7 +5245,7 @@ function renderBfsLevelView(step) {
       <section class="bl-tree-panel"><header><strong>${vi ? "CÂY · MỖI HÀNG LÀ MỘT LEVEL" : "TREE · EACH ROW IS ONE LEVEL"}</strong><span>${vi ? "cam = đang xét · xanh = đã xử lý" : "amber = current · green = processed"}</span></header><div id="bfsLevelTree" class="bl-tree"></div></section>
       <section class="bl-board"><header><strong>${vi ? "BẢNG THEO TẦNG" : "LEVEL BOARD"}</strong><span>${vi ? "đọc từ trái sang phải" : "read left to right"}</span></header><div class="bl-rows">${rowHtml}</div></section>
     </div>
-    <section class="bl-queue"><header><strong>QUEUE</strong><span>${vi ? "front được lấy ra trước" : "front is removed first"}</span></header><div>${queueHtml}</div></section>
+    <section class="bl-queue"><header><strong>QUEUE</strong><span>${escapeHtml(view.queueNote ? text(view.queueNote) : (vi ? "front được lấy ra trước" : "front is removed first"))}</span></header><div>${queueHtml}</div></section>
     ${view.formula ? `<section class="bl-formula"><small>${vi ? "PHÉP TÍNH / ĐIỀU KIỆN" : "COMPUTATION / CONDITION"}</small><code>${escapeHtml(text(view.formula))}</code></section>` : ""}
     ${cardsHtml}
     <div class="bl-legend" aria-hidden="true"><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="done"></i>${vi ? "đã xử lý / chọn" : "processed / selected"}</span><span><i class="bad"></i>${vi ? "vi phạm" : "violation"}</span></div>

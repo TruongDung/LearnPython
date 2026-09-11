@@ -132,7 +132,7 @@ function levelTokens(nodes, extras = {}) {
 function makeStep({
   problemId, mode, root, title, note, codeLines, stage = 0, event = "level",
   queue = [], rows = [], active = [], done = [], selected = [], bad = [], sub = {}, annotations = {},
-  cards = [], formula = null, status = "checking", final = false, vars = [], result = null,
+  cards = [], formula = null, queueNote = null, status = "checking", final = false, vars = [], result = null,
 }) {
   return {
     title, note, codeLines, vars, final,
@@ -140,9 +140,18 @@ function makeStep({
     tree: treeState(root, { active, done, selected, bad, sub, annotations }),
     bfsLevelView: {
       problemId, mode, stages: STAGES, stage, event, status,
-      queue: queue.map((node) => ({ id: node.id, value: node.val })),
+      queue: queue.map((entry) => {
+        const node = entry && entry.node ? entry.node : entry;
+        return {
+          id: node?.id,
+          value: node?.val ?? entry?.value,
+          role: entry?.role,
+          label: entry?.label,
+          meta: entry?.meta,
+        };
+      }),
       rows: rows.map((row) => ({ ...row, values: (row.values || []).map((value) => ({ ...value })) })),
-      cards, formula, result,
+      cards, formula, queueNote, result,
     },
   };
 }
@@ -202,77 +211,687 @@ function build107(input) {
 function build515(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: "[]", steps: [emptyResult(515, "level-max", root, "[]", 3)] };
-  const levels = levelsOf(root), steps = [introStep(515, "level-max", root,
+  const steps = [introStep(515, "level-max", root,
     { vi: "Giữ maximum của từng tầng", en: "Keep each level's maximum" },
-    { vi: "Mỗi tầng có một cuộc đua riêng: quét các node và giữ giá trị lớn nhất.", en: "Each level has its own race: scan its nodes and keep the largest value." })];
-  const rows = [], answer = [], done = new Set(), winners = new Set();
-  levels.forEach((level, index) => {
-    const max = Math.max(...level.map((node) => node.val));
-    const winner = level.find((node) => node.val === max);
-    answer.push(max); winners.add(winner.id); level.forEach((node) => done.add(node.id));
-    rows.push({ level: index, values: levelTokens(level, { tones: level.map((node) => node.id === winner.id ? "success" : "neutral") }), metric: { label: "max", value: max } });
-    steps.push(makeStep({
-      problemId: 515, mode: "level-max", root, stage: 2, event: "maximum", rows, queue: levels[index + 1] || [],
-      active: level.map((node) => node.id), done, selected: winners,
-      title: { vi: `Tầng ${index}: max = ${max}`, en: `Level ${index}: max = ${max}` },
-      note: { vi: `So [${level.map((n) => n.val).join(", ")}] → lưu ${max}.`, en: `Compare [${level.map((n) => n.val).join(", ")}] → save ${max}.` },
-      codeLines: [9, 10], cards: [{ label: "level", value: index }, { label: "max", value: max, tone: "success" }, { label: "result", value: `[${answer.join(", ")}]` }],
-    }));
+    { vi: "Bấm Next để theo đúng từng dòng: khóa size, pop một node, cập nhật level_max, rồi enqueue từng child.", en: "Press Next to follow each line: lock size, pop one node, update level_max, then enqueue each child." })];
+  const queue = [root];
+  const answer = [];
+  const completedRows = [];
+  const processed = new Set();
+  const winners = new Set();
+  const sub = {};
+  const maxText = (value) => value === -Infinity ? "−∞" : value === null || value === undefined ? "—" : value;
+  const queueText = () => queue.map((node) => node.val);
+  const answerText = () => `[${answer.join(", ")}]`;
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const varsSnapshot = ({ size = "—", i = "—", node = null, levelMax = "—" } = {}) => [
+    { name: "queue", value: queueText() },
+    { name: "answer", value: answer.slice() },
+    { name: "size", value: size },
+    { name: "i", value: i },
+    { name: "node", value: node ? node.val : "—" },
+    { name: "level_max", value: maxText(levelMax) },
+  ];
+  const currentRow = ({ level, nodes, processedCount = 0, currentIndex = -1, levelMax = null, winner = null, state = "waiting", complete = false }) => ({
+    level,
+    status: complete ? "sorted" : undefined,
+    values: nodes.map((node, index) => {
+      let tone = "neutral";
+      let meta = index < processedCount ? "checked" : "waiting";
+      if (winner && node.id === winner.id) { tone = "success"; meta = "level_max"; }
+      if (index === currentIndex) {
+        tone = state === "new-max" ? "success" : state === "keep-max" ? "neutral" : "warning";
+        meta = state === "new-max" ? "new max" : state === "keep-max" ? "≤ max" : state;
+      }
+      return { id: node.id, value: node.val, tone, meta };
+    }),
+    metric: { label: "level_max", value: levelMax === null ? "not set" : maxText(levelMax) },
   });
-  steps.push(makeStep({ problemId: 515, mode: "level-max", root, stage: 3, event: "done", status: "success", final: true, rows, done, selected: winners,
-    title: { vi: "Đã có maximum của mọi tầng", en: "Every level maximum is ready" }, note: { vi: "Mỗi chip xanh là node thắng trong tầng của nó.", en: "Each green chip is the winner of its level." },
-    codeLines: [13], cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: `[${answer.join(", ")}]`, tone: "success" }], result: `[${answer.join(", ")}]` }));
+  const debugStep = ({
+    level, nodes, size, i = "—", node = null, levelMax = "—", winner = null,
+    currentIndex = -1, processedCount = 0, rowState = "waiting", complete = false,
+    currentCount = 0, title, note, codeLine, stage = 1, event, formula = null,
+    active = [], status = "checking", final = false, result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, currentRow({ level, nodes, processedCount, currentIndex, levelMax, winner, state: rowState, complete })]
+      : completedRows;
+    steps.push(makeStep({
+      problemId: 515, mode: "level-max", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: queueSnapshot(currentCount),
+      queueNote: { vi: "vàng = tầng này · xanh dương = tầng kế", en: "amber = this level · blue = next level" },
+      active, done: processed, selected: [...winners, ...(winner ? [winner.id] : [])], sub,
+      formula,
+      vars: varsSnapshot({ size, i, node, levelMax }),
+      cards: [
+        { label: "level", value: level ?? "—" },
+        { label: { vi: "size (đã khóa)", en: "size (locked)" }, value: size ?? "—", detail: { vi: "chỉ pop đúng size node", en: "pop exactly size nodes" } },
+        { label: "i / size", value: Number.isInteger(i) ? `${i} / ${size}` : "—" },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: "level_max", value: maxText(levelMax), tone: Number.isFinite(levelMax) ? "success" : "neutral" },
+        { label: "answer", value: answerText() },
+      ],
+    }));
+  };
+
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "guard", codeLine: 3,
+    title: { vi: "Kiểm tra root có rỗng không", en: "Check whether root is empty" },
+    note: { vi: `root = ${root.val} nên điều kiện \`not root\` là False; tiếp tục BFS.`, en: `root = ${root.val}, so \`not root\` is False; continue into BFS.` },
+    formula: "not root = False",
+  });
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "init", codeLine: 4,
+    title: { vi: "Khởi tạo queue và answer", en: "Initialize queue and answer" },
+    note: { vi: "Đưa root vào queue; answer bắt đầu rỗng.", en: "Put the root in the queue; answer starts empty." },
+    formula: `queue = [${root.val}] · answer = []`,
+  });
+
+  let level = 0;
+  while (queue.length) {
+    const size = queue.length;
+    const nodes = queue.slice(0, size);
+    debugStep({
+      level, nodes, size, currentCount: size, stage: 0, event: "while-check", codeLine: 5,
+      title: { vi: `Queue chưa rỗng: bắt đầu tầng ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Queue hiện có [${queueText().join(", ")}], nên vòng while chạy tiếp.`, en: `The queue is [${queueText().join(", ")}], so the while loop continues.` },
+      formula: "bool(queue) = True",
+    });
+    debugStep({
+      level, nodes, size, currentCount: size, stage: 0, event: "lock-size", codeLine: 6,
+      title: { vi: `Khóa size = ${size}`, en: `Lock size = ${size}` },
+      note: { vi: "Child được enqueue sau đó không thuộc vòng for hiện tại; chúng chờ tầng kế tiếp.", en: "Children enqueued later do not belong to this for-loop; they wait for the next level." },
+      formula: `size = len(queue) = ${size}`,
+    });
+
+    let levelMax = -Infinity;
+    let winner = null;
+    debugStep({
+      level, nodes, size, levelMax, currentCount: size, event: "reset-max", codeLine: 7,
+      title: { vi: "Reset level_max về −∞", en: "Reset level_max to −∞" },
+      note: { vi: "Mỗi tầng phải bắt đầu một maximum mới, kể cả khi mọi giá trị đều âm.", en: "Each level needs a fresh maximum, including levels containing only negative values." },
+      formula: "level_max = −∞",
+    });
+
+    for (let i = 0; i < size; i++) {
+      const remainingBeforePop = size - i;
+      const node = queue[0];
+      debugStep({
+        level, nodes, size, i, node, levelMax, winner, currentIndex: i, processedCount: i,
+        currentCount: remainingBeforePop, rowState: "front", event: "loop", codeLine: 8,
+        title: { vi: `Lượt i = ${i}: xử lý FRONT = ${node.val}`, en: `Iteration i = ${i}: process FRONT = ${node.val}` },
+        note: { vi: `Đây là node thứ ${i + 1}/${size} của tầng ${level}.`, en: `This is node ${i + 1}/${size} in level ${level}.` },
+        formula: `i = ${i} < size = ${size}`,
+        active: [node.id],
+      });
+
+      queue.shift();
+      processed.add(node.id);
+      debugStep({
+        level, nodes, size, i, node, levelMax, winner, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "popped", event: "pop", codeLine: 9,
+        title: { vi: `Pop ${node.val} khỏi đầu queue`, en: `Pop ${node.val} from the queue front` },
+        note: { vi: `Queue sau popleft: [${queueText().join(", ")}].`, en: `Queue after popleft: [${queueText().join(", ")}].` },
+        formula: `node = queue.popleft() = ${node.val}`,
+        active: [node.id],
+      });
+
+      const previousMax = levelMax;
+      debugStep({
+        level, nodes, size, i, node, levelMax: previousMax, winner, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "compare", event: "compare", codeLine: 10,
+        title: { vi: `So ${node.val} với level_max = ${maxText(previousMax)}`, en: `Compare ${node.val} with level_max = ${maxText(previousMax)}` },
+        note: { vi: "Chưa thay đổi biến; bước kế tiếp sẽ cho thấy kết quả của max(...).", en: "No variable has changed yet; the next step shows the result of max(...)." },
+        formula: `max(${maxText(previousMax)}, ${node.val}) = ?`,
+        active: [node.id],
+      });
+
+      const isNewMax = node.val > levelMax;
+      if (isNewMax) {
+        if (winner && !winners.has(winner.id)) delete sub[winner.id];
+        levelMax = node.val;
+        winner = node;
+      }
+      if (winner) sub[winner.id] = `level_max = ${levelMax}`;
+      debugStep({
+        level, nodes, size, i, node, levelMax, winner, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: isNewMax ? "new-max" : "keep-max", event: isNewMax ? "new-max" : "keep-max", codeLine: 10,
+        title: isNewMax
+          ? { vi: `Cập nhật level_max = ${levelMax}`, en: `Update level_max = ${levelMax}` }
+          : { vi: `Giữ level_max = ${levelMax}`, en: `Keep level_max = ${levelMax}` },
+        note: isNewMax
+          ? { vi: `${node.val} lớn hơn maximum cũ, nên node này trở thành ứng viên xanh.`, en: `${node.val} is greater than the old maximum, so this node becomes the green candidate.` }
+          : { vi: `${node.val} không lớn hơn ${levelMax}; ứng viên hiện tại vẫn giữ nguyên.`, en: `${node.val} is not greater than ${levelMax}; the current candidate stays.` },
+        formula: `max(${maxText(previousMax)}, ${node.val}) = ${levelMax}`,
+        active: [node.id],
+      });
+
+      if (node.left) queue.push(node.left);
+      debugStep({
+        level, nodes, size, i, node, levelMax, winner, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: winner?.id === node.id ? "new-max" : "checked",
+        event: node.left ? "enqueue-left" : "skip-left", codeLine: 11,
+        title: node.left
+          ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left
+          ? { vi: `${node.left.val} nằm ở phần xanh dương của queue: chỉ xử lý ở tầng kế tiếp.`, en: `${node.left.val} sits in the blue part of the queue and is processed only on the next level.` }
+          : { vi: "Không có gì được thêm vào queue.", en: "Nothing is added to the queue." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+        active: [node.id],
+      });
+
+      if (node.right) queue.push(node.right);
+      debugStep({
+        level, nodes, size, i, node, levelMax, winner, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: winner?.id === node.id ? "new-max" : "checked",
+        event: node.right ? "enqueue-right" : "skip-right", codeLine: 12,
+        title: node.right
+          ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right
+          ? { vi: `${node.right.val} cũng chờ ở tầng kế tiếp; size vẫn cố định là ${size}.`, en: `${node.right.val} also waits for the next level; size remains locked at ${size}.` }
+          : { vi: `Queue giữ nguyên; vòng for vẫn chỉ chạy ${size} lượt.`, en: `The queue is unchanged; the for-loop still runs exactly ${size} times.` },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+        active: [node.id],
+      });
+    }
+
+    answer.push(levelMax);
+    winners.add(winner.id);
+    completedRows.push(currentRow({ level, nodes, processedCount: size, levelMax, winner, complete: true }));
+    debugStep({
+      level, size, levelMax, winner, currentCount: 0, stage: 2, event: "append-level", codeLine: 13,
+      title: { vi: `Chốt tầng ${level}: append ${levelMax}`, en: `Finish level ${level}: append ${levelMax}` },
+      note: { vi: `Đã pop đủ ${size} node; answer trở thành ${answerText()}.`, en: `All ${size} nodes were popped; answer is now ${answerText()}.` },
+      formula: `answer.append(${levelMax}) → ${answerText()}`,
+    });
+    level += 1;
+  }
+
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 0, event: "while-stop", codeLine: 5,
+    title: { vi: "Queue rỗng: thoát vòng while", en: "Queue is empty: exit the while loop" },
+    note: { vi: "Không còn node nào của tầng hiện tại hoặc tầng kế tiếp.", en: "No nodes remain in either the current or next level." },
+    formula: "bool(queue) = False",
+  });
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 3, event: "done", codeLine: 14, status: "success", final: true, result: answerText(),
+    title: { vi: "Trả về maximum của từng tầng", en: "Return every level maximum" },
+    note: { vi: "Mỗi hàng xanh đã được chốt đúng một giá trị lớn nhất.", en: "Each green row has exactly one finalized maximum." },
+    formula: `return ${answerText()}`,
+  });
   return { input, answer: JSON.stringify(answer), steps };
 }
 
 function build513(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: null, steps: [emptyResult(513, "bottom-left", root, null, 3, "None")] };
-  const levels = levelsOf(root), steps = [introStep(513, "bottom-left", root,
+  const steps = [introStep(513, "bottom-left", root,
     { vi: "Node đầu tiên của mỗi tầng là bên trái nhất", en: "The first node of a level is its leftmost" },
-    { vi: "BFS enqueue trái trước phải. Mỗi tầng ghi đè candidate bằng node đầu tiên; tầng sâu nhất sẽ thắng.", en: "BFS enqueues left before right. Each level replaces the candidate with its first node; the deepest level wins." })];
-  const rows = [], done = new Set(); let answer = root.val, winner = root;
-  levels.forEach((level, index) => {
-    winner = level[0]; answer = winner.val; level.forEach((node) => done.add(node.id));
-    rows.push({ level: index, values: levelTokens(level, { tones: level.map((_, i) => i === 0 ? "success" : "neutral"), meta: level.map((_, i) => i === 0 ? "leftmost" : "") }), metric: { label: "candidate", value: answer } });
-    steps.push(makeStep({
-      problemId: 513, mode: "bottom-left", root, stage: 2, event: "candidate", rows, queue: levels[index + 1] || [], active: [winner.id], done, selected: [winner.id],
-      title: { vi: `Tầng ${index}: candidate = ${answer}`, en: `Level ${index}: candidate = ${answer}` },
-      note: { vi: `${answer} đứng đầu queue của tầng ${index}, nên là node trái nhất ở độ sâu này.`, en: `${answer} is first in level ${index}'s queue, so it is the leftmost node at this depth.` },
-      codeLines: [8], cards: [{ label: "depth", value: index }, { label: "leftmost", value: answer, tone: "success" }],
-    }));
+    { vi: "Bấm Next để theo từng dòng: khóa size, pop FRONT, kiểm tra i == 0, cập nhật answer rồi enqueue child.", en: "Press Next to follow each line: lock size, pop FRONT, check i == 0, update answer, then enqueue each child." })];
+  const queue = [root];
+  const completedRows = [];
+  const processed = new Set();
+  const sub = {};
+  let answer = null;
+  let candidate = null;
+  const queueText = () => queue.map((node) => node.val);
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const varsSnapshot = ({ size = "—", i = "—", node = null, condition = "—" } = {}) => [
+    { name: "queue", value: queueText() },
+    { name: "answer", value: answer ?? "—" },
+    { name: "size", value: size },
+    { name: "i", value: i },
+    { name: "node", value: node ? node.val : "—" },
+    { name: "i == 0", value: condition },
+  ];
+  const currentRow = ({ level, nodes, processedCount = 0, currentIndex = -1, leftmost = null, state = "waiting", complete = false }) => ({
+    level,
+    status: complete ? "sorted" : undefined,
+    values: nodes.map((node, index) => {
+      let tone = "neutral";
+      let meta = index < processedCount ? "checked" : "waiting";
+      if (leftmost && node.id === leftmost.id) { tone = "success"; meta = "leftmost"; }
+      if (index === currentIndex) {
+        tone = state === "leftmost" ? "success" : state === "not-first" ? "neutral" : "warning";
+        meta = state === "leftmost" ? "leftmost" : state === "not-first" ? "not first" : state;
+      }
+      return { id: node.id, value: node.val, tone, meta };
+    }),
+    metric: { label: "answer", value: leftmost ? leftmost.val : "pending" },
   });
-  steps.push(makeStep({ problemId: 513, mode: "bottom-left", root, stage: 3, event: "done", status: "success", final: true, rows, done, selected: [winner.id],
-    title: { vi: `Node trái nhất ở tầng cuối = ${answer}`, en: `Bottom-left value = ${answer}` }, note: { vi: "Candidate cuối cùng đến từ tầng sâu nhất.", en: "The final candidate came from the deepest level." }, codeLines: [12],
-    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: "success" }], result: answer }));
+  const debugStep = ({
+    level, nodes, size, i = "—", node = null, condition = "—", leftmost = null,
+    currentIndex = -1, processedCount = 0, rowState = "waiting", complete = false,
+    currentCount = 0, title, note, codeLine, stage = 1, event, formula = null,
+    active = [], status = "checking", final = false, result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, currentRow({ level, nodes, processedCount, currentIndex, leftmost, state: rowState, complete })]
+      : completedRows;
+    steps.push(makeStep({
+      problemId: 513, mode: "bottom-left", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: queueSnapshot(currentCount),
+      queueNote: { vi: "vàng = tầng này · xanh dương = tầng kế", en: "amber = this level · blue = next level" },
+      active, done: processed, selected: candidate ? [candidate.id] : [], sub,
+      formula,
+      vars: varsSnapshot({ size, i, node, condition }),
+      cards: [
+        { label: "level", value: level ?? "—" },
+        { label: { vi: "size (đã khóa)", en: "size (locked)" }, value: size ?? "—", detail: { vi: "chỉ pop đúng size node", en: "pop exactly size nodes" } },
+        { label: "i / size", value: Number.isInteger(i) ? `${i} / ${size}` : "—" },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: "i == 0", value: condition === true ? "True" : condition === false ? "False" : "—", tone: condition === true ? "success" : "neutral" },
+        { label: "answer", value: answer ?? "—", tone: answer !== null ? "success" : "neutral" },
+      ],
+    }));
+  };
+
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "init-queue", codeLine: 3,
+    title: { vi: "Đưa root vào queue", en: "Put root into the queue" },
+    note: { vi: `BFS bắt đầu với queue = [${root.val}].`, en: `BFS starts with queue = [${root.val}].` },
+    formula: `queue = deque([${root.val}])`,
+  });
+  answer = root.val;
+  candidate = root;
+  sub[candidate.id] = `answer = ${answer}`;
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "init-answer", codeLine: 4,
+    title: { vi: `Khởi tạo answer = ${answer}`, en: `Initialize answer = ${answer}` },
+    note: { vi: "Nếu cây chỉ có root, đây cũng chính là node trái nhất ở tầng cuối.", en: "If the tree contains only the root, this is also the bottom-left value." },
+    formula: `answer = root.val = ${answer}`,
+  });
+
+  let level = 0;
+  while (queue.length) {
+    const size = queue.length;
+    const nodes = queue.slice(0, size);
+    let leftmost = null;
+    debugStep({
+      level, nodes, size, currentCount: size, stage: 0, event: "while-check", codeLine: 5,
+      title: { vi: `Queue chưa rỗng: bắt đầu tầng ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Queue hiện có [${queueText().join(", ")}], nên tiếp tục vòng while.`, en: `The queue is [${queueText().join(", ")}], so the while loop continues.` },
+      formula: "bool(queue) = True",
+    });
+    debugStep({
+      level, nodes, size, currentCount: size, stage: 0, event: "lock-size", codeLine: 6,
+      title: { vi: `Khóa size = ${size}`, en: `Lock size = ${size}` },
+      note: { vi: "Chỉ các node đang ở queue lúc này thuộc tầng hiện tại; child mới enqueue sẽ chờ tầng kế.", en: "Only nodes currently in the queue belong to this level; newly enqueued children wait for the next level." },
+      formula: `size = len(queue) = ${size}`,
+    });
+
+    for (let i = 0; i < size; i++) {
+      const node = queue[0];
+      debugStep({
+        level, nodes, size, i, node, leftmost, currentIndex: i, processedCount: i,
+        currentCount: size - i, rowState: "front", event: "loop", codeLine: 7,
+        title: { vi: `Lượt i = ${i}: FRONT = ${node.val}`, en: `Iteration i = ${i}: FRONT = ${node.val}` },
+        note: { vi: `Đây là node thứ ${i + 1}/${size} của tầng ${level}.`, en: `This is node ${i + 1}/${size} in level ${level}.` },
+        formula: `i = ${i} < size = ${size}`,
+        active: [node.id],
+      });
+
+      queue.shift();
+      processed.add(node.id);
+      debugStep({
+        level, nodes, size, i, node, leftmost, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "popped", event: "pop", codeLine: 8,
+        title: { vi: `Pop ${node.val} khỏi đầu queue`, en: `Pop ${node.val} from the queue front` },
+        note: { vi: `Queue sau popleft: [${queueText().join(", ")}].`, en: `Queue after popleft: [${queueText().join(", ")}].` },
+        formula: `node = queue.popleft() = ${node.val}`,
+        active: [node.id],
+      });
+
+      const isFirst = i === 0;
+      debugStep({
+        level, nodes, size, i, node, condition: isFirst, leftmost, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "check i == 0", event: "check-first", codeLine: 9,
+        title: isFirst
+          ? { vi: `i = 0: ${node.val} là node đầu tầng`, en: `i = 0: ${node.val} is first in the level` }
+          : { vi: `i = ${i}: ${node.val} không phải node đầu`, en: `i = ${i}: ${node.val} is not first` },
+        note: isFirst
+          ? { vi: "BFS enqueue trái trước phải, nên node đầu tiên chính là node trái nhất của tầng.", en: "BFS enqueues left before right, so the first node is the level's leftmost node." }
+          : { vi: "Node này vẫn được duyệt để tìm tầng kế tiếp, nhưng không được ghi vào answer.", en: "This node is still visited to discover the next level, but it does not overwrite answer." },
+        formula: `i == 0 → ${isFirst ? "True" : "False"}`,
+        active: [node.id],
+      });
+
+      if (isFirst) {
+        if (candidate) delete sub[candidate.id];
+        answer = node.val;
+        candidate = node;
+        leftmost = node;
+        sub[candidate.id] = `answer = ${answer}`;
+      }
+      debugStep({
+        level, nodes, size, i, node, condition: isFirst, leftmost, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: isFirst ? "leftmost" : "not-first",
+        stage: 2, event: isFirst ? "select-leftmost" : "keep-candidate", codeLine: 9,
+        title: isFirst
+          ? { vi: `Cập nhật answer = ${answer}`, en: `Update answer = ${answer}` }
+          : { vi: `Giữ answer = ${answer}`, en: `Keep answer = ${answer}` },
+        note: isFirst
+          ? { vi: `${node.val} được đánh dấu xanh là node trái nhất của tầng ${level}.`, en: `${node.val} is marked green as the leftmost node of level ${level}.` }
+          : { vi: `Chỉ i = 0 được ghi đè answer; ${node.val} có i = ${i}.`, en: `Only i = 0 overwrites answer; ${node.val} has i = ${i}.` },
+        formula: isFirst ? `answer = node.val = ${answer}` : `i != 0 → answer stays ${answer}`,
+        active: [node.id],
+      });
+
+      if (node.left) queue.push(node.left);
+      debugStep({
+        level, nodes, size, i, node, condition: isFirst, leftmost, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: leftmost?.id === node.id ? "leftmost" : "checked", stage: 2,
+        event: node.left ? "enqueue-left" : "skip-left", codeLine: 10,
+        title: node.left
+          ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left
+          ? { vi: `${node.left.val} nằm ở phần xanh dương của queue và sẽ được xét ở tầng kế tiếp.`, en: `${node.left.val} sits in the blue part of the queue and will be processed on the next level.` }
+          : { vi: "Không có gì được thêm vào queue.", en: "Nothing is added to the queue." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+        active: [node.id],
+      });
+
+      if (node.right) queue.push(node.right);
+      debugStep({
+        level, nodes, size, i, node, condition: isFirst, leftmost, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: leftmost?.id === node.id ? "leftmost" : "checked", stage: 2,
+        event: node.right ? "enqueue-right" : "skip-right", codeLine: 11,
+        title: node.right
+          ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right
+          ? { vi: `${node.right.val} vào sau con trái, nhờ đó thứ tự trái → phải được giữ nguyên.`, en: `${node.right.val} enters after the left child, preserving left-to-right order.` }
+          : { vi: `Queue giữ nguyên; size của tầng ${level} vẫn là ${size}.`, en: `The queue is unchanged; level ${level}'s size remains ${size}.` },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+        active: [node.id],
+      });
+    }
+
+    completedRows.push(currentRow({ level, nodes, processedCount: size, leftmost, complete: true }));
+    level += 1;
+  }
+
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 0, event: "while-stop", codeLine: 5,
+    title: { vi: "Queue rỗng: thoát vòng while", en: "Queue is empty: exit the while loop" },
+    note: { vi: "Candidate hiện tại đến từ tầng sâu nhất vừa xử lý.", en: "The current candidate came from the deepest processed level." },
+    formula: "bool(queue) = False",
+  });
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 3, event: "done", codeLine: 12, status: "success", final: true, result: answer,
+    title: { vi: `Trả về node trái nhất tầng cuối = ${answer}`, en: `Return the bottom-left value = ${answer}` },
+    note: { vi: "Mỗi tầng ghi đè answer đúng một lần tại i = 0; tầng sâu nhất ghi đè cuối cùng.", en: "Each level overwrites answer exactly once at i = 0; the deepest level writes last." },
+    formula: `return ${answer}`,
+  });
   return { input, answer, steps };
 }
 
 function build662(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: 0, steps: [emptyResult(662, "indexed-width", root, 0, 3)] };
-  const levels = levelsOf(root), steps = [introStep(662, "indexed-width", root,
+  const steps = [introStep(662, "indexed-width", root,
     { vi: "Gán index như cây hoàn chỉnh", en: "Index nodes as if the tree were complete" },
-    { vi: "Khoảng trống null ở giữa vẫn tính vào width. Với index chuẩn hóa: width = last − first + 1.", en: "Null gaps between endpoints still count. With normalized indices: width = last − first + 1." })];
-  const rows = [], done = new Set(); let best = 0, bestIds = [];
-  levels.forEach((level, index) => {
-    const firstSlot = level[0].slot;
-    const positions = level.map((node) => node.slot - firstSlot);
-    const width = positions.at(-1) - positions[0] + 1;
-    if (width > best) { best = width; bestIds = [level[0].id, level.at(-1).id]; }
-    level.forEach((node) => done.add(node.id));
-    rows.push({ level: index, values: levelTokens(level, { meta: positions.map((position) => `idx ${position}`), tones: level.map((node) => bestIds.includes(node.id) ? "success" : "neutral") }), metric: { label: "width", value: `${positions.at(-1)} − ${positions[0]} + 1 = ${width}` }, span: width });
+    { vi: "Bấm Next để theo từng dòng: pop (node, pos), chuẩn hóa pos, enqueue child bằng 2·pos / 2·pos+1, rồi tính width.", en: "Press Next to follow each line: pop (node, pos), normalize pos, enqueue children with 2·pos / 2·pos+1, then compute width." })];
+  const queue = [{ node: root, pos: 0 }];
+  const completedRows = [];
+  const processed = new Set();
+  const sub = {};
+  let best = 0;
+  let bestIds = [];
+  const queueText = () => queue.map((entry) => `${entry.node.val}@${entry.pos}`);
+  const queueSnapshot = (currentCount = 0) => queue.map((entry, index) => ({
+    node: entry.node,
+    role: index < currentCount ? "current-level" : "next-level",
+    meta: `pos ${entry.pos}`,
+  }));
+  const varsSnapshot = ({ size = "—", i = "—", node = null, rawPos = "—", pos = "—", first = "—", last = "—", width = "—" } = {}) => [
+    { name: "queue", value: queueText() },
+    { name: "size", value: size },
+    { name: "i", value: i },
+    { name: "node", value: node ? node.val : "—" },
+    { name: "raw_pos", value: rawPos },
+    { name: "pos", value: pos },
+    { name: "first", value: first },
+    { name: "last", value: last },
+    { name: "width", value: width },
+    { name: "best", value: best },
+  ];
+  const currentRow = ({ level, entries, first = null, processedCount = 0, currentIndex = -1, state = "waiting", last = null, width = null, complete = false }) => {
+    const positions = entries.map((entry) => first === null ? entry.pos : entry.pos - first);
+    return {
+      level,
+      status: complete ? "sorted" : undefined,
+      values: entries.map((entry, index) => {
+        let tone = "neutral";
+        let meta = `${first === null ? "raw" : "idx"} ${positions[index]}`;
+        if (index < processedCount) meta += " · checked";
+        if (complete && (index === 0 || index === entries.length - 1)) {
+          tone = "success";
+          meta = entries.length === 1 ? `idx ${positions[index]} · both ends` : `idx ${positions[index]} · ${index === 0 ? "first" : "last"}`;
+        }
+        if (index === currentIndex) {
+          tone = state === "last" ? "success" : "warning";
+          meta = state === "raw" ? `raw ${entries[index].pos}` : state === "last" ? `idx ${positions[index]} · last` : `idx ${positions[index]} · ${state}`;
+        }
+        return { id: entry.node.id, value: entry.node.val, tone, meta };
+      }),
+      metric: {
+        label: "width",
+        value: width === null ? (last === null ? "pending" : `${last} − 0 + 1`) : `${last} − 0 + 1 = ${width}`,
+      },
+      span: width ?? undefined,
+    };
+  };
+  const debugStep = ({
+    level, entries, size, i = "—", node = null, rawPos = "—", pos = "—",
+    first = "—", last = "—", width = "—", currentIndex = -1, processedCount = 0,
+    rowState = "waiting", complete = false, currentCount = 0, title, note, codeLine,
+    stage = 1, event, formula = null, active = [], status = "checking", final = false, result = null,
+  }) => {
+    const rowFirst = Number.isInteger(first) ? first : null;
+    const rowLast = Number.isInteger(last) ? last : null;
+    const rowWidth = Number.isInteger(width) ? width : null;
+    const rows = entries
+      ? [...completedRows, currentRow({ level, entries, first: rowFirst, processedCount, currentIndex, state: rowState, last: rowLast, width: rowWidth, complete })]
+      : completedRows;
     steps.push(makeStep({
-      problemId: 662, mode: "indexed-width", root, stage: 1, event: "width", rows, queue: levels[index + 1] || [], active: level.map((node) => node.id), done, selected: bestIds,
-      title: { vi: `Tầng ${index}: width = ${width}`, en: `Level ${index}: width = ${width}` },
-      note: { vi: `Endpoint ở index ${positions[0]} và ${positions.at(-1)}; mọi slot giữa chúng đều thuộc độ rộng.`, en: `The endpoints sit at indices ${positions[0]} and ${positions.at(-1)}; every slot between them contributes to the width.` },
-      codeLines: [8, 9], formula: `width = ${positions.at(-1)} − ${positions[0]} + 1 = ${width}`,
-      cards: [{ label: "level width", value: width }, { label: "best", value: best, tone: "success" }],
+      problemId: 662, mode: "indexed-width", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: queueSnapshot(currentCount),
+      queueNote: { vi: "mỗi node mang positional index", en: "each node carries a positional index" },
+      active, done: processed, selected: bestIds, sub,
+      formula,
+      vars: varsSnapshot({ size, i, node, rawPos, pos, first, last, width }),
+      cards: [
+        { label: "level", value: level ?? "—" },
+        { label: { vi: "size (đã khóa)", en: "size (locked)" }, value: size ?? "—", detail: { vi: "chỉ pop đúng size node", en: "pop exactly size nodes" } },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: { vi: "pos gốc → chuẩn hóa", en: "raw → normalized pos" }, value: Number.isInteger(rawPos) ? `${rawPos} → ${Number.isInteger(pos) ? pos : "?"}` : "—" },
+        { label: "first / last", value: `${Number.isInteger(first) ? first : "—"} / ${Number.isInteger(last) ? last : "—"}` },
+        { label: "width / best", value: `${Number.isInteger(width) ? width : "—"} / ${best}`, tone: Number.isInteger(width) ? "success" : "neutral" },
+      ],
     }));
+  };
+
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "guard", codeLine: 3,
+    title: { vi: "Kiểm tra root có rỗng không", en: "Check whether root is empty" },
+    note: { vi: `root = ${root.val}, nên tiếp tục BFS.`, en: `root = ${root.val}, so continue into BFS.` },
+    formula: "not root = False",
   });
-  steps.push(makeStep({ problemId: 662, mode: "indexed-width", root, stage: 3, event: "done", status: "success", final: true, rows, done, selected: bestIds,
-    title: { vi: `Độ rộng lớn nhất = ${best}`, en: `Maximum width = ${best}` }, note: { vi: "Best là maximum của width ở tất cả các tầng.", en: "Best is the maximum width across all levels." }, codeLines: [14],
-    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: best, tone: "success" }], result: best }));
+  debugStep({
+    level: "—", size: "—", currentCount: 1, stage: 0, event: "init", codeLine: 4,
+    title: { vi: "Khởi tạo queue với (root, 0)", en: "Initialize queue with (root, 0)" },
+    note: { vi: `Root ${root.val} bắt đầu ở positional index 0; best bắt đầu bằng 0.`, en: `Root ${root.val} starts at positional index 0; best starts at 0.` },
+    formula: `queue = [(${root.val}, 0)] · best = 0`,
+  });
+
+  let level = 0;
+  while (queue.length) {
+    const size = queue.length;
+    const entries = queue.slice(0, size);
+    debugStep({
+      level, entries, size, currentCount: size, stage: 0, event: "while-check", codeLine: 5,
+      title: { vi: `Queue chưa rỗng: bắt đầu tầng ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Queue đang giữ [${queueText().join(", ")}], trong đó value@pos cho biết node và index.`, en: `The queue holds [${queueText().join(", ")}], where value@pos shows each node and index.` },
+      formula: "bool(queue) = True",
+    });
+    debugStep({
+      level, entries, size, currentCount: size, stage: 0, event: "lock-size", codeLine: 6,
+      title: { vi: `Khóa size = ${size}`, en: `Lock size = ${size}` },
+      note: { vi: "Child mới enqueue không được pop trong level hiện tại.", en: "Newly enqueued children are not popped in the current level." },
+      formula: `size = len(queue) = ${size}`,
+    });
+
+    const first = queue[0].pos;
+    debugStep({
+      level, entries, size, first, currentCount: size, stage: 0, event: "set-first", codeLine: 7,
+      title: { vi: `Lấy first = ${first}`, en: `Set first = ${first}` },
+      note: { vi: "Trừ first khỏi mọi pos trong tầng để index không tăng quá lớn.", en: "Subtract first from every position in the level so indices do not grow too large." },
+      formula: `first = queue[0].pos = ${first}`,
+    });
+    let last = 0;
+    debugStep({
+      level, entries, size, first, last, currentCount: size, event: "reset-last", codeLine: 8,
+      title: { vi: "Reset last = 0", en: "Reset last = 0" },
+      note: { vi: "Sau chuẩn hóa, node đầu tiên luôn ở index 0; last sẽ đi tới endpoint bên phải.", en: "After normalization, the first node is always at index 0; last will move to the right endpoint." },
+      formula: "last = 0",
+    });
+
+    for (let i = 0; i < size; i++) {
+      const entry = queue[0];
+      const node = entry.node;
+      const rawPos = entry.pos;
+      debugStep({
+        level, entries, size, i, node, rawPos, first, last, currentIndex: i, processedCount: i,
+        currentCount: size - i, rowState: "front", event: "loop", codeLine: 9,
+        title: { vi: `Lượt i = ${i}: FRONT = (${node.val}, ${rawPos})`, en: `Iteration i = ${i}: FRONT = (${node.val}, ${rawPos})` },
+        note: { vi: `Đây là node thứ ${i + 1}/${size} của tầng ${level}.`, en: `This is node ${i + 1}/${size} in level ${level}.` },
+        formula: `i = ${i} < size = ${size}`,
+        active: [node.id],
+      });
+
+      queue.shift();
+      processed.add(node.id);
+      debugStep({
+        level, entries, size, i, node, rawPos, first, last, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "raw", event: "pop", codeLine: 10,
+        title: { vi: `Pop (${node.val}, ${rawPos})`, en: `Pop (${node.val}, ${rawPos})` },
+        note: { vi: `pos hiện vẫn là index gốc ${rawPos}; queue còn [${queueText().join(", ")}].`, en: `pos is still the raw index ${rawPos}; the queue is now [${queueText().join(", ")}].` },
+        formula: `node, pos = queue.popleft() = (${node.val}, ${rawPos})`,
+        active: [node.id],
+      });
+
+      const pos = rawPos - first;
+      sub[node.id] = `idx = ${pos}`;
+      debugStep({
+        level, entries, size, i, node, rawPos, pos, first, last, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "normalized", event: "normalize", codeLine: 11,
+        title: { vi: `Chuẩn hóa pos: ${rawPos} − ${first} = ${pos}`, en: `Normalize pos: ${rawPos} − ${first} = ${pos}` },
+        note: { vi: "Khoảng cách giữa các node vẫn giữ nguyên, nhưng index được kéo về gần 0.", en: "Distances between nodes stay unchanged, while indices shift closer to 0." },
+        formula: `pos = raw_pos − first = ${rawPos} − ${first} = ${pos}`,
+        active: [node.id],
+      });
+
+      last = pos;
+      debugStep({
+        level, entries, size, i, node, rawPos, pos, first, last, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "last", event: "set-last", codeLine: 12,
+        title: { vi: `Dời last tới ${last}`, en: `Move last to ${last}` },
+        note: { vi: "BFS đọc trái → phải, nên pos của node vừa pop là endpoint phải mới nhất.", en: "BFS reads left to right, so the popped node's position is the newest right endpoint." },
+        formula: `last = pos = ${last}`,
+        active: [node.id],
+      });
+
+      if (node.left) queue.push({ node: node.left, pos: 2 * pos });
+      debugStep({
+        level, entries, size, i, node, rawPos, pos, first, last, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "checked", event: node.left ? "enqueue-left" : "skip-left", codeLine: 13,
+        title: node.left
+          ? { vi: `Enqueue con trái ${node.left.val} tại pos ${2 * pos}`, en: `Enqueue left child ${node.left.val} at pos ${2 * pos}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left
+          ? { vi: "Con trái dùng index 2 × pos và chờ ở phần xanh dương của queue.", en: "The left child uses index 2 × pos and waits in the blue part of the queue." }
+          : { vi: "Vị trí con trái vẫn là một khoảng trống có thể nằm bên trong width.", en: "The missing left-child slot may still be an internal gap inside the width." },
+        formula: node.left ? `left pos = 2 × ${pos} = ${2 * pos}` : "node.left = None → skip",
+        active: [node.id],
+      });
+
+      if (node.right) queue.push({ node: node.right, pos: 2 * pos + 1 });
+      debugStep({
+        level, entries, size, i, node, rawPos, pos, first, last, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "checked", event: node.right ? "enqueue-right" : "skip-right", codeLine: 14,
+        title: node.right
+          ? { vi: `Enqueue con phải ${node.right.val} tại pos ${2 * pos + 1}`, en: `Enqueue right child ${node.right.val} at pos ${2 * pos + 1}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right
+          ? { vi: "Con phải dùng index 2 × pos + 1; chênh lệch index sẽ bảo toàn các ô null ở giữa.", en: "The right child uses 2 × pos + 1; index gaps preserve null slots between endpoints." }
+          : { vi: "Không thêm node, nhưng không nén các positional index đã tạo.", en: "No node is added, but existing positional indices are not compressed." },
+        formula: node.right ? `right pos = 2 × ${pos} + 1 = ${2 * pos + 1}` : "node.right = None → skip",
+        active: [node.id],
+      });
+    }
+
+    const width = last + 1;
+    debugStep({
+      level, entries, size, first, last, width, processedCount: size, currentCount: 0,
+      stage: 2, event: "width", codeLine: 15,
+      title: { vi: `Tầng ${level}: width = ${width}`, en: `Level ${level}: width = ${width}` },
+      note: { vi: `Endpoint chuẩn hóa là 0 và ${last}; mọi slot giữa chúng đều được tính.`, en: `The normalized endpoints are 0 and ${last}; every slot between them counts.` },
+      formula: `width = ${last} − 0 + 1 = ${width}`,
+    });
+
+    const previousBest = best;
+    debugStep({
+      level, entries, size, first, last, width, processedCount: size, currentCount: 0,
+      stage: 2, event: "compare-best", codeLine: 16,
+      title: { vi: `So width ${width} với best ${previousBest}`, en: `Compare width ${width} with best ${previousBest}` },
+      note: { vi: "Bước kế tiếp sẽ cho thấy best có thay đổi hay không.", en: "The next step shows whether best changes." },
+      formula: `max(${previousBest}, ${width}) = ?`,
+    });
+    const isNewBest = width > best;
+    if (isNewBest) {
+      best = width;
+      bestIds = [entries[0].node.id, entries.at(-1).node.id];
+    }
+    completedRows.push(currentRow({ level, entries, first, processedCount: size, last, width, complete: true }));
+    debugStep({
+      level, size, first, last, width, currentCount: 0, stage: 2,
+      event: isNewBest ? "new-best" : "keep-best", codeLine: 16,
+      title: isNewBest
+        ? { vi: `Cập nhật best = ${best}`, en: `Update best = ${best}` }
+        : { vi: `Giữ best = ${best}`, en: `Keep best = ${best}` },
+      note: isNewBest
+        ? { vi: `Width ${width} lớn hơn kỷ lục cũ ${previousBest}.`, en: `Width ${width} exceeds the previous record ${previousBest}.` }
+        : { vi: `Width ${width} không lớn hơn kỷ lục ${best}.`, en: `Width ${width} does not exceed the record ${best}.` },
+      formula: `best = max(${previousBest}, ${width}) = ${best}`,
+    });
+    level += 1;
+  }
+
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 0, event: "while-stop", codeLine: 5,
+    title: { vi: "Queue rỗng: thoát vòng while", en: "Queue is empty: exit the while loop" },
+    note: { vi: `Mọi tầng đã được đo; best hiện là ${best}.`, en: `Every level has been measured; best is now ${best}.` },
+    formula: "bool(queue) = False",
+  });
+  debugStep({
+    level, size: 0, currentCount: 0, stage: 3, event: "done", codeLine: 17, status: "success", final: true, result: best,
+    title: { vi: `Trả về độ rộng lớn nhất = ${best}`, en: `Return maximum width = ${best}` },
+    note: { vi: "Trong bảng level, hai chip endpoint màu xanh đánh dấu khoảng tạo ra best hiện tại.", en: "On the level board, the two green endpoint chips mark the span that produced the current best." },
+    formula: `return ${best}`,
+  });
   return { input, answer: best, steps };
 }
 
@@ -523,7 +1142,7 @@ module.exports = {
     { vi: "Trả về giá trị lớn nhất ở mỗi tầng của cây.", en: "Return the largest value in every level of the tree." }, "1,3,2,5,3,null,9",
     [{ vi: "BFS theo tầng và lấy max của các node vừa pop.", en: "Run level-order BFS and take the maximum among nodes popped for each level." }],
     { time: "O(n)", space: "O(w)", note: { vi: "Queue chứa tối đa w node ở tầng rộng nhất.", en: "The queue holds at most w nodes on the widest level." } },
-    ["class Solution:", "    def largestValues(self, root):", "        if not root: return []", "        queue, answer = deque([root]), []", "        while queue:", "            level_max = float('-inf')", "            for _ in range(len(queue)):", "                node = queue.popleft()", "                level_max = max(level_max, node.val)", "                if node.left: queue.append(node.left)", "                if node.right: queue.append(node.right)", "            answer.append(level_max)", "        return answer"], build515),
+    ["class Solution:", "    def largestValues(self, root):", "        if not root: return []", "        queue, answer = deque([root]), []", "        while queue:", "            size = len(queue)", "            level_max = float('-inf')", "            for i in range(size):", "                node = queue.popleft()", "                level_max = max(level_max, node.val)", "                if node.left: queue.append(node.left)", "                if node.right: queue.append(node.right)", "            answer.append(level_max)", "        return answer"], build515),
 
   513: base(513, "medium", "find-bottom-left-tree-value", "Find Bottom Left Tree Value", { vi: "Giá trị trái nhất ở tầng cuối", en: "Bottom-left tree value" },
     { vi: "Tìm giá trị của node bên trái nhất tại tầng sâu nhất.", en: "Find the leftmost value in the last row of the tree." }, "2,1,3",
@@ -535,7 +1154,7 @@ module.exports = {
     { vi: "Độ rộng một tầng tính từ node ngoài cùng trái đến ngoài cùng phải, kể cả các vị trí null ở giữa.", en: "A level's width spans its leftmost to rightmost non-null nodes, including null positions between them." }, "1,3,2,5,3,null,9",
     [{ vi: "Gán index như cây hoàn chỉnh và chuẩn hóa mỗi tầng để số không phình lớn.", en: "Assign complete-tree indices and normalize them per level to keep numbers small." }, { vi: "width = last_index − first_index + 1.", en: "width = last_index − first_index + 1." }],
     { time: "O(n)", space: "O(w)", note: { vi: "Mỗi node mang thêm một positional index.", en: "Each queued node carries one positional index." } },
-    ["class Solution:", "    def widthOfBinaryTree(self, root):", "        if not root: return 0", "        queue, best = deque([(root, 0)]), 0", "        while queue:", "            first = queue[0][1]", "            last = first", "            for _ in range(len(queue)):", "                node, pos = queue.popleft()", "                pos -= first", "                last = pos", "                if node.left: queue.append((node.left, 2 * pos))", "                if node.right: queue.append((node.right, 2 * pos + 1))", "            best = max(best, last + 1)", "        return best"], build662),
+    ["class Solution:", "    def widthOfBinaryTree(self, root):", "        if not root: return 0", "        queue, best = deque([(root, 0)]), 0", "        while queue:", "            size = len(queue)", "            first = queue[0][1]", "            last = 0", "            for i in range(size):", "                node, pos = queue.popleft()", "                pos -= first", "                last = pos", "                if node.left: queue.append((node.left, 2 * pos))", "                if node.right: queue.append((node.right, 2 * pos + 1))", "            width = last + 1", "            best = max(best, width)", "        return best"], build662),
 
   117: base(117, "medium", "populating-next-right-pointers-in-each-node-ii", "Populating Next Right Pointers in Each Node II", { vi: "Nối next trên cây nhị phân bất kỳ", en: "Populate next pointers in any binary tree" },
     { vi: "Nối mỗi node với node ngay bên phải cùng tầng; cây có thể thiếu node ở bất kỳ vị trí nào.", en: "Connect each node to its immediate right neighbor on the same level; the tree may be sparse." }, "1,2,3,4,5,null,7",

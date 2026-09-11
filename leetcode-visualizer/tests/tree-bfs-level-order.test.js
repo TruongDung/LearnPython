@@ -45,6 +45,54 @@ test('515 and 513 select the correct node from each BFS row', () => {
   assert.equal(SUPPORTED[513].builder('1,2,3,4,null,5,6,null,null,7').answer, 7);
 });
 
+test('515 exposes a line-by-line BFS debugger with locked level boundaries', () => {
+  const problem = SUPPORTED[515];
+  const run = problem.builder('1,3,2,5,3,null,9');
+  const events = run.steps.map(step => step.bfsLevelView.event);
+  for (const event of ['guard', 'init', 'while-check', 'lock-size', 'reset-max', 'loop', 'pop', 'compare', 'new-max', 'keep-max', 'enqueue-left', 'skip-left', 'enqueue-right', 'skip-right', 'append-level', 'while-stop', 'done']) {
+    assert.ok(events.includes(event), event);
+  }
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'append-level').length, 3);
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'pop').length, 6);
+  assert.ok(run.steps.filter(step => step.bfsLevelView.event === 'reset-max').every(step => step.bfsLevelView.formula === 'level_max = −∞'));
+
+  const firstChild = run.steps.find(step => step.bfsLevelView.event === 'enqueue-left');
+  assert.deepEqual(firstChild.bfsLevelView.queue.map(item => item.value), [3]);
+  assert.ok(firstChild.bfsLevelView.queue.every(item => item.role === 'next-level'));
+  assert.match(firstChild.bfsLevelView.formula, /queue\.append\(3\)/);
+  const secondChild = run.steps.find(step => step.bfsLevelView.event === 'enqueue-right');
+  assert.deepEqual(secondChild.bfsLevelView.queue.map(item => item.value), [3, 2]);
+
+  const mixedQueue = run.steps.find(step => step.bfsLevelView.queue.some(item => item.role === 'current-level') && step.bfsLevelView.queue.some(item => item.role === 'next-level'));
+  assert.ok(mixedQueue);
+  assert.ok(run.steps.some(step => step.bfsLevelView.formula === 'max(3, 2) = 3'));
+  const lastWinner = run.steps.find(step => step.bfsLevelView.formula === 'max(5, 9) = 9');
+  assert.equal(lastWinner.tree.nodes.find(node => node.y === 2 && node.label === '5').sub, undefined);
+  assert.deepEqual(run.steps.at(-1).vars.find(variable => variable.name === 'answer').value, [1, 3, 9]);
+});
+
+test('513 exposes each queue operation and updates answer only at i = 0', () => {
+  const run = SUPPORTED[513].builder('1,2,3,4,null,5,6,null,null,7');
+  const events = run.steps.map(step => step.bfsLevelView.event);
+  for (const event of ['init-queue', 'init-answer', 'while-check', 'lock-size', 'loop', 'pop', 'check-first', 'select-leftmost', 'keep-candidate', 'enqueue-left', 'skip-left', 'enqueue-right', 'skip-right', 'while-stop', 'done']) {
+    assert.ok(events.includes(event), event);
+  }
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'pop').length, 7);
+  assert.deepEqual(
+    run.steps.filter(step => step.bfsLevelView.event === 'select-leftmost').map(step => step.vars.find(variable => variable.name === 'answer').value),
+    [1, 2, 4, 7],
+  );
+
+  const mixedQueue = run.steps.find(step => step.bfsLevelView.formula === 'queue.append(4)');
+  assert.deepEqual(mixedQueue.bfsLevelView.queue.map(item => [item.value, item.role]), [[3, 'current-level'], [4, 'next-level']]);
+  const skippedCandidate = run.steps.find(step => step.bfsLevelView.formula === 'i != 0 → answer stays 2');
+  assert.equal(skippedCandidate.vars.find(variable => variable.name === 'i == 0').value, false);
+  assert.equal(run.steps.at(-1).bfsLevelView.result, 7);
+  assert.ok(run.steps.at(-1).tree.nodes.some(node => node.label === '7' && node.sub === 'answer = 7'));
+});
+
 test('662 counts internal null slots with normalized complete-tree indices', () => {
   assert.equal(SUPPORTED[662].builder('1,3,2,5,3,null,9').answer, 4);
   assert.equal(SUPPORTED[662].builder('1,3,2,5,null,null,9,6,null,7').answer, 7);
@@ -52,6 +100,35 @@ test('662 counts internal null slots with normalized complete-tree indices', () 
   const widthFour = run.steps.find(step => step.bfsLevelView.rows.some(row => row.span === 4));
   assert.ok(widthFour);
   assert.match(widthFour.bfsLevelView.formula, /3 − 0 \+ 1 = 4/);
+});
+
+test('662 debugs raw positions, normalization, child indices, width, and best separately', () => {
+  const run = SUPPORTED[662].builder('1,3,2,5,3,null,9');
+  const events = run.steps.map(step => step.bfsLevelView.event);
+  for (const event of ['guard', 'init', 'while-check', 'lock-size', 'set-first', 'reset-last', 'loop', 'pop', 'normalize', 'set-last', 'enqueue-left', 'skip-left', 'enqueue-right', 'skip-right', 'width', 'compare-best', 'new-best', 'while-stop', 'done']) {
+    assert.ok(events.includes(event), event);
+  }
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'pop').length, 6);
+  assert.ok(run.steps.some(step => step.bfsLevelView.formula === 'pos = raw_pos − first = 3 − 0 = 3'));
+
+  const sparseChildren = run.steps.find(step => step.bfsLevelView.formula === 'right pos = 2 × 1 + 1 = 3');
+  assert.deepEqual(
+    sparseChildren.bfsLevelView.queue.map(item => [item.value, item.meta, item.role]),
+    [[5, 'pos 0', 'next-level'], [3, 'pos 1', 'next-level'], [9, 'pos 3', 'next-level']],
+  );
+  assert.ok(run.steps.some(step => step.bfsLevelView.formula === 'width = 3 − 0 + 1 = 4'));
+  assert.equal(run.steps.at(-1).vars.find(variable => variable.name === 'best').value, 4);
+
+  const narrowerLastLevel = SUPPORTED[662].builder('1,2,3,4');
+  const keepBest = narrowerLastLevel.steps.find(step => step.bfsLevelView.event === 'keep-best');
+  assert.equal(keepBest.bfsLevelView.formula, 'best = max(2, 1) = 2');
+  assert.equal(narrowerLastLevel.answer, 2);
+
+  const rightSpine = SUPPORTED[662].builder('1,null,2,null,3');
+  assert.ok(rightSpine.steps.some(step => step.bfsLevelView.formula === 'first = queue[0].pos = 1'));
+  assert.ok(rightSpine.steps.some(step => step.bfsLevelView.formula === 'pos = raw_pos − first = 1 − 1 = 0'));
+  assert.equal(rightSpine.answer, 1);
 });
 
 test('117 links sparse levels and terminates every chain with null', () => {
