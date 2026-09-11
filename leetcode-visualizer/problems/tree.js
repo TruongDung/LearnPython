@@ -5800,6 +5800,7 @@ module.exports = {
   102: {
     id: 102, difficulty: "medium", slug: "binary-tree-level-order-traversal",
     category: TREE_CAT,
+    tags: [{ key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" }],
     title: { vi: "Binary Tree Level Order Traversal", en: "Binary Tree Level Order Traversal" },
     titleVi: { vi: "Duyệt cây theo tầng (Level order)", en: "Level order traversal" },
     statement: { vi: "Cho root của cây nhị phân, trả về duyệt theo TẦNG (từ trái sang phải, mỗi tầng 1 mảng). Nhập level-order.", en: "Given the root of a binary tree, return its LEVEL ORDER traversal (left to right, one list per level). Enter as level-order." },
@@ -6055,6 +6056,7 @@ module.exports = {
   637: {
     id: 637, difficulty: "easy", slug: "average-of-levels-in-binary-tree",
     category: TREE_CAT,
+    tags: [{ key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" }],
     title: { vi: "Average of Levels in Binary Tree", en: "Average of Levels in Binary Tree" },
     titleVi: { vi: "Trung bình mỗi tầng", en: "Average of each level" },
     statement: { vi: "Cho root, trả về mảng trung bình giá trị các nút trên MỖI tầng (từ gốc xuống). Nhập level-order.", en: "Given root, return an array of the average value of the nodes on EACH level (top to bottom). Enter as level-order." },
@@ -6071,6 +6073,7 @@ module.exports = {
   199: {
     id: 199, difficulty: "medium", slug: "binary-tree-right-side-view",
     category: TREE_CAT,
+    tags: [{ key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" }],
     title: { vi: "Binary Tree Right Side View", en: "Binary Tree Right Side View" },
     titleVi: { vi: "Góc nhìn bên phải của cây", en: "Right side view of tree" },
     statement: { vi: "Cho root, tưởng tượng đứng bên PHẢI cây, trả về các nút nhìn thấy từ trên xuống dưới (nút phải nhất mỗi tầng). Nhập level-order.", en: "Given root, imagine standing on the RIGHT side, return the nodes you can see top to bottom (rightmost node of each level). Enter as level-order." },
@@ -6418,6 +6421,7 @@ module.exports = {
   116: {
     id: 116, difficulty: "medium", slug: "populating-next-right-pointers-in-each-node",
     category: TREE_CAT,
+    tags: [{ key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" }],
     title: { vi: "Populating Next Right Pointers in Each Node", en: "Populating Next Right Pointers in Each Node" },
     titleVi: { vi: "Nối con trỏ next mỗi tầng", en: "Populate next right pointers" },
     statement: { vi: "Cho cây nhị phân HOÀN HẢO, nối mỗi nút tới nút bên phải cùng tầng (next); nút phải nhất → null. Nhập level-order.", en: "Given a PERFECT binary tree, connect each node to its right neighbor on the same level (next); rightmost → null. Enter as level-order." },
@@ -6434,6 +6438,7 @@ module.exports = {
   103: {
     id: 103, difficulty: "medium", slug: "binary-tree-zigzag-level-order-traversal",
     category: TREE_CAT,
+    tags: [{ key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" }],
     title: { vi: "Binary Tree Zigzag Level Order Traversal", en: "Binary Tree Zigzag Level Order Traversal" },
     titleVi: { vi: "Duyệt tầng kiểu zigzag", en: "Zigzag level order" },
     statement: { vi: "Cho root, duyệt theo tầng nhưng đảo chiều xen kẽ (trái→phải, rồi phải→trái...). Nhập level-order.", en: "Given root, traverse by level but alternate direction (left→right, then right→left...). Enter as level-order." },
@@ -6808,8 +6813,6 @@ Object.assign(module.exports, {
     builder: buildSteps968,
   },
 });
-
-Object.assign(module.exports, require("./tree-bfs"));
 
 function parseAverageSubtreeInput(input, { maxValue = 1000, maxNodes = 31 } = {}) {
   const raw = Array.isArray(input)
@@ -8489,3 +8492,7 @@ Object.assign(module.exports, {
     builder: buildSteps951,
   },
 });
+
+// Keep the BFS / level-order family in a focused module while exposing every
+// entry through the existing Binary Tree catalog.
+Object.assign(module.exports, require("./tree-bfs"));

@@ -4,6 +4,8 @@
 
 const TREE_CAT = { key: "binary-tree", vi: "Cây nhị phân", en: "Binary Tree" };
 const BFS_TAG = { key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" };
+const HEAP_TAG = { key: "heap", vi: "Heap / Hàng đợi ưu tiên", en: "Heap / Priority Queue" };
+const SORTING_TAG = { key: "sorting", vi: "Sắp xếp", en: "Sorting" };
 
 function parseLevelTree(input) {
   const raw = Array.isArray(input)
@@ -414,8 +416,8 @@ function build2583(input, params) {
   if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer");
   if (!root) return { input, k, answer: -1, steps: [emptyResult(2583, "level-sums", root, -1, 3)] };
   const levels = levelsOf(root), steps = [introStep(2583, "level-sums", root,
-    { vi: "Cộng từng tầng, rồi xếp hạng các tổng", en: "Sum each level, then rank the sums" },
-    { vi: `BFS tạo một sum cho mỗi level. Sau đó sort giảm dần và lấy vị trí k=${k}.`, en: `BFS creates one sum per level. Then sort descending and take rank k=${k}.` })];
+    { vi: "Cộng từng tầng, giữ min-heap size k", en: "Sum each level, keep a size-k min-heap" },
+    { vi: `BFS tạo một sum cho mỗi level. Min-heap chỉ giữ k=${k} tổng lớn nhất đã gặp.`, en: `BFS creates one sum per level. The min-heap keeps only the k=${k} largest sums seen.` })];
   const rows = [], sums = [], done = new Set();
   levels.forEach((level, index) => {
     const sum = level.reduce((total, node) => total + node.val, 0); sums.push(sum); level.forEach((node) => done.add(node.id));
@@ -427,17 +429,31 @@ function build2583(input, params) {
       cards: [{ label: "level", value: index }, { label: "sum", value: sum }, { label: "all sums", value: `[${sums}]` }],
     }));
   });
-  const ranking = [...sums].sort((a, b) => b - a);
-  const answer = ranking.length >= k ? ranking[k - 1] : -1;
-  steps.push(makeStep({
-    problemId: 2583, mode: "level-sums", root, stage: 2, event: "rank", rows, done,
-    title: { vi: `Xếp hạng giảm dần: [${ranking}]`, en: `Descending ranking: [${ranking}]` },
-    note: ranking.length >= k ? { vi: `Phần tử thứ ${k} là ${answer}.`, en: `Rank ${k} is ${answer}.` } : { vi: `Chỉ có ${ranking.length} tầng, ít hơn k=${k}.`, en: `There are only ${ranking.length} levels, fewer than k=${k}.` },
-    codeLines: [12], cards: ranking.map((sum, index) => ({ label: `#${index + 1}`, value: sum, tone: index === k - 1 ? "success" : "neutral" })),
-  }));
+  const heap = [];
+  sums.forEach((sum) => {
+    heap.push(sum);
+    heap.sort((a, b) => a - b);
+    const removed = heap.length > k ? heap.shift() : null;
+    steps.push(makeStep({
+      problemId: 2583, mode: "level-sums", root, stage: 2, event: removed === null ? "heap-push" : "heap-trim", rows, done,
+      title: removed === null
+        ? { vi: `Push sum ${sum} vào min-heap`, en: `Push sum ${sum} into the min-heap` }
+        : { vi: `Heap vượt k: bỏ minimum ${removed}`, en: `Heap exceeded k: remove minimum ${removed}` },
+      note: removed === null
+        ? { vi: `Heap đang giữ ${heap.length}/${k} tổng lớn nhất đã gặp.`, en: `The heap currently keeps ${heap.length}/${k} largest sums seen.` }
+        : { vi: `Sau khi bỏ ${removed}, heap chỉ giữ k=${k} tổng lớn nhất: [${heap}].`, en: `After removing ${removed}, the heap keeps only the k=${k} largest sums: [${heap}].` },
+      codeLines: removed === null ? [15] : [16], formula: `min-heap (size ≤ ${k}) = [${heap}]`,
+      cards: [
+        { label: { vi: "SUM VỪA XÉT", en: "CURRENT SUM" }, value: sum },
+        { label: "min-heap", value: `[${heap}]`, tone: "warning" },
+        { label: { vi: "ĐÃ BỎ", en: "REMOVED" }, value: removed === null ? "—" : removed },
+      ],
+    }));
+  });
+  const answer = heap.length === k ? heap[0] : -1;
   steps.push(makeStep({ problemId: 2583, mode: "level-sums", root, stage: 3, event: "done", status: answer === -1 ? "danger" : "success", final: true, rows, done,
-    title: { vi: `Kết quả = ${answer}`, en: `Result = ${answer}` }, note: answer === -1 ? { vi: "Số tầng nhỏ hơn k nên trả -1.", en: "The tree has fewer than k levels, so return -1." } : { vi: `Tổng lớn thứ ${k} là ${answer}.`, en: `The ${k}-th largest level sum is ${answer}.` }, codeLines: [13],
-    cards: [{ label: "k", value: k }, { label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer === -1 ? "danger" : "success" }], result: answer }));
+    title: { vi: `Kết quả = ${answer}`, en: `Result = ${answer}` }, note: answer === -1 ? { vi: "Số tầng nhỏ hơn k nên trả -1.", en: "The tree has fewer than k levels, so return -1." } : { vi: `Heap giữ k tổng lớn nhất; minimum ${answer} chính là hạng ${k}.`, en: `The heap keeps the k largest sums; its minimum ${answer} is rank ${k}.` }, codeLines: [17],
+    cards: [{ label: "k", value: k }, { label: "min-heap", value: `[${heap}]` }, { label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer === -1 ? "danger" : "success" }], result: answer }));
   return { input, k, answer, steps };
 }
 
@@ -547,9 +563,9 @@ module.exports = {
 
   2583: base(2583, "medium", "kth-largest-sum-in-a-binary-tree", "Kth Largest Sum in a Binary Tree", { vi: "Tổng tầng lớn thứ k", en: "K-th largest level sum" },
     { vi: "Tính tổng mỗi tầng và trả về tổng lớn thứ k; nếu cây có ít hơn k tầng thì trả -1.", en: "Compute every level sum and return the k-th largest; return -1 when the tree has fewer than k levels." }, "5,8,9,2,1,3,7,4,6",
-    [{ vi: "BFS để lấy level sums, rồi sort giảm dần và chọn index k−1.", en: "Use BFS for level sums, then sort descending and choose index k−1." }],
-    { time: "O(n + h log h)", space: "O(w + h)", note: { vi: "h là số tầng và w là độ rộng lớn nhất.", en: "h is the number of levels and w is the maximum width." } },
-    ["class Solution:", "    def kthLargestLevelSum(self, root, k):", "        if not root: return -1", "        queue, sums = deque([root]), []", "        while queue:", "            total = 0", "            for _ in range(len(queue)):", "                node = queue.popleft()", "                total += node.val", "                if node.left: queue.append(node.left)", "                if node.right: queue.append(node.right)", "            sums.append(total)", "        sums.sort(reverse=True)", "        return sums[k - 1] if len(sums) >= k else -1"], build2583,
+    [{ vi: "BFS để lấy level sums; giữ min-heap tối đa k phần tử.", en: "Use BFS for level sums; keep a min-heap of at most k elements." }, { vi: "Sau cùng heap[0] là tổng lớn thứ k.", en: "At the end, heap[0] is the k-th largest sum." }],
+    { time: "O(n + h log k)", space: "O(w + k)", note: { vi: "h là số tầng và w là độ rộng lớn nhất.", en: "h is the number of levels and w is the maximum width." } },
+    ["class Solution:", "    def kthLargestLevelSum(self, root, k):", "        if not root: return -1", "        queue, sums = deque([root]), []", "        while queue:", "            total = 0", "            for _ in range(len(queue)):", "                node = queue.popleft()", "                total += node.val", "                if node.left: queue.append(node.left)", "                if node.right: queue.append(node.right)", "            sums.append(total)", "        heap = []", "        for total in sums:", "            heapq.heappush(heap, total)", "            if len(heap) > k: heapq.heappop(heap)", "        return heap[0] if len(heap) == k else -1"], build2583,
     [{ key: "k", type: "number", label: { vi: "Hạng k", en: "Rank k" }, min: 1, default: 2 }]),
 
   2641: base(2641, "medium", "cousins-in-binary-tree-ii", "Cousins in Binary Tree II", { vi: "Thay value bằng tổng các cousin", en: "Replace each value with its cousin sum" },
@@ -558,3 +574,6 @@ module.exports = {
     { time: "O(n)", space: "O(w)", note: { vi: "Hai lượt nhỏ trên mỗi tầng; mỗi node xử lý hằng số lần.", en: "Two small passes per level; each node is processed a constant number of times." } },
     ["class Solution:", "    def replaceValueInTree(self, root):", "        if not root: return root", "        root.val = 0", "        parents = [root]", "        while parents:", "            children = [child for p in parents for child in (p.left, p.right) if child]", "            level_sum = sum(child.val for child in children)", "            for parent in parents:", "                sibling_sum = sum(child.val for child in (parent.left, parent.right) if child)", "                for child in (parent.left, parent.right):", "                    if child: child.val = level_sum - sibling_sum", "            parents = children", "        return root"], build2641),
 };
+
+module.exports[2471].tags.push(SORTING_TAG);
+module.exports[2583].tags.push(HEAP_TAG);

@@ -82,12 +82,17 @@ test('2415 reverses values on odd levels only', () => {
 test('2471 visualizes each minimum swap and totals independent levels', () => {
   const run = SUPPORTED[2471].builder('1,4,3,7,6,8,5,null,null,null,null,9,null,10');
   assert.equal(run.answer, 3);
+  assert.ok(SUPPORTED[2471].tags.some(tag => tag.key === 'sorting'));
   assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'swap').length, 3);
   assert.equal(SUPPORTED[2471].builder('1,2,3,4,5,6').answer, 0);
 });
 
 test('2583 ranks all level sums and handles k beyond the tree height', () => {
-  assert.equal(SUPPORTED[2583].builder('5,8,9,2,1,3,7,4,6', { k: 2 }).answer, 13);
+  const run = SUPPORTED[2583].builder('5,8,9,2,1,3,7,4,6', { k: 2 });
+  assert.equal(run.answer, 13);
+  assert.ok(SUPPORTED[2583].tags.some(tag => tag.key === 'heap'));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'heap-trim'));
+  assert.deepEqual(run.steps.at(-1).bfsLevelView.result, 13);
   assert.equal(SUPPORTED[2583].builder('1,2,null,3', { k: 1 }).answer, 3);
   assert.equal(SUPPORTED[2583].builder('1,2,null,3', { k: 4 }).answer, -1);
   assert.throws(() => SUPPORTED[2583].builder('1', { k: 0 }), /positive integer/);

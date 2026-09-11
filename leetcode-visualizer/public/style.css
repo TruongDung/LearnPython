@@ -18630,7 +18630,7 @@ button:disabled {
 
 .bl-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(330px, 1.05fr);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   border: 1px solid rgba(100, 116, 139, 0.34);
   border-radius: 10px;
@@ -18640,7 +18640,7 @@ button:disabled {
 
 .bl-tree-panel,
 .bl-board { display: grid; align-content: start; min-width: 0; padding: 12px; }
-.bl-board { border-left: 1px solid rgba(100, 116, 139, 0.3); }
+.bl-board { border-top: 1px solid rgba(100, 116, 139, 0.3); }
 .bl-tree-panel > header,
 .bl-board > header,
 .bl-queue > header {
@@ -18658,7 +18658,7 @@ button:disabled {
 .bl-board > header span,
 .bl-queue > header span { text-align: right; }
 .bl-tree { display: flex; min-height: 250px; align-items: center; justify-content: center; min-width: 0; overflow-x: auto; }
-.bl-tree .tree-svg { display: block; width: 100%; max-width: 520px; height: auto; }
+.bl-tree .tree-svg { display: block; width: 100%; max-width: 620px; height: auto; }
 .bl-tree-empty { color: #64748b; font-size: 36px; }
 
 .bl-rows { display: grid; gap: 8px; min-width: 0; }
@@ -18786,11 +18786,6 @@ button:disabled {
 [data-theme="light"] .bl-cards strong { color: #0f172a; }
 [data-theme="light"] .bl-board { border-color: #cbd5e1; }
 [data-theme="light"] .bl-transform b { color: #334155; }
-
-@media (max-width: 880px) {
-  .bl-layout { grid-template-columns: 1fr; }
-  .bl-board { border-top: 1px solid rgba(100, 116, 139, 0.3); border-left: 0; }
-}
 
 @media (max-width: 620px) {
   .bl-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
