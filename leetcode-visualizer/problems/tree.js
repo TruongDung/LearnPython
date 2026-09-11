@@ -5671,7 +5671,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 1120, 1973, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 1120, 1973, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -7834,5 +7834,656 @@ Object.assign(module.exports, {
       "        return order",
     ],
     builder: buildSteps1600,
+  },
+});
+
+// ─── Tree essentials: shared, readable traces for #257/#404/#617/#572/#965/#872/#951 ───
+function parseTreeEssentialsInput(input, { allowEmpty = false, minValue = -10000, maxValue = 10000, maxNodes = 31 } = {}) {
+  const rawText = Array.isArray(input) ? null : String(input ?? "").trim();
+  if (!Array.isArray(input) && (rawText === "" || rawText === "[]" || rawText.toLowerCase() === "null")) {
+    if (allowEmpty) return null;
+    throw new Error("Enter a non-empty binary tree");
+  }
+  const raw = Array.isArray(input)
+    ? [...input]
+    : rawText.replace(/^\[|\]$/g, "").split(",").map((item) => item.trim());
+  const values = raw.map((item) => {
+    if (item === null || String(item).trim().toLowerCase() === "null" || String(item).trim() === "") return null;
+    const value = Number(item);
+    if (!Number.isInteger(value) || value < minValue || value > maxValue) {
+      throw new Error(`Tree values must be integers from ${minValue} to ${maxValue}, or null`);
+    }
+    return value;
+  });
+  if (!values.length || values[0] === null) {
+    if (allowEmpty && values.slice(1).every((value) => value === null)) return null;
+    throw new Error("The root must be an integer");
+  }
+  if (values.filter((value) => value !== null).length > maxNodes) {
+    throw new Error(`Visualization supports up to ${maxNodes} nodes per tree`);
+  }
+
+  let nextId = 0;
+  const root = { id: nextId++, val: values[0], left: null, right: null };
+  const queue = [root];
+  let index = 1;
+  while (queue.length && index < values.length) {
+    const parent = queue.shift();
+    const leftValue = values[index++];
+    if (leftValue !== undefined && leftValue !== null) {
+      parent.left = { id: nextId++, val: leftValue, left: null, right: null };
+      queue.push(parent.left);
+    }
+    if (index >= values.length) break;
+    const rightValue = values[index++];
+    if (rightValue !== null) {
+      parent.right = { id: nextId++, val: rightValue, left: null, right: null };
+      queue.push(parent.right);
+    }
+  }
+  if (values.slice(index).some((value) => value !== null)) {
+    throw new Error("Invalid level-order tree: a value has no parent");
+  }
+  return root;
+}
+
+function serializeTreeEssentials(root) {
+  if (!root) return [];
+  const values = [];
+  const queue = [root];
+  while (queue.length) {
+    const node = queue.shift();
+    if (!node) {
+      values.push(null);
+      continue;
+    }
+    values.push(node.val);
+    queue.push(node.left, node.right);
+  }
+  while (values.length && values[values.length - 1] === null) values.pop();
+  return values;
+}
+
+function treeEssentialsState(root, { active = [], done = [], bad = [], annotations = {} } = {}) {
+  const toIds = (items) => new Set([...items].map((item) => (item && typeof item === "object" ? item.id : item)));
+  const activeIds = toIds(active);
+  const doneIds = toIds(done);
+  const badIds = toIds(bad);
+  const nodes = treeToVizNodes(root, activeIds, doneIds);
+  nodes.forEach((node) => {
+    if (badIds.has(node.id)) node.isPruned = true;
+  });
+  return { nodes, annotations: { ...annotations }, showLevels: false };
+}
+
+function treeEssentialsStep({
+  problemId, mode, stages, stage, event, title, note, codeLines, panels, cards = [], sequences = [], status = "checking", statusText, final = false,
+}) {
+  return {
+    title,
+    arr: [],
+    treeEssentialsView: {
+      problemId, mode, stages, stage, event, panels, cards, sequences, status, statusText,
+    },
+    highlight: [],
+    mark: [],
+    codeLines: codeLines || [],
+    vars: cards.map((card) => ({ name: card.label && card.label.en ? card.label.en : card.label, value: card.value })),
+    note,
+    final,
+  };
+}
+
+function buildSteps257(input) {
+  const root = parseTreeEssentialsInput(input, { minValue: -100, maxValue: 100 });
+  const steps = [];
+  const path = [];
+  const pathNodes = [];
+  const completed = [];
+  const visited = new Set();
+  const stages = [
+    { vi: "Mở path", en: "Start path" }, { vi: "Đi DFS", en: "Walk DFS" },
+    { vi: "Gặp leaf: lưu", en: "Leaf: save" }, { vi: "Backtrack", en: "Backtrack" },
+  ];
+  const panels = (active = null) => [{
+    label: { vi: "CÂY VÀ ĐƯỜNG ĐANG ĐI", en: "TREE AND ACTIVE PATH" },
+    caption: { vi: "xanh = path hiện tại · cam = node hiện tại", en: "green = active path · amber = current node" },
+    tree: treeEssentialsState(root, { active: active ? [active] : [], done: pathNodes }),
+  }];
+  const sequences = () => [
+    { label: { vi: "path hiện tại", en: "current path" }, values: [...path], tone: "active" },
+    { label: { vi: "paths đã lưu", en: "saved paths" }, values: completed.map((item) => item.join(" → ")), tone: "done" },
+  ];
+  steps.push(treeEssentialsStep({
+    problemId: 257, mode: "paths", stages, stage: 0, event: "intro", panels: panels(), sequences: sequences(),
+    title: { vi: "Mỗi lần DFS giữ một path từ root", en: "DFS carries one path from the root" }, codeLines: [3, 4],
+    cards: [{ label: { vi: "QUY TẮC LƯU", en: "SAVE RULE" }, value: "node is leaf", detail: { vi: "chỉ node không có cả hai con", en: "only a node with no children" } }],
+    note: { vi: "Thêm node khi đi xuống; chỉ lưu path khi chạm lá; sau đó pop để thử nhánh khác.", en: "Append while descending; save only at a leaf; then pop to explore another branch." },
+  }));
+  function dfs(node) {
+    if (!node) return;
+    path.push(node.val);
+    pathNodes.push(node);
+    steps.push(treeEssentialsStep({
+      problemId: 257, mode: "paths", stages, stage: 1, event: "visit", panels: panels(node), sequences: sequences(),
+      title: { vi: `Thêm ${node.val} vào path`, en: `Append ${node.val} to path` }, codeLines: [5],
+      cards: [{ label: { vi: "NODE", en: "NODE" }, value: node.val }, { label: { vi: "ĐỘ DÀI PATH", en: "PATH LENGTH" }, value: path.length }],
+      note: { vi: `Path hiện tại là ${path.join(" → ")}.`, en: `The current path is ${path.join(" → ")}.` },
+    }));
+    if (!node.left && !node.right) {
+      completed.push([...path]);
+      visited.add(node.id);
+      steps.push(treeEssentialsStep({
+        problemId: 257, mode: "paths", stages, stage: 2, event: "save", panels: panels(node), sequences: sequences(), status: "match",
+        statusText: { vi: "Đã lưu một root-to-leaf path", en: "Saved one root-to-leaf path" },
+        title: { vi: `Leaf ${node.val} → lưu path`, en: `Leaf ${node.val} → save path` }, codeLines: [6, 7],
+        cards: [{ label: { vi: "PATH MỚI", en: "NEW PATH" }, value: path.join(" → "), tone: "success" }, { label: { vi: "TỔNG PATHS", en: "PATH COUNT" }, value: completed.length }],
+        note: { vi: "Đây là leaf nên path từ root tới node này là một đáp án hoàn chỉnh.", en: "This is a leaf, so the path from root to this node is a complete answer." },
+      }));
+    } else {
+      dfs(node.left);
+      dfs(node.right);
+    }
+    path.pop();
+    pathNodes.pop();
+    visited.add(node.id);
+    steps.push(treeEssentialsStep({
+      problemId: 257, mode: "paths", stages, stage: 3, event: "backtrack", panels: panels(path.length ? null : node), sequences: sequences(),
+      title: { vi: `Rời ${node.val} → pop khỏi path`, en: `Leave ${node.val} → pop from path` }, codeLines: [11],
+      cards: [{ label: { vi: "ĐÃ POP", en: "POPPED" }, value: node.val }, { label: { vi: "QUAY LẠI PATH", en: "RESTORED PATH" }, value: path.length ? path.join(" → ") : "∅" }],
+      note: { vi: "Backtrack khôi phục path đúng cho nhánh kế tiếp.", en: "Backtracking restores the correct path for the next branch." },
+    }));
+  }
+  dfs(root);
+  steps.push(treeEssentialsStep({
+    problemId: 257, mode: "paths", stages, stage: 3, event: "done",
+    panels: [{ label: { vi: "MỌI ROOT-TO-LEAF PATH", en: "ALL ROOT-TO-LEAF PATHS" }, caption: { vi: "tất cả node đã được duyệt", en: "every node has been visited" }, tree: treeEssentialsState(root, { done: visited }) }],
+    sequences: sequences(), status: "match", statusText: { vi: "Hoàn tất", en: "Complete" }, final: true,
+    title: { vi: `Tìm được ${completed.length} path`, en: `Found ${completed.length} path(s)` }, codeLines: [13],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: JSON.stringify(completed.map((item) => item.join("->"))), tone: "success" }],
+    note: { vi: "Mỗi path kết thúc đúng tại một leaf.", en: "Every saved path ends at exactly one leaf." },
+  }));
+  return { input, answer: completed.map((item) => item.join("->")), steps };
+}
+
+function buildSteps404(input) {
+  const root = parseTreeEssentialsInput(input, { minValue: -1000, maxValue: 1000 });
+  const steps = [];
+  const checked = new Set();
+  const leftLeaves = new Set();
+  let total = 0;
+  const stages = [
+    { vi: "Duyệt DFS", en: "Walk DFS" }, { vi: "Kiểm tra leaf", en: "Check leaf" },
+    { vi: "Cộng left leaf", en: "Add left leaf" }, { vi: "Kết quả", en: "Result" },
+  ];
+  const makePanels = (active = null, bad = []) => [{
+    label: { vi: "LEFT LEAF NẰM Ở ĐÂU?", en: "WHERE ARE THE LEFT LEAVES?" },
+    caption: { vi: "phải vừa là con trái, vừa không có con", en: "must be a left child and have no children" },
+    tree: treeEssentialsState(root, { active: active ? [active] : [], done: leftLeaves, bad }),
+  }];
+  const makeSequences = () => [{ label: { vi: "left leaves đã tìm", en: "left leaves found" }, values: [...leftLeaves].map((id) => {
+    let found = null;
+    (function find(node) { if (!node || found) return; if (node.id === id) found = node.val; else { find(node.left); find(node.right); } })(root);
+    return found;
+  }), tone: "done" }];
+  steps.push(treeEssentialsStep({
+    problemId: 404, mode: "left-leaves", stages, stage: 0, event: "intro", panels: makePanels(), sequences: makeSequences(),
+    title: { vi: "Mang theo hướng đi vào node", en: "Carry the incoming side" }, codeLines: [3],
+    cards: [{ label: { vi: "ĐIỀU KIỆN", en: "CONDITION" }, value: "is_left AND is_leaf" }, { label: { vi: "SUM", en: "SUM" }, value: total }],
+    note: { vi: "Một leaf ở bên phải không được cộng; node bên trái nhưng còn con cũng không được cộng.", en: "A right leaf does not count; a left child with children does not count either." },
+  }));
+  function dfs(node, isLeft) {
+    if (!node) return;
+    const isLeaf = !node.left && !node.right;
+    const qualifies = isLeft && isLeaf;
+    steps.push(treeEssentialsStep({
+      problemId: 404, mode: "left-leaves", stages, stage: isLeaf ? 1 : 0, event: "check", panels: makePanels(node, isLeaf && !qualifies ? [node] : []), sequences: makeSequences(),
+      title: { vi: `Node ${node.val}: ${isLeft ? "con trái" : "không phải con trái"}${isLeaf ? " + leaf" : " + còn con"}`, en: `Node ${node.val}: ${isLeft ? "left child" : "not a left child"}${isLeaf ? " + leaf" : " + has children"}` },
+      codeLines: [6], status: qualifies ? "match" : isLeaf ? "mismatch" : "checking",
+      statusText: qualifies ? { vi: "Đây là left leaf", en: "This is a left leaf" } : isLeaf ? { vi: "Leaf nhưng không nằm bên trái", en: "A leaf, but not on the left" } : { vi: "Tiếp tục xuống các con", en: "Continue to its children" },
+      cards: [
+        { label: { vi: "is_left", en: "is_left" }, value: isLeft }, { label: { vi: "is_leaf", en: "is_leaf" }, value: isLeaf },
+        { label: { vi: "ĐÓNG GÓP", en: "CONTRIBUTION" }, value: qualifies ? `+${node.val}` : "+0", tone: qualifies ? "success" : "neutral" },
+      ],
+      note: qualifies
+        ? { vi: `Node ${node.val} thỏa cả hai điều kiện nên được cộng.`, en: `Node ${node.val} satisfies both conditions, so add it.` }
+        : { vi: "Thiếu ít nhất một điều kiện nên đóng góp 0.", en: "At least one condition is missing, so the contribution is 0." },
+    }));
+    if (qualifies) {
+      total += node.val;
+      leftLeaves.add(node.id);
+      checked.add(node.id);
+      steps.push(treeEssentialsStep({
+        problemId: 404, mode: "left-leaves", stages, stage: 2, event: "add", panels: makePanels(node), sequences: makeSequences(), status: "match",
+        title: { vi: `Cộng ${node.val} vào tổng`, en: `Add ${node.val} to the sum` }, codeLines: [7],
+        cards: [{ label: { vi: "PHÉP CỘNG", en: "ADDITION" }, value: `${total - node.val} + ${node.val} = ${total}`, tone: "success" }],
+        note: { vi: `Tổng left leaves hiện tại là ${total}.`, en: `The running left-leaf sum is now ${total}.` },
+      }));
+    }
+    checked.add(node.id);
+    dfs(node.left, true);
+    dfs(node.right, false);
+  }
+  dfs(root, false);
+  steps.push(treeEssentialsStep({
+    problemId: 404, mode: "left-leaves", stages, stage: 3, event: "done", panels: makePanels(), sequences: makeSequences(), status: "match", statusText: { vi: "Hoàn tất", en: "Complete" }, final: true,
+    title: { vi: `Tổng các left leaves = ${total}`, en: `Sum of left leaves = ${total}` }, codeLines: [10],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: total, tone: "success" }],
+    note: { vi: "Chỉ các leaf là con trái trực tiếp của cha mới xuất hiện trong tổng.", en: "Only leaves that are a parent's direct left child appear in the sum." },
+  }));
+  return { input, answer: total, steps };
+}
+
+function buildSteps617(input, params) {
+  const root1 = parseTreeEssentialsInput(input, { allowEmpty: true });
+  const root2 = parseTreeEssentialsInput(params?.root2 ?? "", { allowEmpty: true });
+  const steps = [];
+  const done1 = new Set(), done2 = new Set(), doneResult = new Set();
+  let resultRoot = null;
+  let nextId = 0;
+  const stages = [
+    { vi: "Ghép cặp node", en: "Pair nodes" }, { vi: "Cộng / lấy node", en: "Add / take node" },
+    { vi: "Ghép hai nhánh", en: "Merge children" }, { vi: "Cây kết quả", en: "Result tree" },
+  ];
+  const panels = (a = null, b = null, result = null) => [
+    { label: "root1", caption: { vi: "cây thứ nhất", en: "first tree" }, tree: treeEssentialsState(root1, { active: a ? [a] : [], done: done1 }) },
+    { label: "root2", caption: { vi: "cây thứ hai", en: "second tree" }, tree: treeEssentialsState(root2, { active: b ? [b] : [], done: done2 }) },
+    { label: { vi: "MERGED", en: "MERGED" }, caption: { vi: "được tạo dần", en: "built step by step" }, tree: treeEssentialsState(resultRoot, { active: result ? [result] : [], done: doneResult }) },
+  ];
+  steps.push(treeEssentialsStep({
+    problemId: 617, mode: "merge", stages, stage: 0, event: "intro", panels: panels(),
+    title: { vi: "Đặt hai cây chồng lên nhau", en: "Overlay the two trees" }, codeLines: [3, 5],
+    cards: [{ label: { vi: "QUY TẮC", en: "RULE" }, value: "a + b" }, { label: { vi: "NẾU MỘT BÊN NULL", en: "IF ONE SIDE IS NULL" }, value: "0 + value" }],
+    note: { vi: "Hai node cùng vị trí được cộng; nếu chỉ một node tồn tại thì giữ giá trị node đó.", en: "Add overlapping nodes; if only one node exists, keep that node's value." },
+  }));
+  function merge(a, b, path, parent = null, side = null) {
+    if (!a && !b) return null;
+    const leftValue = a ? a.val : 0;
+    const rightValue = b ? b.val : 0;
+    const node = { id: nextId++, val: leftValue + rightValue, left: null, right: null };
+    if (parent && side) parent[side] = node;
+    else resultRoot = node;
+    if (a) done1.add(a.id);
+    if (b) done2.add(b.id);
+    steps.push(treeEssentialsStep({
+      problemId: 617, mode: "merge", stages, stage: 1, event: "combine", panels: panels(a, b, node), status: "match",
+      title: { vi: `Vị trí ${path}: ${leftValue} + ${rightValue} = ${node.val}`, en: `At ${path}: ${leftValue} + ${rightValue} = ${node.val}` }, codeLines: [6],
+      cards: [{ label: { vi: "VỊ TRÍ", en: "PATH" }, value: path }, { label: { vi: "PHÉP GHÉP", en: "MERGE" }, value: `${leftValue} + ${rightValue} = ${node.val}`, tone: "success" }],
+      note: { vi: "Tạo node kết quả trước, rồi đệ quy ghép con trái và con phải.", en: "Create the result node first, then recursively merge its left and right children." },
+    }));
+    node.left = merge(a && a.left, b && b.left, `${path}.left`, node, "left");
+    node.right = merge(a && a.right, b && b.right, `${path}.right`, node, "right");
+    doneResult.add(node.id);
+    steps.push(treeEssentialsStep({
+      problemId: 617, mode: "merge", stages, stage: 2, event: "return", panels: panels(null, null, node), status: "match",
+      title: { vi: `Subtree ${path} đã ghép xong`, en: `Merged subtree ${path}` }, codeLines: [7, 8, 9],
+      cards: [{ label: { vi: "NODE TRẢ VỀ", en: "RETURN NODE" }, value: node.val }, { label: { vi: "SUBTREE", en: "SUBTREE" }, value: JSON.stringify(serializeTreeEssentials(node)) }],
+      note: { vi: "Cả hai nhánh con đã sẵn sàng; trả node này lên lời gọi cha.", en: "Both child branches are ready; return this node to its parent call." },
+    }));
+    return node;
+  }
+  resultRoot = merge(root1, root2, "root");
+  const answer = serializeTreeEssentials(resultRoot);
+  steps.push(treeEssentialsStep({
+    problemId: 617, mode: "merge", stages, stage: 3, event: "done", panels: panels(), status: "match", statusText: { vi: "Cây mới hoàn tất", en: "New tree complete" }, final: true,
+    title: { vi: "Hoàn tất cây merged", en: "Merged tree complete" }, codeLines: [10],
+    cards: [{ label: { vi: "ĐÁP ÁN LEVEL-ORDER", en: "LEVEL-ORDER ANSWER" }, value: JSON.stringify(answer), tone: "success" }],
+    note: { vi: "Mỗi vị trí trong cây kết quả là tổng của hai node chồng lên nhau, coi null là 0.", en: "Every result position is the sum of the overlapping nodes, treating null as 0." },
+  }));
+  return { input, root2: params?.root2, answer, steps };
+}
+
+function buildSteps572(input, params) {
+  const root = parseTreeEssentialsInput(input);
+  const subRoot = parseTreeEssentialsInput(params?.subRoot ?? "");
+  const candidates = [];
+  (function preorder(node) { if (!node) return; candidates.push(node); preorder(node.left); preorder(node.right); })(root);
+  const steps = [];
+  const rejected = new Set();
+  let attemptRoot = null;
+  let matchedA = new Set(), matchedB = new Set(), badA = new Set(), badB = new Set();
+  let found = false;
+  const stages = [
+    { vi: "Chọn candidate", en: "Choose candidate" }, { vi: "So cấu trúc", en: "Compare shape" },
+    { vi: "So giá trị", en: "Compare values" }, { vi: "Kết luận", en: "Conclusion" },
+  ];
+  const panels = (a = null, b = null) => [
+    { label: { vi: "ROOT · thử từng node", en: "ROOT · TRY EACH NODE" }, caption: { vi: "đỏ = candidate đã loại", en: "red = rejected candidate" }, tree: treeEssentialsState(root, { active: a ? [a] : attemptRoot ? [attemptRoot] : [], done: matchedA, bad: new Set([...rejected, ...badA]) }) },
+    { label: "subRoot", caption: { vi: "phải khớp toàn bộ", en: "must match completely" }, tree: treeEssentialsState(subRoot, { active: b ? [b] : [], done: matchedB, bad: badB }) },
+  ];
+  steps.push(treeEssentialsStep({
+    problemId: 572, mode: "subtree", stages, stage: 0, event: "intro", panels: panels(),
+    title: { vi: "Mỗi node của root là một candidate", en: "Every root node is a candidate" }, codeLines: [3, 4],
+    cards: [{ label: { vi: "BƯỚC 1", en: "STEP 1" }, value: "scan root" }, { label: { vi: "BƯỚC 2", en: "STEP 2" }, value: "sameTree(candidate, subRoot)" }],
+    note: { vi: "Chỉ candidate có cùng giá trị gốc mới có cơ hội; sau đó toàn bộ cấu trúc và giá trị phải khớp.", en: "Only a candidate with the same root value can work; then every shape and value must match." },
+  }));
+  function sameTree(a, b, path) {
+    if (!a && !b) return true;
+    if (!a || !b) {
+      if (a) badA.add(a.id);
+      if (b) badB.add(b.id);
+      steps.push(treeEssentialsStep({
+        problemId: 572, mode: "subtree", stages, stage: 1, event: "shape-mismatch", panels: panels(a, b), status: "mismatch",
+        title: { vi: `Khác cấu trúc tại ${path}`, en: `Shape mismatch at ${path}` }, codeLines: [9, 10],
+        cards: [{ label: "root", value: a ? a.val : "None" }, { label: "subRoot", value: b ? b.val : "None" }, { label: { vi: "KẾT QUẢ CẶP", en: "PAIR RESULT" }, value: false, tone: "danger" }],
+        note: { vi: "Một bên có node còn bên kia là None nên hai subtree không thể giống nhau.", en: "One side has a node while the other is None, so the subtrees cannot match." },
+      }));
+      return false;
+    }
+    if (a.val !== b.val) {
+      badA.add(a.id); badB.add(b.id);
+      steps.push(treeEssentialsStep({
+        problemId: 572, mode: "subtree", stages, stage: 2, event: "value-mismatch", panels: panels(a, b), status: "mismatch",
+        title: { vi: `${a.val} ≠ ${b.val} tại ${path}`, en: `${a.val} ≠ ${b.val} at ${path}` }, codeLines: [11, 12],
+        cards: [{ label: "root", value: a.val }, { label: "subRoot", value: b.val }, { label: { vi: "SO SÁNH", en: "COMPARE" }, value: `${a.val} ≠ ${b.val}`, tone: "danger" }],
+        note: { vi: "Giá trị khác nhau nên loại candidate hiện tại.", en: "Different values reject the current candidate." },
+      }));
+      return false;
+    }
+    matchedA.add(a.id); matchedB.add(b.id);
+    steps.push(treeEssentialsStep({
+      problemId: 572, mode: "subtree", stages, stage: 2, event: "match", panels: panels(a, b), status: "match",
+      title: { vi: `${a.val} = ${b.val} tại ${path}`, en: `${a.val} = ${b.val} at ${path}` }, codeLines: [11, 13],
+      cards: [{ label: { vi: "VỊ TRÍ TƯƠNG ĐỐI", en: "RELATIVE PATH" }, value: path }, { label: { vi: "SO SÁNH", en: "COMPARE" }, value: `${a.val} = ${b.val}`, tone: "success" }],
+      note: { vi: "Cặp này khớp; tiếp tục so cả nhánh trái và nhánh phải.", en: "This pair matches; continue with both left and right branches." },
+    }));
+    return sameTree(a.left, b.left, `${path}.left`) && sameTree(a.right, b.right, `${path}.right`);
+  }
+  for (const candidate of candidates) {
+    attemptRoot = candidate;
+    matchedA = new Set(); matchedB = new Set(); badA = new Set(); badB = new Set();
+    steps.push(treeEssentialsStep({
+      problemId: 572, mode: "subtree", stages, stage: 0, event: "candidate", panels: panels(candidate, subRoot),
+      title: { vi: `Thử candidate ${candidate.val}`, en: `Try candidate ${candidate.val}` }, codeLines: [4, 5],
+      cards: [{ label: { vi: "CANDIDATE", en: "CANDIDATE" }, value: candidate.val }, { label: { vi: "GỐC CẦN KHỚP", en: "TARGET ROOT" }, value: subRoot.val }],
+      note: { vi: "Gọi sameTree từ candidate này với toàn bộ subRoot.", en: "Call sameTree from this candidate against the entire subRoot." },
+    }));
+    if (sameTree(candidate, subRoot, "root")) { found = true; break; }
+    rejected.add(candidate.id);
+  }
+  steps.push(treeEssentialsStep({
+    problemId: 572, mode: "subtree", stages, stage: 3, event: "done", panels: panels(found ? attemptRoot : null, found ? subRoot : null), status: found ? "match" : "mismatch",
+    statusText: found ? { vi: "Tìm thấy subtree", en: "Subtree found" } : { vi: "Không có candidate nào khớp", en: "No candidate matched" }, final: true,
+    title: { vi: `Kết quả: ${found}`, en: `Result: ${found}` }, codeLines: [6],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: found, tone: found ? "success" : "danger" }, { label: { vi: "CANDIDATES ĐÃ THỬ", en: "CANDIDATES TRIED" }, value: found ? rejected.size + 1 : rejected.size }],
+    note: found
+      ? { vi: "Một candidate khớp toàn bộ cấu trúc và giá trị của subRoot.", en: "One candidate matches the complete structure and values of subRoot." }
+      : { vi: "Mọi candidate đều sai cấu trúc hoặc sai ít nhất một giá trị.", en: "Every candidate has a shape mismatch or at least one different value." },
+  }));
+  return { input, subRoot: params?.subRoot, answer: found, steps };
+}
+
+function buildSteps965(input) {
+  const root = parseTreeEssentialsInput(input, { minValue: 0, maxValue: 99 });
+  const steps = [];
+  const checked = new Set();
+  const bad = new Set();
+  const target = root.val;
+  let answer = true;
+  const stages = [
+    { vi: "Chọn giá trị gốc", en: "Choose root value" }, { vi: "Duyệt từng node", en: "Check each node" },
+    { vi: "Dừng khi khác", en: "Stop on mismatch" }, { vi: "Kết luận", en: "Conclusion" },
+  ];
+  const panels = (active = null) => [{
+    label: { vi: `MỌI NODE PHẢI BẰNG ${target}`, en: `EVERY NODE MUST EQUAL ${target}` },
+    caption: { vi: "xanh = đã khớp · đỏ = khác", en: "green = matched · red = different" },
+    tree: treeEssentialsState(root, { active: active ? [active] : [], done: checked, bad }),
+  }];
+  steps.push(treeEssentialsStep({
+    problemId: 965, mode: "unival", stages, stage: 0, event: "intro", panels: panels(),
+    title: { vi: `Dùng giá trị root ${target} làm chuẩn`, en: `Use root value ${target} as the target` }, codeLines: [3],
+    cards: [{ label: { vi: "TARGET", en: "TARGET" }, value: target }, { label: { vi: "QUY TẮC", en: "RULE" }, value: "node.val == target" }],
+    note: { vi: "Chỉ cần gặp một node khác target là có thể trả False ngay.", en: "The first node different from target lets us return False immediately." },
+  }));
+  function dfs(node) {
+    if (!node || !answer) return;
+    const match = node.val === target;
+    if (match) checked.add(node.id); else { bad.add(node.id); answer = false; }
+    steps.push(treeEssentialsStep({
+      problemId: 965, mode: "unival", stages, stage: match ? 1 : 2, event: match ? "match" : "mismatch", panels: panels(node), status: match ? "match" : "mismatch",
+      title: { vi: `${node.val} ${match ? "=" : "≠"} ${target}`, en: `${node.val} ${match ? "=" : "≠"} ${target}` }, codeLines: match ? [7, 9] : [7, 8],
+      cards: [{ label: { vi: "NODE", en: "NODE" }, value: node.val }, { label: { vi: "TARGET", en: "TARGET" }, value: target }, { label: { vi: "KẾT QUẢ", en: "RESULT" }, value: match, tone: match ? "success" : "danger" }],
+      note: match
+        ? { vi: "Node này khớp; tiếp tục DFS.", en: "This node matches; keep walking." }
+        : { vi: "Node khác giá trị gốc nên cây không phải uni-valued; dừng sớm.", en: "This node differs from the root value, so the tree is not uni-valued; stop early." },
+    }));
+    dfs(node.left);
+    dfs(node.right);
+  }
+  dfs(root);
+  steps.push(treeEssentialsStep({
+    problemId: 965, mode: "unival", stages, stage: 3, event: "done", panels: panels(), status: answer ? "match" : "mismatch", final: true,
+    statusText: answer ? { vi: "Mọi node đều giống nhau", en: "Every node has the same value" } : { vi: "Có node khác target", en: "A node differs from target" },
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` }, codeLines: [8],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer ? "success" : "danger" }, { label: { vi: "NODE ĐÃ KIỂM TRA", en: "NODES CHECKED" }, value: checked.size + bad.size }],
+    note: answer
+      ? { vi: `Tất cả node đều có giá trị ${target}.`, en: `Every node has value ${target}.` }
+      : { vi: "DFS dừng ngay tại mismatch đầu tiên.", en: "DFS stopped at the first mismatch." },
+  }));
+  return { input, answer, steps };
+}
+
+function buildSteps872(input, params) {
+  const root1 = parseTreeEssentialsInput(input, { minValue: 0, maxValue: 200 });
+  const root2 = parseTreeEssentialsInput(params?.root2 ?? "", { minValue: 0, maxValue: 200 });
+  const steps = [];
+  const leaves1 = [], leaves2 = [];
+  const visited1 = new Set(), visited2 = new Set();
+  let current1 = null, current2 = null;
+  const stages = [
+    { vi: "Lấy leaves cây 1", en: "Collect tree 1" }, { vi: "Lấy leaves cây 2", en: "Collect tree 2" },
+    { vi: "So sequence", en: "Compare sequences" }, { vi: "Kết luận", en: "Conclusion" },
+  ];
+  const panels = () => [
+    { label: "root1", caption: { vi: "đọc leaf từ trái sang phải", en: "read leaves left to right" }, tree: treeEssentialsState(root1, { active: current1 ? [current1] : [], done: visited1 }) },
+    { label: "root2", caption: { vi: "đọc leaf từ trái sang phải", en: "read leaves left to right" }, tree: treeEssentialsState(root2, { active: current2 ? [current2] : [], done: visited2 }) },
+  ];
+  const sequences = (activeIndex = null) => [
+    { label: { vi: "leaf sequence 1", en: "leaf sequence 1" }, values: [...leaves1], activeIndex, tone: "first" },
+    { label: { vi: "leaf sequence 2", en: "leaf sequence 2" }, values: [...leaves2], activeIndex, tone: "second" },
+  ];
+  steps.push(treeEssentialsStep({
+    problemId: 872, mode: "leaf-sequence", stages, stage: 0, event: "intro", panels: panels(), sequences: sequences(),
+    title: { vi: "Chỉ ghi lại leaf, theo thứ tự trái → phải", en: "Record only leaves, from left → right" }, codeLines: [3, 4],
+    cards: [{ label: { vi: "BỎ QUA", en: "IGNORE" }, value: "internal nodes" }, { label: { vi: "SO SÁNH", en: "COMPARE" }, value: "leaf sequence 1 == 2" }],
+    note: { vi: "Hình dạng hai cây có thể khác; chỉ dãy giá trị tại lá cần giống hệt nhau.", en: "The tree shapes may differ; only their leaf-value sequences must be identical." },
+  }));
+  function collect(node, which) {
+    if (!node) return;
+    if (which === 1) current1 = node; else current2 = node;
+    const leaves = which === 1 ? leaves1 : leaves2;
+    const visited = which === 1 ? visited1 : visited2;
+    const isLeaf = !node.left && !node.right;
+    if (isLeaf) leaves.push(node.val);
+    steps.push(treeEssentialsStep({
+      problemId: 872, mode: "leaf-sequence", stages, stage: which - 1, event: isLeaf ? "leaf" : "walk", panels: panels(), sequences: sequences(), status: isLeaf ? "match" : "checking",
+      title: isLeaf ? { vi: `Cây ${which}: gặp leaf ${node.val}`, en: `Tree ${which}: found leaf ${node.val}` } : { vi: `Cây ${which}: đi qua node ${node.val}`, en: `Tree ${which}: walk through node ${node.val}` },
+      codeLines: isLeaf ? [5, 6] : [7, 8],
+      cards: [{ label: { vi: "CÂY", en: "TREE" }, value: `root${which}` }, { label: { vi: "NODE", en: "NODE" }, value: node.val }, { label: { vi: "LÀ LEAF?", en: "IS LEAF?" }, value: isLeaf, tone: isLeaf ? "success" : "neutral" }],
+      note: isLeaf
+        ? { vi: `Append ${node.val} vào cuối sequence ${which}.`, en: `Append ${node.val} to sequence ${which}.` }
+        : { vi: "Node còn con nên không thuộc leaf sequence; tiếp tục đi trái trước.", en: "This node has children, so it is not in the leaf sequence; continue left first." },
+    }));
+    visited.add(node.id);
+    collect(node.left, which);
+    collect(node.right, which);
+  }
+  collect(root1, 1); current1 = null;
+  collect(root2, 2); current2 = null;
+  const length = Math.max(leaves1.length, leaves2.length);
+  let answer = leaves1.length === leaves2.length;
+  for (let index = 0; index < length; index++) {
+    const a = leaves1[index];
+    const b = leaves2[index];
+    const match = a === b;
+    if (!match) answer = false;
+    steps.push(treeEssentialsStep({
+      problemId: 872, mode: "leaf-sequence", stages, stage: 2, event: "compare", panels: panels(), sequences: sequences(index), status: match ? "match" : "mismatch",
+      title: { vi: `Vị trí ${index}: ${a ?? "∅"} ${match ? "=" : "≠"} ${b ?? "∅"}`, en: `Index ${index}: ${a ?? "∅"} ${match ? "=" : "≠"} ${b ?? "∅"}` }, codeLines: [13],
+      cards: [{ label: { vi: "INDEX", en: "INDEX" }, value: index }, { label: "root1", value: a ?? "∅" }, { label: "root2", value: b ?? "∅" }, { label: { vi: "KHỚP?", en: "MATCH?" }, value: match, tone: match ? "success" : "danger" }],
+      note: match
+        ? { vi: "Hai leaf ở cùng vị trí khớp nhau.", en: "The leaves at this position match." }
+        : { vi: "Một vị trí khác nhau là đủ để kết luận hai cây không leaf-similar.", en: "One different position is enough to prove the trees are not leaf-similar." },
+    }));
+  }
+  steps.push(treeEssentialsStep({
+    problemId: 872, mode: "leaf-sequence", stages, stage: 3, event: "done", panels: panels(), sequences: sequences(), status: answer ? "match" : "mismatch", final: true,
+    title: { vi: `Hai leaf sequence ${answer ? "giống nhau" : "khác nhau"}`, en: `The leaf sequences are ${answer ? "identical" : "different"}` }, codeLines: [13],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer ? "success" : "danger" }, { label: { vi: "SỐ LEAVES", en: "LEAF COUNTS" }, value: `${leaves1.length} / ${leaves2.length}` }],
+    note: answer
+      ? { vi: "Cùng số leaf và mọi giá trị cùng vị trí đều bằng nhau.", en: "The counts match and every value at the same position is equal." }
+      : { vi: "Hai dãy khác độ dài hoặc khác ít nhất một giá trị.", en: "The sequences differ in length or at least one value." },
+  }));
+  return { input, root2: params?.root2, answer, steps };
+}
+
+function buildSteps951(input, params) {
+  const root1 = parseTreeEssentialsInput(input, { allowEmpty: true, minValue: 0, maxValue: 99 });
+  const root2 = parseTreeEssentialsInput(params?.root2 ?? "", { allowEmpty: true, minValue: 0, maxValue: 99 });
+  const steps = [];
+  const matched1 = new Set(), matched2 = new Set(), bad1 = new Set(), bad2 = new Set();
+  const stages = [
+    { vi: "So node hiện tại", en: "Compare nodes" }, { vi: "Xem hướng con", en: "Inspect children" },
+    { vi: "Giữ / flip", en: "Keep / flip" }, { vi: "Kết luận", en: "Conclusion" },
+  ];
+  const panels = (a = null, b = null) => [
+    { label: "root1", caption: { vi: "cây cần biến đổi", en: "tree that may be flipped" }, tree: treeEssentialsState(root1, { active: a ? [a] : [], done: matched1, bad: bad1 }) },
+    { label: "root2", caption: { vi: "cây mục tiêu", en: "target tree" }, tree: treeEssentialsState(root2, { active: b ? [b] : [], done: matched2, bad: bad2 }) },
+  ];
+  const nodeValue = (node) => node ? node.val : "∅";
+  steps.push(treeEssentialsStep({
+    problemId: 951, mode: "flip-equiv", stages, stage: 0, event: "intro", panels: panels(),
+    title: { vi: "Tại mỗi node: giữ hướng hoặc flip hai con", en: "At each node: keep or flip its children" }, codeLines: [3, 4],
+    cards: [{ label: { vi: "KHÔNG FLIP", en: "NO FLIP" }, value: "L↔L, R↔R" }, { label: "FLIP", value: "L↔R, R↔L" }],
+    note: { vi: "Giá trị node hiện tại phải bằng nhau trước; sau đó chọn cách ghép hai nhánh con.", en: "Current node values must match first; then choose how to pair their child branches." },
+  }));
+  function compare(a, b, path) {
+    if (!a && !b) return true;
+    if (!a || !b || a.val !== b.val) {
+      if (a) bad1.add(a.id);
+      if (b) bad2.add(b.id);
+      steps.push(treeEssentialsStep({
+        problemId: 951, mode: "flip-equiv", stages, stage: 0, event: "mismatch", panels: panels(a, b), status: "mismatch",
+        title: { vi: `Cặp ${path} không khớp`, en: `Pair ${path} does not match` }, codeLines: [3, 4],
+        cards: [{ label: "root1", value: nodeValue(a) }, { label: "root2", value: nodeValue(b) }, { label: { vi: "KẾT QUẢ CẶP", en: "PAIR RESULT" }, value: false, tone: "danger" }],
+        note: { vi: "Một bên thiếu node hoặc hai giá trị khác nhau; flip không thể sửa giá trị gốc của subtree này.", en: "One node is missing or the values differ; a flip cannot repair this subtree root." },
+      }));
+      return false;
+    }
+    matched1.add(a.id); matched2.add(b.id);
+    steps.push(treeEssentialsStep({
+      problemId: 951, mode: "flip-equiv", stages, stage: 0, event: "match", panels: panels(a, b), status: "match",
+      title: { vi: `${a.val} = ${b.val}: so hướng hai con`, en: `${a.val} = ${b.val}: inspect child orientation` }, codeLines: [5],
+      cards: [{ label: { vi: "VỊ TRÍ", en: "PATH" }, value: path }, { label: { vi: "NODE KHỚP", en: "MATCHED NODE" }, value: a.val, tone: "success" }],
+      note: { vi: "Giá trị gốc khớp; giờ xác định con trái của root1 nằm bên trái hay bên phải root2.", en: "The roots match; now determine whether root1's left child appears on root2's left or right." },
+    }));
+    const straight = nodeValue(a.left) === nodeValue(b.left);
+    const orientation = straight ? "NO FLIP · L↔L, R↔R" : "FLIP · L↔R, R↔L";
+    steps.push(treeEssentialsStep({
+      problemId: 951, mode: "flip-equiv", stages, stage: straight ? 1 : 2, event: straight ? "straight" : "flip", panels: panels(a, b), status: "checking",
+      title: straight ? { vi: `Node ${a.val}: giữ nguyên hướng`, en: `Node ${a.val}: keep orientation` } : { vi: `Node ${a.val}: flip hai nhánh`, en: `Node ${a.val}: flip child branches` },
+      codeLines: straight ? [7, 8, 9, 10] : [7, 8, 9, 11],
+      cards: [
+        { label: { vi: "CON TRÁI root1", en: "root1 LEFT" }, value: nodeValue(a.left) },
+        { label: { vi: "CON TRÁI root2", en: "root2 LEFT" }, value: nodeValue(b.left) },
+        { label: { vi: "CÁCH GHÉP", en: "PAIRING" }, value: orientation, tone: straight ? "neutral" : "warning" },
+      ],
+      note: straight
+        ? { vi: "Hai con trái có cùng gốc nên ghép thẳng các nhánh tương ứng.", en: "The left-child roots match, so pair corresponding branches directly." }
+        : { vi: "Con trái không cùng gốc; đổi chéo trái ↔ phải tại node này.", en: "The left-child roots differ; cross left ↔ right at this node." },
+    }));
+    if (straight) return compare(a.left, b.left, `${path}.left`) && compare(a.right, b.right, `${path}.right`);
+    return compare(a.left, b.right, `${path}.left↔right`) && compare(a.right, b.left, `${path}.right↔left`);
+  }
+  const answer = compare(root1, root2, "root");
+  steps.push(treeEssentialsStep({
+    problemId: 951, mode: "flip-equiv", stages, stage: 3, event: "done", panels: panels(), status: answer ? "match" : "mismatch", final: true,
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` }, codeLines: [10],
+    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer ? "success" : "danger" }, { label: { vi: "CẶP NODE ĐÃ KHỚP", en: "MATCHED NODE PAIRS" }, value: Math.min(matched1.size, matched2.size) }],
+    note: answer
+      ? { vi: "Mọi cặp subtree đều khớp sau khi giữ hoặc flip hướng phù hợp.", en: "Every subtree pair matches after keeping or flipping the appropriate orientation." }
+      : { vi: "Có ít nhất một cặp subtree không thể khớp bằng phép flip.", en: "At least one subtree pair cannot be matched by flipping." },
+  }));
+  return { input, root2: params?.root2, answer, steps };
+}
+
+Object.assign(module.exports, {
+  257: {
+    id: 257, difficulty: "easy", slug: "binary-tree-paths", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS + Backtracking", en: "DFS + Backtracking" }],
+    title: { vi: "Binary Tree Paths", en: "Binary Tree Paths" }, titleVi: { vi: "Mọi đường đi từ root đến leaf", en: "All root-to-leaf paths" },
+    statement: { vi: "Trả về mọi đường đi từ root đến leaf. Một leaf là node không có con.", en: "Return every root-to-leaf path. A leaf is a node with no children." },
+    defaultInput: "1,2,3,null,5", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    approach: [
+      { vi: "DFS mang theo path hiện tại; append node khi đi xuống.", en: "DFS carries the current path and appends each node while descending." },
+      { vi: "Khi gặp leaf, chuyển path thành chuỗi và lưu vào kết quả.", en: "At a leaf, convert the path to a string and save it." },
+      { vi: "Pop khi quay lui để path không lẫn node của nhánh trước.", en: "Pop while backtracking so the next branch does not inherit the previous branch's nodes." },
+    ], complexity: { time: "O(n²) worst case", space: "O(h)", note: { vi: "Có thể cần O(n) để tạo mỗi chuỗi path; stack/path cao h.", en: "Creating each path string may cost O(n); stack/path height is h." } },
+    code: ["class Solution:", "    def binaryTreePaths(self, root):", "        paths = []", "        def dfs(node, path):", "            path.append(str(node.val))", "            if not node.left and not node.right:", "                paths.append('->'.join(path))", "            else:", "                if node.left: dfs(node.left, path)", "                if node.right: dfs(node.right, path)", "            path.pop()", "        dfs(root, [])", "        return paths"],
+    builder: buildSteps257,
+  },
+  404: {
+    id: 404, difficulty: "easy", slug: "sum-of-left-leaves", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }], title: { vi: "Sum of Left Leaves", en: "Sum of Left Leaves" }, titleVi: { vi: "Tổng các leaf bên trái", en: "Sum all left leaves" },
+    statement: { vi: "Trả về tổng của mọi left leaf: node vừa là con trái của cha, vừa không có con.", en: "Return the sum of every left leaf: a node that is both a left child and has no children." },
+    defaultInput: "3,9,20,null,null,15,7", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    approach: [{ vi: "DFS truyền cờ is_left cho từng node.", en: "DFS passes an is_left flag to each node." }, { vi: "Chỉ cộng node.val khi is_left và node là leaf.", en: "Add node.val only when is_left and the node is a leaf." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được kiểm tra một lần; stack đệ quy cao h.", en: "Each node is checked once; the recursion stack has height h." } },
+    code: ["class Solution:", "    def sumOfLeftLeaves(self, root):", "        def dfs(node, is_left):", "            if not node:", "                return 0", "            if is_left and not node.left and not node.right:", "                return node.val", "            return dfs(node.left, True) + dfs(node.right, False)", "", "        return dfs(root, False)"],
+    builder: buildSteps404,
+  },
+  617: {
+    id: 617, difficulty: "easy", slug: "merge-two-binary-trees", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS hai cây", en: "Two-tree DFS" }], title: { vi: "Merge Two Binary Trees", en: "Merge Two Binary Trees" }, titleVi: { vi: "Ghép hai cây nhị phân", en: "Merge two binary trees" },
+    statement: { vi: "Chồng hai cây từ root. Node trùng vị trí được cộng; nếu một bên null thì dùng node còn lại.", en: "Overlay two trees from their roots. Add overlapping nodes; if one side is null, use the other node." },
+    defaultInput: "1,3,2,5", inputKind: "string", inputLabel: { vi: "root1 (level-order)", en: "root1 (level-order)" },
+    extraParams: [{ key: "root2", type: "string", label: { vi: "root2 (level-order)", en: "root2 (level-order)" }, default: "2,1,3,null,4,null,7" }],
+    approach: [{ vi: "Tại mỗi vị trí, coi null là 0 và tạo node có tổng hai giá trị.", en: "At every position, treat null as 0 and create a node with the two-value sum." }, { vi: "Đệ quy ghép cặp con trái, rồi cặp con phải.", en: "Recursively merge the left-child pair, then the right-child pair." }],
+    complexity: { time: "O(n + m)", space: "O(h)", note: { vi: "Mỗi node của hai cây được chạm tối đa một lần; h là độ cao lớn hơn.", en: "Each node across both trees is touched at most once; h is the larger height." } },
+    code: ["class Solution:", "    def mergeTrees(self, root1, root2):", "        if not root1 and not root2:", "            return None", "        a = root1.val if root1 else 0", "        b = root2.val if root2 else 0", "        node = TreeNode(a + b)", "        node.left = self.mergeTrees(root1.left if root1 else None, root2.left if root2 else None)", "        node.right = self.mergeTrees(root1.right if root1 else None, root2.right if root2 else None)", "        return node"],
+    builder: buildSteps617,
+  },
+  572: {
+    id: 572, difficulty: "easy", slug: "subtree-of-another-tree", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS hai cây", en: "Two-tree DFS" }], title: { vi: "Subtree of Another Tree", en: "Subtree of Another Tree" }, titleVi: { vi: "Một cây có nằm trọn trong cây kia", en: "Is one tree a complete subtree of another" },
+    statement: { vi: "Trả về True nếu tồn tại một node trong root mà toàn bộ subtree tại đó có cùng cấu trúc và giá trị với subRoot.", en: "Return True if some node in root begins a subtree with exactly the same structure and values as subRoot." },
+    defaultInput: "3,4,5,1,2", inputKind: "string", inputLabel: { vi: "root (level-order)", en: "root (level-order)" },
+    extraParams: [{ key: "subRoot", type: "string", label: { vi: "subRoot (level-order)", en: "subRoot (level-order)" }, default: "4,1,2" }],
+    approach: [{ vi: "Duyệt từng node của root như một candidate.", en: "Visit every root node as a candidate." }, { vi: "Với mỗi candidate, sameTree kiểm tra toàn bộ cấu trúc và giá trị với subRoot.", en: "For each candidate, sameTree checks the complete shape and values against subRoot." }],
+    complexity: { time: "O(mn) worst case", space: "O(h)", note: { vi: "Có thể so tối đa n node của subRoot tại mỗi trong m candidates.", en: "Up to n subRoot nodes may be compared at each of m candidates." } },
+    code: ["class Solution:", "    def isSubtree(self, root, subRoot):", "        if not root:", "            return False", "        if self.same(root, subRoot):", "            return True", "        return self.isSubtree(root.left, subRoot) or self.isSubtree(root.right, subRoot)", "", "    def same(self, a, b):", "        if not a and not b:", "            return True", "        if not a or not b or a.val != b.val:", "            return False", "        return self.same(a.left, b.left) and self.same(a.right, b.right)"],
+    builder: buildSteps572,
+  },
+  965: {
+    id: 965, difficulty: "easy", slug: "univalued-binary-tree", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }], title: { vi: "Univalued Binary Tree", en: "Univalued Binary Tree" }, titleVi: { vi: "Mọi node có cùng giá trị", en: "Does every node have one value" },
+    statement: { vi: "Cây là uni-valued khi mọi node có cùng giá trị. Trả về True nếu cây đã cho là uni-valued.", en: "A tree is uni-valued when every node has the same value. Return True if the given tree is uni-valued." },
+    defaultInput: "1,1,1,1,1,null,1", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    approach: [{ vi: "Lấy root.val làm target rồi DFS toàn cây.", en: "Use root.val as the target, then DFS the tree." }, { vi: "Nếu một node khác target, trả False ngay; nếu duyệt hết thì True.", en: "Return False at the first node different from target; reaching the end means True." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt tối đa mỗi node một lần, có thể dừng sớm.", en: "Visit each node at most once, with possible early exit." } },
+    code: ["class Solution:", "    def isUnivalTree(self, root):", "        target = root.val", "        def dfs(node):", "            if not node:", "                return True", "            if node.val != target:", "                return False", "            return dfs(node.left) and dfs(node.right)", "        return dfs(root)"],
+    builder: buildSteps965,
+  },
+  872: {
+    id: 872, difficulty: "easy", slug: "leaf-similar-trees", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS hai cây", en: "Two-tree DFS" }], title: { vi: "Leaf-Similar Trees", en: "Leaf-Similar Trees" }, titleVi: { vi: "Hai cây có cùng dãy leaf", en: "Do two trees share a leaf sequence" },
+    statement: { vi: "Đọc giá trị các leaf từ trái sang phải ở mỗi cây. Trả về True khi hai dãy giống hệt nhau.", en: "Read each tree's leaf values from left to right. Return True when the two sequences are identical." },
+    defaultInput: "3,5,1,6,2,9,8,null,null,7,4", inputKind: "string", inputLabel: { vi: "root1 (level-order)", en: "root1 (level-order)" },
+    extraParams: [{ key: "root2", type: "string", label: { vi: "root2 (level-order)", en: "root2 (level-order)" }, default: "3,5,1,6,7,4,2,null,null,null,null,null,null,9,8" }],
+    approach: [{ vi: "DFS trái trước để thu leaf sequence của từng cây.", en: "Use left-first DFS to collect each tree's leaf sequence." }, { vi: "So sánh hai mảng về cả độ dài lẫn từng giá trị.", en: "Compare the arrays by both length and every value." }],
+    complexity: { time: "O(n + m)", space: "O(h1 + h2)", note: { vi: "Mỗi node được duyệt một lần; lưu tối đa số leaf của hai cây.", en: "Each node is visited once; store at most all leaves from both trees." } },
+    code: ["class Solution:", "    def leafSimilar(self, root1, root2):", "        def leaves(root):", "            result = []", "            def dfs(node):", "                if not node.left and not node.right:", "                    result.append(node.val)", "                    return", "                if node.left: dfs(node.left)", "                if node.right: dfs(node.right)", "            dfs(root)", "            return result", "        return leaves(root1) == leaves(root2)"],
+    builder: buildSteps872,
+  },
+  951: {
+    id: 951, difficulty: "medium", slug: "flip-equivalent-binary-trees", category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS hai cây", en: "Two-tree DFS" }], title: { vi: "Flip Equivalent Binary Trees", en: "Flip Equivalent Binary Trees" }, titleVi: { vi: "Hai cây tương đương sau các phép flip", en: "Are two trees equivalent after flips" },
+    statement: { vi: "Một phép flip đổi chỗ subtree trái và phải tại một node. Trả về True nếu một số phép flip có thể làm hai cây giống nhau.", en: "A flip swaps a node's left and right subtrees. Return True if some flips can make the two trees equal." },
+    defaultInput: "1,2,3,4,5,6,null,null,null,7,8", inputKind: "string", inputLabel: { vi: "root1 (level-order; [] nếu rỗng)", en: "root1 (level-order; [] for empty)" },
+    extraParams: [{ key: "root2", type: "string", label: { vi: "root2 (level-order; [] nếu rỗng)", en: "root2 (level-order; [] for empty)" }, default: "1,3,2,null,6,4,5,null,null,null,null,8,7" }],
+    approach: [{ vi: "Hai node hiện tại phải cùng rỗng hoặc có cùng giá trị.", en: "Current nodes must both be empty or have the same value." }, { vi: "Vì giá trị trong mỗi cây là duy nhất, nhìn gốc con trái để chọn ghép thẳng (L-L, R-R) hay flip (L-R, R-L).", en: "Because each tree has unique values, inspect the left-child root to choose straight pairing (L-L, R-R) or flipped pairing (L-R, R-L)." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi cặp node được xét một lần; stack đệ quy cao h.", en: "Each node pair is checked once; the recursion stack has height h." } },
+    code: ["class Solution:", "    def flipEquiv(self, root1, root2):", "        if not root1 or not root2:", "            return root1 is root2", "        if root1.val != root2.val:", "            return False", "        left1 = root1.left.val if root1.left else -1", "        left2 = root2.left.val if root2.left else -1", "        if left1 == left2:", "            return self.flipEquiv(root1.left, root2.left) and self.flipEquiv(root1.right, root2.right)", "        return self.flipEquiv(root1.left, root2.right) and self.flipEquiv(root1.right, root2.left)"],
+    builder: buildSteps951,
   },
 });

@@ -5126,6 +5126,69 @@ function renderSameTreeView(step) {
   renderSide(view.qTree, "sameTreeQ");
 }
 
+function renderTreeEssentialsView(step) {
+  const view = step.treeEssentialsView || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phaseHtml = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(pick(stage))}</b></span>`;
+  }).join("");
+  const statusClass = view.status === "match" ? "success" : view.status === "mismatch" ? "danger" : "checking";
+  const defaultStatus = view.status === "match"
+    ? (vi ? "Khớp" : "Match")
+    : view.status === "mismatch"
+      ? (vi ? "Không khớp" : "Mismatch")
+      : (vi ? "Đang xét" : "Checking");
+  const panels = Array.isArray(view.panels) ? view.panels : [];
+  const panelHtml = panels.map((panel, index) => `<section class="te-tree-panel">
+    <header><strong>${escapeHtml(pick(panel.label))}</strong><span>${escapeHtml(pick(panel.caption || ""))}</span></header>
+    <div id="treeEssentialsTree${index}" class="te-tree-canvas"></div>
+  </section>`).join("");
+  const cards = Array.isArray(view.cards) ? view.cards : [];
+  const cardsHtml = cards.length ? `<div class="te-cards">${cards.map((card) => `<section class="te-card ${escapeHtml(card.tone || "neutral")}">
+    <small>${escapeHtml(pick(card.label))}</small><strong>${escapeHtml(card.value)}</strong>${card.detail ? `<span>${escapeHtml(pick(card.detail))}</span>` : ""}
+  </section>`).join("")}</div>` : "";
+  const sequences = Array.isArray(view.sequences) ? view.sequences : [];
+  const sequenceHtml = sequences.length ? `<section class="te-sequences">${sequences.map((sequence) => {
+    const values = Array.isArray(sequence.values) ? sequence.values : [];
+    const tokens = values.length
+      ? values.map((value, index) => `<b class="${index === sequence.activeIndex ? "active" : ""}">${escapeHtml(value)}</b>`).join("<i>→</i>")
+      : `<em>∅</em>`;
+    return `<div class="${escapeHtml(sequence.tone || "neutral")}"><small>${escapeHtml(pick(sequence.label))}</small><span>${tokens}</span></div>`;
+  }).join("")}</section>` : "";
+  const summary = vi
+    ? `Bài ${view.problemId}: ${pick(step.title)}. ${pick(view.statusText) || defaultStatus}.`
+    : `Problem ${view.problemId}: ${pick(step.title)}. ${pick(view.statusText) || defaultStatus}.`;
+
+  target.innerHTML = `<section class="te-viz te-${escapeHtml(view.mode || "tree")}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="te-phases">${phaseHtml}</div>
+    <section class="te-action ${statusClass}">
+      <span><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong></span>
+      <em>${escapeHtml(pick(view.statusText) || defaultStatus)}</em>
+    </section>
+    <div class="te-tree-grid count-${panels.length}">${panelHtml}</div>
+    ${cardsHtml}
+    ${sequenceHtml}
+    <div class="te-legend" aria-hidden="true">
+      <span><i class="current"></i>${vi ? "node hiện tại" : "current node"}</span>
+      <span><i class="done"></i>${vi ? "đã khớp / đã xử lý" : "matched / processed"}</span>
+      <span><i class="bad"></i>${vi ? "không khớp / bị loại" : "mismatch / rejected"}</span>
+    </div>
+  </section>`;
+
+  panels.forEach((panel, index) => {
+    const panelTarget = $(`treeEssentialsTree${index}`);
+    if (!panel.tree || !Array.isArray(panel.tree.nodes) || panel.tree.nodes.length === 0) {
+      panelTarget.innerHTML = `<span class="te-empty">∅</span>`;
+      return;
+    }
+    renderTree({ tree: panel.tree }, `treeEssentialsTree${index}`);
+  });
+}
+
 function renderSortedListBstView(step) {
   const view = step.sortedListBstView;
   const treeView = $("treeView");
@@ -27461,6 +27524,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSkylineView(step);
+  } else if (step.treeEssentialsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTreeEssentialsView(step);
   } else if (step.sameTreeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

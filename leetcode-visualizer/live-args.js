@@ -110,7 +110,9 @@ function parseMatrix(value) {
 }
 
 function parseTreeValues(value) {
-  const values = Array.isArray(value) ? value : String(value || "").split(",");
+  const text = Array.isArray(value) ? null : String(value || "").trim();
+  if (!Array.isArray(value) && (text === "" || text === "[]" || /^(null|none|#)$/i.test(text))) return [];
+  const values = Array.isArray(value) ? value : text.replace(/^\[|\]$/g, "").split(",");
   return values.map((item) => {
     const trimmed = String(item).trim();
     if (!trimmed || /^(null|none|#)$/i.test(trimmed)) return null;
@@ -146,9 +148,9 @@ function coerceParamValue(problem, paramName, value, context) {
     return { ...treeMarker(value), tree_id: paramName };
   }
 
-  if (paramName === "root") {
+  if (["root", "root1", "root2", "subRoot"].includes(paramName)) {
     if (problem.id === 116) return { ...treeMarker(value), __viz_type: "binary_tree_next" };
-    return treeMarker(value);
+    return { ...treeMarker(value), tree_id: paramName };
   }
   if (["head", "l1", "l2", "headA", "headB"].includes(paramName)) return listMarker(value);
   if (paramName === "lists") {
