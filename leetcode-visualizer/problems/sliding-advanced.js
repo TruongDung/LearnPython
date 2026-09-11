@@ -17,6 +17,7 @@ function makeStep(nums, opts) {
     note: opts.note,
     ...(opts.slidingFreqView ? { slidingFreqView: opts.slidingFreqView } : {}),
     ...(opts.exactK992View ? { exactK992View: opts.exactK992View } : {}),
+    ...(opts.nice1248View ? { nice1248View: opts.nice1248View } : {}),
   };
 }
 
@@ -323,10 +324,152 @@ function buildStepsPrefixExact(input, params, config) {
 }
 
 function buildSteps1248(input, params) {
-  return buildStepsPrefixExact(input, params, {
-    param: "k", defaultTarget: 3, contribution: (value) => Math.abs(value) % 2, expression: (value) => `${value} % 2`,
-    viContribution: "Chỉ số lẻ đóng góp 1, số chẵn đóng góp 0 vào prefix.", enContribution: "Odd numbers contribute 1 and even numbers contribute 0 to the prefix.",
-  });
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const k = Number(params?.k ?? 3);
+  if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer");
+  if (nums.length > 20) throw new Error("Use at most 20 numbers so every prefix and matching subarray remains readable.");
+
+  const steps = [];
+  const freq = new Map([[0, 1]]);
+  const positions = new Map([[0, [-1]]]);
+  const prefixHistory = [{ boundary: -1, value: 0 }];
+  const niceSubarrays = [];
+  let prefix = 0;
+  let ans = 0;
+
+  const freqObject = () => Object.fromEntries([...freq.entries()].sort(([a], [b]) => a - b));
+  const positionsObject = () => Object.fromEntries(
+    [...positions.entries()].sort(([a], [b]) => a - b).map(([value, indices]) => [value, [...indices]]),
+  );
+  const snap = (title, codeLine, right, note, extra = {}) => {
+    const need = Number.isInteger(extra.need) ? extra.need : null;
+    const matchingPositions = Array.isArray(extra.matchingPositions) ? [...extra.matchingPositions] : [];
+    const newSubarrays = Array.isArray(extra.newSubarrays)
+      ? extra.newSubarrays.map((item) => ({ ...item, values: [...item.values] }))
+      : [];
+    steps.push(makeStep(nums, {
+      title,
+      codeLines: [codeLine],
+      highlight: right >= 0 ? range(0, right) : [],
+      mark: newSubarrays.flatMap((item) => range(item.start, item.end)),
+      note,
+      final: Boolean(extra.final),
+      vars: [
+        { name: "k", value: k },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "num", value: right >= 0 ? nums[right] : "-" },
+        { name: "prefix", value: prefix },
+        { name: "need", value: need ?? "-" },
+        { name: "prefix_freq", value: mapText(freq) },
+        { name: "new subarrays", value: newSubarrays.length },
+        { name: "ans", value: ans },
+      ],
+      nice1248View: {
+        nums: [...nums],
+        k,
+        right,
+        currentValue: right >= 0 ? nums[right] : null,
+        parity: right >= 0 ? Math.abs(nums[right]) % 2 : null,
+        prefix,
+        need,
+        freq: freqObject(),
+        positions: positionsObject(),
+        prefixHistory: prefixHistory.map((item) => ({ ...item })),
+        matchingPositions,
+        newSubarrays,
+        niceSubarrays: niceSubarrays.map((item) => ({ ...item, values: [...item.values] })),
+        added: Number(extra.added || 0),
+        ans,
+        event: extra.event || "init",
+        final: Boolean(extra.final),
+      },
+    }));
+  };
+
+  snap(
+    { vi: "Khởi tạo prefix_freq = {0: 1}", en: "Initialize prefix_freq = {0: 1}" },
+    3,
+    -1,
+    { vi: "Prefix rỗng nằm trước index 0 và có 0 số lẻ.", en: "The empty prefix sits before index 0 and contains zero odd numbers." },
+    { event: "init-freq" },
+  );
+  snap(
+    { vi: "Khởi tạo prefix = ans = 0", en: "Initialize prefix = ans = 0" },
+    4,
+    -1,
+    { vi: "prefix đếm số lẻ đã thấy; ans là tổng nice subarray.", en: "prefix counts odds seen so far; ans is the total number of nice subarrays." },
+    { event: "init-values" },
+  );
+
+  for (let right = 0; right < nums.length; right++) {
+    const num = nums[right];
+    const parity = Math.abs(num) % 2;
+    snap(
+      { vi: `Xét nums[${right}] = ${num}`, en: `Inspect nums[${right}] = ${num}` },
+      5,
+      right,
+      { vi: `Số ${num} là ${parity ? "lẻ nên đóng góp 1" : "chẵn nên đóng góp 0"}.`, en: `${num} is ${parity ? "odd, so it contributes 1" : "even, so it contributes 0"}.` },
+      { event: "inspect" },
+    );
+
+    prefix += parity;
+    snap(
+      { vi: `prefix += ${parity} → ${prefix}`, en: `prefix += ${parity} → ${prefix}` },
+      6,
+      right,
+      { vi: `Đến index ${right}, prefix có ${prefix} số lẻ.`, en: `Through index ${right}, the prefix contains ${prefix} odd number(s).` },
+      { event: "update-prefix" },
+    );
+
+    const need = prefix - k;
+    const matchingPositions = [...(positions.get(need) || [])];
+    snap(
+      { vi: `need = ${prefix} - ${k} = ${need}`, en: `need = ${prefix} - ${k} = ${need}` },
+      7,
+      right,
+      { vi: `Tìm prefix cũ bằng ${need}; bỏ phần đó đi sẽ còn đúng ${k} số lẻ.`, en: `Look for an earlier prefix equal to ${need}; removing it leaves exactly ${k} odd numbers.` },
+      { event: "find-need", need, matchingPositions },
+    );
+
+    const newSubarrays = matchingPositions.map((prefixEnd) => ({
+      prefixEnd,
+      start: prefixEnd + 1,
+      end: right,
+      values: nums.slice(prefixEnd + 1, right + 1),
+    }));
+    ans += newSubarrays.length;
+    niceSubarrays.push(...newSubarrays);
+    snap(
+      { vi: `ans += prefix_freq[${need}] = ${newSubarrays.length} → ${ans}`, en: `ans += prefix_freq[${need}] = ${newSubarrays.length} → ${ans}` },
+      8,
+      right,
+      newSubarrays.length
+        ? { vi: `Có ${newSubarrays.length} prefix khớp, tạo ${newSubarrays.length} nice subarray mới kết thúc tại right=${right}.`, en: `${newSubarrays.length} matching prefix(es) create ${newSubarrays.length} new nice subarray(s) ending at right=${right}.` }
+        : { vi: `Chưa từng thấy prefix ${need}, nên right=${right} chưa tạo nice subarray mới.`, en: `Prefix ${need} has not appeared, so right=${right} creates no new nice subarray.` },
+      { event: "count", need, matchingPositions, newSubarrays, added: newSubarrays.length },
+    );
+
+    freq.set(prefix, (freq.get(prefix) || 0) + 1);
+    if (!positions.has(prefix)) positions.set(prefix, []);
+    positions.get(prefix).push(right);
+    prefixHistory.push({ boundary: right, value: prefix });
+    snap(
+      { vi: `Lưu prefix ${prefix} tại index ${right}`, en: `Store prefix ${prefix} at index ${right}` },
+      9,
+      right,
+      { vi: `prefix_freq[${prefix}] hiện bằng ${freq.get(prefix)} cho các right phía sau.`, en: `prefix_freq[${prefix}] is now ${freq.get(prefix)} for later right positions.` },
+      { event: "store", need, matchingPositions, newSubarrays },
+    );
+  }
+
+  snap(
+    { vi: `return ans → ${ans}`, en: `return ans → ${ans}` },
+    10,
+    nums.length - 1,
+    { vi: `Tìm được tổng cộng ${ans} subarray chứa đúng ${k} số lẻ.`, en: `Found ${ans} total subarrays containing exactly ${k} odd numbers.` },
+    { event: "done", final: true },
+  );
+  return { original: nums, k, answer: ans, steps };
 }
 
 function buildSteps930(input, params) {
@@ -827,7 +970,7 @@ module.exports = {
     { vi: "Chạy hai cửa sổ cùng lúc: `left_k` giữ tối đa K distinct, `left_km1` giữ tối đa K-1 distinct.", en: "Run two windows together: `left_k` keeps at most K distinct values, `left_km1` keeps at most K-1." },
     { vi: "Với mỗi right, số subarray đúng K kết thúc tại right là `left_km1 - left_k`.", en: "For each right, the number of exactly-K subarrays ending there is `left_km1 - left_k`." },
   ], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi phần tử được thêm/xóa khỏi mỗi cửa sổ tối đa một lần.", en: "Each element enters and leaves each window at most once." } }, code: ["class Solution:", "    def subarraysWithKDistinct(self, nums, k):", "        def add(freq, x):", "            freq[x] = freq.get(x, 0) + 1", "        def remove(freq, x):", "            freq[x] -= 1", "            if freq[x] == 0:", "                del freq[x]", "        freq_k, freq_km1 = {}, {}", "        left_k = left_km1 = ans = 0", "        for right, num in enumerate(nums):", "            add(freq_k, num)", "            add(freq_km1, num)", "            while len(freq_k) > k:", "                remove(freq_k, nums[left_k])", "                left_k += 1", "            while len(freq_km1) > k - 1:", "                remove(freq_km1, nums[left_km1])", "                left_km1 += 1", "            ans += left_km1 - left_k", "        return ans"], builder: buildSteps992 },
-  1248: { id: 1248, difficulty: "medium", slug: "count-number-of-nice-subarrays", category, tags: arrayTag, title: { vi: "Count Number of Nice Subarrays", en: "Count Number of Nice Subarrays" }, titleVi: { vi: "Đếm subarray có đúng K số lẻ", en: "Count subarrays with exactly K odd numbers" }, statement: { vi: "Đếm subarray có đúng k số lẻ.", en: "Count subarrays containing exactly k odd numbers." }, defaultInput: [1, 1, 2, 1, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lẻ chính xác)", en: "k (exact odd count)" }, default: 3 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix đếm số lẻ và frequency map.", en: "Odd-count prefix sums with a frequency map." } }, code: ["class Solution:", "    def numberOfSubarrays(self, nums, k):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num % 2", "            need = prefix - k", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps1248 },
+  1248: { id: 1248, difficulty: "medium", slug: "count-number-of-nice-subarrays", category, tags: arrayTag, title: { vi: "Count Number of Nice Subarrays", en: "Count Number of Nice Subarrays" }, titleVi: { vi: "Đếm subarray có đúng K số lẻ", en: "Count subarrays with exactly K odd numbers" }, statement: { vi: "Đếm subarray có đúng k số lẻ.", en: "Count subarrays containing exactly k odd numbers." }, defaultInput: [1, 1, 2, 1, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lẻ chính xác)", en: "k (exact odd count)" }, default: 3 }], approach: [{ vi: "Đổi mỗi số lẻ thành 1 và số chẵn thành 0; prefix là số lượng số lẻ đã gặp.", en: "Treat each odd number as 1 and each even number as 0; prefix is the number of odds seen so far." }, { vi: "Tại right, cần prefix cũ `need = prefix - k`. Mỗi lần need từng xuất hiện tạo một subarray có đúng k số lẻ.", en: "At right, seek an earlier prefix `need = prefix - k`. Every prior occurrence creates one subarray with exactly k odds." }, { vi: "Luôn lưu prefix rỗng `{0: 1}` để đếm subarray bắt đầu tại index 0.", en: "Seed the empty prefix `{0: 1}` so subarrays starting at index 0 are counted." }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Duyệt một lần; frequency map lưu số lần mỗi odd-prefix đã xuất hiện.", en: "One pass; the frequency map stores how often each odd-prefix has appeared." } }, code: ["class Solution:", "    def numberOfSubarrays(self, nums, k):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num % 2", "            need = prefix - k", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], debugMode: "line-by-line", builder: buildSteps1248 },
   930: { id: 930, difficulty: "medium", slug: "binary-subarrays-with-sum", category, tags: arrayTag, title: { vi: "Binary Subarrays With Sum", en: "Binary Subarrays With Sum" }, titleVi: { vi: "Đếm subarray nhị phân có tổng bằng Goal", en: "Binary subarrays with sum Goal" }, statement: { vi: "Đếm subarray trong mảng nhị phân có tổng đúng goal.", en: "Count binary subarrays whose sum equals goal." }, defaultInput: [1, 0, 1, 0, 1], inputKind: "binary", inputLabel: { vi: "nums (0 hoặc 1)", en: "nums (0 or 1)" }, extraParams: [{ key: "goal", label: { vi: "goal (tổng chính xác)", en: "goal (exact sum)" }, default: 2 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix sum và frequency map.", en: "Prefix sums and a frequency map." } }, code: ["class Solution:", "    def numSubarraysWithSum(self, nums, goal):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num", "            need = prefix - goal", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps930 },
   2799: { id: 2799, difficulty: "medium", slug: "count-complete-subarrays-in-an-array", category, tags: arrayTag, title: { vi: "Count Complete Subarrays in an Array", en: "Count Complete Subarrays in an Array" }, titleVi: { vi: "Đếm complete subarray", en: "Count complete subarrays" }, statement: { vi: "Đếm subarray chứa mọi giá trị distinct xuất hiện trong toàn mảng.", en: "Count subarrays containing every distinct value from the full array." }, defaultInput: [1, 3, 1, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cửa sổ trượt với frequency map.", en: "Sliding window with a frequency map." } }, code: ["class Solution:", "    def countCompleteSubarrays(self, nums):", "        target = len(set(nums))", "        freq = {}; left = ans = 0", "        for right, num in enumerate(nums):", "            freq[num] = freq.get(num, 0) + 1", "            while len(freq) == target:", "                ans += len(nums) - right", "                remove_from(freq, left); left += 1", "        return ans"], builder: buildSteps2799 },
   2962: { id: 2962, difficulty: "medium", slug: "count-subarrays-where-max-element-appears-at-least-k-times", category, tags: arrayTag, title: { vi: "Count Subarrays Where Max Element Appears at Least K Times", en: "Count Subarrays Where Max Element Appears at Least K Times" }, titleVi: { vi: "Đếm subarray có phần tử lớn nhất xuất hiện ít nhất K lần", en: "Count subarrays where the maximum appears at least K times" }, statement: { vi: "Đếm subarray mà giá trị lớn nhất của toàn mảng xuất hiện ít nhất k lần.", en: "Count subarrays in which the global maximum appears at least k times." }, defaultInput: [1, 3, 2, 3, 3], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lần max xuất hiện)", en: "k (maximum occurrences)" }, default: 2 }], complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ theo dõi số lần maxValue trong cửa sổ.", en: "Track only maxValue occurrences in the window." } }, code: ["class Solution:", "    def countSubarrays(self, nums, k):", "        max_value = max(nums)", "        left = count_max = ans = 0", "        for right, num in enumerate(nums):", "            if num == max_value: count_max += 1", "            while count_max >= k:", "                ans += len(nums) - right", "                if nums[left] == max_value: count_max -= 1", "                left += 1", "        return ans"], builder: buildSteps2962 },

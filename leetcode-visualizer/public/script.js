@@ -13644,6 +13644,115 @@ function renderSlidingFreqView(step) {
     </div>`;
 }
 
+function renderNice1248View(step) {
+  const view = step.nice1248View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const matchingPositions = new Set(Array.isArray(view.matchingPositions) ? view.matchingPositions : []);
+  const newSubarrays = Array.isArray(view.newSubarrays) ? view.newSubarrays : [];
+  const vi = lang === "vi";
+  const event = String(view.event || "init-freq");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "—";
+  const phaseIndex = {
+    "init-freq": 0,
+    "init-values": 0,
+    inspect: 0,
+    "update-prefix": 1,
+    "find-need": 2,
+    count: 3,
+    store: 4,
+    done: 5,
+  }[event] ?? 0;
+  const phaseLabels = vi
+    ? ["Đổi lẻ/chẵn", "Cập nhật prefix", "Tìm need", "Cộng số match", "Lưu prefix"]
+    : ["Read parity", "Update prefix", "Find need", "Count matches", "Store prefix"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = event === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const eventLabels = {
+    "init-freq": vi ? "PREFIX RỖNG" : "EMPTY PREFIX",
+    "init-values": vi ? "KHỞI TẠO" : "INITIALIZE",
+    inspect: vi ? "ĐỌC PHẦN TỬ" : "READ VALUE",
+    "update-prefix": vi ? "ĐẾM SỐ LẺ" : "COUNT ODDS",
+    "find-need": vi ? "TÍNH NEED" : "COMPUTE NEED",
+    count: vi ? "ĐẾM SUBARRAY MỚI" : "COUNT NEW SUBARRAYS",
+    store: vi ? "LƯU PREFIX" : "STORE PREFIX",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+
+  const belongsToNew = (index) => newSubarrays.some((item) => index >= item.start && index <= item.end);
+  const arrayCells = nums.map((value, index) => {
+    const odd = Math.abs(Number(value)) % 2 === 1;
+    const classes = [
+      "nice1248-cell",
+      odd ? "odd" : "even",
+      index < right ? "processed" : "",
+      index === right ? "current" : "",
+      belongsToNew(index) ? "new-range" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="nice1248-cell-wrap">
+      <div class="nice1248-pointer">${index === right ? "right ▼" : ""}</div>
+      <div class="${classes}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${odd ? (vi ? "LẺ +1" : "ODD +1") : (vi ? "CHẴN +0" : "EVEN +0")}</em></div>
+    </div>`;
+  }).join("");
+
+  const prefixHistory = Array.isArray(view.prefixHistory) ? view.prefixHistory.map((item) => ({ ...item })) : [];
+  if (right >= 0 && ["update-prefix", "find-need", "count"].includes(event) && !prefixHistory.some((item) => item.boundary === right)) {
+    prefixHistory.push({ boundary: right, value: view.prefix, temporary: true });
+  }
+  const prefixCells = prefixHistory.map((item) => {
+    const isCurrent = item.boundary === right;
+    const isMatch = matchingPositions.has(item.boundary) && ["find-need", "count", "store"].includes(event);
+    const classes = ["nice1248-prefix", isCurrent ? "current" : "", isMatch ? "match" : "", item.temporary ? "temporary" : ""].filter(Boolean).join(" ");
+    const boundaryLabel = item.boundary === -1 ? (vi ? "trước mảng" : "before array") : `after [${item.boundary}]`;
+    return `<div class="${classes}"><small>P[${item.boundary}]</small><strong>${item.value}</strong><span>${escapeHtml(boundaryLabel)}</span>${isMatch ? `<em>need ✓</em>` : ""}</div>`;
+  }).join("");
+
+  const freqEntries = Object.entries(view.freq || {}).sort(([a], [b]) => Number(a) - Number(b));
+  const freqCards = freqEntries.map(([prefixValue, count]) => {
+    const isNeed = Number(prefixValue) === Number(view.need) && view.need !== null;
+    const isCurrent = Number(prefixValue) === Number(view.prefix) && ["store", "done"].includes(event);
+    const positions = Array.isArray(view.positions?.[prefixValue]) ? view.positions[prefixValue] : [];
+    return `<div class="nice1248-freq${isNeed ? " need" : ""}${isCurrent ? " current" : ""}">
+      <small>prefix</small><strong>${escapeHtml(prefixValue)}</strong><span>count = ${escapeHtml(String(count))}</span><em>${positions.map((index) => index === -1 ? "P[-1]" : `P[${index}]`).join(", ")}</em>
+    </div>`;
+  }).join("");
+
+  const needReady = Number.isInteger(view.need);
+  const found = Array.isArray(view.matchingPositions) ? view.matchingPositions.length : 0;
+  const lookup = needReady
+    ? `<div class="nice1248-equation"><span><small>${vi ? "prefix hiện tại" : "current prefix"}</small><strong>${view.prefix}</strong></span><b>−</b><span><small>k</small><strong>${view.k}</strong></span><b>=</b><span class="need"><small>need</small><strong>${view.need}</strong></span></div>
+       <div class="nice1248-count"><span>prefix_freq[${view.need}]</span><strong>${found}</strong><b>ans: ${view.ans - (event === "count" ? view.added : 0)} + ${event === "count" ? view.added : 0} = ${view.ans}</b></div>`
+    : `<div class="nice1248-wait"><strong>${vi ? "Chưa tính need" : "Need is not computed yet"}</strong><span>${vi ? "Đọc phần tử rồi cập nhật số lượng số lẻ trước." : "Read the value and update the odd count first."}</span></div>`;
+
+  const newCards = newSubarrays.length
+    ? newSubarrays.map((item) => `<div class="nice1248-subarray"><small>prefix P[${item.prefixEnd}] = ${view.need}</small><strong>[${item.start}..${item.end}]</strong><span>[${item.values.map((value) => escapeHtml(String(value))).join(", ")}]</span><em>${vi ? `đúng ${view.k} số lẻ` : `exactly ${view.k} odds`}</em></div>`).join("")
+    : `<div class="nice1248-empty">${event === "done"
+      ? (vi ? `Đã đếm xong ${view.ans} nice subarray.` : `Finished counting ${view.ans} nice subarray(s).`)
+      : needReady
+        ? (vi ? `Không có prefix cũ bằng ${view.need} ở bước này.` : `No earlier prefix equals ${view.need} at this step.`)
+        : (vi ? "Các nice subarray mới sẽ hiện ở đây." : "New nice subarrays will appear here.")}</div>`;
+
+  const coreRule = vi
+    ? "Hai prefix chênh nhau k số lẻ ⇒ đoạn nằm giữa là một nice subarray."
+    : "Two prefixes differing by k odds ⇒ the segment between them is a nice subarray.";
+  const totalFound = Array.isArray(view.niceSubarrays) ? view.niceSubarrays.length : view.ans;
+
+  $("treeView").innerHTML = `<section class="nice1248-viz" role="img" aria-label="Count Number of Nice Subarrays visualization">
+    <header><div><small>#1248 · PREFIX COUNT</small><strong>${vi ? "ĐẾM SUBARRAY CÓ ĐÚNG K SỐ LẺ" : "COUNT SUBARRAYS WITH EXACTLY K ODDS"}</strong></div><span>${eventLabels[event] || event}</span></header>
+    <section class="nice1248-rule"><b>${vi ? "QUY TẮC CỐT LÕI" : "CORE RULE"}</b><strong>prefix[right] − prefix[left − 1] = k</strong><span>${escapeHtml(coreRule)}</span></section>
+    <div class="nice1248-phases">${phases}</div>
+    <section class="nice1248-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="nice1248-array"><header><strong>NUMS → ODD CONTRIBUTION</strong><span>${vi ? "lẻ = +1 · chẵn = +0" : "odd = +1 · even = +0"}</span></header><div class="nice1248-scroll"><div class="nice1248-cells">${arrayCells}</div></div></section>
+    <section class="nice1248-prefixes"><header><strong>${vi ? "CÁC MỐC PREFIX" : "PREFIX CHECKPOINTS"}</strong><span>${vi ? "P[i] = số lượng số lẻ trong nums[0..i]" : "P[i] = odd count in nums[0..i]"}</span></header><div class="nice1248-scroll"><div class="nice1248-prefix-row">${prefixCells}</div></div></section>
+    <div class="nice1248-main"><section class="nice1248-lookup"><header><strong>${vi ? "TÌM PREFIX CẦN THIẾT" : "LOOK UP THE NEEDED PREFIX"}</strong><span>need = prefix − k</span></header>${lookup}</section><section class="nice1248-ledger"><header><strong>PREFIX_FREQ</strong><span>${vi ? "giá trị prefix → số lần đã lưu" : "prefix value → stored count"}</span></header><div>${freqCards}</div></section></div>
+    <section class="nice1248-results"><header><strong>${vi ? "NICE SUBARRAY MỚI Ở RIGHT NÀY" : "NEW NICE SUBARRAYS AT THIS RIGHT"}</strong><span>${newSubarrays.length} ${vi ? "đoạn mới" : "new"}</span></header><div>${newCards}</div></section>
+    <footer><span><small>${vi ? "đã liệt kê" : "listed so far"}</small><strong>${totalFound}</strong></span><b>${vi ? "TỔNG ĐÁP ÁN" : "RUNNING ANSWER"}</b><strong>${view.ans ?? 0}</strong></footer>
+  </section>`;
+}
+
 function renderExactK992View(step) {
   const view = step.exactK992View || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -28541,6 +28650,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSmallHashView(step);
+  } else if (step.nice1248View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNice1248View(step);
   } else if (step.exactK992View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
