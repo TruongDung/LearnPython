@@ -180,14 +180,11 @@ function applyStaticStrings() {
   const catalogJumpNav = $("catalogJumpNav");
   if (catalogJumpNav) catalogJumpNav.setAttribute("aria-label", t().catalogJumpNav);
   const quickProblemInput = $("quickProblemId");
-  if (quickProblemInput) quickProblemInput.placeholder = t().quickJumpPlaceholder;
-  const quickProblemError = $("quickProblemError");
-  if (quickProblemError && !quickProblemError.classList.contains("hidden")) {
-    if (searchErrorState?.type === "unsupported") {
-      quickProblemError.textContent = t().unsupportedProblem(searchErrorState.id);
-    } else if (!quickProblemInput?.value.trim()) {
-      quickProblemError.textContent = t().errEmptyId;
-    }
+  if (quickProblemInput) {
+    quickProblemInput.placeholder = t().quickJumpPlaceholder;
+    quickProblemInput.setAttribute("aria-label", t().quickJumpLabel);
+    quickProblemInput.closest("form")?.setAttribute("aria-label", t().quickJumpLabel);
+    if (quickProblemInput.getAttribute("aria-invalid") !== "true") quickProblemInput.title = t().quickJumpLabel;
   }
   const liveEditButton = $("liveEditBtn");
   if (liveEditButton) {
@@ -1665,12 +1662,11 @@ $("problemId").addEventListener("keydown", (e) => {
 $("quickProblemForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = $("quickProblemId");
-  const error = $("quickProblemError");
-  const button = $("quickProblemBtn");
   $("problemId").value = input.value.trim();
   input.removeAttribute("aria-invalid");
-  hide("quickProblemError");
-  button.disabled = true;
+  input.setCustomValidity("");
+  input.title = t().quickJumpLabel;
+  input.disabled = true;
   try {
     const loaded = await loadProblem({ scrollToEnd: true });
     if (loaded) {
@@ -1678,10 +1674,11 @@ $("quickProblemForm").addEventListener("submit", async (event) => {
       return;
     }
     input.setAttribute("aria-invalid", "true");
-    error.textContent = $("searchError").textContent || t().errLoad;
-    show("quickProblemError");
+    const message = $("searchError").textContent || t().errLoad;
+    input.setCustomValidity(message);
+    input.title = message;
   } finally {
-    button.disabled = false;
+    input.disabled = false;
   }
 });
 
@@ -1743,8 +1740,9 @@ async function loadProblem({ scrollToEnd = false } = {}) {
     if (quickProblemInput) {
       quickProblemInput.value = data.id;
       quickProblemInput.removeAttribute("aria-invalid");
+      quickProblemInput.setCustomValidity("");
+      quickProblemInput.title = t().quickJumpLabel;
     }
-    hide("quickProblemError");
     resetLiveEditorState();
     saveRecentProblem(data);
     if (problemChanged) $("extraParams").innerHTML = "";

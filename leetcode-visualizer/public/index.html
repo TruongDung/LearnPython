@@ -196,14 +196,8 @@
     </div>
 
     <nav id="catalogJumpNav" class="catalog-jump-nav" aria-label="Jump to this problem in a tag">
-      <form id="quickProblemForm" class="catalog-quick-jump" novalidate>
-        <label for="quickProblemId" data-i18n="quickJumpLabel">Jump to LeetCode problem</label>
-        <div class="catalog-quick-row">
-          <span aria-hidden="true">#</span>
-          <input id="quickProblemId" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" placeholder="Problem number" />
-          <button id="quickProblemBtn" type="submit" data-i18n="quickJumpBtn">Go</button>
-        </div>
-        <p id="quickProblemError" class="catalog-quick-error hidden" role="alert"></p>
+      <form id="quickProblemForm" class="catalog-quick-jump" novalidate aria-label="Jump to LeetCode problem">
+        <input id="quickProblemId" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" placeholder="Problem number" aria-label="Jump to LeetCode problem" />
       </form>
     </nav>
 
