@@ -149,7 +149,7 @@ function coerceParamValue(problem, paramName, value, context) {
   }
 
   if (["root", "root1", "root2", "subRoot"].includes(paramName)) {
-    if (problem.id === 116) return { ...treeMarker(value), __viz_type: "binary_tree_next" };
+    if (problem.id === 116 || problem.id === 117) return { ...treeMarker(value), __viz_type: "binary_tree_next" };
     return { ...treeMarker(value), tree_id: paramName };
   }
   if (["head", "l1", "l2", "headA", "headB"].includes(paramName)) return listMarker(value);

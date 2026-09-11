@@ -5126,6 +5126,70 @@ function renderSameTreeView(step) {
   renderSide(view.qTree, "sameTreeQ");
 }
 
+function renderBfsLevelView(step) {
+  const view = step.bfsLevelView || {};
+  const vi = lang === "vi";
+  const target = $("treeView");
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (Array.isArray(value)) return JSON.stringify(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(pick(stage))}</b></span>`;
+  }).join("");
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const queueHtml = queue.length
+    ? queue.map((item, index) => `<span><small>${index === 0 ? "FRONT" : `#${index}`}</small><strong>${escapeHtml(text(item.value))}</strong></span>`).join('<i aria-hidden="true">→</i>')
+    : `<em>∅</em>`;
+  const valueTokens = (values) => (Array.isArray(values) ? values : []).map((item) => `<span class="bl-token ${escapeHtml(item.tone || "neutral")}">
+    <strong>${escapeHtml(text(item.value))}</strong>${item.meta ? `<small>${escapeHtml(text(item.meta))}</small>` : ""}
+  </span>`).join("");
+  const compactTokens = (values, tone = "neutral", active = []) => (Array.isArray(values) ? values : []).map((value, index) => `<b class="${tone}${active.includes(index) ? " active" : ""}">${escapeHtml(text(value))}</b>`).join("");
+  const rows = Array.isArray(view.rows) ? view.rows : [];
+  const rowHtml = rows.length ? rows.map((row) => {
+    const status = row.status === "fail" ? "danger" : row.status === "sorted" || row.tone === "success" ? "success" : "";
+    const beforeAfter = Array.isArray(row.before) || Array.isArray(row.secondary) || Array.isArray(row.working)
+      ? `<div class="bl-transform">
+          ${Array.isArray(row.before) ? `<span><small>${vi ? "TRƯỚC" : "BEFORE"}</small><i>${compactTokens(row.before)}</i></span>` : ""}
+          ${Array.isArray(row.secondary) ? `<span><small>${view.mode === "level-sort" ? "TARGET" : (vi ? "SAU" : "AFTER")}</small><i>${compactTokens(row.secondary, view.mode === "level-sort" ? "target" : "success")}</i></span>` : ""}
+          ${Array.isArray(row.working) ? `<span><small>${vi ? "HIỆN TẠI" : "CURRENT"}</small><i>${compactTokens(row.working, "working", row.swap || [])}</i></span>` : ""}
+        </div>`
+      : "";
+    return `<section class="bl-row ${status}">
+      <header><span><small>LEVEL</small><strong>${escapeHtml(row.level ?? 0)}</strong></span>${row.metric ? `<code><small>${escapeHtml(text(row.metric.label))}</small>${escapeHtml(text(row.metric.value))}</code>` : ""}</header>
+      <div class="bl-values">${valueTokens(row.values)}</div>
+      ${beforeAfter}
+    </section>`;
+  }).join("") : `<div class="bl-empty">${vi ? "Chưa xử lý tầng nào" : "No level processed yet"}</div>`;
+  const cards = Array.isArray(view.cards) ? view.cards : [];
+  const cardsHtml = cards.length ? `<div class="bl-cards">${cards.map((card) => `<section class="${escapeHtml(card.tone || "neutral")}"><small>${escapeHtml(text(card.label))}</small><strong>${escapeHtml(text(card.value))}</strong>${card.detail ? `<span>${escapeHtml(text(card.detail))}</span>` : ""}</section>`).join("")}</div>` : "";
+  const status = view.status === "danger" ? "danger" : view.status === "success" ? "success" : "checking";
+  const summary = vi
+    ? `Bài ${view.problemId}, bước ${pick(step.title)}. Queue có ${queue.length} node và đã hiển thị ${rows.length} tầng.`
+    : `Problem ${view.problemId}, step ${pick(step.title)}. The queue has ${queue.length} nodes and ${rows.length} levels are shown.`;
+
+  target.innerHTML = `<section class="bl-viz bl-${escapeHtml(view.mode || "level-order")}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="bl-phases">${phases}</div>
+    <section class="bl-action ${status}"><span><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong></span><em>${escapeHtml(String(view.event || "BFS").replaceAll("-", " "))}</em></section>
+    <div class="bl-layout">
+      <section class="bl-tree-panel"><header><strong>${vi ? "CÂY · MỖI HÀNG LÀ MỘT LEVEL" : "TREE · EACH ROW IS ONE LEVEL"}</strong><span>${vi ? "cam = đang xét · xanh = đã xử lý" : "amber = current · green = processed"}</span></header><div id="bfsLevelTree" class="bl-tree"></div></section>
+      <section class="bl-board"><header><strong>${vi ? "BẢNG THEO TẦNG" : "LEVEL BOARD"}</strong><span>${vi ? "đọc từ trái sang phải" : "read left to right"}</span></header><div class="bl-rows">${rowHtml}</div></section>
+    </div>
+    <section class="bl-queue"><header><strong>QUEUE</strong><span>${vi ? "front được lấy ra trước" : "front is removed first"}</span></header><div>${queueHtml}</div></section>
+    ${view.formula ? `<section class="bl-formula"><small>${vi ? "PHÉP TÍNH / ĐIỀU KIỆN" : "COMPUTATION / CONDITION"}</small><code>${escapeHtml(text(view.formula))}</code></section>` : ""}
+    ${cardsHtml}
+    <div class="bl-legend" aria-hidden="true"><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="done"></i>${vi ? "đã xử lý / chọn" : "processed / selected"}</span><span><i class="bad"></i>${vi ? "vi phạm" : "violation"}</span></div>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "bfsLevelTree");
+  else $("bfsLevelTree").innerHTML = `<span class="bl-tree-empty">∅</span>`;
+}
+
 function renderTreeEssentialsView(step) {
   const view = step.treeEssentialsView || {};
   const target = $("treeView");
@@ -27524,6 +27588,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSkylineView(step);
+  } else if (step.bfsLevelView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBfsLevelView(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
