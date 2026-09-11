@@ -96,5 +96,8 @@ test('1248 remains line-by-line and has scoped responsive CSS', () => {
   assert.match(css, /\.nice1248-viz \{/);
   assert.match(css, /\.nice1248-prefix\.match \{/);
   assert.match(css, /\.nice1248-subarray \{/);
+  assert.match(css, /\.nice1248-debug span \{[^}]*font-size:\s*12px;/);
+  assert.match(css, /\.nice1248-cell em \{[^}]*font-size:\s*10px;/);
+  assert.match(css, /\.nice1248-freq span \{[^}]*font:\s*800 11px/);
   assert.match(css, /@container \(max-width: 430px\)/);
 });

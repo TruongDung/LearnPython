@@ -13642,6 +13642,103 @@ function renderSlidingFreqView(step) {
     </div>`;
 }
 
+function renderBalanced1234View(step) {
+  const view = step.balanced1234View || {};
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const alphabet = Array.isArray(view.alphabet) ? view.alphabet : ["Q", "W", "E", "R"];
+  const windowSet = new Set(Array.isArray(view.windowIndices) ? view.windowIndices : []);
+  const vi = lang === "vi";
+  const event = String(view.event || "target");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "—";
+  const phaseIndex = {
+    target: 0,
+    count: 0,
+    "balanced-check": 0,
+    "init-window": 1,
+    inspect: 1,
+    expand: 2,
+    "invalid-check": 3,
+    "valid-check": 3,
+    "update-best": 4,
+    "restore-left": 5,
+    "move-left": 5,
+    done: 6,
+  }[event] ?? 0;
+  const phaseLabels = vi
+    ? ["Đếm toàn chuỗi", "Mở rộng right", "Chuyển vào window", "Kiểm tra outside", "Cập nhật best", "Thu hẹp left"]
+    : ["Count string", "Expand right", "Move into window", "Check outside", "Update best", "Shrink left"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = event === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const bestLeft = view.bestWindow?.left;
+  const bestRight = view.bestWindow?.right;
+  const cells = chars.map((char, index) => {
+    const inWindow = windowSet.has(index);
+    const inBest = Number.isInteger(bestLeft) && index >= bestLeft && index <= bestRight;
+    const pointers = [index === view.left ? "L" : "", index === view.right ? "R" : ""].filter(Boolean).join("/");
+    const classes = [
+      "bal1234-cell",
+      `char-${char.toLowerCase()}`,
+      inWindow ? "replace" : "outside",
+      inBest ? "best" : "",
+      index === view.restoringIndex ? "restoring" : "",
+      index === view.right ? "current" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="bal1234-cell-wrap"><div class="bal1234-pointer">${pointers ? `${pointers} ▼` : ""}</div><div class="${classes}"><small>[${index}]</small><strong>${char}</strong><em>${inWindow ? (vi ? "THAY" : "REPLACE") : "OUTSIDE"}</em></div></div>`;
+  }).join("");
+
+  const countCards = alphabet.map((char) => {
+    const count = Number(view.outside?.[char] || 0);
+    const initial = Number(view.initialCounts?.[char] || 0);
+    const status = count > view.target ? "excess" : "safe";
+    const statusText = status === "excess" ? (vi ? "CÒN DƯ" : "EXCESS") : (vi ? "ĐẠT" : "SAFE");
+    return `<div class="bal1234-count ${status} char-${char.toLowerCase()}"><header><strong>${char}</strong><em>${statusText}</em></header><div><span>${count}</span><b>/ ${view.target}</b></div><footer>${vi ? "ban đầu" : "initial"} ${initial} · window ${view.windowCounts?.[char] || 0}</footer></div>`;
+  }).join("");
+
+  const conditions = alphabet.map((char) => {
+    const count = Number(view.outside?.[char] || 0);
+    const pass = count <= view.target;
+    return `<span class="${pass ? "pass" : "fail"}"><b>${char}</b><code>${count} ≤ ${view.target}</code><em>${pass ? "✓" : "✕"}</em></span>`;
+  }).join("");
+  const needed = alphabet.map((char) => `${char}:${view.replacementNeeds?.[char] || 0}`).join(" · ");
+
+  const eventLabels = {
+    target: "TARGET",
+    count: "COUNT",
+    "balanced-check": vi ? "CÂN BẰNG?" : "BALANCED?",
+    "init-window": "WINDOW",
+    inspect: "READ RIGHT",
+    expand: "OUTSIDE − 1",
+    "invalid-check": vi ? "CHƯA HỢP LỆ" : "NOT VALID",
+    "valid-check": vi ? "WINDOW HỢP LỆ" : "VALID WINDOW",
+    "update-best": view.improved ? "NEW BEST" : "KEEP BEST",
+    "restore-left": "OUTSIDE + 1",
+    "move-left": "MOVE LEFT",
+    done: "DONE",
+  };
+  const validClass = view.valid ? "valid" : "invalid";
+  const candidateText = view.candidate
+    ? `[${view.candidate.left}..${view.candidate.right}] · ${view.candidate.length}`
+    : "—";
+  const bestText = view.bestWindow
+    ? `[${view.bestWindow.left}..${view.bestWindow.right}] · ${view.best}`
+    : view.best === 0 ? "[] · 0" : `— · ${view.best}`;
+
+  $("treeView").innerHTML = `<section class="bal1234-viz" role="img" aria-label="Replace the Substring for Balanced String visualization">
+    <header><div><small>#1234 · SLIDING WINDOW</small><strong>${vi ? "THAY SUBSTRING ĐỂ CÂN BẰNG QWER" : "REPLACE A SUBSTRING TO BALANCE QWER"}</strong></div><span>${escapeHtml(eventLabels[event] || event)}</span></header>
+    <section class="bal1234-rule"><b>${vi ? "Ý TƯỞNG QUAN TRỌNG" : "KEY IDEA"}</b><strong>WINDOW = ${vi ? "phần sẽ thay" : "replaceable"} · OUTSIDE = ${vi ? "phần giữ nguyên" : "kept"}</strong><span>${vi ? "Chỉ cần mọi outside count ≤ target. Phần còn thiếu sẽ được điền vào window." : "Only the outside counts must be ≤ target. Missing characters can be placed inside the window."}</span></section>
+    <div class="bal1234-phases">${phases}</div>
+    <section class="bal1234-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><b>${escapeHtml(eventLabels[event] || event)}</b><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="bal1234-string"><header><strong>s = ${escapeHtml(JSON.stringify(view.s || ""))}</strong><span>${vi ? "xanh = outside · tím = window sẽ thay · nét đứt = best" : "blue = outside · purple = replacement window · dashed = best"}</span></header><div class="bal1234-scroll"><div class="bal1234-cells">${cells}</div></div></section>
+    <section class="bal1234-counts"><header><strong>${vi ? "BỘ ĐẾM BÊN NGOÀI WINDOW" : "COUNTS OUTSIDE THE WINDOW"}</strong><span>${vi ? `mỗi ký tự tối đa ${view.target}` : `each character at most ${view.target}`}</span></header><div>${countCards}</div></section>
+    <section class="bal1234-check ${validClass}"><header><div><small>${vi ? "ĐIỀU KIỆN WINDOW" : "WINDOW CONDITION"}</small><strong>all(outside[ch] ≤ target)</strong></div><b>${view.valid ? (vi ? "HỢP LỆ ✓" : "VALID ✓") : (vi ? "MỞ RỘNG TIẾP" : "KEEP EXPANDING")}</b></header><div>${conditions}</div><footer><span>${vi ? "Nếu thay window này, cần điền" : "If this window is replaced, fill"}</span><strong>${escapeHtml(needed)}</strong></footer></section>
+    <div class="bal1234-bottom"><section><small>${vi ? "CANDIDATE HIỆN TẠI" : "CURRENT CANDIDATE"}</small><strong>${candidateText}</strong><span>${view.improved ? (vi ? "ngắn hơn → lưu" : "shorter → save") : (vi ? "chưa cập nhật" : "not updated")}</span></section><section class="best"><small>${vi ? "WINDOW TỐT NHẤT" : "BEST WINDOW"}</small><strong>${bestText}</strong><span>${vi ? "độ dài nhỏ nhất" : "minimum length"}</span></section></div>
+    <footer><span>${vi ? "ANSWER · độ dài substring cần thay" : "ANSWER · replacement substring length"}</span><strong>${view.final || view.best === 0 || view.bestWindow ? view.best : "—"}</strong></footer>
+  </section>`;
+}
+
 function renderNice1248View(step) {
   const view = step.nice1248View || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -28648,6 +28745,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSmallHashView(step);
+  } else if (step.balanced1234View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBalanced1234View(step);
   } else if (step.nice1248View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

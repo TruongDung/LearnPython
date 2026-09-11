@@ -18,6 +18,7 @@ function makeStep(nums, opts) {
     ...(opts.slidingFreqView ? { slidingFreqView: opts.slidingFreqView } : {}),
     ...(opts.exactK992View ? { exactK992View: opts.exactK992View } : {}),
     ...(opts.nice1248View ? { nice1248View: opts.nice1248View } : {}),
+    ...(opts.balanced1234View ? { balanced1234View: opts.balanced1234View } : {}),
   };
 }
 
@@ -321,6 +322,195 @@ function buildStepsPrefixExact(input, params, config) {
   }
   snap({ vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, 10, nums.length - 1, { vi: "Đếm xong mọi subarray có tổng điều kiện đúng target.", en: "All subarrays satisfying the target condition are counted." }, { final: true });
   return { original: nums, [config.param]: target, answer: ans, steps };
+}
+
+function buildSteps1234(input) {
+  const s = String(input ?? "").toUpperCase();
+  const chars = [...s];
+  const alphabet = ["Q", "W", "E", "R"];
+  if (chars.length < 4 || chars.length % 4 !== 0) throw new Error("s length must be a positive multiple of 4");
+  if (chars.length > 24) throw new Error("Use at most 24 characters so the sliding window remains readable.");
+  if (chars.some((char) => !alphabet.includes(char))) throw new Error("s may contain only Q, W, E, and R");
+
+  const target = chars.length / 4;
+  const initialCounts = Object.fromEntries(alphabet.map((char) => [char, 0]));
+  chars.forEach((char) => { initialCounts[char] += 1; });
+  const outside = { ...initialCounts };
+  const steps = [];
+  let left = 0;
+  let best = chars.length;
+  let bestWindow = null;
+
+  const isValid = () => alphabet.every((char) => outside[char] <= target);
+  const snap = (title, codeLine, right, note, extra = {}) => {
+    const windowRight = Number.isInteger(extra.windowRight) ? extra.windowRight : right;
+    const windowIndices = left <= windowRight ? range(left, windowRight) : [];
+    const windowCounts = Object.fromEntries(alphabet.map((char) => [char, initialCounts[char] - outside[char]]));
+    const replacementNeeds = Object.fromEntries(alphabet.map((char) => [char, Math.max(0, target - outside[char])]));
+    steps.push(makeStep(chars, {
+      title,
+      codeLines: [codeLine],
+      highlight: windowIndices,
+      mark: bestWindow ? range(bestWindow.left, bestWindow.right) : [],
+      final: Boolean(extra.final),
+      note,
+      vars: [
+        { name: "target", value: target },
+        { name: "left", value: left },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "outside", value: `{${alphabet.map((char) => `${char}:${outside[char]}`).join(", ")}}` },
+        { name: "valid", value: isValid() },
+        { name: "best", value: best },
+      ],
+      balanced1234View: {
+        s,
+        chars: [...chars],
+        alphabet: [...alphabet],
+        target,
+        initialCounts: { ...initialCounts },
+        outside: { ...outside },
+        windowCounts,
+        replacementNeeds,
+        left,
+        right,
+        windowRight,
+        windowIndices,
+        valid: isValid(),
+        best,
+        bestWindow: bestWindow ? { ...bestWindow } : null,
+        candidate: extra.candidate ? { ...extra.candidate } : null,
+        improved: Boolean(extra.improved),
+        restoringIndex: Number.isInteger(extra.restoringIndex) ? extra.restoringIndex : null,
+        event: extra.event || "setup",
+        final: Boolean(extra.final),
+      },
+    }));
+  };
+
+  snap(
+    { vi: `target = ${chars.length} // 4 = ${target}`, en: `target = ${chars.length} // 4 = ${target}` },
+    3,
+    -1,
+    { vi: `Chuỗi cân bằng cần đúng ${target} ký tự của mỗi loại Q, W, E, R.`, en: `A balanced string needs exactly ${target} of each character Q, W, E, and R.` },
+    { event: "target", windowRight: -1 },
+  );
+  snap(
+    { vi: "Đếm toàn bộ ký tự bên ngoài window", en: "Count all characters outside the window" },
+    4,
+    -1,
+    { vi: "Ban đầu window rỗng nên outside chính là toàn bộ chuỗi.", en: "Initially the window is empty, so outside is the entire string." },
+    { event: "count", windowRight: -1 },
+  );
+
+  const alreadyBalanced = alphabet.every((char) => outside[char] === target);
+  snap(
+    { vi: `Chuỗi đã cân bằng? ${alreadyBalanced}`, en: `Already balanced? ${alreadyBalanced}` },
+    5,
+    -1,
+    alreadyBalanced
+      ? { vi: "Mỗi ký tự đã xuất hiện đúng target lần; không cần thay thế.", en: "Every character already appears exactly target times; no replacement is needed." }
+      : { vi: "Có ký tự vượt target, nên cần tìm window ngắn nhất che hết phần dư.", en: "At least one character exceeds target, so find the shortest window covering every excess." },
+    { event: "balanced-check", windowRight: -1 },
+  );
+  if (alreadyBalanced) {
+    best = 0;
+    snap(
+      { vi: "return 0", en: "return 0" },
+      6,
+      -1,
+      { vi: "Đáp án là 0 vì chuỗi đã cân bằng.", en: "The answer is 0 because the string is already balanced." },
+      { event: "done", windowRight: -1, final: true },
+    );
+    return { original: s, answer: 0, steps };
+  }
+
+  snap(
+    { vi: `left = 0, best = ${best}`, en: `left = 0, best = ${best}` },
+    7,
+    -1,
+    { vi: "Window sẽ chứa phần được phép thay thế; outside chứa phần bắt buộc giữ nguyên.", en: "The window is the replaceable part; outside is the part that must stay unchanged." },
+    { event: "init-window", windowRight: -1 },
+  );
+
+  for (let right = 0; right < chars.length; right++) {
+    const char = chars[right];
+    snap(
+      { vi: `Xét s[${right}] = '${char}'`, en: `Inspect s[${right}] = '${char}'` },
+      8,
+      right,
+      { vi: "right chuẩn bị đưa ký tự này vào replacement window.", en: "right is about to move this character into the replacement window." },
+      { event: "inspect", windowRight: right - 1 },
+    );
+
+    outside[char] -= 1;
+    snap(
+      { vi: `outside['${char}'] -= 1 → ${outside[char]}`, en: `outside['${char}'] -= 1 → ${outside[char]}` },
+      9,
+      right,
+      { vi: `'${char}' chuyển từ outside vào window; phần này giờ có thể bị thay thế.`, en: `'${char}' moves from outside into the window and may now be replaced.` },
+      { event: "expand" },
+    );
+
+    while (true) {
+      const valid = isValid();
+      snap(
+        { vi: `Mọi outside count ≤ ${target}? ${valid}`, en: `Every outside count ≤ ${target}? ${valid}` },
+        10,
+        right,
+        valid
+          ? { vi: "Hợp lệ: phần bên ngoài không còn ký tự dư; window này có thể được thay để cân bằng chuỗi.", en: "Valid: the outside has no excess character, so replacing this window can balance the string." }
+          : { vi: "Chưa hợp lệ: ít nhất một ký tự bên ngoài vẫn vượt target; cần mở rộng right.", en: "Not valid yet: an outside character still exceeds target, so right must expand." },
+        { event: valid ? "valid-check" : "invalid-check" },
+      );
+      if (!valid) break;
+
+      const candidateLength = right - left + 1;
+      const improved = candidateLength < best;
+      if (improved) {
+        best = candidateLength;
+        bestWindow = { left, right };
+      }
+      snap(
+        { vi: `best = min(best, ${candidateLength}) → ${best}`, en: `best = min(best, ${candidateLength}) → ${best}` },
+        11,
+        right,
+        improved
+          ? { vi: `Lưu [${left}..${right}] làm window tốt nhất mới.`, en: `Save [${left}..${right}] as the new best window.` }
+          : { vi: `Window [${left}..${right}] hợp lệ nhưng không ngắn hơn best.`, en: `Window [${left}..${right}] is valid but not shorter than best.` },
+        { event: "update-best", candidate: { left, right, length: candidateLength }, improved },
+      );
+
+      const leaving = chars[left];
+      outside[leaving] += 1;
+      snap(
+        { vi: `outside['${leaving}'] += 1 → ${outside[leaving]}`, en: `outside['${leaving}'] += 1 → ${outside[leaving]}` },
+        12,
+        right,
+        { vi: `Trả s[left] = '${leaving}' về outside để thử window ngắn hơn.`, en: `Return s[left] = '${leaving}' to outside to try a shorter window.` },
+        { event: "restore-left", restoringIndex: left },
+      );
+
+      left += 1;
+      snap(
+        { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+        13,
+        right,
+        { vi: "Thu hẹp cạnh trái rồi kiểm tra lại điều kiện outside.", en: "Shrink the left edge, then check the outside condition again." },
+        { event: "move-left" },
+      );
+    }
+  }
+
+  snap(
+    { vi: `return best → ${best}`, en: `return best → ${best}` },
+    14,
+    chars.length - 1,
+    bestWindow
+      ? { vi: `Window thay thế ngắn nhất là [${bestWindow.left}..${bestWindow.right}], độ dài ${best}.`, en: `The shortest replacement window is [${bestWindow.left}..${bestWindow.right}], length ${best}.` }
+      : { vi: `Đáp án cuối cùng là ${best}.`, en: `The final answer is ${best}.` },
+    { event: "done", final: true },
+  );
+  return { original: s, answer: best, steps };
 }
 
 function buildSteps1248(input, params) {
@@ -970,6 +1160,7 @@ module.exports = {
     { vi: "Chạy hai cửa sổ cùng lúc: `left_k` giữ tối đa K distinct, `left_km1` giữ tối đa K-1 distinct.", en: "Run two windows together: `left_k` keeps at most K distinct values, `left_km1` keeps at most K-1." },
     { vi: "Với mỗi right, số subarray đúng K kết thúc tại right là `left_km1 - left_k`.", en: "For each right, the number of exactly-K subarrays ending there is `left_km1 - left_k`." },
   ], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi phần tử được thêm/xóa khỏi mỗi cửa sổ tối đa một lần.", en: "Each element enters and leaves each window at most once." } }, code: ["class Solution:", "    def subarraysWithKDistinct(self, nums, k):", "        def add(freq, x):", "            freq[x] = freq.get(x, 0) + 1", "        def remove(freq, x):", "            freq[x] -= 1", "            if freq[x] == 0:", "                del freq[x]", "        freq_k, freq_km1 = {}, {}", "        left_k = left_km1 = ans = 0", "        for right, num in enumerate(nums):", "            add(freq_k, num)", "            add(freq_km1, num)", "            while len(freq_k) > k:", "                remove(freq_k, nums[left_k])", "                left_k += 1", "            while len(freq_km1) > k - 1:", "                remove(freq_km1, nums[left_km1])", "                left_km1 += 1", "            ans += left_km1 - left_k", "        return ans"], builder: buildSteps992 },
+  1234: { id: 1234, difficulty: "medium", slug: "replace-the-substring-for-balanced-string", category, tags: [stringTag], title: { vi: "Replace the Substring for Balanced String", en: "Replace the Substring for Balanced String" }, titleVi: { vi: "Thay substring để chuỗi cân bằng", en: "Replace a substring to balance the string" }, statement: { vi: "Cho chuỗi chỉ gồm Q, W, E, R. Tìm độ dài substring ngắn nhất có thể thay thế để mỗi ký tự xuất hiện đúng n/4 lần.", en: "Given a string containing only Q, W, E, and R, find the shortest substring that can be replaced so every character appears exactly n/4 times." }, defaultInput: "WQWRQQQW", inputKind: "string", inputLabel: { vi: "s (chỉ Q, W, E, R)", en: "s (Q, W, E, R only)" }, extraParams: [], approach: [{ vi: "Window là đoạn sẽ bị thay thế; bộ đếm `outside` chỉ theo dõi phần chuỗi được giữ nguyên.", en: "The window is the part to replace; the `outside` counter tracks only the portion that stays unchanged." }, { vi: "Window hợp lệ khi mọi `outside[ch] <= n/4`. Khi đó các ký tự còn thiếu có thể được đặt vào window.", en: "A window is valid when every `outside[ch] <= n/4`; the missing characters can then be placed inside the window." }, { vi: "Mở rộng right cho đến khi hợp lệ, sau đó tăng left để tìm window hợp lệ ngắn nhất.", en: "Expand right until valid, then advance left to find the shortest valid window." }], complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi ký tự đi vào và ra khỏi window tối đa một lần; bộ đếm chỉ có bốn ký tự.", en: "Each character enters and leaves the window at most once; the counter has only four keys." } }, code: ["class Solution:", "    def balancedString(self, s: str) -> int:", "        target = len(s) // 4", "        outside = Counter(s)", "        if all(outside[ch] == target for ch in 'QWER'):", "            return 0", "        left, best = 0, len(s)", "        for right, ch in enumerate(s):", "            outside[ch] -= 1", "            while all(outside[x] <= target for x in 'QWER'):", "                best = min(best, right - left + 1)", "                outside[s[left]] += 1", "                left += 1", "        return best"], debugMode: "line-by-line", builder: buildSteps1234 },
   1248: { id: 1248, difficulty: "medium", slug: "count-number-of-nice-subarrays", category, tags: arrayTag, title: { vi: "Count Number of Nice Subarrays", en: "Count Number of Nice Subarrays" }, titleVi: { vi: "Đếm subarray có đúng K số lẻ", en: "Count subarrays with exactly K odd numbers" }, statement: { vi: "Đếm subarray có đúng k số lẻ.", en: "Count subarrays containing exactly k odd numbers." }, defaultInput: [1, 1, 2, 1, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lẻ chính xác)", en: "k (exact odd count)" }, default: 3 }], approach: [{ vi: "Đổi mỗi số lẻ thành 1 và số chẵn thành 0; prefix là số lượng số lẻ đã gặp.", en: "Treat each odd number as 1 and each even number as 0; prefix is the number of odds seen so far." }, { vi: "Tại right, cần prefix cũ `need = prefix - k`. Mỗi lần need từng xuất hiện tạo một subarray có đúng k số lẻ.", en: "At right, seek an earlier prefix `need = prefix - k`. Every prior occurrence creates one subarray with exactly k odds." }, { vi: "Luôn lưu prefix rỗng `{0: 1}` để đếm subarray bắt đầu tại index 0.", en: "Seed the empty prefix `{0: 1}` so subarrays starting at index 0 are counted." }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Duyệt một lần; frequency map lưu số lần mỗi odd-prefix đã xuất hiện.", en: "One pass; the frequency map stores how often each odd-prefix has appeared." } }, code: ["class Solution:", "    def numberOfSubarrays(self, nums, k):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num % 2", "            need = prefix - k", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], debugMode: "line-by-line", builder: buildSteps1248 },
   930: { id: 930, difficulty: "medium", slug: "binary-subarrays-with-sum", category, tags: arrayTag, title: { vi: "Binary Subarrays With Sum", en: "Binary Subarrays With Sum" }, titleVi: { vi: "Đếm subarray nhị phân có tổng bằng Goal", en: "Binary subarrays with sum Goal" }, statement: { vi: "Đếm subarray trong mảng nhị phân có tổng đúng goal.", en: "Count binary subarrays whose sum equals goal." }, defaultInput: [1, 0, 1, 0, 1], inputKind: "binary", inputLabel: { vi: "nums (0 hoặc 1)", en: "nums (0 or 1)" }, extraParams: [{ key: "goal", label: { vi: "goal (tổng chính xác)", en: "goal (exact sum)" }, default: 2 }], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Prefix sum và frequency map.", en: "Prefix sums and a frequency map." } }, code: ["class Solution:", "    def numSubarraysWithSum(self, nums, goal):", "        prefix_freq = {0: 1}", "        prefix = ans = 0", "        for right, num in enumerate(nums):", "            prefix += num", "            need = prefix - goal", "            ans += prefix_freq.get(need, 0)", "            prefix_freq[prefix] = prefix_freq.get(prefix, 0) + 1", "        return ans"], builder: buildSteps930 },
   2799: { id: 2799, difficulty: "medium", slug: "count-complete-subarrays-in-an-array", category, tags: arrayTag, title: { vi: "Count Complete Subarrays in an Array", en: "Count Complete Subarrays in an Array" }, titleVi: { vi: "Đếm complete subarray", en: "Count complete subarrays" }, statement: { vi: "Đếm subarray chứa mọi giá trị distinct xuất hiện trong toàn mảng.", en: "Count subarrays containing every distinct value from the full array." }, defaultInput: [1, 3, 1, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cửa sổ trượt với frequency map.", en: "Sliding window with a frequency map." } }, code: ["class Solution:", "    def countCompleteSubarrays(self, nums):", "        target = len(set(nums))", "        freq = {}; left = ans = 0", "        for right, num in enumerate(nums):", "            freq[num] = freq.get(num, 0) + 1", "            while len(freq) == target:", "                ans += len(nums) - right", "                remove_from(freq, left); left += 1", "        return ans"], builder: buildSteps2799 },
