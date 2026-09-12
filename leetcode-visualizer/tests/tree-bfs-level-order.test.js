@@ -214,12 +214,30 @@ test('2415 reverses values on odd levels only', () => {
   assert.deepEqual(reversed.bfsLevelView.rows.at(-1).secondary, [5, 3]);
 });
 
+test('2415 debugs reverse, assignment, and child enqueueing one source line at a time', () => {
+  const run = SUPPORTED[2415].builder('2,3,5,8,13,21,34');
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'zip-pair' && step.codeLines[0] === 8));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'assign' && step.codeLines[0] === 9));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'enqueue-right' && step.codeLines[0] === 12));
+});
+
 test('2471 visualizes each minimum swap and totals independent levels', () => {
   const run = SUPPORTED[2471].builder('1,4,3,7,6,8,5,null,null,null,null,9,null,10');
   assert.equal(run.answer, 3);
   assert.ok(SUPPORTED[2471].tags.some(tag => tag.key === 'sorting'));
   assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'swap').length, 3);
   assert.equal(SUPPORTED[2471].builder('1,2,3,4,5,6').answer, 0);
+});
+
+test('2471 exposes target, position-map, swap, and counter updates separately', () => {
+  const run = SUPPORTED[2471].builder('1,4,3,7,6,8,5,null,null,null,null,9,null,10');
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'build-position' && step.codeLines[0] === 8));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'find-swap-index' && step.codeLines[0] === 11));
+  const counted = run.steps.filter(step => step.bfsLevelView.event === 'count-swap');
+  assert.equal(counted.length, 3);
+  assert.equal(counted.at(-1).vars.find(variable => variable.name === 'answer').value, 3);
 });
 
 test('2583 ranks all level sums and handles k beyond the tree height', () => {
@@ -233,11 +251,30 @@ test('2583 ranks all level sums and handles k beyond the tree height', () => {
   assert.throws(() => SUPPORTED[2583].builder('1', { k: 0 }), /positive integer/);
 });
 
+test('2583 separates BFS accumulation from every min-heap operation', () => {
+  const run = SUPPORTED[2583].builder('5,8,9,2,1,3,7,4,6', { k: 2 });
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'add-value' && step.codeLines[0] === 9));
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'append-sum').length, 4);
+  assert.equal(run.steps.filter(step => step.bfsLevelView.event === 'heap-push').length, 4);
+  assert.equal(run.steps.at(-1).vars.find(variable => variable.name === 'heap').value[0], 13);
+});
+
 test('2641 subtracts the complete sibling group from each original level total', () => {
   assert.deepEqual(SUPPORTED[2641].builder('5,4,9,1,10,null,7').answer, [0, 0, 0, 7, 7, null, 11]);
   assert.deepEqual(SUPPORTED[2641].builder('3,1,2').answer, [0, 0, 0]);
   const run = SUPPORTED[2641].builder('5,4,9,1,10,null,7');
   assert.ok(run.steps.some(step => step.bfsLevelView.formula === 'new value = 18 − (1 + 10) = 7'));
+});
+
+test('2641 preserves original level totals while replacing one child at a time', () => {
+  const run = SUPPORTED[2641].builder('5,4,9,1,10,null,7');
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'level-sum' && step.codeLines[0] === 8));
+  assert.ok(run.steps.some(step => step.bfsLevelView.event === 'sibling-sum' && step.codeLines[0] === 10));
+  const replacement = run.steps.find(step => step.bfsLevelView.formula === 'new value = 18 − (1 + 10) = 7');
+  assert.equal(replacement.vars.find(variable => variable.name === 'level_sum').value, 18);
+  assert.deepEqual(replacement.vars.find(variable => variable.name === 'siblings').value, [1, 10]);
 });
 
 test('Edit & run code gets TreeNode arguments, including Node.next for 117', () => {

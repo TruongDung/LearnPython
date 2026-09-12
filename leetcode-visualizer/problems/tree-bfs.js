@@ -1410,71 +1410,436 @@ function build1609(input) {
 function build2415(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: [], steps: [emptyResult(2415, "reverse-odd", root, "[]", 3)] };
-  const levels = levelsOf(root), steps = [introStep(2415, "reverse-odd", root,
-    { vi: "Chỉ đảo giá trị ở tầng lẻ", en: "Reverse values only on odd levels" },
-    { vi: "Cấu trúc và các cạnh không đổi. Ở level 1, 3, 5… đổi giá trị đối xứng từ hai đầu vào.", en: "The shape and edges do not change. On levels 1, 3, 5… swap symmetric values from the outside inward." })];
-  const rows = [], done = new Set();
-  levels.forEach((level, index) => {
-    const before = level.map((node) => node.val);
-    const reversed = index % 2 === 1 ? [...before].reverse() : [...before];
-    if (index % 2 === 1) level.forEach((node, i) => { node.val = reversed[i]; });
-    level.forEach((node) => done.add(node.id));
-    rows.push({ level: index, values: levelTokens(level, { tones: level.map(() => index % 2 === 1 ? "warning" : "neutral") }), before, secondary: reversed, metric: { label: index % 2 === 1 ? "reverse" : "keep", value: `[${reversed.join(", ")}]` } });
+  const steps = [];
+  const queue = [root];
+  const completedRows = [];
+  const done = new Set();
+  const sub = {};
+  let level = 0;
+  const queueText = () => queue.map((node) => node.val);
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const rowFor = ({ nodes, before, target, written = 0, currentIndex = -1, state = "waiting", complete = false }) => ({
+    level,
+    status: complete ? "sorted" : undefined,
+    before: [...before],
+    secondary: [...target],
+    working: nodes.map((node) => node.val),
+    swap: currentIndex >= 0 ? [currentIndex] : [],
+    values: nodes.map((node, index) => ({
+      id: node.id,
+      value: node.val,
+      tone: index === currentIndex ? "warning" : index < written ? "success" : "neutral",
+      meta: index === currentIndex ? state : index < written ? (level % 2 ? "reversed" : "kept") : "waiting",
+    })),
+    metric: { label: level % 2 ? "odd → reverse" : "even → keep", value: `[${nodes.map((node) => node.val).join(", ")}]` },
+  });
+  const debugStep = ({
+    nodes = null, before = [], target = [], written = 0, currentIndex = -1, state = "waiting",
+    currentCount = 0, node = null, value = "—", title, note, codeLine, event,
+    stage = 1, formula = null, active = [], final = false, status = "checking", result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, rowFor({ nodes, before, target, written, currentIndex, state })]
+      : completedRows;
     steps.push(makeStep({
-      problemId: 2415, mode: "reverse-odd", root, stage: index % 2 === 1 ? 2 : 1, event: index % 2 === 1 ? "reverse" : "keep", rows,
-      active: level.map((node) => node.id), done,
-      title: index % 2 === 1 ? { vi: `Tầng ${index}: đảo [${before}] → [${reversed}]`, en: `Level ${index}: reverse [${before}] → [${reversed}]` } : { vi: `Tầng ${index} chẵn: giữ nguyên`, en: `Even level ${index}: keep values` },
-      note: index % 2 === 1 ? { vi: "Node giữ nguyên vị trí; chỉ các value đổi chỗ đối xứng.", en: "Nodes stay in place; only their values swap symmetrically." } : { vi: "Level chẵn không thay đổi.", en: "Even levels remain unchanged." },
-      codeLines: index % 2 === 1 ? [7, 8] : [6], cards: [{ label: "level", value: index }, { label: "before", value: `[${before}]` }, { label: "after", value: `[${reversed}]`, tone: index % 2 === 1 ? "warning" : "neutral" }],
+      problemId: 2415, mode: "reverse-odd", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows, queue: queueSnapshot(currentCount),
+      queueNote: { vi: "vàng = level hiện tại · xanh dương = level kế", en: "amber = current level · blue = next level" },
+      active, done, sub, formula,
+      vars: [
+        { name: "queue", value: queueText() },
+        { name: "level", value: level },
+        { name: "nodes", value: nodes ? nodes.map((item) => item.val) : [] },
+        { name: "values", value: target.length ? target : "—" },
+        { name: "node", value: node ? node.val : "—" },
+        { name: "value", value },
+      ],
+      cards: [
+        { label: "level", value: level, tone: level % 2 ? "warning" : "neutral" },
+        { label: { vi: "CHẴN / LẺ", en: "PARITY" }, value: level % 2 ? "ODD" : "EVEN" },
+        { label: "before", value: before.length ? `[${before.join(", ")}]` : "—" },
+        { label: "target", value: target.length ? `[${target.join(", ")}]` : "—", tone: target.length ? "success" : "neutral" },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: "queue", value: `[${queueText().join(", ")}]` },
+      ],
     }));
+  };
+
+  debugStep({
+    stage: 0, event: "init", codeLine: 3, currentCount: 1, active: [root.id],
+    title: { vi: `Khởi tạo queue = [${root.val}], level = 0`, en: `Initialize queue = [${root.val}], level = 0` },
+    note: { vi: "Chỉ level lẻ mới đảo value; cấu trúc cây luôn giữ nguyên.", en: "Only odd levels reverse values; the tree structure never changes." },
+    formula: `queue = [${root.val}] · level = 0`,
+  });
+
+  while (queue.length) {
+    const size = queue.length;
+    const levelNodes = queue.slice(0, size);
+    debugStep({
+      nodes: levelNodes, before: levelNodes.map((node) => node.val), target: levelNodes.map((node) => node.val),
+      currentCount: size, stage: 0, event: "while-check", codeLine: 4,
+      title: { vi: `Queue chưa rỗng: bắt đầu level ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Khóa ${size} node đang có trong queue thành một level.`, en: `Lock the ${size} node(s) currently in the queue as one level.` },
+      formula: `bool(queue) = True · size = ${size}`,
+    });
+
+    const nodes = queue.splice(0, size);
+    const before = nodes.map((node) => node.val);
+    let target = [...before];
+    debugStep({
+      nodes, before, target, stage: 0, event: "collect-level", codeLine: 5,
+      title: { vi: `Pop trọn level ${level}: [${before}]`, en: `Pop all of level ${level}: [${before}]` },
+      note: { vi: "List nodes giữ các node vừa pop; queue tạm rỗng trước khi append children.", en: "The nodes list holds the popped nodes; the queue is temporarily empty before appending children." },
+      formula: `nodes = [${before.join(", ")}]`,
+    });
+
+    const odd = level % 2 === 1;
+    debugStep({
+      nodes, before, target, stage: 1, event: "parity-check", codeLine: 6,
+      title: odd ? { vi: `${level} là level lẻ → vào nhánh reverse`, en: `${level} is odd → enter the reverse block` }
+        : { vi: `${level} là level chẵn → bỏ qua reverse`, en: `${level} is even → skip the reverse block` },
+      note: odd ? { vi: "Bước kế sẽ đọc list value từ phải sang trái.", en: "The next step reads the value list from right to left." }
+        : { vi: "Các node giữ nguyên value và chuyển thẳng sang bước enqueue child.", en: "Nodes keep their values and move directly to child enqueueing." },
+      formula: `${level} % 2 == 1 → ${odd ? "True" : "False"}`,
+    });
+
+    let written = odd ? 0 : nodes.length;
+    if (odd) {
+      target = [...before].reverse();
+      debugStep({
+        nodes, before, target, stage: 1, event: "reverse", codeLine: 7,
+        title: { vi: `Đảo list value: [${before}] → [${target}]`, en: `Reverse the value list: [${before}] → [${target}]` },
+        note: { vi: "Đây mới là target; cây chưa đổi cho tới dòng gán node.val.", en: "This is only the target; the tree does not change until node.val is assigned." },
+        formula: `values = [${before.join(", ")}][::-1] = [${target.join(", ")}]`,
+      });
+
+      for (let index = 0; index < nodes.length; index += 1) {
+        const node = nodes[index];
+        const value = target[index];
+        debugStep({
+          nodes, before, target, written, currentIndex: index, state: "zip pair", node, value,
+          stage: 1, event: "zip-pair", codeLine: 8, active: [node.id],
+          title: { vi: `Ghép node vị trí ${index} với value ${value}`, en: `Pair node at index ${index} with value ${value}` },
+          note: { vi: `zip chọn cặp (node ${node.val}, value ${value}); chưa gán ở dòng này.`, en: `zip selects (node ${node.val}, value ${value}); this line does not assign yet.` },
+          formula: `(node, value) = (${node.val}, ${value})`,
+        });
+        const oldValue = node.val;
+        node.val = value;
+        written += 1;
+        sub[node.id] = `${oldValue} → ${value}`;
+        debugStep({
+          nodes, before, target, written, currentIndex: index, state: "assigned", node, value,
+          stage: 2, event: "assign", codeLine: 9, active: [node.id],
+          title: { vi: `Gán ${oldValue} → ${value}`, en: `Assign ${oldValue} → ${value}` },
+          note: { vi: "Value đổi tại chỗ, còn node và mọi cạnh vẫn ở nguyên vị trí.", en: "The value changes in place while the node and every edge stay put." },
+          formula: `node.val = ${value}`,
+        });
+      }
+    }
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      const node = nodes[index];
+      debugStep({
+        nodes, before, target, written, currentIndex: index, state: "scan children", node,
+        stage: 1, event: "child-loop", codeLine: 10, active: [node.id],
+        title: { vi: `Xét children của node ${node.val}`, en: `Inspect children of node ${node.val}` },
+        note: { vi: `Đây là node ${index + 1}/${nodes.length}; children sẽ tạo level ${level + 1}.`, en: `This is node ${index + 1}/${nodes.length}; its children build level ${level + 1}.` },
+        formula: `for node in nodes → ${node.val}`,
+      });
+
+      if (node.left) queue.push(node.left);
+      debugStep({
+        nodes, before, target, written, currentIndex: index, state: "left checked", node,
+        stage: 1, event: node.left ? "enqueue-left" : "skip-left", codeLine: 11, active: [node.id],
+        title: node.left ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left ? { vi: "Con trái vào queue trước con phải.", en: "The left child enters the queue before the right child." }
+          : { vi: "Queue không đổi.", en: "The queue is unchanged." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+      });
+
+      if (node.right) queue.push(node.right);
+      debugStep({
+        nodes, before, target, written, currentIndex: index, state: "right checked", node,
+        stage: 1, event: node.right ? "enqueue-right" : "skip-right", codeLine: 12, active: [node.id],
+        title: node.right ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right ? { vi: "Thứ tự trái → phải của level kế tiếp được giữ nguyên.", en: "The next level keeps left-to-right order." }
+          : { vi: "Không có node nào được thêm ở phía phải.", en: "No node is appended from the right side." },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+      });
+      done.add(node.id);
+    }
+
+    completedRows.push(rowFor({ nodes, before, target, written: nodes.length, complete: true }));
+    const finishedLevel = level;
+    level += 1;
+    debugStep({
+      stage: 2, event: "level-complete", codeLine: 13,
+      title: { vi: `Level ${finishedLevel} xong → level = ${level}`, en: `Level ${finishedLevel} done → level = ${level}` },
+      note: { vi: `Queue cho level kế là [${queueText()}].`, en: `The next level queue is [${queueText()}].` },
+      formula: `level = ${finishedLevel} + 1 = ${level}`,
+    });
+  }
+
+  debugStep({
+    stage: 0, event: "while-stop", codeLine: 4,
+    title: { vi: "Queue rỗng: dừng BFS", en: "Queue is empty: stop BFS" },
+    note: { vi: "Mọi level lẻ đã được đảo, mọi level chẵn được giữ nguyên.", en: "Every odd level was reversed and every even level was preserved." },
+    formula: "bool(queue) = False",
   });
   const answer = serializeTree(root);
-  steps.push(makeStep({ problemId: 2415, mode: "reverse-odd", root, stage: 3, event: "done", status: "success", final: true, rows, done,
-    title: { vi: "Đã đảo mọi tầng lẻ", en: "All odd levels are reversed" }, note: { vi: "So sánh hàng before → after để thấy chính xác value nào đổi chỗ.", en: "Compare each before → after row to see exactly which values moved." }, codeLines: [12],
-    cards: [{ label: { vi: "CÂY KẾT QUẢ", en: "RESULT TREE" }, value: JSON.stringify(answer), tone: "success" }], result: answer }));
+  debugStep({
+    stage: 3, event: "done", codeLine: 14, status: "success", final: true, result: answer,
+    title: { vi: "Trả về cây đã cập nhật", en: "Return the updated tree" },
+    note: { vi: "So sánh BEFORE → AFTER ở từng hàng để thấy chính xác value nào đổi chỗ.", en: "Compare BEFORE → AFTER in each row to see exactly which values moved." },
+    formula: `return root → ${JSON.stringify(answer)}`,
+  });
   return { input, answer, steps };
 }
 
 function build2471(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: 0, steps: [emptyResult(2471, "level-sort", root, 0, 3)] };
-  const levels = levelsOf(root), steps = [introStep(2471, "level-sort", root,
-    { vi: "Mỗi tầng là một bài minimum swaps", en: "Each level is a minimum-swaps problem" },
-    { vi: "Tạo target đã sort. Mỗi swap đặt ít nhất một giá trị đúng vị trí, rồi cộng swaps của mọi tầng.", en: "Build the sorted target. Every swap fixes at least one position, then sum swaps over all levels." })];
-  const rows = [], done = new Set(); let total = 0;
-  levels.forEach((level, levelIndex) => {
-    const before = level.map((node) => node.val), current = [...before], target = [...before].sort((a, b) => a - b);
-    const position = new Map(current.map((value, index) => [value, index]));
-    let swaps = 0;
-    rows.push({ level: levelIndex, values: levelTokens(level), before, secondary: target, working: [...current], metric: { label: "swaps", value: swaps } });
-    for (let index = 0; index < current.length; index++) {
-      if (current[index] === target[index]) continue;
-      const other = position.get(target[index]);
-      const a = current[index], b = current[other];
-      [current[index], current[other]] = [current[other], current[index]];
-      position.set(a, other); position.set(b, index); swaps += 1; total += 1;
-      rows[rows.length - 1] = { ...rows.at(-1), working: [...current], metric: { label: "swaps", value: swaps }, swap: [index, other] };
-      steps.push(makeStep({
-        problemId: 2471, mode: "level-sort", root, stage: 1, event: "swap", rows, active: [level[index].id, level[other].id], done,
-        title: { vi: `Tầng ${levelIndex}: swap vị trí ${index} ↔ ${other}`, en: `Level ${levelIndex}: swap positions ${index} ↔ ${other}` },
-        note: { vi: `Cần ${target[index]} tại index ${index}; đổi với vị trí ${other} → [${current}].`, en: `Index ${index} needs ${target[index]}; swap with position ${other} → [${current}].` },
-        codeLines: [10, 11, 12], formula: `[${before}] → [${current}] → target [${target}]`,
-        cards: [{ label: "level", value: levelIndex }, { label: "level swaps", value: swaps, tone: "warning" }, { label: "total", value: total }],
-      }));
-    }
-    level.forEach((node) => done.add(node.id));
-    rows[rows.length - 1] = { ...rows.at(-1), working: [...current], metric: { label: "minimum swaps", value: swaps }, status: "sorted" };
-    steps.push(makeStep({
-      problemId: 2471, mode: "level-sort", root, stage: 2, event: "sorted", rows, active: level.map((node) => node.id), done,
-      title: { vi: `Tầng ${levelIndex} cần ${swaps} swap`, en: `Level ${levelIndex} needs ${swaps} swaps` },
-      note: { vi: `[${current}] đã bằng target tăng dần [${target}].`, en: `[${current}] now equals the ascending target [${target}].` },
-      codeLines: [13], cards: [{ label: "level swaps", value: swaps, tone: "success" }, { label: "running total", value: total }],
-    }));
+  const steps = [];
+  const queue = [root];
+  const completedRows = [];
+  const done = new Set();
+  let answer = 0;
+  let level = 0;
+  const queueText = () => queue.map((node) => node.val);
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const mapText = (position) => position ? `{${[...position.entries()].map(([value, index]) => `${value}:${index}`).join(", ")}}` : "—";
+  const rowFor = ({ nodes, before, values, target, active = [], state = "waiting", swaps = 0, complete = false }) => ({
+    level,
+    status: complete ? "sorted" : undefined,
+    before: [...before],
+    secondary: [...target],
+    working: [...values],
+    swap: [...active],
+    values: nodes.map((node, index) => ({
+      id: node.id,
+      value: values[index],
+      tone: active.includes(index) ? "warning" : values[index] === target[index] ? "success" : "neutral",
+      meta: active.includes(index) ? state : values[index] === target[index] ? "correct" : `slot ${index}`,
+    })),
+    metric: { label: "level swaps", value: swaps },
   });
-  steps.push(makeStep({ problemId: 2471, mode: "level-sort", root, stage: 3, event: "done", status: "success", final: true, rows, done,
-    title: { vi: `Tổng minimum swaps = ${total}`, en: `Total minimum swaps = ${total}` }, note: { vi: "Các tầng độc lập, nên cộng số swap tối thiểu của từng tầng.", en: "Levels are independent, so add their individual minimum swap counts." }, codeLines: [15],
-    cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: total, tone: "success" }], result: total }));
-  return { input, answer: total, steps };
+  const debugStep = ({
+    nodes = null, before = [], values = [], target = [], position = null, swaps = 0,
+    i = "—", wanted = "—", j = "—", activeSlots = [], rowState = "waiting",
+    currentCount = 0, node = null, title, note, codeLine, event, stage = 1,
+    formula = null, active = [], complete = false, final = false, status = "checking", result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, rowFor({ nodes, before, values, target, active: activeSlots, state: rowState, swaps, complete })]
+      : completedRows;
+    steps.push(makeStep({
+      problemId: 2471, mode: "level-sort", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows, queue: queueSnapshot(currentCount),
+      queueNote: { vi: "vàng = level hiện tại · xanh dương = level kế", en: "amber = current level · blue = next level" },
+      active, done, formula,
+      vars: [
+        { name: "queue", value: queueText() },
+        { name: "answer", value: answer },
+        { name: "level", value: level },
+        { name: "nodes", value: nodes ? nodes.map((item) => item.val) : [] },
+        { name: "values", value: values.length ? values : "—" },
+        { name: "target", value: target.length ? target : "—" },
+        { name: "pos", value: mapText(position) },
+        { name: "i / wanted / j", value: `${i} / ${wanted} / ${j}` },
+      ],
+      cards: [
+        { label: "level", value: level },
+        { label: "values", value: values.length ? `[${values.join(", ")}]` : "—" },
+        { label: "target", value: target.length ? `[${target.join(", ")}]` : "—", tone: target.length ? "success" : "neutral" },
+        { label: "i / wanted", value: `${i} / ${wanted}` },
+        { label: "j", value: j },
+        { label: "level / total swaps", value: `${swaps} / ${answer}`, tone: swaps ? "warning" : "neutral" },
+      ],
+    }));
+  };
+
+  debugStep({
+    stage: 0, event: "init", codeLine: 3, currentCount: 1, active: [root.id],
+    title: { vi: `Khởi tạo queue = [${root.val}], answer = 0`, en: `Initialize queue = [${root.val}], answer = 0` },
+    note: { vi: "Mỗi level được sort độc lập; answer cộng số swap của tất cả level.", en: "Each level is sorted independently; answer adds swaps from every level." },
+    formula: `queue = [${root.val}] · answer = 0`,
+  });
+
+  while (queue.length) {
+    const size = queue.length;
+    const preview = queue.slice(0, size);
+    const previewValues = preview.map((node) => node.val);
+    debugStep({
+      nodes: preview, before: previewValues, values: previewValues, target: previewValues,
+      currentCount: size, stage: 0, event: "while-check", codeLine: 4,
+      title: { vi: `Queue chưa rỗng: bắt đầu level ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Khóa ${size} node để children append sau đó không lẫn vào level này.`, en: `Lock ${size} node(s) so appended children cannot leak into this level.` },
+      formula: `bool(queue) = True · size = ${size}`,
+    });
+
+    const nodes = queue.splice(0, size);
+    const before = nodes.map((node) => node.val);
+    const values = [...before];
+    let target = [...before];
+    let position = null;
+    let swaps = 0;
+    debugStep({
+      nodes, before, values, target, swaps, stage: 0, event: "collect-level", codeLine: 5,
+      title: { vi: `Pop level ${level}: nodes = [${before}]`, en: `Pop level ${level}: nodes = [${before}]` },
+      note: { vi: "Queue tạm rỗng; list nodes giữ đúng thứ tự trái → phải.", en: "The queue is temporarily empty; nodes preserves left-to-right order." },
+      formula: `nodes = [${before.join(", ")}]`,
+    });
+
+    debugStep({
+      nodes, before, values, target, swaps, stage: 0, event: "copy-values", codeLine: 6,
+      title: { vi: `Sao chép value: [${values}]`, en: `Copy node values: [${values}]` },
+      note: { vi: "Ta sort và swap trên mảng values; node trong cây không bị đổi value.", en: "We sort and swap the values array; tree-node values are not mutated." },
+      formula: `values = [node.val for node in nodes] = [${values.join(", ")}]`,
+    });
+
+    target = [...values].sort((a, b) => a - b);
+    debugStep({
+      nodes, before, values, target, swaps, stage: 1, event: "build-target", codeLine: 7,
+      title: { vi: `Tạo target tăng dần: [${target}]`, en: `Build ascending target: [${target}]` },
+      note: { vi: "Mỗi index i phải nhận đúng target[i].", en: "Each index i must receive target[i]." },
+      formula: `target = sorted([${values.join(", ")}]) = [${target.join(", ")}]`,
+    });
+
+    position = new Map(values.map((value, index) => [value, index]));
+    debugStep({
+      nodes, before, values, target, position, swaps, stage: 1, event: "build-position", codeLine: 8,
+      title: { vi: "Lập bảng value → index hiện tại", en: "Build the current value → index map" },
+      note: { vi: `pos = ${mapText(position)} giúp tìm O(1) vị trí của value đang cần.`, en: `pos = ${mapText(position)} finds the needed value's position in O(1).` },
+      formula: `pos = ${mapText(position)}`,
+    });
+
+    for (let i = 0; i < target.length; i += 1) {
+      const wanted = target[i];
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, stage: 1,
+        event: "target-loop", codeLine: 9, activeSlots: [i], active: [nodes[i].id],
+        title: { vi: `Index ${i} cần value ${wanted}`, en: `Index ${i} needs value ${wanted}` },
+        note: { vi: `Hiện values[${i}] = ${values[i]}; so với target[${i}] = ${wanted}.`, en: `Currently values[${i}] = ${values[i]}; compare it with target[${i}] = ${wanted}.` },
+        formula: `i = ${i} · wanted = ${wanted}`,
+      });
+
+      const mismatch = values[i] !== wanted;
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, stage: 1,
+        event: mismatch ? "needs-swap" : "already-correct", codeLine: 10,
+        activeSlots: [i], rowState: mismatch ? "wrong" : "correct", active: [nodes[i].id],
+        title: mismatch ? { vi: `${values[i]} ≠ ${wanted} → cần swap`, en: `${values[i]} ≠ ${wanted} → swap needed` }
+          : { vi: `${values[i]} = ${wanted} → index này đã đúng`, en: `${values[i]} = ${wanted} → this index is correct` },
+        note: mismatch ? { vi: "Dùng pos để nhảy thẳng tới nơi value wanted đang đứng.", en: "Use pos to jump directly to where the wanted value currently sits." }
+          : { vi: "Không tăng answer và chuyển sang index kế tiếp.", en: "Do not increment answer; continue to the next index." },
+        formula: `${values[i]} != ${wanted} → ${mismatch ? "True" : "False"}`,
+      });
+      if (!mismatch) continue;
+
+      const j = position.get(wanted);
+      const displaced = values[i];
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, j, stage: 1,
+        event: "find-swap-index", codeLine: 11, activeSlots: [i, j], active: [nodes[i].id, nodes[j].id],
+        title: { vi: `Tìm thấy ${wanted} tại j = ${j}`, en: `Find ${wanted} at j = ${j}` },
+        note: { vi: `Sẽ đổi values[${i}] = ${displaced} với values[${j}] = ${wanted}.`, en: `Swap values[${i}] = ${displaced} with values[${j}] = ${wanted}.` },
+        formula: `j = pos[${wanted}] = ${j}`,
+      });
+
+      position.set(displaced, j);
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, j, stage: 1,
+        event: "move-displaced-position", codeLine: 12, activeSlots: [i, j], active: [nodes[i].id, nodes[j].id],
+        title: { vi: `Cập nhật vị trí tương lai của ${displaced} thành ${j}`, en: `Update ${displaced}'s future position to ${j}` },
+        note: { vi: "Bảng pos được chuẩn bị trước khi mảng values thực hiện swap ở dòng kế.", en: "The position map is prepared before values performs the swap on the next line." },
+        formula: `pos[${displaced}] = ${j}`,
+      });
+
+      [values[i], values[j]] = [values[j], values[i]];
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, j, stage: 1,
+        event: "swap", codeLine: 13, activeSlots: [i, j], rowState: "swapped", active: [nodes[i].id, nodes[j].id],
+        title: { vi: `Swap index ${i} ↔ ${j}`, en: `Swap indices ${i} ↔ ${j}` },
+        note: { vi: `values trở thành [${values}]; index ${i} đã khớp target.`, en: `values becomes [${values}]; index ${i} now matches target.` },
+        formula: `[${displaced}, ${wanted}] → [${wanted}, ${displaced}]`,
+      });
+
+      position.set(wanted, i);
+      swaps += 1;
+      answer += 1;
+      debugStep({
+        nodes, before, values, target, position, swaps, i, wanted, j, stage: 2,
+        event: "count-swap", codeLine: 14, activeSlots: [i], rowState: "fixed", active: [nodes[i].id],
+        title: { vi: `Chốt pos[${wanted}] = ${i}; answer = ${answer}`, en: `Set pos[${wanted}] = ${i}; answer = ${answer}` },
+        note: { vi: `Swap vừa rồi đặt ${wanted} đúng vị trí và tăng bộ đếm đúng một lần.`, en: `The swap places ${wanted} correctly and increments the counter exactly once.` },
+        formula: `pos[${wanted}] = ${i} · answer += 1 → ${answer}`,
+      });
+    }
+
+    debugStep({
+      nodes, before, values, target, position, swaps, complete: true, stage: 2,
+      event: "sorted", codeLine: 15, active: nodes.map((node) => node.id),
+      title: { vi: `Level ${level} đã sort với ${swaps} swap`, en: `Level ${level} is sorted with ${swaps} swap(s)` },
+      note: { vi: `[${values}] đã bằng target; giờ enqueue children để sang level kế.`, en: `[${values}] now equals target; enqueue children for the next level.` },
+      formula: `[${values.join(", ")}] = [${target.join(", ")}]`,
+    });
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      const node = nodes[index];
+      debugStep({
+        nodes, before, values, target, position, swaps, i: index, complete: true,
+        stage: 2, event: "child-loop", codeLine: 15, active: [node.id],
+        title: { vi: `Xét children của node ${node.val}`, en: `Inspect children of node ${node.val}` },
+        note: { vi: `Node ${index + 1}/${nodes.length}; cây vẫn giữ các value gốc.`, en: `Node ${index + 1}/${nodes.length}; the tree still keeps its original values.` },
+        formula: `for node in nodes → ${node.val}`,
+      });
+      if (node.left) queue.push(node.left);
+      debugStep({
+        nodes, before, values, target, position, swaps, i: index, complete: true,
+        stage: 2, event: node.left ? "enqueue-left" : "skip-left", codeLine: 16, active: [node.id],
+        title: node.left ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left ? { vi: "Child này thuộc level kế tiếp.", en: "This child belongs to the next level." }
+          : { vi: "Queue không đổi.", en: "The queue is unchanged." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+      });
+      if (node.right) queue.push(node.right);
+      debugStep({
+        nodes, before, values, target, position, swaps, i: index, complete: true,
+        stage: 2, event: node.right ? "enqueue-right" : "skip-right", codeLine: 17, active: [node.id],
+        title: node.right ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right ? { vi: "Con phải vào sau con trái để giữ thứ tự BFS.", en: "The right child follows the left child to preserve BFS order." }
+          : { vi: "Không append node ở phía phải.", en: "No node is appended from the right side." },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+      });
+      done.add(node.id);
+    }
+    completedRows.push(rowFor({ nodes, before, values, target, swaps, complete: true }));
+    level += 1;
+  }
+
+  debugStep({
+    stage: 0, event: "while-stop", codeLine: 4,
+    title: { vi: "Queue rỗng: mọi level đã hoàn tất", en: "Queue is empty: every level is complete" },
+    note: { vi: `Tổng hiện tại là ${answer} swap.`, en: `The running total is ${answer} swap(s).` },
+    formula: "bool(queue) = False",
+  });
+  debugStep({
+    stage: 3, event: "done", codeLine: 18, status: "success", final: true, result: answer,
+    title: { vi: `Trả về tổng minimum swaps = ${answer}`, en: `Return total minimum swaps = ${answer}` },
+    note: { vi: "Mỗi level độc lập, nên tổng các minimum swap theo level là đáp án toàn cây.", en: "Levels are independent, so the sum of their minimum swap counts is the tree-wide answer." },
+    formula: `return ${answer}`,
+  });
+  return { input, answer, steps };
 }
 
 function build2583(input, params) {
@@ -1482,94 +1847,493 @@ function build2583(input, params) {
   const k = Number(params?.k ?? 2);
   if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer");
   if (!root) return { input, k, answer: -1, steps: [emptyResult(2583, "level-sums", root, -1, 3)] };
-  const levels = levelsOf(root), steps = [introStep(2583, "level-sums", root,
-    { vi: "Cộng từng tầng, giữ min-heap size k", en: "Sum each level, keep a size-k min-heap" },
-    { vi: `BFS tạo một sum cho mỗi level. Min-heap chỉ giữ k=${k} tổng lớn nhất đã gặp.`, en: `BFS creates one sum per level. The min-heap keeps only the k=${k} largest sums seen.` })];
-  const rows = [], sums = [], done = new Set();
-  levels.forEach((level, index) => {
-    const sum = level.reduce((total, node) => total + node.val, 0); sums.push(sum); level.forEach((node) => done.add(node.id));
-    rows.push({ level: index, values: levelTokens(level), metric: { label: "sum", value: `${level.map((n) => n.val).join(" + ")} = ${sum}` } });
-    steps.push(makeStep({
-      problemId: 2583, mode: "level-sums", root, stage: 1, event: "sum", rows, queue: levels[index + 1] || [], active: level.map((node) => node.id), done,
-      title: { vi: `Tầng ${index}: sum = ${sum}`, en: `Level ${index}: sum = ${sum}` }, note: { vi: `Thêm ${sum} vào danh sách tổng các tầng.`, en: `Append ${sum} to the list of level sums.` },
-      codeLines: [8, 9], formula: `${level.map((n) => n.val).join(" + ")} = ${sum}`,
-      cards: [{ label: "level", value: index }, { label: "sum", value: sum }, { label: "all sums", value: `[${sums}]` }],
-    }));
-  });
+  const steps = [];
+  const queue = [root];
+  const completedRows = [];
+  const sums = [];
   const heap = [];
-  sums.forEach((sum) => {
-    heap.push(sum);
-    heap.sort((a, b) => a - b);
-    const removed = heap.length > k ? heap.shift() : null;
+  const done = new Set();
+  const sub = {};
+  let level = 0;
+  const queueText = () => queue.map((node) => node.val);
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const heapSnapshot = () => heap.map((value, index) => ({
+    value,
+    role: index === 0 ? "current-level" : "next-level",
+    label: index === 0 ? "MIN / k-th" : `KEEP #${index + 1}`,
+    meta: `heap[${index}]`,
+  }));
+  const rowFor = ({ nodes, processedCount = 0, currentIndex = -1, total = 0, complete = false }) => ({
+    level,
+    status: complete ? "sorted" : undefined,
+    values: nodes.map((node, index) => ({
+      id: node.id,
+      value: node.val,
+      tone: index === currentIndex ? "warning" : index < processedCount ? "success" : "neutral",
+      meta: index === currentIndex ? "current add" : index < processedCount ? "added" : "waiting",
+    })),
+    metric: { label: "running sum", value: total },
+  });
+  const debugStep = ({
+    nodes = null, processedCount = 0, currentIndex = -1, total = "—", size = "—",
+    i = "—", node = null, currentSum = "—", removed = "—", currentCount = 0,
+    heapMode = false, title, note, codeLine, event, stage = 1, formula = null,
+    active = [], final = false, status = "checking", result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, rowFor({ nodes, processedCount, currentIndex, total: Number.isFinite(total) ? total : 0 })]
+      : completedRows;
     steps.push(makeStep({
-      problemId: 2583, mode: "level-sums", root, stage: 2, event: removed === null ? "heap-push" : "heap-trim", rows, done,
-      title: removed === null
-        ? { vi: `Push sum ${sum} vào min-heap`, en: `Push sum ${sum} into the min-heap` }
-        : { vi: `Heap vượt k: bỏ minimum ${removed}`, en: `Heap exceeded k: remove minimum ${removed}` },
-      note: removed === null
-        ? { vi: `Heap đang giữ ${heap.length}/${k} tổng lớn nhất đã gặp.`, en: `The heap currently keeps ${heap.length}/${k} largest sums seen.` }
-        : { vi: `Sau khi bỏ ${removed}, heap chỉ giữ k=${k} tổng lớn nhất: [${heap}].`, en: `After removing ${removed}, the heap keeps only the k=${k} largest sums: [${heap}].` },
-      codeLines: removed === null ? [15] : [16], formula: `min-heap (size ≤ ${k}) = [${heap}]`,
-      cards: [
-        { label: { vi: "SUM VỪA XÉT", en: "CURRENT SUM" }, value: sum },
-        { label: "min-heap", value: `[${heap}]`, tone: "warning" },
-        { label: { vi: "ĐÃ BỎ", en: "REMOVED" }, value: removed === null ? "—" : removed },
+      problemId: 2583, mode: "level-sums", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: heapMode ? heapSnapshot() : queueSnapshot(currentCount),
+      queueTitle: heapMode ? { vi: `MIN-HEAP · GIỮ K=${k} TỔNG LỚN NHẤT`, en: `MIN-HEAP · KEEP K=${k} LARGEST SUMS` } : "BFS QUEUE",
+      queueNote: heapMode
+        ? { vi: "phần tử nhỏ nhất ở FRONT; nếu đủ k thì đó là hạng k", en: "the minimum is at the FRONT; with k items it is rank k" }
+        : { vi: "vàng = level hiện tại · xanh dương = level kế", en: "amber = current level · blue = next level" },
+      active, done, sub, formula,
+      vars: [
+        { name: "queue", value: heapMode ? "—" : queueText() },
+        { name: "sums", value: sums.slice() },
+        { name: "level", value: level },
+        { name: "size / i", value: `${size} / ${i}` },
+        { name: "node", value: node ? node.val : "—" },
+        { name: "total", value: total },
+        { name: "heap", value: heap.slice() },
+        { name: "k", value: k },
+        { name: "current sum", value: currentSum },
+        { name: "removed", value: removed },
+      ],
+      cards: heapMode ? [
+        { label: "k", value: k },
+        { label: { vi: "SUM ĐANG XÉT", en: "CURRENT SUM" }, value: currentSum },
+        { label: "heap", value: `[${heap.join(", ")}]`, tone: heap.length === k ? "success" : "warning" },
+        { label: "heap size / k", value: `${heap.length} / ${k}` },
+        { label: { vi: "ĐÃ BỎ", en: "REMOVED" }, value: removed },
+        { label: { vi: "ỨNG VIÊN HẠNG K", en: "RANK-K CANDIDATE" }, value: heap.length === k ? heap[0] : "—", tone: heap.length === k ? "success" : "neutral" },
+      ] : [
+        { label: "level", value: level },
+        { label: { vi: "size (đã khóa)", en: "size (locked)" }, value: size },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: "running total", value: total, tone: Number.isFinite(total) ? "success" : "neutral" },
+        { label: "sums", value: `[${sums.join(", ")}]` },
+        { label: "k", value: k },
       ],
     }));
+  };
+
+  debugStep({
+    stage: 0, event: "guard", codeLine: 3, currentCount: 1, active: [root.id],
+    title: { vi: "Kiểm tra root có rỗng không", en: "Check whether root is empty" },
+    note: { vi: `root = ${root.val}, nên không return -1 và tiếp tục BFS.`, en: `root = ${root.val}, so do not return -1; continue into BFS.` },
+    formula: "not root = False",
   });
+  debugStep({
+    stage: 0, event: "init", codeLine: 4, currentCount: 1, active: [root.id],
+    title: { vi: `Khởi tạo queue = [${root.val}], sums = []`, en: `Initialize queue = [${root.val}], sums = []` },
+    note: { vi: "Pha đầu dùng BFS để tính đúng một sum cho mỗi level.", en: "The first phase uses BFS to compute exactly one sum per level." },
+    formula: `queue = [${root.val}] · sums = []`,
+  });
+
+  while (queue.length) {
+    const size = queue.length;
+    const nodes = queue.slice(0, size);
+    debugStep({
+      nodes, size, total: 0, currentCount: size, stage: 0, event: "while-check", codeLine: 5,
+      title: { vi: `Queue chưa rỗng: bắt đầu level ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Khóa size = ${size}; chỉ ${size} node này được cộng vào total của level.`, en: `Lock size = ${size}; only these ${size} node(s) contribute to this level total.` },
+      formula: `bool(queue) = True · size = ${size}`,
+    });
+
+    let total = 0;
+    debugStep({
+      nodes, size, total, currentCount: size, stage: 0, event: "reset-total", codeLine: 6,
+      title: { vi: "Reset total = 0", en: "Reset total = 0" },
+      note: { vi: "Mỗi level bắt đầu một tổng mới; sums cũ vẫn được giữ riêng.", en: "Each level starts a fresh total; earlier sums remain stored separately." },
+      formula: "total = 0",
+    });
+
+    for (let i = 0; i < size; i += 1) {
+      const node = queue[0];
+      debugStep({
+        nodes, size, i, node, total, processedCount: i, currentIndex: i,
+        currentCount: size - i, stage: 0, event: "level-loop", codeLine: 7, active: [node.id],
+        title: { vi: `Lượt ${i + 1}/${size}: FRONT = ${node.val}`, en: `Iteration ${i + 1}/${size}: FRONT = ${node.val}` },
+        note: { vi: "range(len(queue)) đã khóa trước khi enqueue children.", en: "range(len(queue)) was fixed before any children are enqueued." },
+        formula: `i = ${i} < size = ${size}`,
+      });
+
+      queue.shift();
+      debugStep({
+        nodes, size, i, node, total, processedCount: i + 1, currentIndex: i,
+        currentCount: size - i - 1, stage: 0, event: "pop", codeLine: 8, active: [node.id],
+        title: { vi: `Pop node ${node.val}`, en: `Pop node ${node.val}` },
+        note: { vi: `Queue sau popleft: [${queueText()}].`, en: `Queue after popleft: [${queueText()}].` },
+        formula: `node = queue.popleft() = ${node.val}`,
+      });
+
+      const beforeTotal = total;
+      total += node.val;
+      sub[node.id] = `total = ${total}`;
+      debugStep({
+        nodes, size, i, node, total, processedCount: i + 1, currentIndex: i,
+        currentCount: size - i - 1, stage: 1, event: "add-value", codeLine: 9, active: [node.id],
+        title: { vi: `Cộng ${node.val}: total = ${total}`, en: `Add ${node.val}: total = ${total}` },
+        note: { vi: `Running sum đổi từ ${beforeTotal} thành ${total}.`, en: `The running sum changes from ${beforeTotal} to ${total}.` },
+        formula: `${beforeTotal} + ${node.val} = ${total}`,
+      });
+
+      if (node.left) queue.push(node.left);
+      debugStep({
+        nodes, size, i, node, total, processedCount: i + 1, currentIndex: i,
+        currentCount: size - i - 1, stage: 1, event: node.left ? "enqueue-left" : "skip-left", codeLine: 10, active: [node.id],
+        title: node.left ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left ? { vi: "Child nằm ở phần xanh dương và thuộc level kế.", en: "The child sits in the blue section for the next level." }
+          : { vi: "Queue không đổi.", en: "The queue is unchanged." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+      });
+
+      if (node.right) queue.push(node.right);
+      debugStep({
+        nodes, size, i, node, total, processedCount: i + 1, currentIndex: i,
+        currentCount: size - i - 1, stage: 1, event: node.right ? "enqueue-right" : "skip-right", codeLine: 11, active: [node.id],
+        title: node.right ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right ? { vi: "Con phải vào sau con trái, giữ đúng thứ tự level.", en: "The right child follows the left child, preserving level order." }
+          : { vi: "Không append child bên phải.", en: "No right child is appended." },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+      });
+      done.add(node.id);
+    }
+
+    sums.push(total);
+    completedRows.push(rowFor({ nodes, processedCount: size, total, complete: true }));
+    debugStep({
+      size, total, currentCount: 0, stage: 2, event: "append-sum", codeLine: 12,
+      title: { vi: `Chốt level ${level}: append sum ${total}`, en: `Finish level ${level}: append sum ${total}` },
+      note: { vi: `sums trở thành [${sums}].`, en: `sums becomes [${sums}].` },
+      formula: `sums.append(${total}) → [${sums.join(", ")}]`,
+    });
+    level += 1;
+  }
+
+  debugStep({
+    size: 0, total: "—", stage: 0, event: "while-stop", codeLine: 5,
+    title: { vi: "Queue rỗng: đã có toàn bộ level sums", en: "Queue is empty: all level sums are ready" },
+    note: { vi: `Có ${sums.length} level với sums = [${sums}].`, en: `There are ${sums.length} levels with sums = [${sums}].` },
+    formula: "bool(queue) = False",
+  });
+
+  debugStep({
+    heapMode: true, stage: 0, event: "heap-init", codeLine: 13,
+    title: { vi: "Khởi tạo min-heap rỗng", en: "Initialize an empty min-heap" },
+    note: { vi: `Heap sẽ chỉ giữ tối đa k = ${k} tổng lớn nhất đã gặp.`, en: `The heap will keep at most the k = ${k} largest sums seen.` },
+    formula: "heap = []",
+  });
+
+  for (let index = 0; index < sums.length; index += 1) {
+    const currentSum = sums[index];
+    debugStep({
+      heapMode: true, currentSum, stage: 1, event: "heap-loop", codeLine: 14,
+      title: { vi: `Xét level sum ${currentSum}`, en: `Inspect level sum ${currentSum}` },
+      note: { vi: `Đây là sum thứ ${index + 1}/${sums.length}.`, en: `This is sum ${index + 1}/${sums.length}.` },
+      formula: `total = sums[${index}] = ${currentSum}`,
+    });
+
+    heap.push(currentSum);
+    heap.sort((a, b) => a - b);
+    debugStep({
+      heapMode: true, currentSum, stage: 1, event: "heap-push", codeLine: 15,
+      title: { vi: `Push ${currentSum} vào min-heap`, en: `Push ${currentSum} into the min-heap` },
+      note: { vi: `Heap tạm thời là [${heap}]; minimum luôn đứng ở FRONT.`, en: `The temporary heap is [${heap}]; its minimum is always at the FRONT.` },
+      formula: `heappush(heap, ${currentSum}) → [${heap.join(", ")}]`,
+    });
+
+    const mustTrim = heap.length > k;
+    const beforeTrim = [...heap];
+    const removed = mustTrim ? heap.shift() : null;
+    debugStep({
+      heapMode: true, currentSum, removed: removed ?? "—", stage: 2,
+      event: mustTrim ? "heap-trim" : "heap-keep", codeLine: 16,
+      title: mustTrim ? { vi: `Heap vượt k → bỏ minimum ${removed}`, en: `Heap exceeds k → remove minimum ${removed}` }
+        : { vi: `Heap size ${heap.length} ≤ k → giữ nguyên`, en: `Heap size ${heap.length} ≤ k → keep it` },
+      note: mustTrim ? { vi: `Bỏ ${removed} vì nó không thể nằm trong k tổng lớn nhất; heap còn [${heap}].`, en: `Remove ${removed} because it cannot belong to the k largest sums; heap is [${heap}].` }
+        : { vi: `Chưa có hơn ${k} ứng viên nên không pop.`, en: `There are no more than ${k} candidates yet, so do not pop.` },
+      formula: mustTrim ? `[${beforeTrim.join(", ")}] → pop min ${removed} → [${heap.join(", ")}]` : `${heap.length} > ${k} → False`,
+    });
+  }
+
   const answer = heap.length === k ? heap[0] : -1;
-  steps.push(makeStep({ problemId: 2583, mode: "level-sums", root, stage: 3, event: "done", status: answer === -1 ? "danger" : "success", final: true, rows, done,
-    title: { vi: `Kết quả = ${answer}`, en: `Result = ${answer}` }, note: answer === -1 ? { vi: "Số tầng nhỏ hơn k nên trả -1.", en: "The tree has fewer than k levels, so return -1." } : { vi: `Heap giữ k tổng lớn nhất; minimum ${answer} chính là hạng ${k}.`, en: `The heap keeps the k largest sums; its minimum ${answer} is rank ${k}.` }, codeLines: [17],
-    cards: [{ label: "k", value: k }, { label: "min-heap", value: `[${heap}]` }, { label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer === -1 ? "danger" : "success" }], result: answer }));
+  debugStep({
+    heapMode: true, currentSum: "—", stage: 3, event: "done", codeLine: 17,
+    status: answer === -1 ? "danger" : "success", final: true, result: answer,
+    title: answer === -1 ? { vi: `Chỉ có ${heap.length} level < k=${k} → return -1`, en: `Only ${heap.length} levels < k=${k} → return -1` }
+      : { vi: `Heap minimum ${answer} là tổng lớn thứ ${k}`, en: `Heap minimum ${answer} is the ${k}-th largest sum` },
+    note: answer === -1 ? { vi: "Không tồn tại đủ k level để xếp hạng.", en: "There are not enough levels to define rank k." }
+      : { vi: `Heap giữ đúng k tổng lớn nhất; phần tử nhỏ nhất trong nhóm đó là hạng ${k}.`, en: `The heap holds exactly the k largest sums; the smallest among them is rank k.` },
+    formula: `return ${answer}`,
+  });
   return { input, k, answer, steps };
 }
 
 function build2641(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: [], steps: [emptyResult(2641, "cousin-sum", root, "[]", 3)] };
-  const steps = [introStep(2641, "cousin-sum", root,
-    { vi: "Cousin sum = tổng cả tầng − tổng nhóm anh em", en: "Cousin sum = level total − sibling-group total" },
-    { vi: "Hai node là cousin khi cùng độ sâu nhưng khác cha. Vì vậy loại cả nhóm con của cùng một parent khỏi tổng tầng.", en: "Cousins share a depth but not a parent. Subtract the whole sibling group under the same parent from the level total." })];
-  const rows = [{ level: 0, values: [{ id: root.id, value: 0, tone: "success", meta: "root → 0" }], before: [root.val], secondary: [0], metric: { label: "root", value: 0 } }];
+  const steps = [];
+  const completedRows = [];
+  const done = new Set();
+  const sub = {};
+  let parents = [];
+  let depth = 0;
+  const listText = (nodes) => `[${nodes.map((node) => node.val).join(", ")}]`;
+  const frontierSnapshot = (parentNodes = parents, childNodes = [], activeParent = null, activeChild = null) => [
+    ...parentNodes.map((node, index) => ({
+      node,
+      role: "current-level",
+      label: node.id === activeParent?.id ? "CURRENT PARENT" : `PARENT ${index + 1}`,
+      meta: `now ${node.val}`,
+    })),
+    ...childNodes.map((node, index) => ({
+      node,
+      role: "next-level",
+      label: node.id === activeChild?.id ? "CURRENT CHILD" : `CHILD ${index + 1}`,
+      meta: `original ${node.original}`,
+    })),
+  ];
+  const rowFor = ({ children, before, target = null, updated = new Set(), activeIds = [], complete = false, levelSum = "—" }) => ({
+    level: depth,
+    status: complete ? "sorted" : undefined,
+    before: [...before],
+    secondary: target ? [...target] : undefined,
+    working: children.map((node) => node.val),
+    swap: children.map((node, index) => activeIds.includes(node.id) ? index : -1).filter((index) => index >= 0),
+    values: children.map((node) => ({
+      id: node.id,
+      value: node.val,
+      tone: activeIds.includes(node.id) ? "warning" : updated.has(node.id) ? "success" : "neutral",
+      meta: activeIds.includes(node.id) ? "current group" : updated.has(node.id) ? `new ${node.val}` : "waiting",
+    })),
+    metric: { label: "level_sum", value: levelSum },
+  });
+  const debugStep = ({
+    children = null, before = [], target = null, updated = new Set(), activeIds = [],
+    levelSum = "—", parent = null, siblingValues = [], siblingSum = "—", child = null,
+    replacement = "—", frontier = null, title, note, codeLine, event, stage = 1,
+    formula = null, active = [], final = false, status = "checking", result = null,
+  }) => {
+    const rows = children && children.length
+      ? [...completedRows, rowFor({ children, before, target, updated, activeIds, levelSum })]
+      : completedRows;
+    steps.push(makeStep({
+      problemId: 2641, mode: "cousin-sum", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: frontier || frontierSnapshot(parents, children || [], parent, child),
+      queueTitle: { vi: "PARENTS HIỆN TẠI → CHILDREN LEVEL KẾ", en: "CURRENT PARENTS → NEXT-LEVEL CHILDREN" },
+      queueNote: { vi: "cam = parent đang xử lý · xanh dương = child cùng level_sum", en: "amber = current parent · blue = children sharing one level_sum" },
+      active, done, sub, formula,
+      vars: [
+        { name: "parents", value: parents.map((node) => node.val) },
+        { name: "children", value: children ? children.map((node) => node.val) : [] },
+        { name: "depth", value: depth },
+        { name: "level_sum", value: levelSum },
+        { name: "parent", value: parent ? `${parent.original}→${parent.val}` : "—" },
+        { name: "siblings", value: siblingValues.length ? siblingValues : "[]" },
+        { name: "sibling_sum", value: siblingSum },
+        { name: "child", value: child ? child.val : "None" },
+        { name: "new value", value: replacement },
+      ],
+      cards: [
+        { label: "depth", value: depth },
+        { label: "level_sum", value: levelSum, tone: Number.isFinite(levelSum) ? "success" : "neutral" },
+        { label: { vi: "PARENT GỐC → HIỆN TẠI", en: "PARENT ORIGINAL → NOW" }, value: parent ? `${parent.original} → ${parent.val}` : "—" },
+        { label: { vi: "NHÓM SIBLING GỐC", en: "ORIGINAL SIBLING GROUP" }, value: siblingValues.length ? `[${siblingValues.join(", ")}]` : "[]" },
+        { label: "sibling_sum", value: siblingSum },
+        { label: "cousin sum", value: replacement, tone: Number.isFinite(replacement) ? "success" : "neutral" },
+      ],
+    }));
+  };
+
+  debugStep({
+    stage: 0, event: "guard", codeLine: 3,
+    frontier: [{ node: root, role: "current-level", label: "ROOT", meta: `original ${root.original}` }],
+    active: [root.id],
+    title: { vi: "Kiểm tra root có rỗng không", en: "Check whether root is empty" },
+    note: { vi: `root = ${root.val}, nên không return sớm.`, en: `root = ${root.val}, so do not return early.` },
+    formula: "not root = False",
+  });
+
+  const rootBefore = root.val;
   root.val = 0;
-  const done = new Set([root.id]);
-  let parents = [root], depth = 1;
+  done.add(root.id);
+  sub[root.id] = `${rootBefore} → 0`;
+  completedRows.push({
+    level: 0,
+    status: "sorted",
+    before: [rootBefore],
+    secondary: [0],
+    working: [0],
+    values: [{ id: root.id, value: 0, tone: "success", meta: "root → 0" }],
+    metric: { label: "cousin sum", value: 0 },
+  });
+  debugStep({
+    stage: 0, event: "root-zero", codeLine: 4,
+    frontier: [{ node: root, role: "current-level", label: "ROOT", meta: `${rootBefore} → 0` }],
+    active: [root.id], levelSum: 0, replacement: 0,
+    title: { vi: `Root ${rootBefore} → 0`, en: `Root ${rootBefore} → 0` },
+    note: { vi: "Root không có cousin nên giá trị mới luôn bằng 0.", en: "The root has no cousins, so its new value is always 0." },
+    formula: "root.val = 0",
+  });
+
+  parents = [root];
+  depth = 1;
+  debugStep({
+    stage: 0, event: "init-parents", codeLine: 5,
+    frontier: frontierSnapshot(parents), active: [root.id],
+    title: { vi: "Khởi tạo parents với root", en: "Initialize parents with the root" },
+    note: { vi: "Mỗi vòng while dùng parents để tạo toàn bộ children của level kế.", en: "Each while-loop uses parents to build the complete next child level." },
+    formula: `parents = [${root.val}]`,
+  });
+
   while (parents.length) {
+    debugStep({
+      stage: 0, event: "while-check", codeLine: 6, frontier: frontierSnapshot(parents),
+      active: parents.map((node) => node.id),
+      title: { vi: `parents chưa rỗng: chuẩn bị depth ${depth}`, en: `parents is not empty: prepare depth ${depth}` },
+      note: { vi: `Có ${parents.length} parent ở frontier hiện tại.`, en: `There are ${parents.length} parent(s) in the current frontier.` },
+      formula: "bool(parents) = True",
+    });
+
     const children = parents.flatMap((node) => [node.left, node.right].filter(Boolean));
-    if (!children.length) break;
     const before = children.map((node) => node.val);
+    const beforeById = new Map(children.map((node) => [node.id, node.val]));
+    debugStep({
+      children, before, target: null, stage: 0, event: "collect-children", codeLine: 7,
+      frontier: frontierSnapshot(parents, children), active: children.map((node) => node.id),
+      title: children.length ? { vi: `Thu thập children depth ${depth}: [${before}]`, en: `Collect depth-${depth} children: [${before}]` }
+        : { vi: "Các parent đều là lá: children = []", en: "Every parent is a leaf: children = []" },
+      note: children.length ? { vi: "Phải lấy trọn level trước khi thay bất kỳ value nào.", en: "Collect the entire level before changing any value." }
+        : { vi: "Không còn level con; vòng kế tiếp sẽ dừng.", en: "There is no child level; the next loop check will stop." },
+      formula: `children = [${before.join(", ")}]`,
+    });
+
     const levelSum = before.reduce((sum, value) => sum + value, 0);
-    const nextValues = new Map();
+    const targetById = new Map();
     for (const parent of parents) {
       const siblings = [parent.left, parent.right].filter(Boolean);
-      const siblingSum = siblings.reduce((sum, node) => sum + node.val, 0);
-      siblings.forEach((node) => nextValues.set(node.id, levelSum - siblingSum));
+      const siblingSum = siblings.reduce((sum, node) => sum + (beforeById.get(node.id) ?? 0), 0);
+      siblings.forEach((node) => targetById.set(node.id, levelSum - siblingSum));
     }
+    const target = children.map((node) => targetById.get(node.id));
+    const updated = new Set();
+    debugStep({
+      children, before, target, updated, levelSum, stage: 1, event: "level-sum", codeLine: 8,
+      frontier: frontierSnapshot(parents, children), active: children.map((node) => node.id),
+      title: { vi: `Tổng depth ${depth} = ${levelSum}`, en: `Depth ${depth} total = ${levelSum}` },
+      note: children.length ? { vi: `Cộng các value gốc trước khi sửa: ${before.join(" + ")} = ${levelSum}.`, en: `Add original values before mutation: ${before.join(" + ")} = ${levelSum}.` }
+        : { vi: "Level rỗng có tổng 0.", en: "An empty level has total 0." },
+      formula: before.length ? `${before.join(" + ")} = ${levelSum}` : "sum([]) = 0",
+    });
+
     for (const parent of parents) {
       const siblings = [parent.left, parent.right].filter(Boolean);
-      if (!siblings.length) continue;
-      const siblingSum = siblings.reduce((sum, node) => sum + node.val, 0);
+      const siblingValues = siblings.map((node) => beforeById.get(node.id));
+      const siblingSum = siblingValues.reduce((sum, value) => sum + value, 0);
       const replacement = levelSum - siblingSum;
-      siblings.forEach((node) => { node.val = replacement; done.add(node.id); });
-      const previewValues = children.map((node) => nextValues.get(node.id));
-      const previewRow = { level: depth, values: levelTokens(children, { tones: children.map((node) => siblings.some((sibling) => sibling.id === node.id) ? "warning" : "neutral"), meta: children.map((node) => `new ${nextValues.get(node.id)}`) }), before, secondary: previewValues, metric: { label: "level sum", value: levelSum } };
-      const priorRows = rows.filter((row) => row.level !== depth);
-      steps.push(makeStep({
-        problemId: 2641, mode: "cousin-sum", root, stage: 1, event: "replace", rows: [...priorRows, previewRow], active: siblings.map((node) => node.id), done,
-        title: { vi: `Con của ${parent.val}: ${levelSum} − ${siblingSum} = ${replacement}`, en: `Children of ${parent.val}: ${levelSum} − ${siblingSum} = ${replacement}` },
-        note: { vi: `Tổng level ${depth} là ${levelSum}. Bỏ nhóm sibling [${siblings.map((n) => n.original).join(", ")}] có tổng ${siblingSum}; phần còn lại là cousin sum.`, en: `Level ${depth} totals ${levelSum}. Remove sibling group [${siblings.map((n) => n.original).join(", ")}] totaling ${siblingSum}; the remainder is the cousin sum.` },
-        codeLines: [10, 11, 12], formula: `new value = ${levelSum} − (${siblings.map((n) => n.original).join(" + ")}) = ${replacement}`,
-        cards: [{ label: "level sum", value: levelSum }, { label: "sibling sum", value: siblingSum }, { label: "cousin sum", value: replacement, tone: "success" }],
-      }));
+      const siblingIds = siblings.map((node) => node.id);
+      debugStep({
+        children, before, target, updated, activeIds: siblingIds, levelSum, parent,
+        siblingValues, siblingSum: "—", replacement: "—", stage: 1, event: "parent-loop", codeLine: 9,
+        frontier: frontierSnapshot(parents, children, parent), active: [parent.id, ...siblingIds],
+        title: { vi: `Xét nhóm con của parent ${parent.original}`, en: `Inspect children of parent ${parent.original}` },
+        note: siblings.length ? { vi: `Nhóm này là [${siblingValues}]; cả nhóm phải bị loại khỏi level_sum.`, en: `This group is [${siblingValues}]; the entire group must be excluded from level_sum.` }
+          : { vi: "Parent này không có child; nhóm sibling rỗng.", en: "This parent has no children; its sibling group is empty." },
+        formula: `for parent in parents → ${parent.original}`,
+      });
+
+      debugStep({
+        children, before, target, updated, activeIds: siblingIds, levelSum, parent,
+        siblingValues, siblingSum, replacement, stage: 1, event: "sibling-sum", codeLine: 10,
+        frontier: frontierSnapshot(parents, children, parent), active: [parent.id, ...siblingIds],
+        title: { vi: `sibling_sum = ${siblingSum}`, en: `sibling_sum = ${siblingSum}` },
+        note: siblings.length ? { vi: `Cộng value gốc của mọi child cùng parent: ${siblingValues.join(" + ")} = ${siblingSum}.`, en: `Add the original values of all children sharing this parent: ${siblingValues.join(" + ")} = ${siblingSum}.` }
+          : { vi: "Không có child nên sum của nhóm bằng 0.", en: "There are no children, so the group sum is 0." },
+        formula: siblings.length ? `sibling_sum = ${siblingValues.join(" + ")} = ${siblingSum}` : "sibling_sum = sum([]) = 0",
+      });
+
+      for (const child of [parent.left, parent.right]) {
+        debugStep({
+          children, before, target, updated, activeIds: child ? [child.id] : siblingIds,
+          levelSum, parent, siblingValues, siblingSum, child, replacement,
+          stage: 1, event: "child-loop", codeLine: 11,
+          frontier: frontierSnapshot(parents, children, parent, child), active: child ? [parent.id, child.id] : [parent.id],
+          title: child ? { vi: `Xét child gốc ${beforeById.get(child.id)}`, en: `Inspect original child ${beforeById.get(child.id)}` }
+            : { vi: "Vị trí child này là None", en: "This child position is None" },
+          note: child ? { vi: "Cả left và right child của cùng parent dùng chung một replacement.", en: "Both left and right children of one parent use the same replacement." }
+            : { vi: "Vòng for vẫn nhìn vị trí rỗng, nhưng dòng if sẽ bỏ qua.", en: "The loop still sees the empty slot, but the if condition skips it." },
+          formula: child ? `child = ${beforeById.get(child.id)}` : "child = None",
+        });
+
+        if (child) {
+          const oldValue = child.val;
+          child.val = replacement;
+          updated.add(child.id);
+          done.add(child.id);
+          sub[child.id] = `${oldValue} → ${replacement}`;
+          debugStep({
+            children, before, target, updated, activeIds: [child.id], levelSum, parent,
+            siblingValues, siblingSum, child, replacement, stage: 2, event: "replace", codeLine: 12,
+            frontier: frontierSnapshot(parents, children, parent, child), active: [child.id],
+            title: { vi: `Thay ${oldValue} bằng cousin sum ${replacement}`, en: `Replace ${oldValue} with cousin sum ${replacement}` },
+            note: { vi: `Lấy tổng cả level ${levelSum}, rồi loại toàn bộ sibling group [${siblingValues}].`, en: `Take the whole-level total ${levelSum}, then exclude the full sibling group [${siblingValues}].` },
+            formula: `new value = ${levelSum} − (${siblingValues.join(" + ")}) = ${replacement}`,
+          });
+        } else {
+          debugStep({
+            children, before, target, updated, activeIds: siblingIds, levelSum, parent,
+            siblingValues, siblingSum, child, replacement, stage: 2, event: "skip-child", codeLine: 12,
+            frontier: frontierSnapshot(parents, children, parent), active: [parent.id],
+            title: { vi: "child là None → không gán", en: "child is None → skip assignment" },
+            note: { vi: "Không có node ở vị trí này nên cây không thay đổi.", en: "There is no node in this slot, so the tree is unchanged." },
+            formula: "if child → False · skip",
+          });
+        }
+      }
     }
-    children.forEach((node) => { node.val = nextValues.get(node.id); });
-    rows.push({ level: depth, values: levelTokens(children, { tones: children.map(() => "success"), meta: children.map((node) => `new ${node.val}`) }), before, secondary: children.map((node) => node.val), metric: { label: "level sum", value: levelSum } });
-    parents = children; depth += 1;
+
+    if (children.length) {
+      completedRows.push(rowFor({ children, before, target, updated, levelSum, complete: true }));
+    }
+    parents = children;
+    depth += 1;
+    debugStep({
+      stage: 2, event: "advance-frontier", codeLine: 13,
+      frontier: frontierSnapshot(parents), active: parents.map((node) => node.id),
+      levelSum, replacement: "—",
+      title: parents.length ? { vi: `Children trở thành parents của depth ${depth}`, en: `Children become the parents for depth ${depth}` }
+        : { vi: "children rỗng → parents trở thành []", en: "children is empty → parents becomes []" },
+      note: parents.length ? { vi: `Frontier mới là ${listText(parents)}.`, en: `The new frontier is ${listText(parents)}.` }
+        : { vi: "Điều kiện while tiếp theo sẽ là False.", en: "The next while condition will be false." },
+      formula: `parents = children = ${listText(parents)}`,
+    });
   }
+
+  debugStep({
+    stage: 0, event: "while-stop", codeLine: 6, frontier: [],
+    title: { vi: "parents rỗng: dừng duyệt", en: "parents is empty: stop traversing" },
+    note: { vi: "Mọi node thật đã nhận cousin sum của mình.", en: "Every real node now stores its cousin sum." },
+    formula: "bool(parents) = False",
+  });
   const answer = serializeTree(root);
-  steps.push(makeStep({ problemId: 2641, mode: "cousin-sum", root, stage: 3, event: "done", status: "success", final: true, rows, done,
-    title: { vi: "Mọi node đã mang cousin sum", en: "Every node now stores its cousin sum" }, note: { vi: "Root bằng 0; mỗi node khác đã loại chính nó và mọi sibling khỏi tổng cùng tầng.", en: "The root is 0; every other node excludes itself and all siblings from its level total." }, codeLines: [14],
-    cards: [{ label: { vi: "CÂY KẾT QUẢ", en: "RESULT TREE" }, value: JSON.stringify(answer), tone: "success" }], result: answer }));
+  debugStep({
+    stage: 3, event: "done", codeLine: 14, frontier: [], status: "success", final: true, result: answer,
+    title: { vi: "Trả về cây cousin-sum", en: "Return the cousin-sum tree" },
+    note: { vi: "Root bằng 0; mỗi node khác bằng tổng value gốc của các node cùng depth nhưng khác parent.", en: "The root is 0; every other node equals the original-value sum of nodes at the same depth with different parents." },
+    formula: `return root → ${JSON.stringify(answer)}`,
+  });
   return { input, answer, steps };
 }
 
