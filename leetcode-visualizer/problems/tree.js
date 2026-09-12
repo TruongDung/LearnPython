@@ -2660,30 +2660,298 @@ function buildSteps199v3(input) {
 
 // ─── 236: Lowest Common Ancestor of a Binary Tree ───
 function buildSteps236(input, params) {
-  const root = parseTree(input); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: `LCA của ${pv} và ${qv}`, en: `LCA of ${pv} and ${qv}` },
-    codeLines: [2, 3], vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
-    note: { vi: `Đệ quy: nếu nút == p hoặc q → trả nút đó. Nếu CẢ 2 nhánh con đều trả về khác null → nút hiện tại là LCA.`, en: `Recursion: if node == p or q → return it. If BOTH child branches return non-null → current node is the LCA.` },
+  const root = parseTreeEssentialsInput(input, { minValue: -1000000000, maxValue: 1000000000, maxNodes: 31 });
+  const pv = Number(params && params.p);
+  const qv = Number(params && params.q);
+  if (!Number.isInteger(pv) || !Number.isInteger(qv)) throw new Error("p and q must be integers");
+  if (pv === qv) throw new Error("p and q must be different nodes");
+
+  const steps = [];
+  const nodesById = new Map();
+  const nodesByValue = new Map();
+  (function collect(node) {
+    if (!node) return;
+    if (nodesByValue.has(node.val)) throw new Error("Tree values must be unique for problem 236");
+    nodesById.set(node.id, node);
+    nodesByValue.set(node.val, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+  if (!nodesByValue.has(pv) || !nodesByValue.has(qv)) throw new Error("Both p and q must exist in the tree");
+
+  const pNode = nodesByValue.get(pv);
+  const qNode = nodesByValue.get(qv);
+  const callStack = [];
+  const activePath = [];
+  const visited = new Set();
+  const foundTargets = new Set();
+  const returned = new Map();
+  const returnDetails = new Map();
+  const processed = [];
+  let lcaCandidate = null;
+
+  const stages = [
+    { vi: "DFS xuống cây", en: "Descend through the tree" },
+    { vi: "Gặp p / q hoặc None", en: "Hit p / q or None" },
+    { vi: "Nhận kết quả hai nhánh", en: "Receive both branch results" },
+    { vi: "Chọn split hoặc bubble", en: "Choose split or bubble" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "call-left", "call-right"].includes(phase)) return 0;
+    if (["return-null", "target-match"].includes(phase)) return 1;
+    if (["left-return", "right-return"].includes(phase)) return 2;
+    return 3;
+  };
+  const nodeRef = (node) => node ? { id: node.id, value: node.val } : null;
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    stage: frame.stage,
+    left: frame.leftReady ? (frame.left ? frame.left.val : "None") : "?",
+    right: frame.rightReady ? (frame.right ? frame.right.val : "None") : "?",
   }));
-  let answer = null;
-  function lca(node) {
-    if (!node) return null;
-    if (node.val === pv || node.val === qv) {
-      steps.push(snapshot(root, { title: { vi: `Tìm thấy ${node.val}`, en: `Found ${node.val}` }, hlSet: new Set([node.id]), codeLines: [4, 5], vars: [{ name: "node", value: node.val }], note: { vi: `${node.val} là p hoặc q → trả về nút này.`, en: `${node.val} is p or q → return this node.` } }));
+  const pathState = () => activePath.map((node, index) => ({ id: node.id, value: node.val, current: index === activePath.length - 1 }));
+  const pathTo = (target) => {
+    const path = [];
+    function find(node) {
+      if (!node) return false;
+      path.push(node.id);
+      if (node === target) return true;
+      if (find(node.left) || find(node.right)) return true;
+      path.pop();
+      return false;
+    }
+    find(root);
+    return path;
+  };
+  const annotationsFor = (current) => {
+    const annotations = {};
+    for (const node of nodesById.values()) {
+      const labels = [];
+      if (node === pNode) labels.push({ label: `P = ${pv}`, kind: "lca236-p" });
+      if (node === qNode) labels.push({ label: `Q = ${qv}`, kind: "lca236-q" });
+      if (returned.has(node.id)) {
+        const result = returned.get(node.id);
+        if (result) labels.push({ label: `↩ ${result.val}`, kind: "lca236-returned" });
+      }
+      if (current === node) labels.push({ label: "CURRENT", kind: "lca236-current" });
+      if (labels.length) annotations[node.id] = { labels };
+    }
+    return annotations;
+  };
+
+  const pushStep = ({
+    phase, event, title, note, line, current = null,
+    leftResult = undefined, rightResult = undefined,
+    leftReady = false, rightReady = false, decision = "waiting",
+    returnValue = undefined, final = false, routeP = [], routeQ = [],
+  }) => {
+    const activeIds = new Set(activePath.map((node) => node.id));
+    const finalRouteIds = new Set([...routeP, ...routeQ]);
+    const wordSet = final ? finalRouteIds : new Set([...activeIds, ...foundTargets]);
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet,
+      annotations: annotationsFor(current),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "node", value: current ? current.val : "None" },
+        { name: "left", value: leftReady ? (leftResult ? leftResult.val : "None") : "—" },
+        { name: "right", value: rightReady ? (rightResult ? rightResult.val : "None") : "—" },
+        { name: "return", value: returnValue === undefined ? "—" : returnValue ? returnValue.val : "None" },
+        { name: "LCA", value: lcaCandidate ? lcaCandidate.val : "—" },
+      ],
+      note,
+    });
+    treeStep.lca236View = {
+      problemId: 236,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      p: nodeRef(pNode),
+      q: nodeRef(qNode),
+      current: nodeRef(current),
+      leftResult: leftReady ? nodeRef(leftResult) : undefined,
+      rightResult: rightReady ? nodeRef(rightResult) : undefined,
+      leftReady,
+      rightReady,
+      decision,
+      returnValue: returnValue === undefined ? undefined : nodeRef(returnValue),
+      lca: nodeRef(lcaCandidate),
+      path: pathState(),
+      stack: stackState(),
+      visited: [...visited],
+      foundTargets: [...foundTargets],
+      processed: processed.map((item) => ({ ...item })),
+      routeP: routeP.map((id) => nodesById.get(id).val),
+      routeQ: routeQ.map((id) => nodesById.get(id).val),
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro", event: "rule",
+    title: { vi: `Tìm LCA của p=${pv} và q=${qv}`, en: `Find the LCA of p=${pv} and q=${qv}` },
+    note: {
+      vi: "Mỗi lời gọi trả None, p, q hoặc LCA đã tìm thấy. Split khi cả trái và phải đều trả node; nếu chỉ một bên có node thì bubble node đó lên.",
+      en: "Each call returns None, p, q, or an LCA already found. Split when both sides return a node; when only one side does, bubble that node upward.",
+    },
+    line: 2,
+  });
+
+  function lca(node, side) {
+    const frame = { node, side, stage: "enter", left: null, right: null, leftReady: false, rightReady: false };
+    callStack.push(frame);
+    if (!node) {
+      pushStep({
+        phase: "return-null", event: "return-null",
+        title: { vi: `${side} là None → return None`, en: `${side} is None → return None` },
+        note: { vi: "Nhánh rỗng không chứa p hoặc q.", en: "An empty branch contains neither p nor q." },
+        line: 4, decision: "none", returnValue: null,
+      });
+      callStack.pop();
+      return null;
+    }
+
+    activePath.push(node);
+    visited.add(node.id);
+    pushStep({
+      phase: "enter", event: "enter",
+      title: { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` },
+      note: { vi: `Kiểm tra ${node.val} có phải p=${pv} hoặc q=${qv} không.`, en: `Check whether ${node.val} is p=${pv} or q=${qv}.` },
+      line: 3, current: node,
+    });
+
+    if (node === pNode || node === qNode) {
+      foundTargets.add(node.id);
+      returned.set(node.id, node);
+      const targetDecision = node === pNode ? "target-p" : "target-q";
+      returnDetails.set(node.id, { left: null, right: null, leftReady: false, rightReady: false, decision: targetDecision });
+      processed.push({ id: node.id, value: node.val, left: "skipped", right: "skipped", decision: node === pNode ? "return p" : "return q", returned: node.val });
+      frame.stage = "target-match";
+      pushStep({
+        phase: "target-match", event: "target-match",
+        title: node === pNode ? { vi: `Gặp p=${pv} → return p`, en: `Found p=${pv} → return p` } : { vi: `Gặp q=${qv} → return q`, en: `Found q=${qv} → return q` },
+        note: {
+          vi: "p hoặc q được phép là tổ tiên của node còn lại. Vì đề đảm bảo cả hai tồn tại, có thể trả target ngay mà không cần đi sâu hơn.",
+          en: "Either target may be an ancestor of the other. Because both are guaranteed to exist, return the target immediately without descending farther.",
+        },
+        line: 6, current: node, decision: targetDecision, returnValue: node,
+      });
+      activePath.pop();
+      callStack.pop();
       return node;
     }
-    const L = lca(node.left), R = lca(node.right);
-    if (L && R) {
-      if (!answer) answer = node;
-      steps.push(snapshot(root, { title: { vi: `${node.val} là LCA (split)`, en: `${node.val} is LCA (split)` }, hlSet: new Set([node.id]), wordSet: new Set([L.id, R.id]), codeLines: [7, 8], vars: [{ name: "left", value: L.val }, { name: "right", value: R.val }, { name: "LCA", value: node.val }], note: { vi: `p và q nằm ở 2 nhánh khác nhau của ${node.val} → ${node.val} là LCA.`, en: `p and q lie in different branches of ${node.val} → ${node.val} is the LCA.` } }));
-      return node;
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left", event: "call-left",
+      title: { vi: `DFS nhánh trái của ${node.val}`, en: `DFS the left branch of ${node.val}` },
+      note: { vi: "Tìm xem nhánh trái trả p, q, một LCA, hay None.", en: "Find whether the left branch returns p, q, an LCA, or None." },
+      line: 7, current: node,
+    });
+    const left = lca(node.left, "left");
+    frame.left = left;
+    frame.leftReady = true;
+    frame.stage = "left-return";
+    pushStep({
+      phase: "left-return", event: "left-return",
+      title: { vi: `Trái của ${node.val} trả ${left ? left.val : "None"}`, en: `${node.val}'s left returns ${left ? left.val : "None"}` },
+      note: left
+        ? { vi: `Nhánh trái đã tìm thấy tín hiệu ${left.val}; giữ nó trong biến left.`, en: `The left branch found signal ${left.val}; keep it in left.` }
+        : { vi: "Nhánh trái không chứa target nào.", en: "The left branch contains no target." },
+      line: 7, current: node, leftResult: left, leftReady: true,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right", event: "call-right",
+      title: { vi: `DFS nhánh phải của ${node.val}`, en: `DFS the right branch of ${node.val}` },
+      note: { vi: "Tiếp tục lấy kết quả từ nhánh phải.", en: "Continue by obtaining the right branch result." },
+      line: 8, current: node, leftResult: left, leftReady: true,
+    });
+    const right = lca(node.right, "right");
+    frame.right = right;
+    frame.rightReady = true;
+    frame.stage = "right-return";
+    pushStep({
+      phase: "right-return", event: "right-return",
+      title: { vi: `Phải của ${node.val} trả ${right ? right.val : "None"}`, en: `${node.val}'s right returns ${right ? right.val : "None"}` },
+      note: right
+        ? { vi: `Nhánh phải đã tìm thấy tín hiệu ${right.val}; giờ có thể quyết định tại ${node.val}.`, en: `The right branch found signal ${right.val}; now decide at ${node.val}.` }
+        : { vi: `Nhánh phải trả None; giờ có thể quyết định tại ${node.val}.`, en: `The right branch returned None; now decide at ${node.val}.` },
+      line: 8, current: node, leftResult: left, rightResult: right, leftReady: true, rightReady: true,
+    });
+
+    let result = null;
+    let decision = "none";
+    let title;
+    let note;
+    let line;
+    if (left && right) {
+      result = node;
+      decision = "split";
+      lcaCandidate = node;
+      title = { vi: `${left.val} | ${node.val} | ${right.val} → SPLIT tại ${node.val}`, en: `${left.val} | ${node.val} | ${right.val} → SPLIT at ${node.val}` };
+      note = { vi: `Hai nhánh đều trả node, nên ${node.val} là node thấp nhất gom được cả p và q.`, en: `Both branches return a node, so ${node.val} is the lowest node that combines p and q.` };
+      line = 10;
+    } else if (left) {
+      result = left;
+      decision = "bubble-left";
+      title = { vi: `Chỉ trái có ${left.val} → bubble ${left.val}`, en: `Only left has ${left.val} → bubble ${left.val}` };
+      note = { vi: `Không có split tại ${node.val}; chuyển nguyên kết quả trái lên cha.`, en: `There is no split at ${node.val}; pass the left result unchanged to its parent.` };
+      line = 11;
+    } else if (right) {
+      result = right;
+      decision = "bubble-right";
+      title = { vi: `Chỉ phải có ${right.val} → bubble ${right.val}`, en: `Only right has ${right.val} → bubble ${right.val}` };
+      note = { vi: `Không có split tại ${node.val}; chuyển nguyên kết quả phải lên cha.`, en: `There is no split at ${node.val}; pass the right result unchanged to its parent.` };
+      line = 11;
+    } else {
+      title = { vi: "Hai nhánh đều None → return None", en: "Both branches are None → return None" };
+      note = { vi: `Cây con tại ${node.val} không chứa p hoặc q.`, en: `The subtree at ${node.val} contains neither p nor q.` };
+      line = 11;
     }
-    return L || R;
+    returned.set(node.id, result);
+    returnDetails.set(node.id, { left, right, leftReady: true, rightReady: true, decision });
+    processed.push({ id: node.id, value: node.val, left: left ? left.val : "None", right: right ? right.val : "None", decision, returned: result ? result.val : "None" });
+    frame.stage = decision;
+    pushStep({
+      phase: "decide", event: decision,
+      title, note, line, current: node,
+      leftResult: left, rightResult: right, leftReady: true, rightReady: true,
+      decision, returnValue: result,
+    });
+    activePath.pop();
+    callStack.pop();
+    return result;
   }
-  lca(root);
-  const fs = snapshot(root, { title: { vi: `LCA = ${answer ? answer.val : "null"}`, en: `LCA = ${answer ? answer.val : "null"}` }, wordSet: answer ? new Set([answer.id]) : undefined, vars: [{ name: "answer", value: answer ? answer.val : "null" }], note: { vi: `Tổ tiên chung thấp nhất = ${answer ? answer.val : "null"}.`, en: `Lowest common ancestor = ${answer ? answer.val : "null"}.` } }); fs.final = true; steps.push(fs);
-  return { input, answer: answer ? answer.val : "null", steps };
+
+  const answerNode = lca(root, "root");
+  lcaCandidate = answerNode;
+  const pPath = pathTo(pNode);
+  const qPath = pathTo(qNode);
+  const pStart = pPath.indexOf(answerNode.id);
+  const qStart = qPath.indexOf(answerNode.id);
+  const routeP = pPath.slice(pStart);
+  const routeQ = qPath.slice(qStart);
+  const finalDetails = returnDetails.get(answerNode.id);
+  pushStep({
+    phase: "done", event: "done",
+    title: { vi: `LCA(${pv}, ${qv}) = ${answerNode.val}`, en: `LCA(${pv}, ${qv}) = ${answerNode.val}` },
+    note: {
+      vi: `${answerNode.val} là node thấp nhất có cả p=${pv} và q=${qv} trong cây con của nó; một target được phép là hậu duệ của chính nó.`,
+      en: `${answerNode.val} is the lowest node whose subtree contains both p=${pv} and q=${qv}; a target is allowed to be its own descendant.`,
+    },
+    line: 11, current: answerNode,
+    leftResult: finalDetails.left, rightResult: finalDetails.right,
+    leftReady: finalDetails.leftReady, rightReady: finalDetails.rightReady,
+    decision: finalDetails.decision, returnValue: answerNode, final: true, routeP, routeQ,
+  });
+  return { input, answer: answerNode.val, steps };
 }
 
 // ─── 1644: LCA of a Binary Tree II (p or q may be absent), fully line-by-line ───
@@ -6497,6 +6765,10 @@ function buildSteps687(input) {
   }
 
   dfs(root, "root");
+  if (root && bestPathIds.length === 0) {
+    bestPathIds = [root.id];
+    bestPathValues = [root.val];
+  }
   pushStep({
     phase: "done",
     event: "done",
@@ -6508,6 +6780,264 @@ function buildSteps687(input) {
     through: best,
     returnGain: root ? returned.get(root.id) : 0,
     final: true,
+  });
+  return { input, answer: best, steps };
+}
+
+// ─── 1372: Longest ZigZag Path in a Binary Tree ───
+function buildSteps1372(input) {
+  const root = parseTreeEssentialsInput(input, { allowEmpty: true, minValue: 1, maxValue: 100, maxNodes: 31 });
+  const steps = [];
+  const callStack = [];
+  const activePath = [];
+  const returned = new Map();
+  const processed = [];
+  const nodesById = new Map();
+  (function collect(node) {
+    if (!node) return;
+    nodesById.set(node.id, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  let best = 0;
+  let bestPathIds = [];
+  let bestPathValues = [];
+  let bestDirections = [];
+  const stages = [
+    { vi: "DFS xuống lá", en: "Descend to leaves" },
+    { vi: "Nhận cặp L / R", en: "Receive the L / R pair" },
+    { vi: "Đổi hướng", en: "Switch direction" },
+    { vi: "Cập nhật best", en: "Update the best" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "return-null", "call-left", "call-right"].includes(phase)) return 0;
+    if (["left-return", "right-return"].includes(phase)) return 1;
+    if (["build-left", "build-right"].includes(phase)) return 2;
+    return 3;
+  };
+  const directionsFor = (ids) => {
+    const directions = [];
+    for (let index = 0; index + 1 < ids.length; index++) {
+      const parent = nodesById.get(ids[index]);
+      directions.push(parent && parent.left && parent.left.id === ids[index + 1] ? "L" : "R");
+    }
+    return directions;
+  };
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    stage: frame.stage,
+    leftPair: frame.leftPair ? { ...frame.leftPair } : null,
+    rightPair: frame.rightPair ? { ...frame.rightPair } : null,
+  }));
+  const pathState = () => activePath.map((node, index) => ({ id: node.id, value: node.val, current: index === activePath.length - 1 }));
+  const annotationsFor = (current) => {
+    const annotations = {};
+    returned.forEach((pair, id) => {
+      annotations[id] = { label: `L${pair.left} · R${pair.right}`, kind: "zz1372-returned" };
+    });
+    if (current) annotations[current.id] = { label: "CURRENT", kind: "zz1372-current" };
+    return annotations;
+  };
+  const childState = (child, pair, ready) => ({
+    id: child ? child.id : null,
+    value: child ? child.val : null,
+    ready,
+    left: ready && pair ? pair.left : null,
+    right: ready && pair ? pair.right : null,
+  });
+  const pushStep = ({
+    phase, event, title, note, line, current = null,
+    leftPair = null, rightPair = null, leftReady = false, rightReady = false,
+    goLeft = null, goRight = null, localBest = null, bestBefore = null,
+    bestUpdated = false, returnPair = null, candidatePathIds = [], final = false,
+  }) => {
+    const activeIds = new Set(activePath.map((node) => node.id));
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: final ? new Set(bestPathIds) : activeIds,
+      annotations: annotationsFor(current),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "go_left", value: goLeft ?? "—" },
+        { name: "go_right", value: goRight ?? "—" },
+        { name: "local_best", value: localBest ?? "—" },
+        { name: "best", value: best },
+        { name: "return", value: returnPair ? `(${returnPair.left}, ${returnPair.right})` : "—" },
+      ],
+      note,
+    });
+    treeStep.zigzag1372View = {
+      problemId: 1372,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      current: current ? { id: current.id, value: current.val } : null,
+      leftChild: current ? childState(current.left, leftPair, leftReady) : null,
+      rightChild: current ? childState(current.right, rightPair, rightReady) : null,
+      leftPair: leftPair ? { ...leftPair } : null,
+      rightPair: rightPair ? { ...rightPair } : null,
+      goLeft,
+      goRight,
+      localBest,
+      bestBefore,
+      best,
+      bestUpdated,
+      returnPair: returnPair ? { ...returnPair } : null,
+      candidatePath: candidatePathIds.map((id) => nodesById.get(id).val),
+      candidateDirections: directionsFor(candidatePathIds),
+      path: pathState(),
+      stack: stackState(),
+      processed: processed.map((item) => ({ ...item })),
+      bestPath: [...bestPathValues],
+      bestDirections: [...bestDirections],
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro", event: "rule",
+    title: { vi: "Sau L phải là R; sau R phải là L", en: "After L must come R; after R must come L" },
+    note: {
+      vi: "Mỗi node trả một cặp: độ dài nếu cạnh đầu tiên đi trái (L) và nếu cạnh đầu tiên đi phải (R). None trả (-1, -1) để lá tự nhiên nhận (0, 0).",
+      en: "Each node returns a pair: the length when the first edge goes left (L) and when it goes right (R). None returns (-1, -1), so a leaf naturally gets (0, 0).",
+    },
+    line: 3,
+  });
+
+  function dfs(node, side) {
+    const frame = { node, side, stage: "enter", leftPair: null, rightPair: null };
+    callStack.push(frame);
+    if (!node) {
+      pushStep({
+        phase: "return-null", event: "return-null",
+        title: { vi: `${side} là None → trả (-1, -1)`, en: `${side} is None → return (-1, -1)` },
+        note: { vi: "Cộng một cạnh vào -1 sẽ cho 0, đúng với hướng không có child.", en: "Adding one edge to -1 gives 0, which is correct for a direction with no child." },
+        line: 6,
+        returnPair: { left: -1, right: -1 },
+      });
+      callStack.pop();
+      return { left: -1, right: -1, leftPath: [], rightPath: [] };
+    }
+
+    activePath.push(node);
+    pushStep({
+      phase: "enter", event: "enter",
+      title: { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` },
+      note: { vi: "Tính hai cây con trước theo postorder.", en: "Compute both children first in postorder." },
+      line: 4, current: node,
+    });
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left", event: "call-left",
+      title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
+      note: { vi: "Cần cặp (L, R) của con trái.", en: "We need the left child's (L, R) pair." },
+      line: 7, current: node,
+    });
+    const leftResult = dfs(node.left, "left");
+    const leftPair = { left: leftResult.left, right: leftResult.right };
+    frame.leftPair = leftPair;
+    frame.stage = "left-return";
+    pushStep({
+      phase: "left-return", event: "left-return",
+      title: { vi: `Con trái trả (L=${leftPair.left}, R=${leftPair.right})`, en: `Left child returns (L=${leftPair.left}, R=${leftPair.right})` },
+      note: { vi: "Đi trái bây giờ thì tại child phải đổi sang phải, nên dùng R của child.", en: "Going left now means the child must switch right, so use the child's R value." },
+      line: 7, current: node, leftPair, leftReady: true,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right", event: "call-right",
+      title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
+      note: { vi: "Giữ cặp bên trái và tính cặp của con phải.", en: "Keep the left pair and compute the right child's pair." },
+      line: 8, current: node, leftPair, leftReady: true,
+    });
+    const rightResult = dfs(node.right, "right");
+    const rightPair = { left: rightResult.left, right: rightResult.right };
+    frame.rightPair = rightPair;
+    frame.stage = "right-return";
+    pushStep({
+      phase: "right-return", event: "right-return",
+      title: { vi: `Con phải trả (L=${rightPair.left}, R=${rightPair.right})`, en: `Right child returns (L=${rightPair.left}, R=${rightPair.right})` },
+      note: { vi: "Đã có đủ hai cặp để xây hai lựa chọn tại node hiện tại.", en: "Both pairs are ready, so we can build the two choices at this node." },
+      line: 8, current: node, leftPair, rightPair, leftReady: true, rightReady: true,
+    });
+
+    const goLeft = 1 + leftPair.right;
+    const leftPath = node.left ? [node.id, ...leftResult.rightPath] : [node.id];
+    frame.stage = "build-left";
+    pushStep({
+      phase: "build-left", event: "build-left",
+      title: { vi: `Đi L trước: 1 + child.R(${leftPair.right}) = ${goLeft}`, en: `Start L: 1 + child.R(${leftPair.right}) = ${goLeft}` },
+      note: { vi: "Cạnh đầu là L, vì vậy hướng cần dùng ở con trái là R.", en: "The first edge is L, so the required direction at the left child is R." },
+      line: 9, current: node, leftPair, rightPair, leftReady: true, rightReady: true,
+      goLeft, candidatePathIds: leftPath,
+    });
+
+    const goRight = 1 + rightPair.left;
+    const rightPath = node.right ? [node.id, ...rightResult.leftPath] : [node.id];
+    frame.stage = "build-right";
+    pushStep({
+      phase: "build-right", event: "build-right",
+      title: { vi: `Đi R trước: 1 + child.L(${rightPair.left}) = ${goRight}`, en: `Start R: 1 + child.L(${rightPair.left}) = ${goRight}` },
+      note: { vi: "Cạnh đầu là R, vì vậy hướng cần dùng ở con phải là L.", en: "The first edge is R, so the required direction at the right child is L." },
+      line: 10, current: node, leftPair, rightPair, leftReady: true, rightReady: true,
+      goLeft, goRight, candidatePathIds: goLeft >= goRight ? leftPath : rightPath,
+    });
+
+    const localBest = Math.max(goLeft, goRight);
+    const candidatePathIds = goLeft >= goRight ? leftPath : rightPath;
+    const bestBefore = best;
+    const bestUpdated = localBest > best;
+    if (bestUpdated) {
+      best = localBest;
+      bestPathIds = [...candidatePathIds];
+      bestPathValues = bestPathIds.map((id) => nodesById.get(id).val);
+      bestDirections = directionsFor(bestPathIds);
+    }
+    frame.stage = bestUpdated ? "best-update" : "best-keep";
+    pushStep({
+      phase: bestUpdated ? "best-update" : "best-keep",
+      event: bestUpdated ? "best-update" : "best-keep",
+      title: bestUpdated ? { vi: `best: ${bestBefore} → ${best}`, en: `best: ${bestBefore} → ${best}` } : { vi: `Giữ best = ${best}`, en: `Keep best = ${best}` },
+      note: { vi: `Node ${node.val}: local best = max(${goLeft}, ${goRight}) = ${localBest} cạnh.`, en: `Node ${node.val}: local best = max(${goLeft}, ${goRight}) = ${localBest} edges.` },
+      line: 11, current: node, leftPair, rightPair, leftReady: true, rightReady: true,
+      goLeft, goRight, localBest, bestBefore, bestUpdated, candidatePathIds,
+    });
+
+    const returnPair = { left: goLeft, right: goRight };
+    returned.set(node.id, returnPair);
+    processed.push({ id: node.id, value: node.val, goLeft, goRight, localBest, bestAfter: best });
+    frame.stage = "return-pair";
+    pushStep({
+      phase: "return-pair", event: "return-pair",
+      title: { vi: `Return (L=${goLeft}, R=${goRight})`, en: `Return (L=${goLeft}, R=${goRight})` },
+      note: { vi: "Trả cả hai lựa chọn vì cha chưa biết nó sẽ đi vào node này từ phía nào.", en: "Return both choices because the parent does not yet know from which direction it will enter this node." },
+      line: 12, current: node, leftPair, rightPair, leftReady: true, rightReady: true,
+      goLeft, goRight, localBest, bestBefore, bestUpdated, returnPair, candidatePathIds,
+    });
+    activePath.pop();
+    callStack.pop();
+    return { left: goLeft, right: goRight, leftPath, rightPath };
+  }
+
+  const rootPair = dfs(root, "root");
+  if (root && bestPathIds.length === 0) {
+    bestPathIds = [root.id];
+    bestPathValues = [root.val];
+  }
+  pushStep({
+    phase: "done", event: "done",
+    title: { vi: `Longest ZigZag = ${best}`, en: `Longest ZigZag = ${best}` },
+    note: bestPathValues.length
+      ? { vi: `Path tốt nhất: ${bestPathValues.join(" → ")} · hướng ${bestDirections.join(" → ") || "không có cạnh"} · ${best} cạnh.`, en: `Best path: ${bestPathValues.join(" → ")} · directions ${bestDirections.join(" → ") || "no edge"} · ${best} edges.` }
+      : { vi: "Cây rỗng nên kết quả bằng 0.", en: "The tree is empty, so the result is 0." },
+    line: 14, localBest: best, returnPair: { left: rootPair.left, right: rootPair.right }, final: true,
   });
   return { input, answer: best, steps };
 }
@@ -7510,7 +8040,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -7901,6 +8431,81 @@ module.exports = {
     ],
     builder: buildSteps1457,
   },
+  687: {
+    id: 687, difficulty: "medium", slug: "longest-univalue-path",
+    category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }, { key: "tree-dp", vi: "Tree DP", en: "Tree DP" }],
+    title: { vi: "Longest Univalue Path", en: "Longest Univalue Path" },
+    titleVi: { vi: "Đường dài nhất có cùng giá trị", en: "Longest path with one value" },
+    statement: {
+      vi: "Cho một cây nhị phân. Trả về số cạnh của đường dài nhất mà mọi node trên đường đều có cùng giá trị. Đường này không nhất thiết đi qua root.",
+      en: "Given a binary tree, return the number of edges in the longest path where every node has the same value. The path does not need to pass through the root.",
+    },
+    defaultInput: "5,4,5,1,1,null,5",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; null cho node rỗng)", en: "Tree (level-order; null for empty)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng postorder để nhận gain dài nhất đi xuống từ con trái và con phải.", en: "Use postorder to receive the longest downward gain from the left and right children." },
+      { vi: "Chỉ nối qua một cạnh khi giá trị của child bằng node; khi đó arrow = child_gain + 1, ngược lại arrow = 0.", en: "Keep an edge only when the child value equals the node; then arrow = child_gain + 1, otherwise arrow = 0." },
+      { vi: "Cập nhật best bằng left_arrow + right_arrow. Trả về max(left_arrow, right_arrow) vì cha chỉ tiếp tục được qua một nhánh.", en: "Update best with left_arrow + right_arrow. Return max(left_arrow, right_arrow) because the parent can continue through only one branch." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được xử lý đúng một lần; stack DFS cao tối đa h.", en: "Each node is processed exactly once; the DFS stack is at most h deep." } },
+    code: [
+      "class Solution:",
+      "    def longestUnivaluePath(self, root):",
+      "        self.best = 0",
+      "        def dfs(node):",
+      "            if not node: return 0",
+      "            left = dfs(node.left)",
+      "            right = dfs(node.right)",
+      "            left_arrow = left + 1 if node.left and node.left.val == node.val else 0",
+      "            right_arrow = right + 1 if node.right and node.right.val == node.val else 0",
+      "            self.best = max(self.best, left_arrow + right_arrow)",
+      "            return max(left_arrow, right_arrow)",
+      "        dfs(root)",
+      "        return self.best",
+    ],
+    builder: buildSteps687,
+  },
+  1372: {
+    id: 1372, difficulty: "medium", slug: "longest-zigzag-path-in-a-binary-tree",
+    category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }, { key: "tree-dp", vi: "Tree DP", en: "Tree DP" }],
+    title: { vi: "Longest ZigZag Path in a Binary Tree", en: "Longest ZigZag Path in a Binary Tree" },
+    titleVi: { vi: "Đường ZigZag dài nhất trong cây", en: "Longest alternating path in a tree" },
+    statement: {
+      vi: "Cho một cây nhị phân. Một path ZigZag đổi hướng trái/phải sau mỗi cạnh. Trả về số cạnh của path ZigZag dài nhất; path có thể bắt đầu tại bất kỳ node nào.",
+      en: "Given a binary tree, a ZigZag path alternates left and right after every edge. Return the number of edges in the longest ZigZag path; it may start at any node.",
+    },
+    defaultInput: "1,2,3,null,4,7,null,5,null,null,null,null,6",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; giá trị 1–100)", en: "Tree (level-order; values 1–100)" },
+    extraParams: [],
+    approach: [
+      { vi: "Postorder: mỗi node trả cặp (go_left, go_right), là độ dài khi cạnh đầu tiên đi trái hoặc đi phải.", en: "Postorder: each node returns (go_left, go_right), the lengths when the first edge goes left or right." },
+      { vi: "Đi trái trước thì bước kế tiếp phải đi phải: go_left = 1 + left_child.go_right. Tương tự go_right = 1 + right_child.go_left.", en: "Starting left means the next edge must go right: go_left = 1 + left_child.go_right. Likewise, go_right = 1 + right_child.go_left." },
+      { vi: "None trả (-1, -1), giúp hướng không có child cho kết quả 0. Cập nhật best bằng max(go_left, go_right) tại mọi node.", en: "None returns (-1, -1), making a missing-child direction equal 0. Update best with max(go_left, go_right) at every node." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được xử lý một lần; stack DFS cao tối đa h.", en: "Each node is processed once; the DFS stack is at most h deep." } },
+    code: [
+      "class Solution:",
+      "    def longestZigZag(self, root):",
+      "        self.best = 0",
+      "        def dfs(node):",
+      "            if not node:",
+      "                return -1, -1",
+      "            left_l, left_r = dfs(node.left)",
+      "            right_l, right_r = dfs(node.right)",
+      "            go_left = 1 + left_r",
+      "            go_right = 1 + right_l",
+      "            self.best = max(self.best, go_left, go_right)",
+      "            return go_left, go_right",
+      "        dfs(root)",
+      "        return self.best",
+    ],
+    builder: buildSteps1372,
+  },
   124: {
     id: 124, difficulty: "hard", slug: "binary-tree-maximum-path-sum",
     category: TREE_CAT,
@@ -8132,14 +8737,17 @@ module.exports = {
   236: {
     id: 236, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree",
     category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }, { key: "lowest-common-ancestor", vi: "Lowest Common Ancestor", en: "Lowest Common Ancestor" }],
     title: { vi: "Lowest Common Ancestor of a Binary Tree", en: "Lowest Common Ancestor of a Binary Tree" },
     titleVi: { vi: "Tổ tiên chung thấp nhất", en: "LCA of a binary tree" },
     statement: { vi: "Cho root và 2 giá trị p, q (đảm bảo tồn tại), tìm tổ tiên chung THẤP NHẤT. Nhập level-order.", en: "Given root and two values p, q (guaranteed to exist), find their LOWEST common ancestor. Enter as level-order." },
-    defaultInput: "3,5,1,6,2,0,8",
-    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    defaultInput: "3,5,1,6,2,0,8,null,null,7,4",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order; giá trị duy nhất)", en: "Tree (level-order; unique values)" },
     extraParams: [{ key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 5 }, { key: "q", label: { vi: "q", en: "q" }, allowNegative: true, default: 1 }],
     approach: [
-      { vi: "Đệ quy: nếu nút là p/q → trả nút. Nếu 2 nhánh con đều khác null → nút hiện tại là LCA.", en: "Recursion: if node is p/q → return it. If both child branches non-null → current node is LCA." },
+      { vi: "Base case: None trả None; nếu node là p hoặc q thì trả chính node đó ngay.", en: "Base case: None returns None; if a node is p or q, return that node immediately." },
+      { vi: "Dùng postorder nhận kết quả left và right. Nếu cả hai đều khác None, node hiện tại là điểm split và chính là LCA.", en: "Use postorder to receive left and right results. If both are non-null, the current node is the split point and therefore the LCA." },
+      { vi: "Nếu chỉ một nhánh có kết quả, bubble kết quả đó lên cha; nếu cả hai None thì trả None.", en: "If only one branch has a result, bubble it up to the parent; if both are None, return None." },
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần.", en: "Visit each node once." } },
     code: ["class Solution:", "    def lowestCommonAncestor(self, root, p, q):", "        if not root:", "            return None", "        if root == p or root == q:", "            return root", "        left = self.lowestCommonAncestor(root.left, p, q)", "        right = self.lowestCommonAncestor(root.right, p, q)", "        if left and right:", "            return root", "        return left or right"],

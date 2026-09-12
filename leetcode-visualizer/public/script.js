@@ -5562,6 +5562,310 @@ function renderPseudoPalindrome1457View(step) {
   else $("pp1457Tree").innerHTML = `<span class="pp1457-tree-empty">∅</span>`;
 }
 
+function renderUnivaluePath687View(step) {
+  const view = step.univaluePath687View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const hasValue = (value) => value !== null && value !== undefined;
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const path = Array.isArray(view.path) ? view.path : [];
+  const pathHtml = path.length
+    ? path.map((item, index) => `<span class="${item.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(item.value)}</strong></span>${index < path.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="uv687-empty">∅ ${vi ? "DFS đã quay về khỏi root" : "DFS has returned from the root"}</b>`;
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · L=${escapeHtml(frame.leftRaw ?? "?")} · R=${escapeHtml(frame.rightRaw ?? "?")}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const edgeGate = (side, child, arrow) => {
+    const filtered = hasValue(arrow);
+    const rawReady = Boolean(child && hasValue(child.raw));
+    const childValue = child && child.value !== null ? child.value : "None";
+    const parentValue = view.current?.value ?? "?";
+    const tone = !filtered ? "waiting" : child?.match ? "keep" : "block";
+    const status = !filtered
+      ? (rawReady ? (vi ? "RAW GAIN ĐÃ VỀ" : "RAW GAIN READY") : (vi ? "ĐANG CHỜ" : "WAITING"))
+      : child?.match ? "✓ MATCH" : "✕ BLOCK";
+    const formula = !filtered
+      ? `${side}_arrow = ?`
+      : child?.match ? `${child.raw} + 1 = ${arrow}` : `${side}_arrow = 0`;
+    return `<section class="uv687-gate ${tone}"><header><strong>${side.toUpperCase()} EDGE</strong><b>${status}</b></header><div><span><small>PARENT</small><strong>${escapeHtml(parentValue)}</strong></span><i>${filtered ? (child?.match ? "=" : "≠") : "?"}</i><span><small>CHILD</small><strong>${escapeHtml(childValue)}</strong></span></div><code>${escapeHtml(formula)}</code></section>`;
+  };
+
+  const leftArrow = hasValue(view.leftArrow) ? view.leftArrow : "?";
+  const rightArrow = hasValue(view.rightArrow) ? view.rightArrow : "?";
+  const through = hasValue(view.through) ? view.through : "?";
+  const equationTone = view.bestUpdated ? "updated" : hasValue(view.through) ? "ready" : "waiting";
+  const bestLine = hasValue(view.through)
+    ? view.bestUpdated
+      ? `${view.bestBefore} → ${view.best}`
+      : `${view.best} (${vi ? "không đổi" : "unchanged"})`
+    : (vi ? "chờ hai arrow" : "waiting for both arrows");
+
+  const returnReady = hasValue(view.returnGain);
+  const returnChoice = view.chosenArm === "left"
+    ? (vi ? "chọn tay trái" : "choose the left arm")
+    : view.chosenArm === "right"
+      ? (vi ? "chọn tay phải" : "choose the right arm")
+      : view.chosenArm === "none"
+        ? (vi ? "không có cạnh nối được" : "no connectable edge")
+        : (vi ? "chưa return" : "not returned yet");
+  const bestPath = Array.isArray(view.bestPath) ? view.bestPath : [];
+  const bestPathText = bestPath.length ? bestPath.join(" → ") : "—";
+
+  const calculationsHtml = view.event === "done"
+    ? `<div class="uv687-calculations">
+      <section class="uv687-through ready"><small>${vi ? "PATH TỐT NHẤT TOÀN CỤC" : "GLOBAL BEST PATH"}</small><div><span class="result"><em>BEST</em><strong>${escapeHtml(view.best || 0)}</strong></span></div><p>${vi ? "Path" : "Path"}: ${escapeHtml(bestPathText)}</p></section>
+      <section class="uv687-return ready"><small>${vi ? "GAIN MỘT TAY CỦA ROOT" : "ROOT'S ONE-ARM GAIN"}</small><code>root return = ${escapeHtml(view.returnGain ?? 0)}</code><strong>${vi ? "DFS đã hoàn tất" : "DFS complete"}</strong><p>${vi ? "Đáp án dùng global best; giá trị return chỉ mang được một tay lên cha." : "The answer uses the global best; a return value can carry only one arm to its parent."}</p></section>
+    </div>`
+    : `<div class="uv687-calculations">
+      <section class="uv687-through ${equationTone}"><small>${vi ? "PATH ĐI QUA NODE HIỆN TẠI" : "PATH THROUGH THE CURRENT NODE"}</small><div><span><em>LEFT ARROW</em><strong>${escapeHtml(leftArrow)}</strong></span><b>+</b><span><em>RIGHT ARROW</em><strong>${escapeHtml(rightArrow)}</strong></span><b>=</b><span class="result"><em>THROUGH</em><strong>${escapeHtml(through)}</strong></span></div><p>best: ${escapeHtml(bestLine)}</p></section>
+      <section class="uv687-return ${returnReady ? "ready" : ""}"><small>${vi ? "GAIN TRẢ LÊN CHA" : "GAIN RETURNED TO PARENT"}</small><code>max(${escapeHtml(leftArrow)}, ${escapeHtml(rightArrow)}) = ${returnReady ? escapeHtml(view.returnGain) : "?"}</code><strong>${escapeHtml(returnChoice)}</strong><p>${vi ? "Chỉ một tay có thể tiếp tục lên cha." : "Only one arm can continue to the parent."}</p></section>
+    </div>`;
+
+  const processed = Array.isArray(view.processed) ? view.processed : [];
+  const processedHtml = processed.length
+    ? processed.map((item, index) => `<span class="${index === processed.length - 1 && view.event === "return-gain" ? "fresh" : ""}"><small>NODE ${escapeHtml(item.value)}</small><strong>${escapeHtml(item.leftArrow)} + ${escapeHtml(item.rightArrow)} = ${escapeHtml(item.through)}</strong><em>return ${escapeHtml(item.returnGain)} · best ${escapeHtml(item.bestAfter)}</em></span>`).join("")
+    : `<b class="uv687-empty">${vi ? "Chưa node nào hoàn tất postorder" : "No node has completed postorder yet"}</b>`;
+
+  const tone = view.event === "best-update" ? "updated" : view.event === "done" ? "done" : view.event === "filter-left" || view.event === "filter-right" ? "filter" : "";
+  const summary = vi
+    ? `Bài 687, ${text(step.title)}. Best hiện tại là ${view.best || 0} cạnh.`
+    : `Problem 687, ${text(step.title)}. The current best is ${view.best || 0} edges.`;
+
+  target.innerHTML = `<section class="uv687-viz ${step.final ? "final" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="uv687-phases">${phases}</div>
+    <section class="uv687-rule"><span><small>${vi ? "NỐI MỖI TAY" : "EXTEND EACH ARM"}</small><strong>child.val == node.val ? child_gain + 1 : 0</strong></span><b>→</b><span><small>${vi ? "HAI KẾT QUẢ KHÁC NHAU" : "TWO DIFFERENT RESULTS"}</small><strong>best ← left + right · return max(left, right)</strong></span></section>
+    <section class="uv687-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>BEST: ${escapeHtml(view.best || 0)} ${vi ? "cạnh" : "edges"}</em></section>
+    <div class="uv687-layout">
+      <section class="uv687-tree-card"><header><strong>${vi ? "CÂY · POSTORDER TỪ DƯỚI LÊN" : "TREE · BOTTOM-UP POSTORDER"}</strong><span>${step.final ? `${vi ? "path tốt nhất" : "best path"}: ${escapeHtml(bestPathText)}` : (vi ? "cam = current · xanh dương = call path" : "amber = current · blue = call path")}</span></header><div id="uv687Tree" class="uv687-tree"></div></section>
+      <aside class="uv687-side">
+        <section class="uv687-stats"><div><small>NODE</small><strong>${escapeHtml(view.current?.value ?? "—")}</strong></div><div><small>LEFT RAW</small><strong>${escapeHtml(view.leftRaw ?? "—")}</strong></div><div><small>RIGHT RAW</small><strong>${escapeHtml(view.rightRaw ?? "—")}</strong></div><div><small>BEST</small><strong>${escapeHtml(view.best || 0)}</strong></div></section>
+        <div class="uv687-gates">${edgeGate("left", view.left, view.leftArrow)}${edgeGate("right", view.right, view.rightArrow)}</div>
+        <section class="uv687-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="uv687-path"><header><strong>${vi ? "ĐƯỜNG DFS ĐANG HOẠT ĐỘNG" : "ACTIVE DFS PATH"}</strong><span>${vi ? "postorder: child return trước parent" : "postorder: children return before their parent"}</span></header><div>${pathHtml}</div></section>
+    ${calculationsHtml}
+    <section class="uv687-processed"><header><strong>${vi ? "CÁC NODE ĐÃ CHỐT GAIN" : "NODES WITH RESOLVED GAINS"}</strong><span>${vi ? "mỗi ô: through, return và best" : "each tile: through, return, and best"}</span></header><div>${processedHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "uv687Tree");
+  else $("uv687Tree").innerHTML = `<span class="uv687-tree-empty">∅</span>`;
+}
+
+function renderLongestZigzag1372View(step) {
+  const view = step.zigzag1372View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const hasValue = (value) => value !== null && value !== undefined;
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = view.event === "done" ? "done" : index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => {
+      const left = frame.leftPair ? `(${frame.leftPair.left},${frame.leftPair.right})` : "?";
+      const right = frame.rightPair ? `(${frame.rightPair.left},${frame.rightPair.right})` : "?";
+      return `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · left=${escapeHtml(left)} · right=${escapeHtml(right)}</small><em>${escapeHtml(frame.stage)}</em></li>`;
+    }).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const activePath = Array.isArray(view.path) ? view.path : [];
+  const activePathHtml = activePath.length
+    ? activePath.map((node, index) => `<span class="${node.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(node.value)}</strong></span>${index < activePath.length - 1 ? "<i>↓</i>" : ""}`).join("")
+    : `<b class="zz1372-empty">∅ ${vi ? "không có node active" : "no active node"}</b>`;
+
+  const pathRow = (values, directions) => {
+    if (!Array.isArray(values) || !values.length) return `<b class="zz1372-empty">${vi ? "chưa có path" : "no path yet"}</b>`;
+    return values.map((value, index) => {
+      const direction = directions[index];
+      const arrow = direction === "L" ? "↙ L" : direction === "R" ? "R ↘" : "";
+      return `<span><strong>${escapeHtml(value)}</strong></span>${index < values.length - 1 ? `<i>${escapeHtml(arrow)}</i>` : ""}`;
+    }).join("");
+  };
+
+  const pairCard = (side, child, goValue) => {
+    const isLeft = side === "left";
+    const ready = Boolean(child && child.ready);
+    const needed = ready ? (isLeft ? child.right : child.left) : null;
+    const nextDirection = isLeft ? "R" : "L";
+    const firstDirection = isLeft ? "L" : "R";
+    const childValue = !view.current ? "—" : child && child.value !== null ? child.value : "None";
+    const built = hasValue(goValue);
+    const tone = built ? "built" : ready ? "ready" : "waiting";
+    return `<section class="zz1372-choice ${tone}">
+      <header><strong>${vi ? "BẮT ĐẦU" : "START"} ${firstDirection}</strong><b>${firstDirection} → ${nextDirection} → ${firstDirection}…</b></header>
+      <div class="zz1372-child"><span><small>CHILD</small><strong>${escapeHtml(childValue)}</strong></span><span><small>${vi ? "CẶP CHILD" : "CHILD PAIR"}</small><strong>${ready ? `(L=${escapeHtml(child.left)}, R=${escapeHtml(child.right)})` : "(L=?, R=?)"}</strong></span></div>
+      <code>go_${side} = 1 + child.${nextDirection}</code>
+      <div class="zz1372-math"><span>1</span><b>+</b><span class="needed">${hasValue(needed) ? escapeHtml(needed) : "?"}</span><b>=</b><strong>${built ? escapeHtml(goValue) : "?"}</strong></div>
+    </section>`;
+  };
+
+  const candidatePath = Array.isArray(view.candidatePath) ? view.candidatePath : [];
+  const candidateDirections = Array.isArray(view.candidateDirections) ? view.candidateDirections : [];
+  const bestPath = Array.isArray(view.bestPath) ? view.bestPath : [];
+  const bestDirections = Array.isArray(view.bestDirections) ? view.bestDirections : [];
+  const displayedPath = view.event === "done" ? bestPath : candidatePath;
+  const displayedDirections = view.event === "done" ? bestDirections : candidateDirections;
+  const choicesHtml = view.event === "done"
+    ? ""
+    : `<div class="zz1372-choices">${pairCard("left", view.leftChild, view.goLeft)}${pairCard("right", view.rightChild, view.goRight)}</div>`;
+  const processed = Array.isArray(view.processed) ? view.processed : [];
+  const processedHtml = processed.length
+    ? processed.map((item, index) => `<span class="${index === processed.length - 1 && view.event === "return-pair" ? "fresh" : ""}"><small>NODE ${escapeHtml(item.value)}</small><strong>L ${escapeHtml(item.goLeft)} · R ${escapeHtml(item.goRight)}</strong><em>local ${escapeHtml(item.localBest)} · best ${escapeHtml(item.bestAfter)}</em></span>`).join("")
+    : `<b class="zz1372-empty">${vi ? "Chưa node nào return cặp" : "No node has returned a pair yet"}</b>`;
+
+  const returnPair = view.returnPair;
+  const returnHtml = view.event === "done"
+    ? `<section class="zz1372-return done"><small>${vi ? "KẾT QUẢ TOÀN CỤC" : "GLOBAL RESULT"}</small><strong>${escapeHtml(view.best || 0)} ${vi ? "cạnh" : "edges"}</strong><code>${bestDirections.length ? bestDirections.join(" → ") : (vi ? "không có cạnh" : "no edge")}</code><p>${vi ? "Path có thể bắt đầu tại bất kỳ node nào." : "The path may start at any node."}</p></section>`
+    : `<section class="zz1372-return ${returnPair ? "ready" : ""}"><small>${vi ? "CẶP TRẢ VỀ CHO CHA" : "PAIR RETURNED TO PARENT"}</small><strong>${returnPair ? `(L=${escapeHtml(returnPair.left)}, R=${escapeHtml(returnPair.right)})` : "(L=?, R=?)"}</strong><code>return go_left, go_right</code><p>${vi ? "Cha sẽ dùng đúng một thành phần để tiếp tục đổi hướng." : "The parent will use exactly one component to keep alternating."}</p></section>`;
+
+  const bestBefore = hasValue(view.bestBefore) ? view.bestBefore : view.best;
+  const localBest = hasValue(view.localBest) ? view.localBest : "?";
+  const localHtml = view.event === "done"
+    ? `<section class="zz1372-local updated"><small>${vi ? "ĐẾM SỐ CẠNH" : "COUNT THE EDGES"}</small><code>${bestDirections.length ? bestDirections.join(" → ") : (vi ? "không có hướng" : "no direction")}</code><strong>${bestDirections.length} ${vi ? "hướng =" : "directions ="} ${escapeHtml(view.best || 0)} ${vi ? "cạnh" : "edges"}</strong></section>`
+    : `<section class="zz1372-local ${view.bestUpdated ? "updated" : ""}"><small>${vi ? "SO SÁNH TẠI NODE" : "COMPARE AT THIS NODE"}</small><code>local = max(${escapeHtml(view.goLeft ?? "?")}, ${escapeHtml(view.goRight ?? "?")}) = ${escapeHtml(localBest)}</code><strong>best: ${escapeHtml(bestBefore ?? 0)} ${view.bestUpdated ? "→" : "="} ${escapeHtml(view.best || 0)}</strong></section>`;
+  const tone = view.event === "best-update" ? "updated" : view.event === "done" ? "done" : view.event === "build-left" || view.event === "build-right" ? "switch" : "";
+  const summary = vi
+    ? `Bài 1372, ${text(step.title)}. Best hiện tại là ${view.best || 0} cạnh.`
+    : `Problem 1372, ${text(step.title)}. The current best is ${view.best || 0} edges.`;
+
+  target.innerHTML = `<section class="zz1372-viz ${step.final ? "final" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="zz1372-phases">${phases}</div>
+    <section class="zz1372-rule"><span><small>${vi ? "ĐI TRÁI TRƯỚC" : "START LEFT"}</small><strong>go_left = 1 + left_child.go_right</strong></span><b>⇄</b><span><small>${vi ? "ĐI PHẢI TRƯỚC" : "START RIGHT"}</small><strong>go_right = 1 + right_child.go_left</strong></span></section>
+    <section class="zz1372-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>BEST: ${escapeHtml(view.best || 0)} ${vi ? "cạnh" : "edges"}</em></section>
+    <div class="zz1372-layout">
+      <section class="zz1372-tree-card"><header><strong>${vi ? "CÂY · POSTORDER TỪ DƯỚI LÊN" : "TREE · BOTTOM-UP POSTORDER"}</strong><span>${step.final ? (vi ? "xanh lá = best path" : "green = best path") : (vi ? "cam = current · xanh dương = call path" : "amber = current · blue = call path")}</span></header><div id="zz1372Tree" class="zz1372-tree"></div></section>
+      <aside class="zz1372-side">
+        <section class="zz1372-stats"><div><small>NODE</small><strong>${escapeHtml(view.current?.value ?? "—")}</strong></div><div><small>GO LEFT</small><strong>${escapeHtml(view.goLeft ?? "—")}</strong></div><div><small>GO RIGHT</small><strong>${escapeHtml(view.goRight ?? "—")}</strong></div><div><small>BEST</small><strong>${escapeHtml(view.best || 0)}</strong></div></section>
+        <section class="zz1372-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    ${choicesHtml}
+    <section class="zz1372-path"><header><strong>${view.event === "done" ? (vi ? "PATH ZIGZAG TỐT NHẤT" : "BEST ZIGZAG PATH") : (vi ? "PATH ỨNG VIÊN TẠI NODE" : "CANDIDATE PATH AT THIS NODE")}</strong><span>${vi ? "mỗi mũi tên phải đổi hướng" : "every arrow must switch direction"}</span></header><div>${pathRow(displayedPath, displayedDirections)}</div></section>
+    <div class="zz1372-bottom">
+      ${localHtml}
+      ${returnHtml}
+    </div>
+    <section class="zz1372-active"><header><strong>${vi ? "PATH DFS ĐANG HOẠT ĐỘNG" : "ACTIVE DFS PATH"}</strong><span>postorder</span></header><div>${activePathHtml}</div></section>
+    <section class="zz1372-processed"><header><strong>${vi ? "CÁC NODE ĐÃ CHỐT CẶP (L, R)" : "NODES WITH RESOLVED (L, R) PAIRS"}</strong><span>${vi ? "L/R = hướng của cạnh đầu tiên" : "L/R = direction of the first edge"}</span></header><div>${processedHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "zz1372Tree");
+  else $("zz1372Tree").innerHTML = `<span class="zz1372-tree-empty">∅</span>`;
+}
+
+function renderLca236View(step) {
+  const view = step.lca236View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = view.event === "done" ? "done" : index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const valueOf = (node, ready) => !ready ? "?" : node ? node.value : "None";
+  const targetStopsHere = String(view.decision || "").startsWith("target");
+  const leftValue = targetStopsHere && !view.leftReady ? "SKIP" : valueOf(view.leftResult, view.leftReady);
+  const rightValue = targetStopsHere && !view.rightReady ? "SKIP" : valueOf(view.rightResult, view.rightReady);
+  const returnReady = Object.prototype.hasOwnProperty.call(view, "returnValue");
+  const returnValue = valueOf(view.returnValue, returnReady);
+  const decisionLabels = {
+    waiting: vi ? "đang chờ" : "waiting",
+    none: "RETURN NONE",
+    "target-p": "RETURN P",
+    "target-q": "RETURN Q",
+    split: "SPLIT → LCA",
+    "bubble-left": vi ? "BUBBLE TRÁI" : "BUBBLE LEFT",
+    "bubble-right": vi ? "BUBBLE PHẢI" : "BUBBLE RIGHT",
+    done: "LCA FOUND",
+  };
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · L=${escapeHtml(frame.left)} · R=${escapeHtml(frame.right)}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const path = Array.isArray(view.path) ? view.path : [];
+  const pathHtml = path.length
+    ? path.map((node, index) => `<span class="${node.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(node.value)}</strong></span>${index < path.length - 1 ? "<i>↓</i>" : ""}`).join("")
+    : `<b class="lca236-empty">∅ ${vi ? "không có node active" : "no active node"}</b>`;
+
+  const routeRow = (values, targetName) => {
+    if (!Array.isArray(values) || !values.length) return `<b class="lca236-empty">—</b>`;
+    return values.map((value, index) => `<span class="${index === 0 ? "lca" : index === values.length - 1 ? targetName.toLowerCase() : ""}"><strong>${escapeHtml(value)}</strong></span>${index < values.length - 1 ? "<i>→</i>" : ""}`).join("");
+  };
+  const finalRoutes = view.event === "done"
+    ? `<section class="lca236-routes"><header><strong>${vi ? "HAI ĐƯỜNG TỪ LCA" : "TWO ROUTES FROM THE LCA"}</strong><span>${vi ? "node đầu tiên chung và thấp nhất" : "the first node is the lowest shared node"}</span></header><div><section><small>LCA → P</small><div>${routeRow(view.routeP, "P")}</div></section><section><small>LCA → Q</small><div>${routeRow(view.routeQ, "Q")}</div></section></div></section>`
+    : "";
+
+  const processed = Array.isArray(view.processed) ? view.processed : [];
+  const processedHtml = processed.length
+    ? processed.map((item, index) => `<span class="${index === processed.length - 1 && view.event !== "done" ? "fresh" : ""}"><small>NODE ${escapeHtml(item.value)}</small><strong>L ${escapeHtml(item.left)} · R ${escapeHtml(item.right)}</strong><em>${escapeHtml(String(item.decision).replaceAll("-", " "))} → ${escapeHtml(item.returned)}</em></span>`).join("")
+    : `<b class="lca236-empty">${vi ? "Chưa lời gọi nào return" : "No call has returned yet"}</b>`;
+
+  const decisions = [
+    { key: "target", active: view.decision === "target-p" || view.decision === "target-q", label: vi ? "NODE LÀ P / Q" : "NODE IS P / Q", formula: "return node" },
+    { key: "split", active: view.decision === "split", label: vi ? "LEFT VÀ RIGHT CÓ NODE" : "LEFT AND RIGHT HAVE NODES", formula: "return node  ← LCA" },
+    { key: "bubble", active: view.decision === "bubble-left" || view.decision === "bubble-right", label: vi ? "CHỈ MỘT BÊN CÓ NODE" : "ONLY ONE SIDE HAS A NODE", formula: "return left or right" },
+  ];
+  const decisionHtml = decisions.map(item => `<span class="${item.active ? `active ${item.key}` : ""}"><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.formula)}</strong></span>`).join("");
+  const tone = view.decision === "split" || view.event === "done" ? "split" : String(view.decision || "").startsWith("target") ? "target" : String(view.decision || "").startsWith("bubble") ? "bubble" : "";
+  const summary = vi
+    ? `Bài 236, ${text(step.title)}. LCA hiện tại là ${view.lca?.value ?? "chưa xác định"}.`
+    : `Problem 236, ${text(step.title)}. The current LCA is ${view.lca?.value ?? "not determined"}.`;
+
+  target.innerHTML = `<section class="lca236-viz ${step.final ? "final" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="lca236-phases">${phases}</div>
+    <section class="lca236-rule"><span><small>BASE / TARGET</small><strong>None → None · p/q → itself</strong></span><b>→</b><span><small>${vi ? "SAU HAI LỜI GỌI" : "AFTER BOTH CALLS"}</small><strong>both → node · one → bubble · none → None</strong></span></section>
+    <section class="lca236-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${escapeHtml(decisionLabels[view.event === "done" ? "done" : view.decision] || view.decision || "waiting")}</em></section>
+    <div class="lca236-layout">
+      <section class="lca236-tree-card"><header><strong>${vi ? "CÂY VÀ TÍN HIỆU RETURN" : "TREE AND RETURN SIGNALS"}</strong><span>${step.final ? (vi ? "xanh lá = hai route từ LCA" : "green = both routes from LCA") : (vi ? "cam = current · P/Q luôn được gắn nhãn" : "amber = current · P/Q stay labeled")}</span></header><div id="lca236Tree" class="lca236-tree"></div></section>
+      <aside class="lca236-side">
+        <section class="lca236-targets"><div class="p"><small>P</small><strong>${escapeHtml(view.p?.value ?? "—")}</strong></div><div class="q"><small>Q</small><strong>${escapeHtml(view.q?.value ?? "—")}</strong></div><div><small>CURRENT</small><strong>${escapeHtml(view.current?.value ?? "—")}</strong></div><div class="answer"><small>LCA</small><strong>${escapeHtml(view.lca?.value ?? "—")}</strong></div></section>
+        <section class="lca236-returns"><header><strong>${vi ? "KẾT QUẢ TRỞ VỀ NODE HIỆN TẠI" : "RESULTS RETURNED TO THE CURRENT NODE"}</strong><span>${vi ? "None = không thấy target" : "None = no target found"}</span></header><div><span><small>LEFT</small><strong>${escapeHtml(leftValue)}</strong></span><b>+</b><span><small>RIGHT</small><strong>${escapeHtml(rightValue)}</strong></span><b>→</b><span class="result"><small>RETURN</small><strong>${escapeHtml(returnValue)}</strong></span></div></section>
+        <section class="lca236-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="lca236-decisions"><header><strong>${vi ? "BA TRƯỜNG HỢP TRẢ NODE" : "THREE NODE-RETURN CASES"}</strong><span>${vi ? "ô sáng là quyết định hiện tại" : "the highlighted case is active"}</span></header><div>${decisionHtml}</div></section>
+    ${finalRoutes}
+    <section class="lca236-path"><header><strong>${vi ? "PATH DFS ĐANG HOẠT ĐỘNG" : "ACTIVE DFS PATH"}</strong><span>root → current</span></header><div>${pathHtml}</div></section>
+    <section class="lca236-processed"><header><strong>${vi ? "CÁC LỜI GỌI ĐÃ RETURN" : "CALLS THAT HAVE RETURNED"}</strong><span>${vi ? "left · right · quyết định · kết quả" : "left · right · decision · result"}</span></header><div>${processedHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "lca236Tree");
+  else $("lca236Tree").innerHTML = `<span class="lca236-tree-empty">∅</span>`;
+}
+
 function renderTreeEssentialsView(step) {
   const view = step.treeEssentialsView || {};
   const target = $("treeView");
@@ -28363,6 +28667,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPseudoPalindrome1457View(step);
+  } else if (step.univaluePath687View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderUnivaluePath687View(step);
+  } else if (step.zigzag1372View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLongestZigzag1372View(step);
+  } else if (step.lca236View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLca236View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
