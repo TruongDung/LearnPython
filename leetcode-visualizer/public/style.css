@@ -18386,6 +18386,126 @@ button:disabled {
 .te-action.danger { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
 .te-action.danger em { background: rgba(239, 68, 68, 0.13); color: #fca5a5; }
 
+/* #101 Symmetric Tree: make the cross-axis pairing explicit. */
+.te-mirror-guide {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.42);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.11), rgba(15, 23, 42, 0.28));
+}
+
+.te-mirror-guide > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.te-mirror-guide > header > span {
+  display: grid;
+  gap: 2px;
+}
+
+.te-mirror-guide > header small,
+.te-mirror-branches > span {
+  color: #a5b4fc;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.te-mirror-guide > header strong {
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.te-mirror-guide > header code {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #c7d2fe;
+  font-size: 12px;
+  white-space: normal;
+  text-align: right;
+}
+
+.te-mirror-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.te-mirror-pair > div {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.38);
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.66);
+}
+
+.te-mirror-pair > div small {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.te-mirror-pair > div strong {
+  color: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 25px;
+}
+
+.te-mirror-pair > div code {
+  max-width: 100%;
+  color: #94a3b8;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.te-mirror-pair > span {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  color: #fbbf24;
+}
+
+.te-mirror-pair > span b { font-size: 30px; line-height: 1; }
+.te-mirror-pair > span em { font-size: 9px; font-style: normal; font-weight: 900; letter-spacing: 0.06em; }
+.te-mirror-pair.match > span { color: #34d399; }
+.te-mirror-pair.match > div { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.08); }
+.te-mirror-pair.mismatch > span { color: #f87171; }
+.te-mirror-pair.mismatch > div { border-color: rgba(239, 68, 68, 0.55); background: rgba(239, 68, 68, 0.09); }
+
+.te-mirror-branches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(129, 140, 248, 0.34);
+}
+
+.te-mirror-branches > span { grid-column: 1 / -1; }
+
+.te-mirror-pair.compact { grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr); }
+.te-mirror-pair.compact > div { padding: 7px; }
+.te-mirror-pair.compact > div strong { font-size: 17px; }
+.te-mirror-pair.compact > div code { font-size: 10px; white-space: nowrap; }
+.te-mirror-pair.compact > span b { font-size: 20px; }
+.te-mirror-pair.compact > span em { display: none; }
+
 .te-tree-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -18567,6 +18687,11 @@ button:disabled {
 [data-theme="light"] .te-card.success strong { color: #047857; }
 [data-theme="light"] .te-card.danger strong { color: #b91c1c; }
 [data-theme="light"] .te-card.warning strong { color: #b45309; }
+[data-theme="light"] .te-mirror-guide { background: #eef2ff; border-color: #a5b4fc; }
+[data-theme="light"] .te-mirror-guide > header strong,
+[data-theme="light"] .te-mirror-pair > div strong { color: #0f172a; }
+[data-theme="light"] .te-mirror-guide > header code,
+[data-theme="light"] .te-mirror-pair > div { background: #ffffff; }
 
 @media (max-width: 900px) {
   .te-tree-grid.count-3 { grid-template-columns: 1fr; }
@@ -18579,6 +18704,17 @@ button:disabled {
   .te-tree-grid { grid-template-columns: 1fr; }
   .te-tree-panel + .te-tree-panel { border-top: 1px solid rgba(100, 116, 139, 0.3); border-left: 0; }
   .te-sequences > div { grid-template-columns: 1fr; }
+  .te-mirror-guide > header { align-items: flex-start; flex-direction: column; }
+  .te-mirror-guide > header code { text-align: left; }
+  .te-mirror-branches { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .te-mirror-pair { grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr); }
+  .te-mirror-pair > div { padding: 8px 5px; }
+  .te-mirror-pair > div strong { font-size: 20px; }
+  .te-mirror-pair > div code { font-size: 9px; }
+  .te-mirror-pair > span b { font-size: 22px; }
 }
 
 /* ---- BFS / level-order tree family (#107/#515/#513/#662/#117/#1609/#2415/#2471/#2583/#2641) ---- */

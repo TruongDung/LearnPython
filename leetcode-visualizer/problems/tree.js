@@ -1589,39 +1589,215 @@ function buildSteps226(input) {
 
 // ─── 101: Symmetric Tree ───
 function buildSteps101(input) {
-  const root = parseTree(input); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: "Kiểm tra cây đối xứng", en: "Check symmetric tree" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "L.val==R.val, L.left↔R.right, L.right↔R.left" }],
-    note: { vi: `Cây đối xứng nếu con trái là ẢNH GƯƠNG của con phải. So sánh: L.val == R.val, rồi (L.left ↔ R.right) và (L.right ↔ R.left).`, en: `Tree is symmetric if the left subtree is a MIRROR of the right. Compare: L.val == R.val, then (L.left ↔ R.right) and (L.right ↔ R.left).` },
-  }));
-  let answer = true;
-  function mirror(a, b) {
-    if (!a && !b) return true;
+  const root = parseTreeEssentialsInput(input, { minValue: -100, maxValue: 100, allowEmpty: true });
+  const steps = [];
+  const matched = new Set();
+  const bad = new Set();
+  const callStack = [];
+  const matchedPairs = [];
+  const stages = [
+    { vi: "Nhớ quy tắc gương", en: "Mirror rule" },
+    { vi: "So cặp hiện tại", en: "Compare pair" },
+    { vi: "Tách OUTER / INNER", en: "Split OUTER / INNER" },
+    { vi: "Kết luận", en: "Answer" },
+  ];
+  let failure = null;
+
+  const nodeValue = (node) => (node ? node.val : "∅");
+  const pairText = (pair) => `${nodeValue(pair.a)} ↔ ${nodeValue(pair.b)}`;
+  const pairInfo = (a, b, aPath, bPath, role, verdict = "waiting") => ({
+    role,
+    verdict,
+    left: { value: nodeValue(a), path: aPath, shortPath: aPath.replace(/^root\.left/, "L").replace(/^root\.right/, "R") },
+    right: { value: nodeValue(b), path: bPath, shortPath: bPath.replace(/^root\.left/, "L").replace(/^root\.right/, "R") },
+  });
+  const childPairs = (a, b, aPath, bPath) => [
+    pairInfo(a ? a.left : null, b ? b.right : null, `${aPath}.left`, `${bPath}.right`, "OUTER"),
+    pairInfo(a ? a.right : null, b ? b.left : null, `${aPath}.right`, `${bPath}.left`, "INNER"),
+  ];
+  const panels = (active = [], annotations = {}) => [{
+    label: { vi: "CÂY VÀ TRỤC GƯƠNG", en: "TREE AND MIRROR AXIS" },
+    caption: { vi: "cam = cặp đang so · xanh = cặp đã khớp · đỏ = sai", en: "amber = current pair · green = matched pair · red = mismatch" },
+    tree: treeEssentialsState(root, { active, done: matched, bad, annotations }),
+  }];
+  const sequences = () => [
+    {
+      label: { vi: "CALL STACK (cặp đang chờ)", en: "CALL STACK (pending pairs)" },
+      values: callStack.map((frame) => `${frame.role}: ${pairText(frame)}`),
+      activeIndex: callStack.length ? callStack.length - 1 : -1,
+      tone: "active",
+    },
+    {
+      label: { vi: "CẶP ĐÃ XÁC NHẬN", en: "CONFIRMED PAIRS" },
+      values: matchedPairs.map((pair) => pair.label),
+      tone: "done",
+    },
+  ];
+  const addStep = ({
+    stage, event, title, note, codeLines, a = null, b = null, aPath = "root.left", bPath = "root.right",
+    role = "ROOT PAIR", verdict = "waiting", nextPairs = [], status = "checking", statusText, final = false,
+  }) => {
+    const active = [a, b].filter(Boolean);
+    const annotations = {};
+    if (a) annotations[a.id] = { label: "LEFT SIDE", kind: verdict === "mismatch" ? "danger" : "" };
+    if (b) annotations[b.id] = { label: "RIGHT SIDE", kind: verdict === "mismatch" ? "danger" : "" };
+    steps.push(treeEssentialsStep({
+      problemId: 101,
+      mode: "symmetric-tree",
+      stages,
+      stage,
+      event,
+      title,
+      note,
+      codeLines,
+      panels: panels(active, annotations),
+      sequences: sequences(),
+      status,
+      statusText,
+      final,
+      mirror: {
+        current: pairInfo(a, b, aPath, bPath, role, verdict),
+        nextPairs,
+        matchedCount: matchedPairs.length,
+      },
+      cards: [
+        { label: { vi: "CẶP KHỚP", en: "MATCHED PAIRS" }, value: matchedPairs.length, tone: matchedPairs.length ? "success" : "neutral" },
+        { label: { vi: "ĐỘ SÂU CALL STACK", en: "CALL STACK DEPTH" }, value: callStack.length },
+      ],
+    }));
+  };
+
+  addStep({
+    stage: 0,
+    event: "intro",
+    title: { vi: "Chỉ cần nhớ hai cặp gương", en: "Remember only two mirror pairings" },
+    note: {
+      vi: "Cặp ngoài: trái.left ↔ phải.right. Cặp trong: trái.right ↔ phải.left. Mọi cặp phải cùng rỗng hoặc cùng giá trị.",
+      en: "Outer pair: left.left ↔ right.right. Inner pair: left.right ↔ right.left. Every pair must be both empty or have equal values.",
+    },
+    codeLines: [10],
+    a: root ? root.left : null,
+    b: root ? root.right : null,
+    nextPairs: root ? childPairs(root.left, root.right, "root.left", "root.right") : [],
+  });
+
+  function mirror(a, b, aPath, bPath, role) {
+    const frame = { a, b, aPath, bPath, role };
+    callStack.push(frame);
+    addStep({
+      stage: 1,
+      event: "compare",
+      title: { vi: `So cặp ${pairText(frame)}`, en: `Compare pair ${pairText(frame)}` },
+      note: { vi: "Kiểm tra theo thứ tự: cùng rỗng → True; chỉ một bên rỗng → False; khác giá trị → False.", en: "Check in order: both empty → True; only one empty → False; different values → False." },
+      codeLines: [4], a, b, aPath, bPath, role,
+    });
+
+    if (!a && !b) {
+      matchedPairs.push({ label: `${role}: ∅ ↔ ∅` });
+      addStep({
+        stage: 1,
+        event: "both-empty",
+        title: { vi: "Hai bên cùng rỗng → cặp này khớp", en: "Both sides are empty → this pair matches" },
+        note: { vi: "∅ ↔ ∅ là base case True; quay lại cặp cha.", en: "∅ ↔ ∅ is the True base case; return to the parent pair." },
+        codeLines: [4, 5], a, b, aPath, bPath, role, verdict: "match", status: "match",
+        statusText: { vi: "Cùng rỗng — MATCH", en: "Both empty — MATCH" },
+      });
+      callStack.pop();
+      return true;
+    }
+
     if (!a || !b || a.val !== b.val) {
-      answer = false;
-      steps.push(snapshot(root, {
-        title: { vi: `✗ Không khớp`, en: `✗ Mismatch` },
-        hlSet: new Set([a, b].filter(Boolean).map((n) => n.id)), codeLines: [5, 6],
-        vars: [{ name: "left", value: a ? a.val : "null" }, { name: "right", value: b ? b.val : "null" }],
-        note: { vi: `${a ? a.val : "null"} ≠ ${b ? b.val : "null"} → không đối xứng.`, en: `${a ? a.val : "null"} ≠ ${b ? b.val : "null"} → not symmetric.` },
-      }));
+      if (a) bad.add(a.id);
+      if (b) bad.add(b.id);
+      failure = { a, b, aPath, bPath, role };
+      addStep({
+        stage: 1,
+        event: !a || !b ? "shape-mismatch" : "value-mismatch",
+        title: !a || !b
+          ? { vi: "Chỉ một bên rỗng → sai hình dạng", en: "Only one side is empty → shape mismatch" }
+          : { vi: `${a.val} ≠ ${b.val} → sai giá trị`, en: `${a.val} ≠ ${b.val} → value mismatch` },
+        note: { vi: `${nodeValue(a)} và ${nodeValue(b)} không thể là một cặp gương; trả False ngay.`, en: `${nodeValue(a)} and ${nodeValue(b)} cannot form a mirror pair; return False immediately.` },
+        codeLines: [6, 7], a, b, aPath, bPath, role, verdict: "mismatch", status: "mismatch",
+        statusText: { vi: "MISMATCH — dừng sớm", en: "MISMATCH — stop early" },
+      });
+      callStack.pop();
       return false;
     }
-    steps.push(snapshot(root, {
-      title: { vi: `So khớp ${a.val} ↔ ${b.val}`, en: `Match ${a.val} ↔ ${b.val}` },
-      hlSet: new Set([a.id, b.id]), codeLines: [7, 8],
-      vars: [{ name: "left", value: a.val }, { name: "right", value: b.val }],
-      note: { vi: `${a.val} == ${b.val} ✓. Tiếp tục so: (L.left ↔ R.right) và (L.right ↔ R.left).`, en: `${a.val} == ${b.val} ✓. Continue: (L.left ↔ R.right) and (L.right ↔ R.left).` },
-    }));
-    return mirror(a.left, b.right) && mirror(a.right, b.left);
+
+    matched.add(a.id);
+    matched.add(b.id);
+    matchedPairs.push({ label: `${role}: ${a.val} ↔ ${b.val}` });
+    const nextPairs = childPairs(a, b, aPath, bPath);
+    addStep({
+      stage: 2,
+      event: "expand",
+      title: { vi: `${a.val} = ${b.val}; tách thành OUTER và INNER`, en: `${a.val} = ${b.val}; split into OUTER and INNER` },
+      note: { vi: "Không so trái↔trái. Ảnh gương bắt chéo qua trục giữa: OUTER trước, sau đó INNER.", en: "Do not compare left↔left. A mirror crosses the center axis: OUTER first, then INNER." },
+      codeLines: [8, 9], a, b, aPath, bPath, role, verdict: "match", nextPairs, status: "match",
+      statusText: { vi: "GIÁ TRỊ KHỚP — kiểm tra con", en: "VALUES MATCH — check children" },
+    });
+
+    const outer = nextPairs[0];
+    const outerResult = mirror(a.left, b.right, outer.left.path, outer.right.path, "OUTER");
+    if (!outerResult) {
+      addStep({
+        stage: 3,
+        event: "short-circuit",
+        title: { vi: "OUTER sai → bỏ qua INNER", en: "OUTER failed → skip INNER" },
+        note: { vi: "Toán tử and dừng ngay khi vế OUTER là False; cả cây không đối xứng.", en: "The and operator stops when OUTER is False; the whole tree is not symmetric." },
+        codeLines: [8, 9], a, b, aPath, bPath, role, verdict: "mismatch", nextPairs, status: "mismatch",
+        statusText: { vi: "SHORT-CIRCUIT", en: "SHORT-CIRCUIT" },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    const inner = nextPairs[1];
+    const innerResult = mirror(a.right, b.left, inner.left.path, inner.right.path, "INNER");
+    const result = outerResult && innerResult;
+    addStep({
+      stage: 3,
+      event: "return-pair",
+      title: result
+        ? { vi: `OUTER ✓ và INNER ✓ → ${a.val} ↔ ${b.val} đúng`, en: `OUTER ✓ and INNER ✓ → ${a.val} ↔ ${b.val} is true` }
+        : { vi: `INNER sai → ${a.val} ↔ ${b.val} sai`, en: `INNER failed → ${a.val} ↔ ${b.val} is false` },
+      note: result
+        ? { vi: "Cả hai cặp con đều là ảnh gương nên cặp cha trả True.", en: "Both child pairs mirror each other, so the parent pair returns True." }
+        : { vi: "Chỉ cần một cặp con sai thì cặp cha trả False.", en: "One failed child pair is enough for the parent pair to return False." },
+      codeLines: [8, 9], a, b, aPath, bPath, role, verdict: result ? "match" : "mismatch", nextPairs,
+      status: result ? "match" : "mismatch",
+      statusText: result ? { vi: "CẶP CHA MATCH", en: "PARENT PAIR MATCHES" } : { vi: "CẶP CHA MISMATCH", en: "PARENT PAIR MISMATCH" },
+    });
+    callStack.pop();
+    return result;
   }
-  if (root) mirror(root.left, root.right);
-  const fs = snapshot(root, {
-    title: { vi: answer ? `✓ Đối xứng` : `✗ Không đối xứng`, en: answer ? `✓ Symmetric` : `✗ Not symmetric` },
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: answer ? `Cây đối xứng qua trục giữa.` : `Cây KHÔNG đối xứng.`, en: answer ? `Tree is symmetric about its center.` : `Tree is NOT symmetric.` },
-  }); fs.final = true; steps.push(fs);
+
+  const answer = root ? mirror(root.left, root.right, "root.left", "root.right", "ROOT PAIR") : true;
+  const finalPair = failure || {
+    a: root ? root.left : null,
+    b: root ? root.right : null,
+    aPath: "root.left",
+    bPath: "root.right",
+    role: "ROOT PAIR",
+  };
+  addStep({
+    stage: 3,
+    event: "done",
+    title: answer ? { vi: "✓ Cây đối xứng", en: "✓ Tree is symmetric" } : { vi: "✗ Cây không đối xứng", en: "✗ Tree is not symmetric" },
+    note: answer
+      ? { vi: "Mọi cặp qua trục giữa đều khớp theo đúng quy tắc OUTER và INNER.", en: "Every pair across the center axis matches under the OUTER and INNER rules." }
+      : { vi: "Cặp đỏ là phản ví dụ đầu tiên; chỉ một cặp sai là đủ kết luận False.", en: "The red pair is the first counterexample; one failed pair is enough to conclude False." },
+    codeLines: [10],
+    a: finalPair.a,
+    b: finalPair.b,
+    aPath: finalPair.aPath,
+    bPath: finalPair.bPath,
+    role: finalPair.role,
+    verdict: answer ? "match" : "mismatch",
+    status: answer ? "match" : "mismatch",
+    statusText: answer ? { vi: "ANSWER = TRUE", en: "ANSWER = TRUE" } : { vi: "ANSWER = FALSE", en: "ANSWER = FALSE" },
+    final: true,
+  });
   return { input, answer, steps };
 }
 
@@ -7922,13 +8098,13 @@ function treeEssentialsState(root, { active = [], done = [], bad = [], annotatio
 }
 
 function treeEssentialsStep({
-  problemId, mode, stages, stage, event, title, note, codeLines, panels, cards = [], sequences = [], status = "checking", statusText, final = false,
+  problemId, mode, stages, stage, event, title, note, codeLines, panels, cards = [], sequences = [], status = "checking", statusText, mirror = null, final = false,
 }) {
   return {
     title,
     arr: [],
     treeEssentialsView: {
-      problemId, mode, stages, stage, event, panels, cards, sequences, status, statusText,
+      problemId, mode, stages, stage, event, panels, cards, sequences, status, statusText, mirror,
     },
     highlight: [],
     mark: [],

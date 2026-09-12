@@ -5289,6 +5289,23 @@ function renderTreeEssentialsView(step) {
   const summary = vi
     ? `Bài ${view.problemId}: ${pick(step.title)}. ${pick(view.statusText) || defaultStatus}.`
     : `Problem ${view.problemId}: ${pick(step.title)}. ${pick(view.statusText) || defaultStatus}.`;
+  const mirror = view.mirror;
+  const mirrorValue = (side) => side && side.value !== undefined ? side.value : "∅";
+  const mirrorPath = (side, compact) => side && (compact ? side.shortPath || side.path : side.path) ? (compact ? side.shortPath || side.path : side.path) : "—";
+  const mirrorPairHtml = (pair, compact = false) => {
+    if (!pair) return "";
+    const pairStatus = pair.verdict === "match" ? "match" : pair.verdict === "mismatch" ? "mismatch" : "waiting";
+    return `<article class="te-mirror-pair ${pairStatus}${compact ? " compact" : ""}">
+      <div><small>${escapeHtml(pair.role || (vi ? "CẶP GƯƠNG" : "MIRROR PAIR"))}</small><strong>${escapeHtml(mirrorValue(pair.left))}</strong><code>${escapeHtml(mirrorPath(pair.left, compact))}</code></div>
+      <span><b>↔</b><em>${pairStatus === "match" ? "MATCH" : pairStatus === "mismatch" ? "MISMATCH" : (vi ? "SO SÁNH" : "COMPARE")}</em></span>
+      <div><small>${escapeHtml(pair.role || (vi ? "CẶP GƯƠNG" : "MIRROR PAIR"))}</small><strong>${escapeHtml(mirrorValue(pair.right))}</strong><code>${escapeHtml(mirrorPath(pair.right, compact))}</code></div>
+    </article>`;
+  };
+  const mirrorHtml = mirror ? `<section class="te-mirror-guide">
+    <header><span><small>${vi ? "MỘT QUY TẮC DUY NHẤT" : "ONE RULE TO REMEMBER"}</small><strong>${vi ? "SO CHÉO QUA TRỤC GIỮA" : "COMPARE ACROSS THE CENTER AXIS"}</strong></span><code>OUTER: L.left ↔ R.right&nbsp;&nbsp;·&nbsp;&nbsp;INNER: L.right ↔ R.left</code></header>
+    ${mirrorPairHtml(mirror.current)}
+    ${Array.isArray(mirror.nextPairs) && mirror.nextPairs.length ? `<div class="te-mirror-branches"><span>${vi ? "HAI LỜI GỌI CON" : "TWO CHILD CALLS"}</span>${mirror.nextPairs.map((pair) => mirrorPairHtml(pair, true)).join("")}</div>` : ""}
+  </section>` : "";
 
   target.innerHTML = `<section class="te-viz te-${escapeHtml(view.mode || "tree")}" role="img" aria-label="${escapeHtml(summary)}">
     <div class="te-phases">${phaseHtml}</div>
@@ -5296,6 +5313,7 @@ function renderTreeEssentialsView(step) {
       <span><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong></span>
       <em>${escapeHtml(pick(view.statusText) || defaultStatus)}</em>
     </section>
+    ${mirrorHtml}
     <div class="te-tree-grid count-${panels.length}">${panelHtml}</div>
     ${cardsHtml}
     ${sequenceHtml}
