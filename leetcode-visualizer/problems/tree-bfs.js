@@ -1141,39 +1141,269 @@ function build117(input) {
 function build1609(input) {
   const root = parseLevelTree(input);
   if (!root) return { input, answer: true, steps: [emptyResult(1609, "even-odd", root, true, 3)] };
-  const levels = levelsOf(root), steps = [introStep(1609, "even-odd", root,
-    { vi: "Level quyết định parity và chiều", en: "The level decides parity and direction" },
-    { vi: "Level chẵn: số lẻ tăng nghiêm ngặt. Level lẻ: số chẵn giảm nghiêm ngặt.", en: "Even levels: odd values strictly increase. Odd levels: even values strictly decrease." })];
-  const rows = [], done = new Set(), bad = new Set(); let answer = true;
-  for (let index = 0; index < levels.length; index++) {
-    const level = levels[index];
-    const needOdd = index % 2 === 0;
-    let previous = needOdd ? -Infinity : Infinity;
-    let invalidIndex = -1;
-    for (let i = 0; i < level.length; i++) {
-      const value = level[i].val;
-      const parityOk = Math.abs(value % 2) === (needOdd ? 1 : 0);
-      const orderOk = needOdd ? value > previous : value < previous;
-      if (!parityOk || !orderOk) { invalidIndex = i; break; }
-      previous = value;
-    }
-    level.forEach((node) => done.add(node.id));
-    if (invalidIndex >= 0) { answer = false; bad.add(level[invalidIndex].id); }
-    const rule = needOdd ? "odd · strictly ↑" : "even · strictly ↓";
-    rows.push({ level: index, values: levelTokens(level, { tones: level.map((_, i) => i === invalidIndex ? "danger" : "success") }), metric: { label: "rule", value: rule }, status: invalidIndex < 0 ? "pass" : "fail" });
+  const steps = [];
+  const queue = [root];
+  const completedRows = [];
+  const processed = new Set();
+  const bad = new Set();
+  const sub = {};
+  let level = 0;
+  let answer = true;
+  let previous = null;
+  let previousNode = null;
+
+  const sentinelText = (value) => value === -Infinity ? "−∞" : value === Infinity ? "+∞" : value ?? "—";
+  const queueText = () => queue.map((node) => node.val);
+  const ruleFor = (currentLevel) => currentLevel % 2 === 0
+    ? { parity: "odd", direction: "strictly ↑", symbol: ">", vi: "số lẻ · tăng nghiêm ngặt", en: "odd · strictly increasing" }
+    : { parity: "even", direction: "strictly ↓", symbol: "<", vi: "số chẵn · giảm nghiêm ngặt", en: "even · strictly decreasing" };
+  const queueSnapshot = (currentCount = 0) => queue.map((node, index) => ({
+    node,
+    role: index < currentCount ? "current-level" : "next-level",
+  }));
+  const rowFor = ({ nodes, rowLevel, processedCount = 0, currentIndex = -1, state = "waiting", complete = false }) => {
+    const rule = ruleFor(rowLevel);
+    return {
+      level: rowLevel,
+      status: state === "fail" ? "fail" : complete ? "sorted" : undefined,
+      values: nodes.map((node, index) => {
+        let tone = index < processedCount ? "success" : "neutral";
+        let meta = sub[node.id] || (index < processedCount ? "PASS" : "waiting");
+        if (index === currentIndex) {
+          tone = state === "fail" ? "danger" : state === "pass" ? "success" : "warning";
+          meta = sub[node.id] || state;
+        }
+        return { id: node.id, value: node.val, tone, meta };
+      }),
+      metric: { label: "rule", value: `${rule.parity} · ${rule.direction}` },
+    };
+  };
+  const varsSnapshot = ({ size = "—", i = "—", node = null, parityBad = "—", orderBad = "—" } = {}) => [
+    { name: "queue", value: queueText() },
+    { name: "level", value: level },
+    { name: "size", value: size },
+    { name: "i", value: i },
+    { name: "node", value: node ? node.val : "—" },
+    { name: "prev", value: sentinelText(previous) },
+    { name: "parity_bad", value: parityBad },
+    { name: "order_bad", value: orderBad },
+  ];
+  const boolText = (value) => typeof value === "boolean" ? (value ? "True" : "False") : "—";
+  const debugStep = ({
+    nodes = null, size = "—", i = "—", node = null, parityBad = "—", orderBad = "—",
+    processedCount = 0, currentIndex = -1, rowState = "waiting", complete = false,
+    currentCount = 0, title, note, codeLine, event, stage = 1, formula = null,
+    active = [], status = "checking", final = false, result = null,
+  }) => {
+    const rows = nodes
+      ? [...completedRows, rowFor({ nodes, rowLevel: level, processedCount, currentIndex, state: rowState, complete })]
+      : completedRows;
+    const rule = ruleFor(level);
     steps.push(makeStep({
-      problemId: 1609, mode: "even-odd", root, stage: 1, event: invalidIndex < 0 ? "pass" : "fail", status: invalidIndex < 0 ? "success" : "danger", rows,
-      active: invalidIndex < 0 ? level.map((node) => node.id) : [level[invalidIndex].id], done, bad,
-      title: invalidIndex < 0 ? { vi: `Tầng ${index}: PASS`, en: `Level ${index}: PASS` } : { vi: `Tầng ${index}: FAIL tại ${level[invalidIndex].val}`, en: `Level ${index}: FAIL at ${level[invalidIndex].val}` },
-      note: invalidIndex < 0 ? { vi: `Dãy [${level.map((n) => n.val).join(", ")}] thỏa ${rule}.`, en: `[${level.map((n) => n.val).join(", ")}] satisfies ${rule}.` } : { vi: `Node đỏ vi phạm parity hoặc thứ tự ${rule}.`, en: `The red node violates parity or the ${rule} ordering.` },
-      codeLines: [9, 10], formula: needOdd ? "level % 2 = 0 ⇒ odd and a[i] < a[i+1]" : "level % 2 = 1 ⇒ even and a[i] > a[i+1]",
-      cards: [{ label: "level", value: index }, { label: { vi: "QUY TẮC", en: "RULE" }, value: rule }, { label: { vi: "KẾT QUẢ", en: "RESULT" }, value: invalidIndex < 0 ? "PASS" : "FAIL", tone: invalidIndex < 0 ? "success" : "danger" }],
+      problemId: 1609, mode: "even-odd", root, stage, event, status, final, result,
+      title, note, codeLines: [codeLine], rows,
+      queue: queueSnapshot(currentCount),
+      queueNote: { vi: "vàng = level hiện tại · xanh dương = level kế", en: "amber = current level · blue = next level" },
+      active, done: processed, selected: previousNode ? [previousNode.id] : [], bad, sub,
+      formula,
+      vars: varsSnapshot({ size, i, node, parityBad, orderBad }),
+      cards: [
+        { label: "level", value: level },
+        { label: { vi: "QUY TẮC", en: "RULE" }, value: { vi: rule.vi, en: rule.en } },
+        { label: "node", value: node ? node.val : "—", tone: node ? "warning" : "neutral" },
+        { label: "prev", value: sentinelText(previous), tone: previousNode ? "success" : "neutral" },
+        { label: "parity_bad", value: boolText(parityBad), tone: parityBad === true ? "danger" : parityBad === false ? "success" : "neutral" },
+        { label: "order_bad", value: boolText(orderBad), tone: orderBad === true ? "danger" : orderBad === false ? "success" : "neutral" },
+      ],
     }));
-    if (!answer) break;
+  };
+
+  debugStep({
+    stage: 0, event: "guard", codeLine: 3, currentCount: 1,
+    title: { vi: "Kiểm tra root có rỗng không", en: "Check whether root is empty" },
+    note: { vi: `root = ${root.val}, nên không return sớm và bắt đầu BFS.`, en: `root = ${root.val}, so do not return early; start BFS.` },
+    formula: "not root = False",
+    active: [root.id],
+  });
+  debugStep({
+    stage: 0, event: "init", codeLine: 4, currentCount: 1,
+    title: { vi: `Khởi tạo queue = [${root.val}], level = 0`, en: `Initialize queue = [${root.val}], level = 0` },
+    note: { vi: "Level 0 là level chẵn nên cần các giá trị lẻ tăng nghiêm ngặt.", en: "Level 0 is even-indexed, so it needs strictly increasing odd values." },
+    formula: `queue = [${root.val}] · level = 0`,
+    active: [root.id],
+  });
+
+  while (queue.length) {
+    const size = queue.length;
+    const levelNodes = queue.slice(0, size);
+    const rule = ruleFor(level);
+    debugStep({
+      nodes: levelNodes, size, currentCount: size, stage: 0, event: "while-check", codeLine: 5,
+      title: { vi: `Queue chưa rỗng: bắt đầu level ${level}`, en: `Queue is not empty: start level ${level}` },
+      note: { vi: `Có ${size} node trong level này; quy tắc là ${rule.vi}.`, en: `This level contains ${size} node(s); its rule is ${rule.en}.` },
+      formula: "bool(queue) = True",
+    });
+
+    previous = level % 2 === 0 ? -Infinity : Infinity;
+    previousNode = null;
+    debugStep({
+      nodes: levelNodes, size, currentCount: size, stage: 0, event: "reset-prev", codeLine: 6,
+      title: { vi: `Reset prev = ${sentinelText(previous)}`, en: `Reset prev = ${sentinelText(previous)}` },
+      note: level % 2 === 0
+        ? { vi: "Dùng −∞ để node đầu tiên chỉ cần là số lẻ; mọi giá trị thực đều lớn hơn sentinel.", en: "Use −∞ so the first node only needs to be odd; every real value exceeds the sentinel." }
+        : { vi: "Dùng +∞ để node đầu tiên chỉ cần là số chẵn; mọi giá trị thực đều nhỏ hơn sentinel.", en: "Use +∞ so the first node only needs to be even; every real value is below the sentinel." },
+      formula: `prev = ${sentinelText(previous)}`,
+    });
+
+    for (let i = 0; i < size; i += 1) {
+      const node = queue[0];
+      debugStep({
+        nodes: levelNodes, size, i, node, currentIndex: i, processedCount: i,
+        currentCount: size - i, rowState: "front", stage: 0, event: "loop", codeLine: 7,
+        title: { vi: `Lượt ${i + 1}/${size}: FRONT = ${node.val}`, en: `Iteration ${i + 1}/${size}: FRONT = ${node.val}` },
+        note: { vi: "range(len(queue)) được khóa trước khi child được append, nên chỉ xử lý đúng level hiện tại.", en: "range(len(queue)) is fixed before children are appended, so it processes exactly the current level." },
+        formula: `i = ${i} < size = ${size}`,
+        active: [node.id],
+      });
+
+      queue.shift();
+      processed.add(node.id);
+      debugStep({
+        nodes: levelNodes, size, i, node, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "popped", event: "pop", codeLine: 8,
+        title: { vi: `Pop ${node.val} khỏi FRONT`, en: `Pop ${node.val} from the FRONT` },
+        note: { vi: `Queue sau popleft: [${queueText().join(", ")}].`, en: `Queue after popleft: [${queueText().join(", ")}].` },
+        formula: `node = queue.popleft() = ${node.val}`,
+        active: [node.id],
+      });
+
+      const parityBad = Math.abs(node.val % 2) === level % 2;
+      sub[node.id] = parityBad ? `${rule.parity} ✗` : `${rule.parity} ✓`;
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: parityBad ? "fail" : "parity pass", stage: 1,
+        event: parityBad ? "parity-fail" : "parity-pass", codeLine: 9,
+        title: parityBad
+          ? { vi: `${node.val} sai parity`, en: `${node.val} has the wrong parity` }
+          : { vi: `${node.val} đúng parity ${rule.parity}`, en: `${node.val} has the required ${rule.parity} parity` },
+        note: parityBad
+          ? { vi: `node.val % 2 bằng level % 2, nên parity_bad = True.`, en: `node.val % 2 equals level % 2, so parity_bad = True.` }
+          : { vi: `node.val % 2 khác level % 2, đúng quy tắc của level ${level}.`, en: `node.val % 2 differs from level % 2, satisfying level ${level}'s parity rule.` },
+        formula: `${node.val} % 2 == ${level} % 2 → ${parityBad ? "True" : "False"}`,
+        active: [node.id],
+      });
+
+      const orderBad = level % 2 === 0 ? node.val <= previous : node.val >= previous;
+      const comparison = `${node.val} ${rule.symbol} ${sentinelText(previous)}`;
+      sub[node.id] = `${rule.parity} ${parityBad ? "✗" : "✓"} · ${comparison} ${orderBad ? "✗" : "✓"}`;
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: orderBad ? "fail" : parityBad ? "fail" : "order pass", stage: 1,
+        event: orderBad ? "order-fail" : "order-pass", codeLine: 10,
+        title: orderBad
+          ? { vi: `${comparison} sai`, en: `${comparison} fails` }
+          : { vi: `${comparison} đúng`, en: `${comparison} passes` },
+        note: orderBad
+          ? { vi: `Thứ tự phải ${rule.vi}; node hiện tại không đi đúng hướng so với prev.`, en: `Values must be ${rule.en}; the current node does not move in the required direction from prev.` }
+          : { vi: "So sánh với prev đạt yêu cầu nghiêm ngặt; giá trị bằng nhau cũng sẽ FAIL.", en: "The strict comparison with prev passes; equal values would fail." },
+        formula: level % 2 === 0
+          ? `${node.val} <= ${sentinelText(previous)} → ${orderBad ? "True" : "False"}`
+          : `${node.val} >= ${sentinelText(previous)} → ${orderBad ? "True" : "False"}`,
+        active: [node.id],
+      });
+
+      if (parityBad || orderBad) {
+        answer = false;
+        bad.add(node.id);
+        const reasons = [parityBad ? "parity_bad" : null, orderBad ? "order_bad" : null].filter(Boolean).join(" OR ");
+        debugStep({
+          nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+          currentCount: size - i - 1, rowState: "fail", stage: 3, event: "fail", codeLine: 11,
+          status: "danger", final: true, result: false,
+          title: { vi: `FAIL tại node ${node.val} · return False`, en: `FAIL at node ${node.val} · return False` },
+          note: { vi: `${reasons} = True. Thuật toán dừng ngay; không cập nhật prev và không enqueue child của node này.`, en: `${reasons} = True. Stop immediately without updating prev or enqueuing this node's children.` },
+          formula: `${boolText(parityBad)} OR ${boolText(orderBad)} → True · return False`,
+          active: [node.id],
+        });
+        return { input, answer, steps };
+      }
+
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "pass", stage: 1, event: "pass-node", codeLine: 11,
+        title: { vi: `Node ${node.val} PASS cả hai điều kiện`, en: `Node ${node.val} passes both checks` },
+        note: { vi: "parity_bad và order_bad đều False, nên không return sớm.", en: "Both parity_bad and order_bad are false, so there is no early return." },
+        formula: "False OR False → False · continue",
+        active: [node.id],
+      });
+
+      previous = node.val;
+      previousNode = node;
+      sub[node.id] = `prev = ${node.val} · PASS`;
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "pass", stage: 2, event: "update-prev", codeLine: 12,
+        title: { vi: `Cập nhật prev = ${node.val}`, en: `Update prev = ${node.val}` },
+        note: { vi: "Node kế bên phải phải tiếp tục tăng hoặc giảm nghiêm ngặt từ giá trị này.", en: "The next node to the right must continue strictly increasing or decreasing from this value." },
+        formula: `prev = node.val = ${node.val}`,
+        active: [node.id],
+      });
+
+      if (node.left) queue.push(node.left);
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "pass", stage: 2,
+        event: node.left ? "enqueue-left" : "skip-left", codeLine: 13,
+        title: node.left
+          ? { vi: `Enqueue con trái ${node.left.val}`, en: `Enqueue left child ${node.left.val}` }
+          : { vi: `${node.val} không có con trái`, en: `${node.val} has no left child` },
+        note: node.left
+          ? { vi: `${node.left.val} nằm ở phần xanh dương và chỉ được kiểm tra ở level kế.`, en: `${node.left.val} sits in the blue section and is checked only on the next level.` }
+          : { vi: "Queue không đổi ở dòng này.", en: "The queue does not change on this line." },
+        formula: node.left ? `queue.append(${node.left.val})` : "node.left = None → skip",
+        active: [node.id],
+      });
+
+      if (node.right) queue.push(node.right);
+      debugStep({
+        nodes: levelNodes, size, i, node, parityBad, orderBad, currentIndex: i, processedCount: i + 1,
+        currentCount: size - i - 1, rowState: "pass", stage: 2,
+        event: node.right ? "enqueue-right" : "skip-right", codeLine: 14,
+        title: node.right
+          ? { vi: `Enqueue con phải ${node.right.val}`, en: `Enqueue right child ${node.right.val}` }
+          : { vi: `${node.val} không có con phải`, en: `${node.val} has no right child` },
+        note: node.right
+          ? { vi: "Con phải vào sau con trái, nên thứ tự trái → phải của level được giữ nguyên.", en: "The right child enters after the left child, preserving the level's left-to-right order." }
+          : { vi: "Không có node nào được thêm ở phía phải.", en: "No node is added from the right side." },
+        formula: node.right ? `queue.append(${node.right.val})` : "node.right = None → skip",
+        active: [node.id],
+      });
+    }
+
+    completedRows.push(rowFor({ nodes: levelNodes, rowLevel: level, processedCount: size, complete: true }));
+    level += 1;
+    previous = null;
+    previousNode = null;
+    debugStep({
+      stage: 2, event: "level-complete", codeLine: 15, currentCount: 0,
+      title: { vi: `Level trước PASS · chuyển sang level ${level}`, en: `Previous level passed · advance to level ${level}` },
+      note: { vi: `Tăng level để đổi parity và chiều so sánh; queue hiện là [${queueText().join(", ")}].`, en: `Increment level to switch parity and comparison direction; the queue is now [${queueText().join(", ")}].` },
+      formula: `level = ${level - 1} + 1 = ${level}`,
+    });
   }
-  steps.push(makeStep({ problemId: 1609, mode: "even-odd", root, stage: 3, event: "done", status: answer ? "success" : "danger", final: true, rows, done, bad,
-    title: { vi: `Even-Odd Tree = ${answer}`, en: `Even-Odd Tree = ${answer}` }, note: answer ? { vi: "Tất cả các tầng đều PASS.", en: "Every level passed." } : { vi: "Chỉ một node vi phạm là đủ trả False.", en: "A single violation is enough to return false." },
-    codeLines: [15], cards: [{ label: { vi: "ĐÁP ÁN", en: "ANSWER" }, value: answer, tone: answer ? "success" : "danger" }], result: answer }));
+
+  debugStep({
+    stage: 0, event: "while-stop", codeLine: 5, currentCount: 0,
+    title: { vi: "Queue rỗng: thoát vòng while", en: "Queue is empty: exit the while loop" },
+    note: { vi: "Mọi node đều đã vượt qua cả kiểm tra parity và thứ tự.", en: "Every node passed both the parity and ordering checks." },
+    formula: "bool(queue) = False",
+  });
+  debugStep({
+    stage: 3, event: "done", codeLine: 16, currentCount: 0, status: "success", final: true, result: true,
+    title: { vi: "Mọi level đều PASS · return True", en: "Every level passed · return True" },
+    note: { vi: "Level chẵn chứa số lẻ tăng nghiêm ngặt; level lẻ chứa số chẵn giảm nghiêm ngặt.", en: "Even-indexed levels contain strictly increasing odd values; odd-indexed levels contain strictly decreasing even values." },
+    formula: "return True",
+  });
   return { input, answer, steps };
 }
 

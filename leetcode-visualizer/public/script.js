@@ -22335,6 +22335,91 @@ function renderMinCostStairsView(step) {
   </section>`;
 }
 
+function renderWeightedIntervals3414View(step) {
+  const view = step.weightedIntervals3414View || {};
+  const vi = lang === "vi";
+  const intervals = Array.isArray(view.intervals) ? view.intervals : [];
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const active = Number.isInteger(view.activeRow) ? intervals[view.activeRow] : null;
+  const picked = new Set(view.answer || view.decision?.winner?.picks || []);
+  const formatPicks = (candidate) => candidate ? `[${(candidate.picks || []).join(", ")}]` : "—";
+  const phasesHtml = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(pick(stage))}</b></span>`;
+  }).join("");
+
+  const minimum = intervals.length ? Math.min(...intervals.map((interval) => interval.start)) : 0;
+  const maximum = intervals.length ? Math.max(...intervals.map((interval) => interval.end)) : 1;
+  const range = Math.max(1, maximum - minimum);
+  const timelineHtml = intervals.map((interval, row) => {
+    const compatible = active && row < view.activeRow && interval.end < active.start;
+    const conflicts = active && row < view.activeRow && interval.end >= active.start;
+    const classes = [
+      row === view.activeRow ? "current" : "",
+      row === view.prevRow ? "predecessor" : "",
+      compatible ? "compatible" : "",
+      conflicts ? "conflict" : "",
+      picked.has(interval.id) ? "picked" : "",
+    ].filter(Boolean).join(" ");
+    const left = Math.min(97, ((interval.start - minimum) / range) * 100);
+    const naturalWidth = ((interval.end - interval.start) / range) * 100;
+    const width = Math.max(3, Math.min(100 - left, naturalWidth || 3));
+    const prev = Number.isInteger(interval.prev) ? interval.prev : "?";
+    return `<div class="wi3414-interval ${classes}">
+      <span><b>sorted ${row} · #${interval.id}</b><small>[${interval.start}, ${interval.end}] · w=${interval.weight} · prev=${prev}</small></span>
+      <div><i style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"><em>#${interval.id}</em></i></div>
+    </div>`;
+  }).join("");
+
+  let decisionHtml = `<section class="wi3414-rule"><b>dp[i][k]</b><strong>${vi ? "tốt nhất trong i interval đầu, chọn tối đa k" : "best among the first i intervals, choosing at most k"}</strong><span>end(prev) &lt; start(current)</span></section>`;
+  if (view.decision) {
+    const decision = view.decision;
+    const skipWins = decision.choice === "skip";
+    const tie = decision.skip.score === decision.take.score;
+    decisionHtml = `<section class="wi3414-decision">
+      <article class="${skipWins ? "winner" : ""}"><small>SKIP #${active?.id ?? "?"}</small><strong>${decision.skip.score}</strong><code>${escapeHtml(formatPicks(decision.skip))}</code><span>dp[${view.activeRow}][${view.activeCapacity}]</span></article>
+      <i>VS</i>
+      <article class="${skipWins ? "" : "winner"}"><small>TAKE #${active?.id ?? "?"}</small><strong>${decision.take.score}</strong><code>${escapeHtml(formatPicks(decision.take))}</code><span>dp[${(active?.prev ?? -1) + 1}][${view.activeCapacity - 1}] + w</span></article>
+      <div><small>${tie ? (vi ? "HÒA SCORE → SO INDEX" : "SCORE TIE → COMPARE INDICES") : (vi ? "CHỌN SCORE LỚN HƠN" : "KEEP THE HIGHER SCORE")}</small><strong>${decision.choice.toUpperCase()}</strong><code>${escapeHtml(formatPicks(decision.winner))}</code></div>
+    </section>`;
+  }
+
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const visibleRowCount = view.phase === "dp"
+    ? Math.min(dp.length, (Number.isInteger(view.activeRow) ? view.activeRow + 2 : 1))
+    : view.phase === "done" ? dp.length : Math.min(1, dp.length);
+  const dpRows = dp.slice(0, visibleRowCount).map((row, rowIndex) => {
+    const interval = rowIndex > 0 ? intervals[rowIndex - 1] : null;
+    const cells = row.map((cell, capacity) => {
+      const current = rowIndex === (view.activeRow ?? -2) + 1 && capacity === view.activeCapacity;
+      const skipSource = view.decision && rowIndex === view.activeRow && capacity === view.activeCapacity;
+      const takeSource = view.decision && rowIndex === (active?.prev ?? -1) + 1 && capacity === view.activeCapacity - 1;
+      const classes = [current ? "current" : "", skipSource ? "skip-source" : "", takeSource ? "take-source" : ""].filter(Boolean).join(" ");
+      return `<td class="${classes}">${cell ? `<strong>${cell.score}</strong><small>[${cell.picks.join(",")}]</small>` : `<em>?</em>`}</td>`;
+    }).join("");
+    return `<tr><th><b>${rowIndex}</b><small>${interval ? `+ #${interval.id}` : (vi ? "rỗng" : "empty")}</small></th>${cells}</tr>`;
+  }).join("");
+  const dpHeader = Array.from({ length: 5 }, (_, capacity) => `<th><small>k ≤</small><b>${capacity}</b></th>`).join("");
+
+  const predecessorText = active
+    ? Number.isInteger(view.prevRow)
+      ? `prev[${view.activeRow}] = ${view.prevRow} · #${intervals[view.prevRow].id} ends ${intervals[view.prevRow].end} < ${active.start}`
+      : `prev[${view.activeRow}] = −1 · ${vi ? "không có interval tương thích" : "no compatible interval"}`
+    : (vi ? "Dấu # là index gốc cần trả về" : "# is the original index returned in the answer");
+  const answerHtml = view.answer
+    ? `<section class="wi3414-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>[${view.answer.join(", ")}]</strong><span>score = ${view.answerScore}</span></section>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="wi3414-viz" role="img" aria-label="${escapeHtml(vi ? "Trực quan hóa weighted interval DP bài 3414" : "Weighted interval DP visualization for problem 3414")}">
+    <div class="wi3414-phases">${phasesHtml}</div>
+    <section class="wi3414-timeline"><header><strong>${vi ? "INTERVAL ĐÃ SORT THEO END" : "INTERVALS SORTED BY END"}</strong><span>${escapeHtml(predecessorText)}</span></header><div class="wi3414-axis"><span>${minimum}</span><i></i><span>${maximum}</span></div><div>${timelineHtml}</div></section>
+    ${decisionHtml}
+    <section class="wi3414-table"><header><strong>DP · SCORE + ORIGINAL INDICES</strong><span>${vi ? "hàng = số interval đã xét · cột = giới hạn số interval" : "row = intervals considered · column = selection limit"}</span></header><div><table><thead><tr><th><small>i</small></th>${dpHeader}</tr></thead><tbody>${dpRows}</tbody></table></div></section>
+    ${answerHtml}
+  </section>`;
+}
+
 function renderAdvancedBitmaskView(step) {
   const view = step.advancedBitmaskView || {};
   const vi = lang === "vi";
@@ -27281,6 +27366,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinCostStairsView(step);
+  } else if (step.weightedIntervals3414View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWeightedIntervals3414View(step);
   } else if (step.advancedBitmaskView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

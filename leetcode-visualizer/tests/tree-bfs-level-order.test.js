@@ -170,6 +170,41 @@ test('1609 shows both passing rows and the first parity/order violation', () => 
   assert.equal(orderFailure.answer, false);
 });
 
+test('1609 debugs parity and ordering independently before updating prev or enqueuing children', () => {
+  const valid = SUPPORTED[1609].builder('1,10,4,3,null,7,9,12,8,6,null,null,2');
+  const events = valid.steps.map(step => step.bfsLevelView.event);
+  for (const event of ['guard', 'init', 'while-check', 'reset-prev', 'loop', 'pop', 'parity-pass', 'order-pass', 'pass-node', 'update-prev', 'enqueue-left', 'skip-left', 'enqueue-right', 'skip-right', 'level-complete', 'while-stop', 'done']) {
+    assert.ok(events.includes(event), event);
+  }
+  assert.ok(valid.steps.every(step => step.codeLines.length === 1));
+  assert.equal(valid.steps.filter(step => step.bfsLevelView.event === 'pop').length, 10);
+  assert.deepEqual(
+    valid.steps.filter(step => step.bfsLevelView.event === 'reset-prev').map(step => step.vars.find(variable => variable.name === 'prev').value),
+    ['−∞', '+∞', '−∞', '+∞'],
+  );
+
+  const mixedQueue = valid.steps.find(step => step.bfsLevelView.formula === 'queue.append(3)');
+  assert.deepEqual(mixedQueue.bfsLevelView.queue.map(item => [item.value, item.role]), [[4, 'current-level'], [3, 'next-level']]);
+  const updateTen = valid.steps.find(step => step.bfsLevelView.formula === 'prev = node.val = 10');
+  assert.equal(updateTen.vars.find(variable => variable.name === 'parity_bad').value, false);
+  assert.equal(updateTen.vars.find(variable => variable.name === 'order_bad').value, false);
+
+  const parityFailure = SUPPORTED[1609].builder('1,3,2');
+  const parityFail = parityFailure.steps.at(-1);
+  assert.equal(parityFail.bfsLevelView.event, 'fail');
+  assert.equal(parityFail.final, true);
+  assert.equal(parityFail.vars.find(variable => variable.name === 'parity_bad').value, true);
+  assert.equal(parityFail.vars.find(variable => variable.name === 'order_bad').value, false);
+  assert.ok(parityFail.tree.nodes.some(node => node.label === '3' && node.isPruned));
+
+  const orderFailure = SUPPORTED[1609].builder('1,2,4');
+  const orderFail = orderFailure.steps.at(-1);
+  assert.equal(orderFail.vars.find(variable => variable.name === 'prev').value, 2);
+  assert.equal(orderFail.vars.find(variable => variable.name === 'parity_bad').value, false);
+  assert.equal(orderFail.vars.find(variable => variable.name === 'order_bad').value, true);
+  assert.match(orderFail.bfsLevelView.formula, /False OR True/);
+});
+
 test('2415 reverses values on odd levels only', () => {
   assert.deepEqual(SUPPORTED[2415].builder('2,3,5,8,13,21,34').answer, [2, 5, 3, 8, 13, 21, 34]);
   assert.deepEqual(SUPPORTED[2415].builder('7,13,11').answer, [7, 11, 13]);
