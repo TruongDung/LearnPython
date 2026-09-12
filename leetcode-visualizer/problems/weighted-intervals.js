@@ -6,6 +6,241 @@ const DP_TAG = { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dyn
 const BINARY_SEARCH_TAG = { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" };
 const SORTING_TAG = { key: "sorting", vi: "Sắp xếp", en: "Sorting" };
 const INTERVAL_TAG = { key: "interval", vi: "Đoạn", en: "Interval" };
+const HEAP_CATEGORY = { key: "heap", vi: "Heap / Hàng đợi ưu tiên", en: "Heap / Priority Queue" };
+const HEAP_TAG = { key: "heap", vi: "Heap", en: "Heap" };
+
+function parseEvents2054(input) {
+  const message = "Enter 2–12 events as start,end,value; start,end,value or as a JSON array [[start,end,value],...].";
+  let events = input;
+  if (!Array.isArray(events)) {
+    const raw = String(input ?? "").trim();
+    if (!raw) throw new Error(message);
+    if (raw.startsWith("[")) {
+      try {
+        events = JSON.parse(raw);
+      } catch (_error) {
+        throw new Error(message);
+      }
+    } else {
+      events = raw.split(";").map((part) => part.split(",").map((value) => Number(value.trim())));
+    }
+  }
+  if (!Array.isArray(events) || events.length < 2 || events.length > 12
+      || events.some((event) => !Array.isArray(event) || event.length !== 3
+        || event.some((value) => !Number.isInteger(Number(value)))
+        || Number(event[0]) < 1 || Number(event[0]) > Number(event[1])
+        || Number(event[1]) > 1000000000
+        || Number(event[2]) < 1 || Number(event[2]) > 1000000)) {
+    throw new Error(message);
+  }
+  return events.map((event) => event.map(Number));
+}
+
+function lexCompare2054(left, right) {
+  const size = Math.min(left.length, right.length);
+  for (let index = 0; index < size; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return left.length - right.length;
+}
+
+function buildSteps2054(input) {
+  const original = parseEvents2054(input);
+  const sorted = original
+    .map(([start, end, value], id) => ({ id, start, end, value }))
+    .sort((left, right) => left.start - right.start || left.end - right.end || left.id - right.id);
+  const heap = [];
+  const releasedIds = new Set();
+  const processed = [];
+  const steps = [];
+  let bestPast = null;
+  let answer = { score: 0, picks: [] };
+  let candidate = null;
+
+  const stages = [
+    { vi: "Sort theo start", en: "Sort by start" },
+    { vi: "Pop event đã kết thúc", en: "Release ended events" },
+    { vi: "Ghép tối đa 2 event", en: "Combine at most 2" },
+    { vi: "Push event hiện tại", en: "Push current event" },
+  ];
+  const cloneEvent = (event) => event ? { ...event } : null;
+  const cloneScore = (score) => score ? { score: score.score, picks: [...score.picks] } : null;
+  const stageFor = (phase) => {
+    if (phase === "sort") return 0;
+    if (["scan", "release", "past"].includes(phase)) return 1;
+    if (["combine", "answer"].includes(phase)) return 2;
+    return 3;
+  };
+  const pushStep = ({
+    phase, event, line, title, note, currentIndex = null, heapTop = null,
+    popped = null, compatible = null, answerChanged = false, final = false,
+  }) => {
+    const current = Number.isInteger(currentIndex) ? sorted[currentIndex] : null;
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      arr: sorted.map((item) => item.value),
+      highlight: current ? [currentIndex] : [],
+      mark: [],
+      vars: [
+        { name: "current", value: current ? `#${current.id} [${current.start},${current.end}]` : "—" },
+        { name: "heap top end", value: heap.length ? heap[0].end : "—" },
+        { name: "best_ended", value: bestPast ? bestPast.value : 0 },
+        { name: "candidate", value: candidate ? candidate.score : "—" },
+        { name: "answer", value: answer.score },
+      ],
+      twoEvents2054View: {
+        problemId: 2054,
+        stages,
+        stage: stageFor(phase),
+        phase,
+        event,
+        original: original.map((item) => [...item]),
+        events: sorted.map(cloneEvent),
+        currentIndex,
+        heap: heap.map(cloneEvent),
+        heapTop: cloneEvent(heapTop),
+        popped: cloneEvent(popped),
+        compatible,
+        releasedIds: [...releasedIds],
+        bestPast: cloneEvent(bestPast),
+        candidate: cloneScore(candidate),
+        answer: cloneScore(answer),
+        answerChanged,
+        processed: processed.map((item) => ({ ...item, picks: [...item.picks] })),
+      },
+    });
+  };
+  const pushHeap = (event) => {
+    heap.push(event);
+    heap.sort((left, right) => left.end - right.end || left.start - right.start || left.id - right.id);
+  };
+  const isBetterPast = (event) => !bestPast || event.value > bestPast.value
+    || (event.value === bestPast.value && event.id < bestPast.id);
+  const isBetterAnswer = (next) => next.score > answer.score
+    || (next.score === answer.score && lexCompare2054(next.picks, answer.picks) < 0);
+
+  pushStep({
+    phase: "sort", event: "sort", line: 4,
+    title: { vi: "Sort event theo start tăng dần", en: "Sort events by increasing start" },
+    note: {
+      vi: `Sau sort: ${sorted.map((item) => `#${item.id}[${item.start},${item.end}]`).join(" · ")}. Dấu # luôn là index gốc.`,
+      en: `Sorted order: ${sorted.map((item) => `#${item.id}[${item.start},${item.end}]`).join(" · ")}. Each # remains the original index.`,
+    },
+  });
+
+  for (let index = 0; index < sorted.length; index += 1) {
+    const current = sorted[index];
+    candidate = null;
+    pushStep({
+      phase: "scan", event: "scan", line: 7, currentIndex: index,
+      title: { vi: `Xét #${current.id} = [${current.start}, ${current.end}], value ${current.value}`, en: `Visit #${current.id} = [${current.start}, ${current.end}], value ${current.value}` },
+      note: { vi: `Trước khi ghép, pop mọi event có end < start=${current.start}.`, en: `Before combining, pop every event whose end is < start=${current.start}.` },
+    });
+
+    while (heap.length && heap[0].end < current.start) {
+      const top = heap[0];
+      pushStep({
+        phase: "release", event: "check-compatible", line: 8, currentIndex: index,
+        heapTop: top, compatible: true,
+        title: { vi: `${top.end} < ${current.start} ✓ · #${top.id} đã kết thúc`, en: `${top.end} < ${current.start} ✓ · #${top.id} has ended` },
+        note: { vi: `#${top.id} không overlap #${current.id}, nên có thể trở thành event thứ nhất.`, en: `#${top.id} does not overlap #${current.id}, so it may become the first event.` },
+      });
+      const popped = heap.shift();
+      releasedIds.add(popped.id);
+      pushStep({
+        phase: "release", event: "pop-ended", line: 9, currentIndex: index,
+        heapTop: popped, popped, compatible: true,
+        title: { vi: `Pop #${popped.id} khỏi min-heap`, en: `Pop #${popped.id} from the min-heap` },
+        note: { vi: `Heap chỉ giữ các event chưa kết thúc trước start=${current.start}.`, en: `The heap now keeps only events that have not ended before start=${current.start}.` },
+      });
+      const changed = isBetterPast(popped);
+      if (changed) bestPast = popped;
+      pushStep({
+        phase: "past", event: changed ? "new-best-past" : "keep-best-past", line: 10,
+        currentIndex: index, popped, compatible: true,
+        title: changed
+          ? { vi: `best_ended = ${popped.value} từ #${popped.id}`, en: `best_ended = ${popped.value} from #${popped.id}` }
+          : { vi: `Giữ best_ended = ${bestPast.value} từ #${bestPast.id}`, en: `Keep best_ended = ${bestPast.value} from #${bestPast.id}` },
+        note: changed
+          ? { vi: `Trong các event đã kết thúc, #${popped.id} có value tốt nhất hiện tại.`, en: `Among ended events, #${popped.id} now has the best value.` }
+          : { vi: `#${popped.id} có value ${popped.value}, không vượt best_ended=${bestPast.value}.`, en: `#${popped.id} has value ${popped.value}, which does not beat best_ended=${bestPast.value}.` },
+      });
+    }
+
+    if (heap.length) {
+      const top = heap[0];
+      pushStep({
+        phase: "release", event: "stop-overlap", line: 8, currentIndex: index,
+        heapTop: top, compatible: false,
+        title: { vi: `${top.end} < ${current.start} ✗ · dừng pop`, en: `${top.end} < ${current.start} ✗ · stop popping` },
+        note: {
+          vi: `#${top.id} kết thúc tại ${top.end}; vì thời gian là inclusive, end = start cũng vẫn overlap.`,
+          en: `#${top.id} ends at ${top.end}; because endpoints are inclusive, end = start still overlaps.`,
+        },
+      });
+    } else {
+      pushStep({
+        phase: "release", event: "heap-clear", line: 8, currentIndex: index,
+        compatible: null,
+        title: { vi: "Heap không còn event cần kiểm tra", en: "No heap event remains to check" },
+        note: { vi: "Tất cả event trước đó đã được giải phóng, hoặc đây là event đầu tiên.", en: "All earlier events have been released, or this is the first event." },
+      });
+    }
+
+    const picks = [bestPast && bestPast.id, current.id].filter(Number.isInteger).sort((left, right) => left - right);
+    candidate = { score: (bestPast ? bestPast.value : 0) + current.value, picks };
+    pushStep({
+      phase: "combine", event: "combine", line: 11, currentIndex: index,
+      title: { vi: `${bestPast ? bestPast.value : 0} + ${current.value} = ${candidate.score}`, en: `${bestPast ? bestPast.value : 0} + ${current.value} = ${candidate.score}` },
+      note: bestPast
+        ? { vi: `Ghép #${bestPast.id} đã kết thúc với #${current.id} hiện tại.`, en: `Combine ended event #${bestPast.id} with current event #${current.id}.` }
+        : { vi: `Chưa có event tương thích phía trước, nên phương án chỉ chọn #${current.id}.`, en: `No compatible earlier event exists, so this candidate takes only #${current.id}.` },
+    });
+
+    const changed = isBetterAnswer(candidate);
+    if (changed) answer = cloneScore(candidate);
+    processed.push({
+      id: current.id,
+      pastId: bestPast ? bestPast.id : null,
+      pastValue: bestPast ? bestPast.value : 0,
+      currentValue: current.value,
+      candidate: candidate.score,
+      answer: answer.score,
+      picks: [...answer.picks],
+    });
+    pushStep({
+      phase: "answer", event: changed ? "new-answer" : "keep-answer", line: 11,
+      currentIndex: index, answerChanged: changed,
+      title: changed
+        ? { vi: `Cập nhật answer = ${answer.score}`, en: `Update answer = ${answer.score}` }
+        : { vi: `Giữ answer = ${answer.score}`, en: `Keep answer = ${answer.score}` },
+      note: changed
+        ? { vi: `Phương án [${answer.picks.map((id) => `#${id}`).join(" + ")}] tốt nhất cho tới lúc này.`, en: `Choice [${answer.picks.map((id) => `#${id}`).join(" + ")}] is the best seen so far.` }
+        : { vi: `Candidate ${candidate.score} không vượt đáp án ${answer.score}.`, en: `Candidate ${candidate.score} does not beat answer ${answer.score}.` },
+    });
+
+    pushHeap(current);
+    pushStep({
+      phase: "push", event: "push", line: 12, currentIndex: index,
+      title: { vi: `Push #${current.id} với end=${current.end}`, en: `Push #${current.id} with end=${current.end}` },
+      note: { vi: "Min-heap sắp theo end; event kết thúc sớm nhất luôn ở TOP.", en: "The min-heap is ordered by end, so the earliest ending event stays at TOP." },
+    });
+  }
+
+  candidate = null;
+  pushStep({
+    phase: "done", event: "done", line: 13, final: true,
+    title: { vi: `Đáp án lớn nhất = ${answer.score}`, en: `Maximum value = ${answer.score}` },
+    note: {
+      vi: `Chọn ${answer.picks.map((id) => `#${id}`).join(" + ")}; mỗi candidate luôn gồm nhiều nhất một event đã kết thúc và event hiện tại.`,
+      en: `Choose ${answer.picks.map((id) => `#${id}`).join(" + ")}; every candidate contains at most one ended event plus the current event.`,
+    },
+  });
+  return { input, original, answer: answer.score, picks: [...answer.picks], steps };
+}
 
 function parseIntervals3414(input) {
   const message = "Enter 1–12 intervals as l,r,w; l,r,w or as a JSON array [[l,r,w],...].";
@@ -260,6 +495,51 @@ function buildSteps3414(input) {
 }
 
 module.exports = {
+  2054: {
+    id: 2054,
+    difficulty: "medium",
+    slug: "two-best-non-overlapping-events",
+    category: HEAP_CATEGORY,
+    tags: [HEAP_TAG, SORTING_TAG, INTERVAL_TAG],
+    title: { vi: "Two Best Non-Overlapping Events", en: "Two Best Non-Overlapping Events" },
+    titleVi: { vi: "Hai sự kiện không chồng nhau có tổng lớn nhất", en: "Two best non-overlapping events" },
+    statement: {
+      vi: "Cho events[i] = [startᵢ, endᵢ, valueᵢ]. Chọn nhiều nhất hai event không chồng nhau để tổng value lớn nhất. Hai đầu mút là inclusive, nên event tiếp theo phải bắt đầu sau end của event trước.",
+      en: "Given events[i] = [startᵢ, endᵢ, valueᵢ], choose at most two non-overlapping events with maximum total value. Endpoints are inclusive, so the next event must start after the previous event ends.",
+    },
+    defaultInput: "1,3,2;4,5,2;2,4,3",
+    inputKind: "string",
+    inputLabel: { vi: "events: start,end,value; …", en: "events: start,end,value; …" },
+    extraParams: [],
+    approach: [
+      { vi: "Sort event theo start tăng dần; min-heap giữ các event trước theo end.", en: "Sort events by increasing start; a min-heap keeps earlier events ordered by end." },
+      { vi: "Trước mỗi event hiện tại, pop mọi event có end < start. Dấu < nghiêm ngặt vì thời gian inclusive.", en: "Before each current event, pop every event with end < start. The strict < is required because times are inclusive." },
+      { vi: "best_ended lưu value lớn nhất của đúng một event đã kết thúc; candidate = best_ended + value hiện tại.", en: "best_ended stores the largest value of one ended event; candidate = best_ended + the current value." },
+      { vi: "Cập nhật answer rồi push event hiện tại vào heap để dùng cho các event sau.", en: "Update the answer, then push the current event into the heap for later events." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: { vi: "Mỗi event được push và pop khỏi heap đúng một lần.", en: "Each event is pushed to and popped from the heap once." },
+    },
+    code: [
+      "import heapq",
+      "class Solution:",
+      "    def maxTwoEvents(self, events):",
+      "        events.sort()",
+      "        heap = []",
+      "        best_ended = answer = 0",
+      "        for start, end, value in events:",
+      "            while heap and heap[0][0] < start:",
+      "                _, ended_value = heapq.heappop(heap)",
+      "                best_ended = max(best_ended, ended_value)",
+      "            answer = max(answer, best_ended + value)",
+      "            heapq.heappush(heap, (end, value))",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseEvents2054(input)],
+    builder: buildSteps2054,
+  },
   3414: {
     id: 3414,
     difficulty: "hard",

@@ -23170,6 +23170,110 @@ function renderMinCostStairsView(step) {
   </section>`;
 }
 
+function renderTwoEvents2054View(step) {
+  const view = step.twoEvents2054View || {};
+  const vi = lang === "vi";
+  const events = Array.isArray(view.events) ? view.events : [];
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const current = Number.isInteger(view.currentIndex) ? events[view.currentIndex] : null;
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const heapIds = new Set(heap.map((event) => event.id));
+  const releasedIds = new Set(Array.isArray(view.releasedIds) ? view.releasedIds : []);
+  const pickedIds = new Set(view.answer?.picks || []);
+  const final = view.event === "done";
+  const phaseHtml = stages.map((stage, index) => {
+    const state = final || index < view.stage ? "done" : index === view.stage ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(pick(stage))}</b></span>`;
+  }).join("");
+  const line = Array.isArray(step.codeLines) && step.codeLines.length ? step.codeLines[0] : "—";
+
+  const minimum = events.length ? Math.min(...events.map((event) => event.start)) : 0;
+  const maximum = events.length ? Math.max(...events.map((event) => event.end)) : 1;
+  const timeRange = Math.max(1, maximum - minimum);
+  const timelineHtml = events.map((event, index) => {
+    const isCurrent = index === view.currentIndex;
+    const isBestPast = view.bestPast?.id === event.id;
+    const isPicked = final && pickedIds.has(event.id);
+    const status = isPicked
+      ? (vi ? "ĐÁP ÁN" : "ANSWER")
+      : isCurrent
+        ? (vi ? "HIỆN TẠI" : "CURRENT")
+        : isBestPast
+          ? "BEST ENDED"
+          : heapIds.has(event.id)
+            ? "IN HEAP"
+            : releasedIds.has(event.id)
+              ? (vi ? "ĐÃ KẾT THÚC" : "ENDED")
+              : (vi ? "CHƯA XÉT" : "WAITING");
+    const classes = [isCurrent ? "current" : "", isBestPast ? "best" : "", isPicked ? "picked" : "", heapIds.has(event.id) ? "in-heap" : "", releasedIds.has(event.id) ? "released" : ""].filter(Boolean).join(" ");
+    const left = Math.min(97, ((event.start - minimum) / timeRange) * 100);
+    const naturalWidth = ((event.end - event.start) / timeRange) * 100;
+    const width = Math.max(3, Math.min(100 - left, naturalWidth || 3));
+    return `<div class="te2054-event ${classes}">
+      <span><strong>#${event.id} · [${event.start}, ${event.end}]</strong><small>value ${event.value} · ${status}</small></span>
+      <div><i style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"><b>${event.value}</b></i></div>
+    </div>`;
+  }).join("");
+
+  let gateHtml = "";
+  if (current) {
+    const checked = view.heapTop || view.popped || null;
+    const relation = view.compatible === true ? "pass" : view.compatible === false ? "blocked" : "waiting";
+    const equation = checked ? `${checked.end} < ${current.start}` : `end < ${current.start}`;
+    const verdict = view.compatible === true ? "✓ POP" : view.compatible === false ? "✗ STOP" : "…";
+    gateHtml = `<section class="te2054-gate ${relation}">
+      <header><strong>${vi ? "CỔNG KHÔNG OVERLAP" : "NON-OVERLAP GATE"}</strong><span>end(previous) &lt; start(current)</span></header>
+      <div><article><small>${checked ? `HEAP TOP · #${checked.id}` : "HEAP TOP"}</small><strong>${checked ? checked.end : "∅"}</strong><span>end</span></article><b>&lt;</b><article class="current"><small>CURRENT · #${current.id}</small><strong>${current.start}</strong><span>start</span></article><em>${equation} · ${verdict}</em></div>
+      <footer>${view.compatible === true
+        ? (vi ? `#${checked.id} đã kết thúc trước #${current.id} bắt đầu, nên có thể ghép.` : `#${checked.id} ended before #${current.id} starts, so they may be combined.`)
+        : view.compatible === false
+          ? (vi ? `Chạm biên hoặc chồng thời gian vẫn overlap; giữ #${checked.id} trong heap.` : `Touching or crossing time ranges still overlap; keep #${checked.id} in the heap.`)
+          : (vi ? "Nếu heap rỗng, event hiện tại sẽ đứng một mình." : "When the heap is empty, the current event stands alone.")}</footer>
+    </section>`;
+  }
+
+  const heapHtml = heap.length
+    ? heap.map((event, index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? "TOP" : `#${index + 1}`} · #${event.id}</small><strong>end ${event.end}</strong><em>value ${event.value}</em></span>`).join("")
+    : `<b class="te2054-empty">∅ ${vi ? "heap rỗng" : "empty heap"}</b>`;
+  const past = view.bestPast;
+  const bestPastHtml = past
+    ? `<article><small>BEST ENDED · #${past.id}</small><strong>${past.value}</strong><span>[${past.start}, ${past.end}]</span></article>`
+    : `<article class="empty"><small>BEST ENDED</small><strong>0</strong><span>${vi ? "chưa có event tương thích" : "no compatible event yet"}</span></article>`;
+
+  const candidate = view.candidate;
+  const candidateHtml = candidate && current
+    ? `<section class="te2054-equation ${view.answerChanged ? "winner" : ""}">
+      <header><strong>${vi ? "CHỈ CÓ HAI SLOT" : "ONLY TWO SLOTS"}</strong><span>${vi ? "một event đã kết thúc + event hiện tại" : "one ended event + the current event"}</span></header>
+      <div><article><small>SLOT 1 · BEST ENDED</small><strong>${past ? past.value : 0}</strong><span>${past ? `#${past.id}` : "∅"}</span></article><b>+</b><article class="current"><small>SLOT 2 · CURRENT</small><strong>${current.value}</strong><span>#${current.id}</span></article><b>=</b><article class="candidate"><small>CANDIDATE</small><strong>${candidate.score}</strong><span>[${candidate.picks.map((id) => `#${id}`).join(" + ")}]</span></article></div>
+      <footer><span>${vi ? "ĐÁP ÁN TỐT NHẤT" : "BEST ANSWER"}</span><strong>${view.answer?.score ?? 0}</strong><em>[${(view.answer?.picks || []).map((id) => `#${id}`).join(" + ") || "∅"}]</em></footer>
+    </section>`
+    : "";
+
+  const processed = Array.isArray(view.processed) ? view.processed : [];
+  const processedHtml = processed.length
+    ? processed.map((item, index) => `<span class="${index === processed.length - 1 && !final ? "fresh" : ""}"><small>CURRENT #${item.id}</small><strong>${item.pastValue} + ${item.currentValue} = ${item.candidate}</strong><em>answer ${item.answer} · [${item.picks.map((id) => `#${id}`).join(" + ")}]</em></span>`).join("")
+    : `<b class="te2054-empty">${vi ? "Chưa tính candidate nào" : "No candidate calculated yet"}</b>`;
+
+  const answerHtml = final
+    ? `<section class="te2054-answer"><header><span><small>${vi ? "TỔNG VALUE LỚN NHẤT" : "MAXIMUM TOTAL VALUE"}</small><strong>${view.answer?.score ?? 0}</strong></span><b>${(view.answer?.picks || []).length} / 2 ${vi ? "event được chọn" : "events selected"}</b></header><div>${(view.answer?.picks || []).map((id) => {
+      const event = Array.isArray(view.original?.[id]) ? view.original[id] : [];
+      return `<article><small>#${id}</small><strong>[${event[0]}, ${event[1]}]</strong><span>+${event[2]}</span></article>`;
+    }).join("<i>+</i>")}</div><footer>${vi ? "Hai event hợp lệ chỉ khi end của event trước nhỏ hơn start của event sau." : "Two events are valid only when the earlier event's end is smaller than the later event's start."}</footer></section>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="te2054-viz" role="img" aria-label="${escapeHtml(vi ? "Trực quan hóa hai event không chồng nhau bài 2054" : "Two best non-overlapping events visualization for problem 2054")}">
+    <div class="te2054-phases">${phaseHtml}</div>
+    <section class="te2054-action"><small>${vi ? "DÒNG CODE" : "CODE LINE"} ${line} · ${escapeHtml(String(view.event || "step").replaceAll("-", " "))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="te2054-rule"><b>${vi ? "QUY TẮC QUAN TRỌNG" : "KEY RULE"}</b><strong>end(previous) &lt; start(current)</strong><span>${vi ? "Dấu <, không phải ≤ · vì cả start và end đều inclusive" : "Strict <, not ≤ · both start and end are inclusive"}</span></section>
+    <section class="te2054-timeline"><header><strong>${vi ? "EVENTS · SORT THEO START · GIỮ INDEX GỐC #" : "EVENTS · SORT BY START · KEEP ORIGINAL INDEX #"}</strong><span>${vi ? "cam = current · xanh dương = heap · tím = best ended · xanh lá = answer" : "amber = current · blue = heap · purple = best ended · green = answer"}</span></header><div class="te2054-axis"><span>${minimum}</span><i></i><span>${maximum}</span></div><div>${timelineHtml}</div></section>
+    ${gateHtml}
+    <div class="te2054-memory"><section><header><strong>MIN-HEAP BY END</strong><span>${vi ? "TOP kết thúc sớm nhất" : "earliest end is TOP"}</span></header><div class="te2054-heap">${heapHtml}</div></section><section><header><strong>BEST ENDED</strong><span>${vi ? "event tốt nhất đã được pop" : "best event already popped"}</span></header><div class="te2054-best">${bestPastHtml}</div></section></div>
+    ${candidateHtml}
+    <section class="te2054-processed"><header><strong>${vi ? "CANDIDATE ĐÃ TÍNH" : "CALCULATED CANDIDATES"}</strong><span>best_ended + current → answer</span></header><div>${processedHtml}</div></section>
+    ${answerHtml}
+  </section>`;
+}
+
 function renderWeightedIntervals3414View(step) {
   const view = step.weightedIntervals3414View || {};
   const vi = lang === "vi";
@@ -28259,6 +28363,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinCostStairsView(step);
+  } else if (step.twoEvents2054View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoEvents2054View(step);
   } else if (step.weightedIntervals3414View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
