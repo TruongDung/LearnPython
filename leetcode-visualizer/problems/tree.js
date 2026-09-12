@@ -4849,6 +4849,1669 @@ function buildSteps113(input, params) {
   return { input, answer: result, steps };
 }
 
+// ─── 437: Path Sum III ───
+function buildSteps437(input, params = {}) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: -1000000000,
+    maxValue: 1000000000,
+    maxNodes: 31,
+  });
+  const target = Number(params.target ?? 8);
+  if (!Number.isInteger(target) || target < -1000000000 || target > 1000000000) {
+    throw new Error("targetSum must be an integer from -1000000000 to 1000000000");
+  }
+
+  const steps = [];
+  const callStack = [];
+  const pathNodes = [];
+  const pathPrefixes = [];
+  const prefixCount = new Map([[0, 1]]);
+  const prefixSources = new Map([[0, [{ nodeId: null, pathIndex: -1, label: "before root" }]]]);
+  const foundPaths = [];
+  let answer = 0;
+
+  const phaseIndex = (phase) => {
+    if (["rule", "init", "enter", "null"].includes(phase)) return 0;
+    if (phase === "add") return 1;
+    if (["need", "lookup"].includes(phase)) return 2;
+    if (["store", "call-left", "call-right"].includes(phase)) return 3;
+    return 4;
+  };
+  const stages = [
+    { vi: "Vào DFS", en: "Enter DFS" },
+    { vi: "Cộng node", en: "Add node" },
+    { vi: "Tìm prefix cần", en: "Find needed prefix" },
+    { vi: "Duyệt hai con", en: "Visit children" },
+    { vi: "Backtrack", en: "Backtrack" },
+  ];
+  const mapEntries = () => [...prefixCount.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => a[0] - b[0])
+    .map(([sum, count]) => ({
+      sum,
+      count,
+      sources: (prefixSources.get(sum) || []).map((source) => source.label),
+    }));
+  const pathState = () => pathNodes.map((node, index) => ({
+    id: node.id,
+    value: node.val,
+    prefix: pathPrefixes[index],
+    current: index === pathNodes.length - 1,
+  }));
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    incoming: frame.incoming,
+    running: frame.running,
+    stage: frame.stage,
+  }));
+  const annotationsFor = (current, matches) => {
+    const annotations = {};
+    if (current) annotations[current.id] = { label: "CURRENT", kind: "ps437-current" };
+    const matchingIds = new Set((matches || []).flatMap((match) => match.ids));
+    if (matchingIds.size) {
+      const matchingNodes = pathNodes.filter((node) => matchingIds.has(node.id));
+      if (matchingNodes[0]) annotations[matchingNodes[0].id] = { label: "PATH START", kind: "ps437-match" };
+      if (current) annotations[current.id] = { label: `PATH END · +${matches.length}`, kind: "ps437-match" };
+    }
+    return annotations;
+  };
+  const addStep = ({
+    phase, event, title, note, line, current = null, running = null, needed = null,
+    matches = [], added = 0, subtreeCount = null, final = false,
+  }) => {
+    const matchIds = new Set(matches.flatMap((match) => match.ids));
+    const activePathIds = new Set(pathNodes.map((node) => node.id));
+    const highlightIds = new Set(current ? [current.id] : []);
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: highlightIds,
+      wordSet: matchIds.size ? matchIds : activePathIds,
+      annotations: annotationsFor(current, matches),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "running", value: running ?? "—" },
+        { name: "needed", value: needed ?? "—" },
+        { name: "prefix_count", value: `{${mapEntries().map((entry) => `${entry.sum}:${entry.count}`).join(", ")}}` },
+        { name: "answer", value: answer },
+      ],
+      note,
+    });
+    treeStep.pathSumIIIView = {
+      problemId: 437,
+      stages,
+      stage: phaseIndex(phase),
+      phase,
+      event,
+      target,
+      current: current ? { id: current.id, value: current.val } : null,
+      running,
+      needed,
+      added,
+      subtreeCount,
+      matches: matches.map((match) => ({
+        values: [...match.values],
+        ids: [...match.ids],
+        from: match.from,
+      })),
+      path: pathState(),
+      prefixEntries: mapEntries(),
+      stack: stackState(),
+      foundPaths: foundPaths.map((path) => ({ values: [...path.values], from: path.from, end: path.end })),
+      answer,
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  addStep({
+    phase: "rule",
+    event: "rule",
+    title: { vi: "Biến path sum thành hiệu hai prefix", en: "Turn a path sum into two prefix sums" },
+    note: {
+      vi: `Tại node hiện tại, cần một prefix cũ = running − target. Mỗi lần prefix cũ xuất hiện trên đường từ root sẽ tạo một path có tổng ${target}.`,
+      en: `At the current node, we need an old prefix = running − target. Every occurrence of that old prefix on the root path creates one path summing to ${target}.`,
+    },
+    line: 3,
+  });
+  addStep({
+    phase: "init",
+    event: "init-map",
+    title: { vi: "prefix_count = {0: 1}", en: "prefix_count = {0: 1}" },
+    note: { vi: "Prefix 0 ảo nằm trước root, để path bắt đầu từ root cũng được đếm.", en: "A virtual prefix 0 sits before the root so paths starting at the root are counted too." },
+    line: 3,
+  });
+
+  function dfs(node, running, side) {
+    const frame = { node, side, incoming: running, running, stage: "enter" };
+    callStack.push(frame);
+    addStep({
+      phase: node ? "enter" : "null",
+      event: node ? "enter" : "return-null",
+      title: node
+        ? { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` }
+        : { vi: `Nhánh ${side} là None → return 0`, en: `${side} branch is None → return 0` },
+      note: node
+        ? { vi: `running trước khi cộng node là ${running}.`, en: `running is ${running} before adding this node.` }
+        : { vi: "Nhánh rỗng không thể kết thúc path mới.", en: "An empty branch cannot end a new path." },
+      line: 6,
+      current: node,
+      running,
+      subtreeCount: node ? null : 0,
+    });
+    if (!node) {
+      callStack.pop();
+      return 0;
+    }
+
+    const before = running;
+    running += node.val;
+    frame.running = running;
+    frame.stage = "add";
+    pathNodes.push(node);
+    pathPrefixes.push(running);
+    addStep({
+      phase: "add",
+      event: "add-node",
+      title: { vi: `running = ${before} + (${node.val}) = ${running}`, en: `running = ${before} + (${node.val}) = ${running}` },
+      note: { vi: "running là tổng từ root đến node hiện tại, không phải chỉ path cần tìm.", en: "running is the sum from the root to the current node, not only the path we are looking for." },
+      line: 7,
+      current: node,
+      running,
+    });
+
+    const needed = running - target;
+    frame.stage = "need";
+    addStep({
+      phase: "need",
+      event: "compute-needed",
+      title: { vi: `needed = ${running} − (${target}) = ${needed}`, en: `needed = ${running} − (${target}) = ${needed}` },
+      note: { vi: `Nếu prefix cũ bằng ${needed}, phần path sau prefix đó có tổng ${running} − (${needed}) = ${target}.`, en: `If an old prefix equals ${needed}, the path after it sums to ${running} − (${needed}) = ${target}.` },
+      line: 8,
+      current: node,
+      running,
+      needed,
+    });
+
+    const sources = [...(prefixSources.get(needed) || [])];
+    const matches = sources.map((source) => {
+      const segment = pathNodes.slice(source.pathIndex + 1);
+      return {
+        ids: segment.map((item) => item.id),
+        values: segment.map((item) => item.val),
+        from: source.label,
+      };
+    });
+    const added = matches.length;
+    answer += added;
+    for (const match of matches) {
+      foundPaths.push({ values: [...match.values], from: match.from, end: node.val });
+    }
+    frame.stage = "lookup";
+    addStep({
+      phase: "lookup",
+      event: added ? "found" : "not-found",
+      title: added
+        ? { vi: `prefix_count[${needed}] = ${added} → thêm ${added} path`, en: `prefix_count[${needed}] = ${added} → add ${added} path(s)` }
+        : { vi: `prefix_count[${needed}] = 0 → chưa có path mới`, en: `prefix_count[${needed}] = 0 → no new path` },
+      note: added
+        ? { vi: `Tìm thấy ${added} prefix khớp; answer tăng lên ${answer}.`, en: `Found ${added} matching prefix(es); answer increases to ${answer}.` }
+        : { vi: "Không có prefix cũ cần thiết trên path root→current.", en: "The needed old prefix is absent from the root-to-current path." },
+      line: 9,
+      current: node,
+      running,
+      needed,
+      matches,
+      added,
+    });
+
+    const oldCount = prefixCount.get(running) || 0;
+    prefixCount.set(running, oldCount + 1);
+    if (!prefixSources.has(running)) prefixSources.set(running, []);
+    prefixSources.get(running).push({
+      nodeId: node.id,
+      pathIndex: pathNodes.length - 1,
+      label: `after node ${node.val}`,
+    });
+    frame.stage = "store";
+    addStep({
+      phase: "store",
+      event: "store-prefix",
+      title: { vi: `prefix_count[${running}] = ${oldCount + 1}`, en: `prefix_count[${running}] = ${oldCount + 1}` },
+      note: { vi: "Chỉ lưu prefix hiện tại SAU khi lookup, tránh ghép nó với chính nó thành path rỗng.", en: "Store the current prefix only AFTER lookup so it cannot pair with itself as an empty path." },
+      line: 10,
+      current: node,
+      running,
+      needed,
+    });
+
+    frame.stage = "call-left";
+    addStep({
+      phase: "call-left",
+      event: "call-left",
+      title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
+      note: { vi: `Con trái nhận running=${running} và prefix map hiện tại.`, en: `The left child receives running=${running} and the current prefix map.` },
+      line: 11,
+      current: node,
+      running,
+      needed,
+    });
+    const leftCount = dfs(node.left, running, "left");
+
+    frame.stage = "call-right";
+    addStep({
+      phase: "call-right",
+      event: "call-right",
+      title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
+      note: { vi: `Nhánh trái đã tìm ${leftCount} path; tiếp tục nhánh phải với cùng running=${running}.`, en: `The left branch found ${leftCount} path(s); continue right with the same running=${running}.` },
+      line: 12,
+      current: node,
+      running,
+      needed,
+      subtreeCount: added + leftCount,
+    });
+    const rightCount = dfs(node.right, running, "right");
+    const subtreeCount = added + leftCount + rightCount;
+
+    const currentSources = prefixSources.get(running) || [];
+    currentSources.pop();
+    if (currentSources.length) prefixSources.set(running, currentSources);
+    else prefixSources.delete(running);
+    if (oldCount) prefixCount.set(running, oldCount);
+    else prefixCount.delete(running);
+    frame.stage = "backtrack";
+    addStep({
+      phase: "backtrack",
+      event: "remove-prefix",
+      title: { vi: `Backtrack: xóa một prefix ${running}`, en: `Backtrack: remove one prefix ${running}` },
+      note: { vi: `Rời node ${node.val}; xóa prefix của nhánh này để nhánh anh em không dùng nhầm.`, en: `Leave node ${node.val}; remove this branch's prefix so a sibling branch cannot reuse it.` },
+      line: 13,
+      current: node,
+      running,
+      needed,
+      subtreeCount,
+    });
+    pathNodes.pop();
+    pathPrefixes.pop();
+
+    frame.stage = "return";
+    addStep({
+      phase: "return",
+      event: "return-subtree",
+      title: { vi: `Node ${node.val} trả ${subtreeCount} path`, en: `Node ${node.val} returns ${subtreeCount} path(s)` },
+      note: { vi: `${added} tại node + ${leftCount} bên trái + ${rightCount} bên phải = ${subtreeCount}.`, en: `${added} at this node + ${leftCount} left + ${rightCount} right = ${subtreeCount}.` },
+      line: 14,
+      current: node,
+      running,
+      needed,
+      subtreeCount,
+    });
+    callStack.pop();
+    return subtreeCount;
+  }
+
+  dfs(root, 0, "root");
+  addStep({
+    phase: "done",
+    event: "done",
+    title: { vi: `Kết quả: ${answer} path có tổng ${target}`, en: `Result: ${answer} path(s) sum to ${target}` },
+    note: { vi: "Prefix map đã trở lại {0:1}; mọi nhánh đều backtrack sạch.", en: "The prefix map is back to {0:1}; every branch was backtracked cleanly." },
+    line: 16,
+    subtreeCount: answer,
+    final: true,
+  });
+  return { input, target, answer, steps };
+}
+
+// ─── 129: Sum Root to Leaf Numbers ───
+function buildSteps129(input) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: 0,
+    maxValue: 9,
+    maxNodes: 31,
+  });
+  let maxDepth = 0;
+  (function measureDepth(node, depth) {
+    if (!node) return;
+    maxDepth = Math.max(maxDepth, depth);
+    measureDepth(node.left, depth + 1);
+    measureDepth(node.right, depth + 1);
+  })(root, 1);
+  if (maxDepth > 10) throw new Error("Root-to-leaf depth must be at most 10");
+
+  const steps = [];
+  const callStack = [];
+  const path = [];
+  const leafNumbers = [];
+  const returned = new Map();
+  let leafTotal = 0;
+
+  const stages = [
+    { vi: "Tạo số", en: "Build number" },
+    { vi: "Kiểm tra lá", en: "Check leaf" },
+    { vi: "Duyệt hai con", en: "Visit children" },
+    { vi: "Cộng kết quả", en: "Add returns" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "append-digit"].includes(phase)) return 0;
+    if (["check-leaf", "leaf-return"].includes(phase)) return 1;
+    if (["call-left", "left-return", "call-right", "right-return", "null"].includes(phase)) return 2;
+    return 3;
+  };
+  const pathState = () => path.map((item, index) => ({
+    id: item.node.id,
+    digit: item.node.val,
+    number: item.number,
+    current: index === path.length - 1,
+  }));
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    incoming: frame.incoming,
+    number: frame.number,
+    stage: frame.stage,
+  }));
+  const annotationsFor = (current, freshLeaf) => {
+    const annotations = {};
+    returned.forEach((value, id) => {
+      annotations[id] = { label: `↩ ${value}`, kind: "rln129-returned" };
+    });
+    for (const leaf of leafNumbers) {
+      annotations[leaf.id] = {
+        label: `${freshLeaf && freshLeaf.id === leaf.id ? "NEW " : ""}LEAF · ${leaf.number}`,
+        kind: freshLeaf && freshLeaf.id === leaf.id ? "rln129-fresh-leaf" : "rln129-leaf",
+      };
+    }
+    if (current && !(freshLeaf && freshLeaf.id === current.id)) {
+      annotations[current.id] = { label: "CURRENT", kind: "rln129-current" };
+    }
+    return annotations;
+  };
+  const pushStep = ({
+    phase, event, title, note, line, current = null, incoming = null, number = null,
+    leftResult = null, rightResult = null, returnValue = null, isLeaf = false,
+    freshLeaf = null, final = false,
+  }) => {
+    const activeIds = new Set(path.map((item) => item.node.id));
+    const finishedIds = new Set(leafNumbers.map((leaf) => leaf.id));
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: activeIds.size ? activeIds : finishedIds,
+      annotations: annotationsFor(current, freshLeaf),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "incoming", value: incoming ?? "—" },
+        { name: "current", value: number ?? "—" },
+        { name: "leaf total", value: leafTotal },
+        { name: "return", value: returnValue ?? "—" },
+      ],
+      note,
+    });
+    treeStep.rootLeafNumber129View = {
+      problemId: 129,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      current: current ? { id: current.id, value: current.val } : null,
+      incoming,
+      number,
+      digit: current ? current.val : null,
+      isLeaf,
+      leftResult,
+      rightResult,
+      returnValue,
+      path: pathState(),
+      stack: stackState(),
+      leaves: leafNumbers.map((leaf) => ({
+        id: leaf.id,
+        digits: leaf.digits,
+        number: leaf.number,
+        fresh: Boolean(freshLeaf && freshLeaf.id === leaf.id),
+      })),
+      leafTotal,
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro",
+    event: "rule",
+    title: { vi: "Mỗi cạnh nối thêm một chữ số", en: "Each edge appends one digit" },
+    note: {
+      vi: "Nhân số hiện tại với 10 để dịch các chữ số sang trái, rồi cộng digit ở node mới. Chỉ node lá mới tạo ra một số hoàn chỉnh.",
+      en: "Multiply the current number by 10 to shift its digits left, then add the new node's digit. Only a leaf completes a number.",
+    },
+    line: 3,
+  });
+
+  function dfs(node, incoming, side) {
+    const frame = { node, side, incoming, number: incoming, stage: "enter" };
+    callStack.push(frame);
+    pushStep({
+      phase: node ? "enter" : "null",
+      event: node ? "enter" : "return-zero",
+      title: node
+        ? { vi: `Vào node digit ${node.val}`, en: `Enter digit node ${node.val}` }
+        : { vi: `Nhánh ${side} là None → trả 0`, en: `${side} branch is None → return 0` },
+      note: node
+        ? { vi: `Số nhận từ cha là ${incoming}.`, en: `The number received from the parent is ${incoming}.` }
+        : { vi: "Nhánh rỗng không tạo thêm số root→leaf.", en: "An empty branch creates no root-to-leaf number." },
+      line: 4,
+      current: node,
+      incoming,
+      number: incoming,
+      returnValue: node ? null : 0,
+    });
+    if (!node) {
+      callStack.pop();
+      return 0;
+    }
+
+    const number = incoming * 10 + node.val;
+    frame.number = number;
+    frame.stage = "append-digit";
+    path.push({ node, number });
+    pushStep({
+      phase: "append-digit",
+      event: "append-digit",
+      title: { vi: `${incoming} × 10 + ${node.val} = ${number}`, en: `${incoming} × 10 + ${node.val} = ${number}` },
+      note: {
+        vi: `Digit ${node.val} được nối vào cuối: path [${path.map((item) => item.node.val).join(", ")}] tạo số ${number}.`,
+        en: `Digit ${node.val} is appended: path [${path.map((item) => item.node.val).join(", ")}] forms ${number}.`,
+      },
+      line: 6,
+      current: node,
+      incoming,
+      number,
+    });
+
+    const isLeaf = !node.left && !node.right;
+    frame.stage = "check-leaf";
+    pushStep({
+      phase: "check-leaf",
+      event: "check-leaf",
+      title: isLeaf
+        ? { vi: `Node ${node.val} là lá`, en: `Node ${node.val} is a leaf` }
+        : { vi: `Node ${node.val} chưa phải lá`, en: `Node ${node.val} is not a leaf` },
+      note: isLeaf
+        ? { vi: `Cả left và right đều None, nên ${number} là một số hoàn chỉnh.`, en: `Both left and right are None, so ${number} is a complete number.` }
+        : { vi: "Cần tiếp tục DFS xuống con trái và con phải.", en: "Continue DFS into the left and right children." },
+      line: 7,
+      current: node,
+      incoming,
+      number,
+      isLeaf,
+    });
+
+    if (isLeaf) {
+      const digits = path.map((item) => item.node.val).join("");
+      const leaf = { id: node.id, digits, number };
+      leafNumbers.push(leaf);
+      leafTotal += number;
+      returned.set(node.id, number);
+      frame.stage = "leaf-return";
+      pushStep({
+        phase: "leaf-return",
+        event: "leaf-return",
+        title: { vi: `Lá trả ${number}; tổng lá = ${leafTotal}`, en: `Leaf returns ${number}; leaf total = ${leafTotal}` },
+        note: {
+          vi: `Lưu số ${digits} = ${number}. Giá trị này được trả lên node cha để cộng với các lá khác.`,
+          en: `Save ${digits} = ${number}. This value returns to the parent to be added to the other leaves.`,
+        },
+        line: 8,
+        current: node,
+        incoming,
+        number,
+        isLeaf: true,
+        returnValue: number,
+        freshLeaf: leaf,
+      });
+      path.pop();
+      callStack.pop();
+      return number;
+    }
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left",
+      event: "call-left",
+      title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
+      note: { vi: `Truyền số ${number} xuống con trái.`, en: `Pass ${number} to the left child.` },
+      line: 9,
+      current: node,
+      incoming,
+      number,
+    });
+    const leftResult = dfs(node.left, number, "left");
+    frame.stage = "left-return";
+    pushStep({
+      phase: "left-return",
+      event: "left-return",
+      title: { vi: `Nhánh trái trả ${leftResult}`, en: `Left branch returns ${leftResult}` },
+      note: { vi: `Tổng các số hoàn chỉnh trong nhánh trái của ${node.val} là ${leftResult}.`, en: `The completed numbers in ${node.val}'s left subtree sum to ${leftResult}.` },
+      line: 9,
+      current: node,
+      incoming,
+      number,
+      leftResult,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right",
+      event: "call-right",
+      title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
+      note: { vi: `Giữ nguyên prefix ${number} và truyền xuống con phải.`, en: `Keep prefix ${number} and pass it to the right child.` },
+      line: 10,
+      current: node,
+      incoming,
+      number,
+      leftResult,
+    });
+    const rightResult = dfs(node.right, number, "right");
+    frame.stage = "right-return";
+    pushStep({
+      phase: "right-return",
+      event: "right-return",
+      title: { vi: `Nhánh phải trả ${rightResult}`, en: `Right branch returns ${rightResult}` },
+      note: { vi: `Tổng các số hoàn chỉnh trong nhánh phải của ${node.val} là ${rightResult}.`, en: `The completed numbers in ${node.val}'s right subtree sum to ${rightResult}.` },
+      line: 10,
+      current: node,
+      incoming,
+      number,
+      leftResult,
+      rightResult,
+    });
+
+    const returnValue = leftResult + rightResult;
+    returned.set(node.id, returnValue);
+    frame.stage = "combine";
+    pushStep({
+      phase: "combine",
+      event: "combine",
+      title: { vi: `${leftResult} + ${rightResult} = ${returnValue}`, en: `${leftResult} + ${rightResult} = ${returnValue}` },
+      note: {
+        vi: `Node ${node.val} trả tổng hai cây con: ${leftResult} + ${rightResult} = ${returnValue}. Khi rời node, path quay lại trạng thái của cha.`,
+        en: `Node ${node.val} returns both subtree totals: ${leftResult} + ${rightResult} = ${returnValue}. Leaving the node restores the parent's path.`,
+      },
+      line: 11,
+      current: node,
+      incoming,
+      number,
+      leftResult,
+      rightResult,
+      returnValue,
+    });
+    path.pop();
+    callStack.pop();
+    return returnValue;
+  }
+
+  const answer = dfs(root, 0, "root");
+  pushStep({
+    phase: "done",
+    event: "done",
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    note: {
+      vi: leafNumbers.length
+        ? `Cộng ${leafNumbers.map((leaf) => leaf.number).join(" + ")} = ${answer}.`
+        : "Cây rỗng nên tổng bằng 0.",
+      en: leafNumbers.length
+        ? `Add ${leafNumbers.map((leaf) => leaf.number).join(" + ")} = ${answer}.`
+        : "The tree is empty, so the sum is 0.",
+    },
+    line: 12,
+    returnValue: answer,
+    final: true,
+  });
+  return { input, answer, steps };
+}
+
+// ─── 988: Smallest String Starting From Leaf ───
+function buildSteps988(input) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: 0,
+    maxValue: 25,
+    maxNodes: 31,
+  });
+  const letterFor = (value) => String.fromCharCode(97 + value);
+  const nodesById = new Map();
+  (function collect(node) {
+    if (!node) return;
+    nodesById.set(node.id, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  const steps = [];
+  const callStack = [];
+  const rootPath = [];
+  const candidates = [];
+  let best = null;
+  let bestLeafId = null;
+  let bestPathIds = [];
+
+  const stages = [
+    { vi: "Prepend ký tự", en: "Prepend letter" },
+    { vi: "Kiểm tra lá", en: "Check leaf" },
+    { vi: "So sánh từ điển", en: "Lexicographic compare" },
+    { vi: "Duyệt hai con", en: "Visit children" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "prepend"].includes(phase)) return 0;
+    if (["check-leaf", "candidate"].includes(phase)) return 1;
+    if (["compare", "update-best", "keep-best", "leaf-return"].includes(phase)) return 2;
+    return 3;
+  };
+  const pathState = () => rootPath.map((node, index) => ({
+    id: node.id,
+    value: node.val,
+    letter: letterFor(node.val),
+    current: index === rootPath.length - 1,
+  }));
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    letter: frame.node ? letterFor(frame.node.val) : "∅",
+    side: frame.side,
+    incoming: frame.incoming,
+    path: frame.path,
+    stage: frame.stage,
+  }));
+  const comparisonIndex = (candidate, previousBest) => {
+    if (candidate === null || previousBest === null) return -1;
+    const limit = Math.min(candidate.length, previousBest.length);
+    for (let index = 0; index < limit; index++) {
+      if (candidate[index] !== previousBest[index]) return index;
+    }
+    return limit;
+  };
+  const annotationsFor = (current, candidate, freshDecision) => {
+    const annotations = {};
+    for (const record of candidates) {
+      const isBest = record.id === bestLeafId;
+      annotations[record.id] = {
+        label: `${isBest ? "BEST" : "TRIED"} · ${record.candidate}`,
+        kind: isBest ? "sl988-best" : "sl988-tried",
+      };
+    }
+    if (candidate && current) {
+      annotations[current.id] = {
+        label: `${freshDecision === "update" ? "NEW BEST" : freshDecision === "keep" ? "CANDIDATE" : "LEAF"} · ${candidate}`,
+        kind: freshDecision === "update" ? "sl988-best" : "sl988-candidate",
+      };
+    } else if (current) {
+      annotations[current.id] = { label: "CURRENT", kind: "sl988-current" };
+    }
+    return annotations;
+  };
+  const pushStep = ({
+    phase, event, title, note, line, current = null, incoming = null, pathString = null,
+    candidate = null, previousBest = null, decision = null, final = false,
+  }) => {
+    const activeIds = new Set(rootPath.map((node) => node.id));
+    const finalBestIds = final ? new Set(bestPathIds) : null;
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: finalBestIds && finalBestIds.size ? finalBestIds : activeIds,
+      annotations: annotationsFor(current, candidate, decision),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "path (leaf→root)", value: pathString ?? "—" },
+        { name: "candidate", value: candidate ?? "—" },
+        { name: "best", value: best ?? "None" },
+      ],
+      note,
+    });
+    treeStep.tree.nodes.forEach((vizNode) => {
+      const source = nodesById.get(vizNode.id);
+      if (!source) return;
+      vizNode.label = letterFor(source.val);
+      vizNode.sub = String(source.val);
+    });
+    treeStep.smallestLeaf988View = {
+      problemId: 988,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      current: current ? { id: current.id, value: current.val, letter: letterFor(current.val) } : null,
+      incoming,
+      pathString,
+      candidate,
+      previousBest,
+      best,
+      decision,
+      compareIndex: comparisonIndex(candidate, previousBest),
+      rootPath: pathState(),
+      stack: stackState(),
+      candidates: candidates.map((record) => ({
+        id: record.id,
+        rootToLeaf: record.rootToLeaf,
+        candidate: record.candidate,
+        decision: record.decision,
+        isBest: record.id === bestLeafId,
+      })),
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro",
+    event: "rule",
+    title: { vi: "Chuỗi phải đọc từ lá lên root", en: "The string must read from leaf to root" },
+    note: {
+      vi: "Khi đi xuống một node, prepend chữ cái mới vào đầu path. Vì vậy tới lá, path đã đúng chiều leaf→root và có thể so sánh ngay.",
+      en: "When descending into a node, prepend its letter to the path. At a leaf, the path already reads leaf→root and can be compared immediately.",
+    },
+    line: 3,
+  });
+
+  function dfs(node, incoming, side) {
+    const frame = { node, side, incoming, path: incoming, stage: "enter" };
+    callStack.push(frame);
+    pushStep({
+      phase: node ? "enter" : "null",
+      event: node ? "enter" : "return-null",
+      title: node
+        ? { vi: `Vào node ${node.val} = '${letterFor(node.val)}'`, en: `Enter node ${node.val} = '${letterFor(node.val)}'` }
+        : { vi: `Nhánh ${side} là None → return`, en: `${side} branch is None → return` },
+      note: node
+        ? { vi: `Path leaf→root nhận từ cha: "${incoming}".`, en: `Leaf-to-root path received from the parent: "${incoming}".` }
+        : { vi: "Nhánh rỗng không tạo candidate.", en: "An empty branch creates no candidate." },
+      line: 6,
+      current: node,
+      incoming,
+      pathString: incoming,
+    });
+    if (!node) {
+      callStack.pop();
+      return;
+    }
+
+    rootPath.push(node);
+    const letter = letterFor(node.val);
+    const pathString = letter + incoming;
+    frame.path = pathString;
+    frame.stage = "prepend";
+    pushStep({
+      phase: "prepend",
+      event: "prepend-letter",
+      title: { vi: `path = '${letter}' + '${incoming}' = '${pathString}'`, en: `path = '${letter}' + '${incoming}' = '${pathString}'` },
+      note: {
+        vi: `Thêm '${letter}' vào ĐẦU chuỗi để giữ đúng chiều từ node hiện tại đi ngược lên root.`,
+        en: `Put '${letter}' at the FRONT so the string reads from the current node upward to the root.`,
+      },
+      line: 7,
+      current: node,
+      incoming,
+      pathString,
+    });
+
+    const isLeaf = !node.left && !node.right;
+    frame.stage = "check-leaf";
+    pushStep({
+      phase: "check-leaf",
+      event: "check-leaf",
+      title: isLeaf
+        ? { vi: `Node '${letter}' là lá`, en: `Node '${letter}' is a leaf` }
+        : { vi: `Node '${letter}' chưa phải lá`, en: `Node '${letter}' is not a leaf` },
+      note: isLeaf
+        ? { vi: `Path "${pathString}" là một candidate hoàn chỉnh.`, en: `Path "${pathString}" is a complete candidate.` }
+        : { vi: "Chưa thể so sánh; tiếp tục xuống hai cây con.", en: "It is not ready to compare; continue into both subtrees." },
+      line: 8,
+      current: node,
+      incoming,
+      pathString,
+      candidate: isLeaf ? pathString : null,
+    });
+
+    if (isLeaf) {
+      const candidate = pathString;
+      const previousBest = best;
+      const shouldUpdate = best === null || candidate < best;
+      frame.stage = "compare";
+      pushStep({
+        phase: "compare",
+        event: "compare",
+        title: previousBest === null
+          ? { vi: `Chưa có best → '${candidate}' thắng`, en: `No best yet → '${candidate}' wins` }
+          : { vi: `So '${candidate}' với '${previousBest}'`, en: `Compare '${candidate}' with '${previousBest}'` },
+        note: previousBest === null
+          ? { vi: "Candidate đầu tiên luôn trở thành best.", en: "The first candidate always becomes the best." }
+          : shouldUpdate
+            ? { vi: `'${candidate}' nhỏ hơn '${previousBest}' tại ký tự khác nhau đầu tiên.`, en: `'${candidate}' is smaller than '${previousBest}' at the first differing character.` }
+            : { vi: `'${candidate}' không nhỏ hơn '${previousBest}', nên best không đổi.`, en: `'${candidate}' is not smaller than '${previousBest}', so the best stays unchanged.` },
+        line: 9,
+        current: node,
+        incoming,
+        pathString,
+        candidate,
+        previousBest,
+        decision: shouldUpdate ? "update" : "keep",
+      });
+
+      if (shouldUpdate) {
+        best = candidate;
+        bestLeafId = node.id;
+        bestPathIds = rootPath.map((item) => item.id);
+      }
+      const decision = shouldUpdate ? "update" : "keep";
+      candidates.push({
+        id: node.id,
+        rootToLeaf: rootPath.map((item) => letterFor(item.val)).join(""),
+        candidate,
+        decision,
+      });
+      frame.stage = decision === "update" ? "update-best" : "keep-best";
+      pushStep({
+        phase: decision === "update" ? "update-best" : "keep-best",
+        event: decision === "update" ? "update-best" : "keep-best",
+        title: decision === "update"
+          ? { vi: `best = '${candidate}'`, en: `best = '${candidate}'` }
+          : { vi: `Giữ best = '${best}'`, en: `Keep best = '${best}'` },
+        note: decision === "update"
+          ? { vi: `Đánh dấu path ${rootPath.map((item) => letterFor(item.val)).join(" → ")} là best mới.`, en: `Mark ${rootPath.map((item) => letterFor(item.val)).join(" → ")} as the new best path.` }
+          : { vi: `Candidate '${candidate}' đã được xét nhưng không thay thế '${best}'.`, en: `Candidate '${candidate}' was checked but does not replace '${best}'.` },
+        line: decision === "update" ? 10 : 9,
+        current: node,
+        incoming,
+        pathString,
+        candidate,
+        previousBest,
+        decision,
+      });
+
+      frame.stage = "leaf-return";
+      pushStep({
+        phase: "leaf-return",
+        event: "leaf-return",
+        title: { vi: `Lá '${letter}' hoàn tất → return`, en: `Leaf '${letter}' is complete → return` },
+        note: { vi: "Chuỗi path là immutable, nên lời gọi cha vẫn giữ nguyên path của nó.", en: "The path string is immutable, so the parent call keeps its own path unchanged." },
+        line: 11,
+        current: node,
+        incoming,
+        pathString,
+        candidate,
+        previousBest,
+        decision,
+      });
+      rootPath.pop();
+      callStack.pop();
+      return;
+    }
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left",
+      event: "call-left",
+      title: { vi: `DFS con trái của '${letter}'`, en: `DFS the left child of '${letter}'` },
+      note: { vi: `Truyền path "${pathString}" xuống con trái.`, en: `Pass path "${pathString}" to the left child.` },
+      line: 12,
+      current: node,
+      incoming,
+      pathString,
+    });
+    dfs(node.left, pathString, "left");
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right",
+      event: "call-right",
+      title: { vi: `DFS con phải của '${letter}'`, en: `DFS the right child of '${letter}'` },
+      note: { vi: `Nhánh trái xong; con phải cũng nhận path "${pathString}".`, en: `The left branch is done; the right child receives the same path "${pathString}".` },
+      line: 13,
+      current: node,
+      incoming,
+      pathString,
+    });
+    dfs(node.right, pathString, "right");
+    rootPath.pop();
+    callStack.pop();
+  }
+
+  dfs(root, "", "root");
+  pushStep({
+    phase: "done",
+    event: "done",
+    title: { vi: `Kết quả: '${best || ""}'`, en: `Result: '${best || ""}'` },
+    note: best
+      ? { vi: `'${best}' là chuỗi leaf→root nhỏ nhất trong ${candidates.length} candidate.`, en: `'${best}' is the smallest leaf-to-root string among ${candidates.length} candidates.` }
+      : { vi: "Cây rỗng nên trả chuỗi rỗng.", en: "The tree is empty, so return an empty string." },
+    line: 15,
+    final: true,
+  });
+  return { input, answer: best || "", steps };
+}
+
+// ─── 1457: Pseudo-Palindromic Paths in a Binary Tree ───
+function buildSteps1457(input) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: 1,
+    maxValue: 9,
+    maxNodes: 31,
+  });
+  const steps = [];
+  const callStack = [];
+  const path = [];
+  const leaves = [];
+  const returned = new Map();
+  const acceptedPathIds = new Set();
+  let acceptedTotal = 0;
+
+  const stages = [
+    { vi: "Toggle chữ số", en: "Toggle digit" },
+    { vi: "Xem chữ số lẻ", en: "Inspect odd digits" },
+    { vi: "Kiểm tra tại lá", en: "Test at a leaf" },
+    { vi: "Cộng kết quả", en: "Add returns" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "toggle-bit"].includes(phase)) return 0;
+    if (phase === "inspect-parity") return 1;
+    if (["check-leaf", "leaf-pass", "leaf-fail"].includes(phase)) return 2;
+    return 3;
+  };
+  const binaryMask = (mask) => mask.toString(2).padStart(10, "0");
+  const oddDigitsFor = (mask) => {
+    const digits = [];
+    for (let digit = 1; digit <= 9; digit += 1) {
+      if (mask & (1 << digit)) digits.push(digit);
+    }
+    return digits;
+  };
+  const frequencies = () => {
+    const counts = Array(10).fill(0);
+    for (const item of path) counts[item.node.val] += 1;
+    return counts.slice(1).map((count, index) => ({
+      digit: index + 1,
+      count,
+      odd: count % 2 === 1,
+      active: Boolean(path.length && path[path.length - 1].node.val === index + 1),
+    }));
+  };
+  const palindromeFor = () => {
+    const counts = Array(10).fill(0);
+    for (const item of path) counts[item.node.val] += 1;
+    let half = "";
+    let center = "";
+    for (let digit = 1; digit <= 9; digit += 1) {
+      half += String(digit).repeat(Math.floor(counts[digit] / 2));
+      if (counts[digit] % 2 === 1) center = String(digit);
+    }
+    return half + center + [...half].reverse().join("");
+  };
+  const pathState = () => path.map((item, index) => ({
+    id: item.node.id,
+    value: item.node.val,
+    mask: item.mask,
+    binaryMask: binaryMask(item.mask),
+    current: index === path.length - 1,
+  }));
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    incomingMask: frame.incomingMask,
+    mask: frame.mask,
+    stage: frame.stage,
+  }));
+  const annotationsFor = (current, freshLeaf) => {
+    const annotations = {};
+    returned.forEach((value, id) => {
+      annotations[id] = { label: `↩ ${value}`, kind: "pp1457-returned" };
+    });
+    for (const leaf of leaves) {
+      annotations[leaf.id] = {
+        label: `${leaf.valid ? "✓ PSEUDO" : "✕ NO"} · ${leaf.path.join("→")}`,
+        kind: leaf.valid ? "pp1457-pass" : "pp1457-fail",
+      };
+    }
+    if (current && !(freshLeaf && freshLeaf.id === current.id)) {
+      annotations[current.id] = { label: "CURRENT", kind: "pp1457-current" };
+    }
+    return annotations;
+  };
+  const pushStep = ({
+    phase, event, title, note, line, current = null, incomingMask = 0, mask = 0,
+    isLeaf = false, valid = null, leftResult = null, rightResult = null,
+    returnValue = null, freshLeaf = null, final = false,
+  }) => {
+    const activeIds = new Set(path.map((item) => item.node.id));
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: final ? new Set(acceptedPathIds) : activeIds,
+      annotations: annotationsFor(current, freshLeaf),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "mask", value: mask },
+        { name: "odd digits", value: oddDigitsFor(mask).join(",") || "none" },
+        { name: "valid leaves", value: acceptedTotal },
+        { name: "return", value: returnValue ?? "—" },
+      ],
+      note,
+    });
+    treeStep.pseudoPalindrome1457View = {
+      problemId: 1457,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      current: current ? { id: current.id, value: current.val } : null,
+      incomingMask,
+      mask,
+      binaryMask: binaryMask(mask),
+      toggledDigit: current ? current.val : null,
+      oddDigits: oddDigitsFor(mask),
+      oddCount: oddDigitsFor(mask).length,
+      frequencies: frequencies(),
+      isLeaf,
+      valid,
+      leftResult,
+      rightResult,
+      returnValue,
+      path: pathState(),
+      stack: stackState(),
+      leaves: leaves.map((leaf) => ({
+        id: leaf.id,
+        path: [...leaf.path],
+        mask: leaf.mask,
+        binaryMask: binaryMask(leaf.mask),
+        oddDigits: [...leaf.oddDigits],
+        valid: leaf.valid,
+        palindrome: leaf.palindrome,
+        fresh: Boolean(freshLeaf && freshLeaf.id === leaf.id),
+      })),
+      acceptedTotal,
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro",
+    event: "rule",
+    title: { vi: "Chỉ cần nhớ chẵn hay lẻ", en: "Only parity matters" },
+    note: {
+      vi: "Mỗi chữ số toggle một bit. Ở node lá, mask có 0 hoặc 1 bit bật thì các chữ số có thể sắp xếp thành palindrome.",
+      en: "Each digit toggles one bit. At a leaf, zero or one set bit means the digits can be rearranged into a palindrome.",
+    },
+    line: 3,
+  });
+
+  function dfs(node, incomingMask, side) {
+    const frame = { node, side, incomingMask, mask: incomingMask, stage: "enter" };
+    callStack.push(frame);
+    pushStep({
+      phase: node ? "enter" : "null",
+      event: node ? "enter" : "return-zero",
+      title: node
+        ? { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` }
+        : { vi: `Nhánh ${side} là None → trả 0`, en: `${side} branch is None → return 0` },
+      note: node
+        ? { vi: `Mask nhận từ cha là ${binaryMask(incomingMask)}.`, en: `The mask received from the parent is ${binaryMask(incomingMask)}.` }
+        : { vi: "Nhánh rỗng không có path root→leaf.", en: "An empty branch has no root-to-leaf path." },
+      line: 4,
+      current: node,
+      incomingMask,
+      mask: incomingMask,
+      returnValue: node ? null : 0,
+    });
+    if (!node) {
+      callStack.pop();
+      return 0;
+    }
+
+    const mask = incomingMask ^ (1 << node.val);
+    frame.mask = mask;
+    frame.stage = "toggle-bit";
+    path.push({ node, mask });
+    const bitWasOn = Boolean(incomingMask & (1 << node.val));
+    pushStep({
+      phase: "toggle-bit",
+      event: "toggle-bit",
+      title: {
+        vi: `Digit ${node.val}: bit ${bitWasOn ? "1 → 0" : "0 → 1"}`,
+        en: `Digit ${node.val}: bit ${bitWasOn ? "1 → 0" : "0 → 1"}`,
+      },
+      note: {
+        vi: `mask ^= 1 << ${node.val}. Bit bật nghĩa là digit ${node.val} đang xuất hiện số lần lẻ.`,
+        en: `mask ^= 1 << ${node.val}. A set bit means digit ${node.val} currently occurs an odd number of times.`,
+      },
+      line: 6,
+      current: node,
+      incomingMask,
+      mask,
+    });
+
+    const oddDigits = oddDigitsFor(mask);
+    frame.stage = "inspect-parity";
+    pushStep({
+      phase: "inspect-parity",
+      event: "inspect-parity",
+      title: oddDigits.length
+        ? { vi: `Đang lẻ: ${oddDigits.join(", ")}`, en: `Currently odd: ${oddDigits.join(", ")}` }
+        : { vi: "Mọi chữ số đang chẵn", en: "Every digit is currently even" },
+      note: {
+        vi: "Không cần giữ toàn bộ frequency trong thuật toán; các bit trong mask đã lưu đủ thông tin chẵn/lẻ.",
+        en: "The algorithm does not need every full frequency; the mask bits retain all parity information.",
+      },
+      line: 6,
+      current: node,
+      incomingMask,
+      mask,
+    });
+
+    const isLeaf = !node.left && !node.right;
+    frame.stage = "check-leaf";
+    pushStep({
+      phase: "check-leaf",
+      event: "check-leaf",
+      title: isLeaf
+        ? { vi: `Node ${node.val} là lá → kiểm tra mask`, en: `Node ${node.val} is a leaf → test the mask` }
+        : { vi: `Node ${node.val} chưa phải lá`, en: `Node ${node.val} is not a leaf` },
+      note: isLeaf
+        ? { vi: "Đây là lúc duy nhất cần quyết định path có pseudo-palindrome hay không.", en: "This is the only point where the path needs a pseudo-palindrome decision." }
+        : { vi: "Tiếp tục DFS; chưa cộng kết quả tại node ở giữa.", en: "Continue DFS; do not count an internal-node path." },
+      line: 7,
+      current: node,
+      incomingMask,
+      mask,
+      isLeaf,
+    });
+
+    if (isLeaf) {
+      const valid = (mask & (mask - 1)) === 0;
+      const leaf = {
+        id: node.id,
+        path: path.map((item) => item.node.val),
+        pathIds: path.map((item) => item.node.id),
+        mask,
+        oddDigits,
+        valid,
+        palindrome: valid ? palindromeFor() : null,
+      };
+      leaves.push(leaf);
+      if (valid) {
+        acceptedTotal += 1;
+        for (const id of leaf.pathIds) acceptedPathIds.add(id);
+      }
+      returned.set(node.id, valid ? 1 : 0);
+      frame.stage = valid ? "leaf-pass" : "leaf-fail";
+      pushStep({
+        phase: valid ? "leaf-pass" : "leaf-fail",
+        event: valid ? "leaf-pass" : "leaf-fail",
+        title: valid
+          ? { vi: `PASS: ${oddDigits.length} chữ số lẻ`, en: `PASS: ${oddDigits.length} odd digit${oddDigits.length === 1 ? "" : "s"}` }
+          : { vi: `FAIL: ${oddDigits.length} chữ số lẻ`, en: `FAIL: ${oddDigits.length} odd digits` },
+        note: valid
+          ? { vi: `mask & (mask − 1) = 0. Path có thể sắp thành ${leaf.palindrome}.`, en: `mask & (mask − 1) = 0. The path can be rearranged as ${leaf.palindrome}.` }
+          : { vi: `Cần tối đa 1 chữ số lẻ, nhưng path có ${oddDigits.length}: ${oddDigits.join(", ")}.`, en: `At most one odd digit is allowed, but this path has ${oddDigits.length}: ${oddDigits.join(", ")}.` },
+        line: 8,
+        current: node,
+        incomingMask,
+        mask,
+        isLeaf: true,
+        valid,
+        returnValue: valid ? 1 : 0,
+        freshLeaf: leaf,
+      });
+      path.pop();
+      callStack.pop();
+      return valid ? 1 : 0;
+    }
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left",
+      event: "call-left",
+      title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
+      note: { vi: `Truyền mask ${binaryMask(mask)} xuống con trái.`, en: `Pass mask ${binaryMask(mask)} to the left child.` },
+      line: 9,
+      current: node,
+      incomingMask,
+      mask,
+    });
+    const leftResult = dfs(node.left, mask, "left");
+    frame.stage = "left-return";
+    pushStep({
+      phase: "left-return",
+      event: "left-return",
+      title: { vi: `Nhánh trái trả ${leftResult}`, en: `Left subtree returns ${leftResult}` },
+      note: { vi: `Có ${leftResult} path hợp lệ trong cây con trái.`, en: `The left subtree contains ${leftResult} valid path(s).` },
+      line: 9,
+      current: node,
+      incomingMask,
+      mask,
+      leftResult,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right",
+      event: "call-right",
+      title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
+      note: { vi: `Con phải nhận cùng mask ${binaryMask(mask)}.`, en: `The right child receives the same mask ${binaryMask(mask)}.` },
+      line: 10,
+      current: node,
+      incomingMask,
+      mask,
+      leftResult,
+    });
+    const rightResult = dfs(node.right, mask, "right");
+    frame.stage = "right-return";
+    pushStep({
+      phase: "right-return",
+      event: "right-return",
+      title: { vi: `Nhánh phải trả ${rightResult}`, en: `Right subtree returns ${rightResult}` },
+      note: { vi: `Có ${rightResult} path hợp lệ trong cây con phải.`, en: `The right subtree contains ${rightResult} valid path(s).` },
+      line: 10,
+      current: node,
+      incomingMask,
+      mask,
+      leftResult,
+      rightResult,
+    });
+
+    const returnValue = leftResult + rightResult;
+    returned.set(node.id, returnValue);
+    frame.stage = "combine";
+    pushStep({
+      phase: "combine",
+      event: "combine",
+      title: { vi: `${leftResult} + ${rightResult} = ${returnValue}`, en: `${leftResult} + ${rightResult} = ${returnValue}` },
+      note: {
+        vi: `Node ${node.val} trả tổng path hợp lệ của hai cây con cho cha.`,
+        en: `Node ${node.val} returns the total valid paths from both subtrees to its parent.`,
+      },
+      line: 11,
+      current: node,
+      incomingMask,
+      mask,
+      leftResult,
+      rightResult,
+      returnValue,
+    });
+    path.pop();
+    callStack.pop();
+    return returnValue;
+  }
+
+  const answer = dfs(root, 0, "root");
+  pushStep({
+    phase: "done",
+    event: "done",
+    title: { vi: `Kết quả: ${answer} path`, en: `Result: ${answer} path${answer === 1 ? "" : "s"}` },
+    note: leaves.length
+      ? { vi: `${leaves.filter((leaf) => leaf.valid).length}/${leaves.length} path root→leaf có thể sắp xếp thành palindrome.`, en: `${leaves.filter((leaf) => leaf.valid).length}/${leaves.length} root-to-leaf paths can be rearranged into palindromes.` }
+      : { vi: "Cây rỗng nên kết quả bằng 0.", en: "The tree is empty, so the result is 0." },
+    line: 12,
+    returnValue: answer,
+    final: true,
+  });
+  return { input, answer, steps };
+}
+
+// ─── 687: Longest Univalue Path ───
+function buildSteps687(input) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: -1000,
+    maxValue: 1000,
+    maxNodes: 31,
+  });
+  const steps = [];
+  const callStack = [];
+  const activePath = [];
+  const returned = new Map();
+  const processed = [];
+  const nodesById = new Map();
+  (function collect(node) {
+    if (!node) return;
+    nodesById.set(node.id, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  let best = 0;
+  let bestPathIds = [];
+  let bestPathValues = [];
+
+  const stages = [
+    { vi: "DFS xuống lá", en: "Descend to leaves" },
+    { vi: "Nhận gain hai con", en: "Receive child gains" },
+    { vi: "Lọc cạnh cùng giá trị", en: "Keep equal-value edges" },
+    { vi: "Cập nhật và return", en: "Update and return" },
+  ];
+  const stageFor = (phase) => {
+    if (["intro", "enter", "return-zero", "call-left", "call-right"].includes(phase)) return 0;
+    if (["left-return", "right-return"].includes(phase)) return 1;
+    if (["filter-left", "filter-right"].includes(phase)) return 2;
+    return 3;
+  };
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    stage: frame.stage,
+    leftRaw: frame.leftRaw,
+    rightRaw: frame.rightRaw,
+  }));
+  const pathState = () => activePath.map((node, index) => ({
+    id: node.id,
+    value: node.val,
+    current: index === activePath.length - 1,
+  }));
+  const annotationsFor = (current) => {
+    const annotations = {};
+    returned.forEach((gain, id) => {
+      annotations[id] = { label: `↩ gain ${gain}`, kind: "uv687-returned" };
+    });
+    if (current) annotations[current.id] = { label: "CURRENT", kind: "uv687-current" };
+    return annotations;
+  };
+  const childState = (child, raw, arrow, match, ready) => child ? {
+    id: child.id,
+    value: child.val,
+    raw: ready ? raw : null,
+    arrow: ready ? arrow : null,
+    match: ready ? match : null,
+  } : {
+    id: null,
+    value: null,
+    raw: ready ? 0 : null,
+    arrow: ready ? 0 : null,
+    match: ready ? false : null,
+  };
+  const pushStep = ({
+    phase, event, title, note, line, current = null,
+    leftRaw = null, rightRaw = null, leftArrow = null, rightArrow = null,
+    leftReady = false, rightReady = false, through = null, bestBefore = null,
+    bestUpdated = false, returnGain = null, chosenArm = null, final = false,
+  }) => {
+    const activeIds = new Set(activePath.map((node) => node.id));
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: final ? new Set(bestPathIds) : activeIds,
+      annotations: annotationsFor(current),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "left_arrow", value: leftArrow ?? "—" },
+        { name: "right_arrow", value: rightArrow ?? "—" },
+        { name: "through", value: through ?? "—" },
+        { name: "best", value: best },
+        { name: "return", value: returnGain ?? "—" },
+      ],
+      note,
+    });
+    treeStep.univaluePath687View = {
+      problemId: 687,
+      stages,
+      stage: stageFor(phase),
+      phase,
+      event,
+      current: current ? { id: current.id, value: current.val } : null,
+      left: current ? childState(current.left, leftRaw, leftArrow, Boolean(current.left && current.left.val === current.val), leftReady) : null,
+      right: current ? childState(current.right, rightRaw, rightArrow, Boolean(current.right && current.right.val === current.val), rightReady) : null,
+      leftRaw,
+      rightRaw,
+      leftArrow,
+      rightArrow,
+      through,
+      bestBefore,
+      best,
+      bestUpdated,
+      returnGain,
+      chosenArm,
+      path: pathState(),
+      stack: stackState(),
+      processed: processed.map((item) => ({ ...item })),
+      bestPath: [...bestPathValues],
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    phase: "intro",
+    event: "rule",
+    title: { vi: "Gain chỉ đi xuống một nhánh cùng giá trị", en: "A gain follows one equal-value branch" },
+    note: {
+      vi: "Postorder tính từ lá lên. Mỗi node có thể nối cả hai nhánh để cập nhật best, nhưng chỉ được trả một nhánh lên cha.",
+      en: "Postorder works from leaves upward. A node may join both arms to update best, but it can return only one arm to its parent.",
+    },
+    line: 3,
+  });
+
+  function dfs(node, side) {
+    const frame = { node, side, stage: "enter", leftRaw: null, rightRaw: null };
+    callStack.push(frame);
+    if (!node) {
+      pushStep({
+        phase: "return-zero",
+        event: "return-zero",
+        title: { vi: `Nhánh ${side} là None → gain 0`, en: `${side} branch is None → gain 0` },
+        note: { vi: "Nhánh rỗng không đóng góp cạnh cùng giá trị.", en: "An empty branch contributes no equal-value edge." },
+        line: 5,
+        returnGain: 0,
+      });
+      callStack.pop();
+      return { gain: 0, armIds: [] };
+    }
+
+    activePath.push(node);
+    pushStep({
+      phase: "enter",
+      event: "enter",
+      title: { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` },
+      note: { vi: "Chưa thể tính gain trước khi hai cây con return.", en: "The gain cannot be computed until both children return." },
+      line: 4,
+      current: node,
+    });
+
+    frame.stage = "call-left";
+    pushStep({
+      phase: "call-left",
+      event: "call-left",
+      title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
+      note: { vi: "Đi xuống nhánh trái trước theo postorder.", en: "Descend into the left subtree first in postorder." },
+      line: 6,
+      current: node,
+    });
+    const leftResult = dfs(node.left, "left");
+    const leftRaw = leftResult.gain;
+    frame.leftRaw = leftRaw;
+    frame.stage = "left-return";
+    pushStep({
+      phase: "left-return",
+      event: "left-return",
+      title: { vi: `Con trái trả raw gain ${leftRaw}`, en: `Left child returns raw gain ${leftRaw}` },
+      note: node.left
+        ? { vi: `Đây là gain dài nhất bắt đầu tại node con ${node.left.val}; bước sau mới kiểm tra có nối được qua cạnh hay không.`, en: `This is the longest gain starting at child ${node.left.val}; the next step checks whether the edge can connect.` }
+        : { vi: "Không có con trái nên raw gain bằng 0.", en: "There is no left child, so the raw gain is 0." },
+      line: 6,
+      current: node,
+      leftRaw,
+      leftReady: true,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      phase: "call-right",
+      event: "call-right",
+      title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
+      note: { vi: "Giữ raw gain bên trái và tiếp tục tính nhánh phải.", en: "Keep the left raw gain and compute the right subtree." },
+      line: 7,
+      current: node,
+      leftRaw,
+      leftReady: true,
+    });
+    const rightResult = dfs(node.right, "right");
+    const rightRaw = rightResult.gain;
+    frame.rightRaw = rightRaw;
+    frame.stage = "right-return";
+    pushStep({
+      phase: "right-return",
+      event: "right-return",
+      title: { vi: `Con phải trả raw gain ${rightRaw}`, en: `Right child returns raw gain ${rightRaw}` },
+      note: node.right
+        ? { vi: `Hai raw gain đã sẵn sàng: left=${leftRaw}, right=${rightRaw}.`, en: `Both raw gains are ready: left=${leftRaw}, right=${rightRaw}.` }
+        : { vi: "Không có con phải nên raw gain bằng 0.", en: "There is no right child, so the raw gain is 0." },
+      line: 7,
+      current: node,
+      leftRaw,
+      rightRaw,
+      leftReady: true,
+      rightReady: true,
+    });
+
+    const leftMatch = Boolean(node.left && node.left.val === node.val);
+    const leftArrow = leftMatch ? leftRaw + 1 : 0;
+    frame.stage = "filter-left";
+    pushStep({
+      phase: "filter-left",
+      event: "filter-left",
+      title: leftMatch
+        ? { vi: `${node.left.val} = ${node.val} → left_arrow = ${leftRaw} + 1`, en: `${node.left.val} = ${node.val} → left_arrow = ${leftRaw} + 1` }
+        : { vi: `${node.left ? node.left.val : "None"} ≠ ${node.val} → left_arrow = 0`, en: `${node.left ? node.left.val : "None"} ≠ ${node.val} → left_arrow = 0` },
+      note: leftMatch
+        ? { vi: `Cạnh trái cùng giá trị nên nối thêm 1 cạnh: ${leftArrow}.`, en: `The left edge has the same value, so extend it by one edge: ${leftArrow}.` }
+        : { vi: "Giá trị khác nhau (hoặc không có con) nên cạnh trái bị chặn.", en: "A different value (or no child) blocks the left edge." },
+      line: 8,
+      current: node,
+      leftRaw,
+      rightRaw,
+      leftArrow,
+      leftReady: true,
+      rightReady: true,
+    });
+
+    const rightMatch = Boolean(node.right && node.right.val === node.val);
+    const rightArrow = rightMatch ? rightRaw + 1 : 0;
+    frame.stage = "filter-right";
+    pushStep({
+      phase: "filter-right",
+      event: "filter-right",
+      title: rightMatch
+        ? { vi: `${node.right.val} = ${node.val} → right_arrow = ${rightRaw} + 1`, en: `${node.right.val} = ${node.val} → right_arrow = ${rightRaw} + 1` }
+        : { vi: `${node.right ? node.right.val : "None"} ≠ ${node.val} → right_arrow = 0`, en: `${node.right ? node.right.val : "None"} ≠ ${node.val} → right_arrow = 0` },
+      note: rightMatch
+        ? { vi: `Cạnh phải cùng giá trị nên nối thêm 1 cạnh: ${rightArrow}.`, en: `The right edge has the same value, so extend it by one edge: ${rightArrow}.` }
+        : { vi: "Giá trị khác nhau (hoặc không có con) nên cạnh phải bị chặn.", en: "A different value (or no child) blocks the right edge." },
+      line: 9,
+      current: node,
+      leftRaw,
+      rightRaw,
+      leftArrow,
+      rightArrow,
+      leftReady: true,
+      rightReady: true,
+    });
+
+    const through = leftArrow + rightArrow;
+    const bestBefore = best;
+    const bestUpdated = through > best;
+    const leftArmIds = leftMatch ? leftResult.armIds : [];
+    const rightArmIds = rightMatch ? rightResult.armIds : [];
+    if (bestUpdated) {
+      best = through;
+      bestPathIds = [...leftArmIds, node.id, ...rightArmIds];
+      bestPathValues = [
+        ...[...leftArmIds].reverse().map((id) => nodesById.get(id).val),
+        node.val,
+        ...rightArmIds.map((id) => nodesById.get(id).val),
+      ];
+    }
+    frame.stage = bestUpdated ? "best-update" : "best-keep";
+    pushStep({
+      phase: bestUpdated ? "best-update" : "best-keep",
+      event: bestUpdated ? "best-update" : "best-keep",
+      title: bestUpdated
+        ? { vi: `best: ${bestBefore} → ${best}`, en: `best: ${bestBefore} → ${best}` }
+        : { vi: `Giữ best = ${best}`, en: `Keep best = ${best}` },
+      note: {
+        vi: `Path đi qua node ${node.val} dùng được cả hai tay: ${leftArrow} + ${rightArrow} = ${through} cạnh.`,
+        en: `The path through node ${node.val} may use both arms: ${leftArrow} + ${rightArrow} = ${through} edges.`,
+      },
+      line: 10,
+      current: node,
+      leftRaw,
+      rightRaw,
+      leftArrow,
+      rightArrow,
+      leftReady: true,
+      rightReady: true,
+      through,
+      bestBefore,
+      bestUpdated,
+    });
+
+    const chooseLeft = leftArrow >= rightArrow;
+    const returnGain = Math.max(leftArrow, rightArrow);
+    const chosenArm = returnGain === 0 ? "none" : chooseLeft ? "left" : "right";
+    const armIds = returnGain === 0
+      ? [node.id]
+      : [node.id, ...(chooseLeft ? leftArmIds : rightArmIds)];
+    returned.set(node.id, returnGain);
+    processed.push({
+      id: node.id,
+      value: node.val,
+      leftArrow,
+      rightArrow,
+      through,
+      returnGain,
+      bestAfter: best,
+    });
+    frame.stage = "return-gain";
+    pushStep({
+      phase: "return-gain",
+      event: "return-gain",
+      title: { vi: `Return max(${leftArrow}, ${rightArrow}) = ${returnGain}`, en: `Return max(${leftArrow}, ${rightArrow}) = ${returnGain}` },
+      note: returnGain
+        ? { vi: `Cha chỉ có thể tiếp tục qua một phía, nên chọn tay ${chosenArm === "left" ? "trái" : "phải"}.`, en: `The parent can continue through only one side, so choose the ${chosenArm} arm.` }
+        : { vi: "Không có cạnh cùng giá trị để kéo dài lên cha.", en: "There is no equal-value edge to extend to the parent." },
+      line: 11,
+      current: node,
+      leftRaw,
+      rightRaw,
+      leftArrow,
+      rightArrow,
+      leftReady: true,
+      rightReady: true,
+      through,
+      bestBefore,
+      bestUpdated,
+      returnGain,
+      chosenArm,
+    });
+    activePath.pop();
+    callStack.pop();
+    return { gain: returnGain, armIds };
+  }
+
+  dfs(root, "root");
+  pushStep({
+    phase: "done",
+    event: "done",
+    title: { vi: `Longest univalue path = ${best}`, en: `Longest univalue path = ${best}` },
+    note: bestPathValues.length
+      ? { vi: `Path tốt nhất: ${bestPathValues.join(" → ")} (${best} cạnh).`, en: `Best path: ${bestPathValues.join(" → ")} (${best} edges).` }
+      : { vi: "Cây rỗng nên kết quả bằng 0.", en: "The tree is empty, so the result is 0." },
+    line: 13,
+    through: best,
+    returnGain: root ? returned.get(root.id) : 0,
+    final: true,
+  });
+  return { input, answer: best, steps };
+}
+
 // ─── 111: Minimum Depth of Binary Tree ───
 function buildSteps111(input) {
   const root = parseTree(input);
@@ -5847,7 +7510,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -6086,6 +7749,157 @@ module.exports = {
     complexity: { time: "O(n²)", space: "O(h)", note: { vi: "Sao chép đường đi khi tìm thấy.", en: "Copy the path when found." } },
     code: ["class Solution:", "    def pathSum(self, root, targetSum):", "        res = []", "        def dfs(node, rem, path):", "            if not node: return", "            path.append(node.val); rem -= node.val", "            if not node.left and not node.right and rem == 0: res.append(list(path))", "            else:", "                dfs(node.left, rem, path); dfs(node.right, rem, path)", "            path.pop()", "        dfs(root, targetSum, []); return res"],
     builder: buildSteps113,
+  },
+  437: {
+    id: 437, difficulty: "medium", slug: "path-sum-iii",
+    category: TREE_CAT,
+    tags: [{ key: "prefix-sum", vi: "Tổng tiền tố", en: "Prefix Sum" }, { key: "dfs", vi: "DFS", en: "DFS" }],
+    title: { vi: "Path Sum III", en: "Path Sum III" },
+    titleVi: { vi: "Đếm path xuống có tổng bằng target", en: "Count downward paths summing to target" },
+    statement: {
+      vi: "Cho cây nhị phân và targetSum. Đếm các path đi xuống theo cạnh cha→con có tổng bằng targetSum. Path có thể bắt đầu và kết thúc ở bất kỳ node nào.",
+      en: "Given a binary tree and targetSum, count downward parent-to-child paths whose values sum to targetSum. A path may start and end at any nodes.",
+    },
+    defaultInput: "10,5,-3,3,2,null,11,3,-2,null,1",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; null cho node rỗng)", en: "Tree (level-order; null for empty)" },
+    extraParams: [{ key: "target", label: { vi: "targetSum", en: "targetSum" }, default: 8, allowNegative: true }],
+    approach: [
+      { vi: "DFS mang running sum từ root. Tại node, path có tổng target khi tồn tại prefix cũ = running − target.", en: "DFS carries the running sum from the root. At a node, a path sums to target when an old prefix equals running − target." },
+      { vi: "prefix_count chỉ chứa prefix trên path root→node hiện tại; tăng trước khi đi xuống và giảm khi backtrack.", en: "prefix_count contains only prefixes on the current root-to-node path; increment before descending and decrement while backtracking." },
+      { vi: "Khởi tạo {0:1} để đếm path bắt đầu ngay từ root.", en: "Initialize {0:1} to count paths that begin at the root." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được duyệt một lần; map và call stack chứa tối đa một root-path.", en: "Each node is visited once; the map and call stack hold at most one root path." } },
+    code: [
+      "class Solution:",
+      "    def pathSum(self, root, targetSum):",
+      "        prefix_count = {0: 1}",
+      "",
+      "        def dfs(node, running):",
+      "            if not node: return 0",
+      "            running += node.val",
+      "            needed = running - targetSum",
+      "            paths = prefix_count.get(needed, 0)",
+      "            prefix_count[running] = prefix_count.get(running, 0) + 1",
+      "            paths += dfs(node.left, running)",
+      "            paths += dfs(node.right, running)",
+      "            prefix_count[running] -= 1  # backtrack",
+      "            return paths",
+      "",
+      "        return dfs(root, 0)",
+    ],
+    builder: buildSteps437,
+  },
+  129: {
+    id: 129, difficulty: "medium", slug: "sum-root-to-leaf-numbers",
+    category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }],
+    title: { vi: "Sum Root to Leaf Numbers", en: "Sum Root to Leaf Numbers" },
+    titleVi: { vi: "Tổng các số tạo bởi đường root→leaf", en: "Sum numbers formed by root-to-leaf paths" },
+    statement: {
+      vi: "Mỗi node của cây chứa một chữ số từ 0 đến 9. Mỗi đường từ root đến lá tạo thành một số; trả về tổng của tất cả các số đó.",
+      en: "Each tree node contains a digit from 0 to 9. Every root-to-leaf path forms a number; return the sum of all those numbers.",
+    },
+    defaultInput: "4,9,0,5,1",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; mỗi node là digit 0–9)", en: "Tree (level-order; each node is a digit 0–9)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS mang theo số current đã tạo. Khi tới node mới: current = current × 10 + node.val.", en: "DFS carries the number built so far. At each new node: current = current × 10 + node.val." },
+      { vi: "Nếu node là lá, trả current vì đây là một số root→leaf hoàn chỉnh.", en: "If the node is a leaf, return current because it is one complete root-to-leaf number." },
+      { vi: "Node không phải lá trả tổng kết quả từ cây con trái và phải.", en: "A non-leaf node returns the sum from its left and right subtrees." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được duyệt một lần; stack DFS cao tối đa h.", en: "Each node is visited once; the DFS stack is at most h deep." } },
+    code: [
+      "class Solution:",
+      "    def sumNumbers(self, root):",
+      "        def dfs(node, current):",
+      "            if not node:",
+      "                return 0",
+      "            current = current * 10 + node.val",
+      "            if not node.left and not node.right:",
+      "                return current",
+      "            left = dfs(node.left, current)",
+      "            right = dfs(node.right, current)",
+      "            return left + right",
+      "        return dfs(root, 0)",
+    ],
+    builder: buildSteps129,
+  },
+  988: {
+    id: 988, difficulty: "medium", slug: "smallest-string-starting-from-leaf",
+    category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }],
+    title: { vi: "Smallest String Starting From Leaf", en: "Smallest String Starting From Leaf" },
+    titleVi: { vi: "Chuỗi nhỏ nhất đọc từ lá lên root", en: "Smallest string read from leaf to root" },
+    statement: {
+      vi: "Mỗi node chứa số 0–25, tương ứng với 'a'–'z'. Mỗi đường từ lá lên root tạo một chuỗi; trả về chuỗi nhỏ nhất theo thứ tự từ điển.",
+      en: "Each node stores 0–25, corresponding to 'a'–'z'. Every leaf-to-root path forms a string; return the lexicographically smallest one.",
+    },
+    defaultInput: "0,1,2,3,4,3,4",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; 0=a, …, 25=z)", en: "Tree (level-order; 0=a, …, 25=z)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS mang chuỗi path theo chiều node hiện tại→root. Tại mỗi node, prepend ký tự mới: path = letter + path.", en: "DFS carries a current-node-to-root path. At each node, prepend its letter: path = letter + path." },
+      { vi: "Chỉ khi tới lá, path mới là candidate hoàn chỉnh để so sánh với best.", en: "Only at a leaf is path a complete candidate that can be compared with best." },
+      { vi: "So sánh từ điển từ trái sang phải; ký tự khác nhau đầu tiên quyết định chuỗi nhỏ hơn.", en: "Compare lexicographically from left to right; the first differing character decides the smaller string." },
+    ],
+    complexity: { time: "O(nh)", space: "O(h)", note: { vi: "Mỗi node tạo một chuỗi dài tối đa h; stack DFS và path dùng O(h).", en: "Each node creates a string of length at most h; the DFS stack and path use O(h)." } },
+    code: [
+      "class Solution:",
+      "    def smallestFromLeaf(self, root):",
+      "        best = None",
+      "        def dfs(node, path):",
+      "            nonlocal best",
+      "            if not node: return",
+      "            path = chr(ord('a') + node.val) + path",
+      "            if not node.left and not node.right:",
+      "                if best is None or path < best:",
+      "                    best = path",
+      "                return",
+      "            dfs(node.left, path)",
+      "            dfs(node.right, path)",
+      "        dfs(root, '')",
+      "        return best or ''",
+    ],
+    builder: buildSteps988,
+  },
+  1457: {
+    id: 1457, difficulty: "medium", slug: "pseudo-palindromic-paths-in-a-binary-tree",
+    category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS", en: "DFS" }, { key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
+    title: { vi: "Pseudo-Palindromic Paths in a Binary Tree", en: "Pseudo-Palindromic Paths in a Binary Tree" },
+    titleVi: { vi: "Đếm path có thể sắp thành palindrome", en: "Count paths that can form a palindrome" },
+    statement: {
+      vi: "Mỗi node chứa một chữ số 1–9. Đếm số đường root→leaf mà các chữ số có thể được sắp xếp lại để tạo thành một palindrome.",
+      en: "Each node contains a digit from 1 to 9. Count root-to-leaf paths whose digits can be rearranged to form a palindrome.",
+    },
+    defaultInput: "2,3,1,3,1,null,1",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; mỗi node là digit 1–9)", en: "Tree (level-order; each node is a digit 1–9)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS mang một bitmask chẵn/lẻ. Gặp digit d thì toggle bit d bằng mask ^= 1 << d.", en: "DFS carries a parity bitmask. At digit d, toggle bit d with mask ^= 1 << d." },
+      { vi: "Tại lá, path tạo được palindrome khi có nhiều nhất một digit xuất hiện lẻ.", en: "At a leaf, the path can form a palindrome when at most one digit occurs an odd number of times." },
+      { vi: "Mask có tối đa một bit bật khi mask & (mask − 1) == 0; lá hợp lệ trả 1, lá còn lại trả 0.", en: "A mask has at most one set bit when mask & (mask − 1) == 0; a valid leaf returns 1, otherwise 0." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được duyệt một lần; bitmask dùng O(1), stack DFS cao tối đa h.", en: "Each node is visited once; the bitmask uses O(1), and the DFS stack is at most h deep." } },
+    code: [
+      "class Solution:",
+      "    def pseudoPalindromicPaths(self, root):",
+      "        def dfs(node, mask):",
+      "            if not node:",
+      "                return 0",
+      "            mask ^= 1 << node.val",
+      "            if not node.left and not node.right:",
+      "                return 1 if mask & (mask - 1) == 0 else 0",
+      "            left = dfs(node.left, mask)",
+      "            right = dfs(node.right, mask)",
+      "            return left + right",
+      "        return dfs(root, 0)",
+    ],
+    builder: buildSteps1457,
   },
   124: {
     id: 124, difficulty: "hard", slug: "binary-tree-maximum-path-sum",

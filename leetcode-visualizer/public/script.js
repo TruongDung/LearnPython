@@ -5253,6 +5253,315 @@ function renderBfsLevelView(step) {
   else $("bfsLevelTree").innerHTML = `<span class="bl-tree-empty">∅</span>`;
 }
 
+function renderPathSumIIIView(step) {
+  const view = step.pathSumIIIView || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phaseHtml = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+  const path = Array.isArray(view.path) ? view.path : [];
+  const pathHtml = path.length
+    ? path.map((item, index) => `<span class="${item.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(item.value)}</strong><em>P=${escapeHtml(item.prefix)}</em></span>${index < path.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="ps437-empty">∅ ${vi ? "chưa vào node nào" : "no active node"}</b>`;
+  const entries = Array.isArray(view.prefixEntries) ? view.prefixEntries : [];
+  const mapHtml = entries.length
+    ? entries.map((entry) => `<span class="${entry.sum === view.needed ? "needed" : ""}"><small>prefix</small><strong>${escapeHtml(entry.sum)}</strong><em>× ${escapeHtml(entry.count)}</em><code>${escapeHtml((entry.sources || []).join(" · "))}</code></span>`).join("")
+    : `<b class="ps437-empty">{}</b>`;
+  const matches = Array.isArray(view.matches) ? view.matches : [];
+  const lookupReady = view.needed !== null && view.needed !== undefined;
+  const proofClass = matches.length ? "match" : lookupReady ? "none" : "waiting";
+  const proofHtml = `<section class="ps437-proof ${proofClass}">
+    <small>${vi ? "PHÉP TRỪ QUAN TRỌNG" : "THE KEY SUBTRACTION"}</small>
+    <div><span><em>running</em><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b><span><em>needed</em><strong>${escapeHtml(view.needed ?? "?")}</strong></span><b>=</b><span><em>target</em><strong>${escapeHtml(view.target)}</strong></span></div>
+    <p>${matches.length
+      ? escapeHtml(vi ? `${matches.length} prefix khớp → thêm ${matches.length} path ở node này.` : `${matches.length} matching prefix(es) → add ${matches.length} path(s) at this node.`)
+      : escapeHtml(lookupReady ? (vi ? `Không có prefix ${view.needed} trên path hiện tại.` : `Prefix ${view.needed} is absent from the current path.`) : (vi ? "Cộng node rồi tính needed." : "Add the node, then compute needed."))}</p>
+  </section>`;
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · in=${escapeHtml(frame.incoming)} · run=${escapeHtml(frame.running)}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+  const foundPaths = Array.isArray(view.foundPaths) ? view.foundPaths : [];
+  const pathsHtml = foundPaths.length
+    ? foundPaths.map((found, index) => `<span class="${index === foundPaths.length - 1 && matches.length ? "fresh" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(found.values.join(" → "))}</strong><em>sum = ${escapeHtml(view.target)}</em></span>`).join("")
+    : `<b class="ps437-empty">${vi ? "Chưa tìm thấy path" : "No path found yet"}</b>`;
+  const statusTone = matches.length ? "match" : view.event === "remove-prefix" ? "backtrack" : "";
+  const summary = vi
+    ? `Bài 437, ${text(step.title)}. Đang có ${view.answer} path hợp lệ.`
+    : `Problem 437, ${text(step.title)}. ${view.answer} valid paths found so far.`;
+
+  target.innerHTML = `<section class="ps437-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ps437-phases">${phaseHtml}</div>
+    <section class="ps437-rule"><span><small>${vi ? "MỘT CÔNG THỨC" : "ONE FORMULA"}</small><strong>needed = running − target</strong></span><code>old prefix = needed ⇒ path sum = target</code></section>
+    <section class="ps437-action ${statusTone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Tổng path" : "Paths"}: ${escapeHtml(view.answer)}</em></section>
+    <div class="ps437-layout">
+      <section class="ps437-tree-card"><header><strong>${vi ? "CÂY · PATH ROOT → CURRENT" : "TREE · ROOT → CURRENT PATH"}</strong><span>${vi ? "cam = current · xanh = path đang dùng" : "amber = current · green = active path"}</span></header><div id="ps437Tree" class="ps437-tree"></div></section>
+      <aside class="ps437-side">
+        <section class="ps437-stats"><div><small>TARGET</small><strong>${escapeHtml(view.target)}</strong></div><div><small>RUNNING</small><strong>${escapeHtml(view.running ?? "—")}</strong></div><div><small>NEEDED</small><strong>${escapeHtml(view.needed ?? "—")}</strong></div><div><small>${vi ? "THÊM" : "ADD"}</small><strong>+${escapeHtml(view.added || 0)}</strong></div></section>
+        ${proofHtml}
+        <section class="ps437-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="ps437-path"><header><strong>${vi ? "PATH HIỆN TẠI VÀ PREFIX TẠI MỖI NODE" : "CURRENT PATH AND EACH NODE'S PREFIX"}</strong><span>${vi ? "P là tổng từ root" : "P is the sum from root"}</span></header><div>${pathHtml}</div></section>
+    <section class="ps437-map"><header><strong>prefix_count</strong><span>${vi ? "chỉ prefix trên path hiện tại" : "only prefixes on the current path"}</span></header><div>${mapHtml}</div></section>
+    <section class="ps437-found"><header><strong>${vi ? "CÁC PATH ĐÃ TÌM THẤY" : "PATHS FOUND"}</strong><span>${vi ? "path có thể bắt đầu ở bất kỳ node" : "a path may start at any node"}</span></header><div>${pathsHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "ps437Tree");
+  else $("ps437Tree").innerHTML = `<span class="ps437-tree-empty">∅</span>`;
+}
+
+function renderRootLeafNumber129View(step) {
+  const view = step.rootLeafNumber129View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const hasValue = (value) => value !== null && value !== undefined;
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const path = Array.isArray(view.path) ? view.path : [];
+  const pathHtml = path.length
+    ? path.map((item, index) => `<span class="${item.current ? "current" : ""}"><small>DIGIT</small><strong>${escapeHtml(item.digit)}</strong><em>${vi ? "số" : "number"} ${escapeHtml(item.number)}</em></span>${index < path.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="rln129-empty">∅ ${vi ? "path đã rỗng" : "path is empty"}</b>`;
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · in=${escapeHtml(frame.incoming)} · now=${escapeHtml(frame.number)}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const leaves = Array.isArray(view.leaves) ? view.leaves : [];
+  const leavesHtml = leaves.length
+    ? leaves.map((leaf, index) => `<span class="${leaf.fresh ? "fresh" : ""}"><small>${vi ? `LÁ #${index + 1}` : `LEAF #${index + 1}`}</small><strong>${escapeHtml(leaf.digits)}</strong><em>${vi ? "giá trị" : "value"} ${escapeHtml(leaf.number)}</em></span>`).join("")
+    : `<b class="rln129-empty">${vi ? "Chưa tới lá nào" : "No leaf reached yet"}</b>`;
+
+  const builtNumber = view.current && view.phase !== "enter";
+  const formulaHtml = view.current
+    ? `<div class="rln129-equation ${builtNumber ? "ready" : "waiting"}">
+        <span><small>${vi ? "SỐ TỪ CHA" : "FROM PARENT"}</small><strong>${escapeHtml(view.incoming)}</strong></span><b>× 10</b><i>+</i><span><small>DIGIT</small><strong>${escapeHtml(view.digit)}</strong></span><b>=</b><span class="result"><small>current</small><strong>${builtNumber ? escapeHtml(view.number) : "?"}</strong></span>
+      </div>`
+    : `<div class="rln129-equation empty"><code>current = current × 10 + digit</code></div>`;
+
+  const hasLeft = hasValue(view.leftResult);
+  const hasRight = hasValue(view.rightResult);
+  const returnBody = view.isLeaf
+    ? `<div class="direct"><span><small>${vi ? "SỐ HOÀN CHỈNH" : "COMPLETED NUMBER"}</small><strong>${escapeHtml(view.number)}</strong></span><b>→</b><span class="result"><small>RETURN</small><strong>${escapeHtml(view.returnValue ?? view.number)}</strong></span></div><p>${vi ? "Đã tới lá: trả thẳng số vừa tạo, không gọi hai nhánh None." : "At a leaf: return the completed number directly; do not recurse into its two None children."}</p>`
+    : `<div><span><small>LEFT</small><strong>${hasLeft ? escapeHtml(view.leftResult) : "?"}</strong></span><b>+</b><span><small>RIGHT</small><strong>${hasRight ? escapeHtml(view.rightResult) : "?"}</strong></span><b>=</b><span class="result"><small>RETURN</small><strong>${hasValue(view.returnValue) ? escapeHtml(view.returnValue) : "?"}</strong></span></div>`;
+  const returnHtml = `<section class="rln129-return ${view.event === "combine" || view.event === "done" || view.event === "leaf-return" ? "ready" : ""}">
+    <header><strong>${vi ? "GIÁ TRỊ TRẢ VỀ CHO CHA" : "VALUE RETURNED TO PARENT"}</strong><span>${view.isLeaf ? (vi ? "lá trả current trực tiếp" : "a leaf returns current directly") : (vi ? "node thường cộng 2 cây con" : "an internal node adds both subtrees")}</span></header>
+    ${returnBody}
+  </section>`;
+
+  const tone = view.event === "leaf-return" ? "leaf" : view.event === "combine" || view.event === "done" ? "sum" : "";
+  const summary = vi
+    ? `Bài 129, ${text(step.title)}. Đã hoàn thành ${leaves.length} số, tổng ${view.leafTotal}.`
+    : `Problem 129, ${text(step.title)}. ${leaves.length} numbers completed, totaling ${view.leafTotal}.`;
+
+  target.innerHTML = `<section class="rln129-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rln129-phases">${phases}</div>
+    <section class="rln129-rule"><span><small>${vi ? "QUY TẮC NỐI DIGIT" : "APPEND-DIGIT RULE"}</small><strong>current = current × 10 + node.val</strong></span><code>49 → 49 × 10 + 5 = 495</code></section>
+    <section class="rln129-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Tổng lá" : "Leaf total"}: ${escapeHtml(view.leafTotal ?? 0)}</em></section>
+    <div class="rln129-layout">
+      <section class="rln129-tree-card"><header><strong>${vi ? "CÂY · PATH ROOT → CURRENT" : "TREE · ROOT → CURRENT PATH"}</strong><span>${vi ? "cam = current · xanh = path / lá xong" : "amber = current · green = path / completed leaf"}</span></header><div id="rln129Tree" class="rln129-tree"></div></section>
+      <aside class="rln129-side">
+        <section class="rln129-stats"><div><small>${vi ? "SỐ TỪ CHA" : "INCOMING"}</small><strong>${escapeHtml(view.incoming ?? "—")}</strong></div><div><small>DIGIT</small><strong>${escapeHtml(view.digit ?? "—")}</strong></div><div><small>CURRENT</small><strong>${escapeHtml(view.number ?? "—")}</strong></div><div><small>${vi ? "TỔNG LÁ" : "LEAF TOTAL"}</small><strong>${escapeHtml(view.leafTotal ?? 0)}</strong></div></section>
+        ${formulaHtml}
+        <section class="rln129-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="rln129-path"><header><strong>${vi ? "CÁC DIGIT TRÊN PATH HIỆN TẠI" : "DIGITS ON THE CURRENT PATH"}</strong><span>${vi ? "mỗi bước nhân 10 rồi nối digit" : "multiply by 10, then append each digit"}</span></header><div>${pathHtml}</div></section>
+    ${returnHtml}
+    <section class="rln129-leaves"><header><strong>${vi ? "CÁC SỐ ROOT → LEAF ĐÃ HOÀN THÀNH" : "COMPLETED ROOT → LEAF NUMBERS"}</strong><span>${leaves.length ? `${leaves.map((leaf) => leaf.number).join(" + ")} = ${view.leafTotal}` : (vi ? "chỉ thêm khi tới lá" : "added only at a leaf")}</span></header><div>${leavesHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "rln129Tree");
+  else $("rln129Tree").innerHTML = `<span class="rln129-tree-empty">∅</span>`;
+}
+
+function renderSmallestLeaf988View(step) {
+  const view = step.smallestLeaf988View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const rootPath = Array.isArray(view.rootPath) ? view.rootPath : [];
+  const rootPathHtml = rootPath.length
+    ? rootPath.map((node, index) => `<span class="${node.current ? "current" : ""}"><small>${node.value}</small><strong>${escapeHtml(node.letter)}</strong></span>${index < rootPath.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="sl988-empty">∅</b>`;
+  const upwardPath = [...rootPath].reverse();
+  const upwardHtml = upwardPath.length
+    ? upwardPath.map((node, index) => `<span class="${index === 0 ? "leaf-end" : ""}"><strong>${escapeHtml(node.letter)}</strong></span>${index < upwardPath.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="sl988-empty">∅</b>`;
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.letter)}</strong><small>${escapeHtml(frame.side)} · in="${escapeHtml(frame.incoming)}" · path="${escapeHtml(frame.path)}"</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const stringCells = (value, focusIndex, tone) => {
+    if (value === null || value === undefined) return `<b class="sl988-empty">${vi ? "chưa có" : "none yet"}</b>`;
+    if (value === "") return `<b class="sl988-empty">""</b>`;
+    return [...String(value)].map((letter, index) => `<span class="${index === focusIndex ? `focus ${tone}` : ""}"><small>${index}</small><strong>${escapeHtml(letter)}</strong></span>`).join("");
+  };
+  const candidate = view.candidate;
+  const previousBest = view.previousBest;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : -1;
+  const hasComparison = candidate !== null && candidate !== undefined;
+  const compareSymbol = previousBest === null || previousBest === undefined
+    ? "→"
+    : candidate < previousBest ? "<" : candidate === previousBest ? "=" : ">";
+  const compareVerdict = !hasComparison
+    ? (vi ? "Chỉ so sánh khi tới lá" : "Compare only at a leaf")
+    : previousBest === null || previousBest === undefined
+      ? (vi ? "Candidate đầu tiên → trở thành best" : "First candidate → becomes best")
+      : candidate < previousBest
+        ? (vi ? `'${candidate}' nhỏ hơn → UPDATE BEST` : `'${candidate}' is smaller → UPDATE BEST`)
+        : (vi ? `'${candidate}' không nhỏ hơn → GIỮ BEST` : `'${candidate}' is not smaller → KEEP BEST`);
+  const compareTone = view.decision === "update" ? "update" : view.decision === "keep" ? "keep" : "waiting";
+  const comparisonHtml = `<section class="sl988-compare ${compareTone}">
+    <header><strong>${vi ? "SO SÁNH TỪ TRÁI SANG PHẢI" : "COMPARE LEFT TO RIGHT"}</strong><span>${vi ? "ký tự khác nhau đầu tiên quyết định" : "the first differing letter decides"}</span></header>
+    <div class="sl988-compare-row"><section><small>CANDIDATE</small><div>${stringCells(candidate, compareIndex, "candidate")}</div></section><b>${compareSymbol}</b><section><small>${vi ? "BEST TRƯỚC ĐÓ" : "PREVIOUS BEST"}</small><div>${stringCells(previousBest, compareIndex, "best")}</div></section></div>
+    <p>${escapeHtml(compareVerdict)}</p>
+  </section>`;
+
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const candidatesHtml = candidates.length
+    ? candidates.map((record, index) => `<span class="${record.isBest ? "best" : "tried"}"><small>#${index + 1} · root→leaf ${escapeHtml(record.rootToLeaf)}</small><strong>${escapeHtml(record.candidate)}</strong><em>${record.isBest ? "BEST" : (vi ? "đã xét" : "checked")}</em></span>`).join("")
+    : `<b class="sl988-empty">${vi ? "Chưa có candidate" : "No candidate yet"}</b>`;
+
+  const currentLetter = view.current?.letter ?? "—";
+  const tone = view.decision === "update" ? "update" : view.decision === "keep" ? "keep" : view.event === "done" ? "done" : "";
+  const summary = vi
+    ? `Bài 988, ${text(step.title)}. Best hiện tại là ${view.best ?? "chưa có"}.`
+    : `Problem 988, ${text(step.title)}. The current best is ${view.best ?? "none"}.`;
+
+  target.innerHTML = `<section class="sl988-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sl988-phases">${phases}</div>
+    <section class="sl988-rule"><span><small>${vi ? "GIỮ PATH ĐÚNG CHIỀU LEAF → ROOT" : "KEEP PATH IN LEAF → ROOT ORDER"}</small><strong>path = letter + path</strong></span><code>'d' + 'ba' = 'dba'</code></section>
+    <section class="sl988-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>BEST: ${escapeHtml(view.best ?? "None")}</em></section>
+    <div class="sl988-layout">
+      <section class="sl988-tree-card"><header><strong>${vi ? "CÂY · NODE HIỂN THỊ LETTER" : "TREE · NODES SHOW LETTERS"}</strong><span>${vi ? "số gốc nằm dưới letter" : "the original number is below each letter"}</span></header><div id="sl988Tree" class="sl988-tree"></div></section>
+      <aside class="sl988-side">
+        <section class="sl988-stats"><div><small>NODE VALUE</small><strong>${escapeHtml(view.current?.value ?? "—")}</strong></div><div><small>LETTER</small><strong>${escapeHtml(currentLetter)}</strong></div><div><small>PATH</small><strong>${escapeHtml(view.pathString ?? "—")}</strong></div><div><small>BEST</small><strong>${escapeHtml(view.best ?? "None")}</strong></div></section>
+        <section class="sl988-direction"><header><strong>${vi ? "CÙNG MỘT PATH, HAI CHIỀU ĐỌC" : "ONE PATH, TWO READING DIRECTIONS"}</strong><span>${vi ? "đáp án dùng hàng thứ hai" : "the answer uses the second row"}</span></header><div><small>ROOT → CURRENT</small><section>${rootPathHtml}</section></div><div class="answer-order"><small>LEAF / CURRENT → ROOT</small><section>${upwardHtml}</section><code>${escapeHtml(view.pathString ?? "")}</code></div></section>
+        <section class="sl988-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    ${comparisonHtml}
+    <section class="sl988-candidates"><header><strong>${vi ? "CÁC CHUỖI LEAF → ROOT ĐÃ XÉT" : "CHECKED LEAF → ROOT STRINGS"}</strong><span>${vi ? "viền xanh = best hiện tại" : "green border = current best"}</span></header><div>${candidatesHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "sl988Tree");
+  else $("sl988Tree").innerHTML = `<span class="sl988-tree-empty">∅</span>`;
+}
+
+function renderPseudoPalindrome1457View(step) {
+  const view = step.pseudoPalindrome1457View || {};
+  const target = $("treeView");
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages.map((stage, index) => {
+    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+  }).join("");
+
+  const frequencies = Array.isArray(view.frequencies) ? view.frequencies : [];
+  const parityHtml = frequencies.length
+    ? frequencies.map((item) => `<span class="${item.odd ? "odd" : item.count ? "even" : "zero"} ${item.active ? "active" : ""}"><small>DIGIT</small><strong>${escapeHtml(item.digit)}</strong><em>${escapeHtml(item.count)}× · ${item.odd ? "ODD" : "EVEN"}</em></span>`).join("")
+    : `<b class="pp1457-empty">${vi ? "Chưa có digit trên path" : "No digit on the path yet"}</b>`;
+
+  const path = Array.isArray(view.path) ? view.path : [];
+  const pathHtml = path.length
+    ? path.map((item, index) => `<span class="${item.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(item.value)}</strong><em>mask ${escapeHtml(item.mask)}</em></span>${index < path.length - 1 ? "<i>→</i>" : ""}`).join("")
+    : `<b class="pp1457-empty">∅ ${vi ? "path đã rỗng" : "path is empty"}</b>`;
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · in=${escapeHtml(frame.incomingMask)} · now=${escapeHtml(frame.mask)}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const leafReady = Boolean(view.isLeaf);
+  const bitResult = leafReady ? (Number(view.mask) & (Number(view.mask) - 1)) : null;
+  const testTone = !leafReady ? "waiting" : view.valid === true ? "pass" : view.valid === false ? "fail" : "ready";
+  const verdict = !leafReady
+    ? (vi ? "Chỉ chạy phép test này khi tới node lá" : "Run this test only after reaching a leaf")
+    : view.valid === true
+      ? (vi ? "0 → tối đa 1 bit bật → PASS" : "0 → at most 1 set bit → PASS")
+      : view.valid === false
+        ? (vi ? `${bitResult} ≠ 0 → nhiều hơn 1 bit bật → FAIL` : `${bitResult} ≠ 0 → more than 1 set bit → FAIL`)
+        : (vi ? "Node này là lá; bước kế tiếp sẽ quyết định" : "This node is a leaf; the next step makes the decision");
+  const bitTestHtml = `<section class="pp1457-test ${testTone}">
+    <header><strong>${vi ? "PHÉP TEST TẠI LÁ" : "THE LEAF TEST"}</strong><span>${vi ? "xóa bit 1 thấp nhất rồi AND" : "remove the lowest set bit, then AND"}</span></header>
+    <div><span><small>mask</small><strong>${leafReady ? escapeHtml(view.mask) : "?"}</strong></span><b>&amp;</b><span><small>mask − 1</small><strong>${leafReady ? escapeHtml(Number(view.mask) - 1) : "?"}</strong></span><b>=</b><span class="result"><small>RESULT</small><strong>${leafReady ? escapeHtml(bitResult) : "?"}</strong></span></div>
+    <code>${leafReady ? `${escapeHtml(view.mask)} &amp; ${escapeHtml(Number(view.mask) - 1)} = ${escapeHtml(bitResult)}` : "mask &amp; (mask - 1) == 0"}</code>
+    <p>${escapeHtml(verdict)}</p>
+  </section>`;
+
+  const leaves = Array.isArray(view.leaves) ? view.leaves : [];
+  const leavesHtml = leaves.length
+    ? leaves.map((leaf, index) => `<span class="${leaf.valid ? "pass" : "fail"} ${leaf.fresh ? "fresh" : ""}"><small>${vi ? `LÁ #${index + 1}` : `LEAF #${index + 1}`}</small><strong>${escapeHtml(leaf.path.join(" → "))}</strong><em>${leaf.oddDigits.length ? `${vi ? "lẻ" : "odd"}: ${escapeHtml(leaf.oddDigits.join(", "))}` : (vi ? "không digit lẻ" : "no odd digits")}</em><b>${leaf.valid ? `✓ PASS · ${escapeHtml(leaf.palindrome)}` : "✕ FAIL"}</b></span>`).join("")
+    : `<b class="pp1457-empty">${vi ? "Chưa kiểm tra path root→leaf nào" : "No root-to-leaf path checked yet"}</b>`;
+
+  const oddDigits = Array.isArray(view.oddDigits) ? view.oddDigits : [];
+  const tone = view.event === "leaf-pass" ? "pass" : view.event === "leaf-fail" ? "fail" : view.event === "done" ? "done" : "";
+  const summary = vi
+    ? `Bài 1457, ${text(step.title)}. Có ${view.acceptedTotal || 0} path hợp lệ.`
+    : `Problem 1457, ${text(step.title)}. ${view.acceptedTotal || 0} valid paths found.`;
+
+  target.innerHTML = `<section class="pp1457-viz ${step.final ? "final" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="pp1457-phases">${phases}</div>
+    <section class="pp1457-rule"><span><small>${vi ? "KHI ĐI QUA DIGIT" : "WHEN VISITING A DIGIT"}</small><strong>mask ^= 1 &lt;&lt; digit</strong></span><b>→</b><span><small>${vi ? "CHỈ TẠI NODE LÁ" : "ONLY AT A LEAF"}</small><strong>mask &amp; (mask − 1) == 0</strong></span></section>
+    <section class="pp1457-action ${tone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Path hợp lệ" : "Valid paths"}: ${escapeHtml(view.acceptedTotal || 0)}</em></section>
+    <div class="pp1457-layout">
+      <section class="pp1457-tree-card"><header><strong>${vi ? "CÂY · PATH ROOT → CURRENT" : "TREE · ROOT → CURRENT PATH"}</strong><span>${vi ? "cam = current · xanh = path đang xét" : "amber = current · blue = active path"}</span></header><div id="pp1457Tree" class="pp1457-tree"></div></section>
+      <aside class="pp1457-side">
+        <section class="pp1457-stats"><div><small>DIGIT</small><strong>${escapeHtml(view.current?.value ?? "—")}</strong></div><div><small>MASK</small><strong>${escapeHtml(view.mask ?? 0)}</strong></div><div><small>BINARY</small><strong>${escapeHtml(view.binaryMask ?? "0000000000")}</strong></div><div><small>${vi ? "SỐ DIGIT LẺ" : "ODD DIGITS"}</small><strong>${escapeHtml(view.oddCount ?? 0)}</strong></div></section>
+        <section class="pp1457-parity"><header><strong>${vi ? "BẢNG CHẴN / LẺ TRÊN PATH" : "PATH PARITY BOARD"}</strong><span>${oddDigits.length ? `${vi ? "đang lẻ" : "odd now"}: ${escapeHtml(oddDigits.join(", "))}` : (vi ? "mọi count đều chẵn" : "all counts are even")}</span></header><div>${parityHtml}</div></section>
+        <section class="pp1457-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="pp1457-path"><header><strong>${vi ? "PATH VÀ MASK SAU MỖI NODE" : "PATH AND MASK AFTER EACH NODE"}</strong><span>${vi ? "gặp lại digit sẽ toggle bit về 0" : "seeing a digit again toggles its bit back to 0"}</span></header><div>${pathHtml}</div></section>
+    ${bitTestHtml}
+    <section class="pp1457-leaves"><header><strong>${vi ? "KẾT QUẢ TỪNG PATH ROOT → LEAF" : "EACH ROOT → LEAF RESULT"}</strong><span>${vi ? "PASS kèm một palindrome có thể tạo" : "PASS includes one possible palindrome"}</span></header><div>${leavesHtml}</div></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "pp1457Tree");
+  else $("pp1457Tree").innerHTML = `<span class="pp1457-tree-empty">∅</span>`;
+}
+
 function renderTreeEssentialsView(step) {
   const view = step.treeEssentialsView || {};
   const target = $("treeView");
@@ -28030,6 +28339,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBfsLevelView(step);
+  } else if (step.pathSumIIIView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPathSumIIIView(step);
+  } else if (step.rootLeafNumber129View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRootLeafNumber129View(step);
+  } else if (step.smallestLeaf988View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSmallestLeaf988View(step);
+  } else if (step.pseudoPalindrome1457View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPseudoPalindrome1457View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
