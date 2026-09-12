@@ -91,10 +91,12 @@ test('3414 exposes the sorting, predecessor, DP decision, and final states', () 
   const events = run.steps.map(step => step.weightedIntervals3414View.event);
   assert.equal(events[0], 'sort');
   assert.equal(events.at(-1), 'done');
+  assert.ok(events.includes('build-ends'));
   assert.equal(events.filter(event => event === 'find-prev').length, 6);
   assert.ok(events.includes('take'));
   assert.ok(events.includes('skip'));
   assert.ok(run.steps.every(step => step.weightedIntervals3414View));
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
   assert.ok(run.steps.every(step => step.codeLines.every(line => line >= 1 && line <= problem.code.length)));
 
   const strictBoundary = problem.builder('1,2,5;2,3,6');
@@ -105,6 +107,25 @@ test('3414 exposes the sorting, predecessor, DP decision, and final states', () 
   assert.deepEqual(last.answer, [2, 3]);
   assert.equal(last.answerScore, 8);
   assert.deepEqual(last.dp.at(-1)[4], { score: 8, picks: [2, 3] });
+});
+
+test('3414 explains every DP cell as SKIP source, TAKE base, TAKE sum, then winner', () => {
+  const run = problem.builder(problem.defaultInput);
+  const events = run.steps.map(step => step.weightedIntervals3414View.event);
+  assert.equal(events.filter(event => event === 'read-skip').length, 24);
+  assert.equal(events.filter(event => event === 'read-take-base').length, 24);
+  assert.equal(events.filter(event => event === 'build-take').length, 24);
+
+  const baseStep = run.steps.find(step => step.weightedIntervals3414View.event === 'read-take-base');
+  assert.equal(baseStep.codeLines[0], 17);
+  assert.ok(baseStep.weightedIntervals3414View.decision.skip);
+  assert.ok(baseStep.weightedIntervals3414View.decision.base);
+  assert.equal(baseStep.weightedIntervals3414View.decision.take, null);
+
+  const winnerStep = run.steps.find(step => ['take', 'skip'].includes(step.weightedIntervals3414View.event));
+  assert.equal(winnerStep.codeLines[0], 19);
+  assert.ok(winnerStep.weightedIntervals3414View.decision.winner);
+  assert.equal(winnerStep.weightedIntervals3414View.completedCells, 1);
 });
 
 test('3414 parser feeds the same triples to Edit and run code', () => {
@@ -121,6 +142,8 @@ test('3414 custom renderer and responsive styles are wired into the page', () =>
   assert.match(script, /renderWeightedIntervals3414View\(step\)/);
   assert.match(css, /\.wi3414-timeline/);
   assert.match(css, /\.wi3414-decision/);
+  assert.match(css, /\.wi3414-compat/);
+  assert.match(css, /\.wi3414-progress/);
   assert.match(css, /\.wi3414-table/);
   assert.match(css, /@container \(max-width: 480px\)/);
 });
@@ -145,6 +168,8 @@ test('3414 custom renderer handles every step in Vietnamese and English', () => 
       context.renderWeightedIntervals3414View(step);
       assert.match(element.innerHTML, /wi3414-timeline/);
       assert.match(element.innerHTML, /wi3414-table/);
+      assert.match(element.innerHTML, /wi3414-action/);
+      assert.match(element.innerHTML, /wi3414-progress/);
       assert.doesNotMatch(element.innerHTML, /NaN|undefined|Infinity/);
     }
   }

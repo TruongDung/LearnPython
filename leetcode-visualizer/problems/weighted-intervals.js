@@ -70,6 +70,9 @@ function buildSteps3414(input) {
     activeCapacity = null, decision = null, final = false,
   }) => {
     const answer = dp[sorted.length][4];
+    const completedCells = dp.slice(1).reduce((count, row) => (
+      count + row.slice(1).filter(Boolean).length
+    ), 0);
     steps.push({
       title, note, codeLines, final,
       arr: sorted.map((interval) => interval.weight),
@@ -79,6 +82,9 @@ function buildSteps3414(input) {
         { name: "i", value: Number.isInteger(activeRow) ? activeRow : "—" },
         { name: "k", value: Number.isInteger(activeCapacity) ? activeCapacity : "—" },
         { name: "prev[i]", value: Number.isInteger(activeRow) ? (predecessors[activeRow] ?? "—") : "—" },
+        { name: "skip", value: decision?.skip?.score ?? "—" },
+        { name: "base", value: decision?.base?.score ?? "—" },
+        { name: "take", value: decision?.take?.score ?? "—" },
         { name: "best score", value: decision?.winner?.score ?? answer?.score ?? 0 },
         { name: "indices", value: decision?.winner ? [...decision.winner.picks] : answer ? [...answer.picks] : [] },
       ],
@@ -96,11 +102,15 @@ function buildSteps3414(input) {
         activeCapacity,
         decision: decision ? {
           skip: cloneCandidate(decision.skip),
+          base: cloneCandidate(decision.base),
           take: cloneCandidate(decision.take),
           winner: cloneCandidate(decision.winner),
-          choice: decision.choice,
-          reason: decision.reason,
+          choice: decision.choice || null,
+          reason: decision.reason || null,
+          step: decision.step,
         } : null,
+        completedCells,
+        totalCells: sorted.length * 4,
         answer: final && answer ? [...answer.picks] : null,
         answerScore: final && answer ? answer.score : null,
       },
@@ -113,6 +123,15 @@ function buildSteps3414(input) {
     note: {
       vi: `Nhãn # giữ index gốc. Sau sort: ${sorted.map((interval) => `#${interval.id}[${interval.start},${interval.end}]`).join(" · ")}.`,
       en: `The # labels retain original indices. Sorted order: ${sorted.map((interval) => `#${interval.id}[${interval.start},${interval.end}]`).join(" · ")}.`,
+    },
+  });
+
+  snapshot({
+    phase: "sort", stage: 0, event: "build-ends", codeLines: [5],
+    title: { vi: `Tách mảng ends = [${ends.join(", ")}]`, en: `Build ends = [${ends.join(", ")}]` },
+    note: {
+      vi: "Mảng end đã tăng dần, nên mỗi prev[i] có thể tìm nhanh bằng binary search.",
+      en: "The end points are sorted, so every prev[i] can be found quickly with binary search.",
     },
   });
 
@@ -159,11 +178,49 @@ function buildSteps3414(input) {
     const interval = sorted[index];
     for (let capacity = 1; capacity <= 4; capacity += 1) {
       const skip = dp[index][capacity];
+      snapshot({
+        phase: "dp", stage: 2, event: "read-skip", codeLines: [16],
+        activeRow: index, prevRow: predecessors[index] >= 0 ? predecessors[index] : null,
+        activeCapacity: capacity, decision: { skip, step: "skip" },
+        title: { vi: `Ô dp[${index + 1}][${capacity}] · tính phương án SKIP`, en: `Cell dp[${index + 1}][${capacity}] · compute SKIP` },
+        note: {
+          vi: `Nếu bỏ #${interval.id}, giữ nguyên dp[${index}][${capacity}] = score ${skip.score}, indices [${skip.picks.join(", ")}].`,
+          en: `If #${interval.id} is skipped, keep dp[${index}][${capacity}] = score ${skip.score}, indices [${skip.picks.join(", ")}].`,
+        },
+      });
+
       const base = dp[predecessors[index] + 1][capacity - 1];
+      snapshot({
+        phase: "dp", stage: 2, event: "read-take-base", codeLines: [17],
+        activeRow: index, prevRow: predecessors[index] >= 0 ? predecessors[index] : null,
+        activeCapacity: capacity, decision: { skip, base, step: "base" },
+        title: { vi: `TAKE bắt đầu từ dp[${predecessors[index] + 1}][${capacity - 1}]`, en: `TAKE starts from dp[${predecessors[index] + 1}][${capacity - 1}]` },
+        note: predecessors[index] >= 0
+          ? {
+            vi: `Hàng ${predecessors[index] + 1} chỉ chứa các interval kết thúc trước #${interval.id}; còn ${capacity - 1} lượt chọn trước khi thêm nó.`,
+            en: `Row ${predecessors[index] + 1} contains only intervals ending before #${interval.id}; ${capacity - 1} pick(s) remain before adding it.`,
+          }
+          : {
+            vi: `Không có interval tương thích phía trước, nên TAKE dùng hàng 0 rỗng với score ${base.score}.`,
+            en: `There is no compatible earlier interval, so TAKE uses empty row 0 with score ${base.score}.`,
+          },
+      });
+
       const take = {
         score: base.score + interval.weight,
         picks: [...base.picks, interval.id].sort((a, b) => a - b),
       };
+      snapshot({
+        phase: "dp", stage: 2, event: "build-take", codeLines: [18],
+        activeRow: index, prevRow: predecessors[index] >= 0 ? predecessors[index] : null,
+        activeCapacity: capacity, decision: { skip, base, take, step: "take" },
+        title: { vi: `Cộng weight ${interval.weight} → TAKE score ${take.score}`, en: `Add weight ${interval.weight} → TAKE score ${take.score}` },
+        note: {
+          vi: `TAKE = score gốc ${base.score} + ${interval.weight}; indices trở thành [${take.picks.join(", ")}].`,
+          en: `TAKE = base score ${base.score} + ${interval.weight}; indices become [${take.picks.join(", ")}].`,
+        },
+      });
+
       const winner = better3414(skip, take);
       const choice = winner === take ? "take" : "skip";
       let reason;
@@ -173,7 +230,7 @@ function buildSteps3414(input) {
       snapshot({
         phase: "dp", stage: 2, event: choice, codeLines: [19],
         activeRow: index, prevRow: predecessors[index] >= 0 ? predecessors[index] : null,
-        activeCapacity: capacity, decision: { skip, take, winner, choice, reason },
+        activeCapacity: capacity, decision: { skip, base, take, winner, choice, reason, step: "winner" },
         title: choice === "take"
           ? { vi: `dp[${index + 1}][${capacity}]: TAKE #${interval.id}`, en: `dp[${index + 1}][${capacity}]: TAKE #${interval.id}` }
           : { vi: `dp[${index + 1}][${capacity}]: SKIP #${interval.id}`, en: `dp[${index + 1}][${capacity}]: SKIP #${interval.id}` },

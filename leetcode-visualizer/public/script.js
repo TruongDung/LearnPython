@@ -22547,7 +22547,9 @@ function renderWeightedIntervals3414View(step) {
   const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
   const active = Number.isInteger(view.activeRow) ? intervals[view.activeRow] : null;
   const picked = new Set(view.answer || view.decision?.winner?.picks || []);
-  const formatPicks = (candidate) => candidate ? `[${(candidate.picks || []).join(", ")}]` : "—";
+  const formatPicks = (candidate) => candidate ? `[${(candidate.picks || []).join(", ")}]` : "?";
+  const scoreOf = (candidate) => candidate ? candidate.score : "?";
+  const activeLine = Array.isArray(step.codeLines) && step.codeLines.length ? step.codeLines[0] : "—";
   const phasesHtml = stages.map((stage, index) => {
     const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
     return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(pick(stage))}</b></span>`;
@@ -22559,9 +22561,11 @@ function renderWeightedIntervals3414View(step) {
   const timelineHtml = intervals.map((interval, row) => {
     const compatible = active && row < view.activeRow && interval.end < active.start;
     const conflicts = active && row < view.activeRow && interval.end >= active.start;
+    const isCurrent = row === view.activeRow;
+    const isPredecessor = row === view.prevRow;
     const classes = [
-      row === view.activeRow ? "current" : "",
-      row === view.prevRow ? "predecessor" : "",
+      isCurrent ? "current" : "",
+      isPredecessor ? "predecessor" : "",
       compatible ? "compatible" : "",
       conflicts ? "conflict" : "",
       picked.has(interval.id) ? "picked" : "",
@@ -22570,22 +22574,68 @@ function renderWeightedIntervals3414View(step) {
     const naturalWidth = ((interval.end - interval.start) / range) * 100;
     const width = Math.max(3, Math.min(100 - left, naturalWidth || 3));
     const prev = Number.isInteger(interval.prev) ? interval.prev : "?";
+    const state = isCurrent
+      ? (vi ? "ĐANG XÉT" : "CURRENT")
+      : isPredecessor
+        ? "PREV"
+        : picked.has(interval.id)
+          ? (vi ? "ĐƯỢC CHỌN" : "PICKED")
+          : compatible
+            ? (vi ? "CÓ THỂ ĐỨNG TRƯỚC" : "CAN COME BEFORE")
+            : conflicts
+              ? (vi ? "CHỒNG LẤN" : "OVERLAPS")
+              : (vi ? "CHỜ" : "WAITING");
     return `<div class="wi3414-interval ${classes}">
-      <span><b>sorted ${row} · #${interval.id}</b><small>[${interval.start}, ${interval.end}] · w=${interval.weight} · prev=${prev}</small></span>
+      <span><b>#${interval.id} · [${interval.start}, ${interval.end}] <em>+${interval.weight}</em></b><small>sorted ${row} · prev=${prev} · ${state}</small></span>
       <div><i style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"><em>#${interval.id}</em></i></div>
     </div>`;
   }).join("");
 
-  let decisionHtml = `<section class="wi3414-rule"><b>dp[i][k]</b><strong>${vi ? "tốt nhất trong i interval đầu, chọn tối đa k" : "best among the first i intervals, choosing at most k"}</strong><span>end(prev) &lt; start(current)</span></section>`;
+  const ruleHtml = `<section class="wi3414-rule"><b>${vi ? "1 QUY TẮC CẦN NHỚ" : "ONE RULE TO REMEMBER"}</b><strong>end(previous) &lt; start(current)</strong><span>${vi ? "Dấu < nghiêm ngặt: chạm biên vẫn overlap" : "Strict <: touching endpoints still overlap"}</span></section>`;
+
+  let compatibilityHtml = "";
+  if (active) {
+    const predecessor = Number.isInteger(view.prevRow) ? intervals[view.prevRow] : null;
+    const equation = predecessor ? `${predecessor.end} < ${active.start}  ✓` : `${vi ? "không có end" : "no end"} < ${active.start}`;
+    compatibilityHtml = `<section class="wi3414-compat ${predecessor ? "found" : "empty"}">
+      <header><strong>${vi ? `VÌ SAO prev[${view.activeRow}] = ${predecessor ? view.prevRow : "−1"}?` : `WHY IS prev[${view.activeRow}] = ${predecessor ? view.prevRow : "−1"}?`}</strong><span>${vi ? "prev là interval tương thích gần nhất trong thứ tự đã sort" : "prev is the nearest compatible interval in sorted order"}</span></header>
+      <div>
+        <article class="previous"><small>${predecessor ? `PREV · #${predecessor.id}` : (vi ? "KHÔNG CÓ PREV" : "NO PREV")}</small><strong>${predecessor ? `[${predecessor.start}, ${predecessor.end}]` : "∅"}</strong><span>${predecessor ? `end = ${predecessor.end}` : (vi ? "dùng hàng DP 0" : "use DP row 0")}</span></article>
+        <i>→</i>
+        <code>${escapeHtml(equation)}</code>
+        <i>→</i>
+        <article class="current"><small>CURRENT · #${active.id}</small><strong>[${active.start}, ${active.end}]</strong><span>start = ${active.start} · score +${active.weight}</span></article>
+      </div>
+      <footer>${predecessor
+        ? (vi ? `#${predecessor.id} kết thúc trước khi #${active.id} bắt đầu, nên TAKE có thể nối hai lời giải.` : `#${predecessor.id} ends before #${active.id} starts, so TAKE may join their solutions.`)
+        : (vi ? `Không interval nào kết thúc trước ${active.start}; TAKE phải bắt đầu từ lời giải rỗng.` : `No interval ends before ${active.start}; TAKE must start from the empty solution.`)}</footer>
+    </section>`;
+  }
+
+  let decisionHtml = "";
   if (view.decision) {
     const decision = view.decision;
     const skipWins = decision.choice === "skip";
-    const tie = decision.skip.score === decision.take.score;
+    const takeWins = decision.choice === "take";
+    const tie = decision.skip && decision.take && decision.skip.score === decision.take.score;
+    const reason = !decision.winner
+      ? decision.step === "skip"
+        ? (vi ? "Bước 1/4 · đọc phương án SKIP" : "Step 1/4 · read the SKIP option")
+        : decision.step === "base"
+          ? (vi ? "Bước 2/4 · tìm lời giải gốc tương thích cho TAKE" : "Step 2/4 · find TAKE's compatible base solution")
+          : (vi ? "Bước 3/4 · cộng weight để tạo TAKE" : "Step 3/4 · add the weight to build TAKE")
+      : tie
+        ? (vi ? `Hòa score → giữ mảng index nhỏ hơn: ${formatPicks(decision.winner)}` : `Score tie → keep the smaller index list: ${formatPicks(decision.winner)}`)
+        : (vi ? `${decision.choice.toUpperCase()} có score lớn hơn` : `${decision.choice.toUpperCase()} has the higher score`);
     decisionHtml = `<section class="wi3414-decision">
-      <article class="${skipWins ? "winner" : ""}"><small>SKIP #${active?.id ?? "?"}</small><strong>${decision.skip.score}</strong><code>${escapeHtml(formatPicks(decision.skip))}</code><span>dp[${view.activeRow}][${view.activeCapacity}]</span></article>
-      <i>VS</i>
-      <article class="${skipWins ? "" : "winner"}"><small>TAKE #${active?.id ?? "?"}</small><strong>${decision.take.score}</strong><code>${escapeHtml(formatPicks(decision.take))}</code><span>dp[${(active?.prev ?? -1) + 1}][${view.activeCapacity - 1}] + w</span></article>
-      <div><small>${tie ? (vi ? "HÒA SCORE → SO INDEX" : "SCORE TIE → COMPARE INDICES") : (vi ? "CHỌN SCORE LỚN HƠN" : "KEEP THE HIGHER SCORE")}</small><strong>${decision.choice.toUpperCase()}</strong><code>${escapeHtml(formatPicks(decision.winner))}</code></div>
+      <header><span><small>${vi ? "Ô ĐANG TÍNH" : "CURRENT CELL"}</small><strong>dp[${view.activeRow + 1}][${view.activeCapacity}]</strong></span><em>${vi ? `chọn tối đa ${view.activeCapacity} interval` : `choose at most ${view.activeCapacity} interval(s)`}</em></header>
+      <div class="wi3414-choice-grid">
+        <article class="skip ${decision.skip ? "ready" : ""} ${skipWins ? "winner" : ""} ${decision.step === "skip" ? "current" : ""}"><small>1 · SKIP #${active?.id ?? "?"}</small><strong>${scoreOf(decision.skip)}</strong><code>${escapeHtml(formatPicks(decision.skip))}</code><span>dp[${view.activeRow}][${view.activeCapacity}]</span></article>
+        <article class="base ${decision.base ? "ready" : ""} ${decision.step === "base" ? "current" : ""}"><small>2 · TAKE BASE</small><strong>${scoreOf(decision.base)}</strong><code>${escapeHtml(formatPicks(decision.base))}</code><span>dp[${(active?.prev ?? -1) + 1}][${view.activeCapacity - 1}]</span></article>
+        <article class="take ${decision.take ? "ready" : ""} ${takeWins ? "winner" : ""} ${decision.step === "take" ? "current" : ""}"><small>3 · TAKE #${active?.id ?? "?"}</small><strong>${scoreOf(decision.take)}</strong><code>${escapeHtml(formatPicks(decision.take))}</code><span>${decision.base ? `${decision.base.score} + ${active?.weight ?? 0}` : "base + weight"}</span></article>
+        <article class="result ${decision.winner ? "ready winner" : ""} ${decision.step === "winner" ? "current" : ""}"><small>4 · ${vi ? "GIỮ PHƯƠNG ÁN TỐT HƠN" : "KEEP THE BETTER OPTION"}</small><strong>${decision.choice ? decision.choice.toUpperCase() : "?"}</strong><code>${escapeHtml(formatPicks(decision.winner))}</code><span>${decision.winner ? `score ${decision.winner.score}` : "compare score, then indices"}</span></article>
+      </div>
+      <footer>${escapeHtml(reason)}</footer>
     </section>`;
   }
 
@@ -22602,25 +22652,33 @@ function renderWeightedIntervals3414View(step) {
       const classes = [current ? "current" : "", skipSource ? "skip-source" : "", takeSource ? "take-source" : ""].filter(Boolean).join(" ");
       return `<td class="${classes}">${cell ? `<strong>${cell.score}</strong><small>[${cell.picks.join(",")}]</small>` : `<em>?</em>`}</td>`;
     }).join("");
-    return `<tr><th><b>${rowIndex}</b><small>${interval ? `+ #${interval.id}` : (vi ? "rỗng" : "empty")}</small></th>${cells}</tr>`;
+    return `<tr><th><b>${rowIndex}</b><small>${interval ? `${vi ? "sau" : "after"} #${interval.id}` : (vi ? "bắt đầu" : "start")}</small></th>${cells}</tr>`;
   }).join("");
-  const dpHeader = Array.from({ length: 5 }, (_, capacity) => `<th><small>k ≤</small><b>${capacity}</b></th>`).join("");
+  const dpHeader = Array.from({ length: 5 }, (_, capacity) => `<th><small>${vi ? "TỐI ĐA" : "AT MOST"}</small><b>${capacity}</b></th>`).join("");
 
-  const predecessorText = active
-    ? Number.isInteger(view.prevRow)
-      ? `prev[${view.activeRow}] = ${view.prevRow} · #${intervals[view.prevRow].id} ends ${intervals[view.prevRow].end} < ${active.start}`
-      : `prev[${view.activeRow}] = −1 · ${vi ? "không có interval tương thích" : "no compatible interval"}`
-    : (vi ? "Dấu # là index gốc cần trả về" : "# is the original index returned in the answer");
-  const answerHtml = view.answer
-    ? `<section class="wi3414-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>[${view.answer.join(", ")}]</strong><span>score = ${view.answerScore}</span></section>`
+  const completedCells = Number.isInteger(view.completedCells) ? view.completedCells : 0;
+  const totalCells = Number.isInteger(view.totalCells) && view.totalCells > 0 ? view.totalCells : 1;
+  const progress = Math.max(0, Math.min(100, completedCells / totalCells * 100));
+  const progressHtml = `<section class="wi3414-progress"><header><span><small>${vi ? "TIẾN ĐỘ DP" : "DP PROGRESS"}</small><strong>${completedCells} / ${totalCells} ${vi ? "ô đã chốt" : "cells finalized"}</strong></span><em>dp[i][k] = better(SKIP, TAKE)</em></header><div><i style="width:${progress.toFixed(3)}%"></i></div></section>`;
+
+  const answerHtml = Array.isArray(view.answer)
+    ? `<section class="wi3414-answer"><header><span><small>${vi ? "ĐÁP ÁN · INDEX GỐC TĂNG DẦN" : "ANSWER · SORTED ORIGINAL INDICES"}</small><strong>[${view.answer.join(", ")}]</strong></span><b>score = ${view.answerScore}</b></header><div>${view.answer.map((id) => {
+      const interval = Array.isArray(view.original?.[id]) ? view.original[id] : [];
+      return `<article><small>#${id}</small><strong>[${interval[0]}, ${interval[1]}]</strong><span>+${interval[2]}</span></article>`;
+    }).join("<i>+</i>")}</div><footer>${vi ? "Các interval trên không chồng nhau; DP đã xử lý tie-break theo index." : "These intervals do not overlap; DP already applied the index tie-break."}</footer></section>`
     : "";
 
   $("treeView").innerHTML = `<section class="wi3414-viz" role="img" aria-label="${escapeHtml(vi ? "Trực quan hóa weighted interval DP bài 3414" : "Weighted interval DP visualization for problem 3414")}">
     <div class="wi3414-phases">${phasesHtml}</div>
-    <section class="wi3414-timeline"><header><strong>${vi ? "INTERVAL ĐÃ SORT THEO END" : "INTERVALS SORTED BY END"}</strong><span>${escapeHtml(predecessorText)}</span></header><div class="wi3414-axis"><span>${minimum}</span><i></i><span>${maximum}</span></div><div>${timelineHtml}</div></section>
+    <section class="wi3414-action"><small>${vi ? "DÒNG CODE" : "CODE LINE"} ${activeLine} · ${escapeHtml(String(view.event || "step").replaceAll("-", " "))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    ${ruleHtml}
+    <section class="wi3414-timeline"><header><strong>${vi ? "1 · SORT THEO END · GIỮ INDEX GỐC #" : "1 · SORT BY END · KEEP ORIGINAL INDEX #"}</strong><span>${vi ? "cam = current · xanh lá = prev / picked · đỏ = overlap" : "amber = current · green = prev / picked · red = overlap"}</span></header><div class="wi3414-axis"><span>${minimum}</span><i></i><span>${maximum}</span></div><div>${timelineHtml}</div></section>
+    ${compatibilityHtml}
     ${decisionHtml}
-    <section class="wi3414-table"><header><strong>DP · SCORE + ORIGINAL INDICES</strong><span>${vi ? "hàng = số interval đã xét · cột = giới hạn số interval" : "row = intervals considered · column = selection limit"}</span></header><div><table><thead><tr><th><small>i</small></th>${dpHeader}</tr></thead><tbody>${dpRows}</tbody></table></div></section>
+    ${progressHtml}
+    <section class="wi3414-table"><header><strong>DP · <b>SCORE</b> + [INDICES]</strong><span>${vi ? "hàng = đã xét bao nhiêu interval · cột = được chọn tối đa bao nhiêu" : "row = intervals considered · column = maximum picks allowed"}</span></header><div><table><thead><tr><th><small>${vi ? "ĐÃ XÉT" : "SEEN"}</small></th>${dpHeader}</tr></thead><tbody>${dpRows}</tbody></table></div></section>
     ${answerHtml}
+    <section class="wi3414-legend"><span><i class="current"></i>${vi ? "interval / ô hiện tại" : "current interval / cell"}</span><span><i class="compatible"></i>${vi ? "tương thích / được chọn" : "compatible / picked"}</span><span><i class="conflict"></i>${vi ? "overlap với current" : "overlaps current"}</span></section>
   </section>`;
 }
 
