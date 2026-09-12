@@ -180,14 +180,11 @@ function applyStaticStrings() {
   const catalogJumpNav = $("catalogJumpNav");
   if (catalogJumpNav) catalogJumpNav.setAttribute("aria-label", t().catalogJumpNav);
   const quickProblemInput = $("quickProblemId");
-  if (quickProblemInput) quickProblemInput.placeholder = t().quickJumpPlaceholder;
-  const quickProblemError = $("quickProblemError");
-  if (quickProblemError && !quickProblemError.classList.contains("hidden")) {
-    if (searchErrorState?.type === "unsupported") {
-      quickProblemError.textContent = t().unsupportedProblem(searchErrorState.id);
-    } else if (!quickProblemInput?.value.trim()) {
-      quickProblemError.textContent = t().errEmptyId;
-    }
+  if (quickProblemInput) {
+    quickProblemInput.placeholder = t().quickJumpPlaceholder;
+    quickProblemInput.setAttribute("aria-label", t().quickJumpLabel);
+    quickProblemInput.closest("form")?.setAttribute("aria-label", t().quickJumpLabel);
+    if (quickProblemInput.getAttribute("aria-invalid") !== "true") quickProblemInput.title = t().quickJumpLabel;
   }
   const liveEditButton = $("liveEditBtn");
   if (liveEditButton) {
@@ -1665,12 +1662,11 @@ $("problemId").addEventListener("keydown", (e) => {
 $("quickProblemForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = $("quickProblemId");
-  const error = $("quickProblemError");
-  const button = $("quickProblemBtn");
   $("problemId").value = input.value.trim();
   input.removeAttribute("aria-invalid");
-  hide("quickProblemError");
-  button.disabled = true;
+  input.setCustomValidity("");
+  input.title = t().quickJumpLabel;
+  input.disabled = true;
   try {
     const loaded = await loadProblem({ scrollToEnd: true });
     if (loaded) {
@@ -1678,10 +1674,11 @@ $("quickProblemForm").addEventListener("submit", async (event) => {
       return;
     }
     input.setAttribute("aria-invalid", "true");
-    error.textContent = $("searchError").textContent || t().errLoad;
-    show("quickProblemError");
+    const message = $("searchError").textContent || t().errLoad;
+    input.setCustomValidity(message);
+    input.title = message;
   } finally {
-    button.disabled = false;
+    input.disabled = false;
   }
 });
 
@@ -1743,8 +1740,9 @@ async function loadProblem({ scrollToEnd = false } = {}) {
     if (quickProblemInput) {
       quickProblemInput.value = data.id;
       quickProblemInput.removeAttribute("aria-invalid");
+      quickProblemInput.setCustomValidity("");
+      quickProblemInput.title = t().quickJumpLabel;
     }
-    hide("quickProblemError");
     resetLiveEditorState();
     saveRecentProblem(data);
     if (problemChanged) $("extraParams").innerHTML = "";
@@ -13642,6 +13640,212 @@ function renderSlidingFreqView(step) {
         <span><i class="sfw-legend-swatch sfw-legend-over"></i>${isDistinctMode ? (vi ? "ký tự mới làm vượt giới hạn distinct" : "new character exceeding the distinct limit") : (vi ? "phần tử vượt k" : "element exceeding k")}</span>
       </div>
     </div>`;
+}
+
+function renderBalanced1234View(step) {
+  const view = step.balanced1234View || {};
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const alphabet = Array.isArray(view.alphabet) ? view.alphabet : ["Q", "W", "E", "R"];
+  const windowSet = new Set(Array.isArray(view.windowIndices) ? view.windowIndices : []);
+  const vi = lang === "vi";
+  const event = String(view.event || "target");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "—";
+  const phaseIndex = {
+    target: 0,
+    count: 0,
+    "balanced-check": 0,
+    "init-window": 1,
+    inspect: 1,
+    expand: 2,
+    "invalid-check": 3,
+    "valid-check": 3,
+    "update-best": 4,
+    "restore-left": 5,
+    "move-left": 5,
+    done: 6,
+  }[event] ?? 0;
+  const phaseLabels = vi
+    ? ["Đếm toàn chuỗi", "Mở rộng right", "Chuyển vào window", "Kiểm tra outside", "Cập nhật best", "Thu hẹp left"]
+    : ["Count string", "Expand right", "Move into window", "Check outside", "Update best", "Shrink left"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = event === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const bestLeft = view.bestWindow?.left;
+  const bestRight = view.bestWindow?.right;
+  const cells = chars.map((char, index) => {
+    const inWindow = windowSet.has(index);
+    const inBest = Number.isInteger(bestLeft) && index >= bestLeft && index <= bestRight;
+    const pointers = [index === view.left ? "L" : "", index === view.right ? "R" : ""].filter(Boolean).join("/");
+    const classes = [
+      "bal1234-cell",
+      `char-${char.toLowerCase()}`,
+      inWindow ? "replace" : "outside",
+      inBest ? "best" : "",
+      index === view.restoringIndex ? "restoring" : "",
+      index === view.right ? "current" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="bal1234-cell-wrap"><div class="bal1234-pointer">${pointers ? `${pointers} ▼` : ""}</div><div class="${classes}"><small>[${index}]</small><strong>${char}</strong><em>${inWindow ? (vi ? "THAY" : "REPLACE") : "OUTSIDE"}</em></div></div>`;
+  }).join("");
+
+  const countCards = alphabet.map((char) => {
+    const count = Number(view.outside?.[char] || 0);
+    const initial = Number(view.initialCounts?.[char] || 0);
+    const status = count > view.target ? "excess" : "safe";
+    const statusText = status === "excess" ? (vi ? "CÒN DƯ" : "EXCESS") : (vi ? "ĐẠT" : "SAFE");
+    return `<div class="bal1234-count ${status} char-${char.toLowerCase()}"><header><strong>${char}</strong><em>${statusText}</em></header><div><span>${count}</span><b>/ ${view.target}</b></div><footer>${vi ? "ban đầu" : "initial"} ${initial} · window ${view.windowCounts?.[char] || 0}</footer></div>`;
+  }).join("");
+
+  const conditions = alphabet.map((char) => {
+    const count = Number(view.outside?.[char] || 0);
+    const pass = count <= view.target;
+    return `<span class="${pass ? "pass" : "fail"}"><b>${char}</b><code>${count} ≤ ${view.target}</code><em>${pass ? "✓" : "✕"}</em></span>`;
+  }).join("");
+  const needed = alphabet.map((char) => `${char}:${view.replacementNeeds?.[char] || 0}`).join(" · ");
+
+  const eventLabels = {
+    target: "TARGET",
+    count: "COUNT",
+    "balanced-check": vi ? "CÂN BẰNG?" : "BALANCED?",
+    "init-window": "WINDOW",
+    inspect: "READ RIGHT",
+    expand: "OUTSIDE − 1",
+    "invalid-check": vi ? "CHƯA HỢP LỆ" : "NOT VALID",
+    "valid-check": vi ? "WINDOW HỢP LỆ" : "VALID WINDOW",
+    "update-best": view.improved ? "NEW BEST" : "KEEP BEST",
+    "restore-left": "OUTSIDE + 1",
+    "move-left": "MOVE LEFT",
+    done: "DONE",
+  };
+  const validClass = view.valid ? "valid" : "invalid";
+  const candidateText = view.candidate
+    ? `[${view.candidate.left}..${view.candidate.right}] · ${view.candidate.length}`
+    : "—";
+  const bestText = view.bestWindow
+    ? `[${view.bestWindow.left}..${view.bestWindow.right}] · ${view.best}`
+    : view.best === 0 ? "[] · 0" : `— · ${view.best}`;
+
+  $("treeView").innerHTML = `<section class="bal1234-viz" role="img" aria-label="Replace the Substring for Balanced String visualization">
+    <header><div><small>#1234 · SLIDING WINDOW</small><strong>${vi ? "THAY SUBSTRING ĐỂ CÂN BẰNG QWER" : "REPLACE A SUBSTRING TO BALANCE QWER"}</strong></div><span>${escapeHtml(eventLabels[event] || event)}</span></header>
+    <section class="bal1234-rule"><b>${vi ? "Ý TƯỞNG QUAN TRỌNG" : "KEY IDEA"}</b><strong>WINDOW = ${vi ? "phần sẽ thay" : "replaceable"} · OUTSIDE = ${vi ? "phần giữ nguyên" : "kept"}</strong><span>${vi ? "Chỉ cần mọi outside count ≤ target. Phần còn thiếu sẽ được điền vào window." : "Only the outside counts must be ≤ target. Missing characters can be placed inside the window."}</span></section>
+    <div class="bal1234-phases">${phases}</div>
+    <section class="bal1234-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><b>${escapeHtml(eventLabels[event] || event)}</b><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="bal1234-string"><header><strong>s = ${escapeHtml(JSON.stringify(view.s || ""))}</strong><span>${vi ? "xanh = outside · tím = window sẽ thay · nét đứt = best" : "blue = outside · purple = replacement window · dashed = best"}</span></header><div class="bal1234-scroll"><div class="bal1234-cells">${cells}</div></div></section>
+    <section class="bal1234-counts"><header><strong>${vi ? "BỘ ĐẾM BÊN NGOÀI WINDOW" : "COUNTS OUTSIDE THE WINDOW"}</strong><span>${vi ? `mỗi ký tự tối đa ${view.target}` : `each character at most ${view.target}`}</span></header><div>${countCards}</div></section>
+    <section class="bal1234-check ${validClass}"><header><div><small>${vi ? "ĐIỀU KIỆN WINDOW" : "WINDOW CONDITION"}</small><strong>all(outside[ch] ≤ target)</strong></div><b>${view.valid ? (vi ? "HỢP LỆ ✓" : "VALID ✓") : (vi ? "MỞ RỘNG TIẾP" : "KEEP EXPANDING")}</b></header><div>${conditions}</div><footer><span>${vi ? "Nếu thay window này, cần điền" : "If this window is replaced, fill"}</span><strong>${escapeHtml(needed)}</strong></footer></section>
+    <div class="bal1234-bottom"><section><small>${vi ? "CANDIDATE HIỆN TẠI" : "CURRENT CANDIDATE"}</small><strong>${candidateText}</strong><span>${view.improved ? (vi ? "ngắn hơn → lưu" : "shorter → save") : (vi ? "chưa cập nhật" : "not updated")}</span></section><section class="best"><small>${vi ? "WINDOW TỐT NHẤT" : "BEST WINDOW"}</small><strong>${bestText}</strong><span>${vi ? "độ dài nhỏ nhất" : "minimum length"}</span></section></div>
+    <footer><span>${vi ? "ANSWER · độ dài substring cần thay" : "ANSWER · replacement substring length"}</span><strong>${view.final || view.best === 0 || view.bestWindow ? view.best : "—"}</strong></footer>
+  </section>`;
+}
+
+function renderNice1248View(step) {
+  const view = step.nice1248View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const matchingPositions = new Set(Array.isArray(view.matchingPositions) ? view.matchingPositions : []);
+  const newSubarrays = Array.isArray(view.newSubarrays) ? view.newSubarrays : [];
+  const vi = lang === "vi";
+  const event = String(view.event || "init-freq");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "—";
+  const phaseIndex = {
+    "init-freq": 0,
+    "init-values": 0,
+    inspect: 0,
+    "update-prefix": 1,
+    "find-need": 2,
+    count: 3,
+    store: 4,
+    done: 5,
+  }[event] ?? 0;
+  const phaseLabels = vi
+    ? ["Đổi lẻ/chẵn", "Cập nhật prefix", "Tìm need", "Cộng số match", "Lưu prefix"]
+    : ["Read parity", "Update prefix", "Find need", "Count matches", "Store prefix"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = event === "done" || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const eventLabels = {
+    "init-freq": vi ? "PREFIX RỖNG" : "EMPTY PREFIX",
+    "init-values": vi ? "KHỞI TẠO" : "INITIALIZE",
+    inspect: vi ? "ĐỌC PHẦN TỬ" : "READ VALUE",
+    "update-prefix": vi ? "ĐẾM SỐ LẺ" : "COUNT ODDS",
+    "find-need": vi ? "TÍNH NEED" : "COMPUTE NEED",
+    count: vi ? "ĐẾM SUBARRAY MỚI" : "COUNT NEW SUBARRAYS",
+    store: vi ? "LƯU PREFIX" : "STORE PREFIX",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+
+  const belongsToNew = (index) => newSubarrays.some((item) => index >= item.start && index <= item.end);
+  const arrayCells = nums.map((value, index) => {
+    const odd = Math.abs(Number(value)) % 2 === 1;
+    const classes = [
+      "nice1248-cell",
+      odd ? "odd" : "even",
+      index < right ? "processed" : "",
+      index === right ? "current" : "",
+      belongsToNew(index) ? "new-range" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="nice1248-cell-wrap">
+      <div class="nice1248-pointer">${index === right ? "right ▼" : ""}</div>
+      <div class="${classes}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${odd ? (vi ? "LẺ +1" : "ODD +1") : (vi ? "CHẴN +0" : "EVEN +0")}</em></div>
+    </div>`;
+  }).join("");
+
+  const prefixHistory = Array.isArray(view.prefixHistory) ? view.prefixHistory.map((item) => ({ ...item })) : [];
+  if (right >= 0 && ["update-prefix", "find-need", "count"].includes(event) && !prefixHistory.some((item) => item.boundary === right)) {
+    prefixHistory.push({ boundary: right, value: view.prefix, temporary: true });
+  }
+  const prefixCells = prefixHistory.map((item) => {
+    const isCurrent = item.boundary === right;
+    const isMatch = matchingPositions.has(item.boundary) && ["find-need", "count", "store"].includes(event);
+    const classes = ["nice1248-prefix", isCurrent ? "current" : "", isMatch ? "match" : "", item.temporary ? "temporary" : ""].filter(Boolean).join(" ");
+    const boundaryLabel = item.boundary === -1 ? (vi ? "trước mảng" : "before array") : `after [${item.boundary}]`;
+    return `<div class="${classes}"><small>P[${item.boundary}]</small><strong>${item.value}</strong><span>${escapeHtml(boundaryLabel)}</span>${isMatch ? `<em>need ✓</em>` : ""}</div>`;
+  }).join("");
+
+  const freqEntries = Object.entries(view.freq || {}).sort(([a], [b]) => Number(a) - Number(b));
+  const freqCards = freqEntries.map(([prefixValue, count]) => {
+    const isNeed = Number(prefixValue) === Number(view.need) && view.need !== null;
+    const isCurrent = Number(prefixValue) === Number(view.prefix) && ["store", "done"].includes(event);
+    const positions = Array.isArray(view.positions?.[prefixValue]) ? view.positions[prefixValue] : [];
+    return `<div class="nice1248-freq${isNeed ? " need" : ""}${isCurrent ? " current" : ""}">
+      <small>prefix</small><strong>${escapeHtml(prefixValue)}</strong><span>count = ${escapeHtml(String(count))}</span><em>${positions.map((index) => index === -1 ? "P[-1]" : `P[${index}]`).join(", ")}</em>
+    </div>`;
+  }).join("");
+
+  const needReady = Number.isInteger(view.need);
+  const found = Array.isArray(view.matchingPositions) ? view.matchingPositions.length : 0;
+  const lookup = needReady
+    ? `<div class="nice1248-equation"><span><small>${vi ? "prefix hiện tại" : "current prefix"}</small><strong>${view.prefix}</strong></span><b>−</b><span><small>k</small><strong>${view.k}</strong></span><b>=</b><span class="need"><small>need</small><strong>${view.need}</strong></span></div>
+       <div class="nice1248-count"><span>prefix_freq[${view.need}]</span><strong>${found}</strong><b>ans: ${view.ans - (event === "count" ? view.added : 0)} + ${event === "count" ? view.added : 0} = ${view.ans}</b></div>`
+    : `<div class="nice1248-wait"><strong>${vi ? "Chưa tính need" : "Need is not computed yet"}</strong><span>${vi ? "Đọc phần tử rồi cập nhật số lượng số lẻ trước." : "Read the value and update the odd count first."}</span></div>`;
+
+  const newCards = newSubarrays.length
+    ? newSubarrays.map((item) => `<div class="nice1248-subarray"><small>prefix P[${item.prefixEnd}] = ${view.need}</small><strong>[${item.start}..${item.end}]</strong><span>[${item.values.map((value) => escapeHtml(String(value))).join(", ")}]</span><em>${vi ? `đúng ${view.k} số lẻ` : `exactly ${view.k} odds`}</em></div>`).join("")
+    : `<div class="nice1248-empty">${event === "done"
+      ? (vi ? `Đã đếm xong ${view.ans} nice subarray.` : `Finished counting ${view.ans} nice subarray(s).`)
+      : needReady
+        ? (vi ? `Không có prefix cũ bằng ${view.need} ở bước này.` : `No earlier prefix equals ${view.need} at this step.`)
+        : (vi ? "Các nice subarray mới sẽ hiện ở đây." : "New nice subarrays will appear here.")}</div>`;
+
+  const coreRule = vi
+    ? "Hai prefix chênh nhau k số lẻ ⇒ đoạn nằm giữa là một nice subarray."
+    : "Two prefixes differing by k odds ⇒ the segment between them is a nice subarray.";
+  const totalFound = Array.isArray(view.niceSubarrays) ? view.niceSubarrays.length : view.ans;
+
+  $("treeView").innerHTML = `<section class="nice1248-viz" role="img" aria-label="Count Number of Nice Subarrays visualization">
+    <header><div><small>#1248 · PREFIX COUNT</small><strong>${vi ? "ĐẾM SUBARRAY CÓ ĐÚNG K SỐ LẺ" : "COUNT SUBARRAYS WITH EXACTLY K ODDS"}</strong></div><span>${eventLabels[event] || event}</span></header>
+    <section class="nice1248-rule"><b>${vi ? "QUY TẮC CỐT LÕI" : "CORE RULE"}</b><strong>prefix[right] − prefix[left − 1] = k</strong><span>${escapeHtml(coreRule)}</span></section>
+    <div class="nice1248-phases">${phases}</div>
+    <section class="nice1248-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="nice1248-array"><header><strong>NUMS → ODD CONTRIBUTION</strong><span>${vi ? "lẻ = +1 · chẵn = +0" : "odd = +1 · even = +0"}</span></header><div class="nice1248-scroll"><div class="nice1248-cells">${arrayCells}</div></div></section>
+    <section class="nice1248-prefixes"><header><strong>${vi ? "CÁC MỐC PREFIX" : "PREFIX CHECKPOINTS"}</strong><span>${vi ? "P[i] = số lượng số lẻ trong nums[0..i]" : "P[i] = odd count in nums[0..i]"}</span></header><div class="nice1248-scroll"><div class="nice1248-prefix-row">${prefixCells}</div></div></section>
+    <div class="nice1248-main"><section class="nice1248-lookup"><header><strong>${vi ? "TÌM PREFIX CẦN THIẾT" : "LOOK UP THE NEEDED PREFIX"}</strong><span>need = prefix − k</span></header>${lookup}</section><section class="nice1248-ledger"><header><strong>PREFIX_FREQ</strong><span>${vi ? "giá trị prefix → số lần đã lưu" : "prefix value → stored count"}</span></header><div>${freqCards}</div></section></div>
+    <section class="nice1248-results"><header><strong>${vi ? "NICE SUBARRAY MỚI Ở RIGHT NÀY" : "NEW NICE SUBARRAYS AT THIS RIGHT"}</strong><span>${newSubarrays.length} ${vi ? "đoạn mới" : "new"}</span></header><div>${newCards}</div></section>
+    <footer><span><small>${vi ? "đã liệt kê" : "listed so far"}</small><strong>${totalFound}</strong></span><b>${vi ? "TỔNG ĐÁP ÁN" : "RUNNING ANSWER"}</b><strong>${view.ans ?? 0}</strong></footer>
+  </section>`;
 }
 
 function renderExactK992View(step) {
@@ -28632,6 +28836,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSmallHashView(step);
+  } else if (step.balanced1234View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBalanced1234View(step);
+  } else if (step.nice1248View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNice1248View(step);
   } else if (step.exactK992View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
