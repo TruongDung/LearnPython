@@ -29090,6 +29090,184 @@ function renderOrderlyQueue899View(step) {
   </section>`;
 }
 
+function renderShortestPalindrome214View(step) {
+  const view = step.shortestPalindrome214View || {};
+  const vi = lang === "vi";
+  const original = String(view.original || "");
+  const reversed = String(view.reversed || "");
+  const pattern = String(view.pattern || "#");
+  const lps = Array.isArray(view.lps) ? view.lps : [];
+  const current = Number.isInteger(view.i) ? view.i : -1;
+  const compare = Number.isInteger(view.compareIndex) ? view.compareIndex : -1;
+  const palindromeLength = Number(view.palindromeLength) || 0;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Ghép chuỗi gương", "Xây bảng KMP", "Tìm prefix đối xứng", "Thêm phần thiếu"]
+    : ["Build mirror string", "Build KMP table", "Find palindrome prefix", "Prepend missing part"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const suffixMatchStart = pattern.length - palindromeLength;
+  const cells = [...pattern].map((char, index) => {
+    const classes = ["sp214-cell"];
+    if (index < view.separatorIndex) classes.push("source");
+    else if (index === view.separatorIndex) classes.push("separator");
+    else classes.push("mirror");
+    if (index === current) classes.push("current");
+    if (index === compare) classes.push("compare");
+    if (view.matched === true && (index === current || index === compare)) classes.push("match");
+    if (view.matched === false && (index === current || index === compare)) classes.push("mismatch");
+    if (palindromeLength && (index < palindromeLength || index >= suffixMatchStart)) classes.push("pal-region");
+    const value = lps[index];
+    return `<span class="${classes.join(" ")}"><small>${index}</small><b>${escapeHtml(char)}</b><em>${value == null ? "·" : value}</em></span>`;
+  }).join("");
+
+  let operationTitle = vi ? "Đang chuẩn bị KMP" : "Preparing KMP";
+  let operationFormula = "pattern = s + '#' + reverse(s)";
+  let operationDetail = vi ? "lps[i] đo prefix dài nhất cũng xuất hiện ở cuối đoạn đang xét." : "lps[i] measures the longest prefix also appearing at the end of the current slice.";
+  if (["loop", "match-check", "mismatch", "extend", "write-lps", "fallback"].includes(view.operation)) {
+    const leftChar = compare >= 0 ? pattern[compare] : "?";
+    const rightChar = current >= 0 ? pattern[current] : "?";
+    operationTitle = view.operation === "fallback"
+      ? (vi ? "Nhảy tới border ngắn hơn" : "Jump to a shorter border")
+      : (vi ? "So khớp hai ký tự" : "Compare two characters");
+    operationFormula = view.operation === "fallback"
+      ? `length: ${view.previousLength} → ${view.length}`
+      : `pattern[${current}] '${rightChar}' ${view.matched === true ? "=" : view.matched === false ? "≠" : "?"} pattern[${compare}] '${leftChar}'`;
+    operationDetail = view.operation === "fallback"
+      ? `length = lps[${Math.max(0, Number(view.previousLength) - 1)}]`
+      : view.operation === "write-lps"
+        ? `lps[${current}] = ${view.length}`
+        : (vi ? "Xanh = khớp; đỏ = mismatch; tím = vị trí đang quét." : "Green = match; red = mismatch; purple = scan position.");
+  } else if (view.operation === "palindrome-prefix") {
+    operationTitle = vi ? "Đọc ô lps cuối" : "Read the final lps cell";
+    operationFormula = `lps[-1] = ${palindromeLength}`;
+    operationDetail = vi ? "Đây là độ dài palindrome prefix dài nhất của s." : "This is the longest palindromic-prefix length of s.";
+  } else if (view.operation === "suffix" || view.operation === "return") {
+    operationTitle = vi ? "Bù phần chưa đối xứng" : "Mirror the non-palindromic remainder";
+    operationFormula = `'${view.addFront}' + '${original}' = '${view.answer || `${view.addFront}${original}`}'`;
+    operationDetail = vi ? "Chỉ thêm reverse(suffix), nên không thể dùng ít ký tự hơn." : "Only reverse(suffix) is added, so no shorter addition can work.";
+  }
+
+  const prefix = original.slice(0, palindromeLength);
+  const suffix = String(view.suffix || "");
+  const constructionReady = ["palindrome-prefix", "suffix", "return"].includes(view.operation);
+  const sourceParts = [...original].map((char, index) => `<span class="sp214-part ${constructionReady ? (index < palindromeLength ? "prefix" : "suffix") : "pending"}"><small>${index}</small><b>${escapeHtml(char)}</b></span>`).join("") || `<span class="sp214-empty">${vi ? "chuỗi rỗng" : "empty string"}</span>`;
+  const added = [...String(view.addFront || "")].map((char) => `<span class="sp214-result-char added"><b>${escapeHtml(char)}</b><small>${vi ? "thêm" : "new"}</small></span>`).join("");
+  const kept = [...original].map((char, index) => `<span class="sp214-result-char ${index < palindromeLength ? "kept-prefix" : "kept-suffix"}"><b>${escapeHtml(char)}</b><small>${vi ? "giữ" : "keep"}</small></span>`).join("");
+  const construction = constructionReady
+    ? added + (kept || `<span class="sp214-empty">ε</span>`)
+    : `<span class="sp214-empty">${vi ? "chờ lps cuối" : "waiting for final lps"}</span>`;
+
+  const summary = vi
+    ? `Bài 214: palindrome prefix dài nhất hiện có độ dài ${palindromeLength}.`
+    : `Problem 214: the current longest palindromic prefix has length ${palindromeLength}.`;
+  $("treeView").innerHTML = `<section class="sp214-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>KMP · PREFIX FUNCTION · #214</small><strong>SHORTEST PALINDROME</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sp214-phases">${phases}</div>
+    <section class="sp214-idea"><strong>${vi ? "MỤC TIÊU" : "TARGET"}</strong><code>${vi ? "palindrome prefix dài nhất" : "longest palindromic prefix"}</code><i>→</i><span>${vi ? "đảo phần còn lại và thêm vào trước" : "reverse the remainder and prepend it"}</span></section>
+    <section class="sp214-pattern"><header><strong>s + # + reverse(s)</strong><span><b>s</b> · <i>#</i> · <em>reverse(s)</em></span></header><div class="sp214-strip">${cells}</div><footer><span>CHAR</span><span>LPS</span><p>${vi ? "Số dưới mỗi ký tự là lps tại index đó; · nghĩa là chưa tính." : "The lower number is lps at that index; · means not computed yet."}</p></footer></section>
+    <section class="sp214-operation"><header><strong>${escapeHtml(operationTitle)}</strong><code>${escapeHtml(operationFormula)}</code></header><span>${escapeHtml(operationDetail)}</span></section>
+    <section class="sp214-proof ${constructionReady ? "ready" : "pending"}"><header><strong>${vi ? "TÁCH s TẠI PALINDROME PREFIX" : "SPLIT s AT THE PALINDROME PREFIX"}</strong><span>${constructionReady ? `${palindromeLength} + ${suffix.length}` : "…"}</span></header><div>${sourceParts}</div><footer><span class="prefix"><b>${vi ? "prefix đối xứng" : "palindrome prefix"}</b><code>${constructionReady ? `'${escapeHtml(prefix)}'` : "…"}</code></span><i>+</i><span class="suffix"><b>${vi ? "suffix cần bù" : "suffix to mirror"}</b><code>${constructionReady ? `'${escapeHtml(suffix)}'` : "…"}</code></span></footer></section>
+    <section class="sp214-construction ${view.final ? "done" : ""}"><header><strong>reverse(suffix) + s</strong><span>${vi ? "ký tự xanh được thêm mới" : "green characters are prepended"}</span></header><div>${construction}</div></section>
+    <section class="sp214-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="sp214-result ${view.final ? "done" : ""}"><small>${vi ? "PALINDROME NGẮN NHẤT" : "SHORTEST PALINDROME"}</small><strong>${view.final ? (view.answer ? escapeHtml(view.answer) : "ε") : "…"}</strong><span>${view.final ? `${vi ? "thêm" : "prepend"} ${String(view.addFront || "").length} ${vi ? "ký tự" : "character(s)"}` : (vi ? "KMP đang tìm prefix đối xứng dài nhất." : "KMP is finding the longest palindromic prefix.")}</span></footer>
+  </section>`;
+}
+
+function renderEquallySpaced4048View(step) {
+  const view = step.equallySpaced4048View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const activeIndices = Array.isArray(view.activeIndices) ? view.activeIndices : [];
+  const activeIndexSet = new Set(activeIndices);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const collectedCount = Number(view.collectedCount) || 0;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Gom index", "Đúng 3 lần", "So khoảng cách", "Đếm", "Kết quả"]
+    : ["Collect indices", "Exactly 3", "Compare gaps", "Count", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const arrayHtml = nums.map((value, index) => {
+    const classes = ["es4048-cell"];
+    if (index < collectedCount) classes.push("collected");
+    if (index === currentIndex) classes.push("current");
+    if (activeIndexSet.has(index)) classes.push("same-value");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${escapeHtml(value)}</b></span>`;
+  }).join("");
+
+  const statusText = {
+    pending: vi ? "chờ kiểm tra" : "pending",
+    active: vi ? "đang xét" : "checking",
+    "special-ready": vi ? "khoảng cách bằng" : "equal gaps",
+    special: "SPECIAL ✓",
+    unequal: vi ? "khoảng cách khác" : "unequal gaps",
+    "wrong-count": vi ? "không đủ 3 lần" : "not exactly 3",
+  };
+  const groupsHtml = groups.length
+    ? groups.map((group) => {
+      const indices = Array.isArray(group.indices) ? group.indices : [];
+      const isActive = group.value === view.activeValue;
+      return `<article class="es4048-group ${escapeHtml(group.status || "pending")} ${isActive ? "active" : ""}">
+        <header><strong>${escapeHtml(group.value)}</strong><span>×${indices.length}</span></header>
+        <div>${indices.map((index) => `<b>${index}</b>`).join("") || "<i>—</i>"}</div>
+        <footer>${escapeHtml(statusText[group.status] || statusText.pending)}</footer>
+      </article>`;
+    }).join("")
+    : `<p>${vi ? "Hash map đang rỗng." : "The hash map is empty."}</p>`;
+
+  let spacingHtml;
+  if (view.activeValue == null) {
+    spacingHtml = `<p>${vi ? "Chọn một nhóm value để kiểm tra." : "Select a value group to inspect."}</p>`;
+  } else if (activeIndices.length !== 3) {
+    spacingHtml = `<div class="es4048-count-check"><span>value <b>${escapeHtml(view.activeValue)}</b></span><code>len(indices) = ${activeIndices.length}</code><strong>≠ 3</strong></div>`;
+  } else {
+    const leftGap = view.gapLeft == null ? "?" : view.gapLeft;
+    const rightGap = view.gapRight == null ? "?" : view.gapRight;
+    const comparison = view.equalGaps == null ? "?" : view.equalGaps ? "=" : "≠";
+    spacingHtml = `<div class="es4048-spacing ${view.equalGaps === true ? "equal" : view.equalGaps === false ? "unequal" : ""}">
+      <span><small>i₁</small><b>${activeIndices[0]}</b></span>
+      <i><small>gap 1</small><b>${leftGap}</b></i>
+      <span><small>i₂</small><b>${activeIndices[1]}</b></span>
+      <i><small>gap 2</small><b>${rightGap}</b></i>
+      <span><small>i₃</small><b>${activeIndices[2]}</b></span>
+      <strong>${leftGap} ${comparison} ${rightGap}</strong>
+    </div>`;
+  }
+
+  const operation = view.operation || "init-map";
+  const formulas = {
+    "init-map": "positions = defaultdict(list)",
+    scan: currentIndex >= 0 ? `index = ${currentIndex}, value = ${view.currentValue}` : "for index, value in enumerate(nums)",
+    append: `positions[${view.currentValue}].append(${currentIndex})`,
+    "init-answer": "answer = 0",
+    group: `value = ${view.activeValue}, indices = [${activeIndices.join(", ")}]`,
+    check: view.countOk === false
+      ? `len(indices) = ${activeIndices.length} != 3`
+      : `${view.gapLeft} ${view.equalGaps ? "==" : "!="} ${view.gapRight}`,
+    count: `answer = ${view.answerBefore} + 1 = ${view.answer}`,
+    return: `return ${view.answer}`,
+  };
+  const countedValues = groups.filter((group) => group.status === "special").map((group) => group.value);
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 4048: đã gom ${collectedCount}/${nums.length} index và đếm ${view.answer || 0} value special.`
+    : `Problem 4048: collected ${collectedCount}/${nums.length} indices and counted ${view.answer || 0} special values.`;
+
+  $("treeView").innerHTML = `<section class="es4048-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>HASH MAP · INDEX GAPS · #4048</small><strong>EQUALLY SPACED OCCURRENCES</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="es4048-phases">${phases}</div>
+    <section class="es4048-rule"><strong>SPECIAL</strong><code>count = 3</code><i>AND</i><code>i₂ − i₁ = i₃ − i₂</code></section>
+    <section class="es4048-array"><header><strong>NUMS</strong><span>${vi ? "các ô cùng màu là occurrence của value đang xét" : "matching cells are occurrences of the active value"}</span></header><div>${arrayHtml}</div></section>
+    <section class="es4048-groups"><header><strong>${vi ? "HASH MAP: VALUE → INDICES" : "HASH MAP: VALUE → INDICES"}</strong><span>${groups.length} ${vi ? "value phân biệt" : "distinct values"}</span></header><div>${groupsHtml}</div></section>
+    <section class="es4048-check"><header><strong>${vi ? "KIỂM TRA NHÓM HIỆN TẠI" : "ACTIVE GROUP CHECK"}</strong><span>${view.activeValue == null ? "—" : `value ${escapeHtml(view.activeValue)}`}</span></header>${spacingHtml}</section>
+    <section class="es4048-operation"><header><strong>${vi ? "PHÉP TOÁN" : "OPERATION"}</strong><code>${escapeHtml(formulas[operation] || operation)}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="es4048-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <footer class="es4048-result ${final ? "done" : ""}"><div><small>SPECIAL VALUES</small><span>${countedValues.length ? countedValues.map((value) => `<b>${escapeHtml(value)}</b>`).join("") : "—"}</span></div><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "giá trị special phân biệt" : "distinct special values") : (vi ? "answer chỉ tăng sau khi cả hai điều kiện đúng" : "answer increases only after both conditions pass")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -30150,12 +30328,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderShadowPairs4055View(step);
+  } else if (step.equallySpaced4048View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEquallySpaced4048View(step);
   } else if (step.orderlyQueue899View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderOrderlyQueue899View(step);
+  } else if (step.shortestPalindrome214View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShortestPalindrome214View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

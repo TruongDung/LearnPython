@@ -15776,3 +15776,328 @@ Object.assign(module.exports, {
     builder: buildSteps899,
   },
 });
+
+/**
+ * LeetCode 214: Shortest Palindrome.
+ * Use the KMP prefix table on s + '#' + reverse(s) to find the longest
+ * palindromic prefix, then mirror the remaining suffix in front.
+ */
+function validateShortestPalindrome214Input(input) {
+  const s = String(input ?? "");
+  if (!/^[a-z]*$/.test(s)) {
+    throw new Error("s must contain only lowercase English letters");
+  }
+  if (s.length > 16) {
+    throw new Error("s must contain at most 16 letters for visualization");
+  }
+  return s;
+}
+
+function buildSteps214(input) {
+  const s = validateShortestPalindrome214Input(input);
+  const reversed = [...s].reverse().join("");
+  const pattern = `${s}#${reversed}`;
+  const lps = new Array(pattern.length).fill(0);
+  const visibleLps = new Array(pattern.length).fill(null);
+  visibleLps[0] = 0;
+  const steps = [];
+
+  function pushStep({
+    title,
+    note,
+    line,
+    operation,
+    phaseIndex,
+    i = -1,
+    length = 0,
+    compareIndex = -1,
+    matched = null,
+    previousLength = null,
+    palindromeLength = 0,
+    suffix = "",
+    answer = "",
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      final,
+      vars: [
+        { name: "i", value: i },
+        { name: "length", value: length },
+        { name: "lps", value: `[${visibleLps.map((value) => value ?? "·").join(", ")}]` },
+      ],
+      shortestPalindrome214View: {
+        original: s,
+        reversed,
+        pattern,
+        separatorIndex: s.length,
+        lps: [...visibleLps],
+        operation,
+        phaseIndex,
+        i,
+        length,
+        compareIndex,
+        matched,
+        previousLength,
+        palindromeLength,
+        palindromePrefix: s.slice(0, palindromeLength),
+        suffix,
+        addFront: [...suffix].reverse().join(""),
+        answer,
+        final,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Đảo s → '${reversed}'`, en: `Reverse s → '${reversed}'` },
+    note: {
+      vi: "Bản đảo giúp biến câu hỏi palindrome thành câu hỏi prefix nào khớp với suffix.",
+      en: "The reversed copy turns the palindrome question into a prefix-versus-suffix match.",
+    },
+    line: 3,
+    operation: "reverse",
+    phaseIndex: 0,
+  });
+  pushStep({
+    title: { vi: `Ghép '${pattern}'`, en: `Build '${pattern}'` },
+    note: {
+      vi: "Ký tự # ngăn một match chạy xuyên từ s sang reverse(s).",
+      en: "The # separator prevents a match from crossing directly from s into reverse(s).",
+    },
+    line: 4,
+    operation: "combine",
+    phaseIndex: 0,
+  });
+  pushStep({
+    title: { vi: "Khởi tạo bảng lps", en: "Initialize the lps table" },
+    note: {
+      vi: "lps[i] là độ dài prefix dài nhất cũng là suffix của pattern[0..i].",
+      en: "lps[i] is the longest prefix that is also a suffix of pattern[0..i].",
+    },
+    line: 5,
+    operation: "init-lps",
+    phaseIndex: 1,
+  });
+
+  for (let i = 1; i < pattern.length; i += 1) {
+    let length = lps[i - 1];
+    pushStep({
+      title: { vi: `Xét pattern[${i}] = '${pattern[i]}'`, en: `Inspect pattern[${i}] = '${pattern[i]}'` },
+      note: {
+        vi: `Bắt đầu từ match dài ${length}, lấy từ lps[${i - 1}].`,
+        en: `Start with match length ${length}, inherited from lps[${i - 1}].`,
+      },
+      line: 6,
+      operation: "loop",
+      phaseIndex: 1,
+      i,
+      length,
+      compareIndex: length,
+    });
+
+    while (length > 0 && pattern[i] !== pattern[length]) {
+      pushStep({
+        title: { vi: `'${pattern[i]}' ≠ '${pattern[length]}'`, en: `'${pattern[i]}' ≠ '${pattern[length]}'` },
+        note: {
+          vi: `Match dài ${length} thất bại; KMP thử border ngắn hơn mà không quét lại từ đầu.`,
+          en: `The length-${length} match fails; KMP tries a shorter border without rescanning from the start.`,
+        },
+        line: 8,
+        operation: "mismatch",
+        phaseIndex: 1,
+        i,
+        length,
+        compareIndex: length,
+        matched: false,
+      });
+      const previousLength = length;
+      length = lps[length - 1];
+      pushStep({
+        title: { vi: `Fallback ${previousLength} → ${length}`, en: `Fallback ${previousLength} → ${length}` },
+        note: {
+          vi: `Dùng lps[${previousLength - 1}] để nhảy thẳng tới border khả thi tiếp theo.`,
+          en: `Use lps[${previousLength - 1}] to jump directly to the next possible border.`,
+        },
+        line: 9,
+        operation: "fallback",
+        phaseIndex: 1,
+        i,
+        length,
+        compareIndex: length,
+        previousLength,
+      });
+    }
+
+    const matched = pattern[i] === pattern[length];
+    pushStep({
+      title: matched
+        ? { vi: `'${pattern[i]}' = '${pattern[length]}'`, en: `'${pattern[i]}' = '${pattern[length]}'` }
+        : { vi: `'${pattern[i]}' vẫn không khớp`, en: `'${pattern[i]}' still does not match` },
+      note: matched
+        ? {
+            vi: `Prefix được kéo dài thêm bằng ký tự ở index ${length}.`,
+            en: `Extend the prefix match with the character at index ${length}.`,
+          }
+        : {
+            vi: "Không còn border nào để thử; lps tại vị trí này sẽ bằng 0.",
+            en: "No border remains to try; lps at this position will be 0.",
+          },
+      line: 10,
+      operation: "match-check",
+      phaseIndex: 1,
+      i,
+      length,
+      compareIndex: length,
+      matched,
+    });
+    if (matched) {
+      length += 1;
+      pushStep({
+        title: { vi: `Tăng length lên ${length}`, en: `Increase length to ${length}` },
+        note: {
+          vi: `Đã khớp ${length} ký tự đầu của pattern.`,
+          en: `The first ${length} characters of pattern now match.`,
+        },
+        line: 11,
+        operation: "extend",
+        phaseIndex: 1,
+        i,
+        length,
+        compareIndex: length - 1,
+        matched: true,
+      });
+    }
+    lps[i] = length;
+    visibleLps[i] = length;
+    pushStep({
+      title: { vi: `Ghi lps[${i}] = ${length}`, en: `Write lps[${i}] = ${length}` },
+      note: {
+        vi: `Prefix và suffix dài nhất của pattern[0..${i}] có độ dài ${length}.`,
+        en: `The longest equal prefix and suffix of pattern[0..${i}] has length ${length}.`,
+      },
+      line: 12,
+      operation: "write-lps",
+      phaseIndex: 1,
+      i,
+      length,
+    });
+  }
+
+  const palindromeLength = lps[lps.length - 1];
+  pushStep({
+    title: { vi: `Palindrome prefix dài ${palindromeLength}`, en: `Palindrome prefix length is ${palindromeLength}` },
+    note: {
+      vi: `lps cuối nối prefix của s với suffix của reverse(s), nên s[0:${palindromeLength}] đọc xuôi và ngược như nhau.`,
+      en: `The final lps links a prefix of s to a suffix of reverse(s), so s[0:${palindromeLength}] reads the same both ways.`,
+    },
+    line: 13,
+    operation: "palindrome-prefix",
+    phaseIndex: 2,
+    palindromeLength,
+    length: palindromeLength,
+  });
+
+  const suffix = s.slice(palindromeLength);
+  pushStep({
+    title: { vi: `Suffix cần bù: '${suffix}'`, en: `Suffix to mirror: '${suffix}'` },
+    note: {
+      vi: `Phần '${s.slice(0, palindromeLength)}' đã đối xứng; chỉ suffix '${suffix}' cần được đảo và thêm trước.`,
+      en: `Prefix '${s.slice(0, palindromeLength)}' is already symmetric; only suffix '${suffix}' must be reversed and prepended.`,
+    },
+    line: 14,
+    operation: "suffix",
+    phaseIndex: 2,
+    palindromeLength,
+    suffix,
+    length: palindromeLength,
+  });
+
+  const answer = [...suffix].reverse().join("") + s;
+  pushStep({
+    title: { vi: `Trả về '${answer}'`, en: `Return '${answer}'` },
+    note: {
+      vi: "Đảo suffix rồi thêm vào trước s tạo palindrome ngắn nhất.",
+      en: "Reverse the suffix and prepend it to s to form the shortest palindrome.",
+    },
+    line: 15,
+    operation: "return",
+    phaseIndex: 3,
+    palindromeLength,
+    suffix,
+    answer,
+    length: palindromeLength,
+    final: true,
+  });
+  return { s, answer, steps };
+}
+
+Object.assign(module.exports, {
+  214: {
+    id: 214,
+    difficulty: "hard",
+    slug: "shortest-palindrome",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "kmp", vi: "KMP", en: "KMP" },
+      { key: "palindrome", vi: "Palindrome", en: "Palindrome" },
+    ],
+    title: { vi: "Shortest Palindrome", en: "Shortest Palindrome" },
+    titleVi: { vi: "Palindrome ngắn nhất", en: "Shortest palindrome" },
+    statement: {
+      vi: "Cho chuỗi s. Bạn chỉ được thêm ký tự vào phía trước s. Trả về palindrome ngắn nhất có thể tạo ra.",
+      en: "Given a string s, add characters only in front of it and return the shortest palindrome that can be formed.",
+    },
+    defaultInput: "aacecaaa",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường)", en: "s (lowercase letters)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Palindrome ngắn nhất giữ lại palindrome prefix dài nhất của s; phần suffix còn lại phải được đảo và thêm vào trước.",
+        en: "The shortest answer keeps the longest palindromic prefix of s; the remaining suffix must be reversed and prepended.",
+      },
+      {
+        vi: "Tạo pattern = s + '#' + reverse(s). Giá trị lps cuối của KMP chính là độ dài palindrome prefix dài nhất.",
+        en: "Build pattern = s + '#' + reverse(s). The final KMP lps value is exactly the longest palindromic-prefix length.",
+      },
+      {
+        vi: "Trả về reverse(suffix) + s.",
+        en: "Return reverse(suffix) + s.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "KMP quét chuỗi ghép độ dài 2n+1 đúng một lần và lưu bảng lps.",
+        en: "KMP scans the length-(2n+1) combined string once and stores its lps table.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def shortestPalindrome(self, s: str) -> str:",
+      "        reverse = s[::-1]",
+      "        pattern = s + '#' + reverse",
+      "        lps = [0] * len(pattern)",
+      "        for i in range(1, len(pattern)):",
+      "            length = lps[i - 1]",
+      "            while length and pattern[i] != pattern[length]:",
+      "                length = lps[length - 1]",
+      "            if pattern[i] == pattern[length]:",
+      "                length += 1",
+      "            lps[i] = length",
+      "        palindrome_prefix = lps[-1]",
+      "        suffix = s[palindrome_prefix:]",
+      "        return suffix[::-1] + s",
+    ],
+    debugMode: "semantic",
+    builder: buildSteps214,
+  },
+});
