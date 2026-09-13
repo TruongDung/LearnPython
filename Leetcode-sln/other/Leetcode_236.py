@@ -13,7 +13,7 @@ class Solution:
         right = self.lowestCommonAncestor(root.right, p, q)
         if left and right:
             return root
-        return left or right 
+        return left or right
 
 root = TreeNode(3)
 
