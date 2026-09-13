@@ -5857,73 +5857,188 @@ function buildSteps128(input) {
 }
 
 /** LeetCode 240: Search a 2D Matrix II — staircase search from the top-right. */
-function buildSteps240(input, params) {
-  const m = parseMatrix(input);
-  const R = m.length, C = m[0].length;
-  const target = Number(params && params.target !== undefined ? params.target : 5);
+function buildSteps240(input, params = {}) {
+  const matrix = parseIntegerMatrix2D(input);
+  const rows = matrix.length, cols = matrix[0].length;
+  const target = Number(params.target ?? 5);
+  if (!Number.isInteger(target)) throw new Error("target must be an integer");
+  const rowsSorted = matrix.every((values) => values.every((value, col) => col === 0 || values[col - 1] <= value));
+  const colsSorted = matrix.every((values, row) => values.every((value, col) => row === 0 || matrix[row - 1][col] <= value));
+  if (!rowsSorted || !colsSorted) throw new Error("matrix rows and columns must be sorted in nondecreasing order");
+
   const steps = [];
-  const visited = new Set();
-  function gsnap(o) {
+  const path = [];
+  const eliminatedRows = [];
+  const eliminatedCols = [];
+  let row = 0, col = cols - 1, value = null;
+
+  function snapshot({ title, note, codeLine, phase, decision, activeCell = null, previousCell = null, final = false }) {
+    const pointer = row >= 0 && row < rows && col >= 0 && col < cols ? [row, col] : null;
     steps.push({
-      title: o.title, arr: [],
-      grid: {
-        dp: m.map((r) => [...r]),
-        text1: Array.from({ length: R }, (_, i) => String(i)).join(""),
-        text2: Array.from({ length: C }, (_, i) => String(i)).join(""),
-        hlCell: o.hlCell || null,
-        pathCells: [...visited].map((k) => k.split(",").map(Number)),
-        largeCells: true,
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars: [
+        { name: "row", value: row },
+        { name: "col", value: col },
+        { name: "value", value: value ?? "—" },
+        { name: "target", value: target },
+      ],
+      note,
+      search240View: {
+        matrix: cloneMatrix2D(matrix),
+        rows,
+        cols,
+        target,
+        row,
+        col,
+        value,
+        pointer,
+        activeCell: activeCell ? [...activeCell] : null,
+        previousCell: previousCell ? [...previousCell] : null,
+        path: path.map((cell) => [...cell]),
+        eliminatedRows: [...eliminatedRows],
+        eliminatedCols: [...eliminatedCols],
+        candidates: Math.max(0, rows - eliminatedRows.length) * Math.max(0, cols - eliminatedCols.length),
+        phase,
+        decision: { ...decision },
       },
-      highlight: [], mark: [], final: o.final || false,
-      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
     });
   }
-  gsnap({
-    title: { vi: "Bắt đầu từ góc trên-phải", en: "Start at the top-right corner" },
-    codeLines: [5],
-    vars: [{ name: "target", value: target }, { name: "row", value: 0 }, { name: "col", value: C - 1 }],
-    note: {
-      vi: `Ma trận ${R}×${C}: mỗi hàng tăng dần trái→phải, mỗi cột tăng dần trên→dưới. Bắt đầu ở góc trên-phải (0, ${C - 1}): đi TRÁI nếu giá trị > target, đi XUỐNG nếu < target.`,
-      en: `${R}×${C} matrix: rows increase left→right, cols increase top→bottom. Start at top-right (0, ${C - 1}): go LEFT if value > target, go DOWN if value < target.`,
-    },
+
+  snapshot({
+    title: { vi: "Kiểm tra matrix không rỗng", en: "Check that the matrix is not empty" },
+    note: { vi: `${rows}×${cols} là matrix hợp lệ, nên không trả về False sớm.`, en: `${rows}×${cols} is a valid matrix, so the early False return is skipped.` },
+    codeLine: 3,
+    phase: "guard",
+    decision: { kind: "guard", passed: true },
   });
-  let row = 0, col = C - 1;
-  while (row < R && col >= 0) {
-    const value = m[row][col];
-    visited.add(`${row},${col}`);
-    if (value === target) {
-      gsnap({
-        title: { vi: `matrix[${row}][${col}] = ${value} = target ✓`, en: `matrix[${row}][${col}] = ${value} = target ✓` },
-        hlCell: [row, col], final: true, codeLines: [7, 8, 9],
-        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }, { name: "found", value: true }],
-        note: { vi: `Tìm thấy target=${target} tại ô (${row}, ${col}) → trả về True.`, en: `Found target=${target} at cell (${row}, ${col}) → return True.` },
+  snapshot({
+    title: { vi: `Đặt con trỏ tại góc trên-phải (0, ${col})`, en: `Place the pointer at the top-right corner (0, ${col})` },
+    note: { vi: "Tại góc này, so sánh một lần có thể loại trọn phần còn lại của một hàng hoặc một cột.", en: "At this corner, one comparison can eliminate the remaining part of an entire row or column." },
+    codeLine: 5,
+    phase: "init",
+    activeCell: [row, col],
+    decision: { kind: "init" },
+  });
+
+  while (true) {
+    const inBounds = row < rows && col >= 0;
+    snapshot({
+      title: inBounds
+        ? { vi: `${row} < ${rows} và ${col} ≥ 0 → tiếp tục`, en: `${row} < ${rows} and ${col} ≥ 0 → continue` }
+        : { vi: "Con trỏ đã ra ngoài matrix", en: "The pointer has left the matrix" },
+      note: inBounds
+        ? { vi: `Ô (${row}, ${col}) vẫn nằm trong vùng ứng viên.`, en: `Cell (${row}, ${col}) is still inside the candidate region.` }
+        : { vi: "Điều kiện while là False; không còn ô ứng viên nào để kiểm tra.", en: "The while condition is false; no candidate cell remains to inspect." },
+      codeLine: 6,
+      phase: "loop",
+      activeCell: inBounds ? [row, col] : null,
+      decision: { kind: "bounds", inBounds },
+    });
+    if (!inBounds) break;
+
+    value = matrix[row][col];
+    path.push([row, col]);
+    snapshot({
+      title: { vi: `Đọc matrix[${row}][${col}] = ${value}`, en: `Read matrix[${row}][${col}] = ${value}` },
+      note: { vi: `Đây là lần đọc thứ ${path.length}; so sánh ${value} với target ${target}.`, en: `This is probe ${path.length}; compare ${value} with target ${target}.` },
+      codeLine: 7,
+      phase: "read",
+      activeCell: [row, col],
+      decision: { kind: "read" },
+    });
+
+    const equal = value === target;
+    snapshot({
+      title: equal
+        ? { vi: `${value} == ${target} → True`, en: `${value} == ${target} → True` }
+        : { vi: `${value} == ${target} → False`, en: `${value} == ${target} → False` },
+      note: equal
+        ? { vi: `Ô (${row}, ${col}) chính là target.`, en: `Cell (${row}, ${col}) is the target.` }
+        : { vi: "Chưa tìm thấy; cần quyết định đi trái hay đi xuống.", en: "Not found yet; decide whether to move left or down." },
+      codeLine: 8,
+      phase: "compare",
+      activeCell: [row, col],
+      decision: { kind: "equal", result: equal },
+    });
+    if (equal) {
+      snapshot({
+        title: { vi: `Tìm thấy ${target} tại (${row}, ${col})`, en: `Found ${target} at (${row}, ${col})` },
+        note: { vi: `Trả về True sau ${path.length} lần đọc ô.`, en: `Return True after ${path.length} cell probe(s).` },
+        codeLine: 9,
+        phase: "found",
+        activeCell: [row, col],
+        decision: { kind: "found" },
+        final: true,
       });
-      return { original: m, answer: true, steps };
+      return { original: cloneMatrix2D(matrix), answer: true, steps };
     }
-    if (value > target) {
-      gsnap({
-        title: { vi: `${value} > ${target} → sang trái (col--)`, en: `${value} > ${target} → go left (col--)` },
-        hlCell: [row, col], codeLines: [7, 10, 11],
-        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }],
-        note: { vi: `matrix[${row}][${col}]=${value} > target. Mọi ô còn lại của cột ${col} còn lớn hơn → loại cột này, col = ${col - 1}.`, en: `matrix[${row}][${col}]=${value} > target. The rest of column ${col} is even larger → drop it, col = ${col - 1}.` },
-      });
+
+    const greater = value > target;
+    snapshot({
+      title: greater
+        ? { vi: `${value} > ${target} → True`, en: `${value} > ${target} → True` }
+        : { vi: `${value} > ${target} → False`, en: `${value} > ${target} → False` },
+      note: greater
+        ? { vi: `Các ô phía dưới trong cột ${col} đều ≥ ${value}, nên cột này không thể chứa target.`, en: `Every lower cell in column ${col} is at least ${value}, so this column cannot contain the target.` }
+        : { vi: `Vì ${value} < ${target}, nhánh else sẽ chạy.`, en: `Because ${value} < ${target}, the else branch will run.` },
+      codeLine: 10,
+      phase: "compare",
+      activeCell: [row, col],
+      decision: { kind: "greater", result: greater },
+    });
+
+    const previousCell = [row, col];
+    if (greater) {
+      const removedCol = col;
+      eliminatedCols.push(removedCol);
       col -= 1;
-    } else {
-      gsnap({
-        title: { vi: `${value} < ${target} → xuống dưới (row++)`, en: `${value} < ${target} → go down (row++)` },
-        hlCell: [row, col], codeLines: [7, 10, 12, 13],
-        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }],
-        note: { vi: `matrix[${row}][${col}]=${value} < target. Mọi ô còn lại bên trái của hàng ${row} còn nhỏ hơn → loại hàng này, row = ${row + 1}.`, en: `matrix[${row}][${col}]=${value} < target. The rest of row ${row} to the left is even smaller → drop it, row = ${row + 1}.` },
+      snapshot({
+        title: { vi: `Loại cột ${removedCol}; col = ${col}`, en: `Eliminate column ${removedCol}; col = ${col}` },
+        note: { vi: `Đi sang trái một ô. Cột ${removedCol} bị loại an toàn vì phần còn lại của nó đều lớn hơn target.`, en: `Move one cell left. Column ${removedCol} is safely eliminated because its remaining values all exceed the target.` },
+        codeLine: 11,
+        phase: "move-left",
+        activeCell: row < rows && col >= 0 ? [row, col] : null,
+        previousCell,
+        decision: { kind: "move-left", eliminatedCol: removedCol },
       });
+    } else {
+      snapshot({
+        title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+        note: { vi: `Các ô bên trái trong hàng ${row} đều ≤ ${value} < ${target}, nên có thể loại hàng này.`, en: `Every leftward cell in row ${row} is at most ${value} < ${target}, so this row can be eliminated.` },
+        codeLine: 12,
+        phase: "compare",
+        activeCell: [row, col],
+        decision: { kind: "else" },
+      });
+      const removedRow = row;
+      eliminatedRows.push(removedRow);
       row += 1;
+      snapshot({
+        title: { vi: `Loại hàng ${removedRow}; row = ${row}`, en: `Eliminate row ${removedRow}; row = ${row}` },
+        note: { vi: `Đi xuống một ô. Hàng ${removedRow} bị loại an toàn vì phần còn lại của nó đều nhỏ hơn target.`, en: `Move one cell down. Row ${removedRow} is safely eliminated because its remaining values all fall below the target.` },
+        codeLine: 13,
+        phase: "move-down",
+        activeCell: row < rows && col >= 0 ? [row, col] : null,
+        previousCell,
+        decision: { kind: "move-down", eliminatedRow: removedRow },
+      });
     }
   }
-  gsnap({
-    title: { vi: `Không tìm thấy ${target}`, en: `${target} not found` },
-    final: true, codeLines: [6, 14], vars: [{ name: "found", value: false }],
-    note: { vi: `Đã ra khỏi ma trận mà chưa gặp target → trả về False.`, en: `Walked off the matrix without meeting target → return False.` },
+
+  snapshot({
+    title: { vi: `Không tìm thấy ${target}`, en: `${target} was not found` },
+    note: { vi: `Đường cầu thang đã loại hết vùng ứng viên sau ${path.length} lần đọc; trả về False.`, en: `The staircase path eliminated the candidate region after ${path.length} probe(s); return False.` },
+    codeLine: 14,
+    phase: "missing",
+    decision: { kind: "missing" },
+    final: true,
   });
-  return { original: m, answer: false, steps };
+  return { original: cloneMatrix2D(matrix), answer: false, steps };
 }
 
 /** LeetCode 287: Find the Duplicate Number — Floyd's tortoise & hare. */
@@ -10440,6 +10555,7 @@ module.exports = {
   240: {
     id: 240, difficulty: "medium", slug: "search-a-2d-matrix-ii",
     category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },
+    tags: [twoDArrayTag, { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" }],
     title: { vi: "Search a 2D Matrix II", en: "Search a 2D Matrix II" },
     titleVi: { vi: "Tìm kiếm trong ma trận 2D II (đi kiểu cầu thang)", en: "Search a 2D matrix II (staircase)" },
     statement: { vi: "Ma trận mỗi hàng tăng dần trái→phải, mỗi cột tăng dần trên→dưới. Kiểm tra target có tồn tại. Nhập ma trận (hàng cách ';'), target trong tham số.", en: "Each row increases left→right and each column top→bottom. Check whether target exists. Enter matrix (rows separated by ';'); target as a parameter." },
@@ -10468,6 +10584,7 @@ module.exports = {
       "                row += 1",
       "        return False",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps240,
   },
   287: {

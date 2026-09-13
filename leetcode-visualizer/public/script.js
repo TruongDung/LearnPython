@@ -26075,6 +26075,116 @@ function renderSearchMatrix74View(step) {
   </section>`;
 }
 
+function renderSearchMatrix240View(step) {
+  const view = step.search240View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const target = view.target;
+  const phase = String(view.phase || "guard");
+  const decision = view.decision || {};
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const previousCell = Array.isArray(view.previousCell) ? view.previousCell : null;
+  const path = Array.isArray(view.path) ? view.path : [];
+  const eliminatedRows = new Set((view.eliminatedRows || []).map(Number));
+  const eliminatedCols = new Set((view.eliminatedCols || []).map(Number));
+  const cellKey = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const sameCell = (cell, row, col) => cellKey(cell) === `${row},${col}`;
+  const pathOrder = new Map(path.map((cell, index) => [cellKey(cell), index + 1]));
+  const isResult = phase === "found" || phase === "missing";
+  const phaseIndex = isResult ? 4 : phase.startsWith("move") ? 3 : phase === "compare" ? 2 : phase === "read" || phase === "loop" ? 1 : 0;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+
+  const stages = [
+    { vi: "Góc trên-phải", en: "Top-right corner", detail: "row = 0" },
+    { vi: "Đọc một ô", en: "Read one cell", detail: "matrix[row][col]" },
+    { vi: "So với target", en: "Compare to target", detail: "= / > / <" },
+    { vi: "Loại hàng/cột", en: "Drop row/column", detail: "↓ / ←" },
+  ].map((item, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (decision.kind === "guard") {
+    decisionHtml = `<section class="s240-decision init"><small>${vi ? "ĐIỀU KIỆN ĐẦU VÀO" : "INPUT GUARD"}</small><strong>matrix and matrix[0] → TRUE</strong><span>${vi ? "Matrix không rỗng nên tiếp tục đến bước đặt con trỏ." : "The matrix is non-empty, so execution continues to pointer initialization."}</span></section>`;
+  } else if (decision.kind === "init") {
+    decisionHtml = `<section class="s240-decision init"><small>${vi ? "ĐIỂM BẮT ĐẦU" : "STARTING POINT"}</small><strong>(row, col) = (0, ${cols - 1})</strong><span>${vi ? "Góc trên-phải cho phép loại một hướng chắc chắn sau mỗi lần so sánh." : "The top-right corner makes one direction safely removable after each comparison."}</span></section>`;
+  } else if (decision.kind === "bounds") {
+    decisionHtml = `<section class="s240-decision ${decision.inBounds ? "check" : "missing"}"><small>WHILE</small><strong>row &lt; ${rows} and col &gt;= 0 → ${decision.inBounds ? "TRUE" : "FALSE"}</strong><span>${decision.inBounds ? (vi ? "Con trỏ còn trong vùng ứng viên." : "The pointer remains in the candidate region.") : (vi ? "Con trỏ đã đi qua biên; vùng ứng viên rỗng." : "The pointer crossed a boundary; the candidate region is empty.")}</span></section>`;
+  } else if (decision.kind === "read") {
+    decisionHtml = `<section class="s240-decision check"><small>${vi ? "ĐỌC Ô" : "READ CELL"}</small><strong>value = matrix[${view.row}][${view.col}] = ${escapeHtml(String(view.value))}</strong><span>${vi ? `Lần đọc ${path.length}; chỉ những ô trên đường cầu thang mới được truy cập.` : `Probe ${path.length}; only cells on the staircase path are accessed.`}</span></section>`;
+  } else if (decision.kind === "equal") {
+    decisionHtml = `<section class="s240-decision ${decision.result ? "found" : "check"}"><small>VALUE == TARGET</small><strong>${escapeHtml(String(view.value))} == ${escapeHtml(String(target))} → ${decision.result ? "TRUE" : "FALSE"}</strong><span>${decision.result ? (vi ? "Đã xác định đúng ô target." : "The target cell has been identified.") : (vi ? "Chưa bằng target; xét tiếp quan hệ lớn hơn." : "Not equal; next test whether the value is greater.")}</span></section>`;
+  } else if (decision.kind === "greater") {
+    decisionHtml = `<section class="s240-decision ${decision.result ? "left" : "down"}"><small>VALUE &gt; TARGET</small><strong>${escapeHtml(String(view.value))} &gt; ${escapeHtml(String(target))} → ${decision.result ? "TRUE" : "FALSE"}</strong><span>${decision.result ? (vi ? "Giá trị quá lớn: bước kế tiếp đi sang trái." : "The value is too large: the next move goes left.") : (vi ? "Giá trị nhỏ hơn target: chuyển sang nhánh đi xuống." : "The value is below the target: switch to the downward branch.")}</span></section>`;
+  } else if (decision.kind === "else") {
+    decisionHtml = `<section class="s240-decision down"><small>ELSE · VALUE &lt; TARGET</small><strong>${escapeHtml(String(view.value))} &lt; ${escapeHtml(String(target))}</strong><span>${vi ? `Mọi ô còn lại bên trái của hàng ${view.row} đều còn nhỏ hơn, nên loại hàng đó.` : `Every remaining cell to the left in row ${view.row} is smaller, so that row can be removed.`}</span></section>`;
+  } else if (decision.kind === "move-left") {
+    decisionHtml = `<section class="s240-decision left"><small>COL -= 1 · ←</small><strong>${vi ? `Loại cột ${decision.eliminatedCol}` : `Eliminate column ${decision.eliminatedCol}`}</strong><span>${vi ? `Con trỏ mới: (${view.row}, ${view.col}). Các ô chưa xét trong cột vừa loại đều ≥ ${view.value} > target.` : `New pointer: (${view.row}, ${view.col}). Every unvisited cell in the removed column is at least ${view.value} > target.`}</span></section>`;
+  } else if (decision.kind === "move-down") {
+    decisionHtml = `<section class="s240-decision down"><small>ROW += 1 · ↓</small><strong>${vi ? `Loại hàng ${decision.eliminatedRow}` : `Eliminate row ${decision.eliminatedRow}`}</strong><span>${vi ? `Con trỏ mới: (${view.row}, ${view.col}). Các ô chưa xét trong hàng vừa loại đều ≤ ${view.value} < target.` : `New pointer: (${view.row}, ${view.col}). Every unvisited cell in the removed row is at most ${view.value} < target.`}</span></section>`;
+  } else if (decision.kind === "found") {
+    decisionHtml = `<section class="s240-decision found"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>return True · (${view.row}, ${view.col})</strong><span>${vi ? `Tìm thấy target ${target} sau ${path.length} lần đọc.` : `Found target ${target} after ${path.length} probe(s).`}</span></section>`;
+  } else {
+    decisionHtml = `<section class="s240-decision missing"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>return False</strong><span>${vi ? `Không còn ứng viên sau ${path.length} lần đọc.` : `No candidate remains after ${path.length} probe(s).`}</span></section>`;
+  }
+
+  const matrixRows = matrix.map((values, row) => values.map((value, col) => {
+    const key = `${row},${col}`;
+    const discardedByRow = eliminatedRows.has(row);
+    const discardedByCol = eliminatedCols.has(col);
+    const discarded = discardedByRow || discardedByCol;
+    const current = sameCell(activeCell, row, col);
+    const previous = sameCell(previousCell, row, col);
+    const order = pathOrder.get(key);
+    const found = phase === "found" && current;
+    const classes = ["s240-cell", discarded ? "discarded" : "candidate"];
+    if (discardedByRow) classes.push("discarded-row");
+    if (discardedByCol) classes.push("discarded-col");
+    if (order) classes.push("visited");
+    if (previous) classes.push("previous");
+    if (current) classes.push("current");
+    if (found) classes.push("found");
+    const tag = found
+      ? (vi ? "TÌM THẤY" : "FOUND")
+      : current
+        ? (vi ? "CON TRỎ" : "POINTER")
+        : discarded
+          ? (vi ? "ĐÃ LOẠI" : "REMOVED")
+          : order
+            ? `${vi ? "BƯỚC" : "STEP"} ${order}`
+            : (vi ? "ỨNG VIÊN" : "CANDIDATE");
+    return `<span class="${classes.join(" ")}"><small>[${row},${col}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em>${order ? `<b>${order}</b>` : ""}</span>`;
+  }).join(""));
+
+  const trail = path.length
+    ? path.map((cell, index) => {
+      const next = path[index + 1];
+      const arrow = next ? (next[0] > cell[0] ? "↓" : "←") : "";
+      return `<span><b>${index + 1}</b><code>(${cell[0]},${cell[1]})</code><em>${escapeHtml(String(matrix[cell[0]]?.[cell[1]]))}</em>${arrow ? `<i>${arrow}</i>` : ""}</span>`;
+    }).join("")
+    : `<em class="s240-empty">${vi ? "Chưa đọc ô nào" : "No cell has been read yet"}</em>`;
+  const pointerText = view.pointer ? `(${view.pointer[0]}, ${view.pointer[1]})` : (vi ? "ngoài matrix" : "outside matrix");
+  const summary = vi
+    ? `Search a 2D Matrix II: target ${target}, đã đọc ${path.length} ô, còn ${view.candidates} ứng viên.`
+    : `Search a 2D Matrix II: target ${target}, ${path.length} probes, ${view.candidates} candidates remain.`;
+
+  $("treeView").innerHTML = `<section class="s240-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="s240-stages">${stages}</div>
+    <section class="s240-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="s240-stats"><span><small>TARGET</small><strong>${escapeHtml(String(target))}</strong></span><span><small>${vi ? "CON TRỎ" : "POINTER"}</small><strong>${escapeHtml(pointerText)}</strong></span><span><small>${vi ? "LẦN ĐỌC" : "PROBES"}</small><strong>${path.length}</strong></span><span><small>${vi ? "Ô ỨNG VIÊN" : "CANDIDATES"}</small><strong>${view.candidates}</strong></span></section>
+    ${decisionHtml}
+    <div class="s240-layout">
+      <section class="s240-board"><header><strong>${vi ? "MA TRẬN TÌM KIẾM" : "SEARCH MATRIX"}</strong><span>${rows} × ${cols}</span></header><div class="s240-board-scroll"><div class="s240-grid" style="--s240-cols:${cols}"><span class="s240-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="s240-axis">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="s240-axis s240-row">r=${row}</span>${matrixRows[row] || ""}`).join("")}</div></div></section>
+      <aside class="s240-proof"><strong>${vi ? "QUY TẮC CẦU THANG" : "STAIRCASE RULE"}</strong><span class="left ${decision.kind === "greater" && decision.result || decision.kind === "move-left" ? "active" : ""}"><b>value &gt; target</b><em>← ${vi ? "đi trái · loại cột" : "left · drop column"}</em></span><span class="down ${decision.kind === "else" || decision.kind === "move-down" || decision.kind === "greater" && !decision.result ? "active" : ""}"><b>value &lt; target</b><em>↓ ${vi ? "đi xuống · loại hàng" : "down · drop row"}</em></span><span class="equal ${phase === "found" ? "active" : ""}"><b>value == target</b><em>✓ return True</em></span></aside>
+    </div>
+    <section class="s240-trail"><header><strong>${vi ? "ĐƯỜNG ĐI ĐÃ ĐỌC" : "VISITED STAIRCASE PATH"}</strong><span>${path.length} / ${rows + cols - 1} ${vi ? "ô tối đa" : "max probes"}</span></header><div>${trail}</div></section>
+    <aside class="s240-legend"><span class="candidate"><i></i>${vi ? "vùng còn xét" : "candidate region"}</span><span class="current"><i></i>${vi ? "con trỏ hiện tại" : "current pointer"}</span><span class="visited"><i></i>${vi ? "đường đã đọc" : "visited path"}</span><span class="discarded"><i></i>${vi ? "hàng/cột đã loại" : "removed row/column"}</span></aside>
+  </section>`;
+}
+
 function renderImageOverlap835View(step) {
   const view = step.overlap835View || {};
   const vi = lang === "vi";
@@ -29279,6 +29389,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderImageOverlap835View(step);
+  } else if (step.search240View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSearchMatrix240View(step);
   } else if (step.search74View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
