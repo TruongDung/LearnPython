@@ -28784,6 +28784,11 @@ function renderCyclicShift4052View(step) {
   const mappings = Array.isArray(view.mappings) ? view.mappings : [];
   const activeRow = Number.isInteger(view.activeRow) ? view.activeRow : -1;
   const activeCol = Number.isInteger(view.activeCol) ? view.activeCol : -1;
+  const sourceRow = Number.isInteger(view.sourceRow) ? view.sourceRow : -1;
+  const sourceCol = Number.isInteger(view.sourceCol) ? view.sourceCol : -1;
+  const targetRow = Number.isInteger(view.targetRow) ? view.targetRow : -1;
+  const targetCol = Number.isInteger(view.targetCol) ? view.targetCol : -1;
+  const operation = view.operation || "idle";
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
   const labels = vi
     ? ["Grid gốc", "Dịch hàng ←", "Dịch cột ↑", "Kết quả"]
@@ -28797,10 +28802,12 @@ function renderCyclicShift4052View(step) {
         const value = matrix[row]?.[col];
         const classes = ["cs4052-cell"];
         if (value == null) classes.push("empty");
-        if (kind === "original" && view.phase === "rows" && row === activeRow) classes.push("source");
-        if (kind === "rows" && view.phase === "rows" && row === activeRow) classes.push("target");
-        if (kind === "rows" && view.phase === "columns" && col === activeCol) classes.push("source");
-        if (kind === "result" && view.phase === "columns" && col === activeCol) classes.push("target");
+        const hasSourceCell = sourceRow >= 0 && sourceCol >= 0;
+        const hasTargetCell = targetRow >= 0 && targetCol >= 0;
+        if (kind === "original" && view.phase === "rows" && (hasSourceCell ? row === sourceRow && col === sourceCol : row === activeRow)) classes.push("source");
+        if (kind === "rows" && view.phase === "rows" && hasTargetCell && row === targetRow && col === targetCol) classes.push("target");
+        if (kind === "rows" && view.phase === "columns" && (hasSourceCell ? row === sourceRow && col === sourceCol : col === activeCol)) classes.push("source");
+        if (kind === "result" && view.phase === "columns" && hasTargetCell && row === targetRow && col === targetCol) classes.push("target");
         if (kind === "result" && view.final) classes.push("final");
         cells.push(`<span class="${classes.join(" ")}"><small>${row},${col}</small><b>${value == null ? "·" : escapeHtml(value)}</b></span>`);
       }
@@ -28812,21 +28819,32 @@ function renderCyclicShift4052View(step) {
   const colVector = colShift.map((shift, index) => `<span class="${index === activeCol ? "active" : index < Number(view.colsDone || 0) ? "done" : ""}"><small>c${index}</small><b>${shift}</b><i>↑</i></span>`).join("");
 
   let mappingHtml;
-  if (view.phase === "rows") {
+  if (view.phase === "rows" && mappings.length) {
     mappingHtml = mappings.map((mapping) => `<span><small>value ${mapping.value}</small><b>c${mapping.from}</b><i>→</i><b>c${mapping.to}</b></span>`).join("");
-  } else if (view.phase === "columns") {
+  } else if (view.phase === "columns" && mappings.length) {
     mappingHtml = mappings.map((mapping) => `<span><small>value ${mapping.value}</small><b>r${mapping.from}</b><i>→</i><b>r${mapping.to}</b></span>`).join("");
+  } else if (view.phase === "rows") {
+    mappingHtml = `<p>${operation === "row-loop" ? (vi ? "Chọn hàng tiếp theo." : "Select the next row.") : (vi ? "Chọn ô nguồn tiếp theo trong hàng." : "Select the next source cell in the row.")}</p>`;
+  } else if (view.phase === "columns") {
+    mappingHtml = `<p>${operation === "column-loop" ? (vi ? "Chọn cột tiếp theo." : "Select the next column.") : (vi ? "Chọn ô nguồn tiếp theo trong cột." : "Select the next source cell in the column.")}</p>`;
   } else {
     mappingHtml = `<p>${view.final ? (vi ? "Mọi phần tử đã tới tọa độ cuối." : "Every element has reached its final coordinate.") : (vi ? "Chọn một hàng để bắt đầu dịch trái." : "Select a row to begin shifting left.")}</p>`;
   }
 
-  const formula = view.phase === "rows"
-    ? `target_col = (col − ${view.shift} + ${n}) % ${n}`
-    : view.phase === "columns"
-      ? `target_row = (row − ${view.shift} + ${n}) % ${n}`
-      : view.final
-        ? "result = columnShift(rowShift(grid))"
-        : "rows first → columns second";
+  const formulas = {
+    "init-rows": "after_rows = [[0] * n for _ in range(n)]",
+    "init-result": "result = [[0] * n for _ in range(n)]",
+    "row-loop": "for row in range(n)",
+    "row-cell": "for col in range(n)",
+    "row-target": `target_col = (${activeCol} − ${view.shift}) % ${n} = ${targetCol}`,
+    "row-write": `after_rows[${activeRow}][${targetCol}] = grid[${sourceRow}][${sourceCol}]`,
+    "column-loop": "for col in range(n)",
+    "column-cell": "for row in range(n)",
+    "column-target": `target_row = (${activeRow} − ${view.shift}) % ${n} = ${targetRow}`,
+    "column-write": `result[${targetRow}][${activeCol}] = after_rows[${sourceRow}][${sourceCol}]`,
+    return: "return result",
+  };
+  const formula = formulas[operation] || "rows first → columns second";
   const final = Boolean(view.final);
   const resultText = final ? JSON.stringify(result) : "…";
   const summary = vi
@@ -28846,8 +28864,229 @@ function renderCyclicShift4052View(step) {
       <article><header><strong>FINAL GRID</strong><span>${view.colsDone || 0}/${n}</span></header>${matrixHtml(result, "result")}</article>
     </section>
     <section class="cs4052-mapping"><header><strong>${vi ? "ÁNH XẠ TRONG BƯỚC NÀY" : "MAPPING IN THIS STEP"}</strong><code>${escapeHtml(formula)}</code></header><div>${mappingHtml}</div></section>
-    <section class="cs4052-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="cs4052-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
     <footer class="cs4052-result ${final ? "done" : ""}"><small>RESULT GRID</small><strong>${escapeHtml(resultText)}</strong><span>${final ? (vi ? "Thứ tự hàng trước, cột sau đã được giữ nguyên." : "The required row-first, column-second order is preserved.") : (vi ? "Dấu · là ô chưa được ghi trong giai đoạn hiện tại." : "A · marks a cell not yet written in the current phase.")}</span></footer>
+  </section>`;
+}
+
+function renderShadowPairs4054View(step) {
+  const view = step.shadowPairs4054View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const qualifying = Array.isArray(view.qualifying) ? view.qualifying : [];
+  const qualifyingIndices = new Set(qualifying.map((item) => item.index));
+  const j = Number.isInteger(view.j) ? view.j : -1;
+  const value = view.value;
+  const smaller = Number.isInteger(view.smaller) ? view.smaller : 0;
+  const operation = view.operation || "idle";
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Ứng viên", "Đếm < x", "Loại > x", "Push x", "Kết quả"]
+    : ["Candidates", "Count < x", "Prune > x", "Push x", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const arrayHtml = nums.map((number, index) => {
+    const classes = ["sp4054-cell"];
+    if (index < j) classes.push("processed");
+    if (index === j) classes.push("current");
+    if (qualifyingIndices.has(index)) classes.push("pair-source");
+    if (view.popped && index === view.popped.index) classes.push("removed");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${escapeHtml(number)}</b></span>`;
+  }).join("");
+
+  const stackHtml = candidates.length
+    ? candidates.map((item, index) => {
+      const classes = ["sp4054-stack-item"];
+      if (qualifyingIndices.has(item.index)) classes.push("qualifying");
+      if (j >= 0 && item.index === j) classes.push("new");
+      if (value != null && item.value === value && item.index !== j) classes.push("equal");
+      if (value != null && item.value > value) classes.push("greater");
+      return `<span class="${classes.join(" ")}"><small>#${index} · i=${item.index}</small><b>${escapeHtml(item.value)}</b></span>`;
+    }).join("")
+    : `<p>${vi ? "Stack đang rỗng." : "The stack is empty."}</p>`;
+
+  const pairsHtml = qualifying.length && j >= 0
+    ? qualifying.map((item) => `<span><b>(${item.index}, ${j})</b><small>${item.value} &lt; ${escapeHtml(value)}</small></span>`).join("")
+    : `<p>${j < 0 ? (vi ? "Chưa xét đầu phải." : "No right endpoint yet.") : (vi ? "Không có cặp mới ở bước này." : "No new pair at this step.")}</p>`;
+
+  const formulas = {
+    "init-stack": "stack = []",
+    "init-answer": "answer = 0",
+    scan: j >= 0 ? `j = ${j}, value = ${value}` : "for j, value in enumerate(nums)",
+    "binary-search": `bisect_left(stack, ${value}) = ${smaller}`,
+    "add-count": `answer = ${view.answerBefore} + ${smaller} = ${view.answer}`,
+    "check-pop": candidates.length ? `${candidates[candidates.length - 1].value} > ${value} → ${view.shouldPop ? "True" : "False"}` : `empty stack → False`,
+    pop: view.popped ? `pop (${view.popped.index}, ${view.popped.value})` : "stack.pop()",
+    push: `stack.append(${value})`,
+    return: `return ${view.answer}`,
+  };
+  const formula = formulas[operation] || "suffix-minimum candidates";
+  const currentDelta = operation === "add-count" ? smaller : 0;
+  const processedCount = view.final ? nums.length : Math.max(0, j + 1);
+  const summary = vi
+    ? `Đếm shadow pair: đã duyệt ${processedCount} trên ${nums.length} phần tử, answer bằng ${view.answer || 0}.`
+    : `Counting shadow pairs: processed ${processedCount} of ${nums.length} values, answer is ${view.answer || 0}.`;
+
+  $("treeView").innerHTML = `<section class="sp4054-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>MONOTONIC STACK · BINARY SEARCH · #4054</small><strong>COUNT SHADOW PAIRS I</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sp4054-phases">${phases}</div>
+    <section class="sp4054-invariant"><strong>${vi ? "BẤT BIẾN" : "INVARIANT"}</strong><span>${vi ? "Stack tăng không giảm và chỉ giữ các i chưa gặp phần tử nhỏ hơn ở bên phải." : "The stack is nondecreasing and keeps only indices not followed by a smaller processed value."}</span></section>
+    <section class="sp4054-array"><header><strong>NUMS</strong><span>${vi ? "tím = đầu phải j · xanh = đầu trái hợp lệ" : "purple = right endpoint j · green = valid left endpoint"}</span></header><div>${arrayHtml}</div></section>
+    <section class="sp4054-workspace">
+      <article><header><strong>CANDIDATE STACK</strong><span>${candidates.length} ${vi ? "ứng viên" : "candidates"}</span></header><div class="sp4054-stack">${stackHtml}</div><footer><span>&lt; ${value == null ? "x" : escapeHtml(value)}</span><b>${smaller}</b><small>${vi ? "phần tử đứng trước vị trí bisect" : "entries before the bisect position"}</small></footer></article>
+      <article><header><strong>${vi ? "CẶP MỚI" : "NEW PAIRS"}</strong><span>+${currentDelta}</span></header><div class="sp4054-pairs">${pairsHtml}</div><footer><span>answer</span><b>${view.answer || 0}</b><small>${vi ? `trước bước: ${view.answerBefore ?? view.answer ?? 0}` : `before this step: ${view.answerBefore ?? view.answer ?? 0}`}</small></footer></article>
+    </section>
+    <section class="sp4054-operation"><header><strong>${vi ? "PHÉP TOÁN" : "OPERATION"}</strong><code>${escapeHtml(formula)}</code></header>${view.popped ? `<span class="removed">${vi ? "Đã pop" : "Popped"}: i=${view.popped.index}, value=${view.popped.value}</span>` : `<span>${vi ? "Giữ value bằng x; chỉ pop value lớn hơn x." : "Equal values stay; only values greater than x are popped."}</span>`}</section>
+    <section class="sp4054-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="sp4054-result ${view.final ? "done" : ""}"><small>SHADOW PAIRS</small><strong>${view.final ? view.answer : "…"}</strong><span>${view.final ? (vi ? "Tất cả đầu phải j đã được xử lý." : "Every right endpoint j has been processed.") : (vi ? "Mỗi bước chỉ thực thi một dòng code." : "Every step executes exactly one source line.")}</span></footer>
+  </section>`;
+}
+
+function renderShadowPairs4055View(step) {
+  const view = step.shadowPairs4055View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const upper = Array.isArray(view.upper) ? view.upper : [];
+  const lower = Array.isArray(view.lower) ? view.lower : [];
+  const active = Array.isArray(view.active) ? view.active : [];
+  const qualifying = Array.isArray(view.qualifying) ? view.qualifying : [];
+  const rejected = Array.isArray(view.rejected) ? view.rejected : [];
+  const activeIndices = new Set(active.map((item) => item.index));
+  const qualifyingIndices = new Set(qualifying.map((item) => item.index));
+  const rejectedIndices = new Set(rejected.map((item) => item.index));
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const right = Number.isInteger(view.right) ? view.right : nums.length - 1;
+  const middle = Number.isInteger(view.middle) ? view.middle : null;
+  const currentRight = view.currentRight || null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Chia đoạn", "Tính b / c", "Sweep Fenwick", "Gộp", "Kết quả"]
+    : ["Split", "Build b / c", "Fenwick sweep", "Combine", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const boundText = (value, positive) => Number.isFinite(value) ? escapeHtml(value) : positive ? "+∞" : "−∞";
+
+  const arrayHtml = nums.map((number, index) => {
+    const classes = ["spii4055-cell"];
+    if (index >= left && index <= right) classes.push("segment");
+    if (middle != null && index >= left && index <= middle) classes.push("left-half");
+    if (middle != null && index > middle && index <= right) classes.push("right-half");
+    if (currentRight && index === currentRight.index) classes.push("current-right");
+    if (activeIndices.has(index)) classes.push("active-left");
+    if (qualifyingIndices.has(index)) classes.push("qualifying");
+    if (rejectedIndices.has(index)) classes.push("rejected");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${escapeHtml(number)}</b></span>`;
+  }).join("");
+
+  const upperHtml = upper.length
+    ? upper.map((item) => `<span class="${qualifyingIndices.has(item.index) ? "qualifying" : rejectedIndices.has(item.index) ? "rejected" : activeIndices.has(item.index) ? "active" : ""}"><small>i=${item.index}</small><b>${item.value}</b><i>≤ b=${boundText(item.bound, true)}</i></span>`).join("")
+    : `<p>${vi ? "Chưa tính b[i]." : "No b[i] bounds yet."}</p>`;
+  const lowerHtml = lower.length
+    ? lower.map((item) => `<span class="${currentRight && currentRight.index === item.index ? "current" : ""}"><small>j=${item.index}</small><i>c=${boundText(item.bound, false)} ≤</i><b>${item.value}</b></span>`).join("")
+    : `<p>${vi ? "Chưa tính c[j]." : "No c[j] bounds yet."}</p>`;
+
+  const pairsHtml = qualifying.length && currentRight
+    ? qualifying.map((item) => `<span><b>(${item.index}, ${currentRight.index})</b><small>${boundText(currentRight.bound, false)} ≤ ${item.value} &lt; ${currentRight.value} ≤ ${boundText(item.bound, true)}</small></span>`).join("")
+    : `<p>${vi ? "Chưa có cặp băng qua ở bước này." : "No crossing pair at this step."}</p>`;
+
+  const formulas = {
+    "base-check": `left (${left}) >= right (${right})`,
+    "base-return": "return 0",
+    split: middle == null ? "middle = (left + right) // 2" : `middle = (${left} + ${right}) // 2 = ${middle}`,
+    "combine-halves": `${view.leftAnswer || 0} + ${view.rightAnswer || 0} = ${view.subtotal || 0}`,
+    "upper-bound": "b[i] = min(value > nums[i] in left suffix)",
+    "lower-bound": "c[j] = max(value < nums[j] in right prefix)",
+    "sort-right": "right_indices.sort(key = nums[j])",
+    "select-right": currentRight ? `j=${currentRight.index}, nums[j]=${currentRight.value}` : "for j in right_indices",
+    "active-window": currentRight ? `nums[i] < ${currentRight.value} ≤ b[i]` : "nums[i] < nums[j] ≤ b[i]",
+    "query-lower": currentRight ? `${boundText(currentRight.bound, false)} ≤ nums[i]` : "c[j] ≤ nums[i]",
+    "add-cross": `answer += ${qualifying.length}`,
+    "return-segment": `return ${view.subtotal || 0}`,
+    "return-final": `return ${view.subtotal || 0}`,
+  };
+  const formula = formulas[view.operation] || "c[j] ≤ nums[i] < nums[j] ≤ b[i]";
+  const summary = vi
+    ? `Đếm shadow pair II trên đoạn ${left} đến ${right}; subtotal ${view.subtotal || 0}.`
+    : `Counting Shadow Pairs II on segment ${left} through ${right}; subtotal ${view.subtotal || 0}.`;
+
+  $("treeView").innerHTML = `<section class="spii4055-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>DIVIDE & CONQUER · FENWICK · #4055</small><strong>COUNT SHADOW PAIRS II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="spii4055-phases">${phases}</div>
+    <section class="spii4055-segment"><header><strong>${vi ? "ĐOẠN ĐỆ QUY" : "RECURSIVE SEGMENT"}</strong><span>depth ${view.depth || 0}</span></header><div><b>[${left}, ${right}]</b>${middle == null ? "" : `<span>[${left}, ${middle}]</span><i>+</i><span>[${middle + 1}, ${right}]</span>`}</div></section>
+    <section class="spii4055-array"><header><strong>NUMS</strong><span>${vi ? "xanh = nửa trái · tím = nửa phải" : "green = left half · purple = right half"}</span></header><div>${arrayHtml}</div></section>
+    <section class="spii4055-bounds">
+      <article><header><strong>LEFT BOUNDS · b[i]</strong><span>nums[i] &lt; nums[j] ≤ b[i]</span></header><div>${upperHtml}</div></article>
+      <article><header><strong>RIGHT BOUNDS · c[j]</strong><span>c[j] ≤ nums[i] &lt; nums[j]</span></header><div>${lowerHtml}</div></article>
+    </section>
+    <section class="spii4055-condition"><strong>c[j] ≤ nums[i] &lt; nums[j] ≤ b[i]</strong><span>${vi ? "Hai bound loại mọi blocker nằm giữa hai endpoint." : "The two bounds exclude every blocker between the endpoints."}</span></section>
+    <section class="spii4055-cross"><header><strong>${vi ? "CẶP BĂNG QUA" : "CROSSING PAIRS"}</strong><span>+${view.operation === "add-cross" ? qualifying.length : 0}</span></header><div>${pairsHtml}</div></section>
+    <section class="spii4055-totals"><span><small>${vi ? "nửa trái" : "left half"}</small><b>${view.leftAnswer || 0}</b></span><i>+</i><span><small>${vi ? "nửa phải" : "right half"}</small><b>${view.rightAnswer || 0}</b></span><i>+</i><span><small>${vi ? "băng qua" : "crossing"}</small><b>${view.crossAnswer || 0}</b></span><i>=</i><span class="total"><small>subtotal</small><b>${view.subtotal || 0}</b></span></section>
+    <section class="spii4055-operation"><header><strong>${vi ? "PHÉP TOÁN" : "OPERATION"}</strong><code>${escapeHtml(formula)}</code></header><span>${active.length} ${vi ? "đầu trái active" : "active left endpoints"} · ${rejected.length} ${vi ? "bị loại bởi c[j]" : "rejected by c[j]"}</span></section>
+    <section class="spii4055-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="spii4055-result ${view.final ? "done" : ""}"><small>SHADOW PAIRS II</small><strong>${view.final ? view.subtotal : "…"}</strong><span>${view.final ? (vi ? "Mọi cặp được đếm đúng một lần ở merge chứa hai endpoint khác nửa." : "Every pair is counted once at the merge where its endpoints first lie in different halves.") : (vi ? "Mỗi bước highlight đúng một dòng code." : "Each step highlights exactly one source line.")}</span></footer>
+  </section>`;
+}
+
+function renderOrderlyQueue899View(step) {
+  const view = step.orderlyQueue899View || {};
+  const vi = lang === "vi";
+  const original = String(view.original || "");
+  const queue = String(view.queue || original);
+  const isRotation = view.branch === "rotation";
+  const currentShift = Number.isInteger(view.currentShift) ? view.currentShift : -1;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Chọn nhánh", "Trạng thái reachable", "Lấy nhỏ nhất", "Kết quả"]
+    : ["Choose branch", "Reachable states", "Keep smallest", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const selectable = new Set(view.selectable || []);
+  const queueCells = [...queue].map((char, index) => {
+    const classes = ["oq899-char", selectable.has(index) ? "selectable" : "", index === 0 && isRotation ? "front" : ""];
+    return `<span class="${classes.filter(Boolean).join(" ")}"><small>${index}</small><b>${escapeHtml(char)}</b>${selectable.has(index) ? `<em>${vi ? "chọn" : "pick"}</em>` : ""}</span>`;
+  }).join("");
+
+  const branchCards = `<section class="oq899-branches">
+    <article class="${isRotation ? "active" : "muted"}"><header><strong>k = 1</strong><span>${isRotation ? "ACTIVE" : ""}</span></header><b>${vi ? "Chỉ xoay" : "Rotations only"}</b><code>abc → bca → cab</code><p>${vi ? "Thứ tự vòng tròn bị khóa." : "Cyclic order stays locked."}</p></article>
+    <article class="${!isRotation ? "active" : "muted"}"><header><strong>k ≥ 2</strong><span>${!isRotation ? "ACTIVE" : ""}</span></header><b>${vi ? "Mọi hoán vị" : "Any permutation"}</b><code>abc ⇢ a, b, c ${vi ? "tự do" : "unlocked"}</code><p>${vi ? "Hai lựa chọn đủ để đổi thứ tự tương đối." : "Two choices unlock relative order."}</p></article>
+  </section>`;
+
+  let workspace;
+  if (isRotation) {
+    const rotations = (view.rotations || []).map((rotation) => {
+      const classes = [
+        "oq899-rotation",
+        rotation.shift === currentShift ? "current" : "",
+        rotation.shift === view.bestShift ? "best" : "",
+      ];
+      return `<span class="${classes.filter(Boolean).join(" ")}"><small>${vi ? "xoay" : "shift"} ${rotation.shift}</small><b>${escapeHtml(rotation.value)}</b><em>${rotation.shift === view.bestShift ? "BEST" : rotation.shift === currentShift ? (vi ? "đang xét" : "checking") : ""}</em></span>`;
+    }).join("");
+    const candidate = String(view.candidate || "");
+    const previousBest = String(view.previousBest || "");
+    const comparison = candidate && previousBest
+      ? `<section class="oq899-compare" style="--oq899-length:${original.length}"><header><strong>${vi ? "SO SÁNH TỪ TRÁI SANG PHẢI" : "COMPARE LEFT TO RIGHT"}</strong><span>${compareIndex >= 0 ? `${vi ? "khác đầu tiên tại" : "first difference at"} ${compareIndex}` : (vi ? "hai chuỗi bằng nhau" : "strings are equal")}</span></header><div><label>${vi ? "ứng viên" : "candidate"}</label>${[...candidate].map((char, index) => `<b class="${index === compareIndex ? "different" : index < compareIndex || compareIndex < 0 ? "same" : ""}">${escapeHtml(char)}</b>`).join("")}</div><div><label>best ${vi ? "trước đó" : "before"}</label>${[...previousBest].map((char, index) => `<b class="${index === compareIndex ? "different" : index < compareIndex || compareIndex < 0 ? "same" : ""}">${escapeHtml(char)}</b>`).join("")}</div><footer>${view.changed ? (vi ? "candidate nhỏ hơn → thay best" : "candidate is smaller → replace best") : (vi ? "giữ nguyên best" : "keep current best")}</footer></section>`
+      : `<section class="oq899-compare idle"><strong>${vi ? "Liệt kê đủ n điểm cắt rồi lấy chuỗi nhỏ nhất." : "List all n cut points, then keep the smallest string."}</strong></section>`;
+    workspace = `<section class="oq899-rotations"><header><strong>${vi ? "MỌI TRẠNG THÁI REACHABLE" : "ALL REACHABLE STATES"}</strong><span>${vi ? "mỗi thẻ = một điểm cắt vòng tròn" : "each card = one circular cut"}</span></header><div>${rotations}</div></section>${comparison}`;
+  } else {
+    const remaining = (view.remaining || []).map((char) => `<span class="oq899-pool-char${char === view.picked ? " picked" : ""}">${escapeHtml(char)}</span>`).join("") || `<span class="oq899-empty">${vi ? "rỗng" : "empty"}</span>`;
+    const prefix = String(view.sortedPrefix || "");
+    const output = Array.from({ length: original.length }, (_, index) => `<span class="oq899-output-char ${index < prefix.length ? "filled" : ""}${index === prefix.length - 1 && view.phase === "sort" ? "current" : ""}"><small>${index}</small><b>${escapeHtml(prefix[index] || "·")}</b></span>`).join("");
+    workspace = `<section class="oq899-unlocked"><div class="oq899-swap-rule"><strong>${vi ? "VÌ SAO SORT ĐƯỢC?" : "WHY CAN WE SORT?"}</strong><span><code>#1</code><i>${vi ? "hoặc" : "or"}</i><code>#2</code><b>→</b>${vi ? "quyết định ký tự nào đi trước" : "choose which character stays ahead"}</span><p>${vi ? "Lặp lại lựa chọn này cho phép mô phỏng các phép đổi chỗ, nên mọi hoán vị đều reachable." : "Repeating this choice simulates swaps, making every permutation reachable."}</p></div><div class="oq899-sort"><article><header><strong>${vi ? "KÝ TỰ CÒN LẠI" : "REMAINING CHARACTERS"}</strong><span>${(view.remaining || []).length}</span></header><div>${remaining}</div></article><i>→</i><article><header><strong>${vi ? "KẾT QUẢ TĂNG DẦN" : "ASCENDING RESULT"}</strong><span>${prefix.length}/${original.length}</span></header><div>${output}</div></article></div></section>`;
+  }
+
+  const best = String(view.best || "");
+  const summary = vi
+    ? `Bài 899 với k bằng ${view.k}; ${isRotation ? "chỉ các phép xoay" : "mọi hoán vị"} là reachable.`
+    : `Problem 899 with k equal to ${view.k}; ${isRotation ? "only rotations" : "every permutation"} is reachable.`;
+  $("treeView").innerHTML = `<section class="oq899-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>STRING · SORTING · #899</small><strong>ORDERLY QUEUE</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="oq899-phases">${phases}</div>
+    ${branchCards}
+    <section class="oq899-queue"><header><strong>${vi ? "HÀNG ĐỢI HIỆN TẠI" : "CURRENT QUEUE"}</strong><span>${vi ? `${view.k} ký tự đầu có thể chọn` : `first ${view.k} character${view.k === 1 ? " is" : "s are"} selectable`}</span></header><div>${queueCells}</div><footer><b>FRONT</b><i>→</i><span>${isRotation ? (vi ? "lấy đầu, đưa ra sau" : "take front, append to back") : (vi ? "chọn trong vùng màu" : "pick from highlighted zone")}</span><i>→</i><b>BACK</b></footer></section>
+    ${workspace}
+    <section class="oq899-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="oq899-result ${view.final ? "done" : ""}"><small>${vi ? "CHUỖI NHỎ NHẤT" : "LEXICOGRAPHIC MINIMUM"}</small><strong>${view.final ? escapeHtml(best) : "…"}</strong><span>${view.final ? (isRotation ? (vi ? `nhỏ nhất trong ${original.length} phép xoay` : `smallest among ${original.length} rotations`) : (vi ? "các ký tự đã được xếp tăng dần" : "characters sorted in ascending order")) : (vi ? "Theo dõi reachable states trước khi chọn đáp án." : "Understand the reachable states before choosing the answer.")}</span></footer>
   </section>`;
 }
 
@@ -29899,6 +30138,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCyclicShift4052View(step);
+  } else if (step.shadowPairs4054View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShadowPairs4054View(step);
+  } else if (step.shadowPairs4055View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShadowPairs4055View(step);
+  } else if (step.orderlyQueue899View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderOrderlyQueue899View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

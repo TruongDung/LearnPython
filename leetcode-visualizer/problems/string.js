@@ -15467,3 +15467,312 @@ Object.assign(module.exports, {
     builder3: buildSteps3720ReverseBalance,
   },
 });
+
+/**
+ * LeetCode 899: Orderly Queue.
+ * k = 1 preserves cyclic order; k >= 2 unlocks every permutation.
+ */
+function validateOrderlyQueue899Input(input, params = {}) {
+  const s = String(input ?? "").trim();
+  if (!/^[a-z]+$/.test(s)) {
+    throw new Error("s must contain only lowercase English letters");
+  }
+  if (s.length > 16) {
+    throw new Error("s must contain at most 16 letters for visualization");
+  }
+
+  const k = Number(params.k);
+  if (!Number.isInteger(k) || k < 1 || k > s.length) {
+    throw new Error(`k must be an integer from 1 to ${s.length}`);
+  }
+  return { s, k };
+}
+
+function firstDifference899(left, right) {
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return index;
+  }
+  return -1;
+}
+
+function buildSteps899(input, params = {}) {
+  const { s, k } = validateOrderlyQueue899Input(input, params);
+  const steps = [];
+  const rotations = [];
+
+  function pushStep({
+    title,
+    note,
+    line,
+    phase,
+    phaseIndex,
+    queue = s,
+    currentShift = -1,
+    candidate = "",
+    previousBest = "",
+    best = s,
+    bestShift = 0,
+    compareIndex = -1,
+    changed = false,
+    sortedPrefix = "",
+    remaining = s.split(""),
+    picked = "",
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      final,
+      vars: [
+        { name: "k", value: k },
+        { name: "candidate", value: candidate ? JSON.stringify(candidate) : '""' },
+        { name: "answer", value: JSON.stringify(best) },
+      ],
+      orderlyQueue899View: {
+        original: s,
+        k,
+        branch: k === 1 ? "rotation" : "permutation",
+        phase,
+        phaseIndex,
+        queue,
+        selectable: Array.from({ length: Math.min(k, queue.length) }, (_, index) => index),
+        rotations: rotations.map((rotation) => ({ ...rotation })),
+        currentShift,
+        candidate,
+        previousBest,
+        best,
+        bestShift,
+        compareIndex,
+        changed,
+        sortedPrefix,
+        remaining: [...remaining],
+        picked,
+        final,
+      },
+    });
+  }
+
+  pushStep({
+    title: k === 1
+      ? { vi: "k = 1: chỉ có thể xoay", en: "k = 1: rotations only" }
+      : { vi: `k = ${k}: mở khóa mọi hoán vị`, en: `k = ${k}: every permutation is reachable` },
+    note: k === 1
+      ? {
+          vi: "Chỉ ký tự đầu được chọn, nên mỗi thao tác buộc phải xoay trái đúng một vị trí.",
+          en: "Only the first character is selectable, so every move is exactly one left rotation.",
+        }
+      : {
+          vi: "Có ít nhất hai lựa chọn ở đầu hàng đợi, nên ta có thể thay đổi thứ tự tương đối của các ký tự.",
+          en: "At least two front characters are selectable, so their relative order is no longer fixed.",
+        },
+    line: 3,
+    phase: "branch",
+    phaseIndex: 0,
+  });
+
+  if (k === 1) {
+    let best = s;
+    let bestShift = 0;
+    rotations.push({ shift: 0, value: s });
+    pushStep({
+      title: { vi: `Ứng viên đầu tiên: '${s}'`, en: `First candidate: '${s}'` },
+      note: {
+        vi: "Chưa xoay lần nào; dùng chuỗi gốc làm đáp án tốt nhất ban đầu.",
+        en: "No rotation yet; use the original string as the initial best answer.",
+      },
+      line: 4,
+      phase: "initialize",
+      phaseIndex: 1,
+      best,
+      bestShift,
+    });
+
+    for (let shift = 1; shift < s.length; shift += 1) {
+      const candidate = s.slice(shift) + s.slice(0, shift);
+      rotations.push({ shift, value: candidate });
+      pushStep({
+        title: { vi: `Xoay tại vị trí ${shift}: '${candidate}'`, en: `Rotate at index ${shift}: '${candidate}'` },
+        note: {
+          vi: `Cắt trước s[${shift}], đưa prefix '${s.slice(0, shift)}' ra cuối hàng đợi.`,
+          en: `Cut before s[${shift}] and move prefix '${s.slice(0, shift)}' to the back of the queue.`,
+        },
+        line: 6,
+        phase: "rotate",
+        phaseIndex: 1,
+        queue: candidate,
+        currentShift: shift,
+        candidate,
+        best,
+        bestShift,
+      });
+
+      const previousBest = best;
+      const compareIndex = firstDifference899(candidate, previousBest);
+      const changed = candidate < best;
+      if (changed) {
+        best = candidate;
+        bestShift = shift;
+      }
+      pushStep({
+        title: changed
+          ? { vi: `'${candidate}' nhỏ hơn → cập nhật best`, en: `'${candidate}' is smaller → update best` }
+          : { vi: `'${candidate}' không nhỏ hơn best`, en: `'${candidate}' is not smaller than best` },
+        note: compareIndex >= 0
+          ? {
+              vi: `Khác nhau đầu tiên tại index ${compareIndex}: '${candidate[compareIndex]}' ${changed ? "<" : ">"} '${previousBest[compareIndex]}'.`,
+              en: `First difference at index ${compareIndex}: '${candidate[compareIndex]}' ${changed ? "<" : ">"} '${previousBest[compareIndex]}'.`,
+            }
+          : {
+              vi: "Hai chuỗi giống nhau, nên best không đổi.",
+              en: "The strings are equal, so best does not change.",
+            },
+        line: 7,
+        phase: "compare",
+        phaseIndex: 2,
+        queue: candidate,
+        currentShift: shift,
+        candidate,
+        previousBest,
+        best,
+        bestShift,
+        compareIndex,
+        changed,
+      });
+    }
+
+    pushStep({
+      title: { vi: `Trả về '${best}'`, en: `Return '${best}'` },
+      note: {
+        vi: "Đã kiểm tra toàn bộ n phép xoay; best là trạng thái reachable nhỏ nhất.",
+        en: "All n rotations were checked; best is the smallest reachable state.",
+      },
+      line: 8,
+      phase: "done",
+      phaseIndex: 3,
+      queue: best,
+      best,
+      bestShift,
+      final: true,
+    });
+    return { s, k, answer: best, steps };
+  }
+
+  const sorted = [...s].sort();
+  const remaining = [...s];
+  let sortedPrefix = "";
+  pushStep({
+    title: { vi: "Thứ tự tương đối đã được mở khóa", en: "Relative order is unlocked" },
+    note: {
+      vi: "Vì k ≥ 2, các lựa chọn lặp lại có thể mô phỏng đổi chỗ; do đó mọi hoán vị đều reachable.",
+      en: "Because k ≥ 2, repeated choices can simulate swaps, so every permutation is reachable.",
+    },
+    line: 9,
+    phase: "unlock",
+    phaseIndex: 1,
+    best: "",
+    remaining,
+  });
+
+  for (const picked of sorted) {
+    remaining.splice(remaining.indexOf(picked), 1);
+    sortedPrefix += picked;
+    pushStep({
+      title: { vi: `Chọn ký tự nhỏ nhất '${picked}'`, en: `Pick smallest character '${picked}'` },
+      note: {
+        vi: `Đặt '${picked}' vào vị trí ${sortedPrefix.length - 1}; prefix kết quả là '${sortedPrefix}'.`,
+        en: `Place '${picked}' at index ${sortedPrefix.length - 1}; the result prefix is '${sortedPrefix}'.`,
+      },
+      line: 9,
+      phase: "sort",
+      phaseIndex: 2,
+      queue: s,
+      best: sortedPrefix,
+      sortedPrefix,
+      remaining,
+      picked,
+    });
+  }
+
+  const answer = sorted.join("");
+  pushStep({
+    title: { vi: `Trả về '${answer}'`, en: `Return '${answer}'` },
+    note: {
+      vi: "Chuỗi tăng dần là hoán vị nhỏ nhất theo thứ tự từ điển.",
+      en: "The ascending string is the lexicographically smallest permutation.",
+    },
+    line: 9,
+    phase: "done",
+    phaseIndex: 3,
+    queue: answer,
+    best: answer,
+    sortedPrefix: answer,
+    remaining: [],
+    final: true,
+  });
+  return { s, k, answer, steps };
+}
+
+Object.assign(module.exports, {
+  899: {
+    id: 899,
+    difficulty: "hard",
+    slug: "orderly-queue",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "sorting", vi: "Sắp xếp", en: "Sorting" },
+      { key: "math", vi: "Toán học", en: "Math" },
+    ],
+    title: { vi: "Orderly Queue", en: "Orderly Queue" },
+    titleVi: { vi: "Hàng đợi có thứ tự", en: "Orderly queue" },
+    statement: {
+      vi: "Cho chuỗi s và số nguyên k. Mỗi lượt, chọn một trong k ký tự đầu của s rồi đưa nó ra cuối. Trả về chuỗi nhỏ nhất theo thứ tự từ điển có thể đạt được sau bất kỳ số lượt nào.",
+      en: "Given a string s and integer k, repeatedly choose one of the first k characters and append it to the end. Return the lexicographically smallest reachable string.",
+    },
+    defaultInput: "cba",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường)", en: "s (lowercase letters)" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 1, min: 1, max: 1000 },
+    ],
+    approach: [
+      {
+        vi: "Nếu k = 1, mỗi lượt chỉ có thể đưa ký tự đầu ra cuối; thứ tự vòng tròn không đổi, nên chỉ cần thử n phép xoay.",
+        en: "When k = 1, every move sends the first character to the back; cyclic order is fixed, so test all n rotations.",
+      },
+      {
+        vi: "Nếu k ≥ 2, ta có thể thay đổi thứ tự tương đối của các ký tự và đạt mọi hoán vị.",
+        en: "When k ≥ 2, relative character order can be changed and every permutation is reachable.",
+      },
+      {
+        vi: "Hoán vị nhỏ nhất chính là các ký tự được sắp xếp tăng dần.",
+        en: "The smallest permutation is the characters in ascending order.",
+      },
+    ],
+    complexity: {
+      time: "O(n²) if k = 1; O(n log n) if k ≥ 2",
+      space: "O(n)",
+      note: {
+        vi: "Nhánh k = 1 tạo n substring độ dài n; nhánh k ≥ 2 sắp xếp n ký tự.",
+        en: "The k = 1 branch creates n length-n slices; the k ≥ 2 branch sorts n characters.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def orderlyQueue(self, s: str, k: int) -> str:",
+      "        if k == 1:",
+      "            answer = s",
+      "            for shift in range(1, len(s)):",
+      "                candidate = s[shift:] + s[:shift]",
+      "                answer = min(answer, candidate)",
+      "            return answer",
+      "        return ''.join(sorted(s))",
+    ],
+    debugMode: "semantic",
+    builder: buildSteps899,
+  },
+});

@@ -60,16 +60,27 @@ test('4052 agrees with an independent direct-mapping oracle', () => {
   }
 });
 
-test('4052 trace keeps row and column phases separate', () => {
+test('4052 trace debugs one executed source line at a time', () => {
   const built = problem.builder('1,2,3;4,5,6;7,8,9', { rowShift: '1,2,0', colShift: '2,2,1' });
-  assert.equal(built.steps.length, 8);
+  assert.equal(built.steps.length, 63);
   assert.ok(built.steps.every((step) => step.cyclicShift4052View));
+  assert.ok(built.steps.every((step) => step.codeLines.length === 1));
+  const lineCounts = built.steps.reduce((counts, step) => {
+    const line = step.codeLines[0];
+    counts[line] = (counts[line] || 0) + 1;
+    return counts;
+  }, {});
+  assert.deepEqual(lineCounts, {
+    3: 1, 4: 1, 5: 3, 6: 9, 7: 9, 8: 9,
+    9: 3, 10: 9, 11: 9, 12: 9, 14: 1,
+  });
   const rowSteps = built.steps.filter((step) => step.cyclicShift4052View.phase === 'rows');
   const colSteps = built.steps.filter((step) => step.cyclicShift4052View.phase === 'columns');
-  assert.equal(rowSteps.length, 3);
-  assert.equal(colSteps.length, 3);
+  assert.equal(rowSteps.length, 30);
+  assert.equal(colSteps.length, 30);
   assert.deepEqual(rowSteps.at(-1).cyclicShift4052View.afterRows, [[2, 3, 1], [6, 4, 5], [7, 8, 9]]);
-  assert.deepEqual(colSteps[0].cyclicShift4052View.mappings.map((item) => item.to), [1, 2, 0]);
+  const firstColumnWrites = colSteps.filter((step) => step.codeLines[0] === 12 && step.cyclicShift4052View.activeCol === 0);
+  assert.deepEqual(firstColumnWrites.map((step) => step.cyclicShift4052View.mappings[0].to), [1, 2, 0]);
 });
 
 test('4052 displayed Python agrees with the visualization', () => {
@@ -102,6 +113,7 @@ test('4052 custom renderer handles every phase in both languages', () => {
       assert.match(element.innerHTML, /cs4052-viz/);
       assert.match(element.innerHTML, /AFTER ROW SHIFTS/);
       assert.match(element.innerHTML, /FINAL GRID/);
+      assert.match(element.innerHTML, new RegExp(`(?:LINE|DÒNG) ${step.codeLines[0]}`));
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
