@@ -1095,6 +1095,7 @@ function renderCatalog() {
             [54, "Spiral Matrix — 4 boundaries"],
             [48, "Rotate Image — transpose + reverse"],
             [73, "Set Matrix Zeroes — marker rows / columns"],
+            [2319, "Check if Matrix Is X-Matrix — diagonal rules"],
           ] },
           { icon: "🔎", name: vi ? "Tìm kiếm trong ma trận" : "Matrix search", problems: [
             [74, "Search a 2D Matrix — binary search"],
@@ -1115,7 +1116,7 @@ function renderCatalog() {
             [221, "Maximal Square — square DP"],
           ] },
         ];
-        const sequence = [54, 48, 73, 74, 240, 733, 200, 695, 994, 542, 79, 304, 62, 64, 221];
+        const sequence = [54, 48, 73, 2319, 74, 240, 733, 200, 695, 994, 542, 79, 304, 62, 64, 221];
         const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
         const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
         const problemRow = ([id, name]) => (supportedIds.has(id)
@@ -26072,6 +26073,104 @@ function renderSearchMatrix74View(step) {
       <section class="s74-board"><header><strong>MATRIX</strong><span>${rows} × ${cols}</span></header><div class="s74-grid" style="--s74-cols:${cols}"><span class="s74-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="s74-col">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="s74-row">r=${row}</span>${(matrixRows[row] || []).join("")}`).join("")}</div></section>
       <aside class="s74-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="range"><i></i>${vi ? "khoảng còn lại" : "remaining range"}</span><span class="mid"><i></i>${vi ? "mid đang thử" : "midpoint"}</span><span class="discard"><i></i>${vi ? "nửa đã bỏ" : "discarded half"}</span><span class="found"><i></i>${vi ? "target" : "target"}</span></aside>
     </div>
+  </section>`;
+}
+
+function renderXMatrix2319View(step) {
+  const view = step.xMatrix2319View || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const n = Number(view.n) || matrix.length;
+  const phase = String(view.phase || "init");
+  const decision = view.decision || {};
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const checkedCells = Array.isArray(view.checkedCells) ? view.checkedCells : [];
+  const checkedCount = Number(view.checkedCount) || 0;
+  const key = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const checkedOrder = new Map(checkedCells.map((cell, index) => [key(cell), index + 1]));
+  const resultPhase = phase === "fail" || phase === "done";
+  const phaseIndex = resultPhase ? 4 : phase === "check-x" || phase === "check-outside" ? 2 : phase === "classify" || phase === "cell-loop" || phase === "row-loop" ? 1 : 0;
+  const diagonalCount = n % 2 === 0 ? n * 2 : n * 2 - 1;
+  const outsideCount = n * n - diagonalCount;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const stages = [
+    { vi: "Đọc kích thước", en: "Read size", detail: "n" },
+    { vi: "Phân loại ô", en: "Classify cell", detail: "r,c" },
+    { vi: "Kiểm tra giá trị", en: "Check value", detail: "0 / nonzero" },
+    { vi: "Trả kết quả", en: "Return result", detail: "True / False" },
+  ].map((item, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (decision.kind === "init") {
+    decisionHtml = `<section class="xm2319-decision info"><small>${vi ? "ĐỊNH NGHĨA" : "DEFINITION"}</small><strong>on_x = (r == c) or (r + c == n - 1)</strong><span>${vi ? "Ô trên một trong hai đường chéo phải khác 0; mọi ô khác phải bằng 0." : "A cell on either diagonal must be nonzero; every other cell must equal zero."}</span></section>`;
+  } else if (decision.kind === "row-loop" || decision.kind === "cell-loop") {
+    decisionHtml = `<section class="xm2319-decision info"><small>${decision.kind === "row-loop" ? "FOR R" : "FOR C"}</small><strong>${decision.kind === "row-loop" ? `r = ${view.row}` : `(r, c) = (${view.row}, ${view.col})`}</strong><span>${decision.kind === "row-loop" ? (vi ? "Vòng ngoài chọn hàng tiếp theo." : "The outer loop selects the next row.") : (vi ? `Đọc giá trị ${view.value} trước khi phân loại ô.` : `Read value ${view.value} before classifying the cell.`)}</span></section>`;
+  } else if (decision.kind === "classify") {
+    decisionHtml = `<section class="xm2319-decision ${decision.onX ? "diagonal" : "outside"}"><small>ON_X</small><strong>(${view.row} == ${view.col}) or (${view.row} + ${view.col} == ${n - 1}) → ${decision.onX ? "TRUE" : "FALSE"}</strong><span>${decision.onX ? (vi ? "Ô này thuộc chữ X nên giá trị bắt buộc khác 0." : "This cell belongs to the X, so its value must be nonzero.") : (vi ? "Ô này nằm ngoài chữ X nên giá trị bắt buộc bằng 0." : "This cell lies outside the X, so its value must be zero.")}</span></section>`;
+  } else if (decision.kind === "check-x") {
+    decisionHtml = `<section class="xm2319-decision ${decision.invalid ? "invalid" : "valid"}"><small>ON_X AND VALUE == 0</small><strong>True and ${view.value} == 0 → ${decision.invalid ? "TRUE" : "FALSE"}</strong><span>${decision.invalid ? (vi ? "Vi phạm: ô trên đường chéo không được bằng 0." : "Violation: a diagonal cell cannot equal zero.") : (vi ? "Hợp lệ: ô trên đường chéo khác 0." : "Valid: the diagonal cell is nonzero.")}</span></section>`;
+  } else if (decision.kind === "check-outside") {
+    decisionHtml = `<section class="xm2319-decision ${decision.invalid ? "invalid" : "valid"}"><small>NOT ON_X AND VALUE != 0</small><strong>True and ${view.value} != 0 → ${decision.invalid ? "TRUE" : "FALSE"}</strong><span>${decision.invalid ? (vi ? "Vi phạm: ô ngoài đường chéo phải bằng 0." : "Violation: a cell outside the diagonals must equal zero.") : (vi ? "Hợp lệ: ô ngoài đường chéo bằng 0." : "Valid: the outside cell equals zero.")}</span></section>`;
+  } else if (decision.kind === "fail") {
+    const diagonalFailure = decision.reason === "x-zero";
+    decisionHtml = `<section class="xm2319-decision invalid"><small>RETURN FALSE</small><strong>grid[${view.row}][${view.col}] = ${view.value} · expected ${escapeHtml(decision.expected)}</strong><span>${diagonalFailure ? (vi ? "Ô thuộc chữ X nhưng bằng 0." : "The cell belongs to the X but equals zero.") : (vi ? "Ô nằm ngoài chữ X nhưng khác 0." : "The cell lies outside the X but is nonzero.")}</span></section>`;
+  } else if (decision.kind === "done") {
+    decisionHtml = `<section class="xm2319-decision valid"><small>RETURN TRUE</small><strong>${checkedCount} / ${n * n} ${vi ? "ô hợp lệ" : "cells valid"}</strong><span>${vi ? "Hai đường chéo đều khác 0 và toàn bộ vùng ngoài đều bằng 0." : "Both diagonals are nonzero and the entire outside region equals zero."}</span></section>`;
+  } else {
+    decisionHtml = `<section class="xm2319-decision info"><small>LOOP</small><strong>${vi ? "Tiếp tục duyệt grid" : "Continue scanning the grid"}</strong><span>${checkedCount} / ${n * n}</span></section>`;
+  }
+
+  const cells = [];
+  cells.push(`<span class="xm2319-corner">r\\c</span>`);
+  for (let col = 0; col < n; col++) cells.push(`<span class="xm2319-axis">c=${col}</span>`);
+  for (let row = 0; row < n; row++) {
+    cells.push(`<span class="xm2319-axis xm2319-row">r=${row}</span>`);
+    for (let col = 0; col < n; col++) {
+      const onMain = row === col;
+      const onAnti = row + col === n - 1;
+      const onX = onMain || onAnti;
+      const current = key(activeCell) === `${row},${col}`;
+      const order = checkedOrder.get(`${row},${col}`);
+      const invalid = current && phase === "fail";
+      const valid = current && !invalid && (phase === "check-x" || phase === "check-outside");
+      const classes = ["xm2319-cell", onX ? "on-x" : "outside"];
+      if (onMain) classes.push("main-diagonal");
+      if (onAnti) classes.push("anti-diagonal");
+      if (order) classes.push("checked");
+      if (current) classes.push("active");
+      if (valid) classes.push("valid");
+      if (invalid) classes.push("invalid");
+      const label = invalid
+        ? (vi ? "VI PHẠM" : "INVALID")
+        : valid
+          ? (vi ? "HỢP LỆ" : "VALID")
+          : current
+            ? (onX ? "ON X" : (vi ? "NGOÀI X" : "OUTSIDE"))
+            : onX
+              ? (onMain && onAnti ? (vi ? "TÂM X" : "X CENTER") : (vi ? "ĐƯỜNG CHÉO" : "DIAGONAL"))
+              : (vi ? "PHẢI = 0" : "MUST = 0");
+      cells.push(`<span class="${classes.join(" ")}"><small>[${row},${col}]</small><strong>${escapeHtml(String(matrix[row]?.[col]))}</strong><em>${escapeHtml(label)}</em>${order ? `<b>${order}</b>` : ""}</span>`);
+    }
+  }
+
+  const pointer = activeCell ? `(${activeCell[0]}, ${activeCell[1]})` : "—";
+  const zone = view.onX == null ? "—" : view.onX ? (vi ? "trên X" : "on X") : (vi ? "ngoài X" : "outside X");
+  const summary = vi
+    ? `Check X-Matrix: đã xác nhận ${checkedCount} trong ${n * n} ô.`
+    : `Check X-Matrix: ${checkedCount} of ${n * n} cells confirmed.`;
+  $("treeView").innerHTML = `<section class="xm2319-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="xm2319-stages">${stages}</div>
+    <section class="xm2319-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="xm2319-stats"><span><small>N × N</small><strong>${n} × ${n}</strong></span><span><small>${vi ? "Ô HIỆN TẠI" : "CURRENT CELL"}</small><strong>${escapeHtml(pointer)}</strong></span><span><small>${vi ? "VÙNG" : "ZONE"}</small><strong>${escapeHtml(zone)}</strong></span><span><small>${vi ? "ĐÃ XÁC NHẬN" : "CONFIRMED"}</small><strong>${checkedCount}/${n * n}</strong></span></section>
+    ${decisionHtml}
+    <div class="xm2319-layout">
+      <section class="xm2319-board"><header><strong>X-MATRIX GRID</strong><span>${n} × ${n}</span></header><div class="xm2319-board-scroll"><div class="xm2319-grid" style="--xm2319-n:${n}">${cells.join("")}</div></div></section>
+      <aside class="xm2319-rules"><strong>${vi ? "HAI ĐIỀU KIỆN" : "TWO CONDITIONS"}</strong><span class="diagonal ${view.onX === true ? "active" : ""}"><small>${diagonalCount} ${vi ? "ô chữ X" : "X cells"}</small><b>r == c <i>OR</i> r+c == n-1</b><em>grid[r][c] != 0</em></span><span class="outside ${view.onX === false ? "active" : ""}"><small>${outsideCount} ${vi ? "ô bên ngoài" : "outside cells"}</small><b>${vi ? "không thuộc hai đường chéo" : "not on either diagonal"}</b><em>grid[r][c] == 0</em></span></aside>
+    </div>
+    <aside class="xm2319-legend"><span class="diagonal"><i></i>${vi ? "ô trên chữ X" : "cell on X"}</span><span class="outside"><i></i>${vi ? "ô ngoài chữ X" : "outside cell"}</span><span class="active"><i></i>${vi ? "ô đang kiểm tra" : "current cell"}</span><span class="checked"><i></i>${vi ? "đã hợp lệ" : "confirmed valid"}</span><span class="invalid"><i></i>${vi ? "ô vi phạm" : "violating cell"}</span></aside>
   </section>`;
 }
 

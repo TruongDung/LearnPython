@@ -3976,6 +3976,168 @@ function matrixStep2D(matrix, { title, codeLines = [], vars = [], note, final = 
   };
 }
 
+/** LeetCode 2319: Check if Matrix Is X-Matrix. */
+function buildSteps2319(input) {
+  const matrix = parseIntegerMatrix2D(input);
+  const n = matrix.length;
+  if (!matrix.every((row) => row.length === n)) throw new Error("grid must be a non-empty square integer matrix");
+
+  const steps = [];
+  const checkedCells = [];
+  let row = null, col = null, onX = null, value = null;
+  const snapshot = ({ title, note, codeLine, phase, decision, activeCell = null, final = false }) => {
+    steps.push({
+      title,
+      note,
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [codeLine],
+      vars: [
+        { name: "n", value: n },
+        { name: "r", value: row ?? "—" },
+        { name: "c", value: col ?? "—" },
+        { name: "grid[r][c]", value: value ?? "—" },
+        { name: "on_x", value: onX == null ? "—" : onX },
+      ],
+      xMatrix2319View: {
+        matrix: cloneMatrix2D(matrix),
+        n,
+        row,
+        col,
+        value,
+        onX,
+        activeCell: activeCell ? [...activeCell] : null,
+        checkedCells: checkedCells.map((cell) => [...cell]),
+        checkedCount: checkedCells.length,
+        phase,
+        decision: { ...decision },
+      },
+    });
+  };
+
+  snapshot({
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    note: { vi: `Grid vuông ${n}×${n}; mỗi ô sẽ được phân loại là nằm trên chữ X hoặc nằm ngoài chữ X.`, en: `The grid is ${n}×${n}; every cell will be classified as either on or outside the X.` },
+    codeLine: 3,
+    phase: "init",
+    decision: { kind: "init" },
+  });
+
+  for (row = 0; row < n; row++) {
+    col = null;
+    value = null;
+    onX = null;
+    snapshot({
+      title: { vi: `Duyệt hàng r = ${row}`, en: `Visit row r = ${row}` },
+      note: { vi: `Bắt đầu kiểm tra ${n} ô của hàng ${row}.`, en: `Begin checking the ${n} cells in row ${row}.` },
+      codeLine: 4,
+      phase: "row-loop",
+      decision: { kind: "row-loop" },
+    });
+
+    for (col = 0; col < n; col++) {
+      value = matrix[row][col];
+      onX = null;
+      snapshot({
+        title: { vi: `Duyệt ô (${row}, ${col})`, en: `Visit cell (${row}, ${col})` },
+        note: { vi: `Đọc grid[${row}][${col}] = ${value}.`, en: `Read grid[${row}][${col}] = ${value}.` },
+        codeLine: 5,
+        phase: "cell-loop",
+        activeCell: [row, col],
+        decision: { kind: "cell-loop" },
+      });
+
+      const onMain = row === col;
+      const onAnti = row + col === n - 1;
+      onX = onMain || onAnti;
+      snapshot({
+        title: onX
+          ? { vi: `(${row}, ${col}) nằm trên chữ X`, en: `(${row}, ${col}) lies on the X` }
+          : { vi: `(${row}, ${col}) nằm ngoài chữ X`, en: `(${row}, ${col}) lies outside the X` },
+        note: {
+          vi: `r == c là ${onMain ? "True" : "False"}; r + c == n - 1 là ${onAnti ? "True" : "False"}; on_x = ${onX ? "True" : "False"}.`,
+          en: `r == c is ${onMain ? "True" : "False"}; r + c == n - 1 is ${onAnti ? "True" : "False"}; on_x = ${onX ? "True" : "False"}.`,
+        },
+        codeLine: 6,
+        phase: "classify",
+        activeCell: [row, col],
+        decision: { kind: "classify", onMain, onAnti, onX },
+      });
+
+      if (onX) {
+        const invalid = value === 0;
+        snapshot({
+          title: invalid
+            ? { vi: `Ô trên X có giá trị 0 → sai`, en: `An X cell contains 0 → invalid` }
+            : { vi: `Ô trên X có giá trị ${value} → hợp lệ`, en: `X cell contains ${value} → valid` },
+          note: invalid
+            ? { vi: `Ô (${row}, ${col}) thuộc đường chéo nhưng bằng 0; điều kiện X-Matrix bị vi phạm.`, en: `Cell (${row}, ${col}) is diagonal but equals 0; the X-Matrix condition is violated.` }
+            : { vi: `Ô (${row}, ${col}) thuộc đường chéo và khác 0; tiếp tục.`, en: `Cell (${row}, ${col}) is diagonal and nonzero; continue.` },
+          codeLine: 7,
+          phase: "check-x",
+          activeCell: [row, col],
+          decision: { kind: "check-x", invalid, expected: "!= 0" },
+        });
+        if (invalid) {
+          snapshot({
+            title: { vi: "Không phải X-Matrix", en: "Not an X-Matrix" },
+            note: { vi: `Trả về False ngay tại ô đường chéo (${row}, ${col}).`, en: `Return False immediately at diagonal cell (${row}, ${col}).` },
+            codeLine: 8,
+            phase: "fail",
+            activeCell: [row, col],
+            decision: { kind: "fail", reason: "x-zero", expected: "!= 0" },
+            final: true,
+          });
+          return { original: cloneMatrix2D(matrix), answer: false, steps };
+        }
+      } else {
+        const invalid = value !== 0;
+        snapshot({
+          title: invalid
+            ? { vi: `Ô ngoài X có giá trị ${value} → sai`, en: `An outside cell contains ${value} → invalid` }
+            : { vi: "Ô ngoài X bằng 0 → hợp lệ", en: "Outside cell equals 0 → valid" },
+          note: invalid
+            ? { vi: `Ô (${row}, ${col}) nằm ngoài hai đường chéo nhưng khác 0; điều kiện X-Matrix bị vi phạm.`, en: `Cell (${row}, ${col}) is outside both diagonals but is nonzero; the X-Matrix condition is violated.` }
+            : { vi: `Ô (${row}, ${col}) nằm ngoài chữ X và bằng 0; tiếp tục.`, en: `Cell (${row}, ${col}) is outside the X and equals 0; continue.` },
+          codeLine: 9,
+          phase: "check-outside",
+          activeCell: [row, col],
+          decision: { kind: "check-outside", invalid, expected: "== 0" },
+        });
+        if (invalid) {
+          snapshot({
+            title: { vi: "Không phải X-Matrix", en: "Not an X-Matrix" },
+            note: { vi: `Trả về False ngay tại ô ngoài đường chéo (${row}, ${col}).`, en: `Return False immediately at outside cell (${row}, ${col}).` },
+            codeLine: 10,
+            phase: "fail",
+            activeCell: [row, col],
+            decision: { kind: "fail", reason: "outside-nonzero", expected: "== 0" },
+            final: true,
+          });
+          return { original: cloneMatrix2D(matrix), answer: false, steps };
+        }
+      }
+      checkedCells.push([row, col]);
+    }
+  }
+
+  row = null;
+  col = null;
+  value = null;
+  onX = null;
+  snapshot({
+    title: { vi: "Đây là X-Matrix hợp lệ", en: "This is a valid X-Matrix" },
+    note: { vi: `Cả ${n * n} ô đều đúng: hai đường chéo khác 0 và mọi ô còn lại bằng 0.`, en: `All ${n * n} cells pass: both diagonals are nonzero and every other cell is zero.` },
+    codeLine: 11,
+    phase: "done",
+    decision: { kind: "done" },
+    final: true,
+  });
+  return { original: cloneMatrix2D(matrix), answer: true, steps };
+}
+
 /** LeetCode 422: Valid Word Square. */
 function buildSteps422(input) {
   const words = String(input).split(",").map((word) => word.trim()).filter(Boolean);
@@ -11812,6 +11974,48 @@ module.exports = {
 };
 
 Object.assign(module.exports, {
+  2319: {
+    id: 2319,
+    difficulty: "easy",
+    slug: "check-if-matrix-is-x-matrix",
+    category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },
+    tags: [twoDArrayTag],
+    title: { vi: "Check if Matrix Is X-Matrix", en: "Check if Matrix Is X-Matrix" },
+    titleVi: { vi: "Kiểm tra ma trận chữ X", en: "Check whether a matrix forms an X" },
+    statement: {
+      vi: "Một grid vuông là X-Matrix khi mọi ô trên đường chéo chính hoặc đường chéo phụ đều khác 0, còn tất cả ô khác đều bằng 0.",
+      en: "A square grid is an X-Matrix when every cell on the main or anti-diagonal is nonzero and every other cell is zero.",
+    },
+    defaultInput: "2,0,0,1;0,3,1,0;0,5,2,0;4,0,0,2",
+    inputKind: "string",
+    inputLabel: { vi: "grid vuông (hàng cách ;)", en: "square grid (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Ô (r,c) nằm trên chữ X khi r == c hoặc r + c == n - 1.", en: "Cell (r,c) lies on the X when r == c or r + c == n - 1." },
+      { vi: "Nếu ô trên X bằng 0, trả về False ngay.", en: "If a cell on the X is zero, return False immediately." },
+      { vi: "Nếu ô ngoài X khác 0, cũng trả về False; chỉ trả True sau khi mọi ô đều hợp lệ.", en: "If a cell outside the X is nonzero, also return False; return True only after every cell passes." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(1)",
+      note: { vi: "Kiểm tra tối đa n² ô và chỉ dùng vài biến.", en: "Inspect at most n² cells and use only a few variables." },
+    },
+    code: [
+      "class Solution:",
+      "    def checkXMatrix(self, grid):",
+      "        n = len(grid)",
+      "        for r in range(n):",
+      "            for c in range(n):",
+      "                on_x = r == c or r + c == n - 1",
+      "                if on_x and grid[r][c] == 0:",
+      "                    return False",
+      "                if not on_x and grid[r][c] != 0:",
+      "                    return False",
+      "        return True",
+    ],
+    debugMode: "line-by-line",
+    builder: buildSteps2319,
+  },
   422: {
     id: 422, difficulty: "easy", slug: "valid-word-square",
     category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
