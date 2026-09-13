@@ -4694,6 +4694,480 @@ function buildSteps73(input) {
   return { original, answer: result, steps };
 }
 
+/** LeetCode 73, approach 2: reuse the first row and column as O(1) markers. */
+function buildSteps73ConstantSpace(input) {
+  const original = parseIntegerMatrix2D(input);
+  const result = cloneMatrix2D(original);
+  const rows = original.length;
+  const cols = original[0].length;
+  const firstRowHasZero = original[0].some((value) => value === 0);
+  const firstColHasZero = original.some((row) => row[0] === 0);
+  const markerRows = new Set();
+  const markerCols = new Set();
+  const steps = [];
+
+  function snapshot({ title, phase, codeLine, vars = [], note, activeCell = null, changedCell = null, decision = null, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      vars,
+      note,
+      zero73View: {
+        approach: 2,
+        original: cloneMatrix2D(original),
+        matrix: cloneMatrix2D(result),
+        rows,
+        cols,
+        phase,
+        activeCell,
+        changedCell,
+        markerRows: [...markerRows],
+        markerCols: [...markerCols],
+        firstRowHasZero,
+        firstColHasZero,
+        decision,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo kích thước matrix", en: "Initialize the matrix dimensions" },
+    phase: "boundaries",
+    codeLine: 3,
+    vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
+    note: { vi: `Dòng 3 gán rows=${rows}, cols=${cols}. Chưa thay đổi ô nào.`, en: `Line 3 assigns rows=${rows}, cols=${cols}. No cell has changed yet.` },
+    decision: { kind: "init" },
+  });
+
+  const firstRowStop = firstRowHasZero ? original[0].findIndex((value) => value === 0) : cols - 1;
+  snapshot({
+    title: { vi: `Lưu cờ hàng đầu = ${firstRowHasZero}`, en: `Save first-row flag = ${firstRowHasZero}` },
+    phase: "boundaries",
+    codeLine: 4,
+    vars: [{ name: "first_row_has_zero", value: firstRowHasZero }, { name: "c đã đọc", value: `0..${firstRowStop}` }],
+    note: { vi: firstRowHasZero ? `any(...) dừng tại số 0 đầu tiên ở (0,${firstRowStop}).` : `any(...) đọc hết ${cols} ô và không gặp 0.`, en: firstRowHasZero ? `any(...) stops at the first zero, at (0,${firstRowStop}).` : `any(...) reads all ${cols} cells without finding zero.` },
+    activeCell: [0, firstRowStop],
+    decision: { kind: "boundary-flag", axis: "row", found: firstRowHasZero, stop: firstRowStop },
+  });
+
+  const firstColStop = firstColHasZero ? original.findIndex((row) => row[0] === 0) : rows - 1;
+  snapshot({
+    title: { vi: `Lưu cờ cột đầu = ${firstColHasZero}`, en: `Save first-column flag = ${firstColHasZero}` },
+    phase: "boundaries",
+    codeLine: 5,
+    vars: [{ name: "first_col_has_zero", value: firstColHasZero }, { name: "r đã đọc", value: `0..${firstColStop}` }],
+    note: { vi: firstColHasZero ? `any(...) dừng tại số 0 đầu tiên ở (${firstColStop},0).` : `any(...) đọc hết ${rows} ô và không gặp 0.`, en: firstColHasZero ? `any(...) stops at the first zero, at (${firstColStop},0).` : `any(...) reads all ${rows} cells without finding zero.` },
+    activeCell: [firstColStop, 0],
+    decision: { kind: "boundary-flag", axis: "col", found: firstColHasZero, stop: firstColStop },
+  });
+
+  for (let row = 1; row < rows; row++) {
+    snapshot({
+      title: { vi: `Vòng marker: gán r = ${row}`, en: `Marker loop: assign r = ${row}` },
+      phase: "mark",
+      codeLine: 7,
+      vars: [{ name: "r", value: row }],
+      note: { vi: `Bắt đầu quét phần lõi của hàng ${row}.`, en: `Begin scanning the inner cells of row ${row}.` },
+      activeCell: [row, 0],
+      decision: { kind: "loop-marker-row", row },
+    });
+    for (let col = 1; col < cols; col++) {
+      const value = original[row][col];
+      snapshot({
+        title: { vi: `Vòng marker: gán c = ${col}`, en: `Marker loop: assign c = ${col}` },
+        phase: "mark",
+        codeLine: 8,
+        vars: [{ name: "r", value: row }, { name: "c", value: col }],
+        note: { vi: `Con trỏ vòng trong chuyển tới ô (${row},${col}).`, en: `The inner-loop cursor moves to cell (${row},${col}).` },
+        activeCell: [row, col],
+        decision: { kind: "loop-marker-col", row, col },
+      });
+      snapshot({
+        title: { vi: `Kiểm tra ${value} == 0`, en: `Check whether ${value} == 0` },
+        phase: "mark",
+        codeLine: 9,
+        vars: [{ name: "matrix[r][c]", value }, { name: "condition", value: value === 0 }],
+        note: { vi: value === 0 ? "Điều kiện True: tiếp theo ghi riêng marker hàng rồi marker cột." : "Điều kiện False: bỏ qua hai dòng gán marker.", en: value === 0 ? "The condition is true: next write the row marker, then the column marker." : "The condition is false: skip both marker assignments." },
+        activeCell: [row, col],
+        decision: { kind: "check-zero", value, matched: value === 0 },
+      });
+      if (value !== 0) continue;
+      result[row][0] = 0;
+      markerRows.add(row);
+      snapshot({
+        title: { vi: `Ghi marker hàng ${row}`, en: `Write the marker for row ${row}` },
+        phase: "mark",
+        codeLine: 10,
+        vars: [{ name: "r", value: row }, { name: `matrix[${row}][0]`, value: 0 }],
+        note: { vi: `Chỉ matrix[${row}][0] vừa đổi thành 0; marker cột chưa được ghi.`, en: `Only matrix[${row}][0] has become zero; the column marker has not been written yet.` },
+        activeCell: [row, 0],
+        changedCell: [row, 0],
+        decision: { kind: "store-row-marker", row, col },
+      });
+      result[0][col] = 0;
+      markerCols.add(col);
+      snapshot({
+        title: { vi: `Ghi marker cột ${col}`, en: `Write the marker for column ${col}` },
+        phase: "mark",
+        codeLine: 11,
+        vars: [{ name: "c", value: col }, { name: `matrix[0][${col}]`, value: 0 }],
+        note: { vi: `Bây giờ matrix[0][${col}] mới đổi thành 0; cặp marker đã hoàn tất.`, en: `Now matrix[0][${col}] becomes zero; the marker pair is complete.` },
+        activeCell: [0, col],
+        changedCell: [0, col],
+        decision: { kind: "store-col-marker", row, col },
+      });
+    }
+  }
+
+  for (let row = 1; row < rows; row++) {
+    snapshot({
+      title: { vi: `Vòng áp dụng: gán r = ${row}`, en: `Apply loop: assign r = ${row}` },
+      phase: "apply",
+      codeLine: 13,
+      vars: [{ name: "r", value: row }],
+      note: { vi: `Bắt đầu áp dụng marker cho phần lõi của hàng ${row}.`, en: `Begin applying markers to the inner cells of row ${row}.` },
+      activeCell: [row, 0],
+      decision: { kind: "loop-apply-row", row },
+    });
+    for (let col = 1; col < cols; col++) {
+      snapshot({
+        title: { vi: `Vòng áp dụng: gán c = ${col}`, en: `Apply loop: assign c = ${col}` },
+        phase: "apply",
+        codeLine: 14,
+        vars: [{ name: "r", value: row }, { name: "c", value: col }],
+        note: { vi: `Con trỏ vòng trong chuyển tới ô (${row},${col}).`, en: `The inner-loop cursor moves to cell (${row},${col}).` },
+        activeCell: [row, col],
+        decision: { kind: "loop-apply-col", row, col },
+      });
+      const rowMarked = result[row][0] === 0;
+      const colMarked = result[0][col] === 0;
+      const shouldZero = rowMarked || colMarked;
+      snapshot({
+        title: { vi: `Kiểm tra marker cho ô (${row},${col})`, en: `Check markers for cell (${row},${col})` },
+        phase: "apply",
+        codeLine: 15,
+        vars: [{ name: `matrix[${row}][0] == 0`, value: rowMarked }, { name: `matrix[0][${col}] == 0`, value: colMarked }, { name: "OR", value: shouldZero }],
+        note: { vi: shouldZero ? "Điều kiện True: dòng 16 sẽ gán ô hiện tại bằng 0." : "Điều kiện False: bỏ qua dòng 16 và giữ nguyên giá trị.", en: shouldZero ? "The condition is true: line 16 will assign zero to the current cell." : "The condition is false: skip line 16 and preserve the value." },
+        activeCell: [row, col],
+        decision: { kind: "check-marker", rowMarked, colMarked, shouldZero },
+      });
+      if (!shouldZero) continue;
+      const before = result[row][col];
+      result[row][col] = 0;
+      snapshot({
+        title: { vi: `Đặt matrix[${row}][${col}] = 0`, en: `Set matrix[${row}][${col}] = 0` },
+        phase: "apply",
+        codeLine: 16,
+        vars: [{ name: "before", value: before }, { name: "after", value: 0 }],
+        note: { vi: `Phép gán của dòng 16 đã chạy cho đúng ô (${row},${col}).`, en: `The line-16 assignment has executed for exactly cell (${row},${col}).` },
+        activeCell: [row, col],
+        changedCell: [row, col],
+        decision: { kind: "write-zero", rowMarked, colMarked, before },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Kiểm tra cờ hàng đầu: ${firstRowHasZero}`, en: `Check the first-row flag: ${firstRowHasZero}` },
+    phase: "restore",
+    codeLine: 18,
+    vars: [{ name: "first_row_has_zero", value: firstRowHasZero }],
+    note: { vi: firstRowHasZero ? "Điều kiện True: đi vào vòng lặp dòng 19." : "Điều kiện False: bỏ qua dòng 19–20.", en: firstRowHasZero ? "The condition is true: enter the loop on line 19." : "The condition is false: skip lines 19–20." },
+    activeCell: [0, 0],
+    decision: { kind: "check-boundary", axis: "row", enabled: firstRowHasZero },
+  });
+  if (firstRowHasZero) {
+    for (let col = 0; col < cols; col++) {
+      snapshot({
+        title: { vi: `Vòng hàng đầu: gán c = ${col}`, en: `First-row loop: assign c = ${col}` },
+        phase: "restore",
+        codeLine: 19,
+        vars: [{ name: "c", value: col }],
+        note: { vi: `Chuẩn bị xóa ô (0,${col}).`, en: `Prepare to clear cell (0,${col}).` },
+        activeCell: [0, col],
+        decision: { kind: "loop-boundary", axis: "row", index: col },
+      });
+      const before = result[0][col];
+      result[0][col] = 0;
+      snapshot({
+        title: { vi: `Xóa ô hàng đầu (0,${col})`, en: `Clear first-row cell (0,${col})` },
+        phase: "restore",
+        codeLine: 20,
+        vars: [{ name: "c", value: col }, { name: "before", value: before }, { name: "after", value: 0 }],
+        note: { vi: `Dòng 20 vừa gán matrix[0][${col}] = 0.`, en: `Line 20 has assigned matrix[0][${col}] = 0.` },
+        activeCell: [0, col],
+        changedCell: [0, col],
+        decision: { kind: "write-boundary", axis: "row", index: col },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Kiểm tra cờ cột đầu: ${firstColHasZero}`, en: `Check the first-column flag: ${firstColHasZero}` },
+    phase: "restore",
+    codeLine: 22,
+    vars: [{ name: "first_col_has_zero", value: firstColHasZero }],
+    note: { vi: firstColHasZero ? "Điều kiện True: đi vào vòng lặp dòng 23." : "Điều kiện False: bỏ qua dòng 23–24.", en: firstColHasZero ? "The condition is true: enter the loop on line 23." : "The condition is false: skip lines 23–24." },
+    activeCell: [0, 0],
+    decision: { kind: "check-boundary", axis: "col", enabled: firstColHasZero },
+  });
+  if (firstColHasZero) {
+    for (let row = 0; row < rows; row++) {
+      snapshot({
+        title: { vi: `Vòng cột đầu: gán r = ${row}`, en: `First-column loop: assign r = ${row}` },
+        phase: "restore",
+        codeLine: 23,
+        vars: [{ name: "r", value: row }],
+        note: { vi: `Chuẩn bị xóa ô (${row},0).`, en: `Prepare to clear cell (${row},0).` },
+        activeCell: [row, 0],
+        decision: { kind: "loop-boundary", axis: "col", index: row },
+      });
+      const before = result[row][0];
+      result[row][0] = 0;
+      snapshot({
+        title: { vi: `Xóa ô cột đầu (${row},0)`, en: `Clear first-column cell (${row},0)` },
+        phase: "restore",
+        codeLine: 24,
+        vars: [{ name: "r", value: row }, { name: "before", value: before }, { name: "after", value: 0 }],
+        note: { vi: `Dòng 24 vừa gán matrix[${row}][0] = 0.`, en: `Line 24 has assigned matrix[${row}][0] = 0.` },
+        activeCell: [row, 0],
+        changedCell: [row, 0],
+        decision: { kind: "write-boundary", axis: "col", index: row },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "Trả về None — matrix đã được sửa tại chỗ", en: "Return None — matrix was modified in place" },
+    phase: "done",
+    codeLine: 25,
+    final: true,
+    vars: [{ name: "result", value: JSON.stringify(result) }],
+    note: { vi: "Dòng 25 kết thúc hàm bằng None; đáp án nằm trong chính matrix đầu vào.", en: "Line 25 ends the function with None; the answer lives in the original matrix object." },
+    decision: { kind: "return" },
+  });
+  return { original, answer: result, steps };
+}
+
+/** LeetCode 835: count equal translation vectors between 1-cells. */
+function buildSteps835(input, params = {}) {
+  const img1 = parseIntegerMatrix2D(input);
+  const img2 = parseIntegerMatrix2D(params.img2);
+  const n = img1.length;
+  const validBinarySquare = (image) => image.length === n
+    && image.every((row) => row.length === n && row.every((value) => value === 0 || value === 1));
+  if (img1.some((row) => row.length !== n) || !validBinarySquare(img1) || !validBinarySquare(img2)) {
+    throw new Error("enter two binary n x n images with the same size");
+  }
+  if (n > 6) throw new Error("Use images up to 6 x 6 so every translation vote remains readable.");
+
+  const ones1 = [];
+  const ones2 = [];
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      if (img1[row][col] === 1) ones1.push([row, col]);
+      if (img2[row][col] === 1) ones2.push([row, col]);
+    }
+  }
+
+  const steps = [];
+  const counts = new Map();
+  const countedMatches = new Map();
+  let best = 0;
+  let bestShift = null;
+
+  const keyOf = (dr, dc) => `${dr},${dc}`;
+  const cellsForShift = (dr, dc) => {
+    const shifted = [];
+    const overlap = [];
+    let clipped = 0;
+    for (const [row, col] of ones1) {
+      const movedRow = row + dr;
+      const movedCol = col + dc;
+      if (movedRow < 0 || movedRow >= n || movedCol < 0 || movedCol >= n) {
+        clipped++;
+        continue;
+      }
+      shifted.push([movedRow, movedCol]);
+      if (img2[movedRow][movedCol] === 1) overlap.push([movedRow, movedCol]);
+    }
+    return { shifted, overlap, clipped };
+  };
+  const countEntries = () => [...counts.entries()]
+    .map(([key, count]) => {
+      const [dr, dc] = key.split(",").map(Number);
+      return { dr, dc, count };
+    })
+    .sort((a, b) => b.count - a.count || a.dr - b.dr || a.dc - b.dc);
+
+  function snapshot({ title, phase, codeLine, note, vars = [], activeOne1 = null, activeOne2 = null, shift = null, countBefore = null, countAfter = null, bestChanged = false, final = false }) {
+    const geometry = shift ? cellsForShift(shift[0], shift[1]) : { shifted: [], overlap: [], clipped: 0 };
+    const shiftKey = shift ? keyOf(shift[0], shift[1]) : null;
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      overlap835View: {
+        img1: cloneMatrix2D(img1),
+        img2: cloneMatrix2D(img2),
+        n,
+        ones1: ones1.map((cell) => [...cell]),
+        ones2: ones2.map((cell) => [...cell]),
+        phase,
+        activeOne1,
+        activeOne2,
+        shift,
+        shiftedCells: geometry.shifted,
+        overlapCells: geometry.overlap,
+        clipped: geometry.clipped,
+        countedCells: shiftKey ? (countedMatches.get(shiftKey) || []).map((cell) => [...cell]) : [],
+        countBefore,
+        countAfter,
+        counts: countEntries(),
+        best,
+        bestShift: bestShift ? [...bestShift] : null,
+        bestChanged,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: `Lấy ${ones1.length} ô 1 từ img1`, en: `Collect ${ones1.length} one-cells from img1` },
+    phase: "collect",
+    codeLine: 3,
+    vars: [{ name: "ones1", value: JSON.stringify(ones1) }],
+    note: { vi: "Chỉ tọa độ các ô 1 mới có thể tham gia overlap.", en: "Only coordinates containing 1 can contribute to an overlap." },
+  });
+  snapshot({
+    title: { vi: `Lấy ${ones2.length} ô 1 từ img2`, en: `Collect ${ones2.length} one-cells from img2` },
+    phase: "collect",
+    codeLine: 4,
+    vars: [{ name: "ones2", value: JSON.stringify(ones2) }],
+    note: { vi: "Mỗi ô 1 của img1 sẽ được ghép thử với mỗi ô 1 của img2.", en: "Every one-cell in img1 will be paired with every one-cell in img2." },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo bảng đếm vector", en: "Initialize the translation counter" },
+    phase: "count",
+    codeLine: 5,
+    vars: [{ name: "shifts", value: "{}" }],
+    note: { vi: "Key là vector (dr, dc); value là số cặp ô 1 cùng tạo ra vector đó.", en: "Each key is a (dr, dc) vector; its value counts one-cell pairs producing that vector." },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo best = 0", en: "Initialize best = 0" },
+    phase: "count",
+    codeLine: 6,
+    vars: [{ name: "best", value: 0 }],
+    note: { vi: "Nếu một ảnh không có ô 1, không có cặp nào và đáp án giữ nguyên 0.", en: "If either image has no one-cell, no pair exists and the answer remains zero." },
+  });
+
+  for (const one1 of ones1) {
+    snapshot({
+      title: { vi: `Chọn ô img1 (${one1.join(",")})`, en: `Select img1 cell (${one1.join(",")})` },
+      phase: "pairs",
+      codeLine: 7,
+      activeOne1: [...one1],
+      vars: [{ name: "(r1,c1)", value: `(${one1.join(",")})` }],
+      note: { vi: "Bắt đầu ghép ô này với toàn bộ ô 1 của img2.", en: "Begin pairing this cell with every one-cell in img2." },
+    });
+    for (const one2 of ones2) {
+      snapshot({
+        title: { vi: `Ghép với ô img2 (${one2.join(",")})`, en: `Pair with img2 cell (${one2.join(",")})` },
+        phase: "pairs",
+        codeLine: 8,
+        activeOne1: [...one1],
+        activeOne2: [...one2],
+        vars: [{ name: "(r1,c1)", value: `(${one1.join(",")})` }, { name: "(r2,c2)", value: `(${one2.join(",")})` }],
+        note: { vi: "Hai tọa độ xác định duy nhất một phép dịch img1.", en: "The two coordinates determine exactly one translation of img1." },
+      });
+
+      const dr = one2[0] - one1[0];
+      const dc = one2[1] - one1[1];
+      const shift = [dr, dc];
+      const key = keyOf(dr, dc);
+      const before = counts.get(key) || 0;
+      snapshot({
+        title: { vi: `Tính vector (${dr}, ${dc})`, en: `Compute vector (${dr}, ${dc})` },
+        phase: "translate",
+        codeLine: 9,
+        activeOne1: [...one1],
+        activeOne2: [...one2],
+        shift,
+        countBefore: before,
+        countAfter: before,
+        vars: [{ name: "shift", value: `(${dr},${dc})` }, { name: "count trước", value: before }],
+        note: { vi: `Dịch img1 ${dr >= 0 ? "xuống" : "lên"} ${Math.abs(dr)} và ${dc >= 0 ? "sang phải" : "sang trái"} ${Math.abs(dc)} ô.`, en: `Move img1 ${Math.abs(dr)} ${dr >= 0 ? "down" : "up"} and ${Math.abs(dc)} ${dc >= 0 ? "right" : "left"}.` },
+      });
+
+      const after = before + 1;
+      counts.set(key, after);
+      const matches = countedMatches.get(key) || [];
+      matches.push([...one2]);
+      countedMatches.set(key, matches);
+      snapshot({
+        title: { vi: `Vector (${dr}, ${dc}) nhận phiếu thứ ${after}`, en: `Vector (${dr}, ${dc}) receives vote ${after}` },
+        phase: "count",
+        codeLine: 10,
+        activeOne1: [...one1],
+        activeOne2: [...one2],
+        shift,
+        countBefore: before,
+        countAfter: after,
+        vars: [{ name: `shifts[(${dr},${dc})]`, value: after }, { name: "best", value: best }],
+        note: { vi: `Cặp đang xét làm bộ đếm tăng ${before} → ${after}.`, en: `The active pair increments this counter from ${before} to ${after}.` },
+      });
+
+      const changed = after > best;
+      if (changed) {
+        best = after;
+        bestShift = [...shift];
+      }
+      snapshot({
+        title: changed
+          ? { vi: `Cập nhật best = ${best}`, en: `Update best = ${best}` }
+          : { vi: `Giữ best = ${best}`, en: `Keep best = ${best}` },
+        phase: "best",
+        codeLine: 11,
+        activeOne1: [...one1],
+        activeOne2: [...one2],
+        shift,
+        countBefore: before,
+        countAfter: after,
+        bestChanged: changed,
+        vars: [{ name: "current count", value: after }, { name: "best", value: best }, { name: "best_shift", value: bestShift ? `(${bestShift.join(",")})` : "None" }],
+        note: changed
+          ? { vi: "Vector hiện tại lập kỷ lục mới; số phiếu của nó chính là số ô 1 overlap.", en: "The current vector sets a new record; its vote count equals the number of overlapping one-cells." }
+          : { vi: "Vector hiện tại chưa vượt kỷ lục đang giữ.", en: "The current vector does not exceed the existing record." },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Overlap lớn nhất = ${best}`, en: `Largest overlap = ${best}` },
+    phase: "done",
+    codeLine: 12,
+    final: true,
+    shift: bestShift,
+    countBefore: best,
+    countAfter: best,
+    vars: [{ name: "best", value: best }, { name: "best_shift", value: bestShift ? `(${bestShift.join(",")})` : "None" }],
+    note: bestShift
+      ? { vi: `Dịch img1 theo (${bestShift.join(", ")}) làm ${best} ô 1 trùng với img2.`, en: `Translating img1 by (${bestShift.join(", ")}) aligns ${best} one-cells with img2.` }
+      : { vi: "Không có cặp ô 1 nên overlap bằng 0.", en: "There is no pair of one-cells, so the overlap is zero." },
+  });
+
+  return { original: { img1: cloneMatrix2D(img1), img2: cloneMatrix2D(img2) }, answer: best, steps };
+}
+
 /** LeetCode 74: Search a 2D Matrix. */
 function buildSteps74(input, params = {}) {
   const matrix = parseIntegerMatrix2D(input);
@@ -12200,10 +12674,20 @@ Object.assign(module.exports, {
     id: 73, difficulty: "medium", slug: "set-matrix-zeroes",
     category: { key: "array", vi: "Mảng", en: "Array" }, tags: [twoDArrayTag],
     title: { vi: "Set Matrix Zeroes", en: "Set Matrix Zeroes" }, titleVi: { vi: "Đặt hàng/cột chứa 0 thành 0", en: "Zero every row and column containing a zero" },
-    statement: { vi: "Nếu matrix[r][c] là 0, đặt toàn bộ hàng r và cột c thành 0. Visualizer dùng hai Set để nhớ marker trước khi đổi ma trận.", en: "If matrix[r][c] is 0, set its entire row r and column c to zero. The visualizer uses two Sets to preserve markers before changing the matrix." },
-    defaultInput: "1,1,1;1,0,1;1,1,1", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [],
-    approach: [{ vi: "Lượt 1: quét matrix, ghi mọi chỉ số hàng và cột chứa 0 vào Set.", en: "Pass 1: scan the matrix and record every row and column that contains a zero." }, { vi: "Lượt 2: ô nào nằm trong hàng hoặc cột đã ghi thì đổi thành 0.", en: "Pass 2: turn a cell to 0 if its row or column was recorded." }],
-    complexity: { time: "O(m·n)", space: "O(m+n)", note: { vi: "Mỗi ô được quét tối đa hai lần; các Set chứa tối đa m hàng và n cột.", en: "Each cell is scanned at most twice; the Sets hold at most m rows and n columns." } },
+    statement: { vi: "Nếu matrix[r][c] là 0, đặt toàn bộ hàng r và cột c thành 0 ngay trên matrix. Chọn Cách 2 để xem lời giải O(1) bộ nhớ phụ.", en: "If matrix[r][c] is 0, set its entire row r and column c to zero in place. Choose Approach 2 for the O(1)-auxiliary-space solution." },
+    defaultInput: "1,1,1;1,0,1;1,1,1", inputKind: "string", inputLabel: { vi: "matrix (hàng cách ;)", en: "matrix (rows separated by ;)" }, extraParams: [{
+      key: "approach", type: "select", label: { vi: "Cách giải", en: "Approach" }, default: "2", options: [
+        { value: "1", label: { vi: "Cách 1: hai Set — O(m+n)", en: "Approach 1: two Sets — O(m+n)" } },
+        { value: "2", label: { vi: "Cách 2: marker tại chỗ — O(1)", en: "Approach 2: in-place markers — O(1)" } },
+      ],
+    }],
+    approach: [
+      { vi: "Cách 1: ghi chỉ số hàng/cột chứa 0 vào hai Set, rồi áp dụng marker trong lượt hai.", en: "Approach 1: store zero-bearing row and column indexes in two Sets, then apply them in a second pass." },
+      { vi: "Cách 2: lưu trước hai cờ cho hàng/cột đầu, rồi dùng chính hàng 0 và cột 0 làm marker.", en: "Approach 2: save two flags for the first row and column, then reuse row 0 and column 0 as markers." },
+      { vi: "Xử lý phần lõi trước; cuối cùng dùng hai cờ để xóa hàng đầu và cột đầu nếu cần.", en: "Process the inner matrix first; finally use the two flags to clear the first row and column when needed." },
+    ],
+    complexity: { time: "O(m·n)", space: "O(m+n) / O(1)", note: { vi: "Cách 1 dùng hai Set. Cách 2 chỉ dùng hai biến cờ và tái sử dụng các ô trong matrix, nên bộ nhớ phụ là O(1).", en: "Approach 1 uses two Sets. Approach 2 uses two flags and reuses matrix cells, so its auxiliary space is O(1)." } },
+    codeLabel: { vi: "Cách 1: hai Set", en: "Approach 1: two Sets" },
     code: [
       "class Solution:",
       "    def setZeroes(self, matrix):",
@@ -12219,7 +12703,38 @@ Object.assign(module.exports, {
       "                if r in zero_rows or c in zero_cols:",
       "                    matrix[r][c] = 0",
       "        return matrix",
-    ], builder: buildSteps73,
+    ],
+    code2Label: { vi: "Cách 2: marker tại chỗ — O(1)", en: "Approach 2: in-place markers — O(1)" },
+    code2: [
+      "class Solution:",
+      "    def setZeroes(self, matrix):",
+      "        rows, cols = len(matrix), len(matrix[0])",
+      "        first_row_has_zero = any(matrix[0][c] == 0 for c in range(cols))",
+      "        first_col_has_zero = any(matrix[r][0] == 0 for r in range(rows))",
+      "",
+      "        for r in range(1, rows):",
+      "            for c in range(1, cols):",
+      "                if matrix[r][c] == 0:",
+      "                    matrix[r][0] = 0",
+      "                    matrix[0][c] = 0",
+      "",
+      "        for r in range(1, rows):",
+      "            for c in range(1, cols):",
+      "                if matrix[r][0] == 0 or matrix[0][c] == 0:",
+      "                    matrix[r][c] = 0",
+      "",
+      "        if first_row_has_zero:",
+      "            for c in range(cols):",
+      "                matrix[0][c] = 0",
+      "",
+      "        if first_col_has_zero:",
+      "            for r in range(rows):",
+      "                matrix[r][0] = 0",
+      "        return",
+    ],
+    debugMode: "line-by-line",
+    builder: buildSteps73,
+    builder2: buildSteps73ConstantSpace,
   },
   74: {
     id: 74, difficulty: "medium", slug: "search-a-2d-matrix",
@@ -12230,6 +12745,55 @@ Object.assign(module.exports, {
     approach: [{ vi: "Coi matrix là mảng đã sắp xếp dài rows×cols: lo=0, hi=rows×cols−1.", en: "Treat the matrix as one sorted array of rows×cols values: lo=0, hi=rows×cols−1." }, { vi: "Đổi index mid trở lại tọa độ bằng row=mid//cols, col=mid%cols.", en: "Convert flat mid back to a coordinate with row=mid//cols, col=mid%cols." }],
     complexity: { time: "O(log(m·n))", space: "O(1)", note: { vi: "Mỗi bước bỏ đi một nửa toàn bộ vùng tìm kiếm.", en: "Each step discards half of the entire search range." } },
     code: ["class Solution:", "    def searchMatrix(self, matrix, target):", "        rows, cols = len(matrix), len(matrix[0])", "        lo, hi = 0, rows * cols - 1", "        while lo <= hi:", "            mid = (lo + hi) // 2", "            value = matrix[mid // cols][mid % cols]", "            if value == target:", "                return True", "            elif value < target:", "                lo = mid + 1", "            else:", "                hi = mid - 1", "        return False"], builder: buildSteps74,
+  },
+  835: {
+    id: 835, difficulty: "medium", slug: "image-overlap",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [twoDArrayTag, { key: "hash-map", vi: "Hash Map", en: "Hash Map" }],
+    title: { vi: "Image Overlap", en: "Image Overlap" },
+    titleVi: { vi: "Độ chồng lấn lớn nhất của hai ảnh", en: "Largest overlap of two binary images" },
+    statement: {
+      vi: "Dịch img1 theo bốn hướng mà không xoay, rồi tìm số ô 1 trùng với ô 1 của img2 lớn nhất. Visualizer nhận hai ảnh vuông nhị phân cùng kích thước, tối đa 6×6.",
+      en: "Translate img1 in four directions without rotation and maximize the number of one-cells aligned with img2. The visualizer accepts equally sized binary square images up to 6×6.",
+    },
+    defaultInput: "1,1,0;0,1,0;0,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "img1 (0/1; hàng cách ;)", en: "img1 (0/1; rows separated by ;)" },
+    extraParams: [{ key: "img2", type: "string", label: { vi: "img2 (0/1; hàng cách ;)", en: "img2 (0/1; rows separated by ;)" }, default: "0,0,0;0,1,1;0,0,1" }],
+    approach: [
+      { vi: "Liệt kê tọa độ các ô 1 trong cả hai ảnh; các ô 0 không thể đóng góp vào overlap.", en: "Collect the one-cell coordinates from both images; zero-cells cannot contribute to overlap." },
+      { vi: "Mỗi cặp (ô 1 của img1, ô 1 của img2) tạo một vector dịch (dr, dc) và bỏ một phiếu cho vector đó.", en: "Each pair of one-cells—one from each image—produces a translation vector (dr, dc) and casts one vote for it." },
+      { vi: "Số phiếu lớn nhất chính là số ô 1 overlap dưới cùng một phép dịch.", en: "The largest vote count is exactly the number of overlapping one-cells under one translation." },
+    ],
+    complexity: {
+      time: "O(k₁·k₂) ≤ O(n⁴)",
+      space: "O(n²)",
+      note: { vi: "k₁, k₂ là số ô 1. Chỉ có tối đa (2n−1)² vector dịch khác nhau.", en: "k₁ and k₂ are the one-cell counts. At most (2n−1)² distinct translation vectors exist." },
+    },
+    code: [
+      "class Solution:",
+      "    def largestOverlap(self, img1, img2):",
+      "        ones1 = [(r, c) for r, row in enumerate(img1) for c, v in enumerate(row) if v]",
+      "        ones2 = [(r, c) for r, row in enumerate(img2) for c, v in enumerate(row) if v]",
+      "        shifts = {}",
+      "        best = 0",
+      "        for r1, c1 in ones1:",
+      "            for r2, c2 in ones2:",
+      "                shift = (r2 - r1, c2 - c1)",
+      "                shifts[shift] = shifts.get(shift, 0) + 1",
+      "                best = max(best, shifts[shift])",
+      "        return best",
+    ],
+    debugMode: "line-by-line",
+    liveArgs: (input, params = {}) => {
+      const img1 = parseIntegerMatrix2D(input);
+      const img2 = parseIntegerMatrix2D(params.img2);
+      const n = img1.length;
+      const valid = (image) => image.length === n && image.every((row) => row.length === n && row.every((value) => value === 0 || value === 1));
+      if (!valid(img1) || !valid(img2)) throw new Error("enter two binary n x n images with the same size");
+      return [img1, img2];
+    },
+    builder: buildSteps835,
   },
 });
 

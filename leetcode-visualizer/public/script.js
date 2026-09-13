@@ -186,6 +186,11 @@ function applyStaticStrings() {
     quickProblemInput.closest("form")?.setAttribute("aria-label", t().quickJumpLabel);
     if (quickProblemInput.getAttribute("aria-invalid") !== "true") quickProblemInput.title = t().quickJumpLabel;
   }
+  const quickProblemGoButton = $("quickProblemGoBtn");
+  if (quickProblemGoButton) {
+    quickProblemGoButton.setAttribute("aria-label", t().quickJumpBtn);
+    quickProblemGoButton.title = t().quickJumpBtn;
+  }
   const liveEditButton = $("liveEditBtn");
   if (liveEditButton) {
     liveEditButton.setAttribute("aria-label", t().liveEditBtn);
@@ -1662,11 +1667,13 @@ $("problemId").addEventListener("keydown", (e) => {
 $("quickProblemForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = $("quickProblemId");
+  const submitButton = $("quickProblemGoBtn");
   $("problemId").value = input.value.trim();
   input.removeAttribute("aria-invalid");
   input.setCustomValidity("");
   input.title = t().quickJumpLabel;
   input.disabled = true;
+  if (submitButton) submitButton.disabled = true;
   try {
     const loaded = await loadProblem({ scrollToEnd: true });
     if (loaded) {
@@ -1679,6 +1686,7 @@ $("quickProblemForm").addEventListener("submit", async (event) => {
     input.title = message;
   } finally {
     input.disabled = false;
+    if (submitButton) submitButton.disabled = false;
   }
 });
 
@@ -26067,8 +26075,232 @@ function renderSearchMatrix74View(step) {
   </section>`;
 }
 
+function renderImageOverlap835View(step) {
+  const view = step.overlap835View || {};
+  const vi = lang === "vi";
+  const img1 = Array.isArray(view.img1) ? view.img1 : [];
+  const img2 = Array.isArray(view.img2) ? view.img2 : [];
+  const n = Number(view.n) || img1.length || 1;
+  const phase = String(view.phase || "collect");
+  const activeOne1 = Array.isArray(view.activeOne1) ? view.activeOne1 : null;
+  const activeOne2 = Array.isArray(view.activeOne2) ? view.activeOne2 : null;
+  const shift = Array.isArray(view.shift) ? view.shift : null;
+  const bestShift = Array.isArray(view.bestShift) ? view.bestShift : null;
+  const key = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const same = (a, b) => key(a) !== "" && key(a) === key(b);
+  const shifted = new Set((view.shiftedCells || []).map(key));
+  const overlaps = new Set((view.overlapCells || []).map(key));
+  const counted = new Set((view.countedCells || []).map(key));
+  const currentShiftKey = key(shift);
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const phaseIndex = phase === "done" ? 4 : phase === "best" ? 3 : phase === "count" ? 2 : phase === "pairs" || phase === "translate" ? 1 : 0;
+  const stages = [
+    { vi: "Lấy tọa độ 1", en: "Collect one-cells" },
+    { vi: "Ghép từng cặp", en: "Pair coordinates" },
+    { vi: "Đếm vector dịch", en: "Count translations" },
+    { vi: "Giữ kỷ lục", en: "Track maximum" },
+  ].map((item, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong></span>`;
+  }).join("");
+
+  const originalGrid = (image, active, label) => {
+    const cells = [];
+    cells.push(`<span class="io835-corner">r\\c</span>`);
+    for (let col = 0; col < n; col++) cells.push(`<span class="io835-axis">${col}</span>`);
+    for (let row = 0; row < n; row++) {
+      cells.push(`<span class="io835-axis">${row}</span>`);
+      for (let col = 0; col < n; col++) {
+        const value = image[row]?.[col] || 0;
+        const classes = ["io835-cell", value ? "one" : "zero"];
+        if (same(active, [row, col])) classes.push("active");
+        cells.push(`<span class="${classes.join(" ")}"><strong>${value}</strong><small>[${row},${col}]</small></span>`);
+      }
+    }
+    return `<section class="io835-board"><header><strong>${escapeHtml(label)}</strong><span>${n} × ${n}</span></header><div class="io835-grid" style="--io835-n:${n}">${cells.join("")}</div></section>`;
+  };
+
+  const overlayCells = [];
+  overlayCells.push(`<span class="io835-corner">r\\c</span>`);
+  for (let col = 0; col < n; col++) overlayCells.push(`<span class="io835-axis">${col}</span>`);
+  for (let row = 0; row < n; row++) {
+    overlayCells.push(`<span class="io835-axis">${row}</span>`);
+    for (let col = 0; col < n; col++) {
+      const cellKey = `${row},${col}`;
+      const from1 = shifted.has(cellKey);
+      const from2 = img2[row]?.[col] === 1;
+      const overlap = overlaps.has(cellKey);
+      const classes = ["io835-cell", "overlay"];
+      if (from1) classes.push("from-img1");
+      if (from2) classes.push("from-img2");
+      if (overlap) classes.push("overlap");
+      if (counted.has(cellKey)) classes.push("counted");
+      if (same(activeOne2, [row, col]) && shift) classes.push("active-pair");
+      const symbol = overlap ? "1+1" : from1 ? "A" : from2 ? "B" : "·";
+      const tag = counted.has(cellKey) ? (vi ? "ĐÃ ĐẾM" : "COUNTED") : overlap ? (vi ? "TRÙNG" : "OVERLAP") : from1 ? "img1" : from2 ? "img2" : "";
+      overlayCells.push(`<span class="${classes.join(" ")}"><strong>${symbol}</strong><small>${escapeHtml(tag)}</small></span>`);
+    }
+  }
+
+  const vector = shift
+    ? `<section class="io835-vector active"><small>${vi ? "VECTOR HIỆN TẠI" : "CURRENT VECTOR"}</small><strong>(${shift[0]}, ${shift[1]})</strong><span>(${activeOne2?.[0] ?? "r2"} − ${activeOne1?.[0] ?? "r1"}, ${activeOne2?.[1] ?? "c2"} − ${activeOne1?.[1] ?? "c1"})</span></section>`
+    : `<section class="io835-vector"><small>${vi ? "VECTOR DỊCH" : "TRANSLATION VECTOR"}</small><strong>(dr, dc)</strong><span>(r2 − r1, c2 − c1)</span></section>`;
+  const vote = view.countAfter === null || view.countAfter === undefined
+    ? "—"
+    : `${view.countBefore ?? 0} → ${view.countAfter}`;
+  const bestText = bestShift ? `(${bestShift[0]}, ${bestShift[1]})` : "—";
+  const formula = `<section class="io835-formula">
+    ${vector}
+    <i>→</i>
+    <section><small>${vi ? "PHIẾU CHO VECTOR" : "VECTOR VOTES"}</small><strong>${escapeHtml(vote)}</strong><span>shifts[(dr, dc)] += 1</span></section>
+    <i>→</i>
+    <section class="best ${view.bestChanged ? "changed" : ""}"><small>BEST</small><strong>${Number(view.best) || 0}</strong><span>${escapeHtml(bestText)}</span></section>
+  </section>`;
+
+  const countRows = (view.counts || []).slice(0, 8).map((entry, index) => {
+    const entryKey = `${entry.dr},${entry.dc}`;
+    const classes = [];
+    if (entryKey === currentShiftKey) classes.push("current");
+    if (bestShift && entryKey === key(bestShift)) classes.push("best");
+    return `<li class="${classes.join(" ")}"><small>#${index + 1}</small><code>(${entry.dr}, ${entry.dc})</code><strong>${entry.count}</strong></li>`;
+  }).join("") || `<li class="empty">${vi ? "Chưa có vector nào được đếm" : "No translation has been counted yet"}</li>`;
+  const scoreboard = `<section class="io835-score"><header><strong>${vi ? "BẢNG XẾP HẠNG VECTOR" : "TRANSLATION LEADERBOARD"}</strong><span>${(view.counts || []).length} ${vi ? "vector khác nhau" : "distinct vectors"}</span></header><ol>${countRows}</ol><footer>${vi ? "Các vector được xếp theo số phiếu giảm dần." : "Vectors are ordered by descending vote count."}</footer></section>`;
+  const overlay = `<section class="io835-board io835-overlay"><header><strong>${vi ? "IMG1 SAU KHI DỊCH + IMG2" : "SHIFTED IMG1 + IMG2"}</strong><span>${shift ? `Δ = (${shift.join(", ")})` : "Δ = —"}</span></header><div class="io835-grid" style="--io835-n:${n}">${overlayCells.join("")}</div><footer>${Number(view.clipped) || 0} ${vi ? "ô 1 của img1 nằm ngoài khung" : "img1 one-cell(s) outside the frame"}</footer></section>`;
+  const summary = vi
+    ? `Image Overlap: vector tốt nhất ${bestText}, overlap ${Number(view.best) || 0}.`
+    : `Image Overlap: best vector ${bestText}, overlap ${Number(view.best) || 0}.`;
+
+  $("treeView").innerHTML = `<section class="io835-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="io835-stages">${stages}</div>
+    <section class="io835-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    ${formula}
+    <div class="io835-main">
+      <div class="io835-images">${originalGrid(img1, activeOne1, "IMG1")}${overlay}${originalGrid(img2, activeOne2, "IMG2")}</div>
+      ${scoreboard}
+    </div>
+    <div class="io835-legend"><span class="a"><i></i>${vi ? "1 từ img1 đã dịch" : "shifted img1 one"}</span><span class="b"><i></i>${vi ? "1 từ img2" : "img2 one"}</span><span class="overlap"><i></i>${vi ? "hai ô 1 trùng nhau" : "overlapping ones"}</span><span class="counted"><i></i>${vi ? "phiếu đã đếm" : "counted vote"}</span></div>
+  </section>`;
+}
+
+function renderSetMatrixZeroes73ConstantView(step) {
+  const view = step.zero73View || {};
+  const vi = lang === "vi";
+  const original = Array.isArray(view.original) ? view.original : [];
+  const matrix = Array.isArray(view.matrix) ? view.matrix : original;
+  const rows = Number(view.rows) || matrix.length;
+  const cols = Number(view.cols) || (matrix[0] ? matrix[0].length : 0);
+  const markerRows = new Set((view.markerRows || []).map(Number));
+  const markerCols = new Set((view.markerCols || []).map(Number));
+  const activeCell = Array.isArray(view.activeCell) ? view.activeCell : null;
+  const changedCell = Array.isArray(view.changedCell) ? view.changedCell : null;
+  const phase = String(view.phase || "boundaries");
+  const decision = view.decision || {};
+  const sameCell = (cell, row, col) => Array.isArray(cell) && cell[0] === row && cell[1] === col;
+  const phaseIndex = phase === "done" ? 4 : phase === "restore" ? 3 : phase === "apply" ? 2 : phase === "mark" ? 1 : 0;
+  const phases = [
+    { label: vi ? "Lưu cờ" : "Save flags", detail: "row 0 / col 0" },
+    { label: vi ? "Ghi marker" : "Mark matrix", detail: "[r][0] / [0][c]" },
+    { label: vi ? "Xóa lõi" : "Clear core", detail: vi ? "đọc marker" : "read markers" },
+    { label: vi ? "Xóa biên" : "Clear border", detail: vi ? "dùng hai cờ" : "use flags" },
+  ].map((item, index) => {
+    const state = phaseIndex === 4 || index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  const flag = (name, value, label) => `<section class="${value ? "true" : "false"}"><small>${escapeHtml(name)}</small><strong>${value ? "TRUE" : "FALSE"}</strong><span>${escapeHtml(label)}</span></section>`;
+  const flags = `${flag("first_row_has_zero", Boolean(view.firstRowHasZero), vi ? "xóa hàng 0 ở cuối" : "clear row 0 at the end")}${flag("first_col_has_zero", Boolean(view.firstColHasZero), vi ? "xóa cột 0 ở cuối" : "clear column 0 at the end")}`;
+  const markers = (indices, axis) => indices.length
+    ? indices.map((index) => `<span>${axis}${index} → matrix[${axis === "r" ? `${index}][0` : `0][${index}`}] = 0</span>`).join("")
+    : `<em>${vi ? "chưa ghi marker lõi" : "no inner marker stored"}</em>`;
+
+  let rule;
+  if (decision.kind === "init") {
+    rule = `<section class="zm73-rule continue"><small>${vi ? "O(1) BỘ NHỚ PHỤ" : "O(1) AUXILIARY SPACE"}</small><strong>${vi ? "Matrix tự làm bộ nhớ marker" : "The matrix stores its own markers"}</strong><b>${vi ? "Chỉ cần thêm hai biến boolean." : "Only two boolean variables are added."}</b></section>`;
+  } else if (decision.kind === "boundary-flag") {
+    const found = Boolean(decision.found);
+    const axis = decision.axis === "row" ? (vi ? "hàng đầu" : "first row") : (vi ? "cột đầu" : "first column");
+    rule = `<section class="zm73-rule ${found ? "found" : "continue"}"><small>${vi ? "DÒNG ĐANG CHẠY · ANY(...)" : "CURRENT LINE · ANY(...)"}</small><strong>${escapeHtml(axis)} ${found ? "→ TRUE" : "→ FALSE"}</strong><b>${found ? (vi ? `Dừng tại index ${decision.stop}: đã gặp 0.` : `Stopped at index ${decision.stop}: found zero.`) : (vi ? "Đã đọc hết biên và không gặp 0." : "Read the full boundary without finding zero.")}</b></section>`;
+  } else if (["loop-marker-row", "loop-marker-col", "loop-apply-row", "loop-apply-col", "loop-boundary"].includes(decision.kind)) {
+    const index = decision.col ?? decision.row ?? decision.index;
+    rule = `<section class="zm73-rule continue"><small>${vi ? "VÒNG LẶP ĐANG CHẠY" : "LOOP LINE EXECUTED"}</small><strong>${decision.col !== undefined || decision.axis === "row" ? "c" : "r"} = ${escapeHtml(String(index))}</strong><b>${vi ? "Chỉ cập nhật con trỏ; matrix chưa đổi ở bước này." : "Only the cursor changes; the matrix is unchanged in this step."}</b></section>`;
+  } else if (decision.kind === "check-zero") {
+    const found = Number(decision.value) === 0;
+    rule = `<section class="zm73-rule ${found ? "found" : "continue"}"><small>${vi ? "DÒNG 9 · KIỂM TRA Ô LÕI" : "LINE 9 · CHECK INTERIOR CELL"}</small><strong>matrix[r][c] == 0 → ${found ? "TRUE" : "FALSE"}</strong><b>${found ? (vi ? "Tiếp theo chạy dòng 10, rồi dòng 11." : "Next execute line 10, then line 11.") : (vi ? "Bỏ qua dòng 10–11." : "Skip lines 10–11.")}</b></section>`;
+  } else if (decision.kind === "store-row-marker") {
+    rule = `<section class="zm73-rule found"><small>${vi ? "DÒNG 10 · GHI MARKER HÀNG" : "LINE 10 · WRITE ROW MARKER"}</small><strong>matrix[${decision.row}][0] = 0</strong><b>${vi ? "Marker cột chưa được ghi ở bước này." : "The column marker has not been written in this step."}</b></section>`;
+  } else if (decision.kind === "store-col-marker") {
+    rule = `<section class="zm73-rule found"><small>${vi ? "DÒNG 11 · GHI MARKER CỘT" : "LINE 11 · WRITE COLUMN MARKER"}</small><strong>matrix[0][${decision.col}] = 0</strong><b>${vi ? "Bây giờ cặp marker mới hoàn tất." : "The marker pair is now complete."}</b></section>`;
+  } else if (decision.kind === "check-marker" || decision.kind === "write-zero") {
+    const rowMarked = Boolean(decision.rowMarked);
+    const colMarked = Boolean(decision.colMarked);
+    const becomesZero = decision.kind === "write-zero" || Boolean(decision.shouldZero);
+    rule = `<section class="zm73-rule ${becomesZero ? "zero" : "keep"}"><small>${vi ? "ĐỌC MARKER TẠI CHỖ" : "READ IN-PLACE MARKERS"}</small><div><span class="${rowMarked ? "true" : "false"}">matrix[r][0] == 0 <b>${rowMarked ? "TRUE" : "FALSE"}</b></span><i>OR</i><span class="${colMarked ? "true" : "false"}">matrix[0][c] == 0 <b>${colMarked ? "TRUE" : "FALSE"}</b></span></div><strong>${becomesZero ? (vi ? "Có marker 0 → xóa ô lõi" : "A zero marker exists → clear inner cell") : (vi ? "Không marker 0 → giữ nguyên" : "No zero marker → keep the cell")}</strong></section>`;
+  } else if (decision.kind === "check-boundary") {
+    const axis = decision.axis === "row" ? (vi ? "hàng đầu" : "first row") : (vi ? "cột đầu" : "first column");
+    const enabled = Boolean(decision.enabled);
+    const skipped = decision.axis === "row" ? "19–20" : "23–24";
+    rule = `<section class="zm73-rule ${enabled ? "found" : "keep"}"><small>${vi ? "KIỂM TRA CỜ BIÊN" : "CHECK BOUNDARY FLAG"}</small><strong>${escapeHtml(axis)} → ${enabled ? "TRUE" : "FALSE"}</strong><b>${enabled ? (vi ? "Đi vào vòng xóa biên." : "Enter the boundary-clearing loop.") : (vi ? `Bỏ qua dòng ${skipped}.` : `Skip lines ${skipped}.`)}</b></section>`;
+  } else if (decision.kind === "write-boundary") {
+    const axis = decision.axis === "row" ? (vi ? "hàng đầu" : "first row") : (vi ? "cột đầu" : "first column");
+    const target = decision.axis === "row" ? `matrix[0][${decision.index}]` : `matrix[${decision.index}][0]`;
+    rule = `<section class="zm73-rule zero"><small>${vi ? "GÁN Ô BIÊN" : "WRITE BOUNDARY CELL"}</small><strong>${escapeHtml(target)} = 0</strong><b>${vi ? `${escapeHtml(axis)} được xử lý từng ô, đúng dòng đang sáng.` : `${escapeHtml(axis)} is cleared one cell at a time on the highlighted line.`}</b></section>`;
+  } else if (decision.kind === "return") {
+    rule = `<section class="zm73-rule done"><small>${vi ? "DÒNG 25 · RETURN" : "LINE 25 · RETURN"}</small><strong>${vi ? "Trả về None; matrix đã sửa tại chỗ." : "Return None; matrix was modified in place."}</strong><b>O(m·n) time · O(1) space</b></section>`;
+  } else {
+    rule = `<section class="zm73-rule done"><small>${vi ? "HOÀN TẤT" : "COMPLETE"}</small><strong>${vi ? "Đã áp dụng toàn bộ marker ngay trong matrix." : "All in-matrix markers have been applied."}</strong><b>O(m·n) time · O(1) space</b></section>`;
+  }
+
+  const cellRows = matrix.map((row, rowIndex) => row.map((value, colIndex) => {
+    const sourceZero = original[rowIndex]?.[colIndex] === 0;
+    const boundary = rowIndex === 0 || colIndex === 0;
+    const storedRow = colIndex === 0 && markerRows.has(rowIndex);
+    const storedCol = rowIndex === 0 && markerCols.has(colIndex);
+    const active = sameCell(activeCell, rowIndex, colIndex);
+    const changed = sameCell(changedCell, rowIndex, colIndex);
+    const classes = ["zm73-cell"];
+    if (boundary) classes.push("marker-storage");
+    if (storedRow || storedCol) classes.push("stored-marker");
+    if (sourceZero) classes.push("source-zero");
+    if (active) classes.push("active");
+    if (changed) classes.push("changed");
+    const tag = changed
+      ? (vi ? "VỪA → 0" : "NOW → 0")
+      : storedRow
+        ? (vi ? `MARK HÀNG ${rowIndex}` : `MARK ROW ${rowIndex}`)
+        : storedCol
+          ? (vi ? `MARK CỘT ${colIndex}` : `MARK COL ${colIndex}`)
+          : sourceZero
+            ? (vi ? "0 GỐC" : "ORIGINAL 0")
+            : boundary
+              ? (vi ? "Ô MARKER" : "MARKER CELL")
+              : (vi ? "PHẦN LÕI" : "INTERIOR");
+    return `<div class="${classes.join(" ")}"><small>[${rowIndex},${colIndex}]</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(tag)}</em></div>`;
+  }));
+
+  const actionLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Set Matrix Zeroes Cách 2: ${markerRows.size} marker hàng, ${markerCols.size} marker cột, O(1) bộ nhớ phụ.`
+    : `Set Matrix Zeroes Approach 2: ${markerRows.size} row markers, ${markerCols.size} column markers, O(1) auxiliary space.`;
+  $("treeView").innerHTML = `<section class="zm73-viz zm73-constant" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="zm73-method"><small>${vi ? "CÁCH 2" : "APPROACH 2"}</small><strong>${vi ? "Marker tại chỗ" : "In-place markers"}</strong><span>O(1) ${vi ? "bộ nhớ phụ" : "auxiliary space"}</span></div>
+    <div class="zm73-phases">${phases}</div>
+    <section class="zm73-action"><small>${vi ? "DÒNG" : "LINE"} ${actionLine ?? "-"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <div class="zm73-flags">${flags}</div>
+    <section class="zm73-markers"><header><strong>${vi ? "MARKER NẰM TRONG MATRIX" : "MARKERS STORED IN THE MATRIX"}</strong><span>${vi ? "hàng 0 + cột 0 thay cho hai Set" : "row 0 + column 0 replace two Sets"}</span></header><div><section class="rows"><small>matrix[r][0]</small><div>${markers([...markerRows].sort((a, b) => a - b), "r")}</div></section><section class="cols"><small>matrix[0][c]</small><div>${markers([...markerCols].sort((a, b) => a - b), "c")}</div></section></div></section>
+    ${rule}
+    <div class="zm73-layout">
+      <section class="zm73-board"><header><strong>${vi ? "MATRIX + VÙNG MARKER" : "MATRIX + MARKER STORAGE"}</strong><span>${rows} × ${cols}</span></header><div class="zm73-grid" style="--zm73-cols:${cols}"><span class="zm73-corner">r\\c</span>${Array.from({ length: cols }, (_, col) => `<span class="zm73-col ${col === 0 || markerCols.has(col) ? "marked" : ""}">c=${col}</span>`).join("")}${Array.from({ length: rows }, (_, row) => `<span class="zm73-row ${row === 0 || markerRows.has(row) ? "marked" : ""}">r=${row}</span>${(cellRows[row] || []).join("")}`).join("")}</div></section>
+      <aside class="zm73-legend"><strong>${vi ? "ĐỌC MÀU" : "READ COLORS"}</strong><span class="storage"><i></i>${vi ? "ô lưu marker" : "marker storage"}</span><span class="stored"><i></i>${vi ? "marker đã ghi" : "stored marker"}</span><span class="source"><i></i>${vi ? "số 0 gốc" : "original zero"}</span><span class="active"><i></i>${vi ? "ô đang xét" : "active cell"}</span><span class="changed"><i></i>${vi ? "ô vừa thành 0" : "just set to 0"}</span></aside>
+    </div>
+  </section>`;
+}
+
 function renderSetMatrixZeroes73View(step) {
   const view = step.zero73View || {};
+  if (Number(view.approach) === 2) {
+    renderSetMatrixZeroes73ConstantView(step);
+    return;
+  }
   const vi = lang === "vi";
   const original = Array.isArray(view.original) ? view.original : [];
   const matrix = Array.isArray(view.matrix) ? view.matrix : original;
@@ -29041,6 +29273,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderConvert2022View(step);
+  } else if (step.overlap835View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderImageOverlap835View(step);
   } else if (step.search74View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
