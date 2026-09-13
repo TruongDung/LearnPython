@@ -25757,3 +25757,235 @@ Object.assign(module.exports, {
     builder: buildSteps799,
   },
 });
+
+function parseDiceRoll1223Input(input, params = {}) {
+  if (!Array.isArray(input) || input.length !== 6 || !input.every(Number.isInteger)) {
+    throw new Error("rollMax must contain exactly six integers.");
+  }
+  if (!input.every((limit) => limit >= 1 && limit <= 15)) {
+    throw new Error("Every rollMax value must be between 1 and 15.");
+  }
+  const n = Number(params.n ?? 2);
+  if (!Number.isInteger(n) || n < 1 || n > 12) {
+    throw new Error("n must be an integer between 1 and 12 for the visualization.");
+  }
+  return { n, rollMax: [...input] };
+}
+
+function buildSteps1223(input, params = {}) {
+  const { n, rollMax } = parseDiceRoll1223Input(input, params);
+  const mod = 1000000007;
+  const maxStreak = Math.max(...rollMax);
+  const blankTable = () => Array.from({ length: 6 }, () => Array(maxStreak + 1).fill(0));
+  const copyTable = (table) => table.map((row) => [...row]);
+  const rowTotals = (table) => table.map((row) => row.reduce((sum, value) => (sum + value) % mod, 0));
+  const totalWays = (table) => rowTotals(table).reduce((sum, value) => (sum + value) % mod, 0);
+  const steps = [];
+  let dp = blankTable();
+
+  function snapshot({
+    phase,
+    phaseIndex,
+    title,
+    note,
+    codeLines,
+    currentRoll,
+    currentFace = -1,
+    previous = null,
+    previousTotals = [],
+    previousTotal = 0,
+    switchWays = null,
+    repeatWays = [],
+    completedFaces = 0,
+    final = false,
+  }) {
+    const totals = rowTotals(dp);
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      arr: totals,
+      highlight: currentFace >= 0 ? [currentFace] : [],
+      mark: final ? [0, 1, 2, 3, 4, 5] : [],
+      vars: [
+        { name: "roll", value: currentRoll },
+        { name: "face", value: currentFace >= 0 ? currentFace + 1 : "—" },
+        { name: "switch ways", value: switchWays == null ? "—" : switchWays },
+        { name: "total ways", value: totalWays(dp) },
+      ],
+      diceRoll1223View: {
+        phase,
+        phaseIndex,
+        n,
+        rollMax: [...rollMax],
+        maxStreak,
+        currentRoll,
+        currentFace,
+        dp: copyTable(dp),
+        previous: previous ? copyTable(previous) : null,
+        previousTotals: [...previousTotals],
+        previousTotal,
+        switchWays,
+        repeatWays: repeatWays.map((item) => ({ ...item })),
+        completedFaces,
+        totals,
+        total: totalWays(dp),
+        final,
+      },
+    });
+  }
+
+  for (let face = 0; face < 6; face += 1) dp[face][1] = 1;
+  snapshot({
+    phase: "init",
+    phaseIndex: 0,
+    currentRoll: 1,
+    completedFaces: 6,
+    codeLines: [4, 5, 6, 7],
+    title: { vi: "Khởi tạo: mỗi mặt tạo một chuỗi dài 1", en: "Initialize: every face starts one length-1 sequence" },
+    note: {
+      vi: "Với một lần gieo, có đúng một chuỗi kết thúc bằng mỗi mặt và streak của mặt đó bằng 1.",
+      en: "With one roll, exactly one sequence ends at each face, with a streak of one.",
+    },
+  });
+
+  for (let roll = 2; roll <= n; roll += 1) {
+    const previous = copyTable(dp);
+    const previousTotals = rowTotals(previous);
+    const previousTotal = previousTotals.reduce((sum, value) => (sum + value) % mod, 0);
+    const next = blankTable();
+
+    for (let face = 0; face < 6; face += 1) {
+      const switchWays = (previousTotal - previousTotals[face] + mod) % mod;
+      next[face][1] = switchWays;
+      const repeatWays = [];
+      for (let streak = 2; streak <= rollMax[face]; streak += 1) {
+        next[face][streak] = previous[face][streak - 1];
+        repeatWays.push({
+          fromStreak: streak - 1,
+          toStreak: streak,
+          ways: previous[face][streak - 1],
+        });
+      }
+      dp = copyTable(next);
+      snapshot({
+        phase: "face",
+        phaseIndex: 1,
+        currentRoll: roll,
+        currentFace: face,
+        previous,
+        previousTotals,
+        previousTotal,
+        switchWays,
+        repeatWays,
+        completedFaces: face + 1,
+        codeLines: [10, 11, 12, 13, 14, 15],
+        title: {
+          vi: `Lần gieo ${roll}: điền trạng thái kết thúc bằng mặt ${face + 1}`,
+          en: `Roll ${roll}: fill states ending with face ${face + 1}`,
+        },
+        note: {
+          vi: `Đổi từ năm mặt khác tạo ${switchWays} chuỗi có streak 1; lặp mặt ${face + 1} dịch từng streak sang phải nếu chưa vượt rollMax.` ,
+          en: `Switching from the other five faces creates ${switchWays} streak-1 sequences; repeating face ${face + 1} shifts each allowed streak one cell right.`,
+        },
+      });
+    }
+
+    snapshot({
+      phase: "commit",
+      phaseIndex: 2,
+      currentRoll: roll,
+      previous,
+      previousTotals,
+      previousTotal,
+      completedFaces: 6,
+      codeLines: [16],
+      title: { vi: `Hoàn tất lớp DP cho ${roll} lần gieo`, en: `Finish the DP layer for ${roll} rolls` },
+      note: {
+        vi: "Toàn bộ sáu hàng đã được tính; lớp hiện tại trở thành lớp trước cho lần gieo tiếp theo.",
+        en: "All six rows are complete; this layer becomes the previous layer for the next roll.",
+      },
+    });
+  }
+
+  const answer = totalWays(dp);
+  snapshot({
+    phase: "done",
+    phaseIndex: 3,
+    currentRoll: n,
+    completedFaces: 6,
+    codeLines: [17],
+    title: { vi: `Cộng mọi trạng thái: ${answer} chuỗi hợp lệ`, en: `Sum every state: ${answer} valid sequences` },
+    note: {
+      vi: "Mỗi chuỗi hợp lệ nằm ở đúng một ô theo mặt cuối và độ dài streak cuối, nên tổng mọi ô là đáp án.",
+      en: "Every valid sequence belongs to exactly one cell by its ending face and final streak length, so the sum of all cells is the answer.",
+    },
+    final: true,
+  });
+
+  return { original: [...rollMax], n, rollMax, answer, steps };
+}
+
+Object.assign(module.exports, {
+  1223: {
+    id: 1223,
+    difficulty: "hard",
+    slug: "dice-roll-simulation",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "state-dp", vi: "DP trạng thái", en: "State DP" },
+      { key: "simulation", vi: "Mô phỏng", en: "Simulation" },
+    ],
+    title: { vi: "Dice Roll Simulation", en: "Dice Roll Simulation" },
+    titleVi: { vi: "Mô phỏng gieo xúc xắc", en: "Dice Roll Simulation" },
+    statement: {
+      vi: "Gieo xúc xắc n lần. Mặt i không được xuất hiện liên tiếp quá rollMax[i] lần. Đếm số chuỗi gieo hợp lệ modulo 10^9 + 7.",
+      en: "Roll a die n times. Face i may not appear more than rollMax[i] consecutive times. Count valid roll sequences modulo 10^9 + 7.",
+    },
+    defaultInput: [1, 1, 2, 2, 2, 3],
+    inputKind: "positive",
+    inputLabel: { vi: "rollMax (giới hạn cho 6 mặt)", en: "rollMax (limits for faces 1–6)" },
+    extraParams: [
+      { key: "n", type: "number", label: { vi: "n (1–12 cho visualization)", en: "n (1–12 for visualization)" }, default: 3, min: 1, max: 12 },
+    ],
+    approach: [
+      { vi: "Trạng thái dp[face][streak] đếm chuỗi kết thúc bằng face lặp đúng streak lần.", en: "State dp[face][streak] counts sequences ending with exactly streak copies of face." },
+      { vi: "Đổi mặt: cộng mọi trạng thái kết thúc bằng năm mặt khác để tạo streak 1.", en: "Switch face: sum every state ending in one of the other five faces to create streak 1." },
+      { vi: "Lặp mặt: dịch dp[face][streak−1] sang streak, nhưng chỉ tới rollMax[face].", en: "Repeat face: shift dp[face][streak−1] to streak, stopping at rollMax[face]." },
+    ],
+    complexity: {
+      time: "O(n · 6 · max(rollMax))",
+      space: "O(6 · max(rollMax))",
+      note: {
+        vi: "Chỉ giữ lớp DP trước và lớp hiện tại.",
+        en: "Only the previous and current DP layers are stored.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def dieSimulator(self, n, rollMax):",
+      "        MOD = 10 ** 9 + 7",
+      "        max_streak = max(rollMax)",
+      "        dp = [[0] * (max_streak + 1) for _ in range(6)]",
+      "        for face in range(6):",
+      "            dp[face][1] = 1",
+      "        for _ in range(1, n):",
+      "            next_dp = [[0] * (max_streak + 1) for _ in range(6)]",
+      "            face_totals = [sum(row) % MOD for row in dp]",
+      "            total = sum(face_totals) % MOD",
+      "            for face in range(6):",
+      "                next_dp[face][1] = (total - face_totals[face]) % MOD",
+      "                for streak in range(2, rollMax[face] + 1):",
+      "                    next_dp[face][streak] = dp[face][streak - 1]",
+      "            dp = next_dp",
+      "        return sum(map(sum, dp)) % MOD",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseDiceRoll1223Input(input, params);
+      return [parsed.n, parsed.rollMax];
+    },
+    builder: buildSteps1223,
+  },
+});

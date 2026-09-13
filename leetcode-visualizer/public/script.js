@@ -28692,6 +28692,165 @@ function renderMultiplesIeView(step) {
   </section>`;
 }
 
+function renderDiceRoll1223View(step) {
+  const view = step.diceRoll1223View || {};
+  const vi = lang === "vi";
+  const rollMax = Array.isArray(view.rollMax) ? view.rollMax : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const totals = Array.isArray(view.totals) ? view.totals : [];
+  const previousTotals = Array.isArray(view.previousTotals) ? view.previousTotals : [];
+  const repeatWays = Array.isArray(view.repeatWays) ? view.repeatWays : [];
+  const maxStreak = Math.max(1, Number(view.maxStreak) || 1);
+  const currentFace = Number.isInteger(view.currentFace) ? view.currentFace : -1;
+  const currentRoll = Number(view.currentRoll) || 1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Điền từng mặt", "Chốt lớp DP", "Cộng đáp án"]
+    : ["Initialize", "Fill each face", "Commit DP layer", "Sum answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const timeline = Array.from({ length: view.n || 1 }, (_, index) => {
+    const roll = index + 1;
+    const classes = roll < currentRoll ? "done" : roll === currentRoll ? "current" : "";
+    return `<span class="${classes}"><small>ROLL</small><b>${roll}</b></span>`;
+  }).join("<i>→</i>");
+
+  const streakHeaders = Array.from({ length: maxStreak }, (_, index) => `<span><small>STREAK</small><b>${index + 1}</b></span>`).join("");
+  const tableRows = dp.map((row, face) => {
+    const isCurrent = face === currentFace;
+    const isPending = view.phase === "face" && face >= Number(view.completedFaces || 0);
+    const cells = Array.from({ length: maxStreak }, (_, index) => {
+      const streak = index + 1;
+      const blocked = streak > rollMax[face];
+      const classes = [
+        "dr1223-cell",
+        blocked ? "blocked" : "",
+        isCurrent && streak === 1 ? "switch" : "",
+        isCurrent && streak > 1 && streak <= rollMax[face] ? "repeat" : "",
+      ].filter(Boolean).join(" ");
+      return `<span class="${classes}"><small>${blocked ? "LIMIT" : `s=${streak}`}</small><b>${blocked ? "×" : (row[index + 1] ?? 0)}</b></span>`;
+    }).join("");
+    return `<div class="dr1223-row ${isCurrent ? "current" : ""} ${isPending ? "pending" : ""}">
+      <header><span class="dr1223-die" aria-hidden="true">${face + 1}</span><div><strong>${vi ? "Mặt" : "Face"} ${face + 1}</strong><small>rollMax = ${rollMax[face]}</small></div></header>
+      ${cells}
+      <span class="dr1223-total"><small>TOTAL</small><b>${totals[face] ?? 0}</b></span>
+    </div>`;
+  }).join("");
+
+  let transition;
+  if (view.phase === "face" && currentFace >= 0) {
+    const sources = previousTotals.map((value, face) => `<span class="${face === currentFace ? "excluded" : "included"}"><small>${vi ? "mặt" : "face"} ${face + 1}</small><b>${value}</b><em>${face === currentFace ? (vi ? "loại" : "exclude") : "+"}</em></span>`).join("");
+    const repeats = repeatWays.length
+      ? repeatWays.map((item) => `<span><small>streak ${item.fromStreak}</small><b>${item.ways}</b><i>→</i><small>streak ${item.toStreak}</small></span>`).join("")
+      : `<p>${vi ? `rollMax[${currentFace}] = 1 nên mặt này không thể lặp.` : `rollMax[${currentFace}] = 1, so this face cannot repeat.`}</p>`;
+    transition = `<section class="dr1223-transition">
+      <div class="dr1223-switch"><header><strong>${vi ? "A. ĐỔI SANG MẶT" : "A. SWITCH TO FACE"} ${currentFace + 1}</strong><span>new streak = 1</span></header><div class="dr1223-sources">${sources}</div><footer><code>${view.previousTotal} − ${previousTotals[currentFace]} = ${view.switchWays}</code><span>→ dp[${currentFace + 1}][1]</span></footer></div>
+      <div class="dr1223-repeat"><header><strong>${vi ? "B. LẶP MẶT" : "B. REPEAT FACE"} ${currentFace + 1}</strong><span>streak + 1 ≤ ${rollMax[currentFace]}</span></header><div>${repeats}</div></div>
+    </section>`;
+  } else if (view.phase === "init") {
+    transition = `<section class="dr1223-base"><b>dp[face][1] = 1</b><span>${vi ? "Sáu lựa chọn cho lần gieo đầu tiên; chưa có mặt nào vi phạm giới hạn." : "Six choices for the first roll; no face can violate its limit yet."}</span></section>`;
+  } else {
+    transition = `<section class="dr1223-base ${view.final ? "finish" : ""}"><b>${view.final ? `answer = ${view.total}` : `dp = next_dp · roll ${currentRoll}`}</b><span>${view.final ? (vi ? "Mỗi ô là một nhóm chuỗi rời nhau, phân loại theo trạng thái cuối." : "Each cell is a disjoint group of sequences classified by its final state.") : (vi ? "Sáu hàng đã hoàn tất và sẵn sàng cho lần gieo kế tiếp." : "All six rows are complete and ready for the next roll.")}</span></section>`;
+  }
+
+  const currentBuilt = totals.reduce((sum, value) => sum + value, 0) % 1000000007;
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bảng DP cho ${currentRoll} lần gieo, tổng hiện tại ${currentBuilt}.`
+    : `DP table for ${currentRoll} rolls, current total ${currentBuilt}.`;
+
+  $("treeView").innerHTML = `<section class="dr1223-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>STATE DP · RUN LENGTH · #1223</small><strong>DICE ROLL SIMULATION</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="dr1223-phases">${phases}</div>
+    <section class="dr1223-rule"><b>dp[face][streak]</b><span>${vi ? "Số chuỗi kết thúc bằng face, với face lặp đúng streak lần ở cuối." : "Sequences ending in face, with exactly streak copies of face at the end."}</span></section>
+    <section class="dr1223-timeline"><header><strong>${vi ? "ĐỘ DÀI CHUỖI" : "SEQUENCE LENGTH"}</strong><span>${currentRoll}/${view.n}</span></header><div>${timeline}</div></section>
+    <section class="dr1223-metrics"><div><small>${vi ? "lần gieo" : "roll"}</small><strong>${currentRoll}/${view.n}</strong></div><div><small>${vi ? "mặt đang điền" : "face being filled"}</small><strong>${currentFace >= 0 ? currentFace + 1 : "—"}</strong></div><div><small>${vi ? "hàng hoàn tất" : "rows complete"}</small><strong>${view.completedFaces || 0}/6</strong></div><div class="answer"><small>${vi ? "chuỗi trong lớp" : "ways in layer"}</small><strong>${currentBuilt}</strong></div></section>
+    <section class="dr1223-table"><header><strong>DP STATE TABLE</strong><span>${vi ? "cam = đổi mặt · tím = kéo dài streak · × = bị giới hạn" : "amber = switch · purple = extend streak · × = blocked by limit"}</span></header><div class="dr1223-table-scroll"><div class="dr1223-grid" style="--dr1223-streaks:${maxStreak}"><div class="dr1223-grid-head"><span>ENDING FACE</span>${streakHeaders}<span>ROW TOTAL</span></div>${tableRows}</div></div></section>
+    ${transition}
+    <section class="dr1223-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="dr1223-result ${final ? "done" : ""}"><small>VALID SEQUENCES MOD 1,000,000,007</small><strong>${final ? view.total : "…"}</strong><span>${final ? (vi ? "Cộng tổng của cả sáu mặt kết thúc." : "Sum the totals for all six ending faces.") : (vi ? "Mỗi lần gieo chỉ đọc lớp trước." : "Each roll reads only the previous layer.")}</span></footer>
+  </section>`;
+}
+
+function renderCyclicShift4052View(step) {
+  const view = step.cyclicShift4052View || {};
+  const vi = lang === "vi";
+  const n = Math.max(1, Number(view.n) || 1);
+  const original = Array.isArray(view.original) ? view.original : [];
+  const afterRows = Array.isArray(view.afterRows) ? view.afterRows : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const rowShift = Array.isArray(view.rowShift) ? view.rowShift : [];
+  const colShift = Array.isArray(view.colShift) ? view.colShift : [];
+  const mappings = Array.isArray(view.mappings) ? view.mappings : [];
+  const activeRow = Number.isInteger(view.activeRow) ? view.activeRow : -1;
+  const activeCol = Number.isInteger(view.activeCol) ? view.activeCol : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Grid gốc", "Dịch hàng ←", "Dịch cột ↑", "Kết quả"]
+    : ["Original grid", "Shift rows ←", "Shift columns ↑", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  function matrixHtml(matrix, kind) {
+    const cells = [];
+    for (let row = 0; row < n; row += 1) {
+      for (let col = 0; col < n; col += 1) {
+        const value = matrix[row]?.[col];
+        const classes = ["cs4052-cell"];
+        if (value == null) classes.push("empty");
+        if (kind === "original" && view.phase === "rows" && row === activeRow) classes.push("source");
+        if (kind === "rows" && view.phase === "rows" && row === activeRow) classes.push("target");
+        if (kind === "rows" && view.phase === "columns" && col === activeCol) classes.push("source");
+        if (kind === "result" && view.phase === "columns" && col === activeCol) classes.push("target");
+        if (kind === "result" && view.final) classes.push("final");
+        cells.push(`<span class="${classes.join(" ")}"><small>${row},${col}</small><b>${value == null ? "·" : escapeHtml(value)}</b></span>`);
+      }
+    }
+    return `<div class="cs4052-grid" style="--cs4052-n:${n}">${cells.join("")}</div>`;
+  }
+
+  const rowVector = rowShift.map((shift, index) => `<span class="${index === activeRow ? "active" : index < Number(view.rowsDone || 0) ? "done" : ""}"><small>r${index}</small><b>${shift}</b><i>←</i></span>`).join("");
+  const colVector = colShift.map((shift, index) => `<span class="${index === activeCol ? "active" : index < Number(view.colsDone || 0) ? "done" : ""}"><small>c${index}</small><b>${shift}</b><i>↑</i></span>`).join("");
+
+  let mappingHtml;
+  if (view.phase === "rows") {
+    mappingHtml = mappings.map((mapping) => `<span><small>value ${mapping.value}</small><b>c${mapping.from}</b><i>→</i><b>c${mapping.to}</b></span>`).join("");
+  } else if (view.phase === "columns") {
+    mappingHtml = mappings.map((mapping) => `<span><small>value ${mapping.value}</small><b>r${mapping.from}</b><i>→</i><b>r${mapping.to}</b></span>`).join("");
+  } else {
+    mappingHtml = `<p>${view.final ? (vi ? "Mọi phần tử đã tới tọa độ cuối." : "Every element has reached its final coordinate.") : (vi ? "Chọn một hàng để bắt đầu dịch trái." : "Select a row to begin shifting left.")}</p>`;
+  }
+
+  const formula = view.phase === "rows"
+    ? `target_col = (col − ${view.shift} + ${n}) % ${n}`
+    : view.phase === "columns"
+      ? `target_row = (row − ${view.shift} + ${n}) % ${n}`
+      : view.final
+        ? "result = columnShift(rowShift(grid))"
+        : "rows first → columns second";
+  const final = Boolean(view.final);
+  const resultText = final ? JSON.stringify(result) : "…";
+  const summary = vi
+    ? `Dịch vòng grid ${n} x ${n}: ${view.rowsDone || 0} hàng và ${view.colsDone || 0} cột đã xử lý.`
+    : `Cyclic shift of a ${n} by ${n} grid: ${view.rowsDone || 0} rows and ${view.colsDone || 0} columns processed.`;
+
+  $("treeView").innerHTML = `<section class="cs4052-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>2D ARRAY · CYCLIC MAPPING · #4052</small><strong>SHIFT ROWS, THEN COLUMNS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cs4052-phases">${phases}</div>
+    <section class="cs4052-order"><span><b>1</b>${vi ? "Mỗi hàng dịch trái độc lập" : "Each row shifts left independently"}</span><i>→</i><span><b>2</b>${vi ? "Mỗi cột của grid trung gian dịch lên" : "Each intermediate-grid column shifts up"}</span></section>
+    <section class="cs4052-vectors"><div><header><strong>rowShift</strong><span>${vi ? "vị trí sang trái" : "positions left"}</span></header><div>${rowVector}</div></div><div><header><strong>colShift</strong><span>${vi ? "vị trí lên trên" : "positions up"}</span></header><div>${colVector}</div></div></section>
+    <section class="cs4052-matrices">
+      <article><header><strong>ORIGINAL</strong><span>${n} × ${n}</span></header>${matrixHtml(original, "original")}</article>
+      <i>→</i>
+      <article><header><strong>AFTER ROW SHIFTS</strong><span>${view.rowsDone || 0}/${n}</span></header>${matrixHtml(afterRows, "rows")}</article>
+      <i>→</i>
+      <article><header><strong>FINAL GRID</strong><span>${view.colsDone || 0}/${n}</span></header>${matrixHtml(result, "result")}</article>
+    </section>
+    <section class="cs4052-mapping"><header><strong>${vi ? "ÁNH XẠ TRONG BƯỚC NÀY" : "MAPPING IN THIS STEP"}</strong><code>${escapeHtml(formula)}</code></header><div>${mappingHtml}</div></section>
+    <section class="cs4052-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="cs4052-result ${final ? "done" : ""}"><small>RESULT GRID</small><strong>${escapeHtml(resultText)}</strong><span>${final ? (vi ? "Thứ tự hàng trước, cột sau đã được giữ nguyên." : "The required row-first, column-second order is preserved.") : (vi ? "Dấu · là ô chưa được ghi trong giai đoạn hiện tại." : "A · marks a cell not yet written in the current phase.")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -29728,6 +29887,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderChampagne799View(step);
+  } else if (step.diceRoll1223View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDiceRoll1223View(step);
+  } else if (step.cyclicShift4052View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCyclicShift4052View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

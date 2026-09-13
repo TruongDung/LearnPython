@@ -14042,3 +14042,251 @@ Object.assign(module.exports, {
     builder: buildSteps3483,
   },
 });
+
+function parseCyclicShift4052Input(input, params = {}) {
+  let grid;
+  try {
+    if (Array.isArray(input)) {
+      grid = input.map((row) => Array.isArray(row) ? [...row] : row);
+    } else {
+      const raw = String(input ?? "").trim();
+      grid = raw.startsWith("[")
+        ? JSON.parse(raw)
+        : raw.split(";").map((row) => row.split(",").map((value) => Number(value.trim())));
+    }
+  } catch (_error) {
+    throw new Error("grid must be a square integer matrix.");
+  }
+
+  const n = Array.isArray(grid) ? grid.length : 0;
+  const validGrid = n >= 1 && n <= 10
+    && grid.every((row) => Array.isArray(row) && row.length === n)
+    && grid.every((row) => row.every((value) => Number.isInteger(value) && value >= 1 && value <= 100));
+  if (!validGrid) {
+    throw new Error("grid must be an n x n matrix (1 <= n <= 10) with values from 1 to 100.");
+  }
+
+  function parseShift(value, name) {
+    let values;
+    try {
+      values = Array.isArray(value)
+        ? [...value]
+        : String(value ?? "").trim().replace(/^\[/, "").replace(/\]$/, "")
+          .split(",").map((item) => Number(item.trim()));
+    } catch (_error) {
+      throw new Error(`${name} must contain ${n} integers.`);
+    }
+    if (values.length !== n || !values.every((shift) => Number.isInteger(shift) && shift >= 0 && shift < n)) {
+      throw new Error(`${name} must contain ${n} integers from 0 to ${n - 1}.`);
+    }
+    return values;
+  }
+
+  return {
+    n,
+    grid: grid.map((row) => [...row]),
+    rowShift: parseShift(params.rowShift, "rowShift"),
+    colShift: parseShift(params.colShift, "colShift"),
+  };
+}
+
+function buildSteps4052(input, params = {}) {
+  const { n, grid, rowShift, colShift } = parseCyclicShift4052Input(input, params);
+  const blankGrid = () => Array.from({ length: n }, () => Array(n).fill(null));
+  const copyGrid = (matrix) => matrix.map((row) => [...row]);
+  const afterRows = blankGrid();
+  const result = blankGrid();
+  const steps = [];
+
+  function snapshot({
+    phase,
+    phaseIndex,
+    title,
+    note,
+    codeLines,
+    activeRow = -1,
+    activeCol = -1,
+    shift = null,
+    mappings = [],
+    rowsDone = 0,
+    colsDone = 0,
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      vars: [
+        { name: "n", value: n },
+        { name: "row", value: activeRow >= 0 ? activeRow : "—" },
+        { name: "col", value: activeCol >= 0 ? activeCol : "—" },
+        { name: "shift", value: shift == null ? "—" : shift },
+      ],
+      cyclicShift4052View: {
+        phase,
+        phaseIndex,
+        n,
+        original: copyGrid(grid),
+        afterRows: copyGrid(afterRows),
+        result: copyGrid(result),
+        rowShift: [...rowShift],
+        colShift: [...colShift],
+        activeRow,
+        activeCol,
+        shift,
+        mappings: mappings.map((mapping) => ({ ...mapping })),
+        rowsDone,
+        colsDone,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "init",
+    phaseIndex: 0,
+    codeLines: [3, 4],
+    title: { vi: `Bắt đầu với grid ${n} x ${n}`, en: `Start with a ${n} x ${n} grid` },
+    note: {
+      vi: "Thứ tự rất quan trọng: dịch tất cả hàng sang trái trước, rồi mới dịch các cột của grid trung gian lên trên.",
+      en: "Order matters: shift every row left first, then shift the columns of that intermediate grid upward.",
+    },
+  });
+
+  for (let row = 0; row < n; row += 1) {
+    const shift = rowShift[row];
+    const mappings = [];
+    for (let col = 0; col < n; col += 1) {
+      const targetCol = (col - shift + n) % n;
+      afterRows[row][targetCol] = grid[row][col];
+      mappings.push({ value: grid[row][col], from: col, to: targetCol });
+    }
+    snapshot({
+      phase: "rows",
+      phaseIndex: 1,
+      activeRow: row,
+      shift,
+      mappings,
+      rowsDone: row + 1,
+      codeLines: [5, 6, 7],
+      title: {
+        vi: `Dịch hàng ${row} sang trái ${shift} vị trí`,
+        en: `Shift row ${row} left by ${shift}`,
+      },
+      note: {
+        vi: `Mỗi cột nguồn c đi tới (c - ${shift} + ${n}) % ${n}; modulo đưa phần tử vượt biên quay lại cuối hàng.`,
+        en: `Each source column c moves to (c - ${shift} + ${n}) % ${n}; modulo wraps elements across the row boundary.`,
+      },
+    });
+  }
+
+  for (let col = 0; col < n; col += 1) {
+    const shift = colShift[col];
+    const mappings = [];
+    for (let row = 0; row < n; row += 1) {
+      const targetRow = (row - shift + n) % n;
+      result[targetRow][col] = afterRows[row][col];
+      mappings.push({ value: afterRows[row][col], from: row, to: targetRow });
+    }
+    snapshot({
+      phase: "columns",
+      phaseIndex: 2,
+      activeCol: col,
+      shift,
+      mappings,
+      rowsDone: n,
+      colsDone: col + 1,
+      codeLines: [9, 10, 11, 12],
+      title: {
+        vi: `Dịch cột ${col} lên ${shift} vị trí`,
+        en: `Shift column ${col} upward by ${shift}`,
+      },
+      note: {
+        vi: `Mỗi hàng nguồn r đi tới (r - ${shift} + ${n}) % ${n}; dữ liệu nguồn luôn là grid sau khi dịch hàng.`,
+        en: `Each source row r moves to (r - ${shift} + ${n}) % ${n}; the source is always the row-shifted grid.`,
+      },
+    });
+  }
+
+  snapshot({
+    phase: "done",
+    phaseIndex: 3,
+    rowsDone: n,
+    colsDone: n,
+    codeLines: [14],
+    title: { vi: "Hoàn tất cả hai giai đoạn dịch", en: "Both shift phases are complete" },
+    note: {
+      vi: "Grid cuối đã nhận đúng một phần tử vào mỗi ô sau phép dịch hàng rồi dịch cột.",
+      en: "Every final-grid cell has received exactly one element after the row phase followed by the column phase.",
+    },
+    final: true,
+  });
+
+  return {
+    original: copyGrid(grid),
+    n,
+    rowShift,
+    colShift,
+    answer: copyGrid(result),
+    steps,
+  };
+}
+
+Object.assign(module.exports, {
+  4052: {
+    id: 4052,
+    difficulty: "easy",
+    slug: "cyclically-shift-rows-and-columns",
+    category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },
+    tags: [twoDArrayTag, { key: "simulation", vi: "Mô phỏng", en: "Simulation" }],
+    title: { vi: "Cyclically Shift Rows and Columns", en: "Cyclically Shift Rows and Columns" },
+    titleVi: { vi: "Dịch vòng các hàng và cột", en: "Cyclically shift rows and columns" },
+    statement: {
+      vi: "Cho grid vuông n x n cùng rowShift và colShift. Trước tiên dịch vòng hàng i sang trái rowShift[i] vị trí, sau đó dịch vòng cột j của grid trung gian lên colShift[j] vị trí.",
+      en: "Given an n x n grid plus rowShift and colShift, first cyclically shift row i left by rowShift[i], then cyclically shift column j of the intermediate grid upward by colShift[j].",
+    },
+    defaultInput: "1,2,3;4,5,6;7,8,9",
+    inputKind: "string",
+    inputLabel: { vi: "grid vuông (hàng cách ;)", en: "square grid (rows separated by ;)" },
+    extraParams: [
+      { key: "rowShift", type: "string", label: { vi: "rowShift (cách bởi dấu phẩy)", en: "rowShift (comma separated)" }, default: "1,2,0" },
+      { key: "colShift", type: "string", label: { vi: "colShift (cách bởi dấu phẩy)", en: "colShift (comma separated)" }, default: "2,2,1" },
+    ],
+    approach: [
+      { vi: "Tạo grid trung gian: phần tử (r,c) đi tới cột (c - rowShift[r] + n) % n.", en: "Build an intermediate grid: element (r,c) moves to column (c - rowShift[r] + n) % n." },
+      { vi: "Từ grid trung gian, phần tử (r,c) đi tới hàng (r - colShift[c] + n) % n trong kết quả.", en: "From the intermediate grid, element (r,c) moves to row (r - colShift[c] + n) % n in the result." },
+      { vi: "Dùng grid mới cho mỗi giai đoạn để các phép dịch độc lập không ghi đè dữ liệu nguồn.", en: "Use a new grid for each phase so independent shifts never overwrite source data." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Mỗi phần tử được chuyển một lần theo hàng và một lần theo cột.",
+        en: "Each element is moved once in the row phase and once in the column phase.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def cyclicShift(self, n, grid, rowShift, colShift):",
+      "        after_rows = [[0] * n for _ in range(n)]",
+      "        result = [[0] * n for _ in range(n)]",
+      "        for row in range(n):",
+      "            for col in range(n):",
+      "                target_col = (col - rowShift[row]) % n",
+      "                after_rows[row][target_col] = grid[row][col]",
+      "        for col in range(n):",
+      "            for row in range(n):",
+      "                target_row = (row - colShift[col]) % n",
+      "                result[target_row][col] = after_rows[row][col]",
+      "",
+      "        return result",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseCyclicShift4052Input(input, params);
+      return [parsed.n, parsed.grid, parsed.rowShift, parsed.colShift];
+    },
+    builder: buildSteps4052,
+  },
+});
