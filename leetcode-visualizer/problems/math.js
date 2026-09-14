@@ -4817,6 +4817,165 @@ module.exports = {
   },
 };
 
+function parseRectangle223(raw, label) {
+  const values = Array.isArray(raw)
+    ? raw.map(Number)
+    : String(raw ?? "")
+      .trim()
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((part) => Number(part.trim()));
+  if (values.length !== 4 || !values.every(Number.isInteger)) {
+    throw new Error(`${label} must contain exactly 4 comma-separated integers: x1,y1,x2,y2.`);
+  }
+  if (!values.every((value) => value >= -10_000 && value <= 10_000)) {
+    throw new Error(`${label} coordinates must be between -10,000 and 10,000.`);
+  }
+  if (values[0] > values[2] || values[1] > values[3]) {
+    throw new Error(`${label} must satisfy x1 <= x2 and y1 <= y2.`);
+  }
+  return values;
+}
+
+function parseRectangleArea223Input(input, params = {}) {
+  return {
+    rectA: parseRectangle223(input, "Rectangle A"),
+    rectB: parseRectangle223(params.rectB ?? "0,-1,9,2", "Rectangle B"),
+  };
+}
+
+function buildSteps223(input, params = {}) {
+  const { rectA, rectB } = parseRectangleArea223Input(input, params);
+  const [ax1, ay1, ax2, ay2] = rectA;
+  const [bx1, by1, bx2, by2] = rectB;
+  const overlapLeft = Math.max(ax1, bx1);
+  const overlapRight = Math.min(ax2, bx2);
+  const overlapBottom = Math.max(ay1, by1);
+  const overlapTop = Math.min(ay2, by2);
+  const rawOverlapWidth = overlapRight - overlapLeft;
+  const rawOverlapHeight = overlapTop - overlapBottom;
+  const steps = [];
+  let areaA = null;
+  let areaB = null;
+  let overlapWidth = null;
+  let overlapHeight = null;
+  let overlapArea = null;
+  let answer = null;
+
+  function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "area_a", value: areaA ?? "—" },
+        { name: "area_b", value: areaB ?? "—" },
+        { name: "overlap_width", value: overlapWidth ?? "—" },
+        { name: "overlap_height", value: overlapHeight ?? "—" },
+        { name: "overlap_area", value: overlapArea ?? "—" },
+      ],
+      rectangleArea223View: {
+        operation,
+        phaseIndex,
+        rectA: [...rectA],
+        rectB: [...rectB],
+        areaA,
+        areaB,
+        overlapLeft,
+        overlapRight,
+        overlapBottom,
+        overlapTop,
+        rawOverlapWidth,
+        rawOverlapHeight,
+        overlapWidth,
+        overlapHeight,
+        overlapArea,
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "inputs",
+    phaseIndex: 0,
+    codeLine: 2,
+    title: { vi: "Nhận tọa độ hai rectangle", en: "Receive both rectangles" },
+    note: {
+      vi: "Mỗi rectangle được xác định bởi góc trái dưới và góc phải trên.",
+      en: "Each rectangle is defined by its bottom-left and top-right corners.",
+    },
+  });
+
+  areaA = (ax2 - ax1) * (ay2 - ay1);
+  snapshot({
+    operation: "area-a",
+    phaseIndex: 1,
+    codeLine: 3,
+    title: { vi: `Diện tích A = ${areaA}`, en: `Area A = ${areaA}` },
+    note: { vi: "Diện tích rectangle A bằng chiều rộng nhân chiều cao.", en: "Rectangle A's area is its width times its height." },
+  });
+
+  areaB = (bx2 - bx1) * (by2 - by1);
+  snapshot({
+    operation: "area-b",
+    phaseIndex: 1,
+    codeLine: 4,
+    title: { vi: `Diện tích B = ${areaB}`, en: `Area B = ${areaB}` },
+    note: { vi: "Tính riêng diện tích rectangle B.", en: "Compute rectangle B's area separately." },
+  });
+
+  overlapWidth = Math.max(0, rawOverlapWidth);
+  snapshot({
+    operation: "overlap-width",
+    phaseIndex: 2,
+    codeLine: 6,
+    title: { vi: `Chiều rộng phần giao = ${overlapWidth}`, en: `Overlap width = ${overlapWidth}` },
+    note: {
+      vi: rawOverlapWidth > 0 ? "Hai khoảng chiếu trên trục X giao nhau." : "Hai khoảng X không giao; max(0, ...) đưa chiều rộng về 0.",
+      en: rawOverlapWidth > 0 ? "The X-axis projections intersect." : "The X intervals do not intersect; max(0, ...) clamps the width to 0.",
+    },
+  });
+
+  overlapHeight = Math.max(0, rawOverlapHeight);
+  snapshot({
+    operation: "overlap-height",
+    phaseIndex: 2,
+    codeLine: 7,
+    title: { vi: `Chiều cao phần giao = ${overlapHeight}`, en: `Overlap height = ${overlapHeight}` },
+    note: {
+      vi: rawOverlapHeight > 0 ? "Hai khoảng chiếu trên trục Y giao nhau." : "Hai khoảng Y không giao; chiều cao phần giao bằng 0.",
+      en: rawOverlapHeight > 0 ? "The Y-axis projections intersect." : "The Y intervals do not intersect, so overlap height is 0.",
+    },
+  });
+
+  overlapArea = overlapWidth * overlapHeight;
+  snapshot({
+    operation: "overlap-area",
+    phaseIndex: 3,
+    codeLine: 8,
+    title: { vi: `Diện tích bị đếm hai lần = ${overlapArea}`, en: `Double-counted area = ${overlapArea}` },
+    note: { vi: "Phần giao nằm trong cả A và B nên đã bị cộng hai lần.", en: "The intersection belongs to both A and B, so it was counted twice." },
+  });
+
+  answer = areaA + areaB - overlapArea;
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 10,
+    title: { vi: `Tổng diện tích phủ = ${answer}`, en: `Total covered area = ${answer}` },
+    note: {
+      vi: "Áp dụng bao hàm–loại trừ: diện tích A + diện tích B − diện tích phần giao.",
+      en: "Apply inclusion-exclusion: area A + area B - intersection area.",
+    },
+    final: true,
+  });
+
+  return { original: { rectA: [...rectA], rectB: [...rectB] }, answer, steps };
+}
+
 function parseRectangle836(raw, label) {
   const values = Array.isArray(raw)
     ? raw.map(Number)
@@ -5093,6 +5252,56 @@ function buildSteps836Approach2(input, params = {}) {
 }
 
 Object.assign(module.exports, {
+  223: {
+    id: 223,
+    difficulty: "medium",
+    slug: "rectangle-area",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [
+      { key: "geometry", vi: "Hình học", en: "Geometry" },
+      { key: "math", vi: "Toán học", en: "Math" },
+    ],
+    title: { vi: "Rectangle Area", en: "Rectangle Area" },
+    titleVi: { vi: "Tổng diện tích được phủ bởi hai rectangle", en: "Total area covered by two rectangles" },
+    statement: {
+      vi: "Cho tọa độ hai rectangle song song với trục tọa độ. Trả về tổng diện tích được phủ bởi hai rectangle.",
+      en: "Given two axis-aligned rectangles, return the total area covered by them.",
+    },
+    defaultInput: "-3,0,3,4",
+    inputKind: "string",
+    inputLabel: { vi: "Rectangle A: ax1,ay1,ax2,ay2", en: "Rectangle A: ax1,ay1,ax2,ay2" },
+    extraParams: [
+      { key: "rectB", type: "string", label: { vi: "Rectangle B: bx1,by1,bx2,by2", en: "Rectangle B: bx1,by1,bx2,by2" }, default: "0,-1,9,2" },
+    ],
+    approach: [
+      { vi: "Tính riêng diện tích A và diện tích B.", en: "Compute the areas of A and B separately." },
+      { vi: "Tìm chiều rộng và chiều cao phần giao; dùng max(0, ...) để trường hợp không giao cho kết quả 0.", en: "Find the overlap width and height; max(0, ...) makes either dimension 0 when there is no intersection." },
+      { vi: "Dùng bao hàm–loại trừ: areaA + areaB − overlapArea.", en: "Use inclusion-exclusion: areaA + areaB - overlapArea." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: { vi: "Chỉ dùng một số cố định phép tính số học và min/max.", en: "Only a fixed number of arithmetic and min/max operations are used." },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def computeArea(self, ax1: int, ay1: int, ax2: int, ay2: int, bx1: int, by1: int, bx2: int, by2: int) -> int:",
+      "        area_a = (ax2 - ax1) * (ay2 - ay1)",
+      "        area_b = (bx2 - bx1) * (by2 - by1)",
+      "",
+      "        overlap_width = max(0, min(ax2, bx2) - max(ax1, bx1))",
+      "        overlap_height = max(0, min(ay2, by2) - max(ay1, by1))",
+      "        overlap_area = overlap_width * overlap_height",
+      "",
+      "        return area_a + area_b - overlap_area",
+    ],
+    liveArgs: (input, params) => {
+      const { rectA, rectB } = parseRectangleArea223Input(input, params);
+      return [...rectA, ...rectB];
+    },
+    builder: buildSteps223,
+  },
   836: {
     id: 836,
     difficulty: "easy",

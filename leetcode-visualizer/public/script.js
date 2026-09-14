@@ -29560,6 +29560,77 @@ function renderDistantSubarrays4051View(step) {
   </section>`;
 }
 
+function renderRectangleArea223View(step) {
+  const view = step.rectangleArea223View || {};
+  const vi = lang === "vi";
+  const rectA = Array.isArray(view.rectA) ? view.rectA.map(Number) : [0, 0, 1, 1];
+  const rectB = Array.isArray(view.rectB) ? view.rectB.map(Number) : [0, 0, 1, 1];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Hai rectangle", "Diện tích riêng", "Kích thước phần giao", "Diện tích giao", "Bao hàm–loại trừ"]
+    : ["Two rectangles", "Individual areas", "Overlap dimensions", "Overlap area", "Inclusion-exclusion"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const allX = [rectA[0], rectA[2], rectB[0], rectB[2]];
+  const allY = [rectA[1], rectA[3], rectB[1], rectB[3]];
+  const baseSpanX = Math.max(1, Math.max(...allX) - Math.min(...allX));
+  const baseSpanY = Math.max(1, Math.max(...allY) - Math.min(...allY));
+  const minX = Math.min(...allX) - baseSpanX * 0.16;
+  const maxX = Math.max(...allX) + baseSpanX * 0.16;
+  const minY = Math.min(...allY) - baseSpanY * 0.18;
+  const maxY = Math.max(...allY) + baseSpanY * 0.18;
+  const plot = { left: 52, top: 20, width: 556, height: 244 };
+  const mapX = (x) => plot.left + ((x - minX) / (maxX - minX)) * plot.width;
+  const mapY = (y) => plot.top + ((maxY - y) / (maxY - minY)) * plot.height;
+  const rectangleSvg = (rect, label, className) => {
+    const x = mapX(rect[0]);
+    const y = mapY(rect[3]);
+    const width = Math.max(0, mapX(rect[2]) - x);
+    const height = Math.max(0, mapY(rect[1]) - y);
+    return `<g class="${className}"><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}" rx="4"/><text x="${(x + width / 2).toFixed(2)}" y="${(y + height / 2).toFixed(2)}">${label}</text></g>`;
+  };
+  const showOverlap = view.overlapWidth > 0 && view.overlapHeight > 0;
+  let overlapSvg = "";
+  if (showOverlap) {
+    const x = mapX(view.overlapLeft);
+    const y = mapY(view.overlapTop);
+    const width = mapX(view.overlapRight) - x;
+    const height = mapY(view.overlapBottom) - y;
+    overlapSvg = `<g class="ra223-overlap"><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}" rx="3"/><text x="${(x + width / 2).toFixed(2)}" y="${(y + height / 2).toFixed(2)}">A ∩ B</text></g>`;
+  }
+  const planeSummary = vi ? "Hai rectangle và phần diện tích giao nhau." : "Two rectangles and their overlapping area.";
+  const plane = `<svg viewBox="0 0 660 290" role="img" aria-label="${escapeHtml(planeSummary)}"><rect class="ra223-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="ra223-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="ra223-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="ra223-axis-name" x="${plot.left + plot.width + 9}" y="${plot.top + plot.height + 4}">x</text><text class="ra223-axis-name" x="${plot.left - 4}" y="${plot.top - 7}">y</text>${rectangleSvg(rectA, "A", "ra223-rect-a")}${rectangleSvg(rectB, "B", "ra223-rect-b")}${overlapSvg}</svg>`;
+
+  const metric = (className, label, value, detail) => `<article class="${className}"><small>${escapeHtml(label)}</small><strong>${value == null ? "…" : value}</strong><span>${escapeHtml(detail)}</span></article>`;
+  const widthState = view.overlapWidth == null ? "pending" : view.overlapWidth > 0 ? "positive" : "zero";
+  const heightState = view.overlapHeight == null ? "pending" : view.overlapHeight > 0 ? "positive" : "zero";
+  const dimensions = `<article class="ra223-dimension ${widthState}"><header><strong>${vi ? "CHIỀU RỘNG GIAO" : "OVERLAP WIDTH"}</strong><span>X axis</span></header><code>max(0, ${view.overlapRight} − ${view.overlapLeft})</code><b>${view.overlapWidth == null ? "…" : view.overlapWidth}</b></article><article class="ra223-dimension ${heightState}"><header><strong>${vi ? "CHIỀU CAO GIAO" : "OVERLAP HEIGHT"}</strong><span>Y axis</span></header><code>max(0, ${view.overlapTop} − ${view.overlapBottom})</code><b>${view.overlapHeight == null ? "…" : view.overlapHeight}</b></article>`;
+  const formulas = {
+    inputs: `A=[${rectA.join(",")}], B=[${rectB.join(",")}]`,
+    "area-a": `(${rectA[2]} − ${rectA[0]}) × (${rectA[3]} − ${rectA[1]}) = ${view.areaA}`,
+    "area-b": `(${rectB[2]} − ${rectB[0]}) × (${rectB[3]} − ${rectB[1]}) = ${view.areaB}`,
+    "overlap-width": `max(0, ${view.overlapRight} − ${view.overlapLeft}) = ${view.overlapWidth}`,
+    "overlap-height": `max(0, ${view.overlapTop} − ${view.overlapBottom}) = ${view.overlapHeight}`,
+    "overlap-area": `${view.overlapWidth} × ${view.overlapHeight} = ${view.overlapArea}`,
+    return: `${view.areaA} + ${view.areaB} − ${view.overlapArea} = ${view.answer}`,
+  };
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 223: tổng diện tích phủ là ${view.answer ?? "đang tính"}.`
+    : `Problem 223: total covered area is ${view.answer ?? "being computed"}.`;
+
+  $("treeView").innerHTML = `<section class="ra223-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>GEOMETRY · INCLUSION–EXCLUSION · #223</small><strong>RECTANGLE AREA</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ra223-phases">${phases}</div>
+    <section class="ra223-rule"><span><b>AREA A</b></span><i>+</i><span><b>AREA B</b></span><i>−</i><span class="overlap"><b>OVERLAP</b></span><i>=</i><strong>${vi ? "DIỆN TÍCH PHỦ" : "COVERED AREA"}</strong></section>
+    <section class="ra223-workspace"><div class="ra223-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>A</i> · <em>B</em> · <b>A ∩ B</b></span></header>${plane}</div><div class="ra223-metrics">${metric("area-a", "AREA A", view.areaA, `${rectA[2] - rectA[0]} × ${rectA[3] - rectA[1]}`)}${metric("area-b", "AREA B", view.areaB, `${rectB[2] - rectB[0]} × ${rectB[3] - rectB[1]}`)}${metric("overlap", "OVERLAP", view.overlapArea, `${view.overlapWidth ?? "?"} × ${view.overlapHeight ?? "?"}`)}</div></section>
+    <section class="ra223-dimensions">${dimensions}</section>
+    <section class="ra223-equation ${final ? "done" : ""}"><small>INCLUSION–EXCLUSION</small><div><b>${view.areaA ?? "A"}</b><i>+</i><b>${view.areaB ?? "B"}</b><i>−</i><b class="overlap">${view.overlapArea ?? "A ∩ B"}</b><i>=</i><strong>${final ? view.answer : "…"}</strong></div></section>
+    <section class="ra223-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="ra223-result ${final ? "done" : ""}"><small>${vi ? "TỔNG DIỆN TÍCH PHỦ" : "TOTAL COVERED AREA"}</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "phần giao chỉ được tính một lần" : "the overlap is counted exactly once") : (vi ? "đang tính từng thành phần" : "computing each component")}</span></footer>
+  </section>`;
+}
+
 function renderRectangleOverlap836View(step) {
   const view = step.rectangleOverlap836View || {};
   const vi = lang === "vi";
@@ -30770,6 +30841,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDistantSubarrays4051View(step);
+  } else if (step.rectangleArea223View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRectangleArea223View(step);
   } else if (step.rectangleOverlap836View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
