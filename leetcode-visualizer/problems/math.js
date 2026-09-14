@@ -4816,3 +4816,217 @@ module.exports = {
     builder2: buildSteps1739Approach2,
   },
 };
+
+function parseRectangle836(raw, label) {
+  const values = Array.isArray(raw)
+    ? raw.map(Number)
+    : String(raw ?? "")
+      .trim()
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((part) => Number(part.trim()));
+  if (values.length !== 4 || !values.every(Number.isInteger)) {
+    throw new Error(`${label} must contain exactly 4 comma-separated integers: x1,y1,x2,y2.`);
+  }
+  if (!values.every((value) => value >= -1_000_000_000 && value <= 1_000_000_000)) {
+    throw new Error(`${label} coordinates must be between -1,000,000,000 and 1,000,000,000.`);
+  }
+  if (values[0] >= values[2] || values[1] >= values[3]) {
+    throw new Error(`${label} must have positive area: x1 < x2 and y1 < y2.`);
+  }
+  return values;
+}
+
+function parseRectangleOverlap836Input(input, params = {}) {
+  return {
+    rec1: parseRectangle836(input, "rec1"),
+    rec2: parseRectangle836(params.rec2 ?? "1,1,3,3", "rec2"),
+  };
+}
+
+function buildSteps836(input, params = {}) {
+  const { rec1, rec2 } = parseRectangleOverlap836Input(input, params);
+  const steps = [];
+  let left = null;
+  let right = null;
+  let bottom = null;
+  let top = null;
+  let overlapX = null;
+  let overlapY = null;
+
+  function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
+    const answer = overlapX == null || overlapY == null ? null : overlapX && overlapY;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "left", value: left ?? "—" },
+        { name: "right", value: right ?? "—" },
+        { name: "bottom", value: bottom ?? "—" },
+        { name: "top", value: top ?? "—" },
+        { name: "overlap_x", value: overlapX == null ? "—" : overlapX },
+        { name: "overlap_y", value: overlapY == null ? "—" : overlapY },
+      ],
+      rectangleOverlap836View: {
+        operation,
+        phaseIndex,
+        rec1: [...rec1],
+        rec2: [...rec2],
+        left,
+        right,
+        bottom,
+        top,
+        overlapX,
+        overlapY,
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "inputs",
+    phaseIndex: 0,
+    codeLine: 4,
+    title: { vi: "Nhận hai hình chữ nhật", en: "Receive the two rectangles" },
+    note: {
+      vi: "Mỗi rectangle có dạng [x1, y1, x2, y2] với góc trái dưới và góc phải trên.",
+      en: "Each rectangle is [x1, y1, x2, y2], from its bottom-left to its top-right corner.",
+    },
+  });
+
+  left = Math.max(rec1[0], rec2[0]);
+  snapshot({
+    operation: "left",
+    phaseIndex: 1,
+    codeLine: 5,
+    title: { vi: `Biên trái giao = ${left}`, en: `Intersection left edge = ${left}` },
+    note: { vi: "Giao chỉ có thể bắt đầu sau cả hai biên trái.", en: "The intersection can only begin after both left edges." },
+  });
+
+  right = Math.min(rec1[2], rec2[2]);
+  snapshot({
+    operation: "right",
+    phaseIndex: 1,
+    codeLine: 6,
+    title: { vi: `Biên phải giao = ${right}`, en: `Intersection right edge = ${right}` },
+    note: { vi: "Giao phải kết thúc trước cả hai biên phải.", en: "The intersection must end before both right edges." },
+  });
+
+  bottom = Math.max(rec1[1], rec2[1]);
+  snapshot({
+    operation: "bottom",
+    phaseIndex: 2,
+    codeLine: 7,
+    title: { vi: `Biên dưới giao = ${bottom}`, en: `Intersection bottom edge = ${bottom}` },
+    note: { vi: "Giao chỉ có thể bắt đầu phía trên cả hai đáy.", en: "The intersection can only begin above both bottom edges." },
+  });
+
+  top = Math.min(rec1[3], rec2[3]);
+  snapshot({
+    operation: "top",
+    phaseIndex: 2,
+    codeLine: 8,
+    title: { vi: `Biên trên giao = ${top}`, en: `Intersection top edge = ${top}` },
+    note: { vi: "Giao phải kết thúc phía dưới cả hai cạnh trên.", en: "The intersection must end below both top edges." },
+  });
+
+  overlapX = left < right;
+  snapshot({
+    operation: "overlap-x",
+    phaseIndex: 3,
+    codeLine: 9,
+    title: {
+      vi: overlapX ? `Trục X overlap: ${left} < ${right}` : `Trục X không overlap: ${left} ≥ ${right}`,
+      en: overlapX ? `X overlaps: ${left} < ${right}` : `X does not overlap: ${left} >= ${right}`,
+    },
+    note: overlapX
+      ? { vi: `Độ rộng phần giao là ${right - left} > 0.`, en: `The intersection width is ${right - left} > 0.` }
+      : { vi: "Chạm cạnh hoặc tách rời tạo độ rộng không dương.", en: "Touching edges or separation produce non-positive width." },
+  });
+
+  overlapY = bottom < top;
+  snapshot({
+    operation: "overlap-y",
+    phaseIndex: 3,
+    codeLine: 10,
+    title: {
+      vi: overlapY ? `Trục Y overlap: ${bottom} < ${top}` : `Trục Y không overlap: ${bottom} ≥ ${top}`,
+      en: overlapY ? `Y overlaps: ${bottom} < ${top}` : `Y does not overlap: ${bottom} >= ${top}`,
+    },
+    note: overlapY
+      ? { vi: `Chiều cao phần giao là ${top - bottom} > 0.`, en: `The intersection height is ${top - bottom} > 0.` }
+      : { vi: "Chạm cạnh hoặc tách rời tạo chiều cao không dương.", en: "Touching edges or separation produce non-positive height." },
+  });
+
+  const answer = overlapX && overlapY;
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 11,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: answer
+      ? { vi: "Cả chiều rộng và chiều cao phần giao đều dương.", en: "Both intersection width and height are positive." }
+      : { vi: "Chỉ cần một trục không overlap là hai rectangle không giao nhau theo diện tích.", en: "If either axis does not overlap, the rectangles share no positive area." },
+    final: true,
+  });
+
+  return { original: { rec1: [...rec1], rec2: [...rec2] }, answer, steps };
+}
+
+Object.assign(module.exports, {
+  836: {
+    id: 836,
+    difficulty: "easy",
+    slug: "rectangle-overlap",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [
+      { key: "geometry", vi: "Hình học", en: "Geometry" },
+      { key: "math", vi: "Toán học", en: "Math" },
+    ],
+    title: { vi: "Rectangle Overlap", en: "Rectangle Overlap" },
+    titleVi: { vi: "Hai hình chữ nhật có overlap không", en: "Determine whether two rectangles overlap" },
+    statement: {
+      vi: "Cho hai rectangle song song với trục tọa độ. Trả về true khi phần giao của chúng có diện tích dương; chỉ chạm cạnh hoặc chạm góc không được tính.",
+      en: "Given two axis-aligned rectangles, return true when their intersection has positive area; touching at an edge or corner does not count.",
+    },
+    defaultInput: "0,0,2,2",
+    inputKind: "string",
+    inputLabel: { vi: "rec1: x1,y1,x2,y2", en: "rec1: x1,y1,x2,y2" },
+    extraParams: [
+      { key: "rec2", type: "string", label: { vi: "rec2: x1,y1,x2,y2", en: "rec2: x1,y1,x2,y2" }, default: "1,1,3,3" },
+    ],
+    approach: [
+      { vi: "Lấy phần giao trên trục X: left = max(x1) và right = min(x2).", en: "Find the X-axis intersection: left = max(x1) and right = min(x2)." },
+      { vi: "Lấy phần giao trên trục Y: bottom = max(y1) và top = min(y2).", en: "Find the Y-axis intersection: bottom = max(y1) and top = min(y2)." },
+      { vi: "Hai rectangle overlap theo diện tích khi left < right và bottom < top. Dấu < nghiêm ngặt loại trường hợp chỉ chạm.", en: "The rectangles overlap in area when left < right and bottom < top. Strict inequalities exclude touching only." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: { vi: "Chỉ thực hiện một số cố định phép min, max và so sánh.", en: "Only a constant number of min, max, and comparison operations are used." },
+    },
+    debugMode: "semantic",
+    code: [
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def isRectangleOverlap(self, rec1: List[int], rec2: List[int]) -> bool:",
+      "        left = max(rec1[0], rec2[0])",
+      "        right = min(rec1[2], rec2[2])",
+      "        bottom = max(rec1[1], rec2[1])",
+      "        top = min(rec1[3], rec2[3])",
+      "        overlap_x = left < right",
+      "        overlap_y = bottom < top",
+      "        return overlap_x and overlap_y",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseRectangleOverlap836Input(input, params);
+      return [parsed.rec1, parsed.rec2];
+    },
+    builder: buildSteps836,
+  },
+});

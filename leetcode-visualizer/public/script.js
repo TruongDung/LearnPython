@@ -29375,6 +29375,92 @@ function renderEquallySpaced4049View(step) {
   </section>`;
 }
 
+function renderRectangleOverlap836View(step) {
+  const view = step.rectangleOverlap836View || {};
+  const vi = lang === "vi";
+  const rec1 = Array.isArray(view.rec1) ? view.rec1.map(Number) : [0, 0, 1, 1];
+  const rec2 = Array.isArray(view.rec2) ? view.rec2.map(Number) : [0, 0, 1, 1];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Hai rectangle", "Chiếu trục X", "Chiếu trục Y", "Kiểm tra độ dài", "Kết quả"]
+    : ["Two rectangles", "Project on X", "Project on Y", "Check lengths", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const valuesX = [rec1[0], rec1[2], rec2[0], rec2[2]];
+  const valuesY = [rec1[1], rec1[3], rec2[1], rec2[3]];
+  let minX = Math.min(...valuesX);
+  let maxX = Math.max(...valuesX);
+  let minY = Math.min(...valuesY);
+  let maxY = Math.max(...valuesY);
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  minX -= spanX * 0.16;
+  maxX += spanX * 0.16;
+  minY -= spanY * 0.18;
+  maxY += spanY * 0.18;
+  const plot = { left: 52, top: 20, width: 556, height: 244 };
+  const mapX = (x) => plot.left + ((x - minX) / (maxX - minX)) * plot.width;
+  const mapY = (y) => plot.top + ((maxY - y) / (maxY - minY)) * plot.height;
+  const rectSvg = (rect, name, className) => {
+    const x = mapX(rect[0]);
+    const y = mapY(rect[3]);
+    const width = mapX(rect[2]) - x;
+    const height = mapY(rect[1]) - y;
+    return `<g class="${className}"><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}" rx="4"/><text x="${(x + width / 2).toFixed(2)}" y="${(y + height / 2).toFixed(2)}">${name}</text><text class="corner start" x="${(x + 5).toFixed(2)}" y="${(y + height - 7).toFixed(2)}">(${rect[0]}, ${rect[1]})</text><text class="corner end" x="${(x + width - 5).toFixed(2)}" y="${(y + 13).toFixed(2)}">(${rect[2]}, ${rect[3]})</text></g>`;
+  };
+  const bounds = [];
+  if (Number.isFinite(view.left)) bounds.push(`<line class="ro836-bound x" x1="${mapX(view.left).toFixed(2)}" y1="${plot.top}" x2="${mapX(view.left).toFixed(2)}" y2="${plot.top + plot.height}"/><text class="ro836-bound-label" x="${mapX(view.left).toFixed(2)}" y="${plot.top + plot.height + 17}">left ${view.left}</text>`);
+  if (Number.isFinite(view.right)) bounds.push(`<line class="ro836-bound x" x1="${mapX(view.right).toFixed(2)}" y1="${plot.top}" x2="${mapX(view.right).toFixed(2)}" y2="${plot.top + plot.height}"/><text class="ro836-bound-label" x="${mapX(view.right).toFixed(2)}" y="${plot.top + plot.height + 17}">right ${view.right}</text>`);
+  if (Number.isFinite(view.bottom)) bounds.push(`<line class="ro836-bound y" x1="${plot.left}" y1="${mapY(view.bottom).toFixed(2)}" x2="${plot.left + plot.width}" y2="${mapY(view.bottom).toFixed(2)}"/><text class="ro836-bound-label y" x="${plot.left - 5}" y="${(mapY(view.bottom) + 4).toFixed(2)}">${view.bottom}</text>`);
+  if (Number.isFinite(view.top)) bounds.push(`<line class="ro836-bound y" x1="${plot.left}" y1="${mapY(view.top).toFixed(2)}" x2="${plot.left + plot.width}" y2="${mapY(view.top).toFixed(2)}"/><text class="ro836-bound-label y" x="${plot.left - 5}" y="${(mapY(view.top) + 4).toFixed(2)}">${view.top}</text>`);
+
+  let intersection = "";
+  if (view.overlapX === true && view.overlapY === true) {
+    const x = mapX(view.left);
+    const y = mapY(view.top);
+    const width = mapX(view.right) - x;
+    const height = mapY(view.bottom) - y;
+    intersection = `<g class="ro836-intersection"><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}" rx="3"/><text x="${(x + width / 2).toFixed(2)}" y="${(y + height / 2).toFixed(2)}">OVERLAP</text></g>`;
+  }
+  const svgSummary = vi ? "Hai hình chữ nhật trên mặt phẳng tọa độ và vùng giao của chúng." : "Two rectangles on a coordinate plane and their intersection.";
+  const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}"><rect class="ro836-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="ro836-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="ro836-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="ro836-axis-name" x="${plot.left + plot.width + 10}" y="${plot.top + plot.height + 4}">x</text><text class="ro836-axis-name" x="${plot.left - 4}" y="${plot.top - 7}">y</text>${rectSvg(rec1, "A", "ro836-rect-a")}${rectSvg(rec2, "B", "ro836-rect-b")}${bounds.join("")}${intersection}</svg>`;
+
+  const axisCard = (axis, start, end, overlap) => {
+    const known = Number.isFinite(start) && Number.isFinite(end);
+    const state = overlap === true ? "pass" : overlap === false ? "fail" : "pending";
+    const symbol = overlap === true ? "<" : overlap === false ? "≥" : "?";
+    const length = known ? end - start : null;
+    return `<article class="ro836-axis-card ${state}"><header><strong>${axis}</strong><span>${overlap === true ? "OVERLAP ✓" : overlap === false ? "NO OVERLAP ✕" : (vi ? "đang tính" : "computing")}</span></header><div><b>${known ? start : "?"}</b><i>${symbol}</i><b>${known ? end : "?"}</b></div><footer><span>${axis === "X" ? (vi ? "độ rộng" : "width") : (vi ? "chiều cao" : "height")}</span><code>${length == null ? "?" : length}</code><small>${vi ? "phải > 0" : "must be > 0"}</small></footer></article>`;
+  };
+
+  const formulas = {
+    inputs: `rec1=[${rec1.join(",")}], rec2=[${rec2.join(",")}]`,
+    left: `left = max(${rec1[0]}, ${rec2[0]}) = ${view.left}`,
+    right: `right = min(${rec1[2]}, ${rec2[2]}) = ${view.right}`,
+    bottom: `bottom = max(${rec1[1]}, ${rec2[1]}) = ${view.bottom}`,
+    top: `top = min(${rec1[3]}, ${rec2[3]}) = ${view.top}`,
+    "overlap-x": `${view.left} < ${view.right} → ${view.overlapX}`,
+    "overlap-y": `${view.bottom} < ${view.top} → ${view.overlapY}`,
+    return: `${view.overlapX} and ${view.overlapY} → ${view.answer}`,
+  };
+  const final = Boolean(view.final);
+  const answerLabel = view.answer === true ? "TRUE" : view.answer === false ? "FALSE" : "…";
+  const summary = vi
+    ? `Bài 836: overlap trục X là ${view.overlapX ?? "chưa biết"}, overlap trục Y là ${view.overlapY ?? "chưa biết"}.`
+    : `Problem 836: X overlap is ${view.overlapX ?? "unknown"}, Y overlap is ${view.overlapY ?? "unknown"}.`;
+
+  $("treeView").innerHTML = `<section class="ro836-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>GEOMETRY · AXIS PROJECTION · #836</small><strong>RECTANGLE OVERLAP</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ro836-phases">${phases}</div>
+    <section class="ro836-rule"><span><b>X</b><code>max(lefts) &lt; min(rights)</code></span><i>AND</i><span><b>Y</b><code>max(bottoms) &lt; min(tops)</code></span></section>
+    <section class="ro836-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>A</i> rec1 · <em>B</em> rec2 · <b>${vi ? "giao" : "intersection"}</b></span></header>${plane}</section>
+    <section class="ro836-axis-checks">${axisCard("X", view.left, view.right, view.overlapX)}${axisCard("Y", view.bottom, view.top, view.overlapY)}</section>
+    <section class="ro836-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="ro836-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <footer class="ro836-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>POSITIVE-AREA OVERLAP?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "cả width và height đều dương" : "both width and height are positive") : (vi ? "ít nhất một chiều không dương" : "at least one dimension is non-positive")) : (vi ? "cần cả hai phép chiếu overlap" : "both axis projections must overlap")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -30447,6 +30533,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEquallySpaced4049View(step);
+  } else if (step.rectangleOverlap836View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRectangleOverlap836View(step);
   } else if (step.orderlyQueue899View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
