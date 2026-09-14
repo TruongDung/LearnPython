@@ -31,6 +31,6 @@ test('quick form is fixed with the tag shortcuts and remains responsive', () => 
   assert.match(css, /\.catalog-quick-jump \{[\s\S]*position: sticky;[\s\S]*width: 112px;/);
   assert.match(css, /\.catalog-quick-jump input \{[\s\S]*height: 34px;/);
   assert.match(css, /\.catalog-quick-jump button \{[\s\S]*display: none;/);
-  assert.match(css, /@media \(hover: none\) and \(pointer: coarse\), \(max-width: 640px\)[\s\S]*\.catalog-quick-jump button \{ display: grid; \}/);
-  assert.match(css, /@media \(max-width: 480px\)[\s\S]*\.catalog-quick-jump \{ width: 170px;/);
+  assert.match(css, /@media \(hover: none\) and \(pointer: coarse\), \(max-width: 640px\)[\s\S]*grid-template-columns: 68px 44px;[\s\S]*\.catalog-quick-jump button \{[\s\S]*display: grid;/);
+  assert.match(css, /@media \(max-width: 480px\)[\s\S]*\.catalog-quick-jump \{ width: 112px;/);
 });

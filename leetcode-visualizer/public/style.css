@@ -406,16 +406,23 @@
 @media (hover: none) and (pointer: coarse), (max-width: 640px) {
   .catalog-quick-jump {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 48px;
-    width: 170px;
+    grid-template-columns: 68px 44px;
+    width: 112px;
   }
 
   .catalog-quick-jump input {
-    height: 40px;
+    height: 38px;
+    padding-inline: 8px;
+    font-variant-numeric: tabular-nums;
     border-radius: 7px 0 0 7px;
   }
 
-  .catalog-quick-jump button { display: grid; }
+  .catalog-quick-jump button {
+    display: grid;
+    min-width: 44px;
+    height: 38px;
+    padding: 0 7px;
+  }
 }
 
 .catalog-jump-btn {
@@ -568,7 +575,7 @@
     padding: 5px 8px 5px 6px;
   }
 
-  .catalog-quick-jump { width: 170px; }
+  .catalog-quick-jump { width: 112px; }
 
   .catalog-jump-label { font-size: 10px; }
 }
