@@ -29268,6 +29268,113 @@ function renderEquallySpaced4048View(step) {
   </section>`;
 }
 
+function renderEquallySpaced4049View(step) {
+  const view = step.equallySpaced4049View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const activeIndices = Array.isArray(view.activeIndices) ? view.activeIndices : [];
+  const activeIndexSet = new Set(activeIndices);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const collectedCount = Number(view.collectedCount) || 0;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["Gom index", "Ít nhất 3", "Chọn gap", "Quét mọi gap", "Kết quả"]
+    : ["Collect indices", "At least 3", "Choose gap", "Scan every gap", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const arrayHtml = nums.map((value, index) => {
+    const classes = ["es4048-cell"];
+    if (index < collectedCount) classes.push("collected");
+    if (index === currentIndex) classes.push("current");
+    if (activeIndexSet.has(index)) classes.push("same-value");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><b>${escapeHtml(value)}</b></span>`;
+  }).join("");
+
+  const statusText = {
+    pending: vi ? "chờ kiểm tra" : "pending",
+    active: vi ? "đang xét" : "checking",
+    enough: vi ? "đủ occurrences" : "enough occurrences",
+    checking: vi ? "đang quét gap" : "scanning gaps",
+    "special-ready": vi ? "mọi gap bằng" : "all gaps equal",
+    special: "SPECIAL ✓",
+    unequal: vi ? "có gap khác" : "gap mismatch",
+    "too-few": vi ? "ít hơn 3 lần" : "fewer than 3",
+  };
+  const groupsHtml = groups.length
+    ? groups.map((group) => {
+      const indices = Array.isArray(group.indices) ? group.indices : [];
+      const isActive = group.value === view.activeValue;
+      return `<article class="es4048-group ${escapeHtml(group.status || "pending")} ${isActive ? "active" : ""}">
+        <header><strong>${escapeHtml(group.value)}</strong><span>×${indices.length}</span></header>
+        <div>${indices.map((index) => `<b>${index}</b>`).join("") || "<i>—</i>"}</div>
+        <footer>${escapeHtml(statusText[group.status] || statusText.pending)}</footer>
+      </article>`;
+    }).join("")
+    : `<p>${vi ? "Hash map đang rỗng." : "The hash map is empty."}</p>`;
+
+  let gapLane;
+  if (view.activeValue == null) {
+    gapLane = `<p>${vi ? "Chọn một nhóm value để kiểm tra." : "Select a value group to inspect."}</p>`;
+  } else if (activeIndices.length < 3) {
+    gapLane = `<div class="es4048-count-check"><span>value <b>${escapeHtml(view.activeValue)}</b></span><code>len(indices) = ${activeIndices.length}</code><strong>&lt; 3</strong></div>`;
+  } else {
+    const lane = [];
+    activeIndices.forEach((index, occurrence) => {
+      const nodeClasses = ["esii4049-node"];
+      if (occurrence === view.currentGapOrdinal) nodeClasses.push("current");
+      if (occurrence === view.mismatchGapOrdinal) nodeClasses.push("mismatch");
+      lane.push(`<span class="${nodeClasses.join(" ")}"><small>i${occurrence + 1}</small><b>${index}</b></span>`);
+      if (occurrence === activeIndices.length - 1) return;
+      const ordinal = occurrence + 1;
+      const actual = activeIndices[ordinal] - activeIndices[ordinal - 1];
+      const gapClasses = ["esii4049-gap"];
+      if (ordinal <= Number(view.checkedGapCount || 0)) gapClasses.push("match");
+      if (ordinal === view.currentGapOrdinal) gapClasses.push("current");
+      if (ordinal === view.mismatchGapOrdinal) gapClasses.push("mismatch");
+      lane.push(`<i class="${gapClasses.join(" ")}"><small>δ${ordinal}</small><b>${actual}</b></i>`);
+    });
+    gapLane = `<div class="esii4049-lane">${lane.join("")}</div><footer><span>${vi ? "gap chuẩn" : "reference gap"}</span><strong>${view.expectedGap ?? "?"}</strong><code>${view.actualGap == null ? (vi ? "chờ gap tiếp theo" : "waiting for the next gap") : `${view.actualGap} ${view.actualGap === view.expectedGap ? "=" : "≠"} ${view.expectedGap}`}</code></footer>`;
+  }
+
+  const operation = view.operation || "init-map";
+  const formulas = {
+    "init-map": "positions = defaultdict(list)",
+    scan: currentIndex >= 0 ? `index = ${currentIndex}, value = ${view.currentValue}` : "for index, value in enumerate(nums)",
+    append: `positions[${view.currentValue}].append(${currentIndex})`,
+    "init-answer": "answer = 0",
+    group: `value = ${view.activeValue}, indices = [${activeIndices.join(", ")}]`,
+    "size-check": `len(indices) = ${activeIndices.length} ${view.countOk ? ">=" : "<"} 3`,
+    continue: "continue",
+    "set-gap": activeIndices.length >= 2 ? `gap = ${activeIndices[1]} - ${activeIndices[0]} = ${view.expectedGap}` : "gap = indices[1] - indices[0]",
+    "init-flag": "equally_spaced = True",
+    "gap-loop": `i = ${view.currentGapOrdinal}`,
+    "gap-check": `${view.actualGap} ${view.actualGap === view.expectedGap ? "==" : "!="} ${view.expectedGap}`,
+    "set-false": "equally_spaced = False",
+    break: "break",
+    "final-check": `equally_spaced is ${view.equallySpaced ? "True" : "False"}`,
+    count: `answer = ${view.answerBefore} + 1 = ${view.answer}`,
+    return: `return ${view.answer}`,
+  };
+  const countedValues = groups.filter((group) => group.status === "special").map((group) => group.value);
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 4049: đã gom ${collectedCount}/${nums.length} index và đếm ${view.answer || 0} value special.`
+    : `Problem 4049: collected ${collectedCount}/${nums.length} indices and counted ${view.answer || 0} special values.`;
+
+  $("treeView").innerHTML = `<section class="es4048-viz esii4049-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>HASH MAP · ARITHMETIC INDICES · #4049</small><strong>EQUALLY SPACED OCCURRENCES II</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="es4048-phases">${phases}</div>
+    <section class="es4048-rule"><strong>SPECIAL</strong><code>count ≥ 3</code><i>AND</i><code>δ₁ = δ₂ = … = δₘ₋₁</code></section>
+    <section class="es4048-array"><header><strong>NUMS</strong><span>${vi ? "xanh = mọi occurrence của value đang xét" : "blue = every occurrence of the active value"}</span></header><div>${arrayHtml}</div></section>
+    <section class="es4048-groups"><header><strong>HASH MAP: VALUE → INDICES</strong><span>${groups.length} ${vi ? "value phân biệt" : "distinct values"}</span></header><div>${groupsHtml}</div></section>
+    <section class="es4048-check esii4049-check"><header><strong>${vi ? "DÃY KHOẢNG CÁCH" : "GAP SEQUENCE"}</strong><span>${view.activeValue == null ? "—" : `value ${escapeHtml(view.activeValue)}`}</span></header>${gapLane}</section>
+    <section class="es4048-operation"><header><strong>${vi ? "PHÉP TOÁN" : "OPERATION"}</strong><code>${escapeHtml(formulas[operation] || operation)}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="es4048-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <footer class="es4048-result ${final ? "done" : ""}"><div><small>SPECIAL VALUES</small><span>${countedValues.length ? countedValues.map((value) => `<b>${escapeHtml(value)}</b>`).join("") : "—"}</span></div><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? "giá trị special phân biệt" : "distinct special values") : (vi ? "một mismatch sẽ dừng nhóm hiện tại" : "one mismatch stops the current group")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -30334,6 +30441,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEquallySpaced4048View(step);
+  } else if (step.equallySpaced4049View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEquallySpaced4049View(step);
   } else if (step.orderlyQueue899View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
