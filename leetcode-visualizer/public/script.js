@@ -29375,15 +29375,205 @@ function renderEquallySpaced4049View(step) {
   </section>`;
 }
 
+function renderMinDays4050View(step) {
+  const view = step.minDays4050View || {};
+  const vi = lang === "vi";
+  const streaks = Array.isArray(view.streaks) ? view.streaks : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const schedule = Array.isArray(view.schedule) ? view.schedule : [];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const activeScore = Number.isInteger(view.activeScore) ? view.activeScore : -1;
+  const activeOption = Number.isInteger(view.activeOption) ? view.activeOption : -1;
+  const predecessor = Number.isInteger(view.predecessor) ? view.predecessor : -1;
+  const labels = vi
+    ? ["Tạo streak", "Base DP", "Thử lựa chọn", "Giữ min", "Lịch tối ưu"]
+    : ["Build streaks", "DP base", "Try options", "Keep minimum", "Optimal schedule"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const optionHtml = streaks.length
+    ? streaks.map((item, index) => `<article class="md4050-option${index === activeOption ? " active" : ""}">
+        <small>STREAK L=${item.length}</small>
+        <strong>${item.points} <em>pts</em></strong>
+        <span>${item.length} earn + 1 skip = <b>${item.cost}</b> ${vi ? "ngày" : "days"}</span>
+      </article>`).join("")
+    : `<p class="md4050-empty">${vi ? "Chưa có streak nào." : "No streak options yet."}</p>`;
+
+  const dpHtml = dp.length
+    ? dp.map((value, score) => {
+      const classes = ["md4050-cell"];
+      if (score === activeScore) classes.push("active");
+      if (score === predecessor) classes.push("source");
+      if (value != null) classes.push("known");
+      if (view.final && score === view.n) classes.push("answer");
+      return `<span class="${classes.join(" ")}"><small>score ${score}</small><b>${value == null ? "∞" : value}</b></span>`;
+    }).join("")
+    : `<span class="md4050-cell"><small>dp</small><b>—</b></span>`;
+
+  let transitionFormula = vi ? "Chọn một streak để xem transition." : "Choose a streak to inspect a transition.";
+  if (view.operation === "fit-check" && Number(view.points) > activeScore) {
+    transitionFormula = `${view.points} > ${activeScore} → break`;
+  } else if (predecessor >= 0 && view.candidate != null) {
+    transitionFormula = `dp[${predecessor}] + ${view.cost} = ${dp[predecessor]} + ${view.cost} = ${view.candidate}`;
+  } else if (activeOption >= 0 && view.points != null && activeScore >= 0) {
+    transitionFormula = `${view.points} ${view.points <= activeScore ? "≤" : ">"} ${activeScore}`;
+  } else if (view.operation === "return") {
+    transitionFormula = `dp[${view.n}] - 1 = ${dp[view.n]} - 1 = ${view.answer}`;
+  }
+  const comparison = view.updated === true
+    ? (vi ? "NHỎ HƠN → CẬP NHẬT" : "SMALLER → UPDATE")
+    : view.updated === false
+      ? (vi ? "KHÔNG NHỎ HƠN → GIỮ NGUYÊN" : "NOT SMALLER → KEEP")
+      : (vi ? "TRANSITION HIỆN TẠI" : "CURRENT TRANSITION");
+
+  const scheduleHtml = schedule.length
+    ? schedule.map((day, index) => `<span class="md4050-day ${day.type}"><small>${vi ? "ngày" : "day"} ${index + 1}</small><b>${day.type === "skip" ? "SKIP" : `+${day.points}`}</b><em>${day.type === "skip" ? (vi ? "reset" : "reset") : `streak ${day.streak}`}</em></span>`).join("")
+    : `<p class="md4050-empty">${vi ? "Bảng DP sẽ dựng lịch tối ưu khi hoàn tất." : "The DP table will reconstruct the optimal schedule when complete."}</p>`;
+
+  const formulas = {
+    "init-streaks": "streaks = []",
+    "init-length": "length = 1",
+    "while-check": `T_${view.length} ≤ n ?`,
+    "while-stop": `T_${view.length} > n → stop`,
+    "compute-points": `points = ${view.length} × ${view.length + 1} / 2 = ${view.points}`,
+    "append-option": `streaks.append((${view.points}, ${view.cost}))`,
+    "increment-length": `length = ${view.length}`,
+    "init-dp": `dp = [∞] × (${view.n} + 1)`,
+    "base-case": "dp[0] = 0",
+    "score-loop": `score = ${activeScore}`,
+    "option-loop": activeOption >= 0 ? `points, cost = ${view.points}, ${view.cost}` : "for points, cost in streaks",
+    "fit-check": `${view.points} > ${activeScore} ?`,
+    break: "break",
+    relax: transitionFormula,
+    return: `return dp[${view.n}] - 1`,
+  };
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 4050: DP tìm số ngày ít nhất để đạt chính xác ${view.n} điểm.`
+    : `Problem 4050: DP finds the minimum days needed to score exactly ${view.n} points.`;
+
+  $("treeView").innerHTML = `<section class="md4050-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>UNBOUNDED KNAPSACK · TRIANGULAR NUMBERS · #4050</small><strong>MINIMUM DAYS TO SCORE EXACTLY N POINTS</strong></div><span>n = ${view.n}</span></header>
+    <div class="md4050-phases">${phases}</div>
+    <section class="md4050-rule"><div><small>${vi ? "STREAK DÀI L" : "LENGTH-L STREAK"}</small><code>1 + 2 + … + L = L(L+1)/2</code></div><i>→</i><div><small>${vi ? "CHI PHÍ TẠM" : "CHARGED COST"}</small><code>L earn + 1 skip</code></div><i>→</i><strong>${vi ? "kết quả = dp[n] − 1" : "answer = dp[n] - 1"}</strong></section>
+    <section class="md4050-options"><header><strong>${vi ? "CÁC STREAK CÓ THỂ DÙNG" : "AVAILABLE STREAK OPTIONS"}</strong><span>${streaks.length} options</span></header><div>${optionHtml}</div></section>
+    <section class="md4050-dp"><header><strong>DP[EXACT SCORE]</strong><span>${vi ? "giá trị = ngày đã charge" : "value = charged days"}</span></header><div>${dpHtml}</div></section>
+    <section class="md4050-transition ${view.updated === true ? "updated" : view.updated === false ? "kept" : ""}"><header><strong>${comparison}</strong><code>${escapeHtml(transitionFormula)}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="md4050-schedule"><header><strong>${vi ? "LỊCH NGÀY TỐI ƯU" : "OPTIMAL DAY SCHEDULE"}</strong><span>${final ? `${view.answer} ${vi ? "ngày" : "days"} · ${view.n} points` : (vi ? "xuất hiện ở bước cuối" : "shown at the final step")}</span></header><div>${scheduleHtml}</div></section>
+    <section class="md4050-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></section>
+    <footer class="md4050-result ${final ? "done" : ""}"><small>MIN DAYS</small><strong>${final ? view.answer : "…"}</strong><span>${final ? (vi ? `đạt chính xác ${view.n} điểm` : `scores exactly ${view.n} points`) : (vi ? "DP đang so sánh các cách chia thành streak" : "DP is comparing streak decompositions")}</span></footer>
+  </section>`;
+}
+
+function renderDistantSubarrays4051View(step) {
+  const view = step.distantSubarrays4051View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const matches = Array.isArray(view.currentMatches) ? view.currentMatches : [];
+  const accepted = Array.isArray(view.accepted) ? view.accepted : [];
+  const activePrefix = Number.isInteger(view.prefixIndex) ? view.prefixIndex : -1;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const hasBounds = Number.isFinite(view.low) && Number.isFinite(view.high);
+  const labels = vi
+    ? ["Prefix sum", "Nén tọa độ", "Query 2 miền", "Đếm + insert", "Kết quả"]
+    : ["Prefix sums", "Compress", "Query 2 ranges", "Count + insert", "Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const numsHtml = nums.map((value, index) => `<span class="ds4051-num${activePrefix === index + 1 ? " current" : ""}"><small>i=${index}</small><b>${escapeHtml(value)}</b></span>`).join("");
+  const prefixHtml = prefix.map((value, index) => {
+    const classes = ["ds4051-prefix"];
+    if (index < Number(view.seen || 0)) classes.push("seen");
+    if (index === activePrefix) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><b>${escapeHtml(value)}</b><em>${index < Number(view.seen || 0) ? (vi ? "đã insert" : "inserted") : index === activePrefix ? "current" : ""}</em></span>`;
+  }).join("");
+
+  const coordinatesHtml = values.length
+    ? values.map((value, index) => {
+      const classes = ["ds4051-coordinate"];
+      if (hasBounds && value <= view.low) classes.push("left-range");
+      else if (hasBounds && value >= view.high) classes.push("right-range");
+      else if (hasBounds) classes.push("middle-range");
+      if (index === view.coordinate) classes.push("inserted-now");
+      return `<span class="${classes.join(" ")}"><small>rank ${index + 1}</small><b>${escapeHtml(value)}</b><em>count ${counts[index] || 0}</em></span>`;
+    }).join("")
+    : `<p class="ds4051-empty">${vi ? "Chưa nén tọa độ." : "Coordinates are not compressed yet."}</p>`;
+
+  const leftCount = view.leftCount == null ? "?" : view.leftCount;
+  const rightCount = view.rightCount == null ? "?" : view.rightCount;
+  const boundsHtml = hasBounds
+    ? `<div class="ds4051-bound left"><small>${vi ? "MIỀN TRÁI" : "LEFT RANGE"}</small><strong>p ≤ ${view.low}</strong><span>${leftCount} prefix</span></div><i>OR</i><div class="ds4051-bound middle"><small>${vi ? "KHÔNG DISTANT" : "NOT DISTANT"}</small><strong>${view.low} &lt; p &lt; ${view.high}</strong><span>${vi ? "không đếm" : "do not count"}</span></div><i>OR</i><div class="ds4051-bound right"><small>${vi ? "MIỀN PHẢI" : "RIGHT RANGE"}</small><strong>p ≥ ${view.high}</strong><span>${rightCount} prefix</span></div>`
+    : `<div class="ds4051-bound idle"><small>${vi ? "ĐỔI ĐIỀU KIỆN" : "TRANSFORM CONDITION"}</small><strong>|(s − p) − goal| ≥ k</strong><span>${vi ? "tìm hai miền của prefix trước p" : "find two ranges for earlier prefix p"}</span></div>`;
+
+  const matchHtml = matches.length
+    ? matches.map((item) => `<span class="ds4051-match ${item.side}"><small>[${item.start}..${item.end}]</small><b>sum ${item.sum}</b><em>|${item.sum} − ${view.goal}| = ${item.difference}</em></span>`).join("")
+    : `<p class="ds4051-empty">${activePrefix > 0 ? (vi ? "Không có subarray distant kết thúc tại đây." : "No distant subarray ends here.") : (vi ? "Chưa có subarray không rỗng." : "No non-empty subarray yet.")}</p>`;
+  const recentAccepted = accepted.slice(-12);
+  const acceptedHtml = recentAccepted.length
+    ? recentAccepted.map((item) => `<span class="ds4051-accepted"><b>[${item.start}..${item.end}]</b><small>Σ=${item.sum} · Δ=${item.difference}</small></span>`).join("")
+    : `<p class="ds4051-empty">${vi ? "Chưa đếm subarray nào." : "No subarray counted yet."}</p>`;
+
+  const formula = view.k === 0
+    ? `${nums.length} × ${nums.length + 1} / 2 = ${view.totalSubarrays ?? "?"}`
+    : view.operation === "count"
+      ? `answer = ${view.answerBefore} + ${leftCount} + ${rightCount} = ${view.answer}`
+      : hasBounds
+        ? `p ≤ ${view.current} − ${view.goal} − ${view.k} = ${view.low}  OR  p ≥ ${view.current} − ${view.goal} + ${view.k} = ${view.high}`
+        : "|(current − p) − goal| ≥ k";
+  const formulas = {
+    "k-check": `k == 0 → ${view.k === 0}`,
+    "set-n": `n = len(nums) = ${nums.length}`,
+    "return-all": `return ${nums.length} × ${nums.length + 1} // 2`,
+    "init-prefix": "prefix = [0]",
+    "prefix-loop": activePrefix > 0 ? `value = nums[${activePrefix - 1}]` : "for value in nums",
+    "append-prefix": `prefix.append(${view.current})`,
+    compress: `values = [${values.join(", ")}]`,
+    "init-bit": `bit = Fenwick(${values.length})`,
+    "init-counters": "answer = seen = 0",
+    "scan-prefix": `current = P${activePrefix} = ${view.current}`,
+    "low-threshold": `low = ${view.current} - ${view.goal} - ${view.k} = ${view.low}`,
+    "high-threshold": `high = ${view.current} - ${view.goal} + ${view.k} = ${view.high}`,
+    "query-left": `left_count = ${leftCount}`,
+    "query-right": `right_count = ${rightCount}`,
+    count: formula,
+    insert: `bit.add(rank(${view.current}), 1)`,
+    "increment-seen": `seen = ${view.seen}`,
+    return: `return ${view.answer}`,
+  };
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 4051: đã đếm ${view.answer || 0} subarray có tổng cách goal ít nhất k.`
+    : `Problem 4051: counted ${view.answer || 0} subarrays whose sums are at least k away from goal.`;
+
+  $("treeView").innerHTML = `<section class="ds4051-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>PREFIX SUM · FENWICK TREE · #4051</small><strong>COUNT SUBARRAYS WITH DISTANT SUMS</strong></div><span>goal = ${view.goal} · k = ${view.k}</span></header>
+    <div class="ds4051-phases">${phases}</div>
+    <section class="ds4051-rule"><code>sum(i..j) = P[j+1] − P[i]</code><i>→</i><strong>|sum − goal| ≥ k</strong><i>→</i><code>2 prefix ranges</code></section>
+    <section class="ds4051-prefixes"><header><strong>NUMS → PREFIX SUMS</strong><span>${vi ? "chỉ query prefix đã insert" : "query inserted prefixes only"}</span></header><div class="ds4051-nums">${numsHtml}</div><div class="ds4051-arrow">↓ prefix</div><div class="ds4051-prefix-row">${prefixHtml || `<span class="ds4051-prefix"><b>—</b></span>`}</div></section>
+    <section class="ds4051-ranges">${boundsHtml}</section>
+    <section class="ds4051-coordinates"><header><strong>${vi ? "TỌA ĐỘ NÉN · TẦN SUẤT ĐÃ THẤY" : "COMPRESSED COORDINATES · SEEN FREQUENCIES"}</strong><span>seen = ${view.seen || 0}</span></header><div>${coordinatesHtml}</div></section>
+    <section class="ds4051-transition"><header><strong>${vi ? "PHÉP ĐẾM HIỆN TẠI" : "CURRENT COUNT"}</strong><code>${escapeHtml(formula)}</code></header><div>${matchHtml}</div><footer>${escapeHtml(pick(step.note))}</footer></section>
+    <section class="ds4051-found"><header><strong>${vi ? "SUBARRAY DISTANT ĐÃ ĐẾM" : "COUNTED DISTANT SUBARRAYS"}</strong><span>${accepted.length > 12 ? `${vi ? "12 gần nhất /" : "latest 12 /"} ` : ""}${view.answer || 0}</span></header><div>${acceptedHtml}</div></section>
+    <section class="ds4051-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></section>
+    <footer class="ds4051-result ${final ? "done" : ""}"><small>DISTANT SUBARRAYS</small><strong>${final ? view.answer : "…"}</strong><span>${final ? `|sum − ${view.goal}| ≥ ${view.k}` : (vi ? "query trước, insert sau để loại subarray rỗng" : "query before insertion to exclude empty subarrays")}</span></footer>
+  </section>`;
+}
+
 function renderRectangleOverlap836View(step) {
   const view = step.rectangleOverlap836View || {};
   const vi = lang === "vi";
+  const approach = view.approach === 2 ? 2 : 1;
   const rec1 = Array.isArray(view.rec1) ? view.rec1.map(Number) : [0, 0, 1, 1];
   const rec2 = Array.isArray(view.rec2) ? view.rec2.map(Number) : [0, 0, 1, 1];
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
-  const labels = vi
-    ? ["Hai rectangle", "Chiếu trục X", "Chiếu trục Y", "Kiểm tra độ dài", "Kết quả"]
-    : ["Two rectangles", "Project on X", "Project on Y", "Check lengths", "Result"];
+  const labels = approach === 2
+    ? vi
+      ? ["Tọa độ rec1", "Tọa độ rec2", "4 hướng tách", "Điều kiện OR", "Kết quả"]
+      : ["rec1 coordinates", "rec2 coordinates", "4 separations", "OR condition", "Result"]
+    : vi
+      ? ["Hai rectangle", "Chiếu trục X", "Chiếu trục Y", "Kiểm tra độ dài", "Kết quả"]
+      : ["Two rectangles", "Project on X", "Project on Y", "Check lengths", "Result"];
   const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
 
   const valuesX = [rec1[0], rec1[2], rec2[0], rec2[2]];
@@ -29433,6 +29623,20 @@ function renderRectangleOverlap836View(step) {
     return `<article class="ro836-axis-card ${state}"><header><strong>${axis}</strong><span>${overlap === true ? "OVERLAP ✓" : overlap === false ? "NO OVERLAP ✕" : (vi ? "đang tính" : "computing")}</span></header><div><b>${known ? start : "?"}</b><i>${symbol}</i><b>${known ? end : "?"}</b></div><footer><span>${axis === "X" ? (vi ? "độ rộng" : "width") : (vi ? "chiều cao" : "height")}</span><code>${length == null ? "?" : length}</code><small>${vi ? "phải > 0" : "must be > 0"}</small></footer></article>`;
   };
 
+  const separationDefinitions = [
+    { label: vi ? "A ở bên trái B" : "A is left of B", formula: `x2 ≤ x3`, left: rec1[2], right: rec2[0] },
+    { label: vi ? "A ở bên phải B" : "A is right of B", formula: `x1 ≥ x4`, left: rec1[0], right: rec2[2] },
+    { label: vi ? "A ở phía dưới B" : "A is below B", formula: `y2 ≤ y3`, left: rec1[3], right: rec2[1] },
+    { label: vi ? "A ở phía trên B" : "A is above B", formula: `y1 ≥ y4`, left: rec1[1], right: rec2[3] },
+  ];
+  const separationValues = Array.isArray(view.separations) ? view.separations : [null, null, null, null];
+  const separationCards = separationDefinitions.map((item, index) => {
+    const result = separationValues[index];
+    const state = result === true ? "separated" : result === false ? "clear" : "pending";
+    const active = index === view.activeSeparation ? " active" : "";
+    return `<article class="ro836-separation ${state}${active}"><header><strong>${escapeHtml(item.label)}</strong><span>${result == null ? "?" : result ? "TRUE · NOT OVERLAP" : "FALSE"}</span></header><code>${item.formula}</code><div><b>${item.left}</b><i>${item.formula.includes("≤") ? "≤" : "≥"}</i><b>${item.right}</b></div></article>`;
+  }).join("");
+
   const formulas = {
     inputs: `rec1=[${rec1.join(",")}], rec2=[${rec2.join(",")}]`,
     left: `left = max(${rec1[0]}, ${rec2[0]}) = ${view.left}`,
@@ -29442,19 +29646,40 @@ function renderRectangleOverlap836View(step) {
     "overlap-x": `${view.left} < ${view.right} → ${view.overlapX}`,
     "overlap-y": `${view.bottom} < ${view.top} → ${view.overlapY}`,
     return: `${view.overlapX} and ${view.overlapY} → ${view.answer}`,
+    "assign-x1": `x1 = rec1[0] = ${rec1[0]}`,
+    "assign-y1": `y1 = rec1[1] = ${rec1[1]}`,
+    "assign-x2": `x2 = rec1[2] = ${rec1[2]}`,
+    "assign-y2": `y2 = rec1[3] = ${rec1[3]}`,
+    "assign-x3": `x3 = rec2[0] = ${rec2[0]}`,
+    "assign-y3": `y3 = rec2[1] = ${rec2[1]}`,
+    "assign-x4": `x4 = rec2[2] = ${rec2[2]}`,
+    "assign-y4": `y4 = rec2[3] = ${rec2[3]}`,
+    "not-overlap-check": "x2 <= x3 or x1 >= x4 or y2 <= y3 or y1 >= y4",
+    "return-false": "return False",
+    "return-true": "return True",
   };
   const final = Boolean(view.final);
   const answerLabel = view.answer === true ? "TRUE" : view.answer === false ? "FALSE" : "…";
-  const summary = vi
-    ? `Bài 836: overlap trục X là ${view.overlapX ?? "chưa biết"}, overlap trục Y là ${view.overlapY ?? "chưa biết"}.`
-    : `Problem 836: X overlap is ${view.overlapX ?? "unknown"}, Y overlap is ${view.overlapY ?? "unknown"}.`;
+  const summary = approach === 2
+    ? vi
+      ? `Bài 836 cách 2: kiểm tra bốn hướng có thể làm hai rectangle không overlap.`
+      : "Problem 836 approach 2: check the four directions that can separate the rectangles."
+    : vi
+      ? `Bài 836: overlap trục X là ${view.overlapX ?? "chưa biết"}, overlap trục Y là ${view.overlapY ?? "chưa biết"}.`
+      : `Problem 836: X overlap is ${view.overlapX ?? "unknown"}, Y overlap is ${view.overlapY ?? "unknown"}.`;
+  const rule = approach === 2
+    ? `<section class="ro836-rule ro836-rule-separation"><span><b>1</b><code>x2 ≤ x3</code></span><i>OR</i><span><b>2</b><code>x1 ≥ x4</code></span><i>OR</i><span><b>3</b><code>y2 ≤ y3</code></span><i>OR</i><span><b>4</b><code>y1 ≥ y4</code></span></section>`
+    : `<section class="ro836-rule"><span><b>X</b><code>max(lefts) &lt; min(rights)</code></span><i>AND</i><span><b>Y</b><code>max(bottoms) &lt; min(tops)</code></span></section>`;
+  const checks = approach === 2
+    ? `<section class="ro836-separation-grid">${separationCards}</section>`
+    : `<section class="ro836-axis-checks">${axisCard("X", view.left, view.right, view.overlapX)}${axisCard("Y", view.bottom, view.top, view.overlapY)}</section>`;
 
   $("treeView").innerHTML = `<section class="ro836-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <header><div><small>GEOMETRY · AXIS PROJECTION · #836</small><strong>RECTANGLE OVERLAP</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <header><div><small>GEOMETRY · ${approach === 2 ? "SEPARATION TEST" : "AXIS PROJECTION"} · #836</small><strong>RECTANGLE OVERLAP · ${approach === 2 ? "APPROACH 2" : "APPROACH 1"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="ro836-phases">${phases}</div>
-    <section class="ro836-rule"><span><b>X</b><code>max(lefts) &lt; min(rights)</code></span><i>AND</i><span><b>Y</b><code>max(bottoms) &lt; min(tops)</code></span></section>
+    ${rule}
     <section class="ro836-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>A</i> rec1 · <em>B</em> rec2 · <b>${vi ? "giao" : "intersection"}</b></span></header>${plane}</section>
-    <section class="ro836-axis-checks">${axisCard("X", view.left, view.right, view.overlapX)}${axisCard("Y", view.bottom, view.top, view.overlapY)}</section>
+    ${checks}
     <section class="ro836-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
     <section class="ro836-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
     <footer class="ro836-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>POSITIVE-AREA OVERLAP?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "cả width và height đều dương" : "both width and height are positive") : (vi ? "ít nhất một chiều không dương" : "at least one dimension is non-positive")) : (vi ? "cần cả hai phép chiếu overlap" : "both axis projections must overlap")}</span></footer>
@@ -30533,6 +30758,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEquallySpaced4049View(step);
+  } else if (step.minDays4050View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinDays4050View(step);
+  } else if (step.distantSubarrays4051View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDistantSubarrays4051View(step);
   } else if (step.rectangleOverlap836View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -25989,3 +25989,352 @@ Object.assign(module.exports, {
     builder: buildSteps1223,
   },
 });
+
+function validateMinDays4050Input(input) {
+  if (!Array.isArray(input) || input.length !== 1 || !Number.isInteger(input[0])) {
+    throw new Error("n must be exactly one integer.");
+  }
+  const n = input[0];
+  if (n < 1 || n > 60) {
+    throw new Error("Use n from 1 to 60 so the line-by-line DP visualization stays readable.");
+  }
+  return n;
+}
+
+function buildSteps4050(input) {
+  const n = validateMinDays4050Input(input);
+  const streaks = [];
+  const steps = [];
+  let length = 1;
+  let dp = [];
+  let parent = [];
+
+  function snapshot({
+    operation,
+    phaseIndex,
+    codeLine,
+    title,
+    note,
+    activeScore = null,
+    activeOption = -1,
+    points = null,
+    cost = null,
+    predecessor = null,
+    candidate = null,
+    bestBefore = null,
+    updated = null,
+    schedule = [],
+    answer = null,
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "n", value: n },
+        { name: "score", value: activeScore ?? "—" },
+        { name: "length", value: activeOption >= 0 ? streaks[activeOption]?.length ?? length : length },
+        { name: "points", value: points ?? "—" },
+        { name: "candidate", value: candidate ?? "—" },
+        { name: "dp[score]", value: activeScore == null || !Number.isFinite(dp[activeScore]) ? "∞" : dp[activeScore] },
+      ],
+      minDays4050View: {
+        operation,
+        phaseIndex,
+        n,
+        length,
+        streaks: streaks.map((item) => ({ ...item })),
+        dp: dp.map((value) => Number.isFinite(value) ? value : null),
+        parent: [...parent],
+        activeScore,
+        activeOption,
+        points,
+        cost,
+        predecessor,
+        candidate,
+        bestBefore,
+        updated,
+        schedule: schedule.map((item) => ({ ...item })),
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "init-streaks",
+    phaseIndex: 0,
+    codeLine: 3,
+    title: { vi: "Tạo danh sách streak", en: "Create the streak list" },
+    note: {
+      vi: "Mỗi streak liên tiếp sẽ trở thành một lựa chọn có số điểm tam giác và chi phí ngày cố định.",
+      en: "Each consecutive streak becomes an option with a triangular point value and a fixed day cost.",
+    },
+  });
+  snapshot({
+    operation: "init-length",
+    phaseIndex: 0,
+    codeLine: 4,
+    title: { vi: "Bắt đầu từ streak dài 1", en: "Start with a length-1 streak" },
+    note: { vi: "Một ngày earn đầu tiên cho 1 điểm.", en: "The first earning day scores 1 point." },
+  });
+
+  while (length * (length + 1) / 2 <= n) {
+    const triangular = length * (length + 1) / 2;
+    snapshot({
+      operation: "while-check",
+      phaseIndex: 0,
+      codeLine: 5,
+      points: triangular,
+      title: { vi: `Streak ${length} vẫn không vượt n`, en: `Length ${length} still fits within n` },
+      note: { vi: `T_${length} = ${triangular} ≤ ${n}, nên đây là một lựa chọn hữu ích.`, en: `T_${length} = ${triangular} <= ${n}, so this option can be useful.` },
+    });
+    snapshot({
+      operation: "compute-points",
+      phaseIndex: 0,
+      codeLine: 6,
+      points: triangular,
+      title: { vi: `Tính T_${length} = ${triangular}`, en: `Compute T_${length} = ${triangular}` },
+      note: { vi: `1 + 2 + … + ${length} = ${length} × ${length + 1} / 2 = ${triangular}.`, en: `1 + 2 + ... + ${length} = ${length} × ${length + 1} / 2 = ${triangular}.` },
+    });
+    streaks.push({ length, points: triangular, cost: length + 1 });
+    snapshot({
+      operation: "append-option",
+      phaseIndex: 0,
+      codeLine: 7,
+      activeOption: streaks.length - 1,
+      points: triangular,
+      cost: length + 1,
+      title: { vi: `Thêm lựa chọn ${triangular} điểm`, en: `Add the ${triangular}-point option` },
+      note: {
+        vi: `Tạm tính ${length} ngày earn + 1 ngày skip = ${length + 1} ngày. Ngày skip cuối sẽ được trừ khỏi đáp án.`,
+        en: `Temporarily charge ${length} earning days + 1 skipped day = ${length + 1} days. The final trailing skip is removed from the answer.`,
+      },
+    });
+    length += 1;
+    snapshot({
+      operation: "increment-length",
+      phaseIndex: 0,
+      codeLine: 8,
+      title: { vi: `Tăng length lên ${length}`, en: `Increase length to ${length}` },
+      note: { vi: "Chuẩn bị tạo số tam giác kế tiếp.", en: "Prepare the next triangular number." },
+    });
+  }
+  snapshot({
+    operation: "while-stop",
+    phaseIndex: 1,
+    codeLine: 5,
+    points: length * (length + 1) / 2,
+    title: { vi: `Dừng tại streak ${length}`, en: `Stop at length ${length}` },
+    note: {
+      vi: `T_${length} = ${length * (length + 1) / 2} > ${n}; streak dài hơn cũng chắc chắn vượt n.`,
+      en: `T_${length} = ${length * (length + 1) / 2} > ${n}; every longer streak also exceeds n.`,
+    },
+  });
+
+  dp = Array(n + 1).fill(Infinity);
+  parent = Array(n + 1).fill(0);
+  snapshot({
+    operation: "init-dp",
+    phaseIndex: 1,
+    codeLine: 10,
+    title: { vi: "Khởi tạo bảng DP bằng ∞", en: "Initialize the DP table with infinity" },
+    note: {
+      vi: "dp[score] là số ngày đã tính cả một ngày skip giả sau streak cuối.",
+      en: "dp[score] is the day count including one imaginary skipped day after the final streak.",
+    },
+  });
+  dp[0] = 0;
+  snapshot({
+    operation: "base-case",
+    phaseIndex: 1,
+    codeLine: 11,
+    activeScore: 0,
+    title: { vi: "Base case: 0 điểm cần 0 ngày", en: "Base case: 0 points needs 0 days" },
+    note: { vi: "Đây là điểm bắt đầu cho mọi transition.", en: "This is the starting point for every transition." },
+  });
+
+  for (let score = 1; score <= n; score += 1) {
+    snapshot({
+      operation: "score-loop",
+      phaseIndex: 2,
+      codeLine: 12,
+      activeScore: score,
+      title: { vi: `Tính dp[${score}]`, en: `Compute dp[${score}]` },
+      note: { vi: `Thử mọi streak có điểm không vượt ${score}.`, en: `Try every streak whose points do not exceed ${score}.` },
+    });
+
+    for (let option = 0; option < streaks.length; option += 1) {
+      const { length: streakLength, points, cost } = streaks[option];
+      snapshot({
+        operation: "option-loop",
+        phaseIndex: 2,
+        codeLine: 13,
+        activeScore: score,
+        activeOption: option,
+        points,
+        cost,
+        title: { vi: `Thử streak dài ${streakLength}`, en: `Try a length-${streakLength} streak` },
+        note: { vi: `Lựa chọn này cộng ${points} điểm với chi phí ${cost} ngày đã charge.`, en: `This option adds ${points} points at a charged cost of ${cost} days.` },
+      });
+
+      const fits = points <= score;
+      snapshot({
+        operation: "fit-check",
+        phaseIndex: 2,
+        codeLine: 14,
+        activeScore: score,
+        activeOption: option,
+        points,
+        cost,
+        title: {
+          vi: fits ? `${points} ≤ ${score}: có thể dùng` : `${points} > ${score}: không thể dùng`,
+          en: fits ? `${points} <= ${score}: option fits` : `${points} > ${score}: option does not fit`,
+        },
+        note: fits
+          ? { vi: `Transition bắt đầu từ dp[${score - points}].`, en: `The transition starts from dp[${score - points}].` }
+          : { vi: "Các số tam giác sau còn lớn hơn, nên dừng vòng lặp trong.", en: "Later triangular numbers are even larger, so stop the inner loop." },
+      });
+      if (!fits) {
+        snapshot({
+          operation: "break",
+          phaseIndex: 2,
+          codeLine: 15,
+          activeScore: score,
+          activeOption: option,
+          points,
+          cost,
+          title: { vi: "Dừng thử streak", en: "Stop trying streaks" },
+          note: { vi: "Danh sách streak tăng dần theo points.", en: "The streak options are sorted by points." },
+        });
+        break;
+      }
+
+      const predecessor = score - points;
+      const candidate = dp[predecessor] + cost;
+      const bestBefore = dp[score];
+      const updated = candidate < bestBefore;
+      if (updated) {
+        dp[score] = candidate;
+        parent[score] = streakLength;
+      }
+      snapshot({
+        operation: "relax",
+        phaseIndex: updated ? 3 : 2,
+        codeLine: 16,
+        activeScore: score,
+        activeOption: option,
+        points,
+        cost,
+        predecessor,
+        candidate,
+        bestBefore: Number.isFinite(bestBefore) ? bestBefore : null,
+        updated,
+        title: {
+          vi: updated ? `Cập nhật dp[${score}] = ${candidate}` : `Giữ dp[${score}] = ${dp[score]}`,
+          en: updated ? `Update dp[${score}] = ${candidate}` : `Keep dp[${score}] = ${dp[score]}`,
+        },
+        note: {
+          vi: `dp[${predecessor}] + ${cost} = ${dp[predecessor]} + ${cost} = ${candidate}${updated ? " tốt hơn giá trị cũ." : " không tốt hơn giá trị hiện tại."}`,
+          en: `dp[${predecessor}] + ${cost} = ${dp[predecessor]} + ${cost} = ${candidate}${updated ? " improves the old value." : " does not improve the current value."}`,
+        },
+      });
+    }
+  }
+
+  const chosenLengths = [];
+  let remaining = n;
+  while (remaining > 0) {
+    const streakLength = parent[remaining];
+    chosenLengths.push(streakLength);
+    remaining -= streakLength * (streakLength + 1) / 2;
+  }
+  chosenLengths.reverse();
+  const schedule = [];
+  chosenLengths.forEach((streakLength, streakIndex) => {
+    for (let day = 1; day <= streakLength; day += 1) {
+      schedule.push({ type: "earn", points: day, streak: streakIndex + 1 });
+    }
+    if (streakIndex < chosenLengths.length - 1) {
+      schedule.push({ type: "skip", points: 0, streak: streakIndex + 1 });
+    }
+  });
+  const answer = dp[n] - 1;
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 17,
+    activeScore: n,
+    schedule,
+    answer,
+    title: { vi: `Trả về ${dp[n]} − 1 = ${answer}`, en: `Return ${dp[n]} - 1 = ${answer}` },
+    note: {
+      vi: "Trừ ngày skip giả sau streak cuối; các ngày skip nằm giữa những streak vẫn được giữ lại.",
+      en: "Remove the imaginary skip after the final streak; skipped days between streaks remain counted.",
+    },
+    final: true,
+  });
+
+  return { original: [n], answer, steps };
+}
+
+Object.assign(module.exports, {
+  4050: {
+    id: 4050,
+    difficulty: "medium",
+    slug: "minimum-days-to-score-exactly-n-points",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "unbounded-knapsack", vi: "Ba lô vô hạn", en: "Unbounded Knapsack" },
+      { key: "math", vi: "Toán", en: "Math" },
+    ],
+    title: { vi: "Minimum Days to Score Exactly N Points", en: "Minimum Days to Score Exactly N Points" },
+    titleVi: { vi: "Số ngày ít nhất để đạt chính xác N điểm", en: "Minimum days to score exactly N points" },
+    statement: {
+      vi: "Điểm bắt đầu từ 0. Trong một streak, các ngày earn lần lượt cho 1, 2, 3, … điểm; một ngày skip cho 0 điểm và reset streak. Trả về số ngày ít nhất để đạt chính xác n điểm.",
+      en: "The score starts at 0. Within a streak, earning days score 1, 2, 3, ... points; a skipped day scores 0 and resets the streak. Return the minimum days needed to score exactly n points.",
+    },
+    defaultInput: [9],
+    inputKind: "positive",
+    inputLabel: { vi: "n (1–60 cho visualization)", en: "n (1–60 for visualization)" },
+    singleInput: true,
+    maxInput: 60,
+    approach: [
+      { vi: "Streak dài L cho số điểm tam giác T_L = L(L+1)/2.", en: "A streak of length L scores the triangular number T_L = L(L+1)/2." },
+      { vi: "Tạm tính mỗi streak tốn L+1 ngày gồm L ngày earn và một ngày skip, rồi giải unbounded knapsack theo tổng điểm.", en: "Temporarily charge each streak L+1 days—L earning days plus one skip—then solve an unbounded knapsack over total score." },
+      { vi: "dp[s] là chi phí nhỏ nhất để tạo đúng s điểm; cuối cùng trừ 1 vì streak cuối không cần ngày skip theo sau.", en: "dp[s] is the minimum charged cost to make exactly s points; subtract 1 because the final streak needs no trailing skipped day." },
+    ],
+    complexity: {
+      time: "O(n · √n)",
+      space: "O(n)",
+      note: {
+        vi: "Chỉ có O(√n) số tam giác không vượt n; mỗi score thử toàn bộ các streak đó.",
+        en: "Only O(sqrt(n)) triangular numbers are at most n; each score tries those streak options.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def minDays(self, n: int) -> int:",
+      "        streaks = []",
+      "        length = 1",
+      "        while length * (length + 1) // 2 <= n:",
+      "            points = length * (length + 1) // 2",
+      "            streaks.append((points, length + 1))",
+      "            length += 1",
+      "",
+      "        dp = [float('inf')] * (n + 1)",
+      "        dp[0] = 0",
+      "        for score in range(1, n + 1):",
+      "            for points, cost in streaks:",
+      "                if points > score:",
+      "                    break",
+      "                dp[score] = min(dp[score], dp[score - points] + cost)",
+      "        return dp[n] - 1",
+    ],
+    liveArgs: (input) => [validateMinDays4050Input(input)],
+    builder: buildSteps4050,
+  },
+});

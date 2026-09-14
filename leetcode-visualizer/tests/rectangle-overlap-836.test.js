@@ -16,6 +16,10 @@ function build(rec1, rec2) {
   return problem.builder(rec1.join(','), { rec2: rec2.join(',') });
 }
 
+function buildApproach2(rec1, rec2) {
+  return problem.builder2(rec1.join(','), { rec2: rec2.join(','), approach: 2 });
+}
+
 test('836 is registered with the expected signature and metadata', () => {
   assert.equal(problem.id, 836);
   assert.equal(problem.slug, 'rectangle-overlap');
@@ -57,6 +61,7 @@ test('836 builder agrees with an independent intersection-area oracle', () => {
     const rec1 = [x1, y1, x2, y2];
     const rec2 = [a1, b1, a2, b2];
     assert.equal(build(rec1, rec2).answer, oracle(rec1, rec2), `${rec1} vs ${rec2}`);
+    assert.equal(buildApproach2(rec1, rec2).answer, oracle(rec1, rec2), `approach 2: ${rec1} vs ${rec2}`);
   }
 });
 
@@ -82,10 +87,27 @@ test('836 displayed Python and solution file produce the expected answers', () =
   ].join('\n');
   const displayed = spawnSync('python3', ['-c', `${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(displayed.status, 0, displayed.stderr);
+  const displayedApproach2 = spawnSync('python3', ['-c', `${problem.code2.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+  assert.equal(displayedApproach2.status, 0, displayedApproach2.stderr);
 
   const solutionPath = path.resolve(__dirname, '../../Leetcode-sln/array/Leetcode_836.py');
   const solution = spawnSync('python3', [solutionPath], { encoding: 'utf8' });
   assert.equal(solution.status, 0, solution.stderr);
+});
+
+test('836 approach 2 assigns coordinates line by line and short-circuits on separation', () => {
+  const overlap = buildApproach2([0, 0, 2, 2], [1, 1, 3, 3]);
+  assert.equal(overlap.answer, true);
+  assert.deepEqual(overlap.steps.map((step) => step.codeLines[0]), [5, 6, 7, 8, 10, 11, 12, 13, 16, 20]);
+  assert.ok(overlap.steps.every((step) => step.codeLines.length === 1));
+  assert.deepEqual(overlap.steps.at(-2).rectangleOverlap836View.separations, [false, false, false, false]);
+  assert.equal(overlap.steps.at(-1).rectangleOverlap836View.operation, 'return-true');
+
+  const touching = buildApproach2([0, 0, 1, 1], [1, 0, 2, 1]);
+  assert.equal(touching.answer, false);
+  assert.deepEqual(touching.steps.at(-2).rectangleOverlap836View.separations, [true, false, false, false]);
+  assert.equal(touching.steps.at(-1).rectangleOverlap836View.operation, 'return-false');
+  assert.equal(touching.steps.at(-1).codeLines[0], 17);
 });
 
 test('836 renderer covers all states in English and Vietnamese', () => {
@@ -105,6 +127,8 @@ test('836 renderer covers all states in English and Vietnamese', () => {
   const traces = [
     ...build([0, 0, 2, 2], [1, 1, 3, 3]).steps,
     ...build([0, 0, 1, 1], [1, 0, 2, 1]).steps,
+    ...buildApproach2([0, 0, 2, 2], [1, 1, 3, 3]).steps,
+    ...buildApproach2([0, 0, 1, 1], [1, 0, 2, 1]).steps,
   ];
   for (const language of ['en', 'vi']) {
     context.lang = language;

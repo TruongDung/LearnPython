@@ -15931,3 +15931,442 @@ Object.assign(module.exports, {
     builder: buildSteps4049,
   },
 });
+
+function parseDistantSubarrays4051Input(input, params = {}) {
+  if (!Array.isArray(input) || input.length < 1) {
+    throw new Error("nums must contain at least one integer.");
+  }
+  if (input.length > 16) {
+    throw new Error("Use at most 16 values so the line-by-line Fenwick visualization stays readable.");
+  }
+  if (!input.every((value) => Number.isInteger(value) && Math.abs(value) <= 1_000_000_000)) {
+    throw new Error("nums must contain integers from -1,000,000,000 to 1,000,000,000.");
+  }
+  const goal = Number(params.goal);
+  const k = Number(params.k);
+  if (!Number.isInteger(goal) || Math.abs(goal) > 1_000_000_000) {
+    throw new Error("goal must be an integer from -1,000,000,000 to 1,000,000,000.");
+  }
+  if (!Number.isInteger(k) || k < 0 || k > 1_000_000_000) {
+    throw new Error("k must be an integer from 0 to 1,000,000,000.");
+  }
+  return { nums: [...input], goal, k };
+}
+
+function buildSteps4051(input, params = {}) {
+  const { nums, goal, k } = parseDistantSubarrays4051Input(input, params);
+  const prefix = [];
+  const values = [];
+  const counts = [];
+  const tree = [];
+  const steps = [];
+  const accepted = [];
+  let answer = 0;
+  let seen = 0;
+
+  function snapshot({
+    operation,
+    phaseIndex,
+    codeLine,
+    title,
+    note,
+    prefixIndex = -1,
+    current = null,
+    low = null,
+    high = null,
+    leftCount = null,
+    rightCount = null,
+    coordinate = -1,
+    currentMatches = [],
+    answerBefore = answer,
+    totalSubarrays = null,
+    final = false,
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "current", value: current ?? "—" },
+        { name: "low", value: low ?? "—" },
+        { name: "high", value: high ?? "—" },
+        { name: "left_count", value: leftCount ?? "—" },
+        { name: "right_count", value: rightCount ?? "—" },
+        { name: "answer", value: answer },
+      ],
+      distantSubarrays4051View: {
+        operation,
+        phaseIndex,
+        nums: [...nums],
+        goal,
+        k,
+        prefix: [...prefix],
+        values: [...values],
+        counts: [...counts],
+        tree: [...tree],
+        prefixIndex,
+        current,
+        low,
+        high,
+        leftCount,
+        rightCount,
+        coordinate,
+        seen,
+        currentMatches: currentMatches.map((item) => ({ ...item })),
+        accepted: accepted.map((item) => ({ ...item })),
+        answerBefore,
+        answer,
+        totalSubarrays,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "k-check",
+    phaseIndex: 0,
+    codeLine: 21,
+    title: { vi: `Kiểm tra k = ${k}`, en: `Check k = ${k}` },
+    note: k === 0
+      ? { vi: "Khoảng cách tuyệt đối luôn ≥ 0, nên mọi subarray đều distant.", en: "Every absolute difference is at least 0, so every subarray is distant." }
+      : { vi: "Vì k > 0, hai miền prefix hợp lệ rời nhau và có thể đếm bằng Fenwick tree.", en: "Because k > 0, the two valid prefix ranges are disjoint and can be counted with a Fenwick tree." },
+  });
+
+  if (k === 0) {
+    const n = nums.length;
+    snapshot({
+      operation: "set-n",
+      phaseIndex: 4,
+      codeLine: 22,
+      title: { vi: `Đặt n = ${n}`, en: `Set n = ${n}` },
+      note: { vi: "Một mảng dài n có n(n+1)/2 subarray không rỗng.", en: "An array of length n has n(n+1)/2 non-empty subarrays." },
+    });
+    answer = n * (n + 1) / 2;
+    snapshot({
+      operation: "return-all",
+      phaseIndex: 4,
+      codeLine: 23,
+      title: { vi: `Trả về ${n} × ${n + 1} / 2 = ${answer}`, en: `Return ${n} × ${n + 1} / 2 = ${answer}` },
+      note: { vi: "Không cần tạo prefix sum hay Fenwick tree cho nhánh đặc biệt này.", en: "This special branch needs neither prefix sums nor a Fenwick tree." },
+      totalSubarrays: answer,
+      final: true,
+    });
+    return { original: [...nums], goal, k, answer, steps };
+  }
+
+  prefix.push(0);
+  snapshot({
+    operation: "init-prefix",
+    phaseIndex: 0,
+    codeLine: 25,
+    title: { vi: "Khởi tạo prefix[0] = 0", en: "Initialize prefix[0] = 0" },
+    note: { vi: "Prefix rỗng cho phép đếm subarray bắt đầu tại index 0.", en: "The empty prefix lets us count subarrays starting at index 0." },
+  });
+  for (let index = 0; index < nums.length; index += 1) {
+    snapshot({
+      operation: "prefix-loop",
+      phaseIndex: 0,
+      codeLine: 26,
+      prefixIndex: index + 1,
+      current: prefix.at(-1),
+      title: { vi: `Đọc nums[${index}] = ${nums[index]}`, en: `Read nums[${index}] = ${nums[index]}` },
+      note: { vi: "Cộng value hiện tại vào prefix gần nhất.", en: "Add the current value to the latest prefix." },
+    });
+    const next = prefix.at(-1) + nums[index];
+    prefix.push(next);
+    snapshot({
+      operation: "append-prefix",
+      phaseIndex: 0,
+      codeLine: 27,
+      prefixIndex: index + 1,
+      current: next,
+      title: { vi: `prefix[${index + 1}] = ${next}`, en: `prefix[${index + 1}] = ${next}` },
+      note: { vi: `${next - nums[index]} + (${nums[index]}) = ${next}.`, en: `${next - nums[index]} + (${nums[index]}) = ${next}.` },
+    });
+  }
+
+  values.push(...[...new Set(prefix)].sort((a, b) => a - b));
+  counts.push(...Array(values.length).fill(0));
+  tree.push(...Array(values.length + 1).fill(0));
+  snapshot({
+    operation: "compress",
+    phaseIndex: 1,
+    codeLine: 29,
+    title: { vi: "Nén tọa độ các prefix sum", en: "Coordinate-compress the prefix sums" },
+    note: { vi: `Sắp xếp các giá trị phân biệt: [${values.join(", ")}].`, en: `Sort the distinct values: [${values.join(", ")}].` },
+  });
+  snapshot({
+    operation: "init-bit",
+    phaseIndex: 1,
+    codeLine: 30,
+    title: { vi: "Tạo Fenwick tree rỗng", en: "Create an empty Fenwick tree" },
+    note: { vi: "Fenwick lưu tần suất của những prefix đã đi qua.", en: "The Fenwick tree stores frequencies of previously seen prefixes." },
+  });
+  snapshot({
+    operation: "init-counters",
+    phaseIndex: 1,
+    codeLine: 31,
+    title: { vi: "Khởi tạo answer và seen", en: "Initialize answer and seen" },
+    note: { vi: "Chưa có prefix nào được insert nên cả hai đều bằng 0.", en: "No prefix has been inserted yet, so both counters are 0." },
+  });
+
+  const lowerBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const upperBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const query = (size) => {
+    let total = 0;
+    for (let index = size; index > 0; index -= index & -index) total += tree[index];
+    return total;
+  };
+  const add = (index) => {
+    for (let cursor = index; cursor < tree.length; cursor += cursor & -cursor) tree[cursor] += 1;
+  };
+  const previousPrefixes = [];
+
+  for (let prefixIndex = 0; prefixIndex < prefix.length; prefixIndex += 1) {
+    const current = prefix[prefixIndex];
+    snapshot({
+      operation: "scan-prefix",
+      phaseIndex: 2,
+      codeLine: 32,
+      prefixIndex,
+      current,
+      title: { vi: `Xét current = prefix[${prefixIndex}] = ${current}`, en: `Inspect current = prefix[${prefixIndex}] = ${current}` },
+      note: { vi: `Chỉ ${seen} prefix đứng trước được phép tạo subarray kết thúc tại ${prefixIndex - 1}.`, en: `Only the ${seen} earlier prefixes may form subarrays ending at ${prefixIndex - 1}.` },
+    });
+    const low = current - goal - k;
+    snapshot({
+      operation: "low-threshold",
+      phaseIndex: 2,
+      codeLine: 33,
+      prefixIndex,
+      current,
+      low,
+      title: { vi: `Ngưỡng trái low = ${low}`, en: `Left threshold low = ${low}` },
+      note: { vi: `Prefix trước p ≤ ${low} làm sum − goal ≥ ${k}.`, en: `An earlier prefix p <= ${low} makes sum - goal >= ${k}.` },
+    });
+    const high = current - goal + k;
+    snapshot({
+      operation: "high-threshold",
+      phaseIndex: 2,
+      codeLine: 34,
+      prefixIndex,
+      current,
+      low,
+      high,
+      title: { vi: `Ngưỡng phải high = ${high}`, en: `Right threshold high = ${high}` },
+      note: { vi: `Prefix trước p ≥ ${high} làm sum − goal ≤ −${k}.`, en: `An earlier prefix p >= ${high} makes sum - goal <= -${k}.` },
+    });
+
+    const currentMatches = previousPrefixes.filter((item) => item.value <= low || item.value >= high).map((item) => {
+      const sum = current - item.value;
+      return {
+        start: item.index,
+        end: prefixIndex - 1,
+        sum,
+        difference: Math.abs(sum - goal),
+        side: item.value <= low ? "left" : "right",
+      };
+    });
+    const leftCount = query(upperBound(low));
+    snapshot({
+      operation: "query-left",
+      phaseIndex: 2,
+      codeLine: 35,
+      prefixIndex,
+      current,
+      low,
+      high,
+      leftCount,
+      currentMatches,
+      title: { vi: `Miền p ≤ ${low} có ${leftCount} prefix`, en: `The p <= ${low} range contains ${leftCount} prefixes` },
+      note: { vi: "bisect_right bao gồm cả prefix nằm đúng trên ngưỡng low.", en: "bisect_right includes prefixes exactly equal to the low threshold." },
+    });
+    const rightCount = seen - query(lowerBound(high));
+    snapshot({
+      operation: "query-right",
+      phaseIndex: 2,
+      codeLine: 36,
+      prefixIndex,
+      current,
+      low,
+      high,
+      leftCount,
+      rightCount,
+      currentMatches,
+      title: { vi: `Miền p ≥ ${high} có ${rightCount} prefix`, en: `The p >= ${high} range contains ${rightCount} prefixes` },
+      note: { vi: "Lấy seen trừ số prefix nhỏ hơn high để giữ cả giá trị bằng high.", en: "Subtract prefixes below high from seen to include values equal to high." },
+    });
+
+    const answerBefore = answer;
+    answer += leftCount + rightCount;
+    accepted.push(...currentMatches);
+    snapshot({
+      operation: "count",
+      phaseIndex: 3,
+      codeLine: 37,
+      prefixIndex,
+      current,
+      low,
+      high,
+      leftCount,
+      rightCount,
+      currentMatches,
+      answerBefore,
+      title: { vi: `Cộng ${leftCount} + ${rightCount} vào answer`, en: `Add ${leftCount} + ${rightCount} to the answer` },
+      note: { vi: `answer = ${answerBefore} + ${leftCount + rightCount} = ${answer}.`, en: `answer = ${answerBefore} + ${leftCount + rightCount} = ${answer}.` },
+    });
+
+    const coordinate = lowerBound(current);
+    counts[coordinate] += 1;
+    add(coordinate + 1);
+    snapshot({
+      operation: "insert",
+      phaseIndex: 3,
+      codeLine: 38,
+      prefixIndex,
+      current,
+      low,
+      high,
+      leftCount,
+      rightCount,
+      coordinate,
+      currentMatches,
+      title: { vi: `Insert prefix ${current} vào rank ${coordinate + 1}`, en: `Insert prefix ${current} at rank ${coordinate + 1}` },
+      note: { vi: "Query luôn diễn ra trước insert, nên subarray không bao giờ rỗng.", en: "Every query occurs before insertion, so an empty subarray is never counted." },
+    });
+    seen += 1;
+    previousPrefixes.push({ index: prefixIndex, value: current });
+    snapshot({
+      operation: "increment-seen",
+      phaseIndex: 3,
+      codeLine: 39,
+      prefixIndex,
+      current,
+      low,
+      high,
+      leftCount,
+      rightCount,
+      coordinate,
+      currentMatches,
+      title: { vi: `seen = ${seen}`, en: `seen = ${seen}` },
+      note: { vi: "Prefix hiện tại trở thành prefix trước cho vòng lặp kế tiếp.", en: "The current prefix becomes an earlier prefix for the next iteration." },
+    });
+  }
+
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 40,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: { vi: "Mỗi subarray distant được đếm đúng khi prefix phải của nó được xử lý.", en: "Each distant subarray is counted exactly when its right prefix is processed." },
+    final: true,
+  });
+  return { original: [...nums], goal, k, answer, steps };
+}
+
+Object.assign(module.exports, {
+  4051: {
+    id: 4051,
+    difficulty: "hard",
+    slug: "count-subarrays-with-distant-sums",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "prefix-sum", vi: "Tiền tố", en: "Prefix Sum" },
+      { key: "binary-indexed-tree", vi: "Fenwick Tree", en: "Fenwick Tree" },
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+    ],
+    title: { vi: "Count Subarrays with Distant Sums", en: "Count Subarrays with Distant Sums" },
+    titleVi: { vi: "Đếm subarray có tổng cách xa goal", en: "Count subarrays with distant sums" },
+    statement: {
+      vi: "Cho nums, goal và k. Subarray nums[i..j] là distant nếu |sum(nums[i..j]) − goal| ≥ k. Trả về số subarray distant.",
+      en: "Given nums, goal, and k, a subarray nums[i..j] is distant when |sum(nums[i..j]) - goal| >= k. Return the number of distant subarrays.",
+    },
+    defaultInput: [1, 2, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (tối đa 16 phần tử cho visualization)", en: "nums (up to 16 values for visualization)" },
+    extraParams: [
+      { key: "goal", type: "number", allowNegative: true, label: { vi: "goal", en: "goal" }, default: 4, min: -1_000_000_000, max: 1_000_000_000 },
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 1, min: 0, max: 1_000_000_000 },
+    ],
+    approach: [
+      { vi: "Với prefix hiện tại s và prefix trước p, sum của subarray là s−p.", en: "For current prefix s and earlier prefix p, the subarray sum is s-p." },
+      { vi: "Điều kiện distant tách thành hai miền rời nhau: p ≤ s−goal−k hoặc p ≥ s−goal+k.", en: "The distant condition splits into two disjoint ranges: p <= s-goal-k or p >= s-goal+k." },
+      { vi: "Nén tọa độ mọi prefix sum; Fenwick tree đếm số prefix đã thấy trong hai miền trước khi insert s.", en: "Coordinate-compress all prefix sums; a Fenwick tree counts seen prefixes in both ranges before inserting s." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi prefix thực hiện hai binary search, hai Fenwick query và một Fenwick update.",
+        en: "Each prefix performs two binary searches, two Fenwick queries, and one Fenwick update.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "from bisect import bisect_left, bisect_right",
+      "",
+      "class Fenwick:",
+      "    def __init__(self, size: int):",
+      "        self.tree = [0] * (size + 1)",
+      "",
+      "    def add(self, index: int, delta: int) -> None:",
+      "        while index < len(self.tree):",
+      "            self.tree[index] += delta",
+      "            index += index & -index",
+      "",
+      "    def query(self, index: int) -> int:",
+      "        total = 0",
+      "        while index > 0:",
+      "            total += self.tree[index]",
+      "            index -= index & -index",
+      "        return total",
+      "",
+      "class Solution:",
+      "    def distantSubarrays(self, nums: list[int], goal: int, k: int) -> int:",
+      "        if k == 0:",
+      "            n = len(nums)",
+      "            return n * (n + 1) // 2",
+      "",
+      "        prefix = [0]",
+      "        for value in nums:",
+      "            prefix.append(prefix[-1] + value)",
+      "",
+      "        values = sorted(set(prefix))",
+      "        bit = Fenwick(len(values))",
+      "        answer = seen = 0",
+      "        for current in prefix:",
+      "            low = current - goal - k",
+      "            high = current - goal + k",
+      "            left_count = bit.query(bisect_right(values, low))",
+      "            right_count = seen - bit.query(bisect_left(values, high))",
+      "            answer += left_count + right_count",
+      "            bit.add(bisect_left(values, current) + 1, 1)",
+      "            seen += 1",
+      "        return answer",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = parseDistantSubarrays4051Input(input, params);
+      return [parsed.nums, parsed.goal, parsed.k];
+    },
+    builder: buildSteps4051,
+  },
+});
