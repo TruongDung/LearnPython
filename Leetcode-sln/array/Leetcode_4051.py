@@ -1,4 +1,5 @@
 from bisect import bisect_left, bisect_right
+from typing import List
 
 
 class Fenwick:
@@ -19,7 +20,7 @@ class Fenwick:
 
 
 class Solution:
-    def distantSubarrays(self, nums: list[int], goal: int, k: int) -> int:
+    def distantSubarrays(self, nums: List[int], goal: int, k: int) -> int:
         if k == 0:
             n = len(nums)
             return n * (n + 1) // 2
