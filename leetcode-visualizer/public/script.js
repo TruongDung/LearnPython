@@ -23006,6 +23006,146 @@ function renderNumberOfLISView(step) {
   </section>`;
 }
 
+function renderLIS2407View(step) {
+  const view = step.lis2407View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const owners = Array.isArray(view.owners) ? view.owners : [];
+  const coverage = Array.isArray(view.coverage) ? view.coverage : [];
+  const queryNodes = new Set(Array.isArray(view.queryNodes) ? view.queryNodes : []);
+  const visitedNodes = new Set(Array.isArray(view.visitedNodes) ? view.visitedNodes : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const chain = new Set(Array.isArray(view.chain) ? view.chain : []);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const currentValue = view.currentValue;
+  const phaseLabels = vi
+    ? ["1 · Nén giá trị", "2 · Chọn cửa sổ", "3 · Query max", "4 · Point update", "5 · Kết quả"]
+    : ["1 · Compress values", "2 · Choose window", "3 · Query maximum", "4 · Point update", "5 · Result"];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓ " : ""}${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const sequenceHtml = nums.map((value, index) => {
+    const classes = ["lis2407-number"];
+    if (index < currentIndex || dp[index] !== null && dp[index] !== undefined) classes.push("is-processed");
+    if (index === currentIndex) classes.push("is-current");
+    if (index === view.predecessorIndex) classes.push("is-predecessor");
+    if (chain.has(index)) classes.push("is-chain");
+    const dpValue = dp[index] === null || dp[index] === undefined ? "·" : dp[index];
+    return `<article class="${classes.join(" ")}">
+      <small>i=${index}</small>
+      <strong>${escapeHtml(String(value))}</strong>
+      <em>dp=${escapeHtml(String(dpValue))}</em>
+    </article>`;
+  }).join("");
+
+  const hasWindow = Number.isInteger(view.leftCoord) && Number.isInteger(view.rightCoord) && view.leftCoord <= view.rightCoord;
+  const leavesHtml = values.map((value, coord) => {
+    const node = Number(view.size || 1) + coord;
+    const leafBest = tree[node - 1] ?? 0;
+    const leafOwner = owners[node - 1] ?? -1;
+    const classes = ["lis2407-leaf"];
+    if (hasWindow && coord >= view.leftCoord && coord <= view.rightCoord) classes.push("is-eligible");
+    if (value === currentValue) classes.push("is-target");
+    if (leafOwner === view.predecessorIndex && view.predecessorIndex >= 0) classes.push("is-predecessor");
+    return `<article class="${classes.join(" ")}">
+      <small>${vi ? "giá trị" : "value"}</small>
+      <strong>${escapeHtml(String(value))}</strong>
+      <em>${vi ? "tốt nhất" : "best"} ${escapeHtml(String(leafBest))}</em>
+    </article>`;
+  }).join("");
+
+  const levels = [];
+  const size = Math.max(1, Number(view.size) || 1);
+  for (let start = 1, level = 0; start < size * 2; start *= 2, level += 1) {
+    const end = Math.min(start * 2 - 1, size * 2 - 1);
+    const nodes = [];
+    for (let node = start; node <= end; node += 1) nodes.push(node);
+    levels.push({ level, nodes });
+  }
+  const treeHtml = levels.map(({ level, nodes }) => {
+    const nodesHtml = nodes.map((node) => {
+      const range = coverage[node - 1];
+      if (!Array.isArray(range)) return `<span class="lis2407-node is-empty" aria-hidden="true"></span>`;
+      const rangeText = values[range[0]] === values[range[1]]
+        ? String(values[range[0]])
+        : `${values[range[0]]}..${values[range[1]]}`;
+      const best = tree[node - 1] ?? 0;
+      const owner = owners[node - 1] ?? -1;
+      const classes = ["lis2407-node"];
+      if (visitedNodes.has(node)) classes.push("is-visited");
+      if (queryNodes.has(node)) classes.push("is-query");
+      if (updatePath.has(node)) classes.push("is-update");
+      return `<article class="${classes.join(" ")}" aria-label="${escapeHtml(`tree ${node}, values ${rangeText}, maximum ${best}`)}">
+        <small>[${escapeHtml(rangeText)}]</small>
+        <strong>${escapeHtml(String(best))}</strong>
+        <em>${owner >= 0 ? `i=${owner}` : "—"}</em>
+      </article>`;
+    }).join("");
+    return `<div class="lis2407-level" style="--lis2407-cols:${nodes.length}"><b>L${level}</b><div>${nodesHtml}</div></div>`;
+  }).join("");
+
+  const operation = String(view.operation || "init");
+  let action = "";
+  if (operation === "init") {
+    action = vi ? "Mỗi lá bắt đầu ở 0; mỗi node cha lưu max của hai con." : "Every leaf starts at 0; each parent stores the maximum of its children.";
+  } else if (operation === "scan") {
+    action = `${vi ? "x" : "x"} = ${currentValue} → ${vi ? "tìm predecessor trong" : "find a predecessor in"} [${Number(currentValue) - Number(view.k)}, ${Number(currentValue) - 1}]`;
+  } else if (operation === "bounds") {
+    action = hasWindow
+      ? `${vi ? "Giá trị hợp lệ" : "Eligible values"}: [${view.leftValue}, ${view.rightValue}] → ${vi ? "tọa độ" : "coordinates"} [${view.leftCoord}, ${view.rightCoord}]`
+      : (vi ? "Cửa sổ không chứa giá trị đã nén nào → previous = 0" : "The window contains no compressed value → previous = 0");
+  } else if (operation === "query") {
+    action = `${vi ? "Max trên các node xanh" : "Maximum across green nodes"} = <b>${view.queryLength ?? 0}</b>`;
+  } else if (operation === "dp") {
+    action = `dp[${currentIndex}] = 1 + ${view.queryLength ?? 0} = <b>${dp[currentIndex] ?? 1}</b>`;
+  } else if (operation === "update") {
+    action = view.updateImproved
+      ? `${vi ? "Đẩy" : "Propagate"} dp[${currentIndex}]=${dp[currentIndex]} ${vi ? "từ lá lên root" : "from the leaf to the root"}`
+      : (vi ? "Giữ max cũ tại lá và các node cha" : "Keep the existing maximum at the leaf and its ancestors");
+  } else if (operation === "best") {
+    action = `${vi ? "Kết quả tốt nhất sau prefix này" : "Best result after this prefix"} = <b>${view.answer ?? 0}</b>`;
+  } else {
+    const chainValues = Array.from(chain).map((index) => nums[index]);
+    action = `${vi ? "Một dãy tối ưu" : "One optimal subsequence"}: <b>[${chainValues.join(", ")}]</b> → ${vi ? "độ dài" : "length"} ${view.answer ?? 0}`;
+  }
+
+  const windowText = currentValue === null || currentValue === undefined
+    ? "—"
+    : `[${Number(currentValue) - Number(view.k)}, ${Number(currentValue) - 1}]`;
+  const selectedText = queryNodes.size ? Array.from(queryNodes).map((node) => `tree[${node}]`).join(" + ") : "—";
+
+  $("treeView").innerHTML = `<section class="lis2407-viz" role="img" aria-label="${vi ? "Trực quan hóa Longest Increasing Subsequence II" : "Longest Increasing Subsequence II visualization"}">
+    <header><strong>LIS II · SEGMENT TREE</strong><span>k = ${escapeHtml(String(view.k ?? "—"))}</span></header>
+    <div class="lis2407-phases">${phasesHtml}</div>
+    <section class="lis2407-action">${action}</section>
+    <div class="lis2407-stats">
+      <span><small>x</small><strong>${escapeHtml(currentValue === null || currentValue === undefined ? "—" : String(currentValue))}</strong></span>
+      <span><small>${vi ? "cửa sổ" : "window"}</small><strong>${escapeHtml(windowText)}</strong></span>
+      <span><small>${vi ? "range max" : "range max"}</small><strong>${escapeHtml(view.queryLength === null || view.queryLength === undefined ? "—" : String(view.queryLength))}</strong></span>
+      <span><small>${vi ? "đáp án" : "answer"}</small><strong>${escapeHtml(String(view.answer ?? Math.max(0, ...dp.filter(Number.isFinite))))}</strong></span>
+    </div>
+    <section class="lis2407-panel">
+      <header><strong>nums → dp</strong><span>${vi ? "vàng = x · tím = predecessor · xanh = dãy cuối" : "yellow = x · purple = predecessor · green = final chain"}</span></header>
+      <div class="lis2407-sequence">${sequenceHtml}</div>
+    </section>
+    <section class="lis2407-panel">
+      <header><strong>${vi ? "TRỤC GIÁ TRỊ ĐÃ NÉN" : "COMPRESSED VALUE AXIS"}</strong><span>[x−k, x−1] · ${vi ? "không phải khoảng index" : "not an index range"}</span></header>
+      <div class="lis2407-leaves">${leavesHtml}</div>
+    </section>
+    <section class="lis2407-panel lis2407-tree-panel">
+      <header><strong>RANGE-MAX TREE</strong><span>${escapeHtml(selectedText)}</span></header>
+      <div class="lis2407-tree">${treeHtml}</div>
+    </section>
+  </section>`;
+}
+
 function renderHouseRobberView(step) {
   const view = step.houseRobberView || {};
   const vi = lang === "vi";
@@ -29857,6 +29997,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNumberOfLISView(step);
+  } else if (step.lis2407View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLIS2407View(step);
   } else if (step.houseRobberView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

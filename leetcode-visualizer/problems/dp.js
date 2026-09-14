@@ -26338,3 +26338,431 @@ Object.assign(module.exports, {
     builder: buildSteps4050,
   },
 });
+
+function validateLIS2407Input(input, params = {}) {
+  if (!Array.isArray(input) || input.length === 0 || !input.every((value) => Number.isInteger(value) && value > 0)) {
+    throw new Error("nums must contain positive integers.");
+  }
+  if (input.length > 16) {
+    throw new Error("Use at most 16 numbers so the segment tree stays readable.");
+  }
+  const k = Number(params.k);
+  if (!Number.isInteger(k) || k < 1 || k > 100000) {
+    throw new Error("k must be an integer from 1 to 100000.");
+  }
+  return { nums: [...input], k };
+}
+
+/**
+ * LeetCode 2407: Longest Increasing Subsequence II.
+ *
+ * Coordinate-compressed segment tree:
+ *   tree node = best subsequence length ending at a value in its range.
+ *   dp[i] = 1 + max(tree values in [nums[i] - k, nums[i] - 1]).
+ */
+function buildSteps2407(input, params = {}) {
+  const { nums, k } = validateLIS2407Input(input, params);
+  const values = [...new Set(nums)].sort((a, b) => a - b);
+  const valueToCoord = new Map(values.map((value, index) => [value, index]));
+  let size = 1;
+  while (size < values.length) size *= 2;
+
+  const tree = new Array(2 * size).fill(0);
+  const owners = new Array(2 * size).fill(-1);
+  const coverage = new Array(2 * size).fill(null);
+  const dp = new Array(nums.length).fill(null);
+  const parent = new Array(nums.length).fill(-1);
+  const steps = [];
+
+  for (let coord = 0; coord < size; coord += 1) {
+    coverage[size + coord] = coord < values.length ? [coord, coord] : null;
+  }
+  for (let node = size - 1; node >= 1; node -= 1) {
+    const left = coverage[node * 2];
+    const right = coverage[node * 2 + 1];
+    if (left && right) coverage[node] = [left[0], right[1]];
+    else coverage[node] = left ? [...left] : right ? [...right] : null;
+  }
+
+  const lowerBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const middle = Math.floor((left + right) / 2);
+      if (values[middle] < target) left = middle + 1;
+      else right = middle;
+    }
+    return left;
+  };
+
+  const betterNode = (first, second) => {
+    if (tree[first] !== tree[second]) return tree[first] > tree[second] ? first : second;
+    if (owners[first] === -1) return second;
+    if (owners[second] === -1) return first;
+    return owners[first] <= owners[second] ? first : second;
+  };
+
+  const rangeQuery = (leftCoord, rightCoord) => {
+    if (leftCoord > rightCoord) {
+      return { length: 0, owner: -1, selected: [], visited: [] };
+    }
+    let left = leftCoord + size;
+    let right = rightCoord + size;
+    let bestNode = -1;
+    const selected = [];
+    const visited = [];
+    while (left <= right) {
+      visited.push(left);
+      if (right !== left) visited.push(right);
+      if (left % 2 === 1) {
+        selected.push(left);
+        bestNode = bestNode === -1 ? left : betterNode(bestNode, left);
+        left += 1;
+      }
+      if (right % 2 === 0) {
+        selected.push(right);
+        bestNode = bestNode === -1 ? right : betterNode(bestNode, right);
+        right -= 1;
+      }
+      left = Math.floor(left / 2);
+      right = Math.floor(right / 2);
+    }
+    return {
+      length: bestNode === -1 ? 0 : tree[bestNode],
+      owner: bestNode === -1 ? -1 : owners[bestNode],
+      selected,
+      visited: [...new Set(visited)],
+    };
+  };
+
+  const update = (coord, length, owner) => {
+    let node = size + coord;
+    const path = [node];
+    const improved = length > tree[node];
+    if (improved) {
+      tree[node] = length;
+      owners[node] = owner;
+    }
+    while (node > 1) {
+      node = Math.floor(node / 2);
+      const winner = betterNode(node * 2, node * 2 + 1);
+      tree[node] = tree[winner];
+      owners[node] = owners[winner];
+      path.push(node);
+    }
+    return { path, improved };
+  };
+
+  const makeView = ({
+    operation,
+    phaseIndex,
+    currentIndex = -1,
+    leftValue = null,
+    rightValue = null,
+    leftCoord = null,
+    rightCoord = null,
+    query = null,
+    updatePath = [],
+    updateImproved = null,
+    answer = null,
+    chain = [],
+  }) => ({
+    operation,
+    phaseIndex,
+    nums: [...nums],
+    k,
+    values: [...values],
+    size,
+    tree: tree.slice(1),
+    owners: owners.slice(1),
+    coverage: coverage.slice(1).map((range) => range ? [...range] : null),
+    dp: [...dp],
+    parent: [...parent],
+    currentIndex,
+    currentValue: currentIndex >= 0 ? nums[currentIndex] : null,
+    leftValue,
+    rightValue,
+    leftCoord,
+    rightCoord,
+    queryLength: query ? query.length : null,
+    predecessorIndex: query ? query.owner : -1,
+    queryNodes: query ? [...query.selected] : [],
+    visitedNodes: query ? [...query.visited] : [],
+    updatePath: [...updatePath],
+    updateImproved,
+    answer,
+    chain: [...chain],
+  });
+
+  const snapshot = ({ title, note, codeLine, vars = [], final = false, ...view }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "k", value: k },
+        { name: "answer", value: view.answer ?? Math.max(0, ...dp.filter(Number.isFinite)) },
+        ...vars,
+      ],
+      lis2407View: makeView(view),
+    });
+  };
+
+  snapshot({
+    operation: "init",
+    phaseIndex: 0,
+    codeLine: 9,
+    title: { vi: `Nén ${values.length} giá trị và tạo cây rỗng`, en: `Compress ${values.length} values and create an empty tree` },
+    note: {
+      vi: "Mỗi lá đại diện cho một giá trị xuất hiện trong nums; node lưu độ dài subsequence tốt nhất trong khoảng giá trị đó.",
+      en: "Each leaf represents one value found in nums; every node stores the best subsequence length in that value range.",
+    },
+    vars: [{ name: "values", value: `[${values.join(", ")}]` }, { name: "size", value: size }],
+  });
+
+  let answer = 0;
+  let answerOwner = -1;
+  for (let index = 0; index < nums.length; index += 1) {
+    const value = nums[index];
+    snapshot({
+      operation: "scan",
+      phaseIndex: 1,
+      currentIndex: index,
+      codeLine: 30,
+      title: { vi: `Đọc nums[${index}] = ${value}`, en: `Read nums[${index}] = ${value}` },
+      note: {
+        vi: `Ta cần subsequence tốt nhất kết thúc bằng giá trị trong [${value - k}, ${value - 1}].`,
+        en: `We need the best subsequence ending at a value in [${value - k}, ${value - 1}].`,
+      },
+      vars: [{ name: "i", value: index }, { name: "x", value }],
+    });
+
+    const leftValue = value - k;
+    const rightValue = value - 1;
+    const leftCoord = lowerBound(leftValue);
+    const rightCoord = lowerBound(value) - 1;
+    snapshot({
+      operation: "bounds",
+      phaseIndex: 1,
+      currentIndex: index,
+      leftValue,
+      rightValue,
+      leftCoord,
+      rightCoord,
+      codeLine: 32,
+      title: {
+        vi: leftCoord <= rightCoord ? `Khoảng hợp lệ: [${leftValue}, ${rightValue}]` : "Không có giá trị nhỏ hơn hợp lệ",
+        en: leftCoord <= rightCoord ? `Eligible range: [${leftValue}, ${rightValue}]` : "No eligible smaller value",
+      },
+      note: {
+        vi: leftCoord <= rightCoord
+          ? `Sau nén tọa độ, truy vấn các lá ${leftCoord}..${rightCoord}.`
+          : "Không có giá trị đã nén nào nằm trong khoảng, nên subsequence mới bắt đầu với độ dài 1.",
+        en: leftCoord <= rightCoord
+          ? `After coordinate compression, query leaves ${leftCoord}..${rightCoord}.`
+          : "No compressed value lies in the range, so a new length-1 subsequence starts here.",
+      },
+      vars: [{ name: "left", value: leftCoord }, { name: "right", value: rightCoord }],
+    });
+
+    const query = rangeQuery(leftCoord, rightCoord);
+    snapshot({
+      operation: "query",
+      phaseIndex: 2,
+      currentIndex: index,
+      leftValue,
+      rightValue,
+      leftCoord,
+      rightCoord,
+      query,
+      codeLine: 33,
+      title: { vi: `Range max = ${query.length}`, en: `Range maximum = ${query.length}` },
+      note: query.owner >= 0
+        ? {
+            vi: `Node được chọn cho biết subsequence tốt nhất dài ${query.length}, kết thúc tại nums[${query.owner}] = ${nums[query.owner]}.`,
+            en: `The selected nodes reveal a best length of ${query.length}, ending at nums[${query.owner}] = ${nums[query.owner]}.`,
+          }
+        : {
+            vi: "Khoảng chưa có subsequence nào; range max bằng 0.",
+            en: "The range has no prior subsequence, so its maximum is 0.",
+          },
+      vars: [{ name: "previous", value: query.length }, { name: "predecessor", value: query.owner }],
+    });
+
+    dp[index] = query.length + 1;
+    parent[index] = query.owner;
+    snapshot({
+      operation: "dp",
+      phaseIndex: 2,
+      currentIndex: index,
+      leftValue,
+      rightValue,
+      leftCoord,
+      rightCoord,
+      query,
+      codeLine: 33,
+      title: { vi: `dp[${index}] = ${query.length} + 1 = ${dp[index]}`, en: `dp[${index}] = ${query.length} + 1 = ${dp[index]}` },
+      note: {
+        vi: `Nối ${value} sau subsequence tốt nhất trong cửa sổ giá trị, hoặc bắt đầu mới nếu previous = 0.`,
+        en: `Append ${value} to the best subsequence in the value window, or start fresh when previous = 0.`,
+      },
+      vars: [{ name: `dp[${index}]`, value: dp[index] }, { name: `parent[${index}]`, value: parent[index] }],
+    });
+
+    const coord = valueToCoord.get(value);
+    const updateResult = update(coord, dp[index], index);
+    snapshot({
+      operation: "update",
+      phaseIndex: 3,
+      currentIndex: index,
+      leftValue,
+      rightValue,
+      leftCoord,
+      rightCoord,
+      query,
+      updatePath: updateResult.path,
+      updateImproved: updateResult.improved,
+      codeLine: 34,
+      title: {
+        vi: updateResult.improved ? `Cập nhật lá value ${value} lên ${dp[index]}` : `Lá value ${value} đã có kết quả tốt hơn`,
+        en: updateResult.improved ? `Update value ${value}'s leaf to ${dp[index]}` : `Value ${value}'s leaf already has a better result`,
+      },
+      note: {
+        vi: updateResult.improved
+          ? "Đẩy giá trị max từ lá lên root để các truy vấn sau thấy subsequence mới."
+          : "Không hạ giá trị tại lá; mỗi node luôn giữ kết quả tốt nhất từng thấy.",
+        en: updateResult.improved
+          ? "Propagate the new maximum from the leaf to the root for later queries."
+          : "Do not lower the leaf; every node keeps the best result seen so far.",
+      },
+      vars: [{ name: "coordinate", value: coord }, { name: "updated", value: updateResult.improved }],
+    });
+
+    if (dp[index] > answer) {
+      answer = dp[index];
+      answerOwner = index;
+    }
+    snapshot({
+      operation: "best",
+      phaseIndex: 3,
+      currentIndex: index,
+      leftValue,
+      rightValue,
+      leftCoord,
+      rightCoord,
+      query,
+      answer,
+      codeLine: 35,
+      title: { vi: `Đáp án tốt nhất hiện tại = ${answer}`, en: `Best answer so far = ${answer}` },
+      note: {
+        vi: `Sau nums[${index}], LIS hợp lệ dài nhất đã thấy có độ dài ${answer}.`,
+        en: `After nums[${index}], the longest valid LIS seen so far has length ${answer}.`,
+      },
+      vars: [{ name: "answer", value: answer }],
+    });
+  }
+
+  const chain = [];
+  for (let cursor = answerOwner; cursor >= 0; cursor = parent[cursor]) chain.push(cursor);
+  chain.reverse();
+  snapshot({
+    operation: "done",
+    phaseIndex: 4,
+    currentIndex: -1,
+    answer,
+    chain,
+    codeLine: 36,
+    title: { vi: `LIS II dài nhất = ${answer}`, en: `Longest LIS II length = ${answer}` },
+    note: {
+      vi: `Một subsequence tối ưu là [${chain.map((index) => nums[index]).join(", ")}]. Mỗi bước tăng từ 1 đến k=${k}.`,
+      en: `One optimal subsequence is [${chain.map((index) => nums[index]).join(", ")}]. Every increase is between 1 and k=${k}.`,
+    },
+    vars: [{ name: "chain indices", value: `[${chain.join(", ")}]` }],
+    final: true,
+  });
+
+  return { original: [...nums], k, answer, steps };
+}
+
+Object.assign(module.exports, {
+  2407: {
+    id: 2407,
+    difficulty: "hard",
+    slug: "longest-increasing-subsequence-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+    ],
+    title: { vi: "Longest Increasing Subsequence II", en: "Longest Increasing Subsequence II" },
+    titleVi: { vi: "Dãy con tăng dài nhất II", en: "Longest increasing subsequence II" },
+    statement: {
+      vi: "Cho nums và k. Tìm độ dài dãy con tăng nghiêm ngặt dài nhất sao cho hiệu giữa hai phần tử liên tiếp không vượt quá k.",
+      en: "Given nums and k, find the longest strictly increasing subsequence whose difference between adjacent elements is at most k.",
+    },
+    defaultInput: [4, 2, 1, 4, 3, 4, 5, 8, 15],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (tối đa 16 số để trực quan hóa)", en: "nums (up to 16 values for visualization)" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k (độ tăng tối đa)", en: "k (maximum increase)" }, default: 3, min: 1, max: 100000 },
+    ],
+    approach: [
+      { vi: "Nén các giá trị phân biệt của nums thành các lá liên tiếp trong segment tree.", en: "Coordinate-compress the distinct nums values into consecutive segment-tree leaves." },
+      { vi: "Với x, query max trên khoảng giá trị [x-k, x-1]; đó là subsequence tốt nhất có thể nối thêm x.", en: "For x, query the maximum over values [x-k, x-1]; that is the best subsequence that x can extend." },
+      { vi: "Đặt current = previous + 1, rồi cập nhật lá của x bằng max hiện tại.", en: "Set current = previous + 1, then maximize the leaf for x." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi phần tử thực hiện một range-maximum query và một point update trên cây nén.",
+        en: "Each value performs one range-maximum query and one point update on the compressed tree.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def lengthOfLIS(self, nums, k):",
+      "        values = sorted(set(nums))",
+      "        size = 1",
+      "        while size < len(values):",
+      "            size *= 2",
+      "        tree = [0] * (2 * size)",
+      "",
+      "        def query(left, right):",
+      "            left, right = left + size, right + size",
+      "            best = 0",
+      "            while left <= right:",
+      "                if left % 2 == 1:",
+      "                    best = max(best, tree[left]); left += 1",
+      "                if right % 2 == 0:",
+      "                    best = max(best, tree[right]); right -= 1",
+      "                left //= 2; right //= 2",
+      "            return best",
+      "",
+      "        def update(position, value):",
+      "            position += size",
+      "            tree[position] = max(tree[position], value)",
+      "            while position > 1:",
+      "                position //= 2",
+      "                tree[position] = max(tree[2 * position], tree[2 * position + 1])",
+      "",
+      "        answer = 0",
+      "        for x in nums:",
+      "            left = bisect_left(values, x - k)",
+      "            right = bisect_left(values, x) - 1",
+      "            current = 1 + (query(left, right) if left <= right else 0)",
+      "            update(bisect_left(values, x), current)",
+      "            answer = max(answer, current)",
+      "        return answer",
+    ],
+    liveArgs: (input, params) => {
+      const parsed = validateLIS2407Input(input, params);
+      return [parsed.nums, parsed.k];
+    },
+    builder: buildSteps2407,
+  },
+});
