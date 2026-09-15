@@ -9,6 +9,7 @@ const {
   buildSteps3341,
   buildSteps3342,
   buildSteps1377,
+  parseWordLadder126,
   buildSteps126,
   buildSteps815,
 } = require("../builders_graph");
@@ -20014,6 +20015,10 @@ module.exports = {
     difficulty: "hard",
     slug: "word-ladder-ii",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [
+      { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    ],
     title: { vi: "Word Ladder II", en: "Word Ladder II" },
     titleVi: { vi: "Chuỗi biến đổi từ II", en: "All shortest word transformation paths" },
     statement: {
@@ -20041,6 +20046,20 @@ module.exports = {
         type: "string",
         label: { vi: "endWord", en: "endWord" },
         default: "cog",
+      },
+    ],
+    approach: [
+      {
+        vi: "BFS theo từng layer để chỉ giữ các cạnh thuộc khoảng cách ngắn nhất; queue không cần chứa cả path.",
+        en: "Run BFS layer by layer to keep only shortest-distance edges; the queue does not need to store complete paths.",
+      },
+      {
+        vi: "Mỗi từ ở layer mới lưu TẤT CẢ parent từ layer trước, vì nhiều parent có thể tạo nhiều đáp án ngắn nhất.",
+        en: "Each word in a new layer stores ALL parents from the prior layer because multiple parents can produce multiple shortest answers.",
+      },
+      {
+        vi: "Sau khi BFS hoàn tất layer chứa endWord, DFS đi ngược parent DAG để dựng mọi chuỗi kết quả.",
+        en: "After BFS finishes the layer containing endWord, DFS walks backward through the parent DAG to build every result.",
       },
     ],
     complexity: {
@@ -20089,6 +20108,11 @@ module.exports = {
       "        dfs(endWord, [endWord])",
       "        return result",
     ],
+    debugMode: "semantic",
+    liveArgs: (input, params) => {
+      const parsed = parseWordLadder126(input, params);
+      return [parsed.beginWord, parsed.endWord, parsed.wordList];
+    },
     builder: buildSteps126,
   },
   815: {

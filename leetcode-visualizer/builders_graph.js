@@ -2437,112 +2437,406 @@ function buildSteps1377(input, params) {
 }
 
 // ─── 126: Word Ladder II ───
-function buildSteps126(input, params) {
-  const beginWord = params.beginWord || "hit";
-  const endWord = params.endWord || "cog";
-  const wordList = input ? input.split(",").map(s => s.trim()) : ["hot","dot","dog","lot","log","cog"];
-  const original = wordList.join(",");
-  const steps = [];
+function parseWordLadder126(input, params = {}) {
+  const beginWord = String(params.beginWord || "hit").trim();
+  const endWord = String(params.endWord || "cog").trim();
+  const rawWords = String(input || "hot,dot,dog,lot,log,cog")
+    .split(",")
+    .map(word => word.trim())
+    .filter(Boolean);
+  const wordList = [...new Set(rawWords)];
+  const lowercaseWord = /^[a-z]+$/;
 
-  const wordSet = new Set(wordList);
-  if (!wordSet.has(endWord)) {
-    steps.push({
-      title: {vi: "endWord không trong danh sách", en: "endWord not in wordList"},
-      arr: wordList.map(() => 0), highlight: [], mark: [], codeLines: [],
-      vars: [{name: "endWord", value: endWord}],
-      note: {vi: `"${endWord}" không có trong wordList → không có đường đi.`,
-             en: `"${endWord}" is not in wordList → no path exists.`}
-    });
-    return {original, answer: [], steps};
+  if (!lowercaseWord.test(beginWord) || !lowercaseWord.test(endWord)) {
+    throw new Error("beginWord and endWord must contain lowercase English letters only.");
   }
+  if (beginWord === endWord) {
+    throw new Error("beginWord and endWord must be different.");
+  }
+  if (wordList.length === 0 || wordList.length > 12) {
+    throw new Error("Use 1 to 12 dictionary words so the ladder stays readable.");
+  }
+  if (beginWord.length > 8 || beginWord.length < 1) {
+    throw new Error("Use words with 1 to 8 letters for the visualization.");
+  }
+  if (!wordList.every(word => lowercaseWord.test(word) && word.length === beginWord.length)
+      || endWord.length !== beginWord.length) {
+    throw new Error("Every word must use lowercase letters and have the same length.");
+  }
+  return { beginWord, endWord, wordList };
+}
 
-  // BFS level by level
-  const level = {}; // word -> BFS level
-  level[beginWord] = 0;
-  let queue = [beginWord];
-  const parents = {}; // word -> list of parent words
+function buildSteps126(input, params = {}) {
+  const { beginWord, endWord, wordList } = parseWordLadder126(input, params);
+  const original = wordList.join(",");
+  const allWords = [beginWord, ...wordList.filter(word => word !== beginWord)];
+  const wordOrder = new Map(allWords.map((word, index) => [word, index]));
+  const wordSet = new Set(wordList);
+  const levels = { [beginWord]: 0 };
+  const parents = {};
+  const edges = [];
+  const answers = [];
+  const steps = [];
+  let frontier = [beginWord];
+  let nextFrontier = [];
+  let layer = 0;
   let found = false;
-  let lev = 0;
 
-  const allWords = [beginWord, ...wordList];
-  function neighbors(word) {
-    const result = [];
-    for (let i = 0; i < word.length; i++) {
-      for (let ch = 97; ch <= 122; ch++) {
-        const c = String.fromCharCode(ch);
-        if (c === word[i]) continue;
-        const nw = word.slice(0, i) + c + word.slice(i + 1);
-        if (wordSet.has(nw) || nw === beginWord) result.push(nw);
+  const differsByOne = (first, second) => {
+    let changes = 0;
+    let changedIndex = -1;
+    for (let index = 0; index < first.length; index += 1) {
+      if (first[index] !== second[index]) {
+        changes += 1;
+        changedIndex = index;
+        if (changes > 1) return { matches: false, changedIndex: -1 };
       }
     }
-    return result;
-  }
+    return { matches: changes === 1, changedIndex };
+  };
 
-  // Show initial state
-  const barVals = wordList.map(() => 0);
-  const labels = wordList.slice();
-  steps.push({
-    title: {vi: "Khởi tạo BFS", en: "Initialize BFS"},
-    arr: [...barVals], sub: labels, highlight: [], mark: [], codeLines: [],
-    vars: [{name: "beginWord", value: beginWord}, {name: "endWord", value: endWord}],
-    note: {vi: `Tìm tất cả đường ngắn nhất từ "${beginWord}" đến "${endWord}".`,
-           en: `Find all shortest paths from "${beginWord}" to "${endWord}".`}
+  const availableNeighbors = word => [...wordSet]
+    .map(candidate => ({ candidate, ...differsByOne(word, candidate) }))
+    .filter(item => item.matches)
+    .sort((first, second) => (wordOrder.get(first.candidate) ?? 999) - (wordOrder.get(second.candidate) ?? 999));
+
+  const cloneParents = () => Object.fromEntries(
+    Object.entries(parents).map(([word, list]) => [word, [...list]]),
+  );
+
+  const makeView = ({
+    operation,
+    phaseIndex,
+    currentWord = null,
+    candidateWord = null,
+    changedIndex = -1,
+    decision = null,
+    backtrackPath = [],
+    activeEdge = null,
+  }) => ({
+    operation,
+    phaseIndex,
+    beginWord,
+    endWord,
+    words: [...allWords],
+    dictionary: [...wordList],
+    levels: { ...levels },
+    parents: cloneParents(),
+    edges: edges.map(edge => ({ ...edge })),
+    frontier: [...frontier],
+    nextFrontier: [...nextFrontier],
+    layer,
+    currentWord,
+    candidateWord,
+    changedIndex,
+    decision,
+    found,
+    backtrackPath: [...backtrackPath],
+    activeEdge: activeEdge ? { ...activeEdge } : null,
+    answers: answers.map(path => [...path]),
   });
 
-  while (queue.length > 0 && !found) {
-    lev++;
-    const nextQueue = [];
-    const levelWords = new Set();
-    for (const word of queue) {
-      for (const nb of neighbors(word)) {
-        if (nb === endWord) found = true;
-        if (level[nb] == null) {
-          level[nb] = lev;
-          levelWords.add(nb);
-          nextQueue.push(nb);
-          parents[nb] = [word];
-        } else if (level[nb] === lev) {
-          parents[nb].push(word);
+  const snapshot = ({ title, note, codeLine, vars = [], final = false, ...view }) => {
+    const currentIndex = view.currentWord ? allWords.indexOf(view.currentWord) : -1;
+    const candidateIndex = view.candidateWord ? allWords.indexOf(view.candidateWord) : -1;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: allWords.map(word => levels[word] ?? 0),
+      sub: [...allWords],
+      highlight: candidateIndex >= 0 ? [candidateIndex] : currentIndex >= 0 ? [currentIndex] : [],
+      mark: currentIndex >= 0 && candidateIndex >= 0 ? [currentIndex] : [],
+      vars: [
+        { name: "layer", value: layer },
+        { name: "frontier", value: `[${frontier.join(", ")}]` },
+        { name: "found", value: found },
+        ...vars,
+      ],
+      wordLadder126View: makeView(view),
+    });
+  };
+
+  if (!wordSet.has(endWord)) {
+    snapshot({
+      operation: "missing-end",
+      phaseIndex: 0,
+      codeLine: 6,
+      title: { vi: `Không có "${endWord}" trong từ điển`, en: `"${endWord}" is missing from the dictionary` },
+      note: {
+        vi: "Mọi từ sau beginWord phải nằm trong wordList, nên thiếu endWord đồng nghĩa không thể tạo đường đi.",
+        en: "Every word after beginWord must be in wordList, so a missing endWord makes every path impossible.",
+      },
+      vars: [{ name: "return", value: "[]" }],
+      final: true,
+    });
+    return { original, answer: [], steps };
+  }
+
+  snapshot({
+    operation: "init",
+    phaseIndex: 0,
+    codeLine: 9,
+    title: { vi: `Bắt đầu tại "${beginWord}"`, en: `Start at "${beginWord}"` },
+    note: {
+      vi: "BFS chỉ lưu frontier hiện tại và các cạnh parent. Không lưu cả path trong queue.",
+      en: "BFS stores only the current frontier and parent edges—not complete paths in the queue.",
+    },
+    vars: [{ name: "beginWord", value: beginWord }, { name: "endWord", value: endWord }],
+  });
+
+  while (frontier.length > 0 && !found) {
+    snapshot({
+      operation: "layer-check",
+      phaseIndex: 1,
+      codeLine: 11,
+      title: { vi: `Mở BFS layer ${layer}`, en: `Open BFS layer ${layer}` },
+      note: {
+        vi: `Tất cả từ trong frontier đều cách beginWord đúng ${layer} bước. Ta phải xử lý hết layer trước khi dừng.`,
+        en: `Every frontier word is exactly ${layer} steps from beginWord. We must finish the whole layer before stopping.`,
+      },
+    });
+
+    for (const word of frontier) wordSet.delete(word);
+    snapshot({
+      operation: "remove-layer",
+      phaseIndex: 1,
+      codeLine: 12,
+      title: { vi: "Khóa các layer cũ", en: "Lock the older layers" },
+      note: {
+        vi: "Xóa frontier khỏi word_set để không đi ngược về layer cũ; các từ của next_layer vẫn còn để nhận nhiều parent.",
+        en: "Remove the frontier from word_set to prevent backward edges; next-layer words remain available to collect multiple parents.",
+      },
+    });
+
+    const nextLayer = new Set();
+    nextFrontier = [];
+    snapshot({
+      operation: "next-layer",
+      phaseIndex: 1,
+      codeLine: 13,
+      title: { vi: `Tạo layer ${layer + 1} rỗng`, en: `Create empty layer ${layer + 1}` },
+      note: { vi: "Từ mới sẽ được gom vào đây.", en: "Newly reached words will be collected here." },
+    });
+
+    for (const word of frontier) {
+      snapshot({
+        operation: "scan-word",
+        phaseIndex: 1,
+        currentWord: word,
+        codeLine: 14,
+        title: { vi: `Mở rộng "${word}"`, en: `Expand "${word}"` },
+        note: {
+          vi: "Thử thay từng vị trí bằng a..z; visualization chỉ hiện các kết quả thật sự có trong word_set.",
+          en: "Try a..z at each position; the visualization shows only candidates that actually exist in word_set.",
+        },
+        vars: [{ name: "word", value: word }],
+      });
+
+      for (const { candidate, changedIndex } of availableNeighbors(word)) {
+        const alreadyInNextLayer = nextLayer.has(candidate);
+        snapshot({
+          operation: "candidate",
+          phaseIndex: 1,
+          currentWord: word,
+          candidateWord: candidate,
+          changedIndex,
+          decision: alreadyInNextLayer ? "same-layer-parent" : "discover",
+          activeEdge: { from: word, to: candidate },
+          codeLine: 18,
+          title: { vi: `"${word}" → "${candidate}" hợp lệ`, en: `"${word}" → "${candidate}" is valid` },
+          note: {
+            vi: `Chỉ ký tự thứ ${changedIndex + 1} thay đổi và "${candidate}" vẫn còn trong word_set.`,
+            en: `Only character ${changedIndex + 1} changes, and "${candidate}" is still in word_set.`,
+          },
+          vars: [{ name: "new_word", value: candidate }, { name: "changed index", value: changedIndex }],
+        });
+
+        nextLayer.add(candidate);
+        if (!alreadyInNextLayer) {
+          nextFrontier.push(candidate);
+          levels[candidate] = layer + 1;
+        }
+        if (!parents[candidate]) parents[candidate] = [];
+        if (!parents[candidate].includes(word)) {
+          parents[candidate].push(word);
+          parents[candidate].sort((first, second) => (wordOrder.get(first) ?? 999) - (wordOrder.get(second) ?? 999));
+          edges.push({ from: word, to: candidate });
+        }
+        snapshot({
+          operation: alreadyInNextLayer ? "add-parent" : "discover",
+          phaseIndex: 2,
+          currentWord: word,
+          candidateWord: candidate,
+          changedIndex,
+          decision: alreadyInNextLayer ? "same-layer-parent" : "discover",
+          activeEdge: { from: word, to: candidate },
+          codeLine: 20,
+          title: alreadyInNextLayer
+            ? { vi: `Thêm parent thứ ${parents[candidate].length} cho "${candidate}"`, en: `Add parent ${parents[candidate].length} for "${candidate}"` }
+            : { vi: `Đưa "${candidate}" vào layer ${layer + 1}`, en: `Place "${candidate}" in layer ${layer + 1}` },
+          note: alreadyInNextLayer
+            ? {
+                vi: `Không enqueue lần nữa, nhưng phải giữ cạnh ${word} → ${candidate}; cạnh này có thể tạo thêm một đáp án ngắn nhất.`,
+                en: `Do not enqueue it again, but keep ${word} → ${candidate}; this edge may produce another shortest answer.`,
+              }
+            : {
+                vi: `Đây là lần đầu "${candidate}" xuất hiện ở khoảng cách ${layer + 1}.`,
+                en: `This is the first time "${candidate}" is reached at distance ${layer + 1}.`,
+              },
+          vars: [{ name: `parents[${candidate}]`, value: `[${parents[candidate].join(", ")}]` }],
+        });
+
+        if (candidate === endWord) {
+          found = true;
+          snapshot({
+            operation: "found-end",
+            phaseIndex: 2,
+            currentWord: word,
+            candidateWord: candidate,
+            changedIndex,
+            decision: "found",
+            activeEdge: { from: word, to: candidate },
+            codeLine: 22,
+            title: { vi: `Đã chạm endWord "${endWord}"`, en: `Reached endWord "${endWord}"` },
+            note: {
+              vi: "Đánh dấu found nhưng vẫn xử lý hết frontier hiện tại để giữ mọi parent ngắn nhất khác của endWord.",
+              en: "Set found, but finish the current frontier so every other shortest parent of endWord is preserved.",
+            },
+          });
         }
       }
     }
-    queue = nextQueue;
 
-    // Update bar values to show level
-    const hl = [];
-    for (let i = 0; i < wordList.length; i++) {
-      if (level[wordList[i]] != null) barVals[i] = level[wordList[i]];
-      if (levelWords.has(wordList[i])) hl.push(i);
-    }
-
-    steps.push({
-      title: {vi: `BFS level ${lev}`, en: `BFS level ${lev}`},
-      arr: [...barVals], sub: labels, highlight: hl, mark: [], codeLines: [],
-      vars: [{name: "level", value: lev}, {name: "new_words", value: [...levelWords].join(",")}],
-      note: {vi: `Level ${lev}: khám phá [${[...levelWords].join(", ")}].${found ? " Tìm thấy endWord!" : ""}`,
-             en: `Level ${lev}: discovered [${[...levelWords].join(", ")}].${found ? " Found endWord!" : ""}`}
+    frontier = [...nextFrontier];
+    layer += 1;
+    snapshot({
+      operation: "finish-layer",
+      phaseIndex: 2,
+      codeLine: 23,
+      title: { vi: `Chốt BFS layer ${layer}`, en: `Finish BFS layer ${layer}` },
+      note: found
+        ? {
+            vi: `Layer chứa "${endWord}" đã hoàn tất. Mọi cạnh trong DAG bây giờ đều thuộc một đường đi ngắn nhất tiềm năng.`,
+            en: `The layer containing "${endWord}" is complete. Every DAG edge now belongs to a potential shortest path.`,
+          }
+        : {
+            vi: `Frontier tiếp theo: [${frontier.join(", ")}].`,
+            en: `Next frontier: [${frontier.join(", ")}].`,
+          },
     });
   }
 
-  // DFS backtrack to find all paths
-  const paths = [];
-  function dfs(word, path) {
-    if (word === beginWord) { paths.push([word, ...path]); return; }
-    if (!parents[word]) return;
-    for (const p of parents[word]) dfs(p, [word, ...path]);
+  if (!found) {
+    snapshot({
+      operation: "no-path",
+      phaseIndex: 4,
+      codeLine: 25,
+      title: { vi: "BFS kết thúc mà không thấy endWord", en: "BFS ended without reaching endWord" },
+      note: { vi: "Không tồn tại chuỗi biến đổi hợp lệ.", en: "No valid transformation sequence exists." },
+      vars: [{ name: "return", value: "[]" }],
+      final: true,
+    });
+    return { original, answer: [], steps };
   }
-  if (found) dfs(endWord, []);
 
-  const pathStrs = paths.map(p => p.join(" → "));
-  steps.push({
-    title: {vi: "Kết quả: tất cả đường ngắn nhất", en: "Result: all shortest paths"},
-    arr: [...barVals], sub: labels, highlight: [], mark: [], codeLines: [],
-    vars: [{name: "path_count", value: paths.length}, {name: "length", value: paths.length > 0 ? paths[0].length : 0}],
-    note: {vi: paths.length > 0 ? `Tìm được ${paths.length} đường:\n${pathStrs.join("\n")}` : "Không có đường đi.",
-           en: paths.length > 0 ? `Found ${paths.length} paths:\n${pathStrs.join("\n")}` : "No path exists."}
+  snapshot({
+    operation: "dfs-start",
+    phaseIndex: 3,
+    backtrackPath: [endWord],
+    codeLine: 26,
+    title: { vi: "BFS xong: bắt đầu đi ngược DAG", en: "BFS complete: walk backward through the DAG" },
+    note: {
+      vi: `BFS đảm bảo DAG chỉ giữ cạnh giữa hai layer liên tiếp. DFS đi từ "${endWord}" về "${beginWord}" để dựng từng đáp án.`,
+      en: `BFS guarantees that the DAG keeps only edges between consecutive layers. DFS walks from "${endWord}" back to "${beginWord}" to build each answer.`,
+    },
   });
 
-  return {original, answer: paths, steps};
+  function reconstruct(word, backwardPath) {
+    snapshot({
+      operation: "dfs-enter",
+      phaseIndex: 3,
+      currentWord: word,
+      backtrackPath: backwardPath,
+      codeLine: 27,
+      title: { vi: `DFS đang ở "${word}"`, en: `DFS is at "${word}"` },
+      note: {
+        vi: `Path tạm đang đi ngược: ${backwardPath.join(" ← ")}.`,
+        en: `The temporary path runs backward: ${backwardPath.join(" ← ")}.`,
+      },
+    });
+
+    if (word === beginWord) {
+      const completePath = [...backwardPath].reverse();
+      answers.push(completePath);
+      snapshot({
+        operation: "emit-path",
+        phaseIndex: 4,
+        currentWord: word,
+        backtrackPath: backwardPath,
+        codeLine: 29,
+        title: { vi: `Lưu đáp án #${answers.length}`, en: `Save answer #${answers.length}` },
+        note: {
+          vi: completePath.join(" → "),
+          en: completePath.join(" → "),
+        },
+        vars: [{ name: "path", value: `[${completePath.join(", ")}]` }],
+      });
+      return;
+    }
+
+    for (const parent of parents[word] || []) {
+      const nextPath = [...backwardPath, parent];
+      snapshot({
+        operation: "choose-parent",
+        phaseIndex: 3,
+        currentWord: word,
+        candidateWord: parent,
+        decision: "backtrack",
+        backtrackPath: nextPath,
+        activeEdge: { from: parent, to: word },
+        codeLine: 32,
+        title: { vi: `Chọn parent "${parent}" của "${word}"`, en: `Choose parent "${parent}" of "${word}"` },
+        note: {
+          vi: `Đi ngược cạnh ${parent} → ${word}.`,
+          en: `Follow the edge ${parent} → ${word} backward.`,
+        },
+      });
+      reconstruct(parent, nextPath);
+      snapshot({
+        operation: "backtrack",
+        phaseIndex: 3,
+        currentWord: word,
+        candidateWord: parent,
+        decision: "backtrack",
+        backtrackPath: backwardPath,
+        activeEdge: { from: parent, to: word },
+        codeLine: 34,
+        title: { vi: `Quay lại "${word}"`, en: `Backtrack to "${word}"` },
+        note: {
+          vi: `Bỏ "${parent}" khỏi path tạm để thử parent tiếp theo.`,
+          en: `Remove "${parent}" from the temporary path and try the next parent.`,
+        },
+      });
+    }
+  }
+
+  reconstruct(endWord, [endWord]);
+  snapshot({
+    operation: "done",
+    phaseIndex: 4,
+    codeLine: 36,
+    title: { vi: `Hoàn tất: ${answers.length} đường ngắn nhất`, en: `Complete: ${answers.length} shortest paths` },
+    note: {
+      vi: `Mỗi đường có ${answers[0]?.length || 0} từ; BFS quyết định độ ngắn nhất, DFS chỉ liệt kê các đường trong parent DAG.`,
+      en: `Every path has ${answers[0]?.length || 0} words; BFS guarantees shortestness, while DFS only enumerates paths in the parent DAG.`,
+    },
+    vars: [{ name: "path_count", value: answers.length }, { name: "path_length", value: answers[0]?.length || 0 }],
+    final: true,
+  });
+
+  return { original, answer: answers.map(path => [...path]), steps };
 }
 
 // ─── 815: Bus Routes ───
@@ -2641,4 +2935,4 @@ function buildSteps815(input, params) {
   return {original, answer, steps};
 }
 
-module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps3341, buildSteps3342, buildSteps1377, buildSteps126, buildSteps815 };
+module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps3341, buildSteps3342, buildSteps1377, parseWordLadder126, buildSteps126, buildSteps815 };

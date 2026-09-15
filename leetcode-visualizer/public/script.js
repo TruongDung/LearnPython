@@ -23146,6 +23146,151 @@ function renderLIS2407View(step) {
   </section>`;
 }
 
+function renderWordLadder126View(step) {
+  const view = step.wordLadder126View || {};
+  const vi = lang === "vi";
+  const words = Array.isArray(view.words) ? view.words : [];
+  const dictionary = Array.isArray(view.dictionary) ? view.dictionary : [];
+  const levels = view.levels && typeof view.levels === "object" ? view.levels : {};
+  const parents = view.parents && typeof view.parents === "object" ? view.parents : {};
+  const frontier = new Set(Array.isArray(view.frontier) ? view.frontier : []);
+  const nextFrontier = new Set(Array.isArray(view.nextFrontier) ? view.nextFrontier : []);
+  const backtrackPath = Array.isArray(view.backtrackPath) ? view.backtrackPath : [];
+  const pathWords = new Set(backtrackPath);
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const activeEdge = view.activeEdge || null;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["1 · Từ điển", "2 · BFS theo layer", "3 · Parent DAG", "4 · DFS đi ngược", "5 · Đáp án"]
+    : ["1 · Dictionary", "2 · Layered BFS", "3 · Parent DAG", "4 · Backward DFS", "5 · Answers"];
+
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const classes = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${classes}">${index < phaseIndex ? "✓ " : ""}${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const renderLetters = (word, changedIndex = -1) => String(word || "").split("").map((letter, index) => (
+    `<b class="${index === changedIndex ? "is-changed" : ""}">${escapeHtml(letter)}</b>`
+  )).join("");
+
+  const currentWord = view.currentWord;
+  const candidateWord = view.candidateWord;
+  let comparisonHtml = "";
+  if (currentWord && candidateWord) {
+    const reverse = view.decision === "backtrack";
+    const fromWord = reverse ? candidateWord : currentWord;
+    const toWord = reverse ? currentWord : candidateWord;
+    const changedIndex = Number.isInteger(view.changedIndex) && view.changedIndex >= 0
+      ? view.changedIndex
+      : (() => {
+          for (let index = 0; index < String(fromWord).length; index += 1) {
+            if (fromWord[index] !== toWord[index]) return index;
+          }
+          return -1;
+        })();
+    comparisonHtml = `<div class="wl126-transform">
+      <span>${renderLetters(fromWord, changedIndex)}</span>
+      <i>→</i>
+      <span>${renderLetters(toWord, changedIndex)}</span>
+      <em>${reverse ? (vi ? "đi ngược parent" : "follow parent backward") : (vi ? "đổi đúng 1 ký tự" : "change exactly 1 letter")}</em>
+    </div>`;
+  }
+
+  const maxLevel = Math.max(0, ...Object.values(levels).filter(Number.isInteger));
+  const layerHtml = Array.from({ length: maxLevel + 1 }, (_, depth) => {
+    const layerWords = words.filter(word => levels[word] === depth);
+    const nodesHtml = layerWords.map(word => {
+      const classes = ["wl126-node"];
+      if (word === view.beginWord) classes.push("is-begin");
+      if (word === view.endWord) classes.push("is-end");
+      if (frontier.has(word)) classes.push("is-frontier");
+      if (nextFrontier.has(word)) classes.push("is-next");
+      if (word === currentWord) classes.push("is-current");
+      if (word === candidateWord) classes.push("is-candidate");
+      if (pathWords.has(word)) classes.push("is-path");
+      const wordParents = Array.isArray(parents[word]) ? parents[word] : [];
+      const parentHtml = wordParents.length
+        ? wordParents.map(parent => {
+            const edgeActive = activeEdge && activeEdge.from === parent && activeEdge.to === word;
+            return `<span class="${edgeActive ? "is-active" : ""}">← ${escapeHtml(parent)}</span>`;
+          }).join("")
+        : `<span class="is-root">${depth === 0 ? (vi ? "bắt đầu" : "start") : "—"}</span>`;
+      return `<article class="${classes.join(" ")}">
+        <small>${vi ? "tầng" : "level"} ${depth}</small>
+        <strong>${escapeHtml(word)}</strong>
+        <div>${parentHtml}</div>
+      </article>`;
+    }).join("");
+    return `<section class="wl126-layer">
+      <header><b>L${depth}</b><span>${depth === 0 ? "0 " + (vi ? "bước đổi" : "changes") : `${depth} ${vi ? "bước đổi" : "changes"}`}</span></header>
+      <div>${nodesHtml}</div>
+    </section>`;
+  }).join("");
+
+  const unseenWords = dictionary.filter(word => levels[word] === undefined);
+  const unseenHtml = unseenWords.length
+    ? unseenWords.map(word => `<span class="${word === view.endWord ? "is-end" : ""}">${escapeHtml(word)}</span>`).join("")
+    : `<em>${vi ? "không còn từ chưa thăm" : "no unvisited words"}</em>`;
+
+  const forwardPath = [...backtrackPath].reverse();
+  const backtrackHtml = forwardPath.length
+    ? forwardPath.map((word, index) => `${index ? "<i>→</i>" : ""}<span>${escapeHtml(word)}</span>`).join("")
+    : `<em>${vi ? "DFS chưa bắt đầu" : "DFS has not started"}</em>`;
+
+  const answersHtml = answers.length
+    ? answers.map((path, answerIndex) => `<article><small>#${answerIndex + 1}</small><div>${path.map((word, index) => `${index ? "<i>→</i>" : ""}<strong>${escapeHtml(word)}</strong>`).join("")}</div></article>`).join("")
+    : `<p>${view.operation === "missing-end" || view.operation === "no-path" ? (vi ? "Không có đường đi." : "No path exists.") : (vi ? "Chưa hoàn thành đường nào." : "No completed path yet.")}</p>`;
+
+  const operation = String(view.operation || "init");
+  const actionByOperation = {
+    "missing-end": vi ? "endWord không có trong wordList ⇒ trả về [] ngay." : "endWord is absent from wordList ⇒ return [] immediately.",
+    init: vi ? "BFS bắt đầu với frontier chỉ có beginWord." : "BFS starts with beginWord as the only frontier word.",
+    "layer-check": vi ? "Mọi từ trong frontier hiện tại có cùng khoảng cách ngắn nhất." : "Every word in the current frontier has the same shortest distance.",
+    "remove-layer": vi ? "Khóa layer cũ để DAG không có cạnh đi lùi." : "Lock the old layer so the DAG cannot contain backward edges.",
+    "next-layer": vi ? "Chuẩn bị một set cho các từ đạt được sau đúng 1 bước nữa." : "Prepare a set for words reachable in exactly one more change.",
+    "scan-word": vi ? `Mở rộng ${currentWord}; chỉ giữ từ có trong dictionary.` : `Expand ${currentWord}; keep only words in the dictionary.`,
+    candidate: vi ? "Candidate hợp lệ: đúng một chữ khác và vẫn chưa bị khóa." : "Valid candidate: exactly one letter differs and the word is not locked.",
+    discover: vi ? "Lần đầu tới từ này: đặt layer và lưu parent." : "First arrival: assign its layer and store its parent.",
+    "add-parent": vi ? "Cùng shortest layer: thêm parent, không enqueue lần hai." : "Same shortest layer: add another parent without enqueuing twice.",
+    "found-end": vi ? "Đã thấy endWord, nhưng phải quét hết layer để không bỏ sót parent khác." : "endWord is found, but finish the layer so no other parent is lost.",
+    "finish-layer": vi ? "Chuyển next_layer thành frontier; BFS dừng nếu layer này chứa endWord." : "Promote next_layer to frontier; BFS stops if this layer contains endWord.",
+    "no-path": vi ? "Frontier rỗng trước khi tới endWord ⇒ không có lời giải." : "The frontier emptied before endWord ⇒ there is no solution.",
+    "dfs-start": vi ? "Parent DAG đã xong; giờ đi ngược từ endWord." : "The parent DAG is complete; now walk backward from endWord.",
+    "dfs-enter": vi ? `Đang dựng path ngược tại ${currentWord}.` : `Building a backward path at ${currentWord}.`,
+    "choose-parent": vi ? "Chọn một parent ở layer trước và đi sâu tiếp." : "Choose one parent in the prior layer and recurse.",
+    "emit-path": vi ? "Đã chạm beginWord: đảo path ngược và lưu một đáp án." : "beginWord reached: reverse the backward path and save one answer.",
+    backtrack: vi ? "Quay lui để thử parent khác; đây là cách tìm đủ mọi path." : "Backtrack to try another parent; this is how every path is found.",
+    done: vi ? "BFS bảo đảm ngắn nhất; DFS bảo đảm liệt kê đầy đủ." : "BFS guarantees shortestness; DFS guarantees complete enumeration.",
+  };
+
+  $("treeView").innerHTML = `<section class="wl126-viz" role="img" aria-label="${vi ? "Trực quan hóa Word Ladder II bằng BFS và DFS" : "Word Ladder II BFS and DFS visualization"}">
+    <header><strong>WORD LADDER II</strong><span>${escapeHtml(view.beginWord || "")} → ${escapeHtml(view.endWord || "")}</span></header>
+    <div class="wl126-phases">${phasesHtml}</div>
+    <section class="wl126-rule">
+      <span><b>BFS</b>${vi ? "xây các layer ngắn nhất" : "build shortest layers"}</span>
+      <i>→</i>
+      <span><b>PARENTS</b>${vi ? "giữ mọi cách đi vào" : "keep every shortest entry"}</span>
+      <i>→</i>
+      <span><b>DFS</b>${vi ? "dựng tất cả đáp án" : "build all answers"}</span>
+    </section>
+    <section class="wl126-action">${escapeHtml(actionByOperation[operation] || operation)}</section>
+    ${comparisonHtml}
+    <section class="wl126-panel">
+      <header><strong>${vi ? "PARENT DAG THEO BFS LAYER" : "PARENT DAG BY BFS LAYER"}</strong><span>${vi ? "mỗi nhãn ← là một cạnh parent" : "each ← label is one parent edge"}</span></header>
+      <div class="wl126-layers">${layerHtml}</div>
+    </section>
+    <section class="wl126-unseen"><b>${vi ? "CHƯA THĂM" : "UNVISITED"}</b><div>${unseenHtml}</div></section>
+    <section class="wl126-backtrack">
+      <header><strong>${vi ? "PATH DFS ĐANG DỰNG" : "CURRENT DFS PATH"}</strong><span>${backtrackPath.length ? (vi ? "hiển thị theo chiều begin → end" : "shown begin → end") : ""}</span></header>
+      <div>${backtrackHtml}</div>
+    </section>
+    <section class="wl126-answers">
+      <header><strong>${vi ? "ĐƯỜNG NGẮN NHẤT ĐÃ TÌM" : "SHORTEST PATHS FOUND"}</strong><span>${answers.length}</span></header>
+      <div>${answersHtml}</div>
+    </section>
+  </section>`;
+}
+
 function renderHouseRobberView(step) {
   const view = step.houseRobberView || {};
   const vi = lang === "vi";
@@ -30100,6 +30245,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLIS2407View(step);
+  } else if (step.wordLadder126View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordLadder126View(step);
   } else if (step.houseRobberView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
