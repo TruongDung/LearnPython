@@ -4423,21 +4423,155 @@ function buildSteps863v2(input, params) {
 
 // ─── 156: Binary Tree Upside Down ───
 function buildSteps156(input) {
-  const root = parseTree(input); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: "Lật ngược cây", en: "Turn the tree upside down" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "left→new root, right→new left, root→new right" }],
-    note: { vi: `Đi theo nhánh TRÁI nhất. Con trái cũ thành cha mới; con phải cũ thành con trái mới; cha cũ thành con phải mới.`, en: `Follow the LEFTMOST path. Old left child becomes new parent; old right child becomes new left; old parent becomes new right.` },
-  }));
-  const chain = []; let c = root; while (c && c.left) { chain.push(c); c = c.left; }
-  const newRootVal = c ? c.val : (root ? root.val : "null");
-  chain.forEach((n) => {
-    steps.push(snapshot(root, { title: { vi: `Xoay quanh ${n.val}`, en: `Rotate around ${n.val}` }, hlSet: new Set([n.id, n.left.id].concat(n.right ? [n.right.id] : [])), codeLines: [4, 5, 6], vars: [{ name: "node", value: n.val }, { name: "left (→ parent)", value: n.left.val }, { name: "right (→ new left)", value: n.right ? n.right.val : "null" }], note: { vi: `${n.left.val} thành cha; ${n.right ? n.right.val : "null"} thành con trái; ${n.val} thành con phải.`, en: `${n.left.val} becomes parent; ${n.right ? n.right.val : "null"} becomes left child; ${n.val} becomes right child.` } }));
+  const root = parseTree(input);
+  const steps = [];
+  const callStack = [];
+  const rotated = [];
+
+  function toLevelOrder(node) {
+    if (!node) return [];
+    const values = [];
+    const queue = [node];
+    while (queue.length) {
+      const current = queue.shift();
+      if (!current) {
+        values.push(null);
+        continue;
+      }
+      values.push(current.val);
+      queue.push(current.left, current.right);
+    }
+    while (values.length && values[values.length - 1] === null) values.pop();
+    return values;
+  }
+
+  const originalValues = toLevelOrder(root);
+
+  function addStep(treeRoot, options) {
+    const step = snapshot(treeRoot, {
+      title: options.title,
+      hlSet: options.highlightIds ? new Set(options.highlightIds) : undefined,
+      wordSet: options.completedIds ? new Set(options.completedIds) : undefined,
+      codeLines: options.codeLines,
+      vars: options.vars,
+      note: options.note,
+    });
+    step.upsideDown156View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      current: options.current ?? null,
+      pivot: options.pivot || null,
+      stack: callStack.slice(),
+      rotated: rotated.slice(),
+      originalValues: originalValues.slice(),
+      currentValues: toLevelOrder(treeRoot),
+      newRoot: options.newRoot ?? null,
+    };
+    if (options.final) step.final = true;
+    steps.push(step);
+  }
+
+  addStep(root, {
+    title: { vi: "Quy tắc lật cây", en: "The upside-down rule" },
+    phase: "intro", phaseIndex: 0, operation: "explain",
+    codeLines: [2, 3],
+    vars: [
+      { name: "old left", value: "new parent" },
+      { name: "old right", value: "new left child" },
+      { name: "old parent", value: "new right child" },
+    ],
+    note: {
+      vi: "Đi xuống nhánh trái đến node cuối, rồi quay lui. Mỗi lần quay lui, bộ ba [con trái, cha, con phải] được nối lại theo cùng một quy tắc.",
+      en: "Descend to the last node on the left, then unwind. Each return rewires the trio [left child, parent, right child] with the same rule.",
+    },
   });
-  function rec(node) { if (!node || !node.left) return node; const nr = rec(node.left); node.left.left = node.right; node.left.right = node; node.left = null; node.right = null; return nr; }
-  const finalRoot = rec(root);
-  const fs = snapshot(finalRoot, { title: { vi: `Gốc mới = ${finalRoot ? finalRoot.val : "null"}`, en: `New root = ${finalRoot ? finalRoot.val : "null"}` }, vars: [{ name: "answer", value: finalRoot ? finalRoot.val : "null" }], note: { vi: `Cây đã lật ngược, gốc mới = ${newRootVal}.`, en: `Tree turned upside down, new root = ${newRootVal}.` } }); fs.final = true; steps.push(fs);
-  return { input, answer: finalRoot ? finalRoot.val : "null", steps };
+
+  if (!root) {
+    addStep(null, {
+      title: { vi: "Cây rỗng → trả về None", en: "Empty tree → return None" },
+      phase: "done", phaseIndex: 3, operation: "done", newRoot: null,
+      codeLines: [3, 4], vars: [{ name: "answer", value: "[]" }], final: true,
+      note: { vi: "Không có node nào cần lật.", en: "There are no nodes to rotate." },
+    });
+    return { input, answer: [], steps };
+  }
+
+  function turn(node) {
+    callStack.push(node.val);
+    if (!node.left) {
+      addStep(root, {
+        title: { vi: `Chạm đáy tại ${node.val}: đây là gốc mới`, en: `Base case at ${node.val}: this is the new root` },
+        phase: "base", phaseIndex: 1, operation: "base", current: node.val, newRoot: node.val,
+        highlightIds: [node.id], codeLines: [3, 4],
+        vars: [{ name: "root", value: node.val }, { name: "new_root", value: node.val }],
+        note: { vi: `${node.val} không có con trái, nên đệ quy dừng và trả node này làm gốc mới.`, en: `${node.val} has no left child, so recursion stops and returns it as the new root.` },
+      });
+      callStack.pop();
+      return node;
+    }
+
+    addStep(root, {
+      title: { vi: `Đi trái: ${node.val} → ${node.left.val}`, en: `Descend left: ${node.val} → ${node.left.val}` },
+      phase: "descend", phaseIndex: 0, operation: "descend", current: node.val,
+      highlightIds: [node.id, node.left.id], codeLines: [5],
+      vars: [{ name: "call", value: `turn(${node.left.val})` }, { name: "stack", value: `[${callStack.join(", ")}]` }],
+      note: { vi: "Chưa đổi cạnh nào. Ta phải tìm gốc mới ở cuối nhánh trái trước.", en: "No edge changes yet. First find the new root at the end of the left spine." },
+    });
+
+    const oldLeft = node.left;
+    const oldRight = node.right;
+    const newRoot = turn(oldLeft);
+    const pivot = {
+      parent: node.val,
+      parentId: node.id,
+      left: oldLeft.val,
+      leftId: oldLeft.id,
+      right: oldRight ? oldRight.val : null,
+      rightId: oldRight ? oldRight.id : null,
+    };
+
+    addStep(newRoot, {
+      title: { vi: `Quay lui tới ${node.val}: chuẩn bị đổi 3 cạnh`, en: `Unwind to ${node.val}: prepare three edge changes` },
+      phase: "rewire", phaseIndex: 2, operation: "prepare", current: node.val, pivot, newRoot: newRoot.val,
+      highlightIds: [oldLeft.id, node.id].concat(oldRight ? [oldRight.id] : []), codeLines: [6, 7, 8, 9],
+      vars: [
+        { name: "new parent", value: oldLeft.val },
+        { name: "new left", value: oldRight ? oldRight.val : "None" },
+        { name: "new right", value: node.val },
+      ],
+      note: { vi: `Đặt ${oldRight ? oldRight.val : "None"} bên trái ${oldLeft.val}, đặt ${node.val} bên phải ${oldLeft.val}, rồi xóa hai cạnh cũ từ ${node.val}.`, en: `Put ${oldRight ? oldRight.val : "None"} on ${oldLeft.val}'s left, put ${node.val} on its right, then clear ${node.val}'s two old edges.` },
+    });
+
+    oldLeft.left = oldRight;
+    oldLeft.right = node;
+    node.left = null;
+    node.right = null;
+    rotated.push(node.val);
+
+    addStep(newRoot, {
+      title: { vi: `Đã lật: ${oldLeft.val} có trái=${oldRight ? oldRight.val : "None"}, phải=${node.val}`, en: `Rotated: ${oldLeft.val} now has left=${oldRight ? oldRight.val : "None"}, right=${node.val}` },
+      phase: "rewire", phaseIndex: 2, operation: "rewired", current: oldLeft.val, pivot, newRoot: newRoot.val,
+      highlightIds: [oldLeft.id, node.id].concat(oldRight ? [oldRight.id] : []),
+      completedIds: [oldLeft.id, node.id].concat(oldRight ? [oldRight.id] : []), codeLines: [6, 7, 8, 9],
+      vars: [{ name: "new_root", value: newRoot.val }, { name: "rotated parents", value: `[${rotated.join(", ")}]` }],
+      note: { vi: `Cụm ${oldLeft.val} ← [${oldRight ? oldRight.val : "None"}, ${node.val}] đã hoàn tất. Tiếp tục quay lui lên một tầng.`, en: `The ${oldLeft.val} ← [${oldRight ? oldRight.val : "None"}, ${node.val}] cluster is complete. Continue unwinding one level.` },
+    });
+
+    callStack.pop();
+    return newRoot;
+  }
+
+  const finalRoot = turn(root);
+  const answer = toLevelOrder(finalRoot);
+  addStep(finalRoot, {
+    title: { vi: `Hoàn tất: gốc mới = ${finalRoot.val}`, en: `Complete: new root = ${finalRoot.val}` },
+    phase: "done", phaseIndex: 3, operation: "done", current: finalRoot.val, newRoot: finalRoot.val,
+    completedIds: finalRoot ? treeToVizNodes(finalRoot).map((node) => node.id) : [], codeLines: [10],
+    vars: [{ name: "answer", value: `[${answer.map((value) => value === null ? "null" : value).join(", ")}]` }], final: true,
+    note: { vi: `Mỗi node được đổi cạnh đúng một lần. Cây kết quả theo level-order là [${answer.join(", ")}].`, en: `Every node is rewired once. The result in level order is [${answer.join(", ")}].` },
+  });
+  return { input, answer, steps };
 }
 
 // ─── 337: House Robber III ───
@@ -8987,18 +9121,22 @@ module.exports = {
   156: {
     id: 156, difficulty: "medium", slug: "binary-tree-upside-down",
     category: TREE_CAT,
+    tags: [{ key: "dfs", vi: "DFS + Đệ quy", en: "DFS + Recursion" }],
     title: { vi: "Binary Tree Upside Down", en: "Binary Tree Upside Down" },
     titleVi: { vi: "Lật ngược cây", en: "Turn the tree upside down" },
-    statement: { vi: "Cây mà mọi nút phải là lá có anh em trái và không con. Lật ngược: con trái cũ thành gốc mới. Nhập level-order (cây lệch trái).", en: "A tree where every right node is a leaf with a left sibling and no children. Turn it upside down: old left child becomes the new root. Enter as level-order (left-leaning)." },
+    statement: { vi: "Lật cây theo nhánh trái: node trái nhất thành gốc mới; tại mỗi tầng, con phải cũ thành con trái mới và cha cũ thành con phải mới. Nhập cây theo level-order.", en: "Turn the tree upside down along its left spine: the leftmost node becomes the new root; at each level, the old right child becomes the new left child and the old parent becomes the new right child. Enter the tree in level order." },
     defaultInput: "1,2,3,4,5",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],
     approach: [
-      { vi: "Đi theo nhánh trái nhất. Tại mỗi nút: left.left = right; left.right = node; xóa con của node.", en: "Follow the leftmost path. At each node: left.left = right; left.right = node; clear node's children." },
+      { vi: "Đi hết nhánh trái trước; node trái nhất là base case và trở thành gốc mới.", en: "Descend the entire left spine first; the leftmost node is the base case and becomes the new root." },
+      { vi: "Khi quay lui tại node: left.left = right và left.right = node.", en: "While unwinding at a node: set left.left = right and left.right = node." },
+      { vi: "Xóa node.left và node.right để bỏ các cạnh cũ, tránh tạo chu trình.", en: "Clear node.left and node.right to remove the old edges and avoid a cycle." },
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Đi theo 1 nhánh trái.", en: "Follow one left spine." } },
     code: ["class Solution:", "    def upsideDownBinaryTree(self, root):", "        if not root or not root.left:", "            return root", "        new_root = self.upsideDownBinaryTree(root.left)", "        root.left.left = root.right", "        root.left.right = root", "        root.left = None", "        root.right = None", "        return new_root"],
     builder: buildSteps156,
+    debugMode: "semantic",
   },
   337: {
     id: 337, difficulty: "medium", slug: "house-robber-iii",

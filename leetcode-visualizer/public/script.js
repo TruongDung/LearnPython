@@ -4482,6 +4482,74 @@ function renderInsufficient1080View(step) {
   renderTree(step, "is1080Tree");
 }
 
+function renderUpsideDown156View(step) {
+  const view = step.upsideDown156View || {};
+  const vi = lang === "vi";
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const phases = [
+    [vi ? "1 · Đi xuống trái" : "1 · Descend left", vi ? "tìm node cuối" : "find the last node"],
+    [vi ? "2 · Base case" : "2 · Base case", vi ? "chọn gốc mới" : "choose new root"],
+    [vi ? "3 · Quay lui" : "3 · Unwind", vi ? "đổi các cạnh" : "rewire edges"],
+    [vi ? "4 · Hoàn tất" : "4 · Complete", vi ? "trả cây mới" : "return new tree"],
+  ].map(([label, detail], index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${escapeHtml(label)}</b><small>${escapeHtml(detail)}</small></span>`).join("");
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((value, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(value)}</strong></span>`).join("<i>→</i>")
+    : `<em>${view.phase === "done" ? (vi ? "stack đã rỗng" : "stack is empty") : (vi ? "chưa gọi đệ quy" : "recursion has not started")}</em>`;
+
+  const pivot = view.pivot;
+  const value = item => item === null || item === undefined ? "∅" : escapeHtml(item);
+  const rotationHtml = pivot ? `<section class="ud156-rotation ${view.operation === "rewired" ? "is-done" : ""}">
+    <header><strong>${vi ? "PHÉP LẬT ĐANG XÉT" : "CURRENT LOCAL ROTATION"}</strong><span>${vi ? "chỉ 3 node thay đổi vai trò" : "only three nodes change roles"}</span></header>
+    <div class="ud156-before">
+      <small>${vi ? "TRƯỚC" : "BEFORE"}</small>
+      <div class="ud156-parent"><span>${vi ? "cha cũ" : "old parent"}</span><strong>${value(pivot.parent)}</strong></div>
+      <div class="ud156-children"><div><span>${vi ? "trái cũ" : "old left"}</span><strong>${value(pivot.left)}</strong></div><div><span>${vi ? "phải cũ" : "old right"}</span><strong>${value(pivot.right)}</strong></div></div>
+    </div>
+    <div class="ud156-turn"><b>↻</b><small>${vi ? "lật" : "turn"}</small></div>
+    <div class="ud156-after">
+      <small>${vi ? "SAU" : "AFTER"}</small>
+      <div class="ud156-parent"><span>${vi ? "cha mới" : "new parent"}</span><strong>${value(pivot.left)}</strong></div>
+      <div class="ud156-children"><div><span>${vi ? "con trái mới" : "new left"}</span><strong>${value(pivot.right)}</strong></div><div><span>${vi ? "con phải mới" : "new right"}</span><strong>${value(pivot.parent)}</strong></div></div>
+    </div>
+  </section>` : `<section class="ud156-concept">
+    <div><small>${vi ? "CON TRÁI CŨ" : "OLD LEFT"}</small><strong>${vi ? "cha mới" : "new parent"}</strong></div><i>·</i>
+    <div><small>${vi ? "CON PHẢI CŨ" : "OLD RIGHT"}</small><strong>${vi ? "con trái mới" : "new left"}</strong></div><i>·</i>
+    <div><small>${vi ? "CHA CŨ" : "OLD PARENT"}</small><strong>${vi ? "con phải mới" : "new right"}</strong></div>
+  </section>`;
+
+  const currentValues = Array.isArray(view.currentValues) ? view.currentValues : [];
+  const originalValues = Array.isArray(view.originalValues) ? view.originalValues : [];
+  const formatValues = values => `[${values.map(item => item === null ? "null" : item).join(", ")}]`;
+  const rotated = Array.isArray(view.rotated) ? view.rotated : [];
+  const treeHeading = view.phase === "done"
+    ? (vi ? "CÂY SAU KHI LẬT" : "UPSIDE-DOWN TREE")
+    : view.phase === "rewire"
+      ? (vi ? "CÂY ĐANG ĐƯỢC DỰNG TỪ GỐC MỚI" : "TREE GROWING FROM THE NEW ROOT")
+      : (vi ? "CÂY BAN ĐẦU" : "ORIGINAL TREE");
+  const summary = vi
+    ? `LeetCode 156, pha ${view.phase || "intro"}, node hiện tại ${view.current ?? "không có"}, gốc mới ${view.newRoot ?? "chưa chọn"}.`
+    : `LeetCode 156, ${view.phase || "intro"} phase, current node ${view.current ?? "none"}, new root ${view.newRoot ?? "not selected"}.`;
+
+  $("treeView").innerHTML = `<section class="ud156-viz phase-${escapeHtml(view.phase || "intro")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>RECURSION · POINTER REWIRING · #156</small><strong>UPSIDE DOWN</strong></div><span>${view.newRoot === null || view.newRoot === undefined ? (vi ? "gốc mới: ?" : "new root: ?") : `${vi ? "gốc mới" : "new root"}: ${escapeHtml(view.newRoot)}`}</span></header>
+    <div class="ud156-phases">${phases}</div>
+    <section class="ud156-rule"><b>${vi ? "NHỚ 1 CÂU" : "ONE RULE"}</b><strong>${vi ? "Đi xuống bằng cạnh trái, đổi cạnh khi quay lui." : "Descend through left edges; rewire while unwinding."}</strong></section>
+    ${rotationHtml}
+    <div class="ud156-layout">
+      <section class="ud156-tree-panel"><header><strong>${escapeHtml(treeHeading)}</strong><span>${vi ? "cam = đang đổi · xanh = đã gắn vào cây mới" : "amber = changing · green = attached to the new tree"}</span></header><div id="ud156Tree" class="ud156-tree"></div></section>
+      <aside class="ud156-side">
+        <section class="ud156-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "đi trái →, quay lui ←" : "descend →, unwind ←"}</span></header><div>${stackHtml}</div></section>
+        <section class="ud156-progress"><small>${vi ? "CHA ĐÃ LẬT" : "ROTATED PARENTS"}</small><strong>${rotated.length ? rotated.join(" → ") : "—"}</strong><span>${vi ? `${rotated.length} phép lật hoàn tất` : `${rotated.length} rotations complete`}</span></section>
+        <section class="ud156-state"><div><small>${vi ? "BAN ĐẦU" : "ORIGINAL"}</small><code>${escapeHtml(formatValues(originalValues))}</code></div><div><small>${vi ? "HIỆN TẠI" : "CURRENT"}</small><code>${escapeHtml(formatValues(currentValues))}</code></div></section>
+      </aside>
+    </div>
+    <footer class="${step.final ? "done" : ""}"><small>${vi ? "Ý NGHĨA BƯỚC NÀY" : "WHY THIS STEP MATTERS"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "ud156Tree");
+}
+
 function renderTree(step, targetId = "treeView") {
   if (step.insufficient1080View && targetId === "treeView") {
     renderInsufficient1080View(step);
@@ -30977,6 +31045,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSpiral54View(step);
+  } else if (step.upsideDown156View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderUpsideDown156View(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
