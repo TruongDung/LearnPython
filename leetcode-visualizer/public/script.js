@@ -29897,6 +29897,103 @@ function renderRectangleOverlap836View(step) {
   </section>`;
 }
 
+function renderPalindrome2472View(step) {
+  const view = step.palindrome2472View || {};
+  const vi = lang === "vi";
+  const s = String(view.s || "");
+  const n = s.length;
+  const k = Number(view.k) || 1;
+  const table = Array.isArray(view.palindrome) ? view.palindrome : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const current = Array.isArray(view.current) ? view.current : null;
+  const inner = Array.isArray(view.inner) ? view.inner : null;
+  const selected = Array.isArray(view.selected) ? view.selected : [];
+  const candidate = view.candidate || null;
+  const activePrefix = Number.isInteger(view.activePrefix) ? view.activePrefix : -1;
+  const phaseIndex = view.phase === "palindrome" ? 0 : view.phase === "prefix" ? 1 : 2;
+
+  const phases = [
+    vi ? "Nhận diện palindrome" : "Find palindromes",
+    vi ? "Tối ưu từng prefix" : "Optimize prefixes",
+    vi ? "Đọc kết quả" : "Read result",
+  ].map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const isSelected = (index) => selected.some(([left, right]) => left <= index && index <= right);
+  const isCurrent = (index) => current && current[0] <= index && index <= current[1];
+  const chars = [...s].map((char, index) => {
+    const classes = ["p2472-char"];
+    if (isSelected(index)) classes.push("selected");
+    if (isCurrent(index)) classes.push(candidate && !candidate.isPalindrome ? "rejected" : "current");
+    if (activePrefix >= 0 && index >= activePrefix) classes.push("outside-prefix");
+    const labels = [];
+    if (isSelected(index)) labels.push(vi ? "đã chọn" : "chosen");
+    if (isCurrent(index)) labels.push(vi ? "đang xét" : "checking");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${escapeHtml(labels.join(" · "))}</em></span>`;
+  }).join("");
+
+  const matrixHeader = `<span class="corner">pal</span>${[...s].map((char, index) => `<span class="axis"><small>${index}</small><b>${escapeHtml(char)}</b></span>`).join("")}`;
+  const matrixRows = [...s].map((char, row) => {
+    const cells = [...s].map((_unused, col) => {
+      if (col < row) return '<span class="p2472-pal-cell unused" aria-hidden="true"></span>';
+      const value = table[row]?.[col];
+      const classes = ["p2472-pal-cell", value == null ? "unknown" : value ? "yes" : "no"];
+      if (current && current[0] === row && current[1] === col) classes.push("current");
+      if (inner && inner[0] === row && inner[1] === col) classes.push("inner");
+      const word = s.slice(row, col + 1);
+      const state = value == null ? (vi ? "chưa tính" : "not computed") : value ? "palindrome" : (vi ? "không palindrome" : "not a palindrome");
+      return `<span class="${classes.join(" ")}" aria-label="${escapeHtml(`${word}: ${state}`)}"><b>${value == null ? "·" : value ? "1" : "0"}</b></span>`;
+    }).join("");
+    return `<span class="axis row"><small>${row}</small><b>${escapeHtml(char)}</b></span>${cells}`;
+  }).join("");
+
+  const dpCells = Array.from({ length: n + 1 }, (_unused, index) => {
+    const value = dp[index];
+    const classes = ["p2472-dp-cell"];
+    if (index === activePrefix) classes.push("active");
+    if (value != null) classes.push("ready");
+    return `<span class="${classes.join(" ")}"><small>dp[${index}]</small><b>${value == null ? "·" : value}</b><em>${index === 0 ? "∅" : escapeHtml(s.slice(0, index))}</em></span>`;
+  }).join("");
+
+  const chosenHtml = selected.length
+    ? selected.map(([left, right]) => `<span><code>[${left}..${right}]</code><b>“${escapeHtml(s.slice(left, right + 1))}”</b></span>`).join("")
+    : `<p>${vi ? "Chưa chọn palindrome nào trong prefix này." : "No palindrome has been selected in this prefix yet."}</p>`;
+
+  let transition;
+  if (view.phase === "palindrome" && current) {
+    const [left, right] = current;
+    const endpoints = s[left] === s[right];
+    const innerText = right - left <= 1 ? "base case" : `pal[${left + 1}][${right - 1}] = ${table[left + 1]?.[right - 1] ? 1 : 0}`;
+    transition = `<code>s[${left}] == s[${right}] → ${endpoints ? "True" : "False"}</code><i>AND</i><code>${escapeHtml(innerText)}</code><i>→</i><strong>${table[left]?.[right] ? "PALINDROME" : "NO"}</strong>`;
+  } else if (candidate) {
+    transition = candidate.isPalindrome
+      ? `<code>dp[${candidate.start}] + 1 = ${candidate.value}</code><i>${candidate.improves ? ">" : "≤"}</i><code>dp[${activePrefix}] = ${dp[activePrefix]}</code><strong>${candidate.improves ? (vi ? "CẬP NHẬT" : "UPDATE") : (vi ? "GIỮ NGUYÊN" : "KEEP")}</strong>`
+      : `<code>pal[${candidate.start}][${candidate.end}] = 0</code><i>→</i><strong>${vi ? "LOẠI" : "REJECT"}</strong>`;
+  } else if (view.operation === "skip") {
+    transition = `<code>dp[${activePrefix}] = dp[${activePrefix - 1}] = ${dp[activePrefix]}</code><strong>${vi ? "BỎ QUA KÝ TỰ CUỐI" : "SKIP LAST CHARACTER"}</strong>`;
+  } else {
+    transition = `<code>dp[p] = max(dp[p − 1], dp[start] + 1)</code><strong>${vi ? "MỖI ĐOẠN PHẢI DÀI ≥" : "EACH SPAN MUST HAVE LENGTH ≥"} ${k}</strong>`;
+  }
+
+  const result = view.final ? String(view.answer) : "…";
+  const summary = vi
+    ? `Bài 2472: đã chọn ${selected.length} palindrome không giao nhau; kết quả hiện tại ${view.final ? view.answer : "đang tính"}.`
+    : `Problem 2472: ${selected.length} non-overlapping palindromes selected; result ${view.final ? view.answer : "in progress"}.`;
+
+  $("treeView").innerHTML = `<section class="p2472-viz phase-${escapeHtml(view.phase || "palindrome")}" style="--p2472-size:${n}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>PALINDROME TABLE · PREFIX DP · #2472</small><strong>MAX NON-OVERLAPPING PALINDROMES</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="p2472-phases">${phases}</div>
+    <section class="p2472-rule"><b>STATE</b><span><code>pal[l][r]</code> ${vi ? "xác nhận đoạn đối xứng" : "recognizes a palindrome"} · <code>dp[p]</code> ${vi ? "tối đa số đoạn trong prefix dài p" : "maximizes the count in a prefix of length p"}</span></section>
+    <section class="p2472-string"><header><strong>${vi ? "CHUỖI ĐẦU VÀO" : "INPUT STRING"}</strong><span>k = ${k} · n = ${n}</span></header><div>${chars}</div></section>
+    <section class="p2472-main">
+      <article class="p2472-matrix"><header><strong>PALINDROME LOOKUP</strong><span>1 = yes · 0 = no · · = pending</span></header><div class="p2472-matrix-scroll"><div class="p2472-pal-grid" style="--p2472-size:${n}">${matrixHeader}${matrixRows}</div></div></article>
+      <article class="p2472-prefix"><header><strong>PREFIX DP</strong><span>${vi ? "prefix kết thúc trước vị trí p" : "prefix ends before position p"}</span></header><div class="p2472-dp-scroll"><div class="p2472-dp-grid">${dpCells}</div></div><div class="p2472-chosen"><small>${vi ? "MỘT LỰA CHỌN TỐI ƯU HIỆN TẠI" : "ONE CURRENT OPTIMAL SELECTION"}</small><div>${chosenHtml}</div></div></article>
+    </section>
+    <section class="p2472-transition">${transition}</section>
+    <section class="p2472-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="p2472-result ${view.final ? "done" : ""}"><small>MAXIMUM COUNT</small><strong>${result}</strong><span>${view.final ? (vi ? "Các đoạn xanh không giao nhau và đều dài ít nhất k." : "The green spans do not overlap and each has length at least k.") : (vi ? "Bảng DP đang được điền từ trái sang phải." : "The DP row is filling from left to right.")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -31011,6 +31108,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderShortestPalindrome214View(step);
+  } else if (step.palindrome2472View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPalindrome2472View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
