@@ -275,29 +275,183 @@ function buildSteps938(input, params) {
 // ─── 285: Inorder Successor in BST ───
 function buildSteps285(input, params) {
   const root = parseBST(input);
-  const p = params.p || 1;
-  const steps = [];
-  if (!root) { steps.push(snapshot(null, { title: { vi: "Cây rỗng", en: "Empty tree" }, vars: [{ name: "answer", value: "null" }], note: { vi: "null", en: "null" } })); steps[0].final = true; return { input, answer: "null", steps }; }
+  if (!root) throw new Error("Enter a non-empty BST in level-order form.");
 
-  steps.push(snapshot(root, { title: { vi: `Tìm successor của ${p}`, en: `Find successor of ${p}` }, hlSet: new Set(), codeLines: [2, 3], vars: [{ name: "p", value: p }, { name: "rule", value: "smallest node > p (inorder next)" }], note: { vi: `Inorder successor = nút nhỏ nhất LỚN HƠN p.\nCách: đi từ root, khi node.val > p → candidate + đi trái. Khi ≤ p → đi phải.`, en: `Inorder successor = smallest node GREATER than p.\nApproach: from root, when node.val > p → candidate + go left. When ≤ p → go right.` } }));
+  const pValue = params && params.p !== undefined ? Number(params.p) : 3;
+  if (!Number.isFinite(pValue)) throw new Error("p must be a finite number.");
 
-  let successor = null;
-  let node = root;
-  while (node) {
-    if (node.val > p) {
-      successor = node;
-      steps.push(snapshot(root, { title: { vi: `${node.val} > ${p} → candidate`, en: `${node.val} > ${p} → candidate` }, hlSet: new Set([node.id]), wordSet: new Set([node.id]), codeLines: [5, 6, 7], vars: [{ name: "node", value: node.val }, { name: "successor", value: node.val }, { name: "go", value: "left" }], note: { vi: `${node.val} > ${p} → cập nhật successor = ${node.val}. Đi trái tìm nhỏ hơn.`, en: `${node.val} > ${p} → update successor = ${node.val}. Go left for smaller.` } }));
-      node = node.left;
-    } else {
-      steps.push(snapshot(root, { title: { vi: `${node.val} ≤ ${p} → đi phải`, en: `${node.val} ≤ ${p} → go right` }, hlSet: new Set([node.id]), codeLines: [8, 9], vars: [{ name: "node", value: node.val }, { name: "go", value: "right" }], note: { vi: `${node.val} ≤ ${p} → cần nút lớn hơn → đi phải.`, en: `${node.val} ≤ ${p} → need larger → go right.` } }));
-      node = node.right;
+  const allNodes = [];
+  const inorderNodes = [];
+  (function collect(node) {
+    if (!node) return;
+    allNodes.push(node);
+    collect(node.left);
+    inorderNodes.push(node);
+    collect(node.right);
+  })(root);
+  if (allNodes.some((item) => !Number.isFinite(item.val))) {
+    throw new Error("Every BST value must be a finite number.");
+  }
+  for (let index = 1; index < inorderNodes.length; index += 1) {
+    if (inorderNodes[index].val <= inorderNodes[index - 1].val) {
+      throw new Error("Input must be a valid BST with unique values.");
     }
   }
+  const pNode = allNodes.find((item) => item.val === pValue);
+  if (!pNode) throw new Error("p must match a value that exists in the BST.");
 
-  const ans = successor ? successor.val : "null";
-  const fs = snapshot(root, { title: { vi: `Kết quả: ${ans}`, en: `Result: ${ans}` }, hlSet: successor ? new Set([successor.id]) : new Set(), wordSet: successor ? new Set([successor.id]) : new Set(), codeLines: [10], vars: [{ name: "answer", value: ans }], note: { vi: `Inorder successor của ${p} = ${ans}.`, en: `Inorder successor of ${p} = ${ans}.` } });
-  fs.final = true; steps.push(fs);
-  return { input, answer: ans, steps };
+  const steps = [];
+  const visited = [];
+  let successor = null;
+  let node = null;
+
+  function addStep(options) {
+    const current = options.current === undefined ? node : options.current;
+    const annotations = {
+      [pNode.id]: { labels: [{ label: "P", kind: "target" }] },
+    };
+    if (successor) {
+      annotations[successor.id] = {
+        labels: [
+          ...(annotations[successor.id]?.labels || []),
+          { label: "SUCCESSOR", kind: "answer" },
+        ],
+      };
+    }
+    if (current) {
+      annotations[current.id] = {
+        labels: [
+          ...(annotations[current.id]?.labels || []),
+          { label: "CURRENT", kind: "current" },
+        ],
+      };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: new Set(successor ? [successor.id] : []),
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "p.val", value: pValue },
+        { name: "node", value: current ? current.val : "None" },
+        { name: "successor", value: successor ? successor.val : "None" },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.inorderSuccessor285View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      p: { id: pNode.id, value: pValue },
+      current: current ? { id: current.id, value: current.val } : null,
+      successor: successor ? { id: successor.id, value: successor.val } : null,
+      visited: visited.map((item) => ({ id: item.id, value: item.val })),
+      comparison: options.comparison || null,
+      direction: options.direction || null,
+      next: options.next ? { id: options.next.id, value: options.next.val } : null,
+      oldSuccessor: options.oldSuccessor === undefined ? null : options.oldSuccessor,
+      answer: options.final ? (successor ? successor.val : null) : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "successor = None", en: "successor = None" },
+    phase: "initialize", phaseIndex: 0, operation: "initialize-successor", codeLine: 3, current: null,
+    note: { vi: `Ta chưa thấy giá trị nào lớn hơn p = ${pValue}. Successor phải là giá trị nhỏ nhất lớn hơn p.`, en: `No value greater than p = ${pValue} has been seen yet. The successor must be the smallest value greater than p.` },
+  });
+
+  node = root;
+  addStep({
+    title: { vi: `node bắt đầu tại root ${root.val}`, en: `node starts at root ${root.val}` },
+    phase: "initialize", phaseIndex: 0, operation: "set-node", codeLine: 4,
+    note: { vi: "Con trỏ node sẽ đi xuống đúng một đường của BST.", en: "The node pointer will follow exactly one path down the BST." },
+  });
+
+  while (node) {
+    visited.push(node);
+    addStep({
+      title: { vi: `node = ${node.val} nên tiếp tục`, en: `node = ${node.val}, so continue` },
+      phase: "search", phaseIndex: 1, operation: "while-check", codeLine: 5,
+      vars: [{ name: "path", value: `[${visited.map((item) => item.val).join(", ")}]` }],
+      note: { vi: `Đang xét ${node.val}; đây là node thứ ${visited.length} trên đường tìm kiếm.`, en: `Inspecting ${node.val}; this is node ${visited.length} on the search path.` },
+    });
+
+    const isGreater = node.val > pValue;
+    const direction = isGreater ? "left" : "right";
+    const next = isGreater ? node.left : node.right;
+    addStep({
+      title: isGreater
+        ? { vi: `${node.val} > ${pValue} → có thể là successor`, en: `${node.val} > ${pValue} → possible successor` }
+        : { vi: `${node.val} ≤ ${pValue} → chưa đủ lớn`, en: `${node.val} ≤ ${pValue} → not large enough` },
+      phase: "compare", phaseIndex: 1, operation: "compare", codeLine: 6,
+      comparison: isGreater ? "greater" : "not-greater", direction, next,
+      vars: [{ name: "node.val > p.val", value: isGreater }],
+      note: isGreater
+        ? { vi: `${node.val} lớn hơn p, nên là một ứng viên hợp lệ. Ta vẫn phải đi trái để tìm ứng viên nhỏ hơn.`, en: `${node.val} is greater than p, so it is valid. We still go left to look for a smaller valid candidate.` }
+        : { vi: `${node.val} không lớn hơn p, nên cả node này và mọi node bên trái đều không thể là successor.`, en: `${node.val} is not greater than p, so neither it nor anything to its left can be the successor.` },
+    });
+
+    if (isGreater) {
+      const oldSuccessor = successor ? successor.val : null;
+      successor = node;
+      addStep({
+        title: { vi: `Cập nhật successor = ${successor.val}`, en: `Update successor = ${successor.val}` },
+        phase: "candidate", phaseIndex: 2, operation: "update-successor", codeLine: 7,
+        comparison: "greater", direction, next, oldSuccessor,
+        note: oldSuccessor === null
+          ? { vi: `${successor.val} là ứng viên đầu tiên lớn hơn p.`, en: `${successor.val} is the first candidate greater than p.` }
+          : { vi: `${successor.val} thay ${oldSuccessor}: vẫn lớn hơn p nhưng nhỏ hơn ứng viên cũ.`, en: `${successor.val} replaces ${oldSuccessor}: it is still greater than p but smaller than the old candidate.` },
+      });
+      addStep({
+        title: next
+          ? { vi: `Đi trái tới ${next.val}`, en: `Move left to ${next.val}` }
+          : { vi: "Đi trái tới None", en: "Move left to None" },
+        phase: "move", phaseIndex: 1, operation: "move-left", codeLine: 8,
+        comparison: "greater", direction, next,
+        note: next
+          ? { vi: `Tìm một giá trị nằm giữa p = ${pValue} và successor = ${successor.val}.`, en: `Look for a value between p = ${pValue} and successor = ${successor.val}.` }
+          : { vi: "Không còn node nhỏ hơn trong nhánh này; ứng viên hiện tại là tốt nhất.", en: "No smaller node remains in this branch; the current candidate is best." },
+      });
+    } else {
+      addStep({
+        title: next
+          ? { vi: `Đi phải tới ${next.val}`, en: `Move right to ${next.val}` }
+          : { vi: "Đi phải tới None", en: "Move right to None" },
+        phase: "move", phaseIndex: 1, operation: "move-right", codeLine: 10,
+        comparison: "not-greater", direction, next,
+        note: next
+          ? { vi: `Chỉ nhánh phải mới có thể chứa giá trị lớn hơn ${pValue}.`, en: `Only the right subtree can contain a value greater than ${pValue}.` }
+          : { vi: `Không còn giá trị lớn hơn ở đường này.`, en: `No larger value remains on this path.` },
+      });
+    }
+    node = next;
+  }
+
+  addStep({
+    title: { vi: "node = None → dừng vòng lặp", en: "node = None → stop the loop" },
+    phase: "search", phaseIndex: 1, operation: "while-stop", codeLine: 5, current: null,
+    note: { vi: "Đã đi hết đường BST cần thiết; không cần duyệt các nhánh đã bị loại.", en: "The required BST path is exhausted; discarded branches never need to be visited." },
+  });
+
+  const answer = successor ? successor.val : "null";
+  addStep({
+    title: successor
+      ? { vi: `Trả về successor = ${answer}`, en: `Return successor = ${answer}` }
+      : { vi: "Trả về None — không có successor", en: "Return None—there is no successor" },
+    phase: "done", phaseIndex: 3, operation: "return", codeLine: 11, current: null, final: true,
+    vars: [{ name: "answer", value: answer }],
+    note: successor
+      ? { vi: `${answer} là giá trị nhỏ nhất trong BST lớn hơn p = ${pValue}.`, en: `${answer} is the smallest BST value greater than p = ${pValue}.` }
+      : { vi: `${pValue} là giá trị lớn nhất trong BST nên không có inorder successor.`, en: `${pValue} is the largest BST value, so it has no inorder successor.` },
+  });
+
+  return { input, answer, steps };
 }
 
 // ─── 235: Lowest Common Ancestor of BST ───
@@ -3059,10 +3213,17 @@ module.exports = {
     defaultInput: "5,3,6,2,4,null,null,1",
     inputKind: "string",
     inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [{ key: "p", label: { vi: "p (giá trị cần tìm successor)", en: "p (find successor of)" }, default: 3 }],
+    extraParams: [{ key: "p", type: "number", label: { vi: "p (giá trị cần tìm successor)", en: "p (find successor of)" }, default: 3 }],
+    tags: [
+      { key: "bst", vi: "BST", en: "BST" },
+      { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+      { key: "inorder", vi: "Inorder", en: "Inorder" },
+    ],
+    debugMode: "semantic",
     approach: [
-      { vi: "Từ root: nếu node.val > p → candidate, đi trái (tìm nhỏ hơn). Nếu ≤ p → đi phải.", en: "From root: if node.val > p → candidate, go left. If ≤ p → go right." },
-      { vi: "Khi tới null → candidate cuối cùng chính là successor.", en: "When reaching null → last candidate is the successor." },
+      { vi: "Successor là giá trị nhỏ nhất lớn hơn p. Bắt đầu từ root và chỉ đi một đường của BST.", en: "The successor is the smallest value greater than p. Start at the root and follow only one BST path." },
+      { vi: "Nếu node.val > p.val: lưu node làm ứng viên rồi đi trái để tìm ứng viên nhỏ hơn.", en: "If node.val > p.val, save node as the candidate and move left to seek a smaller candidate." },
+      { vi: "Nếu node.val ≤ p.val: bỏ node cùng toàn bộ nhánh trái rồi đi phải. Khi tới None, ứng viên cuối cùng là đáp án.", en: "If node.val ≤ p.val, discard the node and its entire left subtree, then move right. At None, the last candidate is the answer." },
     ],
     complexity: { time: "O(h)", space: "O(1)", note: { vi: "Đi theo 1 nhánh BST → O(h).", en: "Follow one BST path → O(h)." } },
     code: ["class Solution:", "    def inorderSuccessor(self, root, p):", "        successor = None", "        node = root", "        while node:", "            if node.val > p.val:", "                successor = node", "                node = node.left", "            else:", "                node = node.right", "        return successor"],

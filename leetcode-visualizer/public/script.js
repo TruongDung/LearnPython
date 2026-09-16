@@ -30579,6 +30579,63 @@ function renderClosestBst270View(step) {
   renderTree({ tree: step.tree }, "cb270Tree");
 }
 
+function renderInorderSuccessor285View(step) {
+  const view = step.inorderSuccessor285View || {};
+  const vi = lang === "vi";
+  const p = view.p || {};
+  const current = view.current || null;
+  const successor = view.successor || null;
+  const next = view.next || null;
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "So sánh + đi nhánh", "Lưu ứng viên", "Trả kết quả"]
+    : ["Initialize", "Compare + branch", "Save candidate", "Return answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const numberText = (value) => Number.isFinite(value) ? Number(value).toString() : "—";
+  const comparison = view.comparison === "greater" ? ">" : view.comparison === "not-greater" ? "≤" : "?";
+  const comparisonClass = view.comparison === "greater" ? "valid" : view.comparison === "not-greater" ? "invalid" : "idle";
+  const directionText = view.direction === "left" ? (vi ? "TRÁI" : "LEFT") : view.direction === "right" ? (vi ? "PHẢI" : "RIGHT") : "—";
+  const reasonText = view.direction === "left"
+    ? (vi ? "node đủ lớn; đi trái để tìm số nhỏ hơn" : "node is large enough; go left for a smaller value")
+    : view.direction === "right"
+      ? (vi ? "node chưa lớn hơn p; chỉ nhánh phải còn hy vọng" : "node is not greater than p; only the right side can work")
+      : (vi ? "Chờ so sánh node với p" : "Waiting to compare node with p");
+  const pathHtml = visited.length
+    ? visited.map((item, index) => {
+        const role = item.value === p.value ? "p" : successor && item.id === successor.id ? "successor" : current && item.id === current.id ? "current" : "";
+        return `<span class="${role}"><small>${index + 1}</small><b>${escapeHtml(numberText(item.value))}</b></span>`;
+      }).join("<i>→</i>")
+    : `<em>${vi ? "Chưa duyệt node nào" : "No node visited yet"}</em>`;
+  const candidateChange = view.operation === "update-successor"
+    ? `<div class="cb285-change"><span>${view.oldSuccessor === null ? "None" : escapeHtml(numberText(view.oldSuccessor))}</span><i>→</i><strong>${escapeHtml(numberText(successor && successor.value))}</strong></div>`
+    : `<div class="cb285-change"><span>${vi ? "ứng viên hiện tại" : "current candidate"}</span><i>→</i><strong>${successor ? escapeHtml(numberText(successor.value)) : "None"}</strong></div>`;
+  const final = Boolean(view.final);
+  const answerText = final ? (view.answer === null ? "None" : numberText(view.answer)) : "…";
+  const summary = vi
+    ? `Bài 285: tìm successor của ${numberText(p.value)}, current ${numberText(current && current.value)}, ứng viên ${numberText(successor && successor.value)}.`
+    : `Problem 285: successor of ${numberText(p.value)}, current ${numberText(current && current.value)}, candidate ${numberText(successor && successor.value)}.`;
+
+  $("treeView").innerHTML = `<section class="cb285-viz phase-${escapeHtml(view.phase || "initialize")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BST · ONE SEARCH PATH · #285</small><strong>${vi ? "INORDER SUCCESSOR TRONG BST" : "INORDER SUCCESSOR IN BST"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cb285-phases">${phases}</div>
+    <section class="cb285-rule"><strong>SUCCESSOR</strong><span>${vi ? "giá trị nhỏ nhất thỏa" : "smallest value satisfying"}</span><code>successor.val &gt; p.val</code></section>
+    <div class="cb285-layout">
+      <section class="cb285-tree-card"><header><strong>${vi ? "ĐƯỜNG TÌM TRÊN BST" : "BST SEARCH PATH"}</strong><span>${vi ? "tím = p · cam = current · xanh = successor" : "purple = p · amber = current · green = successor"}</span></header><div id="cb285Tree" class="cb285-tree"></div></section>
+      <aside class="cb285-side">
+        <section class="cb285-values"><div><small>p.val</small><strong>${escapeHtml(numberText(p.value))}</strong></div><div><small>node.val</small><strong>${escapeHtml(numberText(current && current.value))}</strong></div><div><small>successor</small><strong>${successor ? escapeHtml(numberText(successor.value)) : "None"}</strong></div></section>
+        <section class="cb285-compare ${comparisonClass}"><header><strong>${vi ? "CÂU HỎI DUY NHẤT" : "THE ONE QUESTION"}</strong><span>node.val &gt; p.val ?</span></header><div><b>${escapeHtml(numberText(current && current.value))}</b><i>${comparison}</i><b>${escapeHtml(numberText(p.value))}</b><em>${comparisonClass === "valid" ? "TRUE" : comparisonClass === "invalid" ? "FALSE" : "—"}</em></div></section>
+        <section class="cb285-decision ${view.direction || "idle"}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(directionText)} → ${next ? escapeHtml(numberText(next.value)) : view.direction ? "None" : "—"}</strong><span>${escapeHtml(reasonText)}</span></section>
+        <section class="cb285-candidate ${view.operation === "update-successor" ? "updated" : ""}"><small>${vi ? "ỨNG VIÊN TỐT NHẤT" : "BEST CANDIDATE"}</small>${candidateChange}<p>${successor ? (vi ? `${successor.value} > ${p.value}; tiếp tục tìm số nhỏ hơn nếu có.` : `${successor.value} > ${p.value}; keep looking for a smaller valid value.`) : (vi ? "Chưa gặp node nào lớn hơn p." : "No node greater than p has been found.")}</p></section>
+        <section class="cb285-path"><header><strong>${vi ? "ĐƯỜNG ĐÃ ĐI" : "VISITED PATH"}</strong><span>${visited.length} ${vi ? "node" : "node(s)"}</span></header><div>${pathHtml}</div></section>
+      </aside>
+    </div>
+    <section class="cb285-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="cb285-result ${final ? "done" : ""} ${final && view.answer === null ? "empty" : ""}"><small>SUCCESSOR(${escapeHtml(numberText(p.value))})</small><strong>${escapeHtml(answerText)}</strong><span>${final ? view.answer === null ? (vi ? "p là node lớn nhất nên không có successor." : "p is the largest node, so no successor exists.") : (vi ? "Giá trị nhỏ nhất lớn hơn p." : "The smallest value greater than p.") : (vi ? "Giữ ứng viên rồi tiếp tục thu hẹp bằng tính chất BST." : "Keep a candidate and narrow the search using BST order.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "cb285Tree");
+}
+
 function renderClosestBst272View(step) {
   const view = step.closestBst272View || {};
   const vi = lang === "vi";
@@ -31376,6 +31433,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderClosestBst270View(step);
+  } else if (step.inorderSuccessor285View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderInorderSuccessor285View(step);
   } else if (step.closestBst272View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
