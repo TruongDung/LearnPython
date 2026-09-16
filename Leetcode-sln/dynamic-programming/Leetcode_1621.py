@@ -23,7 +23,13 @@ class Solution:
 
     def numberOfSetsCombinatorial(self, n: int, k: int) -> int:
         """Stars and bars over k segment lengths and k + 1 gaps."""
-        return math.comb(n + k - 1, 2 * k) % (10**9 + 7)
+        distance = n - 1
+        mandatory_edges = k
+        remaining = distance - mandatory_edges
+        variables = 2 * k + 1
+        dividers = variables - 1
+        total_slots = remaining + dividers
+        return math.comb(total_slots, dividers) % (10**9 + 7)
 
 
 if __name__ == "__main__":

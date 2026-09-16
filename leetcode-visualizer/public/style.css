@@ -53111,8 +53111,10 @@ html, body {
 .ls1621-cell.pending { opacity: .25; }
 .ls1621-cell.skip-source { border-color: var(--ls1621-skip); background: color-mix(in srgb, var(--ls1621-skip) 11%, var(--ls1621-panel)); opacity: 1; }
 .ls1621-cell.prefix-source { border-color: color-mix(in srgb, var(--ls1621-prefix) 58%, var(--ls1621-border)); background: color-mix(in srgb, var(--ls1621-prefix) 9%, var(--ls1621-panel)); opacity: 1; }
+.ls1621-cell.running-source { border-color: var(--ls1621-prefix); background: color-mix(in srgb, var(--ls1621-prefix) 12%, var(--ls1621-panel)); opacity: 1; }
 .ls1621-cell.current { border: 2px solid var(--ls1621-current); background: color-mix(in srgb, var(--ls1621-current) 12%, var(--ls1621-panel)); opacity: 1; }
 .ls1621-cell.current b { color: var(--ls1621-current); }
+.ls1621-cell.prefix-current small { color: var(--ls1621-prefix); font-weight: 800; }
 .ls1621-cell.answer { border-color: var(--ls1621-good); background: color-mix(in srgb, var(--ls1621-good) 12%, var(--ls1621-panel)); }
 .ls1621-cell.answer b { color: var(--ls1621-good); }
 .ls1621-formula { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
@@ -53161,6 +53163,7 @@ html, body {
 .ls1621-comb-stars > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; min-height: 52px; padding: 8px; border-radius: 8px; background: var(--ls1621-soft); }
 .ls1621-comb-stars .star { color: var(--ls1621-current); font-size: 22px; }
 .ls1621-comb-stars .bar { color: var(--ls1621-prefix); font: 800 28px/1 Consolas, monospace; }
+.ls1621-comb-wait { color: var(--ls1621-muted); font-size: 10px; }
 .ls1621-comb-stars > p { margin: 0; color: var(--ls1621-muted); font-size: 10px; text-align: center; }
 .ls1621-comb-formula { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; }
 .ls1621-comb-formula > span { display: grid; gap: 3px; min-width: 120px; text-align: center; }

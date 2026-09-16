@@ -30219,6 +30219,8 @@ function renderLineSegments1621View(step) {
     const variables = Number(view.variables) || 0;
     const bars = Number(view.bars) || 0;
     const totalSlots = Number(view.totalSlots) || 0;
+    const revealed = view.revealed || {};
+    const show = (name, value) => revealed[name] ? value : "…";
     const shifted = view.phase !== "encode";
     const parts = shifted && Array.isArray(view.shiftedParts) ? view.shiftedParts : (Array.isArray(view.parts) ? view.parts : []);
     const phaseIndex = view.phase === "encode" ? 0 : view.phase === "shift" ? 1 : view.phase === "stars" ? 2 : 3;
@@ -30235,13 +30237,13 @@ function renderLineSegments1621View(step) {
       return `${index ? `<i aria-hidden="true">+</i>` : ""}<span class="ls1621-comb-piece ${kind}"><strong>${label}</strong><small>${caption} ≥ ${Number(part.minimum) || 0}</small></span>`;
     }).join("");
     const labels = parts.map((part) => escapeHtml(part.label || "?")).join(" + ");
-    const rightSide = shifted ? remaining : totalDistance;
-    const tokens = [
+    const rightSide = shifted ? show("remaining", remaining) : show("distance", totalDistance);
+    const tokens = revealed.dividers ? [
       ...Array.from({ length: remaining }, () => `<span class="star" aria-label="star">★</span>`),
       ...Array.from({ length: bars }, () => `<span class="bar" aria-label="divider">|</span>`),
-    ].join("");
+    ].join("") : `<span class="ls1621-comb-wait">${vi ? "Tính số vạch ở dòng tiếp theo" : "Compute the divider count on the next line"}</span>`;
     const starPanel = phaseIndex >= 2
-      ? `<section class="ls1621-comb-stars"><header><strong>STARS AND BARS</strong><span>${vi ? `${remaining} sao + ${bars} vạch = ${totalSlots} vị trí` : `${remaining} stars + ${bars} dividers = ${totalSlots} slots`}</span></header><div aria-label="${vi ? "Một cách sắp xếp sao và vạch" : "One stars-and-bars arrangement"}">${tokens || `<span class="bar">|</span>`}</div><p>${vi ? `Chọn ${bars} vị trí đặt vạch trong ${totalSlots} vị trí.` : `Choose ${bars} divider positions among ${totalSlots} slots.`}</p></section>`
+      ? `<section class="ls1621-comb-stars"><header><strong>STARS AND BARS</strong><span>${vi ? `${show("remaining", remaining)} sao + ${show("dividers", bars)} vạch = ${show("total_slots", totalSlots)} vị trí` : `${show("remaining", remaining)} stars + ${show("dividers", bars)} dividers = ${show("total_slots", totalSlots)} slots`}</span></header><div aria-label="${vi ? "Một cách sắp xếp sao và vạch" : "One stars-and-bars arrangement"}">${tokens}</div><p>${revealed.total_slots ? (vi ? `Chọn ${bars} vị trí đặt vạch trong ${totalSlots} vị trí.` : `Choose ${bars} divider positions among ${totalSlots} slots.`) : (vi ? "Mỗi dòng code mở thêm đúng một đại lượng." : "Each code line reveals exactly one more quantity.")}</p></section>`
       : "";
     const answer = view.final ? String(view.answer) : "…";
     const summary = vi
@@ -30254,8 +30256,8 @@ function renderLineSegments1621View(step) {
       <section class="ls1621-comb-meaning"><strong>${shifted ? (vi ? "SAU KHI TRỪ 1 CẠNH BẮT BUỘC MỖI ĐOẠN" : "AFTER REMOVING 1 MANDATORY EDGE PER SEGMENT") : (vi ? "MỘT HÌNH VẼ = ĐỘ DÀI ĐOẠN + CÁC KHOẢNG TRỐNG" : "ONE DRAWING = SEGMENT LENGTHS + GAPS")}</strong><span>${vi ? `${k} đoạn tạo ${k} biến s; trước, giữa và sau chúng có ${k + 1} biến g.` : `${k} segments create ${k} s-variables; before, between, and after them are ${k + 1} g-variables.`}</span></section>
       <section class="ls1621-comb-parts"><div>${partHtml}</div><p><code>${labels}</code><b>=</b><strong>${rightSide}</strong></p></section>
       ${starPanel}
-      <section class="ls1621-comb-formula"><span><small>${vi ? "SỐ BIẾN" : "VARIABLES"}</small><strong>${variables} = 2k + 1</strong></span><i>→</i><span><small>${vi ? "SỐ VẠCH" : "DIVIDERS"}</small><strong>${bars} = 2k</strong></span><i>→</i><span><small>${vi ? "CHỌN VỊ TRÍ VẠCH" : "CHOOSE DIVIDER SLOTS"}</small><strong>C(${totalSlots}, ${bars})</strong></span></section>
-      <footer class="ls1621-result ${view.final ? "done" : ""}"><small>NUMBER OF SETS</small><strong>${answer}</strong><span>C(n + k − 1, 2k) = C(${totalSlots}, ${bars})${view.final ? ` = ${answer}` : ""}</span></footer>
+      <section class="ls1621-comb-formula"><span><small>${vi ? "SỐ BIẾN" : "VARIABLES"}</small><strong>${show("variables", variables)}${revealed.variables ? " = 2k + 1" : ""}</strong></span><i>→</i><span><small>${vi ? "SỐ VẠCH" : "DIVIDERS"}</small><strong>${show("dividers", bars)}${revealed.dividers ? " = 2k" : ""}</strong></span><i>→</i><span><small>${vi ? "CHỌN VỊ TRÍ VẠCH" : "CHOOSE DIVIDER SLOTS"}</small><strong>C(${show("total_slots", totalSlots)}, ${show("dividers", bars)})</strong></span></section>
+      <footer class="ls1621-result ${view.final ? "done" : ""}"><small>NUMBER OF SETS</small><strong>${answer}</strong><span>C(n + k − 1, 2k) = C(${show("total_slots", totalSlots)}, ${show("dividers", bars)})${view.final ? ` = ${answer}` : ""}</span></footer>
     </section>`;
     return;
   }
@@ -30265,6 +30267,7 @@ function renderLineSegments1621View(step) {
   const ways = Array.isArray(view.ways) ? view.ways : [];
   const prefix = Array.isArray(view.prefix) ? view.prefix : [];
   const computed = Array.isArray(view.computed) ? view.computed : [];
+  const prefixComputed = Array.isArray(view.prefixComputed) ? view.prefixComputed : computed;
   const points = Number.isInteger(view.points) ? view.points : 0;
   const segments = Number.isInteger(view.segments) ? view.segments : 0;
   const candidates = Array.isArray(view.candidates) ? view.candidates : [];
@@ -30291,29 +30294,40 @@ function renderLineSegments1621View(step) {
         const state = candidate.priorWays > 0 ? "contributes" : "zero";
         return `<div class="ls1621-lane ${state}"><code>start ${candidate.start}</code><div class="ls1621-track"><i style="left:${left}%;width:${width}%"></i><span style="left:${left}%"></span><span style="left:${left + width}%"></span></div><b>${candidate.priorWays}</b><small>${vi ? "cách bên trái" : "left-side ways"}</small></div>`;
       }).join("")
-    : `<p>${view.phase === "fill" ? (vi ? "Chưa có điểm nào bên trái để tạo đoạn có độ dài dương." : "No earlier point can form a positive-length segment yet.") : (vi ? "Các đoạn ứng viên sẽ xuất hiện khi điền trạng thái." : "Candidate final segments appear while filling a state.")}</p>`;
+    : `<p>${view.operation === "read-skip" ? (vi ? "Dòng này chỉ đọc nhánh bỏ điểm cuối; các đoạn ứng viên xuất hiện ở dòng kế tiếp." : "This line only reads the skip branch; candidate segments appear on the next line.") : view.phase === "fill" ? (vi ? "Chưa có điểm nào bên trái để tạo đoạn có độ dài dương." : "No earlier point can form a positive-length segment yet.") : (vi ? "Các đoạn ứng viên sẽ xuất hiện khi điền trạng thái." : "Candidate final segments appear while filling a state.")}</p>`;
 
   const tableHeader = `<span class="corner">s \\ p</span>${Array.from({ length: n + 1 }, (_unused, p) => `<span class="axis"><small>${vi ? "điểm" : "points"}</small><b>${p}</b></span>`).join("")}`;
   const tableRows = Array.from({ length: k + 1 }, (_unused, s) => {
     const cells = Array.from({ length: n + 1 }, (_unusedCell, p) => {
       const ready = Boolean(computed[p]?.[s]);
+      const sumReady = Boolean(prefixComputed[p]?.[s]);
       const classes = ["ls1621-cell", ready ? "ready" : "pending"];
       if (p === points && s === segments) classes.push("current");
-      if (view.phase === "fill" && p === points - 1 && s === segments) classes.push("skip-source");
-      if (view.phase === "fill" && s === segments - 1 && p >= 1 && p <= points - 1) classes.push("prefix-source");
+      if (view.phase === "fill" && ["read-skip", "write-ways"].includes(view.operation) && p === points - 1 && s === segments) classes.push("skip-source");
+      if (view.phase === "fill" && ["read-prefix", "write-ways"].includes(view.operation) && s === segments - 1 && p >= 1 && p <= points - 1) classes.push("prefix-source");
+      if (view.operation === "write-prefix" && p === points - 1 && s === segments) classes.push("running-source");
+      if (view.operation === "write-prefix" && p === points && s === segments) classes.push("prefix-current");
       if (view.final && p === n && s === k) classes.push("answer");
       const value = ready ? ways[p]?.[s] ?? 0 : "·";
-      const sum = ready ? prefix[p]?.[s] ?? 0 : "·";
+      const sum = sumReady ? prefix[p]?.[s] ?? 0 : "·";
       return `<span class="${classes.join(" ")}"><b>${value}</b><small>Σ ${sum}</small></span>`;
     }).join("");
     return `<span class="axis row"><small>${vi ? "đoạn" : "segments"}</small><b>${s}</b></span>${cells}`;
   }).join("");
 
   let formula;
-  if (view.phase === "fill") {
+  if (view.operation === "read-skip") {
+    formula = `<span><small>${vi ? "ĐỌC Ô XANH" : "READ BLUE CELL"}</small><code>skip = ways[${points - 1}][${segments}]</code></span><i>→</i><strong>${view.skip}</strong>`;
+  } else if (view.operation === "read-prefix") {
+    formula = `<span><small>${vi ? "ĐỌC TỔNG PREFIX" : "READ PREFIX SUM"}</small><code>end_here = prefix[${points - 1}][${segments - 1}]</code></span><i>→</i><strong>${view.endHere}</strong>`;
+  } else if (view.operation === "write-ways") {
     formula = `<span><small>${vi ? "BỎ ĐIỂM CUỐI" : "SKIP LAST POINT"}</small><code>ways[${points - 1}][${segments}] = ${view.skip}</code></span><i>+</i><span><small>${vi ? "KẾT THÚC ĐOẠN TẠI" : "END SEGMENT AT"} ${points - 1}</small><code>prefix[${points - 1}][${segments - 1}] = ${view.endHere}</code></span><i>=</i><strong>${ways[points]?.[segments] ?? 0}</strong>`;
-  } else if (view.phase === "base") {
-    formula = `<span><small>BASE</small><code>ways[${points}][0] = 1</code></span><i>·</i><span><small>RUNNING SUM</small><code>prefix[${points}][0] = ${points}</code></span>`;
+  } else if (view.operation === "write-prefix") {
+    formula = `<span><small>${vi ? "PREFIX TRƯỚC" : "PREVIOUS PREFIX"}</small><code>prefix[${points - 1}][${segments}] = ${prefix[points - 1]?.[segments] ?? 0}</code></span><i>+</i><span><small>${vi ? "Ô WAYS VỪA GHI" : "NEW WAYS CELL"}</small><code>ways[${points}][${segments}] = ${ways[points]?.[segments] ?? 0}</code></span><i>=</i><strong>${prefix[points]?.[segments] ?? 0}</strong>`;
+  } else if (view.operation === "base-ways") {
+    formula = `<span><small>BASE WAYS</small><code>ways[${points}][0]</code></span><i>=</i><strong>1</strong>`;
+  } else if (view.operation === "base-prefix") {
+    formula = `<span><small>RUNNING SUM</small><code>prefix[${points}][0]</code></span><i>=</i><strong>${points}</strong>`;
   } else if (view.final) {
     formula = `<span><small>ANSWER</small><code>ways[${n}][${k}]</code></span><i>=</i><strong>${view.answer}</strong>`;
   } else {

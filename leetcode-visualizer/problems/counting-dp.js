@@ -16,6 +16,7 @@ function buildSteps1621(input, params = {}) {
   const ways = Array.from({ length: n + 1 }, () => Array(k + 1).fill(0));
   const prefix = Array.from({ length: n + 1 }, () => Array(k + 1).fill(0));
   const computed = Array.from({ length: n + 1 }, () => Array(k + 1).fill(false));
+  const prefixComputed = Array.from({ length: n + 1 }, () => Array(k + 1).fill(false));
   const steps = [];
 
   const snapshot = ({ phase, operation, codeLine, title, note, points = 0, segments = 0,
@@ -31,6 +32,7 @@ function buildSteps1621(input, params = {}) {
         ways: ways.map((row) => [...row]),
         prefix: prefix.map((row) => [...row]),
         computed: computed.map((row) => [...row]),
+        prefixComputed: prefixComputed.map((row) => [...row]),
         points,
         segments,
         skip,
@@ -43,7 +45,8 @@ function buildSteps1621(input, params = {}) {
         { name: "n", value: n },
         { name: "k", value: k },
         ...(points > 0 ? [{ name: "points", value: points }, { name: "segments", value: segments }] : []),
-        ...(skip != null ? [{ name: "skip", value: skip }, { name: "end_here", value: endHere }] : []),
+        ...(skip != null ? [{ name: "skip", value: skip }] : []),
+        ...(endHere != null ? [{ name: "end_here", value: endHere }] : []),
       ],
       note,
       final,
@@ -51,7 +54,10 @@ function buildSteps1621(input, params = {}) {
   };
 
   ways[0][0] = 1;
-  for (let segments = 0; segments <= k; segments += 1) computed[0][segments] = true;
+  for (let segments = 0; segments <= k; segments += 1) {
+    computed[0][segments] = true;
+    prefixComputed[0][segments] = true;
+  }
   snapshot({
     phase: "init",
     operation: "init",
@@ -65,23 +71,51 @@ function buildSteps1621(input, params = {}) {
 
   for (let points = 1; points <= n; points += 1) {
     ways[points][0] = 1;
-    prefix[points][0] = points;
     computed[points][0] = true;
     snapshot({
       phase: "base",
-      operation: "base",
+      operation: "base-ways",
+      codeLine: 8,
+      points,
+      segments: 0,
+      title: { vi: `Gán ways[${points}][0] = 1`, en: `Set ways[${points}][0] = 1` },
+      note: {
+        vi: `Dùng ${points} điểm nhưng vẽ 0 đoạn luôn có đúng một cách: không chọn đoạn nào.`,
+        en: `Using ${points} points and drawing 0 segments has exactly one configuration: choose nothing.`,
+      },
+    });
+
+    prefix[points][0] = points;
+    prefixComputed[points][0] = true;
+    snapshot({
+      phase: "base",
+      operation: "base-prefix",
       codeLine: 9,
       points,
       segments: 0,
-      title: { vi: `${points} điểm, 0 đoạn: 1 cách`, en: `${points} points, 0 segments: 1 way` },
+      title: { vi: `Gán prefix[${points}][0] = ${points}`, en: `Set prefix[${points}][0] = ${points}` },
       note: {
-        vi: `Không vẽ gì luôn có đúng 1 cách. prefix[${points}][0] = 1 + ··· + 1 = ${points}.`,
-        en: `Drawing nothing always gives exactly one way. prefix[${points}][0] = 1 + ··· + 1 = ${points}.`,
+        vi: `prefix[${points}][0] = ways[1][0] + ··· + ways[${points}][0] = ${points}.`,
+        en: `prefix[${points}][0] = ways[1][0] + ··· + ways[${points}][0] = ${points}.`,
       },
     });
 
     for (let segments = 1; segments <= k; segments += 1) {
       const skip = ways[points - 1][segments];
+      snapshot({
+        phase: "fill",
+        operation: "read-skip",
+        codeLine: 11,
+        points,
+        segments,
+        skip,
+        title: { vi: `Đọc nhánh bỏ điểm cuối: ${skip}`, en: `Read the skip branch: ${skip}` },
+        note: {
+          vi: `Không dùng điểm ${points - 1}; sao chép ways[${points - 1}][${segments}] = ${skip}.`,
+          en: `Do not use point ${points - 1}; copy ways[${points - 1}][${segments}] = ${skip}.`,
+        },
+      });
+
       const candidates = [];
       for (let q = 1; q <= points - 1; q += 1) {
         candidates.push({
@@ -92,13 +126,27 @@ function buildSteps1621(input, params = {}) {
         });
       }
       const endHere = prefix[points - 1][segments - 1];
-      ways[points][segments] = (skip + endHere) % MOD;
-      prefix[points][segments] = (prefix[points - 1][segments] + ways[points][segments]) % MOD;
-      computed[points][segments] = true;
-
       snapshot({
         phase: "fill",
-        operation: "cell",
+        operation: "read-prefix",
+        codeLine: 12,
+        points,
+        segments,
+        skip,
+        endHere,
+        candidates,
+        title: { vi: `Đọc nhánh kết thúc tại ${points - 1}: ${endHere}`, en: `Read the end-here branch: ${endHere}` },
+        note: {
+          vi: `prefix[${points - 1}][${segments - 1}] = ${endHere} gom mọi vị trí có thể bắt đầu đoạn cuối.`,
+          en: `prefix[${points - 1}][${segments - 1}] = ${endHere} aggregates every possible start of the final segment.`,
+        },
+      });
+
+      ways[points][segments] = (skip + endHere) % MOD;
+      computed[points][segments] = true;
+      snapshot({
+        phase: "fill",
+        operation: "write-ways",
         codeLine: 13,
         points,
         segments,
@@ -110,8 +158,26 @@ function buildSteps1621(input, params = {}) {
           en: `ways[${points}][${segments}] = ${ways[points][segments]}`,
         },
         note: {
-          vi: `Không dùng điểm ${points - 1}: ${skip} cách. Hoặc kết thúc đoạn cuối tại đó: ${endHere} cách, gom từ mọi điểm bắt đầu hợp lệ.`,
-          en: `Do not use point ${points - 1}: ${skip} ways. Or end the last segment there: ${endHere} ways, aggregated over every valid starting point.`,
+          vi: `Cộng hai nhánh: ${skip} + ${endHere} = ${ways[points][segments]}. Ô ways hiện tại được ghi ở bước này.`,
+          en: `Add both branches: ${skip} + ${endHere} = ${ways[points][segments]}. This step writes the current ways cell.`,
+        },
+      });
+
+      prefix[points][segments] = (prefix[points - 1][segments] + ways[points][segments]) % MOD;
+      prefixComputed[points][segments] = true;
+      snapshot({
+        phase: "fill",
+        operation: "write-prefix",
+        codeLine: 14,
+        points,
+        segments,
+        skip,
+        endHere,
+        candidates,
+        title: { vi: `Cập nhật prefix[${points}][${segments}] = ${prefix[points][segments]}`, en: `Update prefix[${points}][${segments}] = ${prefix[points][segments]}` },
+        note: {
+          vi: `prefix[${points - 1}][${segments}] + ways[${points}][${segments}] = ${prefix[points - 1][segments]} + ${ways[points][segments]} = ${prefix[points][segments]}.`,
+          en: `prefix[${points - 1}][${segments}] + ways[${points}][${segments}] = ${prefix[points - 1][segments]} + ${ways[points][segments]} = ${prefix[points][segments]}.`,
         },
       });
     }
@@ -163,7 +229,15 @@ function buildCombinationSteps1621(input, params = {}) {
     }
   }
 
-  const makeStep = ({ phase, operation, codeLine, title, note, final = false }) => ({
+  const values = {
+    distance: totalDistance,
+    mandatory_edges: k,
+    remaining,
+    variables,
+    dividers: bars,
+    total_slots: totalSlots,
+  };
+  const makeStep = ({ phase, operation, codeLine, title, note, visibleVars = [], final = false }) => ({
     title,
     codeBlock: 2,
     codeLines: [codeLine],
@@ -180,14 +254,14 @@ function buildCombinationSteps1621(input, params = {}) {
       totalSlots,
       parts: parts.map((part) => ({ ...part })),
       shiftedParts: shiftedParts.map((part) => ({ ...part })),
+      revealed: Object.fromEntries(visibleVars.map((name) => [name, true])),
       answer: final ? answer : null,
       final,
     },
     vars: [
       { name: "n", value: n },
       { name: "k", value: k },
-      { name: "remaining", value: remaining },
-      { name: "bars", value: bars },
+      ...visibleVars.map((name) => ({ name, value: values[name] })),
     ],
     note,
     final,
@@ -196,19 +270,35 @@ function buildCombinationSteps1621(input, params = {}) {
   const steps = [
     makeStep({
       phase: "encode",
-      operation: "encode",
+      operation: "distance",
       codeLine: 6,
-      title: { vi: "Mã hóa đoạn thẳng thành độ dài và khoảng trống", en: "Encode segments as lengths and gaps" },
+      visibleVars: ["distance"],
+      title: { vi: `Khoảng cách tổng = n − 1 = ${totalDistance}`, en: `Total distance = n − 1 = ${totalDistance}` },
       note: {
         vi: `Có ${k} độ dài đoạn sᵢ ≥ 1 và ${k + 1} khoảng trống gᵢ ≥ 0. Tổng của chúng bằng khoảng cách từ điểm 0 đến ${n - 1}: ${totalDistance}.`,
         en: `There are ${k} segment lengths sᵢ ≥ 1 and ${k + 1} gaps gᵢ ≥ 0. Their sum is the distance from point 0 to ${n - 1}: ${totalDistance}.`,
       },
     }),
     makeStep({
+      phase: "encode",
+      operation: "mandatory",
+      codeLine: 7,
+      visibleVars: ["distance", "mandatory_edges"],
+      title: { vi: `${k} đoạn cần ${k} cạnh bắt buộc`, en: `${k} segments need ${k} mandatory edges` },
+      note: {
+        vi: `Mỗi đoạn phải nối ít nhất hai điểm nên dùng ít nhất một cạnh. Tổng phần bắt buộc là k = ${k}.`,
+        en: `Every segment must connect at least two points, so it consumes at least one edge. The mandatory total is k = ${k}.`,
+      },
+    }),
+    makeStep({
       phase: "shift",
-      operation: "shift",
-      codeLine: 6,
-      title: { vi: "Bỏ một cạnh bắt buộc khỏi mỗi đoạn", en: "Remove one mandatory edge from every segment" },
+      operation: "remaining",
+      codeLine: 8,
+      visibleVars: ["distance", "mandatory_edges", "remaining"],
+      title: {
+        vi: `Còn lại ${remaining} cạnh để phân phối`,
+        en: `${remaining} ${remaining === 1 ? "edge remains" : "edges remain"} to distribute`,
+      },
       note: {
         vi: `Đặt tᵢ = sᵢ − 1. Tất cả ${variables} biến mới đều không âm và tổng còn lại là ${totalDistance} − ${k} = ${remaining}.`,
         en: `Set tᵢ = sᵢ − 1. All ${variables} new variables are non-negative and their remaining sum is ${totalDistance} − ${k} = ${remaining}.`,
@@ -216,18 +306,42 @@ function buildCombinationSteps1621(input, params = {}) {
     }),
     makeStep({
       phase: "stars",
-      operation: "stars-bars",
-      codeLine: 7,
-      title: { vi: "Áp dụng Stars and Bars", en: "Apply stars and bars" },
+      operation: "variables",
+      codeLine: 9,
+      visibleVars: ["distance", "mandatory_edges", "remaining", "variables"],
+      title: { vi: `Có ${variables} biến không âm`, en: `There are ${variables} non-negative variables` },
       note: {
-        vi: `${remaining} ngôi sao được chia vào ${variables} ô bằng ${bars} vạch ngăn. Chọn vị trí cho ${bars} vạch trong ${totalSlots} vị trí.`,
-        en: `Distribute ${remaining} stars among ${variables} boxes using ${bars} dividers. Choose the ${bars} divider positions among ${totalSlots} slots.`,
+        vi: `${k + 1} biến khoảng trống g và ${k} biến phần mở rộng t tạo tổng cộng 2k + 1 = ${variables} ô.`,
+        en: `${k + 1} gap variables g and ${k} extension variables t create 2k + 1 = ${variables} boxes.`,
+      },
+    }),
+    makeStep({
+      phase: "stars",
+      operation: "dividers",
+      codeLine: 10,
+      visibleVars: ["distance", "mandatory_edges", "remaining", "variables", "dividers"],
+      title: { vi: `${variables} ô cần ${bars} vạch ngăn`, en: `${variables} boxes need ${bars} dividers` },
+      note: {
+        vi: `Stars and Bars dùng số vạch bằng số ô trừ một: ${variables} − 1 = ${bars}.`,
+        en: `Stars and bars uses one fewer divider than boxes: ${variables} − 1 = ${bars}.`,
+      },
+    }),
+    makeStep({
+      phase: "stars",
+      operation: "total-slots",
+      codeLine: 11,
+      visibleVars: ["distance", "mandatory_edges", "remaining", "variables", "dividers", "total_slots"],
+      title: { vi: `Tổng cộng ${totalSlots} vị trí`, en: `${totalSlots} total slots` },
+      note: {
+        vi: `${remaining} ngôi sao + ${bars} vạch = ${totalSlots} vị trí; chọn ${bars} vị trí cho các vạch.`,
+        en: `${remaining} stars + ${bars} dividers = ${totalSlots} slots; choose ${bars} divider positions.`,
       },
     }),
     makeStep({
       phase: "done",
       operation: "return",
-      codeLine: 8,
+      codeLine: 12,
+      visibleVars: ["distance", "mandatory_edges", "remaining", "variables", "dividers", "total_slots"],
       final: true,
       title: { vi: `Kết quả: C(${totalSlots}, ${bars}) = ${answer}`, en: `Result: C(${totalSlots}, ${bars}) = ${answer}` },
       note: {
@@ -313,8 +427,12 @@ module.exports = {
       "class Solution:",
       "    def numberOfSets(self, n: int, k: int) -> int:",
       "        MOD = 10**9 + 7",
-      "        total_slots = n + k - 1",
-      "        dividers = 2 * k",
+      "        distance = n - 1",
+      "        mandatory_edges = k",
+      "        remaining = distance - mandatory_edges",
+      "        variables = 2 * k + 1",
+      "        dividers = variables - 1",
+      "        total_slots = remaining + dividers",
       "        return math.comb(total_slots, dividers) % MOD",
     ],
     liveArgs: (input, params) => {

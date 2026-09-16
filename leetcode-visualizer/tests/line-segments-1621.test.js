@@ -60,31 +60,55 @@ test('1621 agrees with an independent exhaustive segment-set oracle', () => {
   }
 });
 
-test('1621 trace exposes both recurrence branches and prefix aggregation', () => {
+test('1621 DP trace advances one source/read/write line at a time', () => {
   const result = problem.builder([4], { k: 2 });
   assert.ok(result.steps.every((step) => step.lineSegments1621View));
   assert.ok(result.steps.every((step) => step.codeLines.length === 1));
   const operations = new Set(result.steps.map((step) => step.lineSegments1621View.operation));
-  for (const operation of ['init', 'base', 'cell', 'return']) assert.ok(operations.has(operation), operation);
+  for (const operation of [
+    'init',
+    'base-ways',
+    'base-prefix',
+    'read-skip',
+    'read-prefix',
+    'write-ways',
+    'write-prefix',
+    'return',
+  ]) assert.ok(operations.has(operation), operation);
 
-  const finalCell = result.steps.find((step) => {
+  const cellSteps = result.steps.filter((step) => {
     const view = step.lineSegments1621View;
-    return view.operation === 'cell' && view.points === 4 && view.segments === 2;
-  }).lineSegments1621View;
+    return view.points === 4 && view.segments === 2 && view.phase === 'fill';
+  });
+  assert.deepEqual(cellSteps.map((step) => step.codeLines[0]), [11, 12, 13, 14]);
+  assert.deepEqual(cellSteps.map((step) => step.lineSegments1621View.operation), [
+    'read-skip',
+    'read-prefix',
+    'write-ways',
+    'write-prefix',
+  ]);
+
+  const finalCell = cellSteps[2].lineSegments1621View;
   assert.equal(finalCell.skip, 1);
   assert.equal(finalCell.endHere, 4);
   assert.equal(finalCell.ways[4][2], 5);
+  assert.equal(finalCell.prefixComputed[4][2], false);
+  assert.equal(cellSteps[3].lineSegments1621View.prefixComputed[4][2], true);
   assert.deepEqual(finalCell.candidates.map((item) => item.priorWays), [0, 1, 3]);
 });
 
-test('1621 combinatorial trace explains encoding, shifting, and stars and bars', () => {
+test('1621 combinatorial trace maps every derived quantity to one code line', () => {
   const result = problem.builder([4], { k: 2, approach: 2 });
-  assert.equal(result.steps.length, 4);
+  assert.equal(result.steps.length, 7);
   assert.ok(result.steps.every((step) => step.codeBlock === 2));
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [6, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(result.steps.map((step) => step.lineSegments1621View.operation), [
-    'encode',
-    'shift',
-    'stars-bars',
+    'distance',
+    'mandatory',
+    'remaining',
+    'variables',
+    'dividers',
+    'total-slots',
     'return',
   ]);
   const view = result.steps.at(-1).lineSegments1621View;
