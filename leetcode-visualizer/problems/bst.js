@@ -2250,6 +2250,233 @@ function buildSteps270(input, params) {
   return { input, answer: closest, steps };
 }
 
+// ─── 272: Closest Binary Search Tree Value II ───
+function buildSteps272(input, params) {
+  const root = parseBST(input);
+  if (!root) throw new Error("Enter a non-empty BST in level-order form.");
+
+  const target = params && params.target !== undefined ? Number(params.target) : 3.714286;
+  const k = params && params.k !== undefined ? Number(params.k) : 2;
+  if (!Number.isFinite(target)) throw new Error("target must be a finite number.");
+  if (!Number.isInteger(k) || k < 1) throw new Error("k must be a positive integer.");
+
+  const allNodes = [];
+  (function collect(node) {
+    if (!node) return;
+    allNodes.push(node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+  if (allNodes.some((node) => !Number.isFinite(node.val))) {
+    throw new Error("Every BST value must be a finite number.");
+  }
+  if (k > allNodes.length) throw new Error("k cannot exceed the number of BST nodes.");
+
+  const steps = [];
+  const orderedNodes = [];
+  const traversalStack = [];
+  const removedIndices = new Set();
+  let left = null;
+  let right = null;
+
+  const numberText = (value) => Number(value.toFixed(6)).toString();
+  const distance = (value) => Math.abs(value - target);
+
+  function addStep(options) {
+    const current = options.current || null;
+    const collectedIds = new Set(orderedNodes.map((node) => node.id));
+    const annotations = {};
+    for (const node of orderedNodes) {
+      annotations[node.id] = { labels: [{ label: "SORTED", kind: "answer" }] };
+    }
+    if (current) {
+      annotations[current.id] = {
+        labels: [
+          ...(annotations[current.id]?.labels || []),
+          { label: "CURRENT", kind: "current" },
+        ],
+      };
+    }
+
+    const values = orderedNodes.map((node) => node.val);
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: collectedIds,
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "target", value: target },
+        { name: "k", value: k },
+        { name: "left", value: left === null ? "—" : left },
+        { name: "right", value: right === null ? "—" : right },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.closestBst272View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      target,
+      k,
+      values,
+      orderedNodeIds: orderedNodes.map((node) => node.id),
+      current: current ? { id: current.id, value: current.val } : null,
+      stack: traversalStack.map((node) => ({ id: node.id, value: node.val })),
+      left,
+      right,
+      windowSize: left === null || right === null ? values.length : Math.max(0, right - left + 1),
+      leftValue: left === null || left >= values.length ? null : values[left],
+      rightValue: right === null || right < 0 ? null : values[right],
+      leftDistance: left === null || left >= values.length ? null : distance(values[left]),
+      rightDistance: right === null || right < 0 ? null : distance(values[right]),
+      removedIndices: [...removedIndices],
+      removeSide: options.removeSide || null,
+      removeIndex: options.removeIndex === undefined ? null : options.removeIndex,
+      removeValue: options.removeValue === undefined ? null : options.removeValue,
+      answer: options.final ? values.slice(left, right + 1) : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "Tạo mảng values rỗng", en: "Create an empty values array" },
+    phase: "inorder", phaseIndex: 0, operation: "initialize-values", codeLine: 3,
+    note: { vi: "Ta sẽ dùng inorder để đưa toàn bộ giá trị BST vào mảng theo thứ tự tăng dần.", en: "Inorder traversal will place every BST value into the array in ascending order." },
+  });
+
+  function inorder(node) {
+    if (!node) return;
+    traversalStack.push(node);
+    addStep({
+      title: { vi: `Kiểm tra node ${node.val}: không rỗng`, en: `Check node ${node.val}: not null` },
+      phase: "inorder", phaseIndex: 0, operation: "visit-frame", codeLine: 5, current: node,
+      vars: [{ name: "stack", value: `[${traversalStack.map((item) => item.val).join(", ")}]` }],
+      note: { vi: `Frame của node ${node.val} đang hoạt động; inorder luôn xử lý cây con trái trước.`, en: `The frame for node ${node.val} is active; inorder always processes its left subtree first.` },
+    });
+    addStep({
+      title: { vi: `Đi sang trái của ${node.val}`, en: `Traverse left from ${node.val}` },
+      phase: "inorder", phaseIndex: 0, operation: "go-left", codeLine: 7, current: node,
+      note: { vi: "Các giá trị nhỏ hơn phải được thêm vào mảng trước node hiện tại.", en: "Smaller values must enter the array before the current node." },
+    });
+    inorder(node.left);
+
+    orderedNodes.push(node);
+    addStep({
+      title: { vi: `Thêm ${node.val} vào values`, en: `Append ${node.val} to values` },
+      phase: "inorder", phaseIndex: 0, operation: "append", codeLine: 8, current: node,
+      vars: [{ name: "values", value: `[${orderedNodes.map((item) => item.val).join(", ")}]` }],
+      note: { vi: `Sau cây trái, thêm node ${node.val}. Mảng hiện tại vẫn được sắp tăng dần.`, en: `After its left subtree, append node ${node.val}. The current array remains sorted.` },
+    });
+
+    addStep({
+      title: { vi: `Đi sang phải của ${node.val}`, en: `Traverse right from ${node.val}` },
+      phase: "inorder", phaseIndex: 0, operation: "go-right", codeLine: 9, current: node,
+      note: { vi: "Các giá trị lớn hơn node hiện tại sẽ được thêm sau.", en: "Values greater than the current node will be appended afterward." },
+    });
+    inorder(node.right);
+    traversalStack.pop();
+  }
+
+  inorder(root);
+  const values = orderedNodes.map((node) => node.val);
+  for (let index = 1; index < values.length; index += 1) {
+    if (values[index] <= values[index - 1]) {
+      throw new Error("Input must be a valid BST with unique values.");
+    }
+  }
+  addStep({
+    title: { vi: `Inorder hoàn tất: [${values.join(", ")}]`, en: `Inorder complete: [${values.join(", ")}]` },
+    phase: "sorted", phaseIndex: 1, operation: "inorder-complete", codeLine: 10,
+    vars: [{ name: "values", value: `[${values.join(", ")}]` }],
+    note: { vi: "BST đã trở thành một hàng số tăng dần. Bây giờ chỉ cần giữ lại đoạn liên tiếp gần target nhất.", en: "The BST is now an ascending row. We only need to keep the contiguous segment closest to target." },
+  });
+
+  left = 0;
+  addStep({
+    title: { vi: "Đặt left = 0", en: "Set left = 0" },
+    phase: "window", phaseIndex: 2, operation: "set-left", codeLine: 11,
+    note: { vi: "Cửa sổ ban đầu bắt đầu tại phần tử nhỏ nhất.", en: "The initial window starts at the smallest value." },
+  });
+  right = values.length - 1;
+  addStep({
+    title: { vi: `Đặt right = ${right}`, en: `Set right = ${right}` },
+    phase: "window", phaseIndex: 2, operation: "set-right", codeLine: 12,
+    note: { vi: "Cửa sổ ban đầu chứa toàn bộ dãy đã sắp xếp.", en: "The initial window contains the entire sorted array." },
+  });
+
+  while (right - left + 1 > k) {
+    const leftDistance = distance(values[left]);
+    const rightDistance = distance(values[right]);
+    addStep({
+      title: { vi: `Cửa sổ có ${right - left + 1} phần tử > k = ${k}`, en: `Window has ${right - left + 1} values > k = ${k}` },
+      phase: "window", phaseIndex: 2, operation: "check-window", codeLine: 13,
+      vars: [{ name: "window size", value: right - left + 1 }],
+      note: { vi: "Còn quá nhiều ứng viên, nên phải loại đúng một đầu xa target hơn.", en: "There are too many candidates, so remove exactly one endpoint—the one farther from target." },
+    });
+    const removeSide = leftDistance > rightDistance ? "left" : "right";
+    addStep({
+      title: {
+        vi: `So ${numberText(leftDistance)} với ${numberText(rightDistance)} → loại ${removeSide === "left" ? "trái" : "phải"}`,
+        en: `Compare ${numberText(leftDistance)} with ${numberText(rightDistance)} → remove ${removeSide}`,
+      },
+      phase: "window", phaseIndex: 2, operation: "compare-ends", codeLine: 14, removeSide,
+      vars: [
+        { name: `|${values[left]} - target|`, value: numberText(leftDistance) },
+        { name: `|${values[right]} - target|`, value: numberText(rightDistance) },
+      ],
+      note: removeSide === "left"
+        ? { vi: `${values[left]} xa target hơn ${values[right]}, nên loại đầu trái.`, en: `${values[left]} is farther from target than ${values[right]}, so discard the left endpoint.` }
+        : leftDistance === rightDistance
+          ? { vi: "Hai đầu cách target bằng nhau; loại đầu phải để giữ giá trị nhỏ hơn.", en: "The endpoints are equally distant; discard the right one to keep the smaller value." }
+          : { vi: `${values[right]} xa target hơn ${values[left]}, nên loại đầu phải.`, en: `${values[right]} is farther from target than ${values[left]}, so discard the right endpoint.` },
+    });
+
+    if (removeSide === "left") {
+      const removeIndex = left;
+      const removeValue = values[left];
+      removedIndices.add(removeIndex);
+      left += 1;
+      addStep({
+        title: { vi: `left += 1 → loại ${removeValue}`, en: `left += 1 → remove ${removeValue}` },
+        phase: "window", phaseIndex: 2, operation: "remove-left", codeLine: 15,
+        removeSide, removeIndex, removeValue,
+        note: { vi: `Cửa sổ mới bắt đầu tại index ${left}; ${removeValue} không thể thuộc đáp án.`, en: `The new window starts at index ${left}; ${removeValue} cannot be in the answer.` },
+      });
+    } else {
+      const removeIndex = right;
+      const removeValue = values[right];
+      removedIndices.add(removeIndex);
+      right -= 1;
+      addStep({
+        title: { vi: `right -= 1 → loại ${removeValue}`, en: `right -= 1 → remove ${removeValue}` },
+        phase: "window", phaseIndex: 2, operation: "remove-right", codeLine: 17,
+        removeSide, removeIndex, removeValue,
+        note: { vi: `Cửa sổ mới kết thúc tại index ${right}; ${removeValue} không thể thuộc đáp án.`, en: `The new window ends at index ${right}; ${removeValue} cannot be in the answer.` },
+      });
+    }
+  }
+
+  addStep({
+    title: { vi: `Cửa sổ còn đúng k = ${k} phần tử`, en: `The window now has exactly k = ${k} values` },
+    phase: "window", phaseIndex: 2, operation: "window-ready", codeLine: 13,
+    vars: [{ name: "window size", value: right - left + 1 }],
+    note: { vi: "Điều kiện while sai; mọi phần tử còn trong cửa sổ là k giá trị gần target nhất.", en: "The while condition is false; every remaining window value belongs to the k closest values." },
+  });
+  const answer = values.slice(left, right + 1);
+  addStep({
+    title: { vi: `Trả về [${answer.join(", ")}]`, en: `Return [${answer.join(", ")}]` },
+    phase: "done", phaseIndex: 3, operation: "return", codeLine: 18, final: true,
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+    note: { vi: `Đoạn values[${left}:${right + 1}] chứa đúng ${k} giá trị gần ${target} nhất.`, en: `The slice values[${left}:${right + 1}] contains exactly the ${k} values closest to ${target}.` },
+  });
+
+  return { input, answer, steps };
+}
+
 // ─── 783: Min Distance Between BST Nodes ───
 function buildSteps783(input) {
   const root = parseBST(input); const steps = []; const sorted = [];
@@ -3217,6 +3444,53 @@ module.exports = {
     complexity: { time: "O(h)", space: "O(1)", note: { vi: "1 đường từ root xuống → O(h).", en: "One path from root down → O(h)." } },
     code: ["class Solution:", "    def closestValue(self, root, target):", "        closest = root.val", "        node = root", "        while node:", "            if (abs(node.val - target), node.val) < (abs(closest - target), closest):", "                closest = node.val", "            if target < node.val:", "                node = node.left", "            else:", "                node = node.right", "        return closest"],
     builder: buildSteps270,
+  },
+  272: {
+    id: 272, difficulty: "hard", slug: "closest-binary-search-tree-value-ii",
+    category: { key: "bst", vi: "Cây nhị phân tìm kiếm (BST)", en: "Binary Search Tree" },
+    title: { vi: "Closest Binary Search Tree Value II", en: "Closest Binary Search Tree Value II" },
+    titleVi: { vi: "K giá trị BST gần target nhất", en: "K closest values in a BST" },
+    statement: { vi: "Cho BST, số thực target và số nguyên k. Trả về k giá trị trong cây gần target nhất.", en: "Given a BST, a floating-point target, and an integer k, return the k values in the tree closest to target." },
+    defaultInput: "4,2,5,1,3",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [
+      { key: "target", label: { vi: "target (số thực)", en: "target (float)" }, type: "float", default: 3.714286 },
+      { key: "k", label: { vi: "k (số lượng)", en: "k (count)" }, type: "int", default: 2 },
+    ],
+    tags: [
+      { key: "bst", vi: "BST", en: "BST" },
+      { key: "inorder", vi: "Inorder", en: "Inorder" },
+      { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+      { key: "sliding-window", vi: "Cửa sổ", en: "Window" },
+    ],
+    debugMode: "semantic",
+    approach: [
+      { vi: "Inorder BST để lấy mảng values tăng dần.", en: "Traverse the BST inorder to obtain an ascending values array." },
+      { vi: "Đặt left và right ở hai đầu. Khi cửa sổ còn nhiều hơn k phần tử, so khoảng cách của hai đầu tới target.", en: "Place left and right at the endpoints. While the window has more than k values, compare both endpoint distances to target." },
+      { vi: "Loại đầu xa hơn. Nếu bằng nhau, loại đầu phải để giữ giá trị nhỏ hơn. Đoạn còn lại là đáp án.", en: "Discard the farther endpoint. On a tie, discard the right endpoint to keep the smaller value. The remaining slice is the answer." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Inorder thăm n node; hai con trỏ chỉ co tối đa n − k lần. Mảng values dùng O(n).", en: "Inorder visits n nodes; the pointers shrink at most n − k times. The values array uses O(n) space." } },
+    code: [
+      "class Solution:",
+      "    def closestKValues(self, root, target, k):",
+      "        values = []",
+      "        def inorder(node):",
+      "            if not node:",
+      "                return",
+      "            inorder(node.left)",
+      "            values.append(node.val)",
+      "            inorder(node.right)",
+      "        inorder(root)",
+      "        left = 0",
+      "        right = len(values) - 1",
+      "        while right - left + 1 > k:",
+      "            if abs(values[left] - target) > abs(values[right] - target):",
+      "                left += 1",
+      "            else:",
+      "                right -= 1",
+      "        return values[left:right + 1]",
+    ],
+    builder: buildSteps272,
   },
   783: {
     id: 783, difficulty: "easy", slug: "minimum-distance-between-bst-nodes",

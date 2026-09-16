@@ -4482,6 +4482,65 @@ function renderInsufficient1080View(step) {
   renderTree(step, "is1080Tree");
 }
 
+function renderUnivalue250View(step) {
+  const view = step.univalue250View || {};
+  const vi = lang === "vi";
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const phases = [
+    vi ? "1 · Postorder" : "1 · Postorder",
+    vi ? "2 · Ghép kết quả con" : "2 · Combine children",
+    vi ? "3 · Kết luận + đếm" : "3 · Decide + count",
+    vi ? "4 · Đáp án" : "4 · Answer",
+  ].map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index + 1}</b>${escapeHtml(label.replace(/^\d+ · /, ""))}</span>`).join("");
+
+  const statuses = Array.isArray(view.statuses) ? view.statuses : [];
+  const accepted = statuses.filter(item => item.state === "univalue");
+  const rejected = statuses.filter(item => item.state === "rejected");
+  const pending = statuses.filter(item => item.state === "pending");
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(frame.value)}</strong></span>`).join("<i>→</i>")
+    : `<em>${view.phase === "done" ? (vi ? "stack đã rỗng" : "stack is empty") : (vi ? "chưa bắt đầu" : "not started")}</em>`;
+
+  function childCard(side, child) {
+    const label = side === "left" ? (vi ? "CON TRÁI" : "LEFT CHILD") : (vi ? "CON PHẢI" : "RIGHT CHILD");
+    if (!child) return `<article class="empty"><small>${label}</small><strong>None</strong><span>${vi ? "None trả True" : "None returns True"}</span></article>`;
+    const subtree = child.isUnivalue ? "True" : "False";
+    const matches = child.matches ? "True" : "False";
+    return `<article class="${child.isUnivalue && child.matches ? "pass" : "fail"}"><small>${label}</small><strong>${child.exists ? escapeHtml(child.value) : "None"}</strong><span>subtree UNI = <b>${subtree}</b></span><span>${vi ? "giá trị khớp" : "value matches"} = <b>${matches}</b></span></article>`;
+  }
+
+  const checksHtml = view.current
+    ? `<section class="uv250-checks"><header><strong>${vi ? `KIỂM TRA NODE ${escapeHtml(view.current.value)}` : `CHECK NODE ${escapeHtml(view.current.value)}`}</strong><span>${vi ? "cần đủ 4 điều kiện" : "all four conditions are required"}</span></header><div>${childCard("left", view.left)}<i>AND</i>${childCard("right", view.right)}</div><code>${escapeHtml(view.formula || (vi ? "đang chờ hai con" : "waiting for both children"))}</code></section>`
+    : `<section class="uv250-rule"><strong>${vi ? "SUBTREE ĐỒNG NHẤT KHI" : "A SUBTREE IS UNIVALUE WHEN"}</strong><code>left UNI ∧ right UNI ∧ left matches ∧ right matches</code></section>`;
+
+  const statusHtml = statuses.length
+    ? statuses.map(item => `<span class="${escapeHtml(item.state)}"><small>node</small><b>${escapeHtml(item.value)}</b><em>${item.state === "univalue" ? "UNI" : item.state === "rejected" ? (vi ? "KHÔNG" : "NO") : "?"}</em></span>`).join("")
+    : `<em>—</em>`;
+  const countChanged = Number(view.countAfter) > Number(view.countBefore);
+  const final = Boolean(step.final || view.phase === "done");
+  const summary = vi
+    ? `LeetCode 250, pha ${view.phase || "postorder"}, count ${view.countAfter || 0}, ${accepted.length} subtree đồng nhất.`
+    : `LeetCode 250, ${view.phase || "postorder"} phase, count ${view.countAfter || 0}, ${accepted.length} univalue subtrees.`;
+
+  $("treeView").innerHTML = `<section class="uv250-viz phase-${escapeHtml(view.phase || "descend")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>POSTORDER DFS · BOOLEAN RETURN · #250</small><strong>COUNT UNIVALUE SUBTREES</strong></div><span>count = ${escapeHtml(view.countAfter || 0)}</span></header>
+    <div class="uv250-phases">${phases}</div>
+    ${checksHtml}
+    <div class="uv250-layout">
+      <section class="uv250-tree-card"><header><strong>${vi ? "CÂY VÀ KẾT LUẬN TỪNG SUBTREE" : "TREE AND EACH SUBTREE'S VERDICT"}</strong><span>${vi ? "cam = current · xanh = UNI · đỏ = không UNI" : "amber = current · green = UNI · red = not UNI"}</span></header><div id="uv250Tree" class="uv250-tree"></div></section>
+      <aside class="uv250-side">
+        <section class="uv250-count ${countChanged ? "changed" : ""}"><small>COUNT</small><strong>${escapeHtml(view.countAfter || 0)}</strong><span>${countChanged ? `+1 (${view.countBefore} → ${view.countAfter})` : (vi ? "không đổi ở bước này" : "unchanged in this step")}</span></section>
+        <section class="uv250-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><div>${stackHtml}</div></section>
+        <section class="uv250-totals"><div class="pass"><small>UNI</small><strong>${accepted.length}</strong></div><div class="fail"><small>${vi ? "KHÔNG UNI" : "NOT UNI"}</small><strong>${rejected.length}</strong></div><div><small>${vi ? "CHỜ" : "PENDING"}</small><strong>${pending.length}</strong></div></section>
+        <section class="uv250-status"><header><strong>${vi ? "TRẠNG THÁI MỖI NODE" : "NODE VERDICTS"}</strong></header><div>${statusHtml}</div></section>
+      </aside>
+    </div>
+    <footer class="${final ? "done" : ""}"><small>${escapeHtml(String(view.operation || "postorder").toUpperCase())}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "uv250Tree");
+}
+
 function renderUpsideDown156View(step) {
   const view = step.upsideDown156View || {};
   const vi = lang === "vi";
@@ -30520,6 +30579,85 @@ function renderClosestBst270View(step) {
   renderTree({ tree: step.tree }, "cb270Tree");
 }
 
+function renderClosestBst272View(step) {
+  const view = step.closestBst272View || {};
+  const vi = lang === "vi";
+  const values = Array.isArray(view.values) ? view.values : [];
+  const removed = new Set(Array.isArray(view.removedIndices) ? view.removedIndices : []);
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const target = Number(view.target);
+  const k = Number(view.k) || 0;
+  const left = Number.isInteger(view.left) ? view.left : null;
+  const right = Number.isInteger(view.right) ? view.right : null;
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const numberText = (value) => Number.isFinite(value) ? Number(value.toFixed(6)).toString() : "—";
+  const phaseLabels = vi
+    ? ["Inorder BST", "Dãy tăng dần", "Co cửa sổ", "Kết quả"]
+    : ["Inorder BST", "Sorted values", "Shrink window", "Answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const valueCells = values.length
+    ? values.map((value, index) => {
+        const outside = removed.has(index) || (left !== null && right !== null && (index < left || index > right));
+        const markers = [
+          index === left ? `<i class="left">L</i>` : "",
+          index === right ? `<i class="right">R</i>` : "",
+        ].join("");
+        const classes = [
+          "cb272-cell",
+          outside ? "removed" : "candidate",
+          index === left ? "left" : "",
+          index === right ? "right" : "",
+          index === view.removeIndex ? "just-removed" : "",
+          view.current && value === view.current.value ? "current" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${classes}"><span>${markers}</span><small>index ${index}</small><strong>${escapeHtml(numberText(value))}</strong><em>|Δ| ${escapeHtml(numberText(Math.abs(value - target)))}</em></div>`;
+      }).join("")
+    : `<p>${vi ? "Mảng còn rỗng — inorder chưa thêm node nào." : "The array is empty—inorder has not appended a node yet."}</p>`;
+
+  const stackHtml = stack.length
+    ? stack.map((item, index) => `<span class="${view.current && item.id === view.current.id ? "current" : ""}"><small>${index === stack.length - 1 ? "TOP" : `#${index + 1}`}</small><b>${escapeHtml(numberText(item.value))}</b></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack rỗng" : "Empty stack"}</em>`;
+  const hasEnds = left !== null && right !== null && Number.isFinite(view.leftValue) && Number.isFinite(view.rightValue);
+  const comparisonSymbol = hasEnds
+    ? view.leftDistance > view.rightDistance ? ">" : view.leftDistance < view.rightDistance ? "<" : "="
+    : "?";
+  const decisionText = !hasEnds
+    ? (vi ? "Chờ khởi tạo L và R" : "Waiting for L and R")
+    : view.removeSide === "left"
+      ? (vi ? "Đầu trái xa hơn → bỏ L" : "Left is farther → discard L")
+      : view.removeSide === "right"
+        ? view.leftDistance === view.rightDistance
+          ? (vi ? "Bằng nhau → bỏ R, giữ số nhỏ hơn" : "Tie → discard R, keep the smaller value")
+          : (vi ? "Đầu phải xa hơn → bỏ R" : "Right is farther → discard R")
+        : (vi ? "So hai khoảng cách ở hai đầu" : "Compare the two endpoint distances");
+  const windowSize = Number(view.windowSize) || 0;
+  const windowReady = left !== null && right !== null && windowSize === k;
+  const currentText = view.current ? numberText(view.current.value) : "—";
+  const answerText = view.final && Array.isArray(view.answer) ? `[${view.answer.map(numberText).join(", ")}]` : "…";
+  const summary = vi
+    ? `Bài 272: target ${numberText(target)}, cần ${k} giá trị, cửa sổ hiện có ${windowSize}.`
+    : `Problem 272: target ${numberText(target)}, need ${k} values, current window has ${windowSize}.`;
+
+  $("treeView").innerHTML = `<section class="cb272-viz phase-${escapeHtml(view.phase || "inorder")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BST · INORDER + TWO POINTERS · #272</small><strong>${vi ? "K GIÁ TRỊ GẦN TARGET NHẤT" : "K CLOSEST VALUES IN A BST"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cb272-phases">${phases}</div>
+    <section class="cb272-rule"><strong>${vi ? "Ý TƯỞNG CHÍNH" : "CORE IDEA"}</strong><span>BST <b>inorder</b> → ${vi ? "dãy tăng dần" : "sorted values"}</span><span>${vi ? "mỗi vòng loại đầu xa target hơn" : "each loop discards the farther endpoint"}</span></section>
+    <div class="cb272-layout">
+      <section class="cb272-tree-card"><header><strong>${vi ? "1 · DUYỆT INORDER" : "1 · INORDER TRAVERSAL"}</strong><span>${vi ? "xanh = đã thêm · cam = node hiện tại" : "green = appended · amber = current"}</span></header><div id="cb272Tree" class="cb272-tree"></div><footer><small>CALL STACK</small><div>${stackHtml}</div><span>current = <b>${escapeHtml(currentText)}</b></span></footer></section>
+      <aside class="cb272-side">
+        <section class="cb272-target"><small>TARGET</small><strong>${escapeHtml(numberText(target))}</strong><span>k = <b>${k}</b></span></section>
+        <section class="cb272-compare ${view.removeSide ? `remove-${view.removeSide}` : "idle"}"><header><strong>${vi ? "2 · SO HAI ĐẦU" : "2 · COMPARE ENDPOINTS"}</strong><span>${escapeHtml(decisionText)}</span></header><div><article><small>L · ${escapeHtml(numberText(view.leftValue))}</small><b>${escapeHtml(numberText(view.leftDistance))}</b><em>|L − target|</em></article><i>${comparisonSymbol}</i><article><small>R · ${escapeHtml(numberText(view.rightValue))}</small><b>${escapeHtml(numberText(view.rightDistance))}</b><em>|R − target|</em></article></div></section>
+        <section class="cb272-window ${windowReady ? "ready" : ""}"><header><strong>${vi ? "CỬA SỔ ỨNG VIÊN" : "CANDIDATE WINDOW"}</strong><span>${windowSize} / k=${k}</span></header><div><b>L = ${left === null ? "—" : left}</b><i>values[L : R + 1]</i><b>R = ${right === null ? "—" : right}</b></div><p>${windowReady ? (vi ? "Đủ k phần tử — dừng co cửa sổ." : "Exactly k values—stop shrinking.") : (vi ? "Còn hơn k phần tử thì tiếp tục loại một đầu." : "Keep removing one endpoint while more than k remain.")}</p></section>
+      </aside>
+    </div>
+    <section class="cb272-values"><header><strong>${vi ? "DÃY TĂNG DẦN + CỬA SỔ [L, R]" : "SORTED VALUES + WINDOW [L, R]"}</strong><span>${vi ? "mờ/gạch = đã loại · |Δ| = khoảng cách tới target" : "dimmed/struck = removed · |Δ| = distance to target"}</span></header><div>${valueCells}</div></section>
+    <section class="cb272-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="cb272-result ${view.final ? "done" : ""}"><small>ANSWER</small><strong>${escapeHtml(answerText)}</strong><span>${view.final ? (vi ? `${k} giá trị còn lại gần target nhất.` : `The remaining ${k} values are closest to target.`) : (vi ? "Giữ lại đúng k ô không bị loại." : "Keep exactly k cells that are not discarded.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "cb272Tree");
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -31238,6 +31376,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderClosestBst270View(step);
+  } else if (step.closestBst272View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClosestBst272View(step);
   } else if (step.palPathView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -31364,6 +31508,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSpiral54View(step);
+  } else if (step.univalue250View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderUnivalue250View(step);
   } else if (step.upsideDown156View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

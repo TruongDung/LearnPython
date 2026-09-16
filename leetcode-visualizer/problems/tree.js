@@ -4421,6 +4421,167 @@ function buildSteps863v2(input, params) {
   return { input, answer: "[]", steps };
 }
 
+// ─── 250: Count Univalue Subtrees ───
+function buildSteps250(input) {
+  const root = parseTree(input);
+  const steps = [];
+  const callStack = [];
+  const status = new Map();
+  const allNodes = [];
+  let count = 0;
+
+  (function collect(node) {
+    if (!node) return;
+    allNodes.push(node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  function statusRows() {
+    return allNodes.map((node) => ({
+      id: node.id,
+      value: node.val,
+      state: status.has(node.id) ? (status.get(node.id) ? "univalue" : "rejected") : "pending",
+    }));
+  }
+
+  function addStep(options) {
+    const current = options.current || null;
+    const acceptedIds = allNodes.filter((node) => status.get(node.id) === true).map((node) => node.id);
+    const annotations = {};
+    for (const node of allNodes) {
+      if (status.get(node.id) === true) annotations[node.id] = { labels: [{ label: "UNI", kind: "answer" }] };
+      if (status.get(node.id) === false) annotations[node.id] = { labels: [{ label: "NOT UNI", kind: "reject" }] };
+    }
+    if (current) {
+      annotations[current.id] = {
+        labels: [
+          ...(annotations[current.id]?.labels || []),
+          { label: "CURRENT", kind: "current" },
+        ],
+      };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: current ? new Set([current.id]) : undefined,
+      wordSet: new Set(acceptedIds),
+      annotations,
+      codeLines: options.codeLines,
+      vars: [
+        { name: "count", value: count },
+        { name: "node", value: current ? current.val : "None" },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.univalue250View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      current: current ? { id: current.id, value: current.val } : null,
+      stack: callStack.map((node) => ({ id: node.id, value: node.val })),
+      statuses: statusRows(),
+      left: options.left || null,
+      right: options.right || null,
+      formula: options.formula || null,
+      decision: options.decision === undefined ? null : options.decision,
+      countBefore: options.countBefore === undefined ? count : options.countBefore,
+      countAfter: count,
+      acceptedIds,
+      answer: options.final ? count : null,
+    };
+    if (options.final) step.final = true;
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "Postorder: hỏi hai cây con trước", en: "Postorder: ask both children first" },
+    phase: "descend", phaseIndex: 0, operation: "intro", codeLines: [5, 9, 10],
+    vars: [{ name: "rule", value: "left UNI ∧ right UNI ∧ child values match" }],
+    note: {
+      vi: "Một subtree chỉ được kết luận sau khi biết kết quả của cả hai subtree con. Vì vậy ta duyệt postorder: trái → phải → node.",
+      en: "A subtree can be classified only after both child subtrees return. Therefore use postorder: left → right → node.",
+    },
+  });
+
+  function dfs(node) {
+    if (!node) return true;
+    callStack.push(node);
+    addStep({
+      title: { vi: `Vào node ${node.val}: đi xuống hai con`, en: `Enter node ${node.val}: descend into both children` },
+      phase: "descend", phaseIndex: 0, operation: "enter", current: node, codeLines: [7, 9, 10],
+      vars: [{ name: "stack", value: `[${callStack.map((item) => item.val).join(", ")}]` }],
+      note: { vi: `Chưa thể biết subtree gốc ${node.val} có đồng nhất hay không cho tới khi hai con trả về.`, en: `The subtree rooted at ${node.val} cannot be classified until both children return.` },
+    });
+
+    const leftIsUni = dfs(node.left);
+    const rightIsUni = dfs(node.right);
+    const leftMatches = !node.left || node.left.val === node.val;
+    const rightMatches = !node.right || node.right.val === node.val;
+    const isUnivalue = leftIsUni && rightIsUni && leftMatches && rightMatches;
+    const left = {
+      exists: Boolean(node.left),
+      value: node.left ? node.left.val : null,
+      isUnivalue: leftIsUni,
+      matches: leftMatches,
+    };
+    const right = {
+      exists: Boolean(node.right),
+      value: node.right ? node.right.val : null,
+      isUnivalue: rightIsUni,
+      matches: rightMatches,
+    };
+    const formula = `${leftIsUni ? "T" : "F"} ∧ ${rightIsUni ? "T" : "F"} ∧ ${leftMatches ? "T" : "F"} ∧ ${rightMatches ? "T" : "F"} = ${isUnivalue ? "T" : "F"}`;
+
+    addStep({
+      title: { vi: `Kiểm tra subtree tại ${node.val}`, en: `Evaluate the subtree at ${node.val}` },
+      phase: "compare", phaseIndex: 1, operation: "evaluate", current: node, left, right, formula,
+      decision: isUnivalue, codeLines: [9, 10, 11, 12, 13],
+      vars: [
+        { name: "left_is_uni", value: leftIsUni },
+        { name: "right_is_uni", value: rightIsUni },
+        { name: "children match", value: leftMatches && rightMatches },
+      ],
+      note: {
+        vi: `Cần đủ 4 điều kiện: cây trái UNI, cây phải UNI, giá trị con trái khớp, giá trị con phải khớp. ${formula}.`,
+        en: `All four conditions are required: left UNI, right UNI, left value matches, and right value matches. ${formula}.`,
+      },
+    });
+
+    const countBefore = count;
+    status.set(node.id, isUnivalue);
+    if (isUnivalue) count += 1;
+    addStep({
+      title: isUnivalue
+        ? { vi: `✓ Subtree ${node.val} đồng nhất → count = ${count}`, en: `✓ Subtree ${node.val} is univalue → count = ${count}` }
+        : { vi: `✗ Subtree ${node.val} không đồng nhất`, en: `✗ Subtree ${node.val} is not univalue` },
+      phase: "decide", phaseIndex: 2, operation: isUnivalue ? "count" : "reject", current: node,
+      left, right, formula, decision: isUnivalue, countBefore,
+      codeLines: isUnivalue ? [14, 15, 16] : [13, 16],
+      vars: [
+        { name: "return", value: isUnivalue },
+        { name: "count change", value: isUnivalue ? `${countBefore} → ${count}` : `${count} (unchanged)` },
+      ],
+      note: isUnivalue
+        ? { vi: `Tất cả node trong subtree này có cùng giá trị ${node.val}; tăng bộ đếm đúng một lần.`, en: `Every node in this subtree has value ${node.val}; increment the counter exactly once.` }
+        : { vi: "Ít nhất một điều kiện sai, nên không tăng count và trả False về node cha.", en: "At least one condition failed, so do not increment count and return False to the parent." },
+    });
+
+    callStack.pop();
+    return isUnivalue;
+  }
+
+  dfs(root);
+  addStep({
+    title: { vi: `Hoàn tất: ${count} univalue subtree`, en: `Complete: ${count} univalue subtrees` },
+    phase: "done", phaseIndex: 3, operation: "done", codeLines: [17, 18], final: true,
+    vars: [{ name: "answer", value: count }],
+    note: { vi: `Mỗi node là gốc của đúng một subtree cần kiểm tra; tổng số subtree đồng nhất là ${count}.`, en: `Each node roots exactly one subtree to classify; ${count} of them are univalue.` },
+  });
+  return { input, answer: count, steps };
+}
+
 // ─── 156: Binary Tree Upside Down ───
 function buildSteps156(input) {
   const root = parseTree(input);
@@ -4564,12 +4725,13 @@ function buildSteps156(input) {
 
   const finalRoot = turn(root);
   const answer = toLevelOrder(finalRoot);
+  const answerText = answer.map((value) => value === null ? "null" : value).join(", ");
   addStep(finalRoot, {
     title: { vi: `Hoàn tất: gốc mới = ${finalRoot.val}`, en: `Complete: new root = ${finalRoot.val}` },
     phase: "done", phaseIndex: 3, operation: "done", current: finalRoot.val, newRoot: finalRoot.val,
     completedIds: finalRoot ? treeToVizNodes(finalRoot).map((node) => node.id) : [], codeLines: [10],
-    vars: [{ name: "answer", value: `[${answer.map((value) => value === null ? "null" : value).join(", ")}]` }], final: true,
-    note: { vi: `Mỗi node được đổi cạnh đúng một lần. Cây kết quả theo level-order là [${answer.join(", ")}].`, en: `Every node is rewired once. The result in level order is [${answer.join(", ")}].` },
+    vars: [{ name: "answer", value: `[${answerText}]` }], final: true,
+    note: { vi: `Mỗi node được đổi cạnh đúng một lần. Cây kết quả theo level-order là [${answerText}].`, en: `Every node is rewired once. The result in level order is [${answerText}].` },
   });
   return { input, answer, steps };
 }
@@ -9117,6 +9279,48 @@ module.exports = {
       const approach = Number(params && params.approach) || 1;
       return approach === 2 ? buildSteps863v2(input, params) : buildSteps863(input, params);
     },
+  },
+  250: {
+    id: 250, difficulty: "medium", slug: "count-univalue-subtrees",
+    category: TREE_CAT,
+    tags: [
+      { key: "dfs", vi: "Postorder DFS", en: "Postorder DFS" },
+      { key: "tree-dp", vi: "DP trên cây", en: "Tree DP" },
+    ],
+    title: { vi: "Count Univalue Subtrees", en: "Count Univalue Subtrees" },
+    titleVi: { vi: "Đếm subtree đồng nhất", en: "Count subtrees with one value" },
+    statement: { vi: "Đếm số subtree mà mọi node đều có cùng một giá trị. Mỗi node là gốc của một subtree cần kiểm tra.", en: "Count the subtrees whose nodes all share one value. Every node roots exactly one subtree to classify." },
+    defaultInput: "5,1,5,5,5,null,5",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt postorder để hai subtree con trả kết quả trước node cha.", en: "Use postorder so both child subtrees return before their parent is classified." },
+      { vi: "Subtree tại node là univalue khi hai subtree con đều univalue và giá trị của mỗi con hiện hữu bằng node.val.", en: "A node's subtree is univalue when both child subtrees are univalue and each existing child value equals node.val." },
+      { vi: "Mỗi khi điều kiện đúng, tăng count một lần rồi trả True về cha.", en: "Whenever the condition holds, increment count once and return True to the parent." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được kết luận đúng một lần; stack đệ quy cao h.", en: "Each node is classified once; the recursion stack has height h." } },
+    code: [
+      "class Solution:",
+      "    def countUnivalSubtrees(self, root):",
+      "        count = 0",
+      "",
+      "        def dfs(node):",
+      "            nonlocal count",
+      "            if not node:",
+      "                return True",
+      "            left_is_uni = dfs(node.left)",
+      "            right_is_uni = dfs(node.right)",
+      "            left_matches = not node.left or node.left.val == node.val",
+      "            right_matches = not node.right or node.right.val == node.val",
+      "            is_uni = left_is_uni and right_is_uni and left_matches and right_matches",
+      "            if is_uni:",
+      "                count += 1",
+      "            return is_uni",
+      "        dfs(root)",
+      "        return count",
+    ],
+    builder: buildSteps250,
+    debugMode: "semantic",
   },
   156: {
     id: 156, difficulty: "medium", slug: "binary-tree-upside-down",
