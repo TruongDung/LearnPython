@@ -30354,6 +30354,172 @@ function renderLineSegments1621View(step) {
   </section>`;
 }
 
+function renderDivideString2138View(step) {
+  const view = step.divideString2138View || {};
+  const vi = lang === "vi";
+  const s = String(view.s || "");
+  const k = Number(view.k) || 1;
+  const fill = String(view.fill || "");
+  const start = Number.isInteger(view.start) ? view.start : -1;
+  const end = Number.isInteger(view.end) ? view.end : -1;
+  const processedUntil = Number(view.processedUntil) || 0;
+  const currentGroup = String(view.currentGroup || "");
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const groupIndex = Number(view.groupIndex) || 0;
+  const totalGroups = Number(view.totalGroups) || Math.ceil(s.length / k);
+  const operation = String(view.operation || "init");
+  const phaseIndex = ["init", "window"].includes(operation) ? 0
+    : ["slice", "check"].includes(operation) ? 1
+      : operation === "pad" ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Chọn cửa sổ", "Cắt nhóm", "Bù ký tự", "Lưu kết quả"]
+    : ["Select window", "Slice group", "Pad if needed", "Store result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const source = [...s].map((char, index) => {
+    const classes = ["ds2138-char"];
+    if (index < processedUntil) classes.push("processed");
+    if (start >= 0 && index >= start && index < end) classes.push("active");
+    if (index > 0 && index % k === 0) classes.push("boundary");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("");
+
+  const slots = Array.from({ length: k }, (_unused, slot) => {
+    const sourceIndex = start + slot;
+    const hasSource = start >= 0 && sourceIndex >= 0 && sourceIndex < end;
+    const hasFill = !hasSource && slot < currentGroup.length;
+    const char = hasSource ? s[sourceIndex] : hasFill ? fill : "·";
+    const kind = hasSource ? "source" : hasFill ? "fill" : "empty";
+    const label = hasSource ? `s[${sourceIndex}]` : hasFill ? (vi ? "fill" : "fill") : (vi ? "chờ" : "waiting");
+    return `<span class="ds2138-slot ${kind}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(char)}</strong></span>`;
+  }).join("");
+
+  const output = Array.from({ length: totalGroups }, (_unused, index) => {
+    const group = groups[index];
+    const isCurrent = index === groupIndex && !view.final;
+    const chars = group
+      ? [...group].map((char, slot) => {
+          const originalIndex = index * k + slot;
+          const kind = originalIndex >= s.length ? "fill" : "source";
+          return `<i class="${kind}">${escapeHtml(char)}</i>`;
+        }).join("")
+      : Array.from({ length: k }, () => "<i>·</i>").join("");
+    return `<span class="ds2138-group ${group ? "ready" : "pending"} ${isCurrent ? "current" : ""}"><small>${vi ? "nhóm" : "group"} ${index + 1}</small><b>${chars}</b></span>`;
+  }).join("");
+
+  const missing = Number(view.missing) || 0;
+  const status = operation === "check"
+    ? (missing > 0 ? (vi ? `Thiếu ${missing} → cần fill` : `Missing ${missing} → padding required`) : (vi ? "Đã đủ k ký tự" : "Already has k characters"))
+    : operation === "pad"
+      ? (vi ? `Đã thêm '${fill}' × ${missing}` : `Appended '${fill}' × ${missing}`)
+      : operation === "append"
+        ? (vi ? `Đã lưu ${groups.length}/${totalGroups} nhóm` : `Stored ${groups.length}/${totalGroups} groups`)
+        : (vi ? `k = ${k} · fill = '${fill}'` : `k = ${k} · fill = '${fill}'`);
+  const answer = view.final ? `[${groups.map((group) => `'${escapeHtml(group)}'`).join(", ")}]` : "…";
+  const summary = vi
+    ? `Bài 2138: đã hoàn thành ${groups.length}/${totalGroups} nhóm, nhóm hiện tại bắt đầu tại ${start}.`
+    : `Problem 2138: completed ${groups.length}/${totalGroups} groups; current start is ${start}.`;
+
+  $("treeView").innerHTML = `<section class="ds2138-viz phase-${escapeHtml(operation)}" style="--ds2138-k:${k}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>STRING · FIXED-SIZE CHUNKS · #2138</small><strong>${vi ? "CHIA CHUỖI THÀNH NHÓM KÝ TỰ" : "DIVIDE STRING INTO GROUPS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ds2138-phases">${phases}</div>
+    <section class="ds2138-source"><header><strong>${vi ? "CHUỖI GỐC" : "SOURCE STRING"}</strong><span>${vi ? "viền dọc = ranh giới mỗi k ký tự" : "vertical marker = each k-character boundary"}</span></header><div>${source}</div></section>
+    <section class="ds2138-work"><header><strong>${vi ? "NHÓM ĐANG XỬ LÝ" : "CURRENT GROUP"} ${start >= 0 ? groupIndex + 1 : "—"}</strong><span>${escapeHtml(status)}</span></header><div>${slots}</div></section>
+    <section class="ds2138-output"><header><strong>${vi ? "KẾT QUẢ THEO THỨ TỰ" : "OUTPUT IN ORDER"}</strong><span>${groups.length}/${totalGroups}</span></header><div>${output}</div></section>
+    <section class="ds2138-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="ds2138-result ${view.final ? "done" : ""}"><small>GROUPS</small><strong>${answer}</strong></footer>
+  </section>`;
+}
+
+function renderClosestBst270View(step) {
+  const view = step.closestBst270View || {};
+  const vi = lang === "vi";
+  const values = Array.isArray(view.values) ? view.values : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const current = Number.isFinite(view.current) ? view.current : null;
+  const closest = Number.isFinite(view.closest) ? view.closest : null;
+  const target = Number(view.target);
+  const operation = String(view.operation || "initialize");
+  const phaseIndex = ["initialize", "set-node"].includes(operation) ? 0
+    : ["visit", "compare", "update"].includes(operation) ? 1
+      : ["choose-branch", "move"].includes(operation) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "So khoảng cách", "Chọn nhánh BST", "Trả kết quả"]
+    : ["Initialize", "Compare distance", "Choose BST branch", "Return answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const numberText = (value) => Number.isFinite(value) ? Number(value.toFixed(6)).toString() : "—";
+
+  const rulerValues = [...values, target].filter(Number.isFinite);
+  let minimum = rulerValues.length ? Math.min(...rulerValues) : 0;
+  let maximum = rulerValues.length ? Math.max(...rulerValues) : 1;
+  if (minimum === maximum) {
+    minimum -= 1;
+    maximum += 1;
+  }
+  const padding = Math.max((maximum - minimum) * 0.08, 0.5);
+  minimum -= padding;
+  maximum += padding;
+  const position = (value) => `${Math.max(2, Math.min(98, ((value - minimum) / (maximum - minimum)) * 100)).toFixed(2)}%`;
+  const rulerRow = (kind, label, value) => Number.isFinite(value)
+    ? `<div class="cb270-ruler-row ${kind}"><small>${escapeHtml(label)}</small><div><i></i><b style="left:${position(value)}"><em></em><span>${escapeHtml(numberText(value))}</span></b></div></div>`
+    : "";
+
+  const currentDistance = Number.isFinite(view.currentDistance) ? view.currentDistance : null;
+  const closestDistance = Number.isFinite(view.closestDistance) ? view.closestDistance : null;
+  const comparisonClass = operation === "compare" || operation === "update"
+    ? (view.candidateWins ? "candidate-wins" : "closest-wins")
+    : "";
+  const comparisonSymbol = currentDistance === null || closestDistance === null
+    ? "?"
+    : currentDistance < closestDistance ? "<" : currentDistance > closestDistance ? ">" : "=";
+  const comparisonNote = operation === "compare" || operation === "update"
+    ? view.candidateWins
+      ? view.tied
+        ? (vi ? "Bằng khoảng cách → số nhỏ hơn thắng" : "Equal distance → smaller value wins")
+        : (vi ? "Current gần hơn → cập nhật closest" : "Current is nearer → update closest")
+      : (vi ? "Giữ nguyên closest" : "Keep the existing closest")
+    : (vi ? "Khoảng cách tuyệt đối quyết định ứng viên tốt hơn" : "Absolute distance determines the better candidate");
+
+  const directionLabel = view.direction === "left" ? (vi ? "TRÁI" : "LEFT")
+    : view.direction === "right" ? (vi ? "PHẢI" : "RIGHT") : "—";
+  const directionFormula = view.direction === "left"
+    ? `${numberText(target)} < ${numberText(current)}`
+    : view.direction === "right" && current !== null ? `${numberText(target)} ≥ ${numberText(current)}` : "target ? node.val";
+  const nextLabel = view.direction
+    ? view.nextValue === null ? "None" : numberText(view.nextValue)
+    : "—";
+  const pathHtml = visited.length
+    ? visited.map((item, index) => `<span class="${item.value === current ? "current" : ""} ${item.value === closest ? "closest" : ""}"><small>${index + 1}</small><b>${escapeHtml(numberText(item.value))}</b></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Chưa duyệt node nào" : "No node visited yet"}</em>`;
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 270: target ${numberText(target)}, current ${numberText(current)}, closest ${numberText(closest)}.`
+    : `Problem 270: target ${numberText(target)}, current ${numberText(current)}, closest ${numberText(closest)}.`;
+
+  $("treeView").innerHTML = `<section class="cb270-viz phase-${escapeHtml(view.phase || "initialize")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BST · GREEDY PATH · #270</small><strong>${vi ? "GIÁ TRỊ GẦN TARGET NHẤT" : "CLOSEST BINARY SEARCH TREE VALUE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cb270-phases">${phases}</div>
+    <section class="cb270-rule"><b>${vi ? "HAI QUY TẮC" : "TWO RULES"}</b><span><code>(distance, value)</code> ${vi ? "nhỏ hơn sẽ thắng" : "uses lexicographic minimum"}</span><span><code>target &lt; node</code> → LEFT · else → RIGHT</span></section>
+    <section class="cb270-ruler"><header><strong>${vi ? "CÙNG MỘT TRỤC SỐ" : "ONE SHARED NUMBER LINE"}</strong><span>${vi ? "mỗi hàng dùng cùng thang đo" : "every row uses the same scale"}</span></header><div>
+      ${rulerRow("target", "TARGET", target)}
+      ${rulerRow("current", "CURRENT", current)}
+      ${rulerRow("closest", "CLOSEST", closest)}
+    </div></section>
+    <div class="cb270-layout">
+      <section class="cb270-tree-card"><header><strong>${vi ? "ĐƯỜNG TÌM TRÊN BST" : "SEARCH PATH ON THE BST"}</strong><span>${vi ? "cam = current · xanh = closest" : "amber = current · green = closest"}</span></header><div id="cb270Tree" class="cb270-tree"></div></section>
+      <aside class="cb270-side">
+        <section class="cb270-metrics"><div><small>target</small><strong>${escapeHtml(numberText(target))}</strong></div><div><small>current</small><strong>${escapeHtml(numberText(current))}</strong></div><div><small>closest</small><strong>${escapeHtml(numberText(closest))}</strong></div></section>
+        <section class="cb270-compare ${comparisonClass}"><header><strong>${vi ? "SO KHOẢNG CÁCH" : "COMPARE DISTANCES"}</strong><span>${escapeHtml(comparisonNote)}</span></header><div><article><small>|current − target|</small><b>${escapeHtml(numberText(currentDistance))}</b></article><i>${comparisonSymbol}</i><article><small>|closest − target|</small><b>${escapeHtml(numberText(closestDistance))}</b></article></div></section>
+        <section class="cb270-direction ${view.direction || "idle"}"><small>${vi ? "QUYẾT ĐỊNH BST" : "BST DECISION"}</small><strong>${escapeHtml(directionFormula)} → ${escapeHtml(directionLabel)}</strong><span>${vi ? "node tiếp theo" : "next node"}: <b>${escapeHtml(nextLabel)}</b></span></section>
+        <section class="cb270-path"><header><strong>${vi ? "ĐƯỜNG ĐÃ DUYỆT" : "VISITED PATH"}</strong><span>${visited.length} ${vi ? "node" : "node(s)"}</span></header><div>${pathHtml}</div></section>
+      </aside>
+    </div>
+    <section class="cb270-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="cb270-result ${final ? "done" : ""}"><small>CLOSEST VALUE</small><strong>${final ? escapeHtml(numberText(view.answer)) : "…"}</strong><span>${final ? (vi ? "Chỉ duyệt một đường từ root xuống lá." : "Only one root-to-leaf path was visited.") : (vi ? "Tiếp tục so sánh và loại bỏ một nửa BST." : "Keep comparing while discarding one side of the BST.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "cb270Tree");
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -31066,6 +31232,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBstIteratorView(step);
+  } else if (step.closestBst270View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClosestBst270View(step);
   } else if (step.palPathView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -31492,6 +31664,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLineSegments1621View(step);
+  } else if (step.divideString2138View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDivideString2138View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

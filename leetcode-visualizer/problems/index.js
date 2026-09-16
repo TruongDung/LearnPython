@@ -20,7 +20,7 @@ const categories = {
   trie: require("./trie"),
   hashmap: require("./hashmap"),
   greedy: require("./greedy"),
-  string: require("./string"),
+  string: Object.assign(require("./string"), require("./string-chunking")),
   backtracking: require("./backtracking"),
   bst: require("./bst"),
   "binary-tree": require("./tree"),

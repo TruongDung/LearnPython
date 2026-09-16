@@ -2075,16 +2075,178 @@ function buildSteps109SlowFast(input) {
 
 // ─── 270: Closest BST Value ───
 function buildSteps270(input, params) {
-  const root = parseBST(input); const target = params.target !== undefined ? Number(params.target) : 3.714286; const steps = [];
-  steps.push(snapshot(root, { title: { vi: `Tìm giá trị gần ${target} nhất`, en: `Find value closest to ${target}` }, vars: [{ name: "target", value: target }], note: { vi: `Đi từ root: cập nhật closest nếu gần hơn, rồi đi TRÁI nếu target < node, PHẢI nếu target > node.`, en: `From root: update closest if nearer, then go LEFT if target < node, RIGHT if target > node.` } }));
-  let node = root, closest = root ? root.val : null;
-  while (node){
-    if (Math.abs(node.val - target) < Math.abs(closest - target)) closest = node.val;
-    steps.push(snapshot(root, { title: { vi: `Tại ${node.val}, closest = ${closest}`, en: `At ${node.val}, closest = ${closest}` }, hlSet: new Set([node.id]), vars: [{ name: "node", value: node.val }, { name: "|node-target|", value: Math.abs(node.val-target).toFixed(3) }, { name: "closest", value: closest }], note: { vi: `So sánh khoảng cách. ${target < node.val ? "target < node → đi trái" : "target ≥ node → đi phải"}.`, en: `Compare distance. ${target < node.val ? "target < node → go left" : "target ≥ node → go right"}.` } }));
-    node = target < node.val ? node.left : node.right;
+  const root = parseBST(input);
+  if (!root) throw new Error("Enter a non-empty BST in level-order form.");
+
+  const target = params && params.target !== undefined ? Number(params.target) : 3.714286;
+  if (!Number.isFinite(target)) throw new Error("target must be a finite number.");
+
+  const steps = [];
+  const nodes = [];
+  const nodeByValue = new Map();
+  (function collect(node) {
+    if (!node) return;
+    nodes.push(node);
+    nodeByValue.set(node.val, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  const values = nodes.map((node) => node.val);
+  const visited = [];
+  let closest = root.val;
+
+  const distance = (value) => Math.abs(value - target);
+  const winsTieBreak = (candidate, best) => (
+    distance(candidate) < distance(best)
+    || (distance(candidate) === distance(best) && candidate < best)
+  );
+  const displayNumber = (value) => Number(value.toFixed(6)).toString();
+
+  function addStep(options) {
+    const current = options.current || null;
+    const closestNode = nodeByValue.get(closest) || null;
+    const annotations = {};
+    if (closestNode) annotations[closestNode.id] = { labels: [{ label: "CLOSEST", kind: "answer" }] };
+    if (current) {
+      const labels = [{ label: "CURRENT", kind: "current" }];
+      if (closestNode && current.id === closestNode.id) labels.push({ label: "CLOSEST", kind: "answer" });
+      annotations[current.id] = { labels };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: new Set(closestNode ? [closestNode.id] : []),
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "target", value: target },
+        { name: "node", value: current ? current.val : "None" },
+        { name: "closest", value: closest },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.closestBst270View = {
+      phase: options.phase,
+      operation: options.operation,
+      values: [...values],
+      target,
+      current: current ? current.val : null,
+      currentId: current ? current.id : null,
+      closest,
+      closestId: closestNode ? closestNode.id : null,
+      currentDistance: current ? distance(current.val) : null,
+      closestDistance: distance(closest),
+      candidateWins: options.candidateWins === true,
+      tied: options.tied === true,
+      direction: options.direction || null,
+      nextValue: options.next ? options.next.val : null,
+      visited: visited.map((node) => ({ id: node.id, value: node.val })),
+      answer: options.final ? closest : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
   }
-  let closeId = null; (function find(n){ if(!n) return; if(n.val === closest) closeId = n.id; find(n.left); find(n.right); })(root);
-  const fs = snapshot(root, { title: { vi: `Answer: ${closest}`, en: `Answer: ${closest}` }, wordSet: closeId !== null ? new Set([closeId]) : undefined, vars: [{ name: "answer", value: closest }], note: { vi: `Giá trị gần ${target} nhất là ${closest}.`, en: `Closest value to ${target} is ${closest}.` } }); fs.final = true; steps.push(fs);
+
+  addStep({
+    title: { vi: `closest = root.val = ${closest}`, en: `closest = root.val = ${closest}` },
+    phase: "initialize", operation: "initialize", codeLine: 3,
+    note: {
+      vi: `Khởi tạo đáp án tốt nhất bằng root. Khi khoảng cách bằng nhau, chọn giá trị nhỏ hơn.`,
+      en: `Initialize the best answer with the root. On equal distances, choose the smaller value.`,
+    },
+  });
+
+  let node = root;
+  addStep({
+    title: { vi: `node bắt đầu tại root ${node.val}`, en: `node starts at root ${node.val}` },
+    phase: "initialize", operation: "set-node", codeLine: 4, current: node,
+    note: { vi: "Con trỏ node sẽ chỉ đi xuống đúng một nhánh của BST.", en: "The node pointer will descend along only one BST branch." },
+  });
+
+  while (node) {
+    visited.push(node);
+    addStep({
+      title: { vi: `node = ${node.val} nên tiếp tục vòng lặp`, en: `node = ${node.val}, so continue the loop` },
+      phase: "visit", operation: "visit", codeLine: 5, current: node,
+      note: { vi: `Đang xét node ${node.val}; đường đã đi: ${visited.map((item) => item.val).join(" → ")}.`, en: `Inspect node ${node.val}; path so far: ${visited.map((item) => item.val).join(" → ")}.` },
+    });
+
+    const candidateDistance = distance(node.val);
+    const bestBefore = closest;
+    const bestDistanceBefore = distance(bestBefore);
+    const tied = candidateDistance === bestDistanceBefore && node.val !== bestBefore;
+    const candidateWins = winsTieBreak(node.val, bestBefore);
+    addStep({
+      title: {
+        vi: `So sánh ${displayNumber(candidateDistance)} với ${displayNumber(bestDistanceBefore)}`,
+        en: `Compare ${displayNumber(candidateDistance)} with ${displayNumber(bestDistanceBefore)}`,
+      },
+      phase: "compare", operation: "compare", codeLine: 6, current: node, candidateWins, tied,
+      vars: [
+        { name: "|node-target|", value: displayNumber(candidateDistance) },
+        { name: "|closest-target|", value: displayNumber(bestDistanceBefore) },
+        { name: "candidate wins?", value: candidateWins },
+      ],
+      note: candidateWins
+        ? {
+            vi: tied ? `${node.val} và ${bestBefore} cách target bằng nhau; ${node.val} nhỏ hơn nên thắng tie-break.` : `${node.val} gần target hơn ${bestBefore}.`,
+            en: tied ? `${node.val} and ${bestBefore} are equally distant; ${node.val} wins because it is smaller.` : `${node.val} is closer to the target than ${bestBefore}.`,
+          }
+        : {
+            vi: `${bestBefore} vẫn là ứng viên tốt hơn hoặc bằng ${node.val}.`,
+            en: `${bestBefore} remains at least as good as ${node.val}.`,
+          },
+    });
+
+    if (candidateWins) {
+      closest = node.val;
+      addStep({
+        title: { vi: `Cập nhật closest = ${closest}`, en: `Update closest = ${closest}` },
+        phase: "compare", operation: "update", codeLine: 7, current: node, candidateWins, tied,
+        vars: [{ name: "old closest", value: bestBefore }, { name: "new closest", value: closest }],
+        note: { vi: `Ghi nhận ${closest} là giá trị gần target nhất hiện tại.`, en: `Record ${closest} as the closest value seen so far.` },
+      });
+    }
+
+    const direction = target < node.val ? "left" : "right";
+    const next = direction === "left" ? node.left : node.right;
+    addStep({
+      title: direction === "left"
+        ? { vi: `${target} < ${node.val} → chọn nhánh trái`, en: `${target} < ${node.val} → choose left` }
+        : { vi: `${target} ≥ ${node.val} → chọn nhánh phải`, en: `${target} ≥ ${node.val} → choose right` },
+      phase: "branch", operation: "choose-branch", codeLine: 8, current: node, direction, next,
+      vars: [{ name: "condition", value: target < node.val }, { name: "direction", value: direction }],
+      note: direction === "left"
+        ? { vi: `Mọi giá trị có thể gần target hơn nằm bên trái ${node.val}; bỏ toàn bộ nhánh phải.`, en: `Any value that may be closer lies left of ${node.val}; discard its right subtree.` }
+        : { vi: `Mọi giá trị có thể gần target hơn nằm bên phải ${node.val}; bỏ toàn bộ nhánh trái.`, en: `Any value that may be closer lies right of ${node.val}; discard its left subtree.` },
+    });
+    addStep({
+      title: next
+        ? { vi: `Di chuyển node → ${next.val}`, en: `Move node → ${next.val}` }
+        : { vi: `Di chuyển node → None`, en: `Move node → None` },
+      phase: "branch", operation: "move", codeLine: direction === "left" ? 9 : 11, current: node, direction, next,
+      vars: [{ name: "next node", value: next ? next.val : "None" }],
+      note: next
+        ? { vi: `Tiếp tục tại con ${direction === "left" ? "trái" : "phải"} ${next.val}.`, en: `Continue at ${direction} child ${next.val}.` }
+        : { vi: `Nhánh ${direction === "left" ? "trái" : "phải"} rỗng, vòng lặp kết thúc.`, en: `The ${direction} child is empty, so the loop ends.` },
+    });
+    node = next;
+  }
+
+  addStep({
+    title: { vi: `Trả về closest = ${closest}`, en: `Return closest = ${closest}` },
+    phase: "done", operation: "return", codeLine: 12, final: true,
+    vars: [{ name: "answer", value: closest }],
+    note: {
+      vi: `Đã đi hết đường BST ${visited.map((item) => item.val).join(" → ")}. Giá trị gần ${target} nhất là ${closest}.`,
+      en: `Finished BST path ${visited.map((item) => item.val).join(" → ")}. The value closest to ${target} is ${closest}.`,
+    },
+  });
+
   return { input, answer: closest, steps };
 }
 
@@ -3042,12 +3204,18 @@ module.exports = {
     defaultInput: "4,2,5,1,3",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [{ key: "target", label: { vi: "target (số thực)", en: "target (float)" }, type: "float", default: 3.714286 }],
+    tags: [
+      { key: "bst", vi: "BST", en: "BST" },
+      { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    ],
+    debugMode: "semantic",
     approach: [
       { vi: "Đi từ root, cập nhật closest nếu |node.val - target| nhỏ hơn. Dùng BST property để chọn nhánh.", en: "From root, update closest when |node.val - target| is smaller. Use BST property to pick the branch." },
       { vi: "target < node.val → đi trái, ngược lại → đi phải. Chỉ đi 1 đường → O(h).", en: "target < node.val → go left, else → go right. Only one path → O(h)." },
+      { vi: "Nếu hai giá trị cách target bằng nhau, chọn giá trị nhỏ hơn.", en: "If two values are equally close, choose the smaller value." },
     ],
     complexity: { time: "O(h)", space: "O(1)", note: { vi: "1 đường từ root xuống → O(h).", en: "One path from root down → O(h)." } },
-    code: ["class Solution:", "    def closestValue(self, root, target):", "        closest = root.val", "        node = root", "        while node:", "            if abs(node.val - target) < abs(closest - target):", "                closest = node.val", "            if target < node.val:", "                node = node.left", "            else:", "                node = node.right", "        return closest"],
+    code: ["class Solution:", "    def closestValue(self, root, target):", "        closest = root.val", "        node = root", "        while node:", "            if (abs(node.val - target), node.val) < (abs(closest - target), closest):", "                closest = node.val", "            if target < node.val:", "                node = node.left", "            else:", "                node = node.right", "        return closest"],
     builder: buildSteps270,
   },
   783: {
