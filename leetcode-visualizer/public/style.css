@@ -53007,6 +53007,8 @@ html, body {
   .ud156-stack { grid-column: auto; }
   .ud156-viz > footer { grid-template-columns: 1fr; }
   .ud156-viz > footer small { grid-row: auto; }
+}
+
 /* #1621: counting DP with prefix-sum aggregation over possible left endpoints. */
 .tree-view:has(> .ls1621-viz) { min-width: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
 .ls1621-viz {
@@ -53128,6 +53130,44 @@ html, body {
 .ls1621-result.done { border-color: color-mix(in srgb, var(--ls1621-good) 60%, var(--ls1621-border)); background: color-mix(in srgb, var(--ls1621-good) 8%, var(--ls1621-panel)); }
 .ls1621-result.done strong { color: var(--ls1621-good); }
 
+.ls1621-comb-meaning {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border-left: 3px solid var(--ls1621-prefix);
+  border-radius: 10px;
+  background: var(--ls1621-panel);
+}
+.ls1621-comb-meaning strong { color: var(--ls1621-prefix); font-size: 10px; letter-spacing: .06em; }
+.ls1621-comb-meaning span { color: var(--ls1621-muted); font-size: 11px; line-height: 1.45; }
+.ls1621-comb-parts,
+.ls1621-comb-stars,
+.ls1621-comb-formula { min-width: 0; padding: 13px; border: 1px solid var(--ls1621-border); border-radius: 10px; background: var(--ls1621-panel); }
+.ls1621-comb-parts { display: grid; gap: 13px; }
+.ls1621-comb-parts > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; }
+.ls1621-comb-parts > div > i { color: var(--ls1621-muted); font-style: normal; font-weight: 800; }
+.ls1621-comb-piece { display: grid; min-width: 76px; gap: 3px; padding: 9px; text-align: center; border-radius: 8px; background: var(--ls1621-soft); }
+.ls1621-comb-piece strong { font: 800 16px Consolas, monospace; }
+.ls1621-comb-piece small { color: var(--ls1621-muted); font-size: 8px; }
+.ls1621-comb-piece.gap { color: var(--ls1621-skip); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ls1621-skip) 48%, transparent); }
+.ls1621-comb-piece.segment { color: var(--ls1621-good); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ls1621-good) 48%, transparent); }
+.ls1621-comb-parts > p { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; margin: 0; color: var(--ls1621-muted); }
+.ls1621-comb-parts > p code { color: var(--ls1621-text); font-size: 11px; }
+.ls1621-comb-parts > p strong { color: var(--ls1621-current); font: 800 18px Consolas, monospace; }
+.ls1621-comb-stars { display: grid; gap: 11px; }
+.ls1621-comb-stars > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ls1621-comb-stars > header strong { color: var(--ls1621-text); font-size: 10px; letter-spacing: .07em; }
+.ls1621-comb-stars > header span { color: var(--ls1621-muted); font-size: 9px; text-align: right; }
+.ls1621-comb-stars > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; min-height: 52px; padding: 8px; border-radius: 8px; background: var(--ls1621-soft); }
+.ls1621-comb-stars .star { color: var(--ls1621-current); font-size: 22px; }
+.ls1621-comb-stars .bar { color: var(--ls1621-prefix); font: 800 28px/1 Consolas, monospace; }
+.ls1621-comb-stars > p { margin: 0; color: var(--ls1621-muted); font-size: 10px; text-align: center; }
+.ls1621-comb-formula { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; }
+.ls1621-comb-formula > span { display: grid; gap: 3px; min-width: 120px; text-align: center; }
+.ls1621-comb-formula small { color: var(--ls1621-muted); font-size: 8px; font-weight: 800; }
+.ls1621-comb-formula strong { color: var(--ls1621-text); font: 800 13px Consolas, monospace; }
+.ls1621-comb-formula i { color: var(--ls1621-prefix); font-style: normal; }
+
 @container (max-width: 720px) {
   .ls1621-main { grid-template-columns: 1fr; }
 }
@@ -53142,6 +53182,8 @@ html, body {
   .ls1621-table > header span { max-width: none; text-align: left; }
   .ls1621-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ls1621-rule { align-items: flex-start; flex-direction: column; }
+  .ls1621-comb-stars > header { align-items: flex-start; flex-direction: column; }
+  .ls1621-comb-stars > header span { text-align: left; }
   .ls1621-lane { grid-template-columns: 52px minmax(90px, 1fr) 30px; }
   .ls1621-lane > small { display: none; }
   .ls1621-result { grid-template-columns: auto 1fr; }

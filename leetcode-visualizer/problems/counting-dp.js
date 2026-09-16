@@ -134,6 +134,112 @@ function buildSteps1621(input, params = {}) {
   return { answer: ways[n][k], steps };
 }
 
+function binomial1621(n, r) {
+  const choose = Math.min(r, n - r);
+  let value = 1n;
+  for (let i = 1; i <= choose; i += 1) {
+    value = value * BigInt(n - choose + i) / BigInt(i);
+  }
+  return value;
+}
+
+function buildCombinationSteps1621(input, params = {}) {
+  const { n, k } = validate1621Input(input, params);
+  const totalDistance = n - 1;
+  const remaining = totalDistance - k;
+  const variables = 2 * k + 1;
+  const bars = variables - 1;
+  const totalSlots = remaining + bars;
+  const answer = Number(binomial1621(totalSlots, bars) % 1000000007n);
+  const parts = [];
+  const shiftedParts = [];
+
+  for (let index = 0; index <= k; index += 1) {
+    parts.push({ kind: "gap", label: `g${index}`, minimum: 0 });
+    shiftedParts.push({ kind: "gap", label: `g${index}`, minimum: 0 });
+    if (index < k) {
+      parts.push({ kind: "segment", label: `s${index + 1}`, minimum: 1 });
+      shiftedParts.push({ kind: "segment", label: `t${index + 1}`, minimum: 0 });
+    }
+  }
+
+  const makeStep = ({ phase, operation, codeLine, title, note, final = false }) => ({
+    title,
+    codeBlock: 2,
+    codeLines: [codeLine],
+    lineSegments1621View: {
+      approach: 2,
+      phase,
+      operation,
+      n,
+      k,
+      totalDistance,
+      remaining,
+      variables,
+      bars,
+      totalSlots,
+      parts: parts.map((part) => ({ ...part })),
+      shiftedParts: shiftedParts.map((part) => ({ ...part })),
+      answer: final ? answer : null,
+      final,
+    },
+    vars: [
+      { name: "n", value: n },
+      { name: "k", value: k },
+      { name: "remaining", value: remaining },
+      { name: "bars", value: bars },
+    ],
+    note,
+    final,
+  });
+
+  const steps = [
+    makeStep({
+      phase: "encode",
+      operation: "encode",
+      codeLine: 6,
+      title: { vi: "Mã hóa đoạn thẳng thành độ dài và khoảng trống", en: "Encode segments as lengths and gaps" },
+      note: {
+        vi: `Có ${k} độ dài đoạn sᵢ ≥ 1 và ${k + 1} khoảng trống gᵢ ≥ 0. Tổng của chúng bằng khoảng cách từ điểm 0 đến ${n - 1}: ${totalDistance}.`,
+        en: `There are ${k} segment lengths sᵢ ≥ 1 and ${k + 1} gaps gᵢ ≥ 0. Their sum is the distance from point 0 to ${n - 1}: ${totalDistance}.`,
+      },
+    }),
+    makeStep({
+      phase: "shift",
+      operation: "shift",
+      codeLine: 6,
+      title: { vi: "Bỏ một cạnh bắt buộc khỏi mỗi đoạn", en: "Remove one mandatory edge from every segment" },
+      note: {
+        vi: `Đặt tᵢ = sᵢ − 1. Tất cả ${variables} biến mới đều không âm và tổng còn lại là ${totalDistance} − ${k} = ${remaining}.`,
+        en: `Set tᵢ = sᵢ − 1. All ${variables} new variables are non-negative and their remaining sum is ${totalDistance} − ${k} = ${remaining}.`,
+      },
+    }),
+    makeStep({
+      phase: "stars",
+      operation: "stars-bars",
+      codeLine: 7,
+      title: { vi: "Áp dụng Stars and Bars", en: "Apply stars and bars" },
+      note: {
+        vi: `${remaining} ngôi sao được chia vào ${variables} ô bằng ${bars} vạch ngăn. Chọn vị trí cho ${bars} vạch trong ${totalSlots} vị trí.`,
+        en: `Distribute ${remaining} stars among ${variables} boxes using ${bars} dividers. Choose the ${bars} divider positions among ${totalSlots} slots.`,
+      },
+    }),
+    makeStep({
+      phase: "done",
+      operation: "return",
+      codeLine: 8,
+      final: true,
+      title: { vi: `Kết quả: C(${totalSlots}, ${bars}) = ${answer}`, en: `Result: C(${totalSlots}, ${bars}) = ${answer}` },
+      note: {
+        vi: `C(n + k − 1, 2k) = C(${totalSlots}, ${bars}) = ${answer}.`,
+        en: `C(n + k − 1, 2k) = C(${totalSlots}, ${bars}) = ${answer}.`,
+      },
+    }),
+  ];
+
+  return { answer, steps };
+}
+
 module.exports = {
   1621: {
     id: 1621,
@@ -157,21 +263,33 @@ module.exports = {
     maxInput: 10,
     extraParams: [
       { key: "k", type: "number", label: { vi: "k (số đoạn)", en: "k (segments)" }, default: 2, min: 1, max: 9 },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách giải", en: "Approach" },
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DP + prefix sum", en: "Approach 1: DP + prefix sum" } },
+          { value: "2", label: { vi: "Cách 2: Tổ hợp (Stars and Bars)", en: "Approach 2: Combinatorics (Stars and Bars)" } },
+        ],
+      },
     ],
     approach: [
-      { vi: "ways[p][s] là số cách vẽ s đoạn bằng p điểm đầu tiên; prefix[p][s] là tổng ways[1..p][s].", en: "ways[p][s] counts drawings of s segments using the first p points; prefix[p][s] sums ways[1..p][s]." },
-      { vi: "Bỏ điểm cuối cho ways[p-1][s], hoặc kết thúc đoạn cuối tại điểm p-1 và chọn mọi đầu trái hợp lệ bằng prefix[p-1][s-1].", en: "Skip the last point for ways[p-1][s], or end the final segment at point p-1 and aggregate every valid left endpoint with prefix[p-1][s-1]." },
-      { vi: "Công thức: ways[p][s] = ways[p-1][s] + prefix[p-1][s-1]. Chung đầu mút được tính vì phần trước có thể dùng chính đầu trái của đoạn mới.", en: "Recurrence: ways[p][s] = ways[p-1][s] + prefix[p-1][s-1]. Shared endpoints are counted because the earlier drawing may use the new segment's left endpoint." },
+      { vi: "Cách 1 — DP: ways[p][s] = ways[p-1][s] + prefix[p-1][s-1].", en: "Approach 1 — DP: ways[p][s] = ways[p-1][s] + prefix[p-1][s-1]." },
+      { vi: "Cách 2 — Tổ hợp: biểu diễn cấu hình bằng k độ dài đoạn sᵢ ≥ 1 và k+1 khoảng trống gᵢ ≥ 0; tổng bằng n−1.", en: "Approach 2 — Combinatorics: encode a drawing with k segment lengths sᵢ ≥ 1 and k+1 gaps gᵢ ≥ 0; their sum is n−1." },
+      { vi: "Đặt tᵢ = sᵢ−1. Có 2k+1 biến không âm với tổng n−1−k; Stars and Bars cho C(n+k−1, 2k).", en: "Set tᵢ = sᵢ−1. There are 2k+1 non-negative variables summing to n−1−k; stars and bars gives C(n+k−1, 2k)." },
     ],
     complexity: {
-      time: "O(nk)",
-      space: "O(nk)",
+      time: "O(nk) / O(k)",
+      space: "O(nk) / O(1)",
       note: {
-        vi: "Prefix sum biến tổng qua mọi điểm bắt đầu từ O(n) thành O(1) cho mỗi trạng thái.",
-        en: "The prefix sum reduces the sum over all possible starts from O(n) to O(1) per state.",
+        vi: "Cách 1 dùng bảng DP. Cách 2 tính trực tiếp một hệ số tổ hợp; O(k) bước số học với cách tính nhân/chia chuẩn.",
+        en: "Approach 1 uses a DP table. Approach 2 evaluates one binomial coefficient in O(k) arithmetic steps with the standard multiplicative method.",
       },
     },
     debugMode: "semantic",
+    codeLabel: { vi: "Cách 1: DP + prefix sum", en: "Approach 1: DP + prefix sum" },
+    code2Label: { vi: "Cách 2: Tổ hợp (Stars and Bars)", en: "Approach 2: Combinatorics (Stars and Bars)" },
     code: [
       "class Solution:",
       "    def numberOfSets(self, n: int, k: int) -> int:",
@@ -189,10 +307,22 @@ module.exports = {
       "                prefix[points][segments] = (prefix[points - 1][segments] + ways[points][segments]) % MOD",
       "        return ways[n][k]",
     ],
+    code2: [
+      "import math",
+      "",
+      "class Solution:",
+      "    def numberOfSets(self, n: int, k: int) -> int:",
+      "        MOD = 10**9 + 7",
+      "        total_slots = n + k - 1",
+      "        dividers = 2 * k",
+      "        return math.comb(total_slots, dividers) % MOD",
+    ],
     liveArgs: (input, params) => {
       const parsed = validate1621Input(input, params);
       return [parsed.n, parsed.k];
     },
-    builder: buildSteps1621,
+    builder: (input, params = {}) => Number(params.approach) === 2
+      ? buildCombinationSteps1621(input, params)
+      : buildSteps1621(input, params),
   },
 };

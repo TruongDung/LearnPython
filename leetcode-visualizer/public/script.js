@@ -30210,6 +30210,56 @@ function renderPalindrome2472View(step) {
 function renderLineSegments1621View(step) {
   const view = step.lineSegments1621View || {};
   const vi = lang === "vi";
+
+  if (Number(view.approach) === 2) {
+    const n = Number(view.n) || 0;
+    const k = Number(view.k) || 0;
+    const totalDistance = Number(view.totalDistance) || 0;
+    const remaining = Number(view.remaining) || 0;
+    const variables = Number(view.variables) || 0;
+    const bars = Number(view.bars) || 0;
+    const totalSlots = Number(view.totalSlots) || 0;
+    const shifted = view.phase !== "encode";
+    const parts = shifted && Array.isArray(view.shiftedParts) ? view.shiftedParts : (Array.isArray(view.parts) ? view.parts : []);
+    const phaseIndex = view.phase === "encode" ? 0 : view.phase === "shift" ? 1 : view.phase === "stars" ? 2 : 3;
+    const phaseLabels = vi
+      ? ["Mã hóa", "Trừ phần bắt buộc", "Stars & Bars", "Kết quả"]
+      : ["Encode", "Remove minimum", "Stars & Bars", "Result"];
+    const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("");
+    const partHtml = parts.map((part, index) => {
+      const label = escapeHtml(part.label || "?");
+      const kind = part.kind === "segment" ? "segment" : "gap";
+      const caption = kind === "segment"
+        ? (shifted ? (vi ? "phần thêm" : "extra length") : (vi ? "độ dài đoạn" : "segment length"))
+        : (vi ? "khoảng trống" : "gap");
+      return `${index ? `<i aria-hidden="true">+</i>` : ""}<span class="ls1621-comb-piece ${kind}"><strong>${label}</strong><small>${caption} ≥ ${Number(part.minimum) || 0}</small></span>`;
+    }).join("");
+    const labels = parts.map((part) => escapeHtml(part.label || "?")).join(" + ");
+    const rightSide = shifted ? remaining : totalDistance;
+    const tokens = [
+      ...Array.from({ length: remaining }, () => `<span class="star" aria-label="star">★</span>`),
+      ...Array.from({ length: bars }, () => `<span class="bar" aria-label="divider">|</span>`),
+    ].join("");
+    const starPanel = phaseIndex >= 2
+      ? `<section class="ls1621-comb-stars"><header><strong>STARS AND BARS</strong><span>${vi ? `${remaining} sao + ${bars} vạch = ${totalSlots} vị trí` : `${remaining} stars + ${bars} dividers = ${totalSlots} slots`}</span></header><div aria-label="${vi ? "Một cách sắp xếp sao và vạch" : "One stars-and-bars arrangement"}">${tokens || `<span class="bar">|</span>`}</div><p>${vi ? `Chọn ${bars} vị trí đặt vạch trong ${totalSlots} vị trí.` : `Choose ${bars} divider positions among ${totalSlots} slots.`}</p></section>`
+      : "";
+    const answer = view.final ? String(view.answer) : "…";
+    const summary = vi
+      ? `Bài 1621, cách tổ hợp: ${variables} biến không âm có tổng ${remaining}; đáp án ${view.final ? view.answer : "đang tính"}.`
+      : `Problem 1621, combinatorial approach: ${variables} non-negative variables sum to ${remaining}; answer ${view.final ? view.answer : "in progress"}.`;
+
+    $("treeView").innerHTML = `<section class="ls1621-viz ls1621-comb-viz phase-${escapeHtml(view.phase || "encode")}" role="img" aria-label="${escapeHtml(summary)}">
+      <header><div><small>COMBINATORICS · STARS AND BARS · #1621</small><strong>${vi ? "ĐẾM BẰNG TỔ HỢP" : "COUNT WITH COMBINATORICS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+      <div class="ls1621-phases">${phases}</div>
+      <section class="ls1621-comb-meaning"><strong>${shifted ? (vi ? "SAU KHI TRỪ 1 CẠNH BẮT BUỘC MỖI ĐOẠN" : "AFTER REMOVING 1 MANDATORY EDGE PER SEGMENT") : (vi ? "MỘT HÌNH VẼ = ĐỘ DÀI ĐOẠN + CÁC KHOẢNG TRỐNG" : "ONE DRAWING = SEGMENT LENGTHS + GAPS")}</strong><span>${vi ? `${k} đoạn tạo ${k} biến s; trước, giữa và sau chúng có ${k + 1} biến g.` : `${k} segments create ${k} s-variables; before, between, and after them are ${k + 1} g-variables.`}</span></section>
+      <section class="ls1621-comb-parts"><div>${partHtml}</div><p><code>${labels}</code><b>=</b><strong>${rightSide}</strong></p></section>
+      ${starPanel}
+      <section class="ls1621-comb-formula"><span><small>${vi ? "SỐ BIẾN" : "VARIABLES"}</small><strong>${variables} = 2k + 1</strong></span><i>→</i><span><small>${vi ? "SỐ VẠCH" : "DIVIDERS"}</small><strong>${bars} = 2k</strong></span><i>→</i><span><small>${vi ? "CHỌN VỊ TRÍ VẠCH" : "CHOOSE DIVIDER SLOTS"}</small><strong>C(${totalSlots}, ${bars})</strong></span></section>
+      <footer class="ls1621-result ${view.final ? "done" : ""}"><small>NUMBER OF SETS</small><strong>${answer}</strong><span>C(n + k − 1, 2k) = C(${totalSlots}, ${bars})${view.final ? ` = ${answer}` : ""}</span></footer>
+    </section>`;
+    return;
+  }
+
   const n = Number(view.n) || 0;
   const k = Number(view.k) || 0;
   const ways = Array.isArray(view.ways) ? view.ways : [];

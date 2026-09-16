@@ -23,13 +23,15 @@ function bruteForce(n, k) {
   return visit(0, k);
 }
 
-test('1621 is registered with prefix-sum counting DP metadata', () => {
+test('1621 is registered with DP and combinatorial approaches', () => {
   assert.equal(problem.id, 1621);
   assert.equal(problem.slug, 'number-of-sets-of-k-non-overlapping-line-segments');
   assert.equal(problem.difficulty, 'medium');
   assert.equal(problem.debugMode, 'semantic');
-  assert.equal(problem.complexity.time, 'O(nk)');
+  assert.equal(problem.complexity.time, 'O(nk) / O(k)');
   assert.match(problem.code.join('\n'), /def numberOfSets\(self, n: int, k: int\) -> int/);
+  assert.match(problem.code2.join('\n'), /math\.comb\(total_slots, dividers\)/);
+  assert.ok(problem.extraParams.some((param) => param.key === 'approach'));
   assert.ok(problem.tags.some((tag) => tag.key === 'prefix-sum'));
 });
 
@@ -39,17 +41,21 @@ test('1621 matches the official examples supported by the visualizer', () => {
     [3, 1, 3],
   ];
   for (const [n, k, expected] of examples) {
-    const result = problem.builder([n], { k });
-    assert.equal(result.answer, expected);
-    assert.equal(result.steps.at(-1).lineSegments1621View.answer, expected);
-    assert.equal(result.steps.at(-1).final, true);
+    for (const approach of [1, 2]) {
+      const result = problem.builder([n], { k, approach });
+      assert.equal(result.answer, expected);
+      assert.equal(result.steps.at(-1).lineSegments1621View.answer, expected);
+      assert.equal(result.steps.at(-1).final, true);
+    }
   }
 });
 
 test('1621 agrees with an independent exhaustive segment-set oracle', () => {
   for (let n = 2; n <= 8; n += 1) {
     for (let k = 1; k < n; k += 1) {
-      assert.equal(problem.builder([n], { k }).answer, bruteForce(n, k), `n=${n}, k=${k}`);
+      const expected = bruteForce(n, k);
+      assert.equal(problem.builder([n], { k, approach: 1 }).answer, expected, `DP n=${n}, k=${k}`);
+      assert.equal(problem.builder([n], { k, approach: 2 }).answer, expected, `combination n=${n}, k=${k}`);
     }
   }
 });
@@ -71,15 +77,36 @@ test('1621 trace exposes both recurrence branches and prefix aggregation', () =>
   assert.deepEqual(finalCell.candidates.map((item) => item.priorWays), [0, 1, 3]);
 });
 
-test('1621 displayed Python handles both small and full-constraint examples', () => {
+test('1621 combinatorial trace explains encoding, shifting, and stars and bars', () => {
+  const result = problem.builder([4], { k: 2, approach: 2 });
+  assert.equal(result.steps.length, 4);
+  assert.ok(result.steps.every((step) => step.codeBlock === 2));
+  assert.deepEqual(result.steps.map((step) => step.lineSegments1621View.operation), [
+    'encode',
+    'shift',
+    'stars-bars',
+    'return',
+  ]);
+  const view = result.steps.at(-1).lineSegments1621View;
+  assert.equal(view.totalDistance, 3);
+  assert.equal(view.remaining, 1);
+  assert.equal(view.variables, 5);
+  assert.equal(view.bars, 4);
+  assert.equal(view.totalSlots, 5);
+  assert.equal(view.answer, 5);
+});
+
+test('1621 displayed Python approaches handle small and full-constraint examples', () => {
   const assertions = [
     'assert Solution().numberOfSets(4, 2) == 5',
     'assert Solution().numberOfSets(3, 1) == 3',
     'assert Solution().numberOfSets(30, 7) == 796297179',
     'assert Solution().numberOfSets(10, 3) == 924',
   ].join('\n');
-  const python = spawnSync('python3', ['-c', `${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
-  assert.equal(python.status, 0, python.stderr);
+  for (const code of [problem.code, problem.code2]) {
+    const python = spawnSync('python3', ['-c', `${code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+    assert.equal(python.status, 0, python.stderr);
+  }
 });
 
 test('1621 custom renderer covers every phase in both languages', () => {
@@ -95,15 +122,24 @@ test('1621 custom renderer covers every phase in both languages', () => {
   };
   vm.createContext(context);
   vm.runInContext(source.slice(start, end), context);
-  const result = problem.builder([4], { k: 2 });
+  const results = [
+    problem.builder([4], { k: 2, approach: 1 }),
+    problem.builder([4], { k: 2, approach: 2 }),
+  ];
   for (const language of ['en', 'vi']) {
     context.lang = language;
-    for (const step of result.steps) {
-      context.renderLineSegments1621View(step);
-      assert.match(element.innerHTML, /ls1621-viz/);
-      assert.match(element.innerHTML, /ls1621-grid/);
-      assert.match(element.innerHTML, /ls1621-result/);
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+    for (const result of results) {
+      for (const step of result.steps) {
+        context.renderLineSegments1621View(step);
+        assert.match(element.innerHTML, /ls1621-viz/);
+        assert.match(element.innerHTML, /ls1621-result/);
+        if (step.lineSegments1621View.approach === 2) {
+          assert.match(element.innerHTML, /ls1621-comb-(parts|stars)/);
+        } else {
+          assert.match(element.innerHTML, /ls1621-grid/);
+        }
+        assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+      }
     }
   }
 });
@@ -114,7 +150,11 @@ test('1621 validates visual inputs and includes responsive scoped styles', () =>
   assert.throws(() => problem.builder([4], { k: 0 }), /between 1 and n - 1/);
   assert.throws(() => problem.builder([4], { k: 4 }), /between 1 and n - 1/);
   const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const openBraces = (css.match(/\{/g) || []).length;
+  const closeBraces = (css.match(/\}/g) || []).length;
+  assert.equal(openBraces, closeBraces, 'the stylesheet must not trap 1621 inside an earlier at-rule');
   assert.match(css, /\.ls1621-viz \{/);
   assert.match(css, /\.ls1621-cell\.prefix-source/);
+  assert.match(css, /\.ls1621-comb-stars/);
   assert.match(css, /@container \(max-width: 470px\)/);
 });

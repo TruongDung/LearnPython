@@ -1,3 +1,6 @@
+import math
+
+
 class Solution:
     def numberOfSets(self, n: int, k: int) -> int:
         mod = 10**9 + 7
@@ -18,9 +21,15 @@ class Solution:
 
         return ways[n][k]
 
+    def numberOfSetsCombinatorial(self, n: int, k: int) -> int:
+        """Stars and bars over k segment lengths and k + 1 gaps."""
+        return math.comb(n + k - 1, 2 * k) % (10**9 + 7)
+
 
 if __name__ == "__main__":
     solution = Solution()
     assert solution.numberOfSets(4, 2) == 5
     assert solution.numberOfSets(3, 1) == 3
     assert solution.numberOfSets(30, 7) == 796297179
+    assert solution.numberOfSetsCombinatorial(4, 2) == 5
+    assert solution.numberOfSetsCombinatorial(30, 7) == 796297179
