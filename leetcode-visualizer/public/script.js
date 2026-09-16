@@ -4541,6 +4541,139 @@ function renderUnivalue250View(step) {
   renderTree({ tree: step.tree }, "uv250Tree");
 }
 
+function renderLongestConsecutive298View(step) {
+  const view = step.longestConsecutive298View || {};
+  const vi = lang === "vi";
+  const current = view.current || null;
+  const parent = view.parent || null;
+  const chain = Array.isArray(view.chain) ? view.chain : [];
+  const bestChain = Array.isArray(view.bestChain) ? view.bestChain : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const numberText = value => Number.isFinite(value) ? String(value) : "—";
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Vào node + so sánh", "Cập nhật longest", "DFS hai con", "Kết quả"]
+    : ["Initialize", "Enter + compare", "Update longest", "DFS children", "Answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const relationClass = view.relation || "waiting";
+  const relationTitle = view.relation === "continues"
+    ? (vi ? "NỐI TIẾP CHUỖI" : "EXTEND THE CHAIN")
+    : view.relation === "breaks"
+      ? (vi ? "CHUỖI BỊ ĐỨT" : "CHAIN BREAKS")
+      : view.relation === "root"
+        ? (vi ? "ROOT BẮT ĐẦU CHUỖI" : "ROOT STARTS A CHAIN")
+        : view.relation === "null"
+          ? (vi ? "NHÁNH RỖNG" : "EMPTY BRANCH")
+          : (vi ? "CHỜ NODE" : "WAITING FOR A NODE");
+  const relationDetail = view.relation === "continues"
+    ? `${numberText(current && current.value)} = ${numberText(parent && parent.value)} + 1 → length + 1`
+    : view.relation === "breaks"
+      ? `${numberText(current && current.value)} ≠ ${numberText(view.expectedValue)} → length = 1`
+      : view.relation === "root"
+        ? `${numberText(current && current.value)} → length = 1`
+        : view.relation === "null"
+          ? (vi ? "return · không đổi longest" : "return · longest is unchanged")
+          : "node.val ? parent_val + 1";
+
+  const chips = (items, emptyText) => items.length
+    ? items.map((item, index) => `<span><small>${index + 1}</small><b>${escapeHtml(numberText(item.value))}</b></span>`).join("<i>→</i>")
+    : `<em>${escapeHtml(emptyText)}</em>`;
+  const chainHtml = chips(chain, vi ? "chưa có chuỗi hiện tại" : "no current chain");
+  const bestHtml = chips(bestChain, vi ? "chưa có kỷ lục" : "no record yet");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>#${index + 1}</small><b>${escapeHtml(numberText(frame.value))}</b><em>len ${escapeHtml(numberText(frame.length))}</em></span>`).join("<i>→</i>")
+    : `<em>${view.final ? (vi ? "stack đã rỗng" : "stack is empty") : (vi ? "chưa bắt đầu" : "not started")}</em>`;
+  const updated = Number(view.longest) > Number(view.longestBefore);
+  const sideText = view.side === "left" ? (vi ? "TRÁI" : "LEFT") : view.side === "right" ? (vi ? "PHẢI" : "RIGHT") : view.side === "root" ? "ROOT" : "—";
+  const nextText = view.next ? numberText(view.next.value) : view.side ? "None" : "—";
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 298: node ${numberText(current && current.value)}, length ${view.currentLength || 0}, longest ${view.longest || 0}.`
+    : `Problem 298: node ${numberText(current && current.value)}, length ${view.currentLength || 0}, longest ${view.longest || 0}.`;
+
+  $("treeView").innerHTML = `<section class="lc298-viz phase-${escapeHtml(view.phase || "initialize")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>TOP-DOWN DFS · PATH STATE · #298</small><strong>${vi ? "CHUỖI CHA → CON LIÊN TIẾP DÀI NHẤT" : "LONGEST PARENT → CHILD CONSECUTIVE CHAIN"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="lc298-phases">${phases}</div>
+    <section class="lc298-rule"><strong>${vi ? "ĐIỀU KIỆN DUY NHẤT" : "THE ONE CONDITION"}</strong><code>node.val == parent_val + 1</code><span>${vi ? "đúng: length + 1 · sai: reset về 1" : "true: length + 1 · false: reset to 1"}</span></section>
+    <div class="lc298-layout">
+      <section class="lc298-tree-card"><header><strong>${vi ? "CÂY + CHUỖI TỐT NHẤT" : "TREE + BEST CHAIN"}</strong><span>${vi ? "cam = current · tím = parent · xanh = best" : "amber = current · purple = parent · green = best"}</span></header><div id="lc298Tree" class="lc298-tree"></div></section>
+      <aside class="lc298-side">
+        <section class="lc298-values"><div><small>parent_val</small><strong>${escapeHtml(numberText(parent && parent.value))}</strong></div><div><small>node.val</small><strong>${escapeHtml(numberText(current && current.value))}</strong></div><div><small>${vi ? "cần bằng" : "expected"}</small><strong>${escapeHtml(numberText(view.expectedValue))}</strong></div></section>
+        <section class="lc298-relation ${relationClass}"><small>${escapeHtml(relationTitle)}</small><strong>${escapeHtml(relationDetail)}</strong><span>${vi ? "state chỉ đi từ cha xuống con" : "state only flows from parent to child"}</span></section>
+        <section class="lc298-length ${updated ? "updated" : ""}"><header><strong>${vi ? "ĐỘ DÀI" : "LENGTHS"}</strong><span>${updated ? (vi ? "kỷ lục mới" : "new record") : (vi ? "so với kỷ lục" : "versus record")}</span></header><div><article><small>length</small><b>${escapeHtml(numberText(view.currentLength))}</b></article><i>${updated ? "→" : "≤"}</i><article><small>longest</small><b>${escapeHtml(numberText(view.longest))}</b></article></div></section>
+        <section class="lc298-next ${view.side || "idle"}"><small>${vi ? "NHÁNH ĐANG GỌI" : "NEXT DFS CALL"}</small><strong>${escapeHtml(sideText)} → ${escapeHtml(nextText)}</strong><span>parent_val = ${escapeHtml(numberText(current && current.value))} · length = ${escapeHtml(numberText(view.currentLength))}</span></section>
+        <section class="lc298-stack"><header><strong>RECURSION STACK</strong><span>${stack.length} frame(s)</span></header><div>${stackHtml}</div></section>
+      </aside>
+    </div>
+    <section class="lc298-chains"><article><header><strong>${vi ? "CHUỖI HIỆN TẠI" : "CURRENT CHAIN"}</strong><span>length = ${escapeHtml(numberText(view.currentLength))}</span></header><div>${chainHtml}</div></article><article class="best"><header><strong>${vi ? "CHUỖI TỐT NHẤT" : "BEST CHAIN"}</strong><span>longest = ${escapeHtml(numberText(view.longest))}</span></header><div>${bestHtml}</div></article></section>
+    <section class="lc298-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="lc298-result ${final ? "done" : ""}"><small>LONGEST</small><strong>${final ? escapeHtml(numberText(view.answer)) : "…"}</strong><span>${final ? (vi ? `Chuỗi tốt nhất: ${bestChain.map(item => item.value).join(" → ") || "∅"}.` : `Best chain: ${bestChain.map(item => item.value).join(" → ") || "∅"}.`) : (vi ? "Mỗi nhánh giữ một bản length độc lập." : "Each branch receives an independent length value.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "lc298Tree");
+}
+
+function renderVerticalOrder314View(step) {
+  const view = step.verticalOrder314View || {};
+  const vi = lang === "vi";
+  const columns = Array.isArray(view.columns) ? view.columns : [];
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Lấy khỏi queue", "Gom vào cột", "Thêm hai con", "Đọc kết quả"]
+    : ["Initialize", "Dequeue", "Group by column", "Enqueue children", "Read result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const queueHtml = queue.length
+    ? queue.map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>${index === 0 ? "FRONT" : `#${index + 1}`} · row ${escapeHtml(String(item.row))}</small><b>${escapeHtml(String(item.value))}</b><em>C${item.col >= 0 ? "+" : ""}${escapeHtml(String(item.col))}</em></span>`).join("<i>→</i>")
+    : `<em>${vi ? "queue rỗng" : "empty queue"}</em>`;
+
+  const columnHtml = columns.length
+    ? columns.map((entry) => {
+      const active = view.currentCol === entry.col;
+      const values = Array.isArray(entry.values) ? entry.values : [];
+      const valuesHtml = values.map((value, index) => `<span class="${view.appendedValue === value && index === values.length - 1 && active ? "new" : ""}"><small>${vi ? "thứ" : "order"} ${index + 1}</small><b>${escapeHtml(String(value))}</b></span>`).join("<i>↓</i>");
+      return `<article class="${active ? "active" : ""}"><header><small>COLUMN</small><strong>${entry.col >= 0 ? "+" : ""}${escapeHtml(String(entry.col))}</strong></header><div>${valuesHtml}</div></article>`;
+    }).join("")
+    : `<em class="vo314-empty">${vi ? "Map columns còn rỗng — node đầu tiên sẽ được thêm sau khi popleft." : "The columns map is empty — the first node is added after popleft."}</em>`;
+
+  const childSide = view.childSide === "left" ? (vi ? "CON TRÁI" : "LEFT CHILD") : (vi ? "CON PHẢI" : "RIGHT CHILD");
+  const childHtml = view.childSide
+    ? `<section class="vo314-child ${view.childExists ? "exists" : "missing"}"><small>${escapeHtml(childSide)}</small><strong>${view.childExists && view.child ? escapeHtml(String(view.child.value)) : "None"}</strong><code>${view.childSide === "left" ? "col - 1" : "col + 1"} = ${view.childCol === null ? "?" : escapeHtml(String(view.childCol))}</code><span>${view.childExists ? (vi ? "có node → thêm vào cuối queue" : "node exists → append to queue tail") : (vi ? "không có node → queue không đổi" : "no node → queue stays unchanged")}</span></section>`
+    : `<section class="vo314-child idle"><small>${vi ? "QUY TẮC NODE CON" : "CHILD RULE"}</small><strong>LEFT −1 · RIGHT +1</strong><span>${vi ? "Cột được truyền cùng node trong queue." : "The column travels with the node in the queue."}</span></section>`;
+
+  const result = Array.isArray(view.result) ? view.result : columns.map((entry) => entry.values);
+  const resultHtml = result.length
+    ? result.map((values, index) => `<span><small>C${columns[index] ? (columns[index].col >= 0 ? "+" : "") + columns[index].col : index}</small><b>[${(values || []).map(value => escapeHtml(String(value))).join(", ")}]</b></span>`).join("")
+    : `<em>[]</em>`;
+  const currentValue = view.current ? String(view.current.value) : "—";
+  const currentCol = Number.isFinite(view.currentCol) ? `${view.currentCol >= 0 ? "+" : ""}${view.currentCol}` : "—";
+  const currentRow = Number.isFinite(view.currentRow) ? String(view.currentRow) : "—";
+  const final = Boolean(view.final);
+  const summary = vi
+    ? `Bài 314: BFS theo cột; node hiện tại ${currentValue}, queue có ${queue.length} node.`
+    : `Problem 314: column-aware BFS; current node ${currentValue}, queue contains ${queue.length} node(s).`;
+
+  $("treeView").innerHTML = `<section class="vo314-viz phase-${escapeHtml(view.phase || "initialize")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BFS · COLUMN MAP · #314</small><strong>${vi ? "DUYỆT CÂY THEO CỘT DỌC" : "BINARY TREE VERTICAL ORDER"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="vo314-phases">${phases}</div>
+    <section class="vo314-rule"><strong>${vi ? "QUY TẮC CỘT" : "COLUMN RULE"}</strong><div><span>LEFT</span><code>col − 1</code></div><div><span>ROOT</span><code>col = 0</code></div><div><span>RIGHT</span><code>col + 1</code></div><em>${vi ? "BFS giữ đúng thứ tự trên ↓ dưới, rồi trái → phải khi cùng hàng." : "BFS preserves top ↓ bottom, then left → right on the same row."}</em></section>
+    <div class="vo314-layout">
+      <section class="vo314-tree-card"><header><strong>${vi ? "CÂY + NHÃN CỘT" : "TREE + COLUMN LABELS"}</strong><span>${vi ? "cam = current · xanh = trong queue" : "amber = current · blue = queued"}</span></header><div id="vo314Tree" class="vo314-tree"></div></section>
+      <aside class="vo314-side">
+        <section class="vo314-current"><div><small>CURRENT</small><strong>${escapeHtml(currentValue)}</strong></div><div><small>ROW</small><strong>${escapeHtml(currentRow)}</strong></div><div><small>COLUMN</small><strong>${escapeHtml(currentCol)}</strong></div></section>
+        <section class="vo314-bounds"><header><strong>${vi ? "BIÊN CỘT" : "COLUMN BOUNDS"}</strong><span>${vi ? "để đọc trái → phải" : "for left → right output"}</span></header><div><code>min_col</code><b>${escapeHtml(String(view.minCol ?? 0))}</b><i>…</i><b>${escapeHtml(String(view.maxCol ?? 0))}</b><code>max_col</code></div></section>
+        ${childHtml}
+      </aside>
+    </div>
+    <section class="vo314-queue"><header><strong>QUEUE — FIFO</strong><span>${vi ? "lấy ở FRONT · thêm vào BACK" : "remove at FRONT · append at BACK"}</span></header><div>${queueHtml}</div></section>
+    <section class="vo314-columns"><header><strong>columns[col]</strong><span>${vi ? "mỗi cột giữ nguyên thứ tự BFS" : "each column preserves BFS order"}</span></header><div>${columnHtml}</div></section>
+    <section class="vo314-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="vo314-result ${final ? "done" : ""}"><strong>${vi ? "KẾT QUẢ TRÁI → PHẢI" : "LEFT → RIGHT RESULT"}</strong><div>${resultHtml}</div><span>${final ? (vi ? "Hoàn tất: đọc từ min_col đến max_col." : "Complete: read from min_col through max_col.") : (vi ? "Kết quả tạm thời; BFS vẫn đang chạy." : "Partial result while BFS is still running.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "vo314Tree");
+}
+
 function renderUpsideDown156View(step) {
   const view = step.upsideDown156View || {};
   const vi = lang === "vi";
@@ -31577,6 +31710,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderUnivalue250View(step);
+  } else if (step.longestConsecutive298View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLongestConsecutive298View(step);
   } else if (step.upsideDown156View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

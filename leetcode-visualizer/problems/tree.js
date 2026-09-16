@@ -4582,6 +4582,214 @@ function buildSteps250(input) {
   return { input, answer: count, steps };
 }
 
+// ─── 298: Binary Tree Longest Consecutive Sequence ───
+function buildSteps298(input) {
+  const root = parseTree(input);
+  const steps = [];
+  const allNodes = [];
+  const callStack = [];
+  let longest = 0;
+  let bestChain = [];
+
+  (function collect(node) {
+    if (!node) return;
+    allNodes.push(node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+  if (allNodes.some((node) => !Number.isFinite(node.val))) {
+    throw new Error("Every tree value must be a finite number.");
+  }
+
+  function addStep(options) {
+    const current = options.current || null;
+    const parent = options.parent || null;
+    const chain = Array.isArray(options.chain) ? options.chain : [];
+    const annotations = {};
+    for (const node of bestChain) {
+      annotations[node.id] = { labels: [{ label: "BEST", kind: "answer" }] };
+    }
+    for (const node of chain) {
+      annotations[node.id] = {
+        labels: [
+          ...(annotations[node.id]?.labels || []),
+          { label: "CHAIN", kind: "chain" },
+        ],
+      };
+    }
+    if (parent) {
+      annotations[parent.id] = {
+        labels: [
+          ...(annotations[parent.id]?.labels || []),
+          { label: "PARENT", kind: "parent" },
+        ],
+      };
+    }
+    if (current) {
+      annotations[current.id] = {
+        labels: [
+          ...(annotations[current.id]?.labels || []),
+          { label: "CURRENT", kind: "current" },
+        ],
+      };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: new Set(bestChain.map((node) => node.id)),
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "node", value: current ? current.val : "None" },
+        { name: "parent_val", value: parent ? parent.val : "-inf" },
+        { name: "length", value: options.currentLength === undefined ? 0 : options.currentLength },
+        { name: "longest", value: longest },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.longestConsecutive298View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      current: current ? { id: current.id, value: current.val } : null,
+      parent: parent ? { id: parent.id, value: parent.val } : null,
+      side: options.side || null,
+      relation: options.relation || null,
+      expectedValue: parent ? parent.val + 1 : null,
+      incomingLength: options.incomingLength === undefined ? null : options.incomingLength,
+      currentLength: options.currentLength === undefined ? 0 : options.currentLength,
+      longestBefore: options.longestBefore === undefined ? longest : options.longestBefore,
+      longest,
+      chain: chain.map((node) => ({ id: node.id, value: node.val })),
+      bestChain: bestChain.map((node) => ({ id: node.id, value: node.val })),
+      stack: callStack.map((frame) => ({ id: frame.node.id, value: frame.node.val, length: frame.length })),
+      next: options.next ? { id: options.next.id, value: options.next.val } : null,
+      answer: options.final ? longest : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "Khởi tạo longest = 0", en: "Initialize longest = 0" },
+    phase: "initialize", phaseIndex: 0, operation: "initialize", codeLine: 3,
+    note: { vi: "longest lưu độ dài chuỗi liên tiếp tốt nhất đã gặp trên mọi đường đi từ cha xuống con.", en: "longest stores the best consecutive parent-to-child chain length seen anywhere in the tree." },
+  });
+  addStep({
+    title: root ? { vi: `Gọi dfs từ root ${root.val}`, en: `Call dfs from root ${root.val}` } : { vi: "Gọi dfs với root rỗng", en: "Call dfs with an empty root" },
+    phase: "recurse", phaseIndex: 1, operation: "start-dfs", codeLine: 16, current: root,
+    next: root,
+    note: { vi: "Root không có cha nên nhận parent_val = -∞ và length = 0; nó sẽ bắt đầu một chuỗi mới dài 1.", en: "The root has no parent, so it receives parent_val = -∞ and length = 0; it starts a new chain of length 1." },
+  });
+
+  function dfs(node, parentVal, incomingLength, chainBefore, parent, side) {
+    if (!node) {
+      addStep({
+        title: { vi: `node ${side || "root"} = None`, en: `${side || "root"} node = None` },
+        phase: "recurse", phaseIndex: 1, operation: "null-check", codeLine: 6,
+        parent, side, chain: chainBefore, incomingLength, currentLength: incomingLength, relation: "null",
+        note: { vi: "Nhánh rỗng không thể kéo dài chuỗi hiện tại.", en: "An empty branch cannot extend the current chain." },
+      });
+      addStep({
+        title: { vi: "return khỏi nhánh rỗng", en: "Return from the empty branch" },
+        phase: "recurse", phaseIndex: 1, operation: "return-null", codeLine: 7,
+        parent, side, chain: chainBefore, incomingLength, currentLength: incomingLength, relation: "null",
+        note: { vi: "Quay về frame cha và tiếp tục nhánh còn lại.", en: "Return to the parent frame and continue with its other branch." },
+      });
+      return;
+    }
+
+    callStack.push({ node, length: incomingLength });
+    addStep({
+      title: { vi: `Vào node ${node.val}`, en: `Enter node ${node.val}` },
+      phase: "recurse", phaseIndex: 1, operation: "enter", codeLine: 6,
+      current: node, parent, side, chain: chainBefore, incomingLength, currentLength: incomingLength,
+      vars: [{ name: "stack", value: `[${callStack.map((frame) => frame.node.val).join(", ")}]` }],
+      note: parent
+        ? { vi: `Nhận length = ${incomingLength} từ parent ${parent.val}; kiểm tra ${node.val} có bằng ${parent.val} + 1 hay không.`, en: `Receive length = ${incomingLength} from parent ${parent.val}; check whether ${node.val} equals ${parent.val} + 1.` }
+        : { vi: "Đây là root, nên luôn bắt đầu một chuỗi mới.", en: "This is the root, so it always starts a new chain." },
+    });
+
+    const continues = Boolean(parent) && node.val === parentVal + 1;
+    const relation = parent ? (continues ? "continues" : "breaks") : "root";
+    addStep({
+      title: parent
+        ? { vi: `Kiểm tra ${node.val} == ${parentVal} + 1`, en: `Check ${node.val} == ${parentVal} + 1` }
+        : { vi: `Root ${node.val} không có parent`, en: `Root ${node.val} has no parent` },
+      phase: "compare", phaseIndex: 1, operation: "compare", codeLine: 8,
+      current: node, parent, side, chain: chainBefore, incomingLength, currentLength: incomingLength, relation,
+      vars: [{ name: "continues?", value: continues }],
+      note: continues
+        ? { vi: `${node.val} đúng bằng ${parentVal + 1}; chuỗi được nối dài.`, en: `${node.val} is exactly ${parentVal + 1}; extend the chain.` }
+        : parent
+          ? { vi: `${node.val} khác ${parentVal + 1}; chuỗi từ parent bị đứt và phải bắt đầu lại tại node này.`, en: `${node.val} is not ${parentVal + 1}; the parent chain breaks and restarts at this node.` }
+          : { vi: "Root là phần tử đầu tiên của một chuỗi mới.", en: "The root is the first value of a new chain." },
+    });
+
+    const currentLength = continues ? incomingLength + 1 : 1;
+    const chain = continues ? [...chainBefore, node] : [node];
+    callStack[callStack.length - 1].length = currentLength;
+    addStep({
+      title: continues
+        ? { vi: `length += 1 → ${currentLength}`, en: `length += 1 → ${currentLength}` }
+        : { vi: "Reset length = 1", en: "Reset length = 1" },
+      phase: "compare", phaseIndex: 1, operation: continues ? "extend" : "reset", codeLine: continues ? 9 : 11,
+      current: node, parent, side, chain, incomingLength, currentLength, relation,
+      note: continues
+        ? { vi: `Chuỗi hiện tại là ${chain.map((item) => item.val).join(" → ")} và có độ dài ${currentLength}.`, en: `The current chain is ${chain.map((item) => item.val).join(" → ")} with length ${currentLength}.` }
+        : { vi: `Chuỗi mới bắt đầu tại ${node.val}, nên length trở về 1.`, en: `A new chain starts at ${node.val}, so length resets to 1.` },
+    });
+
+    const longestBefore = longest;
+    if (currentLength > longest) {
+      longest = currentLength;
+      bestChain = [...chain];
+    }
+    addStep({
+      title: currentLength > longestBefore
+        ? { vi: `Cập nhật longest: ${longestBefore} → ${longest}`, en: `Update longest: ${longestBefore} → ${longest}` }
+        : { vi: `Giữ longest = ${longest}`, en: `Keep longest = ${longest}` },
+      phase: "update", phaseIndex: 2, operation: currentLength > longestBefore ? "update-longest" : "keep-longest", codeLine: 12,
+      current: node, parent, side, chain, incomingLength, currentLength, relation, longestBefore,
+      note: currentLength > longestBefore
+        ? { vi: `Chuỗi ${chain.map((item) => item.val).join(" → ")} là kỷ lục mới.`, en: `Chain ${chain.map((item) => item.val).join(" → ")} is the new record.` }
+        : { vi: `Độ dài ${currentLength} chưa vượt kỷ lục ${longest}.`, en: `Length ${currentLength} does not beat the record ${longest}.` },
+    });
+
+    addStep({
+      title: node.left ? { vi: `DFS trái tới ${node.left.val}`, en: `DFS left to ${node.left.val}` } : { vi: "DFS trái tới None", en: "DFS left to None" },
+      phase: "recurse", phaseIndex: 3, operation: "recurse-left", codeLine: 13,
+      current: node, parent, side: "left", chain, incomingLength, currentLength, relation, next: node.left,
+      note: { vi: `Truyền parent_val = ${node.val} và length = ${currentLength} cho con trái.`, en: `Pass parent_val = ${node.val} and length = ${currentLength} to the left child.` },
+    });
+    dfs(node.left, node.val, currentLength, chain, node, "left");
+
+    addStep({
+      title: node.right ? { vi: `DFS phải tới ${node.right.val}`, en: `DFS right to ${node.right.val}` } : { vi: "DFS phải tới None", en: "DFS right to None" },
+      phase: "recurse", phaseIndex: 3, operation: "recurse-right", codeLine: 14,
+      current: node, parent, side: "right", chain, incomingLength, currentLength, relation, next: node.right,
+      note: { vi: `Truyền cùng state của node ${node.val} cho con phải; kết quả từ nhánh trái không làm thay đổi length của nhánh phải.`, en: `Pass the same state from node ${node.val} to the right child; the left branch does not change the right branch's length.` },
+    });
+    dfs(node.right, node.val, currentLength, chain, node, "right");
+    callStack.pop();
+  }
+
+  dfs(root, Number.NEGATIVE_INFINITY, 0, [], null, "root");
+  addStep({
+    title: { vi: `Trả về longest = ${longest}`, en: `Return longest = ${longest}` },
+    phase: "done", phaseIndex: 4, operation: "return", codeLine: 17, final: true,
+    chain: bestChain, currentLength: longest,
+    vars: [{ name: "answer", value: longest }, { name: "best chain", value: `[${bestChain.map((node) => node.val).join(", ")}]` }],
+    note: bestChain.length
+      ? { vi: `Chuỗi cha → con dài nhất là ${bestChain.map((node) => node.val).join(" → ")}, độ dài ${longest}.`, en: `The longest parent-to-child consecutive chain is ${bestChain.map((node) => node.val).join(" → ")}, length ${longest}.` }
+      : { vi: "Cây rỗng nên độ dài bằng 0.", en: "The tree is empty, so the length is 0." },
+  });
+  return { input, answer: longest, steps };
+}
+
 // ─── 156: Binary Tree Upside Down ───
 function buildSteps156(input) {
   const root = parseTree(input);
@@ -5209,27 +5417,234 @@ function buildSteps103v2(input) {
 
 // ─── 314: Binary Tree Vertical Order Traversal ───
 function buildSteps314(input) {
-  const root = parseTree(input); const steps = []; const colMap = new Map();
-  steps.push(snapshot(root, {
-    title: { vi: "Duyệt theo cột dọc", en: "Vertical order traversal" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "col: root=0, left=-1, right=+1" }],
-    note: { vi: `Gán mỗi nút 1 CỘT: gốc = 0, đi trái → cột-1, đi phải → cột+1. BFS để giữ thứ tự trên→dưới, trái→phải. Gom theo cột tăng dần.`, en: `Assign each node a COLUMN: root = 0, go left → col-1, go right → col+1. BFS to keep top→bottom, left→right order. Group by ascending column.` },
-  }));
-  if (root) {
-    let queue = [{ node: root, col: 0 }]; const visited = new Set();
-    while (queue.length) {
-      const { node, col } = queue.shift();
-      if (!colMap.has(col)) colMap.set(col, []);
-      colMap.get(col).push(node.val); visited.add(node.id);
-      const cols = [...colMap.keys()].sort((a, b) => a - b);
-      steps.push(snapshot(root, { title: { vi: `Nút ${node.val} → cột ${col}`, en: `Node ${node.val} → column ${col}` }, hlSet: new Set([node.id]), wordSet: new Set(visited), codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "column", value: col }, { name: "columns", value: JSON.stringify(cols.map((c) => colMap.get(c))) }], note: { vi: `Thêm ${node.val} vào cột ${col}. Con trái → cột ${col - 1}, con phải → cột ${col + 1}.`, en: `Add ${node.val} to column ${col}. Left child → col ${col - 1}, right child → col ${col + 1}.` } }));
-      if (node.left) queue.push({ node: node.left, col: col - 1 });
-      if (node.right) queue.push({ node: node.right, col: col + 1 });
+  const root = parseTree(input);
+  const steps = [];
+  const allNodes = [];
+  const columns = new Map();
+  const positionById = new Map();
+  const visited = new Set();
+  let queue = [];
+  let current = null;
+  let currentCol = null;
+  let currentRow = null;
+  let minCol = 0;
+  let maxCol = 0;
+
+  (function collect(node) {
+    if (!node) return;
+    allNodes.push(node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+  if (allNodes.some((node) => !Number.isFinite(node.val))) {
+    throw new Error("Every tree value must be a finite number.");
+  }
+
+  function columnRows() {
+    const keys = [...columns.keys()].sort((a, b) => a - b);
+    return keys.map((col) => ({ col, values: [...columns.get(col)] }));
+  }
+
+  function addStep(options) {
+    const active = options.current === undefined ? current : options.current;
+    const annotations = {};
+    for (const [id, position] of positionById) {
+      annotations[id] = { labels: [{ label: `C${position.col}`, kind: "column" }] };
+    }
+    for (const item of queue) {
+      annotations[item.node.id] = {
+        labels: [
+          ...(annotations[item.node.id]?.labels || []),
+          { label: "QUEUE", kind: "queue" },
+        ],
+      };
+    }
+    if (active) {
+      annotations[active.id] = {
+        labels: [
+          ...(annotations[active.id]?.labels || []),
+          { label: "CURRENT", kind: "current" },
+        ],
+      };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(active ? [active.id] : []),
+      wordSet: new Set(visited),
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "node", value: active ? active.val : "None" },
+        { name: "column", value: options.col === undefined ? (currentCol === null ? "—" : currentCol) : options.col },
+        { name: "min_col", value: minCol },
+        { name: "max_col", value: maxCol },
+        { name: "queue", value: `[${queue.map((item) => `(${item.node.val},${item.col})`).join(", ")}]` },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.verticalOrder314View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      current: active ? { id: active.id, value: active.val } : null,
+      currentCol: options.col === undefined ? currentCol : options.col,
+      currentRow: options.row === undefined ? currentRow : options.row,
+      queue: queue.map((item) => ({ id: item.node.id, value: item.node.val, col: item.col, row: item.row })),
+      columns: columnRows(),
+      minCol,
+      maxCol,
+      visitedIds: [...visited],
+      childSide: options.childSide || null,
+      childExists: options.childExists === undefined ? null : options.childExists,
+      child: options.child ? { id: options.child.id, value: options.child.val } : null,
+      childCol: options.childCol === undefined ? null : options.childCol,
+      childRow: options.childRow === undefined ? null : options.childRow,
+      appendedValue: options.appendedValue === undefined ? null : options.appendedValue,
+      result: options.final ? columnRows().map((entry) => entry.values) : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: root ? { vi: `Root ${root.val} khác None`, en: `Root ${root.val} is not None` } : { vi: "Root = None", en: "Root = None" },
+    phase: "initialize", phaseIndex: 0, operation: "check-root", codeLine: 3, current: root,
+    note: root
+      ? { vi: "Cây không rỗng nên bắt đầu BFS theo cột.", en: "The tree is non-empty, so start column-aware BFS." }
+      : { vi: "Cây rỗng không có cột nào để trả về.", en: "An empty tree has no columns to return." },
+  });
+  if (!root) {
+    addStep({
+      title: { vi: "Trả về []", en: "Return []" },
+      phase: "done", phaseIndex: 4, operation: "return-empty", codeLine: 4, current: null, final: true,
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "Không có node nên vertical order là mảng rỗng.", en: "There are no nodes, so the vertical order is empty." },
+    });
+    return { input, answer: "[]", steps };
+  }
+
+  addStep({
+    title: { vi: "Tạo map columns rỗng", en: "Create an empty columns map" },
+    phase: "initialize", phaseIndex: 0, operation: "initialize-columns", codeLine: 6, current: null,
+    note: { vi: "Mỗi key là số cột; value là danh sách node theo thứ tự BFS.", en: "Each key is a column number; its value is the nodes in BFS order." },
+  });
+  queue = [{ node: root, col: 0, row: 0 }];
+  positionById.set(root.id, { col: 0, row: 0 });
+  addStep({
+    title: { vi: `Queue bắt đầu với (${root.val}, 0)`, en: `Queue starts with (${root.val}, 0)` },
+    phase: "initialize", phaseIndex: 0, operation: "initialize-queue", codeLine: 7, current: root, col: 0, row: 0,
+    note: { vi: "Root luôn nằm ở cột 0. Queue lưu cả node, cột và hàng để visualization dễ theo dõi.", en: "The root is always in column 0. The visual queue tracks node, column, and row." },
+  });
+  minCol = 0;
+  maxCol = 0;
+  addStep({
+    title: { vi: "Khởi tạo min_col = max_col = 0", en: "Initialize min_col = max_col = 0" },
+    phase: "initialize", phaseIndex: 0, operation: "initialize-bounds", codeLine: 8, current: root, col: 0, row: 0,
+    note: { vi: "Hai biên giúp đọc kết quả trái → phải mà không cần sort các key.", en: "The two bounds let us read left to right without sorting map keys." },
+  });
+
+  while (queue.length) {
+    addStep({
+      title: { vi: `Queue có ${queue.length} phần tử`, en: `Queue has ${queue.length} item(s)` },
+      phase: "bfs", phaseIndex: 1, operation: "while-check", codeLine: 9, current: null,
+      vars: [{ name: "queue length", value: queue.length }],
+      note: { vi: "BFS lấy node theo thứ tự trên → dưới và trái → phải trong cùng một hàng.", en: "BFS removes nodes top to bottom and left to right within the same row." },
+    });
+
+    const item = queue.shift();
+    current = item.node;
+    currentCol = item.col;
+    currentRow = item.row;
+    addStep({
+      title: { vi: `popleft → node ${current.val}, cột ${currentCol}`, en: `popleft → node ${current.val}, column ${currentCol}` },
+      phase: "bfs", phaseIndex: 1, operation: "dequeue", codeLine: 10, col: currentCol, row: currentRow,
+      note: { vi: `Node ${current.val} ở hàng ${currentRow}, cột ${currentCol}; đây là node tiếp theo cần ghi vào map.`, en: `Node ${current.val} is at row ${currentRow}, column ${currentCol}; it is the next node written to the map.` },
+    });
+
+    if (!columns.has(currentCol)) columns.set(currentCol, []);
+    columns.get(currentCol).push(current.val);
+    visited.add(current.id);
+    addStep({
+      title: { vi: `Thêm ${current.val} vào columns[${currentCol}]`, en: `Append ${current.val} to columns[${currentCol}]` },
+      phase: "group", phaseIndex: 2, operation: "append-column", codeLine: 11, col: currentCol, row: currentRow, appendedValue: current.val,
+      vars: [{ name: `columns[${currentCol}]`, value: `[${columns.get(currentCol).join(", ")}]` }],
+      note: { vi: `Danh sách cột ${currentCol} giữ nguyên thứ tự BFS, nên không cần sort node bên trong cột.`, en: `Column ${currentCol} preserves BFS order, so nodes inside it never need sorting.` },
+    });
+
+    const oldMin = minCol;
+    minCol = Math.min(minCol, currentCol);
+    addStep({
+      title: { vi: `min_col = min(${oldMin}, ${currentCol}) = ${minCol}`, en: `min_col = min(${oldMin}, ${currentCol}) = ${minCol}` },
+      phase: "group", phaseIndex: 2, operation: "update-min", codeLine: 12, col: currentCol, row: currentRow,
+      note: { vi: "Ghi nhớ cột trái nhất đã gặp.", en: "Remember the leftmost column seen so far." },
+    });
+    const oldMax = maxCol;
+    maxCol = Math.max(maxCol, currentCol);
+    addStep({
+      title: { vi: `max_col = max(${oldMax}, ${currentCol}) = ${maxCol}`, en: `max_col = max(${oldMax}, ${currentCol}) = ${maxCol}` },
+      phase: "group", phaseIndex: 2, operation: "update-max", codeLine: 13, col: currentCol, row: currentRow,
+      note: { vi: "Ghi nhớ cột phải nhất đã gặp.", en: "Remember the rightmost column seen so far." },
+    });
+
+    addStep({
+      title: current.left ? { vi: `Kiểm tra con trái: có node ${current.left.val}`, en: `Check left child: node ${current.left.val} exists` } : { vi: "Kiểm tra con trái: None", en: "Check left child: None" },
+      phase: "enqueue", phaseIndex: 3, operation: "check-left", codeLine: 14, col: currentCol, row: currentRow,
+      childSide: "left", childExists: Boolean(current.left), child: current.left, childCol: currentCol - 1, childRow: currentRow + 1,
+      note: current.left
+        ? { vi: `Con trái đi lệch một cột sang trái: ${currentCol} - 1 = ${currentCol - 1}.`, en: `A left child moves one column left: ${currentCol} - 1 = ${currentCol - 1}.` }
+        : { vi: "Không có con trái nên không enqueue.", en: "There is no left child to enqueue." },
+    });
+    if (current.left) {
+      queue.push({ node: current.left, col: currentCol - 1, row: currentRow + 1 });
+      positionById.set(current.left.id, { col: currentCol - 1, row: currentRow + 1 });
+      addStep({
+        title: { vi: `Enqueue trái (${current.left.val}, ${currentCol - 1})`, en: `Enqueue left (${current.left.val}, ${currentCol - 1})` },
+        phase: "enqueue", phaseIndex: 3, operation: "enqueue-left", codeLine: 15, col: currentCol, row: currentRow,
+        childSide: "left", childExists: true, child: current.left, childCol: currentCol - 1, childRow: currentRow + 1,
+        note: { vi: "Thêm vào cuối queue để các node cùng hàng vẫn giữ thứ tự trái → phải.", en: "Append to the queue tail so same-row nodes stay left-to-right." },
+      });
+    }
+
+    addStep({
+      title: current.right ? { vi: `Kiểm tra con phải: có node ${current.right.val}`, en: `Check right child: node ${current.right.val} exists` } : { vi: "Kiểm tra con phải: None", en: "Check right child: None" },
+      phase: "enqueue", phaseIndex: 3, operation: "check-right", codeLine: 16, col: currentCol, row: currentRow,
+      childSide: "right", childExists: Boolean(current.right), child: current.right, childCol: currentCol + 1, childRow: currentRow + 1,
+      note: current.right
+        ? { vi: `Con phải đi lệch một cột sang phải: ${currentCol} + 1 = ${currentCol + 1}.`, en: `A right child moves one column right: ${currentCol} + 1 = ${currentCol + 1}.` }
+        : { vi: "Không có con phải nên không enqueue.", en: "There is no right child to enqueue." },
+    });
+    if (current.right) {
+      queue.push({ node: current.right, col: currentCol + 1, row: currentRow + 1 });
+      positionById.set(current.right.id, { col: currentCol + 1, row: currentRow + 1 });
+      addStep({
+        title: { vi: `Enqueue phải (${current.right.val}, ${currentCol + 1})`, en: `Enqueue right (${current.right.val}, ${currentCol + 1})` },
+        phase: "enqueue", phaseIndex: 3, operation: "enqueue-right", codeLine: 17, col: currentCol, row: currentRow,
+        childSide: "right", childExists: true, child: current.right, childCol: currentCol + 1, childRow: currentRow + 1,
+        note: { vi: "Con phải được thêm sau con trái, bảo toàn tie-break trái → phải trong cùng hàng/cột.", en: "The right child is appended after the left child, preserving the same-row left-to-right tie-break." },
+      });
     }
   }
-  const sortedCols = [...colMap.keys()].sort((a, b) => a - b);
-  const result = sortedCols.map((c) => colMap.get(c));
-  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Đọc các cột từ trái sang phải.`, en: `Read columns left to right.` } }); fs.final = true; steps.push(fs);
+
+  current = null;
+  currentCol = null;
+  currentRow = null;
+  addStep({
+    title: { vi: "Queue rỗng → kết thúc BFS", en: "Queue is empty → BFS complete" },
+    phase: "bfs", phaseIndex: 1, operation: "while-stop", codeLine: 9, current: null,
+    note: { vi: "Mọi node đã được ghi vào đúng cột theo thứ tự BFS.", en: "Every node has been written to its column in BFS order." },
+  });
+
+  const result = [];
+  for (let col = minCol; col <= maxCol; col += 1) result.push([...(columns.get(col) || [])]);
+  addStep({
+    title: { vi: `Trả về ${JSON.stringify(result)}`, en: `Return ${JSON.stringify(result)}` },
+    phase: "done", phaseIndex: 4, operation: "return", codeLine: 18, current: null, final: true,
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    note: { vi: `Đọc liên tục từ cột ${minCol} tới ${maxCol}: trái → phải.`, en: `Read continuously from column ${minCol} through ${maxCol}: left to right.` },
+  });
   return { input, answer: JSON.stringify(result), steps };
 }
 
@@ -9322,6 +9737,48 @@ module.exports = {
     builder: buildSteps250,
     debugMode: "semantic",
   },
+  298: {
+    id: 298, difficulty: "medium", slug: "binary-tree-longest-consecutive-sequence",
+    premium: true,
+    category: TREE_CAT,
+    tags: [
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "tree-dp", vi: "State trên đường đi", en: "Path State" },
+    ],
+    title: { vi: "Binary Tree Longest Consecutive Sequence", en: "Binary Tree Longest Consecutive Sequence" },
+    titleVi: { vi: "Chuỗi tăng liên tiếp dài nhất trong cây", en: "Longest consecutive sequence in a binary tree" },
+    statement: { vi: "Tìm đường đi cha → con dài nhất mà mỗi node con có giá trị đúng bằng node cha + 1. Đường đi chỉ được đi xuống.", en: "Find the longest parent-to-child path where every child value is exactly its parent value plus one. The path may only move downward." },
+    defaultInput: "1,2,9,3,8,10,11,4",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    debugMode: "semantic",
+    approach: [
+      { vi: "DFS mang theo parent_val và length của chuỗi kết thúc tại node cha.", en: "DFS carries parent_val and the chain length ending at the parent." },
+      { vi: "Nếu node.val == parent_val + 1 thì tăng length; nếu không, reset length = 1 tại node hiện tại.", en: "If node.val == parent_val + 1, increment length; otherwise reset length to 1 at the current node." },
+      { vi: "Sau mỗi node, cập nhật longest rồi truyền state hiện tại độc lập xuống cả hai con.", en: "At every node, update longest, then pass the current state independently to both children." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được thăm một lần; stack DFS cao h.", en: "Each node is visited once; the DFS stack has height h." } },
+    code: [
+      "class Solution:",
+      "    def longestConsecutive(self, root):",
+      "        self.longest = 0",
+      "",
+      "        def dfs(node, parent_val, length):",
+      "            if not node:",
+      "                return",
+      "            if node.val == parent_val + 1:",
+      "                length += 1",
+      "            else:",
+      "                length = 1",
+      "            self.longest = max(self.longest, length)",
+      "            dfs(node.left, node.val, length)",
+      "            dfs(node.right, node.val, length)",
+      "",
+      "        dfs(root, float('-inf'), 0)",
+      "        return self.longest",
+    ],
+    builder: buildSteps298,
+  },
   156: {
     id: 156, difficulty: "medium", slug: "binary-tree-upside-down",
     category: TREE_CAT,
@@ -9438,14 +9895,37 @@ module.exports = {
     title: { vi: "Binary Tree Vertical Order Traversal", en: "Binary Tree Vertical Order Traversal" },
     titleVi: { vi: "Duyệt theo cột dọc", en: "Vertical order traversal" },
     statement: { vi: "Cho root, trả về duyệt theo CỘT từ trái sang phải; trong cùng cột, theo thứ tự trên→dưới (cùng hàng thì trái→phải). Nhập level-order.", en: "Given root, return the VERTICAL order (columns left to right); within a column, top→bottom (same row → left→right). Enter as level-order." },
-    defaultInput: "3,9,20,15,7",
+    defaultInput: "3,9,20,4,5,15,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],
+    tags: ["Tree", "Breadth-First Search", "Hash Table"],
+    debugMode: "semantic",
     approach: [
-      { vi: "Gán cột: gốc 0, trái -1, phải +1. BFS để giữ đúng thứ tự, gom theo cột rồi sắp xếp cột.", en: "Assign columns: root 0, left -1, right +1. BFS to keep correct order, group by column then sort columns." },
+      { vi: "Đặt root ở cột 0; con trái ở col - 1 và con phải ở col + 1.", en: "Place the root in column 0; a left child uses col - 1 and a right child uses col + 1." },
+      { vi: "Duyệt BFS để giữ thứ tự trên → dưới; các node cùng hàng được lấy từ trái → phải.", en: "Use BFS to preserve top-to-bottom order; nodes on the same row are removed left to right." },
+      { vi: "Gom giá trị vào columns[col], đồng thời giữ min_col và max_col để đọc kết quả từ trái sang phải.", en: "Append values to columns[col] while tracking min_col and max_col, then read the result left to right." },
     ],
-    complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS + gom theo cột.", en: "BFS + group by column." } },
-    code: ["class Solution:", "    def verticalOrder(self, root):", "        if not root: return []", "        from collections import defaultdict, deque", "        cols = defaultdict(list)", "        q = deque([(root, 0)])", "        while q:", "            node, c = q.popleft()", "            cols[c].append(node.val)", "            if node.left: q.append((node.left, c - 1))", "            if node.right: q.append((node.right, c + 1))", "        return [cols[c] for c in sorted(cols)]"],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi node vào/ra queue đúng một lần; map và queue cùng dùng tối đa O(n).", en: "Each node enters and leaves the queue once; the map and queue together use O(n) space." } },
+    code: [
+      "class Solution:",
+      "    def verticalOrder(self, root):",
+      "        if not root:",
+      "            return []",
+      "        from collections import defaultdict, deque",
+      "        cols = defaultdict(list)",
+      "        queue = deque([(root, 0)])",
+      "        min_col = max_col = 0",
+      "        while queue:",
+      "            node, col = queue.popleft()",
+      "            cols[col].append(node.val)",
+      "            min_col = min(min_col, col)",
+      "            max_col = max(max_col, col)",
+      "            if node.left:",
+      "                queue.append((node.left, col - 1))",
+      "            if node.right:",
+      "                queue.append((node.right, col + 1))",
+      "        return [cols[col] for col in range(min_col, max_col + 1)]",
+    ],
     builder: buildSteps314,
   },
   987: {
