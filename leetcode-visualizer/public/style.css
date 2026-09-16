@@ -53007,4 +53007,143 @@ html, body {
   .ud156-stack { grid-column: auto; }
   .ud156-viz > footer { grid-template-columns: 1fr; }
   .ud156-viz > footer small { grid-row: auto; }
+/* #1621: counting DP with prefix-sum aggregation over possible left endpoints. */
+.tree-view:has(> .ls1621-viz) { min-width: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
+.ls1621-viz {
+  --ls1621-text: #e2e8f0;
+  --ls1621-muted: #94a3b8;
+  --ls1621-panel: #111827;
+  --ls1621-soft: rgba(15, 23, 42, .72);
+  --ls1621-border: #334155;
+  --ls1621-current: #fbbf24;
+  --ls1621-skip: #38bdf8;
+  --ls1621-prefix: #a78bfa;
+  --ls1621-good: #34d399;
+  container-type: inline-size;
+  display: grid;
+  gap: 11px;
+  width: 100%;
+  min-width: 0;
+  color: var(--ls1621-text);
+  text-align: left;
+}
+[data-theme="light"] .ls1621-viz {
+  --ls1621-text: #172033;
+  --ls1621-muted: #64748b;
+  --ls1621-panel: #fff;
+  --ls1621-soft: #f8fafc;
+  --ls1621-border: #d6deea;
+  --ls1621-current: #b45309;
+  --ls1621-skip: #0369a1;
+  --ls1621-prefix: #6d28d9;
+  --ls1621-good: #047857;
+}
+.ls1621-viz > header,
+.ls1621-points > header,
+.ls1621-candidates > header,
+.ls1621-table > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ls1621-viz > header > div { display: grid; gap: 2px; }
+.ls1621-viz > header small,
+.ls1621-action > small,
+.ls1621-result > small { color: var(--ls1621-prefix); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.ls1621-viz > header strong { color: var(--ls1621-text); font-size: 13px; }
+.ls1621-viz > header > span { max-width: 52%; color: var(--ls1621-muted); font-size: 11px; text-align: right; }
+.ls1621-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.ls1621-phases > span { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 37px; padding: 6px; color: var(--ls1621-muted); background: var(--ls1621-panel); border: 1px solid var(--ls1621-border); border-radius: 8px; font-size: 10px; font-weight: 750; text-align: center; }
+.ls1621-phases > span b { display: grid; width: 19px; height: 19px; flex: 0 0 auto; place-items: center; color: var(--ls1621-text); background: color-mix(in srgb, var(--ls1621-muted) 22%, transparent); border-radius: 50%; font-size: 9px; }
+.ls1621-phases > span.active { color: var(--ls1621-prefix); border-color: var(--ls1621-prefix); background: color-mix(in srgb, var(--ls1621-prefix) 9%, var(--ls1621-panel)); }
+.ls1621-phases > span.active b { color: #fff; background: var(--ls1621-prefix); }
+.ls1621-phases > span.done { color: var(--ls1621-good); border-color: color-mix(in srgb, var(--ls1621-good) 58%, var(--ls1621-border)); }
+.ls1621-phases > span.done b { color: #fff; background: var(--ls1621-good); }
+.ls1621-rule,
+.ls1621-points,
+.ls1621-candidates,
+.ls1621-table,
+.ls1621-formula,
+.ls1621-action,
+.ls1621-result { min-width: 0; padding: 11px; background: var(--ls1621-panel); border: 1px solid var(--ls1621-border); border-radius: 10px; }
+.ls1621-rule { display: flex; align-items: center; gap: 13px; border-left: 3px solid var(--ls1621-prefix); }
+.ls1621-rule > b { flex: 0 0 auto; color: var(--ls1621-prefix); font: 800 12px Consolas, monospace; }
+.ls1621-rule > span { color: var(--ls1621-muted); font-size: 11px; line-height: 1.45; }
+.ls1621-rule code { color: var(--ls1621-text); }
+.ls1621-points { display: grid; gap: 12px; overflow: hidden; }
+.ls1621-points > header strong,
+.ls1621-candidates > header strong,
+.ls1621-table > header strong { color: var(--ls1621-text); font-size: 10px; letter-spacing: .07em; }
+.ls1621-points > header span,
+.ls1621-candidates > header span,
+.ls1621-table > header span { color: var(--ls1621-muted); font-size: 9px; text-align: right; }
+.ls1621-points > div { position: relative; display: grid; grid-template-columns: repeat(var(--ls1621-points), minmax(42px, 1fr)); gap: 7px; min-width: calc(var(--ls1621-points) * 49px); overflow-x: auto; padding: 5px 0 2px; }
+.ls1621-points > div::before { content: ""; position: absolute; top: 22px; right: 22px; left: 22px; height: 2px; background: var(--ls1621-border); }
+.ls1621-point { z-index: 1; display: grid; gap: 5px; place-items: center; color: var(--ls1621-muted); }
+.ls1621-point b { display: grid; width: 34px; height: 34px; place-items: center; border: 2px solid var(--ls1621-border); border-radius: 50%; background: var(--ls1621-panel); font: 800 12px Consolas, monospace; }
+.ls1621-point small { font-size: 8px; }
+.ls1621-point.available b { color: var(--ls1621-text); border-color: var(--ls1621-skip); background: color-mix(in srgb, var(--ls1621-skip) 10%, var(--ls1621-panel)); }
+.ls1621-point.right-end b { color: #fff; border-color: var(--ls1621-current); background: var(--ls1621-current); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls1621-current) 20%, transparent); }
+.ls1621-point.right-end small { color: var(--ls1621-current); font-weight: 800; }
+.ls1621-point.future { opacity: .36; }
+.ls1621-main { display: grid; grid-template-columns: minmax(270px, .78fr) minmax(390px, 1.22fr); gap: 9px; min-width: 0; }
+.ls1621-candidates,
+.ls1621-table { display: grid; align-content: start; gap: 9px; overflow: hidden; }
+.ls1621-candidates > div { display: grid; gap: 6px; }
+.ls1621-candidates > div > p { margin: 0; color: var(--ls1621-muted); font-size: 10px; line-height: 1.45; }
+.ls1621-lane { display: grid; grid-template-columns: 54px minmax(100px, 1fr) 34px 66px; gap: 6px; align-items: center; min-width: 0; }
+.ls1621-lane code { color: var(--ls1621-muted); font-size: 8px; }
+.ls1621-lane > b { color: var(--ls1621-text); font: 800 11px Consolas, monospace; text-align: right; }
+.ls1621-lane > small { color: var(--ls1621-muted); font-size: 8px; }
+.ls1621-lane.zero { opacity: .4; }
+.ls1621-track { position: relative; height: 25px; background: linear-gradient(var(--ls1621-border), var(--ls1621-border)) center / 100% 1px no-repeat; }
+.ls1621-track i { position: absolute; top: 10px; height: 5px; min-width: 2px; background: var(--ls1621-prefix); border-radius: 3px; }
+.ls1621-track span { position: absolute; top: 7px; width: 11px; height: 11px; transform: translateX(-50%); border: 2px solid var(--ls1621-prefix); border-radius: 50%; background: var(--ls1621-panel); }
+.ls1621-lane.contributes .ls1621-track i { background: var(--ls1621-good); }
+.ls1621-lane.contributes .ls1621-track span { border-color: var(--ls1621-good); }
+.ls1621-table-scroll { width: 100%; overflow-x: auto; padding-bottom: 3px; }
+.ls1621-grid { display: grid; grid-template-columns: 50px repeat(var(--ls1621-cols), minmax(50px, 1fr)); gap: 4px; min-width: calc(50px + var(--ls1621-cols) * 54px); }
+.ls1621-grid > .axis,
+.ls1621-grid > .corner { display: grid; min-height: 31px; place-content: center; color: var(--ls1621-muted); font-size: 8px; text-align: center; }
+.ls1621-grid > .axis b { color: var(--ls1621-text); font: 800 10px Consolas, monospace; }
+.ls1621-grid > .axis.row { line-height: 1.1; }
+.ls1621-cell { display: grid; min-height: 43px; padding: 4px; place-content: center; border: 1px solid transparent; border-radius: 6px; background: var(--ls1621-soft); text-align: center; }
+.ls1621-cell b { color: var(--ls1621-text); font: 800 11px Consolas, monospace; }
+.ls1621-cell small { color: var(--ls1621-muted); font: 7px Consolas, monospace; }
+.ls1621-cell.pending { opacity: .25; }
+.ls1621-cell.skip-source { border-color: var(--ls1621-skip); background: color-mix(in srgb, var(--ls1621-skip) 11%, var(--ls1621-panel)); opacity: 1; }
+.ls1621-cell.prefix-source { border-color: color-mix(in srgb, var(--ls1621-prefix) 58%, var(--ls1621-border)); background: color-mix(in srgb, var(--ls1621-prefix) 9%, var(--ls1621-panel)); opacity: 1; }
+.ls1621-cell.current { border: 2px solid var(--ls1621-current); background: color-mix(in srgb, var(--ls1621-current) 12%, var(--ls1621-panel)); opacity: 1; }
+.ls1621-cell.current b { color: var(--ls1621-current); }
+.ls1621-cell.answer { border-color: var(--ls1621-good); background: color-mix(in srgb, var(--ls1621-good) 12%, var(--ls1621-panel)); }
+.ls1621-cell.answer b { color: var(--ls1621-good); }
+.ls1621-formula { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.ls1621-formula > span { display: grid; gap: 3px; text-align: center; }
+.ls1621-formula small { color: var(--ls1621-muted); font-size: 8px; font-weight: 800; }
+.ls1621-formula code { color: var(--ls1621-text); font: 800 11px Consolas, monospace; }
+.ls1621-formula i { color: var(--ls1621-muted); font-style: normal; }
+.ls1621-formula > strong { color: var(--ls1621-current); font: 800 17px Consolas, monospace; }
+.ls1621-action { display: grid; gap: 5px; border-left: 3px solid var(--ls1621-prefix); }
+.ls1621-action strong { color: var(--ls1621-text); font-size: 12px; }
+.ls1621-action span,
+.ls1621-result span { color: var(--ls1621-muted); font-size: 10px; line-height: 1.45; }
+.ls1621-result { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 4px 12px; border-left: 3px solid var(--ls1621-prefix); }
+.ls1621-result strong { color: var(--ls1621-text); font: 800 19px Consolas, monospace; }
+.ls1621-result.done { border-color: color-mix(in srgb, var(--ls1621-good) 60%, var(--ls1621-border)); background: color-mix(in srgb, var(--ls1621-good) 8%, var(--ls1621-panel)); }
+.ls1621-result.done strong { color: var(--ls1621-good); }
+
+@container (max-width: 720px) {
+  .ls1621-main { grid-template-columns: 1fr; }
+}
+@container (max-width: 470px) {
+  .ls1621-viz > header,
+  .ls1621-points > header,
+  .ls1621-candidates > header,
+  .ls1621-table > header { align-items: flex-start; flex-direction: column; }
+  .ls1621-viz > header > span,
+  .ls1621-points > header span,
+  .ls1621-candidates > header span,
+  .ls1621-table > header span { max-width: none; text-align: left; }
+  .ls1621-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ls1621-rule { align-items: flex-start; flex-direction: column; }
+  .ls1621-lane { grid-template-columns: 52px minmax(90px, 1fr) 30px; }
+  .ls1621-lane > small { display: none; }
+  .ls1621-result { grid-template-columns: auto 1fr; }
+  .ls1621-result span { grid-column: 1 / -1; }
 }

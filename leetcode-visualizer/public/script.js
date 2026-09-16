@@ -30207,6 +30207,89 @@ function renderPalindrome2472View(step) {
   </section>`;
 }
 
+function renderLineSegments1621View(step) {
+  const view = step.lineSegments1621View || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const k = Number(view.k) || 0;
+  const ways = Array.isArray(view.ways) ? view.ways : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const computed = Array.isArray(view.computed) ? view.computed : [];
+  const points = Number.isInteger(view.points) ? view.points : 0;
+  const segments = Number.isInteger(view.segments) ? view.segments : 0;
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const phaseIndex = view.phase === "init" ? 0 : view.phase === "base" ? 1 : view.phase === "fill" ? 2 : 3;
+
+  const phaseLabels = vi
+    ? ["Base 0 điểm", "Base 0 đoạn", "Điền bảng", "Kết quả"]
+    : ["Zero-point base", "Zero-segment base", "Fill table", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const pointRail = Array.from({ length: n }, (_unused, index) => {
+    const classes = ["ls1621-point"];
+    if (index < points) classes.push("available");
+    if (points > 0 && index === points - 1) classes.push("right-end");
+    if (index >= points) classes.push("future");
+    return `<span class="${classes.join(" ")}"><b>${index}</b><small>${points > 0 && index === points - 1 ? (vi ? "đầu phải" : "right end") : "x=" + index}</small></span>`;
+  }).join("");
+
+  const laneHtml = candidates.length
+    ? candidates.map((candidate) => {
+        const denominator = Math.max(n - 1, 1);
+        const left = candidate.start / denominator * 100;
+        const width = (candidate.end - candidate.start) / denominator * 100;
+        const state = candidate.priorWays > 0 ? "contributes" : "zero";
+        return `<div class="ls1621-lane ${state}"><code>start ${candidate.start}</code><div class="ls1621-track"><i style="left:${left}%;width:${width}%"></i><span style="left:${left}%"></span><span style="left:${left + width}%"></span></div><b>${candidate.priorWays}</b><small>${vi ? "cách bên trái" : "left-side ways"}</small></div>`;
+      }).join("")
+    : `<p>${view.phase === "fill" ? (vi ? "Chưa có điểm nào bên trái để tạo đoạn có độ dài dương." : "No earlier point can form a positive-length segment yet.") : (vi ? "Các đoạn ứng viên sẽ xuất hiện khi điền trạng thái." : "Candidate final segments appear while filling a state.")}</p>`;
+
+  const tableHeader = `<span class="corner">s \\ p</span>${Array.from({ length: n + 1 }, (_unused, p) => `<span class="axis"><small>${vi ? "điểm" : "points"}</small><b>${p}</b></span>`).join("")}`;
+  const tableRows = Array.from({ length: k + 1 }, (_unused, s) => {
+    const cells = Array.from({ length: n + 1 }, (_unusedCell, p) => {
+      const ready = Boolean(computed[p]?.[s]);
+      const classes = ["ls1621-cell", ready ? "ready" : "pending"];
+      if (p === points && s === segments) classes.push("current");
+      if (view.phase === "fill" && p === points - 1 && s === segments) classes.push("skip-source");
+      if (view.phase === "fill" && s === segments - 1 && p >= 1 && p <= points - 1) classes.push("prefix-source");
+      if (view.final && p === n && s === k) classes.push("answer");
+      const value = ready ? ways[p]?.[s] ?? 0 : "·";
+      const sum = ready ? prefix[p]?.[s] ?? 0 : "·";
+      return `<span class="${classes.join(" ")}"><b>${value}</b><small>Σ ${sum}</small></span>`;
+    }).join("");
+    return `<span class="axis row"><small>${vi ? "đoạn" : "segments"}</small><b>${s}</b></span>${cells}`;
+  }).join("");
+
+  let formula;
+  if (view.phase === "fill") {
+    formula = `<span><small>${vi ? "BỎ ĐIỂM CUỐI" : "SKIP LAST POINT"}</small><code>ways[${points - 1}][${segments}] = ${view.skip}</code></span><i>+</i><span><small>${vi ? "KẾT THÚC ĐOẠN TẠI" : "END SEGMENT AT"} ${points - 1}</small><code>prefix[${points - 1}][${segments - 1}] = ${view.endHere}</code></span><i>=</i><strong>${ways[points]?.[segments] ?? 0}</strong>`;
+  } else if (view.phase === "base") {
+    formula = `<span><small>BASE</small><code>ways[${points}][0] = 1</code></span><i>·</i><span><small>RUNNING SUM</small><code>prefix[${points}][0] = ${points}</code></span>`;
+  } else if (view.final) {
+    formula = `<span><small>ANSWER</small><code>ways[${n}][${k}]</code></span><i>=</i><strong>${view.answer}</strong>`;
+  } else {
+    formula = `<span><small>RECURRENCE</small><code>ways[p][s] = ways[p−1][s] + prefix[p−1][s−1]</code></span>`;
+  }
+
+  const result = view.final ? String(view.answer) : "…";
+  const summary = vi
+    ? `Bài 1621 với n=${n}, k=${k}; trạng thái hiện tại dùng ${points} điểm và ${segments} đoạn.`
+    : `Problem 1621 with n=${n}, k=${k}; the current state uses ${points} points and ${segments} segments.`;
+
+  $("treeView").innerHTML = `<section class="ls1621-viz phase-${escapeHtml(view.phase || "init")}" style="--ls1621-points:${n}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>COUNTING DP · PREFIX SUM · #1621</small><strong>K NON-OVERLAPPING LINE SEGMENTS</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ls1621-phases">${phases}</div>
+    <section class="ls1621-rule"><b>STATE</b><span><code>ways[p][s]</code> ${vi ? "= số cách vẽ s đoạn bằng p điểm đầu" : "= drawings of s segments using the first p points"}. <code>prefix[p][s]</code> ${vi ? "gom mọi vị trí bắt đầu" : "aggregates every possible start"}.</span></section>
+    <section class="ls1621-points"><header><strong>${vi ? "CÁC ĐIỂM TRÊN ĐƯỜNG THẲNG" : "POINTS ON THE LINE"}</strong><span>${vi ? "các đoạn được phép chung đầu mút" : "segments may share endpoints"}</span></header><div>${pointRail}</div></section>
+    <section class="ls1621-main">
+      <article class="ls1621-candidates"><header><strong>${vi ? "ĐOẠN CUỐI CÓ THỂ KẾT THÚC TẠI" : "FINAL SEGMENT ENDING AT"} ${points > 0 ? points - 1 : "—"}</strong><span>${vi ? "mỗi hàng chọn một đầu trái" : "each row chooses one left endpoint"}</span></header><div>${laneHtml}</div></article>
+      <article class="ls1621-table"><header><strong>WAYS + PREFIX</strong><span>${vi ? "số lớn = ways · Σ = prefix" : "large = ways · Σ = prefix"}</span></header><div class="ls1621-table-scroll"><div class="ls1621-grid" style="--ls1621-cols:${n + 1}">${tableHeader}${tableRows}</div></div></article>
+    </section>
+    <section class="ls1621-formula">${formula}</section>
+    <section class="ls1621-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="ls1621-result ${view.final ? "done" : ""}"><small>NUMBER OF SETS</small><strong>${result}</strong><span>${view.final ? (vi ? "Mỗi tập chứa đúng k đoạn; chạm chung đầu mút không bị xem là chồng lấn." : "Every set contains exactly k segments; sharing an endpoint is not overlap.") : (vi ? "Prefix sum giữ mỗi chuyển trạng thái ở O(1)." : "The prefix sum keeps each transition O(1).")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -31339,6 +31422,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindrome2472View(step);
+  } else if (step.lineSegments1621View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLineSegments1621View(step);
   } else if (step.maximizeScore2818View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
