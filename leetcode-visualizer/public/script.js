@@ -18028,6 +18028,72 @@ function renderDistributeCoins979View(step) {
   $("treeView").innerHTML = `<section class="dc979-viz" role="img" aria-label="Distribute Coins in Binary Tree visualization"><header><div><small>POSTORDER DFS · EDGE FLOW · #979</small><strong>${vi ? "PHÂN PHỐI COIN TRONG CÂY" : "DISTRIBUTE COINS IN A BINARY TREE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header><div class="dc979-phases">${phases}</div><section class="dc979-summary"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${currentNode ? currentNode.value : "—"}</strong></div><div><small>${vi ? "ĐÃ TRẢ BALANCE" : "RETURNED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div><small>${vi ? "TỔNG COIN / NODE" : "COINS / NODES"}</small><strong>${view.totalCoins || 0}/${view.totalNodes || nodes.length}</strong></div><div class="moves"><small>MOVES</small><strong>${view.moves || 0}</strong></div></section><section class="dc979-tree"><header><strong>${vi ? "MỖI CẠNH LÀ MỘT DÒNG COIN" : "EVERY EDGE CARRIES A COIN FLOW"}</strong><span>${vi ? "↑ child gửi lên · ↓ parent gửi xuống" : "↑ child sends up · ↓ parent sends down"}</span></header><div><svg class="dc979-tree-svg ${fitTreeToFrame ? "fit" : "scroll"}" viewBox="0 0 ${treeWidth} ${treeHeight}" preserveAspectRatio="xMidYMin meet" ${fitTreeToFrame ? "" : `style="min-width:${treeWidth}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section><section class="dc979-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "frame cuối đang chạy" : "the last frame is active"}</span></header><div>${stackHtml}</div></section>${formulaHtml}<section class="dc979-history"><header><strong>${vi ? "BALANCE TRẢ TỪ LÁ LÊN" : "BALANCES RETURNED BOTTOM-UP"}</strong><span>${vi ? "+ dư · − thiếu" : "+ surplus · − deficit"}</span></header><div>${historyHtml}</div></section><section class="dc979-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section><footer class="dc979-result ${final ? "done" : ""}"><small>${vi ? "SỐ LƯỢT TỐI THIỂU" : "MINIMUM MOVES"}</small><strong>${final ? view.answer : view.moves || 0}</strong><span>${final ? (vi ? "Mỗi node kết thúc với đúng một coin." : "Every node finishes with exactly one coin.") : (vi ? "Moves tăng khi balance đi qua cạnh, không phải khi tính tại node." : "Moves increase when a balance crosses an edge, not merely when a node is computed.")}</span></footer></section>`;
 }
 
+function renderMaximumSumBst1373View(step) {
+  const view = step.maximumSumBst1373View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const history = Array.isArray(view.history) ? view.history : [];
+  const bestIds = new Set(Array.isArray(view.bestSubtreeIds) ? view.bestSubtreeIds : []);
+  const formula = view.formula || null;
+  const currentId = view.current;
+  const bestNodeId = view.bestNode;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["DFS hậu thứ tự", "Nhận state hai con", "Kiểm tra BST", "Cập nhật best", "Trả state lên cha"]
+    : ["Postorder DFS", "Receive child states", "Validate BST", "Update best", "Return state"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const gap = 138;
+  const contentWidth = maxX * gap;
+  const width = Math.max(400, contentWidth + 250);
+  const height = Math.max(240, (maxDepth + 1) * 132 + 92);
+  const offset = (width - contentWidth) / 2;
+  const xOf = node => offset + (Number(node.x) || 0) * gap;
+  const yOf = node => 68 + (Number(node.y) || 0) * 132;
+  const fit = nodes.length <= 15;
+  const edges = nodes.filter(node => node.parentId !== null && nodeMap.has(node.parentId)).map(node => {
+    const parent = nodeMap.get(node.parentId);
+    const best = bestIds.has(node.id) && bestIds.has(parent.id);
+    return `<line class="${best ? "best" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 29}" x2="${xOf(node)}" y2="${yOf(node) - 29}"></line>`;
+  }).join("");
+  const treeNodes = nodes.map(node => {
+    const state = String(node.state || "unvisited");
+    const bestRoot = node.id === bestNodeId;
+    const stateLabel = bestRoot ? "BEST ROOT"
+      : state === "invalid" ? (vi ? "KHÔNG PHẢI BST" : "NOT A BST")
+        : ["bst", "best"].includes(state) ? "BST"
+          : state === "validating" ? (vi ? "BST ỨNG VIÊN" : "BST CANDIDATE")
+            : state === "combine" ? (vi ? "ĐANG KIỂM TRA" : "CHECKING")
+              : state === "waiting" ? (vi ? "CHỜ HAI CON" : "WAITING") : (vi ? "CHƯA THĂM" : "UNVISITED");
+    const stats = node.isBst === true ? `min ${node.min} · max ${node.max} · Σ ${node.sum}`
+      : node.isBst === false ? (vi ? "state: invalid" : "state: invalid")
+        : node.candidateSum === null || node.candidateSum === undefined ? "min ? · max ? · Σ ?" : `candidate Σ ${node.candidateSum}`;
+    return `<g class="mb1373-node ${escapeHtml(state)} ${node.id === currentId ? "current" : ""} ${bestIds.has(node.id) ? "best-subtree" : ""} ${bestRoot ? "best-root" : ""}" transform="translate(${xOf(node)} ${yOf(node)})"><circle r="29"></circle><text class="value" text-anchor="middle" y="7">${escapeHtml(String(node.value))}</text><text class="state" text-anchor="middle" y="49">${escapeHtml(stateLabel)}</text><text class="stats" text-anchor="middle" y="68">${escapeHtml(stats)}</text></g>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((id, index) => `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${escapeHtml(String(nodeMap.get(id)?.value ?? "?"))}</strong></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã rỗng" : "The stack is empty"}</em>`;
+  const childCard = (side, child = {}) => {
+    const label = side === "left" ? (vi ? "STATE CON TRÁI" : "LEFT CHILD STATE") : (vi ? "STATE CON PHẢI" : "RIGHT CHILD STATE");
+    const kind = child.empty ? "empty" : child.isBst ? "bst" : "invalid";
+    return `<article class="${kind}"><small>${label}</small><strong>${child.empty ? "BST ∅" : child.isBst ? "BST" : "INVALID"}</strong><div><span>min <b>${child.empty ? "+∞" : child.min ?? "—"}</b></span><span>max <b>${child.empty ? "−∞" : child.max ?? "—"}</b></span><span>sum <b>${child.sum ?? 0}</b></span></div></article>`;
+  };
+  const formulaHtml = formula
+    ? `<section class="mb1373-formula ${formula.valid === true ? "valid" : formula.valid === false ? "invalid" : "pending"}"><header><strong>${vi ? `SUBTREE GỐC ${formula.nodeValue}` : `SUBTREE ROOTED AT ${formula.nodeValue}`}</strong><span>(is_bst, min, max, sum)</span></header><div class="children">${childCard("left", formula.left)}<b>+</b>${childCard("right", formula.right)}</div><div class="ordering"><span class="${formula.leftOk ? "pass" : "fail"}"><small>LEFT BOUND</small><code>${formula.left?.empty ? "−∞" : formula.left?.max ?? "invalid"} &lt; ${formula.nodeValue}</code><b>${formula.leftOk ? "✓" : "✕"}</b></span><i>AND</i><span class="${formula.rightOk ? "pass" : "fail"}"><small>RIGHT BOUND</small><code>${formula.nodeValue} &lt; ${formula.right?.empty ? "+∞" : formula.right?.min ?? "invalid"}</code><b>${formula.rightOk ? "✓" : "✕"}</b></span></div><div class="sum"><small>BST SUM CANDIDATE</small><code>${formula.left?.sum ?? 0} + ${formula.nodeValue} + ${formula.right?.sum ?? 0}</code><strong>${formula.candidateSum}</strong></div><div class="decision"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${formula.valid === null ? (vi ? "Child states đã sẵn sàng; kiểm tra BST tiếp theo" : "Child states ready; validate the BST next") : formula.valid === false ? (vi ? "INVALID → không cập nhật best" : "INVALID → do not update best") : formula.updated === null ? (vi ? "BST hợp lệ; so tổng với best tiếp theo" : "Valid BST; compare its sum with best next") : formula.updated ? `best: ${formula.bestBefore} → ${formula.bestAfter}` : `best = ${formula.bestAfter}`}</strong></div></section>`
+    : `<section class="mb1373-rule"><strong>POSTORDER STATE</strong><code>(is_bst, min_value, max_value, subtree_sum)</code><span>${vi ? "Hai cây con phải là BST và left.max < node < right.min." : "Both children must be BSTs and left.max < node < right.min."}</span></section>`;
+  const historyHtml = history.length
+    ? history.map((item, index) => `<span class="${item.id === bestNodeId ? "best" : item.isBst ? "bst" : "invalid"}"><small>#${index + 1} · node ${escapeHtml(String(item.value))}</small><strong>${item.isBst ? `BST · Σ ${item.sum}` : "INVALID"}</strong><em>best ${item.bestAfter}</em></span>`).join("")
+    : `<em>${vi ? "Chưa node nào trả state" : "No node has returned a state yet"}</em>`;
+  const currentNode = currentId === null || currentId === undefined ? null : nodeMap.get(currentId);
+  const bestNode = bestNodeId === null || bestNodeId === undefined ? null : nodeMap.get(bestNodeId);
+  const final = Boolean(view.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="mb1373-viz" role="img" aria-label="Maximum Sum BST in Binary Tree visualization"><header><div><small>POSTORDER DFS · BST STATE · #1373</small><strong>${vi ? "BST SUBTREE CÓ TỔNG LỚN NHẤT" : "MAXIMUM-SUM BST SUBTREE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header><div class="mb1373-phases">${phases}</div><section class="mb1373-summary"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${currentNode ? currentNode.value : "—"}</strong></div><div><small>${vi ? "ĐÃ TRẢ STATE" : "RETURNED STATES"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div><small>BEST ROOT</small><strong>${bestNode ? bestNode.value : "∅"}</strong></div><div class="best"><small>BEST SUM</small><strong>${view.best || 0}</strong></div></section><section class="mb1373-tree"><header><strong>${vi ? "STATE ĐƯỢC GỘP TỪ LÁ LÊN" : "STATES COMBINED BOTTOM-UP"}</strong><span>${vi ? "xanh = BST tốt nhất · đỏ = invalid · cam = hiện tại" : "green = best BST · red = invalid · orange = current"}</span></header><div><svg class="mb1373-tree-svg ${fit ? "fit" : "scroll"}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMin meet" ${fit ? "" : `style="min-width:${width}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section><section class="mb1373-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "cha chờ state của hai con" : "a parent waits for both child states"}</span></header><div>${stackHtml}</div></section>${formulaHtml}<section class="mb1373-history"><header><strong>${vi ? "STATE TRẢ VỀ THEO POSTORDER" : "STATES RETURNED IN POSTORDER"}</strong><span>BST / INVALID · sum · best</span></header><div>${historyHtml}</div></section><section class="mb1373-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section><footer class="mb1373-result ${final ? "done" : ""}"><small>MAXIMUM BST SUM</small><strong>${final ? view.answer : view.best || 0}</strong><span>${final ? (bestNode ? (vi ? `Subtree gốc ${bestNode.value} là BST có tổng lớn nhất.` : `The BST rooted at ${bestNode.value} has the largest sum.`) : (vi ? "Mọi tổng BST đều âm; empty subtree cho kết quả 0." : "Every BST sum is negative; the empty subtree gives 0.")) : (vi ? "min/max bảo đảm thứ tự BST trên toàn subtree." : "min/max enforces BST ordering across the whole subtree.")}</span></footer></section>`;
+}
+
 function renderMaximumAverage1120View(step) {
   const view = step.maximumAverage1120View || {};
   const vi = lang === "vi";
@@ -32094,6 +32160,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDistributeCoins979View(step);
+  } else if (step.maximumSumBst1373View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximumSumBst1373View(step);
   } else if (step.maximumAverage1120View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

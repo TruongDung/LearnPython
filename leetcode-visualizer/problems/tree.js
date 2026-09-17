@@ -8751,7 +8751,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -10938,6 +10938,263 @@ function buildSteps979(input) {
   return { input, answer: moves, steps };
 }
 
+function buildSteps1373(input) {
+  const root = parseTreeEssentialsInput(input, {
+    allowEmpty: true,
+    minValue: -40000,
+    maxValue: 40000,
+    maxNodes: 31,
+  });
+  const layout = treeToVizNodes(root, null, null);
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
+
+  const steps = [];
+  const stack = [];
+  const stats = new Map();
+  const history = [];
+  let best = 0;
+  let bestNode = null;
+  let bestSubtreeIds = [];
+
+  const collectSubtreeIds = node => {
+    if (!node) return [];
+    return [node.id, ...collectSubtreeIds(node.left), ...collectSubtreeIds(node.right)];
+  };
+  const safeState = state => ({
+    isBst: state.isBst,
+    empty: Boolean(state.empty),
+    min: Number.isFinite(state.min) ? state.min : null,
+    max: Number.isFinite(state.max) ? state.max : null,
+    sum: state.sum,
+  });
+  const makeView = ({ phase = "descend", phaseIndex = 0, operation = "start", current = null, formula = null, final = false } = {}) => ({
+    phase,
+    phaseIndex,
+    operation,
+    nodes: layout.map(item => {
+      const node = nodeById.get(item.id);
+      const stat = stats.get(item.id) || {};
+      return {
+        id: item.id,
+        parentId: item.parentId,
+        x: item.x,
+        y: item.y,
+        value: node.val,
+        isBst: stat.isBst ?? null,
+        min: stat.min ?? null,
+        max: stat.max ?? null,
+        sum: stat.sum ?? null,
+        candidateSum: stat.candidateSum ?? null,
+        state: stat.state || (stack.includes(item.id) ? "waiting" : "unvisited"),
+      };
+    }),
+    stack: [...stack],
+    current: current ? current.id : null,
+    formula,
+    best,
+    bestNode,
+    bestSubtreeIds: [...bestSubtreeIds],
+    history: history.map(item => ({ ...item })),
+    processed: history.length,
+    totalNodes: layout.length,
+    answer: final ? best : null,
+    final,
+  });
+
+  function addStep({ title, note, codeLines, ...viewOptions }) {
+    const view = makeView(viewOptions);
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "stack", value: `[${stack.map(id => nodeById.get(id).val).join(" → ")}]` },
+        { name: "best", value: best },
+      ],
+      note,
+      maximumSumBst1373View: view,
+      final: Boolean(viewOptions.final),
+    });
+  }
+
+  addStep({
+    title: { vi: "Tìm BST subtree có tổng lớn nhất", en: "Find the BST subtree with the largest sum" },
+    note: {
+      vi: "DFS hậu thứ tự trả về bốn thông tin cho cha: subtree có phải BST không, min, max và sum.",
+      en: "Postorder DFS returns four facts to the parent: whether the subtree is a BST, its min, max, and sum.",
+    },
+    codeLines: [2, 3, 5],
+    operation: "start",
+  });
+
+  function dfs(node) {
+    if (!node) return { isBst: true, min: Infinity, max: -Infinity, sum: 0, empty: true };
+
+    stack.push(node.id);
+    stats.set(node.id, { state: "waiting", isBst: null, min: null, max: null, sum: null, candidateSum: null });
+    addStep({
+      title: { vi: `Vào node ${node.val}: xử lý hai cây con trước`, en: `Enter node ${node.val}: process both children first` },
+      note: {
+        vi: `Node ${node.val} chưa thể quyết định BST cho đến khi nhận state từ cả hai con.`,
+        en: `Node ${node.val} cannot decide whether it forms a BST until both child states return.`,
+      },
+      codeLines: [5, 7, 10, 11],
+      operation: "enter",
+      current: node,
+    });
+
+    const left = dfs(node.left);
+    const right = dfs(node.right);
+    const candidateSum = left.sum + node.val + right.sum;
+    const leftOk = left.isBst && left.max < node.val;
+    const rightOk = right.isBst && node.val < right.min;
+    const valid = leftOk && rightOk;
+    const formula = {
+      nodeValue: node.val,
+      left: safeState(left),
+      right: safeState(right),
+      leftOk,
+      rightOk,
+      valid: null,
+      candidateSum,
+      bestBefore: best,
+      bestAfter: best,
+      updated: null,
+    };
+
+    stats.set(node.id, { state: "combine", isBst: null, min: null, max: null, sum: null, candidateSum });
+    addStep({
+      title: { vi: `Nhận state của hai con tại node ${node.val}`, en: `Receive both child states at node ${node.val}` },
+      note: {
+        vi: `Kiểm tra strict ordering: left.max < ${node.val} < right.min, đồng thời cả hai cây con phải là BST.`,
+        en: `Check strict ordering: left.max < ${node.val} < right.min, and both child subtrees must already be BSTs.`,
+      },
+      codeLines: [10, 11, 13],
+      phase: "combine",
+      phaseIndex: 1,
+      operation: "combine",
+      current: node,
+      formula,
+    });
+
+    if (valid) {
+      const min = Math.min(left.min, node.val);
+      const max = Math.max(right.max, node.val);
+      const bestBefore = best;
+      const updated = candidateSum > best;
+      stats.set(node.id, { state: "validating", isBst: true, min, max, sum: candidateSum, candidateSum });
+      addStep({
+        title: { vi: `${left.empty ? "−∞" : left.max} < ${node.val} < ${right.empty ? "+∞" : right.min} → BST hợp lệ`, en: `${left.empty ? "−∞" : left.max} < ${node.val} < ${right.empty ? "+∞" : right.min} → valid BST` },
+        note: {
+          vi: `Subtree gốc ${node.val} là BST và có tổng ${candidateSum}.`,
+          en: `The subtree rooted at ${node.val} is a BST with sum ${candidateSum}.`,
+        },
+        codeLines: [13, 14],
+        phase: "validate",
+        phaseIndex: 2,
+        operation: "valid",
+        current: node,
+        formula: { ...formula, valid: true },
+      });
+
+      if (updated) {
+        best = candidateSum;
+        bestNode = node.id;
+        bestSubtreeIds = collectSubtreeIds(node);
+      }
+      const finalFormula = { ...formula, valid: true, bestBefore, bestAfter: best, updated };
+      stats.set(node.id, { state: updated ? "best" : "bst", isBst: true, min, max, sum: candidateSum, candidateSum });
+      addStep({
+        title: updated
+          ? { vi: `Cập nhật best: ${bestBefore} → ${best}`, en: `Update best: ${bestBefore} → ${best}` }
+          : { vi: `Giữ best = ${best}`, en: `Keep best = ${best}` },
+        note: updated
+          ? { vi: `Tổng ${candidateSum} lớn hơn best cũ; subtree gốc ${node.val} trở thành đáp án tốt nhất.`, en: `Sum ${candidateSum} beats the previous best; the subtree rooted at ${node.val} becomes the best candidate.` }
+          : { vi: `Tổng ${candidateSum} không lớn hơn best hiện tại ${best}.`, en: `Sum ${candidateSum} does not exceed the current best ${best}.` },
+        codeLines: [15],
+        phase: "update",
+        phaseIndex: 3,
+        operation: updated ? "update-best" : "keep-best",
+        current: node,
+        formula: finalFormula,
+      });
+      history.push({ id: node.id, value: node.val, isBst: true, sum: candidateSum, min, max, bestAfter: best });
+      addStep({
+        title: { vi: `Trả (BST, min=${min}, max=${max}, sum=${candidateSum})`, en: `Return (BST, min=${min}, max=${max}, sum=${candidateSum})` },
+        note: {
+          vi: "Cha chỉ cần bốn giá trị này để kiểm tra subtree lớn hơn của nó.",
+          en: "The parent needs only these four values to validate its larger subtree.",
+        },
+        codeLines: [16],
+        phase: "return",
+        phaseIndex: 4,
+        operation: "return-bst",
+        current: node,
+        formula: finalFormula,
+      });
+      stack.pop();
+      return { isBst: true, min, max, sum: candidateSum, empty: false };
+    }
+
+    stats.set(node.id, { state: "invalid", isBst: false, min: null, max: null, sum: 0, candidateSum });
+    addStep({
+      title: { vi: `Subtree gốc ${node.val} không phải BST`, en: `The subtree rooted at ${node.val} is not a BST` },
+      note: {
+        vi: !left.isBst || !right.isBst
+          ? "Ít nhất một cây con đã không phải BST, nên subtree hiện tại cũng không thể là BST."
+          : `Điều kiện strict ordering thất bại: cần left.max < ${node.val} < right.min.`,
+        en: !left.isBst || !right.isBst
+          ? "At least one child subtree is not a BST, so the current subtree cannot be a BST either."
+          : `Strict ordering fails: we need left.max < ${node.val} < right.min.`,
+      },
+      codeLines: [13, 18],
+      phase: "validate",
+      phaseIndex: 2,
+      operation: "invalid",
+      current: node,
+      formula: { ...formula, valid: false, updated: false, bestAfter: best },
+    });
+    history.push({ id: node.id, value: node.val, isBst: false, sum: null, min: null, max: null, bestAfter: best });
+    addStep({
+      title: { vi: "Trả state invalid lên cha", en: "Return an invalid state to the parent" },
+      note: {
+        vi: "State invalid ngăn mọi ancestor chứa node này bị nhận nhầm là BST.",
+        en: "The invalid state prevents any ancestor containing this node from being mistaken for a BST.",
+      },
+      codeLines: [18],
+      phase: "return",
+      phaseIndex: 4,
+      operation: "return-invalid",
+      current: node,
+      formula: { ...formula, valid: false, updated: false, bestAfter: best },
+    });
+    stack.pop();
+    return { isBst: false, min: -Infinity, max: Infinity, sum: 0, empty: false };
+  }
+
+  dfs(root);
+  addStep({
+    title: { vi: `Tổng BST subtree lớn nhất = ${best}`, en: `Maximum BST subtree sum = ${best}` },
+    note: bestNode === null
+      ? { vi: "Không có BST subtree có tổng dương, nên chọn empty subtree với tổng 0.", en: "No BST subtree has a positive sum, so the empty subtree contributes 0." }
+      : { vi: `Subtree tốt nhất có gốc ${nodeById.get(bestNode).val} và tổng ${best}.`, en: `The best subtree is rooted at ${nodeById.get(bestNode).val} with sum ${best}.` },
+    codeLines: [20, 21],
+    phase: "done",
+    phaseIndex: 4,
+    operation: "done",
+    final: true,
+  });
+  return { input, answer: best, steps };
+}
+
 Object.assign(module.exports, {
   1973: {
     id: 1973,
@@ -11146,6 +11403,63 @@ Object.assign(module.exports, {
       "        return self.moves",
     ],
     builder: buildSteps979,
+  },
+  1373: {
+    id: 1373,
+    difficulty: "hard",
+    slug: "maximum-sum-bst-in-binary-tree",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS hậu thứ tự", en: "Postorder DFS" },
+      { key: "bst", vi: "Cây tìm kiếm nhị phân", en: "Binary Search Tree" },
+      { key: "tree-dp", vi: "State trên cây", en: "Tree State" },
+    ],
+    title: { vi: "Maximum Sum BST in Binary Tree", en: "Maximum Sum BST in Binary Tree" },
+    titleVi: { vi: "BST subtree có tổng lớn nhất", en: "Maximum-sum BST subtree" },
+    statement: {
+      vi: "Tìm tổng lớn nhất trong mọi subtree đồng thời là cây tìm kiếm nhị phân nghiêm ngặt. Nếu mọi tổng hợp lệ đều âm, trả về 0.",
+      en: "Return the maximum sum among all subtrees that are strict binary search trees. Return 0 when every valid sum is negative.",
+    },
+    defaultInput: "1,4,3,2,4,2,5,null,null,null,null,null,null,4,6",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
+    extraParams: [],
+    debugMode: "semantic",
+    approach: [
+      { vi: "DFS hậu thứ tự để nhận state (is_bst, min, max, sum) từ hai cây con.", en: "Use postorder DFS to receive (is_bst, min, max, sum) from both children." },
+      { vi: "Subtree hiện tại là BST khi hai con đều là BST và left.max < node.val < right.min.", en: "The current subtree is a BST when both children are BSTs and left.max < node.val < right.min." },
+      { vi: "Nếu hợp lệ, cộng tổng hai con với node, cập nhật best, rồi trả min/max/sum mới lên cha.", en: "When valid, combine both child sums with the node, update best, and return the new min/max/sum to the parent." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Mỗi node được xử lý một lần; h là chiều cao stack đệ quy.", en: "Each node is processed once; h is the recursive stack height." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSumBST(self, root):",
+      "        best = 0",
+      "",
+      "        def dfs(node):",
+      "            nonlocal best",
+      "            if not node:",
+      "                return (True, float('inf'), float('-inf'), 0)",
+      "",
+      "            left_bst, left_min, left_max, left_sum = dfs(node.left)",
+      "            right_bst, right_min, right_max, right_sum = dfs(node.right)",
+      "",
+      "            if left_bst and right_bst and left_max < node.val < right_min:",
+      "                total = left_sum + node.val + right_sum",
+      "                best = max(best, total)",
+      "                return (True, min(left_min, node.val), max(right_max, node.val), total)",
+      "",
+      "            return (False, 0, 0, 0)",
+      "",
+      "        dfs(root)",
+      "        return best",
+    ],
+    builder: buildSteps1373,
   },
 });
 
