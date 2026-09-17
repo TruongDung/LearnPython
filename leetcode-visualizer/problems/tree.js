@@ -1093,6 +1093,62 @@ function buildSteps543(input) {
   return { input, answer: best, steps };
 }
 
+// ─── 545: Boundary of Binary Tree ───
+function buildSteps545(input) {
+  const root = parseTree(input); const steps = []; const boundary = []; const included = new Set();
+  const leaf = node => !!node && !node.left && !node.right;
+  const add = (node, phase, operation, title, line, note) => {
+    if (!node || included.has(node.id)) return;
+    included.add(node.id); boundary.push(node.val);
+    const step = snapshot(root, { title, hlSet: new Set([node.id]), wordSet: new Set(included), annotations: { [node.id]: { labels: [{ label: phase.toUpperCase(), kind: phase }] } }, codeLines: [line], vars: [{ name: "boundary", value: `[${boundary.join(", ")}]` }, { name: "current", value: node.val }], note });
+    step.boundary545View = { phase, phaseIndex: phase === "root" ? 0 : phase === "left" ? 1 : phase === "leaves" ? 2 : 3, operation, current: { id: node.id, value: node.val }, boundary: [...boundary], final: false };
+    steps.push(step);
+  };
+  if (!root) return { input, answer: [], steps: [] };
+  add(root, "root", "add-root", { vi: `Thêm root ${root.val}`, en: `Add root ${root.val}` }, 2, { vi: "Root luôn là phần tử đầu tiên của boundary.", en: "The root is always the first boundary element." });
+  let node = root.left;
+  while (node && !leaf(node)) { add(node, "left", "add-left", { vi: `Biên trái: thêm ${node.val}`, en: `Left boundary: add ${node.val}` }, 4, { vi: "Đi ưu tiên trái; nếu thiếu trái thì đi phải.", en: "Follow left first; use the right child when left is missing." }); node = node.left || node.right; }
+  const collectLeaves = current => { if (!current) return; if (leaf(current)) { add(current, "leaves", "add-leaf", { vi: `Lá: thêm ${current.val}`, en: `Leaf: add ${current.val}` }, 6, { vi: "Thu thập lá theo thứ tự trái → phải.", en: "Collect leaves from left to right." }); return; } collectLeaves(current.left); collectLeaves(current.right); };
+  collectLeaves(root);
+  const right = []; node = root.right; while (node && !leaf(node)) { right.push(node); node = node.right || node.left; }
+  right.reverse().forEach(item => add(item, "right", "add-right", { vi: `Biên phải ngược: thêm ${item.val}`, en: `Reversed right boundary: add ${item.val}` }, 8, { vi: "Biên phải phải được đảo ngược trước khi ghép vào cuối.", en: "The right boundary is reversed before appending." }));
+  const finalStep = snapshot(root, { title: { vi: `Boundary = [${boundary.join(", ")}]`, en: `Boundary = [${boundary.join(", ")}]` }, wordSet: new Set(included), codeLines: [9], vars: [{ name: "answer", value: `[${boundary.join(", ")}]` }], note: { vi: "Ghép root + biên trái + lá + biên phải đảo ngược.", en: "Combine root + left boundary + leaves + reversed right boundary." } });
+  finalStep.boundary545View = { phase: "done", phaseIndex: 3, operation: "return", current: null, boundary: [...boundary], final: true }; finalStep.final = true; steps.push(finalStep);
+  return { input, answer: boundary, steps };
+}
+
+// ─── 549: Binary Tree Longest Consecutive Sequence II ───
+function buildSteps549(input) {
+  const root = parseTree(input); const steps = []; let best = 0; let bestId = null;
+  const add = (node, options) => { const view = { phase: options.phase, phaseIndex: options.phaseIndex, operation: options.operation, current: node ? { id: node.id, value: node.val } : null, inc: options.inc ?? null, dec: options.dec ?? null, best, bestNode: bestId, final: Boolean(options.final) }; const step = snapshot(root, { title: options.title, hlSet: node ? new Set([node.id]) : undefined, wordSet: bestId === null ? undefined : new Set([bestId]), annotations: node ? { [node.id]: { labels: [{ label: "CURRENT", kind: "current" }] } } : undefined, codeLines: [options.line], vars: [{ name: "node", value: node ? node.val : "None" }, { name: "inc", value: options.inc ?? "—" }, { name: "dec", value: options.dec ?? "—" }, { name: "best", value: best }], note: options.note }); step.consecutive549View = view; step.final = Boolean(options.final); steps.push(step); };
+  if (!root) return { input, answer: 0, steps: [] };
+  add(null, { phase: "start", phaseIndex: 0, operation: "initialize", line: 3, title: { vi: "Khởi tạo best = 0", en: "Initialize best = 0" }, note: { vi: "Mỗi node trả về độ dài tăng và giảm bắt đầu tại node.", en: "Each node returns increasing and decreasing lengths starting at itself." } });
+  function dfs(node) {
+    if (!node) return { inc: 0, dec: 0 };
+    const left = dfs(node.left); const right = dfs(node.right); let inc = 1; let dec = 1;
+    if (node.left && node.left.val === node.val + 1) inc = Math.max(inc, left.inc + 1);
+    if (node.right && node.right.val === node.val + 1) inc = Math.max(inc, right.inc + 1);
+    if (node.left && node.left.val === node.val - 1) dec = Math.max(dec, left.dec + 1);
+    if (node.right && node.right.val === node.val - 1) dec = Math.max(dec, right.dec + 1);
+    add(node, { phase: "combine", phaseIndex: 1, operation: "combine", line: 7, inc, dec, title: { vi: `Node ${node.val}: inc=${inc}, dec=${dec}`, en: `Node ${node.val}: inc=${inc}, dec=${dec}` }, note: { vi: "Chỉ nối hai node nếu giá trị chênh đúng 1; có thể dùng cả hai hướng qua node.", en: "Connect nodes only when values differ by exactly one; both directions may pass through this node." } });
+    if (inc + dec - 1 > best) { best = inc + dec - 1; bestId = node.id; add(node, { phase: "best", phaseIndex: 2, operation: "update-best", line: 8, inc, dec, title: { vi: `Cập nhật best = ${best}`, en: `Update best = ${best}` }, note: { vi: `Đường tăng + giảm qua ${node.val} dài ${best} node.`, en: `The increasing + decreasing path through ${node.val} has ${best} nodes.` } }); }
+    return { inc, dec };
+  }
+  dfs(root); add(root, { phase: "done", phaseIndex: 3, operation: "return", line: 10, inc: null, dec: null, final: true, title: { vi: `Kết quả = ${best}`, en: `Result = ${best}` }, note: { vi: "best là độ dài lớn nhất của chuỗi liên tiếp theo một trong hai hướng.", en: "best is the longest consecutive sequence length in either direction." } });
+  steps.at(-1).consecutive549View.best = best; steps.at(-1).consecutive549View.bestNode = bestId; return { input, answer: best, steps };
+}
+
+// ─── 742: Closest Leaf in a Binary Tree ───
+function buildSteps742(input, params) {
+  const root = parseTree(input); if (!root) throw new Error("Enter a non-empty binary tree."); const targetValue = Number(params && params.k !== undefined ? params.k : 1); if (!Number.isFinite(targetValue)) throw new Error("k must be a finite number.");
+  const all = []; const parent = new Map(); let target = null; (function collect(node, par = null) { if (!node) return; all.push(node); parent.set(node.id, par); if (node.val === targetValue && !target) target = node; collect(node.left, node); collect(node.right, node); })(root); if (!target) throw new Error("k must match a value that exists in the tree.");
+  const queue = [target]; const visited = new Set([target.id]); const steps = []; let answer = null;
+  const add = (node, operation, title, line, note, phase = "bfs") => { const step = snapshot(root, { title, hlSet: node ? new Set([node.id]) : undefined, wordSet: answer ? new Set([answer.id]) : undefined, annotations: { [target.id]: { labels: [{ label: "TARGET", kind: "target" }] }, ...(node ? { [node.id]: { labels: [{ label: node.id === target.id ? "TARGET" : "CURRENT", kind: node.id === target.id ? "target" : "current" }] } } : {}) }, codeLines: [line], vars: [{ name: "queue", value: `[${queue.map(item => item.val).join(", ")}]` }, { name: "visited", value: visited.size }, { name: "answer", value: answer ? answer.val : "None" }], note }); step.closestLeaf742View = { phase, phaseIndex: phase === "start" ? 0 : phase === "expand" ? 1 : 2, operation, target: { id: target.id, value: target.val }, current: node ? { id: node.id, value: node.val } : null, queue: queue.map(item => ({ id: item.id, value: item.val })), answer: answer ? answer.val : null, final: false }; steps.push(step); };
+  add(null, "initialize", { vi: `Tìm lá gần ${targetValue}`, en: `Find closest leaf to ${targetValue}` }, 2, { vi: "Từ target, BFS trên các cạnh trái, phải và parent.", en: "From target, BFS over left, right, and parent edges." }, "start");
+  while (queue.length) { const node = queue.shift(); add(node, "dequeue", { vi: `Lấy ${node.val} khỏi queue`, en: `Dequeue ${node.val}` }, 6, { vi: "BFS đảm bảo node lá đầu tiên gặp là lá gần nhất.", en: "BFS guarantees the first leaf found is the closest." }, "expand"); if ((node.left === null || node.left === undefined) && (node.right === null || node.right === undefined)) { answer = node; add(node, "found-leaf", { vi: `✓ Lá gần nhất = ${node.val}`, en: `✓ Closest leaf = ${node.val}` }, 8, { vi: "Node không có con nên là lá; dừng BFS.", en: "The node has no children, so it is a leaf; stop BFS." }, "done"); break; } const neighbors = [{ node: node.left, edge: "left" }, { node: node.right, edge: "right" }, { node: parent.get(node.id), edge: "parent" }]; for (const item of neighbors) if (item.node && !visited.has(item.node.id)) { visited.add(item.node.id); queue.push(item.node); add(item.node, "enqueue", { vi: `Thêm ${item.node.val} qua ${item.edge}`, en: `Enqueue ${item.node.val} via ${item.edge}` }, 7, { vi: "Đánh dấu visited trước khi enqueue để không lặp vòng.", en: "Mark visited before enqueueing to avoid cycles." }, "expand"); } }
+  const finalStep = snapshot(root, { title: { vi: `Trả về ${answer.val}`, en: `Return ${answer.val}` }, hlSet: new Set([answer.id]), wordSet: new Set([answer.id]), codeLines: [9], vars: [{ name: "answer", value: answer.val }], note: { vi: `Lá ${answer.val} được BFS gặp đầu tiên nên có khoảng cách nhỏ nhất.`, en: `Leaf ${answer.val} is the first reached by BFS, so it has minimum distance.` } }); finalStep.closestLeaf742View = { phase: "done", phaseIndex: 2, operation: "return", target: { id: target.id, value: target.val }, current: null, queue: [], answer: answer.val, final: true }; finalStep.final = true; steps.push(finalStep); return { input, answer: answer.val, steps };
+}
+
 // ─── 124: Binary Tree Maximum Path Sum ───
 function buildSteps124(input) {
   const root = parseTree(input);
@@ -8751,7 +8807,7 @@ function buildSteps2791(input) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 545, 549, 742, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -8947,6 +9003,42 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder. Stack O(h).", en: "One postorder pass. Stack O(h)." } },
     code: ["class Solution:", "    def diameterOfBinaryTree(self, root):", "        self.best = 0", "        def depth(node):", "            if not node: return 0", "            l = depth(node.left)", "            r = depth(node.right)", "            self.best = max(self.best, l + r)", "            return 1 + max(l, r)", "        depth(root)", "        return self.best"],
     builder: buildSteps543,
+  },
+  545: {
+    id: 545, difficulty: "medium", slug: "boundary-of-binary-tree", category: TREE_CAT,
+    title: { vi: "Boundary of Binary Tree", en: "Boundary of Binary Tree" },
+    titleVi: { vi: "Biên của cây nhị phân", en: "Anti-clockwise tree boundary" },
+    statement: { vi: "Trả về đường biên ngược chiều kim đồng hồ: root, biên trái (không lấy lá), toàn bộ lá trái → phải, rồi biên phải đảo ngược.", en: "Return the anti-clockwise boundary: root, left boundary (excluding leaves), all leaves left-to-right, then the reversed right boundary." },
+    defaultInput: "1,2,3,4,5,6,7", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    tags: [{ key: "boundary", vi: "Boundary", en: "Boundary" }, { key: "tree", vi: "Cây", en: "Tree" }], debugMode: "semantic",
+    approach: [{ vi: "Tách boundary thành 4 phần: root, biên trái, lá, biên phải đảo ngược.", en: "Split the boundary into four parts: root, left boundary, leaves, and reversed right boundary." }, { vi: "Bỏ qua lá khi đi biên trái/phải để không trùng với phần lá.", en: "Skip leaves on the side boundaries so they are not duplicated in the leaf pass." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được xét tối đa một lần.", en: "Each node is considered at most once." } },
+    code: ["class Solution:", "    def boundaryOfBinaryTree(self, root):", "        boundary = [root.val]", "        add_left_boundary()", "        add_leaves(root)", "        add_right_boundary_reversed()", "        return boundary", "    # leaves are appended left-to-right", "    # side boundaries exclude leaves"],
+    builder: buildSteps545,
+  },
+  549: {
+    id: 549, difficulty: "hard", slug: "binary-tree-longest-consecutive-sequence-ii", category: TREE_CAT,
+    title: { vi: "Binary Tree Longest Consecutive Sequence II", en: "Binary Tree Longest Consecutive Sequence II" },
+    titleVi: { vi: "Chuỗi liên tiếp dài nhất (hai hướng)", en: "Longest increasing/decreasing path" },
+    statement: { vi: "Tìm chuỗi liên tiếp dài nhất trong cây; được phép tăng hoặc giảm từng 1 và đổi hướng tại một node.", en: "Find the longest consecutive path in a binary tree; values may increase or decrease by one and the direction may turn at a node." },
+    defaultInput: "1,2,3,3,4,2,4", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    tags: [{ key: "tree-dp", vi: "Tree DP", en: "Tree DP" }, { key: "postorder", vi: "Postorder", en: "Postorder" }], debugMode: "semantic",
+    approach: [{ vi: "Postorder trả về inc và dec bắt đầu tại node.", en: "Postorder returns increasing and decreasing lengths starting at each node." }, { vi: "Nếu con lệch đúng 1, nối độ dài của con; best = inc + dec - 1.", en: "When a child differs by exactly one, extend its length; best = inc + dec - 1." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Một lần DFS hậu tự.", en: "One postorder DFS." } },
+    code: ["class Solution:", "    def longestConsecutive(self, root):", "        self.best = 0", "        def dfs(node):", "            if not node: return 0, 0", "            left = dfs(node.left); right = dfs(node.right)", "            inc = dec = 1", "            self.best = max(self.best, inc + dec - 1)", "            return inc, dec", "        dfs(root)", "        return self.best"],
+    builder: buildSteps549,
+  },
+  742: {
+    id: 742, difficulty: "hard", premium: true, slug: "closest-leaf-in-a-binary-tree", category: TREE_CAT,
+    title: { vi: "Closest Leaf in a Binary Tree", en: "Closest Leaf in a Binary Tree" },
+    titleVi: { vi: "Lá gần nhất trong cây nhị phân", en: "Nearest leaf from target" },
+    statement: { vi: "Cho cây và giá trị k tồn tại trong cây, tìm lá gần k nhất theo số cạnh.", en: "Given a binary tree and a value k present in it, find the closest leaf to k by edge distance." },
+    defaultInput: "1,2,3,null,4,5,6", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [{ key: "k", label: { vi: "k (target)", en: "k (target)" }, default: 2 }],
+    tags: [{ key: "bfs", vi: "BFS", en: "BFS" }, { key: "parent-pointer", vi: "Parent pointer", en: "Parent pointer" }], debugMode: "semantic",
+    approach: [{ vi: "Tạo parent map rồi BFS từ k trên đồ thị gồm left, right và parent.", en: "Build a parent map, then BFS from k over left, right, and parent edges." }, { vi: "Lá đầu tiên được dequeue là lá gần nhất.", en: "The first leaf dequeued is the closest leaf." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS cần parent map và visited để tránh đi vòng.", en: "BFS uses a parent map and visited set to avoid cycles." } },
+    code: ["from collections import deque", "class Solution:", "    def findClosestLeaf(self, root, k):", "        parent = build_parent_map(root)", "        queue = deque([find(root, k)])", "        seen = {queue[0]}", "        while queue:", "            node = queue.popleft()", "            if not node.left and not node.right: return node.val", "            enqueue_unseen_neighbors(node)", "        return None"],
+    builder: buildSteps742,
   },
   110: {
     id: 110, difficulty: "easy", slug: "balanced-binary-tree",

@@ -31205,6 +31205,39 @@ function renderInorderSuccessor510View(step) {
   renderTree({ tree: step.tree }, "is510Tree");
 }
 
+function renderTreeFamilyView(step, id, key, titleEn, titleVi, treeLabelEn, treeLabelVi) {
+  const view = step[key] || {};
+  const vi = lang === "vi";
+  const prefix = `bt${id}`;
+  const current = view.current || null;
+  const target = view.target || null;
+  const fmt = value => value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toString() : "—";
+  const phases = id === 545 ? (vi ? ["Root", "Biên trái", "Lá", "Biên phải"] : ["Root", "Left boundary", "Leaves", "Right boundary"]) : id === 549 ? (vi ? ["Khởi tạo", "Kết hợp DP", "Best", "Trả kết quả"] : ["Initialize", "Combine DP", "Best", "Return"]) : (vi ? ["Target", "BFS", "Lá gần nhất", "Trả kết quả"] : ["Target", "BFS", "Closest leaf", "Return"]);
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const values = id === 545 ? (Array.isArray(view.boundary) ? view.boundary : []) : id === 549 ? [`inc ${fmt(view.inc)}`, `dec ${fmt(view.dec)}`, `best ${fmt(view.best)}`] : (Array.isArray(view.queue) ? view.queue.map(item => item.value) : []);
+  const listHtml = values.length ? values.map((value, index) => `<span><small>${index + 1}</small><b>${escapeHtml(fmt(value))}</b></span>`).join("<i>→</i>") : `<em>${vi ? "Chưa có phần tử" : "No items yet"}</em>`;
+  const currentText = current ? fmt(current.value) : "—";
+  const targetText = target ? fmt(target.value) : "—";
+  const result = view.final ? (id === 545 ? `[${(view.boundary || []).join(", ")}]` : fmt(view.answer ?? view.best)) : "…";
+  const summary = id === 545 ? (vi ? "Boundary được ghép theo bốn phần." : "Boundary is assembled from four parts.") : id === 549 ? (vi ? "Mỗi node trả về độ dài tăng và giảm." : "Each node returns increasing and decreasing lengths.") : (vi ? "BFS từ target trên các cạnh parent và child." : "BFS from the target over parent and child edges.");
+  $("treeView").innerHTML = `<section class="${prefix}-viz tree-family-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>TREE · #${id}</small><strong>${vi ? titleVi : titleEn}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="${prefix}-phases tree-family-phases">${phaseHtml}</div>
+    <section class="${prefix}-rule tree-family-rule"><strong>${id === 545 ? "BOUNDARY" : id === 549 ? "TREE DP" : "BFS"}</strong><span>${escapeHtml(summary)}</span><code>${id === 545 ? "root + left + leaves + reverse(right)" : id === 549 ? "best = inc + dec − 1" : "first dequeued leaf"}</code></section>
+    <div class="${prefix}-layout tree-family-layout"><section class="${prefix}-tree tree-family-tree"><header><strong>${vi ? treeLabelVi : treeLabelEn}</strong><span>${current ? `current = ${escapeHtml(currentText)}` : target ? `target = ${escapeHtml(targetText)}` : ""}</span></header><div id="${prefix}Tree"></div></section>
+      <aside class="${prefix}-side tree-family-side"><section class="${prefix}-values tree-family-values"><div><small>${id === 742 ? "target" : "current"}</small><strong>${escapeHtml(id === 742 ? targetText : currentText)}</strong></div><div><small>${id === 549 ? "inc" : id === 545 ? "items" : "queue"}</small><strong>${escapeHtml(id === 549 ? fmt(view.inc) : String(values.length))}</strong></div><div><small>${id === 549 ? "dec" : "answer"}</small><strong>${escapeHtml(id === 549 ? fmt(view.dec) : result)}</strong></div></section>
+      <section class="${prefix}-list tree-family-list"><header><strong>${id === 545 ? (vi ? "BOUNDARY ĐANG GHÉP" : "BOUNDARY SO FAR") : id === 549 ? (vi ? "TRẠNG THÁI DP" : "DP STATE") : (vi ? "QUEUE BFS" : "BFS QUEUE")}</strong><span>${values.length} ${vi ? "mục" : "item(s)"}</span></header><div>${listHtml}</div></section></aside></div>
+    <section class="${prefix}-action tree-family-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="${prefix}-result tree-family-result ${view.final ? "done" : ""}"><small>ANSWER</small><strong>${escapeHtml(result)}</strong><span>${view.final ? (vi ? "Đã hoàn tất." : "Computation complete.") : (vi ? "Theo dõi state hiện tại qua từng bước." : "Follow the current state one step at a time.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, `${prefix}Tree`);
+}
+
+function renderBoundary545View(step) { renderTreeFamilyView(step, 545, "boundary545View", "Boundary of Binary Tree", "BOUNDARY CỦA CÂY NHỊ PHÂN", "BOUNDARY TREE", "CÂY BIÊN"); }
+function renderConsecutive549View(step) { renderTreeFamilyView(step, 549, "consecutive549View", "Longest Consecutive Sequence II", "CHUỖI LIÊN TIẾP DÀI NHẤT II", "POSTORDER TREE", "CÂY POSTORDER"); }
+function renderClosestLeaf742View(step) { renderTreeFamilyView(step, 742, "closestLeaf742View", "Closest Leaf in a Binary Tree", "LÁ GẦN NHẤT TRONG CÂY", "BFS TREE", "CÂY BFS"); }
+
 function renderClosestBst272View(step) {
   const view = step.closestBst272View || {};
   const vi = lang === "vi";
@@ -32014,6 +32047,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderClosestBst270View(step);
+  } else if (step.boundary545View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBoundary545View(step);
+  } else if (step.consecutive549View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderConsecutive549View(step);
+  } else if (step.closestLeaf742View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClosestLeaf742View(step);
   } else if (step.inorderSuccessor510View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
