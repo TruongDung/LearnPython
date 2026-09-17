@@ -319,6 +319,406 @@ function buildSteps33(nums, params) {
   return { original: [...nums], answer: -1, steps };
 }
 
+/**
+ * LeetCode 81: Search in Rotated Sorted Array II.
+ * Duplicates can hide which side of mid is sorted. When L, M, and R carry
+ * the same value, discard only the two boundary duplicates and try again.
+ */
+function buildSteps81(input, params = {}) {
+  const nums = Array.isArray(input) ? [...input] : parseIntegerList(input);
+  const target = Number(params.target !== undefined ? params.target : nums[0]);
+  if (!nums.length || nums.length > 24 || nums.some((value) => !Number.isSafeInteger(value))) {
+    throw new Error("nums must contain 1 to 24 safe integers.");
+  }
+  if (!Number.isSafeInteger(target)) throw new Error("target must be a safe integer.");
+  const descents = nums.reduce((count, value, index) => (
+    index > 0 && nums[index - 1] > value ? count + 1 : count
+  ), 0);
+  if (descents > 1 || (descents === 1 && nums.at(-1) > nums[0])) {
+    throw new Error("nums must be a rotated non-decreasing array.");
+  }
+
+  const steps = [];
+  let left = 0;
+  let right = nums.length - 1;
+  let iteration = 0;
+
+  const activeRange = () => left <= right
+    ? Array.from({ length: right - left + 1 }, (_, offset) => left + offset)
+    : [];
+  const pointerLabels = (mid) => nums.map((_value, index) => {
+    const labels = [];
+    if (index === left) labels.push("L");
+    if (index === mid) labels.push("M");
+    if (index === right) labels.push("R");
+    return labels.length ? `[${index}] ${labels.join("/")}` : `[${index}]`;
+  });
+
+  function pushStep({
+    title,
+    note,
+    codeLine,
+    mid = null,
+    phase = "probe",
+    operation,
+    sortedHalf = null,
+    keptHalf = null,
+    eliminated = [],
+    duplicateWall = false,
+    comparedLeft = null,
+    comparedRight = null,
+    answer = null,
+    final = false,
+    decision,
+    extraVars = [],
+  }) {
+    const hasMid = Number.isInteger(mid) && mid >= 0 && mid < nums.length;
+    const vars = [
+      { name: "left (L)", value: left },
+      { name: "right (R)", value: right },
+      { name: "target", value: target },
+    ];
+    if (hasMid) {
+      vars.splice(2, 0,
+        { name: "mid (M)", value: mid },
+        { name: "nums[M]", value: nums[mid] },
+      );
+    }
+    vars.push(...extraVars);
+    if (final) vars.push({ name: "answer", value: answer });
+
+    steps.push({
+      title,
+      arr: [...nums],
+      rotatedSearch81View: {
+        nums: [...nums],
+        target,
+        left,
+        right,
+        mid: hasMid ? mid : null,
+        iteration,
+        phase,
+        operation,
+        sortedHalf,
+        keptHalf,
+        eliminated: [...new Set(eliminated)],
+        duplicateWall,
+        comparedLeft: Number.isInteger(comparedLeft) ? comparedLeft : left,
+        comparedRight: Number.isInteger(comparedRight) ? comparedRight : right,
+        decision,
+        answer: final ? answer : null,
+        final,
+      },
+      sub: pointerLabels(hasMid ? mid : null),
+      highlight: activeRange(),
+      mark: hasMid ? [mid] : [],
+      codeLines: [codeLine],
+      vars,
+      note,
+      final,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo left và right", en: "Initialize left and right" },
+    note: {
+      vi: `Bắt đầu với toàn bộ mảng [0, ${right}]. Phần tử trùng có thể che mất nửa tăng dần.`,
+      en: `Start with the full range [0, ${right}]. Duplicate values may hide which half is sorted.`,
+    },
+    codeLine: 3,
+    phase: "initialize",
+    operation: "initialize",
+    decision: { vi: `Vùng ứng viên [0, ${right}]`, en: `Candidate range [0, ${right}]` },
+  });
+
+  while (left <= right) {
+    iteration += 1;
+    pushStep({
+      title: { vi: `while ${left} ≤ ${right} → True`, en: `while ${left} ≤ ${right} → True` },
+      note: { vi: `Vòng ${iteration}: vùng [${left}, ${right}] vẫn còn ứng viên.`, en: `Iteration ${iteration}: range [${left}, ${right}] still has candidates.` },
+      codeLine: 4,
+      phase: "probe",
+      operation: "loop-check",
+      decision: { vi: "Tiếp tục tìm kiếm", en: "Continue searching" },
+    });
+
+    const mid = Math.floor((left + right) / 2);
+    pushStep({
+      title: { vi: `mid = (${left} + ${right}) // 2 = ${mid}`, en: `mid = (${left} + ${right}) // 2 = ${mid}` },
+      note: { vi: `Đọc nums[M] = nums[${mid}] = ${nums[mid]}.`, en: `Read nums[M] = nums[${mid}] = ${nums[mid]}.` },
+      codeLine: 5,
+      mid,
+      phase: "probe",
+      operation: "choose-mid",
+      decision: { vi: `M=${mid}, nums[M]=${nums[mid]}`, en: `M=${mid}, nums[M]=${nums[mid]}` },
+    });
+
+    const found = nums[mid] === target;
+    pushStep({
+      title: { vi: `${nums[mid]} == ${target} → ${found}`, en: `${nums[mid]} == ${target} → ${found}` },
+      note: found
+        ? { vi: "Đã gặp target tại mid; trả về True.", en: "The midpoint equals target; return True." }
+        : { vi: "Chưa tìm thấy; phải xử lý phần tử trùng trước khi xác định nửa tăng dần.", en: "Not found; handle duplicates before identifying a sorted half." },
+      codeLine: 6,
+      mid,
+      phase: "probe",
+      operation: "check-target",
+      decision: found
+        ? { vi: "nums[M] == target", en: "nums[M] == target" }
+        : { vi: "nums[M] != target", en: "nums[M] != target" },
+      extraVars: [{ name: "found?", value: found }],
+    });
+    if (found) {
+      pushStep({
+        title: { vi: "Trả về True", en: "Return True" },
+        note: { vi: `Target ${target} tồn tại tại index ${mid}.`, en: `Target ${target} exists at index ${mid}.` },
+        codeLine: 7,
+        mid,
+        phase: "done",
+        operation: "return-true",
+        answer: true,
+        final: true,
+        decision: { vi: `Tìm thấy tại index ${mid}`, en: `Found at index ${mid}` },
+      });
+      return { original: nums, answer: true, steps };
+    }
+
+    const duplicateWall = nums[left] === nums[mid] && nums[mid] === nums[right];
+    pushStep({
+      title: {
+        vi: `nums[L] == nums[M] == nums[R] → ${duplicateWall}`,
+        en: `nums[L] == nums[M] == nums[R] → ${duplicateWall}`,
+      },
+      note: duplicateWall
+        ? {
+            vi: `Ba giá trị đều bằng ${nums[mid]}; không thể biết pivot ở bên nào. Chỉ được bỏ hai biên trùng.`,
+            en: `All three values equal ${nums[mid]}; the pivot side is ambiguous. Only the duplicate boundaries are safe to remove.`,
+          }
+        : {
+            vi: "Ba giá trị không cùng bằng nhau, nên ít nhất một nửa có thể được nhận diện là tăng dần.",
+            en: "The three values are not all equal, so at least one sorted half can be identified.",
+          },
+      codeLine: 8,
+      mid,
+      phase: "duplicates",
+      operation: "check-duplicates",
+      duplicateWall,
+      decision: duplicateWall
+        ? { vi: `${nums[left]} = ${nums[mid]} = ${nums[right]} → mơ hồ`, en: `${nums[left]} = ${nums[mid]} = ${nums[right]} → ambiguous` }
+        : { vi: "Không có duplicate wall", en: "No duplicate wall" },
+      extraVars: [{ name: "duplicate wall?", value: duplicateWall }],
+    });
+
+    if (duplicateWall) {
+      const oldLeft = left;
+      const oldRight = right;
+      left += 1;
+      pushStep({
+        title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+        note: {
+          vi: `nums[${oldLeft}]=${nums[oldLeft]} trùng nums[M] và không phải target, nên loại an toàn biên trái.`,
+          en: `nums[${oldLeft}]=${nums[oldLeft]} duplicates nums[M] and is not target, so the left boundary is safe to discard.`,
+        },
+        codeLine: 9,
+        mid,
+        phase: "duplicates",
+        operation: "shrink-left",
+        duplicateWall: true,
+        comparedLeft: oldLeft,
+        comparedRight: oldRight,
+        eliminated: [oldLeft],
+        decision: { vi: `Loại index ${oldLeft}`, en: `Discard index ${oldLeft}` },
+      });
+      right -= 1;
+      pushStep({
+        title: { vi: `right -= 1 → ${right}`, en: `right -= 1 → ${right}` },
+        note: {
+          vi: `nums[${oldRight}]=${nums[oldRight]} cũng là bản sao không phải target, nên loại biên phải.`,
+          en: `nums[${oldRight}]=${nums[oldRight]} is also a non-target duplicate, so discard the right boundary.`,
+        },
+        codeLine: 10,
+        mid,
+        phase: "duplicates",
+        operation: "shrink-right",
+        duplicateWall: true,
+        comparedLeft: oldLeft,
+        comparedRight: oldRight,
+        eliminated: [oldLeft, oldRight],
+        decision: { vi: `Vùng mới [${left}, ${right}]`, en: `New range [${left}, ${right}]` },
+      });
+      pushStep({
+        title: { vi: "continue → bắt đầu vòng mới", en: "continue → start the next iteration" },
+        note: {
+          vi: "Không đoán nửa nào chứa pivot trong trường hợp mơ hồ; quay lại tính mid với hai biên đã thu hẹp.",
+          en: "Do not guess the pivot side while ambiguous; recompute mid after shrinking both boundaries.",
+        },
+        codeLine: 11,
+        mid,
+        phase: "duplicates",
+        operation: "continue",
+        duplicateWall: true,
+        comparedLeft: oldLeft,
+        comparedRight: oldRight,
+        eliminated: [oldLeft, oldRight],
+        decision: { vi: "Không thể chia đôi ở vòng này", en: "This iteration cannot halve the range" },
+      });
+      continue;
+    }
+
+    const leftSorted = nums[left] <= nums[mid];
+    pushStep({
+      title: leftSorted
+        ? { vi: "Nửa trái tăng dần", en: "The left half is sorted" }
+        : { vi: "Nửa trái chứa pivot", en: "The left half contains the pivot" },
+      note: leftSorted
+        ? { vi: `${nums[left]} ≤ ${nums[mid]}, nên [L, M] tăng dần.`, en: `${nums[left]} ≤ ${nums[mid]}, so [L, M] is sorted.` }
+        : { vi: `${nums[left]} > ${nums[mid]}, nên nửa phải [M, R] tăng dần.`, en: `${nums[left]} > ${nums[mid]}, so the right half [M, R] is sorted.` },
+      codeLine: 12,
+      mid,
+      phase: "sorted-half",
+      operation: "detect-sorted-half",
+      sortedHalf: leftSorted ? "left" : "right",
+      decision: leftSorted
+        ? { vi: `${nums[left]} ≤ ${nums[mid]} → TRÁI tăng dần`, en: `${nums[left]} ≤ ${nums[mid]} → LEFT is sorted` }
+        : { vi: `${nums[left]} > ${nums[mid]} → PHẢI tăng dần`, en: `${nums[left]} > ${nums[mid]} → RIGHT is sorted` },
+    });
+
+    if (leftSorted) {
+      const targetInLeft = nums[left] <= target && target < nums[mid];
+      pushStep({
+        title: { vi: `Target nằm trong nửa trái? ${targetInLeft}`, en: `Is target in the left half? ${targetInLeft}` },
+        note: targetInLeft
+          ? { vi: `${nums[left]} ≤ ${target} < ${nums[mid]} là đúng.`, en: `${nums[left]} ≤ ${target} < ${nums[mid]} is true.` }
+          : { vi: `${target} nằm ngoài [${nums[left]}, ${nums[mid]}).`, en: `${target} is outside [${nums[left]}, ${nums[mid]}).` },
+        codeLine: 13,
+        mid,
+        phase: "sorted-half",
+        operation: "check-left-range",
+        sortedHalf: "left",
+        decision: { vi: `${nums[left]} ≤ ${target} < ${nums[mid]} → ${targetInLeft}`, en: `${nums[left]} ≤ ${target} < ${nums[mid]} → ${targetInLeft}` },
+      });
+      if (targetInLeft) {
+        const oldRight = right;
+        right = mid - 1;
+        pushStep({
+          title: { vi: `right = mid - 1 → ${right}`, en: `right = mid - 1 → ${right}` },
+          note: { vi: "Target thuộc đoạn tăng bên trái; loại mid và toàn bộ phía phải.", en: "Target lies in the sorted left range; discard mid and everything to its right." },
+          codeLine: 14,
+          mid,
+          phase: "narrow",
+          operation: "keep-left",
+          sortedHalf: "left",
+          keptHalf: "left",
+          eliminated: Array.from({ length: oldRight - mid + 1 }, (_, offset) => mid + offset),
+          decision: { vi: `Giữ [${left}, ${right}]`, en: `Keep [${left}, ${right}]` },
+        });
+      } else {
+        pushStep({
+          title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+          note: { vi: "Target không thuộc nửa trái tăng dần.", en: "Target is not in the sorted left half." },
+          codeLine: 15,
+          mid,
+          phase: "sorted-half",
+          operation: "left-range-else",
+          sortedHalf: "left",
+          decision: { vi: "Giữ phía phải", en: "Keep the right side" },
+        });
+        const oldLeft = left;
+        left = mid + 1;
+        pushStep({
+          title: { vi: `left = mid + 1 → ${left}`, en: `left = mid + 1 → ${left}` },
+          note: { vi: "Loại toàn bộ nửa trái đã được chứng minh không chứa target.", en: "Discard the sorted left half proven not to contain target." },
+          codeLine: 16,
+          mid,
+          phase: "narrow",
+          operation: "keep-right",
+          sortedHalf: "left",
+          keptHalf: "right",
+          eliminated: Array.from({ length: mid - oldLeft + 1 }, (_, offset) => oldLeft + offset),
+          decision: { vi: `Giữ [${left}, ${right}]`, en: `Keep [${left}, ${right}]` },
+        });
+      }
+    } else {
+      pushStep({
+        title: { vi: "Đi vào nhánh nửa phải tăng dần", en: "Enter the sorted-right branch" },
+        note: { vi: "Nửa trái không tăng dần, nên nửa phải chắc chắn tăng dần.", en: "The left half is not sorted, so the right half must be sorted." },
+        codeLine: 17,
+        mid,
+        phase: "sorted-half",
+        operation: "right-sorted-else",
+        sortedHalf: "right",
+        decision: { vi: "Xét khoảng (nums[M], nums[R]]", en: "Inspect range (nums[M], nums[R]]" },
+      });
+      const targetInRight = nums[mid] < target && target <= nums[right];
+      pushStep({
+        title: { vi: `Target nằm trong nửa phải? ${targetInRight}`, en: `Is target in the right half? ${targetInRight}` },
+        note: targetInRight
+          ? { vi: `${nums[mid]} < ${target} ≤ ${nums[right]} là đúng.`, en: `${nums[mid]} < ${target} ≤ ${nums[right]} is true.` }
+          : { vi: `${target} nằm ngoài (${nums[mid]}, ${nums[right]}].`, en: `${target} is outside (${nums[mid]}, ${nums[right]}].` },
+        codeLine: 18,
+        mid,
+        phase: "sorted-half",
+        operation: "check-right-range",
+        sortedHalf: "right",
+        decision: { vi: `${nums[mid]} < ${target} ≤ ${nums[right]} → ${targetInRight}`, en: `${nums[mid]} < ${target} ≤ ${nums[right]} → ${targetInRight}` },
+      });
+      if (targetInRight) {
+        const oldLeft = left;
+        left = mid + 1;
+        pushStep({
+          title: { vi: `left = mid + 1 → ${left}`, en: `left = mid + 1 → ${left}` },
+          note: { vi: "Target thuộc đoạn tăng bên phải; loại mid và toàn bộ phía trái.", en: "Target lies in the sorted right range; discard mid and everything to its left." },
+          codeLine: 19,
+          mid,
+          phase: "narrow",
+          operation: "keep-right",
+          sortedHalf: "right",
+          keptHalf: "right",
+          eliminated: Array.from({ length: mid - oldLeft + 1 }, (_, offset) => oldLeft + offset),
+          decision: { vi: `Giữ [${left}, ${right}]`, en: `Keep [${left}, ${right}]` },
+        });
+      } else {
+        pushStep({
+          title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+          note: { vi: "Target không thuộc nửa phải tăng dần.", en: "Target is not in the sorted right half." },
+          codeLine: 20,
+          mid,
+          phase: "sorted-half",
+          operation: "right-range-else",
+          sortedHalf: "right",
+          decision: { vi: "Giữ phía trái", en: "Keep the left side" },
+        });
+        const oldRight = right;
+        right = mid - 1;
+        pushStep({
+          title: { vi: `right = mid - 1 → ${right}`, en: `right = mid - 1 → ${right}` },
+          note: { vi: "Loại toàn bộ nửa phải đã được chứng minh không chứa target.", en: "Discard the sorted right half proven not to contain target." },
+          codeLine: 21,
+          mid,
+          phase: "narrow",
+          operation: "keep-left",
+          sortedHalf: "right",
+          keptHalf: "left",
+          eliminated: Array.from({ length: oldRight - mid + 1 }, (_, offset) => mid + offset),
+          decision: { vi: `Giữ [${left}, ${right}]`, en: `Keep [${left}, ${right}]` },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: "Vùng tìm kiếm rỗng → False", en: "The search range is empty → False" },
+    note: { vi: `left=${left} > right=${right}; target ${target} không tồn tại.`, en: `left=${left} > right=${right}; target ${target} is absent.` },
+    codeLine: 22,
+    phase: "done",
+    operation: "return-false",
+    answer: false,
+    final: true,
+    decision: { vi: "Không còn ứng viên", en: "No candidates remain" },
+  });
+  return { original: nums, answer: false, steps };
+}
+
 function formatCounts(counts) {
   const entries = [...counts.entries()].sort((a, b) => a[0] - b[0]);
   return `{${entries.map(([person, count]) => `${person}: ${count}`).join(", ")}}`;
@@ -5080,6 +5480,65 @@ module.exports = Object.assign(module.exports, {
       "        return -1",
     ],
     builder: buildSteps33,
+  },
+  81: {
+    id: 81,
+    difficulty: "medium",
+    slug: "search-in-rotated-sorted-array-ii",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Search in Rotated Sorted Array II", en: "Search in Rotated Sorted Array II" },
+    titleVi: { vi: "Tìm trong mảng xoay có phần tử trùng", en: "Search a rotated array with duplicates" },
+    statement: {
+      vi: "Cho mảng không giảm có thể chứa phần tử trùng, đã bị xoay tại một pivot, và target. Trả về True nếu target tồn tại.",
+      en: "Given a non-decreasing array with possible duplicates, rotated at an unknown pivot, and a target, return True when target exists.",
+    },
+    defaultInput: [2, 5, 6, 0, 0, 1, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (mảng xoay, có thể trùng)", en: "nums (rotated array, duplicates allowed)" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 0 }],
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    ],
+    debugMode: "line-by-line",
+    approach: [
+      { vi: "Luôn kiểm tra nums[mid] == target trước.", en: "Always check nums[mid] == target first." },
+      { vi: "Nếu nums[left] == nums[mid] == nums[right], không xác định được nửa tăng dần: tăng left và giảm right đúng một bước.", en: "If nums[left] == nums[mid] == nums[right], the sorted half is ambiguous: increment left and decrement right by one." },
+      { vi: "Nếu không mơ hồ, xác định nửa tăng dần rồi giữ nửa có thể chứa target như binary search thông thường.", en: "Otherwise identify the sorted half and keep the side that can contain target, as in ordinary binary search." },
+    ],
+    complexity: {
+      time: "O(log n) average, O(n) worst",
+      space: "O(1)",
+      note: {
+        vi: "Thông thường mỗi vòng loại một nửa. Với nhiều phần tử trùng, nhánh thu hẹp hai biên có thể chỉ loại O(1) phần tử mỗi vòng.",
+        en: "Most iterations discard half. With many duplicates, the boundary-shrink branch may remove only O(1) elements per iteration.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def search(self, nums: list[int], target: int) -> bool:",
+      "        left, right = 0, len(nums) - 1",
+      "        while left <= right:",
+      "            mid = (left + right) // 2",
+      "            if nums[mid] == target:",
+      "                return True",
+      "            if nums[left] == nums[mid] == nums[right]:",
+      "                left += 1",
+      "                right -= 1",
+      "                continue",
+      "            if nums[left] <= nums[mid]:",
+      "                if nums[left] <= target < nums[mid]:",
+      "                    right = mid - 1",
+      "                else:",
+      "                    left = mid + 1",
+      "            else:",
+      "                if nums[mid] < target <= nums[right]:",
+      "                    left = mid + 1",
+      "                else:",
+      "                    right = mid - 1",
+      "        return False",
+    ],
+    builder: buildSteps81,
   },
   34: {
     id: 34,

@@ -15324,6 +15324,102 @@ function renderRotatedSearchView(step) {
   </div>`;
 }
 
+function renderRotatedSearch81View(step) {
+  const view = step.rotatedSearch81View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const mid = Number.isInteger(view.mid) ? view.mid : -1;
+  const comparedLeft = Number.isInteger(view.comparedLeft) ? view.comparedLeft : left;
+  const comparedRight = Number.isInteger(view.comparedRight) ? view.comparedRight : right;
+  const eliminated = new Set(Array.isArray(view.eliminated) ? view.eliminated : []);
+  const operation = String(view.operation || "initialize");
+  const activeGate = ["initialize", "loop-check", "choose-mid", "check-target"].includes(operation) ? 0
+    : ["check-duplicates", "shrink-left", "shrink-right", "continue"].includes(operation) ? 1
+      : ["detect-sorted-half", "check-left-range", "check-right-range", "left-range-else", "right-sorted-else", "right-range-else", "keep-left", "keep-right"].includes(operation) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Kiểm tra mid", "Gỡ duplicate wall", "Chọn nửa tăng dần", "Kết quả"]
+    : ["Check midpoint", "Break duplicate wall", "Choose sorted half", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === activeGate ? "active" : index < activeGate ? "done" : ""}"><b>${index < activeGate ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+
+  const pointerLabels = (index) => {
+    const labels = [];
+    if (index === left) labels.push("L");
+    if (index === mid) labels.push("M");
+    if (index === right) labels.push("R");
+    return labels;
+  };
+  const inSortedHalf = (index) => (
+    view.sortedHalf === "left" ? index >= left && index <= mid
+      : view.sortedHalf === "right" ? index >= mid && index <= right
+        : false
+  );
+  const cells = nums.map((value, index) => {
+    const pointers = pointerLabels(index);
+    const active = index >= left && index <= right;
+    const found = view.answer === true && index === mid;
+    const duplicateEdge = view.duplicateWall && (index === comparedLeft || index === mid || index === comparedRight);
+    const classes = ["rs81-cell"];
+    classes.push(active ? "candidate" : "discarded");
+    if (index === mid) classes.push("mid");
+    if (inSortedHalf(index)) classes.push("sorted");
+    if (view.phase === "narrow" && active) classes.push("kept");
+    if (duplicateEdge) classes.push("duplicate");
+    if (eliminated.has(index)) classes.push("just-eliminated");
+    if (found) classes.push("found");
+    const pointerHtml = pointers.length
+      ? pointers.map((label) => `<b class="pointer-${label.toLowerCase()}">${label}<i></i></b>`).join("")
+      : "";
+    return `<div class="rs81-cell-wrap"><div class="rs81-pointers">${pointerHtml}</div><div class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(value)}</strong></div></div>`;
+  }).join("");
+
+  const valueAt = (index) => index >= 0 && index < nums.length ? nums[index] : "—";
+  const triple = [
+    ["L", comparedLeft, valueAt(comparedLeft)],
+    ["M", mid, valueAt(mid)],
+    ["R", comparedRight, valueAt(comparedRight)],
+  ].map(([label, index, value]) => `<article class="${view.duplicateWall ? "duplicate" : ""}"><small>${label} · index ${index >= 0 && index < nums.length ? index : "—"}</small><strong>${escapeHtml(value)}</strong><span>nums[${label}]</span></article>`).join("<i>=</i>");
+
+  const gateLabels = vi
+    ? ["1 · Mid là target?", "2 · L = M = R?", "3 · Nửa nào tăng dần?"]
+    : ["1 · Is mid the target?", "2 · Does L = M = R?", "3 · Which half is sorted?"];
+  const gates = gateLabels.map((label, index) => {
+    const state = index < activeGate ? "done" : index === activeGate ? "active" : "waiting";
+    const detail = index === 0
+      ? `nums[M] ${mid >= 0 ? `= ${valueAt(mid)}` : "?"} · target = ${view.target}`
+      : index === 1
+        ? view.duplicateWall
+          ? (vi ? "Mơ hồ → left++, right--" : "Ambiguous → left++, right--")
+          : (vi ? "Không mơ hồ" : "Not ambiguous")
+        : view.sortedHalf
+          ? `${view.sortedHalf === "left" ? "LEFT" : "RIGHT"} ${vi ? "tăng dần" : "is sorted"}`
+          : (vi ? "Chưa xác định" : "Not determined yet");
+    return `<span class="${state}"><b>${escapeHtml(label)}</b><small>${escapeHtml(detail)}</small></span>`;
+  }).join("");
+
+  const decision = pick(view.decision) || "—";
+  const answer = view.final ? (view.answer ? "True" : "False") : "…";
+  const rangeSize = Math.max(0, right - left + 1);
+  const summary = vi
+    ? `Bài 81, target ${view.target}, vùng [${left}, ${right}], quyết định: ${decision}.`
+    : `Problem 81, target ${view.target}, range [${left}, ${right}], decision: ${decision}.`;
+
+  $("treeView").innerHTML = `<section class="rs81-viz phase-${escapeHtml(view.phase || "initialize")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BINARY SEARCH · DUPLICATES · #81</small><strong>${vi ? "TÌM TRONG MẢNG XOAY II" : "SEARCH IN ROTATED SORTED ARRAY II"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="rs81-phases">${phases}</div>
+    <section class="rs81-rule"><b>${vi ? "THỨ TỰ KIỂM TRA" : "CHECK ORDER"}</b><code>target first → duplicate wall → sorted half</code><span>${vi ? "Không được kết luận nửa tăng dần trước khi xử lý L = M = R." : "Never infer the sorted half before handling L = M = R."}</span></section>
+    <section class="rs81-array"><header><strong>${vi ? "VÙNG ỨNG VIÊN" : "CANDIDATE RANGE"} [${left}, ${right}]</strong><span>${rangeSize}/${nums.length} ${vi ? "phần tử còn lại" : "values remain"}</span></header><div class="rs81-scroll"><div class="rs81-cells">${cells}</div></div></section>
+    <div class="rs81-main">
+      <section class="rs81-triplet ${view.duplicateWall ? "ambiguous" : ""}"><header><strong>${view.duplicateWall && (comparedLeft !== left || comparedRight !== right) ? (vi ? "BA MỐC ĐÃ KIỂM TRA" : "TESTED ANCHORS") : "L · M · R"}</strong><span>${view.duplicateWall ? (vi ? "BA GIÁ TRỊ ĐÃ SO SÁNH GIỐNG NHAU → KHÔNG BIẾT PIVOT Ở ĐÂU" : "THE COMPARED VALUES WERE EQUAL → PIVOT SIDE WAS UNKNOWN") : (vi ? "so sánh ba mốc" : "compare the three anchors")}</span></header><div>${triple}</div></section>
+      <section class="rs81-gates"><header><strong>${vi ? "CÂY QUYẾT ĐỊNH MỖI VÒNG" : "DECISION GATES PER ITERATION"}</strong><span>#${view.iteration || 0}</span></header><div>${gates}</div></section>
+    </div>
+    <section class="rs81-decision ${view.duplicateWall ? "duplicate" : ""}"><small>${vi ? "QUYẾT ĐỊNH HIỆN TẠI" : "CURRENT DECISION"}</small><strong>${escapeHtml(decision)}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="rs81-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><code>${escapeHtml(pick(step.title))}</code></section>
+    <footer class="rs81-result ${view.final ? (view.answer ? "found" : "missing") : ""}"><small>SEARCH RESULT</small><strong>${answer}</strong><span>${view.final ? (view.answer ? (vi ? "Target tồn tại trong vùng đã xoay." : "The target exists in the rotated array.") : (vi ? "Vùng ứng viên đã rỗng." : "The candidate range is empty.")) : (view.duplicateWall ? (vi ? "Vòng này chỉ thu hẹp biên; worst case O(n)." : "This iteration only shrinks boundaries; worst case O(n).") : (vi ? "Nếu xác định được nửa tăng dần, ta loại khoảng một nửa." : "Once a sorted half is known, about half can be discarded."))}</span></footer>
+  </section>`;
+}
+
 // ---- Find Minimum in Rotated Sorted Array II visualization (LeetCode 154) ----
 // Reuses the same column/pointer layout as the bai 33 rotated-search view,
 // but there is no target: instead nums[mid] is always compared against
@@ -31458,6 +31554,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRotateArray189View(step);
+  } else if (step.rotatedSearch81View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotatedSearch81View(step);
   } else if (step.rotatedSearchView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
