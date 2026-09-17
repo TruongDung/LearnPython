@@ -10740,6 +10740,204 @@ function buildSteps2265(input) {
   return { input, answer, steps };
 }
 
+function buildSteps979(input) {
+  const root = parseAverageSubtreeInput(input, { maxValue: 100, maxNodes: 31 });
+  const layout = treeToVizNodes(root, null, null);
+  const nodeById = new Map();
+  (function indexNodes(node) {
+    if (!node) return;
+    nodeById.set(node.id, node);
+    indexNodes(node.left);
+    indexNodes(node.right);
+  })(root);
+  const totalCoins = [...nodeById.values()].reduce((sum, node) => sum + node.val, 0);
+  if (totalCoins !== nodeById.size) {
+    throw new Error(`Total coins (${totalCoins}) must equal number of nodes (${nodeById.size})`);
+  }
+
+  const steps = [];
+  const stack = [];
+  const stats = new Map();
+  const history = [];
+  let moves = 0;
+
+  const makeView = ({ phase = "initialize", phaseIndex = 0, operation = "initialize", current = null, parent = null, side = null, nextCall = null, formula = null, returnBalance = null, final = false } = {}) => ({
+    phase,
+    phaseIndex,
+    operation,
+    nodes: layout.map((item) => {
+      const node = nodeById.get(item.id);
+      const stat = stats.get(item.id) || {};
+      return {
+        id: item.id,
+        parentId: item.parentId,
+        x: item.x,
+        y: item.y,
+        value: node.val,
+        balance: stat.balance ?? null,
+        leftBalance: stat.leftBalance ?? null,
+        rightBalance: stat.rightBalance ?? null,
+        movesAdded: stat.movesAdded ?? null,
+        state: stat.state || (stack.some((frame) => frame.id === item.id) ? "waiting" : "unvisited"),
+      };
+    }),
+    stack: stack.map((frame) => ({ ...frame })),
+    current: current ? current.id : null,
+    parent: parent ? parent.id : null,
+    side,
+    nextCall: nextCall ? { value: nextCall.node ? nextCall.node.val : null, side: nextCall.side } : null,
+    formula,
+    returnBalance,
+    moves,
+    history: history.map((item) => ({ ...item })),
+    processed: history.length,
+    totalNodes: layout.length,
+    totalCoins,
+    answer: final ? moves : null,
+    final,
+  });
+
+  function addStep({ title, note, codeLine, ...viewOptions }) {
+    const view = makeView(viewOptions);
+    const currentNode = view.current === null ? null : nodeById.get(view.current);
+    const step = snapshot(root, {
+      title,
+      hlSet: currentNode ? new Set([currentNode.id]) : undefined,
+      wordSet: new Set(history.map((item) => item.id)),
+      codeLines: [codeLine],
+      vars: [
+        { name: "node", value: currentNode ? currentNode.val : "None" },
+        { name: "moves", value: moves },
+        { name: "balance", value: view.returnBalance === null ? "—" : view.returnBalance },
+        { name: "stack", value: `[${stack.map((frame) => frame.value === null ? "None" : frame.value).join(" → ")}]` },
+      ],
+      note,
+    });
+    step.distributeCoins979View = view;
+    step.final = Boolean(viewOptions.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "Khởi tạo moves = 0", en: "Initialize moves = 0" },
+    note: { vi: "Mỗi lần một đồng coin đi qua một cạnh, moves tăng 1.", en: "Every time one coin crosses one edge, moves increases by 1." },
+    codeLine: 3, phase: "initialize", phaseIndex: 0, operation: "initialize",
+  });
+  addStep({
+    title: { vi: `Gọi dfs từ root ${root.val}`, en: `Call dfs from root ${root.val}` },
+    note: { vi: "DFS hậu thứ tự xử lý hai cây con trước rồi mới cân bằng node hiện tại.", en: "Postorder DFS balances both child subtrees before the current node." },
+    codeLine: 13, phase: "descend", phaseIndex: 1, operation: "call-root", nextCall: { node: root, side: "root" },
+  });
+
+  function dfs(node, parent = null, side = "root") {
+    stack.push({ id: node ? node.id : null, value: node ? node.val : null, side, stage: "enter" });
+    addStep({
+      title: { vi: `Vào dfs(${node ? node.val : "None"})`, en: `Enter dfs(${node ? node.val : "None"})` },
+      note: node
+        ? { vi: `Node ${node.val} cần giữ lại đúng 1 coin; mọi coin dư hoặc thiếu sẽ đi qua cạnh nối với cha.`, en: `Node ${node.val} must keep exactly 1 coin; every surplus or deficit crosses its parent edge.` }
+        : { vi: "Nhánh rỗng không có coin và không cần coin.", en: "An empty branch owns no coin and needs no coin." },
+      codeLine: 5, phase: "descend", phaseIndex: 1, operation: "enter", current: node, parent, side,
+    });
+
+    stack[stack.length - 1].stage = "check-null";
+    addStep({
+      title: { vi: `if not node → ${node ? "False" : "True"}`, en: `if not node → ${node ? "False" : "True"}` },
+      note: node
+        ? { vi: "Node tồn tại nên tiếp tục gọi hai cây con.", en: "The node exists, so continue into both child subtrees." }
+        : { vi: "Đây là base case của đệ quy.", en: "This is the recursion base case." },
+      codeLine: 6, phase: "descend", phaseIndex: 1, operation: "check-null", current: node, parent, side,
+    });
+    if (!node) {
+      stack[stack.length - 1].stage = "return-zero";
+      addStep({
+        title: { vi: "Nhánh None trả balance = 0", en: "None returns balance = 0" },
+        note: { vi: "Không có cạnh thật nào cần di chuyển coin ở nhánh rỗng.", en: "No real edge needs a coin transfer for an empty branch." },
+        codeLine: 7, phase: "return", phaseIndex: 4, operation: "return-null", current: null, parent, side, returnBalance: 0,
+      });
+      stack.pop();
+      return 0;
+    }
+
+    stack[stack.length - 1].stage = "call-left";
+    addStep({
+      title: node.left ? { vi: `Gọi con trái ${node.left.val}`, en: `Call left child ${node.left.val}` } : { vi: "Gọi con trái None", en: "Call left child None" },
+      note: { vi: "Cần balance của cây trái trước khi tính node hiện tại.", en: "The current node needs the left subtree balance first." },
+      codeLine: 8, phase: "descend", phaseIndex: 1, operation: "call-left", current: node, parent, side, nextCall: { node: node.left, side: "left" },
+    });
+    const leftBalance = dfs(node.left, node, "left");
+    stack[stack.length - 1].stage = "left-returned";
+    addStep({
+      title: { vi: `Cây trái trả balance ${leftBalance}`, en: `Left subtree returns balance ${leftBalance}` },
+      note: leftBalance >= 0
+        ? { vi: `Cây trái dư ${leftBalance} coin để gửi lên node ${node.val}.`, en: `The left subtree has ${leftBalance} surplus coin(s) to send up to node ${node.val}.` }
+        : { vi: `Cây trái thiếu ${Math.abs(leftBalance)} coin; node ${node.val} phải gửi xuống.`, en: `The left subtree needs ${Math.abs(leftBalance)} coin(s) from node ${node.val}.` },
+      codeLine: 8, phase: "receive", phaseIndex: 2, operation: "left-return", current: node, parent, side, returnBalance: leftBalance,
+      formula: { nodeValue: node.val, leftBalance, rightBalance: null, movesBefore: moves, movesAdded: null, balance: null },
+    });
+
+    stack[stack.length - 1].stage = "call-right";
+    addStep({
+      title: node.right ? { vi: `Gọi con phải ${node.right.val}`, en: `Call right child ${node.right.val}` } : { vi: "Gọi con phải None", en: "Call right child None" },
+      note: { vi: "Tiếp tục lấy balance của cây phải.", en: "Next, obtain the right subtree balance." },
+      codeLine: 9, phase: "descend", phaseIndex: 1, operation: "call-right", current: node, parent, side, nextCall: { node: node.right, side: "right" },
+      formula: { nodeValue: node.val, leftBalance, rightBalance: null, movesBefore: moves, movesAdded: null, balance: null },
+    });
+    const rightBalance = dfs(node.right, node, "right");
+    stack[stack.length - 1].stage = "right-returned";
+    addStep({
+      title: { vi: `Cây phải trả balance ${rightBalance}`, en: `Right subtree returns balance ${rightBalance}` },
+      note: rightBalance >= 0
+        ? { vi: `Cây phải dư ${rightBalance} coin để gửi lên node ${node.val}.`, en: `The right subtree has ${rightBalance} surplus coin(s) to send up to node ${node.val}.` }
+        : { vi: `Cây phải thiếu ${Math.abs(rightBalance)} coin; node ${node.val} phải gửi xuống.`, en: `The right subtree needs ${Math.abs(rightBalance)} coin(s) from node ${node.val}.` },
+      codeLine: 9, phase: "receive", phaseIndex: 2, operation: "right-return", current: node, parent, side, returnBalance: rightBalance,
+      formula: { nodeValue: node.val, leftBalance, rightBalance, movesBefore: moves, movesAdded: null, balance: null },
+    });
+
+    const movesBefore = moves;
+    const movesAdded = Math.abs(leftBalance) + Math.abs(rightBalance);
+    moves += movesAdded;
+    stats.set(node.id, { state: "moving", balance: null, leftBalance, rightBalance, movesAdded });
+    stack[stack.length - 1].stage = "move-coins";
+    addStep({
+      title: { vi: `moves += |${leftBalance}| + |${rightBalance}| → ${moves}`, en: `moves += |${leftBalance}| + |${rightBalance}| → ${moves}` },
+      note: { vi: `Cạnh trái cần ${Math.abs(leftBalance)} lượt và cạnh phải cần ${Math.abs(rightBalance)} lượt di chuyển coin.`, en: `The left edge needs ${Math.abs(leftBalance)} move(s), and the right edge needs ${Math.abs(rightBalance)} move(s).` },
+      codeLine: 10, phase: "move", phaseIndex: 3, operation: "add-moves", current: node, parent, side,
+      formula: { nodeValue: node.val, leftBalance, rightBalance, movesBefore, movesAdded, movesAfter: moves, balance: null },
+    });
+
+    const balance = node.val + leftBalance + rightBalance - 1;
+    stats.set(node.id, { state: "returned", balance, leftBalance, rightBalance, movesAdded });
+    history.push({ id: node.id, value: node.val, balance, movesAdded, movesAfter: moves });
+    stack[stack.length - 1].stage = "return-balance";
+    addStep({
+      title: { vi: `return balance = ${balance}`, en: `return balance = ${balance}` },
+      note: balance > 0
+        ? { vi: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = ${balance}: subtree này gửi ${balance} coin lên cha.`, en: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = ${balance}: this subtree sends ${balance} coin(s) to its parent.` }
+        : balance < 0
+          ? { vi: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = ${balance}: subtree này cần ${Math.abs(balance)} coin từ cha.`, en: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = ${balance}: this subtree needs ${Math.abs(balance)} coin(s) from its parent.` }
+          : { vi: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = 0: subtree đã cân bằng hoàn toàn.`, en: `${node.val} + ${leftBalance} + ${rightBalance} - 1 = 0: this subtree is fully balanced.` },
+      codeLine: 11, phase: "return", phaseIndex: 4, operation: "return-balance", current: node, parent, side, returnBalance: balance,
+      formula: { nodeValue: node.val, leftBalance, rightBalance, movesBefore, movesAdded, movesAfter: moves, balance },
+    });
+    stack.pop();
+    return balance;
+  }
+
+  const rootBalance = dfs(root);
+  addStep({
+    title: { vi: `dfs(root) hoàn tất với balance ${rootBalance}`, en: `dfs(root) completes with balance ${rootBalance}` },
+    note: { vi: "Tổng coin bằng số node nên balance cuối cùng của root phải bằng 0.", en: "Because total coins equal total nodes, the root's final balance must be 0." },
+    codeLine: 13, phase: "return", phaseIndex: 4, operation: "root-return", current: root, returnBalance: rootBalance,
+    formula: { nodeValue: root.val, leftBalance: stats.get(root.id).leftBalance, rightBalance: stats.get(root.id).rightBalance, movesBefore: moves - stats.get(root.id).movesAdded, movesAdded: stats.get(root.id).movesAdded, movesAfter: moves, balance: rootBalance },
+  });
+  addStep({
+    title: { vi: `Trả về moves = ${moves}`, en: `Return moves = ${moves}` },
+    note: { vi: `Cần tối thiểu ${moves} lượt đi qua cạnh để mỗi node có đúng 1 coin.`, en: `A minimum of ${moves} edge-crossing moves gives every node exactly 1 coin.` },
+    codeLine: 14, phase: "done", phaseIndex: 5, operation: "return-answer", current: null, returnBalance: rootBalance, final: true,
+  });
+  return { input, answer: moves, steps };
+}
+
 Object.assign(module.exports, {
   1973: {
     id: 1973,
@@ -10899,6 +11097,55 @@ Object.assign(module.exports, {
       "        return answer",
     ],
     builder: buildSteps2265,
+  },
+  979: {
+    id: 979,
+    difficulty: "medium",
+    slug: "distribute-coins-in-binary-tree",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS hậu thứ tự", en: "Postorder DFS" },
+      { key: "tree-dp", vi: "State trên cây", en: "Tree State" },
+    ],
+    title: { vi: "Distribute Coins in Binary Tree", en: "Distribute Coins in Binary Tree" },
+    titleVi: { vi: "Phân phối coin trong cây nhị phân", en: "Distribute coins in a binary tree" },
+    statement: {
+      vi: "Mỗi node chứa một số coin; tổng số coin bằng tổng số node. Trong một lượt, chuyển một coin giữa hai node kề nhau. Trả về số lượt ít nhất để mỗi node có đúng một coin.",
+      en: "Each node contains some coins, and the total number of coins equals the number of nodes. One move transfers one coin between adjacent nodes. Return the minimum moves needed so every node has exactly one coin.",
+    },
+    defaultInput: "3,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (giá trị = số coin)", en: "Level-order tree (value = coin count)" },
+    extraParams: [],
+    debugMode: "semantic",
+    approach: [
+      { vi: "DFS hậu thứ tự để lấy balance từ hai cây con trước. balance dương là coin dư; âm là số coin còn thiếu.", en: "Use postorder DFS to receive both child balances first. A positive balance is surplus; a negative balance is a deficit." },
+      { vi: "Mỗi |child_balance| chính là số coin phải đi qua cạnh nối child với node, nên cộng |left| + |right| vào moves.", en: "Each |child_balance| is exactly the number of coins crossing that child edge, so add |left| + |right| to moves." },
+      { vi: "Trả lên cha: node.val + left_balance + right_balance - 1, vì node hiện tại phải giữ lại một coin.", en: "Return node.val + left_balance + right_balance - 1 to the parent because the current node keeps one coin." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Mỗi node được xử lý một lần; h là chiều cao stack đệ quy.", en: "Each node is processed once; h is the recursive stack height." },
+    },
+    code: [
+      "class Solution:",
+      "    def distributeCoins(self, root):",
+      "        self.moves = 0",
+      "",
+      "        def dfs(node):",
+      "            if not node:",
+      "                return 0",
+      "            left = dfs(node.left)",
+      "            right = dfs(node.right)",
+      "            self.moves += abs(left) + abs(right)",
+      "            return node.val + left + right - 1",
+      "",
+      "        dfs(root)",
+      "        return self.moves",
+    ],
+    builder: buildSteps979,
   },
 });
 

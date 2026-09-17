@@ -17846,6 +17846,92 @@ function renderAverageSubtree2265View(step) {
   </section>`;
 }
 
+function renderDistributeCoins979View(step) {
+  const view = step.distributeCoins979View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const history = Array.isArray(view.history) ? view.history : [];
+  const formula = view.formula || null;
+  const currentId = view.current;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "DFS xuống hai con", "Nhận balance", "Đếm coin qua cạnh", "Trả balance", "Kết quả"]
+    : ["Initialize", "DFS into children", "Receive balances", "Count edge moves", "Return balance", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const signed = value => value === null || value === undefined ? "?" : value > 0 ? `+${value}` : String(value);
+  const balanceMeaning = value => value === null || value === undefined
+    ? (vi ? "chưa tính" : "not computed")
+    : value > 0
+      ? (vi ? `dư ${value} coin` : `${value} surplus coin(s)`)
+      : value < 0
+        ? (vi ? `thiếu ${Math.abs(value)} coin` : `needs ${Math.abs(value)} coin(s)`)
+        : (vi ? "đã cân bằng" : "balanced");
+
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const horizontalGap = 132;
+  const contentWidth = maxX * horizontalGap;
+  const treeWidth = Math.max(380, contentWidth + 230);
+  const treeHeight = Math.max(235, (maxDepth + 1) * 126 + 88);
+  const xOffset = (treeWidth - contentWidth) / 2;
+  const xOf = node => xOffset + (Number(node.x) || 0) * horizontalGap;
+  const yOf = node => 68 + (Number(node.y) || 0) * 126;
+  const fitTreeToFrame = nodes.length <= 15;
+  const edges = nodes.filter(node => node.parentId !== null && nodeMap.has(node.parentId)).map(node => {
+    const parent = nodeMap.get(node.parentId);
+    const balance = node.balance;
+    const stateClass = balance === null || balance === undefined ? "pending" : balance > 0 ? "surplus" : balance < 0 ? "deficit" : "balanced";
+    const edgeLabel = balance === null || balance === undefined
+      ? "?"
+      : balance > 0
+        ? `↑ ${balance}`
+        : balance < 0
+          ? `↓ ${Math.abs(balance)}`
+          : "0";
+    const midX = (xOf(parent) + xOf(node)) / 2;
+    const midY = (yOf(parent) + yOf(node)) / 2;
+    return `<g class="dc979-edge ${stateClass}"><line x1="${xOf(parent)}" y1="${yOf(parent) + 27}" x2="${xOf(node)}" y2="${yOf(node) - 27}"/><rect x="${midX - 20}" y="${midY - 12}" width="40" height="24" rx="6"></rect><text x="${midX}" y="${midY + 4}" text-anchor="middle">${escapeHtml(edgeLabel)}</text></g>`;
+  }).join("");
+  const treeNodes = nodes.map(node => {
+    const isCurrent = node.id === currentId;
+    const state = String(node.state || "unvisited");
+    const status = node.balance === null || node.balance === undefined
+      ? state === "waiting" ? (vi ? "CHỜ CON" : "WAITING") : state === "moving" ? (vi ? "DI CHUYỂN" : "MOVING") : (vi ? "CHƯA TÍNH" : "PENDING")
+      : `${vi ? "BALANCE" : "BALANCE"} ${signed(node.balance)}`;
+    return `<g class="dc979-node ${escapeHtml(state)} ${isCurrent ? "current" : ""}" transform="translate(${xOf(node)} ${yOf(node)})"><circle r="29"></circle><text class="coins" text-anchor="middle" y="7">${escapeHtml(String(node.value))}</text><text class="coin-label" text-anchor="middle" y="48">${vi ? "COIN BAN ĐẦU" : "STARTING COINS"}</text><text class="status" text-anchor="middle" y="66">${escapeHtml(status)}</text></g>`;
+  }).join("");
+
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${frame.id === currentId ? "current" : ""} ${frame.value === null ? "null" : ""}"><small>${index === 0 ? "ROOT" : frame.side.toUpperCase()}</small><strong>${frame.value === null ? "None" : escapeHtml(String(frame.value))}</strong><em>${escapeHtml(String(frame.stage || ""))}</em></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã rỗng" : "The stack is empty"}</em>`;
+
+  const flowCard = (side, balance) => {
+    const label = side === "left" ? (vi ? "CẠNH TRÁI" : "LEFT EDGE") : (vi ? "CẠNH PHẢI" : "RIGHT EDGE");
+    const cls = balance === null || balance === undefined ? "pending" : balance > 0 ? "surplus" : balance < 0 ? "deficit" : "balanced";
+    const direction = balance === null || balance === undefined
+      ? "?"
+      : balance > 0
+        ? (vi ? "CON → NODE" : "CHILD → NODE")
+        : balance < 0
+          ? (vi ? "NODE → CON" : "NODE → CHILD")
+          : (vi ? "KHÔNG DI CHUYỂN" : "NO TRANSFER");
+    return `<article class="${cls}"><small>${label}</small><strong>${signed(balance)}</strong><code>${direction}</code><span>${balance === null || balance === undefined ? (vi ? "đang chờ DFS" : "waiting for DFS") : `${Math.abs(balance)} ${vi ? "lượt qua cạnh" : "edge move(s)"}`}</span></article>`;
+  };
+  const formulaHtml = formula
+    ? `<section class="dc979-formula"><header><strong>${vi ? `CÂN BẰNG NODE ${formula.nodeValue}` : `BALANCE NODE ${formula.nodeValue}`}</strong><span>${vi ? "dương = gửi lên · âm = cần từ cha" : "positive = send up · negative = need from parent"}</span></header><div class="flows">${flowCard("left", formula.leftBalance)}<b>+</b>${flowCard("right", formula.rightBalance)}</div><div class="move-equation"><small>MOVES</small><code>${formula.movesBefore ?? view.moves} + |${formula.leftBalance ?? "?"}| + |${formula.rightBalance ?? "?"}|</code><strong>${formula.movesAfter ?? view.moves}</strong></div><div class="balance-equation"><small>BALANCE RETURNED</small><code>coins + left + right − 1</code><strong>${formula.balance === null || formula.balance === undefined ? "?" : `${formula.nodeValue} + ${formula.leftBalance} + ${formula.rightBalance} − 1 = ${signed(formula.balance)}`}</strong><span>${balanceMeaning(formula.balance)}</span></div></section>`
+    : `<section class="dc979-rule"><strong>${vi ? "HAI CÔNG THỨC" : "TWO FORMULAS"}</strong><div><code>moves += |left| + |right|</code><code>balance = coins + left + right − 1</code></div><span>${vi ? "Balance của child cho biết chính xác bao nhiêu coin phải đi qua cạnh nối với child đó." : "A child's balance tells exactly how many coins must cross that child's edge."}</span></section>`;
+
+  const historyHtml = history.length
+    ? history.map((item, index) => `<span class="${item.id === currentId ? "current" : ""}"><small>#${index + 1} · node ${escapeHtml(String(item.value))}</small><strong>${signed(item.balance)}</strong><em>+${item.movesAdded} moves · total ${item.movesAfter}</em></span>`).join("")
+    : `<em>${vi ? "Chưa node nào trả balance" : "No node has returned a balance yet"}</em>`;
+  const currentNode = currentId === null || currentId === undefined ? null : nodeMap.get(currentId);
+  const final = Boolean(view.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="dc979-viz" role="img" aria-label="Distribute Coins in Binary Tree visualization"><header><div><small>POSTORDER DFS · EDGE FLOW · #979</small><strong>${vi ? "PHÂN PHỐI COIN TRONG CÂY" : "DISTRIBUTE COINS IN A BINARY TREE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header><div class="dc979-phases">${phases}</div><section class="dc979-summary"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${currentNode ? currentNode.value : "—"}</strong></div><div><small>${vi ? "ĐÃ TRẢ BALANCE" : "RETURNED"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div><small>${vi ? "TỔNG COIN / NODE" : "COINS / NODES"}</small><strong>${view.totalCoins || 0}/${view.totalNodes || nodes.length}</strong></div><div class="moves"><small>MOVES</small><strong>${view.moves || 0}</strong></div></section><section class="dc979-tree"><header><strong>${vi ? "MỖI CẠNH LÀ MỘT DÒNG COIN" : "EVERY EDGE CARRIES A COIN FLOW"}</strong><span>${vi ? "↑ child gửi lên · ↓ parent gửi xuống" : "↑ child sends up · ↓ parent sends down"}</span></header><div><svg class="dc979-tree-svg ${fitTreeToFrame ? "fit" : "scroll"}" viewBox="0 0 ${treeWidth} ${treeHeight}" preserveAspectRatio="xMidYMin meet" ${fitTreeToFrame ? "" : `style="min-width:${treeWidth}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section><section class="dc979-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "frame cuối đang chạy" : "the last frame is active"}</span></header><div>${stackHtml}</div></section>${formulaHtml}<section class="dc979-history"><header><strong>${vi ? "BALANCE TRẢ TỪ LÁ LÊN" : "BALANCES RETURNED BOTTOM-UP"}</strong><span>${vi ? "+ dư · − thiếu" : "+ surplus · − deficit"}</span></header><div>${historyHtml}</div></section><section class="dc979-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section><footer class="dc979-result ${final ? "done" : ""}"><small>${vi ? "SỐ LƯỢT TỐI THIỂU" : "MINIMUM MOVES"}</small><strong>${final ? view.answer : view.moves || 0}</strong><span>${final ? (vi ? "Mỗi node kết thúc với đúng một coin." : "Every node finishes with exactly one coin.") : (vi ? "Moves tăng khi balance đi qua cạnh, không phải khi tính tại node." : "Moves increase when a balance crosses an edge, not merely when a node is computed.")}</span></footer></section>`;
+}
+
 function renderMaximumAverage1120View(step) {
   const view = step.maximumAverage1120View || {};
   const vi = lang === "vi";
@@ -31900,6 +31986,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderAverageSubtree2265View(step);
+  } else if (step.distributeCoins979View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDistributeCoins979View(step);
   } else if (step.maximumAverage1120View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
