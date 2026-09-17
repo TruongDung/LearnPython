@@ -18046,13 +18046,13 @@ function renderMaximumSumBst1373View(step) {
   const nodeMap = new Map(nodes.map(node => [node.id, node]));
   const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
   const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
-  const gap = 138;
+  const gap = nodes.length <= 11 ? 82 : 118;
   const contentWidth = maxX * gap;
-  const width = Math.max(400, contentWidth + 250);
-  const height = Math.max(240, (maxDepth + 1) * 132 + 92);
+  const width = Math.max(440, contentWidth + 170);
+  const height = Math.max(300, (maxDepth + 1) * 140 + 100);
   const offset = (width - contentWidth) / 2;
   const xOf = node => offset + (Number(node.x) || 0) * gap;
-  const yOf = node => 68 + (Number(node.y) || 0) * 132;
+  const yOf = node => 68 + (Number(node.y) || 0) * 140;
   const fit = nodes.length <= 15;
   const edges = nodes.filter(node => node.parentId !== null && nodeMap.has(node.parentId)).map(node => {
     const parent = nodeMap.get(node.parentId);

@@ -54879,15 +54879,15 @@ html, body {
 .mb1373-stack header span,
 .mb1373-formula header span,
 .mb1373-history header span { color: var(--mb1373-muted); font-size: 9px; text-align: right; }
-.mb1373-tree > div { display: grid; min-height: 310px; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mb1373-best) 7%, transparent), transparent 58%); }
-.mb1373-tree-svg { display: block; width: 100%; height: auto; max-height: 560px; }
+.mb1373-tree > div { display: grid; min-height: 360px; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mb1373-best) 7%, transparent), transparent 58%); }
+.mb1373-tree-svg { display: block; width: 100%; height: auto; max-height: 640px; }
 .mb1373-tree-svg.scroll { width: auto; max-width: none; }
 .mb1373-tree-svg .edges line { stroke: var(--mb1373-border); stroke-width: 2; }
 .mb1373-tree-svg .edges line.best { stroke: var(--mb1373-valid); stroke-width: 4; }
-.mb1373-node circle { fill: var(--mb1373-soft); stroke: var(--mb1373-border); stroke-width: 2; }
-.mb1373-node .value { fill: var(--mb1373-text); font: 800 17px Consolas, monospace; }
-.mb1373-node .state { fill: var(--mb1373-muted); font-size: 8px; font-weight: 800; }
-.mb1373-node .stats { fill: var(--mb1373-muted); font-size: 8px; font-weight: 700; }
+.mb1373-node circle { fill: var(--mb1373-soft); stroke: var(--mb1373-border); stroke-width: 2.5; }
+.mb1373-node .value { fill: var(--mb1373-text); font: 800 20px Consolas, monospace; }
+.mb1373-node .state { fill: var(--mb1373-muted); font-size: 10px; font-weight: 800; }
+.mb1373-node .stats { fill: var(--mb1373-muted); font-size: 9px; font-weight: 700; }
 .mb1373-node.bst circle { stroke: var(--mb1373-state); }
 .mb1373-node.invalid circle { fill: color-mix(in srgb, var(--mb1373-invalid) 9%, var(--mb1373-panel)); stroke: var(--mb1373-invalid); }
 .mb1373-node.invalid .state { fill: var(--mb1373-invalid); }
@@ -54965,7 +54965,7 @@ html, body {
 
 @container (max-width: 720px) {
   .mb1373-phases { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .mb1373-tree > div { min-height: 270px; }
+  .mb1373-tree > div { min-height: 320px; }
 }
 @container (max-width: 520px) {
   .mb1373-viz > header,
