@@ -9898,7 +9898,10 @@ module.exports = {
     defaultInput: "3,9,20,4,5,15,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],
-    tags: ["Tree", "Breadth-First Search", "Hash Table"],
+    tags: [
+      { key: "bfs", vi: "BFS / Theo tầng", en: "BFS / Level Order" },
+      { key: "column-map", vi: "Hash map theo cột", en: "Column Hash Map" },
+    ],
     debugMode: "semantic",
     approach: [
       { vi: "Đặt root ở cột 0; con trái ở col - 1 và con phải ở col + 1.", en: "Place the root in column 0; a left child uses col - 1 and a right child uses col + 1." },

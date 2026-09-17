@@ -22166,6 +22166,76 @@ function renderMinimumSubarrayView(step) {
   </div>`;
 }
 
+function renderTwoSubarrays1477View(step) {
+  const view = step.twoSubarrays1477View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const best = Array.isArray(view.best) ? view.best : [];
+  const vi = lang === "vi";
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Trượt cửa sổ", "Tìm đoạn target", "Ghép đoạn trái", "Lưu best prefix", "Kết quả"]
+    : ["Initialize", "Slide window", "Find target segment", "Pair left segment", "Save prefix best", "Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const inSegment = (index, segment) => Boolean(segment) && index >= segment.left && index <= segment.right;
+  const bestPair = view.bestPair || null;
+  const candidatePair = view.candidatePair || null;
+  const current = view.currentSegment || null;
+  const previous = view.previousSegment || null;
+  const hasWindow = Number.isInteger(view.left) && Number.isInteger(view.right) && view.left <= view.right;
+  const cells = nums.map((value, index) => {
+    const classes = ["ts1477-cell"];
+    if (hasWindow && index >= view.left && index <= view.right) classes.push("window");
+    if (inSegment(index, current)) classes.push("current-segment");
+    if (inSegment(index, previous)) classes.push("previous-segment");
+    if (bestPair && inSegment(index, bestPair.first)) classes.push("pair-first");
+    if (bestPair && inSegment(index, bestPair.second)) classes.push("pair-second");
+    if (index === view.removedIndex) classes.push("removed");
+    const pointers = [];
+    if (hasWindow && index === view.left) pointers.push("L");
+    if (index === view.right) pointers.push("R");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${pointers.join(" · ")}</em></span>`;
+  }).join("");
+
+  const bestCells = nums.map((_, index) => {
+    const value = best[index];
+    const lookup = Number.isInteger(view.left) && view.left > 0 && index === view.left - 1;
+    const currentIndex = index === view.right;
+    return `<span class="${lookup ? "lookup" : ""}${currentIndex ? " current" : ""}"><small>best[${index}]</small><strong>${value === null || value === undefined ? "∞" : escapeHtml(String(value))}</strong><em>${lookup ? (vi ? "TRA CỨU" : "LOOKUP") : currentIndex ? (vi ? "GHI" : "WRITE") : ""}</em></span>`;
+  }).join("");
+
+  const segmentCard = (segment, label, kind) => segment
+    ? `<article class="${kind}"><small>${escapeHtml(label)}</small><strong>[${segment.left}..${segment.right}]</strong><code>${nums.slice(segment.left, segment.right + 1).map(value => escapeHtml(String(value))).join(" + ")} = ${escapeHtml(String(view.target))}</code><span>length = ${segment.length}</span></article>`
+    : `<article class="${kind} empty"><small>${escapeHtml(label)}</small><strong>—</strong><span>${vi ? "chưa có" : "not found yet"}</span></article>`;
+  const firstForPair = candidatePair ? candidatePair.first : bestPair ? bestPair.first : previous;
+  const secondForPair = candidatePair ? candidatePair.second : bestPair ? bestPair.second : current;
+  const pairLength = candidatePair ? candidatePair.totalLength : bestPair ? bestPair.totalLength : null;
+  const pairState = candidatePair ? "candidate" : bestPair ? "best" : "empty";
+  const pairHtml = `${segmentCard(firstForPair, vi ? "ĐOẠN TRÁI TỪ best[left−1]" : "LEFT SEGMENT FROM best[left−1]", "first")}<b class="ts1477-plus">+</b>${segmentCard(secondForPair, vi ? "ĐOẠN HIỆN TẠI" : "CURRENT SEGMENT", "second")}<b class="ts1477-equals">=</b><article class="ts1477-total ${pairState}"><small>${vi ? "TỔNG ĐỘ DÀI" : "TOTAL LENGTH"}</small><strong>${pairLength === null ? "∞" : escapeHtml(String(pairLength))}</strong><span>${firstForPair && secondForPair ? `${firstForPair.length} + ${secondForPair.length}` : (vi ? "cần đủ hai đoạn" : "two segments required")}</span></article>`;
+
+  const total = Number(view.total) || 0;
+  const target = Number(view.target) || 0;
+  const compare = total === target ? "=" : total > target ? ">" : "<";
+  const status = view.final
+    ? (view.answer === -1 ? (vi ? "KHÔNG CÓ CẶP HỢP LỆ" : "NO VALID PAIR") : (vi ? "CẶP TỐT NHẤT" : "BEST PAIR"))
+    : total === target ? (vi ? "TÌM THẤY MỘT ĐOẠN" : "TARGET SEGMENT FOUND")
+      : total > target ? (vi ? "CO CẠNH TRÁI" : "SHRINK LEFT")
+        : (vi ? "MỞ RỘNG CẠNH PHẢI" : "EXPAND RIGHT");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : "—";
+
+  $("treeView").innerHTML = `<section class="ts1477-viz phase-${escapeHtml(String(view.phase || "initialize"))}" role="img" aria-label="LeetCode 1477 visualization">
+    <header><div><small>SLIDING WINDOW + PREFIX BEST · #1477</small><strong>${vi ? "HAI ĐOẠN TARGET KHÔNG CHỒNG LẤN" : "TWO NON-OVERLAPPING TARGET SEGMENTS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ts1477-phases">${phases}</div>
+    <section class="ts1477-rule"><strong>${vi ? "MẤU CHỐT KHÔNG CHỒNG LẤN" : "NON-OVERLAP KEY"}</strong><code>current = [left..right]</code><b>+</b><code>previous = best[left − 1]</code><span>${vi ? "Đoạn trước kết thúc trước left, nên không thể đè lên đoạn hiện tại." : "The previous segment ends before left, so it cannot overlap the current one."}</span></section>
+    <section class="ts1477-array"><header><strong>arr</strong><span>${vi ? "xanh = window · tím = đoạn trái · cam = đoạn hiện tại" : "blue = window · purple = left segment · amber = current segment"}</span></header><div>${cells || `<em>${vi ? "mảng rỗng" : "empty array"}</em>`}</div></section>
+    <section class="ts1477-window"><div><small>WINDOW</small><strong>${hasWindow ? `[${view.left}..${view.right}]` : "∅"}</strong></div><div><small>TOTAL</small><strong>${escapeHtml(String(total))}</strong></div><div class="compare"><small>CHECK</small><strong>${escapeHtml(String(total))} ${compare} ${escapeHtml(String(target))}</strong></div><div><small>BEST SO FAR</small><strong>${view.bestSoFar === null || view.bestSoFar === undefined ? "∞" : escapeHtml(String(view.bestSoFar))}</strong></div></section>
+    <section class="ts1477-status"><small>${escapeHtml(status)}</small><strong>${escapeHtml(pick(step.note))}</strong></section>
+    <section class="ts1477-best"><header><strong>best[i]</strong><span>${vi ? "độ dài target ngắn nhất nằm trong prefix [0..i]" : "shortest target segment contained in prefix [0..i]"}</span></header><div>${bestCells || `<em>—</em>`}</div></section>
+    <section class="ts1477-pair"><header><strong>${vi ? "GHÉP HAI ĐOẠN" : "PAIR THE TWO SEGMENTS"}</strong><span>best[left − 1] + current length</span></header><div>${pairHtml}</div></section>
+    <section class="ts1477-action"><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="ts1477-result ${view.final ? "done" : ""}"><small>ANS</small><strong>${view.final ? escapeHtml(String(view.answer)) : bestPair ? escapeHtml(String(bestPair.totalLength)) : "∞"}</strong><span>${view.final ? (view.answer === -1 ? (vi ? "Không tìm thấy hai đoạn phù hợp." : "No matching pair was found.") : (vi ? "Tổng độ dài nhỏ nhất của hai đoạn." : "Minimum total length of the two segments.")) : (vi ? "ans chỉ cập nhật khi ghép được hai đoạn tách rời." : "ans updates only after two separated segments can be paired.")}</span></footer>
+  </section>`;
+}
+
 function renderAverageWindowView(step) {
   const view = step.averageWindowView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -31146,6 +31216,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinimumSubarrayView(step);
+  } else if (step.twoSubarrays1477View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoSubarrays1477View(step);
   } else if (step.averageWindowView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -31716,6 +31792,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLongestConsecutive298View(step);
+  } else if (step.verticalOrder314View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderVerticalOrder314View(step);
   } else if (step.upsideDown156View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

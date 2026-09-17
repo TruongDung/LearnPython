@@ -4304,6 +4304,159 @@ function buildSteps2461(input, params) {
   return { original: nums, k, answer: ans, steps };
 }
 
+/** LeetCode 1477: two non-overlapping target-sum subarrays. */
+function buildSteps1477(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const target = Number(params.target);
+  if (nums.some((value) => !Number.isFinite(value) || !Number.isInteger(value) || value <= 0)) {
+    throw new Error("arr must contain positive integers");
+  }
+  if (!Number.isFinite(target) || !Number.isInteger(target) || target <= 0) {
+    throw new Error("target must be a positive integer");
+  }
+
+  const n = nums.length;
+  const inf = n + 1;
+  const best = Array(n).fill(inf);
+  const bestSegmentAt = Array(n).fill(null);
+  const steps = [];
+  let left = 0;
+  let total = 0;
+  let bestSoFar = inf;
+  let bestSegment = null;
+  let ans = inf;
+  let bestPair = null;
+  let right = -1;
+  let currentSegment = null;
+  let previousSegment = null;
+  let candidatePair = null;
+  let removedIndex = null;
+
+  const indices = (start, end) => (
+    Number.isInteger(start) && Number.isInteger(end) && start <= end
+      ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+      : []
+  );
+  const segmentCopy = (segment) => segment ? { ...segment } : null;
+  const pairIndices = (pair) => pair
+    ? [...indices(pair.first.left, pair.first.right), ...indices(pair.second.left, pair.second.right)]
+    : [];
+
+  function addStep({ title, note, codeLine, phase, phaseIndex, final = false, vars = [] }) {
+    const windowIndices = right >= left ? indices(left, right) : [];
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: windowIndices,
+      mark: pairIndices(bestPair),
+      vars: [
+        { name: "target", value: target },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "total", value: total },
+        { name: "best_so_far", value: bestSoFar === inf ? "∞" : bestSoFar },
+        { name: "ans", value: ans === inf ? "∞" : ans },
+        ...vars,
+      ],
+      twoSubarrays1477View: {
+        nums: [...nums], target, left, right, total, phase, phaseIndex,
+        operation: title,
+        best: best.map((value) => value === inf ? null : value),
+        bestSoFar: bestSoFar === inf ? null : bestSoFar,
+        currentSegment: segmentCopy(currentSegment),
+        previousSegment: segmentCopy(previousSegment),
+        candidatePair: candidatePair ? {
+          first: segmentCopy(candidatePair.first),
+          second: segmentCopy(candidatePair.second),
+          totalLength: candidatePair.totalLength,
+        } : null,
+        bestPair: bestPair ? {
+          first: segmentCopy(bestPair.first),
+          second: segmentCopy(bestPair.second),
+          totalLength: bestPair.totalLength,
+        } : null,
+        removedIndex,
+        answer: final ? (ans === inf ? -1 : ans) : null,
+        final,
+      },
+    });
+  }
+
+  addStep({ title: { vi: `n = ${n}`, en: `n = ${n}` }, note: { vi: "Lưu độ dài mảng để tạo giá trị vô cực an toàn.", en: "Store the array length to build a safe infinity sentinel." }, codeLine: 3, phase: "initialize", phaseIndex: 0 });
+  addStep({ title: { vi: `inf = n + 1 = ${inf}`, en: `inf = n + 1 = ${inf}` }, note: { vi: "Không subarray nào có thể dài hơn n; n+1 nghĩa là chưa tìm thấy.", en: "No subarray can be longer than n; n+1 means not found." }, codeLine: 4, phase: "initialize", phaseIndex: 0 });
+  addStep({ title: { vi: "Tạo best toàn ∞", en: "Fill best with ∞" }, note: { vi: "best[i] sẽ là độ dài ngắn nhất của đoạn target kết thúc không muộn hơn i.", en: "best[i] will be the shortest target-sum segment ending no later than i." }, codeLine: 5, phase: "initialize", phaseIndex: 0 });
+  addStep({ title: { vi: "ans = ∞", en: "ans = ∞" }, note: { vi: "Chưa ghép được hai đoạn không chồng lấn.", en: "No non-overlapping pair has been formed yet." }, codeLine: 6, phase: "initialize", phaseIndex: 0 });
+  addStep({ title: { vi: "left = 0, total = 0", en: "left = 0, total = 0" }, note: { vi: "Khởi tạo cửa sổ trượt rỗng.", en: "Initialize an empty sliding window." }, codeLine: 7, phase: "initialize", phaseIndex: 0 });
+  addStep({ title: { vi: "best_so_far = ∞", en: "best_so_far = ∞" }, note: { vi: "Biến này giúp lan truyền đáp án prefix sang best[right].", en: "This value carries the prefix optimum into best[right]." }, codeLine: 8, phase: "initialize", phaseIndex: 0 });
+
+  for (right = 0; right < n; right += 1) {
+    currentSegment = null;
+    previousSegment = null;
+    candidatePair = null;
+    removedIndex = null;
+    addStep({ title: { vi: `Xét right = ${right}`, en: `Inspect right = ${right}` }, note: { vi: `Đưa arr[${right}] = ${nums[right]} vào cạnh phải cửa sổ.`, en: `Bring arr[${right}] = ${nums[right]} into the window's right edge.` }, codeLine: 9, phase: "expand", phaseIndex: 1 });
+    const beforeAdd = total;
+    total += nums[right];
+    addStep({ title: { vi: `total: ${beforeAdd} + ${nums[right]} = ${total}`, en: `total: ${beforeAdd} + ${nums[right]} = ${total}` }, note: { vi: `Cửa sổ hiện tại là [${left}..${right}].`, en: `The current window is [${left}..${right}].` }, codeLine: 10, phase: "expand", phaseIndex: 1 });
+
+    while (total > target) {
+      addStep({ title: { vi: `${total} > ${target} → cần co`, en: `${total} > ${target} → shrink` }, note: { vi: "Mảng chỉ có số dương, nên bỏ cạnh trái là cách duy nhất để giảm tổng.", en: "All values are positive, so removing the left edge is the only way to reduce the sum." }, codeLine: 11, phase: "shrink", phaseIndex: 1 });
+      removedIndex = left;
+      const removedValue = nums[left];
+      const beforeRemove = total;
+      total -= removedValue;
+      addStep({ title: { vi: `total: ${beforeRemove} - ${removedValue} = ${total}`, en: `total: ${beforeRemove} - ${removedValue} = ${total}` }, note: { vi: `Loại arr[${left}] khỏi tổng.`, en: `Remove arr[${left}] from the sum.` }, codeLine: 12, phase: "shrink", phaseIndex: 1 });
+      left += 1;
+      addStep({ title: { vi: `left → ${left}`, en: `left → ${left}` }, note: { vi: "Cạnh trái tiến sang phần tử kế tiếp.", en: "Advance the left edge to the next value." }, codeLine: 13, phase: "shrink", phaseIndex: 1 });
+      removedIndex = null;
+    }
+    addStep({ title: { vi: `${total} > ${target} → False`, en: `${total} > ${target} → False` }, note: { vi: total === target ? "Tổng vừa bằng target; đây là một đoạn hợp lệ." : "Tổng nhỏ hơn target; tiếp tục mở rộng ở vòng sau.", en: total === target ? "The sum now equals target; this is a valid segment." : "The sum is below target; expand again on the next iteration." }, codeLine: 11, phase: "check", phaseIndex: 2 });
+
+    if (total === target) {
+      currentSegment = { left, right, length: right - left + 1 };
+      addStep({ title: { vi: `${total} == ${target} → True`, en: `${total} == ${target} → True` }, note: { vi: `Tìm thấy đoạn target [${left}..${right}].`, en: `Found target segment [${left}..${right}].` }, codeLine: 14, phase: "found", phaseIndex: 2 });
+      addStep({ title: { vi: `length = ${currentSegment.length}`, en: `length = ${currentSegment.length}` }, note: { vi: `${right} - ${left} + 1 = ${currentSegment.length}.`, en: `${right} - ${left} + 1 = ${currentSegment.length}.` }, codeLine: 15, phase: "found", phaseIndex: 2 });
+
+      const canPair = left > 0 && best[left - 1] !== inf;
+      previousSegment = canPair ? segmentCopy(bestSegmentAt[left - 1]) : null;
+      addStep({ title: canPair ? { vi: `best[${left - 1}] đã có → ghép được`, en: `best[${left - 1}] exists → pair found` } : { vi: "Chưa có đoạn bên trái không chồng lấn", en: "No non-overlapping segment exists on the left" }, note: canPair ? { vi: `Đoạn trước kết thúc trước index ${left}; hai đoạn chắc chắn không chồng lấn.`, en: `The earlier segment ends before index ${left}, so the two segments cannot overlap.` } : { vi: "Chỉ được dùng best[left-1]; dùng best[left] có thể chạm vào đoạn hiện tại.", en: "Only best[left-1] is safe; best[left] could overlap the current segment." }, codeLine: 16, phase: "pair", phaseIndex: 3 });
+      if (canPair) {
+        const totalLength = best[left - 1] + currentSegment.length;
+        candidatePair = { first: previousSegment, second: currentSegment, totalLength };
+        if (totalLength < ans) {
+          ans = totalLength;
+          bestPair = { first: segmentCopy(previousSegment), second: segmentCopy(currentSegment), totalLength };
+        }
+        addStep({ title: { vi: `ans = min(ans, ${best[left - 1]} + ${currentSegment.length}) → ${ans}`, en: `ans = min(ans, ${best[left - 1]} + ${currentSegment.length}) → ${ans}` }, note: { vi: `Ghép đoạn trái [${previousSegment.left}..${previousSegment.right}] với đoạn hiện tại [${left}..${right}].`, en: `Pair left segment [${previousSegment.left}..${previousSegment.right}] with current segment [${left}..${right}].` }, codeLine: 17, phase: "pair", phaseIndex: 3 });
+      }
+
+      if (currentSegment.length < bestSoFar) {
+        bestSoFar = currentSegment.length;
+        bestSegment = segmentCopy(currentSegment);
+      }
+      addStep({ title: { vi: `best_so_far = ${bestSoFar}`, en: `best_so_far = ${bestSoFar}` }, note: { vi: `Độ dài target ngắn nhất trong prefix [0..${right}] hiện là ${bestSoFar}.`, en: `The shortest target segment inside prefix [0..${right}] now has length ${bestSoFar}.` }, codeLine: 18, phase: "prefix", phaseIndex: 4 });
+    } else {
+      addStep({ title: { vi: `${total} == ${target} → False`, en: `${total} == ${target} → False` }, note: { vi: "Không có đoạn target kết thúc tại right này.", en: "No target-sum segment ends at this right index." }, codeLine: 14, phase: "check", phaseIndex: 2 });
+    }
+
+    best[right] = bestSoFar;
+    bestSegmentAt[right] = segmentCopy(bestSegment);
+    addStep({ title: { vi: `best[${right}] = ${bestSoFar === inf ? "∞" : bestSoFar}`, en: `best[${right}] = ${bestSoFar === inf ? "∞" : bestSoFar}` }, note: { vi: `Lưu kỷ lục prefix để một đoạn tương lai có thể tra best[left-1].`, en: `Store the prefix record so a future segment can read best[left-1].` }, codeLine: 19, phase: "prefix", phaseIndex: 4 });
+  }
+
+  const answer = ans === inf ? -1 : ans;
+  right = n - 1;
+  currentSegment = null;
+  previousSegment = null;
+  candidatePair = null;
+  addStep({ title: { vi: `Trả về ${answer}`, en: `Return ${answer}` }, note: answer === -1 ? { vi: "Không tồn tại hai đoạn target không chồng lấn.", en: "No two non-overlapping target-sum segments exist." } : { vi: `Hai đoạn tốt nhất có tổng độ dài ${answer}.`, en: `The best pair has total length ${answer}.` }, codeLine: 20, phase: "done", phaseIndex: 5, final: true });
+  return { original: [...nums], target, answer, steps };
+}
+
 module.exports = {
   159: {
     id: 159,
@@ -4717,6 +4870,61 @@ module.exports = {
       "        return min_len if min_len != float('inf') else 0",
     ],
     builder: buildSteps209,
+  },
+  1477: {
+    id: 1477,
+    difficulty: "medium",
+    slug: "find-two-non-overlapping-sub-arrays-each-with-target-sum",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [
+      { key: "sliding-window", vi: "Cửa sổ trượt", en: "Sliding Window" },
+      { key: "prefix-dp", vi: "DP trên prefix", en: "Prefix DP" },
+    ],
+    debugMode: "semantic",
+    title: { vi: "Find Two Non-overlapping Sub-arrays Each With Target Sum", en: "Find Two Non-overlapping Sub-arrays Each With Target Sum" },
+    titleVi: { vi: "Hai đoạn con không chồng lấn có tổng target", en: "Two non-overlapping target-sum subarrays" },
+    statement: {
+      vi: "Cho mảng số nguyên dương arr và target. Tìm hai subarray liên tiếp, không chồng lấn, đều có tổng bằng target và có tổng độ dài nhỏ nhất. Nếu không có, trả về -1.",
+      en: "Given a positive integer array arr and target, find two non-overlapping contiguous subarrays whose sums both equal target and whose total length is minimum. Return -1 if no pair exists.",
+    },
+    defaultInput: [3, 2, 2, 4, 3],
+    inputKind: "positive",
+    extraParams: [
+      { key: "target", type: "number", label: { vi: "target", en: "target" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Dùng cửa sổ trượt vì mọi số đều dương: mở rộng right và co left khi total > target.", en: "Use a sliding window because all values are positive: expand right and shrink left while total > target." },
+      { vi: "best[i] lưu độ dài ngắn nhất của một đoạn target nằm hoàn toàn trong prefix [0..i].", en: "best[i] stores the shortest target-sum segment fully contained in prefix [0..i]." },
+      { vi: "Khi tìm đoạn [left..right], chỉ ghép với best[left-1], nên hai đoạn chắc chắn không chồng lấn.", en: "When [left..right] is found, pair it only with best[left-1], which guarantees no overlap." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Mỗi phần tử vào/rời cửa sổ tối đa một lần; mảng best có n phần tử.", en: "Each value enters/leaves the window at most once; the best array contains n entries." },
+    },
+    code: [
+      "class Solution:",
+      "    def minSumOfLengths(self, arr, target):",
+      "        n = len(arr)",
+      "        inf = n + 1",
+      "        best = [inf] * n",
+      "        ans = inf",
+      "        left, total = 0, 0",
+      "        best_so_far = inf",
+      "        for right, value in enumerate(arr):",
+      "            total += value",
+      "            while total > target:",
+      "                total -= arr[left]",
+      "                left += 1",
+      "            if total == target:",
+      "                length = right - left + 1",
+      "                if left > 0 and best[left - 1] != inf:",
+      "                    ans = min(ans, length + best[left - 1])",
+      "                best_so_far = min(best_so_far, length)",
+      "            best[right] = best_so_far",
+      "        return ans if ans != inf else -1",
+    ],
+    builder: buildSteps1477,
   },
   643: {
     id: 643,
