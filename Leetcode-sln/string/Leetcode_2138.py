@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class Solution:
     def divideString(self, s: str, k: int, fill: str) -> list[str]:
         groups = []

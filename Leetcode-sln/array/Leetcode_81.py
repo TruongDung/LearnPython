@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class Solution:
     def search(self, nums: list[int], target: int) -> bool:
         left, right = 0, len(nums) - 1
