@@ -454,6 +454,199 @@ function buildSteps285(input, params) {
   return { input, answer, steps };
 }
 
+// ─── 510: Inorder Successor in BST II ───
+function buildSteps510(input, params) {
+  const root = parseBST(input);
+  if (!root) throw new Error("Enter a non-empty BST in level-order form.");
+
+  const pValue = params && params.p !== undefined ? Number(params.p) : 3;
+  if (!Number.isFinite(pValue)) throw new Error("p must be a finite number.");
+
+  const allNodes = [];
+  const inorderNodes = [];
+  const parentById = new Map();
+  (function collect(node, parent = null) {
+    if (!node) return;
+    allNodes.push(node);
+    parentById.set(node.id, parent);
+    collect(node.left, node);
+    inorderNodes.push(node);
+    collect(node.right, node);
+  })(root);
+  if (allNodes.some((item) => !Number.isFinite(item.val))) {
+    throw new Error("Every BST value must be a finite number.");
+  }
+  for (let index = 1; index < inorderNodes.length; index += 1) {
+    if (inorderNodes[index].val <= inorderNodes[index - 1].val) {
+      throw new Error("Input must be a valid BST with unique values.");
+    }
+  }
+  const pNode = allNodes.find((item) => item.val === pValue);
+  if (!pNode) throw new Error("p must match a value that exists in the BST.");
+
+  const steps = [];
+  const visited = [];
+  let node = pNode;
+  let successor = null;
+
+  function remember(item) {
+    if (item && !visited.some((entry) => entry.id === item.id)) visited.push(item);
+  }
+
+  function addStep(options) {
+    const current = options.current === undefined ? node : options.current;
+    const parent = options.parent === undefined ? (current ? parentById.get(current.id) : null) : options.parent;
+    const annotations = {
+      [pNode.id]: { labels: [{ label: "P", kind: "target" }] },
+    };
+    if (successor) {
+      annotations[successor.id] = {
+        labels: [...(annotations[successor.id]?.labels || []), { label: "SUCCESSOR", kind: "answer" }],
+      };
+    }
+    if (parent) {
+      annotations[parent.id] = {
+        labels: [...(annotations[parent.id]?.labels || []), { label: "PARENT", kind: "parent" }],
+      };
+    }
+    if (current) {
+      annotations[current.id] = {
+        labels: [...(annotations[current.id]?.labels || []), { label: "CURRENT", kind: "current" }],
+      };
+    }
+
+    const step = snapshot(root, {
+      title: options.title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: new Set(successor ? [successor.id] : []),
+      annotations,
+      codeLines: [options.codeLine],
+      vars: [
+        { name: "p.val", value: pValue },
+        { name: "node", value: current ? current.val : "None" },
+        { name: "parent", value: parent ? parent.val : "None" },
+        { name: "successor", value: successor ? successor.val : "None" },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+    });
+    step.inorderSuccessor510View = {
+      phase: options.phase,
+      phaseIndex: options.phaseIndex,
+      operation: options.operation,
+      p: { id: pNode.id, value: pValue },
+      current: current ? { id: current.id, value: current.val } : null,
+      parent: parent ? { id: parent.id, value: parent.val } : null,
+      successor: successor ? { id: successor.id, value: successor.val } : null,
+      next: options.next ? { id: options.next.id, value: options.next.val } : null,
+      relation: options.relation || null,
+      visited: visited.map((item) => ({ id: item.id, value: item.val })),
+      answer: options.final ? (successor ? successor.val : null) : null,
+      final: Boolean(options.final),
+    };
+    step.final = Boolean(options.final);
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: `Bắt đầu từ p = ${pValue}`, en: `Start at p = ${pValue}` },
+    phase: "target", phaseIndex: 0, operation: "initialize", codeLine: 2, current: null,
+    note: { vi: "Với parent pointer, không cần root: chỉ cần nhìn subtree phải hoặc đi ngược lên cha.", en: "With parent pointers, we do not need the root: inspect the right subtree or walk upward." },
+  });
+  remember(pNode);
+  addStep({
+    title: { vi: `node = p = ${pValue}`, en: `node = p = ${pValue}` },
+    phase: "target", phaseIndex: 0, operation: "set-node", codeLine: 2,
+    note: { vi: "Đặt con trỏ hiện tại tại node p cần tìm successor.", en: "Place the current pointer on the node p whose successor we need." },
+  });
+
+  if (pNode.right) {
+    addStep({
+      title: { vi: `p có nhánh phải ${pNode.right.val}`, en: `p has right child ${pNode.right.val}` },
+      phase: "right-subtree", phaseIndex: 1, operation: "check-right", codeLine: 3, next: pNode.right, relation: "right",
+      note: { vi: "Successor nằm ở node nhỏ nhất của subtree phải.", en: "The successor is the smallest node in the right subtree." },
+    });
+    const rightRoot = pNode.right;
+    node = rightRoot;
+    remember(node);
+    addStep({
+      title: { vi: `Đi phải tới ${node.val}`, en: `Move right to ${node.val}` },
+      phase: "right-subtree", phaseIndex: 1, operation: "move-right", codeLine: 4, current: pNode, next: node, relation: "right",
+      note: { vi: "Bắt đầu tìm node trái nhất trong subtree phải.", en: "Start looking for the leftmost node in the right subtree." },
+    });
+    while (node.left) {
+      addStep({
+        title: { vi: `${node.val} còn con trái ${node.left.val}`, en: `${node.val} still has left child ${node.left.val}` },
+        phase: "right-subtree", phaseIndex: 1, operation: "check-left", codeLine: 5, next: node.left, relation: "left",
+        note: { vi: "Còn đi trái được thì node đó mới nhỏ hơn và vẫn là ứng viên tốt hơn.", en: "If a left child exists, it is smaller and is a better successor candidate." },
+      });
+      const next = node.left;
+      node = next;
+      remember(node);
+      addStep({
+        title: { vi: `Đi trái tới ${node.val}`, en: `Move left to ${node.val}` },
+        phase: "right-subtree", phaseIndex: 1, operation: "move-left", codeLine: 6, current: node, relation: "left",
+        note: { vi: "Tiếp tục tới node trái nhất.", en: "Continue to the leftmost node." },
+      });
+    }
+    successor = node;
+    addStep({
+      title: { vi: `✓ Successor = ${node.val}`, en: `✓ Successor = ${node.val}` },
+      phase: "return", phaseIndex: 3, operation: "found-right", codeLine: 7, current: node,
+      note: { vi: `${node.val} là node trái nhất của subtree phải nên là successor.`, en: `${node.val} is the leftmost node of the right subtree, so it is the successor.` },
+    });
+  } else {
+    addStep({
+      title: { vi: "p không có nhánh phải", en: "p has no right child" },
+      phase: "climb", phaseIndex: 2, operation: "check-right", codeLine: 3, current: pNode, relation: "none",
+      note: { vi: "Phải đi ngược lên cha cho tới khi đi lên từ một nhánh trái.", en: "Walk up through parents until we come from a left child." },
+    });
+    while (node) {
+      const parent = parentById.get(node.id) || null;
+      addStep({
+        title: parent ? { vi: `Xét parent ${parent.val} của ${node.val}`, en: `Check parent ${parent.val} of ${node.val}` } : { vi: "Đã tới root", en: "Reached the root" },
+        phase: "climb", phaseIndex: 2, operation: "check-parent", codeLine: 8, current: node, parent,
+        note: parent ? { vi: "Nếu node là con phải, parent vẫn nhỏ hơn successor và phải bỏ qua.", en: "If node is a right child, this parent is too small and must be skipped." } : { vi: "Không còn parent để đi lên.", en: "There is no parent left to climb to." },
+      });
+      if (!parent) {
+        addStep({
+          title: { vi: "Không có successor", en: "No successor" },
+          phase: "return", phaseIndex: 3, operation: "no-successor", codeLine: 10, current: node,
+          note: { vi: `${pValue} là node lớn nhất trong BST.`, en: `${pValue} is the largest node in the BST.` },
+        });
+        break;
+      }
+      const isRightChild = parent.right && parent.right.id === node.id;
+      if (isRightChild) {
+        addStep({
+          title: { vi: `Đi lên từ nhánh phải ${node.val} → ${parent.val}`, en: `Climb from right child ${node.val} → ${parent.val}` },
+          phase: "climb", phaseIndex: 2, operation: "climb-up", codeLine: 9, current: node, parent, next: parent, relation: "right",
+          note: { vi: "Vì đi lên từ nhánh phải, parent chưa thể là successor; tiếp tục đi lên.", en: "Because we came from a right child, this parent cannot be the successor; keep climbing." },
+        });
+        node = parent;
+        remember(node);
+        continue;
+      }
+      successor = parent;
+      remember(successor);
+      addStep({
+        title: { vi: `Đi lên từ nhánh trái → successor = ${successor.val}`, en: `Climb from left child → successor = ${successor.val}` },
+        phase: "return", phaseIndex: 3, operation: "found-parent", codeLine: 10, current: node, parent, next: parent, relation: "left",
+        note: { vi: `Parent ${successor.val} là node đầu tiên lớn hơn p khi đi ngược lên.`, en: `Parent ${successor.val} is the first ancestor larger than p while climbing.` },
+      });
+      break;
+    }
+  }
+
+  addStep({
+    title: successor ? { vi: `Trả về ${successor.val}`, en: `Return ${successor.val}` } : { vi: "Trả về None", en: "Return None" },
+    phase: "return", phaseIndex: 3, operation: "return", codeLine: 10, current: null, final: true,
+    note: successor ? { vi: `${successor.val} là inorder successor của ${pValue}.`, en: `${successor.val} is the inorder successor of ${pValue}.` } : { vi: "Không tồn tại node nào đứng sau p trong inorder.", en: "No node follows p in inorder traversal." },
+  });
+
+  return { input, answer: successor ? successor.val : "null", steps };
+}
+
 // ─── 235: Lowest Common Ancestor of BST ───
 function buildSteps235(input, params) {
   const root = parseBST(input);
@@ -3228,6 +3421,45 @@ module.exports = {
     complexity: { time: "O(h)", space: "O(1)", note: { vi: "Đi theo 1 nhánh BST → O(h).", en: "Follow one BST path → O(h)." } },
     code: ["class Solution:", "    def inorderSuccessor(self, root, p):", "        successor = None", "        node = root", "        while node:", "            if node.val > p.val:", "                successor = node", "                node = node.left", "            else:", "                node = node.right", "        return successor"],
     builder: buildSteps285,
+  },
+  510: {
+    id: 510,
+    difficulty: "medium",
+    slug: "inorder-successor-in-bst-ii",
+    premium: true,
+    category: { key: "bst", vi: "Cây nhị phân tìm kiếm (BST)", en: "Binary Search Tree" },
+    title: { vi: "Inorder Successor in BST II", en: "Inorder Successor in BST II" },
+    titleVi: { vi: "Successor trong BST có parent pointer", en: "Successor with parent pointers" },
+    statement: { vi: "Cho một node p trong BST, mỗi node có thêm parent pointer. Tìm node kế tiếp theo thứ tự inorder. Nhập cây level-order và giá trị p.", en: "Given a node p in a BST where every node has a parent pointer, find its inorder successor. Enter the tree in level-order and choose p." },
+    defaultInput: "5,3,6,2,4,null,null,1",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "p", type: "number", label: { vi: "p (node cần tìm successor)", en: "p (node to find successor of)" }, default: 3 }],
+    tags: [
+      { key: "bst", vi: "BST", en: "BST" },
+      { key: "parent-pointer", vi: "Parent pointer", en: "Parent pointer" },
+      { key: "inorder", vi: "Inorder", en: "Inorder" },
+    ],
+    debugMode: "semantic",
+    approach: [
+      { vi: "Nếu p có subtree phải: đi phải một lần, sau đó đi trái hết mức có thể.", en: "If p has a right subtree, move right once and then go left as far as possible." },
+      { vi: "Nếu không có subtree phải: đi lên khi đang là con phải; parent đầu tiên mà ta đi lên từ con trái là successor.", en: "Without a right subtree, climb while coming from a right child; the first parent reached from a left child is the successor." },
+      { vi: "Không có parent phù hợp nghĩa là p là node lớn nhất và successor là None.", en: "No suitable parent means p is the largest node and the successor is None." },
+    ],
+    complexity: { time: "O(h)", space: "O(1)", note: { vi: "Mỗi bước đi xuống hoặc đi lên trên tối đa một đường cao h; parent pointer giúp không cần stack.", en: "We move along at most one root-to-leaf path of height h; parent pointers remove the need for a stack." } },
+    code: [
+      "class Solution:",
+      "    def inorderSuccessor(self, node):",
+      "        if node.right:",
+      "            node = node.right",
+      "            while node.left:",
+      "                node = node.left",
+      "            return node",
+      "        while node.parent and node == node.parent.right:",
+      "            node = node.parent",
+      "        return node.parent",
+    ],
+    builder: buildSteps510,
   },
   235: {
     id: 235,

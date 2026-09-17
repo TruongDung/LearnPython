@@ -18094,6 +18094,72 @@ function renderMaximumSumBst1373View(step) {
   $("treeView").innerHTML = `<section class="mb1373-viz" role="img" aria-label="Maximum Sum BST in Binary Tree visualization"><header><div><small>POSTORDER DFS · BST STATE · #1373</small><strong>${vi ? "BST SUBTREE CÓ TỔNG LỚN NHẤT" : "MAXIMUM-SUM BST SUBTREE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header><div class="mb1373-phases">${phases}</div><section class="mb1373-summary"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${currentNode ? currentNode.value : "—"}</strong></div><div><small>${vi ? "ĐÃ TRẢ STATE" : "RETURNED STATES"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div><small>BEST ROOT</small><strong>${bestNode ? bestNode.value : "∅"}</strong></div><div class="best"><small>BEST SUM</small><strong>${view.best || 0}</strong></div></section><section class="mb1373-tree"><header><strong>${vi ? "STATE ĐƯỢC GỘP TỪ LÁ LÊN" : "STATES COMBINED BOTTOM-UP"}</strong><span>${vi ? "xanh = BST tốt nhất · đỏ = invalid · cam = hiện tại" : "green = best BST · red = invalid · orange = current"}</span></header><div><svg class="mb1373-tree-svg ${fit ? "fit" : "scroll"}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMin meet" ${fit ? "" : `style="min-width:${width}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section><section class="mb1373-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "cha chờ state của hai con" : "a parent waits for both child states"}</span></header><div>${stackHtml}</div></section>${formulaHtml}<section class="mb1373-history"><header><strong>${vi ? "STATE TRẢ VỀ THEO POSTORDER" : "STATES RETURNED IN POSTORDER"}</strong><span>BST / INVALID · sum · best</span></header><div>${historyHtml}</div></section><section class="mb1373-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section><footer class="mb1373-result ${final ? "done" : ""}"><small>MAXIMUM BST SUM</small><strong>${final ? view.answer : view.best || 0}</strong><span>${final ? (bestNode ? (vi ? `Subtree gốc ${bestNode.value} là BST có tổng lớn nhất.` : `The BST rooted at ${bestNode.value} has the largest sum.`) : (vi ? "Mọi tổng BST đều âm; empty subtree cho kết quả 0." : "Every BST sum is negative; the empty subtree gives 0.")) : (vi ? "min/max bảo đảm thứ tự BST trên toàn subtree." : "min/max enforces BST ordering across the whole subtree.")}</span></footer></section>`;
 }
 
+function renderLargestBst333View(step) {
+  const view = step.largestBst333View || {};
+  const vi = lang === "vi";
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const history = Array.isArray(view.history) ? view.history : [];
+  const bestIds = new Set(Array.isArray(view.bestSubtreeIds) ? view.bestSubtreeIds : []);
+  const formula = view.formula || null;
+  const currentId = view.current;
+  const bestNodeId = view.bestNode;
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const labels = vi
+    ? ["DFS hậu thứ tự", "Nhận state hai con", "Kiểm tra BST", "Cập nhật best", "Trả state lên cha"]
+    : ["Postorder DFS", "Receive child states", "Validate BST", "Update best", "Return state"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+  const maxDepth = nodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+  const maxX = nodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+  const gap = nodes.length <= 11 ? 82 : 118;
+  const contentWidth = maxX * gap;
+  const width = Math.max(440, contentWidth + 170);
+  const height = Math.max(300, (maxDepth + 1) * 140 + 100);
+  const offset = (width - contentWidth) / 2;
+  const xOf = node => offset + (Number(node.x) || 0) * gap;
+  const yOf = node => 68 + (Number(node.y) || 0) * 140;
+  const fit = nodes.length <= 15;
+  const edges = nodes.filter(node => node.parentId !== null && nodeMap.has(node.parentId)).map(node => {
+    const parent = nodeMap.get(node.parentId);
+    const best = bestIds.has(node.id) && bestIds.has(parent.id);
+    return `<line class="${best ? "best" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 29}" x2="${xOf(node)}" y2="${yOf(node) - 29}"></line>`;
+  }).join("");
+  const treeNodes = nodes.map(node => {
+    const state = String(node.state || "unvisited");
+    const bestRoot = node.id === bestNodeId;
+    const stateLabel = bestRoot ? "BEST ROOT"
+      : state === "invalid" ? (vi ? "KHÔNG PHẢI BST" : "NOT A BST")
+        : ["bst", "best"].includes(state) ? "BST"
+          : state === "validating" ? (vi ? "BST ỨNG VIÊN" : "BST CANDIDATE")
+            : state === "combine" ? (vi ? "ĐANG KIỂM TRA" : "CHECKING")
+              : state === "waiting" ? (vi ? "CHỜ HAI CON" : "WAITING") : (vi ? "CHƯA THĂM" : "UNVISITED");
+    const stats = node.isBst === true ? `min ${node.min} · max ${node.max} · size ${node.size}`
+      : node.isBst === false ? (vi ? "state: invalid" : "state: invalid")
+        : node.candidateSize === null || node.candidateSize === undefined ? "min ? · max ? · size ?" : `candidate size ${node.candidateSize}`;
+    return `<g class="lb333-node ${escapeHtml(state)} ${node.id === currentId ? "current" : ""} ${bestIds.has(node.id) ? "best-subtree" : ""} ${bestRoot ? "best-root" : ""}" transform="translate(${xOf(node)} ${yOf(node)})"><circle r="29"></circle><text class="value" text-anchor="middle" y="7">${escapeHtml(String(node.value))}</text><text class="state" text-anchor="middle" y="49">${escapeHtml(stateLabel)}</text><text class="stats" text-anchor="middle" y="68">${escapeHtml(stats)}</text></g>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((id, index) => `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${escapeHtml(String(nodeMap.get(id)?.value ?? "?"))}</strong></span>`).join("<i>→</i>")
+    : `<em>${vi ? "Stack đã rỗng" : "The stack is empty"}</em>`;
+  const childCard = (side, child = {}) => {
+    const label = side === "left" ? (vi ? "STATE CON TRÁI" : "LEFT CHILD STATE") : (vi ? "STATE CON PHẢI" : "RIGHT CHILD STATE");
+    const kind = child.empty ? "empty" : child.isBst ? "bst" : "invalid";
+    return `<article class="${kind}"><small>${label}</small><strong>${child.empty ? "BST ∅" : child.isBst ? "BST" : "INVALID"}</strong><div><span>min <b>${child.empty ? "+∞" : child.min ?? "—"}</b></span><span>max <b>${child.empty ? "−∞" : child.max ?? "—"}</b></span><span>size <b>${child.size ?? 0}</b></span></div></article>`;
+  };
+  const formulaHtml = formula
+    ? `<section class="lb333-formula ${formula.valid === true ? "valid" : formula.valid === false ? "invalid" : "pending"}"><header><strong>${vi ? `SUBTREE GỐC ${formula.nodeValue}` : `SUBTREE ROOTED AT ${formula.nodeValue}`}</strong><span>(is_bst, min, max, size)</span></header><div class="children">${childCard("left", formula.left)}<b>+</b>${childCard("right", formula.right)}</div><div class="ordering"><span class="${formula.leftOk ? "pass" : "fail"}"><small>LEFT BOUND</small><code>${formula.left?.empty ? "−∞" : formula.left?.max ?? "invalid"} &lt; ${formula.nodeValue}</code><b>${formula.leftOk ? "✓" : "✕"}</b></span><i>AND</i><span class="${formula.rightOk ? "pass" : "fail"}"><small>RIGHT BOUND</small><code>${formula.nodeValue} &lt; ${formula.right?.empty ? "+∞" : formula.right?.min ?? "invalid"}</code><b>${formula.rightOk ? "✓" : "✕"}</b></span></div><div class="size"><small>BST SIZE CANDIDATE</small><code>${formula.left?.size ?? 0} + 1 + ${formula.right?.size ?? 0}</code><strong>${formula.candidateSize}</strong></div><div class="decision"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${formula.valid === null ? (vi ? "Child states đã sẵn sàng; kiểm tra BST tiếp theo" : "Child states ready; validate the BST next") : formula.valid === false ? (vi ? "INVALID → không cập nhật best" : "INVALID → do not update best") : formula.updated === null ? (vi ? "BST hợp lệ; so size với best tiếp theo" : "Valid BST; compare its size with best next") : formula.updated ? `best: ${formula.bestBefore} → ${formula.bestAfter}` : `best = ${formula.bestAfter}`}</strong></div></section>`
+    : `<section class="lb333-rule"><strong>POSTORDER STATE</strong><code>(is_bst, min_value, max_value, subtree_size)</code><span>${vi ? "Hai cây con phải là BST và left.max < node < right.min." : "Both children must be BSTs and left.max < node < right.min."}</span></section>`;
+  const historyHtml = history.length
+    ? history.map((item, index) => `<span class="${item.id === bestNodeId ? "best" : item.isBst ? "bst" : "invalid"}"><small>#${index + 1} · node ${escapeHtml(String(item.value))}</small><strong>${item.isBst ? `BST · size ${item.size}` : "INVALID"}</strong><em>best ${item.bestAfter}</em></span>`).join("")
+    : `<em>${vi ? "Chưa node nào trả state" : "No node has returned a state yet"}</em>`;
+  const currentNode = currentId === null || currentId === undefined ? null : nodeMap.get(currentId);
+  const bestNode = bestNodeId === null || bestNodeId === undefined ? null : nodeMap.get(bestNodeId);
+  const final = Boolean(view.final || view.phase === "done");
+
+  $("treeView").innerHTML = `<section class="lb333-viz" role="img" aria-label="Largest BST Subtree visualization"><header><div><small>POSTORDER DFS · BST STATE · #333</small><strong>${vi ? "SUBTREE BST LỚN NHẤT" : "LARGEST BST SUBTREE"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header><div class="lb333-phases">${phases}</div><section class="lb333-summary"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${currentNode ? currentNode.value : "—"}</strong></div><div><small>${vi ? "ĐÃ TRẢ STATE" : "RETURNED STATES"}</small><strong>${view.processed || 0}/${view.totalNodes || nodes.length}</strong></div><div><small>BEST ROOT</small><strong>${bestNode ? bestNode.value : "∅"}</strong></div><div class="best"><small>BEST SIZE</small><strong>${view.best || 0}</strong></div></section><section class="lb333-tree"><header><strong>${vi ? "STATE ĐƯỢC GỘP TỪ LÁ LÊN" : "STATES COMBINED BOTTOM-UP"}</strong><span>${vi ? "xanh = BST tốt nhất · đỏ = invalid · cam = hiện tại" : "green = best BST · red = invalid · orange = current"}</span></header><div><svg class="lb333-tree-svg ${fit ? "fit" : "scroll"}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMin meet" ${fit ? "" : `style="min-width:${width}px"`} aria-hidden="true"><g class="edges">${edges}</g>${treeNodes}</svg></div></section><section class="lb333-stack"><header><strong>RECURSION STACK</strong><span>${vi ? "cha chờ state của hai con" : "a parent waits for both child states"}</span></header><div>${stackHtml}</div></section>${formulaHtml}<section class="lb333-history"><header><strong>${vi ? "STATE TRẢ VỀ THEO POSTORDER" : "STATES RETURNED IN POSTORDER"}</strong><span>BST / INVALID · size · best</span></header><div>${historyHtml}</div></section><section class="lb333-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"} · ${escapeHtml(String(view.operation || ""))}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section><footer class="lb333-result ${final ? "done" : ""}"><small>LARGEST BST SIZE</small><strong>${final ? view.answer : view.best || 0}</strong><span>${final ? (bestNode ? (vi ? `Subtree gốc ${bestNode.value} có ${view.answer} node.` : `The BST rooted at ${bestNode.value} has ${view.answer} nodes.`) : (vi ? "Cây rỗng có kích thước 0." : "The empty tree has size 0.")) : (vi ? "min/max bảo đảm thứ tự BST trên toàn subtree." : "min/max enforces BST ordering across the whole subtree.")}</span></footer></section>`;
+}
+
 function renderMaximumAverage1120View(step) {
   const view = step.maximumAverage1120View || {};
   const vi = lang === "vi";
@@ -31087,6 +31153,58 @@ function renderInorderSuccessor285View(step) {
   renderTree({ tree: step.tree }, "cb285Tree");
 }
 
+function renderInorderSuccessor510View(step) {
+  const view = step.inorderSuccessor510View || {};
+  const vi = lang === "vi";
+  const p = view.p || {};
+  const current = view.current || null;
+  const parent = view.parent || null;
+  const successor = view.successor || null;
+  const next = view.next || null;
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const phaseIndex = Number(view.phaseIndex) || 0;
+  const numberText = value => value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toString() : "—";
+  const phaseLabels = vi
+    ? ["Đặt p", "Subtree phải", "Đi lên parent", "Trả kết quả"]
+    : ["Set p", "Right subtree", "Climb parents", "Return answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index === phaseIndex ? "active" : index < phaseIndex ? "done" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
+  const relation = view.relation === "right" ? (vi ? "CON PHẢI" : "RIGHT CHILD") : view.relation === "left" ? (vi ? "CON TRÁI" : "LEFT CHILD") : "—";
+  const pathHtml = visited.length
+    ? visited.map((item, index) => {
+        const role = item.id === p.id ? "p" : successor && item.id === successor.id ? "successor" : current && item.id === current.id ? "current" : parent && item.id === parent.id ? "parent" : "";
+        return `<span class="${role}"><small>${index + 1}</small><b>${escapeHtml(numberText(item.value))}</b></span>`;
+      }).join("<i>→</i>")
+    : `<em>${vi ? "Chưa đi qua node nào" : "No node visited yet"}</em>`;
+  const final = Boolean(view.final);
+  const answerText = final ? (view.answer === null ? "None" : numberText(view.answer)) : "…";
+  const branchText = view.phase === "right-subtree"
+    ? (vi ? "Có right subtree → lấy node trái nhất" : "Right subtree exists → take its leftmost node")
+    : view.phase === "climb"
+      ? (vi ? "Không có right subtree → đi lên bằng parent" : "No right subtree → climb with parent pointers")
+      : (vi ? "Chọn nhánh theo cấu trúc của p" : "Choose a branch from p's structure");
+  const summary = vi
+    ? `Bài 510: successor của ${numberText(p.value)}, current ${numberText(current && current.value)}, parent ${numberText(parent && parent.value)}.`
+    : `Problem 510: successor of ${numberText(p.value)}, current ${numberText(current && current.value)}, parent ${numberText(parent && parent.value)}.`;
+
+  $("treeView").innerHTML = `<section class="is510-viz phase-${escapeHtml(view.phase || "target")}" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BST · PARENT POINTERS · #510</small><strong>${vi ? "INORDER SUCCESSOR TRONG BST II" : "INORDER SUCCESSOR IN BST II"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="is510-phases">${phases}</div>
+    <section class="is510-rule"><strong>THE TWO CASES</strong><span>${escapeHtml(branchText)}</span><code>right subtree ? leftmost : climb parent</code></section>
+    <div class="is510-layout">
+      <section class="is510-tree-card"><header><strong>${vi ? "CÂY + LIÊN KẾT PARENT" : "TREE + PARENT LINKS"}</strong><span>${vi ? "tím = p · cam = current · xanh = successor · xanh dương = parent" : "purple = p · amber = current · green = successor · blue = parent"}</span></header><div id="is510Tree" class="is510-tree"></div></section>
+      <aside class="is510-side">
+        <section class="is510-values"><div><small>p</small><strong>${escapeHtml(numberText(p.value))}</strong></div><div><small>current</small><strong>${escapeHtml(numberText(current && current.value))}</strong></div><div><small>parent</small><strong>${escapeHtml(numberText(parent && parent.value))}</strong></div><div><small>successor</small><strong>${successor ? escapeHtml(numberText(successor.value)) : "None"}</strong></div></section>
+        <section class="is510-pointer"><small>${vi ? "CON TRỎ ĐANG XÉT" : "POINTER STATE"}</small><div><b>${current ? escapeHtml(numberText(current.value)) : "None"}</b><i>→</i><b>${next ? escapeHtml(numberText(next.value)) : "None"}</b></div><span>${escapeHtml(relation)}</span></section>
+        <section class="is510-cases"><div class="${view.phase === "right-subtree" ? "active" : ""}"><b>1</b><strong>${vi ? "Có nhánh phải" : "Right subtree"}</strong><span>${vi ? "đi phải rồi đi trái hết mức" : "go right, then all the way left"}</span></div><div class="${view.phase === "climb" ? "active" : ""}"><b>2</b><strong>${vi ? "Không có nhánh phải" : "No right subtree"}</strong><span>${vi ? "đi lên khi còn là con phải" : "climb while a right child"}</span></div></section>
+        <section class="is510-path"><header><strong>${vi ? "ĐƯỜNG ĐÃ ĐI" : "VISITED / CLIMBED"}</strong><span>${visited.length} ${vi ? "node" : "node(s)"}</span></header><div>${pathHtml}</div></section>
+      </aside>
+    </div>
+    <section class="is510-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></section>
+    <footer class="is510-result ${final ? "done" : ""} ${final && view.answer === null ? "empty" : ""}"><small>SUCCESSOR(${escapeHtml(numberText(p.value))})</small><strong>${escapeHtml(answerText)}</strong><span>${final ? view.answer === null ? (vi ? "p là node lớn nhất nên không có successor." : "p is the largest node, so no successor exists.") : (vi ? "Node kế tiếp trong inorder." : "The next node in inorder.") : (vi ? "Theo dõi current, parent và hai trường hợp của thuật toán." : "Track current, parent, and the algorithm's two cases.")}</span></footer>
+  </section>`;
+  renderTree({ tree: step.tree }, "is510Tree");
+}
+
 function renderClosestBst272View(step) {
   const view = step.closestBst272View || {};
   const vi = lang === "vi";
@@ -31896,6 +32014,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderClosestBst270View(step);
+  } else if (step.inorderSuccessor510View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderInorderSuccessor510View(step);
   } else if (step.inorderSuccessor285View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -32160,6 +32284,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDistributeCoins979View(step);
+  } else if (step.largestBst333View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLargestBst333View(step);
   } else if (step.maximumSumBst1373View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
