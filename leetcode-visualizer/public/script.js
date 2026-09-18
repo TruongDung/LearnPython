@@ -11827,6 +11827,181 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 1055 Shortest Way to Form String ----
+// The answer counts SWEEPS over source, so the layout pairs two strips: target
+// coloured by which sweep covered each character, and source showing the sweep in
+// progress. Seeing target get partitioned is seeing the answer.
+function renderShortestWay1055View(step) {
+  const view = step.shortestWay1055View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const source = String(view.source || "");
+  const target = String(view.target || "");
+  const passes = Array.isArray(view.passes) ? view.passes : [];
+  const curPass = view.curPass;
+  const approach = Number(view.approach) || 1;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const PALETTE = 6;
+  const passColor = (idx) => (idx - 1) % PALETTE;
+
+  // Which pass covered each target index, and which source index did it.
+  const coverBy = new Array(target.length).fill(-1);
+  const coverFrom = new Array(target.length).fill(-1);
+  passes.forEach((p) => p.picks.forEach((k) => { coverBy[k.ti] = p.index; coverFrom[k.ti] = k.si; }));
+  // Source indices consumed by the CURRENT pass only: source restarts each sweep,
+  // so showing older passes' picks here would be misleading.
+  const curPicks = new Map();
+  const cp = passes.find((p) => p.index === curPass);
+  if (cp) cp.picks.forEach((k) => curPicks.set(k.si, k.ti));
+
+  // ── target strip ──────────────────────────────────────────────────────────
+  const needIdx = approach === 1 ? view.i : view.i;
+  const targetHtml = target.split("").map((ch, t) => {
+    const cls = ["sw1055-ch"];
+    if (coverBy[t] > 0) cls.push("covered", `p${passColor(coverBy[t])}`);
+    else cls.push("todo");
+    if (t === view.matchedTi) cls.push("justmatched");
+    else if (t === needIdx && !isDone) cls.push("need");
+    if (view.check && view.check.ti === t) cls.push(view.check.ok ? "checkok" : "checkbad");
+    return `<div class="${cls.join(" ")}">
+      <strong>${escapeHtml(ch)}</strong>
+      <span class="ix">${t}</span>
+      ${coverFrom[t] >= 0 ? `<span class="src">s${coverFrom[t]}</span>` : `<span class="src">·</span>`}
+    </div>`;
+  }).join("");
+
+  // ── source strip ──────────────────────────────────────────────────────────
+  const inSkip = (s) => view.skipFrom !== null && view.skipFrom !== undefined
+    && s >= view.skipFrom && s <= view.skipTo;
+  const ptr = approach === 1 ? view.j : view.j;
+  const lk = view.lookup;
+  const sourceHtml = source.split("").map((ch, s) => {
+    const cls = ["sw1055-ch"];
+    if (curPicks.has(s)) cls.push("picked", `p${passColor(curPass || 1)}`);
+    else if (inSkip(s)) cls.push("skipped");
+    else cls.push("plain");
+    if (lk && lk.kind === "hit" && lk.value === s) cls.push("jumped");
+    if (lk && lk.kind === "build" && lk.row === s) cls.push("building");
+    if (s === ptr && !isDone) cls.push("ptr");
+    return `<div class="${cls.join(" ")}">
+      <strong>${escapeHtml(ch)}</strong>
+      <span class="ix">${s}</span>
+      ${curPicks.has(s) ? `<span class="src">t${curPicks.get(s)}</span>` : `<span class="src">·</span>`}
+    </div>`;
+  }).join("") + `<div class="sw1055-ch end${ptr === source.length && !isDone ? " ptr" : ""}"><strong>⊣</strong><span class="ix">${source.length}</span><span class="src">·</span></div>`;
+
+  // ── runs: the partition of target, one run per subsequence ────────────────
+  const runsHtml = passes.length
+    ? passes.map((p) => {
+      const text = p.to >= p.from ? target.slice(p.from, p.to + 1) : "";
+      const srcIdx = p.picks.map((k) => k.si).join(",");
+      return `<div class="sw1055-run p${passColor(p.index)}${p.index === curPass && !isDone ? " cur" : ""}">
+          <small>${vi ? "lượt" : "sweep"} ${p.index}</small>
+          <strong>${escapeHtml(text || "—")}</strong>
+          <em>${vi ? "source" : "source"}[${escapeHtml(srcIdx || "—")}]</em>
+        </div>`;
+    }).join(`<b class="sw1055-plus">+</b>`)
+    : `<em class="sw1055-empty">${vi ? "chưa có lượt nào" : "no sweep yet"}</em>`;
+
+  // ── character availability ────────────────────────────────────────────────
+  const letters = Array.isArray(view.sourceChars) ? view.sourceChars : [];
+  const availHtml = `<div class="sw1055-avail">
+    ${letters.map((c) => `<span class="lt${view.check && view.check.ch === c && view.check.ok ? " hit" : ""}">${escapeHtml(c)}</span>`).join("")}
+    ${view.badChar ? `<span class="lt bad">${escapeHtml(view.badChar)} ✕</span>` : ""}
+  </div>`;
+
+  // ── next-occurrence table (approach 2) ────────────────────────────────────
+  let tableHtml = "";
+  if (view.nxtTable) {
+    const tb = view.nxtTable;
+    const cols = tb.n + 1;
+    const head = `<div class="sw1055-trow head">
+      <span class="rh">i →</span>
+      ${Array.from({ length: cols }, (_, i) => `<span class="tc${lk && lk.row === i ? " col" : ""}">${i}${i < tb.n ? `<i>${escapeHtml(source[i])}</i>` : `<i>⊣</i>`}</span>`).join("")}
+    </div>`;
+    const body = tb.rows.map((row) => `<div class="sw1055-trow${lk && lk.ch === row.ch ? " lit" : ""}">
+        <span class="rh">${escapeHtml(row.ch)}</span>
+        ${row.cells.map((v, i) => {
+      const cls = ["tc"];
+      if (v === null || v === undefined) cls.push("unbuilt");
+      else if (v === tb.n) cls.push("none");
+      if (lk && lk.ch === row.ch && lk.row === i) cls.push(lk.kind === "miss" ? "miss" : "hit");
+      if (lk && lk.kind === "miss" && lk.ch === row.ch && i === lk.restartRow) cls.push("restart");
+      return `<span class="${cls.join(" ")}">${v === null || v === undefined ? "" : v}</span>`;
+    }).join("")}
+      </div>`).join("");
+    tableHtml = `<section class="sw1055-panel">
+      <header>
+        <strong>${vi ? "BẢNG nxt[i][c] — vị trí ĐẦU TIÊN ≥ i trong source có ký tự c" : "TABLE nxt[i][c] — FIRST index ≥ i in source holding c"}</strong>
+        <span>${vi ? `giá trị ${tb.n} = không còn` : `value ${tb.n} = none left`}</span>
+      </header>
+      <div class="sw1055-table">${head}${body}</div>
+      ${lk && lk.kind === "miss"
+        ? `<div class="sw1055-lkup miss">${escapeHtml(vi
+          ? `nxt[${lk.row}]['${lk.ch}'] = ${lk.value} → hết source, phải mở lượt mới rồi tra lại nxt[0]['${lk.ch}'] = ${lk.restartValue}`
+          : `nxt[${lk.row}]['${lk.ch}'] = ${lk.value} → source exhausted, open a new sweep and look up nxt[0]['${lk.ch}'] = ${lk.restartValue}`)}</div>`
+        : lk && lk.kind === "hit"
+          ? `<div class="sw1055-lkup hit">${escapeHtml(vi
+            ? `nxt[${lk.row}]['${lk.ch}'] = ${lk.value} → nhảy thẳng tới source[${lk.value}], không quét`
+            : `nxt[${lk.row}]['${lk.ch}'] = ${lk.value} → jump straight to source[${lk.value}], no scanning`)}</div>`
+          : ""}
+    </section>`;
+  }
+
+  const answerHtml = isDone
+    ? `<div class="sw1055-answer${view.answer === -1 ? " none" : ""}">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer}</strong>
+        <span>${view.answer === -1
+      ? (vi ? "không thể ghép được" : "impossible")
+      : (vi ? `subsequence của source ghép thành "${escapeHtml(target)}"` : `subsequences of source spell "${escapeHtml(target)}"`)}</span>
+      </div>`
+    : `<div class="sw1055-progress">
+        <span><small>${vi ? "ĐÃ DÙNG" : "SWEEPS USED"}</small><b>${view.count === null || view.count === undefined ? 0 : view.count}</b></span>
+        <span><small>${vi ? "PHỦ ĐƯỢC" : "COVERED"}</small><b>${coverBy.filter((x) => x > 0).length}/${target.length}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="sw1055-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa ít subsequence nhất để ghép thành target" : "Fewest subsequences to form the target visualization")}">
+    <div class="sw1055-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(vi
+      ? "Mỗi subsequence = MỘT LƯỢT quét source từ trái sang phải, dọc đường nhặt ký tự khớp target theo thứ tự. Hết source mà target chưa xong thì buộc mở lượt mới. Nên đáp án chính là số lượt, và target bị cắt thành đúng số đoạn đó."
+      : "Each subsequence is ONE SWEEP across source, left to right, picking up characters that match target in order. If source runs out while target is unfinished, a new sweep is forced. So the answer is the number of sweeps, and target is partitioned into exactly that many runs.")}</span>
+    </div>
+
+    ${answerHtml}
+
+    <section class="sw1055-panel">
+      <header>
+        <strong>${vi ? "TARGET — màu = lượt nào phủ ký tự đó" : "TARGET — colour = which sweep covered it"}</strong>
+        <span>${vi ? "sN = lấy từ source[N]" : "sN = taken from source[N]"}</span>
+      </header>
+      <div class="sw1055-strip">${targetHtml}</div>
+    </section>
+
+    <section class="sw1055-panel">
+      <header>
+        <strong>${vi ? `SOURCE — lượt quét ${curPass || "—"}` : `SOURCE — sweep ${curPass || "—"}`}</strong>
+        <span>${vi ? "tN = dùng để phủ target[N] · ⊣ = hết source" : "tN = used to cover target[N] · ⊣ = end of source"}</span>
+      </header>
+      <div class="sw1055-strip">${sourceHtml}</div>
+      ${availHtml}
+    </section>
+
+    <section class="sw1055-panel">
+      <header><strong>${vi ? "TARGET CẮT THÀNH CÁC ĐOẠN — mỗi đoạn là một subsequence" : "TARGET SPLIT INTO RUNS — one run per subsequence"}</strong><span>${passes.length}</span></header>
+      <div class="sw1055-runs">${runsHtml}</div>
+    </section>
+
+    ${tableHtml}
+
+    <div class="sw1055-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
 // ---- 778 Swim in Rising Water ----
 // Two things the generic bfsGrid renderer could not show, and both are the point:
 //   1. The water. Dijkstra pops times in nondecreasing order, so the popped time
@@ -34417,6 +34592,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.shortestWay1055View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShortestWay1055View(step);
   } else if (step.swimWater778View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

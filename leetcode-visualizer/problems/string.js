@@ -16694,3 +16694,548 @@ Object.assign(module.exports, {
     builder: buildSteps777,
   },
 });
+
+// ─── 1055: Shortest Way to Form String ───
+// How many subsequences of `source`, concatenated, spell `target`?
+//
+// Both builders feed the same `shortestWay1055View` renderer. The thing the view
+// has to make obvious is that the answer counts SWEEPS over source: every time
+// the sweep runs off the end of source with target unfinished, you are forced to
+// start a fresh subsequence. So target gets partitioned into runs, one per sweep,
+// and the count of runs IS the answer.
+
+const SW1055_LIMITS = { source: 20, target: 30 };
+
+function parse1055Data(input, params = {}) {
+  const source = String(input ?? "").trim();
+  const target = String(params.target ?? "").trim();
+  if (!source) throw new Error("source must not be empty");
+  if (!target) throw new Error("target must not be empty");
+  if (!/^[a-z]+$/.test(source)) throw new Error("source must contain only lowercase letters a-z");
+  if (!/^[a-z]+$/.test(target)) throw new Error("target must contain only lowercase letters a-z");
+  if (source.length > SW1055_LIMITS.source) throw new Error(`visualization supports source up to ${SW1055_LIMITS.source} characters`);
+  if (target.length > SW1055_LIMITS.target) throw new Error(`visualization supports target up to ${SW1055_LIMITS.target} characters`);
+  return { source, target };
+}
+
+// Shared scaffolding: the character-availability pre-check and the step factory.
+function sw1055Base(source, target, approach) {
+  const steps = [];
+  const sourceSet = new Set(source.split(""));
+  // Runs of target, one per sweep of source. `picks` ties each covered target
+  // index back to the source index that covered it.
+  const passes = [];
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      shortestWay1055View: {
+        approach,
+        source, target,
+        phase: o.phase,
+        sourceChars: [...sourceSet].sort(),
+        check: o.check || null,
+        badChar: o.badChar === undefined ? null : o.badChar,
+        passes: passes.map((p) => ({ index: p.index, from: p.from, to: p.to, picks: p.picks.map((x) => ({ ...x })) })),
+        curPass: o.curPass === undefined ? null : o.curPass,
+        i: o.i === undefined ? null : o.i,
+        j: o.j === undefined ? null : o.j,
+        skipFrom: o.skipFrom === undefined ? null : o.skipFrom,
+        skipTo: o.skipTo === undefined ? null : o.skipTo,
+        matchedTi: o.matchedTi === undefined ? null : o.matchedTi,
+        nxtTable: o.nxtTable || null,
+        lookup: o.lookup || null,
+        count: o.count === undefined ? null : o.count,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+
+  return { steps, sourceSet, passes, snap };
+}
+
+// Emit the "is every target character even available?" pre-check. Returns true
+// when a character is missing, in which case the answer is -1.
+function sw1055PreCheck({ source, target, sourceSet, snap, codeLines, missingLines }) {
+  const seen = new Set();
+  for (let t = 0; t < target.length; t++) {
+    const ch = target[t];
+    if (seen.has(ch)) continue;          // one step per DISTINCT character
+    seen.add(ch);
+    const ok = sourceSet.has(ch);
+    snap({
+      phase: ok ? "charCheck" : "impossible",
+      title: ok
+        ? { vi: `'${ch}' có trong source ✓`, en: `'${ch}' is in source ✓` }
+        : { vi: `'${ch}' KHÔNG có trong source → -1`, en: `'${ch}' is NOT in source → -1` },
+      note: ok
+        ? {
+          vi: `Ký tự '${ch}' (lần đầu ở target[${t}]) xuất hiện trong source, nên riêng nó thì phủ được. Kiểm tra trước như vậy để về sau khỏi phải lo trường hợp bất khả thi.`,
+          en: `Character '${ch}' (first at target[${t}]) does occur in source, so it can be covered. Checking this up front means the main loop never has to worry about impossibility.`,
+        }
+        : {
+          vi: `Source chỉ có {${[...sourceSet].sort().join(", ")}}. Không subsequence nào của source chứa được '${ch}', nên ghép bao nhiêu lần cũng không ra target. Trả -1.`,
+          en: `Source only holds {${[...sourceSet].sort().join(", ")}}. No subsequence of source can ever contain '${ch}', so no concatenation spells target. Return -1.`,
+        },
+      codeLines: ok ? codeLines : missingLines,
+      check: { ch, ti: t, ok },
+      badChar: ok ? null : ch,
+      final: !ok,
+      answer: ok ? undefined : -1,
+      count: 0,
+      decision: ok
+        ? { vi: `'${ch}' ổn.`, en: `'${ch}' is fine.` }
+        : { vi: `Thiếu '${ch}' → đáp án -1.`, en: `'${ch}' is missing → answer -1.` },
+      vars: [{ name: "ch", value: ch }, { name: "chars", value: `{${[...sourceSet].sort().join(", ")}}` }],
+    });
+    if (!ok) return true;
+  }
+  return false;
+}
+
+// ── Approach 1: greedy sweep with two pointers ───────────────────────────────
+function buildSteps1055(input, params = {}) {
+  const { source, target } = parse1055Data(input, params);
+  const n = source.length;
+  const m = target.length;
+  const { steps, sourceSet, passes, snap } = sw1055Base(source, target, 1);
+
+  snap({
+    phase: "intro",
+    title: { vi: `source = "${source}", target = "${target}"`, en: `source = "${source}", target = "${target}"` },
+    note: {
+      vi: `Cần ghép ít nhất bao nhiêu SUBSEQUENCE của source lại thành target. Cách nghĩ: mỗi subsequence = một lượt QUÉT source từ đầu đến cuối, trên đường đi nhặt các ký tự khớp với target theo thứ tự. Hết source mà target chưa xong thì buộc phải bắt đầu lượt mới. Vậy đáp án = số lượt quét. Tham lam mỗi lượt nhặt được càng nhiều càng tốt là tối ưu: nhặt thêm một ký tự không bao giờ làm ta tệ đi, vì nó chỉ đẩy điểm bắt đầu của lượt sau đi xa hơn.`,
+      en: `We need the fewest SUBSEQUENCES of source whose concatenation is target. The way to see it: each subsequence is one SWEEP across source from left to right, picking up characters that match target in order. If source runs out while target is unfinished, a new sweep is forced. So the answer is the number of sweeps. Greedily taking as much as possible per sweep is optimal: covering one more character never hurts, it only pushes the next sweep's start further along.`,
+    },
+    codeLines: [2],
+    count: 0,
+    i: 0,
+    decision: { vi: "Đáp án = số lượt quét source.", en: "The answer is the number of sweeps over source." },
+    vars: [{ name: "source", value: source }, { name: "target", value: target }, { name: "n, m", value: `${n}, ${m}` }],
+  });
+
+  snap({
+    phase: "charSet",
+    title: { vi: `chars = {${[...sourceSet].sort().join(", ")}}`, en: `chars = {${[...sourceSet].sort().join(", ")}}` },
+    note: {
+      vi: `Tập ký tự có trong source. Nếu target dùng một ký tự ngoài tập này thì vô vọng ngay, nên kiểm tra trước.`,
+      en: `The set of characters available in source. If target uses anything outside this set the task is hopeless, so check that first.`,
+    },
+    codeLines: [3],
+    count: 0,
+    i: 0,
+    decision: { vi: `Source có ${sourceSet.size} ký tự khác nhau.`, en: `Source has ${sourceSet.size} distinct characters.` },
+    vars: [{ name: "chars", value: `{${[...sourceSet].sort().join(", ")}}` }],
+  });
+
+  if (sw1055PreCheck({ source, target, sourceSet, snap, codeLines: [4, 5], missingLines: [4, 5, 6] })) {
+    return { input, answer: -1, steps };
+  }
+
+  let count = 0;
+  let i = 0;
+
+  snap({
+    phase: "init",
+    title: { vi: "count = 0, i = 0", en: "count = 0, i = 0" },
+    note: {
+      vi: "i là chỉ số ký tự tiếp theo của target cần phủ. Điểm quan trọng: i KHÔNG bị reset giữa các lượt — nó chỉ tiến lên, còn j (chỉ số trong source) mới reset về 0 mỗi lượt.",
+      en: "i is the index of the next target character to cover. The key point: i is NOT reset between sweeps — it only moves forward, while j (the index into source) is what restarts at 0 each sweep.",
+    },
+    codeLines: [7, 8, 9],
+    count, i,
+    decision: { vi: "i chỉ tiến; j reset mỗi lượt.", en: "i only advances; j restarts each sweep." },
+    vars: [{ name: "count", value: count }, { name: "i", value: i }],
+  });
+
+  while (i < m) {
+    count += 1;
+    const pass = { index: count, from: i, to: i - 1, picks: [] };
+    passes.push(pass);
+    snap({
+      phase: "newPass",
+      title: { vi: `Lượt ${count}: quét source lại từ đầu, bắt đầu phủ target[${i}]='${target[i]}'`, en: `Sweep ${count}: restart source from the left, now covering target[${i}]='${target[i]}'` },
+      note: {
+        vi: `target vẫn còn ${m - i} ký tự chưa phủ, nên cần thêm một subsequence nữa → count = ${count}. Đặt j = 0 để quét source từ đầu; i giữ nguyên ở ${i}.`,
+        en: `target still has ${m - i} characters uncovered, so one more subsequence is needed → count = ${count}. Set j = 0 to sweep source from the start; i stays at ${i}.`,
+      },
+      codeLines: [11, 12, 13],
+      curPass: count, count, i, j: 0,
+      decision: { vi: `Bắt đầu subsequence thứ ${count}.`, en: `Starting subsequence number ${count}.` },
+      vars: [{ name: "count", value: count }, { name: "i", value: i }, { name: "j", value: 0 }],
+    });
+
+    let j = 0;
+    while (j < n && i < m) {
+      // Fold the run of non-matching source characters into one step: that is how
+      // a person reads the scan, and it keeps long sources from drowning the trace.
+      const skipStart = j;
+      while (j < n && source[j] !== target[i]) j += 1;
+      if (j > skipStart) {
+        snap({
+          phase: "skip",
+          title: {
+            vi: `Bỏ qua source[${skipStart}..${j - 1}] = "${source.slice(skipStart, j)}"`,
+            en: `Skip source[${skipStart}..${j - 1}] = "${source.slice(skipStart, j)}"`,
+          },
+          note: {
+            vi: `Đang cần '${target[i]}' cho target[${i}]. Các ký tự "${source.slice(skipStart, j)}" không phải '${target[i]}' nên bỏ qua — subsequence được phép bỏ ký tự, chỉ cần giữ thứ tự.`,
+            en: `We need '${target[i]}' for target[${i}]. The characters "${source.slice(skipStart, j)}" are not '${target[i]}', so skip them — a subsequence may drop characters as long as order is kept.`,
+          },
+          codeLines: [14, 15, 17],
+          curPass: count, count, i, j,
+          skipFrom: skipStart, skipTo: j - 1,
+          decision: { vi: `Bỏ ${j - skipStart} ký tự, vẫn đang tìm '${target[i]}'.`, en: `Skipped ${j - skipStart} characters, still hunting '${target[i]}'.` },
+          vars: [{ name: "target[i]", value: `'${target[i]}'` }, { name: "j", value: j }],
+        });
+      }
+      if (j >= n) break;
+
+      const matchedTi = i;
+      pass.picks.push({ si: j, ti: i, ch: target[i] });
+      pass.to = i;
+      i += 1;
+      j += 1;
+      snap({
+        phase: "match",
+        title: { vi: `Khớp: source[${j - 1}] = target[${matchedTi}] = '${target[matchedTi]}'`, en: `Match: source[${j - 1}] = target[${matchedTi}] = '${target[matchedTi]}'` },
+        note: {
+          vi: `Nhặt '${target[matchedTi]}' vào subsequence thứ ${count}. i tiến lên ${i}${i < m ? `, giờ cần '${target[i]}'` : " — target đã phủ hết"}. j tiến lên ${j}: mỗi ký tự source chỉ dùng được một lần trong một lượt.`,
+          en: `Picked '${target[matchedTi]}' into subsequence ${count}. i advances to ${i}${i < m ? `, now needing '${target[i]}'` : " — target is fully covered"}. j advances to ${j}: each source character can be used only once per sweep.`,
+        },
+        codeLines: [15, 16, 17],
+        curPass: count, count, i, j,
+        matchedTi,
+        decision: i < m
+          ? { vi: `Phủ được ${i}/${m} ký tự target.`, en: `Covered ${i}/${m} target characters.` }
+          : { vi: `Phủ xong toàn bộ target ở lượt ${count}.`, en: `Target fully covered on sweep ${count}.` },
+        vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "picked", value: `'${target[matchedTi]}'` }],
+      });
+    }
+
+    const exhausted = j >= n;
+    snap({
+      phase: "passEnd",
+      title: i >= m
+        ? { vi: `Lượt ${count} kết thúc — target đã xong`, en: `Sweep ${count} ends — target is done` }
+        : { vi: `Lượt ${count} kết thúc — hết source ở j = ${n}, target còn ${m - i} ký tự`, en: `Sweep ${count} ends — source exhausted at j = ${n}, ${m - i} target characters left` },
+      note: i >= m
+        ? {
+          vi: `Subsequence thứ ${count} phủ target[${pass.from}..${pass.to}] = "${target.slice(pass.from, pass.to + 1)}". Không còn gì phải phủ nên vòng ngoài dừng.`,
+          en: `Subsequence ${count} covered target[${pass.from}..${pass.to}] = "${target.slice(pass.from, pass.to + 1)}". Nothing is left to cover, so the outer loop stops.`,
+        }
+        : {
+          vi: `${exhausted ? `Đã quét hết source (j = ${n})` : "Vòng trong dừng"} mà target mới phủ tới ${i}. Subsequence thứ ${count} phủ "${target.slice(pass.from, pass.to + 1)}" — đây là đoạn DÀI NHẤT mà một lượt qua source có thể phủ từ vị trí ${pass.from}. Muốn phủ tiếp thì phải dùng thêm một subsequence nữa.`,
+          en: `${exhausted ? `Source is fully swept (j = ${n})` : "The inner loop stopped"} but target is only covered up to ${i}. Subsequence ${count} covered "${target.slice(pass.from, pass.to + 1)}" — the LONGEST stretch one sweep of source can cover starting at ${pass.from}. Covering more requires another subsequence.`,
+        },
+      codeLines: [14],
+      curPass: count, count, i, j: n,
+      decision: i >= m
+        ? { vi: `Xong — dùng ${count} subsequence.`, en: `Done — ${count} subsequences used.` }
+        : { vi: `Cần thêm lượt nữa (đang ở ${count}).`, en: `Another sweep is needed (at ${count} so far).` },
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: n },
+        { name: "count", value: count },
+        { name: "đoạn phủ / covered", value: `"${target.slice(pass.from, pass.to + 1)}"` },
+      ],
+    });
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${count}`, en: `Answer = ${count}` },
+    note: {
+      vi: `target "${target}" được cắt thành ${count} đoạn: ${passes.map((p) => `"${target.slice(p.from, p.to + 1)}"`).join(" + ")}. Mỗi đoạn là một subsequence của source, nên cần đúng ${count} bản sao của source. Vì mỗi lượt đã phủ tối đa có thể, không cách nào dùng ít hơn ${count}.`,
+      en: `target "${target}" splits into ${count} runs: ${passes.map((p) => `"${target.slice(p.from, p.to + 1)}"`).join(" + ")}. Each run is a subsequence of source, so exactly ${count} copies of source are needed. Since every sweep covered as much as it possibly could, no smaller count is achievable.`,
+    },
+    codeLines: [18],
+    final: true,
+    count, i: m, answer: count,
+    decision: { vi: `${count} subsequence là ít nhất.`, en: `${count} subsequences is the minimum.` },
+    vars: [{ name: "answer", value: count }],
+  });
+
+  return { input, answer: count, steps };
+}
+
+// ── Approach 2: next-occurrence jump table ───────────────────────────────────
+function buildSteps1055Jump(input, params = {}) {
+  const { source, target } = parse1055Data(input, params);
+  const n = source.length;
+  const { steps, sourceSet, passes, snap } = sw1055Base(source, target, 2);
+  const letters = [...sourceSet].sort();
+
+  // nxt[i][ch] = smallest index j >= i with source[j] === ch, else n.
+  // Only characters that actually occur in source get a row: the other 26-|Σ|
+  // rows of the textbook table are all n and teach nothing.
+  const nxt = Array.from({ length: n + 1 }, () => ({}));
+  for (const ch of letters) nxt[n][ch] = n;
+  for (let i = n - 1; i >= 0; i--) {
+    for (const ch of letters) nxt[i][ch] = nxt[i + 1][ch];
+    nxt[i][source[i]] = i;
+  }
+  const tableAt = (built) => ({
+    letters,
+    n,
+    rows: letters.map((ch) => ({
+      ch,
+      cells: Array.from({ length: n + 1 }, (_, i) => (i >= built ? null : nxt[i][ch])),
+    })),
+    builtFrom: built,
+  });
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: bảng nhảy — source = "${source}", target = "${target}"`, en: `Approach 2: jump table — source = "${source}", target = "${target}"` },
+    note: {
+      vi: `Cách 1 phải quét từng ký tự source để tìm ký tự cần, nên xấu nhất là O(n·m). Ý tưởng cải tiến: dựng sẵn bảng nxt[i][c] = vị trí ĐẦU TIÊN ≥ i trong source có ký tự c (bằng n nếu không còn). Khi đó tìm ký tự tiếp theo là tra bảng O(1), không phải quét.`,
+      en: `Approach 1 scans source character by character to find what it needs, which is O(n·m) in the worst case. The improvement: precompute nxt[i][c] = the FIRST index ≥ i in source holding character c (or n if there is none). Finding the next character then becomes an O(1) table lookup instead of a scan.`,
+    },
+    codeLines: [3, 4],
+    count: 0,
+    decision: { vi: "Đổi quét tuyến tính thành tra bảng O(1).", en: "Trade the linear scan for an O(1) lookup." },
+    vars: [{ name: "source", value: source }, { name: "target", value: target }],
+  });
+
+  snap({
+    phase: "tableInit",
+    title: { vi: `nxt[${n}][c] = ${n} cho mọi c`, en: `nxt[${n}][c] = ${n} for every c` },
+    note: {
+      vi: `Hàng cuối (i = n, tức đã đi hết source) không còn ký tự nào phía sau, nên mọi ô bằng n — nghĩa là "không tìm thấy".`,
+      en: `The last row (i = n, past the end of source) has nothing after it, so every cell is n — meaning "not found".`,
+    },
+    codeLines: [5],
+    nxtTable: tableAt(n + 1),
+    count: 0,
+    decision: { vi: "n = không tìm thấy.", en: "n means not found." },
+    vars: [{ name: "n", value: n }],
+  });
+
+  for (let i = n - 1; i >= 0; i--) {
+    snap({
+      phase: "tableBuild",
+      title: { vi: `nxt[${i}]: sao hàng ${i + 1} rồi đặt nxt[${i}]['${source[i]}'] = ${i}`, en: `nxt[${i}]: copy row ${i + 1}, then set nxt[${i}]['${source[i]}'] = ${i}` },
+      note: {
+        vi: `Dựng bảng từ phải sang trái. Hàng i giống hàng i+1 ở mọi ký tự, chỉ khác đúng một ô: source[${i}] = '${source[i]}', nên ký tự '${source[i]}' gần nhất tính từ ${i} chính là ${i}.`,
+        en: `The table is built right to left. Row i equals row i+1 everywhere except one cell: source[${i}] = '${source[i]}', so the nearest '${source[i]}' from ${i} onward is ${i} itself.`,
+      },
+      codeLines: [6, 7, 8, 9],
+      nxtTable: tableAt(i + 1),
+      lookup: { row: i, ch: source[i], value: i, kind: "build" },
+      count: 0,
+      decision: { vi: `nxt[${i}]['${source[i]}'] = ${i}.`, en: `nxt[${i}]['${source[i]}'] = ${i}.` },
+      vars: [{ name: "i", value: i }, { name: "source[i]", value: `'${source[i]}'` }],
+    });
+  }
+
+  const fullTable = () => tableAt(0);
+
+  if (sw1055PreCheck({
+    source, target, sourceSet, snap,
+    codeLines: [13, 14], missingLines: [13, 14, 15],
+  })) {
+    return { input, answer: -1, steps };
+  }
+
+  let count = 1;
+  let i = 0;
+  let pass = { index: 1, from: 0, to: -1, picks: [] };
+  passes.push(pass);
+
+  snap({
+    phase: "init",
+    title: { vi: "count = 1, i = 0", en: "count = 1, i = 0" },
+    note: {
+      vi: "Bắt đầu với 1 subsequence đang mở và con trỏ i = 0 trong source. Khác cách 1: i ở đây là vị trí trong SOURCE của lượt hiện tại, không phải vị trí trong target.",
+      en: "Start with one open subsequence and pointer i = 0 into source. Unlike approach 1, here i is the position within SOURCE for the current sweep, not a position in target.",
+    },
+    codeLines: [11],
+    nxtTable: fullTable(),
+    curPass: 1, count, j: 0,
+    decision: { vi: "i = vị trí trong source của lượt hiện tại.", en: "i = position in source for the current sweep." },
+    vars: [{ name: "count", value: count }, { name: "i", value: i }],
+  });
+
+  for (let t = 0; t < target.length; t++) {
+    const ch = target[t];
+    const direct = nxt[i][ch];
+    if (direct === n) {
+      count += 1;
+      pass.to = t - 1;
+      pass = { index: count, from: t, to: t - 1, picks: [] };
+      passes.push(pass);
+      const restart = nxt[0][ch];
+      snap({
+        phase: "newPass",
+        title: { vi: `nxt[${i}]['${ch}'] = ${n} → hết source, mở lượt ${count}`, en: `nxt[${i}]['${ch}'] = ${n} → source exhausted, open sweep ${count}` },
+        note: {
+          vi: `Từ vị trí ${i} trong source không còn '${ch}' nào nữa (bảng trả về ${n}). Vậy lượt hiện tại không thể phủ target[${t}]='${ch}' → phải dùng thêm một subsequence: count = ${count}. Quay về đầu source và tra lại: nxt[0]['${ch}'] = ${restart}.`,
+          en: `From position ${i} in source there is no further '${ch}' (the table returns ${n}). So the current sweep cannot cover target[${t}]='${ch}' → another subsequence is needed: count = ${count}. Go back to the start of source and look up again: nxt[0]['${ch}'] = ${restart}.`,
+        },
+        codeLines: [16, 17, 18, 19],
+        nxtTable: fullTable(),
+        lookup: { row: i, ch, value: n, kind: "miss", restartRow: 0, restartValue: restart },
+        curPass: count, count, i: t, j: restart,
+        decision: { vi: `Hết source → subsequence thứ ${count}.`, en: `Source ran out → subsequence ${count}.` },
+        vars: [{ name: "ch", value: `'${ch}'` }, { name: `nxt[${i}]['${ch}']`, value: n }, { name: "count", value: count }],
+      });
+      pass.picks.push({ si: restart, ti: t, ch });
+      pass.to = t;
+      i = restart + 1;
+      snap({
+        phase: "match",
+        title: { vi: `target[${t}]='${ch}' lấy ở source[${restart}], i → ${i}`, en: `target[${t}]='${ch}' taken from source[${restart}], i → ${i}` },
+        note: {
+          vi: `Lượt mới nhặt '${ch}' tại source[${restart}]. Con trỏ source nhảy tới ${i} = ${restart} + 1 để lần sau chỉ tìm từ sau vị trí vừa dùng.`,
+          en: `The new sweep picks '${ch}' at source[${restart}]. The source pointer jumps to ${i} = ${restart} + 1 so the next lookup only searches after the position just consumed.`,
+        },
+        codeLines: [20],
+        nxtTable: fullTable(),
+        lookup: { row: 0, ch, value: restart, kind: "hit" },
+        curPass: count, count, i: t + 1, j: i,
+        matchedTi: t,
+        decision: { vi: `Phủ target[${t}] bằng source[${restart}].`, en: `Covered target[${t}] with source[${restart}].` },
+        vars: [{ name: "i", value: i }],
+      });
+      continue;
+    }
+
+    pass.picks.push({ si: direct, ti: t, ch });
+    pass.to = t;
+    const before = i;
+    i = direct + 1;
+    snap({
+      phase: "match",
+      title: { vi: `nxt[${before}]['${ch}'] = ${direct} → phủ target[${t}], i → ${i}`, en: `nxt[${before}]['${ch}'] = ${direct} → covers target[${t}], i → ${i}` },
+      note: {
+        vi: `Tra bảng một lần là biết '${ch}' gần nhất từ vị trí ${before} nằm ở source[${direct}] — không phải quét. Nhặt nó vào lượt ${count}, rồi đẩy con trỏ source tới ${i}.`,
+        en: `One table lookup tells us the nearest '${ch}' from position ${before} sits at source[${direct}] — no scanning. Take it into sweep ${count}, then move the source pointer to ${i}.`,
+      },
+      codeLines: [16, 20],
+      nxtTable: fullTable(),
+      lookup: { row: before, ch, value: direct, kind: "hit" },
+      curPass: count, count, i: t + 1, j: i,
+      matchedTi: t,
+      decision: { vi: `Nhảy thẳng tới source[${direct}].`, en: `Jumped straight to source[${direct}].` },
+      vars: [{ name: "ch", value: `'${ch}'` }, { name: `nxt[${before}]['${ch}']`, value: direct }, { name: "i", value: i }],
+    });
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${count}`, en: `Answer = ${count}` },
+    note: {
+      vi: `Cùng kết quả như cách 1: target cắt thành ${count} đoạn ${passes.map((p) => `"${target.slice(p.from, p.to + 1)}"`).join(" + ")}. Khác biệt là mỗi ký tự target chỉ tốn một lần tra bảng, nên tổng là O(26·n + m) thay vì O(n·m).`,
+      en: `Same result as approach 1: target splits into ${count} runs ${passes.map((p) => `"${target.slice(p.from, p.to + 1)}"`).join(" + ")}. The difference is that each target character costs one lookup, making the total O(26·n + m) instead of O(n·m).`,
+    },
+    codeLines: [21],
+    final: true,
+    nxtTable: fullTable(),
+    count, answer: count, i: target.length,
+    decision: { vi: `${count} subsequence — O(26·n + m).`, en: `${count} subsequences — O(26·n + m).` },
+    vars: [{ name: "answer", value: count }],
+  });
+
+  return { input, answer: count, steps };
+}
+
+Object.assign(module.exports, {
+  1055: {
+    id: 1055,
+    difficulty: "medium",
+    premium: true,
+    slug: "shortest-way-to-form-string",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "subsequence", vi: "Subsequence", en: "Subsequence" },
+    ],
+    title: { vi: "Shortest Way to Form String", en: "Shortest Way to Form String" },
+    titleVi: { vi: "Ít subsequence nhất để ghép thành target", en: "Fewest subsequences to form the target" },
+    statement: {
+      vi: "Cho hai chuỗi source và target (chữ thường). Trả về số lượng SUBSEQUENCE của source ít nhất mà ghép liên tiếp lại được đúng target. Nếu không thể, trả -1. (Subsequence là chuỗi thu được bằng cách bỏ đi một số ký tự của source mà giữ nguyên thứ tự.)",
+      en: "Given two lowercase strings source and target, return the minimum number of SUBSEQUENCES of source whose concatenation equals target, or -1 if it is impossible. (A subsequence is formed by deleting some characters of source while keeping the order.)",
+    },
+    defaultInput: "xyz",
+    inputKind: "string",
+    inputLabel: { vi: "source (chữ thường)", en: "source (lowercase)" },
+    extraParams: [
+      { key: "target", type: "string", label: { vi: "target (chữ thường)", en: "target (lowercase)" }, default: "xzyxz" },
+    ],
+    approach: [
+      { vi: "Kiểm tra trước: nếu target có ký tự không nằm trong source thì trả -1 ngay, vì không subsequence nào của source chứa được ký tự đó.", en: "Check first: if target uses a character absent from source, return -1 immediately, since no subsequence of source can ever contain it." },
+      { vi: "Mỗi subsequence tương ứng một LƯỢT QUÉT source từ trái sang phải, dọc đường nhặt các ký tự khớp target theo thứ tự. Hết source mà target chưa xong thì buộc mở lượt mới. Đáp án = số lượt.", en: "Each subsequence is one SWEEP across source from left to right, picking up characters that match target in order. If source runs out while target is unfinished, a new sweep is forced. The answer is the number of sweeps." },
+      { vi: "Con trỏ i (trong target) chỉ tiến, không bao giờ reset; con trỏ j (trong source) mới reset về 0 mỗi lượt. Đây là chỗ dễ nhầm nhất.", en: "Pointer i (into target) only advances and never resets; pointer j (into source) is the one that restarts at 0 each sweep. This is the easiest part to get wrong." },
+      { vi: "Tham lam là tối ưu: mỗi lượt phủ đoạn target DÀI NHẤT có thể. Phủ thêm một ký tự không bao giờ làm tệ hơn vì nó chỉ đẩy điểm bắt đầu của lượt sau đi xa hơn, mà đoạn phủ được của lượt sau là đơn điệu theo điểm bắt đầu.", en: "Greedy is optimal: each sweep covers the LONGEST possible run of target. Covering one more character never hurts, because it only pushes the next sweep's start further along, and how far a sweep reaches is monotone in where it starts." },
+      { vi: "Cách 2 thay việc quét bằng bảng nxt[i][c] = vị trí đầu tiên ≥ i trong source có ký tự c. Dựng bảng từ phải sang trái, mỗi ký tự target chỉ cần một lần tra → O(26·n + m) thay vì O(n·m).", en: "Approach 2 replaces the scan with a table nxt[i][c] = the first index ≥ i in source holding c. Build it right to left; each target character then needs one lookup → O(26·n + m) instead of O(n·m)." },
+    ],
+    complexity: {
+      time: "O(n · m)",
+      space: "O(1)",
+      note: {
+        vi: "Cách 1: mỗi lượt quét hết source O(n), số lượt tối đa m → O(n·m), bộ nhớ O(1) ngoài tập ký tự. Cách 2: O(26·n) dựng bảng + O(m) tra, bộ nhớ O(26·n).",
+        en: "Approach 1: each sweep scans all of source in O(n) and there are at most m sweeps → O(n·m), with O(1) extra space beyond the character set. Approach 2: O(26·n) to build the table plus O(m) lookups, using O(26·n) space.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Tham lam + hai con trỏ", en: "Approach 1 · Greedy + two pointers" },
+    code: [
+      "class Solution:",
+      "    def shortestWay(self, source: str, target: str) -> int:",
+      "        chars = set(source)",
+      "        for ch in target:",
+      "            if ch not in chars:",
+      "                return -1",
+      "        m, n = len(target), len(source)",
+      "        count = 0",
+      "        i = 0                        # next target index to cover",
+      "",
+      "        while i < m:",
+      "            count += 1               # one more subsequence of source",
+      "            j = 0                    # sweep source from the start",
+      "            while j < n and i < m:",
+      "                if source[j] == target[i]:",
+      "                    i += 1           # this target char is covered",
+      "                j += 1",
+      "        return count",
+    ],
+    code2Label: { vi: "Cách 2 · Bảng next-occurrence", en: "Approach 2 · Next-occurrence table" },
+    code2: [
+      "class Solution:",
+      "    def shortestWay(self, source: str, target: str) -> int:",
+      "        n = len(source)",
+      "        # nxt[i][c] = first index >= i in source holding c, else n",
+      "        nxt = [[n] * 26 for _ in range(n + 1)]",
+      "        for i in range(n - 1, -1, -1):",
+      "            for c in range(26):",
+      "                nxt[i][c] = nxt[i + 1][c]",
+      "            nxt[i][ord(source[i]) - 97] = i",
+      "",
+      "        count, i = 1, 0",
+      "        for ch in target:",
+      "            c = ord(ch) - 97",
+      "            if nxt[0][c] == n:",
+      "                return -1",
+      "            j = nxt[i][c]",
+      "            if j == n:               # this sweep cannot continue",
+      "                count += 1",
+      "                j = nxt[0][c]",
+      "            i = j + 1",
+      "        return count",
+    ],
+    liveArgs(input, params = {}) {
+      const { source, target } = parse1055Data(input, params);
+      return [source, target];
+    },
+    builder: buildSteps1055,
+    builder2: buildSteps1055Jump,
+  },
+});
