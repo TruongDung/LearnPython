@@ -17033,3 +17033,414 @@ Object.assign(module.exports, {
     builder: buildSteps539,
   },
 });
+
+// ─── 419: Battleships in a Board ───
+// Count the ships on an X/. board. Ships are straight 1×k or k×1 runs and never
+// touch, so the connected components ARE the ships.
+//
+// Both builders feed `battleships419View`. The point worth seeing is why the
+// O(1)-space one-pass solution is allowed to be so short: because each ship is a
+// straight run that touches nothing else, exactly ONE of its cells has no X above
+// AND no X to the left — its top-left end. Counting those cells counts the ships,
+// with no visited set and no writes to the board.
+
+const BS419_LIMITS = { rows: 10, cols: 12 };
+
+function parseBoard419(input) {
+  const raw = String(input ?? "").trim();
+  if (!raw) throw new Error("board must not be empty");
+  const rowsRaw = raw.split(/[|;\n]/).map((r) => r.trim().replace(/,/g, "")).filter((r) => r.length);
+  if (!rowsRaw.length) throw new Error("board must not be empty");
+  if (!rowsRaw.every((r) => /^[X.]+$/i.test(r))) throw new Error("board cells must be only 'X' or '.'");
+  const grid = rowsRaw.map((r) => r.toUpperCase().split(""));
+  const cols = grid[0].length;
+  if (!grid.every((r) => r.length === cols)) throw new Error("all board rows must have the same length");
+  const rows = grid.length;
+  if (rows > BS419_LIMITS.rows) throw new Error(`visualization supports at most ${BS419_LIMITS.rows} rows`);
+  if (cols > BS419_LIMITS.cols) throw new Error(`visualization supports at most ${BS419_LIMITS.cols} cols`);
+
+  // LeetCode guarantees ships are 1×k or k×1 and never adjacent, so every
+  // connected component must be a straight line. That guarantee is exactly what
+  // makes the top-left trick correct, and an L-shaped blob genuinely breaks it
+  // (".X / XX" would be counted as 2 ships but is 1 component), so reject inputs
+  // the problem never allows rather than report something wrong.
+  const shipOf = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const ships = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "X" || shipOf[r][c] !== -1) continue;
+      const id = ships.length;
+      const cells = [];
+      const stack = [[r, c]];
+      shipOf[r][c] = id;
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        cells.push([cr, cc]);
+        for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (grid[nr][nc] !== "X" || shipOf[nr][nc] !== -1) continue;
+          shipOf[nr][nc] = id;
+          stack.push([nr, nc]);
+        }
+      }
+      const sameRow = cells.every(([cr]) => cr === cells[0][0]);
+      const sameCol = cells.every(([, cc]) => cc === cells[0][1]);
+      if (!sameRow && !sameCol) {
+        throw new Error("every ship must be a straight 1xk or kx1 run with no ship touching another (LeetCode guarantees this)");
+      }
+      cells.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      ships.push({ id, cells, horizontal: sameRow && cells.length > 1 });
+    }
+  }
+  return { grid, rows, cols, shipOf, ships };
+}
+
+function bs419Base(grid, rows, cols, shipOf, ships, approach) {
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      battleships419View: {
+        approach,
+        rows, cols,
+        grid: grid.map((row) => [...row]),
+        // Ship identity is shown only so a reader can check the count by eye. The
+        // O(1) algorithm never computes it, and the panel says so.
+        shipOf: shipOf.map((row) => [...row]),
+        shipCount: ships.length,
+        phase: o.phase,
+        cur: o.cur || null,
+        skip: o.skip || null,
+        checks: o.checks || null,
+        counted: o.counted ? o.counted.map((x) => [...x]) : [],
+        seen: o.seen ? o.seen.map((x) => [...x]) : null,
+        stack: o.stack ? o.stack.map((x) => [...x]) : null,
+        count: o.count === undefined ? null : o.count,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, snap };
+}
+
+const bs419Cells = (grid) => grid.flat();
+const bs419CountX = (grid) => bs419Cells(grid).filter((ch) => ch === "X").length;
+
+// ── Approach 1: count only each ship's top-left cell (O(1) space, one pass) ──
+function buildSteps419(input) {
+  const { grid, rows, cols, shipOf, ships } = parseBoard419(input);
+  const { steps, snap } = bs419Base(grid, rows, cols, shipOf, ships, 1);
+  const counted = [];
+  let count = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Bảng ${rows}×${cols}, ${bs419CountX(grid)} ô 'X'`, en: `Board ${rows}×${cols}, ${bs419CountX(grid)} cells of 'X'` },
+    note: {
+      vi: `Tàu là một dãy THẲNG 1×k hoặc k×1, và hai tàu không bao giờ kề nhau. Chính hai điều kiện đó khiến mỗi tàu có ĐÚNG MỘT ô không có 'X' ở trên và cũng không có 'X' ở bên trái — đó là ô đầu trên-trái của tàu. Vậy chỉ cần đếm những ô như thế là đếm được số tàu: quét một lượt, không cần mảng visited, không sửa bảng.`,
+      en: `A ship is a STRAIGHT 1×k or k×1 run, and two ships never touch. Those two facts give every ship EXACTLY ONE cell with no 'X' above it and no 'X' to its left — its top-left end. So counting those cells counts the ships: one pass, no visited array, no writes to the board.`,
+    },
+    codeLines: [2, 3],
+    count: 0, counted,
+    decision: { vi: "Đếm ô đầu trên-trái của mỗi tàu.", en: "Count each ship's top-left end cell." },
+    vars: [{ name: "rows, cols", value: `${rows}, ${cols}` }, { name: "count", value: 0 }],
+  });
+
+  let pendingFrom = null;                 // start of the current run of non-X cells
+  const flushSkip = (toR, toC) => {
+    if (pendingFrom === null) return;
+    const from = pendingFrom;
+    pendingFrom = null;
+    snap({
+      phase: "skip",
+      title: {
+        vi: `Bỏ qua ô trống (${from[0]},${from[1]}) → (${toR},${toC})`,
+        en: `Skip the empty cells (${from[0]},${from[1]}) → (${toR},${toC})`,
+      },
+      note: {
+        vi: `Các ô này là '.' nên không thuộc tàu nào, bỏ qua ngay. Quét theo thứ tự từng hàng từ trái sang phải — đó là lý do "ô ở trên" và "ô bên trái" luôn đã được xét trước ô hiện tại.`,
+        en: `These cells are '.', so they belong to no ship and are skipped. The scan goes row by row, left to right — which is exactly why the cell above and the cell to the left have always been visited before the current one.`,
+      },
+      codeLines: [6, 7],
+      cur: { r: toR, c: toC },
+      skip: { from, to: [toR, toC] },
+      count, counted,
+      decision: { vi: "Ô trống → bỏ qua.", en: "Empty cells → skipped." },
+      vars: [{ name: "count", value: count }],
+    });
+  };
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "X") {
+        if (pendingFrom === null) pendingFrom = [r, c];
+        continue;
+      }
+      flushSkip(r, c);
+
+      const up = r > 0 ? grid[r - 1][c] : null;       // null = off the board
+      const left = c > 0 ? grid[r][c - 1] : null;
+      const upIsX = up === "X";
+      const leftIsX = left === "X";
+      const isStart = !upIsX && !leftIsX;
+      const checks = { up, left, upIsX, leftIsX, isStart };
+
+      if (isStart) {
+        count += 1;
+        counted.push([r, c]);
+        snap({
+          phase: "count",
+          title: { vi: `(${r},${c}) là đầu tàu → count = ${count}`, en: `(${r},${c}) is a ship's start → count = ${count}` },
+          note: {
+            vi: `Ô trên: ${up === null ? "ngoài bảng" : `'${up}'`}. Ô bên trái: ${left === null ? "ngoài bảng" : `'${left}'`}. Không bên nào là 'X', nên (${r},${c}) là ô trên-trái nhất của tàu nó thuộc về → đếm tàu này. Các ô 'X' còn lại của cùng tàu đó sẽ bị bỏ qua vì chúng có 'X' ở trên hoặc bên trái.`,
+            en: `Above: ${up === null ? "off the board" : `'${up}'`}. To the left: ${left === null ? "off the board" : `'${left}'`}. Neither is 'X', so (${r},${c}) is the top-left end of its ship → count it. The ship's other 'X' cells will be skipped, because each of them does have an 'X' above or to the left.`,
+          },
+          codeLines: [8, 10, 12],
+          cur: { r, c }, checks,
+          count, counted,
+          decision: { vi: `Tàu thứ ${count}.`, en: `Ship number ${count}.` },
+          vars: [
+            { name: "board[i-1][j]", value: up === null ? "ngoài bảng / off board" : `'${up}'` },
+            { name: "board[i][j-1]", value: left === null ? "ngoài bảng / off board" : `'${left}'` },
+            { name: "count", value: count },
+          ],
+        });
+      } else {
+        snap({
+          phase: "inside",
+          title: {
+            vi: `(${r},${c}) là thân tàu → không đếm`,
+            en: `(${r},${c}) is inside a ship → not counted`,
+          },
+          note: {
+            vi: `${upIsX ? `Ô trên (${r - 1},${c}) là 'X'` : `Ô bên trái (${r},${c - 1}) là 'X'`}, nghĩa là ô này nối tiếp một ô 'X' đã quét trước đó của CÙNG một tàu. Tàu đó đã được đếm ở đầu trên-trái của nó, nên bỏ qua ô này để không đếm trùng.`,
+            en: `${upIsX ? `The cell above (${r - 1},${c}) is 'X'` : `The cell to the left (${r},${c - 1}) is 'X'`}, so this cell continues an already-scanned 'X' of the SAME ship. That ship was counted at its top-left end, so skip this cell to avoid double counting.`,
+          },
+          codeLines: upIsX ? [8, 9] : [10, 11],
+          cur: { r, c }, checks,
+          count, counted,
+          decision: upIsX
+            ? { vi: "Có 'X' ở trên → đã đếm rồi.", en: "There is an 'X' above → already counted." }
+            : { vi: "Có 'X' bên trái → đã đếm rồi.", en: "There is an 'X' to the left → already counted." },
+          vars: [
+            { name: "board[i-1][j]", value: up === null ? "ngoài bảng / off board" : `'${up}'` },
+            { name: "board[i][j-1]", value: left === null ? "ngoài bảng / off board" : `'${left}'` },
+            { name: "count", value: count },
+          ],
+        });
+      }
+    }
+  }
+  flushSkip(rows - 1, cols - 1);
+
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${count}`, en: `Answer = ${count}` },
+    note: {
+      vi: `Quét đúng một lượt qua ${rows * cols} ô và chỉ dùng một biến count — O(1) bộ nhớ thêm, không sửa bảng. Đếm được ${count} tàu, khớp với ${ships.length} tàu thật trên bảng. Mấu chốt vẫn là: vì tàu là dãy thẳng và không kề nhau, mỗi tàu chỉ có một ô "không có X ở trên và không có X bên trái".`,
+      en: `Exactly one pass over ${rows * cols} cells using a single counter — O(1) extra memory, and the board is never modified. It found ${count} ships, matching the ${ships.length} ships actually on the board. The reason it works stays the same: because ships are straight and never touch, each has exactly one cell with no X above and no X to the left.`,
+    },
+    codeLines: [13],
+    final: true,
+    count, counted, answer: count,
+    decision: { vi: `${count} tàu.`, en: `${count} ships.` },
+    vars: [{ name: "answer", value: count }],
+  });
+
+  return { input, answer: count, steps };
+}
+
+// ── Approach 2: flood fill each component (the baseline that needs memory) ───
+function buildSteps419FloodFill(input) {
+  const { grid, rows, cols, shipOf, ships } = parseBoard419(input);
+  const { steps, snap } = bs419Base(grid, rows, cols, shipOf, ships, 2);
+  const seenSet = new Set();
+  const seen = [];
+  const key = (r, c) => `${r},${c}`;
+  let count = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: flood fill — bảng ${rows}×${cols}`, en: `Approach 2: flood fill — board ${rows}×${cols}` },
+    note: {
+      vi: `Cách thẳng thắn: mỗi tàu là một thành phần liên thông của các ô 'X', nên quét bảng, gặp ô 'X' chưa thăm thì tăng count rồi loang ra toàn bộ tàu đó và đánh dấu đã thăm. Đúng nhưng phải trả giá: cần một tập seen kích thước O(m·n) (hoặc phải ghi đè lên bảng). Đề bài hỏi thêm liệu có làm được một lượt với O(1) bộ nhớ và KHÔNG sửa bảng — đó chính là cách 1.`,
+      en: `The straightforward way: each ship is a connected component of 'X' cells, so scan the board, and on an unvisited 'X' increment the count then flood out over that whole ship marking cells visited. Correct, but it costs an O(m·n) seen set (or overwriting the board). The problem's follow-up asks for one pass in O(1) memory WITHOUT modifying the board — that is approach 1.`,
+    },
+    codeLines: [3, 4, 5],
+    count: 0, seen, stack: [],
+    decision: { vi: "Đếm thành phần liên thông, cần O(m·n) bộ nhớ.", en: "Count connected components, needing O(m·n) memory." },
+    vars: [{ name: "rows, cols", value: `${rows}, ${cols}` }, { name: "len(seen)", value: 0 }],
+  });
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "X" || seenSet.has(key(r, c))) continue;
+      count += 1;
+      seenSet.add(key(r, c));
+      seen.push([r, c]);
+      const stack = [[r, c]];
+      snap({
+        phase: "newShip",
+        title: { vi: `Gặp 'X' chưa thăm ở (${r},${c}) → tàu thứ ${count}`, en: `Unvisited 'X' at (${r},${c}) → ship number ${count}` },
+        note: {
+          vi: `Ô (${r},${c}) là 'X' và chưa nằm trong seen, nên nó mở ra một tàu mới. Tăng count lên ${count}, đánh dấu đã thăm, rồi đẩy vào stack để loang ra hết tàu.`,
+          en: `Cell (${r},${c}) is an 'X' not yet in seen, so it opens a new ship. Bump the count to ${count}, mark it visited, and push it on the stack to flood the rest of the ship.`,
+        },
+        codeLines: [8, 10, 11, 12],
+        cur: { r, c },
+        count, seen, stack,
+        decision: { vi: `Tàu thứ ${count} bắt đầu ở (${r},${c}).`, en: `Ship ${count} starts at (${r},${c}).` },
+        vars: [{ name: "count", value: count }, { name: "len(seen)", value: seen.length }],
+      });
+
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        const added = [];
+        for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (grid[nr][nc] !== "X" || seenSet.has(key(nr, nc))) continue;
+          seenSet.add(key(nr, nc));
+          seen.push([nr, nc]);
+          stack.push([nr, nc]);
+          added.push([nr, nc]);
+        }
+        snap({
+          phase: "flood",
+          title: {
+            vi: added.length
+              ? `Loang từ (${cr},${cc}): thêm ${added.map(([ar, ac]) => `(${ar},${ac})`).join(", ")}`
+              : `Loang từ (${cr},${cc}): không còn ô mới`,
+            en: added.length
+              ? `Flood from (${cr},${cc}): added ${added.map(([ar, ac]) => `(${ar},${ac})`).join(", ")}`
+              : `Flood from (${cr},${cc}): nothing new`,
+          },
+          note: {
+            vi: added.length
+              ? `Xét 4 ô kề của (${cr},${cc}); ${added.length} ô là 'X' và chưa thăm nên thuộc cùng tàu này, đánh dấu và đẩy vào stack. Stack còn ${stack.length} ô chờ.`
+              : `Cả 4 ô kề của (${cr},${cc}) đều ngoài bảng, là '.', hoặc đã thăm. ${stack.length ? `Stack còn ${stack.length} ô chờ.` : "Stack rỗng → tàu này đã loang xong."}`,
+            en: added.length
+              ? `Check the 4 neighbours of (${cr},${cc}); ${added.length} of them are 'X' and unvisited so they belong to this ship — mark and push them. The stack holds ${stack.length} cells.`
+              : `All 4 neighbours of (${cr},${cc}) are off the board, '.', or already visited. ${stack.length ? `The stack holds ${stack.length} cells.` : "The stack is empty → this ship is fully flooded."}`,
+          },
+          codeLines: [14, 15, 16, 17, 18, 19],
+          cur: { r: cr, c: cc },
+          count, seen, stack,
+          decision: added.length
+            ? { vi: `Thêm ${added.length} ô vào tàu ${count}.`, en: `Added ${added.length} cells to ship ${count}.` }
+            : { vi: stack.length ? "Không có ô mới, lấy ô khác từ stack." : `Tàu ${count} loang xong.`, en: stack.length ? "Nothing new, pop the next stack cell." : `Ship ${count} is complete.` },
+          vars: [{ name: "stack", value: stack.length }, { name: "len(seen)", value: seen.length }],
+        });
+      }
+    }
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${count}`, en: `Answer = ${count}` },
+    note: {
+      vi: `Tìm được ${count} thành phần liên thông = ${count} tàu, cùng kết quả với cách 1. Nhưng cách này đã phải lưu ${seen.length} ô trong seen — O(m·n) bộ nhớ, trong khi cách 1 chỉ dùng một biến đếm. Đó là lý do cách 1 mới là câu trả lời cho phần follow-up của đề.`,
+      en: `It found ${count} connected components = ${count} ships, the same result as approach 1. But it had to store ${seen.length} cells in seen — O(m·n) memory, where approach 1 uses a single counter. That is why approach 1 is the answer to the problem's follow-up.`,
+    },
+    codeLines: [20],
+    final: true,
+    count, seen, stack: [], answer: count,
+    decision: { vi: `${count} tàu, dùng ${seen.length} ô bộ nhớ.`, en: `${count} ships, using ${seen.length} cells of memory.` },
+    vars: [{ name: "answer", value: count }, { name: "len(seen)", value: seen.length }],
+  });
+
+  return { input, answer: count, steps };
+}
+
+Object.assign(module.exports, {
+  419: {
+    id: 419,
+    difficulty: "medium",
+    slug: "battleships-in-a-board",
+    category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },
+    tags: [
+      { key: "matrix", vi: "Ma trận", en: "Matrix" },
+      { key: "counting", vi: "Đếm", en: "Counting" },
+      { key: "flood-fill", vi: "Flood Fill", en: "Flood Fill" },
+    ],
+    title: { vi: "Battleships in a Board", en: "Battleships in a Board" },
+    titleVi: { vi: "Đếm tàu chiến trên bảng", en: "Counting battleships on a board" },
+    statement: {
+      vi: "Cho bảng m×n gồm 'X' (thân tàu) và '.' (ô trống), đếm số tàu. Mỗi tàu là một dãy thẳng 1×k hoặc k×1, và giữa hai tàu luôn có ít nhất một ô trống ngăn cách (không có hai tàu kề nhau). Nhập bảng: các hàng cách nhau bởi '|' hoặc ';', ví dụ \"X..X|...X|...X\".",
+      en: "Given an m×n board of 'X' (ship) and '.' (empty), count the battleships. Each ship is a straight 1×k or k×1 run, and at least one empty cell always separates two ships (no two ships are adjacent). Enter the board with rows separated by '|' or ';', e.g. \"X..X|...X|...X\".",
+    },
+    defaultInput: "X..X|...X|...X",
+    inputKind: "string",
+    inputLabel: { vi: "board (hàng cách bởi '|', ký tự X và .)", en: "board (rows separated by '|', characters X and .)" },
+    extraParams: [],
+    approach: [
+      { vi: "Vì tàu là dãy THẲNG và hai tàu không bao giờ kề nhau, mỗi tàu có ĐÚNG MỘT ô không có 'X' ở trên và cũng không có 'X' ở bên trái — chính là đầu trên-trái của nó.", en: "Because ships are STRAIGHT runs and two ships never touch, every ship has EXACTLY ONE cell with no 'X' above it and no 'X' to its left — its top-left end." },
+      { vi: "Vậy chỉ cần quét từng hàng từ trái sang phải và đếm các ô 'X' thoả điều kiện đó. Đếm đúng mỗi tàu một lần, không cần visited, không sửa bảng → đúng yêu cầu follow-up: một lượt, O(1) bộ nhớ.", en: "So scan row by row, left to right, and count the 'X' cells meeting that condition. Each ship is counted exactly once with no visited array and no writes to the board → exactly the follow-up's ask: one pass, O(1) memory." },
+      { vi: "Thứ tự quét là lý do phép kiểm chỉ cần nhìn LÊN và nhìn SANG TRÁI: hai ô đó chắc chắn đã được quét trước ô hiện tại, còn ô dưới và ô bên phải thì chưa.", en: "The scan order is why the test only looks UP and LEFT: those two cells have certainly been scanned already, while the cell below and the cell to the right have not." },
+      { vi: "Cách 2 là flood fill đếm thành phần liên thông — dễ nghĩ ra và cũng đúng, nhưng cần tập seen O(m·n) (hoặc phải ghi đè bảng), nên không đáp ứng được follow-up.", en: "Approach 2 is flood fill counting connected components — easy to think of and also correct, but it needs an O(m·n) seen set (or overwriting the board), so it does not satisfy the follow-up." },
+      { vi: "Điều kiện 'không hai tàu kề nhau' là bắt buộc cho cách 1. Với một khối hình chữ L như '.X' trên 'XX', cách 1 đếm ra 2 còn flood fill ra 1 — nhưng đề bài bảo đảm không có hình như thế.", en: "The 'no two ships adjacent' rule is essential for approach 1. On an L-shaped blob such as '.X' over 'XX' approach 1 counts 2 while flood fill counts 1 — but the problem guarantees such shapes never appear." },
+    ],
+    complexity: {
+      time: "O(m · n)",
+      space: "O(1)",
+      note: {
+        vi: "Cách 1 xét mỗi ô đúng một lần và chỉ giữ một biến đếm → O(m·n) thời gian, O(1) bộ nhớ thêm, bảng không bị sửa. Cách 2 cũng O(m·n) thời gian nhưng tốn O(m·n) bộ nhớ cho tập seen và stack.",
+        en: "Approach 1 visits each cell once and keeps a single counter → O(m·n) time, O(1) extra space, board untouched. Approach 2 is also O(m·n) time but spends O(m·n) space on the seen set and the stack.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Đếm đầu trên-trái (O(1) bộ nhớ)", en: "Approach 1 · Count top-left ends (O(1) space)" },
+    code: [
+      "class Solution:",
+      "    def countBattleships(self, board: List[List[str]]) -> int:",
+      "        count = 0",
+      "        for i in range(len(board)):",
+      "            for j in range(len(board[0])):",
+      "                if board[i][j] != 'X':",
+      "                    continue",
+      "                if i > 0 and board[i-1][j] == 'X':",
+      "                    continue            # same ship, already counted",
+      "                if j > 0 and board[i][j-1] == 'X':",
+      "                    continue            # same ship, already counted",
+      "                count += 1              # top-left end of a ship",
+      "        return count",
+    ],
+    code2Label: { vi: "Cách 2 · Flood fill thành phần liên thông", en: "Approach 2 · Flood-fill connected components" },
+    code2: [
+      "class Solution:",
+      "    def countBattleships(self, board: List[List[str]]) -> int:",
+      "        m, n = len(board), len(board[0])",
+      "        seen = set()",
+      "        count = 0",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if board[i][j] != 'X' or (i, j) in seen:",
+      "                    continue",
+      "                count += 1              # a new ship",
+      "                stack = [(i, j)]",
+      "                seen.add((i, j))",
+      "                while stack:",
+      "                    r, c = stack.pop()",
+      "                    for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):",
+      "                        nr, nc = r+dr, c+dc",
+      "                        if 0 <= nr < m and 0 <= nc < n and board[nr][nc] == 'X' and (nr, nc) not in seen:",
+      "                            seen.add((nr, nc))",
+      "                            stack.append((nr, nc))",
+      "        return count",
+    ],
+    liveArgs(input) {
+      const { grid } = parseBoard419(input);
+      return [grid];
+    },
+    builder: buildSteps419,
+    builder2: buildSteps419FloodFill,
+  },
+});

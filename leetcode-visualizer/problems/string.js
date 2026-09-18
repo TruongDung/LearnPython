@@ -17239,3 +17239,797 @@ Object.assign(module.exports, {
     builder2: buildSteps1055Jump,
   },
 });
+
+// ─── 1554: Strings Differ by One Character ───
+// Are there two words in dict that agree everywhere except exactly one index?
+//
+// Both builders feed `differByOne1554View`. The idea worth seeing is the wildcard
+// mask: if two words differ at exactly index i, then blanking index i in BOTH of
+// them produces the SAME string. So "differ by one" becomes "two words collide on
+// some masked pattern", which a hash set answers without comparing pairs at all.
+
+const DBO1554_LIMITS = { words: 8, length: 8 };
+
+function parse1554Data(input) {
+  let words;
+  if (Array.isArray(input)) words = input.map((w) => String(w).trim());
+  else {
+    const raw = String(input ?? "").trim();
+    if (!raw) throw new Error("dict must not be empty");
+    words = raw.startsWith("[")
+      ? JSON.parse(raw).map((w) => String(w).trim())
+      : raw.split(/[,;|]/).map((w) => w.trim()).filter(Boolean);
+  }
+  if (words.length < 2) throw new Error("dict needs at least 2 words");
+  if (words.length > DBO1554_LIMITS.words) throw new Error(`visualization supports at most ${DBO1554_LIMITS.words} words`);
+  if (!words.every((w) => /^[a-z]+$/.test(w))) throw new Error("every word must be non-empty lowercase a-z");
+  const m = words[0].length;
+  if (!words.every((w) => w.length === m)) throw new Error("all words must have the same length");
+  if (m > DBO1554_LIMITS.length) throw new Error(`visualization supports words up to ${DBO1554_LIMITS.length} characters`);
+  // LeetCode states dict[i] is unique, and the masking trick relies on it: two
+  // identical words would collide on every pattern while differing at ZERO
+  // indices, which is not an answer. Reject duplicates rather than report a
+  // wrong result for input the problem never allows.
+  if (new Set(words).size !== words.length) throw new Error("dict entries must be unique (LeetCode guarantees this)");
+  return { words, m };
+}
+
+// Count the indices at which two equal-length words differ, and the first one.
+function dbo1554Diff(a, b) {
+  const at = [];
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) at.push(i);
+  return at;
+}
+
+function dbo1554Base(words, m, approach) {
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      differByOne1554View: {
+        approach,
+        words: [...words],
+        m,
+        phase: o.phase,
+        wi: o.wi === undefined ? null : o.wi,
+        pi: o.pi === undefined ? null : o.pi,
+        pattern: o.pattern === undefined ? null : o.pattern,
+        table: o.table || null,
+        seen: o.seen || null,
+        pairMatrix: o.pairMatrix || null,
+        pair: o.pair || null,
+        collide: o.collide || null,
+        counters: o.counters || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, snap };
+}
+
+// ── Approach 1: wildcard mask + hash set ─────────────────────────────────────
+function buildSteps1554(input) {
+  const { words, m } = parse1554Data(input);
+  const n = words.length;
+  const { steps, snap } = dbo1554Base(words, m, 1);
+
+  const mask = (w, i) => `${w.slice(0, i)}*${w.slice(i + 1)}`;
+  // table[wi][pi] = the pattern once computed, else null. Drives the grid view.
+  const table = Array.from({ length: n }, () => Array(m).fill(null));
+  const seen = new Map();                 // pattern -> { wi, pi }
+  const cloneTable = () => table.map((row) => [...row]);
+  const cloneSeen = () => [...seen.entries()].map(([pattern, at]) => ({ pattern, wi: at.wi, pi: at.pi }));
+  let built = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `${n} từ, mỗi từ ${m} ký tự`, en: `${n} words, each ${m} characters` },
+    note: {
+      vi: `Cần biết có hai từ nào chỉ khác nhau ở ĐÚNG MỘT vị trí không. Mẹo: nếu hai từ khác nhau đúng ở vị trí i, thì khi ta xoá ký tự ở vị trí i của CẢ HAI (thay bằng '*'), hai chuỗi thu được GIỐNG HỆT nhau. Ngược lại cũng đúng. Vậy câu hỏi "khác nhau 1 ký tự" biến thành "có hai pattern trùng nhau" — và câu đó thì một hash set trả lời được, không cần so từng cặp.`,
+      en: `We need to know whether two words differ at EXACTLY ONE index. The trick: if two words differ exactly at index i, then blanking index i in BOTH of them (writing '*') yields IDENTICAL strings. The converse holds too. So "differ by one character" becomes "two patterns collide" — and a hash set answers that without comparing any pair.`,
+    },
+    codeLines: [2],
+    table: cloneTable(),
+    seen: cloneSeen(),
+    counters: { built: 0, total: n * m },
+    decision: {
+      vi: "Che 1 vị trí → 'khác 1 ký tự' thành 'trùng pattern'.",
+      en: "Mask one index → 'differ by one' becomes 'patterns collide'.",
+    },
+    vars: [{ name: "n", value: n }, { name: "m", value: m }],
+  });
+
+  snap({
+    phase: "init",
+    title: { vi: "seen = set() rỗng", en: "seen = empty set()" },
+    note: {
+      vi: `Ta sẽ sinh ${n} × ${m} = ${n * m} pattern (mỗi từ che lần lượt từng vị trí) và nhét vào set. Chỉ cần một lần va chạm là có đáp án True.`,
+      en: `We will generate ${n} × ${m} = ${n * m} patterns (each word with each index masked in turn) and drop them into the set. A single collision is enough to answer True.`,
+    },
+    codeLines: [3],
+    table: cloneTable(),
+    seen: cloneSeen(),
+    counters: { built: 0, total: n * m },
+    decision: { vi: `Tối đa ${n * m} pattern.`, en: `At most ${n * m} patterns.` },
+    vars: [{ name: "seen", value: "{}" }],
+  });
+
+  for (let wi = 0; wi < n; wi++) {
+    snap({
+      phase: "word",
+      title: { vi: `Từ ${wi}: "${words[wi]}"`, en: `Word ${wi}: "${words[wi]}"` },
+      note: {
+        vi: `Lần lượt che từng vị trí của "${words[wi]}" để tạo ${m} pattern: ${Array.from({ length: m }, (_, i) => mask(words[wi], i)).join(", ")}.`,
+        en: `Mask each index of "${words[wi]}" in turn to make ${m} patterns: ${Array.from({ length: m }, (_, i) => mask(words[wi], i)).join(", ")}.`,
+      },
+      codeLines: [4, 5],
+      wi,
+      table: cloneTable(),
+      seen: cloneSeen(),
+      counters: { built, total: n * m },
+      decision: { vi: `Sinh ${m} pattern cho từ ${wi}.`, en: `Generating ${m} patterns for word ${wi}.` },
+      vars: [{ name: "word", value: words[wi] }],
+    });
+
+    for (let pi = 0; pi < m; pi++) {
+      const pattern = mask(words[wi], pi);
+      table[wi][pi] = pattern;
+      built += 1;
+      const prior = seen.get(pattern);
+
+      if (prior) {
+        const other = prior.wi;
+        const diffs = dbo1554Diff(words[other], words[wi]);
+        snap({
+          phase: "hit",
+          title: { vi: `"${pattern}" đã có → True`, en: `"${pattern}" is already in the set → True` },
+          note: {
+            vi: `Pattern "${pattern}" từng được từ ${other} ("${words[other]}") thêm vào (cũng che vị trí ${prior.pi}). Hai từ cho ra cùng một pattern khi che vị trí ${pi} nghĩa là chúng giống nhau ở mọi vị trí khác và chỉ khác ở vị trí ${pi}: '${words[other][pi]}' so với '${words[wi][pi]}'. Đúng điều đề bài hỏi → trả True ngay, không cần xét tiếp.`,
+            en: `Pattern "${pattern}" was inserted by word ${other} ("${words[other]}") when it masked index ${prior.pi}. Two words producing the same pattern under mask ${pi} means they agree at every other index and differ only at index ${pi}: '${words[other][pi]}' versus '${words[wi][pi]}'. Exactly what the problem asks → return True immediately.`,
+          },
+          codeLines: [6, 7, 8],
+          wi, pi, pattern,
+          table: cloneTable(),
+          seen: cloneSeen(),
+          collide: { pattern, a: other, b: wi, index: pi, diffs },
+          counters: { built, total: n * m },
+          answer: true,
+          final: true,
+          decision: {
+            vi: `"${words[other]}" và "${words[wi]}" khác nhau đúng ở vị trí ${pi}.`,
+            en: `"${words[other]}" and "${words[wi]}" differ exactly at index ${pi}.`,
+          },
+          vars: [
+            { name: "pattern", value: pattern },
+            { name: "đã có từ / inserted by", value: `dict[${other}] = "${words[other]}"` },
+            { name: "answer", value: true },
+          ],
+        });
+        return { input, answer: true, steps };
+      }
+
+      seen.set(pattern, { wi, pi });
+      snap({
+        phase: "mask",
+        title: { vi: `che vị trí ${pi} → "${pattern}" (mới)`, en: `mask index ${pi} → "${pattern}" (new)` },
+        note: {
+          vi: `Thay '${words[wi][pi]}' ở vị trí ${pi} bằng '*': "${words[wi]}" → "${pattern}". Chưa từng thấy pattern này, nên chưa có từ nào trước đó khác "${words[wi]}" đúng ở vị trí ${pi}. Thêm vào set và đi tiếp. Set đang có ${seen.size} pattern.`,
+          en: `Replace '${words[wi][pi]}' at index ${pi} with '*': "${words[wi]}" → "${pattern}". This pattern is new, so no earlier word differs from "${words[wi]}" exactly at index ${pi}. Add it and move on. The set now holds ${seen.size} patterns.`,
+        },
+        codeLines: [6, 7, 9],
+        wi, pi, pattern,
+        table: cloneTable(),
+        seen: cloneSeen(),
+        counters: { built, total: n * m },
+        decision: { vi: `"${pattern}" là mới → thêm vào set.`, en: `"${pattern}" is new → add to the set.` },
+        vars: [{ name: "pattern", value: pattern }, { name: "len(seen)", value: seen.size }],
+      });
+    }
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: "Không có va chạm nào → False", en: "No collision at all → False" },
+    note: {
+      vi: `Đã sinh hết ${n * m} pattern mà không có hai pattern nào trùng. Nghĩa là không tồn tại cặp từ nào chỉ khác nhau đúng một ký tự → False. Lưu ý điều này mạnh hơn "không cặp nào giống nhau": mọi cặp từ trong dict đều khác nhau ở ít nhất 2 vị trí.`,
+      en: `All ${n * m} patterns were generated and none repeated. So no pair of words differs at exactly one index → False. Note this says something stronger than "no pair matched": every pair of words in dict differs at 2 or more indices.`,
+    },
+    codeLines: [10],
+    table: cloneTable(),
+    seen: cloneSeen(),
+    counters: { built, total: n * m },
+    answer: false,
+    final: true,
+    decision: { vi: "Mọi cặp khác nhau ≥ 2 vị trí → False.", en: "Every pair differs at ≥ 2 indices → False." },
+    vars: [{ name: "len(seen)", value: seen.size }, { name: "answer", value: false }],
+  });
+
+  return { input, answer: false, steps };
+}
+
+// ── Approach 2: brute-force pair scan (the baseline the trick replaces) ──────
+function buildSteps1554BruteForce(input) {
+  const { words, m } = parse1554Data(input);
+  const n = words.length;
+  const { steps, snap } = dbo1554Base(words, m, 2);
+
+  // matrix[i][j] for i < j: number of differing indices once compared, else null.
+  const matrix = Array.from({ length: n }, () => Array(n).fill(null));
+  const cloneMatrix = () => matrix.map((row) => [...row]);
+  const totalPairs = (n * (n - 1)) / 2;
+  let comparedPairs = 0;
+  let charCompares = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: so từng cặp — ${totalPairs} cặp`, en: `Approach 2: compare every pair — ${totalPairs} pairs` },
+    note: {
+      vi: `Cách thẳng thắn nhất: xét mọi cặp (i, j) và đếm số vị trí khác nhau; nếu đúng bằng 1 thì trả True. Có ${totalPairs} cặp, mỗi cặp so tối đa ${m} ký tự → O(n²·m). Chạy được với dữ liệu nhỏ, nhưng đề cho tổng số ký tự tới 10⁵ nên cách này sẽ TLE. Xem nó chạy sẽ thấy vì sao mẹo che ký tự ở cách 1 là cần thiết.`,
+      en: `The straightforward way: look at every pair (i, j), count the differing indices, and return True when the count is exactly 1. There are ${totalPairs} pairs and each costs up to ${m} character comparisons → O(n²·m). Fine for tiny input, but the problem allows 10⁵ total characters, so this times out. Watching it run shows why approach 1's masking trick is needed.`,
+    },
+    codeLines: [2, 3],
+    pairMatrix: cloneMatrix(),
+    counters: { comparedPairs: 0, totalPairs, charCompares: 0 },
+    decision: { vi: `O(n²·m) — ${totalPairs} cặp phải xét.`, en: `O(n²·m) — ${totalPairs} pairs to examine.` },
+    vars: [{ name: "n", value: n }, { name: "m", value: m }, { name: "pairs", value: totalPairs }],
+  });
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      // Count differences but stop early once a second one shows up: that is what
+      // makes the brute force bearable, and it is worth seeing.
+      const diffs = [];
+      let scanned = 0;
+      for (let p = 0; p < m; p++) {
+        scanned += 1;
+        if (words[i][p] !== words[j][p]) {
+          diffs.push(p);
+          if (diffs.length > 1) break;               // early exit
+        }
+      }
+      charCompares += scanned;
+      comparedPairs += 1;
+      matrix[i][j] = diffs.length;
+      const exactlyOne = diffs.length === 1;
+      snap({
+        phase: exactlyOne ? "hit" : "pair",
+        title: exactlyOne
+          ? { vi: `("${words[i]}", "${words[j]}") khác đúng 1 vị trí (${diffs[0]}) → True`, en: `("${words[i]}", "${words[j]}") differ at exactly 1 index (${diffs[0]}) → True` }
+          : {
+            vi: `("${words[i]}", "${words[j]}") khác ${diffs.length > 1 ? "≥2" : "0"} vị trí`,
+            en: `("${words[i]}", "${words[j]}") differ at ${diffs.length > 1 ? "≥2" : "0"} indices`,
+          },
+        note: exactlyOne
+          ? {
+            vi: `Chỉ vị trí ${diffs[0]} khác nhau ('${words[i][diffs[0]]}' so với '${words[j][diffs[0]]}'), mọi vị trí còn lại trùng khớp. Đây đúng là cặp đề bài cần → True.`,
+            en: `Only index ${diffs[0]} differs ('${words[i][diffs[0]]}' versus '${words[j][diffs[0]]}'), every other index matches. This is the pair the problem asks for → True.`,
+          }
+          : diffs.length > 1
+            ? {
+              vi: `Tìm thấy vị trí khác thứ hai (${diffs[1]}) sau khi so ${scanned}/${m} ký tự, nên dừng sớm — đã chắc chắn cặp này không dùng được, không cần so nốt phần còn lại.`,
+              en: `A second differing index (${diffs[1]}) turned up after comparing ${scanned}/${m} characters, so stop early — this pair is already disqualified and the rest need not be checked.`,
+            }
+            : {
+              vi: `Hai từ trùng khớp ở cả ${m} vị trí. Đề bài bảo đảm các từ trong dict phân biệt nên trường hợp này không xảy ra với input hợp lệ.`,
+              en: `The two words match at all ${m} indices. The problem guarantees dict entries are unique, so this cannot happen for valid input.`,
+            },
+        // 7-9 = the character scan, 10-11 = the early bail on a second diff,
+        // 12-13 = the verdict.
+        codeLines: exactlyOne ? [7, 8, 9, 12, 13] : diffs.length > 1 ? [8, 9, 10, 11, 12] : [7, 8, 12],
+        pairMatrix: cloneMatrix(),
+        pair: { i, j, diffs: [...diffs], scanned, exactlyOne },
+        collide: exactlyOne ? { pattern: null, a: i, b: j, index: diffs[0], diffs: [...diffs] } : null,
+        counters: { comparedPairs, totalPairs, charCompares },
+        answer: exactlyOne ? true : undefined,
+        final: exactlyOne,
+        decision: exactlyOne
+          ? { vi: `Tìm thấy sau ${comparedPairs}/${totalPairs} cặp.`, en: `Found after ${comparedPairs}/${totalPairs} pairs.` }
+          : { vi: `Loại cặp này (đã so ${charCompares} ký tự).`, en: `Pair rejected (${charCompares} character comparisons so far).` },
+        vars: [
+          { name: "i, j", value: `${i}, ${j}` },
+          { name: "diff indices", value: diffs.length ? diffs.join(", ") : "none" },
+          { name: "char compares", value: charCompares },
+        ],
+      });
+      if (exactlyOne) return { input, answer: true, steps };
+    }
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: `Hết ${totalPairs} cặp, không cặp nào khác đúng 1 vị trí → False`, en: `All ${totalPairs} pairs checked, none differ at exactly 1 index → False` },
+    note: {
+      vi: `Tổng cộng đã so ${charCompares} ký tự. Cách 1 chỉ cần ${n * m} lần băm thay vì ${totalPairs} lần so cặp — đó là toàn bộ lợi ích của mẹo che ký tự.`,
+      en: `That was ${charCompares} character comparisons in total. Approach 1 needs only ${n * m} hash insertions instead of ${totalPairs} pair comparisons — that is the entire payoff of the masking trick.`,
+    },
+    codeLines: [14],
+    pairMatrix: cloneMatrix(),
+    counters: { comparedPairs, totalPairs, charCompares },
+    answer: false,
+    final: true,
+    decision: { vi: "Không có cặp nào → False.", en: "No such pair → False." },
+    vars: [{ name: "char compares", value: charCompares }, { name: "answer", value: false }],
+  });
+
+  return { input, answer: false, steps };
+}
+
+Object.assign(module.exports, {
+  1554: {
+    id: 1554,
+    difficulty: "medium",
+    premium: true,
+    slug: "strings-differ-by-one-character",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "hashmap", vi: "Hash Map / Set", en: "Hash Map / Set" },
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "hashing", vi: "Băm (hashing)", en: "Hashing" },
+    ],
+    title: { vi: "Strings Differ by One Character", en: "Strings Differ by One Character" },
+    titleVi: { vi: "Hai chuỗi khác nhau đúng một ký tự", en: "Two strings differing by one character" },
+    statement: {
+      vi: "Cho danh sách dict gồm các chuỗi chữ thường CÙNG độ dài và phân biệt nhau. Trả về true nếu tồn tại hai chuỗi chỉ khác nhau ở ĐÚNG MỘT vị trí (cùng chỉ số), ngược lại trả false.",
+      en: "Given a list dict of distinct lowercase strings all of the SAME length, return true if two of them differ at EXACTLY ONE index, otherwise false.",
+    },
+    defaultInput: ["abcd", "cccc", "abyd", "abab"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "dict (JSON hoặc phẩy ngăn cách, các từ cùng độ dài)", en: "dict (JSON or comma separated, equal-length words)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mẹo chính: nếu hai từ khác nhau ĐÚNG ở vị trí i, thì che vị trí i của cả hai (thay bằng '*') sẽ cho ra hai chuỗi GIỐNG HỆT nhau. Điều ngược lại cũng đúng, nên 'khác 1 ký tự' tương đương 'trùng pattern'.", en: "The key trick: if two words differ EXACTLY at index i, masking index i in both of them (writing '*') yields IDENTICAL strings. The converse also holds, so 'differ by one character' is equivalent to 'patterns collide'." },
+      { vi: "Với mỗi từ, sinh m pattern bằng cách che lần lượt từng vị trí, rồi nhét vào một hash set. Gặp pattern đã có là trả true ngay — không cần so cặp nào cả.", en: "For each word, generate m patterns by masking each index in turn and insert them into a hash set. The first pattern already present means true — no pair is ever compared." },
+      { vi: "Đề bảo đảm các từ trong dict phân biệt, và mẹo này phụ thuộc vào đó: hai từ giống nhau hoàn toàn cũng trùng pattern nhưng khác nhau 0 vị trí, không phải đáp án.", en: "The problem guarantees dict entries are distinct, and the trick relies on that: two identical words would also collide but differ at zero indices, which is not an answer." },
+      { vi: "Cách 2 (brute force) xét cả n(n-1)/2 cặp và đếm số vị trí khác, dừng sớm khi thấy vị trí khác thứ hai. Dễ hiểu nhưng O(n²·m) nên TLE với giới hạn 10⁵ ký tự của đề.", en: "Approach 2 (brute force) examines all n(n-1)/2 pairs and counts differing indices, bailing out at the second difference. Easy to follow but O(n²·m), which times out against the problem's 10⁵-character limit." },
+      { vi: "Follow-up O(n·m): thay vì dựng chuỗi pattern dài m (mất O(m) mỗi pattern), dùng rolling hash để sửa đúng một vị trí trong O(1).", en: "The O(n·m) follow-up: instead of building an m-character pattern string (O(m) each), use a rolling hash so masking one index costs O(1)." },
+    ],
+    complexity: {
+      time: "O(n · m²)",
+      space: "O(n · m²)",
+      note: {
+        vi: "Sinh n·m pattern, mỗi pattern là một chuỗi dài m nên dựng và băm mất O(m) → O(n·m²) cho cả thời gian và bộ nhớ. Dùng rolling hash thì xuống O(n·m). Cách 2 brute force là O(n²·m) thời gian, O(1) bộ nhớ.",
+        en: "There are n·m patterns and each is an m-character string, so building and hashing it costs O(m) → O(n·m²) in both time and space. A rolling hash brings this to O(n·m). Approach 2's brute force is O(n²·m) time and O(1) space.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Che ký tự + hash set", en: "Approach 1 · Wildcard mask + hash set" },
+    code: [
+      "class Solution:",
+      "    def differByOne(self, dict: List[str]) -> bool:",
+      "        seen = set()",
+      "        for word in dict:",
+      "            for i in range(len(word)):",
+      "                pattern = word[:i] + '*' + word[i+1:]",
+      "                if pattern in seen:",
+      "                    return True",
+      "                seen.add(pattern)",
+      "        return False",
+    ],
+    code2Label: { vi: "Cách 2 · Brute force từng cặp", en: "Approach 2 · Brute-force every pair" },
+    code2: [
+      "class Solution:",
+      "    def differByOne(self, dict: List[str]) -> bool:",
+      "        n, m = len(dict), len(dict[0])",
+      "        for i in range(n):",
+      "            for j in range(i + 1, n):",
+      "                diff = 0",
+      "                for p in range(m):",
+      "                    if dict[i][p] != dict[j][p]:",
+      "                        diff += 1",
+      "                        if diff > 1:",
+      "                            break",
+      "                if diff == 1:",
+      "                    return True",
+      "        return False",
+    ],
+    liveArgs(input) {
+      const { words } = parse1554Data(input);
+      return [words];
+    },
+    builder: buildSteps1554,
+    builder2: buildSteps1554BruteForce,
+  },
+});
+
+// ─── 418: Sentence Screen Fitting ───
+// How many whole copies of a sentence fit on a rows × cols screen?
+//
+// Both builders feed `screenFit418View` and both draw the SAME screen, because
+// the screen is what the problem is actually about. Approach 1 fills it word by
+// word. Approach 2 does something that looks like sleight of hand — join the
+// sentence with a TRAILING space, treat it as an infinite tape, add cols per row,
+// then back up to a space — so the view draws the tape with the row's jump and
+// back-up marked, and shows cur // m landing on the answer.
+
+const SF418_LIMITS = { words: 8, wordLen: 10, tape: 30, rows: 12, cols: 24 };
+
+function parse418Data(input, params = {}) {
+  let words;
+  if (Array.isArray(input)) words = input.map((w) => String(w).trim());
+  else {
+    const raw = String(input ?? "").trim();
+    if (!raw) throw new Error("sentence must not be empty");
+    words = raw.startsWith("[")
+      ? JSON.parse(raw).map((w) => String(w).trim())
+      : raw.split(/[,;|\s]+/).map((w) => w.trim()).filter(Boolean);
+  }
+  if (!words.length) throw new Error("sentence must not be empty");
+  if (words.length > SF418_LIMITS.words) throw new Error(`visualization supports at most ${SF418_LIMITS.words} words`);
+  if (!words.every((w) => /^[a-z]+$/.test(w))) throw new Error("every word must be non-empty lowercase a-z");
+  if (!words.every((w) => w.length <= SF418_LIMITS.wordLen)) throw new Error(`each word may be at most ${SF418_LIMITS.wordLen} characters`);
+  const rows = Number(params.rows);
+  const cols = Number(params.cols);
+  if (!Number.isInteger(rows) || rows < 1) throw new Error("rows must be a positive integer");
+  if (!Number.isInteger(cols) || cols < 1) throw new Error("cols must be a positive integer");
+  if (rows > SF418_LIMITS.rows) throw new Error(`visualization supports at most ${SF418_LIMITS.rows} rows`);
+  if (cols > SF418_LIMITS.cols) throw new Error(`visualization supports at most ${SF418_LIMITS.cols} cols`);
+  // The tape "word word … " is drawn character by character, so keep it short
+  // enough to stay readable.
+  const tape = `${words.join(" ")} `;
+  if (tape.length > SF418_LIMITS.tape) throw new Error(`the joined sentence may be at most ${SF418_LIMITS.tape} characters including spaces`);
+  return { words, rows, cols, tape };
+}
+
+function sf418Base(words, rows, cols, tape, approach) {
+  const steps = [];
+  const n = words.length;
+  // screen[r][c] is the character shown there (null = blank), copy[r][c] is which
+  // copy of the sentence that character belongs to, so the renderer can tint each
+  // copy differently and "2 whole sentences" becomes something you can see.
+  const screen = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const copy = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const cloneScreen = () => screen.map((row) => [...row]);
+  const cloneCopy = () => copy.map((row) => [...row]);
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      screenFit418View: {
+        approach,
+        words: [...words],
+        n, rows, cols,
+        tape,
+        m: tape.length,
+        phase: o.phase,
+        screen: cloneScreen(),
+        copy: cloneCopy(),
+        rowIndex: o.rowIndex === undefined ? null : o.rowIndex,
+        used: o.used === undefined ? null : o.used,
+        wordIdx: o.wordIdx === undefined ? null : o.wordIdx,
+        placed: o.placed === undefined ? null : o.placed,
+        completed: o.completed === undefined ? null : o.completed,
+        fit: o.fit || null,
+        pointer: o.pointer || null,
+        tooLong: o.tooLong || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, n, screen, copy, snap };
+}
+
+// ── Approach 1: fill the screen row by row, word by word ─────────────────────
+function buildSteps418(input, params = {}) {
+  const { words, rows, cols, tape } = parse418Data(input, params);
+  const { steps, n, screen, copy, snap } = sf418Base(words, rows, cols, tape, 1);
+
+  snap({
+    phase: "intro",
+    title: { vi: `Màn hình ${rows}×${cols}, câu có ${n} từ`, en: `Screen ${rows}×${cols}, sentence of ${n} words` },
+    note: {
+      vi: `Viết câu "${words.join(" ")}" lặp lại lên màn hình ${rows} dòng × ${cols} cột, đếm xem được BAO NHIÊU CÂU TRỌN VẸN. Ba luật: không cắt một từ sang hai dòng, giữ nguyên thứ tự từ, và hai từ liền nhau trên cùng dòng cách nhau đúng một dấu cách. Cách 1 làm thẳng: lấp từng dòng, mỗi lần thử nhét một từ nữa.`,
+      en: `Write the sentence "${words.join(" ")}" repeatedly onto a ${rows}-row × ${cols}-column screen and count how many COMPLETE sentences appear. Three rules: never split a word across lines, keep the word order, and separate two consecutive words on a line by exactly one space. Approach 1 is direct: fill each row, trying to squeeze in one more word at a time.`,
+    },
+    codeLines: [2, 3],
+    placed: 0, completed: 0,
+    decision: { vi: "Lấp từng dòng, đếm số từ đã đặt.", en: "Fill row by row and count words placed." },
+    vars: [{ name: "rows, cols", value: `${rows}, ${cols}` }, { name: "n", value: n }],
+  });
+
+  const longest = words.reduce((a, b) => (b.length > a.length ? b : a), words[0]);
+  const tooLong = longest.length > cols;
+  snap({
+    phase: "widthCheck",
+    title: tooLong
+      ? { vi: `"${longest}" dài ${longest.length} > cols=${cols} → 0`, en: `"${longest}" is ${longest.length} long > cols=${cols} → 0` }
+      : { vi: `Từ dài nhất "${longest}" (${longest.length}) ≤ cols=${cols} ✓`, en: `Longest word "${longest}" (${longest.length}) ≤ cols=${cols} ✓` },
+    note: tooLong
+      ? {
+        vi: `Từ "${longest}" dài ${longest.length} ký tự mà một dòng chỉ có ${cols} cột. Vì không được cắt từ sang hai dòng, từ này không bao giờ viết được → không câu nào trọn vẹn, trả 0. Phải kiểm tra trước, nếu không vòng lặp trong sẽ không bao giờ nhét được từ nào và quay mãi.`,
+        en: `Word "${longest}" is ${longest.length} characters but a row has only ${cols} columns. Since words cannot be split across lines, it can never be written → no complete sentence, return 0. This must be checked up front, otherwise the inner loop could never place anything and would spin forever.`,
+      }
+      : {
+        vi: `Mọi từ đều vừa một dòng, nên luôn đặt được ít nhất một từ mỗi dòng và vòng lặp chắc chắn tiến.`,
+        en: `Every word fits a row, so at least one word goes on each row and the loop is guaranteed to make progress.`,
+      },
+    codeLines: [4, 5],
+    tooLong: tooLong ? { word: longest, len: longest.length } : null,
+    placed: 0, completed: 0,
+    answer: tooLong ? 0 : undefined,
+    final: tooLong,
+    decision: tooLong
+      ? { vi: "Có từ rộng hơn màn hình → 0.", en: "A word is wider than the screen → 0." }
+      : { vi: "Mọi từ đều vừa một dòng.", en: "Every word fits on a row." },
+    vars: [{ name: "longest", value: `${longest} (${longest.length})` }, { name: "cols", value: cols }],
+  });
+  if (tooLong) return { input, answer: 0, steps };
+
+  let placed = 0;                      // total words written, across all copies
+
+  for (let r = 0; r < rows; r++) {
+    let used = 0;
+    snap({
+      phase: "newRow",
+      title: { vi: `Dòng ${r}: bắt đầu trống, used = 0`, en: `Row ${r}: starts empty, used = 0` },
+      note: {
+        vi: `used là số cột đã dùng của dòng này. Từ tiếp theo phải viết là sentence[${placed} mod ${n}] = "${words[placed % n]}" — con trỏ từ KHÔNG reset khi sang dòng mới, nó chạy liên tục qua các bản lặp của câu.`,
+        en: `used is how many columns of this row are taken. The next word to write is sentence[${placed} mod ${n}] = "${words[placed % n]}" — the word pointer does NOT reset on a new row, it runs continuously across copies of the sentence.`,
+      },
+      codeLines: [7, 8],
+      rowIndex: r, used, wordIdx: placed % n, placed, completed: Math.floor(placed / n),
+      decision: { vi: `Dòng ${r} trống, cần viết "${words[placed % n]}".`, en: `Row ${r} empty, next word is "${words[placed % n]}".` },
+      vars: [{ name: "row", value: r }, { name: "used", value: used }, { name: "count % n", value: placed % n }],
+    });
+
+    for (;;) {
+      const wi = placed % n;
+      const w = words[wi];
+      // The +1 is the mandatory single space, and it is only needed when the row
+      // already has something on it. Getting this condition wrong is the usual bug.
+      const need = used === 0 ? w.length : w.length + 1;
+      const fits = used + need <= cols;
+
+      if (!fits) {
+        snap({
+          phase: "noFit",
+          title: { vi: `"${w}" không vừa: ${used} + ${need} = ${used + need} > ${cols}`, en: `"${w}" does not fit: ${used} + ${need} = ${used + need} > ${cols}` },
+          note: {
+            vi: `Cần ${need} cột nữa cho "${w}"${used === 0 ? "" : ` (${w.length} cho từ + 1 cho dấu cách)`}, nhưng dòng ${r} chỉ còn ${cols - used} cột. Không cắt từ được nên dừng dòng này, ${cols - used} cột cuối để trống, xuống dòng tiếp theo. Chú ý "${w}" vẫn là từ chờ viết — nó sẽ mở đầu dòng sau.`,
+            en: `"${w}" needs ${need} more columns${used === 0 ? "" : ` (${w.length} for the word plus 1 for the space)`}, but row ${r} has only ${cols - used} left. Words cannot be split, so end this row, leave ${cols - used} columns blank, and move on. Note "${w}" is still pending — it will start the next row.`,
+          },
+          codeLines: [11, 12, 13],
+          rowIndex: r, used, wordIdx: wi, placed, completed: Math.floor(placed / n),
+          fit: { word: w, wordLen: w.length, need, used, cols, fits: false, remaining: cols - used },
+          decision: { vi: `Hết chỗ ở dòng ${r} (còn ${cols - used} cột trống).`, en: `Row ${r} is out of room (${cols - used} columns left blank).` },
+          vars: [{ name: "word", value: w }, { name: "need", value: need }, { name: "used + need", value: used + need }, { name: "cols", value: cols }],
+        });
+        break;
+      }
+
+      // write the space (if any) and then the word into the screen
+      const copyIdx = Math.floor(placed / n);
+      if (used > 0) { screen[r][used] = " "; copy[r][used] = copyIdx; used += 1; }
+      for (let k = 0; k < w.length; k++) { screen[r][used + k] = w[k]; copy[r][used + k] = copyIdx; }
+      used += w.length;
+      placed += 1;
+      const completed = Math.floor(placed / n);
+      const justFinished = placed % n === 0;
+
+      snap({
+        phase: "place",
+        title: {
+          vi: `Viết "${w}" → used = ${used}${justFinished ? ` · xong câu thứ ${completed}` : ""}`,
+          en: `Write "${w}" → used = ${used}${justFinished ? ` · sentence ${completed} complete` : ""}`,
+        },
+        note: {
+          // need === w.length exactly when the row was empty, i.e. no space added.
+          vi: `${need === w.length ? "Từ đầu dòng nên không cần dấu cách." : `Thêm 1 dấu cách rồi tới từ, tổng ${need} cột.`} Đã đặt ${placed} từ tất cả = ${completed} câu trọn vẹn + ${placed % n} từ lẻ.${justFinished ? ` Vừa khép kín bản lặp thứ ${completed} của câu.` : ""}`,
+          en: `${need === w.length ? "First word on the row, so no space is needed." : `A single space then the word, ${need} columns in total.`} ${placed} words placed in total = ${completed} complete sentences plus ${placed % n} leftover words.${justFinished ? ` Copy ${completed} of the sentence just closed.` : ""}`,
+        },
+        codeLines: [10, 14, 15],
+        rowIndex: r, used, wordIdx: (placed - 1) % n, placed, completed,
+        fit: { word: w, wordLen: w.length, need, used: used - need, cols, fits: true, remaining: cols - used },
+        decision: justFinished
+          ? { vi: `Xong câu thứ ${completed}.`, en: `Sentence ${completed} finished.` }
+          : { vi: `Đã đặt ${placed} từ (${completed} câu + ${placed % n} từ).`, en: `${placed} words placed (${completed} sentences + ${placed % n} words).` },
+        vars: [{ name: "used", value: used }, { name: "count", value: placed }, { name: "count // n", value: completed }],
+      });
+    }
+  }
+
+  const answer = Math.floor(placed / n);
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${placed} // ${n} = ${answer}`, en: `Answer = ${placed} // ${n} = ${answer}` },
+    note: {
+      vi: `Tổng cộng viết được ${placed} từ trong ${rows} dòng. Vì các từ chạy liên tục theo thứ tự câu, cứ ${n} từ là trọn một câu → ${placed} // ${n} = ${answer} câu trọn vẹn${placed % n ? `, còn ${placed % n} từ lẻ của câu tiếp theo (không được tính)` : ""}.`,
+      en: `${placed} words were written across ${rows} rows. Since the words run continuously in sentence order, every ${n} of them closes one sentence → ${placed} // ${n} = ${answer} complete sentences${placed % n ? `, with ${placed % n} leftover words of the next one (which does not count)` : ""}.`,
+    },
+    codeLines: [16],
+    final: true,
+    placed, completed: answer, answer,
+    decision: { vi: `${answer} câu trọn vẹn.`, en: `${answer} complete sentences.` },
+    vars: [{ name: "count", value: placed }, { name: "answer", value: answer }],
+  });
+
+  return { input, answer, steps };
+}
+
+// ── Approach 2: one pointer running along an infinite tape ───────────────────
+function buildSteps418Tape(input, params = {}) {
+  const { words, rows, cols, tape } = parse418Data(input, params);
+  const { steps, n, screen, copy, snap } = sf418Base(words, rows, cols, tape, 2);
+  const m = tape.length;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: băng vô hạn s = "${tape.replace(/ /g, "·")}" (m = ${m})`, en: `Approach 2: infinite tape s = "${tape.replace(/ /g, "·")}" (m = ${m})` },
+    note: {
+      vi: `Nối các từ bằng dấu cách RỒI THÊM MỘT DẤU CÁCH Ở CUỐI: s = "${tape.replace(/ /g, "·")}", dài m = ${m}. Dấu cách cuối là mấu chốt — nhờ nó, lặp s vô hạn lần sẽ cho đúng dòng chữ liên tục "…${words.join(" ")} ${words.join(" ")}…", tức là ranh giới giữa hai bản lặp cũng là một dấu cách như mọi ranh giới từ khác. Giờ chỉ cần một con trỏ cur = tổng số ký tự đã tiêu thụ trên băng đó.`,
+      en: `Join the words with spaces AND APPEND ONE MORE SPACE: s = "${tape.replace(/ /g, "·")}", of length m = ${m}. That trailing space is the trick — with it, repeating s forever spells the continuous text "…${words.join(" ")} ${words.join(" ")}…", so the seam between two copies is a space just like every other word boundary. Now one pointer suffices: cur = how many tape characters have been consumed.`,
+    },
+    codeLines: [3, 4, 5],
+    pointer: { cur: 0, prevCur: 0, jumpTo: null, landedChar: null, backedTo: null, rowText: "" },
+    completed: 0,
+    decision: { vi: "Dấu cách cuối làm ranh giới giữa hai bản lặp giống mọi ranh giới từ.", en: "The trailing space makes the seam between copies behave like any word boundary." },
+    vars: [{ name: "s", value: tape.replace(/ /g, "·") }, { name: "m", value: m }, { name: "cur", value: 0 }],
+  });
+
+  let cur = 0;
+  for (let r = 0; r < rows; r++) {
+    const prevCur = cur;
+    const jumpTo = cur + cols;
+    const landedChar = tape[jumpTo % m];
+    let backedTo = null;
+
+    if (landedChar === " ") {
+      cur = jumpTo + 1;
+    } else {
+      let back = jumpTo;
+      while (back > 0 && tape[(back - 1) % m] !== " ") back -= 1;
+      backedTo = back;
+      cur = back;
+    }
+
+    // paint what this row actually shows: tape[prevCur .. cur)
+    for (let k = 0; k < cur - prevCur && k < cols; k++) {
+      const abs = prevCur + k;
+      screen[r][k] = tape[abs % m];
+      copy[r][k] = Math.floor(abs / m);
+    }
+    const rowText = Array.from({ length: Math.max(0, cur - prevCur) }, (_, k) => tape[(prevCur + k) % m]).join("");
+
+    snap({
+      phase: landedChar === " " ? "landSpace" : "backUp",
+      title: landedChar === " "
+        ? { vi: `Dòng ${r}: cur ${prevCur} + ${cols} = ${jumpTo}, s[${jumpTo} mod ${m}] = '·' → cur = ${cur}`, en: `Row ${r}: cur ${prevCur} + ${cols} = ${jumpTo}, s[${jumpTo} mod ${m}] = '·' → cur = ${cur}` }
+        : { vi: `Dòng ${r}: cur ${prevCur} + ${cols} = ${jumpTo} rơi giữa từ '${landedChar}' → lùi về ${cur}`, en: `Row ${r}: cur ${prevCur} + ${cols} = ${jumpTo} landed mid-word at '${landedChar}' → back up to ${cur}` },
+      note: landedChar === " "
+        ? {
+          vi: `Cộng ${cols} vì một dòng chứa ${cols} cột. Ký tự tại vị trí ${jumpTo} (tức ${jumpTo} mod ${m} = ${jumpTo % m} trên băng) là DẤU CÁCH, nghĩa là dòng vừa kết thúc đúng ngay sau một từ trọn vẹn. Nuốt luôn dấu cách đó (cur = ${jumpTo} + 1) để dòng sau bắt đầu ngay đầu từ kế tiếp. Dòng ${r} hiển thị "${rowText.replace(/ /g, "·")}".`,
+          en: `Add ${cols} because a row holds ${cols} columns. The character at position ${jumpTo} (that is ${jumpTo} mod ${m} = ${jumpTo % m} on the tape) is a SPACE, meaning the row ended exactly after a whole word. Swallow that space (cur = ${jumpTo} + 1) so the next row starts right at the next word. Row ${r} shows "${rowText.replace(/ /g, "·")}".`,
+        }
+        : {
+          vi: `Ký tự tại vị trí ${jumpTo} là '${landedChar}' — không phải dấu cách, nên dòng đã cắt NGANG GIỮA một từ. Không được phép, phải lùi cur về đầu từ đó: lùi từng bước trong khi ký tự ngay trước cur không phải dấu cách, dừng ở ${cur}. ${cur === prevCur ? `cur không tiến được → dòng này rỗng.` : `Dòng ${r} hiển thị "${rowText.replace(/ /g, "·")}" (${cur - prevCur} ký tự), ${cols - (cur - prevCur)} cột cuối để trống.`}`,
+          en: `The character at position ${jumpTo} is '${landedChar}' — not a space, so the row cut THROUGH the middle of a word. That is not allowed, so back cur up to where that word starts: step back while the character just before cur is not a space, stopping at ${cur}. ${cur === prevCur ? `cur made no progress → this row is empty.` : `Row ${r} shows "${rowText.replace(/ /g, "·")}" (${cur - prevCur} characters), leaving ${cols - (cur - prevCur)} columns blank.`}`,
+        },
+      codeLines: landedChar === " " ? [7, 8, 9] : [7, 8, 11, 12],
+      rowIndex: r,
+      pointer: { cur, prevCur, jumpTo, landedChar, backedTo, rowText },
+      completed: Math.floor(cur / m),
+      decision: landedChar === " "
+        ? { vi: `Rơi đúng dấu cách → nuốt nó, cur = ${cur}.`, en: `Landed on a space → swallow it, cur = ${cur}.` }
+        : { vi: `Rơi giữa từ → lùi ${jumpTo - cur} bước về ${cur}.`, en: `Landed mid-word → back up ${jumpTo - cur} steps to ${cur}.` },
+      vars: [
+        { name: "cur trước / before", value: prevCur },
+        { name: "cur + cols", value: jumpTo },
+        { name: `s[${jumpTo} % ${m}]`, value: landedChar === " " ? "'·' (space)" : `'${landedChar}'` },
+        { name: "cur", value: cur },
+      ],
+    });
+  }
+
+  const answer = Math.floor(cur / m);
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = cur // m = ${cur} // ${m} = ${answer}`, en: `Answer = cur // m = ${cur} // ${m} = ${answer}` },
+    note: {
+      vi: `cur = ${cur} là tổng số ký tự của băng đã tiêu thụ hết ${rows} dòng. Mỗi bản lặp trọn vẹn của câu chiếm đúng m = ${m} ký tự trên băng (đã tính cả dấu cách cuối), nên số bản lặp trọn vẹn là ${cur} // ${m} = ${answer}${cur % m ? `, còn thừa ${cur % m} ký tự là một câu chưa xong` : ""}. Đó là toàn bộ lý do phép chia nguyên này cho ra đáp án.`,
+      en: `cur = ${cur} is the total tape characters consumed over all ${rows} rows. Each complete copy of the sentence occupies exactly m = ${m} tape characters (trailing space included), so the number of complete copies is ${cur} // ${m} = ${answer}${cur % m ? `, with ${cur % m} characters left over forming an unfinished sentence` : ""}. That is the whole reason this integer division gives the answer.`,
+    },
+    codeLines: [13],
+    final: true,
+    pointer: { cur, prevCur: cur, jumpTo: null, landedChar: null, backedTo: null, rowText: "" },
+    completed: answer, answer,
+    decision: { vi: `${answer} câu trọn vẹn.`, en: `${answer} complete sentences.` },
+    vars: [{ name: "cur", value: cur }, { name: "m", value: m }, { name: "answer", value: answer }],
+  });
+
+  return { input, answer, steps };
+}
+
+Object.assign(module.exports, {
+  418: {
+    id: 418,
+    difficulty: "medium",
+    premium: true,
+    slug: "sentence-screen-fitting",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "simulation", vi: "Mô phỏng", en: "Simulation" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    ],
+    title: { vi: "Sentence Screen Fitting", en: "Sentence Screen Fitting" },
+    titleVi: { vi: "Xếp câu vừa màn hình", en: "Fitting a sentence on a screen" },
+    statement: {
+      vi: "Cho màn hình rows × cols và một câu là danh sách các từ. Trả về số lần câu đó được viết TRỌN VẸN lên màn hình. Không được cắt một từ sang hai dòng, phải giữ nguyên thứ tự từ, và hai từ liền nhau trên cùng một dòng cách nhau đúng một dấu cách.",
+      en: "Given a rows × cols screen and a sentence given as a list of words, return how many times the sentence fits COMPLETELY on the screen. A word cannot be split across two lines, the word order must be kept, and two consecutive words on a line are separated by exactly one space.",
+    },
+    defaultInput: ["a", "bcd", "e"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "sentence (JSON hoặc phẩy ngăn cách)", en: "sentence (JSON or comma separated)" },
+    extraParams: [
+      { key: "rows", label: { vi: "rows (số dòng)", en: "rows" }, default: 3, min: 1, max: 12 },
+      { key: "cols", label: { vi: "cols (số cột)", en: "cols" }, default: 6, min: 1, max: 24 },
+    ],
+    approach: [
+      { vi: "Kiểm tra trước: nếu có từ dài hơn cols thì không bao giờ viết được (không được cắt từ) → trả 0. Bỏ qua bước này thì vòng lặp trong có thể không đặt được từ nào và quay mãi.", en: "Check first: if any word is longer than cols it can never be written (words cannot be split) → return 0. Skip this and the inner loop may place nothing and spin forever." },
+      { vi: "Cách 1 mô phỏng trực tiếp: với mỗi dòng, lặp việc thử nhét từ kế tiếp. Từ cần thêm len(w) cột, cộng 1 cột nữa cho dấu cách NẾU dòng đã có chữ. Hết chỗ thì xuống dòng. Con trỏ từ chạy liên tục, không reset theo dòng.", en: "Approach 1 simulates it directly: for each row, repeatedly try the next word. A word costs len(w) columns, plus 1 more for the space IF the row is not empty. Out of room means move to the next row. The word pointer runs continuously and never resets per row." },
+      { vi: "Đáp án của cách 1 là count // n với count là tổng số từ đã viết: các từ chạy liên tục theo thứ tự câu nên cứ n từ là trọn một câu.", en: "Approach 1's answer is count // n where count is the total words written: the words run continuously in sentence order, so every n of them closes one sentence." },
+      { vi: "Cách 2 dùng một mẹo: đặt s = ' '.join(sentence) + ' ' (CHÚ Ý dấu cách ở cuối) rồi coi s lặp vô hạn là một băng. Nhờ dấu cách cuối, ranh giới giữa hai bản lặp cũng là dấu cách như mọi ranh giới từ khác.", en: "Approach 2 uses a trick: let s = ' '.join(sentence) + ' ' (NOTE the trailing space) and treat s repeated forever as a tape. Thanks to that trailing space, the seam between copies is a space just like every other word boundary." },
+      { vi: "Mỗi dòng cộng cur += cols. Nếu s[cur % m] là dấu cách thì dòng vừa kết thúc sau một từ trọn vẹn, nuốt luôn dấu cách (cur += 1). Nếu không, con trỏ đang nằm giữa một từ nên lùi cur về đầu từ đó.", en: "Each row does cur += cols. If s[cur % m] is a space the row ended right after a whole word, so swallow it (cur += 1). Otherwise the pointer sits mid-word, so back cur up to where that word starts." },
+      { vi: "Cuối cùng cur // m chính là đáp án, vì mỗi câu trọn vẹn chiếm đúng m ký tự trên băng (đã gồm dấu cách cuối).", en: "Finally cur // m is the answer, because each complete sentence occupies exactly m tape characters (trailing space included)." },
+    ],
+    complexity: {
+      time: "O(rows · n + n · L)",
+      space: "O(n · L)",
+      note: {
+        vi: "Cách 1: mỗi dòng đặt tối đa O(cols) từ nhưng tổng số từ đặt là O(rows · số từ mỗi dòng). Cách 2: mỗi dòng làm O(1) phép cộng cộng phần lùi, tổng phần lùi bị chặn bởi độ dài từ dài nhất mỗi dòng → O(rows · maxWordLen); bộ nhớ chỉ là chuỗi s dài m.",
+        en: "Approach 1: each row places at most O(cols) words, so the total work is O(rows × words per row). Approach 2: each row is O(1) arithmetic plus the back-up, whose cost per row is bounded by the longest word → O(rows × maxWordLen); the only memory is the m-character string s.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Mô phỏng từng dòng", en: "Approach 1 · Row-by-row simulation" },
+    code: [
+      "class Solution:",
+      "    def wordsTyping(self, sentence: List[str], rows: int, cols: int) -> int:",
+      "        n = len(sentence)",
+      "        if any(len(w) > cols for w in sentence):",
+      "            return 0",
+      "        count = 0                       # words written in total",
+      "        for _ in range(rows):",
+      "            used = 0                    # columns used on this row",
+      "            while True:",
+      "                w = sentence[count % n]",
+      "                need = len(w) if used == 0 else len(w) + 1",
+      "                if used + need > cols:",
+      "                    break",
+      "                used += need",
+      "                count += 1",
+      "        return count // n",
+    ],
+    code2Label: { vi: "Cách 2 · Con trỏ trên băng vô hạn", en: "Approach 2 · Pointer on an infinite tape" },
+    code2: [
+      "class Solution:",
+      "    def wordsTyping(self, sentence: List[str], rows: int, cols: int) -> int:",
+      "        s = ' '.join(sentence) + ' '    # the trailing space is the trick",
+      "        m = len(s)",
+      "        cur = 0                         # tape characters consumed",
+      "        for _ in range(rows):",
+      "            cur += cols",
+      "            if s[cur % m] == ' ':",
+      "                cur += 1                # row ended after a whole word",
+      "            else:",
+      "                while cur > 0 and s[(cur - 1) % m] != ' ':",
+      "                    cur -= 1            # back up out of a split word",
+      "        return cur // m",
+    ],
+    liveArgs(input, params = {}) {
+      const { words, rows, cols } = parse418Data(input, params);
+      return [words, rows, cols];
+    },
+    builder: buildSteps418,
+    builder2: buildSteps418Tape,
+  },
+});

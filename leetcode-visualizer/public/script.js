@@ -11827,6 +11827,735 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 552 Student Attendance Record II ----
+// The whole problem collapses to a 6-node state machine, so the view draws that
+// machine and animates the counts flowing along its edges. Node and label
+// positions are hand-placed constants below; tests/ checks the emitted SVG for
+// label overlap and viewBox overflow so the diagram cannot silently rot.
+// Sizing rule: an edge label can grow to "P +1000000000" (13 glyphs of 14px
+// Consolas plus the halo ≈ 104px wide), so every label slot must clear 52px each
+// side of its centre without touching a node box or leaving the viewBox, and a
+// node must fit a 10-digit count at 19px. The spacing and margins below are sized
+// for those worst cases, not for the bare "P" that shows before any flow exists.
+// The CSS max-width matches w so the diagram renders 1:1 instead of being scaled
+// down, which is what made the text look tiny.
+const AR552_LAYOUT = {
+  w: 760, h: 460,
+  nodeW: 124, nodeH: 58,
+  // node centres, indexed by state = a * 3 + l
+  nodes: [
+    { x: 180, y: 150 }, { x: 430, y: 150 }, { x: 680, y: 150 },
+    { x: 180, y: 320 }, { x: 430, y: 320 }, { x: 680, y: 320 },
+  ],
+};
+
+function renderAttendance552View(step) {
+  const view = step.attendance552View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const n = Number(view.n) || 0;
+  const approach = Number(view.approach) || 1;
+  const states = Array.isArray(view.states) ? view.states : [];
+  const dp = Array.isArray(view.dp) ? view.dp : null;
+  const prevDp = Array.isArray(view.prevDp) ? view.prevDp : null;
+  const flows = Array.isArray(view.flows) ? view.flows : [];
+  const samples = Array.isArray(view.samples) ? view.samples : null;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const L = AR552_LAYOUT;
+  const P = L.nodes;
+  const flowOn = new Map();
+  for (const f of flows) flowOn.set(`${f.from}>${f.to}:${f.ch}`, f.amount);
+
+  // ── the state machine ─────────────────────────────────────────────────────
+  // Each entry is [from, to, char, path, labelX, labelY]. Positions are fixed so
+  // that the 13 labels never collide with each other or with a node box.
+  const half = { w: L.nodeW / 2, h: L.nodeH / 2 };
+  const edges = [
+    // L moves: straight to the right along each row, labels centred in the 126px
+    // gaps between node boxes
+    [0, 1, "L", `M ${P[0].x + half.w} ${P[0].y} L ${P[1].x - half.w} ${P[1].y}`, 305, 138],
+    [1, 2, "L", `M ${P[1].x + half.w} ${P[1].y} L ${P[2].x - half.w} ${P[2].y}`, 555, 138],
+    [3, 4, "L", `M ${P[3].x + half.w} ${P[3].y} L ${P[4].x - half.w} ${P[4].y}`, 305, 332],
+    [4, 5, "L", `M ${P[4].x + half.w} ${P[4].y} L ${P[5].x - half.w} ${P[5].y}`, 555, 332],
+    // P moves: back to column 0 of the same row; a self-loop out to the left
+    // margin for l = 0, which is why the left margin is 118px wide
+    [0, 0, "P", `M ${P[0].x - half.w} ${P[0].y - 14} C 50 ${P[0].y - 34}, 50 ${P[0].y + 34}, ${P[0].x - half.w} ${P[0].y + 14}`, 56, 150],
+    [3, 3, "P", `M ${P[3].x - half.w} ${P[3].y - 14} C 50 ${P[3].y - 34}, 50 ${P[3].y + 34}, ${P[3].x - half.w} ${P[3].y + 14}`, 56, 320],
+    [1, 0, "P", `M ${P[1].x} ${P[1].y - half.h} C ${P[1].x} 88, ${P[0].x} 88, ${P[0].x} ${P[0].y - half.h}`, 305, 96],
+    [2, 0, "P", `M ${P[2].x} ${P[2].y - half.h} C ${P[2].x} 29, ${P[0].x} 29, ${P[0].x} ${P[0].y - half.h}`, 430, 52],
+    [4, 3, "P", `M ${P[4].x} ${P[4].y + half.h} C ${P[4].x} 382, ${P[3].x} 382, ${P[3].x} ${P[3].y + half.h}`, 305, 374],
+    [5, 3, "P", `M ${P[5].x} ${P[5].y + half.h} C ${P[5].x} 441, ${P[3].x} 441, ${P[3].x} ${P[3].y + half.h}`, 430, 418],
+    // A moves: only from the a = 0 row, all landing on (1, 0)
+    [0, 3, "A", `M ${P[0].x} ${P[0].y + half.h} L ${P[3].x} ${P[3].y - half.h}`, 238, 235],
+    [1, 3, "A", `M ${P[1].x} ${P[1].y + half.h} L ${P[3].x + half.w} ${P[3].y - 8}`, 360, 229],
+    [2, 3, "A", `M ${P[2].x} ${P[2].y + half.h} L ${P[3].x + half.w} ${P[3].y + 8}`, 560, 220],
+  ];
+
+  const edgeSvg = edges.map(([from, to, ch, path, lx, ly]) => {
+    const amount = flowOn.get(`${from}>${to}:${ch}`);
+    const active = amount !== undefined && amount !== "0";
+    return `<path class="ar552-edge c${ch}${active ? " on" : ""}" d="${path}" marker-end="url(#ar552arrow${active ? "on" : ""})"></path>
+      <text class="ar552-elabel c${ch}${active ? " on" : ""}" x="${lx}" y="${ly}">${ch}${active ? ` +${amount}` : ""}</text>`;
+  }).join("");
+
+  const nodeSvg = states.map((st, s) => {
+    const val = dp ? dp[s] : "0";
+    const was = prevDp ? prevDp[s] : null;
+    const grew = was !== null && val !== was;
+    const cls = ["ar552-node", `a${st.a}`];
+    if (val !== "0") cls.push("live");
+    if (grew) cls.push("grew");
+    return `<g class="${cls.join(" ")}">
+      <rect x="${P[s].x - half.w}" y="${P[s].y - half.h}" width="${L.nodeW}" height="${L.nodeH}" rx="9"></rect>
+      <text class="st" x="${P[s].x}" y="${P[s].y - 12}">a=${st.a} l=${st.l}</text>
+      <text class="vl" x="${P[s].x}" y="${P[s].y + 15}">${val}</text>
+    </g>`;
+  }).join("");
+
+  const machineSvg = `<svg class="ar552-machine" viewBox="0 0 ${L.w} ${L.h}" role="img" aria-label="${escapeHtml(vi ? "Máy trạng thái 6 đỉnh" : "Six-state machine")}">
+    <defs>
+      <marker id="ar552arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(148,163,184,0.7)"></path>
+      </marker>
+      <marker id="ar552arrowon" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"></path>
+      </marker>
+    </defs>
+    ${edgeSvg}${nodeSvg}
+  </svg>`;
+
+  // ── dp table ──────────────────────────────────────────────────────────────
+  const tableHtml = [0, 1].map((a) => `<div class="ar552-trow">
+      <span class="rh">a=${a}</span>
+      ${[0, 1, 2].map((l) => {
+    const s = a * 3 + l;
+    const val = dp ? dp[s] : "0";
+    const was = prevDp ? prevDp[s] : null;
+    const cls = ["tc"];
+    if (val === "0") cls.push("zero");
+    if (was !== null && val !== was) cls.push("grew");
+    return `<span class="${cls.join(" ")}"><small>l=${l}</small><b>${val}</b>${was !== null && val !== was ? `<i>${was} →</i>` : ""}</span>`;
+  }).join("")}
+    </div>`).join("");
+
+  // ── concrete records, so the numbers are not abstract ─────────────────────
+  let samplesHtml = "";
+  if (samples) {
+    const CAP = 10;
+    const cells = samples.map((list, s) => {
+      const st = states[s];
+      const shown = list.slice(0, CAP);
+      return `<div class="ar552-scell${list.length ? "" : " empty"}">
+        <small>a=${st.a} l=${st.l} · ${list.length}</small>
+        <div>${shown.map((rec) => `<code>${escapeHtml(rec || "ε")}</code>`).join("")}${list.length > CAP ? `<em>+${list.length - CAP}</em>` : ""}</div>
+      </div>`;
+    }).join("");
+    samplesHtml = `<section class="ar552-panel">
+      <header>
+        <strong>${vi ? "CÁC BẢN GHI THẬT ĐANG ĐƯỢC ĐẾM" : "THE ACTUAL RECORDS BEING COUNTED"}</strong>
+        <span>${vi ? "liệt kê bằng vét cạn, chỉ để đối chiếu" : "enumerated by brute force, for checking only"}</span>
+      </header>
+      <div class="ar552-samples">${cells}</div>
+      <div class="ar552-hint">${escapeHtml(vi
+      ? "Đếm số chuỗi trong mỗi ô sẽ thấy đúng bằng con số dp của trạng thái đó. Thuật toán KHÔNG dựng các chuỗi này — nó chỉ giữ 6 con số, đó mới là điểm mạnh."
+      : "Count the strings in each cell and you get exactly that state's dp number. The algorithm never builds these strings — it only keeps the 6 counts, which is the whole point.")}</div>
+    </section>`;
+  }
+
+  // ── approach 2: matrices and the bits of n ────────────────────────────────
+  let matrixHtml = "";
+  if (approach === 2) {
+    const grid = (M, label, cls) => `<div class="ar552-mx ${cls || ""}">
+        <small>${escapeHtml(label)}</small>
+        <div class="rows">${M.map((row, i) => `<div class="mrow">${row.map((v, j) => `<span class="${v === "0" ? "z" : ""}${i === 0 ? " r0" : ""}">${v}</span>`).join("")}</div>`).join("")}</div>
+      </div>`;
+    const bits = Array.isArray(view.bits) ? view.bits : [];
+    const bitsHtml = bits.map((b, k) => `<span class="ar552-bit${b ? " one" : ""}${k === view.bitIndex ? " cur" : ""}"><b>${b}</b><i>2^${k}</i></span>`).reverse().join("");
+    matrixHtml = `<section class="ar552-panel">
+      <header>
+        <strong>${vi ? `n = ${n} dạng nhị phân — bình phương liên tiếp` : `n = ${n} in binary — repeated squaring`}</strong>
+        <span>${n.toString(2)}</span>
+      </header>
+      <div class="ar552-bits">${bitsHtml}</div>
+      <div class="ar552-mxrow">
+        ${view.matrix ? grid(view.matrix, view.matrixLabel || "T", "t") : ""}
+        ${view.result ? grid(view.result, "R = T^(bits so far)", "r") : ""}
+      </div>
+      <div class="ar552-hint">${escapeHtml(vi
+      ? "Hàng 0 được tô đậm: đáp án là TỔNG HÀNG 0 của R, vì trạng thái bắt đầu là (a=0, l=0) tức chỉ số 0, nên R[0][t] đếm số bản ghi đi từ đó tới trạng thái t."
+      : "Row 0 is emphasised: the answer is the SUM OF ROW 0 of R, because the start state is (a=0, l=0) — index 0 — so R[0][t] counts the records going from there to state t.")}</div>
+    </section>`;
+  }
+
+  const statusHtml = isDone
+    ? `<div class="ar552-answer">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer}</strong>
+        <span>${vi ? `bản ghi hợp lệ dài ${n} (mod 1e9+7)` : `eligible records of length ${n} (mod 1e9+7)`}</span>
+      </div>`
+    : `<div class="ar552-progress">
+        <span><small>${vi ? "ĐỘ DÀI" : "LENGTH"}</small><b>${view.step === null || view.step === undefined ? "—" : `${view.step}/${n}`}</b></span>
+        <span><small>${vi ? "TỔNG HIỆN TẠI" : "RUNNING TOTAL"}</small><b>${view.total === null || view.total === undefined ? "—" : view.total}</b></span>
+        <span><small>${vi ? "SỐ TRẠNG THÁI" : "STATES"}</small><b>6</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="ar552-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đếm bản ghi điểm danh hợp lệ" : "Student attendance record II visualization")}">
+    <div class="ar552-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? (vi
+        ? "Muốn biết một tiền tố còn nối tiếp hợp lệ được hay không, chỉ cần nhớ ĐÚNG HAI thứ: đã dùng mấy chữ 'A' (0 hay 1) và đuôi có mấy chữ 'L' liền nhau (0, 1 hay 2). Vậy chỉ có 6 trạng thái — dù n bằng 5 hay 100000. Luật 'không 3 chữ L liền nhau' được cài sẵn vào máy: trạng thái l=2 đơn giản là không có cạnh 'L' đi ra."
+        : "To know whether a prefix can still be extended legally, only TWO things matter: how many 'A' it used (0 or 1) and how long its trailing 'L' run is (0, 1 or 2). That is 6 states — whether n is 5 or 100000. The 'never 3 L's in a row' rule is baked into the machine: state l=2 simply has no outgoing 'L' edge.")
+      : (vi
+        ? "Mỗi bước của cách 1 là CÙNG MỘT phép biến đổi tuyến tính trên vector 6 trạng thái. Lặp n lần một phép biến đổi tuyến tính chính là luỹ thừa ma trận, và luỹ thừa tính được bằng bình phương liên tiếp — từ n bước xuống còn khoảng log₂(n) bước."
+        : "Every step of approach 1 is the SAME linear map on the 6-state vector. Iterating one linear map n times is a matrix power, and powers come from repeated squaring — turning n steps into about log₂(n)."))}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="ar552-panel">
+      <header>
+        <strong>${vi ? "MÁY TRẠNG THÁI 6 ĐỈNH" : "THE SIX-STATE MACHINE"}</strong>
+        <span>${vi ? "số trong đỉnh = dp · nhãn cạnh = lượng chuyển ở bước này" : "number in a node = dp · edge label = the amount flowing this step"}</span>
+      </header>
+      ${machineSvg}
+      <div class="ar552-legend">
+        <span class="lg cP">P — ${vi ? "đứt đuôi L, về l=0" : "breaks the L run, back to l=0"}</span>
+        <span class="lg cA">A — ${vi ? "chỉ từ hàng a=0, sang (1,0)" : "only from row a=0, lands on (1,0)"}</span>
+        <span class="lg cL">L — ${vi ? "l tăng 1, không có cạnh từ l=2" : "l grows by 1, no edge out of l=2"}</span>
+      </div>
+    </section>
+
+    <section class="ar552-panel">
+      <header><strong>${vi ? "BẢNG dp[a][l] — chỉ 6 con số cho cả bài" : "TABLE dp[a][l] — just 6 numbers for the whole problem"}</strong><span>${vi ? "tổng" : "total"} = ${view.total === null || view.total === undefined ? "—" : view.total}</span></header>
+      <div class="ar552-table">${tableHtml}</div>
+    </section>
+
+    ${samplesHtml}
+    ${matrixHtml}
+
+    <div class="ar552-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 419 Battleships in a Board ----
+// The whole trick is a two-cell test, so the board draws the two cells being
+// tested (above and to the left) explicitly, and tints each ship so a reader can
+// check the count by eye. Ship tinting is presentation only — approach 1 never
+// computes it, which is exactly why it needs no memory.
+function renderBattleships419View(step) {
+  const view = step.battleships419View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const grid = Array.isArray(view.grid) ? view.grid : [];
+  const shipOf = Array.isArray(view.shipOf) ? view.shipOf : [];
+  const approach = Number(view.approach) || 1;
+  const cur = view.cur;
+  const checks = view.checks;
+  const skip = view.skip;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const PALETTE = 5;
+
+  const countedSet = new Set((view.counted || []).map(([r, c]) => `${r},${c}`));
+  const seenSet = new Set((view.seen || []).map(([r, c]) => `${r},${c}`));
+  const stackSet = new Set((view.stack || []).map(([r, c]) => `${r},${c}`));
+  const inSkip = (r, c) => {
+    if (!skip) return false;
+    const lin = r * cols + c;
+    return lin >= skip.from[0] * cols + skip.from[1] && lin < skip.to[0] * cols + skip.to[1];
+  };
+
+  // ── the board ─────────────────────────────────────────────────────────────
+  const boardHtml = grid.map((row, r) => row.map((ch, c) => {
+    const cls = ["bs419-cell"];
+    const isX = ch === "X";
+    const ship = shipOf[r] ? shipOf[r][c] : -1;
+    if (isX) cls.push("ship", `s${ship % PALETTE}`);
+    else cls.push("water");
+    if (countedSet.has(`${r},${c}`)) cls.push("counted");
+    if (approach === 2) {
+      if (stackSet.has(`${r},${c}`)) cls.push("instack");
+      else if (seenSet.has(`${r},${c}`)) cls.push("seen");
+    }
+    if (inSkip(r, c)) cls.push("skipped");
+    if (cur && cur.r === r && cur.c === c) cls.push("cur");
+    // the two cells the O(1) test looks at
+    if (approach === 1 && cur && checks) {
+      if (r === cur.r - 1 && c === cur.c) cls.push("probe", checks.upIsX ? "probe-x" : "probe-free");
+      if (r === cur.r && c === cur.c - 1) cls.push("probe", checks.leftIsX ? "probe-x" : "probe-free");
+    }
+    return `<div class="${cls.join(" ")}">${isX ? "X" : "·"}${countedSet.has(`${r},${c}`) ? `<i>★</i>` : ""}</div>`;
+  }).join("")).join("");
+
+  const shipsSeen = new Set(shipOf.flat().filter((x) => x >= 0));
+  const legendHtml = [...shipsSeen].sort((a, b) => a - b).map((s) => `<span class="lg s${s % PALETTE}">${vi ? "tàu" : "ship"} ${s + 1}</span>`).join("");
+
+  // ── approach 1: the two-cell test spelled out ─────────────────────────────
+  let testHtml = "";
+  if (approach === 1 && cur && checks) {
+    const cell = (label, val, isX) => `<div class="one ${val === null ? "off" : isX ? "isx" : "free"}">
+        <small>${escapeHtml(label)}</small>
+        <strong>${val === null ? "—" : escapeHtml(val)}</strong>
+        <span>${val === null ? (vi ? "ngoài bảng" : "off board") : isX ? (vi ? "là tàu" : "is ship") : (vi ? "trống" : "empty")}</span>
+      </div>`;
+    testHtml = `<section class="bs419-panel">
+      <header>
+        <strong>${vi ? `PHÉP KIỂM TẠI (${cur.r},${cur.c}) — chỉ nhìn LÊN và SANG TRÁI` : `THE TEST AT (${cur.r},${cur.c}) — look only UP and LEFT`}</strong>
+        <span>${vi ? "2 ô, không cần bộ nhớ" : "two cells, no memory needed"}</span>
+      </header>
+      <div class="bs419-test ${checks.isStart ? "start" : "inside"}">
+        ${cell(vi ? `trên (${cur.r - 1},${cur.c})` : `above (${cur.r - 1},${cur.c})`, checks.up, checks.upIsX)}
+        ${cell(vi ? `trái (${cur.r},${cur.c - 1})` : `left (${cur.r},${cur.c - 1})`, checks.left, checks.leftIsX)}
+        <div class="verdict">
+          <strong>${checks.isStart ? (vi ? "ĐẦU TÀU → đếm" : "SHIP START → count") : (vi ? "THÂN TÀU → bỏ qua" : "INSIDE A SHIP → skip")}</strong>
+          <span>${escapeHtml(checks.isStart
+      ? (vi ? "không bên nào là 'X' nên đây là ô trên-trái nhất của tàu"
+        : "neither is 'X', so this is the ship's top-left end")
+      : (vi ? `đã có 'X' ở ${checks.upIsX ? "trên" : "bên trái"} nên tàu này đã được đếm rồi`
+        : `there is already an 'X' ${checks.upIsX ? "above" : "to the left"}, so this ship is already counted`))}</span>
+        </div>
+      </div>
+      <div class="bs419-hint">${escapeHtml(vi
+      ? "Vì quét theo từng hàng từ trái sang phải, ô ở trên và ô bên trái luôn đã được xét trước — còn ô dưới và ô bên phải thì chưa. Đó là lý do phép kiểm chỉ cần hai hướng đó."
+      : "Because the scan goes row by row, left to right, the cell above and the cell to the left have always been visited already — the ones below and to the right have not. That is why the test needs only those two directions.")}</div>
+    </section>`;
+  }
+
+  // ── approach 2: the memory it has to carry ────────────────────────────────
+  let memHtml = "";
+  if (approach === 2) {
+    const stack = view.stack || [];
+    memHtml = `<section class="bs419-panel">
+      <header>
+        <strong>${vi ? "BỘ NHỚ PHẢI MANG THEO" : "THE MEMORY IT MUST CARRY"}</strong>
+        <span>${vi ? `seen: ${(view.seen || []).length} ô · stack: ${stack.length} ô` : `seen: ${(view.seen || []).length} cells · stack: ${stack.length} cells`}</span>
+      </header>
+      <div class="bs419-mem">
+        <div class="box"><small>seen</small><b>${(view.seen || []).length}</b><span>${vi ? `ô đã đánh dấu (O(m·n))` : `cells marked (O(m·n))`}</span></div>
+        <div class="box stack"><small>stack</small><b>${stack.length}</b><span>${stack.length ? stack.map(([r, c]) => `(${r},${c})`).join(" ") : (vi ? "rỗng" : "empty")}</span></div>
+      </div>
+      <div class="bs419-hint">${escapeHtml(vi
+      ? "So với cách 1 chỉ dùng một biến đếm: đây chính là cái giá của flood fill, và cũng là lý do đề bài đặt thêm câu hỏi follow-up."
+      : "Compare approach 1, which uses a single counter: this is what flood fill costs, and it is why the problem adds its follow-up question.")}</div>
+    </section>`;
+  }
+
+  const statusHtml = isDone
+    ? `<div class="bs419-answer${view.answer === 0 ? " zero" : ""}">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer}</strong>
+        <span>${view.answer === 0 ? (vi ? "không có tàu nào" : "no battleships") : (vi ? "tàu chiến" : "battleships")}</span>
+        ${approach === 1 ? `<em>${vi ? "một lượt quét · O(1) bộ nhớ · bảng không bị sửa" : "one pass · O(1) memory · board untouched"}</em>` : ""}
+      </div>`
+    : `<div class="bs419-progress">
+        <span><small>${vi ? "ĐÃ ĐẾM" : "COUNTED"}</small><b>${view.count === null || view.count === undefined ? 0 : view.count}</b></span>
+        <span><small>${vi ? "TÀU TRÊN BẢNG" : "SHIPS ON BOARD"}</small><b>${view.shipCount || 0}</b></span>
+        <span><small>${vi ? "Ô ĐANG XÉT" : "CURRENT CELL"}</small><b>${cur ? `${cur.r},${cur.c}` : "—"}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="bs419-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đếm tàu chiến trên bảng" : "Battleships in a board visualization")}">
+    <div class="bs419-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? (vi
+        ? "Tàu là dãy THẲNG và hai tàu không bao giờ kề nhau. Hai điều đó khiến mỗi tàu có ĐÚNG MỘT ô không có 'X' ở trên và cũng không có 'X' ở bên trái — đầu trên-trái của nó. Đếm những ô đó là đếm tàu: một lượt quét, không cần visited, không sửa bảng."
+        : "Ships are STRAIGHT runs and two ships never touch. Those two facts give every ship EXACTLY ONE cell with no 'X' above and no 'X' to its left — its top-left end. Counting those cells counts the ships: one pass, no visited array, no writes to the board.")
+      : (vi
+        ? "Mỗi tàu là một thành phần liên thông của ô 'X', nên loang ra từng thành phần và đếm. Đúng, dễ nghĩ, nhưng phải mang theo tập seen O(m·n) — đối chiếu với cách 1 để thấy follow-up của đề đòi gì."
+        : "Each ship is a connected component of 'X' cells, so flood each component and count them. Correct and easy to think of, but it must carry an O(m·n) seen set — compare approach 1 to see what the problem's follow-up is asking for."))}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="bs419-panel">
+      <header>
+        <strong>${vi ? `BẢNG ${rows} × ${cols}` : `BOARD ${rows} × ${cols}`}</strong>
+        <span>${vi ? "★ = ô được đếm" : "★ = the counted cell"}</span>
+      </header>
+      <div class="bs419-board" style="--bs-cols:${cols}">${boardHtml}</div>
+      <div class="bs419-legend">${legendHtml || `<em class="bs419-empty">${vi ? "bảng không có tàu nào" : "the board has no ships"}</em>`}</div>
+      <div class="bs419-hint">${escapeHtml(vi
+      ? "Màu tàu chỉ để bạn đối chiếu bằng mắt — thuật toán KHÔNG tính ra nhóm nào thuộc tàu nào, và đó chính là lý do nó không cần bộ nhớ."
+      : "The ship colours are only there so you can check by eye — the algorithm never works out which cells form which ship, and that is precisely why it needs no memory.")}</div>
+    </section>
+
+    ${testHtml}
+    ${memHtml}
+
+    <div class="bs419-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 418 Sentence Screen Fitting ----
+// Both approaches draw the same screen, because the screen is what the problem is
+// about. Approach 1 fills it word by word. Approach 2's pointer trick looks like
+// sleight of hand, so the tape is drawn as labelled copies of s with the row's
+// +cols jump and its back-up marked, which makes cur // m obviously the answer.
+function renderScreenFit418View(step) {
+  const view = step.screenFit418View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const words = Array.isArray(view.words) ? view.words : [];
+  const n = Number(view.n) || 0;
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const m = Number(view.m) || 1;
+  const tape = String(view.tape || "");
+  const approach = Number(view.approach) || 1;
+  const screen = Array.isArray(view.screen) ? view.screen : [];
+  const copy = Array.isArray(view.copy) ? view.copy : [];
+  const fit = view.fit;
+  const ptr = view.pointer;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const PALETTE = 5;
+  const glyph = (ch) => (ch === null || ch === undefined ? "" : ch === " " ? "·" : ch);
+
+  // ── the screen ────────────────────────────────────────────────────────────
+  const screenHtml = screen.map((row, r) => row.map((ch, c) => {
+    const cls = ["sf418-cell"];
+    const cp = copy[r] ? copy[r][c] : -1;
+    if (ch === null || ch === undefined) cls.push("blank");
+    else {
+      cls.push(cp >= 0 ? `q${cp % PALETTE}` : "plain");
+      if (ch === " ") cls.push("sp");
+    }
+    if (r === view.rowIndex && !isDone) {
+      cls.push("inrow");
+      // approach 1: mark the cells just written, or the tail being left blank
+      if (fit && fit.fits && c >= fit.used && c < fit.used + fit.need) cls.push("wrote");
+      if (fit && !fit.fits && c >= fit.used) cls.push("left");
+    }
+    return `<div class="${cls.join(" ")}">${escapeHtml(glyph(ch))}</div>`;
+  }).join("")).join("");
+
+  const copiesUsed = new Set(copy.flat().filter((x) => x >= 0));
+  const legendHtml = [...copiesUsed].sort((a, b) => a - b).map((cp) => `<span class="lg q${cp % PALETTE}">${vi ? "câu" : "sentence"} ${cp + 1}</span>`).join("");
+
+  // ── approach 1: sentence strip and the fit arithmetic ─────────────────────
+  let sentenceHtml = "";
+  if (approach === 1) {
+    const strip = words.map((w, i) => `<span class="sf418-w${i === view.wordIdx && !isDone ? " cur" : ""}">${escapeHtml(w)}<i>${w.length}</i></span>`).join("");
+    const fitHtml = fit
+      ? `<div class="sf418-fit ${fit.fits ? "ok" : "no"}">
+          <small>${vi ? "THỬ NHÉT" : "TRY TO FIT"} "${escapeHtml(fit.word)}"</small>
+          <div class="calc">
+            <span class="a">used ${fit.used}</span><span class="op">+</span>
+            <span class="b">${fit.need}</span><span class="op">${fit.fits ? "≤" : ">"}</span>
+            <span class="c">cols ${fit.cols}</span>
+            <strong>${fit.fits ? (vi ? "vừa" : "fits") : (vi ? "không vừa" : "no room")}</strong>
+          </div>
+          <span class="why">${escapeHtml(fit.need === fit.wordLen
+        ? (vi ? `đầu dòng nên chỉ cần ${fit.wordLen} cột cho từ, không cần dấu cách`
+          : `row is empty, so just ${fit.wordLen} columns for the word, no space needed`)
+        : (vi ? `${fit.wordLen} cột cho từ + 1 cột cho dấu cách = ${fit.need}`
+          : `${fit.wordLen} columns for the word + 1 for the space = ${fit.need}`))}</span>
+          ${!fit.fits ? `<em>${escapeHtml(vi ? `để trống ${fit.remaining} cột cuối dòng, "${fit.word}" chuyển sang dòng sau` : `leave the last ${fit.remaining} columns blank; "${fit.word}" moves to the next row`)}</em>` : ""}
+        </div>`
+      : "";
+    sentenceHtml = `<section class="sf418-panel">
+      <header>
+        <strong>${vi ? "CÂU — con trỏ từ chạy liên tục, không reset theo dòng" : "SENTENCE — the word pointer runs continuously, never resets per row"}</strong>
+        <span>${vi ? `đã đặt ${view.placed || 0} từ` : `${view.placed || 0} words placed`}</span>
+      </header>
+      <div class="sf418-sentence">${strip}</div>
+      ${fitHtml}
+    </section>`;
+  }
+
+  // ── approach 2: the tape ──────────────────────────────────────────────────
+  let tapeHtml = "";
+  if (approach === 2 && ptr) {
+    const hi = Math.max(ptr.cur, ptr.jumpTo === null || ptr.jumpTo === undefined ? ptr.cur : ptr.jumpTo);
+    const firstCopy = Math.max(0, Math.floor(ptr.prevCur / m) - (Math.floor(hi / m) - Math.floor(ptr.prevCur / m) >= 2 ? 0 : 0));
+    const lastCopy = Math.min(firstCopy + 3, Math.floor(hi / m) + 1);
+    const groups = [];
+    for (let cp = firstCopy; cp <= lastCopy; cp++) {
+      const cells = Array.from({ length: m }, (_, k) => {
+        const abs = cp * m + k;
+        const cls = ["sf418-tc"];
+        if (abs >= ptr.prevCur && abs < ptr.cur) cls.push("consumed");
+        if (ptr.backedTo !== null && ptr.backedTo !== undefined && abs >= ptr.cur && abs <= (ptr.jumpTo === null ? -1 : ptr.jumpTo)) cls.push("rolled");
+        if (abs === ptr.prevCur) cls.push("start");
+        if (ptr.jumpTo !== null && ptr.jumpTo !== undefined && abs === ptr.jumpTo) cls.push("jump");
+        if (abs === ptr.cur) cls.push("cur");
+        if (tape[k] === " ") cls.push("sp");
+        return `<span class="${cls.join(" ")}"><b>${escapeHtml(glyph(tape[k]))}</b><i>${abs}</i></span>`;
+      }).join("");
+      groups.push(`<div class="sf418-copy q${cp % PALETTE}">
+        <small>${vi ? "câu" : "sentence"} ${cp + 1}</small>
+        <div class="cells">${cells}</div>
+      </div>`);
+    }
+    const doneCopies = Math.floor(ptr.cur / m);
+    tapeHtml = `<section class="sf418-panel">
+      <header>
+        <strong>${vi ? `BĂNG s lặp vô hạn — mỗi bản lặp đúng m = ${m} ký tự` : `THE TAPE s repeated forever — each copy is exactly m = ${m} characters`}</strong>
+        <span>${vi ? "số nhỏ = vị trí tuyệt đối" : "small number = absolute position"}</span>
+      </header>
+      <div class="sf418-tape">${groups.join("")}</div>
+      <div class="sf418-tlegend">
+        <span class="lg start">${vi ? "đầu dòng này" : "row starts here"}</span>
+        ${ptr.jumpTo !== null && ptr.jumpTo !== undefined ? `<span class="lg jump">+cols → ${ptr.jumpTo}</span>` : ""}
+        <span class="lg consumed">${vi ? "dòng này hiển thị" : "this row shows"}</span>
+        ${ptr.backedTo !== null && ptr.backedTo !== undefined ? `<span class="lg rolled">${vi ? "đã lùi lại (từ bị cắt)" : "backed out (split word)"}</span>` : ""}
+        <span class="lg cur">cur = ${ptr.cur}</span>
+      </div>
+      <div class="sf418-div">
+        <span class="lbl">${vi ? "ĐÁP ÁN LÀ" : "THE ANSWER IS"}</span>
+        <span class="eq">cur // m = ${ptr.cur} // ${m} = <strong>${doneCopies}</strong></span>
+        <span class="bars">${Array.from({ length: Math.max(1, doneCopies + 1) }, (_, k) => `<i class="${k < doneCopies ? "full" : "part"}" style="--f:${k < doneCopies ? 100 : Math.round(((ptr.cur % m) / m) * 100)}%"></i>`).join("")}</span>
+        <span class="note">${escapeHtml(vi
+      ? `${doneCopies} bản lặp trọn vẹn${ptr.cur % m ? ` + ${ptr.cur % m}/${m} ký tự của bản kế tiếp (chưa trọn nên không tính)` : ""}`
+      : `${doneCopies} whole copies${ptr.cur % m ? ` + ${ptr.cur % m}/${m} characters of the next one (incomplete, so it does not count)` : ""}`)}</span>
+      </div>
+    </section>`;
+  }
+
+  const tooLongHtml = view.tooLong
+    ? `<div class="sf418-toolong">${escapeHtml(vi
+      ? `Từ "${view.tooLong.word}" dài ${view.tooLong.len} ký tự nhưng một dòng chỉ có ${cols} cột. Không được cắt từ sang hai dòng nên nó không bao giờ viết được → đáp án 0.`
+      : `Word "${view.tooLong.word}" is ${view.tooLong.len} characters but a row has only ${cols} columns. Words cannot be split across lines, so it can never be written → the answer is 0.`)}</div>`
+    : "";
+
+  const statusHtml = isDone
+    ? `<div class="sf418-answer${view.answer === 0 ? " zero" : ""}">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer}</strong>
+        <span>${view.answer === 0
+      ? (vi ? "không câu nào viết trọn vẹn được" : "no sentence fits completely")
+      : (vi ? `lần câu "${escapeHtml(words.join(" "))}" được viết trọn vẹn` : `complete copies of "${escapeHtml(words.join(" "))}"`)}</span>
+      </div>`
+    : `<div class="sf418-progress">
+        ${approach === 1
+      ? `<span><small>${vi ? "TỪ ĐÃ ĐẶT" : "WORDS PLACED"}</small><b>${view.placed || 0}</b></span>`
+      : `<span><small>cur</small><b>${ptr ? ptr.cur : 0}</b></span>`}
+        <span><small>${vi ? "CÂU TRỌN VẸN" : "COMPLETE SENTENCES"}</small><b>${view.completed || 0}</b></span>
+        <span><small>${vi ? "DÒNG" : "ROW"}</small><b>${view.rowIndex === null || view.rowIndex === undefined ? "—" : `${view.rowIndex}/${rows - 1}`}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="sf418-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa xếp câu vừa màn hình" : "Sentence screen fitting visualization")}">
+    <div class="sf418-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? (vi
+        ? `Lấp từng dòng, mỗi lần thử nhét thêm một từ. Một từ tốn len(w) cột, CỘNG 1 cột nữa cho dấu cách nếu dòng đã có chữ. Con trỏ từ chạy liên tục qua các bản lặp của câu và không reset theo dòng — nên cuối cùng chỉ cần lấy (số từ đã đặt) // ${n}.`
+        : `Fill each row, trying one more word each time. A word costs len(w) columns, PLUS 1 for the space if the row is not empty. The word pointer runs continuously across copies of the sentence and never resets per row — so at the end the answer is just (words placed) // ${n}.`)
+      : (vi
+        ? `Nối câu bằng dấu cách rồi THÊM MỘT DẤU CÁCH Ở CUỐI: s = "${tape.replace(/ /g, "·")}". Nhờ dấu cách cuối, lặp s vô hạn cho ra dòng chữ liên tục mà ranh giới giữa hai bản lặp cũng chỉ là một dấu cách bình thường. Mỗi dòng: cur += cols; nếu rơi vào dấu cách thì nuốt nó, còn rơi giữa từ thì lùi về đầu từ đó. Cuối cùng cur // m là đáp án vì mỗi câu trọn vẹn chiếm đúng m ký tự băng.`
+        : `Join the sentence with spaces and APPEND ONE MORE SPACE: s = "${tape.replace(/ /g, "·")}". Thanks to that trailing space, repeating s forever spells continuous text where the seam between copies is just an ordinary space. Each row: cur += cols; if it lands on a space swallow it, if it lands mid-word back up to where that word starts. At the end cur // m is the answer, because each complete sentence occupies exactly m tape characters.`))}</span>
+    </div>
+
+    ${statusHtml}
+    ${tooLongHtml}
+
+    <section class="sf418-panel">
+      <header>
+        <strong>${vi ? `MÀN HÌNH ${rows} × ${cols}` : `SCREEN ${rows} × ${cols}`}</strong>
+        <span>${vi ? "· = dấu cách · ô trống = cột bỏ trống" : "· = a space · empty cell = unused column"}</span>
+      </header>
+      <div class="sf418-screen" style="--sf-cols:${cols}">${screenHtml}</div>
+      <div class="sf418-legend">${legendHtml || `<em class="sf418-empty">${vi ? "màn hình còn trống" : "the screen is empty"}</em>`}</div>
+    </section>
+
+    ${sentenceHtml}
+    ${tapeHtml}
+
+    <div class="sf418-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 1554 Strings Differ by One Character ----
+// The masking trick is the whole problem, so the layout puts the pattern grid
+// (word × masked index) front and centre: a repeat inside that grid IS the
+// answer. Approach 2 swaps the grid for a pair matrix so the O(n²) cost it pays
+// is visible next to approach 1's O(n·m) insertions.
+function renderDifferByOne1554View(step) {
+  const view = step.differByOne1554View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const words = Array.isArray(view.words) ? view.words : [];
+  const m = Number(view.m) || 0;
+  const n = words.length;
+  const approach = Number(view.approach) || 1;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const collide = view.collide;
+  const counters = view.counters || {};
+  const wi = view.wi;
+  const pi = view.pi;
+  const pair = view.pair;
+
+  const partOfMatch = (idx) => collide && (collide.a === idx || collide.b === idx);
+
+  // ── word list, each word as its own character row ─────────────────────────
+  const wordsHtml = words.map((w, idx) => {
+    const cls = ["dbo1554-word"];
+    if (idx === wi && !isDone) cls.push("cur");
+    if (partOfMatch(idx)) cls.push("match");
+    if (pair && (pair.i === idx || pair.j === idx)) cls.push("inpair");
+    return `<div class="${cls.join(" ")}">
+      <span class="wl">w${idx}</span>
+      <div class="chs">${w.split("").map((ch, p) => {
+      const c = ["ch"];
+      const masked = idx === wi && p === pi && !isDone;
+      if (masked) c.push("masked");
+      if (collide && collide.index === p && partOfMatch(idx)) c.push("diff");
+      else if (collide && partOfMatch(idx)) c.push("same");
+      else if (pair && (pair.i === idx || pair.j === idx)) {
+        if (pair.diffs.includes(p)) c.push("diff");
+        else if (p < pair.scanned) c.push("same");
+      }
+      return `<span class="${c.join(" ")}">${escapeHtml(masked ? "*" : ch)}</span>`;
+    }).join("")}</div>
+    </div>`;
+  }).join("");
+
+  const indexRuler = `<div class="dbo1554-ruler"><span class="wl"></span><div class="chs">${Array.from({ length: m }, (_, p) => `<span class="ch">${p}</span>`).join("")}</div></div>`;
+
+  // ── approach 1: the pattern grid ──────────────────────────────────────────
+  let gridHtml = "";
+  if (view.table) {
+    const head = `<div class="dbo1554-trow head"><span class="rh">${vi ? "che →" : "mask →"}</span>${Array.from({ length: m }, (_, p) => `<span class="tc${p === pi && !isDone ? " col" : ""}">${p}</span>`).join("")}</div>`;
+    const body = view.table.map((row, r) => `<div class="dbo1554-trow">
+        <span class="rh${r === wi && !isDone ? " lit" : ""}">w${r}</span>
+        ${row.map((pat, p) => {
+      const c = ["tc"];
+      if (pat === null || pat === undefined) c.push("unbuilt");
+      if (collide && pat === collide.pattern) c.push("collide");
+      else if (r === wi && p === pi && !isDone) c.push("cur");
+      return `<span class="${c.join(" ")}">${pat === null || pat === undefined ? "" : escapeHtml(pat)}</span>`;
+    }).join("")}
+      </div>`).join("");
+    gridHtml = `<section class="dbo1554-panel">
+      <header>
+        <strong>${vi ? "BẢNG PATTERN — hàng = từ, cột = vị trí bị che" : "PATTERN GRID — row = word, column = masked index"}</strong>
+        <span>${vi ? `${counters.built || 0}/${counters.total || 0} pattern` : `${counters.built || 0}/${counters.total || 0} patterns`}</span>
+      </header>
+      <div class="dbo1554-table">${head}${body}</div>
+      <div class="dbo1554-hint">${escapeHtml(vi
+      ? "Hai ô TRÙNG NHAU ở bất kỳ đâu trong bảng này chính là đáp án: chúng phải nằm ở cùng một cột (cùng vị trí bị che) và thuộc hai từ khác nhau."
+      : "Any two IDENTICAL cells anywhere in this grid are the answer: they must sit in the same column (same masked index) and belong to two different words.")}</div>
+    </section>`;
+  }
+
+  // ── approach 1: the set ───────────────────────────────────────────────────
+  let seenHtml = "";
+  if (view.seen) {
+    const chips = view.seen.map((e) => {
+      const hot = collide && e.pattern === collide.pattern;
+      return `<div class="dbo1554-chip${hot ? " hot" : ""}"><strong>${escapeHtml(e.pattern)}</strong><span>w${e.wi}</span></div>`;
+    }).join("");
+    seenHtml = `<section class="dbo1554-panel">
+      <header><strong>${vi ? "SET seen — pattern → từ đã thêm nó" : "SET seen — pattern → the word that inserted it"}</strong><span>${view.seen.length}</span></header>
+      <div class="dbo1554-chips">${chips || `<em class="dbo1554-empty">${vi ? "set đang rỗng" : "the set is empty"}</em>`}</div>
+    </section>`;
+  }
+
+  // ── approach 2: the pair matrix ───────────────────────────────────────────
+  let matrixHtml = "";
+  if (view.pairMatrix) {
+    const head = `<div class="dbo1554-trow head"><span class="rh"></span>${words.map((_, j) => `<span class="tc${pair && pair.j === j ? " col" : ""}">w${j}</span>`).join("")}</div>`;
+    const body = view.pairMatrix.map((row, i) => `<div class="dbo1554-trow">
+        <span class="rh${pair && pair.i === i ? " lit" : ""}">w${i}</span>
+        ${row.map((v, j) => {
+      const c = ["tc"];
+      if (j <= i) c.push("na");
+      else if (v === null || v === undefined) c.push("unbuilt");
+      else if (v === 1) c.push("collide");
+      if (pair && pair.i === i && pair.j === j) c.push("cur");
+      const label = j <= i ? "" : v === null || v === undefined ? "" : v === 1 ? "1" : v === 0 ? "0" : "≥2";
+      return `<span class="${c.join(" ")}">${label}</span>`;
+    }).join("")}
+      </div>`).join("");
+    matrixHtml = `<section class="dbo1554-panel">
+      <header>
+        <strong>${vi ? "MA TRẬN CẶP — số vị trí khác nhau" : "PAIR MATRIX — count of differing indices"}</strong>
+        <span>${counters.comparedPairs || 0}/${counters.totalPairs || 0} ${vi ? "cặp" : "pairs"} · ${counters.charCompares || 0} ${vi ? "lần so ký tự" : "char compares"}</span>
+      </header>
+      <div class="dbo1554-table">${head}${body}</div>
+      <div class="dbo1554-hint">${escapeHtml(vi
+      ? `Cần tìm ô có giá trị đúng 1. Phải xét tới ${counters.totalPairs || 0} cặp — cách 1 chỉ cần ${counters.total || n * m} lần băm và không so cặp nào.`
+      : `We are looking for a cell equal to exactly 1. Up to ${counters.totalPairs || 0} pairs must be examined — approach 1 needs only ${counters.total || n * m} hash insertions and compares no pairs at all.`)}</div>
+    </section>`;
+  }
+
+  // ── the payoff: the two words aligned ─────────────────────────────────────
+  let matchHtml = "";
+  if (collide) {
+    const a = words[collide.a];
+    const b = words[collide.b];
+    matchHtml = `<section class="dbo1554-match">
+      <small>${vi ? "CẶP TÌM ĐƯỢC — khớp mọi vị trí, trừ đúng một" : "THE PAIR — matching everywhere except exactly one index"}</small>
+      <div class="rows">
+        <div class="row"><span class="wl">w${collide.a}</span>${a.split("").map((ch, p) => `<span class="ch ${p === collide.index ? "diff" : "same"}">${escapeHtml(ch)}</span>`).join("")}</div>
+        <div class="row marks"><span class="wl"></span>${a.split("").map((_, p) => `<span class="ch">${p === collide.index ? "✕" : "="}</span>`).join("")}</div>
+        <div class="row"><span class="wl">w${collide.b}</span>${b.split("").map((ch, p) => `<span class="ch ${p === collide.index ? "diff" : "same"}">${escapeHtml(ch)}</span>`).join("")}</div>
+      </div>
+      <em>${escapeHtml(vi
+      ? `Chỉ vị trí ${collide.index} khác: '${a[collide.index]}' so với '${b[collide.index]}'.${collide.pattern ? ` Che vị trí đó thì cả hai đều thành "${collide.pattern}".` : ""}`
+      : `Only index ${collide.index} differs: '${a[collide.index]}' versus '${b[collide.index]}'.${collide.pattern ? ` Masking it turns both into "${collide.pattern}".` : ""}`)}</em>
+    </section>`;
+  }
+
+  const statusHtml = isDone
+    ? `<div class="dbo1554-answer ${view.answer ? "yes" : "no"}">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer ? "true" : "false"}</strong>
+        <span>${view.answer
+      ? (vi ? "có hai từ khác nhau đúng một ký tự" : "two words differ by exactly one character")
+      : (vi ? "mọi cặp đều khác nhau ở ≥ 2 vị trí" : "every pair differs at 2 or more indices")}</span>
+      </div>`
+    : `<div class="dbo1554-progress">
+        ${approach === 1
+      ? `<span><small>${vi ? "PATTERN ĐÃ SINH" : "PATTERNS BUILT"}</small><b>${counters.built || 0}/${counters.total || 0}</b></span>`
+      : `<span><small>${vi ? "CẶP ĐÃ XÉT" : "PAIRS CHECKED"}</small><b>${counters.comparedPairs || 0}/${counters.totalPairs || 0}</b></span>
+         <span><small>${vi ? "SO KÝ TỰ" : "CHAR COMPARES"}</small><b>${counters.charCompares || 0}</b></span>`}
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="dbo1554-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa hai chuỗi khác nhau đúng một ký tự" : "Strings differ by one character visualization")}">
+    <div class="dbo1554-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? (vi
+        ? "Nếu hai từ khác nhau ĐÚNG ở vị trí i, thì che vị trí i của cả hai (thay bằng '*') sẽ cho ra hai chuỗi GIỐNG HỆT nhau — và ngược lại. Vậy 'khác 1 ký tự' biến thành 'trùng pattern', mà cái đó thì hash set trả lời được, không cần so cặp nào."
+        : "If two words differ EXACTLY at index i, masking index i in both (writing '*') yields IDENTICAL strings — and the converse holds. So 'differ by one character' becomes 'patterns collide', which a hash set answers without comparing any pair.")
+      : (vi
+        ? "Cách thẳng thắn: xét mọi cặp, đếm số vị trí khác, dừng sớm ở vị trí khác thứ hai. Dễ hiểu nhưng O(n²·m) nên TLE với giới hạn 10⁵ ký tự — đối chiếu với cách 1 để thấy mẹo che ký tự tiết kiệm bao nhiêu."
+        : "The straightforward way: examine every pair, count differing indices, bail out at the second one. Easy to follow but O(n²·m), which times out against the 10⁵-character limit — compare it with approach 1 to see what the masking trick saves."))}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="dbo1554-panel">
+      <header>
+        <strong>${vi ? `dict — ${n} từ × ${m} ký tự` : `dict — ${n} words × ${m} characters`}</strong>
+        <span>${vi ? "'*' = vị trí đang bị che" : "'*' = the index being masked"}</span>
+      </header>
+      <div class="dbo1554-words">${indexRuler}${wordsHtml}</div>
+    </section>
+
+    ${matchHtml}
+    ${gridHtml}
+    ${seenHtml}
+    ${matrixHtml}
+
+    <div class="dbo1554-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
 // ---- 1055 Shortest Way to Form String ----
 // The answer counts SWEEPS over source, so the layout pairs two strips: target
 // coloured by which sweep covered each character, and source showing the sweep in
@@ -34592,6 +35321,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.attendance552View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAttendance552View(step);
+  } else if (step.battleships419View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBattleships419View(step);
+  } else if (step.screenFit418View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderScreenFit418View(step);
+  } else if (step.differByOne1554View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDifferByOne1554View(step);
   } else if (step.shortestWay1055View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

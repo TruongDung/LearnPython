@@ -26766,3 +26766,436 @@ Object.assign(module.exports, {
     builder: buildSteps2407,
   },
 });
+
+// ─── 552: Student Attendance Record II ───
+// Count length-n records over {P, A, L} with at most one 'A' and never three 'L'
+// in a row, mod 1e9+7.
+//
+// Both builders feed `attendance552View`. The insight worth seeing is that only
+// TWO things about a prefix can ever affect whether it can be extended legally:
+// how many A's it already used (0 or 1) and how long its trailing run of L is
+// (0, 1 or 2). That is 2 × 3 = 6 states, no matter how large n gets — so the
+// whole problem is a 6-node state machine, and the view draws it.
+
+const AR552_MOD = 1000000007n;
+const AR552_LIMITS = { n: 60 };
+// state index s = a * 3 + l, so 0..5 = (0,0) (0,1) (0,2) (1,0) (1,1) (1,2)
+const AR552_STATES = [
+  { a: 0, l: 0 }, { a: 0, l: 1 }, { a: 0, l: 2 },
+  { a: 1, l: 0 }, { a: 1, l: 1 }, { a: 1, l: 2 },
+];
+
+function parse552N(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > AR552_LIMITS.n) throw new Error(`visualization supports n up to ${AR552_LIMITS.n}`);
+  return n;
+}
+
+// The legal moves out of every state, shared by both approaches and by the view.
+// Returning them as data (rather than inlining the ifs) keeps the diagram, the DP
+// and the transition matrix provably consistent.
+function ar552Moves() {
+  return AR552_STATES.map(({ a, l }, s) => {
+    const out = [{ ch: "P", to: a * 3 + 0 }];
+    if (a === 0) out.push({ ch: "A", to: 1 * 3 + 0 });
+    if (l < 2) out.push({ ch: "L", to: a * 3 + l + 1 });
+    return { from: s, out };
+  });
+}
+
+// Brute force over every string of length n, kept only for small n: it turns the
+// DP numbers into concrete records a reader can count by hand.
+function ar552Enumerate(n, cap) {
+  if (n > cap) return null;
+  const byState = AR552_STATES.map(() => []);
+  const rec = [];
+  (function walk(a, l) {
+    if (rec.length === n) { byState[a * 3 + l].push(rec.join("")); return; }
+    rec.push("P"); walk(a, 0); rec.pop();
+    if (a === 0) { rec.push("A"); walk(1, 0); rec.pop(); }
+    if (l < 2) { rec.push("L"); walk(a, l + 1); rec.pop(); }
+  })(0, 0);
+  return byState;
+}
+
+function ar552Base(n, approach) {
+  const steps = [];
+  const moves = ar552Moves();
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      attendance552View: {
+        approach, n,
+        states: AR552_STATES.map((s) => ({ ...s })),
+        moves: moves.map((m) => ({ from: m.from, out: m.out.map((x) => ({ ...x })) })),
+        phase: o.phase,
+        step: o.step === undefined ? null : o.step,
+        dp: o.dp ? o.dp.map((v) => String(v)) : null,
+        prevDp: o.prevDp ? o.prevDp.map((v) => String(v)) : null,
+        flows: o.flows || null,
+        total: o.total === undefined ? null : String(o.total),
+        samples: o.samples || null,
+        matrix: o.matrix || null,
+        matrixLabel: o.matrixLabel || null,
+        result: o.result || null,
+        bits: o.bits || null,
+        bitIndex: o.bitIndex === undefined ? null : o.bitIndex,
+        answer: o.answer === undefined || o.answer === null ? null : String(o.answer),
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, moves, snap };
+}
+
+// ── Approach 1: the 6-state rolling DP ───────────────────────────────────────
+function buildSteps552(input) {
+  const n = parse552N(input);
+  const { steps, moves, snap } = ar552Base(n, 1);
+  const SAMPLE_CAP = 5;                 // enumerating beyond this is unreadable
+  const sum = (dp) => dp.reduce((t, v) => (t + v) % AR552_MOD, 0n);
+
+  let dp = [1n, 0n, 0n, 0n, 0n, 0n];    // length 0: only the empty prefix
+
+  snap({
+    phase: "intro",
+    title: { vi: `n = ${n} — đếm bản ghi hợp lệ, mod 1e9+7`, en: `n = ${n} — count eligible records, mod 1e9+7` },
+    note: {
+      vi: `Bản ghi dài ${n} gồm các ký tự P (có mặt), A (vắng), L (muộn); hợp lệ khi có ÍT HƠN 2 chữ A tổng cộng và KHÔNG có 3 chữ L liền nhau. Có 3^${n} chuỗi nên không thể liệt kê. Điểm mấu chốt: muốn biết một tiền tố còn nối tiếp được hay không, ta chỉ cần nhớ ĐÚNG HAI THỨ — đã dùng bao nhiêu chữ A (0 hay 1) và đuôi đang có bao nhiêu chữ L liền nhau (0, 1 hay 2). Vậy chỉ có 2 × 3 = 6 trạng thái, bất kể n lớn cỡ nào.`,
+      en: `A length-${n} record is made of P (present), A (absent), L (late); it is eligible when it has FEWER THAN 2 A's in total and never 3 L's in a row. There are 3^${n} strings, so enumeration is out. The key: to know whether a prefix can still be extended legally, only TWO things matter — how many A's it already used (0 or 1) and how long its trailing run of L is (0, 1 or 2). That is 2 × 3 = 6 states, however large n gets.`,
+    },
+    codeLines: [2, 3, 4],
+    step: 0, dp,
+    total: sum(dp),
+    samples: ar552Enumerate(0, SAMPLE_CAP),
+    decision: { vi: "Chỉ cần 6 trạng thái: (số A, độ dài đuôi L).", en: "Only 6 states are needed: (A count, trailing L length)." },
+    vars: [{ name: "n", value: n }, { name: "MOD", value: "1e9 + 7" }],
+  });
+
+  snap({
+    phase: "init",
+    title: { vi: "dp[0][0] = 1, các trạng thái khác = 0", en: "dp[0][0] = 1, every other state 0" },
+    note: {
+      vi: "Với độ dài 0 chỉ có một bản ghi: chuỗi rỗng. Nó chưa dùng chữ A nào và đuôi chưa có chữ L nào, nên nằm ở trạng thái (a=0, l=0).",
+      en: "At length 0 there is exactly one record: the empty string. It has used no A and has no trailing L, so it sits in state (a=0, l=0).",
+    },
+    codeLines: [5, 6],
+    step: 0, dp,
+    total: sum(dp),
+    samples: ar552Enumerate(0, SAMPLE_CAP),
+    decision: { vi: "1 bản ghi ở trạng thái (0,0).", en: "1 record in state (0,0)." },
+    vars: [{ name: "dp", value: "[[1,0,0],[0,0,0]]" }],
+  });
+
+  for (let step = 1; step <= n; step++) {
+    const prevDp = [...dp];
+    const nxt = [0n, 0n, 0n, 0n, 0n, 0n];
+    const flows = [];
+    for (const { from, out } of moves) {
+      if (prevDp[from] === 0n) continue;
+      for (const { ch, to } of out) {
+        nxt[to] = (nxt[to] + prevDp[from]) % AR552_MOD;
+        flows.push({ from, to, ch, amount: String(prevDp[from]) });
+      }
+    }
+    dp = nxt;
+    const total = sum(dp);
+    const samples = ar552Enumerate(step, SAMPLE_CAP);
+
+    snap({
+      phase: "extend",
+      title: { vi: `Độ dài ${step}: tổng = ${total}`, en: `Length ${step}: total = ${total}` },
+      note: {
+        vi: `Mỗi bản ghi dài ${step - 1} được nối thêm một ký tự. Từ trạng thái (a, l): nối 'P' thì đuôi L đứt nên về (a, 0); nối 'A' chỉ được khi a = 0 và đưa sang (1, 0) — cũng làm đứt đuôi L; nối 'L' chỉ được khi l < 2 và đưa sang (a, l+1). Trạng thái (a, 2) không nối 'L' được nữa, vì thế sẽ thành 3 chữ L liền nhau. ${flows.length} luồng chuyển được vẽ trên sơ đồ.`,
+        en: `Every record of length ${step - 1} gets one more character. From state (a, l): appending 'P' breaks the L run so it lands on (a, 0); appending 'A' is only allowed when a = 0 and moves to (1, 0) — also breaking the L run; appending 'L' is only allowed when l < 2 and moves to (a, l+1). State (a, 2) cannot take an 'L' at all, since that would make three in a row. ${flows.length} transitions are drawn on the diagram.`,
+      },
+      codeLines: [7, 8, 14, 16, 18],
+      step, dp, prevDp, flows,
+      total,
+      samples,
+      decision: {
+        vi: `${total} bản ghi hợp lệ dài ${step}.`,
+        en: `${total} eligible records of length ${step}.`,
+      },
+      vars: [
+        { name: "length", value: step },
+        { name: "dp", value: `[${dp.slice(0, 3).join(", ")} | ${dp.slice(3).join(", ")}]` },
+        { name: "total", value: String(total) },
+      ],
+    });
+  }
+
+  const answer = sum(dp);
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${answer}`, en: `Answer = ${answer}` },
+    note: {
+      vi: `Cộng cả 6 trạng thái lại: mọi bản ghi hợp lệ dài ${n} đều kết thúc ở đúng một trong 6 trạng thái đó, nên tổng chính là đáp án. Chú ý toàn bộ quá trình chỉ giữ 6 con số — O(1) bộ nhớ, O(n) thời gian, không phụ thuộc vào việc n lớn tới đâu.`,
+      en: `Add all 6 states: every eligible length-${n} record ends in exactly one of them, so the sum is the answer. Note the whole run kept only 6 numbers — O(1) memory and O(n) time, regardless of how large n is.`,
+    },
+    codeLines: [19, 20],
+    final: true,
+    step: n, dp, total: answer, answer,
+    samples: ar552Enumerate(n, SAMPLE_CAP),
+    decision: { vi: `${answer} bản ghi hợp lệ.`, en: `${answer} eligible records.` },
+    vars: [{ name: "answer", value: String(answer) }],
+  });
+
+  return { input, answer: Number(answer), steps };
+}
+
+// ── Approach 2: raise the 6×6 transition matrix to the n-th power ─────────────
+function buildSteps552Matrix(input) {
+  const n = parse552N(input);
+  const { steps, moves, snap } = ar552Base(n, 2);
+  const SZ = 6;
+
+  const zero = () => Array.from({ length: SZ }, () => Array(SZ).fill(0n));
+  const identity = () => Array.from({ length: SZ }, (_, i) => Array.from({ length: SZ }, (_, j) => (i === j ? 1n : 0n)));
+  const show = (M) => M.map((row) => row.map((v) => String(v)));
+  function mul(A, B) {
+    const C = zero();
+    for (let i = 0; i < SZ; i++) {
+      for (let k = 0; k < SZ; k++) {
+        if (A[i][k] === 0n) continue;
+        for (let j = 0; j < SZ; j++) C[i][j] = (C[i][j] + A[i][k] * B[k][j]) % AR552_MOD;
+      }
+    }
+    return C;
+  }
+
+  // T[s][t] = how many single characters take state s to state t.
+  let T = zero();
+  for (const { from, out } of moves) for (const { to } of out) T[from][to] += 1n;
+
+  const bits = n.toString(2).split("").reverse().map((b) => Number(b));
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: luỹ thừa ma trận 6×6, n = ${n}`, en: `Approach 2: 6×6 matrix power, n = ${n}` },
+    note: {
+      vi: `Cách 1 chạy ${n} bước, mỗi bước là một phép biến đổi TUYẾN TÍNH giống hệt nhau trên vector 6 trạng thái. Việc lặp lại cùng một phép biến đổi n lần chính là nhân ma trận n lần, mà luỹ thừa thì có thể tính bằng bình phương liên tiếp: chỉ cần khoảng log₂(${n}) ≈ ${bits.length} bước. T[s][t] = số ký tự đưa trạng thái s sang t.`,
+      en: `Approach 1 runs ${n} steps, and every step is the SAME linear transformation on the 6-state vector. Repeating one linear map n times is a matrix power, and powers can be computed by repeated squaring: about log₂(${n}) ≈ ${bits.length} steps. T[s][t] = how many characters carry state s to state t.`,
+    },
+    codeLines: [3, 4, 5],
+    matrix: show(T), matrixLabel: "T",
+    bits, bitIndex: null,
+    decision: { vi: `${n} bước → ${bits.length} bit, dùng bình phương liên tiếp.`, en: `${n} steps → ${bits.length} bits, via repeated squaring.` },
+    vars: [{ name: "n", value: n }, { name: "n in binary", value: n.toString(2) }],
+  });
+
+  snap({
+    phase: "buildT",
+    title: { vi: "Dựng T từ đúng các nước đi hợp lệ", en: "Build T from exactly the legal moves" },
+    note: {
+      vi: `Mỗi hàng s của T đếm các ký tự đi ra từ trạng thái s: 'P' luôn được, 'A' chỉ khi a = 0, 'L' chỉ khi l < 2. Tổng mỗi hàng là số lựa chọn hợp lệ tại trạng thái đó (${moves.map((m) => m.out.length).join(", ")}). Chính T này mã hoá toàn bộ luật của bài.`,
+      en: `Row s of T counts the characters leaving state s: 'P' is always allowed, 'A' only when a = 0, 'L' only when l < 2. Each row sums to the number of legal choices in that state (${moves.map((m) => m.out.length).join(", ")}). This single matrix encodes every rule of the problem.`,
+    },
+    codeLines: [6, 7, 8, 9, 11, 13],
+    matrix: show(T), matrixLabel: "T",
+    bits, bitIndex: null,
+    decision: { vi: "T mã hoá toàn bộ luật hợp lệ.", en: "T encodes all the eligibility rules." },
+    vars: [{ name: "row sums", value: moves.map((m) => m.out.length).join(", ") }],
+  });
+
+  let R = identity();
+  snap({
+    phase: "initR",
+    title: { vi: "R = ma trận đơn vị", en: "R = the identity matrix" },
+    note: {
+      vi: "R sẽ tích luỹ kết quả T^n. Bắt đầu bằng ma trận đơn vị vì nó là phần tử trung hoà của phép nhân ma trận, giống số 1 với phép nhân số.",
+      en: "R will accumulate T^n. It starts as the identity because that is the neutral element for matrix multiplication, just as 1 is for numbers.",
+    },
+    codeLines: [24],
+    matrix: show(R), matrixLabel: "R",
+    result: show(R),
+    bits, bitIndex: null,
+    decision: { vi: "R = I, sẵn sàng tích luỹ.", en: "R = I, ready to accumulate." },
+    vars: [{ name: "R", value: "I₆" }],
+  });
+
+  let rest = n;
+  let bitIndex = 0;
+  while (rest > 0) {
+    if (rest & 1) {
+      R = mul(R, T);
+      snap({
+        phase: "multiply",
+        title: { vi: `Bit ${bitIndex} của n là 1 → R = R · T^(2^${bitIndex})`, en: `Bit ${bitIndex} of n is 1 → R = R · T^(2^${bitIndex})` },
+        note: {
+          vi: `n = ${n} có bit thứ ${bitIndex} bằng 1, nghĩa là T^n chứa thừa số T^(2^${bitIndex}) = T^${2 ** bitIndex}. Ma trận T hiện tại đúng là T^${2 ** bitIndex} (do đã bình phương ${bitIndex} lần), nên nhân nó vào R.`,
+          en: `n = ${n} has bit ${bitIndex} set, so T^n contains the factor T^(2^${bitIndex}) = T^${2 ** bitIndex}. The current T is exactly T^${2 ** bitIndex} (it has been squared ${bitIndex} times), so multiply it into R.`,
+        },
+        codeLines: [26, 27],
+        matrix: show(T), matrixLabel: `T^${2 ** bitIndex}`,
+        result: show(R),
+        bits, bitIndex,
+        decision: { vi: `Nhân T^${2 ** bitIndex} vào R.`, en: `Multiplied T^${2 ** bitIndex} into R.` },
+        vars: [{ name: "bit", value: `${bitIndex} → 1` }, { name: "R[0] sum", value: String(R[0].reduce((t, v) => (t + v) % AR552_MOD, 0n)) }],
+      });
+    } else {
+      snap({
+        phase: "skipBit",
+        title: { vi: `Bit ${bitIndex} của n là 0 → bỏ qua`, en: `Bit ${bitIndex} of n is 0 → skip` },
+        note: {
+          vi: `Bit thứ ${bitIndex} của n = ${n} bằng 0, nên T^n không chứa thừa số T^${2 ** bitIndex}. Không nhân gì vào R, chỉ tiếp tục bình phương T.`,
+          en: `Bit ${bitIndex} of n = ${n} is 0, so T^n does not contain the factor T^${2 ** bitIndex}. Nothing is multiplied into R; just keep squaring T.`,
+        },
+        codeLines: [26],
+        matrix: show(T), matrixLabel: `T^${2 ** bitIndex}`,
+        result: show(R),
+        bits, bitIndex,
+        decision: { vi: `Bit 0 → R không đổi.`, en: `Bit is 0 → R unchanged.` },
+        vars: [{ name: "bit", value: `${bitIndex} → 0` }],
+      });
+    }
+    rest >>= 1;
+    if (rest > 0) {
+      T = mul(T, T);
+      snap({
+        phase: "square",
+        title: { vi: `Bình phương: T^${2 ** bitIndex} → T^${2 ** (bitIndex + 1)}`, en: `Square: T^${2 ** bitIndex} → T^${2 ** (bitIndex + 1)}` },
+        note: {
+          vi: `Một phép nhân ma trận nhân đôi số bước mà T đại diện. Đó là lý do chỉ cần ${bits.length} vòng thay vì ${n} vòng như cách 1.`,
+          en: `One matrix multiplication doubles the number of steps T represents. That is why only ${bits.length} rounds are needed instead of approach 1's ${n}.`,
+        },
+        codeLines: [28, 29],
+        matrix: show(T), matrixLabel: `T^${2 ** (bitIndex + 1)}`,
+        result: show(R),
+        bits, bitIndex: bitIndex + 1,
+        decision: { vi: `T giờ đại diện ${2 ** (bitIndex + 1)} bước.`, en: `T now represents ${2 ** (bitIndex + 1)} steps.` },
+        vars: [{ name: "T represents", value: `${2 ** (bitIndex + 1)} steps` }],
+      });
+    }
+    bitIndex += 1;
+  }
+
+  const answer = R[0].reduce((t, v) => (t + v) % AR552_MOD, 0n);
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = tổng hàng 0 của T^n = ${answer}`, en: `Answer = sum of row 0 of T^n = ${answer}` },
+    note: {
+      vi: `R giờ là T^${n}. Phần tử R[0][t] là số bản ghi dài ${n} đi từ trạng thái đầu (0,0) tới trạng thái t, nên cộng cả hàng 0 lại được tổng số bản ghi hợp lệ. Chỉ mất ${bits.length} vòng (${steps.length - 4} phép nhân ma trận) so với ${n} bước của cách 1 — và khoảng cách đó càng lớn khi n càng lớn, đây là cách duy nhất chịu được n cỡ 10^9.`,
+      en: `R is now T^${n}. Entry R[0][t] counts the length-${n} records going from the start state (0,0) to state t, so summing row 0 gives every eligible record. That took ${bits.length} rounds (${steps.length - 4} matrix multiplications) against approach 1's ${n} steps — and the gap widens as n grows, which is what makes n around 10^9 tractable.`,
+    },
+    codeLines: [30],
+    final: true,
+    matrix: show(T), matrixLabel: "T",
+    result: show(R),
+    bits, bitIndex: bits.length,
+    answer,
+    decision: { vi: `${answer} bản ghi hợp lệ, trong ${bits.length} vòng.`, en: `${answer} eligible records, in ${bits.length} rounds.` },
+    vars: [{ name: "answer", value: String(answer) }, { name: "rounds", value: bits.length }],
+  });
+
+  return { input, answer: Number(answer), steps };
+}
+
+Object.assign(module.exports, {
+  552: {
+    id: 552,
+    difficulty: "hard",
+    slug: "student-attendance-record-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+      { key: "state-machine", vi: "Máy trạng thái", en: "State Machine" },
+      { key: "counting", vi: "Đếm", en: "Counting" },
+      { key: "matrix-exponentiation", vi: "Luỹ thừa ma trận", en: "Matrix Exponentiation" },
+    ],
+    title: { vi: "Student Attendance Record II", en: "Student Attendance Record II" },
+    titleVi: { vi: "Đếm bản ghi điểm danh hợp lệ", en: "Counting eligible attendance records" },
+    statement: {
+      vi: "Bản ghi điểm danh là chuỗi gồm 'P' (có mặt), 'A' (vắng), 'L' (muộn). Một học sinh được thưởng nếu vắng ÍT HƠN 2 ngày tổng cộng và KHÔNG BAO GIỜ muộn 3 ngày liền nhau trở lên. Cho số nguyên n, trả về số bản ghi dài n đủ điều kiện thưởng, lấy modulo 10^9 + 7.",
+      en: "An attendance record is a string of 'P' (present), 'A' (absent), 'L' (late). A student is eligible for an award if absent on FEWER THAN 2 days in total and NEVER late 3 or more days in a row. Given an integer n, return the number of eligible length-n records, modulo 10^9 + 7.",
+    },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n — độ dài bản ghi (nhập 1 số)", en: "n — record length (one number)" },
+    extraParams: [],
+    approach: [
+      { vi: "Muốn biết một tiền tố còn nối tiếp hợp lệ được hay không, chỉ cần nhớ ĐÚNG HAI thứ: đã dùng mấy chữ 'A' (0 hoặc 1) và đuôi đang có mấy chữ 'L' liền nhau (0, 1 hoặc 2). Vậy có 2 × 3 = 6 trạng thái, bất kể n lớn cỡ nào.", en: "To know whether a prefix can still be extended legally, only TWO things matter: how many 'A' it used (0 or 1) and how long its trailing run of 'L' is (0, 1 or 2). That gives 2 × 3 = 6 states, however large n is." },
+      { vi: "Nối 'P' luôn được và làm đứt đuôi L → về (a, 0). Nối 'A' chỉ khi a = 0, sang (1, 0) và cũng làm đứt đuôi L. Nối 'L' chỉ khi l < 2, sang (a, l+1).", en: "Appending 'P' is always allowed and breaks the L run → (a, 0). Appending 'A' is allowed only when a = 0, going to (1, 0) and also breaking the L run. Appending 'L' is allowed only when l < 2, going to (a, l+1)." },
+      { vi: "Trạng thái (a, 2) không nhận thêm 'L' được — đó chính là chỗ luật 'không 3 chữ L liền nhau' được cài vào máy trạng thái, nên phần còn lại của thuật toán không phải kiểm gì thêm.", en: "State (a, 2) cannot accept another 'L' — that is where the 'never 3 L's in a row' rule is baked into the state machine, so the rest of the algorithm never has to check it again." },
+      { vi: "Lặp n lần, mỗi lần cập nhật 6 con số theo các luật trên rồi cộng cả 6 trạng thái để ra đáp án: O(n) thời gian, O(1) bộ nhớ.", en: "Iterate n times, updating the 6 numbers by those rules, then sum all 6 states for the answer: O(n) time, O(1) memory." },
+      { vi: "Cách 2: mỗi bước là CÙNG MỘT phép biến đổi tuyến tính trên vector 6 trạng thái, nên lặp n lần chính là luỹ thừa ma trận 6×6. Dùng bình phương liên tiếp còn O(log n) — đây là cách duy nhất chịu được n rất lớn.", en: "Approach 2: every step is the SAME linear map on the 6-state vector, so iterating n times is a 6×6 matrix power. Repeated squaring makes it O(log n) — which is what makes very large n tractable." },
+      { vi: "Đáp án của cách 2 là tổng hàng 0 của T^n, vì T^n[0][t] đếm số bản ghi dài n đi từ trạng thái đầu (0,0) tới trạng thái t.", en: "Approach 2's answer is the sum of row 0 of T^n, because T^n[0][t] counts the length-n records going from the start state (0,0) to state t." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Cách 1: n vòng, mỗi vòng xử lý 6 trạng thái × tối đa 3 nước đi → O(n) thời gian và chỉ 6 con số bộ nhớ. Cách 2: O(6³ log n) thời gian, O(6²) bộ nhớ — chậm hơn khi n nhỏ nhưng thắng hẳn khi n rất lớn.",
+        en: "Approach 1: n rounds of 6 states × at most 3 moves → O(n) time and just 6 numbers of memory. Approach 2: O(6³ log n) time and O(6²) space — slower for small n but decisively better for very large n.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · DP 6 trạng thái", en: "Approach 1 · 6-state DP" },
+    code: [
+      "class Solution:",
+      "    def checkRecord(self, n: int) -> int:",
+      "        MOD = 10**9 + 7",
+      "        # dp[a][l]: a absences so far, l trailing lates",
+      "        dp = [[0] * 3 for _ in range(2)]",
+      "        dp[0][0] = 1",
+      "        for _ in range(n):",
+      "            nxt = [[0] * 3 for _ in range(2)]",
+      "            for a in range(2):",
+      "                for l in range(3):",
+      "                    cur = dp[a][l]",
+      "                    if cur == 0:",
+      "                        continue",
+      "                    nxt[a][0] = (nxt[a][0] + cur) % MOD          # 'P'",
+      "                    if a == 0:",
+      "                        nxt[1][0] = (nxt[1][0] + cur) % MOD      # 'A'",
+      "                    if l < 2:",
+      "                        nxt[a][l+1] = (nxt[a][l+1] + cur) % MOD  # 'L'",
+      "            dp = nxt",
+      "        return sum(sum(row) for row in dp) % MOD",
+    ],
+    code2Label: { vi: "Cách 2 · Luỹ thừa ma trận 6×6 (O(log n))", en: "Approach 2 · 6×6 matrix power (O(log n))" },
+    code2: [
+      "class Solution:",
+      "    def checkRecord(self, n: int) -> int:",
+      "        MOD = 10**9 + 7",
+      "        # state s = a * 3 + l, so 0..5",
+      "        T = [[0] * 6 for _ in range(6)]",
+      "        for a in range(2):",
+      "            for l in range(3):",
+      "                s = a * 3 + l",
+      "                T[s][a * 3] += 1                 # 'P'",
+      "                if a == 0:",
+      "                    T[s][3] += 1                 # 'A'",
+      "                if l < 2:",
+      "                    T[s][a * 3 + l + 1] += 1     # 'L'",
+      "",
+      "        def mul(A, B):",
+      "            C = [[0] * 6 for _ in range(6)]",
+      "            for i in range(6):",
+      "                for k in range(6):",
+      "                    if A[i][k]:",
+      "                        for j in range(6):",
+      "                            C[i][j] = (C[i][j] + A[i][k] * B[k][j]) % MOD",
+      "            return C",
+      "",
+      "        R = [[int(i == j) for j in range(6)] for i in range(6)]",
+      "        while n:",
+      "            if n & 1:",
+      "                R = mul(R, T)",
+      "            T = mul(T, T)",
+      "            n >>= 1",
+      "        return sum(R[0]) % MOD",
+    ],
+    liveArgs(input) {
+      return [parse552N(input)];
+    },
+    builder: buildSteps552,
+    builder2: buildSteps552Matrix,
+  },
+});
