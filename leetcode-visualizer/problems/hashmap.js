@@ -4866,38 +4866,278 @@ function buildSteps383(input, params) {
   return { original: ransom, answer, steps };
 }
 
-/** LeetCode 359: Logger Rate Limiter — hash map of next-allowed timestamps. */
-function buildSteps359(input) {
-  // input: "ts,message; ts,message; ..."
-  const calls = String(input).split(";").map((c) => c.trim()).filter(Boolean).map((c) => {
-    const idx = c.indexOf(",");
-    return [Number(c.slice(0, idx).trim()), c.slice(idx + 1).trim()];
+/**
+ * LeetCode 359: Logger Rate Limiter.
+ *
+ * Both builders feed the dedicated `logger359View` renderer. Before this the
+ * problem only emitted title/note/vars, so it rendered as plain text — and a rate
+ * limiter is the one thing that really wants a TIMELINE: each message gets a lane,
+ * every printed call paints its 10-second cooldown bar, and a suppressed call is
+ * simply a call that landed inside one of those bars.
+ */
+
+const LOG359_WINDOW = 10;
+const LOG359_LIMITS = { calls: 14, messages: 6, timestamp: 60 };
+
+function parse359Data(input) {
+  const raw = String(input ?? "").trim();
+  if (!raw) throw new Error("at least one call is required");
+  const calls = raw.split(/[;|\n]/).map((c) => c.trim()).filter(Boolean).map((c, idx) => {
+    const at = c.indexOf(",");
+    if (at < 0) throw new Error(`call ${idx} must look like "timestamp,message"`);
+    const ts = Number(c.slice(0, at).trim());
+    const message = c.slice(at + 1).trim();
+    if (!Number.isInteger(ts) || ts < 0) throw new Error(`call ${idx} has a bad timestamp; it must be an integer >= 0`);
+    if (!message) throw new Error(`call ${idx} is missing its message`);
+    if (!/^[A-Za-z0-9_-]+$/.test(message)) throw new Error(`call ${idx}: a message may use only letters, digits, '_' and '-'`);
+    return { ts, message };
   });
+  if (!calls.length) throw new Error("at least one call is required");
+  if (calls.length > LOG359_LIMITS.calls) throw new Error(`visualization supports at most ${LOG359_LIMITS.calls} calls`);
+  if (calls.some((c) => c.ts > LOG359_LIMITS.timestamp)) throw new Error(`timestamps may be at most ${LOG359_LIMITS.timestamp} so the timeline stays readable`);
+  // The problem guarantees calls arrive in chronological order, and approach 2
+  // depends on it: its queue is only sorted because timestamps never go back.
+  // Reject out-of-order input instead of quietly producing a wrong trace.
+  for (let i = 1; i < calls.length; i++) {
+    if (calls[i].ts < calls[i - 1].ts) {
+      throw new Error("calls must be in chronological order (timestamps never decrease), as the problem guarantees");
+    }
+  }
+  const messages = [...new Set(calls.map((c) => c.message))];
+  if (messages.length > LOG359_LIMITS.messages) throw new Error(`visualization supports at most ${LOG359_LIMITS.messages} distinct messages`);
+  return { calls, messages };
+}
+
+function log359Base(calls, messages, approach) {
   const steps = [];
-  const lastPrinted = {};
-  const mapStr = () => `{${Object.entries(lastPrinted).map(([k, v]) => `${k}:${v}`).join(", ")}}`;
-  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  snap({ title: { vi: "last_printed = {}", en: "last_printed = {}" }, codeLines: [3], vars: [{ name: "calls", value: calls.length }], note: { vi: "Mỗi message lưu thời điểm SỚM NHẤT được in lại (= ts+10). In nếu chưa từng in hoặc ts ≥ mốc đó.", en: "Each message stores the EARLIEST timestamp it may reprint (= ts+10). Print if never printed or ts ≥ that mark." } });
-  const results = [];
-  for (const [ts, msg] of calls) {
-    const ok = !(msg in lastPrinted) || ts >= lastPrinted[msg];
-    if (ok) lastPrinted[msg] = ts + 10;
-    results.push(ok);
-    snap({
-      title: { vi: `t=${ts} "${msg}" → ${ok}`, en: `t=${ts} "${msg}" → ${ok}` },
-      codeLines: ok ? [4, 5, 6] : [4, 7],
-      vars: [{ name: "timestamp", value: ts }, { name: "message", value: `"${msg}"` }, { name: "last_printed", value: mapStr() }, { name: "result", value: ok }],
-      note: {
-        vi: ok
-          ? `"${msg}" chưa in hoặc đã qua 10s → IN. Đặt mốc kế = ${ts + 10}.`
-          : `"${msg}" mới in gần đây (mốc ${lastPrinted[msg]} > ${ts}) → KHÔNG in.`,
-        en: ok
-          ? `"${msg}" never printed or 10s passed → PRINT. Set next mark = ${ts + 10}.`
-          : `"${msg}" printed recently (mark ${lastPrinted[msg]} > ${ts}) → do NOT print.`,
+  const span = Math.max(...calls.map((c) => c.ts)) + LOG359_WINDOW;
+  // lanes[m] collects the cooldown bars painted for message m, so the timeline can
+  // be redrawn from scratch at every step.
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      logger359View: {
+        approach,
+        window: LOG359_WINDOW,
+        span,
+        messages: [...messages],
+        calls: calls.map((c) => ({ ...c })),
+        phase: o.phase,
+        callIndex: o.callIndex === undefined ? null : o.callIndex,
+        verdicts: o.verdicts ? [...o.verdicts] : null,
+        bars: o.bars ? o.bars.map((b) => ({ ...b })) : null,
+        nextAllowed: o.nextAllowed ? { ...o.nextAllowed } : null,
+        queue: o.queue ? o.queue.map((q) => ({ ...q })) : null,
+        recent: o.recent ? [...o.recent] : null,
+        evicted: o.evicted ? o.evicted.map((q) => ({ ...q })) : null,
+        compare: o.compare || null,
+        printed: o.printed === undefined ? null : o.printed,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
       },
     });
   }
-  snap({ title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Result: [${results.join(", ")}]` }, final: true, codeLines: [7], vars: [{ name: "answers", value: `[${results.join(", ")}]` }], note: { vi: "Kết quả in/không-in cho từng message.", en: "Print/no-print result for each message." } });
+  return { steps, span, snap };
+}
+
+// ── Approach 1: a map of next-allowed timestamps ─────────────────────────────
+function buildSteps359(input) {
+  const { calls, messages } = parse359Data(input);
+  const { steps, snap } = log359Base(calls, messages, 1);
+  const nextAllowed = {};
+  const verdicts = new Array(calls.length).fill(null);
+  const bars = [];
+  const results = [];
+  let printed = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `next_allowed = {} · ${calls.length} lời gọi`, en: `next_allowed = {} · ${calls.length} calls` },
+    note: {
+      vi: `Mỗi message chỉ được in nếu chưa in trong ${LOG359_WINDOW} giây gần nhất. Cách gọn nhất: với mỗi message, lưu MỘT con số — thời điểm sớm nhất nó được in lại. In ở thời điểm t thì mốc đó thành t + ${LOG359_WINDOW}. Nhờ vậy mỗi lời gọi chỉ là một phép so sánh, không cần lưu lịch sử.`,
+      en: `A message may print only if it has not printed within the last ${LOG359_WINDOW} seconds. The tidiest way: for each message store ONE number — the earliest timestamp it may print again. Printing at t sets that mark to t + ${LOG359_WINDOW}. Then every call is a single comparison, with no history to keep.`,
+    },
+    codeLines: [2, 3],
+    verdicts, bars, nextAllowed, printed: 0,
+    decision: { vi: `Mỗi message giữ một mốc "được in lại từ".`, en: `Each message keeps one "allowed again from" mark.` },
+    vars: [{ name: "calls", value: calls.length }, { name: "window", value: LOG359_WINDOW }],
+  });
+
+  calls.forEach((c, idx) => {
+    const mark = nextAllowed[c.message];
+    const known = mark !== undefined;
+    const ok = !known || c.ts >= mark;
+    if (ok) {
+      nextAllowed[c.message] = c.ts + LOG359_WINDOW;
+      bars.push({ message: c.message, from: c.ts, to: c.ts + LOG359_WINDOW, callIndex: idx });
+      printed += 1;
+    }
+    verdicts[idx] = ok;
+    results.push(ok);
+
+    snap({
+      phase: ok ? "print" : "block",
+      title: {
+        vi: `t=${c.ts} "${c.message}" → ${ok ? "IN" : "BỎ"}`,
+        en: `t=${c.ts} "${c.message}" → ${ok ? "PRINT" : "SUPPRESS"}`,
+      },
+      note: ok
+        ? {
+          vi: `${known
+            ? `Mốc của "${c.message}" là ${mark}, và t = ${c.ts} ≥ ${mark} nên cửa sổ ${LOG359_WINDOW}s đã hết hạn → được in.`
+            : `"${c.message}" chưa từng xuất hiện nên không có mốc nào chặn → được in.`} Đặt mốc mới = ${c.ts} + ${LOG359_WINDOW} = ${c.ts + LOG359_WINDOW}: từ đây tới ${c.ts + LOG359_WINDOW - 1} mọi "${c.message}" sẽ bị bỏ, và đúng tại ${c.ts + LOG359_WINDOW} thì lại được in. Chú ý biên là ≥, không phải >.`,
+          en: `${known
+            ? `The mark for "${c.message}" is ${mark}, and t = ${c.ts} ≥ ${mark}, so the ${LOG359_WINDOW}s window has expired → it prints.`
+            : `"${c.message}" has never been seen, so no mark blocks it → it prints.`} Set the new mark = ${c.ts} + ${LOG359_WINDOW} = ${c.ts + LOG359_WINDOW}: from here through ${c.ts + LOG359_WINDOW - 1} every "${c.message}" is suppressed, and exactly at ${c.ts + LOG359_WINDOW} it prints again. Note the boundary is ≥, not >.`,
+        }
+        : {
+          vi: `Mốc của "${c.message}" là ${mark}, mà t = ${c.ts} < ${mark} nên lời gọi này rơi VÀO TRONG cửa sổ ${LOG359_WINDOW}s của lần in trước (lúc ${mark - LOG359_WINDOW}) → bỏ. Mốc KHÔNG được cập nhật: một lời gọi bị bỏ không làm cửa sổ dài thêm, nếu cập nhật thì message sẽ bị chặn vĩnh viễn khi bị gọi liên tục.`,
+          en: `The mark for "${c.message}" is ${mark} but t = ${c.ts} < ${mark}, so this call lands INSIDE the ${LOG359_WINDOW}s window opened by the previous print (at ${mark - LOG359_WINDOW}) → suppress. The mark is NOT updated: a suppressed call must not extend the window, otherwise a message called repeatedly would be blocked forever.`,
+        },
+      codeLines: ok ? [5, 6, 8, 9] : [5, 6, 7],
+      callIndex: idx,
+      verdicts, bars, nextAllowed, printed,
+      compare: { ts: c.ts, message: c.message, mark: known ? mark : null, ok },
+      decision: ok
+        ? { vi: `IN · mốc mới của "${c.message}" = ${c.ts + LOG359_WINDOW}.`, en: `PRINT · new mark for "${c.message}" = ${c.ts + LOG359_WINDOW}.` }
+        : { vi: `BỎ · còn ${mark - c.ts}s nữa mới được in.`, en: `SUPPRESS · ${mark - c.ts}s still to wait.` },
+      vars: [
+        { name: "timestamp", value: c.ts },
+        { name: "message", value: `"${c.message}"` },
+        { name: "next_allowed", value: `{${Object.entries(nextAllowed).map(([k, v]) => `${k}:${v}`).join(", ")}}` },
+        { name: "return", value: ok },
+      ],
+    });
+  });
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Results: [${results.join(", ")}]` },
+    note: {
+      vi: `${printed}/${calls.length} lời gọi được in. Mỗi lời gọi chỉ mất một lần tra hash map nên O(1). Nhược điểm: map giữ mọi message TỪNG xuất hiện mãi mãi — với luồng log dài và nhiều message khác nhau thì bộ nhớ cứ tăng, kể cả những message đã lâu không gặp. Cách 2 xử lý chính chuyện đó.`,
+      en: `${printed}/${calls.length} calls printed. Each call is one hash-map lookup, so O(1). The downside: the map keeps every message EVER seen forever — on a long log stream with many distinct messages the memory only grows, even for messages long gone. Approach 2 addresses exactly that.`,
+    },
+    codeLines: [9],
+    final: true,
+    verdicts, bars, nextAllowed, printed, answer: results.join(", "),
+    decision: { vi: `[${results.join(", ")}] — ${printed} in, ${calls.length - printed} bỏ.`, en: `[${results.join(", ")}] — ${printed} printed, ${calls.length - printed} suppressed.` },
+    vars: [{ name: "answers", value: `[${results.join(", ")}]` }, { name: "map size", value: Object.keys(nextAllowed).length }],
+  });
+
+  return { original: calls, answer: results, steps };
+}
+
+// ── Approach 2: queue + set, evicting anything older than the window ─────────
+function buildSteps359Queue(input) {
+  const { calls, messages } = parse359Data(input);
+  const { steps, snap } = log359Base(calls, messages, 2);
+  let queue = [];                       // { ts, message } still inside the window
+  const recent = new Set();
+  const verdicts = new Array(calls.length).fill(null);
+  const bars = [];
+  const results = [];
+  let printed = 0;
+  const qSnap = () => queue.map((q) => ({ ...q }));
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: queue + set, chỉ giữ ${LOG359_WINDOW}s gần nhất`, en: `Approach 2: queue + set holding only the last ${LOG359_WINDOW}s` },
+    note: {
+      vi: `Cách 1 nhớ mọi message từng gặp, nên bộ nhớ không bao giờ giảm. Cách này chỉ giữ những message còn ĐANG trong cửa sổ ${LOG359_WINDOW}s: một queue các cặp (thời điểm, message) theo thứ tự thời gian, cộng một set để tra nhanh xem message có nằm trong queue không. Đầu mỗi lời gọi, loại khỏi queue mọi mục đã quá hạn. Nhờ đề bảo đảm các lời gọi đến theo thứ tự thời gian tăng, queue luôn tự sắp xếp và chỉ cần loại từ đầu.`,
+      en: `Approach 1 remembers every message ever seen, so its memory never shrinks. This one keeps only the messages STILL inside the ${LOG359_WINDOW}s window: a queue of (timestamp, message) in time order plus a set for quick "is it in the queue" lookups. At the start of each call, evict everything that has expired. Because the problem guarantees calls arrive in non-decreasing time order, the queue is always sorted and only ever needs popping from the front.`,
+    },
+    codeLines: [4, 5, 6],
+    verdicts, bars, queue: qSnap(), recent: [...recent], printed: 0,
+    decision: { vi: `Bộ nhớ chỉ tỉ lệ với số message trong ${LOG359_WINDOW}s gần nhất.`, en: `Memory scales only with the messages inside the last ${LOG359_WINDOW}s.` },
+    vars: [{ name: "calls", value: calls.length }, { name: "window", value: LOG359_WINDOW }],
+  });
+
+  calls.forEach((c, idx) => {
+    const evicted = [];
+    while (queue.length && queue[0].ts <= c.ts - LOG359_WINDOW) {
+      const old = queue.shift();
+      recent.delete(old.message);
+      evicted.push(old);
+    }
+    if (evicted.length) {
+      snap({
+        phase: "evict",
+        title: { vi: `t=${c.ts}: loại ${evicted.length} mục đã quá hạn`, en: `t=${c.ts}: evict ${evicted.length} expired entr${evicted.length === 1 ? "y" : "ies"}` },
+        note: {
+          vi: `Mục nào có thời điểm ≤ ${c.ts} − ${LOG359_WINDOW} = ${c.ts - LOG359_WINDOW} thì cửa sổ của nó đã đóng: ${evicted.map((e) => `("${e.message}" lúc ${e.ts}) hết hạn tại ${e.ts + LOG359_WINDOW}`).join(", ")}. Bỏ khỏi queue và khỏi set nên các message đó lại được in. Chú ý điều kiện là ≤ ${c.ts - LOG359_WINDOW} chứ không phải <, vì in lúc t thì đúng tại t + ${LOG359_WINDOW} đã được in lại.`,
+          en: `Any entry with timestamp ≤ ${c.ts} − ${LOG359_WINDOW} = ${c.ts - LOG359_WINDOW} has closed its window: ${evicted.map((e) => `("${e.message}" at ${e.ts}) expired at ${e.ts + LOG359_WINDOW}`).join(", ")}. Dropping them from the queue and the set makes those messages printable again. Note the test is ≤ ${c.ts - LOG359_WINDOW} and not <, because printing at t means t + ${LOG359_WINDOW} is already allowed.`,
+        },
+        codeLines: [9, 10, 11],
+        callIndex: idx,
+        verdicts, bars, queue: qSnap(), recent: [...recent], evicted, printed,
+        decision: { vi: `Queue còn ${queue.length} mục.`, en: `The queue now holds ${queue.length} entr${queue.length === 1 ? "y" : "ies"}.` },
+        vars: [{ name: "cutoff", value: `${c.ts} - ${LOG359_WINDOW} = ${c.ts - LOG359_WINDOW}` }, { name: "queue size", value: queue.length }],
+      });
+    }
+
+    const blocked = recent.has(c.message);
+    const ok = !blocked;
+    let blockedBy = null;
+    if (blocked) blockedBy = queue.find((q) => q.message === c.message) || null;
+    if (ok) {
+      queue.push({ ts: c.ts, message: c.message });
+      recent.add(c.message);
+      bars.push({ message: c.message, from: c.ts, to: c.ts + LOG359_WINDOW, callIndex: idx });
+      printed += 1;
+    }
+    verdicts[idx] = ok;
+    results.push(ok);
+
+    snap({
+      phase: ok ? "print" : "block",
+      title: {
+        vi: `t=${c.ts} "${c.message}" → ${ok ? "IN" : "BỎ"}`,
+        en: `t=${c.ts} "${c.message}" → ${ok ? "PRINT" : "SUPPRESS"}`,
+      },
+      note: ok
+        ? {
+          vi: `Sau khi loại hết mục quá hạn, "${c.message}" KHÔNG còn trong set nên nó không nằm trong cửa sổ ${LOG359_WINDOW}s nào → được in. Đẩy (${c.ts}, "${c.message}") vào cuối queue và thêm vào set; nó sẽ chặn các lần gọi cùng message cho tới ${c.ts + LOG359_WINDOW}.`,
+          en: `After the eviction "${c.message}" is NOT in the set, so it sits inside no ${LOG359_WINDOW}s window → it prints. Push (${c.ts}, "${c.message}") to the back of the queue and add it to the set; it will block calls with the same message until ${c.ts + LOG359_WINDOW}.`,
+        }
+        : {
+          vi: `"${c.message}" vẫn còn trong set${blockedBy ? `, do mục (${blockedBy.ts}, "${blockedBy.message}") chưa quá hạn (còn chặn tới ${blockedBy.ts + LOG359_WINDOW})` : ""} → bỏ. KHÔNG đẩy gì vào queue: một lời gọi bị bỏ không được làm cửa sổ dài thêm.`,
+          en: `"${c.message}" is still in the set${blockedBy ? `, held by the entry (${blockedBy.ts}, "${blockedBy.message}") which has not expired (it blocks until ${blockedBy.ts + LOG359_WINDOW})` : ""} → suppress. Nothing is pushed: a suppressed call must not extend the window.`,
+        },
+      codeLines: ok ? [12, 14, 15, 16] : [12, 13],
+      callIndex: idx,
+      verdicts, bars, queue: qSnap(), recent: [...recent], printed,
+      compare: { ts: c.ts, message: c.message, mark: blockedBy ? blockedBy.ts + LOG359_WINDOW : null, ok },
+      decision: ok
+        ? { vi: `IN · queue có ${queue.length} mục.`, en: `PRINT · the queue holds ${queue.length}.` }
+        : { vi: `BỎ · "${c.message}" đang trong cửa sổ.`, en: `SUPPRESS · "${c.message}" is inside its window.` },
+      vars: [
+        { name: "timestamp", value: c.ts },
+        { name: "message", value: `"${c.message}"` },
+        { name: "queue", value: queue.length ? queue.map((q) => `(${q.ts},${q.message})`).join(" ") : "empty" },
+        { name: "return", value: ok },
+      ],
+    });
+  });
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Results: [${results.join(", ")}]` },
+    note: {
+      vi: `Cùng kết quả với cách 1. Khác biệt nằm ở bộ nhớ: queue chỉ còn ${queue.length} mục vì mọi thứ cũ hơn ${LOG359_WINDOW}s đã bị loại, trong khi map của cách 1 giữ cả ${new Set(calls.map((x) => x.message)).size} message từng gặp. Đổi lại mỗi lời gọi phải làm thêm việc loại mục quá hạn, nhưng mỗi mục chỉ vào và ra queue đúng một lần nên trung bình vẫn là O(1).`,
+      en: `Same results as approach 1. The difference is memory: the queue holds just ${queue.length} entr${queue.length === 1 ? "y" : "ies"} because everything older than ${LOG359_WINDOW}s was evicted, whereas approach 1's map keeps all ${new Set(calls.map((x) => x.message)).size} messages ever seen. The price is the eviction work per call, but each entry enters and leaves the queue exactly once, so it is still O(1) amortised.`,
+    },
+    codeLines: [16],
+    final: true,
+    verdicts, bars, queue: qSnap(), recent: [...recent], printed, answer: results.join(", "),
+    decision: { vi: `[${results.join(", ")}] — queue còn ${queue.length}, map của cách 1 sẽ là ${new Set(calls.map((x) => x.message)).size}.`, en: `[${results.join(", ")}] — queue holds ${queue.length}, approach 1's map would hold ${new Set(calls.map((x) => x.message)).size}.` },
+    vars: [{ name: "answers", value: `[${results.join(", ")}]` }, { name: "queue size", value: queue.length }],
+  });
+
   return { original: calls, answer: results, steps };
 }
 
@@ -5438,13 +5678,54 @@ module.exports = {
     defaultInput: "1,foo;2,bar;3,foo;8,bar;10,foo;11,foo",
     inputKind: "string", inputLabel: { vi: "Lời gọi (ts,message; ...)", en: "Calls (ts,message; ...)" }, extraParams: [],
     approach: [
-      { vi: "last_printed[message] = thời điểm sớm nhất được in lại (= ts+10).", en: "last_printed[message] = earliest timestamp allowed to reprint (= ts+10)." },
-      { vi: "In nếu message chưa từng in HOẶC ts ≥ mốc đã lưu.", en: "Print if the message is new OR ts ≥ the stored mark." },
-      { vi: "Khi in, cập nhật mốc = ts + 10.", en: "When printing, update the mark = ts + 10." },
+      { vi: "Cách 1: với mỗi message lưu MỘT con số — next_allowed[message] = thời điểm sớm nhất nó được in lại. In ở t thì đặt mốc = t + 10.", en: "Approach 1: for each message store ONE number — next_allowed[message] = the earliest timestamp it may print again. Printing at t sets the mark to t + 10." },
+      { vi: "Mỗi lời gọi chỉ là một phép so sánh: in nếu message chưa có mốc HOẶC t ≥ mốc. Biên là ≥ chứ không phải >: in lúc t thì đúng tại t+10 đã được in lại.", en: "Each call is one comparison: print if the message has no mark OR t ≥ the mark. The boundary is ≥ and not >: printing at t means t+10 is already allowed." },
+      { vi: "Lời gọi bị bỏ KHÔNG được cập nhật mốc. Nếu cập nhật thì một message bị gọi liên tục sẽ tự gia hạn cửa sổ và bị chặn vĩnh viễn.", en: "A suppressed call must NOT update the mark. If it did, a message called repeatedly would keep extending its own window and be blocked forever." },
+      { vi: "Nhược điểm của cách 1: map giữ mọi message TỪNG xuất hiện, nên bộ nhớ chỉ tăng chứ không giảm.", en: "Approach 1's downside: the map keeps every message EVER seen, so memory only grows and never shrinks." },
+      { vi: "Cách 2: chỉ giữ những message còn trong cửa sổ 10s — một queue các cặp (thời điểm, message) cộng một set để tra nhanh. Đầu mỗi lời gọi, loại khỏi đầu queue mọi mục có thời điểm ≤ t − 10.", en: "Approach 2: keep only the messages still inside the 10s window — a queue of (timestamp, message) plus a set for fast lookups. At the start of each call, pop from the front every entry whose timestamp is ≤ t − 10." },
+      { vi: "Cách 2 dựa vào việc đề bảo đảm các lời gọi đến theo thứ tự thời gian không giảm: nhờ đó queue luôn tự sắp xếp và chỉ cần loại từ đầu. Mỗi mục vào/ra queue đúng một lần nên vẫn O(1) trung bình.", en: "Approach 2 relies on the problem's guarantee that calls arrive in non-decreasing time order: that is what keeps the queue sorted so it only ever pops from the front. Each entry enters and leaves once, so it stays O(1) amortised." },
     ],
-    complexity: { time: "O(1)/call", space: "O(unique messages)", note: { vi: "Tra cứu hash map O(1).", en: "O(1) hash-map lookups." } },
-    code: ["class Logger:", "    def __init__(self): self.last_printed = {}", "    def shouldPrintMessage(self, timestamp, message):", "        if message not in self.last_printed or timestamp >= self.last_printed[message]:", "            self.last_printed[message] = timestamp + 10", "            return True", "        return False"],
+    complexity: {
+      time: "O(1) / call",
+      space: "O(số message khác nhau)",
+      note: {
+        vi: "Cách 1: mỗi lời gọi là một lần tra hash map O(1); bộ nhớ O(số message KHÁC NHAU từng gặp) và không bao giờ giảm. Cách 2: O(1) trung bình mỗi lời gọi (mỗi mục vào và ra queue đúng một lần); bộ nhớ chỉ O(số message trong 10s gần nhất), nên tốt hơn hẳn với luồng log dài nhiều message lạ.",
+        en: "Approach 1: one O(1) hash-map lookup per call; memory is O(DISTINCT messages ever seen) and never shrinks. Approach 2: O(1) amortised per call (each entry enters and leaves the queue once); memory is only O(messages within the last 10s), which is far better for a long log stream full of one-off messages.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Map mốc next_allowed", en: "Approach 1 · Map of next-allowed marks" },
+    code: [
+      "class Logger:",
+      "    def __init__(self):",
+      "        self.next_allowed = {}       # message -> earliest ts it may reprint",
+      "",
+      "    def shouldPrintMessage(self, timestamp: int, message: str) -> bool:",
+      "        if timestamp < self.next_allowed.get(message, 0):",
+      "            return False             # still inside the 10-second window",
+      "        self.next_allowed[message] = timestamp + 10",
+      "        return True",
+    ],
+    code2Label: { vi: "Cách 2 · Queue + set, loại mục quá hạn", en: "Approach 2 · Queue + set, evicting expired entries" },
+    code2: [
+      "from collections import deque",
+      "",
+      "class Logger:",
+      "    def __init__(self):",
+      "        self.queue = deque()         # (timestamp, message) inside the window",
+      "        self.recent = set()          # the messages currently in the queue",
+      "",
+      "    def shouldPrintMessage(self, timestamp: int, message: str) -> bool:",
+      "        while self.queue and self.queue[0][0] <= timestamp - 10:",
+      "            _, old = self.queue.popleft()",
+      "            self.recent.discard(old)",
+      "        if message in self.recent:",
+      "            return False",
+      "        self.queue.append((timestamp, message))",
+      "        self.recent.add(message)",
+      "        return True",
+    ],
     builder: buildSteps359,
+    builder2: buildSteps359Queue,
   },
   1797: {
     id: 1797,

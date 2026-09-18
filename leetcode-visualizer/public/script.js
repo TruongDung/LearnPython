@@ -11827,6 +11827,195 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 359 Logger Rate Limiter ----
+// A rate limiter is the one thing that really wants a timeline, so each message
+// gets a lane, every printed call paints its 10-second cooldown bar, and a
+// suppressed call is visibly just a call that landed inside one of those bars.
+// Positions come from CSS grid columns (one per second) rather than pixel maths.
+function renderLogger359View(step) {
+  const view = step.logger359View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const approach = Number(view.approach) || 1;
+  const W = Number(view.window) || 10;
+  const span = Number(view.span) || 1;
+  const cols = span + 1;                       // one column per second, 0..span
+  const messages = Array.isArray(view.messages) ? view.messages : [];
+  const calls = Array.isArray(view.calls) ? view.calls : [];
+  const verdicts = Array.isArray(view.verdicts) ? view.verdicts : [];
+  const bars = Array.isArray(view.bars) ? view.bars : [];
+  const queue = Array.isArray(view.queue) ? view.queue : null;
+  const recent = Array.isArray(view.recent) ? view.recent : null;
+  const evicted = Array.isArray(view.evicted) ? view.evicted : null;
+  const nextAllowed = view.nextAllowed || null;
+  const compare = view.compare;
+  const callIndex = view.callIndex;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const PALETTE = 6;
+  const hueOf = (msg) => messages.indexOf(msg) % PALETTE;
+
+  // ── timeline ──────────────────────────────────────────────────────────────
+  const tickStep = span > 30 ? 5 : span > 14 ? 2 : 1;
+  const ruler = `<div class="lg359-lane ruler">
+    <span class="lbl"></span>
+    <div class="track" style="--lg-cols:${cols}">
+      ${Array.from({ length: cols }, (_, k) => (k % tickStep === 0
+    ? `<span class="tick" style="grid-column:${k + 1}">${k}</span>`
+    : "")).join("")}
+    </div>
+  </div>`;
+
+  const lanes = messages.map((msg) => {
+    const myBars = bars.filter((b) => b.message === msg);
+    const myCalls = calls.map((c, i) => ({ ...c, i })).filter((c) => c.message === msg);
+    const barHtml = myBars.map((b) => `<div class="bar" style="grid-column:${b.from + 1} / ${Math.min(b.to, span) + 1}"></div>`).join("");
+    const dotHtml = myCalls.map((c) => {
+      const v = verdicts[c.i];
+      const cls = ["dot"];
+      if (v === true) cls.push("printed");
+      else if (v === false) cls.push("blocked");
+      else cls.push("pending");
+      if (c.i === callIndex && !isDone) cls.push("cur");
+      return `<div class="${cls.join(" ")}" style="grid-column:${c.ts + 1}" title="t=${c.ts}">${v === true ? "✓" : v === false ? "✕" : "·"}</div>`;
+    }).join("");
+    return `<div class="lg359-lane q${hueOf(msg)}">
+      <span class="lbl">${escapeHtml(msg)}</span>
+      <div class="track" style="--lg-cols:${cols}">${barHtml}${dotHtml}</div>
+    </div>`;
+  }).join("");
+
+  // ── the comparison this call makes ────────────────────────────────────────
+  let cmpHtml = "";
+  if (compare) {
+    const hasMark = compare.mark !== null && compare.mark !== undefined;
+    cmpHtml = `<section class="lg359-panel">
+      <header>
+        <strong>${vi ? `PHÉP KIỂM CHO "${escapeHtml(compare.message)}" TẠI t = ${compare.ts}` : `THE TEST FOR "${escapeHtml(compare.message)}" AT t = ${compare.ts}`}</strong>
+      </header>
+      <div class="lg359-cmp ${compare.ok ? "ok" : "no"}">
+        <span class="a">t = ${compare.ts}</span>
+        <span class="op">${hasMark ? (compare.ok ? "≥" : "<") : ""}</span>
+        <span class="b">${hasMark
+      ? (approach === 1 ? `${vi ? "mốc" : "mark"} = ${compare.mark}` : `${vi ? "hết hạn lúc" : "expires at"} ${compare.mark}`)
+      : (vi ? "chưa có mốc nào" : "no mark yet")}</span>
+        <strong>${compare.ok ? (vi ? "IN" : "PRINT") : (vi ? "BỎ" : "SUPPRESS")}</strong>
+      </div>
+      <div class="lg359-hint">${escapeHtml(compare.ok
+      ? (vi ? `Biên là ≥ chứ không phải >: in lúc t thì đúng tại t+${W} đã được in lại, nên cửa sổ chặn là [t+1, t+${W - 1}].`
+        : `The boundary is ≥ and not >: printing at t means t+${W} is already allowed, so the blocking window is [t+1, t+${W - 1}].`)
+      : (vi ? `Lời gọi bị bỏ KHÔNG cập nhật mốc / KHÔNG đẩy vào queue — nếu có thì một message bị gọi liên tục sẽ tự gia hạn cửa sổ và bị chặn vĩnh viễn.`
+        : `A suppressed call does NOT update the mark / does NOT get queued — otherwise a message called repeatedly would keep extending its own window and be blocked forever.`))}</div>
+    </section>`;
+  }
+
+  // ── the state each approach carries ───────────────────────────────────────
+  let stateHtml = "";
+  if (approach === 1 && nextAllowed) {
+    const keys = Object.keys(nextAllowed);
+    stateHtml = `<section class="lg359-panel">
+      <header>
+        <strong>${vi ? "next_allowed — mỗi message MỘT con số" : "next_allowed — ONE number per message"}</strong>
+        <span>${keys.length} ${vi ? "mục" : "entries"}</span>
+      </header>
+      <div class="lg359-chips">${keys.length
+      ? keys.map((k) => `<span class="chip q${hueOf(k)}${compare && compare.message === k ? " lit" : ""}"><b>${escapeHtml(k)}</b><i>→ ${nextAllowed[k]}</i></span>`).join("")
+      : `<em class="lg359-empty">${vi ? "chưa có message nào" : "no message yet"}</em>`}</div>
+      <div class="lg359-hint">${escapeHtml(vi
+      ? "Map này chỉ tăng chứ không bao giờ giảm: một message gặp một lần rồi biến mất vẫn nằm đây mãi. Với luồng log dài đầy message lạ thì đó là chỗ tốn bộ nhớ — cách 2 giải quyết đúng điểm này."
+      : "This map only grows and never shrinks: a message seen once and never again still sits here forever. On a long log stream full of one-off messages that is the memory problem — and it is exactly what approach 2 fixes.")}</div>
+    </section>`;
+  } else if (approach === 2 && queue) {
+    stateHtml = `<section class="lg359-panel">
+      <header>
+        <strong>${vi ? `QUEUE + SET — chỉ những gì còn trong ${W}s` : `QUEUE + SET — only what is still inside the ${W}s window`}</strong>
+        <span>${queue.length} ${vi ? "mục" : "entries"}</span>
+      </header>
+      <div class="lg359-chips">
+        ${queue.length
+      ? queue.map((q, k) => `<span class="chip q${hueOf(q.message)}${k === 0 ? " head" : ""}${compare && compare.message === q.message ? " lit" : ""}">${k === 0 ? `<em>${vi ? "đầu" : "head"}</em>` : ""}<b>${escapeHtml(q.message)}</b><i>@${q.ts}</i></span>`).join("")
+      : `<em class="lg359-empty">${vi ? "queue rỗng" : "the queue is empty"}</em>`}
+      </div>
+      ${evicted && evicted.length
+      ? `<div class="lg359-evict">${evicted.map((e) => `<span><b>${escapeHtml(e.message)}</b>@${e.ts} ${vi ? "hết hạn" : "expired"} ${e.ts + W}</span>`).join("")}</div>`
+      : ""}
+      <div class="lg359-hint">${escapeHtml(vi
+      ? `Set recent = {${(recent || []).join(", ") || "∅"}} luôn đúng bằng tập message trong queue, nên mỗi message chỉ nằm trong queue nhiều nhất một lần. Điều kiện loại là thời điểm ≤ t − ${W} (dùng ≤, không phải <).`
+      : `The set recent = {${(recent || []).join(", ") || "∅"}} always mirrors the messages in the queue, so a message is in the queue at most once. The eviction test is timestamp ≤ t − ${W} (≤, not <).`)}</div>
+    </section>`;
+  }
+
+  // ── memory contrast, both numbers on screen ───────────────────────────────
+  const seenSoFar = new Set(calls.slice(0, (callIndex === null || callIndex === undefined ? calls.length : callIndex + 1)).map((c) => c.message)).size;
+  const memHtml = `<section class="lg359-panel">
+    <header><strong>${vi ? "BỘ NHỚ" : "MEMORY"}</strong><span>${vi ? "so sánh hai cách" : "the two approaches side by side"}</span></header>
+    <div class="lg359-mem">
+      <div class="box${approach === 1 ? " active" : ""}"><small>${vi ? "CÁCH 1 · MAP" : "APPROACH 1 · MAP"}</small><b>${approach === 1 && nextAllowed ? Object.keys(nextAllowed).length : seenSoFar}</b><span>${vi ? "mọi message từng gặp" : "every message ever seen"}</span></div>
+      <div class="box${approach === 2 ? " active" : ""}"><small>${vi ? "CÁCH 2 · QUEUE" : "APPROACH 2 · QUEUE"}</small><b>${queue ? queue.length : "—"}</b><span>${vi ? `chỉ trong ${W}s gần nhất` : `only within the last ${W}s`}</span></div>
+      <div class="box"><small>${vi ? "ĐÃ IN" : "PRINTED"}</small><b>${view.printed === null || view.printed === undefined ? 0 : view.printed}/${calls.length}</b><span>${vi ? "lời gọi" : "calls"}</span></div>
+    </div>
+  </section>`;
+
+  // ── call log ──────────────────────────────────────────────────────────────
+  const logHtml = calls.map((c, i) => {
+    const v = verdicts[i];
+    const cls = ["lg359-call", `q${hueOf(c.message)}`];
+    if (i === callIndex && !isDone) cls.push("cur");
+    else if (v !== null && v !== undefined) cls.push("done");
+    return `<div class="${cls.join(" ")}">
+      <small>t=${c.ts}</small><strong>${escapeHtml(c.message)}</strong>
+      <b class="${v === true ? "yes" : v === false ? "no" : "pending"}">${v === true ? "true" : v === false ? "false" : "?"}</b>
+    </div>`;
+  }).join("");
+
+  const statusHtml = isDone
+    ? `<div class="lg359-answer">
+        <small>${vi ? "KẾT QUẢ" : "RESULTS"}</small>
+        <strong>[${escapeHtml(String(view.answer))}]</strong>
+        <span>${vi ? `${view.printed}/${calls.length} lời gọi được in` : `${view.printed}/${calls.length} calls printed`}</span>
+      </div>`
+    : `<div class="lg359-progress">
+        <span><small>${vi ? "LỜI GỌI" : "CALL"}</small><b>${callIndex === null || callIndex === undefined ? "—" : `${callIndex + 1}/${calls.length}`}</b></span>
+        <span><small>${vi ? "ĐÃ IN" : "PRINTED"}</small><b>${view.printed === null || view.printed === undefined ? 0 : view.printed}</b></span>
+        <span><small>${vi ? "CỬA SỔ" : "WINDOW"}</small><b>${W}s</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="lg359-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa giới hạn tần suất log" : "Logger rate limiter visualization")}">
+    <div class="lg359-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? `Mỗi message chỉ cần nhớ MỘT con số: thời điểm sớm nhất nó được in lại. In ở t thì đặt mốc = t + ${W}. Mỗi lời gọi là một phép so sánh duy nhất, không cần lưu lịch sử. Trên timeline, mỗi lần in vẽ ra một thanh cooldown dài ${W}s — lời gọi nào rơi vào trong thanh đó thì bị bỏ.`
+      : `Chỉ giữ những message còn ĐANG trong cửa sổ ${W}s: một queue các cặp (thời điểm, message) theo thứ tự thời gian, cộng một set để tra nhanh. Đầu mỗi lời gọi, loại khỏi đầu queue mọi mục đã quá hạn. Bộ nhớ vì thế không phụ thuộc vào tổng số message từng gặp — khác hẳn cách 1.`)}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="lg359-panel">
+      <header>
+        <strong>${vi ? `TIMELINE — mỗi message một hàng, mỗi lần in mở cửa sổ ${W}s` : `TIMELINE — one lane per message, each print opens a ${W}s window`}</strong>
+        <span>${vi ? "✓ = in · ✕ = bị bỏ · vùng tô = đang trong cửa sổ" : "✓ = printed · ✕ = suppressed · shaded = inside a window"}</span>
+      </header>
+      <div class="lg359-timeline">${ruler}${lanes}</div>
+      <div class="lg359-hint">${escapeHtml(vi
+      ? `Mỗi ✕ đều nằm bên trong một vùng tô — đó chính là toàn bộ nội dung bài. Vùng tô bắt đầu ngay tại lần in và dài ${W}s, nên ô cuối bị chặn là t+${W - 1}, còn t+${W} đã được in lại.`
+      : `Every ✕ sits inside a shaded band — that is the whole problem in one picture. A band starts at the print itself and runs ${W}s, so the last blocked second is t+${W - 1} while t+${W} prints again.`)}</div>
+    </section>
+
+    ${cmpHtml}
+    ${stateHtml}
+    ${memHtml}
+
+    <section class="lg359-panel">
+      <header><strong>${vi ? "CÁC LỜI GỌI shouldPrintMessage" : "THE shouldPrintMessage CALLS"}</strong><span>${calls.length}</span></header>
+      <div class="lg359-log">${logHtml}</div>
+    </section>
+
+    <div class="lg359-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
 // ---- 900 RLE Iterator ----
 // The encoding and the sequence it stands for are shown side by side, because the
 // whole problem is keeping those two in sync while never building the second one.
@@ -35651,6 +35840,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.logger359View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLogger359View(step);
   } else if (step.rleIter900View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
