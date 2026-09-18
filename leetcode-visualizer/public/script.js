@@ -11457,6 +11457,332 @@ function renderKokoSpeedView(step) {
   </div>`;
 }
 
+// ---- 1520 Maximum Number of Non-Overlapping Substrings renderer ----
+function renderNonOverlapView(step) {
+  const view = step.nonOverlapView || {};
+  const vi = lang === "vi";
+  const s = String(view.s || "");
+  const n = Number(view.n) || s.length;
+  const phase = view.phase || "";
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const intervals = Array.isArray(view.intervals) ? view.intervals : [];
+  const selected = Array.isArray(view.selected) ? view.selected : [];
+  const scanIndex = Number(view.scanIndex);
+  const ex = view.expand || null;
+  const end = Number(view.end);
+  const curIv = Number(view.currentIv);
+
+  // ── Phase strip ─────────────────────────────────────────────────────────
+  const stageOf = { intro: 0, scan: 0, "first-last": 0, expand: 1, sorted: 2, greedy: 3, done: 4 };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const stageLabels = vi
+    ? ["1 · first/last mỗi ký tự", "2 · Mở rộng thành khoảng đóng", "3 · Sort theo điểm cuối", "4 · Chọn tham lam"]
+    : ["1 · first/last per char", "2 · Expand to closed intervals", "3 · Sort by end", "4 · Greedy pick"];
+  const stages = stageLabels.map((label, i) => {
+    const cls = i < stage ? "done" : i === stage ? "active" : "pending";
+    return `<span class="${cls}">${i < stage ? "✓" : i === stage ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── String strip + interval lanes (one SVG so they align) ───────────────
+  const cellW = 34;
+  const padL = 10;
+  const svgW = Math.max(240, padL * 2 + n * cellW);
+  const laneH = 17;
+  const visibleIvs = intervals.filter((iv) => iv.state !== "discarded");
+  const laneCount = Math.max(1, visibleIvs.length);
+  const stripY = 52;
+  const svgH = stripY + 30 + laneCount * laneH + 12;
+
+  const selRanges = selected.map((x) => [x.l, x.r]);
+  const inSelected = (i) => selRanges.some(([a, b]) => i >= a && i <= b);
+  const inExpand = (i) => ex && !ex.done && i >= ex.l && i <= ex.r;
+
+  let cells = "";
+  for (let i = 0; i < n; i++) {
+    const cx = padL + i * cellW + cellW / 2;
+    const cls = ["no-cell"];
+    if (phase === "scan") { if (i === scanIndex) cls.push("cur"); else if (i < scanIndex) cls.push("seen"); else cls.push("future"); }
+    if (inSelected(i)) cls.push("picked");
+    if (ex && inExpand(i)) cls.push("inwin");
+    if (ex && ex.j === i && !ex.done) cls.push("cur");
+    if (ex && ex.badChar && s[i] === ex.badChar && Number(ex.badFirst) === i) cls.push("bad");
+    cells += `<g class="${cls.join(" ")}" transform="translate(${cx},${stripY})">
+      <rect x="-15" y="-17" width="30" height="34" rx="5"></rect>
+      <text class="no-ch" y="5">${escapeHtml(s[i])}</text>
+      <text class="no-ix" y="28">${i}</text>
+    </g>`;
+  }
+
+  // expand window bracket
+  let winBar = "";
+  if (ex) {
+    const x1 = padL + ex.l * cellW + 2;
+    const x2 = padL + (ex.r + 1) * cellW - 2;
+    winBar = `<rect class="no-window ${ex.valid ? "" : "invalid"}" x="${x1}" y="${stripY - 24}" width="${Math.max(4, x2 - x1)}" height="48" rx="6"></rect>`;
+  }
+
+  // interval lanes
+  let lanes = "";
+  visibleIvs.forEach((iv, k) => {
+    const y = stripY + 34 + k * laneH;
+    const x1 = padL + iv.l * cellW + 3;
+    const x2 = padL + (iv.r + 1) * cellW - 3;
+    const isCur = curIv >= 0 && intervals.indexOf(iv) === curIv;
+    const cls = ["no-bar", iv.state];
+    if (isCur) cls.push("current");
+    lanes += `<g class="${cls.join(" ")}">
+      <rect x="${x1}" y="${y}" width="${Math.max(6, x2 - x1)}" height="${laneH - 5}" rx="4"></rect>
+      <text x="${x1 + 4}" y="${y + laneH - 10}">${escapeHtml(iv.text.length > 14 ? iv.text.slice(0, 13) + "…" : iv.text)}</text>
+    </g>`;
+  });
+  // greedy end marker
+  let endMark = "";
+  if ((phase === "greedy" || phase === "done") && end >= 0 && end < n) {
+    const ex2 = padL + (end + 1) * cellW;
+    endMark = `<line class="no-endline" x1="${ex2}" y1="${stripY - 26}" x2="${ex2}" y2="${svgH - 6}"></line>
+      <text class="no-endlabel" x="${ex2 + 3}" y="${stripY - 30}">end=${end}</text>`;
+  }
+
+  const stripSvg = `<svg class="no-strip" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="${vi ? "Chuỗi và các khoảng ứng viên" : "String and candidate intervals"}">${winBar}${endMark}${cells}${lanes}</svg>`;
+
+  // ── first/last table ────────────────────────────────────────────────────
+  const charChips = chars.map((c) => {
+    const active = ex && ex.ch === c.ch;
+    const bad = ex && ex.badChar === c.ch;
+    return `<span class="no-chip${active ? " active" : ""}${bad ? " bad" : ""}"><b>${escapeHtml(c.ch)}</b><small>[${c.first}, ${c.last}]</small></span>`;
+  }).join("") || `<em class="no-empty">${vi ? "đang quét…" : "scanning…"}</em>`;
+
+  // ── expand / decision panel ─────────────────────────────────────────────
+  let decHtml = "";
+  if (ex) {
+    const cls = ex.valid ? (ex.done ? "ok" : "working") : "bad";
+    const head = vi ? `extend('${ex.ch}')` : `extend('${ex.ch}')`;
+    let body;
+    if (!ex.valid) {
+      body = vi
+        ? `'${ex.badChar}' có first=${ex.badFirst} < l=${ex.l} → phải mở sang TRÁI → loại ứng viên này`
+        : `'${ex.badChar}' has first=${ex.badFirst} < l=${ex.l} → would grow LEFT → discard this candidate`;
+    } else if (ex.done) {
+      body = vi ? `khoảng đóng hợp lệ [${ex.l}, ${ex.r}] = "${s.slice(ex.l, ex.r + 1)}"` : `valid closed interval [${ex.l}, ${ex.r}] = "${s.slice(ex.l, ex.r + 1)}"`;
+    } else {
+      body = vi ? `cửa sổ [${ex.l}, ${ex.r}], đang xét j=${ex.j} ('${s[ex.j]}')` : `window [${ex.l}, ${ex.r}], scanning j=${ex.j} ('${s[ex.j]}')`;
+    }
+    decHtml = `<section class="no-decision ${cls}"><small>${escapeHtml(head)}</small><strong>${escapeHtml(body)}</strong></section>`;
+  } else if (phase === "greedy" && curIv >= 0 && intervals[curIv]) {
+    const iv = intervals[curIv];
+    const take = iv.state === "selected";
+    decHtml = `<section class="no-decision ${take ? "ok" : "bad"}"><small>${vi ? "CHỌN THAM LAM" : "GREEDY PICK"}</small><strong>[${iv.l}, ${iv.r}] "${escapeHtml(iv.text)}" · l=${iv.l} ${iv.l > end ? ">" : "≤"} end=${end} → ${take ? (vi ? "NHẬN" : "TAKE") : (vi ? "BỎ" : "SKIP")}</strong></section>`;
+  }
+
+  // ── result ──────────────────────────────────────────────────────────────
+  const done = view.answer !== null && view.answer !== undefined;
+  const picks = selected.map((x) => `<span class="no-pick">"${escapeHtml(x.text)}"<small>[${x.l},${x.r}]</small></span>`).join("")
+    || `<em class="no-empty">${vi ? "chưa chọn substring nào" : "no substring chosen yet"}</em>`;
+  const resultHtml = `<section class="no-result ${done ? "complete" : ""}">
+    <header><strong>${vi ? "ĐÃ CHỌN" : "SELECTED"}</strong><span>${selected.length} ${vi ? "substring" : selected.length === 1 ? "substring" : "substrings"}</span></header>
+    <div>${picks}</div>
+  </section>`;
+
+  $("treeView").innerHTML = `<section class="no-viz">
+    <div class="no-stages">${stages}</div>
+    <section class="no-board">
+      <header><strong>${vi ? "CHUỖI + KHOẢNG ỨNG VIÊN" : "STRING + CANDIDATE INTERVALS"}</strong><span>${vi ? "mỗi thanh = một substring hợp lệ" : "each bar = one valid substring"}</span></header>
+      ${stripSvg}
+      <div class="no-legend">
+        <span><i class="lg-cand"></i>${vi ? "ứng viên" : "candidate"}</span>
+        <span><i class="lg-sel"></i>${vi ? "đã chọn" : "selected"}</span>
+        <span><i class="lg-skip"></i>${vi ? "bỏ (giao nhau)" : "skipped (overlap)"}</span>
+        <span><i class="lg-win"></i>${vi ? "cửa sổ đang mở rộng" : "expanding window"}</span>
+      </div>
+    </section>
+    <section class="no-chars"><header><strong>first / last</strong><span>${chars.length} ${vi ? "ký tự" : "chars"}</span></header><div>${charChips}</div></section>
+    ${decHtml}
+    ${resultHtml}
+  </section>`;
+}
+
+// ---- 34 Find First and Last Position renderer ----
+function renderSearchRangeView(step) {
+  const view = step.searchRangeView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const n = nums.length;
+  const target = Number(view.target);
+  const x = Number(view.x);
+  const halfOpen = !!view.halfOpen;
+  const lo = Number(view.lo);
+  const hi = Number(view.hi);
+  const mid = Number(view.mid);
+  const first = Number(view.first);
+  const last = Number(view.last);
+  const settled = Number(view.settled);
+  const phase = view.phase || "";
+  const searchIndex = Number(view.searchIndex) || 0;
+
+  // An index is inside the live window: [lo, hi) half-open, [lo, hi] closed.
+  const inWindow = (i) => (halfOpen ? (i >= lo && i < hi) : (i >= lo && i <= hi));
+  const windowEmpty = halfOpen ? !(hi > lo) : !(hi >= lo);
+  const searching = ["init", "loop", "mid", "compare", "move"].indexOf(phase) >= 0;
+
+  // ── Phase strip: the two searches + combine ──────────────────────────────
+  const stageLabels = vi
+    ? ["1 · Tìm biên TRÁI", "2 · Kiểm tra tồn tại", "3 · Tìm biên PHẢI", "4 · Ghép [first, last]"]
+    : ["1 · Find LEFT bound", "2 · Check exists", "3 · Find RIGHT bound", "4 · Combine [first, last]"];
+  let stage = 0;
+  if (phase === "start") stage = 0;
+  else if (searchIndex === 1 && searching) stage = 0;
+  else if (phase === "converged" || phase === "return") stage = searchIndex === 2 ? 2 : 0;
+  else if (phase === "check") stage = 1;
+  else if (phase === "notfound") stage = 3;
+  else if (phase === "start2" || (searchIndex === 2 && searching)) stage = 2;
+  else if (phase === "derive-last") stage = 2;
+  else if (phase === "done") stage = 3;
+  const stages = stageLabels.map((label, i) => {
+    const cls = i < stage ? "done" : i === stage ? "active" : "pending";
+    return `<span class="${cls}">${i < stage ? "✓" : i === stage ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Array cells ─────────────────────────────────────────────────────────
+  // Vertical layout (keep these in sync or labels will collide):
+  //   L/R label text baseline .... y = 12
+  //   L/R arrow (points down) .... y = 16 → 24
+  //   cell box ................... y = 40 → 80   (translate 60, rect -20..20)
+  //   index label ................ y = 93
+  //   M arrow (points up) + label. y = 98 → 119
+  //   first/last badge ........... y = 134
+  const cellW = 54;
+  const svgW = Math.max(220, n * cellW + 24);
+  const svgH = 146;
+  const CELL_Y = 60;
+  let cells = "";
+  for (let i = 0; i < n; i++) {
+    const cx = 12 + i * cellW + cellW / 2;
+    const active = inWindow(i);
+    const isTargetVal = nums[i] === target;
+    const isMid = i === mid;
+    const isFirst = first >= 0 && i === first;
+    const isLast = last >= 0 && i === last;
+    const isSettled = settled >= 0 && i === settled;
+    const cls = ["sr-cell"];
+    if (!active) cls.push("out");
+    if (isTargetVal) cls.push("is-target");
+    if (isMid) cls.push("is-mid");
+    if (isFirst) cls.push("is-first");
+    if (isLast) cls.push("is-last");
+    if (isSettled && !isFirst && !isLast) cls.push("is-settled");
+    cells += `<g class="${cls.join(" ")}" transform="translate(${cx},${CELL_Y})">
+      <rect x="-23" y="-20" width="46" height="40" rx="6"></rect>
+      <text class="sr-val" y="6">${escapeHtml(nums[i])}</text>
+      <text class="sr-idx" y="33">${i}</text>
+    </g>`;
+  }
+
+  // Pointer arrows (L / M / R or S / M / E)
+  const loName = halfOpen ? "L" : "S";
+  const hiName = halfOpen ? "R" : "E";
+  const ptrX = (i) => 12 + i * cellW + cellW / 2;
+  let ptrs = "";
+  if (searching || phase === "converged" || phase === "return") {
+    // L and R can land on the same index; nudge them apart so labels stay legible.
+    const sameSpot = lo === hi;
+    if (lo >= 0 && lo <= n) {
+      const px = (lo >= n ? svgW - 14 : ptrX(lo)) + (sameSpot ? -13 : 0);
+      ptrs += `<g class="sr-ptr lo" transform="translate(${px},12)"><text y="0">${loName}=${lo}</text><path d="M0,24 L-5,16 L5,16 Z"></path></g>`;
+    }
+    if (hi >= 0 && hi <= n) {
+      const px = (hi >= n ? svgW - 14 : ptrX(hi)) + (sameSpot ? 13 : 0);
+      ptrs += `<g class="sr-ptr hi" transform="translate(${px},12)"><text y="0">${hiName}=${hi}${halfOpen && hi >= n ? " (n)" : ""}</text><path d="M0,24 L-5,16 L5,16 Z"></path></g>`;
+    }
+    if (mid >= 0 && mid < n) {
+      ptrs += `<g class="sr-ptr mid" transform="translate(${ptrX(mid)},98)"><path d="M0,-2 L-5,6 L5,6 Z"></path><text y="19">M=${mid}</text></g>`;
+    }
+  }
+  // Boundary badges once known — own row below the M label so they never collide.
+  let badges = "";
+  if (first >= 0 && first < n) {
+    const label = (last === first) ? "first=last" : "first";
+    badges += `<g class="sr-badge first" transform="translate(${ptrX(first)},134)"><text y="0">${label}</text></g>`;
+  }
+  if (last >= 0 && last < n && last !== first) {
+    badges += `<g class="sr-badge last" transform="translate(${ptrX(last)},134)"><text y="0">last</text></g>`;
+  }
+
+  const arraySvg = `<svg class="sr-array" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="${vi ? "Mảng và vùng tìm kiếm" : "Array and search window"}">${cells}${ptrs}${badges}</svg>`;
+
+  // ── Which search is running ─────────────────────────────────────────────
+  const searchTitle = searchIndex === 0
+    ? (vi ? "Chuẩn bị" : "Setup")
+    : halfOpen
+      ? `lowerBound(${x})`
+      : (searchIndex === 1 ? "findFirst(nums, target)" : "findLast(nums, target)");
+  const searchGoal = searchIndex === 0
+    ? (vi ? `Mảng đã sắp xếp, target = ${target}` : `Sorted array, target = ${target}`)
+    : halfOpen
+      ? (searchIndex === 1
+          ? (vi ? `chỉ số đầu tiên có nums[i] ≥ ${x}  →  first` : `first index with nums[i] ≥ ${x}  →  first`)
+          : (vi ? `chỉ số đầu tiên có nums[i] ≥ ${x}, rồi −1  →  last` : `first index with nums[i] ≥ ${x}, then −1  →  last`))
+      : (searchIndex === 1
+          ? (vi ? "thu hẹp về vị trí xuất hiện ĐẦU TIÊN" : "narrow to the FIRST occurrence")
+          : (vi ? "thu hẹp về vị trí xuất hiện CUỐI CÙNG" : "narrow to the LAST occurrence"));
+
+  const windowLabel = windowEmpty
+    ? (vi ? "rỗng" : "empty")
+    : (halfOpen ? `[${lo}, ${hi})` : `[${lo}, ${hi}]`);
+  const windowSize = windowEmpty ? 0 : (halfOpen ? hi - lo : hi - lo + 1);
+
+  // ── Decision panel ──────────────────────────────────────────────────────
+  let decHtml = "";
+  const c = view.compare;
+  if (c) {
+    const truth = c.result ? "TRUE" : "FALSE";
+    const cls = view.decision === "go-right" ? "go-right" : "keep-mid";
+    const explain = view.decision === "go-right"
+      ? (vi ? `Bỏ nửa TRÁI (kể cả M) → ${loName} = M + 1` : `Discard the LEFT half incl. M → ${loName} = M + 1`)
+      : (vi ? `M có thể là đáp án → giữ M, bỏ nửa PHẢI → ${hiName} = M` : `M may be the answer → keep M, discard the RIGHT half → ${hiName} = M`);
+    decHtml = `<section class="sr-decision ${cls}">
+      <small>${vi ? "SO SÁNH" : "COMPARISON"}</small>
+      <strong>${escapeHtml(c.leftLabel)} = ${escapeHtml(c.leftVal)} ${escapeHtml(c.op)} ${escapeHtml(c.rightLabel)} = ${escapeHtml(c.rightVal)} → ${truth}</strong>
+      <p>${escapeHtml(explain)}</p>
+    </section>`;
+  } else if (phase === "check") {
+    const exists = first >= 0;
+    decHtml = `<section class="sr-decision ${exists ? "keep-mid" : "go-right"}">
+      <small>${vi ? "KIỂM TRA TỒN TẠI" : "EXISTENCE CHECK"}</small>
+      <strong>${exists ? (vi ? `nums[${first}] == ${target} ✓` : `nums[${first}] == ${target} ✓`) : (vi ? `${target} không có trong mảng` : `${target} is not in the array`)}</strong>
+      <p>${exists ? (vi ? "target tồn tại → đi tìm biên phải." : "target exists → go find the right boundary.") : (vi ? "trả về [-1, -1]." : "return [-1, -1].")}</p>
+    </section>`;
+  }
+
+  // ── Result panel ────────────────────────────────────────────────────────
+  const ansText = view.answer !== null && view.answer !== undefined
+    ? view.answer
+    : `[${first >= 0 ? first : "?"}, ${last >= 0 ? last : "?"}]`;
+  const complete = view.answer !== null && view.answer !== undefined;
+  const resultHtml = `<section class="sr-result ${complete ? (view.answer === "[-1, -1]" ? "notfound" : "complete") : ""}">
+    <div><small>target</small><strong>${escapeHtml(target)}</strong></div>
+    <div><small>first</small><strong>${first >= 0 ? first : "—"}</strong></div>
+    <div><small>last</small><strong>${last >= 0 ? last : "—"}</strong></div>
+    <div class="sr-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${escapeHtml(ansText)}</strong></div>
+  </section>`;
+
+  $("treeView").innerHTML = `<section class="sr-viz">
+    <div class="sr-stages">${stages}</div>
+    <section class="sr-search">
+      <header><strong>${escapeHtml(searchTitle)}</strong><span>${escapeHtml(searchGoal)}</span></header>
+      <div class="sr-window">${vi ? "Vùng tìm kiếm" : "Search window"}: <b>${escapeHtml(windowLabel)}</b> <em>(${windowSize} ${vi ? "phần tử" : windowSize === 1 ? "element" : "elements"})</em>${halfOpen ? `<i>${vi ? "nửa mở — R không thuộc vùng" : "half-open — R is excluded"}</i>` : `<i>${vi ? "đóng — cả S và E thuộc vùng" : "closed — both S and E included"}</i>`}</div>
+      ${arraySvg}
+      <div class="sr-legend">
+        <span><i class="lg-target"></i>${vi ? `giá trị = ${target}` : `value = ${target}`}</span>
+        <span><i class="lg-mid"></i>mid</span>
+        <span><i class="lg-out"></i>${vi ? "đã loại" : "eliminated"}</span>
+        <span><i class="lg-bound"></i>first / last</span>
+      </div>
+    </section>
+    ${decHtml}
+    ${resultHtml}
+  </section>`;
+}
+
 // ---- 3161 Block Placement Queries renderer ----
 function renderBlockQueriesView(step) {
   const view = step.blockQueriesView || {};
@@ -18057,7 +18383,7 @@ function renderMaximumSumBst1373View(step) {
   const edges = nodes.filter(node => node.parentId !== null && nodeMap.has(node.parentId)).map(node => {
     const parent = nodeMap.get(node.parentId);
     const best = bestIds.has(node.id) && bestIds.has(parent.id);
-    return `<line class="${best ? "best" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 29}" x2="${xOf(node)}" y2="${yOf(node) - 29}"></line>`;
+    return `<line class="${best ? "best" : ""}" x1="${xOf(parent)}" y1="${yOf(parent) + 33}" x2="${xOf(node)}" y2="${yOf(node) - 33}"></line>`;
   }).join("");
   const treeNodes = nodes.map(node => {
     const state = String(node.state || "unvisited");
@@ -18071,7 +18397,7 @@ function renderMaximumSumBst1373View(step) {
     const stats = node.isBst === true ? `min ${node.min} · max ${node.max} · Σ ${node.sum}`
       : node.isBst === false ? (vi ? "state: invalid" : "state: invalid")
         : node.candidateSum === null || node.candidateSum === undefined ? "min ? · max ? · Σ ?" : `candidate Σ ${node.candidateSum}`;
-    return `<g class="mb1373-node ${escapeHtml(state)} ${node.id === currentId ? "current" : ""} ${bestIds.has(node.id) ? "best-subtree" : ""} ${bestRoot ? "best-root" : ""}" transform="translate(${xOf(node)} ${yOf(node)})"><circle r="29"></circle><text class="value" text-anchor="middle" y="7">${escapeHtml(String(node.value))}</text><text class="state" text-anchor="middle" y="49">${escapeHtml(stateLabel)}</text><text class="stats" text-anchor="middle" y="68">${escapeHtml(stats)}</text></g>`;
+    return `<g class="mb1373-node ${escapeHtml(state)} ${node.id === currentId ? "current" : ""} ${bestIds.has(node.id) ? "best-subtree" : ""} ${bestRoot ? "best-root" : ""}" transform="translate(${xOf(node)} ${yOf(node)})"><circle r="33"></circle><text class="value" text-anchor="middle" y="8">${escapeHtml(String(node.value))}</text><text class="state" text-anchor="middle" y="55">${escapeHtml(stateLabel)}</text><text class="stats" text-anchor="middle" y="76">${escapeHtml(stats)}</text></g>`;
   }).join("");
   const stackHtml = stack.length
     ? stack.map((id, index) => `<span class="${id === currentId ? "current" : ""}"><small>${index === 0 ? "ROOT" : `DEPTH ${index}`}</small><strong>${escapeHtml(String(nodeMap.get(id)?.value ?? "?"))}</strong></span>`).join("<i>→</i>")
@@ -32617,6 +32943,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSqrtBinaryView(step);
+  } else if (step.nonOverlapView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNonOverlapView(step);
+  } else if (step.searchRangeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSearchRangeView(step);
   } else if (step.blockQueriesView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

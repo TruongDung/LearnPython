@@ -16101,3 +16101,319 @@ Object.assign(module.exports, {
     builder: buildSteps214,
   },
 });
+
+// ─── 1520: Maximum Number of Non-Overlapping Substrings ─────────────────────
+//
+// Greedy + interval scheduling. Three ideas stacked:
+//   1. For every distinct character record first[c] and last[c].
+//   2. A valid substring must be "closed": starting from [first[c], last[c]],
+//      scan right and stretch r to last[s[j]]. If some s[j] has
+//      first[s[j]] < l, the window would have to grow LEFT — that means this
+//      candidate belongs to a bigger group, so discard it (the correct
+//      interval will be produced by the character that starts earlier).
+//   3. Sort surviving intervals by right endpoint and greedily take any whose
+//      left endpoint is beyond the last taken end — classic interval
+//      scheduling, which maximises the count.
+//
+// Line numbers below match the `code` array shown to the user.
+function buildSteps1520(input) {
+  const s = String(input ?? "").trim();
+  if (!s) throw new Error("s must be a non-empty string");
+  if (!/^[a-z]+$/.test(s)) throw new Error("s must contain only lowercase letters a-z");
+  if (s.length > 26) throw new Error("Use at most 26 characters so the interval lanes stay readable.");
+
+  const n = s.length;
+  const steps = [];
+
+  const first = {};
+  const last = {};
+  const order = [];           // distinct chars in first-appearance order
+  const intervals = [];       // { l, r, ch, state, text }
+  let end = -1;
+  const selected = [];
+
+  const charRows = () => order.map((ch) => ({
+    ch, first: first[ch], last: last[ch],
+  }));
+  const ivCopy = () => intervals.map((iv) => ({ ...iv }));
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      codeLines: o.codeLines,
+      arr: [],
+      highlight: [],
+      mark: [],
+      vars: o.vars || [],
+      final: o.final || false,
+      nonOverlapView: {
+        s, n,
+        phase: o.phase,
+        chars: charRows(),
+        scanIndex: o.scanIndex === undefined ? -1 : o.scanIndex,
+        expand: o.expand || null,
+        intervals: ivCopy(),
+        sorted: !!o.sorted,
+        end: o.end === undefined ? -1 : o.end,
+        currentIv: o.currentIv === undefined ? -1 : o.currentIv,
+        selected: selected.map((x) => ({ ...x })),
+        answer: o.answer === undefined ? null : o.answer,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `s = "${s}" (${n} ký tự)`, en: `s = "${s}" (${n} chars)` },
+    note: {
+      vi: "Mỗi substring được chọn phải chứa TẤT CẢ lần xuất hiện của mọi ký tự bên trong nó. Cần chọn nhiều substring không giao nhau nhất.",
+      en: "Each chosen substring must contain ALL occurrences of every character inside it. We want the maximum number of non-overlapping such substrings.",
+    },
+    codeLines: [1, 2], phase: "intro",
+    vars: [{ name: "s", value: s }, { name: "n", value: n }],
+  });
+
+  // ── Phase 1: first / last per character ──────────────────────────────────
+  for (let i = 0; i < n; i++) {
+    const c = s[i];
+    const isNew = first[c] === undefined;
+    if (isNew) { first[c] = i; order.push(c); }
+    last[c] = i;
+    snap({
+      title: { vi: `i=${i}: '${c}' → ${isNew ? `first['${c}']=${i}, ` : ""}last['${c}']=${i}`, en: `i=${i}: '${c}' → ${isNew ? `first['${c}']=${i}, ` : ""}last['${c}']=${i}` },
+      note: isNew
+        ? { vi: `Lần đầu thấy '${c}' → ghi first['${c}']=${i}. last luôn được cập nhật.`, en: `First time seeing '${c}' → record first['${c}']=${i}. last is always updated.` }
+        : { vi: `'${c}' đã thấy trước đó (first=${first[c]}) → chỉ cập nhật last['${c}']=${i}.`, en: `'${c}' seen before (first=${first[c]}) → only update last['${c}']=${i}.` },
+      codeLines: isNew ? [4, 5, 6, 7] : [4, 7],
+      phase: "scan", scanIndex: i,
+      vars: [{ name: "i", value: i }, { name: "c", value: c }, { name: `first['${c}']`, value: first[c] }, { name: `last['${c}']`, value: i }],
+    });
+  }
+
+  snap({
+    title: { vi: `Đã có first/last cho ${order.length} ký tự khác nhau`, en: `Collected first/last for ${order.length} distinct characters` },
+    note: {
+      vi: `Mỗi ký tự bắt buộc phải nằm trọn trong một substring, nên [first, last] là khoảng tối thiểu cho nó.`,
+      en: `Every character must be fully contained in one substring, so [first, last] is its minimum required span.`,
+    },
+    codeLines: [3, 7], phase: "first-last",
+    vars: order.map((ch) => ({ name: `'${ch}'`, value: `[${first[ch]}, ${last[ch]}]` })),
+  });
+
+  // ── Phase 2: expand each character into a minimal closed interval ────────
+  for (const ch of order) {
+    let l = first[ch];
+    let r = last[ch];
+    let valid = true;
+    let reason = null;
+
+    snap({
+      title: { vi: `extend('${ch}'): bắt đầu l=${l}, r=${r}`, en: `extend('${ch}'): start l=${l}, r=${r}` },
+      note: { vi: `Thử dựng khoảng đóng nhỏ nhất bắt đầu từ [${l}, ${r}] của '${ch}'.`, en: `Try to build the minimal closed interval starting from '${ch}' span [${l}, ${r}].` },
+      codeLines: [9, 10, 11],
+      phase: "expand",
+      expand: { ch, l, r, j: l, valid: true, reason: null, done: false },
+      vars: [{ name: "c", value: ch }, { name: "l", value: l }, { name: "r", value: r }],
+    });
+
+    for (let j = l; j <= r; j++) {
+      const cj = s[j];
+      if (first[cj] < l) {
+        valid = false;
+        reason = "extend-left";
+        snap({
+          title: { vi: `j=${j}: '${cj}' có first=${first[cj]} < l=${l} → return None`, en: `j=${j}: '${cj}' has first=${first[cj]} < l=${l} → return None` },
+          note: {
+            vi: `'${cj}' xuất hiện TRƯỚC l=${l}, nên khoảng này buộc phải mở rộng sang TRÁI. Bỏ ứng viên '${ch}' — khoảng đúng sẽ được sinh từ ký tự bắt đầu sớm hơn.`,
+            en: `'${cj}' appears BEFORE l=${l}, so this window would have to grow LEFT. Discard candidate '${ch}' — the correct interval comes from the earlier-starting character.`,
+          },
+          codeLines: [12, 13, 14],
+          phase: "expand",
+          expand: { ch, l, r, j, valid: false, reason: "extend-left", badChar: cj, badFirst: first[cj], done: true },
+          vars: [{ name: "j", value: j }, { name: `s[${j}]`, value: cj }, { name: `first['${cj}']`, value: first[cj] }, { name: "l", value: l }, { name: "verdict", value: "discard" }],
+        });
+        break;
+      }
+      const grew = last[cj] > r;
+      const oldR = r;
+      if (grew) r = last[cj];
+      snap({
+        title: grew
+          ? { vi: `j=${j}: '${cj}' last=${last[cj]} > r → r mở rộng ${oldR} → ${r}`, en: `j=${j}: '${cj}' last=${last[cj]} > r → r grows ${oldR} → ${r}` }
+          : { vi: `j=${j}: '${cj}' nằm gọn trong [${l}, ${r}]`, en: `j=${j}: '${cj}' already fits inside [${l}, ${r}]` },
+        note: grew
+          ? { vi: `'${cj}' còn xuất hiện tới index ${last[cj]}, nên khoảng phải kéo dài sang phải tới ${r}.`, en: `'${cj}' also appears up to index ${last[cj]}, so the window must stretch right to ${r}.` }
+          : { vi: `last['${cj}']=${last[cj]} ≤ r=${r} → không cần mở rộng.`, en: `last['${cj}']=${last[cj]} ≤ r=${r} → no expansion needed.` },
+        codeLines: [12, 15, 16],
+        phase: "expand",
+        expand: { ch, l, r, j, valid: true, reason: null, grew, done: false },
+        vars: [{ name: "j", value: j }, { name: `s[${j}]`, value: cj }, { name: `last['${cj}']`, value: last[cj] }, { name: "r", value: r }],
+      });
+    }
+
+    if (valid) {
+      intervals.push({ l, r, ch, state: "candidate", text: s.slice(l, r + 1) });
+      snap({
+        title: { vi: `'${ch}' → khoảng hợp lệ [${l}, ${r}] = "${s.slice(l, r + 1)}"`, en: `'${ch}' → valid interval [${l}, ${r}] = "${s.slice(l, r + 1)}"` },
+        note: {
+          vi: `Mọi ký tự trong [${l}, ${r}] đều nằm trọn bên trong → đây là substring hợp lệ, thêm vào danh sách ứng viên.`,
+          en: `Every character inside [${l}, ${r}] is fully contained → this is a valid substring, add it to the candidate list.`,
+        },
+        codeLines: [17, 21, 22, 23],
+        phase: "expand",
+        expand: { ch, l, r, j: -1, valid: true, reason: null, done: true },
+        vars: [{ name: "interval", value: `[${l}, ${r}]` }, { name: "substring", value: s.slice(l, r + 1) }],
+      });
+    } else {
+      intervals.push({ l, r, ch, state: "discarded", text: s.slice(l, r + 1) });
+      snap({
+        title: { vi: `'${ch}' bị loại (phải mở rộng sang trái)`, en: `'${ch}' discarded (would extend left)` },
+        note: { vi: `Không thêm vào danh sách ứng viên.`, en: `Not added to the candidate list.` },
+        codeLines: [21, 22],
+        phase: "expand",
+        expand: { ch, l, r, j: -1, valid: false, reason: "extend-left", done: true },
+        vars: [{ name: "verdict", value: "discarded" }],
+      });
+    }
+  }
+
+  // ── Phase 3: sort valid intervals by right endpoint ──────────────────────
+  const valids = intervals.filter((iv) => iv.state === "candidate");
+  valids.sort((a, b) => a.r - b.r || a.l - b.l);
+  // Rebuild `intervals` so the view lists valid ones in sorted order, then discarded.
+  intervals.length = 0;
+  valids.forEach((iv) => intervals.push(iv));
+
+  snap({
+    title: { vi: `Sort ${valids.length} khoảng theo điểm KẾT THÚC tăng dần`, en: `Sort ${valids.length} intervals by increasing END` },
+    note: {
+      vi: "Đây là bài Interval Scheduling: sort theo điểm kết thúc rồi chọn tham lam sẽ cho SỐ LƯỢNG khoảng không giao nhau lớn nhất.",
+      en: "This is Interval Scheduling: sorting by end and picking greedily maximises the COUNT of non-overlapping intervals.",
+    },
+    codeLines: [24], phase: "sorted", sorted: true,
+    vars: [{ name: "sorted", value: valids.map((iv) => `[${iv.l},${iv.r}]`).join(" ") || "(none)" }],
+  });
+
+  snap({
+    title: { vi: "res = [], end = -1", en: "res = [], end = -1" },
+    note: { vi: "end = index kết thúc của khoảng vừa chọn. Khoảng mới chỉ được chọn nếu l > end.", en: "end = the right endpoint of the last picked interval. A new interval is only taken if l > end." },
+    codeLines: [26], phase: "greedy", sorted: true, end,
+    vars: [{ name: "end", value: end }, { name: "res", value: "[]" }],
+  });
+
+  // ── Phase 4: greedy pick ─────────────────────────────────────────────────
+  for (let k = 0; k < intervals.length; k++) {
+    const iv = intervals[k];
+    const take = iv.l > end;
+    snap({
+      title: { vi: `Xét [${iv.l}, ${iv.r}]: l=${iv.l} > end=${end}? ${take}`, en: `Consider [${iv.l}, ${iv.r}]: l=${iv.l} > end=${end}? ${take}` },
+      note: take
+        ? { vi: `Không giao với khoảng đã chọn → NHẬN "${iv.text}", cập nhật end=${iv.r}.`, en: `No overlap with what we already took → TAKE "${iv.text}", set end=${iv.r}.` }
+        : { vi: `l=${iv.l} ≤ end=${end} → giao với khoảng đã chọn → BỎ QUA.`, en: `l=${iv.l} ≤ end=${end} → overlaps a taken interval → SKIP.` },
+      codeLines: [27, 28],
+      phase: "greedy", sorted: true, end, currentIv: k,
+      vars: [{ name: "l, r", value: `${iv.l}, ${iv.r}` }, { name: "end", value: end }, { name: "decision", value: take ? "take" : "skip" }],
+    });
+    if (take) {
+      iv.state = "selected";
+      selected.push({ l: iv.l, r: iv.r, text: iv.text });
+      end = iv.r;
+      snap({
+        title: { vi: `✓ Chọn "${iv.text}" → end = ${end}`, en: `✓ Take "${iv.text}" → end = ${end}` },
+        note: { vi: `res có ${selected.length} substring. end lùi tới ${end}.`, en: `res now has ${selected.length} substring(s). end advances to ${end}.` },
+        codeLines: [29, 30],
+        phase: "greedy", sorted: true, end, currentIv: k,
+        vars: [{ name: "res", value: `[${selected.map((x) => `"${x.text}"`).join(", ")}]` }, { name: "end", value: end }],
+      });
+    } else {
+      iv.state = "skipped";
+    }
+  }
+
+  const answer = selected.map((x) => x.text);
+  snap({
+    title: { vi: `Kết quả: ${answer.length} substring — [${answer.map((t) => `"${t}"`).join(", ")}]`, en: `Result: ${answer.length} substrings — [${answer.map((t) => `"${t}"`).join(", ")}]` },
+    note: {
+      vi: `Đây là số substring không giao nhau lớn nhất, và tổng độ dài nhỏ nhất vì mỗi khoảng đã là tối thiểu.`,
+      en: `This is the maximum number of non-overlapping substrings, with minimum total length since every interval is already minimal.`,
+    },
+    codeLines: [31], phase: "done", sorted: true, end, final: true,
+    answer,
+    vars: [{ name: "answer", value: `[${answer.map((t) => `"${t}"`).join(", ")}]` }, { name: "count", value: answer.length }],
+  });
+
+  return { original: s, answer, steps };
+}
+
+Object.assign(module.exports, {
+  1520: {
+    id: 1520,
+    difficulty: "hard",
+    slug: "maximum-number-of-non-overlapping-substrings",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "interval-scheduling", vi: "Interval Scheduling", en: "Interval Scheduling" },
+    ],
+    title: { vi: "Maximum Number of Non-Overlapping Substrings", en: "Maximum Number of Non-Overlapping Substrings" },
+    titleVi: { vi: "Nhiều substring không giao nhau nhất", en: "Maximum number of non-overlapping substrings" },
+    statement: {
+      vi: "Cho chuỗi s gồm chữ thường. Chọn các substring không giao nhau sao cho: nếu substring chứa ký tự c thì nó phải chứa MỌI lần xuất hiện của c trong s. Trả về số substring nhiều nhất; nếu có nhiều đáp án thì lấy tổng độ dài nhỏ nhất.",
+      en: "Given a string s of lowercase letters, choose non-overlapping substrings such that if a substring contains character c, it must contain EVERY occurrence of c in s. Return the maximum number of such substrings; if several answers exist, return the one with minimum total length.",
+    },
+    defaultInput: "adefaddaccc",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường, tối đa 26 ký tự)", en: "s (lowercase, up to 26 chars)" },
+    extraParams: [],
+    approach: [
+      { vi: "Ghi first[c] và last[c] cho mỗi ký tự. Một substring chứa c bắt buộc phải phủ [first[c], last[c]].", en: "Record first[c] and last[c] per character. Any substring containing c must cover [first[c], last[c]]." },
+      { vi: "Với mỗi ký tự, bắt đầu từ [first, last] rồi quét sang phải, kéo r = max(r, last[s[j]]) để khoảng trở nên 'đóng'.", en: "For each character, start at [first, last] and scan right, stretching r = max(r, last[s[j]]) until the window is 'closed'." },
+      { vi: "Nếu gặp s[j] có first[s[j]] < l thì khoảng buộc phải mở sang trái → loại ứng viên này (khoảng đúng sẽ sinh từ ký tự bắt đầu sớm hơn).", en: "If some s[j] has first[s[j]] < l the window would need to grow left → discard this candidate (the correct interval comes from the earlier-starting character)." },
+      { vi: "Sort các khoảng hợp lệ theo điểm kết thúc rồi chọn tham lam (l > end): đúng bài Interval Scheduling, cho số lượng lớn nhất.", en: "Sort surviving intervals by right endpoint and greedily take those with l > end: classic Interval Scheduling, which maximises the count." },
+    ],
+    complexity: {
+      time: "O(26·n)",
+      space: "O(n)",
+      note: {
+        vi: "Có tối đa 26 ký tự khác nhau, mỗi lần extend quét O(n) → O(26·n). Sort 26 khoảng là O(1).",
+        en: "At most 26 distinct characters, each extend scans O(n) → O(26·n). Sorting ≤26 intervals is O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxNumOfSubstrings(self, s: str) -> List[str]:",
+      "        first, last = {}, {}",
+      "        for i, c in enumerate(s):",
+      "            if c not in first:",
+      "                first[c] = i",
+      "            last[c] = i",
+      "",
+      "        def extend(c):",
+      "            l, r = first[c], last[c]",
+      "            j = l",
+      "            while j <= r:",
+      "                if first[s[j]] < l:",
+      "                    return None",
+      "                r = max(r, last[s[j]])",
+      "                j += 1",
+      "            return (l, r)",
+      "",
+      "        intervals = []",
+      "        for c in first:",
+      "            iv = extend(c)",
+      "            if iv:",
+      "                intervals.append(iv)",
+      "        intervals.sort(key=lambda x: x[1])",
+      "",
+      "        res, end = [], -1",
+      "        for l, r in intervals:",
+      "            if l > end:",
+      "                res.append(s[l:r + 1])",
+      "                end = r",
+      "        return res",
+    ],
+    liveArgs: (input) => [String(input ?? "").trim()],
+    builder: buildSteps1520,
+  },
+});

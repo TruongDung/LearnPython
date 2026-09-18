@@ -3914,10 +3914,38 @@ function buildSteps34(nums, params) {
   return buildSteps34Main(nums, params);
 }
 
+// Shared view payload for #34 so both approaches render with the same panel.
+// `halfOpen` distinguishes approach 1's [lo, hi) window from approach 2's
+// closed [lo, hi] window; the renderer draws the bracket accordingly.
+function makeSearchRangeView(o) {
+  return {
+    nums: [...o.nums],
+    target: o.target,
+    x: o.x === undefined ? o.target : o.x,
+    halfOpen: !!o.halfOpen,
+    phase: o.phase,
+    searchIndex: o.searchIndex === undefined ? 0 : o.searchIndex,
+    searchLabel: o.searchLabel || null,
+    lo: o.lo === undefined ? -1 : o.lo,
+    hi: o.hi === undefined ? -1 : o.hi,
+    mid: o.mid === undefined ? -1 : o.mid,
+    compare: o.compare || null,
+    decision: o.decision || null,
+    first: o.first === undefined ? -1 : o.first,
+    last: o.last === undefined ? -1 : o.last,
+    answer: o.answer === undefined ? null : o.answer,
+    settled: o.settled === undefined ? -1 : o.settled,
+  };
+}
+
 function buildSteps34Main(nums, params) {
   const target = Number(params && params.target !== undefined ? params.target : nums[0]);
   const n = nums.length;
   const steps = [];
+
+  // Boundaries discovered so far, shared across both lowerBound calls.
+  let firstKnown = -1;
+  let lastKnown = -1;
 
   function labels(l, r, m) {
     return nums.map((_, i) => {
@@ -3931,13 +3959,21 @@ function buildSteps34Main(nums, params) {
   function activeRange(l, r) {
     return Array.from({ length: Math.max(0, r - l) }, (_, k) => l + k);
   }
+  // Attach the rich view to a step built the legacy way.
+  function withView(step, view) {
+    return { ...step, searchRangeView: makeSearchRangeView({
+      nums, target, halfOpen: true, first: firstKnown, last: lastKnown, ...view,
+    }) };
+  }
 
   // lowerBound(x): first index where nums[i] >= x. Emits one step per line,
   // codeBlock 1 = lowerBound helper, tagged with which call site (first/second).
-  function lowerBound(x, callLabel) {
+  function lowerBound(x, callLabel, searchIndex) {
     let left = 0;
     let right = n;
-    steps.push({
+    const vw = (extra) => ({ x, searchIndex, searchLabel: callLabel, lo: left, hi: right, ...extra });
+
+    steps.push(withView({
       title: { vi: `lowerBound(${x}): left, right = 0, len(nums)`, en: `lowerBound(${x}): left, right = 0, len(nums)` },
       arr: [...nums],
       sub: labels(left, right),
@@ -3949,10 +3985,10 @@ function buildSteps34Main(nums, params) {
         vi: `${callLabel}: tìm chỉ số đầu tiên có nums[i] ≥ ${x}. Vùng tìm kiếm ban đầu là toàn bộ mảng.`,
         en: `${callLabel}: find the first index where nums[i] ≥ ${x}. The initial search range is the whole array.`,
       },
-    });
+    }, vw({ phase: "init" })));
 
     while (left < right) {
-      steps.push({
+      steps.push(withView({
         title: { vi: `while L=${left} < R=${right} → True`, en: `while L=${left} < R=${right} → True` },
         arr: [...nums],
         sub: labels(left, right),
@@ -3964,10 +4000,10 @@ function buildSteps34Main(nums, params) {
           vi: `L=${left} < R=${right} → còn vùng để thu hẹp.`,
           en: `L=${left} < R=${right} → there's still a range to narrow.`,
         },
-      });
+      }, vw({ phase: "loop" })));
 
       const mid = Math.floor((left + right) / 2);
-      steps.push({
+      steps.push(withView({
         title: { vi: `M = (L+R)//2 = ${mid}`, en: `M = (L+R)//2 = ${mid}` },
         arr: [...nums],
         sub: labels(left, right, mid),
@@ -3976,10 +4012,10 @@ function buildSteps34Main(nums, params) {
         codeLines: [6],
         vars: [{ name: "mid (M)", value: mid }, { name: "nums[M]", value: nums[mid] }],
         note: { vi: `Điểm giữa vùng [${left}, ${right}) là M=${mid}. nums[${mid}] = ${nums[mid]}.`, en: `The midpoint of [${left}, ${right}) is M=${mid}. nums[${mid}] = ${nums[mid]}.` },
-      });
+      }, vw({ phase: "mid", mid })));
 
       const goRight = nums[mid] < x;
-      steps.push({
+      steps.push(withView({
         title: { vi: `nums[M]=${nums[mid]} < x=${x} → ${goRight}`, en: `nums[M]=${nums[mid]} < x=${x} → ${goRight}` },
         arr: [...nums],
         sub: labels(left, right, mid),
@@ -3990,12 +4026,16 @@ function buildSteps34Main(nums, params) {
         note: goRight
           ? { vi: `${nums[mid]} < ${x} → M quá nhỏ, đáp án nằm bên PHẢI của M → bỏ nửa trái.`, en: `${nums[mid]} < ${x} → M is too small, the answer is to the RIGHT of M → discard the left half.` }
           : { vi: `${nums[mid]} ≥ ${x} → M có thể là đáp án → giữ M, bỏ nửa phải.`, en: `${nums[mid]} ≥ ${x} → M could be the answer → keep M, discard the right half.` },
-      });
+      }, vw({
+        phase: "compare", mid,
+        compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: "<", rightLabel: "x", rightVal: x, result: goRight },
+        decision: goRight ? "go-right" : "keep-mid",
+      })));
 
       if (goRight) {
         const oldLeft = left;
         left = mid + 1;
-        steps.push({
+        steps.push(withView({
           title: { vi: `L = M + 1 = ${left}`, en: `L = M + 1 = ${left}` },
           arr: [...nums],
           sub: labels(left, right),
@@ -4004,11 +4044,11 @@ function buildSteps34Main(nums, params) {
           codeLines: [8],
           vars: [{ name: "left before", value: oldLeft }, { name: "left after (L)", value: left }],
           note: { vi: `Vùng tìm kiếm co lại thành [${left}, ${right}).`, en: `The search range shrinks to [${left}, ${right}).` },
-        });
+        }, vw({ phase: "move", decision: "go-right" })));
       } else {
         const oldRight = right;
         right = mid;
-        steps.push({
+        steps.push(withView({
           title: { vi: `R = M = ${right}`, en: `R = M = ${right}` },
           arr: [...nums],
           sub: labels(left, right),
@@ -4017,11 +4057,11 @@ function buildSteps34Main(nums, params) {
           codeLines: [10],
           vars: [{ name: "right before", value: oldRight }, { name: "right after (R)", value: right }],
           note: { vi: `Vùng tìm kiếm co lại thành [${left}, ${right}) — M vẫn có thể là đáp án nên không bị loại.`, en: `The search range shrinks to [${left}, ${right}) — M might still be the answer, so it's kept.` },
-        });
+        }, vw({ phase: "move", decision: "keep-mid" })));
       }
     }
 
-    steps.push({
+    steps.push(withView({
       title: { vi: `while L=${left} < R=${right} → False`, en: `while L=${left} < R=${right} → False` },
       arr: [...nums],
       sub: labels(left, right),
@@ -4030,8 +4070,8 @@ function buildSteps34Main(nums, params) {
       codeLines: [5],
       vars: [{ name: "left (L)", value: left }, { name: "right (R)", value: right }],
       note: { vi: `L và R gặp nhau tại ${left} → return ${left}.`, en: `L and R meet at ${left} → return ${left}.` },
-    });
-    steps.push({
+    }, vw({ phase: "converged", settled: left })));
+    steps.push(withView({
       title: { vi: `lowerBound(${x}) return left = ${left}`, en: `lowerBound(${x}) return left = ${left}` },
       arr: [...nums],
       sub: labels(left, right),
@@ -4040,11 +4080,11 @@ function buildSteps34Main(nums, params) {
       codeLines: [11],
       vars: [{ name: "returns", value: left }],
       note: { vi: `${callLabel} trả về ${left}.`, en: `${callLabel} returns ${left}.` },
-    });
+    }, vw({ phase: "return", settled: left })));
     return left;
   }
 
-  steps.push({
+  steps.push(withView({
     title: { vi: `Bắt đầu findFirstLast(nums, ${target})`, en: `Start findFirstLast(nums, ${target})` },
     arr: [...nums],
     sub: labels(0, n),
@@ -4056,12 +4096,13 @@ function buildSteps34Main(nums, params) {
       vi: `Cần tìm vị trí đầu và cuối của ${target}. Gọi lowerBound(target) để tìm biên trái.`,
       en: `Need to find the first and last position of ${target}. Call lowerBound(target) to find the left boundary.`,
     },
-  });
+  }, { phase: "start", lo: 0, hi: n }));
 
-  const first = lowerBound(target, "lowerBound(target) — first call, finds left boundary");
+  const first = lowerBound(target, "lowerBound(target) — first call, finds left boundary", 1);
 
   const notFound = first === n || nums[first] !== target;
-  steps.push({
+  if (!notFound) firstKnown = first;
+  steps.push(withView({
     title: { vi: `first==len(nums) or nums[first]!=target? ${notFound}`, en: `first==len(nums) or nums[first]!=target? ${notFound}` },
     arr: [...nums],
     sub: labels(first, first),
@@ -4072,10 +4113,10 @@ function buildSteps34Main(nums, params) {
     note: notFound
       ? { vi: `first=${first}: ${first === n ? "vượt quá mảng" : `nums[${first}]=${nums[first]} ≠ ${target}`} → target không tồn tại.`, en: `first=${first}: ${first === n ? "out of bounds" : `nums[${first}]=${nums[first]} ≠ ${target}`} → target does not exist.` }
       : { vi: `first=${first}: nums[${first}]=${target} → target tồn tại, tiếp tục tìm biên phải.`, en: `first=${first}: nums[${first}]=${target} → target exists, proceed to find the right boundary.` },
-  });
+  }, { phase: "check", settled: first < n ? first : -1, searchIndex: 1 }));
 
   if (notFound) {
-    steps.push({
+    steps.push(withView({
       title: { vi: "return [-1, -1]", en: "return [-1, -1]" },
       arr: [...nums],
       sub: labels(-1, -1),
@@ -4085,11 +4126,11 @@ function buildSteps34Main(nums, params) {
       codeLines: [14],
       vars: [{ name: "answer", value: "[-1, -1]" }],
       note: { vi: `${target} không có trong mảng.`, en: `${target} is not in the array.` },
-    });
+    }, { phase: "notfound", answer: "[-1, -1]" }));
     return { original: [...nums], answer: "[-1, -1]", steps };
   }
 
-  steps.push({
+  steps.push(withView({
     title: { vi: `Bắt đầu gọi lowerBound(target + 1) = lowerBound(${target + 1})`, en: `Begin calling lowerBound(target + 1) = lowerBound(${target + 1})` },
     arr: [...nums],
     sub: labels(first, first),
@@ -4101,12 +4142,13 @@ function buildSteps34Main(nums, params) {
       vi: `Biên phải = chỉ số đầu tiên có nums[i] > target, trừ 1. Tính bằng lowerBound(target+1) - 1.`,
       en: `The right boundary = the first index where nums[i] > target, minus 1. Computed as lowerBound(target+1) - 1.`,
     },
-  });
+  }, { phase: "start2", x: target + 1, searchIndex: 2 }));
 
-  const lastBoundStart = lowerBound(target + 1, "lowerBound(target + 1) — second call, finds right boundary");
+  const lastBoundStart = lowerBound(target + 1, "lowerBound(target + 1) — second call, finds right boundary", 2);
   const last = lastBoundStart - 1;
+  lastKnown = last;
 
-  steps.push({
+  steps.push(withView({
     title: { vi: `last = lowerBound(target+1) - 1 = ${lastBoundStart} - 1 = ${last}`, en: `last = lowerBound(target+1) - 1 = ${lastBoundStart} - 1 = ${last}` },
     arr: [...nums],
     sub: labels(first, last),
@@ -4115,9 +4157,9 @@ function buildSteps34Main(nums, params) {
     codeLines: [15],
     vars: [{ name: "last", value: last }],
     note: { vi: `Chỉ số cuối cùng của ${target} là ${last}.`, en: `The last index of ${target} is ${last}.` },
-  });
+  }, { phase: "derive-last", x: target + 1, searchIndex: 2, settled: lastBoundStart }));
 
-  steps.push({
+  steps.push(withView({
     title: { vi: `return [first, last] = [${first}, ${last}]`, en: `return [first, last] = [${first}, ${last}]` },
     arr: [...nums],
     sub: labels(first, last),
@@ -4127,7 +4169,7 @@ function buildSteps34Main(nums, params) {
     codeLines: [16],
     vars: [{ name: "answer", value: `[${first}, ${last}]` }],
     note: { vi: `${target} xuất hiện từ index ${first} đến ${last}.`, en: `${target} appears from index ${first} to ${last}.` },
-  });
+  }, { phase: "done", answer: `[${first}, ${last}]` }));
 
   return { original: [...nums], answer: `[${first}, ${last}]`, steps };
 }
@@ -4198,7 +4240,14 @@ function buildSteps34Alt(nums, params) {
   function activeRange(s, e) {
     return s > e ? [] : Array.from({ length: e - s + 1 }, (_, k) => s + k);
   }
-  function push({ title, s, e, m, highlight, mark, codeLines, vars, note, final = false }) {
+  // View state threaded through push(): which helper we're inside and the
+  // boundaries discovered so far.
+  let vwSearchIndex = 0;
+  let vwSearchLabel = null;
+  let vwFirst = -1;
+  let vwLast = -1;
+  function push({ title, s, e, m, highlight, mark, codeLines, vars, note, final = false,
+    phase = "loop", compare = null, decision = null, answer = null, settled = -1 }) {
     steps.push({
       title,
       arr: [...nums],
@@ -4210,6 +4259,12 @@ function buildSteps34Alt(nums, params) {
       codeLines,
       vars: vars || [],
       note,
+      searchRangeView: makeSearchRangeView({
+        nums, target, x: target, halfOpen: false, phase,
+        searchIndex: vwSearchIndex, searchLabel: vwSearchLabel,
+        lo: s, hi: e, mid: m === undefined ? -1 : m,
+        compare, decision, first: vwFirst, last: vwLast, answer, settled,
+      }),
     });
   }
 
@@ -4238,6 +4293,8 @@ function buildSteps34Alt(nums, params) {
   function findFirst() {
     let start = 0;
     let end = n - 1;
+    vwSearchIndex = 1;
+    vwSearchLabel = "findFirst(nums, target) — locates the FIRST occurrence";
     push({
       title: { vi: "findFirst: start, end = 0, len(nums)-1", en: "findFirst: start, end = 0, len(nums)-1" },
       s: start, e: end,
@@ -4271,6 +4328,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [14],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: "==", rightLabel: "target", rightVal: target, result: true }, decision: "keep-mid",
           note: { vi: "M chính là target → có thể là đáp án, giữ M, thu hẹp E về M.", en: "M itself equals target → could be the answer, keep M, shrink E to M." },
         });
         end = mid;
@@ -4278,6 +4336,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `E = M = ${end}`, en: `E = M = ${end}` },
           s: start, e: end,
           codeLines: [15],
+          phase: "move", decision: "keep-mid",
           note: { vi: `Vùng co lại thành [${start}, ${end}] — M vẫn có thể là vị trí đầu tiên nên không bị loại.`, en: `Range shrinks to [${start}, ${end}] — M might still be the first occurrence, so it's kept.` },
         });
       } else if (nums[mid] > target) {
@@ -4286,6 +4345,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [16],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: ">", rightLabel: "target", rightVal: target, result: true }, decision: "keep-mid",
           note: { vi: "M quá lớn → target (nếu có) nằm bên trái M → loại M và mọi thứ bên phải.", en: "M is too large → target (if present) is left of M → discard M and everything to its right." },
         });
         end = mid - 1;
@@ -4293,6 +4353,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `E = M - 1 = ${end}`, en: `E = M - 1 = ${end}` },
           s: start, e: end,
           codeLines: [17],
+          phase: "move", decision: "keep-mid",
           note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
         });
       } else {
@@ -4301,6 +4362,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [18],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: "<", rightLabel: "target", rightVal: target, result: true }, decision: "go-right",
           note: { vi: "M quá nhỏ → target nằm bên phải M → loại M và mọi thứ bên trái.", en: "M is too small → target is right of M → discard M and everything to its left." },
         });
         start = mid + 1;
@@ -4308,6 +4370,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `S = M + 1 = ${start}`, en: `S = M + 1 = ${start}` },
           s: start, e: end,
           codeLines: [19],
+          phase: "move", decision: "go-right",
           note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
         });
       }
@@ -4319,6 +4382,7 @@ function buildSteps34Alt(nums, params) {
       highlight: [],
       mark: [start],
       codeLines: [12],
+      phase: "converged", settled: start,
       vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
       note: { vi: `S và E gặp nhau tại ${start}.`, en: `S and E meet at ${start}.` },
     });
@@ -4337,6 +4401,7 @@ function buildSteps34Alt(nums, params) {
       push({
         title: { vi: `findFirst return start = ${start}`, en: `findFirst return start = ${start}` },
         s: start, e: end, highlight: [], mark: [start],
+        phase: "return", settled: start,
         codeLines: [21],
         vars: [{ name: "returns", value: start }],
         note: { vi: `findFirst trả về ${start}.`, en: `findFirst returns ${start}.` },
@@ -4356,10 +4421,12 @@ function buildSteps34Alt(nums, params) {
   const first = findFirst();
 
   const notFound = first === -1;
+  if (!notFound) vwFirst = first;
   push({
     title: { vi: `first == -1? ${notFound}`, en: `first == -1? ${notFound}` },
     s: 0, e: n - 1, highlight: [], mark: notFound ? [] : [first],
     codeLines: [6],
+    phase: "check", settled: notFound ? -1 : first,
     vars: [{ name: "first", value: first }],
     note: notFound
       ? { vi: `first=-1 → ${target} không tồn tại, không cần tìm findLast.`, en: `first=-1 → ${target} does not exist, no need to call findLast.` }
@@ -4371,6 +4438,7 @@ function buildSteps34Alt(nums, params) {
       s: -1, e: -1, highlight: [], mark: [],
       final: true,
       codeLines: [7],
+      phase: "notfound", answer: "[-1, -1]",
       vars: [{ name: "answer", value: "[-1, -1]" }],
       note: { vi: `${target} không có trong mảng.`, en: `${target} is not in the array.` },
     });
@@ -4392,6 +4460,8 @@ function buildSteps34Alt(nums, params) {
   function findLast() {
     let start = 0;
     let end = n - 1;
+    vwSearchIndex = 2;
+    vwSearchLabel = "findLast(nums, target) — locates the LAST occurrence";
     push({
       title: { vi: "findLast: start, end = 0, len(nums)-1", en: "findLast: start, end = 0, len(nums)-1" },
       s: start, e: end,
@@ -4447,6 +4517,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [30],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: "==", rightLabel: "target", rightVal: target, result: true }, decision: "keep-mid",
           note: { vi: "M chính là target → có thể là đáp án (vị trí cuối), giữ M, thu hẹp S về M.", en: "M itself equals target → could be the answer (last position), keep M, shrink S to M." },
         });
         start = mid;
@@ -4454,6 +4525,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `S = M = ${start}`, en: `S = M = ${start}` },
           s: start, e: end,
           codeLines: [31],
+          phase: "move", decision: "keep-mid",
           note: { vi: `Vùng co lại thành [${start}, ${end}] — M vẫn có thể là vị trí cuối nên không bị loại.`, en: `Range shrinks to [${start}, ${end}] — M might still be the last occurrence, so it's kept.` },
         });
       } else if (nums[mid] > target) {
@@ -4462,6 +4534,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [32],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: ">", rightLabel: "target", rightVal: target, result: true }, decision: "keep-mid",
           note: { vi: "M quá lớn → target (nếu có) nằm bên trái M → loại M và mọi thứ bên phải.", en: "M is too large → target (if present) is left of M → discard M and everything to its right." },
         });
         end = mid - 1;
@@ -4469,6 +4542,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `E = M - 1 = ${end}`, en: `E = M - 1 = ${end}` },
           s: start, e: end,
           codeLines: [33],
+          phase: "move", decision: "keep-mid",
           note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
         });
       } else {
@@ -4477,6 +4551,7 @@ function buildSteps34Alt(nums, params) {
           s: start, e: end, m: mid,
           codeLines: [34],
           mark: [mid],
+          phase: "compare", compare: { leftLabel: `nums[${mid}]`, leftVal: nums[mid], op: "<", rightLabel: "target", rightVal: target, result: true }, decision: "go-right",
           note: { vi: "M quá nhỏ → target nằm bên phải M → loại M và mọi thứ bên trái.", en: "M is too small → target is right of M → discard M and everything to its left." },
         });
         start = mid + 1;
@@ -4484,6 +4559,7 @@ function buildSteps34Alt(nums, params) {
           title: { vi: `S = M + 1 = ${start}`, en: `S = M + 1 = ${start}` },
           s: start, e: end,
           codeLines: [35],
+          phase: "move", decision: "go-right",
           note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
         });
       }
@@ -4492,6 +4568,7 @@ function buildSteps34Alt(nums, params) {
     push({
       title: { vi: `while S=${start} < E=${end} → False`, en: `while S=${start} < E=${end} → False` },
       s: start, e: end, highlight: [], mark: [start],
+      phase: "converged", settled: start,
       codeLines: [26],
       vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
       note: { vi: `S và E gặp nhau tại ${start}.`, en: `S and E meet at ${start}.` },
@@ -4509,6 +4586,7 @@ function buildSteps34Alt(nums, params) {
       push({
         title: { vi: `findLast return start = ${start}`, en: `findLast return start = ${start}` },
         s: start, e: end, highlight: [], mark: [start],
+        phase: "return", settled: start,
         codeLines: [37],
         vars: [{ name: "returns", value: start }],
         note: { vi: `findLast trả về ${start}.`, en: `findLast returns ${start}.` },
@@ -4526,6 +4604,7 @@ function buildSteps34Alt(nums, params) {
   }
 
   const last = findLast();
+  vwLast = last;
 
   push({
     title: { vi: `return [first, last] = [${first}, ${last}]`, en: `return [first, last] = [${first}, ${last}]` },
@@ -4534,6 +4613,7 @@ function buildSteps34Alt(nums, params) {
     mark: [first, last].filter((v, idx, arr) => arr.indexOf(v) === idx),
     final: true,
     codeLines: [9],
+    phase: "done", answer: `[${first}, ${last}]`,
     vars: [{ name: "answer", value: `[${first}, ${last}]` }],
     note: { vi: `${target} xuất hiện từ index ${first} đến ${last}.`, en: `${target} appears from index ${first} to ${last}.` },
   });
