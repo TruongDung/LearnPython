@@ -11827,6 +11827,336 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 900 RLE Iterator ----
+// The encoding and the sequence it stands for are shown side by side, because the
+// whole problem is keeping those two in sync while never building the second one.
+// Consumption is strictly front-to-back, so the decoded strip can be derived from
+// a single "consumed" count.
+function renderRleIter900View(step) {
+  const view = step.rleIter900View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const runs = Array.isArray(view.runs) ? view.runs : [];
+  const expanded = Array.isArray(view.expanded) ? view.expanded : [];
+  const remaining = Array.isArray(view.remaining) ? view.remaining : null;
+  const pref = Array.isArray(view.pref) ? view.pref : null;
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const taken = Array.isArray(view.taken) ? view.taken : null;
+  const approach = Number(view.approach) || 1;
+  const total = Number(view.total) || 0;
+  const consumed = view.consumed === null || view.consumed === undefined ? 0 : view.consumed;
+  const cursor = view.i;
+  const search = view.search;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const PALETTE = 5;
+
+  const takenTotal = taken ? taken.reduce((t, x) => t + x.amount, 0) : 0;
+  const takenFrom = consumed - takenTotal;
+  const takenByRun = new Map();
+  if (taken) for (const t of taken) takenByRun.set(t.runIdx, t.amount);
+
+  // ── the encoding, one card per (count, value) pair ────────────────────────
+  const runsHtml = runs.map((r, idx) => {
+    const left = remaining ? remaining[idx] : r.count;
+    const cls = ["rle900-run", `q${idx % PALETTE}`];
+    if (r.count === 0) cls.push("zero");
+    else if (left === 0) cls.push("drained");
+    if (approach === 1 && idx === cursor && !isDone) cls.push("cursor");
+    if (takenByRun.has(idx)) cls.push("took");
+    const pct = r.count ? Math.round((left / r.count) * 100) : 0;
+    return `<div class="${cls.join(" ")}">
+      <small>${vi ? "cặp" : "pair"} ${idx}</small>
+      <strong>${left} × ${r.value}</strong>
+      ${r.count === 0
+      ? `<span class="tag">${vi ? "rỗng — bỏ qua" : "empty — skipped"}</span>`
+      : `<span class="bar"><i style="width:${pct}%"></i></span><span class="tag">${vi ? `còn ${left}/${r.count}` : `${left}/${r.count} left`}${takenByRun.has(idx) ? ` · ${vi ? "lấy" : "took"} ${takenByRun.get(idx)}` : ""}</span>`}
+    </div>`;
+  }).join("");
+
+  // ── the decoded sequence, which the algorithm never actually builds ───────
+  const seqHtml = expanded.length
+    ? expanded.map((e, k) => {
+      const cls = ["rle900-el", `q${e.runIdx % PALETTE}`];
+      if (k < takenFrom) cls.push("gone");
+      else if (k < consumed) cls.push("justgone");
+      return `<span class="${cls.join(" ")}">${e.value}</span>`;
+    }).join("")
+    : `<em class="rle900-empty">${vi ? "dãy giải nén rỗng" : "the decoded sequence is empty"}</em>`;
+
+  // ── the call in progress ──────────────────────────────────────────────────
+  let callHtml = "";
+  if (view.queryIndex !== null && view.queryIndex !== undefined) {
+    const q = queries[view.queryIndex] || {};
+    const res = q.status === "done" ? q.result : null;
+    callHtml = `<section class="rle900-panel">
+      <header>
+        <strong>${vi ? `ĐANG XỬ LÝ next(${view.n})` : `HANDLING next(${view.n})`}</strong>
+        <span>${view.nLeft !== null && view.nLeft !== undefined ? (vi ? `còn cần ${view.nLeft}` : `${view.nLeft} still needed`) : ""}</span>
+      </header>
+      <div class="rle900-call">
+        <div class="box"><small>${vi ? "YÊU CẦU" : "REQUESTED"}</small><b>${view.n}</b></div>
+        <div class="box"><small>${vi ? "ĐÃ LẤY TRONG LƯỢT NÀY" : "TAKEN THIS CALL"}</small><b>${takenTotal}</b><span>${taken && taken.length ? taken.map((t) => `${vi ? "cặp" : "pair"} ${t.runIdx}: ${t.amount}`).join(" · ") : "—"}</span></div>
+        <div class="box${res === -1 ? " bad" : res === null ? "" : " good"}"><small>${vi ? "TRẢ VỀ" : "RETURNS"}</small><b>${res === null ? "…" : res}</b></div>
+      </div>
+    </section>`;
+  }
+
+  // ── approach 2: the prefix marks and the search ───────────────────────────
+  let prefHtml = "";
+  if (approach === 2 && pref) {
+    const cells = pref.map((v, k) => {
+      const cls = ["rle900-pc"];
+      if (search && k === search.k) cls.push("found");
+      if (k > 0 && runs[k - 1] && runs[k - 1].count === 0) cls.push("flat");
+      return `<span class="${cls.join(" ")}"><b>${v}</b><i>${k === 0 ? "–" : `${vi ? "cặp" : "pair"} ${k - 1}`}</i></span>`;
+    }).join("");
+    prefHtml = `<section class="rle900-panel">
+      <header>
+        <strong>${vi ? "TIỀN TỐ CỘNG DỒN — pref[k] = tổng phần tử của k cặp đầu" : "PREFIX SUMS — pref[k] = elements held by the first k pairs"}</strong>
+        <span>used = ${view.used === null || view.used === undefined ? 0 : view.used} / ${total}</span>
+      </header>
+      <div class="rle900-pref">${cells}</div>
+      ${search
+      ? `<div class="rle900-lk">${escapeHtml(vi
+        ? `Mốc đầu tiên ≥ used = ${search.used} là pref[${search.k}] = ${search.prefAt}, nên phần tử thứ ${search.used} nằm trong cặp ${search.runIdx}.`
+        : `The first mark ≥ used = ${search.used} is pref[${search.k}] = ${search.prefAt}, so element ${search.used} lives in pair ${search.runIdx}.`)}</div>`
+      : ""}
+      <div class="rle900-hint">${escapeHtml(vi
+      ? "Ô nét đứt là mốc do cặp có số lần 0 tạo ra — tiền tố lặp lại giá trị ở đó. Vì luôn lấy mốc ĐẦU TIÊN ≥ used, các ô này luôn bị bỏ qua, nên không bao giờ trả về giá trị của một cặp rỗng."
+      : "A dashed cell is a mark created by a zero-count pair — the prefix repeats its value there. Because we always take the FIRST mark ≥ used, those cells are always stepped past, so an empty pair's value is never returned.")}</div>
+    </section>`;
+  }
+
+  // ── the call log ──────────────────────────────────────────────────────────
+  const logHtml = queries.map((q, k) => {
+    const cls = ["rle900-q"];
+    if (q.status === "current" || k === view.queryIndex) cls.push("current");
+    else if (q.status === "done") cls.push("done");
+    return `<div class="${cls.join(" ")}">
+      <small>${k}</small><strong>next(${q.n})</strong>
+      <b class="${q.result === null || q.result === undefined ? "pending" : q.result === -1 ? "bad" : "good"}">${q.result === null || q.result === undefined ? "?" : q.result}</b>
+    </div>`;
+  }).join("");
+
+  const statusHtml = isDone
+    ? `<div class="rle900-answer">
+        <small>${vi ? "KẾT QUẢ" : "RESULTS"}</small>
+        <strong>[${escapeHtml(String(view.answer))}]</strong>
+        <span>${vi ? `đã tiêu thụ ${consumed}/${total} phần tử` : `${consumed}/${total} elements exhausted`}</span>
+      </div>`
+    : `<div class="rle900-progress">
+        <span><small>${vi ? "ĐÃ TIÊU THỤ" : "EXHAUSTED"}</small><b>${consumed}/${total}</b></span>
+        ${approach === 1
+      ? `<span><small>${vi ? "CON TRỎ i" : "CURSOR i"}</small><b>${cursor === null || cursor === undefined ? "—" : (cursor >= runs.length ? (vi ? "hết" : "past end") : `${vi ? "cặp" : "pair"} ${cursor}`)}</b></span>`
+      : `<span><small>used</small><b>${view.used === null || view.used === undefined ? 0 : view.used}</b></span>`}
+        <span><small>${vi ? "LẦN GỌI" : "CALL"}</small><b>${view.queryIndex === null || view.queryIndex === undefined ? "—" : `${view.queryIndex + 1}/${queries.length}`}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="rle900-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa RLE Iterator" : "RLE Iterator visualization")}">
+    <div class="rle900-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? "Đừng bao giờ giải nén dãy — đề cho số lần tới 10⁹. Chỉ giữ con trỏ i trỏ vào cặp hiện tại. next(n): nếu cặp hiện tại còn đủ thì trừ n rồi trả giá trị của nó (con trỏ KHÔNG dịch); nếu không đủ thì lấy hết cặp đó, trừ vào n rồi sang cặp kế. Cặp có số lần 0 bị bước qua bởi chính vòng lặp đó. Hết cặp mà còn thiếu thì trả -1 — nhưng phần đã lấy vẫn bị tiêu thụ."
+      : "Không sửa dữ liệu gốc: dựng trước tiền tố cộng dồn rồi chỉ giữ một biến used = số phần tử đã tiêu thụ. next(n) chỉ việc used += n và tìm nhị phân cặp đầu tiên có tiền tố ≥ used — O(log số cặp) mỗi lần gọi. Nếu used vượt tổng thì trả -1, và used KHÔNG được hoàn lại, đúng như cách 1 đã tiêu thụ nốt phần còn lại.")}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="rle900-panel">
+      <header>
+        <strong>${vi ? "ENCODING — các cặp (số lần, giá trị)" : "ENCODING — the (count, value) pairs"}</strong>
+        <span>${vi ? `${runs.length} cặp · ${total} phần tử` : `${runs.length} pairs · ${total} elements`}</span>
+      </header>
+      <div class="rle900-runs">${runsHtml}</div>
+    </section>
+
+    <section class="rle900-panel">
+      <header>
+        <strong>${vi ? "DÃY GIẢI NÉN — thứ thuật toán KHÔNG bao giờ dựng ra" : "THE DECODED SEQUENCE — which the algorithm never builds"}</strong>
+        <span>${vi ? "gạch ngang = đã tiêu thụ" : "struck through = exhausted"}</span>
+      </header>
+      <div class="rle900-seq">${seqHtml}</div>
+      <div class="rle900-hint">${escapeHtml(vi
+      ? "Chỉ vẽ ở đây để bạn đối chiếu. Việc tiêu thụ luôn diễn ra từ đầu dãy về sau, nên chỉ cần một con số \"đã tiêu thụ\" là biết chính xác phần nào đã mất."
+      : "Drawn here only so you can check along. Consumption always runs front to back, so a single \"exhausted\" count says exactly which part is gone.")}</div>
+    </section>
+
+    ${callHtml}
+    ${prefHtml}
+
+    <section class="rle900-panel">
+      <header><strong>${vi ? "CÁC LẦN GỌI next(n)" : "THE next(n) CALLS"}</strong><span>${queries.length}</span></header>
+      <div class="rle900-log">${logHtml}</div>
+    </section>
+
+    <div class="rle900-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 792 Number of Matching Subsequences ----
+// The waiting-list panel is the centrepiece: seeing words parked under the single
+// character each one needs, and migrating when that character shows up, is what
+// makes "one pass over s" obvious. The s strip is annotated with how many words
+// each character woke, which shows directly that most characters do nothing.
+function renderMatchSubseq792View(step) {
+  const view = step.matchSubseq792View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const s = String(view.s || "");
+  const words = Array.isArray(view.words) ? view.words : [];
+  const approach = Number(view.approach) || 1;
+  const progress = Array.isArray(view.progress) ? view.progress : [];
+  const status = Array.isArray(view.status) ? view.status : [];
+  const wakeAt = Array.isArray(view.wakeAt) ? view.wakeAt : null;
+  const buckets = view.buckets || null;
+  const released = Array.isArray(view.released) ? view.released : null;
+  const scan = view.scan;
+  const counters = view.counters || {};
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const si = view.si;
+  const PALETTE = 5;
+
+  // ── s, annotated with the wake count of each character ────────────────────
+  const sHtml = s.split("").map((ch, i) => {
+    const cls = ["ms792-ch"];
+    const woke = wakeAt ? wakeAt[i] : null;
+    if (i === si && !isDone) cls.push("cur");
+    else if (si !== null && si !== undefined && i < si) cls.push("past");
+    if (woke !== null && woke !== undefined) cls.push(woke > 0 ? "woke" : "idle");
+    if (scan && scan.matchedAt === i) cls.push("hit");
+    if (scan && scan.skipFrom !== null && scan.skipFrom !== undefined && i >= scan.skipFrom && i < scan.matchedAt) cls.push("skipped");
+    return `<div class="${cls.join(" ")}">
+      <strong>${escapeHtml(ch)}</strong>
+      <span class="ix">${i}</span>
+      ${woke === null || woke === undefined ? `<span class="wk">·</span>` : `<span class="wk">${woke > 0 ? `↑${woke}` : "–"}</span>`}
+    </div>`;
+  }).join("");
+
+  // ── each word with its matched prefix and the character it now needs ──────
+  const wordsHtml = words.map((w, wi) => {
+    const j = progress[wi] || 0;
+    const st = status[wi] || "waiting";
+    const cls = ["ms792-word", st];
+    if (approach === 2 && view.curWord === wi && !isDone) cls.push("cur");
+    if (released && released.some((r) => r.wi === wi)) cls.push("moved");
+    const chars = w.split("").map((c, k) => {
+      const cc = ["c"];
+      if (k < j) cc.push("done");
+      else if (k === j) cc.push("need");
+      return `<span class="${cc.join(" ")}">${escapeHtml(c)}</span>`;
+    }).join("");
+    const badge = st === "matched" ? "✓" : st === "failed" ? "✗" : `${j}/${w.length}`;
+    // j can already equal w.length while the status is still "scanning": approach 2
+    // reaches the final character one step before it records the verdict. Indexing
+    // w[j] there would print "waits 'undefined'".
+    const nx = st === "matched" ? (vi ? "xong" : "done")
+      : st === "failed" ? (vi ? "không đủ" : "short")
+        : j >= w.length ? (vi ? "đã đủ ký tự" : "all characters found")
+          : (vi ? `chờ '${w[j]}'` : `waits '${w[j]}'`);
+    return `<div class="${cls.join(" ")}">
+      <span class="wl">w${wi}</span>
+      <div class="chs">${chars}</div>
+      <span class="bd">${badge}</span>
+      <span class="nx">${escapeHtml(nx)}</span>
+    </div>`;
+  }).join("");
+
+  // ── approach 1: the waiting lists ─────────────────────────────────────────
+  let bucketHtml = "";
+  if (approach === 1 && buckets) {
+    const keys = Object.keys(buckets);
+    const cards = keys.map((ch) => `<div class="ms792-bucket${ch === s[si] && !isDone ? " draining" : ""}">
+        <small>${vi ? "chờ" : "waiting on"} '${escapeHtml(ch)}'</small>
+        <div>${buckets[ch].map((e) => `<span class="q${e.wi % PALETTE}">${escapeHtml(words[e.wi])}<i>${e.j}</i></span>`).join("")}</div>
+      </div>`).join("");
+    const movedHtml = released
+      ? `<div class="ms792-moves">${released.map((r) => `<span class="${r.done ? "done" : ""}">
+            <b>${escapeHtml(words[r.wi])}</b>
+            ${r.done
+        ? (vi ? `khớp đủ ✓` : `fully matched ✓`)
+        : `'${escapeHtml(r.from)}' → '${escapeHtml(r.to)}'`}
+          </span>`).join("")}</div>`
+      : "";
+    bucketHtml = `<section class="ms792-panel">
+      <header>
+        <strong>${vi ? "DANH SÁCH CHỜ — mỗi từ nằm ở đúng MỘT ký tự nó đang cần" : "WAITING LISTS — each word sits under the ONE character it needs"}</strong>
+        <span>${keys.length ? `${keys.length} ${vi ? "ký tự có từ chờ" : "characters have waiters"}` : (vi ? "không còn từ nào chờ" : "nothing left waiting")}</span>
+      </header>
+      <div class="ms792-buckets">${cards || `<em class="ms792-empty">${vi ? "mọi từ đã xong hoặc không thể khớp" : "every word is finished or unmatchable"}</em>`}</div>
+      ${movedHtml}
+      <div class="ms792-hint">${escapeHtml(vi
+      ? "Phải DỌN SẠCH danh sách của ký tự hiện tại trước khi xử lý: một từ có thể được xếp lại vào chính ký tự đó nếu ký tự kế tiếp của nó cũng giống, và nếu không dọn trước thì nó sẽ bị xử lý hai lần trong cùng một bước."
+      : "The current character's list must be EMPTIED before processing it: a word can be re-parked onto that same character when its next character matches, and without emptying first it would be processed twice in one step.")}</div>
+    </section>`;
+  }
+
+  // ── cost panel ────────────────────────────────────────────────────────────
+  const totalWordLen = words.reduce((t, w) => t + w.length, 0);
+  const costHtml = `<section class="ms792-panel">
+    <header><strong>${vi ? "CHI PHÍ" : "COST"}</strong><span>${vi ? `|s| = ${s.length} · tổng độ dài words = ${totalWordLen}` : `|s| = ${s.length} · total word length = ${totalWordLen}`}</span></header>
+    <div class="ms792-cost">
+      ${approach === 1
+      ? `<div class="box"><small>${vi ? "ĐÃ ĐỌC s" : "s READ"}</small><b>${counters.sRead || 0}/${counters.sLen || s.length}</b><span>${vi ? "một lượt duy nhất" : "a single pass"}</span></div>
+         <div class="box"><small>${vi ? "LẦN ĐÁNH THỨC" : "WAKEUPS"}</small><b>${counters.wakeups || 0}</b><span>${vi ? `chặn trên: ${totalWordLen}` : `bounded by ${totalWordLen}`}</span></div>
+         <div class="box good"><small>${vi ? "CÁCH NGÂY THƠ SẼ TỐN" : "THE NAIVE WAY WOULD COST"}</small><b>${words.length * s.length}</b><span>${vi ? `${words.length} × ${s.length} lần so ký tự` : `${words.length} × ${s.length} comparisons`}</span></div>`
+      : `<div class="box"><small>${vi ? "ĐÃ ĐỌC s" : "s READ"}</small><b>${counters.sReads || 0}/${words.length}</b><span>${vi ? "lần (một lần mỗi từ)" : "times (once per word)"}</span></div>
+         <div class="box warn"><small>${vi ? "SO KÝ TỰ" : "CHAR COMPARES"}</small><b>${counters.charCompares || 0}</b><span>${vi ? `tối đa ${counters.naive || 0}` : `up to ${counters.naive || 0}`}</span></div>
+         <div class="box good"><small>${vi ? "CÁCH 1 CHỈ CẦN" : "APPROACH 1 NEEDS ONLY"}</small><b>${s.length + totalWordLen}</b><span>${vi ? `${s.length} + ${totalWordLen}` : `${s.length} + ${totalWordLen}`}</span></div>`}
+    </div>
+  </section>`;
+
+  const statusHtml = isDone
+    ? `<div class="ms792-answer">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${view.answer}</strong>
+        <span>${vi ? `trong ${words.length} từ là subsequence của s` : `of the ${words.length} words are subsequences of s`}</span>
+      </div>`
+    : `<div class="ms792-progress">
+        <span><small>${vi ? "ĐÃ MATCH" : "MATCHED"}</small><b>${view.matched === null || view.matched === undefined ? 0 : view.matched}</b></span>
+        <span><small>${vi ? "VỊ TRÍ TRONG s" : "POSITION IN s"}</small><b>${si === null || si === undefined ? "—" : `${si}/${s.length}`}</b></span>
+        <span><small>${vi ? "SỐ TỪ" : "WORDS"}</small><b>${words.length}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="ms792-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đếm số từ là subsequence" : "Number of matching subsequences visualization")}">
+    <div class="ms792-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? (vi
+        ? "Lật ngược vấn đề: tại mỗi thời điểm một từ chỉ quan tâm ĐÚNG MỘT ký tự — ký tự tiếp theo nó cần. Gửi nó vào danh sách chờ của ký tự đó rồi quét s MỘT LẦN; đến ký tự c thì chỉ đánh thức đúng những từ chờ c, cho mỗi từ tiến 1 ký tự và xếp lại vào danh sách mới. Từ nào còn nằm trong danh sách chờ khi s hết thì không phải subsequence."
+        : "Turn it inside out: at any moment a word cares about exactly ONE character — the next one it needs. Park it in that character's waiting list, then walk s ONCE; reaching character c wakes only the words waiting on c, advances each by one, and re-parks it. Any word still waiting when s runs out is not a subsequence.")
+      : (vi
+        ? "Cách trực tiếp: mỗi từ một con trỏ, quét hết s một lần cho từng từ. Dễ hiểu nhưng s bị đọc lại |words| lần. Xem bảng chi phí ở dưới để so với cách 1."
+        : "The direct way: one pointer per word, walking all of s once per word. Easy to follow but s gets re-read |words| times. Compare the cost panel below with approach 1."))}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="ms792-panel">
+      <header>
+        <strong>${vi ? `s — ${s.length} ký tự, đọc từ trái sang phải` : `s — ${s.length} characters, read left to right`}</strong>
+        <span>${approach === 1 ? (vi ? "↑k = ký tự này đánh thức k từ · – = không đánh thức ai" : "↑k = this character woke k words · – = woke nobody") : (vi ? "ô mờ = bỏ qua khi tìm ký tự cần" : "dim = skipped while hunting the needed character")}</span>
+      </header>
+      <div class="ms792-strip">${sHtml}</div>
+    </section>
+
+    <section class="ms792-panel">
+      <header><strong>${vi ? "CÁC TỪ — phần đã khớp và ký tự đang cần" : "THE WORDS — matched prefix and the character now needed"}</strong><span>${words.length}</span></header>
+      <div class="ms792-words">${wordsHtml}</div>
+    </section>
+
+    ${bucketHtml}
+    ${costHtml}
+
+    <div class="ms792-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
 // ---- 552 Student Attendance Record II ----
 // The whole problem collapses to a 6-node state machine, so the view draws that
 // machine and animates the counts flowing along its edges. Node and label
@@ -35321,6 +35651,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.rleIter900View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRleIter900View(step);
+  } else if (step.matchSubseq792View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMatchSubseq792View(step);
   } else if (step.attendance552View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

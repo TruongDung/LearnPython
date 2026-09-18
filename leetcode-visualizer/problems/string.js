@@ -18033,3 +18033,810 @@ Object.assign(module.exports, {
     builder2: buildSteps418Tape,
   },
 });
+
+// ─── 792: Number of Matching Subsequences ───
+// How many of `words` are subsequences of `s`?
+//
+// Both builders feed `matchSubseq792View`. The naive answer rescans s once per
+// word, which is O(|words| · |s|). The good answer turns it inside out: park every
+// word in a WAITING LIST keyed by the single character it needs next, then walk s
+// ONCE. Arriving at character c wakes exactly the words waiting on c, advances
+// each by one, and re-parks it under its new next-needed character. Every word
+// advances only when its character actually shows up, so s is read a single time.
+
+const MS792_LIMITS = { s: 30, words: 8, wordLen: 10 };
+
+function parse792Data(input, params = {}) {
+  const s = String(input ?? "").trim();
+  if (!s) throw new Error("s must not be empty");
+  if (!/^[a-z]+$/.test(s)) throw new Error("s must contain only lowercase letters a-z");
+  if (s.length > MS792_LIMITS.s) throw new Error(`visualization supports s up to ${MS792_LIMITS.s} characters`);
+
+  const raw = params.words;
+  let words;
+  if (Array.isArray(raw)) words = raw.map((w) => String(w).trim());
+  else {
+    const text = String(raw ?? "").trim();
+    if (!text) throw new Error("words must not be empty");
+    words = text.startsWith("[")
+      ? JSON.parse(text).map((w) => String(w).trim())
+      : text.split(/[,;|\s]+/).map((w) => w.trim()).filter(Boolean);
+  }
+  if (!words.length) throw new Error("words must not be empty");
+  if (words.length > MS792_LIMITS.words) throw new Error(`visualization supports at most ${MS792_LIMITS.words} words`);
+  if (!words.every((w) => /^[a-z]+$/.test(w))) throw new Error("every word must be non-empty lowercase a-z");
+  if (!words.every((w) => w.length <= MS792_LIMITS.wordLen)) throw new Error(`each word may be at most ${MS792_LIMITS.wordLen} characters`);
+  return { s, words };
+}
+
+function ms792Base(s, words, approach) {
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      matchSubseq792View: {
+        approach,
+        s, words: [...words],
+        phase: o.phase,
+        si: o.si === undefined ? null : o.si,
+        // wakeAt[i] = how many words character s[i] woke, or null if not reached.
+        // Lets the s strip show directly that most characters do nothing at all.
+        wakeAt: o.wakeAt ? [...o.wakeAt] : null,
+        // progress[wi] = how many characters of words[wi] are already matched
+        progress: o.progress ? [...o.progress] : null,
+        status: o.status ? [...o.status] : null,
+        buckets: o.buckets || null,
+        released: o.released || null,
+        curWord: o.curWord === undefined ? null : o.curWord,
+        scan: o.scan || null,
+        matched: o.matched === undefined ? null : o.matched,
+        counters: o.counters || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, snap };
+}
+
+// ── Approach 1: waiting lists keyed by the next needed character ─────────────
+function buildSteps792(input, params = {}) {
+  const { s, words } = parse792Data(input, params);
+  const { steps, snap } = ms792Base(s, words, 1);
+  const n = words.length;
+
+  const progress = new Array(n).fill(0);
+  const status = new Array(n).fill("waiting");
+  // buckets is a plain object keyed by the character each word is waiting for.
+  const buckets = {};
+  const park = (wi) => {
+    const ch = words[wi][progress[wi]];
+    if (!buckets[ch]) buckets[ch] = [];
+    buckets[ch].push(wi);
+  };
+  const snapshotBuckets = () => {
+    const out = {};
+    for (const ch of Object.keys(buckets).sort()) {
+      if (buckets[ch].length) out[ch] = buckets[ch].map((wi) => ({ wi, j: progress[wi] }));
+    }
+    return out;
+  };
+  let matched = 0;
+  let wakeups = 0;
+  const wakeAt = new Array(s.length).fill(null);
+
+  snap({
+    phase: "intro",
+    title: { vi: `s = "${s}" (${s.length} ký tự), ${n} từ cần kiểm`, en: `s = "${s}" (${s.length} chars), ${n} words to test` },
+    note: {
+      vi: `Đếm xem bao nhiêu từ là SUBSEQUENCE của s (lấy s rồi bỏ bớt ký tự, giữ nguyên thứ tự). Cách ngây thơ là quét lại s cho từng từ — tốn ${n} × ${s.length} bước. Ý tưởng hay hơn là lật ngược vấn đề: mỗi từ chỉ quan tâm ĐÚNG MỘT ký tự tiếp theo mà nó đang chờ, nên hãy gửi nó vào "danh sách chờ" của ký tự đó. Sau đó quét s MỘT LẦN: đến ký tự c thì chỉ đánh thức đúng những từ đang chờ c.`,
+      en: `Count how many words are SUBSEQUENCES of s (take s and delete characters, keeping order). The naive way rescans s once per word — ${n} × ${s.length} steps. The better idea turns it inside out: each word only cares about the SINGLE next character it is waiting for, so park it in that character's "waiting list". Then walk s ONCE: reaching character c wakes exactly the words waiting on c.`,
+    },
+    codeLines: [2, 3],
+    progress, status, wakeAt,
+    buckets: {}, matched: 0,
+    counters: { wakeups: 0, sRead: 0, sLen: s.length },
+    decision: { vi: "Mỗi từ chờ ở đúng một ký tự → quét s một lần là đủ.", en: "Each word waits on one character → a single pass over s suffices." },
+    vars: [{ name: "s", value: s }, { name: "words", value: words.join(", ") }],
+  });
+
+  for (let wi = 0; wi < n; wi++) park(wi);
+  snap({
+    phase: "park",
+    title: { vi: "Xếp mỗi từ vào danh sách chờ theo ký tự ĐẦU của nó", en: "Park each word in the waiting list of its FIRST character" },
+    note: {
+      vi: `${words.map((w, wi) => `"${w}" chờ '${w[0]}'`).join(", ")}. Lúc này chưa từ nào tiến được ký tự nào — tất cả chỉ đang nằm chờ. Tổng số phần tử trong mọi danh sách chờ luôn bằng số từ chưa xong.`,
+      en: `${words.map((w) => `"${w}" waits on '${w[0]}'`).join(", ")}. No word has advanced yet — they are all simply parked. The total across every waiting list always equals the number of unfinished words.`,
+    },
+    codeLines: [4, 5, 6, 7],
+    progress, status, wakeAt,
+    buckets: snapshotBuckets(), matched: 0,
+    counters: { wakeups: 0, sRead: 0, sLen: s.length },
+    decision: { vi: `${n} từ đang chờ.`, en: `${n} words parked.` },
+    vars: [{ name: "buckets", value: Object.keys(snapshotBuckets()).map((c) => `${c}:${buckets[c].length}`).join(" ") }],
+  });
+
+  for (let si = 0; si < s.length; si++) {
+    const ch = s[si];
+    const waiting = buckets[ch] || [];
+    buckets[ch] = [];
+    wakeAt[si] = waiting.length;
+    const released = [];
+    for (const wi of waiting) {
+      progress[wi] += 1;
+      wakeups += 1;
+      if (progress[wi] === words[wi].length) {
+        status[wi] = "matched";
+        matched += 1;
+        released.push({ wi, from: ch, to: null, done: true, j: progress[wi] });
+      } else {
+        const next = words[wi][progress[wi]];
+        released.push({ wi, from: ch, to: next, done: false, j: progress[wi] });
+        park(wi);
+      }
+    }
+
+    snap({
+      phase: waiting.length ? "wake" : "idle",
+      title: waiting.length
+        ? { vi: `s[${si}] = '${ch}' → đánh thức ${waiting.length} từ`, en: `s[${si}] = '${ch}' → wakes ${waiting.length} word(s)` }
+        : { vi: `s[${si}] = '${ch}' → không từ nào chờ '${ch}'`, en: `s[${si}] = '${ch}' → no word is waiting on '${ch}'` },
+      note: waiting.length
+        ? {
+          vi: `Danh sách chờ của '${ch}' được dọn sạch rồi xử lý từng từ: ${released.map((r) => r.done
+            ? `"${words[r.wi]}" đã khớp ĐỦ → tính là match`
+            : `"${words[r.wi]}" tiến tới ${r.j}/${words[r.wi].length}, giờ chờ '${r.to}'`).join("; ")}. Chú ý phải dọn sạch danh sách TRƯỚC khi xử lý, vì một từ có thể được xếp lại vào chính '${ch}' nếu ký tự kế tiếp của nó cũng là '${ch}' — nếu không sẽ xử lý nó hai lần trong cùng một bước.`,
+          en: `The waiting list for '${ch}' is emptied and then processed: ${released.map((r) => r.done
+            ? `"${words[r.wi]}" is now fully matched → counted`
+            : `"${words[r.wi]}" advances to ${r.j}/${words[r.wi].length} and now waits on '${r.to}'`).join("; ")}. Note the list must be emptied BEFORE processing, because a word can be re-parked back onto '${ch}' when its next character is also '${ch}' — otherwise it would be processed twice in the same step.`,
+        }
+        : {
+          vi: `Không từ nào đang chờ '${ch}', nên ký tự này bị bỏ qua hoàn toàn — không làm gì cả. Đây chính là chỗ tiết kiệm: cách ngây thơ vẫn phải so '${ch}' với từng từ, còn ở đây ta chỉ tra một danh sách rỗng.`,
+          en: `No word is waiting on '${ch}', so this character is skipped entirely — nothing happens. This is where the saving comes from: the naive method would still compare '${ch}' against every word, while here we just look up an empty list.`,
+        },
+      codeLines: waiting.length ? [8, 9, 10, 11, 12, 13, 14, 16] : [8, 9, 10],
+      si,
+      progress, status, wakeAt,
+      buckets: snapshotBuckets(),
+      released: released.length ? released : null,
+      matched,
+      counters: { wakeups, sRead: si + 1, sLen: s.length },
+      decision: waiting.length
+        ? {
+          vi: `${released.filter((r) => r.done).length ? `Khớp xong ${released.filter((r) => r.done).map((r) => `"${words[r.wi]}"`).join(", ")}. ` : ""}Đã match ${matched}/${n}.`,
+          en: `${released.filter((r) => r.done).length ? `Completed ${released.filter((r) => r.done).map((r) => `"${words[r.wi]}"`).join(", ")}. ` : ""}${matched}/${n} matched so far.`,
+        }
+        : { vi: `Bỏ qua '${ch}', không tốn gì.`, en: `Skipped '${ch}' at no cost.` },
+      vars: [
+        { name: "c", value: `'${ch}'` },
+        { name: "woken", value: waiting.length },
+        { name: "matched", value: matched },
+      ],
+    });
+  }
+
+  for (let wi = 0; wi < n; wi++) if (status[wi] !== "matched") status[wi] = "failed";
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${matched}`, en: `Answer = ${matched}` },
+    note: {
+      vi: `Đã đọc s đúng một lần (${s.length} ký tự) và thực hiện ${wakeups} lần đánh thức — mỗi lần đánh thức làm một từ tiến đúng 1 ký tự, nên tổng số lần đánh thức không bao giờ vượt tổng độ dài các từ (${words.reduce((t, w) => t + w.length, 0)}). Vì vậy tổng chi phí là O(|s| + tổng độ dài words), thay vì O(|words| × |s|). Những từ còn nằm trong danh sách chờ khi s hết chính là các từ không phải subsequence.`,
+      en: `s was read exactly once (${s.length} characters) with ${wakeups} wakeups — each wakeup advances one word by exactly one character, so the wakeup count never exceeds the total length of the words (${words.reduce((t, w) => t + w.length, 0)}). That makes the whole cost O(|s| + total word length) instead of O(|words| × |s|). The words still sitting in a waiting list when s runs out are exactly the ones that are not subsequences.`,
+    },
+    codeLines: [17],
+    final: true,
+    si: s.length,
+    progress, status, wakeAt,
+    buckets: snapshotBuckets(), matched, answer: matched,
+    counters: { wakeups, sRead: s.length, sLen: s.length },
+    decision: { vi: `${matched}/${n} từ là subsequence của s.`, en: `${matched}/${n} words are subsequences of s.` },
+    vars: [{ name: "answer", value: matched }, { name: "wakeups", value: wakeups }],
+  });
+
+  return { input, answer: matched, steps };
+}
+
+// ── Approach 2: rescan s for every word (the baseline the buckets replace) ────
+function buildSteps792TwoPointer(input, params = {}) {
+  const { s, words } = parse792Data(input, params);
+  const { steps, snap } = ms792Base(s, words, 2);
+  const n = words.length;
+  const progress = new Array(n).fill(0);
+  const status = new Array(n).fill("pending");
+  let matched = 0;
+  let charCompares = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: quét lại s cho từng từ — ${n} × ${s.length}`, en: `Approach 2: rescan s per word — ${n} × ${s.length}` },
+    note: {
+      vi: `Cách trực tiếp: với mỗi từ, đặt con trỏ i = 0 rồi chạy hết s; gặp ký tự trùng w[i] thì i tăng 1. Nếu cuối cùng i = len(w) thì w là subsequence. Dễ hiểu và đúng, nhưng s bị đọc lại ${n} lần → O(|words| × |s|). Đề cho tổng độ dài words tới 5·10⁴ và |s| tới 5·10⁴ nên cách này quá chậm. Xem bộ đếm "so ký tự" ở dưới để thấy nó đắt hơn cách 1 bao nhiêu.`,
+      en: `The direct way: for each word set a pointer i = 0 and run through all of s, bumping i whenever a character equals w[i]. If i ends at len(w) the word is a subsequence. Easy and correct, but s is re-read ${n} times → O(|words| × |s|). The problem allows total word length up to 5·10⁴ and |s| up to 5·10⁴, so this is too slow. Watch the character-comparison counter below to see how much dearer it is than approach 1.`,
+    },
+    codeLines: [2, 3],
+    progress, status, matched: 0,
+    counters: { charCompares: 0, sReads: 0, sLen: s.length, naive: n * s.length },
+    decision: { vi: `Phải đọc s ${n} lần.`, en: `s must be read ${n} times.` },
+    vars: [{ name: "s", value: s }, { name: "words", value: words.join(", ") }],
+  });
+
+  for (let wi = 0; wi < n; wi++) {
+    const w = words[wi];
+    let i = 0;
+    status[wi] = "scanning";
+    let skipFrom = null;
+
+    for (let si = 0; si < s.length; si++) {
+      charCompares += 1;
+      if (i < w.length && s[si] === w[i]) {
+        // one step per pointer advance, with the skipped run folded in
+        const from = skipFrom;
+        skipFrom = null;
+        i += 1;
+        progress[wi] = i;
+        snap({
+          phase: "advance",
+          title: { vi: `"${w}": s[${si}]='${s[si]}' khớp w[${i - 1}] → i = ${i}`, en: `"${w}": s[${si}]='${s[si]}' matches w[${i - 1}] → i = ${i}` },
+          note: {
+            vi: `${from !== null ? `Đã bỏ qua s[${from}..${si - 1}] vì không khớp '${w[i - 1]}'. ` : ""}Khớp được ký tự thứ ${i}/${w.length} của "${w}". ${i === w.length ? "Đã đủ cả từ." : `Tiếp theo cần '${w[i]}'.`}`,
+            en: `${from !== null ? `Skipped s[${from}..${si - 1}] because none of it was '${w[i - 1]}'. ` : ""}Matched character ${i}/${w.length} of "${w}". ${i === w.length ? "The whole word is covered." : `Next it needs '${w[i]}'.`}`,
+          },
+          codeLines: [6, 7, 8],
+          si, curWord: wi,
+          progress, status,
+          scan: { wi, i, si, skipFrom: from, matchedAt: si },
+          matched,
+          counters: { charCompares, sReads: wi, sLen: s.length, naive: n * s.length },
+          decision: i === w.length
+            ? { vi: `"${w}" khớp đủ sau ${si + 1} ký tự của s.`, en: `"${w}" fully matched after ${si + 1} characters of s.` }
+            : { vi: `Tiến tới ${i}/${w.length}, cần '${w[i]}'.`, en: `Advanced to ${i}/${w.length}, needs '${w[i]}'.` },
+          vars: [{ name: "i", value: i }, { name: "char compares", value: charCompares }],
+        });
+        if (i === w.length) break;
+      } else if (skipFrom === null) {
+        skipFrom = si;
+      }
+    }
+
+    const ok = i === w.length;
+    if (ok) matched += 1;
+    status[wi] = ok ? "matched" : "failed";
+    snap({
+      phase: "verdict",
+      title: ok
+        ? { vi: `"${w}" LÀ subsequence → matched = ${matched}`, en: `"${w}" IS a subsequence → matched = ${matched}` }
+        : { vi: `"${w}" KHÔNG là subsequence (mới khớp ${i}/${w.length})`, en: `"${w}" is NOT a subsequence (only ${i}/${w.length} matched)` },
+      note: ok
+        ? {
+          vi: `Con trỏ i chạy tới ${w.length} = len("${w}"), nghĩa là mọi ký tự của từ đã tìm thấy trong s theo đúng thứ tự.`,
+          en: `The pointer reached ${w.length} = len("${w}"), so every character of the word was found in s in order.`,
+        }
+        : {
+          vi: `Đã đọc hết s mà i chỉ tới ${i}: không còn '${w[i]}' nào trong s sau vị trí đã dùng. Lưu ý dù kết luận sớm được từ giữa đường, vòng lặp vẫn chạy hết s — đó là một phần lý do cách này chậm.`,
+          en: `All of s was read but i only reached ${i}: there is no further '${w[i]}' in s after the positions already used. Note the loop still walks all of s even when the outcome is already decided, which is part of why this is slow.`,
+        },
+      codeLines: [9, 10],
+      curWord: wi,
+      progress, status,
+      matched,
+      counters: { charCompares, sReads: wi + 1, sLen: s.length, naive: n * s.length },
+      decision: ok
+        ? { vi: `"${w}" ✓ — đã match ${matched}/${n}.`, en: `"${w}" ✓ — ${matched}/${n} matched.` }
+        : { vi: `"${w}" ✗.`, en: `"${w}" ✗.` },
+      vars: [{ name: "i", value: i }, { name: "len(w)", value: w.length }, { name: "matched", value: matched }],
+    });
+  }
+
+  snap({
+    phase: "done",
+    title: { vi: `Đáp án = ${matched}`, en: `Answer = ${matched}` },
+    note: {
+      vi: `Cùng đáp án với cách 1, nhưng đã so ${charCompares} lần ký tự và đọc s ${n} lần. Cách 1 chỉ đọc s ${s.length} ký tự một lần cộng số lần đánh thức bị chặn bởi tổng độ dài các từ — càng nhiều từ thì khoảng cách càng lớn.`,
+      en: `Same answer as approach 1, but it took ${charCompares} character comparisons and read s ${n} times. Approach 1 reads s's ${s.length} characters once plus a wakeup count bounded by the total word length — and the more words there are, the wider that gap gets.`,
+    },
+    codeLines: [11],
+    final: true,
+    progress, status, matched, answer: matched,
+    counters: { charCompares, sReads: n, sLen: s.length, naive: n * s.length },
+    decision: { vi: `${matched}/${n} từ là subsequence, tốn ${charCompares} lần so ký tự.`, en: `${matched}/${n} words are subsequences, at ${charCompares} character comparisons.` },
+    vars: [{ name: "answer", value: matched }, { name: "char compares", value: charCompares }],
+  });
+
+  return { input, answer: matched, steps };
+}
+
+Object.assign(module.exports, {
+  792: {
+    id: 792,
+    difficulty: "medium",
+    slug: "number-of-matching-subsequences",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "subsequence", vi: "Subsequence", en: "Subsequence" },
+      { key: "hashmap", vi: "Hash Map / Set", en: "Hash Map / Set" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+    ],
+    title: { vi: "Number of Matching Subsequences", en: "Number of Matching Subsequences" },
+    titleVi: { vi: "Đếm số từ là subsequence của s", en: "Counting words that are subsequences of s" },
+    statement: {
+      vi: "Cho chuỗi s và danh sách words. Trả về số từ trong words là SUBSEQUENCE của s (lấy s rồi xoá bớt một số ký tự, giữ nguyên thứ tự các ký tự còn lại).",
+      en: "Given a string s and an array words, return how many of the words are SUBSEQUENCES of s (a subsequence is formed by deleting some characters of s while keeping the order of the rest).",
+    },
+    defaultInput: "abcde",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường)", en: "s (lowercase)" },
+    extraParams: [
+      { key: "words", type: "string", label: { vi: "words (phẩy ngăn cách hoặc JSON)", en: "words (comma separated or JSON)" }, default: "a,bb,acd,ace" },
+    ],
+    approach: [
+      { vi: "Cách ngây thơ: với mỗi từ, quét lại toàn bộ s bằng hai con trỏ. Đúng nhưng s bị đọc |words| lần → O(|words| × |s|), quá chậm với giới hạn của đề.", en: "The naive way: for each word, rescan all of s with two pointers. Correct, but s is read |words| times → O(|words| × |s|), too slow for the problem's limits." },
+      { vi: "Ý tưởng lật ngược: ở mỗi thời điểm, một từ chỉ quan tâm ĐÚNG MỘT ký tự — ký tự tiếp theo nó cần. Vậy hãy gửi từ đó vào 'danh sách chờ' của ký tự ấy, thay vì để nó tự đi tìm.", en: "The inside-out idea: at any moment a word cares about exactly ONE character — the next one it needs. So park the word in that character's 'waiting list' instead of letting it go hunting." },
+      { vi: "Quét s một lần. Đến ký tự c: lấy toàn bộ danh sách chờ của c, cho mỗi từ trong đó tiến 1 ký tự, rồi xếp lại nó vào danh sách của ký tự mới mà nó cần (hoặc đếm là match nếu đã hết từ).", en: "Walk s once. At character c: take c's whole waiting list, advance each word in it by one character, and re-park it under the new character it needs (or count it as matched if the word is finished)." },
+      { vi: "Phải DỌN SẠCH danh sách của c trước khi xử lý, vì một từ có thể được xếp lại vào chính c khi ký tự kế tiếp của nó cũng là c — nếu không sẽ xử lý nó hai lần trong cùng một bước.", en: "Empty c's list BEFORE processing it, because a word can be re-parked onto c itself when its next character is also c — otherwise it would be processed twice in the same step." },
+      { vi: "Mỗi lần đánh thức làm một từ tiến đúng 1 ký tự, nên tổng số lần đánh thức không vượt tổng độ dài words. Cộng với một lượt quét s, tổng chi phí là O(|s| + tổng độ dài words).", en: "Each wakeup advances one word by exactly one character, so the number of wakeups cannot exceed the total word length. Together with the single pass over s, the cost is O(|s| + total word length)." },
+      { vi: "Từ nào vẫn còn nằm trong một danh sách chờ khi s đã hết thì chính là từ không phải subsequence.", en: "Any word still sitting in a waiting list when s runs out is exactly a word that is not a subsequence." },
+    ],
+    complexity: {
+      time: "O(|s| + Σ|words[i]|)",
+      space: "O(Σ|words[i]|)",
+      note: {
+        vi: "Quét s một lượt là O(|s|); mỗi lần đánh thức đẩy một từ đi 1 ký tự nên tổng cộng bị chặn bởi Σ|words[i]|. Bộ nhớ là các danh sách chờ, mỗi từ chưa xong nằm ở đúng một danh sách. Cách 2 là O(|words| × |s|) thời gian, O(1) bộ nhớ.",
+        en: "The single pass over s is O(|s|); each wakeup pushes one word forward by one character, so the total is bounded by Σ|words[i]|. Memory is the waiting lists, where each unfinished word sits in exactly one. Approach 2 is O(|words| × |s|) time and O(1) space.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Danh sách chờ theo ký tự", en: "Approach 1 · Waiting lists per character" },
+    code: [
+      "class Solution:",
+      "    def numMatchingSubseq(self, s: str, words: List[str]) -> int:",
+      "        # buckets[c] holds words waiting for the character c",
+      "        buckets = defaultdict(list)",
+      "        for i, w in enumerate(words):",
+      "            buckets[w[0]].append((i, 0))",
+      "        matched = 0",
+      "        for c in s:",
+      "            waiting = buckets[c]",
+      "            buckets[c] = []          # empty it BEFORE processing",
+      "            for i, j in waiting:",
+      "                j += 1",
+      "                if j == len(words[i]):",
+      "                    matched += 1",
+      "                else:",
+      "                    buckets[words[i][j]].append((i, j))",
+      "        return matched",
+    ],
+    code2Label: { vi: "Cách 2 · Hai con trỏ cho từng từ", en: "Approach 2 · Two pointers per word" },
+    code2: [
+      "class Solution:",
+      "    def numMatchingSubseq(self, s: str, words: List[str]) -> int:",
+      "        matched = 0",
+      "        for w in words:",
+      "            i = 0",
+      "            for c in s:",
+      "                if i < len(w) and c == w[i]:",
+      "                    i += 1",
+      "            if i == len(w):",
+      "                matched += 1",
+      "        return matched",
+    ],
+    liveArgs(input, params = {}) {
+      const { s, words } = parse792Data(input, params);
+      return [s, words];
+    },
+    builder: buildSteps792,
+    builder2: buildSteps792TwoPointer,
+  },
+});
+
+// ─── 900: RLE Iterator ───
+// encoding is (count, value) pairs; next(n) exhausts n elements of the decoded
+// sequence and returns the last one exhausted, or -1 when it runs out.
+//
+// Both builders feed `rleIter900View`. Two things trip people up and both are
+// drawn explicitly: runs with count 0 contribute nothing and must be stepped over
+// (the [0, 9] in the classic example), and a call that runs out STILL consumes
+// whatever was left before returning -1 — the iterator is not rewound.
+
+const RLE900_LIMITS = { pairs: 8, count: 20, total: 60, queries: 8 };
+
+function parse900Data(input, params = {}) {
+  const raw = String(input ?? "").trim();
+  if (!raw) throw new Error("encoding must not be empty");
+  const flat = (raw.startsWith("[") ? JSON.parse(raw) : raw.split(/[,;|\s]+/).filter(Boolean)).map(Number);
+  if (!flat.length) throw new Error("encoding must not be empty");
+  if (!flat.every((x) => Number.isInteger(x) && x >= 0)) throw new Error("encoding must contain non-negative integers");
+  if (flat.length % 2 !== 0) throw new Error("encoding must have even length: it is (count, value) pairs");
+  const runs = [];
+  for (let k = 0; k < flat.length; k += 2) runs.push({ count: flat[k], value: flat[k + 1] });
+  if (runs.length > RLE900_LIMITS.pairs) throw new Error(`visualization supports at most ${RLE900_LIMITS.pairs} (count, value) pairs`);
+  if (!runs.every((r) => r.count <= RLE900_LIMITS.count)) throw new Error(`each count may be at most ${RLE900_LIMITS.count} so the decoded sequence stays drawable`);
+  const total = runs.reduce((t, r) => t + r.count, 0);
+  if (total > RLE900_LIMITS.total) throw new Error(`the decoded sequence may be at most ${RLE900_LIMITS.total} elements`);
+
+  const qRaw = String(params.queries ?? "").trim();
+  if (!qRaw) throw new Error("queries must not be empty");
+  const queries = (qRaw.startsWith("[") ? JSON.parse(qRaw) : qRaw.split(/[,;|\s]+/).filter(Boolean)).map(Number);
+  if (!queries.length) throw new Error("queries must not be empty");
+  if (!queries.every((x) => Number.isInteger(x) && x >= 1)) throw new Error("every next(n) needs n >= 1");
+  if (queries.length > RLE900_LIMITS.queries) throw new Error(`visualization supports at most ${RLE900_LIMITS.queries} next() calls`);
+  return { runs, queries, total };
+}
+
+// The decoded sequence, tagged with which run each element came from so the strip
+// can be coloured per run. Runs with count 0 simply contribute nothing.
+function rle900Expand(runs) {
+  const out = [];
+  runs.forEach((r, runIdx) => {
+    for (let k = 0; k < r.count; k++) out.push({ value: r.value, runIdx });
+  });
+  return out;
+}
+
+function rle900Base(runs, queries, total, approach) {
+  const steps = [];
+  const expanded = rle900Expand(runs);
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      rleIter900View: {
+        approach,
+        runs: runs.map((r) => ({ ...r })),          // the original encoding
+        total,
+        expanded: expanded.map((e) => ({ ...e })),
+        phase: o.phase,
+        remaining: o.remaining ? [...o.remaining] : null,
+        consumed: o.consumed === undefined ? null : o.consumed,
+        i: o.i === undefined ? null : o.i,
+        pref: o.pref ? [...o.pref] : null,
+        used: o.used === undefined ? null : o.used,
+        search: o.search || null,
+        queryIndex: o.queryIndex === undefined ? null : o.queryIndex,
+        n: o.n === undefined ? null : o.n,
+        nLeft: o.nLeft === undefined ? null : o.nLeft,
+        taken: o.taken || null,
+        queries: o.queries || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, expanded, snap };
+}
+
+// ── Approach 1: cursor over the runs, decrementing counts in place ───────────
+function buildSteps900(input, params = {}) {
+  const { runs, queries, total } = parse900Data(input, params);
+  const { steps, snap } = rle900Base(runs, queries, total, 1);
+  const remaining = runs.map((r) => r.count);
+  const results = [];
+  const qState = queries.map((n) => ({ n, result: null, status: "pending" }));
+  let cursor = 0;            // index of the current run
+  let consumed = 0;          // elements exhausted overall
+
+  const decoded = runs.flatMap((r) => Array(r.count).fill(r.value));
+
+  snap({
+    phase: "intro",
+    title: { vi: `encoding = ${runs.map((r) => `${r.count},${r.value}`).join(", ")}`, en: `encoding = ${runs.map((r) => `${r.count},${r.value}`).join(", ")}` },
+    note: {
+      vi: `Đây là các cặp (số lần, giá trị): ${runs.map((r) => `${r.count} lần số ${r.value}`).join(", ")}. Giải nén ra dãy [${decoded.join(", ")}] gồm ${total} phần tử. Chú ý ${runs.some((r) => r.count === 0) ? `cặp có số lần = 0 (${runs.filter((r) => r.count === 0).map((r) => `${r.count},${r.value}`).join("; ")}) KHÔNG góp phần tử nào, phải bước qua` : "không có cặp nào số lần = 0 trong input này, nhưng nếu có thì phải bước qua vì nó không góp phần tử nào"}. Thực tế đề cho số lần tới 10⁹ nên không bao giờ giải nén thật — ta chỉ đi trên các cặp.`,
+      en: `These are (count, value) pairs: ${runs.map((r) => `${r.count} × ${r.value}`).join(", ")}. Decoded that is [${decoded.join(", ")}], ${total} elements. Note ${runs.some((r) => r.count === 0) ? `a pair with count 0 (${runs.filter((r) => r.count === 0).map((r) => `${r.count},${r.value}`).join("; ")}) contributes NOTHING and must be stepped over` : "this input has no zero-count pair, but one would contribute nothing and would have to be stepped over"}. In the real problem counts go up to 10⁹, so the sequence is never actually expanded — we only walk the pairs.`,
+    },
+    codeLines: [2, 3, 4],
+    remaining, consumed: 0, i: 0,
+    queries: qState,
+    decision: { vi: `Dãy giải nén có ${total} phần tử; con trỏ i = 0.`, en: `The decoded sequence has ${total} elements; cursor i = 0.` },
+    vars: [{ name: "pairs", value: runs.length }, { name: "total elements", value: total }],
+  });
+
+  queries.forEach((n, qi) => {
+    qState[qi].status = "current";
+    let need = n;
+    const taken = [];
+
+    snap({
+      phase: "call",
+      title: { vi: `next(${n})`, en: `next(${n})` },
+      note: {
+        vi: `Cần tiêu thụ ${n} phần tử tiếp theo và trả về phần tử CUỐI CÙNG trong số đó. Con trỏ đang ở cặp ${cursor}${cursor < runs.length ? ` (còn ${remaining[cursor]} lần số ${runs[cursor].value})` : " (đã hết cặp)"}. Còn ${total - consumed}/${total} phần tử chưa dùng.`,
+        en: `We must exhaust the next ${n} elements and return the LAST of them. The cursor sits on pair ${cursor}${cursor < runs.length ? ` (${remaining[cursor]} × ${runs[cursor].value} left)` : " (past the last pair)"}. ${total - consumed}/${total} elements remain unused.`,
+      },
+      codeLines: [6, 7],
+      remaining, consumed, i: cursor,
+      queryIndex: qi, n, nLeft: need,
+      queries: qState,
+      decision: { vi: `Cần ${n} phần tử, còn ${total - consumed}.`, en: `Needs ${n}, ${total - consumed} remain.` },
+      vars: [{ name: "n", value: n }, { name: "i", value: cursor }, { name: "remaining total", value: total - consumed }],
+    });
+
+    let result = -1;
+    while (cursor < runs.length) {
+      if (remaining[cursor] >= need && remaining[cursor] > 0) {
+        remaining[cursor] -= need;
+        consumed += need;
+        taken.push({ runIdx: cursor, amount: need });
+        result = runs[cursor].value;
+        snap({
+          phase: "hit",
+          title: { vi: `Cặp ${cursor} còn đủ (${remaining[cursor] + need} ≥ ${need}) → trả ${result}`, en: `Pair ${cursor} has enough (${remaining[cursor] + need} ≥ ${need}) → return ${result}` },
+          note: {
+            vi: `Lấy ${need} phần tử từ cặp ${cursor}, số lần còn lại giảm ${remaining[cursor] + need} → ${remaining[cursor]}. Con trỏ i KHÔNG dịch: cặp này còn ${remaining[cursor]} phần tử cho lần gọi sau. Phần tử cuối cùng bị tiêu thụ mang giá trị ${result}, đó là kết quả.`,
+            en: `Take ${need} elements from pair ${cursor}, dropping its count ${remaining[cursor] + need} → ${remaining[cursor]}. The cursor does NOT move: this pair still holds ${remaining[cursor]} elements for later calls. The last element exhausted has value ${result}, which is the answer.`,
+          },
+          codeLines: [8, 9, 10],
+          remaining, consumed, i: cursor,
+          queryIndex: qi, n, nLeft: 0, taken,
+          queries: qState,
+          decision: { vi: `next(${n}) = ${result}.`, en: `next(${n}) = ${result}.` },
+          vars: [
+            { name: `enc[${cursor * 2}]`, value: `${remaining[cursor] + need} → ${remaining[cursor]}` },
+            { name: "return", value: result },
+          ],
+        });
+        break;
+      }
+
+      // this run cannot cover the request: swallow all of it and step past
+      const at = cursor;
+      const had = remaining[at];
+      if (had > 0) { taken.push({ runIdx: at, amount: had }); consumed += had; }
+      need -= had;
+      remaining[at] = 0;
+      // Three genuinely different reasons to step past a pair, worth naming
+      // separately: it was empty from the start, it was drained by an earlier
+      // call, or it has some elements but not enough for this request.
+      const kind = runs[at].count === 0 ? "empty" : had === 0 ? "drained" : "partial";
+      cursor += 1;              // the Python code writes i += 2 over the flat array
+      snap({
+        phase: kind === "partial" ? "swallow" : "skipEmpty",
+        title: kind === "empty"
+          ? { vi: `Cặp ${at} có số lần 0 → bước qua`, en: `Pair ${at} has count 0 → step over it` }
+          : kind === "drained"
+            ? { vi: `Cặp ${at} đã dùng hết từ trước → bước qua`, en: `Pair ${at} was already used up → step over it` }
+            : { vi: `Cặp ${at} chỉ còn ${had} < ${had + need} → lấy hết rồi đi tiếp`, en: `Pair ${at} only has ${had} < ${had + need} → take it all and move on` },
+        note: kind === "empty"
+          ? {
+            vi: `Cặp này là "${runs[at].count} lần số ${runs[at].value}", tức không có phần tử nào ngay từ đầu. Nó không đóng góp gì cho dãy giải nén nên chỉ việc bỏ qua — đây chính là cái bẫy của bài: nếu quên xử lý thì sẽ trả về ${runs[at].value} một cách sai lầm. Vẫn còn cần ${need} phần tử.`,
+            en: `This pair is "${runs[at].count} × ${runs[at].value}", i.e. no elements at all from the start. It contributes nothing to the decoded sequence so it is simply skipped — this is the trap of the problem: miss it and you would wrongly return ${runs[at].value}. Still ${need} elements needed.`,
+          }
+          : kind === "drained"
+            ? {
+              vi: `Cặp ${at} vốn có ${runs[at].count} lần số ${runs[at].value}, nhưng đã bị các lần gọi trước lấy hết nên số lần còn lại là 0. Bỏ qua, vẫn cần ${need} phần tử. Con trỏ i chỉ đi một chiều nên mỗi cặp bị bước qua nhiều nhất một lần trong cả vòng đời của iterator — đó là lý do tổng chi phí không phụ thuộc số lần gọi nhân số cặp.`,
+              en: `Pair ${at} originally held ${runs[at].count} × ${runs[at].value}, but earlier calls drained it so its count is now 0. Skip it; ${need} elements are still needed. The cursor only ever moves forward, so each pair is stepped over at most once across the iterator's whole lifetime — which is why the total cost is not calls × pairs.`,
+            }
+            : {
+              vi: `Cặp ${at} chỉ còn ${had} phần tử, không đủ. Lấy hết ${had} phần tử đó (số lần về 0), trừ vào yêu cầu còn ${need}, rồi dịch con trỏ sang cặp ${cursor}. Chú ý ${had} phần tử này ĐÃ BỊ TIÊU THỤ — dù lát nữa có phải trả -1 thì chúng cũng không quay lại được.`,
+              en: `Pair ${at} only holds ${had} elements, not enough. Take all ${had} of them (count drops to 0), subtract them from the request leaving ${need}, and move the cursor to pair ${cursor}. Note those ${had} elements ARE consumed — even if this call ends up returning -1 they do not come back.`,
+            },
+        codeLines: [11, 12, 13],
+        remaining, consumed, i: cursor,
+        queryIndex: qi, n, nLeft: need, taken,
+        queries: qState,
+        decision: kind === "partial"
+          ? { vi: `Lấy ${had}, còn cần ${need}.`, en: `Took ${had}, still need ${need}.` }
+          : { vi: `Bỏ qua cặp rỗng, vẫn cần ${need}.`, en: `Skipped an empty pair, still need ${need}.` },
+        vars: [{ name: "n còn lại / n left", value: need }, { name: "i", value: cursor }],
+      });
+    }
+
+    if (result === -1) {
+      snap({
+        phase: "exhausted",
+        title: { vi: `Hết cặp → next(${n}) = -1`, en: `Ran out of pairs → next(${n}) = -1` },
+        note: {
+          vi: `Con trỏ đã đi qua hết ${runs.length} cặp mà vẫn còn cần ${need} phần tử. Theo đề, khi không còn phần tử để tiêu thụ thì trả -1. Điểm quan trọng: ${taken.reduce((t, x) => t + x.amount, 0)} phần tử lấy được trước khi hết VẪN bị tiêu thụ — iterator không được quay lui. Vì thế mọi lần gọi sau cũng sẽ trả -1.`,
+          en: `The cursor walked past all ${runs.length} pairs while still needing ${need} elements. The problem says to return -1 when there is nothing left to exhaust. The important part: the ${taken.reduce((t, x) => t + x.amount, 0)} element(s) taken before running out ARE still consumed — the iterator does not rewind. So every later call returns -1 too.`,
+        },
+        codeLines: [7, 14],
+        remaining, consumed, i: cursor,
+        queryIndex: qi, n, nLeft: need, taken,
+        queries: qState,
+        decision: { vi: `next(${n}) = -1, đã tiêu thụ hết dãy.`, en: `next(${n}) = -1, the sequence is now exhausted.` },
+        vars: [{ name: "n còn thiếu / still needed", value: need }, { name: "return", value: -1 }],
+      });
+    }
+
+    results.push(result);
+    qState[qi] = { n, result, status: "done" };
+  });
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Results: [${results.join(", ")}]` },
+    note: {
+      vi: `Đã tiêu thụ ${consumed}/${total} phần tử qua ${queries.length} lần gọi. Toàn bộ chi phí chỉ là con trỏ i đi một chiều qua các cặp, nên tổng thời gian cho mọi lần gọi là O(số cặp + số lần gọi) — không phụ thuộc vào giá trị n hay số lần lặp, đó là lý do cách này chịu được count và n tới 10⁹.`,
+      en: `${consumed}/${total} elements were exhausted across ${queries.length} calls. The only cost is the cursor i moving forward through the pairs, so the total across all calls is O(pairs + calls) — independent of how large n or the counts are, which is what makes counts and n up to 10⁹ fine.`,
+    },
+    codeLines: [14],
+    final: true,
+    remaining, consumed, i: cursor,
+    queries: qState, answer: results.join(", "),
+    decision: { vi: `[${results.join(", ")}]`, en: `[${results.join(", ")}]` },
+    vars: [{ name: "results", value: `[${results.join(", ")}]` }, { name: "consumed", value: `${consumed}/${total}` }],
+  });
+
+  return { input, answer: results, steps };
+}
+
+// ── Approach 2: prefix sums + binary search, nothing mutated ─────────────────
+function buildSteps900Prefix(input, params = {}) {
+  const { runs, queries, total } = parse900Data(input, params);
+  const { steps, snap } = rle900Base(runs, queries, total, 2);
+  const vals = runs.map((r) => r.value);
+  const pref = [0];
+  for (const r of runs) pref.push(pref[pref.length - 1] + r.count);
+  const results = [];
+  const qState = queries.map((n) => ({ n, result: null, status: "pending" }));
+  let used = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: tiền tố cộng dồn + tìm nhị phân`, en: `Approach 2: prefix sums + binary search` },
+    note: {
+      vi: `Thay vì sửa các count, hãy tính trước tiền tố cộng dồn pref = [${pref.join(", ")}]: pref[k] là tổng số phần tử của k cặp đầu. Chỉ cần giữ một biến used = đã tiêu thụ bao nhiêu phần tử. Khi gọi next(n): used += n, rồi tìm cặp CHỨA phần tử thứ used — đó là cặp đầu tiên có pref ≥ used. Không sửa dữ liệu gốc, mỗi lần gọi mất O(log số cặp).`,
+      en: `Instead of mutating counts, precompute the prefix sums pref = [${pref.join(", ")}]: pref[k] is how many elements the first k pairs hold. Then keep just one number, used = how many elements have been exhausted. On next(n): used += n, then find the pair CONTAINING element number used — the first pair whose prefix is ≥ used. Nothing is mutated and each call costs O(log pairs).`,
+    },
+    codeLines: [4, 5, 6, 7, 8, 9],
+    pref, used: 0, consumed: 0,
+    queries: qState,
+    decision: { vi: `pref có ${pref.length} mốc, tổng ${total} phần tử.`, en: `pref has ${pref.length} marks, ${total} elements in total.` },
+    vars: [{ name: "vals", value: vals.join(", ") }, { name: "pref", value: pref.join(", ") }],
+  });
+
+  queries.forEach((n, qi) => {
+    used += n;
+    const over = used > total;
+    let k = null;
+    let result = -1;
+    if (!over) {
+      // first index with pref[k] >= used; bisect_left skips the flat stretches
+      // that zero-count runs create, which is exactly why it never returns a
+      // value from a run of length 0
+      k = pref.findIndex((v) => v >= used);
+      result = vals[k - 1];
+    }
+    results.push(result);
+    qState[qi] = { n, result, status: "done" };
+
+    snap({
+      phase: over ? "exhausted" : "hit",
+      title: over
+        ? { vi: `next(${n}): used = ${used} > ${total} → -1`, en: `next(${n}): used = ${used} > ${total} → -1` }
+        : { vi: `next(${n}): used = ${used} → cặp ${k - 1}, trả ${result}`, en: `next(${n}): used = ${used} → pair ${k - 1}, return ${result}` },
+      note: over
+        ? {
+          vi: `Cộng n vào used được ${used}, vượt tổng ${total} phần tử của dãy, nên không đủ để tiêu thụ → trả -1. Chú ý used VẪN được cộng lên ${used} và không bị hoàn lại, đúng như cách 1 đã tiêu thụ nốt phần còn lại — nên mọi lần gọi sau cũng sẽ vượt và cũng trả -1.`,
+          en: `Adding n makes used = ${used}, past the sequence's ${total} elements, so there is not enough to exhaust → return -1. Note used is still advanced to ${used} and never rolled back, mirroring approach 1 consuming whatever was left — so every later call overshoots too and also returns -1.`,
+        }
+        : {
+          vi: `Phần tử thứ ${used} của dãy nằm trong cặp nào? Tìm mốc tiền tố đầu tiên ≥ ${used}: pref[${k}] = ${pref[k]}. Vậy phần tử đó thuộc cặp ${k - 1}, giá trị ${result}. Dùng "mốc ĐẦU TIÊN ≥ used" là quan trọng: cặp có count 0 làm tiền tố lặp lại giá trị, và cách chọn này luôn bỏ qua chúng nên không bao giờ trả về giá trị của một cặp rỗng.`,
+          en: `Which pair holds element number ${used}? Find the first prefix mark ≥ ${used}: pref[${k}] = ${pref[k]}. So that element lives in pair ${k - 1}, with value ${result}. Taking the FIRST mark ≥ used matters: a zero-count pair makes the prefix repeat a value, and this choice always steps past such pairs, so it never returns the value of an empty pair.`,
+        },
+      codeLines: over ? [12, 13, 14] : [12, 15, 16],
+      pref, used, consumed: Math.min(used, total),
+      search: over ? null : { used, k, prefAt: pref[k], runIdx: k - 1 },
+      queryIndex: qi, n,
+      queries: qState,
+      decision: over
+        ? { vi: `used ${used} > ${total} → -1.`, en: `used ${used} > ${total} → -1.` }
+        : { vi: `Phần tử thứ ${used} thuộc cặp ${k - 1} → ${result}.`, en: `Element ${used} is in pair ${k - 1} → ${result}.` },
+      vars: [
+        { name: "used", value: used },
+        { name: "pref[-1]", value: total },
+        ...(over ? [] : [{ name: "k", value: k }, { name: "vals[k-1]", value: result }]),
+      ],
+    });
+  });
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Results: [${results.join(", ")}]` },
+    note: {
+      vi: `Cùng kết quả với cách 1. Khác biệt: mảng encoding không bị sửa một chữ nào, và mỗi lần gọi chỉ mất O(log ${runs.length}) thay vì phải đi bộ qua các cặp. Bù lại phải dựng trước mảng pref, tốn O(số cặp) bộ nhớ.`,
+      en: `Same results as approach 1. The difference: the encoding array is never modified, and each call costs O(log ${runs.length}) instead of walking the pairs. The price is building pref up front, at O(pairs) memory.`,
+    },
+    codeLines: [16],
+    final: true,
+    pref, used, consumed: Math.min(used, total),
+    queries: qState, answer: results.join(", "),
+    decision: { vi: `[${results.join(", ")}]`, en: `[${results.join(", ")}]` },
+    vars: [{ name: "results", value: `[${results.join(", ")}]` }, { name: "used", value: used }],
+  });
+
+  return { input, answer: results, steps };
+}
+
+Object.assign(module.exports, {
+  900: {
+    id: 900,
+    difficulty: "medium",
+    slug: "rle-iterator",
+    category: { key: "stack-queue", vi: "Stack & Queue", en: "Stack & Queue" },
+    tags: [
+      { key: "design", vi: "Thiết kế", en: "Design" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+      { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    ],
+    title: { vi: "RLE Iterator", en: "RLE Iterator" },
+    titleVi: { vi: "Iterator trên dãy nén RLE", en: "Iterator over a run-length encoded sequence" },
+    statement: {
+      vi: "encoding là các cặp (số lần, giá trị): với mọi i chẵn, encoding[i] là số lần giá trị encoding[i+1] được lặp. Hiện thực next(n): tiêu thụ n phần tử tiếp theo của dãy giải nén và trả về phần tử CUỐI CÙNG vừa tiêu thụ; nếu không còn đủ phần tử thì trả -1 (phần đã lấy được vẫn bị tiêu thụ).",
+      en: "encoding holds (count, value) pairs: for every even i, encoding[i] is how many times encoding[i+1] repeats. Implement next(n): exhaust the next n elements of the decoded sequence and return the LAST one exhausted; if there is not enough left, return -1 (whatever was taken is still consumed).",
+    },
+    defaultInput: "3,8,0,9,2,5",
+    inputKind: "string",
+    inputLabel: { vi: "encoding: các cặp số lần,giá trị (độ dài chẵn)", en: "encoding: count,value pairs (even length)" },
+    extraParams: [
+      { key: "queries", type: "string", label: { vi: "các lần gọi next(n), phẩy ngăn cách", en: "the next(n) calls, comma separated" }, default: "2,1,1,2" },
+    ],
+    approach: [
+      { vi: "Không bao giờ giải nén dãy: đề cho số lần tới 10⁹. Chỉ giữ con trỏ i trỏ vào cặp hiện tại và số lần còn lại của cặp đó.", en: "Never expand the sequence: counts go up to 10⁹. Just keep a cursor i on the current pair plus how much of that pair is left." },
+      { vi: "next(n): nếu cặp hiện tại còn ≥ n thì trừ n vào số lần của nó rồi trả về giá trị của cặp — con trỏ KHÔNG dịch, vì cặp còn phần tử cho lần gọi sau.", en: "next(n): if the current pair has ≥ n left, subtract n from its count and return the pair's value — the cursor does NOT move, since the pair still has elements for later calls." },
+      { vi: "Nếu không đủ: lấy hết phần còn lại của cặp, trừ vào n, đặt số lần về 0 rồi dịch con trỏ sang cặp kế tiếp. Lặp lại cho tới khi đủ hoặc hết cặp.", en: "If not enough: take all that remains of the pair, subtract it from n, zero the count and move the cursor to the next pair. Repeat until satisfied or out of pairs." },
+      { vi: "Cặp có số lần = 0 không góp phần tử nào nên bị bước qua tự nhiên bởi cùng vòng lặp đó. Đây là cái bẫy của bài: quên xử lý sẽ trả về giá trị của một cặp rỗng.", en: "A pair with count 0 contributes no elements and is stepped over naturally by that same loop. This is the trap of the problem: miss it and you return the value of an empty pair." },
+      { vi: "Khi hết cặp mà vẫn còn thiếu thì trả -1, NHƯNG phần đã lấy được vẫn bị tiêu thụ — iterator không quay lui, nên các lần gọi sau cũng trả -1.", en: "When the pairs run out while still short, return -1, BUT whatever was taken stays consumed — the iterator does not rewind, so later calls also return -1." },
+      { vi: "Con trỏ i chỉ đi một chiều, nên tổng chi phí cho mọi lần gọi là O(số cặp + số lần gọi), không phụ thuộc n.", en: "The cursor only moves forward, so the total cost across all calls is O(pairs + calls), independent of n." },
+      { vi: "Cách 2 không sửa dữ liệu: dựng tiền tố cộng dồn rồi mỗi next(n) chỉ cộng n vào biến used và tìm nhị phân cặp đầu tiên có tiền tố ≥ used — O(log số cặp) mỗi lần gọi.", en: "Approach 2 mutates nothing: build prefix sums, then each next(n) just adds n to a used counter and binary-searches the first pair whose prefix is ≥ used — O(log pairs) per call." },
+    ],
+    complexity: {
+      time: "O(p + q)",
+      space: "O(1)",
+      note: {
+        vi: "Cách 1: với p cặp và q lần gọi, con trỏ đi qua mỗi cặp nhiều nhất một lần trên toàn bộ vòng đời nên tổng là O(p + q); bộ nhớ thêm O(1) (sửa ngay trên mảng encoding). Cách 2: O(p) dựng tiền tố, O(log p) mỗi lần gọi, O(p) bộ nhớ, không sửa input.",
+        en: "Approach 1: with p pairs and q calls, the cursor passes each pair at most once over the whole lifetime, so the total is O(p + q); extra space is O(1) since it edits the encoding in place. Approach 2: O(p) to build the prefix array, O(log p) per call, O(p) space, and the input is untouched.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Con trỏ + trừ tại chỗ", en: "Approach 1 · Cursor + decrement in place" },
+    code: [
+      "class RLEIterator:",
+      "    def __init__(self, encoding: List[int]):",
+      "        self.enc = encoding",
+      "        self.i = 0                       # index of the current count",
+      "",
+      "    def next(self, n: int) -> int:",
+      "        while self.i < len(self.enc):",
+      "            if self.enc[self.i] >= n:",
+      "                self.enc[self.i] -= n    # this run covers the request",
+      "                return self.enc[self.i + 1]",
+      "            n -= self.enc[self.i]        # swallow the whole run",
+      "            self.enc[self.i] = 0",
+      "            self.i += 2",
+      "        return -1",
+    ],
+    code2Label: { vi: "Cách 2 · Tiền tố cộng dồn + tìm nhị phân", en: "Approach 2 · Prefix sums + binary search" },
+    code2: [
+      "from bisect import bisect_left",
+      "",
+      "class RLEIterator:",
+      "    def __init__(self, encoding: List[int]):",
+      "        self.vals = encoding[1::2]",
+      "        self.pref = [0]                  # cumulative counts",
+      "        for c in encoding[0::2]:",
+      "            self.pref.append(self.pref[-1] + c)",
+      "        self.used = 0                    # elements exhausted so far",
+      "",
+      "    def next(self, n: int) -> int:",
+      "        self.used += n",
+      "        if self.used > self.pref[-1]:",
+      "            return -1",
+      "        k = bisect_left(self.pref, self.used)",
+      "        return self.vals[k - 1]",
+    ],
+    liveArgs(input, params = {}) {
+      const { runs, queries } = parse900Data(input, params);
+      return [runs.flatMap((r) => [r.count, r.value]), queries];
+    },
+    builder: buildSteps900,
+    builder2: buildSteps900Prefix,
+  },
+});
