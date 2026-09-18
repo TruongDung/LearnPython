@@ -3790,28 +3790,235 @@ function buildSteps1123(input) {
 }
 
 // ─── 366: Find Leaves of Binary Tree ───
-function buildSteps366(input) {
-  const root = parseTree(input); const steps = []; const groups = [];
-  steps.push(snapshot(root, {
-    title: { vi: "Lần lượt gỡ lá", en: "Repeatedly remove leaves" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "height = 1 + max(left, right)" }],
-    note: { vi: `Mỗi nút thuộc nhóm = CHIỀU CAO của nó từ dưới lên (lá = 0). Gỡ lá vòng 0, rồi lá mới vòng 1... height(node) = 1 + max(height con).`, en: `Each node belongs to a group = its HEIGHT from the bottom (leaf = 0). Remove round-0 leaves, then new leaves round 1... height(node) = 1 + max(child heights).` },
+// Collect the leaves, remove them, repeat. The naive reading is to literally strip
+// leaves round after round; the good answer is that a node's ROUND NUMBER is
+// exactly its HEIGHT measured from the leaves, so one postorder pass produces
+// every group at once.
+//
+// Both builders feed `leaves366View`. Node positions are taken from the shared
+// `snapshot` layout rather than recomputed, so the tree drawing stays consistent
+// with every other tree problem in the app.
+
+const LV366_LIMITS = { nodes: 20, depth: 5 };
+
+function lv366Layout(root) {
+  // snapshot() already assigns a non-overlapping (x, y) grid position per node.
+  const laid = snapshot(root, {}).tree.nodes;
+  const byId = new Map(laid.map((nd) => [nd.id, nd]));
+  const nodes = laid.map((nd) => ({
+    id: nd.id,
+    val: Number(nd.label),
+    x: nd.x,
+    y: nd.y,
+    parentId: nd.parentId === undefined ? null : nd.parentId,
   }));
-  const nodesByGroup = [];
-  function dfs(node) {
+  const cols = Math.max(...nodes.map((nd) => nd.x)) + 1;
+  const rows = Math.max(...nodes.map((nd) => nd.y)) + 1;
+  if (nodes.length > LV366_LIMITS.nodes) throw new Error(`visualization supports at most ${LV366_LIMITS.nodes} nodes`);
+  if (rows > LV366_LIMITS.depth) throw new Error(`visualization supports a depth of at most ${LV366_LIMITS.depth}`);
+  return { nodes, cols, rows, byId };
+}
+
+function lv366Base(root, approach) {
+  const { nodes, cols, rows } = lv366Layout(root);
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      leaves366View: {
+        approach,
+        nodes: nodes.map((nd) => ({ ...nd })),
+        cols, rows,
+        phase: o.phase,
+        heights: o.heights ? { ...o.heights } : null,
+        resolved: o.resolved ? [...o.resolved] : null,
+        removed: o.removed ? [...o.removed] : null,
+        cur: o.cur || null,
+        stack: o.stack ? [...o.stack] : null,
+        groups: o.groups ? o.groups.map((g) => [...g]) : null,
+        roundIds: o.roundIds ? [...o.roundIds] : null,
+        round: o.round === undefined ? null : o.round,
+        counters: o.counters || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
+    });
+  }
+  return { steps, nodes, snap };
+}
+
+// ── Approach 1: one postorder pass, group = height from the leaves ───────────
+function buildSteps366(input) {
+  const root = parseTree(input);
+  if (!root) throw new Error("the tree must have at least one node");
+  const { steps, nodes, snap } = lv366Base(root, 1);
+  const heights = {};
+  const resolved = [];
+  const groups = [];
+  let visits = 0;
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cây ${nodes.length} nút — nhóm của một nút = chiều cao tính từ lá`, en: `A ${nodes.length}-node tree — a node's group = its height from the leaves` },
+    note: {
+      vi: `Đề nói: gom hết lá, gỡ lá, lặp lại. Làm đúng theo lời thì phải quét cây nhiều vòng. Nhưng hãy để ý một nút bị gỡ ở vòng nào: một lá bị gỡ ngay vòng 0; một nút chỉ thành lá sau khi CON SÂU NHẤT của nó đã bị gỡ hết, nên nó ra đi ở vòng (chiều cao của nó tính từ lá). Vậy vòng của mỗi nút chính là h(nút) = 1 + max(h(con)), với h(null) = −1 để lá ra đúng 0. Một lượt postorder là đủ: cứ tính xong h của một nút thì đẩy giá trị nó vào nhóm thứ h.`,
+      en: `The statement says: collect the leaves, remove them, repeat — which literally means scanning the tree many times. But look at WHEN a node is removed: a leaf goes in round 0, and a non-leaf only becomes a leaf once its DEEPEST descendant is gone, so it leaves in round (its height above the leaves). So a node's round is exactly h(node) = 1 + max(h(children)), with h(null) = −1 so leaves come out as 0. One postorder pass suffices: as soon as a node's h is known, append its value to group h.`,
+    },
+    codeLines: [2, 3],
+    heights, resolved, groups,
+    counters: { visits: 0, nodes: nodes.length, passes: 1 },
+    decision: { vi: "Vòng gỡ của một nút = chiều cao của nó từ lá.", en: "A node's removal round = its height above the leaves." },
+    vars: [{ name: "nodes", value: nodes.length }, { name: "rule", value: "h = 1 + max(h(left), h(right))" }],
+  });
+
+  // Postorder: children first, so both child heights are known before the parent.
+  const stack = [];
+  (function dfs(node) {
     if (!node) return -1;
-    const h = 1 + Math.max(dfs(node.left), dfs(node.right));
-    if (!groups[h]) { groups[h] = []; nodesByGroup[h] = []; }
-    groups[h].push(node.val); nodesByGroup[h].push(node.id);
+    stack.push(node.id);
+    const lh = dfs(node.left);
+    const rh = dfs(node.right);
+    const h = 1 + Math.max(lh, rh);
+    visits += 1;
+    heights[node.id] = h;
+    resolved.push(node.id);
+    if (!groups[h]) groups[h] = [];
+    groups[h].push(node.val);
+    stack.pop();
+
+    const isLeaf = !node.left && !node.right;
+    snap({
+      phase: "visit",
+      title: {
+        vi: `h(${node.val}) = 1 + max(${lh}, ${rh}) = ${h} → nhóm ${h}`,
+        en: `h(${node.val}) = 1 + max(${lh}, ${rh}) = ${h} → group ${h}`,
+      },
+      note: {
+        vi: `${isLeaf
+          ? `${node.val} là lá: cả hai con là null nên h = 1 + max(−1, −1) = 0. Đó là lý do dùng −1 cho null — để lá ra đúng nhóm 0.`
+          : `Hai con của ${node.val} đã tính xong trước (postorder), với chiều cao ${lh} và ${rh}. Lấy max rồi cộng 1: ${node.val} chỉ thành lá sau khi nhánh sâu hơn bị gỡ sạch, nên nó ra ở vòng ${h}.`} Đẩy ${node.val} vào nhóm ${h}. Chú ý các nút CÙNG chiều cao đều ra cùng một vòng dù nằm ở nhánh khác nhau — đó là lý do một nhóm có thể chứa các nút ở độ sâu khác nhau.`,
+        en: `${isLeaf
+          ? `${node.val} is a leaf: both children are null so h = 1 + max(−1, −1) = 0. That is why null returns −1 — it puts leaves in group 0 exactly.`
+          : `Both children of ${node.val} were finished first (postorder), with heights ${lh} and ${rh}. Take the max and add one: ${node.val} only becomes a leaf once the deeper branch has been stripped away, so it leaves in round ${h}.`} Append ${node.val} to group ${h}. Note nodes with the SAME height leave in the same round even from different branches — which is why one group can hold nodes at different depths.`,
+      },
+      codeLines: isLeaf ? [4, 5, 6, 7, 10, 11] : [4, 7, 8, 9, 10, 11],
+      heights, resolved, groups,
+      cur: { id: node.id, val: node.val, leftH: lh, rightH: rh, h, isLeaf },
+      stack,
+      counters: { visits, nodes: nodes.length, passes: 1 },
+      decision: { vi: `${node.val} → nhóm ${h}.`, en: `${node.val} → group ${h}.` },
+      vars: [
+        { name: "node", value: node.val },
+        { name: "h(left), h(right)", value: `${lh}, ${rh}` },
+        { name: "h", value: h },
+        { name: "res", value: JSON.stringify(groups) },
+      ],
+    });
     return h;
+  })(root);
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: ${JSON.stringify(groups)}`, en: `Result: ${JSON.stringify(groups)}` },
+    note: {
+      vi: `Đúng ${visits} lần thăm nút trong MỘT lượt duyệt — bằng số nút, nên O(n). Không hề gỡ nút nào, không quét lại lần nào: mọi nhóm sinh ra cùng lúc từ chiều cao. Số nhóm = chiều cao của cây + 1 = ${groups.length}.`,
+      en: `Exactly ${visits} node visits in ONE traversal — equal to the node count, so O(n). Nothing is ever removed and nothing is rescanned: every group falls out of the heights at once. The number of groups is the tree's height + 1 = ${groups.length}.`,
+    },
+    codeLines: [12, 13],
+    final: true,
+    heights, resolved, groups, answer: JSON.stringify(groups),
+    counters: { visits, nodes: nodes.length, passes: 1 },
+    decision: { vi: `${groups.length} nhóm, ${visits} lần thăm, 1 lượt duyệt.`, en: `${groups.length} groups, ${visits} visits, 1 traversal.` },
+    vars: [{ name: "answer", value: JSON.stringify(groups) }, { name: "visits", value: visits }],
+  });
+
+  return { input, answer: JSON.stringify(groups), steps };
+}
+
+// ── Approach 2: do what the statement literally says — strip leaves in rounds ─
+function buildSteps366Strip(input) {
+  const root = parseTree(input);
+  if (!root) throw new Error("the tree must have at least one node");
+  const { steps, nodes, snap } = lv366Base(root, 2);
+  const removed = [];
+  const groups = [];
+  let visits = 0;
+  let passes = 0;
+
+  // Work on a mutable copy so the original layout ids stay valid for drawing.
+  const clone = (node) => (node ? { id: node.id, val: node.val, left: clone(node.left), right: clone(node.right) } : null);
+  let live = clone(root);
+
+  snap({
+    phase: "intro",
+    title: { vi: `Cách 2: làm đúng như đề — gỡ lá từng vòng`, en: `Approach 2: do exactly what the statement says — strip leaves in rounds` },
+    note: {
+      vi: `Mỗi vòng: duyệt cây, tìm mọi lá HIỆN TẠI, ghi lại rồi cắt chúng khỏi cây. Lặp tới khi cây rỗng. Cách này đúng và dễ tin, nhưng mỗi vòng phải duyệt lại phần cây còn sống, nên số lần thăm nút là O(n·h) chứ không phải O(n). So bộ đếm ở dưới với cách 1 sẽ thấy chênh lệch.`,
+      en: `Each round: walk the tree, find every CURRENT leaf, record it, then cut those leaves off. Repeat until the tree is empty. This is correct and easy to trust, but every round re-walks whatever is still alive, so the node-visit count is O(n·h) rather than O(n). Compare the counters below with approach 1.`,
+    },
+    codeLines: [2, 3],
+    removed, groups, round: null,
+    counters: { visits: 0, nodes: nodes.length, passes: 0 },
+    decision: { vi: "Đúng nhưng phải quét cây nhiều lần.", en: "Correct, but it rescans the tree many times." },
+    vars: [{ name: "nodes", value: nodes.length }],
+  });
+
+  while (live) {
+    const roundLeaves = [];
+    const roundIds = [];
+    passes += 1;
+    const strip = (node) => {
+      if (!node) return null;
+      visits += 1;
+      if (!node.left && !node.right) { roundLeaves.push(node.val); roundIds.push(node.id); return null; }
+      node.left = strip(node.left);
+      node.right = strip(node.right);
+      return node;
+    };
+    live = strip(live);
+    groups.push(roundLeaves);
+    roundIds.forEach((id) => removed.push(id));
+
+    snap({
+      phase: "round",
+      title: { vi: `Vòng ${passes - 1}: gỡ [${roundLeaves.join(", ")}]`, en: `Round ${passes - 1}: strip [${roundLeaves.join(", ")}]` },
+      note: {
+        vi: `Duyệt hết phần cây còn sống và cắt ${roundLeaves.length} lá: ${roundLeaves.join(", ")}. Các nút này bị gỡ CÙNG LÚC nên chúng tạo thành một nhóm, kể cả khi nằm ở độ sâu khác nhau. ${live ? `Cây còn ${nodes.length - removed.length} nút; việc cắt đi vừa tạo ra lứa lá mới cho vòng sau.` : "Cây đã rỗng, dừng."} Riêng vòng này đã thăm ${visits} nút tính từ đầu.`,
+        en: `Walked everything still alive and cut ${roundLeaves.length} leaf/leaves: ${roundLeaves.join(", ")}. They are removed AT THE SAME TIME so they form one group, even when they sit at different depths. ${live ? `${nodes.length - removed.length} nodes remain; cutting these just created the next crop of leaves.` : "The tree is empty, so we stop."} ${visits} node visits so far.`,
+      },
+      codeLines: live ? [4, 5, 6, 7, 13, 14, 15] : [4, 7, 8],
+      removed, groups, round: passes - 1, roundIds,
+      counters: { visits, nodes: nodes.length, passes },
+      decision: { vi: `Nhóm ${passes - 1} = [${roundLeaves.join(", ")}].`, en: `Group ${passes - 1} = [${roundLeaves.join(", ")}].` },
+      vars: [
+        { name: "round", value: passes - 1 },
+        { name: "leaves", value: `[${roundLeaves.join(", ")}]` },
+        { name: "visits so far", value: visits },
+        { name: "res", value: JSON.stringify(groups) },
+      ],
+    });
   }
-  dfs(root);
-  const cumulative = new Set();
-  for (let g = 0; g < groups.length; g++) {
-    nodesByGroup[g].forEach((id) => cumulative.add(id));
-    steps.push(snapshot(root, { title: { vi: `Vòng ${g}: gỡ [${groups[g].join(",")}]`, en: `Round ${g}: remove [${groups[g].join(",")}]` }, hlSet: new Set(nodesByGroup[g]), wordSet: new Set(cumulative), codeLines: [4, 5], vars: [{ name: "round", value: g }, { name: "removed", value: `[${groups[g].join(",")}]` }, { name: "result", value: JSON.stringify(groups.slice(0, g + 1)) }], note: { vi: `Các nút có chiều cao ${g} (lá hiện tại) bị gỡ cùng lúc.`, en: `Nodes with height ${g} (current leaves) are removed together.` } }));
-  }
-  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(groups)}`, en: `Result: ${JSON.stringify(groups)}` }, vars: [{ name: "answer", value: JSON.stringify(groups) }], note: { vi: `Mỗi mảng con = 1 vòng gỡ lá.`, en: `Each sublist = one round of leaf removal.` } }); fs.final = true; steps.push(fs);
+
+  snap({
+    phase: "done",
+    title: { vi: `Kết quả: ${JSON.stringify(groups)}`, en: `Result: ${JSON.stringify(groups)}` },
+    note: {
+      vi: `Cùng kết quả với cách 1, nhưng mất ${passes} lượt duyệt và ${visits} lần thăm nút, so với ${nodes.length} lần của cách 1 — gấp ${(visits / nodes.length).toFixed(2)} lần. Chênh lệch này lớn dần theo chiều cao cây: cây càng cao (ví dụ cây suy biến thành danh sách) thì càng tệ, vì mỗi vòng chỉ cắt được một nút mà vẫn phải đi lại từ gốc.`,
+      en: `Same result as approach 1, but it took ${passes} traversals and ${visits} node visits against approach 1's ${nodes.length} — a factor of ${(visits / nodes.length).toFixed(2)}. The gap widens with the tree's height: a tall tree (a degenerate list, say) is worst, because each round cuts a single node yet still walks down from the root.`,
+    },
+    codeLines: [8],
+    final: true,
+    removed, groups, round: passes - 1, answer: JSON.stringify(groups),
+    counters: { visits, nodes: nodes.length, passes },
+    decision: { vi: `${passes} lượt duyệt, ${visits} lần thăm (cách 1 chỉ ${nodes.length}).`, en: `${passes} traversals, ${visits} visits (approach 1 needed only ${nodes.length}).` },
+    vars: [{ name: "answer", value: JSON.stringify(groups) }, { name: "visits", value: visits }, { name: "passes", value: passes }],
+  });
+
   return { input, answer: JSON.stringify(groups), steps };
 }
 
@@ -9678,9 +9885,39 @@ module.exports = {
     approach: [
       { vi: "Nhóm của mỗi nút = chiều cao từ dưới lên (lá = 0). height(node) = 1 + max(con).", en: "Each node's group = its height from the bottom (leaf = 0). height(node) = 1 + max(children)." },
     ],
-    complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder.", en: "One postorder pass." } },
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: {
+        vi: "Cách 1: một lượt postorder, thăm mỗi nút đúng một lần → O(n) thời gian, O(h) bộ nhớ cho ngăn xếp đệ quy. Cách 2 làm đúng theo lời đề: mỗi vòng duyệt lại phần cây còn sống nên tổng số lần thăm là O(n·h) — cây càng cao càng tệ.",
+        en: "Approach 1: one postorder pass visiting each node exactly once → O(n) time and O(h) space for the recursion stack. Approach 2 follows the statement literally: each round re-walks whatever is still alive, so the total visit count is O(n·h) — the taller the tree, the worse it gets.",
+      },
+    },
+    codeLabel: { vi: "Cách 1 · Postorder, nhóm = chiều cao từ lá", en: "Approach 1 · Postorder, group = height above the leaves" },
     code: ["class Solution:", "    def findLeaves(self, root):", "        res = []", "        def dfs(node):", "            if not node:", "                return -1", "            h = 1 + max(dfs(node.left), dfs(node.right))", "            if h == len(res):", "                res.append([])", "            res[h].append(node.val)", "            return h", "        dfs(root)", "        return res"],
+    code2Label: { vi: "Cách 2 · Gỡ lá từng vòng (đúng như đề)", en: "Approach 2 · Strip leaves round by round (the literal reading)" },
+    code2: [
+      "class Solution:",
+      "    def findLeaves(self, root):",
+      "        res = []",
+      "        while root:",
+      "            leaves = []",
+      "            root = self.strip(root, leaves)",
+      "            res.append(leaves)",
+      "        return res",
+      "",
+      "    def strip(self, node, leaves):",
+      "        if not node:",
+      "            return None",
+      "        if not node.left and not node.right:",
+      "            leaves.append(node.val)      # a current leaf: record and cut",
+      "            return None",
+      "        node.left = self.strip(node.left, leaves)",
+      "        node.right = self.strip(node.right, leaves)",
+      "        return node",
+    ],
     builder: buildSteps366,
+    builder2: buildSteps366Strip,
   },
   863: {
     id: 863, difficulty: "medium", slug: "all-nodes-distance-k-in-binary-tree",

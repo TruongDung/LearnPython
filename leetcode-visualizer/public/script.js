@@ -11827,6 +11827,168 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 366 Find Leaves of Binary Tree ----
+// The whole point is that a node's removal ROUND equals its HEIGHT above the
+// leaves, so the tree is drawn with a height badge on every node and each node
+// tinted by the group it lands in. Grid positions come from the builder (which
+// reuses the shared tree layout), so nothing here invents coordinates.
+const LV366_GEOM = { padX: 36, padY: 42, colW: 58, rowH: 82, r: 23 };
+
+function renderLeaves366View(step) {
+  const view = step.leaves366View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+  const approach = Number(view.approach) || 1;
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const cols = Number(view.cols) || 1;
+  const rows = Number(view.rows) || 1;
+  const heights = view.heights || null;
+  const resolved = new Set(view.resolved || []);
+  const removed = new Set(view.removed || []);
+  const roundIds = new Set(view.roundIds || []);
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const counters = view.counters || {};
+  const cur = view.cur;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const G = LV366_GEOM;
+  const PALETTE = 6;
+
+  const px = (nd) => G.padX + nd.x * G.colW;
+  const py = (nd) => G.padY + nd.y * G.rowH;
+  const w = G.padX * 2 + (cols - 1) * G.colW;
+  const h = G.padY * 2 + (rows - 1) * G.rowH;
+  const byId = new Map(nodes.map((nd) => [nd.id, nd]));
+
+  // Which group a node belongs to: its height for approach 1, or the round it was
+  // stripped in for approach 2. Both are the same number, which is the lesson.
+  const groupOf = (id) => {
+    if (heights && heights[id] !== undefined) return heights[id];
+    if (approach === 2) {
+      for (let g = 0; g < groups.length; g++) {
+        const nd = byId.get(id);
+        if (nd && groups[g].includes(nd.val) && removed.has(id)) return g;
+      }
+    }
+    return -1;
+  };
+
+  const edges = nodes.filter((nd) => nd.parentId !== null && byId.has(nd.parentId)).map((nd) => {
+    const p = byId.get(nd.parentId);
+    const dim = approach === 2 && (removed.has(nd.id) || removed.has(p.id));
+    return `<line class="lv366-edge${dim ? " gone" : ""}" x1="${px(p)}" y1="${py(p)}" x2="${px(nd)}" y2="${py(nd)}"></line>`;
+  }).join("");
+
+  const circles = nodes.map((nd) => {
+    const g = groupOf(nd.id);
+    const cls = ["lv366-node"];
+    if (g >= 0) cls.push("settled", `g${g % PALETTE}`);
+    else cls.push("open");
+    if (approach === 2 && removed.has(nd.id)) cls.push("removed");
+    if (roundIds.has(nd.id)) cls.push("thisround");
+    if (cur && cur.id === nd.id) cls.push("cur");
+    if (approach === 1 && stack.includes(nd.id)) cls.push("onstack");
+    const badge = heights && heights[nd.id] !== undefined
+      ? String(heights[nd.id])
+      : (approach === 2 && g >= 0 ? String(g) : "?");
+    return `<g class="${cls.join(" ")}">
+      <circle cx="${px(nd)}" cy="${py(nd)}" r="${G.r}"></circle>
+      <text class="val" x="${px(nd)}" y="${py(nd) + 6}">${nd.val}</text>
+      <g class="badge"><circle cx="${px(nd) + G.r - 3}" cy="${py(nd) - G.r + 3}" r="11"></circle>
+      <text x="${px(nd) + G.r - 3}" y="${py(nd) - G.r + 7}">${escapeHtml(badge)}</text></g>
+    </g>`;
+  }).join("");
+
+  const treeSvg = `<svg class="lv366-tree" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(vi ? "Cây với chiều cao từng nút" : "The tree with each node's height")}">
+    ${edges}${circles}
+  </svg>`;
+
+  // ── the h = 1 + max(...) computation, spelled out ──────────────────────────
+  let calcHtml = "";
+  if (approach === 1 && cur) {
+    calcHtml = `<section class="lv366-panel">
+      <header><strong>${vi ? `TÍNH CHIỀU CAO CHO NÚT ${cur.val}` : `COMPUTING THE HEIGHT OF NODE ${cur.val}`}</strong></header>
+      <div class="lv366-calc">
+        <span class="op">h =</span><span class="one">1</span><span class="op">+ max(</span>
+        <span class="two">${cur.leftH}</span><span class="op">,</span><span class="two">${cur.rightH}</span>
+        <span class="op">) =</span><strong class="g${cur.h % PALETTE}">${cur.h}</strong>
+      </div>
+      <div class="lv366-hint">${escapeHtml(cur.isLeaf
+      ? (vi ? `${cur.val} là lá, cả hai con là null → cả hai trả −1, nên h = 1 + max(−1, −1) = 0. Chính quy ước null = −1 đặt lá vào đúng nhóm 0.`
+        : `${cur.val} is a leaf, both children are null → both return −1, so h = 1 + max(−1, −1) = 0. The null = −1 convention is what puts leaves in group 0 exactly.`)
+      : (vi ? `Postorder nên hai con đã xong trước. ${cur.val} chỉ thành lá sau khi nhánh SÂU HƠN (chiều cao ${Math.max(cur.leftH, cur.rightH)}) bị gỡ sạch, nên nó ra ở vòng ${cur.h} — dùng max, không phải min hay tổng.`
+        : `Postorder means both children finished first. ${cur.val} only becomes a leaf once the DEEPER branch (height ${Math.max(cur.leftH, cur.rightH)}) has been stripped away, so it leaves in round ${cur.h} — hence max, not min or a sum.`))}</div>
+    </section>`;
+  }
+
+  // ── groups filling up ─────────────────────────────────────────────────────
+  const groupsHtml = groups.length
+    ? groups.map((g, k) => `<div class="lv366-group g${k % PALETTE}${view.round === k && !isDone ? " cur" : ""}">
+        <small>${vi ? "nhóm" : "group"} ${k}${approach === 1 ? ` · h = ${k}` : ` · ${vi ? "vòng" : "round"} ${k}`}</small>
+        <div>${g.map((val) => `<span>${val}</span>`).join("")}</div>
+      </div>`).join("")
+    : `<em class="lv366-empty">${vi ? "chưa có nhóm nào" : "no group yet"}</em>`;
+
+  const costHtml = `<section class="lv366-panel">
+    <header><strong>${vi ? "CHI PHÍ" : "COST"}</strong><span>${vi ? `cây có ${counters.nodes || nodes.length} nút` : `${counters.nodes || nodes.length} nodes in the tree`}</span></header>
+    <div class="lv366-cost">
+      <div class="box${approach === 1 ? " active" : ""}"><small>${vi ? "LƯỢT DUYỆT" : "TRAVERSALS"}</small><b>${counters.passes === undefined ? "—" : counters.passes}</b><span>${approach === 1 ? (vi ? "một lượt là đủ" : "one is enough") : (vi ? "một lượt mỗi vòng" : "one per round")}</span></div>
+      <div class="box${approach === 2 ? " warn" : " active"}"><small>${vi ? "LẦN THĂM NÚT" : "NODE VISITS"}</small><b>${counters.visits || 0}</b><span>${approach === 1 ? (vi ? `= số nút, tức O(n)` : `= the node count, i.e. O(n)`) : (vi ? `so với ${counters.nodes || nodes.length} của cách 1` : `against approach 1's ${counters.nodes || nodes.length}`)}</span></div>
+      <div class="box"><small>${vi ? "SỐ NHÓM" : "GROUPS"}</small><b>${groups.length}</b><span>${vi ? "= chiều cao cây + 1" : "= tree height + 1"}</span></div>
+    </div>
+  </section>`;
+
+  const statusHtml = isDone
+    ? `<div class="lv366-answer">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
+        <strong>${escapeHtml(String(view.answer))}</strong>
+      </div>`
+    : `<div class="lv366-progress">
+        ${approach === 1
+      ? `<span><small>${vi ? "ĐÃ TÍNH XONG" : "RESOLVED"}</small><b>${resolved.size}/${nodes.length}</b></span>
+         <span><small>${vi ? "ĐANG Ở NÚT" : "AT NODE"}</small><b>${cur ? cur.val : "—"}</b></span>`
+      : `<span><small>${vi ? "ĐÃ GỠ" : "STRIPPED"}</small><b>${removed.size}/${nodes.length}</b></span>
+         <span><small>${vi ? "VÒNG" : "ROUND"}</small><b>${view.round === null || view.round === undefined ? "—" : view.round}</b></span>`}
+        <span><small>${vi ? "NHÓM" : "GROUPS"}</small><b>${groups.length}</b></span>
+      </div>`;
+
+  $("treeView").innerHTML = `<section class="lv366-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa gỡ lá cây nhị phân" : "Find leaves of binary tree visualization")}">
+    <div class="lv366-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(approach === 1
+      ? "Một nút bị gỡ ở vòng nào? Lá ra ngay vòng 0. Một nút chỉ thành lá sau khi nhánh SÂU NHẤT của nó đã bị gỡ hết, nên nó ra ở vòng = chiều cao của nó tính từ lá: h = 1 + max(h(con)), với h(null) = −1. Vậy KHÔNG cần gỡ gì cả — một lượt postorder tính h cho mọi nút là mọi nhóm hiện ra cùng lúc."
+      : "Làm đúng như đề: mỗi vòng duyệt cây, ghi lại mọi lá hiện tại rồi cắt chúng, lặp tới khi cây rỗng. Đúng và dễ tin, nhưng mỗi vòng phải duyệt lại phần cây còn sống nên tốn O(n·h) lần thăm. Để ý số ghi trên mỗi nút vẫn đúng bằng số vòng nó ra đi — đó là chiếc cầu sang cách 1.")}</span>
+    </div>
+
+    ${statusHtml}
+
+    <section class="lv366-panel">
+      <header>
+        <strong>${vi ? "CÂY — số trong huy hiệu là chiều cao tính từ lá = số nhóm" : "THE TREE — the badge is the height above the leaves = the group number"}</strong>
+        <span>${vi ? "? = chưa tính · màu = nhóm" : "? = not computed yet · colour = group"}</span>
+      </header>
+      <div class="lv366-treewrap">${treeSvg}</div>
+      <div class="lv366-hint">${escapeHtml(vi
+      ? "Chú ý các nút cùng huy hiệu đều ra CÙNG một vòng dù nằm ở độ sâu khác nhau trên cây — vì vòng phụ thuộc vào khoảng cách xuống lá, không phải khoảng cách xuống từ gốc."
+      : "Note that nodes sharing a badge leave in the SAME round even when they sit at different depths — the round depends on the distance down to the leaves, not the distance from the root.")}</div>
+    </section>
+
+    ${calcHtml}
+
+    <section class="lv366-panel">
+      <header><strong>${vi ? "CÁC NHÓM KẾT QUẢ" : "THE OUTPUT GROUPS"}</strong><span>${groups.length}</span></header>
+      <div class="lv366-groups">${groupsHtml}</div>
+    </section>
+
+    ${costHtml}
+
+    <div class="lv366-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
 // ---- 359 Logger Rate Limiter ----
 // A rate limiter is the one thing that really wants a timeline, so each message
 // gets a lane, every printed call paints its 10-second cooldown bar, and a
@@ -35840,6 +36002,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.leaves366View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLeaves366View(step);
   } else if (step.logger359View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
