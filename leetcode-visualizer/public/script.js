@@ -18970,7 +18970,16 @@ function renderSegmentTreeView(step) {
     levels.push(nodes);
   }
 
+  // Every level shares ONE column grid sized to the deepest level, and each node
+  // spans the columns it actually covers. That makes a parent sit exactly above
+  // its two children instead of each level stretching independently (which used
+  // to misalign the levels and clip the deepest one).
+  const maxLevel = Math.max(0, levels.length - 1);
+  const totalCols = Math.pow(2, maxLevel);
+
   const treeLevels = levels.map((nodes, levelIndex) => {
+    const span = Math.pow(2, maxLevel - levelIndex);
+    const firstIndex = Math.pow(2, levelIndex);
     const cells = nodes.map((index) => {
       const value = tree[index - 1];
       const covers = Array.isArray(coverage[index - 1]) ? coverage[index - 1] : [];
@@ -18981,13 +18990,14 @@ function renderSegmentTreeView(step) {
         activeTree.has(index) ? "active" : "",
         selectedTree.has(index) ? "selected" : "",
       ].filter(Boolean).join(" ");
-      return `<div class="${classes}" aria-label="${escapeHtml(`tree ${index}, sum ${value}, covers ${coverageText}`)}">
+      const startCol = (index - firstIndex) * span + 1;
+      return `<div class="${classes}" style="grid-column:${startCol} / span ${span}" aria-label="${escapeHtml(`tree ${index}, value ${value}, covers ${coverageText}`)}">
         <span>tree[${index}]</span>
         <strong>${escapeHtml(String(value))}</strong>
         <small>${escapeHtml(coverageText)}</small>
       </div>`;
     }).join("");
-    return `<div class="segment-tree-level" style="--segment-level-cols:${nodes.length}">
+    return `<div class="segment-tree-level">
       <div class="segment-tree-level-label">L${levelIndex}</div>
       <div class="segment-tree-level-nodes">${cells}</div>
     </div>`;
@@ -19013,7 +19023,7 @@ function renderSegmentTreeView(step) {
       <div class="segment-tree-heading">nums (0-based)</div>
       <div class="segment-tree-nums" style="--segment-nums-cols:${Math.max(1, nums.length)}">${numsCells}</div>
       <div class="segment-tree-heading">${mapMode ? "Segment Tree · {value: frequency}" : "Segment Tree array (1-based display)"}</div>
-      <div class="segment-tree-levels">${treeLevels}</div>
+      <div class="segment-tree-levels" style="--segment-total-cols:${totalCols}">${treeLevels}</div>
     </div>
     <div class="segment-tree-status">${statusItems}</div>
   </div>`;

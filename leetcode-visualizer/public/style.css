@@ -15434,7 +15434,8 @@ button:disabled {
 }
 
 .segment-tree-levels {
-  min-width: 680px;
+  /* Width follows the real leaf count so the deepest level is never clipped. */
+  min-width: calc(var(--segment-total-cols, 8) * 46px + 40px);
   display: grid;
   gap: 10px;
 }
@@ -15454,8 +15455,10 @@ button:disabled {
 }
 
 .segment-tree-level-nodes {
+  /* One shared column track per leaf; nodes span the range they cover, so a
+     parent lines up exactly above its two children. */
   display: grid;
-  grid-template-columns: repeat(var(--segment-level-cols), minmax(68px, 1fr));
+  grid-template-columns: repeat(var(--segment-total-cols, 1), minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -15499,7 +15502,8 @@ button:disabled {
 }
 
 .segment-tree-viz.map-mode .segment-tree-levels {
-  min-width: 980px;
+  /* Frequency maps need more room per leaf than plain numbers. */
+  min-width: calc(var(--segment-total-cols, 8) * 62px + 40px);
 }
 
 .segment-tree-viz.map-mode .segment-tree-cell {
@@ -15617,7 +15621,11 @@ button:disabled {
   }
 
   .segment-tree-levels {
-    min-width: 560px;
+    min-width: calc(var(--segment-total-cols, 8) * 40px + 32px);
+  }
+
+  .segment-tree-viz.map-mode .segment-tree-levels {
+    min-width: calc(var(--segment-total-cols, 8) * 54px + 32px);
   }
 
   .segment-tree-level {
