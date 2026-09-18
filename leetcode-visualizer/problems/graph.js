@@ -28384,3 +28384,579 @@ Object.assign(module.exports, {
     builder: buildSteps2101,
   },
 });
+
+// ─── 785: Is Graph Bipartite? ───────────────────────────────────────────────
+//
+// A graph is bipartite iff it is 2-colourable: every edge must join two nodes
+// of DIFFERENT colours. Equivalently, the graph contains no odd-length cycle.
+// We greedily colour each component (0 / 1, alternating) and fail the moment an
+// edge is found whose two endpoints already share a colour.
+//
+// The graph may be disconnected, so the outer loop restarts colouring from
+// every still-uncoloured node.
+
+function parseAdjacency785(input) {
+  let graph;
+  try {
+    graph = JSON.parse(String(input ?? "").trim());
+  } catch (_error) {
+    throw new Error("graph must be a JSON adjacency list, for example [[1,3],[0,2],[1,3],[0,2]]");
+  }
+  if (!Array.isArray(graph) || graph.length < 1 || graph.length > 12 || graph.some((neighbors) => !Array.isArray(neighbors))) {
+    throw new Error("graph must be an adjacency list with 1 to 12 node arrays");
+  }
+  const n = graph.length;
+  if (graph.some((neighbors) => neighbors.some((node) => !Number.isInteger(node) || node < 0 || node >= n))) {
+    throw new Error("every neighbor must be a node index from 0 to n - 1");
+  }
+  if (graph.some((neighbors, node) => neighbors.includes(node))) {
+    throw new Error("a self-loop makes the graph non-bipartite by definition; remove it to trace the algorithm");
+  }
+  return graph.map((neighbors) => [...neighbors]);
+}
+
+// Shared helpers for both #785 approaches: undirected edge list + view payload.
+function bipartite785Setup(graph) {
+  const n = graph.length;
+  const allNodes = Array.from({ length: n }, (_, i) => i);
+  const seen = new Set();
+  const allEdges = [];
+  graph.forEach((neighbors, u) => {
+    neighbors.forEach((v) => {
+      const key = u < v ? `${u}-${v}` : `${v}-${u}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      allEdges.push({ u, v, undirected: true });
+    });
+  });
+  return { n, allNodes, allEdges };
+}
+
+function buildSteps785(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2 ? buildSteps785DFS(input) : buildSteps785BFS(input);
+}
+
+/**
+ * Approach 1 — BFS colouring. Code lines map to the `code` array:
+ *  1 from collections import deque
+ *  2 class Solution:
+ *  3     def isBipartite(self, graph):
+ *  4         n = len(graph)
+ *  5         color = [-1] * n
+ *  6         for start in range(n):
+ *  7             if color[start] != -1:
+ *  8                 continue
+ *  9             color[start] = 0
+ * 10             q = deque([start])
+ * 11             while q:
+ * 12                 node = q.popleft()
+ * 13                 for nb in graph[node]:
+ * 14                     if color[nb] == -1:
+ * 15                         color[nb] = 1 - color[node]
+ * 16                         q.append(nb)
+ * 17                     elif color[nb] == color[node]:
+ * 18                         return False
+ * 19         return True
+ */
+function buildSteps785BFS(input) {
+  const graph = parseAdjacency785(input);
+  const { n, allNodes, allEdges } = bipartite785Setup(graph);
+  const steps = [];
+  const color = new Array(n).fill(-1);
+
+  let queue = [];
+  let head = 0;
+  let startNode = null;
+  let conflictEdge = null;
+  let answer = null;
+
+  const pendingQueue = () => queue.slice(head);
+  const coloredNodes = () => allNodes.filter((i) => color[i] !== -1);
+
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: allNodes.map((id) => ({
+        id,
+        label: String(id),
+        sub: color[id] === -1 ? "?" : `c${color[id]}`,
+      })),
+      edges: allEdges.slice(),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: coloredNodes(),
+    };
+  }
+
+  function push(o) {
+    const q = pendingQueue();
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeBlock: 1,
+      codeLines: o.codeLines || [],
+      vars: [
+        { name: "color", value: `[${color.join(", ")}]` },
+        { name: "queue", value: q.length ? `[${q.join(", ")}]` : "[]" },
+        ...(o.vars || []),
+      ],
+      bipartiteView: {
+        mode: "bfs",
+        n,
+        phase: o.phase,
+        decision: o.decision || "",
+        color: [...color],
+        queue: q,
+        adj: graph.map((neighbors) => [...neighbors]),
+        startNode,
+        activeNode: o.activeNode === undefined ? null : o.activeNode,
+        activeNeighbor: o.activeNeighbor === undefined ? null : o.activeNeighbor,
+        conflictEdge: conflictEdge ? { ...conflictEdge } : null,
+        returnValue: answer,
+      },
+    });
+  }
+
+  push({
+    title: { vi: `graph có ${n} node`, en: `graph has ${n} nodes` },
+    note: {
+      vi: "Đồ thị là bipartite nếu tô được 2 màu sao cho MỌI cạnh nối hai màu khác nhau. Tương đương: không có chu trình độ dài lẻ.",
+      en: "A graph is bipartite if it can be 2-coloured so that EVERY edge joins two different colours. Equivalently: it contains no odd-length cycle.",
+    },
+    codeLines: [3, 4], phase: "intro", decision: "intro",
+    vars: [{ name: "n", value: n }],
+  });
+
+  push({
+    title: { vi: "color = [-1] * n (chưa tô màu)", en: "color = [-1] * n (uncoloured)" },
+    note: {
+      vi: "-1 nghĩa là chưa tô. Ta sẽ dùng 0 và 1 cho hai tập. Đồ thị có thể không liên thông nên phải thử mọi node làm điểm bắt đầu.",
+      en: "-1 means uncoloured. We will use 0 and 1 for the two sets. The graph may be disconnected, so every node must be tried as a start.",
+    },
+    codeLines: [5], phase: "init", decision: "init-color",
+  });
+
+  for (let start = 0; start < n; start++) {
+    if (color[start] !== -1) {
+      push({
+        title: { vi: `start=${start} đã có màu ${color[start]} → continue`, en: `start=${start} already coloured ${color[start]} → continue` },
+        note: { vi: `Node ${start} thuộc component đã xử lý, bỏ qua.`, en: `Node ${start} belongs to an already-processed component, skip it.` },
+        codeLines: [6, 7, 8], phase: "scan", decision: "skip-coloured",
+        hlNodes: [start], activeNode: start,
+      });
+      continue;
+    }
+
+    startNode = start;
+    color[start] = 0;
+    queue = [start];
+    head = 0;
+
+    push({
+      title: { vi: `Component mới: color[${start}] = 0`, en: `New component: color[${start}] = 0` },
+      note: {
+        vi: `Node ${start} chưa tô → bắt đầu component mới, gán màu 0 tùy ý (đối xứng nên chọn màu nào cũng được).`,
+        en: `Node ${start} is uncoloured → start a new component and assign colour 0 arbitrarily (the choice is symmetric).`,
+      },
+      codeLines: [9, 10], phase: "bfs", decision: "start-component",
+      hlNodes: [start], activeNode: start,
+    });
+
+    while (head < queue.length) {
+      const node = queue[head++];
+      push({
+        title: { vi: `popleft() → node ${node} (màu ${color[node]})`, en: `popleft() → node ${node} (colour ${color[node]})` },
+        note: { vi: `Lấy node ${node} ra khỏi queue để xét các hàng xóm của nó.`, en: `Dequeue node ${node} to inspect its neighbours.` },
+        codeLines: [11, 12], phase: "bfs", decision: "dequeue",
+        hlNodes: [node], activeNode: node,
+      });
+
+      for (const nb of graph[node]) {
+        if (color[nb] === -1) {
+          color[nb] = 1 - color[node];
+          queue.push(nb);
+          push({
+            title: { vi: `color[${nb}] = 1 - ${color[node]} = ${color[nb]}`, en: `color[${nb}] = 1 - ${color[node]} = ${color[nb]}` },
+            note: {
+              vi: `Hàng xóm ${nb} chưa tô → tô màu NGƯỢC với node ${node}, rồi đẩy vào queue.`,
+              en: `Neighbour ${nb} is uncoloured → give it the OPPOSITE colour of node ${node}, then enqueue it.`,
+            },
+            codeLines: [13, 14, 15, 16], phase: "bfs", decision: "colour-neighbour",
+            hlNodes: [node, nb], hlEdges: [[node, nb]],
+            activeNode: node, activeNeighbor: nb,
+          });
+        } else if (color[nb] === color[node]) {
+          conflictEdge = { u: node, v: nb, color: color[node] };
+          answer = false;
+          push({
+            title: { vi: `✗ Xung đột: color[${nb}] == color[${node}] == ${color[node]}`, en: `✗ Conflict: color[${nb}] == color[${node}] == ${color[node]}` },
+            note: {
+              vi: `Cạnh ${node}—${nb} nối hai node CÙNG màu ${color[node]} → không thể tô 2 màu → tồn tại chu trình lẻ → return False.`,
+              en: `Edge ${node}—${nb} joins two nodes of the SAME colour ${color[node]} → 2-colouring impossible → an odd cycle exists → return False.`,
+            },
+            codeLines: [13, 17, 18], phase: "conflict", decision: "conflict",
+            hlNodes: [node, nb], hlEdges: [[node, nb]],
+            activeNode: node, activeNeighbor: nb,
+          });
+          push({
+            title: { vi: "return False", en: "return False" },
+            note: { vi: "Đồ thị KHÔNG phải bipartite.", en: "The graph is NOT bipartite." },
+            codeLines: [18], phase: "done", decision: "done-false", final: true,
+            hlNodes: [node, nb], hlEdges: [[node, nb]],
+            activeNode: node, activeNeighbor: nb,
+            vars: [{ name: "answer", value: false }],
+          });
+          return { original: graph, answer: false, steps };
+        } else {
+          push({
+            title: { vi: `${nb} đã có màu ${color[nb]} ≠ ${color[node]} → hợp lệ`, en: `${nb} already coloured ${color[nb]} ≠ ${color[node]} → valid` },
+            note: { vi: `Cạnh ${node}—${nb} nối hai màu khác nhau, không vi phạm gì.`, en: `Edge ${node}—${nb} joins two different colours, no violation.` },
+            codeLines: [13, 14, 17], phase: "bfs", decision: "already-ok",
+            hlNodes: [node, nb], hlEdges: [[node, nb]],
+            activeNode: node, activeNeighbor: nb,
+          });
+        }
+      }
+    }
+
+    push({
+      title: { vi: `Component của ${start} đã tô xong`, en: `Component of ${start} fully coloured` },
+      note: { vi: "Queue rỗng → chuyển sang tìm component chưa tô tiếp theo.", en: "The queue is empty → move on to the next uncoloured component." },
+      codeLines: [11, 6], phase: "scan", decision: "component-done",
+    });
+  }
+
+  answer = true;
+  push({
+    title: { vi: "return True — đồ thị là bipartite", en: "return True — the graph is bipartite" },
+    note: {
+      vi: `Mọi cạnh đều nối hai màu khác nhau. Hai tập: {${allNodes.filter((i) => color[i] === 0).join(", ")}} và {${allNodes.filter((i) => color[i] === 1).join(", ")}}.`,
+      en: `Every edge joins two different colours. The two sets are {${allNodes.filter((i) => color[i] === 0).join(", ")}} and {${allNodes.filter((i) => color[i] === 1).join(", ")}}.`,
+    },
+    codeLines: [19], phase: "done", decision: "done-true", final: true,
+    vars: [{ name: "answer", value: true }],
+  });
+
+  return { original: graph, answer: true, steps };
+}
+
+/**
+ * Approach 2 — recursive DFS colouring. Code lines map to `code2`:
+ *  1 class Solution:
+ *  2     def isBipartite(self, graph):
+ *  3         n = len(graph)
+ *  4         color = [-1] * n
+ *  5
+ *  6         def dfs(node, c):
+ *  7             color[node] = c
+ *  8             for nb in graph[node]:
+ *  9                 if color[nb] == -1:
+ * 10                     if not dfs(nb, 1 - c):
+ * 11                         return False
+ * 12                 elif color[nb] == c:
+ * 13                     return False
+ * 14             return True
+ * 15
+ * 16         for start in range(n):
+ * 17             if color[start] == -1:
+ * 18                 if not dfs(start, 0):
+ * 19                     return False
+ * 20         return True
+ */
+function buildSteps785DFS(input) {
+  const graph = parseAdjacency785(input);
+  const { n, allNodes, allEdges } = bipartite785Setup(graph);
+  const steps = [];
+  const color = new Array(n).fill(-1);
+
+  const callStack = [];
+  let startNode = null;
+  let conflictEdge = null;
+  let answer = null;
+
+  const coloredNodes = () => allNodes.filter((i) => color[i] !== -1);
+
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: allNodes.map((id) => ({
+        id,
+        label: String(id),
+        sub: color[id] === -1 ? "?" : `c${color[id]}`,
+      })),
+      edges: allEdges.slice(),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: coloredNodes(),
+    };
+  }
+
+  function push(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeBlock: 2,
+      codeLines: o.codeLines || [],
+      vars: [
+        { name: "color", value: `[${color.join(", ")}]` },
+        { name: "call stack", value: callStack.length ? `[${callStack.join(" → ")}]` : "[]" },
+        ...(o.vars || []),
+      ],
+      bipartiteView: {
+        mode: "dfs",
+        n,
+        phase: o.phase,
+        decision: o.decision || "",
+        color: [...color],
+        queue: [...callStack],
+        adj: graph.map((neighbors) => [...neighbors]),
+        startNode,
+        activeNode: o.activeNode === undefined ? null : o.activeNode,
+        activeNeighbor: o.activeNeighbor === undefined ? null : o.activeNeighbor,
+        conflictEdge: conflictEdge ? { ...conflictEdge } : null,
+        returnValue: answer,
+      },
+    });
+  }
+
+  push({
+    title: { vi: `graph có ${n} node`, en: `graph has ${n} nodes` },
+    note: {
+      vi: "Cùng ý tưởng 2 màu, nhưng tô bằng DFS đệ quy: mỗi lần đi sâu thì đảo màu.",
+      en: "Same 2-colouring idea, but coloured with recursive DFS: flip the colour on every descent.",
+    },
+    codeLines: [2, 3], phase: "intro", decision: "intro",
+    vars: [{ name: "n", value: n }],
+  });
+
+  push({
+    title: { vi: "color = [-1] * n", en: "color = [-1] * n" },
+    note: { vi: "-1 = chưa tô. Hai tập sẽ là màu 0 và màu 1.", en: "-1 = uncoloured. The two sets will be colour 0 and colour 1." },
+    codeLines: [4], phase: "init", decision: "init-color",
+  });
+
+  let failed = false;
+
+  function dfs(node, c) {
+    callStack.push(`dfs(${node},${c})`);
+    color[node] = c;
+    push({
+      title: { vi: `dfs(${node}, ${c}): color[${node}] = ${c}`, en: `dfs(${node}, ${c}): color[${node}] = ${c}` },
+      note: { vi: `Tô node ${node} màu ${c}, rồi xét từng hàng xóm.`, en: `Colour node ${node} with ${c}, then inspect each neighbour.` },
+      codeLines: [6, 7], phase: "dfs", decision: "colour-node",
+      hlNodes: [node], activeNode: node,
+    });
+
+    for (const nb of graph[node]) {
+      if (color[nb] === -1) {
+        push({
+          title: { vi: `${nb} chưa tô → gọi dfs(${nb}, ${1 - c})`, en: `${nb} uncoloured → call dfs(${nb}, ${1 - c})` },
+          note: { vi: `Đi sâu vào ${nb} với màu ĐẢO ${1 - c}.`, en: `Recurse into ${nb} with the FLIPPED colour ${1 - c}.` },
+          codeLines: [8, 9, 10], phase: "dfs", decision: "recurse",
+          hlNodes: [node, nb], hlEdges: [[node, nb]],
+          activeNode: node, activeNeighbor: nb,
+        });
+        if (!dfs(nb, 1 - c)) {
+          push({
+            title: { vi: `dfs(${nb}) trả False → return False`, en: `dfs(${nb}) returned False → return False` },
+            note: { vi: "Lỗi được truyền ngược lên toàn bộ chuỗi đệ quy.", en: "The failure propagates back up the whole recursion chain." },
+            codeLines: [10, 11], phase: "conflict", decision: "propagate-false",
+            hlNodes: [node, nb], hlEdges: [[node, nb]],
+            activeNode: node, activeNeighbor: nb,
+          });
+          callStack.pop();
+          return false;
+        }
+      } else if (color[nb] === c) {
+        conflictEdge = { u: node, v: nb, color: c };
+        answer = false;
+        failed = true;
+        push({
+          title: { vi: `✗ Xung đột: color[${nb}] == ${c} == color[${node}]`, en: `✗ Conflict: color[${nb}] == ${c} == color[${node}]` },
+          note: {
+            vi: `Cạnh ${node}—${nb} nối hai node CÙNG màu ${c} → có chu trình lẻ → không bipartite.`,
+            en: `Edge ${node}—${nb} joins two nodes of the SAME colour ${c} → an odd cycle exists → not bipartite.`,
+          },
+          codeLines: [12, 13], phase: "conflict", decision: "conflict",
+          hlNodes: [node, nb], hlEdges: [[node, nb]],
+          activeNode: node, activeNeighbor: nb,
+        });
+        callStack.pop();
+        return false;
+      } else {
+        push({
+          title: { vi: `${nb} có màu ${color[nb]} ≠ ${c} → hợp lệ`, en: `${nb} has colour ${color[nb]} ≠ ${c} → valid` },
+          note: { vi: `Cạnh ${node}—${nb} nối hai màu khác nhau.`, en: `Edge ${node}—${nb} joins two different colours.` },
+          codeLines: [8, 9, 12], phase: "dfs", decision: "already-ok",
+          hlNodes: [node, nb], hlEdges: [[node, nb]],
+          activeNode: node, activeNeighbor: nb,
+        });
+      }
+    }
+
+    push({
+      title: { vi: `dfs(${node}) → return True`, en: `dfs(${node}) → return True` },
+      note: { vi: `Mọi hàng xóm của ${node} đều hợp lệ.`, en: `Every neighbour of ${node} is valid.` },
+      codeLines: [14], phase: "dfs", decision: "return-true",
+      hlNodes: [node], activeNode: node,
+    });
+    callStack.pop();
+    return true;
+  }
+
+  for (let start = 0; start < n; start++) {
+    if (color[start] !== -1) {
+      push({
+        title: { vi: `start=${start} đã có màu ${color[start]}`, en: `start=${start} already coloured ${color[start]}` },
+        note: { vi: "Component này đã xử lý rồi.", en: "This component was already processed." },
+        codeLines: [16, 17], phase: "scan", decision: "skip-coloured",
+        hlNodes: [start], activeNode: start,
+      });
+      continue;
+    }
+    startNode = start;
+    push({
+      title: { vi: `Component mới tại ${start} → dfs(${start}, 0)`, en: `New component at ${start} → dfs(${start}, 0)` },
+      note: { vi: `Node ${start} chưa tô, bắt đầu DFS với màu 0.`, en: `Node ${start} is uncoloured, start DFS with colour 0.` },
+      codeLines: [16, 17, 18], phase: "dfs", decision: "start-component",
+      hlNodes: [start], activeNode: start,
+    });
+    if (!dfs(start, 0)) {
+      push({
+        title: { vi: "return False", en: "return False" },
+        note: { vi: "Đồ thị KHÔNG phải bipartite.", en: "The graph is NOT bipartite." },
+        codeLines: [18, 19], phase: "done", decision: "done-false", final: true,
+        hlNodes: conflictEdge ? [conflictEdge.u, conflictEdge.v] : [],
+        hlEdges: conflictEdge ? [[conflictEdge.u, conflictEdge.v]] : [],
+        vars: [{ name: "answer", value: false }],
+      });
+      return { original: graph, answer: false, steps };
+    }
+  }
+
+  if (!failed) answer = true;
+  push({
+    title: { vi: "return True — đồ thị là bipartite", en: "return True — the graph is bipartite" },
+    note: {
+      vi: `Hai tập: {${allNodes.filter((i) => color[i] === 0).join(", ")}} và {${allNodes.filter((i) => color[i] === 1).join(", ")}}.`,
+      en: `The two sets are {${allNodes.filter((i) => color[i] === 0).join(", ")}} and {${allNodes.filter((i) => color[i] === 1).join(", ")}}.`,
+    },
+    codeLines: [20], phase: "done", decision: "done-true", final: true,
+    vars: [{ name: "answer", value: true }],
+  });
+
+  return { original: graph, answer: true, steps };
+}
+
+Object.assign(module.exports, {
+  785: {
+    id: 785,
+    difficulty: "medium",
+    slug: "is-graph-bipartite",
+    category: { key: "bfs", vi: "BFS", en: "BFS" },
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "graph-coloring", vi: "Tô màu đồ thị", en: "Graph Coloring" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
+    ],
+    title: { vi: "Is Graph Bipartite?", en: "Is Graph Bipartite?" },
+    titleVi: { vi: "Đồ thị có phải hai phía (bipartite)?", en: "Is the graph bipartite?" },
+    statement: {
+      vi:
+        "Cho đồ thị vô hướng dạng adjacency list: graph[u] là danh sách các node kề với u. Hãy kiểm tra đồ thị có phải bipartite không, " +
+        "tức là có chia được các node thành HAI tập rời nhau sao cho mọi cạnh đều nối một node ở tập này với một node ở tập kia. " +
+        "Nhập graph dạng JSON, ví dụ [[1,3],[0,2],[1,3],[0,2]].",
+      en:
+        "Given an undirected graph as an adjacency list where graph[u] lists the nodes adjacent to u, determine whether the graph is bipartite — " +
+        "that is, whether the nodes can be split into TWO disjoint sets such that every edge connects a node in one set to a node in the other. " +
+        "Enter graph as JSON, e.g. [[1,3],[0,2],[1,3],[0,2]].",
+    },
+    defaultInput: "[[1,3],[0,2],[1,3],[0,2]]",
+    inputKind: "string",
+    inputLabel: { vi: "graph (adjacency list JSON)", en: "graph (JSON adjacency list)" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: BFS tô màu theo queue", en: "Approach 1: BFS colouring with a queue" } },
+          { value: "2", label: { vi: "Cách 2: DFS đệ quy tô màu", en: "Approach 2: Recursive DFS colouring" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Bipartite ⇔ tô được 2 màu sao cho mọi cạnh nối hai màu khác nhau ⇔ không có chu trình độ dài LẺ.", en: "Bipartite ⇔ 2-colourable so every edge joins two different colours ⇔ contains no ODD-length cycle." },
+      { vi: "Dùng color[] với -1 = chưa tô. Khi đi từ node sang hàng xóm, luôn gán màu đảo: 1 - color[node].", en: "Use color[] with -1 = uncoloured. Moving from a node to a neighbour always assigns the flipped colour: 1 - color[node]." },
+      { vi: "Nếu hàng xóm đã tô và TRÙNG màu với node hiện tại → phát hiện chu trình lẻ → trả về False ngay.", en: "If a neighbour is already coloured and MATCHES the current node's colour → an odd cycle is found → return False immediately." },
+      { vi: "Đồ thị có thể không liên thông, nên phải lặp qua mọi node và khởi động lại việc tô màu ở mỗi component chưa xét.", en: "The graph may be disconnected, so loop over every node and restart colouring for each unvisited component." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi node được tô một lần và mỗi cạnh được kiểm tra tối đa hai lần. color[] chiếm O(n).",
+        en: "Each node is coloured once and each edge is checked at most twice. color[] uses O(n).",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def isBipartite(self, graph):",
+      "        n = len(graph)",
+      "        color = [-1] * n",
+      "        for start in range(n):",
+      "            if color[start] != -1:",
+      "                continue",
+      "            color[start] = 0",
+      "            q = deque([start])",
+      "            while q:",
+      "                node = q.popleft()",
+      "                for nb in graph[node]:",
+      "                    if color[nb] == -1:",
+      "                        color[nb] = 1 - color[node]",
+      "                        q.append(nb)",
+      "                    elif color[nb] == color[node]:",
+      "                        return False",
+      "        return True",
+    ],
+    codeLabel: { vi: "Cách 1: BFS tô màu theo queue", en: "Approach 1: BFS colouring with a queue" },
+    code2: [
+      "class Solution:",
+      "    def isBipartite(self, graph):",
+      "        n = len(graph)",
+      "        color = [-1] * n",
+      "",
+      "        def dfs(node, c):",
+      "            color[node] = c",
+      "            for nb in graph[node]:",
+      "                if color[nb] == -1:",
+      "                    if not dfs(nb, 1 - c):",
+      "                        return False",
+      "                elif color[nb] == c:",
+      "                    return False",
+      "            return True",
+      "",
+      "        for start in range(n):",
+      "            if color[start] == -1:",
+      "                if not dfs(start, 0):",
+      "                    return False",
+      "        return True",
+    ],
+    code2Label: { vi: "Cách 2: DFS đệ quy tô màu", en: "Approach 2: Recursive DFS colouring" },
+    liveArgs(input) {
+      return [parseAdjacency785(input)];
+    },
+    builder: buildSteps785,
+  },
+});

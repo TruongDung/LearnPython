@@ -11830,7 +11830,6 @@ Object.assign(module.exports, {
     inputKind: "string",
     inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
     extraParams: [],
-    debugMode: "semantic",
     approach: [
       { vi: "DFS hậu thứ tự để nhận state (is_bst, min, max, sum) từ hai cây con.", en: "Use postorder DFS to receive (is_bst, min, max, sum) from both children." },
       { vi: "Subtree hiện tại là BST khi hai con đều là BST và left.max < node.val < right.min.", en: "The current subtree is a BST when both children are BSTs and left.max < node.val < right.min." },

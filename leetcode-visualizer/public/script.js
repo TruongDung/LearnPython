@@ -9012,6 +9012,155 @@ function renderPathExistsDfsView(step) {
   renderGraph(step, "path1971Graph");
 }
 
+// ---- 785 Is Graph Bipartite? (2-colouring) ----
+function renderBipartiteView(step) {
+  const view = step.bipartiteView || {};
+  const vi = lang === "vi";
+  const isDfs = view.mode === "dfs";
+  const color = Array.isArray(view.color) ? view.color : [];
+  const n = Number(view.n) || color.length;
+  const adj = Array.isArray(view.adj) ? view.adj : [];
+  const frontier = Array.isArray(view.queue) ? view.queue : [];
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const activeNeighbor = Number.isInteger(view.activeNeighbor) ? view.activeNeighbor : null;
+  const startNode = Number.isInteger(view.startNode) ? view.startNode : null;
+  const conflict = view.conflictEdge || null;
+  const conflictNodes = new Set(conflict ? [conflict.u, conflict.v] : []);
+
+  // ── Phase bar ───────────────────────────────────────────────────────────
+  const stage = ["intro", "init"].includes(view.phase) ? 0 : view.phase === "done" ? 2 : 1;
+  const stageLabels = vi
+    ? ["Khởi tạo color[]", isDfs ? "DFS tô 2 màu" : "BFS tô 2 màu", "Kết luận"]
+    : ["Init color[]", isDfs ? "DFS 2-colouring" : "BFS 2-colouring", "Conclusion"];
+  const phases = stageLabels.map((label, i) => {
+    const state = i < stage ? "done" : i === stage ? "active" : "";
+    return `<span class="${state}">${i < stage ? "✓" : i + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── The two sets: the whole point of the problem ────────────────────────
+  const setNodes = (c) => color.map((v, i) => (v === c ? i : -1)).filter((i) => i >= 0);
+  const setChip = (i) => {
+    const cls = ["bip785-chip"];
+    if (i === activeNode) cls.push("active");
+    if (i === activeNeighbor) cls.push("neighbor");
+    if (conflictNodes.has(i)) cls.push("conflict");
+    return `<span class="${cls.join(" ")}">${i}</span>`;
+  };
+  const setA = setNodes(0);
+  const setB = setNodes(1);
+  const uncoloured = color.map((v, i) => (v === -1 ? i : -1)).filter((i) => i >= 0);
+  const partitionHtml = `<div class="bip785-sets">
+    <section class="bip785-set c0"><header><strong>${vi ? "TẬP 0" : "SET 0"}</strong><span>${setA.length}</span></header><div>${setA.map(setChip).join("") || `<em>∅</em>`}</div></section>
+    <div class="bip785-vs">${conflict ? "✕" : "|"}</div>
+    <section class="bip785-set c1"><header><strong>${vi ? "TẬP 1" : "SET 1"}</strong><span>${setB.length}</span></header><div>${setB.map(setChip).join("") || `<em>∅</em>`}</div></section>
+  </div>
+  ${uncoloured.length ? `<div class="bip785-uncoloured"><small>${vi ? "chưa tô" : "uncoloured"}</small><div>${uncoloured.map(setChip).join("")}</div></div>` : ""}`;
+
+  // ── color[] array strip ─────────────────────────────────────────────────
+  const colorCells = color.map((c, i) => {
+    const cls = ["bip785-cell", c === -1 ? "none" : c === 0 ? "c0" : "c1"];
+    if (i === activeNode) cls.push("active");
+    if (i === activeNeighbor) cls.push("neighbor");
+    if (conflictNodes.has(i)) cls.push("conflict");
+    return `<div class="${cls.join(" ")}"><small>${i}</small><strong>${c === -1 ? "−1" : c}</strong></div>`;
+  }).join("");
+
+  // ── Frontier (queue for BFS / call stack for DFS) ───────────────────────
+  const frontierLabel = isDfs ? "call stack" : "queue";
+  const frontierHint = isDfs
+    ? (vi ? "khung trên cùng đang chạy" : "top frame is running")
+    : (vi ? "front được pop trước" : "front pops first");
+  const frontierHtml = frontier.length
+    ? frontier.map((item, i) => {
+      const front = isDfs ? i === frontier.length - 1 : i === 0;
+      const tag = isDfs ? (front ? "top" : `#${i + 1}`) : (front ? "front" : `#${i + 1}`);
+      return `<span class="${front ? "top" : ""}"><small>${tag}</small><strong>${escapeHtml(item)}</strong></span>`;
+    }).join("")
+    : `<span class="bip785-empty">${vi ? (isDfs ? "stack rỗng" : "queue rỗng") : (isDfs ? "empty stack" : "empty queue")}</span>`;
+
+  // ── Adjacency list, with the current edge called out ────────────────────
+  const adjHtml = adj.length
+    ? adj.map((neighbors, node) => {
+      const nbHtml = neighbors.length
+        ? neighbors.map((nb) => {
+          const cls = [];
+          if (node === activeNode && nb === activeNeighbor) cls.push("current");
+          else if (color[nb] === 0) cls.push("c0");
+          else if (color[nb] === 1) cls.push("c1");
+          if (conflictNodes.has(nb) && conflictNodes.has(node)) cls.push("conflict");
+          return `<span class="${cls.join(" ")}">${nb}</span>`;
+        }).join("")
+        : "<em>∅</em>";
+      const rowCls = ["bip785-adj-row"];
+      if (node === activeNode) rowCls.push("active");
+      if (color[node] === 0) rowCls.push("is0");
+      if (color[node] === 1) rowCls.push("is1");
+      return `<div class="${rowCls.join(" ")}"><b>${node}</b><i>→</i><div>${nbHtml}</div></div>`;
+    }).join("")
+    : `<div class="bip785-empty">∅</div>`;
+
+  // ── Decision copy ───────────────────────────────────────────────────────
+  const decisionText = {
+    intro: vi ? "Bipartite ⇔ tô được 2 màu sao cho mọi cạnh nối hai màu khác nhau." : "Bipartite ⇔ 2-colourable so that every edge joins two different colours.",
+    "init-color": vi ? "color[i] = -1 nghĩa là node i chưa được tô." : "color[i] = -1 means node i is not coloured yet.",
+    "skip-coloured": vi ? "Node này đã thuộc một component đã xử lý → bỏ qua." : "This node already belongs to a processed component → skip it.",
+    "start-component": vi ? "Component mới: gán màu 0 cho node bắt đầu (chọn màu nào cũng được)." : "New component: give the start node colour 0 (either choice works).",
+    dequeue: vi ? "Lấy node ra khỏi queue để xét các hàng xóm." : "Dequeue a node to inspect its neighbours.",
+    "colour-node": vi ? "Tô node hiện tại rồi đi xét từng hàng xóm." : "Colour the current node, then inspect each neighbour.",
+    "colour-neighbour": vi ? "Hàng xóm chưa tô → tô màu ĐẢO rồi thêm vào frontier." : "Neighbour is uncoloured → assign the FLIPPED colour and add it to the frontier.",
+    recurse: vi ? "Đi sâu vào hàng xóm với màu đảo." : "Recurse into the neighbour with the flipped colour.",
+    "already-ok": vi ? "Hàng xóm đã tô và khác màu → cạnh này hợp lệ." : "Neighbour is already coloured and differs → this edge is fine.",
+    conflict: vi ? "Cạnh nối hai node CÙNG màu → có chu trình lẻ → không bipartite." : "This edge joins two nodes of the SAME colour → odd cycle → not bipartite.",
+    "propagate-false": vi ? "False được truyền ngược lên chuỗi đệ quy." : "False propagates back up the recursion chain.",
+    "return-true": vi ? "Mọi hàng xóm hợp lệ → khung đệ quy trả True." : "All neighbours are valid → this frame returns True.",
+    "component-done": vi ? "Component này đã tô xong, tìm component tiếp theo." : "This component is fully coloured; look for the next one.",
+    "done-true": vi ? "Không có cạnh nào vi phạm → đồ thị là bipartite." : "No edge is violated → the graph is bipartite.",
+    "done-false": vi ? "Đã tìm được cạnh vi phạm → đồ thị không bipartite." : "A violating edge was found → the graph is not bipartite.",
+  }[view.decision] || (vi ? "Đang tô màu đồ thị." : "Colouring the graph.");
+
+  const rv = view.returnValue;
+  const decCls = rv === true ? "true" : rv === false ? "false" : "";
+  const isDone = view.phase === "done";
+  const rvLabel = rv === null || rv === undefined ? (vi ? "chưa return" : "no return yet") : String(rv);
+
+  const conflictBanner = conflict
+    ? `<div class="bip785-conflict"><b>${vi ? "CẠNH VI PHẠM" : "VIOLATING EDGE"}</b><code>${conflict.u} — ${conflict.v}</code><span>${vi ? `cả hai đều màu ${conflict.color}` : `both are colour ${conflict.color}`}</span></div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="bip785-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa kiểm tra đồ thị hai phía" : "Is-graph-bipartite visualization")}">
+    <div class="bip785-phases">${phases}</div>
+    ${conflictBanner}
+    <div class="bip785-layout">
+      <div id="bip785Graph" class="bip785-graph"></div>
+      <div class="bip785-state">
+        <div class="bip785-head"><strong>${vi ? "HAI TẬP MÀU" : "THE TWO SETS"}</strong><span>${vi ? "mọi cạnh phải bắc qua giữa" : "every edge must cross the middle"}</span></div>
+        ${partitionHtml}
+        <div class="bip785-head"><strong>${escapeHtml(frontierLabel)}</strong><span>${escapeHtml(frontierHint)}</span></div>
+        <div class="bip785-frontier">${frontierHtml}</div>
+      </div>
+    </div>
+    <div class="bip785-head"><strong>color[]</strong><span>${vi ? "−1 = chưa tô" : "−1 = uncoloured"}</span></div>
+    <div class="bip785-array">${colorCells}</div>
+    <div class="bip785-lower">
+      <div class="bip785-adj">
+        <div class="bip785-head"><strong>adjacency list</strong><span>${vi ? "hàng xóm mỗi node" : "neighbours per node"}</span></div>
+        <div>${adjHtml}</div>
+      </div>
+      <div class="bip785-decision ${decCls}${isDone ? " done" : ""}">
+        <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+        <strong>${escapeHtml(decisionText)}</strong>
+        <div>
+          ${startNode === null ? "" : `<span>start = ${escapeHtml(startNode)}</span>`}
+          ${activeNode === null ? "" : `<span>node = ${escapeHtml(activeNode)}</span>`}
+          ${activeNeighbor === null ? "" : `<span>nb = ${escapeHtml(activeNeighbor)}</span>`}
+          <span>return = ${escapeHtml(rvLabel)}</span>
+        </div>
+      </div>
+    </div>
+  </section>`;
+  renderGraph(step, "bip785Graph");
+}
+
 function renderPathExistsBfsView(step) {
   const view = step.pathExistsBfsView || {};
   const vi = lang === "vi";
@@ -32337,6 +32486,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPathExistsBfsView(step);
+  } else if (step.bipartiteView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBipartiteView(step);
   } else if (step.autocompleteView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
