@@ -7910,3 +7910,287 @@ Object.assign(module.exports, {
     builder: buildSteps3161,
   },
 });
+
+// ─── 528: Random Pick with Weight ───────────────────────────────────────────
+//
+// Turn the weights into a prefix-sum array, which slices the range 1..total
+// into one contiguous block per index whose LENGTH equals that index's weight:
+//
+//   w      = [1, 3, 2]
+//   prefix = [1, 4, 6]        total = 6
+//   line   =  1 | 2  3  4 | 5  6
+//             i=0    i=1     i=2
+//
+// A uniform random target in 1..total therefore lands in block i with
+// probability w[i] / total — exactly the required weighting. Finding the owner
+// of a target is "first prefix[i] >= target", i.e. a lower-bound binary search.
+//
+// Randomness is supplied by the user as an explicit list of targets so the
+// visualization is reproducible and the weighting can be observed.
+
+function parseWeights528(value, label) {
+  const text = String(value ?? "").trim();
+  if (!text) throw new Error(`${label} is required`);
+  let arr;
+  try {
+    arr = text.startsWith("[") ? JSON.parse(text) : text.split(",").map((x) => Number(x.trim()));
+  } catch (_error) {
+    throw new Error(`${label} must be a comma-separated list of positive integers`);
+  }
+  if (!Array.isArray(arr) || !arr.length || arr.some((v) => !Number.isInteger(v) || v <= 0)) {
+    throw new Error(`${label} must contain only positive integers`);
+  }
+  if (arr.length > 8) throw new Error("use at most 8 weights so the number line stays readable");
+  const total = arr.reduce((a, b) => a + b, 0);
+  if (total > 40) throw new Error("keep the total weight at 40 or less so every unit is visible");
+  return arr;
+}
+
+function parse528Data(input, params = {}) {
+  const w = parseWeights528(input, "w");
+  const total = w.reduce((a, b) => a + b, 0);
+  const raw = String(params.targets ?? "").trim();
+  if (!raw) throw new Error("targets is required: the simulated randint(1, total) values");
+  let targets;
+  try {
+    targets = raw.startsWith("[") ? JSON.parse(raw) : raw.split(",").map((x) => Number(x.trim()));
+  } catch (_error) {
+    throw new Error("targets must be a comma-separated list of integers");
+  }
+  if (!Array.isArray(targets) || !targets.length || targets.some((v) => !Number.isInteger(v))) {
+    throw new Error("targets must be a non-empty list of integers");
+  }
+  if (targets.length > 8) throw new Error("use at most 8 targets so the trace stays readable");
+  targets.forEach((t, i) => {
+    if (t < 1 || t > total) throw new Error(`targets[${i}] = ${t} is outside 1..${total} (randint range for this w)`);
+  });
+  return { w, total, targets };
+}
+
+function buildSteps528(input, params = {}) {
+  const { w, total, targets } = parse528Data(input, params);
+  const n = w.length;
+  const steps = [];
+
+  const prefix = [];
+  const tally = new Array(n).fill(0);
+  const picks = [];
+  let buildIndex = -1;
+  let pickNumber = 0;
+  let target = null;
+  let lo = null;
+  let hi = null;
+  let mid = null;
+  let result = null;
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      randomPickView: {
+        n,
+        w: [...w],
+        total,
+        prefix: [...prefix],
+        phase: o.phase,
+        decision: o.decision || "",
+        buildIndex,
+        targets: [...targets],
+        pickNumber,
+        target,
+        lo, hi, mid,
+        result,
+        picks: picks.map((p) => ({ ...p })),
+        tally: [...tally],
+        answer: o.final ? picks.map((p) => p.index) : null,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `w = [${w.join(", ")}], tổng = ${total}`, en: `w = [${w.join(", ")}], total = ${total}` },
+    note: {
+      vi: `Cần chọn index i với xác suất w[i]/${total}. Ý tưởng: biến w thành prefix sum để chia dải 1..${total} thành các khối liền nhau, khối của index i dài đúng w[i].`,
+      en: `We must pick index i with probability w[i]/${total}. Idea: turn w into a prefix sum so the range 1..${total} splits into contiguous blocks, where index i's block is exactly w[i] long.`,
+    },
+    codeLines: [5, 6, 7], phase: "intro", decision: "intro",
+    vars: [{ name: "n", value: n }, { name: "total", value: total }],
+  });
+
+  // ── build prefix sums ────────────────────────────────────────────────────
+  let running = 0;
+  for (let i = 0; i < n; i++) {
+    buildIndex = i;
+    running += w[i];
+    prefix.push(running);
+    snap({
+      title: { vi: `prefix[${i}] = ${running} (cộng w[${i}] = ${w[i]})`, en: `prefix[${i}] = ${running} (add w[${i}] = ${w[i]})` },
+      note: {
+        vi: `Index ${i} sở hữu dải (${running - w[i]}, ${running}] — đúng ${w[i]} đơn vị.`,
+        en: `Index ${i} owns the block (${running - w[i]}, ${running}] — exactly ${w[i]} units wide.`,
+      },
+      codeLines: [8, 9, 10], phase: "build", decision: "build",
+      vars: [{ name: "weight", value: w[i] }, { name: "total so far", value: running }],
+    });
+  }
+  buildIndex = -1;
+
+  snap({
+    title: { vi: `prefix = [${prefix.join(", ")}]`, en: `prefix = [${prefix.join(", ")}]` },
+    note: {
+      vi: `prefix tăng dần nên có thể binary search. Chọn target ngẫu nhiên trong 1..${total}, rồi tìm index đầu tiên có prefix[i] ≥ target.`,
+      en: `prefix is increasing, so it is binary-searchable. Draw a random target in 1..${total}, then find the first index with prefix[i] ≥ target.`,
+    },
+    codeLines: [11], phase: "ready", decision: "ready",
+    vars: [{ name: "prefix", value: `[${prefix.join(", ")}]` }],
+  });
+
+  // ── simulate each pickIndex() call ───────────────────────────────────────
+  for (let t = 0; t < targets.length; t++) {
+    pickNumber = t + 1;
+    target = targets[t];
+    result = null;
+    lo = 0;
+    hi = n - 1;
+    mid = null;
+
+    snap({
+      title: { vi: `pickIndex() #${pickNumber}: target = ${target}`, en: `pickIndex() #${pickNumber}: target = ${target}` },
+      note: {
+        vi: `Coi như random.randint(1, ${total}) trả về ${target}. Tìm chủ sở hữu của đơn vị thứ ${target}.`,
+        en: `Treat random.randint(1, ${total}) as returning ${target}. Find which index owns unit ${target}.`,
+      },
+      codeLines: [14, 15], phase: "pick", decision: "draw",
+      vars: [{ name: "target", value: target }, { name: "lo, hi", value: `${lo}, ${hi}` }],
+    });
+
+    while (lo < hi) {
+      mid = Math.floor((lo + hi) / 2);
+      const goRight = prefix[mid] < target;
+      snap({
+        title: { vi: `mid = ${mid}: prefix[${mid}] = ${prefix[mid]} ${goRight ? "<" : "≥"} ${target}`, en: `mid = ${mid}: prefix[${mid}] = ${prefix[mid]} ${goRight ? "<" : "≥"} ${target}` },
+        note: goRight
+          ? { vi: `Khối của index ${mid} kết thúc ở ${prefix[mid]}, còn nhỏ hơn target → chủ sở hữu nằm bên PHẢI → lo = ${mid + 1}.`, en: `Index ${mid}'s block ends at ${prefix[mid]}, still below target → the owner is to the RIGHT → lo = ${mid + 1}.` }
+          : { vi: `prefix[${mid}] ≥ target nên index ${mid} CÓ THỂ là chủ sở hữu → giữ lại, hi = ${mid}.`, en: `prefix[${mid}] ≥ target so index ${mid} COULD be the owner → keep it, hi = ${mid}.` },
+        codeLines: goRight ? [16, 17, 18, 19] : [16, 17, 18, 20, 21], phase: "pick",
+        decision: goRight ? "go-right" : "keep-mid",
+        vars: [
+          { name: "mid", value: mid },
+          { name: "prefix[mid]", value: prefix[mid] },
+          { name: "target", value: target },
+        ],
+      });
+      if (goRight) lo = mid + 1; else hi = mid;
+    }
+
+    mid = null;
+    result = lo;
+    tally[lo] += 1;
+    picks.push({ target, index: lo });
+    snap({
+      title: { vi: `lo == hi == ${lo} → trả về index ${lo}`, en: `lo == hi == ${lo} → return index ${lo}` },
+      note: {
+        vi: `Đơn vị ${target} thuộc dải (${lo === 0 ? 0 : prefix[lo - 1]}, ${prefix[lo]}] của index ${lo}, nên pickIndex() = ${lo}.`,
+        en: `Unit ${target} falls inside index ${lo}'s block (${lo === 0 ? 0 : prefix[lo - 1]}, ${prefix[lo]}], so pickIndex() = ${lo}.`,
+      },
+      codeLines: [22], phase: "pick", decision: "resolved",
+      vars: [{ name: "return", value: lo }, { name: "picks", value: `[${picks.map((p) => p.index).join(", ")}]` }],
+    });
+  }
+
+  target = null;
+  lo = null;
+  hi = null;
+  result = null;
+  const answer = picks.map((p) => p.index);
+  snap({
+    title: { vi: `Kết quả: [${answer.join(", ")}]`, en: `Result: [${answer.join(", ")}]` },
+    note: {
+      vi: `Mỗi pickIndex() chỉ mất O(log n). Về lâu dài, tỉ lệ chọn index i tiến về w[i]/${total} vì khối của nó dài đúng w[i] đơn vị.`,
+      en: `Each pickIndex() costs only O(log n). Over many calls the share of index i approaches w[i]/${total}, because its block is exactly w[i] units long.`,
+    },
+    codeLines: [22], phase: "done", decision: "done", final: true,
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+  });
+
+  return { original: w, answer, steps };
+}
+
+Object.assign(module.exports, {
+  528: {
+    id: 528,
+    difficulty: "medium",
+    slug: "random-pick-with-weight",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [
+      { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+      { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
+      { key: "randomized", vi: "Ngẫu nhiên", en: "Randomized" },
+    ],
+    title: { vi: "Random Pick with Weight", en: "Random Pick with Weight" },
+    titleVi: { vi: "Chọn index theo trọng số", en: "Pick an index by weight" },
+    statement: {
+      vi:
+        "Cho mảng w, w[i] là trọng số của index i. Hãy cài pickIndex() trả về index i với xác suất w[i] / sum(w). " +
+        "Vì visualization cần tái lập được, bạn nhập trực tiếp danh sách targets — coi như kết quả của random.randint(1, total) cho mỗi lần gọi pickIndex().",
+      en:
+        "Given an array w where w[i] is the weight of index i, implement pickIndex() so it returns index i with probability w[i] / sum(w). " +
+        "Because the visualization must be reproducible, you supply the targets list directly — treat each value as the result of random.randint(1, total) for one pickIndex() call.",
+    },
+    defaultInput: "1,3,2",
+    inputKind: "string",
+    inputLabel: { vi: "w — trọng số (dương, tối đa 8 số, tổng ≤ 40)", en: "w — weights (positive, up to 8, total ≤ 40)" },
+    extraParams: [
+      {
+        key: "targets", type: "string",
+        label: { vi: "targets — giá trị randint(1,total) mô phỏng", en: "targets — simulated randint(1,total) values" },
+        default: "1,2,4,5,6",
+      },
+    ],
+    approach: [
+      { vi: "Biến w thành prefix sum: prefix[i] = w[0] + … + w[i]. Index i sở hữu dải (prefix[i-1], prefix[i]] dài đúng w[i] đơn vị.", en: "Turn w into a prefix sum: prefix[i] = w[0] + … + w[i]. Index i owns the block (prefix[i-1], prefix[i]], exactly w[i] units long." },
+      { vi: "Một target ngẫu nhiên đều trong 1..total rơi vào khối i với xác suất w[i]/total — chính là phân phối cần có.", en: "A uniform random target in 1..total lands in block i with probability w[i]/total — exactly the required distribution." },
+      { vi: "Tìm chủ sở hữu = tìm index ĐẦU TIÊN có prefix[i] ≥ target, tức lower-bound binary search trên mảng tăng dần.", en: "Finding the owner = finding the FIRST index with prefix[i] ≥ target, i.e. a lower-bound binary search over an increasing array." },
+      { vi: "Dùng dạng [lo, hi] với hi = mid khi prefix[mid] ≥ target để không bỏ mất đáp án; khi lo == hi thì đó là index cần trả.", en: "Use the [lo, hi] form with hi = mid when prefix[mid] ≥ target so the answer is never skipped; when lo == hi that is the index to return." },
+    ],
+    complexity: {
+      time: "O(n) khởi tạo · O(log n) mỗi pickIndex()",
+      space: "O(n)",
+      note: {
+        vi: "Prefix sum dựng một lần O(n); mỗi lần chọn chỉ là binary search O(log n).",
+        en: "The prefix sum is built once in O(n); each pick is just an O(log n) binary search.",
+      },
+    },
+    code: [
+      "import random",
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def __init__(self, w: List[int]):",
+      "        self.prefix = []",
+      "        total = 0",
+      "        for weight in w:",
+      "            total += weight",
+      "            self.prefix.append(total)",
+      "        self.total = total",
+      "",
+      "    def pickIndex(self) -> int:",
+      "        target = random.randint(1, self.total)",
+      "        lo, hi = 0, len(self.prefix) - 1",
+      "        while lo < hi:",
+      "            mid = (lo + hi) // 2",
+      "            if self.prefix[mid] < target:",
+      "                lo = mid + 1",
+      "            else:",
+      "                hi = mid",
+      "        return lo",
+    ],
+    builder: buildSteps528,
+  },
+});

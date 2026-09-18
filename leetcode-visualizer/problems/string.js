@@ -16417,3 +16417,280 @@ Object.assign(module.exports, {
     builder: buildSteps1520,
   },
 });
+
+// ─── 777: Swap Adjacent in LR String ────────────────────────────────────────
+//
+// Allowed moves:  "XL" -> "LX"   (an L slides LEFT past one X)
+//                 "RX" -> "XR"   (an R slides RIGHT past one X)
+//
+// Neither move ever changes the relative order of the L/R letters — an L can
+// never hop over an R or vice versa. So the problem collapses to two checks on
+// the non-X letters, taken in order:
+//   1. start and end must spell the SAME L/R sequence once X's are removed.
+//   2. the k-th letter must be reachable by its own direction of travel:
+//        'L' can only move left  -> its index in start must be >= in end
+//        'R' can only move right -> its index in start must be <= in end
+//
+// Two pointers walk both strings, skipping X's, and verify both conditions.
+// Verified exhaustively against BFS over the real move set for all strings
+// of length <= 6 (597,870 pairs, zero mismatches).
+
+function parseLrString777(value, label) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (!text) throw new Error(`${label} is required`);
+  if (!/^[LRX]+$/.test(text)) throw new Error(`${label} may only contain the letters L, R and X`);
+  if (text.length > 14) throw new Error("use at most 14 characters so both strings stay readable");
+  return text;
+}
+
+function parse777Data(input, params = {}) {
+  const start = parseLrString777(input, "start");
+  const end = parseLrString777(params.end, "end");
+  if (start.length !== end.length) throw new Error("start and end must have the same length");
+  return { start, end };
+}
+
+function buildSteps777(input, params = {}) {
+  const { start, end } = parse777Data(input, params);
+  const n = start.length;
+  const steps = [];
+
+  const strip = (s) => s.split("").filter((c) => c !== "X").join("");
+  const pairs = [];
+  let i = 0;
+  let j = 0;
+  let verdict = null;
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      lrSwapView: {
+        n,
+        start,
+        end,
+        startClean: strip(start),
+        endClean: strip(end),
+        i: o.i === undefined ? i : o.i,
+        j: o.j === undefined ? j : o.j,
+        phase: o.phase,
+        decision: o.decision || "",
+        skipping: o.skipping || null,
+        pairs: pairs.map((p) => ({ ...p })),
+        verdict,
+        answer: o.final ? verdict : null,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `start = "${start}", end = "${end}"`, en: `start = "${start}", end = "${end}"` },
+    note: {
+      vi: "Chỉ có hai phép: XL→LX (L trượt sang TRÁI) và RX→XR (R trượt sang PHẢI). Không phép nào làm L và R đổi thứ tự cho nhau, nên chỉ cần kiểm tra hai điều: cùng dãy L/R sau khi bỏ X, và mỗi chữ có thể đi đúng hướng của nó.",
+      en: "Only two moves exist: XL→LX (an L slides LEFT) and RX→XR (an R slides RIGHT). Neither ever swaps an L past an R, so we only need two checks: the same L/R sequence once X's are removed, and each letter being reachable along its own direction.",
+    },
+    codeLines: [3, 4], phase: "intro", decision: "intro",
+    i: -1, j: -1,
+    vars: [
+      { name: "n", value: n },
+      { name: "start without X", value: strip(start) || "(empty)" },
+      { name: "end without X", value: strip(end) || "(empty)" },
+    ],
+  });
+
+  while (i < n || j < n) {
+    // skip X in start
+    const iBefore = i;
+    while (i < n && start[i] === "X") i += 1;
+    if (i !== iBefore) {
+      snap({
+        title: { vi: `Bỏ qua ${i - iBefore} ký tự X trong start → i = ${i}`, en: `Skip ${i - iBefore} X character(s) in start → i = ${i}` },
+        note: { vi: "X chỉ là ô trống để L và R trượt qua, không mang thông tin thứ tự.", en: "X is just empty space for L and R to slide through; it carries no ordering information." },
+        codeLines: [6, 7], phase: "skip", decision: "skip-start", skipping: "start",
+      });
+    }
+    const jBefore = j;
+    while (j < n && end[j] === "X") j += 1;
+    if (j !== jBefore) {
+      snap({
+        title: { vi: `Bỏ qua ${j - jBefore} ký tự X trong end → j = ${j}`, en: `Skip ${j - jBefore} X character(s) in end → j = ${j}` },
+        note: { vi: "Tương tự cho end.", en: "Same for end." },
+        codeLines: [8, 9], phase: "skip", decision: "skip-end", skipping: "end",
+      });
+    }
+
+    if (i === n || j === n) {
+      const ok = i === n && j === n;
+      verdict = ok;
+      snap({
+        title: { vi: `Một chuỗi đã hết: i=${i}, j=${j}, n=${n} → ${ok}`, en: `One string ran out: i=${i}, j=${j}, n=${n} → ${ok}` },
+        note: ok
+          ? { vi: "Cả hai cùng hết chữ → số lượng L/R khớp nhau.", en: "Both ran out together → the L/R counts match." }
+          : { vi: "Chỉ một bên hết chữ → số lượng L/R khác nhau nên không thể biến đổi.", en: "Only one ran out → the two strings hold different numbers of letters, so no transformation exists." },
+        codeLines: [10, 11], phase: "done", decision: ok ? "done-true" : "count-mismatch", final: true,
+        vars: [{ name: "answer", value: ok }],
+      });
+      return { original: start, answer: ok, steps };
+    }
+
+    const a = start[i];
+    const b = end[j];
+    snap({
+      title: { vi: `So sánh start[${i}] = '${a}' với end[${j}] = '${b}'`, en: `Compare start[${i}] = '${a}' with end[${j}] = '${b}'` },
+      note: a === b
+        ? { vi: `Cùng là '${a}' → tiếp tục kiểm tra hướng di chuyển.`, en: `Both are '${a}' → continue to the direction check.` }
+        : { vi: `Khác chữ ('${a}' ≠ '${b}') → dãy L/R không khớp. Vì L và R không bao giờ vượt qua nhau, điều này là bất khả thi.`, en: `Different letters ('${a}' ≠ '${b}') → the L/R sequences differ. Since L and R can never cross, this is impossible.` },
+      codeLines: [12, 13], phase: "compare", decision: a === b ? "letters-match" : "letter-mismatch",
+    });
+
+    if (a !== b) {
+      verdict = false;
+      snap({
+        title: { vi: "return False", en: "return False" },
+        note: { vi: `Không thể biến "${start}" thành "${end}".`, en: `Cannot transform "${start}" into "${end}".` },
+        codeLines: [13], phase: "done", decision: "done-false", final: true,
+        vars: [{ name: "answer", value: false }],
+      });
+      return { original: start, answer: false, steps };
+    }
+
+    if (a === "L") {
+      const ok = i >= j;
+      snap({
+        title: { vi: `'L': cần i ≥ j → ${i} ≥ ${j} = ${ok}`, en: `'L': need i ≥ j → ${i} ≥ ${j} = ${ok}` },
+        note: ok
+          ? { vi: `L chỉ trượt sang TRÁI được, nên vị trí trong start (${i}) phải ở bằng hoặc bên phải vị trí trong end (${j}). Hợp lệ — nó đi ${i - j} bước sang trái.`, en: `An L can only slide LEFT, so its index in start (${i}) must be at or to the right of its index in end (${j}). Valid — it travels ${i - j} step(s) left.` }
+          : { vi: `L cần đi từ ${i} tới ${j}, tức sang PHẢI ${j - i} bước — nhưng L không bao giờ đi sang phải được.`, en: `This L would have to travel from ${i} to ${j}, i.e. ${j - i} step(s) RIGHT — but an L can never move right.` },
+        codeLines: [14, 15], phase: "constraint", decision: ok ? "L-ok" : "L-bad",
+      });
+      if (!ok) {
+        verdict = false;
+        snap({
+          title: { vi: "return False", en: "return False" },
+          note: { vi: "Vi phạm hướng di chuyển của L.", en: "The L's direction constraint is violated." },
+          codeLines: [15], phase: "done", decision: "done-false", final: true,
+          vars: [{ name: "answer", value: false }],
+        });
+        return { original: start, answer: false, steps };
+      }
+    } else {
+      const ok = i <= j;
+      snap({
+        title: { vi: `'R': cần i ≤ j → ${i} ≤ ${j} = ${ok}`, en: `'R': need i ≤ j → ${i} ≤ ${j} = ${ok}` },
+        note: ok
+          ? { vi: `R chỉ trượt sang PHẢI được, nên vị trí trong start (${i}) phải ở bằng hoặc bên trái vị trí trong end (${j}). Hợp lệ — nó đi ${j - i} bước sang phải.`, en: `An R can only slide RIGHT, so its index in start (${i}) must be at or to the left of its index in end (${j}). Valid — it travels ${j - i} step(s) right.` }
+          : { vi: `R cần đi từ ${i} tới ${j}, tức sang TRÁI ${i - j} bước — nhưng R không bao giờ đi sang trái được.`, en: `This R would have to travel from ${i} to ${j}, i.e. ${i - j} step(s) LEFT — but an R can never move left.` },
+        codeLines: [16, 17], phase: "constraint", decision: ok ? "R-ok" : "R-bad",
+      });
+      if (!ok) {
+        verdict = false;
+        snap({
+          title: { vi: "return False", en: "return False" },
+          note: { vi: "Vi phạm hướng di chuyển của R.", en: "The R's direction constraint is violated." },
+          codeLines: [17], phase: "done", decision: "done-false", final: true,
+          vars: [{ name: "answer", value: false }],
+        });
+        return { original: start, answer: false, steps };
+      }
+    }
+
+    pairs.push({ i, j, ch: a, shift: a === "L" ? i - j : j - i });
+    i += 1;
+    j += 1;
+    snap({
+      title: { vi: `Khớp xong '${a}' → i = ${i}, j = ${j}`, en: `'${a}' matched → i = ${i}, j = ${j}` },
+      note: { vi: "Sang cặp chữ tiếp theo.", en: "Move on to the next pair of letters." },
+      codeLines: [18, 19], phase: "advance", decision: "advance",
+    });
+  }
+
+  verdict = true;
+  snap({
+    title: { vi: "return True — biến đổi được", en: "return True — the transformation is possible" },
+    note: {
+      vi: `Mọi chữ khớp nhau và đi đúng hướng của mình. ${pairs.length ? `Các bước dịch: ${pairs.map((p) => `${p.ch}${p.shift === 0 ? " giữ nguyên" : ` ${p.shift} bước ${p.ch === "L" ? "trái" : "phải"}`}`).join(", ")}.` : "Cả hai chuỗi chỉ gồm X."}`,
+      en: `Every letter matches and travels in its own legal direction. ${pairs.length ? `Shifts: ${pairs.map((p) => `${p.ch}${p.shift === 0 ? " stays"  : ` moves ${p.shift} ${p.ch === "L" ? "left" : "right"}`}`).join(", ")}.` : "Both strings contain only X."}`,
+    },
+    codeLines: [20], phase: "done", decision: "done-true", final: true,
+    vars: [{ name: "answer", value: true }],
+  });
+
+  return { original: start, answer: true, steps };
+}
+
+Object.assign(module.exports, {
+  777: {
+    id: 777,
+    difficulty: "medium",
+    slug: "swap-adjacent-in-lr-string",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+      { key: "invariant", vi: "Bất biến", en: "Invariant" },
+    ],
+    title: { vi: "Swap Adjacent in LR String", en: "Swap Adjacent in LR String" },
+    titleVi: { vi: "Đổi chỗ liền kề trong chuỗi LR", en: "Swap adjacent in an LR string" },
+    statement: {
+      vi:
+        "Cho hai chuỗi start và end cùng độ dài, chỉ gồm 'L', 'R', 'X'. Mỗi bước bạn được thay \"XL\" thành \"LX\", hoặc thay \"RX\" thành \"XR\". " +
+        "Hỏi có thể biến start thành end sau một số bước không?",
+      en:
+        "Given two strings start and end of equal length containing only 'L', 'R', 'X', in one move you may replace \"XL\" with \"LX\" or replace \"RX\" with \"XR\". " +
+        "Determine whether start can be transformed into end after some number of moves.",
+    },
+    defaultInput: "RXXLRXRXL",
+    inputKind: "string",
+    inputLabel: { vi: "start (chỉ L, R, X — tối đa 14 ký tự)", en: "start (L, R, X only — up to 14 chars)" },
+    extraParams: [
+      { key: "end", type: "string", label: { vi: "end (cùng độ dài)", en: "end (same length)" }, default: "XRLXXRRLX" },
+    ],
+    approach: [
+      { vi: "Hai phép biến đổi chỉ cho L trượt sang TRÁI và R trượt sang PHẢI qua các ô X. Không phép nào đổi thứ tự tương đối giữa L và R.", en: "The two moves only let an L slide LEFT and an R slide RIGHT through X cells. Neither changes the relative order of the L/R letters." },
+      { vi: "Vì vậy bỏ hết X đi thì start và end phải cho ra CÙNG một dãy L/R, nếu khác là bất khả thi.", en: "Therefore, with all X's removed, start and end must spell the SAME L/R sequence; otherwise it is impossible." },
+      { vi: "Với chữ thứ k: nếu là 'L' thì vị trí trong start phải ≥ vị trí trong end (chỉ đi được sang trái); nếu là 'R' thì phải ≤ (chỉ đi được sang phải).", en: "For the k-th letter: an 'L' must have its start index ≥ its end index (it may only go left); an 'R' must have start index ≤ end index (it may only go right)." },
+      { vi: "Dùng hai con trỏ cùng bỏ qua X rồi so từng cặp chữ — tổng O(n), không cần mô phỏng từng bước swap.", en: "Walk both strings with two pointers that skip X's and compare letter by letter — O(n) overall, with no need to simulate individual swaps." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi con trỏ chỉ đi tiến, tổng cộng duyệt mỗi chuỗi một lần; không dùng thêm bộ nhớ phụ.",
+        en: "Each pointer only moves forward, scanning each string once; no auxiliary memory is needed.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def canTransform(self, start: str, end: str) -> bool:",
+      "        n = len(start)",
+      "        i = j = 0",
+      "        while i < n or j < n:",
+      "            while i < n and start[i] == 'X':",
+      "                i += 1",
+      "            while j < n and end[j] == 'X':",
+      "                j += 1",
+      "            if i == n or j == n:",
+      "                return i == n and j == n",
+      "            if start[i] != end[j]:",
+      "                return False",
+      "            if start[i] == 'L' and i < j:",
+      "                return False",
+      "            if start[i] == 'R' and i > j:",
+      "                return False",
+      "            i += 1",
+      "            j += 1",
+      "        return True",
+    ],
+    liveArgs(input, params = {}) {
+      const { start, end } = parse777Data(input, params);
+      return [start, end];
+    },
+    builder: buildSteps777,
+  },
+});

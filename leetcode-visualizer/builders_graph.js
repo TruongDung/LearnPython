@@ -4,8 +4,15 @@
  */
 
 // ─── 1293: Shortest Path in Grid with Obstacles Elimination ───
-// BFS with 3D state: (row, col, eliminations_remaining).
-// Grid view shows cells with distances/obstacles, BFS levels expanding.
+// BFS over a 3D state space: (row, col, eliminations_remaining).
+//
+// This renders through the dedicated `gridElim1293View` renderer rather than the
+// generic `bfsGrid` one. The generic grid could only show ONE number per cell,
+// which hides the single thing that makes this problem hard: a cell is not one
+// node, it is k+1 nodes. Marking a cell "visited" by (row, col) alone is the
+// classic wrong answer here, and you cannot see why unless the per-cell states
+// are drawn separately. So each cell now lists every remaining-k state created
+// on it, and rejected moves say which rule rejected them.
 function buildSteps1293(input, params) {
   const grid = String(input)
     .split(/[|;]/)
@@ -25,16 +32,18 @@ function buildSteps1293(input, params) {
   if (!valid) {
     steps.push({
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
-      arr: [],
-      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
-      highlight: [],
-      mark: [],
-      final: true,
+      arr: [], highlight: [], mark: [], final: true,
       codeLines: [5],
       vars: [{ name: "answer", value: -1 }],
+      gridElim1293View: {
+        error: {
+          vi: "Grid phải là ma trận chữ nhật chỉ gồm 0/1, ô start (0,0) và ô đích đều phải là 0, k là số nguyên ≥ 0. Vì mỗi ô mang nhiều state k khác nhau, visualization giới hạn 8×8.",
+          en: "The grid must be rectangular with only 0/1, both the start (0,0) and the target must be 0, and k must be an integer ≥ 0. Because each cell carries several k states, the visualization is limited to 8×8.",
+        },
+      },
       note: {
-        vi: "Grid phải là ma trận chữ nhật 0/1, start và target bằng 0, k là số nguyên không âm. Vì mỗi ô có nhiều state k, visualization line-by-line hỗ trợ tối đa 8×8.",
-        en: "The grid must be rectangular and contain 0/1, start and target must be 0, and k must be a non-negative integer. Because each cell has many k states, the line-by-line visualization supports at most 8×8.",
+        vi: "Grid phải là ma trận chữ nhật 0/1, start và target bằng 0, k là số nguyên không âm. Visualization hỗ trợ tối đa 8×8.",
+        en: "The grid must be rectangular and contain 0/1, start and target must be 0, and k must be a non-negative integer. The visualization supports at most 8×8.",
       },
     });
     return { original: grid, answer: -1, steps };
@@ -42,173 +51,196 @@ function buildSteps1293(input, params) {
 
   const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
   const best = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  // Every remaining-k value that produced a real state at this cell. The length
+  // of this list IS the number of times the cell entered the queue, which is the
+  // visual proof that (row, col) alone is not a state.
+  const statesAt = Array.from({ length: rows }, () => Array.from({ length: cols }, () => []));
+  const firstDist = Array.from({ length: rows }, () => Array(cols).fill(null));
   const queue = [];
   const parent = new Map();
   const processedCells = new Set();
+  const layerCounts = new Map();
   const stateKey = (r, c, rem) => `${r},${c},${rem}`;
   const cellKey = (r, c) => `${r},${c}`;
-  const bestStr = () => `[${best.map((row) => `[${row.join(", ")}]`).join(", ")}]`;
-  const queueStr = () => `[${queue.map(([r, c, rem, dist]) => `(${r}, ${c}, k=${rem}, d=${dist})`).join(", ")}]`;
+  let popped = 0;
+  let enqueued = 0;
+  let prunedDominated = 0;
+  let prunedNoK = 0;
+  let prunedOob = 0;
 
-  function makeCells(current = null, pathCells = new Set()) {
-    const queuedCells = new Set(queue.map(([r, c]) => cellKey(r, c)));
-    return grid.map((row, r) => row.map((cell, c) => {
-      const key = cellKey(r, c);
-      let cls = cell === 1 ? "wall" : "empty";
-      if (processedCells.has(key)) cls = "visited";
-      if (queuedCells.has(key)) cls = "queued";
-      if (pathCells.has(key)) cls = "path";
-      if (current && current[0] === r && current[1] === c) cls = "current";
-      const endpoint = r === 0 && c === 0
-        ? " · S"
-        : r === rows - 1 && c === cols - 1
-          ? " · T"
-          : "";
-      return { label: cell === 1 ? "■" : "·", meta: `best-k:${best[r][c]}${endpoint}`, cls };
-    }));
+  function record(r, c, rem, dist) {
+    best[r][c] = rem;
+    if (!statesAt[r][c].includes(rem)) statesAt[r][c].push(rem);
+    statesAt[r][c].sort((a, b) => b - a);
+    if (firstDist[r][c] === null) firstDist[r][c] = dist;
+    layerCounts.set(dist, (layerCounts.get(dist) || 0) + 1);
+    enqueued += 1;
   }
 
-  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+  function makeCells(cur, probe, pathCells) {
+    const queuedCells = new Set(queue.map(([r, c]) => cellKey(r, c)));
+    return grid.map((row, r) => row.map((value, c) => ({
+      wall: value === 1,
+      role: r === 0 && c === 0 ? "start" : r === rows - 1 && c === cols - 1 ? "target" : "",
+      rems: [...statesAt[r][c]],
+      dist: firstDist[r][c],
+      inQueue: queuedCells.has(cellKey(r, c)),
+      processed: processedCells.has(cellKey(r, c)),
+      cur: Boolean(cur && cur.r === r && cur.c === c),
+      probe: Boolean(probe && probe.r === r && probe.c === c),
+      verdict: probe && probe.r === r && probe.c === c ? probe.verdict : null,
+      path: pathCells ? pathCells.has(cellKey(r, c)) : false,
+    })));
+  }
+
+  function snap(o) {
+    const pathCells = o.pathCells || null;
     steps.push({
-      title,
-      arr: [],
-      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
-      highlight: [],
-      mark: [],
-      final,
-      codeLines: [codeLine],
-      vars,
-      note,
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      gridElim1293View: {
+        rows, cols, k,
+        phase: o.phase,
+        cells: makeCells(o.cur || null, o.probe || null, pathCells),
+        cur: o.cur || null,
+        probe: o.probe || null,
+        queue: queue.map(([r, c, rem, dist], i) => ({ r, c, rem, dist, head: i === 0 })),
+        layers: [...layerCounts.entries()].sort((a, b) => a[0] - b[0]).map(([d, count]) => ({ d, count })),
+        counters: { popped, enqueued, prunedDominated, prunedNoK, prunedOob },
+        multiState: statesAt.flatMap((row, r) => row
+          .map((rems, c) => ({ r, c, rems: [...rems] }))
+          .filter((e) => e.rems.length > 1)),
+        shortcut: o.shortcut || null,
+        path: o.path || null,
+        eliminated: o.eliminated || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
     });
   }
 
-  pushStep({
-    title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
-    codeLine: 5,
-    vars: [{ name: "m", value: rows }, { name: "n", value: cols }, { name: "k", value: k }],
+  snap({
+    phase: "intro",
+    title: { vi: `Lưới ${rows} × ${cols}, k = ${k}`, en: `Grid ${rows} × ${cols}, k = ${k}` },
     note: {
-      vi: `Ô · là trống, ■ là obstacle. Mỗi state trong queue gồm (row, col, k_còn_lại, distance); cần tới (${rows - 1},${cols - 1}).`,
-      en: `A · cell is empty and ■ is an obstacle. Every queue state is (row, col, k_remaining, distance); reach (${rows - 1},${cols - 1}).`,
+      vi: `Ô · trống, ô ■ là vật cản. Điểm mấu chốt: một ô KHÔNG phải một node. Đứng ở cùng ô nhưng còn 2 quyền phá khác hẳn còn 0 quyền — nên state là (hàng, cột, k_còn_lại). Vì vậy mỗi ô có thể vào queue tới ${k + 1} lần với ${k + 1} giá trị k khác nhau.`,
+      en: `A · cell is empty, a ■ cell is an obstacle. The crux: a cell is NOT a node. Standing on the same cell with 2 eliminations left is a different situation from having 0 left — so a state is (row, col, k_remaining). That is why one cell can enter the queue up to ${k + 1} times, once per remaining-k value.`,
     },
+    codeLines: [5],
+    decision: {
+      vi: `State = (hàng, cột, k còn lại). Không gian state có ${rows}×${cols}×${k + 1} = ${rows * cols * (k + 1)} khả năng.`,
+      en: `State = (row, col, k remaining). The state space holds ${rows}×${cols}×${k + 1} = ${rows * cols * (k + 1)} possibilities.`,
+    },
+    vars: [{ name: "m, n", value: `${rows}, ${cols}` }, { name: "k", value: k }],
   });
 
   const shortcutLimit = rows + cols - 3;
   const shortcut = k >= shortcutLimit;
-  pushStep({
+  const manhattan = rows + cols - 2;
+  snap({
+    phase: "shortcutCheck",
     title: shortcut
-      ? { vi: `${k} ≥ ${shortcutLimit}: đủ k cho đường Manhattan`, en: `${k} ≥ ${shortcutLimit}: enough k for a Manhattan path` }
-      : { vi: `${k} ≥ ${shortcutLimit}? False`, en: `${k} ≥ ${shortcutLimit}? False` },
-    codeLine: 6,
-    current: [0, 0],
-    vars: [
-      { name: "k", value: k },
-      { name: "m + n - 3", value: shortcutLimit },
-      { name: "condition", value: shortcut },
-    ],
+      ? { vi: `k = ${k} ≥ m+n-3 = ${shortcutLimit} → đi thẳng được`, en: `k = ${k} ≥ m+n-3 = ${shortcutLimit} → a straight route works` }
+      : { vi: `k = ${k} ≥ m+n-3 = ${shortcutLimit}? Sai → phải BFS`, en: `k = ${k} ≥ m+n-3 = ${shortcutLimit}? False → BFS needed` },
     note: shortcut
       ? {
-          vi: `Một đường ngắn nhất kiểu Manhattan có ${rows + cols - 2} bước và tối đa ${shortcutLimit} ô trung gian có thể là obstacle. k=${k} chắc chắn phá đủ.`,
-          en: `A Manhattan shortest path has ${rows + cols - 2} moves and at most ${shortcutLimit} intermediate obstacle cells. k=${k} can certainly eliminate them.`,
-        }
+        vi: `Một đường Manhattan đi ${manhattan} bước và chỉ đi qua ${shortcutLimit} ô TRUNG GIAN (trừ start và đích, hai ô này luôn là 0). Xấu nhất cả ${shortcutLimit} ô đó là vật cản, mà k = ${k} đủ phá hết → không cần BFS, đáp án chính là khoảng cách Manhattan.`,
+        en: `A Manhattan route takes ${manhattan} moves and passes only ${shortcutLimit} INTERMEDIATE cells (start and target are always 0). Worst case all ${shortcutLimit} are obstacles, and k = ${k} can clear them all → no BFS needed, the answer is just the Manhattan distance.`,
+      }
       : {
-          vi: "k chưa đủ để bảo đảm đi thẳng qua mọi obstacle, nên phải chạy BFS.",
-          en: "k cannot guarantee crossing every obstacle on a direct route, so BFS is required.",
-        },
+        vi: `k = ${k} không đủ để bảo đảm phá hết ${shortcutLimit} ô trung gian của một đường thẳng, nên có thể phải đi đường vòng. Bắt buộc BFS.`,
+        en: `k = ${k} cannot guarantee clearing all ${shortcutLimit} intermediate cells of a straight route, so a detour may be required. BFS is mandatory.`,
+      },
+    codeLines: [6],
+    shortcut: { limit: shortcutLimit, applies: shortcut, manhattan },
+    decision: shortcut
+      ? { vi: `Trả ngay m+n-2 = ${manhattan}.`, en: `Return m+n-2 = ${manhattan} immediately.` }
+      : { vi: "Chạy BFS trên không gian state 3 chiều.", en: "Run BFS over the 3D state space." },
+    vars: [{ name: "k", value: k }, { name: "m + n - 3", value: shortcutLimit }, { name: "condition", value: shortcut }],
   });
 
   if (shortcut) {
-    const answer = rows + cols - 2;
     const path = [];
     for (let c = 0; c < cols; c += 1) path.push([0, c]);
     for (let r = 1; r < rows; r += 1) path.push([r, cols - 1]);
     const pathCells = new Set(path.map(([r, c]) => cellKey(r, c)));
-    pushStep({
-      title: { vi: `Trả ngay ${answer} bước`, en: `Return ${answer} moves immediately` },
-      codeLine: 7,
-      pathCells,
-      final: true,
-      vars: [{ name: "answer", value: answer }],
+    const walls = path.filter(([r, c]) => grid[r][c] === 1);
+    snap({
+      phase: "shortcut",
+      title: { vi: `Đáp án = ${manhattan}`, en: `Answer = ${manhattan}` },
       note: {
-        vi: `Đường xanh minh họa một đường Manhattan dài ${answer}. Không đường nào ngắn hơn khoảng cách Manhattan này.`,
-        en: `The green cells illustrate one Manhattan route of length ${answer}. No route can beat this Manhattan distance.`,
+        vi: `Đường xanh là một lộ trình Manhattan dài ${manhattan} bước (sang phải hết hàng 0 rồi đi xuống). Nó đi qua ${walls.length} vật cản, và k = ${k} phá được hết. Không đường nào ngắn hơn khoảng cách Manhattan.`,
+        en: `The green cells are one Manhattan route of ${manhattan} moves (right along row 0, then down). It crosses ${walls.length} obstacle(s), and k = ${k} clears them all. No route can be shorter than the Manhattan distance.`,
       },
+      codeLines: [7],
+      final: true,
+      pathCells,
+      path: path.map(([r, c]) => [r, c, k]),
+      eliminated: walls,
+      answer: manhattan,
+      decision: { vi: `Không cần BFS — đáp án ${manhattan}.`, en: `No BFS needed — the answer is ${manhattan}.` },
+      vars: [{ name: "answer", value: manhattan }],
     });
-    return { original: grid, answer, steps };
+    return { original: grid, answer: manhattan, steps };
   }
 
-  pushStep({
-    title: { vi: "Chuẩn bị bốn hướng", en: "Prepare four directions" },
-    codeLine: 8,
+  snap({
+    phase: "init",
+    title: { vi: "Bốn hướng đi", en: "The four moves" },
+    note: { vi: "Mỗi bước đi phải, trái, xuống hoặc lên — không đi chéo. Mọi cạnh có trọng số 1, nên BFS (không cần Dijkstra) là đủ.", en: "Each move goes right, left, down, or up — no diagonals. Every edge costs 1, so plain BFS suffices (no Dijkstra needed)." },
+    codeLines: [8],
+    decision: { vi: "Mọi bước cùng giá 1 → BFS cho đường ngắn nhất.", en: "All moves cost 1 → BFS gives the shortest path." },
     vars: [{ name: "directions", value: "[(0,1), (0,-1), (1,0), (-1,0)]" }],
-    note: { vi: "Mỗi bước đi phải, trái, xuống hoặc lên; không đi chéo.", en: "Each move goes right, left, down, or up; no diagonals." },
   });
 
-  pushStep({
-    title: { vi: "Khởi tạo best-k = -1", en: "Initialize best-k to -1" },
-    codeLine: 9,
-    vars: [{ name: "best", value: bestStr() }],
+  snap({
+    phase: "init",
+    title: { vi: "best[r][c] = -1 cho mọi ô", en: "best[r][c] = -1 for every cell" },
     note: {
-      vi: "best[r][c] là k còn lại LỚN NHẤT từng dùng để tới ô. -1 nghĩa là chưa tới; state có k thấp hơn hoặc bằng sẽ bị dominate.",
-      en: "best[r][c] is the LARGEST remaining k seen at that cell. -1 means unreached; a state with no more remaining k is dominated.",
+      vi: `best[r][c] là số quyền phá còn lại LỚN NHẤT từng đạt được ở ô đó. Đây là mẹo nén ${rows * cols * (k + 1)} state xuống còn một bảng ${rows}×${cols}: vì BFS tới các ô theo distance tăng dần, nếu ta đã từng tới ô này (không muộn hơn) mà còn NHIỀU quyền phá hơn, thì state mới hoàn toàn vô dụng.`,
+      en: `best[r][c] is the LARGEST remaining elimination count ever achieved at that cell. This is the trick that compresses ${rows * cols * (k + 1)} states into one ${rows}×${cols} table: because BFS reaches cells in nondecreasing distance, if we already got here no later with MORE eliminations left, the new state is strictly useless.`,
     },
+    codeLines: [9],
+    decision: { vi: "-1 = chưa từng tới ô này.", en: "-1 = never reached." },
+    vars: [{ name: "best", value: `${rows}×${cols} matrix of -1` }],
   });
 
-  best[0][0] = k;
-  pushStep({
+  record(0, 0, k, 0);
+  firstDist[0][0] = 0;
+  snap({
+    phase: "init",
     title: { vi: `best[0][0] = ${k}`, en: `best[0][0] = ${k}` },
-    codeLine: 10,
-    current: [0, 0],
+    note: { vi: "Ở ô start chưa phá vật cản nào nên còn nguyên k quyền.", en: "No obstacle has been eliminated at the start, so all k eliminations remain." },
+    codeLines: [10],
+    cur: { r: 0, c: 0, rem: k, dist: 0 },
+    decision: { vi: `Ô (0,0) có state k=${k}.`, en: `Cell (0,0) holds state k=${k}.` },
     vars: [{ name: "best[0][0]", value: k }],
-    note: { vi: "Ở start chưa phá obstacle nào, nên còn nguyên k.", en: "No obstacle has been eliminated at the start, so all k remain." },
   });
 
   queue.push([0, 0, k, 0]);
   parent.set(stateKey(0, 0, k), null);
-  pushStep({
-    title: { vi: "Đưa state đầu vào queue", en: "Push the initial state" },
-    codeLine: 11,
-    current: [0, 0],
-    vars: [{ name: "queue", value: queueStr() }],
-    note: { vi: "State đầu là (row=0, col=0, rem=k, dist=0).", en: "The initial state is (row=0, col=0, rem=k, dist=0)." },
+  snap({
+    phase: "init",
+    title: { vi: `queue = [(0, 0, k=${k}, d=0)]`, en: `queue = [(0, 0, k=${k}, d=0)]` },
+    note: { vi: "Queue là FIFO, nên state được xử lý theo distance không giảm. Đó là lý do state đích ĐẦU TIÊN được pop chắc chắn là ngắn nhất.", en: "The queue is FIFO, so states come out in nondecreasing distance. That is why the FIRST target state popped is guaranteed shortest." },
+    codeLines: [11],
+    cur: { r: 0, c: 0, rem: k, dist: 0 },
+    decision: { vi: "Bắt đầu BFS.", en: "Start BFS." },
+    vars: [{ name: "queue", value: `[(0, 0, ${k}, 0)]` }],
   });
 
   let answer = -1;
   while (queue.length) {
-    pushStep({
-      title: { vi: "Queue chưa rỗng", en: "The queue is not empty" },
-      codeLine: 13,
-      vars: [{ name: "queue", value: queueStr() }],
-      note: { vi: "BFS xử lý state theo distance tăng dần vì queue là FIFO.", en: "BFS processes states in nondecreasing distance because the queue is FIFO." },
-    });
-
     const [r, c, rem, dist] = queue.shift();
     const currentState = stateKey(r, c, rem);
     processedCells.add(cellKey(r, c));
-    pushStep({
-      title: { vi: `popleft → (${r},${c}, k=${rem}, d=${dist})`, en: `popleft → (${r},${c}, k=${rem}, d=${dist})` },
-      codeLine: 14,
-      current: [r, c],
-      vars: [
-        { name: "r, c", value: `${r}, ${c}` },
-        { name: "rem", value: rem },
-        { name: "dist", value: dist },
-        { name: "queue còn lại", value: queueStr() },
-      ],
-      note: { vi: `Đã đi ${dist} bước tới (${r},${c}) và còn quyền phá ${rem} obstacle.`, en: `After ${dist} moves, we are at (${r},${c}) with ${rem} eliminations remaining.` },
-    });
-
+    popped += 1;
+    const cur = { r, c, rem, dist };
     const reachedTarget = r === rows - 1 && c === cols - 1;
-    pushStep({
-      title: reachedTarget
-        ? { vi: `(${r},${c}) là target`, en: `(${r},${c}) is the target` }
-        : { vi: `(${r},${c}) chưa phải target`, en: `(${r},${c}) is not the target` },
-      codeLine: 15,
-      current: [r, c],
-      vars: [{ name: "current", value: `(${r}, ${c})` }, { name: "target", value: `(${rows - 1}, ${cols - 1})` }, { name: "condition", value: reachedTarget }],
-      note: reachedTarget
-        ? { vi: "Đây là state target đầu tiên được pop. Vì BFS tăng dần theo dist, đường này chắc chắn ngắn nhất.", en: "This is the first target state popped. Since BFS advances by distance, this route is guaranteed shortest." }
-        : { vi: "Chưa tới target; thử bốn hướng từ state hiện tại.", en: "The target has not been reached; try four directions from the current state." },
-    });
 
     if (reachedTarget) {
       answer = dist;
@@ -220,123 +252,156 @@ function buildSteps1293(input, params) {
       }
       const path = states.map((state) => state.split(",").map(Number));
       const pathCells = new Set(path.map(([pr, pc]) => cellKey(pr, pc)));
-      const pathText = path.map(([pr, pc, pk], index) => `(${pr},${pc},k=${pk},d=${index})`).join(" → ");
-      const removed = path.filter(([pr, pc]) => grid[pr][pc] === 1).map(([pr, pc]) => `(${pr},${pc})`);
-      pushStep({
-        title: { vi: `Đường ngắn nhất = ${answer}`, en: `Shortest path = ${answer}` },
-        codeLine: 16,
-        pathCells,
-        final: true,
-        vars: [
-          { name: "path states", value: pathText },
-          { name: "obstacles eliminated", value: removed.length ? removed.join(", ") : "none" },
-          { name: "answer", value: answer },
-        ],
+      const removed = path.filter(([pr, pc]) => grid[pr][pc] === 1).map(([pr, pc]) => [pr, pc]);
+      snap({
+        phase: "target",
+        title: { vi: `Pop ra đích (${r},${c}) với d = ${dist} → đáp án ${dist}`, en: `Popped the target (${r},${c}) with d = ${dist} → answer ${dist}` },
         note: {
-          vi: `Đường xanh: ${pathText}. Đã phá ${removed.length} obstacle${removed.length ? ` tại ${removed.join(", ")}` : ""}; còn ${path.at(-1)[2]} lượt phá khi tới đích.`,
-          en: `Green path: ${pathText}. Eliminated ${removed.length} obstacle(s)${removed.length ? ` at ${removed.join(", ")}` : ""}; ${path.at(-1)[2]} eliminations remain at the target.`,
+          vi: `Đây là state đích đầu tiên rời queue. Queue FIFO nên mọi state còn lại có distance ≥ ${dist}, không thể có đường ngắn hơn. Đường xanh dài ${dist} bước và phá ${removed.length} vật cản${removed.length ? ` tại ${removed.map(([pr, pc]) => `(${pr},${pc})`).join(", ")}` : ""}, khi tới đích còn ${path.at(-1)[2]} quyền phá.`,
+          en: `This is the first target state to leave the queue. The queue is FIFO, so every remaining state has distance ≥ ${dist} and nothing shorter exists. The green route is ${dist} moves and eliminates ${removed.length} obstacle(s)${removed.length ? ` at ${removed.map(([pr, pc]) => `(${pr},${pc})`).join(", ")}` : ""}, arriving with ${path.at(-1)[2]} eliminations left.`,
         },
+        codeLines: [15, 16],
+        cur,
+        pathCells,
+        path,
+        eliminated: removed,
+        answer: dist,
+        final: true,
+        decision: { vi: `Đường ngắn nhất = ${dist} bước.`, en: `Shortest path = ${dist} moves.` },
+        vars: [
+          { name: "d", value: dist },
+          { name: "obstacles eliminated", value: removed.length ? removed.map(([pr, pc]) => `(${pr},${pc})`).join(", ") : "none" },
+          { name: "answer", value: dist },
+        ],
       });
       break;
     }
 
-    for (const [dr, dc] of directions) {
-      pushStep({
-        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
-        codeLine: 18,
-        current: [r, c],
-        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
-        note: { vi: `Từ (${r},${c}), thử độ lệch (${dr},${dc}).`, en: `From (${r},${c}), try offset (${dr},${dc}).` },
-      });
+    snap({
+      phase: "pop",
+      title: { vi: `popleft → (${r},${c}) k=${rem} d=${dist}`, en: `popleft → (${r},${c}) k=${rem} d=${dist}` },
+      note: {
+        vi: `Đã đi ${dist} bước tới (${r},${c}) và còn ${rem} quyền phá. Chưa phải đích (${rows - 1},${cols - 1}) nên thử cả 4 hướng.`,
+        en: `After ${dist} moves we are at (${r},${c}) with ${rem} eliminations left. Not the target (${rows - 1},${cols - 1}) yet, so try all four moves.`,
+      },
+      codeLines: [13, 14, 15],
+      cur,
+      decision: { vi: `Mở rộng từ (${r},${c}), k=${rem}.`, en: `Expanding from (${r},${c}) with k=${rem}.` },
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "rem", value: rem },
+        { name: "d", value: dist },
+        { name: "queue size", value: queue.length },
+      ],
+    });
 
+    for (const [dr, dc] of directions) {
       const nr = r + dr;
       const nc = c + dc;
-      pushStep({
-        title: { vi: `Neighbor = (${nr},${nc})`, en: `Neighbor = (${nr},${nc})` },
-        codeLine: 19,
-        current: [r, c],
-        vars: [{ name: "nr", value: nr }, { name: "nc", value: nc }],
-        note: { vi: "Tính tọa độ hàng xóm.", en: "Compute the neighbor coordinates." },
-      });
-
       const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
-      pushStep({
-        title: inBounds
-          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
-          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
-        codeLine: 20,
-        current: inBounds ? [nr, nc] : [r, c],
-        vars: [{ name: "neighbor", value: `(${nr}, ${nc})` }, { name: "in bounds", value: inBounds }],
-        note: inBounds
-          ? { vi: "Hàng xóm hợp lệ; tính k còn lại sau khi bước vào.", en: "The neighbor is valid; compute remaining k after entering it." }
-          : { vi: "Ngoài grid nên bỏ qua hướng này.", en: "Outside the grid, so skip this direction." },
-      });
-      if (!inBounds) continue;
 
+      if (!inBounds) {
+        prunedOob += 1;
+        snap({
+          phase: "neighbor",
+          title: { vi: `(${dr},${dc}) → (${nr},${nc}) ra ngoài lưới`, en: `(${dr},${dc}) → (${nr},${nc}) is outside the grid` },
+          note: { vi: `Toạ độ (${nr},${nc}) không nằm trong ${rows}×${cols}, bỏ hướng này.`, en: `Coordinate (${nr},${nc}) is not inside ${rows}×${cols}, so skip this move.` },
+          codeLines: [19, 20],
+          cur,
+          probe: { r: nr, c: nc, verdict: "oob" },
+          decision: { vi: "Ra ngoài lưới → bỏ.", en: "Out of bounds → skip." },
+          vars: [{ name: "nr, nc", value: `${nr}, ${nc}` }, { name: "in bounds", value: false }],
+        });
+        continue;
+      }
+
+      const isWall = grid[nr][nc] === 1;
       const newRem = rem - grid[nr][nc];
-      pushStep({
-        title: { vi: `new_rem = ${rem} - ${grid[nr][nc]} = ${newRem}`, en: `new_rem = ${rem} - ${grid[nr][nc]} = ${newRem}` },
-        codeLine: 21,
-        current: [nr, nc],
-        vars: [
-          { name: "rem", value: rem },
-          { name: `grid[${nr}][${nc}]`, value: grid[nr][nc] },
-          { name: "new_rem", value: newRem },
-        ],
-        note: grid[nr][nc] === 1
-          ? { vi: `Ô (${nr},${nc}) là obstacle ■, phải dùng 1 lượt phá: ${rem} → ${newRem}.`, en: `Cell (${nr},${nc}) is obstacle ■, consuming one elimination: ${rem} → ${newRem}.` }
-          : { vi: `Ô (${nr},${nc}) trống ·, nên k còn lại vẫn là ${newRem}.`, en: `Cell (${nr},${nc}) is empty ·, so remaining k stays ${newRem}.` },
-      });
-
       const useful = newRem > best[nr][nc];
-      pushStep({
-        title: useful
-          ? { vi: `${newRem} > best[${nr}][${nc}]=${best[nr][nc]}: giữ state`, en: `${newRem} > best[${nr}][${nc}]=${best[nr][nc]}: keep state` }
-          : { vi: `${newRem} > best[${nr}][${nc}]=${best[nr][nc]}? False`, en: `${newRem} > best[${nr}][${nc}]=${best[nr][nc]}? False` },
-        codeLine: 22,
-        current: [nr, nc],
+
+      if (newRem < 0) {
+        prunedNoK += 1;
+        snap({
+          phase: "neighbor",
+          title: { vi: `(${nr},${nc}) là ■ nhưng đã hết quyền phá`, en: `(${nr},${nc}) is ■ but no eliminations remain` },
+          note: {
+            vi: `Bước vào vật cản cần 1 quyền phá, mà k còn lại đang là ${rem}. new_rem = ${rem} - 1 = ${newRem} < 0 nên state không tồn tại. Đây chính là chỗ k giới hạn đường đi.`,
+            en: `Entering an obstacle costs one elimination, but only ${rem} remain. new_rem = ${rem} - 1 = ${newRem} < 0, so the state does not exist. This is exactly where k constrains the route.`,
+          },
+          codeLines: [21, 22],
+          cur,
+          probe: { r: nr, c: nc, verdict: "noK" },
+          decision: { vi: `new_rem = ${newRem} < 0 → không đi được.`, en: `new_rem = ${newRem} < 0 → move impossible.` },
+          vars: [{ name: "rem", value: rem }, { name: `grid[${nr}][${nc}]`, value: 1 }, { name: "new_rem", value: newRem }],
+        });
+        continue;
+      }
+
+      if (!useful) {
+        prunedDominated += 1;
+        snap({
+          phase: "neighbor",
+          title: { vi: `(${nr},${nc}) bị dominate: ${newRem} ≤ best = ${best[nr][nc]}`, en: `(${nr},${nc}) is dominated: ${newRem} ≤ best = ${best[nr][nc]}` },
+          note: {
+            vi: `Tới (${nr},${nc}) với k=${newRem}, nhưng ô này đã từng được tới (ở distance không lớn hơn) với k=${best[nr][nc]} ≥ ${newRem}. State cũ vừa ngắn hơn hoặc bằng, vừa còn nhiều quyền phá hơn — nó làm được mọi thứ state mới làm được. Bỏ state mới.`,
+            en: `Reaching (${nr},${nc}) with k=${newRem}, but this cell was already reached (no later) with k=${best[nr][nc]} ≥ ${newRem}. The older state is at least as short AND has at least as many eliminations — it can do everything the new one could. Discard the new state.`,
+          },
+          codeLines: [21, 22],
+          cur,
+          probe: { r: nr, c: nc, verdict: "dominated" },
+          decision: { vi: `${newRem} ≤ ${best[nr][nc]} → cắt tỉa.`, en: `${newRem} ≤ ${best[nr][nc]} → pruned.` },
+          vars: [
+            { name: "new_rem", value: newRem },
+            { name: `best[${nr}][${nc}]`, value: best[nr][nc] },
+            { name: "condition", value: false },
+          ],
+        });
+        continue;
+      }
+
+      const prevBest = best[nr][nc];
+      const revisit = prevBest >= 0;
+      record(nr, nc, newRem, dist + 1);
+      parent.set(stateKey(nr, nc, newRem), currentState);
+      queue.push([nr, nc, newRem, dist + 1]);
+      snap({
+        phase: "neighbor",
+        title: {
+          vi: `Vào queue: (${nr},${nc}) k=${newRem} d=${dist + 1}${revisit ? " (ô cũ, state mới)" : ""}`,
+          en: `Enqueue: (${nr},${nc}) k=${newRem} d=${dist + 1}${revisit ? " (old cell, new state)" : ""}`,
+        },
+        note: {
+          vi: `${isWall ? `Ô (${nr},${nc}) là vật cản ■: phá nó, k giảm ${rem} → ${newRem}.` : `Ô (${nr},${nc}) trống ·: k giữ nguyên ${newRem}.`} ${newRem} > best = ${prevBest} nên state này hữu ích.${revisit ? ` Chú ý: ô này ĐÃ được thăm trước đó với k=${prevBest}, nhưng lần này còn nhiều quyền phá hơn nên nó mở ra những đường mà state cũ không đi được — đúng lý do không được đánh dấu visited chỉ theo (hàng,cột).` : ""}`,
+          en: `${isWall ? `Cell (${nr},${nc}) is an obstacle ■: eliminate it, k drops ${rem} → ${newRem}.` : `Cell (${nr},${nc}) is empty ·: k stays ${newRem}.`} ${newRem} > best = ${prevBest}, so this state is useful.${revisit ? ` Note: this cell WAS visited before with k=${prevBest}, but this time more eliminations remain, so it unlocks routes the old state could not take — precisely why you must not mark visited by (row,col) alone.` : ""}`,
+        },
+        codeLines: [22, 23, 24],
+        cur,
+        probe: { r: nr, c: nc, verdict: "enqueued" },
+        decision: revisit
+          ? { vi: `Ô (${nr},${nc}) vào queue lần nữa với k tốt hơn: ${prevBest} → ${newRem}.`, en: `Cell (${nr},${nc}) is queued again with better k: ${prevBest} → ${newRem}.` }
+          : { vi: `Ô (${nr},${nc}) lần đầu được tới, d=${dist + 1}, k=${newRem}.`, en: `Cell (${nr},${nc}) reached for the first time, d=${dist + 1}, k=${newRem}.` },
         vars: [
           { name: "new_rem", value: newRem },
-          { name: `best[${nr}][${nc}]`, value: best[nr][nc] },
-          { name: "condition", value: useful },
+          { name: `best[${nr}][${nc}]`, value: `${prevBest} → ${newRem}` },
+          { name: "queue size", value: queue.length },
         ],
-        note: newRem < 0
-          ? { vi: "new_rem âm: đã dùng quá k obstacle, state không hợp lệ.", en: "new_rem is negative: the route used more than k obstacles, so the state is invalid." }
-          : useful
-            ? { vi: `Tới (${nr},${nc}) với k=${newRem} tốt hơn mọi state trước tại ô này, nên giữ lại.`, en: `Reaching (${nr},${nc}) with k=${newRem} beats every previous state at this cell, so keep it.` }
-            : { vi: `Đã từng tới (${nr},${nc}) ở khoảng cách không lớn hơn với k=${best[nr][nc]} ≥ ${newRem}. State mới bị dominate và bị bỏ.`, en: `The cell was already reached no later with k=${best[nr][nc]} ≥ ${newRem}. The new state is dominated and discarded.` },
-      });
-      if (!useful) continue;
-
-      best[nr][nc] = newRem;
-      pushStep({
-        title: { vi: `best[${nr}][${nc}] = ${newRem}`, en: `best[${nr}][${nc}] = ${newRem}` },
-        codeLine: 23,
-        current: [nr, nc],
-        vars: [{ name: "best", value: bestStr() }],
-        note: { vi: "Lưu mức k còn lại tốt nhất mới của ô này.", en: "Store the cell's new best remaining-k value." },
-      });
-
-      const nextState = stateKey(nr, nc, newRem);
-      parent.set(nextState, currentState);
-      queue.push([nr, nc, newRem, dist + 1]);
-      pushStep({
-        title: { vi: `append((${nr},${nc}, k=${newRem}, d=${dist + 1}))`, en: `append((${nr},${nc}, k=${newRem}, d=${dist + 1}))` },
-        codeLine: 24,
-        current: [nr, nc],
-        vars: [{ name: "queue", value: queueStr() }],
-        note: { vi: `Đưa state mới vào cuối queue. Khoảng cách tăng đúng 1 từ ${dist} lên ${dist + 1}.`, en: `Append the new state. Distance increases exactly one from ${dist} to ${dist + 1}.` },
       });
     }
   }
 
   if (!steps.at(-1).final) {
-    pushStep({
-      title: { vi: "Không thể tới target", en: "The target is unreachable" },
-      codeLine: 25,
+    snap({
+      phase: "fail",
+      title: { vi: "Queue rỗng → không tới được đích", en: "Queue empty → the target is unreachable" },
+      note: {
+        vi: `Đã duyệt hết mọi state đạt được mà không pop ra đích. Với k = ${k} quyền phá thì không tồn tại đường nào, nên trả -1.`,
+        en: `Every reachable state has been explored without popping the target. With k = ${k} eliminations no route exists, so return -1.`,
+      },
+      codeLines: [25],
       final: true,
+      answer: -1,
+      decision: { vi: "Đáp án = -1.", en: "Answer = -1." },
       vars: [{ name: "queue", value: "[]" }, { name: "answer", value: -1 }],
-      note: { vi: `Queue đã rỗng; không có đường nào dùng tối đa ${k} lần phá obstacle.`, en: `The queue is empty; no route uses at most ${k} obstacle eliminations.` },
     });
   }
 

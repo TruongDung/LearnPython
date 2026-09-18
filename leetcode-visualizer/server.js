@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const { SUPPORTED, CATEGORY_ORDER } = require("./problems");
+const { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG } = require("./problems");
 const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
 const PREMIUM_PROBLEM_IDS = new Set([
@@ -41,6 +41,7 @@ app.get("/api/problems", (req, res) => {
         difficulty: p.difficulty || null,
         premium: isPremium(p),
         tags: Array.isArray(p.tags) ? p.tags : [],
+        companies: Array.isArray(p.companies) ? p.companies : [],
       });
     }
   }
@@ -61,6 +62,48 @@ app.get("/api/problems", (req, res) => {
       g.problems.sort((a, b) => a.id - b.id);
     }
   });
+  // The Company group is built here rather than falling out of `problem.tags`,
+  // because "Google" is not an algorithm tag. It is driven by sub-tabs rather
+  // than a flat list, and each tab carries its whole roster so the UI can also
+  // show problems that are listed for that company but not implemented yet.
+  const companyGroup = (COMPANY_SUBTABS || []).length
+    ? { key: COMPANY_TAG.key, vi: COMPANY_TAG.vi, en: COMPANY_TAG.en, problems: [] }
+    : null;
+  if (companyGroup) {
+    const seenIds = new Set();
+    for (const tab of COMPANY_SUBTABS) {
+      for (const entry of tab.roster || []) {
+        const p = SUPPORTED[entry.id];
+        if (!p || seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        companyGroup.problems.push({
+          id: p.id,
+          title: p.title,
+          titleVi: p.titleVi,
+          difficulty: p.difficulty || null,
+          premium: isPremium(p),
+          tags: Array.isArray(p.tags) ? p.tags : [],
+          companies: Array.isArray(p.companies) ? p.companies : [],
+        });
+      }
+    }
+    companyGroup.problems.sort((a, b) => a.id - b.id);
+    groups.push(companyGroup);
+    companyGroup.subTabs = (COMPANY_SUBTABS || []).map((tab) => {
+      const roster = (tab.roster || []).map((entry) => ({
+        ...entry,
+        premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
+      }));
+      return {
+        key: tab.key,
+        vi: tab.vi,
+        en: tab.en,
+        roster,
+        count: roster.filter((entry) => entry.available).length,
+        total: roster.length,
+      };
+    });
+  }
   groups.sort((a, b) => a.key.localeCompare(b.key));
   res.json({ groups });
 });

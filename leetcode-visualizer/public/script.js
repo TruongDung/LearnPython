@@ -9,6 +9,7 @@ let stepIndex = 0;
 let answerValue = null; // answer from the current run
 let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
+const companySubTabSelection = new Map(); // groupKey -> active sub-tab key
 let problemSearchQuery = "";
 let debugBreakpoints = new Set();
 let debugWatches = [];
@@ -1398,12 +1399,86 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    // The Company group is split into one sub-tab per company. Clicking a tab
+    // filters the chips below it; the selection is remembered per group.
+    const subTabs = Array.isArray(group.subTabs) ? group.subTabs.filter((tab) => tab && tab.key) : [];
+    let activeSubTab = null;
+    if (subTabs.length) {
+      activeSubTab = companySubTabSelection.get(group.key) || subTabs[0].key;
+      if (!subTabs.some((tab) => tab.key === activeSubTab)) activeSubTab = subTabs[0].key;
+
+      const tabBar = document.createElement("div");
+      tabBar.className = "cat-subtabs";
+      tabBar.setAttribute("role", "tablist");
+      subTabs.forEach((tab) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cat-subtab" + (tab.key === activeSubTab ? " active" : "");
+        btn.dataset.subtab = tab.key;
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", tab.key === activeSubTab ? "true" : "false");
+        const done = Number(tab.count) || 0;
+        const total = Number(tab.total) || done;
+        btn.innerHTML = `<span>${escapeHtml(pick(tab))}</span><small>${done}/${total}</small>`;
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          companySubTabSelection.set(group.key, tab.key);
+          renderCatalog();
+          // Keep the group open after re-render so the click feels local.
+          const reopened = document.querySelector(`.cat-group[data-group-key="${group.key}"]`);
+          if (reopened) {
+            const items = reopened.querySelector(".cat-items");
+            const toggle = reopened.querySelector(".cat-toggle");
+            if (items) items.classList.remove("collapsed");
+            if (toggle) toggle.textContent = "−";
+          }
+        });
+        tabBar.appendChild(btn);
+      });
+      itemsEl.appendChild(tabBar);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
-    group.problems.forEach((p, idx) => {
+    let visibleProblems = group.problems;
+
+    if (activeSubTab) {
+      // Show the company's entire roster. Problems that exist use their real
+      // catalog record; the rest render as disabled placeholders so the full
+      // list stays visible as visualizations get added.
+      const tab = subTabs.find((x) => x.key === activeSubTab) || {};
+      const byId = new Map(group.problems.map((p) => [Number(p.id), p]));
+      const roster = Array.isArray(tab.roster) ? tab.roster : [];
+      visibleProblems = roster.length
+        ? roster.map((entry) => byId.get(Number(entry.id)) || {
+            id: entry.id,
+            title: { vi: entry.title, en: entry.title },
+            difficulty: entry.difficulty || null,
+            premium: Boolean(entry.premium),
+            tags: [],
+            unavailable: true,
+          })
+        : group.problems.filter((p) => (p.companies || []).includes(activeSubTab));
+
+      const doneCount = visibleProblems.filter((p) => !p.unavailable).length;
+      const summary = document.createElement("div");
+      summary.className = "cat-subtab-summary";
+      summary.innerHTML = lang === "vi"
+        ? `<b>${doneCount}</b> / ${visibleProblems.length} bài đã có visualization · các bài mờ là chưa làm`
+        : `<b>${doneCount}</b> / ${visibleProblems.length} problems have a visualization · dimmed ones are not built yet`;
+      itemsEl.appendChild(summary);
+    }
+
+    visibleProblems.forEach((p, idx) => {
       const chip = document.createElement("button");
-      chip.className = "prob-chip" + (p.id === currentProblemId ? " active" : "");
+      chip.className = "prob-chip"
+        + (p.id === currentProblemId ? " active" : "")
+        + (p.unavailable ? " unavailable" : "");
       chip.dataset.id = p.id;
-      if (p.premium) {
+      if (p.unavailable) {
+        chip.disabled = true;
+        chip.setAttribute("aria-disabled", "true");
+        chip.title = lang === "vi" ? "Chưa có trong visualizer" : "Not in visualizer yet";
+      } else if (p.premium) {
         chip.dataset.premium = "true";
         chip.title = t().premiumLabel;
       }
@@ -1437,10 +1512,12 @@ function renderCatalog() {
         diff.textContent = p.difficulty;
         chip.appendChild(diff);
       }
-      chip.addEventListener("click", () => {
-        $("problemId").value = p.id;
-        loadProblem({ scrollToEnd: true });
-      });
+      if (!p.unavailable) {
+        chip.addEventListener("click", () => {
+          $("problemId").value = p.id;
+          loadProblem({ scrollToEnd: true });
+        });
+      }
       itemsEl.appendChild(chip);
     });
 
@@ -11750,6 +11827,1086 @@ function renderNonOverlapView(step) {
   </section>`;
 }
 
+// ---- 778 Swim in Rising Water ----
+// Two things the generic bfsGrid renderer could not show, and both are the point:
+//   1. The water. Dijkstra pops times in nondecreasing order, so the popped time
+//      IS the current water level — the grid is drawn flooded up to it, and the
+//      submerged region visibly grows as the algorithm runs.
+//   2. That a route costs max(elevations), not their sum. Every relaxation shows
+//      the max(...) with both operands, plus an explicit "not 13+16" reminder.
+function renderSwimWater778View(step) {
+  const view = step.swimWater778View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+
+  if (view.error) {
+    $("treeView").innerHTML = `<section class="sw778-viz"><div class="sw778-error">${escapeHtml(pick(view.error))}</div></section>`;
+    return;
+  }
+
+  const n = Number(view.n) || 0;
+  const maxVal = Number(view.maxVal) || 1;
+  const compact = Boolean(view.compact);
+  const cells = Array.isArray(view.cells) ? view.cells : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const levels = Array.isArray(view.levels) ? view.levels : [];
+  const counters = view.counters || {};
+  const cur = view.cur;
+  const probe = view.probe;
+  const level = view.level;
+  const isDone = view.answer !== null && view.answer !== undefined;
+  const fmtBest = (v) => (v === null || v === undefined ? "∞" : String(v));
+
+  // ── Water gauge ───────────────────────────────────────────────────────────
+  const submerged = cells.reduce((s, row) => s + row.filter((x) => x.wet).length, 0);
+  const gauge = `<div class="sw778-water${level === null || level === undefined ? " idle" : ""}">
+    <div class="lvl">
+      <small>${vi ? "MỰC NƯỚC" : "WATER LEVEL"}</small>
+      <strong>${level === null || level === undefined ? "—" : `t = ${level}`}</strong>
+    </div>
+    <div class="gauge"><i style="width:${level === null || level === undefined ? 0 : Math.round((level / maxVal) * 100)}%"></i></div>
+    <span>${escapeHtml(level === null || level === undefined
+    ? (vi ? "chưa bắt đầu" : "not started")
+    : (vi ? `${submerged}/${n * n} ô đã chìm (độ cao ≤ ${level})` : `${submerged}/${n * n} cells submerged (elevation ≤ ${level})`))}</span>
+  </div>`;
+
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  const gridHtml = cells.map((row, r) => row.map((cell, c) => {
+    const cls = ["sw778-cell", cell.wet ? "wet" : "dry"];
+    if (cell.finalized) cls.push("settled");
+    if (cell.inHeap) cls.push("inheap");
+    if (cell.path) cls.push("path");
+    if (cell.bottleneck) cls.push("bottleneck");
+    if (cell.cur) cls.push("cur");
+    if (cell.probe && cell.verdict) cls.push("probe", `v-${cell.verdict}`);
+    const badge = cell.verdict === "improved" ? "↓"
+      : cell.verdict === "noImprove" ? "=" : "";
+    const role = cell.role === "start" ? "S" : cell.role === "target" ? "T" : "";
+    return `<div class="${cls.join(" ")}" style="--h:${(cell.elev / maxVal).toFixed(3)}">
+      ${role ? `<span class="rl">${role}</span>` : ""}
+      <strong>${cell.elev}</strong>
+      ${compact ? "" : `<span class="t">${cell.best === null || cell.best === undefined ? "∞" : `t${cell.best}`}</span>`}
+      ${badge ? `<span class="vb">${badge}</span>` : ""}
+    </div>`;
+  }).join("")).join("");
+
+  // ── The max(...) relaxation, spelled out ──────────────────────────────────
+  let formulaHtml = "";
+  if (probe && probe.verdict !== "oob") {
+    const why = probe.needsRise
+      ? (vi ? `ô cao ${probe.elev} > mực nước ${probe.fromTime} → phải chờ nước dâng lên ${probe.elev}`
+        : `cell at ${probe.elev} > level ${probe.fromTime} → must wait for the water to rise to ${probe.elev}`)
+      : (vi ? `ô cao ${probe.elev} đã chìm dưới mực nước ${probe.fromTime} → vào ngay, không chờ thêm`
+        : `cell at ${probe.elev} is already under level ${probe.fromTime} → enter now, no extra wait`);
+    formulaHtml = `<div class="sw778-formula v-${probe.verdict}">
+      <small>${vi ? `THỜI ĐIỂM TỚI (${probe.r},${probe.c})` : `ARRIVAL TIME AT (${probe.r},${probe.c})`}</small>
+      <div class="calc">
+        <span class="op">max(</span><span class="a">${probe.fromTime}</span><span class="op">,</span><span class="b">${probe.elev}</span><span class="op">) =</span><strong>${probe.newTime}</strong>
+      </div>
+      <span class="why">${escapeHtml(why)}</span>
+      <em class="cmp">best: ${fmtBest(probe.oldBest)} ${probe.verdict === "improved" ? `→ ${probe.newTime}` : `(${vi ? "giữ nguyên" : "unchanged"})`}</em>
+      <span class="nosum">${escapeHtml(vi ? `không phải ${probe.fromTime} + ${probe.elev} = ${probe.fromTime + probe.elev}` : `not ${probe.fromTime} + ${probe.elev} = ${probe.fromTime + probe.elev}`)}</span>
+    </div>`;
+  } else if (probe) {
+    formulaHtml = `<div class="sw778-formula v-oob">
+      <small>${vi ? "NƯỚC ĐI" : "MOVE"}</small>
+      <div class="calc"><span class="op">(${probe.r},${probe.c})</span></div>
+      <span class="why">${escapeHtml(vi ? "ra ngoài lưới" : "outside the grid")}</span>
+    </div>`;
+  }
+
+  const curHtml = cur
+    ? `<div class="sw778-state"><small>${vi ? "ĐANG CHỐT" : "SETTLING"}</small><strong>(${cur.r},${cur.c})</strong><span>t = ${cur.time}</span></div>`
+    : `<div class="sw778-state idle"><small>${vi ? "ĐANG CHỐT" : "SETTLING"}</small><strong>—</strong></div>`;
+
+  const countersHtml = `<div class="sw778-counters">
+    <span><b>${counters.popped || 0}</b>${vi ? "pop" : "popped"}</span>
+    <span><b>${counters.pushed || 0}</b>${vi ? "push" : "pushed"}</span>
+    <span class="cut"><b>${counters.notImproved || 0}</b>${vi ? "không tốt hơn" : "no better"}</span>
+    <span class="cut"><b>${counters.skippedStale || 0}</b>${vi ? "bản cũ" : "stale"}</span>
+  </div>`;
+
+  // ── Heap ──────────────────────────────────────────────────────────────────
+  const HMAX = 26;
+  const heapHtml = heap.slice(0, HMAX).map((h) => `<div class="sw778-hchip${h.head ? " head" : ""}">
+      ${h.head ? `<em>${vi ? "nhỏ nhất" : "min"}</em>` : ""}
+      <strong>t${h.t}</strong><span>(${h.r},${h.c})</span>
+    </div>`).join("") + (heap.length > HMAX ? `<div class="sw778-hmore">+${heap.length - HMAX}</div>` : "");
+
+  // ── The rising sequence ───────────────────────────────────────────────────
+  const levelsHtml = levels.length
+    ? levels.map((t, i) => `<span class="sw778-lchip${i === levels.length - 1 ? " now" : ""}">${t}</span>`).join(`<i class="sw778-arr">→</i>`)
+    : `<em class="sw778-empty">—</em>`;
+
+  const answerHtml = isDone
+    ? `<div class="sw778-answer${view.answer === -1 ? " none" : ""}">
+        <div class="hd"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong><span>${view.answer === -1 ? (vi ? "không tới được" : "unreachable") : (vi ? "chờ tới t này là đủ và ít nhất" : "waiting until this t is sufficient and minimal")}</span></div>
+        ${view.path ? `<div class="pth">${view.path.map(([r, c, e]) => {
+      const bn = view.bottleneck && view.bottleneck[0] === r && view.bottleneck[1] === c;
+      return `<span class="${bn ? "bn" : ""}">(${r},${c})<i>${e}</i></span>`;
+    }).join(`<b>→</b>`)}</div>` : ""}
+        ${view.bottleneck ? `<em>${escapeHtml(vi
+      ? `ô bottleneck (${view.bottleneck[0]},${view.bottleneck[1]}) là ô cao nhất trên đường — nó một mình quyết định đáp án`
+      : `the bottleneck cell (${view.bottleneck[0]},${view.bottleneck[1]}) is the highest on the route — it alone sets the answer`)}</em>` : ""}
+      </div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="sw778-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa bơi trong nước đang dâng" : "Swim in rising water visualization")}">
+    <div class="sw778-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(vi
+      ? "Chi phí của một đường là ĐỘ CAO LỚN NHẤT trên đường đó, không phải tổng — vì chỉ cần nước phủ được ô cao nhất là đi hết đường được. Nên khi bước sang ô kề: new_time = max(time, độ cao ô kề). Dãy time mà heap pop ra không giảm, chính là mực nước dâng dần."
+      : "A route's cost is the LARGEST elevation on it, not the sum — once the water covers its highest cell the whole route is usable. So stepping to a neighbour: new_time = max(time, neighbour elevation). The times the heap pops are nondecreasing: that is the water rising.")}</span>
+    </div>
+
+    ${gauge}
+
+    <div class="sw778-main">
+      <section class="sw778-panel">
+        <header>
+          <strong>${vi ? `LƯỚI ${n}×${n} — số lớn = độ cao` : `GRID ${n}×${n} — the big number is elevation`}</strong>
+          <span>${vi ? (compact ? "xanh = đã chìm" : "xanh = đã chìm · t = mực nước nhỏ nhất đủ để tới ô") : (compact ? "blue = submerged" : "blue = submerged · t = lowest level that reaches the cell")}</span>
+        </header>
+        <div class="sw778-grid" style="--sw-cols:${n}">${gridHtml}</div>
+        <div class="sw778-legend">
+          <span class="lg wet">${vi ? "đã chìm" : "submerged"}</span>
+          <span class="lg dry">${vi ? "còn trên mặt nước" : "still above water"}</span>
+          <span class="lg cur">${vi ? "đang chốt" : "settling"}</span>
+          <span class="lg inheap">${vi ? "trong heap" : "in heap"}</span>
+          <span class="lg path">${vi ? "đường kết quả" : "final route"}</span>
+          <span class="lg bn">${vi ? "bottleneck" : "bottleneck"}</span>
+        </div>
+      </section>
+      <aside class="sw778-side">
+        ${curHtml}
+        ${formulaHtml}
+        ${countersHtml}
+      </aside>
+    </div>
+
+    <section class="sw778-panel">
+      <header><strong>${vi ? "MIN-HEAP (time, hàng, cột) — luôn lấy time nhỏ nhất" : "MIN-HEAP (time, row, col) — always pops the smallest time"}</strong><span>${heap.length}</span></header>
+      <div class="sw778-heap">${heapHtml || `<em class="sw778-empty">${vi ? "heap rỗng" : "heap is empty"}</em>`}</div>
+      <div class="sw778-hint">${escapeHtml(vi
+      ? `Vì chi phí là max() và time pop ra không giảm, lần relax đầu tiên của một ô đã là giá trị cuối cùng — mỗi ô vào heap đúng 1 lần. Nên dòng "if time > best[r][c]" trong code không bao giờ chạy ở bài này (bộ đếm "bản cũ" luôn = 0); nó chỉ là thói quen viết Dijkstra an toàn.`
+      : `Because the cost is a max() and popped times never decrease, a cell's first relaxation is already final — each cell enters the heap exactly once. So the line "if time > best[r][c]" never fires here (the "stale" counter stays 0); it is just standard defensive Dijkstra.`)}</div>
+    </section>
+
+    <section class="sw778-panel">
+      <header><strong>${vi ? "MỰC NƯỚC ĐÃ DÂNG QUA — dãy time pop ra, không bao giờ giảm" : "WATER LEVELS SO FAR — the popped times, never decreasing"}</strong><span>${levels.length}</span></header>
+      <div class="sw778-levels">${levelsHtml}</div>
+    </section>
+
+    ${answerHtml}
+
+    <div class="sw778-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 1293 Shortest Path in a Grid with Obstacles Elimination ----
+// The generic bfsGrid renderer could only put ONE number in a cell, which hides
+// the whole difficulty: a cell is k+1 separate nodes. Here every cell lists the
+// remaining-k states created on it, so "this cell entered the queue twice" is
+// something you can see rather than something the prose has to claim.
+function renderGridElim1293View(step) {
+  const view = step.gridElim1293View || {};
+  const vi = lang === "vi";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+
+  if (view.error) {
+    $("treeView").innerHTML = `<section class="ge1293-viz"><div class="ge1293-error">${escapeHtml(pick(view.error))}</div></section>`;
+    return;
+  }
+
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const k = Number(view.k) || 0;
+  const cells = Array.isArray(view.cells) ? view.cells : [];
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const layers = Array.isArray(view.layers) ? view.layers : [];
+  const multiState = Array.isArray(view.multiState) ? view.multiState : [];
+  const counters = view.counters || {};
+  const cur = view.cur;
+  const probe = view.probe;
+  const isDone = view.answer !== null && view.answer !== undefined;
+
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  const gridHtml = cells.map((row, r) => row.map((cell, c) => {
+    const cls = ["ge1293-cell", cell.wall ? "wall" : "empty"];
+    if (cell.processed) cls.push("processed");
+    if (cell.inQueue) cls.push("queued");
+    if (cell.rems.length > 1) cls.push("multi");
+    if (cell.path) cls.push("path");
+    if (cell.cur) cls.push("cur");
+    if (cell.probe && cell.verdict) cls.push("probe", `v-${cell.verdict}`);
+    const badge = cell.verdict === "enqueued" ? "✓"
+      : cell.verdict === "dominated" ? "⊘"
+        : cell.verdict === "noK" ? "✕" : "";
+    const glyph = cell.role === "start" ? "S" : cell.role === "target" ? "T" : cell.wall ? "■" : "·";
+    const ks = cell.rems.length
+      ? `<div class="ks">${cell.rems.map((v) => `<i>${v}</i>`).join("")}</div>`
+      : `<div class="ks empty">·</div>`;
+    return `<div class="${cls.join(" ")}">
+      <span class="rc">${r},${c}</span>
+      <strong class="glyph">${glyph}</strong>
+      <span class="d">${cell.dist === null || cell.dist === undefined ? "—" : `d${cell.dist}`}</span>
+      ${ks}
+      ${badge ? `<span class="vb">${badge}</span>` : ""}
+    </div>`;
+  }).join("")).join("");
+
+  // ── Side: the state being expanded and the move being tested ──────────────
+  const verdictText = {
+    oob: vi ? "ra ngoài lưới" : "outside the grid",
+    noK: vi ? "hết quyền phá" : "no eliminations left",
+    dominated: vi ? "bị state cũ dominate" : "dominated by an older state",
+    enqueued: vi ? "hợp lệ → vào queue" : "valid → enqueued",
+  };
+  const curHtml = cur
+    ? `<div class="ge1293-state cur">
+        <small>${vi ? "ĐANG MỞ RỘNG" : "EXPANDING"}</small>
+        <strong>(${cur.r},${cur.c})</strong>
+        <span>k=${cur.rem} · d=${cur.dist}</span>
+      </div>`
+    : `<div class="ge1293-state idle"><small>${vi ? "ĐANG MỞ RỘNG" : "EXPANDING"}</small><strong>—</strong></div>`;
+  const probeHtml = probe
+    ? `<div class="ge1293-state probe v-${probe.verdict}">
+        <small>${vi ? "THỬ NƯỚC ĐI" : "TESTING MOVE"}</small>
+        <strong>(${probe.r},${probe.c})</strong>
+        <span>${escapeHtml(verdictText[probe.verdict] || "")}</span>
+      </div>`
+    : "";
+
+  const countersHtml = `<div class="ge1293-counters">
+    <span><b>${counters.popped || 0}</b>${vi ? "pop" : "popped"}</span>
+    <span><b>${counters.enqueued || 0}</b>${vi ? "vào queue" : "enqueued"}</span>
+    <span class="cut"><b>${counters.prunedDominated || 0}</b>${vi ? "bị dominate" : "dominated"}</span>
+    <span class="cut"><b>${counters.prunedNoK || 0}</b>${vi ? "thiếu k" : "no k"}</span>
+  </div>`;
+
+  // ── Queue ─────────────────────────────────────────────────────────────────
+  const QMAX = 26;
+  const shown = queue.slice(0, QMAX);
+  const queueHtml = shown.map((q) => `<div class="ge1293-qchip${q.head ? " head" : ""}">
+      ${q.head ? `<em>${vi ? "đầu" : "head"}</em>` : ""}
+      <strong>${q.r},${q.c}</strong><span>k=${q.rem}</span><span>d=${q.dist}</span>
+    </div>`).join("") + (queue.length > QMAX ? `<div class="ge1293-qmore">+${queue.length - QMAX}</div>` : "");
+
+  // ── BFS waves by distance ─────────────────────────────────────────────────
+  const maxLayer = layers.reduce((m, l) => Math.max(m, l.count), 1);
+  const layersHtml = layers.map((l) => `<div class="ge1293-layer">
+      <span class="lbl">d=${l.d}</span>
+      <span class="bar"><i style="width:${Math.max(6, Math.round((l.count / maxLayer) * 100))}%"></i></span>
+      <span class="cnt">${l.count}</span>
+    </div>`).join("");
+
+  // ── The payoff panel: cells that hold more than one state ─────────────────
+  const multiHtml = multiState.length
+    ? multiState.map((e) => `<span class="ge1293-multi"><b>(${e.r},${e.c})</b>${e.rems.map((v) => `<i>k=${v}</i>`).join("")}</span>`).join("")
+    : `<em class="ge1293-empty">${vi ? "chưa có ô nào cần tới 2 state — cứ chạy tiếp" : "no cell needs two states yet — keep stepping"}</em>`;
+
+  const shortcutHtml = view.shortcut
+    ? `<div class="ge1293-shortcut${view.shortcut.applies ? " applies" : ""}">
+        <small>${vi ? "KIỂM TRA ĐƯỜNG THẲNG" : "STRAIGHT-ROUTE CHECK"}</small>
+        <strong>k = ${k} ${view.shortcut.applies ? "≥" : "<"} m+n-3 = ${view.shortcut.limit}</strong>
+        <span>${escapeHtml(view.shortcut.applies
+      ? (vi ? `Đường Manhattan ${view.shortcut.manhattan} bước chỉ qua ${view.shortcut.limit} ô trung gian; k đủ phá hết nên trả ngay ${view.shortcut.manhattan}.`
+        : `A Manhattan route of ${view.shortcut.manhattan} moves crosses only ${view.shortcut.limit} intermediate cells; k clears them all, so return ${view.shortcut.manhattan}.`)
+      : (vi ? "k chưa đủ để bảo đảm đi thẳng, nên phải BFS."
+        : "k is not enough to guarantee a straight route, so BFS is required."))}</span>
+      </div>`
+    : "";
+
+  const answerHtml = isDone
+    ? `<div class="ge1293-answer${view.answer === -1 ? " none" : ""}">
+        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong>
+        <span>${view.answer === -1 ? (vi ? "không có đường nào" : "no route exists") : (vi ? "bước" : "moves")}</span>
+        ${view.eliminated && view.eliminated.length
+      ? `<em>${vi ? "đã phá" : "eliminated"}: ${view.eliminated.map(([r, c]) => `(${r},${c})`).join(", ")}</em>`
+      : ""}
+      </div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="ge1293-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đường ngắn nhất khi được phá vật cản" : "Shortest path with obstacle elimination visualization")}">
+    <div class="ge1293-idea">
+      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
+      <span>${escapeHtml(vi
+      ? `Một ô KHÔNG phải một node. Đứng ở cùng ô mà còn 2 quyền phá khác hẳn còn 0 quyền, nên state là (hàng, cột, k còn lại) — mỗi ô có tới ${k + 1} state. Đánh dấu visited chỉ theo (hàng, cột) là sai.`
+      : `A cell is NOT a node. Being on the same cell with 2 eliminations left differs from having 0, so a state is (row, col, k remaining) — up to ${k + 1} states per cell. Marking visited by (row, col) alone is wrong.`)}</span>
+    </div>
+
+    <div class="ge1293-main">
+      <section class="ge1293-panel">
+        <header>
+          <strong>${vi ? `LƯỚI ${rows}×${cols}` : `GRID ${rows}×${cols}`}</strong>
+          <span>${vi ? "d = số bước tới ô · ô vuông nhỏ = k còn lại của từng state" : "d = moves to reach · small squares = each state's remaining k"}</span>
+        </header>
+        <div class="ge1293-grid" style="--ge-cols:${cols}">${gridHtml}</div>
+        <div class="ge1293-legend">
+          <span class="lg s">S / T</span>
+          <span class="lg wall">■ ${vi ? "vật cản" : "obstacle"}</span>
+          <span class="lg cur">${vi ? "đang mở rộng" : "expanding"}</span>
+          <span class="lg queued">${vi ? "trong queue" : "in queue"}</span>
+          <span class="lg multi">${vi ? "≥2 state" : "≥2 states"}</span>
+          <span class="lg path">${vi ? "đường kết quả" : "final route"}</span>
+        </div>
+      </section>
+      <aside class="ge1293-side">
+        ${curHtml}
+        ${probeHtml}
+        ${countersHtml}
+        ${shortcutHtml}
+      </aside>
+    </div>
+
+    <section class="ge1293-panel">
+      <header><strong>${vi ? "QUEUE (FIFO) — lấy ra theo distance không giảm" : "QUEUE (FIFO) — popped in nondecreasing distance"}</strong><span>${queue.length}</span></header>
+      <div class="ge1293-queue">${queueHtml || `<em class="ge1293-empty">${vi ? "queue rỗng" : "queue is empty"}</em>`}</div>
+    </section>
+
+    <div class="ge1293-cols2">
+      <section class="ge1293-panel">
+        <header><strong>${vi ? "SÓNG BFS — số state ở mỗi distance" : "BFS WAVES — states per distance"}</strong></header>
+        <div class="ge1293-layers">${layersHtml || `<em class="ge1293-empty">—</em>`}</div>
+      </section>
+      <section class="ge1293-panel">
+        <header><strong>${vi ? "Ô CÓ NHIỀU HƠN MỘT STATE" : "CELLS HOLDING MORE THAN ONE STATE"}</strong><span>${multiState.length}</span></header>
+        <div class="ge1293-multis">${multiHtml}</div>
+      </section>
+    </div>
+
+    ${answerHtml}
+
+    <div class="ge1293-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 1627 Graph Connectivity With Threshold (divisor sieve + DSU) ----
+// The point of this layout is that the three things a reader needs are on
+// screen at once and lined up: the numbers 1..n coloured by group, the sieve
+// ladder that says where each edge came from, and the resulting groups that
+// answer the queries. No node-link diagram — for n = 24 that is a hairball and
+// the divisor structure is invisible in it.
+function renderGcThreshold1627View(step) {
+  const view = step.gcThreshold1627View || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const threshold = Number(view.threshold) || 0;
+  const phase = view.phase || "";
+  const ladder = Array.isArray(view.ladder) ? view.ladder : [];
+  const noLeader = Array.isArray(view.noLeader) ? view.noLeader : [];
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const curZ = view.curZ;
+  const curMultiple = view.curMultiple;
+  const marked = new Set(Array.isArray(view.marked) ? view.marked : []);
+  const isDone = phase === "done";
+  const pick = (d) => (!d ? "" : typeof d === "string" ? d : (vi ? d.vi : d.en) || "");
+
+  // ── Phase bar. The "skip" phase only exists when threshold actually removes
+  // rows, so it is dropped from the bar entirely when threshold = 0.
+  const hasSkip = ladder.some((r) => r.status === "skipped");
+  const labels = [];
+  const stageKey = {};
+  const add = (key, label) => { stageKey[key] = labels.length; labels.push(label); };
+  add("init", vi ? "Mỗi số một nhóm" : "Every number alone");
+  if (hasSkip) add("skip", vi ? `Bỏ z ≤ ${threshold}` : `Drop z ≤ ${threshold}`);
+  add("sieve", vi ? "Sàng: nối z với bội số" : "Sieve: link z to multiples");
+  add("query", vi ? "Trả lời truy vấn" : "Answer queries");
+  const stageOf = {
+    intro: stageKey.init, init: stageKey.init,
+    skip: hasSkip ? stageKey.skip : stageKey.sieve,
+    sieve: stageKey.sieve, union: stageKey.sieve, noLeader: stageKey.sieve,
+    query: stageKey.query, done: labels.length,
+  };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const phaseHtml = labels.map((label, k) => {
+    const cls = k < stage ? "done" : k === stage ? "active" : "";
+    return `<span class="${cls}">${k < stage ? "✓" : k + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── The numbers 1..n, coloured by group ────────────────────────────────────
+  const numsHtml = nodes.map((nd) => {
+    const cls = ["gc1627-num"];
+    if (nd.color >= 0) cls.push(`c${nd.color}`);
+    else cls.push("alone");
+    if (nd.id === curZ) cls.push("cur-z");
+    if (nd.id === curMultiple) cls.push("cur-m");
+    else if (marked.has(nd.id)) cls.push("marked");
+    // While a sieve row is open, spell out the divisibility that creates the
+    // edge: 12 under z=4 shows "3×" so the reason is on the chip itself.
+    let sub = "";
+    if (curZ && nd.id !== curZ && nd.id % curZ === 0) sub = `${nd.id / curZ}×`;
+    else if (phase === "query" || isDone) sub = `R${nd.root}`;
+    return `<div class="${cls.join(" ")}"><strong>${nd.id}</strong>${sub ? `<small>${escapeHtml(sub)}</small>` : ""}</div>`;
+  }).join("");
+
+  // ── Sieve ladder ──────────────────────────────────────────────────────────
+  const ladderHtml = ladder.map((row) => {
+    const mults = row.multiples.map((m) => {
+      const st = row.status === "skipped" ? "skip"
+        : m === curMultiple && row.status === "current" ? "cur"
+          : row.outcome[m] || "pending";
+      return `<span class="m ${st}">${m}</span>`;
+    }).join("");
+    const tag = row.status === "skipped"
+      ? `<em class="gc1627-tag skip">${vi ? `z ≤ ${threshold} → bỏ` : `z ≤ ${threshold} → dropped`}</em>`
+      : row.status === "done"
+        ? `<em class="gc1627-tag done">✓</em>`
+        : row.status === "current" ? `<em class="gc1627-tag cur">${vi ? "đang xét" : "running"}</em>` : "";
+    return `<div class="gc1627-row ${row.status}">
+      <span class="gc1627-z">z=${row.z}</span>
+      <span class="gc1627-arr">→</span>
+      <div class="gc1627-mults">${mults}</div>
+      ${tag}
+    </div>`;
+  }).join("");
+
+  // ── Groups ────────────────────────────────────────────────────────────────
+  const multi = groups.filter((g) => g.members.length > 1);
+  const singles = groups.filter((g) => g.members.length === 1).map((g) => g.key);
+  const groupsHtml = multi.map((g) => `<div class="gc1627-group c${g.color}">
+      <small>${vi ? "nhóm" : "group"} · ${g.members.length}</small>
+      <div>${g.members.map((m) => `<span>${m}</span>`).join("")}</div>
+    </div>`).join("") + (singles.length
+      ? `<div class="gc1627-group alone">
+          <small>${vi ? "còn một mình" : "still alone"} · ${singles.length}</small>
+          <div>${singles.map((m) => `<span>${m}</span>`).join("")}</div>
+        </div>`
+      : "");
+
+  // ── Queries ───────────────────────────────────────────────────────────────
+  const queriesHtml = queries.map((q, i) => {
+    const cls = ["gc1627-q"];
+    if (q.status === "current") cls.push("current");
+    else if (q.status === "done") cls.push("done");
+    const roots = q.ra === null || q.ra === undefined
+      ? `<span class="gc1627-roots">${vi ? "chưa xét" : "not yet"}</span>`
+      : `<span class="gc1627-roots">R${q.ra} ${q.result ? "=" : "≠"} R${q.rb}</span>`;
+    const res = q.result === null || q.result === undefined
+      ? `<b class="pending">?</b>`
+      : `<b class="${q.result ? "yes" : "no"}">${q.result}</b>`;
+    return `<div class="${cls.join(" ")}"><small>${i + 1}</small><strong>${q.a} ↔ ${q.b}</strong>${roots}${res}</div>`;
+  }).join("");
+
+  const isolatedHtml = view.isolated && view.isolated.length
+    ? `<div class="gc1627-isolated">
+        <small>${vi ? "VÌ SAO CÁC SỐ NÀY ĐỨNG MỘT MÌNH" : "WHY THESE NUMBERS STAY ALONE"}</small>
+        ${view.isolated.map((it) => {
+      const why = [];
+      if (it.maxDiv) why.push(vi ? `ước thật sự lớn nhất = ${it.maxDiv} ≤ ${threshold}` : `largest proper divisor = ${it.maxDiv} ≤ ${threshold}`);
+      else why.push(vi ? "không có ước thật sự nào" : "no proper divisor at all");
+      if (it.twiceOverN) why.push(vi ? `và 2×${it.id} > ${n} nên cũng không dẫn được nhóm nào` : `and 2×${it.id} > ${n} so it cannot lead a group either`);
+      return `<span><b>${it.id}</b> ${escapeHtml(why.join(" "))}</span>`;
+    }).join("")}
+      </div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="gc1627-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa liên thông theo ngưỡng" : "Graph connectivity with threshold visualization")}">
+    <div class="gc1627-phases">${phaseHtml}</div>
+
+    <div class="gc1627-main">
+      <section class="gc1627-panel">
+        <header>
+          <strong>${vi ? `CÁC SỐ 1..${n}` : `THE NUMBERS 1..${n}`}</strong>
+          <span>${vi ? "cùng màu = cùng nhóm liên thông · xám = một mình" : "same colour = same group · grey = alone"}</span>
+        </header>
+        <div class="gc1627-nums">${numsHtml}</div>
+        ${curZ ? `<div class="gc1627-hint">${escapeHtml(vi
+      ? `Đang mở hàng z = ${curZ}. Số nào có nhãn ×k là bội của ${curZ} → chia hết cho ${curZ} > ${threshold} → phải cùng nhóm với ${curZ}.`
+      : `Row z = ${curZ} is open. Chips tagged ×k are multiples of ${curZ} → divisible by ${curZ} > ${threshold} → must join ${curZ}'s group.`)}</div>` : ""}
+      </section>
+      <aside class="gc1627-side">
+        <header><strong>${vi ? "NHÓM LIÊN THÔNG" : "CONNECTED GROUPS"}</strong><span>${multi.length + singles.length}</span></header>
+        <div class="gc1627-groups">${groupsHtml}</div>
+      </aside>
+    </div>
+
+    <section class="gc1627-panel">
+      <header>
+        <strong>${vi ? "SÀNG ƯỚC SỐ — mỗi hàng z nối z với mọi bội của z" : "DIVISOR SIEVE — each row z links z to every multiple of z"}</strong>
+        <span>${vi ? `z chạy ${threshold + 1}..${n}` : `z runs ${threshold + 1}..${n}`}</span>
+      </header>
+      <div class="gc1627-ladder">${ladderHtml || `<em class="gc1627-empty">${vi ? "không có hàng z nào" : "no z rows"}</em>`}</div>
+      ${noLeader.length ? `<div class="gc1627-noleader"><b>z = ${noLeader.join(", ")}</b> ${escapeHtml(vi
+      ? `: 2z > ${n} nên không có bội số nào ≤ ${n} → không tạo cạnh. Sàng chỉ cần chạy tới ${Math.floor(n / 2)}.`
+      : `: 2z > ${n} so there is no multiple ≤ ${n} → no edge. The sieve only needs to reach ${Math.floor(n / 2)}.`)}</div>` : ""}
+      <div class="gc1627-legend">
+        <span class="lg merged">${vi ? "gộp 2 nhóm" : "merged two groups"}</span>
+        <span class="lg already">${vi ? "đã cùng nhóm (cạnh dư)" : "already together (redundant)"}</span>
+        <span class="lg pending">${vi ? "chưa xét" : "not yet"}</span>
+        <span class="lg skip">${vi ? "bị threshold loại" : "dropped by threshold"}</span>
+      </div>
+    </section>
+
+    <section class="gc1627-panel">
+      <header><strong>${vi ? "TRUY VẤN — chỉ là so sánh root" : "QUERIES — just a root comparison"}</strong><span>${queries.length}</span></header>
+      <div class="gc1627-queries">${queriesHtml || `<em class="gc1627-empty">${vi ? "không có truy vấn" : "no queries"}</em>`}</div>
+      ${view.answer ? `<div class="gc1627-answer">answer = [${view.answer.join(", ")}]</div>` : ""}
+    </section>
+
+    ${isolatedHtml}
+
+    <div class="gc1627-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(pick(view.decision))}</strong>
+    </div>
+  </section>`;
+}
+
+// ---- 539 Minimum Time Difference (circular clock) ----
+function renderClockDiffView(step) {
+  const view = step.clockDiffView || {};
+  const vi = lang === "vi";
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const checked = Array.isArray(view.checked) ? view.checked : [];
+  const cur = view.currentPair || null;
+  const bestPair = view.bestPair || null;
+  const best = view.best;
+  const phase = view.phase || "";
+  const parseIndex = Number.isInteger(view.parseIndex) ? view.parseIndex : -1;
+  const sorted = !!view.sorted;
+  const DAY = 1440;
+
+  const fmt = (v) => `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
+
+  // ── Phase bar ───────────────────────────────────────────────────────────
+  const stageOf = { intro: 0, parse: 0, sort: 1, wrap: 2, scan: 2, done: 3 };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const labels = vi
+    ? ["Đổi sang phút", "Sort", "Xét cặp liền kề + cặp vòng", "Kết quả"]
+    : ["Convert to minutes", "Sort", "Adjacent + wrap pairs", "Result"];
+  const phases = labels.map((label, k) => {
+    const cls = k < stage ? "done" : k === stage ? "active" : "";
+    return `<span class="${cls}">${k < stage ? "✓" : k + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Clock face ──────────────────────────────────────────────────────────
+  // Layout rule: hour numbers live INSIDE the ring, time-point labels OUTSIDE.
+  // That keeps the two label families from ever competing for the same space
+  // (they used to overlap near the top, along with the "midnight" annotation).
+  // SZ is sized so the label ring plus its text always fits:
+  //   C >= R + LABEL_LIFT + textWidth + pad
+  const SZ = 372;
+  const C = SZ / 2;
+  const R = 118;
+  const pt = (mins, radius) => {
+    const th = (mins / DAY) * Math.PI * 2;           // 0 at top, clockwise
+    return { x: C + radius * Math.sin(th), y: C - radius * Math.cos(th) };
+  };
+  const ptDeg = (deg, radius) => pt((deg / 360) * DAY, radius);
+  const arcPath = (fromMin, spanMin, radius) => {
+    const a = pt(fromMin, radius);
+    const b = pt((fromMin + spanMin) % DAY, radius);
+    const large = spanMin > DAY / 2 ? 1 : 0;
+    return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+  };
+
+  // hour ticks + hour numbers placed INSIDE the ring
+  let ticks = "";
+  for (let h = 0; h < 24; h++) {
+    const major = h % 6 === 0;
+    const outer = pt(h * 60, R);
+    const inner = pt(h * 60, R - (major ? 12 : 6));
+    ticks += `<line class="cl539-tick${major ? " major" : ""}${h === 0 ? " midnight" : ""}" x1="${inner.x.toFixed(2)}" y1="${inner.y.toFixed(2)}" x2="${outer.x.toFixed(2)}" y2="${outer.y.toFixed(2)}"></line>`;
+    if (major) {
+      const lp = pt(h * 60, R - 28);
+      ticks += `<text class="cl539-hour${h === 0 ? " midnight" : ""}" x="${lp.x.toFixed(2)}" y="${lp.y.toFixed(2)}">${String(h).padStart(2, "0")}</text>`;
+    }
+  }
+
+  // gap arcs: the best one, plus the pair currently being measured
+  let arcs = "";
+  if (bestPair) {
+    const span = bestPair.wrap ? DAY - bestPair.a + bestPair.b : bestPair.b - bestPair.a;
+    arcs += `<path class="cl539-arc best" d="${arcPath(bestPair.a, span, R)}"></path>`;
+  }
+  if (cur) {
+    const span = cur.wrap ? DAY - cur.a + cur.b : cur.b - cur.a;
+    arcs += `<path class="cl539-arc current${cur.wrap ? " wrap" : ""}" d="${arcPath(cur.a, span, R)}"></path>`;
+  }
+
+  // time dots, with labels OUTSIDE the ring.
+  //
+  // Only the dots taking part in the current / best pair get a text label, so at
+  // most four labels ever appear. Times can cluster arbitrarily tightly (five
+  // inside ten minutes is legal input), so labelling every dot cannot be made
+  // readable — the sorted strip underneath is where all the values are read.
+  // The clock's job is to show circularity and the pair being measured.
+  //
+  // The labels all sit on ONE ring outside the dial and are spread apart
+  // ANGULARLY, with leader lines tying each back to its dot. Spreading sideways
+  // rather than stacking outward is what makes the no-overlap guarantee
+  // possible: MIN_GAP degrees at LABEL_R is wider than the widest label box, and
+  // four labels only ever need 48° of the 360° available.
+  const curSet = new Set(cur ? [cur.a, cur.b] : []);
+  const bestSet = new Set(bestPair ? [bestPair.a, bestPair.b] : []);
+  const LABEL_R = R + 26;
+  const MIN_GAP = 16;
+  const seenMinute = new Set();
+  const labelled = [];
+  entries.forEach((e, idx) => {
+    if (!curSet.has(e.minutes) && !bestSet.has(e.minutes)) return;
+    if (seenMinute.has(e.minutes)) return;          // duplicates share one label
+    seenMinute.add(e.minutes);
+    labelled.push({ idx, deg: (e.minutes / DAY) * 360 });
+  });
+  const placedDeg = new Map();
+  if (labelled.length) {
+    const n = labelled.length;
+    const order = labelled.slice().sort((a, b) => a.deg - b.deg);
+    // Cut the circle at the widest empty arc so the run can be straightened out
+    // without the first and last label colliding across the seam.
+    let cut = 0;
+    let widest = -1;
+    for (let k = 0; k < n; k++) {
+      const gap = (order[(k + 1) % n].deg - order[k].deg + 360) % 360;
+      if (gap > widest) { widest = gap; cut = (k + 1) % n; }
+    }
+    const seq = [];
+    for (let k = 0; k < n; k++) {
+      const o = order[(cut + k) % n];
+      let d = o.deg;
+      if (k > 0) while (d < seq[k - 1].d) d += 360;
+      seq.push({ d, orig: d, idx: o.idx });
+    }
+    for (let k = 1; k < n; k++) {
+      if (seq[k].d - seq[k - 1].d < MIN_GAP) seq[k].d = seq[k - 1].d + MIN_GAP;
+    }
+    // Slide the whole run back so the spread stays centred on its dots instead
+    // of always drifting clockwise.
+    const shift = seq.reduce((s, o) => s + (o.d - o.orig), 0) / n;
+    seq.forEach((o) => placedDeg.set(o.idx, ((o.d - shift) % 360 + 360) % 360));
+  }
+
+  const dots = entries.map((e, idx) => {
+    const p = pt(e.minutes, R);
+    const isCur = curSet.has(e.minutes);
+    const isBest = !isCur && bestSet.has(e.minutes);
+    const cls = ["cl539-dot"];
+    if (isCur) cls.push("current");
+    else if (isBest) cls.push("best");
+    if (!sorted && idx === parseIndex) cls.push("parsing");
+
+    let labelSvg = "";
+    if (placedDeg.has(idx)) {
+      const deg = placedDeg.get(idx);
+      const lp = ptDeg(deg, LABEL_R);
+      const stemTo = ptDeg(deg, LABEL_R - 11);
+      const stemFrom = pt(e.minutes, R + 3);
+      const sinv = Math.sin((deg / 360) * Math.PI * 2);
+      const anchor = Math.abs(sinv) < 0.3 ? "middle" : (sinv > 0 ? "start" : "end");
+      labelSvg = `<line class="cl539-stem" x1="${stemFrom.x.toFixed(2)}" y1="${stemFrom.y.toFixed(2)}" x2="${stemTo.x.toFixed(2)}" y2="${stemTo.y.toFixed(2)}"></line>
+        <text x="${lp.x.toFixed(2)}" y="${lp.y.toFixed(2)}" text-anchor="${anchor}">${escapeHtml(e.time)}</text>`;
+    }
+    return `<g class="${cls.join(" ")}">${labelSvg}<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${isCur || isBest ? 7 : 5}"></circle></g>`;
+  }).join("");
+
+  // Midnight is marked by the pink 00 tick/number inside the ring plus this
+  // short seam on the ring itself — no floating text to collide with anything.
+  const midnightMark = `<line class="cl539-seam" x1="${C}" y1="${(C - R - 9).toFixed(2)}" x2="${C}" y2="${(C - R + 9).toFixed(2)}"></line>`;
+
+  const clockSvg = `<svg class="cl539-clock" viewBox="0 0 ${SZ} ${SZ}" role="img" aria-label="${escapeHtml(vi ? "Mặt đồng hồ 24 giờ với các mốc thời gian" : "24-hour clock face with the time points")}">
+    <circle class="cl539-face" cx="${C}" cy="${C}" r="${R}"></circle>
+    ${ticks}${midnightMark}${arcs}${dots}
+  </svg>`;
+
+  // ── Sorted strip with gaps between neighbours ───────────────────────────
+  let strip = "";
+  if (entries.length) {
+    strip = entries.map((e, idx) => {
+      const isCur = cur && !cur.wrap && (idx === cur.aIdx || idx === cur.bIdx);
+      const isBest = bestPair && !bestPair.wrap && (idx === bestPair.aIdx || idx === bestPair.bIdx);
+      const cls = ["cl539-chip"];
+      if (isCur) cls.push("current");
+      else if (isBest) cls.push("best");
+      if (!sorted && idx === parseIndex) cls.push("parsing");
+      let gapHtml = "";
+      if (idx > 0 && sorted) {
+        const g = e.minutes - entries[idx - 1].minutes;
+        const done = checked.some((c) => !c.wrap && c.bIdx === idx);
+        const isG = cur && !cur.wrap && cur.bIdx === idx;
+        const isBg = bestPair && !bestPair.wrap && bestPair.bIdx === idx;
+        gapHtml = `<span class="cl539-gap${isG ? " current" : isBg ? " best" : done ? " done" : ""}">${done || isG ? g : "?"}</span>`;
+      }
+      return gapHtml + `<div class="${cls.join(" ")}"><strong>${escapeHtml(e.time)}</strong><small>${e.minutes}</small></div>`;
+    }).join("");
+  }
+
+  // ── Wrap-pair callout ───────────────────────────────────────────────────
+  let wrapHtml = "";
+  if (sorted && entries.length >= 2) {
+    const a = entries[entries.length - 1];
+    const b = entries[0];
+    const wd = DAY - a.minutes + b.minutes;
+    const isCur = cur && cur.wrap;
+    const isBest = bestPair && bestPair.wrap;
+    wrapHtml = `<section class="cl539-wrap ${isCur ? "current" : isBest ? "best" : ""}">
+      <small>${vi ? "CẶP VÒNG QUA NỬA ĐÊM" : "WRAP-AROUND PAIR"}</small>
+      <strong>${escapeHtml(a.time)} → ${escapeHtml(b.time)}</strong>
+      <code>1440 − ${a.minutes} + ${b.minutes} = ${wd}</code>
+      <em>${isBest ? (vi ? "✓ đang là khoảng nhỏ nhất" : "✓ currently the smallest gap") : (vi ? "dễ bị bỏ sót nhất" : "the easiest pair to forget")}</em>
+    </section>`;
+  }
+
+  // ── Decision copy ───────────────────────────────────────────────────────
+  const decisionText = {
+    intro: vi ? "Đồng hồ vòng tròn: khoảng cách phải tính cả chiều qua nửa đêm." : "The clock is circular: distances must also be measured through midnight.",
+    parse: vi ? "h×60 + m cho số phút kể từ nửa đêm (0..1439)." : "h×60 + m gives minutes since midnight (0..1439).",
+    sort: vi ? "Sau khi sort, cặp gần nhau nhất phải là hai mốc liền kề — hoặc cặp vòng." : "After sorting, the closest pair must be neighbours — or the wrap pair.",
+    wrap: vi ? "Khởi tạo best bằng cặp vòng qua nửa đêm, không phải bằng vô cực." : "Seed best with the wrap-around pair, not with infinity.",
+    improve: vi ? "Khoảng này nhỏ hơn best → cập nhật." : "This gap beats best → update it.",
+    keep: vi ? "Khoảng này không nhỏ hơn best → giữ nguyên." : "This gap does not beat best → keep it.",
+    duplicate: vi ? "Hai mốc trùng nhau → khoảng 0, đã là nhỏ nhất có thể." : "Two identical times → a gap of 0, the minimum possible.",
+    pigeonhole: vi ? "Hơn 1440 mốc thì chắc chắn trùng → trả 0 ngay." : "More than 1440 times guarantees a duplicate → return 0 at once.",
+    done: vi ? "Đã xét mọi cặp liền kề và cặp vòng." : "Every adjacent pair plus the wrap pair has been checked.",
+  }[view.decision] || (vi ? "Đang xử lý." : "Processing.");
+
+  const isDone = phase === "done";
+  const dup = view.duplicate;
+
+  $("treeView").innerHTML = `<section class="cl539-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa hiệu thời gian nhỏ nhất" : "Minimum time difference visualization")}">
+    <div class="cl539-phases">${phases}</div>
+
+    <div class="cl539-main">
+      <section class="cl539-panel">
+        <header><strong>${vi ? "MẶT ĐỒNG HỒ 24H" : "24-HOUR CLOCK"}</strong><span>${vi ? "cung vàng = đang đo · xanh = nhỏ nhất" : "amber arc = measuring · green = smallest"}</span></header>
+        ${clockSvg}
+        <div class="cl539-clock-legend">
+          <span class="seam">${vi ? "vạch hồng ở 00 = mốc nửa đêm (chỗ vòng lại)" : "pink 00 mark = midnight, where the clock wraps"}</span>
+          <span>${vi ? "số giờ ở trong · chỉ cặp đang xét / tốt nhất mới ghi nhãn ở ngoài" : "hours inside · only the current / best pair is labelled outside"}</span>
+        </div>
+      </section>
+      <aside class="cl539-side">
+        <section class="cl539-best ${isDone ? "done" : ""}">
+          <small>${vi ? "KHOẢNG NHỎ NHẤT" : "SMALLEST GAP"}</small>
+          <strong>${best === null || best === undefined ? "—" : best}</strong>
+          <em>${vi ? "phút" : "minutes"}</em>
+          ${bestPair ? `<span>${escapeHtml(fmt(bestPair.a))} → ${escapeHtml(fmt(bestPair.b))}${bestPair.wrap ? (vi ? " (qua nửa đêm)" : " (via midnight)") : ""}</span>` : ""}
+        </section>
+        ${wrapHtml}
+      </aside>
+    </div>
+
+    <section class="cl539-panel">
+      <header><strong>${sorted ? (vi ? "ĐÃ SORT · khoảng cách giữa các mốc liền kề" : "SORTED · gaps between neighbours") : (vi ? "ĐANG ĐỔI SANG PHÚT" : "CONVERTING TO MINUTES")}</strong><span>${entries.length} ${vi ? "mốc" : "times"}</span></header>
+      <div class="cl539-strip">${strip || `<em class="cl539-empty">${vi ? "chưa có mốc nào" : "no times yet"}</em>`}</div>
+    </section>
+
+    ${dup ? `<div class="cl539-dup">${vi ? `Trùng nhau: ${escapeHtml(dup.a)} và ${escapeHtml(dup.b)} → 0 phút` : `Duplicate: ${escapeHtml(dup.a)} and ${escapeHtml(dup.b)} → 0 minutes`}</div>` : ""}
+
+    <div class="cl539-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(decisionText)}</strong>
+      <div>${cur ? `<span>${escapeHtml(fmt(cur.a))} → ${escapeHtml(fmt(cur.b))} = ${cur.diff}</span>` : ""}<span>best = ${best === null || best === undefined ? "—" : best}</span></div>
+    </div>
+  </section>`;
+}
+
+// ---- 777 Swap Adjacent in LR String (two-pointer invariant) ----
+function renderLrSwapView(step) {
+  const view = step.lrSwapView || {};
+  const vi = lang === "vi";
+  const start = String(view.start || "");
+  const end = String(view.end || "");
+  const n = Number(view.n) || start.length;
+  const i = Number.isInteger(view.i) ? view.i : -1;
+  const j = Number.isInteger(view.j) ? view.j : -1;
+  const phase = view.phase || "";
+  const pairs = Array.isArray(view.pairs) ? view.pairs : [];
+  const verdict = view.verdict;
+  const skipping = view.skipping;
+
+  // ── Phase bar ───────────────────────────────────────────────────────────
+  const stageOf = { intro: 0, skip: 1, compare: 1, constraint: 2, advance: 1, done: 3 };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const labels = vi
+    ? ["Ý tưởng bất biến", "Bỏ qua X · so chữ", "Kiểm tra hướng đi", "Kết luận"]
+    : ["Invariant idea", "Skip X · match letters", "Direction check", "Verdict"];
+  const phases = labels.map((label, k) => {
+    const cls = k < stage ? "done" : k === stage ? "active" : "";
+    return `<span class="${cls}">${k < stage ? "✓" : k + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Character rows, index-aligned so the shift is visible ───────────────
+  const matchedI = new Set(pairs.map((p) => p.i));
+  const matchedJ = new Set(pairs.map((p) => p.j));
+  const cellsFor = (s, ptr, matched, which) => s.split("").map((ch, k) => {
+    const cls = ["lr777-cell", ch === "X" ? "x" : ch === "L" ? "l" : "r"];
+    if (k === ptr) cls.push("cursor");
+    if (matched.has(k)) cls.push("matched");
+    if (k < ptr && ch !== "X" && !matched.has(k)) cls.push("passed");
+    if (skipping === which && k === ptr) cls.push("skipping");
+    return `<div class="${cls.join(" ")}"><small>${k}</small><strong>${ch}</strong></div>`;
+  }).join("");
+
+  const ptrRow = (ptr, label, cls) => Array.from({ length: n }, (_, k) =>
+    `<div class="lr777-ptr ${k === ptr ? cls : ""}">${k === ptr ? label : ""}</div>`).join("");
+
+  // ── Current letter + constraint ─────────────────────────────────────────
+  let constraintHtml = "";
+  if (i >= 0 && i < n && j >= 0 && j < n && (phase === "compare" || phase === "constraint")) {
+    const a = start[i];
+    const b = end[j];
+    if (a === b && a !== "X") {
+      const isL = a === "L";
+      const ok = isL ? i >= j : i <= j;
+      const need = isL ? `i ≥ j  (${i} ≥ ${j})` : `i ≤ j  (${i} ≤ ${j})`;
+      const dist = isL ? i - j : j - i;
+      const dirWord = isL ? (vi ? "TRÁI" : "LEFT") : (vi ? "PHẢI" : "RIGHT");
+      const arrow = isL ? "←" : "→";
+      constraintHtml = `<section class="lr777-constraint ${ok ? "ok" : "bad"}">
+        <div class="lr777-letter ${isL ? "l" : "r"}">${a}</div>
+        <div class="lr777-rule">
+          <small>${isL ? (vi ? "L chỉ trượt sang TRÁI" : "an L may only slide LEFT") : (vi ? "R chỉ trượt sang PHẢI" : "an R may only slide RIGHT")}</small>
+          <strong>${escapeHtml(need)} → ${ok ? "OK" : (vi ? "VI PHẠM" : "VIOLATED")}</strong>
+          <em>${ok
+            ? (dist === 0 ? (vi ? "ở đúng chỗ, không cần dịch" : "already in place, no shift needed") : `${arrow} ${vi ? `dịch ${dist} bước sang ${dirWord.toLowerCase()}` : `shifts ${dist} step(s) ${dirWord.toLowerCase()}`}`)
+            : (vi ? `cần đi sang ${isL ? "phải" : "trái"} ${Math.abs(dist)} bước — không được phép` : `would need ${Math.abs(dist)} step(s) ${isL ? "right" : "left"} — not allowed`)}</em>
+        </div>
+      </section>`;
+    } else if (a !== b) {
+      constraintHtml = `<section class="lr777-constraint bad">
+        <div class="lr777-letter mismatch">≠</div>
+        <div class="lr777-rule">
+          <small>${vi ? "DÃY L/R KHÔNG KHỚP" : "L/R SEQUENCE MISMATCH"}</small>
+          <strong>start[${i}] = '${a}'  ≠  end[${j}] = '${b}'</strong>
+          <em>${vi ? "L và R không bao giờ vượt qua nhau, nên thứ tự phải giống hệt." : "L and R can never cross, so the order must be identical."}</em>
+        </div>
+      </section>`;
+    }
+  }
+
+  // ── Stripped sequences (the first invariant) ─────────────────────────────
+  const sc = String(view.startClean || "");
+  const ec = String(view.endClean || "");
+  const cleanMatch = sc === ec;
+  const cleanHtml = `<section class="lr777-clean ${cleanMatch ? "ok" : "bad"}">
+    <div><small>start ${vi ? "bỏ X" : "without X"}</small><code>${escapeHtml(sc || "∅")}</code></div>
+    <b>${cleanMatch ? "=" : "≠"}</b>
+    <div><small>end ${vi ? "bỏ X" : "without X"}</small><code>${escapeHtml(ec || "∅")}</code></div>
+  </section>`;
+
+  // ── Matched pairs ───────────────────────────────────────────────────────
+  const pairsHtml = pairs.length
+    ? pairs.map((p) => {
+      const arrow = p.shift === 0 ? "·" : (p.ch === "L" ? "←" : "→");
+      return `<span class="lr777-pair ${p.ch === "L" ? "l" : "r"}"><b>${p.ch}</b><small>${p.i}${arrow}${p.j}</small></span>`;
+    }).join("")
+    : `<em class="lr777-empty">${vi ? "chưa khớp chữ nào" : "no letters matched yet"}</em>`;
+
+  // ── Decision copy ───────────────────────────────────────────────────────
+  const decisionText = {
+    intro: vi ? "XL→LX cho L đi sang trái; RX→XR cho R đi sang phải. Không phép nào đổi thứ tự L/R." : "XL→LX moves an L left; RX→XR moves an R right. Neither changes the L/R order.",
+    "skip-start": vi ? "X chỉ là ô trống — bỏ qua trong start." : "X is only empty space — skip it in start.",
+    "skip-end": vi ? "X chỉ là ô trống — bỏ qua trong end." : "X is only empty space — skip it in end.",
+    "letters-match": vi ? "Hai chữ giống nhau → kiểm tra tiếp hướng di chuyển." : "The letters match → now check the direction.",
+    "letter-mismatch": vi ? "Hai chữ khác nhau → dãy L/R khác nhau → bất khả thi." : "The letters differ → different L/R sequences → impossible.",
+    "L-ok": vi ? "L nằm bên phải đích, trượt sang trái là hợp lệ." : "The L sits right of its target, so sliding left is legal.",
+    "L-bad": vi ? "L phải đi sang phải mới tới đích — không được phép." : "This L would need to move right to reach its target — not allowed.",
+    "R-ok": vi ? "R nằm bên trái đích, trượt sang phải là hợp lệ." : "The R sits left of its target, so sliding right is legal.",
+    "R-bad": vi ? "R phải đi sang trái mới tới đích — không được phép." : "This R would need to move left to reach its target — not allowed.",
+    advance: vi ? "Cặp chữ này hợp lệ, sang cặp tiếp theo." : "This pair is valid; advance to the next.",
+    "count-mismatch": vi ? "Một bên còn chữ, bên kia đã hết → số lượng L/R khác nhau." : "One side still has letters while the other ran out → different letter counts.",
+    "done-true": vi ? "Mọi chữ khớp và đi đúng hướng → biến đổi được." : "Every letter matches and travels legally → the transformation exists.",
+    "done-false": vi ? "Có điều kiện bị vi phạm → không biến đổi được." : "A condition was violated → no transformation exists.",
+  }[view.decision] || (vi ? "Đang xử lý." : "Processing.");
+
+  const isDone = phase === "done";
+  const verdictCls = verdict === true ? "true" : verdict === false ? "false" : "";
+  const verdictLabel = verdict === null || verdict === undefined
+    ? (vi ? "chưa kết luận" : "no verdict yet")
+    : String(verdict);
+
+  $("treeView").innerHTML = `<section class="lr777-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đổi chỗ liền kề LR" : "Swap adjacent in LR string visualization")}">
+    <div class="lr777-phases">${phases}</div>
+    ${cleanHtml}
+
+    <section class="lr777-board">
+      <header><strong>start</strong><span>i = ${i < 0 ? "—" : i}</span></header>
+      <div class="lr777-ptrs" style="--lr777-cols:${Math.max(1, n)}">${ptrRow(i, "i", "i")}</div>
+      <div class="lr777-row" style="--lr777-cols:${Math.max(1, n)}">${cellsFor(start, i, matchedI, "start")}</div>
+      <div class="lr777-row" style="--lr777-cols:${Math.max(1, n)}">${cellsFor(end, j, matchedJ, "end")}</div>
+      <div class="lr777-ptrs" style="--lr777-cols:${Math.max(1, n)}">${ptrRow(j, "j", "j")}</div>
+      <header class="bottom"><strong>end</strong><span>j = ${j < 0 ? "—" : j}</span></header>
+      <div class="lr777-legend">
+        <span><i class="lg-l"></i>L (${vi ? "đi trái" : "moves left"})</span>
+        <span><i class="lg-r"></i>R (${vi ? "đi phải" : "moves right"})</span>
+        <span><i class="lg-x"></i>X (${vi ? "ô trống" : "empty space"})</span>
+        <span><i class="lg-m"></i>${vi ? "đã khớp" : "matched"}</span>
+      </div>
+    </section>
+
+    ${constraintHtml}
+
+    <section class="lr777-board">
+      <header><strong>${vi ? "CÁC CHỮ ĐÃ KHỚP" : "MATCHED LETTERS"}</strong><span>${pairs.length}</span></header>
+      <div class="lr777-pairs">${pairsHtml}</div>
+    </section>
+
+    <div class="lr777-decision ${verdictCls}${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(decisionText)}</strong>
+      <div><span>i = ${i < 0 ? "—" : i}</span><span>j = ${j < 0 ? "—" : j}</span><span>return = ${escapeHtml(verdictLabel)}</span></div>
+    </div>
+  </section>`;
+}
+
+// ---- 528 Random Pick with Weight (prefix sum + lower-bound search) ----
+function renderRandomPickView(step) {
+  const view = step.randomPickView || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const w = Array.isArray(view.w) ? view.w : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const total = Number(view.total) || 0;
+  const tally = Array.isArray(view.tally) ? view.tally : [];
+  const picks = Array.isArray(view.picks) ? view.picks : [];
+  const targets = Array.isArray(view.targets) ? view.targets : [];
+  const phase = view.phase || "";
+  const buildIndex = Number.isInteger(view.buildIndex) ? view.buildIndex : -1;
+  const target = Number.isInteger(view.target) ? view.target : null;
+  const lo = Number.isInteger(view.lo) ? view.lo : null;
+  const hi = Number.isInteger(view.hi) ? view.hi : null;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const result = Number.isInteger(view.result) ? view.result : null;
+
+  // ── Phase bar ───────────────────────────────────────────────────────────
+  const stageOf = { intro: 0, build: 0, ready: 1, pick: 2, done: 3 };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const labels = vi
+    ? ["Dựng prefix sum", "Sẵn sàng", "pickIndex() · binary search", "Kết quả"]
+    : ["Build prefix sum", "Ready", "pickIndex() · binary search", "Result"];
+  const phases = labels.map((label, i) => {
+    const cls = i < stage ? "done" : i === stage ? "active" : "";
+    return `<span class="${cls}">${i < stage ? "✓" : i + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Weight blocks over the unit line 1..total ───────────────────────────
+  // Each index spans exactly w[i] columns, so block width IS its probability.
+  let blocks = "";
+  if (prefix.length) {
+    blocks = prefix.map((end, i) => {
+      const start = i === 0 ? 1 : prefix[i - 1] + 1;
+      const size = end - start + 1;
+      const owns = target !== null && target >= start && target <= end;
+      const cls = ["rp528-block"];
+      if (owns) cls.push("hit");
+      if (result === i) cls.push("picked");
+      if (buildIndex === i) cls.push("building");
+      const pct = total ? Math.round((w[i] / total) * 1000) / 10 : 0;
+      return `<div class="${cls.join(" ")}" style="grid-column:${start} / span ${size}"
+        aria-label="${escapeHtml(`index ${i}, weight ${w[i]}, units ${start} to ${end}`)}">
+        <small>i=${i}</small>
+        <strong>w=${w[i]}</strong>
+        <em>${start}–${end} · ${pct}%</em>
+      </div>`;
+    }).join("");
+  }
+  // Tick row + the target marker
+  const ticks = total && total <= 40
+    ? Array.from({ length: total }, (_, k) => {
+      const u = k + 1;
+      const isTarget = target === u;
+      return `<div class="rp528-tick${isTarget ? " target" : ""}" style="grid-column:${u} / span 1">${isTarget ? `<b>${u}</b>` : u}</div>`;
+    }).join("")
+    : "";
+
+  const lineHtml = prefix.length
+    ? `<div class="rp528-line" style="--rp528-units:${Math.max(1, total)}">${blocks}</div>
+       <div class="rp528-ticks" style="--rp528-units:${Math.max(1, total)}">${ticks}</div>`
+    : `<div class="rp528-empty">${vi ? "đang dựng prefix…" : "building prefix…"}</div>`;
+
+  // ── prefix[] array with binary-search pointers ───────────────────────────
+  const inWindow = (i) => lo !== null && hi !== null && i >= lo && i <= hi;
+  const prefixCells = prefix.map((v, i) => {
+    const cls = ["rp528-cell"];
+    if (lo !== null && !inWindow(i)) cls.push("out");
+    if (i === mid) cls.push("mid");
+    if (result === i) cls.push("picked");
+    if (buildIndex === i) cls.push("building");
+    return `<div class="${cls.join(" ")}"><small>prefix[${i}]</small><strong>${v}</strong></div>`;
+  }).join("");
+  let pointers = "";
+  if (lo !== null && hi !== null && phase === "pick") {
+    pointers = `<div class="rp528-ptrs">
+      <span class="lo">lo = ${lo}</span>
+      ${mid !== null ? `<span class="mid">mid = ${mid}</span>` : ""}
+      <span class="hi">hi = ${hi}</span>
+    </div>`;
+  }
+
+  // ── Tally: observed picks vs the weight each index should get ────────────
+  const tallyHtml = w.map((weight, i) => {
+    const got = tally[i] || 0;
+    const share = total ? Math.round((weight / total) * 1000) / 10 : 0;
+    const cls = ["rp528-tally", result === i ? "picked" : ""].filter(Boolean).join(" ");
+    return `<div class="${cls}"><small>i=${i}</small><strong>${got}</strong><em>${vi ? "kỳ vọng" : "expected"} ${share}%</em></div>`;
+  }).join("");
+
+  // ── Picks history ───────────────────────────────────────────────────────
+  const picksHtml = targets.map((t, i) => {
+    const done = i < picks.length;
+    const cls = ["rp528-pick", done ? "done" : "", i === picks.length && phase === "pick" ? "active" : ""].filter(Boolean).join(" ");
+    return `<span class="${cls}"><small>t=${t}</small><b>${done ? `→ i=${picks[i].index}` : "…"}</b></span>`;
+  }).join("");
+
+  // ── Decision copy ───────────────────────────────────────────────────────
+  const decisionText = {
+    intro: vi ? `Muốn P(chọn i) = w[i]/${total}. Biến w thành các khối liền nhau có độ dài bằng w[i].` : `We want P(pick i) = w[i]/${total}. Turn w into contiguous blocks whose lengths equal w[i].`,
+    build: vi ? "Cộng dồn: prefix[i] là biên PHẢI của khối thuộc index i." : "Accumulate: prefix[i] is the RIGHT edge of index i's block.",
+    ready: vi ? "prefix tăng dần → binary search được. Bề rộng khối chính là xác suất." : "prefix is increasing → binary-searchable. A block's width IS its probability.",
+    draw: vi ? "Bốc một đơn vị ngẫu nhiên trong 1..total, rồi tìm khối chứa nó." : "Draw a random unit in 1..total, then find the block containing it.",
+    "go-right": vi ? "prefix[mid] < target → khối của mid kết thúc quá sớm → lo = mid + 1." : "prefix[mid] < target → mid's block ends too early → lo = mid + 1.",
+    "keep-mid": vi ? "prefix[mid] ≥ target → mid có thể là chủ sở hữu → hi = mid (giữ mid)." : "prefix[mid] ≥ target → mid may be the owner → hi = mid (keep mid).",
+    resolved: vi ? "lo gặp hi → đó là index sở hữu target." : "lo meets hi → that is the index owning the target.",
+    done: vi ? "Mỗi lần chọn O(log n); tần suất lâu dài tiến về w[i]/total." : "Each pick is O(log n); long-run frequencies approach w[i]/total.",
+  }[view.decision] || (vi ? "Đang xử lý." : "Processing.");
+
+  const isDone = phase === "done";
+  const badge = target === null ? "" : `<span>target = ${target}</span>`;
+  const resLine = result === null ? "" : `<span>return ${result}</span>`;
+
+  $("treeView").innerHTML = `<section class="rp528-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa chọn index theo trọng số" : "Random pick with weight visualization")}">
+    <div class="rp528-phases">${phases}</div>
+
+    <section class="rp528-block-wrap">
+      <header><strong>${vi ? "DẢI ĐƠN VỊ 1.." : "UNIT LINE 1.."}${total}</strong><span>${vi ? "bề rộng khối = trọng số = xác suất" : "block width = weight = probability"}</span></header>
+      ${lineHtml}
+    </section>
+
+    <section class="rp528-block-wrap">
+      <header><strong>prefix[]</strong><span>${vi ? "mờ = đã loại khỏi vùng tìm kiếm" : "dimmed = eliminated from the search window"}</span></header>
+      <div class="rp528-cells">${prefixCells}</div>
+      ${pointers}
+    </section>
+
+    <div class="rp528-lower">
+      <section class="rp528-block-wrap">
+        <header><strong>${vi ? "SỐ LẦN ĐƯỢC CHỌN" : "TIMES PICKED"}</strong><span>${picks.length}/${targets.length} ${vi ? "lượt" : "calls"}</span></header>
+        <div class="rp528-tallies">${tallyHtml}</div>
+      </section>
+      <section class="rp528-block-wrap">
+        <header><strong>${vi ? "LỊCH SỬ pickIndex()" : "pickIndex() HISTORY"}</strong><span>target → index</span></header>
+        <div class="rp528-picks">${picksHtml}</div>
+      </section>
+    </div>
+
+    <div class="rp528-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(decisionText)}</strong>
+      <div>${badge}${resLine}<span>total = ${total}</span></div>
+    </div>
+  </section>`;
+}
+
 // ---- 34 Find First and Last Position renderer ----
 function renderSearchRangeView(step) {
   const view = step.searchRangeView || {};
@@ -18941,6 +20098,152 @@ function renderFenwickView(step) {
     </div>
     <div class="fenwick-status">${statusItems}</div>
   </div>`;
+}
+
+// ---- 2569 Handling Sum Queries After Update (lazy flip segment tree) ----
+function renderSumQueriesView(step) {
+  const view = step.sumQueriesView || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const nums1 = Array.isArray(view.nums1) ? view.nums1 : [];
+  const nums2 = Array.isArray(view.nums2) ? view.nums2 : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const active = new Set(view.activeNodes || []);
+  const pushed = new Set(view.pushedNodes || []);
+  const covered = new Set(view.coveredNodes || []);
+  const qi = Number.isInteger(view.queryIndex) ? view.queryIndex : -1;
+  const flipRange = Array.isArray(view.flipRange) ? view.flipRange : null;
+  const phase = view.phase || "";
+
+  // ── Phase bar ───────────────────────────────────────────────────────────
+  const stageOf = { intro: 0, build: 1, ready: 1, flip: 2, push: 2, add: 2, sum: 2, done: 3 };
+  const stage = stageOf[phase] === undefined ? 0 : stageOf[phase];
+  const labels = vi
+    ? ["Ý tưởng", "Build cây đếm bit 1", "Chạy queries", "Kết quả"]
+    : ["Key idea", "Build ones-tree", "Run queries", "Result"];
+  const phases = labels.map((label, i) => {
+    const cls = i < stage ? "done" : i === stage ? "active" : "";
+    return `<span class="${cls}">${i < stage ? "✓" : i + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // ── Arrays ──────────────────────────────────────────────────────────────
+  const inFlip = (i) => flipRange && i >= flipRange[0] && i <= flipRange[1];
+  const bitCells = nums1.map((b, i) => {
+    const cls = ["sq2569-bit", b === 1 ? "one" : "zero"];
+    if (inFlip(i)) cls.push("inflip");
+    return `<div class="${cls.join(" ")}"><small>${i}</small><strong>${b}</strong></div>`;
+  }).join("");
+  const valCells = nums2.map((v, i) => `<div class="sq2569-val${inFlip(i) ? " inflip" : ""}"><small>${i}</small><strong>${escapeHtml(v)}</strong></div>`).join("");
+
+  // ── Tree: one column per index, each node spans the range it covers ─────
+  const byDepth = new Map();
+  tree.forEach((nd) => {
+    if (!byDepth.has(nd.depth)) byDepth.set(nd.depth, []);
+    byDepth.get(nd.depth).push(nd);
+  });
+  const treeRows = [...byDepth.keys()].sort((a, b) => a - b).map((depth) => {
+    const cells = byDepth.get(depth).slice().sort((a, b) => a.lo - b.lo).map((nd) => {
+      const cls = ["sq2569-node"];
+      if (active.has(nd.node)) cls.push("active");
+      if (pushed.has(nd.node)) cls.push("pushed");
+      if (covered.has(nd.node)) cls.push("covered");
+      if (nd.lazy) cls.push("lazy");
+      if (nd.ones === nd.size && nd.size > 0) cls.push("allones");
+      const label = nd.lo === nd.hi ? `[${nd.lo}]` : `[${nd.lo},${nd.hi}]`;
+      return `<div class="${cls.join(" ")}" style="grid-column:${nd.lo + 1} / span ${nd.size}"
+        aria-label="${escapeHtml(`node ${nd.node} covers ${label}, ones ${nd.ones} of ${nd.size}${nd.lazy ? ", lazy" : ""}`)}">
+        <small>t[${nd.node}] ${escapeHtml(label)}</small>
+        <strong>${nd.ones}<em>/${nd.size}</em></strong>
+        ${nd.lazy ? `<b class="sq2569-flag">lazy</b>` : ""}
+      </div>`;
+    }).join("");
+    return `<div class="sq2569-row"><small>L${depth}</small><div class="sq2569-nodes" style="--sq2569-cols:${Math.max(1, n)}">${cells}</div></div>`;
+  }).join("");
+
+  // ── Queries timeline ────────────────────────────────────────────────────
+  let ansCursor = 0;
+  const qChips = queries.map((q, i) => {
+    const [kind, a, b] = q;
+    const cls = ["sq2569-q", `k${kind}`];
+    if (i === qi) cls.push("active");
+    if (i < qi || (phase === "done")) cls.push("past");
+    let text;
+    if (kind === 1) text = `flip [${a},${b}]`;
+    else if (kind === 2) text = `+= ${a}·ones`;
+    else text = "sum";
+    let tail = "";
+    if (kind === 3) {
+      const shown = ansCursor < answers.length ? answers[ansCursor] : null;
+      ansCursor += 1;
+      if (shown !== null && (i < qi || phase === "done" || (i === qi && phase === "sum"))) tail = ` → ${shown}`;
+    }
+    return `<span class="${cls.join(" ")}"><small>#${i} · t${kind}</small><b>${escapeHtml(text)}${escapeHtml(tail)}</b></span>`;
+  }).join("");
+
+  // ── Decision copy ───────────────────────────────────────────────────────
+  const root = tree.find((nd) => nd.node === 1);
+  const rootOnes = root ? root.ones : 0;
+  const decisionText = {
+    intro: vi ? "Type-2 chỉ cộng p vào các index có bit 1 → tổng tăng p × (số bit 1). Không cần sửa nums2 từng phần tử." : "A type-2 query only adds p where the bit is 1 → the sum grows by p × (count of ones). No need to touch nums2 element by element.",
+    "build-leaf": vi ? "Lá lưu chính bit tại index đó." : "A leaf stores the bit at its index.",
+    "build-merge": vi ? "Node cha = tổng số bit 1 của hai con." : "A parent equals the sum of its children's ones.",
+    ready: vi ? "Cây xong. ones[1] ở root là số bit 1 toàn mảng." : "Tree ready. ones[1] at the root is the count of ones over the whole array.",
+    "query-flip": vi ? "Flip một đoạn — dùng lazy để tránh sửa từng phần tử." : "Flip a range — lazy propagation avoids per-element work.",
+    "flip-disjoint": vi ? "Đoạn này không giao vùng cần flip → bỏ qua." : "This segment is disjoint from the flip range → skip.",
+    "flip-cover": vi ? "Phủ trọn → ones = size − ones, đặt lazy, và DỪNG tại đây." : "Fully covered → ones = size − ones, set lazy, and STOP here.",
+    "flip-split": vi ? "Giao một phần → phải đi vào cả hai con." : "Partial overlap → must recurse into both children.",
+    "push-down": vi ? "Node có lazy → áp flip cho hai con rồi xóa cờ ở node này." : "The node is lazy → apply the flip to both children, then clear its own flag.",
+    "flip-recombine": vi ? "Gộp lại giá trị cho node cha sau khi hai con đã đổi." : "Recombine the parent after both children changed.",
+    "flip-done": vi ? "Flip hoàn tất; root đã phản ánh số bit 1 mới." : "Flip complete; the root now reflects the new count of ones.",
+    "query-add": vi ? `total += p × ones[1] — chỉ một phép nhân, O(1).` : `total += p × ones[1] — a single multiplication, O(1).`,
+    "query-sum": vi ? "Trả về total hiện tại, O(1)." : "Report the current total, O(1).",
+    done: vi ? "Xong: type-1 O(log n), type-2 và type-3 O(1)." : "Done: type-1 is O(log n), type-2 and type-3 are O(1).",
+  }[view.decision] || (vi ? "Đang xử lý." : "Processing.");
+
+  const isDone = phase === "done";
+  const pLine = view.p === null || view.p === undefined ? "" : `<span>p = ${escapeHtml(view.p)}</span>`;
+  const flipLine = flipRange ? `<span>flip [${flipRange[0]}, ${flipRange[1]}]</span>` : "";
+
+  $("treeView").innerHTML = `<section class="sq2569-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa lazy segment tree cho #2569" : "Lazy segment tree visualization for #2569")}">
+    <div class="sq2569-phases">${phases}</div>
+
+    <div class="sq2569-scoreboard">
+      <div class="big"><small>total = sum(nums2)</small><strong>${escapeHtml(view.total)}</strong></div>
+      <div><small>ones[1] ${vi ? "(số bit 1)" : "(count of ones)"}</small><strong>${rootOnes}<em>/${n}</em></strong></div>
+      <div><small>${vi ? "ĐÁP ÁN" : "ANSWERS"}</small><strong>[${answers.join(", ")}]</strong></div>
+    </div>
+
+    <section class="sq2569-block">
+      <header><strong>${vi ? "TRUY VẤN" : "QUERIES"}</strong><span>${vi ? "t1 = flip · t2 = cộng p·ones · t3 = đọc total" : "t1 = flip · t2 = add p·ones · t3 = read total"}</span></header>
+      <div class="sq2569-queries">${qChips}</div>
+    </section>
+
+    <section class="sq2569-block">
+      <header><strong>nums1 ${vi ? "(bit)" : "(bits)"}</strong><span>${vi ? "vàng = đang trong vùng flip" : "amber = inside the flip range"}</span></header>
+      <div class="sq2569-arr" style="--sq2569-cols:${Math.max(1, n)}">${bitCells}</div>
+      <header><strong>nums2 ${vi ? "(giá trị — chỉ để tham khảo)" : "(values — reference only)"}</strong><span>${vi ? "thuật toán không sửa mảng này" : "the algorithm never mutates this array"}</span></header>
+      <div class="sq2569-arr" style="--sq2569-cols:${Math.max(1, n)}">${valCells}</div>
+    </section>
+
+    <section class="sq2569-block">
+      <header><strong>${vi ? "LAZY SEGMENT TREE · ones / size" : "LAZY SEGMENT TREE · ones / size"}</strong><span>${vi ? "node rộng đúng bằng đoạn nó phủ" : "each node is as wide as the range it covers"}</span></header>
+      <div class="sq2569-tree">${treeRows}</div>
+      <div class="sq2569-legend">
+        <span><i class="lg-active"></i>${vi ? "đang xét" : "active"}</span>
+        <span><i class="lg-cover"></i>${vi ? "phủ trọn → flip & dừng" : "fully covered → flip & stop"}</span>
+        <span><i class="lg-push"></i>${vi ? "vừa nhận lazy" : "just received lazy"}</span>
+        <span><i class="lg-lazy"></i>${vi ? "đang mang cờ lazy" : "carries a lazy flag"}</span>
+      </div>
+    </section>
+
+    <div class="sq2569-decision${isDone ? " done" : ""}">
+      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+      <strong>${escapeHtml(decisionText)}</strong>
+      <div>${flipLine}${pLine}<span>total = ${escapeHtml(view.total)}</span><span>ones[1] = ${rootOnes}</span></div>
+    </div>
+  </section>`;
 }
 
 function renderSegmentTreeView(step) {
@@ -33114,6 +34417,42 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNonOverlapView(step);
+  } else if (step.swimWater778View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSwimWater778View(step);
+  } else if (step.gridElim1293View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGridElim1293View(step);
+  } else if (step.gcThreshold1627View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGcThreshold1627View(step);
+  } else if (step.clockDiffView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClockDiffView(step);
+  } else if (step.lrSwapView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLrSwapView(step);
+  } else if (step.randomPickView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRandomPickView(step);
   } else if (step.searchRangeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -33348,6 +34687,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTrappingRainView(step);
+  } else if (step.sumQueriesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSumQueriesView(step);
   } else if (step.segmentTreeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -60,7 +60,9 @@ test('1373 is registered as a postorder BST-state lesson', () => {
   assert.equal(problem.slug, 'maximum-sum-bst-in-binary-tree');
   assert.equal(problem.difficulty, 'hard');
   assert.equal(problem.category.key, 'binary-tree');
-  assert.equal(problem.debugMode, 'semantic');
+  // No debugMode: 1373 steps line by line rather than in semantic blocks, so a
+  // reader can follow each individual statement of the postorder return.
+  assert.equal(problem.debugMode, undefined);
   assert.equal(problem.complexity.time, 'O(n)');
   assert.equal(problem.complexity.space, 'O(h)');
   assert.ok(problem.tags.some(tag => tag.key === 'bst'));

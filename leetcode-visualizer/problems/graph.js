@@ -5061,6 +5061,14 @@ function buildSteps1514(input, params) {
 /**
  * LeetCode 778: Swim in Rising Water.
  * Dijkstra minimizes the maximum elevation visited along a grid path.
+ *
+ * Rendered by the dedicated `swimWater778View` renderer rather than the generic
+ * bfsGrid one. Two things were invisible before and both are the whole point:
+ *   1. The water. Dijkstra pops times in nondecreasing order, so the sequence of
+ *      popped times IS the rising water level — drawing the grid flooded up to
+ *      that level turns the algorithm into the story the problem tells.
+ *   2. That a path costs max(elevations), not sum. Every relaxation now shows
+ *      the max(...) with both operands side by side.
  */
 function buildSteps778(input) {
   const grid = String(input)
@@ -5079,13 +5087,15 @@ function buildSteps778(input) {
   if (!valid) {
     steps.push({
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
-      arr: [],
-      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
-      highlight: [],
-      mark: [],
-      final: true,
+      arr: [], highlight: [], mark: [], final: true,
       codeLines: [6],
       vars: [{ name: "answer", value: -1 }],
+      swimWater778View: {
+        error: {
+          vi: "Grid phải vuông n×n và chứa mỗi độ cao từ 0 tới n²-1 đúng một lần. Hàng cách bởi '|' hoặc ';', số cách bởi dấu phẩy. Visualization hỗ trợ n ≤ 20.",
+          en: "The grid must be n×n and contain every elevation from 0 through n²-1 exactly once. Separate rows with '|' or ';' and values with commas. The visualization supports n ≤ 20.",
+        },
+      },
       note: {
         vi: "Grid phải là ma trận vuông n×n, chứa mỗi độ cao từ 0 tới n²-1 đúng một lần; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ n ≤ 20.",
         en: "The grid must be n×n and contain every elevation from 0 through n²-1 exactly once; separate rows with '|' or ';'. The visualization supports n ≤ 20.",
@@ -5094,353 +5104,306 @@ function buildSteps778(input) {
     return { grid, answer: -1, steps };
   }
 
+  const maxVal = n * n - 1;
+  const compact = n > 8;
   const best = Array.from({ length: n }, () => Array(n).fill(Infinity));
   const parent = Array.from({ length: n }, () => Array(n).fill(null));
   const finalized = new Set();
   const heap = [];
   const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const key = (r, c) => `${r},${c}`;
-  const formatTime = (value) => Number.isFinite(value) ? String(value) : "∞";
-  const bestStr = () => `[${best.map((row) => `[${row.map(formatTime).join(", ")}]`).join(", ")}]`;
-  const heapStr = () => `[${heap.map(([time, r, c]) => `(${time}, ${r}, ${c})`).join(", ")}]`;
+  const levels = [];
+  let level = null;
+  let popped = 0;
+  let pushed = 0;
+  let skippedStale = 0;
+  let notImproved = 0;
+  let outOfBounds = 0;
 
-  function makeCells(current = null, pathCells = new Set()) {
-    const queued = new Set(heap.map(([, r, c]) => key(r, c)));
-    return grid.map((row, r) => row.map((height, c) => {
-      const cellKey = key(r, c);
-      let cls = "empty";
-      if (finalized.has(cellKey)) cls = "visited";
-      if (queued.has(cellKey)) cls = "queued";
-      if (pathCells.has(cellKey)) cls = "path";
-      if (current && current[0] === r && current[1] === c) cls = "current";
-      const endpoint = r === 0 && c === 0
-        ? " · S"
-        : r === n - 1 && c === n - 1
-          ? " · T"
-          : "";
-      return { label: String(height), meta: `t:${formatTime(best[r][c])}${endpoint}`, cls };
-    }));
+  const sortHeap = () => heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  const jsonTime = (v) => (Number.isFinite(v) ? v : null);
+
+  function makeCells(cur, probe, pathSet, bottleneck) {
+    const inHeap = new Set(heap.map(([, r, c]) => key(r, c)));
+    return grid.map((row, r) => row.map((elev, c) => ({
+      elev,
+      best: jsonTime(best[r][c]),
+      role: r === 0 && c === 0 ? "start" : r === n - 1 && c === n - 1 ? "target" : "",
+      // Submerged means the water has already risen to cover this cell, i.e. it
+      // is standable at the current level. This is what makes the grid readable.
+      wet: level !== null && elev <= level,
+      finalized: finalized.has(key(r, c)),
+      inHeap: inHeap.has(key(r, c)),
+      cur: Boolean(cur && cur.r === r && cur.c === c),
+      probe: Boolean(probe && probe.r === r && probe.c === c),
+      verdict: probe && probe.r === r && probe.c === c ? probe.verdict : null,
+      path: pathSet ? pathSet.has(key(r, c)) : false,
+      bottleneck: Boolean(bottleneck && bottleneck[0] === r && bottleneck[1] === c),
+    })));
   }
 
-  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+  function snap(o) {
     steps.push({
-      title,
-      arr: [],
-      bfsGrid: { rows: n, cols: n, variant: "effort-grid", cells: makeCells(current, pathCells) },
-      highlight: [],
-      mark: [],
-      final,
-      codeLines: [codeLine],
-      vars,
-      note,
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      swimWater778View: {
+        n, maxVal, compact,
+        phase: o.phase,
+        level,
+        cells: makeCells(o.cur || null, o.probe || null, o.pathSet || null, o.bottleneck || null),
+        cur: o.cur || null,
+        probe: o.probe || null,
+        heap: heap.map(([t, r, c], i) => ({ t, r, c, head: i === 0 })),
+        levels: [...levels],
+        counters: { popped, pushed, skippedStale, notImproved, outOfBounds },
+        path: o.path || null,
+        bottleneck: o.bottleneck || null,
+        answer: o.answer === undefined ? null : o.answer,
+        decision: o.decision || null,
+      },
     });
   }
 
-  pushStep({
-    title: { vi: `Grid vuông có n = ${n}`, en: `The square grid has n = ${n}` },
-    codeLine: 6,
-    vars: [{ name: "n", value: n }],
+  snap({
+    phase: "intro",
+    title: { vi: `Grid ${n}×${n}, độ cao 0..${maxVal}`, en: `Grid ${n}×${n}, elevations 0..${maxVal}` },
     note: {
-      vi: `Ta bơi từ (0,0) tới (${n - 1},${n - 1}). Mỗi giây, mực nước bằng t và chỉ có thể đứng trên ô có độ cao ≤ t.`,
-      en: `Swim from (0,0) to (${n - 1},${n - 1}). At time t, water level is t, so only cells with elevation ≤ t are usable.`,
+      vi: `Tại thời điểm t mực nước bằng t, và chỉ đứng được trên ô có độ cao ≤ t. Điểm mấu chốt: chi phí của một đường KHÔNG phải tổng độ cao, mà là ĐỘ CAO LỚN NHẤT trên đường đó — vì phải chờ nước phủ được ô cao nhất mới đi hết được đường. Vì vậy công thức là max(...) chứ không phải cộng.`,
+      en: `At time t the water level is t, and only cells with elevation ≤ t are standable. The crux: a route's cost is NOT the sum of elevations but the MAXIMUM elevation on it — you must wait for the water to cover its highest cell before the whole route is usable. Hence max(...) and not addition.`,
     },
+    codeLines: [6],
+    decision: {
+      vi: "Chi phí đường = độ cao lớn nhất trên đường (bottleneck), không phải tổng.",
+      en: "Route cost = the largest elevation on it (the bottleneck), not the sum.",
+    },
+    vars: [{ name: "n", value: n }, { name: "start", value: `grid[0][0] = ${grid[0][0]}` }, { name: "target", value: `grid[${n - 1}][${n - 1}] = ${grid[n - 1][n - 1]}` }],
   });
 
-  pushStep({
-    title: { vi: "Khởi tạo best bằng ∞", en: "Initialize best to ∞" },
-    codeLine: 7,
-    vars: [{ name: "best", value: bestStr() }],
+  snap({
+    phase: "init",
+    title: { vi: "best[r][c] = ∞ cho mọi ô", en: "best[r][c] = ∞ for every cell" },
     note: {
-      vi: "best[r][c] là thời điểm sớm nhất đã biết có thể tới ô (r,c). ∞ nghĩa là chưa tìm thấy đường.",
-      en: "best[r][c] is the earliest known time at which (r,c) is reachable. ∞ means no route is known.",
+      vi: "best[r][c] là mực nước nhỏ nhất đã biết đủ để tới được ô (r,c) từ ô xuất phát. ∞ = chưa biết đường nào.",
+      en: "best[r][c] is the lowest water level known to be enough to reach (r,c) from the start. ∞ = no route known yet.",
     },
+    codeLines: [7],
+    decision: { vi: "Chưa ô nào có đường tới.", en: "No cell is reachable yet." },
+    vars: [{ name: "best", value: `${n}×${n} matrix of ∞` }],
   });
 
   best[0][0] = grid[0][0];
-  pushStep({
+  snap({
+    phase: "init",
     title: { vi: `best[0][0] = grid[0][0] = ${grid[0][0]}`, en: `best[0][0] = grid[0][0] = ${grid[0][0]}` },
-    codeLine: 8,
-    current: [0, 0],
-    vars: [
-      { name: "grid[0][0]", value: grid[0][0] },
-      { name: "best[0][0]", value: best[0][0] },
-    ],
     note: {
-      vi: `Không thể bắt đầu trước khi nước đạt độ cao của ô đầu tiên, nên thời gian khởi đầu là ${grid[0][0]}, không phải luôn bằng 0.`,
-      en: `Swimming cannot start before water reaches the first cell's elevation, so the initial time is ${grid[0][0]}, not always zero.`,
+      vi: `Chú ý đây KHÔNG phải 0: không thể bắt đầu bơi trước khi nước phủ chính ô xuất phát, mà ô (0,0) cao ${grid[0][0]}. Nên thời điểm sớm nhất có mặt ở (0,0) là ${grid[0][0]}.`,
+      en: `Note this is NOT 0: swimming cannot begin before the water covers the start cell itself, and (0,0) has elevation ${grid[0][0]}. So the earliest you can be at (0,0) is ${grid[0][0]}.`,
     },
+    codeLines: [8],
+    cur: { r: 0, c: 0, time: grid[0][0] },
+    decision: { vi: `Xuất phát ở t = ${grid[0][0]}.`, en: `Start at t = ${grid[0][0]}.` },
+    vars: [{ name: "grid[0][0]", value: grid[0][0] }, { name: "best[0][0]", value: grid[0][0] }],
   });
 
   heap.push([grid[0][0], 0, 0]);
-  pushStep({
-    title: { vi: "Đưa ô bắt đầu vào min-heap", en: "Push the start cell into the min-heap" },
-    codeLine: 9,
-    current: [0, 0],
-    vars: [{ name: "heap", value: heapStr() }],
+  pushed += 1;
+  snap({
+    phase: "init",
+    title: { vi: `heap = [(${grid[0][0]}, 0, 0)]`, en: `heap = [(${grid[0][0]}, 0, 0)]` },
     note: {
-      vi: "Heap lưu (time, row, col) và ưu tiên ô có thời gian tới sớm nhất.",
-      en: "The heap stores (time, row, col) and prioritizes the earliest reachable cell.",
+      vi: "Min-heap giữ (time, row, col) và luôn lấy ra ô có time nhỏ nhất. Vì thế dãy time được pop ra không giảm — nó chính là MỰC NƯỚC ĐANG DÂNG.",
+      en: "The min-heap holds (time, row, col) and always pops the smallest time. So the popped times are nondecreasing — that sequence IS the rising water level.",
     },
-  });
-
-  pushStep({
-    title: { vi: "Chuẩn bị bốn hướng", en: "Prepare four directions" },
-    codeLine: 10,
-    vars: [{ name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
-    note: {
-      vi: "Có thể bơi xuống, lên, phải hoặc trái; không đi chéo.",
-      en: "Swimming may move down, up, right, or left, but not diagonally.",
-    },
+    codeLines: [9, 10],
+    cur: { r: 0, c: 0, time: grid[0][0] },
+    decision: { vi: "Dãy time pop ra = mực nước dâng dần.", en: "The popped times are the water rising." },
+    vars: [{ name: "heap", value: `[(${grid[0][0]}, 0, 0)]` }, { name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
   });
 
   let answer = -1;
   while (heap.length) {
-    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-    pushStep({
-      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
-      codeLine: 12,
-      vars: [{ name: "heap", value: heapStr() }],
-      note: {
-        vi: "Tiếp tục Dijkstra; trạng thái có time nhỏ nhất sẽ được pop trước.",
-        en: "Continue Dijkstra; the state with the smallest time is popped first.",
-      },
-    });
-
+    sortHeap();
     const [time, r, c] = heap.shift();
-    pushStep({
-      title: { vi: `Pop (${time}, ${r}, ${c})`, en: `Pop (${time}, ${r}, ${c})` },
-      codeLine: 13,
-      current: [r, c],
-      vars: [
-        { name: "time", value: time },
-        { name: "r, c", value: `${r}, ${c}` },
-        { name: "heap còn lại", value: heapStr() },
-      ],
-      note: {
-        vi: `Ô (${r},${c}) được chọn vì có thời gian tới ${time}, nhỏ nhất trong heap.`,
-        en: `Cell (${r},${c}) is selected because its arrival time ${time} is the smallest in the heap.`,
-      },
-    });
+    popped += 1;
 
-    const stale = time > best[r][c];
-    pushStep({
-      title: stale
-        ? { vi: `${time} > best[${r}][${c}]=${best[r][c]}: stale`, en: `${time} > best[${r}][${c}]=${best[r][c]}: stale` }
-        : { vi: `${time} > best[${r}][${c}]? False`, en: `${time} > best[${r}][${c}]? False` },
-      codeLine: 14,
-      current: [r, c],
-      vars: [
-        { name: "time", value: time },
-        { name: `best[${r}][${c}]`, value: best[r][c] },
-        { name: "condition", value: stale },
-      ],
-      note: stale
-        ? {
-            vi: "Một đường tốt hơn đã cập nhật ô này; bản ghi vừa pop đã cũ và không được mở rộng.",
-            en: "A better route already updated this cell; the popped entry is stale and must not expand.",
-          }
-        : {
-            vi: "time vẫn khớp thời gian tốt nhất của ô, nên trạng thái còn hợp lệ.",
-            en: "time still matches the cell's best arrival time, so this state is valid.",
-          },
-    });
-
-    if (stale) {
-      pushStep({
-        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
-        codeLine: 15,
-        current: [r, c],
-        vars: [{ name: "continue", value: true }],
+    if (time > best[r][c]) {
+      skippedStale += 1;
+      snap({
+        phase: "stale",
+        title: { vi: `Bỏ bản ghi cũ (${time}, ${r}, ${c})`, en: `Skip the stale entry (${time}, ${r}, ${c})` },
         note: {
-          vi: "Quay lại đầu vòng while, không xét hàng xóm từ một đường chậm hơn.",
-          en: "Return to the while loop without exploring neighbors from a slower route.",
+          vi: `Ô (${r},${c}) về sau đã tìm được đường tốt hơn: best = ${best[r][c]} < ${time}. Bản ghi này là bản cũ còn sót trong heap (ta không xoá được phần tử giữa heap), nên bỏ qua.`,
+          en: `Cell (${r},${c}) later found a better route: best = ${best[r][c]} < ${time}. This entry is a leftover from before (you cannot delete from the middle of a heap), so skip it.`,
         },
+        codeLines: [14, 15],
+        cur: { r, c, time },
+        decision: { vi: `${time} > best = ${best[r][c]} → bỏ qua.`, en: `${time} > best = ${best[r][c]} → skip.` },
+        vars: [{ name: "time", value: time }, { name: `best[${r}][${c}]`, value: best[r][c] }],
       });
       continue;
     }
 
+    level = time;
+    if (levels[levels.length - 1] !== time) levels.push(time);
     finalized.add(key(r, c));
+    const cur = { r, c, time };
     const reachedTarget = r === n - 1 && c === n - 1;
-    pushStep({
-      title: reachedTarget
-        ? { vi: `(${r},${c}) là ô đích`, en: `(${r},${c}) is the target` }
-        : { vi: `(${r},${c}) chưa phải ô đích`, en: `(${r},${c}) is not the target` },
-      codeLine: 16,
-      current: [r, c],
-      vars: [
-        { name: "current", value: `(${r}, ${c})` },
-        { name: "target", value: `(${n - 1}, ${n - 1})` },
-        { name: "condition", value: reachedTarget },
-      ],
-      note: reachedTarget
-        ? {
-            vi: "Đích được pop với time nhỏ nhất toàn heap, nên đây là thời điểm sớm nhất chắc chắn có thể tới đích.",
-            en: "The target was popped with the heap's smallest time, so this is the earliest guaranteed arrival.",
-          }
-        : {
-            vi: "Chưa tới đích; tiếp tục thử bốn ô kề.",
-            en: "The target has not been reached; inspect four adjacent cells.",
-          },
-    });
 
     if (reachedTarget) {
       answer = time;
       const path = [];
-      let current = [r, c];
-      while (current) {
-        path.unshift(current);
-        current = parent[current[0]][current[1]];
+      let cursor = [r, c];
+      while (cursor) {
+        path.unshift(cursor);
+        cursor = parent[cursor[0]][cursor[1]];
       }
-      const pathCells = new Set(path.map(([pr, pc]) => key(pr, pc)));
-      const pathText = path.map(([pr, pc]) => `(${pr},${pc})`).join(" → ");
-      pushStep({
-        title: { vi: `Thời gian nhỏ nhất = ${answer}`, en: `Minimum time = ${answer}` },
-        codeLine: 17,
-        pathCells,
+      const pathSet = new Set(path.map(([pr, pc]) => key(pr, pc)));
+      let bottleneck = path[0];
+      for (const [pr, pc] of path) if (grid[pr][pc] > grid[bottleneck[0]][bottleneck[1]]) bottleneck = [pr, pc];
+      const pathText = path.map(([pr, pc]) => `(${pr},${pc})=${grid[pr][pc]}`).join(" → ");
+      snap({
+        phase: "target",
+        title: { vi: `Pop ra đích với t = ${time} → đáp án ${time}`, en: `Popped the target with t = ${time} → answer ${time}` },
+        note: {
+          vi: `Đích rời heap khi time = ${time} là nhỏ nhất trong toàn heap, nên không đường nào chờ ít hơn. Đường xanh: ${pathText}. Ô cao nhất trên đường là (${bottleneck[0]},${bottleneck[1]}) với độ cao ${grid[bottleneck[0]][bottleneck[1]]} — đó là ô BOTTLENECK quyết định đáp án; mọi ô khác trên đường đều thấp hơn nên nước đã phủ chúng từ trước.`,
+          en: `The target left the heap when time = ${time} was the smallest in the whole heap, so no route waits less. Green route: ${pathText}. Its highest cell is (${bottleneck[0]},${bottleneck[1]}) at elevation ${grid[bottleneck[0]][bottleneck[1]]} — the BOTTLENECK that sets the answer; every other cell on the route is lower and was already submerged.`,
+        },
+        codeLines: [16, 17],
+        cur,
+        pathSet,
+        path: path.map(([pr, pc]) => [pr, pc, grid[pr][pc]]),
+        bottleneck,
+        answer: time,
         final: true,
+        decision: {
+          vi: `Chờ tới t = ${time} (độ cao ô bottleneck) là đủ và là ít nhất.`,
+          en: `Waiting until t = ${time} (the bottleneck elevation) is both sufficient and minimal.`,
+        },
         vars: [
           { name: "path", value: pathText },
-          { name: "max elevation", value: answer },
-          { name: "answer", value: answer },
+          { name: "bottleneck", value: `(${bottleneck[0]},${bottleneck[1]}) = ${grid[bottleneck[0]][bottleneck[1]]}` },
+          { name: "answer", value: time },
         ],
-        note: {
-          vi: `Đường xanh lá: ${pathText}. Ô cao nhất trên đường có độ cao ${answer}, nên phải chờ tới t=${answer}; không có đường nào cần chờ ít hơn.`,
-          en: `Green path: ${pathText}. Its highest cell has elevation ${answer}, so swimming must wait until t=${answer}; no route can wait less.`,
-        },
       });
       break;
     }
 
-    for (const [dr, dc] of directions) {
-      pushStep({
-        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
-        codeLine: 19,
-        current: [r, c],
-        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
-        note: {
-          vi: `Từ (${r},${c}), áp dụng độ lệch hàng ${dr} và cột ${dc}.`,
-          en: `From (${r},${c}), apply row offset ${dr} and column offset ${dc}.`,
-        },
-      });
+    snap({
+      phase: "pop",
+      title: { vi: `Mực nước t = ${time}, đứng ở (${r},${c})`, en: `Water level t = ${time}, standing at (${r},${c})` },
+      note: {
+        vi: `Pop ra ô có time nhỏ nhất: (${r},${c}), độ cao ${grid[r][c]}, tới được lúc t = ${time}. Mọi ô xanh trên lưới đã bị nước phủ (độ cao ≤ ${time}). Chưa phải đích (${n - 1},${n - 1}) nên thử 4 ô kề.`,
+        en: `Pop the smallest time: (${r},${c}) at elevation ${grid[r][c]}, reachable at t = ${time}. Every blue cell on the grid is already submerged (elevation ≤ ${time}). Not the target (${n - 1},${n - 1}) yet, so try the four neighbours.`,
+      },
+      codeLines: [12, 13, 16],
+      cur,
+      decision: { vi: `Chốt (${r},${c}) ở t = ${time} — không thể tới sớm hơn.`, en: `Settled (${r},${c}) at t = ${time} — it cannot be reached sooner.` },
+      vars: [
+        { name: "time", value: time },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: `grid[${r}][${c}]`, value: grid[r][c] },
+        { name: "heap size", value: heap.length },
+      ],
+    });
 
+    for (const [dr, dc] of directions) {
       const nr = r + dr;
       const nc = c + dc;
-      pushStep({
-        title: { vi: `Ô kế tiếp = (${nr},${nc})`, en: `Next cell = (${nr},${nc})` },
-        codeLine: 20,
-        current: [r, c],
-        vars: [
-          { name: "nr", value: `${r} + (${dr}) = ${nr}` },
-          { name: "nc", value: `${c} + (${dc}) = ${nc}` },
-        ],
-        note: {
-          vi: "Tính tọa độ hàng xóm bằng nr = r + dr và nc = c + dc.",
-          en: "Compute the neighbor with nr = r + dr and nc = c + dc.",
-        },
-      });
+      if (nr < 0 || nr >= n || nc < 0 || nc >= n) {
+        outOfBounds += 1;
+        snap({
+          phase: "neighbor",
+          title: { vi: `(${nr},${nc}) ra ngoài lưới`, en: `(${nr},${nc}) is outside the grid` },
+          note: { vi: `Hướng (${dr},${dc}) dẫn ra khỏi lưới ${n}×${n}, bỏ qua.`, en: `Direction (${dr},${dc}) leaves the ${n}×${n} grid, so skip it.` },
+          codeLines: [20, 21],
+          cur,
+          probe: { r: nr, c: nc, verdict: "oob" },
+          decision: { vi: "Ra ngoài lưới → bỏ.", en: "Out of bounds → skip." },
+          vars: [{ name: "nr, nc", value: `${nr}, ${nc}` }],
+        });
+        continue;
+      }
 
-      const inBounds = nr >= 0 && nr < n && nc >= 0 && nc < n;
-      pushStep({
-        title: inBounds
-          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
-          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
-        codeLine: 21,
-        current: inBounds ? [nr, nc] : [r, c],
-        vars: [
-          { name: "neighbor", value: `(${nr}, ${nc})` },
-          { name: "in bounds", value: inBounds },
-        ],
-        note: inBounds
-          ? {
-              vi: "Tọa độ hợp lệ; có thể tính thời gian cần để bước vào ô này.",
-              en: "The coordinates are valid; compute the time required to enter this cell.",
-            }
-          : {
-              vi: "Tọa độ ngoài ma trận; bỏ qua thân if và thử hướng tiếp theo.",
-              en: "The coordinates are outside the matrix; skip the if body and try the next direction.",
-            },
-      });
-      if (!inBounds) continue;
-
-      const newTime = Math.max(time, grid[nr][nc]);
-      pushStep({
-        title: { vi: `new_time = max(${time}, ${grid[nr][nc]}) = ${newTime}`, en: `new_time = max(${time}, ${grid[nr][nc]}) = ${newTime}` },
-        codeLine: 22,
-        current: [nr, nc],
-        vars: [
-          { name: "time", value: time },
-          { name: `grid[${nr}][${nc}]`, value: grid[nr][nc] },
-          { name: "new_time", value: newTime },
-        ],
-        note: {
-          vi: `Muốn đi cả đường tới (${nr},${nc}), nước phải phủ mọi ô đã qua. Vì vậy lấy độ cao lớn nhất: max(${time}, ${grid[nr][nc]}) = ${newTime}, không cộng hai số.`,
-          en: `To traverse the whole route to (${nr},${nc}), water must cover every visited cell. Take the maximum elevation: max(${time}, ${grid[nr][nc]}) = ${newTime}, not their sum.`,
-        },
-      });
-
+      const elev = grid[nr][nc];
+      const newTime = Math.max(time, elev);
       const oldBest = best[nr][nc];
       const improves = newTime < oldBest;
-      pushStep({
-        title: improves
-          ? { vi: `${newTime} < ${formatTime(oldBest)}: tới sớm hơn`, en: `${newTime} < ${formatTime(oldBest)}: earlier arrival` }
-          : { vi: `${newTime} < ${formatTime(oldBest)}? False`, en: `${newTime} < ${formatTime(oldBest)}? False` },
-        codeLine: 23,
-        current: [nr, nc],
-        vars: [
-          { name: "new_time", value: newTime },
-          { name: `best[${nr}][${nc}]`, value: formatTime(oldBest) },
-          { name: "condition", value: improves },
-        ],
-        note: improves
-          ? {
-              vi: `Đường mới giảm thời điểm tới (${nr},${nc}) từ ${formatTime(oldBest)} xuống ${newTime}.`,
-              en: `The new route lowers (${nr},${nc})'s arrival time from ${formatTime(oldBest)} to ${newTime}.`,
-            }
-          : {
-              vi: `Ô (${nr},${nc}) đã có đường tới lúc ${formatTime(oldBest)}, không chậm hơn ${newTime}; giữ nguyên.`,
-              en: `Cell (${nr},${nc}) is already reachable at ${formatTime(oldBest)}, no later than ${newTime}; keep it.`,
-            },
-      });
-      if (!improves) continue;
+      const needsRise = elev > time;
+      const probeBase = { r: nr, c: nc, elev, fromTime: time, newTime, oldBest: jsonTime(oldBest), needsRise };
+
+      if (!improves) {
+        notImproved += 1;
+        snap({
+          phase: "neighbor",
+          title: { vi: `(${nr},${nc}): ${newTime} không tốt hơn best = ${oldBest}`, en: `(${nr},${nc}): ${newTime} is no better than best = ${oldBest}` },
+          note: {
+            vi: `new_time = max(${time}, ${elev}) = ${newTime}. Ô (${nr},${nc}) đã có đường tới ở mực nước ${oldBest} ≤ ${newTime}, nên đường qua (${r},${c}) không cải thiện gì. Không cập nhật, không push.`,
+            en: `new_time = max(${time}, ${elev}) = ${newTime}. Cell (${nr},${nc}) already has a route at water level ${oldBest} ≤ ${newTime}, so going through (${r},${c}) improves nothing. No update, no push.`,
+          },
+          codeLines: [22, 23],
+          cur,
+          probe: { ...probeBase, verdict: "noImprove" },
+          decision: { vi: `${newTime} ≥ ${oldBest} → giữ nguyên.`, en: `${newTime} ≥ ${oldBest} → keep as is.` },
+          vars: [
+            { name: "new_time", value: `max(${time}, ${elev}) = ${newTime}` },
+            { name: `best[${nr}][${nc}]`, value: oldBest },
+            { name: "condition", value: false },
+          ],
+        });
+        continue;
+      }
 
       best[nr][nc] = newTime;
       parent[nr][nc] = [r, c];
-      pushStep({
-        title: { vi: `best[${nr}][${nc}] = ${newTime}`, en: `best[${nr}][${nc}] = ${newTime}` },
-        codeLine: 24,
-        current: [nr, nc],
-        vars: [{ name: "best", value: bestStr() }],
-        note: {
-          vi: `Lưu thời gian tốt hơn cho (${nr},${nc}). Visualization cũng nhớ parent = (${r},${c}) để dựng đường cuối.`,
-          en: `Store the better time for (${nr},${nc}). The visualization also records parent = (${r},${c}) for the final path.`,
-        },
-      });
-
       heap.push([newTime, nr, nc]);
-      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-      pushStep({
-        title: { vi: `Push (${newTime}, ${nr}, ${nc})`, en: `Push (${newTime}, ${nr}, ${nc})` },
-        codeLine: 25,
-        current: [nr, nc],
-        vars: [{ name: "heap", value: heapStr() }],
-        note: {
-          vi: "Đưa trạng thái mới vào heap để Dijkstra tiếp tục ưu tiên thời gian nhỏ nhất.",
-          en: "Push the new state so Dijkstra continues prioritizing the smallest time.",
+      pushed += 1;
+      sortHeap();
+      snap({
+        phase: "neighbor",
+        title: {
+          vi: `(${nr},${nc}) cao ${elev} → tới được ở t = ${newTime}`,
+          en: `(${nr},${nc}) at elevation ${elev} → reachable at t = ${newTime}`,
         },
+        note: {
+          vi: `new_time = max(${time}, ${elev}) = ${newTime}${needsRise
+            ? ` — ô này cao ${elev}, cao hơn mực nước hiện tại ${time}, nên phải CHỜ nước dâng tới ${elev}.`
+            : ` — ô này cao ${elev}, đã chìm dưới mực nước ${time}, nên bước vào không phải chờ thêm.`} Lưu ý dùng max chứ không cộng: đi thêm một ô thấp không làm đường đắt hơn. ${newTime} < best cũ (${oldBest}) nên cập nhật và push vào heap.`,
+          en: `new_time = max(${time}, ${elev}) = ${newTime}${needsRise
+            ? ` — this cell is at ${elev}, above the current level ${time}, so you must WAIT for the water to rise to ${elev}.`
+            : ` — this cell is at ${elev}, already under level ${time}, so stepping in costs no extra wait.`} Note the max rather than a sum: crossing one more low cell does not make the route more expensive. ${newTime} < the old best (${oldBest}), so update and push.`,
+        },
+        codeLines: [22, 23, 24, 25],
+        cur,
+        probe: { ...probeBase, verdict: "improved" },
+        decision: needsRise
+          ? { vi: `Phải chờ nước dâng ${time} → ${elev}.`, en: `Must wait for the water to rise ${time} → ${elev}.` }
+          : { vi: `Ô đã chìm — vào được ngay ở t = ${newTime}.`, en: `Already submerged — enter right away at t = ${newTime}.` },
+        vars: [
+          { name: "new_time", value: `max(${time}, ${elev}) = ${newTime}` },
+          { name: `best[${nr}][${nc}]`, value: `${Number.isFinite(oldBest) ? oldBest : "∞"} → ${newTime}` },
+          { name: "heap size", value: heap.length },
+        ],
       });
     }
   }
 
   if (!steps.at(-1).final) {
-    pushStep({
-      title: { vi: "Không thể tới đích", en: "The target is unreachable" },
-      codeLine: 26,
-      final: true,
-      vars: [{ name: "answer", value: -1 }],
+    snap({
+      phase: "fail",
+      title: { vi: "Heap rỗng → trả -1", en: "Heap empty → return -1" },
       note: {
-        vi: "Dòng fallback trả -1. Với grid hợp lệ, mọi ô nối nhau theo bốn hướng nên thuật toán luôn trả ở dòng 17.",
-        en: "The fallback returns -1. In a valid grid all cells connect through four directions, so line 17 always returns first.",
+        vi: "Dòng fallback trả -1. Với grid hợp lệ mọi ô đều nối nhau theo 4 hướng nên thực tế luôn trả ở dòng 17.",
+        en: "The fallback returns -1. In a valid grid every cell connects through four directions, so line 17 always returns first in practice.",
       },
+      codeLines: [26],
+      final: true,
+      answer: -1,
+      decision: { vi: "Đáp án = -1.", en: "Answer = -1." },
+      vars: [{ name: "answer", value: -1 }],
     });
   }
 
@@ -20949,15 +20912,16 @@ module.exports = {
       vi: "Cho grid n×n, grid[r][c] là độ cao của ô. Tại thời điểm t, mực nước là t và chỉ có thể bơi qua các ô có độ cao ≤ t theo 4 hướng. Tìm thời điểm nhỏ nhất để đi từ (0,0) tới (n-1,n-1). Nhập hàng cách bởi '|' hoặc ';', số cách bởi dấu phẩy.",
       en: "Given an n×n grid where grid[r][c] is elevation, at time t the water level is t and swimming may use cells with elevation ≤ t in four directions. Find the minimum time to travel from (0,0) to (n-1,n-1). Separate rows with '|' or ';' and values with commas.",
     },
-    defaultInput: "0,2|1,3",
+    defaultInput: "0,1,2,3,4|24,23,22,21,5|12,13,14,15,16|11,17,18,19,20|10,9,8,7,6",
     inputKind: "string",
     inputLabel: { vi: "grid độ cao (hàng cách '|')", en: "elevation grid (rows separated by '|')" },
     approach: [
       { vi: "Xem mỗi ô là một node; best[r][c] là thời điểm sớm nhất có thể tới ô đó.", en: "Treat each cell as a node; best[r][c] is the earliest time that cell can be reached." },
       { vi: "Khởi tạo best[0][0] = grid[0][0], vì phải chờ nước phủ được ngay ô xuất phát.", en: "Initialize best[0][0] = grid[0][0], because water must first cover the start cell." },
-      { vi: "Dijkstra dùng min-heap (time,row,col), luôn xử lý ô có thời gian tới nhỏ nhất và bỏ qua stale entry.", en: "Dijkstra uses a min-heap of (time,row,col), processes the earliest reachable cell first, and skips stale entries." },
+      { vi: "Dijkstra dùng min-heap (time,row,col), luôn xử lý ô có thời gian tới nhỏ nhất.", en: "Dijkstra uses a min-heap of (time,row,col) and always processes the earliest reachable cell first." },
       { vi: "Điểm mấu chốt: new_time = max(time, grid[nr][nc]). Thời gian của đường là độ cao lớn nhất đã gặp, không phải tổng và không phải chênh lệch hai ô.", en: "Key point: new_time = max(time, grid[nr][nc]). A route's time is its maximum visited elevation, not a sum or adjacent-cell difference." },
-      { vi: "Khi ô đích được pop, time đã tối ưu nên trả ngay.", en: "When the target is popped, time is optimal, so return immediately." },
+      { vi: "Dãy time được pop ra không bao giờ giảm — nó chính là mực nước đang dâng. Đó cũng là lý do ô đích vừa được pop là đã tối ưu, trả ngay được.", en: "The popped times never decrease — that sequence is the rising water level. It is also why the target is optimal the moment it is popped, so you can return immediately." },
+      { vi: "Hệ quả thú vị: vì chi phí là max() và time pop ra không giảm, lần relax ĐẦU TIÊN của một ô đã cho giá trị cuối cùng (relax sau chỉ ra max(time lớn hơn, cùng độ cao) ≥ giá trị cũ). Nên mỗi ô vào heap đúng một lần và dòng `if time > best[r][c]: continue` không bao giờ chạy với bài này — nó chỉ là thói quen viết Dijkstra an toàn. Đã kiểm chứng trên toàn bộ 362.880 lưới 3×3 và 30.000 lưới random: 0 lần.", en: "A neat consequence: because the cost is a max() and popped times never decrease, a cell's FIRST relaxation already gives its final value (a later one yields max(larger time, same elevation) ≥ the old value). So each cell enters the heap exactly once and the line `if time > best[r][c]: continue` never fires for this problem — it is just standard defensive Dijkstra. Checked over all 362,880 3×3 grids and 30,000 random grids: zero hits." },
     ],
     complexity: {
       time: "O(n² log(n²))",

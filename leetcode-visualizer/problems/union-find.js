@@ -4866,8 +4866,10 @@ function buildSteps1168(input, params = {}) {
 }
 
 // ─── Shared helpers for MST / Union-Find graph visualizations ───
-// Used by #1135, #1489, #1579, #1627. All render through the reusable
-// `step.graph` circle-layout renderer in public/script.js.
+// Used by #1135, #1489, #1579, #1627. The first three render through the
+// reusable `step.graph` circle-layout renderer in public/script.js; #1627 has
+// its own `gcThreshold1627View` renderer instead (a circle layout hides the
+// divisor-sieve structure that the problem is really about).
 
 // Parse a matrix of integer rows from JSON ("[[1,2,5]]") or "a,b,c;a,b,c" text.
 function mstParseMatrix(raw, arity, label) {
@@ -5074,6 +5076,11 @@ function buildSteps1135(input, params = {}) {
 }
 
 // ─── 1627: Graph Connectivity With Threshold (Union Find) ───
+// Rendered by the dedicated `gcThreshold1627View` renderer instead of the shared
+// circle-graph one. The circle layout turned this into a hairball and hid the
+// single idea the problem is about: the edges are not found by testing pairs,
+// they fall out of a DIVISOR SIEVE — for each z > threshold, the whole chain
+// z, 2z, 3z, … collapses into one group, and transitivity does the rest.
 function buildSteps1627(input, params = {}) {
   const n = Array.isArray(input) ? Number(input[0]) : Number(input);
   if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
@@ -5089,102 +5096,246 @@ function buildSteps1627(input, params = {}) {
   const nodeIds = Array.from({ length: n }, (_, i) => i + 1);
   const dsu = mstMakeDSU(n + 1);
   const steps = [];
-  const edges = [];
-  const edgeKeys = new Set();
 
-  function addEdge(u, v) {
-    const key = u < v ? `${u}-${v}` : `${v}-${u}`;
-    if (edgeKeys.has(key)) return;
-    edgeKeys.add(key);
-    edges.push({ u, v });
+  // ── The sieve ladder: every z that actually owns a multiple <= n ──────────
+  // A z with 2z > n can never link anything, so it never appears as a row; it
+  // is reported once in `noLeader` instead. That keeps the ladder short (<= 12
+  // rows for n = 24) while still accounting for every z the loop visits.
+  const maxZ = Math.floor(n / 2);
+  const ladder = [];
+  for (let z = 1; z <= maxZ; z++) {
+    const multiples = [];
+    for (let m = 2 * z; m <= n; m += z) multiples.push(m);
+    ladder.push({ z, multiples, skipped: z <= threshold, done: false, outcome: {} });
+  }
+  const noLeader = [];
+  for (let z = Math.max(maxZ + 1, threshold + 1); z <= n; z++) noLeader.push(z);
+
+  // Largest proper divisor, used to explain WHY a node ends up alone.
+  function maxProperDivisor(k) {
+    for (let d = Math.floor(k / 2); d >= 1; d--) if (k % d === 0) return d;
+    return 0;
   }
 
-  function makeGraph(hlEdges, hlNodes) {
-    const info = mstComponentInfo(dsu, nodeIds);
-    return {
-      nodes: nodeIds.map((id) => ({ id, label: String(id), sub: `R${info.roots[id]}` })),
-      edges: edges.map((e) => ({ u: e.u, v: e.v, undirected: true, kind: "accept" })),
-      hlNodes: hlNodes || [],
-      hlEdges: hlEdges || [],
-      visitedNodes: info.connected,
-    };
+  // ── Group snapshot with colours that stay put as groups merge ─────────────
+  // A group is keyed by its smallest member, so when two groups merge the one
+  // with the smaller minimum keeps its colour instead of every group reshuffling.
+  const PALETTE = 8;
+  function snapshotGroups() {
+    const byRoot = new Map();
+    nodeIds.forEach((id) => {
+      const r = dsu.rootOf(id);
+      if (!byRoot.has(r)) byRoot.set(r, []);
+      byRoot.get(r).push(id);
+    });
+    const groups = [...byRoot.values()]
+      .map((members) => ({ key: members[0], members }))   // nodeIds ascend → [0] is the min
+      .sort((a, b) => a.key - b.key);
+    const used = new Set();
+    const colorOf = {};
+    groups.forEach((g) => {
+      if (g.members.length < 2) { g.color = -1; return; }
+      let c = (g.key - 1) % PALETTE;
+      if (used.size < PALETTE) while (used.has(c)) c = (c + 1) % PALETTE;
+      used.add(c);
+      g.color = c;
+    });
+    groups.forEach((g) => g.members.forEach((id) => { colorOf[id] = g.color; }));
+    return { groups, colorOf };
   }
 
-  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+  const queryState = queries.map(([a, b]) => ({ a, b, ra: null, rb: null, result: null, status: "pending" }));
+  const results = [];
+
+  function snap(o) {
+    const { groups, colorOf } = snapshotGroups();
     steps.push({
-      title, note, codeLines,
-      arr: [...dsu.parent], highlight: hlNodes, mark: [], vars, final,
-      graph: makeGraph(hlEdges, hlNodes),
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      gcThreshold1627View: {
+        n, threshold,
+        phase: o.phase,
+        ladder: ladder.map((r) => ({
+          z: r.z,
+          multiples: [...r.multiples],
+          status: r.skipped ? "skipped" : r.z === o.curZ ? "current" : r.done ? "done" : "pending",
+          outcome: { ...r.outcome },
+        })),
+        noLeader: [...noLeader],
+        curZ: o.curZ === undefined ? null : o.curZ,
+        curMultiple: o.curMultiple === undefined ? null : o.curMultiple,
+        union: o.union || null,
+        nodes: nodeIds.map((id) => ({ id, root: dsu.rootOf(id), color: colorOf[id] })),
+        groups: groups.map((g) => ({ key: g.key, color: g.color, members: [...g.members] })),
+        marked: o.marked || [],
+        queries: queryState.map((q) => ({ ...q })),
+        // A number ends up alone when BOTH doors are shut: it cannot join a
+        // smaller z's group (its largest proper divisor is already <= threshold)
+        // and it cannot lead a group of its own (2*k would exceed n).
+        isolated: o.final
+          ? groups.filter((g) => g.members.length === 1)
+            .map((g) => ({ id: g.key, maxDiv: maxProperDivisor(g.key), twiceOverN: 2 * g.key > n }))
+          : null,
+        answer: o.final ? [...results] : null,
+        decision: o.decision || null,
+      },
     });
   }
 
-  push({
-    title: { vi: `n=${n}, threshold=${threshold}, ${queries.length} truy vấn`, en: `n=${n}, threshold=${threshold}, ${queries.length} queries` },
+  snap({
+    phase: "intro",
+    title: { vi: `n = ${n}, threshold = ${threshold}, ${queries.length} truy vấn`, en: `n = ${n}, threshold = ${threshold}, ${queries.length} queries` },
     note: {
-      vi: "Hai node x, y nối nhau nếu có ước chung z > threshold. Ta gom mọi node dùng Union-Find rồi trả lời từng truy vấn.",
-      en: "Two nodes x, y are connected if they share a common divisor z > threshold. Group all nodes with Union-Find, then answer each query.",
+      vi: `Hai số x, y nối trực tiếp nếu có ước chung z > ${threshold}. Đừng thử từng cặp (O(n²)): nếu x và y cùng chia hết cho z thì CẢ HAI đều là bội của z — nên chỉ cần nối z với từng bội của nó, rồi để tính bắc cầu của Union-Find gộp phần còn lại.`,
+      en: `Two numbers x, y are directly connected if they share a divisor z > ${threshold}. Do not test pairs (O(n²)): if x and y are both divisible by z then BOTH are multiples of z — so it is enough to link z to each of its multiples and let Union-Find's transitivity merge the rest.`,
     },
     codeLines: [1, 2],
-    vars: [{ name: "n", value: n }, { name: "threshold", value: threshold }],
+    decision: {
+      vi: "Ý chính: cạnh sinh ra từ sàng ước số, không phải từ việc thử từng cặp.",
+      en: "Key idea: the edges come from a divisor sieve, not from testing pairs.",
+    },
+    vars: [{ name: "n", value: n }, { name: "threshold", value: threshold }, { name: "queries", value: queries.length }],
   });
 
-  push({
-    title: { vi: `Khởi tạo DSU cho node 1..${n}`, en: `Initialize DSU for nodes 1..${n}` },
-    note: { vi: "Ban đầu mỗi node là một component riêng.", en: "Initially every node is its own component." },
+  snap({
+    phase: "init",
+    title: { vi: `Khởi tạo DSU cho ${n} số 1..${n}`, en: `Initialize DSU for the ${n} numbers 1..${n}` },
+    note: { vi: "Ban đầu mỗi số là một nhóm riêng — chưa có cạnh nào.", en: "Initially each number is its own group — no edges yet." },
     codeLines: [3],
+    decision: { vi: `${n} nhóm rời rạc.`, en: `${n} separate groups.` },
     vars: [{ name: "parent", value: `[${nodeIds.join(", ")}]` }],
   });
 
-  for (let z = threshold + 1; z <= n; z++) {
-    const multiples = [];
-    for (let m = 2 * z; m <= n; m += z) multiples.push(m);
-    if (multiples.length === 0) continue;
-    push({
-      title: { vi: `z = ${z}: nối ${z} với các bội số ${multiples.join(", ")}`, en: `z = ${z}: connect ${z} with multiples ${multiples.join(", ")}` },
-      note: { vi: `Mọi bội số của ${z} đều có ước chung ${z} (> ${threshold}) nên cùng một nhóm.`, en: `Every multiple of ${z} shares the divisor ${z} (> ${threshold}), so they belong to one group.` },
-      codeLines: [9, 10],
-      hlNodes: [z, ...multiples],
+  const skippedRows = ladder.filter((r) => r.skipped);
+  if (skippedRows.length) {
+    snap({
+      phase: "skip",
+      title: { vi: `Bỏ z = 1..${threshold} (z phải > threshold)`, en: `Skip z = 1..${threshold} (z must exceed threshold)` },
+      note: {
+        vi: `Vòng lặp bắt đầu từ z = threshold + 1 = ${threshold + 1}. Ước chung z = ${skippedRows.map((r) => r.z).join(", ")} không tính, nên các cạnh mà những z đó sẽ tạo ra đều bị loại — đây chính là chỗ threshold tác động.`,
+        en: `The loop starts at z = threshold + 1 = ${threshold + 1}. Divisors z = ${skippedRows.map((r) => r.z).join(", ")} do not count, so every edge those z would have created is dropped — this is exactly where threshold bites.`,
+      },
+      codeLines: [9],
+      marked: [],
+      decision: {
+        vi: `${skippedRows.length} hàng đầu của sàng bị gạch bỏ.`,
+        en: `The first ${skippedRows.length} sieve rows are struck out.`,
+      },
+      vars: [{ name: "z bắt đầu / z starts at", value: threshold + 1 }],
+    });
+  }
+
+  for (const row of ladder) {
+    if (row.skipped) continue;
+    const { z, multiples } = row;
+    snap({
+      phase: "sieve",
+      curZ: z,
+      title: { vi: `z = ${z} → các bội số: ${multiples.join(", ")}`, en: `z = ${z} → its multiples: ${multiples.join(", ")}` },
+      note: {
+        vi: `${multiples.map((m) => `${m} = ${m / z}×${z}`).join(", ")} — tất cả đều chia hết cho ${z} (> ${threshold}), nên ${[z, ...multiples].join(", ")} phải nằm cùng một nhóm. Nối ${z} với từng bội là đủ.`,
+        en: `${multiples.map((m) => `${m} = ${m / z}×${z}`).join(", ")} — all divisible by ${z} (> ${threshold}), so ${[z, ...multiples].join(", ")} must share one group. Linking ${z} to each multiple is enough.`,
+      },
+      codeLines: [10],
+      marked: [z, ...multiples],
+      decision: {
+        vi: `${multiples.length} lần union cho hàng z = ${z}.`,
+        en: `${multiples.length} unions for row z = ${z}.`,
+      },
       vars: [{ name: "z", value: z }, { name: "multiples", value: multiples.join(", ") }],
     });
+
     for (const m of multiples) {
       const rz = dsu.rootOf(z);
       const rm = dsu.rootOf(m);
       const already = rz === rm;
-      addEdge(z, m);
       dsu.union(z, m);
-      push({
-        title: { vi: `union(${z}, ${m})`, en: `union(${z}, ${m})` },
+      row.outcome[m] = already ? "already" : "merged";
+      snap({
+        phase: "union",
+        curZ: z,
+        curMultiple: m,
+        title: {
+          vi: `union(${z}, ${m}) → ${already ? "đã cùng nhóm" : "gộp 2 nhóm"}`,
+          en: `union(${z}, ${m}) → ${already ? "already together" : "merged two groups"}`,
+        },
         note: already
-          ? { vi: `${z} và ${m} đã cùng nhóm (R${rz}) — cạnh này chỉ củng cố liên thông.`, en: `${z} and ${m} were already in group R${rz} — this edge just reinforces connectivity.` }
-          : { vi: `Gộp nhóm của ${z} (R${rz}) và ${m} (R${rm}).`, en: `Merge the groups of ${z} (R${rz}) and ${m} (R${rm}).` },
+          ? {
+            vi: `find(${z}) = find(${m}) = R${rz}: hai số này đã chung nhóm từ một z nhỏ hơn. Cạnh này dư — và chính những cạnh dư như vậy giải thích vì sao ${n} số lại dồn về rất ít nhóm.`,
+            en: `find(${z}) = find(${m}) = R${rz}: these two were already joined via a smaller z. This edge is redundant — and redundant edges like it are why ${n} numbers collapse into so few groups.`,
+          }
+          : {
+            vi: `find(${z}) = R${rz}, find(${m}) = R${rm} khác nhau → gộp lại. Mọi số đang ở hai nhóm đó giờ liên thông với nhau.`,
+            en: `find(${z}) = R${rz} and find(${m}) = R${rm} differ → merge them. Everything in those two groups is now mutually connected.`,
+          },
         codeLines: [11],
-        hlEdges: [[z, m]], hlNodes: [z, m],
+        marked: [z, m],
+        union: { a: z, b: m, ra: rz, rb: rm, merged: !already },
+        decision: already
+          ? { vi: `${z} và ${m} đã cùng nhóm → không đổi.`, en: `${z} and ${m} were already together → nothing changes.` }
+          : { vi: `Nhóm R${rz} + nhóm R${rm} → một nhóm.`, en: `Group R${rz} + group R${rm} → one group.` },
         vars: [{ name: "z, m", value: `${z}, ${m}` }, { name: "find(z), find(m)", value: `R${rz}, R${rm}` }],
       });
     }
+    row.done = true;
   }
 
-  const results = [];
+  if (noLeader.length) {
+    snap({
+      phase: "noLeader",
+      title: { vi: `z = ${noLeader.join(", ")}: không có bội số ≤ ${n}`, en: `z = ${noLeader.join(", ")}: no multiple ≤ ${n}` },
+      note: {
+        vi: `Với z > n/2 = ${(n / 2).toFixed(1)} thì 2z > ${n}, nên vòng lặp trong không chạy lần nào và các z này không tạo cạnh mới. Vì vậy sàng thực chất chỉ cần chạy tới ${maxZ}.`,
+        en: `For z > n/2 = ${(n / 2).toFixed(1)} we get 2z > ${n}, so the inner loop never runs and these z create no edges. That is why the sieve effectively only needs to reach ${maxZ}.`,
+      },
+      codeLines: [9],
+      marked: [...noLeader],
+      decision: { vi: `Sàng kết thúc — chỉ z ≤ ${maxZ} có tác dụng.`, en: `Sieve done — only z ≤ ${maxZ} matters.` },
+      vars: [{ name: "n/2", value: (n / 2).toFixed(1) }],
+    });
+  }
+
   queries.forEach(([a, b], index) => {
     const ra = dsu.rootOf(a);
     const rb = dsu.rootOf(b);
     const connected = ra === rb;
     results.push(connected);
-    push({
-      title: { vi: `Truy vấn ${index + 1}: ${a} ↔ ${b}? ${connected ? "TRUE" : "FALSE"}`, en: `Query ${index + 1}: ${a} ↔ ${b}? ${connected ? "TRUE" : "FALSE"}` },
-      note: {
-        vi: `find(${a})=R${ra}, find(${b})=R${rb}. ${connected ? "Cùng root → có đường đi." : "Khác root → không nối được."}`,
-        en: `find(${a})=R${ra}, find(${b})=R${rb}. ${connected ? "Same root → a path exists." : "Different roots → not connected."}`,
+    queryState[index] = { a, b, ra, rb, result: connected, status: "current" };
+    snap({
+      phase: "query",
+      title: {
+        vi: `Truy vấn ${index + 1}/${queries.length}: ${a} ↔ ${b}? → ${connected ? "true" : "false"}`,
+        en: `Query ${index + 1}/${queries.length}: ${a} ↔ ${b}? → ${connected ? "true" : "false"}`,
       },
-      codeLines: [12], hlNodes: [a, b],
+      note: {
+        vi: `find(${a}) = R${ra}, find(${b}) = R${rb}. ${connected ? "Cùng root → cùng nhóm → có đường đi (có thể phải đi qua nhiều số trung gian)." : "Khác root → khác nhóm → không có đường đi nào."}`,
+        en: `find(${a}) = R${ra}, find(${b}) = R${rb}. ${connected ? "Same root → same group → a path exists (possibly through several intermediates)." : "Different roots → different groups → no path at all."}`,
+      },
+      codeLines: [12],
+      marked: [a, b],
+      decision: {
+        vi: `R${ra} ${connected ? "=" : "≠"} R${rb} → ${connected ? "true" : "false"}`,
+        en: `R${ra} ${connected ? "=" : "≠"} R${rb} → ${connected ? "true" : "false"}`,
+      },
       vars: [{ name: "a, b", value: `${a}, ${b}` }, { name: "result", value: String(connected) }],
     });
+    queryState[index].status = "done";
   });
 
-  push({
-    title: { vi: "Kết quả các truy vấn", en: "Query results" },
-    note: { vi: `answer = [${results.join(", ")}]`, en: `answer = [${results.join(", ")}]` },
-    codeLines: [12], final: true,
+  snap({
+    phase: "done",
+    final: true,
+    title: { vi: `answer = [${results.join(", ")}]`, en: `answer = [${results.join(", ")}]` },
+    note: {
+      vi: `Sàng chạy ${ladder.filter((r) => !r.skipped).length} hàng z, sau đó mỗi truy vấn chỉ là một phép so sánh root. Số nào còn đứng một mình là số không có ước z > ${threshold} nào dùng được.`,
+      en: `The sieve ran ${ladder.filter((r) => !r.skipped).length} z-rows, after which each query is just one root comparison. Any number still alone has no usable divisor z > ${threshold}.`,
+    },
+    codeLines: [12],
+    decision: { vi: `Xong — ${results.filter(Boolean).length}/${results.length} truy vấn là true.`, en: `Done — ${results.filter(Boolean).length}/${results.length} queries are true.` },
     vars: [{ name: "answer", value: `[${results.join(", ")}]` }],
   });
 
@@ -5673,18 +5824,20 @@ module.exports = {
       vi: "Cho n thành phố 1..n. Hai thành phố x, y nối trực tiếp nếu có ước chung z với z > threshold. Với mỗi queries[i] = [a, b], cho biết a và b có liên thông không.",
       en: "Given n cities 1..n. Two cities x, y are directly connected if they share a common divisor z with z > threshold. For each queries[i] = [a, b], report whether a and b are connected.",
     },
-    defaultInput: [6],
+    defaultInput: [12],
     inputKind: "positive",
     singleInput: true,
     inputLabel: { vi: "n — số node (nhập 1 số)", en: "n — number of nodes (one number)" },
     extraParams: [
-      { key: "threshold", type: "number", label: { vi: "threshold", en: "threshold" }, default: 1, min: 0 },
-      { key: "queries", type: "string", label: { vi: "queries: a,b;... hoặc JSON", en: "queries: a,b;... or JSON" }, default: "1,5;2,6;3,4;5,6" },
+      { key: "threshold", type: "number", label: { vi: "threshold", en: "threshold" }, default: 2, min: 0 },
+      { key: "queries", type: "string", label: { vi: "queries: a,b;... hoặc JSON", en: "queries: a,b;... or JSON" }, default: "4,8;9,5;5,10;7,11" },
     ],
     approach: [
-      { vi: "Không cần xét từng cặp. Với mỗi z từ threshold+1 tới n, mọi bội số của z đều chia hết cho z (> threshold) nên cùng một nhóm.", en: "No need to test each pair. For each z from threshold+1 to n, all multiples of z are divisible by z (> threshold), so they share a group." },
-      { vi: "Dùng Union-Find: union(z, 2z), union(z, 3z), ... để gộp các bội số vào chung component.", en: "Use Union-Find: union(z, 2z), union(z, 3z), ... to merge multiples into one component." },
+      { vi: "Không cần xét từng cặp (O(n²)). Nếu x và y cùng chia hết cho z thì CẢ HAI đều là bội của z — nên chỉ cần nối z với từng bội của nó.", en: "No need to test each pair (O(n²)). If x and y are both divisible by z then BOTH are multiples of z — so it is enough to link z to each of its multiples." },
+      { vi: "Với mỗi z từ threshold+1 tới n: union(z, 2z), union(z, 3z), ... Tính bắc cầu của Union-Find tự gộp các bội số lại với nhau.", en: "For each z from threshold+1 to n: union(z, 2z), union(z, 3z), ... Union-Find's transitivity merges the multiples together by itself." },
+      { vi: "Thực chất chỉ cần chạy z tới n/2: nếu z > n/2 thì 2z > n nên z không có bội số nào trong 1..n và không tạo được cạnh nào.", en: "In practice z only needs to reach n/2: if z > n/2 then 2z > n, so z has no multiple within 1..n and creates no edge." },
       { vi: "Sau khi gộp xong, mỗi truy vấn [a, b] chỉ cần kiểm tra find(a) == find(b).", en: "After merging, each query [a, b] just checks find(a) == find(b)." },
+      { vi: "Một số k còn đứng một mình khi ước thật sự lớn nhất của nó ≤ threshold (không vào được nhóm của z nhỏ hơn) và 2k > n (không tự dẫn được nhóm nào).", en: "A number k stays alone when its largest proper divisor is ≤ threshold (it cannot join a smaller z's group) and 2k > n (it cannot lead a group of its own)." },
     ],
     complexity: {
       time: "O(n log n · α(n) + q)",
