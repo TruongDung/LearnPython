@@ -34690,6 +34690,150 @@ function renderClosestBst272View(step) {
   renderTree({ tree: step.tree }, "cb272Tree");
 }
 
+function renderCircleRectangle1401View(step) {
+  const view = step.circleRectangle1401View || {};
+  const vi = lang === "vi";
+  const approach = view.approach === 2 ? 2 : 1;
+  const radius = Number.isFinite(view.radius) ? Number(view.radius) : 1;
+  const xCenter = Number.isFinite(view.xCenter) ? Number(view.xCenter) : 0;
+  const yCenter = Number.isFinite(view.yCenter) ? Number(view.yCenter) : 0;
+  const rect = Array.isArray(view.rect) && view.rect.length === 4 ? view.rect.map(Number) : [0, 0, 1, 1];
+  const [x1, y1, x2, y2] = rect;
+  const anchorX = Number.isFinite(view.anchorX) ? Number(view.anchorX) : Math.max(x1, Math.min(xCenter, x2));
+  const anchorY = Number.isFinite(view.anchorY) ? Number(view.anchorY) : Math.max(y1, Math.min(yCenter, y2));
+  const radiusSq = Number.isFinite(view.radiusSq) ? Number(view.radiusSq) : radius * radius;
+  const num = (value) => (Number.isFinite(value) ? String(value) : "?");
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+
+  const labels = approach === 2
+    ? vi
+      ? ["Circle & rectangle", "Vượt trục X", "Vượt trục Y", "Bình phương khoảng cách", "So với r²"]
+      : ["Circle & rectangle", "Overshoot X", "Overshoot Y", "Squared distance", "Compare with r²"]
+    : vi
+      ? ["Circle & rectangle", "Kẹp trục X", "Kẹp trục Y", "Khoảng lệch dx, dy", "So với r²"]
+      : ["Circle & rectangle", "Clamp X", "Clamp Y", "Gaps dx, dy", "Compare with r²"];
+  const phases = labels
+    .map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`)
+    .join("");
+
+  // Equal scale on both axes, otherwise the circle would render as an ellipse.
+  const worldMinX = Math.min(xCenter - radius, x1);
+  const worldMaxX = Math.max(xCenter + radius, x2);
+  const worldMinY = Math.min(yCenter - radius, y1);
+  const worldMaxY = Math.max(yCenter + radius, y2);
+  const spanX = Math.max(worldMaxX - worldMinX, 1e-6) * 1.2;
+  const spanY = Math.max(worldMaxY - worldMinY, 1e-6) * 1.2;
+  const plot = { left: 54, top: 18, width: 552, height: 248 };
+  const scale = Math.min(plot.width / spanX, plot.height / spanY);
+  const midX = (worldMinX + worldMaxX) / 2;
+  const midY = (worldMinY + worldMaxY) / 2;
+  const mapX = (x) => plot.left + plot.width / 2 + (x - midX) * scale;
+  const mapY = (y) => plot.top + plot.height / 2 - (y - midY) * scale;
+  const fx = (x) => mapX(x).toFixed(2);
+  const fy = (y) => mapY(y).toFixed(2);
+
+  const rectLeft = mapX(x1);
+  const rectTop = mapY(y2);
+  const rectWidth = mapX(x2) - rectLeft;
+  const rectHeight = mapY(y1) - rectTop;
+  const rectSvg = `<g class="cr1401-rect"><rect x="${rectLeft.toFixed(2)}" y="${rectTop.toFixed(2)}" width="${rectWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="3"/><text class="corner start" x="${(rectLeft + 5).toFixed(2)}" y="${(rectTop + rectHeight - 6).toFixed(2)}">(${x1}, ${y1})</text><text class="corner end" x="${(rectLeft + rectWidth - 5).toFixed(2)}" y="${(rectTop + 13).toFixed(2)}">(${x2}, ${y2})</text></g>`;
+
+  const centerSvgX = mapX(xCenter);
+  const centerSvgY = mapY(yCenter);
+  const radiusPx = radius * scale;
+  const radiusTipX = centerSvgX - radiusPx * 0.7071;
+  const radiusTipY = centerSvgY - radiusPx * 0.7071;
+  const circleSvg = `<g class="cr1401-circle"><circle cx="${centerSvgX.toFixed(2)}" cy="${centerSvgY.toFixed(2)}" r="${radiusPx.toFixed(2)}"/><line class="cr1401-radius" x1="${centerSvgX.toFixed(2)}" y1="${centerSvgY.toFixed(2)}" x2="${radiusTipX.toFixed(2)}" y2="${radiusTipY.toFixed(2)}"/><text class="cr1401-radius-label" x="${((centerSvgX + radiusTipX) / 2 - 4).toFixed(2)}" y="${((centerSvgY + radiusTipY) / 2 - 5).toFixed(2)}">r = ${radius}</text><circle class="cr1401-center-dot" cx="${centerSvgX.toFixed(2)}" cy="${centerSvgY.toFixed(2)}" r="3.5"/><text class="cr1401-center-label" x="${(centerSvgX + 7).toFixed(2)}" y="${(centerSvgY - 7).toFixed(2)}">C (${xCenter}, ${yCenter})</text></g>`;
+
+  const knownX = approach === 1 ? Number.isFinite(view.closestX) : Number.isFinite(view.dx);
+  const knownY = approach === 1 ? Number.isFinite(view.closestY) : Number.isFinite(view.dy);
+  const guides = [];
+  if (knownX) {
+    guides.push(`<line class="cr1401-guide x" x1="${fx(anchorX)}" y1="${plot.top}" x2="${fx(anchorX)}" y2="${plot.top + plot.height}"/><text class="cr1401-guide-label" x="${fx(anchorX)}" y="${plot.top + plot.height + 14}">${approach === 2 ? "x" : "closest_x"} = ${anchorX}</text>`);
+  }
+  if (knownY) {
+    guides.push(`<line class="cr1401-guide y" x1="${plot.left}" y1="${fy(anchorY)}" x2="${plot.left + plot.width}" y2="${fy(anchorY)}"/><text class="cr1401-guide-label y" x="${plot.left - 6}" y="${(mapY(anchorY) + 4).toFixed(2)}">${anchorY}</text>`);
+  }
+
+  let anchorSvg = "";
+  if (knownX && knownY) {
+    const inside = Boolean(view.answer);
+    const legs = [`<polyline class="cr1401-leg" points="${fx(xCenter)},${fy(yCenter)} ${fx(anchorX)},${fy(yCenter)} ${fx(anchorX)},${fy(anchorY)}"/>`];
+    if (xCenter !== anchorX) {
+      legs.push(`<text class="cr1401-leg-label" x="${((mapX(xCenter) + mapX(anchorX)) / 2).toFixed(2)}" y="${(mapY(yCenter) - 6).toFixed(2)}">|dx| = ${Math.abs(xCenter - anchorX)}</text>`);
+    }
+    if (yCenter !== anchorY) {
+      legs.push(`<text class="cr1401-leg-label y" x="${(mapX(anchorX) + 6).toFixed(2)}" y="${((mapY(yCenter) + mapY(anchorY)) / 2).toFixed(2)}">|dy| = ${Math.abs(yCenter - anchorY)}</text>`);
+    }
+    anchorSvg = `<g class="cr1401-anchor ${view.final ? (inside ? "inside" : "outside") : ""}">${legs.join("")}<line class="cr1401-hypot" x1="${fx(xCenter)}" y1="${fy(yCenter)}" x2="${fx(anchorX)}" y2="${fy(anchorY)}"/><circle cx="${fx(anchorX)}" cy="${fy(anchorY)}" r="4.5"/><text x="${(mapX(anchorX) + 8).toFixed(2)}" y="${(mapY(anchorY) + 14).toFixed(2)}">(${anchorX}, ${anchorY})</text></g>`;
+  }
+
+  const svgSummary = vi
+    ? `Circle tâm (${xCenter}, ${yCenter}) bán kính ${radius} và rectangle từ (${x1}, ${y1}) tới (${x2}, ${y2}) trên mặt phẳng tọa độ.`
+    : `A circle centered at (${xCenter}, ${yCenter}) with radius ${radius} and a rectangle from (${x1}, ${y1}) to (${x2}, ${y2}) on a coordinate plane.`;
+  const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}"><rect class="cr1401-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="cr1401-axis-name" x="${plot.left + plot.width + 8}" y="${plot.top + plot.height + 4}">x</text><text class="cr1401-axis-name" x="${plot.left - 4}" y="${plot.top - 6}">y</text>${rectSvg}${circleSvg}${guides.join("")}${anchorSvg}</svg>`;
+
+  const axisCard = (axis, componentValue, lowBound, highBound, centerValue, clamped) => {
+    const known = Number.isFinite(componentValue);
+    const zero = known && componentValue === 0;
+    const state = !known ? "pending" : zero ? "aligned" : "offset";
+    const formula = approach === 2
+      ? `max(${lowBound} − ${centerValue}, 0, ${centerValue} − ${highBound})`
+      : `${centerValue} − ${num(clamped)}`;
+    const headline = approach === 2
+      ? (vi ? "phần vượt" : "overshoot")
+      : (vi ? "khoảng lệch" : "gap");
+    const statusText = !known
+      ? (vi ? "đang tính" : "computing")
+      : zero
+        ? (vi ? "TRONG SLAB · 0" : "INSIDE SLAB · 0")
+        : (vi ? `LỆCH ${Math.abs(componentValue)}` : `OFF BY ${Math.abs(componentValue)}`);
+    return `<article class="cr1401-axis-card ${state}"><header><strong>${axis === "X" ? "dx" : "dy"}</strong><span>${escapeHtml(statusText)}</span></header><code>${escapeHtml(formula)}</code><div><small>${escapeHtml(vi ? "slab" : "slab")} [${lowBound}, ${highBound}]</small><b>${num(componentValue)}</b></div><footer><span>${escapeHtml(headline)} ${axis}</span><code>${axis === "X" ? "dx" : "dy"}² = ${known ? componentValue * componentValue : "?"}</code></footer></article>`;
+  };
+
+  const distKnown = Number.isFinite(view.distSq);
+  const compareState = !distKnown ? "pending" : view.distSq <= radiusSq ? "pass" : "fail";
+  const compareSymbol = !distKnown ? "?" : view.distSq <= radiusSq ? "≤" : ">";
+  const compare = `<section class="cr1401-compare ${compareState}"><header><strong>${vi ? "SO SÁNH BÌNH PHƯƠNG" : "SQUARED COMPARISON"}</strong><span>${escapeHtml(vi ? "không cần sqrt" : "no sqrt needed")}</span></header><div><article><small>dx² + dy²</small><b>${num(view.distSq)}</b></article><i>${compareSymbol}</i><article><small>radius²</small><b>${num(radiusSq)}</b></article></div><footer>${escapeHtml(vi ? "Khoảng cách ngắn nhất từ tâm tới rectangle phải không lớn hơn bán kính." : "The shortest distance from the center to the rectangle must not exceed the radius.")}</footer></section>`;
+
+  const formulas = {
+    inputs: `radius=${radius}, center=(${xCenter}, ${yCenter}), rect=[${rect.join(", ")}]`,
+    "closest-x": `closest_x = max(${x1}, min(${xCenter}, ${x2})) = ${num(view.closestX)}`,
+    "closest-y": `closest_y = max(${y1}, min(${yCenter}, ${y2})) = ${num(view.closestY)}`,
+    dx: approach === 2
+      ? `dx = max(${x1} - ${xCenter}, 0, ${xCenter} - ${x2}) = ${num(view.dx)}`
+      : `dx = ${xCenter} - ${num(view.closestX)} = ${num(view.dx)}`,
+    dy: approach === 2
+      ? `dy = max(${y1} - ${yCenter}, 0, ${yCenter} - ${y2}) = ${num(view.dy)}`
+      : `dy = ${yCenter} - ${num(view.closestY)} = ${num(view.dy)}`,
+    "dist-squared": `dist_squared = ${num(view.dx)}² + ${num(view.dy)}² = ${num(view.distSq)}`,
+    return: `${num(view.distSq)} <= ${num(radiusSq)} → ${view.answer === true ? "True" : view.answer === false ? "False" : "?"}`,
+  };
+
+  const final = Boolean(view.final);
+  const answerLabel = view.answer === true ? "TRUE" : view.answer === false ? "FALSE" : "…";
+  const summary = approach === 2
+    ? vi
+      ? `Bài 1401 cách 2: đo phần vượt của tâm circle ra ngoài từng slab của rectangle.`
+      : "Problem 1401 approach 2: measure how far the circle center overshoots each rectangle slab."
+    : vi
+      ? `Bài 1401: kẹp tâm circle vào rectangle để tìm điểm gần nhất, rồi so bình phương khoảng cách với r².`
+      : "Problem 1401: clamp the circle center into the rectangle to find the closest point, then compare the squared distance with r².";
+  const rule = `<section class="cr1401-rule"><span><b>1</b><code>${approach === 2 ? "dx = max(x1-xc, 0, xc-x2)" : "closest = clamp(center, rect)"}</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>dx² + dy² &le; r²</code></span></section>`;
+
+  $("treeView").innerHTML = `<section class="cr1401-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>GEOMETRY · ${approach === 2 ? "AXIS OVERSHOOT" : "CLAMP TO RECTANGLE"} · #1401</small><strong>CIRCLE AND RECTANGLE OVERLAPPING · ${approach === 2 ? "APPROACH 2" : "APPROACH 1"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cr1401-phases">${phases}</div>
+    ${rule}
+    <section class="cr1401-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>${vi ? "circle" : "circle"}</i> · <em>rectangle</em> · <b>${vi ? "điểm gần nhất" : "closest point"}</b></span></header>${plane}</section>
+    <section class="cr1401-axis-checks">${axisCard("X", view.dx, x1, x2, xCenter, view.closestX)}${axisCard("Y", view.dy, y1, y2, yCenter, view.closestY)}</section>
+    ${compare}
+    <section class="cr1401-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="cr1401-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <footer class="cr1401-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>SHARE A POINT?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "điểm gần nhất của rectangle nằm trong circle" : "the rectangle's closest point lies inside the circle") : (vi ? "cả rectangle nằm ngoài circle" : "the whole rectangle stays outside the circle")) : (vi ? "cần dx² + dy² ≤ radius²" : "requires dx² + dy² ≤ radius²")}</span></footer>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -35900,6 +36044,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRectangleOverlap836View(step);
+  } else if (step.circleRectangle1401View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCircleRectangle1401View(step);
   } else if (step.orderlyQueue899View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

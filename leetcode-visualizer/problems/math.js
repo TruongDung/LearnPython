@@ -5389,3 +5389,372 @@ Object.assign(module.exports, {
     builder2: buildSteps836Approach2,
   },
 });
+
+function parseCircle1401(raw) {
+  const values = Array.isArray(raw)
+    ? raw.map(Number)
+    : String(raw ?? "")
+      .trim()
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((part) => Number(part.trim()));
+  if (values.length !== 3 || !values.every(Number.isInteger)) {
+    throw new Error("Circle must contain exactly 3 comma-separated integers: radius,xCenter,yCenter.");
+  }
+  const [radius, xCenter, yCenter] = values;
+  if (radius < 1 || radius > 2000) {
+    throw new Error("radius must be between 1 and 2,000.");
+  }
+  if ([xCenter, yCenter].some((value) => value < -10_000 || value > 10_000)) {
+    throw new Error("xCenter and yCenter must be between -10,000 and 10,000.");
+  }
+  return { radius, xCenter, yCenter };
+}
+
+function parseRect1401(raw) {
+  const values = Array.isArray(raw)
+    ? raw.map(Number)
+    : String(raw ?? "")
+      .trim()
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((part) => Number(part.trim()));
+  if (values.length !== 4 || !values.every(Number.isInteger)) {
+    throw new Error("rect must contain exactly 4 comma-separated integers: x1,y1,x2,y2.");
+  }
+  if (!values.every((value) => value >= -10_000 && value <= 10_000)) {
+    throw new Error("rect coordinates must be between -10,000 and 10,000.");
+  }
+  if (values[0] >= values[2] || values[1] >= values[3]) {
+    throw new Error("rect must satisfy x1 < x2 and y1 < y2.");
+  }
+  return values;
+}
+
+function parseCircleRectangle1401Input(input, params = {}) {
+  return {
+    ...parseCircle1401(input),
+    rect: parseRect1401(params.rect ?? "1,-1,3,1"),
+  };
+}
+
+/**
+ * Generate steps for LeetCode 1401: Circle and Rectangle Overlapping — approach 1.
+ *
+ * Clamp the circle center into the rectangle to get the rectangle point that is
+ * closest to the center, then compare the squared distance with radius².
+ */
+function buildSteps1401(input, params = {}) {
+  const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
+  const [x1, y1, x2, y2] = rect;
+  const anchorX = Math.max(x1, Math.min(xCenter, x2));
+  const anchorY = Math.max(y1, Math.min(yCenter, y2));
+  const radiusSq = radius * radius;
+  const steps = [];
+  let closestX = null;
+  let closestY = null;
+  let dx = null;
+  let dy = null;
+  let distSq = null;
+  let answer = null;
+
+  function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "closest_x", value: closestX ?? "—" },
+        { name: "closest_y", value: closestY ?? "—" },
+        { name: "dx", value: dx ?? "—" },
+        { name: "dy", value: dy ?? "—" },
+        { name: "dx*dx + dy*dy", value: distSq ?? "—" },
+        { name: "radius*radius", value: radiusSq },
+      ],
+      circleRectangle1401View: {
+        approach: 1,
+        operation,
+        phaseIndex,
+        radius,
+        xCenter,
+        yCenter,
+        rect: [...rect],
+        anchorX,
+        anchorY,
+        closestX,
+        closestY,
+        dx,
+        dy,
+        distSq,
+        radiusSq,
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "inputs",
+    phaseIndex: 0,
+    codeLine: 1,
+    title: { vi: "Nhận circle và rectangle", en: "Receive the circle and the rectangle" },
+    note: {
+      vi: `Circle có tâm (${xCenter}, ${yCenter}) bán kính ${radius}; rectangle đi từ (${x1}, ${y1}) tới (${x2}, ${y2}). Biên được tính là overlap.`,
+      en: `The circle is centered at (${xCenter}, ${yCenter}) with radius ${radius}; the rectangle spans (${x1}, ${y1}) to (${x2}, ${y2}). Boundaries count as overlapping.`,
+    },
+  });
+
+  closestX = anchorX;
+  snapshot({
+    operation: "closest-x",
+    phaseIndex: 1,
+    codeLine: 2,
+    title: { vi: `closest_x = ${closestX}`, en: `closest_x = ${closestX}` },
+    note: xCenter < x1
+      ? { vi: `xCenter = ${xCenter} nằm bên trái rectangle, nên bị kẹp lên x1 = ${x1}.`, en: `xCenter = ${xCenter} is left of the rectangle, so it clamps up to x1 = ${x1}.` }
+      : xCenter > x2
+        ? { vi: `xCenter = ${xCenter} nằm bên phải rectangle, nên bị kẹp xuống x2 = ${x2}.`, en: `xCenter = ${xCenter} is right of the rectangle, so it clamps down to x2 = ${x2}.` }
+        : { vi: `xCenter = ${xCenter} đã nằm trong [${x1}, ${x2}], nên giữ nguyên.`, en: `xCenter = ${xCenter} already lies in [${x1}, ${x2}], so it stays.` },
+  });
+
+  closestY = anchorY;
+  snapshot({
+    operation: "closest-y",
+    phaseIndex: 2,
+    codeLine: 3,
+    title: { vi: `closest_y = ${closestY}`, en: `closest_y = ${closestY}` },
+    note: yCenter < y1
+      ? { vi: `yCenter = ${yCenter} nằm dưới rectangle, nên bị kẹp lên y1 = ${y1}.`, en: `yCenter = ${yCenter} is below the rectangle, so it clamps up to y1 = ${y1}.` }
+      : yCenter > y2
+        ? { vi: `yCenter = ${yCenter} nằm trên rectangle, nên bị kẹp xuống y2 = ${y2}.`, en: `yCenter = ${yCenter} is above the rectangle, so it clamps down to y2 = ${y2}.` }
+        : { vi: `yCenter = ${yCenter} đã nằm trong [${y1}, ${y2}], nên giữ nguyên.`, en: `yCenter = ${yCenter} already lies in [${y1}, ${y2}], so it stays.` },
+  });
+
+  dx = xCenter - closestX;
+  snapshot({
+    operation: "dx",
+    phaseIndex: 3,
+    codeLine: 4,
+    title: { vi: `dx = ${dx}`, en: `dx = ${dx}` },
+    note: dx === 0
+      ? { vi: "Tâm circle thẳng hàng theo trục X với điểm gần nhất, nên dx = 0.", en: "The center is X-aligned with the closest point, so dx = 0." }
+      : { vi: `Khoảng lệch theo trục X giữa tâm và điểm gần nhất là ${Math.abs(dx)}.`, en: `The X gap between the center and the closest point is ${Math.abs(dx)}.` },
+  });
+
+  dy = yCenter - closestY;
+  snapshot({
+    operation: "dy",
+    phaseIndex: 3,
+    codeLine: 5,
+    title: { vi: `dy = ${dy}`, en: `dy = ${dy}` },
+    note: dy === 0
+      ? { vi: "Tâm circle thẳng hàng theo trục Y với điểm gần nhất, nên dy = 0.", en: "The center is Y-aligned with the closest point, so dy = 0." }
+      : { vi: `Khoảng lệch theo trục Y giữa tâm và điểm gần nhất là ${Math.abs(dy)}.`, en: `The Y gap between the center and the closest point is ${Math.abs(dy)}.` },
+  });
+
+  distSq = dx * dx + dy * dy;
+  answer = distSq <= radiusSq;
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 6,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: answer
+      ? { vi: `${distSq} ≤ ${radiusSq}: điểm gần nhất của rectangle nằm trong circle, nên hai hình có điểm chung.`, en: `${distSq} <= ${radiusSq}: the rectangle's closest point lies inside the circle, so the shapes share a point.` }
+      : { vi: `${distSq} > ${radiusSq}: ngay cả điểm gần nhất cũng ở ngoài circle, nên không có điểm chung.`, en: `${distSq} > ${radiusSq}: even the closest point is outside the circle, so no point is shared.` },
+    final: true,
+  });
+
+  return { original: { radius, xCenter, yCenter, x1, y1, x2, y2 }, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1401: Circle and Rectangle Overlapping — approach 2.
+ *
+ * Per axis, measure how far the center overshoots the rectangle's slab. The
+ * overshoot is 0 while the center projects inside the slab, so the same squared
+ * distance falls out without naming the closest point.
+ */
+function buildSteps1401Approach2(input, params = {}) {
+  const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
+  const [x1, y1, x2, y2] = rect;
+  const anchorX = Math.max(x1, Math.min(xCenter, x2));
+  const anchorY = Math.max(y1, Math.min(yCenter, y2));
+  const radiusSq = radius * radius;
+  const steps = [];
+  let dx = null;
+  let dy = null;
+  let distSq = null;
+  let answer = null;
+
+  function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "dx", value: dx ?? "—" },
+        { name: "dy", value: dy ?? "—" },
+        { name: "dist_squared", value: distSq ?? "—" },
+        { name: "radius*radius", value: radiusSq },
+      ],
+      circleRectangle1401View: {
+        approach: 2,
+        operation,
+        phaseIndex,
+        radius,
+        xCenter,
+        yCenter,
+        rect: [...rect],
+        anchorX,
+        anchorY,
+        closestX: null,
+        closestY: null,
+        dx,
+        dy,
+        distSq,
+        radiusSq,
+        answer,
+        final,
+      },
+    });
+  }
+
+  snapshot({
+    operation: "inputs",
+    phaseIndex: 0,
+    codeLine: 1,
+    title: { vi: "Nhận circle và rectangle", en: "Receive the circle and the rectangle" },
+    note: {
+      vi: `Thay vì tìm điểm gần nhất, cách này đo phần vượt ra của tâm trên từng trục.`,
+      en: "Instead of locating the closest point, this approach measures how far the center overshoots each slab.",
+    },
+  });
+
+  dx = Math.max(x1 - xCenter, 0, xCenter - x2);
+  snapshot({
+    operation: "dx",
+    phaseIndex: 1,
+    codeLine: 2,
+    title: { vi: `dx = ${dx}`, en: `dx = ${dx}` },
+    note: dx === 0
+      ? { vi: `xCenter = ${xCenter} nằm trong slab [${x1}, ${x2}], nên phần vượt bằng 0.`, en: `xCenter = ${xCenter} lies inside the slab [${x1}, ${x2}], so the overshoot is 0.` }
+      : { vi: `max(${x1} − ${xCenter}, 0, ${xCenter} − ${x2}) = ${dx}: tâm vượt ra khỏi slab X đúng ${dx} đơn vị.`, en: `max(${x1} - ${xCenter}, 0, ${xCenter} - ${x2}) = ${dx}: the center overshoots the X slab by ${dx}.` },
+  });
+
+  dy = Math.max(y1 - yCenter, 0, yCenter - y2);
+  snapshot({
+    operation: "dy",
+    phaseIndex: 2,
+    codeLine: 3,
+    title: { vi: `dy = ${dy}`, en: `dy = ${dy}` },
+    note: dy === 0
+      ? { vi: `yCenter = ${yCenter} nằm trong slab [${y1}, ${y2}], nên phần vượt bằng 0.`, en: `yCenter = ${yCenter} lies inside the slab [${y1}, ${y2}], so the overshoot is 0.` }
+      : { vi: `max(${y1} − ${yCenter}, 0, ${yCenter} − ${y2}) = ${dy}: tâm vượt ra khỏi slab Y đúng ${dy} đơn vị.`, en: `max(${y1} - ${yCenter}, 0, ${yCenter} - ${y2}) = ${dy}: the center overshoots the Y slab by ${dy}.` },
+  });
+
+  distSq = dx * dx + dy * dy;
+  snapshot({
+    operation: "dist-squared",
+    phaseIndex: 3,
+    codeLine: 4,
+    title: { vi: `dist_squared = ${distSq}`, en: `dist_squared = ${distSq}` },
+    note: {
+      vi: `${dx}² + ${dy}² = ${distSq}. Đây là bình phương khoảng cách ngắn nhất từ tâm tới rectangle.`,
+      en: `${dx}² + ${dy}² = ${distSq}. This is the squared shortest distance from the center to the rectangle.`,
+    },
+  });
+
+  answer = distSq <= radiusSq;
+  snapshot({
+    operation: "return",
+    phaseIndex: 4,
+    codeLine: 5,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: answer
+      ? { vi: `${distSq} ≤ ${radiusSq}: rectangle chạm tới hoặc lấn vào circle.`, en: `${distSq} <= ${radiusSq}: the rectangle reaches into or touches the circle.` }
+      : { vi: `${distSq} > ${radiusSq}: rectangle nằm hoàn toàn ngoài circle.`, en: `${distSq} > ${radiusSq}: the rectangle stays entirely outside the circle.` },
+    final: true,
+  });
+
+  return { original: { radius, xCenter, yCenter, x1, y1, x2, y2 }, answer, steps };
+}
+
+Object.assign(module.exports, {
+  1401: {
+    id: 1401,
+    difficulty: "medium",
+    slug: "circle-and-rectangle-overlapping",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [
+      { key: "geometry", vi: "Hình học", en: "Geometry" },
+      { key: "math", vi: "Toán học", en: "Math" },
+    ],
+    title: { vi: "Circle and Rectangle Overlapping", en: "Circle and Rectangle Overlapping" },
+    titleVi: { vi: "Circle và rectangle có điểm chung không", en: "Determine whether a circle and a rectangle share a point" },
+    statement: {
+      vi: "Cho một circle tâm (xCenter, yCenter) bán kính radius và một rectangle song song với trục, xác định bởi góc trái dưới (x1, y1) và góc phải trên (x2, y2). Trả về true nếu tồn tại điểm thuộc cả hai hình; biên của cả hai hình đều được tính.",
+      en: "Given a circle with radius and center (xCenter, yCenter), and an axis-aligned rectangle given by its bottom-left corner (x1, y1) and top-right corner (x2, y2), return true if a point belongs to both shapes. The boundary of each shape counts.",
+    },
+    defaultInput: "1,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Circle: radius,xCenter,yCenter", en: "Circle: radius,xCenter,yCenter" },
+    extraParams: [
+      { key: "rect", type: "string", label: { vi: "Rectangle: x1,y1,x2,y2", en: "Rectangle: x1,y1,x2,y2" }, default: "1,-1,3,1" },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 — Kẹp tâm vào rectangle", en: "1 — Clamp center into rectangle" } },
+          { value: 2, label: { vi: "2 — Phần vượt theo từng trục", en: "2 — Per-axis overshoot" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Điểm của rectangle gần tâm circle nhất là điểm thu được khi kẹp tâm vào rectangle theo từng trục: closest_x = max(x1, min(xCenter, x2)) và tương tự cho Y.", en: "The rectangle point closest to the circle center is obtained by clamping the center per axis: closest_x = max(x1, min(xCenter, x2)), and likewise for Y." },
+      { vi: "Hai trục độc lập nhau, nên có thể kẹp riêng từng trục rồi ghép lại thành một điểm duy nhất.", en: "The two axes are independent, so each can be clamped separately and recombined into a single point." },
+      { vi: "Hai hình có điểm chung khi và chỉ khi điểm gần nhất đó nằm trong circle: dx² + dy² ≤ radius². So sánh bình phương nên không cần sqrt và không mất chính xác.", en: "The shapes intersect exactly when that closest point is inside the circle: dx² + dy² <= radius². Comparing squares avoids sqrt and stays exact." },
+      { vi: "Cách 2 viết cùng phép tính theo dạng phần vượt: dx = max(x1 − xCenter, 0, xCenter − x2) bằng 0 khi tâm đã nằm trong slab X.", en: "Approach 2 expresses the same arithmetic as an overshoot: dx = max(x1 - xCenter, 0, xCenter - x2) is 0 while the center is already inside the X slab." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: {
+        vi: "Chỉ vài phép min/max, trừ và nhân; không phụ thuộc vào radius hay kích thước rectangle.",
+        en: "Only a handful of min/max, subtraction, and multiplication operations; independent of radius or rectangle size.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def checkOverlap(self, radius: int, xCenter: int, yCenter: int, x1: int, y1: int, x2: int, y2: int) -> bool:",
+      "        closest_x = max(x1, min(xCenter, x2))",
+      "        closest_y = max(y1, min(yCenter, y2))",
+      "        dx = xCenter - closest_x",
+      "        dy = yCenter - closest_y",
+      "        return dx * dx + dy * dy <= radius * radius",
+    ],
+    code2: [
+      "class Solution:",
+      "    def checkOverlap(self, radius: int, xCenter: int, yCenter: int, x1: int, y1: int, x2: int, y2: int) -> bool:",
+      "        dx = max(x1 - xCenter, 0, xCenter - x2)",
+      "        dy = max(y1 - yCenter, 0, yCenter - y2)",
+      "        dist_squared = dx * dx + dy * dy",
+      "        return dist_squared <= radius * radius",
+    ],
+    codeLabel: { vi: "Cách 1: Kẹp tâm vào rectangle", en: "Approach 1: Clamp center into rectangle" },
+    code2Label: { vi: "Cách 2: Phần vượt theo từng trục", en: "Approach 2: Per-axis overshoot" },
+    liveArgs: (input, params) => {
+      const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
+      return [radius, xCenter, yCenter, ...rect];
+    },
+    builder: buildSteps1401,
+    builder2: buildSteps1401Approach2,
+  },
+});
