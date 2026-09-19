@@ -34692,8 +34692,59 @@ function renderClosestBst272View(step) {
 
 function renderCircleRectangle1401View(step) {
   const view = step.circleRectangle1401View || {};
+  // The two approaches answer the same question from opposite directions, so
+  // they get separate pictures rather than one picture with swapped labels.
+  if (view.approach === 2) {
+    renderCircleRectangle1401RegionView(step);
+    return;
+  }
+  renderCircleRectangle1401ClampView(step);
+}
+
+// Shared coordinate mapping. One scale for both axes, otherwise every circle
+// would render as an ellipse.
+function cr1401Plane(worldMinX, worldMaxX, worldMinY, worldMaxY) {
+  const spanX = Math.max(worldMaxX - worldMinX, 1e-6) * 1.2;
+  const spanY = Math.max(worldMaxY - worldMinY, 1e-6) * 1.2;
+  const plot = { left: 54, top: 18, width: 552, height: 248 };
+  const scale = Math.min(plot.width / spanX, plot.height / spanY);
+  const midX = (worldMinX + worldMaxX) / 2;
+  const midY = (worldMinY + worldMaxY) / 2;
+  const mapX = (x) => plot.left + plot.width / 2 + (x - midX) * scale;
+  const mapY = (y) => plot.top + plot.height / 2 - (y - midY) * scale;
+  return {
+    plot,
+    scale,
+    mapX,
+    mapY,
+    fx: (x) => mapX(x).toFixed(2),
+    fy: (y) => mapY(y).toFixed(2),
+    frame: `<rect class="cr1401-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="cr1401-axis-name" x="${plot.left + plot.width + 8}" y="${plot.top + plot.height + 4}">x</text><text class="cr1401-axis-name" x="${plot.left - 4}" y="${plot.top - 6}">y</text>`,
+  };
+}
+
+// Renders the debugger-style locals strip: one cell per named variable, tagged
+// with the source line that assigns it.
+function cr1401Locals(rows, currentLine, vi) {
+  const cells = rows
+    .map((row) => {
+      const assigned = row.value !== null && row.value !== undefined;
+      const text = !assigned
+        ? "?"
+        : typeof row.value === "boolean"
+          ? (row.value ? "True" : "False")
+          : String(row.value);
+      const active = row.line === currentLine;
+      return `<span class="cr1401-local ${assigned ? "set" : "pending"}${active ? " active" : ""}"><small>L${row.line}</small><code>${row.name}</code><b>${text}</b></span>`;
+    })
+    .join("");
+  return `<section class="cr1401-locals"><header><strong>${vi ? "BIẾN CỤC BỘ THEO TỪNG DÒNG" : "LOCALS BY SOURCE LINE"}</strong><span>${vi ? "mờ = dòng chưa chạy · viền = dòng đang chạy" : "dimmed = line not run yet · outlined = current line"}</span></header><div>${cells}</div></section>`;
+}
+
+// ── Approach 1: clamp the center into the rectangle, measure one distance ──
+function renderCircleRectangle1401ClampView(step) {
+  const view = step.circleRectangle1401View || {};
   const vi = lang === "vi";
-  const approach = view.approach === 2 ? 2 : 1;
   const radius = Number.isFinite(view.radius) ? Number(view.radius) : 1;
   const xCenter = Number.isFinite(view.xCenter) ? Number(view.xCenter) : 0;
   const yCenter = Number.isFinite(view.yCenter) ? Number(view.yCenter) : 0;
@@ -34709,32 +34760,20 @@ function renderCircleRectangle1401View(step) {
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
   const currentLine = (step.codeLines || [])[0];
 
-  const labels = approach === 2
-    ? vi
-      ? ["Circle & rectangle", "Vượt trục X", "Vượt trục Y", "Bình phương khoảng cách", "So với r²"]
-      : ["Circle & rectangle", "Overshoot X", "Overshoot Y", "Squared distance", "Compare with r²"]
-    : vi
-      ? ["Circle & rectangle", "Kẹp trục X", "Kẹp trục Y", "Khoảng lệch dx, dy", "So với r²"]
-      : ["Circle & rectangle", "Clamp X", "Clamp Y", "Gaps dx, dy", "Compare with r²"];
+  const labels = vi
+    ? ["Circle & rectangle", "Kẹp trục X", "Kẹp trục Y", "Khoảng lệch dx, dy", "So với r²"]
+    : ["Circle & rectangle", "Clamp X", "Clamp Y", "Gaps dx, dy", "Compare with r²"];
   const phases = labels
     .map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`)
     .join("");
 
-  // Equal scale on both axes, otherwise the circle would render as an ellipse.
-  const worldMinX = Math.min(xCenter - radius, x1);
-  const worldMaxX = Math.max(xCenter + radius, x2);
-  const worldMinY = Math.min(yCenter - radius, y1);
-  const worldMaxY = Math.max(yCenter + radius, y2);
-  const spanX = Math.max(worldMaxX - worldMinX, 1e-6) * 1.2;
-  const spanY = Math.max(worldMaxY - worldMinY, 1e-6) * 1.2;
-  const plot = { left: 54, top: 18, width: 552, height: 248 };
-  const scale = Math.min(plot.width / spanX, plot.height / spanY);
-  const midX = (worldMinX + worldMaxX) / 2;
-  const midY = (worldMinY + worldMaxY) / 2;
-  const mapX = (x) => plot.left + plot.width / 2 + (x - midX) * scale;
-  const mapY = (y) => plot.top + plot.height / 2 - (y - midY) * scale;
-  const fx = (x) => mapX(x).toFixed(2);
-  const fy = (y) => mapY(y).toFixed(2);
+  const g = cr1401Plane(
+    Math.min(xCenter - radius, x1),
+    Math.max(xCenter + radius, x2),
+    Math.min(yCenter - radius, y1),
+    Math.max(yCenter + radius, y2),
+  );
+  const { plot, scale, mapX, mapY, fx, fy } = g;
 
   const rectLeft = mapX(x1);
   const rectTop = mapY(y2);
@@ -34749,11 +34788,11 @@ function renderCircleRectangle1401View(step) {
   const radiusTipY = centerSvgY - radiusPx * 0.7071;
   const circleSvg = `<g class="cr1401-circle"><circle cx="${centerSvgX.toFixed(2)}" cy="${centerSvgY.toFixed(2)}" r="${radiusPx.toFixed(2)}"/><line class="cr1401-radius" x1="${centerSvgX.toFixed(2)}" y1="${centerSvgY.toFixed(2)}" x2="${radiusTipX.toFixed(2)}" y2="${radiusTipY.toFixed(2)}"/><text class="cr1401-radius-label" x="${((centerSvgX + radiusTipX) / 2 - 4).toFixed(2)}" y="${((centerSvgY + radiusTipY) / 2 - 5).toFixed(2)}">r = ${radius}</text><circle class="cr1401-center-dot" cx="${centerSvgX.toFixed(2)}" cy="${centerSvgY.toFixed(2)}" r="3.5"/><text class="cr1401-center-label" x="${(centerSvgX + 7).toFixed(2)}" y="${(centerSvgY - 7).toFixed(2)}">C (${xCenter}, ${yCenter})</text></g>`;
 
-  const knownX = approach === 1 ? Number.isFinite(view.closestX) : Number.isFinite(view.dx);
-  const knownY = approach === 1 ? Number.isFinite(view.closestY) : Number.isFinite(view.dy);
+  const knownX = Number.isFinite(view.closestX);
+  const knownY = Number.isFinite(view.closestY);
   const guides = [];
   if (knownX) {
-    guides.push(`<line class="cr1401-guide x" x1="${fx(anchorX)}" y1="${plot.top}" x2="${fx(anchorX)}" y2="${plot.top + plot.height}"/><text class="cr1401-guide-label" x="${fx(anchorX)}" y="${plot.top + plot.height + 14}">${approach === 2 ? "x" : "closest_x"} = ${anchorX}</text>`);
+    guides.push(`<line class="cr1401-guide x" x1="${fx(anchorX)}" y1="${plot.top}" x2="${fx(anchorX)}" y2="${plot.top + plot.height}"/><text class="cr1401-guide-label" x="${fx(anchorX)}" y="${plot.top + plot.height + 14}">closest_x = ${anchorX}</text>`);
   }
   if (knownY) {
     guides.push(`<line class="cr1401-guide y" x1="${plot.left}" y1="${fy(anchorY)}" x2="${plot.left + plot.width}" y2="${fy(anchorY)}"/><text class="cr1401-guide-label y" x="${plot.left - 6}" y="${(mapY(anchorY) + 4).toFixed(2)}">${anchorY}</text>`);
@@ -34773,69 +34812,42 @@ function renderCircleRectangle1401View(step) {
   }
 
   const svgSummary = vi
-    ? `Circle tâm (${xCenter}, ${yCenter}) bán kính ${radius} và rectangle từ (${x1}, ${y1}) tới (${x2}, ${y2}) trên mặt phẳng tọa độ.`
-    : `A circle centered at (${xCenter}, ${yCenter}) with radius ${radius} and a rectangle from (${x1}, ${y1}) to (${x2}, ${y2}) on a coordinate plane.`;
-  const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}"><rect class="cr1401-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="cr1401-axis-name" x="${plot.left + plot.width + 8}" y="${plot.top + plot.height + 4}">x</text><text class="cr1401-axis-name" x="${plot.left - 4}" y="${plot.top - 6}">y</text>${rectSvg}${circleSvg}${guides.join("")}${anchorSvg}</svg>`;
+    ? `Circle tâm (${xCenter}, ${yCenter}) bán kính ${radius} và rectangle từ (${x1}, ${y1}) tới (${x2}, ${y2}), kèm điểm gần nhất.`
+    : `A circle centered at (${xCenter}, ${yCenter}) with radius ${radius} and a rectangle from (${x1}, ${y1}) to (${x2}, ${y2}), with the closest point.`;
+  const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}">${g.frame}${rectSvg}${circleSvg}${guides.join("")}${anchorSvg}</svg>`;
 
-  const axisCard = (axis, componentValue, lowBound, highBound, centerValue, inner, clamped, lowGap, highGap) => {
+  const axisCard = (axis, componentValue, lowBound, highBound, centerValue, inner, clamped) => {
     const known = Number.isFinite(componentValue);
     const zero = known && componentValue === 0;
     const state = !known ? "pending" : zero ? "aligned" : "offset";
-    const formula = approach === 2
-      ? `max(${num(lowGap)}, 0, ${num(highGap)})`
-      : `${centerValue} − ${num(clamped)}`;
-    // The intermediate that the previous source line produced, shown so the
-    // step-through makes the two-sided clamp / two-sided gap explicit.
-    const intermediate = approach === 2
-      ? `${axis === "X" ? "left_gap" : "bottom_gap"} = ${num(lowGap)} · ${axis === "X" ? "right_gap" : "top_gap"} = ${num(highGap)}`
-      : `${axis === "X" ? "inner_x" : "inner_y"} = ${num(inner)} → ${axis === "X" ? "closest_x" : "closest_y"} = ${num(clamped)}`;
-    const headline = approach === 2
-      ? (vi ? "phần vượt" : "overshoot")
-      : (vi ? "khoảng lệch" : "gap");
+    const formula = `${centerValue} − ${num(clamped)}`;
+    // The intermediate that the previous source line produced, so the
+    // step-through makes the two-sided clamp explicit.
+    const intermediate = `${axis === "X" ? "inner_x" : "inner_y"} = ${num(inner)} → ${axis === "X" ? "closest_x" : "closest_y"} = ${num(clamped)}`;
     const statusText = !known
       ? (vi ? "đang tính" : "computing")
       : zero
         ? (vi ? "TRONG SLAB · 0" : "INSIDE SLAB · 0")
         : (vi ? `LỆCH ${Math.abs(componentValue)}` : `OFF BY ${Math.abs(componentValue)}`);
-    return `<article class="cr1401-axis-card ${state}"><header><strong>${axis === "X" ? "dx" : "dy"}</strong><span>${escapeHtml(statusText)}</span></header><code>${escapeHtml(formula)}</code><em class="cr1401-axis-inter">${escapeHtml(intermediate)}</em><div><small>slab [${lowBound}, ${highBound}]</small><b>${num(componentValue)}</b></div><footer><span>${escapeHtml(headline)} ${axis}</span><code>${axis === "X" ? "dx" : "dy"}² = ${known ? componentValue * componentValue : "?"}</code></footer></article>`;
+    return `<article class="cr1401-axis-card ${state}"><header><strong>${axis === "X" ? "dx" : "dy"}</strong><span>${escapeHtml(statusText)}</span></header><code>${escapeHtml(formula)}</code><em class="cr1401-axis-inter">${escapeHtml(intermediate)}</em><div><small>slab [${lowBound}, ${highBound}]</small><b>${num(componentValue)}</b></div><footer><span>${escapeHtml(vi ? "khoảng lệch" : "gap")} ${axis}</span><code>${axis === "X" ? "dx" : "dy"}² = ${known ? componentValue * componentValue : "?"}</code></footer></article>`;
   };
 
-  // Debugger-style locals strip: every named variable, the source line that
-  // assigns it, and whether that line has executed yet.
-  const localRows = approach === 2
-    ? [
-      { name: "left_gap", line: 2, value: view.leftGap },
-      { name: "right_gap", line: 3, value: view.rightGap },
-      { name: "dx", line: 4, value: view.dx },
-      { name: "bottom_gap", line: 5, value: view.bottomGap },
-      { name: "top_gap", line: 6, value: view.topGap },
-      { name: "dy", line: 7, value: view.dy },
-      { name: "dist_squared", line: 8, value: view.distSq },
-      { name: "radius_squared", line: 9, value: view.radiusSq },
-    ]
-    : [
-      { name: "inner_x", line: 2, value: view.innerX },
-      { name: "closest_x", line: 3, value: view.closestX },
-      { name: "inner_y", line: 4, value: view.innerY },
-      { name: "closest_y", line: 5, value: view.closestY },
-      { name: "dx", line: 6, value: view.dx },
-      { name: "dy", line: 7, value: view.dy },
-      { name: "dist_squared", line: 8, value: view.distSq },
-      { name: "radius_squared", line: 9, value: view.radiusSq },
-    ];
-  const locals = localRows
-    .map((row) => {
-      const assigned = Number.isFinite(row.value);
-      const active = row.line === currentLine;
-      return `<span class="cr1401-local ${assigned ? "set" : "pending"}${active ? " active" : ""}"><small>L${row.line}</small><code>${row.name}</code><b>${num(row.value)}</b></span>`;
-    })
-    .join("");
+  const locals = cr1401Locals([
+    { name: "inner_x", line: 2, value: view.innerX },
+    { name: "closest_x", line: 3, value: view.closestX },
+    { name: "inner_y", line: 4, value: view.innerY },
+    { name: "closest_y", line: 5, value: view.closestY },
+    { name: "dx", line: 6, value: view.dx },
+    { name: "dy", line: 7, value: view.dy },
+    { name: "dist_squared", line: 8, value: view.distSq },
+    { name: "radius_squared", line: 9, value: view.radiusSq },
+  ], currentLine, vi);
 
   // Both sides must have been assigned before the comparison can be shown.
   const compareReady = Number.isFinite(view.distSq) && Number.isFinite(radiusSq);
   const compareState = !compareReady ? "pending" : view.distSq <= radiusSq ? "pass" : "fail";
   const compareSymbol = !compareReady ? "?" : view.distSq <= radiusSq ? "≤" : ">";
-  const compare = `<section class="cr1401-compare ${compareState}"><header><strong>${vi ? "SO SÁNH BÌNH PHƯƠNG" : "SQUARED COMPARISON"}</strong><span>${escapeHtml(vi ? "không cần sqrt" : "no sqrt needed")}</span></header><div><article><small>dx² + dy²</small><b>${num(view.distSq)}</b></article><i>${compareSymbol}</i><article><small>radius²</small><b>${num(radiusSq)}</b></article></div><footer>${escapeHtml(vi ? "Khoảng cách ngắn nhất từ tâm tới rectangle phải không lớn hơn bán kính." : "The shortest distance from the center to the rectangle must not exceed the radius.")}</footer></section>`;
+  const compare = `<section class="cr1401-compare ${compareState}"><header><strong>${vi ? "SO SÁNH BÌNH PHƯƠNG" : "SQUARED COMPARISON"}</strong><span>${escapeHtml(vi ? "không cần sqrt" : "no sqrt needed")}</span></header><div><article><small>dist_squared</small><b>${num(view.distSq)}</b></article><i>${compareSymbol}</i><article><small>radius_squared</small><b>${num(radiusSq)}</b></article></div><footer>${escapeHtml(vi ? "Khoảng cách ngắn nhất từ tâm tới rectangle phải không lớn hơn bán kính." : "The shortest distance from the center to the rectangle must not exceed the radius.")}</footer></section>`;
 
   const formulas = {
     inputs: `radius=${radius}, center=(${xCenter}, ${yCenter}), rect=[${rect.join(", ")}]`,
@@ -34843,16 +34855,8 @@ function renderCircleRectangle1401View(step) {
     "closest-x": `closest_x = max(${x1}, ${num(view.innerX)}) = ${num(view.closestX)}`,
     "inner-y": `inner_y = min(${yCenter}, ${y2}) = ${num(view.innerY)}`,
     "closest-y": `closest_y = max(${y1}, ${num(view.innerY)}) = ${num(view.closestY)}`,
-    "left-gap": `left_gap = ${x1} - ${xCenter} = ${num(view.leftGap)}`,
-    "right-gap": `right_gap = ${xCenter} - ${x2} = ${num(view.rightGap)}`,
-    "bottom-gap": `bottom_gap = ${y1} - ${yCenter} = ${num(view.bottomGap)}`,
-    "top-gap": `top_gap = ${yCenter} - ${y2} = ${num(view.topGap)}`,
-    dx: approach === 2
-      ? `dx = max(${num(view.leftGap)}, 0, ${num(view.rightGap)}) = ${num(view.dx)}`
-      : `dx = ${xCenter} - ${num(view.closestX)} = ${num(view.dx)}`,
-    dy: approach === 2
-      ? `dy = max(${num(view.bottomGap)}, 0, ${num(view.topGap)}) = ${num(view.dy)}`
-      : `dy = ${yCenter} - ${num(view.closestY)} = ${num(view.dy)}`,
+    dx: `dx = ${xCenter} - ${num(view.closestX)} = ${num(view.dx)}`,
+    dy: `dy = ${yCenter} - ${num(view.closestY)} = ${num(view.dy)}`,
     "dist-squared": `dist_squared = ${sq(view.dx)} + ${sq(view.dy)} = ${num(view.distSq)}`,
     "radius-squared": `radius_squared = ${radius}² = ${num(radiusSq)}`,
     return: `${num(view.distSq)} <= ${num(radiusSq)} → ${view.answer === true ? "True" : view.answer === false ? "False" : "?"}`,
@@ -34860,26 +34864,160 @@ function renderCircleRectangle1401View(step) {
 
   const final = Boolean(view.final);
   const answerLabel = view.answer === true ? "TRUE" : view.answer === false ? "FALSE" : "…";
-  const summary = approach === 2
-    ? vi
-      ? `Bài 1401 cách 2: đo phần vượt của tâm circle ra ngoài từng slab của rectangle.`
-      : "Problem 1401 approach 2: measure how far the circle center overshoots each rectangle slab."
-    : vi
-      ? `Bài 1401: kẹp tâm circle vào rectangle để tìm điểm gần nhất, rồi so bình phương khoảng cách với r².`
-      : "Problem 1401: clamp the circle center into the rectangle to find the closest point, then compare the squared distance with r².";
-  const rule = `<section class="cr1401-rule"><span><b>1</b><code>${approach === 2 ? "dx = max(left_gap, 0, right_gap)" : "closest_x = max(x1, min(xc, x2))"}</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>dist_squared &le; radius_squared</code></span></section>`;
+  const summary = vi
+    ? "Bài 1401 cách 1: kẹp tâm circle vào rectangle để tìm điểm gần nhất, rồi so bình phương khoảng cách với r²."
+    : "Problem 1401 approach 1: clamp the circle center into the rectangle to find the closest point, then compare the squared distance with r².";
 
   $("treeView").innerHTML = `<section class="cr1401-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <header><div><small>GEOMETRY · ${approach === 2 ? "AXIS OVERSHOOT" : "CLAMP TO RECTANGLE"} · #1401</small><strong>CIRCLE AND RECTANGLE OVERLAPPING · ${approach === 2 ? "APPROACH 2" : "APPROACH 1"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <header><div><small>GEOMETRY · CLAMP TO RECTANGLE · #1401</small><strong>CIRCLE AND RECTANGLE OVERLAPPING · APPROACH 1</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="cr1401-phases">${phases}</div>
-    ${rule}
-    <section class="cr1401-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>${vi ? "circle" : "circle"}</i> · <em>rectangle</em> · <b>${vi ? "điểm gần nhất" : "closest point"}</b></span></header>${plane}</section>
-    <section class="cr1401-locals"><header><strong>${vi ? "BIẾN CỤC BỘ THEO TỪNG DÒNG" : "LOCALS BY SOURCE LINE"}</strong><span>${escapeHtml(vi ? "mờ = dòng chưa chạy · viền = dòng đang chạy" : "dimmed = line not run yet · outlined = current line")}</span></header><div>${locals}</div></section>
-    <section class="cr1401-axis-checks">${axisCard("X", view.dx, x1, x2, xCenter, view.innerX, view.closestX, view.leftGap, view.rightGap)}${axisCard("Y", view.dy, y1, y2, yCenter, view.innerY, view.closestY, view.bottomGap, view.topGap)}</section>
+    <section class="cr1401-rule"><span><b>1</b><code>closest_x = max(x1, min(xc, x2))</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>dist_squared &le; radius_squared</code></span></section>
+    <section class="cr1401-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>circle</i> · <em>rectangle</em> · <b>${vi ? "điểm gần nhất" : "closest point"}</b></span></header>${plane}</section>
+    ${locals}
+    <section class="cr1401-axis-checks">${axisCard("X", view.dx, x1, x2, xCenter, view.innerX, view.closestX)}${axisCard("Y", view.dy, y1, y2, yCenter, view.innerY, view.closestY)}</section>
     ${compare}
     <section class="cr1401-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
-    <section class="cr1401-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <section class="cr1401-action"><small>${vi ? "DÒNG" : "LINE"} ${currentLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
     <footer class="cr1401-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>SHARE A POINT?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "điểm gần nhất của rectangle nằm trong circle" : "the rectangle's closest point lies inside the circle") : (vi ? "cả rectangle nằm ngoài circle" : "the whole rectangle stays outside the circle")) : (vi ? "cần dist_squared ≤ radius_squared" : "requires dist_squared ≤ radius_squared")}</span></footer>
+  </section>`;
+}
+
+// ── Approach 2: grow the rectangle by r, shrink the circle to its center ──
+// The inflated shape is a rounded rectangle, decomposed into a wide slab, a
+// tall slab, and four corner discs. No closest point, no single distance.
+function renderCircleRectangle1401RegionView(step) {
+  const view = step.circleRectangle1401View || {};
+  const vi = lang === "vi";
+  const radius = Number.isFinite(view.radius) ? Number(view.radius) : 1;
+  const xCenter = Number.isFinite(view.xCenter) ? Number(view.xCenter) : 0;
+  const yCenter = Number.isFinite(view.yCenter) ? Number(view.yCenter) : 0;
+  const rect = Array.isArray(view.rect) && view.rect.length === 4 ? view.rect.map(Number) : [0, 0, 1, 1];
+  const [x1, y1, x2, y2] = rect;
+  const radiusSq = Number.isFinite(view.radiusSq) ? Number(view.radiusSq) : null;
+  const num = (value) => (Number.isFinite(value) ? String(value) : "?");
+  const sq = (value) => (Number.isFinite(value) ? (value < 0 ? `(${value})²` : `${value}²`) : "?²");
+  const bool = (value) => (value === true ? "True" : value === false ? "False" : "?");
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const currentLine = (step.codeLines || [])[0];
+  const operation = view.operation || "";
+  const cornerIndex = Number.isInteger(view.cornerIndex) ? view.cornerIndex : -1;
+  const cornerResults = Array.isArray(view.cornerResults) ? view.cornerResults : [null, null, null, null];
+  const corners = [[x1, y1], [x1, y2], [x2, y1], [x2, y2]];
+
+  const labels = vi
+    ? ["Circle & rectangle", "Slab ngang", "Slab dọc", "4 đĩa ở góc", "Kết quả"]
+    : ["Circle & rectangle", "Wide slab", "Tall slab", "4 corner discs", "Result"];
+  const phases = labels
+    .map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`)
+    .join("");
+
+  const g = cr1401Plane(
+    Math.min(x1 - radius, xCenter - radius),
+    Math.max(x2 + radius, xCenter + radius),
+    Math.min(y1 - radius, yCenter - radius),
+    Math.max(y2 + radius, yCenter + radius),
+  );
+  const { plot, scale, mapX, mapY, fx, fy } = g;
+
+  const box = (lo, hi, bottom, top, className) => {
+    const left = mapX(lo);
+    const upper = mapY(top);
+    return `<rect class="${className}" x="${left.toFixed(2)}" y="${upper.toFixed(2)}" width="${(mapX(hi) - left).toFixed(2)}" height="${(mapY(bottom) - upper).toFixed(2)}" rx="2"/>`;
+  };
+  const stateOf = (value, active) => `${value === true ? "hit" : value === false ? "miss" : "pending"}${active ? " active" : ""}`;
+
+  const wideSvg = box(x1 - radius, x2 + radius, y1, y2, `cr1401-region-slab ${stateOf(view.inWide, operation === "in-wide")}`);
+  const tallSvg = box(x1, x2, y1 - radius, y2 + radius, `cr1401-region-slab ${stateOf(view.inTall, operation === "in-tall")}`);
+  const radiusPx = radius * scale;
+  const discsSvg = corners
+    .map(([cornerX, cornerY], index) => {
+      const active = cornerIndex === index && operation.startsWith("corner");
+      return `<circle class="cr1401-region-disc ${stateOf(cornerResults[index], active)}" cx="${fx(cornerX)}" cy="${fy(cornerY)}" r="${radiusPx.toFixed(2)}"/>`;
+    })
+    .join("");
+
+  const rectLeft = mapX(x1);
+  const rectTop = mapY(y2);
+  const rectWidth = mapX(x2) - rectLeft;
+  const rectHeight = mapY(y1) - rectTop;
+  const rectSvg = `<g class="cr1401-rect"><rect x="${rectLeft.toFixed(2)}" y="${rectTop.toFixed(2)}" width="${rectWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="3"/><text class="corner start" x="${(rectLeft + 5).toFixed(2)}" y="${(rectTop + rectHeight - 6).toFixed(2)}">(${x1}, ${y1})</text><text class="corner end" x="${(rectLeft + rectWidth - 5).toFixed(2)}" y="${(rectTop + 13).toFixed(2)}">(${x2}, ${y2})</text></g>`;
+
+  // The original circle is kept as a faint outline so the transformation
+  // "circle shrinks to a point, rectangle grows by r" stays visible.
+  const ghostSvg = `<circle class="cr1401-ghost-circle" cx="${fx(xCenter)}" cy="${fy(yCenter)}" r="${radiusPx.toFixed(2)}"/>`;
+
+  const centerState = view.answer === true ? "inside" : view.final ? "outside" : "";
+  let cornerLinkSvg = "";
+  if (cornerIndex >= 0 && Number.isFinite(view.cornerX) && Number.isFinite(view.cornerY)) {
+    cornerLinkSvg = `<line class="cr1401-corner-link ${cornerResults[cornerIndex] === true ? "hit" : cornerResults[cornerIndex] === false ? "miss" : ""}" x1="${fx(xCenter)}" y1="${fy(yCenter)}" x2="${fx(view.cornerX)}" y2="${fy(view.cornerY)}"/><circle class="cr1401-corner-dot" cx="${fx(view.cornerX)}" cy="${fy(view.cornerY)}" r="4"/>`;
+  }
+  const centerSvg = `<g class="cr1401-center ${centerState}"><circle cx="${fx(xCenter)}" cy="${fy(yCenter)}" r="4.5"/><text x="${(mapX(xCenter) + 8).toFixed(2)}" y="${(mapY(yCenter) - 8).toFixed(2)}">C (${xCenter}, ${yCenter})</text></g>`;
+
+  const svgSummary = vi
+    ? `Rectangle từ (${x1}, ${y1}) tới (${x2}, ${y2}) nở ra bán kính ${radius} thành hình chữ nhật bo góc, và tâm circle (${xCenter}, ${yCenter}) được kiểm tra có nằm trong vùng đó.`
+    : `The rectangle from (${x1}, ${y1}) to (${x2}, ${y2}) inflated by radius ${radius} into a rounded rectangle, with the circle center (${xCenter}, ${yCenter}) tested for membership.`;
+  const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}">${g.frame}${discsSvg}${wideSvg}${tallSvg}${rectSvg}${ghostSvg}${cornerLinkSvg}${centerSvg}</svg>`;
+
+  const slabCard = (title, value, active, xLow, xHigh, yLow, yHigh) => {
+    const xOk = xLow <= xCenter && xCenter <= xHigh;
+    const yOk = yLow <= yCenter && yCenter <= yHigh;
+    return `<article class="cr1401-slab-card ${stateOf(value, active)}"><header><strong>${escapeHtml(title)}</strong><span>${bool(value)}</span></header><div><span class="${value === null || value === undefined ? "" : xOk ? "ok" : "bad"}"><small>x</small><code>${xLow} ≤ ${xCenter} ≤ ${xHigh}</code></span><span class="${value === null || value === undefined ? "" : yOk ? "ok" : "bad"}"><small>y</small><code>${yLow} ≤ ${yCenter} ≤ ${yHigh}</code></span></div></article>`;
+  };
+  const slabs = `<section class="cr1401-slab-checks">${slabCard(vi ? "in_wide · nở theo X" : "in_wide · grown in X", view.inWide, operation === "in-wide", x1 - radius, x2 + radius, y1, y2)}${slabCard(vi ? "in_tall · nở theo Y" : "in_tall · grown in Y", view.inTall, operation === "in-tall", x1, x2, y1 - radius, y2 + radius)}</section>`;
+
+  const cornerCards = corners
+    .map(([cornerX, cornerY], index) => {
+      const active = cornerIndex === index && operation.startsWith("corner");
+      const visited = cornerResults[index] !== null && cornerResults[index] !== undefined;
+      const dxText = active && Number.isFinite(view.dx) ? num(view.dx) : visited ? String(xCenter - cornerX) : "?";
+      const dyText = active && Number.isFinite(view.dy) ? num(view.dy) : visited ? String(yCenter - cornerY) : "?";
+      const distText = visited ? String((xCenter - cornerX) ** 2 + (yCenter - cornerY) ** 2) : active && Number.isFinite(view.cornerDistSq) ? num(view.cornerDistSq) : "?";
+      return `<article class="cr1401-corner-card ${stateOf(cornerResults[index], active)}"><header><strong>#${index + 1}</strong><code>(${cornerX}, ${cornerY})</code></header><div><span>dx<b>${dxText}</b></span><span>dy<b>${dyText}</b></span></div><footer><code>dx²+dy² = ${distText}</code><span>${cornerResults[index] === true ? (vi ? "TRONG ĐĨA ✓" : "IN DISC ✓") : cornerResults[index] === false ? (vi ? "ngoài ✕" : "outside ✕") : (vi ? "chưa xét" : "not tested")}</span></footer></article>`;
+    })
+    .join("");
+
+  const locals = cr1401Locals([
+    { name: "in_wide", line: 2, value: view.inWide },
+    { name: "in_tall", line: 3, value: view.inTall },
+    { name: "radius_squared", line: 6, value: view.radiusSq },
+    { name: "corner_x", line: 7, value: view.cornerX },
+    { name: "corner_y", line: 7, value: view.cornerY },
+    { name: "dx", line: 8, value: view.dx },
+    { name: "dy", line: 9, value: view.dy },
+  ], currentLine, vi);
+
+  const formulas = {
+    inputs: `radius=${radius}, center=(${xCenter}, ${yCenter}), rect=[${rect.join(", ")}]`,
+    "in-wide": `in_wide = ${x1 - radius} <= ${xCenter} <= ${x2 + radius} and ${y1} <= ${yCenter} <= ${y2} → ${bool(view.inWide)}`,
+    "in-tall": `in_tall = ${x1} <= ${xCenter} <= ${x2} and ${y1 - radius} <= ${yCenter} <= ${y2 + radius} → ${bool(view.inTall)}`,
+    "slab-check": `if ${bool(view.inWide)} or ${bool(view.inTall)} → ${bool(view.slabHit)}`,
+    "return-slab": "return True",
+    "radius-squared": `radius_squared = ${radius}² = ${num(radiusSq)}`,
+    "corner-loop": `corner ${cornerIndex + 1}/4 = (${num(view.cornerX)}, ${num(view.cornerY)})`,
+    "corner-dx": `dx = ${xCenter} - ${num(view.cornerX)} = ${num(view.dx)}`,
+    "corner-dy": `dy = ${yCenter} - ${num(view.cornerY)} = ${num(view.dy)}`,
+    "corner-check": `${sq(view.dx)} + ${sq(view.dy)} = ${num(view.cornerDistSq)} <= ${num(radiusSq)} → ${bool(cornerResults[cornerIndex])}`,
+    "return-corner": "return True",
+    "return-false": "return False",
+  };
+
+  const final = Boolean(view.final);
+  const answerLabel = view.answer === true ? "TRUE" : view.answer === false ? "FALSE" : "…";
+  const summary = vi
+    ? "Bài 1401 cách 2: nở rectangle ra bán kính r rồi kiểm tra tâm circle có thuộc vùng đó, tách thành 2 slab và 4 đĩa góc."
+    : "Problem 1401 approach 2: inflate the rectangle by r and test whether the circle center lies in that region, split into 2 slabs and 4 corner discs.";
+
+  $("treeView").innerHTML = `<section class="cr1401-viz cr1401-region-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>GEOMETRY · INFLATED REGION · #1401</small><strong>CIRCLE AND RECTANGLE OVERLAPPING · APPROACH 2</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="cr1401-phases">${phases}</div>
+    <section class="cr1401-rule"><span><b>1</b><code>${escapeHtml(vi ? "circle thu về tâm, rectangle nở ra r" : "circle shrinks to its center, rectangle grows by r")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>${escapeHtml(vi ? "chỉ cần: tâm có thuộc vùng nở ra?" : "only ask: is the center inside that region?")}</code></span></section>
+    <section class="cr1401-plane"><header><strong>${vi ? "VÙNG NỞ RA = 2 SLAB + 4 ĐĨA" : "INFLATED REGION = 2 SLABS + 4 DISCS"}</strong><span>${escapeHtml(vi ? "nét mảnh = circle gốc · điểm = tâm" : "thin outline = original circle · dot = center")}</span></header>${plane}</section>
+    ${locals}
+    ${slabs}
+    <section class="cr1401-corner-grid">${cornerCards}</section>
+    <section class="cr1401-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
+    <section class="cr1401-action"><small>${vi ? "DÒNG" : "LINE"} ${currentLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
+    <footer class="cr1401-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>SHARE A POINT?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "tâm nằm trong vùng nở ra" : "the center lies inside the inflated region") : (vi ? "tâm ở ngoài cả 2 slab và cả 4 đĩa" : "the center misses both slabs and all four discs")) : (vi ? "tâm có thuộc vùng nở ra không?" : "is the center inside the inflated region?")}</span></footer>
   </section>`;
 }
 

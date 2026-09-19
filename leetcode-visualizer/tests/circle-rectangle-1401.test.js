@@ -135,32 +135,102 @@ test('1401 approach 1 steps through every source line of the clamp', () => {
   assert.deepEqual([final.anchorX, final.anchorY], [1, 0]);
 });
 
-test('1401 approach 2 steps through every source line of the overshoot', () => {
-  const result = buildApproach2(1, 1, 1, [1, -3, 2, -1]);
-  assert.equal(result.answer, false);
-  assert.equal(result.steps.length, 10);
-  assertWalksEveryLine(result.steps, problem.code2);
-  assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
-    'inputs', 'left-gap', 'right-gap', 'dx', 'bottom-gap', 'top-gap', 'dy', 'dist-squared', 'radius-squared', 'return',
-  ]);
-  const at = (index) => result.steps[index].circleRectangle1401View;
-  // Both raw gaps are visible before max() collapses them, and each can be negative.
-  assert.equal(at(1).leftGap, 0);
-  assert.equal(at(2).rightGap, -1);
-  assert.equal(at(3).dx, 0, 'the 0 in max() wins when neither gap is positive');
-  assert.equal(at(4).bottomGap, -4);
-  assert.equal(at(5).topGap, 2);
-  assert.equal(at(6).dy, 2);
-  assert.equal(at(7).distSq, 4);
-  assert.equal(at(7).radiusSq, null);
-  assert.equal(at(8).radiusSq, 1);
-  const final = result.steps.at(-1).circleRectangle1401View;
-  assert.equal(final.approach, 2);
-  assert.equal(final.closestX, null, 'approach 2 never names a closest point');
-  assert.deepEqual([final.anchorX, final.anchorY], [1, -1]);
+// Approach 2 has branches and a loop, so it visits a subset of lines in an
+// order that depends on the input. Only the one-line-per-step rule and the
+// validity of each line index are universal.
+function assertOneLinePerStep(steps, code) {
+  assert.ok(steps.every((step) => step.codeLines.length === 1), 'each step must own exactly one line');
+  for (const step of steps) {
+    const line = step.codeLines[0];
+    assert.ok(Number.isInteger(line) && line >= 1 && line < code.length, `line ${line} is out of range`);
+  }
+  assert.equal(steps.filter((step) => step.final).length, 1, 'exactly one final step');
+  assert.equal(steps.at(-1).final, true);
+}
+
+test('1401 approach 2 is a different algorithm, not a rewrite of approach 1', () => {
+  // No clamping, no closest point, no single distance: the displayed code must
+  // talk about region membership instead.
+  const code2 = problem.code2.join('\n');
+  assert.match(code2, /in_wide = x1 - radius <= xCenter <= x2 \+ radius and y1 <= yCenter <= y2/);
+  assert.match(code2, /in_tall = x1 <= xCenter <= x2 and y1 - radius <= yCenter <= y2 \+ radius/);
+  assert.match(code2, /for corner_x, corner_y in \(\(x1, y1\), \(x1, y2\), \(x2, y1\), \(x2, y2\)\):/);
+  assert.doesNotMatch(code2, /closest|min\(/);
+  assert.doesNotMatch(problem.code.join('\n'), /in_wide|corner_x/);
+
+  // The traces must not be structurally interchangeable either.
+  const shape = (steps) => steps.map((step) => step.circleRectangle1401View.operation).join(',');
+  const args = [4, 0, 0, [3, 4, 8, 9]];
+  assert.notEqual(shape(build(...args).steps), shape(buildApproach2(...args).steps));
+  // Approach 1 is straight-line code: always the same 10 steps.
+  assert.equal(build(...args).steps.length, 10);
+  assert.equal(build(1, 5, 5, [0, 0, 10, 10]).steps.length, 10);
+  // Approach 2's length tracks how much control flow actually ran.
+  assert.equal(buildApproach2(1, 5, 5, [0, 0, 10, 10]).steps.length, 5, 'slab hit returns early');
+  assert.equal(buildApproach2(5, 0, 0, [3, 4, 8, 9]).steps.length, 10, 'first corner disc hits');
+  assert.equal(buildApproach2(...args).steps.length, 22, 'all four corner discs miss');
 });
 
-test('1401 keeps both traces a strict one-line-per-step walk on many inputs', () => {
+test('1401 approach 2 returns early when a slab already contains the center', () => {
+  const result = buildApproach2(1, 5, 5, [0, 0, 10, 10]);
+  assert.equal(result.answer, true);
+  assertOneLinePerStep(result.steps, problem.code2);
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 5]);
+  assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
+    'inputs', 'in-wide', 'in-tall', 'slab-check', 'return-slab',
+  ]);
+  const final = result.steps.at(-1).circleRectangle1401View;
+  assert.equal(final.inWide, true);
+  assert.equal(final.slabHit, true);
+  // The corner machinery is never touched, so it must stay untouched in the view.
+  assert.equal(final.radiusSq, null, 'line 6 never ran');
+  assert.equal(final.cornerIndex, -1);
+  assert.deepEqual(final.cornerResults, [null, null, null, null]);
+});
+
+test('1401 approach 2 walks the corner discs and breaks on the first hit', () => {
+  // Corner (3, 4) is exactly 5 from the origin, so disc #1 hits.
+  const result = buildApproach2(5, 0, 0, [3, 4, 8, 9]);
+  assert.equal(result.answer, true);
+  assertOneLinePerStep(result.steps, problem.code2);
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
+    'inputs', 'in-wide', 'in-tall', 'slab-check', 'radius-squared',
+    'corner-loop', 'corner-dx', 'corner-dy', 'corner-check', 'return-corner',
+  ]);
+  const at = (index) => result.steps[index].circleRectangle1401View;
+  assert.equal(at(3).slabHit, false, 'both slabs must miss for the loop to run');
+  assert.equal(at(4).radiusSq, 25);
+  assert.deepEqual([at(5).cornerX, at(5).cornerY], [3, 4]);
+  assert.equal(at(5).dx, null, 'the loop header only binds the corner');
+  assert.equal(at(6).dx, -3);
+  assert.equal(at(7).dy, -4);
+  assert.equal(at(8).cornerDistSq, 25);
+  // Only the corner that was reached is resolved; the rest stay untested.
+  assert.deepEqual(at(8).cornerResults, [true, null, null, null]);
+});
+
+test('1401 approach 2 tests all four corner discs before returning False', () => {
+  const result = buildApproach2(4, 0, 0, [3, 4, 8, 9]);
+  assert.equal(result.answer, false);
+  assertOneLinePerStep(result.steps, problem.code2);
+  // Slab tests, then four passes of (loop, dx, dy, check), then return False.
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [
+    1, 2, 3, 4, 6,
+    7, 8, 9, 10,
+    7, 8, 9, 10,
+    7, 8, 9, 10,
+    7, 8, 9, 10,
+    12,
+  ]);
+  const loops = result.steps.filter((step) => step.circleRectangle1401View.operation === 'corner-loop');
+  assert.deepEqual(loops.map((step) => [step.circleRectangle1401View.cornerX, step.circleRectangle1401View.cornerY]), [
+    [3, 4], [3, 9], [8, 4], [8, 9],
+  ]);
+  assert.deepEqual(result.steps.at(-1).circleRectangle1401View.cornerResults, [false, false, false, false]);
+});
+
+test('1401 approach 1 stays a fixed straight-line walk over every source line', () => {
   const shapes = [
     [1, 0, 0, [1, -1, 3, 1]],
     [1, 1, 1, [1, -3, 2, -1]],
@@ -171,8 +241,25 @@ test('1401 keeps both traces a strict one-line-per-step walk on many inputs', ()
   ];
   for (const [radius, xCenter, yCenter, rect] of shapes) {
     assertWalksEveryLine(build(radius, xCenter, yCenter, rect).steps, problem.code);
-    assertWalksEveryLine(buildApproach2(radius, xCenter, yCenter, rect).steps, problem.code2);
+    assertOneLinePerStep(buildApproach2(radius, xCenter, yCenter, rect).steps, problem.code2);
   }
+});
+
+test('1401 approach 2 reaches every line of its code block across inputs', () => {
+  const visited = new Set();
+  const shapes = [
+    [1, 5, 5, [0, 0, 10, 10]],
+    [5, 0, 0, [3, 4, 8, 9]],
+    [4, 0, 0, [3, 4, 8, 9]],
+  ];
+  for (const [radius, xCenter, yCenter, rect] of shapes) {
+    for (const step of buildApproach2(radius, xCenter, yCenter, rect).steps) {
+      visited.add(step.codeLines[0]);
+    }
+  }
+  // Every line except 0 (`class Solution:`) must be reachable.
+  const expected = problem.code2.map((_line, index) => index).slice(1);
+  assert.deepEqual([...visited].sort((a, b) => a - b), expected);
 });
 
 test('1401 opts into the client line-by-line debugger without mangling the trace', () => {
@@ -240,31 +327,49 @@ test('1401 renderer covers all states in English and Vietnamese', () => {
   };
   vm.createContext(context);
   vm.runInContext(source.slice(start, end), context);
+  // Lines that assign a local, per approach. Other lines are branches, loop
+  // headers, or returns, and legitimately have no active local cell.
+  const localLines = { 1: new Set([2, 3, 4, 5, 6, 7, 8, 9]), 2: new Set([2, 3, 6, 7, 8, 9]) };
   const traces = [
-    // Overlapping, separated, center inside, corner-exact, and clamped-on-both-axes shapes.
+    // Overlapping, separated, center inside, corner-exact, clamped-on-both-axes.
     ...build(1, 0, 0, [1, -1, 3, 1]).steps,
     ...build(1, 1, 1, [1, -3, 2, -1]).steps,
     ...build(1, 5, 5, [0, 0, 10, 10]).steps,
     ...build(5, 0, 0, [3, 4, 8, 9]).steps,
     ...build(2000, -10000, 10000, [-10000, -10000, 10000, 10000]).steps,
-    ...buildApproach2(1, 0, 0, [1, -1, 3, 1]).steps,
-    ...buildApproach2(1, 1, 1, [1, -3, 2, -1]).steps,
+    // Approach 2's three control-flow outcomes: slab early return, corner hit,
+    // and every corner disc missing.
     ...buildApproach2(1, 5, 5, [0, 0, 10, 10]).steps,
+    ...buildApproach2(5, 0, 0, [3, 4, 8, 9]).steps,
+    ...buildApproach2(4, 0, 0, [3, 4, 8, 9]).steps,
+    ...buildApproach2(2000, -10000, 10000, [-10000, -10000, 10000, 10000]).steps,
   ];
   for (const language of ['en', 'vi']) {
     context.lang = language;
     for (const step of traces) {
       context.renderCircleRectangle1401View(step);
+      const approach = step.circleRectangle1401View.approach;
       assert.match(element.innerHTML, /cr1401-viz/);
-      assert.match(element.innerHTML, /COORDINATE PLANE|MẶT PHẲNG TỌA ĐỘ/);
       assert.match(element.innerHTML, new RegExp(`(?:LINE|DÒNG) ${step.codeLines[0]}`));
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity|null/);
       // The locals panel is the line-by-line payload: it must always render, and
       // it must flag the line being executed right now.
       assert.match(element.innerHTML, /cr1401-locals/);
       const line = step.codeLines[0];
-      if (line >= 2 && line <= 9) {
+      if (localLines[approach].has(line)) {
         assert.match(element.innerHTML, new RegExp(`cr1401-local [a-z]+ active"><small>L${line}</small>`), `line ${line} must be the active local`);
+      }
+      // Each approach gets its own picture, never the other one's.
+      if (approach === 2) {
+        assert.match(element.innerHTML, /cr1401-region-viz/);
+        assert.match(element.innerHTML, /INFLATED REGION|VÙNG NỞ RA/);
+        assert.equal((element.innerHTML.match(/cr1401-region-disc/g) || []).length, 4, 'all four corner discs are drawn');
+        assert.equal((element.innerHTML.match(/cr1401-region-slab/g) || []).length, 2);
+        assert.equal((element.innerHTML.match(/cr1401-corner-card/g) || []).length, 4);
+        assert.doesNotMatch(element.innerHTML, /cr1401-hypot|closest_x/);
+      } else {
+        assert.match(element.innerHTML, /COORDINATE PLANE|MẶT PHẲNG TỌA ĐỘ/);
+        assert.doesNotMatch(element.innerHTML, /cr1401-region-|in_wide/);
       }
     }
   }
@@ -342,8 +447,8 @@ test('1401 validates the circle and rectangle inputs', () => {
   assert.throws(() => problem.builder2('1,0', { rect: '1,-1,3,1' }), /exactly 3/);
 });
 
-test('1401 parenthesises negative bases in the squared-distance step', () => {
-  // dx is a signed gap in approach 1, so "-1²" would render as -(1²).
+test('1401 parenthesises negative bases when squaring', () => {
+  // dx is a signed gap, so a bare "-1²" would read as -(1²).
   const negative = build(1, 0, 0, [1, -1, 3, 1]).steps.find(
     (step) => step.circleRectangle1401View.operation === 'dist-squared',
   );
@@ -351,11 +456,28 @@ test('1401 parenthesises negative bases in the squared-distance step', () => {
   assert.match(negative.title.en, /\(-1\)² \+ 0² = 1/);
   assert.doesNotMatch(negative.title.en, /[^(]-1²/);
 
-  // Approach 2 overshoots are never negative, so no parentheses appear.
-  const positive = buildApproach2(1, 0, 0, [1, -1, 3, 1]).steps.find(
-    (step) => step.circleRectangle1401View.operation === 'dist-squared',
+  // Approach 2's corner offsets are signed too, and the renderer squares them.
+  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const start = source.indexOf('function renderCircleRectangle1401View(step)');
+  const end = source.indexOf('\nfunction renderStep()', start);
+  const element = {};
+  const context = {
+    lang: 'en',
+    $: () => element,
+    escapeHtml: String,
+    pick: (value) => value?.en ?? value?.vi ?? value ?? '',
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(start, end), context);
+  const cornerCheck = buildApproach2(5, 0, 0, [3, 4, 8, 9]).steps.find(
+    (step) => step.circleRectangle1401View.operation === 'corner-check',
   );
-  assert.match(positive.title.en, /1² \+ 0² = 1/);
+  assert.deepEqual(
+    [cornerCheck.circleRectangle1401View.dx, cornerCheck.circleRectangle1401View.dy],
+    [-3, -4],
+  );
+  context.renderCircleRectangle1401View(cornerCheck);
+  assert.match(element.innerHTML, /\(-3\)² \+ \(-4\)² = 25/);
 });
 
 test('1401 ships responsive scoped styles', () => {
@@ -366,5 +488,11 @@ test('1401 ships responsive scoped styles', () => {
   assert.match(css, /\.cr1401-axis-card\.aligned/);
   assert.match(css, /\.cr1401-local\.pending/);
   assert.match(css, /\.cr1401-local\.active/);
+  // Approach 2's inflated-region picture has its own scoped block.
+  assert.match(css, /\.cr1401-region-slab\.hit/);
+  assert.match(css, /\.cr1401-region-disc\.active/);
+  assert.match(css, /\.cr1401-ghost-circle/);
+  assert.match(css, /\.cr1401-corner-card\.miss/);
+  assert.match(css, /\.cr1401-slab-card\.hit/);
   assert.match(css, /@container \(max-width: 390px\)/);
 });

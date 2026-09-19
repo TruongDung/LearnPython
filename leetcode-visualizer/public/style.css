@@ -58035,7 +58035,65 @@ html, body {
 .cr1401-result.no { border-color: var(--cr1401-bad); background: color-mix(in srgb, var(--cr1401-bad) 7%, var(--cr1401-panel)); }
 .cr1401-result.no > strong { color: var(--cr1401-bad); }
 
+/* #1401 approach 2: the rectangle inflated by r — two slabs plus four corner
+   discs — with the circle reduced to a single point. */
+.cr1401-region-slab { fill: color-mix(in srgb, var(--cr1401-rect) 14%, transparent); stroke: color-mix(in srgb, var(--cr1401-rect) 60%, transparent); stroke-width: 1.25; stroke-dasharray: 5 3; }
+.cr1401-region-disc { fill: color-mix(in srgb, var(--cr1401-rect) 12%, transparent); stroke: color-mix(in srgb, var(--cr1401-rect) 50%, transparent); stroke-width: 1.1; stroke-dasharray: 4 3; }
+.cr1401-region-slab.pending,
+.cr1401-region-disc.pending { opacity: .4; }
+.cr1401-region-slab.miss,
+.cr1401-region-disc.miss { fill: transparent; stroke: color-mix(in srgb, var(--cr1401-muted) 55%, transparent); }
+.cr1401-region-slab.hit,
+.cr1401-region-disc.hit { fill: color-mix(in srgb, var(--cr1401-good) 26%, transparent); stroke: var(--cr1401-good); stroke-dasharray: none; stroke-width: 2; }
+.cr1401-region-slab.active,
+.cr1401-region-disc.active { stroke: var(--cr1401-circle); stroke-width: 2.25; stroke-dasharray: none; opacity: 1; }
+.cr1401-ghost-circle { fill: none; stroke: var(--cr1401-circle); stroke-width: 1; stroke-dasharray: 2 4; opacity: .7; }
+.cr1401-corner-link { stroke: var(--cr1401-circle); stroke-width: 1.5; stroke-dasharray: 5 3; }
+.cr1401-corner-link.hit { stroke: var(--cr1401-good); stroke-dasharray: none; }
+.cr1401-corner-link.miss { stroke: var(--cr1401-bad); }
+.cr1401-corner-dot { fill: var(--cr1401-circle); stroke: var(--cr1401-panel); stroke-width: 1.25; }
+.cr1401-center circle { fill: var(--cr1401-circle); stroke: var(--cr1401-panel); stroke-width: 1.5; }
+.cr1401-center text { fill: var(--cr1401-circle); font: 800 9px Consolas, monospace; paint-order: stroke; stroke: var(--cr1401-panel); stroke-width: 3px; }
+.cr1401-center.inside circle { fill: var(--cr1401-good); }
+.cr1401-center.inside text { fill: var(--cr1401-good); }
+.cr1401-center.outside circle { fill: var(--cr1401-bad); }
+.cr1401-center.outside text { fill: var(--cr1401-bad); }
+.cr1401-slab-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cr1401-slab-card { display: grid; gap: 7px; min-width: 0; padding: 9px; background: var(--cr1401-panel); border: 1px solid var(--cr1401-border); border-radius: 9px; }
+.cr1401-slab-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cr1401-slab-card > header strong { color: var(--cr1401-text); font-size: 10px; }
+.cr1401-slab-card > header span { color: var(--cr1401-muted); font: 800 9px Consolas, monospace; }
+.cr1401-slab-card > div { display: grid; gap: 5px; }
+.cr1401-slab-card > div > span { display: flex; align-items: center; gap: 7px; padding: 5px 7px; background: var(--cr1401-soft); border-radius: 6px; }
+.cr1401-slab-card > div > span small { color: var(--cr1401-muted); font: 800 9px Consolas, monospace; }
+.cr1401-slab-card > div > span code { color: var(--cr1401-text); font: 700 10px Consolas, monospace; overflow-wrap: anywhere; }
+.cr1401-slab-card > div > span.ok code { color: var(--cr1401-good); }
+.cr1401-slab-card > div > span.bad code { color: var(--cr1401-bad); }
+.cr1401-slab-card.pending { opacity: .6; }
+.cr1401-slab-card.hit { border-color: var(--cr1401-good); background: color-mix(in srgb, var(--cr1401-good) 8%, var(--cr1401-panel)); }
+.cr1401-slab-card.hit > header span { color: var(--cr1401-good); }
+.cr1401-slab-card.miss > header span { color: var(--cr1401-bad); }
+.cr1401-slab-card.active { box-shadow: 0 0 0 1px var(--cr1401-circle); opacity: 1; }
+.cr1401-corner-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.cr1401-corner-card { display: grid; gap: 6px; min-width: 0; padding: 8px; background: var(--cr1401-panel); border: 1px solid var(--cr1401-border); border-radius: 9px; }
+.cr1401-corner-card > header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cr1401-corner-card > header strong { color: var(--cr1401-rect); font: 800 10px Consolas, monospace; }
+.cr1401-corner-card > header code { color: var(--cr1401-text); font: 700 9px Consolas, monospace; }
+.cr1401-corner-card > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.cr1401-corner-card > div > span { display: grid; gap: 2px; justify-items: center; padding: 4px; background: var(--cr1401-soft); border-radius: 5px; color: var(--cr1401-muted); font: 800 8px Consolas, monospace; }
+.cr1401-corner-card > div > span b { color: var(--cr1401-text); font: 800 11px Consolas, monospace; }
+.cr1401-corner-card > footer { display: grid; gap: 3px; }
+.cr1401-corner-card > footer code { color: var(--cr1401-text); font: 800 9px Consolas, monospace; overflow-wrap: anywhere; }
+.cr1401-corner-card > footer span { color: var(--cr1401-muted); font-size: 8px; font-weight: 800; }
+.cr1401-corner-card.pending { opacity: .5; }
+.cr1401-corner-card.hit { border-color: var(--cr1401-good); background: color-mix(in srgb, var(--cr1401-good) 8%, var(--cr1401-panel)); }
+.cr1401-corner-card.hit > footer span { color: var(--cr1401-good); }
+.cr1401-corner-card.miss > footer span { color: var(--cr1401-bad); }
+.cr1401-corner-card.active { box-shadow: 0 0 0 1px var(--cr1401-circle); opacity: 1; }
+
 @container (max-width: 520px) {
+  .cr1401-slab-checks { grid-template-columns: 1fr; }
+  .cr1401-corner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cr1401-phases { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cr1401-rule { grid-template-columns: 1fr; }
   .cr1401-rule > i { text-align: center; }
@@ -58054,4 +58112,5 @@ html, body {
   .cr1401-compare > div > i { text-align: center; }
   .cr1401-result { grid-template-columns: 1fr auto; }
   .cr1401-result > span { grid-column: 1 / -1; }
+  .cr1401-corner-grid { grid-template-columns: 1fr; }
 }

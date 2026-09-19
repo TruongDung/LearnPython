@@ -23,9 +23,12 @@ class Solution:
         radius_squared = radius * radius
         return dist_squared <= radius_squared
 
-    # Approach 2: per-axis overshoot. At most one of the two gaps can be
-    # positive, so the 0 in the middle of max() wins whenever the center
-    # already projects inside the slab.
+    # Approach 2: measure nothing. Shrink the circle to its centre and grow the
+    # rectangle by radius; the two meet exactly when the centre lands in that
+    # grown region (the Minkowski sum), which is a rounded rectangle:
+    #   wide slab [x1-r, x2+r] x [y1, y2]   covers the left/right edges
+    #   tall slab [x1, x2] x [y1-r, y2+r]   covers the bottom/top edges
+    #   four radius-r discs at the corners  cover the rounded parts
     def checkOverlap2(
         self,
         radius: int,
@@ -36,15 +39,17 @@ class Solution:
         x2: int,
         y2: int,
     ) -> bool:
-        left_gap = x1 - xCenter
-        right_gap = xCenter - x2
-        dx = max(left_gap, 0, right_gap)
-        bottom_gap = y1 - yCenter
-        top_gap = yCenter - y2
-        dy = max(bottom_gap, 0, top_gap)
-        dist_squared = dx * dx + dy * dy
+        in_wide = x1 - radius <= xCenter <= x2 + radius and y1 <= yCenter <= y2
+        in_tall = x1 <= xCenter <= x2 and y1 - radius <= yCenter <= y2 + radius
+        if in_wide or in_tall:
+            return True
         radius_squared = radius * radius
-        return dist_squared <= radius_squared
+        for corner_x, corner_y in ((x1, y1), (x1, y2), (x2, y1), (x2, y2)):
+            dx = xCenter - corner_x
+            dy = yCenter - corner_y
+            if dx * dx + dy * dy <= radius_squared:
+                return True
+        return False
 
     # The same clamp written compactly, for reference.
     def checkOverlapCompact(
@@ -81,3 +86,12 @@ if __name__ == "__main__":
         assert solution.checkOverlap(*args) is expected, args
         assert solution.checkOverlap2(*args) is expected, args
         assert solution.checkOverlapCompact(*args) is expected, args
+
+    # The two approaches are derived differently, so cross-check them over a
+    # grid that lands in every region: inside, the four edge slabs, and the
+    # four corner discs.
+    for r in range(1, 5):
+        for cx in range(-6, 7):
+            for cy in range(-6, 7):
+                args = (r, cx, cy, -2, -1, 3, 2)
+                assert solution.checkOverlap(*args) == solution.checkOverlap2(*args), args

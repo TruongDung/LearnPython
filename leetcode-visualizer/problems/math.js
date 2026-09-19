@@ -5631,27 +5631,35 @@ function buildSteps1401(input, params = {}) {
 /**
  * Generate steps for LeetCode 1401: Circle and Rectangle Overlapping — approach 2.
  *
- * Per axis, measure how far the center overshoots the rectangle's slab. The
- * overshoot is 0 while the center projects inside the slab, so the same squared
- * distance falls out without naming the closest point.
+ * A different reduction rather than a different spelling of approach 1: instead
+ * of measuring a distance, grow the rectangle by `radius` and shrink the circle
+ * to its centre. The circle meets the rectangle exactly when the centre lands in
+ * that grown region (the Minkowski sum of the rectangle with a disc), which is a
+ * rounded rectangle. It decomposes into three easy membership tests:
  *
- * Both gaps are named before the max() so the trace can stop on each one and
- * show why a negative gap always loses to the 0 in the middle.
+ *   wide slab  [x1-r, x2+r] x [y1, y2]
+ *   tall slab  [x1, x2] x [y1-r, y2+r]
+ *   four discs of radius r centred on the four corners
+ *
+ * No clamping and no closest point appear anywhere, and the corner loop gives the
+ * trace real control flow to step through: an early return, a loop, and a break.
  */
 function buildSteps1401Approach2(input, params = {}) {
   const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
   const [x1, y1, x2, y2] = rect;
-  const anchorX = Math.max(x1, Math.min(xCenter, x2));
-  const anchorY = Math.max(y1, Math.min(yCenter, y2));
+  const corners = [[x1, y1], [x1, y2], [x2, y1], [x2, y2]];
   const steps = [];
-  let leftGap = null;
-  let rightGap = null;
-  let dx = null;
-  let bottomGap = null;
-  let topGap = null;
-  let dy = null;
-  let distSq = null;
+  let inWide = null;
+  let inTall = null;
+  let slabHit = null;
   let radiusSq = null;
+  let cornerIndex = -1;
+  let cornerX = null;
+  let cornerY = null;
+  let dx = null;
+  let dy = null;
+  let cornerDistSq = null;
+  const cornerResults = [null, null, null, null];
   let answer = null;
 
   function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
@@ -5661,14 +5669,14 @@ function buildSteps1401Approach2(input, params = {}) {
       codeLines: [codeLine],
       final,
       vars: [
-        { name: "left_gap", value: leftGap ?? "—" },
-        { name: "right_gap", value: rightGap ?? "—" },
-        { name: "dx", value: dx ?? "—" },
-        { name: "bottom_gap", value: bottomGap ?? "—" },
-        { name: "top_gap", value: topGap ?? "—" },
-        { name: "dy", value: dy ?? "—" },
-        { name: "dist_squared", value: distSq ?? "—" },
+        { name: "in_wide", value: inWide === null ? "—" : inWide },
+        { name: "in_tall", value: inTall === null ? "—" : inTall },
         { name: "radius_squared", value: radiusSq ?? "—" },
+        { name: "corner_x", value: cornerX ?? "—" },
+        { name: "corner_y", value: cornerY ?? "—" },
+        { name: "dx", value: dx ?? "—" },
+        { name: "dy", value: dy ?? "—" },
+        { name: "dx*dx + dy*dy", value: cornerDistSq ?? "—" },
       ],
       circleRectangle1401View: {
         approach: 2,
@@ -5678,20 +5686,17 @@ function buildSteps1401Approach2(input, params = {}) {
         xCenter,
         yCenter,
         rect: [...rect],
-        anchorX,
-        anchorY,
-        innerX: null,
-        closestX: null,
-        innerY: null,
-        closestY: null,
-        leftGap,
-        rightGap,
-        bottomGap,
-        topGap,
+        inWide,
+        inTall,
+        slabHit,
+        radiusSq,
+        cornerIndex,
+        cornerX,
+        cornerY,
         dx,
         dy,
-        distSq,
-        radiusSq,
+        cornerDistSq,
+        cornerResults: [...cornerResults],
         answer,
         final,
       },
@@ -5704,110 +5709,158 @@ function buildSteps1401Approach2(input, params = {}) {
     codeLine: 1,
     title: { vi: "Vào hàm với circle và rectangle", en: "Enter the function with the circle and the rectangle" },
     note: {
-      vi: "Thay vì tìm điểm gần nhất, cách này đo phần vượt ra của tâm trên từng trục.",
-      en: "Instead of locating the closest point, this approach measures how far the center overshoots each slab.",
+      vi: `Đổi bài toán: nở rectangle ra ${radius} đơn vị rồi hỏi tâm (${xCenter}, ${yCenter}) có nằm trong vùng đó không. Vùng nở ra là hình chữ nhật bo góc.`,
+      en: `Reframe the problem: grow the rectangle by ${radius} and ask whether the center (${xCenter}, ${yCenter}) lands inside. That grown region is a rounded rectangle.`,
     },
   });
 
-  leftGap = x1 - xCenter;
+  inWide = x1 - radius <= xCenter && xCenter <= x2 + radius && y1 <= yCenter && yCenter <= y2;
   snapshot({
-    operation: "left-gap",
+    operation: "in-wide",
     phaseIndex: 1,
     codeLine: 2,
-    title: { vi: `left_gap = ${x1} − ${xCenter} = ${leftGap}`, en: `left_gap = ${x1} - ${xCenter} = ${leftGap}` },
-    note: leftGap > 0
-      ? { vi: `Dương: tâm nằm bên trái rectangle, cách biên x1 đúng ${leftGap} đơn vị.`, en: `Positive: the center is left of the rectangle, ${leftGap} away from edge x1.` }
-      : { vi: "Không dương: tâm không nằm bên trái rectangle, nên phần vượt này không tính.", en: "Not positive: the center is not left of the rectangle, so this overshoot does not count." },
+    title: { vi: `in_wide = ${inWide}`, en: `in_wide = ${inWide}` },
+    note: inWide
+      ? { vi: `Tâm nằm trong slab ngang [${x1 - radius}, ${x2 + radius}] × [${y1}, ${y2}], nên đã chắc chắn có điểm chung.`, en: `The center is inside the wide slab [${x1 - radius}, ${x2 + radius}] x [${y1}, ${y2}], which already proves an intersection.` }
+      : { vi: `Tâm không thuộc slab ngang [${x1 - radius}, ${x2 + radius}] × [${y1}, ${y2}]. Slab này phủ trường hợp circle chạm cạnh trái hoặc cạnh phải.`, en: `The center misses the wide slab [${x1 - radius}, ${x2 + radius}] x [${y1}, ${y2}]. This slab covers the circle touching the left or right edge.` },
   });
 
-  rightGap = xCenter - x2;
+  inTall = x1 <= xCenter && xCenter <= x2 && y1 - radius <= yCenter && yCenter <= y2 + radius;
   snapshot({
-    operation: "right-gap",
-    phaseIndex: 1,
+    operation: "in-tall",
+    phaseIndex: 2,
     codeLine: 3,
-    title: { vi: `right_gap = ${xCenter} − ${x2} = ${rightGap}`, en: `right_gap = ${xCenter} - ${x2} = ${rightGap}` },
-    note: rightGap > 0
-      ? { vi: `Dương: tâm nằm bên phải rectangle, cách biên x2 đúng ${rightGap} đơn vị.`, en: `Positive: the center is right of the rectangle, ${rightGap} away from edge x2.` }
-      : { vi: "Không dương: tâm không nằm bên phải rectangle.", en: "Not positive: the center is not right of the rectangle." },
+    title: { vi: `in_tall = ${inTall}`, en: `in_tall = ${inTall}` },
+    note: inTall
+      ? { vi: `Tâm nằm trong slab dọc [${x1}, ${x2}] × [${y1 - radius}, ${y2 + radius}], nên có điểm chung.`, en: `The center is inside the tall slab [${x1}, ${x2}] x [${y1 - radius}, ${y2 + radius}], so the shapes intersect.` }
+      : { vi: `Tâm không thuộc slab dọc [${x1}, ${x2}] × [${y1 - radius}, ${y2 + radius}]. Slab này phủ trường hợp circle chạm cạnh dưới hoặc cạnh trên.`, en: `The center misses the tall slab [${x1}, ${x2}] x [${y1 - radius}, ${y2 + radius}]. This slab covers the circle touching the bottom or top edge.` },
   });
 
-  dx = Math.max(leftGap, 0, rightGap);
+  slabHit = inWide || inTall;
   snapshot({
-    operation: "dx",
-    phaseIndex: 1,
-    codeLine: 4,
-    title: { vi: `dx = max(${leftGap}, 0, ${rightGap}) = ${dx}`, en: `dx = max(${leftGap}, 0, ${rightGap}) = ${dx}` },
-    note: dx === 0
-      ? { vi: `Hai gap đều không dương, nên số 0 ở giữa thắng: xCenter = ${xCenter} nằm trong slab [${x1}, ${x2}].`, en: `Both gaps are non-positive, so the 0 in the middle wins: xCenter = ${xCenter} lies inside the slab [${x1}, ${x2}].` }
-      : { vi: `Tối đa một trong hai gap có thể dương, nên max chọn đúng phần vượt ${dx}.`, en: `At most one gap can be positive, so max picks exactly the overshoot ${dx}.` },
-  });
-
-  bottomGap = y1 - yCenter;
-  snapshot({
-    operation: "bottom-gap",
-    phaseIndex: 2,
-    codeLine: 5,
-    title: { vi: `bottom_gap = ${y1} − ${yCenter} = ${bottomGap}`, en: `bottom_gap = ${y1} - ${yCenter} = ${bottomGap}` },
-    note: bottomGap > 0
-      ? { vi: `Dương: tâm nằm dưới rectangle, cách cạnh y1 đúng ${bottomGap} đơn vị.`, en: `Positive: the center is below the rectangle, ${bottomGap} away from edge y1.` }
-      : { vi: "Không dương: tâm không nằm dưới rectangle.", en: "Not positive: the center is not below the rectangle." },
-  });
-
-  topGap = yCenter - y2;
-  snapshot({
-    operation: "top-gap",
-    phaseIndex: 2,
-    codeLine: 6,
-    title: { vi: `top_gap = ${yCenter} − ${y2} = ${topGap}`, en: `top_gap = ${yCenter} - ${y2} = ${topGap}` },
-    note: topGap > 0
-      ? { vi: `Dương: tâm nằm trên rectangle, cách cạnh y2 đúng ${topGap} đơn vị.`, en: `Positive: the center is above the rectangle, ${topGap} away from edge y2.` }
-      : { vi: "Không dương: tâm không nằm trên rectangle.", en: "Not positive: the center is not above the rectangle." },
-  });
-
-  dy = Math.max(bottomGap, 0, topGap);
-  snapshot({
-    operation: "dy",
-    phaseIndex: 2,
-    codeLine: 7,
-    title: { vi: `dy = max(${bottomGap}, 0, ${topGap}) = ${dy}`, en: `dy = max(${bottomGap}, 0, ${topGap}) = ${dy}` },
-    note: dy === 0
-      ? { vi: `Hai gap đều không dương, nên yCenter = ${yCenter} nằm trong slab [${y1}, ${y2}].`, en: `Both gaps are non-positive, so yCenter = ${yCenter} lies inside the slab [${y1}, ${y2}].` }
-      : { vi: `max chọn phần vượt ${dy} trên trục Y.`, en: `max picks the Y overshoot ${dy}.` },
-  });
-
-  distSq = dx * dx + dy * dy;
-  snapshot({
-    operation: "dist-squared",
+    operation: "slab-check",
     phaseIndex: 3,
-    codeLine: 8,
-    title: { vi: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}`, en: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}` },
-    note: {
-      vi: `${square1401(dx)} + ${square1401(dy)} = ${distSq}. Đây là bình phương khoảng cách ngắn nhất từ tâm tới rectangle.`,
-      en: `${square1401(dx)} + ${square1401(dy)} = ${distSq}. This is the squared shortest distance from the center to the rectangle.`,
+    codeLine: 4,
+    title: {
+      vi: slabHit ? "Một trong hai slab đã chứa tâm" : "Cả hai slab đều không chứa tâm",
+      en: slabHit ? "One of the two slabs already contains the center" : "Neither slab contains the center",
     },
+    note: slabHit
+      ? { vi: "Hai slab phủ toàn bộ phần thân của vùng nở ra, nên không cần xét 4 đĩa ở góc.", en: "The two slabs cover the whole body of the inflated region, so the four corner discs are unnecessary." }
+      : { vi: "Phần còn lại của vùng nở ra chỉ là 4 đĩa bo ở góc, nên giờ kiểm tra từng góc.", en: "The only remaining part of the inflated region is the four rounded corners, so each corner gets checked next." },
   });
+
+  if (slabHit) {
+    answer = true;
+    snapshot({
+      operation: "return-slab",
+      phaseIndex: 4,
+      codeLine: 5,
+      title: { vi: "Trả về True", en: "Return True" },
+      note: {
+        vi: "Tâm thuộc phần thân của vùng nở ra, nghĩa là khoảng cách từ tâm tới rectangle không vượt quá radius.",
+        en: "The center lies in the body of the inflated region, meaning its distance to the rectangle does not exceed radius.",
+      },
+      final: true,
+    });
+    return { original: { radius, xCenter, yCenter, x1, y1, x2, y2 }, answer, steps };
+  }
 
   radiusSq = radius * radius;
   snapshot({
     operation: "radius-squared",
-    phaseIndex: 4,
-    codeLine: 9,
+    phaseIndex: 3,
+    codeLine: 6,
     title: { vi: `radius_squared = ${radius}² = ${radiusSq}`, en: `radius_squared = ${radius}² = ${radiusSq}` },
     note: {
-      vi: "So sánh hai bình phương nên không cần sqrt và kết quả luôn chính xác với số nguyên.",
-      en: "Comparing two squares avoids sqrt and stays exact for integers.",
+      vi: "Bình phương bán kính một lần, dùng lại cho cả 4 đĩa; so bình phương nên không cần sqrt.",
+      en: "Square the radius once and reuse it for all four discs; comparing squares avoids sqrt.",
     },
   });
 
-  answer = distSq <= radiusSq;
+  for (let index = 0; index < corners.length; index += 1) {
+    cornerIndex = index;
+    [cornerX, cornerY] = corners[index];
+    dx = null;
+    dy = null;
+    cornerDistSq = null;
+    snapshot({
+      operation: "corner-loop",
+      phaseIndex: 3,
+      codeLine: 7,
+      title: { vi: `Góc ${index + 1}/4 = (${cornerX}, ${cornerY})`, en: `Corner ${index + 1}/4 = (${cornerX}, ${cornerY})` },
+      note: {
+        vi: `Lấy góc tiếp theo của rectangle và hỏi tâm có nằm trong đĩa bán kính ${radius} quanh góc này không.`,
+        en: `Take the next rectangle corner and ask whether the center falls inside the radius-${radius} disc around it.`,
+      },
+    });
+
+    dx = xCenter - cornerX;
+    snapshot({
+      operation: "corner-dx",
+      phaseIndex: 3,
+      codeLine: 8,
+      title: { vi: `dx = ${xCenter} − ${cornerX} = ${dx}`, en: `dx = ${xCenter} - ${cornerX} = ${dx}` },
+      note: {
+        vi: `Khoảng lệch theo trục X giữa tâm và góc (${cornerX}, ${cornerY}).`,
+        en: `The X offset between the center and corner (${cornerX}, ${cornerY}).`,
+      },
+    });
+
+    dy = yCenter - cornerY;
+    snapshot({
+      operation: "corner-dy",
+      phaseIndex: 3,
+      codeLine: 9,
+      title: { vi: `dy = ${yCenter} − ${cornerY} = ${dy}`, en: `dy = ${yCenter} - ${cornerY} = ${dy}` },
+      note: {
+        vi: `Khoảng lệch theo trục Y giữa tâm và góc (${cornerX}, ${cornerY}).`,
+        en: `The Y offset between the center and corner (${cornerX}, ${cornerY}).`,
+      },
+    });
+
+    cornerDistSq = dx * dx + dy * dy;
+    cornerResults[index] = cornerDistSq <= radiusSq;
+    snapshot({
+      operation: "corner-check",
+      phaseIndex: 3,
+      codeLine: 10,
+      title: {
+        vi: `${cornerDistSq} ${cornerResults[index] ? "≤" : ">"} ${radiusSq} → ${cornerResults[index]}`,
+        en: `${cornerDistSq} ${cornerResults[index] ? "<=" : ">"} ${radiusSq} -> ${cornerResults[index]}`,
+      },
+      note: cornerResults[index]
+        ? { vi: `Tâm nằm trong đĩa quanh góc (${cornerX}, ${cornerY}), nên góc này chính là điểm chung.`, en: `The center is inside the disc around corner (${cornerX}, ${cornerY}), so that corner is the shared point.` }
+        : { vi: `Tâm cách góc (${cornerX}, ${cornerY}) quá xa; thử góc tiếp theo.`, en: `The center is too far from corner (${cornerX}, ${cornerY}); try the next corner.` },
+    });
+
+    if (cornerResults[index]) {
+      answer = true;
+      snapshot({
+        operation: "return-corner",
+        phaseIndex: 4,
+        codeLine: 11,
+        title: { vi: "Trả về True", en: "Return True" },
+        note: {
+          vi: `Chỉ cần một đĩa góc chứa tâm là đủ; vòng lặp dừng ngay ở góc ${index + 1}.`,
+          en: `One corner disc containing the center is enough; the loop stops at corner ${index + 1}.`,
+        },
+        final: true,
+      });
+      return { original: { radius, xCenter, yCenter, x1, y1, x2, y2 }, answer, steps };
+    }
+  }
+
+  answer = false;
   snapshot({
-    operation: "return",
+    operation: "return-false",
     phaseIndex: 4,
-    codeLine: 10,
-    title: { vi: `Trả về ${distSq} ≤ ${radiusSq} → ${answer}`, en: `Return ${distSq} <= ${radiusSq} -> ${answer}` },
-    note: answer
-      ? { vi: `${distSq} ≤ ${radiusSq}: rectangle chạm tới hoặc lấn vào circle.`, en: `${distSq} <= ${radiusSq}: the rectangle reaches into or touches the circle.` }
-      : { vi: `${distSq} > ${radiusSq}: rectangle nằm hoàn toàn ngoài circle.`, en: `${distSq} > ${radiusSq}: the rectangle stays entirely outside the circle.` },
+    codeLine: 12,
+    title: { vi: "Trả về False", en: "Return False" },
+    note: {
+      vi: "Tâm nằm ngoài cả hai slab và cả bốn đĩa góc, tức là ngoài toàn bộ vùng nở ra, nên hai hình rời nhau.",
+      en: "The center misses both slabs and all four corner discs, so it is outside the whole inflated region and the shapes are disjoint.",
+    },
     final: true,
   });
 
@@ -5841,16 +5894,17 @@ Object.assign(module.exports, {
         label: { vi: "Chọn Approach", en: "Select Approach" },
         default: 1,
         options: [
-          { value: 1, label: { vi: "1 — Kẹp tâm vào rectangle", en: "1 — Clamp center into rectangle" } },
-          { value: 2, label: { vi: "2 — Phần vượt theo từng trục", en: "2 — Per-axis overshoot" } },
+          { value: 1, label: { vi: "1 — Kẹp tâm, đo khoảng cách", en: "1 — Clamp center, measure distance" } },
+          { value: 2, label: { vi: "2 — Nở rectangle ra r, xét tâm", en: "2 — Inflate rectangle by r, test center" } },
         ],
       },
     ],
     approach: [
-      { vi: "Điểm của rectangle gần tâm circle nhất là điểm thu được khi kẹp tâm vào rectangle theo từng trục: min() chặn biên phải/trên, rồi max() chặn biên trái/dưới.", en: "The rectangle point closest to the circle center is obtained by clamping the center per axis: min() caps it at the right/top edge, then max() lifts it to the left/bottom edge." },
-      { vi: "Hai trục độc lập nhau, nên có thể kẹp riêng từng trục rồi ghép lại thành một điểm duy nhất.", en: "The two axes are independent, so each can be clamped separately and recombined into a single point." },
-      { vi: "Hai hình có điểm chung khi và chỉ khi điểm gần nhất đó nằm trong circle: dist_squared ≤ radius_squared. So sánh bình phương nên không cần sqrt và không mất chính xác.", en: "The shapes intersect exactly when that closest point is inside the circle: dist_squared <= radius_squared. Comparing squares avoids sqrt and stays exact." },
-      { vi: "Cách 2 viết cùng phép tính theo dạng phần vượt: left_gap và right_gap, rồi dx = max(left_gap, 0, right_gap) bằng 0 khi tâm đã nằm trong slab X.", en: "Approach 2 expresses the same arithmetic as an overshoot: left_gap and right_gap, then dx = max(left_gap, 0, right_gap) is 0 while the center is already inside the X slab." },
+      { vi: "Cách 1 — đo khoảng cách. Điểm của rectangle gần tâm circle nhất là điểm thu được khi kẹp tâm vào rectangle theo từng trục: min() chặn biên phải/trên, rồi max() chặn biên trái/dưới.", en: "Approach 1 — measure a distance. The rectangle point closest to the circle center is obtained by clamping the center per axis: min() caps it at the right/top edge, then max() lifts it to the left/bottom edge." },
+      { vi: "Hai hình có điểm chung khi và chỉ khi điểm gần nhất đó nằm trong circle: dist_squared ≤ radius_squared. So bình phương nên không cần sqrt và không mất chính xác.", en: "The shapes intersect exactly when that closest point is inside the circle: dist_squared <= radius_squared. Comparing squares avoids sqrt and stays exact." },
+      { vi: "Cách 2 — đổi bài toán, không đo khoảng cách nào cả. Cho circle thu về đúng tâm của nó và cho rectangle nở ra radius: hai hình cắt nhau khi và chỉ khi tâm nằm trong vùng nở ra đó (Minkowski sum), là một hình chữ nhật bo góc.", en: "Approach 2 — reframe the problem and measure no distance at all. Shrink the circle to just its center and grow the rectangle by radius: the two shapes meet exactly when the center lands in that grown region (the Minkowski sum), which is a rounded rectangle." },
+      { vi: "Hình bo góc đó tách thành ba phép kiểm tra thuộc vùng: slab ngang [x1−r, x2+r] × [y1, y2], slab dọc [x1, x2] × [y1−r, y2+r], và 4 đĩa bán kính r ở 4 góc. Hai slab phủ phần thân, 4 đĩa phủ phần bo.", en: "That rounded shape splits into three membership tests: the wide slab [x1-r, x2+r] x [y1, y2], the tall slab [x1, x2] x [y1-r, y2+r], and four radius-r discs at the corners. The slabs cover the body, the discs cover the rounding." },
+      { vi: "Hai cách cho cùng đáp án nhưng khác hẳn về cấu trúc: cách 1 là 1 khoảng cách duy nhất, không nhánh; cách 2 là 3 phép thuộc vùng với early return và vòng lặp 4 góc, và chỉ chạm tới 4 đĩa khi cả hai slab đều trượt.", en: "Both give the same answer but the structure differs: approach 1 is a single distance with no branching, while approach 2 is three membership tests with an early return and a four-corner loop that only runs when both slabs miss." },
     ],
     complexity: {
       time: "O(1)",
@@ -5879,18 +5933,20 @@ Object.assign(module.exports, {
     code2: [
       "class Solution:",
       "    def checkOverlap(self, radius: int, xCenter: int, yCenter: int, x1: int, y1: int, x2: int, y2: int) -> bool:",
-      "        left_gap = x1 - xCenter",
-      "        right_gap = xCenter - x2",
-      "        dx = max(left_gap, 0, right_gap)",
-      "        bottom_gap = y1 - yCenter",
-      "        top_gap = yCenter - y2",
-      "        dy = max(bottom_gap, 0, top_gap)",
-      "        dist_squared = dx * dx + dy * dy",
+      "        in_wide = x1 - radius <= xCenter <= x2 + radius and y1 <= yCenter <= y2",
+      "        in_tall = x1 <= xCenter <= x2 and y1 - radius <= yCenter <= y2 + radius",
+      "        if in_wide or in_tall:",
+      "            return True",
       "        radius_squared = radius * radius",
-      "        return dist_squared <= radius_squared",
+      "        for corner_x, corner_y in ((x1, y1), (x1, y2), (x2, y1), (x2, y2)):",
+      "            dx = xCenter - corner_x",
+      "            dy = yCenter - corner_y",
+      "            if dx * dx + dy * dy <= radius_squared:",
+      "                return True",
+      "        return False",
     ],
-    codeLabel: { vi: "Cách 1: Kẹp tâm vào rectangle", en: "Approach 1: Clamp center into rectangle" },
-    code2Label: { vi: "Cách 2: Phần vượt theo từng trục", en: "Approach 2: Per-axis overshoot" },
+    codeLabel: { vi: "Cách 1: Kẹp tâm, đo khoảng cách", en: "Approach 1: Clamp center, measure distance" },
+    code2Label: { vi: "Cách 2: Nở rectangle ra r (2 slab + 4 đĩa góc)", en: "Approach 2: Inflate rectangle by r (2 slabs + 4 corner discs)" },
     liveArgs: (input, params) => {
       const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
       return [radius, xCenter, yCenter, ...rect];
