@@ -41,7 +41,8 @@ test('1401 is registered with the expected signature and metadata', () => {
   assert.equal(problem.id, 1401);
   assert.equal(problem.slug, 'circle-and-rectangle-overlapping');
   assert.equal(problem.difficulty, 'medium');
-  assert.equal(problem.debugMode, 'semantic');
+  // Not "semantic": the client expands and steps this trace one source line at a time.
+  assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.complexity.time, 'O(1)');
   assert.equal(problem.category.key, 'math');
   assert.ok(problem.tags.some((tag) => tag.key === 'geometry'));
@@ -96,48 +97,114 @@ test('1401 builders agree with an independent region-based oracle', () => {
   }
 });
 
-test('1401 approach 1 traces the clamp line by line', () => {
+// Line 0 is `class Solution:`, which a debugger never stops on during a call.
+// Every other line of a code block must be visited exactly once, in order.
+function assertWalksEveryLine(steps, code) {
+  assert.ok(steps.every((step) => step.codeLines.length === 1), 'each step must own exactly one line');
+  const visited = steps.map((step) => step.codeLines[0]);
+  const expected = code.map((_line, index) => index).slice(1);
+  assert.deepEqual(visited, expected, 'the trace must step through every body line in source order');
+}
+
+test('1401 approach 1 steps through every source line of the clamp', () => {
   const result = build(1, 0, 0, [1, -1, 3, 1]);
-  assert.equal(result.steps.length, 6);
-  assert.ok(result.steps.every((step) => step.codeLines.length === 1));
-  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 5, 6]);
+  assert.equal(result.steps.length, 10);
+  assertWalksEveryLine(result.steps, problem.code);
   assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
-    'inputs', 'closest-x', 'closest-y', 'dx', 'dy', 'return',
+    'inputs', 'inner-x', 'closest-x', 'inner-y', 'closest-y', 'dx', 'dy', 'dist-squared', 'radius-squared', 'return',
   ]);
-  // Values only become non-null on the step that assigns them.
-  assert.equal(result.steps[0].circleRectangle1401View.closestX, null);
-  assert.equal(result.steps[1].circleRectangle1401View.closestX, 1);
-  assert.equal(result.steps[1].circleRectangle1401View.closestY, null);
-  assert.equal(result.steps[2].circleRectangle1401View.closestY, 0);
-  assert.equal(result.steps[3].circleRectangle1401View.dx, -1);
-  assert.equal(result.steps[4].circleRectangle1401View.dy, 0);
+  // Each variable stays null until its own line runs, so the locals panel can
+  // distinguish "not assigned yet" from "assigned 0".
+  const at = (index) => result.steps[index].circleRectangle1401View;
+  assert.equal(at(0).innerX, null);
+  assert.equal(at(1).innerX, 0);
+  assert.equal(at(1).closestX, null);
+  assert.equal(at(2).closestX, 1);
+  assert.equal(at(2).innerY, null);
+  assert.equal(at(3).innerY, 0);
+  assert.equal(at(4).closestY, 0);
+  assert.equal(at(5).dx, -1);
+  assert.equal(at(6).dy, 0);
+  assert.equal(at(7).distSq, 1);
+  assert.equal(at(7).radiusSq, null, 'radius_squared has its own line and must not leak early');
+  assert.equal(at(8).radiusSq, 1);
   const final = result.steps.at(-1).circleRectangle1401View;
-  assert.equal(final.distSq, 1);
-  assert.equal(final.radiusSq, 1);
   assert.equal(final.answer, true);
   assert.equal(final.approach, 1);
   // The drawing anchor is always resolved so the plane can be rendered.
   assert.deepEqual([final.anchorX, final.anchorY], [1, 0]);
 });
 
-test('1401 approach 2 traces the per-axis overshoot line by line', () => {
+test('1401 approach 2 steps through every source line of the overshoot', () => {
   const result = buildApproach2(1, 1, 1, [1, -3, 2, -1]);
   assert.equal(result.answer, false);
-  assert.equal(result.steps.length, 5);
-  assert.ok(result.steps.every((step) => step.codeLines.length === 1));
-  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 5]);
+  assert.equal(result.steps.length, 10);
+  assertWalksEveryLine(result.steps, problem.code2);
   assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
-    'inputs', 'dx', 'dy', 'dist-squared', 'return',
+    'inputs', 'left-gap', 'right-gap', 'dx', 'bottom-gap', 'top-gap', 'dy', 'dist-squared', 'radius-squared', 'return',
   ]);
-  // Overshoots are never negative, unlike approach 1's signed gaps.
-  assert.equal(result.steps[1].circleRectangle1401View.dx, 0);
-  assert.equal(result.steps[2].circleRectangle1401View.dy, 2);
+  const at = (index) => result.steps[index].circleRectangle1401View;
+  // Both raw gaps are visible before max() collapses them, and each can be negative.
+  assert.equal(at(1).leftGap, 0);
+  assert.equal(at(2).rightGap, -1);
+  assert.equal(at(3).dx, 0, 'the 0 in max() wins when neither gap is positive');
+  assert.equal(at(4).bottomGap, -4);
+  assert.equal(at(5).topGap, 2);
+  assert.equal(at(6).dy, 2);
+  assert.equal(at(7).distSq, 4);
+  assert.equal(at(7).radiusSq, null);
+  assert.equal(at(8).radiusSq, 1);
   const final = result.steps.at(-1).circleRectangle1401View;
-  assert.equal(final.distSq, 4);
-  assert.equal(final.radiusSq, 1);
   assert.equal(final.approach, 2);
-  assert.equal(final.closestX, null);
+  assert.equal(final.closestX, null, 'approach 2 never names a closest point');
   assert.deepEqual([final.anchorX, final.anchorY], [1, -1]);
+});
+
+test('1401 keeps both traces a strict one-line-per-step walk on many inputs', () => {
+  const shapes = [
+    [1, 0, 0, [1, -1, 3, 1]],
+    [1, 1, 1, [1, -3, 2, -1]],
+    [1, 0, 0, [-1, 0, 0, 1]],
+    [5, 0, 0, [3, 4, 8, 9]],
+    [1, 5, 5, [0, 0, 10, 10]],
+    [2000, -10000, 10000, [-10000, -10000, 10000, 10000]],
+  ];
+  for (const [radius, xCenter, yCenter, rect] of shapes) {
+    assertWalksEveryLine(build(radius, xCenter, yCenter, rect).steps, problem.code);
+    assertWalksEveryLine(buildApproach2(radius, xCenter, yCenter, rect).steps, problem.code2);
+  }
+});
+
+test('1401 opts into the client line-by-line debugger without mangling the trace', () => {
+  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const context = { problemData: { id: 1401, debugMode: problem.debugMode } };
+  vm.createContext(context);
+
+  const flagStart = source.indexOf('function shouldUseLineByLineDebug()');
+  const flagEnd = source.indexOf('}', source.indexOf('return', flagStart)) + 1;
+  vm.runInContext(source.slice(flagStart, flagEnd), context);
+  assert.equal(context.shouldUseLineByLineDebug(), true, '1401 must take the line-by-line path');
+
+  const expandStart = source.indexOf('function expandStepsLineByLine(rawSteps)');
+  const expandEnd = source.indexOf('\n// ---- Run algorithm ----', expandStart);
+  assert.ok(expandStart >= 0 && expandEnd > expandStart);
+  vm.runInContext(source.slice(expandStart, expandEnd), context);
+
+  // Because the builders already emit one line per step, expansion is a
+  // pass-through: no step is split, dropped, or given a second `final`.
+  for (const raw of [build(1, 0, 0, [1, -1, 3, 1]).steps, buildApproach2(1, 0, 0, [1, -1, 3, 1]).steps]) {
+    const expanded = context.expandStepsLineByLine(raw);
+    assert.equal(expanded.length, raw.length);
+    // Array.from rebuilds in this realm: values that cross the vm boundary carry
+    // a foreign Array.prototype, which deepStrictEqual would reject.
+    assert.deepEqual(
+      Array.from(expanded, (step) => step.codeLines[0]),
+      raw.map((step) => step.codeLines[0]),
+    );
+    assert.ok(Array.from(expanded).every((step) => step.codeLines.length === 1));
+    assert.equal(Array.from(expanded).filter((step) => step.final).length, 1);
+    assert.equal(expanded.at(-1).final, true);
+  }
 });
 
 test('1401 displayed Python and solution file produce the expected answers', () => {
@@ -192,8 +259,48 @@ test('1401 renderer covers all states in English and Vietnamese', () => {
       assert.match(element.innerHTML, /COORDINATE PLANE|MẶT PHẲNG TỌA ĐỘ/);
       assert.match(element.innerHTML, new RegExp(`(?:LINE|DÒNG) ${step.codeLines[0]}`));
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity|null/);
+      // The locals panel is the line-by-line payload: it must always render, and
+      // it must flag the line being executed right now.
+      assert.match(element.innerHTML, /cr1401-locals/);
+      const line = step.codeLines[0];
+      if (line >= 2 && line <= 9) {
+        assert.match(element.innerHTML, new RegExp(`cr1401-local [a-z]+ active"><small>L${line}</small>`), `line ${line} must be the active local`);
+      }
     }
   }
+});
+
+test('1401 locals panel reveals values only after their line has executed', () => {
+  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const start = source.indexOf('function renderCircleRectangle1401View(step)');
+  const end = source.indexOf('\nfunction renderStep()', start);
+  const element = {};
+  const context = {
+    lang: 'en',
+    $: () => element,
+    escapeHtml: String,
+    pick: (value) => value?.en ?? value?.vi ?? value ?? '',
+  };
+  vm.createContext(context);
+  vm.runInContext(source.slice(start, end), context);
+
+  const steps = build(1, 0, 0, [1, -1, 3, 1]).steps;
+  const pendingCount = (html) => (html.match(/cr1401-local pending/g) || []).length;
+
+  // Entering the function: all 8 locals are still unassigned.
+  context.renderCircleRectangle1401View(steps[0]);
+  assert.equal(pendingCount(element.innerHTML), 8);
+
+  // Each subsequent line assigns exactly one more local, monotonically.
+  let previous = 8;
+  for (let index = 1; index < steps.length; index += 1) {
+    context.renderCircleRectangle1401View(steps[index]);
+    const remaining = pendingCount(element.innerHTML);
+    assert.ok(remaining <= previous, `step ${index} must not un-assign a local`);
+    previous = remaining;
+  }
+  // By the return line every local has a value.
+  assert.equal(previous, 0);
 });
 
 test('1401 draws the circle with one shared scale on both axes', () => {
@@ -235,11 +342,29 @@ test('1401 validates the circle and rectangle inputs', () => {
   assert.throws(() => problem.builder2('1,0', { rect: '1,-1,3,1' }), /exactly 3/);
 });
 
+test('1401 parenthesises negative bases in the squared-distance step', () => {
+  // dx is a signed gap in approach 1, so "-1²" would render as -(1²).
+  const negative = build(1, 0, 0, [1, -1, 3, 1]).steps.find(
+    (step) => step.circleRectangle1401View.operation === 'dist-squared',
+  );
+  assert.equal(negative.circleRectangle1401View.dx, -1);
+  assert.match(negative.title.en, /\(-1\)² \+ 0² = 1/);
+  assert.doesNotMatch(negative.title.en, /[^(]-1²/);
+
+  // Approach 2 overshoots are never negative, so no parentheses appear.
+  const positive = buildApproach2(1, 0, 0, [1, -1, 3, 1]).steps.find(
+    (step) => step.circleRectangle1401View.operation === 'dist-squared',
+  );
+  assert.match(positive.title.en, /1² \+ 0² = 1/);
+});
+
 test('1401 ships responsive scoped styles', () => {
   const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
   assert.match(css, /\.cr1401-viz \{/);
   assert.match(css, /\.cr1401-anchor circle/);
   assert.match(css, /\.cr1401-compare\.fail/);
   assert.match(css, /\.cr1401-axis-card\.aligned/);
+  assert.match(css, /\.cr1401-local\.pending/);
+  assert.match(css, /\.cr1401-local\.active/);
   assert.match(css, /@container \(max-width: 390px\)/);
 });

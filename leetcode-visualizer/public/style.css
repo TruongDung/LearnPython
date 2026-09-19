@@ -57982,12 +57982,27 @@ html, body {
 .cr1401-anchor.outside circle { fill: var(--cr1401-bad); }
 .cr1401-anchor.outside .cr1401-hypot { stroke: var(--cr1401-bad); }
 .cr1401-anchor.outside text { fill: var(--cr1401-bad); }
+.cr1401-locals { display: grid; gap: 7px; min-width: 0; padding: 9px; background: var(--cr1401-panel); border: 1px solid var(--cr1401-border); border-radius: 9px; }
+.cr1401-locals > header { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.cr1401-locals > header strong { color: var(--cr1401-text); font-size: 9px; letter-spacing: .06em; }
+.cr1401-locals > header span { color: var(--cr1401-muted); font-size: 8px; }
+.cr1401-locals > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cr1401-local { display: grid; gap: 2px; justify-items: center; min-width: 0; padding: 6px 5px; background: var(--cr1401-soft); border: 1px solid var(--cr1401-border); border-radius: 7px; }
+.cr1401-local small { color: var(--cr1401-muted); font: 800 7px Consolas, monospace; letter-spacing: .05em; }
+.cr1401-local code { max-width: 100%; overflow: hidden; color: var(--cr1401-muted); font: 700 8px Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.cr1401-local b { color: var(--cr1401-text); font: 800 12px Consolas, monospace; }
+.cr1401-local.pending { opacity: .45; }
+.cr1401-local.set { border-color: color-mix(in srgb, var(--cr1401-good) 45%, var(--cr1401-border)); }
+.cr1401-local.set code { color: var(--cr1401-good); }
+.cr1401-local.active { border-color: var(--cr1401-rect); box-shadow: 0 0 0 1px var(--cr1401-rect); opacity: 1; }
+.cr1401-local.active code { color: var(--cr1401-rect); }
 .cr1401-axis-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .cr1401-axis-card { display: grid; gap: 7px; min-width: 0; padding: 9px; background: var(--cr1401-panel); border: 1px solid var(--cr1401-border); border-radius: 9px; }
 .cr1401-axis-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cr1401-axis-card > header strong { color: var(--cr1401-text); font: 800 11px Consolas, monospace; }
 .cr1401-axis-card > header span { color: var(--cr1401-muted); font-size: 8px; font-weight: 800; }
 .cr1401-axis-card > code { color: var(--cr1401-rect); font: 800 10px Consolas, monospace; overflow-wrap: anywhere; }
+.cr1401-axis-inter { color: var(--cr1401-muted); font: 700 8px Consolas, monospace; font-style: normal; overflow-wrap: anywhere; }
 .cr1401-axis-card > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cr1401-axis-card > div small { color: var(--cr1401-muted); font-size: 8px; }
 .cr1401-axis-card > div b { display: grid; min-width: 46px; min-height: 30px; place-items: center; padding: 0 8px; color: var(--cr1401-text); background: var(--cr1401-soft); border-radius: 6px; font: 800 13px Consolas, monospace; }
@@ -58025,11 +58040,13 @@ html, body {
   .cr1401-rule { grid-template-columns: 1fr; }
   .cr1401-rule > i { text-align: center; }
   .cr1401-axis-checks { grid-template-columns: 1fr; }
+  .cr1401-locals > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 390px) {
   .cr1401-viz > header,
   .cr1401-plane > header,
   .cr1401-compare > header,
+  .cr1401-locals > header,
   .cr1401-operation > header { align-items: flex-start; flex-direction: column; }
   .cr1401-viz > header > span { max-width: none; text-align: left; }
   .cr1401-operation code { text-align: left; }

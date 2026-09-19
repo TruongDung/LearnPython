@@ -5440,24 +5440,36 @@ function parseCircleRectangle1401Input(input, params = {}) {
   };
 }
 
+// Negative bases need parentheses: "-1²" reads as -(1²), which is not what the
+// squared-distance step computes.
+function square1401(value) {
+  return value < 0 ? `(${value})²` : `${value}²`;
+}
+
 /**
  * Generate steps for LeetCode 1401: Circle and Rectangle Overlapping — approach 1.
  *
  * Clamp the circle center into the rectangle to get the rectangle point that is
  * closest to the center, then compare the squared distance with radius².
+ *
+ * The displayed Python names every intermediate (inner_x, closest_x, ...) so the
+ * trace can stop on one source line at a time, the way a debugger would. Each
+ * snapshot therefore advances exactly one line and mutates exactly one variable.
  */
 function buildSteps1401(input, params = {}) {
   const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
   const [x1, y1, x2, y2] = rect;
   const anchorX = Math.max(x1, Math.min(xCenter, x2));
   const anchorY = Math.max(y1, Math.min(yCenter, y2));
-  const radiusSq = radius * radius;
   const steps = [];
+  let innerX = null;
   let closestX = null;
+  let innerY = null;
   let closestY = null;
   let dx = null;
   let dy = null;
   let distSq = null;
+  let radiusSq = null;
   let answer = null;
 
   function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
@@ -5467,12 +5479,14 @@ function buildSteps1401(input, params = {}) {
       codeLines: [codeLine],
       final,
       vars: [
+        { name: "inner_x", value: innerX ?? "—" },
         { name: "closest_x", value: closestX ?? "—" },
+        { name: "inner_y", value: innerY ?? "—" },
         { name: "closest_y", value: closestY ?? "—" },
         { name: "dx", value: dx ?? "—" },
         { name: "dy", value: dy ?? "—" },
-        { name: "dx*dx + dy*dy", value: distSq ?? "—" },
-        { name: "radius*radius", value: radiusSq },
+        { name: "dist_squared", value: distSq ?? "—" },
+        { name: "radius_squared", value: radiusSq ?? "—" },
       ],
       circleRectangle1401View: {
         approach: 1,
@@ -5484,7 +5498,9 @@ function buildSteps1401(input, params = {}) {
         rect: [...rect],
         anchorX,
         anchorY,
+        innerX,
         closestX,
+        innerY,
         closestY,
         dx,
         dy,
@@ -5500,68 +5516,109 @@ function buildSteps1401(input, params = {}) {
     operation: "inputs",
     phaseIndex: 0,
     codeLine: 1,
-    title: { vi: "Nhận circle và rectangle", en: "Receive the circle and the rectangle" },
+    title: { vi: "Vào hàm với circle và rectangle", en: "Enter the function with the circle and the rectangle" },
     note: {
       vi: `Circle có tâm (${xCenter}, ${yCenter}) bán kính ${radius}; rectangle đi từ (${x1}, ${y1}) tới (${x2}, ${y2}). Biên được tính là overlap.`,
       en: `The circle is centered at (${xCenter}, ${yCenter}) with radius ${radius}; the rectangle spans (${x1}, ${y1}) to (${x2}, ${y2}). Boundaries count as overlapping.`,
     },
   });
 
-  closestX = anchorX;
+  innerX = Math.min(xCenter, x2);
+  snapshot({
+    operation: "inner-x",
+    phaseIndex: 1,
+    codeLine: 2,
+    title: { vi: `inner_x = min(${xCenter}, ${x2}) = ${innerX}`, en: `inner_x = min(${xCenter}, ${x2}) = ${innerX}` },
+    note: xCenter > x2
+      ? { vi: `xCenter = ${xCenter} vượt quá biên phải, nên min kéo nó về x2 = ${x2}.`, en: `xCenter = ${xCenter} is past the right edge, so min pulls it back to x2 = ${x2}.` }
+      : { vi: `xCenter = ${xCenter} chưa vượt biên phải x2 = ${x2}, nên min giữ nguyên.`, en: `xCenter = ${xCenter} has not passed the right edge x2 = ${x2}, so min keeps it.` },
+  });
+
+  closestX = Math.max(x1, innerX);
   snapshot({
     operation: "closest-x",
     phaseIndex: 1,
-    codeLine: 2,
-    title: { vi: `closest_x = ${closestX}`, en: `closest_x = ${closestX}` },
-    note: xCenter < x1
-      ? { vi: `xCenter = ${xCenter} nằm bên trái rectangle, nên bị kẹp lên x1 = ${x1}.`, en: `xCenter = ${xCenter} is left of the rectangle, so it clamps up to x1 = ${x1}.` }
-      : xCenter > x2
-        ? { vi: `xCenter = ${xCenter} nằm bên phải rectangle, nên bị kẹp xuống x2 = ${x2}.`, en: `xCenter = ${xCenter} is right of the rectangle, so it clamps down to x2 = ${x2}.` }
-        : { vi: `xCenter = ${xCenter} đã nằm trong [${x1}, ${x2}], nên giữ nguyên.`, en: `xCenter = ${xCenter} already lies in [${x1}, ${x2}], so it stays.` },
+    codeLine: 3,
+    title: { vi: `closest_x = max(${x1}, ${innerX}) = ${closestX}`, en: `closest_x = max(${x1}, ${innerX}) = ${closestX}` },
+    note: innerX < x1
+      ? { vi: `${innerX} còn nằm bên trái biên x1 = ${x1}, nên max đẩy nó lên ${closestX}.`, en: `${innerX} is still left of the edge x1 = ${x1}, so max pushes it up to ${closestX}.` }
+      : { vi: `${innerX} đã nằm trong [${x1}, ${x2}], nên max không đổi gì. Hoành độ gần nhất là ${closestX}.`, en: `${innerX} already lies in [${x1}, ${x2}], so max changes nothing. The closest x is ${closestX}.` },
   });
 
-  closestY = anchorY;
+  innerY = Math.min(yCenter, y2);
+  snapshot({
+    operation: "inner-y",
+    phaseIndex: 2,
+    codeLine: 4,
+    title: { vi: `inner_y = min(${yCenter}, ${y2}) = ${innerY}`, en: `inner_y = min(${yCenter}, ${y2}) = ${innerY}` },
+    note: yCenter > y2
+      ? { vi: `yCenter = ${yCenter} vượt quá cạnh trên, nên min kéo nó về y2 = ${y2}.`, en: `yCenter = ${yCenter} is above the top edge, so min pulls it back to y2 = ${y2}.` }
+      : { vi: `yCenter = ${yCenter} chưa vượt cạnh trên y2 = ${y2}, nên min giữ nguyên.`, en: `yCenter = ${yCenter} has not passed the top edge y2 = ${y2}, so min keeps it.` },
+  });
+
+  closestY = Math.max(y1, innerY);
   snapshot({
     operation: "closest-y",
     phaseIndex: 2,
-    codeLine: 3,
-    title: { vi: `closest_y = ${closestY}`, en: `closest_y = ${closestY}` },
-    note: yCenter < y1
-      ? { vi: `yCenter = ${yCenter} nằm dưới rectangle, nên bị kẹp lên y1 = ${y1}.`, en: `yCenter = ${yCenter} is below the rectangle, so it clamps up to y1 = ${y1}.` }
-      : yCenter > y2
-        ? { vi: `yCenter = ${yCenter} nằm trên rectangle, nên bị kẹp xuống y2 = ${y2}.`, en: `yCenter = ${yCenter} is above the rectangle, so it clamps down to y2 = ${y2}.` }
-        : { vi: `yCenter = ${yCenter} đã nằm trong [${y1}, ${y2}], nên giữ nguyên.`, en: `yCenter = ${yCenter} already lies in [${y1}, ${y2}], so it stays.` },
+    codeLine: 5,
+    title: { vi: `closest_y = max(${y1}, ${innerY}) = ${closestY}`, en: `closest_y = max(${y1}, ${innerY}) = ${closestY}` },
+    note: innerY < y1
+      ? { vi: `${innerY} còn nằm dưới cạnh y1 = ${y1}, nên max đẩy nó lên ${closestY}.`, en: `${innerY} is still below the edge y1 = ${y1}, so max pushes it up to ${closestY}.` }
+      : { vi: `${innerY} đã nằm trong [${y1}, ${y2}], nên max không đổi gì. Điểm gần nhất là (${closestX}, ${closestY}).`, en: `${innerY} already lies in [${y1}, ${y2}], so max changes nothing. The closest point is (${closestX}, ${closestY}).` },
   });
 
   dx = xCenter - closestX;
   snapshot({
     operation: "dx",
     phaseIndex: 3,
-    codeLine: 4,
-    title: { vi: `dx = ${dx}`, en: `dx = ${dx}` },
+    codeLine: 6,
+    title: { vi: `dx = ${xCenter} − ${closestX} = ${dx}`, en: `dx = ${xCenter} - ${closestX} = ${dx}` },
     note: dx === 0
       ? { vi: "Tâm circle thẳng hàng theo trục X với điểm gần nhất, nên dx = 0.", en: "The center is X-aligned with the closest point, so dx = 0." }
-      : { vi: `Khoảng lệch theo trục X giữa tâm và điểm gần nhất là ${Math.abs(dx)}.`, en: `The X gap between the center and the closest point is ${Math.abs(dx)}.` },
+      : { vi: `Khoảng lệch theo trục X giữa tâm và điểm gần nhất là ${Math.abs(dx)}. Dấu không quan trọng vì sau đó dx được bình phương.`, en: `The X gap between the center and the closest point is ${Math.abs(dx)}. The sign does not matter because dx gets squared.` },
   });
 
   dy = yCenter - closestY;
   snapshot({
     operation: "dy",
     phaseIndex: 3,
-    codeLine: 5,
-    title: { vi: `dy = ${dy}`, en: `dy = ${dy}` },
+    codeLine: 7,
+    title: { vi: `dy = ${yCenter} − ${closestY} = ${dy}`, en: `dy = ${yCenter} - ${closestY} = ${dy}` },
     note: dy === 0
       ? { vi: "Tâm circle thẳng hàng theo trục Y với điểm gần nhất, nên dy = 0.", en: "The center is Y-aligned with the closest point, so dy = 0." }
       : { vi: `Khoảng lệch theo trục Y giữa tâm và điểm gần nhất là ${Math.abs(dy)}.`, en: `The Y gap between the center and the closest point is ${Math.abs(dy)}.` },
   });
 
   distSq = dx * dx + dy * dy;
+  snapshot({
+    operation: "dist-squared",
+    phaseIndex: 3,
+    codeLine: 8,
+    title: { vi: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}`, en: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}` },
+    note: {
+      vi: `Pythagoras trên tam giác vuông dx–dy: đây là bình phương khoảng cách từ tâm tới điểm gần nhất (${closestX}, ${closestY}).`,
+      en: `Pythagoras on the dx-dy right triangle: this is the squared distance from the center to the closest point (${closestX}, ${closestY}).`,
+    },
+  });
+
+  radiusSq = radius * radius;
+  snapshot({
+    operation: "radius-squared",
+    phaseIndex: 4,
+    codeLine: 9,
+    title: { vi: `radius_squared = ${radius}² = ${radiusSq}`, en: `radius_squared = ${radius}² = ${radiusSq}` },
+    note: {
+      vi: "Bình phương bán kính để so sánh hai bình phương, tránh sqrt và tránh sai số dấu phẩy động.",
+      en: "Square the radius so two squares can be compared, avoiding sqrt and any floating point error.",
+    },
+  });
+
   answer = distSq <= radiusSq;
   snapshot({
     operation: "return",
     phaseIndex: 4,
-    codeLine: 6,
-    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    codeLine: 10,
+    title: { vi: `Trả về ${distSq} ≤ ${radiusSq} → ${answer}`, en: `Return ${distSq} <= ${radiusSq} -> ${answer}` },
     note: answer
       ? { vi: `${distSq} ≤ ${radiusSq}: điểm gần nhất của rectangle nằm trong circle, nên hai hình có điểm chung.`, en: `${distSq} <= ${radiusSq}: the rectangle's closest point lies inside the circle, so the shapes share a point.` }
       : { vi: `${distSq} > ${radiusSq}: ngay cả điểm gần nhất cũng ở ngoài circle, nên không có điểm chung.`, en: `${distSq} > ${radiusSq}: even the closest point is outside the circle, so no point is shared.` },
@@ -5577,17 +5634,24 @@ function buildSteps1401(input, params = {}) {
  * Per axis, measure how far the center overshoots the rectangle's slab. The
  * overshoot is 0 while the center projects inside the slab, so the same squared
  * distance falls out without naming the closest point.
+ *
+ * Both gaps are named before the max() so the trace can stop on each one and
+ * show why a negative gap always loses to the 0 in the middle.
  */
 function buildSteps1401Approach2(input, params = {}) {
   const { radius, xCenter, yCenter, rect } = parseCircleRectangle1401Input(input, params);
   const [x1, y1, x2, y2] = rect;
   const anchorX = Math.max(x1, Math.min(xCenter, x2));
   const anchorY = Math.max(y1, Math.min(yCenter, y2));
-  const radiusSq = radius * radius;
   const steps = [];
+  let leftGap = null;
+  let rightGap = null;
   let dx = null;
+  let bottomGap = null;
+  let topGap = null;
   let dy = null;
   let distSq = null;
+  let radiusSq = null;
   let answer = null;
 
   function snapshot({ operation, phaseIndex, codeLine, title, note, final = false }) {
@@ -5597,10 +5661,14 @@ function buildSteps1401Approach2(input, params = {}) {
       codeLines: [codeLine],
       final,
       vars: [
+        { name: "left_gap", value: leftGap ?? "—" },
+        { name: "right_gap", value: rightGap ?? "—" },
         { name: "dx", value: dx ?? "—" },
+        { name: "bottom_gap", value: bottomGap ?? "—" },
+        { name: "top_gap", value: topGap ?? "—" },
         { name: "dy", value: dy ?? "—" },
         { name: "dist_squared", value: distSq ?? "—" },
-        { name: "radius*radius", value: radiusSq },
+        { name: "radius_squared", value: radiusSq ?? "—" },
       ],
       circleRectangle1401View: {
         approach: 2,
@@ -5612,8 +5680,14 @@ function buildSteps1401Approach2(input, params = {}) {
         rect: [...rect],
         anchorX,
         anchorY,
+        innerX: null,
         closestX: null,
+        innerY: null,
         closestY: null,
+        leftGap,
+        rightGap,
+        bottomGap,
+        topGap,
         dx,
         dy,
         distSq,
@@ -5628,44 +5702,100 @@ function buildSteps1401Approach2(input, params = {}) {
     operation: "inputs",
     phaseIndex: 0,
     codeLine: 1,
-    title: { vi: "Nhận circle và rectangle", en: "Receive the circle and the rectangle" },
+    title: { vi: "Vào hàm với circle và rectangle", en: "Enter the function with the circle and the rectangle" },
     note: {
-      vi: `Thay vì tìm điểm gần nhất, cách này đo phần vượt ra của tâm trên từng trục.`,
+      vi: "Thay vì tìm điểm gần nhất, cách này đo phần vượt ra của tâm trên từng trục.",
       en: "Instead of locating the closest point, this approach measures how far the center overshoots each slab.",
     },
   });
 
-  dx = Math.max(x1 - xCenter, 0, xCenter - x2);
+  leftGap = x1 - xCenter;
+  snapshot({
+    operation: "left-gap",
+    phaseIndex: 1,
+    codeLine: 2,
+    title: { vi: `left_gap = ${x1} − ${xCenter} = ${leftGap}`, en: `left_gap = ${x1} - ${xCenter} = ${leftGap}` },
+    note: leftGap > 0
+      ? { vi: `Dương: tâm nằm bên trái rectangle, cách biên x1 đúng ${leftGap} đơn vị.`, en: `Positive: the center is left of the rectangle, ${leftGap} away from edge x1.` }
+      : { vi: "Không dương: tâm không nằm bên trái rectangle, nên phần vượt này không tính.", en: "Not positive: the center is not left of the rectangle, so this overshoot does not count." },
+  });
+
+  rightGap = xCenter - x2;
+  snapshot({
+    operation: "right-gap",
+    phaseIndex: 1,
+    codeLine: 3,
+    title: { vi: `right_gap = ${xCenter} − ${x2} = ${rightGap}`, en: `right_gap = ${xCenter} - ${x2} = ${rightGap}` },
+    note: rightGap > 0
+      ? { vi: `Dương: tâm nằm bên phải rectangle, cách biên x2 đúng ${rightGap} đơn vị.`, en: `Positive: the center is right of the rectangle, ${rightGap} away from edge x2.` }
+      : { vi: "Không dương: tâm không nằm bên phải rectangle.", en: "Not positive: the center is not right of the rectangle." },
+  });
+
+  dx = Math.max(leftGap, 0, rightGap);
   snapshot({
     operation: "dx",
     phaseIndex: 1,
-    codeLine: 2,
-    title: { vi: `dx = ${dx}`, en: `dx = ${dx}` },
+    codeLine: 4,
+    title: { vi: `dx = max(${leftGap}, 0, ${rightGap}) = ${dx}`, en: `dx = max(${leftGap}, 0, ${rightGap}) = ${dx}` },
     note: dx === 0
-      ? { vi: `xCenter = ${xCenter} nằm trong slab [${x1}, ${x2}], nên phần vượt bằng 0.`, en: `xCenter = ${xCenter} lies inside the slab [${x1}, ${x2}], so the overshoot is 0.` }
-      : { vi: `max(${x1} − ${xCenter}, 0, ${xCenter} − ${x2}) = ${dx}: tâm vượt ra khỏi slab X đúng ${dx} đơn vị.`, en: `max(${x1} - ${xCenter}, 0, ${xCenter} - ${x2}) = ${dx}: the center overshoots the X slab by ${dx}.` },
+      ? { vi: `Hai gap đều không dương, nên số 0 ở giữa thắng: xCenter = ${xCenter} nằm trong slab [${x1}, ${x2}].`, en: `Both gaps are non-positive, so the 0 in the middle wins: xCenter = ${xCenter} lies inside the slab [${x1}, ${x2}].` }
+      : { vi: `Tối đa một trong hai gap có thể dương, nên max chọn đúng phần vượt ${dx}.`, en: `At most one gap can be positive, so max picks exactly the overshoot ${dx}.` },
   });
 
-  dy = Math.max(y1 - yCenter, 0, yCenter - y2);
+  bottomGap = y1 - yCenter;
+  snapshot({
+    operation: "bottom-gap",
+    phaseIndex: 2,
+    codeLine: 5,
+    title: { vi: `bottom_gap = ${y1} − ${yCenter} = ${bottomGap}`, en: `bottom_gap = ${y1} - ${yCenter} = ${bottomGap}` },
+    note: bottomGap > 0
+      ? { vi: `Dương: tâm nằm dưới rectangle, cách cạnh y1 đúng ${bottomGap} đơn vị.`, en: `Positive: the center is below the rectangle, ${bottomGap} away from edge y1.` }
+      : { vi: "Không dương: tâm không nằm dưới rectangle.", en: "Not positive: the center is not below the rectangle." },
+  });
+
+  topGap = yCenter - y2;
+  snapshot({
+    operation: "top-gap",
+    phaseIndex: 2,
+    codeLine: 6,
+    title: { vi: `top_gap = ${yCenter} − ${y2} = ${topGap}`, en: `top_gap = ${yCenter} - ${y2} = ${topGap}` },
+    note: topGap > 0
+      ? { vi: `Dương: tâm nằm trên rectangle, cách cạnh y2 đúng ${topGap} đơn vị.`, en: `Positive: the center is above the rectangle, ${topGap} away from edge y2.` }
+      : { vi: "Không dương: tâm không nằm trên rectangle.", en: "Not positive: the center is not above the rectangle." },
+  });
+
+  dy = Math.max(bottomGap, 0, topGap);
   snapshot({
     operation: "dy",
     phaseIndex: 2,
-    codeLine: 3,
-    title: { vi: `dy = ${dy}`, en: `dy = ${dy}` },
+    codeLine: 7,
+    title: { vi: `dy = max(${bottomGap}, 0, ${topGap}) = ${dy}`, en: `dy = max(${bottomGap}, 0, ${topGap}) = ${dy}` },
     note: dy === 0
-      ? { vi: `yCenter = ${yCenter} nằm trong slab [${y1}, ${y2}], nên phần vượt bằng 0.`, en: `yCenter = ${yCenter} lies inside the slab [${y1}, ${y2}], so the overshoot is 0.` }
-      : { vi: `max(${y1} − ${yCenter}, 0, ${yCenter} − ${y2}) = ${dy}: tâm vượt ra khỏi slab Y đúng ${dy} đơn vị.`, en: `max(${y1} - ${yCenter}, 0, ${yCenter} - ${y2}) = ${dy}: the center overshoots the Y slab by ${dy}.` },
+      ? { vi: `Hai gap đều không dương, nên yCenter = ${yCenter} nằm trong slab [${y1}, ${y2}].`, en: `Both gaps are non-positive, so yCenter = ${yCenter} lies inside the slab [${y1}, ${y2}].` }
+      : { vi: `max chọn phần vượt ${dy} trên trục Y.`, en: `max picks the Y overshoot ${dy}.` },
   });
 
   distSq = dx * dx + dy * dy;
   snapshot({
     operation: "dist-squared",
     phaseIndex: 3,
-    codeLine: 4,
-    title: { vi: `dist_squared = ${distSq}`, en: `dist_squared = ${distSq}` },
+    codeLine: 8,
+    title: { vi: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}`, en: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}` },
     note: {
-      vi: `${dx}² + ${dy}² = ${distSq}. Đây là bình phương khoảng cách ngắn nhất từ tâm tới rectangle.`,
-      en: `${dx}² + ${dy}² = ${distSq}. This is the squared shortest distance from the center to the rectangle.`,
+      vi: `${square1401(dx)} + ${square1401(dy)} = ${distSq}. Đây là bình phương khoảng cách ngắn nhất từ tâm tới rectangle.`,
+      en: `${square1401(dx)} + ${square1401(dy)} = ${distSq}. This is the squared shortest distance from the center to the rectangle.`,
+    },
+  });
+
+  radiusSq = radius * radius;
+  snapshot({
+    operation: "radius-squared",
+    phaseIndex: 4,
+    codeLine: 9,
+    title: { vi: `radius_squared = ${radius}² = ${radiusSq}`, en: `radius_squared = ${radius}² = ${radiusSq}` },
+    note: {
+      vi: "So sánh hai bình phương nên không cần sqrt và kết quả luôn chính xác với số nguyên.",
+      en: "Comparing two squares avoids sqrt and stays exact for integers.",
     },
   });
 
@@ -5673,8 +5803,8 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "return",
     phaseIndex: 4,
-    codeLine: 5,
-    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    codeLine: 10,
+    title: { vi: `Trả về ${distSq} ≤ ${radiusSq} → ${answer}`, en: `Return ${distSq} <= ${radiusSq} -> ${answer}` },
     note: answer
       ? { vi: `${distSq} ≤ ${radiusSq}: rectangle chạm tới hoặc lấn vào circle.`, en: `${distSq} <= ${radiusSq}: the rectangle reaches into or touches the circle.` }
       : { vi: `${distSq} > ${radiusSq}: rectangle nằm hoàn toàn ngoài circle.`, en: `${distSq} > ${radiusSq}: the rectangle stays entirely outside the circle.` },
@@ -5717,10 +5847,10 @@ Object.assign(module.exports, {
       },
     ],
     approach: [
-      { vi: "Điểm của rectangle gần tâm circle nhất là điểm thu được khi kẹp tâm vào rectangle theo từng trục: closest_x = max(x1, min(xCenter, x2)) và tương tự cho Y.", en: "The rectangle point closest to the circle center is obtained by clamping the center per axis: closest_x = max(x1, min(xCenter, x2)), and likewise for Y." },
+      { vi: "Điểm của rectangle gần tâm circle nhất là điểm thu được khi kẹp tâm vào rectangle theo từng trục: min() chặn biên phải/trên, rồi max() chặn biên trái/dưới.", en: "The rectangle point closest to the circle center is obtained by clamping the center per axis: min() caps it at the right/top edge, then max() lifts it to the left/bottom edge." },
       { vi: "Hai trục độc lập nhau, nên có thể kẹp riêng từng trục rồi ghép lại thành một điểm duy nhất.", en: "The two axes are independent, so each can be clamped separately and recombined into a single point." },
-      { vi: "Hai hình có điểm chung khi và chỉ khi điểm gần nhất đó nằm trong circle: dx² + dy² ≤ radius². So sánh bình phương nên không cần sqrt và không mất chính xác.", en: "The shapes intersect exactly when that closest point is inside the circle: dx² + dy² <= radius². Comparing squares avoids sqrt and stays exact." },
-      { vi: "Cách 2 viết cùng phép tính theo dạng phần vượt: dx = max(x1 − xCenter, 0, xCenter − x2) bằng 0 khi tâm đã nằm trong slab X.", en: "Approach 2 expresses the same arithmetic as an overshoot: dx = max(x1 - xCenter, 0, xCenter - x2) is 0 while the center is already inside the X slab." },
+      { vi: "Hai hình có điểm chung khi và chỉ khi điểm gần nhất đó nằm trong circle: dist_squared ≤ radius_squared. So sánh bình phương nên không cần sqrt và không mất chính xác.", en: "The shapes intersect exactly when that closest point is inside the circle: dist_squared <= radius_squared. Comparing squares avoids sqrt and stays exact." },
+      { vi: "Cách 2 viết cùng phép tính theo dạng phần vượt: left_gap và right_gap, rồi dx = max(left_gap, 0, right_gap) bằng 0 khi tâm đã nằm trong slab X.", en: "Approach 2 expresses the same arithmetic as an overshoot: left_gap and right_gap, then dx = max(left_gap, 0, right_gap) is 0 while the center is already inside the X slab." },
     ],
     complexity: {
       time: "O(1)",
@@ -5730,23 +5860,34 @@ Object.assign(module.exports, {
         en: "Only a handful of min/max, subtraction, and multiplication operations; independent of radius or rectangle size.",
       },
     },
-    debugMode: "semantic",
+    // Every intermediate value is named on its own source line, so the trace is a
+    // faithful one-line-per-step walk and the debugger UI can break on any line.
+    debugMode: "line-by-line",
     code: [
       "class Solution:",
       "    def checkOverlap(self, radius: int, xCenter: int, yCenter: int, x1: int, y1: int, x2: int, y2: int) -> bool:",
-      "        closest_x = max(x1, min(xCenter, x2))",
-      "        closest_y = max(y1, min(yCenter, y2))",
+      "        inner_x = min(xCenter, x2)",
+      "        closest_x = max(x1, inner_x)",
+      "        inner_y = min(yCenter, y2)",
+      "        closest_y = max(y1, inner_y)",
       "        dx = xCenter - closest_x",
       "        dy = yCenter - closest_y",
-      "        return dx * dx + dy * dy <= radius * radius",
+      "        dist_squared = dx * dx + dy * dy",
+      "        radius_squared = radius * radius",
+      "        return dist_squared <= radius_squared",
     ],
     code2: [
       "class Solution:",
       "    def checkOverlap(self, radius: int, xCenter: int, yCenter: int, x1: int, y1: int, x2: int, y2: int) -> bool:",
-      "        dx = max(x1 - xCenter, 0, xCenter - x2)",
-      "        dy = max(y1 - yCenter, 0, yCenter - y2)",
+      "        left_gap = x1 - xCenter",
+      "        right_gap = xCenter - x2",
+      "        dx = max(left_gap, 0, right_gap)",
+      "        bottom_gap = y1 - yCenter",
+      "        top_gap = yCenter - y2",
+      "        dy = max(bottom_gap, 0, top_gap)",
       "        dist_squared = dx * dx + dy * dy",
-      "        return dist_squared <= radius * radius",
+      "        radius_squared = radius * radius",
+      "        return dist_squared <= radius_squared",
     ],
     codeLabel: { vi: "Cách 1: Kẹp tâm vào rectangle", en: "Approach 1: Clamp center into rectangle" },
     code2Label: { vi: "Cách 2: Phần vượt theo từng trục", en: "Approach 2: Per-axis overshoot" },

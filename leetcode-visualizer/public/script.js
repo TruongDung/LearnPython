@@ -34701,9 +34701,13 @@ function renderCircleRectangle1401View(step) {
   const [x1, y1, x2, y2] = rect;
   const anchorX = Number.isFinite(view.anchorX) ? Number(view.anchorX) : Math.max(x1, Math.min(xCenter, x2));
   const anchorY = Number.isFinite(view.anchorY) ? Number(view.anchorY) : Math.max(y1, Math.min(yCenter, y2));
-  const radiusSq = Number.isFinite(view.radiusSq) ? Number(view.radiusSq) : radius * radius;
+  // radius_squared is assigned by its own source line, so it stays unknown until then.
+  const radiusSq = Number.isFinite(view.radiusSq) ? Number(view.radiusSq) : null;
   const num = (value) => (Number.isFinite(value) ? String(value) : "?");
+  // A negative base needs parentheses: "-1²" would read as -(1²).
+  const sq = (value) => (Number.isFinite(value) ? (value < 0 ? `(${value})²` : `${value}²`) : "?²");
   const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const currentLine = (step.codeLines || [])[0];
 
   const labels = approach === 2
     ? vi
@@ -34773,13 +34777,18 @@ function renderCircleRectangle1401View(step) {
     : `A circle centered at (${xCenter}, ${yCenter}) with radius ${radius} and a rectangle from (${x1}, ${y1}) to (${x2}, ${y2}) on a coordinate plane.`;
   const plane = `<svg viewBox="0 0 660 300" role="img" aria-label="${escapeHtml(svgSummary)}"><rect class="cr1401-plane-bg" x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" rx="5"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top + plot.height}" x2="${plot.left + plot.width}" y2="${plot.top + plot.height}"/><line class="cr1401-axis" x1="${plot.left}" y1="${plot.top}" x2="${plot.left}" y2="${plot.top + plot.height}"/><text class="cr1401-axis-name" x="${plot.left + plot.width + 8}" y="${plot.top + plot.height + 4}">x</text><text class="cr1401-axis-name" x="${plot.left - 4}" y="${plot.top - 6}">y</text>${rectSvg}${circleSvg}${guides.join("")}${anchorSvg}</svg>`;
 
-  const axisCard = (axis, componentValue, lowBound, highBound, centerValue, clamped) => {
+  const axisCard = (axis, componentValue, lowBound, highBound, centerValue, inner, clamped, lowGap, highGap) => {
     const known = Number.isFinite(componentValue);
     const zero = known && componentValue === 0;
     const state = !known ? "pending" : zero ? "aligned" : "offset";
     const formula = approach === 2
-      ? `max(${lowBound} − ${centerValue}, 0, ${centerValue} − ${highBound})`
+      ? `max(${num(lowGap)}, 0, ${num(highGap)})`
       : `${centerValue} − ${num(clamped)}`;
+    // The intermediate that the previous source line produced, shown so the
+    // step-through makes the two-sided clamp / two-sided gap explicit.
+    const intermediate = approach === 2
+      ? `${axis === "X" ? "left_gap" : "bottom_gap"} = ${num(lowGap)} · ${axis === "X" ? "right_gap" : "top_gap"} = ${num(highGap)}`
+      : `${axis === "X" ? "inner_x" : "inner_y"} = ${num(inner)} → ${axis === "X" ? "closest_x" : "closest_y"} = ${num(clamped)}`;
     const headline = approach === 2
       ? (vi ? "phần vượt" : "overshoot")
       : (vi ? "khoảng lệch" : "gap");
@@ -34788,25 +34797,64 @@ function renderCircleRectangle1401View(step) {
       : zero
         ? (vi ? "TRONG SLAB · 0" : "INSIDE SLAB · 0")
         : (vi ? `LỆCH ${Math.abs(componentValue)}` : `OFF BY ${Math.abs(componentValue)}`);
-    return `<article class="cr1401-axis-card ${state}"><header><strong>${axis === "X" ? "dx" : "dy"}</strong><span>${escapeHtml(statusText)}</span></header><code>${escapeHtml(formula)}</code><div><small>${escapeHtml(vi ? "slab" : "slab")} [${lowBound}, ${highBound}]</small><b>${num(componentValue)}</b></div><footer><span>${escapeHtml(headline)} ${axis}</span><code>${axis === "X" ? "dx" : "dy"}² = ${known ? componentValue * componentValue : "?"}</code></footer></article>`;
+    return `<article class="cr1401-axis-card ${state}"><header><strong>${axis === "X" ? "dx" : "dy"}</strong><span>${escapeHtml(statusText)}</span></header><code>${escapeHtml(formula)}</code><em class="cr1401-axis-inter">${escapeHtml(intermediate)}</em><div><small>slab [${lowBound}, ${highBound}]</small><b>${num(componentValue)}</b></div><footer><span>${escapeHtml(headline)} ${axis}</span><code>${axis === "X" ? "dx" : "dy"}² = ${known ? componentValue * componentValue : "?"}</code></footer></article>`;
   };
 
-  const distKnown = Number.isFinite(view.distSq);
-  const compareState = !distKnown ? "pending" : view.distSq <= radiusSq ? "pass" : "fail";
-  const compareSymbol = !distKnown ? "?" : view.distSq <= radiusSq ? "≤" : ">";
+  // Debugger-style locals strip: every named variable, the source line that
+  // assigns it, and whether that line has executed yet.
+  const localRows = approach === 2
+    ? [
+      { name: "left_gap", line: 2, value: view.leftGap },
+      { name: "right_gap", line: 3, value: view.rightGap },
+      { name: "dx", line: 4, value: view.dx },
+      { name: "bottom_gap", line: 5, value: view.bottomGap },
+      { name: "top_gap", line: 6, value: view.topGap },
+      { name: "dy", line: 7, value: view.dy },
+      { name: "dist_squared", line: 8, value: view.distSq },
+      { name: "radius_squared", line: 9, value: view.radiusSq },
+    ]
+    : [
+      { name: "inner_x", line: 2, value: view.innerX },
+      { name: "closest_x", line: 3, value: view.closestX },
+      { name: "inner_y", line: 4, value: view.innerY },
+      { name: "closest_y", line: 5, value: view.closestY },
+      { name: "dx", line: 6, value: view.dx },
+      { name: "dy", line: 7, value: view.dy },
+      { name: "dist_squared", line: 8, value: view.distSq },
+      { name: "radius_squared", line: 9, value: view.radiusSq },
+    ];
+  const locals = localRows
+    .map((row) => {
+      const assigned = Number.isFinite(row.value);
+      const active = row.line === currentLine;
+      return `<span class="cr1401-local ${assigned ? "set" : "pending"}${active ? " active" : ""}"><small>L${row.line}</small><code>${row.name}</code><b>${num(row.value)}</b></span>`;
+    })
+    .join("");
+
+  // Both sides must have been assigned before the comparison can be shown.
+  const compareReady = Number.isFinite(view.distSq) && Number.isFinite(radiusSq);
+  const compareState = !compareReady ? "pending" : view.distSq <= radiusSq ? "pass" : "fail";
+  const compareSymbol = !compareReady ? "?" : view.distSq <= radiusSq ? "≤" : ">";
   const compare = `<section class="cr1401-compare ${compareState}"><header><strong>${vi ? "SO SÁNH BÌNH PHƯƠNG" : "SQUARED COMPARISON"}</strong><span>${escapeHtml(vi ? "không cần sqrt" : "no sqrt needed")}</span></header><div><article><small>dx² + dy²</small><b>${num(view.distSq)}</b></article><i>${compareSymbol}</i><article><small>radius²</small><b>${num(radiusSq)}</b></article></div><footer>${escapeHtml(vi ? "Khoảng cách ngắn nhất từ tâm tới rectangle phải không lớn hơn bán kính." : "The shortest distance from the center to the rectangle must not exceed the radius.")}</footer></section>`;
 
   const formulas = {
     inputs: `radius=${radius}, center=(${xCenter}, ${yCenter}), rect=[${rect.join(", ")}]`,
-    "closest-x": `closest_x = max(${x1}, min(${xCenter}, ${x2})) = ${num(view.closestX)}`,
-    "closest-y": `closest_y = max(${y1}, min(${yCenter}, ${y2})) = ${num(view.closestY)}`,
+    "inner-x": `inner_x = min(${xCenter}, ${x2}) = ${num(view.innerX)}`,
+    "closest-x": `closest_x = max(${x1}, ${num(view.innerX)}) = ${num(view.closestX)}`,
+    "inner-y": `inner_y = min(${yCenter}, ${y2}) = ${num(view.innerY)}`,
+    "closest-y": `closest_y = max(${y1}, ${num(view.innerY)}) = ${num(view.closestY)}`,
+    "left-gap": `left_gap = ${x1} - ${xCenter} = ${num(view.leftGap)}`,
+    "right-gap": `right_gap = ${xCenter} - ${x2} = ${num(view.rightGap)}`,
+    "bottom-gap": `bottom_gap = ${y1} - ${yCenter} = ${num(view.bottomGap)}`,
+    "top-gap": `top_gap = ${yCenter} - ${y2} = ${num(view.topGap)}`,
     dx: approach === 2
-      ? `dx = max(${x1} - ${xCenter}, 0, ${xCenter} - ${x2}) = ${num(view.dx)}`
+      ? `dx = max(${num(view.leftGap)}, 0, ${num(view.rightGap)}) = ${num(view.dx)}`
       : `dx = ${xCenter} - ${num(view.closestX)} = ${num(view.dx)}`,
     dy: approach === 2
-      ? `dy = max(${y1} - ${yCenter}, 0, ${yCenter} - ${y2}) = ${num(view.dy)}`
+      ? `dy = max(${num(view.bottomGap)}, 0, ${num(view.topGap)}) = ${num(view.dy)}`
       : `dy = ${yCenter} - ${num(view.closestY)} = ${num(view.dy)}`,
-    "dist-squared": `dist_squared = ${num(view.dx)}² + ${num(view.dy)}² = ${num(view.distSq)}`,
+    "dist-squared": `dist_squared = ${sq(view.dx)} + ${sq(view.dy)} = ${num(view.distSq)}`,
+    "radius-squared": `radius_squared = ${radius}² = ${num(radiusSq)}`,
     return: `${num(view.distSq)} <= ${num(radiusSq)} → ${view.answer === true ? "True" : view.answer === false ? "False" : "?"}`,
   };
 
@@ -34819,18 +34867,19 @@ function renderCircleRectangle1401View(step) {
     : vi
       ? `Bài 1401: kẹp tâm circle vào rectangle để tìm điểm gần nhất, rồi so bình phương khoảng cách với r².`
       : "Problem 1401: clamp the circle center into the rectangle to find the closest point, then compare the squared distance with r².";
-  const rule = `<section class="cr1401-rule"><span><b>1</b><code>${approach === 2 ? "dx = max(x1-xc, 0, xc-x2)" : "closest = clamp(center, rect)"}</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>dx² + dy² &le; r²</code></span></section>`;
+  const rule = `<section class="cr1401-rule"><span><b>1</b><code>${approach === 2 ? "dx = max(left_gap, 0, right_gap)" : "closest_x = max(x1, min(xc, x2))"}</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>dist_squared &le; radius_squared</code></span></section>`;
 
   $("treeView").innerHTML = `<section class="cr1401-viz" role="img" aria-label="${escapeHtml(summary)}">
     <header><div><small>GEOMETRY · ${approach === 2 ? "AXIS OVERSHOOT" : "CLAMP TO RECTANGLE"} · #1401</small><strong>CIRCLE AND RECTANGLE OVERLAPPING · ${approach === 2 ? "APPROACH 2" : "APPROACH 1"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="cr1401-phases">${phases}</div>
     ${rule}
     <section class="cr1401-plane"><header><strong>${vi ? "MẶT PHẲNG TỌA ĐỘ" : "COORDINATE PLANE"}</strong><span><i>${vi ? "circle" : "circle"}</i> · <em>rectangle</em> · <b>${vi ? "điểm gần nhất" : "closest point"}</b></span></header>${plane}</section>
-    <section class="cr1401-axis-checks">${axisCard("X", view.dx, x1, x2, xCenter, view.closestX)}${axisCard("Y", view.dy, y1, y2, yCenter, view.closestY)}</section>
+    <section class="cr1401-locals"><header><strong>${vi ? "BIẾN CỤC BỘ THEO TỪNG DÒNG" : "LOCALS BY SOURCE LINE"}</strong><span>${escapeHtml(vi ? "mờ = dòng chưa chạy · viền = dòng đang chạy" : "dimmed = line not run yet · outlined = current line")}</span></header><div>${locals}</div></section>
+    <section class="cr1401-axis-checks">${axisCard("X", view.dx, x1, x2, xCenter, view.innerX, view.closestX, view.leftGap, view.rightGap)}${axisCard("Y", view.dy, y1, y2, yCenter, view.innerY, view.closestY, view.bottomGap, view.topGap)}</section>
     ${compare}
     <section class="cr1401-operation"><header><strong>${vi ? "DÒNG ĐANG CHẠY" : "EXECUTING"}</strong><code>${escapeHtml(formulas[view.operation] || view.operation || "—")}</code></header><span>${escapeHtml(pick(step.note))}</span></section>
     <section class="cr1401-action"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong></section>
-    <footer class="cr1401-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>SHARE A POINT?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "điểm gần nhất của rectangle nằm trong circle" : "the rectangle's closest point lies inside the circle") : (vi ? "cả rectangle nằm ngoài circle" : "the whole rectangle stays outside the circle")) : (vi ? "cần dx² + dy² ≤ radius²" : "requires dx² + dy² ≤ radius²")}</span></footer>
+    <footer class="cr1401-result ${final ? (view.answer ? "yes" : "no") : ""}"><small>SHARE A POINT?</small><strong>${answerLabel}</strong><span>${final ? (view.answer ? (vi ? "điểm gần nhất của rectangle nằm trong circle" : "the rectangle's closest point lies inside the circle") : (vi ? "cả rectangle nằm ngoài circle" : "the whole rectangle stays outside the circle")) : (vi ? "cần dist_squared ≤ radius_squared" : "requires dist_squared ≤ radius_squared")}</span></footer>
   </section>`;
 }
 
