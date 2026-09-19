@@ -9012,9 +9012,455 @@ function buildSteps2791(input) {
   return { input, answer, steps: debugSteps };
 }
 
+// ─── 2096: Step-By-Step Directions From a Binary Tree Node to Another ───
+// Two root-to-node direction strings share a prefix exactly as far as the LCA.
+// Drop that prefix and the answer is "climb out of start, descend into dest".
+function buildSteps2096(input, params) {
+  const root = parseTreeEssentialsInput(input, { minValue: 1, maxValue: 100000, maxNodes: 31 });
+  const startValue = Number(params && params.startValue);
+  const destValue = Number(params && params.destValue);
+  if (!Number.isInteger(startValue) || !Number.isInteger(destValue)) {
+    throw new Error("startValue and destValue must be integers");
+  }
+  if (startValue === destValue) throw new Error("startValue and destValue must be different nodes");
+
+  const nodesById = new Map();
+  const nodesByValue = new Map();
+  (function collect(node) {
+    if (!node) return;
+    if (nodesByValue.has(node.val)) throw new Error("Tree values must be unique for problem 2096");
+    nodesById.set(node.id, node);
+    nodesByValue.set(node.val, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+  if (!nodesByValue.has(startValue) || !nodesByValue.has(destValue)) {
+    throw new Error("Both startValue and destValue must exist in the tree");
+  }
+
+  const startNode = nodesByValue.get(startValue);
+  const destNode = nodesByValue.get(destValue);
+  const steps = [];
+  const stages = [
+    { vi: "Path root → start", en: "Path root → start" },
+    { vi: "Path root → dest", en: "Path root → dest" },
+    { vi: "Bỏ tiền tố chung = LCA", en: "Drop the shared prefix = LCA" },
+    { vi: "Ghép U + phần còn lại", en: "Join U's with the rest" },
+  ];
+
+  // Walk state, rebuilt into the view on every step.
+  const callStack = [];
+  const trailNodes = [];
+  let letters = [];
+  let which = null;
+  let target = null;
+  let startPath = null;
+  let destPath = null;
+  let startPathIds = [];
+  let destPathIds = [];
+  let common = null;
+  let compareIndex = -1;
+  let compareResult = null;
+  let lcaNode = null;
+  let upCount = null;
+  let downLetters = null;
+  let answer = null;
+
+  const letterFromParent = new Map();
+  const stackState = () => callStack.map((frame) => ({
+    value: frame.node ? frame.node.val : "None",
+    side: frame.side,
+    stage: frame.stage,
+    trail: frame.trail.join("") || "(root)",
+    left: frame.leftReady ? (frame.left === null ? "None" : `[${frame.left.join(",")}]`) : "?",
+    right: frame.rightReady ? (frame.right === null ? "None" : `[${frame.right.join(",")}]`) : "?",
+  }));
+
+  const annotationsFor = (current) => {
+    const annotations = {};
+    for (const node of nodesById.values()) {
+      const labels = [];
+      if (node === startNode) labels.push({ label: `START ${startValue}`, kind: "dir2096-start" });
+      if (node === destNode) labels.push({ label: `DEST ${destValue}`, kind: "dir2096-dest" });
+      if (lcaNode && node === lcaNode) labels.push({ label: "LCA", kind: "dir2096-lca" });
+      if (current && node === current) labels.push({ label: "CURRENT", kind: "dir2096-current" });
+      if (labels.length) annotations[node.id] = { labels };
+    }
+    return annotations;
+  };
+
+  const pushStep = ({ stage, phase, event, title, note, line, current = null, final = false }) => {
+    const trailIds = new Set(trailNodes.map((node) => node.id));
+    const foundIds = new Set([...startPathIds, ...destPathIds]);
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: new Set([...foundIds, ...trailIds]),
+      annotations: annotationsFor(current),
+      codeLines: line ? [line] : [],
+      vars: [
+        { name: "target", value: target === null ? "—" : target },
+        { name: "trail", value: letters.length ? letters.join("") : '""' },
+        { name: "start_path", value: startPath ? `[${startPath.join(",")}]` : "—" },
+        { name: "dest_path", value: destPath ? `[${destPath.join(",")}]` : "—" },
+        { name: "common", value: common === null ? "—" : common },
+        { name: "answer", value: answer === null ? "—" : `"${answer}"` },
+      ],
+      note,
+    });
+    // Show the direction letter that reaches each node, right under the node.
+    treeStep.tree.nodes.forEach((vizNode) => {
+      const letter = letterFromParent.get(vizNode.id);
+      if (letter) vizNode.sub = letter;
+    });
+    treeStep.directions2096View = {
+      problemId: 2096,
+      stages,
+      stage,
+      phase,
+      event,
+      startValue,
+      destValue,
+      which,
+      target,
+      trail: [...letters],
+      current: current ? { id: current.id, value: current.val } : null,
+      startPath: startPath ? [...startPath] : null,
+      destPath: destPath ? [...destPath] : null,
+      common,
+      compareIndex,
+      compareResult,
+      lca: lcaNode ? { id: lcaNode.id, value: lcaNode.val } : null,
+      upCount,
+      downLetters: downLetters ? [...downLetters] : null,
+      answer,
+      stack: stackState(),
+      final,
+    };
+    treeStep.final = final;
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    stage: 0,
+    phase: "intro",
+    event: "rule",
+    title: { vi: `Đi từ ${startValue} tới ${destValue}`, en: `Travel from ${startValue} to ${destValue}` },
+    note: {
+      vi: "Trong cây chỉ có đúng một đường đi giữa hai node, và nó luôn qua LCA: leo lên tới LCA rồi đi xuống. Hai path từ root giống nhau đúng tới LCA, nên chỉ cần bỏ tiền tố chung.",
+      en: "A tree has exactly one route between two nodes and it always goes through the LCA: climb up to it, then descend. The two root paths agree exactly up to the LCA, so dropping the shared prefix is enough.",
+    },
+    line: 1,
+  });
+
+  // Mirrors path_to(node, target): one step per executed source line.
+  function pathTo(node, side) {
+    const frame = { node, side, stage: "enter", trail: [...letters], left: undefined, right: undefined, leftReady: false, rightReady: false };
+    callStack.push(frame);
+
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: node ? "check-null" : "is-null",
+      title: node
+        ? { vi: `path_to(${node.val}): node tồn tại`, en: `path_to(${node.val}): node exists` }
+        : { vi: `path_to(None) từ nhánh ${side}`, en: `path_to(None) from the ${side} branch` },
+      note: node
+        ? { vi: `Đang ở node ${node.val}, trail từ root là "${letters.join("") || "(rỗng)"}".`, en: `At node ${node.val}, the trail from the root is "${letters.join("") || "(empty)"}".` }
+        : { vi: "Nhánh rỗng: không thể chứa target.", en: "An empty branch cannot contain the target." },
+      line: 3,
+      current: node,
+    });
+
+    if (!node) {
+      frame.stage = "return-none";
+      pushStep({
+        stage: which === "start" ? 0 : 1,
+        phase: "walk",
+        event: "return-none",
+        title: { vi: "return None", en: "return None" },
+        note: { vi: "Trả None để cha biết nhánh này không có target.", en: "Return None so the parent knows this branch has no target." },
+        line: 4,
+      });
+      callStack.pop();
+      return null;
+    }
+
+    trailNodes.push(node);
+    frame.stage = "check-match";
+    const matched = node.val === target;
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: matched ? "match" : "no-match",
+      title: matched
+        ? { vi: `${node.val} == target ${target} ✓`, en: `${node.val} == target ${target} ✓` }
+        : { vi: `${node.val} ≠ target ${target}`, en: `${node.val} != target ${target}` },
+      note: matched
+        ? { vi: "Tìm thấy target; trả [] rồi để các cha gắn chữ cái vào đầu.", en: "Target found; return [] and let the ancestors prepend their letters." }
+        : { vi: `${node.val} không phải target, phải đi sâu hơn.`, en: `${node.val} is not the target, so descend further.` },
+      line: 5,
+      current: node,
+    });
+
+    if (matched) {
+      frame.stage = "return-empty";
+      pushStep({
+        stage: which === "start" ? 0 : 1,
+        phase: "walk",
+        event: "return-empty",
+        title: { vi: "return [] (danh sách rỗng)", en: "return [] (empty list)" },
+        note: {
+          vi: "Chú ý: [] là falsy trong Python. Vì vậy mọi phép kiểm tra phía trên đều dùng `is not None`, không dùng `if left:`.",
+          en: "Careful: [] is falsy in Python. That is why every check above uses `is not None` rather than `if left:`.",
+        },
+        line: 6,
+        current: node,
+      });
+      trailNodes.pop();
+      callStack.pop();
+      return [];
+    }
+
+    frame.stage = "call-left";
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: "call-left",
+      title: { vi: `Thử nhánh trái của ${node.val}`, en: `Try the left branch of ${node.val}` },
+      note: { vi: "Đi xuống bên trái trước; nếu thất bại mới thử bên phải.", en: "Descend left first; only try right if that fails." },
+      line: 7,
+      current: node,
+    });
+    letters.push("L");
+    if (node.left) letterFromParent.set(node.left.id, "L");
+    const left = pathTo(node.left, "left");
+    letters.pop();
+    frame.left = left;
+    frame.leftReady = true;
+    frame.stage = "left-return";
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: left === null ? "left-miss" : "left-hit",
+      title: left === null
+        ? { vi: `Trái của ${node.val} trả None`, en: `${node.val}'s left returned None` }
+        : { vi: `Trái của ${node.val} trả [${left.join(",")}]`, en: `${node.val}'s left returned [${left.join(",")}]` },
+      note: left === null
+        ? { vi: "`left is not None` là False, nên bỏ qua nhánh trái.", en: "`left is not None` is False, so skip the left branch." }
+        : { vi: "`left is not None` là True kể cả khi list rỗng — đó là lý do phải so với None.", en: "`left is not None` is True even for an empty list — exactly why the check compares against None." },
+      line: 8,
+      current: node,
+    });
+
+    if (left !== null) {
+      const result = ["L", ...left];
+      frame.stage = "return-left";
+      pushStep({
+        stage: which === "start" ? 0 : 1,
+        phase: "walk",
+        event: "return-left",
+        title: { vi: `return ["L"] + [${left.join(",")}] = [${result.join(",")}]`, en: `return ["L"] + [${left.join(",")}] = [${result.join(",")}]` },
+        note: { vi: "Gắn 'L' vào ĐẦU để chuỗi luôn đọc từ root đi xuống.", en: "Prepend 'L' so the list always reads from the root downward." },
+        line: 9,
+        current: node,
+      });
+      trailNodes.pop();
+      callStack.pop();
+      return result;
+    }
+
+    frame.stage = "call-right";
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: "call-right",
+      title: { vi: `Thử nhánh phải của ${node.val}`, en: `Try the right branch of ${node.val}` },
+      note: { vi: "Nhánh trái không có target, chuyển sang phải.", en: "The left branch has no target, so move to the right." },
+      line: 10,
+      current: node,
+    });
+    letters.push("R");
+    if (node.right) letterFromParent.set(node.right.id, "R");
+    const right = pathTo(node.right, "right");
+    letters.pop();
+    frame.right = right;
+    frame.rightReady = true;
+    frame.stage = "right-return";
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: right === null ? "right-miss" : "right-hit",
+      title: right === null
+        ? { vi: `Phải của ${node.val} trả None`, en: `${node.val}'s right returned None` }
+        : { vi: `Phải của ${node.val} trả [${right.join(",")}]`, en: `${node.val}'s right returned [${right.join(",")}]` },
+      note: right === null
+        ? { vi: "Cả hai nhánh đều không có target.", en: "Neither branch contains the target." }
+        : { vi: "Nhánh phải tìm được đường tới target.", en: "The right branch found a route to the target." },
+      line: 11,
+      current: node,
+    });
+
+    if (right !== null) {
+      const result = ["R", ...right];
+      frame.stage = "return-right";
+      pushStep({
+        stage: which === "start" ? 0 : 1,
+        phase: "walk",
+        event: "return-right",
+        title: { vi: `return ["R"] + [${right.join(",")}] = [${result.join(",")}]`, en: `return ["R"] + [${right.join(",")}] = [${result.join(",")}]` },
+        note: { vi: "Gắn 'R' vào đầu, giống nhánh trái.", en: "Prepend 'R', mirroring the left branch." },
+        line: 12,
+        current: node,
+      });
+      trailNodes.pop();
+      callStack.pop();
+      return result;
+    }
+
+    frame.stage = "dead-end";
+    pushStep({
+      stage: which === "start" ? 0 : 1,
+      phase: "walk",
+      event: "dead-end",
+      title: { vi: `Cây con tại ${node.val} không có target → return None`, en: `The subtree at ${node.val} has no target → return None` },
+      note: { vi: "Quay lui để cha thử nhánh khác.", en: "Backtrack so the parent can try another branch." },
+      line: 13,
+      current: node,
+    });
+    trailNodes.pop();
+    callStack.pop();
+    return null;
+  }
+
+  const idsAlong = (path) => {
+    const ids = [root.id];
+    let node = root;
+    for (const letter of path) {
+      node = letter === "L" ? node.left : node.right;
+      ids.push(node.id);
+    }
+    return ids;
+  };
+
+  which = "start";
+  target = startValue;
+  letters = [];
+  startPath = pathTo(root, "root");
+  startPathIds = idsAlong(startPath);
+  pushStep({
+    stage: 0,
+    phase: "start-done",
+    event: "start-path",
+    title: { vi: `start_path = [${startPath.join(",")}]`, en: `start_path = [${startPath.join(",")}]` },
+    note: {
+      vi: `Từ root đi "${startPath.join("") || "(không bước nào)"}" là tới ${startValue}.`,
+      en: `Walking "${startPath.join("") || "(no steps)"}" from the root reaches ${startValue}.`,
+    },
+    line: 14,
+    current: startNode,
+  });
+
+  which = "dest";
+  target = destValue;
+  letters = [];
+  destPath = pathTo(root, "root");
+  destPathIds = idsAlong(destPath);
+  pushStep({
+    stage: 1,
+    phase: "dest-done",
+    event: "dest-path",
+    title: { vi: `dest_path = [${destPath.join(",")}]`, en: `dest_path = [${destPath.join(",")}]` },
+    note: {
+      vi: `Từ root đi "${destPath.join("") || "(không bước nào)"}" là tới ${destValue}.`,
+      en: `Walking "${destPath.join("") || "(no steps)"}" from the root reaches ${destValue}.`,
+    },
+    line: 15,
+    current: destNode,
+  });
+
+  which = null;
+  target = null;
+  common = 0;
+  lcaNode = root;
+  pushStep({
+    stage: 2,
+    phase: "common",
+    event: "common-init",
+    title: { vi: "common = 0", en: "common = 0" },
+    note: {
+      vi: "common đếm số bước giống nhau ở đầu hai path. Ở bước 0, cả hai đều đang đứng tại root, nên LCA tạm thời là root.",
+      en: "common counts how many leading steps the two paths share. At 0 both still sit at the root, so the LCA so far is the root.",
+    },
+    line: 16,
+    current: root,
+  });
+
+  while (true) {
+    const inRange = common < startPath.length && common < destPath.length;
+    const sameLetter = inRange && startPath[common] === destPath[common];
+    compareIndex = common;
+    compareResult = sameLetter;
+    pushStep({
+      stage: 2,
+      phase: "common",
+      event: sameLetter ? "compare-same" : "compare-stop",
+      title: !inRange
+        ? { vi: `Hết path tại common = ${common} → dừng`, en: `A path ended at common = ${common} → stop` }
+        : sameLetter
+          ? { vi: `Bước ${common}: '${startPath[common]}' == '${destPath[common]}' → còn chung`, en: `Step ${common}: '${startPath[common]}' == '${destPath[common]}' → still shared` }
+          : { vi: `Bước ${common}: '${startPath[common]}' ≠ '${destPath[common]}' → rẽ nhánh`, en: `Step ${common}: '${startPath[common]}' != '${destPath[common]}' → the paths split` },
+      note: !inRange
+        ? { vi: "Một path là tiền tố của path kia, nghĩa là một node là tổ tiên của node kia và LCA chính là node đó.", en: "One path is a prefix of the other, so one node is an ancestor of the other and it is the LCA itself." }
+        : sameLetter
+          ? { vi: "Hai đường vẫn đi cùng một bước, nên LCA còn ở sâu hơn.", en: "Both routes still take the same step, so the LCA lies deeper." }
+          : { vi: "Đây là chỗ hai đường tách nhau, nên node hiện tại chính là LCA.", en: "This is where the routes diverge, so the current node is the LCA." },
+      line: 17,
+      current: lcaNode,
+    });
+    if (!inRange || !sameLetter) break;
+
+    common += 1;
+    lcaNode = nodesById.get(startPathIds[common]);
+    pushStep({
+      stage: 2,
+      phase: "common",
+      event: "common-advance",
+      title: { vi: `common = ${common}`, en: `common = ${common}` },
+      note: {
+        vi: `Tiến thêm một bước chung; LCA tạm thời giờ là ${lcaNode.val}.`,
+        en: `Advance one shared step; the LCA so far is now ${lcaNode.val}.`,
+      },
+      line: 18,
+      current: lcaNode,
+    });
+  }
+
+  compareIndex = -1;
+  compareResult = null;
+  upCount = startPath.length - common;
+  downLetters = destPath.slice(common);
+  answer = "U".repeat(upCount) + downLetters.join("");
+  pushStep({
+    stage: 3,
+    phase: "answer",
+    event: "answer",
+    title: { vi: `Đáp án = "${answer}"`, en: `Answer = "${answer}"` },
+    note: {
+      vi: `Còn ${upCount} bước từ ${startValue} lên LCA ${lcaNode.val} → ${upCount} chữ 'U'; rồi đi xuống "${downLetters.join("") || "(không bước nào)"}" là tới ${destValue}.`,
+      en: `${upCount} steps remain from ${startValue} up to LCA ${lcaNode.val} → ${upCount} 'U' letters; then descending "${downLetters.join("") || "(no steps)"}" reaches ${destValue}.`,
+    },
+    line: 19,
+    current: lcaNode,
+    final: true,
+  });
+
+  return { input, answer, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 545, 549, 742, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 545, 549, 742, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 2096, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -9762,6 +10208,67 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần.", en: "Visit each node once." } },
     code: ["class Solution:", "    def lowestCommonAncestor(self, root, p, q):", "        if not root:", "            return None", "        if root == p or root == q:", "            return root", "        left = self.lowestCommonAncestor(root.left, p, q)", "        right = self.lowestCommonAncestor(root.right, p, q)", "        if left and right:", "            return root", "        return left or right"],
     builder: buildSteps236,
+  },
+  2096: {
+    id: 2096, difficulty: "medium", slug: "step-by-step-directions-from-a-binary-tree-node-to-another",
+    category: TREE_CAT,
+    tags: [
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "lowest-common-ancestor", vi: "Lowest Common Ancestor", en: "Lowest Common Ancestor" },
+      { key: "string", vi: "Chuỗi", en: "String" },
+    ],
+    title: { vi: "Step-By-Step Directions From a Binary Tree Node to Another", en: "Step-By-Step Directions From a Binary Tree Node to Another" },
+    titleVi: { vi: "Chỉ đường giữa hai node bằng U/L/R", en: "Directions between two nodes using U/L/R" },
+    statement: {
+      vi: "Cho root của cây nhị phân có các giá trị đôi một khác nhau, cùng startValue và destValue. Trả về chuỗi ngắn nhất gồm 'L' (sang con trái), 'R' (sang con phải) và 'U' (lên cha) để đi từ node start tới node dest.",
+      en: "Given the root of a binary tree with unique values, plus startValue and destValue, return the shortest string of 'L' (go to the left child), 'R' (go to the right child), and 'U' (go to the parent) that walks from the start node to the dest node.",
+    },
+    defaultInput: "5,1,2,3,null,6,4",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; giá trị duy nhất)", en: "Tree (level-order; unique values)" },
+    extraParams: [
+      { key: "startValue", label: { vi: "startValue", en: "startValue" }, default: 3, min: 1 },
+      { key: "destValue", label: { vi: "destValue", en: "destValue" }, default: 6, min: 1 },
+    ],
+    approach: [
+      { vi: "Trong cây chỉ có đúng một đường đi giữa hai node, và nó bắt buộc đi qua LCA: leo lên tới LCA rồi đi xuống. Nên chỉ cần biết đường từ root tới từng node.", en: "A tree has exactly one route between two nodes and it must pass through their LCA: climb up to it, then descend. So it is enough to know the route from the root to each node." },
+      { vi: "path_to(node, target) trả về danh sách 'L'/'R' từ root xuống target, hoặc None nếu cây con không chứa target. Khi tìm thấy thì trả [] và các node cha gắn chữ cái của mình vào ĐẦU danh sách.", en: "path_to(node, target) returns the list of 'L'/'R' steps from the root down to target, or None when the subtree has no target. On a hit it returns [] and each ancestor prepends its own letter." },
+      { vi: "Hai path từ root giống nhau đúng tới LCA rồi tách ra. Vì vậy độ dài tiền tố chung chính là độ sâu của LCA — không cần chạy thuật toán LCA riêng.", en: "The two root paths agree exactly as far as the LCA and then diverge. The length of the shared prefix is therefore the LCA's depth — no separate LCA pass is needed." },
+      { vi: "Bỏ tiền tố chung: phần còn lại của start_path chỉ cần biết ĐỘ DÀI (mỗi bước thành một chữ 'U', vì leo lên thì không cần biết trái hay phải), còn phần còn lại của dest_path giữ nguyên chữ cái.", en: "Drop the shared prefix: only the LENGTH of the leftover start_path matters (each step becomes one 'U', since climbing up needs no left/right), while the leftover dest_path keeps its letters." },
+      { vi: "Bẫy cài trong code: khi tìm thấy target, hàm trả [] — mà [] là falsy trong Python. Nếu viết `if left:` thì trường hợp target nằm ngay tại node con sẽ bị bỏ sót, nên phải dùng `if left is not None:`.", en: "The trap hiding in the code: a hit returns [], and [] is falsy in Python. Writing `if left:` would silently miss the case where the target is the child itself, so the check must be `if left is not None:`." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi lần path_to thăm mỗi node tối đa một lần → O(n); chạy hai lần vẫn là O(n). Bộ nhớ O(n) cho hai danh sách hướng đi cộng ngăn xếp đệ quy sâu tối đa O(h).",
+        en: "Each path_to visits every node at most once → O(n); running it twice is still O(n). Space is O(n) for the two direction lists plus a recursion stack of depth O(h).",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "class Solution:",
+      "    def getDirections(self, root, startValue: int, destValue: int) -> str:",
+      "        def path_to(node, target):",
+      "            if not node:",
+      "                return None",
+      "            if node.val == target:",
+      "                return []",
+      "            left = path_to(node.left, target)",
+      "            if left is not None:",
+      "                return [\"L\"] + left",
+      "            right = path_to(node.right, target)",
+      "            if right is not None:",
+      "                return [\"R\"] + right",
+      "            return None",
+      "        start_path = path_to(root, startValue)",
+      "        dest_path = path_to(root, destValue)",
+      "        common = 0",
+      "        while common < len(start_path) and common < len(dest_path) and start_path[common] == dest_path[common]:",
+      "            common += 1",
+      "        return \"U\" * (len(start_path) - common) + \"\".join(dest_path[common:])",
+    ],
+    builder: buildSteps2096,
   },
   1644: {
     id: 1644, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree-ii",

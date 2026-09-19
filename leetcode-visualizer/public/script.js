@@ -35021,6 +35021,125 @@ function renderCircleRectangle1401RegionView(step) {
   </section>`;
 }
 
+function renderDirections2096View(step) {
+  const view = step.directions2096View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  const startPath = Array.isArray(view.startPath) ? view.startPath : null;
+  const destPath = Array.isArray(view.destPath) ? view.destPath : null;
+  const common = Number.isInteger(view.common) ? view.common : null;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : -1;
+
+  // One row of L/R cells. Cells before `common` are the shared walk down to the
+  // LCA; the cell under the cursor is the pair being compared right now.
+  const pathRow = (path, tone) => {
+    if (!path) return `<b class="dir2096-empty">${vi ? "chưa tính" : "not computed yet"}</b>`;
+    if (!path.length) return `<b class="dir2096-empty">[] · ${vi ? "chính là root" : "this is the root"}</b>`;
+    return path
+      .map((letter, index) => {
+        const classes = [];
+        if (common !== null && index < common) classes.push("shared");
+        else if (common !== null) classes.push(tone);
+        if (index === compareIndex) classes.push("compare");
+        return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(letter)}</strong></span>`;
+      })
+      .join("");
+  };
+
+  const compareCard = (() => {
+    if (common === null) {
+      return `<p class="dir2096-compare-note">${escapeHtml(vi ? "Cần cả hai path trước khi so tiền tố." : "Both paths are needed before comparing prefixes.")}</p>`;
+    }
+    if (compareIndex < 0) {
+      return `<p class="dir2096-compare-note">${escapeHtml(vi ? `Tiền tố chung dài ${common} bước — đó chính là đường xuống LCA.` : `The shared prefix is ${common} steps long — that is the walk down to the LCA.`)}</p>`;
+    }
+    const left = startPath && compareIndex < startPath.length ? startPath[compareIndex] : null;
+    const right = destPath && compareIndex < destPath.length ? destPath[compareIndex] : null;
+    const ended = left === null || right === null;
+    const same = view.compareResult === true;
+    const symbol = ended ? "∅" : same ? "==" : "≠";
+    const verdict = ended
+      ? (vi ? "Một path đã hết → dừng" : "One path ran out → stop")
+      : same
+        ? (vi ? "Giống nhau → đi sâu thêm" : "Same → go deeper")
+        : (vi ? "Khác nhau → đây là LCA" : "Different → this is the LCA");
+    return `<div class="dir2096-compare-row ${ended ? "ended" : same ? "same" : "split"}"><span><small>start[${compareIndex}]</small><strong>${escapeHtml(left ?? "∅")}</strong></span><b>${symbol}</b><span><small>dest[${compareIndex}]</small><strong>${escapeHtml(right ?? "∅")}</strong></span><em>${escapeHtml(verdict)}</em></div>`;
+  })();
+
+  const answerCells = (() => {
+    if (view.answer === null || view.answer === undefined) {
+      return `<b class="dir2096-empty">${vi ? "chưa ghép" : "not assembled yet"}</b>`;
+    }
+    if (view.answer === "") return `<b class="dir2096-empty">""</b>`;
+    const upCount = Number.isInteger(view.upCount) ? view.upCount : 0;
+    return [...String(view.answer)]
+      .map((letter, index) => `<span class="${index < upCount ? "up" : "down"}"><small>${index}</small><strong>${escapeHtml(letter)}</strong></span>`)
+      .join("");
+  })();
+
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackHtml = stack.length
+    ? stack
+      .map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(`${frame.side} · trail=${frame.trail}`)}</small><em>${escapeHtml(frame.stage)}</em></li>`)
+      .join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+
+  const searching = view.which === "start" ? (vi ? "start" : "start") : view.which === "dest" ? "dest" : null;
+  const trail = Array.isArray(view.trail) ? view.trail.join("") : "";
+  const tone = view.event === "answer"
+    ? "done"
+    : view.event === "compare-stop"
+      ? "split"
+      : view.event && String(view.event).endsWith("-hit") || view.event === "match"
+        ? "hit"
+        : "";
+
+  const summary = vi
+    ? `Bài 2096, ${text(step.title)}. Đi từ ${view.startValue} tới ${view.destValue}.`
+    : `Problem 2096, ${text(step.title)}. Travelling from ${view.startValue} to ${view.destValue}.`;
+
+  $("treeView").innerHTML = `<section class="dir2096-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>BINARY TREE · ROOT PATHS + SHARED PREFIX · #2096</small><strong>STEP-BY-STEP DIRECTIONS · ${escapeHtml(String(view.startValue))} → ${escapeHtml(String(view.destValue))}</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="dir2096-phases">${phases}</div>
+    <section class="dir2096-rule"><span><b>1</b><code>${escapeHtml(vi ? "tiền tố chung = đường xuống LCA" : "shared prefix = walk down to the LCA")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>"U" × (len(start_path) − common) + dest_path[common:]</code></span></section>
+    <section class="dir2096-action ${tone}"><span><small>${escapeHtml(String(view.event || "walk").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${searching ? `${vi ? "đang tìm" : "looking for"} ${searching} = ${escapeHtml(String(view.target))}` : `ANSWER: ${escapeHtml(view.answer === null || view.answer === undefined ? "—" : `"${view.answer}"`)}`}</em></section>
+    <div class="dir2096-layout">
+      <section class="dir2096-tree-card"><header><strong>${vi ? "CÂY · CHỮ DƯỚI NODE LÀ BƯỚC TỪ CHA" : "TREE · THE LETTER UNDER A NODE IS THE STEP FROM ITS PARENT"}</strong><span>${vi ? "cam = node hiện tại · xanh = trên path" : "amber = current node · green = on a path"}</span></header><div id="dir2096Tree" class="dir2096-tree"></div></section>
+      <aside class="dir2096-side">
+        <section class="dir2096-stats"><div><small>${vi ? "ĐANG TÌM" : "LOOKING FOR"}</small><strong>${escapeHtml(view.target === null || view.target === undefined ? "—" : view.target)}</strong></div><div><small>NODE</small><strong>${escapeHtml(view.current ? view.current.value : "—")}</strong></div><div><small>TRAIL</small><strong>${escapeHtml(trail || '""')}</strong></div><div><small>LCA</small><strong>${escapeHtml(view.lca ? view.lca.value : "—")}</strong></div></section>
+        <section class="dir2096-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+      </aside>
+    </div>
+    <section class="dir2096-paths">
+      <header><strong>${vi ? "HAI ĐƯỜNG TỪ ROOT" : "THE TWO ROOT PATHS"}</strong><span>${vi ? "ô xám = tiền tố chung (tới LCA) · ô màu = phần riêng" : "grey cells = shared prefix (down to the LCA) · coloured cells = the leftover"}</span></header>
+      <div class="dir2096-path-row"><small>start_path · ${escapeHtml(String(view.startValue))}</small><div>${pathRow(startPath, "from-start")}</div></div>
+      <div class="dir2096-path-row"><small>dest_path · ${escapeHtml(String(view.destValue))}</small><div>${pathRow(destPath, "to-dest")}</div></div>
+      <footer>common = <b>${escapeHtml(common === null ? "—" : common)}</b>${compareCard}</footer>
+    </section>
+    <section class="dir2096-answer ${view.final ? "ready" : ""}">
+      <header><strong>${vi ? "GHÉP ĐÁP ÁN" : "ASSEMBLE THE ANSWER"}</strong><span>${vi ? "tím = leo lên (U) · xanh = đi xuống (L/R)" : "purple = climb up (U) · green = descend (L/R)"}</span></header>
+      <div class="dir2096-answer-parts"><span class="up"><small>${vi ? "LEO LÊN" : "CLIMB UP"}</small><strong>${escapeHtml(Number.isInteger(view.upCount) ? `${view.upCount} × U` : "—")}</strong></span><i>+</i><span class="down"><small>${vi ? "ĐI XUỐNG" : "DESCEND"}</small><strong>${escapeHtml(Array.isArray(view.downLetters) ? (view.downLetters.join("") || "(∅)") : "—")}</strong></span></div>
+      <div class="dir2096-answer-cells">${answerCells}</div>
+    </section>
+    <section class="dir2096-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+
+  if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "dir2096Tree");
+  else $("dir2096Tree").innerHTML = `<span class="dir2096-tree-empty">∅</span>`;
+}
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -35589,6 +35708,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLca236View(step);
+  } else if (step.directions2096View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDirections2096View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
