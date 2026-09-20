@@ -35140,6 +35140,77 @@ function renderDirections2096View(step) {
   if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "dir2096Tree");
   else $("dir2096Tree").innerHTML = `<span class="dir2096-tree-empty">∅</span>`;
 }
+function renderReverseDegree3498View(step) {
+  const view = step.reverseDegree3498View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const num = (value) => (Number.isFinite(value) ? String(value) : "?");
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  const cells = Array.isArray(view.cells) ? view.cells : [];
+  const hasChar = typeof view.char === "string" && view.char.length === 1;
+  const alphaIndex = Number.isInteger(view.alphaIndex) ? view.alphaIndex : null;
+  const reversePosition = Number.isInteger(view.reversePosition) ? view.reversePosition : null;
+
+  // The reversed alphabet itself: the single mapping the whole problem rests on.
+  const ruler = Array.from({ length: 26 }, (_unused, rank) => {
+    const letter = String.fromCharCode(97 + rank);
+    const value = 26 - rank;
+    const active = hasChar && letter === view.char;
+    return `<span class="${active ? "active" : ""}"><b>${letter}</b><small>${value}</small></span>`;
+  }).join("");
+
+  const charCells = cells.length
+    ? cells
+      .map((cell) => `<span class="rd3498-cell ${cell.state}"><small>${cell.position}</small><strong>${escapeHtml(cell.char)}</strong><em>${cell.reversePosition === null ? "·" : `×${cell.reversePosition}`}</em><b>${cell.product === null ? "?" : cell.product}</b></span>`)
+      .join("")
+    : `<b class="rd3498-empty">∅</b>`;
+
+  // Substitution for the character being handled right now.
+  const substitution = hasChar
+    ? `<div class="rd3498-substitution"><span><small>ord('${escapeHtml(view.char)}') − ord('a')</small><strong>${num(alphaIndex)}</strong></span><i>→</i><span><small>26 − ${num(alphaIndex)}</small><strong>${num(reversePosition)}</strong></span><i>×</i><span><small>${vi ? "vị trí" : "position"}</small><strong>${num(view.position)}</strong></span><i>=</i><span class="result"><small>${vi ? "đóng góp" : "contribution"}</small><strong>${view.product === null || view.product === undefined ? "?" : view.product}</strong></span></div>`
+    : `<p class="rd3498-substitution-idle">${escapeHtml(vi ? "Chưa có ký tự nào đang được xử lý." : "No character is being handled right now.")}</p>`;
+
+  // The two classic off-by-one formulas, shown against the correct one.
+  const guard = hasChar && alphaIndex !== null
+    ? `<section class="rd3498-guard"><header><strong>${vi ? "BẪY LỆCH MỘT ĐƠN VỊ" : "THE OFF-BY-ONE TRAP"}</strong><span>${escapeHtml(vi ? `với '${view.char}', chỉ một công thức cho đúng` : `for '${view.char}', only one formula is right`)}</span></header><div><span class="bad"><code>25 − ${alphaIndex}</code><b>${25 - alphaIndex}</b><em>✕ ${vi ? "'z' thành 0" : "'z' becomes 0"}</em></span><span class="good"><code>26 − ${alphaIndex}</code><b>${26 - alphaIndex}</b><em>✓ ${vi ? "'a'=26, 'z'=1" : "'a'=26, 'z'=1"}</em></span><span class="bad"><code>27 − ${alphaIndex}</code><b>${27 - alphaIndex}</b><em>✕ ${vi ? "'a' thành 27" : "'a' becomes 27"}</em></span></div></section>`
+    : "";
+
+  const terms = Array.isArray(view.terms) ? view.terms : [];
+  const sumExpression = terms.length
+    ? terms
+      .map((termValue, index) => `<span class="${index === terms.length - 1 ? "fresh" : ""}">${termValue}</span>${index < terms.length - 1 ? "<i>+</i>" : ""}`)
+      .join("")
+    : `<b class="rd3498-empty">${escapeHtml(vi ? "chưa có số hạng" : "no terms yet")}</b>`;
+
+  const tone = view.event === "return" ? "done" : view.event === "accumulate" ? "add" : view.event === "reverse-value" ? "value" : "";
+  const summary = vi
+    ? `Bài 3498, chuỗi "${view.s}". ${text(step.title)}`
+    : `Problem 3498, string "${view.s}". ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="rd3498-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>STRING · WEIGHTED SUM · #3498</small><strong>REVERSE DEGREE · "${escapeHtml(String(view.s ?? ""))}"</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="rd3498-phases">${phases}</div>
+    <section class="rd3498-rule"><span><b>1</b><code>${escapeHtml(vi ? "bảng chữ cái đảo: 'a'=26 … 'z'=1" : "reversed alphabet: 'a'=26 … 'z'=1")}</code></span><i>${vi ? "RỒI" : "THEN"}</i><span><b>2</b><code>total += position × reverse_position</code></span></section>
+    <section class="rd3498-alphabet"><header><strong>${vi ? "BẢNG CHỮ CÁI ĐẢO" : "THE REVERSED ALPHABET"}</strong><span>${escapeHtml(vi ? "chữ trên, giá trị dưới" : "letter on top, value below")}</span></header><div>${ruler}</div></section>
+    <section class="rd3498-strip"><header><strong>${vi ? "TỪNG KÝ TỰ · VỊ TRÍ × GIÁ TRỊ ĐẢO" : "EACH CHARACTER · POSITION × REVERSED VALUE"}</strong><span>${escapeHtml(vi ? "mờ = chưa tới · viền = đang xét" : "dimmed = not reached · outlined = current")}</span></header><div>${charCells}</div></section>
+    <section class="rd3498-work ${tone}"><header><strong>${vi ? "THAY SỐ CHO KÝ TỰ HIỆN TẠI" : "SUBSTITUTION FOR THE CURRENT CHARACTER"}</strong><span>${escapeHtml(vi ? "không cần bảng tra" : "no lookup table needed")}</span></header>${substitution}</section>
+    ${guard}
+    <section class="rd3498-total ${view.final ? "ready" : ""}"><header><strong>${vi ? "TỔNG ĐANG CỘNG DỒN" : "RUNNING TOTAL"}</strong><span>${escapeHtml(vi ? "số hạng mới nhất được làm nổi" : "the newest term is highlighted")}</span></header><div class="rd3498-sum">${sumExpression}</div><footer><small>total</small><strong>${view.total === null || view.total === undefined ? "—" : view.total}</strong><em>${view.final ? (vi ? "đây là đáp án" : "this is the answer") : (vi ? "còn tiếp" : "still accumulating")}</em></footer></section>
+    <section class="rd3498-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -35714,6 +35785,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDirections2096View(step);
+  } else if (step.reverseDegree3498View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReverseDegree3498View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

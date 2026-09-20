@@ -18840,3 +18840,235 @@ Object.assign(module.exports, {
     builder2: buildSteps900Prefix,
   },
 });
+
+// ─── 3498: Reverse Degree of a String ───
+// Weight every character by its 1-indexed position times its position in the
+// REVERSED alphabet ('a' = 26 … 'z' = 1), then sum. The whole difficulty of the
+// problem sits in that one mapping, so the trace keeps the substitution visible.
+function parseReverseDegree3498Input(input) {
+  const s = String(input ?? "").trim();
+  if (!s.length) throw new Error("Enter a non-empty string of lowercase letters a-z.");
+  if (!/^[a-z]+$/.test(s)) throw new Error("s must contain only lowercase English letters a-z.");
+  // The character strip wraps, so the cap is about keeping the step count
+  // navigable (3 steps per character) rather than about horizontal room. It has
+  // to clear 26 so the whole alphabet can be demonstrated in one go.
+  if (s.length > 40) throw new Error("Visualization supports up to 40 characters.");
+  return s;
+}
+
+function buildSteps3498(input) {
+  const s = parseReverseDegree3498Input(input);
+  const chars = [...s];
+  const steps = [];
+  const stages = [
+    { vi: "Khởi tạo total = 0", en: "Initialize total = 0" },
+    { vi: "Duyệt từng ký tự", en: "Scan each character" },
+    { vi: "Trả về tổng", en: "Return the sum" },
+  ];
+
+  let index = -1;
+  let position = null;
+  let char = null;
+  let alphaIndex = null;
+  let reversePosition = null;
+  let product = null;
+  let total = null;
+  let answer = null;
+  const terms = [];
+
+  const reverseOf = (letter) => 26 - (letter.charCodeAt(0) - 97);
+
+  const cellsState = () => chars.map((letter, i) => {
+    const cellPosition = i + 1;
+    const cellAlpha = letter.charCodeAt(0) - 97;
+    const state = i < index ? "done" : i === index ? "current" : "pending";
+    // Only reveal what the executed lines have actually produced.
+    const knowsValue = state === "done" || (state === "current" && reversePosition !== null);
+    const knowsProduct = state === "done" || (state === "current" && product !== null);
+    return {
+      char: letter,
+      position: cellPosition,
+      alphaIndex: knowsValue ? cellAlpha : null,
+      reversePosition: knowsValue ? 26 - cellAlpha : null,
+      product: knowsProduct ? cellPosition * (26 - cellAlpha) : null,
+      state,
+    };
+  });
+
+  const snap = ({ stage, phase, event, title, note, codeLine, final = false }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      vars: [
+        { name: "position", value: position === null ? "—" : position },
+        { name: "char", value: char === null ? "—" : `'${char}'` },
+        { name: "reverse_position", value: reversePosition === null ? "—" : reversePosition },
+        { name: "position * reverse_position", value: product === null ? "—" : product },
+        { name: "total", value: total === null ? "—" : total },
+      ],
+      reverseDegree3498View: {
+        problemId: 3498,
+        s,
+        stages,
+        stage,
+        phase,
+        event,
+        index,
+        position,
+        char,
+        alphaIndex,
+        reversePosition,
+        product,
+        total,
+        terms: [...terms],
+        cells: cellsState(),
+        answer,
+        final,
+      },
+    });
+  };
+
+  snap({
+    stage: 0,
+    phase: "intro",
+    event: "rule",
+    codeLine: 1,
+    title: { vi: `Tính reverse degree của "${s}"`, en: `Compute the reverse degree of "${s}"` },
+    note: {
+      vi: "Bảng chữ cái bị đảo: 'a' đáng 26, 'b' đáng 25, …, 'z' đáng 1. Mỗi ký tự góp (vị trí trong chuỗi) × (giá trị đảo của nó), vị trí đếm từ 1.",
+      en: "The alphabet is reversed: 'a' is worth 26, 'b' 25, …, 'z' 1. Each character contributes (its position in the string) × (its reversed value), counting positions from 1.",
+    },
+  });
+
+  total = 0;
+  snap({
+    stage: 0,
+    phase: "init",
+    event: "init",
+    codeLine: 2,
+    title: { vi: "total = 0", en: "total = 0" },
+    note: { vi: "Một biến tích lũy duy nhất; không cần mảng phụ nào.", en: "A single accumulator; no auxiliary array is needed." },
+  });
+
+  for (let i = 0; i < chars.length; i += 1) {
+    index = i;
+    position = i + 1;
+    char = chars[i];
+    alphaIndex = null;
+    reversePosition = null;
+    product = null;
+    snap({
+      stage: 1,
+      phase: "loop",
+      event: "take-char",
+      codeLine: 3,
+      title: { vi: `position = ${position}, char = '${char}'`, en: `position = ${position}, char = '${char}'` },
+      note: {
+        vi: `enumerate(s, 1) cho vị trí bắt đầu từ 1, nên ký tự đầu tiên là vị trí 1 chứ không phải 0 — đây chính là chỗ dễ lệch một đơn vị.`,
+        en: `enumerate(s, 1) starts positions at 1, so the first character is position 1 rather than 0 — exactly where an off-by-one slips in.`,
+      },
+    });
+
+    alphaIndex = char.charCodeAt(0) - 97;
+    reversePosition = reverseOf(char);
+    snap({
+      stage: 1,
+      phase: "value",
+      event: "reverse-value",
+      codeLine: 4,
+      title: { vi: `reverse_position = 26 − ${alphaIndex} = ${reversePosition}`, en: `reverse_position = 26 - ${alphaIndex} = ${reversePosition}` },
+      note: {
+        vi: `ord('${char}') − ord('a') = ${alphaIndex} là thứ tự 0-based trong bảng chữ cái thường, nên 26 − ${alphaIndex} = ${reversePosition} là giá trị trong bảng đảo. Dùng 25 − ${alphaIndex} hay 27 − ${alphaIndex} đều lệch một đơn vị.`,
+        en: `ord('${char}') - ord('a') = ${alphaIndex} is the 0-based rank in the normal alphabet, so 26 - ${alphaIndex} = ${reversePosition} is the reversed value. Using 25 - ${alphaIndex} or 27 - ${alphaIndex} is off by one.`,
+      },
+    });
+
+    product = position * reversePosition;
+    total += product;
+    terms.push(product);
+    snap({
+      stage: 1,
+      phase: "add",
+      event: "accumulate",
+      codeLine: 5,
+      title: { vi: `total += ${position} × ${reversePosition} = ${product} → total = ${total}`, en: `total += ${position} × ${reversePosition} = ${product} → total = ${total}` },
+      note: {
+        vi: `Đóng góp của '${char}' là ${position} × ${reversePosition} = ${product}. Tổng sau ${position} ký tự là ${total}.`,
+        en: `The contribution of '${char}' is ${position} × ${reversePosition} = ${product}. After ${position} characters the sum is ${total}.`,
+      },
+    });
+  }
+
+  index = chars.length;
+  position = null;
+  char = null;
+  alphaIndex = null;
+  reversePosition = null;
+  product = null;
+  answer = total;
+  snap({
+    stage: 2,
+    phase: "done",
+    event: "return",
+    codeLine: 6,
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    note: {
+      vi: `${terms.join(" + ")} = ${answer}. Mỗi ký tự chỉ được xử lý một lần nên thuật toán là O(n) thời gian và O(1) bộ nhớ.`,
+      en: `${terms.join(" + ")} = ${answer}. Each character is handled once, so the algorithm is O(n) time and O(1) space.`,
+    },
+    final: true,
+  });
+
+  return { input: s, original: s, answer, steps };
+}
+
+Object.assign(module.exports, {
+  3498: {
+    id: 3498,
+    difficulty: "easy",
+    slug: "reverse-degree-of-a-string",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "simulation", vi: "Mô phỏng", en: "Simulation" },
+      { key: "math", vi: "Toán học", en: "Math" },
+    ],
+    title: { vi: "Reverse Degree of a String", en: "Reverse Degree of a String" },
+    titleVi: { vi: "Reverse degree của một chuỗi", en: "Reverse degree of a string" },
+    statement: {
+      vi: "Cho chuỗi s gồm các chữ cái thường. Với mỗi ký tự, lấy vị trí của nó trong bảng chữ cái ĐẢO ('a' = 26, 'b' = 25, …, 'z' = 1) nhân với vị trí của nó trong chuỗi (đếm từ 1), rồi cộng tất cả lại. Trả về tổng đó.",
+      en: "Given a string s of lowercase English letters, multiply each character's position in the REVERSED alphabet ('a' = 26, 'b' = 25, …, 'z' = 1) by its 1-indexed position in the string, and return the sum of all those products.",
+    },
+    defaultInput: "abc",
+    inputKind: "string",
+    inputLabel: { vi: "s (chỉ chữ thường a-z)", en: "s (lowercase a-z only)" },
+    extraParams: [],
+    approach: [
+      { vi: "Chỉ cần một lượt duyệt: mỗi ký tự góp đúng một số hạng, không phụ thuộc các ký tự khác, nên không cần mảng phụ hay tiền xử lý gì.", en: "One pass is enough: each character contributes exactly one term, independent of the others, so no auxiliary array or preprocessing is needed." },
+      { vi: "ord(c) − ord('a') cho thứ tự 0-based trong bảng chữ cái thường: 'a' → 0, 'z' → 25. Giá trị trong bảng ĐẢO là 26 trừ đi số đó: 'a' → 26, 'z' → 1.", en: "ord(c) - ord('a') gives the 0-based rank in the normal alphabet: 'a' → 0, 'z' → 25. The REVERSED value is 26 minus that: 'a' → 26, 'z' → 1." },
+      { vi: "Viết cách khác cho dễ kiểm: nếu c là chữ thứ k tính từ 1 thì giá trị đảo là 27 − k. Hai công thức tương đương vì k = (ord(c) − ord('a')) + 1.", en: "An equivalent way to sanity-check it: if c is the k-th letter counting from 1, the reversed value is 27 - k. The two agree because k = (ord(c) - ord('a')) + 1." },
+      { vi: "Vị trí trong chuỗi đếm từ 1, nên dùng enumerate(s, 1). Đây là hai cái bẫy duy nhất của bài: lấy vị trí 0-based, hoặc lệch một đơn vị ở công thức đảo (25 − … hay 27 − …).", en: "String positions start at 1, so use enumerate(s, 1). These are the only two traps in the problem: using the 0-based index, or being off by one in the reversal (25 - … or 27 - …)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi ký tự được đọc đúng một lần và chỉ làm vài phép số học; chỉ cần một biến tích lũy nên bộ nhớ thêm là hằng số.",
+        en: "Each character is read exactly once with a couple of arithmetic operations; only one accumulator is needed, so extra space is constant.",
+      },
+    },
+    debugMode: "line-by-line",
+    code: [
+      "class Solution:",
+      "    def reverseDegree(self, s: str) -> int:",
+      "        total = 0",
+      "        for position, char in enumerate(s, 1):",
+      "            reverse_position = 26 - (ord(char) - ord(\"a\"))",
+      "            total += position * reverse_position",
+      "        return total",
+    ],
+    liveArgs: (input) => [parseReverseDegree3498Input(input)],
+    builder: buildSteps3498,
+  },
+});
