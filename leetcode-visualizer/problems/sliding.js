@@ -3106,170 +3106,257 @@ function buildSteps239(inputNums, params) {
 /**
  * LeetCode 76: Minimum Window Substring — sliding window with a need-counter.
  *
+ * The only hard part is the bookkeeping, and it hinges on letting need[] go
+ * NEGATIVE: a negative entry means the window holds a surplus of that character,
+ * which is exactly why left can keep shrinking. `missing` counts characters
+ * still owed, so missing == 0 is the "window covers t" test. The custom view
+ * therefore puts need[] and missing on screen instead of leaving them in text.
+ *
  * Code lines (1-indexed):
  *  1  from collections import Counter
- *  2  class Solution:
- *  3      def minWindow(self, s, t):
- *  4          if not s or not t: return ""
- *  5          need = Counter(t)
- *  6          missing = len(t)
- *  7          left = 0
- *  8          start, end = 0, 0
- *  9          for right, char in enumerate(s):
- * 10              if need[char] > 0: missing -= 1
- * 11              need[char] -= 1
- * 12              while missing == 0:
- * 13                  if end == 0 or right - left + 1 < end - start:
- * 14                      start, end = left, right + 1
- * 15                  need[s[left]] += 1
- * 16                  if need[s[left]] > 0: missing += 1
- * 17                  left += 1
- * 18          return s[start:end]
+ *  2
+ *  3  class Solution:
+ *  4      def minWindow(self, s: str, t: str) -> str:
+ *  5          if not s or not t:
+ *  6              return ""
+ *  7          need = Counter(t)
+ *  8          missing = len(t)
+ *  9          left = 0
+ * 10          start, end = 0, 0
+ * 11          for right, char in enumerate(s):
+ * 12              if need[char] > 0:
+ * 13                  missing -= 1
+ * 14              need[char] -= 1
+ * 15              while missing == 0:
+ * 16                  if end == 0 or right - left + 1 < end - start:
+ * 17                      start, end = left, right + 1
+ * 18                  need[s[left]] += 1
+ * 19                  if need[s[left]] > 0:
+ * 20                      missing += 1
+ * 21                  left += 1
+ * 22          return s[start:end]
  */
-function buildSteps76(input, params) {
+function parseMinWindow76Input(input, params = {}) {
   const s = typeof input === "string" ? input : String(input ?? "");
-  const t = params && params.t !== undefined ? String(params.t) : "ABC";
+  const t = params && params.t !== undefined && params.t !== "" ? String(params.t) : "";
+  if (!/^[A-Za-z]*$/.test(s)) throw new Error("s must contain only English letters.");
+  if (!/^[A-Za-z]*$/.test(t)) throw new Error("t must contain only English letters.");
+  // The character strip and the need table are drawn in full, so both are capped.
+  if (s.length > 24) throw new Error("Visualization supports up to 24 characters in s.");
+  if (t.length > 12) throw new Error("Visualization supports up to 12 characters in t.");
+  return { s, t };
+}
+
+function buildSteps76(input, params = {}) {
+  const { s, t } = parseMinWindow76Input(input, params);
   const chars = s.split("");
   const steps = [];
+  const stages = [
+    { vi: "need = Counter(t)", en: "need = Counter(t)" },
+    { vi: "Mở rộng right", en: "Expand right" },
+    { vi: "Co left khi missing == 0", en: "Shrink left while missing == 0" },
+    { vi: "Kết quả", en: "Result" },
+  ];
 
+  // need tracks every character, not just t's: that is what lets entries go
+  // negative and record a surplus.
   const need = {};
   for (const c of t) need[c] = (need[c] || 0) + 1;
-  const needStr = () => `{${Object.entries(need).map(([c, v]) => `${c}:${v}`).join(", ")}}`;
+  const required = [...new Set([...t])];
+  const requiredSet = new Set(required);
+
+  let missing = t.length;
+  let left = 0;
+  let right = -1;
+  let start = 0;
+  let end = 0;
+  let answer = null;
+
+  const needState = () => required.map((c) => {
+    const count = need[c] || 0;
+    return { char: c, count, state: count > 0 ? "missing" : count === 0 ? "exact" : "surplus" };
+  });
+  const charsState = () => chars.map((c, i) => ({
+    char: c,
+    index: i,
+    required: requiredSet.has(c),
+    inWindow: right >= 0 && i >= left && i <= right,
+    inBest: end > 0 && i >= start && i < end,
+    isLeft: right >= 0 && left <= right && i === left,
+    isRight: i === right,
+  }));
+
+  const snap = ({ stage, phase, event, title, note, codeLines, final = false }) => {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right < 0 ? "—" : right },
+        { name: "window", value: right >= 0 && left <= right ? `"${s.slice(left, right + 1)}"` : '""' },
+        { name: "need", value: `{${required.map((c) => `${c}:${need[c]}`).join(", ")}}` },
+        { name: "missing", value: missing },
+        { name: "best", value: end > 0 ? `"${s.slice(start, end)}"` : "none" },
+      ],
+      minWindow76View: {
+        problemId: 76,
+        s,
+        t,
+        stages,
+        stage,
+        phase,
+        event,
+        left,
+        right,
+        missing,
+        need: needState(),
+        chars: charsState(),
+        windowText: right >= 0 && left <= right ? s.slice(left, right + 1) : "",
+        windowLength: right >= 0 && left <= right ? right - left + 1 : 0,
+        best: end > 0 ? { start, end, text: s.slice(start, end), length: end - start } : null,
+        answer,
+        final,
+      },
+    });
+  };
 
   if (!s || !t) {
-    steps.push({
-      title: { vi: "s hoặc t rỗng → \"\"", en: "s or t empty → \"\"" },
-      arr: [], highlight: [], mark: [], final: true, codeLines: [4],
-      vars: [{ name: "answer", value: '""' }],
-      note: { vi: "Không có window hợp lệ.", en: "No valid window." },
+    answer = "";
+    snap({
+      stage: 3,
+      phase: "guard",
+      event: "empty",
+      codeLines: [5, 6],
+      title: { vi: 's hoặc t rỗng → trả ""', en: 's or t is empty → return ""' },
+      note: {
+        vi: "Không có ký tự nào cần phủ (hoặc không có gì để phủ bằng), nên không tồn tại window hợp lệ.",
+        en: "There is nothing to cover (or nothing to cover it with), so no valid window exists.",
+      },
+      final: true,
     });
     return { original: s, answer: "", steps };
   }
 
-  let missing = t.length;
-  let left = 0;
-  let start = 0, end = 0;
-
-  const inWin = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
-
-  steps.push({
-    title: { vi: "need = Counter(t), missing = len(t)", en: "need = Counter(t), missing = len(t)" },
-    arr: chars,
-    sub: chars.map((_, i) => `[${i}]`),
-    highlight: [],
-    mark: [],
-    codeLines: [5, 6, 7, 8],
-    vars: [
-      { name: "t", value: `"${t}"` },
-      { name: "need", value: needStr() },
-      { name: "missing", value: missing },
-      { name: "left", value: left },
-    ],
+  snap({
+    stage: 0,
+    phase: "init",
+    event: "init",
+    codeLines: [7, 8, 9, 10],
+    title: { vi: `need = {${required.map((c) => `${c}:${need[c]}`).join(", ")}}, missing = ${missing}`, en: `need = {${required.map((c) => `${c}:${need[c]}`).join(", ")}}, missing = ${missing}` },
     note: {
-      vi:
-        `need đếm số ký tự cần: ${needStr()}. missing = ${missing} = tổng ký tự còn thiếu.\n` +
-        `Mở rộng right; khi missing==0 thì window đã chứa đủ t → co left để rút gọn.`,
-      en:
-        `need counts required chars: ${needStr()}. missing = ${missing} = total chars still needed.\n` +
-        `Expand right; when missing==0 the window covers t → shrink left to minimize.`,
+      vi: `need đếm số lần mỗi ký tự của "${t}" còn cần. missing = ${missing} là tổng số ký tự còn nợ, nên missing == 0 chính là điều kiện "window đã phủ đủ t".`,
+      en: `need counts how many of each character of "${t}" are still owed. missing = ${missing} is the total still owed, so missing == 0 is exactly the test "the window covers t".`,
     },
   });
 
-  for (let right = 0; right < chars.length; right++) {
-    const ch = chars[right];
+  for (let r = 0; r < chars.length; r += 1) {
+    right = r;
+    const ch = chars[r];
     const wasNeeded = (need[ch] || 0) > 0;
     if (wasNeeded) missing -= 1;
     need[ch] = (need[ch] || 0) - 1;
 
-    steps.push({
-      title: { vi: `right=${right}, char='${ch}': need['${ch}']→${need[ch]}, missing=${missing}`, en: `right=${right}, char='${ch}': need['${ch}']→${need[ch]}, missing=${missing}` },
-      arr: chars,
-      sub: chars.map((_, i) => `[${i}]`),
-      highlight: inWin(left, right),
-      mark: [right],
-      codeLines: [9, 10, 11],
-      vars: [
-        { name: "right", value: right },
-        { name: "char", value: `'${ch}'` },
-        { name: "need", value: needStr() },
-        { name: "missing", value: missing },
-      ],
-      note: {
-        vi: `Thêm '${ch}' vào window. ${wasNeeded ? `'${ch}' là ký tự cần → missing giảm còn ${missing}.` : `'${ch}' không cần thiết (need đã ≤ 0) → missing giữ nguyen.`}`,
-        en: `Add '${ch}' to the window. ${wasNeeded ? `'${ch}' was needed → missing drops to ${missing}.` : `'${ch}' not needed (need ≤ 0) → missing unchanged.`}`,
+    snap({
+      stage: 1,
+      phase: "expand",
+      event: wasNeeded ? "expand-needed" : "expand-surplus",
+      // Line 13 only runs when the character was actually still owed.
+      codeLines: wasNeeded ? [11, 12, 13, 14] : [11, 12, 14],
+      title: {
+        vi: `right=${r}: thêm '${ch}' → need['${ch}']=${need[ch]}, missing=${missing}`,
+        en: `right=${r}: add '${ch}' → need['${ch}']=${need[ch]}, missing=${missing}`,
       },
+      note: wasNeeded
+        ? {
+          vi: `'${ch}' đang thực sự còn nợ (need > 0 trước khi trừ), nên missing giảm còn ${missing}.`,
+          en: `'${ch}' was genuinely still owed (need > 0 before the decrement), so missing drops to ${missing}.`,
+        }
+        : {
+          vi: requiredSet.has(ch)
+            ? `'${ch}' có trong t nhưng window đã đủ '${ch}'; need['${ch}']=${need[ch]} < 0 nghĩa là THỪA, missing không đổi.`
+            : `'${ch}' không thuộc t nên chỉ làm need['${ch}']=${need[ch]} âm thêm; missing không đổi.`,
+          en: requiredSet.has(ch)
+            ? `'${ch}' is in t but the window already has enough of it; need['${ch}']=${need[ch]} < 0 means SURPLUS, so missing is unchanged.`
+            : `'${ch}' is not in t, so it only pushes need['${ch}']=${need[ch]} further negative; missing is unchanged.`,
+        },
     });
 
     while (missing === 0) {
-      const curLen = right - left + 1;
-      const better = end === 0 || curLen < end - start;
+      const windowLength = r - left + 1;
+      const better = end === 0 || windowLength < end - start;
       if (better) {
         start = left;
-        end = right + 1;
+        end = r + 1;
       }
-      steps.push({
-        title: { vi: `missing==0: window [${left}..${right}] hợp lệ${better ? " → cập nhật best" : ""}`, en: `missing==0: window [${left}..${right}] valid${better ? " → update best" : ""}` },
-        arr: chars,
-        sub: chars.map((_, i) => `[${i}]`),
-        highlight: inWin(left, right),
-        mark: inWin(start, end - 1),
-        codeLines: [12, 13, 14],
-        vars: [
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "window len", value: curLen },
-          { name: "best window", value: end > 0 ? `"${s.slice(start, end)}" (len ${end - start})` : "none" },
-        ],
-        note: {
-          vi: better
-            ? `Window "${s.slice(left, right + 1)}" (len ${curLen}) ngắn hơn best cũ → lưu start=${start}, end=${end}.`
-            : `Window "${s.slice(left, right + 1)}" (len ${curLen}) không ngắn hơn best hiện tại.`,
-          en: better
-            ? `Window "${s.slice(left, right + 1)}" (len ${curLen}) beats the old best → store start=${start}, end=${end}.`
-            : `Window "${s.slice(left, right + 1)}" (len ${curLen}) is not shorter than the current best.`,
+      snap({
+        stage: 2,
+        phase: "record",
+        event: better ? "record-better" : "record-keep",
+        // Line 17 only runs when this window actually beats the best.
+        codeLines: better ? [15, 16, 17] : [15, 16],
+        title: {
+          vi: `missing==0: "${s.slice(left, r + 1)}" (len ${windowLength})${better ? " → best mới" : " → không ngắn hơn best"}`,
+          en: `missing==0: "${s.slice(left, r + 1)}" (len ${windowLength})${better ? " → new best" : " → not shorter than best"}`,
         },
+        note: better
+          ? {
+            vi: `Window hiện tại phủ đủ t và ngắn hơn best cũ, nên lưu start=${start}, end=${end}.`,
+            en: `The current window covers t and is shorter than the old best, so store start=${start}, end=${end}.`,
+          }
+          : {
+            vi: `Window phủ đủ t nhưng dài ${windowLength} ≥ best hiện tại (${end - start}), nên giữ best cũ.`,
+            en: `The window covers t but its length ${windowLength} is ≥ the current best (${end - start}), so keep the old best.`,
+          },
       });
 
       const lch = chars[left];
       need[lch] = (need[lch] || 0) + 1;
-      const nowMissing = need[lch] > 0;
-      if (nowMissing) missing += 1;
+      const nowOwed = need[lch] > 0;
+      if (nowOwed) missing += 1;
       left += 1;
-      steps.push({
-        title: { vi: `Co left: bỏ '${lch}', left→${left}${nowMissing ? `, missing=${missing}` : ""}`, en: `Shrink left: drop '${lch}', left→${left}${nowMissing ? `, missing=${missing}` : ""}` },
-        arr: chars,
-        sub: chars.map((_, i) => `[${i}]`),
-        highlight: inWin(left, right),
-        mark: inWin(start, end - 1),
-        codeLines: [15, 16, 17],
-        vars: [
-          { name: "removed", value: `'${lch}'` },
-          { name: "need", value: needStr() },
-          { name: "missing", value: missing },
-          { name: "left", value: left },
-        ],
-        note: {
-          vi: `Trả '${lch}' về need. ${nowMissing ? `Giờ need['${lch}']=${need[lch]} > 0 → window thiếu '${lch}', missing=${missing}, thoát while.` : `need['${lch}']=${need[lch]} ≤ 0 → window vẫn đủ, tiếp tục co.`}`,
-          en: `Return '${lch}' to need. ${nowMissing ? `Now need['${lch}']=${need[lch]} > 0 → window misses '${lch}', missing=${missing}, exit while.` : `need['${lch}']=${need[lch]} ≤ 0 → window still valid, keep shrinking.`}`,
+      snap({
+        stage: 2,
+        phase: "shrink",
+        event: nowOwed ? "shrink-breaks" : "shrink-surplus",
+        // Line 20 only runs when giving the character back creates a debt.
+        codeLines: nowOwed ? [18, 19, 20, 21] : [18, 19, 21],
+        title: {
+          vi: `Bỏ '${lch}' khỏi window, left→${left}${nowOwed ? ` → missing=${missing}, thoát while` : " → vẫn đủ, co tiếp"}`,
+          en: `Drop '${lch}' from the window, left→${left}${nowOwed ? ` → missing=${missing}, exit while` : " → still covered, keep shrinking"}`,
         },
+        note: nowOwed
+          ? {
+            vi: `need['${lch}'] trở lại ${need[lch]} > 0, tức window vừa mất ký tự cuối cùng của '${lch}'. missing=${missing} nên vòng co dừng và right phải đi tiếp.`,
+            en: `need['${lch}'] is back to ${need[lch]} > 0, so the window just lost its last '${lch}'. missing=${missing}, so the shrink loop stops and right must advance.`,
+          }
+          : {
+            vi: `need['${lch}']=${need[lch]} ≤ 0 nghĩa là '${lch}' vốn đang THỪA, bỏ đi window vẫn phủ đủ t → co tiếp để ngắn hơn.`,
+            en: `need['${lch}']=${need[lch]} ≤ 0 means '${lch}' was SURPLUS, so removing it keeps the window covering t → keep shrinking to get shorter.`,
+          },
       });
     }
   }
 
-  const answer = s.slice(start, end);
-  steps.push({
-    title: { vi: `return s[${start}:${end}] = "${answer}"`, en: `return s[${start}:${end}] = "${answer}"` },
-    arr: chars,
-    sub: chars.map((_, i) => `[${i}]`),
-    highlight: [],
-    mark: inWin(start, end - 1),
+  right = chars.length - 1;
+  answer = s.slice(start, end);
+  snap({
+    stage: 3,
+    phase: "done",
+    event: "return",
+    codeLines: [22],
+    title: { vi: `Trả về "${answer}"`, en: `Return "${answer}"` },
+    note: answer
+      ? {
+        vi: `Substring ngắn nhất của s phủ đủ "${t}" là "${answer}" (s[${start}:${end}], độ dài ${end - start}).`,
+        en: `The shortest substring of s covering "${t}" is "${answer}" (s[${start}:${end}], length ${end - start}).`,
+      }
+      : {
+        vi: `missing chưa bao giờ về 0, nên không có window nào phủ đủ "${t}" → trả "".`,
+        en: `missing never reached 0, so no window ever covered "${t}" → return "".`,
+      },
     final: true,
-    codeLines: [18],
-    vars: [{ name: "answer", value: `"${answer}"` }],
-    note: {
-      vi: answer ? `Substring nhỏ nhất chứa mọi ký tự của "${t}" là "${answer}".` : `Không tồn tại window hợp lệ → "".`,
-      en: answer ? `The smallest substring containing all of "${t}" is "${answer}".` : `No valid window exists → "".`,
-    },
   });
 
   return { original: s, answer, steps };
@@ -5383,15 +5470,18 @@ module.exports = {
     },
     defaultInput: "ADOBECODEBANC",
     inputKind: "string",
-    inputLabel: { vi: "s", en: "s" },
+    inputLabel: { vi: "s (chỉ chữ cái)", en: "s (letters only)" },
     extraParams: [
-      { key: "t", label: { vi: "t (ký tự cần)", en: "t (required chars)" }, default: "ABC" },
+      // type: "string" is required — without it renderExtraParams builds a
+      // number input, "ABC" cannot be typed, and the client sends Number("") = 0.
+      { key: "t", type: "string", label: { vi: "t (ký tự cần)", en: "t (required chars)" }, default: "ABC" },
     ],
     approach: [
-      { vi: "need = Counter(t) đếm ký tự cần. missing = tổng ký tự còn thiếu.", en: "need = Counter(t) counts required chars. missing = total chars still needed." },
-      { vi: "Mở rộng right, giảm need[char]; nếu char thực sự cần thì missing giảm.", en: "Expand right, decrement need[char]; if char was actually needed, missing decreases." },
-      { vi: "Khi missing==0 (đủ t) → co left để rút gọn window, cập nhật best.", en: "When missing==0 (t is covered) → shrink left to minimize, update best." },
-      { vi: "Khi bỏ ký tự cần khỏi window, missing tăng lại → thoát vòng co.", en: "When a needed char leaves the window, missing goes back up → stop shrinking." },
+      { vi: "need[c] = số lần ký tự c CÒN NỢ. missing = tổng số ký tự còn nợ, nên missing == 0 chính là điều kiện window đã phủ đủ t — chỉ cần một con số thay vì so cả hai bảng đếm.", en: "need[c] = how many of character c are STILL OWED. missing = the total still owed, so missing == 0 is exactly the test that the window covers t — one number instead of comparing two frequency tables." },
+      { vi: "Mở rộng right: giảm need[char] LUÔN LUÔN, nhưng chỉ giảm missing khi need[char] > 0 trước đó. Nếu không, ký tự đó chỉ làm need âm thêm.", en: "Expand right: ALWAYS decrement need[char], but decrement missing only when need[char] was > 0 beforehand. Otherwise the character merely pushes need further negative." },
+      { vi: "Mấu chốt là để need ÂM: need[c] < 0 nghĩa là window đang THỪA c. Nhờ vậy lúc co left, bỏ một ký tự thừa không phá vỡ tính hợp lệ.", en: "The crux is letting need go NEGATIVE: need[c] < 0 means the window holds a SURPLUS of c. That is what lets the shrink phase drop a character without breaking validity." },
+      { vi: "Khi missing == 0, co left liên tục và cập nhật best. Vòng co chỉ dừng khi trả lại một ký tự làm need[c] > 0 trở lại — đúng lúc window mất ký tự c cuối cùng.", en: "While missing == 0, keep shrinking left and updating best. The loop stops only when giving a character back pushes need[c] above 0 again — exactly when the window loses its last c." },
+      { vi: "Mỗi ký tự của s được right thêm đúng một lần và left bỏ nhiều nhất một lần, nên tổng chi phí là O(|s| + |t|) dù có hai vòng lặp lồng nhau.", en: "Each character of s is added by right exactly once and removed by left at most once, so the total cost is O(|s| + |t|) despite the nested loops." },
     ],
     complexity: {
       time: "O(|s| + |t|)",
@@ -5401,26 +5491,35 @@ module.exports = {
         en: "Each char of s is added by right and removed by left at most once.",
       },
     },
+    debugMode: "semantic",
     code: [
       "from collections import Counter",
+      "",
       "class Solution:",
-      "    def minWindow(self, s, t):",
-      "        if not s or not t: return \"\"",
+      "    def minWindow(self, s: str, t: str) -> str:",
+      "        if not s or not t:",
+      "            return \"\"",
       "        need = Counter(t)",
       "        missing = len(t)",
       "        left = 0",
       "        start, end = 0, 0",
       "        for right, char in enumerate(s):",
-      "            if need[char] > 0: missing -= 1",
+      "            if need[char] > 0:",
+      "                missing -= 1",
       "            need[char] -= 1",
       "            while missing == 0:",
-      "                if end == 0 or right-left+1 < end-start:",
+      "                if end == 0 or right - left + 1 < end - start:",
       "                    start, end = left, right + 1",
       "                need[s[left]] += 1",
-      "                if need[s[left]] > 0: missing += 1",
+      "                if need[s[left]] > 0:",
+      "                    missing += 1",
       "                left += 1",
       "        return s[start:end]",
     ],
+    liveArgs: (input, params) => {
+      const { s, t } = parseMinWindow76Input(input, params);
+      return [s, t];
+    },
     builder: buildSteps76,
   },
   2444: {
