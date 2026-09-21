@@ -9150,7 +9150,7 @@ function buildSteps2096(input, params) {
       vi: "Trong cây chỉ có đúng một đường đi giữa hai node, và nó luôn qua LCA: leo lên tới LCA rồi đi xuống. Hai path từ root giống nhau đúng tới LCA, nên chỉ cần bỏ tiền tố chung.",
       en: "A tree has exactly one route between two nodes and it always goes through the LCA: climb up to it, then descend. The two root paths agree exactly up to the LCA, so dropping the shared prefix is enough.",
     },
-    line: 1,
+    line: 2,
   });
 
   // Mirrors path_to(node, target): one step per executed source line.
@@ -9168,7 +9168,7 @@ function buildSteps2096(input, params) {
       note: node
         ? { vi: `Đang ở node ${node.val}, trail từ root là "${letters.join("") || "(rỗng)"}".`, en: `At node ${node.val}, the trail from the root is "${letters.join("") || "(empty)"}".` }
         : { vi: "Nhánh rỗng: không thể chứa target.", en: "An empty branch cannot contain the target." },
-      line: 3,
+      line: 4,
       current: node,
     });
 
@@ -9180,7 +9180,7 @@ function buildSteps2096(input, params) {
         event: "return-none",
         title: { vi: "return None", en: "return None" },
         note: { vi: "Trả None để cha biết nhánh này không có target.", en: "Return None so the parent knows this branch has no target." },
-        line: 4,
+        line: 5,
       });
       callStack.pop();
       return null;
@@ -9199,7 +9199,7 @@ function buildSteps2096(input, params) {
       note: matched
         ? { vi: "Tìm thấy target; trả [] rồi để các cha gắn chữ cái vào đầu.", en: "Target found; return [] and let the ancestors prepend their letters." }
         : { vi: `${node.val} không phải target, phải đi sâu hơn.`, en: `${node.val} is not the target, so descend further.` },
-      line: 5,
+      line: 6,
       current: node,
     });
 
@@ -9214,7 +9214,7 @@ function buildSteps2096(input, params) {
           vi: "Chú ý: [] là falsy trong Python. Vì vậy mọi phép kiểm tra phía trên đều dùng `is not None`, không dùng `if left:`.",
           en: "Careful: [] is falsy in Python. That is why every check above uses `is not None` rather than `if left:`.",
         },
-        line: 6,
+        line: 7,
         current: node,
       });
       trailNodes.pop();
@@ -9229,7 +9229,7 @@ function buildSteps2096(input, params) {
       event: "call-left",
       title: { vi: `Thử nhánh trái của ${node.val}`, en: `Try the left branch of ${node.val}` },
       note: { vi: "Đi xuống bên trái trước; nếu thất bại mới thử bên phải.", en: "Descend left first; only try right if that fails." },
-      line: 7,
+      line: 8,
       current: node,
     });
     letters.push("L");
@@ -9249,7 +9249,7 @@ function buildSteps2096(input, params) {
       note: left === null
         ? { vi: "`left is not None` là False, nên bỏ qua nhánh trái.", en: "`left is not None` is False, so skip the left branch." }
         : { vi: "`left is not None` là True kể cả khi list rỗng — đó là lý do phải so với None.", en: "`left is not None` is True even for an empty list — exactly why the check compares against None." },
-      line: 8,
+      line: 9,
       current: node,
     });
 
@@ -9262,7 +9262,7 @@ function buildSteps2096(input, params) {
         event: "return-left",
         title: { vi: `return ["L"] + [${left.join(",")}] = [${result.join(",")}]`, en: `return ["L"] + [${left.join(",")}] = [${result.join(",")}]` },
         note: { vi: "Gắn 'L' vào ĐẦU để chuỗi luôn đọc từ root đi xuống.", en: "Prepend 'L' so the list always reads from the root downward." },
-        line: 9,
+        line: 10,
         current: node,
       });
       trailNodes.pop();
@@ -9277,7 +9277,7 @@ function buildSteps2096(input, params) {
       event: "call-right",
       title: { vi: `Thử nhánh phải của ${node.val}`, en: `Try the right branch of ${node.val}` },
       note: { vi: "Nhánh trái không có target, chuyển sang phải.", en: "The left branch has no target, so move to the right." },
-      line: 10,
+      line: 11,
       current: node,
     });
     letters.push("R");
@@ -9297,7 +9297,7 @@ function buildSteps2096(input, params) {
       note: right === null
         ? { vi: "Cả hai nhánh đều không có target.", en: "Neither branch contains the target." }
         : { vi: "Nhánh phải tìm được đường tới target.", en: "The right branch found a route to the target." },
-      line: 11,
+      line: 12,
       current: node,
     });
 
@@ -9310,7 +9310,7 @@ function buildSteps2096(input, params) {
         event: "return-right",
         title: { vi: `return ["R"] + [${right.join(",")}] = [${result.join(",")}]`, en: `return ["R"] + [${right.join(",")}] = [${result.join(",")}]` },
         note: { vi: "Gắn 'R' vào đầu, giống nhánh trái.", en: "Prepend 'R', mirroring the left branch." },
-        line: 12,
+        line: 13,
         current: node,
       });
       trailNodes.pop();
@@ -9325,7 +9325,7 @@ function buildSteps2096(input, params) {
       event: "dead-end",
       title: { vi: `Cây con tại ${node.val} không có target → return None`, en: `The subtree at ${node.val} has no target → return None` },
       note: { vi: "Quay lui để cha thử nhánh khác.", en: "Backtrack so the parent can try another branch." },
-      line: 13,
+      line: 14,
       current: node,
     });
     trailNodes.pop();
@@ -9357,7 +9357,7 @@ function buildSteps2096(input, params) {
       vi: `Từ root đi "${startPath.join("") || "(không bước nào)"}" là tới ${startValue}.`,
       en: `Walking "${startPath.join("") || "(no steps)"}" from the root reaches ${startValue}.`,
     },
-    line: 14,
+    line: 15,
     current: startNode,
   });
 
@@ -9375,7 +9375,7 @@ function buildSteps2096(input, params) {
       vi: `Từ root đi "${destPath.join("") || "(không bước nào)"}" là tới ${destValue}.`,
       en: `Walking "${destPath.join("") || "(no steps)"}" from the root reaches ${destValue}.`,
     },
-    line: 15,
+    line: 16,
     current: destNode,
   });
 
@@ -9392,7 +9392,7 @@ function buildSteps2096(input, params) {
       vi: "common đếm số bước giống nhau ở đầu hai path. Ở bước 0, cả hai đều đang đứng tại root, nên LCA tạm thời là root.",
       en: "common counts how many leading steps the two paths share. At 0 both still sit at the root, so the LCA so far is the root.",
     },
-    line: 16,
+    line: 17,
     current: root,
   });
 
@@ -9415,7 +9415,7 @@ function buildSteps2096(input, params) {
         : sameLetter
           ? { vi: "Hai đường vẫn đi cùng một bước, nên LCA còn ở sâu hơn.", en: "Both routes still take the same step, so the LCA lies deeper." }
           : { vi: "Đây là chỗ hai đường tách nhau, nên node hiện tại chính là LCA.", en: "This is where the routes diverge, so the current node is the LCA." },
-      line: 17,
+      line: 18,
       current: lcaNode,
     });
     if (!inRange || !sameLetter) break;
@@ -9431,7 +9431,7 @@ function buildSteps2096(input, params) {
         vi: `Tiến thêm một bước chung; LCA tạm thời giờ là ${lcaNode.val}.`,
         en: `Advance one shared step; the LCA so far is now ${lcaNode.val}.`,
       },
-      line: 18,
+      line: 19,
       current: lcaNode,
     });
   }
@@ -9450,7 +9450,7 @@ function buildSteps2096(input, params) {
       vi: `Còn ${upCount} bước từ ${startValue} lên LCA ${lcaNode.val} → ${upCount} chữ 'U'; rồi đi xuống "${downLetters.join("") || "(không bước nào)"}" là tới ${destValue}.`,
       en: `${upCount} steps remain from ${startValue} up to LCA ${lcaNode.val} → ${upCount} 'U' letters; then descending "${downLetters.join("") || "(no steps)"}" reaches ${destValue}.`,
     },
-    line: 19,
+    line: 20,
     current: lcaNode,
     final: true,
   });

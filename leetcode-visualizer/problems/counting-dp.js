@@ -552,7 +552,7 @@ function buildSteps3524(input, params = {}) {
     stage: 0,
     phase: "intro",
     event: "rule",
-    codeLine: 1,
+    codeLine: 2,
     title: { vi: `Đếm ${total} subarray theo product % ${k}`, en: `Bucket all ${total} subarrays by product % ${k}` },
     note: {
       vi: `Bỏ một prefix và một suffix mà vẫn còn phần tử nghĩa là chọn đúng một subarray liên tiếp khác rỗng. Mảng có ${n} phần tử nên có ${n}·${n + 1}/2 = ${total} cách, và result[x] là số cách cho product % ${k} = x.`,
@@ -565,7 +565,7 @@ function buildSteps3524(input, params = {}) {
     stage: 0,
     phase: "init",
     event: "init-ans",
-    codeLine: 2,
+    codeLine: 3,
     title: { vi: `ans = [${ans.join(",")}]`, en: `ans = [${ans.join(",")}]` },
     note: {
       vi: `Một ô đếm cho mỗi số dư 0..${k - 1}. Vì k ≤ 5, bảng này luôn rất nhỏ.`,
@@ -578,7 +578,7 @@ function buildSteps3524(input, params = {}) {
     stage: 0,
     phase: "init",
     event: "init-dp",
-    codeLine: 3,
+    codeLine: 4,
     title: { vi: `dp = [${dp.join(",")}]`, en: `dp = [${dp.join(",")}]` },
     note: {
       vi: "dp[r] = số subarray KẾT THÚC tại vị trí vừa xử lý và có product % k = r. Đây là mấu chốt: chỉ cần giữ k con số, không cần duyệt lại mọi subarray.",
@@ -598,7 +598,7 @@ function buildSteps3524(input, params = {}) {
       stage: 1,
       phase: "element",
       event: "take-num",
-      codeLine: 4,
+      codeLine: 5,
       title: { vi: `num = nums[${i}] = ${num}`, en: `num = nums[${i}] = ${num}` },
       note: {
         vi: `Giờ xét mọi subarray kết thúc tại vị trí ${i}. Có đúng ${i + 1} subarray như vậy.`,
@@ -611,7 +611,7 @@ function buildSteps3524(input, params = {}) {
       stage: 1,
       phase: "element",
       event: "reset-newdp",
-      codeLine: 5,
+      codeLine: 6,
       title: { vi: `new_dp = [${newDp.join(",")}]`, en: `new_dp = [${newDp.join(",")}]` },
       note: {
         vi: "new_dp sẽ đếm các subarray kết thúc tại vị trí hiện tại, dựng từ dp của vị trí trước.",
@@ -624,7 +624,7 @@ function buildSteps3524(input, params = {}) {
       stage: 1,
       phase: "element",
       event: "num-mod",
-      codeLine: 6,
+      codeLine: 7,
       title: { vi: `num_mod = ${num} % ${k} = ${numMod}`, en: `num_mod = ${num} % ${k} = ${numMod}` },
       note: {
         vi: `Chỉ số dư của ${num} là quan trọng. Nhân thêm ${num} vào một subarray tương đương nhân số dư của nó với ${numMod} rồi lấy mod ${k}.`,
@@ -637,7 +637,7 @@ function buildSteps3524(input, params = {}) {
       stage: 1,
       phase: "seed",
       event: "seed-single",
-      codeLine: 7,
+      codeLine: 8,
       title: { vi: `new_dp[${numMod}] = 1`, en: `new_dp[${numMod}] = 1` },
       note: {
         vi: `Subarray chỉ gồm một phần tử [${num}] có product % ${k} = ${numMod}. Đây là subarray duy nhất kết thúc tại ${i} mà không mở rộng từ subarray nào.`,
@@ -649,7 +649,7 @@ function buildSteps3524(input, params = {}) {
       stage: 1,
       phase: "extend",
       event: "extend-loop",
-      codeLine: 8,
+      codeLine: 9,
       title: { vi: `Mở rộng mọi subarray của dp`, en: `Extend every subarray recorded in dp` },
       note: {
         vi: `Mỗi subarray kết thúc tại ${i - 1} với số dư r, khi thêm ${num} vào cuối sẽ thành subarray kết thúc tại ${i} với số dư (r × ${numMod}) % ${k}.`,
@@ -666,7 +666,7 @@ function buildSteps3524(input, params = {}) {
         stage: 1,
         phase: "extend",
         event: "extend",
-        codeLine: 9,
+        codeLine: 10,
         title: delta === 0
           ? { vi: `r = ${rr}: dp[${rr}] = 0, không có gì để mở rộng`, en: `r = ${rr}: dp[${rr}] = 0, nothing to extend` }
           : { vi: `r = ${rr}: (${rr} × ${numMod}) % ${k} = ${targetR}, new_dp[${targetR}] += ${delta}`, en: `r = ${rr}: (${rr} × ${numMod}) % ${k} = ${targetR}, new_dp[${targetR}] += ${delta}` },
@@ -683,7 +683,7 @@ function buildSteps3524(input, params = {}) {
       stage: 2,
       phase: "accumulate",
       event: "accumulate-loop",
-      codeLine: 10,
+      codeLine: 11,
       title: { vi: `Cộng new_dp vào ans`, en: `Add new_dp into ans` },
       note: {
         vi: `new_dp = [${newDp.join(",")}] đã đếm đủ ${i + 1} subarray kết thúc tại ${i}; giờ dồn vào tổng chung.`,
@@ -699,7 +699,7 @@ function buildSteps3524(input, params = {}) {
         stage: 2,
         phase: "accumulate",
         event: "accumulate",
-        codeLine: 11,
+        codeLine: 12,
         title: { vi: `ans[${rr}] += ${delta} → ${ans[rr]}`, en: `ans[${rr}] += ${delta} → ${ans[rr]}` },
         note: delta === 0
           ? { vi: `Không có subarray kết thúc tại ${i} nào cho số dư ${rr}.`, en: `No subarray ending at ${i} gives remainder ${rr}.` }
@@ -714,7 +714,7 @@ function buildSteps3524(input, params = {}) {
       stage: 2,
       phase: "roll",
       event: "roll-dp",
-      codeLine: 12,
+      codeLine: 13,
       title: { vi: `dp = new_dp = [${dp.join(",")}]`, en: `dp = new_dp = [${dp.join(",")}]` },
       note: {
         vi: "Chỉ giữ lại một hàng duy nhất; vị trí trước đó không cần nữa nên bộ nhớ là O(k).",
@@ -735,7 +735,7 @@ function buildSteps3524(input, params = {}) {
     stage: 3,
     phase: "done",
     event: "return",
-    codeLine: 13,
+    codeLine: 14,
     title: { vi: `Trả về [${answer.join(",")}]`, en: `Return [${answer.join(",")}]` },
     note: {
       vi: `Tổng các ô là ${answer.reduce((sum, value) => sum + value, 0)} = ${total}, đúng bằng số subarray khác rỗng — một phép kiểm tra nhanh rất hữu ích. Thời gian O(n·k), bộ nhớ O(k).`,

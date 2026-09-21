@@ -119,12 +119,26 @@ test('3524 trace steps one source line at a time through both inner loops', () =
   assert.ok(run.steps.every((step) => step.codeLines.length === 1));
   assert.ok(run.steps.every((step) => step.codeLines[0] >= 1 && step.codeLines[0] <= problem.code.length));
   // intro, ans, dp, then per element: 4,5,6,7,8, 9*k, 10, 11*k, 12; then 13.
-  const perElement = [4, 5, 6, 7, 8, 9, 9, 9, 10, 11, 11, 11, 12];
-  const expected = [1, 2, 3];
+  // codeLines are 1-based: line N highlights code[N - 1].
+  const perElement = [5, 6, 7, 8, 9, 10, 10, 10, 11, 12, 12, 12, 13];
+  const expected = [2, 3, 4];
   for (let i = 0; i < 5; i += 1) expected.push(...perElement);
-  expected.push(13);
+  expected.push(14);
   assert.deepEqual(run.steps.map((step) => step.codeLines[0]), expected);
   assert.equal(run.steps.length, 3 + 5 * 13 + 1);
+  // Guards the convention: each step must light up the line that performs it.
+  const sourceFor = (event) => problem.code[
+    run.steps.find((step) => step.findXValue3524View.event === event).codeLines[0] - 1
+  ];
+  assert.match(sourceFor('init-ans'), /ans = \[0\] \* k/);
+  assert.match(sourceFor('init-dp'), /dp = \[0\] \* k/);
+  assert.match(sourceFor('take-num'), /for num in nums:/);
+  assert.match(sourceFor('num-mod'), /num_mod = num % k/);
+  assert.match(sourceFor('seed-single'), /new_dp\[num_mod\] = 1/);
+  assert.match(sourceFor('extend'), /new_dp\[\(r \* num_mod\) % k\] \+= dp\[r\]/);
+  assert.match(sourceFor('accumulate'), /ans\[r\] \+= new_dp\[r\]/);
+  assert.match(sourceFor('roll-dp'), /dp = new_dp/);
+  assert.match(sourceFor('return'), /return ans/);
 
   const views = run.steps.map((step) => step.findXValue3524View);
   assert.ok(views.every((view) => view.problemId === 3524));

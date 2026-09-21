@@ -34833,14 +34833,15 @@ function renderCircleRectangle1401ClampView(step) {
   };
 
   const locals = cr1401Locals([
-    { name: "inner_x", line: 2, value: view.innerX },
-    { name: "closest_x", line: 3, value: view.closestX },
-    { name: "inner_y", line: 4, value: view.innerY },
-    { name: "closest_y", line: 5, value: view.closestY },
-    { name: "dx", line: 6, value: view.dx },
-    { name: "dy", line: 7, value: view.dy },
-    { name: "dist_squared", line: 8, value: view.distSq },
-    { name: "radius_squared", line: 9, value: view.radiusSq },
+    // Line numbers are 1-based, matching row.dataset.line in renderCode.
+    { name: "inner_x", line: 3, value: view.innerX },
+    { name: "closest_x", line: 4, value: view.closestX },
+    { name: "inner_y", line: 5, value: view.innerY },
+    { name: "closest_y", line: 6, value: view.closestY },
+    { name: "dx", line: 7, value: view.dx },
+    { name: "dy", line: 8, value: view.dy },
+    { name: "dist_squared", line: 9, value: view.distSq },
+    { name: "radius_squared", line: 10, value: view.radiusSq },
   ], currentLine, vi);
 
   // Both sides must have been assigned before the comparison can be shown.
@@ -34977,13 +34978,14 @@ function renderCircleRectangle1401RegionView(step) {
     .join("");
 
   const locals = cr1401Locals([
-    { name: "in_wide", line: 2, value: view.inWide },
-    { name: "in_tall", line: 3, value: view.inTall },
-    { name: "radius_squared", line: 6, value: view.radiusSq },
-    { name: "corner_x", line: 7, value: view.cornerX },
-    { name: "corner_y", line: 7, value: view.cornerY },
-    { name: "dx", line: 8, value: view.dx },
-    { name: "dy", line: 9, value: view.dy },
+    // Line numbers are 1-based, matching row.dataset.line in renderCode.
+    { name: "in_wide", line: 3, value: view.inWide },
+    { name: "in_tall", line: 4, value: view.inTall },
+    { name: "radius_squared", line: 7, value: view.radiusSq },
+    { name: "corner_x", line: 8, value: view.cornerX },
+    { name: "corner_y", line: 8, value: view.cornerY },
+    { name: "dx", line: 9, value: view.dx },
+    { name: "dy", line: 10, value: view.dy },
   ], currentLine, vi);
 
   const formulas = {
@@ -35320,6 +35322,85 @@ function renderFindXValue3524View(step) {
     </div>
     <section class="fx3524-work ${tone}"><header><strong>${vi ? "PHÉP CHUYỂN SỐ DƯ" : "THE REMAINDER TRANSITION"}</strong><span>${escapeHtml(vi ? "nhân thêm một phần tử = nhân số dư" : "appending an element multiplies the remainder")}</span></header>${transition}</section>
     <section class="fx3524-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
+function renderMinWindow76View(step) {
+  const view = step.minWindow76View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  const cells = Array.isArray(view.chars) ? view.chars : [];
+  const strip = cells.length
+    ? cells
+      .map((cell) => {
+        const classes = ["mw76-cell"];
+        if (cell.inWindow) classes.push("in-window");
+        if (cell.inBest) classes.push("in-best");
+        if (cell.required) classes.push("required");
+        const cursors = [];
+        if (cell.isLeft) cursors.push("L");
+        if (cell.isRight) cursors.push("R");
+        if (cursors.length) classes.push("cursor");
+        return `<span class="${classes.join(" ")}"><small>${cell.index}</small><strong>${escapeHtml(cell.char)}</strong><i>${escapeHtml(cursors.join("") || "\u00a0")}</i></span>`;
+      })
+      .join("")
+    : `<b class="mw76-empty">${escapeHtml(vi ? "s rỗng" : "s is empty")}</b>`;
+
+  // need[] is the whole problem: positive = still owed, negative = surplus.
+  const needCells = Array.isArray(view.need) ? view.need : [];
+  const needHtml = needCells.length
+    ? needCells
+      .map((entry) => `<span class="mw76-need ${entry.state}"><strong>${escapeHtml(entry.char)}</strong><b>${entry.count > 0 ? `+${entry.count}` : entry.count}</b><em>${escapeHtml(entry.state === "missing" ? (vi ? "còn nợ" : "still owed") : entry.state === "exact" ? (vi ? "vừa đủ" : "exactly met") : (vi ? "thừa" : "surplus"))}</em></span>`)
+      .join("")
+    : `<b class="mw76-empty">${escapeHtml(vi ? "t rỗng" : "t is empty")}</b>`;
+
+  const missing = Number.isInteger(view.missing) ? view.missing : null;
+  const covered = missing === 0;
+  const gauge = `<section class="mw76-missing ${covered ? "covered" : "short"}"><small>missing</small><strong>${missing === null ? "—" : missing}</strong><em>${escapeHtml(covered ? (vi ? "0 → window đã phủ đủ t, co left được" : "0 → the window covers t, left may shrink") : (vi ? `còn nợ ${missing} ký tự → phải mở rộng right` : `${missing} characters still owed → right must expand`))}</em></section>`;
+
+  const best = view.best;
+  const bestHtml = best
+    ? `<section class="mw76-best found"><small>${vi ? "BEST HIỆN TẠI" : "CURRENT BEST"}</small><strong>"${escapeHtml(best.text)}"</strong><em>s[${best.start}:${best.end}] · ${vi ? "độ dài" : "length"} ${best.length}</em></section>`
+    : `<section class="mw76-best"><small>${vi ? "BEST HIỆN TẠI" : "CURRENT BEST"}</small><strong>${escapeHtml(vi ? "chưa có" : "none yet")}</strong><em>${escapeHtml(vi ? "missing chưa từng về 0" : "missing has never hit 0")}</em></section>`;
+
+  const windowHtml = `<section class="mw76-window ${covered ? "valid" : ""}"><small>${vi ? "WINDOW" : "WINDOW"} [${escapeHtml(text(view.left))}..${view.right === null || view.right === undefined || view.right < 0 ? "—" : view.right}]</small><strong>${view.windowText ? `"${escapeHtml(view.windowText)}"` : '""'}</strong><em>${vi ? "độ dài" : "length"} ${escapeHtml(text(view.windowLength))}</em></section>`;
+
+  const tone = view.event === "return"
+    ? "done"
+    : view.event === "record-better"
+      ? "better"
+      : view.event === "shrink-breaks"
+        ? "breaks"
+        : view.event && String(view.event).startsWith("shrink")
+          ? "shrink"
+          : "";
+  const summary = vi
+    ? `Bài 76, s = "${view.s}", t = "${view.t}". ${text(step.title)}`
+    : `Problem 76, s = "${view.s}", t = "${view.t}". ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="mw76-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>SLIDING WINDOW · NEED COUNTER · #76</small><strong>MINIMUM WINDOW SUBSTRING · t = "${escapeHtml(String(view.t ?? ""))}"</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="mw76-phases">${phases}</div>
+    <section class="mw76-rule"><span><b>1</b><code>missing == 0 ⟺ ${escapeHtml(vi ? "window phủ đủ t" : "the window covers t")}</code></span><i>${vi ? "VÀ" : "AND"}</i><span><b>2</b><code>need[c] &lt; 0 ⟹ ${escapeHtml(vi ? "thừa c, bỏ được" : "surplus c, droppable")}</code></span></section>
+    <section class="mw76-strip"><header><strong>${vi ? "s · WINDOW VÀ BEST" : "s · WINDOW AND BEST"}</strong><span>${escapeHtml(vi ? "viền = window · nền xanh = best · L/R = con trỏ · chữ đậm = ký tự thuộc t" : "outline = window · green fill = best · L/R = cursors · bold letter = character of t")}</span></header><div>${strip}</div></section>
+    <div class="mw76-state">
+      <section class="mw76-need-card"><header><strong>${vi ? "need · CÒN NỢ BAO NHIÊU" : "need · HOW MANY ARE STILL OWED"}</strong><span>${escapeHtml(vi ? "âm = thừa" : "negative = surplus")}</span></header><div>${needHtml}</div></section>
+      <div class="mw76-gauges">${gauge}${windowHtml}${bestHtml}</div>
+    </div>
+    <section class="mw76-action ${tone}"><span><small>${escapeHtml(String(view.event || "step").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${escapeHtml(view.answer === null || view.answer === undefined ? (vi ? "đang chạy" : "running") : `ANSWER "${view.answer}"`)}</em></section>
+    <section class="mw76-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
   </section>`;
 }
 function renderStep() {
@@ -35908,6 +35989,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFindXValue3524View(step);
+  } else if (step.minWindow76View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinWindow76View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

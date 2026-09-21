@@ -97,13 +97,29 @@ test('1401 builders agree with an independent region-based oracle', () => {
   }
 });
 
-// Line 0 is `class Solution:`, which a debugger never stops on during a call.
-// Every other line of a code block must be visited exactly once, in order.
+// codeLines are 1-based: renderCode emits row.dataset.line = index + 1, so line
+// N highlights code[N - 1]. Line 1 is `class Solution:`, which a debugger never
+// stops on; every other line must be visited exactly once, in order.
+const bodyLines = (code) => code.map((_line, index) => index + 1).slice(1);
+
 function assertWalksEveryLine(steps, code) {
   assert.ok(steps.every((step) => step.codeLines.length === 1), 'each step must own exactly one line');
   const visited = steps.map((step) => step.codeLines[0]);
-  const expected = code.map((_line, index) => index).slice(1);
-  assert.deepEqual(visited, expected, 'the trace must step through every body line in source order');
+  assert.deepEqual(visited, bodyLines(code), 'the trace must step through every body line in source order');
+}
+
+// Guards the 1-based convention directly: the highlighted source line must
+// mention the variable the step claims to assign.
+function assertHighlightMentions(steps, code, expectations) {
+  for (const [operation, needle] of Object.entries(expectations)) {
+    const step = steps.find((candidate) => candidate.circleRectangle1401View.operation === operation);
+    assert.ok(step, `no step with operation ${operation}`);
+    const source = code[step.codeLines[0] - 1];
+    assert.ok(
+      source.includes(needle),
+      `operation ${operation} highlights line ${step.codeLines[0]} (${source.trim()}), which does not mention ${needle}`,
+    );
+  }
 }
 
 test('1401 approach 1 steps through every source line of the clamp', () => {
@@ -113,6 +129,19 @@ test('1401 approach 1 steps through every source line of the clamp', () => {
   assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
     'inputs', 'inner-x', 'closest-x', 'inner-y', 'closest-y', 'dx', 'dy', 'dist-squared', 'radius-squared', 'return',
   ]);
+  // Each step must light up the line that actually performs it.
+  assertHighlightMentions(result.steps, problem.code, {
+    inputs: 'def checkOverlap',
+    'inner-x': 'inner_x = min(xCenter, x2)',
+    'closest-x': 'closest_x = max(x1, inner_x)',
+    'inner-y': 'inner_y = min(yCenter, y2)',
+    'closest-y': 'closest_y = max(y1, inner_y)',
+    dx: 'dx = xCenter - closest_x',
+    dy: 'dy = yCenter - closest_y',
+    'dist-squared': 'dist_squared = dx * dx + dy * dy',
+    'radius-squared': 'radius_squared = radius * radius',
+    return: 'return dist_squared <= radius_squared',
+  });
   // Each variable stays null until its own line runs, so the locals panel can
   // distinguish "not assigned yet" from "assigned 0".
   const at = (index) => result.steps[index].circleRectangle1401View;
@@ -142,7 +171,7 @@ function assertOneLinePerStep(steps, code) {
   assert.ok(steps.every((step) => step.codeLines.length === 1), 'each step must own exactly one line');
   for (const step of steps) {
     const line = step.codeLines[0];
-    assert.ok(Number.isInteger(line) && line >= 1 && line < code.length, `line ${line} is out of range`);
+    assert.ok(Number.isInteger(line) && line >= 1 && line <= code.length, `line ${line} is out of range`);
   }
   assert.equal(steps.filter((step) => step.final).length, 1, 'exactly one final step');
   assert.equal(steps.at(-1).final, true);
@@ -175,10 +204,16 @@ test('1401 approach 2 returns early when a slab already contains the center', ()
   const result = buildApproach2(1, 5, 5, [0, 0, 10, 10]);
   assert.equal(result.answer, true);
   assertOneLinePerStep(result.steps, problem.code2);
-  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 5]);
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [2, 3, 4, 5, 6]);
   assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
     'inputs', 'in-wide', 'in-tall', 'slab-check', 'return-slab',
   ]);
+  assertHighlightMentions(result.steps, problem.code2, {
+    'in-wide': 'in_wide =',
+    'in-tall': 'in_tall =',
+    'slab-check': 'if in_wide or in_tall:',
+    'return-slab': 'return True',
+  });
   const final = result.steps.at(-1).circleRectangle1401View;
   assert.equal(final.inWide, true);
   assert.equal(final.slabHit, true);
@@ -193,11 +228,18 @@ test('1401 approach 2 walks the corner discs and breaks on the first hit', () =>
   const result = buildApproach2(5, 0, 0, [3, 4, 8, 9]);
   assert.equal(result.answer, true);
   assertOneLinePerStep(result.steps, problem.code2);
-  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [2, 3, 4, 5, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(result.steps.map((step) => step.circleRectangle1401View.operation), [
     'inputs', 'in-wide', 'in-tall', 'slab-check', 'radius-squared',
     'corner-loop', 'corner-dx', 'corner-dy', 'corner-check', 'return-corner',
   ]);
+  assertHighlightMentions(result.steps, problem.code2, {
+    'radius-squared': 'radius_squared =',
+    'corner-loop': 'for corner_x, corner_y in',
+    'corner-dx': 'dx = xCenter - corner_x',
+    'corner-dy': 'dy = yCenter - corner_y',
+    'corner-check': 'if dx * dx + dy * dy <= radius_squared:',
+  });
   const at = (index) => result.steps[index].circleRectangle1401View;
   assert.equal(at(3).slabHit, false, 'both slabs must miss for the loop to run');
   assert.equal(at(4).radiusSq, 25);
@@ -216,12 +258,12 @@ test('1401 approach 2 tests all four corner discs before returning False', () =>
   assertOneLinePerStep(result.steps, problem.code2);
   // Slab tests, then four passes of (loop, dx, dy, check), then return False.
   assert.deepEqual(result.steps.map((step) => step.codeLines[0]), [
-    1, 2, 3, 4, 6,
-    7, 8, 9, 10,
-    7, 8, 9, 10,
-    7, 8, 9, 10,
-    7, 8, 9, 10,
-    12,
+    2, 3, 4, 5, 7,
+    8, 9, 10, 11,
+    8, 9, 10, 11,
+    8, 9, 10, 11,
+    8, 9, 10, 11,
+    13,
   ]);
   const loops = result.steps.filter((step) => step.circleRectangle1401View.operation === 'corner-loop');
   assert.deepEqual(loops.map((step) => [step.circleRectangle1401View.cornerX, step.circleRectangle1401View.cornerY]), [
@@ -257,9 +299,8 @@ test('1401 approach 2 reaches every line of its code block across inputs', () =>
       visited.add(step.codeLines[0]);
     }
   }
-  // Every line except 0 (`class Solution:`) must be reachable.
-  const expected = problem.code2.map((_line, index) => index).slice(1);
-  assert.deepEqual([...visited].sort((a, b) => a - b), expected);
+  // Every line except line 1 (`class Solution:`) must be reachable.
+  assert.deepEqual([...visited].sort((a, b) => a - b), bodyLines(problem.code2));
 });
 
 test('1401 opts into the client line-by-line debugger without mangling the trace', () => {
@@ -329,7 +370,7 @@ test('1401 renderer covers all states in English and Vietnamese', () => {
   vm.runInContext(source.slice(start, end), context);
   // Lines that assign a local, per approach. Other lines are branches, loop
   // headers, or returns, and legitimately have no active local cell.
-  const localLines = { 1: new Set([2, 3, 4, 5, 6, 7, 8, 9]), 2: new Set([2, 3, 6, 7, 8, 9]) };
+  const localLines = { 1: new Set([3, 4, 5, 6, 7, 8, 9, 10]), 2: new Set([3, 4, 7, 8, 9, 10]) };
   const traces = [
     // Overlapping, separated, center inside, corner-exact, clamped-on-both-axes.
     ...build(1, 0, 0, [1, -1, 3, 1]).steps,

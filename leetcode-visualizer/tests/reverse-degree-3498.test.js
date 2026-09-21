@@ -95,7 +95,17 @@ test('3498 trace steps one source line at a time through the loop', () => {
   assert.equal(run.steps.length, 12);
   assert.ok(run.steps.every((step) => step.codeLines.length === 1));
   // intro, init, then (loop header, value, accumulate) per character, then return.
-  assert.deepEqual(run.steps.map((step) => step.codeLines[0]), [1, 2, 3, 4, 5, 3, 4, 5, 3, 4, 5, 6]);
+  // codeLines are 1-based: line N highlights code[N - 1].
+  assert.deepEqual(run.steps.map((step) => step.codeLines[0]), [2, 3, 4, 5, 6, 4, 5, 6, 4, 5, 6, 7]);
+  // Guards the convention: each step must light up the line that performs it.
+  const sourceFor = (event) => problem.code[
+    run.steps.find((step) => step.reverseDegree3498View.event === event).codeLines[0] - 1
+  ];
+  assert.match(sourceFor('init'), /total = 0/);
+  assert.match(sourceFor('take-char'), /enumerate\(s, 1\)/);
+  assert.match(sourceFor('reverse-value'), /reverse_position = 26 -/);
+  assert.match(sourceFor('accumulate'), /total \+= position \* reverse_position/);
+  assert.match(sourceFor('return'), /return total/);
   assert.deepEqual(run.steps.map((step) => step.reverseDegree3498View.event), [
     'rule', 'init',
     'take-char', 'reverse-value', 'accumulate',
