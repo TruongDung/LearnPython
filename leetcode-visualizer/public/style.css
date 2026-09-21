@@ -58426,3 +58426,139 @@ html, body {
   .rd3498-total > footer { flex-wrap: wrap; }
   .rd3498-total > footer em { margin-left: 0; width: 100%; }
 }
+
+/* #3524: the full subarray triangle next to the k-bucket remainder DP, so the
+   O(n^2) ground truth and the O(n*k) counters stay side by side. */
+.tree-view:has(> .fx3524-viz) { min-width: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
+.fx3524-viz {
+  --fx3524-text: #e2e8f0;
+  --fx3524-muted: #94a3b8;
+  --fx3524-panel: #111827;
+  --fx3524-soft: rgba(15, 23, 42, .72);
+  --fx3524-border: #334155;
+  --fx3524-active: #38bdf8;
+  --fx3524-source: #a78bfa;
+  --fx3524-good: #34d399;
+  --fx3524-warn: #f59e0b;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  color: var(--fx3524-text);
+}
+[data-theme="light"] .fx3524-viz {
+  --fx3524-text: #172033;
+  --fx3524-muted: #64748b;
+  --fx3524-panel: #fff;
+  --fx3524-soft: #f8fafc;
+  --fx3524-border: #d6deea;
+  --fx3524-active: #0369a1;
+  --fx3524-source: #6d28d9;
+  --fx3524-good: #047857;
+  --fx3524-warn: #b45309;
+}
+.fx3524-viz > header,
+.fx3524-nums > header,
+.fx3524-triangle > header,
+.fx3524-dp > header,
+.fx3524-work > header { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.fx3524-viz > header > div { display: grid; gap: 2px; }
+.fx3524-viz > header small { color: var(--fx3524-source); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.fx3524-viz > header strong { color: var(--fx3524-text); font-size: 13px; }
+.fx3524-viz > header > span { max-width: 46%; color: var(--fx3524-muted); font-size: 11px; text-align: right; }
+.fx3524-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.fx3524-phases > span { display: flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; padding: 5px; color: var(--fx3524-muted); background: var(--fx3524-panel); border: 1px solid var(--fx3524-border); border-radius: 8px; font-size: 9px; font-weight: 750; text-align: center; }
+.fx3524-phases > span i { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; color: var(--fx3524-text); background: color-mix(in srgb, var(--fx3524-muted) 20%, transparent); border-radius: 50%; font-size: 8px; font-style: normal; }
+.fx3524-phases > span.active { color: var(--fx3524-source); border-color: var(--fx3524-source); background: color-mix(in srgb, var(--fx3524-source) 9%, var(--fx3524-panel)); }
+.fx3524-phases > span.active i { color: #fff; background: var(--fx3524-source); }
+.fx3524-phases > span.done { color: var(--fx3524-good); border-color: color-mix(in srgb, var(--fx3524-good) 55%, var(--fx3524-border)); }
+.fx3524-phases > span.done i { color: #fff; background: var(--fx3524-good); }
+.fx3524-rule { display: grid; grid-template-columns: auto auto 1fr; gap: 9px; align-items: center; padding: 9px 11px; border-left: 3px solid var(--fx3524-source); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--fx3524-source) 8%, var(--fx3524-panel)); }
+.fx3524-rule > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fx3524-rule b { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; color: #fff; background: var(--fx3524-active); border-radius: 50%; font-size: 9px; }
+.fx3524-rule > span:last-child b { background: var(--fx3524-source); }
+.fx3524-rule code { color: var(--fx3524-text); font: 800 10px Consolas, monospace; overflow-wrap: anywhere; }
+.fx3524-rule > i { color: var(--fx3524-muted); font-size: 8px; font-style: normal; }
+.fx3524-nums,
+.fx3524-triangle,
+.fx3524-dp,
+.fx3524-work { display: grid; gap: 7px; min-width: 0; padding: 9px; background: var(--fx3524-panel); border: 1px solid var(--fx3524-border); border-radius: 9px; }
+.fx3524-nums > header strong,
+.fx3524-triangle > header strong,
+.fx3524-dp > header strong,
+.fx3524-work > header strong { color: var(--fx3524-text); font-size: 9px; letter-spacing: .06em; }
+.fx3524-nums > header span,
+.fx3524-triangle > header span,
+.fx3524-dp > header span,
+.fx3524-work > header span { color: var(--fx3524-muted); font-size: 8px; }
+.fx3524-nums > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.fx3524-nums > div > span { display: grid; gap: 1px; justify-items: center; min-width: 44px; padding: 5px 6px; background: var(--fx3524-soft); border: 1px solid var(--fx3524-border); border-radius: 7px; }
+.fx3524-nums small { color: var(--fx3524-muted); font: 700 7px Consolas, monospace; }
+.fx3524-nums strong { color: var(--fx3524-text); font: 800 13px Consolas, monospace; }
+.fx3524-nums em { color: var(--fx3524-source); font: 700 8px Consolas, monospace; font-style: normal; }
+.fx3524-nums > div > span.pending { opacity: .45; }
+.fx3524-nums > div > span.done { border-color: color-mix(in srgb, var(--fx3524-good) 45%, var(--fx3524-border)); }
+.fx3524-nums > div > span.current { border-color: var(--fx3524-active); box-shadow: 0 0 0 1px var(--fx3524-active); }
+.fx3524-nums > div > span.current strong { color: var(--fx3524-active); }
+.fx3524-layout { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 9px; align-items: start; }
+.fx3524-grid { display: grid; gap: 2px; }
+.fx3524-grid > span { display: grid; place-items: center; min-height: 24px; border-radius: 4px; font: 800 10px Consolas, monospace; }
+.fx3524-corner { color: var(--fx3524-muted); font-size: 8px !important; }
+.fx3524-axis { color: var(--fx3524-muted); background: var(--fx3524-soft); }
+.fx3524-axis.on { color: var(--fx3524-active); background: color-mix(in srgb, var(--fx3524-active) 20%, transparent); }
+.fx3524-blank { background: transparent; }
+.fx3524-cell { color: var(--fx3524-text); background: var(--fx3524-soft); border: 1px solid transparent; }
+.fx3524-cell.pending { opacity: .3; }
+.fx3524-cell.counted { border-color: color-mix(in srgb, var(--fx3524-good) 40%, transparent); background: color-mix(in srgb, var(--fx3524-good) 12%, var(--fx3524-soft)); }
+.fx3524-cell.active { border-color: var(--fx3524-active); background: color-mix(in srgb, var(--fx3524-active) 16%, var(--fx3524-panel)); }
+.fx3524-cell.matched { border-color: var(--fx3524-warn); background: color-mix(in srgb, var(--fx3524-warn) 30%, var(--fx3524-panel)); box-shadow: 0 0 0 1px var(--fx3524-warn); }
+.fx3524-row { display: grid; gap: 4px; }
+.fx3524-row > small { color: var(--fx3524-muted); font: 700 8px Consolas, monospace; }
+.fx3524-row > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx3524-row > div > span { display: grid; gap: 1px; justify-items: center; min-width: 38px; padding: 4px 5px; background: var(--fx3524-soft); border: 1px solid var(--fx3524-border); border-radius: 6px; }
+.fx3524-row > div > span small { color: var(--fx3524-muted); font: 700 7px Consolas, monospace; }
+.fx3524-row > div > span strong { color: var(--fx3524-text); font: 800 13px Consolas, monospace; }
+.fx3524-row > div > span.focus { box-shadow: 0 0 0 1px currentColor; }
+.fx3524-row > div > span.focus.source { color: var(--fx3524-source); border-color: var(--fx3524-source); background: color-mix(in srgb, var(--fx3524-source) 14%, var(--fx3524-panel)); }
+.fx3524-row > div > span.focus.dest { color: var(--fx3524-active); border-color: var(--fx3524-active); background: color-mix(in srgb, var(--fx3524-active) 14%, var(--fx3524-panel)); }
+.fx3524-row > div > span.focus.total { color: var(--fx3524-good); border-color: var(--fx3524-good); background: color-mix(in srgb, var(--fx3524-good) 14%, var(--fx3524-panel)); }
+.fx3524-row > div > span.focus strong { color: inherit; }
+.fx3524-empty { color: var(--fx3524-muted); font: 700 10px Consolas, monospace; }
+.fx3524-checksum { display: flex; align-items: baseline; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--fx3524-border); }
+.fx3524-checksum small { color: var(--fx3524-muted); font: 800 8px Consolas, monospace; }
+.fx3524-checksum strong { color: var(--fx3524-text); font: 800 15px Consolas, monospace; }
+.fx3524-checksum em { color: var(--fx3524-muted); font-size: 8px; font-style: normal; }
+.fx3524-checksum.full strong { color: var(--fx3524-good); }
+.fx3524-transition { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.fx3524-transition > span { display: grid; gap: 2px; justify-items: center; padding: 5px 9px; background: var(--fx3524-soft); border: 1px solid var(--fx3524-border); border-radius: 7px; }
+.fx3524-transition small { color: var(--fx3524-muted); font: 700 7px Consolas, monospace; }
+.fx3524-transition strong { color: var(--fx3524-text); font: 800 14px Consolas, monospace; }
+.fx3524-transition > i { color: var(--fx3524-source); font: 800 12px Consolas, monospace; font-style: normal; }
+.fx3524-transition > em { width: 100%; color: var(--fx3524-muted); font-size: 9px; font-style: normal; }
+.fx3524-transition .dest { border-color: var(--fx3524-active); background: color-mix(in srgb, var(--fx3524-active) 12%, var(--fx3524-panel)); }
+.fx3524-transition .dest strong { color: var(--fx3524-active); }
+.fx3524-transition.empty { opacity: .72; }
+.fx3524-transition-idle { margin: 0; color: var(--fx3524-muted); font-size: 9px; }
+.fx3524-work.extend { border-left: 3px solid var(--fx3524-source); }
+.fx3524-work.accumulate { border-left: 3px solid var(--fx3524-good); }
+.fx3524-work.done { border-left: 3px solid var(--fx3524-good); background: color-mix(in srgb, var(--fx3524-good) 7%, var(--fx3524-panel)); }
+.fx3524-code { display: flex; align-items: baseline; gap: 9px; padding: 8px 11px; background: var(--fx3524-panel); border: 1px solid var(--fx3524-border); border-left: 3px solid var(--fx3524-source); border-radius: 9px; }
+.fx3524-code small { flex: 0 0 auto; color: var(--fx3524-source); font: 800 9px Consolas, monospace; letter-spacing: .06em; }
+.fx3524-code span { color: var(--fx3524-muted); font-size: 10px; line-height: 1.45; }
+
+@container (max-width: 760px) {
+  .fx3524-layout { grid-template-columns: 1fr; }
+  .fx3524-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 520px) {
+  .fx3524-rule { grid-template-columns: 1fr; }
+  .fx3524-rule > i { text-align: center; }
+}
+@container (max-width: 390px) {
+  .fx3524-viz > header,
+  .fx3524-nums > header,
+  .fx3524-triangle > header,
+  .fx3524-dp > header,
+  .fx3524-work > header { align-items: flex-start; flex-direction: column; }
+  .fx3524-viz > header > span { max-width: none; text-align: left; }
+  .fx3524-checksum { flex-wrap: wrap; }
+}

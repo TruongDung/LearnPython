@@ -35211,6 +35211,117 @@ function renderReverseDegree3498View(step) {
     <section class="rd3498-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
   </section>`;
 }
+function renderFindXValue3524View(step) {
+  const view = step.findXValue3524View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const n = Number.isInteger(view.n) ? view.n : nums.length;
+  const k = Number.isInteger(view.k) ? view.k : 1;
+  const index = Number.isInteger(view.index) ? view.index : -1;
+  const r = Number.isInteger(view.r) ? view.r : -1;
+  const targetR = Number.isInteger(view.targetR) ? view.targetR : -1;
+  const event = view.event || "";
+  const grid = Array.isArray(view.grid) ? view.grid : [];
+  const total = (n * (n + 1)) / 2;
+
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, position) => {
+      const state = position < stageIndex ? "done" : position === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : position + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  // nums with each value's remainder underneath, current element lit.
+  const numsStrip = nums
+    .map((value, position) => `<span class="${position === index ? "current" : position < index ? "done" : "pending"}"><small>${position}</small><strong>${escapeHtml(value)}</strong><em>%${k}=${value % k}</em></span>`)
+    .join("");
+
+  // The full triangle of subarrays, each labelled with its product remainder.
+  // The column under the current index is exactly what new_dp is counting.
+  const cellMatched = (cell) => {
+    if (cell.end !== index) return false;
+    if (event === "seed-single") return cell.start === index;
+    if (event === "extend") return cell.start < index && cell.fromMod === r;
+    if (event === "accumulate") return cell.mod === r;
+    return false;
+  };
+  const gridCells = [];
+  gridCells.push(`<span class="fx3524-corner">s\\e</span>`);
+  for (let end = 0; end < n; end += 1) {
+    gridCells.push(`<span class="fx3524-axis ${end === index ? "on" : ""}">${end}</span>`);
+  }
+  for (let start = 0; start < n; start += 1) {
+    gridCells.push(`<span class="fx3524-axis">${start}</span>`);
+    for (let end = 0; end < n; end += 1) {
+      if (end < start) {
+        gridCells.push(`<span class="fx3524-blank"></span>`);
+        continue;
+      }
+      const cell = (grid[start] || [])[end - start];
+      if (!cell) {
+        gridCells.push(`<span class="fx3524-blank"></span>`);
+        continue;
+      }
+      const state = index < 0 || cell.end > index ? "pending" : cell.end < index ? "counted" : "active";
+      gridCells.push(`<span class="fx3524-cell ${state}${cellMatched(cell) ? " matched" : ""}" data-mod="${cell.mod}">${cell.mod}</span>`);
+    }
+  }
+  const gridHtml = `<div class="fx3524-grid" style="grid-template-columns: repeat(${n + 1}, minmax(26px, 1fr))">${gridCells.join("")}</div>`;
+
+  const bucketRow = (label, values, focus, tone) => {
+    if (!Array.isArray(values)) {
+      return `<div class="fx3524-row"><small>${escapeHtml(label)}</small><b class="fx3524-empty">${escapeHtml(vi ? "chưa có" : "not yet")}</b></div>`;
+    }
+    const cells = values
+      .map((value, position) => `<span class="${position === focus ? `focus ${tone}` : ""}"><small>r=${position}</small><strong>${value}</strong></span>`)
+      .join("");
+    return `<div class="fx3524-row"><small>${escapeHtml(label)}</small><div>${cells}</div></div>`;
+  };
+
+  // The multiplication map on remainders, shown only while a transition runs.
+  const transition = event === "extend"
+    ? `<div class="fx3524-transition ${view.delta === 0 ? "empty" : "live"}"><span><small>dp[${r}]</small><strong>${escapeHtml(text(view.delta))}</strong></span><i>×${escapeHtml(text(view.numMod))}</i><span><small>(${r} × ${escapeHtml(text(view.numMod))}) % ${k}</small><strong>${targetR}</strong></span><i>→</i><span class="dest"><small>new_dp[${targetR}]</small><strong>${Array.isArray(view.newDp) ? view.newDp[targetR] : "?"}</strong></span><em>${escapeHtml(view.delta === 0 ? (vi ? "không có subarray nào để mở rộng" : "no subarray to extend") : (vi ? `${view.delta} subarray chuyển sang số dư ${targetR}` : `${view.delta} subarrays move to remainder ${targetR}`))}</em></div>`
+    : event === "seed-single"
+      ? `<div class="fx3524-transition live"><span class="dest"><small>new_dp[${escapeHtml(text(view.numMod))}]</small><strong>1</strong></span><em>${escapeHtml(vi ? `subarray một phần tử [${view.num}] kết thúc tại ${index}` : `the single-element subarray [${view.num}] ending at ${index}`)}</em></div>`
+      : event === "accumulate"
+        ? `<div class="fx3524-transition live"><span><small>new_dp[${r}]</small><strong>${escapeHtml(text(view.delta))}</strong></span><i>→</i><span class="dest"><small>ans[${r}]</small><strong>${Array.isArray(view.ans) ? view.ans[r] : "?"}</strong></span><em>${escapeHtml(vi ? "mọi subarray kết thúc tại đúng một vị trí nên không đếm trùng" : "each subarray ends at exactly one index, so nothing is double counted")}</em></div>`
+        : `<p class="fx3524-transition-idle">${escapeHtml(vi ? "Chưa có phép chuyển số dư nào đang chạy." : "No remainder transition is running right now.")}</p>`;
+
+  const ansSum = Array.isArray(view.ans) ? view.ans.reduce((sum, value) => sum + value, 0) : null;
+  const checksum = ansSum === null
+    ? ""
+    : `<footer class="fx3524-checksum ${ansSum === total ? "full" : ""}"><small>Σ ans</small><strong>${ansSum}</strong><em>${escapeHtml(vi ? `phải bằng n(n+1)/2 = ${total}` : `must reach n(n+1)/2 = ${total}`)}</em></footer>`;
+
+  const tone = event === "return" ? "done" : event === "extend" ? "extend" : event === "accumulate" ? "accumulate" : "";
+  const summary = vi
+    ? `Bài 3524, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`
+    : `Problem 3524, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="fx3524-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>DP ON REMAINDERS · SUBARRAY COUNTING · #3524</small><strong>FIND X VALUE OF ARRAY I · k = ${k}</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="fx3524-phases">${phases}</div>
+    <section class="fx3524-rule"><span><b>1</b><code>${escapeHtml(vi ? "bỏ prefix + suffix = chọn một subarray" : "remove prefix + suffix = pick one subarray")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>result[x] = #{subarray : product % k == x}</code></span></section>
+    <section class="fx3524-nums"><header><strong>${vi ? "NUMS · SỐ DƯ CỦA TỪNG PHẦN TỬ" : "NUMS · REMAINDER OF EACH ELEMENT"}</strong><span>${escapeHtml(vi ? "chỉ số dư là quan trọng" : "only the remainder matters")}</span></header><div>${numsStrip}</div></section>
+    <div class="fx3524-layout">
+      <section class="fx3524-triangle"><header><strong>${vi ? "MỌI SUBARRAY · product % k" : "EVERY SUBARRAY · product % k"}</strong><span>${escapeHtml(vi ? "hàng = start, cột = end · cột sáng = đang đếm" : "row = start, column = end · lit column = being counted")}</span></header>${gridHtml}</section>
+      <section class="fx3524-dp"><header><strong>${vi ? "BẢNG ĐẾM THEO SỐ DƯ" : "COUNTS PER REMAINDER"}</strong><span>${escapeHtml(vi ? "chỉ k ô, không phải n² subarray" : "just k buckets, not n² subarrays")}</span></header>
+        ${bucketRow(vi ? "dp · kết thúc tại i−1" : "dp · ending at i−1", view.dp, event === "extend" ? r : -1, "source")}
+        ${bucketRow(vi ? "new_dp · kết thúc tại i" : "new_dp · ending at i", view.newDp, event === "extend" ? targetR : event === "seed-single" ? view.numMod : event === "accumulate" ? r : -1, "dest")}
+        ${bucketRow("ans", view.ans, event === "accumulate" ? r : -1, "total")}
+        ${checksum}
+      </section>
+    </div>
+    <section class="fx3524-work ${tone}"><header><strong>${vi ? "PHÉP CHUYỂN SỐ DƯ" : "THE REMAINDER TRANSITION"}</strong><span>${escapeHtml(vi ? "nhân thêm một phần tử = nhân số dư" : "appending an element multiplies the remainder")}</span></header>${transition}</section>
+    <section class="fx3524-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -35791,6 +35902,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderReverseDegree3498View(step);
+  } else if (step.findXValue3524View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFindXValue3524View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
