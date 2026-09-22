@@ -4256,11 +4256,75 @@ function buildSteps1976(input, params) {
     };
   }
 
-  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+  function phaseForLine(codeLine, final) {
+    if (final || codeLine === 30) return "done";
+    if (codeLine <= 10) return "build";
+    if (codeLine <= 16) return "init";
+    if (codeLine <= 21) return "pop";
+    if (codeLine <= 23) return "inspect";
+    if (codeLine === 24 || codeLine === 28) return "compare";
+    if (codeLine <= 27) return "shorter";
+    return "equal";
+  }
+
+  function pushStep({
+    title,
+    codeLine,
+    vars,
+    note,
+    hlNodes = [],
+    hlEdges = [],
+    annotations = {},
+    final = false,
+    phase = null,
+    currentNode = null,
+    activeEdge = null,
+    candidateTime = null,
+    previousDistance = null,
+    relation = null,
+    previousWays = null,
+    incomingWays = null,
+    answerValue = null,
+  }) {
+    const highlightedEdge = final ? null : hlEdges[0];
+    const resolvedEdge = activeEdge || (highlightedEdge
+      ? {
+          u: highlightedEdge[0],
+          v: highlightedEdge[1],
+          w: edges.find((edge) => (
+            (edge.u === highlightedEdge[0] && edge.v === highlightedEdge[1])
+            || (edge.undirected && edge.u === highlightedEdge[1] && edge.v === highlightedEdge[0])
+          ))?.w,
+        }
+      : null);
+    const resolvedCurrent = currentNode ?? (resolvedEdge ? resolvedEdge.u : (hlNodes.length === 1 ? hlNodes[0] : null));
     steps.push({
       title,
       arr: [],
       graph: makeGraph(hlNodes, hlEdges, annotations),
+      countPaths1976View: {
+        phase: phase || phaseForLine(codeLine, final),
+        nodes: nodes.map((node) => ({
+          node,
+          distance: formatDist(dist[node]),
+          ways: ways[node],
+          isSource: node === 0,
+          isTarget: node === n - 1,
+          isCurrent: node === resolvedCurrent,
+          isCandidate: !!resolvedEdge && node === resolvedEdge.v,
+          isFinalized: finalized.has(node),
+        })),
+        heap: heap.map(([time, node], index) => ({ time, node, index })),
+        currentNode: resolvedCurrent,
+        activeEdge: resolvedEdge,
+        candidateTime,
+        previousDistance: previousDistance === Infinity ? "∞" : previousDistance,
+        relation,
+        previousWays,
+        incomingWays,
+        answer: answerValue,
+        target: n - 1,
+      },
       highlight: [],
       mark: [],
       final,
@@ -4473,6 +4537,9 @@ function buildSteps1976(input, params) {
       pushStep({
         title: { vi: `new_time = ${time} + ${travelTime} = ${newTime}`, en: `new_time = ${time} + ${travelTime} = ${newTime}` },
         codeLine: 23,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4487,12 +4554,20 @@ function buildSteps1976(input, params) {
       });
 
       const oldDist = dist[v];
+      const waysBefore = ways[v];
       const shorter = newTime < oldDist;
       pushStep({
         title: shorter
           ? { vi: `${newTime} < ${formatDist(oldDist)}: ngắn hơn`, en: `${newTime} < ${formatDist(oldDist)}: shorter` }
           : { vi: `${newTime} < ${formatDist(oldDist)}? False`, en: `${newTime} < ${formatDist(oldDist)}? False` },
         codeLine: 24,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
+        previousDistance: oldDist,
+        relation: shorter ? "shorter" : "check-equal",
+        previousWays: waysBefore,
+        incomingWays: ways[u],
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4517,6 +4592,12 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `dist[${v}] = ${newTime}`, en: `dist[${v}] = ${newTime}` },
           codeLine: 25,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [{ name: "dist", value: distStr() }],
@@ -4530,6 +4611,13 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `ways[${v}] = ways[${u}] = ${ways[u]}`, en: `ways[${v}] = ways[${u}] = ${ways[u]}` },
           codeLine: 26,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          previousWays: waysBefore,
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [{ name: "ways", value: waysStr() }],
@@ -4544,6 +4632,12 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `Push (${newTime}, ${v})`, en: `Push (${newTime}, ${v})` },
           codeLine: 27,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          incomingWays: ways[u],
           hlNodes: [v],
           vars: [{ name: "heap", value: heapStr() }],
           note: {
@@ -4560,6 +4654,13 @@ function buildSteps1976(input, params) {
           ? { vi: `${newTime} == dist[${v}]: thêm số cách`, en: `${newTime} == dist[${v}]: add path counts` }
           : { vi: `${newTime} == dist[${v}]? False`, en: `${newTime} == dist[${v}]? False` },
         codeLine: 28,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
+        previousDistance: dist[v],
+        relation: equal ? "equal" : "longer",
+        previousWays: ways[v],
+        incomingWays: ways[u],
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4585,6 +4686,13 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}`, en: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}` },
           codeLine: 29,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: dist[v],
+          relation: "equal",
+          previousWays: oldWays,
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [
@@ -4632,6 +4740,8 @@ function buildSteps1976(input, params) {
   pushStep({
     title: { vi: `Có ${answer} đường ngắn nhất tới node ${target}`, en: `${answer} shortest routes reach node ${target}` },
     codeLine: 30,
+    phase: "done",
+    answerValue: answer,
     hlNodes: [...shortestNodes],
     hlEdges: shortestEdges,
     final: true,

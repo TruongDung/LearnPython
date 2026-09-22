@@ -8538,6 +8538,136 @@ function renderGraph(step, targetId = "treeView") {
     `</svg>`;
 }
 
+function renderCountPaths1976View(step) {
+  const view = step.countPaths1976View || {};
+  const vi = lang === "vi";
+  const stageIndex = ["build", "init"].includes(view.phase)
+    ? 0
+    : ["pop", "inspect"].includes(view.phase)
+      ? 1
+      : ["compare", "shorter", "equal"].includes(view.phase)
+        ? 2
+        : 3;
+  const stages = vi
+    ? ["1. Dựng graph", "2. Pop gần nhất", "3. Cập nhật dist + ways", "4. Trả kết quả"]
+    : ["1. Build graph", "2. Pop closest", "3. Update dist + ways", "4. Return result"];
+  const stagesHtml = stages.map((label, index) => {
+    const state = index < stageIndex ? "is-done" : index === stageIndex ? "is-active" : "";
+    return `<span class="${state}">${index < stageIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const nodeCards = (view.nodes || []).map((item) => {
+    const classes = ["cp1976-node-state"];
+    if (item.isSource) classes.push("is-source");
+    if (item.isTarget) classes.push("is-target");
+    if (item.isFinalized) classes.push("is-finalized");
+    if (item.isCurrent) classes.push("is-current");
+    if (item.isCandidate) classes.push("is-candidate");
+    const currentRole = view.phase === "build"
+      ? (vi ? "ĐANG NỐI" : "CONNECTING")
+      : (vi ? "ĐANG POP" : "POPPED");
+    const role = item.isSource
+      ? "SOURCE"
+      : item.isTarget
+        ? "TARGET"
+        : item.isCurrent
+          ? currentRole
+          : `NODE ${item.node}`;
+    return `<div class="${classes.join(" ")}">
+      <header><b>${escapeHtml(role)}</b><span>${escapeHtml(item.node)}</span></header>
+      <div><small>dist</small><strong>${escapeHtml(item.distance)}</strong></div>
+      <div><small>ways</small><strong>${escapeHtml(item.ways)}</strong></div>
+    </div>`;
+  }).join("");
+
+  const heapHtml = (view.heap || []).length
+    ? view.heap.map((item, index) => `<div class="cp1976-heap-item${index === 0 ? " is-front" : ""}">
+        <small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `#${index + 1}`}</small>
+        <strong>(${escapeHtml(item.time)}, ${escapeHtml(item.node)})</strong>
+        <em>time, node</em>
+      </div>`).join("")
+    : `<em class="cp1976-empty">${vi ? "Heap đang rỗng" : "Heap is empty"}</em>`;
+
+  const edge = view.activeEdge;
+  const currentState = edge ? (view.nodes || []).find((item) => item.node === edge.u) : null;
+  const hasCandidate = edge && view.candidateTime !== null && view.candidateTime !== undefined;
+  const relationSymbol = view.relation === "shorter"
+    ? "<"
+    : view.relation === "equal"
+      ? "="
+      : view.relation === "longer"
+        ? ">"
+        : "?";
+  const calculationHtml = hasCandidate
+    ? `<div class="cp1976-calc">
+        <small>${vi ? "THỬ ĐI QUA ROAD" : "TRY THIS ROAD"} ${escapeHtml(edge.u)} — ${escapeHtml(edge.v)}</small>
+        <div class="cp1976-equation">
+          <span>dist[${escapeHtml(edge.u)}]</span><b>${escapeHtml(currentState?.distance ?? "?")}</b>
+          <i>+</i><span>${vi ? "road" : "road"}</span><b>${escapeHtml(edge.w)}</b>
+          <i>=</i><strong>${escapeHtml(view.candidateTime)}</strong>
+        </div>
+        ${view.previousDistance !== null && view.previousDistance !== undefined
+          ? `<div class="cp1976-compare is-${escapeHtml(view.relation || "pending")}">
+              <b>${escapeHtml(view.candidateTime)}</b><i>${escapeHtml(relationSymbol)}</i><b>${escapeHtml(view.previousDistance)}</b>
+              <span>${vi ? `so với dist[${edge.v}] hiện tại` : `compared with current dist[${edge.v}]`}</span>
+            </div>`
+          : ""}
+      </div>`
+    : `<div class="cp1976-calc is-idle"><small>${vi ? "PHÉP RELAX" : "RELAXATION"}</small><p>${vi ? "Chọn một cạnh để xem phép tính dist và ways." : "Select an edge to see the dist and ways calculation."}</p></div>`;
+
+  let decisionText = vi
+    ? "Dijkstra luôn xử lý node có thời gian nhỏ nhất trước."
+    : "Dijkstra always processes the node with the smallest time first.";
+  let waysFormula = vi ? "Chưa thay đổi ways" : "ways is unchanged";
+  if (view.relation === "shorter") {
+    decisionText = vi
+      ? "Đường mới ngắn hơn → thay dist và thay toàn bộ số cách cũ."
+      : "The new route is shorter → replace dist and all old path counts.";
+    waysFormula = `ways[${edge.v}] = ways[${edge.u}] = ${view.incomingWays}`;
+  } else if (view.relation === "equal") {
+    decisionText = vi
+      ? "Thời gian bằng nhau → giữ dist và cộng thêm số cách mới."
+      : "The times are equal → keep dist and add the new path count.";
+    waysFormula = `ways[${edge.v}] = (${view.previousWays} + ${view.incomingWays}) % MOD`;
+  } else if (view.relation === "longer") {
+    decisionText = vi
+      ? "Đường mới dài hơn → bỏ qua, dist và ways đều giữ nguyên."
+      : "The new route is longer → ignore it; dist and ways stay unchanged.";
+    waysFormula = vi ? "Không cập nhật" : "No update";
+  } else if (view.relation === "check-equal") {
+    decisionText = vi
+      ? "Không ngắn hơn; cần kiểm tra tiếp xem thời gian có bằng nhau không."
+      : "It is not shorter; next check whether the times are equal.";
+  }
+
+  const answerHtml = view.answer !== null && view.answer !== undefined
+    ? `<div class="cp1976-answer"><small>${vi ? "KẾT QUẢ" : "ANSWER"}</small><strong>${escapeHtml(view.answer)}</strong><span>${vi ? `đường ngắn nhất tới node ${view.target}` : `shortest routes to node ${view.target}`}</span></div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="cp1976-viz" aria-label="${vi ? "Trực quan hóa đếm đường đi ngắn nhất" : "Shortest-path counting visualization"}">
+    <div class="cp1976-stages">${stagesHtml}</div>
+    <div class="cp1976-concepts">
+      <div><b>dist[v]</b><span>${vi ? "thời gian ngắn nhất tới v" : "shortest time to v"}</span></div>
+      <div><b>ways[v]</b><span>${vi ? "số đường đạt đúng dist[v]" : "routes attaining dist[v]"}</span></div>
+    </div>
+    <div class="cp1976-rules">
+      <article class="is-shorter${view.relation === "shorter" ? " is-active" : ""}"><small>${vi ? "TRƯỜNG HỢP 1" : "CASE 1"}</small><strong>new_time &lt; dist[v]</strong><span>${vi ? "Thay dist[v] · ways[v] = ways[u]" : "Replace dist[v] · ways[v] = ways[u]"}</span></article>
+      <article class="is-equal${view.relation === "equal" ? " is-active" : ""}"><small>${vi ? "TRƯỜNG HỢP 2" : "CASE 2"}</small><strong>new_time = dist[v]</strong><span>${vi ? "Giữ dist[v] · ways[v] += ways[u]" : "Keep dist[v] · ways[v] += ways[u]"}</span></article>
+    </div>
+    <div class="cp1976-main">
+      <section class="cp1976-panel cp1976-graph-panel"><header><strong>${vi ? "BẢN ĐỒ ĐƯỜNG ĐI" : "ROAD MAP"}</strong><span>${vi ? "số trên cạnh = thời gian" : "edge label = travel time"}</span></header><div id="countPaths1976Graph"></div></section>
+      <aside class="cp1976-side">
+        ${calculationHtml}
+        <div class="cp1976-decision is-${escapeHtml(view.relation || "neutral")}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(decisionText)}</strong><code>${escapeHtml(waysFormula)}</code></div>
+        ${answerHtml}
+      </aside>
+    </div>
+    <section class="cp1976-panel"><header><strong>dist + ways</strong><span>${vi ? "trạng thái của từng node" : "state of every node"}</span></header><div class="cp1976-node-grid">${nodeCards}</div></section>
+    <section class="cp1976-panel"><header><strong>MIN-HEAP</strong><span>${vi ? "ưu tiên time nhỏ nhất" : "smallest time first"}</span></header><div class="cp1976-heap">${heapHtml}</div></section>
+  </section>`;
+  renderGraph(step, "countPaths1976Graph");
+}
+
 function renderNetworkDelayView(step) {
   const view = step.networkDelayView;
   const vi = lang === "vi";
@@ -36488,6 +36618,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCycle2360View(step);
+  } else if (step.countPaths1976View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountPaths1976View(step);
   } else if (step.graph) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
