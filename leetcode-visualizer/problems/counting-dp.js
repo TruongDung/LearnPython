@@ -809,3 +809,547 @@ Object.assign(module.exports, {
     builder: buildSteps3524,
   },
 });
+
+// ─── 3525: Find X Value of Array II ───
+// Removing a suffix from nums[start..] leaves a PREFIX of that suffix, so a
+// query counts the prefixes of nums[start..n-1] whose product ≡ x (mod k).
+// Each segment-tree node stores prod (its whole range's product mod k) and
+// cnt[r] (how many prefixes OF THAT NODE'S RANGE hit remainder r). The merge is
+// the crux: prefixes inside the left child keep their remainder, while prefixes
+// that swallow the left child entirely and continue into the right child get
+// their remainder multiplied by left.prod.
+function parseFindXValue3525Input(input, params = {}) {
+  const raw = Array.isArray(input)
+    ? input
+    : String(input ?? "").trim().replace(/^\[|\]$/g, "").split(",");
+  const nums = raw.map((item) => Number(String(item).trim()));
+  if (!nums.length || !nums.every(Number.isInteger)) {
+    throw new Error("nums must be a comma-separated list of integers.");
+  }
+  if (!nums.every((value) => value >= 1 && value <= 1000000000)) {
+    throw new Error("nums values must be integers from 1 to 1,000,000,000.");
+  }
+  // The whole segment tree is drawn, so n is capped for the picture.
+  if (nums.length > 8) throw new Error("Visualization supports up to 8 numbers.");
+  const k = Number(params.k);
+  if (!Number.isInteger(k) || k < 1 || k > 5) throw new Error("k must be an integer from 1 to 5.");
+
+  const text = String(params.queries ?? "").trim();
+  if (!text) throw new Error("Enter at least one query as index,value,start,x (separate queries with ';').");
+  const groups = text.split(";").map((part) => part.trim()).filter(Boolean);
+  if (groups.length > 4) throw new Error("Visualization supports up to 4 queries.");
+  const queries = groups.map((group) => {
+    const parts = group.split(",").map((item) => Number(item.trim()));
+    if (parts.length !== 4 || !parts.every(Number.isInteger)) {
+      throw new Error("Each query must be 4 integers: index,value,start,x.");
+    }
+    const [index, value, start, x] = parts;
+    if (index < 0 || index > nums.length - 1) throw new Error(`Query index must be between 0 and ${nums.length - 1}.`);
+    if (value < 1 || value > 1000000000) throw new Error("Query value must be between 1 and 1,000,000,000.");
+    if (start < 0 || start > nums.length - 1) throw new Error(`Query start must be between 0 and ${nums.length - 1}.`);
+    if (x < 0 || x > k - 1) throw new Error(`Query x must be between 0 and ${k - 1}.`);
+    return { index, value, start, x };
+  });
+  return { nums, k, queries };
+}
+
+function buildSteps3525(input, params = {}) {
+  const parsed = parseFindXValue3525Input(input, params);
+  const { k, queries } = parsed;
+  const original = [...parsed.nums];
+  const nums = [...parsed.nums];
+  const n = nums.length;
+  const steps = [];
+  const stages = [
+    { vi: "Dựng segment tree", en: "Build the segment tree" },
+    { vi: "Cập nhật nums[index]", en: "Update nums[index]" },
+    { vi: "Truy vấn hậu tố [start..n−1]", en: "Query the suffix [start..n−1]" },
+    { vi: "Đọc cnt[x]", en: "Read cnt[x]" },
+  ];
+
+  const prod = Array(4 * n).fill(1);
+  const cnt = Array.from({ length: 4 * n }, () => Array(k).fill(0));
+  const range = new Map();
+  const ready = new Set();
+
+  let queryIndex = -1;
+  let activeU = -1;
+  let leftU = -1;
+  let rightU = -1;
+  let pathU = [];
+  let selectedU = [];
+  let mergeInfo = null;
+  let runningCnt = null;
+  let runningProd = null;
+  const answers = [];
+  let answer = null;
+
+  // Ground truth for the picture: the running product remainder of every
+  // prefix of nums[start..n-1].
+  const prefixProducts = (start) => {
+    if (start === null) return null;
+    const out = [];
+    let running = 1;
+    for (let j = start; j < n; j += 1) {
+      running = (running * (nums[j] % k)) % k;
+      out.push({ end: j, mod: running });
+    }
+    return out;
+  };
+
+  const nodesState = () => [...range.entries()]
+    .map(([u, info]) => ({
+      u,
+      lo: info.lo,
+      hi: info.hi,
+      depth: info.depth,
+      prod: ready.has(u) ? prod[u] : null,
+      cnt: ready.has(u) ? [...cnt[u]] : null,
+      ready: ready.has(u),
+    }))
+    .sort((a, b) => (a.depth - b.depth) || (a.lo - b.lo));
+
+  const snap = ({ stage, phase, event, title, note, codeLines, start = null, x = null, final = false }) => {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      final,
+      vars: [
+        { name: "nums", value: `[${nums.join(",")}]` },
+        { name: "query", value: queryIndex < 0 ? "—" : `#${queryIndex} ${JSON.stringify([queries[queryIndex].index, queries[queryIndex].value, queries[queryIndex].start, queries[queryIndex].x])}` },
+        { name: "node", value: activeU < 0 ? "—" : `u=${activeU} [${range.get(activeU).lo}..${range.get(activeU).hi}]` },
+        { name: "cnt[node]", value: activeU >= 0 && ready.has(activeU) ? `[${cnt[activeU].join(",")}]` : "—" },
+        { name: "query cnt", value: runningCnt ? `[${runningCnt.join(",")}]` : "—" },
+        { name: "ans", value: `[${answers.join(",")}]` },
+      ],
+      findXValue3525View: {
+        problemId: 3525,
+        nums: [...nums],
+        original: [...original],
+        n,
+        k,
+        queries: queries.map((q) => ({ ...q })),
+        queryIndex,
+        stages,
+        stage,
+        phase,
+        event,
+        nodes: nodesState(),
+        activeU,
+        leftU,
+        rightU,
+        pathU: [...pathU],
+        selectedU: [...selectedU],
+        merge: mergeInfo ? { ...mergeInfo, aCnt: [...mergeInfo.aCnt], bCnt: [...mergeInfo.bCnt], result: [...mergeInfo.result], shifts: mergeInfo.shifts.map((s) => ({ ...s })) } : null,
+        prefixProducts: prefixProducts(start),
+        start,
+        x,
+        runningCnt: runningCnt ? [...runningCnt] : null,
+        runningProd,
+        answers: [...answers],
+        answer: answer ? [...answer] : null,
+        final,
+      },
+    });
+  };
+
+  // cnt[a..b] = cnt[a] with cnt[b] folded in, each of b's remainders shifted by
+  // a.prod because those prefixes now start by consuming all of a.
+  const foldRight = (aProd, aCnt, bProd, bCnt) => {
+    const result = [...aCnt];
+    const shifts = [];
+    for (let r = 0; r < k; r += 1) {
+      const to = (aProd * r) % k;
+      result[to] += bCnt[r];
+      shifts.push({ r, to, amount: bCnt[r] });
+    }
+    return { aProd, bProd, aCnt: [...aCnt], bCnt: [...bCnt], result, shifts, prod: (aProd * bProd) % k };
+  };
+
+  snap({
+    stage: 0,
+    phase: "intro",
+    event: "rule",
+    codeLines: [5, 6, 7],
+    title: { vi: `Segment tree trên ${n} phần tử, mỗi node giữ prod và cnt[${k}]`, en: `Segment tree over ${n} elements, each node stores prod and cnt[${k}]` },
+    note: {
+      vi: `Bỏ một suffix của nums[start..] thì phần còn lại là một PREFIX của đoạn đó, nên mỗi query đếm các prefix của nums[start..${n - 1}] có product % ${k} = x. Mỗi node giữ prod (product cả đoạn) và cnt[r] = số prefix CỦA ĐOẠN ĐÓ có số dư r.`,
+      en: `Removing a suffix of nums[start..] leaves a PREFIX of that range, so a query counts the prefixes of nums[start..${n - 1}] whose product % ${k} is x. Each node stores prod (its whole range's product) and cnt[r] = how many prefixes OF THAT RANGE have remainder r.`,
+    },
+  });
+
+  function emitMerge({ u, stage, phase, event, codeLines, start = null, x = null }) {
+    const a = u * 2;
+    const b = u * 2 + 1;
+    leftU = a;
+    rightU = b;
+    activeU = u;
+    mergeInfo = foldRight(prod[a], cnt[a], prod[b], cnt[b]);
+    prod[u] = mergeInfo.prod;
+    cnt[u] = [...mergeInfo.result];
+    ready.add(u);
+    const info = range.get(u);
+    const moved = mergeInfo.shifts.filter((s) => s.amount > 0);
+    snap({
+      stage,
+      phase,
+      event,
+      codeLines,
+      start,
+      x,
+      title: {
+        vi: `merge(u=${u}) [${info.lo}..${info.hi}]: prod=${prod[u]}, cnt=[${cnt[u].join(",")}]`,
+        en: `merge(u=${u}) [${info.lo}..${info.hi}]: prod=${prod[u]}, cnt=[${cnt[u].join(",")}]`,
+      },
+      note: {
+        vi: `Prefix nằm hẳn trong con trái giữ nguyên số dư (copy cnt[${a}]=[${mergeInfo.aCnt.join(",")}]). Prefix ăn trọn con trái rồi lấn sang con phải thì số dư bị nhân với prod[${a}]=${mergeInfo.aProd}${moved.length ? `: ${moved.map((s) => `${s.amount} prefix ${s.r}→${s.to}`).join(", ")}` : ", nhưng con phải chưa có prefix nào khác 0"}.`,
+        en: `Prefixes living entirely inside the left child keep their remainder (copy cnt[${a}]=[${mergeInfo.aCnt.join(",")}]). Prefixes that swallow the left child and continue into the right child have their remainder multiplied by prod[${a}]=${mergeInfo.aProd}${moved.length ? `: ${moved.map((s) => `${s.amount} prefix ${s.r}→${s.to}`).join(", ")}` : ", but the right child contributes nothing here"}.`,
+      },
+    });
+    mergeInfo = null;
+    leftU = -1;
+    rightU = -1;
+  }
+
+  (function build(u, lo, hi, depth) {
+    range.set(u, { lo, hi, depth });
+    if (lo === hi) {
+      const v = nums[lo] % k;
+      prod[u] = v;
+      cnt[u] = Array(k).fill(0);
+      cnt[u][v] = 1;
+      ready.add(u);
+      activeU = u;
+      snap({
+        stage: 0,
+        phase: "build",
+        event: "build-leaf",
+        codeLines: [17, 18, 19, 20, 21],
+        title: { vi: `Lá u=${u} = nums[${lo}]=${nums[lo]} → prod=${v}, cnt=[${cnt[u].join(",")}]`, en: `Leaf u=${u} = nums[${lo}]=${nums[lo]} → prod=${v}, cnt=[${cnt[u].join(",")}]` },
+        note: {
+          vi: `Một đoạn dài 1 chỉ có đúng một prefix: chính nó, số dư ${nums[lo]} % ${k} = ${v}.`,
+          en: `A range of length 1 has exactly one prefix — itself — with remainder ${nums[lo]} % ${k} = ${v}.`,
+        },
+      });
+      return;
+    }
+    const mid = Math.floor((lo + hi) / 2);
+    build(u * 2, lo, mid, depth + 1);
+    build(u * 2 + 1, mid + 1, hi, depth + 1);
+    emitMerge({ u, stage: 0, phase: "build", event: "build-merge", codeLines: [23, 24, 25, 26] });
+  })(1, 0, n - 1, 0);
+
+  activeU = -1;
+  snap({
+    stage: 0,
+    phase: "built",
+    event: "built",
+    codeLines: [54],
+    title: { vi: `Cây đã dựng: cnt[gốc] = [${cnt[1].join(",")}]`, en: `Tree built: cnt[root] = [${cnt[1].join(",")}]` },
+    note: {
+      vi: `cnt[gốc] đếm các prefix của cả mảng, tổng = ${n}. Dựng mất O(n·k); mỗi update và mỗi query sau đó chỉ mất O(k·log n).`,
+      en: `cnt[root] counts the prefixes of the whole array and sums to ${n}. Building costs O(n·k); every later update and query costs only O(k·log n).`,
+    },
+  });
+
+  for (let qi = 0; qi < queries.length; qi += 1) {
+    queryIndex = qi;
+    const { index, value, start, x } = queries[qi];
+
+    nums[index] = value;
+    pathU = [];
+    activeU = -1;
+    snap({
+      stage: 1,
+      phase: "assign",
+      event: "assign",
+      codeLines: [57],
+      start,
+      x,
+      title: { vi: `Query #${qi}: nums[${index}] = ${value}`, en: `Query #${qi}: nums[${index}] = ${value}` },
+      note: {
+        vi: `Thay đổi này GIỮ LẠI cho các query sau, nên cây phải được cập nhật thật chứ không chỉ tính tạm. nums giờ là [${nums.join(",")}].`,
+        en: `This edit PERSISTS for later queries, so the tree must really be updated rather than patched temporarily. nums is now [${nums.join(",")}].`,
+      },
+    });
+
+    (function update(u, lo, hi) {
+      pathU = [...pathU, u];
+      if (lo === hi) {
+        const v = value % k;
+        prod[u] = v;
+        cnt[u] = Array(k).fill(0);
+        cnt[u][v] = 1;
+        activeU = u;
+        snap({
+          stage: 1,
+          phase: "update",
+          event: "update-leaf",
+          codeLines: [29, 30, 31, 32],
+          start,
+          x,
+          title: { vi: `Lá u=${u} [${lo}] → prod=${v}, cnt=[${cnt[u].join(",")}]`, en: `Leaf u=${u} [${lo}] → prod=${v}, cnt=[${cnt[u].join(",")}]` },
+          note: {
+            vi: `Ghi lại số dư mới ${value} % ${k} = ${v}. Giờ phải merge ngược lên gốc để mọi tổ tiên đúng lại.`,
+            en: `Record the new remainder ${value} % ${k} = ${v}. Now merge back up to the root so every ancestor is correct again.`,
+          },
+        });
+        return;
+      }
+      const mid = Math.floor((lo + hi) / 2);
+      activeU = u;
+      snap({
+        stage: 1,
+        phase: "update",
+        event: "descend",
+        codeLines: [34, 35, index <= mid ? 36 : 38],
+        start,
+        x,
+        title: {
+          vi: `u=${u} [${lo}..${hi}], mid=${mid} → đi ${index <= mid ? "trái" : "phải"}`,
+          en: `u=${u} [${lo}..${hi}], mid=${mid} → go ${index <= mid ? "left" : "right"}`,
+        },
+        note: {
+          vi: `index ${index} ${index <= mid ? `≤ ${mid} nên nằm trong con trái [${lo}..${mid}]` : `> ${mid} nên nằm trong con phải [${mid + 1}..${hi}]`}. Chỉ một nhánh cần đi, nên đường cập nhật dài O(log n).`,
+          en: `index ${index} ${index <= mid ? `≤ ${mid}, so it lives in the left child [${lo}..${mid}]` : `> ${mid}, so it lives in the right child [${mid + 1}..${hi}]`}. Only one branch is followed, so the update path is O(log n) long.`,
+        },
+      });
+      if (index <= mid) update(u * 2, lo, mid);
+      else update(u * 2 + 1, mid + 1, hi);
+      emitMerge({ u, stage: 1, phase: "update", event: "update-merge", codeLines: [39, 10, 11, 12, 13, 14], start, x });
+    })(1, 0, n - 1);
+
+    pathU = [];
+    activeU = -1;
+    selectedU = [];
+    runningCnt = null;
+    runningProd = null;
+
+    // query(u, lo, hi, start): whole node when lo >= start, otherwise split.
+    const result = (function query(u, lo, hi) {
+      if (lo >= start) {
+        selectedU = [...selectedU, u];
+        activeU = u;
+        snap({
+          stage: 2,
+          phase: "query",
+          event: "query-whole",
+          codeLines: [42, 43],
+          start,
+          x,
+          title: { vi: `u=${u} [${lo}..${hi}] nằm trọn trong [${start}..${n - 1}] → dùng cả node`, en: `u=${u} [${lo}..${hi}] sits entirely inside [${start}..${n - 1}] → take the whole node` },
+          note: {
+            vi: `lo=${lo} ≥ start=${start}, nên cnt[${u}]=[${cnt[u].join(",")}] dùng được nguyên vẹn mà không cần đi sâu hơn.`,
+            en: `lo=${lo} ≥ start=${start}, so cnt[${u}]=[${cnt[u].join(",")}] can be used as-is without descending further.`,
+          },
+        });
+        return { prod: prod[u], cnt: [...cnt[u]] };
+      }
+      const mid = Math.floor((lo + hi) / 2);
+      if (start > mid) {
+        activeU = u;
+        snap({
+          stage: 2,
+          phase: "query",
+          event: "query-right-only",
+          codeLines: [44, 45, 46],
+          start,
+          x,
+          title: { vi: `u=${u} [${lo}..${hi}]: start=${start} > mid=${mid} → chỉ cần con phải`, en: `u=${u} [${lo}..${hi}]: start=${start} > mid=${mid} → only the right child matters` },
+          note: {
+            vi: `Cả con trái [${lo}..${mid}] nằm trước start nên bị bỏ hoàn toàn; không có gì để merge.`,
+            en: `The entire left child [${lo}..${mid}] lies before start and is discarded; there is nothing to merge.`,
+          },
+        });
+        return query(u * 2 + 1, mid + 1, hi);
+      }
+      activeU = u;
+      snap({
+        stage: 2,
+        phase: "query",
+        event: "query-split",
+        codeLines: [44, 47, 48],
+        start,
+        x,
+        title: { vi: `u=${u} [${lo}..${hi}]: start=${start} ≤ mid=${mid} → cắt con trái, lấy trọn con phải`, en: `u=${u} [${lo}..${hi}]: start=${start} ≤ mid=${mid} → clip the left child, take all of the right` },
+        note: {
+          vi: `Con trái chỉ góp phần [${start}..${mid}], còn con phải [${mid + 1}..${hi}] nằm trọn sau start nên lấy nguyên. Hai kết quả sẽ được merge bằng đúng quy tắc của merge().`,
+          en: `The left child contributes only [${start}..${mid}], while the right child [${mid + 1}..${hi}] lies entirely after start and is taken whole. The two results are then combined with exactly the same rule as merge().`,
+        },
+      });
+      const left = query(u * 2, lo, mid);
+      const right = query(u * 2 + 1, mid + 1, hi);
+      const folded = foldRight(left.prod, left.cnt, right.prod, right.cnt);
+      mergeInfo = folded;
+      activeU = u;
+      runningCnt = [...folded.result];
+      runningProd = folded.prod;
+      const moved = folded.shifts.filter((s) => s.amount > 0);
+      snap({
+        stage: 2,
+        phase: "query",
+        event: "query-merge",
+        codeLines: [49, 50, 51, 52],
+        start,
+        x,
+        title: { vi: `Ghép hai mảnh tại u=${u} → cnt=[${folded.result.join(",")}]`, en: `Combine the two pieces at u=${u} → cnt=[${folded.result.join(",")}]` },
+        note: {
+          vi: `Mảnh trái có prod=${folded.aProd}, nên mọi prefix của mảnh phải bị dịch số dư ×${folded.aProd}${moved.length ? `: ${moved.map((s) => `${s.amount} prefix ${s.r}→${s.to}`).join(", ")}` : ""}. Thứ tự trái-trước-phải là bắt buộc: phép ghép này KHÔNG giao hoán.`,
+          en: `The left piece has prod=${folded.aProd}, so every prefix of the right piece has its remainder shifted by ×${folded.aProd}${moved.length ? `: ${moved.map((s) => `${s.amount} prefix ${s.r}→${s.to}`).join(", ")}` : ""}. Left-before-right matters: this combination is NOT commutative.`,
+        },
+      });
+      mergeInfo = null;
+      return { prod: folded.prod, cnt: folded.result };
+    })(1, 0, n - 1);
+
+    runningCnt = [...result.cnt];
+    runningProd = result.prod;
+    answers.push(result.cnt[x]);
+    activeU = -1;
+    snap({
+      stage: 3,
+      phase: "answer",
+      event: "read",
+      codeLines: [59],
+      start,
+      x,
+      title: { vi: `cnt[${x}] = ${result.cnt[x]} → result[${qi}] = ${result.cnt[x]}`, en: `cnt[${x}] = ${result.cnt[x]} → result[${qi}] = ${result.cnt[x]}` },
+      note: {
+        vi: `Trong [${start}..${n - 1}] có ${result.cnt[x]} prefix cho product % ${k} = ${x}. Tổng mọi ô cnt là ${result.cnt.reduce((a, b) => a + b, 0)} = số phần tử của đoạn.`,
+        en: `Inside [${start}..${n - 1}] there are ${result.cnt[x]} prefixes with product % ${k} = ${x}. The cnt buckets sum to ${result.cnt.reduce((a, b) => a + b, 0)}, the length of the range.`,
+      },
+    });
+  }
+
+  queryIndex = -1;
+  selectedU = [];
+  runningCnt = null;
+  runningProd = null;
+  answer = [...answers];
+  snap({
+    stage: 3,
+    phase: "done",
+    event: "return",
+    codeLines: [60],
+    title: { vi: `Trả về [${answer.join(",")}]`, en: `Return [${answer.join(",")}]` },
+    note: {
+      vi: `Khác bài 3524 (đếm mọi subarray một lần), ở đây nums bị sửa giữa các query nên phải có cấu trúc cập nhật được: segment tree cho O(k·log n) mỗi lần thay vì O(n·k) làm lại từ đầu.`,
+      en: `Unlike 3524, which counts every subarray once, here nums changes between queries, so an updatable structure is required: the segment tree gives O(k·log n) per query instead of redoing O(n·k) work.`,
+    },
+    final: true,
+  });
+
+  return { original, answer, steps };
+}
+
+Object.assign(module.exports, {
+  3525: {
+    id: 3525,
+    difficulty: "hard",
+    slug: "find-x-value-of-array-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+      { key: "math", vi: "Toán học", en: "Math" },
+      { key: "counting", vi: "Đếm", en: "Counting" },
+    ],
+    title: { vi: "Find X Value of Array II", en: "Find X Value of Array II" },
+    titleVi: { vi: "Đếm prefix theo product % k, có cập nhật", en: "Count prefixes by product % k, with updates" },
+    statement: {
+      vi: "Cho mảng số nguyên dương nums, số nguyên dương k và các query [index, value, start, x]. Với mỗi query: gán nums[index] = value (thay đổi này GIỮ LẠI cho các query sau), bỏ prefix nums[0..start−1], rồi đếm số cách bỏ một suffix sao cho nums còn khác rỗng và product phần còn lại chia k dư x. Trả về mảng kết quả cho từng query.",
+      en: "Given an array of positive integers nums, a positive integer k, and queries [index, value, start, x]: for each query set nums[index] = value (the edit PERSISTS for later queries), remove the prefix nums[0..start−1], then count the ways to remove a suffix leaving nums non-empty such that the product of what remains leaves remainder x modulo k. Return the answer for each query.",
+    },
+    defaultInput: [1, 2, 3, 4, 5],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (số nguyên dương, tối đa 8 số)", en: "nums (positive integers, at most 8)" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k (1..5)", en: "k (1..5)" }, default: 3, min: 1, max: 5 },
+      { key: "queries", type: "string", label: { vi: "queries: index,value,start,x — cách nhau bởi ';'", en: "queries: index,value,start,x — separated by ';'" }, default: "2,2,0,2;3,3,3,0;0,1,0,1" },
+    ],
+    approach: [
+      { vi: "Đọc lại đề cho gọn: sau khi bỏ prefix tới start, bỏ một suffix nghĩa là giữ lại một PREFIX của nums[start..n−1]. Vậy mỗi query chỉ là: đếm các prefix của nums[start..n−1] có product % k = x.", en: "Simplify the statement first: after the prefix up to start is gone, removing a suffix means keeping a PREFIX of nums[start..n−1]. So each query is just: count the prefixes of nums[start..n−1] whose product % k equals x." },
+      { vi: "Khác bài 3524, nums bị SỬA giữa các query và thay đổi đó giữ lại, nên không thể tiền xử lý một lần. Cần cấu trúc vừa cập nhật được vừa trả lời được trên một đoạn — segment tree.", en: "Unlike 3524, nums is MUTATED between queries and the edit persists, so a single preprocessing pass is impossible. What is needed is a structure that supports both updates and range answers — a segment tree." },
+      { vi: "Mỗi node giữ hai thứ: prod = product của cả đoạn mod k, và cnt[r] = số prefix CỦA ĐOẠN ĐÓ có số dư r. Lá dài 1 có prod = nums[i] % k và đúng một prefix.", en: "Each node stores two things: prod = the product of its whole range mod k, and cnt[r] = how many prefixes OF THAT RANGE have remainder r. A length-1 leaf has prod = nums[i] % k and exactly one prefix." },
+      { vi: "Mấu chốt là phép merge. Prefix nằm hẳn trong con trái giữ nguyên số dư nên cnt được copy y nguyên. Prefix ăn trọn con trái rồi lấn sang con phải thì số dư bị nhân với prod của con trái: cnt[left.prod × r % k] += right.cnt[r].", en: "The merge is the crux. A prefix living entirely inside the left child keeps its remainder, so its cnt is copied unchanged. A prefix that swallows the left child and continues into the right child has its remainder multiplied by the left child's prod: cnt[left.prod × r % k] += right.cnt[r]." },
+      { vi: "Phép merge này KHÔNG giao hoán — đổi chỗ trái phải là sai, vì chỉ prefix của mảnh bên phải mới bị nhân thêm. Truy vấn [start..n−1] cũng dùng đúng quy tắc đó khi ghép các mảnh, và phải ghép theo thứ tự từ trái sang phải.", en: "This merge is NOT commutative — swapping left and right is wrong, because only the right piece's prefixes get the extra multiplication. The query over [start..n−1] combines its pieces with the very same rule, and must combine them left to right." },
+      { vi: "Dựng cây O(n·k); mỗi query gồm một update O(k·log n) và một truy vấn O(k·log n), thay vì làm lại O(n·k) từ đầu sau mỗi lần sửa.", en: "Building costs O(n·k); each query is one O(k·log n) update plus one O(k·log n) range answer, instead of redoing O(n·k) work after every edit." },
+    ],
+    complexity: {
+      time: "O(n·k + q·k·log n)",
+      space: "O(n·k)",
+      note: {
+        vi: "Mỗi node giữ một vector dài k nên cây tốn O(n·k) bộ nhớ. Update đi một đường gốc–lá và merge lại mỗi tầng: O(k·log n). Truy vấn hậu tố cũng chỉ chạm O(log n) node.",
+        en: "Each node holds a length-k vector, so the tree costs O(n·k) memory. An update walks one root-to-leaf path and re-merges at each level: O(k·log n). The suffix query touches only O(log n) nodes.",
+      },
+    },
+    debugMode: "semantic",
+    code: [
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def resultArray(self, nums: List[int], k: int, queries: List[List[int]]) -> List[int]:",
+      "        n = len(nums)",
+      "        prod = [1] * (4 * n)",
+      "        cnt = [[0] * k for _ in range(4 * n)]",
+      "",
+      "        def merge(u):",
+      "            left, right = u * 2, u * 2 + 1",
+      "            prod[u] = prod[left] * prod[right] % k",
+      "            cnt[u] = cnt[left][:]",
+      "            for r in range(k):",
+      "                cnt[u][prod[left] * r % k] += cnt[right][r]",
+      "",
+      "        def build(u, lo, hi):",
+      "            if lo == hi:",
+      "                v = nums[lo] % k",
+      "                prod[u] = v",
+      "                cnt[u] = [0] * k",
+      "                cnt[u][v] = 1",
+      "                return",
+      "            mid = (lo + hi) // 2",
+      "            build(u * 2, lo, mid)",
+      "            build(u * 2 + 1, mid + 1, hi)",
+      "            merge(u)",
+      "",
+      "        def update(u, lo, hi, i, v):",
+      "            if lo == hi:",
+      "                prod[u] = v % k",
+      "                cnt[u] = [0] * k",
+      "                cnt[u][v % k] = 1",
+      "                return",
+      "            mid = (lo + hi) // 2",
+      "            if i <= mid:",
+      "                update(u * 2, lo, mid, i, v)",
+      "            else:",
+      "                update(u * 2 + 1, mid + 1, hi, i, v)",
+      "            merge(u)",
+      "",
+      "        def query(u, lo, hi, left):",
+      "            if lo >= left:",
+      "                return prod[u], cnt[u]",
+      "            mid = (lo + hi) // 2",
+      "            if left > mid:",
+      "                return query(u * 2 + 1, mid + 1, hi, left)",
+      "            lp, lc = query(u * 2, lo, mid, left)",
+      "            rp, rc = query(u * 2 + 1, mid + 1, hi, left)",
+      "            total = lc[:]",
+      "            for r in range(k):",
+      "                total[lp * r % k] += rc[r]",
+      "            return lp * rp % k, total",
+      "",
+      "        build(1, 0, n - 1)",
+      "        ans = []",
+      "        for index, value, start, x in queries:",
+      "            nums[index] = value",
+      "            update(1, 0, n - 1, index, value)",
+      "            ans.append(query(1, 0, n - 1, start)[1][x])",
+      "        return ans",
+    ],
+    liveArgs: (input, params) => {
+      const { nums, k, queries } = parseFindXValue3525Input(input, params);
+      return [nums, k, queries.map((q) => [q.index, q.value, q.start, q.x])];
+    },
+    builder: buildSteps3525,
+  },
+});

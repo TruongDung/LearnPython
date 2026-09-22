@@ -35403,6 +35403,121 @@ function renderMinWindow76View(step) {
     <section class="mw76-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
   </section>`;
 }
+function renderFindXValue3525View(step) {
+  const view = step.findXValue3525View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const original = Array.isArray(view.original) ? view.original : nums;
+  const n = Number.isInteger(view.n) ? view.n : nums.length;
+  const k = Number.isInteger(view.k) ? view.k : 1;
+  const start = Number.isInteger(view.start) ? view.start : null;
+  const x = Number.isInteger(view.x) ? view.x : null;
+  const activeU = Number.isInteger(view.activeU) ? view.activeU : -1;
+  const leftU = Number.isInteger(view.leftU) ? view.leftU : -1;
+  const rightU = Number.isInteger(view.rightU) ? view.rightU : -1;
+  const pathU = new Set(Array.isArray(view.pathU) ? view.pathU : []);
+  const selectedU = new Set(Array.isArray(view.selectedU) ? view.selectedU : []);
+  const queryIndex = Number.isInteger(view.queryIndex) ? view.queryIndex : -1;
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const current = queryIndex >= 0 ? queries[queryIndex] : null;
+
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  // nums, with the removed prefix dimmed and the just-written cell marked.
+  const numsStrip = nums
+    .map((value, index) => {
+      const classes = ["fx3525-num"];
+      if (start !== null && index < start) classes.push("dropped");
+      if (current && index === current.index) classes.push("written");
+      if (start !== null && index === start) classes.push("start");
+      if (value !== original[index]) classes.push("changed");
+      return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(value)}</strong><em>%${k}=${value % k}</em></span>`;
+    })
+    .join("");
+
+  // Ground truth: the running product remainder of every prefix of nums[start..].
+  const prefixes = Array.isArray(view.prefixProducts) ? view.prefixProducts : null;
+  const prefixStrip = prefixes
+    ? `<section class="fx3525-truth"><header><strong>${vi ? `PREFIX CỦA nums[${start}..${n - 1}] · product % ${k}` : `PREFIXES OF nums[${start}..${n - 1}] · product % ${k}`}</strong><span>${escapeHtml(x === null ? "" : (vi ? `ô sáng = khớp x = ${x}` : `lit cells match x = ${x}`))}</span></header><div>${prefixes
+      .map((entry) => `<span class="${x !== null && entry.mod === x ? "hit" : ""}"><small>..${entry.end}</small><strong>${entry.mod}</strong></span>`)
+      .join("")}</div><footer>${escapeHtml(x === null ? "" : (vi ? `số ô khớp = đáp án của query này` : "the number of matching cells is this query's answer"))}</footer></section>`
+    : "";
+
+  // Segment tree laid out by level, each node spanning its array range so the
+  // halving of the array is visible.
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const maxDepth = nodes.reduce((deepest, node) => Math.max(deepest, node.depth), 0);
+  const treeCells = nodes
+    .map((node) => {
+      const classes = ["fx3525-node"];
+      if (!node.ready) classes.push("pending");
+      if (node.u === leftU) classes.push("merge-left");
+      else if (node.u === rightU) classes.push("merge-right");
+      else if (node.u === activeU) classes.push("active");
+      if (selectedU.has(node.u)) classes.push("selected");
+      if (pathU.has(node.u)) classes.push("on-path");
+      const prodText = node.prod === null || node.prod === undefined ? "?" : node.prod;
+      const cntText = node.cnt ? node.cnt.join("·") : Array(k).fill("?").join("·");
+      return `<span class="${classes.join(" ")}" style="grid-row:${node.depth + 1};grid-column:${node.lo + 1} / span ${node.hi - node.lo + 1}"><small>u${node.u} [${node.lo}..${node.hi}]</small><b>prod ${prodText}</b><code>${cntText}</code></span>`;
+    })
+    .join("");
+  const treeHtml = `<div class="fx3525-tree" style="grid-template-columns: repeat(${Math.max(n, 1)}, minmax(0, 1fr)); grid-template-rows: repeat(${maxDepth + 1}, auto)">${treeCells}</div>`;
+
+  // The merge rule: copy the left child's cnt, then fold the right child's in
+  // with every remainder multiplied by the left child's prod.
+  const merge = view.merge;
+  const mergeHtml = merge
+    ? `<div class="fx3525-merge"><div class="fx3525-merge-row"><small>${vi ? "copy cnt trái" : "copy left cnt"}</small><div>${merge.aCnt.map((value, r) => `<span><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div></div>
+      <div class="fx3525-merge-row shift"><small>${vi ? `dịch cnt phải ×${merge.aProd}` : `shift right cnt ×${merge.aProd}`}</small><div>${merge.shifts.map((shift) => `<span class="${shift.amount > 0 ? "moves" : "zero"}"><small>r${shift.r}→${shift.to}</small><strong>${shift.amount > 0 ? `+${shift.amount}` : "0"}</strong></span>`).join("")}</div></div>
+      <div class="fx3525-merge-row result"><small>${vi ? "cnt kết quả" : "result cnt"}</small><div>${merge.result.map((value, r) => `<span class="${x !== null && r === x ? "target" : ""}"><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div></div>
+      <footer><code>prod = ${merge.aProd} × ${merge.bProd} % ${k} = ${merge.prod}</code><em>${escapeHtml(vi ? "chỉ mảnh PHẢI bị nhân thêm — phép ghép không giao hoán" : "only the RIGHT piece gets the extra factor — the combination is not commutative")}</em></footer></div>`
+    : `<p class="fx3525-merge-idle">${escapeHtml(vi ? "Chưa có phép merge nào đang chạy." : "No merge is running right now.")}</p>`;
+
+  const runningCnt = Array.isArray(view.runningCnt) ? view.runningCnt : null;
+  const runningHtml = runningCnt
+    ? `<div>${runningCnt.map((value, r) => `<span class="${x !== null && r === x ? "target" : ""}"><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div>`
+    : `<b class="fx3525-empty">${escapeHtml(vi ? "chưa ghép" : "not combined yet")}</b>`;
+
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const answersHtml = queries.length
+    ? queries
+      .map((query, index) => {
+        const state = index < answers.length ? "done" : index === queryIndex ? "active" : "pending";
+        const value = index < answers.length ? answers[index] : "?";
+        return `<span class="${state}"><small>#${index} [${query.index},${query.value},${query.start},${query.x}]</small><strong>${value}</strong></span>`;
+      })
+      .join("")
+    : `<b class="fx3525-empty">—</b>`;
+
+  const tone = view.event === "return" ? "done" : view.event === "read" ? "read" : String(view.event || "").includes("merge") ? "merge" : "";
+  const summary = vi
+    ? `Bài 3525, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`
+    : `Problem 3525, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="fx3525-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>SEGMENT TREE · PREFIX COUNTS PER REMAINDER · #3525</small><strong>FIND X VALUE OF ARRAY II · k = ${k}</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="fx3525-phases">${phases}</div>
+    <section class="fx3525-rule"><span><b>1</b><code>${escapeHtml(vi ? "bỏ suffix = giữ một prefix của nums[start..]" : "remove a suffix = keep a prefix of nums[start..]")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>cnt[left.prod × r % k] += right.cnt[r]</code></span></section>
+    <section class="fx3525-nums"><header><strong>${vi ? "NUMS" : "NUMS"}</strong><span>${escapeHtml(vi ? "mờ = prefix đã bỏ · viền = ô vừa ghi · S = start" : "dimmed = dropped prefix · outlined = just written · S = start")}</span></header><div>${numsStrip}</div></section>
+    ${prefixStrip}
+    <section class="fx3525-tree-card"><header><strong>${vi ? "SEGMENT TREE · u [lo..hi] · prod · cnt" : "SEGMENT TREE · u [lo..hi] · prod · cnt"}</strong><span>${escapeHtml(vi ? "node rộng theo đoạn nó phủ · tím/xanh = hai con đang merge · vàng = node được chọn cho query" : "node width matches its range · purple/blue = the two children being merged · amber = node chosen for the query")}</span></header>${treeHtml}</section>
+    <section class="fx3525-merge-card ${tone}"><header><strong>${vi ? "PHÉP MERGE" : "THE MERGE"}</strong><span>${escapeHtml(vi ? "prefix trong con trái giữ nguyên, prefix lấn sang phải bị nhân" : "prefixes inside the left keep their remainder, prefixes reaching right get multiplied")}</span></header>${mergeHtml}</section>
+    <section class="fx3525-out"><div class="fx3525-running"><small>${vi ? `cnt CỦA [${start === null ? "—" : start}..${n - 1}]` : `cnt OF [${start === null ? "—" : start}..${n - 1}]`}</small>${runningHtml}</div><div class="fx3525-answers"><small>${vi ? "KẾT QUẢ TỪNG QUERY" : "PER-QUERY RESULTS"}</small><div>${answersHtml}</div></div></section>
+    <section class="fx3525-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -35995,6 +36110,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMinWindow76View(step);
+  } else if (step.findXValue3525View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFindXValue3525View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
