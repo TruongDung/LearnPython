@@ -37,7 +37,7 @@ test('3525 is registered as the segment-tree sequel to 3524', () => {
   assert.equal(problem.category.key, 'dp');
   assert.deepEqual(problem.tags.map((tag) => tag.key), ['segment-tree', 'math', 'counting']);
   assert.equal(problem.complexity.time, 'O(n·k + q·k·log n)');
-  assert.equal(problem.debugMode, 'semantic');
+  assert.equal(problem.debugMode, 'line-by-line');
   assert.deepEqual(problem.extraParams.map((p) => p.key), ['k', 'queries']);
   // The queries field holds text, so it must not be rendered as a number input.
   assert.equal(problem.extraParams.find((p) => p.key === 'queries').type, 'string');

@@ -1283,7 +1283,7 @@ Object.assign(module.exports, {
         en: "Each node holds a length-k vector, so the tree costs O(n·k) memory. An update walks one root-to-leaf path and re-merges at each level: O(k·log n). The suffix query touches only O(log n) nodes.",
       },
     },
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     code: [
       "from typing import List",
       "",
