@@ -9460,7 +9460,7 @@ function buildSteps2096(input, params) {
 
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 545, 549, 742, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 2096, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
+    order: [114, 144, 94, 145, 104, 102, 107, 103, 199, 637, 671, 515, 513, 662, 116, 117, 1609, 2415, 2471, 2583, 2641, 429, 543, 545, 549, 742, 110, 111, 124, 226, 100, 101, 257, 404, 617, 572, 965, 872, 951, 113, 437, 129, 988, 1457, 687, 1372, 236, 1644, 1650, 1676, 2096, 366, 863, 156, 337, 333, 314, 987, 297, 1120, 1973, 2265, 979, 1373, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -11164,6 +11164,143 @@ function parseAverageSubtreeInput(input, { maxValue = 1000, maxNodes = 31 } = {}
   return root;
 }
 
+// ─── 671: Second Minimum Node In a Binary Tree ──────────────────────────────
+function parseSecondMinimum671Input(input) {
+  const root = parseAverageSubtreeInput(input, { maxValue: 100000, maxNodes: 31 });
+  (function validate(node) {
+    if (!node) return;
+    if (node.val < 1) throw new Error("Tree values must be integers from 1 to 100000, or null");
+    const hasLeft = Boolean(node.left);
+    const hasRight = Boolean(node.right);
+    if (hasLeft !== hasRight) throw new Error("Every non-leaf node must have exactly two children");
+    if (hasLeft && node.val !== Math.min(node.left.val, node.right.val)) {
+      throw new Error("Each parent must equal the smaller value of its two children");
+    }
+    validate(node.left);
+    validate(node.right);
+  })(root);
+  return root;
+}
+
+function findNodeById671(root, id) {
+  if (!root) return null;
+  if (root.id === id) return root;
+  return findNodeById671(root.left, id) || findNodeById671(root.right, id);
+}
+
+function buildSteps671(input) {
+  const root = parseSecondMinimum671Input(input);
+  const steps = [];
+  const visited = new Set();
+  const candidates = new Set();
+  const pruned = new Set();
+  const first = root.val;
+
+  const addStep = ({ title, note, codeLines, current = null, left = null, right = null, answer = null, final = false }) => {
+    const annotations = {};
+    candidates.forEach((id) => { annotations[id] = { label: "candidate", tone: "good" }; });
+    pruned.forEach((id) => { annotations[id] = { label: "pruned", tone: "muted" }; });
+    if (current) annotations[current.id] = { label: "current", tone: "warn" };
+    const step = snapshot(root, {
+      title,
+      note,
+      hlSet: current ? new Set([current.id]) : new Set(),
+      wordSet: visited,
+      annotations,
+      codeLines,
+      vars: [
+        { name: "first", value: first },
+        { name: "current", value: current ? current.val : "—" },
+        { name: "left, right", value: left === null && right === null ? "—" : `${left}, ${right}` },
+        { name: "candidates", value: `[${[...candidates].map((id) => findNodeById671(root, id).val).join(", ")}]` },
+      ],
+    });
+    step.secondMinimum671View = {
+      first,
+      current: current ? current.id : null,
+      visited: [...visited],
+      candidates: [...candidates],
+      pruned: [...pruned],
+      left,
+      right,
+      answer,
+    };
+    step.final = final;
+    steps.push(step);
+  };
+
+  addStep({
+    title: { vi: `root = ${first}: giá trị nhỏ nhất toàn cây`, en: `root = ${first}: the global minimum` },
+    note: {
+      vi: "Cây này có tính chất đặc biệt: mỗi node không phải lá bằng min(hai con). Vì vậy root là giá trị nhỏ nhất. Ta chỉ cần tìm giá trị nhỏ nhất LỚN HƠN root.",
+      en: "This tree has a special property: every non-leaf equals min(its two children). Therefore the root is the global minimum. We only need the smallest value STRICTLY greater than root.",
+    },
+    codeLines: [2, 3, 5],
+  });
+
+  function dfs(node) {
+    if (!node) return -1;
+    visited.add(node.id);
+    if (node.val > first) {
+      candidates.add(node.id);
+      (function markPruned(descendant) {
+        if (!descendant) return;
+        if (descendant.id !== node.id) pruned.add(descendant.id);
+        markPruned(descendant.left);
+        markPruned(descendant.right);
+      })(node);
+      addStep({
+        title: { vi: `${node.val} > ${first}: candidate, dừng cả subtree`, en: `${node.val} > ${first}: candidate, prune its subtree` },
+        note: {
+          vi: `Vì mọi node con không nhỏ hơn ${node.val}, ${node.val} đã là giá trị nhỏ nhất của subtree này. Không cần đi sâu hơn; chỉ so candidate này với candidate từ nhánh còn lại.`,
+          en: `Every descendant is at least ${node.val}, so ${node.val} is already this subtree's minimum. Do not descend further; only compare this candidate with one from the other branch.`,
+        },
+        codeLines: [8, 9],
+        current: node,
+      });
+      return node.val;
+    }
+
+    addStep({
+      title: { vi: `${node.val} = root: phải xét cả hai con`, en: `${node.val} = root: inspect both children` },
+      note: {
+        vi: `Node ${node.val} vẫn bằng minimum ${first}, nên chưa thể là đáp án. Duyệt tiếp cả hai nhánh để tìm nơi giá trị tăng lần đầu.`,
+        en: `Node ${node.val} still equals the minimum ${first}, so it cannot be the answer. Continue down both branches to find where a value first increases.`,
+      },
+      codeLines: [10, 11],
+      current: node,
+    });
+    const left = dfs(node.left);
+    const right = dfs(node.right);
+    const best = left === -1 ? right : right === -1 ? left : Math.min(left, right);
+    addStep({
+      title: { vi: `Gộp hai nhánh: min(${left}, ${right}) = ${best}`, en: `Combine branches: min(${left}, ${right}) = ${best}` },
+      note: best === -1
+        ? { vi: `Cả hai nhánh dưới ${node.val} chỉ có giá trị ${first}; chưa có second minimum.`, en: `Both branches below ${node.val} contain only ${first}; no second minimum exists here.` }
+        : { vi: `Giữ candidate nhỏ hơn ${best}.`, en: `Keep the smaller candidate ${best}.` },
+      codeLines: best === left && right === -1 ? [12, 13] : best === right && left === -1 ? [14, 15] : [16],
+      current: node,
+      left,
+      right,
+    });
+    return best;
+  }
+
+  const answer = dfs(root);
+  addStep({
+    title: answer === -1
+      ? { vi: "Không có giá trị lớn thứ hai", en: "No second minimum exists" }
+      : { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
+    note: answer === -1
+      ? { vi: `Mọi node đều bằng ${first}, nên không có giá trị nào lớn hơn minimum.`, en: `Every node equals ${first}, so no value is greater than the minimum.` }
+      : { vi: `${answer} là candidate nhỏ nhất lớn hơn ${first}.`, en: `${answer} is the smallest candidate greater than ${first}.` },
+    codeLines: [18],
+    answer,
+    final: true,
+  });
+  return { input, answer, steps };
+}
+
 function buildSteps1120(input) {
   const root = parseAverageSubtreeInput(input, { maxValue: 100000, maxNodes: 31 });
   const layout = treeToVizNodes(root, null, null);
@@ -12345,6 +12482,59 @@ function buildSteps333(input) {
 }
 
 Object.assign(module.exports, {
+  671: {
+    id: 671,
+    difficulty: "easy",
+    slug: "second-minimum-node-in-a-binary-tree",
+    category: TREE_CAT,
+    tags: [
+      { key: "tree", vi: "Cây", en: "Tree" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
+    ],
+    title: { vi: "Second Minimum Node In a Binary Tree", en: "Second Minimum Node In a Binary Tree" },
+    titleVi: { vi: "Giá trị nhỏ thứ hai trong cây nhị phân đặc biệt", en: "Second minimum in a special binary tree" },
+    statement: {
+      vi: "Cho một cây nhị phân đặc biệt: mỗi node không phải lá có đúng hai con và node.val = min(node.left.val, node.right.val). Trả về giá trị nhỏ thứ hai khác biệt trong cây, hoặc -1 nếu không có.",
+      en: "Given a special binary tree where every non-leaf has exactly two children and node.val = min(node.left.val, node.right.val), return the second distinct minimum value, or -1 when it does not exist.",
+    },
+    defaultInput: "2,2,5,null,null,5,7",
+    inputKind: "string",
+    inputLabel: { vi: "Cây level-order (null cho node rỗng)", en: "Level-order tree (null for an empty node)" },
+    extraParams: [],
+    debugMode: "line-by-line",
+    approach: [
+      { vi: "Do tính chất đặc biệt, root.val là minimum toàn cây. Đáp án là giá trị nhỏ nhất lớn hơn root.val.", en: "By the special property, root.val is the tree-wide minimum. The answer is the smallest value greater than root.val." },
+      { vi: "Nếu node.val > root.val, node đó đã là giá trị nhỏ nhất trong subtree của nó; không cần thăm con — prune cả subtree.", en: "If node.val > root.val, that node is already its subtree's minimum; do not visit its children — prune the entire subtree." },
+      { vi: "Nếu node.val = root.val, phải xét cả hai con rồi chọn candidate nhỏ hơn khác -1.", en: "If node.val = root.val, inspect both children and choose the smaller candidate that is not -1." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(h)",
+      note: { vi: "Trong trường hợp xấu nhất mọi node đều bằng root nên phải thăm cả cây. Nhờ pruning, nhiều cây dừng sớm hơn; h là chiều cao cây.", en: "In the worst case every node equals root, so every node is visited. Pruning often stops sooner; h is the tree height." },
+    },
+    code: [
+      "class Solution:",
+      "    def findSecondMinimumValue(self, root):",
+      "        first = root.val",
+      "",
+      "        def dfs(node):",
+      "            if not node:",
+      "                return -1",
+      "            if node.val > first:",
+      "                return node.val",
+      "            left = dfs(node.left)",
+      "            right = dfs(node.right)",
+      "            if left == -1:",
+      "                return right",
+      "            if right == -1:",
+      "                return left",
+      "            return min(left, right)",
+      "",
+      "        return dfs(root)",
+    ],
+    builder: buildSteps671,
+  },
   1973: {
     id: 1973,
     difficulty: "medium",
