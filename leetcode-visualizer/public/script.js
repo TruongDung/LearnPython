@@ -17884,6 +17884,43 @@ function renderNumberBfs2059View(step) {
   </section>`;
 }
 
+function renderShelfDp1105View(step) {
+  const view = step.shelfDp1105View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const books = Array.isArray(view.books) ? view.books : [];
+  const maxHeight = Math.max(1, ...books.map((book) => book.height));
+  const bookTile = (book, active = false) => {
+    const height = 30 + Math.round(book.height / maxHeight * 44);
+    const width = 38 + Math.round(book.thickness / view.shelfWidth * 56);
+    return `<div class="sh1105-book ${active ? "active" : ""}" style="--sh-height:${height}px;--sh-width:${width}px"><small>#${book.index + 1}</small><strong>${book.height}</strong><span>w=${book.thickness}</span></div>`;
+  };
+  const source = books.map((book) => bookTile(book,
+    view.j !== null && view.i !== null && book.index >= view.j && book.index < view.i)).join("");
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const indices = dp.length <= 26
+    ? dp.map((_, index) => index)
+    : [...new Set([...Array.from({ length: 10 }, (_, index) => index),
+      ...Array.from({ length: 7 }, (_, offset) => Math.min(dp.length - 1, Math.max(0, (view.i || 0) - 3 + offset))), dp.length - 1])].sort((a, b) => a - b);
+  const dpCells = indices.map((index, position) => `${position && index > indices[position - 1] + 1 ? `<span class="sh1105-ellipsis">…</span>` : ""}
+    <div class="sh1105-dp-cell ${index === view.i ? "current" : ""}"><small>dp[${index}]</small><strong>${dp[index] === null ? "∞" : show(dp[index])}</strong></div>`).join("");
+  const shelves = (view.shelves || []).slice(0, 12).map((shelf, index) => `<div class="sh1105-shelf"><header><strong>${vi ? "KỆ" : "SHELF"} ${index + 1}</strong><span>${vi ? "rộng" : "width"} ${shelf.width}/${view.shelfWidth} · ${vi ? "cao" : "height"} ${shelf.height}</span></header><div class="sh1105-book-row">${shelf.books.map((book) => bookTile(book)).join("")}</div></div>`).join("");
+  const moreShelves = (view.shelves || []).length > 12 ? `<span class="sh1105-more">+${view.shelves.length - 12} ${vi ? "kệ khác" : "more shelves"}</span>` : "";
+  const bestText = view.i !== null && view.best === null ? "∞" : show(view.best);
+  const formula = step.final ? `dp[${view.n}] = ${show(view.answer)}`
+    : view.candidate === null ? (vi ? "Chọn j để thử kệ cuối [j..i−1]" : "Choose j for the final shelf [j..i−1]")
+    : `dp[${view.j}] + maxHeight = ${show(view.previous)} + ${show(view.height)} = ${show(view.candidate)}`;
+  $("treeView").innerHTML = `<section class="sh1105-viz" aria-label="Filling Bookcase Shelves visualization">
+    <header class="sh1105-heading"><div><small>DP · #1105</small><strong>${vi ? "XẾP SÁCH LÊN KỆ" : "FILLING BOOKCASE SHELVES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sh1105-rule">${vi ? "Giữ nguyên thứ tự sách." : "Keep books in their original order."} <code>dp[i]</code> = ${vi ? "chiều cao nhỏ nhất của i quyển đầu" : "minimum height for the first i books"}.</div>
+    <div class="sh1105-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>j</small><strong>${show(view.j)}</strong></div><div><small>${vi ? "RỘNG KỆ CUỐI" : "LAST SHELF WIDTH"}</small><strong>${show(view.width)} / ${show(view.shelfWidth)}</strong></div><div><small>${vi ? "CAO KỆ CUỐI" : "LAST SHELF HEIGHT"}</small><strong>${show(view.height)}</strong></div><div><small>dp[i]</small><strong>${bestText}</strong></div></div>
+    <section class="sh1105-panel"><header><strong>${vi ? "SÁCH THEO THỨ TỰ" : "BOOKS IN ORDER"}</strong><span>${books.length < view.n ? `${vi ? "Hiện" : "Showing"} ${books.length}/${view.n}` : `${view.n} ${vi ? "quyển" : "books"}`}</span></header><div class="sh1105-book-scroll"><div class="sh1105-book-row">${source}</div></div><p>${vi ? "Số lớn trên sách là chiều cao; w là độ dày. Sách viền vàng đang được thử trên kệ cuối." : "The large number is height; w is thickness. Gold-bordered books are on the trial last shelf."}</p></section>
+    <section class="sh1105-panel"><header><strong>${vi ? "THỬ PHƯƠNG ÁN" : "TRIAL CANDIDATE"}</strong><span>${view.phase === "break" ? (vi ? "KỆ QUÁ RỘNG" : "TOO WIDE") : ""}</span></header><code class="sh1105-formula">${escapeHtml(formula)}</code><div class="sh1105-dp-row">${dpCells}</div></section>
+    ${shelves ? `<section class="sh1105-panel sh1105-layout"><header><strong>${step.final ? (vi ? "CÁCH XẾP TỐI ƯU" : "OPTIMAL ARRANGEMENT") : (vi ? "PHƯƠNG ÁN TỐT NHẤT HIỆN TẠI" : "CURRENT BEST ARRANGEMENT")}</strong><span>${step.final ? `${vi ? "Tổng cao" : "Total height"} ${show(view.answer)}` : `${vi ? "Tổng cao" : "Total height"} ${show(view.best)}`}</span></header><div class="sh1105-shelves">${shelves}${moreShelves}</div></section>` : ""}
+    <footer class="sh1105-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37556,6 +37593,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNumberBfs2059View(step);
+  } else if (step.shelfDp1105View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShelfDp1105View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
