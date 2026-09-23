@@ -23,6 +23,7 @@ function buildSteps2059(input, params = {}) {
   let candidate = null;
   let omitted = false;
   const parent = new Map([[start, null]]);
+  const numsForDebug = nums.length <= 16 ? [...nums] : `[${nums.slice(0, 16).join(", ")}, …] (${nums.length} values)`;
 
   function record(phase, title, line, note, options = {}) {
     if (steps.length >= MAX_TRACE_STEPS && !options.final) {
@@ -31,7 +32,7 @@ function buildSteps2059(input, params = {}) {
     }
     const waiting = queue ? queue.length - head : null;
     const preview = queue ? queue.slice(head, head + 8).map(([value, depth]) => ({ value, depth })) : [];
-    const vars = [{ name: "nums", value: [...nums] }, { name: "start", value: start }, { name: "goal", value: goal }];
+    const vars = [{ name: "nums", value: numsForDebug }, { name: "start", value: start }, { name: "goal", value: goal }];
     if (queue) vars.push({ name: "queue", value: `[${preview.map(({ value, depth }) => `(${value},${depth})`).join(", ")}${waiting > 8 ? ", …" : ""}]` });
     if (seen) vars.push({ name: "seen count", value: seen.size });
     if (current !== null) vars.push({ name: "value", value: current }, { name: "steps", value: distance });
@@ -39,10 +40,10 @@ function buildSteps2059(input, params = {}) {
     if (candidate) vars.push({ name: "nxt", value: candidate.value });
     if (options.final) vars.push({ name: "answer", value: options.answer });
     steps.push({
-      title, arr: [...nums], highlight: [], mark: [], codeLines: [line], vars, note,
+      title, arr: [], highlight: [], mark: [], codeLines: [line], vars, note,
       final: Boolean(options.final),
       numberBfs2059View: {
-        phase, start, goal, nums: [...nums], current, distance, num,
+        phase, start, goal, current, distance, num,
         candidate: candidate ? { ...candidate } : null,
         queue: preview, queueSize: waiting, seenCount: seen ? seen.size : null,
         path: options.path || [], answer: options.answer ?? null, omitted,
@@ -188,7 +189,7 @@ module.exports = {
       "        while queue:",
       "            value, steps = queue.popleft()",
       "            for num in nums:",
-      "                for nxt, op in ((value + num, '+'), (value - num, '−'), (value ^ num, '^')):",
+      "                for nxt in (value + num, value - num, value ^ num):",
       "                    if nxt == goal:",
       "                        return steps + 1",
       "                    if 0 <= nxt <= 1000 and nxt not in seen:",
