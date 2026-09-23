@@ -17798,6 +17798,47 @@ function renderSubstringConcatView(step) {
 // "freq table" panel listing the count of every distinct value currently
 // inside the window (the offending value highlighted in red once it exceeds
 // k), and a separate dimmed row marking the best window found so far.
+function renderComplement1658View(step) {
+  const view = step.complement1658View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const done = step.final;
+  const hasBest = view.bestLen >= 0;
+  const currentCells = nums.map((value, index) => {
+    const inWindow = !done && index >= view.left && index <= view.right;
+    const side = done && hasBest
+      ? (index < view.bestLeft ? "take-left" : index > view.bestRight ? "take-right" : "keep")
+      : index < view.left && index <= view.right ? "outside" : inWindow ? "keep" : "future";
+    const pointer = !done && index === view.activeIndex ? " active" : "";
+    return `<div class="co1658-cell ${side}${pointer}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
+  }).join("");
+  const bestCells = hasBest ? nums.map((value, index) => {
+    const side = index < view.bestLeft ? "take-left" : index > view.bestRight ? "take-right" : "keep";
+    return `<div class="co1658-cell ${side}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
+  }).join("") : "";
+  const leftCount = hasBest ? view.bestLeft : 0;
+  const rightCount = hasBest ? nums.length - view.bestRight - 1 : 0;
+  const bestMessage = hasBest
+    ? (vi ? `Lấy trái ${leftCount} + lấy phải ${rightCount} = ${leftCount + rightCount} phép` : `Take ${leftCount} left + ${rightCount} right = ${leftCount + rightCount} operations`)
+    : (vi ? "Chưa tìm thấy đoạn giữa có tổng bằng target." : "No middle segment summing to target has been found yet.");
+  const currentLength = done ? (hasBest ? view.bestLen : 0) : view.right >= view.left ? view.right - view.left + 1 : 0;
+  const status = done
+    ? view.answer < 0 ? (vi ? "Không có cách lấy ở hai đầu để đạt đúng x." : "No end removals can sum to exactly x.") : bestMessage
+    : view.phase === "too-large" ? (vi ? "Tổng quá lớn → bỏ phần tử trái để thu hẹp." : "Sum too large → drop the left value.")
+      : view.phase === "match" || view.phase === "best" ? (vi ? "Tổng vừa bằng target → thử giữ đoạn này." : "Sum equals target → consider keeping this segment.")
+        : (vi ? "Mở rộng đoạn giữa sang phải, rồi kiểm tra tổng." : "Grow the middle segment rightward, then check its sum.");
+
+  $("treeView").innerHTML = `<section class="co1658-viz" aria-label="Minimum Operations to Reduce X to Zero visualization">
+    <header class="co1658-heading"><div><small>SLIDING WINDOW · #1658</small><strong>${vi ? "GIỮ ĐOẠN GIỮA DÀI NHẤT" : "KEEP THE LONGEST MIDDLE SEGMENT"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="co1658-idea"><strong>${vi ? "ĐỔI GÓC NHÌN" : "CHANGE THE VIEW"}</strong><span>${vi ? "Lấy ở hai đầu" : "Remove from both ends"} <b>↔</b> ${vi ? "giữ một đoạn liên tiếp ở giữa" : "keep one contiguous middle segment"}</span><code>target = total - x = ${view.total} - ${view.x} = ${view.target}</code></div>
+    <div class="co1658-stats"><div><small>total</small><strong>${view.total}</strong></div><div><small>x</small><strong>${view.x}</strong></div><div class="target"><small>${vi ? "TỔNG CẦN GIỮ" : "SUM TO KEEP"}</small><strong>${view.target}</strong></div><div><small>windowSum</small><strong>${view.windowSum}</strong></div><div><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></div><div class="best"><small>bestLen</small><strong>${hasBest ? view.bestLen : "—"}</strong></div></div>
+    <section class="co1658-panel"><header><strong>${done ? (vi ? "PHƯƠNG ÁN CUỐI" : "FINAL CHOICE") : (vi ? "ĐOẠN ĐANG XÉT" : "CURRENT WINDOW")}</strong><span>${done ? "" : `left = ${view.left} · right = ${view.right}`}</span></header><div class="co1658-scroll"><div class="co1658-row">${currentCells}</div></div><p>${escapeHtml(status)}</p></section>
+    <section class="co1658-panel co1658-best"><header><strong>${vi ? "ĐOẠN TỐT NHẤT ĐÃ TÌM" : "BEST SEGMENT FOUND"}</strong><span>${hasBest ? (view.bestLen === 0 ? "∅" : `[${view.bestLeft}..${view.bestRight}]`) : "—"}</span></header>${hasBest ? `<div class="co1658-scroll"><div class="co1658-row">${bestCells}</div></div>` : ""}<p>${escapeHtml(bestMessage)}</p></section>
+    <div class="co1658-legend"><span><i class="keep"></i>${vi ? "giữ đoạn giữa" : "keep middle"}</span><span><i class="take-left"></i>${vi ? "lấy bên trái" : "take left"}</span><span><i class="take-right"></i>${vi ? "lấy bên phải" : "take right"}</span></div>
+    <footer class="co1658-answer ${done ? "done" : ""}"><div><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>operations = n - bestLen</code><span>${escapeHtml(pick(step.note))}</span></div><strong>${done ? view.answer : "?"}</strong></footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37458,6 +37499,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderExactK992View(step);
+  } else if (step.complement1658View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderComplement1658View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

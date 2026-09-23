@@ -68,6 +68,113 @@ function buildSteps1423(input, params = {}) {
   const answer = total - minWindow; snap({ vi: `return total - minKeep = ${answer}`, en: `return total - minKeep = ${answer}` }, 9, 0, cards.length - 1, { vi: "Tổng ngoài đoạn giữa tối thiểu là đáp án.", en: "The sum outside the minimum middle segment is the answer." }, { final: true }); return { original: cards, k, answer, steps };
 }
 
+/** LeetCode 1658: keep the longest middle subarray with sum total - x. */
+function buildSteps1658(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const x = Number(params.x ?? 5);
+  if (!nums.length || nums.some((value) => !Number.isInteger(value) || value <= 0) || !Number.isInteger(x) || x < 0) {
+    throw new Error("nums must contain positive integers and x must be a non-negative integer");
+  }
+
+  const total = nums.reduce((sum, value) => sum + value, 0);
+  const target = total - x;
+  const steps = [];
+  let left = 0;
+  let right = -1;
+  let windowSum = 0;
+  let bestLen = -1;
+  let bestLeft = -1;
+  let bestRight = -1;
+
+  const snap = (phase, title, line, note, extra = {}) => {
+    const current = right >= left ? indices(left, right) : [];
+    const best = bestLen > 0 ? indices(bestLeft, bestRight) : [];
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: extra.final ? best : current,
+      mark: extra.final ? best : [],
+      codeLines: [line],
+      vars: [
+        { name: "total", value: total },
+        { name: "x", value: x },
+        { name: "target", value: target },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "windowSum", value: windowSum },
+        { name: "bestLen", value: bestLen },
+      ],
+      note,
+      final: Boolean(extra.final),
+      complement1658View: {
+        nums: [...nums], x, total, target, left, right, windowSum,
+        bestLen, bestLeft, bestRight, phase,
+        activeIndex: extra.activeIndex ?? null,
+        answer: extra.answer ?? null,
+      },
+    });
+  };
+
+  snap("transform", { vi: `Tổng ${total} → cần giữ ${total} - ${x} = ${target}`, en: `Total ${total} → keep ${total} - ${x} = ${target}` }, 4,
+    { vi: "Các phần tử bị lấy chỉ nằm ở hai đầu, nên phần còn lại luôn là một đoạn liên tiếp ở giữa.", en: "Removing only from the ends leaves one contiguous middle segment." });
+
+  if (target < 0) {
+    snap("impossible", { vi: "x lớn hơn tổng → không thể", en: "x exceeds the total → impossible" }, 5,
+      { vi: "Không thể lấy tổng lớn hơn tổng cả mảng.", en: "The removed values cannot exceed the whole-array total." }, { final: true, answer: -1 });
+    return { original: nums, x, answer: -1, steps };
+  }
+  if (target === 0) {
+    bestLen = 0;
+    bestLeft = 0;
+    bestRight = -1;
+    snap("done", { vi: `Giữ đoạn rỗng → lấy cả ${nums.length} phần tử`, en: `Keep an empty segment → remove all ${nums.length} values` }, 6,
+      { vi: "Vì mọi số đều dương, chỉ đoạn rỗng có tổng bằng 0.", en: "All values are positive, so only the empty segment sums to zero." }, { final: true, answer: nums.length });
+    return { original: nums, x, answer: nums.length, steps };
+  }
+
+  snap("scan", { vi: "Bắt đầu tìm đoạn giữa dài nhất", en: "Start finding the longest middle segment" }, 8,
+    { vi: "Đoạn giữa càng dài thì càng ít phần tử phải lấy ở hai đầu.", en: "A longer middle segment means fewer removals from the ends." });
+  for (right = 0; right < nums.length; right++) {
+    windowSum += nums[right];
+    snap("expand", { vi: `Thêm nums[${right}] = ${nums[right]}`, en: `Add nums[${right}] = ${nums[right]}` }, 10,
+      { vi: `Tổng cửa sổ hiện tại = ${windowSum}.`, en: `The current window sum is ${windowSum}.` }, { activeIndex: right });
+
+    while (windowSum > target) {
+      snap("too-large", { vi: `${windowSum} > ${target}: cần thu hẹp`, en: `${windowSum} > ${target}: shrink the window` }, 11,
+        { vi: "Mọi số đều dương; thêm bên phải chỉ làm tổng tăng, nên cần bỏ từ bên trái.", en: "All values are positive, so shrink from the left to reduce the sum." }, { activeIndex: left });
+      const removedIndex = left;
+      windowSum -= nums[left];
+      left++;
+      snap("shrink", { vi: `Bỏ nums[${removedIndex}] = ${nums[removedIndex]}`, en: `Drop nums[${removedIndex}] = ${nums[removedIndex]}` }, 12,
+        { vi: `left = ${left}, tổng cửa sổ còn ${windowSum}.`, en: `left = ${left}, window sum is now ${windowSum}.` }, { activeIndex: removedIndex });
+    }
+
+    if (windowSum === target) {
+      const length = right - left + 1;
+      snap("match", { vi: `Tìm thấy đoạn tổng ${target}, dài ${length}`, en: `Found sum ${target}, length ${length}` }, 13,
+        { vi: `Lấy ${left} phần tử bên trái và ${nums.length - right - 1} phần tử bên phải sẽ đạt x.`, en: `Removing ${left} values from the left and ${nums.length - right - 1} from the right reaches x.` });
+      if (length > bestLen) {
+        bestLen = length;
+        bestLeft = left;
+        bestRight = right;
+        snap("best", { vi: `Đoạn giữa tốt nhất dài ${bestLen}`, en: `Best middle segment length: ${bestLen}` }, 14,
+          { vi: `Giữ [${bestLeft}..${bestRight}] → cần ${nums.length - bestLen} phép lấy.`, en: `Keep [${bestLeft}..${bestRight}] → ${nums.length - bestLen} removals.` });
+      }
+    }
+  }
+
+  right = nums.length - 1;
+  const answer = bestLen < 0 ? -1 : nums.length - bestLen;
+  snap(bestLen < 0 ? "impossible" : "done",
+    bestLen < 0 ? { vi: "Không có đoạn giữa phù hợp", en: "No matching middle segment" } : { vi: `Đáp án = ${nums.length} - ${bestLen} = ${answer}`, en: `Answer = ${nums.length} - ${bestLen} = ${answer}` }, 15,
+    bestLen < 0
+      ? { vi: "Không có cách lấy ở hai đầu để tổng đúng bằng x.", en: "No choice of values from the ends sums to exactly x." }
+      : { vi: `Lấy ${bestLeft} phần tử bên trái và ${nums.length - bestRight - 1} phần tử bên phải.`, en: `Remove ${bestLeft} values from the left and ${nums.length - bestRight - 1} from the right.` },
+    { final: true, answer });
+  return { original: nums, x, answer, steps };
+}
+
 function buildSteps1052(input, params = {}) {
   const customers = Array.isArray(input) ? input.map(Number) : []; const grumpy = String(params.grumpy ?? "0,1,0,1,0,1,0,1").split(",").map((value) => Number(value.trim())); const minutes = Number(params.minutes ?? 3);
   if (grumpy.length !== customers.length || grumpy.some((v) => v !== 0 && v !== 1) || !Number.isInteger(minutes) || minutes < 1 || minutes > customers.length) throw new Error("grumpy must be 0/1 values matching customers and minutes must fit");
@@ -150,6 +257,26 @@ module.exports = {
   1456: problem(1456, "medium", "maximum-number-of-vowels-in-a-substring-of-given-length", "Maximum Number of Vowels in a Substring of Given Length", "Return the greatest number of vowels in a substring of length k.", "abciiidef", "string", "s", [{ key: "k", label: { vi: "k (độ dài cửa sổ)", en: "k (window length)" }, default: 3 }], ["class Solution:", "    def maxVowels(self, s, k):", "        count = ans = 0", "        for right, ch in enumerate(s):", "            if ch in 'aeiou':", "                count += 1", "            if right >= k:", "                if s[right-k] in 'aeiou': count -= 1", "            if right >= k-1: ans = max(ans, count)", "        return ans"], buildSteps1456, stringTag),
   1343: problem(1343, "medium", "number-of-sub-arrays-of-size-k-and-average-greater-than-or-equal-to-threshold", "Number of Sub-arrays of Size K and Average Greater than or Equal to Threshold", "Count length-k subarrays whose average is at least threshold.", [2, 2, 2, 2, 5, 5, 5, 8], "integer", "arr", [{ key: "k", label: { vi: "k", en: "k" }, default: 3 }, { key: "threshold", label: { vi: "ngưỡng", en: "threshold" }, default: 4 }], ["class Solution:", "    def numOfSubarrays(self, arr, k, threshold):", "        windowSum = ans = 0", "        for right, value in enumerate(arr):", "            windowSum += value", "            if right >= k:", "                windowSum -= arr[right-k]", "            if right >= k-1 and windowSum >= k*threshold:", "                ans += 1", "        return ans"], buildSteps1343),
   1423: problem(1423, "medium", "maximum-points-you-can-obtain-from-cards", "Maximum Points You Can Obtain from Cards", "Take exactly k cards from either end for the maximum score.", [1, 2, 3, 4, 5, 6, 1], "integer", "cardPoints", [{ key: "k", label: { vi: "k (số lá bài)", en: "k (cards to take)" }, default: 3 }], ["class Solution:", "    def maxScore(self, cardPoints, k):", "        total = sum(cardPoints); keep = len(cardPoints)-k", "        if keep == 0: return total", "        minKeep = float('inf'); windowSum = 0", "        for right, value in enumerate(cardPoints):", "            windowSum += value", "            if right >= keep: windowSum -= cardPoints[right-keep]", "            if right >= keep-1: minKeep = min(minKeep, windowSum)", "        return total - minKeep"], buildSteps1423),
+  1658: {
+    ...problem(1658, "medium", "minimum-operations-to-reduce-x-to-zero", "Minimum Operations to Reduce X to Zero", "Remove values from either end to make their sum equal x using the fewest operations.", [1, 1, 4, 2, 3], "positive", "nums", [{ key: "x", label: { vi: "x (tổng cần lấy)", en: "x (sum to remove)" }, default: 5 }], [
+      "class Solution:",
+      "    def minOperations(self, nums, x):",
+      "        total = sum(nums)",
+      "        target = total - x",
+      "        if target < 0: return -1",
+      "        if target == 0: return len(nums)",
+      "        left = windowSum = 0",
+      "        bestLen = -1",
+      "        for right, value in enumerate(nums):",
+      "            windowSum += value",
+      "            while windowSum > target:",
+      "                windowSum -= nums[left]; left += 1",
+      "            if windowSum == target:",
+      "                bestLen = max(bestLen, right-left+1)",
+      "        return len(nums)-bestLen if bestLen >= 0 else -1",
+    ], buildSteps1658),
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Hai con trỏ chỉ đi sang phải; ngoài vài biến đếm, không cần bộ nhớ phụ.", en: "Both pointers move only right; the algorithm uses constant extra space." } },
+  },
   1052: problem(1052, "medium", "grumpy-bookstore-owner", "Grumpy Bookstore Owner", "Maximize satisfied customers by suppressing grumpiness for minutes consecutive minutes.", [1, 0, 1, 2, 1, 1, 7, 5], "integer", "customers", [{ key: "grumpy", type: "string", label: { vi: "grumpy (0/1, cách dấu phẩy)", en: "grumpy (0/1, comma separated)" }, default: "0,1,0,1,0,1,0,1" }, { key: "minutes", label: { vi: "minutes", en: "minutes" }, default: 3 }], ["class Solution:", "    def maxSatisfied(self, customers, grumpy, minutes):", "        baseline = sum(c for c,g in zip(customers,grumpy) if not g)", "        extra = bestExtra = 0", "        for right, value in enumerate(customers):", "            if grumpy[right]: extra += value", "            if right >= minutes and grumpy[right-minutes]:", "                extra -= customers[right-minutes]", "            if right >= minutes-1: bestExtra = max(bestExtra, extra)", "        return baseline + bestExtra"], buildSteps1052),
   862: problem(862, "hard", "shortest-subarray-with-sum-at-least-k", "Shortest Subarray with Sum at Least K", "Return the shortest non-empty subarray whose sum is at least k.", [2, -1, 2], "integer", "nums", [{ key: "k", label: { vi: "k (tổng tối thiểu)", en: "k (minimum sum)" }, default: 3 }], ["class Solution:", "    def shortestSubarray(self, nums, k):", "        prefix = [0]; deque = []; ans = float('inf')", "        for value in nums: prefix.append(prefix[-1] + value)", "        for i, total in enumerate(prefix):", "            while deque and total-prefix[deque[0]] >= k:", "                ans = min(ans, i-deque.pop(0))", "            while deque and total <= prefix[deque[-1]]: deque.pop()", "            deque.append(i)", "        return ans if ans < float('inf') else -1"], buildSteps862),
   1438: problem(1438, "medium", "longest-continuous-subarray-with-absolute-diff-less-than-or-equal-to-limit", "Longest Continuous Subarray With Absolute Diff Less Than or Equal to Limit", "Find the longest subarray where max minus min is at most limit.", [8, 2, 4, 7], "integer", "nums", [{ key: "limit", label: { vi: "limit", en: "limit" }, default: 4 }], ["class Solution:", "    def longestSubarray(self, nums, limit):", "        minDeque = []; maxDeque = []; left = ans = 0", "        for right, value in enumerate(nums):", "            while minDeque and nums[minDeque[-1]] > value: minDeque.pop()", "            while maxDeque and nums[maxDeque[-1]] < value: maxDeque.pop()", "            minDeque.append(right); maxDeque.append(right)", "            while nums[maxDeque[0]] - nums[minDeque[0]] > limit:", "                if minDeque[0] == left: minDeque.pop(0)", "                if maxDeque[0] == left: maxDeque.pop(0)", "                left += 1", "            ans = max(ans, right-left+1)", "        return ans"], buildSteps1438),
