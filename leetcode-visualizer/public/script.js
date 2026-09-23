@@ -17952,6 +17952,34 @@ function renderServerHeap1606View(step) {
   </section>`;
 }
 
+function renderMeetingRooms2402View(step) {
+  const view = step.meetingRooms2402View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const meeting = view.meeting;
+  const rooms = (view.rooms || []).map(({ id, count, until, chosen, released }) =>
+    `<div class="mr2402-room ${until === null ? "free" : "busy"} ${chosen ? "chosen" : ""} ${released ? "released" : ""}"><small>ROOM ${show(id)}</small><strong>${show(count)}</strong><span>${until === null ? (vi ? "RẢNH" : "FREE") : `${vi ? "BẬN TỚI" : "BUSY UNTIL"} ${show(until)}`}</span></div>`).join("");
+  const freeRooms = (view.freeRooms || []).map((id) => `<span class="mr2402-heap-chip">R${show(id)}</span>`).join("");
+  const busyJobs = (view.busyJobs || []).map(({ until, room }) =>
+    `<span class="mr2402-heap-chip">R${show(room)} <small>→ ${show(until)}</small></span>`).join("");
+  const assignments = (view.assignments || []).map((item) =>
+    `<div class="mr2402-assignment ${item.actualStart > item.originalStart ? "delayed" : ""}"><small>#${show(item.originalIndex)} · R${show(item.room)}</small><strong>[${show(item.actualStart)}, ${show(item.finish)})</strong><span>${item.actualStart > item.originalStart ? `${vi ? "gốc" : "original"} [${show(item.originalStart)}, ${show(item.originalEnd)})` : (vi ? "đúng giờ" : "on time")}</span></div>`).join("");
+  const currentText = meeting ? `[${show(meeting.start)}, ${show(meeting.end)})` : "—";
+  const actualText = view.actualStart !== null && view.finish !== null
+    ? `[${show(view.actualStart)}, ${show(view.finish)})` : "—";
+  $("treeView").innerHTML = `<section class="mr2402-viz" aria-label="Meeting Rooms III visualization">
+    <header class="mr2402-heading"><div><small>TWO HEAPS · #2402</small><strong>${vi ? "PHÒNG HỌP ĐƯỢC DÙNG NHIỀU NHẤT" : "MEETING ROOMS III"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mr2402-rule">${vi ? "Xét theo giờ bắt đầu gốc. Phòng rảnh: lấy số nhỏ nhất. Hết phòng: lấy phòng xong sớm nhất, giữ nguyên thời lượng." : "Use original start order. Take the lowest free room; if none is free, wait for the earliest finish and keep the duration."}</div>
+    <div class="mr2402-stats"><div><small>MEETING</small><strong>${view.currentIndex === null ? "—" : `${show(view.currentIndex + 1)} / ${show(view.meetingCount)}`}</strong></div><div><small>${vi ? "LỊCH GỐC" : "ORIGINAL"}</small><strong>${currentText}</strong></div><div><small>${vi ? "LỊCH THỰC" : "ACTUAL"}</small><strong>${actualText}</strong></div><div><small>${vi ? "PHÒNG CHỌN" : "ROOM"}</small><strong>${show(view.room)}</strong></div></div>
+    ${view.delayed ? `<div class="mr2402-delay">${vi ? "Đã dời" : "Delayed"}: ${currentText} → ${actualText}. ${vi ? "Thời lượng không đổi." : "Duration is unchanged."}</div>` : ""}
+    <section class="mr2402-panel"><header><strong>${vi ? "TRẠNG THÁI PHÒNG · SỐ CUỘC HỌP" : "ROOM STATUS · MEETING COUNTS"}</strong><span>${(view.rooms || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.rooms || []).length}/${show(view.n)}` : `${show(view.n)} rooms`}</span></header><div class="mr2402-rooms">${rooms}</div><div class="mr2402-legend">${vi ? "Viền xanh: phòng được chọn · Viền nét đứt: vừa giải phóng · Số lớn: số cuộc họp" : "Green border: selected · Dashed border: just released · Large number: meetings held"}</div></section>
+    <div class="mr2402-heaps"><section class="mr2402-panel"><header><strong>FREE HEAP · ${vi ? "SỐ PHÒNG" : "ROOM NUMBER"}</strong><span>${show(view.freeCount)} ${vi ? "rảnh" : "free"}</span></header><div class="mr2402-heap-list">${freeRooms || `<span class="mr2402-empty">${vi ? "Trống" : "Empty"}</span>`}</div></section><section class="mr2402-panel"><header><strong>BUSY HEAP · ${vi ? "GIỜ XONG, PHÒNG" : "FINISH, ROOM"}</strong><span>${show(view.busyCount)} ${vi ? "bận" : "busy"}</span></header><div class="mr2402-heap-list">${busyJobs || `<span class="mr2402-empty">${vi ? "Trống" : "Empty"}</span>`}</div></section></div>
+    <section class="mr2402-panel"><header><strong>${vi ? "LỊCH ĐÃ PHÂN" : "SCHEDULED MEETINGS"}</strong><span>${show(view.assignmentCount)} / ${show(view.meetingCount)}</span></header><div class="mr2402-assignments">${assignments || `<span class="mr2402-empty">${vi ? "Chưa có cuộc họp" : "No meetings assigned yet"}</span>`}${view.assignmentCount > (view.assignments || []).length ? `<span class="mr2402-empty">… ${vi ? "đã rút gọn" : "truncated"}</span>` : ""}</div></section>
+    ${step.final ? `<section class="mr2402-panel mr2402-result"><header><strong>${vi ? "PHÒNG NHIỀU CUỘC HỌP NHẤT" : "MOST-BOOKED ROOM"}</strong><span>${show(view.best)} ${vi ? "cuộc họp" : "meetings"}</span></header><strong>Room ${show(view.answer)}</strong></section>` : ""}
+    <footer class="mr2402-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37636,6 +37664,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderServerHeap1606View(step);
+  } else if (step.meetingRooms2402View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMeetingRooms2402View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

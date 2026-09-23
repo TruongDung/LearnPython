@@ -24,7 +24,7 @@ const categories = {
   backtracking: require("./backtracking"),
   bst: require("./bst"),
   "binary-tree": require("./tree"),
-  heap: Object.assign(require("./heap"), require("./server-heap")),
+  heap: Object.assign(require("./heap"), require("./server-heap"), require("./meeting-rooms-iii")),
   "union-find": require("./union-find"),
   "linked-list": require("./linked-list"),
   "binary-lifting": require("./binary-lifting"),
