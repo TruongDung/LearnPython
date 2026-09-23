@@ -17921,6 +17921,37 @@ function renderShelfDp1105View(step) {
   </section>`;
 }
 
+function renderServerHeap1606View(step) {
+  const view = step.serverHeap1606View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const servers = (view.servers || []).map((item) => {
+    const classes = ["sv1606-server", item.until !== null ? "busy" : "free",
+      item.preferred ? "preferred" : "", item.chosen ? "chosen" : "", item.released ? "released" : ""].join(" ");
+    return `<div class="${classes}"><small>SERVER ${item.id}</small><strong>${show(item.count)}</strong><span>${item.until === null ? (vi ? "RẢNH" : "FREE") : `${vi ? "BẬN TỚI" : "BUSY UNTIL"} ${show(item.until)}`}</span></div>`;
+  }).join("");
+  const freeSlots = (view.freeSlots || []).map(({ virtual, server }) =>
+    `<span class="sv1606-heap-item"><small>slot ${show(virtual)}</small><strong>→ S${show(server)}</strong></span>`).join("");
+  const busyJobs = (view.busyJobs || []).map(({ until, server }) =>
+    `<span class="sv1606-heap-item"><small>S${show(server)}</small><strong>${vi ? "xong" : "until"} ${show(until)}</strong></span>`).join("");
+  const winners = (view.answer || []).map((id) => `<span class="sv1606-winner">S${show(id)}</span>`).join("");
+  const slotFormula = view.slot !== null && view.i !== null && view.server !== null
+    ? `slot = ${show(view.slot)} → server = ${show(view.slot)} % ${show(view.k)} = ${show(view.slot % view.k)}`
+    : view.released !== null && view.i !== null
+      ? `slot = i + (server − i) mod k`
+      : `server ${vi ? "ưu tiên" : "preferred"} = i mod k`;
+  $("treeView").innerHTML = `<section class="sv1606-viz" aria-label="Find Servers That Handled Most Number of Requests visualization">
+    <header class="sv1606-heading"><div><small>TWO HEAPS · #1606</small><strong>${vi ? "SERVER XỬ LÝ NHIỀU REQUEST NHẤT" : "BUSIEST SERVERS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sv1606-rule">${vi ? "Request i ưu tiên server" : "Request i prefers server"} <code>i % k</code>; ${vi ? "nếu bận, tìm server rảnh kế tiếp theo vòng." : "if busy, take the next free server with wraparound."}</div>
+    <div class="sv1606-stats"><div><small>REQUEST</small><strong>${show(view.i)} / ${show(view.requestCount)}</strong></div><div><small>${vi ? "THỜI ĐIỂM" : "ARRIVAL"}</small><strong>${show(view.time)}</strong></div><div><small>LOAD</small><strong>${show(view.duration)}</strong></div><div><small>${vi ? "ƯU TIÊN" : "PREFERRED"}</small><strong>${show(view.preferred)}</strong></div><div><small>${vi ? "ĐÃ BỎ" : "DROPPED"}</small><strong>${show(view.droppedCount)}</strong></div></div>
+    <section class="sv1606-panel"><header><strong>${vi ? "TRẠNG THÁI SERVER" : "SERVER STATUS"}</strong><span>${(view.servers || []).length < view.k ? `${vi ? "Hiện" : "Showing"} ${(view.servers || []).length}/${view.k}` : `${view.k} servers`}</span></header><div class="sv1606-servers">${servers}</div><div class="sv1606-legend"><span>${vi ? "viền tím: ưu tiên" : "purple: preferred"}</span><span>${vi ? "viền xanh: được chọn" : "green: selected"}</span><span>${vi ? "số lớn: đã xử lý" : "large number: handled"}</span></div></section>
+    <div class="sv1606-heaps"><section class="sv1606-panel"><header><strong>${vi ? "FREE HEAP · VỊ TRÍ ẢO" : "FREE HEAP · VIRTUAL SLOTS"}</strong><span>${show(view.freeCount)} ${vi ? "server rảnh" : "free"}</span></header><div class="sv1606-heap-list">${freeSlots || `<span class="sv1606-empty">${vi ? "Trống" : "Empty"}</span>`}${view.freeCount > 30 ? `<span class="sv1606-empty">${vi ? "Chỉ hiện phần tử nhỏ nhất" : "Showing the minimum only"}</span>` : ""}</div></section><section class="sv1606-panel"><header><strong>${vi ? "BUSY HEAP · GIỜ HOÀN TẤT" : "BUSY HEAP · FINISH TIMES"}</strong><span>${show(view.busyCount)} ${vi ? "server bận" : "busy"}</span></header><div class="sv1606-heap-list">${busyJobs || `<span class="sv1606-empty">${vi ? "Trống" : "Empty"}</span>`}${view.busyCount > 30 ? `<span class="sv1606-empty">${vi ? "Chỉ hiện phần tử nhỏ nhất" : "Showing the minimum only"}</span>` : ""}</div></section></div>
+    <div class="sv1606-formula"><code>${escapeHtml(slotFormula)}</code><span>${view.dropped ? (vi ? "Request này bị bỏ vì không còn server rảnh." : "This request was dropped because no server was free.") : ""}</span></div>
+    ${step.final ? `<section class="sv1606-panel sv1606-result"><header><strong>${vi ? "SERVER BẬN NHẤT" : "BUSIEST SERVERS"}</strong><span>${vi ? "Mỗi server xử lý" : "Handled by each"} ${show(view.best)}</span></header><div class="sv1606-winners">${winners}${view.winnerCount > (view.answer || []).length ? `<span class="sv1606-empty">+${view.winnerCount - view.answer.length} ${vi ? "server khác" : "more"}</span>` : ""}</div></section>` : ""}
+    <footer class="sv1606-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37599,6 +37630,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderShelfDp1105View(step);
+  } else if (step.serverHeap1606View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderServerHeap1606View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

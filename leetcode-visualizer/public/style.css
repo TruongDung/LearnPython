@@ -59117,3 +59117,49 @@ html, body {
 [data-theme="light"] .sh1105-book.active { background: #a16207; }
 @container (max-width: 560px) { .sh1105-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @container (max-width: 360px) { .sh1105-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- 1606: cyclic server assignment with two heaps ---- */
+.sv1606-viz { --sv-bg: #101827; --sv-panel: #17243a; --sv-border: #334155; --sv-text: #e2e8f0; --sv-muted: #94a3b8; display: grid; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--sv-border); border-radius: 12px; background: var(--sv-bg); color: var(--sv-text); container-type: inline-size; }
+.sv1606-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.sv1606-heading div { display: grid; gap: 3px; }
+.sv1606-heading small { color: #38bdf8; font: 800 10px Consolas, monospace; letter-spacing: .08em; }
+.sv1606-heading strong { font-size: 16px; }
+.sv1606-heading > span { color: var(--sv-muted); font-size: 11px; }
+.sv1606-rule { padding: 10px 12px; border: 1px solid #0e7490; border-radius: 9px; background: rgba(8, 145, 178, .12); font-size: 11px; line-height: 1.5; }
+.sv1606-rule code { color: #67e8f9; font-weight: 800; }
+.sv1606-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.sv1606-stats > div { display: grid; gap: 4px; min-width: 0; padding: 9px; border: 1px solid var(--sv-border); border-radius: 8px; background: var(--sv-panel); }
+.sv1606-stats small { color: var(--sv-muted); font: 750 9px Consolas, monospace; letter-spacing: .03em; }
+.sv1606-stats strong { overflow-wrap: anywhere; font: 850 17px Consolas, monospace; }
+.sv1606-stats > div:nth-child(4) strong { color: #c4b5fd; }
+.sv1606-panel { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--sv-border); border-radius: 9px; background: var(--sv-panel); }
+.sv1606-panel header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.sv1606-panel header strong { font: 800 10px Consolas, monospace; letter-spacing: .05em; }
+.sv1606-panel header span { color: var(--sv-muted); font: 700 10px Consolas, monospace; }
+.sv1606-servers { display: flex; flex-wrap: wrap; gap: 7px; }
+.sv1606-server { display: grid; gap: 3px; min-width: 92px; padding: 9px; border: 1px solid #059669; border-radius: 8px; background: rgba(16, 185, 129, .1); }
+.sv1606-server.busy { border-color: #b45309; background: rgba(245, 158, 11, .1); }
+.sv1606-server.preferred { outline: 2px solid #a78bfa; outline-offset: 2px; }
+.sv1606-server.chosen { border-color: #34d399; box-shadow: inset 0 0 0 1px #34d399; }
+.sv1606-server.released { border-style: dashed; }
+.sv1606-server small, .sv1606-server span { color: var(--sv-muted); font: 750 9px Consolas, monospace; }
+.sv1606-server strong { font: 850 23px Consolas, monospace; }
+.sv1606-legend { display: flex; flex-wrap: wrap; gap: 5px 14px; color: var(--sv-muted); font-size: 10px; }
+.sv1606-heaps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sv1606-heap-list, .sv1606-winners { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 30px; }
+.sv1606-heap-item { display: flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid #0e7490; border-radius: 7px; background: rgba(8, 145, 178, .13); font: 750 10px Consolas, monospace; }
+.sv1606-heap-item small { color: var(--sv-muted); font-size: 9px; }
+.sv1606-empty { color: var(--sv-muted); font-size: 10px; }
+.sv1606-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px; border: 1px solid #7c3aed; border-radius: 7px; background: rgba(124, 58, 237, .1); }
+.sv1606-formula code { color: #c4b5fd; font: 800 11px Consolas, monospace; }
+.sv1606-formula span { color: #fbbf24; font-size: 10px; }
+.sv1606-result { border-color: #059669; }
+.sv1606-winner { padding: 6px 8px; border: 1px solid #059669; border-radius: 6px; background: rgba(16, 185, 129, .13); color: #6ee7b7; font: 850 12px Consolas, monospace; }
+.sv1606-note { padding: 9px 11px; border-left: 3px solid #38bdf8; color: var(--sv-muted); font-size: 11px; line-height: 1.5; }
+[data-theme="light"] .sv1606-viz { --sv-bg: #f8fafc; --sv-panel: #fff; --sv-border: #cbd5e1; --sv-text: #0f172a; --sv-muted: #475569; }
+[data-theme="light"] .sv1606-rule { background: #ecfeff; }
+[data-theme="light"] .sv1606-rule code { color: #155e75; }
+[data-theme="light"] .sv1606-formula code { color: #6d28d9; }
+[data-theme="light"] .sv1606-winner { color: #047857; }
+@container (max-width: 620px) { .sv1606-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .sv1606-heaps { grid-template-columns: 1fr; } }
+@container (max-width: 380px) { .sv1606-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sv1606-server { min-width: 82px; } }
