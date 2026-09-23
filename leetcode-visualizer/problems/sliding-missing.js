@@ -76,19 +76,30 @@ function buildSteps1658(input, params = {}) {
     throw new Error("nums must contain positive integers and x must be a non-negative integer");
   }
 
-  const total = nums.reduce((sum, value) => sum + value, 0);
-  const target = total - x;
   const steps = [];
-  let left = 0;
-  let right = -1;
-  let windowSum = 0;
-  let bestLen = -1;
+  let total = null;
+  let target = null;
+  let left = null;
+  let right = null;
+  let value = null;
+  let windowSum = null;
+  let bestLen = null;
   let bestLeft = -1;
   let bestRight = -1;
 
   const snap = (phase, title, line, note, extra = {}) => {
-    const current = right >= left ? indices(left, right) : [];
-    const best = bestLen > 0 ? indices(bestLeft, bestRight) : [];
+    const windowLeft = extra.windowLeft ?? left;
+    const windowRight = extra.windowRight ?? right;
+    const current = Number.isInteger(windowLeft) && Number.isInteger(windowRight) && windowRight >= windowLeft
+      ? indices(windowLeft, windowRight) : [];
+    const best = Number.isInteger(bestLen) && bestLen > 0 ? indices(bestLeft, bestRight) : [];
+    const vars = [{ name: "nums", value: [...nums] }, { name: "x", value: x }];
+    if (total !== null) vars.push({ name: "total", value: total });
+    if (target !== null) vars.push({ name: "target", value: target });
+    if (left !== null) vars.push({ name: "left", value: left });
+    if (windowSum !== null) vars.push({ name: "windowSum", value: windowSum });
+    if (bestLen !== null) vars.push({ name: "bestLen", value: bestLen });
+    if (right !== null) vars.push({ name: "right", value: right }, { name: "value", value });
     steps.push({
       title,
       arr: [...nums],
@@ -96,78 +107,108 @@ function buildSteps1658(input, params = {}) {
       highlight: extra.final ? best : current,
       mark: extra.final ? best : [],
       codeLines: [line],
-      vars: [
-        { name: "total", value: total },
-        { name: "x", value: x },
-        { name: "target", value: target },
-        { name: "left", value: left },
-        { name: "right", value: right },
-        { name: "windowSum", value: windowSum },
-        { name: "bestLen", value: bestLen },
-      ],
+      vars,
       note,
       final: Boolean(extra.final),
       complement1658View: {
         nums: [...nums], x, total, target, left, right, windowSum,
-        bestLen, bestLeft, bestRight, phase,
+        bestLen, bestLeft, bestRight, phase, windowLeft, windowRight,
         activeIndex: extra.activeIndex ?? null,
         answer: extra.answer ?? null,
       },
     });
   };
 
-  snap("transform", { vi: `Tổng ${total} → cần giữ ${total} - ${x} = ${target}`, en: `Total ${total} → keep ${total} - ${x} = ${target}` }, 4,
+  snap("enter", { vi: `Gọi minOperations(nums, ${x})`, en: `Call minOperations(nums, ${x})` }, 2,
+    { vi: "Bắt đầu với mảng nums và tổng cần lấy x.", en: "Start with nums and the amount x to remove." });
+  total = nums.reduce((sum, number) => sum + number, 0);
+  snap("total", { vi: `total = sum(nums) = ${total}`, en: `total = sum(nums) = ${total}` }, 3,
+    { vi: "Tính tổng toàn mảng trước khi chọn đoạn giữa.", en: "Sum the whole array before choosing the middle segment." });
+  target = total - x;
+  snap("transform", { vi: `target = ${total} - ${x} = ${target}`, en: `target = ${total} - ${x} = ${target}` }, 4,
     { vi: "Các phần tử bị lấy chỉ nằm ở hai đầu, nên phần còn lại luôn là một đoạn liên tiếp ở giữa.", en: "Removing only from the ends leaves one contiguous middle segment." });
 
+  snap("guard", { vi: `target < 0? ${target < 0}`, en: `target < 0? ${target < 0}` }, 5,
+    target < 0
+      ? { vi: "x lớn hơn tổng mảng; không thể lấy đủ x.", en: "x exceeds the total, so it cannot be removed." }
+      : { vi: "target không âm; tiếp tục kiểm tra trường hợp đoạn giữa rỗng.", en: "target is non-negative; continue to the empty-middle check." });
   if (target < 0) {
-    snap("impossible", { vi: "x lớn hơn tổng → không thể", en: "x exceeds the total → impossible" }, 5,
+    snap("impossible", { vi: "x lớn hơn tổng → không thể", en: "x exceeds the total → impossible" }, 6,
       { vi: "Không thể lấy tổng lớn hơn tổng cả mảng.", en: "The removed values cannot exceed the whole-array total." }, { final: true, answer: -1 });
     return { original: nums, x, answer: -1, steps };
   }
+  snap("guard", { vi: `target == 0? ${target === 0}`, en: `target == 0? ${target === 0}` }, 7,
+    target === 0
+      ? { vi: "Đoạn giữa cần giữ có tổng 0; mọi số dương nên đoạn này rỗng.", en: "The kept sum is zero; with positive numbers the middle is empty." }
+      : { vi: "target dương; tìm đoạn giữa dài nhất bằng cửa sổ trượt.", en: "target is positive; find the longest middle segment with a sliding window." });
   if (target === 0) {
-    bestLen = 0;
     bestLeft = 0;
     bestRight = -1;
-    snap("done", { vi: `Giữ đoạn rỗng → lấy cả ${nums.length} phần tử`, en: `Keep an empty segment → remove all ${nums.length} values` }, 6,
+    snap("all", { vi: `Giữ đoạn rỗng → lấy cả ${nums.length} phần tử`, en: `Keep an empty segment → remove all ${nums.length} values` }, 8,
       { vi: "Vì mọi số đều dương, chỉ đoạn rỗng có tổng bằng 0.", en: "All values are positive, so only the empty segment sums to zero." }, { final: true, answer: nums.length });
     return { original: nums, x, answer: nums.length, steps };
   }
 
-  snap("scan", { vi: "Bắt đầu tìm đoạn giữa dài nhất", en: "Start finding the longest middle segment" }, 8,
-    { vi: "Đoạn giữa càng dài thì càng ít phần tử phải lấy ở hai đầu.", en: "A longer middle segment means fewer removals from the ends." });
-  for (right = 0; right < nums.length; right++) {
-    windowSum += nums[right];
-    snap("expand", { vi: `Thêm nums[${right}] = ${nums[right]}`, en: `Add nums[${right}] = ${nums[right]}` }, 10,
+  left = 0;
+  snap("init", { vi: "left = 0", en: "left = 0" }, 9,
+    { vi: "Con trỏ trái bắt đầu ở đầu mảng.", en: "The left pointer starts at the beginning." });
+  windowSum = 0;
+  snap("init", { vi: "windowSum = 0", en: "windowSum = 0" }, 10,
+    { vi: "Cửa sổ ban đầu rỗng.", en: "The window starts empty." });
+  bestLen = -1;
+  snap("init", { vi: "bestLen = -1", en: "bestLen = -1" }, 11,
+    { vi: "-1 nghĩa là chưa tìm được đoạn giữa có tổng target.", en: "-1 means no middle segment summing to target has been found." });
+
+  for (let index = 0; index < nums.length; index++) {
+    right = index;
+    value = nums[right];
+    snap("iterate", { vi: `right = ${right}, value = ${value}`, en: `right = ${right}, value = ${value}` }, 12,
+      { vi: `Đã chọn nums[${right}], nhưng chưa cộng nó vào windowSum.`, en: `Selected nums[${right}], but it has not been added to windowSum yet.` }, { windowRight: right - 1, activeIndex: right });
+    windowSum += value;
+    snap("expand", { vi: `windowSum += ${value} → ${windowSum}`, en: `windowSum += ${value} → ${windowSum}` }, 13,
       { vi: `Tổng cửa sổ hiện tại = ${windowSum}.`, en: `The current window sum is ${windowSum}.` }, { activeIndex: right });
 
+    snap("check-window", { vi: `${windowSum} > ${target}? ${windowSum > target}`, en: `${windowSum} > ${target}? ${windowSum > target}` }, 14,
+      windowSum > target
+        ? { vi: "Tổng vượt target; cần bỏ phần tử trái.", en: "The sum exceeds target; remove the left value." }
+        : { vi: "Tổng không vượt target; dừng thu hẹp.", en: "The sum does not exceed target; stop shrinking." }, { activeIndex: windowSum > target ? left : null });
     while (windowSum > target) {
-      snap("too-large", { vi: `${windowSum} > ${target}: cần thu hẹp`, en: `${windowSum} > ${target}: shrink the window` }, 11,
-        { vi: "Mọi số đều dương; thêm bên phải chỉ làm tổng tăng, nên cần bỏ từ bên trái.", en: "All values are positive, so shrink from the left to reduce the sum." }, { activeIndex: left });
       const removedIndex = left;
       windowSum -= nums[left];
+      snap("subtract", { vi: `windowSum -= nums[${removedIndex}] → ${windowSum}`, en: `windowSum -= nums[${removedIndex}] → ${windowSum}` }, 15,
+        { vi: `Đã trừ ${nums[removedIndex]}; left vẫn là ${left} cho đến dòng kế tiếp.`, en: `Subtracted ${nums[removedIndex]}; left remains ${left} until the next line.` }, { windowLeft: left + 1, activeIndex: removedIndex });
       left++;
-      snap("shrink", { vi: `Bỏ nums[${removedIndex}] = ${nums[removedIndex]}`, en: `Drop nums[${removedIndex}] = ${nums[removedIndex]}` }, 12,
-        { vi: `left = ${left}, tổng cửa sổ còn ${windowSum}.`, en: `left = ${left}, window sum is now ${windowSum}.` }, { activeIndex: removedIndex });
+      snap("advance-left", { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, 16,
+        { vi: `Cửa sổ giờ bắt đầu ở ${left}; tổng là ${windowSum}.`, en: `The window now starts at ${left}; its sum is ${windowSum}.` }, { activeIndex: left });
+      snap("check-window", { vi: `${windowSum} > ${target}? ${windowSum > target}`, en: `${windowSum} > ${target}? ${windowSum > target}` }, 14,
+        windowSum > target
+          ? { vi: "Vẫn quá lớn; tiếp tục thu hẹp.", en: "Still too large; shrink again." }
+          : { vi: "Đã đủ nhỏ; thoát vòng while.", en: "Small enough now; exit the while loop." }, { activeIndex: windowSum > target ? left : null });
     }
 
+    const matches = windowSum === target;
+    snap("check-match", { vi: `${windowSum} == ${target}? ${matches}`, en: `${windowSum} == ${target}? ${matches}` }, 17,
+      matches
+        ? { vi: `Đoạn [${left}..${right}] có đúng tổng cần giữ.`, en: `Segment [${left}..${right}] has exactly the sum to keep.` }
+        : { vi: "Tổng chưa bằng target; chuyển sang phần tử tiếp theo.", en: "The sum is not target; move to the next value." });
     if (windowSum === target) {
       const length = right - left + 1;
-      snap("match", { vi: `Tìm thấy đoạn tổng ${target}, dài ${length}`, en: `Found sum ${target}, length ${length}` }, 13,
-        { vi: `Lấy ${left} phần tử bên trái và ${nums.length - right - 1} phần tử bên phải sẽ đạt x.`, en: `Removing ${left} values from the left and ${nums.length - right - 1} from the right reaches x.` });
+      const previousBest = bestLen;
       if (length > bestLen) {
-        bestLen = length;
         bestLeft = left;
         bestRight = right;
-        snap("best", { vi: `Đoạn giữa tốt nhất dài ${bestLen}`, en: `Best middle segment length: ${bestLen}` }, 14,
-          { vi: `Giữ [${bestLeft}..${bestRight}] → cần ${nums.length - bestLen} phép lấy.`, en: `Keep [${bestLeft}..${bestRight}] → ${nums.length - bestLen} removals.` });
       }
+      bestLen = Math.max(bestLen, length);
+      snap("best", { vi: `bestLen = max(${previousBest}, ${length}) = ${bestLen}`, en: `bestLen = max(${previousBest}, ${length}) = ${bestLen}` }, 18,
+        length > previousBest
+          ? { vi: `Giữ [${bestLeft}..${bestRight}] → cần ${nums.length - bestLen} phép lấy.`, en: `Keep [${bestLeft}..${bestRight}] → ${nums.length - bestLen} removals.` }
+          : { vi: "Đoạn này không dài hơn kỷ lục; giữ phương án cũ.", en: "This segment is not longer than the best one; keep the previous choice." });
     }
   }
 
-  right = nums.length - 1;
   const answer = bestLen < 0 ? -1 : nums.length - bestLen;
   snap(bestLen < 0 ? "impossible" : "done",
-    bestLen < 0 ? { vi: "Không có đoạn giữa phù hợp", en: "No matching middle segment" } : { vi: `Đáp án = ${nums.length} - ${bestLen} = ${answer}`, en: `Answer = ${nums.length} - ${bestLen} = ${answer}` }, 15,
+    bestLen < 0 ? { vi: "Không có đoạn giữa phù hợp", en: "No matching middle segment" } : { vi: `Đáp án = ${nums.length} - ${bestLen} = ${answer}`, en: `Answer = ${nums.length} - ${bestLen} = ${answer}` }, 19,
     bestLen < 0
       ? { vi: "Không có cách lấy ở hai đầu để tổng đúng bằng x.", en: "No choice of values from the ends sums to exactly x." }
       : { vi: `Lấy ${bestLeft} phần tử bên trái và ${nums.length - bestRight - 1} phần tử bên phải.`, en: `Remove ${bestLeft} values from the left and ${nums.length - bestRight - 1} from the right.` },
@@ -263,17 +304,21 @@ module.exports = {
       "    def minOperations(self, nums, x):",
       "        total = sum(nums)",
       "        target = total - x",
-      "        if target < 0: return -1",
-      "        if target == 0: return len(nums)",
-      "        left = windowSum = 0",
+      "        if target < 0:",
+      "            return -1",
+      "        if target == 0:",
+      "            return len(nums)",
+      "        left = 0",
+      "        windowSum = 0",
       "        bestLen = -1",
       "        for right, value in enumerate(nums):",
       "            windowSum += value",
       "            while windowSum > target:",
-      "                windowSum -= nums[left]; left += 1",
+      "                windowSum -= nums[left]",
+      "                left += 1",
       "            if windowSum == target:",
-      "                bestLen = max(bestLen, right-left+1)",
-      "        return len(nums)-bestLen if bestLen >= 0 else -1",
+      "                bestLen = max(bestLen, right - left + 1)",
+      "        return len(nums) - bestLen if bestLen != -1 else -1",
     ], buildSteps1658),
     complexity: { time: "O(n)", space: "O(1)", note: { vi: "Hai con trỏ chỉ đi sang phải; ngoài vài biến đếm, không cần bộ nhớ phụ.", en: "Both pointers move only right; the algorithm uses constant extra space." } },
   },

@@ -13,7 +13,7 @@
 const categories = {
   dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp")),
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing")),
-  graph: require("./graph"),
+  graph: Object.assign(require("./graph"), require("./number-bfs")),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
   array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two")),

@@ -17803,39 +17803,84 @@ function renderComplement1658View(step) {
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const vi = lang === "vi";
   const done = step.final;
-  const hasBest = view.bestLen >= 0;
+  const isAll = view.phase === "all";
+  const hasBest = isAll || (Number.isInteger(view.bestLen) && view.bestLen >= 0);
+  const bestLength = isAll ? 0 : view.bestLen;
+  const bestLeft = isAll ? 0 : view.bestLeft;
+  const bestRight = isAll ? -1 : view.bestRight;
+  const windowReady = Number.isInteger(view.windowLeft) && Number.isInteger(view.windowRight);
+  const show = (number) => number === null || number === undefined ? "—" : number;
   const currentCells = nums.map((value, index) => {
-    const inWindow = !done && index >= view.left && index <= view.right;
+    const inWindow = !done && windowReady && index >= view.windowLeft && index <= view.windowRight;
     const side = done && hasBest
-      ? (index < view.bestLeft ? "take-left" : index > view.bestRight ? "take-right" : "keep")
-      : index < view.left && index <= view.right ? "outside" : inWindow ? "keep" : "future";
+      ? (index < bestLeft ? "take-left" : index > bestRight ? "take-right" : "keep")
+      : done ? "future" : windowReady && index < view.windowLeft && index <= view.right ? "outside" : inWindow ? "keep" : "future";
     const pointer = !done && index === view.activeIndex ? " active" : "";
     return `<div class="co1658-cell ${side}${pointer}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
   }).join("");
   const bestCells = hasBest ? nums.map((value, index) => {
-    const side = index < view.bestLeft ? "take-left" : index > view.bestRight ? "take-right" : "keep";
+    const side = index < bestLeft ? "take-left" : index > bestRight ? "take-right" : "keep";
     return `<div class="co1658-cell ${side}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
   }).join("") : "";
-  const leftCount = hasBest ? view.bestLeft : 0;
-  const rightCount = hasBest ? nums.length - view.bestRight - 1 : 0;
+  const leftCount = hasBest ? bestLeft : 0;
+  const rightCount = hasBest ? nums.length - bestRight - 1 : 0;
   const bestMessage = hasBest
     ? (vi ? `Lấy trái ${leftCount} + lấy phải ${rightCount} = ${leftCount + rightCount} phép` : `Take ${leftCount} left + ${rightCount} right = ${leftCount + rightCount} operations`)
     : (vi ? "Chưa tìm thấy đoạn giữa có tổng bằng target." : "No middle segment summing to target has been found yet.");
-  const currentLength = done ? (hasBest ? view.bestLen : 0) : view.right >= view.left ? view.right - view.left + 1 : 0;
+  const currentLength = done ? (hasBest ? bestLength : 0)
+    : windowReady && view.windowRight >= view.windowLeft ? view.windowRight - view.windowLeft + 1 : 0;
   const status = done
     ? view.answer < 0 ? (vi ? "Không có cách lấy ở hai đầu để đạt đúng x." : "No end removals can sum to exactly x.") : bestMessage
-    : view.phase === "too-large" ? (vi ? "Tổng quá lớn → bỏ phần tử trái để thu hẹp." : "Sum too large → drop the left value.")
-      : view.phase === "match" || view.phase === "best" ? (vi ? "Tổng vừa bằng target → thử giữ đoạn này." : "Sum equals target → consider keeping this segment.")
-        : (vi ? "Mở rộng đoạn giữa sang phải, rồi kiểm tra tổng." : "Grow the middle segment rightward, then check its sum.");
+    : pick(step.note);
+  const formula = view.target !== null && view.target < 0
+    ? "x > total → return -1"
+    : isAll ? "target == 0 → return len(nums)"
+      : "operations = n - bestLen";
 
   $("treeView").innerHTML = `<section class="co1658-viz" aria-label="Minimum Operations to Reduce X to Zero visualization">
     <header class="co1658-heading"><div><small>SLIDING WINDOW · #1658</small><strong>${vi ? "GIỮ ĐOẠN GIỮA DÀI NHẤT" : "KEEP THE LONGEST MIDDLE SEGMENT"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
-    <div class="co1658-idea"><strong>${vi ? "ĐỔI GÓC NHÌN" : "CHANGE THE VIEW"}</strong><span>${vi ? "Lấy ở hai đầu" : "Remove from both ends"} <b>↔</b> ${vi ? "giữ một đoạn liên tiếp ở giữa" : "keep one contiguous middle segment"}</span><code>target = total - x = ${view.total} - ${view.x} = ${view.target}</code></div>
-    <div class="co1658-stats"><div><small>total</small><strong>${view.total}</strong></div><div><small>x</small><strong>${view.x}</strong></div><div class="target"><small>${vi ? "TỔNG CẦN GIỮ" : "SUM TO KEEP"}</small><strong>${view.target}</strong></div><div><small>windowSum</small><strong>${view.windowSum}</strong></div><div><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></div><div class="best"><small>bestLen</small><strong>${hasBest ? view.bestLen : "—"}</strong></div></div>
-    <section class="co1658-panel"><header><strong>${done ? (vi ? "PHƯƠNG ÁN CUỐI" : "FINAL CHOICE") : (vi ? "ĐOẠN ĐANG XÉT" : "CURRENT WINDOW")}</strong><span>${done ? "" : `left = ${view.left} · right = ${view.right}`}</span></header><div class="co1658-scroll"><div class="co1658-row">${currentCells}</div></div><p>${escapeHtml(status)}</p></section>
-    <section class="co1658-panel co1658-best"><header><strong>${vi ? "ĐOẠN TỐT NHẤT ĐÃ TÌM" : "BEST SEGMENT FOUND"}</strong><span>${hasBest ? (view.bestLen === 0 ? "∅" : `[${view.bestLeft}..${view.bestRight}]`) : "—"}</span></header>${hasBest ? `<div class="co1658-scroll"><div class="co1658-row">${bestCells}</div></div>` : ""}<p>${escapeHtml(bestMessage)}</p></section>
+    <div class="co1658-idea"><strong>${vi ? "ĐỔI GÓC NHÌN" : "CHANGE THE VIEW"}</strong><span>${vi ? "Lấy ở hai đầu" : "Remove from both ends"} <b>↔</b> ${vi ? "giữ một đoạn liên tiếp ở giữa" : "keep one contiguous middle segment"}</span><code>target = total - x = ${show(view.total)} - ${view.x} = ${show(view.target)}</code></div>
+    <div class="co1658-stats"><div><small>total</small><strong>${show(view.total)}</strong></div><div><small>x</small><strong>${view.x}</strong></div><div class="target"><small>${vi ? "TỔNG CẦN GIỮ" : "SUM TO KEEP"}</small><strong>${show(view.target)}</strong></div><div><small>windowSum</small><strong>${show(view.windowSum)}</strong></div><div><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></div><div class="best"><small>bestLen</small><strong>${isAll ? "—" : show(view.bestLen)}</strong></div></div>
+    <section class="co1658-panel"><header><strong>${done ? (vi ? "PHƯƠNG ÁN CUỐI" : "FINAL CHOICE") : (vi ? "ĐOẠN ĐANG XÉT" : "CURRENT WINDOW")}</strong><span>${done ? "" : `left = ${show(view.left)} · right = ${show(view.right)}`}</span></header><div class="co1658-scroll"><div class="co1658-row">${currentCells}</div></div><p>${escapeHtml(status)}</p></section>
+    <section class="co1658-panel co1658-best"><header><strong>${vi ? "ĐOẠN TỐT NHẤT ĐÃ TÌM" : "BEST SEGMENT FOUND"}</strong><span>${hasBest ? (bestLength === 0 ? "∅" : `[${bestLeft}..${bestRight}]`) : "—"}</span></header>${hasBest ? `<div class="co1658-scroll"><div class="co1658-row">${bestCells}</div></div>` : ""}<p>${escapeHtml(bestMessage)}</p></section>
     <div class="co1658-legend"><span><i class="keep"></i>${vi ? "giữ đoạn giữa" : "keep middle"}</span><span><i class="take-left"></i>${vi ? "lấy bên trái" : "take left"}</span><span><i class="take-right"></i>${vi ? "lấy bên phải" : "take right"}</span></div>
-    <footer class="co1658-answer ${done ? "done" : ""}"><div><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>operations = n - bestLen</code><span>${escapeHtml(pick(step.note))}</span></div><strong>${done ? view.answer : "?"}</strong></footer>
+    <footer class="co1658-answer ${done ? "done" : ""}"><div><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>${escapeHtml(formula)}</code><span>${escapeHtml(pick(step.note))}</span></div><strong>${done ? view.answer : "?"}</strong></footer>
+  </section>`;
+}
+
+function renderNumberBfs2059View(step) {
+  const view = step.numberBfs2059View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const current = view.current;
+  const selected = view.num;
+  const variants = current === null || selected === null ? [] : [
+    { op: "+", value: current + selected },
+    { op: "−", value: current - selected },
+    { op: "^", value: current ^ selected },
+  ];
+  const candidates = variants.map(({ op, value }) => {
+    const active = view.candidate && view.candidate.op === op;
+    const status = active ? view.candidate.status : "preview";
+    const badge = status === "goal" ? (vi ? "GOAL" : "GOAL")
+      : status === "outside" ? (vi ? "NGOÀI KHOẢNG" : "OUT OF RANGE")
+        : status === "seen" ? (vi ? "ĐÃ THẤY" : "SEEN")
+          : status === "queued" ? (vi ? "TRONG QUEUE" : "QUEUED")
+            : status === "new" || status === "discovered" ? (vi ? "MỚI" : "NEW") : "";
+    return `<div class="nb2059-candidate ${active ? `active ${status}` : ""}"><small>${show(current)} ${escapeHtml(op)} ${show(selected)}</small><strong>${show(value)}</strong><span>${badge}</span></div>`;
+  }).join("");
+  const queue = (view.queue || []).map(({ value, depth }) => `<span class="nb2059-queue-item"><strong>${show(value)}</strong><small>d=${show(depth)}</small></span>`).join("");
+  const path = (view.path || []).map(({ value, op, num }, index) =>
+    `<span class="nb2059-path-node">${index ? `<small>${escapeHtml(op)} ${show(num)} →</small>` : ""}<strong>${show(value)}</strong></span>`).join("");
+  const goalOutside = view.goal < 0 || view.goal > 1000;
+  $("treeView").innerHTML = `<section class="nb2059-viz" aria-label="Minimum Operations to Convert Number visualization">
+    <header class="nb2059-heading"><div><small>BFS · #2059</small><strong>${vi ? "ĐỔI SỐ VỚI ÍT THAO TÁC NHẤT" : "MINIMUM OPERATIONS TO CONVERT A NUMBER"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="nb2059-rule">${vi ? "Chỉ mở rộng trạng thái trong" : "Only expand states in"} <code>[0, 1000]</code>. ${goalOutside ? (vi ? "Goal ngoài khoảng vẫn hợp lệ ở bước cuối." : "An out-of-range goal is valid as the final move.") : (vi ? "BFS duyệt theo số thao tác tăng dần." : "BFS explores by increasing operation count.")}</div>
+    <div class="nb2059-stats"><div><small>START</small><strong>${show(view.start)}</strong></div><div><small>GOAL</small><strong>${show(view.goal)}</strong></div><div><small>${vi ? "TẦNG BFS" : "BFS DEPTH"}</small><strong>${show(view.distance)}</strong></div><div><small>QUEUE</small><strong>${show(view.queueSize)}</strong></div><div><small>${vi ? "ĐÃ THẤY" : "SEEN"}</small><strong>${show(view.seenCount)}</strong></div></div>
+    <section class="nb2059-panel"><header><strong>${vi ? "TRẠNG THÁI ĐANG MỞ RỘNG" : "CURRENT STATE"}</strong><span>${selected === null ? "" : `num = ${show(selected)}`}</span></header><div class="nb2059-current">${show(current)}</div><div class="nb2059-candidates">${candidates || `<p>${vi ? "Lấy trạng thái từ queue để thử ba phép toán." : "Pop a state to try the three operations."}</p>`}</div></section>
+    <section class="nb2059-panel"><header><strong>${vi ? "HÀNG ĐỢI BFS" : "BFS QUEUE"}</strong><span>${show(view.queueSize)} ${vi ? "đang chờ" : "waiting"}</span></header><div class="nb2059-queue">${queue || `<span class="nb2059-empty">${vi ? "Trống" : "Empty"}</span>`}${view.queueSize > 8 ? `<span class="nb2059-empty">+${view.queueSize - 8} ${vi ? "khác" : "more"}</span>` : ""}</div></section>
+    ${step.final ? `<section class="nb2059-panel nb2059-result"><header><strong>${view.answer < 0 ? (vi ? "KHÔNG THỂ ĐẠT GOAL" : "GOAL UNREACHABLE") : (vi ? "ĐƯỜNG ĐI NGẮN NHẤT" : "SHORTEST PATH")}</strong><span>${vi ? "Đáp án" : "Answer"}: ${show(view.answer)}</span></header>${path ? `<div class="nb2059-path">${path}</div>` : ""}</section>` : ""}
+    <footer class="nb2059-note">${escapeHtml(pick(step.note))}</footer>
   </section>`;
 }
 
@@ -37505,6 +37550,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderComplement1658View(step);
+  } else if (step.numberBfs2059View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNumberBfs2059View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

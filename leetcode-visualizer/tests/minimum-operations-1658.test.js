@@ -57,12 +57,58 @@ test('1658 steps keep the visualized window and final choice consistent', () => 
     assert.ok(view);
     assert.equal(step.codeLines.length, 1);
     assert.ok(step.codeLines[0] >= 1 && step.codeLines[0] <= problem.code.length);
-    if (view.right >= 0 && !step.final) {
-      assert.equal(view.windowSum, view.nums.slice(view.left, view.right + 1).reduce((sum, value) => sum + value, 0));
+    if (view.windowSum !== null && Number.isInteger(view.windowLeft) && Number.isInteger(view.windowRight) && !step.final) {
+      assert.equal(view.windowSum, view.nums.slice(view.windowLeft, view.windowRight + 1).reduce((sum, value) => sum + value, 0));
     }
   }
   const final = run.steps.at(-1).complement1658View;
   assert.equal(final.answer, 2);
   assert.equal(final.bestLen, 3);
   assert.equal(final.nums.slice(final.bestLeft, final.bestRight + 1).reduce((sum, value) => sum + value, 0), final.target);
+});
+
+test('1658 line-by-line trace follows each executed Python statement', () => {
+  const steps = solve([1, 1, 4, 2, 3], 5).steps;
+  const lines = steps.map(step => step.codeLines[0]);
+  assert.deepEqual(lines, [
+    2, 3, 4, 5, 7, 9, 10, 11,
+    12, 13, 14, 17,
+    12, 13, 14, 17,
+    12, 13, 14, 17, 18,
+    12, 13, 14, 15, 16, 14, 15, 16, 14, 17, 18,
+    12, 13, 14, 15, 16, 14, 17,
+    19,
+  ]);
+
+  const names = step => step.vars.map(variable => variable.name);
+  assert.deepEqual(names(steps[0]), ['nums', 'x']);
+  assert.ok(names(steps[1]).includes('total'));
+  assert.ok(!names(steps[1]).includes('target'));
+  assert.ok(names(steps[2]).includes('target'));
+  assert.ok(!names(steps.find(step => step.codeLines[0] === 9)).includes('windowSum'));
+
+  const beforeAdd = steps.find(step => step.codeLines[0] === 12);
+  const afterAdd = steps.find(step => step.codeLines[0] === 13);
+  assert.equal(beforeAdd.complement1658View.right, 0);
+  assert.equal(beforeAdd.complement1658View.windowRight, -1);
+  assert.equal(beforeAdd.complement1658View.windowSum, 0);
+  assert.equal(afterAdd.complement1658View.windowRight, 0);
+  assert.equal(afterAdd.complement1658View.windowSum, 1);
+
+  const subtraction = steps.find(step => step.codeLines[0] === 15);
+  const pointerMove = steps[steps.indexOf(subtraction) + 1];
+  assert.equal(subtraction.complement1658View.left, 0);
+  assert.equal(subtraction.complement1658View.windowLeft, 1);
+  assert.equal(pointerMove.codeLines[0], 16);
+  assert.equal(pointerMove.complement1658View.left, 1);
+  assert.equal(pointerMove.complement1658View.windowSum, subtraction.complement1658View.windowSum);
+
+  const bestUpdates = steps.filter(step => step.codeLines[0] === 18);
+  assert.deepEqual(bestUpdates.map(step => step.complement1658View.bestLen), [3, 3]);
+});
+
+test('1658 early returns highlight the guard and then the matching return line', () => {
+  assert.deepEqual(solve([1, 2], 10).steps.map(step => step.codeLines[0]), [2, 3, 4, 5, 6]);
+  assert.deepEqual(solve([1, 2], 3).steps.map(step => step.codeLines[0]), [2, 3, 4, 5, 7, 8]);
+  assert.equal(solve([1, 2], 3).steps.at(-1).complement1658View.bestLen, null);
 });
