@@ -18054,6 +18054,47 @@ function renderDigitSum3550View(step) {
   </section>`;
 }
 
+function renderPermutation1589View(step) {
+  const view = step.permutation1589View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const activeRequest = view.requestIndex;
+  const requestList = [...(view.requests || [])];
+  if (activeRequest !== null && !requestList.some((item) => item.index === activeRequest) && view.request) {
+    requestList.push({ index: activeRequest, left: view.request[0], right: view.request[1] });
+  }
+  const requests = requestList.map((item) => `<span class="mp1589-request ${item.index === activeRequest ? "active" : ""}">#${show(item.index)} [${show(item.left)}, ${show(item.right)}]</span>`).join("");
+  let previous = -1;
+  const cells = (view.cells || []).map((cell) => {
+    const gap = cell.index > previous + 1 ? `<span class="mp1589-gap">…</span>` : "";
+    previous = cell.index;
+    const inRange = view.request && cell.index >= view.request[0] && cell.index <= view.request[1];
+    const active = cell.index === view.activeIndex;
+    return `${gap}<div class="mp1589-cell ${inRange ? "in-range" : ""} ${active ? "active" : ""}"><small>${cell.index === view.n ? "end" : `[${show(cell.index)}]`}</small><strong>${cell.index === view.n ? "∅" : show(cell.value)}</strong><span>Δ ${show(cell.diff)}</span><span>f ${show(cell.frequency)}</span></div>`;
+  }).join("");
+  previous = -1;
+  const pairs = (view.sorted || []).map((item) => {
+    const gap = item.index > previous + 1 ? `<span class="mp1589-gap">…</span>` : "";
+    previous = item.index;
+    return `${gap}<div class="mp1589-pair ${item.index === view.pairIndex ? "active" : ""}"><small>#${show(item.index)}</small><strong>${show(item.value)} × ${show(item.frequency)}</strong><span>${item.value === null || item.frequency === null ? "—" : show(item.value * item.frequency)}</span></div>`;
+  }).join("");
+  const phase = view.phase || "init";
+  const stage = phase.startsWith("range") || phase === "init" ? (vi ? "1 · ĐÁNH DẤU ĐOẠN" : "1 · MARK RANGES")
+    : phase === "prefix" ? (vi ? "2 · ĐẾM TẦN SUẤT" : "2 · COUNT COVERAGE")
+      : (vi ? "3 · GHÉP TỐI ƯU" : "3 · OPTIMAL PAIRING");
+  $("treeView").innerHTML = `<section class="mp1589-viz" aria-label="Maximum Sum Obtained of Any Permutation visualization">
+    <header class="mp1589-heading"><div><small>DIFFERENCE ARRAY + GREEDY · #1589</small><strong>${vi ? "TỔNG TRUY VẤN LỚN NHẤT" : "MAXIMUM REQUEST SUM"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mp1589-rule">${vi ? "Mỗi vị trí đóng góp nums[i] × số truy vấn phủ nó. Đặt số lớn ở nơi được dùng nhiều lần nhất." : "Each position contributes nums[i] × its request count. Put the largest values at the most-used positions."}</div>
+    <div class="mp1589-stats"><div><small>${vi ? "GIAI ĐOẠN" : "STAGE"}</small><strong>${stage}</strong></div><div><small>${vi ? "VỊ TRÍ" : "POSITION"}</small><strong>${show(view.activeIndex)}</strong></div><div><small>${vi ? "TẦN SUẤT" : "FREQUENCY"}</small><strong>${phase === "prefix" ? show(view.running) : "—"}</strong></div><div><small>${vi ? "TỔNG HIỆN TẠI" : "RUNNING SUM"}</small><strong>${phase === "pair" || phase === "done" ? show(view.answer) : "—"}</strong></div></div>
+    <section class="mp1589-panel"><header><strong>requests</strong><span>${show(view.requestCount)} ${vi ? "đoạn" : "ranges"}</span></header><div class="mp1589-requests">${requests}</div>${view.request ? `<p>${vi ? "Đang xét" : "Current"}: [${show(view.request[0])}, ${show(view.request[1])}] · Δ[${show(view.request[0])}] += 1 · Δ[${show(view.request[1] + 1)}] -= 1</p>` : ""}</section>
+    <section class="mp1589-panel"><header><strong>${vi ? "MẢNG HIỆU → SỐ LẦN PHỦ" : "DIFFERENCE ARRAY → COVERAGE"}</strong><span>n = ${show(view.n)}</span></header><div class="mp1589-scroll"><div class="mp1589-cells">${cells}</div></div><p>${vi ? "Δ là mảng hiệu · f là tần suất sau tổng tiền tố · ô end không thuộc nums." : "Δ is the difference array · f is the prefix-sum frequency · end is a sentinel outside nums."}</p></section>
+    <section class="mp1589-panel"><header><strong>${vi ? "SỐ ĐÃ SẮP × TẦN SUẤT ĐÃ SẮP" : "SORTED VALUES × SORTED FREQUENCIES"}</strong><span>${vi ? "ghép cùng thứ tự" : "pair in order"}</span></header><div class="mp1589-scroll"><div class="mp1589-pairs">${pairs || `<span class="mp1589-empty">${vi ? "Đếm tần suất trước, rồi sắp xếp hai dãy." : "Count coverage first, then sort both lists."}</span>`}</div></div>${view.pairIndex !== null ? `<p>${vi ? "Vừa cộng" : "Just added"}: ${show(view.contribution)} → ${show(view.answer)} (mod 1 000 000 007)</p>` : ""}</section>
+    ${view.truncated ? `<div class="mp1589-short">${vi ? "Trace chỉ hiển thị phần đầu; kết quả vẫn tính trên toàn bộ đầu vào." : "The trace shows only the beginning; the answer still uses the full input."}</div>` : ""}
+    ${step.final ? `<section class="mp1589-panel mp1589-result"><header><strong>${vi ? "ĐÁP ÁN" : "ANSWER"}</strong></header><strong>${show(view.answer)}</strong></section>` : ""}
+    <footer class="mp1589-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37756,6 +37797,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitSum3550View(step);
+  } else if (step.permutation1589View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPermutation1589View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -59311,3 +59311,44 @@ html, body {
 [data-theme="light"] .ds3550-stats > div:last-child strong, [data-theme="light"] .ds3550-compare.match strong, [data-theme="light"] .ds3550-result > strong, [data-theme="light"] .ds3550-cell.matched span { color: #047857; }
 [data-theme="light"] .ds3550-equation code { color: #0e7490; }
 @container (max-width: 590px) { .ds3550-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- 1589: difference array and optimal value-frequency pairing ---- */
+.mp1589-viz { --mp-bg: #101827; --mp-panel: #17243a; --mp-border: #334155; --mp-text: #e2e8f0; --mp-muted: #94a3b8; display: grid; gap: 11px; min-width: 0; padding: 14px; border: 1px solid var(--mp-border); border-radius: 12px; background: var(--mp-bg); color: var(--mp-text); container-type: inline-size; }
+.mp1589-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.mp1589-heading div { display: grid; gap: 3px; }
+.mp1589-heading small { color: #60a5fa; font: 800 10px Consolas, monospace; letter-spacing: .07em; }
+.mp1589-heading strong { font-size: 16px; }
+.mp1589-heading > span { color: var(--mp-muted); font-size: 11px; }
+.mp1589-rule { padding: 10px 12px; border: 1px solid #2563eb; border-radius: 8px; background: rgba(37, 99, 235, .12); font-size: 11px; line-height: 1.5; }
+.mp1589-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.mp1589-stats > div { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid var(--mp-border); border-radius: 8px; background: var(--mp-panel); }
+.mp1589-stats small { color: var(--mp-muted); font: 750 9px Consolas, monospace; }
+.mp1589-stats strong { overflow-wrap: anywhere; font: 800 13px Consolas, monospace; }
+.mp1589-stats > div:last-child strong { color: #6ee7b7; }
+.mp1589-panel { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--mp-border); border-radius: 9px; background: var(--mp-panel); }
+.mp1589-panel header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.mp1589-panel header strong { font: 800 10px Consolas, monospace; letter-spacing: .05em; }
+.mp1589-panel header span, .mp1589-panel p { margin: 0; color: var(--mp-muted); font: 700 10px Consolas, monospace; }
+.mp1589-requests { display: flex; flex-wrap: wrap; gap: 5px; }
+.mp1589-request { padding: 5px 8px; border: 1px solid var(--mp-border); border-radius: 6px; color: var(--mp-muted); font: 750 10px Consolas, monospace; }
+.mp1589-request.active { border-color: #38bdf8; color: var(--mp-text); background: rgba(14, 165, 233, .15); }
+.mp1589-scroll { overflow-x: auto; max-width: 100%; padding: 3px 2px 7px; }
+.mp1589-cells, .mp1589-pairs { display: flex; align-items: center; gap: 5px; width: max-content; min-width: 100%; }
+.mp1589-cell, .mp1589-pair { display: grid; place-items: center; gap: 3px; min-width: 61px; padding: 7px 6px; border: 1px solid var(--mp-border); border-radius: 7px; background: var(--mp-bg); }
+.mp1589-cell.in-range { background: rgba(37, 99, 235, .16); }
+.mp1589-cell.active, .mp1589-pair.active { border-color: #fbbf24; background: rgba(245, 158, 11, .13); }
+.mp1589-cell small, .mp1589-pair small { color: var(--mp-muted); font: 700 9px Consolas, monospace; }
+.mp1589-cell strong { font: 850 15px Consolas, monospace; }
+.mp1589-cell span, .mp1589-pair span { color: var(--mp-muted); font: 750 10px Consolas, monospace; }
+.mp1589-pair { min-width: 77px; }
+.mp1589-pair strong { font: 800 12px Consolas, monospace; }
+.mp1589-gap { color: var(--mp-muted); font-size: 17px; }
+.mp1589-empty { color: var(--mp-muted); font-size: 10px; }
+.mp1589-short { color: var(--mp-muted); font-size: 10px; }
+.mp1589-result { border-color: #059669; }
+.mp1589-result > strong { color: #6ee7b7; font: 850 24px Consolas, monospace; }
+.mp1589-note { padding: 9px 11px; border-left: 3px solid #60a5fa; color: var(--mp-muted); font-size: 11px; line-height: 1.5; }
+[data-theme="light"] .mp1589-viz { --mp-bg: #f8fafc; --mp-panel: #fff; --mp-border: #cbd5e1; --mp-text: #0f172a; --mp-muted: #475569; }
+[data-theme="light"] .mp1589-rule { background: #eff6ff; }
+[data-theme="light"] .mp1589-stats > div:last-child strong, [data-theme="light"] .mp1589-result > strong { color: #047857; }
+@container (max-width: 590px) { .mp1589-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
