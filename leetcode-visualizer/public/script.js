@@ -17980,6 +17980,80 @@ function renderMeetingRooms2402View(step) {
   </section>`;
 }
 
+function renderAdjacentRuns3350View(step) {
+  const view = step.adjacentRuns3350View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const focus = view.candidate || view.witness;
+  const partOf = (pair, index) => {
+    if (!pair) return "";
+    if (index >= pair.leftStart && index < pair.leftStart + pair.k) return "left";
+    if (index >= pair.rightStart && index < pair.rightStart + pair.k) return "right";
+    return "";
+  };
+  let previousIndex = -1;
+  const cells = (view.cells || []).map(({ index, value }) => {
+    const gap = index > previousIndex + 1 ? `<span class="ai3350-gap">…</span>` : "";
+    previousIndex = index;
+    const side = partOf(focus, index);
+    const bestSide = partOf(view.witness, index);
+    const inCurrent = view.currentRun && index >= view.currentRun[0] && index <= view.currentRun[1];
+    const inPrevious = view.previousRun && index >= view.previousRun[0] && index <= view.previousRun[1];
+    const classes = ["ai3350-cell", side ? `focus-${side}` : "", bestSide ? "best" : "",
+      inCurrent ? "current" : "", inPrevious ? "previous" : "", index === view.i ? "active" : ""].filter(Boolean).join(" ");
+    return `${gap}<div class="${classes}"><small>[${index}]</small><strong>${show(value)}</strong><span>${side ? side === "left" ? "L" : "R" : ""}</span></div>`;
+  }).join("");
+  const runText = (range) => range ? `[${show(range[0])}..${show(range[1])}]` : "—";
+  const pairText = (pair) => pair
+    ? `[${show(pair.leftStart)}..${show(pair.leftStart + pair.k - 1)}] + [${show(pair.rightStart)}..${show(pair.rightStart + pair.k - 1)}]`
+    : "—";
+  $("treeView").innerHTML = `<section class="ai3350-viz" aria-label="Adjacent Increasing Subarrays Detection II visualization">
+    <header class="ai3350-heading"><div><small>INCREASING RUNS · #3350</small><strong>${vi ? "HAI ĐOẠN TĂNG LIỀN KỀ" : "ADJACENT INCREASING SUBARRAYS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ai3350-rule">${vi ? "Hai đoạn phải có cùng độ dài k, đứng sát nhau và mỗi đoạn tăng nghiêm ngặt. Điểm nối giữa hai đoạn không bắt buộc tăng." : "Both subarrays must have length k, be adjacent, and increase strictly inside each one. Their shared boundary need not increase."}</div>
+    <div class="ai3350-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>${vi ? "RUN TRƯỚC" : "PREVIOUS RUN"}</small><strong>${show(view.previous)}</strong></div><div><small>${vi ? "RUN HIỆN TẠI" : "CURRENT RUN"}</small><strong>${show(view.current)}</strong></div><div><small>best k</small><strong>${show(view.best)}</strong></div></div>
+    <section class="ai3350-panel"><header><strong>nums</strong><span>${(view.cells || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.cells || []).length}/${show(view.n)}` : `${show(view.n)} ${vi ? "phần tử" : "values"}`}</span></header><div class="ai3350-array-scroll"><div class="ai3350-array">${cells}</div></div><div class="ai3350-legend"><span>${vi ? "L/R: hai đoạn đang xét" : "L/R: the two subarrays"}</span><span>${vi ? "viền vàng: cặp tốt nhất" : "gold outline: best pair"}</span></div></section>
+    <div class="ai3350-runs"><div><small>${vi ? "RUN TRƯỚC" : "PREVIOUS RUN"}</small><strong>${runText(view.previousRun)}</strong></div><div><small>${vi ? "RUN HIỆN TẠI" : "CURRENT RUN"}</small><strong>${runText(view.currentRun)}</strong></div></div>
+    <div class="ai3350-candidates"><div class="${view.candidate?.kind === "inside" ? "active" : ""}"><small>${vi ? "CHIA ĐÔI MỘT RUN" : "SPLIT ONE RUN"}</small><strong>⌊current / 2⌋ = ${show(view.inside)}</strong></div><div class="${view.candidate?.kind === "across" ? "active" : ""}"><small>${vi ? "GHÉP QUA RANH GIỚI" : "ACROSS RUN BOUNDARY"}</small><strong>min(previous, current) = ${show(view.across)}</strong></div></div>
+    <section class="ai3350-panel ai3350-best"><header><strong>${vi ? "CẶP TỐT NHẤT" : "BEST PAIR"}</strong><span>k = ${show(view.best)}</span></header><code>${pairText(view.witness)}</code>${view.candidate ? `<p>${vi ? "Đang thử" : "Trying"}: ${pairText(view.candidate)}</p>` : ""}</section>
+    <footer class="ai3350-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderDigitSum3550View(step) {
+  const view = step.digitSum3550View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  let previousIndex = -1;
+  const cells = (view.cells || []).map((item) => {
+    const gap = item.index > previousIndex + 1 ? `<span class="ds3550-gap">…</span>` : "";
+    previousIndex = item.index;
+    const classes = ["ds3550-cell", item.scanned ? "scanned" : "", item.current ? "current" : "",
+      item.matched ? "matched" : ""].filter(Boolean).join(" ");
+    return `${gap}<div class="${classes}"><small>[${show(item.index)}]</small><strong>${show(item.value)}</strong><span>${item.matched ? "✓" : item.current ? "▲" : ""}</span></div>`;
+  }).join("");
+  const digits = (view.digits || []).map((value, index, all) => {
+    const processed = index >= all.length - view.processed;
+    const active = view.phase === "add-digit" && index === all.length - view.processed;
+    return `<div class="ds3550-digit ${processed ? "processed" : ""} ${active ? "active" : ""}"><small>10<sup>${all.length - index - 1}</sup></small><strong>${show(value)}</strong></div>`;
+  }).join("");
+  const processedDigits = view.processed ? (view.digits || []).slice(-view.processed).reverse() : [];
+  const expression = processedDigits.length ? processedDigits.map(show).join(" + ")
+    : view.value === 0 && view.total !== null ? "0" : "…";
+  const compared = view.phase === "compare" || view.phase === "found";
+  const matches = compared && view.total === view.i;
+  const exhausted = step.final && view.answer === -1;
+  $("treeView").innerHTML = `<section class="ds3550-viz" aria-label="Smallest Index With Digit Sum Equal to Index visualization">
+    <header class="ds3550-heading"><div><small>DIGIT SUM · #3550</small><strong>${vi ? "CHỈ SỐ NHỎ NHẤT BẰNG TỔNG CHỮ SỐ" : "SMALLEST INDEX = DIGIT SUM"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ds3550-rule">${vi ? "Quét i từ trái sang phải. Khi tổng chữ số của nums[i] bằng i, trả về ngay: đó chắc chắn là chỉ số nhỏ nhất." : "Scan i from left to right. Return as soon as the digit sum of nums[i] equals i: this is necessarily the smallest index."}</div>
+    <div class="ds3550-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>nums[i]</small><strong>${show(view.value)}</strong></div><div><small>${vi ? "CÒN LẠI" : "REMAINING"}</small><strong>${show(view.remaining)}</strong></div><div><small>${vi ? "TỔNG CHỮ SỐ" : "DIGIT SUM"}</small><strong>${show(view.total)}</strong></div></div>
+    <section class="ds3550-panel"><header><strong>nums</strong><span>${(view.cells || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.cells || []).length}/${show(view.n)}` : `${show(view.n)} ${vi ? "phần tử" : "values"}`}</span></header><div class="ds3550-scroll"><div class="ds3550-array">${cells}</div></div><p>${vi ? "Ô mờ đã kiểm tra · viền xanh là vị trí hiện tại · dấu ✓ là chỉ số đầu tiên khớp." : "Dim cells were checked · cyan border is the current index · ✓ marks the first match."}</p></section>
+    <section class="ds3550-panel"><header><strong>${vi ? "TÁCH TỪNG CHỮ SỐ" : "EXTRACT DIGITS"}</strong><span>${view.value === null ? "—" : `${show(view.processed)} / ${(view.digits || []).length}`}</span></header><div class="ds3550-digits">${digits || `<span class="ds3550-empty">${vi ? "Chọn một phần tử" : "Select a value"}</span>`}</div><div class="ds3550-equation">${vi ? "Đã cộng" : "Added"}: <code>${expression} = ${show(view.total)}</code>${view.digit !== null ? `<span>${vi ? "chữ số vừa lấy" : "last digit"}: ${show(view.digit)}</span>` : ""}</div></section>
+    <div class="ds3550-compare ${exhausted ? "mismatch" : compared ? matches ? "match" : "mismatch" : ""}"><strong>${exhausted ? (vi ? "Đã kiểm tra mọi chỉ số" : "All indices checked") : `${show(view.total)} ${compared ? matches ? "=" : "≠" : "?"} ${show(view.i)}`}</strong><span>${exhausted ? (vi ? "Không có tổng chữ số nào bằng chỉ số tương ứng" : "No digit sum equals its index") : compared ? matches ? (vi ? "Khớp — dừng tại chỉ số nhỏ nhất" : "Match — stop at the smallest index") : (vi ? "Chưa khớp — xét phần tử tiếp" : "No match — continue scanning") : (vi ? "Đang tính tổng chữ số" : "Computing digit sum")}</span></div>
+    ${step.final ? `<section class="ds3550-panel ds3550-result"><header><strong>${vi ? "KẾT QUẢ" : "RESULT"}</strong></header><strong>${show(view.answer)}</strong><span>${view.answer === -1 ? (vi ? "Không có chỉ số hợp lệ" : "No matching index") : (vi ? "Chỉ số khớp đầu tiên" : "First matching index")}</span></section>` : ""}
+    <footer class="ds3550-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -37670,6 +37744,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMeetingRooms2402View(step);
+  } else if (step.adjacentRuns3350View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAdjacentRuns3350View(step);
+  } else if (step.digitSum3550View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDigitSum3550View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
