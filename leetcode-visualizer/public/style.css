@@ -59406,3 +59406,43 @@ html, body {
 [data-theme="light"] .ns2242-stats > div:last-child strong, [data-theme="light"] .ns2242-best > strong { color: #047857; }
 @container (max-width: 590px) { .ns2242-stats, .ns2242-lists { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container (max-width: 420px) { .ns2242-stats, .ns2242-lists { grid-template-columns: 1fr; } }
+
+/* ---- 562: four-direction DP for the longest line of ones ---- */
+.ll562-viz { --ll-bg: #101827; --ll-panel: #17243a; --ll-border: #334155; --ll-text: #e2e8f0; --ll-muted: #94a3b8; display: grid; gap: 11px; min-width: 0; padding: 14px; border: 1px solid var(--ll-border); border-radius: 12px; background: var(--ll-bg); color: var(--ll-text); container-type: inline-size; }
+.ll562-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.ll562-heading div { display: grid; gap: 3px; }
+.ll562-heading small { color: #a78bfa; font: 800 10px Consolas, monospace; letter-spacing: .07em; }
+.ll562-heading strong { font-size: 16px; }
+.ll562-heading > span, .ll562-panel header span { color: var(--ll-muted); font-size: 11px; }
+.ll562-rule { padding: 10px 12px; border: 1px solid #7c3aed; border-radius: 8px; background: rgba(124, 58, 237, .12); font-size: 11px; line-height: 1.5; }
+.ll562-stats, .ll562-directions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.ll562-stats > div, .ll562-direction { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid var(--ll-border); border-radius: 8px; background: var(--ll-panel); }
+.ll562-stats small, .ll562-direction small { color: var(--ll-muted); font: 750 9px Consolas, monospace; }
+.ll562-stats strong, .ll562-direction strong { overflow-wrap: anywhere; font: 800 15px Consolas, monospace; }
+.ll562-stats > div:last-child strong { color: #6ee7b7; }
+.ll562-panel { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--ll-border); border-radius: 9px; background: var(--ll-panel); }
+.ll562-panel header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.ll562-panel header strong { font: 800 10px Consolas, monospace; letter-spacing: .05em; }
+.ll562-panel p { margin: 0; color: var(--ll-muted); font: 700 10px Consolas, monospace; }
+.ll562-scroll { overflow-x: auto; max-width: 100%; padding: 2px 2px 7px; }
+.ll562-row { display: flex; gap: 5px; width: max-content; margin-bottom: 5px; }
+.ll562-cell { display: grid; place-items: center; gap: 2px; width: 57px; min-height: 55px; border: 2px solid var(--ll-border); border-radius: 7px; background: var(--ll-bg); }
+.ll562-cell.zero { opacity: .6; }
+.ll562-cell.best { background: rgba(16, 185, 129, .16); border-color: #059669; }
+.ll562-cell.run { background: rgba(245, 158, 11, .16); border-color: #fbbf24; }
+.ll562-cell.source { border-color: #38bdf8; }
+.ll562-cell.current { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167, 139, 250, .2); opacity: 1; }
+.ll562-cell small, .ll562-cell span { color: var(--ll-muted); font: 700 9px Consolas, monospace; }
+.ll562-cell strong { font: 850 17px Consolas, monospace; }
+.ll562-directions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ll562-direction.active { border-color: #fbbf24; background: rgba(245, 158, 11, .13); }
+.ll562-direction.winner strong { color: #6ee7b7; }
+.ll562-best { border-color: #059669; }
+.ll562-best > strong { color: #6ee7b7; font: 850 24px Consolas, monospace; }
+.ll562-short { color: var(--ll-muted); font-size: 10px; }
+.ll562-note { padding: 9px 11px; border-left: 3px solid #a78bfa; color: var(--ll-muted); font-size: 11px; line-height: 1.5; }
+[data-theme="light"] .ll562-viz { --ll-bg: #f8fafc; --ll-panel: #fff; --ll-border: #cbd5e1; --ll-text: #0f172a; --ll-muted: #475569; }
+[data-theme="light"] .ll562-rule { background: #f5f3ff; }
+[data-theme="light"] .ll562-stats > div:last-child strong, [data-theme="light"] .ll562-direction.winner strong, [data-theme="light"] .ll562-best > strong { color: #047857; }
+@container (max-width: 620px) { .ll562-directions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 420px) { .ll562-stats { grid-template-columns: 1fr; } }

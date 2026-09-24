@@ -18095,6 +18095,59 @@ function renderPermutation1589View(step) {
   </section>`;
 }
 
+function renderLongestLine562View(step) {
+  const view = step.longestLine562View || {};
+  const vi = lang === "vi";
+  const directions = [
+    { key: "H", name: vi ? "Ngang →" : "Horizontal →", dr: 0, dc: 1 },
+    { key: "V", name: vi ? "Dọc ↓" : "Vertical ↓", dr: 1, dc: 0 },
+    { key: "D", name: vi ? "Chéo ↘" : "Diagonal ↘", dr: 1, dc: 1 },
+    { key: "A", name: vi ? "Chéo ↙" : "Anti-diagonal ↙", dr: 1, dc: -1 },
+  ];
+  const current = view.current || [];
+  const bestLine = view.bestLine;
+  const bestCells = new Set();
+  if (bestLine) {
+    const direction = directions[bestLine.direction];
+    for (let offset = 0; offset < bestLine.length; offset++) {
+      bestCells.add(`${bestLine.end[0] - offset * direction.dr},${bestLine.end[1] - offset * direction.dc}`);
+    }
+  }
+  const runCells = new Set();
+  if (current.length === 2 && view.activeDirection !== null) {
+    const direction = directions[view.activeDirection];
+    for (let offset = 0; offset < (view.lengths?.[view.activeDirection] || 0); offset++) {
+      runCells.add(`${current[0] - offset * direction.dr},${current[1] - offset * direction.dc}`);
+    }
+  }
+  const matrix = (view.matrix || []).map((row, r) => `<div class="ll562-row">${row.map((value, c) => {
+    const key = `${r},${c}`;
+    const counts = view.dp?.[r]?.[c] || [0, 0, 0, 0];
+    const classes = ["ll562-cell", value === 0 ? "zero" : "one",
+      bestCells.has(key) ? "best" : "", runCells.has(key) ? "run" : "",
+      view.source?.row === r && view.source?.col === c ? "source" : "",
+      current[0] === r && current[1] === c ? "current" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${r},${c}</small><strong>${value}</strong><span>${counts.join("/")}</span></div>`;
+  }).join("")}</div>`).join("");
+  const cards = directions.map((direction, index) => `<div class="ll562-direction ${view.activeDirection === index ? "active" : ""} ${bestLine?.direction === index ? "winner" : ""}"><small>${direction.key} · ${direction.name}</small><strong>${view.lengths?.[index] ?? 0}</strong></div>`).join("");
+  const predecessor = view.activeDirection === null ? "—" : view.source
+    ? `(${view.source.row}, ${view.source.col}) = ${view.source.value}`
+    : (vi ? "Ngoài biên → 0" : "Outside grid → 0");
+  const bestText = bestLine
+    ? `${directions[bestLine.direction].name} · (${bestLine.end.join(", ")})`
+    : (vi ? "Chưa có dãy 1" : "No line of ones yet");
+  $("treeView").innerHTML = `<section class="ll562-viz" aria-label="Longest Line of Consecutive One in Matrix visualization">
+    <header class="ll562-heading"><div><small>4-DIRECTION DP · #562</small><strong>${vi ? "DÃY SỐ 1 DÀI NHẤT" : "LONGEST LINE OF ONES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ll562-rule">${vi ? "Mỗi ô 1 nối dài dãy từ ô liền trước theo từng hướng. Ô 0 đặt cả bốn độ dài về 0." : "Each one extends the previous cell in each direction. A zero keeps all four lengths at zero."}</div>
+    <div class="ll562-stats"><div><small>${vi ? "Ô ĐANG XÉT" : "CURRENT CELL"}</small><strong>${current.length ? `(${current.join(", ")})` : "—"}</strong></div><div><small>${vi ? "Ô ĐỨNG TRƯỚC" : "PREDECESSOR"}</small><strong>${predecessor}</strong></div><div><small>${vi ? "KỶ LỤC" : "BEST"}</small><strong>${view.best ?? 0}</strong></div></div>
+    <section class="ll562-panel"><header><strong>${vi ? "MA TRẬN · MỖI Ô HIỆN H/V/D/A" : "MATRIX · EACH CELL SHOWS H/V/D/A"}</strong><span>${view.rows} × ${view.cols}</span></header><div class="ll562-scroll">${matrix}</div><p>${vi ? "Viền tím: ô hiện tại · Viền lam: ô đứng trước · Vàng: dãy đang tính · Xanh: dãy tốt nhất" : "Purple: current · Blue: predecessor · Amber: current run · Green: best run"}</p></section>
+    <div class="ll562-directions">${cards}</div>
+    <section class="ll562-panel ll562-best"><header><strong>${vi ? "DÃY TỐT NHẤT" : "BEST LINE"}</strong><span>${bestText}</span></header><strong>${view.best ?? 0}</strong></section>
+    ${view.shortened ? `<div class="ll562-short">${vi ? "Trace và lưới xem trước được rút gọn; đáp án vẫn tính toàn bộ ma trận." : "The trace and grid preview are shortened; the answer still uses the whole matrix."}</div>` : ""}
+    <footer class="ll562-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderNodeSequence2242View(step) {
   const view = step.nodeSequence2242View || {};
   const vi = lang === "vi";
@@ -37849,6 +37902,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPermutation1589View(step);
+  } else if (step.longestLine562View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLongestLine562View(step);
   } else if (step.nodeSequence2242View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
