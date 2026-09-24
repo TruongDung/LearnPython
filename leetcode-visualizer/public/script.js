@@ -18107,7 +18107,7 @@ function renderNodeSequence2242View(step) {
   const nodes = (view.nodes || []).map((node) => {
     const gap = node.id > previous + 1 ? `<span class="ns2242-gap">…</span>` : "";
     previous = node.id;
-    const cls = candidate.includes(node.id) ? "candidate" : middle.includes(node.id) ? "middle" : "";
+    const cls = node.id === view.helperNode ? "helper" : candidate.includes(node.id) ? "candidate" : middle.includes(node.id) ? "middle" : "";
     return `${gap}<div class="ns2242-node ${cls}"><small>#${show(node.id)}</small><strong>${show(node.score)}</strong><span>top: ${(node.top || []).length ? node.top.map(show).join(", ") : "—"}</span></div>`;
   }).join("");
   previous = -1;
@@ -18122,7 +18122,7 @@ function renderNodeSequence2242View(step) {
   const path = (items) => items.length === 4
     ? items.map((id, index) => `<div class="ns2242-path-node"><small>${["a", "b", "c", "d"][index]} · #${show(id)}</small><strong>${show(scoreById.get(id))}</strong></div>`).join('<span class="ns2242-arrow">→</span>')
     : `<span class="ns2242-empty">${vi ? "Chọn cạnh giữa và hai đầu ngoài" : "Choose a middle edge and two outer nodes"}</span>`;
-  const resultText = view.answer === -1 ? "—" : bestPath.join(" → ");
+  const resultText = bestPath.length ? bestPath.join(" → ") : "—";
   const emptyBest = step.final
     ? (vi ? "Không tồn tại đường đi 4 đỉnh" : "No four-node path exists")
     : (vi ? "Chưa có dãy hợp lệ" : "No valid path yet");
@@ -18130,9 +18130,10 @@ function renderNodeSequence2242View(step) {
     <header class="ns2242-heading"><div><small>TOP-3 NEIGHBORS · #2242</small><strong>${vi ? "ĐƯỜNG ĐI 4 ĐỈNH ĐIỂM CAO NHẤT" : "BEST FOUR-NODE PATH"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="ns2242-rule">${vi ? "Cố định cạnh giữa b—c. Chỉ cần thử 3 hàng xóm điểm cao nhất ở mỗi đầu, rồi loại dãy có đỉnh trùng." : "Fix a middle edge b—c. Try only each endpoint's top three neighbors, rejecting repeated nodes."}</div>
     <div class="ns2242-stats"><div><small>${vi ? "CẠNH GIỮA" : "MIDDLE EDGE"}</small><strong>${middle.length ? `${show(middle[0])}—${show(middle[1])}` : "—"}</strong></div><div><small>${vi ? "ĐANG THỬ" : "CANDIDATE"}</small><strong>${candidate.length ? candidate.map(show).join("→") : "—"}</strong></div><div><small>${vi ? "ĐIỂM DÃY" : "PATH SCORE"}</small><strong>${show(view.total)}</strong></div><div><small>BEST</small><strong>${show(view.answer)}</strong></div></div>
+    ${view.helperNode !== null && view.helperNode !== undefined ? `<section class="ns2242-panel ns2242-build"><header><strong>${vi ? "ĐANG XÂY TOP-3" : "BUILDING TOP-3"}</strong><span>node = ${show(view.helperNode)} · neighbor = ${show(view.helperNeighbor)}</span></header><div><span>top[${show(view.helperNode)}]</span><strong>[${(view.helperTop || []).map(show).join(", ")}]</strong><span>${view.trimCondition === null ? "" : view.trimCondition ? (vi ? "Cần bỏ phần tử cuối" : "Pop the last entry") : (vi ? "Không cần bỏ" : "No pop needed")}</span></div></section>` : ""}
     <section class="ns2242-panel"><header><strong>${vi ? "ĐỈNH · ĐIỂM · TOP HÀNG XÓM" : "NODES · SCORES · TOP NEIGHBORS"}</strong><span>${show(view.n)} ${vi ? "đỉnh" : "nodes"}</span></header><div class="ns2242-scroll"><div class="ns2242-nodes">${nodes}</div></div></section>
     <section class="ns2242-panel"><header><strong>${vi ? "CÁC CẠNH" : "EDGES"}</strong><span>${show(view.edgeCount)} ${vi ? "cạnh" : "edges"}</span></header><div class="ns2242-scroll"><div class="ns2242-edges">${edges || `<span class="ns2242-empty">${vi ? "Không có cạnh" : "No edges"}</span>`}</div></div></section>
-    <div class="ns2242-lists"><section class="ns2242-panel"><header><strong>top[${show(middle[0])}] → a</strong></header><div class="ns2242-neighbors">${neighborList(view.leftTop || [], middle[1], candidate[0])}</div></section><section class="ns2242-panel"><header><strong>top[${show(middle[1])}] → d</strong></header><div class="ns2242-neighbors">${neighborList(view.rightTop || [], middle[0], candidate[3])}</div></section></div>
+    <div class="ns2242-lists"><section class="ns2242-panel"><header><strong>top[${show(middle[0])}] → a</strong></header><div class="ns2242-neighbors">${neighborList(view.leftTop || [], middle[1], view.selectedA)}</div></section><section class="ns2242-panel"><header><strong>top[${show(middle[1])}] → d</strong></header><div class="ns2242-neighbors">${neighborList(view.rightTop || [], middle[0], view.selectedD)}</div></section></div>
     <section class="ns2242-panel"><header><strong>${vi ? "DÃY ĐANG XÉT" : "CURRENT FOUR-NODE PATH"}</strong><span>${view.valid === false ? (vi ? `Bị loại: ${show(view.reason)}` : `Rejected: ${show(view.reason)}`) : view.valid === true ? (vi ? "Hợp lệ" : "Valid") : ""}</span></header><div class="ns2242-path ${view.valid === false ? "rejected" : view.valid === true ? "valid" : ""}">${path(candidate)}</div>${candidate.length ? `<p>${vi ? "Bốn ID phải khác nhau và mỗi cặp kề nhau phải có cạnh." : "All four IDs must differ and every adjacent pair must share an edge."}</p>` : ""}</section>
     <section class="ns2242-panel ns2242-best"><header><strong>${vi ? "DÃY TỐT NHẤT" : "BEST PATH"}</strong><span>${resultText}</span></header><div class="ns2242-path">${bestPath.length ? path(bestPath) : `<span class="ns2242-empty">${emptyBest}</span>`}</div><strong>${view.answer === -1 ? "−1" : show(view.answer)}</strong></section>
     ${view.shortened ? `<div class="ns2242-short">${vi ? "Trace được rút gọn; đáp án vẫn xét toàn bộ đồ thị." : "The trace is shortened; the answer still checks the full graph."}</div>` : ""}

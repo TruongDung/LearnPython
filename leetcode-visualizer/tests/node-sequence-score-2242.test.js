@@ -73,7 +73,39 @@ test('2242 trace keeps top-three lists and rejects repeated outer nodes', () => 
   assert.deepEqual(middle.rightTop.map((item) => item.id), [0, 2, 3]);
   assert.ok(run.steps.some((step) => step.nodeSequence2242View.reason === 'a=d'));
   assert.deepEqual(run.steps.at(-1).nodeSequence2242View.bestPath.length, 4);
-  assert.equal(run.steps.at(-1).codeLines[0], 21);
+  assert.equal(run.steps.at(-1).codeLines[0], 19);
+});
+
+test('2242 debug advances through one executed Python line per step', () => {
+  assert.equal(problem.debugMode, 'line-by-line');
+  assert.equal(problem.code.length, 19);
+  assert.deepEqual(solve([1, 2, 3, 4], []).steps.map((step) => step.codeLines[0]),
+    [2, 3, 4, 11, 19]);
+  const run = solve([100, 90, 80, 70], [[0, 1], [0, 2], [1, 2], [1, 3]]);
+  for (const [index, step] of run.steps.entries()) {
+    assert.equal(step.codeLines.length, 1, `step ${index}`);
+    assert.ok(step.codeLines[0] >= 2 && step.codeLines[0] <= 19, `step ${index}`);
+    if (step.codeLines[0] === 15) {
+      const next = run.steps[index + 1];
+      assert.equal(next.codeLines[0], step.nodeSequence2242View.valid ? 17 : 16);
+      if (step.nodeSequence2242View.valid) {
+        assert.equal(run.steps[index + 2].codeLines[0], 18);
+        assert.equal(step.nodeSequence2242View.answer, run.steps[index + 1].nodeSequence2242View.answer);
+      }
+    }
+  }
+});
+
+test('2242 debug shows append, sort, trim check, and pop separately', () => {
+  const run = solve([1, 2, 3, 4, 5], [[0, 1], [0, 2], [0, 3], [0, 4]]);
+  const start = run.steps.findIndex((step) => step.nodeSequence2242View.phase === 'build-edge'
+    && step.nodeSequence2242View.edgeIndex === 3);
+  const sequence = run.steps.slice(start, start + 6);
+  assert.deepEqual(sequence.map((step) => step.codeLines[0]), [5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(sequence.map((step) => step.nodeSequence2242View.helperTop.length),
+    [0, 3, 4, 4, 4, 3]);
+  assert.equal(sequence[4].nodeSequence2242View.trimCondition, true);
+  assert.deepEqual(sequence[5].nodeSequence2242View.helperTop, [4, 3, 2]);
 });
 
 test('2242 validates score and undirected-edge constraints', () => {
@@ -124,4 +156,5 @@ test('2242 renderer handles every phase in English and Vietnamese', () => {
   const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
   assert.match(css, /\.ns2242-viz \{/);
   assert.match(css, /\.ns2242-path\.rejected/);
+  assert.match(css, /\.ns2242-build/);
 });

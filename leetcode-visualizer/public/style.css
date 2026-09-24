@@ -59375,11 +59375,16 @@ html, body {
 .ns2242-node { display: grid; place-items: center; gap: 3px; min-width: 58px; padding: 6px; border: 1px solid var(--ns-border); border-radius: 7px; background: var(--ns-bg); }
 .ns2242-node.middle { border-color: #38bdf8; background: rgba(14, 165, 233, .13); }
 .ns2242-node.candidate { border-color: #fbbf24; background: rgba(245, 158, 11, .12); }
+.ns2242-node.helper { border-color: #a78bfa; background: rgba(124, 58, 237, .2); }
 .ns2242-node small, .ns2242-node span { color: var(--ns-muted); font: 700 9px Consolas, monospace; }
 .ns2242-node strong { font: 850 16px Consolas, monospace; }
 .ns2242-gap { color: var(--ns-muted); font-size: 17px; }
 .ns2242-edge { padding: 6px 8px; border: 1px solid var(--ns-border); border-radius: 7px; color: var(--ns-muted); font: 750 10px Consolas, monospace; white-space: nowrap; }
 .ns2242-edge.active { border-color: #a78bfa; color: var(--ns-text); background: rgba(124, 58, 237, .15); }
+.ns2242-build { border-color: #7c3aed; }
+.ns2242-build > div { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font: 750 11px Consolas, monospace; }
+.ns2242-build > div strong { color: #c4b5fd; font-size: 14px; }
+.ns2242-build > div span:last-child { color: var(--ns-muted); }
 .ns2242-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .ns2242-neighbors { display: flex; flex-wrap: wrap; gap: 5px; }
 .ns2242-neighbor { padding: 6px 8px; border: 1px solid var(--ns-border); border-radius: 7px; font: 750 10px Consolas, monospace; }
