@@ -18095,6 +18095,52 @@ function renderPermutation1589View(step) {
   </section>`;
 }
 
+function renderWeakCharacters1996View(step) {
+  const view = step.weakCharacters1996View || {};
+  const vi = lang === "vi";
+  const current = view.current;
+  const witness = view.witness;
+  const sorted = view.sorted || [];
+  const statusText = (status) => status === "weak" ? (vi ? "Yếu" : "Weak")
+    : status === "safe" ? (vi ? "Không yếu" : "Not weak") : (vi ? "Chưa xét" : "Pending");
+  const original = (view.original || []).map((item) => `<span class="wc1996-original">#${item.id} <strong>${item.attack}/${item.defense}</strong></span>`).join("");
+  const sortedCards = sorted.map((item) => {
+    const classes = ["wc1996-character", item.status || "pending",
+      current?.id === item.id ? "current" : "", witness?.id === item.id ? "witness" : "",
+      current && item.attack === current.attack ? "same-attack" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${item.index + 1} · #${item.id}</small><strong>A ${item.attack} · D ${item.defense}</strong><span>${statusText(item.status)}</span></div>`;
+  }).join("");
+  const attacks = sorted.map((item) => item.attack);
+  const defenses = sorted.map((item) => item.defense);
+  const minAttack = Math.min(...attacks);
+  const maxAttack = Math.max(...attacks);
+  const minDefense = Math.min(...defenses);
+  const maxDefense = Math.max(...defenses);
+  const px = (attack) => 39 + (attack - minAttack) / (maxAttack - minAttack || 1) * 258;
+  const py = (defense) => 195 - (defense - minDefense) / (maxDefense - minDefense || 1) * 166;
+  const plotPoints = sorted.map((item) => {
+    const classes = ["wc1996-point", item.status || "pending",
+      current?.id === item.id ? "current" : "", witness?.id === item.id ? "witness" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}"><circle cx="${px(item.attack)}" cy="${py(item.defense)}" r="7"/><text x="${px(item.attack) + 9}" y="${py(item.defense) - 7}">#${item.id}</text><title>#${item.id}: attack ${item.attack}, defense ${item.defense}</title></g>`;
+  }).join("");
+  const threshold = current ? `<rect class="wc1996-quadrant" x="${px(current.attack)}" y="22" width="${Math.max(0, 304 - px(current.attack))}" height="${Math.max(0, py(current.defense) - 22)}"/><line class="wc1996-threshold" x1="${px(current.attack)}" y1="22" x2="${px(current.attack)}" y2="198"/><line class="wc1996-threshold" x1="36" y1="${py(current.defense)}" x2="304" y2="${py(current.defense)}"/>` : "";
+  const plot = sorted.length ? `<svg class="wc1996-plot" viewBox="0 0 330 230" role="img" aria-label="Attack and defense plot"><line class="wc1996-axis" x1="36" y1="198" x2="306" y2="198"/><line class="wc1996-axis" x1="36" y1="198" x2="36" y2="18"/>${threshold}${plotPoints}<text class="wc1996-axis-label" x="270" y="219">attack →</text><text class="wc1996-axis-label" x="2" y="17">defense ↑</text><text class="wc1996-axis-label" x="36" y="211">${minAttack}</text><text class="wc1996-axis-label" x="287" y="211">${maxAttack}</text><text class="wc1996-axis-label" x="10" y="195">${minDefense}</text><text class="wc1996-axis-label" x="10" y="31">${maxDefense}</text></svg>` : `<span class="wc1996-empty">${vi ? "Sắp xếp để hiện đồ thị" : "Sort to show the plot"}</span>`;
+  const attackGreater = current && witness ? witness.attack > current.attack : null;
+  const defenseGreater = current && witness ? witness.defense > current.defense : null;
+  const comparison = current ? `<div class="wc1996-comparison"><div><small>${vi ? "NHÂN VẬT ĐANG XÉT" : "CURRENT CHARACTER"}</small><strong>#${current.id} · A ${current.attack} / D ${current.defense}</strong></div><div><small>${vi ? "NGƯỜI GIỮ MAX DEFENSE TRƯỚC BƯỚC NÀY" : "PREVIOUS MAX-DEFENSE OWNER"}</small><strong>${witness ? `#${witness.id} · A ${witness.attack} / D ${witness.defense}` : "—"}</strong></div><div class="${attackGreater ? "pass" : "fail"}"><small>ATTACK</small><strong>${witness ? `${witness.attack} > ${current.attack}` : "—"} ${attackGreater === null ? "" : attackGreater ? "✓" : "✗"}</strong></div><div class="${defenseGreater ? "pass" : "fail"}"><small>DEFENSE</small><strong>${witness ? `${witness.defense} > ${current.defense}` : "—"} ${defenseGreater === null ? "" : defenseGreater ? "✓" : "✗"}</strong></div></div>` : `<span class="wc1996-empty">${vi ? "Chọn nhân vật tiếp theo để so sánh hai chỉ số." : "Visit a character to compare both stats."}</span>`;
+  const verdict = view.isWeak === null ? "—" : view.isWeak ? (vi ? "YẾU" : "WEAK") : (vi ? "KHÔNG YẾU" : "NOT WEAK");
+  $("treeView").innerHTML = `<section class="wc1996-viz" aria-label="Weak Characters visualization">
+    <header class="wc1996-heading"><div><small>SORT + MAX DEFENSE · #1996</small><strong>${vi ? "NHÂN VẬT YẾU TRONG GAME" : "WEAK CHARACTERS IN THE GAME"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="wc1996-rule">${vi ? "Yếu ⇔ tồn tại người có attack LỚN HƠN và defense LỚN HƠN. Cùng attack không tính." : "Weak ⇔ another character has strictly higher attack AND strictly higher defense. Equal attack does not count."}</div>
+    <div class="wc1996-stats"><div><small>${vi ? "ĐÃ XÉT" : "PROCESSED"}</small><strong>${view.processed}/${view.total}</strong></div><div><small>MAX DEFENSE</small><strong>${view.maxDefense ?? "—"}</strong></div><div><small>${vi ? "SỐ NHÂN VẬT YẾU" : "WEAK COUNT"}</small><strong>${view.weak ?? "—"}</strong></div><div><small>${vi ? "KẾT LUẬN HIỆN TẠI" : "CURRENT VERDICT"}</small><strong>${verdict}</strong></div></div>
+    <section class="wc1996-panel"><header><strong>${vi ? "BAN ĐẦU" : "ORIGINAL ORDER"}</strong></header><div class="wc1996-originals">${original}</div></section>
+    <section class="wc1996-panel"><header><strong>${vi ? "SAU SORT: ATTACK ↓ · DEFENSE ↑ KHI ATTACK BẰNG" : "SORTED: ATTACK ↓ · DEFENSE ↑ ON TIES"}</strong><span>${vi ? "Quét từ trái sang phải →" : "Scan left to right →"}</span></header><div class="wc1996-sorted">${sortedCards || `<span class="wc1996-empty">${vi ? "Chưa sort" : "Not sorted yet"}</span>`}</div></section>
+    <div class="wc1996-main"><section class="wc1996-panel"><header><strong>${vi ? "ĐỒ THỊ ATTACK / DEFENSE" : "ATTACK / DEFENSE PLOT"}</strong></header>${plot}<p>${vi ? "Vùng xanh phía trên bên phải ô hiện tại: mạnh hơn ở cả hai chỉ số. Đường nét đứt là ranh giới, không tính bằng nhau." : "Green upper-right area: strictly higher in both stats. Dashed borders are excluded."}</p></section><section class="wc1996-panel"><header><strong>${vi ? "SO SÁNH TỪNG CHỈ SỐ" : "COMPARE BOTH STATS"}</strong></header>${comparison}<p>${vi ? "Người cùng attack được xếp defense tăng dần nên không thể tạo kết luận yếu sai." : "Equal-attack characters are sorted by ascending defense, preventing false weak results."}</p></section></div>
+    ${view.shortened ? `<div class="wc1996-short">${vi ? "Chỉ minh họa 14 nhân vật đầu sau sort; kết quả vẫn tính toàn bộ input." : "Only the first 14 sorted characters are traced; the answer still uses the full input."}</div>` : ""}
+    <footer class="wc1996-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderLongestLine562View(step) {
   const view = step.longestLine562View || {};
   const vi = lang === "vi";
@@ -37902,6 +37948,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPermutation1589View(step);
+  } else if (step.weakCharacters1996View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWeakCharacters1996View(step);
   } else if (step.longestLine562View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -59446,3 +59446,56 @@ html, body {
 [data-theme="light"] .ll562-stats > div:last-child strong, [data-theme="light"] .ll562-direction.winner strong, [data-theme="light"] .ll562-best > strong { color: #047857; }
 @container (max-width: 620px) { .ll562-directions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container (max-width: 420px) { .ll562-stats { grid-template-columns: 1fr; } }
+
+/* ---- 1996: sorted scan and strict two-stat dominance ---- */
+.wc1996-viz { --wc-bg: #101827; --wc-panel: #17243a; --wc-border: #334155; --wc-text: #e2e8f0; --wc-muted: #94a3b8; display: grid; gap: 11px; min-width: 0; padding: 14px; border: 1px solid var(--wc-border); border-radius: 12px; background: var(--wc-bg); color: var(--wc-text); container-type: inline-size; }
+.wc1996-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.wc1996-heading div { display: grid; gap: 3px; }
+.wc1996-heading small { color: #a78bfa; font: 800 10px Consolas, monospace; letter-spacing: .07em; }
+.wc1996-heading strong { font-size: 16px; }
+.wc1996-heading > span, .wc1996-panel header span { color: var(--wc-muted); font-size: 11px; }
+.wc1996-rule { padding: 10px 12px; border: 1px solid #7c3aed; border-radius: 8px; background: rgba(124, 58, 237, .12); font-size: 11px; line-height: 1.5; }
+.wc1996-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.wc1996-stats > div { display: grid; gap: 5px; min-width: 0; padding: 9px; border: 1px solid var(--wc-border); border-radius: 8px; background: var(--wc-panel); }
+.wc1996-stats small, .wc1996-comparison small { color: var(--wc-muted); font: 750 9px Consolas, monospace; }
+.wc1996-stats strong, .wc1996-comparison strong { overflow-wrap: anywhere; font: 800 15px Consolas, monospace; }
+.wc1996-stats > div:nth-child(3) strong { color: #fca5a5; }
+.wc1996-panel { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--wc-border); border-radius: 9px; background: var(--wc-panel); }
+.wc1996-panel header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.wc1996-panel header strong { font: 800 10px Consolas, monospace; letter-spacing: .05em; }
+.wc1996-panel p { margin: 0; color: var(--wc-muted); font: 700 10px Consolas, monospace; line-height: 1.5; }
+.wc1996-originals, .wc1996-sorted { display: flex; flex-wrap: wrap; gap: 5px; }
+.wc1996-original { padding: 6px 8px; border: 1px solid var(--wc-border); border-radius: 7px; color: var(--wc-muted); font: 750 10px Consolas, monospace; }
+.wc1996-original strong { color: var(--wc-text); }
+.wc1996-character { display: grid; gap: 3px; min-width: 90px; padding: 7px 9px; border: 2px solid var(--wc-border); border-radius: 8px; background: var(--wc-bg); }
+.wc1996-character small, .wc1996-character span { color: var(--wc-muted); font: 700 9px Consolas, monospace; }
+.wc1996-character strong { font: 800 11px Consolas, monospace; }
+.wc1996-character.same-attack { border-style: dashed; }
+.wc1996-character.weak { background: rgba(239, 68, 68, .12); border-color: #ef4444; }
+.wc1996-character.safe { background: rgba(56, 189, 248, .1); border-color: #38bdf8; }
+.wc1996-character.witness { box-shadow: inset 0 0 0 2px #fbbf24; }
+.wc1996-character.current { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167, 139, 250, .25); }
+.wc1996-main { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 7px; }
+.wc1996-plot { width: 100%; max-width: 400px; height: auto; background: var(--wc-bg); border-radius: 8px; }
+.wc1996-axis { stroke: var(--wc-muted); stroke-width: 1.5; }
+.wc1996-axis-label { fill: var(--wc-muted); font: 9px Consolas, monospace; }
+.wc1996-quadrant { fill: rgba(16, 185, 129, .18); }
+.wc1996-threshold { stroke: #a78bfa; stroke-width: 1; stroke-dasharray: 4 3; }
+.wc1996-point circle { fill: #64748b; stroke: var(--wc-bg); stroke-width: 2; }
+.wc1996-point text { fill: var(--wc-text); font: 8px Consolas, monospace; }
+.wc1996-point.weak circle { fill: #ef4444; }
+.wc1996-point.safe circle { fill: #38bdf8; }
+.wc1996-point.witness circle { fill: #fbbf24; r: 9; }
+.wc1996-point.current circle { fill: #a78bfa; r: 10; }
+.wc1996-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.wc1996-comparison > div { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--wc-border); border-radius: 7px; }
+.wc1996-comparison .pass strong { color: #6ee7b7; }
+.wc1996-comparison .fail strong { color: #fca5a5; }
+.wc1996-empty, .wc1996-short { color: var(--wc-muted); font-size: 10px; }
+.wc1996-note { padding: 9px 11px; border-left: 3px solid #a78bfa; color: var(--wc-muted); font-size: 11px; line-height: 1.5; }
+[data-theme="light"] .wc1996-viz { --wc-bg: #f8fafc; --wc-panel: #fff; --wc-border: #cbd5e1; --wc-text: #0f172a; --wc-muted: #475569; }
+[data-theme="light"] .wc1996-rule { background: #f5f3ff; }
+[data-theme="light"] .wc1996-comparison .pass strong { color: #047857; }
+[data-theme="light"] .wc1996-comparison .fail strong, [data-theme="light"] .wc1996-stats > div:nth-child(3) strong { color: #b91c1c; }
+@container (max-width: 680px) { .wc1996-main { grid-template-columns: 1fr; } .wc1996-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 420px) { .wc1996-stats, .wc1996-comparison { grid-template-columns: 1fr; } }

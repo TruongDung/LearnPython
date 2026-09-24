@@ -3097,19 +3097,28 @@ function buildSteps3016(input) {
 }
 
 function parseProperties1996(input) {
-  if (Array.isArray(input)) {
-    return input
-      .map((pair) => Array.isArray(pair) ? pair.map(Number) : [])
-      .filter((pair) => pair.length === 2 && pair.every(Number.isFinite))
-      .slice(0, 14);
+  let properties = input;
+  if (typeof input === "string") {
+    const raw = input.trim();
+    if (raw.startsWith("[")) {
+      try {
+        properties = JSON.parse(raw);
+      } catch (_error) {
+        throw new Error("properties must be valid JSON or attack,defense pairs separated by semicolons");
+      }
+    } else {
+      properties = raw.split(";").map((part) => part.split(",").map((value) => {
+        const token = value.trim();
+        return /^\d+$/.test(token) ? Number(token) : NaN;
+      }));
+    }
   }
-  return String(input || "")
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => part.split(",").map((value) => Number(value.trim())))
-    .filter((pair) => pair.length === 2 && pair.every(Number.isFinite))
-    .slice(0, 14);
+  if (!Array.isArray(properties) || properties.length < 2 || properties.length > 100000
+    || !properties.every((pair) => Array.isArray(pair) && pair.length === 2
+      && pair.every((value) => Number.isInteger(value) && value >= 1 && value <= 100000))) {
+    throw new Error("properties must contain 2..100000 [attack, defense] pairs with values in 1..100000");
+  }
+  return properties;
 }
 
 /**
@@ -3120,125 +3129,119 @@ function parseProperties1996(input) {
  */
 function buildSteps1996(input) {
   const properties = parseProperties1996(input);
-  const sorted = [...properties].sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
+  const original = properties.map(([attack, defense], id) => ({ id, attack, defense }));
+  const sorted = [...original].sort((a, b) => (b.attack - a.attack) || (a.defense - b.defense) || (a.id - b.id));
   const steps = [];
-  const labels = sorted.map(([attack, defense]) => `A${attack}/D${defense}`);
-  const defenses = sorted.map(([, defense]) => defense);
-  const rowLabels = () => sorted.map(([attack, defense], i) => `${i}: ${attack},${defense}`);
-  const allIndexes = () => sorted.map((_, i) => i);
+  const TRACE_ITEMS = 14;
+  const PREVIEW_ITEMS = 14;
+  const status = Array(sorted.length).fill(null);
+  let sortedReady = false;
+  let maxDefense = null;
+  let maxIndex = null;
+  let weak = null;
+  let currentIndex = null;
+  let comparedWith = null;
+  let maxBefore = null;
+  let isWeak = null;
+  let processed = 0;
 
-  steps.push({
-    title: { vi: "Input ban đầu", en: "Initial input" },
-    arr: properties.map(([, defense]) => defense),
-    sub: properties.map(([attack, defense], i) => `${i}: ${attack},${defense}`),
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "properties", value: `[${properties.map(([a, d]) => `[${a},${d}]`).join(", ")}]` },
-    ],
-    note: {
-      vi: `Một nhân vật yếu nếu tồn tại nhân vật khác có attack LỚN HƠN và defense LỚN HƠN.`,
-      en: `A character is weak if another character has both strictly higher attack and strictly higher defense.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Sort: attack giảm, defense tăng khi attack bằng", en: "Sort: attack desc, defense asc on ties" },
-    arr: defenses,
-    sub: rowLabels(),
-    highlight: allIndexes(),
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "sorted", value: `[${labels.join(", ")}]` },
-    ],
-    note: {
-      vi: `Quét từ trái sang phải nghĩa là các nhân vật đã thấy có attack lớn hơn hoặc bằng hiện tại. Defense tăng khi attack bằng nhau để nhân vật cùng attack không làm nhau bị đếm nhầm là yếu.`,
-      en: `Scanning left to right means seen characters have attack >= current. Defense asc on equal attack prevents same-attack characters from falsely making one another weak.`,
-    },
-  });
-
-  let maxDefense = 0;
-  let maxDefenseIdx = -1;
-  let weak = 0;
-
-  steps.push({
-    title: { vi: "Khởi tạo max_defense = 0", en: "Initialize max_defense = 0" },
-    arr: defenses,
-    sub: rowLabels(),
-    highlight: [],
-    mark: [],
-    codeLines: [4, 5],
-    vars: [
-      { name: "max_defense", value: 0 },
-      { name: "weak", value: 0 },
-    ],
-    note: {
-      vi: `max_defense là defense lớn nhất trong các nhân vật đã quét qua. Nhờ sort, giá trị này đại diện cho ứng viên có attack lớn hơn hiện tại.`,
-      en: `max_defense is the largest defense among scanned characters. Because of the sort, it represents candidates with higher attack than the current one.`,
-    },
-  });
-
-  for (let i = 0; i < sorted.length; i++) {
-    const [attack, defense] = sorted[i];
-    const beforeMax = maxDefense;
-    const beforeMaxIdx = maxDefenseIdx;
-    const isWeak = defense < maxDefense;
-
-    if (isWeak) weak++;
-    else {
-      maxDefense = defense;
-      maxDefenseIdx = i;
-    }
-
+  function record(phase, title, line, note, final = false) {
+    const current = currentIndex === null ? null : sorted[currentIndex];
+    const witness = comparedWith === null ? null : sorted[comparedWith];
+    const vars = [{ name: "n", value: sorted.length }];
+    if (maxDefense !== null) vars.push({ name: "max_defense", value: maxDefense });
+    if (weak !== null) vars.push({ name: "weak", value: weak });
+    if (current) vars.push({ name: "attack", value: current.attack }, { name: "defense", value: current.defense });
+    if (maxBefore !== null) vars.push({ name: "max_before", value: maxBefore });
     steps.push({
-      title: {
-        vi: `${labels[i]} → ${isWeak ? "yếu" : "không yếu"}`,
-        en: `${labels[i]} → ${isWeak ? "weak" : "not weak"}`,
+      title, arr: [], highlight: [], mark: [], codeLines: [line], vars, note, final,
+      weakCharacters1996View: {
+        phase, total: sorted.length, processed, weak, maxDefense, maxBefore, isWeak,
+        currentIndex, current: current ? { ...current } : null,
+        witness: witness ? { ...witness } : null,
+        original: original.slice(0, PREVIEW_ITEMS).map((item) => ({ ...item })),
+        sorted: sortedReady ? sorted.slice(0, PREVIEW_ITEMS).map((item, index) => ({
+          ...item, index, status: status[index],
+        })) : [],
+        shortened: sorted.length > TRACE_ITEMS,
       },
-      arr: defenses,
-      sub: rowLabels(),
-      highlight: [i],
-      mark: isWeak && beforeMaxIdx >= 0 ? [beforeMaxIdx] : maxDefenseIdx >= 0 ? [maxDefenseIdx] : [],
-      codeLines: isWeak ? [7, 8] : [10],
-      vars: [
-        { name: "i", value: i },
-        { name: "attack", value: attack },
-        { name: "defense", value: defense },
-        { name: "max_defense trước khi xét", value: beforeMax },
-        { name: "defense < max_defense?", value: isWeak },
-        { name: "weak", value: weak },
-        { name: "max_defense sau bước này", value: maxDefense },
-      ],
-      note: isWeak
-        ? {
-          vi: `${labels[i]} có defense ${defense} < max_defense ${maxDefense}. Vì max_defense đến từ nhân vật đã quét trước đó với attack lớn hơn, nhân vật này là weak.`,
-          en: `${labels[i]} has defense ${defense} < max_defense ${maxDefense}. Since max_defense comes from an earlier character with higher attack, this character is weak.`,
-        }
-        : {
-          vi: `${labels[i]} chưa bị ai trước đó áp đảo defense. Cập nhật max_defense = ${maxDefense}.`,
-          en: `${labels[i]} is not dominated by any earlier defense. Update max_defense = ${maxDefense}.`,
-        },
     });
   }
 
-  steps.push({
-    title: { vi: `Kết quả: ${weak} weak characters`, en: `Result: ${weak} weak characters` },
-    arr: defenses,
-    sub: rowLabels(),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [11],
-    vars: [{ name: "answer", value: weak }],
-    note: {
-      vi: `Tổng số nhân vật yếu = ${weak}.`,
-      en: `Total weak characters = ${weak}.`,
-    },
+  record("input", { vi: "Các nhân vật đầu vào", en: "Input characters" }, 2, {
+    vi: "Một nhân vật yếu khi có người khác hơn nó ở CẢ attack và defense.",
+    en: "A character is weak only when another has BOTH higher attack and higher defense.",
+  });
+  sortedReady = true;
+  record("sort", { vi: "Sort attack giảm, defense tăng nếu attack bằng", en: "Sort attack descending, defense ascending on ties" }, 3, {
+    vi: "Nhân vật cùng attack được xếp defense từ thấp lên cao; họ không thể làm nhau thành yếu.",
+    en: "Equal-attack characters appear from lower to higher defense; they cannot make one another weak.",
+  });
+  maxDefense = 0;
+  record("init-max", { vi: "max_defense = 0", en: "max_defense = 0" }, 4, {
+    vi: "Kỷ lục defense trong những nhân vật đã quét, ban đầu bằng 0.",
+    en: "The highest defense among characters already scanned starts at zero.",
+  });
+  weak = 0;
+  record("init-weak", { vi: "weak = 0", en: "weak = 0" }, 5, {
+    vi: "Chưa xét ai nên số nhân vật yếu là 0.",
+    en: "No one has been classified, so the weak count is zero.",
   });
 
-  return { original: properties, sorted, answer: weak, steps };
+  for (let index = 0; index < sorted.length; index++) {
+    const current = sorted[index];
+    const trace = index < TRACE_ITEMS;
+    currentIndex = index;
+    comparedWith = maxIndex;
+    maxBefore = maxDefense;
+    isWeak = null;
+    if (trace) record("visit", { vi: `Xét #${current.id} (${current.attack}, ${current.defense})`,
+      en: `Visit #${current.id} (${current.attack}, ${current.defense})` }, 6, {
+      vi: "Các nhân vật bên trái đã được xét theo thứ tự attack giảm dần.",
+      en: "Characters to the left have already been scanned in descending attack order.",
+    });
+    isWeak = current.defense < maxDefense;
+    if (trace) record("compare", { vi: `${current.defense} < ${maxDefense}? ${isWeak ? "Có" : "Không"}`,
+      en: `${current.defense} < ${maxDefense}? ${isWeak ? "Yes" : "No"}` }, 7,
+    isWeak
+      ? { vi: "Defense nhỏ hơn kỷ lục. Do quy tắc sort, người giữ kỷ lục cũng có attack lớn hơn.",
+        en: "Defense is below the maximum. By the sort rule, its owner also has higher attack." }
+      : { vi: "Không có defense nào đã thấy lớn hơn ô này; nhân vật này chưa thể là yếu.",
+        en: "No seen defense is higher; this character is not weak." });
+    if (isWeak) {
+      weak++;
+      status[index] = "weak";
+      processed++;
+      if (trace) record("weak", { vi: `#${current.id} yếu · weak = ${weak}`,
+        en: `#${current.id} is weak · weak = ${weak}` }, 8, {
+        vi: `#${comparedWith === null ? "?" : sorted[comparedWith].id} mạnh hơn #${current.id} ở cả hai chỉ số.`,
+        en: `#${comparedWith === null ? "?" : sorted[comparedWith].id} exceeds #${current.id} in both stats.`,
+      });
+    } else {
+      if (trace) record("else", { vi: `#${current.id} không yếu`, en: `#${current.id} is not weak` }, 9, {
+        vi: "Chuyển sang nhánh cập nhật max_defense.",
+        en: "Take the branch that updates max_defense.",
+      });
+      maxDefense = current.defense;
+      maxIndex = index;
+      status[index] = "safe";
+      processed++;
+      if (trace) record("update", { vi: `max_defense = ${maxDefense} (từ #${current.id})`,
+        en: `max_defense = ${maxDefense} (from #${current.id})` }, 10, {
+        vi: "Từ bây giờ, defense này có thể làm nhân vật attack thấp hơn thành yếu.",
+        en: "This defense can make a later, lower-attack character weak.",
+      });
+    }
+  }
+  currentIndex = null;
+  comparedWith = null;
+  maxBefore = null;
+  isWeak = null;
+  record("done", { vi: `Trả về ${weak}`, en: `Return ${weak}` }, 11, {
+    vi: `Đã xét đủ ${sorted.length} nhân vật; có ${weak} nhân vật yếu.`,
+    en: `All ${sorted.length} characters were checked; ${weak} are weak.`,
+  }, true);
+  return { original: properties, sorted: sorted.map(({ attack, defense }) => [attack, defense]), answer: weak, steps };
 }
 
 module.exports = {
@@ -3253,7 +3256,7 @@ module.exports = {
       vi: "Mỗi nhân vật có [attack, defense]. Một nhân vật là yếu nếu tồn tại nhân vật khác có attack lớn hơn VÀ defense lớn hơn. Trả về số nhân vật yếu. Nhập: attack,defense; attack,defense; ...",
       en: "Each character has [attack, defense]. A character is weak if another character has both greater attack and greater defense. Return the number of weak characters. Enter: attack,defense; attack,defense; ...",
     },
-    defaultInput: "5,5;6,3;3,6",
+    defaultInput: "5,5;5,9;6,3;6,7;3,6;7,8",
     inputKind: "string",
     inputLabel: { vi: "properties (attack,defense; ...)", en: "properties (attack,defense; ...)" },
     extraParams: [],
@@ -3283,7 +3286,9 @@ module.exports = {
       "                max_defense = defense",
       "        return weak",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps1996,
+    liveArgs(input) { return [parseProperties1996(input)]; },
   },
   3016: {
     id: 3016, difficulty: "medium", slug: "minimum-number-of-pushes-to-type-word-ii",
