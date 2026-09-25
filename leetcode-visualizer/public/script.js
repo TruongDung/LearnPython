@@ -18095,6 +18095,42 @@ function renderPermutation1589View(step) {
   </section>`;
 }
 
+function renderBraceExpansion1096View(step) {
+  const view = step.braceExpansion1096View || {};
+  const vi = lang === "vi";
+  const chars = [...(view.expression || "")].map((char, index) => {
+    const classes = ["be1096-token", index < view.index ? "consumed" : "",
+      index === view.index ? "current" : "", char === "{" || char === "}" ? "brace" : "",
+      char === "," ? "comma" : ""].filter(Boolean).join(" ");
+    return `<span class="${classes}"><small>${index}</small><strong>${escapeHtml(char)}</strong>${index === view.index ? "<i>i</i>" : ""}</span>`;
+  }).join("");
+  const setChips = (values, prefix) => (values || []).map((value) =>
+    `<span class="be1096-word ${prefix || ""}">${value === "" ? "ε" : escapeHtml(value)}</span>`).join("");
+  const frames = (view.frames || []).map((frame, index) => {
+    const active = index === view.frames.length - 1 ? "active" : "";
+    const kind = frame.kind === "union" ? "∪ UNION" : "× CONCAT";
+    return `<div class="be1096-frame ${frame.kind} ${active}"><small>#${frame.depth} · ${kind}</small><div>${setChips(frame.result)}</div><span>${frame.size} ${frame.size === 1 ? "word" : "words"}</span></div>`;
+  }).join("");
+  const opSymbol = view.operation === "union" ? "∪" : view.operation === "concat" ? "×" : "→ sort";
+  const operation = view.operation ? `<section class="be1096-operation ${view.operation}">
+    <div><small>${vi ? "TRÁI" : "LEFT"}</small><div>${setChips(view.left, "left") || "—"}</div></div>
+    <b>${opSymbol}</b>
+    <div><small>${vi ? "PHẢI" : "RIGHT"}</small><div>${setChips(view.right, "right") || "—"}</div></div>
+    <b>=</b>
+    <div><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><div>${setChips(view.produced, "result") || "—"}</div></div>
+  </section>` : `<div class="be1096-empty">${vi ? "Đọc biểu thức để tạo phép hợp hoặc phép nối tiếp theo." : "Read the expression to form the next union or concatenation."}</div>`;
+  const answer = view.answer ? `<section class="be1096-answer"><header><strong>${vi ? "KẾT QUẢ ĐÃ SẮP XẾP" : "SORTED RESULT"}</strong><span>${view.answerSize} ${vi ? "từ khác nhau" : "distinct words"}</span></header><div>${setChips(view.answer, "answer")}</div></section>` : "";
+  $("treeView").innerHTML = `<section class="be1096-viz" aria-label="Brace Expansion II parser visualization">
+    <header class="be1096-heading"><div><small>RECURSIVE-DESCENT PARSER · #1096</small><strong>${vi ? "KHAI TRIỂN BIỂU THỨC NGOẶC II" : "BRACE EXPANSION II"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="be1096-rule">${vi ? "Dấu phẩy = HỢP (∪) · đứng liền nhau = NỐI bằng tích Descartes (×) · ngoặc = gọi đệ quy" : "Comma = UNION (∪) · adjacency = CONCATENATE by Cartesian product (×) · braces = recurse"}</div>
+    <section class="be1096-panel"><header><strong>${vi ? "CON TRỎ TRÊN BIỂU THỨC" : "EXPRESSION POINTER"}</strong><span>i = ${view.index}/${(view.expression || "").length}</span></header><div class="be1096-expression">${chars}</div></section>
+    <div class="be1096-main"><section class="be1096-panel"><header><strong>${vi ? "NGĂN XẾP LỜI GỌI" : "CALL STACK"}</strong><span>${(view.frames || []).length} ${vi ? "khung" : "frames"}</span></header><div class="be1096-frames">${frames || `<span class="be1096-empty">${vi ? "Đã rời mọi lời gọi đệ quy." : "All recursive calls have returned."}</span>`}</div></section><section class="be1096-panel"><header><strong>${vi ? "PHÉP TOÁN TẬP HỢP" : "SET OPERATION"}</strong><span>${view.operation || "—"}</span></header>${operation}</section></div>
+    ${answer}
+    ${view.shortened ? `<div class="be1096-short">${vi ? "Bảng chỉ hiện tối đa 12 từ mỗi tập; thuật toán vẫn tính toàn bộ kết quả." : "The board previews at most 12 words per set; the algorithm still computes the full result."}</div>` : ""}
+    <footer class="be1096-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderWeakCharacters1996View(step) {
   const view = step.weakCharacters1996View || {};
   const vi = lang === "vi";
@@ -37948,6 +37984,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPermutation1589View(step);
+  } else if (step.braceExpansion1096View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBraceExpansion1096View(step);
   } else if (step.weakCharacters1996View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
