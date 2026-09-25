@@ -17,7 +17,7 @@ const categories = {
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
   array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation")),
-  trie: require("./trie"),
+  trie: Object.assign(require("./trie"), require("./prefix-scores-2416")),
   hashmap: require("./hashmap"),
   greedy: require("./greedy"),
   string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii")),

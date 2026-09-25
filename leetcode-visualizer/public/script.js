@@ -18095,6 +18095,65 @@ function renderPermutation1589View(step) {
   </section>`;
 }
 
+function renderPrefixScores2416View(step) {
+  const view = step.prefixScores2416View || {};
+  const vi = lang === "vi";
+  const phase = view.phase || "enter";
+  const stage = phase === "done" ? 2 : phase.startsWith("score") || phase === "answer-init"
+    || phase === "total-init" || phase === "append-answer" ? 1 : 0;
+  const stageLabels = vi
+    ? ["1 · Xây Trie + đếm prefix", "2 · Cộng điểm từng từ", "3 · Kết quả"]
+    : ["1 · Build Trie + count prefixes", "2 · Score each word", "3 · Result"];
+  const stages = stageLabels.map((title, index) => `<span class="${index < stage ? "done" : index === stage ? "active" : "pending"}">${index < stage ? "✓" : index === stage ? "▶" : "○"}<b>${title}</b></span>`).join("");
+  const answers = view.answer || [];
+  const words = (view.words || []).map((word, index) => {
+    const classes = ["ps2416-word", index === view.wordIndex ? "active" : "",
+      index < answers.length ? "done" : ""].filter(Boolean).join(" ");
+    const score = index < answers.length ? answers[index] : "—";
+    return `<div class="${classes}"><small>#${index}</small><strong>${escapeHtml(word)}</strong><span>${vi ? "điểm" : "score"} ${score}</span></div>`;
+  }).join("");
+  const activePath = new Set(view.activePath || []);
+  const nodesByDepth = new Map();
+  for (const node of view.nodes || []) {
+    if (!nodesByDepth.has(node.depth)) nodesByDepth.set(node.depth, []);
+    nodesByDepth.get(node.depth).push(node);
+  }
+  const nodeRows = [...nodesByDepth.entries()].map(([depth, nodes]) => `<div class="ps2416-level"><small>d=${depth}</small><div>${nodes.map((node) => {
+    const classes = ["ps2416-node", node.id === 0 ? "root" : "",
+      activePath.has(node.id) ? "path" : "", node.id === view.currentNode ? "current" : "",
+      node.id === view.nextNode ? "next" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>#${node.id}${node.parent === null ? "" : ` ← #${node.parent}`}</small><strong>${node.id === 0 ? "root" : escapeHtml(node.prefix)}</strong><span>count = ${node.count}</span></div>`;
+  }).join("")}</div></div>`).join("");
+  const activeWord = view.word || "";
+  const prefixCards = [...activeWord].map((_char, index) => {
+    const prefix = activeWord.slice(0, index + 1);
+    const trieNode = (view.nodes || []).find((node) => node.prefix === prefix);
+    const classes = ["ps2416-prefix", prefix === view.currentPrefix ? "current" : "",
+      prefix === view.nextPrefix ? "next" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${index + 1}</small><strong>${escapeHtml(prefix)}</strong><span>${trieNode ? `count ${trieNode.count}` : (vi ? "chưa tạo" : "not built")}</span></div>`;
+  }).join("");
+  let formula = vi ? "Chọn một từ để xem đường prefix." : "Select a word to inspect its prefix path.";
+  if (stage === 0 && view.word) {
+    formula = `count("${escapeHtml(view.nextPrefix || view.currentPrefix)}") += 1`;
+  } else if (stage === 1 && view.word) {
+    formula = view.addedCount === null ? `total = ${view.total ?? 0}`
+      : `total += ${view.addedCount} → ${view.total}`;
+  } else if (stage === 2) {
+    formula = `[${answers.slice(0, 8).join(", ")}${answers.length > 8 ? ", …" : ""}]`;
+  }
+  const resultChips = answers.slice(0, 8).map((score, index) => `<span><small>#${index}</small><b>${score}</b></span>`).join("");
+  $("treeView").innerHTML = `<section class="ps2416-viz" aria-label="Sum of Prefix Scores of Strings visualization">
+    <header class="ps2416-heading"><div><small>COUNTED TRIE · #2416</small><strong>${vi ? "TỔNG ĐIỂM CÁC PREFIX" : "SUM OF PREFIX SCORES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ps2416-rule">${vi ? "Mỗi nút Trie lưu số từ đi qua prefix đó. Điểm của một từ = tổng count trên đường từ gốc tới từ." : "Each Trie node stores how many words pass through its prefix. A word's score is the sum of counts along its root-to-word path."}</div>
+    <div class="ps2416-stages">${stages}</div>
+    <div class="ps2416-stats"><div><small>${vi ? "SỐ TỪ" : "WORDS"}</small><strong>${view.wordCount}</strong></div><div><small>${vi ? "TỔNG KÝ TỰ" : "CHARACTERS"}</small><strong>${view.totalChars}</strong></div><div><small>${vi ? "NÚT TRIE" : "TRIE NODES"}</small><strong>${view.nodeCount}</strong></div><div><small>${vi ? "TỔNG HIỆN TẠI" : "RUNNING TOTAL"}</small><strong>${view.total ?? "—"}</strong></div></div>
+    <section class="ps2416-panel"><header><strong>${vi ? "TỪ ĐẦU VÀO" : "INPUT WORDS"}</strong><span>${vi ? "vàng = đang xử lý · xanh = đã chấm điểm" : "amber = active · green = scored"}</span></header><div class="ps2416-words">${words}</div></section>
+    <div class="ps2416-main"><section class="ps2416-panel"><header><strong>TRIE</strong><span>${vi ? "mỗi hàng là một độ sâu" : "one row per depth"}</span></header><div class="ps2416-tree">${nodeRows}</div></section><section class="ps2416-panel"><header><strong>${vi ? "ĐƯỜNG PREFIX" : "PREFIX PATH"}</strong><span>${escapeHtml(activeWord || "—")}</span></header><div class="ps2416-prefixes">${prefixCards || `<span class="ps2416-empty">${vi ? "Chưa chọn từ." : "No active word."}</span>`}</div><div class="ps2416-formula"><small>${stage === 0 ? (vi ? "TĂNG COUNT" : "INCREMENT COUNT") : stage === 1 ? (vi ? "CỘNG ĐIỂM" : "ADD SCORE") : (vi ? "ĐÁP ÁN" : "ANSWER")}</small><strong>${formula}</strong></div><div class="ps2416-results">${resultChips || `<span class="ps2416-empty">${vi ? "Chưa có điểm hoàn chỉnh." : "No completed scores yet."}</span>`}</div></section></div>
+    ${view.shortened ? `<div class="ps2416-short">${vi ? "Trace giới hạn 8 từ, 40 ký tự và 28 nút; đáp án vẫn tính toàn bộ input." : "The trace previews 8 words, 40 characters, and 28 nodes; the answer still uses the full input."}</div>` : ""}
+    <footer class="ps2416-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderBraceExpansion1096View(step) {
   const view = step.braceExpansion1096View || {};
   const vi = lang === "vi";
@@ -37984,6 +38043,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPermutation1589View(step);
+  } else if (step.prefixScores2416View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefixScores2416View(step);
   } else if (step.braceExpansion1096View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
