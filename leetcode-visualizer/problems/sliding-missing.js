@@ -68,6 +68,154 @@ function buildSteps1423(input, params = {}) {
   const answer = total - minWindow; snap({ vi: `return total - minKeep = ${answer}`, en: `return total - minKeep = ${answer}` }, 9, 0, cards.length - 1, { vi: "Tổng ngoài đoạn giữa tối thiểu là đáp án.", en: "The sum outside the minimum middle segment is the answer." }, { final: true }); return { original: cards, k, answer, steps };
 }
 
+/** LeetCode 1658: keep the longest middle subarray with sum total - x. */
+function buildSteps1658(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const x = Number(params.x ?? 5);
+  if (!nums.length || nums.some((value) => !Number.isInteger(value) || value <= 0) || !Number.isInteger(x) || x < 0) {
+    throw new Error("nums must contain positive integers and x must be a non-negative integer");
+  }
+
+  const steps = [];
+  let total = null;
+  let target = null;
+  let left = null;
+  let right = null;
+  let value = null;
+  let windowSum = null;
+  let bestLen = null;
+  let bestLeft = -1;
+  let bestRight = -1;
+
+  const snap = (phase, title, line, note, extra = {}) => {
+    const windowLeft = extra.windowLeft ?? left;
+    const windowRight = extra.windowRight ?? right;
+    const current = Number.isInteger(windowLeft) && Number.isInteger(windowRight) && windowRight >= windowLeft
+      ? indices(windowLeft, windowRight) : [];
+    const best = Number.isInteger(bestLen) && bestLen > 0 ? indices(bestLeft, bestRight) : [];
+    const vars = [{ name: "nums", value: [...nums] }, { name: "x", value: x }];
+    if (total !== null) vars.push({ name: "total", value: total });
+    if (target !== null) vars.push({ name: "target", value: target });
+    if (left !== null) vars.push({ name: "left", value: left });
+    if (windowSum !== null) vars.push({ name: "windowSum", value: windowSum });
+    if (bestLen !== null) vars.push({ name: "bestLen", value: bestLen });
+    if (right !== null) vars.push({ name: "right", value: right }, { name: "value", value });
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: extra.final ? best : current,
+      mark: extra.final ? best : [],
+      codeLines: [line],
+      vars,
+      note,
+      final: Boolean(extra.final),
+      complement1658View: {
+        nums: [...nums], x, total, target, left, right, windowSum,
+        bestLen, bestLeft, bestRight, phase, windowLeft, windowRight,
+        activeIndex: extra.activeIndex ?? null,
+        answer: extra.answer ?? null,
+      },
+    });
+  };
+
+  snap("enter", { vi: `Gọi minOperations(nums, ${x})`, en: `Call minOperations(nums, ${x})` }, 2,
+    { vi: "Bắt đầu với mảng nums và tổng cần lấy x.", en: "Start with nums and the amount x to remove." });
+  total = nums.reduce((sum, number) => sum + number, 0);
+  snap("total", { vi: `total = sum(nums) = ${total}`, en: `total = sum(nums) = ${total}` }, 3,
+    { vi: "Tính tổng toàn mảng trước khi chọn đoạn giữa.", en: "Sum the whole array before choosing the middle segment." });
+  target = total - x;
+  snap("transform", { vi: `target = ${total} - ${x} = ${target}`, en: `target = ${total} - ${x} = ${target}` }, 4,
+    { vi: "Các phần tử bị lấy chỉ nằm ở hai đầu, nên phần còn lại luôn là một đoạn liên tiếp ở giữa.", en: "Removing only from the ends leaves one contiguous middle segment." });
+
+  snap("guard", { vi: `target < 0? ${target < 0}`, en: `target < 0? ${target < 0}` }, 5,
+    target < 0
+      ? { vi: "x lớn hơn tổng mảng; không thể lấy đủ x.", en: "x exceeds the total, so it cannot be removed." }
+      : { vi: "target không âm; tiếp tục kiểm tra trường hợp đoạn giữa rỗng.", en: "target is non-negative; continue to the empty-middle check." });
+  if (target < 0) {
+    snap("impossible", { vi: "x lớn hơn tổng → không thể", en: "x exceeds the total → impossible" }, 6,
+      { vi: "Không thể lấy tổng lớn hơn tổng cả mảng.", en: "The removed values cannot exceed the whole-array total." }, { final: true, answer: -1 });
+    return { original: nums, x, answer: -1, steps };
+  }
+  snap("guard", { vi: `target == 0? ${target === 0}`, en: `target == 0? ${target === 0}` }, 7,
+    target === 0
+      ? { vi: "Đoạn giữa cần giữ có tổng 0; mọi số dương nên đoạn này rỗng.", en: "The kept sum is zero; with positive numbers the middle is empty." }
+      : { vi: "target dương; tìm đoạn giữa dài nhất bằng cửa sổ trượt.", en: "target is positive; find the longest middle segment with a sliding window." });
+  if (target === 0) {
+    bestLeft = 0;
+    bestRight = -1;
+    snap("all", { vi: `Giữ đoạn rỗng → lấy cả ${nums.length} phần tử`, en: `Keep an empty segment → remove all ${nums.length} values` }, 8,
+      { vi: "Vì mọi số đều dương, chỉ đoạn rỗng có tổng bằng 0.", en: "All values are positive, so only the empty segment sums to zero." }, { final: true, answer: nums.length });
+    return { original: nums, x, answer: nums.length, steps };
+  }
+
+  left = 0;
+  snap("init", { vi: "left = 0", en: "left = 0" }, 9,
+    { vi: "Con trỏ trái bắt đầu ở đầu mảng.", en: "The left pointer starts at the beginning." });
+  windowSum = 0;
+  snap("init", { vi: "windowSum = 0", en: "windowSum = 0" }, 10,
+    { vi: "Cửa sổ ban đầu rỗng.", en: "The window starts empty." });
+  bestLen = -1;
+  snap("init", { vi: "bestLen = -1", en: "bestLen = -1" }, 11,
+    { vi: "-1 nghĩa là chưa tìm được đoạn giữa có tổng target.", en: "-1 means no middle segment summing to target has been found." });
+
+  for (let index = 0; index < nums.length; index++) {
+    right = index;
+    value = nums[right];
+    snap("iterate", { vi: `right = ${right}, value = ${value}`, en: `right = ${right}, value = ${value}` }, 12,
+      { vi: `Đã chọn nums[${right}], nhưng chưa cộng nó vào windowSum.`, en: `Selected nums[${right}], but it has not been added to windowSum yet.` }, { windowRight: right - 1, activeIndex: right });
+    windowSum += value;
+    snap("expand", { vi: `windowSum += ${value} → ${windowSum}`, en: `windowSum += ${value} → ${windowSum}` }, 13,
+      { vi: `Tổng cửa sổ hiện tại = ${windowSum}.`, en: `The current window sum is ${windowSum}.` }, { activeIndex: right });
+
+    snap("check-window", { vi: `${windowSum} > ${target}? ${windowSum > target}`, en: `${windowSum} > ${target}? ${windowSum > target}` }, 14,
+      windowSum > target
+        ? { vi: "Tổng vượt target; cần bỏ phần tử trái.", en: "The sum exceeds target; remove the left value." }
+        : { vi: "Tổng không vượt target; dừng thu hẹp.", en: "The sum does not exceed target; stop shrinking." }, { activeIndex: windowSum > target ? left : null });
+    while (windowSum > target) {
+      const removedIndex = left;
+      windowSum -= nums[left];
+      snap("subtract", { vi: `windowSum -= nums[${removedIndex}] → ${windowSum}`, en: `windowSum -= nums[${removedIndex}] → ${windowSum}` }, 15,
+        { vi: `Đã trừ ${nums[removedIndex]}; left vẫn là ${left} cho đến dòng kế tiếp.`, en: `Subtracted ${nums[removedIndex]}; left remains ${left} until the next line.` }, { windowLeft: left + 1, activeIndex: removedIndex });
+      left++;
+      snap("advance-left", { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, 16,
+        { vi: `Cửa sổ giờ bắt đầu ở ${left}; tổng là ${windowSum}.`, en: `The window now starts at ${left}; its sum is ${windowSum}.` }, { activeIndex: left });
+      snap("check-window", { vi: `${windowSum} > ${target}? ${windowSum > target}`, en: `${windowSum} > ${target}? ${windowSum > target}` }, 14,
+        windowSum > target
+          ? { vi: "Vẫn quá lớn; tiếp tục thu hẹp.", en: "Still too large; shrink again." }
+          : { vi: "Đã đủ nhỏ; thoát vòng while.", en: "Small enough now; exit the while loop." }, { activeIndex: windowSum > target ? left : null });
+    }
+
+    const matches = windowSum === target;
+    snap("check-match", { vi: `${windowSum} == ${target}? ${matches}`, en: `${windowSum} == ${target}? ${matches}` }, 17,
+      matches
+        ? { vi: `Đoạn [${left}..${right}] có đúng tổng cần giữ.`, en: `Segment [${left}..${right}] has exactly the sum to keep.` }
+        : { vi: "Tổng chưa bằng target; chuyển sang phần tử tiếp theo.", en: "The sum is not target; move to the next value." });
+    if (windowSum === target) {
+      const length = right - left + 1;
+      const previousBest = bestLen;
+      if (length > bestLen) {
+        bestLeft = left;
+        bestRight = right;
+      }
+      bestLen = Math.max(bestLen, length);
+      snap("best", { vi: `bestLen = max(${previousBest}, ${length}) = ${bestLen}`, en: `bestLen = max(${previousBest}, ${length}) = ${bestLen}` }, 18,
+        length > previousBest
+          ? { vi: `Giữ [${bestLeft}..${bestRight}] → cần ${nums.length - bestLen} phép lấy.`, en: `Keep [${bestLeft}..${bestRight}] → ${nums.length - bestLen} removals.` }
+          : { vi: "Đoạn này không dài hơn kỷ lục; giữ phương án cũ.", en: "This segment is not longer than the best one; keep the previous choice." });
+    }
+  }
+
+  const answer = bestLen < 0 ? -1 : nums.length - bestLen;
+  snap(bestLen < 0 ? "impossible" : "done",
+    bestLen < 0 ? { vi: "Không có đoạn giữa phù hợp", en: "No matching middle segment" } : { vi: `Đáp án = ${nums.length} - ${bestLen} = ${answer}`, en: `Answer = ${nums.length} - ${bestLen} = ${answer}` }, 19,
+    bestLen < 0
+      ? { vi: "Không có cách lấy ở hai đầu để tổng đúng bằng x.", en: "No choice of values from the ends sums to exactly x." }
+      : { vi: `Lấy ${bestLeft} phần tử bên trái và ${nums.length - bestRight - 1} phần tử bên phải.`, en: `Remove ${bestLeft} values from the left and ${nums.length - bestRight - 1} from the right.` },
+    { final: true, answer });
+  return { original: nums, x, answer, steps };
+}
+
 function buildSteps1052(input, params = {}) {
   const customers = Array.isArray(input) ? input.map(Number) : []; const grumpy = String(params.grumpy ?? "0,1,0,1,0,1,0,1").split(",").map((value) => Number(value.trim())); const minutes = Number(params.minutes ?? 3);
   if (grumpy.length !== customers.length || grumpy.some((v) => v !== 0 && v !== 1) || !Number.isInteger(minutes) || minutes < 1 || minutes > customers.length) throw new Error("grumpy must be 0/1 values matching customers and minutes must fit");
@@ -150,6 +298,30 @@ module.exports = {
   1456: problem(1456, "medium", "maximum-number-of-vowels-in-a-substring-of-given-length", "Maximum Number of Vowels in a Substring of Given Length", "Return the greatest number of vowels in a substring of length k.", "abciiidef", "string", "s", [{ key: "k", label: { vi: "k (độ dài cửa sổ)", en: "k (window length)" }, default: 3 }], ["class Solution:", "    def maxVowels(self, s, k):", "        count = ans = 0", "        for right, ch in enumerate(s):", "            if ch in 'aeiou':", "                count += 1", "            if right >= k:", "                if s[right-k] in 'aeiou': count -= 1", "            if right >= k-1: ans = max(ans, count)", "        return ans"], buildSteps1456, stringTag),
   1343: problem(1343, "medium", "number-of-sub-arrays-of-size-k-and-average-greater-than-or-equal-to-threshold", "Number of Sub-arrays of Size K and Average Greater than or Equal to Threshold", "Count length-k subarrays whose average is at least threshold.", [2, 2, 2, 2, 5, 5, 5, 8], "integer", "arr", [{ key: "k", label: { vi: "k", en: "k" }, default: 3 }, { key: "threshold", label: { vi: "ngưỡng", en: "threshold" }, default: 4 }], ["class Solution:", "    def numOfSubarrays(self, arr, k, threshold):", "        windowSum = ans = 0", "        for right, value in enumerate(arr):", "            windowSum += value", "            if right >= k:", "                windowSum -= arr[right-k]", "            if right >= k-1 and windowSum >= k*threshold:", "                ans += 1", "        return ans"], buildSteps1343),
   1423: problem(1423, "medium", "maximum-points-you-can-obtain-from-cards", "Maximum Points You Can Obtain from Cards", "Take exactly k cards from either end for the maximum score.", [1, 2, 3, 4, 5, 6, 1], "integer", "cardPoints", [{ key: "k", label: { vi: "k (số lá bài)", en: "k (cards to take)" }, default: 3 }], ["class Solution:", "    def maxScore(self, cardPoints, k):", "        total = sum(cardPoints); keep = len(cardPoints)-k", "        if keep == 0: return total", "        minKeep = float('inf'); windowSum = 0", "        for right, value in enumerate(cardPoints):", "            windowSum += value", "            if right >= keep: windowSum -= cardPoints[right-keep]", "            if right >= keep-1: minKeep = min(minKeep, windowSum)", "        return total - minKeep"], buildSteps1423),
+  1658: {
+    ...problem(1658, "medium", "minimum-operations-to-reduce-x-to-zero", "Minimum Operations to Reduce X to Zero", "Remove values from either end to make their sum equal x using the fewest operations.", [1, 1, 4, 2, 3], "positive", "nums", [{ key: "x", label: { vi: "x (tổng cần lấy)", en: "x (sum to remove)" }, default: 5 }], [
+      "class Solution:",
+      "    def minOperations(self, nums, x):",
+      "        total = sum(nums)",
+      "        target = total - x",
+      "        if target < 0:",
+      "            return -1",
+      "        if target == 0:",
+      "            return len(nums)",
+      "        left = 0",
+      "        windowSum = 0",
+      "        bestLen = -1",
+      "        for right, value in enumerate(nums):",
+      "            windowSum += value",
+      "            while windowSum > target:",
+      "                windowSum -= nums[left]",
+      "                left += 1",
+      "            if windowSum == target:",
+      "                bestLen = max(bestLen, right - left + 1)",
+      "        return len(nums) - bestLen if bestLen != -1 else -1",
+    ], buildSteps1658),
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Hai con trỏ chỉ đi sang phải; ngoài vài biến đếm, không cần bộ nhớ phụ.", en: "Both pointers move only right; the algorithm uses constant extra space." } },
+  },
   1052: problem(1052, "medium", "grumpy-bookstore-owner", "Grumpy Bookstore Owner", "Maximize satisfied customers by suppressing grumpiness for minutes consecutive minutes.", [1, 0, 1, 2, 1, 1, 7, 5], "integer", "customers", [{ key: "grumpy", type: "string", label: { vi: "grumpy (0/1, cách dấu phẩy)", en: "grumpy (0/1, comma separated)" }, default: "0,1,0,1,0,1,0,1" }, { key: "minutes", label: { vi: "minutes", en: "minutes" }, default: 3 }], ["class Solution:", "    def maxSatisfied(self, customers, grumpy, minutes):", "        baseline = sum(c for c,g in zip(customers,grumpy) if not g)", "        extra = bestExtra = 0", "        for right, value in enumerate(customers):", "            if grumpy[right]: extra += value", "            if right >= minutes and grumpy[right-minutes]:", "                extra -= customers[right-minutes]", "            if right >= minutes-1: bestExtra = max(bestExtra, extra)", "        return baseline + bestExtra"], buildSteps1052),
   862: problem(862, "hard", "shortest-subarray-with-sum-at-least-k", "Shortest Subarray with Sum at Least K", "Return the shortest non-empty subarray whose sum is at least k.", [2, -1, 2], "integer", "nums", [{ key: "k", label: { vi: "k (tổng tối thiểu)", en: "k (minimum sum)" }, default: 3 }], ["class Solution:", "    def shortestSubarray(self, nums, k):", "        prefix = [0]; deque = []; ans = float('inf')", "        for value in nums: prefix.append(prefix[-1] + value)", "        for i, total in enumerate(prefix):", "            while deque and total-prefix[deque[0]] >= k:", "                ans = min(ans, i-deque.pop(0))", "            while deque and total <= prefix[deque[-1]]: deque.pop()", "            deque.append(i)", "        return ans if ans < float('inf') else -1"], buildSteps862),
   1438: problem(1438, "medium", "longest-continuous-subarray-with-absolute-diff-less-than-or-equal-to-limit", "Longest Continuous Subarray With Absolute Diff Less Than or Equal to Limit", "Find the longest subarray where max minus min is at most limit.", [8, 2, 4, 7], "integer", "nums", [{ key: "limit", label: { vi: "limit", en: "limit" }, default: 4 }], ["class Solution:", "    def longestSubarray(self, nums, limit):", "        minDeque = []; maxDeque = []; left = ans = 0", "        for right, value in enumerate(nums):", "            while minDeque and nums[minDeque[-1]] > value: minDeque.pop()", "            while maxDeque and nums[maxDeque[-1]] < value: maxDeque.pop()", "            minDeque.append(right); maxDeque.append(right)", "            while nums[maxDeque[0]] - nums[minDeque[0]] > limit:", "                if minDeque[0] == left: minDeque.pop(0)", "                if maxDeque[0] == left: maxDeque.pop(0)", "                left += 1", "            ans = max(ans, right-left+1)", "        return ans"], buildSteps1438),

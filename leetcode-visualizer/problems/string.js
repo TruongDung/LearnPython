@@ -18934,7 +18934,7 @@ function buildSteps3498(input) {
     stage: 0,
     phase: "intro",
     event: "rule",
-    codeLine: 1,
+    codeLine: 2,
     title: { vi: `Tính reverse degree của "${s}"`, en: `Compute the reverse degree of "${s}"` },
     note: {
       vi: "Bảng chữ cái bị đảo: 'a' đáng 26, 'b' đáng 25, …, 'z' đáng 1. Mỗi ký tự góp (vị trí trong chuỗi) × (giá trị đảo của nó), vị trí đếm từ 1.",
@@ -18947,7 +18947,7 @@ function buildSteps3498(input) {
     stage: 0,
     phase: "init",
     event: "init",
-    codeLine: 2,
+    codeLine: 3,
     title: { vi: "total = 0", en: "total = 0" },
     note: { vi: "Một biến tích lũy duy nhất; không cần mảng phụ nào.", en: "A single accumulator; no auxiliary array is needed." },
   });
@@ -18963,7 +18963,7 @@ function buildSteps3498(input) {
       stage: 1,
       phase: "loop",
       event: "take-char",
-      codeLine: 3,
+      codeLine: 4,
       title: { vi: `position = ${position}, char = '${char}'`, en: `position = ${position}, char = '${char}'` },
       note: {
         vi: `enumerate(s, 1) cho vị trí bắt đầu từ 1, nên ký tự đầu tiên là vị trí 1 chứ không phải 0 — đây chính là chỗ dễ lệch một đơn vị.`,
@@ -18977,7 +18977,7 @@ function buildSteps3498(input) {
       stage: 1,
       phase: "value",
       event: "reverse-value",
-      codeLine: 4,
+      codeLine: 5,
       title: { vi: `reverse_position = 26 − ${alphaIndex} = ${reversePosition}`, en: `reverse_position = 26 - ${alphaIndex} = ${reversePosition}` },
       note: {
         vi: `ord('${char}') − ord('a') = ${alphaIndex} là thứ tự 0-based trong bảng chữ cái thường, nên 26 − ${alphaIndex} = ${reversePosition} là giá trị trong bảng đảo. Dùng 25 − ${alphaIndex} hay 27 − ${alphaIndex} đều lệch một đơn vị.`,
@@ -18992,7 +18992,7 @@ function buildSteps3498(input) {
       stage: 1,
       phase: "add",
       event: "accumulate",
-      codeLine: 5,
+      codeLine: 6,
       title: { vi: `total += ${position} × ${reversePosition} = ${product} → total = ${total}`, en: `total += ${position} × ${reversePosition} = ${product} → total = ${total}` },
       note: {
         vi: `Đóng góp của '${char}' là ${position} × ${reversePosition} = ${product}. Tổng sau ${position} ký tự là ${total}.`,
@@ -19012,7 +19012,7 @@ function buildSteps3498(input) {
     stage: 2,
     phase: "done",
     event: "return",
-    codeLine: 6,
+    codeLine: 7,
     title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
     note: {
       vi: `${terms.join(" + ")} = ${answer}. Mỗi ký tự chỉ được xử lý một lần nên thuật toán là O(n) thời gian và O(1) bộ nhớ.`,

@@ -215,9 +215,29 @@ test('2096 trace walks both searches, the prefix loop, and the assembly', () => 
   assert.deepEqual(views[startDone].startPath, ['L', 'L']);
   assert.equal(views[startDone].destPath, null, 'dest_path must still be unknown');
   assert.deepEqual(views[destDone].destPath, ['R', 'L']);
-  assert.equal(views[startDone].codeLines === undefined, true);
-  assert.equal(run.steps[startDone].codeLines[0], 14);
-  assert.equal(run.steps[destDone].codeLines[0], 15);
+  // codeLines are 1-based: line N highlights code[N - 1].
+  assert.equal(run.steps[startDone].codeLines[0], 15);
+  assert.equal(run.steps[destDone].codeLines[0], 16);
+  // Guards the convention: each step must light up the line that performs it.
+  const sourceFor = (event) => problem.code[
+    run.steps.find((step) => step.directions2096View.event === event).codeLines[0] - 1
+  ];
+  assert.match(sourceFor('check-null'), /if not node:/);
+  assert.match(sourceFor('return-none'), /return None/);
+  assert.match(sourceFor('no-match'), /if node\.val == target:/);
+  assert.match(sourceFor('return-empty'), /return \[\]/);
+  assert.match(sourceFor('call-left'), /left = path_to\(node\.left, target\)/);
+  assert.match(sourceFor('left-hit'), /if left is not None:/);
+  assert.match(sourceFor('return-left'), /return \["L"\] \+ left/);
+  assert.match(sourceFor('call-right'), /right = path_to\(node\.right, target\)/);
+  assert.match(sourceFor('right-hit'), /if right is not None:/);
+  assert.match(sourceFor('return-right'), /return \["R"\] \+ right/);
+  assert.match(sourceFor('dead-end'), /return None/);
+  assert.match(sourceFor('start-path'), /start_path = path_to\(root, startValue\)/);
+  assert.match(sourceFor('dest-path'), /dest_path = path_to\(root, destValue\)/);
+  assert.match(sourceFor('common-init'), /common = 0/);
+  assert.match(sourceFor('compare-stop'), /while common </);
+  assert.match(sourceFor('answer'), /return "U" \* \(len\(start_path\) - common\)/);
 
   // 'L' vs 'R' at index 0, so the prefix is empty and the LCA is the root.
   const split = views.find((view) => view.event === 'compare-stop');
@@ -252,7 +272,9 @@ test('2096 advances the shared prefix step by step when the LCA is deeper', () =
   assert.equal(advances.length, 1);
   assert.equal(advances[0].common, 1);
   assert.equal(advances[0].lca.value, 2);
-  assert.equal(run.steps[views.indexOf(advances[0])].codeLines[0], 18);
+  const advanceLine = run.steps[views.indexOf(advances[0])].codeLines[0];
+  assert.equal(advanceLine, 19);
+  assert.match(problem.code[advanceLine - 1], /common \+= 1/);
   assert.ok(views.some((view) => view.event === 'compare-same'));
 });
 

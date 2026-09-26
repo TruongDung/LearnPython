@@ -8538,6 +8538,136 @@ function renderGraph(step, targetId = "treeView") {
     `</svg>`;
 }
 
+function renderCountPaths1976View(step) {
+  const view = step.countPaths1976View || {};
+  const vi = lang === "vi";
+  const stageIndex = ["build", "init"].includes(view.phase)
+    ? 0
+    : ["pop", "inspect"].includes(view.phase)
+      ? 1
+      : ["compare", "shorter", "equal"].includes(view.phase)
+        ? 2
+        : 3;
+  const stages = vi
+    ? ["1. Dựng graph", "2. Pop gần nhất", "3. Cập nhật dist + ways", "4. Trả kết quả"]
+    : ["1. Build graph", "2. Pop closest", "3. Update dist + ways", "4. Return result"];
+  const stagesHtml = stages.map((label, index) => {
+    const state = index < stageIndex ? "is-done" : index === stageIndex ? "is-active" : "";
+    return `<span class="${state}">${index < stageIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const nodeCards = (view.nodes || []).map((item) => {
+    const classes = ["cp1976-node-state"];
+    if (item.isSource) classes.push("is-source");
+    if (item.isTarget) classes.push("is-target");
+    if (item.isFinalized) classes.push("is-finalized");
+    if (item.isCurrent) classes.push("is-current");
+    if (item.isCandidate) classes.push("is-candidate");
+    const currentRole = view.phase === "build"
+      ? (vi ? "ĐANG NỐI" : "CONNECTING")
+      : (vi ? "ĐANG POP" : "POPPED");
+    const role = item.isSource
+      ? "SOURCE"
+      : item.isTarget
+        ? "TARGET"
+        : item.isCurrent
+          ? currentRole
+          : `NODE ${item.node}`;
+    return `<div class="${classes.join(" ")}">
+      <header><b>${escapeHtml(role)}</b><span>${escapeHtml(item.node)}</span></header>
+      <div><small>dist</small><strong>${escapeHtml(item.distance)}</strong></div>
+      <div><small>ways</small><strong>${escapeHtml(item.ways)}</strong></div>
+    </div>`;
+  }).join("");
+
+  const heapHtml = (view.heap || []).length
+    ? view.heap.map((item, index) => `<div class="cp1976-heap-item${index === 0 ? " is-front" : ""}">
+        <small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `#${index + 1}`}</small>
+        <strong>(${escapeHtml(item.time)}, ${escapeHtml(item.node)})</strong>
+        <em>time, node</em>
+      </div>`).join("")
+    : `<em class="cp1976-empty">${vi ? "Heap đang rỗng" : "Heap is empty"}</em>`;
+
+  const edge = view.activeEdge;
+  const currentState = edge ? (view.nodes || []).find((item) => item.node === edge.u) : null;
+  const hasCandidate = edge && view.candidateTime !== null && view.candidateTime !== undefined;
+  const relationSymbol = view.relation === "shorter"
+    ? "<"
+    : view.relation === "equal"
+      ? "="
+      : view.relation === "longer"
+        ? ">"
+        : "?";
+  const calculationHtml = hasCandidate
+    ? `<div class="cp1976-calc">
+        <small>${vi ? "THỬ ĐI QUA ROAD" : "TRY THIS ROAD"} ${escapeHtml(edge.u)} — ${escapeHtml(edge.v)}</small>
+        <div class="cp1976-equation">
+          <span>dist[${escapeHtml(edge.u)}]</span><b>${escapeHtml(currentState?.distance ?? "?")}</b>
+          <i>+</i><span>${vi ? "road" : "road"}</span><b>${escapeHtml(edge.w)}</b>
+          <i>=</i><strong>${escapeHtml(view.candidateTime)}</strong>
+        </div>
+        ${view.previousDistance !== null && view.previousDistance !== undefined
+          ? `<div class="cp1976-compare is-${escapeHtml(view.relation || "pending")}">
+              <b>${escapeHtml(view.candidateTime)}</b><i>${escapeHtml(relationSymbol)}</i><b>${escapeHtml(view.previousDistance)}</b>
+              <span>${vi ? `so với dist[${edge.v}] hiện tại` : `compared with current dist[${edge.v}]`}</span>
+            </div>`
+          : ""}
+      </div>`
+    : `<div class="cp1976-calc is-idle"><small>${vi ? "PHÉP RELAX" : "RELAXATION"}</small><p>${vi ? "Chọn một cạnh để xem phép tính dist và ways." : "Select an edge to see the dist and ways calculation."}</p></div>`;
+
+  let decisionText = vi
+    ? "Dijkstra luôn xử lý node có thời gian nhỏ nhất trước."
+    : "Dijkstra always processes the node with the smallest time first.";
+  let waysFormula = vi ? "Chưa thay đổi ways" : "ways is unchanged";
+  if (view.relation === "shorter") {
+    decisionText = vi
+      ? "Đường mới ngắn hơn → thay dist và thay toàn bộ số cách cũ."
+      : "The new route is shorter → replace dist and all old path counts.";
+    waysFormula = `ways[${edge.v}] = ways[${edge.u}] = ${view.incomingWays}`;
+  } else if (view.relation === "equal") {
+    decisionText = vi
+      ? "Thời gian bằng nhau → giữ dist và cộng thêm số cách mới."
+      : "The times are equal → keep dist and add the new path count.";
+    waysFormula = `ways[${edge.v}] = (${view.previousWays} + ${view.incomingWays}) % MOD`;
+  } else if (view.relation === "longer") {
+    decisionText = vi
+      ? "Đường mới dài hơn → bỏ qua, dist và ways đều giữ nguyên."
+      : "The new route is longer → ignore it; dist and ways stay unchanged.";
+    waysFormula = vi ? "Không cập nhật" : "No update";
+  } else if (view.relation === "check-equal") {
+    decisionText = vi
+      ? "Không ngắn hơn; cần kiểm tra tiếp xem thời gian có bằng nhau không."
+      : "It is not shorter; next check whether the times are equal.";
+  }
+
+  const answerHtml = view.answer !== null && view.answer !== undefined
+    ? `<div class="cp1976-answer"><small>${vi ? "KẾT QUẢ" : "ANSWER"}</small><strong>${escapeHtml(view.answer)}</strong><span>${vi ? `đường ngắn nhất tới node ${view.target}` : `shortest routes to node ${view.target}`}</span></div>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="cp1976-viz" aria-label="${vi ? "Trực quan hóa đếm đường đi ngắn nhất" : "Shortest-path counting visualization"}">
+    <div class="cp1976-stages">${stagesHtml}</div>
+    <div class="cp1976-concepts">
+      <div><b>dist[v]</b><span>${vi ? "thời gian ngắn nhất tới v" : "shortest time to v"}</span></div>
+      <div><b>ways[v]</b><span>${vi ? "số đường đạt đúng dist[v]" : "routes attaining dist[v]"}</span></div>
+    </div>
+    <div class="cp1976-rules">
+      <article class="is-shorter${view.relation === "shorter" ? " is-active" : ""}"><small>${vi ? "TRƯỜNG HỢP 1" : "CASE 1"}</small><strong>new_time &lt; dist[v]</strong><span>${vi ? "Thay dist[v] · ways[v] = ways[u]" : "Replace dist[v] · ways[v] = ways[u]"}</span></article>
+      <article class="is-equal${view.relation === "equal" ? " is-active" : ""}"><small>${vi ? "TRƯỜNG HỢP 2" : "CASE 2"}</small><strong>new_time = dist[v]</strong><span>${vi ? "Giữ dist[v] · ways[v] += ways[u]" : "Keep dist[v] · ways[v] += ways[u]"}</span></article>
+    </div>
+    <div class="cp1976-main">
+      <section class="cp1976-panel cp1976-graph-panel"><header><strong>${vi ? "BẢN ĐỒ ĐƯỜNG ĐI" : "ROAD MAP"}</strong><span>${vi ? "số trên cạnh = thời gian" : "edge label = travel time"}</span></header><div id="countPaths1976Graph"></div></section>
+      <aside class="cp1976-side">
+        ${calculationHtml}
+        <div class="cp1976-decision is-${escapeHtml(view.relation || "neutral")}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(decisionText)}</strong><code>${escapeHtml(waysFormula)}</code></div>
+        ${answerHtml}
+      </aside>
+    </div>
+    <section class="cp1976-panel"><header><strong>dist + ways</strong><span>${vi ? "trạng thái của từng node" : "state of every node"}</span></header><div class="cp1976-node-grid">${nodeCards}</div></section>
+    <section class="cp1976-panel"><header><strong>MIN-HEAP</strong><span>${vi ? "ưu tiên time nhỏ nhất" : "smallest time first"}</span></header><div class="cp1976-heap">${heapHtml}</div></section>
+  </section>`;
+  renderGraph(step, "countPaths1976Graph");
+}
+
 function renderNetworkDelayView(step) {
   const view = step.networkDelayView;
   const vi = lang === "vi";
@@ -17668,6 +17798,543 @@ function renderSubstringConcatView(step) {
 // "freq table" panel listing the count of every distinct value currently
 // inside the window (the offending value highlighted in red once it exceeds
 // k), and a separate dimmed row marking the best window found so far.
+function renderComplement1658View(step) {
+  const view = step.complement1658View || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const done = step.final;
+  const isAll = view.phase === "all";
+  const hasBest = isAll || (Number.isInteger(view.bestLen) && view.bestLen >= 0);
+  const bestLength = isAll ? 0 : view.bestLen;
+  const bestLeft = isAll ? 0 : view.bestLeft;
+  const bestRight = isAll ? -1 : view.bestRight;
+  const windowReady = Number.isInteger(view.windowLeft) && Number.isInteger(view.windowRight);
+  const show = (number) => number === null || number === undefined ? "—" : number;
+  const currentCells = nums.map((value, index) => {
+    const inWindow = !done && windowReady && index >= view.windowLeft && index <= view.windowRight;
+    const side = done && hasBest
+      ? (index < bestLeft ? "take-left" : index > bestRight ? "take-right" : "keep")
+      : done ? "future" : windowReady && index < view.windowLeft && index <= view.right ? "outside" : inWindow ? "keep" : "future";
+    const pointer = !done && index === view.activeIndex ? " active" : "";
+    return `<div class="co1658-cell ${side}${pointer}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
+  }).join("");
+  const bestCells = hasBest ? nums.map((value, index) => {
+    const side = index < bestLeft ? "take-left" : index > bestRight ? "take-right" : "keep";
+    return `<div class="co1658-cell ${side}"><small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
+  }).join("") : "";
+  const leftCount = hasBest ? bestLeft : 0;
+  const rightCount = hasBest ? nums.length - bestRight - 1 : 0;
+  const bestMessage = hasBest
+    ? (vi ? `Lấy trái ${leftCount} + lấy phải ${rightCount} = ${leftCount + rightCount} phép` : `Take ${leftCount} left + ${rightCount} right = ${leftCount + rightCount} operations`)
+    : (vi ? "Chưa tìm thấy đoạn giữa có tổng bằng target." : "No middle segment summing to target has been found yet.");
+  const currentLength = done ? (hasBest ? bestLength : 0)
+    : windowReady && view.windowRight >= view.windowLeft ? view.windowRight - view.windowLeft + 1 : 0;
+  const status = done
+    ? view.answer < 0 ? (vi ? "Không có cách lấy ở hai đầu để đạt đúng x." : "No end removals can sum to exactly x.") : bestMessage
+    : pick(step.note);
+  const formula = view.target !== null && view.target < 0
+    ? "x > total → return -1"
+    : isAll ? "target == 0 → return len(nums)"
+      : "operations = n - bestLen";
+
+  $("treeView").innerHTML = `<section class="co1658-viz" aria-label="Minimum Operations to Reduce X to Zero visualization">
+    <header class="co1658-heading"><div><small>SLIDING WINDOW · #1658</small><strong>${vi ? "GIỮ ĐOẠN GIỮA DÀI NHẤT" : "KEEP THE LONGEST MIDDLE SEGMENT"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="co1658-idea"><strong>${vi ? "ĐỔI GÓC NHÌN" : "CHANGE THE VIEW"}</strong><span>${vi ? "Lấy ở hai đầu" : "Remove from both ends"} <b>↔</b> ${vi ? "giữ một đoạn liên tiếp ở giữa" : "keep one contiguous middle segment"}</span><code>target = total - x = ${show(view.total)} - ${view.x} = ${show(view.target)}</code></div>
+    <div class="co1658-stats"><div><small>total</small><strong>${show(view.total)}</strong></div><div><small>x</small><strong>${view.x}</strong></div><div class="target"><small>${vi ? "TỔNG CẦN GIỮ" : "SUM TO KEEP"}</small><strong>${show(view.target)}</strong></div><div><small>windowSum</small><strong>${show(view.windowSum)}</strong></div><div><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></div><div class="best"><small>bestLen</small><strong>${isAll ? "—" : show(view.bestLen)}</strong></div></div>
+    <section class="co1658-panel"><header><strong>${done ? (vi ? "PHƯƠNG ÁN CUỐI" : "FINAL CHOICE") : (vi ? "ĐOẠN ĐANG XÉT" : "CURRENT WINDOW")}</strong><span>${done ? "" : `left = ${show(view.left)} · right = ${show(view.right)}`}</span></header><div class="co1658-scroll"><div class="co1658-row">${currentCells}</div></div><p>${escapeHtml(status)}</p></section>
+    <section class="co1658-panel co1658-best"><header><strong>${vi ? "ĐOẠN TỐT NHẤT ĐÃ TÌM" : "BEST SEGMENT FOUND"}</strong><span>${hasBest ? (bestLength === 0 ? "∅" : `[${bestLeft}..${bestRight}]`) : "—"}</span></header>${hasBest ? `<div class="co1658-scroll"><div class="co1658-row">${bestCells}</div></div>` : ""}<p>${escapeHtml(bestMessage)}</p></section>
+    <div class="co1658-legend"><span><i class="keep"></i>${vi ? "giữ đoạn giữa" : "keep middle"}</span><span><i class="take-left"></i>${vi ? "lấy bên trái" : "take left"}</span><span><i class="take-right"></i>${vi ? "lấy bên phải" : "take right"}</span></div>
+    <footer class="co1658-answer ${done ? "done" : ""}"><div><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>${escapeHtml(formula)}</code><span>${escapeHtml(pick(step.note))}</span></div><strong>${done ? view.answer : "?"}</strong></footer>
+  </section>`;
+}
+
+function renderNumberBfs2059View(step) {
+  const view = step.numberBfs2059View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const current = view.current;
+  const selected = view.num;
+  const variants = current === null || selected === null ? [] : [
+    { op: "+", value: current + selected },
+    { op: "−", value: current - selected },
+    { op: "^", value: current ^ selected },
+  ];
+  const candidates = variants.map(({ op, value }) => {
+    const active = view.candidate && view.candidate.op === op;
+    const status = active ? view.candidate.status : "preview";
+    const badge = status === "goal" ? (vi ? "GOAL" : "GOAL")
+      : status === "outside" ? (vi ? "NGOÀI KHOẢNG" : "OUT OF RANGE")
+        : status === "seen" ? (vi ? "ĐÃ THẤY" : "SEEN")
+          : status === "queued" ? (vi ? "TRONG QUEUE" : "QUEUED")
+            : status === "new" || status === "discovered" ? (vi ? "MỚI" : "NEW") : "";
+    return `<div class="nb2059-candidate ${active ? `active ${status}` : ""}"><small>${show(current)} ${escapeHtml(op)} ${show(selected)}</small><strong>${show(value)}</strong><span>${badge}</span></div>`;
+  }).join("");
+  const queue = (view.queue || []).map(({ value, depth }) => `<span class="nb2059-queue-item"><strong>${show(value)}</strong><small>d=${show(depth)}</small></span>`).join("");
+  const path = (view.path || []).map(({ value, op, num }, index) =>
+    `<span class="nb2059-path-node">${index ? `<small>${escapeHtml(op)} ${show(num)} →</small>` : ""}<strong>${show(value)}</strong></span>`).join("");
+  const goalOutside = view.goal < 0 || view.goal > 1000;
+  $("treeView").innerHTML = `<section class="nb2059-viz" aria-label="Minimum Operations to Convert Number visualization">
+    <header class="nb2059-heading"><div><small>BFS · #2059</small><strong>${vi ? "ĐỔI SỐ VỚI ÍT THAO TÁC NHẤT" : "MINIMUM OPERATIONS TO CONVERT A NUMBER"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="nb2059-rule">${vi ? "Chỉ mở rộng trạng thái trong" : "Only expand states in"} <code>[0, 1000]</code>. ${goalOutside ? (vi ? "Goal ngoài khoảng vẫn hợp lệ ở bước cuối." : "An out-of-range goal is valid as the final move.") : (vi ? "BFS duyệt theo số thao tác tăng dần." : "BFS explores by increasing operation count.")}</div>
+    <div class="nb2059-stats"><div><small>START</small><strong>${show(view.start)}</strong></div><div><small>GOAL</small><strong>${show(view.goal)}</strong></div><div><small>${vi ? "TẦNG BFS" : "BFS DEPTH"}</small><strong>${show(view.distance)}</strong></div><div><small>QUEUE</small><strong>${show(view.queueSize)}</strong></div><div><small>${vi ? "ĐÃ THẤY" : "SEEN"}</small><strong>${show(view.seenCount)}</strong></div></div>
+    <section class="nb2059-panel"><header><strong>${vi ? "TRẠNG THÁI ĐANG MỞ RỘNG" : "CURRENT STATE"}</strong><span>${selected === null ? "" : `num = ${show(selected)}`}</span></header><div class="nb2059-current">${show(current)}</div><div class="nb2059-candidates">${candidates || `<p>${vi ? "Lấy trạng thái từ queue để thử ba phép toán." : "Pop a state to try the three operations."}</p>`}</div></section>
+    <section class="nb2059-panel"><header><strong>${vi ? "HÀNG ĐỢI BFS" : "BFS QUEUE"}</strong><span>${show(view.queueSize)} ${vi ? "đang chờ" : "waiting"}</span></header><div class="nb2059-queue">${queue || `<span class="nb2059-empty">${vi ? "Trống" : "Empty"}</span>`}${view.queueSize > 8 ? `<span class="nb2059-empty">+${view.queueSize - 8} ${vi ? "khác" : "more"}</span>` : ""}</div></section>
+    ${step.final ? `<section class="nb2059-panel nb2059-result"><header><strong>${view.answer < 0 ? (vi ? "KHÔNG THỂ ĐẠT GOAL" : "GOAL UNREACHABLE") : (vi ? "ĐƯỜNG ĐI NGẮN NHẤT" : "SHORTEST PATH")}</strong><span>${vi ? "Đáp án" : "Answer"}: ${show(view.answer)}</span></header>${path ? `<div class="nb2059-path">${path}</div>` : ""}</section>` : ""}
+    <footer class="nb2059-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderShelfDp1105View(step) {
+  const view = step.shelfDp1105View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const books = Array.isArray(view.books) ? view.books : [];
+  const maxHeight = Math.max(1, ...books.map((book) => book.height));
+  const bookTile = (book, active = false) => {
+    const height = 30 + Math.round(book.height / maxHeight * 44);
+    const width = 38 + Math.round(book.thickness / view.shelfWidth * 56);
+    return `<div class="sh1105-book ${active ? "active" : ""}" style="--sh-height:${height}px;--sh-width:${width}px"><small>#${book.index + 1}</small><strong>${book.height}</strong><span>w=${book.thickness}</span></div>`;
+  };
+  const source = books.map((book) => bookTile(book,
+    view.j !== null && view.i !== null && book.index >= view.j && book.index < view.i)).join("");
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const indices = dp.length <= 26
+    ? dp.map((_, index) => index)
+    : [...new Set([...Array.from({ length: 10 }, (_, index) => index),
+      ...Array.from({ length: 7 }, (_, offset) => Math.min(dp.length - 1, Math.max(0, (view.i || 0) - 3 + offset))), dp.length - 1])].sort((a, b) => a - b);
+  const dpCells = indices.map((index, position) => `${position && index > indices[position - 1] + 1 ? `<span class="sh1105-ellipsis">…</span>` : ""}
+    <div class="sh1105-dp-cell ${index === view.i ? "current" : ""}"><small>dp[${index}]</small><strong>${dp[index] === null ? "∞" : show(dp[index])}</strong></div>`).join("");
+  const shelves = (view.shelves || []).slice(0, 12).map((shelf, index) => `<div class="sh1105-shelf"><header><strong>${vi ? "KỆ" : "SHELF"} ${index + 1}</strong><span>${vi ? "rộng" : "width"} ${shelf.width}/${view.shelfWidth} · ${vi ? "cao" : "height"} ${shelf.height}</span></header><div class="sh1105-book-row">${shelf.books.map((book) => bookTile(book)).join("")}</div></div>`).join("");
+  const moreShelves = (view.shelves || []).length > 12 ? `<span class="sh1105-more">+${view.shelves.length - 12} ${vi ? "kệ khác" : "more shelves"}</span>` : "";
+  const bestText = view.i !== null && view.best === null ? "∞" : show(view.best);
+  const formula = step.final ? `dp[${view.n}] = ${show(view.answer)}`
+    : view.candidate === null ? (vi ? "Chọn j để thử kệ cuối [j..i−1]" : "Choose j for the final shelf [j..i−1]")
+    : `dp[${view.j}] + maxHeight = ${show(view.previous)} + ${show(view.height)} = ${show(view.candidate)}`;
+  $("treeView").innerHTML = `<section class="sh1105-viz" aria-label="Filling Bookcase Shelves visualization">
+    <header class="sh1105-heading"><div><small>DP · #1105</small><strong>${vi ? "XẾP SÁCH LÊN KỆ" : "FILLING BOOKCASE SHELVES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sh1105-rule">${vi ? "Giữ nguyên thứ tự sách." : "Keep books in their original order."} <code>dp[i]</code> = ${vi ? "chiều cao nhỏ nhất của i quyển đầu" : "minimum height for the first i books"}.</div>
+    <div class="sh1105-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>j</small><strong>${show(view.j)}</strong></div><div><small>${vi ? "RỘNG KỆ CUỐI" : "LAST SHELF WIDTH"}</small><strong>${show(view.width)} / ${show(view.shelfWidth)}</strong></div><div><small>${vi ? "CAO KỆ CUỐI" : "LAST SHELF HEIGHT"}</small><strong>${show(view.height)}</strong></div><div><small>dp[i]</small><strong>${bestText}</strong></div></div>
+    <section class="sh1105-panel"><header><strong>${vi ? "SÁCH THEO THỨ TỰ" : "BOOKS IN ORDER"}</strong><span>${books.length < view.n ? `${vi ? "Hiện" : "Showing"} ${books.length}/${view.n}` : `${view.n} ${vi ? "quyển" : "books"}`}</span></header><div class="sh1105-book-scroll"><div class="sh1105-book-row">${source}</div></div><p>${vi ? "Số lớn trên sách là chiều cao; w là độ dày. Sách viền vàng đang được thử trên kệ cuối." : "The large number is height; w is thickness. Gold-bordered books are on the trial last shelf."}</p></section>
+    <section class="sh1105-panel"><header><strong>${vi ? "THỬ PHƯƠNG ÁN" : "TRIAL CANDIDATE"}</strong><span>${view.phase === "break" ? (vi ? "KỆ QUÁ RỘNG" : "TOO WIDE") : ""}</span></header><code class="sh1105-formula">${escapeHtml(formula)}</code><div class="sh1105-dp-row">${dpCells}</div></section>
+    ${shelves ? `<section class="sh1105-panel sh1105-layout"><header><strong>${step.final ? (vi ? "CÁCH XẾP TỐI ƯU" : "OPTIMAL ARRANGEMENT") : (vi ? "PHƯƠNG ÁN TỐT NHẤT HIỆN TẠI" : "CURRENT BEST ARRANGEMENT")}</strong><span>${step.final ? `${vi ? "Tổng cao" : "Total height"} ${show(view.answer)}` : `${vi ? "Tổng cao" : "Total height"} ${show(view.best)}`}</span></header><div class="sh1105-shelves">${shelves}${moreShelves}</div></section>` : ""}
+    <footer class="sh1105-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderServerHeap1606View(step) {
+  const view = step.serverHeap1606View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const servers = (view.servers || []).map((item) => {
+    const classes = ["sv1606-server", item.until !== null ? "busy" : "free",
+      item.preferred ? "preferred" : "", item.chosen ? "chosen" : "", item.released ? "released" : ""].join(" ");
+    return `<div class="${classes}"><small>SERVER ${item.id}</small><strong>${show(item.count)}</strong><span>${item.until === null ? (vi ? "RẢNH" : "FREE") : `${vi ? "BẬN TỚI" : "BUSY UNTIL"} ${show(item.until)}`}</span></div>`;
+  }).join("");
+  const freeSlots = (view.freeSlots || []).map(({ virtual, server }) =>
+    `<span class="sv1606-heap-item"><small>slot ${show(virtual)}</small><strong>→ S${show(server)}</strong></span>`).join("");
+  const busyJobs = (view.busyJobs || []).map(({ until, server }) =>
+    `<span class="sv1606-heap-item"><small>S${show(server)}</small><strong>${vi ? "xong" : "until"} ${show(until)}</strong></span>`).join("");
+  const winners = (view.answer || []).map((id) => `<span class="sv1606-winner">S${show(id)}</span>`).join("");
+  const slotFormula = view.slot !== null && view.i !== null && view.server !== null
+    ? `slot = ${show(view.slot)} → server = ${show(view.slot)} % ${show(view.k)} = ${show(view.slot % view.k)}`
+    : view.released !== null && view.i !== null
+      ? `slot = i + (server − i) mod k`
+      : `server ${vi ? "ưu tiên" : "preferred"} = i mod k`;
+  $("treeView").innerHTML = `<section class="sv1606-viz" aria-label="Find Servers That Handled Most Number of Requests visualization">
+    <header class="sv1606-heading"><div><small>TWO HEAPS · #1606</small><strong>${vi ? "SERVER XỬ LÝ NHIỀU REQUEST NHẤT" : "BUSIEST SERVERS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="sv1606-rule">${vi ? "Request i ưu tiên server" : "Request i prefers server"} <code>i % k</code>; ${vi ? "nếu bận, tìm server rảnh kế tiếp theo vòng." : "if busy, take the next free server with wraparound."}</div>
+    <div class="sv1606-stats"><div><small>REQUEST</small><strong>${show(view.i)} / ${show(view.requestCount)}</strong></div><div><small>${vi ? "THỜI ĐIỂM" : "ARRIVAL"}</small><strong>${show(view.time)}</strong></div><div><small>LOAD</small><strong>${show(view.duration)}</strong></div><div><small>${vi ? "ƯU TIÊN" : "PREFERRED"}</small><strong>${show(view.preferred)}</strong></div><div><small>${vi ? "ĐÃ BỎ" : "DROPPED"}</small><strong>${show(view.droppedCount)}</strong></div></div>
+    <section class="sv1606-panel"><header><strong>${vi ? "TRẠNG THÁI SERVER" : "SERVER STATUS"}</strong><span>${(view.servers || []).length < view.k ? `${vi ? "Hiện" : "Showing"} ${(view.servers || []).length}/${view.k}` : `${view.k} servers`}</span></header><div class="sv1606-servers">${servers}</div><div class="sv1606-legend"><span>${vi ? "viền tím: ưu tiên" : "purple: preferred"}</span><span>${vi ? "viền xanh: được chọn" : "green: selected"}</span><span>${vi ? "số lớn: đã xử lý" : "large number: handled"}</span></div></section>
+    <div class="sv1606-heaps"><section class="sv1606-panel"><header><strong>${vi ? "FREE HEAP · VỊ TRÍ ẢO" : "FREE HEAP · VIRTUAL SLOTS"}</strong><span>${show(view.freeCount)} ${vi ? "server rảnh" : "free"}</span></header><div class="sv1606-heap-list">${freeSlots || `<span class="sv1606-empty">${vi ? "Trống" : "Empty"}</span>`}${view.freeCount > 30 ? `<span class="sv1606-empty">${vi ? "Chỉ hiện phần tử nhỏ nhất" : "Showing the minimum only"}</span>` : ""}</div></section><section class="sv1606-panel"><header><strong>${vi ? "BUSY HEAP · GIỜ HOÀN TẤT" : "BUSY HEAP · FINISH TIMES"}</strong><span>${show(view.busyCount)} ${vi ? "server bận" : "busy"}</span></header><div class="sv1606-heap-list">${busyJobs || `<span class="sv1606-empty">${vi ? "Trống" : "Empty"}</span>`}${view.busyCount > 30 ? `<span class="sv1606-empty">${vi ? "Chỉ hiện phần tử nhỏ nhất" : "Showing the minimum only"}</span>` : ""}</div></section></div>
+    <div class="sv1606-formula"><code>${escapeHtml(slotFormula)}</code><span>${view.dropped ? (vi ? "Request này bị bỏ vì không còn server rảnh." : "This request was dropped because no server was free.") : ""}</span></div>
+    ${step.final ? `<section class="sv1606-panel sv1606-result"><header><strong>${vi ? "SERVER BẬN NHẤT" : "BUSIEST SERVERS"}</strong><span>${vi ? "Mỗi server xử lý" : "Handled by each"} ${show(view.best)}</span></header><div class="sv1606-winners">${winners}${view.winnerCount > (view.answer || []).length ? `<span class="sv1606-empty">+${view.winnerCount - view.answer.length} ${vi ? "server khác" : "more"}</span>` : ""}</div></section>` : ""}
+    <footer class="sv1606-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderMeetingRooms2402View(step) {
+  const view = step.meetingRooms2402View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const meeting = view.meeting;
+  const rooms = (view.rooms || []).map(({ id, count, until, chosen, released }) =>
+    `<div class="mr2402-room ${until === null ? "free" : "busy"} ${chosen ? "chosen" : ""} ${released ? "released" : ""}"><small>ROOM ${show(id)}</small><strong>${show(count)}</strong><span>${until === null ? (vi ? "RẢNH" : "FREE") : `${vi ? "BẬN TỚI" : "BUSY UNTIL"} ${show(until)}`}</span></div>`).join("");
+  const freeRooms = (view.freeRooms || []).map((id) => `<span class="mr2402-heap-chip">R${show(id)}</span>`).join("");
+  const busyJobs = (view.busyJobs || []).map(({ until, room }) =>
+    `<span class="mr2402-heap-chip">R${show(room)} <small>→ ${show(until)}</small></span>`).join("");
+  const assignments = (view.assignments || []).map((item) =>
+    `<div class="mr2402-assignment ${item.actualStart > item.originalStart ? "delayed" : ""}"><small>#${show(item.originalIndex)} · R${show(item.room)}</small><strong>[${show(item.actualStart)}, ${show(item.finish)})</strong><span>${item.actualStart > item.originalStart ? `${vi ? "gốc" : "original"} [${show(item.originalStart)}, ${show(item.originalEnd)})` : (vi ? "đúng giờ" : "on time")}</span></div>`).join("");
+  const currentText = meeting ? `[${show(meeting.start)}, ${show(meeting.end)})` : "—";
+  const actualText = view.actualStart !== null && view.finish !== null
+    ? `[${show(view.actualStart)}, ${show(view.finish)})` : "—";
+  $("treeView").innerHTML = `<section class="mr2402-viz" aria-label="Meeting Rooms III visualization">
+    <header class="mr2402-heading"><div><small>TWO HEAPS · #2402</small><strong>${vi ? "PHÒNG HỌP ĐƯỢC DÙNG NHIỀU NHẤT" : "MEETING ROOMS III"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mr2402-rule">${vi ? "Xét theo giờ bắt đầu gốc. Phòng rảnh: lấy số nhỏ nhất. Hết phòng: lấy phòng xong sớm nhất, giữ nguyên thời lượng." : "Use original start order. Take the lowest free room; if none is free, wait for the earliest finish and keep the duration."}</div>
+    <div class="mr2402-stats"><div><small>MEETING</small><strong>${view.currentIndex === null ? "—" : `${show(view.currentIndex + 1)} / ${show(view.meetingCount)}`}</strong></div><div><small>${vi ? "LỊCH GỐC" : "ORIGINAL"}</small><strong>${currentText}</strong></div><div><small>${vi ? "LỊCH THỰC" : "ACTUAL"}</small><strong>${actualText}</strong></div><div><small>${vi ? "PHÒNG CHỌN" : "ROOM"}</small><strong>${show(view.room)}</strong></div></div>
+    ${view.delayed ? `<div class="mr2402-delay">${vi ? "Đã dời" : "Delayed"}: ${currentText} → ${actualText}. ${vi ? "Thời lượng không đổi." : "Duration is unchanged."}</div>` : ""}
+    <section class="mr2402-panel"><header><strong>${vi ? "TRẠNG THÁI PHÒNG · SỐ CUỘC HỌP" : "ROOM STATUS · MEETING COUNTS"}</strong><span>${(view.rooms || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.rooms || []).length}/${show(view.n)}` : `${show(view.n)} rooms`}</span></header><div class="mr2402-rooms">${rooms}</div><div class="mr2402-legend">${vi ? "Viền xanh: phòng được chọn · Viền nét đứt: vừa giải phóng · Số lớn: số cuộc họp" : "Green border: selected · Dashed border: just released · Large number: meetings held"}</div></section>
+    <div class="mr2402-heaps"><section class="mr2402-panel"><header><strong>FREE HEAP · ${vi ? "SỐ PHÒNG" : "ROOM NUMBER"}</strong><span>${show(view.freeCount)} ${vi ? "rảnh" : "free"}</span></header><div class="mr2402-heap-list">${freeRooms || `<span class="mr2402-empty">${vi ? "Trống" : "Empty"}</span>`}</div></section><section class="mr2402-panel"><header><strong>BUSY HEAP · ${vi ? "GIỜ XONG, PHÒNG" : "FINISH, ROOM"}</strong><span>${show(view.busyCount)} ${vi ? "bận" : "busy"}</span></header><div class="mr2402-heap-list">${busyJobs || `<span class="mr2402-empty">${vi ? "Trống" : "Empty"}</span>`}</div></section></div>
+    <section class="mr2402-panel"><header><strong>${vi ? "LỊCH ĐÃ PHÂN" : "SCHEDULED MEETINGS"}</strong><span>${show(view.assignmentCount)} / ${show(view.meetingCount)}</span></header><div class="mr2402-assignments">${assignments || `<span class="mr2402-empty">${vi ? "Chưa có cuộc họp" : "No meetings assigned yet"}</span>`}${view.assignmentCount > (view.assignments || []).length ? `<span class="mr2402-empty">… ${vi ? "đã rút gọn" : "truncated"}</span>` : ""}</div></section>
+    ${step.final ? `<section class="mr2402-panel mr2402-result"><header><strong>${vi ? "PHÒNG NHIỀU CUỘC HỌP NHẤT" : "MOST-BOOKED ROOM"}</strong><span>${show(view.best)} ${vi ? "cuộc họp" : "meetings"}</span></header><strong>Room ${show(view.answer)}</strong></section>` : ""}
+    <footer class="mr2402-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderAdjacentRuns3350View(step) {
+  const view = step.adjacentRuns3350View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const focus = view.candidate || view.witness;
+  const partOf = (pair, index) => {
+    if (!pair) return "";
+    if (index >= pair.leftStart && index < pair.leftStart + pair.k) return "left";
+    if (index >= pair.rightStart && index < pair.rightStart + pair.k) return "right";
+    return "";
+  };
+  let previousIndex = -1;
+  const cells = (view.cells || []).map(({ index, value }) => {
+    const gap = index > previousIndex + 1 ? `<span class="ai3350-gap">…</span>` : "";
+    previousIndex = index;
+    const side = partOf(focus, index);
+    const bestSide = partOf(view.witness, index);
+    const inCurrent = view.currentRun && index >= view.currentRun[0] && index <= view.currentRun[1];
+    const inPrevious = view.previousRun && index >= view.previousRun[0] && index <= view.previousRun[1];
+    const classes = ["ai3350-cell", side ? `focus-${side}` : "", bestSide ? "best" : "",
+      inCurrent ? "current" : "", inPrevious ? "previous" : "", index === view.i ? "active" : ""].filter(Boolean).join(" ");
+    return `${gap}<div class="${classes}"><small>[${index}]</small><strong>${show(value)}</strong><span>${side ? side === "left" ? "L" : "R" : ""}</span></div>`;
+  }).join("");
+  const runText = (range) => range ? `[${show(range[0])}..${show(range[1])}]` : "—";
+  const pairText = (pair) => pair
+    ? `[${show(pair.leftStart)}..${show(pair.leftStart + pair.k - 1)}] + [${show(pair.rightStart)}..${show(pair.rightStart + pair.k - 1)}]`
+    : "—";
+  $("treeView").innerHTML = `<section class="ai3350-viz" aria-label="Adjacent Increasing Subarrays Detection II visualization">
+    <header class="ai3350-heading"><div><small>INCREASING RUNS · #3350</small><strong>${vi ? "HAI ĐOẠN TĂNG LIỀN KỀ" : "ADJACENT INCREASING SUBARRAYS"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ai3350-rule">${vi ? "Hai đoạn phải có cùng độ dài k, đứng sát nhau và mỗi đoạn tăng nghiêm ngặt. Điểm nối giữa hai đoạn không bắt buộc tăng." : "Both subarrays must have length k, be adjacent, and increase strictly inside each one. Their shared boundary need not increase."}</div>
+    <div class="ai3350-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>${vi ? "RUN TRƯỚC" : "PREVIOUS RUN"}</small><strong>${show(view.previous)}</strong></div><div><small>${vi ? "RUN HIỆN TẠI" : "CURRENT RUN"}</small><strong>${show(view.current)}</strong></div><div><small>best k</small><strong>${show(view.best)}</strong></div></div>
+    <section class="ai3350-panel"><header><strong>nums</strong><span>${(view.cells || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.cells || []).length}/${show(view.n)}` : `${show(view.n)} ${vi ? "phần tử" : "values"}`}</span></header><div class="ai3350-array-scroll"><div class="ai3350-array">${cells}</div></div><div class="ai3350-legend"><span>${vi ? "L/R: hai đoạn đang xét" : "L/R: the two subarrays"}</span><span>${vi ? "viền vàng: cặp tốt nhất" : "gold outline: best pair"}</span></div></section>
+    <div class="ai3350-runs"><div><small>${vi ? "RUN TRƯỚC" : "PREVIOUS RUN"}</small><strong>${runText(view.previousRun)}</strong></div><div><small>${vi ? "RUN HIỆN TẠI" : "CURRENT RUN"}</small><strong>${runText(view.currentRun)}</strong></div></div>
+    <div class="ai3350-candidates"><div class="${view.candidate?.kind === "inside" ? "active" : ""}"><small>${vi ? "CHIA ĐÔI MỘT RUN" : "SPLIT ONE RUN"}</small><strong>⌊current / 2⌋ = ${show(view.inside)}</strong></div><div class="${view.candidate?.kind === "across" ? "active" : ""}"><small>${vi ? "GHÉP QUA RANH GIỚI" : "ACROSS RUN BOUNDARY"}</small><strong>min(previous, current) = ${show(view.across)}</strong></div></div>
+    <section class="ai3350-panel ai3350-best"><header><strong>${vi ? "CẶP TỐT NHẤT" : "BEST PAIR"}</strong><span>k = ${show(view.best)}</span></header><code>${pairText(view.witness)}</code>${view.candidate ? `<p>${vi ? "Đang thử" : "Trying"}: ${pairText(view.candidate)}</p>` : ""}</section>
+    <footer class="ai3350-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderDigitSum3550View(step) {
+  const view = step.digitSum3550View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  let previousIndex = -1;
+  const cells = (view.cells || []).map((item) => {
+    const gap = item.index > previousIndex + 1 ? `<span class="ds3550-gap">…</span>` : "";
+    previousIndex = item.index;
+    const classes = ["ds3550-cell", item.scanned ? "scanned" : "", item.current ? "current" : "",
+      item.matched ? "matched" : ""].filter(Boolean).join(" ");
+    return `${gap}<div class="${classes}"><small>[${show(item.index)}]</small><strong>${show(item.value)}</strong><span>${item.matched ? "✓" : item.current ? "▲" : ""}</span></div>`;
+  }).join("");
+  const digits = (view.digits || []).map((value, index, all) => {
+    const processed = index >= all.length - view.processed;
+    const active = view.phase === "add-digit" && index === all.length - view.processed;
+    return `<div class="ds3550-digit ${processed ? "processed" : ""} ${active ? "active" : ""}"><small>10<sup>${all.length - index - 1}</sup></small><strong>${show(value)}</strong></div>`;
+  }).join("");
+  const processedDigits = view.processed ? (view.digits || []).slice(-view.processed).reverse() : [];
+  const expression = processedDigits.length ? processedDigits.map(show).join(" + ")
+    : view.value === 0 && view.total !== null ? "0" : "…";
+  const compared = view.phase === "compare" || view.phase === "found";
+  const matches = compared && view.total === view.i;
+  const exhausted = step.final && view.answer === -1;
+  $("treeView").innerHTML = `<section class="ds3550-viz" aria-label="Smallest Index With Digit Sum Equal to Index visualization">
+    <header class="ds3550-heading"><div><small>DIGIT SUM · #3550</small><strong>${vi ? "CHỈ SỐ NHỎ NHẤT BẰNG TỔNG CHỮ SỐ" : "SMALLEST INDEX = DIGIT SUM"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ds3550-rule">${vi ? "Quét i từ trái sang phải. Khi tổng chữ số của nums[i] bằng i, trả về ngay: đó chắc chắn là chỉ số nhỏ nhất." : "Scan i from left to right. Return as soon as the digit sum of nums[i] equals i: this is necessarily the smallest index."}</div>
+    <div class="ds3550-stats"><div><small>i</small><strong>${show(view.i)}</strong></div><div><small>nums[i]</small><strong>${show(view.value)}</strong></div><div><small>${vi ? "CÒN LẠI" : "REMAINING"}</small><strong>${show(view.remaining)}</strong></div><div><small>${vi ? "TỔNG CHỮ SỐ" : "DIGIT SUM"}</small><strong>${show(view.total)}</strong></div></div>
+    <section class="ds3550-panel"><header><strong>nums</strong><span>${(view.cells || []).length < view.n ? `${vi ? "Hiện" : "Showing"} ${(view.cells || []).length}/${show(view.n)}` : `${show(view.n)} ${vi ? "phần tử" : "values"}`}</span></header><div class="ds3550-scroll"><div class="ds3550-array">${cells}</div></div><p>${vi ? "Ô mờ đã kiểm tra · viền xanh là vị trí hiện tại · dấu ✓ là chỉ số đầu tiên khớp." : "Dim cells were checked · cyan border is the current index · ✓ marks the first match."}</p></section>
+    <section class="ds3550-panel"><header><strong>${vi ? "TÁCH TỪNG CHỮ SỐ" : "EXTRACT DIGITS"}</strong><span>${view.value === null ? "—" : `${show(view.processed)} / ${(view.digits || []).length}`}</span></header><div class="ds3550-digits">${digits || `<span class="ds3550-empty">${vi ? "Chọn một phần tử" : "Select a value"}</span>`}</div><div class="ds3550-equation">${vi ? "Đã cộng" : "Added"}: <code>${expression} = ${show(view.total)}</code>${view.digit !== null ? `<span>${vi ? "chữ số vừa lấy" : "last digit"}: ${show(view.digit)}</span>` : ""}</div></section>
+    <div class="ds3550-compare ${exhausted ? "mismatch" : compared ? matches ? "match" : "mismatch" : ""}"><strong>${exhausted ? (vi ? "Đã kiểm tra mọi chỉ số" : "All indices checked") : `${show(view.total)} ${compared ? matches ? "=" : "≠" : "?"} ${show(view.i)}`}</strong><span>${exhausted ? (vi ? "Không có tổng chữ số nào bằng chỉ số tương ứng" : "No digit sum equals its index") : compared ? matches ? (vi ? "Khớp — dừng tại chỉ số nhỏ nhất" : "Match — stop at the smallest index") : (vi ? "Chưa khớp — xét phần tử tiếp" : "No match — continue scanning") : (vi ? "Đang tính tổng chữ số" : "Computing digit sum")}</span></div>
+    ${step.final ? `<section class="ds3550-panel ds3550-result"><header><strong>${vi ? "KẾT QUẢ" : "RESULT"}</strong></header><strong>${show(view.answer)}</strong><span>${view.answer === -1 ? (vi ? "Không có chỉ số hợp lệ" : "No matching index") : (vi ? "Chỉ số khớp đầu tiên" : "First matching index")}</span></section>` : ""}
+    <footer class="ds3550-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderPermutation1589View(step) {
+  const view = step.permutation1589View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const activeRequest = view.requestIndex;
+  const requestList = [...(view.requests || [])];
+  if (activeRequest !== null && !requestList.some((item) => item.index === activeRequest) && view.request) {
+    requestList.push({ index: activeRequest, left: view.request[0], right: view.request[1] });
+  }
+  const requests = requestList.map((item) => `<span class="mp1589-request ${item.index === activeRequest ? "active" : ""}">#${show(item.index)} [${show(item.left)}, ${show(item.right)}]</span>`).join("");
+  let previous = -1;
+  const cells = (view.cells || []).map((cell) => {
+    const gap = cell.index > previous + 1 ? `<span class="mp1589-gap">…</span>` : "";
+    previous = cell.index;
+    const inRange = view.request && cell.index >= view.request[0] && cell.index <= view.request[1];
+    const active = cell.index === view.activeIndex;
+    return `${gap}<div class="mp1589-cell ${inRange ? "in-range" : ""} ${active ? "active" : ""}"><small>${cell.index === view.n ? "end" : `[${show(cell.index)}]`}</small><strong>${cell.index === view.n ? "∅" : show(cell.value)}</strong><span>Δ ${show(cell.diff)}</span><span>f ${show(cell.frequency)}</span></div>`;
+  }).join("");
+  previous = -1;
+  const pairs = (view.sorted || []).map((item) => {
+    const gap = item.index > previous + 1 ? `<span class="mp1589-gap">…</span>` : "";
+    previous = item.index;
+    return `${gap}<div class="mp1589-pair ${item.index === view.pairIndex ? "active" : ""}"><small>#${show(item.index)}</small><strong>${show(item.value)} × ${show(item.frequency)}</strong><span>${item.value === null || item.frequency === null ? "—" : show(item.value * item.frequency)}</span></div>`;
+  }).join("");
+  const phase = view.phase || "init";
+  const stage = phase.startsWith("range") || phase === "init" ? (vi ? "1 · ĐÁNH DẤU ĐOẠN" : "1 · MARK RANGES")
+    : phase === "prefix" ? (vi ? "2 · ĐẾM TẦN SUẤT" : "2 · COUNT COVERAGE")
+      : (vi ? "3 · GHÉP TỐI ƯU" : "3 · OPTIMAL PAIRING");
+  $("treeView").innerHTML = `<section class="mp1589-viz" aria-label="Maximum Sum Obtained of Any Permutation visualization">
+    <header class="mp1589-heading"><div><small>DIFFERENCE ARRAY + GREEDY · #1589</small><strong>${vi ? "TỔNG TRUY VẤN LỚN NHẤT" : "MAXIMUM REQUEST SUM"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="mp1589-rule">${vi ? "Mỗi vị trí đóng góp nums[i] × số truy vấn phủ nó. Đặt số lớn ở nơi được dùng nhiều lần nhất." : "Each position contributes nums[i] × its request count. Put the largest values at the most-used positions."}</div>
+    <div class="mp1589-stats"><div><small>${vi ? "GIAI ĐOẠN" : "STAGE"}</small><strong>${stage}</strong></div><div><small>${vi ? "VỊ TRÍ" : "POSITION"}</small><strong>${show(view.activeIndex)}</strong></div><div><small>${vi ? "TẦN SUẤT" : "FREQUENCY"}</small><strong>${phase === "prefix" ? show(view.running) : "—"}</strong></div><div><small>${vi ? "TỔNG HIỆN TẠI" : "RUNNING SUM"}</small><strong>${phase === "pair" || phase === "done" ? show(view.answer) : "—"}</strong></div></div>
+    <section class="mp1589-panel"><header><strong>requests</strong><span>${show(view.requestCount)} ${vi ? "đoạn" : "ranges"}</span></header><div class="mp1589-requests">${requests}</div>${view.request ? `<p>${vi ? "Đang xét" : "Current"}: [${show(view.request[0])}, ${show(view.request[1])}] · Δ[${show(view.request[0])}] += 1 · Δ[${show(view.request[1] + 1)}] -= 1</p>` : ""}</section>
+    <section class="mp1589-panel"><header><strong>${vi ? "MẢNG HIỆU → SỐ LẦN PHỦ" : "DIFFERENCE ARRAY → COVERAGE"}</strong><span>n = ${show(view.n)}</span></header><div class="mp1589-scroll"><div class="mp1589-cells">${cells}</div></div><p>${vi ? "Δ là mảng hiệu · f là tần suất sau tổng tiền tố · ô end không thuộc nums." : "Δ is the difference array · f is the prefix-sum frequency · end is a sentinel outside nums."}</p></section>
+    <section class="mp1589-panel"><header><strong>${vi ? "SỐ ĐÃ SẮP × TẦN SUẤT ĐÃ SẮP" : "SORTED VALUES × SORTED FREQUENCIES"}</strong><span>${vi ? "ghép cùng thứ tự" : "pair in order"}</span></header><div class="mp1589-scroll"><div class="mp1589-pairs">${pairs || `<span class="mp1589-empty">${vi ? "Đếm tần suất trước, rồi sắp xếp hai dãy." : "Count coverage first, then sort both lists."}</span>`}</div></div>${view.pairIndex !== null ? `<p>${vi ? "Vừa cộng" : "Just added"}: ${show(view.contribution)} → ${show(view.answer)} (mod 1 000 000 007)</p>` : ""}</section>
+    ${view.truncated ? `<div class="mp1589-short">${vi ? "Trace chỉ hiển thị phần đầu; kết quả vẫn tính trên toàn bộ đầu vào." : "The trace shows only the beginning; the answer still uses the full input."}</div>` : ""}
+    ${step.final ? `<section class="mp1589-panel mp1589-result"><header><strong>${vi ? "ĐÁP ÁN" : "ANSWER"}</strong></header><strong>${show(view.answer)}</strong></section>` : ""}
+    <footer class="mp1589-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderPrefixScores2416View(step) {
+  const view = step.prefixScores2416View || {};
+  const vi = lang === "vi";
+  const phase = view.phase || "enter";
+  const stage = phase === "done" ? 2 : phase.startsWith("score") || phase === "answer-init"
+    || phase === "total-init" || phase === "append-answer" ? 1 : 0;
+  const stageLabels = vi
+    ? ["1 · Xây Trie + đếm prefix", "2 · Cộng điểm từng từ", "3 · Kết quả"]
+    : ["1 · Build Trie + count prefixes", "2 · Score each word", "3 · Result"];
+  const stages = stageLabels.map((title, index) => `<span class="${index < stage ? "done" : index === stage ? "active" : "pending"}">${index < stage ? "✓" : index === stage ? "▶" : "○"}<b>${title}</b></span>`).join("");
+  const answers = view.answer || [];
+  const words = (view.words || []).map((word, index) => {
+    const classes = ["ps2416-word", index === view.wordIndex ? "active" : "",
+      index < answers.length ? "done" : ""].filter(Boolean).join(" ");
+    const score = index < answers.length ? answers[index] : "—";
+    return `<div class="${classes}"><small>#${index}</small><strong>${escapeHtml(word)}</strong><span>${vi ? "điểm" : "score"} ${score}</span></div>`;
+  }).join("");
+  const activePath = new Set(view.activePath || []);
+  const nodesByDepth = new Map();
+  for (const node of view.nodes || []) {
+    if (!nodesByDepth.has(node.depth)) nodesByDepth.set(node.depth, []);
+    nodesByDepth.get(node.depth).push(node);
+  }
+  const nodeRows = [...nodesByDepth.entries()].map(([depth, nodes]) => `<div class="ps2416-level"><small>d=${depth}</small><div>${nodes.map((node) => {
+    const classes = ["ps2416-node", node.id === 0 ? "root" : "",
+      activePath.has(node.id) ? "path" : "", node.id === view.currentNode ? "current" : "",
+      node.id === view.nextNode ? "next" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>#${node.id}${node.parent === null ? "" : ` ← #${node.parent}`}</small><strong>${node.id === 0 ? "root" : escapeHtml(node.prefix)}</strong><span>count = ${node.count}</span></div>`;
+  }).join("")}</div></div>`).join("");
+  const activeWord = view.word || "";
+  const prefixCards = [...activeWord].map((_char, index) => {
+    const prefix = activeWord.slice(0, index + 1);
+    const trieNode = (view.nodes || []).find((node) => node.prefix === prefix);
+    const classes = ["ps2416-prefix", prefix === view.currentPrefix ? "current" : "",
+      prefix === view.nextPrefix ? "next" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${index + 1}</small><strong>${escapeHtml(prefix)}</strong><span>${trieNode ? `count ${trieNode.count}` : (vi ? "chưa tạo" : "not built")}</span></div>`;
+  }).join("");
+  let formula = vi ? "Chọn một từ để xem đường prefix." : "Select a word to inspect its prefix path.";
+  if (stage === 0 && view.word) {
+    formula = `count("${escapeHtml(view.nextPrefix || view.currentPrefix)}") += 1`;
+  } else if (stage === 1 && view.word) {
+    formula = view.addedCount === null ? `total = ${view.total ?? 0}`
+      : `total += ${view.addedCount} → ${view.total}`;
+  } else if (stage === 2) {
+    formula = `[${answers.slice(0, 8).join(", ")}${answers.length > 8 ? ", …" : ""}]`;
+  }
+  const resultChips = answers.slice(0, 8).map((score, index) => `<span><small>#${index}</small><b>${score}</b></span>`).join("");
+  $("treeView").innerHTML = `<section class="ps2416-viz" aria-label="Sum of Prefix Scores of Strings visualization">
+    <header class="ps2416-heading"><div><small>COUNTED TRIE · #2416</small><strong>${vi ? "TỔNG ĐIỂM CÁC PREFIX" : "SUM OF PREFIX SCORES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ps2416-rule">${vi ? "Mỗi nút Trie lưu số từ đi qua prefix đó. Điểm của một từ = tổng count trên đường từ gốc tới từ." : "Each Trie node stores how many words pass through its prefix. A word's score is the sum of counts along its root-to-word path."}</div>
+    <div class="ps2416-stages">${stages}</div>
+    <div class="ps2416-stats"><div><small>${vi ? "SỐ TỪ" : "WORDS"}</small><strong>${view.wordCount}</strong></div><div><small>${vi ? "TỔNG KÝ TỰ" : "CHARACTERS"}</small><strong>${view.totalChars}</strong></div><div><small>${vi ? "NÚT TRIE" : "TRIE NODES"}</small><strong>${view.nodeCount}</strong></div><div><small>${vi ? "TỔNG HIỆN TẠI" : "RUNNING TOTAL"}</small><strong>${view.total ?? "—"}</strong></div></div>
+    <section class="ps2416-panel"><header><strong>${vi ? "TỪ ĐẦU VÀO" : "INPUT WORDS"}</strong><span>${vi ? "vàng = đang xử lý · xanh = đã chấm điểm" : "amber = active · green = scored"}</span></header><div class="ps2416-words">${words}</div></section>
+    <div class="ps2416-main"><section class="ps2416-panel"><header><strong>TRIE</strong><span>${vi ? "mỗi hàng là một độ sâu" : "one row per depth"}</span></header><div class="ps2416-tree">${nodeRows}</div></section><section class="ps2416-panel"><header><strong>${vi ? "ĐƯỜNG PREFIX" : "PREFIX PATH"}</strong><span>${escapeHtml(activeWord || "—")}</span></header><div class="ps2416-prefixes">${prefixCards || `<span class="ps2416-empty">${vi ? "Chưa chọn từ." : "No active word."}</span>`}</div><div class="ps2416-formula"><small>${stage === 0 ? (vi ? "TĂNG COUNT" : "INCREMENT COUNT") : stage === 1 ? (vi ? "CỘNG ĐIỂM" : "ADD SCORE") : (vi ? "ĐÁP ÁN" : "ANSWER")}</small><strong>${formula}</strong></div><div class="ps2416-results">${resultChips || `<span class="ps2416-empty">${vi ? "Chưa có điểm hoàn chỉnh." : "No completed scores yet."}</span>`}</div></section></div>
+    ${view.shortened ? `<div class="ps2416-short">${vi ? "Trace giới hạn 8 từ, 40 ký tự và 28 nút; đáp án vẫn tính toàn bộ input." : "The trace previews 8 words, 40 characters, and 28 nodes; the answer still uses the full input."}</div>` : ""}
+    <footer class="ps2416-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderBraceExpansion1096View(step) {
+  const view = step.braceExpansion1096View || {};
+  const vi = lang === "vi";
+  const chars = [...(view.expression || "")].map((char, index) => {
+    const classes = ["be1096-token", index < view.index ? "consumed" : "",
+      index === view.index ? "current" : "", char === "{" || char === "}" ? "brace" : "",
+      char === "," ? "comma" : ""].filter(Boolean).join(" ");
+    return `<span class="${classes}"><small>${index}</small><strong>${escapeHtml(char)}</strong>${index === view.index ? "<i>i</i>" : ""}</span>`;
+  }).join("");
+  const setChips = (values, prefix) => (values || []).map((value) =>
+    `<span class="be1096-word ${prefix || ""}">${value === "" ? "ε" : escapeHtml(value)}</span>`).join("");
+  const frames = (view.frames || []).map((frame, index) => {
+    const active = index === view.frames.length - 1 ? "active" : "";
+    const kind = frame.kind === "union" ? "∪ UNION" : "× CONCAT";
+    return `<div class="be1096-frame ${frame.kind} ${active}"><small>#${frame.depth} · ${kind}</small><div>${setChips(frame.result)}</div><span>${frame.size} ${frame.size === 1 ? "word" : "words"}</span></div>`;
+  }).join("");
+  const opSymbol = view.operation === "union" ? "∪" : view.operation === "concat" ? "×" : "→ sort";
+  const operation = view.operation ? `<section class="be1096-operation ${view.operation}">
+    <div><small>${vi ? "TRÁI" : "LEFT"}</small><div>${setChips(view.left, "left") || "—"}</div></div>
+    <b>${opSymbol}</b>
+    <div><small>${vi ? "PHẢI" : "RIGHT"}</small><div>${setChips(view.right, "right") || "—"}</div></div>
+    <b>=</b>
+    <div><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><div>${setChips(view.produced, "result") || "—"}</div></div>
+  </section>` : `<div class="be1096-empty">${vi ? "Đọc biểu thức để tạo phép hợp hoặc phép nối tiếp theo." : "Read the expression to form the next union or concatenation."}</div>`;
+  const answer = view.answer ? `<section class="be1096-answer"><header><strong>${vi ? "KẾT QUẢ ĐÃ SẮP XẾP" : "SORTED RESULT"}</strong><span>${view.answerSize} ${vi ? "từ khác nhau" : "distinct words"}</span></header><div>${setChips(view.answer, "answer")}</div></section>` : "";
+  $("treeView").innerHTML = `<section class="be1096-viz" aria-label="Brace Expansion II parser visualization">
+    <header class="be1096-heading"><div><small>RECURSIVE-DESCENT PARSER · #1096</small><strong>${vi ? "KHAI TRIỂN BIỂU THỨC NGOẶC II" : "BRACE EXPANSION II"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="be1096-rule">${vi ? "Dấu phẩy = HỢP (∪) · đứng liền nhau = NỐI bằng tích Descartes (×) · ngoặc = gọi đệ quy" : "Comma = UNION (∪) · adjacency = CONCATENATE by Cartesian product (×) · braces = recurse"}</div>
+    <section class="be1096-panel"><header><strong>${vi ? "CON TRỎ TRÊN BIỂU THỨC" : "EXPRESSION POINTER"}</strong><span>i = ${view.index}/${(view.expression || "").length}</span></header><div class="be1096-expression">${chars}</div></section>
+    <div class="be1096-main"><section class="be1096-panel"><header><strong>${vi ? "NGĂN XẾP LỜI GỌI" : "CALL STACK"}</strong><span>${(view.frames || []).length} ${vi ? "khung" : "frames"}</span></header><div class="be1096-frames">${frames || `<span class="be1096-empty">${vi ? "Đã rời mọi lời gọi đệ quy." : "All recursive calls have returned."}</span>`}</div></section><section class="be1096-panel"><header><strong>${vi ? "PHÉP TOÁN TẬP HỢP" : "SET OPERATION"}</strong><span>${view.operation || "—"}</span></header>${operation}</section></div>
+    ${answer}
+    ${view.shortened ? `<div class="be1096-short">${vi ? "Bảng chỉ hiện tối đa 12 từ mỗi tập; thuật toán vẫn tính toàn bộ kết quả." : "The board previews at most 12 words per set; the algorithm still computes the full result."}</div>` : ""}
+    <footer class="be1096-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderWeakCharacters1996View(step) {
+  const view = step.weakCharacters1996View || {};
+  const vi = lang === "vi";
+  const current = view.current;
+  const witness = view.witness;
+  const sorted = view.sorted || [];
+  const statusText = (status) => status === "weak" ? (vi ? "Yếu" : "Weak")
+    : status === "safe" ? (vi ? "Không yếu" : "Not weak") : (vi ? "Chưa xét" : "Pending");
+  const original = (view.original || []).map((item) => `<span class="wc1996-original">#${item.id} <strong>${item.attack}/${item.defense}</strong></span>`).join("");
+  const sortedCards = sorted.map((item) => {
+    const classes = ["wc1996-character", item.status || "pending",
+      current?.id === item.id ? "current" : "", witness?.id === item.id ? "witness" : "",
+      current && item.attack === current.attack ? "same-attack" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${item.index + 1} · #${item.id}</small><strong>A ${item.attack} · D ${item.defense}</strong><span>${statusText(item.status)}</span></div>`;
+  }).join("");
+  const attacks = sorted.map((item) => item.attack);
+  const defenses = sorted.map((item) => item.defense);
+  const minAttack = Math.min(...attacks);
+  const maxAttack = Math.max(...attacks);
+  const minDefense = Math.min(...defenses);
+  const maxDefense = Math.max(...defenses);
+  const px = (attack) => 39 + (attack - minAttack) / (maxAttack - minAttack || 1) * 258;
+  const py = (defense) => 195 - (defense - minDefense) / (maxDefense - minDefense || 1) * 166;
+  const plotPoints = sorted.map((item) => {
+    const classes = ["wc1996-point", item.status || "pending",
+      current?.id === item.id ? "current" : "", witness?.id === item.id ? "witness" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}"><circle cx="${px(item.attack)}" cy="${py(item.defense)}" r="7"/><text x="${px(item.attack) + 9}" y="${py(item.defense) - 7}">#${item.id}</text><title>#${item.id}: attack ${item.attack}, defense ${item.defense}</title></g>`;
+  }).join("");
+  const threshold = current ? `<rect class="wc1996-quadrant" x="${px(current.attack)}" y="22" width="${Math.max(0, 304 - px(current.attack))}" height="${Math.max(0, py(current.defense) - 22)}"/><line class="wc1996-threshold" x1="${px(current.attack)}" y1="22" x2="${px(current.attack)}" y2="198"/><line class="wc1996-threshold" x1="36" y1="${py(current.defense)}" x2="304" y2="${py(current.defense)}"/>` : "";
+  const plot = sorted.length ? `<svg class="wc1996-plot" viewBox="0 0 330 230" role="img" aria-label="Attack and defense plot"><line class="wc1996-axis" x1="36" y1="198" x2="306" y2="198"/><line class="wc1996-axis" x1="36" y1="198" x2="36" y2="18"/>${threshold}${plotPoints}<text class="wc1996-axis-label" x="270" y="219">attack →</text><text class="wc1996-axis-label" x="2" y="17">defense ↑</text><text class="wc1996-axis-label" x="36" y="211">${minAttack}</text><text class="wc1996-axis-label" x="287" y="211">${maxAttack}</text><text class="wc1996-axis-label" x="10" y="195">${minDefense}</text><text class="wc1996-axis-label" x="10" y="31">${maxDefense}</text></svg>` : `<span class="wc1996-empty">${vi ? "Sắp xếp để hiện đồ thị" : "Sort to show the plot"}</span>`;
+  const attackGreater = current && witness ? witness.attack > current.attack : null;
+  const defenseGreater = current && witness ? witness.defense > current.defense : null;
+  const comparison = current ? `<div class="wc1996-comparison"><div><small>${vi ? "NHÂN VẬT ĐANG XÉT" : "CURRENT CHARACTER"}</small><strong>#${current.id} · A ${current.attack} / D ${current.defense}</strong></div><div><small>${vi ? "NGƯỜI GIỮ MAX DEFENSE TRƯỚC BƯỚC NÀY" : "PREVIOUS MAX-DEFENSE OWNER"}</small><strong>${witness ? `#${witness.id} · A ${witness.attack} / D ${witness.defense}` : "—"}</strong></div><div class="${attackGreater ? "pass" : "fail"}"><small>ATTACK</small><strong>${witness ? `${witness.attack} > ${current.attack}` : "—"} ${attackGreater === null ? "" : attackGreater ? "✓" : "✗"}</strong></div><div class="${defenseGreater ? "pass" : "fail"}"><small>DEFENSE</small><strong>${witness ? `${witness.defense} > ${current.defense}` : "—"} ${defenseGreater === null ? "" : defenseGreater ? "✓" : "✗"}</strong></div></div>` : `<span class="wc1996-empty">${vi ? "Chọn nhân vật tiếp theo để so sánh hai chỉ số." : "Visit a character to compare both stats."}</span>`;
+  const verdict = view.isWeak === null ? "—" : view.isWeak ? (vi ? "YẾU" : "WEAK") : (vi ? "KHÔNG YẾU" : "NOT WEAK");
+  $("treeView").innerHTML = `<section class="wc1996-viz" aria-label="Weak Characters visualization">
+    <header class="wc1996-heading"><div><small>SORT + MAX DEFENSE · #1996</small><strong>${vi ? "NHÂN VẬT YẾU TRONG GAME" : "WEAK CHARACTERS IN THE GAME"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="wc1996-rule">${vi ? "Yếu ⇔ tồn tại người có attack LỚN HƠN và defense LỚN HƠN. Cùng attack không tính." : "Weak ⇔ another character has strictly higher attack AND strictly higher defense. Equal attack does not count."}</div>
+    <div class="wc1996-stats"><div><small>${vi ? "ĐÃ XÉT" : "PROCESSED"}</small><strong>${view.processed}/${view.total}</strong></div><div><small>MAX DEFENSE</small><strong>${view.maxDefense ?? "—"}</strong></div><div><small>${vi ? "SỐ NHÂN VẬT YẾU" : "WEAK COUNT"}</small><strong>${view.weak ?? "—"}</strong></div><div><small>${vi ? "KẾT LUẬN HIỆN TẠI" : "CURRENT VERDICT"}</small><strong>${verdict}</strong></div></div>
+    <section class="wc1996-panel"><header><strong>${vi ? "BAN ĐẦU" : "ORIGINAL ORDER"}</strong></header><div class="wc1996-originals">${original}</div></section>
+    <section class="wc1996-panel"><header><strong>${vi ? "SAU SORT: ATTACK ↓ · DEFENSE ↑ KHI ATTACK BẰNG" : "SORTED: ATTACK ↓ · DEFENSE ↑ ON TIES"}</strong><span>${vi ? "Quét từ trái sang phải →" : "Scan left to right →"}</span></header><div class="wc1996-sorted">${sortedCards || `<span class="wc1996-empty">${vi ? "Chưa sort" : "Not sorted yet"}</span>`}</div></section>
+    <div class="wc1996-main"><section class="wc1996-panel"><header><strong>${vi ? "ĐỒ THỊ ATTACK / DEFENSE" : "ATTACK / DEFENSE PLOT"}</strong></header>${plot}<p>${vi ? "Vùng xanh phía trên bên phải ô hiện tại: mạnh hơn ở cả hai chỉ số. Đường nét đứt là ranh giới, không tính bằng nhau." : "Green upper-right area: strictly higher in both stats. Dashed borders are excluded."}</p></section><section class="wc1996-panel"><header><strong>${vi ? "SO SÁNH TỪNG CHỈ SỐ" : "COMPARE BOTH STATS"}</strong></header>${comparison}<p>${vi ? "Người cùng attack được xếp defense tăng dần nên không thể tạo kết luận yếu sai." : "Equal-attack characters are sorted by ascending defense, preventing false weak results."}</p></section></div>
+    ${view.shortened ? `<div class="wc1996-short">${vi ? "Chỉ minh họa 14 nhân vật đầu sau sort; kết quả vẫn tính toàn bộ input." : "Only the first 14 sorted characters are traced; the answer still uses the full input."}</div>` : ""}
+    <footer class="wc1996-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderLongestLine562View(step) {
+  const view = step.longestLine562View || {};
+  const vi = lang === "vi";
+  const directions = [
+    { key: "H", name: vi ? "Ngang →" : "Horizontal →", dr: 0, dc: 1 },
+    { key: "V", name: vi ? "Dọc ↓" : "Vertical ↓", dr: 1, dc: 0 },
+    { key: "D", name: vi ? "Chéo ↘" : "Diagonal ↘", dr: 1, dc: 1 },
+    { key: "A", name: vi ? "Chéo ↙" : "Anti-diagonal ↙", dr: 1, dc: -1 },
+  ];
+  const current = view.current || [];
+  const bestLine = view.bestLine;
+  const bestCells = new Set();
+  if (bestLine) {
+    const direction = directions[bestLine.direction];
+    for (let offset = 0; offset < bestLine.length; offset++) {
+      bestCells.add(`${bestLine.end[0] - offset * direction.dr},${bestLine.end[1] - offset * direction.dc}`);
+    }
+  }
+  const runCells = new Set();
+  if (current.length === 2 && view.activeDirection !== null) {
+    const direction = directions[view.activeDirection];
+    for (let offset = 0; offset < (view.lengths?.[view.activeDirection] || 0); offset++) {
+      runCells.add(`${current[0] - offset * direction.dr},${current[1] - offset * direction.dc}`);
+    }
+  }
+  const matrix = (view.matrix || []).map((row, r) => `<div class="ll562-row">${row.map((value, c) => {
+    const key = `${r},${c}`;
+    const counts = view.dp?.[r]?.[c] || [0, 0, 0, 0];
+    const classes = ["ll562-cell", value === 0 ? "zero" : "one",
+      bestCells.has(key) ? "best" : "", runCells.has(key) ? "run" : "",
+      view.source?.row === r && view.source?.col === c ? "source" : "",
+      current[0] === r && current[1] === c ? "current" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${r},${c}</small><strong>${value}</strong><span>${counts.join("/")}</span></div>`;
+  }).join("")}</div>`).join("");
+  const cards = directions.map((direction, index) => `<div class="ll562-direction ${view.activeDirection === index ? "active" : ""} ${bestLine?.direction === index ? "winner" : ""}"><small>${direction.key} · ${direction.name}</small><strong>${view.lengths?.[index] ?? 0}</strong></div>`).join("");
+  const predecessor = view.activeDirection === null ? "—" : view.source
+    ? `(${view.source.row}, ${view.source.col}) = ${view.source.value}`
+    : (vi ? "Ngoài biên → 0" : "Outside grid → 0");
+  const bestText = bestLine
+    ? `${directions[bestLine.direction].name} · (${bestLine.end.join(", ")})`
+    : (vi ? "Chưa có dãy 1" : "No line of ones yet");
+  $("treeView").innerHTML = `<section class="ll562-viz" aria-label="Longest Line of Consecutive One in Matrix visualization">
+    <header class="ll562-heading"><div><small>4-DIRECTION DP · #562</small><strong>${vi ? "DÃY SỐ 1 DÀI NHẤT" : "LONGEST LINE OF ONES"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ll562-rule">${vi ? "Mỗi ô 1 nối dài dãy từ ô liền trước theo từng hướng. Ô 0 đặt cả bốn độ dài về 0." : "Each one extends the previous cell in each direction. A zero keeps all four lengths at zero."}</div>
+    <div class="ll562-stats"><div><small>${vi ? "Ô ĐANG XÉT" : "CURRENT CELL"}</small><strong>${current.length ? `(${current.join(", ")})` : "—"}</strong></div><div><small>${vi ? "Ô ĐỨNG TRƯỚC" : "PREDECESSOR"}</small><strong>${predecessor}</strong></div><div><small>${vi ? "KỶ LỤC" : "BEST"}</small><strong>${view.best ?? 0}</strong></div></div>
+    <section class="ll562-panel"><header><strong>${vi ? "MA TRẬN · MỖI Ô HIỆN H/V/D/A" : "MATRIX · EACH CELL SHOWS H/V/D/A"}</strong><span>${view.rows} × ${view.cols}</span></header><div class="ll562-scroll">${matrix}</div><p>${vi ? "Viền tím: ô hiện tại · Viền lam: ô đứng trước · Vàng: dãy đang tính · Xanh: dãy tốt nhất" : "Purple: current · Blue: predecessor · Amber: current run · Green: best run"}</p></section>
+    <div class="ll562-directions">${cards}</div>
+    <section class="ll562-panel ll562-best"><header><strong>${vi ? "DÃY TỐT NHẤT" : "BEST LINE"}</strong><span>${bestText}</span></header><strong>${view.best ?? 0}</strong></section>
+    ${view.shortened ? `<div class="ll562-short">${vi ? "Trace và lưới xem trước được rút gọn; đáp án vẫn tính toàn bộ ma trận." : "The trace and grid preview are shortened; the answer still uses the whole matrix."}</div>` : ""}
+    <footer class="ll562-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
+function renderNodeSequence2242View(step) {
+  const view = step.nodeSequence2242View || {};
+  const vi = lang === "vi";
+  const show = (value) => value === null || value === undefined ? "—" : escapeHtml(value);
+  const scoreById = new Map((view.nodes || []).map((node) => [node.id, node.score]));
+  const middle = view.middle || [];
+  const candidate = view.candidate || [];
+  const bestPath = view.bestPath || [];
+  let previous = -1;
+  const nodes = (view.nodes || []).map((node) => {
+    const gap = node.id > previous + 1 ? `<span class="ns2242-gap">…</span>` : "";
+    previous = node.id;
+    const cls = node.id === view.helperNode ? "helper" : candidate.includes(node.id) ? "candidate" : middle.includes(node.id) ? "middle" : "";
+    return `${gap}<div class="ns2242-node ${cls}"><small>#${show(node.id)}</small><strong>${show(node.score)}</strong><span>top: ${(node.top || []).length ? node.top.map(show).join(", ") : "—"}</span></div>`;
+  }).join("");
+  previous = -1;
+  const edges = (view.edges || []).map((edge) => {
+    const gap = edge.index > previous + 1 ? `<span class="ns2242-gap">…</span>` : "";
+    previous = edge.index;
+    return `${gap}<span class="ns2242-edge ${edge.index === view.edgeIndex ? "active" : ""}">#${show(edge.index)} ${show(edge.u)}—${show(edge.v)}</span>`;
+  }).join("");
+  const neighborList = (list, opposite, selected) => list.length
+    ? list.map((item) => `<span class="ns2242-neighbor ${item.id === selected ? "selected" : ""} ${item.id === opposite ? "blocked" : ""}">#${show(item.id)} · ${show(item.score)}</span>`).join("")
+    : `<span class="ns2242-empty">${vi ? "Không có hàng xóm" : "No neighbors"}</span>`;
+  const path = (items) => items.length === 4
+    ? items.map((id, index) => `<div class="ns2242-path-node"><small>${["a", "b", "c", "d"][index]} · #${show(id)}</small><strong>${show(scoreById.get(id))}</strong></div>`).join('<span class="ns2242-arrow">→</span>')
+    : `<span class="ns2242-empty">${vi ? "Chọn cạnh giữa và hai đầu ngoài" : "Choose a middle edge and two outer nodes"}</span>`;
+  const resultText = bestPath.length ? bestPath.join(" → ") : "—";
+  const emptyBest = step.final
+    ? (vi ? "Không tồn tại đường đi 4 đỉnh" : "No four-node path exists")
+    : (vi ? "Chưa có dãy hợp lệ" : "No valid path yet");
+  $("treeView").innerHTML = `<section class="ns2242-viz" aria-label="Maximum Score of a Node Sequence visualization">
+    <header class="ns2242-heading"><div><small>TOP-3 NEIGHBORS · #2242</small><strong>${vi ? "ĐƯỜNG ĐI 4 ĐỈNH ĐIỂM CAO NHẤT" : "BEST FOUR-NODE PATH"}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <div class="ns2242-rule">${vi ? "Cố định cạnh giữa b—c. Chỉ cần thử 3 hàng xóm điểm cao nhất ở mỗi đầu, rồi loại dãy có đỉnh trùng." : "Fix a middle edge b—c. Try only each endpoint's top three neighbors, rejecting repeated nodes."}</div>
+    <div class="ns2242-stats"><div><small>${vi ? "CẠNH GIỮA" : "MIDDLE EDGE"}</small><strong>${middle.length ? `${show(middle[0])}—${show(middle[1])}` : "—"}</strong></div><div><small>${vi ? "ĐANG THỬ" : "CANDIDATE"}</small><strong>${candidate.length ? candidate.map(show).join("→") : "—"}</strong></div><div><small>${vi ? "ĐIỂM DÃY" : "PATH SCORE"}</small><strong>${show(view.total)}</strong></div><div><small>BEST</small><strong>${show(view.answer)}</strong></div></div>
+    ${view.helperNode !== null && view.helperNode !== undefined ? `<section class="ns2242-panel ns2242-build"><header><strong>${vi ? "ĐANG XÂY TOP-3" : "BUILDING TOP-3"}</strong><span>node = ${show(view.helperNode)} · neighbor = ${show(view.helperNeighbor)}</span></header><div><span>top[${show(view.helperNode)}]</span><strong>[${(view.helperTop || []).map(show).join(", ")}]</strong><span>${view.trimCondition === null ? "" : view.trimCondition ? (vi ? "Cần bỏ phần tử cuối" : "Pop the last entry") : (vi ? "Không cần bỏ" : "No pop needed")}</span></div></section>` : ""}
+    <section class="ns2242-panel"><header><strong>${vi ? "ĐỈNH · ĐIỂM · TOP HÀNG XÓM" : "NODES · SCORES · TOP NEIGHBORS"}</strong><span>${show(view.n)} ${vi ? "đỉnh" : "nodes"}</span></header><div class="ns2242-scroll"><div class="ns2242-nodes">${nodes}</div></div></section>
+    <section class="ns2242-panel"><header><strong>${vi ? "CÁC CẠNH" : "EDGES"}</strong><span>${show(view.edgeCount)} ${vi ? "cạnh" : "edges"}</span></header><div class="ns2242-scroll"><div class="ns2242-edges">${edges || `<span class="ns2242-empty">${vi ? "Không có cạnh" : "No edges"}</span>`}</div></div></section>
+    <div class="ns2242-lists"><section class="ns2242-panel"><header><strong>top[${show(middle[0])}] → a</strong></header><div class="ns2242-neighbors">${neighborList(view.leftTop || [], middle[1], view.selectedA)}</div></section><section class="ns2242-panel"><header><strong>top[${show(middle[1])}] → d</strong></header><div class="ns2242-neighbors">${neighborList(view.rightTop || [], middle[0], view.selectedD)}</div></section></div>
+    <section class="ns2242-panel"><header><strong>${vi ? "DÃY ĐANG XÉT" : "CURRENT FOUR-NODE PATH"}</strong><span>${view.valid === false ? (vi ? `Bị loại: ${show(view.reason)}` : `Rejected: ${show(view.reason)}`) : view.valid === true ? (vi ? "Hợp lệ" : "Valid") : ""}</span></header><div class="ns2242-path ${view.valid === false ? "rejected" : view.valid === true ? "valid" : ""}">${path(candidate)}</div>${candidate.length ? `<p>${vi ? "Bốn ID phải khác nhau và mỗi cặp kề nhau phải có cạnh." : "All four IDs must differ and every adjacent pair must share an edge."}</p>` : ""}</section>
+    <section class="ns2242-panel ns2242-best"><header><strong>${vi ? "DÃY TỐT NHẤT" : "BEST PATH"}</strong><span>${resultText}</span></header><div class="ns2242-path">${bestPath.length ? path(bestPath) : `<span class="ns2242-empty">${emptyBest}</span>`}</div><strong>${view.answer === -1 ? "−1" : show(view.answer)}</strong></section>
+    ${view.shortened ? `<div class="ns2242-short">${vi ? "Trace được rút gọn; đáp án vẫn xét toàn bộ đồ thị." : "The trace is shortened; the answer still checks the full graph."}</div>` : ""}
+    <footer class="ns2242-note">${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderSlidingFreqView(step) {
   const view = step.slidingFreqView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -34833,14 +35500,15 @@ function renderCircleRectangle1401ClampView(step) {
   };
 
   const locals = cr1401Locals([
-    { name: "inner_x", line: 2, value: view.innerX },
-    { name: "closest_x", line: 3, value: view.closestX },
-    { name: "inner_y", line: 4, value: view.innerY },
-    { name: "closest_y", line: 5, value: view.closestY },
-    { name: "dx", line: 6, value: view.dx },
-    { name: "dy", line: 7, value: view.dy },
-    { name: "dist_squared", line: 8, value: view.distSq },
-    { name: "radius_squared", line: 9, value: view.radiusSq },
+    // Line numbers are 1-based, matching row.dataset.line in renderCode.
+    { name: "inner_x", line: 3, value: view.innerX },
+    { name: "closest_x", line: 4, value: view.closestX },
+    { name: "inner_y", line: 5, value: view.innerY },
+    { name: "closest_y", line: 6, value: view.closestY },
+    { name: "dx", line: 7, value: view.dx },
+    { name: "dy", line: 8, value: view.dy },
+    { name: "dist_squared", line: 9, value: view.distSq },
+    { name: "radius_squared", line: 10, value: view.radiusSq },
   ], currentLine, vi);
 
   // Both sides must have been assigned before the comparison can be shown.
@@ -34977,13 +35645,14 @@ function renderCircleRectangle1401RegionView(step) {
     .join("");
 
   const locals = cr1401Locals([
-    { name: "in_wide", line: 2, value: view.inWide },
-    { name: "in_tall", line: 3, value: view.inTall },
-    { name: "radius_squared", line: 6, value: view.radiusSq },
-    { name: "corner_x", line: 7, value: view.cornerX },
-    { name: "corner_y", line: 7, value: view.cornerY },
-    { name: "dx", line: 8, value: view.dx },
-    { name: "dy", line: 9, value: view.dy },
+    // Line numbers are 1-based, matching row.dataset.line in renderCode.
+    { name: "in_wide", line: 3, value: view.inWide },
+    { name: "in_tall", line: 4, value: view.inTall },
+    { name: "radius_squared", line: 7, value: view.radiusSq },
+    { name: "corner_x", line: 8, value: view.cornerX },
+    { name: "corner_y", line: 8, value: view.cornerY },
+    { name: "dx", line: 9, value: view.dx },
+    { name: "dy", line: 10, value: view.dy },
   ], currentLine, vi);
 
   const formulas = {
@@ -35209,6 +35878,311 @@ function renderReverseDegree3498View(step) {
     ${guard}
     <section class="rd3498-total ${view.final ? "ready" : ""}"><header><strong>${vi ? "TỔNG ĐANG CỘNG DỒN" : "RUNNING TOTAL"}</strong><span>${escapeHtml(vi ? "số hạng mới nhất được làm nổi" : "the newest term is highlighted")}</span></header><div class="rd3498-sum">${sumExpression}</div><footer><small>total</small><strong>${view.total === null || view.total === undefined ? "—" : view.total}</strong><em>${view.final ? (vi ? "đây là đáp án" : "this is the answer") : (vi ? "còn tiếp" : "still accumulating")}</em></footer></section>
     <section class="rd3498-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
+function renderFindXValue3524View(step) {
+  const view = step.findXValue3524View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const n = Number.isInteger(view.n) ? view.n : nums.length;
+  const k = Number.isInteger(view.k) ? view.k : 1;
+  const index = Number.isInteger(view.index) ? view.index : -1;
+  const r = Number.isInteger(view.r) ? view.r : -1;
+  const targetR = Number.isInteger(view.targetR) ? view.targetR : -1;
+  const event = view.event || "";
+  const grid = Array.isArray(view.grid) ? view.grid : [];
+  const total = (n * (n + 1)) / 2;
+
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, position) => {
+      const state = position < stageIndex ? "done" : position === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : position + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  // nums with each value's remainder underneath, current element lit.
+  const numsStrip = nums
+    .map((value, position) => `<span class="${position === index ? "current" : position < index ? "done" : "pending"}"><small>${position}</small><strong>${escapeHtml(value)}</strong><em>%${k}=${value % k}</em></span>`)
+    .join("");
+
+  // The full triangle of subarrays, each labelled with its product remainder.
+  // The column under the current index is exactly what new_dp is counting.
+  const cellMatched = (cell) => {
+    if (cell.end !== index) return false;
+    if (event === "seed-single") return cell.start === index;
+    if (event === "extend") return cell.start < index && cell.fromMod === r;
+    if (event === "accumulate") return cell.mod === r;
+    return false;
+  };
+  const gridCells = [];
+  gridCells.push(`<span class="fx3524-corner">s\\e</span>`);
+  for (let end = 0; end < n; end += 1) {
+    gridCells.push(`<span class="fx3524-axis ${end === index ? "on" : ""}">${end}</span>`);
+  }
+  for (let start = 0; start < n; start += 1) {
+    gridCells.push(`<span class="fx3524-axis">${start}</span>`);
+    for (let end = 0; end < n; end += 1) {
+      if (end < start) {
+        gridCells.push(`<span class="fx3524-blank"></span>`);
+        continue;
+      }
+      const cell = (grid[start] || [])[end - start];
+      if (!cell) {
+        gridCells.push(`<span class="fx3524-blank"></span>`);
+        continue;
+      }
+      const state = index < 0 || cell.end > index ? "pending" : cell.end < index ? "counted" : "active";
+      gridCells.push(`<span class="fx3524-cell ${state}${cellMatched(cell) ? " matched" : ""}" data-mod="${cell.mod}">${cell.mod}</span>`);
+    }
+  }
+  const gridHtml = `<div class="fx3524-grid" style="grid-template-columns: repeat(${n + 1}, minmax(26px, 1fr))">${gridCells.join("")}</div>`;
+
+  const bucketRow = (label, values, focus, tone) => {
+    if (!Array.isArray(values)) {
+      return `<div class="fx3524-row"><small>${escapeHtml(label)}</small><b class="fx3524-empty">${escapeHtml(vi ? "chưa có" : "not yet")}</b></div>`;
+    }
+    const cells = values
+      .map((value, position) => `<span class="${position === focus ? `focus ${tone}` : ""}"><small>r=${position}</small><strong>${value}</strong></span>`)
+      .join("");
+    return `<div class="fx3524-row"><small>${escapeHtml(label)}</small><div>${cells}</div></div>`;
+  };
+
+  // The multiplication map on remainders, shown only while a transition runs.
+  const transition = event === "extend"
+    ? `<div class="fx3524-transition ${view.delta === 0 ? "empty" : "live"}"><span><small>dp[${r}]</small><strong>${escapeHtml(text(view.delta))}</strong></span><i>×${escapeHtml(text(view.numMod))}</i><span><small>(${r} × ${escapeHtml(text(view.numMod))}) % ${k}</small><strong>${targetR}</strong></span><i>→</i><span class="dest"><small>new_dp[${targetR}]</small><strong>${Array.isArray(view.newDp) ? view.newDp[targetR] : "?"}</strong></span><em>${escapeHtml(view.delta === 0 ? (vi ? "không có subarray nào để mở rộng" : "no subarray to extend") : (vi ? `${view.delta} subarray chuyển sang số dư ${targetR}` : `${view.delta} subarrays move to remainder ${targetR}`))}</em></div>`
+    : event === "seed-single"
+      ? `<div class="fx3524-transition live"><span class="dest"><small>new_dp[${escapeHtml(text(view.numMod))}]</small><strong>1</strong></span><em>${escapeHtml(vi ? `subarray một phần tử [${view.num}] kết thúc tại ${index}` : `the single-element subarray [${view.num}] ending at ${index}`)}</em></div>`
+      : event === "accumulate"
+        ? `<div class="fx3524-transition live"><span><small>new_dp[${r}]</small><strong>${escapeHtml(text(view.delta))}</strong></span><i>→</i><span class="dest"><small>ans[${r}]</small><strong>${Array.isArray(view.ans) ? view.ans[r] : "?"}</strong></span><em>${escapeHtml(vi ? "mọi subarray kết thúc tại đúng một vị trí nên không đếm trùng" : "each subarray ends at exactly one index, so nothing is double counted")}</em></div>`
+        : `<p class="fx3524-transition-idle">${escapeHtml(vi ? "Chưa có phép chuyển số dư nào đang chạy." : "No remainder transition is running right now.")}</p>`;
+
+  const ansSum = Array.isArray(view.ans) ? view.ans.reduce((sum, value) => sum + value, 0) : null;
+  const checksum = ansSum === null
+    ? ""
+    : `<footer class="fx3524-checksum ${ansSum === total ? "full" : ""}"><small>Σ ans</small><strong>${ansSum}</strong><em>${escapeHtml(vi ? `phải bằng n(n+1)/2 = ${total}` : `must reach n(n+1)/2 = ${total}`)}</em></footer>`;
+
+  const tone = event === "return" ? "done" : event === "extend" ? "extend" : event === "accumulate" ? "accumulate" : "";
+  const summary = vi
+    ? `Bài 3524, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`
+    : `Problem 3524, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="fx3524-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>DP ON REMAINDERS · SUBARRAY COUNTING · #3524</small><strong>FIND X VALUE OF ARRAY I · k = ${k}</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="fx3524-phases">${phases}</div>
+    <section class="fx3524-rule"><span><b>1</b><code>${escapeHtml(vi ? "bỏ prefix + suffix = chọn một subarray" : "remove prefix + suffix = pick one subarray")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>result[x] = #{subarray : product % k == x}</code></span></section>
+    <section class="fx3524-nums"><header><strong>${vi ? "NUMS · SỐ DƯ CỦA TỪNG PHẦN TỬ" : "NUMS · REMAINDER OF EACH ELEMENT"}</strong><span>${escapeHtml(vi ? "chỉ số dư là quan trọng" : "only the remainder matters")}</span></header><div>${numsStrip}</div></section>
+    <div class="fx3524-layout">
+      <section class="fx3524-triangle"><header><strong>${vi ? "MỌI SUBARRAY · product % k" : "EVERY SUBARRAY · product % k"}</strong><span>${escapeHtml(vi ? "hàng = start, cột = end · cột sáng = đang đếm" : "row = start, column = end · lit column = being counted")}</span></header>${gridHtml}</section>
+      <section class="fx3524-dp"><header><strong>${vi ? "BẢNG ĐẾM THEO SỐ DƯ" : "COUNTS PER REMAINDER"}</strong><span>${escapeHtml(vi ? "chỉ k ô, không phải n² subarray" : "just k buckets, not n² subarrays")}</span></header>
+        ${bucketRow(vi ? "dp · kết thúc tại i−1" : "dp · ending at i−1", view.dp, event === "extend" ? r : -1, "source")}
+        ${bucketRow(vi ? "new_dp · kết thúc tại i" : "new_dp · ending at i", view.newDp, event === "extend" ? targetR : event === "seed-single" ? view.numMod : event === "accumulate" ? r : -1, "dest")}
+        ${bucketRow("ans", view.ans, event === "accumulate" ? r : -1, "total")}
+        ${checksum}
+      </section>
+    </div>
+    <section class="fx3524-work ${tone}"><header><strong>${vi ? "PHÉP CHUYỂN SỐ DƯ" : "THE REMAINDER TRANSITION"}</strong><span>${escapeHtml(vi ? "nhân thêm một phần tử = nhân số dư" : "appending an element multiplies the remainder")}</span></header>${transition}</section>
+    <section class="fx3524-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
+function renderMinWindow76View(step) {
+  const view = step.minWindow76View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  const cells = Array.isArray(view.chars) ? view.chars : [];
+  const strip = cells.length
+    ? cells
+      .map((cell) => {
+        const classes = ["mw76-cell"];
+        if (cell.inWindow) classes.push("in-window");
+        if (cell.inBest) classes.push("in-best");
+        if (cell.required) classes.push("required");
+        const cursors = [];
+        if (cell.isLeft) cursors.push("L");
+        if (cell.isRight) cursors.push("R");
+        if (cursors.length) classes.push("cursor");
+        return `<span class="${classes.join(" ")}"><small>${cell.index}</small><strong>${escapeHtml(cell.char)}</strong><i>${escapeHtml(cursors.join("") || "\u00a0")}</i></span>`;
+      })
+      .join("")
+    : `<b class="mw76-empty">${escapeHtml(vi ? "s rỗng" : "s is empty")}</b>`;
+
+  // need[] is the whole problem: positive = still owed, negative = surplus.
+  const needCells = Array.isArray(view.need) ? view.need : [];
+  const needHtml = needCells.length
+    ? needCells
+      .map((entry) => `<span class="mw76-need ${entry.state}"><strong>${escapeHtml(entry.char)}</strong><b>${entry.count > 0 ? `+${entry.count}` : entry.count}</b><em>${escapeHtml(entry.state === "missing" ? (vi ? "còn nợ" : "still owed") : entry.state === "exact" ? (vi ? "vừa đủ" : "exactly met") : (vi ? "thừa" : "surplus"))}</em></span>`)
+      .join("")
+    : `<b class="mw76-empty">${escapeHtml(vi ? "t rỗng" : "t is empty")}</b>`;
+
+  const missing = Number.isInteger(view.missing) ? view.missing : null;
+  const covered = missing === 0;
+  const gauge = `<section class="mw76-missing ${covered ? "covered" : "short"}"><small>missing</small><strong>${missing === null ? "—" : missing}</strong><em>${escapeHtml(covered ? (vi ? "0 → window đã phủ đủ t, co left được" : "0 → the window covers t, left may shrink") : (vi ? `còn nợ ${missing} ký tự → phải mở rộng right` : `${missing} characters still owed → right must expand`))}</em></section>`;
+
+  const best = view.best;
+  const bestHtml = best
+    ? `<section class="mw76-best found"><small>${vi ? "BEST HIỆN TẠI" : "CURRENT BEST"}</small><strong>"${escapeHtml(best.text)}"</strong><em>s[${best.start}:${best.end}] · ${vi ? "độ dài" : "length"} ${best.length}</em></section>`
+    : `<section class="mw76-best"><small>${vi ? "BEST HIỆN TẠI" : "CURRENT BEST"}</small><strong>${escapeHtml(vi ? "chưa có" : "none yet")}</strong><em>${escapeHtml(vi ? "missing chưa từng về 0" : "missing has never hit 0")}</em></section>`;
+
+  const windowHtml = `<section class="mw76-window ${covered ? "valid" : ""}"><small>${vi ? "WINDOW" : "WINDOW"} [${escapeHtml(text(view.left))}..${view.right === null || view.right === undefined || view.right < 0 ? "—" : view.right}]</small><strong>${view.windowText ? `"${escapeHtml(view.windowText)}"` : '""'}</strong><em>${vi ? "độ dài" : "length"} ${escapeHtml(text(view.windowLength))}</em></section>`;
+
+  const tone = view.event === "return"
+    ? "done"
+    : view.event === "record-better"
+      ? "better"
+      : view.event === "shrink-breaks"
+        ? "breaks"
+        : view.event && String(view.event).startsWith("shrink")
+          ? "shrink"
+          : "";
+  const summary = vi
+    ? `Bài 76, s = "${view.s}", t = "${view.t}". ${text(step.title)}`
+    : `Problem 76, s = "${view.s}", t = "${view.t}". ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="mw76-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>SLIDING WINDOW · NEED COUNTER · #76</small><strong>MINIMUM WINDOW SUBSTRING · t = "${escapeHtml(String(view.t ?? ""))}"</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="mw76-phases">${phases}</div>
+    <section class="mw76-rule"><span><b>1</b><code>missing == 0 ⟺ ${escapeHtml(vi ? "window phủ đủ t" : "the window covers t")}</code></span><i>${vi ? "VÀ" : "AND"}</i><span><b>2</b><code>need[c] &lt; 0 ⟹ ${escapeHtml(vi ? "thừa c, bỏ được" : "surplus c, droppable")}</code></span></section>
+    <section class="mw76-strip"><header><strong>${vi ? "s · WINDOW VÀ BEST" : "s · WINDOW AND BEST"}</strong><span>${escapeHtml(vi ? "viền = window · nền xanh = best · L/R = con trỏ · chữ đậm = ký tự thuộc t" : "outline = window · green fill = best · L/R = cursors · bold letter = character of t")}</span></header><div>${strip}</div></section>
+    <div class="mw76-state">
+      <section class="mw76-need-card"><header><strong>${vi ? "need · CÒN NỢ BAO NHIÊU" : "need · HOW MANY ARE STILL OWED"}</strong><span>${escapeHtml(vi ? "âm = thừa" : "negative = surplus")}</span></header><div>${needHtml}</div></section>
+      <div class="mw76-gauges">${gauge}${windowHtml}${bestHtml}</div>
+    </div>
+    <section class="mw76-action ${tone}"><span><small>${escapeHtml(String(view.event || "step").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${escapeHtml(view.answer === null || view.answer === undefined ? (vi ? "đang chạy" : "running") : `ANSWER "${view.answer}"`)}</em></section>
+    <section class="mw76-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
+  </section>`;
+}
+function renderFindXValue3525View(step) {
+  const view = step.findXValue3525View || {};
+  const vi = lang === "vi";
+  const text = (value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const original = Array.isArray(view.original) ? view.original : nums;
+  const n = Number.isInteger(view.n) ? view.n : nums.length;
+  const k = Number.isInteger(view.k) ? view.k : 1;
+  const start = Number.isInteger(view.start) ? view.start : null;
+  const x = Number.isInteger(view.x) ? view.x : null;
+  const activeU = Number.isInteger(view.activeU) ? view.activeU : -1;
+  const leftU = Number.isInteger(view.leftU) ? view.leftU : -1;
+  const rightU = Number.isInteger(view.rightU) ? view.rightU : -1;
+  const pathU = new Set(Array.isArray(view.pathU) ? view.pathU : []);
+  const selectedU = new Set(Array.isArray(view.selectedU) ? view.selectedU : []);
+  const queryIndex = Number.isInteger(view.queryIndex) ? view.queryIndex : -1;
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const current = queryIndex >= 0 ? queries[queryIndex] : null;
+
+  const stages = Array.isArray(view.stages) ? view.stages : [];
+  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
+  const phases = stages
+    .map((stage, index) => {
+      const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
+    })
+    .join("");
+
+  // nums, with the removed prefix dimmed and the just-written cell marked.
+  const numsStrip = nums
+    .map((value, index) => {
+      const classes = ["fx3525-num"];
+      if (start !== null && index < start) classes.push("dropped");
+      if (current && index === current.index) classes.push("written");
+      if (start !== null && index === start) classes.push("start");
+      if (value !== original[index]) classes.push("changed");
+      return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(value)}</strong><em>%${k}=${value % k}</em></span>`;
+    })
+    .join("");
+
+  // Ground truth: the running product remainder of every prefix of nums[start..].
+  const prefixes = Array.isArray(view.prefixProducts) ? view.prefixProducts : null;
+  const prefixStrip = prefixes
+    ? `<section class="fx3525-truth"><header><strong>${vi ? `PREFIX CỦA nums[${start}..${n - 1}] · product % ${k}` : `PREFIXES OF nums[${start}..${n - 1}] · product % ${k}`}</strong><span>${escapeHtml(x === null ? "" : (vi ? `ô sáng = khớp x = ${x}` : `lit cells match x = ${x}`))}</span></header><div>${prefixes
+      .map((entry) => `<span class="${x !== null && entry.mod === x ? "hit" : ""}"><small>..${entry.end}</small><strong>${entry.mod}</strong></span>`)
+      .join("")}</div><footer>${escapeHtml(x === null ? "" : (vi ? `số ô khớp = đáp án của query này` : "the number of matching cells is this query's answer"))}</footer></section>`
+    : "";
+
+  // Segment tree laid out by level, each node spanning its array range so the
+  // halving of the array is visible.
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const maxDepth = nodes.reduce((deepest, node) => Math.max(deepest, node.depth), 0);
+  const treeCells = nodes
+    .map((node) => {
+      const classes = ["fx3525-node"];
+      if (!node.ready) classes.push("pending");
+      if (node.u === leftU) classes.push("merge-left");
+      else if (node.u === rightU) classes.push("merge-right");
+      else if (node.u === activeU) classes.push("active");
+      if (selectedU.has(node.u)) classes.push("selected");
+      if (pathU.has(node.u)) classes.push("on-path");
+      const prodText = node.prod === null || node.prod === undefined ? "?" : node.prod;
+      const cntText = node.cnt ? node.cnt.join("·") : Array(k).fill("?").join("·");
+      return `<span class="${classes.join(" ")}" style="grid-row:${node.depth + 1};grid-column:${node.lo + 1} / span ${node.hi - node.lo + 1}"><small>u${node.u} [${node.lo}..${node.hi}]</small><b>prod ${prodText}</b><code>${cntText}</code></span>`;
+    })
+    .join("");
+  const treeHtml = `<div class="fx3525-tree" style="grid-template-columns: repeat(${Math.max(n, 1)}, minmax(0, 1fr)); grid-template-rows: repeat(${maxDepth + 1}, auto)">${treeCells}</div>`;
+
+  // The merge rule: copy the left child's cnt, then fold the right child's in
+  // with every remainder multiplied by the left child's prod.
+  const merge = view.merge;
+  const mergeHtml = merge
+    ? `<div class="fx3525-merge"><div class="fx3525-merge-row"><small>${vi ? "copy cnt trái" : "copy left cnt"}</small><div>${merge.aCnt.map((value, r) => `<span><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div></div>
+      <div class="fx3525-merge-row shift"><small>${vi ? `dịch cnt phải ×${merge.aProd}` : `shift right cnt ×${merge.aProd}`}</small><div>${merge.shifts.map((shift) => `<span class="${shift.amount > 0 ? "moves" : "zero"}"><small>r${shift.r}→${shift.to}</small><strong>${shift.amount > 0 ? `+${shift.amount}` : "0"}</strong></span>`).join("")}</div></div>
+      <div class="fx3525-merge-row result"><small>${vi ? "cnt kết quả" : "result cnt"}</small><div>${merge.result.map((value, r) => `<span class="${x !== null && r === x ? "target" : ""}"><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div></div>
+      <footer><code>prod = ${merge.aProd} × ${merge.bProd} % ${k} = ${merge.prod}</code><em>${escapeHtml(vi ? "chỉ mảnh PHẢI bị nhân thêm — phép ghép không giao hoán" : "only the RIGHT piece gets the extra factor — the combination is not commutative")}</em></footer></div>`
+    : `<p class="fx3525-merge-idle">${escapeHtml(vi ? "Chưa có phép merge nào đang chạy." : "No merge is running right now.")}</p>`;
+
+  const runningCnt = Array.isArray(view.runningCnt) ? view.runningCnt : null;
+  const runningHtml = runningCnt
+    ? `<div>${runningCnt.map((value, r) => `<span class="${x !== null && r === x ? "target" : ""}"><small>r${r}</small><strong>${value}</strong></span>`).join("")}</div>`
+    : `<b class="fx3525-empty">${escapeHtml(vi ? "chưa ghép" : "not combined yet")}</b>`;
+
+  const answers = Array.isArray(view.answers) ? view.answers : [];
+  const answersHtml = queries.length
+    ? queries
+      .map((query, index) => {
+        const state = index < answers.length ? "done" : index === queryIndex ? "active" : "pending";
+        const value = index < answers.length ? answers[index] : "?";
+        return `<span class="${state}"><small>#${index} [${query.index},${query.value},${query.start},${query.x}]</small><strong>${value}</strong></span>`;
+      })
+      .join("")
+    : `<b class="fx3525-empty">—</b>`;
+
+  const tone = view.event === "return" ? "done" : view.event === "read" ? "read" : String(view.event || "").includes("merge") ? "merge" : "";
+  const summary = vi
+    ? `Bài 3525, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`
+    : `Problem 3525, nums = [${nums.join(", ")}], k = ${k}. ${text(step.title)}`;
+
+  $("treeView").innerHTML = `<section class="fx3525-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>SEGMENT TREE · PREFIX COUNTS PER REMAINDER · #3525</small><strong>FIND X VALUE OF ARRAY II · k = ${k}</strong></div><span>${escapeHtml(text(step.title))}</span></header>
+    <div class="fx3525-phases">${phases}</div>
+    <section class="fx3525-rule"><span><b>1</b><code>${escapeHtml(vi ? "bỏ suffix = giữ một prefix của nums[start..]" : "remove a suffix = keep a prefix of nums[start..]")}</code></span><i>${vi ? "NÊN" : "SO"}</i><span><b>2</b><code>cnt[left.prod × r % k] += right.cnt[r]</code></span></section>
+    <section class="fx3525-nums"><header><strong>${vi ? "NUMS" : "NUMS"}</strong><span>${escapeHtml(vi ? "mờ = prefix đã bỏ · viền = ô vừa ghi · S = start" : "dimmed = dropped prefix · outlined = just written · S = start")}</span></header><div>${numsStrip}</div></section>
+    ${prefixStrip}
+    <section class="fx3525-tree-card"><header><strong>${vi ? "SEGMENT TREE · u [lo..hi] · prod · cnt" : "SEGMENT TREE · u [lo..hi] · prod · cnt"}</strong><span>${escapeHtml(vi ? "node rộng theo đoạn nó phủ · tím/xanh = hai con đang merge · vàng = node được chọn cho query" : "node width matches its range · purple/blue = the two children being merged · amber = node chosen for the query")}</span></header>${treeHtml}</section>
+    <section class="fx3525-merge-card ${tone}"><header><strong>${vi ? "PHÉP MERGE" : "THE MERGE"}</strong><span>${escapeHtml(vi ? "prefix trong con trái giữ nguyên, prefix lấn sang phải bị nhân" : "prefixes inside the left keep their remainder, prefixes reaching right get multiplied")}</span></header>${mergeHtml}</section>
+    <section class="fx3525-out"><div class="fx3525-running"><small>${vi ? `cnt CỦA [${start === null ? "—" : start}..${n - 1}]` : `cnt OF [${start === null ? "—" : start}..${n - 1}]`}</small>${runningHtml}</div><div class="fx3525-answers"><small>${vi ? "KẾT QUẢ TỪNG QUERY" : "PER-QUERY RESULTS"}</small><div>${answersHtml}</div></div></section>
+    <section class="fx3525-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
   </section>`;
 }
 function renderStep() {
@@ -35791,6 +36765,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderReverseDegree3498View(step);
+  } else if (step.findXValue3524View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFindXValue3524View(step);
+  } else if (step.minWindow76View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinWindow76View(step);
+  } else if (step.findXValue3525View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFindXValue3525View(step);
   } else if (step.treeEssentialsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -36163,6 +37155,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCycle2360View(step);
+  } else if (step.countPaths1976View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountPaths1976View(step);
   } else if (step.graph) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -36997,6 +37995,84 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderExactK992View(step);
+  } else if (step.complement1658View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderComplement1658View(step);
+  } else if (step.numberBfs2059View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNumberBfs2059View(step);
+  } else if (step.shelfDp1105View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShelfDp1105View(step);
+  } else if (step.serverHeap1606View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderServerHeap1606View(step);
+  } else if (step.meetingRooms2402View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMeetingRooms2402View(step);
+  } else if (step.adjacentRuns3350View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAdjacentRuns3350View(step);
+  } else if (step.digitSum3550View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDigitSum3550View(step);
+  } else if (step.permutation1589View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPermutation1589View(step);
+  } else if (step.prefixScores2416View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefixScores2416View(step);
+  } else if (step.braceExpansion1096View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBraceExpansion1096View(step);
+  } else if (step.weakCharacters1996View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWeakCharacters1996View(step);
+  } else if (step.longestLine562View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLongestLine562View(step);
+  } else if (step.nodeSequence2242View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNodeSequence2242View(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

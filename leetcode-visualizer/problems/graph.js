@@ -4256,11 +4256,75 @@ function buildSteps1976(input, params) {
     };
   }
 
-  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+  function phaseForLine(codeLine, final) {
+    if (final || codeLine === 30) return "done";
+    if (codeLine <= 10) return "build";
+    if (codeLine <= 16) return "init";
+    if (codeLine <= 21) return "pop";
+    if (codeLine <= 23) return "inspect";
+    if (codeLine === 24 || codeLine === 28) return "compare";
+    if (codeLine <= 27) return "shorter";
+    return "equal";
+  }
+
+  function pushStep({
+    title,
+    codeLine,
+    vars,
+    note,
+    hlNodes = [],
+    hlEdges = [],
+    annotations = {},
+    final = false,
+    phase = null,
+    currentNode = null,
+    activeEdge = null,
+    candidateTime = null,
+    previousDistance = null,
+    relation = null,
+    previousWays = null,
+    incomingWays = null,
+    answerValue = null,
+  }) {
+    const highlightedEdge = final ? null : hlEdges[0];
+    const resolvedEdge = activeEdge || (highlightedEdge
+      ? {
+          u: highlightedEdge[0],
+          v: highlightedEdge[1],
+          w: edges.find((edge) => (
+            (edge.u === highlightedEdge[0] && edge.v === highlightedEdge[1])
+            || (edge.undirected && edge.u === highlightedEdge[1] && edge.v === highlightedEdge[0])
+          ))?.w,
+        }
+      : null);
+    const resolvedCurrent = currentNode ?? (resolvedEdge ? resolvedEdge.u : (hlNodes.length === 1 ? hlNodes[0] : null));
     steps.push({
       title,
       arr: [],
       graph: makeGraph(hlNodes, hlEdges, annotations),
+      countPaths1976View: {
+        phase: phase || phaseForLine(codeLine, final),
+        nodes: nodes.map((node) => ({
+          node,
+          distance: formatDist(dist[node]),
+          ways: ways[node],
+          isSource: node === 0,
+          isTarget: node === n - 1,
+          isCurrent: node === resolvedCurrent,
+          isCandidate: !!resolvedEdge && node === resolvedEdge.v,
+          isFinalized: finalized.has(node),
+        })),
+        heap: heap.map(([time, node], index) => ({ time, node, index })),
+        currentNode: resolvedCurrent,
+        activeEdge: resolvedEdge,
+        candidateTime,
+        previousDistance: previousDistance === Infinity ? "∞" : previousDistance,
+        relation,
+        previousWays,
+        incomingWays,
+        answer: answerValue,
+        target: n - 1,
+      },
       highlight: [],
       mark: [],
       final,
@@ -4473,6 +4537,9 @@ function buildSteps1976(input, params) {
       pushStep({
         title: { vi: `new_time = ${time} + ${travelTime} = ${newTime}`, en: `new_time = ${time} + ${travelTime} = ${newTime}` },
         codeLine: 23,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4487,12 +4554,20 @@ function buildSteps1976(input, params) {
       });
 
       const oldDist = dist[v];
+      const waysBefore = ways[v];
       const shorter = newTime < oldDist;
       pushStep({
         title: shorter
           ? { vi: `${newTime} < ${formatDist(oldDist)}: ngắn hơn`, en: `${newTime} < ${formatDist(oldDist)}: shorter` }
           : { vi: `${newTime} < ${formatDist(oldDist)}? False`, en: `${newTime} < ${formatDist(oldDist)}? False` },
         codeLine: 24,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
+        previousDistance: oldDist,
+        relation: shorter ? "shorter" : "check-equal",
+        previousWays: waysBefore,
+        incomingWays: ways[u],
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4517,6 +4592,12 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `dist[${v}] = ${newTime}`, en: `dist[${v}] = ${newTime}` },
           codeLine: 25,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [{ name: "dist", value: distStr() }],
@@ -4530,6 +4611,13 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `ways[${v}] = ways[${u}] = ${ways[u]}`, en: `ways[${v}] = ways[${u}] = ${ways[u]}` },
           codeLine: 26,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          previousWays: waysBefore,
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [{ name: "ways", value: waysStr() }],
@@ -4544,6 +4632,12 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `Push (${newTime}, ${v})`, en: `Push (${newTime}, ${v})` },
           codeLine: 27,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: oldDist,
+          relation: "shorter",
+          incomingWays: ways[u],
           hlNodes: [v],
           vars: [{ name: "heap", value: heapStr() }],
           note: {
@@ -4560,6 +4654,13 @@ function buildSteps1976(input, params) {
           ? { vi: `${newTime} == dist[${v}]: thêm số cách`, en: `${newTime} == dist[${v}]: add path counts` }
           : { vi: `${newTime} == dist[${v}]? False`, en: `${newTime} == dist[${v}]? False` },
         codeLine: 28,
+        currentNode: u,
+        activeEdge: { u, v, w: travelTime },
+        candidateTime: newTime,
+        previousDistance: dist[v],
+        relation: equal ? "equal" : "longer",
+        previousWays: ways[v],
+        incomingWays: ways[u],
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -4585,6 +4686,13 @@ function buildSteps1976(input, params) {
         pushStep({
           title: { vi: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}`, en: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}` },
           codeLine: 29,
+          currentNode: u,
+          activeEdge: { u, v, w: travelTime },
+          candidateTime: newTime,
+          previousDistance: dist[v],
+          relation: "equal",
+          previousWays: oldWays,
+          incomingWays: ways[u],
           hlNodes: [u, v],
           hlEdges: [[u, v]],
           vars: [
@@ -4632,6 +4740,8 @@ function buildSteps1976(input, params) {
   pushStep({
     title: { vi: `Có ${answer} đường ngắn nhất tới node ${target}`, en: `${answer} shortest routes reach node ${target}` },
     codeLine: 30,
+    phase: "done",
+    answerValue: answer,
     hlNodes: [...shortestNodes],
     hlEdges: shortestEdges,
     final: true,
@@ -17981,6 +18091,87 @@ module.exports = {
         order: [733, 200, 695, 1020, 130, 1905],
         label: { vi: "Lộ trình Flood Fill", en: "Flood Fill learning path" },
       },
+      dijkstra: {
+        order: [743, 1514, 1631, 1976, 787, 778],
+        label: {
+          vi: "Lộ trình học Dijkstra được khuyến nghị",
+          en: "Recommended Dijkstra learning path",
+        },
+        guide: {
+          vi: {
+            intro:
+              "Học theo thứ tự từ Dijkstra chuẩn đến các biến thể max-heap, minimax, đếm đường, giới hạn số bước và bài grid nâng cao.",
+            patterns: [
+              { id: 743, name: "Network Delay Time", pattern: "Dijkstra chuẩn" },
+              { id: 1514, name: "Path with Maximum Probability", pattern: "Max-heap · tối đa hóa xác suất" },
+              { id: 1631, name: "Path With Minimum Effort", pattern: "Dijkstra minimax trên matrix" },
+              { id: 1976, name: "Number of Ways to Arrive at Destination", pattern: "Dijkstra + đếm số đường ngắn nhất" },
+              { id: 787, name: "Cheapest Flights Within K Stops", pattern: "Shortest path + giới hạn số bước" },
+              { id: 778, name: "Swim in Rising Water", pattern: "Dijkstra minimax trên grid nâng cao" },
+            ],
+            stages: [
+              {
+                title: "Giai đoạn 1 — Nắm Dijkstra chuẩn",
+                description: "Hiểu dist, min-heap, relax cạnh và cách bỏ qua stale entry.",
+                problems: [743],
+              },
+              {
+                title: "Giai đoạn 2 — Thay đổi hàm chi phí",
+                description: "Đổi từ tổng khoảng cách nhỏ nhất sang tích xác suất lớn nhất và bottleneck nhỏ nhất.",
+                problems: [1514, 1631],
+              },
+              {
+                title: "Giai đoạn 3 — Mở rộng trạng thái",
+                description: "Bổ sung số đường tối ưu hoặc số bước đã dùng vào trạng thái Dijkstra.",
+                problems: [1976, 787],
+              },
+              {
+                title: "Giai đoạn 4 — Grid nâng cao",
+                description: "Áp dụng minimax Dijkstra trên grid và nhận ra thời điểm có thể dừng sớm.",
+                problems: [778],
+              },
+            ],
+            conclusion:
+              "Sau 6 bài, bạn nên tự viết được Dijkstra chuẩn và nhận ra khi cần đổi heap, công thức relax hoặc mở rộng state.",
+          },
+          en: {
+            intro:
+              "Follow this order from standard Dijkstra through max-heap, minimax, path counting, bounded-step, and advanced grid variants.",
+            patterns: [
+              { id: 743, name: "Network Delay Time", pattern: "Standard Dijkstra" },
+              { id: 1514, name: "Path with Maximum Probability", pattern: "Max-heap · maximize probability" },
+              { id: 1631, name: "Path With Minimum Effort", pattern: "Minimax Dijkstra on a matrix" },
+              { id: 1976, name: "Number of Ways to Arrive at Destination", pattern: "Dijkstra + count shortest paths" },
+              { id: 787, name: "Cheapest Flights Within K Stops", pattern: "Shortest path + bounded steps" },
+              { id: 778, name: "Swim in Rising Water", pattern: "Advanced minimax Dijkstra on a grid" },
+            ],
+            stages: [
+              {
+                title: "Stage 1 — Master standard Dijkstra",
+                description: "Understand distances, the min-heap, edge relaxation, and stale-entry skipping.",
+                problems: [743],
+              },
+              {
+                title: "Stage 2 — Change the cost function",
+                description: "Move from minimum additive distance to maximum product and minimum bottleneck costs.",
+                problems: [1514, 1631],
+              },
+              {
+                title: "Stage 3 — Extend the state",
+                description: "Add the number of optimal paths or the number of used steps to Dijkstra's state.",
+                problems: [1976, 787],
+              },
+              {
+                title: "Stage 4 — Advanced grids",
+                description: "Apply minimax Dijkstra on a grid and recognize when early termination is safe.",
+                problems: [778],
+              },
+            ],
+            conclusion:
+              "After these six problems, you should be able to write standard Dijkstra and recognize when to change the heap, relaxation formula, or state.",
+          },
+        },
+      },
     },
     label: {
       vi: "Thứ tự học được khuyến nghị",
@@ -20668,6 +20859,7 @@ module.exports = {
     difficulty: "medium",
     slug: "network-delay-time",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Network Delay Time", en: "Network Delay Time" },
     titleVi: { vi: "Thời gian trễ mạng", en: "Network delay time" },
     statement: {
@@ -20741,6 +20933,7 @@ module.exports = {
     difficulty: "medium",
     slug: "cheapest-flights-within-k-stops",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Cheapest Flights Within K Stops", en: "Cheapest Flights Within K Stops" },
     titleVi: { vi: "Chuyến bay rẻ nhất trong K điểm dừng", en: "Cheapest flight within K stops" },
     statement: {
@@ -20906,6 +21099,7 @@ module.exports = {
     difficulty: "hard",
     slug: "swim-in-rising-water",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Swim in Rising Water", en: "Swim in Rising Water" },
     titleVi: { vi: "Bơi trong nước đang dâng", en: "Swim in rising water" },
     statement: {
@@ -20966,6 +21160,7 @@ module.exports = {
     difficulty: "medium",
     slug: "number-of-ways-to-arrive-at-destination",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Number of Ways to Arrive at Destination", en: "Number of Ways to Arrive at Destination" },
     titleVi: { vi: "Số cách đến đích trong thời gian ngắn nhất", en: "Count shortest ways to the destination" },
     statement: {

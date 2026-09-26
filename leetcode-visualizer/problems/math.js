@@ -5515,7 +5515,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "inputs",
     phaseIndex: 0,
-    codeLine: 1,
+    codeLine: 2,
     title: { vi: "Vào hàm với circle và rectangle", en: "Enter the function with the circle and the rectangle" },
     note: {
       vi: `Circle có tâm (${xCenter}, ${yCenter}) bán kính ${radius}; rectangle đi từ (${x1}, ${y1}) tới (${x2}, ${y2}). Biên được tính là overlap.`,
@@ -5527,7 +5527,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "inner-x",
     phaseIndex: 1,
-    codeLine: 2,
+    codeLine: 3,
     title: { vi: `inner_x = min(${xCenter}, ${x2}) = ${innerX}`, en: `inner_x = min(${xCenter}, ${x2}) = ${innerX}` },
     note: xCenter > x2
       ? { vi: `xCenter = ${xCenter} vượt quá biên phải, nên min kéo nó về x2 = ${x2}.`, en: `xCenter = ${xCenter} is past the right edge, so min pulls it back to x2 = ${x2}.` }
@@ -5538,7 +5538,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "closest-x",
     phaseIndex: 1,
-    codeLine: 3,
+    codeLine: 4,
     title: { vi: `closest_x = max(${x1}, ${innerX}) = ${closestX}`, en: `closest_x = max(${x1}, ${innerX}) = ${closestX}` },
     note: innerX < x1
       ? { vi: `${innerX} còn nằm bên trái biên x1 = ${x1}, nên max đẩy nó lên ${closestX}.`, en: `${innerX} is still left of the edge x1 = ${x1}, so max pushes it up to ${closestX}.` }
@@ -5549,7 +5549,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "inner-y",
     phaseIndex: 2,
-    codeLine: 4,
+    codeLine: 5,
     title: { vi: `inner_y = min(${yCenter}, ${y2}) = ${innerY}`, en: `inner_y = min(${yCenter}, ${y2}) = ${innerY}` },
     note: yCenter > y2
       ? { vi: `yCenter = ${yCenter} vượt quá cạnh trên, nên min kéo nó về y2 = ${y2}.`, en: `yCenter = ${yCenter} is above the top edge, so min pulls it back to y2 = ${y2}.` }
@@ -5560,7 +5560,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "closest-y",
     phaseIndex: 2,
-    codeLine: 5,
+    codeLine: 6,
     title: { vi: `closest_y = max(${y1}, ${innerY}) = ${closestY}`, en: `closest_y = max(${y1}, ${innerY}) = ${closestY}` },
     note: innerY < y1
       ? { vi: `${innerY} còn nằm dưới cạnh y1 = ${y1}, nên max đẩy nó lên ${closestY}.`, en: `${innerY} is still below the edge y1 = ${y1}, so max pushes it up to ${closestY}.` }
@@ -5571,7 +5571,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "dx",
     phaseIndex: 3,
-    codeLine: 6,
+    codeLine: 7,
     title: { vi: `dx = ${xCenter} − ${closestX} = ${dx}`, en: `dx = ${xCenter} - ${closestX} = ${dx}` },
     note: dx === 0
       ? { vi: "Tâm circle thẳng hàng theo trục X với điểm gần nhất, nên dx = 0.", en: "The center is X-aligned with the closest point, so dx = 0." }
@@ -5582,7 +5582,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "dy",
     phaseIndex: 3,
-    codeLine: 7,
+    codeLine: 8,
     title: { vi: `dy = ${yCenter} − ${closestY} = ${dy}`, en: `dy = ${yCenter} - ${closestY} = ${dy}` },
     note: dy === 0
       ? { vi: "Tâm circle thẳng hàng theo trục Y với điểm gần nhất, nên dy = 0.", en: "The center is Y-aligned with the closest point, so dy = 0." }
@@ -5593,7 +5593,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "dist-squared",
     phaseIndex: 3,
-    codeLine: 8,
+    codeLine: 9,
     title: { vi: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}`, en: `dist_squared = ${square1401(dx)} + ${square1401(dy)} = ${distSq}` },
     note: {
       vi: `Pythagoras trên tam giác vuông dx–dy: đây là bình phương khoảng cách từ tâm tới điểm gần nhất (${closestX}, ${closestY}).`,
@@ -5605,7 +5605,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "radius-squared",
     phaseIndex: 4,
-    codeLine: 9,
+    codeLine: 10,
     title: { vi: `radius_squared = ${radius}² = ${radiusSq}`, en: `radius_squared = ${radius}² = ${radiusSq}` },
     note: {
       vi: "Bình phương bán kính để so sánh hai bình phương, tránh sqrt và tránh sai số dấu phẩy động.",
@@ -5617,7 +5617,7 @@ function buildSteps1401(input, params = {}) {
   snapshot({
     operation: "return",
     phaseIndex: 4,
-    codeLine: 10,
+    codeLine: 11,
     title: { vi: `Trả về ${distSq} ≤ ${radiusSq} → ${answer}`, en: `Return ${distSq} <= ${radiusSq} -> ${answer}` },
     note: answer
       ? { vi: `${distSq} ≤ ${radiusSq}: điểm gần nhất của rectangle nằm trong circle, nên hai hình có điểm chung.`, en: `${distSq} <= ${radiusSq}: the rectangle's closest point lies inside the circle, so the shapes share a point.` }
@@ -5706,7 +5706,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "inputs",
     phaseIndex: 0,
-    codeLine: 1,
+    codeLine: 2,
     title: { vi: "Vào hàm với circle và rectangle", en: "Enter the function with the circle and the rectangle" },
     note: {
       vi: `Đổi bài toán: nở rectangle ra ${radius} đơn vị rồi hỏi tâm (${xCenter}, ${yCenter}) có nằm trong vùng đó không. Vùng nở ra là hình chữ nhật bo góc.`,
@@ -5718,7 +5718,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "in-wide",
     phaseIndex: 1,
-    codeLine: 2,
+    codeLine: 3,
     title: { vi: `in_wide = ${inWide}`, en: `in_wide = ${inWide}` },
     note: inWide
       ? { vi: `Tâm nằm trong slab ngang [${x1 - radius}, ${x2 + radius}] × [${y1}, ${y2}], nên đã chắc chắn có điểm chung.`, en: `The center is inside the wide slab [${x1 - radius}, ${x2 + radius}] x [${y1}, ${y2}], which already proves an intersection.` }
@@ -5729,7 +5729,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "in-tall",
     phaseIndex: 2,
-    codeLine: 3,
+    codeLine: 4,
     title: { vi: `in_tall = ${inTall}`, en: `in_tall = ${inTall}` },
     note: inTall
       ? { vi: `Tâm nằm trong slab dọc [${x1}, ${x2}] × [${y1 - radius}, ${y2 + radius}], nên có điểm chung.`, en: `The center is inside the tall slab [${x1}, ${x2}] x [${y1 - radius}, ${y2 + radius}], so the shapes intersect.` }
@@ -5740,7 +5740,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "slab-check",
     phaseIndex: 3,
-    codeLine: 4,
+    codeLine: 5,
     title: {
       vi: slabHit ? "Một trong hai slab đã chứa tâm" : "Cả hai slab đều không chứa tâm",
       en: slabHit ? "One of the two slabs already contains the center" : "Neither slab contains the center",
@@ -5755,7 +5755,7 @@ function buildSteps1401Approach2(input, params = {}) {
     snapshot({
       operation: "return-slab",
       phaseIndex: 4,
-      codeLine: 5,
+      codeLine: 6,
       title: { vi: "Trả về True", en: "Return True" },
       note: {
         vi: "Tâm thuộc phần thân của vùng nở ra, nghĩa là khoảng cách từ tâm tới rectangle không vượt quá radius.",
@@ -5770,7 +5770,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "radius-squared",
     phaseIndex: 3,
-    codeLine: 6,
+    codeLine: 7,
     title: { vi: `radius_squared = ${radius}² = ${radiusSq}`, en: `radius_squared = ${radius}² = ${radiusSq}` },
     note: {
       vi: "Bình phương bán kính một lần, dùng lại cho cả 4 đĩa; so bình phương nên không cần sqrt.",
@@ -5787,7 +5787,7 @@ function buildSteps1401Approach2(input, params = {}) {
     snapshot({
       operation: "corner-loop",
       phaseIndex: 3,
-      codeLine: 7,
+      codeLine: 8,
       title: { vi: `Góc ${index + 1}/4 = (${cornerX}, ${cornerY})`, en: `Corner ${index + 1}/4 = (${cornerX}, ${cornerY})` },
       note: {
         vi: `Lấy góc tiếp theo của rectangle và hỏi tâm có nằm trong đĩa bán kính ${radius} quanh góc này không.`,
@@ -5799,7 +5799,7 @@ function buildSteps1401Approach2(input, params = {}) {
     snapshot({
       operation: "corner-dx",
       phaseIndex: 3,
-      codeLine: 8,
+      codeLine: 9,
       title: { vi: `dx = ${xCenter} − ${cornerX} = ${dx}`, en: `dx = ${xCenter} - ${cornerX} = ${dx}` },
       note: {
         vi: `Khoảng lệch theo trục X giữa tâm và góc (${cornerX}, ${cornerY}).`,
@@ -5811,7 +5811,7 @@ function buildSteps1401Approach2(input, params = {}) {
     snapshot({
       operation: "corner-dy",
       phaseIndex: 3,
-      codeLine: 9,
+      codeLine: 10,
       title: { vi: `dy = ${yCenter} − ${cornerY} = ${dy}`, en: `dy = ${yCenter} - ${cornerY} = ${dy}` },
       note: {
         vi: `Khoảng lệch theo trục Y giữa tâm và góc (${cornerX}, ${cornerY}).`,
@@ -5824,7 +5824,7 @@ function buildSteps1401Approach2(input, params = {}) {
     snapshot({
       operation: "corner-check",
       phaseIndex: 3,
-      codeLine: 10,
+      codeLine: 11,
       title: {
         vi: `${cornerDistSq} ${cornerResults[index] ? "≤" : ">"} ${radiusSq} → ${cornerResults[index]}`,
         en: `${cornerDistSq} ${cornerResults[index] ? "<=" : ">"} ${radiusSq} -> ${cornerResults[index]}`,
@@ -5839,7 +5839,7 @@ function buildSteps1401Approach2(input, params = {}) {
       snapshot({
         operation: "return-corner",
         phaseIndex: 4,
-        codeLine: 11,
+        codeLine: 12,
         title: { vi: "Trả về True", en: "Return True" },
         note: {
           vi: `Chỉ cần một đĩa góc chứa tâm là đủ; vòng lặp dừng ngay ở góc ${index + 1}.`,
@@ -5855,7 +5855,7 @@ function buildSteps1401Approach2(input, params = {}) {
   snapshot({
     operation: "return-false",
     phaseIndex: 4,
-    codeLine: 12,
+    codeLine: 13,
     title: { vi: "Trả về False", en: "Return False" },
     note: {
       vi: "Tâm nằm ngoài cả hai slab và cả bốn đĩa góc, tức là ngoài toàn bộ vùng nở ra, nên hai hình rời nhau.",
