@@ -55,7 +55,7 @@ function buildSteps304(input, params) {
 
   steps.push({
     title: { vi: "Khoi tao bang prefix co vien 0", en: "Initialize a zero-padded prefix table" },
-    codeLines: [4],
+    codeLines: [3],
     prefix2DView: view({
       status: [
         { label: "matrix", value: `${rows} x ${cols}` },
@@ -300,7 +300,7 @@ function buildSteps746B(cost) {
     highlight: [0, 1],
     mark: [],
     codeBlock: 2,
-    codeLines: [5],
+    codeLines: [4],
     vars: [{ name: "n", value: n }, { name: "prev2 = cost[0]", value: prev2 }, { name: "prev1 = cost[1]", value: prev1 }],
     note: {
       vi: `Chỉ cần 2 biến: prev2 = chi phí nhỏ nhất để đứng trên bậc trước-trước, prev1 = bậc ngay trước. Bắt đầu prev2=cost[0], prev1=cost[1].`,
@@ -1889,7 +1889,7 @@ function buildSteps509Optimized(n) {
     highlight: [0, 1],
     mark: [],
     codeBlock: 2,
-    codeLines: [6],
+    codeLines: [5],
     vars: [
       { name: "n", value: n },
       { name: "prev2", value: 0 },
@@ -18387,17 +18387,20 @@ function buildSteps1547(input, params) {
  * Mỗi ngày đi thử 3 loại vé: 1 ngày, 7 ngày, 30 ngày.
  */
 function buildSteps983(input, params) {
-  const days = (Array.isArray(input) ? input.map(Number) : []).filter((d) => Number.isFinite(d));
+  const days = (Array.isArray(input) ? input.map(Number) : []).filter((d) => Number.isInteger(d) && d > 0);
+  if (!days.length || days.length > 30 || days.some((day, index) => index && day <= days[index - 1])) {
+    throw new Error("days must contain 1 to 30 strictly increasing positive integers.");
+  }
   const costsRaw = String((params && params.costs) || "2,7,15").split(",").map((v) => Number(v.trim()));
-  const costs = [costsRaw[0] || 2, costsRaw[1] || 7, costsRaw[2] || 15];
+  if (costsRaw.length !== 3 || costsRaw.some((cost) => !Number.isInteger(cost) || cost <= 0)) {
+    throw new Error("costs must contain exactly three positive integers, e.g. 2,7,15.");
+  }
+  const costs = costsRaw;
   const n = days.length;
   const dp = new Array(n + 1).fill(null);
-  dp[0] = 0;
   const steps = [];
-  const firstAtLeast = (value) => {
-    for (let idx = 0; idx < n; idx++) if (days[idx] >= value) return idx;
-    return n;
-  };
+  let j7 = 0;
+  let j30 = 0;
 
   const push = (meta, step) => {
     steps.push(Object.assign({}, step, {
@@ -18415,24 +18418,122 @@ function buildSteps983(input, params) {
     }));
   };
 
+  push({ phase: "init", currentIndex: -1 }, {
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    arr: [], highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "days", value: `[${days.join(", ")}]` }, { name: "n", value: n }],
+    note: {
+      vi: `Có ${n} ngày phải đi. dp[i] sẽ là chi phí nhỏ nhất để phủ i ngày ĐẦU TIÊN trong danh sách, không phải i ngày lịch.`,
+      en: `There are ${n} travel days. dp[i] will be the minimum cost to cover the FIRST i travel days in the list, not calendar day i.`,
+    },
+  });
+
+  dp[0] = 0;
   push({ phase: "init", currentIndex: 0 }, {
     title: { vi: "dp[0] = 0", en: "dp[0] = 0" },
     arr: [], highlight: [], mark: [],
-    codeLines: [5],
-    vars: [{ name: "days", value: `[${days.join(", ")}]` }, { name: "costs (1/7/30)", value: `[${costs.join(", ")}]` }],
+    codeLines: [4],
+    vars: [{ name: "dp", value: `[0, ${Array(n).fill("·").join(", ")}]` }],
     note: {
-      vi: `dp[i] = chi phí ít nhất để đi được i ngày ĐẦU TIÊN trong danh sách. Chỉ quan tâm các ngày phải đi: [${days.join(", ")}]. Mỗi ngày thử 3 vé: 1 ngày (${costs[0]}), 7 ngày (${costs[1]}), 30 ngày (${costs[2]}).`,
-      en: `dp[i] = minimum cost to cover the FIRST i travel days. Only travel days matter: [${days.join(", ")}]. Each day tries 3 passes: 1-day (${costs[0]}), 7-day (${costs[1]}), 30-day (${costs[2]}).`,
+      vi: "Không có ngày nào cần phủ thì không tốn tiền. Đây là base case mà mọi lựa chọn vé sẽ quay về.",
+      en: "Covering zero travel days costs nothing. This base case is where each pass choice can jump back to.",
+    },
+  });
+
+  push({ phase: "init", currentIndex: 0 }, {
+    title: { vi: "j7 = j30 = 0", en: "j7 = j30 = 0" },
+    arr: [], highlight: [], mark: [],
+    codeLines: [5],
+    vars: [{ name: "j7", value: j7 }, { name: "j30", value: j30 }],
+    note: {
+      vi: "Hai con trỏ luôn chỉ đến ngày đi ĐẦU TIÊN còn nằm trong cửa sổ 7 hoặc 30 ngày. Chúng chỉ tiến tới, nên tổng số lần dịch chuyển là O(n).",
+      en: "The two pointers always identify the FIRST travel day still inside the 7- or 30-day window. They only move forward, so their total movement is O(n).",
     },
   });
 
   for (let i = 1; i <= n; i++) {
     const day = days[i - 1];
-    const j7 = firstAtLeast(day - 6);
-    const j30 = firstAtLeast(day - 29);
+    push({ phase: "compute", currentIndex: i }, {
+      title: { vi: `Vòng lặp i = ${i}`, en: `Loop iteration i = ${i}` },
+      arr: [], highlight: [], mark: [], codeLines: [6],
+      vars: [{ name: "i", value: i }, { name: "days đã phủ", value: i - 1 }],
+      note: { vi: `Chuẩn bị tính dp[${i}], tức chi phí phủ ${i} ngày phải đi đầu tiên.`, en: `Prepare to compute dp[${i}], the cost to cover the first ${i} travel days.` },
+    });
+    push({ phase: "compute", currentIndex: i }, {
+      title: { vi: `day = days[${i - 1}] = ${day}`, en: `day = days[${i - 1}] = ${day}` },
+      arr: [], highlight: [], mark: [], codeLines: [7],
+      vars: [{ name: "i", value: i }, { name: "day", value: day }],
+      note: { vi: `Đây là ngày phải đi mới nhất mà dp[${i}] phải phủ.`, en: `This is the newest travel day that dp[${i}] must cover.` },
+    });
+
+    while (days[j7] < day - 6) {
+      push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1] }, {
+        title: { vi: `days[j7] = ${days[j7]} < ${day - 6}`, en: `days[j7] = ${days[j7]} < ${day - 6}` },
+        arr: [], highlight: [], mark: [], codeLines: [8],
+        vars: [{ name: "j7", value: j7 }, { name: "7-day window", value: `${day - 6}..${day}` }],
+        note: { vi: `Ngày ${days[j7]} đã nằm ngoài vé 7 ngày cho ngày ${day}, nên phải dịch j7.`, en: `Day ${days[j7]} is outside the 7-day pass for day ${day}, so advance j7.` },
+      });
+      j7 += 1;
+      push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1] }, {
+        title: { vi: `j7 += 1 → ${j7}`, en: `j7 += 1 → ${j7}` },
+        arr: [], highlight: [], mark: [], codeLines: [9],
+        vars: [{ name: "j7", value: j7 }],
+        note: { vi: "Chỉ số này không bao giờ lùi lại trong các vòng sau.", en: "This index never moves backward in later iterations." },
+      });
+    }
+    push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1] }, {
+      title: { vi: `days[j7] = ${days[j7]} ≥ ${day - 6}`, en: `days[j7] = ${days[j7]} ≥ ${day - 6}` },
+      arr: [], highlight: [], mark: [], codeLines: [8],
+      vars: [{ name: "j7", value: j7 }, { name: "7-day window", value: `${day - 6}..${day}` }],
+      note: { vi: `j7 = ${j7} là ngày đầu tiên còn được vé 7 ngày phủ.`, en: `j7 = ${j7} is the first travel day still covered by the 7-day pass.` },
+    });
+
+    while (days[j30] < day - 29) {
+      push({ phase: "compute", currentIndex: i, windowThirty: [j30, i - 1] }, {
+        title: { vi: `days[j30] = ${days[j30]} < ${day - 29}`, en: `days[j30] = ${days[j30]} < ${day - 29}` },
+        arr: [], highlight: [], mark: [], codeLines: [10],
+        vars: [{ name: "j30", value: j30 }, { name: "30-day window", value: `${day - 29}..${day}` }],
+        note: { vi: `Ngày ${days[j30]} đã nằm ngoài vé 30 ngày cho ngày ${day}, nên phải dịch j30.`, en: `Day ${days[j30]} is outside the 30-day pass for day ${day}, so advance j30.` },
+      });
+      j30 += 1;
+      push({ phase: "compute", currentIndex: i, windowThirty: [j30, i - 1] }, {
+        title: { vi: `j30 += 1 → ${j30}`, en: `j30 += 1 → ${j30}` },
+        arr: [], highlight: [], mark: [], codeLines: [11],
+        vars: [{ name: "j30", value: j30 }],
+        note: { vi: "j30 cũng chỉ tiến về phía trước, không quét lại danh sách.", en: "j30 also moves forward only; it never rescans the list." },
+      });
+    }
+    push({ phase: "compute", currentIndex: i, windowThirty: [j30, i - 1] }, {
+      title: { vi: `days[j30] = ${days[j30]} ≥ ${day - 29}`, en: `days[j30] = ${days[j30]} ≥ ${day - 29}` },
+      arr: [], highlight: [], mark: [], codeLines: [10],
+      vars: [{ name: "j30", value: j30 }, { name: "30-day window", value: `${day - 29}..${day}` }],
+      note: { vi: `j30 = ${j30} là ngày đầu tiên còn được vé 30 ngày phủ.`, en: `j30 = ${j30} is the first travel day still covered by the 30-day pass.` },
+    });
+
     const optOne = dp[i - 1] + costs[0];
     const optSeven = dp[j7] + costs[1];
     const optThirty = dp[j30] + costs[2];
+    const optionVars = [
+      { name: "1-day", value: `dp[${i - 1}] + ${costs[0]} = ${optOne}` },
+      { name: "7-day", value: `dp[${j7}] + ${costs[1]} = ${optSeven}` },
+      { name: "30-day", value: `dp[${j30}] + ${costs[2]} = ${optThirty}` },
+    ];
+    push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1], windowThirty: [j30, i - 1] }, {
+      title: { vi: `one = dp[${i - 1}] + ${costs[0]} = ${optOne}`, en: `one = dp[${i - 1}] + ${costs[0]} = ${optOne}` },
+      arr: [], highlight: [], mark: [], codeLines: [12], vars: optionVars,
+      note: { vi: "Vé 1 ngày chỉ phủ ngày hiện tại, nên phải cộng nó vào dp của i−1 ngày trước.", en: "A 1-day pass covers only the current day, so add it after the first i−1 days." },
+    });
+    push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1], windowThirty: [j30, i - 1] }, {
+      title: { vi: `seven = dp[${j7}] + ${costs[1]} = ${optSeven}`, en: `seven = dp[${j7}] + ${costs[1]} = ${optSeven}` },
+      arr: [], highlight: [], mark: [], codeLines: [13], vars: optionVars,
+      note: { vi: `Vé 7 ngày phủ từ ${day - 6} đến ${day}, nên mọi ngày trước index ${j7} đã được xử lý bởi dp[${j7}].`, en: `The 7-day pass covers ${day - 6} through ${day}, so dp[${j7}] handles all days before index ${j7}.` },
+    });
+    push({ phase: "compute", currentIndex: i, windowSeven: [j7, i - 1], windowThirty: [j30, i - 1] }, {
+      title: { vi: `thirty = dp[${j30}] + ${costs[2]} = ${optThirty}`, en: `thirty = dp[${j30}] + ${costs[2]} = ${optThirty}` },
+      arr: [], highlight: [], mark: [], codeLines: [14], vars: optionVars,
+      note: { vi: `Tương tự, vé 30 ngày phủ ${day - 29}..${day}; dp[${j30}] là chi phí ngay trước cửa sổ đó.`, en: `Likewise, the 30-day pass covers ${day - 29}..${day}; dp[${j30}] is the cost immediately before that window.` },
+    });
     dp[i] = Math.min(optOne, optSeven, optThirty);
     const chosen = dp[i] === optOne ? "one" : dp[i] === optSeven ? "seven" : "thirty";
     push({
@@ -18449,17 +18550,11 @@ function buildSteps983(input, params) {
     }, {
       title: { vi: `Ngày đi ${day}: dp[${i}] = ${dp[i]}`, en: `Travel day ${day}: dp[${i}] = ${dp[i]}` },
       arr: [], highlight: [], mark: [],
-      codeLines: [10, 11, 12],
-      vars: [
-        { name: "ngày phải đi", value: day },
-        { name: "vé 1 ngày", value: `dp[${i - 1}]+${costs[0]} = ${dp[i - 1]}+${costs[0]} = ${optOne}` },
-        { name: "vé 7 ngày", value: `dp[${j7}]+${costs[1]} = ${dp[j7]}+${costs[1]} = ${optSeven}` },
-        { name: "vé 30 ngày", value: `dp[${j30}]+${costs[2]} = ${dp[j30]}+${costs[2]} = ${optThirty}` },
-        { name: `dp[${i}]`, value: dp[i] },
-      ],
+      codeLines: [15],
+      vars: [...optionVars, { name: `dp[${i}]`, value: dp[i] }],
       note: {
-        vi: `Để đi ngày ${day}, thử 3 vé:\n• Vé 1 ngày: chi phí trước đó dp[${i - 1}]=${dp[i - 1]} + ${costs[0]} = ${optOne}.\n• Vé 7 ngày (phủ ngày ${day - 6}..${day}): dp[${j7}]=${dp[j7]} + ${costs[1]} = ${optSeven}.\n• Vé 30 ngày (phủ ngày ${day - 29}..${day}): dp[${j30}]=${dp[j30]} + ${costs[2]} = ${optThirty}.\n→ Chọn rẻ nhất: dp[${i}] = ${dp[i]} (vé ${chosen === "one" ? "1 ngày" : chosen === "seven" ? "7 ngày" : "30 ngày"}).`,
-        en: `To cover day ${day}, try 3 passes:\n• 1-day: prior cost dp[${i - 1}]=${dp[i - 1]} + ${costs[0]} = ${optOne}.\n• 7-day (covers days ${day - 6}..${day}): dp[${j7}]=${dp[j7]} + ${costs[1]} = ${optSeven}.\n• 30-day (covers days ${day - 29}..${day}): dp[${j30}]=${dp[j30]} + ${costs[2]} = ${optThirty}.\n→ Pick the cheapest: dp[${i}] = ${dp[i]} (${chosen === "one" ? "1-day" : chosen === "seven" ? "7-day" : "30-day"} pass).`,
+        vi: `min(${optOne}, ${optSeven}, ${optThirty}) = ${dp[i]}. Chọn vé ${chosen === "one" ? "1 ngày" : chosen === "seven" ? "7 ngày" : "30 ngày"}.`,
+        en: `min(${optOne}, ${optSeven}, ${optThirty}) = ${dp[i]}. Choose the ${chosen === "one" ? "1-day" : chosen === "seven" ? "7-day" : "30-day"} pass.`,
       },
     });
   }
@@ -18469,7 +18564,7 @@ function buildSteps983(input, params) {
     title: { vi: `Kết quả: dp[${n}] = ${answer}`, en: `Result: dp[${n}] = ${answer}` },
     arr: [], highlight: [], mark: [],
     final: true,
-    codeLines: [13],
+    codeLines: [16],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Chi phí nhỏ nhất để đi hết ${n} ngày = dp[${n}] = ${answer}.`,
@@ -19960,20 +20055,24 @@ module.exports = {
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Chỉ duyệt các ngày phải đi (n ngày).", en: "Iterate only travel days (n days)." } },
     code: [
-      "from bisect import bisect_left",
       "class Solution:",
       "    def mincostTickets(self, days, costs):",
       "        n = len(days)",
       "        dp = [0] * (n + 1)",
+      "        j7 = j30 = 0",
       "        for i in range(1, n + 1):",
-      "            day = days[i-1]",
-      "            j7 = bisect_left(days, day - 6)",
-      "            j30 = bisect_left(days, day - 29)",
-      "            dp[i] = min(dp[i-1] + costs[0],",
-      "                        dp[j7]  + costs[1],",
-      "                        dp[j30] + costs[2])",
+      "            day = days[i - 1]",
+      "            while days[j7] < day - 6:",
+      "                j7 += 1",
+      "            while days[j30] < day - 29:",
+      "                j30 += 1",
+      "            one = dp[i - 1] + costs[0]",
+      "            seven = dp[j7] + costs[1]",
+      "            thirty = dp[j30] + costs[2]",
+      "            dp[i] = min(one, seven, thirty)",
       "        return dp[n]",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps983,
   },
   309: {
