@@ -14538,6 +14538,89 @@ function buildSteps3734(input, params) {
   return { original: s, target, answer: "", steps };
 }
 
+/** LeetCode 3735: enumerate the two legal reversals for each k (small visual inputs). */
+function buildSteps3735(input) {
+  const s = String(input ?? "").trim();
+  if (!/^[a-z]+$/.test(s)) throw new Error("s must be a non-empty lowercase string.");
+  if (s.length > 14) throw new Error("Visualization supports strings up to length 14.");
+
+  const n = s.length;
+  const steps = [];
+  let best = s;
+  let bestOperation = "prefix";
+  let bestK = 1;
+
+  const reverse = (value) => [...value].reverse().join("");
+  function push({ title, line, note, candidate = null, operation = null, k = null, improved = false, final = false }) {
+    const start = operation === "prefix" && k !== null ? 0 : operation === "suffix" && k !== null ? n - k : -1;
+    const end = operation && k !== null ? (operation === "prefix" ? k - 1 : n - 1) : -1;
+    steps.push({
+      title,
+      arr: [...s],
+      highlight: start < 0 ? [] : Array.from({ length: k }, (_, index) => start + index),
+      mark: start < 0 ? [] : [start, end],
+      codeLines: [line],
+      vars: [
+        { name: "k", value: k === null ? "—" : k },
+        { name: "operation", value: operation || "—" },
+        { name: "candidate", value: candidate === null ? "—" : JSON.stringify(candidate) },
+        { name: "best", value: JSON.stringify(best) },
+        { name: "best operation", value: `${bestOperation}, k=${bestK}` },
+      ],
+      note,
+      reverse3735View: { source: s, candidate, best, operation, k, improved, start, end },
+      final,
+    });
+  }
+
+  push({
+    title: { vi: `best = '${s}'`, en: `best = '${s}'` }, line: 3,
+    note: { vi: "Đảo 1 ký tự là một phép hợp lệ và giữ nguyên chuỗi, nên đây là đáp án khởi tạo an toàn.", en: "Reversing one character is a legal no-op, so the original string is a safe initial answer." },
+  });
+
+  for (let k = 1; k <= n; k += 1) {
+    push({
+      title: { vi: `k = ${k}`, en: `k = ${k}` }, line: 4,
+      note: { vi: `Thử cả hai phép đảo có độ dài ${k}.`, en: `Try both reversals of length ${k}.` }, k,
+    });
+    const prefix = reverse(s.slice(0, k)) + s.slice(k);
+    push({
+      title: { vi: `prefix = '${prefix}'`, en: `prefix = '${prefix}'` }, line: 5,
+      note: { vi: `Đảo ${k} ký tự đầu: '${s.slice(0, k)}' → '${reverse(s.slice(0, k))}'.`, en: `Reverse the first ${k} characters: '${s.slice(0, k)}' → '${reverse(s.slice(0, k))}'.` },
+      candidate: prefix, operation: "prefix", k,
+    });
+    if (prefix < best) {
+      best = prefix; bestOperation = "prefix"; bestK = k;
+      push({
+        title: { vi: `best = '${best}'`, en: `best = '${best}'` }, line: 7,
+        note: { vi: "Candidate nhỏ hơn theo thứ tự từ điển, nên thay best.", en: "This candidate is lexicographically smaller, so replace best." },
+        candidate: prefix, operation: "prefix", k, improved: true,
+      });
+    }
+    const suffix = s.slice(0, n - k) + reverse(s.slice(n - k));
+    push({
+      title: { vi: `suffix = '${suffix}'`, en: `suffix = '${suffix}'` }, line: 8,
+      note: { vi: `Đảo ${k} ký tự cuối: '${s.slice(n - k)}' → '${reverse(s.slice(n - k))}'.`, en: `Reverse the last ${k} characters: '${s.slice(n - k)}' → '${reverse(s.slice(n - k))}'.` },
+      candidate: suffix, operation: "suffix", k,
+    });
+    if (suffix < best) {
+      best = suffix; bestOperation = "suffix"; bestK = k;
+      push({
+        title: { vi: `best = '${best}'`, en: `best = '${best}'` }, line: 10,
+        note: { vi: "Candidate nhỏ hơn theo thứ tự từ điển, nên thay best.", en: "This candidate is lexicographically smaller, so replace best." },
+        candidate: suffix, operation: "suffix", k, improved: true,
+      });
+    }
+  }
+
+  push({
+    title: { vi: `return '${best}'`, en: `return '${best}'` }, line: 11,
+    note: { vi: `Sau khi thử mọi k và hai hướng, best đến từ đảo ${bestOperation} với k = ${bestK}.`, en: `After trying every k and both directions, best comes from the ${bestOperation} reversal with k = ${bestK}.` },
+    candidate: best, operation: bestOperation, k: bestK, final: true,
+  });
+  return { original: s, answer: best, steps };
+}
+
 Object.assign(module.exports, {
   3734: {
     id: 3734,
@@ -14622,6 +14705,51 @@ Object.assign(module.exports, {
       "        return ''",
     ],
     builder: buildSteps3734,
+  },
+  3735: {
+    id: 3735,
+    difficulty: "hard",
+    slug: "lexicographically-smallest-string-after-reverse-ii",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "enumeration", vi: "Liệt kê", en: "Enumeration" },
+    ],
+    title: { vi: "Lexicographically Smallest String After Reverse II", en: "Lexicographically Smallest String After Reverse II" },
+    titleVi: { vi: "Chuỗi nhỏ nhất sau một lần đảo II", en: "Smallest string after one reversal II" },
+    statement: {
+      vi: "Chọn đúng một k, rồi đảo k ký tự đầu hoặc k ký tự cuối của s. Trả về chuỗi nhỏ nhất theo thứ tự từ điển có thể nhận được.",
+      en: "Choose exactly one k, then reverse either the first k or the last k characters of s. Return the lexicographically smallest obtainable string.",
+    },
+    defaultInput: "dcab",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường)", en: "s (lowercase letters)" },
+    extraParams: [],
+    approach: [
+      { vi: "Với mỗi k từ 1 đến n, có đúng hai ứng viên: đảo prefix dài k hoặc đảo suffix dài k.", en: "For every k from 1 to n, there are exactly two candidates: reverse a prefix of length k or a suffix of length k." },
+      { vi: "So sánh từng ứng viên với best theo thứ tự từ điển. Đảo k = 1 giữ nguyên chuỗi nhưng vẫn thỏa điều kiện phải làm đúng một phép.", en: "Compare every candidate with best lexicographically. Reversing k = 1 leaves the string unchanged but still satisfies the exactly-one-operation rule." },
+      { vi: "Bản visual dùng liệt kê O(n²) để thấy toàn bộ ứng viên (giới hạn 14 ký tự). Với n = 10⁵, cần rolling hash hoặc suffix array để so sánh ứng viên nhanh hơn.", en: "The visual lesson uses O(n²) enumeration to show every candidate (limited to 14 characters). At n = 10⁵, use rolling hashes or a suffix array to compare candidates faster." },
+    ],
+    complexity: {
+      time: "O(n²) visual trace",
+      space: "O(n)",
+      note: { vi: "Mỗi trong 2n ứng viên cần dựng một chuỗi dài n. Đây là bản trực quan; nó cố ý giới hạn input nhỏ.", en: "Each of 2n candidates constructs a length-n string. This is the visual version, intentionally capped to small inputs." },
+    },
+    codeLabel: { vi: "Liệt kê hai phép đảo cho mỗi k (visual)", en: "Enumerate both reversals per k (visual)" },
+    code: [
+      "class Solution:",
+      "    def lexSmallest(self, s: str) -> str:",
+      "        best = s",
+      "        for k in range(1, len(s) + 1):",
+      "            prefix = s[:k][::-1] + s[k:]",
+      "            if prefix < best:",
+      "                best = prefix",
+      "            suffix = s[:-k] + s[-k:][::-1]",
+      "            if suffix < best:",
+      "                best = suffix",
+      "        return best",
+    ],
+    builder: buildSteps3735,
   },
 });
 
