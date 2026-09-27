@@ -32,6 +32,7 @@ const categories = {
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: require("./bitmask"),
   design: require("./music-player"),
+  interview: require("./interview"),
 };
 
 const SUPPORTED = {};
@@ -115,6 +116,11 @@ const COMPANY_LISTS = {
       [2172, "Maximum AND Sum of Array", "hard"],
       [2158, "Amount of New Area Painted Each Day", "hard"],
       [253, "Meeting Rooms II", "medium"],
+      [834, "Sum of Distances in Tree", "hard"],
+      [2386, "Find the K-Sum of an Array", "hard"],
+      [9005, "Next Word Predictor", "medium"],
+      [9006, "Graph BFS Shortest Path", "medium"],
+      [921, "Minimum Add to Make Parentheses Valid", "medium"],
     ],
   },
 };
