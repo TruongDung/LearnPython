@@ -36185,6 +36185,69 @@ function renderFindXValue3525View(step) {
     <section class="fx3525-code"><small>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || []).join(", ") || "—"}</small><span>${escapeHtml(text(step.note))}</span></section>
   </section>`;
 }
+
+function renderReverseParen1190View(step) {
+  const view = step.reverseParen1190View || {};
+  const vi = lang === "vi";
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const pairs = Array.isArray(view.pairs) ? view.pairs : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const visited = new Set(Array.isArray(view.visited) ? view.visited : []);
+  const output = Array.isArray(view.output) ? view.output : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const direction = view.direction === -1 ? -1 : 1;
+  const jump = view.jump || null;
+  const pairByIndex = new Map();
+  pairs.forEach(([left, right]) => { pairByIndex.set(left, right); pairByIndex.set(right, left); });
+  const stackSet = new Set(stack);
+  const pairSet = new Set(jump ? [jump.from, jump.to] : []);
+  const phase = String(view.phase || "pair");
+  const phaseIndex = phase === "done" ? 2 : phase === "walk" ? 1 : 0;
+  const stages = [
+    vi ? "1 · Ghép ngoặc" : "1 · Match parentheses",
+    vi ? "2 · Nhảy + đổi hướng" : "2 · Jump + flip direction",
+  ].map((label, index) => `<span class="${phaseIndex > index || phase === "done" ? "done" : phaseIndex === index ? "active" : ""}"><i>${phaseIndex > index || phase === "done" ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`).join("");
+  const cells = chars.map((char, index) => {
+    const classes = ["rp1190-cell"];
+    if (current === index) classes.push("current");
+    if (visited.has(index)) classes.push("visited");
+    if (stackSet.has(index)) classes.push("stacked");
+    if (pairSet.has(index)) classes.push("jump");
+    if (char === "(" || char === ")") classes.push("paren");
+    const mate = pairByIndex.get(index);
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${mate === undefined ? "" : `↔ ${mate}`}</em></span>`;
+  }).join("") || `<span class="rp1190-empty">${vi ? "chuỗi rỗng" : "empty string"}</span>`;
+  const pairsHtml = pairs.length
+    ? pairs.map(([left, right]) => `<span class="${jump && jump.from === left && jump.to === right || jump && jump.from === right && jump.to === left ? "active" : ""}"><b>${left}</b> ↔ <b>${right}</b></span>`).join("")
+    : `<span class="rp1190-empty">${vi ? "chưa có cặp" : "no pairs yet"}</span>`;
+  const stackHtml = stack.length
+    ? [...stack].reverse().map((index, position) => `<span><small>${position === 0 ? "TOP" : ""}</small><b>( [${index}]</b></span>`).join("")
+    : `<span class="rp1190-empty">${vi ? "stack rỗng" : "empty stack"}</span>`;
+  let action;
+  if (view.event === "push") action = vi ? "Mở một cặp: lưu chỉ số '(' lên stack." : "Open a pair: push the '(' index onto the stack.";
+  else if (view.event === "match") action = vi ? "Đóng cặp trong cùng: nối hai chỉ số vào pair." : "Close the innermost pair: link both indices in pair.";
+  else if (view.event === "jump") action = vi ? `Nhảy từ ${jump?.from} tới ${jump?.to}, rồi đổi chiều.` : `Jump from ${jump?.from} to ${jump?.to}, then flip direction.`;
+  else if (view.event === "emit") action = vi ? `Giữ '${chars[current] || ""}' và đi tiếp ${direction === 1 ? "→" : "←"}.` : `Keep '${chars[current] || ""}' and continue ${direction === 1 ? "→" : "←"}.`;
+  else if (view.event === "return") action = vi ? "Đã đi hết chuỗi; answer không có ngoặc." : "The walk is complete; answer contains no parentheses.";
+  else action = vi ? "Hai lượt duyệt, không cần đảo chuỗi con." : "Two passes; no substring is physically reversed.";
+  const heading = phase === "done" ? (vi ? "HOÀN TẤT" : "COMPLETE") : phase === "walk" ? (vi ? "LƯỢT ĐI" : "WALK") : (vi ? "LƯỢT GHÉP" : "PAIRING PASS");
+  const summary = vi
+    ? `Reverse Parentheses: ${heading.toLowerCase()}, answer hiện tại ${output.join("") || "rỗng"}.`
+    : `Reverse Parentheses: ${heading.toLowerCase()}, current answer ${output.join("") || "empty"}.`;
+
+  $("treeView").innerHTML = `<section class="rp1190-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>LEETCODE 1190 · O(n) TIME</small><strong>REVERSE PARENTHESES</strong></div><span>${escapeHtml(heading)}</span></header>
+    <section class="rp1190-stages">${stages}</section>
+    <section class="rp1190-action"><small>${escapeHtml(String(view.event || "start").toUpperCase())}</small><strong>${escapeHtml(action)}</strong></section>
+    <section class="rp1190-panel"><header><strong>s · index</strong><span>${vi ? "mũi tên ↔ = bạn ghép · vàng = vị trí đang xét" : "↔ labels = matching mate · yellow = current position"}</span></header><div class="rp1190-chars">${cells}</div></section>
+    <section class="rp1190-lower">
+      <section class="rp1190-panel"><header><strong>PAIR MAP</strong><span>${pairs.length} ${vi ? "cặp" : "pair(s)"}</span></header><div class="rp1190-pairs">${pairsHtml}</div></section>
+      <section class="rp1190-panel"><header><strong>STACK</strong><span>${vi ? "đỉnh ở bên trái" : "top at left"}</span></header><div class="rp1190-stack">${stackHtml}</div></section>
+    </section>
+    <section class="rp1190-output"><div><small>${vi ? "HƯỚNG HIỆN TẠI" : "CURRENT DIRECTION"}</small><strong>${direction === 1 ? "→ +1" : "← -1"}</strong></div><div><small>ANSWER</small><strong>${escapeHtml(output.join("") || '""')}</strong></div></section>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -36207,6 +36270,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.reverseParen1190View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReverseParen1190View(step);
   } else if (step.calendar731View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

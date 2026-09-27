@@ -10497,6 +10497,154 @@ function buildSteps32(input) {
   return { original: s, answer: best, steps };
 }
 
+/**
+ * LeetCode 1190: Reverse Substrings Between Each Pair of Parentheses.
+ *
+ * First connect each matching pair with a stack.  Then walk the string with a
+ * direction (+1 or -1).  Landing on either parenthesis jumps to its mate and
+ * reverses direction, so the letters are emitted in their final order without
+ * ever constructing or reversing nested substrings.
+ */
+function buildSteps1190(input) {
+  const s = String(input ?? "");
+  if (!s.length) throw new Error("s must not be empty.");
+  if (s.length > 30) throw new Error("The visualizer supports at most 30 characters.");
+  if (!/^[a-z()]+$/.test(s)) throw new Error("s may contain only lowercase letters and parentheses.");
+
+  const chars = [...s];
+  const n = chars.length;
+  const pair = Array(n).fill(null);
+  const stack = [];
+  const steps = [];
+  const joined = () => pair.flatMap((mate, index) => (mate !== null && index < mate ? [[index, mate]] : []));
+
+  function snap({ phase, current = -1, direction = 1, output = [], visited = [], jump = null, event = "", title, note, codeLines, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      final,
+      vars: [
+        { name: "i", value: current < 0 ? "—" : current },
+        { name: "direction", value: direction === 1 ? "+1 (→)" : "-1 (←)" },
+        { name: "stack", value: `[${stack.join(", ")}]` },
+        { name: "answer", value: output.join("") || '""' },
+      ],
+      note,
+      reverseParen1190View: {
+        s,
+        chars,
+        pairs: joined(),
+        stack: [...stack],
+        phase,
+        current,
+        direction,
+        output: [...output],
+        visited: [...visited],
+        jump,
+        event,
+      },
+    });
+  }
+
+  snap({
+    phase: "pair", event: "start",
+    title: { vi: "Bước 1: ghép các cặp ngoặc", en: "Step 1: connect matching parentheses" },
+    note: {
+      vi: "Duyệt từ trái sang phải. Stack lưu chỉ số của các '(' chưa có bạn ghép; khi gặp ')' thì lấy '(' gần nhất ra để nối thành một cặp.",
+      en: "Scan left to right. The stack stores indices of unmatched '('; when ')' appears, pop its nearest '(' and connect the pair.",
+    },
+    codeLines: [3, 4],
+  });
+
+  for (let index = 0; index < n; index += 1) {
+    if (chars[index] === "(") {
+      stack.push(index);
+      snap({
+        phase: "pair", current: index, event: "push",
+        title: { vi: `s[${index}] = '(' → push ${index}`, en: `s[${index}] = '(' → push ${index}` },
+        note: { vi: `Ngoặc mở tại ${index} chờ ngoặc đóng tương ứng.`, en: `The opening parenthesis at ${index} waits for its matching close.` },
+        codeLines: [5, 6],
+      });
+    } else if (chars[index] === ")") {
+      if (!stack.length) throw new Error("Parentheses must be balanced.");
+      const open = stack.pop();
+      pair[index] = open;
+      pair[open] = index;
+      snap({
+        phase: "pair", current: index, event: "match", jump: { from: open, to: index },
+        title: { vi: `Ghép ${open} ↔ ${index}`, en: `Match ${open} ↔ ${index}` },
+        note: {
+          vi: `')' tại ${index} ghép với '(' mới nhất chưa ghép tại ${open}. Cặp lồng nhau tự hoạt động vì stack luôn lấy cặp trong cùng trước.`,
+          en: `')' at ${index} pairs with the most recent unmatched '(' at ${open}. Nesting works naturally because the stack closes the innermost pair first.`,
+        },
+        codeLines: [7, 8, 9],
+      });
+    }
+  }
+  if (stack.length) throw new Error("Parentheses must be balanced.");
+
+  const output = [];
+  const visited = [];
+  let i = 0;
+  let direction = 1;
+  snap({
+    phase: "walk", current: i, direction, output, visited, event: "walk-start",
+    title: { vi: "Bước 2: đi theo hướng có thể đảo", en: "Step 2: walk with a reversible direction" },
+    note: {
+      vi: "Bắt đầu ở i = 0, đi sang phải. Gặp ngoặc thì nhảy thẳng đến bạn ghép và đảo chiều; không thêm ngoặc nào vào answer.",
+      en: "Start at i = 0 moving right. On a parenthesis, jump to its mate and flip direction; parentheses never enter the answer.",
+    },
+    codeLines: [11, 12, 13],
+  });
+
+  while (i >= 0 && i < n) {
+    const at = i;
+    visited.push(at);
+    if (chars[at] === "(" || chars[at] === ")") {
+      const mate = pair[at];
+      const before = direction;
+      direction *= -1;
+      i = mate + direction;
+      snap({
+        phase: "walk", current: at, direction, output, visited, event: "jump", jump: { from: at, to: mate, before },
+        title: { vi: `${at} ↔ ${mate}, đảo hướng`, en: `${at} ↔ ${mate}, reverse direction` },
+        note: {
+          vi: `Đứng trên '${chars[at]}' tại ${at}: nhảy tới ${mate}, đổi ${before === 1 ? "→" : "←"} thành ${direction === 1 ? "→" : "←"}, rồi bước tiếp đến ${i}. Đây thay thế toàn bộ thao tác reverse.`,
+          en: `At '${chars[at]}' at ${at}: jump to ${mate}, flip ${before === 1 ? "→" : "←"} into ${direction === 1 ? "→" : "←"}, then advance to ${i}. This replaces every substring reversal.`,
+        },
+        codeLines: [14, 15, 16],
+      });
+    } else {
+      output.push(chars[at]);
+      i += direction;
+      snap({
+        phase: "walk", current: at, direction, output, visited, event: "emit",
+        title: { vi: `Thêm '${chars[at]}' vào answer`, en: `Append '${chars[at]}' to answer` },
+        note: {
+          vi: `'${chars[at]}' không phải ngoặc, nên giữ lại. Tiếp tục đi ${direction === 1 ? "sang phải" : "sang trái"} đến i = ${i}.`,
+          en: `'${chars[at]}' is a letter, so keep it. Continue ${direction === 1 ? "right" : "left"} to i = ${i}.`,
+        },
+        codeLines: [17, 18],
+      });
+    }
+  }
+
+  snap({
+    phase: "done", current: -1, direction, output, visited, event: "return", final: true,
+    title: { vi: `Kết quả: ${output.join("")}`, en: `Result: ${output.join("")}` },
+    note: {
+      vi: "Mỗi chữ cái được thêm đúng một lần; mỗi ngoặc chỉ tạo một số lần nhảy hằng số, nên thời gian O(n). Mảng pair và stack dùng O(n) bộ nhớ.",
+      en: "Each letter is appended once and each parenthesis causes only constant jump work, so time is O(n). The pair array and stack use O(n) space.",
+    },
+    codeLines: [19],
+  });
+
+  return { original: s, answer: output.join(""), steps };
+}
+
 module.exports = {
   32: {
     id: 32,
@@ -19025,6 +19173,59 @@ function buildSteps3498(input) {
 }
 
 Object.assign(module.exports, {
+  1190: {
+    id: 1190,
+    difficulty: "medium",
+    slug: "reverse-substrings-between-each-pair-of-parentheses",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [{ key: "stack", vi: "Ngăn xếp", en: "Stack" }],
+    title: { vi: "Reverse Substrings Between Each Pair of Parentheses", en: "Reverse Substrings Between Each Pair of Parentheses" },
+    titleVi: { vi: "Đảo chuỗi con trong từng cặp ngoặc", en: "Reverse substrings inside each pair of parentheses" },
+    statement: {
+      vi: "Cho chuỗi s gồm chữ thường và ngoặc tròn cân bằng. Đảo chuỗi con nằm trong từng cặp ngoặc, từ cặp trong cùng ra ngoài, rồi xóa toàn bộ ngoặc.",
+      en: "Given a balanced string s of lowercase letters and parentheses, reverse the substring inside every matching pair from the innermost pairs outward, then remove all parentheses.",
+    },
+    defaultInput: "(u(love)i)",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường và ngoặc cân bằng)", en: "s (lowercase letters and balanced parentheses)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt một lần với stack để nối hai vị trí của mỗi cặp ngoặc vào mảng pair.", en: "Scan once with a stack to connect the two indices of every parenthesis pair in a pair array." },
+      { vi: "Duyệt lại từ i = 0 với hướng d = +1. Ký tự thường được thêm vào answer; ngoặc sẽ nhảy đến pair[i] và đổi d = −d.", en: "Walk again from i = 0 with direction d = +1. A letter is appended; a parenthesis jumps to pair[i] and flips d = −d." },
+      { vi: "Nhảy qua cặp ngoặc thay cho việc thật sự đảo chuỗi, nên xử lý được ngoặc lồng nhau trong O(n).", en: "Jumping across a pair replaces actual substring reversals, which handles nesting in O(n)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi ký tự được quét để ghép cặp; mỗi chữ cái được thêm một lần và mỗi ngoặc chỉ gây số lần nhảy hằng số. Mảng pair và stack có kích thước O(n).",
+        en: "Each character is scanned to build pairs; every letter is appended once and each parenthesis causes constant jump work. The pair array and stack are O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def reverseParentheses(self, s: str) -> str:",
+      "        pair = [0] * len(s)",
+      "        stack = []",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '(': ",
+      "                stack.append(i)",
+      "            elif ch == ')':",
+      "                j = stack.pop()",
+      "                pair[i] = j; pair[j] = i",
+      "        answer = []",
+      "        i, direction = 0, 1",
+      "        while 0 <= i < len(s):",
+      "            if s[i] in '()':",
+      "                i = pair[i]",
+      "                direction = -direction",
+      "            else:",
+      "                answer.append(s[i])",
+      "            i += direction",
+      "        return ''.join(answer)",
+    ],
+    builder: buildSteps1190,
+  },
   3498: {
     id: 3498,
     difficulty: "easy",
