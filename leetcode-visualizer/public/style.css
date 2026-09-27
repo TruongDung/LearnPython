@@ -59696,3 +59696,49 @@ html, body {
 [data-theme="light"] .ts653h-seen, [data-theme="light"] .ts653h-equation, [data-theme="light"] .ts653h-tree { border-color: #cbd5e1; background: #fff; color: #0f172a; }
 [data-theme="light"] .ts653h-chip { background: #e2e8f0; color: #0f172a; }
 @container (max-width: 480px) { .ts653h-check { grid-template-columns: 1fr; } .ts653h-check > b { display: none; } }
+
+/* Custom #9002 — Music Player: LFU selection with a no-repeat round reset. */
+.mp9002-viz { display: grid; gap: 12px; padding: 14px; color: #e2e8f0; }
+.mp9002-viz > header, .mp9002-body > section > header, .mp9002-history > header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.mp9002-viz > header small, .mp9002-viz > header > span, .mp9002-body header span, .mp9002-history header span { color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.mp9002-viz > header strong { display: block; margin-top: 3px; font-size: 16px; }
+.mp9002-viz > header > span { padding: 5px 8px; border: 1px solid #475569; border-radius: 999px; white-space: nowrap; }
+.mp9002-status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mp9002-status > span, .mp9002-choice { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #334155; border-radius: 9px; background: #0f172a; }
+.mp9002-status small, .mp9002-choice small { color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: .07em; }
+.mp9002-status b { font: 800 16px ui-monospace, monospace; }
+.mp9002-reset { display: flex; gap: 8px; align-items: center; padding: 9px 11px; border: 1px solid #fbbf24; border-radius: 9px; background: rgba(245,158,11,.12); color: #fef3c7; font-size: 12px; }
+.mp9002-reset b { color: #fbbf24; white-space: nowrap; }
+.mp9002-body { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 10px; }
+.mp9002-songs { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 7px; margin-top: 7px; }
+.mp9002-song { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; min-height: 72px; padding: 9px; border: 1px solid #475569; border-radius: 9px; background: #1e293b; }
+.mp9002-song > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.mp9002-song > span { display: grid; justify-items: end; }
+.mp9002-song small { color: #94a3b8; font-size: 9px; font-weight: 800; }
+.mp9002-song b { font: 800 15px ui-monospace, monospace; }
+.mp9002-song em { grid-column: 1 / -1; color: #94a3b8; font-size: 10px; font-style: normal; }
+.mp9002-song.played { opacity: .58; border-style: dashed; }
+.mp9002-song.candidate { border-color: #2dd4bf; box-shadow: 0 0 0 2px rgba(45,212,191,.14); }
+.mp9002-song.candidate em { color: #5eead4; }
+.mp9002-song.selected { border-color: #fbbf24; background: #3b2f12; box-shadow: 0 0 0 2px rgba(251,191,36,.16); opacity: 1; }
+.mp9002-song.selected em { color: #fcd34d; }
+.mp9002-choice { align-content: center; text-align: center; border-color: #fbbf24; background: #2d2512; }
+.mp9002-choice strong { color: #fcd34d; overflow-wrap: anywhere; font-size: 15px; }
+.mp9002-choice span { color: #fde68a; font: 800 11px ui-monospace, monospace; }
+.mp9002-choice.idle { border-color: #334155; background: #0f172a; }
+.mp9002-choice.idle strong, .mp9002-choice.idle span { color: #94a3b8; }
+.mp9002-history { padding: 10px; border: 1px solid #334155; border-radius: 9px; background: #0f172a; }
+.mp9002-history > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mp9002-history em { color: #94a3b8; font-size: 12px; }
+.mp9002-history-item { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 7px; background: #334155; font-size: 11px; }
+.mp9002-history-item small { color: #94a3b8; font: 800 10px ui-monospace, monospace; }
+.mp9002-history-item.latest { background: #0f766e; color: #ecfeff; }
+.mp9002-viz > footer { color: #cbd5e1; font-size: 12px; line-height: 1.45; white-space: pre-line; }
+[data-theme="light"] .mp9002-viz { color: #1e293b; }
+[data-theme="light"] .mp9002-viz > header small, [data-theme="light"] .mp9002-viz > header > span, [data-theme="light"] .mp9002-body header span, [data-theme="light"] .mp9002-history header span, [data-theme="light"] .mp9002-status small, [data-theme="light"] .mp9002-choice small, [data-theme="light"] .mp9002-song small, [data-theme="light"] .mp9002-song em, [data-theme="light"] .mp9002-history em, [data-theme="light"] .mp9002-history-item small { color: #64748b; }
+[data-theme="light"] .mp9002-viz > header > span, [data-theme="light"] .mp9002-status > span, [data-theme="light"] .mp9002-history, [data-theme="light"] .mp9002-choice, [data-theme="light"] .mp9002-choice.idle { border-color: #cbd5e1; background: #fff; }
+[data-theme="light"] .mp9002-song { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .mp9002-song.selected { border-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .mp9002-history-item { background: #e2e8f0; }
+[data-theme="light"] .mp9002-viz > footer { color: #475569; }
+@container (max-width: 520px) { .mp9002-status, .mp9002-body { grid-template-columns: 1fr; } .mp9002-choice { min-height: 78px; } }

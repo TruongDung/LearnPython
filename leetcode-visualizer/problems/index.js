@@ -31,6 +31,7 @@ const categories = {
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: require("./bitmask"),
+  design: require("./music-player"),
 };
 
 const SUPPORTED = {};

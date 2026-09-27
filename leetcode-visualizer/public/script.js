@@ -25148,6 +25148,46 @@ function renderLfuCacheView(step) {
   </div>`;
 }
 
+function renderMusicPlayerView(step) {
+  const view = step.musicPlayerView || {};
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const songs = Array.isArray(view.songs) ? view.songs : [];
+  const history = Array.isArray(view.history) ? view.history : [];
+  const candidates = new Set(Array.isArray(view.candidates) ? view.candidates : []);
+  const selected = view.selectedSong;
+  const total = Number(view.requestedPlays || 0);
+  const completed = Number(view.completedPlays || 0);
+  const roundPlayed = songs.filter((song) => song.playedThisRound).length;
+  const historyHtml = history.length
+    ? history.map((song, index) => `<span class="mp9002-history-item${index === history.length - 1 ? " latest" : ""}"><small>${index + 1}</small>${escapeHtml(song)}</span>`).join("")
+    : `<em>${vi ? "Chưa có bài nào được phát" : "No song has played yet"}</em>`;
+  const songsHtml = songs.map((item) => {
+    const classes = ["mp9002-song"];
+    if (item.playedThisRound) classes.push("played");
+    if (candidates.has(item.song)) classes.push("candidate");
+    if (item.song === selected) classes.push("selected");
+    const cycleLabel = item.playedThisRound ? (vi ? "đã phát vòng này" : "played this round") : (vi ? "đủ điều kiện" : "eligible");
+    return `<article class="${classes.join(" ")}"><strong>${escapeHtml(item.song)}</strong><span><small>FREQ</small><b>${escapeHtml(item.frequency)}</b></span><em>${escapeHtml(cycleLabel)}</em></article>`;
+  }).join("");
+  const resetHtml = view.didReset
+    ? `<div class="mp9002-reset"><b>↻ ${vi ? "RESET VÒNG" : "ROUND RESET"}</b><span>${vi ? "Tập chặn đã được xóa; freq vẫn giữ nguyên." : "The blocking set was cleared; freq is preserved."}</span></div>`
+    : "";
+  const chosenHtml = selected
+    ? `<div class="mp9002-choice"><small>${vi ? "BÀI ĐƯỢC CHỌN" : "SELECTED SONG"}</small><strong>${escapeHtml(selected)}</strong><span>LFU = ${view.minFrequency ?? "—"}</span></div>`
+    : `<div class="mp9002-choice idle"><small>${vi ? "BÀI ĐƯỢC CHỌN" : "SELECTED SONG"}</small><strong>—</strong><span>${vi ? "đang chuẩn bị" : "preparing"}</span></div>`;
+  const summary = vi ? `Music Player vòng ${view.round || 1}: ${roundPlayed}/${songs.length} bài đã phát trong vòng.` : `Music Player round ${view.round || 1}: ${roundPlayed}/${songs.length} songs played this round.`;
+
+  treeView.innerHTML = `<section class="mp9002-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>MUSIC PLAYER · LFU + RESET</small><strong>${escapeHtml(pick(step.title))}</strong></div><span>${vi ? `vòng ${view.round || 1}` : `round ${view.round || 1}`}</span></header>
+    <div class="mp9002-status"><span><small>PLAY()</small><b>${completed} / ${total}</b></span><span><small>${vi ? "ĐÃ PHÁT VÒNG NÀY" : "PLAYED THIS ROUND"}</small><b>${roundPlayed} / ${songs.length}</b></span><span><small>${vi ? "ỨNG VIÊN LFU" : "LFU CANDIDATES"}</small><b>${candidates.size}</b></span></div>
+    ${resetHtml}
+    <div class="mp9002-body"><section><header><strong>${vi ? "THƯ VIỆN BÀI HÁT" : "SONG LIBRARY"}</strong><span>${vi ? "xanh = còn được chọn" : "teal = still eligible"}</span></header><div class="mp9002-songs">${songsHtml}</div></section>${chosenHtml}</div>
+    <section class="mp9002-history"><header><strong>${vi ? "LỊCH SỬ PLAY()" : "PLAY() HISTORY"}</strong><span>${vi ? "mỗi vòng không lặp" : "no repeats per round"}</span></header><div>${historyHtml}</div></section>
+    <footer>${escapeHtml(pick(step.note))}</footer>
+  </section>`;
+}
+
 function renderRideSharingView(step) {
   const view = step.rideSharingView;
   const treeView = $("treeView");
@@ -36726,6 +36766,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLfuCacheView(step);
+  } else if (step.musicPlayerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMusicPlayerView(step);
   } else if (step.rideSharingView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
