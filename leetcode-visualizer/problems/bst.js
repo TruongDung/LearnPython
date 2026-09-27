@@ -1441,18 +1441,104 @@ function buildSteps450(input, params) {
 
 // ─── 653: Two Sum IV (BST) ───
 function buildSteps653(input, params) {
-  const root = parseBST(input); const target = params.k || 9; const steps = []; const sorted = [];
-  function io(n) { if (!n) return; io(n.left); sorted.push(n); io(n.right); } io(root);
-  const vals = sorted.map(n=>n.val);
-  steps.push(snapshot(root, { title: { vi: `Two Sum = ${target}`, en: `Two Sum = ${target}` }, vars: [{ name: "target", value: target }, { name: "inorder", value: `[${vals.join(",")}]` }], note: { vi: `Inorder → sorted. 2 pointers tìm pair.`, en: `Inorder → sorted. 2 pointers find pair.` } }));
-  let l = 0, r = vals.length-1, answer = false;
-  while (l < r) {
-    const s = vals[l]+vals[r];
-    if (s === target) { answer = true; const fs = snapshot(root, { title: { vi: `✓ ${vals[l]}+${vals[r]}=${target}`, en: `✓ ${vals[l]}+${vals[r]}=${target}` }, hlSet: new Set([sorted[l].id,sorted[r].id]), wordSet: new Set([sorted[l].id,sorted[r].id]), vars: [{ name: "pair", value: `(${vals[l]},${vals[r]})` }], note: { vi: `Found!`, en: `Found!` } }); fs.final = true; steps.push(fs); break; }
-    else if (s < target) l++; else r--;
+  const root = parseBST(input);
+  const target = Number(params?.k ?? 9);
+  const steps = [];
+  const sorted = [];
+  function inorder(node) {
+    if (!node) return;
+    inorder(node.left);
+    sorted.push(node);
+    inorder(node.right);
   }
-  if (!answer) { const fs = snapshot(root, { title: { vi: "✗ Not found", en: "✗ Not found" }, vars: [{ name: "answer", value: false }], note: { vi: "Không tìm thấy.", en: "Not found." } }); fs.final = true; steps.push(fs); }
-  return { input, answer, steps };
+  inorder(root);
+  const vals = sorted.map((node) => node.val);
+
+  function push({ title, codeLines, note, l = -1, r = -1, sum = null, final = false }) {
+    const selected = [l, r].filter((index) => index >= 0 && index < sorted.length);
+    const annotations = {};
+    if (l >= 0 && sorted[l]) annotations[sorted[l].id] = { label: "L", kind: "two-sum-left" };
+    if (r >= 0 && sorted[r]) annotations[sorted[r].id] = { label: r === l ? "L/R" : "R", kind: "two-sum-right" };
+    const step = snapshot(root, {
+      title,
+      codeLines,
+      hlSet: new Set(selected.map((index) => sorted[index].id)),
+      wordSet: new Set(selected.map((index) => sorted[index].id)),
+      annotations,
+      vars: [
+        { name: "k", value: target },
+        { name: "inorder values", value: `[${vals.join(", ")}]` },
+        { name: "left", value: l < 0 ? "—" : `${l} → ${vals[l]}` },
+        { name: "right", value: r < 0 ? "—" : `${r} → ${vals[r]}` },
+        { name: "sum", value: sum === null ? "—" : `${vals[l]} + ${vals[r]} = ${sum}` },
+      ],
+      note,
+    });
+    step.twoSum653View = { values: vals, left: l, right: r, sum, target, final };
+    step.final = final;
+    steps.push(step);
+  }
+
+  if (!root) {
+    push({
+      title: { vi: "Cây rỗng → false", en: "Empty tree → false" }, codeLines: [20], final: true,
+      note: { vi: "Không có hai nút để tạo tổng target.", en: "There are no two nodes that can form the target sum." },
+    });
+    return { input, answer: false, steps };
+  }
+
+  push({
+    title: { vi: "Khởi tạo inorder", en: "Initialize inorder" }, codeLines: [3],
+    note: { vi: "Ta sẽ đưa BST về mảng tăng dần, rồi tìm hai tổng bằng hai con trỏ.", en: "We will turn the BST into a sorted array, then search with two pointers." },
+  });
+  push({
+    title: { vi: `inorder = [${vals.join(", ")}]`, en: `inorder = [${vals.join(", ")}]` }, codeLines: [4, 10],
+    note: { vi: "Duyệt inorder của BST luôn sinh ra thứ tự tăng dần.", en: "An inorder traversal of a BST always produces ascending order." },
+  });
+
+  let l = 0;
+  let r = vals.length - 1;
+  push({
+    title: { vi: `left = 0, right = ${r}`, en: `left = 0, right = ${r}` }, codeLines: [11], l, r,
+    note: { vi: "Bắt đầu từ số nhỏ nhất và lớn nhất trong inorder.", en: "Start at the smallest and largest inorder values." },
+  });
+
+  while (l < r) {
+    push({
+      title: { vi: `left < right (${l} < ${r})`, en: `left < right (${l} < ${r})` }, codeLines: [12], l, r,
+      note: { vi: "Hai con trỏ khác nhau, nên đây là một cặp nút hợp lệ để thử.", en: "The pointers refer to distinct nodes, so this is a valid pair to test." },
+    });
+    const sum = vals[l] + vals[r];
+    push({
+      title: { vi: `${vals[l]} + ${vals[r]} = ${sum}`, en: `${vals[l]} + ${vals[r]} = ${sum}` }, codeLines: [13], l, r, sum,
+      note: { vi: `So sánh ${sum} với target k = ${target}.`, en: `Compare ${sum} with target k = ${target}.` },
+    });
+    if (sum === target) {
+      push({
+        title: { vi: `✓ Tìm thấy ${vals[l]} + ${vals[r]} = ${target}`, en: `✓ Found ${vals[l]} + ${vals[r]} = ${target}` }, codeLines: [14, 15], l, r, sum, final: true,
+        note: { vi: "Đúng target, trả về true ngay. Hai màu trên cây là hai nút của đáp án.", en: "It equals the target, so return true immediately. The two highlighted tree nodes form the answer." },
+      });
+      return { input, answer: true, steps };
+    }
+    if (sum < target) {
+      push({
+        title: { vi: `${sum} < ${target} → left += 1`, en: `${sum} < ${target} → left += 1` }, codeLines: [16, 17], l, r, sum,
+        note: { vi: "Tổng quá nhỏ; tăng left để chọn số lớn hơn. Giảm right chỉ làm tổng nhỏ hơn nữa.", en: "The sum is too small; move left to a larger value. Moving right would only make it smaller." },
+      });
+      l += 1;
+    } else {
+      push({
+        title: { vi: `${sum} > ${target} → right -= 1`, en: `${sum} > ${target} → right -= 1` }, codeLines: [18, 19], l, r, sum,
+        note: { vi: "Tổng quá lớn; giảm right để chọn số nhỏ hơn. Tăng left chỉ làm tổng lớn hơn nữa.", en: "The sum is too large; move right to a smaller value. Moving left would only make it larger." },
+      });
+      r -= 1;
+    }
+  }
+  push({
+    title: { vi: "left gặp right → false", en: "left meets right → false" }, codeLines: [20], l, r, final: true,
+    note: { vi: "Không còn hai nút khác nhau để thử, nên không tồn tại cặp có tổng k.", en: "No two distinct nodes remain to test, so no pair sums to k." },
+  });
+  return { input, answer: false, steps };
 }
 
 // ─── 530: Min Abs Diff in BST ───
@@ -3656,15 +3742,37 @@ module.exports = {
     category: { key: "bst", vi: "Cây nhị phân tìm kiếm (BST)", en: "Binary Search Tree" },
     title: { vi: "Two Sum IV - Input is a BST", en: "Two Sum IV - Input is a BST" },
     titleVi: { vi: "Two Sum trong BST", en: "Two sum in BST" },
-    statement: { vi: "Cho BST và target, kiểm tra có 2 nút có tổng = target không. Dùng inorder + set.", en: "Given BST and target, check if two nodes sum to target. Use inorder + set." },
+    statement: { vi: "Cho BST và target k, kiểm tra có hai nút khác nhau có tổng bằng k không. Dùng inorder để lấy dãy tăng dần, rồi dùng hai con trỏ.", en: "Given a BST and target k, check whether two distinct nodes sum to k. Use inorder to obtain sorted values, then two pointers." },
     defaultInput: "5,3,6,2,4,null,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [{ key: "k", label: { vi: "target (tổng)", en: "target (sum)" }, default: 9 }],
     approach: [
-      { vi: "Inorder → sorted array. Dùng 2 pointers (left, right) hoặc set để tìm pair.", en: "Inorder → sorted array. Use 2 pointers or set to find pair." },
+      { vi: "Inorder của BST tạo ra mảng tăng dần. Đặt left ở số nhỏ nhất và right ở số lớn nhất.", en: "BST inorder traversal produces an ascending array. Put left at the smallest value and right at the largest." },
+      { vi: "Nếu tổng nhỏ hơn k thì tăng left; nếu lớn hơn k thì giảm right. Vì mảng đã sắp xếp, hướng di chuyển này không bỏ sót đáp án.", en: "If the sum is below k, increment left; if above k, decrement right. Because the array is sorted, these moves cannot skip an answer." },
     ],
-    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Inorder O(n) + set O(n).", en: "Inorder O(n) + set O(n)." } },
-    code: ["class Solution:", "    def findTarget(self, root, k):", "        seen = set()", "        def dfs(node):", "            if not node: return False", "            if k - node.val in seen:", "                return True", "            seen.add(node.val)", "            return dfs(node.left) or dfs(node.right)", "        return dfs(root)"],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Inorder thăm mỗi nút một lần và lưu n giá trị; hai con trỏ chỉ quét vào trong, tối đa n − 1 lần.", en: "Inorder visits each node once and stores n values; the two pointers only move inward, at most n − 1 times." } },
+    code: [
+      "class Solution:",
+      "    def findTarget(self, root, k):",
+      "        values = []",
+      "        def inorder(node):",
+      "            if not node:",
+      "                return",
+      "            inorder(node.left)",
+      "            values.append(node.val)",
+      "            inorder(node.right)",
+      "        inorder(root)",
+      "        left, right = 0, len(values) - 1",
+      "        while left < right:",
+      "            total = values[left] + values[right]",
+      "            if total == k:",
+      "                return True",
+      "            if total < k:",
+      "                left += 1",
+      "            else:",
+      "                right -= 1",
+      "        return False",
+    ],
     builder: buildSteps653,
   },
   530: {

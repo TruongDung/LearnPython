@@ -4819,6 +4819,32 @@ function renderUpsideDown156View(step) {
   renderTree({ tree: step.tree }, "ud156Tree");
 }
 
+function renderTwoSum653View(step) {
+  const view = step.twoSum653View || {};
+  const values = Array.isArray(view.values) ? view.values : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const hasPair = left >= 0 && right >= 0 && Number.isFinite(view.sum);
+  const vi = lang === "vi";
+  const cells = values.map((value, index) => {
+    const roles = [index === left ? "left" : "", index === right ? "right" : ""].filter(Boolean);
+    const pointer = index === left && index === right ? "L/R" : index === left ? "L" : index === right ? "R" : "";
+    return `<div class="ts653-cell ${roles.join(" ")}"><small>${index}</small><strong>${escapeHtml(value)}</strong>${pointer ? `<em>${pointer}</em>` : ""}</div>`;
+  }).join("");
+  const equation = hasPair
+    ? view.sum === view.target
+      ? `${values[left]} + ${values[right]} = ${view.target} ✓`
+      : `${values[left]} + ${values[right]} = ${view.sum} ${view.sum < view.target ? "<" : ">"} k = ${view.target}`
+    : (vi ? `target k = ${view.target}` : `target k = ${view.target}`);
+  $("treeView").innerHTML = `<section class="ts653-viz">
+    <header><strong>${vi ? "INORDER → HAI CON TRỎ" : "INORDER → TWO POINTERS"}</strong><span>${vi ? "mảng tăng dần" : "sorted values"}</span></header>
+    <div class="ts653-array">${cells || "∅"}</div>
+    <div class="ts653-equation">${escapeHtml(equation)}</div>
+    <div class="ts653-tree"><div id="twoSum653Tree"></div></div>
+  </section>`;
+  renderTree({ tree: step.tree }, "twoSum653Tree");
+}
+
 function renderTree(step, targetId = "treeView") {
   if (step.insufficient1080View && targetId === "treeView") {
     renderInsufficient1080View(step);
@@ -37206,6 +37232,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderUpsideDown156View(step);
+  } else if (step.twoSum653View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoSum653View(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

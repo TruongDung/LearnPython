@@ -59649,3 +59649,24 @@ html, body {
 [data-theme="light"] .rp1190-output strong { color: #047857; }
 @container (max-width: 560px) { .rp1190-lower { grid-template-columns: 1fr; } }
 @container (max-width: 390px) { .rp1190-stages, .rp1190-output { grid-template-columns: 1fr; } .rp1190-cell { flex-basis: 36px; } }
+/* LeetCode #653 — inorder values and two-pointer search. */
+.ts653-viz { display: grid; gap: 11px; padding: 14px; color: #e2e8f0; }
+.ts653-viz > header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.ts653-viz > header strong { font-size: 12px; letter-spacing: .07em; }
+.ts653-viz > header span { color: #94a3b8; font-size: 11px; }
+.ts653-array { display: flex; gap: 7px; overflow-x: auto; padding: 4px 1px 8px; }
+.ts653-cell { position: relative; display: grid; min-width: 46px; min-height: 58px; place-items: center; border: 1px solid #475569; border-radius: 9px; background: #1e293b; }
+.ts653-cell small { position: absolute; top: 5px; left: 7px; color: #94a3b8; font: 10px ui-monospace, monospace; }
+.ts653-cell strong { font: 800 16px ui-monospace, monospace; }
+.ts653-cell em { position: absolute; bottom: 5px; min-width: 15px; padding: 2px 6px; border-radius: 999px; color: #0f172a; background: #fbbf24; font: 800 11px ui-monospace, monospace; font-style: normal; text-align: center; }
+.ts653-cell.left em { background: #7dd3fc; }
+.ts653-cell.left { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,.18); }
+.ts653-cell.right { border-color: #f472b6; box-shadow: 0 0 0 2px rgba(244,114,182,.18); }
+.ts653-cell.right em { background: #f9a8d4; }
+.ts653-equation { padding: 9px 11px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #f8fafc; font: 800 13px ui-monospace, monospace; text-align: center; }
+.ts653-tree { min-height: 180px; border: 1px solid #334155; border-radius: 10px; background: rgba(15,23,42,.6); overflow: auto; }
+.ts653-tree .tree-svg { display: block; margin: 0 auto; }
+[data-theme="light"] .ts653-viz { color: #1e293b; }
+[data-theme="light"] .ts653-viz > header span, [data-theme="light"] .ts653-cell small { color: #64748b; }
+[data-theme="light"] .ts653-cell { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .ts653-equation, [data-theme="light"] .ts653-tree { border-color: #cbd5e1; background: #fff; color: #0f172a; }
