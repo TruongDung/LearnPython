@@ -4845,6 +4845,40 @@ function renderTwoSum653View(step) {
   renderTree({ tree: step.tree }, "twoSum653Tree");
 }
 
+function renderTwoSum653HashView(step) {
+  const view = step.twoSum653HashView || {};
+  const vi = lang === "vi";
+  const seen = Array.isArray(view.seen) ? view.seen : [];
+  const hasCurrent = Number.isFinite(view.current) && Number.isFinite(view.need);
+  const hasMatch = hasCurrent && seen.includes(view.need);
+  const pair = Array.isArray(view.pair) ? view.pair : null;
+  const status = pair
+    ? `${pair[0]} + ${pair[1]} = ${view.target} ✓`
+    : hasCurrent
+      ? `${view.target} − ${view.current} = ${view.need} ${hasMatch ? "∈" : "∉"} seen`
+      : (vi ? "Chờ DFS chọn node" : "Waiting for DFS to choose a node");
+  const chips = seen.length
+    ? seen.map((value) => `<span class="ts653h-chip ${value === view.need ? "needed" : ""}">${escapeHtml(String(value))}</span>`).join("")
+    : `<em>${vi ? "∅ · chưa có node đã duyệt" : "∅ · no earlier nodes"}</em>`;
+  const phase = {
+    init: vi ? "khởi tạo" : "initialize",
+    check: vi ? "kiểm tra complement" : "check complement",
+    add: vi ? "thêm vào seen" : "add to seen",
+    left: vi ? "DFS trái" : "DFS left",
+    right: vi ? "DFS phải" : "DFS right",
+    found: vi ? "đã tìm thấy" : "found",
+    result: vi ? "kết quả" : "result",
+  }[view.phase] || view.phase || "—";
+  $("treeView").innerHTML = `<section class="ts653h-viz">
+    <header><strong>${vi ? "DFS → HASH SET" : "DFS → HASH SET"}</strong><span>${escapeHtml(phase)}</span></header>
+    <section class="ts653h-check"><div><small>${vi ? "NODE HIỆN TẠI" : "CURRENT NODE"}</small><strong>${view.current ?? "—"}</strong></div><b>→</b><div><small>${vi ? "CẦN TÌM" : "NEED"}</small><strong>${view.need ?? "—"}</strong></div><b>→</b><div class="result"><small>seen?</small><strong>${hasCurrent ? (hasMatch ? "YES" : "NO") : "—"}</strong></div></section>
+    <section class="ts653h-seen"><header><strong>seen</strong><span>${vi ? "chỉ gồm node đã duyệt trước đó" : "only earlier DFS nodes"}</span></header><div>${chips}</div></section>
+    <div class="ts653h-equation">${escapeHtml(status)}</div>
+    <div class="ts653h-tree"><div id="twoSum653HashTree"></div></div>
+  </section>`;
+  renderTree({ tree: step.tree }, "twoSum653HashTree");
+}
+
 function renderTree(step, targetId = "treeView") {
   if (step.insufficient1080View && targetId === "treeView") {
     renderInsufficient1080View(step);
@@ -37232,6 +37266,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderUpsideDown156View(step);
+  } else if (step.twoSum653HashView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoSum653HashView(step);
   } else if (step.twoSum653View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

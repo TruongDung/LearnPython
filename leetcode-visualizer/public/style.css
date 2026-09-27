@@ -59670,3 +59670,29 @@ html, body {
 [data-theme="light"] .ts653-viz > header span, [data-theme="light"] .ts653-cell small { color: #64748b; }
 [data-theme="light"] .ts653-cell { border-color: #cbd5e1; background: #f8fafc; }
 [data-theme="light"] .ts653-equation, [data-theme="light"] .ts653-tree { border-color: #cbd5e1; background: #fff; color: #0f172a; }
+
+/* LeetCode #653, approach 2 — DFS + Hash Set. */
+.ts653h-viz { display: grid; gap: 11px; padding: 14px; color: #e2e8f0; }
+.ts653h-viz > header, .ts653h-seen > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ts653h-viz > header strong, .ts653h-seen > header strong { font-size: 12px; letter-spacing: .07em; }
+.ts653h-viz > header span, .ts653h-seen > header span { color: #94a3b8; font-size: 11px; }
+.ts653h-check { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 7px; }
+.ts653h-check > div { display: grid; min-height: 56px; place-items: center; border: 1px solid #475569; border-radius: 9px; background: #1e293b; }
+.ts653h-check small { color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: .06em; }
+.ts653h-check strong { font: 800 18px ui-monospace, monospace; }
+.ts653h-check > b { color: #94a3b8; }
+.ts653h-check .result strong { color: #34d399; font-size: 13px; }
+.ts653h-seen { padding: 10px; border: 1px solid #334155; border-radius: 9px; background: #0f172a; }
+.ts653h-seen > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ts653h-seen em { color: #94a3b8; font-size: 12px; }
+.ts653h-chip { min-width: 28px; padding: 4px 7px; border-radius: 7px; background: #334155; color: #e2e8f0; font: 800 13px ui-monospace, monospace; text-align: center; }
+.ts653h-chip.needed { background: #34d399; color: #052e2b; }
+.ts653h-equation { padding: 9px 11px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #f8fafc; font: 800 13px ui-monospace, monospace; text-align: center; }
+.ts653h-tree { min-height: 180px; border: 1px solid #334155; border-radius: 10px; background: rgba(15,23,42,.6); overflow: auto; }
+.ts653h-tree .tree-svg { display: block; margin: 0 auto; }
+[data-theme="light"] .ts653h-viz { color: #1e293b; }
+[data-theme="light"] .ts653h-viz > header span, [data-theme="light"] .ts653h-seen > header span, [data-theme="light"] .ts653h-check small, [data-theme="light"] .ts653h-seen em { color: #64748b; }
+[data-theme="light"] .ts653h-check > div { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .ts653h-seen, [data-theme="light"] .ts653h-equation, [data-theme="light"] .ts653h-tree { border-color: #cbd5e1; background: #fff; color: #0f172a; }
+[data-theme="light"] .ts653h-chip { background: #e2e8f0; color: #0f172a; }
+@container (max-width: 480px) { .ts653h-check { grid-template-columns: 1fr; } .ts653h-check > b { display: none; } }

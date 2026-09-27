@@ -1541,6 +1541,127 @@ function buildSteps653(input, params) {
   return { input, answer: false, steps };
 }
 
+// ─── 653, approach 2: DFS + hash set ───
+function buildSteps653HashSet(input, params) {
+  const root = parseBST(input);
+  const target = Number(params?.k ?? 9);
+  const steps = [];
+  const seen = new Set();
+  const seenNodes = new Map();
+  let foundPair = null;
+
+  function push({ title, codeLines, note, node = null, need = null, phase, final = false }) {
+    const partner = need === null ? null : seenNodes.get(need);
+    const annotations = {};
+    for (const seenNode of seenNodes.values()) {
+      annotations[seenNode.id] = { label: "seen", kind: "two-sum-seen" };
+    }
+    if (node) annotations[node.id] = { label: "current", kind: "two-sum-current" };
+    if (partner && partner !== node) annotations[partner.id] = { label: "match", kind: "two-sum-match" };
+
+    const highlighted = new Set([node, partner].filter(Boolean).map((item) => item.id));
+    const step = snapshot(root, {
+      title,
+      codeLines,
+      hlSet: highlighted,
+      wordSet: new Set([...seenNodes.values()].map((item) => item.id)),
+      annotations,
+      vars: [
+        { name: "k", value: target },
+        { name: "node", value: node ? node.val : "—" },
+        { name: "need = k - node", value: need === null ? "—" : `${target} - ${node.val} = ${need}` },
+        { name: "seen", value: `{${[...seen].join(", ")}}` },
+      ],
+      note,
+    });
+    step.twoSum653HashView = {
+      target,
+      seen: [...seen],
+      current: node ? node.val : null,
+      need,
+      phase,
+      pair: foundPair,
+      final,
+    };
+    step.final = final;
+    steps.push(step);
+  }
+
+  if (!root) {
+    push({
+      title: { vi: "Cây rỗng → false", en: "Empty tree → false" },
+      codeLines: [12], phase: "result", final: true,
+      note: { vi: "Không có hai node khác nhau để tạo tổng k.", en: "There are no two distinct nodes that can form k." },
+    });
+    return { input, answer: false, steps };
+  }
+
+  push({
+    title: { vi: "seen = ∅", en: "seen = ∅" },
+    codeLines: [3], phase: "init",
+    note: { vi: "seen chỉ chứa các node DFS đã duyệt trước đó.", en: "seen contains only nodes visited earlier by DFS." },
+  });
+
+  function dfs(node) {
+    if (!node) return false;
+    const need = target - node.val;
+    const partner = seenNodes.get(need);
+    push({
+      title: { vi: `Node ${node.val}: cần ${need}`, en: `Node ${node.val}: need ${need}` },
+      codeLines: [4, 5, 7, 8], node, need, phase: "check",
+      note: { vi: `Kiểm tra xem ${need} đã có trong seen chưa.`, en: `Check whether ${need} is already in seen.` },
+    });
+
+    if (partner) {
+      foundPair = [partner.val, node.val];
+      push({
+        title: { vi: `✓ ${partner.val} + ${node.val} = ${target}`, en: `✓ ${partner.val} + ${node.val} = ${target}` },
+        codeLines: [8, 9], node, need, phase: "found",
+        note: { vi: `${need} đã ở trong seen, nên hai node khác nhau tạo đúng tổng k.`, en: `${need} is already in seen, so two distinct nodes form k.` },
+      });
+      return true;
+    }
+
+    seen.add(node.val);
+    seenNodes.set(node.val, node);
+    push({
+      title: { vi: `Thêm ${node.val} vào seen`, en: `Add ${node.val} to seen` },
+      codeLines: [10], node, need, phase: "add",
+      note: { vi: `Các node về sau có thể ghép với ${node.val}.`, en: `Later nodes can now pair with ${node.val}.` },
+    });
+
+    if (node.left) {
+      push({
+        title: { vi: `DFS trái → ${node.left.val}`, en: `DFS left → ${node.left.val}` },
+        codeLines: [11], node, need, phase: "left",
+        note: { vi: "Duyệt subtree trái trước; nếu tìm thấy thì `or` dừng sớm.", en: "Visit the left subtree first; `or` short-circuits if it succeeds." },
+      });
+      if (dfs(node.left)) return true;
+    }
+    if (node.right) {
+      push({
+        title: { vi: `DFS phải → ${node.right.val}`, en: `DFS right → ${node.right.val}` },
+        codeLines: [11], node, need, phase: "right",
+        note: { vi: "Subtree trái chưa tìm thấy, nên tiếp tục sang phải.", en: "The left subtree did not find a pair, so continue right." },
+      });
+      if (dfs(node.right)) return true;
+    }
+    return false;
+  }
+
+  const answer = dfs(root);
+  push({
+    title: answer
+      ? { vi: "Trả về true", en: "Return true" }
+      : { vi: "Đã duyệt hết → false", en: "All nodes visited → false" },
+    codeLines: [12], phase: "result", final: true,
+    note: answer
+      ? { vi: "DFS đã tìm được một cặp hợp lệ.", en: "DFS found a valid pair." }
+      : { vi: "Không node nào tìm được complement đã xuất hiện trước đó.", en: "No node found a complement that had appeared earlier." },
+  });
+  return { input, answer, steps };
+}
+
 // ─── 530: Min Abs Diff in BST ───
 function buildSteps530(input) {
   const root = parseBST(input); const steps = []; const sorted = [];
@@ -3745,12 +3866,18 @@ module.exports = {
     statement: { vi: "Cho BST và target k, kiểm tra có hai nút khác nhau có tổng bằng k không. Dùng inorder để lấy dãy tăng dần, rồi dùng hai con trỏ.", en: "Given a BST and target k, check whether two distinct nodes sum to k. Use inorder to obtain sorted values, then two pointers." },
     defaultInput: "5,3,6,2,4,null,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [{ key: "k", label: { vi: "target (tổng)", en: "target (sum)" }, default: 9 }],
-    approach: [
-      { vi: "Inorder của BST tạo ra mảng tăng dần. Đặt left ở số nhỏ nhất và right ở số lớn nhất.", en: "BST inorder traversal produces an ascending array. Put left at the smallest value and right at the largest." },
-      { vi: "Nếu tổng nhỏ hơn k thì tăng left; nếu lớn hơn k thì giảm right. Vì mảng đã sắp xếp, hướng di chuyển này không bỏ sót đáp án.", en: "If the sum is below k, increment left; if above k, decrement right. Because the array is sorted, these moves cannot skip an answer." },
+    extraParams: [
+      { key: "k", label: { vi: "target (tổng)", en: "target (sum)" }, default: 9 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Inorder + hai con trỏ", en: "Approach 1: Inorder + two pointers" } },
+        { value: "2", label: { vi: "Cách 2: DFS + Hash Set", en: "Approach 2: DFS + Hash Set" } },
+      ] },
     ],
-    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Inorder thăm mỗi nút một lần và lưu n giá trị; hai con trỏ chỉ quét vào trong, tối đa n − 1 lần.", en: "Inorder visits each node once and stores n values; the two pointers only move inward, at most n − 1 times." } },
+    approach: [
+      { vi: "Cách 1 — Inorder của BST tạo mảng tăng dần, rồi dùng hai con trỏ từ hai đầu.", en: "Approach 1 — BST inorder creates an ascending array, then two pointers move inward from both ends." },
+      { vi: "Cách 2 — DFS từng node. Với node x, kiểm tra k − x có trong Hash Set seen (các node đã duyệt) không.", en: "Approach 2 — DFS each node. For node x, check whether k − x is in the seen hash set of earlier nodes." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cách 1 lưu mảng inorder; Cách 2 lưu Hash Set seen. Cả hai thăm mỗi node không quá một lần.", en: "Approach 1 stores the inorder array; Approach 2 stores the seen hash set. Both visit each node at most once." } },
     code: [
       "class Solution:",
       "    def findTarget(self, root, k):",
@@ -3773,7 +3900,24 @@ module.exports = {
       "                right -= 1",
       "        return False",
     ],
+    codeLabel: { vi: "Cách 1: Inorder + hai con trỏ", en: "Approach 1: Inorder + two pointers" },
+    code2Label: { vi: "Cách 2: DFS + Hash Set", en: "Approach 2: DFS + Hash Set" },
+    code2: [
+      "class Solution:",
+      "    def findTarget(self, root, k):",
+      "        seen = set()",
+      "        def dfs(node):",
+      "            if not node:",
+      "                return False",
+      "            need = k - node.val",
+      "            if need in seen:",
+      "                return True",
+      "            seen.add(node.val)",
+      "            return dfs(node.left) or dfs(node.right)",
+      "        return dfs(root)",
+    ],
     builder: buildSteps653,
+    builder2: buildSteps653HashSet,
   },
   530: {
     id: 530, difficulty: "easy", slug: "minimum-absolute-difference-in-bst",
