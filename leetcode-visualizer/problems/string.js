@@ -10645,6 +10645,134 @@ function buildSteps1190(input) {
   return { original: s, answer: output.join(""), steps };
 }
 
+/**
+ * LeetCode 1190, Approach 2: a stack of partial strings.
+ *
+ * Each opening parenthesis starts a new string layer. On ')', pop the
+ * innermost layer, reverse it once, and append it to its parent layer.
+ */
+function buildSteps1190StringStack(input) {
+  const s = String(input ?? "");
+  if (!s.length) throw new Error("s must not be empty.");
+  if (s.length > 30) throw new Error("The visualizer supports at most 30 characters.");
+  if (!/^[a-z()]+$/.test(s)) throw new Error("s may contain only lowercase letters and parentheses.");
+
+  const chars = [...s];
+  const stack = [""];
+  const steps = [];
+  let temp = null;
+
+  function stackItems() {
+    return stack.map((value, level) => ({
+      value: `"${value}"`,
+      detail: level === 0 ? "base" : `depth ${level}`,
+    }));
+  }
+
+  function snap({ current = -1, event, codeLine, title, note, final = false }) {
+    const answer = stack[0] || "";
+    steps.push({
+      title,
+      arr: [], highlight: [], mark: [], final,
+      codeLines: [codeLine],
+      vars: [
+        { name: "ch", value: current < 0 ? "—" : `'${chars[current]}'` },
+        { name: "stack", value: `[${stack.map((value) => `"${value}"`).join(", ")}]` },
+        { name: "temp", value: temp === null ? "—" : `"${temp}"` },
+        { name: "answer", value: `"${answer}"` },
+      ],
+      note,
+      stackView: {
+        title: "STRING STACK · innermost layer on top",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "s",
+        status: [
+          { label: "event", value: event },
+          { label: "depth", value: stack.length - 1 },
+          { label: "temp", value: temp === null ? "—" : `"${temp}"` },
+          { label: "base answer", value: `"${answer}"` },
+        ],
+      },
+    });
+  }
+
+  snap({
+    event: "initialize", codeLine: 3,
+    title: { vi: 'stack = [""]', en: 'stack = [""]' },
+    note: {
+      vi: "Phần tử đáy là answer đang xây. Mỗi '(' sẽ đẩy một chuỗi rỗng mới để gom phần bên trong cặp ngoặc đó.",
+      en: "The bottom item is the answer being built. Each '(' pushes a fresh empty string to collect that pair's contents.",
+    },
+  });
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const ch = chars[index];
+    snap({
+      current: index, event: "read character", codeLine: 4,
+      title: { vi: `for ch in s: ch = '${ch}'`, en: `for ch in s: ch = '${ch}'` },
+      note: { vi: `Đọc s[${index}] = '${ch}'.`, en: `Read s[${index}] = '${ch}'.` },
+    });
+
+    if (ch === "(") {
+      snap({
+        current: index, event: "open parenthesis", codeLine: 5,
+        title: { vi: "ch == '(' → True", en: "ch == '(' → True" },
+        note: { vi: "Bắt đầu một lớp chuỗi mới cho cặp ngoặc này.", en: "Start a new string layer for this parenthesis pair." },
+      });
+      stack.push("");
+      snap({
+        current: index, event: "push empty layer", codeLine: 6,
+        title: { vi: 'stack.append("")', en: 'stack.append("")' },
+        note: { vi: "Đỉnh stack rỗng sẽ nhận các ký tự bên trong ngoặc.", en: "The empty stack top will receive the characters inside these parentheses." },
+      });
+    } else if (ch === ")") {
+      snap({
+        current: index, event: "close parenthesis", codeLine: 7,
+        title: { vi: "ch == ')' → True", en: "ch == ')' → True" },
+        note: { vi: "Lớp trên cùng đã là chuỗi bên trong cặp ngoặc trong cùng hiện tại.", en: "The top layer is the string inside the current innermost parenthesis pair." },
+      });
+      if (stack.length === 1) throw new Error("Parentheses must be balanced.");
+      temp = stack.pop();
+      snap({
+        current: index, event: "pop innermost string", codeLine: 8,
+        title: { vi: `temp = stack.pop() = "${temp}"`, en: `temp = stack.pop() = "${temp}"` },
+        note: { vi: `Lấy chuỗi trong ngoặc ra khỏi stack: "${temp}".`, en: `Pop the string inside the parentheses: "${temp}".` },
+      });
+      const reversed = [...temp].reverse().join("");
+      stack[stack.length - 1] += reversed;
+      snap({
+        current: index, event: "reverse and merge", codeLine: 9,
+        title: { vi: `stack[-1] += "${temp}"[::-1] = "${reversed}"`, en: `stack[-1] += "${temp}"[::-1] = "${reversed}"` },
+        note: { vi: `Đảo "${temp}" thành "${reversed}" rồi nối vào lớp cha.`, en: `Reverse "${temp}" into "${reversed}", then append it to the parent layer.` },
+      });
+      temp = null;
+    } else {
+      snap({
+        current: index, event: "letter", codeLine: 10,
+        title: { vi: `ch = '${ch}' là ký tự thường`, en: `ch = '${ch}' is a letter` },
+        note: { vi: "Không phải ngoặc, nên thêm trực tiếp vào chuỗi ở đỉnh stack.", en: "It is not a parenthesis, so append it directly to the string at stack top." },
+      });
+      stack[stack.length - 1] += ch;
+      snap({
+        current: index, event: "append letter", codeLine: 11,
+        title: { vi: `stack[-1] += '${ch}'`, en: `stack[-1] += '${ch}'` },
+        note: { vi: `'${ch}' được gom vào lớp sâu nhất đang mở.`, en: `'${ch}' is collected in the deepest currently open layer.` },
+      });
+    }
+  }
+
+  if (stack.length !== 1) throw new Error("Parentheses must be balanced.");
+  snap({
+    event: "return", codeLine: 12, final: true,
+    title: { vi: `return stack[0] = "${stack[0]}"`, en: `return stack[0] = "${stack[0]}"` },
+    note: { vi: "Mọi lớp ngoặc đã pop; chuỗi đáy chính là đáp án cuối cùng.", en: "All parenthesis layers have been popped; the base string is the final answer." },
+  });
+
+  return { original: s, answer: stack[0], steps };
+}
+
 module.exports = {
   32: {
     id: 32,
@@ -19188,11 +19316,20 @@ Object.assign(module.exports, {
     defaultInput: "(u(love)i)",
     inputKind: "string",
     inputLabel: { vi: "s (chữ thường và ngoặc cân bằng)", en: "s (lowercase letters and balanced parentheses)" },
-    extraParams: [],
+    extraParams: [{
+      key: "approach",
+      type: "select",
+      label: { vi: "Cách tiếp cận", en: "Approach" },
+      default: 1,
+      options: [
+        { value: 1, label: { vi: "1 - Map cặp ngoặc + đổi hướng", en: "1 - Pair map + direction flip" } },
+        { value: 2, label: { vi: "2 - Stack chuỗi", en: "2 - String stack" } },
+      ],
+    }],
     approach: [
-      { vi: "Duyệt một lần với stack để nối hai vị trí của mỗi cặp ngoặc vào mảng pair.", en: "Scan once with a stack to connect the two indices of every parenthesis pair in a pair array." },
-      { vi: "Duyệt lại từ i = 0 với hướng d = +1. Ký tự thường được thêm vào answer; ngoặc sẽ nhảy đến pair[i] và đổi d = −d.", en: "Walk again from i = 0 with direction d = +1. A letter is appended; a parenthesis jumps to pair[i] and flips d = −d." },
-      { vi: "Nhảy qua cặp ngoặc thay cho việc thật sự đảo chuỗi, nên xử lý được ngoặc lồng nhau trong O(n).", en: "Jumping across a pair replaces actual substring reversals, which handles nesting in O(n)." },
+      { vi: "Cách 1: duyệt một lần với stack để nối hai vị trí của mỗi cặp ngoặc vào mảng pair; lượt duyệt thứ hai nhảy qua ngoặc và đổi hướng.", en: "Approach 1: scan once with a stack to connect each parenthesis pair in a pair array; the second walk jumps across parentheses and flips direction." },
+      { vi: "Cách 2: stack chứa một chuỗi cho mỗi mức ngoặc. Gặp '(' thì mở chuỗi rỗng; gặp ')' thì pop chuỗi trong, đảo nó, rồi nối vào mức cha.", en: "Approach 2: the stack holds one string per parenthesis depth. '(' opens an empty string; ')' pops the inner string, reverses it, and appends it to its parent level." },
+      { vi: "Cả hai cách đều xử lý ngoặc lồng nhau trong O(n). Cách stack chuỗi trực quan hơn vì thấy rõ thao tác pop → reverse → merge.", en: "Both approaches handle nesting in O(n). The string stack is more visual because it exposes the pop → reverse → merge operation." },
     ],
     complexity: {
       time: "O(n)",
@@ -19224,7 +19361,23 @@ Object.assign(module.exports, {
       "            i += direction",
       "        return ''.join(answer)",
     ],
+    code2Label: { vi: "Cách 2: Stack chuỗi", en: "Approach 2: String stack" },
+    code2: [
+      "class Solution:",
+      "    def reverseParentheses(self, s: str) -> str:",
+      '        stack = [""]',
+      "        for ch in s:",
+      "            if ch == '(': ",
+      '                stack.append("")',
+      "            elif ch == ')':",
+      "                temp = stack.pop()",
+      "                stack[-1] += temp[::-1]",
+      "            else:",
+      "                stack[-1] += ch",
+      "        return stack[0]",
+    ],
     builder: buildSteps1190,
+    builder2: buildSteps1190StringStack,
   },
   3498: {
     id: 3498,
