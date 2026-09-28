@@ -3315,41 +3315,153 @@ function buildSteps11(input) {
   return { original: h, answer: best, steps };
 }
 
-/** LeetCode 167: Two Sum II — sorted two pointers. */
+/** LeetCode 167: Two Sum II — exact source-line execution trace. */
 function buildSteps167(input, params) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
   const target = params && params.target !== undefined ? Number(params.target) : 9;
   const steps = [];
-  let left = 0, right = nums.length - 1;
-  const snap = (title, codeLines, note, view, final = false) => steps.push({
-    title, arr: [...nums], sub: nums.map((_, i) => `[${i + 1}]`), highlight: [view.left, view.right].filter((i) => i >= 0), mark: view.found ? [view.left, view.right] : [], final, codeLines,
-    twoSumIIView: { values: [...nums], target, ...view },
-    vars: [{ name: "target", value: target }, { name: "left (0-based)", value: view.left }, { name: "right (0-based)", value: view.right }, { name: "answer (1-based)", value: view.found ? `[${view.left + 1}, ${view.right + 1}]` : "—" }], note,
-  });
-  snap({ vi: `Mở cửa sổ [0, ${right}]`, en: `Open window [0, ${right}]` }, [3], { vi: "Mảng tăng dần. Chỉ cần xét hai đầu cửa sổ: L là số nhỏ nhất và R là số lớn nhất còn khả thi.", en: "The array is sorted. Only inspect the window ends: L is the smallest and R is the largest still possible." }, { left, right, sum: null, decision: "start", discardedLeft: [], discardedRight: [], found: false });
+  const discardedLeft = [];
+  const discardedRight = [];
+  let left = 0;
+  let right = nums.length - 1;
   let answer = [];
-  const discardedLeft = [], discardedRight = [];
+  let total = null;
+
+  const snap = ({ title, line, note, condition = null, decision = "start", found = false, final = false, movedFrom = null }) => {
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index + 1}]`),
+      highlight: [left, right].filter((index) => index >= 0 && index < nums.length),
+      mark: found ? [left, right] : [],
+      final,
+      codeLines: [line],
+      twoSumIIView: {
+        values: [...nums], target, left, right,
+        // After changing a pointer, the old total remains in Python, but it no
+        // longer represents the new two endpoints. Keep that distinction clear.
+        sum: decision === "advance-left" || decision === "advance-right" ? null : total,
+        decision, condition, movedFrom,
+        discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found,
+      },
+      vars: [
+        { name: "target", value: target },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "total", value: total === null ? "—" : total },
+        ...(condition === null ? [] : [{ name: "condition", value: condition ? "True" : "False" }]),
+        { name: "answer (1-based)", value: answer.length ? `[${answer.join(", ")}]` : "—" },
+      ],
+      note,
+    });
+  };
+
+  snap({
+    title: { vi: "Khởi tạo left và right", en: "Initialize left and right" },
+    line: 3,
+    note: { vi: `left = 0 ở đầu mảng; right = ${right} ở cuối mảng.`, en: `left = 0 starts at the front; right = ${right} starts at the end.` },
+  });
+
   while (left < right) {
-    const total = nums[left] + nums[right];
-    if (total === target) {
+    snap({
+      title: { vi: `Kiểm tra left < right: ${left} < ${right} → True`, en: `Check left < right: ${left} < ${right} → True` },
+      line: 4,
+      condition: true,
+      decision: "check-loop",
+      note: { vi: "Hai con trỏ chưa gặp nhau, nên vẫn còn cặp để kiểm tra.", en: "The pointers have not met, so a candidate pair remains." },
+    });
+
+    total = nums[left] + nums[right];
+    snap({
+      title: { vi: `Tính total = ${nums[left]} + ${nums[right]} = ${total}`, en: `Compute total = ${nums[left]} + ${nums[right]} = ${total}` },
+      line: 5,
+      decision: "compute",
+      note: { vi: "Đọc hai giá trị ở hai biên của cửa sổ hiện tại.", en: "Read the values at the current window boundaries." },
+    });
+
+    const equalsTarget = total === target;
+    snap({
+      title: { vi: `Kiểm tra total == target: ${total} == ${target} → ${equalsTarget ? "True" : "False"}`, en: `Check total == target: ${total} == ${target} → ${equalsTarget ? "True" : "False"}` },
+      line: 6,
+      condition: equalsTarget,
+      decision: "check-target",
+      note: equalsTarget
+        ? { vi: "Điều kiện đúng; dòng kế tiếp trả về chỉ số 1-based.", en: "The condition is true; the next line returns 1-based indices." }
+        : { vi: "Chưa bằng target; tiếp tục chọn con trỏ cần di chuyển.", en: "It does not equal target yet; next choose the pointer to move." },
+    });
+
+    if (equalsTarget) {
       answer = [left + 1, right + 1];
-      snap({ vi: `${nums[left]} + ${nums[right]} = ${target} ✓`, en: `${nums[left]} + ${nums[right]} = ${target} ✓` }, [4, 5], { vi: `Đúng target. Chỉ số LeetCode là 1-based nên trả [${left + 1}, ${right + 1}].`, en: `It equals the target. LeetCode indices are 1-based, so return [${left + 1}, ${right + 1}].` }, { left, right, sum: total, decision: "found", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: true }, true);
+      snap({
+        title: { vi: `Trả về [${answer.join(", ")}]`, en: `Return [${answer.join(", ")}]` },
+        line: 7,
+        decision: "found",
+        found: true,
+        final: true,
+        note: { vi: `Đổi index 0-based [${left}, ${right}] thành đáp án 1-based [${answer.join(", ")}].`, en: `Convert 0-based indices [${left}, ${right}] to the 1-based answer [${answer.join(", ")}].` },
+      });
       break;
     }
-    const less = total < target;
-    if (less) {
+
+    const tooSmall = total < target;
+    snap({
+      title: { vi: `Kiểm tra total < target: ${total} < ${target} → ${tooSmall ? "True" : "False"}`, en: `Check total < target: ${total} < ${target} → ${tooSmall ? "True" : "False"}` },
+      line: 8,
+      condition: tooSmall,
+      decision: "check-smaller",
+      note: tooSmall
+        ? { vi: "Tổng quá nhỏ; cần một giá trị lớn hơn nên sẽ tăng left.", en: "The sum is too small; we need a larger value, so left will advance." }
+        : { vi: "Tổng quá lớn; điều kiện sai nên đi vào else để giảm right.", en: "The sum is too large; the condition is false, so enter else to decrease right." },
+    });
+
+    if (tooSmall) {
       const removed = left;
       discardedLeft.push(removed);
-      snap({ vi: `${nums[left]} + ${nums[right]} = ${total} < ${target} → bỏ L`, en: `${nums[left]} + ${nums[right]} = ${total} < ${target} → discard L` }, [6, 7], { vi: `Vì mọi j ≤ R đều có numbers[j] ≤ ${nums[right]}, nên ${nums[left]} + numbers[j] ≤ ${total} < ${target}. Index ${left + 1} không thể thuộc đáp án.`, en: `For every j ≤ R, numbers[j] ≤ ${nums[right]}, so ${nums[left]} + numbers[j] ≤ ${total} < ${target}. Index ${left + 1} cannot be in the answer.` }, { left, right, sum: total, decision: "move-left", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: false });
-      left++;
+      left += 1;
+      snap({
+        title: { vi: `left += 1: ${removed} → ${left}`, en: `left += 1: ${removed} → ${left}` },
+        line: 9,
+        decision: "advance-left",
+        movedFrom: removed,
+        note: { vi: `Loại index ${removed + 1}: ${nums[removed]} + mọi số còn lại ≤ ${total} < ${target}.`, en: `Discard index ${removed + 1}: ${nums[removed]} + every remaining value ≤ ${total} < ${target}.` },
+      });
     } else {
+      snap({
+        title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+        line: 10,
+        decision: "else",
+        note: { vi: "total không bằng target và không nhỏ hơn target, nên total > target.", en: "total is neither equal to nor smaller than target, so total > target." },
+      });
       const removed = right;
       discardedRight.push(removed);
-      snap({ vi: `${nums[left]} + ${nums[right]} = ${total} > ${target} → bỏ R`, en: `${nums[left]} + ${nums[right]} = ${total} > ${target} → discard R` }, [8, 9], { vi: `Vì mọi i ≥ L đều có numbers[i] ≥ ${nums[left]}, nên numbers[i] + ${nums[right]} ≥ ${total} > ${target}. Index ${right + 1} không thể thuộc đáp án.`, en: `For every i ≥ L, numbers[i] ≥ ${nums[left]}, so numbers[i] + ${nums[right]} ≥ ${total} > ${target}. Index ${right + 1} cannot be in the answer.` }, { left, right, sum: total, decision: "move-right", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: false });
-      right--;
+      right -= 1;
+      snap({
+        title: { vi: `right -= 1: ${removed} → ${right}`, en: `right -= 1: ${removed} → ${right}` },
+        line: 11,
+        decision: "advance-right",
+        movedFrom: removed,
+        note: { vi: `Loại index ${removed + 1}: mọi số còn lại + ${nums[removed]} ≥ ${total} > ${target}.`, en: `Discard index ${removed + 1}: every remaining value + ${nums[removed]} ≥ ${total} > ${target}.` },
+      });
     }
   }
-  if (!answer.length) snap({ vi: "Cửa sổ rỗng → không có cặp", en: "Window exhausted → no pair" }, [10], { vi: "L và R đã gặp nhau, nên mọi cặp khả dĩ đã bị chứng minh loại trừ.", en: "L and R have met, so every possible pair has been proven impossible." }, { left, right, sum: null, decision: "not-found", discardedLeft, discardedRight, found: false }, true);
+
+  if (!answer.length) {
+    snap({
+      title: { vi: `Kiểm tra left < right: ${left} < ${right} → False`, en: `Check left < right: ${left} < ${right} → False` },
+      line: 4,
+      condition: false,
+      decision: "check-loop",
+      note: { vi: "Hai con trỏ đã gặp hoặc vượt nhau; không còn cặp để thử.", en: "The pointers have met or crossed; no pair remains to test." },
+    });
+    snap({
+      title: { vi: "Trả về []", en: "Return []" },
+      line: 12,
+      decision: "not-found",
+      final: true,
+      note: { vi: "Mọi cặp đã bị loại, nên không có đáp án.", en: "Every candidate pair has been eliminated, so there is no answer." },
+    });
+  }
+
   return { original: nums, answer, steps };
 }
 
@@ -3711,7 +3823,8 @@ module.exports = {
     extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 9 }],
     approach: [{ vi: "Hai con trỏ từ hai đầu.", en: "Two pointers from both ends." }, { vi: "sum<target → left++; sum>target → right--.", en: "sum<target → left++; sum>target → right--." }, { vi: "sum==target → trả về [left+1, right+1].", en: "sum==target → return [left+1, right+1]." }],
     complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt hai con trỏ.", en: "Single two-pointer pass." } },
-    code: ["class Solution:", "    def twoSum(self, numbers, target):", "        l, r = 0, len(numbers)-1", "        while l < r:", "            s = numbers[l] + numbers[r]", "            if s == target: return [l+1, r+1]", "            if s < target: l += 1", "            else: r -= 1", "        return []"],
+    code: ["class Solution:", "    def twoSum(self, numbers, target):", "        left, right = 0, len(numbers) - 1", "        while left < right:", "            total = numbers[left] + numbers[right]", "            if total == target:", "                return [left + 1, right + 1]", "            if total < target:", "                left += 1", "            else:", "                right -= 1", "        return []"],
+    debugMode: "line-by-line",
     builder: buildSteps167,
   },
   15: {

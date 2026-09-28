@@ -4854,6 +4854,7 @@ function renderTwoSumIIView(step) {
   const discardedRight = new Set(view.discardedRight || []);
   const vi = lang === "vi";
   const decision = view.decision || "start";
+  const movedFrom = Number.isInteger(view.movedFrom) ? view.movedFrom : null;
   const isComparison = Number.isFinite(view.sum);
   const relation = isComparison ? (view.sum === view.target ? "=" : view.sum < view.target ? "<" : ">") : "";
   const cells = values.map((value, index) => {
@@ -4869,7 +4870,21 @@ function renderTwoSumIIView(step) {
   const equation = isComparison
     ? `${values[left]} + ${values[right]} = ${view.sum} ${relation} ${view.target}${view.found ? " ✓" : ""}`
     : `target = ${view.target}`;
-  const rule = decision === "move-left"
+  const rule = decision === "advance-left"
+    ? (vi ? `left đã tăng; index ${movedFrom + 1} bị loại vì tổng luôn quá nhỏ.` : `left advanced; index ${movedFrom + 1} is discarded because every sum stays too small.`)
+    : decision === "advance-right"
+      ? (vi ? `right đã giảm; index ${movedFrom + 1} bị loại vì tổng luôn quá lớn.` : `right decreased; index ${movedFrom + 1} is discarded because every sum stays too large.`)
+      : decision === "check-loop"
+        ? (view.condition ? (vi ? "Điều kiện đúng: cửa sổ còn một cặp để thử." : "Condition is true: the window still contains a pair to test.") : (vi ? "Điều kiện sai: hai con trỏ đã gặp nhau." : "Condition is false: the pointers have met."))
+        : decision === "check-target"
+          ? (view.condition ? (vi ? "Điều kiện đúng: trả về hai chỉ số 1-based." : "Condition is true: return the two 1-based indices.") : (vi ? "Điều kiện sai: chưa tìm thấy đáp án." : "Condition is false: the answer is not found yet."))
+          : decision === "check-smaller"
+            ? (view.condition ? (vi ? "Điều kiện đúng: tổng quá nhỏ, nên tăng left." : "Condition is true: the sum is too small, so advance left.") : (vi ? "Điều kiện sai: tổng quá lớn, nên giảm right." : "Condition is false: the sum is too large, so decrease right."))
+            : decision === "else"
+              ? (vi ? "Đi vào else: chuẩn bị giảm right." : "Enter else: prepare to decrease right.")
+              : decision === "compute"
+                ? (vi ? "Đã tính total từ hai biên hiện tại." : "Calculated total from the current two boundaries.")
+                : decision === "move-left"
     ? (vi ? `L++ · loại index ${left + 1}: ghép với mọi số còn lại cũng không đủ target.` : `L++ · discard index ${left + 1}: pairing it with every remaining number is still below target.`)
     : decision === "move-right"
       ? (vi ? `R-- · loại index ${right + 1}: ghép với mọi số còn lại vẫn vượt target.` : `R-- · discard index ${right + 1}: pairing it with every remaining number still exceeds target.`)
