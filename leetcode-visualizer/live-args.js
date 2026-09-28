@@ -359,6 +359,13 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         ...words(input).map((word) => ({ name: "addWord", args: [word] })),
         { name: "search", args: [String(params.search || "").trim()] },
       ]);
+    case 295: {
+      const nums = problem.parseMedianFinder295Input(input);
+      return designConfig("MedianFinder", [], nums.flatMap((num) => [
+        { name: "addNum", args: [num] },
+        { name: "findMedian", args: [] },
+      ]));
+    }
     case 297:
       return designConfig("Codec", [], [
         { name: "serialize", args: [treeMarker(input)] },

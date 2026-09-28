@@ -499,6 +499,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.slidingMaximum239View), surface: "treeView", render: (step) => {
       renderSlidingMaximum239View(step);
     } },
+    { predicate: (step) => Boolean(step.medianFinder295View), surface: "treeView", render: (step) => {
+      renderMedianFinder295View(step);
+    } },
     { predicate: (step) => Boolean(step.tree), surface: "treeView", render: (step) => {
       renderTree(step);
     } },

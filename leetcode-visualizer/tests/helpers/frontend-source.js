@@ -18,6 +18,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-max-path-sum-124.js',
   'renderer-palindrome-cuts-132.js',
   'renderer-sliding-maximum-239.js',
+  'renderer-median-finder-295.js',
   'script.js',
 ]);
 
@@ -39,6 +40,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'max-path-sum-124.css',
   'palindrome-cuts-132.css',
   'sliding-maximum-239.css',
+  'median-finder-295.css',
 ]);
 
 const sourceCache = new Map();

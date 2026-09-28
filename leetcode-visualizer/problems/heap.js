@@ -2930,187 +2930,677 @@ function buildSteps2558(input, params) {
  * 15          if len(small) > len(large): return -small[0]
  * 16          return (-small[0] + large[0]) / 2
  */
+const MEDIAN_FINDER_295_LIMIT = 40;
+
+function parseMedianFinder295Input(input) {
+  if (!Array.isArray(input)) {
+    throw new TypeError("nums must be an array of integers.");
+  }
+  if (input.length < 1) {
+    throw new RangeError("nums must contain at least one integer.");
+  }
+  if (input.length > MEDIAN_FINDER_295_LIMIT) {
+    throw new RangeError(`Visualization supports at most ${MEDIAN_FINDER_295_LIMIT} integers.`);
+  }
+  return input.map((value, index) => {
+    if (!Number.isSafeInteger(value)) {
+      throw new TypeError(`nums[${index}] must be a safe integer.`);
+    }
+    return Object.is(value, -0) ? 0 : value;
+  });
+}
+
+function deepFreezeMedianFinder295(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreezeMedianFinder295);
+  return Object.freeze(value);
+}
+
+// These two helpers deliberately mirror CPython heapq's sift choices. In
+// particular, sift-up chooses the right child when equal values tie.
+function heapPush295(heap, item) {
+  let position = heap.length;
+  heap.push(item);
+  while (position > 0) {
+    const parentPosition = (position - 1) >> 1;
+    const parent = heap[parentPosition];
+    if (!(item.storage < parent.storage)) break;
+    heap[position] = parent;
+    position = parentPosition;
+  }
+  heap[position] = item;
+}
+
+function heapPop295(heap) {
+  const last = heap.pop();
+  if (!heap.length) return last;
+  const result = heap[0];
+  const end = heap.length;
+  const start = 0;
+  let position = 0;
+  let childPosition = 1;
+
+  while (childPosition < end) {
+    const rightPosition = childPosition + 1;
+    if (rightPosition < end && !(heap[childPosition].storage < heap[rightPosition].storage)) {
+      childPosition = rightPosition;
+    }
+    heap[position] = heap[childPosition];
+    position = childPosition;
+    childPosition = 2 * position + 1;
+  }
+  heap[position] = last;
+
+  while (position > start) {
+    const parentPosition = (position - 1) >> 1;
+    const parent = heap[parentPosition];
+    if (!(last.storage < parent.storage)) break;
+    heap[position] = parent;
+    position = parentPosition;
+  }
+  heap[position] = last;
+  return result;
+}
+
 function buildSteps295(input) {
-  const nums = Array.isArray(input)
-    ? [...input]
-    : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const nums = parseMedianFinder295Input(input);
   const steps = [];
+  const small = []; // Python heapq min-heap of negatives; semantic lower max-heap.
+  const large = []; // Python heapq min-heap of positive values.
+  const operationLedger = [];
+  const designResults = [];
+  const medianHistory = [];
+  const duplicateCounts = new Map();
+  let smallInitialized = false;
+  let largeInitialized = false;
+  let insertedCount = 0;
 
-  // small = max-heap (store as sorted array, max at index 0 conceptually)
-  // large = min-heap
-  const small = []; // we keep as array; smallTop() = max
-  const large = []; // largeTop() = min
-  const smallTop = () => Math.max(...small);
-  const largeTop = () => Math.min(...large);
+  const heapProperty = (heap) => heap.every((entry, index) => {
+    if (index === 0) return true;
+    return heap[(index - 1) >> 1].storage <= entry.storage;
+  });
 
-  const sortedAll = () => [...small, ...large].sort((a, b) => a - b);
-  const smallStr = () => `[${[...small].sort((a, b) => b - a).join(", ")}]`;
-  const largeStr = () => `[${[...large].sort((a, b) => a - b).join(", ")}]`;
+  const heapState = (heap, role, initialized) => {
+    const isLower = role === "lower";
+    const storage = heap.map((entry) => entry.storage);
+    const semanticValues = heap.map((entry) => entry.value);
+    return {
+      role,
+      kind: isLower ? "max-heap" : "min-heap",
+      storageKind: "min-heap",
+      storageEncoding: isLower ? "negated" : "identity",
+      initialized,
+      storage,
+      semanticValues,
+      entries: heap.map((entry, index) => ({
+        id: entry.id,
+        inputIndex: entry.inputIndex,
+        occurrence: entry.occurrence,
+        index,
+        value: entry.value,
+        storageValue: entry.storage,
+      })),
+      top: heap.length ? heap[0].value : null,
+      storageTop: heap.length ? heap[0].storage : null,
+      size: heap.length,
+      heapProperty: heapProperty(heap),
+    };
+  };
 
-  function snap(opts) {
-    const all = sortedAll();
-    // highlight median position(s)
-    const hl = [];
-    if (all.length) {
-      if (all.length % 2 === 1) hl.push((all.length - 1) / 2);
-      else { hl.push(all.length / 2 - 1); hl.push(all.length / 2); }
+  const captureHeaps = () => ({
+    lower: heapState(small, "lower", smallInitialized),
+    upper: heapState(large, "upper", largeInitialized),
+  });
+
+  const invariantState = (heaps) => {
+    const order = heaps.lower.top === null || heaps.upper.top === null || heaps.lower.top <= heaps.upper.top;
+    const size = heaps.lower.size === heaps.upper.size || heaps.lower.size === heaps.upper.size + 1;
+    const count = heaps.lower.size + heaps.upper.size === insertedCount;
+    const lowerHeapProperty = heaps.lower.heapProperty;
+    const upperHeapProperty = heaps.upper.heapProperty;
+    const initialized = heaps.lower.initialized && heaps.upper.initialized;
+    return {
+      lowerHeapProperty,
+      upperHeapProperty,
+      order,
+      size,
+      count,
+      initialized,
+      all: lowerHeapProperty && upperHeapProperty && order && size && count && initialized,
+      lowerTop: heaps.lower.top,
+      upperTop: heaps.upper.top,
+      sizeDifference: heaps.lower.size - heaps.upper.size,
+      expectedCount: insertedCount,
+      actualCount: heaps.lower.size + heaps.upper.size,
+      rules: {
+        lowerStorage: "small is a min-heap of negated values",
+        upperStorage: "large is a min-heap of values",
+        order: "lower.top <= upper.top",
+        size: "lower.size === upper.size || lower.size === upper.size + 1",
+        count: "lower.size + upper.size === inserted count",
+      },
+    };
+  };
+
+  const emptyCheck = () => ({
+    kind: null,
+    expression: null,
+    result: null,
+    left: null,
+    right: null,
+  });
+
+  const emptyMovement = () => ({
+    kind: "none",
+    from: null,
+    to: null,
+    reason: null,
+    occurrence: null,
+    value: null,
+    storageBefore: null,
+    storageAfter: null,
+    indexBefore: null,
+    indexAfter: null,
+  });
+
+  const emptyMedian = () => ({
+    kind: null,
+    formula: null,
+    substituted: null,
+    operands: [],
+    value: null,
+    returned: false,
+  });
+
+  const copyOperation = (operation) => ({
+    streamIndex: operation.streamIndex,
+    inputIndex: operation.inputIndex,
+    name: operation.name,
+    args: [...operation.args],
+    status: operation.status,
+    result: operation.result,
+  });
+
+  const startOperation = (name, args, inputIndex) => {
+    const operation = {
+      streamIndex: operationLedger.length,
+      inputIndex,
+      name,
+      args: [...args],
+      status: "running",
+      result: null,
+    };
+    operationLedger.push(operation);
+    return operation;
+  };
+
+  const completeOperation = (operation, result) => {
+    operation.status = "complete";
+    operation.result = result;
+    designResults.push(result);
+  };
+
+  const transfer = (fromHeap, toHeap, from, to, reason) => {
+    const item = heapPop295(fromHeap);
+    const storageBefore = item.storage;
+    item.storage = to === "lower" ? -item.value : item.value;
+    heapPush295(toHeap, item);
+    return {
+      kind: "transfer",
+      from,
+      to,
+      reason,
+      occurrence: {
+        id: item.id,
+        inputIndex: item.inputIndex,
+        occurrence: item.occurrence,
+        value: item.value,
+      },
+      value: item.value,
+      storageBefore,
+      storageAfter: item.storage,
+      indexBefore: 0,
+      indexAfter: toHeap.findIndex((entry) => entry.id === item.id),
+    };
+  };
+
+  const frameText = (event, operation, check, movement, median) => {
+    const num = operation.args.length ? operation.args[0] : null;
+    const moved = movement.value;
+    const checked = check.result === true ? "True" : "False";
+    const titles = {
+      constructor: { vi: "Tạo MedianFinder", en: "Construct MedianFinder" },
+      "initialize-small": { vi: "Khởi tạo small (heap âm)", en: "Initialize small (negative heap)" },
+      "initialize-large": { vi: "Khởi tạo large (min-heap)", en: "Initialize large (min-heap)" },
+      "enter-add-num": { vi: `Vào addNum(${num})`, en: `Enter addNum(${num})` },
+      "push-small": { vi: `Push ${-num} vào small`, en: `Push ${-num} into small` },
+      "check-partition": { vi: `Kiểm tra thứ tự hai heap → ${checked}`, en: `Check heap partition → ${checked}` },
+      "transfer-small-to-large": { vi: `Chuyển ${moved} từ small sang large`, en: `Move ${moved} from small to large` },
+      "check-small-size": { vi: `Kiểm tra small quá lớn → ${checked}`, en: `Check whether small is too large → ${checked}` },
+      "rebalance-small-to-large": { vi: `Cân bằng: ${moved} sang large`, en: `Rebalance: move ${moved} to large` },
+      "check-large-size": { vi: `Kiểm tra large quá lớn → ${checked}`, en: `Check whether large is too large → ${checked}` },
+      "rebalance-large-to-small": { vi: `Cân bằng: ${moved} sang small`, en: `Rebalance: move ${moved} to small` },
+      "enter-find-median": { vi: "Vào findMedian()", en: "Enter findMedian()" },
+      "check-return-odd": median.returned
+        ? { vi: `Số lượng lẻ: trả ${median.value}`, en: `Odd count: return ${median.value}` }
+        : { vi: "Kiểm tra số lượng lẻ → False", en: "Check odd count → False" },
+      "return-even": { vi: `Số lượng chẵn: trả ${median.value}`, en: `Even count: return ${median.value}` },
+    };
+    const notes = {
+      constructor: {
+        vi: "Một instance MedianFinder sẽ phục vụ toàn bộ luồng addNum/findMedian.",
+        en: "One MedianFinder instance serves the complete addNum/findMedian stream.",
+      },
+      "initialize-small": {
+        vi: "small là max-heap ngữ nghĩa nhưng lưu số âm trong heapq min-heap.",
+        en: "small is semantically a max-heap, stored as negatives in heapq's min-heap.",
+      },
+      "initialize-large": {
+        vi: "large lưu trực tiếp nửa trên trong heapq min-heap.",
+        en: "large stores the upper half directly in a heapq min-heap.",
+      },
+      "enter-add-num": {
+        vi: `Bắt đầu thao tác addNum thứ ${operation.inputIndex + 1}.`,
+        en: `Begin addNum operation ${operation.inputIndex + 1}.`,
+      },
+      "push-small": {
+        vi: `Giá trị ${num} có token ổn định và được lưu là ${-num}.`,
+        en: `Value ${num} keeps a stable token and is stored as ${-num}.`,
+      },
+      "check-partition": {
+        vi: "Luôn đánh giá điều kiện phân vùng, kể cả khi một heap rỗng.",
+        en: "Always evaluate the partition condition, including when one heap is empty.",
+      },
+      "transfer-small-to-large": {
+        vi: `Đỉnh lower ${moved} vượt đỉnh upper nên phải đổi heap và đổi cách lưu dấu.`,
+        en: `Lower top ${moved} exceeds upper top, so it changes heap and storage sign.`,
+      },
+      "check-small-size": {
+        vi: "small chỉ được nhiều hơn large tối đa một phần tử.",
+        en: "small may contain at most one more item than large.",
+      },
+      "rebalance-small-to-large": {
+        vi: `Chuyển đỉnh lower ${moved} để sửa bất biến kích thước.`,
+        en: `Move lower top ${moved} to restore the size invariant.`,
+      },
+      "check-large-size": {
+        vi: "large không được có nhiều phần tử hơn small.",
+        en: "large may not contain more items than small.",
+      },
+      "rebalance-large-to-small": {
+        vi: `Chuyển đỉnh upper ${moved} về lower để sửa bất biến kích thước.`,
+        en: `Move upper top ${moved} back to lower to restore the size invariant.`,
+      },
+      "enter-find-median": {
+        vi: "addNum đã hoàn tất; bắt đầu thao tác findMedian kế tiếp trên cùng instance.",
+        en: "addNum is complete; begin the next findMedian on the same instance.",
+      },
+      "check-return-odd": median.returned
+        ? { vi: `Median lẻ dùng công thức ${median.formula}.`, en: `The odd median uses ${median.formula}.` }
+        : { vi: "Hai heap bằng nhau nên tiếp tục xuống dòng 16.", en: "The heaps have equal size, so execution continues to line 16." },
+      "return-even": {
+        vi: `Median chẵn dùng công thức ${median.substituted}.`,
+        en: `The even median uses ${median.substituted}.`,
+      },
+    };
+    return { title: titles[event], note: notes[event] };
+  };
+
+  const snapshot = ({
+    sourceLine,
+    timing,
+    phase,
+    event,
+    before,
+    after,
+    operation,
+    check = emptyCheck(),
+    movement = emptyMovement(),
+    median = emptyMedian(),
+    final = false,
+  }) => {
+    const text = frameText(event, operation, check, movement, median);
+    const view = deepFreezeMedianFinder295({
+      version: 1,
+      problemId: 295,
+      source: { line: sourceLine, timing },
+      sourceLine,
+      timing,
+      phase,
+      event,
+      input: {
+        values: [...nums],
+        size: nums.length,
+        operationIndex: operation.inputIndex,
+        value: operation.args.length ? operation.args[0] : null,
+        insertedCount,
+      },
+      operation: copyOperation(operation),
+      heaps: { before, after },
+      check: { ...check },
+      movement: {
+        ...movement,
+        occurrence: movement.occurrence ? { ...movement.occurrence } : null,
+      },
+      invariants: invariantState(after),
+      median: { ...median, operands: [...median.operands] },
+      operationLedger: operationLedger.map(copyOperation),
+      designResults: [...designResults],
+      medianHistory: [...medianHistory],
+      final,
+    });
+    const semanticEntries = [
+      ...after.lower.entries.map((entry) => ({ ...entry, role: "lower" })),
+      ...after.upper.entries.map((entry) => ({ ...entry, role: "upper" })),
+    ].sort((left, right) => left.value - right.value || left.inputIndex - right.inputIndex);
+    const medianHighlight = [];
+    if (median.returned && semanticEntries.length) {
+      const middle = semanticEntries.length >> 1;
+      if (semanticEntries.length % 2) medianHighlight.push(middle);
+      else medianHighlight.push(middle - 1, middle);
     }
     steps.push({
-      title: opts.title,
-      arr: all,
-      sub: all.map((v) => (small.includes(v) && (!large.includes(v) || [...small, ...large].filter(x => x === v).length) ? "" : "")),
-      highlight: opts.showMedian ? hl : [],
+      title: text.title,
+      note: text.note,
+      arr: semanticEntries.map((entry) => entry.value),
+      sub: semanticEntries.map((entry) => `${entry.role} · #${entry.inputIndex}`),
+      highlight: medianHighlight,
       mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
+      codeLines: [sourceLine],
+      final,
+      vars: [
+        { name: "small storage", value: `[${after.lower.storage.join(", ")}]` },
+        { name: "small values", value: `[${after.lower.semanticValues.join(", ")}]` },
+        { name: "large storage", value: `[${after.upper.storage.join(", ")}]` },
+        { name: "median", value: median.returned ? median.value : "—" },
+        { name: "history", value: `[${medianHistory.join(", ")}]` },
+      ],
+      medianFinder295View: view,
     });
-  }
+  };
 
-  snap({
-    title: { vi: "Khởi tạo hai heap rỗng", en: "Initialize two empty heaps" },
-    codeLines: [3, 4, 5],
-    vars: [
-      { name: "small (max-heap)", value: "[]" },
-      { name: "large (min-heap)", value: "[]" },
-    ],
-    note: {
-      vi:
-        "small = nửa NHỎ (max-heap, đỉnh là số lớn nhất của nửa dưới).\n" +
-        "large = nửa LỚN (min-heap, đỉnh là số nhỏ nhất của nửa trên).\n" +
-        "Bất biến: mọi phần tử small ≤ mọi phần tử large; |small| = |large| hoặc |small| = |large|+1.\n" +
-        "Median = đỉnh small (lẻ) hoặc trung bình 2 đỉnh (chẵn). Mảng dưới là toàn bộ số đã thêm (đã sort); median được tô đậm.",
-      en:
-        "small = LOWER half (max-heap, top = largest of lower half).\n" +
-        "large = UPPER half (min-heap, top = smallest of upper half).\n" +
-        "Invariant: every small ≤ every large; |small| = |large| or |small| = |large|+1.\n" +
-        "Median = small's top (odd) or average of both tops (even). The array below shows all numbers added (sorted); the median is highlighted.",
-    },
+  const constructorOperation = {
+    streamIndex: null,
+    inputIndex: null,
+    name: "MedianFinder",
+    args: [],
+    status: "running",
+    result: null,
+  };
+  let before = captureHeaps();
+  snapshot({
+    sourceLine: 3,
+    timing: "before",
+    phase: "initialize",
+    event: "constructor",
+    before,
+    after: captureHeaps(),
+    operation: constructorOperation,
   });
 
-  for (const num of nums) {
-    // Line 7: push to small
-    small.push(num);
-    snap({
-      title: { vi: `addNum(${num}): push ${num} vào small`, en: `addNum(${num}): push ${num} into small` },
-      codeLines: [6, 7],
-      vars: [
-        { name: "num", value: num },
-        { name: "small", value: smallStr() },
-        { name: "large", value: largeStr() },
-      ],
-      note: {
-        vi: `Luôn đẩy số mới vào small (max-heap) trước. small = ${smallStr()}.`,
-        en: `Always push the new number into small (max-heap) first. small = ${smallStr()}.`,
-      },
-    });
-
-    // Line 8-9: if small top > large top, move it over
-    if (small.length && large.length && smallTop() > largeTop()) {
-      const moved = smallTop();
-      small.splice(small.indexOf(moved), 1);
-      large.push(moved);
-      snap({
-        title: { vi: `small đỉnh ${moved} > large đỉnh → chuyển sang large`, en: `small top ${moved} > large top → move to large` },
-        codeLines: [8, 9],
-        vars: [
-          { name: "moved", value: moved },
-          { name: "small", value: smallStr() },
-          { name: "large", value: largeStr() },
-        ],
-        note: {
-          vi: `Đỉnh small (${moved}) lớn hơn đỉnh large → vi phạm "mọi small ≤ mọi large". Chuyển ${moved} sang large.`,
-          en: `small's top (${moved}) exceeds large's top → violates "every small ≤ every large". Move ${moved} to large.`,
-        },
-      });
-    }
-
-    // Line 10-11: rebalance if small too big
-    if (small.length > large.length + 1) {
-      const moved = smallTop();
-      small.splice(small.indexOf(moved), 1);
-      large.push(moved);
-      snap({
-        title: { vi: `|small| > |large|+1 → chuyển ${moved} sang large`, en: `|small| > |large|+1 → move ${moved} to large` },
-        codeLines: [10, 11],
-        vars: [
-          { name: "len(small)", value: small.length + 1 },
-          { name: "len(large)", value: large.length - 1 },
-          { name: "small", value: smallStr() },
-          { name: "large", value: largeStr() },
-        ],
-        note: {
-          vi: `small nhiều hơn large quá 1 phần tử → cân bằng: chuyển đỉnh small (${moved}) sang large.`,
-          en: `small has more than one extra element → rebalance: move small's top (${moved}) to large.`,
-        },
-      });
-    }
-
-    // Line 12-13: rebalance if large too big
-    if (large.length > small.length) {
-      const moved = largeTop();
-      large.splice(large.indexOf(moved), 1);
-      small.push(moved);
-      snap({
-        title: { vi: `|large| > |small| → chuyển ${moved} sang small`, en: `|large| > |small| → move ${moved} to small` },
-        codeLines: [12, 13],
-        vars: [
-          { name: "len(large)", value: large.length + 1 },
-          { name: "len(small)", value: small.length - 1 },
-          { name: "small", value: smallStr() },
-          { name: "large", value: largeStr() },
-        ],
-        note: {
-          vi: `large nhiều hơn small → cân bằng: chuyển đỉnh large (${moved}) về small.`,
-          en: `large has more than small → rebalance: move large's top (${moved}) back to small.`,
-        },
-      });
-    }
-
-    // findMedian
-    const median = small.length > large.length ? smallTop() : (smallTop() + largeTop()) / 2;
-    snap({
-      title: { vi: `findMedian() = ${median}`, en: `findMedian() = ${median}` },
-      showMedian: true,
-      codeLines: small.length > large.length ? [14, 15] : [14, 16],
-      vars: [
-        { name: "small", value: smallStr() },
-        { name: "large", value: largeStr() },
-        { name: "median", value: median },
-      ],
-      note: {
-        vi: small.length > large.length
-          ? `|small| > |large| → tổng số phần tử LẺ → median = đỉnh small = ${smallTop()}.`
-          : `|small| == |large| → tổng số phần tử CHẴN → median = (đỉnh small + đỉnh large) / 2 = (${smallTop()} + ${largeTop()}) / 2 = ${median}.`,
-        en: small.length > large.length
-          ? `|small| > |large| → ODD count → median = small's top = ${smallTop()}.`
-          : `|small| == |large| → EVEN count → median = (small top + large top) / 2 = (${smallTop()} + ${largeTop()}) / 2 = ${median}.`,
-      },
-    });
-  }
-
-  const finalMedian = small.length
-    ? (small.length > large.length ? smallTop() : (smallTop() + largeTop()) / 2)
-    : 0;
-
-  snap({
-    title: { vi: `Median cuối = ${finalMedian}`, en: `Final median = ${finalMedian}` },
-    showMedian: true,
-    final: true,
-    codeLines: [14, 15, 16],
-    vars: [
-      { name: "small", value: smallStr() },
-      { name: "large", value: largeStr() },
-      { name: "median", value: finalMedian },
-    ],
-    note: {
-      vi: `Sau khi thêm tất cả ${nums.length} số, median hiện tại = ${finalMedian}. Mỗi lần thêm số, median lấy được trong O(1).`,
-      en: `After adding all ${nums.length} numbers, the current median = ${finalMedian}. Each query is O(1).`,
-    },
+  before = captureHeaps();
+  smallInitialized = true;
+  snapshot({
+    sourceLine: 4,
+    timing: "after",
+    phase: "initialize",
+    event: "initialize-small",
+    before,
+    after: captureHeaps(),
+    operation: constructorOperation,
   });
 
-  return { original: nums, answer: finalMedian, steps };
+  before = captureHeaps();
+  largeInitialized = true;
+  constructorOperation.status = "complete";
+  snapshot({
+    sourceLine: 5,
+    timing: "after",
+    phase: "initialize",
+    event: "initialize-large",
+    before,
+    after: captureHeaps(),
+    operation: constructorOperation,
+  });
+
+  nums.forEach((num, inputIndex) => {
+    const addOperation = startOperation("addNum", [num], inputIndex);
+    before = captureHeaps();
+    snapshot({
+      sourceLine: 6,
+      timing: "before",
+      phase: "add",
+      event: "enter-add-num",
+      before,
+      after: captureHeaps(),
+      operation: addOperation,
+    });
+
+    before = captureHeaps();
+    const occurrence = (duplicateCounts.get(num) || 0) + 1;
+    duplicateCounts.set(num, occurrence);
+    heapPush295(small, {
+      id: `input-${inputIndex}`,
+      inputIndex,
+      occurrence,
+      value: num,
+      storage: -num,
+    });
+    insertedCount += 1;
+    snapshot({
+      sourceLine: 7,
+      timing: "after",
+      phase: "add",
+      event: "push-small",
+      before,
+      after: captureHeaps(),
+      operation: addOperation,
+    });
+
+    let lowerTop = small.length ? small[0].value : null;
+    let upperTop = large.length ? large[0].value : null;
+    const partitionBroken = lowerTop !== null && upperTop !== null && lowerTop > upperTop;
+    const partitionCheck = {
+      kind: "partition-order",
+      expression: "small and large and -small[0] > large[0]",
+      result: partitionBroken,
+      left: lowerTop,
+      right: upperTop,
+    };
+    before = captureHeaps();
+    snapshot({
+      sourceLine: 8,
+      timing: "before",
+      phase: "partition",
+      event: "check-partition",
+      before,
+      after: captureHeaps(),
+      operation: addOperation,
+      check: partitionCheck,
+    });
+
+    if (partitionBroken) {
+      before = captureHeaps();
+      const movement = transfer(small, large, "lower", "upper", "partition-order");
+      snapshot({
+        sourceLine: 9,
+        timing: "after",
+        phase: "partition",
+        event: "transfer-small-to-large",
+        before,
+        after: captureHeaps(),
+        operation: addOperation,
+        check: partitionCheck,
+        movement,
+      });
+    }
+
+    const smallTooLarge = small.length > large.length + 1;
+    const smallSizeCheck = {
+      kind: "small-size",
+      expression: "len(small) > len(large) + 1",
+      result: smallTooLarge,
+      left: small.length,
+      right: large.length + 1,
+    };
+    before = captureHeaps();
+    snapshot({
+      sourceLine: 10,
+      timing: "before",
+      phase: "rebalance",
+      event: "check-small-size",
+      before,
+      after: captureHeaps(),
+      operation: addOperation,
+      check: smallSizeCheck,
+    });
+
+    if (smallTooLarge) {
+      before = captureHeaps();
+      const movement = transfer(small, large, "lower", "upper", "small-too-large");
+      snapshot({
+        sourceLine: 11,
+        timing: "after",
+        phase: "rebalance",
+        event: "rebalance-small-to-large",
+        before,
+        after: captureHeaps(),
+        operation: addOperation,
+        check: smallSizeCheck,
+        movement,
+      });
+    }
+
+    const largeTooLarge = large.length > small.length;
+    const largeSizeCheck = {
+      kind: "large-size",
+      expression: "len(large) > len(small)",
+      result: largeTooLarge,
+      left: large.length,
+      right: small.length,
+    };
+    before = captureHeaps();
+    snapshot({
+      sourceLine: 12,
+      timing: "before",
+      phase: "rebalance",
+      event: "check-large-size",
+      before,
+      after: captureHeaps(),
+      operation: addOperation,
+      check: largeSizeCheck,
+    });
+
+    if (largeTooLarge) {
+      before = captureHeaps();
+      const movement = transfer(large, small, "upper", "lower", "large-too-large");
+      snapshot({
+        sourceLine: 13,
+        timing: "after",
+        phase: "rebalance",
+        event: "rebalance-large-to-small",
+        before,
+        after: captureHeaps(),
+        operation: addOperation,
+        check: largeSizeCheck,
+        movement,
+      });
+    }
+
+    completeOperation(addOperation, null);
+    const findOperation = startOperation("findMedian", [], inputIndex);
+    before = captureHeaps();
+    snapshot({
+      sourceLine: 14,
+      timing: "before",
+      phase: "median",
+      event: "enter-find-median",
+      before,
+      after: captureHeaps(),
+      operation: findOperation,
+    });
+
+    lowerTop = small[0].value;
+    upperTop = large.length ? large[0].value : null;
+    const odd = small.length > large.length;
+    const oddCheck = {
+      kind: "odd-count",
+      expression: "len(small) > len(large)",
+      result: odd,
+      left: small.length,
+      right: large.length,
+    };
+
+    if (odd) {
+      const median = {
+        kind: "odd",
+        formula: "-small[0]",
+        substituted: `-${small[0].storage} = ${lowerTop}`,
+        operands: [lowerTop],
+        value: lowerTop,
+        returned: true,
+      };
+      completeOperation(findOperation, lowerTop);
+      medianHistory.push(lowerTop);
+      const final = inputIndex === nums.length - 1;
+      before = captureHeaps();
+      snapshot({
+        sourceLine: 15,
+        timing: "after",
+        phase: "median",
+        event: "check-return-odd",
+        before,
+        after: captureHeaps(),
+        operation: findOperation,
+        check: oddCheck,
+        median,
+        final,
+      });
+    } else {
+      before = captureHeaps();
+      snapshot({
+        sourceLine: 15,
+        timing: "before",
+        phase: "median",
+        event: "check-return-odd",
+        before,
+        after: captureHeaps(),
+        operation: findOperation,
+        check: oddCheck,
+      });
+      const medianValue = (lowerTop + upperTop) / 2;
+      const median = {
+        kind: "even",
+        formula: "(-small[0] + large[0]) / 2",
+        substituted: `(${lowerTop} + ${upperTop}) / 2 = ${medianValue}`,
+        operands: [lowerTop, upperTop],
+        value: medianValue,
+        returned: true,
+      };
+      completeOperation(findOperation, medianValue);
+      medianHistory.push(medianValue);
+      const final = inputIndex === nums.length - 1;
+      before = captureHeaps();
+      snapshot({
+        sourceLine: 16,
+        timing: "after",
+        phase: "median",
+        event: "return-even",
+        before,
+        after: captureHeaps(),
+        operation: findOperation,
+        check: oddCheck,
+        median,
+        final,
+      });
+    }
+  });
+
+  return {
+    original: [...nums],
+    answer: medianHistory[medianHistory.length - 1],
+    steps,
+  };
 }
 
 /**
@@ -4464,16 +4954,18 @@ module.exports = {
       vi:
         "Thiết kế cấu trúc hỗ trợ addNum(num) và findMedian(). " +
         "Dùng hai heap: small (max-heap, nửa dưới) và large (min-heap, nửa trên). " +
-        "Nhập dãy số cần thêm, cách nhau dấu phẩy; median được báo sau mỗi lần thêm.",
+        "Nhập từ 1–40 số nguyên an toàn; median được báo sau mỗi lần thêm.",
       en:
         "Design a structure supporting addNum(num) and findMedian(). " +
         "Use two heaps: small (max-heap, lower half) and large (min-heap, upper half). " +
-        "Enter numbers to add, comma-separated; the median is reported after each insertion.",
+        "Enter 1–40 safe integers; the median is reported after each insertion.",
     },
     defaultInput: [5, 15, 1, 3, 8, 7, 9, 10, 20, 2],
     inputKind: "integer",
-    inputLabel: { vi: "Dãy addNum", en: "addNum sequence" },
+    inputLabel: { vi: "Dãy addNum (1–40 số nguyên)", en: "addNum sequence (1–40 integers)" },
     extraParams: [],
+    debugMode: "line-by-line",
+    parseMedianFinder295Input,
     approach: [
       { vi: "small là max-heap giữ nửa NHỎ; large là min-heap giữ nửa LỚN.", en: "small is a max-heap holding the LOWER half; large is a min-heap holding the UPPER half." },
       { vi: "Luôn push vào small trước, rồi chuyển đỉnh small sang large nếu sai thứ tự.", en: "Always push into small first, then move small's top to large if out of order." },
@@ -4541,3 +5033,10 @@ module.exports = {
     builder: buildSteps2558,
   },
 };
+
+// Named access for infrastructure and focused audits without adding a
+// non-problem key to the enumerable heap registry.
+Object.defineProperty(module.exports, "parseMedianFinder295Input", {
+  value: parseMedianFinder295Input,
+  enumerable: false,
+});
