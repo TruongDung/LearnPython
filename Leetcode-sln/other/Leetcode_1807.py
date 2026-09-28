@@ -1,6 +1,8 @@
-import re
+from typing import List
+
+
 class Solution:
-    def evaluate(self, s: str, knowledge: list[list[str]]) -> str:
+    def evaluate(self, s: str, knowledge: List[List[str]]) -> str:
 
         # for a in knowledge:
         #     if a[0] in s:
