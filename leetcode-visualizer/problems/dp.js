@@ -21702,7 +21702,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 140, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473, 3414],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 140, 91, 514, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473, 3414],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -21738,6 +21738,7 @@ module.exports = {
           { id: 279, name: "Perfect Squares", pattern: "Complete Knapsack" },
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
+          { id: 514, name: "Freedom Trail", pattern: "Layered Position DP + Circular Transitions" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
           { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
@@ -21768,7 +21769,7 @@ module.exports = {
           {
             title: "Giai đoạn 4 — String DP",
             description: "dp[i] = cắt được tới i / số cách giải mã. Trên chuỗi 1 chiều.",
-            problems: [139, 91],
+            problems: [139, 91, 514],
           },
           {
             title: "Giai đoạn 5 — Grid DP",
@@ -21805,6 +21806,7 @@ module.exports = {
           { id: 279, name: "Perfect Squares", pattern: "Complete Knapsack" },
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
+          { id: 514, name: "Freedom Trail", pattern: "Layered Position DP + Circular Transitions" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
           { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
@@ -21833,7 +21835,7 @@ module.exports = {
           {
             title: "Stage 4 — String DP",
             description: "dp[i] = can split up to i / number of decodings. On 1D string.",
-            problems: [139, 91],
+            problems: [139, 91, 514],
           },
           {
             title: "Stage 5 — Grid DP",

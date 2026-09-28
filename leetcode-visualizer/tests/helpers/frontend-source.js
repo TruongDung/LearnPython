@@ -24,6 +24,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-longest-increasing-path-329.js',
   'renderer-split-array-410.js',
   'renderer-all-one-432.js',
+  'renderer-freedom-trail-514.js',
   'script.js',
 ]);
 
@@ -51,6 +52,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'longest-increasing-path-329.css',
   'split-array-410.css',
   'all-one-432.css',
+  'freedom-trail-514.css',
 ]);
 
 const sourceCache = new Map();
