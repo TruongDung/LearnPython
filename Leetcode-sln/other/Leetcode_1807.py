@@ -5,7 +5,7 @@ class Solution:
         # for a in knowledge:
         #     if a[0] in s:
         #         s = s.replace("(" + a[0] + ")", a[1])
-            
+
         # s = re.sub(r"\([^)]*\)", "?", s)
 
         # return s
