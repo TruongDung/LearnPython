@@ -123,6 +123,39 @@ const COMPANY_LISTS = {
       [921, "Minimum Add to Make Parentheses Valid", "medium"],
     ],
   },
+  microsoft: {
+    key: "microsoft",
+    vi: "Microsoft",
+    en: "Microsoft",
+    roster: [
+      [1570, "Dot Product of Two Sparse Vectors", "medium"],
+      [9006, "Graph BFS Shortest Path", "medium"],
+      [1, "Two Sum", "easy"],
+      [167, "Two Sum II - Input Array Is Sorted", "medium"],
+    ],
+  },
+  apple: {
+    key: "apple",
+    vi: "Apple",
+    en: "Apple",
+    roster: [
+      [208, "Implement Trie (Prefix Tree)", "medium"],
+      [9011, "On-Disk Key-Value Store", "medium"],
+      [9012, "Vending Machine Change", "medium"],
+      [9013, "Perfect-Square Arrangement", "hard"],
+    ],
+  },
+  netflix: {
+    key: "netflix",
+    vi: "Netflix",
+    en: "Netflix",
+    roster: [
+      [9014, "Loyal Customers from Daily Logs", "medium"],
+      [9015, "Interval Overlap Counter", "medium"],
+      [9016, "Movie-History Friends", "hard"],
+      [9017, "Ad Promotion Metrics System", "hard"],
+    ],
+  },
 };
 
 for (const [catKey, mod] of Object.entries(categories)) {
