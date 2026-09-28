@@ -59671,6 +59671,52 @@ html, body {
 [data-theme="light"] .ts653-cell { border-color: #cbd5e1; background: #f8fafc; }
 [data-theme="light"] .ts653-equation, [data-theme="light"] .ts653-tree { border-color: #cbd5e1; background: #fff; color: #0f172a; }
 
+/* LeetCode #167 — proof-oriented two-pointer visualization. */
+.ts167-viz { display: grid; gap: 11px; padding: 14px; color: #e2e8f0; }
+.ts167-viz > header, .ts167-window > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ts167-viz > header small, .ts167-window > header span { color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .07em; }
+.ts167-viz > header strong { display: block; margin-top: 3px; font-size: 15px; }
+.ts167-viz > header > span { padding: 5px 8px; border: 1px solid #475569; border-radius: 999px; color: #f8fafc; font: 800 12px ui-monospace, monospace; }
+.ts167-window { padding: 10px; border: 1px solid #334155; border-radius: 10px; background: #0f172a; }
+.ts167-window > header strong { font-size: 11px; letter-spacing: .06em; }
+.ts167-array { display: flex; gap: 7px; overflow-x: auto; padding: 18px 1px 5px; }
+.ts167-cell { position: relative; display: grid; min-width: 82px; min-height: 78px; grid-template-rows: auto 1fr auto; gap: 3px; align-items: center; padding: 6px 7px; border: 1px solid #475569; border-radius: 9px; background: #1e293b; text-align: center; transition: opacity .15s ease; }
+.ts167-cell > small { color: #94a3b8; font: 700 10px ui-monospace, monospace; }
+.ts167-cell > strong { font: 800 19px ui-monospace, monospace; }
+.ts167-cell > em { min-height: 12px; color: #94a3b8; font-size: 9px; font-style: normal; line-height: 1.15; }
+.ts167-cell.discarded { opacity: .44; border-style: dashed; }
+.ts167-cell.left { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,.16); }
+.ts167-cell.right { border-color: #f472b6; box-shadow: 0 0 0 2px rgba(244,114,182,.16); }
+.ts167-cell.found { border-color: #34d399; background: rgba(6,78,59,.4); opacity: 1; }
+.ts167-pointer { position: absolute; top: -21px; left: 0; right: 0; display: grid; justify-items: center; color: #f8fafc; font: 800 11px ui-monospace, monospace; line-height: 10px; }
+.ts167-cell.left .ts167-pointer { color: #7dd3fc; }
+.ts167-cell.right .ts167-pointer { color: #f9a8d4; }
+.ts167-cell.found .ts167-pointer { color: #6ee7b7; }
+.ts167-pointer i { font-style: normal; font-size: 13px; }
+.ts167-check { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 6px; align-items: center; }
+.ts167-check > div { display: grid; min-height: 56px; place-items: center; border: 1px solid #475569; border-radius: 9px; background: #1e293b; }
+.ts167-check small { color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: .06em; }
+.ts167-check strong { font: 800 18px ui-monospace, monospace; }
+.ts167-check > b { color: #94a3b8; }
+.ts167-check .sum strong { color: #fbbf24; }
+.ts167-check .target strong { color: #c4b5fd; }
+.ts167-rule { padding: 10px 11px; border: 1px solid #334155; border-radius: 9px; background: #0f172a; color: #e2e8f0; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.ts167-rule.move-left { border-color: #0ea5e9; color: #bae6fd; }
+.ts167-rule.move-right { border-color: #ec4899; color: #fbcfe8; }
+.ts167-rule.found { border-color: #34d399; color: #bbf7d0; }
+.ts167-legend { display: flex; flex-wrap: wrap; gap: 8px 13px; color: #94a3b8; font-size: 10px; }
+.ts167-legend span { display: flex; align-items: center; gap: 5px; }
+.ts167-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; background: #334155; }
+.ts167-legend i.left { background: #38bdf8; }
+.ts167-legend i.right { background: #f472b6; }
+.ts167-legend i.discarded { border: 1px dashed #94a3b8; background: transparent; }
+[data-theme="light"] .ts167-viz { color: #1e293b; }
+[data-theme="light"] .ts167-viz > header small, [data-theme="light"] .ts167-window > header span, [data-theme="light"] .ts167-cell > small, [data-theme="light"] .ts167-cell > em, [data-theme="light"] .ts167-check small, [data-theme="light"] .ts167-legend { color: #64748b; }
+[data-theme="light"] .ts167-viz > header > span, [data-theme="light"] .ts167-window, [data-theme="light"] .ts167-rule { border-color: #cbd5e1; background: #fff; color: #0f172a; }
+[data-theme="light"] .ts167-cell, [data-theme="light"] .ts167-check > div { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .ts167-cell.found { background: #ecfdf5; }
+@container (max-width: 520px) { .ts167-check { grid-template-columns: 1fr auto 1fr; } .ts167-check > b:nth-of-type(2), .ts167-check > b:nth-of-type(3), .ts167-check .sum, .ts167-check .target { grid-row: 2; } .ts167-check .sum { grid-column: 1; } .ts167-check .target { grid-column: 3; } }
+
 /* LeetCode #653, approach 2 — DFS + Hash Set. */
 .ts653h-viz { display: grid; gap: 11px; padding: 14px; color: #e2e8f0; }
 .ts653h-viz > header, .ts653h-seen > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }

@@ -4845,6 +4845,51 @@ function renderTwoSum653View(step) {
   renderTree({ tree: step.tree }, "twoSum653Tree");
 }
 
+function renderTwoSumIIView(step) {
+  const view = step.twoSumIIView || {};
+  const values = Array.isArray(view.values) ? view.values : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const discardedLeft = new Set(view.discardedLeft || []);
+  const discardedRight = new Set(view.discardedRight || []);
+  const vi = lang === "vi";
+  const decision = view.decision || "start";
+  const isComparison = Number.isFinite(view.sum);
+  const relation = isComparison ? (view.sum === view.target ? "=" : view.sum < view.target ? "<" : ">") : "";
+  const cells = values.map((value, index) => {
+    const classes = ["ts167-cell"];
+    if (discardedLeft.has(index) || discardedRight.has(index)) classes.push("discarded");
+    if (index === left) classes.push("left");
+    if (index === right) classes.push("right");
+    if (view.found && (index === left || index === right)) classes.push("found");
+    const pointers = [index === left ? "L" : "", index === right ? "R" : ""].filter(Boolean).join("/");
+    const state = discardedLeft.has(index) ? (vi ? "loại: quá nhỏ" : "discarded: too small") : discardedRight.has(index) ? (vi ? "loại: quá lớn" : "discarded: too large") : index >= left && index <= right ? (vi ? "còn xét" : "still possible") : "";
+    return `<div class="${classes.join(" ")}"><div class="ts167-pointer">${pointers ? `<b>${pointers}</b><i>▼</i>` : ""}</div><small>index ${index + 1}</small><strong>${escapeHtml(value)}</strong><em>${escapeHtml(state)}</em></div>`;
+  }).join("");
+  const equation = isComparison
+    ? `${values[left]} + ${values[right]} = ${view.sum} ${relation} ${view.target}${view.found ? " ✓" : ""}`
+    : `target = ${view.target}`;
+  const rule = decision === "move-left"
+    ? (vi ? `L++ · loại index ${left + 1}: ghép với mọi số còn lại cũng không đủ target.` : `L++ · discard index ${left + 1}: pairing it with every remaining number is still below target.`)
+    : decision === "move-right"
+      ? (vi ? `R-- · loại index ${right + 1}: ghép với mọi số còn lại vẫn vượt target.` : `R-- · discard index ${right + 1}: pairing it with every remaining number still exceeds target.`)
+      : decision === "found"
+        ? (vi ? `Đáp án 1-based: [${left + 1}, ${right + 1}]` : `1-based answer: [${left + 1}, ${right + 1}]`)
+        : decision === "not-found"
+          ? (vi ? "Không còn cặp nào trong cửa sổ." : "No pair remains in the window.")
+          : (vi ? "L và R đánh dấu hai biên duy nhất cần kiểm tra." : "L and R mark the only two boundaries that need checking.");
+  const summary = vi
+    ? `Two Sum II, target ${view.target}; L tại index ${left + 1}, R tại index ${right + 1}. ${rule}`
+    : `Two Sum II, target ${view.target}; L at index ${left + 1}, R at index ${right + 1}. ${rule}`;
+  $("treeView").innerHTML = `<section class="ts167-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><div><small>TWO POINTERS · SORTED ARRAY · #167</small><strong>${vi ? "CHỈ LOẠI BỎ KHI ĐÃ CÓ BẰNG CHỨNG" : "DISCARD ONLY WHEN PROVEN"}</strong></div><span>target = ${escapeHtml(view.target)}</span></header>
+    <section class="ts167-window"><header><strong>${vi ? "CỬA SỔ CÒN KHẢ THI" : "STILL-POSSIBLE WINDOW"}</strong><span>${left < right ? `[${left + 1} … ${right + 1}]` : "∅"}</span></header><div class="ts167-array">${cells || "∅"}</div></section>
+    <section class="ts167-check"><div><small>numbers[L]</small><strong>${left >= 0 ? escapeHtml(values[left]) : "—"}</strong></div><b>+</b><div><small>numbers[R]</small><strong>${right >= 0 ? escapeHtml(values[right]) : "—"}</strong></div><b>=</b><div class="sum"><small>sum</small><strong>${isComparison ? escapeHtml(view.sum) : "—"}</strong></div><b>${relation || "?"}</b><div class="target"><small>target</small><strong>${escapeHtml(view.target)}</strong></div></section>
+    <div class="ts167-rule ${decision}">${escapeHtml(rule)}</div>
+    <div class="ts167-legend"><span><i class="left"></i>L: ${vi ? "biên nhỏ nhất còn lại" : "smallest remaining"}</span><span><i class="right"></i>R: ${vi ? "biên lớn nhất còn lại" : "largest remaining"}</span><span><i class="discarded"></i>${vi ? "đã loại bằng tính tăng dần" : "discarded by sortedness"}</span></div>
+  </section>`;
+}
+
 function renderTwoSum653HashView(step) {
   const view = step.twoSum653HashView || {};
   const vi = lang === "vi";
@@ -37312,6 +37357,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderUpsideDown156View(step);
+  } else if (step.twoSumIIView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoSumIIView(step);
   } else if (step.twoSum653HashView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

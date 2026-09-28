@@ -3321,19 +3321,35 @@ function buildSteps167(input, params) {
   const target = params && params.target !== undefined ? Number(params.target) : 9;
   const steps = [];
   let left = 0, right = nums.length - 1;
-  steps.push({ title: { vi: `left=0, right=n-1, target=${target}`, en: `left=0, right=n-1, target=${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [], codeLines: [3], vars: [{ name: "target", value: target }, { name: "left", value: left }, { name: "right", value: right }], note: { vi: "Mảng đã sắp xếp. Tổng nhỏ → left++; tổng lớn → right--; bằng → tìm thấy.", en: "Array is sorted. Sum too small → left++; too big → right--; equal → found." } });
+  const snap = (title, codeLines, note, view, final = false) => steps.push({
+    title, arr: [...nums], sub: nums.map((_, i) => `[${i + 1}]`), highlight: [view.left, view.right].filter((i) => i >= 0), mark: view.found ? [view.left, view.right] : [], final, codeLines,
+    twoSumIIView: { values: [...nums], target, ...view },
+    vars: [{ name: "target", value: target }, { name: "left (0-based)", value: view.left }, { name: "right (0-based)", value: view.right }, { name: "answer (1-based)", value: view.found ? `[${view.left + 1}, ${view.right + 1}]` : "—" }], note,
+  });
+  snap({ vi: `Mở cửa sổ [0, ${right}]`, en: `Open window [0, ${right}]` }, [3], { vi: "Mảng tăng dần. Chỉ cần xét hai đầu cửa sổ: L là số nhỏ nhất và R là số lớn nhất còn khả thi.", en: "The array is sorted. Only inspect the window ends: L is the smallest and R is the largest still possible." }, { left, right, sum: null, decision: "start", discardedLeft: [], discardedRight: [], found: false });
   let answer = [];
+  const discardedLeft = [], discardedRight = [];
   while (left < right) {
     const total = nums[left] + nums[right];
     if (total === target) {
       answer = [left + 1, right + 1];
-      steps.push({ title: { vi: `${nums[left]}+${nums[right]}=${target} ✓ → [${left + 1},${right + 1}]`, en: `${nums[left]}+${nums[right]}=${target} ✓ → [${left + 1},${right + 1}]` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [left, right], final: true, codeLines: [4, 5], vars: [{ name: "answer (1-indexed)", value: `[${left + 1},${right + 1}]` }], note: { vi: `Tìm thấy cặp tổng = ${target}. Trả về chỉ số 1-based.`, en: `Found the pair summing to ${target}. Return 1-based indices.` } });
+      snap({ vi: `${nums[left]} + ${nums[right]} = ${target} ✓`, en: `${nums[left]} + ${nums[right]} = ${target} ✓` }, [4, 5], { vi: `Đúng target. Chỉ số LeetCode là 1-based nên trả [${left + 1}, ${right + 1}].`, en: `It equals the target. LeetCode indices are 1-based, so return [${left + 1}, ${right + 1}].` }, { left, right, sum: total, decision: "found", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: true }, true);
       break;
     }
     const less = total < target;
-    steps.push({ title: { vi: `${nums[left]}+${nums[right]}=${total} ${less ? "<" : ">"} ${target}`, en: `${nums[left]}+${nums[right]}=${total} ${less ? "<" : ">"} ${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [], codeLines: less ? [6, 7] : [8, 9], vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "sum", value: total }], note: { vi: less ? `Tổng ${total} < ${target} → cần lớn hơn → left++.` : `Tổng ${total} > ${target} → cần nhỏ hơn → right--.`, en: less ? `Sum ${total} < ${target} → need larger → left++.` : `Sum ${total} > ${target} → need smaller → right--.` } });
-    if (less) left++; else right--;
+    if (less) {
+      const removed = left;
+      discardedLeft.push(removed);
+      snap({ vi: `${nums[left]} + ${nums[right]} = ${total} < ${target} → bỏ L`, en: `${nums[left]} + ${nums[right]} = ${total} < ${target} → discard L` }, [6, 7], { vi: `Vì mọi j ≤ R đều có numbers[j] ≤ ${nums[right]}, nên ${nums[left]} + numbers[j] ≤ ${total} < ${target}. Index ${left + 1} không thể thuộc đáp án.`, en: `For every j ≤ R, numbers[j] ≤ ${nums[right]}, so ${nums[left]} + numbers[j] ≤ ${total} < ${target}. Index ${left + 1} cannot be in the answer.` }, { left, right, sum: total, decision: "move-left", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: false });
+      left++;
+    } else {
+      const removed = right;
+      discardedRight.push(removed);
+      snap({ vi: `${nums[left]} + ${nums[right]} = ${total} > ${target} → bỏ R`, en: `${nums[left]} + ${nums[right]} = ${total} > ${target} → discard R` }, [8, 9], { vi: `Vì mọi i ≥ L đều có numbers[i] ≥ ${nums[left]}, nên numbers[i] + ${nums[right]} ≥ ${total} > ${target}. Index ${right + 1} không thể thuộc đáp án.`, en: `For every i ≥ L, numbers[i] ≥ ${nums[left]}, so numbers[i] + ${nums[right]} ≥ ${total} > ${target}. Index ${right + 1} cannot be in the answer.` }, { left, right, sum: total, decision: "move-right", discardedLeft: [...discardedLeft], discardedRight: [...discardedRight], found: false });
+      right--;
+    }
   }
+  if (!answer.length) snap({ vi: "Cửa sổ rỗng → không có cặp", en: "Window exhausted → no pair" }, [10], { vi: "L và R đã gặp nhau, nên mọi cặp khả dĩ đã bị chứng minh loại trừ.", en: "L and R have met, so every possible pair has been proven impossible." }, { left, right, sum: null, decision: "not-found", discardedLeft, discardedRight, found: false }, true);
   return { original: nums, answer, steps };
 }
 
