@@ -2692,216 +2692,602 @@ function buildSteps980(input) {
  * 20              level = next_level
  * 21          return [""]
  */
+const REMOVE_INVALID_PARENTHESES_301_MAX_LENGTH = 14;
+const REMOVE_INVALID_PARENTHESES_301_SOURCE = Object.freeze([
+  "class Solution:",
+  "    def removeInvalidParentheses(self, s):",
+  "        def is_valid(string):",
+  "            count = 0",
+  "            for ch in string:",
+  "                if ch == '(': count += 1",
+  "                elif ch == ')':",
+  "                    count -= 1",
+  "                    if count < 0: return False",
+  "            return count == 0",
+  "        level = {s}",
+  "        while level:",
+  "            valid = [x for x in level if is_valid(x)]",
+  "            if valid: return valid",
+  "            next_level = set()",
+  "            for string in level:",
+  "                for i in range(len(string)):",
+  "                    if string[i] in '()':",
+  "                        next_level.add(string[:i] + string[i+1:])",
+  "            level = next_level",
+  "        return ['']",
+]);
+
+function parseRemoveInvalidParentheses301Input(input) {
+  if (typeof input !== "string") {
+    throw new TypeError("Remove Invalid Parentheses input must be a string.");
+  }
+  if (input.length === 0) {
+    throw new TypeError("Remove Invalid Parentheses input must be nonempty.");
+  }
+  if (!/^[a-z()]+$/.test(input)) {
+    throw new TypeError("Remove Invalid Parentheses input must contain only lowercase letters a-z and parentheses.");
+  }
+  if (input.length > REMOVE_INVALID_PARENTHESES_301_MAX_LENGTH) {
+    throw new RangeError(`Remove Invalid Parentheses visualizes at most ${REMOVE_INVALID_PARENTHESES_301_MAX_LENGTH} characters.`);
+  }
+  return input;
+}
+
+function deepFreezeRemoveInvalid301View(value) {
+  const copy = JSON.parse(JSON.stringify(value));
+  const freeze = (item) => {
+    if (!item || typeof item !== "object" || Object.isFrozen(item)) return item;
+    Object.values(item).forEach(freeze);
+    return Object.freeze(item);
+  };
+  return freeze(copy);
+}
+
 function buildSteps301(input) {
-  const s = String(input);
+  const s = parseRemoveInvalidParentheses301Input(input);
   const steps = [];
+  const inputChars = [...s].map((char, index) => ({
+    index,
+    char,
+    kind: char === "(" ? "open" : char === ")" ? "close" : "letter",
+  }));
+  const localized = (en, vi) => ({ en, vi });
+  const emptyScan = () => ({
+    candidate: null,
+    balanceBefore: null,
+    balanceAfter: null,
+    index: null,
+    char: null,
+    decision: "idle",
+    firstNegativeIndex: null,
+    unmatchedOpens: null,
+    valid: null,
+  });
+  const emptyRemoval = () => ({
+    parent: null,
+    index: null,
+    char: null,
+    child: null,
+    removable: null,
+    duplicate: null,
+    origins: [],
+  });
+  const strToArr = (str) => [...str].map((char) => char === "(" ? 1 : char === ")" ? 2 : 3);
 
-  // Encode string as char array for bar display
-  function strToArr(str) {
-    return str.split("").map((ch) => ch === "(" ? 1 : ch === ")" ? 2 : 3);
+  let level = new Set();
+  let depth = 0;
+  let frontierStatuses = new Map();
+  let currentCandidate = null;
+  let processedCount = 0;
+  let nextLevel = new Set();
+  let generatedCount = 0;
+  let duplicateCount = 0;
+  let scan = emptyScan();
+  let removal = emptyRemoval();
+  let validResults = [];
+  let minimalDepth = null;
+  let stopProof = null;
+  let finalAnswers = [];
+  const earlierInvalidDepths = [];
+  let originsByChild = new Map();
+
+  function sortedFrontier() {
+    return [...level].sort();
   }
-  function strToSub(str) {
-    return str.split("");
+
+  function emit({ line, event, phase, timing = "after", title, note, condition = null, final = false }) {
+    const frontier = sortedFrontier();
+    const candidateIndex = currentCandidate === null ? null : frontier.indexOf(currentCandidate);
+    const view = deepFreezeRemoveInvalid301View({
+      version: 1,
+      problemId: 301,
+      source: {
+        line,
+        text: REMOVE_INVALID_PARENTHESES_301_SOURCE[line - 1],
+      },
+      event,
+      phase,
+      timing,
+      condition: condition && typeof condition === "object"
+        ? { expression: condition.expression, result: condition.result }
+        : { expression: null, result: null },
+      input: {
+        value: s,
+        length: s.length,
+        limit: REMOVE_INVALID_PARENTHESES_301_MAX_LENGTH,
+        chars: inputChars,
+      },
+      bfs: {
+        depth,
+        frontier: frontier.map((value) => ({
+          value,
+          status: frontierStatuses.get(value) || "pending",
+        })),
+        currentCandidate,
+        currentCandidateIndex: candidateIndex >= 0 ? candidateIndex : null,
+        processedCount,
+        nextFrontier: [...nextLevel].sort(),
+        generatedCount,
+        uniqueCount: nextLevel.size,
+        duplicateCount,
+      },
+      scan,
+      removal,
+      validResults,
+      minimalDepth,
+      stopProof,
+      finalAnswers,
+      final,
+    });
+    const activeText = currentCandidate === null ? (finalAnswers[0] ?? s) : currentCandidate;
+    const activeIndex = scan.index !== null ? scan.index : removal.index;
+    const status = currentCandidate === null ? null : frontierStatuses.get(currentCandidate);
+    steps.push({
+      title,
+      note,
+      arr: strToArr(activeText),
+      sub: [...activeText],
+      highlight: activeIndex === null ? [] : [activeIndex],
+      mark: status === "valid" || final ? [...activeText].map((_, index) => index) : [],
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "depth", value: depth },
+        { name: "candidate", value: currentCandidate === null ? "—" : JSON.stringify(currentCandidate) },
+        { name: "processed", value: `${processedCount}/${frontier.length}` },
+        { name: "next unique", value: nextLevel.size },
+      ],
+      removeInvalid301View: view,
+    });
   }
 
-  function isValid(str) {
-    let count = 0;
-    for (const ch of str) {
-      if (ch === "(") count += 1;
-      else if (ch === ")") {
-        count -= 1;
-        if (count < 0) return false;
-      }
-    }
-    return count === 0;
-  }
-
-  // Compute min removals needed (count unmatched '(' and ')')
-  function minRemovals(str) {
-    let open = 0, close = 0;
-    for (const ch of str) {
-      if (ch === "(") {
-        open += 1;
-      } else if (ch === ")") {
-        if (open > 0) open -= 1;
-        else close += 1;
-      }
-    }
-    return open + close;
-  }
-
-  const totalMin = minRemovals(s);
-  const chars = s.split("");
-
-  // ── Init step ─────────────────────────────────────────────────────
-  steps.push({
-    title: { vi: `Chuỗi gốc: "${s}"`, en: `Input string: "${s}"` },
-    arr: strToArr(s),
-    sub: strToSub(s),
-    highlight: [], mark: [], final: false,
-    codeLines: [3, 4, 5, 6, 7],
-    vars: [
-      { name: "s", value: `"${s}"` },
-      { name: "length", value: s.length },
-      { name: "min removals needed", value: totalMin },
-    ],
-    note: {
-      vi:
-        `Đếm nhanh: ${totalMin} ký tự dư thừa cần xóa. ` +
-        `BFS mức 0 = chuỗi gốc; mức k = tập các chuỗi nhận được sau đúng k lần xóa. ` +
-        `Mức đầu tiên có chuỗi HỢP LỆ chính là đáp án (dấu ( = cột thấp, ) = cột cao).`,
-      en:
-        `Quick count: ${totalMin} excess char(s) to remove. ` +
-        `BFS level 0 = original; level k = all strings obtainable by exactly k removals. ` +
-        `The first level with a VALID string is the answer. (( = low bar, ) = tall bar.)`,
-    },
+  emit({
+    line: 1,
+    event: "bind-class",
+    phase: "setup",
+    title: localized("Bind class Solution", "Liên kết lớp Solution"),
+    note: localized("Python creates the Solution class before the method is called.", "Python tạo lớp Solution trước khi phương thức được gọi."),
+  });
+  emit({
+    line: 2,
+    event: "bind-method",
+    phase: "setup",
+    title: localized(`Bind removeInvalidParentheses(s = ${JSON.stringify(s)})`, `Liên kết removeInvalidParentheses(s = ${JSON.stringify(s)})`),
+    note: localized("The real input string is bound to s without coercion.", "Chuỗi đầu vào thật được liên kết với s mà không ép kiểu."),
+  });
+  emit({
+    line: 3,
+    event: "bind-helper",
+    phase: "setup",
+    title: localized("Bind helper is_valid", "Liên kết hàm phụ is_valid"),
+    note: localized("The nested validator closes over no future BFS result.", "Hàm kiểm tra lồng nhau chưa biết trước kết quả BFS."),
   });
 
-  let level = new Set([s]);
-  let removals = 0;
+  level = new Set([s]);
+  frontierStatuses = new Map([[s, "pending"]]);
+  emit({
+    line: 11,
+    event: "level-init",
+    phase: "level",
+    title: localized("Initialize BFS level 0", "Khởi tạo mức BFS 0"),
+    note: localized("The frontier contains exactly the original string.", "Frontier chỉ chứa đúng chuỗi ban đầu."),
+  });
 
-  while (level.size > 0) {
-    const levelArr = [...level].sort();
-    const valid = levelArr.filter(isValid);
-
-    // ── Level overview ────────────────────────────────────────────────
-    steps.push({
-      title: { vi: `Level ${removals}: ${level.size} chuỗi (xóa ${removals} ký tự)`, en: `Level ${removals}: ${level.size} string(s) (${removals} removed)` },
-      arr: strToArr(levelArr[0] || ""),
-      sub: strToSub(levelArr[0] || ""),
-      highlight: [], mark: [], final: false,
-      codeLines: [8, 9, 10],
-      vars: [
-        { name: "removals", value: removals },
-        { name: "# candidates", value: level.size },
-        { name: "candidates (first 6)", value: levelArr.slice(0, 6).map((x) => `"${x}"`).join(", ") + (levelArr.length > 6 ? "…" : "") },
-        { name: "# valid", value: valid.length },
-      ],
-      note: {
-        vi: `Level ${removals}: kiểm tra is_valid cho ${level.size} chuỗi ứng viên. Tìm thấy ${valid.length} chuỗi hợp lệ.`,
-        en: `Level ${removals}: check is_valid for ${level.size} candidate string(s). Found ${valid.length} valid string(s).`,
-      },
+  function traceIsValid(candidate) {
+    let count = 0;
+    scan = {
+      candidate,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      index: null,
+      char: null,
+      decision: "initialize-balance",
+      firstNegativeIndex: null,
+      unmatchedOpens: null,
+      valid: null,
+    };
+    emit({
+      line: 4,
+      event: "balance-init",
+      phase: "validate",
+      title: localized(`Start balance for ${JSON.stringify(candidate)}`, `Bắt đầu balance cho ${JSON.stringify(candidate)}`),
+      note: localized("is_valid starts with count = 0.", "is_valid bắt đầu với count = 0."),
     });
 
-    // ── Per-candidate validity steps (show first 6 only to avoid explosion) ──
-    const SHOW_LIMIT = 6;
-    for (let ci = 0; ci < Math.min(levelArr.length, SHOW_LIMIT); ci++) {
-      const cand = levelArr[ci];
-      const ok = isValid(cand);
-      // Highlight first invalid char if any
-      let badIdx = -1;
-      let cnt = 0;
-      for (let i = 0; i < cand.length; i++) {
-        if (cand[i] === "(") cnt++;
-        else if (cand[i] === ")") {
-          cnt--;
-          if (cnt < 0) { badIdx = i; break; }
-        }
-      }
-      if (!ok && badIdx < 0 && cnt !== 0) {
-        // find last unmatched open
-        badIdx = cand.lastIndexOf("(");
-      }
-      steps.push({
-        title: ok
-          ? { vi: `"${cand}" ✓ HỢP LỆ`, en: `"${cand}" ✓ VALID` }
-          : { vi: `"${cand}" ✗ không hợp lệ`, en: `"${cand}" ✗ invalid` },
-        arr: strToArr(cand),
-        sub: strToSub(cand),
-        highlight: badIdx >= 0 ? [badIdx] : [],
-        mark: ok ? cand.split("").map((_, i) => i) : [],
-        final: false,
-        codeLines: [11, 12, 13, 14, 15],
-        vars: [
-          { name: "candidate", value: `"${cand}"` },
-          { name: "is_valid", value: ok },
-          { name: "balance at end", value: cnt >= 0 ? cnt : `went negative at [${badIdx}]` },
-        ],
-        note: ok
-          ? { vi: `"${cand}" hợp lệ: tất cả dấu ngoặc đều khớp đôi và không bị âm.`, en: `"${cand}" is valid: all brackets are balanced and balance never goes negative.` }
-          : badIdx >= 0
-            ? { vi: `"${cand}" không hợp lệ: balance < 0 tại vị trí [${badIdx}] = '${cand[badIdx]}' (đánh dấu đỏ).`, en: `"${cand}" invalid: balance < 0 at index [${badIdx}] = '${cand[badIdx]}' (highlighted red).` }
-            : { vi: `"${cand}" không hợp lệ: còn ${cnt} dấu '(' chưa khớp.`, en: `"${cand}" invalid: ${cnt} unmatched '(' remaining.` },
+    for (let index = 0; index < candidate.length; index += 1) {
+      const char = candidate[index];
+      scan = {
+        ...scan,
+        balanceBefore: count,
+        balanceAfter: count,
+        index,
+        char,
+        decision: "select-character",
+      };
+      emit({
+        line: 5,
+        event: "character-select",
+        phase: "validate",
+        title: localized(`Select [${index}] ${JSON.stringify(char)}`, `Chọn [${index}] ${JSON.stringify(char)}`),
+        note: localized("The loop selects this character; validity is still unknown.", "Vòng lặp chọn ký tự này; tính hợp lệ vẫn chưa biết."),
       });
-    }
-    if (levelArr.length > SHOW_LIMIT) {
-      steps.push({
-        title: { vi: `… và ${levelArr.length - SHOW_LIMIT} chuỗi khác`, en: `… and ${levelArr.length - SHOW_LIMIT} more` },
-        arr: [], highlight: [], mark: [], final: false,
-        codeLines: [11],
-        vars: [{ name: "skipped", value: levelArr.length - SHOW_LIMIT }],
-        note: {
-          vi: `(Bỏ qua ${levelArr.length - SHOW_LIMIT} chuỗi còn lại để tránh quá nhiều bước.)`,
-          en: `(Skipping ${levelArr.length - SHOW_LIMIT} remaining candidates to keep the step count manageable.)`,
-        },
+
+      if (char === "(") {
+        const before = count;
+        count += 1;
+        scan = {
+          ...scan,
+          balanceBefore: before,
+          balanceAfter: count,
+          decision: "open-increment",
+        };
+        emit({
+          line: 6,
+          event: "open-increment",
+          phase: "validate",
+          title: localized(`Open parenthesis: ${before} → ${count}`, `Ngoặc mở: ${before} → ${count}`),
+          note: localized("The line-6 condition is true, so count increases by one.", "Điều kiện dòng 6 đúng nên count tăng một."),
+          condition: { expression: "ch == '('", result: true },
+        });
+        continue;
+      }
+
+      scan = {
+        ...scan,
+        balanceBefore: count,
+        balanceAfter: count,
+        decision: "not-open",
+      };
+      emit({
+        line: 6,
+        event: "open-check",
+        phase: "validate",
+        title: localized(`${JSON.stringify(char)} is not '('`, `${JSON.stringify(char)} không phải '('`),
+        note: localized("The line-6 condition is false; evaluate the elif next.", "Điều kiện dòng 6 sai; tiếp tục đánh giá elif."),
+        condition: { expression: "ch == '('", result: false },
       });
+
+      const isClose = char === ")";
+      scan = {
+        ...scan,
+        decision: isClose ? "close-match" : "letter-scan-skip",
+      };
+      emit({
+        line: 7,
+        event: "close-check",
+        phase: "validate",
+        title: localized(
+          isClose ? "Close-parenthesis branch selected" : `Letter ${JSON.stringify(char)} changes no balance`,
+          isClose ? "Chọn nhánh ngoặc đóng" : `Chữ ${JSON.stringify(char)} không đổi balance`,
+        ),
+        note: localized(
+          isClose ? "The elif condition is true." : "The elif condition is false, so this lowercase letter is ignored by the validator.",
+          isClose ? "Điều kiện elif đúng." : "Điều kiện elif sai nên hàm kiểm tra bỏ qua chữ thường này.",
+        ),
+        condition: { expression: "ch == ')'", result: isClose },
+      });
+      if (!isClose) continue;
+
+      const before = count;
+      count -= 1;
+      scan = {
+        ...scan,
+        balanceBefore: before,
+        balanceAfter: count,
+        decision: "close-decrement",
+      };
+      emit({
+        line: 8,
+        event: "close-decrement",
+        phase: "validate",
+        title: localized(`Close parenthesis: ${before} → ${count}`, `Ngoặc đóng: ${before} → ${count}`),
+        note: localized("A close parenthesis consumes one unmatched open parenthesis.", "Ngoặc đóng dùng một ngoặc mở chưa ghép."),
+      });
+
+      const negative = count < 0;
+      scan = {
+        ...scan,
+        decision: negative ? "early-return-false" : "balance-nonnegative",
+        firstNegativeIndex: negative ? index : scan.firstNegativeIndex,
+        valid: negative ? false : null,
+      };
+      emit({
+        line: 9,
+        event: negative ? "early-return-invalid" : "negative-check",
+        phase: "validate",
+        title: localized(
+          negative ? `Balance first becomes negative at [${index}]` : `Balance remains nonnegative at [${index}]`,
+          negative ? `Balance âm lần đầu tại [${index}]` : `Balance vẫn không âm tại [${index}]`,
+        ),
+        note: localized(
+          negative ? "The validator returns False immediately; later characters are not scanned." : "The early-return condition is false, so scanning continues.",
+          negative ? "Hàm kiểm tra trả False ngay; các ký tự sau không được quét." : "Điều kiện trả sớm sai nên tiếp tục quét.",
+        ),
+        condition: { expression: "count < 0", result: negative },
+      });
+      if (negative) return false;
     }
 
-    if (valid.length > 0) {
-      const answer = [...new Set(valid)].sort();
-      steps.push({
-        title: { vi: `Kết quả: ${answer.map((x) => `"${x}"`).join(", ")}`, en: `Result: ${answer.map((x) => `"${x}"`).join(", ")}` },
-        arr: strToArr(answer[0]),
-        sub: strToSub(answer[0]),
-        highlight: [],
-        mark: answer[0].split("").map((_, i) => i),
+    const valid = count === 0;
+    scan = {
+      ...scan,
+      balanceBefore: count,
+      balanceAfter: count,
+      index: null,
+      char: null,
+      decision: valid ? "return-true" : "return-false-unmatched-opens",
+      unmatchedOpens: Math.max(0, count),
+      valid,
+    };
+    emit({
+      line: 10,
+      event: "validation-result",
+      phase: "validate",
+      title: localized(
+        valid ? `${JSON.stringify(candidate)} is valid` : `${JSON.stringify(candidate)} has ${count} unmatched open parenthesis(es)`,
+        valid ? `${JSON.stringify(candidate)} hợp lệ` : `${JSON.stringify(candidate)} còn ${count} ngoặc mở chưa ghép`,
+      ),
+      note: localized(
+        valid ? "The complete scan ends at balance zero." : "The complete scan ends above zero, so is_valid returns False.",
+        valid ? "Quét xong với balance bằng không." : "Quét xong với balance lớn hơn không nên is_valid trả False.",
+      ),
+      condition: { expression: "count == 0", result: valid },
+    });
+    return valid;
+  }
+
+  while (true) {
+    const levelArr = sortedFrontier();
+    const hasLevel = levelArr.length > 0;
+    currentCandidate = null;
+    scan = emptyScan();
+    removal = emptyRemoval();
+    emit({
+      line: 12,
+      event: "while-check",
+      phase: "level",
+      title: localized(
+        hasLevel ? `Enter BFS level ${depth}` : "BFS frontier is empty",
+        hasLevel ? `Vào mức BFS ${depth}` : "Frontier BFS rỗng",
+      ),
+      note: localized(
+        hasLevel ? `All ${levelArr.length} candidates at this depth will be scanned.` : "The defensive return on line 21 is now reachable.",
+        hasLevel ? `Tất cả ${levelArr.length} ứng viên ở độ sâu này sẽ được quét.` : "Nhánh trả về phòng thủ ở dòng 21 giờ được thực thi.",
+      ),
+      condition: { expression: "bool(level)", result: hasLevel },
+    });
+
+    if (!hasLevel) {
+      finalAnswers = [""];
+      stopProof = {
+        kind: "defensive-exhaustion",
+        firstValidLevel: null,
+        earlierInvalidDepths: [...earlierInvalidDepths],
+        currentLevelFullyScanned: true,
+        generationSkipped: true,
+      };
+      emit({
+        line: 21,
+        event: "defensive-return",
+        phase: "done",
+        title: localized("Defensive return ['']", "Trả về phòng thủ ['']"),
+        note: localized("This source fallback executes only if the BFS frontier is truly empty; safe accepted inputs normally stop at line 14.", "Fallback nguồn này chỉ chạy khi frontier BFS thực sự rỗng; input an toàn thường dừng ở dòng 14."),
         final: true,
-        codeLines: [16, 17],
-        vars: [
-          { name: "min removals", value: removals },
-          { name: "answer", value: answer.map((x) => `"${x}"`).join(", ") },
-        ],
-        note: {
-          vi: `Level ${removals} là mức ĐẦU TIÊN có chuỗi hợp lệ → xóa ít nhất ${removals} ký tự. Đáp án: [${answer.map((x) => `"${x}"`).join(", ")}].`,
-          en: `Level ${removals} is the FIRST level with valid strings → minimum ${removals} removal(s). Answer: [${answer.map((x) => `"${x}"`).join(", ")}].`,
-        },
       });
-      return { original: s, answer, steps };
+      return { original: s, answer: [...finalAnswers], steps };
     }
 
-    // Build next level
-    const nextLevel = new Set();
-    for (const str of levelArr) {
-      for (let i = 0; i < str.length; i++) {
-        if (str[i] === "(" || str[i] === ")") {
-          nextLevel.add(str.slice(0, i) + str.slice(i + 1));
-        }
+    processedCount = 0;
+    validResults = [];
+    for (const candidate of levelArr) {
+      currentCandidate = candidate;
+      frontierStatuses.set(candidate, "scanning");
+      scan = emptyScan();
+      scan.candidate = candidate;
+      emit({
+        line: 13,
+        event: "candidate-dispatch",
+        phase: "validate",
+        timing: "before",
+        title: localized(`Dispatch is_valid(${JSON.stringify(candidate)})`, `Gọi is_valid(${JSON.stringify(candidate)})`),
+        note: localized("This list-comprehension candidate has not been classified yet.", "Ứng viên trong list comprehension này chưa được phân loại."),
+      });
+
+      const valid = traceIsValid(candidate);
+      frontierStatuses.set(candidate, valid ? "valid" : "invalid");
+      processedCount += 1;
+      if (valid) validResults = [...validResults, candidate].sort();
+      emit({
+        line: 13,
+        event: "candidate-classified",
+        phase: "validate",
+        title: localized(
+          valid ? `Keep valid candidate ${JSON.stringify(candidate)}` : `Reject invalid candidate ${JSON.stringify(candidate)}`,
+          valid ? `Giữ ứng viên hợp lệ ${JSON.stringify(candidate)}` : `Loại ứng viên không hợp lệ ${JSON.stringify(candidate)}`,
+        ),
+        note: localized(
+          valid ? "The completed validator result is appended to valid." : "The completed validator result excludes this candidate from valid.",
+          valid ? "Kết quả kiểm tra hoàn tất được thêm vào valid." : "Kết quả kiểm tra hoàn tất loại ứng viên này khỏi valid.",
+        ),
+        condition: { expression: "is_valid(x)", result: valid },
+      });
+    }
+
+    currentCandidate = null;
+    scan = emptyScan();
+    const foundValid = validResults.length > 0;
+    if (foundValid) {
+      minimalDepth = depth;
+      finalAnswers = [...new Set(validResults)].sort();
+      stopProof = {
+        kind: "first-valid-bfs-level",
+        firstValidLevel: depth,
+        earlierInvalidDepths: [...earlierInvalidDepths],
+        earlierLevelsHadNoValid: earlierInvalidDepths.length === depth,
+        currentLevelFullyScanned: processedCount === levelArr.length,
+        allCurrentValidReturned: finalAnswers.length === validResults.length,
+        generationSkipped: true,
+      };
+      emit({
+        line: 14,
+        event: "minimal-stop",
+        phase: "done",
+        title: localized(`Stop at minimum removal depth ${depth}`, `Dừng ở độ sâu xóa tối thiểu ${depth}`),
+        note: localized(
+          `This is the first valid BFS level; return all ${finalAnswers.length} distinct sorted result(s) without generating another level.`,
+          `Đây là mức BFS hợp lệ đầu tiên; trả về đủ ${finalAnswers.length} kết quả phân biệt đã sắp xếp mà không sinh mức mới.`,
+        ),
+        condition: { expression: "bool(valid)", result: true },
+        final: true,
+      });
+      return { original: s, answer: [...finalAnswers], steps };
+    }
+
+    stopProof = null;
+    emit({
+      line: 14,
+      event: "level-no-valid",
+      phase: "level",
+      title: localized(`No valid candidate at depth ${depth}`, `Không có ứng viên hợp lệ ở độ sâu ${depth}`),
+      note: localized("The whole level was scanned before deciding to generate children.", "Toàn bộ mức đã được quét trước khi quyết định sinh các chuỗi con."),
+      condition: { expression: "bool(valid)", result: false },
+    });
+    earlierInvalidDepths.push(depth);
+
+    nextLevel = new Set();
+    originsByChild = new Map();
+    generatedCount = 0;
+    duplicateCount = 0;
+    removal = emptyRemoval();
+    emit({
+      line: 15,
+      event: "next-level-init",
+      phase: "generate",
+      title: localized(`Initialize level ${depth + 1} set`, `Khởi tạo set mức ${depth + 1}`),
+      note: localized("A fresh set will deduplicate every one-parenthesis deletion.", "Set mới sẽ loại trùng mọi phép xóa một dấu ngoặc."),
+    });
+
+    for (const parent of levelArr) {
+      currentCandidate = parent;
+      removal = { ...emptyRemoval(), parent };
+      emit({
+        line: 16,
+        event: "parent-select",
+        phase: "generate",
+        title: localized(`Generate from ${JSON.stringify(parent)}`, `Sinh từ ${JSON.stringify(parent)}`),
+        note: localized("Select this fully classified parent from the current level.", "Chọn chuỗi cha đã được phân loại đầy đủ từ mức hiện tại."),
+      });
+
+      for (let index = 0; index < parent.length; index += 1) {
+        const char = parent[index];
+        removal = {
+          parent,
+          index,
+          char,
+          child: null,
+          removable: null,
+          duplicate: null,
+          origins: [],
+        };
+        emit({
+          line: 17,
+          event: "index-select",
+          phase: "generate",
+          title: localized(`Inspect parent index ${index}`, `Xét index cha ${index}`),
+          note: localized("The inner loop visits every character index, including letters.", "Vòng lặp trong xét mọi index ký tự, kể cả chữ cái."),
+        });
+
+        const removable = char === "(" || char === ")";
+        removal = { ...removal, removable };
+        emit({
+          line: 18,
+          event: removable ? "removable-check" : "letter-skip",
+          phase: "generate",
+          title: localized(
+            removable ? `${JSON.stringify(char)} can be removed` : `Skip letter ${JSON.stringify(char)}`,
+            removable ? `Có thể xóa ${JSON.stringify(char)}` : `Bỏ qua chữ ${JSON.stringify(char)}`,
+          ),
+          note: localized(
+            removable ? "The membership check succeeds; line 19 will attempt this deletion." : "Letters are never removed, so no child is attempted for this index.",
+            removable ? "Kiểm tra membership đúng; dòng 19 sẽ thử phép xóa này." : "Không bao giờ xóa chữ cái nên index này không thử tạo chuỗi con.",
+          ),
+          condition: { expression: "string[i] in '()'", result: removable },
+        });
+        if (!removable) continue;
+
+        const child = parent.slice(0, index) + parent.slice(index + 1);
+        const duplicate = nextLevel.has(child);
+        const origin = { parent, index, char };
+        const origins = [...(originsByChild.get(child) || []), origin];
+        originsByChild.set(child, origins);
+        generatedCount += 1;
+        if (duplicate) duplicateCount += 1;
+        else nextLevel.add(child);
+        removal = {
+          parent,
+          index,
+          char,
+          child,
+          removable: true,
+          duplicate,
+          origins,
+        };
+        emit({
+          line: 19,
+          event: duplicate ? "deletion-duplicate" : "deletion-inserted",
+          phase: "generate",
+          title: localized(
+            duplicate ? `Duplicate child ${JSON.stringify(child)}` : `Insert child ${JSON.stringify(child)}`,
+            duplicate ? `Chuỗi con trùng ${JSON.stringify(child)}` : `Chèn chuỗi con ${JSON.stringify(child)}`,
+          ),
+          note: localized(
+            duplicate ? "The deletion was attempted, but the set already contains this child." : "The deletion produced a new unique next-level child.",
+            duplicate ? "Đã thử phép xóa nhưng set đã chứa chuỗi con này." : "Phép xóa tạo một chuỗi con mới, phân biệt ở mức kế tiếp.",
+          ),
+        });
       }
     }
-
-    steps.push({
-      title: { vi: `Không có hợp lệ → sinh level ${removals + 1}`, en: `None valid → build level ${removals + 1}` },
-      arr: strToArr(s),
-      sub: strToSub(s),
-      highlight: [], mark: [], final: false,
-      codeLines: [18, 19, 20, 21],
-      vars: [
-        { name: "current level", value: removals },
-        { name: "next level size", value: nextLevel.size },
-      ],
-      note: {
-        vi: `Chưa có chuỗi hợp lệ ở level ${removals}. Sinh level ${removals + 1}: mỗi chuỗi → xóa 1 '(' hoặc ')' tại từng vị trí. Set loại trùng → ${nextLevel.size} chuỗi ứng viên.`,
-        en: `No valid string at level ${removals}. Build level ${removals + 1}: each string → remove one '(' or ')' at every index. Set deduplicates → ${nextLevel.size} candidates.`,
-      },
-    });
 
     level = nextLevel;
-    removals += 1;
-    if (removals > 6) break; // safety cap
+    depth += 1;
+    frontierStatuses = new Map([...level].map((candidate) => [candidate, "pending"]));
+    currentCandidate = null;
+    scan = emptyScan();
+    removal = emptyRemoval();
+    processedCount = 0;
+    validResults = [];
+    emit({
+      line: 20,
+      event: "level-promote",
+      phase: "level",
+      title: localized(`Promote ${level.size} candidates to depth ${depth}`, `Chuyển ${level.size} ứng viên lên độ sâu ${depth}`),
+      note: localized("The complete deduplicated next set becomes the current BFS frontier.", "Toàn bộ set kế tiếp đã loại trùng trở thành frontier BFS hiện tại."),
+    });
+    nextLevel = new Set();
+    generatedCount = 0;
+    duplicateCount = 0;
+    originsByChild = new Map();
   }
-
-  const answer = [""];
-  steps.push({
-    title: { vi: `return [""]`, en: `return [""]` },
-    arr: [], highlight: [], mark: [], final: true,
-    codeLines: [22],
-    vars: [{ name: "answer", value: '[""]' }],
-    note: {
-      vi: `Đã xóa hết ký tự mà không tìm được chuỗi hợp lệ → trả về [""].`,
-      en: `Removed all characters without finding a valid string → return [""].`,
-    },
-  });
-  return { original: s, answer, steps };
 }
 
 /**
@@ -4220,52 +4606,34 @@ module.exports = {
     titleVi: { vi: "Xóa dấu ngoặc không hợp lệ (BFS theo số lần xóa)", en: "Remove invalid parentheses (BFS by removal count)" },
     statement: {
       vi:
-        "Cho chuỗi s gồm chữ cái và '(' ')'. Xóa SỐ ÍT NHẤT dấu ngoặc để s hợp lệ. " +
-        "Trả về TẤT CẢ kết quả khác nhau. Nhập chuỗi s.",
+        "Cho chuỗi thật, không rỗng, dài 1–14 ký tự gồm chữ thường và '(' ')'. Xóa SỐ ÍT NHẤT dấu ngoặc để s hợp lệ. " +
+        "Trả về TẤT CẢ kết quả khác nhau.",
       en:
-        "Given a string s of letters and '(' ')'. Remove the MINIMUM number of parentheses to make s valid. " +
-        "Return ALL distinct results. Enter the string s.",
+        "Given a real nonempty 1–14 character string of lowercase letters and '(' ')'. Remove the MINIMUM number of parentheses to make s valid. " +
+        "Return ALL distinct results.",
     },
     defaultInput: "()())()",
     inputKind: "string",
-    inputLabel: { vi: "s", en: "s" },
+    inputLabel: { vi: "s (1–14 chữ thường / ngoặc)", en: "s (1–14 lowercase letters / parentheses)" },
     extraParams: [],
+    debugMode: "line-by-line",
+    parseRemoveInvalidParentheses301Input,
     approach: [
       { vi: "BFS theo SỐ LẦN XÓA: level 0 là chuỗi gốc, mỗi level xóa thêm 1 dấu ngoặc.", en: "BFS by REMOVAL COUNT: level 0 is the original, each level removes one more parenthesis." },
-      { vi: "Kiểm tra is_valid mọi chuỗi trong level. Level đầu tiên có chuỗi hợp lệ = đáp án (xóa ít nhất).", en: "Check is_valid for every string in the level. The first level with a valid string = answer (fewest removals)." },
-      { vi: "Sinh level tiếp theo bằng cách xóa 1 dấu '(' hoặc ')' tại từng vị trí; dùng set để loại trùng.", en: "Generate the next level by removing one '(' or ')' at every position; use a set to dedupe." },
+      { vi: "Quét is_valid từng ký tự của MỌI chuỗi trong level trước khi biết kết quả.", en: "Scan every character in is_valid for EVERY string in the level before its result is known." },
+      { vi: "Level đầu tiên có chuỗi hợp lệ trả về toàn bộ kết quả phân biệt đã sắp xếp; không sinh level sau.", en: "The first valid level returns every distinct sorted result; no later level is generated." },
+      { vi: "Sinh con bằng cách thử xóa từng dấu ngoặc; set ghi rõ phép chèn mới và phép tạo trùng.", en: "Generate children by trying every parenthesis deletion; the set distinguishes insertions from duplicates." },
     ],
     complexity: {
       time: "O(2^n · n)",
       space: "O(2^n)",
       note: {
-        vi: "Worst-case mỗi ký tự có thể bị xóa hoặc giữ. BFS dừng ngay ở level hợp lệ đầu tiên.",
-        en: "Worst-case each char may be removed or kept. BFS stops at the first valid level.",
+        vi: "Worst-case mỗi dấu ngoặc có thể bị xóa hoặc giữ. Visualization giới hạn n ≤ 14 và BFS dừng ở level hợp lệ đầu tiên.",
+        en: "Worst-case each parenthesis may be removed or kept. Visualization limits n ≤ 14 and BFS stops at the first valid level.",
       },
     },
-    code: [
-      "class Solution:",
-      "    def removeInvalidParentheses(self, s):",
-      "        def is_valid(string):",
-      "            count = 0",
-      "            for ch in string:",
-      "                if ch == '(': count += 1",
-      "                elif ch == ')':",
-      "                    count -= 1",
-      "                    if count < 0: return False",
-      "            return count == 0",
-      "        level = {s}",
-      "        while level:",
-      "            valid = [x for x in level if is_valid(x)]",
-      "            if valid: return valid",
-      "            next_level = set()",
-      "            for string in level:",
-      "                for i in range(len(string)):",
-      "                    if string[i] in '()':",
-      "                        next_level.add(string[:i] + string[i+1:])",
-      "            level = next_level",
-      "        return ['']",
-    ],
+    code: REMOVE_INVALID_PARENTHESES_301_SOURCE,
+    liveArgs: (input) => [parseRemoveInvalidParentheses301Input(input)],
     builder: buildSteps301,
   },
   980: {
@@ -5264,6 +5632,13 @@ function buildSteps401(input) {
 
   return { original: turnedOn, answer: times, steps };
 }
+
+// Named access for focused audits without adding a non-problem key to the
+// enumerable backtracking registry.
+Object.defineProperty(module.exports, "parseRemoveInvalidParentheses301Input", {
+  value: parseRemoveInvalidParentheses301Input,
+  enumerable: false,
+});
 
 Object.assign(module.exports, {
   401: {

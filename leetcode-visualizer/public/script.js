@@ -502,6 +502,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.medianFinder295View), surface: "treeView", render: (step) => {
       renderMedianFinder295View(step);
     } },
+    { predicate: (step) => Boolean(step.removeInvalid301View), surface: "treeView", render: (step) => {
+      renderRemoveInvalidParentheses301View(step);
+    } },
     { predicate: (step) => Boolean(step.tree), surface: "treeView", render: (step) => {
       renderTree(step);
     } },
