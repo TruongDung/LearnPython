@@ -11,6 +11,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderers-04.js',
   'renderers-05.js',
   'renderers-06.js',
+  'renderer-sparse-vector-1570.js',
   'script.js',
 ]);
 
@@ -25,6 +26,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'style-07.css',
   'style-08.css',
   'style-09.css',
+  'sparse-vector-1570.css',
 ]);
 
 const sourceCache = new Map();

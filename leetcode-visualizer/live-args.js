@@ -419,6 +419,22 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         : "BrowserHistory";
       return designConfig(className, [homepage], parseSpaceOperations(parts.join(" | ")));
     }
+    case 1570: {
+      const [nums1, nums2] = problem.parseSparseVectors(input);
+      return {
+        ...designConfig("SparseVector", [nums1], [
+          {
+            name: "dotProduct",
+            args: [{
+              __viz_type: "design_instance",
+              className: "SparseVector",
+              constructorArgs: [nums2],
+            }],
+          },
+        ]),
+        resultMode: "last",
+      };
+    }
     case 1797:
       return designConfig("AuthenticationManager", [params.ttl], parseSpaceOperations(input));
     case 1804:

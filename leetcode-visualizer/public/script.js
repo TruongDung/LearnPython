@@ -1009,6 +1009,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.maximumSubarrayView), surface: "treeView", render: (step) => {
       renderMaximumSubarrayView(step);
     } },
+    { predicate: (step) => Boolean(step.sparseVector1570View), surface: "treeView", render: (step) => {
+      renderSparseVector1570View(step);
+    } },
 ];
 
 function renderStep() {
@@ -2065,10 +2068,12 @@ def __viz_build_node_tree(values, with_parent=False):
         index += 1
     return root, nodes
 
-def __viz_materialize(value, context=None):
+def __viz_materialize(value, context=None, namespace=None):
     """Convert JSON-safe live arguments into LeetCode helper objects."""
     if context is None:
         context = {}
+    if namespace is None:
+        namespace = globals()
     if isinstance(value, dict) and value.get("__viz_type") == "binary_tree":
         values = value.get("values", [])
         root, nodes = __viz_build_tree(values)
@@ -2160,12 +2165,26 @@ def __viz_materialize(value, context=None):
     if isinstance(value, dict) and value.get("__viz_type") == "intersecting_lists_ref":
         heads = context.get("intersecting_lists", (None, None))
         return heads[1] if value.get("head") == "b" else heads[0]
+    if isinstance(value, dict) and value.get("__viz_type") == "design_instance":
+        class_name = value.get("className", value.get("class_name"))
+        if not isinstance(class_name, str) or not class_name:
+            raise RuntimeError("A design_instance marker requires a className.")
+        instance_class = namespace.get(class_name)
+        if instance_class is None:
+            raise RuntimeError(f"Class '{class_name}' was not found for a design_instance marker.")
+        constructor_values = value.get("constructorArgs", value.get("args", []))
+        if constructor_values is None:
+            constructor_values = []
+        elif not isinstance(constructor_values, (list, tuple)):
+            constructor_values = [constructor_values]
+        constructor_args = [__viz_materialize(item, context, namespace) for item in constructor_values]
+        return instance_class(*constructor_args)
     if isinstance(value, list):
-        return [__viz_materialize(item, context) for item in value]
+        return [__viz_materialize(item, context, namespace) for item in value]
     if isinstance(value, tuple):
-        return tuple(__viz_materialize(item, context) for item in value)
+        return tuple(__viz_materialize(item, context, namespace) for item in value)
     if isinstance(value, dict):
-        return {key: __viz_materialize(item, context) for key, item in value.items()}
+        return {key: __viz_materialize(item, context, namespace) for key, item in value.items()}
     return value
 
 def __viz_run_trace(user_code, method_name, call_args, design_config=None):
@@ -2259,20 +2278,22 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None):
                     function2 = ns2.get(design_config["functionName"])
                     if function2 is None:
                         raise RuntimeError(f"Function '{design_config['functionName']}' was not found.")
-                    materialized_args = [__viz_materialize(value, materialize_context) for value in design_config.get("args", [])]
+                    materialized_args = [__viz_materialize(value, materialize_context, ns2) for value in design_config.get("args", [])]
                     result = function2(*materialized_args)
                 else:
                     class2 = ns2.get(design_config.get("className"))
                     if class2 is None:
                         raise RuntimeError(f"Class '{design_config.get('className')}' was not found.")
-                    constructor_args = [__viz_materialize(value, materialize_context) for value in design_config.get("constructorArgs", [])]
+                    constructor_args = [__viz_materialize(value, materialize_context, ns2) for value in design_config.get("constructorArgs", [])]
                     instance2 = class2(*constructor_args)
                     result = []
                     for operation in design_config.get("operations", []):
-                        operation_args = [__viz_materialize(value, materialize_context) for value in operation.get("args", [])]
+                        operation_args = [__viz_materialize(value, materialize_context, ns2) for value in operation.get("args", [])]
                         operation_result = getattr(instance2, operation["name"])(*operation_args)
                         materialize_context["previous_result"] = operation_result
                         result.append(operation_result)
+                    if design_config.get("resultMode") == "last":
+                        result = result[-1] if result else None
             else:
                 Solution2 = ns2.get("Solution")
                 if Solution2 is None:
@@ -2281,7 +2302,7 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None):
                 method2 = getattr(instance2, method_name, None)
                 if method2 is None:
                     raise RuntimeError(f"Solution has no method '{method_name}'.")
-                materialized_args = [__viz_materialize(value, materialize_context) for value in call_args]
+                materialized_args = [__viz_materialize(value, materialize_context, ns2) for value in call_args]
                 result = method2(*materialized_args)
     finally:
         sys.settrace(None)

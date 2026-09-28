@@ -231,36 +231,6 @@ function buildSteps9009(input, params = {}) {
   return { original: merchants, answer: matches.map((merchant) => merchant.name), steps };
 }
 
-function buildSteps1570(input) {
-  const vectors = String(input || "").split("|").map((part) => part.trim().split(",").map((value) => Number(value.trim())));
-  if (vectors.length !== 2 || !vectors[0].length || vectors[0].length !== vectors[1].length || vectors.some((vector) => vector.some((value) => !Number.isFinite(value)))) throw new Error("Nhập hai vector cùng độ dài: a0,a1,...|b0,b1,...");
-  const [left, right] = vectors;
-  const leftMap = new Map(left.map((value, index) => [index, value]).filter(([, value]) => value !== 0));
-  const rightMap = new Map(right.map((value, index) => [index, value]).filter(([, value]) => value !== 0));
-  const smaller = leftMap.size <= rightMap.size ? leftMap : rightMap;
-  const other = smaller === leftMap ? rightMap : leftMap;
-  const steps = [];
-  let dot = 0;
-  const mapText = (map) => `{${[...map.entries()].map(([index, value]) => `${index}:${value}`).join(", ")}}`;
-  const snap = (title, line, note, index = null, final = false) => steps.push({
-    title, arr: [...left], sub: left.map((value, i) => `i=${i} · b=${right[i]}`), highlight: index === null ? [] : [index], mark: index === null ? [] : [index], final, codeLines: [line],
-    vars: [{ name: "a sparse", value: mapText(leftMap) }, { name: "b sparse", value: mapText(rightMap) }, { name: "dot", value: dot }], note,
-  });
-  snap({ vi: `Nén vector a: ${leftMap.size}/${left.length} non-zero`, en: `Compress vector a: ${leftMap.size}/${left.length} non-zero` }, 4, { vi: "Chỉ lưu index có giá trị khác 0; các số 0 lặp lại không tốn entry hash map.", en: "Store only non-zero indices; repeated zeros consume no hash-map entry." });
-  snap({ vi: `Nén vector b: ${rightMap.size}/${right.length} non-zero`, en: `Compress vector b: ${rightMap.size}/${right.length} non-zero` }, 5, { vi: "Lưu dạng index → value giúp tra giá trị đối ứng O(1) expected.", en: "The index → value form gives expected O(1) counterpart lookup." });
-  for (const [index, value] of smaller) {
-    const counterpart = other.get(index);
-    if (counterpart === undefined) {
-      snap({ vi: `i=${index}: không có index chung`, en: `i=${index}: no shared index` }, 9, { vi: "Bỏ qua vì tích với 0 là 0.", en: "Skip it because multiplying by zero contributes zero." }, index);
-      continue;
-    }
-    dot += value * counterpart;
-    snap({ vi: `i=${index}: cộng ${value} × ${counterpart}`, en: `i=${index}: add ${value} × ${counterpart}` }, 11, { vi: `Hai vector cùng non-zero tại index ${index}; dot = ${dot}.`, en: `Both vectors are non-zero at index ${index}; dot = ${dot}.` }, index);
-  }
-  snap({ vi: `Return dot = ${dot}`, en: `Return dot = ${dot}` }, 12, { vi: "Duyệt map nhỏ hơn nên công việc tỉ lệ với số phần tử khác 0, không phải độ dài vector.", en: "Iterating the smaller map makes work proportional to non-zero entries rather than vector length." }, null, true);
-  return { original: vectors, answer: dot, steps };
-}
-
 function buildSteps9011(input) {
   const commands = String(input || "").split("|").map((part) => part.trim()).filter(Boolean).map((part) => part.split(/\s+/));
   if (!commands.length) throw new Error("Nhập thao tác như PUT a 1|UPDATE a 2|DELETE a|SCAN.");
@@ -454,13 +424,6 @@ module.exports = {
     defaultInput: "Cafe:0,3|Market:3,4|Pharmacy:6,0|Bakery:-4,3", inputKind: "string", inputLabel: { vi: "merchant Name:x,y (ngăn bởi |)", en: "merchants Name:x,y (separated by |)" }, extraParams: [{ key: "x", type: "float", label: { vi: "user x", en: "user x" }, default: 0 }, { key: "y", type: "float", label: { vi: "user y", en: "user y" }, default: 0 }, { key: "radius", type: "float", label: { vi: "radius (miles)", en: "radius (miles)" }, default: 5, min: 0 }],
     approach: [{ vi: "Tính distance từ query tới từng merchant và giữ distance ≤ radius để xử lý đúng biên.", en: "Compute distance from query to every merchant and keep distance ≤ radius to handle the boundary correctly." }, { vi: "Bản demo dùng scan; cache theo geohash/cell giúp giảm candidate trước khi tính distance thật.", en: "The demo scans; caching by geohash/cell reduces candidates before exact distance checks." }, { vi: "Quad tree chỉ duyệt quadrant giao với vòng tròn query, sau đó test chính xác từng điểm còn lại.", en: "A quad tree visits only quadrants intersecting the query circle, then precisely tests remaining points." }], complexity: { time: "O(n) scan · O(log n + output) expected with quad tree", space: "O(n)", note: { vi: "Với lat/lng thật, thay Euclid bằng Haversine và mở rộng query radius theo bounding box trước khi exact-check.", en: "For real latitude/longitude, replace Euclidean distance with Haversine and expand the query radius to a bounding box before exact checks." } },
     code: ["def nearby_merchants(merchants, user, radius):", "    answer = []", "    for merchant in merchants:", "        distance = euclidean(user, merchant.point)", "        if distance <= radius:  # includes boundary", "            answer.append(merchant)", "    return answer", "", "# Follow-up: QuadTree.query(circle)", "# skips nodes whose bounding box misses the circle", "# then exact-checks points in intersecting leaves"], builder: buildSteps9009,
-  },
-  1570: {
-    id: 1570, difficulty: "medium", slug: "dot-product-of-two-sparse-vectors", category: DESIGN, tags: [HASHMAP], title: { vi: "Dot Product of Two Sparse Vectors", en: "Dot Product of Two Sparse Vectors" }, titleVi: { vi: "Tích vô hướng hai sparse vector", en: "Dot product of sparse vectors" },
-    statement: { vi: "Hai vector số nguyên rất dài có nhiều số 0 lặp lại. Thiết kế lưu trữ gọn bằng index→non-zero value, rồi tính dot product chỉ trên các index chung.", en: "Two long integer vectors contain many repeated zeros. Store them compactly as index→non-zero value, then compute their dot product only at shared indices." },
-    defaultInput: "0,0,3,0,4,0,0,2|0,0,2,0,5,0,0,7", inputKind: "string", inputLabel: { vi: "vector a | vector b", en: "vector a | vector b" }, extraParams: [],
-    approach: [{ vi: "Nén mỗi vector thành hash map index→value, bỏ toàn bộ phần tử 0.", en: "Compress each vector into an index→value hash map, dropping every zero." }, { vi: "Duyệt map ít non-zero hơn và tra index đó trong map còn lại.", en: "Iterate the map with fewer non-zero values and look up each index in the other map." }, { vi: "Chỉ index xuất hiện trong cả hai mới đóng góp vào dot product.", en: "Only indices present in both maps contribute to the dot product." }], complexity: { time: "O(min(nnz(a), nnz(b))) expected", space: "O(nnz(a) + nnz(b))", note: { vi: "nnz là số phần tử khác 0. Đây là lợi ích chính khi vector rất dài nhưng sparse.", en: "nnz is the number of non-zero entries. This is the key benefit when vectors are long but sparse." } },
-    code: ["class SparseVector:", "    def __init__(self, nums):", "        self.values = {}", "        for i, value in enumerate(nums):", "            if value != 0:", "                self.values[i] = value", "", "    def dotProduct(self, other):", "        small, large = sorted([self.values, other.values], key=len)", "        total = 0", "        for i, value in small.items():", "            total += value * large.get(i, 0)", "        return total"], builder: buildSteps1570,
   },
   9011: {
     id: 9011, difficulty: "medium", category: DESIGN, tags: [HASHMAP, FILE_IO], title: { vi: "On-Disk Key-Value Store", en: "On-Disk Key-Value Store" }, titleVi: { vi: "Key-value store trên disk", en: "On-disk key-value store" },

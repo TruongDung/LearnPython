@@ -117,6 +117,21 @@ def build_node_tree(values, with_parent=False):
 
 
 def materialize(value, context):
+    if isinstance(value, dict) and value.get("__viz_type") == "design_instance":
+        class_name = value.get("className")
+        user_namespace = context.get("namespace")
+        instance_class = (
+            user_namespace.get(class_name)
+            if isinstance(user_namespace, dict) and isinstance(class_name, str)
+            else None
+        )
+        if not isinstance(instance_class, type):
+            raise RuntimeError(f"Class '{class_name}' was not found in the user-code namespace.")
+        constructor_args = [
+            materialize(argument, context)
+            for argument in value.get("constructorArgs", [])
+        ]
+        return instance_class(*constructor_args)
     if isinstance(value, dict) and value.get("__viz_type") == "binary_tree":
         root, nodes = build_tree(value.get("values", []))
         context["tree:" + value.get("tree_id", "root")] = (root, nodes)
@@ -250,22 +265,29 @@ for case in payload["cases"]:
         exec(  # pylint: disable=exec-used
             compile(safe_code, f"<problem-{case['id']}>", "exec"), scope
         )
-        context = {}
+        context = {"namespace": scope}
         with contextlib.redirect_stdout(io.StringIO()):
             design = case.get("design")
             if design and design.get("functionName"):
                 args = [materialize(value, context) for value in design.get("args", [])]
-                scope[design["functionName"]](*args)
+                _result = scope[design["functionName"]](*args)
             elif design:
                 args = [materialize(value, context) for value in design.get("constructorArgs", [])]
                 instance = scope[design["className"]](*args)
+                operation_results = []
                 for operation in design.get("operations", []):
                     operation_args = [materialize(value, context) for value in operation.get("args", [])]
-                    context["previous_result"] = getattr(instance, operation["name"])(*operation_args)
+                    operation_result = getattr(instance, operation["name"])(*operation_args)
+                    context["previous_result"] = operation_result
+                    operation_results.append(operation_result)
+                if design.get("resultMode") == "last":
+                    _result = operation_results[-1] if operation_results else None
+                else:
+                    _result = operation_results
             else:
                 solution = scope["Solution"]()
                 args = [materialize(value, context) for value in case["args"]]
-                getattr(solution, case["method"])(*args)
+                _result = getattr(solution, case["method"])(*args)
         passed += 1
     # Keep auditing subsequent snippets regardless of how one snippet fails.
     except Exception as error:  # pylint: disable=broad-exception-caught
