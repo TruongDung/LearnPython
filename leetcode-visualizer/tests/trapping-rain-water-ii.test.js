@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -58,7 +59,7 @@ for case in json.load(sys.stdin):
 });
 
 test('407 simplified renderer teaches one rule in every phase and language', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderTrapRain2View(step)');
   const end = source.indexOf('\nfunction renderMissingIntegerView', start);
   const element = {};
@@ -82,14 +83,14 @@ test('407 simplified renderer teaches one rule in every phase and language', () 
 });
 
 test('407 compact cell CSS keeps the level visible instead of clipping it', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.trw407-viz\.simple \.trw407-grid \{[\s\S]*?minmax\(78px, 1fr\)/);
   assert.match(css, /\.trw407-viz\.simple \.trw407-cell \{[\s\S]*?overflow: visible;/);
   assert.match(css, /\.trw407-viz\.simple \.trw407-cell > footer \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;/);
 });
 
 test('407 expands semantic snapshots so only one code line is active per debug step', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function shouldUseLineByLineDebug()');
   const end = source.indexOf('\n// ---- Run algorithm ----', start);
   const context = {

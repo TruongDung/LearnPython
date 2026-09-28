@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -101,7 +102,7 @@ test('407 validates shape, height range, and visualization size', () => {
 });
 
 test('407 simplified renderer handles every step in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderTrapRain2View(step)');
   const end = script.indexOf('\nfunction renderAverageSubtree2265View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -134,7 +135,7 @@ test('407 simplified renderer handles every step in English and Vietnamese', () 
 });
 
 test('407 height map fits its frame instead of forcing max-content width', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   const start = css.indexOf('/* ---- Trapping Rain Water II: outside-in flood model (#407) ---- */');
   const end = css.indexOf('/* ---- Count Nodes Equal to Average of Subtree (#2265) ---- */', start);
   const styles = css.slice(start, end);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -93,7 +94,7 @@ test('4052 displayed Python agrees with the visualization', () => {
 });
 
 test('4052 custom renderer handles every phase in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCyclicShift4052View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -123,7 +124,7 @@ test('4052 validates grid and shift vectors and has responsive styles', () => {
   assert.throws(() => problem.builder('1,2;3,4', { rowShift: '1', colShift: '0,1' }), /rowShift/);
   assert.throws(() => problem.builder('1,2;3,4', { rowShift: '2,0', colShift: '0,1' }), /rowShift/);
   assert.throws(() => problem.builder('1,2,3;4,5,6', { rowShift: '0,0', colShift: '0,0' }), /n x n/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.cs4052-viz \{/);
   assert.match(css, /\.cs4052-cell\.target/);
   assert.match(css, /@container \(max-width: 390px\)/);

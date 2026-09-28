@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -169,8 +170,8 @@ test('1372 validates values and compact shape and prepares a live TreeNode', () 
 });
 
 test('1372 custom renderer stays complete in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const styles = readFrontendStyles();
   const start = script.indexOf('function renderLongestZigzag1372View(step)');
   const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
   assert.ok(start >= 0 && end > start);

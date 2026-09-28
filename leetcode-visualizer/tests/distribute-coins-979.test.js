@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -130,7 +131,7 @@ test('979 displayed Python solution passes representative cases', () => {
 });
 
 test('979 custom renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderDistributeCoins979View(step)');
   const end = source.indexOf('\nfunction renderMaximumAverage1120View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -163,7 +164,7 @@ test('979 validates coin totals and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder('1,-1,3'), /integers from 0/);
   assert.throws(() => problem.builder('1,nope'), /integers from 0/);
 
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.dc979-viz \{/);
   assert.match(css, /\.dc979-edge\.surplus/);
   assert.match(css, /\.dc979-edge\.deficit/);

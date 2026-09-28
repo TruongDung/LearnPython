@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -96,7 +97,7 @@ test('2472 displayed Python agrees with the oracle', () => {
 });
 
 test('2472 custom renderer covers every phase in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderPalindrome2472View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -127,7 +128,7 @@ test('2472 validates visual inputs and includes responsive scoped styles', () =>
   assert.throws(() => problem.builder('abc', { k: 0 }), /between 1/);
   assert.throws(() => problem.builder('abc', { k: 4 }), /between 1/);
   assert.throws(() => problem.builder('a'.repeat(17), { k: 2 }), /at most 16/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.p2472-viz \{/);
   assert.match(css, /\.p2472-pal-cell\.current/);
   assert.match(css, /@container \(max-width: 430px\)/);

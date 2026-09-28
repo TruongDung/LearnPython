@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -113,7 +114,7 @@ test('3350 caps long traces but still computes the whole array', () => {
 });
 
 test('3350 renderer handles every step in both languages with scoped styles', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderAdjacentRuns3350View(step)');
   const end = source.indexOf('\nfunction renderSlidingFreqView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -135,7 +136,7 @@ test('3350 renderer handles every step in both languages with scoped styles', ()
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ai3350-viz \{/);
   assert.match(css, /\.ai3350-cell\.focus-left/);
   assert.match(css, /@container \(max-width: 590px\)/);

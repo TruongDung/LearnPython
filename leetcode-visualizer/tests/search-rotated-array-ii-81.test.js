@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -91,7 +92,7 @@ test('81 displayed and repository Python solutions agree with representative cas
 });
 
 test('81 renderer covers regular, duplicate, found, and missing states in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderRotatedSearch81View(step)');
   const end = source.indexOf('\n// ---- Find Minimum in Rotated Sorted Array II visualization', start);
   assert.ok(start >= 0 && end > start);
@@ -130,7 +131,7 @@ test('81 validates visual input and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder([1, 2.5], { target: 1 }), /safe integers/);
   assert.throws(() => problem.builder([2, 1, 3], { target: 1 }), /rotated non-decreasing/);
   assert.throws(() => problem.builder([1, 2, 3], { target: 1.5 }), /target must be a safe integer/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.rs81-viz \{/);
   assert.match(css, /\.rs81-cell\.duplicate/);
   assert.match(css, /\.rs81-triplet\.ambiguous/);

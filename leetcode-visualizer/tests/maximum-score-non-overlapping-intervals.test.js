@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -135,8 +136,8 @@ test('3414 parser feeds the same triples to Edit and run code', () => {
 });
 
 test('3414 custom renderer and responsive styles are wired into the page', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const css = readFrontendStyles();
   assert.match(script, /function renderWeightedIntervals3414View\(step\)/);
   assert.match(script, /step\.weightedIntervals3414View/);
   assert.match(script, /renderWeightedIntervals3414View\(step\)/);
@@ -149,7 +150,7 @@ test('3414 custom renderer and responsive styles are wired into the page', () =>
 });
 
 test('3414 custom renderer handles every step in Vietnamese and English', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderWeightedIntervals3414View(step)');
   const end = source.indexOf('\nfunction renderAdvancedBitmaskView(step)', start);
   const element = {};

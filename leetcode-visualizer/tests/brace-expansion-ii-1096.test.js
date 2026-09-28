@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -71,7 +72,7 @@ test('1096 validates input and bounds the teaching trace', () => {
 });
 
 test('1096 custom renderer covers every step in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderBraceExpansion1096View(step)');
   const end = source.indexOf('\nfunction renderWeakCharacters1996View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -89,7 +90,7 @@ test('1096 custom renderer covers every step in English and Vietnamese', () => {
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.be1096-viz \{/);
   assert.match(css, /\.be1096-token\.current/);
   assert.match(css, /\.be1096-frame\.active/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -85,7 +86,7 @@ test('272 displayed Python solution passes representative cases', () => {
 });
 
 test('272 custom renderer covers all states in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderClosestBst272View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -130,7 +131,7 @@ test('272 validates inputs and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder('4,2,5', { target: 3, k: 4 }), /cannot exceed/);
   assert.throws(() => problem.builder('4,5,2', { target: 3, k: 1 }), /valid BST/);
 
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.cb272-viz \{/);
   assert.match(css, /\.cb272-cell\.removed/);
   assert.match(css, /\.cb272-compare\.remove-left/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -112,8 +113,8 @@ test('2265 accepts bracketed input and validates values and visualization size',
 });
 
 test('2265 custom renderer handles every step in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const styles = readFrontendStyles();
   const start = script.indexOf('function renderAverageSubtree2265View(step)');
   const end = script.indexOf('\nfunction renderMissingIntegerView(step)', start);
   assert.ok(start >= 0 && end > start);

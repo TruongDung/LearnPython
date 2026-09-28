@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -78,7 +79,7 @@ test('1234 displayed Python agrees with the visualization', () => {
 });
 
 test('1234 custom renderer handles every event in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderBalanced1234View(step)');
   const end = source.indexOf('\nfunction renderNice1248View(step)', start);
   const element = {};
@@ -106,7 +107,7 @@ test('1234 validates input and includes responsive scoped styles', () => {
   assert.throws(() => problem.builder('QWE'), /multiple of 4/);
   assert.throws(() => problem.builder('QWEX'), /only Q, W, E, and R/);
   assert.throws(() => problem.builder('QWER'.repeat(7)), /at most 24/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.bal1234-viz \{/);
   assert.match(css, /\.bal1234-cell\.replace \{/);
   assert.match(css, /\.bal1234-count\.excess \{/);

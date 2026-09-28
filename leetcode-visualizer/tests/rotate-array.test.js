@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -106,7 +107,7 @@ test('189 visualization and live code validate numbers and k consistently', () =
 });
 
 test('189 renders all reversal phases, pointer crossings, and no-op rotations in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderRotateArray189View(step)');
   const end = source.indexOf('\nfunction renderRotatedSearchView', start);
   const element = {}, context = { lang: 'en', $: () => element, escapeHtml: String };

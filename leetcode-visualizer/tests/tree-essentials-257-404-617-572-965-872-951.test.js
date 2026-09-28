@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -132,7 +133,7 @@ test('Edit & run code receives real TreeNode arguments for one-tree and two-tree
 });
 
 test('shared renderer handles every step for all seven problems in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderTreeEssentialsView(step)');
   const end = script.indexOf('\nfunction renderSortedListBstView(step)', start);
   assert.ok(start >= 0 && end > start);

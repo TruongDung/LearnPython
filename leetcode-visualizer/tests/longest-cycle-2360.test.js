@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -47,7 +48,7 @@ test('2360 displayed Python agrees with the visualization', () => {
 });
 
 test('2360 custom renderer explains every event in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCycle2360View(step)');
   const end = source.indexOf('\n// ---- Graph renderer', start);
   const element = {};
@@ -76,7 +77,7 @@ test('2360 custom renderer explains every event in English and Vietnamese', () =
 });
 
 test('2360 line-by-line expansion activates at most one code line', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function shouldUseLineByLineDebug()');
   const end = source.indexOf('\n// ---- Run algorithm ----', start);
   const context = {
@@ -94,7 +95,7 @@ test('2360 line-by-line expansion activates at most one code line', () => {
 });
 
 test('2360 has responsive, scoped styles for path, cycle, and node states', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.lc2360-viz \{/);
   assert.match(css, /\.lc2360-path > div \{[\s\S]*?overflow-x: auto;/);
   assert.match(css, /\.lc2360-node\.cycle \{/);

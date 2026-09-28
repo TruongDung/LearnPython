@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -59,7 +60,7 @@ test('731 validates input and configures the correct Python design class', () =>
 });
 
 test('custom calendar timelines render every example phase in both languages', () => {
-  const source=fs.readFileSync(require.resolve('../public/script.js'),'utf8');
+  const source=readFrontendJavaScript();
   const element={}; const context={lang:'en',$:()=>element,escapeHtml:String,pick:value=>value && typeof value==='object' ? value[context.lang] : value};
   vm.createContext(context);
   const loadFunction = (name) => {

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -245,7 +246,7 @@ test('76 displayed Python and the solution file agree with the visualizer', () =
 });
 
 function loadRenderer() {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderMinWindow76View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -339,7 +340,7 @@ test('76 renderer colours need entries by owed / met / surplus', () => {
 });
 
 test('76 ships responsive scoped styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.mw76-viz \{/);
   assert.match(css, /\.mw76-cell\.in-window/);
   assert.match(css, /\.mw76-cell\.in-best/);

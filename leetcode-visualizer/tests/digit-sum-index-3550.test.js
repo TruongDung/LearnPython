@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -83,7 +84,7 @@ test('3550 caps a long trace while still returning -1', () => {
 });
 
 test('3550 renderer handles every phase in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderDigitSum3550View(step)');
   const end = source.indexOf('\nfunction renderSlidingFreqView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -114,7 +115,7 @@ test('3550 renderer handles every phase in English and Vietnamese', () => {
       }
     }
   }
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ds3550-viz \{/);
   assert.match(css, /\.ds3550-cell\.matched/);
 });

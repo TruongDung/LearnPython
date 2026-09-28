@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -104,7 +105,7 @@ test('1080 validates limit, node values, and malformed compact trees', () => {
 });
 
 test('1080 custom renderer covers every step in Vietnamese and English', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderInsufficient1080View(step)');
   const end = script.indexOf('\nfunction renderTree(step, targetId = "treeView")', start);
   assert.ok(start >= 0 && end > start);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -361,7 +362,7 @@ test('2096 displayed Python and the solution file agree with the visualizer', ()
 });
 
 test('2096 renderer covers every trace state in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderDirections2096View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -416,7 +417,7 @@ test('2096 renderer covers every trace state in English and Vietnamese', () => {
 });
 
 test('2096 answer strip separates the U prefix from the descent letters', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderDirections2096View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   const elements = new Map();
@@ -443,7 +444,7 @@ test('2096 answer strip separates the U prefix from the descent letters', () => 
 });
 
 test('2096 ships responsive scoped styles and tree annotation colours', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.dir2096-viz \{/);
   assert.match(css, /\.dir2096-path-row span\.shared/);
   assert.match(css, /\.dir2096-path-row span\.compare/);

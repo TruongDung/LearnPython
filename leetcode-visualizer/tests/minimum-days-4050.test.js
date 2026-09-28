@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -89,7 +90,7 @@ test('4050 displayed Python and solution file produce the expected answers', () 
 });
 
 test('4050 custom renderer handles every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderMinDays4050View(step)');
   const end = source.indexOf('\nfunction renderRectangleOverlap836View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -119,7 +120,7 @@ test('4050 validates visual input and includes responsive scoped styles', () => 
   assert.throws(() => problem.builder([]), /exactly one integer/);
   assert.throws(() => problem.builder([0]), /1 to 60/);
   assert.throws(() => problem.builder([61]), /1 to 60/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.md4050-viz/);
   assert.match(css, /\.md4050-cell\.active/);
   assert.match(css, /\.md4050-day\.skip/);

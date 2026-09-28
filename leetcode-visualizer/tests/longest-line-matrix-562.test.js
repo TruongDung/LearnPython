@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -102,7 +103,7 @@ test('562 validates binary rectangular input and bounds the trace without losing
 });
 
 test('562 custom renderer covers every step in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderLongestLine562View(step)');
   const end = source.indexOf('\nfunction renderNodeSequence2242View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -122,7 +123,7 @@ test('562 custom renderer covers every step in English and Vietnamese', () => {
       }
     }
   }
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ll562-viz \{/);
   assert.match(css, /\.ll562-cell\.current/);
 });

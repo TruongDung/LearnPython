@@ -1,3 +1,4 @@
+const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -130,7 +131,7 @@ test('333 displayed Python solution passes representative cases', () => {
 });
 
 test('333 custom renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderLargestBst333View(step)');
   const end = source.indexOf('\nfunction renderMaximumAverage1120View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -160,8 +161,8 @@ test('333 custom renderer covers every state in English and Vietnamese', () => {
 });
 
 test('333 includes scoped responsive styles and refreshed assets', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
-  const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
+  const css = readFrontendStyles();
+  const html = readFrontendIndex();
   assert.match(css, /\.lb333-viz \{/);
   assert.match(css, /\.lb333-node\.invalid/);
   assert.match(css, /\.lb333-node\.best-subtree/);

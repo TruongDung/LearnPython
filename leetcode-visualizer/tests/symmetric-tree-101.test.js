@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -49,7 +50,7 @@ test('101 identifies the first concrete mismatch and shows short-circuiting', ()
 });
 
 test('101 mirror renderer is readable in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderTreeEssentialsView(step)');
   const end = script.indexOf('\nfunction renderSortedListBstView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -82,7 +83,7 @@ test('101 mirror renderer is readable in English and Vietnamese', () => {
     }
   }
 
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.te-mirror-guide/);
   assert.match(css, /\.te-mirror-branches/);
 });

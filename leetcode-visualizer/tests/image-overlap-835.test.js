@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -123,7 +124,7 @@ for case in json.load(sys.stdin):
 });
 
 test('835 renderer shows all trace states in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderImageOverlap835View(step)');
   const end = source.indexOf('\nfunction renderSetMatrixZeroes73ConstantView(step)', start);
   assert.ok(start >= 0 && end > start);

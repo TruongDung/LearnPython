@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -101,7 +102,7 @@ for case in json.load(sys.stdin):
 });
 
 test('240 renderer covers every trace state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderSearchMatrix240View(step)');
   const end = source.indexOf('\nfunction renderImageOverlap835View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -130,8 +131,8 @@ test('240 renderer covers every trace state in English and Vietnamese', () => {
 });
 
 test('240 custom renderer is wired before the generic grid renderer and has responsive styles', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const css = readFrontendStyles();
   assert.match(script, /Boolean\(step\.search240View\)[\s\S]*?renderSearchMatrix240View\(step\)/);
   assert.ok(script.indexOf('Boolean(step.search240View)') < script.indexOf('Boolean(step.grid)'));
   assert.match(css, /\.tree-view:has\(\.s240-viz\)/);

@@ -1,10 +1,27 @@
+const { JAVASCRIPT_ASSETS, STYLESHEET_ASSETS, readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 
-const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
-const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+const html = readFrontendIndex();
+const script = readFrontendJavaScript();
+const css = readFrontendStyles();
+
+test('index loads modular frontend assets synchronously in source order', () => {
+  const stylesheetAssets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
+    .map(match => match[1].split('?')[0]);
+  assert.deepEqual(stylesheetAssets, STYLESHEET_ASSETS);
+
+  const externalScriptTags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)];
+  assert.match(externalScriptTags[0][1], /monaco-editor@0\.52\.0\/min\/vs\/loader\.js/);
+  const localScriptTags = externalScriptTags.slice(1);
+  assert.deepEqual(localScriptTags.map(match => match[1].split('?')[0]), JAVASCRIPT_ASSETS);
+  for (const [tag] of localScriptTags) {
+    assert.doesNotMatch(tag, /\b(?:async|defer)\b|type=["']module["']/i);
+  }
+  assert.ok(html.indexOf(externalScriptTags[0][0]) < html.indexOf(localScriptTags[0][0]));
+  assert.ok(html.indexOf(localScriptTags.at(-1)[0]) < html.indexOf('new MutationObserver'));
+});
 
 test('floating tag navigation has an accessible problem textbox and mobile submit button', () => {
   const formStart = html.indexOf('<form id="quickProblemForm"');

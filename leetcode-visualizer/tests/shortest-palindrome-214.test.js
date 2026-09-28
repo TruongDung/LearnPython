@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -94,7 +95,7 @@ test('214 displayed Python and solution file agree with the oracle', () => {
 });
 
 test('214 custom renderer covers every phase in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderShortestPalindrome214View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -124,7 +125,7 @@ test('214 validates visual input and includes responsive scoped styles', () => {
   assert.throws(() => problem.builder('Aba'), /lowercase/);
   assert.throws(() => problem.builder('a b'), /lowercase/);
   assert.throws(() => problem.builder('a'.repeat(17)), /at most 16/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.sp214-viz \{/);
   assert.match(css, /\.sp214-cell\.mismatch/);
   assert.match(css, /@container \(max-width: 390px\)/);

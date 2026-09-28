@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -99,7 +100,7 @@ test('238 validates the visualization input limit', () => {
 });
 
 test('238 custom renderer handles every step in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderProductExcept238View(step)');
   const end = script.indexOf('\nfunction renderPourWater755View(step)', start);
   assert.ok(start >= 0 && end > start);

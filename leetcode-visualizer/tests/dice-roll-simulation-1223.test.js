@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -83,7 +84,7 @@ test('1223 displayed Python agrees with the visualization', () => {
 });
 
 test('1223 custom renderer covers all phases in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderDiceRoll1223View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -112,7 +113,7 @@ test('1223 validates inputs and includes responsive scoped styles', () => {
   assert.throws(() => problem.builder([1, 1, 1], { n: 2 }), /exactly six/);
   assert.throws(() => problem.builder([1, 1, 1, 1, 1, 16], { n: 2 }), /between 1 and 15/);
   assert.throws(() => problem.builder([1, 1, 1, 1, 1, 1], { n: 13 }), /between 1 and 12/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.dr1223-viz \{/);
   assert.match(css, /\.dr1223-cell\.blocked/);
   assert.match(css, /@container \(max-width: 430px\)/);

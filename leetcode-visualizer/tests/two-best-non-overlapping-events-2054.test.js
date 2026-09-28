@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -106,8 +107,8 @@ test('2054 parser validates visualization bounds and feeds Edit and run code', (
 });
 
 test('2054 renderer handles every step in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const source = readFrontendJavaScript();
+  const styles = readFrontendStyles();
   const start = source.indexOf('function renderTwoEvents2054View(step)');
   const end = source.indexOf('\nfunction renderWeightedIntervals3414View(step)', start);
   assert.ok(start >= 0 && end > start);

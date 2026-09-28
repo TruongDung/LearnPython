@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -304,7 +305,7 @@ test('1401 approach 2 reaches every line of its code block across inputs', () =>
 });
 
 test('1401 opts into the client line-by-line debugger without mangling the trace', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const context = { problemData: { id: 1401, debugMode: problem.debugMode } };
   vm.createContext(context);
 
@@ -355,7 +356,7 @@ test('1401 displayed Python and solution file produce the expected answers', () 
 });
 
 test('1401 renderer covers all states in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCircleRectangle1401View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -417,7 +418,7 @@ test('1401 renderer covers all states in English and Vietnamese', () => {
 });
 
 test('1401 locals panel reveals values only after their line has executed', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCircleRectangle1401View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -450,7 +451,7 @@ test('1401 locals panel reveals values only after their line has executed', () =
 });
 
 test('1401 draws the circle with one shared scale on both axes', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCircleRectangle1401View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -498,7 +499,7 @@ test('1401 parenthesises negative bases when squaring', () => {
   assert.doesNotMatch(negative.title.en, /[^(]-1²/);
 
   // Approach 2's corner offsets are signed too, and the renderer squares them.
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderCircleRectangle1401View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -522,7 +523,7 @@ test('1401 parenthesises negative bases when squaring', () => {
 });
 
 test('1401 ships responsive scoped styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.cr1401-viz \{/);
   assert.match(css, /\.cr1401-anchor circle/);
   assert.match(css, /\.cr1401-compare\.fail/);

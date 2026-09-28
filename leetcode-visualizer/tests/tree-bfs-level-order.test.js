@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -290,7 +291,7 @@ test('Edit & run code gets TreeNode arguments, including Node.next for 117', () 
 });
 
 test('shared level renderer handles every step in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderBfsLevelView(step)');
   const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
   assert.ok(start >= 0 && end > start);

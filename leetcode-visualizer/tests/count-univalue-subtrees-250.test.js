@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -36,7 +37,7 @@ test('250 trace explains every postorder verdict and count increment', () => {
 });
 
 test('250 custom renderer handles every state in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderUnivalue250View(step)');
   const end = script.indexOf('\nfunction renderUpsideDown156View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -73,7 +74,7 @@ test('250 custom renderer handles every state in English and Vietnamese', () => 
 });
 
 test('250 includes scoped responsive styles for decision states', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.uv250-viz/);
   assert.match(css, /\.uv250-checks/);
   assert.match(css, /\.uv250-tree \.tree-annotation\.reject/);

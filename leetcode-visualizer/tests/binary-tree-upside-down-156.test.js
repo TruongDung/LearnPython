@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -38,7 +39,7 @@ test('156 trace separates descent, base case, preparation, rewiring, and complet
 });
 
 test('156 custom renderer handles every state in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderUpsideDown156View(step)');
   const end = script.indexOf('\nfunction renderTree(step, targetId = "treeView")', start);
   assert.ok(start >= 0 && end > start);
@@ -75,7 +76,7 @@ test('156 custom renderer handles every state in English and Vietnamese', () => 
 });
 
 test('156 includes scoped responsive styles for the teaching states', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ud156-viz/);
   assert.match(css, /\.ud156-rotation/);
   assert.match(css, /\.ud156-tree/);

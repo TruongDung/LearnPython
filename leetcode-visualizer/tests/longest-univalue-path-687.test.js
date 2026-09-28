@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -170,8 +171,8 @@ test('687 validates values, compact tree shape, size, and prepares a live TreeNo
 });
 
 test('687 custom renderer remains complete in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const styles = readFrontendStyles();
   const start = script.indexOf('function renderUnivaluePath687View(step)');
   const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
   assert.ok(start >= 0 && end > start);

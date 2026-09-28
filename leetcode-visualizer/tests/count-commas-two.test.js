@@ -1,4 +1,5 @@
 "use strict";
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -28,7 +29,7 @@ function thresholdOracle(n) {
 }
 
 function renderStep(step, language) {
-  const source = fs.readFileSync(path.join(__dirname, "../public/script.js"), "utf8");
+  const source = readFrontendJavaScript();
   const start = source.indexOf("function renderCountCommas3871View");
   const end = source.indexOf("\nfunction renderStable3903View", start);
   assert.ok(start >= 0 && end > start, "#3871 renderer must be present");

@@ -1,3 +1,4 @@
+const { readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -19,7 +20,7 @@ test('994 solves the standard, impossible, and already-finished cases', () => {
 });
 
 test('994 light theme keeps labels, empty cells, and state panels legible', () => {
-  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
 
   assert.match(css, /\[data-theme="light"\] \.rotting-phases span \{ color: #475569; \}/);
   assert.match(css, /\[data-theme="light"\] \.rotting-status small,[\s\S]*?\.rotting-action span \{ color: #475569; \}/);

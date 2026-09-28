@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -111,7 +112,7 @@ test('836 approach 2 assigns coordinates line by line and short-circuits on sepa
 });
 
 test('836 renderer covers all states in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderRectangleOverlap836View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -146,7 +147,7 @@ test('836 validates rectangles and includes responsive scoped styles', () => {
   assert.throws(() => problem.builder('0,0,1', { rec2: '1,1,2,2' }), /exactly 4/);
   assert.throws(() => problem.builder('0,0,0,2', { rec2: '1,1,2,2' }), /positive area/);
   assert.throws(() => problem.builder('0,0,1,1', { rec2: '1,1,no,2' }), /integers/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ro836-viz \{/);
   assert.match(css, /\.ro836-intersection rect/);
   assert.match(css, /\.ro836-axis-card\.fail/);

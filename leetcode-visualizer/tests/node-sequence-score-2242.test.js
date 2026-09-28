@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -130,7 +131,7 @@ test('2242 shortens large traces but checks all middle edges', () => {
 });
 
 test('2242 renderer handles every phase in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderNodeSequence2242View(step)');
   const end = source.indexOf('\nfunction renderSlidingFreqView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -153,7 +154,7 @@ test('2242 renderer handles every phase in English and Vietnamese', () => {
       }
     }
   }
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ns2242-viz \{/);
   assert.match(css, /\.ns2242-path\.rejected/);
   assert.match(css, /\.ns2242-build/);

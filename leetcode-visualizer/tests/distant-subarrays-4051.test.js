@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -108,7 +109,7 @@ test('4051 displayed Python, solution file, and live arguments agree', () => {
 });
 
 test('4051 custom renderer handles every path in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderDistantSubarrays4051View(step)');
   const end = source.indexOf('\nfunction renderRectangleOverlap836View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -142,7 +143,7 @@ test('4051 validates visual input and includes responsive scoped styles', () => 
   assert.throws(() => problem.builder(Array(17).fill(1), { goal: 0, k: 1 }), /at most 16/);
   assert.throws(() => problem.builder([1], { goal: 0.5, k: 1 }), /goal must be an integer/);
   assert.throws(() => problem.builder([1], { goal: 0, k: -1 }), /k must be an integer/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ds4051-viz/);
   assert.match(css, /\.ds4051-bound\.left/);
   assert.match(css, /\.ds4051-coordinate\.right-range/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -95,7 +96,7 @@ test('223 displayed Python and solution file return the expected values', () => 
 });
 
 test('223 renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderRectangleArea223View(step)');
   const end = source.indexOf('\nfunction renderRectangleOverlap836View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -129,7 +130,7 @@ test('223 validates coordinates and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder('0,0,1', { rectB: '0,0,1,1' }), /exactly 4/);
   assert.throws(() => problem.builder('2,0,1,1', { rectB: '0,0,1,1' }), /x1 <= x2/);
   assert.throws(() => problem.builder('0,0,10001,1', { rectB: '0,0,1,1' }), /between -10,000 and 10,000/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ra223-viz/);
   assert.match(css, /\.ra223-overlap/);
   assert.match(css, /@container \(max-width: 520px\)[\s\S]*\.ra223-workspace \{ grid-template-columns: 1fr;/);

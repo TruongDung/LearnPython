@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -189,7 +190,7 @@ test('3498 displayed Python and the solution file agree with the visualizer', ()
 });
 
 function loadRenderer() {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderReverseDegree3498View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -278,7 +279,7 @@ test('3498 renderer contrasts the correct reversal against both off-by-one forms
 });
 
 test('3498 ships responsive scoped styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.rd3498-viz \{/);
   assert.match(css, /\.rd3498-cell\.current/);
   assert.match(css, /\.rd3498-cell\.pending/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -68,7 +69,7 @@ test('366 validates empty and oversized tree input', () => {
 });
 
 test('366 renderer covers both approaches in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('const LV366_GEOM =');
   const end = script.indexOf('\n// ---- 359 Logger Rate Limiter ----', start);
   assert.ok(start >= 0 && end > start);
@@ -103,7 +104,7 @@ test('366 renderer covers both approaches in English and Vietnamese', () => {
 });
 
 test('366 ships the scoped responsive visualization styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.lv366-viz/);
   assert.match(css, /\.lv366-node\.removed/);
   assert.match(css, /\[data-theme="light"\] \.lv366-viz/);

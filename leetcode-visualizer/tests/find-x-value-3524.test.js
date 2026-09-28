@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -235,7 +236,7 @@ test('3524 displayed Python and the solution file agree with the visualizer', ()
 });
 
 function loadRenderer() {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderFindXValue3524View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -322,7 +323,7 @@ test('3524 renderer shows the checksum reaching n(n+1)/2 only at the end', () =>
 });
 
 test('3524 ships responsive scoped styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.fx3524-viz \{/);
   assert.match(css, /\.fx3524-cell\.matched/);
   assert.match(css, /\.fx3524-cell\.counted/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -175,8 +176,8 @@ test('437 validates tree and target inputs and prepares the live Python argument
 });
 
 test('437 custom renderer remains complete and readable in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  const styles = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const script = readFrontendJavaScript();
+  const styles = readFrontendStyles();
   const start = script.indexOf('function renderPathSumIIIView(step)');
   const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
   assert.ok(start >= 0 && end > start);

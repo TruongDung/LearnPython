@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -41,7 +42,7 @@ test('742 finds the closest leaf using parent-aware BFS', () => {
 });
 
 test('545/549/742 renderers cover all states in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderTreeFamilyView(step, id, key');
   const end = source.indexOf('\nfunction renderClosestBst272View(step)', start);
   assert.ok(start >= 0 && end > start);

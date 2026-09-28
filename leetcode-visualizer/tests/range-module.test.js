@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -121,7 +122,7 @@ for case in json.load(sys.stdin):
 });
 
 test('715 renders every phase in both languages, including an uncovered query and empty input', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderRangeModuleView(step)');
   const end = source.indexOf('\nfunction ', start + 1);
   const element = {};

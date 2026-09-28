@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -85,7 +86,7 @@ test('285 displayed Python solution passes representative cases', () => {
 });
 
 test('285 custom renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderInorderSuccessor285View(step)');
   const end = source.indexOf('\nfunction renderClosestBst272View(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -133,7 +134,7 @@ test('285 validates input and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder('5,3,6', { p: 4 }), /exists in the BST/);
   assert.throws(() => problem.builder('5,6,3', { p: 5 }), /valid BST/);
 
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.cb285-viz \{/);
   assert.match(css, /\.cb285-compare\.valid/);
   assert.match(css, /\.cb285-tree \.tree-annotation\.target/);

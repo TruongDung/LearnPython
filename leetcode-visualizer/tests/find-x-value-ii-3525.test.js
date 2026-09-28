@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -318,7 +319,7 @@ test('3525 displayed Python and the solution file agree with the visualizer', ()
 });
 
 function loadRenderer() {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderFindXValue3525View(step)');
   const end = script.indexOf('\nfunction renderStep()', start);
   assert.ok(start >= 0 && end > start);
@@ -425,7 +426,7 @@ test('3525 renderer dims the dropped prefix and flags the written cell', () => {
 });
 
 test('3525 ships responsive scoped styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.fx3525-viz \{/);
   assert.match(css, /\.fx3525-node\.merge-left/);
   assert.match(css, /\.fx3525-node\.merge-right/);

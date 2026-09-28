@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -68,7 +69,7 @@ test('2138 displayed and repository Python solutions pass representative cases',
 });
 
 test('2138 custom renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderDivideString2138View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -98,7 +99,7 @@ test('2138 validates visual inputs and includes scoped responsive styles', () =>
   assert.throws(() => problem.builder('ABC', { k: 3, fill: 'x' }), /1 to 24 lowercase/);
   assert.throws(() => problem.builder('abc', { k: 0, fill: 'x' }), /between 1 and 12/);
   assert.throws(() => problem.builder('abc', { k: 3, fill: 'xy' }), /exactly one lowercase/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ds2138-viz \{/);
   assert.match(css, /\.ds2138-slot\.fill/);
   assert.match(css, /@container \(max-width: 500px\)/);

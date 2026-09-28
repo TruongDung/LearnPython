@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -153,7 +154,7 @@ test('755 and 799 validate their visualization inputs', () => {
 });
 
 test('755 and 799 custom renderers handle every trace step in English and Vietnamese', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const pourStart = script.indexOf('function renderPourWater755View(step)');
   const champagneStart = script.indexOf('function renderChampagne799View(step)', pourStart);
   const end = script.indexOf('\nfunction renderMaximizeScore2818View(step)', champagneStart);

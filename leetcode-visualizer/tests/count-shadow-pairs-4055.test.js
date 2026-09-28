@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -97,7 +98,7 @@ test('4055 displayed Python and solution file match brute force', () => {
 });
 
 test('4055 custom renderer handles every phase in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderShadowPairs4055View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -127,7 +128,7 @@ test('4055 validates visualization input and includes responsive styles', () => 
   assert.throws(() => problem.builder([1, 2]), /at least 3/);
   assert.throws(() => problem.builder([1, 0, 2]), /1,000,000,000/);
   assert.throws(() => problem.builder(Array(17).fill(1)), /at most 16/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.spii4055-viz \{/);
   assert.match(css, /\.spii4055-cell\.qualifying/);
   assert.match(css, /@container \(max-width: 420px\)/);

@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -53,7 +54,7 @@ test('1248 displayed Python agrees with the visualization answers', () => {
 });
 
 test('1248 custom renderer covers every event in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderNice1248View(step)');
   const end = source.indexOf('\nfunction renderExactK992View(step)', start);
   const element = {};
@@ -80,7 +81,7 @@ test('1248 custom renderer covers every event in English and Vietnamese', () => 
 });
 
 test('1248 remains line-by-line and has scoped responsive CSS', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function shouldUseLineByLineDebug()');
   const end = source.indexOf('\n// ---- Run algorithm ----', start);
   const context = {
@@ -92,7 +93,7 @@ test('1248 remains line-by-line and has scoped responsive CSS', () => {
   const expanded = context.expandStepsLineByLine(problem.builder([1, 1, 2, 1, 1], { k: 3 }).steps);
   assert.ok(expanded.every(step => !step.codeLines || step.codeLines.length <= 1));
 
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.nice1248-viz \{/);
   assert.match(css, /\.nice1248-prefix\.match \{/);
   assert.match(css, /\.nice1248-subarray \{/);

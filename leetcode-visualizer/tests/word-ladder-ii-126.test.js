@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
@@ -170,7 +171,7 @@ test('126 displayed Python, live args, and solution file agree', () => {
 });
 
 test('126 custom renderer handles every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderWordLadder126View(step)');
   const end = source.indexOf('\nfunction renderHouseRobberView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -203,7 +204,7 @@ test('126 custom renderer handles every state in English and Vietnamese', () => 
 });
 
 test('126 includes scoped responsive styles for every teaching state', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.wl126-viz/);
   assert.match(css, /\.wl126-node\.is-frontier/);
   assert.match(css, /\.wl126-node\.is-path/);

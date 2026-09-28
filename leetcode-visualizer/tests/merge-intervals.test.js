@@ -1,3 +1,4 @@
+const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -91,7 +92,7 @@ for case in json.load(sys.stdin):
 });
 
 test('56 renders every phase in English and Vietnamese without invalid bar coordinates', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderMergeIntervalsView(step)');
   const end = script.indexOf('\n// ---- Meeting-room', start);
   const element = {}, context = { lang: 'en', $: () => element, escapeHtml: String };
@@ -111,9 +112,9 @@ test('56 renders every phase in English and Vietnamese without invalid bar coord
 });
 
 test('the code toolbar can blur and reveal the #56 snippet beside Edit & run code', () => {
-  const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const html = readFrontendIndex();
+  const css = readFrontendStyles();
+  const script = readFrontendJavaScript();
   const editButton = html.indexOf('id="liveEditBtn"');
   const blurButton = html.indexOf('id="codeBlurBtn"');
 

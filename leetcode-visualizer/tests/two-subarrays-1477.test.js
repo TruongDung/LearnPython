@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -95,7 +96,7 @@ test('1477 displayed Python solution passes representative cases', () => {
 });
 
 test('1477 custom renderer covers every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderTwoSubarrays1477View(step)');
   const end = source.indexOf('\nfunction renderAverageWindowView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -128,7 +129,7 @@ test('1477 custom renderer covers every state in English and Vietnamese', () => 
 test('1477 validates inputs and includes scoped responsive styles', () => {
   assert.throws(() => problem.builder([1, 0, 2], { target: 3 }), /positive integers/);
   assert.throws(() => problem.builder([1, 2], { target: 0 }), /positive integer/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.ts1477-viz \{/);
   assert.match(css, /\.ts1477-best > div > span\.lookup/);
   assert.match(css, /\.ts1477-cell\.pair-first/);

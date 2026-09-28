@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -109,7 +110,7 @@ test('2407 displayed Python and solution file produce the expected answers', () 
 });
 
 test('2407 custom renderer handles every state in English and Vietnamese', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderLIS2407View(step)');
   const end = source.indexOf('\nfunction renderHouseRobberView(step)', start);
   assert.ok(start >= 0 && end > start);
@@ -137,7 +138,7 @@ test('2407 custom renderer handles every state in English and Vietnamese', () =>
 });
 
 test('2407 has responsive, scoped visualization styles', () => {
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.lis2407-viz/);
   assert.match(css, /\.lis2407-leaf\.is-eligible/);
   assert.match(css, /\.lis2407-node\.is-query/);

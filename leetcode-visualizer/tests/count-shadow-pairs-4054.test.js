@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -88,7 +89,7 @@ test('4054 displayed Python agrees with the visualization', () => {
 });
 
 test('4054 custom renderer handles every phase in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderShadowPairs4054View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -118,7 +119,7 @@ test('4054 validates visualization input and includes responsive styles', () => 
   assert.throws(() => problem.builder([1, 2]), /at least 3/);
   assert.throws(() => problem.builder([1, 0, 2]), /1,000,000,000/);
   assert.throws(() => problem.builder(Array(41).fill(1)), /at most 40/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   assert.match(css, /\.sp4054-viz \{/);
   assert.match(css, /\.sp4054-stack-item\.qualifying/);
   assert.match(css, /@container \(max-width: 390px\)/);

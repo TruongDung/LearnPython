@@ -1,3 +1,4 @@
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -118,7 +119,7 @@ test('1120 validates bracketed input, values, malformed trees, and visualization
 });
 
 test('1120 custom renderer covers every phase in Vietnamese and English', () => {
-  const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const script = readFrontendJavaScript();
   const start = script.indexOf('function renderMaximumAverage1120View(step)');
   const end = script.indexOf('\nfunction renderMissingIntegerView(step)', start);
   assert.ok(start >= 0 && end > start);

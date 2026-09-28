@@ -1,3 +1,4 @@
+const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -134,7 +135,7 @@ test('1621 displayed Python approaches handle small and full-constraint examples
 });
 
 test('1621 custom renderer covers every phase in both languages', () => {
-  const source = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const source = readFrontendJavaScript();
   const start = source.indexOf('function renderLineSegments1621View(step)');
   const end = source.indexOf('\nfunction renderStep()', start);
   const element = {};
@@ -173,7 +174,7 @@ test('1621 validates visual inputs and includes responsive scoped styles', () =>
   assert.throws(() => problem.builder([11], { k: 1 }), /between 2 and 10/);
   assert.throws(() => problem.builder([4], { k: 0 }), /between 1 and n - 1/);
   assert.throws(() => problem.builder([4], { k: 4 }), /between 1 and n - 1/);
-  const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
+  const css = readFrontendStyles();
   const openBraces = (css.match(/\{/g) || []).length;
   const closeBraces = (css.match(/\}/g) || []).length;
   assert.equal(openBraces, closeBraces, 'the stylesheet must not trap 1621 inside an earlier at-rule');
