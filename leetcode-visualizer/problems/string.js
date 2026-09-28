@@ -2283,6 +2283,145 @@ function buildSteps921(input) {
 }
 
 /**
+ * LeetCode 1614: Maximum Nesting Depth of the Parentheses.
+ * `depth` is the number of opening parentheses currently unmatched; this is
+ * exactly the current nesting level.  Record the largest depth after opening
+ * a new level.
+ */
+function buildSteps1614(input) {
+  const s = String(input ?? "");
+  if (!s.length) throw new Error("s must not be empty.");
+  if (s.length > 60) throw new Error("The visualizer supports at most 60 characters.");
+
+  const chars = [...s];
+  const steps = [];
+  let depth = 0;
+  let best = 0;
+
+  const stackItems = () => Array.from({ length: depth }, (_, index) => ({
+    value: "(",
+    detail: `depth ${index + 1}`,
+  }));
+
+  function snap({ title, line, note, current = -1, condition = null, event = "scan", final = false }) {
+    const ch = current >= 0 ? chars[current] : null;
+    steps.push({
+      title,
+      codeLines: [line],
+      final,
+      stackView: {
+        title: "Nesting levels · open parentheses",
+        emptyLabel: "depth 0 · outside every pair",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "s",
+        status: [
+          { label: "event", value: event },
+          { label: "current depth", value: depth },
+          { label: "maximum depth", value: best },
+        ],
+      },
+      vars: [
+        { name: "i", value: current < 0 ? "—" : current },
+        { name: "ch", value: ch === null ? "—" : `'${ch}'` },
+        { name: "depth", value: depth },
+        { name: "best", value: best },
+        ...(condition === null ? [] : [{ name: "condition", value: condition ? "True" : "False" }]),
+      ],
+      note,
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo depth = best = 0", en: "Initialize depth = best = 0" },
+    line: 3,
+    event: "initialize",
+    note: { vi: "depth là số '(' đang mở nhưng chưa đóng. best lưu mức lớn nhất đã từng thấy.", en: "depth counts '(' that are open but not closed. best stores the largest level seen so far." },
+  });
+
+  for (let i = 0; i < chars.length; i += 1) {
+    const ch = chars[i];
+    snap({
+      title: { vi: `Đọc s[${i}] = '${ch}'`, en: `Read s[${i}] = '${ch}'` },
+      line: 4,
+      current: i,
+      event: "read character",
+      note: { vi: "Mỗi ký tự được duyệt đúng một lần.", en: "Each character is visited exactly once." },
+    });
+
+    const isOpen = ch === "(";
+    snap({
+      title: { vi: `ch == '(': ${isOpen ? "True" : "False"}`, en: `ch == '(': ${isOpen ? "True" : "False"}` },
+      line: 5,
+      current: i,
+      condition: isOpen,
+      event: "check opening",
+      note: isOpen
+        ? { vi: "Gặp ngoặc mở: sắp đi sâu thêm một tầng.", en: "An opening parenthesis starts one deeper level." }
+        : { vi: "Không phải ngoặc mở; kiểm tra nó có phải ngoặc đóng không.", en: "It is not an opening parenthesis; check for a closing parenthesis." },
+    });
+
+    if (isOpen) {
+      depth += 1;
+      snap({
+        title: { vi: `depth += 1 → ${depth}`, en: `depth += 1 → ${depth}` },
+        line: 6,
+        current: i,
+        event: "open level",
+        note: { vi: `Thêm một tầng đang mở. Stack trực quan bên phải hiện có ${depth} tầng.`, en: `One open level is added. The visual stack now has ${depth} levels.` },
+      });
+
+      const previousBest = best;
+      best = Math.max(best, depth);
+      snap({
+        title: { vi: `best = max(${previousBest}, ${depth}) = ${best}`, en: `best = max(${previousBest}, ${depth}) = ${best}` },
+        line: 7,
+        current: i,
+        event: best > previousBest ? "new maximum" : "keep maximum",
+        note: best > previousBest
+          ? { vi: `Đây là độ sâu lớn nhất mới: ${best}.`, en: `This is a new maximum depth: ${best}.` }
+          : { vi: `Độ sâu ${depth} chưa vượt kỷ lục ${best}.`, en: `Depth ${depth} does not exceed the record ${best}.` },
+      });
+      continue;
+    }
+
+    const isClose = ch === ")";
+    snap({
+      title: { vi: `ch == ')': ${isClose ? "True" : "False"}`, en: `ch == ')': ${isClose ? "True" : "False"}` },
+      line: 8,
+      current: i,
+      condition: isClose,
+      event: "check closing",
+      note: isClose
+        ? { vi: "Gặp ngoặc đóng: sắp rời một tầng.", en: "A closing parenthesis leaves one nesting level." }
+        : { vi: "Ký tự thường không làm thay đổi depth.", en: "A regular character does not change depth." },
+    });
+
+    if (isClose) {
+      depth -= 1;
+      snap({
+        title: { vi: `depth -= 1 → ${depth}`, en: `depth -= 1 → ${depth}` },
+        line: 9,
+        current: i,
+        event: "close level",
+        note: { vi: "Một cặp ngoặc đã kết thúc, nên bỏ tầng trên cùng khỏi stack trực quan.", en: "One parenthesis pair ends, so remove the top level from the visual stack." },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `Trả về best = ${best}`, en: `Return best = ${best}` },
+    line: 10,
+    event: "return",
+    final: true,
+    note: { vi: `Độ sâu lồng ngoặc lớn nhất của chuỗi là ${best}.`, en: `The maximum nesting depth of the string is ${best}.` },
+  });
+
+  return { original: s, answer: best, steps };
+}
+
+/**
  * LeetCode 1249: Minimum Remove to Make Valid Parentheses.
  * Match closing parentheses with opening indices and remove unmatched ones.
  */
@@ -12308,6 +12447,50 @@ module.exports = {
       "        return additions + len(stack)",
     ],
     builder: buildSteps921,
+  },
+  1614: {
+    id: 1614,
+    difficulty: "easy",
+    slug: "maximum-nesting-depth-of-the-parentheses",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    tags: [
+      { key: "stack", vi: "Ngăn xếp", en: "Stack" },
+      { key: "counter", vi: "Bộ đếm", en: "Counter" },
+    ],
+    title: { vi: "Maximum Nesting Depth of the Parentheses", en: "Maximum Nesting Depth of the Parentheses" },
+    titleVi: { vi: "Độ sâu lồng ngoặc lớn nhất", en: "Maximum parenthesis nesting depth" },
+    statement: {
+      vi: "Cho chuỗi ngoặc hợp lệ s, có thể kèm chữ cái hoặc số. Trả về số mức ngoặc lồng nhau sâu nhất.",
+      en: "Given a valid parentheses string s, which may also contain letters or digits, return its maximum nesting depth.",
+    },
+    defaultInput: "(1+(2*3)+((8)/4))+1",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "depth đếm số '(' đã mở nhưng chưa gặp ')'. Đây chính là mức lồng hiện tại.", en: "depth counts '(' that have opened but not yet met ')'. This is the current nesting level." },
+      { vi: "Gặp '(' thì tăng depth và cập nhật best; gặp ')' thì giảm depth. Ký tự thường được bỏ qua.", en: "On '(', increase depth and update best; on ')', decrease depth. Ignore regular characters." },
+      { vi: "Chuỗi hợp lệ bảo đảm depth không âm và cuối cùng quay về 0.", en: "Validity guarantees depth never becomes negative and finally returns to 0." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Một lượt duyệt; chỉ dùng hai biến depth và best.", en: "One scan; only depth and best are stored." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxDepth(self, s: str) -> int:",
+      "        depth = best = 0",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '(':",
+      "                depth += 1",
+      "                best = max(best, depth)",
+      "            elif ch == ')':",
+      "                depth -= 1",
+      "        return best",
+    ],
+    debugMode: "line-by-line",
+    builder: buildSteps1614,
   },
   1249: {
     id: 1249,
