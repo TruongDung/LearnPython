@@ -12,6 +12,12 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderers-05.js',
   'renderers-06.js',
   'renderer-sparse-vector-1570.js',
+  'renderer-regex-match-10.js',
+  'renderer-wildcard-match-44.js',
+  'renderer-maximal-rectangle-85.js',
+  'renderer-max-path-sum-124.js',
+  'renderer-palindrome-cuts-132.js',
+  'renderer-sliding-maximum-239.js',
   'script.js',
 ]);
 
@@ -27,6 +33,12 @@ const STYLESHEET_ASSETS = Object.freeze([
   'style-08.css',
   'style-09.css',
   'sparse-vector-1570.css',
+  'regex-match-10.css',
+  'wildcard-match-44.css',
+  'maximal-rectangle-85.css',
+  'max-path-sum-124.css',
+  'palindrome-cuts-132.css',
+  'sliding-maximum-239.css',
 ]);
 
 const sourceCache = new Map();

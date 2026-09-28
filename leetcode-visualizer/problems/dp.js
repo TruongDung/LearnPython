@@ -7718,274 +7718,492 @@ function buildSteps140(input, params = {}) {
 
 /**
  * LeetCode 132: Palindrome Partitioning II.
- * dp[i] = minimum cuts needed for s[0..i-1] to be split into all palindromes.
- * isPalin[j][i] = true if s[j..i] is a palindrome.
- * Transition: dp[i] = min(dp[j] + 1) for all j where s[j..i-1] is palindrome.
+ * Precompute palindrome intervals, then minimize prefix cuts while retaining the
+ * first strictly better parent so the final partition can be reconstructed.
  */
+const PALINDROME_CUTS_132_MAX_LENGTH = 16;
+
+function parsePalindromeCuts132Input(input) {
+  if (typeof input !== "string") {
+    throw new TypeError("Palindrome Partitioning II input must be a string.");
+  }
+  if (input.length === 0) {
+    throw new TypeError("Palindrome Partitioning II input must be nonempty.");
+  }
+  if (!/^[a-z]+$/.test(input)) {
+    throw new TypeError("Palindrome Partitioning II input must contain only lowercase letters a-z.");
+  }
+  if (input.length > PALINDROME_CUTS_132_MAX_LENGTH) {
+    throw new RangeError(`Palindrome Partitioning II visualizes at most ${PALINDROME_CUTS_132_MAX_LENGTH} characters.`);
+  }
+  return input;
+}
+
 function buildSteps132(input) {
-  const s = typeof input === "string" ? input : String(input);
+  const s = parsePalindromeCuts132Input(input);
   const n = s.length;
   const steps = [];
-  const chars = s.split("");
-  const rowLabels = Array.from({ length: n }, (_, idx) => String(idx));
-  const indices = Array.from({ length: n + 1 }, (_, idx) => idx);
-  const dpLabels = ["dp[0]", ...chars.map((ch, idx) => `dp[${idx + 1}]\n${ch}`)];
-  const sliceHighlight = (start, end) =>
-    start <= end ? Array.from({ length: end - start + 1 }, (_, k) => start + k) : [];
-  const dpSliceHighlight = (start, end) =>
-    start <= end ? Array.from({ length: end - start + 1 }, (_, k) => start + 1 + k) : [];
-
-  steps.push({
-    title: { vi: `n = ${n}`, en: `n = ${n}` },
-    arr: indices,
-    sub: dpLabels,
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "s", value: s },
-      { name: "n", value: n },
-    ],
-    note: {
-      vi: `Doc do dai chuoi: n = len("${s}") = ${n}.`,
-      en: `Read the string length: n = len("${s}") = ${n}.`,
-    },
+  const discovered = [];
+  const blankCandidate = () => ({
+    start: null,
+    end: null,
+    text: "",
+    palindrome: null,
+    fromCuts: null,
+    value: null,
+    incumbentBefore: null,
+    incumbentAfter: null,
+    proposedParent: null,
+    outcome: "pending",
   });
+  const deepFreezeJson = (value) => {
+    const copy = JSON.parse(JSON.stringify(value));
+    const freeze = (item) => {
+      if (!item || typeof item !== "object" || Object.isFrozen(item)) return item;
+      Object.values(item).forEach(freeze);
+      return Object.freeze(item);
+    };
+    return freeze(copy);
+  };
+  const finiteOrNull = (value) => Number.isFinite(value) ? value : null;
 
-  const isPalin = Array.from({ length: n }, () => new Array(n).fill(false));
-  steps.push({
-    title: { vi: "Tao bang isPalin", en: "Create isPalin table" },
-    matrix: isPalin.map(row => [...row]),
-    rowLabels,
-    colLabels: rowLabels,
-    highlight: [],
-    mark: [],
-    codeLines: [5],
-    vars: [
-      { name: "isPalin size", value: `${n} x ${n}` },
-      { name: "default", value: "False" },
-    ],
-    note: {
-      vi: "Khoi tao isPalin[i][j] = False cho moi substring s[i..j].",
-      en: "Initialize isPalin[i][j] = False for every substring s[i..j].",
-    },
+  let palindromeAllocated = false;
+  const palindrome = Array.from({ length: n }, () => Array(n).fill(false));
+  const palindromeStatus = Array.from({ length: n }, () => Array(n).fill("unallocated"));
+  let palindromeActive = null;
+  let palindromeInner = null;
+  let palindromeEndpoints = null;
+  let cutsAllocated = false;
+  let baseInitialized = false;
+  let parentAllocated = false;
+  let cuts = Array(n + 1).fill(Infinity);
+  let parent = Array(n + 1).fill(null);
+  let activePrefix = null;
+  let completedPrefix = 0;
+  let candidate = blankCandidate();
+  const reconstruction = {
+    cursor: null,
+    activeLink: null,
+    reversedIntervals: [],
+    reversedPieces: [],
+    orderedIntervals: [],
+    orderedPieces: [],
+    complete: false,
+  };
+
+  const cutStatus = () => Array.from({ length: n + 1 }, (_, index) => {
+    if (!cutsAllocated) return "unallocated";
+    if (index === 0 && baseInitialized) return "base";
+    if (index === activePrefix) return "active";
+    if (index > 0 && index <= completedPrefix) return "computed";
+    return "infinity";
   });
-
-  for (let i = n - 1; i >= 0; i--) {
-    steps.push({
-      title: { vi: `Vong ngoai i = ${i}`, en: `Outer loop i = ${i}` },
-      arr: chars,
-      sub: rowLabels,
-      highlight: [i],
-      mark: [],
-      codeLines: [6],
+  const snapshotView = ({ line, timing, phase, event, answer = null, final = false }) => deepFreezeJson({
+    version: 1,
+    problemId: 132,
+    sourceLine: line,
+    timing,
+    phase,
+    event,
+    s,
+    n,
+    palindrome: {
+      values: palindrome.map((row) => [...row]),
+      status: palindromeStatus.map((row) => [...row]),
+      active: palindromeActive ? { ...palindromeActive } : null,
+      inner: palindromeInner ? { ...palindromeInner } : null,
+      endpoints: palindromeEndpoints ? { ...palindromeEndpoints } : null,
+      discovered: discovered.map((interval) => ({ ...interval })),
+    },
+    cuts: {
+      values: cuts.map(finiteOrNull),
+      status: cutStatus(),
+      parent: parent.map((value) => Number.isInteger(value) ? value : null),
+      activePrefix,
+    },
+    candidate: { ...candidate },
+    reconstruction: {
+      cursor: reconstruction.cursor,
+      activeLink: reconstruction.activeLink ? {
+        ...reconstruction.activeLink,
+        interval: [...reconstruction.activeLink.interval],
+      } : null,
+      reversedIntervals: reconstruction.reversedIntervals.map((interval) => [...interval]),
+      reversedPieces: [...reconstruction.reversedPieces],
+      orderedIntervals: reconstruction.orderedIntervals.map((interval) => [...interval]),
+      orderedPieces: [...reconstruction.orderedPieces],
+      complete: reconstruction.complete,
+    },
+    answer,
+    final,
+  });
+  const pushStep = ({ line, timing = "after", phase, event, title, note, answer = null, final = false }) => {
+    const view = snapshotView({ line, timing, phase, event, answer, final });
+    const step = {
+      title,
+      codeLines: [line],
       vars: [
-        { name: "i", value: i },
-        { name: "s[i]", value: s[i] ?? "" },
+        { name: "event", value: event },
+        { name: "s", value: s },
+        { name: "cuts", value: JSON.stringify(view.cuts.values) },
+        { name: "parent", value: JSON.stringify(view.cuts.parent) },
       ],
+      note,
+      palindromeCuts132View: view,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  };
+
+  pushStep({
+    line: 3,
+    phase: "setup",
+    event: "read-input",
+    title: { vi: `Đọc chuỗi dài ${n}`, en: `Read a string of length ${n}` },
+    note: { vi: `n = len(s) = ${n}.`, en: `n = len(s) = ${n}.` },
+  });
+
+  palindromeAllocated = true;
+  for (let row = 0; row < n; row += 1) {
+    for (let col = 0; col < n; col += 1) {
+      palindromeStatus[row][col] = col < row ? "not-applicable" : "unknown";
+    }
+  }
+  pushStep({
+    line: 4,
+    phase: "palindrome",
+    event: "allocate-palindrome",
+    title: { vi: "Tạo bảng palindrome", en: "Allocate the palindrome table" },
+    note: { vi: "Mọi khoảng hợp lệ bắt đầu ở trạng thái chưa biết.", en: "Every valid interval starts in an unknown state." },
+  });
+
+  for (let start = n - 1; start >= 0; start -= 1) {
+    palindromeActive = { start, end: null, text: "", result: null };
+    palindromeInner = null;
+    palindromeEndpoints = null;
+    pushStep({
+      line: 5,
+      phase: "palindrome",
+      event: "palindrome-start",
+      title: { vi: `Chọn start = ${start}`, en: `Select start = ${start}` },
       note: {
-        vi: `Bat dau tinh cac palindrome co diem bat dau i = ${i}.`,
-        en: `Start computing palindromes that begin at i = ${i}.`,
+        vi: `Vòng ngoài chọn hàng start ${start}; tiếp theo vòng trong sẽ chọn từng end từ ${start} đến ${n - 1}.`,
+        en: `The outer loop selects start row ${start}; the inner loop will next select each end from ${start} through ${n - 1}.`,
       },
     });
 
-    for (let j = i; j < n; j++) {
-      steps.push({
-        title: { vi: `Vong trong j = ${j}`, en: `Inner loop j = ${j}` },
-        arr: chars,
-        sub: rowLabels,
-        highlight: sliceHighlight(i, j),
-        mark: [i, j],
-        codeLines: [7],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "s[i..j]", value: s.slice(i, j + 1) },
-        ],
+    for (let end = start; end < n; end += 1) {
+      palindromeActive = { start, end, text: s.slice(start, end + 1), result: null };
+      palindromeInner = null;
+      palindromeEndpoints = null;
+      pushStep({
+        line: 6,
+        phase: "palindrome",
+        event: "palindrome-interval",
+        title: { vi: `Chọn khoảng [${start}, ${end}]`, en: `Select interval [${start}, ${end}]` },
         note: {
-          vi: `Dang xet substring s[${i}..${j}] = "${s.slice(i, j + 1)}".`,
-          en: `Checking substring s[${i}..${j}] = "${s.slice(i, j + 1)}".`,
+          vi: `Vòng trong chọn “${s.slice(start, end + 1)}”; điều kiện nhiều dòng 7–9 được đánh giá tiếp theo tại dòng 7.`,
+          en: `The inner loop selects “${s.slice(start, end + 1)}”; the multiline condition on lines 7–9 is evaluated next at line 7.`,
         },
       });
 
-      const sameEnds = s[i] === s[j];
-      const shortEnough = j - i <= 2;
-      const innerValue = shortEnough ? true : isPalin[i + 1][j - 1];
-      const pal = sameEnds && innerValue;
-      steps.push({
-        title: { vi: pal ? "Dieu kien dung" : "Dieu kien sai", en: pal ? "Condition true" : "Condition false" },
-        matrix: isPalin.map(row => [...row]),
-        rowLabels,
-        colLabels: rowLabels,
-        activeCell: [i, j],
-        highlight: [[i, j]],
-        mark: pal ? [[i, j]] : [],
-        codeLines: [8],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "s[i] == s[j]", value: `${JSON.stringify(s[i])} == ${JSON.stringify(s[j])} -> ${sameEnds}` },
-          { name: "j - i <= 2", value: shortEnough },
-          { name: shortEnough ? "inner check" : `isPalin[${i + 1}][${j - 1}]`, value: innerValue },
-          { name: `isPalin[${i}][${j}]`, value: pal },
-        ],
+      const shortInterval = end - start <= 2;
+      const endpointsMatch = s[start] === s[end];
+      const innerValue = shortInterval ? true : palindrome[start + 1][end - 1];
+      const isPalindrome = endpointsMatch && innerValue;
+      palindromeActive = { start, end, text: s.slice(start, end + 1), result: isPalindrome };
+      palindromeInner = shortInterval
+        ? { start: null, end: null, status: "not-needed", value: true }
+        : {
+          start: start + 1,
+          end: end - 1,
+          status: palindromeStatus[start + 1][end - 1],
+          value: palindrome[start + 1][end - 1],
+        };
+      palindromeEndpoints = {
+        start,
+        end,
+        left: s[start],
+        right: s[end],
+        match: endpointsMatch,
+      };
+      if (!isPalindrome) palindromeStatus[start][end] = "computed-false";
+      pushStep({
+        line: 7,
+        phase: "palindrome",
+        event: "test-interval",
+        title: {
+          vi: `Kiểm tra “${s.slice(start, end + 1)}”: ${isPalindrome ? "đạt" : "không đạt"}`,
+          en: `Test “${s.slice(start, end + 1)}”: ${isPalindrome ? "pass" : "fail"}`,
+        },
         note: {
-          vi: `Kiem tra s[${i}] == s[${j}] va phan ben trong co palindrome khong. Ket qua: ${pal}.`,
-          en: `Check matching ends and whether the inside is a palindrome. Result: ${pal}.`,
+          vi: endpointsMatch
+            ? `Hai đầu bằng nhau; điều kiện phần trong là ${innerValue}.`
+            : "Hai ký tự đầu-cuối khác nhau nên khoảng không phải palindrome.",
+          en: endpointsMatch
+            ? `The endpoints match; the inner condition is ${innerValue}.`
+            : "The endpoints differ, so the interval is not a palindrome.",
         },
       });
 
-      if (pal) {
-        isPalin[i][j] = true;
-        steps.push({
-          title: { vi: `isPalin[${i}][${j}] = True`, en: `isPalin[${i}][${j}] = True` },
-          matrix: isPalin.map(row => [...row]),
-          rowLabels,
-          colLabels: rowLabels,
-          activeCell: [i, j],
-          highlight: [[i, j]],
-          mark: [[i, j]],
-          codeLines: [9],
-          vars: [
-            { name: `s[${i}..${j}]`, value: s.slice(i, j + 1) },
-            { name: `isPalin[${i}][${j}]`, value: true },
-          ],
-          note: {
-            vi: `Danh dau "${s.slice(i, j + 1)}" la palindrome.`,
-            en: `Mark "${s.slice(i, j + 1)}" as a palindrome.`,
-          },
+      if (isPalindrome) {
+        palindrome[start][end] = true;
+        palindromeStatus[start][end] = "computed-true";
+        discovered.push({ start, end, text: s.slice(start, end + 1) });
+        pushStep({
+          line: 10,
+          phase: "palindrome",
+          event: "discover-palindrome",
+          title: { vi: `Ghi nhận “${s.slice(start, end + 1)}”`, en: `Discover “${s.slice(start, end + 1)}”` },
+          note: { vi: `palindrome[${start}][${end}] = True.`, en: `palindrome[${start}][${end}] = True.` },
         });
       }
     }
   }
 
-  const dp = Array.from({ length: n + 1 }, (_, idx) => idx - 1);
-  steps.push({
-    title: { vi: "Khoi tao dp", en: "Initialize dp" },
-    arr: [...dp],
-    sub: dpLabels,
-    highlight: [],
-    mark: [0],
-    codeLines: [11],
-    vars: [
-      { name: "dp", value: `[${dp.join(", ")}]` },
-      { name: "dp[0]", value: -1 },
-    ],
-    note: {
-      vi: "dp[i] = so lan cat toi thieu cho s[0..i-1]. Gia tri ban dau la worst case: dp[i] = i - 1.",
-      en: "dp[i] = minimum cuts for s[0..i-1]. Initial values are the worst case: dp[i] = i - 1.",
-    },
+  cuts = Array(n + 1).fill(Infinity);
+  cutsAllocated = true;
+  pushStep({
+    line: 11,
+    phase: "cuts",
+    event: "allocate-cuts",
+    title: { vi: "Tạo mảng cuts", en: "Allocate the cuts array" },
+    note: { vi: "Giá trị vô hạn được biểu diễn bằng null trong payload JSON.", en: "Unbounded values are represented by null in the JSON payload." },
   });
 
-  for (let i = 1; i <= n; i++) {
-    steps.push({
-      title: { vi: `Vong DP i = ${i}`, en: `DP outer loop i = ${i}` },
-      arr: [...dp],
-      sub: dpLabels,
-      highlight: dpSliceHighlight(0, i - 1),
-      mark: [i],
-      codeLines: [12],
-      vars: [
-        { name: "i", value: i },
-        { name: "s[0..i-1]", value: s.slice(0, i) },
-        { name: `dp[${i}]`, value: dp[i] },
-      ],
-      note: {
-        vi: `Tinh dp[${i}] cho prefix "${s.slice(0, i)}".`,
-        en: `Compute dp[${i}] for prefix "${s.slice(0, i)}".`,
-      },
+  cuts[0] = -1;
+  baseInitialized = true;
+  pushStep({
+    line: 12,
+    phase: "cuts",
+    event: "set-base",
+    title: { vi: "Đặt cuts[0] = -1", en: "Set cuts[0] = -1" },
+    note: { vi: "Base -1 làm một prefix palindrome hoàn chỉnh cần 0 lần cắt.", en: "The -1 base makes a fully palindromic prefix require zero cuts." },
+  });
+
+  parent = Array(n + 1).fill(-1);
+  parentAllocated = true;
+  pushStep({
+    line: 13,
+    phase: "cuts",
+    event: "allocate-parent",
+    title: { vi: "Tạo mảng parent", en: "Allocate the parent array" },
+    note: { vi: "parent[end] sẽ giữ điểm bắt đầu của đoạn palindrome cuối.", en: "parent[end] will retain the start of the final palindrome piece." },
+  });
+
+  for (let end = 1; end <= n; end += 1) {
+    if (activePrefix !== null) completedPrefix = activePrefix;
+    activePrefix = end;
+    candidate = blankCandidate();
+    pushStep({
+      line: 14,
+      phase: "cuts",
+      event: "prefix",
+      title: { vi: `Tính prefix s[:${end}]`, en: `Compute prefix s[:${end}]` },
+      note: { vi: `Tìm số cắt tốt nhất cho “${s.slice(0, end)}”.`, en: `Find the best cut count for “${s.slice(0, end)}”.` },
     });
 
-    for (let j = 0; j < i; j++) {
-      const fragment = s.slice(j, i);
-      steps.push({
-        title: { vi: `Thu j = ${j}`, en: `Try j = ${j}` },
-        arr: [...dp],
-        sub: dpLabels,
-        highlight: dpSliceHighlight(j, i - 1),
-        mark: [j, i],
-        codeLines: [13],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: `s[${j}..${i - 1}]`, value: fragment },
-          { name: `dp[${i}] before`, value: dp[i] },
-        ],
-        note: {
-          vi: `Thu cat truoc vi tri ${j}; doan cuoi la "${fragment}".`,
-          en: `Try cutting before index ${j}; the last segment is "${fragment}".`,
-        },
+    for (let start = 0; start < end; start += 1) {
+      const text = s.slice(start, end);
+      candidate = {
+        ...blankCandidate(),
+        start,
+        end: end - 1,
+        text,
+        incumbentBefore: finiteOrNull(cuts[end]),
+        incumbentAfter: finiteOrNull(cuts[end]),
+      };
+      pushStep({
+        line: 15,
+        phase: "cuts",
+        event: "candidate",
+        title: { vi: `Thử đoạn cuối “${text}”`, en: `Try final piece “${text}”` },
+        note: { vi: `Ứng viên bắt đầu tại ${start} và kết thúc tại ${end - 1}.`, en: `The candidate starts at ${start} and ends at ${end - 1}.` },
       });
 
-      const pal = isPalin[j][i - 1];
-      const candidate = dp[j] + 1;
-      steps.push({
-        title: { vi: pal ? "Substring la palindrome" : "Substring khong palindrome", en: pal ? "Substring is palindrome" : "Substring is not palindrome" },
-        matrix: isPalin.map(row => [...row]),
-        rowLabels,
-        colLabels: rowLabels,
-        activeCell: [j, i - 1],
-        highlight: [[j, i - 1]],
-        mark: pal ? [[j, i - 1]] : [],
-        codeLines: [14],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: `isPalin[${j}][${i - 1}]`, value: pal },
-          { name: pal ? `dp[${j}] + 1` : "candidate", value: pal ? `${dp[j]} + 1 = ${candidate}` : "skip" },
-        ],
+      const isPalindrome = palindrome[start][end - 1];
+      candidate = {
+        ...candidate,
+        palindrome: isPalindrome,
+        outcome: isPalindrome ? "pending" : "reject",
+      };
+      pushStep({
+        line: 16,
+        phase: "cuts",
+        event: "palindrome-gate",
+        title: {
+          vi: isPalindrome ? "Qua cổng palindrome" : "Loại ứng viên",
+          en: isPalindrome ? "Pass the palindrome gate" : "Reject the candidate",
+        },
         note: {
-          vi: pal
-            ? `"${fragment}" la palindrome, co the cap nhat bang dp[${j}] + 1.`
-            : `"${fragment}" khong phai palindrome, bo qua j = ${j}.`,
-          en: pal
-            ? `"${fragment}" is a palindrome, so dp[${j}] + 1 can update the answer.`
-            : `"${fragment}" is not a palindrome, so skip j = ${j}.`,
+          vi: isPalindrome ? `“${text}” có thể là đoạn cuối.` : `“${text}” không phải palindrome.`,
+          en: isPalindrome ? `“${text}” can be the final piece.` : `“${text}” is not a palindrome.`,
         },
       });
+      if (!isPalindrome) continue;
 
-      if (pal) {
-        const before = dp[i];
-        dp[i] = Math.min(dp[i], candidate);
-        steps.push({
-          title: { vi: `dp[${i}] = ${dp[i]}`, en: `dp[${i}] = ${dp[i]}` },
-          arr: [...dp],
-          sub: dpLabels,
-          highlight: dpSliceHighlight(j, i - 1),
-          mark: [j, i],
-          codeLines: [15],
-          vars: [
-            { name: `dp[${i}] before`, value: before },
-            { name: `dp[${j}] + 1`, value: `${dp[j]} + 1 = ${candidate}` },
-            { name: `dp[${i}] after`, value: dp[i] },
-          ],
-          note: {
-            vi: `Cap nhat dp[${i}] = min(${before}, ${candidate}) = ${dp[i]}.`,
-            en: `Update dp[${i}] = min(${before}, ${candidate}) = ${dp[i]}.`,
-          },
-        });
-      }
+      const candidateValue = cuts[start] + 1;
+      const incumbentBefore = finiteOrNull(cuts[end]);
+      candidate = {
+        ...candidate,
+        fromCuts: cuts[start],
+        value: candidateValue,
+        incumbentBefore,
+        incumbentAfter: incumbentBefore,
+        proposedParent: start,
+      };
+      pushStep({
+        line: 17,
+        phase: "cuts",
+        event: "candidate-value",
+        title: { vi: `candidate = ${candidateValue}`, en: `candidate = ${candidateValue}` },
+        note: { vi: `cuts[${start}] + 1 = ${cuts[start]} + 1.`, en: `cuts[${start}] + 1 = ${cuts[start]} + 1.` },
+      });
+
+      const improves = candidateValue < cuts[end];
+      candidate = {
+        ...candidate,
+        incumbentAfter: improves ? candidateValue : incumbentBefore,
+        outcome: improves ? "update" : "keep",
+      };
+      pushStep({
+        line: 18,
+        phase: "cuts",
+        event: improves ? "improve" : "keep",
+        title: { vi: improves ? "Ứng viên tốt hơn" : "Giữ nghiệm đầu tiên", en: improves ? "Candidate improves" : "Keep the first witness" },
+        note: {
+          vi: improves
+            ? `${candidateValue} nhỏ hơn giá trị hiện tại nên sẽ cập nhật.`
+            : `${candidateValue} không nhỏ hơn giá trị hiện tại; tie không thay parent.`,
+          en: improves
+            ? `${candidateValue} is smaller than the incumbent, so update it.`
+            : `${candidateValue} is not smaller; a tie does not replace the parent.`,
+        },
+      });
+      if (!improves) continue;
+
+      cuts[end] = candidateValue;
+      pushStep({
+        line: 19,
+        phase: "cuts",
+        event: "update-cut",
+        title: { vi: `cuts[${end}] = ${candidateValue}`, en: `cuts[${end}] = ${candidateValue}` },
+        note: { vi: "Ghi số cắt tốt hơn cho prefix đang hoạt động.", en: "Store the better cut count for the active prefix." },
+      });
+
+      parent[end] = start;
+      pushStep({
+        line: 20,
+        phase: "cuts",
+        event: "update-parent",
+        title: { vi: `parent[${end}] = ${start}`, en: `parent[${end}] = ${start}` },
+        note: { vi: "Ghi liên kết để tái dựng witness tối ưu.", en: "Store the link used to reconstruct the optimal witness." },
+      });
     }
   }
 
-  const answer = dp[n];
-  steps.push({
-    title: { vi: `Ket qua: ${answer} cat`, en: `Result: ${answer} cut(s)` },
-    arr: [...dp],
-    sub: dpLabels,
-    highlight: [],
-    mark: [n],
+  completedPrefix = n;
+  activePrefix = null;
+  candidate = blankCandidate();
+  reconstruction.reversedIntervals = [];
+  reconstruction.reversedPieces = [];
+  reconstruction.orderedIntervals = [];
+  reconstruction.orderedPieces = [];
+  reconstruction.activeLink = null;
+  reconstruction.complete = false;
+  pushStep({
+    line: 21,
+    phase: "reconstruction",
+    event: "reconstruction-init",
+    title: { vi: "Bắt đầu tái dựng", en: "Initialize reconstruction" },
+    note: { vi: "partition bắt đầu rỗng và sẽ nhận các đoạn từ phải sang trái.", en: "partition starts empty and receives pieces from right to left." },
+  });
+
+  reconstruction.cursor = n;
+  pushStep({
+    line: 22,
+    phase: "reconstruction",
+    event: "set-cursor",
+    title: { vi: `Đặt cursor = ${n}`, en: `Set cursor = ${n}` },
+    note: { vi: "Bắt đầu tại cuối chuỗi.", en: "Start at the end of the string." },
+  });
+
+  while (reconstruction.cursor > 0) {
+    reconstruction.activeLink = null;
+    pushStep({
+      line: 23,
+      phase: "reconstruction",
+      event: "reconstruction-loop",
+      title: { vi: `cursor ${reconstruction.cursor} > 0`, en: `cursor ${reconstruction.cursor} > 0` },
+      note: { vi: "Còn một liên kết parent cần đi theo.", en: "There is another parent link to follow." },
+    });
+
+    const cursorBefore = reconstruction.cursor;
+    const start = parent[cursorBefore];
+    const piece = s.slice(start, cursorBefore);
+    reconstruction.activeLink = {
+      from: cursorBefore,
+      to: start,
+      interval: [start, cursorBefore],
+      piece,
+    };
+    pushStep({
+      line: 24,
+      phase: "reconstruction",
+      event: "follow-parent",
+      title: { vi: `Theo parent[${cursorBefore}] → ${start}`, en: `Follow parent[${cursorBefore}] → ${start}` },
+      note: { vi: `Liên kết chọn khoảng [${start}, ${cursorBefore}).`, en: `The link selects interval [${start}, ${cursorBefore}).` },
+    });
+
+    reconstruction.reversedIntervals.push([start, cursorBefore]);
+    reconstruction.reversedPieces.push(piece);
+    pushStep({
+      line: 25,
+      phase: "reconstruction",
+      event: "append-piece",
+      title: { vi: `Thêm “${piece}”`, en: `Append “${piece}”` },
+      note: { vi: "Danh sách hiện đang theo thứ tự phải-sang-trái.", en: "The list is currently in right-to-left order." },
+    });
+
+    reconstruction.cursor = start;
+    pushStep({
+      line: 26,
+      phase: "reconstruction",
+      event: "move-cursor",
+      title: { vi: `Di chuyển cursor → ${start}`, en: `Move cursor → ${start}` },
+      note: { vi: "Tiếp tục tại đầu của đoạn vừa thêm.", en: "Continue at the start of the appended piece." },
+    });
+  }
+
+  reconstruction.activeLink = null;
+  pushStep({
+    line: 23,
+    phase: "reconstruction",
+    event: "reconstruction-loop",
+    title: { vi: "cursor = 0, dừng", en: "cursor = 0, stop" },
+    note: { vi: "Điều kiện while sai; mọi liên kết đã được theo.", en: "The while condition is false; every link has been followed." },
+  });
+
+  reconstruction.orderedIntervals = [...reconstruction.reversedIntervals].reverse().map((interval) => [...interval]);
+  reconstruction.orderedPieces = [...reconstruction.reversedPieces].reverse();
+  reconstruction.complete = true;
+  pushStep({
+    line: 27,
+    phase: "reconstruction",
+    event: "reverse-partition",
+    title: { vi: "Đảo về thứ tự ban đầu", en: "Reverse into source order" },
+    note: { vi: `Partition có thứ tự: ${reconstruction.orderedPieces.join(" | ")}.`, en: `The ordered partition is: ${reconstruction.orderedPieces.join(" | ")}.` },
+  });
+
+  const answer = cuts[n];
+  pushStep({
+    line: 28,
+    phase: "done",
+    event: "done",
+    title: { vi: `Kết quả: ${answer} lần cắt`, en: `Result: ${answer} cut(s)` },
+    note: { vi: `return cuts[${n}] = ${answer}.`, en: `return cuts[${n}] = ${answer}.` },
+    answer,
     final: true,
-    codeLines: [16],
-    vars: [
-      { name: "answer", value: answer },
-      { name: `dp[${n}]`, value: answer },
-      { name: "dp", value: `[${dp.join(", ")}]` },
-    ],
-    note: {
-      vi: `return dp[${n}] = ${answer}.`,
-      en: `return dp[${n}] = ${answer}.`,
-    },
   });
 
   return { input: s, answer, steps };
@@ -14018,39 +14236,222 @@ function buildSteps10(input, params) {
   const m = s.length;
   const n = p.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
+  const known = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
   const steps = [];
+  let previousDp = dp.map((row) => row.slice());
+
+  const phaseByLine = Object.freeze({
+    3: "measure-inputs",
+    4: "initialize-table",
+    5: "seed-empty-match",
+    6: "scan-empty-pattern",
+    7: "check-empty-star",
+    8: "write-empty-zero-copy",
+    9: "scan-source-prefix",
+    10: "scan-pattern-prefix",
+    11: "check-direct-match",
+    12: "write-diagonal-match",
+    13: "check-star-token",
+    14: "write-zero-copy",
+    15: "check-star-atom",
+    16: "write-upward-repeat",
+    17: "return-answer",
+  });
+  const afterLines = new Set([3, 4, 5, 8, 12, 14, 16, 17]);
+  const writeReasonByLine = Object.freeze({
+    5: "empty-matches-empty",
+    8: "empty-pattern-zero-copy",
+    12: "direct-match-diagonal",
+    14: "star-zero-copy",
+    16: "star-upward-repeat",
+  });
+
+  function deepFreezeJson(value) {
+    const copy = JSON.parse(JSON.stringify(value));
+    function freeze(node) {
+      if (!node || typeof node !== "object" || Object.isFrozen(node)) return node;
+      Object.values(node).forEach(freeze);
+      return Object.freeze(node);
+    }
+    return freeze(copy);
+  }
+
+  function isCell(i, j) {
+    return Number.isInteger(i) && Number.isInteger(j)
+      && i >= 0 && i <= m && j >= 0 && j <= n;
+  }
+
+  function conditionFor(line, i, j, opts) {
+    const conditionVar = (opts.vars || []).find((item) => item.name === "condition");
+    const result = conditionVar ? Boolean(conditionVar.value) : null;
+    const none = { kind: "none", expression: null, result: null, operands: [] };
+
+    if (line === 6) {
+      return {
+        kind: "loop",
+        expression: "j in range(2, n + 1)",
+        result: true,
+        operands: [{ name: "j", value: j }, { name: "n", value: n }],
+      };
+    }
+    if (line === 7) {
+      return {
+        kind: "empty-star",
+        expression: "p[j - 1] == '*'",
+        result,
+        operands: [{ name: "p[j - 1]", value: j > 0 ? p[j - 1] : "" }],
+      };
+    }
+    if (line === 9) {
+      return {
+        kind: "loop",
+        expression: "i in range(1, m + 1)",
+        result: true,
+        operands: [{ name: "i", value: i }, { name: "m", value: m }],
+      };
+    }
+    if (line === 10) {
+      return {
+        kind: "loop",
+        expression: "j in range(1, n + 1)",
+        result: true,
+        operands: [{ name: "j", value: j }, { name: "n", value: n }],
+      };
+    }
+    if (line === 11) {
+      return {
+        kind: "direct-match",
+        expression: "p[j - 1] == '.' or p[j - 1] == s[i - 1]",
+        result,
+        operands: [
+          { name: "p[j - 1]", value: j > 0 ? p[j - 1] : "" },
+          { name: "s[i - 1]", value: i > 0 ? s[i - 1] : "" },
+        ],
+      };
+    }
+    if (line === 13) {
+      return {
+        kind: "star-token",
+        expression: "p[j - 1] == '*'",
+        result,
+        operands: [{ name: "p[j - 1]", value: j > 0 ? p[j - 1] : "" }],
+      };
+    }
+    if (line === 15) {
+      return {
+        kind: "star-atom-match",
+        expression: "p[j - 2] == '.' or p[j - 2] == s[i - 1]",
+        result,
+        operands: [
+          { name: "p[j - 2]", value: j >= 2 ? p[j - 2] : "" },
+          { name: "s[i - 1]", value: i > 0 ? s[i - 1] : "" },
+        ],
+      };
+    }
+    return none;
+  }
+
+  function readsFor(line, i, j) {
+    const reads = [];
+    const add = (row, col, role, matrix = dp) => {
+      if (!isCell(row, col)) return;
+      reads.push({ i: row, j: col, value: Boolean(matrix[row][col]), role });
+    };
+
+    if (line === 8) add(0, j - 2, "zero-copy");
+    if (line === 12) add(i - 1, j - 1, "diagonal");
+    if (line === 14) add(i, j - 2, "zero-copy");
+    if (line === 16) {
+      add(i, j, "zero-copy", previousDp);
+      add(i - 1, j, "upward-repeat");
+    }
+    if (line === 17) add(m, n, "final-answer");
+    return reads;
+  }
 
   function gridSnap(opts) {
+    const sourceLine = Number(opts.codeLines[0]);
     const hasActiveCell = Array.isArray(opts.hlCell);
+    const i = hasActiveCell ? opts.hlCell[0] : null;
+    const j = hasActiveCell ? opts.hlCell[1] : null;
+    const sIndex = Number.isInteger(i) && i > 0 ? i - 1 : null;
+    const pIndex = Number.isInteger(j) && j > 0 ? j - 1 : null;
+    const atomIndex = pIndex === null
+      ? null
+      : (p[pIndex] === "*" ? (pIndex > 0 ? pIndex - 1 : null) : pIndex);
     const currentVars = [];
     if (hasActiveCell) {
-      currentVars.push({ name: "i", value: opts.hlCell[0] });
-      currentVars.push({ name: "j", value: opts.hlCell[1] });
+      currentVars.push({ name: "i", value: i });
+      currentVars.push({ name: "j", value: j });
     }
     for (const item of opts.vars || []) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
+
+    const isCellWrite = Object.prototype.hasOwnProperty.call(writeReasonByLine, sourceLine)
+      && isCell(i, j);
+    if (sourceLine === 9 && isCell(i, 0)) known[i][0] = true;
+    const write = isCellWrite
+      ? {
+          i,
+          j,
+          before: Boolean(previousDp[i][j]),
+          after: Boolean(dp[i][j]),
+          reason: writeReasonByLine[sourceLine],
+        }
+      : null;
+    if (isCellWrite) known[i][j] = true;
+
+    const dpSnapshot = dp.map((row) => row.map(Boolean));
+    const knownSnapshot = known.map((row) => row.map(Boolean));
+    const condition = conditionFor(sourceLine, i, j, opts);
+    const reads = readsFor(sourceLine, i, j);
+    const answer = sourceLine === 17 ? Boolean(dp[m][n]) : null;
+    const regexMatch10View = deepFreezeJson({
+      phase: phaseByLine[sourceLine],
+      sourceLine,
+      timing: afterLines.has(sourceLine) ? "after" : "before",
+      s,
+      p,
+      m,
+      n,
+      dp: dpSnapshot,
+      known: knownSnapshot,
+      cursor: { i, j, sIndex, pIndex, atomIndex },
+      condition,
+      reads,
+      write,
+      answer,
+      finalAnswer: answer,
+    });
+
     steps.push({
       title: opts.title,
       arr: [],
       grid: {
-        dp: dp.map((row) => row.map((v) => (v ? "T" : "F"))),
+        dp: dpSnapshot.map((row) => row.map((value) => (value ? "T" : "F"))),
         text1: s,
         text2: p,
         largeCells: true,
-        hlCell: opts.hlCell || null,
-        pathCells: opts.pathCells || [],
-        cellLabels: opts.cellLabels || {},
+        hlCell: hasActiveCell ? [i, j] : null,
+        pathCells: (opts.pathCells || []).map((cell) => cell.slice()),
+        cellLabels: { ...(opts.cellLabels || {}) },
         showIndices: true,
       },
+      regexMatch10View,
       highlight: [],
       mark: [],
-      codeLines: opts.codeLines || [],
-      vars: currentVars,
+      codeLines: [sourceLine],
+      vars: currentVars.map((item) => ({ ...item })),
       note: opts.note,
       final: opts.final || false,
     });
+
+    previousDp = dpSnapshot.map((row) => row.slice());
+    if (sourceLine === 5 && n >= 1) known[0][1] = true;
+    if (sourceLine === 7 && condition.result === false && isCell(i, j)) known[i][j] = true;
+    if (sourceLine === 13 && condition.result === false && isCell(i, j)) known[i][j] = true;
   }
 
   gridSnap({
@@ -14332,39 +14733,272 @@ function buildSteps44Table(input, params) {
   const m = s.length;
   const n = p.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
+  const known = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
   const steps = [];
+  let previousDp = dp.map((row) => row.slice());
+  let previousKnown = known.map((row) => row.slice());
+
+  const phaseByLine = Object.freeze({
+    3: "measure-inputs",
+    4: "allocate-table",
+    5: "write-empty-base",
+    6: "scan-empty-prefix",
+    7: "check-leading-star",
+    8: "write-leading-star",
+    10: "stop-empty-prefix",
+    11: "start-source-row",
+    12: "scan-cell",
+    13: "check-single-token",
+    14: "write-diagonal",
+    15: "check-star",
+    16: "write-star-recurrence",
+    18: "write-literal-mismatch",
+    19: "return-answer",
+  });
+  const afterLines = new Set([3, 4, 5, 8, 10, 14, 16, 18, 19]);
+  const tokenLines = new Set([6, 7, 8, 10, 12, 13, 14, 15, 16, 18]);
+  const writeReasonByLine = Object.freeze({
+    5: "empty-matches-empty",
+    8: "leading-star-copies-left",
+    14: "single-token-copies-diagonal",
+    16: "star-empty-or-consume",
+    18: "literal-mismatch",
+  });
+
+  function deepFreezeJson(value) {
+    const copy = JSON.parse(JSON.stringify(value));
+    function freeze(node) {
+      if (!node || typeof node !== "object" || Object.isFrozen(node)) return node;
+      Object.values(node).forEach(freeze);
+      return Object.freeze(node);
+    }
+    return freeze(copy);
+  }
+
+  function isCell(i, j) {
+    return Number.isInteger(i) && Number.isInteger(j)
+      && i >= 0 && i <= m && j >= 0 && j <= n;
+  }
+
+  function currentTokenFor(sourceLine, pIndex) {
+    if (!tokenLines.has(sourceLine) || !Number.isInteger(pIndex) || pIndex < 0 || pIndex >= n) {
+      return { index: null, value: null, kind: "none" };
+    }
+    const value = p[pIndex];
+    const kind = value === "?" ? "question" : (value === "*" ? "star" : "literal");
+    return { index: pIndex, value, kind };
+  }
+
+  function conditionBranch(kind, expression, result, operands) {
+    return { kind, expression, result: Boolean(result), operands };
+  }
+
+  function conditionFor(sourceLine, i, j) {
+    const none = { kind: "none", expression: null, result: null, operands: [], branches: [] };
+    if (sourceLine === 6) {
+      return {
+        kind: "loop",
+        expression: "j in range(1, n + 1)",
+        result: true,
+        operands: [{ name: "j", value: j }, { name: "n", value: n }],
+        branches: [],
+      };
+    }
+    if (sourceLine === 7) {
+      const value = isCell(i, j) && j > 0 ? p[j - 1] : null;
+      const result = value === "*";
+      return {
+        kind: "leading-star",
+        expression: "p[j - 1] == '*'",
+        result,
+        operands: [{ name: "p[j - 1]", value }],
+        branches: [conditionBranch("star", "p[j - 1] == '*'", result, [{ name: "token", value }])],
+      };
+    }
+    if (sourceLine === 11) {
+      return {
+        kind: "loop",
+        expression: "i in range(1, m + 1)",
+        result: true,
+        operands: [{ name: "i", value: i }, { name: "m", value: m }],
+        branches: [],
+      };
+    }
+    if (sourceLine === 12) {
+      return {
+        kind: "loop",
+        expression: "j in range(1, n + 1)",
+        result: true,
+        operands: [{ name: "j", value: j }, { name: "n", value: n }],
+        branches: [],
+      };
+    }
+    if (sourceLine === 13) {
+      const patternToken = isCell(i, j) && j > 0 ? p[j - 1] : null;
+      const sourceToken = isCell(i, j) && i > 0 ? s[i - 1] : null;
+      const questionResult = patternToken === "?";
+      const literalResult = patternToken === sourceToken;
+      return {
+        kind: "single-token",
+        expression: "p[j - 1] == '?' or p[j - 1] == s[i - 1]",
+        result: questionResult || literalResult,
+        operands: [
+          { name: "p[j - 1]", value: patternToken },
+          { name: "s[i - 1]", value: sourceToken },
+        ],
+        branches: [
+          conditionBranch("question", "p[j - 1] == '?'", questionResult, [{ name: "token", value: patternToken }]),
+          conditionBranch("literal", "p[j - 1] == s[i - 1]", literalResult, [
+            { name: "pattern", value: patternToken },
+            { name: "source", value: sourceToken },
+          ]),
+        ],
+      };
+    }
+    if (sourceLine === 15) {
+      const value = isCell(i, j) && j > 0 ? p[j - 1] : null;
+      const result = value === "*";
+      return {
+        kind: "star",
+        expression: "p[j - 1] == '*'",
+        result,
+        operands: [{ name: "p[j - 1]", value }],
+        branches: [conditionBranch("star", "p[j - 1] == '*'", result, [{ name: "token", value }])],
+      };
+    }
+    return none;
+  }
+
+  function readsFor(sourceLine, i, j) {
+    const reads = [];
+    const add = (row, column, role, matrix = previousDp, knownMatrix = previousKnown) => {
+      if (!isCell(row, column)) return;
+      reads.push({
+        i: row,
+        j: column,
+        role,
+        known: Boolean(knownMatrix[row][column]),
+        value: Boolean(matrix[row][column]),
+      });
+    };
+
+    if (sourceLine === 8) add(0, j - 1, "left");
+    if (sourceLine === 14) add(i - 1, j - 1, "diagonal");
+    if (sourceLine === 16) {
+      add(i, j - 1, "empty");
+      add(i - 1, j, "consume");
+    }
+    if (sourceLine === 19) add(m, n, "final", dp, known);
+    return reads;
+  }
+
+  function resolveInvariants(sourceLine, i, j) {
+    const invariantResolutions = [];
+    const resolve = (row, column, reason) => {
+      if (!isCell(row, column) || known[row][column]) return;
+      invariantResolutions.push({
+        i: row,
+        j: column,
+        beforeKnown: Boolean(previousKnown[row][column]),
+        beforeValue: Boolean(previousDp[row][column]),
+        value: Boolean(dp[row][column]),
+        reason,
+      });
+      known[row][column] = true;
+    };
+
+    if (sourceLine === 10 && i === 0 && Number.isInteger(j)) {
+      for (let column = j; column <= n; column++) {
+        resolve(0, column, "non-star-empty-prefix-and-suffix");
+      }
+    }
+    if (sourceLine === 11 && Number.isInteger(i)) {
+      resolve(i, 0, "nonempty-source-cannot-match-empty-pattern");
+    }
+    return invariantResolutions;
+  }
 
   function gridSnap(opts) {
+    const sourceLine = Number((opts.codeLines || [])[0]);
     const hasActiveCell = Array.isArray(opts.hlCell);
+    const i = hasActiveCell && Number.isInteger(opts.hlCell[0]) ? opts.hlCell[0] : null;
+    const j = hasActiveCell && Number.isInteger(opts.hlCell[1]) ? opts.hlCell[1] : null;
+    const sIndex = Number.isInteger(i) && i > 0 ? i - 1 : null;
+    const pIndex = Number.isInteger(j) && j > 0 ? j - 1 : null;
     const currentVars = [];
     if (hasActiveCell) {
-      currentVars.push({ name: "i", value: opts.hlCell[0] });
-      currentVars.push({ name: "j", value: opts.hlCell[1] });
+      currentVars.push({ name: "i", value: i });
+      currentVars.push({ name: "j", value: j });
     }
     for (const item of opts.vars || []) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
+
+    const invariantResolutions = resolveInvariants(sourceLine, i, j);
+    const isWrite = Object.prototype.hasOwnProperty.call(writeReasonByLine, sourceLine) && isCell(i, j);
+    const write = isWrite
+      ? {
+          i,
+          j,
+          beforeKnown: Boolean(previousKnown[i][j]),
+          beforeValue: Boolean(previousDp[i][j]),
+          afterValue: Boolean(dp[i][j]),
+          reason: writeReasonByLine[sourceLine],
+        }
+      : null;
+    if (isWrite) known[i][j] = true;
+
+    const dpSnapshot = dp.map((row) => row.map(Boolean));
+    const knownSnapshot = known.map((row) => row.map(Boolean));
+    const condition = conditionFor(sourceLine, i, j);
+    const reads = readsFor(sourceLine, i, j);
+    const answer = sourceLine === 19 ? Boolean(dp[m][n]) : null;
+    const wildcardMatch44View = deepFreezeJson({
+      approach: "table",
+      phase: phaseByLine[sourceLine] || "unknown",
+      sourceLine,
+      timing: afterLines.has(sourceLine) ? "after" : "before",
+      s,
+      p,
+      m,
+      n,
+      dp: dpSnapshot,
+      known: knownSnapshot,
+      cursor: { i, j, sIndex, pIndex },
+      currentToken: currentTokenFor(sourceLine, pIndex),
+      condition,
+      reads,
+      write,
+      invariantResolutions,
+      answer,
+      finalAnswer: answer,
+    });
+
     steps.push({
       title: opts.title,
       arr: [],
       grid: {
-        dp: dp.map((row) => row.map((v) => (v ? "T" : "F"))),
+        dp: dpSnapshot.map((row) => row.map((value) => (value ? "T" : "F"))),
         text1: s,
         text2: p,
         largeCells: true,
-        hlCell: opts.hlCell || null,
+        hlCell: hasActiveCell ? [i, j] : null,
         pathCells: opts.pathCells || [],
         cellLabels: opts.cellLabels || {},
         showIndices: true,
       },
+      wildcardMatch44View,
       highlight: [],
       mark: [],
-      codeLines: opts.codeLines || [],
+      codeLines: [sourceLine],
       vars: currentVars,
       note: opts.note,
       final: opts.final || false,
     });
+
+    previousDp = dpSnapshot.map((row) => row.slice());
+    previousKnown = knownSnapshot.map((row) => row.slice());
   }
 
   gridSnap({
@@ -21490,37 +22124,51 @@ module.exports = {
     title: { vi: "Palindrome Partitioning II", en: "Palindrome Partitioning II" },
     titleVi: { vi: "Số cắt tối thiểu (palindrome)", en: "Min cuts for palindrome partitioning" },
     statement: {
-      vi: "Cho chuỗi s, trả về SỐ CẮT TỐI THIỂU để chia s thành các đoạn con đều là palindrome. Nhập chuỗi chữ thường.",
-      en: "Given a string s, return the MINIMUM number of cuts so every substring in the partition is a palindrome. Enter a lowercase string.",
+      vi: "Cho chuỗi s gồm 1-16 chữ thường a-z, trả về SỐ CẮT TỐI THIỂU để mọi đoạn trong partition đều là palindrome.",
+      en: "Given a string s of 1-16 lowercase a-z letters, return the MINIMUM cuts so every piece in the partition is a palindrome.",
     },
     defaultInput: "aab",
     inputKind: "string",
-    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    inputLabel: { vi: "Chuỗi s (1-16 chữ thường a-z)", en: "String s (1-16 lowercase a-z letters)" },
     extraParams: [],
+    debugMode: "line-by-line",
     approach: [
-      { vi: "Tiền xử lý isPalin[i][j] = s[i..j] có phải palindrome không (DP 2D O(n²)).", en: "Precompute isPalin[i][j] = whether s[i..j] is a palindrome (2D DP O(n²))." },
-      { vi: "dp[i] = số cắt tối thiểu cho s[0..i-1]. dp[0] = -1 (base). dp[i] = min(dp[j]+1) với mọi j mà s[j..i-1] palindrome.", en: "dp[i] = min cuts for s[0..i-1]. dp[0] = -1 (base). dp[i] = min(dp[j]+1) for all j where s[j..i-1] is a palindrome." },
-      { vi: "Đáp án = dp[n].", en: "Answer = dp[n]." },
+      { vi: "Điền bảng palindrome theo start giảm dần để trạng thái phần trong đã sẵn sàng.", en: "Fill the palindrome table with decreasing starts so every inner interval is ready." },
+      { vi: "cuts[end] lấy cuts[start] + 1 khi s[start:end] là palindrome; chỉ cải thiện nghiêm ngặt để giữ parent đầu tiên khi hòa.", en: "cuts[end] uses cuts[start] + 1 when s[start:end] is a palindrome; strict improvements preserve the first parent on ties." },
+      { vi: "Theo parent từ phải sang trái, rồi đảo partition; đáp án vẫn là cuts[n].", en: "Follow parent links right to left, then reverse the partition; the answer remains cuts[n]." },
     ],
-    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "n² cho isPalin + n² cho dp fill.", en: "n² for isPalin + n² for dp fill." } },
+    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "O(n²) cho bảng palindrome và duyệt mọi candidate; parent/cuts dùng O(n).", en: "O(n²) for the palindrome table and all candidates; parent/cuts use O(n)." } },
     code: [
       "class Solution:",
-      "    def minCut(self, s):",
+      "    def minCut(self, s: str) -> int:",
       "        n = len(s)",
-      "        # Precompute isPalin[i][j]",
-      "        isPalin = [[False]*n for _ in range(n)]",
-      "        for i in range(n-1, -1, -1):",
-      "            for j in range(i, n):",
-      "                if s[i]==s[j] and (j-i<=2 or isPalin[i+1][j-1]):",
-      "                    isPalin[i][j] = True",
-      "        # DP",
-      "        dp = list(range(-1, n))  # dp[0]=-1, dp[1]=0,...",
-      "        for i in range(1, n+1):",
-      "            for j in range(i):",
-      "                if isPalin[j][i-1]:",
-      "                    dp[i] = min(dp[i], dp[j] + 1)",
-      "        return dp[n]",
+      "        is_palindrome = [[False] * n for _ in range(n)]",
+      "        for start in range(n - 1, -1, -1):",
+      "            for end in range(start, n):",
+      "                if s[start] == s[end] and (",
+      "                    end - start <= 2 or is_palindrome[start + 1][end - 1]",
+      "                ):",
+      "                    is_palindrome[start][end] = True",
+      "        cuts = [float('inf')] * (n + 1)",
+      "        cuts[0] = -1",
+      "        parent = [-1] * (n + 1)",
+      "        for end in range(1, n + 1):",
+      "            for start in range(end):",
+      "                if is_palindrome[start][end - 1]:",
+      "                    candidate = cuts[start] + 1",
+      "                    if candidate < cuts[end]:",
+      "                        cuts[end] = candidate",
+      "                        parent[end] = start",
+      "        partition = []",
+      "        cursor = n",
+      "        while cursor > 0:",
+      "            start = parent[cursor]",
+      "            partition.append(s[start:cursor])",
+      "            cursor = start",
+      "        partition.reverse()",
+      "        return cuts[n]",
     ],
+    liveArgs: (input) => [parsePalindromeCuts132Input(input)],
     builder: buildSteps132,
   },
   139: {

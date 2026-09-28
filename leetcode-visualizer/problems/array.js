@@ -2281,12 +2281,35 @@ function buildSteps85(input) {
     throw new Error("Matrix must be rectangular and contain only 0/1.");
   }
   if (matrix.length > 8 || matrix[0].length > 8) throw new Error("Visualization for 85 supports matrices up to 8 x 8.");
+
   const rows = matrix.length;
   const cols = matrix[0].length;
-  const heights = new Array(cols).fill(0);
   const steps = [];
+  let heights = [];
   let maxArea = 0;
   let bestRect = null;
+  let lastBars = [];
+  let lastStack = [];
+
+  function cloneRect(rect) {
+    if (!rect) return null;
+    const copy = {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+    };
+    for (const key of ["height", "width", "area"]) {
+      if (Number.isFinite(rect[key])) copy[key] = rect[key];
+    }
+    return copy;
+  }
+
+  function deepFreeze(value) {
+    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+    Object.values(value).forEach(deepFreeze);
+    return Object.freeze(value);
+  }
 
   function rectCells(rect) {
     if (!rect) return [];
@@ -2297,18 +2320,18 @@ function buildSteps85(input) {
     return cells;
   }
 
-  function stackLabel(stack) {
-    return `[${stack.map((i) => `${i}:${i < cols ? heights[i] : 0}`).join(", ")}]`;
-  }
-
   function rectLabel(rect, fallback = "none") {
     return rect ? `rows ${rect.top}-${rect.bottom}, cols ${rect.left}-${rect.right}` : fallback;
   }
 
-  function labelCells({ row, col, candidate, best, currentLabel }) {
+  function stackLabel(stack, bars) {
+    return `[${stack.map((index) => `${index}:${bars[index] ?? 0}`).join(", ")}]`;
+  }
+
+  function labelCells({ row, col, candidateRect, currentLabel }) {
     const labels = {};
-    if (best) labels[`${best.top},${best.left}`] = { vi: "best", en: "best" };
-    if (candidate) labels[`${candidate.top},${candidate.left}`] = { vi: "cand", en: "cand" };
+    if (bestRect) labels[`${bestRect.top},${bestRect.left}`] = { vi: "best", en: "best" };
+    if (candidateRect) labels[`${candidateRect.top},${candidateRect.left}`] = { vi: "cand", en: "cand" };
     if (Number.isInteger(row) && Number.isInteger(col) && row < rows && col < cols) {
       labels[`${row},${col}`] = currentLabel || { vi: "đang xét", en: "current" };
     }
@@ -2317,15 +2340,29 @@ function buildSteps85(input) {
 
   function push({
     title,
-    codeLines,
+    line,
+    phase,
+    event,
+    timing = "after",
     row = null,
     col = null,
+    histogramIndex = null,
+    heightsView = heights,
+    bars = [],
     stack = [],
+    cellValue = null,
+    oldHeight = null,
+    newHeight = null,
+    current = null,
+    whileResult = null,
     popped = null,
-    left = null,
-    right = null,
-    candidate = null,
-    showBest = true,
+    boundaries = null,
+    width = null,
+    candidateArea = null,
+    candidateRect = null,
+    previousBest = maxArea,
+    previousBestRect = bestRect,
+    improved = null,
     final = false,
     vars = [],
     note,
@@ -2333,17 +2370,25 @@ function buildSteps85(input) {
     secondaryCaption,
     currentLabel,
   }) {
-    const visibleRect = candidate || (showBest ? bestRect : null);
-    const span = Number.isInteger(left) && Number.isInteger(right)
+    const heightSnapshot = [...heightsView];
+    const barsSnapshot = [...bars];
+    const stackSnapshot = [...stack];
+    const candidateSnapshot = cloneRect(candidateRect);
+    const bestSnapshot = cloneRect(bestRect);
+    const previousBestRectSnapshot = cloneRect(previousBestRect);
+    const visibleRect = candidateSnapshot || bestSnapshot;
+    const left = boundaries && Number.isInteger(boundaries.left) ? boundaries.left : null;
+    const right = boundaries && Number.isInteger(boundaries.right) ? boundaries.right : null;
+    const span = left !== null && right !== null
       ? Array.from({ length: Math.max(0, right - left + 1) }, (_, offset) => left + offset)
       : [];
     const gridStep = matrixStep2D(matrix, {
       title,
-      codeLines,
+      codeLines: [line],
       final,
       vars: [
-        { name: "heights", value: `[${heights.join(",")}]` },
-        { name: "stack", value: stackLabel(stack) },
+        { name: "heights", value: `[${heightSnapshot.join(",")}]` },
+        { name: "stack", value: stackLabel(stackSnapshot, barsSnapshot) },
         { name: "max_area", value: maxArea },
         ...vars,
       ],
@@ -2352,225 +2397,368 @@ function buildSteps85(input) {
         hlCell: Number.isInteger(row) && Number.isInteger(col) ? [row, col] : null,
         pathCells: rectCells(visibleRect),
         historyCells: Number.isInteger(row)
-          ? Array.from({ length: row }, (_, r) => matrix[r].map((_, c) => [r, c])).flat()
+          ? Array.from({ length: row }, (_, historyRow) => matrix[historyRow].map((_, historyCol) => [historyRow, historyCol])).flat()
           : [],
-        cellLabels: labelCells({ row, col, candidate, best: showBest ? bestRect : null, currentLabel }),
+        cellLabels: labelCells({ row, col, candidateRect: candidateSnapshot, currentLabel }),
         caption: caption || { vi: "Ma trận nhị phân", en: "Binary matrix" },
         secondaryCaption,
       },
     });
-    gridStep.arr = [...heights];
-    gridStep.sub = heights.map((_, index) => `[${index}]`);
-    gridStep.highlight = [...span.filter((i) => i >= 0 && i < cols)];
+
+    gridStep.arr = [...heightSnapshot];
+    gridStep.sub = heightSnapshot.map((_, index) => `[${index}]`);
+    gridStep.highlight = [...span.filter((index) => index >= 0 && index < cols)];
     if (Number.isInteger(col) && col < cols) gridStep.highlight.push(col);
-    if (Number.isInteger(popped) && popped < cols) gridStep.highlight.push(popped);
-    gridStep.mark = final && bestRect ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, offset) => bestRect.left + offset) : [];
+    if (popped && Number.isInteger(popped.index) && popped.index < cols) gridStep.highlight.push(popped.index);
+    gridStep.mark = final && bestSnapshot
+      ? Array.from({ length: bestSnapshot.right - bestSnapshot.left + 1 }, (_, offset) => bestSnapshot.left + offset)
+      : [];
+
+    const sentinelIndex = barsSnapshot.length === cols + 1 ? cols : null;
+    const normalizedCurrent = {
+      index: current && Number.isInteger(current.index) ? current.index : null,
+      height: current && Number.isFinite(current.height) ? current.height : null,
+    };
+    const normalizedPopped = {
+      index: popped && Number.isInteger(popped.index) ? popped.index : null,
+      height: popped && Number.isFinite(popped.height) ? popped.height : null,
+    };
+    const boundarySnapshot = { left, right };
+    const cell = { value: cellValue, oldHeight, newHeight };
+    const candidate = { area: candidateArea, rect: candidateSnapshot };
+
+    gridStep.maximalRectangle85View = deepFreeze({
+      version: 1,
+      phase,
+      event,
+      sourceLine: line,
+      timing,
+      matrix: matrix.map((matrixRow) => [...matrixRow]),
+      rows,
+      cols,
+      cursor: {
+        row: Number.isInteger(row) ? row : null,
+        col: Number.isInteger(col) ? col : null,
+        histogramIndex: Number.isInteger(histogramIndex) ? histogramIndex : null,
+        sentinel: histogramIndex === cols,
+      },
+      cell,
+      cellValue,
+      oldHeight,
+      newHeight,
+      heights: heightSnapshot,
+      bars: barsSnapshot,
+      sentinelIndex,
+      stack: stackSnapshot,
+      stackTop: stackSnapshot.length ? stackSnapshot[stackSnapshot.length - 1] : null,
+      stackTopHeight: stackSnapshot.length ? (barsSnapshot[stackSnapshot[stackSnapshot.length - 1]] ?? null) : null,
+      current: normalizedCurrent,
+      currentIndex: normalizedCurrent.index,
+      currentHeight: normalizedCurrent.height,
+      whileResult,
+      popped: normalizedPopped,
+      poppedIndex: normalizedPopped.index,
+      poppedHeight: normalizedPopped.height,
+      boundaries: boundarySnapshot,
+      leftBoundary: left,
+      rightBoundary: right,
+      width,
+      candidate,
+      candidateArea,
+      candidateRect: candidateSnapshot,
+      previousBest,
+      previousBestRect: previousBestRectSnapshot,
+      maxArea,
+      improved,
+      bestRect: bestSnapshot,
+    });
     steps.push(gridStep);
   }
 
   push({
-    title: { vi: "Khởi tạo heights = 0", en: "Initialize heights = 0" },
-    codeLines: [3, 4, 5],
-    vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
-    secondaryCaption: { vi: "heights[c] = số lượng 1 liên tiếp kết thúc tại hàng hiện tại.", en: "heights[c] = consecutive 1s ending at the current row." },
-    note: { vi: "Mỗi hàng biến thành một histogram. Sau khi cập nhật heights của hàng r, bài toán trên hàng đó trở thành Largest Rectangle in Histogram.", en: "Each row becomes a histogram. After updating heights for row r, that row becomes a Largest Rectangle in Histogram problem." },
+    title: { vi: "Kiểm tra ma trận không rỗng", en: "Check that the matrix is nonempty" },
+    line: 3,
+    phase: "guard",
+    event: "check-matrix",
+    timing: "before",
+    heightsView: [],
+    vars: [{ name: "matrix empty", value: false }, { name: "rows,cols", value: `${rows},${cols}` }],
+    secondaryCaption: { vi: `Ma trận hợp lệ có ${rows} hàng và ${cols} cột.`, en: `The valid matrix has ${rows} rows and ${cols} columns.` },
+    note: { vi: "Parser đã xác nhận ma trận nhị phân không rỗng trước khi tạo trace.", en: "The parser validated a nonempty binary matrix before creating the trace." },
+  });
+
+  heights = new Array(cols).fill(0);
+  push({
+    title: { vi: "Tạo histogram heights", en: "Allocate the heights histogram" },
+    line: 4,
+    phase: "initialize",
+    event: "allocate-heights",
+    vars: [{ name: "cols", value: cols }],
+    secondaryCaption: { vi: `heights = [${heights.join(", ")}]`, en: `heights = [${heights.join(", ")}]` },
+    note: { vi: "Mỗi cột bắt đầu với chiều cao 0.", en: "Every column starts at height 0." },
+  });
+
+  push({
+    title: { vi: "Khởi tạo best = 0", en: "Initialize best = 0" },
+    line: 5,
+    phase: "initialize",
+    event: "initialize-best",
+    vars: [{ name: "best", value: 0 }],
+    secondaryCaption: { vi: "Chưa có rectangle ứng viên.", en: "No candidate rectangle exists yet." },
+    note: { vi: "Chỉ diện tích lớn hơn best mới thay thế rectangle tốt nhất.", en: "Only an area strictly greater than best replaces the global rectangle." },
   });
 
   for (let r = 0; r < rows; r++) {
     push({
-      title: { vi: `Bắt đầu hàng ${r}`, en: `Start row ${r}` },
-      codeLines: [6],
+      title: { vi: `Chọn hàng ${r}`, en: `Select row ${r}` },
+      line: 6,
+      phase: "row",
+      event: "select-row",
+      timing: "before",
       row: r,
-      showBest: Boolean(bestRect),
       vars: [{ name: "row", value: r }],
-      caption: { vi: `Cập nhật histogram cho hàng ${r}`, en: `Update histogram for row ${r}` },
-      secondaryCaption: { vi: "Ô 1 kéo dài cột histogram; ô 0 cắt đứt cột đó.", en: "A 1 extends the histogram bar; a 0 resets that bar." },
-      note: { vi: `Ta chỉ xét các rectangle có đáy nằm tại hàng ${r}.`, en: `Now consider rectangles whose bottom edge is row ${r}.` },
+      caption: { vi: `Hàng hoạt động ${r}`, en: `Active row ${r}` },
+      secondaryCaption: { vi: "Cập nhật histogram từ trái sang phải.", en: "Update the histogram from left to right." },
+      note: { vi: `Mọi rectangle được chốt trong lượt này có đáy ở hàng ${r}.`, en: `Every rectangle closed in this pass has bottom row ${r}.` },
     });
 
     for (let c = 0; c < cols; c++) {
       const oldHeight = heights[c];
-      heights[c] = matrix[r][c] === "1" ? heights[c] + 1 : 0;
+      const newHeight = matrix[r][c] === "1" ? oldHeight + 1 : 0;
+      const currentLabel = { vi: matrix[r][c] === "1" ? "+1" : "reset", en: matrix[r][c] === "1" ? "+1" : "reset" };
+
       push({
-        title: { vi: `heights[${c}]: ${oldHeight} → ${heights[c]}`, en: `heights[${c}]: ${oldHeight} → ${heights[c]}` },
-        codeLines: [7, 8],
+        title: { vi: `Đọc ô (${r},${c}) trước khi ghi`, en: `Read cell (${r},${c}) before writing` },
+        line: 7,
+        phase: "heights",
+        event: "read-cell",
+        timing: "before",
         row: r,
         col: c,
-        vars: [
-          { name: "matrix[r][c]", value: matrix[r][c] },
-          { name: "old height", value: oldHeight },
-          { name: "new height", value: heights[c] },
-        ],
-        currentLabel: { vi: matrix[r][c] === "1" ? "+1" : "reset", en: matrix[r][c] === "1" ? "+1" : "reset" },
-        secondaryCaption: { vi: `Sau ô (${r},${c}), heights = [${heights.join(", ")}]`, en: `After cell (${r},${c}), heights = [${heights.join(", ")}]` },
-        note: { vi: matrix[r][c] === "1" ? "Gặp 1 nên tăng chiều cao histogram ở cột này." : "Gặp 0 nên không rectangle toàn 1 nào đi xuyên qua ô này; reset về 0.", en: matrix[r][c] === "1" ? "A 1 extends this histogram bar." : "A 0 blocks any all-1 rectangle through this cell, so reset to 0." },
+        cellValue: matrix[r][c],
+        oldHeight,
+        newHeight,
+        currentLabel,
+        vars: [{ name: "value", value: matrix[r][c] }, { name: "old height", value: oldHeight }, { name: "next height", value: newHeight }],
+        secondaryCaption: { vi: `Trước ghi: heights[${c}] = ${oldHeight}.`, en: `Before the write: heights[${c}] = ${oldHeight}.` },
+        note: { vi: "Dòng 7 chọn đúng ô; heights vẫn chưa thay đổi.", en: "Line 7 selects the cell; heights has not changed yet." },
+      });
+
+      heights[c] = newHeight;
+      push({
+        title: { vi: `Ghi heights[${c}]: ${oldHeight} → ${newHeight}`, en: `Write heights[${c}]: ${oldHeight} → ${newHeight}` },
+        line: 8,
+        phase: "heights",
+        event: "write-height",
+        row: r,
+        col: c,
+        cellValue: matrix[r][c],
+        oldHeight,
+        newHeight,
+        currentLabel,
+        vars: [{ name: "value", value: matrix[r][c] }, { name: "old height", value: oldHeight }, { name: "new height", value: newHeight }],
+        secondaryCaption: { vi: `Sau ghi: heights = [${heights.join(", ")}].`, en: `After the write: heights = [${heights.join(", ")}].` },
+        note: { vi: matrix[r][c] === "1" ? "Ô 1 kéo dài bar thêm một hàng." : "Ô 0 cắt bar và reset chiều cao.", en: matrix[r][c] === "1" ? "A 1 extends the bar by one row." : "A 0 cuts the bar and resets its height." },
       });
     }
 
     const stack = [];
     const bars = [...heights, 0];
     push({
-      title: { vi: `Xử lý histogram của hàng ${r}`, en: `Process row ${r}'s histogram` },
-      codeLines: [9, 10],
+      title: { vi: `Tạo stack rỗng cho hàng ${r}`, en: `Allocate an empty stack for row ${r}` },
+      line: 9,
+      phase: "histogram",
+      event: "allocate-stack",
       row: r,
-      vars: [{ name: "row", value: r }],
-      caption: { vi: `Histogram đáy ở hàng ${r}`, en: `Histogram ending at row ${r}` },
-      secondaryCaption: { vi: `bars = heights + [0] = [${bars.join(", ")}]`, en: `bars = heights + [0] = [${bars.join(", ")}]` },
-      note: { vi: "Thêm cột sentinel 0 ở cuối để xả stack và tính hết các rectangle còn mở.", en: "Append a sentinel 0 bar to flush the stack and evaluate all still-open rectangles." },
+      bars,
+      stack,
+      vars: [{ name: "stack", value: "[]" }],
+      caption: { vi: `Histogram của hàng ${r}`, en: `Histogram for row ${r}` },
+      secondaryCaption: { vi: `bars = [${bars.join(", ")}], cột cuối là sentinel.`, en: `bars = [${bars.join(", ")}], with a final sentinel.` },
+      note: { vi: "Dòng 9 chỉ tạo stack; chưa chọn hay push bar nào.", en: "Line 9 only allocates the stack; no bar is selected or pushed yet." },
     });
 
     for (let i = 0; i <= cols; i++) {
+      const current = { index: i, height: bars[i] };
       push({
         title: i === cols
-          ? { vi: `Duyệt sentinel i=${i}`, en: `Scan sentinel i=${i}` }
-          : { vi: `Duyệt cột i=${i}, height=${bars[i]}`, en: `Scan column i=${i}, height=${bars[i]}` },
-        codeLines: [10],
+          ? { vi: `Chọn sentinel ${i}`, en: `Select sentinel ${i}` }
+          : { vi: `Chọn bar ${i}, cao ${bars[i]}`, en: `Select bar ${i}, height ${bars[i]}` },
+        line: 10,
+        phase: "histogram",
+        event: "select-bar",
+        timing: "before",
         row: r,
         col: i < cols ? i : null,
+        histogramIndex: i,
+        bars,
         stack,
-        showBest: Boolean(bestRect),
-        vars: [{ name: "i", value: i === cols ? "sentinel" : i }, { name: "h", value: bars[i] }],
+        current,
+        vars: [{ name: "i", value: i }, { name: "h", value: bars[i] }, { name: "sentinel", value: i === cols }],
         secondaryCaption: i === cols
-          ? { vi: "Sentinel height 0 buộc các cột còn lại bị pop.", en: "The height-0 sentinel forces remaining bars to pop." }
-          : { vi: `So sánh height ${bars[i]} với đỉnh stack.`, en: `Compare height ${bars[i]} with the stack top.` },
-        note: { vi: "Stack lưu index các cột có height tăng dần.", en: "The stack stores column indices in increasing height order." },
+          ? { vi: "Sentinel cao 0 xả mọi bar thật còn lại.", en: "The height-0 sentinel flushes every remaining real bar." }
+          : { vi: `So sánh bar ${i} với đỉnh stack.`, en: `Compare bar ${i} with the stack top.` },
+        note: { vi: "Mỗi bar thật và sentinel được chọn đúng một lần.", en: "Every real bar and the sentinel is selected exactly once." },
       });
 
       while (true) {
         const topIndex = stack.length ? stack[stack.length - 1] : null;
         const shouldPop = topIndex !== null && bars[topIndex] >= bars[i];
         push({
-          title: { vi: `Kiểm tra while → ${shouldPop}`, en: `Evaluate while → ${shouldPop}` },
-          codeLines: [11],
+          title: { vi: `Điều kiện pop là ${shouldPop}`, en: `Pop condition is ${shouldPop}` },
+          line: 11,
+          phase: "stack",
+          event: "evaluate-pop-condition",
+          timing: "before",
           row: r,
           col: i < cols ? i : null,
+          histogramIndex: i,
+          bars,
           stack,
-          popped: topIndex,
-          showBest: Boolean(bestRect),
+          current,
+          whileResult: shouldPop,
           vars: topIndex === null
-            ? [{ name: "condition", value: false }]
-            : [
-                { name: "stack[-1]", value: topIndex },
-                { name: `bars[${topIndex}] >= h`, value: `${bars[topIndex]} >= ${bars[i]} → ${shouldPop}` },
-              ],
+            ? [{ name: "stack nonempty", value: false }, { name: "while result", value: false }]
+            : [{ name: "stack[-1]", value: topIndex }, { name: "comparison", value: `${bars[topIndex]} >= ${bars[i]}` }, { name: "while result", value: shouldPop }],
           secondaryCaption: shouldPop
-            ? { vi: "Current thấp hơn/bằng đỉnh stack, nên pop để chốt rectangle của đỉnh đó.", en: "Current is lower/equal to the stack top, so pop to close that top bar's rectangle." }
-            : { vi: "Điều kiện sai, có thể push current vào stack.", en: "Condition is false, so current can be pushed." },
-          note: shouldPop
-            ? { vi: `Cột ${i === cols ? "sentinel" : i} là biên phải đầu tiên làm height ${bars[topIndex]} không thể kéo tiếp.`, en: `Column ${i === cols ? "sentinel" : i} is the first right boundary that blocks height ${bars[topIndex]}.` }
-            : topIndex === null
-              ? { vi: "Stack rỗng, không có gì để pop.", en: "The stack is empty; nothing to pop." }
-              : { vi: `Height ${bars[topIndex]} < ${bars[i]}, stack vẫn tăng.`, en: `Height ${bars[topIndex]} < ${bars[i]}, so the stack remains increasing.` },
+            ? { vi: "TRUE: pop bar đỉnh và chốt hình học.", en: "TRUE: pop the top bar and close its geometry." }
+            : { vi: "FALSE: dừng pop và chuẩn bị push current.", en: "FALSE: stop popping and prepare to push current." },
+          note: topIndex === null
+            ? { vi: "Stack rỗng nên điều kiện là false.", en: "The stack is empty, so the condition is false." }
+            : { vi: `So sánh ${bars[topIndex]} >= ${bars[i]} tại các index ${topIndex} và ${i}.`, en: `Compare ${bars[topIndex]} >= ${bars[i]} at indices ${topIndex} and ${i}.` },
         });
 
         if (!shouldPop) break;
 
         const top = stack.pop();
         const height = bars[top];
+        const popped = { index: top, height };
         push({
-          title: { vi: `top = stack.pop() → ${top}`, en: `top = stack.pop() → ${top}` },
-          codeLines: [12],
+          title: { vi: `Pop bar ${top} cao ${height}`, en: `Pop bar ${top} at height ${height}` },
+          line: 12,
+          phase: "stack",
+          event: "pop-bar",
           row: r,
           col: i < cols ? i : null,
+          histogramIndex: i,
+          bars,
           stack,
-          popped: top,
-          showBest: Boolean(bestRect),
+          current,
+          popped,
           vars: [{ name: "top", value: top }, { name: "height", value: height }],
-          secondaryCaption: { vi: `Cột ${top} cao ${height} đã có biên phải là ${i - 1}.`, en: `Column ${top} with height ${height} now has right boundary ${i - 1}.` },
-          note: { vi: "Sau khi pop, đỉnh stack mới sẽ cho biết biên trái gần nhất thấp hơn height này.", en: "After popping, the new stack top gives the nearest lower left boundary for this height." },
+          secondaryCaption: { vi: `Stack sau pop: ${stackLabel(stack, bars)}.`, en: `Stack after pop: ${stackLabel(stack, bars)}.` },
+          note: { vi: "Đỉnh stack mới xác định bar thấp hơn gần nhất ở bên trái.", en: "The new stack top identifies the nearest lower bar on the left." },
         });
 
         const left = stack.length ? stack[stack.length - 1] + 1 : 0;
         const right = i - 1;
         const width = right - left + 1;
         const area = height * width;
-        const candidate = height > 0 ? { top: r - height + 1, bottom: r, left, right } : null;
+        const candidateRect = height > 0
+          ? { top: r - height + 1, bottom: r, left, right, height, width, area }
+          : null;
+        const boundaries = { left, right };
         push({
-          title: { vi: `Rectangle ứng viên: ${height} × ${width} = ${area}`, en: `Candidate rectangle: ${height} × ${width} = ${area}` },
-          codeLines: [13],
+          title: { vi: `Ứng viên ${height} × ${width} = ${area}`, en: `Candidate ${height} × ${width} = ${area}` },
+          line: 13,
+          phase: "geometry",
+          event: "measure-candidate",
           row: r,
           col: i < cols ? i : null,
+          histogramIndex: i,
+          bars,
           stack,
-          popped: top,
-          left,
-          right,
-          candidate,
-          showBest: Boolean(bestRect),
-          vars: [
-            { name: "left", value: left },
-            { name: "right", value: right },
-            { name: "width", value: width },
-            { name: "height", value: height },
-            { name: "area", value: area },
-          ],
-          caption: { vi: candidate ? "Rectangle ứng viên trên ma trận" : "Height 0 không tạo rectangle", en: candidate ? "Candidate rectangle on the matrix" : "Height 0 creates no rectangle" },
-          secondaryCaption: candidate
-            ? { vi: `${rectLabel(candidate)} → area ${area}`, en: `${rectLabel(candidate)} → area ${area}` }
-            : { vi: "Sentinel height 0 chỉ dùng để xả stack.", en: "The height-0 sentinel is only used to flush the stack." },
-          note: candidate
-            ? { vi: `Vì đáy rectangle ở hàng ${r}, top = r - height + 1 = ${candidate.top}.`, en: `Because the rectangle bottom is row ${r}, top = r - height + 1 = ${candidate.top}.` }
-            : { vi: "Không cập nhật best với rectangle rỗng.", en: "Do not update best with an empty rectangle." },
+          current,
+          popped,
+          boundaries,
+          width,
+          candidateArea: area,
+          candidateRect,
+          vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "width", value: width }, { name: "area", value: area }],
+          caption: { vi: candidateRect ? "Rectangle ứng viên" : "Ứng viên rỗng", en: candidateRect ? "Candidate rectangle" : "Empty candidate" },
+          secondaryCaption: candidateRect
+            ? { vi: `${rectLabel(candidateRect)}.`, en: `${rectLabel(candidateRect)}.` }
+            : { vi: "Bar cao 0 có area 0.", en: "A height-0 bar has area 0." },
+          note: { vi: `Biên là [${left}, ${right}]; width = ${right} - ${left} + 1.`, en: `The bounds are [${left}, ${right}]; width = ${right} - ${left} + 1.` },
         });
 
         const previousBest = maxArea;
-        if (area > maxArea) {
+        const previousBestRect = cloneRect(bestRect);
+        const improved = area > previousBest;
+        if (improved) {
           maxArea = area;
-          bestRect = candidate;
+          bestRect = cloneRect(candidateRect);
         }
         push({
-          title: area > previousBest
-            ? { vi: `Cập nhật best = ${maxArea}`, en: `Update best = ${maxArea}` }
+          title: improved
+            ? { vi: `Cập nhật best: ${previousBest} → ${maxArea}`, en: `Update best: ${previousBest} → ${maxArea}` }
             : { vi: `Giữ best = ${maxArea}`, en: `Keep best = ${maxArea}` },
-          codeLines: [14],
+          line: 14,
+          phase: "decision",
+          event: "update-or-keep-best",
           row: r,
           col: i < cols ? i : null,
+          histogramIndex: i,
+          bars,
           stack,
-          popped: top,
-          candidate,
-          left,
-          right,
-          vars: [
-            { name: "old best", value: previousBest },
-            { name: "height", value: height },
-            { name: "left..right", value: `${left}..${right}` },
-            { name: "area", value: area },
-            { name: "best rectangle", value: rectLabel(bestRect) },
-          ],
-          caption: { vi: "So sánh rectangle ứng viên với best hiện tại", en: "Compare candidate rectangle with current best" },
-          secondaryCaption: area > previousBest
-            ? { vi: `${area} > ${previousBest}, lưu rectangle mới.`, en: `${area} > ${previousBest}, store the new rectangle.` }
-            : { vi: `${area} <= ${previousBest}, không đổi best.`, en: `${area} <= ${previousBest}, keep the existing best.` },
-          note: area > previousBest
-            ? { vi: `Best mới là ${rectLabel(bestRect)} với diện tích ${maxArea}.`, en: `The new best is ${rectLabel(bestRect)} with area ${maxArea}.` }
-            : { vi: `Rectangle này không tốt hơn best hiện tại.`, en: `This rectangle does not improve the current best.` },
+          current,
+          popped,
+          boundaries,
+          width,
+          candidateArea: area,
+          candidateRect,
+          previousBest,
+          previousBestRect,
+          improved,
+          vars: [{ name: "previous best", value: previousBest }, { name: "candidate area", value: area }, { name: "improved", value: improved }, { name: "best rectangle", value: rectLabel(bestRect) }],
+          caption: { vi: improved ? "Ứng viên trở thành best" : "Giữ global best", en: improved ? "Candidate becomes the best" : "Keep the global best" },
+          secondaryCaption: improved
+            ? { vi: `${area} > ${previousBest}: lưu rectangle mới.`, en: `${area} > ${previousBest}: store the new rectangle.` }
+            : { vi: `${area} <= ${previousBest}: không đổi best.`, en: `${area} <= ${previousBest}: keep the best unchanged.` },
+          note: improved
+            ? { vi: `Global best mới là ${rectLabel(bestRect)}.`, en: `The new global best is ${rectLabel(bestRect)}.` }
+            : { vi: "Phép so sánh nghiêm ngặt giữ rectangle thắng trước khi hòa.", en: "The strict comparison preserves the earlier rectangle on ties." },
         });
       }
 
       stack.push(i);
       push({
-        title: { vi: `Push cột ${i === cols ? "sentinel" : i}`, en: `Push ${i === cols ? "sentinel" : `column ${i}`}` },
-        codeLines: [15],
+        title: i === cols
+          ? { vi: "Push sentinel", en: "Push the sentinel" }
+          : { vi: `Push bar ${i}`, en: `Push bar ${i}` },
+        line: 15,
+        phase: "stack",
+        event: "push-bar",
         row: r,
         col: i < cols ? i : null,
+        histogramIndex: i,
+        bars,
         stack,
-        showBest: Boolean(bestRect),
-        vars: [{ name: "i", value: i === cols ? "sentinel" : i }],
-        secondaryCaption: { vi: `stack = ${stackLabel(stack)}`, en: `stack = ${stackLabel(stack)}` },
-        note: { vi: "Sau khi pop hết cột cao hơn/bằng, stack giữ index có chiều cao tăng dần.", en: "After popping every taller/equal bar, the stack keeps indices in increasing height order." },
+        current,
+        vars: [{ name: "pushed index", value: i }, { name: "stack", value: stackLabel(stack, bars) }],
+        secondaryCaption: { vi: `Stack sau push: ${stackLabel(stack, bars)}.`, en: `Stack after push: ${stackLabel(stack, bars)}.` },
+        note: { vi: "Sau mọi pop cần thiết, stack tăng nghiêm ngặt theo chiều cao.", en: "After all required pops, stack is strictly increasing by height." },
       });
     }
+
+    lastBars = [...bars];
+    lastStack = [...stack];
   }
 
   push({
-    title: { vi: `Diện tích lớn nhất = ${maxArea}`, en: `Largest area = ${maxArea}` },
-    codeLines: [16],
+    title: { vi: `Trả về diện tích lớn nhất ${maxArea}`, en: `Return largest area ${maxArea}` },
+    line: 16,
+    phase: "return",
+    event: "return-best",
+    bars: lastBars,
+    stack: lastStack,
     final: true,
     vars: [{ name: "best rectangle", value: rectLabel(bestRect) }, { name: "answer", value: maxArea }],
-    caption: { vi: "Best rectangle cuối cùng", en: "Final best rectangle" },
+    caption: { vi: "Global best cuối cùng", en: "Final global best" },
     secondaryCaption: bestRect
       ? { vi: `${rectLabel(bestRect)} có area ${maxArea}.`, en: `${rectLabel(bestRect)} has area ${maxArea}.` }
       : { vi: "Không có ô 1 nào.", en: "No 1-cell exists." },
-    note: { vi: "Hình chữ nhật tốt nhất được tô trên ma trận; histogram cuối hiển thị hàng cuối đã xử lý.", en: "The best rectangle is highlighted on the matrix; the histogram shows the last processed row." },
+    note: { vi: "Rectangle tốt nhất vẫn hiện trên ma trận khi thuật toán trả kết quả.", en: "The winning rectangle remains visible when the algorithm returns." },
   });
 
   return { original: matrix, answer: maxArea, steps };

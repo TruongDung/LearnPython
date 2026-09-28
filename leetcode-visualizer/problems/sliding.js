@@ -2930,177 +2930,372 @@ function buildSteps480(inputNums, params) {
  * 13                  result.append(nums[dq[0]])
  * 14          return result
  */
-function buildSteps239(inputNums, params) {
-  const nums = Array.isArray(inputNums)
-    ? [...inputNums]
-    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
-  const k = params && params.k !== undefined ? Number(params.k) : 3;
-  const n = nums.length;
-  const steps = [];
-  const dq = [];       // indices, values decreasing
-  const result = [];
+const SLIDING_MAXIMUM_239_LIMIT = 40;
 
-  const dqStr = () => `[${dq.map((idx) => `${idx}:${nums[idx]}`).join(", ")}]`;
-  const windowCells = (i) => {
-    const lo = Math.max(0, i - k + 1);
-    return Array.from({ length: i - lo + 1 }, (_, x) => lo + x);
-  };
-
-  if (n === 0 || k <= 0) {
-    steps.push({
-      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
-      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
-      vars: [], note: { vi: "Cần mảng không rỗng và k > 0.", en: "Need a non-empty array and k > 0." },
-    });
-    return { original: nums, k, answer: [], steps };
+function parseSlidingMaximum239Input(inputNums, params = {}) {
+  if (!Array.isArray(inputNums)) {
+    throw new TypeError("nums must be an array of integers.");
+  }
+  if (inputNums.length === 0) {
+    throw new RangeError("nums must contain at least one integer.");
+  }
+  if (inputNums.length > SLIDING_MAXIMUM_239_LIMIT) {
+    throw new RangeError(`Visualization supports at most ${SLIDING_MAXIMUM_239_LIMIT} integers.`);
   }
 
-  steps.push({
-    title: { vi: "dq = deque(), result = []", en: "dq = deque(), result = []" },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [],
-    mark: [],
-    codeLines: [4, 5],
-    vars: [
-      { name: "k", value: k },
-      { name: "dq (indices)", value: "[]" },
-      { name: "result", value: "[]" },
-    ],
+  const nums = inputNums.map((value, index) => {
+    if (!Number.isSafeInteger(value)) {
+      throw new TypeError(`nums[${index}] must be a safe integer.`);
+    }
+    return value;
+  });
+  const rawK = params && Object.prototype.hasOwnProperty.call(params, "k") ? params.k : 3;
+  if (!Number.isSafeInteger(rawK)) {
+    throw new TypeError("k must be an integer.");
+  }
+  if (rawK < 1 || rawK > nums.length) {
+    throw new RangeError("k must satisfy 1 <= k <= nums.length.");
+  }
+  return { nums, k: rawK };
+}
+
+function deepFreezeSlidingMaximum239(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.values(value).forEach(deepFreezeSlidingMaximum239);
+  return Object.freeze(value);
+}
+
+function buildSteps239(inputNums, params = {}) {
+  const { nums, k } = parseSlidingMaximum239Input(inputNums, params);
+  const n = nums.length;
+  const steps = [];
+  const dq = [];
+  const result = [];
+  const answerWitness = [];
+
+  const valueEntry = (index) => index === null || index === undefined
+    ? null
+    : { index, value: nums[index] };
+  const dequeEntries = (indices) => indices.map((index, position) => ({
+    index,
+    value: nums[index],
+    front: position === 0,
+    back: position === indices.length - 1,
+  }));
+  const windowState = (i) => {
+    if (i === null) {
+      return { left: null, right: null, size: 0, full: false, expiryCutoff: null };
+    }
+    const left = Math.max(0, i - k + 1);
+    return {
+      left,
+      right: i,
+      size: i - left + 1,
+      full: i >= k - 1,
+      expiryCutoff: i - k,
+    };
+  };
+  const actionState = ({ kind = "none", side = null, removed = null, pushed = null, dominatedBy = null } = {}) => ({
+    kind,
+    side,
+    removed,
+    pushed,
+    dominatedBy,
+  });
+  const checkState = ({ kind = null, result: checkResult = null, candidate = null } = {}) => ({
+    kind,
+    result: typeof checkResult === "boolean" ? checkResult : null,
+    candidate,
+  });
+  const copyWitness = (witness) => witness ? { ...witness } : null;
+
+  const snapshot = ({
+    sourceLine,
+    timing,
+    phase,
+    event,
+    i = null,
+    dequeBefore = dq,
+    dequeAfter = dq,
+    check,
+    action,
+    currentWitness = null,
+    title,
+    note,
+    final = false,
+  }) => {
+    const beforeIndices = [...dequeBefore];
+    const afterIndices = [...dequeAfter];
+    const num = i === null ? null : nums[i];
+    const view = deepFreezeSlidingMaximum239({
+      version: 1,
+      problemId: 239,
+      sourceLine,
+      timing,
+      phase,
+      event,
+      nums: [...nums],
+      n,
+      k,
+      i,
+      num,
+      window: windowState(i),
+      deque: {
+        before: dequeEntries(beforeIndices),
+        after: dequeEntries(afterIndices),
+      },
+      check: checkState(check),
+      action: actionState(action),
+      result: [...result],
+      currentWitness: copyWitness(currentWitness),
+      answerWitness: answerWitness.map(copyWitness),
+      final,
+    });
+    const window = view.window;
+    const highlighted = i === null
+      ? []
+      : Array.from({ length: window.size }, (_, offset) => window.left + offset);
+    steps.push({
+      title,
+      note,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: highlighted,
+      mark: afterIndices,
+      codeLines: [sourceLine],
+      final,
+      vars: [
+        { name: "i", value: i === null ? "—" : i },
+        { name: "num", value: num === null ? "—" : num },
+        { name: "k", value: k },
+        { name: "dq", value: `[${afterIndices.map((index) => `${index}:${nums[index]}`).join(", ")}]` },
+        { name: "result", value: `[${result.join(", ")}]` },
+      ],
+      slidingMaximum239View: view,
+    });
+  };
+
+  snapshot({
+    sourceLine: 4,
+    timing: "after",
+    phase: "initialize",
+    event: "initialize-deque",
+    action: { kind: "initialize" },
+    title: { vi: "Khởi tạo deque rỗng", en: "Initialize an empty deque" },
     note: {
-      vi:
-        `dq lưu INDEX của các phần tử theo giá trị GIẢM DẦN. Front dq[0] luôn là index của MAX trong cửa sổ.\n` +
-        `Mỗi lần cửa sổ đủ k=${k} phần tử thì ghi nums[dq[0]] vào result.`,
-      en:
-        `dq holds element INDICES in DECREASING value order. Front dq[0] is always the index of the window MAX.\n` +
-        `Whenever the window reaches k=${k} elements, append nums[dq[0]] to result.`,
+      vi: "dq lưu index theo thứ tự giá trị không tăng; front sẽ là witness của maximum.",
+      en: "dq stores indices in non-increasing value order; its front will witness each maximum.",
+    },
+  });
+  snapshot({
+    sourceLine: 5,
+    timing: "after",
+    phase: "initialize",
+    event: "initialize-result",
+    action: { kind: "initialize" },
+    title: { vi: "Khởi tạo result rỗng", en: "Initialize an empty result" },
+    note: {
+      vi: "Mỗi cửa sổ đủ k phần tử sẽ thêm đúng một maximum vào result.",
+      en: "Each full window will append exactly one maximum to result.",
     },
   });
 
   for (let i = 0; i < n; i++) {
     const num = nums[i];
-    steps.push({
-      title: { vi: `for i=${i}, num=${num}`, en: `for i=${i}, num=${num}` },
-      arr: [...nums],
-      sub: nums.map((_, x) => `[${x}]`),
-      highlight: [i],
-      mark: dq.length ? [...dq] : [],
-      codeLines: [6],
-      vars: [
-        { name: "i", value: i },
-        { name: "num", value: num },
-        { name: "dq", value: dqStr() },
-      ],
+    snapshot({
+      sourceLine: 6,
+      timing: "after",
+      phase: "iterate",
+      event: "visit-number",
+      i,
+      title: { vi: `Duyệt nums[${i}] = ${num}`, en: `Visit nums[${i}] = ${num}` },
       note: {
-        vi: `Xét phần tử nums[${i}]=${num}. Các index trong dq được tô đậm.`,
-        en: `Inspect nums[${i}]=${num}. Indices currently in dq are marked.`,
+        vi: `Bắt đầu lượt i=${i}; cửa sổ hiện tại kết thúc tại index ${i}.`,
+        en: `Begin iteration i=${i}; the current window ends at index ${i}.`,
       },
     });
 
-    // Pop smaller values from the back
-    while (dq.length && nums[dq[dq.length - 1]] < num) {
-      const popped = dq.pop();
-      steps.push({
-        title: { vi: `nums[${popped}]=${nums[popped]} < ${num} → pop khỏi đuôi dq`, en: `nums[${popped}]=${nums[popped]} < ${num} → pop from dq back` },
-        arr: [...nums],
-        sub: nums.map((_, x) => `[${x}]`),
-        highlight: [i],
-        mark: dq.length ? [...dq] : [],
-        codeLines: [7, 8],
-        vars: [
-          { name: "i", value: i },
-          { name: "num", value: num },
-          { name: "popped index", value: popped },
-          { name: "dq", value: dqStr() },
-        ],
+    while (true) {
+      const beforeCheck = [...dq];
+      const backIndex = beforeCheck.length ? beforeCheck[beforeCheck.length - 1] : null;
+      const dominated = backIndex !== null && nums[backIndex] < num;
+      snapshot({
+        sourceLine: 7,
+        timing: "before",
+        phase: "maintain-monotonicity",
+        event: "check-dominated-back",
+        i,
+        dequeBefore: beforeCheck,
+        dequeAfter: beforeCheck,
+        check: { kind: "dominated-back", result: dominated, candidate: valueEntry(backIndex) },
+        title: {
+          vi: backIndex === null ? "Kiểm tra đuôi: deque rỗng" : `Kiểm tra ${nums[backIndex]} < ${num}`,
+          en: backIndex === null ? "Check back: deque is empty" : `Check ${nums[backIndex]} < ${num}`,
+        },
         note: {
-          vi: `nums[${popped}]=${nums[popped]} < num=${num} nên index ${popped} không bao giờ là max nữa (bị ${num} "che"). Pop khỏi đuôi dq.`,
-          en: `nums[${popped}]=${nums[popped]} < num=${num}, so index ${popped} can never be the max again (dominated by ${num}). Pop it from the back.`,
+          vi: dominated
+            ? `Index ${backIndex} nhỏ hơn ${num}, nên bị index ${i} che khuất.`
+            : backIndex === null
+              ? "Điều kiện while là false vì deque rỗng."
+              : `Điều kiện strict ${nums[backIndex]} < ${num} là false; giá trị bằng nhau không bị pop.`,
+          en: dominated
+            ? `Index ${backIndex} is smaller than ${num}, so index ${i} dominates it.`
+            : backIndex === null
+              ? "The while condition is false because the deque is empty."
+              : `The strict condition ${nums[backIndex]} < ${num} is false; equal values are retained.`,
+        },
+      });
+      if (!dominated) break;
+
+      const beforePop = [...dq];
+      const removedIndex = dq.pop();
+      snapshot({
+        sourceLine: 8,
+        timing: "after",
+        phase: "maintain-monotonicity",
+        event: "pop-dominated-back",
+        i,
+        dequeBefore: beforePop,
+        dequeAfter: dq,
+        check: { kind: "dominated-back", result: true, candidate: valueEntry(removedIndex) },
+        action: {
+          kind: "pop",
+          side: "back",
+          removed: valueEntry(removedIndex),
+          dominatedBy: valueEntry(i),
+        },
+        title: { vi: `Pop index ${removedIndex} khỏi back`, en: `Pop index ${removedIndex} from the back` },
+        note: {
+          vi: `${nums[removedIndex]} bị ${num} che khuất; snapshot hiển thị deque trước và sau mutation.`,
+          en: `${nums[removedIndex]} is dominated by ${num}; the snapshot shows the deque before and after the mutation.`,
         },
       });
     }
 
+    const beforePush = [...dq];
     dq.push(i);
-    steps.push({
-      title: { vi: `dq.append(${i})`, en: `dq.append(${i})` },
-      arr: [...nums],
-      sub: nums.map((_, x) => `[${x}]`),
-      highlight: [i],
-      mark: [...dq],
-      codeLines: [9],
-      vars: [
-        { name: "i", value: i },
-        { name: "dq", value: dqStr() },
-      ],
+    snapshot({
+      sourceLine: 9,
+      timing: "after",
+      phase: "maintain-monotonicity",
+      event: "push-current-index",
+      i,
+      dequeBefore: beforePush,
+      dequeAfter: dq,
+      action: { kind: "push", side: "back", pushed: valueEntry(i) },
+      title: { vi: `Thêm index ${i} vào back`, en: `Push index ${i} at the back` },
       note: {
-        vi: `Thêm index ${i} vào đuôi dq. Giá trị trong dq vẫn giảm dần: ${dqStr()}.`,
-        en: `Append index ${i} to dq's back. Values in dq stay decreasing: ${dqStr()}.`,
+        vi: "Sau khi push, giá trị trong deque vẫn không tăng từ FRONT đến BACK.",
+        en: "After the push, deque values remain non-increasing from FRONT to BACK.",
       },
     });
 
-    // Remove front if outside window
-    if (dq[0] <= i - k) {
-      const removed = dq.shift();
-      steps.push({
-        title: { vi: `dq[0]=${removed} ≤ i-k=${i - k} → popleft (ra khỏi cửa sổ)`, en: `dq[0]=${removed} ≤ i-k=${i - k} → popleft (out of window)` },
-        arr: [...nums],
-        sub: nums.map((_, x) => `[${x}]`),
-        highlight: windowCells(i),
-        mark: [...dq],
-        codeLines: [10, 11],
-        vars: [
-          { name: "i", value: i },
-          { name: "i - k", value: i - k },
-          { name: "removed front", value: removed },
-          { name: "dq", value: dqStr() },
-        ],
+    const beforeExpiryCheck = [...dq];
+    const frontIndex = beforeExpiryCheck[0];
+    const expired = frontIndex <= i - k;
+    snapshot({
+      sourceLine: 10,
+      timing: "before",
+      phase: "expire-front",
+      event: "check-expired-front",
+      i,
+      dequeBefore: beforeExpiryCheck,
+      dequeAfter: beforeExpiryCheck,
+      check: { kind: "expired-front", result: expired, candidate: valueEntry(frontIndex) },
+      title: { vi: `Kiểm tra ${frontIndex} ≤ ${i - k}`, en: `Check ${frontIndex} ≤ ${i - k}` },
+      note: {
+        vi: expired
+          ? `Front index ${frontIndex} nằm tại hoặc trước cutoff ${i - k}, nên đã ra khỏi cửa sổ.`
+          : `Front index ${frontIndex} còn nằm sau cutoff ${i - k}.`,
+        en: expired
+          ? `Front index ${frontIndex} is at or before cutoff ${i - k}, so it has expired.`
+          : `Front index ${frontIndex} remains after cutoff ${i - k}.`,
+      },
+    });
+
+    if (expired) {
+      const beforePop = [...dq];
+      const removedIndex = dq.shift();
+      snapshot({
+        sourceLine: 11,
+        timing: "after",
+        phase: "expire-front",
+        event: "pop-expired-front",
+        i,
+        dequeBefore: beforePop,
+        dequeAfter: dq,
+        check: { kind: "expired-front", result: true, candidate: valueEntry(removedIndex) },
+        action: { kind: "pop", side: "front", removed: valueEntry(removedIndex) },
+        title: { vi: `Loại front index ${removedIndex}`, en: `Remove expired front index ${removedIndex}` },
         note: {
-          vi: `Front dq[0]=${removed} đã nằm ngoài cửa sổ [${i - k + 1}..${i}] → popleft.`,
-          en: `Front dq[0]=${removed} is now outside window [${i - k + 1}..${i}] → popleft.`,
+          vi: `Index ${removedIndex} ở ngoài cửa sổ [${Math.max(0, i - k + 1)}, ${i}] và bị popleft.`,
+          en: `Index ${removedIndex} is outside window [${Math.max(0, i - k + 1)}, ${i}] and is removed from the front.`,
         },
       });
     }
 
-    // Record window max
-    if (i >= k - 1) {
-      result.push(nums[dq[0]]);
-      steps.push({
-        title: { vi: `Cửa sổ [${i - k + 1}..${i}] đủ k → result.append(${nums[dq[0]]})`, en: `Window [${i - k + 1}..${i}] full → result.append(${nums[dq[0]]})` },
-        arr: [...nums],
-        sub: nums.map((_, x) => `[${x}]`),
-        highlight: windowCells(i),
-        mark: [dq[0]],
-        codeLines: [12, 13],
-        vars: [
-          { name: "i", value: i },
-          { name: "window", value: `[${i - k + 1}..${i}]` },
-          { name: "max (nums[dq[0]])", value: nums[dq[0]] },
-          { name: "result", value: `[${result.join(", ")}]` },
-        ],
+    const full = i >= k - 1;
+    const maximumIndex = full ? dq[0] : null;
+    snapshot({
+      sourceLine: 12,
+      timing: "before",
+      phase: "emit-maximum",
+      event: "check-full-window",
+      i,
+      check: { kind: "full-window", result: full, candidate: valueEntry(maximumIndex) },
+      title: { vi: `Kiểm tra ${i} ≥ ${k - 1}`, en: `Check ${i} ≥ ${k - 1}` },
+      note: {
+        vi: full
+          ? `Cửa sổ [${i - k + 1}, ${i}] đã đủ ${k} phần tử.`
+          : `Cửa sổ mới có ${i + 1} / ${k} phần tử.`,
+        en: full
+          ? `Window [${i - k + 1}, ${i}] now contains all ${k} elements.`
+          : `The window currently has ${i + 1} / ${k} elements.`,
+      },
+    });
+
+    if (full) {
+      const witness = {
+        answerIndex: answerWitness.length,
+        windowLeft: i - k + 1,
+        windowRight: i,
+        witnessIndex: dq[0],
+        value: nums[dq[0]],
+      };
+      result.push(witness.value);
+      answerWitness.push(witness);
+      snapshot({
+        sourceLine: 13,
+        timing: "after",
+        phase: "emit-maximum",
+        event: "append-maximum",
+        i,
+        action: { kind: "append-output" },
+        currentWitness: witness,
+        title: { vi: `Ghi maximum ${witness.value}`, en: `Append maximum ${witness.value}` },
         note: {
-          vi: `Cửa sổ đủ ${k} phần tử. Max = nums[dq[0]] = nums[${dq[0]}] = ${nums[dq[0]]}. result = [${result.join(", ")}].`,
-          en: `Window has ${k} elements. Max = nums[dq[0]] = nums[${dq[0]}] = ${nums[dq[0]]}. result = [${result.join(", ")}].`,
+          vi: `FRONT index ${witness.witnessIndex} chứng minh maximum của cửa sổ [${witness.windowLeft}, ${witness.windowRight}].`,
+          en: `FRONT index ${witness.witnessIndex} witnesses the maximum for window [${witness.windowLeft}, ${witness.windowRight}].`,
         },
       });
     }
   }
 
-  steps.push({
-    title: { vi: `return result = [${result.join(", ")}]`, en: `return result = [${result.join(", ")}]` },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [14],
-    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
+  snapshot({
+    sourceLine: 14,
+    timing: "after",
+    phase: "complete",
+    event: "return-result",
+    action: { kind: "return" },
+    title: { vi: `Trả về [${result.join(", ")}]`, en: `Return [${result.join(", ")}]` },
     note: {
-      vi: `Max của mỗi cửa sổ trượt kích thước ${k}: [${result.join(", ")}].`,
-      en: `Maximum of each sliding window of size ${k}: [${result.join(", ")}].`,
+      vi: `Đã ghi maximum cho toàn bộ ${result.length} cửa sổ.`,
+      en: `Recorded the maximum for all ${result.length} windows.`,
     },
+    final: true,
   });
 
-  return { original: nums, k, answer: result, steps };
+  return { original: [...nums], k, answer: [...result], steps };
 }
 
 /**
@@ -5322,16 +5517,17 @@ module.exports = {
     titleVi: { vi: "Giá trị lớn nhất mỗi cửa sổ trượt (monotonic deque)", en: "Maximum of each sliding window (monotonic deque)" },
     statement: {
       vi:
-        "Cho mảng nums và số k. Cửa sổ kích thước k trượt từ trái sang phải. " +
-        "Trả về mảng giá trị lớn nhất của mỗi cửa sổ. Nhập nums cách nhau dấu phẩy.",
+        "Cho mảng nums gồm 1–40 số nguyên và số nguyên k với 1 ≤ k ≤ nums.length. " +
+        "Cửa sổ kích thước k trượt từ trái sang phải; trả về maximum của mỗi cửa sổ.",
       en:
-        "Given an array nums and integer k, a window of size k slides from left to right. " +
-        "Return the maximum of each window. Enter nums as comma-separated numbers.",
+        "Given nums containing 1–40 integers and an integer k with 1 <= k <= nums.length, " +
+        "slide a window of size k from left to right and return each window maximum.",
     },
     defaultInput: [1, 3, -1, -3, 5, 3, 6, 7],
     inputKind: "integer",
+    inputLabel: { vi: "nums (1–40 số nguyên)", en: "nums (1–40 integers)" },
     extraParams: [
-      { key: "k", label: { vi: "k (kích thước cửa sổ)", en: "k (window size)" }, default: 3 },
+      { key: "k", label: { vi: "k (kích thước cửa sổ)", en: "k (window size)" }, default: 3, min: 1 },
     ],
     approach: [
       { vi: "Dùng deque lưu INDEX theo giá trị GIẢM DẦN. Front dq[0] luôn là index của max cửa sổ.", en: "Use a deque of INDICES in DECREASING value order. Front dq[0] is always the window max index." },
@@ -5347,6 +5543,7 @@ module.exports = {
         en: "Each index is pushed and popped at most once → O(n). The deque holds at most k elements.",
       },
     },
+    debugMode: "line-by-line",
     code: [
       "from collections import deque",
       "class Solution:",
@@ -5363,6 +5560,10 @@ module.exports = {
       "                result.append(nums[dq[0]])",
       "        return result",
     ],
+    liveArgs: (input, params) => {
+      const { nums, k } = parseSlidingMaximum239Input(input, params);
+      return [nums, k];
+    },
     builder: buildSteps239,
   },
   424: {

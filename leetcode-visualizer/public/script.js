@@ -490,6 +490,15 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.twoSum653View), surface: "treeView", render: (step) => {
       renderTwoSum653View(step);
     } },
+    { predicate: (step) => Boolean(step.maxPathSum124View), surface: "treeView", render: (step) => {
+      renderMaxPathSum124View(step);
+    } },
+    { predicate: (step) => Boolean(step.palindromeCuts132View), surface: "treeView", render: (step) => {
+      renderPalindromeCuts132View(step);
+    } },
+    { predicate: (step) => Boolean(step.slidingMaximum239View), surface: "treeView", render: (step) => {
+      renderSlidingMaximum239View(step);
+    } },
     { predicate: (step) => Boolean(step.tree), surface: "treeView", render: (step) => {
       renderTree(step);
     } },
@@ -510,6 +519,15 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.transpose867View), surface: "treeView", render: (step) => {
       renderTranspose867View(step);
+    } },
+    { predicate: (step) => Boolean(step.regexMatch10View), surface: "treeView", render: (step) => {
+      renderRegexMatch10View(step);
+    } },
+    { predicate: (step) => Boolean(step.wildcardMatch44View), surface: "treeView", render: (step) => {
+      renderWildcardMatch44View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximalRectangle85View), surface: "treeView", render: (step) => {
+      renderMaximalRectangle85View(step);
     } },
     { predicate: (step) => Boolean(step.grid), surface: "gridView", render: (step) => {
       renderGrid(step);

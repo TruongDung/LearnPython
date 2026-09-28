@@ -1151,113 +1151,533 @@ function buildSteps742(input, params) {
 
 // ─── 124: Binary Tree Maximum Path Sum ───
 function buildSteps124(input) {
-  const root = parseTree(input);
-  const steps = [];
-  let maxSum = -Infinity;
-  let bestId = null;
-
-  steps.push(snapshot(root, {
-    title: { vi: "Maximum Path Sum", en: "Maximum Path Sum" },
-    codeLines: [3, 4],
-    vars: [{ name: "max_sum", value: "-inf" }, { name: "rule", value: "node.val + left_gain + right_gain" }],
-    note: {
-      vi: "Dung postorder. Tai moi node, tinh gain tot nhat di len cha va cap nhat duong di tot nhat di QUA node do.",
-      en: "Use postorder. At each node, compute the best gain to return to the parent and update the best path passing THROUGH that node.",
-    },
-  }));
-
-  if (!root) {
-    const fs = snapshot(root, {
-      title: { vi: "Cay rong", en: "Empty tree" },
-      codeLines: [11],
-      vars: [{ name: "answer", value: 0 }],
-      note: { vi: "Cay rong nen tra 0 trong visualization.", en: "The visualization returns 0 for an empty tree." },
-    });
-    fs.final = true;
-    steps.push(fs);
-    return { input, answer: 0, steps };
-  }
-
-  function gain(node) {
-    if (!node) return 0;
-
-    const leftGain = Math.max(gain(node.left), 0);
-    const rightGain = Math.max(gain(node.right), 0);
-    steps.push(snapshot(root, {
-      title: { vi: `Node ${node.val}: left/right gain`, en: `Node ${node.val}: left/right gain` },
-      hlSet: new Set([node.id]),
-      wordSet: bestId !== null ? new Set([bestId]) : undefined,
-      codeLines: [6, 7],
-      vars: [
-        { name: "node", value: node.val },
-        { name: "left_gain", value: leftGain },
-        { name: "right_gain", value: rightGain },
-        { name: "max_sum", value: maxSum === -Infinity ? "-inf" : maxSum },
-      ],
-      note: {
-        vi: `Gain am bi bo qua bang max(gain, 0). Tai node ${node.val}: left_gain = ${leftGain}, right_gain = ${rightGain}.`,
-        en: `Negative gains are ignored with max(gain, 0). At node ${node.val}: left_gain = ${leftGain}, right_gain = ${rightGain}.`,
-      },
-    }));
-
-    const pathThrough = node.val + leftGain + rightGain;
-    const oldMax = maxSum;
-    if (pathThrough > maxSum) {
-      maxSum = pathThrough;
-      bestId = node.id;
-    }
-    steps.push(snapshot(root, {
-      title: { vi: `Qua ${node.val}: ${pathThrough}`, en: `Through ${node.val}: ${pathThrough}` },
-      hlSet: new Set([node.id]),
-      wordSet: bestId !== null ? new Set([bestId]) : undefined,
-      codeLines: [8],
-      vars: [
-        { name: "node.val", value: node.val },
-        { name: "left_gain", value: leftGain },
-        { name: "right_gain", value: rightGain },
-        { name: "path_sum", value: `${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}` },
-        { name: "max_sum before", value: oldMax === -Infinity ? "-inf" : oldMax },
-        { name: "max_sum after", value: maxSum },
-      ],
-      note: {
-        vi: `Duong di tot nhat di qua node nay = ${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}. Cap nhat max_sum = ${maxSum}.`,
-        en: `Best path passing through this node = ${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}. Update max_sum = ${maxSum}.`,
-      },
-    }));
-
-    const returnGain = node.val + Math.max(leftGain, rightGain);
-    steps.push(snapshot(root, {
-      title: { vi: `Return gain = ${returnGain}`, en: `Return gain = ${returnGain}` },
-      hlSet: new Set([node.id]),
-      wordSet: bestId !== null ? new Set([bestId]) : undefined,
-      codeLines: [9],
-      vars: [
-        { name: "node", value: node.val },
-        { name: "return", value: `${node.val} + max(${leftGain}, ${rightGain}) = ${returnGain}` },
-        { name: "max_sum", value: maxSum },
-      ],
-      note: {
-        vi: `Tra ve cha chi duoc chon 1 nhanh: node.val + max(left_gain, right_gain) = ${returnGain}.`,
-        en: `Return only one branch to the parent: node.val + max(left_gain, right_gain) = ${returnGain}.`,
-      },
-    }));
-    return returnGain;
-  }
-
-  gain(root);
-  const fs = snapshot(root, {
-    title: { vi: `Max path sum = ${maxSum}`, en: `Max path sum = ${maxSum}` },
-    wordSet: bestId !== null ? new Set([bestId]) : undefined,
-    codeLines: [11],
-    vars: [{ name: "answer", value: maxSum }],
-    note: {
-      vi: `Ket qua la max_sum = ${maxSum}. Duong di co the bat dau va ket thuc o bat ky node nao.`,
-      en: `The answer is max_sum = ${maxSum}. The path may start and end at any nodes.`,
-    },
+  const root = parseTreeEssentialsInput(input, {
+    minValue: -1000,
+    maxValue: 1000,
+    maxNodes: 31,
   });
-  fs.final = true;
-  steps.push(fs);
-  return { input, answer: maxSum, steps };
+  const steps = [];
+  const callStack = [];
+  const activePath = [];
+  const returned = new Map();
+  const processed = [];
+  const nodesById = new Map();
+  (function collect(node) {
+    if (!node) return;
+    nodesById.set(node.id, node);
+    collect(node.left);
+    collect(node.right);
+  })(root);
+
+  let globalInitialized = false;
+  let globalSum = null;
+  let globalPivot = null;
+  let globalPathIds = [];
+  let rootReturn = null;
+
+  const stages = [
+    { vi: "Khởi tạo quy tắc", en: "Initialize the rule" },
+    { vi: "Đi xuống và kiểm tra", en: "Descend and check calls" },
+    { vi: "Nhận rồi chặn gain âm", en: "Receive and clamp child gains" },
+    { vi: "So sánh path đi qua node", en: "Compare the through-node path" },
+    { vi: "Trả một tay và hoàn tất", en: "Return one arm and finish" },
+  ];
+  const stageFor = (event) => {
+    if (["initialize-best", "define-gain"].includes(event)) return 0;
+    if (["call-root", "check-node", "return-zero", "call-left", "call-right"].includes(event)) return 1;
+    if (["raw-left-return", "clamp-left", "raw-right-return", "clamp-right"].includes(event)) return 2;
+    if (["through-candidate", "best-update", "best-keep"].includes(event)) return 3;
+    return 4;
+  };
+  const valuesFor = (ids) => ids.map((id) => nodesById.get(id).val);
+  const nodeState = (node) => node ? { id: node.id, value: node.val } : null;
+  const deepFreezeJson = (value) => {
+    const copy = JSON.parse(JSON.stringify(value));
+    const freeze = (item) => {
+      if (!item || typeof item !== "object" || Object.isFrozen(item)) return item;
+      Object.values(item).forEach(freeze);
+      return Object.freeze(item);
+    };
+    return freeze(copy);
+  };
+  const stackState = () => callStack.map((frame, index) => ({
+    index,
+    id: frame.node ? frame.node.id : null,
+    nodeId: frame.node ? frame.node.id : null,
+    value: frame.node ? frame.node.val : null,
+    side: frame.side,
+    depth: frame.depth,
+    stage: frame.stage,
+    leftRaw: frame.leftRaw,
+    leftClamped: frame.leftClamped,
+    rightRaw: frame.rightRaw,
+    rightClamped: frame.rightClamped,
+  }));
+  const pathState = () => activePath.map((entry, index) => ({
+    id: entry.node.id,
+    value: entry.node.val,
+    side: entry.side,
+    depth: index,
+    current: index === activePath.length - 1,
+  }));
+  const childState = (child, result, raw, clamped) => ({
+    id: child ? child.id : null,
+    value: child ? child.val : null,
+    ready: raw !== null,
+    clampedReady: clamped !== null,
+    raw,
+    clamped,
+    rawGain: raw,
+    clampedGain: clamped,
+    included: clamped === null ? null : clamped > 0,
+    pathIds: result ? [...result.pathIds] : [],
+    pathValues: result ? [...result.pathValues] : [],
+  });
+  const annotationsFor = (current, candidatePathIds, final) => {
+    const annotations = {};
+    const add = (id, label, kind) => {
+      if (!annotations[id]) annotations[id] = { labels: [] };
+      annotations[id].labels.push({ label, kind });
+    };
+    returned.forEach((result, id) => add(id, `↩ ${result.gain}`, "mps124-returned"));
+    activePath.forEach((entry, index) => add(entry.node.id, `CALL ${index + 1}`, "mps124-path"));
+    globalPathIds.forEach((id) => add(id, final ? "FINAL" : `BEST ${globalSum}`, final ? "mps124-final" : "mps124-best"));
+    (candidatePathIds || []).forEach((id) => add(id, "CAND", "mps124-candidate"));
+    if (current) add(current.id, "CURRENT", "mps124-current");
+    return annotations;
+  };
+  const pushStep = ({
+    line,
+    timing,
+    phase,
+    event,
+    title,
+    note,
+    current = null,
+    nextCall = null,
+    locals = null,
+    candidate = null,
+    globalBefore = globalInitialized ? globalSum : null,
+    globalAfter = globalInitialized ? globalSum : null,
+    globalUpdated = null,
+    returnedResult = null,
+    final = false,
+  }) => {
+    const leftRaw = locals ? locals.leftRaw : null;
+    const leftClamped = locals ? locals.leftClamped : null;
+    const rightRaw = locals ? locals.rightRaw : null;
+    const rightClamped = locals ? locals.rightClamped : null;
+    const left = current ? childState(current.left, locals && locals.leftResult, leftRaw, leftClamped) : null;
+    const right = current ? childState(current.right, locals && locals.rightResult, rightRaw, rightClamped) : null;
+    const candidatePathIds = candidate ? [...candidate.pathIds] : [];
+    const candidatePathValues = candidate ? [...candidate.pathValues] : [];
+    const returnedGain = returnedResult ? returnedResult.gain : null;
+    const returnedPathIds = returnedResult ? [...returnedResult.pathIds] : [];
+    const returnedPathValues = returnedResult ? [...returnedResult.pathValues] : [];
+    const chosenArm = returnedResult ? returnedResult.chosenArm : null;
+    const stack = stackState();
+    const path = pathState();
+    const finalWitness = final ? new Set(globalPathIds) : null;
+    const activeWitness = new Set(activePath.map((entry) => entry.node.id));
+    const treeStep = snapshot(root, {
+      title,
+      hlSet: new Set(current ? [current.id] : []),
+      wordSet: finalWitness || activeWitness,
+      annotations: annotationsFor(current, candidatePathIds, final),
+      codeLines: [line],
+      vars: [
+        { name: "node", value: current ? current.val : "None" },
+        { name: "left_raw", value: leftRaw },
+        { name: "left_gain", value: leftClamped },
+        { name: "right_raw", value: rightRaw },
+        { name: "right_gain", value: rightClamped },
+        { name: "candidate", value: candidate ? candidate.sum : null },
+        { name: "max_sum", value: globalInitialized ? globalSum : null },
+        { name: "return", value: returnedGain },
+      ],
+      note,
+    });
+    const pivot = nodeState(globalPivot);
+    const globalPathValues = valuesFor(globalPathIds);
+    const callStackFrames = stack.map((frame) => ({ ...frame }));
+    treeStep.final = final;
+    treeStep.maxPathSum124View = deepFreezeJson({
+      version: 1,
+      problemId: 124,
+      sourceLine: line,
+      timing,
+      phase,
+      event,
+      stages,
+      stage: stageFor(event),
+      current: nodeState(current),
+      nextCall: nextCall ? {
+        side: nextCall.side,
+        depth: nextCall.depth,
+        id: nextCall.node ? nextCall.node.id : null,
+        nodeId: nextCall.node ? nextCall.node.id : null,
+        value: nextCall.node ? nextCall.node.val : null,
+      } : null,
+      path,
+      callStack: callStackFrames,
+      stack,
+      left,
+      right,
+      leftRaw,
+      leftClamped,
+      rightRaw,
+      rightClamped,
+      candidate: candidate ? {
+        sum: candidate.sum,
+        pivot: nodeState(current),
+        pathIds: candidatePathIds,
+        pathValues: candidatePathValues,
+      } : null,
+      candidateSum: candidate ? candidate.sum : null,
+      candidatePathIds,
+      candidatePathValues,
+      global: {
+        initialized: globalInitialized,
+        before: globalBefore,
+        after: globalAfter,
+        updated: globalUpdated,
+        pivot,
+        pathIds: [...globalPathIds],
+        pathValues: globalPathValues,
+      },
+      globalInitialized,
+      globalBefore,
+      globalAfter,
+      globalUpdated,
+      globalPivot: pivot,
+      globalPathIds: [...globalPathIds],
+      globalPathValues,
+      returned: {
+        gain: returnedGain,
+        chosenArm,
+        pathIds: returnedPathIds,
+        pathValues: returnedPathValues,
+      },
+      returnedGain,
+      returnGain: returnedGain,
+      chosenArm,
+      returnedPathIds,
+      returnedPathValues,
+      returnPathIds: returnedPathIds,
+      returnPathValues: returnedPathValues,
+      processed: processed.map((item) => ({
+        ...item,
+        candidatePathIds: [...item.candidatePathIds],
+        candidatePathValues: [...item.candidatePathValues],
+        returnPathIds: [...item.returnPathIds],
+        returnPathValues: [...item.returnPathValues],
+        globalPathIds: [...item.globalPathIds],
+        globalPathValues: [...item.globalPathValues],
+      })),
+      rootReturn,
+      answer: final ? globalSum : null,
+      final,
+    });
+    steps.push(treeStep);
+  };
+
+  pushStep({
+    line: 3,
+    timing: "after",
+    phase: "setup",
+    event: "initialize-best",
+    title: { vi: "Khởi tạo max_sum", en: "Initialize max_sum" },
+    note: { vi: "Payload dùng null + initialized=false thay cho sentinel không hữu hạn để luôn JSON-safe.", en: "The payload uses null plus initialized=false instead of serializing an unbounded sentinel." },
+  });
+  pushStep({
+    line: 4,
+    timing: "after",
+    phase: "setup",
+    event: "define-gain",
+    title: { vi: "Định nghĩa gain(node)", en: "Define gain(node)" },
+    note: { vi: "Mỗi lời gọi trả về một path một tay bắt đầu tại node.", en: "Each call returns a one-arm path that starts at its node." },
+  });
+  pushStep({
+    line: 10,
+    timing: "before",
+    phase: "root-call",
+    event: "call-root",
+    title: { vi: `Gọi gain(root=${root.val})`, en: `Call gain(root=${root.val})` },
+    note: { vi: "Bắt đầu DFS hậu tự từ root.", en: "Start postorder DFS at the root." },
+    nextCall: { node: root, side: "root", depth: 0 },
+  });
+
+  function gain(node, side) {
+    const frame = {
+      node,
+      side,
+      depth: callStack.length,
+      stage: "check-node",
+      leftRaw: null,
+      leftClamped: null,
+      rightRaw: null,
+      rightClamped: null,
+    };
+    callStack.push(frame);
+    if (node) activePath.push({ node, side });
+    pushStep({
+      line: 5,
+      timing: "before",
+      phase: "base-case",
+      event: "check-node",
+      title: node
+        ? { vi: `Kiểm tra node ${node.val}`, en: `Check node ${node.val}` }
+        : { vi: `Kiểm tra ${side}: None`, en: `Check ${side}: None` },
+      note: node
+        ? { vi: "Node tồn tại nên tiếp tục tính hai gain con.", en: "The node exists, so continue with both child gains." }
+        : { vi: "None kích hoạt base case trên cùng dòng.", en: "None triggers the base case on this line." },
+      current: node,
+    });
+    if (!node) {
+      frame.stage = "return-zero";
+      const zeroResult = { gain: 0, chosenArm: "none", pathIds: [], pathValues: [] };
+      pushStep({
+        line: 5,
+        timing: "after",
+        phase: "base-case",
+        event: "return-zero",
+        title: { vi: `${side}: None trả 0`, en: `${side}: None returns 0` },
+        note: { vi: "Nhánh rỗng có raw gain bằng 0.", en: "An empty branch has raw gain zero." },
+        returnedResult: zeroResult,
+      });
+      callStack.pop();
+      return zeroResult;
+    }
+
+    const locals = {
+      leftResult: null,
+      leftRaw: null,
+      leftClamped: null,
+      rightResult: null,
+      rightRaw: null,
+      rightClamped: null,
+      candidateSum: null,
+      candidatePathIds: [],
+      candidatePathValues: [],
+    };
+
+    frame.stage = "call-left";
+    pushStep({
+      line: 6,
+      timing: "before",
+      phase: "left-gain",
+      event: "call-left",
+      title: { vi: `Gọi gain(left) của ${node.val}`, en: `Call gain(left) of ${node.val}` },
+      note: { vi: "Lấy raw gain trước khi áp dụng max(raw, 0).", en: "Obtain the raw gain before applying max(raw, 0)." },
+      current: node,
+      nextCall: { node: node.left, side: "left", depth: callStack.length },
+      locals,
+    });
+    locals.leftResult = gain(node.left, "left");
+    locals.leftRaw = locals.leftResult.gain;
+    frame.leftRaw = locals.leftRaw;
+    frame.stage = "raw-left-return";
+    pushStep({
+      line: 6,
+      timing: "after",
+      phase: "left-gain",
+      event: "raw-left-return",
+      title: { vi: `Raw trái = ${locals.leftRaw}`, en: `Left raw gain = ${locals.leftRaw}` },
+      note: { vi: "Giữ nguyên gain âm để minh họa giá trị thật do child trả về.", en: "Keep a negative raw gain visible as the child's actual return value." },
+      current: node,
+      locals,
+    });
+    locals.leftClamped = Math.max(locals.leftRaw, 0);
+    frame.leftClamped = locals.leftClamped;
+    frame.stage = "clamp-left";
+    pushStep({
+      line: 6,
+      timing: "after",
+      phase: "left-gain",
+      event: "clamp-left",
+      title: { vi: `left_gain = max(${locals.leftRaw}, 0) = ${locals.leftClamped}`, en: `left_gain = max(${locals.leftRaw}, 0) = ${locals.leftClamped}` },
+      note: locals.leftRaw < 0
+        ? { vi: "Bỏ nhánh trái âm khỏi mọi path của parent.", en: "Discard the negative left arm from every parent path." }
+        : { vi: "Nhánh trái không âm nên giữ lại.", en: "The left arm is nonnegative, so keep it." },
+      current: node,
+      locals,
+    });
+
+    frame.stage = "call-right";
+    pushStep({
+      line: 7,
+      timing: "before",
+      phase: "right-gain",
+      event: "call-right",
+      title: { vi: `Gọi gain(right) của ${node.val}`, en: `Call gain(right) of ${node.val}` },
+      note: { vi: "Giữ left_gain đã chặn và đi xuống nhánh phải.", en: "Keep the clamped left gain and descend into the right subtree." },
+      current: node,
+      nextCall: { node: node.right, side: "right", depth: callStack.length },
+      locals,
+    });
+    locals.rightResult = gain(node.right, "right");
+    locals.rightRaw = locals.rightResult.gain;
+    frame.rightRaw = locals.rightRaw;
+    frame.stage = "raw-right-return";
+    pushStep({
+      line: 7,
+      timing: "after",
+      phase: "right-gain",
+      event: "raw-right-return",
+      title: { vi: `Raw phải = ${locals.rightRaw}`, en: `Right raw gain = ${locals.rightRaw}` },
+      note: { vi: "Raw gain phải vẫn chưa bị chặn ở event này.", en: "The right raw gain has not been clamped at this event." },
+      current: node,
+      locals,
+    });
+    locals.rightClamped = Math.max(locals.rightRaw, 0);
+    frame.rightClamped = locals.rightClamped;
+    frame.stage = "clamp-right";
+    pushStep({
+      line: 7,
+      timing: "after",
+      phase: "right-gain",
+      event: "clamp-right",
+      title: { vi: `right_gain = max(${locals.rightRaw}, 0) = ${locals.rightClamped}`, en: `right_gain = max(${locals.rightRaw}, 0) = ${locals.rightClamped}` },
+      note: locals.rightRaw < 0
+        ? { vi: "Bỏ nhánh phải âm khỏi mọi path của parent.", en: "Discard the negative right arm from every parent path." }
+        : { vi: "Nhánh phải không âm nên giữ lại.", en: "The right arm is nonnegative, so keep it." },
+      current: node,
+      locals,
+    });
+
+    const leftArmIds = locals.leftClamped > 0 ? [...locals.leftResult.pathIds] : [];
+    const rightArmIds = locals.rightClamped > 0 ? [...locals.rightResult.pathIds] : [];
+    locals.candidateSum = node.val + locals.leftClamped + locals.rightClamped;
+    locals.candidatePathIds = [...leftArmIds].reverse().concat(node.id, rightArmIds);
+    locals.candidatePathValues = valuesFor(locals.candidatePathIds);
+    const candidate = {
+      sum: locals.candidateSum,
+      pathIds: locals.candidatePathIds,
+      pathValues: locals.candidatePathValues,
+    };
+    const bestBefore = globalInitialized ? globalSum : null;
+    frame.stage = "through-candidate";
+    pushStep({
+      line: 8,
+      timing: "before",
+      phase: "through-path",
+      event: "through-candidate",
+      title: { vi: `Candidate qua ${node.val} = ${candidate.sum}`, en: `Candidate through ${node.val} = ${candidate.sum}` },
+      note: { vi: "Candidate có thể dùng cả hai tay dương; global chưa đổi ở frame trước dòng này.", en: "The candidate may use both positive arms; the global value has not changed in this before-frame." },
+      current: node,
+      locals,
+      candidate,
+      globalBefore: bestBefore,
+      globalAfter: bestBefore,
+      globalUpdated: null,
+    });
+
+    const bestUpdated = !globalInitialized || candidate.sum > globalSum;
+    if (bestUpdated) {
+      globalInitialized = true;
+      globalSum = candidate.sum;
+      globalPivot = node;
+      globalPathIds = [...candidate.pathIds];
+    }
+    frame.stage = bestUpdated ? "best-update" : "best-keep";
+    pushStep({
+      line: 8,
+      timing: "after",
+      phase: "global-best",
+      event: bestUpdated ? "best-update" : "best-keep",
+      title: bestUpdated
+        ? { vi: `Cập nhật global: ${bestBefore === null ? "unset" : bestBefore} → ${globalSum}`, en: `Update global: ${bestBefore === null ? "unset" : bestBefore} → ${globalSum}` }
+        : { vi: `Giữ global = ${globalSum}`, en: `Keep global = ${globalSum}` },
+      note: bestUpdated
+        ? { vi: "Chỉ cập nhật khi candidate lớn hơn nghiêm ngặt, nên tie giữ witness đầu tiên.", en: "Update only for a strictly larger candidate, so a tie retains the first witness." }
+        : { vi: "Candidate không lớn hơn nghiêm ngặt; giữ nguyên sum, pivot và witness.", en: "The candidate is not strictly larger; keep the sum, pivot, and witness unchanged." },
+      current: node,
+      locals,
+      candidate,
+      globalBefore: bestBefore,
+      globalAfter: globalSum,
+      globalUpdated: bestUpdated,
+    });
+
+    const bestArm = Math.max(locals.leftClamped, locals.rightClamped);
+    const chosenArm = bestArm === 0 ? "none" : locals.leftClamped >= locals.rightClamped ? "left" : "right";
+    const chosenPath = chosenArm === "left" ? leftArmIds : chosenArm === "right" ? rightArmIds : [];
+    const result = {
+      gain: node.val + bestArm,
+      chosenArm,
+      pathIds: [node.id, ...chosenPath],
+      pathValues: valuesFor([node.id, ...chosenPath]),
+      ...locals,
+    };
+    returned.set(node.id, result);
+    processed.push({
+      id: node.id,
+      value: node.val,
+      leftRaw: locals.leftRaw,
+      leftClamped: locals.leftClamped,
+      rightRaw: locals.rightRaw,
+      rightClamped: locals.rightClamped,
+      candidateSum: candidate.sum,
+      candidatePathIds: [...candidate.pathIds],
+      candidatePathValues: [...candidate.pathValues],
+      globalAfter: globalSum,
+      globalUpdated: bestUpdated,
+      globalPathIds: [...globalPathIds],
+      globalPathValues: valuesFor(globalPathIds),
+      returnGain: result.gain,
+      chosenArm,
+      returnPathIds: [...result.pathIds],
+      returnPathValues: [...result.pathValues],
+    });
+    frame.stage = "return-one-arm";
+    pushStep({
+      line: 9,
+      timing: "after",
+      phase: "return-gain",
+      event: "return-one-arm",
+      title: { vi: `Return một tay = ${result.gain}`, en: `Return one arm = ${result.gain}` },
+      note: chosenArm === "none"
+        ? { vi: "Không tay dương nào được nối; chỉ trả node hiện tại.", en: "No positive arm is attached; return the current node alone." }
+        : { vi: `Chỉ tay ${chosenArm === "left" ? "trái" : "phải"} đi lên cha; tie dương ưu tiên trái.`, en: `Only the ${chosenArm} arm goes to the parent; positive ties prefer the left arm.` },
+      current: node,
+      locals,
+      candidate,
+      returnedResult: result,
+    });
+    activePath.pop();
+    callStack.pop();
+    return result;
+  }
+
+  const rootResult = gain(root, "root");
+  rootReturn = rootResult.gain;
+  pushStep({
+    line: 10,
+    timing: "after",
+    phase: "root-call",
+    event: "root-returned",
+    title: { vi: `gain(root) trả ${rootReturn}`, en: `gain(root) returns ${rootReturn}` },
+    note: { vi: "Root return chỉ mang một tay và có thể khác đáp án global.", en: "The root return carries only one arm and may differ from the global answer." },
+    current: root,
+    locals: rootResult,
+    candidate: {
+      sum: rootResult.candidateSum,
+      pathIds: rootResult.candidatePathIds,
+      pathValues: rootResult.candidatePathValues,
+    },
+    returnedResult: rootResult,
+  });
+  pushStep({
+    line: 11,
+    timing: "after",
+    phase: "done",
+    event: "done",
+    title: { vi: `Maximum path sum = ${globalSum}`, en: `Maximum path sum = ${globalSum}` },
+    note: { vi: `Đáp án global là ${globalSum}; root return riêng biệt là ${rootReturn}.`, en: `The global answer is ${globalSum}; the distinct root return is ${rootReturn}.` },
+    returnedResult: rootResult,
+    final: true,
+  });
+  return { input, answer: globalSum, steps };
 }
 
 // ─── 1022: Sum of Root To Leaf Binary Numbers ───
@@ -9971,6 +10391,7 @@ module.exports = {
     defaultInput: "-10,9,20,null,null,15,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],
+    debugMode: "line-by-line",
     approach: [
       { vi: "Postorder tu duoi len. Tai moi node, lay left_gain = max(gain(left), 0), right_gain = max(gain(right), 0).", en: "Postorder bottom-up. At each node, use left_gain = max(gain(left), 0), right_gain = max(gain(right), 0)." },
       { vi: "Duong di tot nhat DI QUA node = node.val + left_gain + right_gain; dung gia tri nay de cap nhat max_sum.", en: "Best path THROUGH a node = node.val + left_gain + right_gain; use it to update max_sum." },
