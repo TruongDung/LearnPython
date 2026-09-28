@@ -290,7 +290,7 @@ test('76 renderer covers every trace state in English and Vietnamese', () => {
       }
     }
   }
-  assert.match(script, /else if \(step\.minWindow76View\)/);
+  assert.match(script, /Boolean\(step\.minWindow76View\)/);
 });
 
 test('76 renderer marks the window, the best window and both cursors', () => {

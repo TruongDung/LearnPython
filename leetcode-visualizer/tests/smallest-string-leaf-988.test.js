@@ -216,5 +216,5 @@ test('988 custom renderer stays complete in English and Vietnamese', () => {
   assert.ok(treeTargets.every(targetId => targetId === 'sl988Tree'));
   assert.match(styles, /\.sl988-layout/);
   assert.match(styles, /@container \(max-width: 760px\) \{ \.sl988-layout/);
-  assert.match(script, /else if \(step\.smallestLeaf988View\)/);
+  assert.match(script, /Boolean\(step\.smallestLeaf988View\)/);
 });

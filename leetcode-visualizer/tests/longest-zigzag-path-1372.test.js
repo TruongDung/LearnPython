@@ -216,5 +216,5 @@ test('1372 custom renderer stays complete in English and Vietnamese', () => {
   assert.ok(treeTargets.every(targetId => targetId === 'zz1372Tree'));
   assert.match(styles, /\.zz1372-layout/);
   assert.match(styles, /@container \(max-width: 520px\)/);
-  assert.match(script, /else if \(step\.zigzag1372View\)/);
+  assert.match(script, /Boolean\(step\.zigzag1372View\)/);
 });

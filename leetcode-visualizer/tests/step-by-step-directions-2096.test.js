@@ -412,7 +412,7 @@ test('2096 renderer covers every trace state in English and Vietnamese', () => {
   }
   assert.ok(treeTargets.length > 0);
   assert.ok(treeTargets.every((targetId) => targetId === 'dir2096Tree'), 'the tree must render into the scoped id');
-  assert.match(script, /else if \(step\.directions2096View\)/);
+  assert.match(script, /Boolean\(step\.directions2096View\)/);
 });
 
 test('2096 answer strip separates the U prefix from the descent letters', () => {

@@ -282,7 +282,7 @@ test('3524 renderer covers every trace state in English and Vietnamese', () => {
       }
     }
   }
-  assert.match(script, /else if \(step\.findXValue3524View\)/);
+  assert.match(script, /Boolean\(step\.findXValue3524View\)/);
 });
 
 test('3524 renderer lights the column of subarrays currently being counted', () => {

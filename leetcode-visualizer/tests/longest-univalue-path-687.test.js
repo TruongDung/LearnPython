@@ -219,5 +219,5 @@ test('687 custom renderer remains complete in English and Vietnamese', () => {
   assert.ok(treeTargets.every(targetId => targetId === 'uv687Tree'));
   assert.match(styles, /\.uv687-layout/);
   assert.match(styles, /@container \(max-width: 760px\)/);
-  assert.match(script, /else if \(step\.univaluePath687View\)/);
+  assert.match(script, /Boolean\(step\.univaluePath687View\)/);
 });

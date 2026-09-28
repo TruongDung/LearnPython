@@ -211,5 +211,5 @@ test('1457 custom renderer remains complete in English and Vietnamese', () => {
   assert.ok(treeTargets.every(targetId => targetId === 'pp1457Tree'));
   assert.match(styles, /\.pp1457-layout/);
   assert.match(styles, /@container \(max-width: 760px\) \{ \.pp1457-layout/);
-  assert.match(script, /else if \(step\.pseudoPalindrome1457View\)/);
+  assert.match(script, /Boolean\(step\.pseudoPalindrome1457View\)/);
 });

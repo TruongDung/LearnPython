@@ -36408,6 +36408,1019 @@ function renderReverseParen1190View(step) {
   </section>`;
 }
 
+const PRIMARY_VISUALIZATION_SURFACES = ["bars", "treeView", "gridView", "bfsGridView", "liveVarsView"];
+
+function setPrimaryVisualizationSurface(visibleSurface) {
+  PRIMARY_VISUALIZATION_SURFACES.forEach((surface) => {
+    $(surface).classList.toggle("hidden", surface !== visibleSurface);
+  });
+}
+
+const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
+      renderLiveVarsView(step);
+    } },
+    { predicate: (step) => Boolean(step.reverseParen1190View), surface: "treeView", render: (step) => {
+      renderReverseParen1190View(step);
+    } },
+    { predicate: (step) => Boolean(step.calendar731View), surface: "treeView", render: (step) => {
+      renderCalendar731View(step);
+    } },
+    { predicate: (step) => Boolean(step.calendar729View), surface: "treeView", render: (step) => {
+      renderCalendar729View(step);
+    } },
+    { predicate: (step) => Boolean(step.rangeModuleView), surface: "treeView", render: (step) => {
+      renderRangeModuleView(step);
+    } },
+    { predicate: (step) => Boolean(step.calendarView), surface: "treeView", render: (step) => {
+      renderCalendarView(step);
+    } },
+    { predicate: (step) => Boolean(step.goodSubseqView), surface: "treeView", render: (step) => {
+      renderGoodSubseqView(step);
+    } },
+    { predicate: (step) => Boolean(step.nextPermutationView), surface: "treeView", render: (step) => {
+      renderNextPermutation31View(step);
+    } },
+    { predicate: (step) => Boolean(step.permutation46View), surface: "treeView", render: (step) => {
+      renderPermutation46View(step);
+    } },
+    { predicate: (step) => Boolean(step.lexPermutationView), surface: "treeView", render: (step) => {
+      renderLexPermutation3720View(step);
+    } },
+    { predicate: (step) => Boolean(step.palindrome3734View), surface: "treeView", render: (step) => {
+      renderPalindromicPermutation3734View(step);
+    } },
+    { predicate: (step) => Boolean(step.ticketsView), surface: "treeView", render: (step) => {
+      renderTicketsView(step);
+    } },
+    { predicate: (step) => Boolean(step.stockCooldownView), surface: "treeView", render: (step) => {
+      renderStockCooldownView(step);
+    } },
+    { predicate: (step) => Boolean(step.maximalSquareView), surface: "treeView", render: (step) => {
+      renderMaximalSquareView(step);
+    } },
+    { predicate: (step) => Boolean(step.numberOfLISView), surface: "treeView", render: (step) => {
+      renderNumberOfLISView(step);
+    } },
+    { predicate: (step) => Boolean(step.lis2407View), surface: "treeView", render: (step) => {
+      renderLIS2407View(step);
+    } },
+    { predicate: (step) => Boolean(step.wordLadder126View), surface: "treeView", render: (step) => {
+      renderWordLadder126View(step);
+    } },
+    { predicate: (step) => Boolean(step.houseRobberView), surface: "treeView", render: (step) => {
+      renderHouseRobberView(step);
+    } },
+    { predicate: (step) => Boolean(step.minCostStairsView), surface: "treeView", render: (step) => {
+      renderMinCostStairsView(step);
+    } },
+    { predicate: (step) => Boolean(step.twoEvents2054View), surface: "treeView", render: (step) => {
+      renderTwoEvents2054View(step);
+    } },
+    { predicate: (step) => Boolean(step.weightedIntervals3414View), surface: "treeView", render: (step) => {
+      renderWeightedIntervals3414View(step);
+    } },
+    { predicate: (step) => Boolean(step.advancedBitmaskView), surface: "treeView", render: (step) => {
+      renderAdvancedBitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.bitmaskBasicsView), surface: "treeView", render: (step) => {
+      renderBitmaskBasicsView(step);
+    } },
+    { predicate: (step) => Boolean(step.countBitsView), surface: "treeView", render: (step) => {
+      renderCountBitsView(step);
+    } },
+    { predicate: (step) => Boolean(step.wordBreakView), surface: "treeView", render: (step) => {
+      renderWordBreakView(step);
+    } },
+    { predicate: (step) => Boolean(step.cinemaSeatView), surface: "treeView", render: (step) => {
+      renderCinemaSeatView(step);
+    } },
+    { predicate: (step) => Boolean(step.coinChangeView), surface: "treeView", render: (step) => {
+      renderCoinChangeView(step);
+    } },
+    { predicate: (step) => Boolean(step.missingNumberView), surface: "treeView", render: (step) => {
+      renderMissingNumberView(step);
+    } },
+    { predicate: (step) => Boolean(step.almostMissingView), surface: "treeView", render: (step) => {
+      renderAlmostMissingView(step);
+    } },
+    { predicate: (step) => Boolean(step.pascalTriangleView), surface: "treeView", render: (step) => {
+      renderPascalTriangleView(step);
+    } },
+    { predicate: (step) => Boolean(step.fibonacciView), surface: "treeView", render: (step) => {
+      renderFibonacciView(step);
+    } },
+    { predicate: (step) => Boolean(step.tribonacciView), surface: "treeView", render: (step) => {
+      renderTribonacciView(step);
+    } },
+    { predicate: (step) => Boolean(step.climbingStairsView), surface: "treeView", render: (step) => {
+      renderClimbingStairsView(step);
+    } },
+    { predicate: (step) => Boolean(step.mapSumView), surface: "treeView", render: (step) => {
+      renderMapSumView(step);
+    } },
+    { predicate: (step) => Boolean(step.longestDupView), surface: "treeView", render: (step) => {
+      renderLongestDuplicateView(step);
+    } },
+    { predicate: (step) => Boolean(step.clearStarsView), surface: "treeView", render: (step) => {
+      renderClearStarsView(step);
+    } },
+    { predicate: (step) => Boolean(step.validSequenceView), surface: "treeView", render: (step) => {
+      renderValidSequenceView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixAverageView), surface: "treeView", render: (step) => {
+      renderPrefixAverageView(step);
+    } },
+    { predicate: (step) => Boolean(step.replaceGreatestView), surface: "treeView", render: (step) => {
+      renderReplaceGreatestView(step);
+    } },
+    { predicate: (step) => Boolean(step.mountainArrayView), surface: "treeView", render: (step) => {
+      renderMountainArrayView(step);
+    } },
+    { predicate: (step) => Boolean(step.houses2320View), surface: "treeView", render: (step) => {
+      renderHouses2320View(step);
+    } },
+    { predicate: (step) => Boolean(step.stoneGame1690View), surface: "treeView", render: (step) => {
+      renderStoneGame1690View(step);
+    } },
+    { predicate: (step) => Boolean(step.pizza1388View), surface: "treeView", render: (step) => {
+      renderPizza1388View(step);
+    } },
+    { predicate: (step) => Boolean(step.brainpower2140View), surface: "treeView", render: (step) => {
+      renderBrainpower2140View(step);
+    } },
+    { predicate: (step) => Boolean(step.deleteEarn740View), surface: "treeView", render: (step) => {
+      renderDeleteEarn740View(step);
+    } },
+    { predicate: (step) => Boolean(step.maxProductView), surface: "treeView", render: (step) => {
+      renderMaximumProductView(step);
+    } },
+    { predicate: (step) => Boolean(step.productSubarrayView), surface: "treeView", render: (step) => {
+      renderProductSubarrayView(step);
+    } },
+    { predicate: (step) => Boolean(step.minimumSubarrayView), surface: "treeView", render: (step) => {
+      renderMinimumSubarrayView(step);
+    } },
+    { predicate: (step) => Boolean(step.twoSubarrays1477View), surface: "treeView", render: (step) => {
+      renderTwoSubarrays1477View(step);
+    } },
+    { predicate: (step) => Boolean(step.averageWindowView), surface: "treeView", render: (step) => {
+      renderAverageWindowView(step);
+    } },
+    { predicate: (step) => Boolean(step.rectangleSweepView), surface: "treeView", render: (step) => {
+      renderRectangleSweepView(step);
+    } },
+    { predicate: (step) => Boolean(step.kruskalEffortView), surface: "treeView", render: (step) => {
+      renderKruskalEffortView(step);
+    } },
+    { predicate: (step) => Boolean(step.waterDistributionView), surface: "treeView", render: (step) => {
+      renderWaterDistributionView(step);
+    } },
+    { predicate: (step) => Boolean(step.connectCitiesView), surface: "treeView", render: (step) => {
+      renderConnectCitiesView(step);
+    } },
+    { predicate: (step) => Boolean(step.bricks803View), surface: "treeView", render: (step) => {
+      renderBricks803View(step);
+    } },
+    { predicate: (step) => Boolean(step.malware928View), surface: "treeView", render: (step) => {
+      renderMalware928View(step);
+    } },
+    { predicate: (step) => Boolean(step.malware924View), surface: "treeView", render: (step) => {
+      renderMalware924View(step);
+    } },
+    { predicate: (step) => Boolean(step.countPairs2316View), surface: "treeView", render: (step) => {
+      renderCountPairs2316View(step);
+    } },
+    { predicate: (step) => Boolean(step.equalityEquationsView), surface: "treeView", render: (step) => {
+      renderEqualityEquationsView(step);
+    } },
+    { predicate: (step) => Boolean(step.multiplesIeView), surface: "treeView", render: (step) => {
+      renderMultiplesIeView(step);
+    } },
+    { predicate: (step) => Boolean(step.stones947View), surface: "treeView", render: (step) => {
+      renderStones947View(step);
+    } },
+    { predicate: (step) => Boolean(step.equivalent1061View), surface: "treeView", render: (step) => {
+      renderEquivalent1061View(step);
+    } },
+    { predicate: (step) => Boolean(step.islands305View), surface: "treeView", render: (step) => {
+      renderIslands305View(step);
+    } },
+    { predicate: (step) => Boolean(step.parallelCoursesView), surface: "treeView", render: (step) => {
+      renderParallelCoursesView(step);
+    } },
+    { predicate: (step) => Boolean(step.loudRichView || step.loudRichV2), surface: "treeView", render: (step) => {
+      renderLoudRichView(step);
+    } },
+    { predicate: (step) => Boolean(step.lruCacheView), surface: "treeView", render: (step) => {
+      renderLruCacheView(step);
+    } },
+    { predicate: (step) => Boolean(step.lfuCacheView), surface: "treeView", render: (step) => {
+      renderLfuCacheView(step);
+    } },
+    { predicate: (step) => Boolean(step.musicPlayerView), surface: "treeView", render: (step) => {
+      renderMusicPlayerView(step);
+    } },
+    { predicate: (step) => Boolean(step.rideSharingView), surface: "treeView", render: (step) => {
+      renderRideSharingView(step);
+    } },
+    { predicate: (step) => Boolean(step.kthPalindromeView), surface: "treeView", render: (step) => {
+      renderKthPalindromeView(step);
+    } },
+    { predicate: (step) => Boolean(step.palindromeBuildView), surface: "treeView", render: (step) => {
+      renderPalindromeBuildView(step);
+    } },
+    { predicate: (step) => Boolean(step.occurrenceLookupView), surface: "treeView", render: (step) => {
+      renderOccurrenceLookupView(step);
+    } },
+    { predicate: (step) => Boolean(step.duplicateZerosView), surface: "treeView", render: (step) => {
+      renderDuplicateZerosView(step);
+    } },
+    { predicate: (step) => Boolean(step.gcdPairsView), surface: "treeView", render: (step) => {
+      renderGcdPairsView(step);
+    } },
+    { predicate: (step) => Boolean(step.rotateArray189View), surface: "treeView", render: (step) => {
+      renderRotateArray189View(step);
+    } },
+    { predicate: (step) => Boolean(step.rotatedSearch81View), surface: "treeView", render: (step) => {
+      renderRotatedSearch81View(step);
+    } },
+    { predicate: (step) => Boolean(step.rotatedSearchView), surface: "treeView", render: (step) => {
+      renderRotatedSearchView(step);
+    } },
+    { predicate: (step) => Boolean(step.findMinRotatedView), surface: "treeView", render: (step) => {
+      renderFindMinRotatedView(step);
+    } },
+    { predicate: (step) => Boolean(step.twitterView), surface: "treeView", render: (step) => {
+      renderTwitterView(step);
+    } },
+    { predicate: (step) => Boolean(step.profitTrackerView), surface: "treeView", render: (step) => {
+      renderProfitTrackerView(step);
+    } },
+    { predicate: (step) => Boolean(step.cyclicSortView), surface: "treeView", render: (step) => {
+      renderCyclicSortView(step);
+    } },
+    { predicate: (step) => Boolean(step.mergeIntervalsView), surface: "treeView", render: (step) => {
+      renderMergeIntervalsView(step);
+    } },
+    { predicate: (step) => Boolean(step.meetingRoomsTimelineView), surface: "treeView", render: (step) => {
+      renderMeetingRoomsTimelineView(step);
+    } },
+    { predicate: (step) => Boolean(step.pairChainView), surface: "treeView", render: (step) => {
+      renderPairChainView(step);
+    } },
+    { predicate: (step) => Boolean(step.meetingTimelineView), surface: "treeView", render: (step) => {
+      renderMeetingTimelineView(step);
+    } },
+    { predicate: (step) => Boolean(step.skylineView), surface: "treeView", render: (step) => {
+      renderSkylineView(step);
+    } },
+    { predicate: (step) => Boolean(step.bfsLevelView), surface: "treeView", render: (step) => {
+      renderBfsLevelView(step);
+    } },
+    { predicate: (step) => Boolean(step.pathSumIIIView), surface: "treeView", render: (step) => {
+      renderPathSumIIIView(step);
+    } },
+    { predicate: (step) => Boolean(step.rootLeafNumber129View), surface: "treeView", render: (step) => {
+      renderRootLeafNumber129View(step);
+    } },
+    { predicate: (step) => Boolean(step.smallestLeaf988View), surface: "treeView", render: (step) => {
+      renderSmallestLeaf988View(step);
+    } },
+    { predicate: (step) => Boolean(step.pseudoPalindrome1457View), surface: "treeView", render: (step) => {
+      renderPseudoPalindrome1457View(step);
+    } },
+    { predicate: (step) => Boolean(step.univaluePath687View), surface: "treeView", render: (step) => {
+      renderUnivaluePath687View(step);
+    } },
+    { predicate: (step) => Boolean(step.zigzag1372View), surface: "treeView", render: (step) => {
+      renderLongestZigzag1372View(step);
+    } },
+    { predicate: (step) => Boolean(step.lca236View), surface: "treeView", render: (step) => {
+      renderLca236View(step);
+    } },
+    { predicate: (step) => Boolean(step.directions2096View), surface: "treeView", render: (step) => {
+      renderDirections2096View(step);
+    } },
+    { predicate: (step) => Boolean(step.reverseDegree3498View), surface: "treeView", render: (step) => {
+      renderReverseDegree3498View(step);
+    } },
+    { predicate: (step) => Boolean(step.findXValue3524View), surface: "treeView", render: (step) => {
+      renderFindXValue3524View(step);
+    } },
+    { predicate: (step) => Boolean(step.minWindow76View), surface: "treeView", render: (step) => {
+      renderMinWindow76View(step);
+    } },
+    { predicate: (step) => Boolean(step.findXValue3525View), surface: "treeView", render: (step) => {
+      renderFindXValue3525View(step);
+    } },
+    { predicate: (step) => Boolean(step.treeEssentialsView), surface: "treeView", render: (step) => {
+      renderTreeEssentialsView(step);
+    } },
+    { predicate: (step) => Boolean(step.sameTreeView), surface: "treeView", render: (step) => {
+      renderSameTreeView(step);
+    } },
+    { predicate: (step) => Boolean(step.sortedListBstView), surface: "treeView", render: (step) => {
+      renderSortedListBstView(step);
+    } },
+    { predicate: (step) => Boolean(step.recoverBstView), surface: "treeView", render: (step) => {
+      renderRecoverBstView(step);
+    } },
+    { predicate: (step) => Boolean(step.wordSearchIIView), surface: "treeView", render: (step) => {
+      renderWordSearchIIView(step);
+    } },
+    { predicate: (step) => Boolean(step.wordSearchView), surface: "treeView", render: (step) => {
+      renderWordSearchView(step);
+    } },
+    { predicate: (step) => Boolean(step.keypadPushView), surface: "treeView", render: (step) => {
+      renderKeypadPushView(step);
+    } },
+    { predicate: (step) => Boolean(step.keypadHeapView), surface: "treeView", render: (step) => {
+      renderKeypadHeapView(step);
+    } },
+    { predicate: (step) => Boolean(step.stoneGameIIView), surface: "treeView", render: (step) => {
+      renderStoneGameIIView(step);
+    } },
+    { predicate: (step) => Boolean(step.stoneGameIVView), surface: "treeView", render: (step) => {
+      renderStoneGameIVView(step);
+    } },
+    { predicate: (step) => Boolean(step.stoneGameView), surface: "treeView", render: (step) => {
+      renderStoneGameView(step);
+    } },
+    { predicate: (step) => Boolean(step.predictWinnerView), surface: "treeView", render: (step) => {
+      renderPredictWinnerView(step);
+    } },
+    { predicate: (step) => Boolean(step.rectangleAreaView), surface: "treeView", render: (step) => {
+      renderRectangleAreaView(step);
+    } },
+    { predicate: (step) => Boolean(step.buildingBoxesView), surface: "treeView", render: (step) => {
+      renderBuildingBoxesView(step);
+    } },
+    { predicate: (step) => Boolean(step.networkDelayView), surface: "treeView", render: (step) => {
+      renderNetworkDelayView(step);
+    } },
+    { predicate: (step) => Boolean(step.reachable882View), surface: "treeView", render: (step) => {
+      renderReachable882View(step);
+    } },
+    { predicate: (step) => Boolean(step.maze499View), surface: "treeView", render: (step) => {
+      renderMaze499View(step);
+    } },
+    { predicate: (step) => Boolean(step.restricted1786View), surface: "treeView", render: (step) => {
+      renderRestricted1786View(step);
+    } },
+    { predicate: (step) => Boolean(step.multiDijkstra2203View), surface: "treeView", render: (step) => {
+      renderMultiDijkstra2203View(step);
+    } },
+    { predicate: (step) => Boolean(step.pathExistsDfsView), surface: "treeView", render: (step) => {
+      renderPathExistsDfsView(step);
+    } },
+    { predicate: (step) => Boolean(step.pathExistsBfsView), surface: "treeView", render: (step) => {
+      renderPathExistsBfsView(step);
+    } },
+    { predicate: (step) => Boolean(step.bipartiteView), surface: "treeView", render: (step) => {
+      renderBipartiteView(step);
+    } },
+    { predicate: (step) => Boolean(step.autocompleteView), surface: "treeView", render: (step) => {
+      renderAutocompleteView(step);
+    } },
+    { predicate: (step) => Boolean(step.fileSystemView), surface: "treeView", render: (step) => {
+      renderFileSystemView(step);
+    } },
+    { predicate: (step) => Boolean(step.wordDictionaryView), surface: "treeView", render: (step) => {
+      renderWordDictionaryView(step);
+    } },
+    { predicate: (step) => Boolean(step.replaceWordsView), surface: "treeView", render: (step) => {
+      renderReplaceWordsView(step);
+    } },
+    { predicate: (step) => Boolean(step.bstIteratorView), surface: "treeView", render: (step) => {
+      renderBstIteratorView(step);
+    } },
+    { predicate: (step) => Boolean(step.closestBst270View), surface: "treeView", render: (step) => {
+      renderClosestBst270View(step);
+    } },
+    { predicate: (step) => Boolean(step.boundary545View), surface: "treeView", render: (step) => {
+      renderBoundary545View(step);
+    } },
+    { predicate: (step) => Boolean(step.consecutive549View), surface: "treeView", render: (step) => {
+      renderConsecutive549View(step);
+    } },
+    { predicate: (step) => Boolean(step.closestLeaf742View), surface: "treeView", render: (step) => {
+      renderClosestLeaf742View(step);
+    } },
+    { predicate: (step) => Boolean(step.inorderSuccessor510View), surface: "treeView", render: (step) => {
+      renderInorderSuccessor510View(step);
+    } },
+    { predicate: (step) => Boolean(step.inorderSuccessor285View), surface: "treeView", render: (step) => {
+      renderInorderSuccessor285View(step);
+    } },
+    { predicate: (step) => Boolean(step.closestBst272View), surface: "treeView", render: (step) => {
+      renderClosestBst272View(step);
+    } },
+    { predicate: (step) => Boolean(step.palPathView), surface: "treeView", render: (step) => {
+      renderPalindromePathView(step);
+    } },
+    { predicate: (step) => Boolean(step.separate1977View), surface: "treeView", render: (step) => {
+      renderSeparate1977View(step);
+    } },
+    { predicate: (step) => Boolean(step.missing3718View), surface: "treeView", render: (step) => {
+      renderMissing3718View(step);
+    } },
+    { predicate: (step) => Boolean(step.russian354View), surface: "treeView", render: (step) => {
+      renderRussian354View(step);
+    } },
+    { predicate: (step) => Boolean(step.paren32View), surface: "treeView", render: (step) => {
+      renderParen32View(step);
+    } },
+    { predicate: (step) => Boolean(step.wordBreakIIView), surface: "treeView", render: (step) => {
+      renderWordBreakIIView(step);
+    } },
+    { predicate: (step) => Boolean(step.mountain1095View), surface: "treeView", render: (step) => {
+      renderMountain1095View(step);
+    } },
+    { predicate: (step) => Boolean(step.directed685View), surface: "treeView", render: (step) => {
+      renderDirected685View(step);
+    } },
+    { predicate: (step) => Boolean(step.employee690View), surface: "treeView", render: (step) => {
+      renderEmployee690View(step);
+    } },
+    { predicate: (step) => Boolean(step.videos1311View), surface: "treeView", render: (step) => {
+      renderVideos1311View(step);
+    } },
+    { predicate: (step) => Boolean(step.bombs2101View), surface: "treeView", render: (step) => {
+      renderBombs2101View(step);
+    } },
+    { predicate: (step) => Boolean(step.throne1600View), surface: "treeView", render: (step) => {
+      renderThrone1600View(step);
+    } },
+    { predicate: (step) => Boolean(step.nary429View), surface: "treeView", render: (step) => {
+      renderNary429View(step);
+    } },
+    { predicate: (step) => Boolean(step.rotation1886View), surface: "treeView", render: (step) => {
+      renderRotation1886View(step);
+    } },
+    { predicate: (step) => Boolean(step.convert2022View), surface: "treeView", render: (step) => {
+      renderConvert2022View(step);
+    } },
+    { predicate: (step) => Boolean(step.overlap835View), surface: "treeView", render: (step) => {
+      renderImageOverlap835View(step);
+    } },
+    { predicate: (step) => Boolean(step.search240View), surface: "treeView", render: (step) => {
+      renderSearchMatrix240View(step);
+    } },
+    { predicate: (step) => Boolean(step.search74View), surface: "treeView", render: (step) => {
+      renderSearchMatrix74View(step);
+    } },
+    { predicate: (step) => Boolean(step.zero73View), surface: "treeView", render: (step) => {
+      renderSetMatrixZeroes73View(step);
+    } },
+    { predicate: (step) => Boolean(step.rotate48View), surface: "treeView", render: (step) => {
+      renderRotate48View(step);
+    } },
+    { predicate: (step) => Boolean(step.spiral54View), surface: "treeView", render: (step) => {
+      renderSpiral54View(step);
+    } },
+    { predicate: (step) => Boolean(step.univalue250View), surface: "treeView", render: (step) => {
+      renderUnivalue250View(step);
+    } },
+    { predicate: (step) => Boolean(step.longestConsecutive298View), surface: "treeView", render: (step) => {
+      renderLongestConsecutive298View(step);
+    } },
+    { predicate: (step) => Boolean(step.verticalOrder314View), surface: "treeView", render: (step) => {
+      renderVerticalOrder314View(step);
+    } },
+    { predicate: (step) => Boolean(step.upsideDown156View), surface: "treeView", render: (step) => {
+      renderUpsideDown156View(step);
+    } },
+    { predicate: (step) => Boolean(step.twoSumIIView), surface: "treeView", render: (step) => {
+      renderTwoSumIIView(step);
+    } },
+    { predicate: (step) => Boolean(step.twoSum653HashView), surface: "treeView", render: (step) => {
+      renderTwoSum653HashView(step);
+    } },
+    { predicate: (step) => Boolean(step.twoSum653View), surface: "treeView", render: (step) => {
+      renderTwoSum653View(step);
+    } },
+    { predicate: (step) => Boolean(step.tree), surface: "treeView", render: (step) => {
+      renderTree(step);
+    } },
+    { predicate: (step) => Boolean(step.treeDpLessonView), surface: "treeView", render: (step) => {
+      renderTreeDpLessonView(step);
+    } },
+    { predicate: (step) => Boolean(step.cycle2360View), surface: "treeView", render: (step) => {
+      renderCycle2360View(step);
+    } },
+    { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
+      renderCountPaths1976View(step);
+    } },
+    { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
+      renderGraph(step);
+    } },
+    { predicate: (step) => Boolean(step.shiftGridView), surface: "treeView", render: (step) => {
+      renderShiftGridView(step);
+    } },
+    { predicate: (step) => Boolean(step.transpose867View), surface: "treeView", render: (step) => {
+      renderTranspose867View(step);
+    } },
+    { predicate: (step) => Boolean(step.grid), surface: "gridView", render: (step) => {
+      renderGrid(step);
+    } },
+    { predicate: (step) => Boolean(step.floodFillView), surface: "treeView", render: (step) => {
+      renderFloodFillView(step);
+    } },
+    { predicate: (step) => Boolean(step.virusView), surface: "treeView", render: (step) => {
+      renderVirusView(step);
+    } },
+    { predicate: (step) => Boolean(step.gasStationView), surface: "treeView", render: (step) => {
+      renderGasStationView(step);
+    } },
+    { predicate: (step) => Boolean(step.gasDepositsView), surface: "treeView", render: (step) => {
+      renderGasDepositsView(step);
+    } },
+    { predicate: (step) => Boolean(step.gasCircularView), surface: "treeView", render: (step) => {
+      renderGasCircularView(step);
+    } },
+    { predicate: (step) => Boolean(step.rottingOrangesView), surface: "treeView", render: (step) => {
+      renderRottingOrangesView(step);
+    } },
+    { predicate: (step) => Boolean(step.trapRain2View), surface: "treeView", render: (step) => {
+      renderTrapRain2View(step);
+    } },
+    { predicate: (step) => Boolean(step.descendantSum1973View), surface: "treeView", render: (step) => {
+      renderDescendantSum1973View(step);
+    } },
+    { predicate: (step) => Boolean(step.averageSubtree2265View), surface: "treeView", render: (step) => {
+      renderAverageSubtree2265View(step);
+    } },
+    { predicate: (step) => Boolean(step.distributeCoins979View), surface: "treeView", render: (step) => {
+      renderDistributeCoins979View(step);
+    } },
+    { predicate: (step) => Boolean(step.largestBst333View), surface: "treeView", render: (step) => {
+      renderLargestBst333View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximumSumBst1373View), surface: "treeView", render: (step) => {
+      renderMaximumSumBst1373View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximumAverage1120View), surface: "treeView", render: (step) => {
+      renderMaximumAverage1120View(step);
+    } },
+    { predicate: (step) => Boolean(step.bfsGrid), surface: "bfsGridView", render: (step) => {
+      renderBfsGrid(step);
+    } },
+    { predicate: (step) => Boolean(step.binaryWatch401View), surface: "treeView", render: (step) => {
+      renderBinaryWatch401View(step);
+    } },
+    { predicate: (step) => Boolean(step.subsets90BitmaskView), surface: "treeView", render: (step) => {
+      renderSubsets90BitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.subsets78BitmaskView), surface: "treeView", render: (step) => {
+      renderSubsets78BitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.oddEven975View), surface: "treeView", render: (step) => {
+      renderOddEven975View(step);
+    } },
+    { predicate: (step) => Boolean(step.visibleQueue1944View), surface: "treeView", render: (step) => {
+      renderVisibleQueue1944View(step);
+    } },
+    { predicate: (step) => Boolean(step.maxMin1950View), surface: "treeView", render: (step) => {
+      renderMaxMin1950View(step);
+    } },
+    { predicate: (step) => Boolean(step.distinctSubseq940View), surface: "treeView", render: (step) => {
+      renderDistinctSubseq940View(step);
+    } },
+    { predicate: (step) => Boolean(step.bstPreorder255View), surface: "treeView", render: (step) => {
+      renderBstPreorder255View(step);
+    } },
+    { predicate: (step) => Boolean(step.validSubarrays1063View), surface: "treeView", render: (step) => {
+      renderValidSubarrays1063View(step);
+    } },
+    { predicate: (step) => Boolean(step.totalStrength2281View), surface: "treeView", render: (step) => {
+      renderTotalStrength2281View(step);
+    } },
+    { predicate: (step) => Boolean(step.visibleMountains2345View), surface: "treeView", render: (step) => {
+      renderVisibleMountains2345View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximumSumQueries2736View), surface: "treeView", render: (step) => {
+      renderMaximumSumQueries2736View(step);
+    } },
+    { predicate: (step) => Boolean(step.buildingMeet2940View), surface: "treeView", render: (step) => {
+      renderBuildingMeet2940View(step);
+    } },
+    { predicate: (step) => Boolean(step.productExcept238View), surface: "treeView", render: (step) => {
+      renderProductExcept238View(step);
+    } },
+    { predicate: (step) => Boolean(step.uniqueEven3483View), surface: "treeView", render: (step) => {
+      renderUniqueEven3483View(step);
+    } },
+    { predicate: (step) => Boolean(step.pourWater755View), surface: "treeView", render: (step) => {
+      renderPourWater755View(step);
+    } },
+    { predicate: (step) => Boolean(step.champagne799View), surface: "treeView", render: (step) => {
+      renderChampagne799View(step);
+    } },
+    { predicate: (step) => Boolean(step.diceRoll1223View), surface: "treeView", render: (step) => {
+      renderDiceRoll1223View(step);
+    } },
+    { predicate: (step) => Boolean(step.cyclicShift4052View), surface: "treeView", render: (step) => {
+      renderCyclicShift4052View(step);
+    } },
+    { predicate: (step) => Boolean(step.shadowPairs4054View), surface: "treeView", render: (step) => {
+      renderShadowPairs4054View(step);
+    } },
+    { predicate: (step) => Boolean(step.shadowPairs4055View), surface: "treeView", render: (step) => {
+      renderShadowPairs4055View(step);
+    } },
+    { predicate: (step) => Boolean(step.equallySpaced4048View), surface: "treeView", render: (step) => {
+      renderEquallySpaced4048View(step);
+    } },
+    { predicate: (step) => Boolean(step.equallySpaced4049View), surface: "treeView", render: (step) => {
+      renderEquallySpaced4049View(step);
+    } },
+    { predicate: (step) => Boolean(step.minDays4050View), surface: "treeView", render: (step) => {
+      renderMinDays4050View(step);
+    } },
+    { predicate: (step) => Boolean(step.distantSubarrays4051View), surface: "treeView", render: (step) => {
+      renderDistantSubarrays4051View(step);
+    } },
+    { predicate: (step) => Boolean(step.rectangleArea223View), surface: "treeView", render: (step) => {
+      renderRectangleArea223View(step);
+    } },
+    { predicate: (step) => Boolean(step.rectangleOverlap836View), surface: "treeView", render: (step) => {
+      renderRectangleOverlap836View(step);
+    } },
+    { predicate: (step) => Boolean(step.circleRectangle1401View), surface: "treeView", render: (step) => {
+      renderCircleRectangle1401View(step);
+    } },
+    { predicate: (step) => Boolean(step.orderlyQueue899View), surface: "treeView", render: (step) => {
+      renderOrderlyQueue899View(step);
+    } },
+    { predicate: (step) => Boolean(step.shortestPalindrome214View), surface: "treeView", render: (step) => {
+      renderShortestPalindrome214View(step);
+    } },
+    { predicate: (step) => Boolean(step.palindrome2472View), surface: "treeView", render: (step) => {
+      renderPalindrome2472View(step);
+    } },
+    { predicate: (step) => Boolean(step.lineSegments1621View), surface: "treeView", render: (step) => {
+      renderLineSegments1621View(step);
+    } },
+    { predicate: (step) => Boolean(step.divideString2138View), surface: "treeView", render: (step) => {
+      renderDivideString2138View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximizeScore2818View), surface: "treeView", render: (step) => {
+      renderMaximizeScore2818View(step);
+    } },
+    { predicate: (step) => Boolean(step.minIncrements1526View), surface: "treeView", render: (step) => {
+      renderMinIncrements1526View(step);
+    } },
+    { predicate: (step) => Boolean(step.countCommas3870View), surface: "treeView", render: (step) => {
+      renderCountCommas3870View(step);
+    } },
+    { predicate: (step) => Boolean(step.countCommas3871View), surface: "treeView", render: (step) => {
+      renderCountCommas3871View(step);
+    } },
+    { predicate: (step) => Boolean(step.stable3903View), surface: "treeView", render: (step) => {
+      renderStable3903View(step);
+    } },
+    { predicate: (step) => Boolean(step.criticalPoints2058View), surface: "treeView", render: (step) => {
+      renderCriticalPoints2058View(step);
+    } },
+    { predicate: (step) => Boolean(step.linkedList), surface: "treeView", render: (step) => {
+      renderLinkedList(step);
+    } },
+    { predicate: (step) => Boolean(step.onlineElectionView), surface: "treeView", render: (step) => {
+      renderOnlineElectionView(step);
+    } },
+    { predicate: (step) => Boolean(step.shipCapacityView), surface: "treeView", render: (step) => {
+      renderShipCapacityView(step);
+    } },
+    { predicate: (step) => Boolean(step.kokoSpeedView), surface: "treeView", render: (step) => {
+      renderKokoSpeedView(step);
+    } },
+    { predicate: (step) => Boolean(step.sqrtBinaryView), surface: "treeView", render: (step) => {
+      renderSqrtBinaryView(step);
+    } },
+    { predicate: (step) => Boolean(step.nonOverlapView), surface: "treeView", render: (step) => {
+      renderNonOverlapView(step);
+    } },
+    { predicate: (step) => Boolean(step.leaves366View), surface: "treeView", render: (step) => {
+      renderLeaves366View(step);
+    } },
+    { predicate: (step) => Boolean(step.logger359View), surface: "treeView", render: (step) => {
+      renderLogger359View(step);
+    } },
+    { predicate: (step) => Boolean(step.rleIter900View), surface: "treeView", render: (step) => {
+      renderRleIter900View(step);
+    } },
+    { predicate: (step) => Boolean(step.matchSubseq792View), surface: "treeView", render: (step) => {
+      renderMatchSubseq792View(step);
+    } },
+    { predicate: (step) => Boolean(step.attendance552View), surface: "treeView", render: (step) => {
+      renderAttendance552View(step);
+    } },
+    { predicate: (step) => Boolean(step.battleships419View), surface: "treeView", render: (step) => {
+      renderBattleships419View(step);
+    } },
+    { predicate: (step) => Boolean(step.screenFit418View), surface: "treeView", render: (step) => {
+      renderScreenFit418View(step);
+    } },
+    { predicate: (step) => Boolean(step.differByOne1554View), surface: "treeView", render: (step) => {
+      renderDifferByOne1554View(step);
+    } },
+    { predicate: (step) => Boolean(step.shortestWay1055View), surface: "treeView", render: (step) => {
+      renderShortestWay1055View(step);
+    } },
+    { predicate: (step) => Boolean(step.swimWater778View), surface: "treeView", render: (step) => {
+      renderSwimWater778View(step);
+    } },
+    { predicate: (step) => Boolean(step.gridElim1293View), surface: "treeView", render: (step) => {
+      renderGridElim1293View(step);
+    } },
+    { predicate: (step) => Boolean(step.gcThreshold1627View), surface: "treeView", render: (step) => {
+      renderGcThreshold1627View(step);
+    } },
+    { predicate: (step) => Boolean(step.clockDiffView), surface: "treeView", render: (step) => {
+      renderClockDiffView(step);
+    } },
+    { predicate: (step) => Boolean(step.lrSwapView), surface: "treeView", render: (step) => {
+      renderLrSwapView(step);
+    } },
+    { predicate: (step) => Boolean(step.randomPickView), surface: "treeView", render: (step) => {
+      renderRandomPickView(step);
+    } },
+    { predicate: (step) => Boolean(step.searchRangeView), surface: "treeView", render: (step) => {
+      renderSearchRangeView(step);
+    } },
+    { predicate: (step) => Boolean(step.blockQueriesView), surface: "treeView", render: (step) => {
+      renderBlockQueriesView(step);
+    } },
+    { predicate: (step) => Boolean(step.histogramRectangleView), surface: "treeView", render: (step) => {
+      renderHistogramRectangleView(step);
+    } },
+    { predicate: (step) => Boolean(step.maxNonDecreasingView), surface: "treeView", render: (step) => {
+      renderMaxNonDecreasingView(step);
+    } },
+    { predicate: (step) => Boolean(step.boundaryMaxView), surface: "treeView", render: (step) => {
+      renderBoundaryMaxView(step);
+    } },
+    { predicate: (step) => Boolean(step.sortedSubmatrixView), surface: "treeView", render: (step) => {
+      renderSortedSubmatrixView(step);
+    } },
+    { predicate: (step) => Boolean(step.stackView), surface: "treeView", render: (step) => {
+      renderStackView(step);
+    } },
+    { predicate: (step) => Boolean(step.circularDequeView), surface: "treeView", render: (step) => {
+      renderCircularDequeView(step);
+    } },
+    { predicate: (step) => Boolean(step.queueView), surface: "treeView", render: (step) => {
+      renderQueueView(step);
+    } },
+    { predicate: (step) => Boolean(step.calculator772View), surface: "treeView", render: (step) => {
+      renderCalculator772View(step);
+    } },
+    { predicate: (step) => Boolean(step.calculator772bView), surface: "treeView", render: (step) => {
+      renderCalculator772BView(step);
+    } },
+    { predicate: (step) => Boolean(step.camera968View), surface: "treeView", render: (step) => {
+      renderCamera968View(step);
+    } },
+    { predicate: (step) => Boolean(step.mountain1095View), surface: "treeView", render: (step) => {
+      renderMountain1095View(step);
+    } },
+    { predicate: (step) => Boolean(step.tiling1240View), surface: "treeView", render: (step) => {
+      renderTiling1240View(step);
+    } },
+    { predicate: (step) => Boolean(step.students1349View), surface: "treeView", render: (step) => {
+      renderStudents1349View(step);
+    } },
+    { predicate: (step) => Boolean(step.superstring943View), surface: "treeView", render: (step) => {
+      renderSuperstring943View(step);
+    } },
+    { predicate: (step) => Boolean(step.goodStrings1397View), surface: "treeView", render: (step) => {
+      renderGoodStrings1397View(step);
+    } },
+    { predicate: (step) => Boolean(step.distribute1655View), surface: "treeView", render: (step) => {
+      renderDistribute1655View(step);
+    } },
+    { predicate: (step) => Boolean(step.distribute1655BacktrackView), surface: "treeView", render: (step) => {
+      renderDistribute1655BacktrackView(step);
+    } },
+    { predicate: (step) => Boolean(step.sentenceView), surface: "treeView", render: (step) => {
+      renderSentenceView(step);
+    } },
+    { predicate: (step) => Boolean(step.synonymSentenceView), surface: "treeView", render: (step) => {
+      renderSynonymSentenceView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefix2DView), surface: "treeView", render: (step) => {
+      renderPrefix2DView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixSumCountView), surface: "treeView", render: (step) => {
+      renderPrefixSumCountView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixRemainderView), surface: "treeView", render: (step) => {
+      renderPrefixRemainderView(step);
+    } },
+    { predicate: (step) => Boolean(step.differenceArrayView), surface: "treeView", render: (step) => {
+      renderDifferenceArrayView(step);
+    } },
+    { predicate: (step) => Boolean(step.runningSumView), surface: "treeView", render: (step) => {
+      renderRunningSumView(step);
+    } },
+    { predicate: (step) => Boolean(step.missingIntegerView), surface: "treeView", render: (step) => {
+      renderMissingIntegerView(step);
+    } },
+    { predicate: (step) => Boolean(step.calendarThreeView), surface: "treeView", render: (step) => {
+      renderCalendarThreeView(step);
+    } },
+    { predicate: (step) => Boolean(step.fallingSquaresView), surface: "treeView", render: (step) => {
+      renderFallingSquaresView(step);
+    } },
+    { predicate: (step) => Boolean(step.reversePairsSegmentTreeView), surface: "treeView", render: (step) => {
+      renderReversePairsSegmentTreeView(step);
+    } },
+    { predicate: (step) => Boolean(step.reversePairsView), surface: "treeView", render: (step) => {
+      renderReversePairsView(step);
+    } },
+    { predicate: (step) => Boolean(step.sortedArrayCostView), surface: "treeView", render: (step) => {
+      renderSortedArrayCostView(step);
+    } },
+    { predicate: (step) => Boolean(step.rangeSumFenwickView), surface: "treeView", render: (step) => {
+      renderRangeSumFenwickView(step);
+    } },
+    { predicate: (step) => Boolean(step.rangeSumSegmentTreeView), surface: "treeView", render: (step) => {
+      renderRangeSumSegmentTreeView(step);
+    } },
+    { predicate: (step) => Boolean(step.rangeSumCountView), surface: "treeView", render: (step) => {
+      renderRangeSumCountView(step);
+    } },
+    { predicate: (step) => Boolean(step.countSmallerView), surface: "treeView", render: (step) => {
+      renderCountSmallerView(step);
+    } },
+    { predicate: (step) => Boolean(step.evenOddRatioView), surface: "treeView", render: (step) => {
+      renderEvenOddRatioView(step);
+    } },
+    { predicate: (step) => Boolean(step.bookMyShowView), surface: "treeView", render: (step) => {
+      renderBookMyShowView(step);
+    } },
+    { predicate: (step) => Boolean(step.trappingRainView), surface: "treeView", render: (step) => {
+      renderTrappingRainView(step);
+    } },
+    { predicate: (step) => Boolean(step.sumQueriesView), surface: "treeView", render: (step) => {
+      renderSumQueriesView(step);
+    } },
+    { predicate: (step) => Boolean(step.segmentTreeView), surface: "treeView", render: (step) => {
+      renderSegmentTreeView(step);
+    } },
+    { predicate: (step) => Boolean(step.fenwickView), surface: "treeView", render: (step) => {
+      renderFenwickView(step);
+    } },
+    { predicate: (step) => Boolean(step.rangeFrequencyView), surface: "treeView", render: (step) => {
+      renderRangeFrequencyView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefix1DView), surface: "treeView", render: (step) => {
+      renderPrefix1DView(step);
+    } },
+    { predicate: (step) => Boolean(step.evenOddFillView), surface: "treeView", render: (step) => {
+      renderEvenOddFillView(step);
+    } },
+    { predicate: (step) => Boolean(step.digitPodiumView), surface: "treeView", render: (step) => {
+      renderDigitPodiumView(step);
+    } },
+    { predicate: (step) => Boolean(step.jewelsStonesView), surface: "treeView", render: (step) => {
+      renderJewelsStonesView(step);
+    } },
+    { predicate: (step) => Boolean(step.palindromePartitionView), surface: "treeView", render: (step) => {
+      renderPalindromePartitionView(step);
+    } },
+    { predicate: (step) => Boolean(step.nonDecreasingView), surface: "treeView", render: (step) => {
+      renderNonDecreasingSubsequencesView(step);
+    } },
+    { predicate: (step) => Boolean(step.partitionView), surface: "treeView", render: (step) => {
+      renderPartitionView(step);
+    } },
+    { predicate: (step) => Boolean(step.twoPointerMergeView), surface: "treeView", render: (step) => {
+      renderTwoPointerMergeView(step);
+    } },
+    { predicate: (step) => Boolean(step.triangleCountView), surface: "treeView", render: (step) => {
+      renderTriangleCountView(step);
+    } },
+    { predicate: (step) => Boolean(step.multiSlotPodiumView), surface: "treeView", render: (step) => {
+      renderMultiSlotPodiumView(step);
+    } },
+    { predicate: (step) => Boolean(step.substringConcatView), surface: "treeView", render: (step) => {
+      renderSubstringConcatView(step);
+    } },
+    { predicate: (step) => Boolean(step.sequenceTraceView), surface: "treeView", render: (step) => {
+      renderSequenceTraceView(step);
+    } },
+    { predicate: (step) => Boolean(step.taskSchedulerView), surface: "treeView", render: (step) => {
+      renderTaskSchedulerView(step);
+    } },
+    { predicate: (step) => Boolean(step.happyNumberView), surface: "treeView", render: (step) => {
+      renderHappyNumberView(step);
+    } },
+    { predicate: (step) => Boolean(step.reverse344View || step.smallHashView), surface: "treeView", render: (step) => {
+      renderSmallHashView(step);
+    } },
+    { predicate: (step) => Boolean(step.balanced1234View), surface: "treeView", render: (step) => {
+      renderBalanced1234View(step);
+    } },
+    { predicate: (step) => Boolean(step.nice1248View), surface: "treeView", render: (step) => {
+      renderNice1248View(step);
+    } },
+    { predicate: (step) => Boolean(step.exactK992View), surface: "treeView", render: (step) => {
+      renderExactK992View(step);
+    } },
+    { predicate: (step) => Boolean(step.complement1658View), surface: "treeView", render: (step) => {
+      renderComplement1658View(step);
+    } },
+    { predicate: (step) => Boolean(step.numberBfs2059View), surface: "treeView", render: (step) => {
+      renderNumberBfs2059View(step);
+    } },
+    { predicate: (step) => Boolean(step.shelfDp1105View), surface: "treeView", render: (step) => {
+      renderShelfDp1105View(step);
+    } },
+    { predicate: (step) => Boolean(step.serverHeap1606View), surface: "treeView", render: (step) => {
+      renderServerHeap1606View(step);
+    } },
+    { predicate: (step) => Boolean(step.meetingRooms2402View), surface: "treeView", render: (step) => {
+      renderMeetingRooms2402View(step);
+    } },
+    { predicate: (step) => Boolean(step.adjacentRuns3350View), surface: "treeView", render: (step) => {
+      renderAdjacentRuns3350View(step);
+    } },
+    { predicate: (step) => Boolean(step.digitSum3550View), surface: "treeView", render: (step) => {
+      renderDigitSum3550View(step);
+    } },
+    { predicate: (step) => Boolean(step.permutation1589View), surface: "treeView", render: (step) => {
+      renderPermutation1589View(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixScores2416View), surface: "treeView", render: (step) => {
+      renderPrefixScores2416View(step);
+    } },
+    { predicate: (step) => Boolean(step.braceExpansion1096View), surface: "treeView", render: (step) => {
+      renderBraceExpansion1096View(step);
+    } },
+    { predicate: (step) => Boolean(step.weakCharacters1996View), surface: "treeView", render: (step) => {
+      renderWeakCharacters1996View(step);
+    } },
+    { predicate: (step) => Boolean(step.longestLine562View), surface: "treeView", render: (step) => {
+      renderLongestLine562View(step);
+    } },
+    { predicate: (step) => Boolean(step.nodeSequence2242View), surface: "treeView", render: (step) => {
+      renderNodeSequence2242View(step);
+    } },
+    { predicate: (step) => Boolean(step.slidingFreqView), surface: "treeView", render: (step) => {
+      renderSlidingFreqView(step);
+    } },
+    { predicate: (step) => Boolean(step.candyAllocationView), surface: "treeView", render: (step) => {
+      renderCandyAllocationView(step);
+    } },
+    { predicate: (step) => Boolean(step.repeatingRunsView), surface: "treeView", render: (step) => {
+      renderRepeatingRunsView(step);
+    } },
+    { predicate: (step) => Boolean(step.binaryReductionView), surface: "treeView", render: (step) => {
+      renderBinaryReductionView(step);
+    } },
+    { predicate: (step) => Boolean(step.fourSumPairsView), surface: "treeView", render: (step) => {
+      renderFourSumPairsView(step);
+    } },
+    { predicate: (step) => Boolean(step.elevator4027View), surface: "treeView", render: (step) => {
+      renderElevator4027View(step);
+    } },
+    { predicate: (step) => Boolean(step.randomizedSet380View), surface: "treeView", render: (step) => {
+      renderRandomizedSet380View(step);
+    } },
+    { predicate: (step) => Boolean(step.randomizedCollection381View), surface: "treeView", render: (step) => {
+      renderRandomizedCollection381View(step);
+    } },
+    { predicate: (step) => Boolean(step.lexSwap2948View), surface: "treeView", render: (step) => {
+      renderLexSwap2948View(step);
+    } },
+    { predicate: (step) => Boolean(step.allocator2502View), surface: "treeView", render: (step) => {
+      renderAllocator2502View(step);
+    } },
+    { predicate: (step) => Boolean(step.dataStream352View), surface: "treeView", render: (step) => {
+      renderDataStream352View(step);
+    } },
+    { predicate: (step) => Boolean(step.maxPoints149View), surface: "treeView", render: (step) => {
+      renderMaxPoints149View(step);
+    } },
+    { predicate: (step) => Boolean(step.removeBoxes546View), surface: "treeView", render: (step) => {
+      renderRemoveBoxes546View(step);
+    } },
+    { predicate: (step) => Boolean(step.stoneGame1872View), surface: "treeView", render: (step) => {
+      renderStoneGame1872View(step);
+    } },
+    { predicate: (step) => Boolean(step.absoluteSubarrayView), surface: "treeView", render: (step) => {
+      renderAbsoluteSubarray1749View(step);
+    } },
+    { predicate: (step) => Boolean(step.circularSubarrayView), surface: "treeView", render: (step) => {
+      renderCircularMaximumSubarrayView(step);
+    } },
+    { predicate: (step) => Boolean(step.maximumSubarrayView), surface: "treeView", render: (step) => {
+      renderMaximumSubarrayView(step);
+    } },
+];
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -36418,2023 +37431,12 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (!step.__live) {
-    const liveView = $("liveVarsView");
-    if (liveView) liveView.classList.add("hidden");
-  }
-
-  if (step.__live) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.add("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    $("liveVarsView").classList.remove("hidden");
-    renderLiveVarsView(step);
-  } else if (step.reverseParen1190View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReverseParen1190View(step);
-  } else if (step.calendar731View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalendar731View(step);
-  } else if (step.calendar729View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalendar729View(step);
-  } else if (step.rangeModuleView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRangeModuleView(step);
-  } else if (step.calendarView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalendarView(step);
-  } else if (step.goodSubseqView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGoodSubseqView(step);
-  } else if (step.nextPermutationView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNextPermutation31View(step);
-  } else if (step.permutation46View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPermutation46View(step);
-  } else if (step.lexPermutationView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLexPermutation3720View(step);
-  } else if (step.palindrome3734View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPalindromicPermutation3734View(step);
-  } else if (step.ticketsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTicketsView(step);
-  } else if (step.stockCooldownView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStockCooldownView(step);
-  } else if (step.maximalSquareView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximalSquareView(step);
-  } else if (step.numberOfLISView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNumberOfLISView(step);
-  } else if (step.lis2407View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLIS2407View(step);
-  } else if (step.wordLadder126View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordLadder126View(step);
-  } else if (step.houseRobberView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderHouseRobberView(step);
-  } else if (step.minCostStairsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMinCostStairsView(step);
-  } else if (step.twoEvents2054View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoEvents2054View(step);
-  } else if (step.weightedIntervals3414View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWeightedIntervals3414View(step);
-  } else if (step.advancedBitmaskView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAdvancedBitmaskView(step);
-  } else if (step.bitmaskBasicsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBitmaskBasicsView(step);
-  } else if (step.countBitsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountBitsView(step);
-  } else if (step.wordBreakView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordBreakView(step);
-  } else if (step.cinemaSeatView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCinemaSeatView(step);
-  } else if (step.coinChangeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCoinChangeView(step);
-  } else if (step.missingNumberView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMissingNumberView(step);
-  } else if (step.almostMissingView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAlmostMissingView(step);
-  } else if (step.pascalTriangleView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPascalTriangleView(step);
-  } else if (step.fibonacciView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFibonacciView(step);
-  } else if (step.tribonacciView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTribonacciView(step);
-  } else if (step.climbingStairsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClimbingStairsView(step);
-  } else if (step.mapSumView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMapSumView(step);
-  } else if (step.longestDupView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLongestDuplicateView(step);
-  } else if (step.clearStarsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClearStarsView(step);
-  } else if (step.validSequenceView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderValidSequenceView(step);
-  } else if (step.prefixAverageView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefixAverageView(step);
-  } else if (step.replaceGreatestView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReplaceGreatestView(step);
-  } else if (step.mountainArrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMountainArrayView(step);
-  } else if (step.houses2320View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderHouses2320View(step);
-  } else if (step.stoneGame1690View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStoneGame1690View(step);
-  } else if (step.pizza1388View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPizza1388View(step);
-  } else if (step.brainpower2140View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBrainpower2140View(step);
-  } else if (step.deleteEarn740View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDeleteEarn740View(step);
-  } else if (step.maxProductView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximumProductView(step);
-  } else if (step.productSubarrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderProductSubarrayView(step);
-  } else if (step.minimumSubarrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMinimumSubarrayView(step);
-  } else if (step.twoSubarrays1477View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoSubarrays1477View(step);
-  } else if (step.averageWindowView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAverageWindowView(step);
-  } else if (step.rectangleSweepView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRectangleSweepView(step);
-  } else if (step.kruskalEffortView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderKruskalEffortView(step);
-  } else if (step.waterDistributionView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWaterDistributionView(step);
-  } else if (step.connectCitiesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderConnectCitiesView(step);
-  } else if (step.bricks803View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBricks803View(step);
-  } else if (step.malware928View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMalware928View(step);
-  } else if (step.malware924View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMalware924View(step);
-  } else if (step.countPairs2316View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountPairs2316View(step);
-  } else if (step.equalityEquationsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEqualityEquationsView(step);
-  } else if (step.multiplesIeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMultiplesIeView(step);
-  } else if (step.stones947View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStones947View(step);
-  } else if (step.equivalent1061View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEquivalent1061View(step);
-  } else if (step.islands305View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderIslands305View(step);
-  } else if (step.parallelCoursesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderParallelCoursesView(step);
-  } else if (step.loudRichView || step.loudRichV2) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLoudRichView(step);
-  } else if (step.lruCacheView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLruCacheView(step);
-  } else if (step.lfuCacheView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLfuCacheView(step);
-  } else if (step.musicPlayerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMusicPlayerView(step);
-  } else if (step.rideSharingView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRideSharingView(step);
-  } else if (step.kthPalindromeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderKthPalindromeView(step);
-  } else if (step.palindromeBuildView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPalindromeBuildView(step);
-  } else if (step.occurrenceLookupView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderOccurrenceLookupView(step);
-  } else if (step.duplicateZerosView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDuplicateZerosView(step);
-  } else if (step.gcdPairsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGcdPairsView(step);
-  } else if (step.rotateArray189View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRotateArray189View(step);
-  } else if (step.rotatedSearch81View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRotatedSearch81View(step);
-  } else if (step.rotatedSearchView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRotatedSearchView(step);
-  } else if (step.findMinRotatedView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFindMinRotatedView(step);
-  } else if (step.twitterView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwitterView(step);
-  } else if (step.profitTrackerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderProfitTrackerView(step);
-  } else if (step.cyclicSortView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCyclicSortView(step);
-  } else if (step.mergeIntervalsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMergeIntervalsView(step);
-  } else if (step.meetingRoomsTimelineView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMeetingRoomsTimelineView(step);
-  } else if (step.pairChainView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPairChainView(step);
-  } else if (step.meetingTimelineView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMeetingTimelineView(step);
-  } else if (step.skylineView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSkylineView(step);
-  } else if (step.bfsLevelView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBfsLevelView(step);
-  } else if (step.pathSumIIIView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPathSumIIIView(step);
-  } else if (step.rootLeafNumber129View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRootLeafNumber129View(step);
-  } else if (step.smallestLeaf988View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSmallestLeaf988View(step);
-  } else if (step.pseudoPalindrome1457View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPseudoPalindrome1457View(step);
-  } else if (step.univaluePath687View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderUnivaluePath687View(step);
-  } else if (step.zigzag1372View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLongestZigzag1372View(step);
-  } else if (step.lca236View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLca236View(step);
-  } else if (step.directions2096View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDirections2096View(step);
-  } else if (step.reverseDegree3498View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReverseDegree3498View(step);
-  } else if (step.findXValue3524View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFindXValue3524View(step);
-  } else if (step.minWindow76View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMinWindow76View(step);
-  } else if (step.findXValue3525View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFindXValue3525View(step);
-  } else if (step.treeEssentialsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTreeEssentialsView(step);
-  } else if (step.sameTreeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSameTreeView(step);
-  } else if (step.sortedListBstView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSortedListBstView(step);
-  } else if (step.recoverBstView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRecoverBstView(step);
-  } else if (step.wordSearchIIView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordSearchIIView(step);
-  } else if (step.wordSearchView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordSearchView(step);
-  } else if (step.keypadPushView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderKeypadPushView(step);
-  } else if (step.keypadHeapView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderKeypadHeapView(step);
-  } else if (step.stoneGameIIView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStoneGameIIView(step);
-  } else if (step.stoneGameIVView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStoneGameIVView(step);
-  } else if (step.stoneGameView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStoneGameView(step);
-  } else if (step.predictWinnerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPredictWinnerView(step);
-  } else if (step.rectangleAreaView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRectangleAreaView(step);
-  } else if (step.buildingBoxesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBuildingBoxesView(step);
-  } else if (step.networkDelayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNetworkDelayView(step);
-  } else if (step.reachable882View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReachable882View(step);
-  } else if (step.maze499View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaze499View(step);
-  } else if (step.restricted1786View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRestricted1786View(step);
-  } else if (step.multiDijkstra2203View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMultiDijkstra2203View(step);
-  } else if (step.pathExistsDfsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPathExistsDfsView(step);
-  } else if (step.pathExistsBfsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPathExistsBfsView(step);
-  } else if (step.bipartiteView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBipartiteView(step);
-  } else if (step.autocompleteView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAutocompleteView(step);
-  } else if (step.fileSystemView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFileSystemView(step);
-  } else if (step.wordDictionaryView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordDictionaryView(step);
-  } else if (step.replaceWordsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReplaceWordsView(step);
-  } else if (step.bstIteratorView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBstIteratorView(step);
-  } else if (step.closestBst270View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClosestBst270View(step);
-  } else if (step.boundary545View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBoundary545View(step);
-  } else if (step.consecutive549View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderConsecutive549View(step);
-  } else if (step.closestLeaf742View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClosestLeaf742View(step);
-  } else if (step.inorderSuccessor510View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderInorderSuccessor510View(step);
-  } else if (step.inorderSuccessor285View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderInorderSuccessor285View(step);
-  } else if (step.closestBst272View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClosestBst272View(step);
-  } else if (step.palPathView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPalindromePathView(step);
-  } else if (step.separate1977View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSeparate1977View(step);
-  } else if (step.missing3718View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMissing3718View(step);
-  } else if (step.russian354View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRussian354View(step);
-  } else if (step.paren32View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderParen32View(step);
-  } else if (step.wordBreakIIView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWordBreakIIView(step);
-  } else if (step.mountain1095View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMountain1095View(step);
-  } else if (step.directed685View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDirected685View(step);
-  } else if (step.employee690View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEmployee690View(step);
-  } else if (step.videos1311View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderVideos1311View(step);
-  } else if (step.bombs2101View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBombs2101View(step);
-  } else if (step.throne1600View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderThrone1600View(step);
-  } else if (step.nary429View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNary429View(step);
-  } else if (step.rotation1886View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRotation1886View(step);
-  } else if (step.convert2022View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderConvert2022View(step);
-  } else if (step.overlap835View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderImageOverlap835View(step);
-  } else if (step.search240View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSearchMatrix240View(step);
-  } else if (step.search74View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSearchMatrix74View(step);
-  } else if (step.zero73View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSetMatrixZeroes73View(step);
-  } else if (step.rotate48View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRotate48View(step);
-  } else if (step.spiral54View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSpiral54View(step);
-  } else if (step.univalue250View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderUnivalue250View(step);
-  } else if (step.longestConsecutive298View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLongestConsecutive298View(step);
-  } else if (step.verticalOrder314View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderVerticalOrder314View(step);
-  } else if (step.upsideDown156View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderUpsideDown156View(step);
-  } else if (step.twoSumIIView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoSumIIView(step);
-  } else if (step.twoSum653HashView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoSum653HashView(step);
-  } else if (step.twoSum653View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoSum653View(step);
-  } else if (step.tree) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTree(step);
-  } else if (step.treeDpLessonView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTreeDpLessonView(step);
-  } else if (step.cycle2360View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCycle2360View(step);
-  } else if (step.countPaths1976View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountPaths1976View(step);
-  } else if (step.graph) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGraph(step);
-  } else if (step.shiftGridView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShiftGridView(step);
-  } else if (step.transpose867View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTranspose867View(step);
-  } else if (step.grid) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.add("hidden");
-    $("gridView").classList.remove("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGrid(step);
-  } else if (step.floodFillView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFloodFillView(step);
-  } else if (step.virusView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderVirusView(step);
-  } else if (step.gasStationView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGasStationView(step);
-  } else if (step.gasDepositsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGasDepositsView(step);
-  } else if (step.gasCircularView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGasCircularView(step);
-  } else if (step.rottingOrangesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRottingOrangesView(step);
-  } else if (step.trapRain2View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTrapRain2View(step);
-  } else if (step.descendantSum1973View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDescendantSum1973View(step);
-  } else if (step.averageSubtree2265View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAverageSubtree2265View(step);
-  } else if (step.distributeCoins979View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDistributeCoins979View(step);
-  } else if (step.largestBst333View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLargestBst333View(step);
-  } else if (step.maximumSumBst1373View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximumSumBst1373View(step);
-  } else if (step.maximumAverage1120View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximumAverage1120View(step);
-  } else if (step.bfsGrid) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.add("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.remove("hidden");
-    renderBfsGrid(step);
-  } else if (step.binaryWatch401View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBinaryWatch401View(step);
-  } else if (step.subsets90BitmaskView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSubsets90BitmaskView(step);
-  } else if (step.subsets78BitmaskView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSubsets78BitmaskView(step);
-  } else if (step.oddEven975View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderOddEven975View(step);
-  } else if (step.visibleQueue1944View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderVisibleQueue1944View(step);
-  } else if (step.maxMin1950View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaxMin1950View(step);
-  } else if (step.distinctSubseq940View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDistinctSubseq940View(step);
-  } else if (step.bstPreorder255View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBstPreorder255View(step);
-  } else if (step.validSubarrays1063View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderValidSubarrays1063View(step);
-  } else if (step.totalStrength2281View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTotalStrength2281View(step);
-  } else if (step.visibleMountains2345View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderVisibleMountains2345View(step);
-  } else if (step.maximumSumQueries2736View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximumSumQueries2736View(step);
-  } else if (step.buildingMeet2940View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBuildingMeet2940View(step);
-  } else if (step.productExcept238View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderProductExcept238View(step);
-  } else if (step.uniqueEven3483View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderUniqueEven3483View(step);
-  } else if (step.pourWater755View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPourWater755View(step);
-  } else if (step.champagne799View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderChampagne799View(step);
-  } else if (step.diceRoll1223View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDiceRoll1223View(step);
-  } else if (step.cyclicShift4052View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCyclicShift4052View(step);
-  } else if (step.shadowPairs4054View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShadowPairs4054View(step);
-  } else if (step.shadowPairs4055View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShadowPairs4055View(step);
-  } else if (step.equallySpaced4048View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEquallySpaced4048View(step);
-  } else if (step.equallySpaced4049View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEquallySpaced4049View(step);
-  } else if (step.minDays4050View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMinDays4050View(step);
-  } else if (step.distantSubarrays4051View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDistantSubarrays4051View(step);
-  } else if (step.rectangleArea223View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRectangleArea223View(step);
-  } else if (step.rectangleOverlap836View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRectangleOverlap836View(step);
-  } else if (step.circleRectangle1401View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCircleRectangle1401View(step);
-  } else if (step.orderlyQueue899View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderOrderlyQueue899View(step);
-  } else if (step.shortestPalindrome214View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShortestPalindrome214View(step);
-  } else if (step.palindrome2472View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPalindrome2472View(step);
-  } else if (step.lineSegments1621View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLineSegments1621View(step);
-  } else if (step.divideString2138View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDivideString2138View(step);
-  } else if (step.maximizeScore2818View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximizeScore2818View(step);
-  } else if (step.minIncrements1526View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMinIncrements1526View(step);
-  } else if (step.countCommas3870View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountCommas3870View(step);
-  } else if (step.countCommas3871View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountCommas3871View(step);
-  } else if (step.stable3903View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStable3903View(step);
-  } else if (step.criticalPoints2058View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCriticalPoints2058View(step);
-  } else if (step.linkedList) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLinkedList(step);
-  } else if (step.onlineElectionView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderOnlineElectionView(step);
-  } else if (step.shipCapacityView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShipCapacityView(step);
-  } else if (step.kokoSpeedView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderKokoSpeedView(step);
-  } else if (step.sqrtBinaryView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSqrtBinaryView(step);
-  } else if (step.nonOverlapView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNonOverlapView(step);
-  } else if (step.leaves366View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLeaves366View(step);
-  } else if (step.logger359View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLogger359View(step);
-  } else if (step.rleIter900View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRleIter900View(step);
-  } else if (step.matchSubseq792View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMatchSubseq792View(step);
-  } else if (step.attendance552View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAttendance552View(step);
-  } else if (step.battleships419View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBattleships419View(step);
-  } else if (step.screenFit418View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderScreenFit418View(step);
-  } else if (step.differByOne1554View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDifferByOne1554View(step);
-  } else if (step.shortestWay1055View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShortestWay1055View(step);
-  } else if (step.swimWater778View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSwimWater778View(step);
-  } else if (step.gridElim1293View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGridElim1293View(step);
-  } else if (step.gcThreshold1627View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGcThreshold1627View(step);
-  } else if (step.clockDiffView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderClockDiffView(step);
-  } else if (step.lrSwapView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLrSwapView(step);
-  } else if (step.randomPickView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRandomPickView(step);
-  } else if (step.searchRangeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSearchRangeView(step);
-  } else if (step.blockQueriesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBlockQueriesView(step);
-  } else if (step.histogramRectangleView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderHistogramRectangleView(step);
-  } else if (step.maxNonDecreasingView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaxNonDecreasingView(step);
-  } else if (step.boundaryMaxView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBoundaryMaxView(step);
-  } else if (step.sortedSubmatrixView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSortedSubmatrixView(step);
-  } else if (step.stackView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStackView(step);
-  } else if (step.circularDequeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCircularDequeView(step);
-  } else if (step.queueView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderQueueView(step);
-  } else if (step.calculator772View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalculator772View(step);
-  } else if (step.calculator772bView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalculator772BView(step);
-  } else if (step.camera968View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCamera968View(step);
-  } else if (step.mountain1095View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMountain1095View(step);
-  } else if (step.tiling1240View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTiling1240View(step);
-  } else if (step.students1349View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStudents1349View(step);
-  } else if (step.superstring943View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSuperstring943View(step);
-  } else if (step.goodStrings1397View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderGoodStrings1397View(step);
-  } else if (step.distribute1655View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDistribute1655View(step);
-  } else if (step.distribute1655BacktrackView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDistribute1655BacktrackView(step);
-  } else if (step.sentenceView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSentenceView(step);
-  } else if (step.synonymSentenceView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSynonymSentenceView(step);
-  } else if (step.prefix2DView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefix2DView(step);
-  } else if (step.prefixSumCountView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefixSumCountView(step);
-  } else if (step.prefixRemainderView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefixRemainderView(step);
-  } else if (step.differenceArrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDifferenceArrayView(step);
-  } else if (step.runningSumView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRunningSumView(step);
-  } else if (step.missingIntegerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMissingIntegerView(step);
-  } else if (step.calendarThreeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCalendarThreeView(step);
-  } else if (step.fallingSquaresView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFallingSquaresView(step);
-  } else if (step.reversePairsSegmentTreeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReversePairsSegmentTreeView(step);
-  } else if (step.reversePairsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderReversePairsView(step);
-  } else if (step.sortedArrayCostView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSortedArrayCostView(step);
-  } else if (step.rangeSumFenwickView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRangeSumFenwickView(step);
-  } else if (step.rangeSumSegmentTreeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRangeSumSegmentTreeView(step);
-  } else if (step.rangeSumCountView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRangeSumCountView(step);
-  } else if (step.countSmallerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCountSmallerView(step);
-  } else if (step.evenOddRatioView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEvenOddRatioView(step);
-  } else if (step.bookMyShowView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBookMyShowView(step);
-  } else if (step.trappingRainView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTrappingRainView(step);
-  } else if (step.sumQueriesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSumQueriesView(step);
-  } else if (step.segmentTreeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSegmentTreeView(step);
-  } else if (step.fenwickView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFenwickView(step);
-  } else if (step.rangeFrequencyView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRangeFrequencyView(step);
-  } else if (step.prefix1DView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefix1DView(step);
-  } else if (step.evenOddFillView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderEvenOddFillView(step);
-  } else if (step.digitPodiumView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDigitPodiumView(step);
-  } else if (step.jewelsStonesView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderJewelsStonesView(step);
-  } else if (step.palindromePartitionView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPalindromePartitionView(step);
-  } else if (step.nonDecreasingView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNonDecreasingSubsequencesView(step);
-  } else if (step.partitionView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPartitionView(step);
-  } else if (step.twoPointerMergeView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTwoPointerMergeView(step);
-  } else if (step.triangleCountView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTriangleCountView(step);
-  } else if (step.multiSlotPodiumView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMultiSlotPodiumView(step);
-  } else if (step.substringConcatView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSubstringConcatView(step);
-  } else if (step.sequenceTraceView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSequenceTraceView(step);
-  } else if (step.taskSchedulerView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderTaskSchedulerView(step);
-  } else if (step.happyNumberView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderHappyNumberView(step);
-  } else if (step.reverse344View || step.smallHashView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSmallHashView(step);
-  } else if (step.balanced1234View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBalanced1234View(step);
-  } else if (step.nice1248View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNice1248View(step);
-  } else if (step.exactK992View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderExactK992View(step);
-  } else if (step.complement1658View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderComplement1658View(step);
-  } else if (step.numberBfs2059View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNumberBfs2059View(step);
-  } else if (step.shelfDp1105View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderShelfDp1105View(step);
-  } else if (step.serverHeap1606View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderServerHeap1606View(step);
-  } else if (step.meetingRooms2402View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMeetingRooms2402View(step);
-  } else if (step.adjacentRuns3350View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAdjacentRuns3350View(step);
-  } else if (step.digitSum3550View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDigitSum3550View(step);
-  } else if (step.permutation1589View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPermutation1589View(step);
-  } else if (step.prefixScores2416View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderPrefixScores2416View(step);
-  } else if (step.braceExpansion1096View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBraceExpansion1096View(step);
-  } else if (step.weakCharacters1996View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderWeakCharacters1996View(step);
-  } else if (step.longestLine562View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLongestLine562View(step);
-  } else if (step.nodeSequence2242View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderNodeSequence2242View(step);
-  } else if (step.slidingFreqView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderSlidingFreqView(step);
-  } else if (step.candyAllocationView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCandyAllocationView(step);
-  } else if (step.repeatingRunsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRepeatingRunsView(step);
-  } else if (step.binaryReductionView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderBinaryReductionView(step);
-  } else if (step.fourSumPairsView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderFourSumPairsView(step);
-  } else if (step.elevator4027View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderElevator4027View(step);
-  } else if (step.randomizedSet380View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRandomizedSet380View(step);
-  } else if (step.randomizedCollection381View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRandomizedCollection381View(step);
-  } else if (step.lexSwap2948View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderLexSwap2948View(step);
-  } else if (step.allocator2502View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAllocator2502View(step);
-  } else if (step.dataStream352View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderDataStream352View(step);
-  } else if (step.maxPoints149View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaxPoints149View(step);
-  } else if (step.removeBoxes546View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderRemoveBoxes546View(step);
-  } else if (step.stoneGame1872View) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderStoneGame1872View(step);
-  } else if (step.absoluteSubarrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderAbsoluteSubarray1749View(step);
-  } else if (step.circularSubarrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderCircularMaximumSubarrayView(step);
-  } else if (step.maximumSubarrayView) {
-    $("bars").classList.add("hidden");
-    $("treeView").classList.remove("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    renderMaximumSubarrayView(step);
-  } else {
-    $("treeView").classList.add("hidden");
-    $("gridView").classList.add("hidden");
-    $("bfsGridView").classList.add("hidden");
-    $("bars").classList.remove("hidden");
-    renderBars(step);
-  }
+  const rendererEntry = ORDERED_RENDERER_REGISTRY.find(({ predicate }) => predicate(step)) || {
+    surface: "bars",
+    render: renderBars,
+  };
+  setPrimaryVisualizationSurface(rendererEntry.surface);
+  rendererEntry.render(step);
 
   // Backtracking problems keep their original board/array/grid above and show
   // the persistent decision tree in parallel underneath. Problem 77 already

@@ -218,5 +218,5 @@ test('437 custom renderer remains complete and readable in English and Vietnames
   assert.ok(treeTargets.every(targetId => targetId === 'ps437Tree'));
   assert.match(styles, /\.ps437-layout/);
   assert.match(styles, /@container \(max-width: 760px\)/);
-  assert.match(script, /else if \(step\.pathSumIIIView\)/);
+  assert.match(script, /Boolean\(step\.pathSumIIIView\)/);
 });

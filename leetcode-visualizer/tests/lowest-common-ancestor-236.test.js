@@ -224,5 +224,5 @@ test('236 custom renderer remains complete in English and Vietnamese', () => {
   assert.ok(treeTargets.every(targetId => targetId === 'lca236Tree'));
   assert.match(styles, /\.lca236-layout/);
   assert.match(styles, /@container \(max-width: 520px\)/);
-  assert.match(script, /else if \(step\.lca236View\)/);
+  assert.match(script, /Boolean\(step\.lca236View\)/);
 });

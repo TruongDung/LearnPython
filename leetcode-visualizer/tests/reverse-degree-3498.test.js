@@ -230,7 +230,7 @@ test('3498 renderer covers every trace state in English and Vietnamese', () => {
       }
     }
   }
-  assert.match(script, /else if \(step\.reverseDegree3498View\)/);
+  assert.match(script, /Boolean\(step\.reverseDegree3498View\)/);
 });
 
 test('3498 renderer highlights the current letter on the reversed ruler', () => {

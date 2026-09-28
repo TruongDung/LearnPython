@@ -132,8 +132,8 @@ test('240 renderer covers every trace state in English and Vietnamese', () => {
 test('240 custom renderer is wired before the generic grid renderer and has responsive styles', () => {
   const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
   const css = fs.readFileSync(require.resolve('../public/style.css'), 'utf8');
-  assert.match(script, /else if \(step\.search240View\)[\s\S]*renderSearchMatrix240View\(step\)/);
-  assert.ok(script.indexOf('else if (step.search240View)') < script.indexOf('} else if (step.grid)'));
+  assert.match(script, /Boolean\(step\.search240View\)[\s\S]*?renderSearchMatrix240View\(step\)/);
+  assert.ok(script.indexOf('Boolean(step.search240View)') < script.indexOf('Boolean(step.grid)'));
   assert.match(css, /\.tree-view:has\(\.s240-viz\)/);
   assert.match(css, /\.s240-cell\.current/);
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.s240-grid/);

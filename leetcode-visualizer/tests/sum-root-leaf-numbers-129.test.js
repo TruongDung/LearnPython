@@ -208,5 +208,5 @@ test('129 custom renderer stays readable for every step in English and Vietnames
   assert.ok(treeTargets.every(targetId => targetId === 'rln129Tree'));
   assert.match(styles, /\.rln129-layout/);
   assert.match(styles, /@container \(max-width: 760px\) \{ \.rln129-layout/);
-  assert.match(script, /else if \(step\.rootLeafNumber129View\)/);
+  assert.match(script, /Boolean\(step\.rootLeafNumber129View\)/);
 });

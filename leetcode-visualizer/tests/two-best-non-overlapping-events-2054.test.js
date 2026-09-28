@@ -139,5 +139,5 @@ test('2054 renderer handles every step in English and Vietnamese', () => {
   assert.match(styles, /\.te2054-gate/);
   assert.match(styles, /\.te2054-equation/);
   assert.match(styles, /@container \(max-width: 480px\)/);
-  assert.match(source, /else if \(step\.twoEvents2054View\)/);
+  assert.match(source, /Boolean\(step\.twoEvents2054View\)/);
 });

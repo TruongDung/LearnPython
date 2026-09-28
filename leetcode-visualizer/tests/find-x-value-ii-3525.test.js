@@ -366,7 +366,7 @@ test('3525 renderer covers every trace state in English and Vietnamese', () => {
       }
     }
   }
-  assert.match(script, /else if \(step\.findXValue3525View\)/);
+  assert.match(script, /Boolean\(step\.findXValue3525View\)/);
 });
 
 test('3525 renderer lays nodes out spanning their array range', () => {
