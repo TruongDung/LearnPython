@@ -382,7 +382,10 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
     case 381:
       return designConfig("RandomizedCollection", [], parseSpaceOperations(input));
     case 432:
-      return designConfig("AllOne", [], parseSpaceOperations(input));
+      return designConfig("AllOne", [], problem.parseAllOne432Operations(input).map((operation) => ({
+        name: operation.op,
+        args: [...operation.args],
+      })));
     case 588: {
       const aliases = { add: "addContentToFile", read: "readContentFromFile" };
       const operations = parseFunctionOperations(input).map((operation) => ({ ...operation, name: aliases[operation.name] || operation.name }));

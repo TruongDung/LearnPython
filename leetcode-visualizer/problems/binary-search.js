@@ -1753,181 +1753,867 @@ function fmt(v) {
  *   - if that count > k, mid is TOO SMALL (needs more groups than allowed) → left = mid + 1
  * The smallest feasible mid is the answer.
  */
-function buildSteps410(nums, params) {
-  const k = Number(params && params.k !== undefined ? params.k : 2);
-  const steps = [];
-  const n = nums.length;
+const SPLIT_ARRAY_410_MAX_LENGTH = 16;
+const SPLIT_ARRAY_410_MAX_VALUE = 1_000_000;
+const SPLIT_ARRAY_410_SOURCE = Object.freeze([
+  "class Solution:",
+  "    def splitArray(self, nums, k):",
+  "        left, right = max(nums), sum(nums)",
+  "        while left < right:",
+  "            mid = (left + right) // 2",
+  "            groups = self.count_groups(nums, mid)",
+  "            if groups <= k:",
+  "                right = mid",
+  "            else:",
+  "                left = mid + 1",
+  "        cuts = self.build_cuts(nums, k, left)",
+  "        return left",
+  "    def count_groups(self, nums, limit):",
+  "        groups, running = 1, 0",
+  "        for num in nums:",
+  "            if running + num > limit:",
+  "                groups += 1",
+  "                running = 0",
+  "            running += num",
+  "        return groups",
+  "    def build_cuts(self, nums, k, limit):",
+  "        cuts = []",
+  "        groups_left, suffix_sum = k, 0",
+  "        for i in range(len(nums) - 1, -1, -1):",
+  "            must_cut = suffix_sum + nums[i] > limit or i + 1 < groups_left",
+  "            if must_cut:",
+  "                cuts.append(i + 1)",
+  "                groups_left -= 1",
+  "                suffix_sum = 0",
+  "            suffix_sum += nums[i]",
+  "        return sorted(cuts)",
+]);
 
-  function groupsFor(mid) {
-    // Greedily pack nums into the fewest groups possible where each group's
-    // sum never exceeds `mid`. Returns [groupId per index], groupCount.
-    const groupOf = new Array(n).fill(0);
-    let groups = 1;
-    let curSum = 0;
-    for (let i = 0; i < n; i++) {
-      if (curSum + nums[i] > mid) {
-        groups++;
-        curSum = 0;
+function parseSplitArray410Input(input) {
+  let candidate;
+  if (Array.isArray(input)) {
+    candidate = [...input];
+  } else if (typeof input === "string") {
+    const text = input.trim();
+    if (!text) throw new RangeError("Split Array input must be nonempty.");
+    if (text.startsWith("[")) {
+      try {
+        candidate = JSON.parse(text);
+      } catch (error) {
+        throw new TypeError("Split Array JSON input must be a valid array.");
       }
-      groupOf[i] = groups - 1;
-      curSum += nums[i];
+    } else {
+      const parts = text.split(",");
+      if (parts.some((part) => !/^\d+$/.test(part.trim()))) {
+        throw new TypeError("Split Array compact input must contain comma-separated positive integers.");
+      }
+      candidate = parts.map((part) => Number(part.trim()));
     }
-    return { groupOf, groups };
+  } else {
+    throw new TypeError("Split Array input must be an array, JSON array string, or comma-separated string.");
   }
 
-  function subLabels(l, r, m) {
-    return nums.map((_, i) => {
-      const tags = [];
-      if (i === l) tags.push("L");
-      if (m !== undefined && i === m) tags.push("M");
-      if (i === r) tags.push("R");
-      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+  if (!Array.isArray(candidate) || candidate.length < 1) {
+    throw new RangeError("Split Array input must contain at least one value.");
+  }
+  if (candidate.length > SPLIT_ARRAY_410_MAX_LENGTH) {
+    throw new RangeError(`Split Array visualization supports at most ${SPLIT_ARRAY_410_MAX_LENGTH} values.`);
+  }
+
+  let total = 0;
+  const nums = candidate.map((value) => {
+    if (!Number.isSafeInteger(value)) {
+      throw new TypeError("Split Array values must be safe integers.");
+    }
+    if (value < 1 || value > SPLIT_ARRAY_410_MAX_VALUE) {
+      throw new RangeError(`Split Array values must be between 1 and ${SPLIT_ARRAY_410_MAX_VALUE}.`);
+    }
+    total += value;
+    if (!Number.isSafeInteger(total)) {
+      throw new RangeError("Split Array total must remain a safe integer.");
+    }
+    return value;
+  });
+  return nums;
+}
+
+function parseSplitArray410K(params, length) {
+  const raw = params && Object.prototype.hasOwnProperty.call(params, "k") ? params.k : 2;
+  const k = typeof raw === "number"
+    ? raw
+    : typeof raw === "string" && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
+  if (!Number.isSafeInteger(k)) {
+    throw new TypeError("Split Array k must be a safe integer.");
+  }
+  if (k < 1 || k > length) {
+    throw new RangeError(`Split Array k must be between 1 and nums.length (${length}).`);
+  }
+  return k;
+}
+
+function deepFreezeSplitArray410View(value) {
+  const copy = JSON.parse(JSON.stringify(value));
+  const freeze = (item) => {
+    if (!item || typeof item !== "object" || Object.isFrozen(item)) return item;
+    Object.values(item).forEach(freeze);
+    return Object.freeze(item);
+  };
+  return freeze(copy);
+}
+
+/**
+ * LeetCode 410: Split Array Largest Sum — exact binary-search, greedy-check,
+ * and deterministic exact-k witness trace.
+ */
+function buildSteps410(input, params) {
+  const nums = parseSplitArray410Input(input);
+  const n = nums.length;
+  const k = parseSplitArray410K(params, n);
+  const maximum = nums.reduce((total, value) => total + value, 0);
+  const minimum = nums.reduce((largest, value) => Math.max(largest, value), nums[0]);
+  const steps = [];
+  const localized = (en, vi) => ({ en, vi });
+  const counters = {
+    searchIterations: 0,
+    feasibilityCalls: 0,
+    loopVisits: 0,
+    overflowChecks: 0,
+    greedyCuts: 0,
+    runningAdds: 0,
+    feasibleChecks: 0,
+    feasibleMids: 0,
+    infeasibleMids: 0,
+    upperUpdates: 0,
+    lowerUpdates: 0,
+    reconstructionVisits: 0,
+    reconstructionChecks: 0,
+    witnessCuts: 0,
+    capacityCuts: 0,
+    remainingCuts: 0,
+    suffixAdds: 0,
+  };
+  const blankCut = () => ({
+    status: "idle",
+    beforeIndex: null,
+    fromGroup: null,
+    toGroup: null,
+    reason: null,
+  });
+  const blankScan = (limit = null) => ({
+    active: false,
+    call: 0,
+    limit,
+    index: null,
+    num: null,
+    processed: 0,
+    groups: null,
+    currentGroup: null,
+    running: null,
+    runningBefore: null,
+    runningAfter: null,
+    prospective: null,
+    overflow: null,
+    groupOf: Array(n).fill(null),
+    groupSums: [],
+    cut: blankCut(),
+    returnedGroups: null,
+    complete: false,
+  });
+  const search = {
+    initialized: false,
+    minimum,
+    maximum,
+    left: null,
+    right: null,
+    mid: null,
+    iteration: 0,
+    previousLeft: null,
+    previousRight: null,
+    groups: null,
+    feasible: null,
+    outcome: "idle",
+    lastFeasible: { limit: maximum, groups: 1, reason: "whole-array" },
+    lastInfeasible: null,
+  };
+  let scan = blankScan();
+  let witness = {
+    active: false,
+    entered: false,
+    initialized: false,
+    callerAssigned: false,
+    limit: null,
+    index: null,
+    num: null,
+    visited: 0,
+    groupsLeft: null,
+    suffixSum: null,
+    suffixBefore: null,
+    suffixAfter: null,
+    prospective: null,
+    mustCut: null,
+    capacityCut: null,
+    remainingCut: null,
+    rawCuts: [],
+    cuts: [],
+    boundaries: [],
+    partitions: [],
+    cut: { status: "idle", index: null, reason: null },
+    complete: false,
+  };
+  let answer = null;
+
+  const partitionGroupOf = () => {
+    const groupOf = Array(n).fill(null);
+    witness.partitions.forEach((partition) => {
+      for (let index = partition.start; index < partition.end; index++) groupOf[index] = partition.group;
     });
-  }
-
-  function snap(opts) {
-    const groupInfo = opts.mid !== undefined ? groupsFor(opts.mid) : null;
-    steps.push({
-      title: opts.title,
-      arr: [...nums],
-      sub: opts.sub || nums.map((_, i) => `[${i}]`),
-      highlight: opts.highlight || [],
-      mark: groupInfo ? groupInfo.groupOf.filter((_, i) => groupInfo.groupOf[i] % 2 === 1) : [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
-    });
-  }
-
-  const sum = nums.reduce((a, b) => a + b, 0);
-  const maxVal = Math.max(...nums);
-
-  // Line 3: left, right = max(nums), sum(nums)
-  let left = maxVal;
-  let right = sum;
-  snap({
-    title: { vi: `left, right = max(nums), sum(nums) → left=${left}, right=${right}`, en: `left, right = max(nums), sum(nums) → left=${left}, right=${right}` },
-    sub: subLabels(undefined, undefined),
-    codeLines: [3],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "k", value: k },
-      { name: "left (max element)", value: left },
-      { name: "right (total sum)", value: right },
-    ],
-    note: {
-      vi: `nums=[${nums.join(",")}], k=${k}. Đáp án (largest sum nhỏ nhất có thể) chắc chắn nằm trong [max(nums), sum(nums)] = [${left}, ${right}]: không thể nhỏ hơn phần tử lớn nhất (1 nhóm phải chứa nó), và không cần lớn hơn tổng cả mảng (dùng đúng 1 nhóm).`,
-      en: `nums=[${nums.join(",")}], k=${k}. The answer (the minimized largest sum) is guaranteed to lie in [max(nums), sum(nums)] = [${left}, ${right}]: it can't be smaller than the largest element (some group must contain it), and never needs to exceed the total sum (using just 1 group).`,
+    return groupOf;
+  };
+  const minimalitySnapshot = () => {
+    if (!search.initialized || search.left === null) {
+      return { proven: false, kind: "pending", capacity: null, groups: null };
+    }
+    if (search.left === minimum) {
+      return { proven: search.left === search.right, kind: "largest-element", capacity: minimum - 1, groups: null };
+    }
+    const rejected = search.lastInfeasible;
+    return {
+      proven: search.left === search.right && Boolean(rejected && rejected.limit === search.left - 1),
+      kind: "greedy-rejection",
+      capacity: search.left - 1,
+      groups: rejected && rejected.limit === search.left - 1 ? rejected.groups : null,
+    };
+  };
+  const snapshotView = ({ line, event, phase, timing, condition, final }) => deepFreezeSplitArray410View({
+    version: 1,
+    problemId: 410,
+    source: { line, text: SPLIT_ARRAY_410_SOURCE[line - 1] },
+    event,
+    phase,
+    timing,
+    condition: condition && typeof condition === "object"
+      ? { expression: condition.expression, result: condition.result }
+      : { expression: null, result: null },
+    input: {
+      nums: [...nums],
+      k,
+      length: n,
+      total: maximum,
+      largest: minimum,
+      limits: { maxLength: SPLIT_ARRAY_410_MAX_LENGTH, maxValue: SPLIT_ARRAY_410_MAX_VALUE },
     },
+    search: {
+      ...search,
+      lastFeasible: search.lastFeasible ? { ...search.lastFeasible } : null,
+      lastInfeasible: search.lastInfeasible ? { ...search.lastInfeasible } : null,
+      rangeSize: search.left === null || search.right === null ? null : search.right - search.left,
+      invariant: {
+        leftAtLeastLargest: search.initialized ? search.left >= minimum : null,
+        orderedBounds: search.initialized ? search.left <= search.right : null,
+        rightKnownFeasible: search.initialized,
+        belowLeftExcluded: search.initialized
+          ? search.left === minimum || Boolean(search.lastInfeasible && search.lastInfeasible.limit === search.left - 1)
+          : null,
+      },
+      minimality: minimalitySnapshot(),
+    },
+    scan: {
+      ...scan,
+      groupOf: [...scan.groupOf],
+      groupSums: [...scan.groupSums],
+      cut: { ...scan.cut },
+    },
+    witness: {
+      ...witness,
+      rawCuts: [...witness.rawCuts],
+      cuts: [...witness.cuts],
+      boundaries: [...witness.boundaries],
+      partitions: witness.partitions.map((partition) => ({
+        ...partition,
+        values: [...partition.values],
+      })),
+      cut: { ...witness.cut },
+    },
+    counters: { ...counters },
+    answer,
+    final,
+  });
+  const emit = ({
+    line,
+    event,
+    phase,
+    timing = "after",
+    condition = null,
+    title,
+    note,
+    final = false,
+  }) => {
+    const view = snapshotView({ line, event, phase, timing, condition, final });
+    const groupOf = view.witness.partitions.length ? partitionGroupOf() : view.scan.groupOf;
+    const activeIndex = Number.isInteger(view.witness.index) ? view.witness.index : view.scan.index;
+    const marked = view.witness.cuts.length
+      ? [...view.witness.cuts]
+      : groupOf.flatMap((group, index) => Number.isInteger(group) && group % 2 === 1 ? [index] : []);
+    steps.push({
+      title,
+      note,
+      arr: [...nums],
+      sub: nums.map((_, index) => Number.isInteger(groupOf[index]) ? `[${index}] G${groupOf[index]}` : `[${index}]`),
+      highlight: Number.isInteger(activeIndex) ? [activeIndex] : [],
+      mark: marked,
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "event", value: event },
+        { name: "left", value: view.search.left ?? "—" },
+        { name: "right", value: view.search.right ?? "—" },
+        { name: "mid", value: view.search.mid ?? "—" },
+        { name: "groups / k", value: `${view.search.groups ?? "—"} / ${k}` },
+        { name: "running", value: view.scan.running ?? "—" },
+        { name: "answer", value: view.answer ?? "—" },
+      ],
+      splitArray410View: view,
+    });
+  };
+
+  emit({
+    line: 1,
+    event: "bind-class",
+    phase: "setup",
+    title: localized("Bind Solution class", "Liên kết lớp Solution"),
+    note: localized("Create the class namespace that owns the answer and both traceable helpers.", "Tạo namespace lớp chứa hàm giải và hai helper có thể theo dõi."),
+  });
+  emit({
+    line: 2,
+    event: "bind-split-method",
+    phase: "setup",
+    title: localized("Bind splitArray(nums, k)", "Liên kết splitArray(nums, k)"),
+    note: localized("The method must return the minimum possible largest sum for exactly k nonempty contiguous groups.", "Phương thức phải trả về tổng nhóm lớn nhất nhỏ nhất khi chia đúng k nhóm liên tiếp không rỗng."),
+  });
+  emit({
+    line: 13,
+    event: "bind-count-method",
+    phase: "setup",
+    title: localized("Bind the greedy feasibility helper", "Liên kết helper kiểm tra tham lam"),
+    note: localized("count_groups computes the fewest groups needed under one candidate limit.", "count_groups tính số nhóm ít nhất cần dùng dưới một giới hạn ứng viên."),
+  });
+  emit({
+    line: 21,
+    event: "bind-cuts-method",
+    phase: "setup",
+    title: localized("Bind deterministic witness reconstruction", "Liên kết tái dựng witness xác định"),
+    note: localized("build_cuts will turn the final capacity into exactly k contiguous groups.", "build_cuts sẽ biến capacity cuối thành đúng k nhóm liên tiếp."),
   });
 
-  let answer = right;
-  let iterGuard = 0;
+  search.left = minimum;
+  search.right = maximum;
+  search.initialized = true;
+  search.outcome = "bounded";
+  emit({
+    line: 3,
+    event: "initialize-bounds",
+    phase: "search",
+    title: localized(`Search interval = [${minimum}, ${maximum}]`, `Khoảng tìm kiếm = [${minimum}, ${maximum}]`),
+    note: localized(
+      `No group limit can be below max(nums)=${minimum}; sum(nums)=${maximum} is feasible as one group.`,
+      `Giới hạn không thể nhỏ hơn max(nums)=${minimum}; sum(nums)=${maximum} khả thi với một nhóm.`,
+    ),
+  });
 
-  while (left < right && iterGuard < 100) {
-    iterGuard++;
-    // Line 4: while left < right:
-    snap({
-      title: { vi: `while left < right → ${left} < ${right} → True`, en: `while left < right → ${left} < ${right} → True` },
-      sub: subLabels(undefined, undefined),
-      codeLines: [4],
-      vars: [{ name: "left", value: left }, { name: "right", value: right }],
-      note: {
-        vi: `left=${left} < right=${right} → còn khoảng để tìm đáp án nhỏ nhất, tiếp tục.`,
-        en: `left=${left} < right=${right} → there's still a range to search for the minimum answer, continue.`,
-      },
+  const traceCountGroups = (limit) => {
+    counters.feasibilityCalls++;
+    scan = blankScan(limit);
+    scan.active = true;
+    scan.call = counters.feasibilityCalls;
+    emit({
+      line: 6,
+      event: "count-call",
+      phase: "count",
+      timing: "before",
+      title: localized(`Call count_groups at limit ${limit}`, `Gọi count_groups với giới hạn ${limit}`),
+      note: localized("The assignment to groups waits until the helper returns.", "Phép gán cho groups chờ đến khi helper trả về."),
+    });
+    emit({
+      line: 13,
+      event: "count-entry",
+      phase: "count",
+      timing: "before",
+      title: localized(`Enter count_groups(nums, ${limit})`, `Vào count_groups(nums, ${limit})`),
+      note: localized("This call greedily packs every value from left to right.", "Lần gọi này xếp tham lam mọi giá trị từ trái sang phải."),
     });
 
-    // Line 5: mid = (left + right) // 2
-    const mid = Math.floor((left + right) / 2);
-    snap({
-      title: { vi: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}`, en: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}` },
-      sub: subLabels(undefined, undefined),
-      codeLines: [5],
-      vars: [{ name: "mid", value: mid }],
-      note: {
-        vi: `Thử mid=${mid}: nếu giới hạn mỗi nhóm ≤ ${mid} thì cần bao nhiêu nhóm?`,
-        en: `Try mid=${mid}: if each group is capped at ≤ ${mid}, how many groups are needed?`,
-      },
+    let groups = 1;
+    let running = 0;
+    scan.groups = groups;
+    scan.currentGroup = 0;
+    scan.running = running;
+    scan.runningBefore = 0;
+    scan.runningAfter = 0;
+    scan.groupSums = [0];
+    emit({
+      line: 14,
+      event: "count-initialize",
+      phase: "count",
+      title: localized("Start with group 1 and running sum 0", "Bắt đầu với nhóm 1 và tổng chạy 0"),
+      note: localized("At least one nonempty group is required; no number has been consumed yet.", "Cần ít nhất một nhóm không rỗng; chưa tiêu thụ số nào."),
     });
 
-    // Line 6: groups = count_groups(nums, mid)
-    const { groupOf, groups } = groupsFor(mid);
-    const groupsStr = groupOf.map((g, i) => `${nums[i]}→G${g}`).join(", ");
-    snap({
-      title: { vi: `groups = count_groups(nums, mid) → ${groups} nhóm`, en: `groups = count_groups(nums, mid) → ${groups} groups` },
-      sub: nums.map((v, i) => `[${i}] G${groupOf[i]}`),
-      mid,
-      codeLines: [6],
-      vars: [{ name: "groups needed", value: groups }, { name: "grouping", value: groupsStr }],
-      note: {
-        vi: `Đi từ trái sang phải, cộng dồn vào nhóm hiện tại; khi cộng thêm sẽ VƯỢT mid=${mid} thì mở nhóm mới. Kết quả cần ${groups} nhóm (màu xen kẽ = nhóm khác nhau).`,
-        en: `Scan left to right, accumulate into the current group; when adding the next element would EXCEED mid=${mid}, start a new group. Needs ${groups} groups (alternating colors = different groups).`,
-      },
+    for (let index = 0; index < n; index++) {
+      const num = nums[index];
+      counters.loopVisits++;
+      scan.index = index;
+      scan.num = num;
+      scan.runningBefore = running;
+      scan.runningAfter = running;
+      scan.prospective = running + num;
+      scan.overflow = null;
+      scan.cut = blankCut();
+      emit({
+        line: 15,
+        event: "count-loop",
+        phase: "count",
+        timing: "before",
+        condition: { expression: `${index} < ${n}`, result: true },
+        title: localized(`Read nums[${index}] = ${num}`, `Đọc nums[${index}] = ${num}`),
+        note: localized(`The current group sum is ${running}; test whether adding ${num} fits.`, `Tổng nhóm hiện tại là ${running}; kiểm tra cộng ${num} có vừa không.`),
+      });
+
+      counters.overflowChecks++;
+      const overflow = running + num > limit;
+      scan.overflow = overflow;
+      scan.cut = {
+        status: overflow ? "required" : "not-required",
+        beforeIndex: overflow ? index : null,
+        fromGroup: groups - 1,
+        toGroup: overflow ? groups : groups - 1,
+        reason: overflow ? "capacity" : "fits",
+      };
+      emit({
+        line: 16,
+        event: overflow ? "overflow-true" : "overflow-false",
+        phase: "count",
+        condition: { expression: `${running} + ${num} > ${limit}`, result: overflow },
+        title: localized(
+          `${running} + ${num} > ${limit} is ${overflow ? "true" : "false"}`,
+          `${running} + ${num} > ${limit} là ${overflow ? "đúng" : "sai"}`,
+        ),
+        note: overflow
+          ? localized("The value cannot stay in the current group, so a cut is mandatory before it.", "Giá trị không thể ở nhóm hiện tại, nên bắt buộc cắt trước nó.")
+          : localized("The value still fits, so keep the current group.", "Giá trị vẫn vừa, nên giữ nhóm hiện tại."),
+      });
+
+      if (overflow) {
+        groups++;
+        counters.greedyCuts++;
+        scan.groups = groups;
+        scan.currentGroup = groups - 1;
+        scan.groupSums.push(0);
+        scan.cut.status = "opened";
+        emit({
+          line: 17,
+          event: "open-greedy-group",
+          phase: "count",
+          title: localized(`Increase groups to ${groups}`, `Tăng groups lên ${groups}`),
+          note: localized(`A new greedy group G${groups - 1} starts before index ${index}.`, `Nhóm tham lam mới G${groups - 1} bắt đầu trước index ${index}.`),
+        });
+
+        running = 0;
+        scan.running = 0;
+        scan.runningAfter = 0;
+        scan.cut.status = "reset";
+        emit({
+          line: 18,
+          event: "reset-running",
+          phase: "count",
+          title: localized("Reset running sum to 0", "Đặt lại tổng chạy về 0"),
+          note: localized(`The next addition belongs to the new group G${groups - 1}.`, `Phép cộng tiếp theo thuộc nhóm mới G${groups - 1}.`),
+        });
+      }
+
+      const addBefore = running;
+      running += num;
+      counters.runningAdds++;
+      scan.groupOf[index] = groups - 1;
+      scan.groupSums[groups - 1] = running;
+      scan.processed = index + 1;
+      scan.groups = groups;
+      scan.currentGroup = groups - 1;
+      scan.runningBefore = addBefore;
+      scan.running = running;
+      scan.runningAfter = running;
+      scan.cut.status = overflow ? "placed-after-cut" : "placed";
+      emit({
+        line: 19,
+        event: "add-running",
+        phase: "count",
+        title: localized(`G${groups - 1}: ${addBefore} + ${num} = ${running}`, `G${groups - 1}: ${addBefore} + ${num} = ${running}`),
+        note: localized(`Index ${index} is now assigned to greedy group G${groups - 1}; its sum remains ≤ ${limit}.`, `Index ${index} được gán vào nhóm tham lam G${groups - 1}; tổng nhóm vẫn ≤ ${limit}.`),
+      });
+    }
+
+    scan.index = null;
+    scan.num = null;
+    scan.complete = true;
+    emit({
+      line: 15,
+      event: "count-loop-complete",
+      phase: "count",
+      timing: "before",
+      condition: { expression: `${n} < ${n}`, result: false },
+      title: localized("Greedy scan is complete", "Quét tham lam hoàn tất"),
+      note: localized(`All ${n} values were placed into ${groups} minimal-capacity groups.`, `Đã xếp cả ${n} giá trị vào ${groups} nhóm tối thiểu theo capacity.`),
     });
 
-    const feasible = groups <= k;
-    // Line 7: if groups <= k:
-    snap({
-      title: { vi: `if groups <= k → ${groups} <= ${k} → ${feasible}`, en: `if groups <= k → ${groups} <= ${k} → ${feasible}` },
-      sub: nums.map((v, i) => `[${i}] G${groupOf[i]}`),
-      mid,
-      codeLines: [7],
-      vars: [{ name: "groups", value: groups }, { name: "k", value: k }],
+    scan.active = false;
+    scan.returnedGroups = groups;
+    emit({
+      line: 20,
+      event: "count-return",
+      phase: "count",
+      title: localized(`Return ${groups} groups`, `Trả về ${groups} nhóm`),
+      note: localized("Greedy cuts only when forced, so no packing under this limit can use fewer groups.", "Tham lam chỉ cắt khi bắt buộc, nên không cách xếp nào dưới giới hạn này dùng ít nhóm hơn."),
+    });
+    return { groups, groupOf: [...scan.groupOf], groupSums: [...scan.groupSums] };
+  };
+
+  while (search.left < search.right) {
+    counters.searchIterations++;
+    search.iteration = counters.searchIterations;
+    search.outcome = "searching";
+    emit({
+      line: 4,
+      event: "while-true",
+      phase: "search",
+      timing: "before",
+      condition: { expression: `${search.left} < ${search.right}`, result: true },
+      title: localized(`Iteration ${search.iteration}: ${search.left} < ${search.right}`, `Vòng ${search.iteration}: ${search.left} < ${search.right}`),
+      note: localized("The lower-bound search still contains more than one candidate.", "Tìm kiếm lower-bound vẫn còn nhiều hơn một ứng viên."),
+    });
+
+    search.previousLeft = search.left;
+    search.previousRight = search.right;
+    search.mid = Math.floor((search.left + search.right) / 2);
+    search.groups = null;
+    search.feasible = null;
+    search.outcome = "testing";
+    emit({
+      line: 5,
+      event: "choose-mid",
+      phase: "search",
+      title: localized(`mid = (${search.left} + ${search.right}) // 2 = ${search.mid}`, `mid = (${search.left} + ${search.right}) // 2 = ${search.mid}`),
+      note: localized("Use the lower midpoint so either boundary update strictly shrinks the interval.", "Dùng midpoint dưới để mỗi cập nhật biên đều thu hẹp khoảng nghiêm ngặt."),
+    });
+
+    const result = traceCountGroups(search.mid);
+    search.groups = result.groups;
+    emit({
+      line: 6,
+      event: "count-assignment",
+      phase: "search",
+      title: localized(`groups = ${result.groups}`, `groups = ${result.groups}`),
+      note: localized(`Under limit ${search.mid}, the greedy partition needs ${result.groups} groups.`, `Với giới hạn ${search.mid}, partition tham lam cần ${result.groups} nhóm.`),
+    });
+
+    counters.feasibleChecks++;
+    const feasible = result.groups <= k;
+    search.feasible = feasible;
+    search.outcome = feasible ? "feasible" : "infeasible";
+    if (feasible) {
+      counters.feasibleMids++;
+      search.lastFeasible = { limit: search.mid, groups: result.groups, reason: "greedy-count" };
+    } else {
+      counters.infeasibleMids++;
+      search.lastInfeasible = { limit: search.mid, groups: result.groups, reason: "too-many-groups" };
+    }
+    emit({
+      line: 7,
+      event: feasible ? "feasible-mid" : "infeasible-mid",
+      phase: "search",
+      condition: { expression: `${result.groups} <= ${k}`, result: feasible },
+      title: localized(
+        `${result.groups} groups ${feasible ? "fit" : "do not fit"} k=${k}`,
+        `${result.groups} nhóm ${feasible ? "không vượt" : "vượt"} k=${k}`,
+      ),
       note: feasible
-        ? { vi: `${groups} ≤ k=${k} → mid=${mid} KHẢ THI (đủ ít nhóm), có thể thử giá trị NHỎ HƠN → right=mid.`, en: `${groups} ≤ k=${k} → mid=${mid} is FEASIBLE (few enough groups), maybe can go SMALLER → right=mid.` }
-        : { vi: `${groups} > k=${k} → mid=${mid} QUÁ NHỎ (cần nhiều nhóm hơn cho phép) → left=mid+1.`, en: `${groups} > k=${k} → mid=${mid} is TOO SMALL (needs more groups than allowed) → left=mid+1.` },
+        ? localized("This capacity works with at most k groups; positive groups can be split further to reach exactly k.", "Capacity này dùng không quá k nhóm; các nhóm dương có thể tách thêm để đạt đúng k.")
+        : localized("This capacity needs too many groups, so it and every smaller capacity are impossible.", "Capacity này cần quá nhiều nhóm, nên nó và mọi capacity nhỏ hơn đều bất khả thi."),
     });
 
     if (feasible) {
-      // Line 8: right = mid
-      right = mid;
-      snap({
-        title: { vi: `right = mid → right = ${right}`, en: `right = mid → right = ${right}` },
-        sub: subLabels(undefined, undefined),
-        codeLines: [8],
-        vars: [{ name: "right", value: right }],
-        note: {
-          vi: `right = ${right}. Thu hẹp phạm vi tìm kiếm về phía nhỏ hơn.`,
-          en: `right = ${right}. Shrink the search range toward smaller values.`,
-        },
+      search.right = search.mid;
+      search.outcome = "move-right";
+      counters.upperUpdates++;
+      emit({
+        line: 8,
+        event: "move-right",
+        phase: "search",
+        title: localized(`right = ${search.mid}`, `right = ${search.mid}`),
+        note: localized(`Keep feasible ${search.mid} and search the tighter interval [${search.left}, ${search.right}].`, `Giữ ${search.mid} khả thi và tìm trong khoảng chặt hơn [${search.left}, ${search.right}].`),
       });
     } else {
-      // Line 10: left = mid + 1
-      left = mid + 1;
-      snap({
-        title: { vi: `left = mid + 1 → left = ${left}`, en: `left = mid + 1 → left = ${left}` },
-        sub: subLabels(undefined, undefined),
-        codeLines: [10],
-        vars: [{ name: "left", value: left }],
-        note: {
-          vi: `left = ${left}. Thu hẹp phạm vi tìm kiếm về phía lớn hơn.`,
-          en: `left = ${left}. Shrink the search range toward larger values.`,
-        },
+      emit({
+        line: 9,
+        event: "else-branch",
+        phase: "search",
+        timing: "before",
+        title: localized("Take the infeasible branch", "Đi vào nhánh bất khả thi"),
+        note: localized("groups <= k was false, so execution enters else without changing a bound yet.", "groups <= k sai, nên thực thi vào else nhưng chưa đổi biên."),
+      });
+      search.left = search.mid + 1;
+      search.outcome = "move-left";
+      counters.lowerUpdates++;
+      emit({
+        line: 10,
+        event: "move-left",
+        phase: "search",
+        title: localized(`left = ${search.mid} + 1 = ${search.left}`, `left = ${search.mid} + 1 = ${search.left}`),
+        note: localized(`Discard all capacities through ${search.mid}; continue in [${search.left}, ${search.right}].`, `Loại mọi capacity đến ${search.mid}; tiếp tục trong [${search.left}, ${search.right}].`),
       });
     }
   }
 
-  answer = left;
-  const { groupOf: finalGroupOf } = groupsFor(answer);
-  const fs = {
-    title: { vi: `return left → ${answer}`, en: `return left → ${answer}` },
-    arr: [...nums],
-    sub: nums.map((v, i) => `[${i}] G${finalGroupOf[i]}`),
-    highlight: [],
-    mark: finalGroupOf.filter((_, i) => finalGroupOf[i] % 2 === 1),
-    final: true,
-    codeLines: [11],
-    vars: [{ name: "answer", value: answer }],
-    note: {
-      vi: `left == right == ${answer} → đây là giá trị NHỎ NHẤT sao cho nums chia được thành ≤ k=${k} nhóm liên tiếp mà tổng mỗi nhóm ≤ ${answer}.`,
-      en: `left == right == ${answer} → this is the SMALLEST value such that nums can be split into ≤ k=${k} contiguous groups each summing to ≤ ${answer}.`,
-    },
-  };
-  steps.push(fs);
+  search.outcome = "converged";
+  emit({
+    line: 4,
+    event: "while-false",
+    phase: "search",
+    timing: "before",
+    condition: { expression: `${search.left} < ${search.right}`, result: false },
+    title: localized(`Bounds meet at ${search.left}`, `Hai biên gặp nhau tại ${search.left}`),
+    note: localized("The loop stops at the smallest feasible capacity; now reconstruct exactly k groups.", "Vòng lặp dừng tại capacity khả thi nhỏ nhất; giờ tái dựng đúng k nhóm."),
+  });
 
-  return { original: nums, answer, steps };
+  witness.active = true;
+  witness.limit = search.left;
+  emit({
+    line: 11,
+    event: "cuts-call",
+    phase: "reconstruct",
+    timing: "before",
+    title: localized(`Call build_cuts at capacity ${search.left}`, `Gọi build_cuts với capacity ${search.left}`),
+    note: localized("The cuts variable is assigned only after the helper returns its sorted boundaries.", "Biến cuts chỉ được gán sau khi helper trả về các biên đã sắp xếp."),
+  });
+  witness.entered = true;
+  emit({
+    line: 21,
+    event: "cuts-entry",
+    phase: "reconstruct",
+    timing: "before",
+    title: localized("Enter build_cuts", "Vào build_cuts"),
+    note: localized("Scan right-to-left so capacity cuts and exact-group cuts are deterministic.", "Quét phải sang trái để cắt theo capacity và số nhóm một cách xác định."),
+  });
+
+  witness.rawCuts = [];
+  witness.cuts = [];
+  witness.initialized = true;
+  emit({
+    line: 22,
+    event: "cuts-initialize",
+    phase: "reconstruct",
+    title: localized("Initialize cuts = []", "Khởi tạo cuts = []"),
+    note: localized("Each stored index will become the start of a group to its right.", "Mỗi index lưu lại sẽ là đầu của một nhóm ở bên phải."),
+  });
+
+  witness.groupsLeft = k;
+  witness.suffixSum = 0;
+  witness.suffixBefore = 0;
+  witness.suffixAfter = 0;
+  emit({
+    line: 23,
+    event: "witness-state-initialize",
+    phase: "reconstruct",
+    title: localized(`groups_left = ${k}, suffix_sum = 0`, `groups_left = ${k}, suffix_sum = 0`),
+    note: localized("groups_left counts the nonempty groups still required in the unprocessed prefix plus current suffix.", "groups_left đếm số nhóm không rỗng còn cần trong prefix chưa xử lý cộng suffix hiện tại."),
+  });
+
+  for (let index = n - 1; index >= 0; index--) {
+    const num = nums[index];
+    counters.reconstructionVisits++;
+    witness.index = index;
+    witness.num = num;
+    witness.visited = counters.reconstructionVisits;
+    witness.suffixBefore = witness.suffixSum;
+    witness.suffixAfter = witness.suffixSum;
+    witness.prospective = witness.suffixSum + num;
+    witness.mustCut = null;
+    witness.capacityCut = null;
+    witness.remainingCut = null;
+    witness.cut = { status: "idle", index: null, reason: null };
+    emit({
+      line: 24,
+      event: "witness-loop",
+      phase: "reconstruct",
+      timing: "before",
+      condition: { expression: `${index} >= 0`, result: true },
+      title: localized(`Visit nums[${index}] = ${num}`, `Xét nums[${index}] = ${num}`),
+      note: localized(`Try prepending ${num} to the suffix whose sum is ${witness.suffixSum}.`, `Thử thêm ${num} vào đầu suffix có tổng ${witness.suffixSum}.`),
+    });
+
+    counters.reconstructionChecks++;
+    const capacityCut = witness.suffixSum + num > search.left;
+    const remainingCut = index + 1 < witness.groupsLeft;
+    const mustCut = capacityCut || remainingCut;
+    witness.capacityCut = capacityCut;
+    witness.remainingCut = remainingCut;
+    witness.mustCut = mustCut;
+    witness.cut = {
+      status: mustCut ? "required" : "not-required",
+      index: mustCut ? index + 1 : null,
+      reason: capacityCut ? "capacity" : remainingCut ? "remaining-elements" : "fits",
+    };
+    emit({
+      line: 25,
+      event: mustCut ? "must-cut-true" : "must-cut-false",
+      phase: "reconstruct",
+      condition: {
+        expression: `${witness.suffixSum} + ${num} > ${search.left} or ${index + 1} < ${witness.groupsLeft}`,
+        result: mustCut,
+      },
+      title: localized(`must_cut = ${mustCut}`, `must_cut = ${mustCut}`),
+      note: capacityCut
+        ? localized("Adding this value would exceed the optimal capacity.", "Thêm giá trị này sẽ vượt capacity tối ưu.")
+        : remainingCut
+          ? localized("Force a cut so the remaining prefix has enough elements for all remaining groups.", "Buộc cắt để prefix còn đủ phần tử cho mọi nhóm còn lại.")
+          : localized("Neither rule requires a cut, so extend the current suffix group.", "Không quy tắc nào yêu cầu cắt, nên mở rộng nhóm suffix hiện tại."),
+    });
+    emit({
+      line: 26,
+      event: mustCut ? "cut-branch-true" : "cut-branch-false",
+      phase: "reconstruct",
+      timing: "before",
+      condition: { expression: "must_cut", result: mustCut },
+      title: localized(`if must_cut → ${mustCut}`, `if must_cut → ${mustCut}`),
+      note: mustCut
+        ? localized(`Create a boundary before index ${index + 1}.`, `Tạo biên trước index ${index + 1}.`)
+        : localized("Skip the three indented cut operations.", "Bỏ qua ba thao tác cắt thụt vào."),
+    });
+
+    if (mustCut) {
+      witness.rawCuts.push(index + 1);
+      witness.cut.status = "appended";
+      counters.witnessCuts++;
+      if (capacityCut) counters.capacityCuts++;
+      if (remainingCut) counters.remainingCuts++;
+      emit({
+        line: 27,
+        event: "append-cut",
+        phase: "reconstruct",
+        title: localized(`Append cut ${index + 1}`, `Thêm cut ${index + 1}`),
+        note: localized(`Reverse-order cuts are now [${witness.rawCuts.join(", ")}].`, `Các cut theo thứ tự ngược hiện là [${witness.rawCuts.join(", ")}].`),
+      });
+
+      witness.groupsLeft--;
+      witness.cut.status = "group-reserved";
+      emit({
+        line: 28,
+        event: "decrement-groups-left",
+        phase: "reconstruct",
+        title: localized(`groups_left = ${witness.groupsLeft}`, `groups_left = ${witness.groupsLeft}`),
+        note: localized("The completed suffix reserves one of the required groups.", "Suffix vừa hoàn tất chiếm một trong các nhóm bắt buộc."),
+      });
+
+      witness.suffixSum = 0;
+      witness.suffixAfter = 0;
+      witness.cut.status = "reset";
+      emit({
+        line: 29,
+        event: "reset-suffix",
+        phase: "reconstruct",
+        title: localized("Reset suffix_sum to 0", "Đặt lại suffix_sum về 0"),
+        note: localized("Start accumulating the next group immediately to the left.", "Bắt đầu cộng dồn nhóm tiếp theo ngay bên trái."),
+      });
+    }
+
+    const suffixBeforeAdd = witness.suffixSum;
+    witness.suffixSum += num;
+    witness.suffixBefore = suffixBeforeAdd;
+    witness.suffixAfter = witness.suffixSum;
+    witness.cut.status = mustCut ? "placed-after-cut" : "placed";
+    counters.suffixAdds++;
+    emit({
+      line: 30,
+      event: "add-suffix",
+      phase: "reconstruct",
+      title: localized(`${suffixBeforeAdd} + ${num} = ${witness.suffixSum}`, `${suffixBeforeAdd} + ${num} = ${witness.suffixSum}`),
+      note: localized(`The active suffix-group sum is ${witness.suffixSum}, still within ${search.left}.`, `Tổng nhóm suffix đang hoạt động là ${witness.suffixSum}, vẫn không vượt ${search.left}.`),
+    });
+  }
+
+  witness.index = null;
+  witness.num = null;
+  emit({
+    line: 24,
+    event: "witness-loop-complete",
+    phase: "reconstruct",
+    timing: "before",
+    condition: { expression: "-1 >= 0", result: false },
+    title: localized("Right-to-left scan is complete", "Quét phải sang trái hoàn tất"),
+    note: localized(`The helper collected ${witness.rawCuts.length} boundaries for ${k} groups.`, `Helper đã thu ${witness.rawCuts.length} biên cho ${k} nhóm.`),
+  });
+
+  witness.cuts = [...witness.rawCuts].sort((a, b) => a - b);
+  witness.active = false;
+  emit({
+    line: 31,
+    event: "cuts-return",
+    phase: "reconstruct",
+    title: localized(`Return sorted cuts [${witness.cuts.join(", ")}]`, `Trả cuts đã sắp xếp [${witness.cuts.join(", ")}]`),
+    note: localized("Ascending boundaries restore the original left-to-right array order.", "Các biên tăng dần khôi phục thứ tự mảng từ trái sang phải."),
+  });
+
+  witness.callerAssigned = true;
+  witness.boundaries = [0, ...witness.cuts, n];
+  witness.partitions = witness.boundaries.slice(0, -1).map((start, group) => {
+    const end = witness.boundaries[group + 1];
+    const values = nums.slice(start, end);
+    return {
+      group,
+      start,
+      end,
+      values,
+      sum: values.reduce((total, value) => total + value, 0),
+    };
+  });
+  witness.complete = true;
+
+  const witnessValid = witness.cuts.length === k - 1
+    && witness.partitions.length === k
+    && witness.partitions.every((partition) => partition.start < partition.end && partition.sum <= search.left)
+    && witness.partitions.flatMap((partition) => partition.values).every((value, index) => value === nums[index])
+    && Math.max(...witness.partitions.map((partition) => partition.sum)) === search.left;
+  if (!witnessValid) throw new Error("Split Array witness invariant failed.");
+
+  emit({
+    line: 11,
+    event: "cuts-assignment",
+    phase: "reconstruct",
+    title: localized(`cuts = [${witness.cuts.join(", ")}]`, `cuts = [${witness.cuts.join(", ")}]`),
+    note: localized(
+      `These ${k - 1} cuts define exactly ${k} nonempty groups with sums [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
+      `${k - 1} cut này tạo đúng ${k} nhóm không rỗng với tổng [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
+    ),
+  });
+
+  answer = search.left;
+  emit({
+    line: 12,
+    event: "final-return",
+    phase: "done",
+    title: localized(`Return the minimum largest sum: ${answer}`, `Trả tổng lớn nhất nhỏ nhất: ${answer}`),
+    note: localized(
+      `Capacity ${answer} is feasible and minimal; witness sums are [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
+      `Capacity ${answer} khả thi và nhỏ nhất; các tổng witness là [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
+    ),
+    final: true,
+  });
+
+  return {
+    original: [...nums],
+    answer,
+    cuts: [...witness.cuts],
+    partitions: witness.partitions.map((partition) => [...partition.values]),
+    steps,
+  };
 }
 
 /**
@@ -3677,42 +4363,29 @@ module.exports = {
     },
     defaultInput: [7, 2, 5, 10, 8],
     inputKind: "positive",
-    inputLabel: { vi: "nums (dương)", en: "nums (positive)" },
-    extraParams: [{ key: "k", label: { vi: "k (số nhóm)", en: "k (number of groups)" }, default: 2 }],
+    inputLabel: { vi: "nums dương (tối đa 16)", en: "positive nums (at most 16)" },
+    extraParams: [{ key: "k", label: { vi: "k (số nhóm)", en: "k (number of groups)" }, type: "number", min: 1, default: 2 }],
+    debugMode: "line-by-line",
+    parseSplitArray410Input,
     approach: [
-      { vi: "Binary search trên ĐÁP ÁN: giá trị cần tìm nằm trong [max(nums), sum(nums)].", en: "Binary search on the ANSWER: the value we want lies in [max(nums), sum(nums)]." },
-      { vi: "Với mid, đếm SỐ NHÓM cần dùng nếu mỗi nhóm bị giới hạn tổng ≤ mid (đi tham lam từ trái sang phải).", en: "For a given mid, count the NUMBER OF GROUPS needed if each group's sum is capped at ≤ mid (greedy left to right)." },
-      { vi: "Nếu số nhóm ≤ k → mid khả thi, thử nhỏ hơn (right=mid). Nếu > k → mid quá nhỏ (left=mid+1).", en: "If the group count ≤ k → mid is feasible, try smaller (right=mid). If > k → mid is too small (left=mid+1)." },
+      { vi: "Tìm kiếm nhị phân trên ĐÁP ÁN trong [max(nums), sum(nums)]; right luôn là capacity khả thi.", en: "Binary-search the ANSWER in [max(nums), sum(nums)]; right always remains a feasible capacity." },
+      { vi: "Với từng mid, count_groups duyệt từng phần tử và chỉ mở nhóm mới khi cộng thêm sẽ vượt mid.", en: "For each mid, count_groups visits every value and opens a new group only when the next addition would exceed mid." },
+      { vi: "groups ≤ k nghĩa là mid khả thi; ngược lại loại mid và mọi capacity nhỏ hơn.", en: "groups ≤ k makes mid feasible; otherwise discard mid and every smaller capacity." },
+      { vi: "Sau khi hai biên gặp nhau, quét phải→trái để tạo đúng k nhóm witness theo quy tắc cắt xác định.", en: "After the bounds meet, scan right→left to build exactly k witness groups with a deterministic cut rule." },
     ],
     complexity: {
-      time: "O(n·log(sum(nums)))",
-      space: "O(1)",
+      time: "O(n·log(sum(nums)−max(nums)+1) + n)",
+      space: "O(k)",
       note: {
-        vi: "Binary search O(log(sum)) lần, mỗi lần đếm nhóm tốn O(n).",
-        en: "O(log(sum)) binary search iterations, each counting groups in O(n).",
+        vi: "Phần tìm đáp án dùng O(1) bộ nhớ thuật toán; mảng cuts O(k) chỉ tái dựng witness. Các frame debug bất biến tốn thêm bộ nhớ theo kích thước trace.",
+        en: "The answer search uses O(1) algorithmic space; the O(k) cuts array only reconstructs the witness. Immutable debug frames use additional trace-sized storage.",
       },
     },
-    code: [
-      "class Solution:",
-      "    def splitArray(self, nums, k):",
-      "        left, right = max(nums), sum(nums)",
-      "        while left < right:",
-      "            mid = (left + right) // 2",
-      "            groups = self.count_groups(nums, mid)",
-      "            if groups <= k:",
-      "                right = mid",
-      "            else:",
-      "                left = mid + 1",
-      "        return left",
-      "    def count_groups(self, nums, mid):",
-      "        groups, cur_sum = 1, 0",
-      "        for num in nums:",
-      "            if cur_sum + num > mid:",
-      "                groups += 1",
-      "                cur_sum = 0",
-      "            cur_sum += num",
-      "        return groups",
-    ],
+    code: SPLIT_ARRAY_410_SOURCE,
+    liveArgs: (input, params) => {
+      const nums = parseSplitArray410Input(input);
+      return [nums, parseSplitArray410K(params, nums.length)];
+    },
     builder: buildSteps410,
   },
   2226: {

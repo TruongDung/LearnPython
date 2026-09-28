@@ -22,6 +22,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-remove-invalid-301.js',
   'renderer-burst-balloons-312.js',
   'renderer-longest-increasing-path-329.js',
+  'renderer-split-array-410.js',
+  'renderer-all-one-432.js',
   'script.js',
 ]);
 
@@ -47,6 +49,8 @@ const STYLESHEET_ASSETS = Object.freeze([
   'remove-invalid-301.css',
   'burst-balloons-312.css',
   'longest-increasing-path-329.css',
+  'split-array-410.css',
+  'all-one-432.css',
 ]);
 
 const sourceCache = new Map();
