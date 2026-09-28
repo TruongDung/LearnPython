@@ -505,6 +505,12 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.removeInvalid301View), surface: "treeView", render: (step) => {
       renderRemoveInvalidParentheses301View(step);
     } },
+    { predicate: (step) => Boolean(step.burstBalloons312View), surface: "treeView", render: (step) => {
+      renderBurstBalloons312View(step);
+    } },
+    { predicate: (step) => Boolean(step.longestIncreasingPath329View), surface: "treeView", render: (step) => {
+      renderLongestIncreasingPath329View(step);
+    } },
     { predicate: (step) => Boolean(step.tree), surface: "treeView", render: (step) => {
       renderTree(step);
     } },

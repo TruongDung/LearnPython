@@ -20,6 +20,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-sliding-maximum-239.js',
   'renderer-median-finder-295.js',
   'renderer-remove-invalid-301.js',
+  'renderer-burst-balloons-312.js',
+  'renderer-longest-increasing-path-329.js',
   'script.js',
 ]);
 
@@ -43,6 +45,8 @@ const STYLESHEET_ASSETS = Object.freeze([
   'sliding-maximum-239.css',
   'median-finder-295.css',
   'remove-invalid-301.css',
+  'burst-balloons-312.css',
+  'longest-increasing-path-329.css',
 ]);
 
 const sourceCache = new Map();

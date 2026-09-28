@@ -16001,166 +16001,773 @@ function buildSteps264(input, params) {
 }
 
 /**
- * LeetCode 312: Burst Balloons — interval DP.
- * balloons = [1] + nums + [1]. dp[left][right] = max coins from bursting all
- * balloons strictly inside the open interval (left, right). k = the LAST
- * balloon burst in that interval.
- *
- * Code lines (1-indexed):
- *  1  class Solution:
- *  2      def maxCoins(self, nums):
- *  3          balloons = [1] + nums + [1]
- *  4          n = len(balloons)
- *  5          dp = [[0]*n for _ in range(n)]
- *  6          for length in range(2, n):
- *  7              for left in range(n - length):
- *  8                  right = left + length
- *  9                  for k in range(left + 1, right):
- * 10                      coins = balloons[left]*balloons[k]*balloons[right]
- * 11                      coins += dp[left][k] + dp[k][right]
- * 12                      dp[left][right] = max(dp[left][right], coins)
- * 13          return dp[0][n-1]
+ * LeetCode 312: Burst Balloons — exact interval-DP execution trace.
+ * dp[left][right] stores the best score for the open interval (left, right),
+ * while choice[left][right] stores its deterministic final balloon. Rebuilding
+ * left, then right, then k produces one chronological optimal burst witness.
  */
+const BURST_BALLOONS_312_MAX_LENGTH = 8;
+const BURST_BALLOONS_312_MAX_VALUE = 100;
+const BURST_BALLOONS_312_SOURCE = Object.freeze([
+  "class Solution:",
+  "    def maxCoins(self, nums):",
+  "        balloons = [1] + nums + [1]",
+  "        n = len(balloons)",
+  "        dp = [[0] * n for _ in range(n)]",
+  "        choice = [[-1] * n for _ in range(n)]",
+  "        for length in range(2, n):",
+  "            for left in range(n - length):",
+  "                right = left + length",
+  "                for k in range(left + 1, right):",
+  "                    boundary = balloons[left] * balloons[k] * balloons[right]",
+  "                    left_coins = dp[left][k]",
+  "                    right_coins = dp[k][right]",
+  "                    candidate = boundary + left_coins + right_coins",
+  "                    if choice[left][right] == -1 or candidate > dp[left][right]:",
+  "                        dp[left][right] = candidate",
+  "                        choice[left][right] = k",
+  "        order = []",
+  "        def rebuild(left, right):",
+  "            k = choice[left][right]",
+  "            if k == -1:",
+  "                return",
+  "            rebuild(left, k)",
+  "            rebuild(k, right)",
+  "            order.append(k)",
+  "        rebuild(0, n - 1)",
+  "        return dp[0][n - 1]",
+]);
+
+function parseBurstBalloons312Input(input) {
+  if (!Array.isArray(input)) {
+    throw new TypeError("Burst Balloons input must be an actual array.");
+  }
+  if (input.length < 1 || input.length > BURST_BALLOONS_312_MAX_LENGTH) {
+    throw new RangeError(`Burst Balloons input must contain 1 to ${BURST_BALLOONS_312_MAX_LENGTH} integers.`);
+  }
+  const nums = [...input];
+  if (!nums.every((value) => Number.isInteger(value))) {
+    throw new TypeError("Burst Balloons input must contain only integers.");
+  }
+  if (!nums.every((value) => value >= 0 && value <= BURST_BALLOONS_312_MAX_VALUE)) {
+    throw new RangeError(`Burst Balloons values must be between 0 and ${BURST_BALLOONS_312_MAX_VALUE}.`);
+  }
+  return nums;
+}
+
+function deepFreezeBurstBalloons312View(value) {
+  const copy = JSON.parse(JSON.stringify(value));
+  const freeze = (item) => {
+    if (!item || typeof item !== "object" || Object.isFrozen(item)) return item;
+    Object.values(item).forEach(freeze);
+    return Object.freeze(item);
+  };
+  return freeze(copy);
+}
+
 function buildSteps312(inputNums) {
-  const nums = Array.isArray(inputNums)
-    ? [...inputNums]
-    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
-  const balloons = [1, ...nums, 1];
-  const n = balloons.length;
-  const dp = Array.from({ length: n }, () => Array(n).fill(0));
+  const nums = parseBurstBalloons312Input(inputNums);
   const steps = [];
-
-  // Column/row headers show the padded balloon values
-  const headers = balloons.map((b, i) => `${i}:${b}`);
-
-  function gridSnap(opts) {
-    // Build display grid with header row + header col
-    const display = [["", ...headers]];
-    for (let r = 0; r < n; r++) {
-      display.push([headers[r], ...dp[r].map((v) => (v === 0 ? "·" : String(v)))]);
-    }
-    steps.push({
-      title: opts.title,
-      arr: [],
-      grid: {
-        dp: display,
-        text1: "",
-        text2: "",
-        hlCell: opts.hlCell || null,      // [row+1, col+1] in display coords
-        pathCells: opts.pathCells || [],
-        largeCells: true,
-      },
-      highlight: [],
-      mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
-    });
-  }
-
-  if (nums.length === 0) {
-    gridSnap({
-      title: { vi: "Mảng rỗng → 0", en: "Empty array → 0" },
-      final: true, codeLines: [13], vars: [{ name: "answer", value: 0 }],
-      note: { vi: "Không có bóng.", en: "No balloons." },
-    });
-    return { original: nums, answer: 0, steps };
-  }
-
-  gridSnap({
-    title: { vi: "balloons = [1] + nums + [1]", en: "balloons = [1] + nums + [1]" },
-    codeLines: [3, 4, 5],
-    vars: [
-      { name: "nums", value: `[${nums.join(", ")}]` },
-      { name: "balloons", value: `[${balloons.join(", ")}]` },
-      { name: "n", value: n },
-    ],
-    note: {
-      vi:
-        `Đệm 1 vào hai đầu: balloons = [${balloons.join(", ")}].\n` +
-        `dp[left][right] = số coin tối đa khi làm nổ hết bóng NẰM GIỮA khoảng mở (left, right).\n` +
-        `Đường chéo (khoảng không có bóng bên trong) = 0.`,
-      en:
-        `Pad with 1 on both ends: balloons = [${balloons.join(", ")}].\n` +
-        `dp[left][right] = max coins from bursting every balloon strictly inside open interval (left, right).\n` +
-        `The diagonal (empty interior) is 0.`,
-    },
+  const localized = (en, vi) => ({ en, vi });
+  const blankRead = (side, status = "idle") => ({
+    side,
+    row: null,
+    column: null,
+    value: null,
+    status,
+    cellStatus: null,
+  });
+  const blankCandidate = () => ({
+    boundary: null,
+    leftCoins: null,
+    rightCoins: null,
+    total: null,
+    proposed: null,
+    incumbent: null,
+    incumbentBefore: null,
+    incumbentAfter: null,
+    incumbentChoice: null,
+    outcome: "idle",
+    reason: null,
   });
 
-  // Interval DP
-  for (let length = 2; length < n; length++) {
-    for (let left = 0; left + length < n; left++) {
-      const right = left + length;
-      let best = 0;
-      let bestK = -1;
+  let balloons = [];
+  let balloonsAllocated = false;
+  let n = null;
+  let dp = [];
+  let dpStatus = [];
+  let dpAllocated = false;
+  let choice = [];
+  let choiceStatus = [];
+  let choiceAllocated = false;
+  let cursor = { length: null, left: null, right: null, k: null };
+  let activeDpCell = null;
+  let activeChoiceCell = null;
+  let lastChoice = null;
+  let multipliers = {
+    left: null,
+    k: null,
+    right: null,
+    values: { left: null, k: null, right: null },
+    product: null,
+  };
+  let dependencyReads = {
+    left: blankRead("left"),
+    right: blankRead("right"),
+  };
+  let choiceRead = {
+    row: null,
+    column: null,
+    value: null,
+    status: "idle",
+    cellStatus: null,
+  };
+  let candidate = blankCandidate();
+  let reconstructionInitialized = false;
+  let helperBound = false;
+  let rootCalled = false;
+  let reconstructionComplete = false;
+  let activeReconstructionChoice = null;
+  const reconstructionStack = [];
+  const burstItems = [];
 
-      gridSnap({
-        title: { vi: `Khoảng (left=${left}, right=${right}), length=${length}`, en: `Interval (left=${left}, right=${right}), length=${length}` },
-        codeLines: [6, 7, 8],
-        hlCell: [left + 1, right + 1],
-        vars: [
-          { name: "length", value: length },
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "balloons[left]", value: balloons[left] },
-          { name: "balloons[right]", value: balloons[right] },
-        ],
-        note: {
-          vi: `Xét khoảng mở (${left}, ${right}). Thử từng bóng k giữa hai đầu làm bóng nổ CUỐI CÙNG.`,
-          en: `Consider open interval (${left}, ${right}). Try each balloon k inside as the LAST to burst.`,
-        },
+  const initialStatus = (row, column) => {
+    if (column <= row) return "not-applicable";
+    if (column === row + 1) return "base";
+    return "uncomputed";
+  };
+  const nullMatrix = () => Number.isInteger(n)
+    ? Array.from({ length: n }, () => Array(n).fill(null))
+    : [];
+  const balloonRef = (paddedIndex) => {
+    if (!balloonsAllocated || !Number.isInteger(paddedIndex) || paddedIndex < 0 || paddedIndex >= balloons.length) return null;
+    const isSentinel = paddedIndex === 0 || paddedIndex === balloons.length - 1;
+    return {
+      paddedIndex,
+      originalIndex: isSentinel ? null : paddedIndex - 1,
+      value: balloons[paddedIndex],
+      sentinel: paddedIndex === 0 ? "left" : paddedIndex === balloons.length - 1 ? "right" : null,
+    };
+  };
+  const paddedCells = () => balloonsAllocated ? balloons.map((value, paddedIndex) => {
+    const roles = [];
+    if (paddedIndex === 0) roles.push("left-sentinel");
+    if (paddedIndex === balloons.length - 1) roles.push("right-sentinel");
+    if (paddedIndex === cursor.left) roles.push("left-boundary");
+    if (paddedIndex === cursor.k) roles.push("last-choice");
+    if (paddedIndex === cursor.right) roles.push("right-boundary");
+    if (Number.isInteger(cursor.left) && Number.isInteger(cursor.right) && paddedIndex > cursor.left && paddedIndex < cursor.right) {
+      roles.push("interval-interior");
+    }
+    if (!roles.length) roles.push("outside");
+    return {
+      paddedIndex,
+      originalIndex: paddedIndex === 0 || paddedIndex === balloons.length - 1 ? null : paddedIndex - 1,
+      value,
+      sentinel: paddedIndex === 0 ? "left" : paddedIndex === balloons.length - 1 ? "right" : null,
+      role: roles.includes("last-choice")
+        ? "last-choice"
+        : roles.includes("left-boundary")
+          ? "left-boundary"
+          : roles.includes("right-boundary")
+            ? "right-boundary"
+            : roles[0],
+      roles,
+    };
+  }) : [];
+  const intervalSnapshot = () => {
+    if (!Number.isInteger(cursor.left) || !Number.isInteger(cursor.right)) return null;
+    return {
+      length: cursor.length,
+      leftIndex: cursor.left,
+      rightIndex: cursor.right,
+      left: balloonRef(cursor.left),
+      right: balloonRef(cursor.right),
+      interiorPaddedIndices: Array.from(
+        { length: Math.max(0, cursor.right - cursor.left - 1) },
+        (_, index) => cursor.left + index + 1,
+      ),
+    };
+  };
+  const copyRead = (read) => ({ ...read });
+  const activeCellSnapshot = (active, values, statuses, allocated) => {
+    if (!allocated || !active) return null;
+    const { row, column } = active;
+    return {
+      row,
+      column,
+      value: values[row][column],
+      status: statuses[row][column],
+    };
+  };
+  const burstOrderSnapshot = () => ({
+    items: burstItems.map((item) => ({ ...item, interval: { ...item.interval } })),
+    paddedIndices: burstItems.map((item) => item.paddedIndex),
+    originalIndices: burstItems.map((item) => item.originalIndex),
+    values: burstItems.map((item) => item.value),
+  });
+  const snapshotView = ({ line, event, phase, timing, condition, answer, final }) => deepFreezeBurstBalloons312View({
+    version: 1,
+    problemId: 312,
+    source: {
+      line,
+      text: BURST_BALLOONS_312_SOURCE[line - 1],
+    },
+    event,
+    phase,
+    timing,
+    condition: condition && typeof condition === "object"
+      ? { expression: condition.expression, result: condition.result }
+      : { expression: null, result: null },
+    input: {
+      values: [...nums],
+      length: nums.length,
+      limits: {
+        minLength: 1,
+        maxLength: BURST_BALLOONS_312_MAX_LENGTH,
+        minValue: 0,
+        maxValue: BURST_BALLOONS_312_MAX_VALUE,
+      },
+    },
+    padded: {
+      allocated: balloonsAllocated,
+      values: [...balloons],
+      cells: paddedCells(),
+      sentinels: {
+        left: balloonRef(0),
+        right: balloonsAllocated ? balloonRef(balloons.length - 1) : null,
+      },
+    },
+    size: n,
+    cursor: { ...cursor },
+    interval: intervalSnapshot(),
+    lastChoice: lastChoice ? { ...lastChoice } : null,
+    multipliers: {
+      left: multipliers.left ? { ...multipliers.left } : null,
+      k: multipliers.k ? { ...multipliers.k } : null,
+      right: multipliers.right ? { ...multipliers.right } : null,
+      values: { ...multipliers.values },
+      product: multipliers.product,
+    },
+    dependencyReads: {
+      left: copyRead(dependencyReads.left),
+      right: copyRead(dependencyReads.right),
+    },
+    candidate: { ...candidate },
+    dp: {
+      allocated: dpAllocated,
+      values: dpAllocated ? dp.map((row) => [...row]) : nullMatrix(),
+      status: dpAllocated ? dpStatus.map((row) => [...row]) : nullMatrix().map((row) => row.map(() => "unallocated")),
+      active: activeCellSnapshot(activeDpCell, dp, dpStatus, dpAllocated),
+      dependencies: {
+        left: copyRead(dependencyReads.left),
+        right: copyRead(dependencyReads.right),
+      },
+    },
+    choice: {
+      allocated: choiceAllocated,
+      values: choiceAllocated ? choice.map((row) => [...row]) : nullMatrix(),
+      status: choiceAllocated ? choiceStatus.map((row) => [...row]) : nullMatrix().map((row) => row.map(() => "unallocated")),
+      active: activeCellSnapshot(activeChoiceCell, choice, choiceStatus, choiceAllocated),
+      dependencies: {
+        read: { ...choiceRead },
+      },
+    },
+    reconstruction: {
+      initialized: reconstructionInitialized,
+      helperBound,
+      rootCalled,
+      stack: reconstructionStack.map((frame) => ({ ...frame })),
+      activeChoice: activeReconstructionChoice ? { ...activeReconstructionChoice } : null,
+      choiceRead: { ...choiceRead },
+      burstOrder: burstOrderSnapshot(),
+      complete: reconstructionComplete,
+    },
+    answer,
+    final,
+  });
+  const emit = ({
+    line,
+    event,
+    phase,
+    timing = "after",
+    condition = null,
+    title,
+    note,
+    answer = null,
+    final = false,
+  }) => {
+    const view = snapshotView({ line, event, phase, timing, condition, answer, final });
+    const shownValues = balloonsAllocated ? balloons : nums;
+    steps.push({
+      title,
+      note,
+      arr: [...shownValues],
+      sub: shownValues.map((value, index) => balloonsAllocated
+        ? (index === 0 || index === shownValues.length - 1 ? `S:${value}` : `${index - 1}:${value}`)
+        : `${index}:${value}`),
+      highlight: Number.isInteger(cursor.k) ? [cursor.k] : [],
+      mark: [cursor.left, cursor.right].filter(Number.isInteger),
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "event", value: event },
+        { name: "length", value: cursor.length ?? "—" },
+        { name: "left, right, k", value: `${cursor.left ?? "—"}, ${cursor.right ?? "—"}, ${cursor.k ?? "—"}` },
+        { name: "candidate", value: candidate.proposed ?? "—" },
+      ],
+      burstBalloons312View: view,
+    });
+  };
+
+  emit({
+    line: 1,
+    event: "bind-class",
+    phase: "setup",
+    title: localized("Bind class Solution", "Liên kết lớp Solution"),
+    note: localized("Python creates the class before maxCoins is called.", "Python tạo lớp trước khi maxCoins được gọi."),
+  });
+  emit({
+    line: 2,
+    event: "bind-method",
+    phase: "setup",
+    title: localized(`Bind maxCoins(nums = [${nums.join(", ")}])`, `Liên kết maxCoins(nums = [${nums.join(", ")}])`),
+    note: localized("The validated array is bound without coercion.", "Mảng đã kiểm tra được liên kết mà không ép kiểu."),
+  });
+
+  balloons = [1, ...nums, 1];
+  balloonsAllocated = true;
+  emit({
+    line: 3,
+    event: "pad-balloons",
+    phase: "setup",
+    title: localized("Pad both boundaries with 1", "Đệm 1 ở hai biên"),
+    note: localized(`balloons = [${balloons.join(", ")}].`, `balloons = [${balloons.join(", ")}].`),
+  });
+
+  n = balloons.length;
+  emit({
+    line: 4,
+    event: "set-size",
+    phase: "setup",
+    title: localized(`Set n = ${n}`, `Đặt n = ${n}`),
+    note: localized("The padded indices include two permanent sentinels.", "Các chỉ số đã đệm gồm hai sentinel cố định."),
+  });
+
+  dp = Array.from({ length: n }, () => Array(n).fill(0));
+  dpStatus = Array.from({ length: n }, (_, row) => Array.from({ length: n }, (_, column) => initialStatus(row, column)));
+  dpAllocated = true;
+  emit({
+    line: 5,
+    event: "allocate-dp",
+    phase: "setup",
+    title: localized("Allocate the DP table", "Tạo bảng DP"),
+    note: localized("Adjacent boundaries are base zero; wider intervals are still uncomputed.", "Hai biên kề nhau là base 0; các khoảng rộng hơn vẫn chưa tính."),
+  });
+
+  choice = Array.from({ length: n }, () => Array(n).fill(-1));
+  choiceStatus = Array.from({ length: n }, (_, row) => Array.from({ length: n }, (_, column) => initialStatus(row, column)));
+  choiceAllocated = true;
+  emit({
+    line: 6,
+    event: "allocate-choice",
+    phase: "setup",
+    title: localized("Allocate the choice table", "Tạo bảng choice"),
+    note: localized("-1 means no final balloon has been stored for that interval.", "-1 nghĩa là khoảng đó chưa lưu bóng nổ cuối."),
+  });
+
+  for (let length = 2; length < n; length += 1) {
+    cursor = { length, left: null, right: null, k: null };
+    activeDpCell = null;
+    activeChoiceCell = null;
+    lastChoice = null;
+    candidate = blankCandidate();
+    dependencyReads = { left: blankRead("left"), right: blankRead("right") };
+    emit({
+      line: 7,
+      event: "select-length",
+      phase: "interval-dp",
+      title: localized(`Select interval length ${length}`, `Chọn độ dài khoảng ${length}`),
+      note: localized("Increasing lengths guarantee both dependency intervals are ready.", "Độ dài tăng dần bảo đảm hai khoảng phụ đã sẵn sàng."),
+    });
+
+    for (let left = 0; left < n - length; left += 1) {
+      cursor = { length, left, right: null, k: null };
+      activeDpCell = null;
+      activeChoiceCell = null;
+      lastChoice = null;
+      candidate = blankCandidate();
+      dependencyReads = { left: blankRead("left"), right: blankRead("right") };
+      emit({
+        line: 8,
+        event: "select-left",
+        phase: "interval-dp",
+        title: localized(`Select left = ${left}`, `Chọn left = ${left}`),
+        note: localized("The right boundary is assigned on the next source line.", "Biên phải được gán ở dòng mã kế tiếp."),
       });
 
-      for (let k = left + 1; k < right; k++) {
-        const gain = balloons[left] * balloons[k] * balloons[right];
-        const coins = gain + dp[left][k] + dp[k][right];
-        const improved = coins > best;
-        if (improved) { best = coins; bestK = k; }
-        dp[left][right] = best;
+      const right = left + length;
+      cursor = { length, left, right, k: null };
+      activeDpCell = { row: left, column: right };
+      activeChoiceCell = { row: left, column: right };
+      emit({
+        line: 9,
+        event: "set-right",
+        phase: "interval-dp",
+        title: localized(`Set right = ${right}`, `Đặt right = ${right}`),
+        note: localized(`The active open interval is (${left}, ${right}).`, `Khoảng mở đang xét là (${left}, ${right}).`),
+      });
 
-        gridSnap({
-          title: { vi: `k=${k}: coins = ${balloons[left]}·${balloons[k]}·${balloons[right]} + dp[${left}][${k}] + dp[${k}][${right}] = ${coins}`, en: `k=${k}: coins = ${balloons[left]}·${balloons[k]}·${balloons[right]} + dp[${left}][${k}] + dp[${k}][${right}] = ${coins}` },
-          codeLines: [9, 10, 11, 12],
-          hlCell: [left + 1, right + 1],
-          pathCells: [[left + 1, k + 1], [k + 1, right + 1]],
-          vars: [
-            { name: "left, right", value: `${left}, ${right}` },
-            { name: "k (last burst)", value: k },
-            { name: "gain (l·k·r)", value: gain },
-            { name: `dp[${left}][${k}]`, value: dp[left][k] },
-            { name: `dp[${k}][${right}]`, value: dp[k][right] },
-            { name: "coins", value: coins },
-            { name: `dp[${left}][${right}]`, value: dp[left][right] },
-          ],
-          note: {
-            vi:
-              `Nếu k=${k} nổ CUỐI trong (${left}, ${right}): lúc đó chỉ còn bóng ${left} và ${right} bên cạnh k.\n` +
-              `coins = balloons[${left}]·balloons[${k}]·balloons[${right}] + dp[${left}][${k}] + dp[${k}][${right}] = ${gain} + ${dp[left][k]} + ${dp[k][right]} = ${coins}.\n` +
-              (improved ? `Tốt hơn → dp[${left}][${right}] = ${best}.` : `Không tốt hơn ${best}.`),
-            en:
-              `If k=${k} bursts LAST in (${left}, ${right}): only balloons ${left} and ${right} remain beside k.\n` +
-              `coins = balloons[${left}]·balloons[${k}]·balloons[${right}] + dp[${left}][${k}] + dp[${k}][${right}] = ${gain} + ${dp[left][k]} + ${dp[k][right]} = ${coins}.\n` +
-              (improved ? `Better → dp[${left}][${right}] = ${best}.` : `Not better than ${best}.`),
+      for (let k = left + 1; k < right; k += 1) {
+        cursor = { length, left, right, k };
+        activeDpCell = { row: left, column: right };
+        activeChoiceCell = { row: left, column: right };
+        lastChoice = balloonRef(k);
+        multipliers = {
+          left: balloonRef(left),
+          k: balloonRef(k),
+          right: balloonRef(right),
+          values: { left: balloons[left], k: balloons[k], right: balloons[right] },
+          product: null,
+        };
+        dependencyReads = {
+          left: {
+            side: "left",
+            row: left,
+            column: k,
+            value: null,
+            status: "pending",
+            cellStatus: dpStatus[left][k],
           },
+          right: {
+            side: "right",
+            row: k,
+            column: right,
+            value: null,
+            status: "pending",
+            cellStatus: dpStatus[k][right],
+          },
+        };
+        candidate = {
+          ...blankCandidate(),
+          incumbent: dp[left][right],
+          incumbentBefore: dp[left][right],
+          incumbentAfter: dp[left][right],
+          incumbentChoice: choice[left][right] === -1 ? null : choice[left][right],
+          outcome: "pending",
+        };
+        emit({
+          line: 10,
+          event: "select-last",
+          phase: "interval-dp",
+          title: localized(`Try k = ${k} as the last burst`, `Thử k = ${k} nổ cuối`),
+          note: localized("This choice leaves the interval boundaries adjacent to k.", "Lựa chọn này khiến hai biên khoảng nằm kề k."),
+        });
+
+        const boundary = balloons[left] * balloons[k] * balloons[right];
+        multipliers = { ...multipliers, product: boundary };
+        candidate = { ...candidate, boundary };
+        emit({
+          line: 11,
+          event: "boundary-product",
+          phase: "interval-dp",
+          title: localized(`Boundary product = ${boundary}`, `Tích biên = ${boundary}`),
+          note: localized(`${balloons[left]} × ${balloons[k]} × ${balloons[right]} = ${boundary}.`, `${balloons[left]} × ${balloons[k]} × ${balloons[right]} = ${boundary}.`),
+        });
+
+        const leftCoins = dp[left][k];
+        dependencyReads.left = { ...dependencyReads.left, value: leftCoins, status: "read" };
+        candidate = { ...candidate, leftCoins };
+        emit({
+          line: 12,
+          event: "read-left-dp",
+          phase: "interval-dp",
+          title: localized(`Read dp[${left}][${k}] = ${leftCoins}`, `Đọc dp[${left}][${k}] = ${leftCoins}`),
+          note: localized(`Left dependency status: ${dpStatus[left][k]}.`, `Trạng thái phụ thuộc trái: ${dpStatus[left][k]}.`),
+        });
+
+        const rightCoins = dp[k][right];
+        dependencyReads.right = { ...dependencyReads.right, value: rightCoins, status: "read" };
+        candidate = { ...candidate, rightCoins };
+        emit({
+          line: 13,
+          event: "read-right-dp",
+          phase: "interval-dp",
+          title: localized(`Read dp[${k}][${right}] = ${rightCoins}`, `Đọc dp[${k}][${right}] = ${rightCoins}`),
+          note: localized(`Right dependency status: ${dpStatus[k][right]}.`, `Trạng thái phụ thuộc phải: ${dpStatus[k][right]}.`),
+        });
+
+        const proposed = boundary + leftCoins + rightCoins;
+        candidate = { ...candidate, total: proposed, proposed };
+        emit({
+          line: 14,
+          event: "candidate-total",
+          phase: "interval-dp",
+          title: localized(`Candidate total = ${proposed}`, `Tổng ứng viên = ${proposed}`),
+          note: localized(`${boundary} + ${leftCoins} + ${rightCoins} = ${proposed}.`, `${boundary} + ${leftCoins} + ${rightCoins} = ${proposed}.`),
+        });
+
+        const firstCandidate = choice[left][right] === -1;
+        const strictlyGreater = proposed > dp[left][right];
+        const shouldUpdate = firstCandidate || strictlyGreater;
+        const reason = firstCandidate
+          ? "first-candidate"
+          : strictlyGreater
+            ? "strictly-greater"
+            : proposed === dp[left][right]
+              ? "tie"
+              : "lower";
+        candidate = {
+          ...candidate,
+          incumbent: dp[left][right],
+          incumbentBefore: dp[left][right],
+          incumbentAfter: shouldUpdate ? proposed : dp[left][right],
+          incumbentChoice: choice[left][right] === -1 ? null : choice[left][right],
+          outcome: shouldUpdate ? "update" : "keep",
+          reason,
+        };
+        emit({
+          line: 15,
+          event: "update-condition",
+          phase: "interval-dp",
+          condition: {
+            expression: "choice[left][right] == -1 or candidate > dp[left][right]",
+            result: shouldUpdate,
+          },
+          title: localized(
+            shouldUpdate ? "Update this interval" : "Keep the incumbent",
+            shouldUpdate ? "Cập nhật khoảng này" : "Giữ nghiệm hiện tại",
+          ),
+          note: localized(
+            firstCandidate
+              ? "The first candidate always writes, even when its score is zero."
+              : strictlyGreater
+                ? "The candidate is strictly greater than the incumbent."
+                : "A tie or lower score keeps the earliest stored choice.",
+            firstCandidate
+              ? "Ứng viên đầu tiên luôn được ghi, kể cả khi điểm bằng 0."
+              : strictlyGreater
+                ? "Ứng viên lớn hơn nghiêm ngặt nghiệm hiện tại."
+                : "Điểm hòa hoặc thấp hơn giữ lựa chọn đầu tiên đã lưu.",
+          ),
+        });
+        if (!shouldUpdate) continue;
+
+        dp[left][right] = proposed;
+        dpStatus[left][right] = proposed === 0 ? "computed-zero" : "computed";
+        candidate = { ...candidate, incumbentAfter: proposed };
+        emit({
+          line: 16,
+          event: "write-dp",
+          phase: "interval-dp",
+          title: localized(`Write dp[${left}][${right}] = ${proposed}`, `Ghi dp[${left}][${right}] = ${proposed}`),
+          note: localized("Only a true line-15 condition reaches this write.", "Chỉ điều kiện đúng ở dòng 15 mới chạy phép ghi này."),
+        });
+
+        choice[left][right] = k;
+        choiceStatus[left][right] = "computed";
+        emit({
+          line: 17,
+          event: "write-choice",
+          phase: "interval-dp",
+          title: localized(`Write choice[${left}][${right}] = ${k}`, `Ghi choice[${left}][${right}] = ${k}`),
+          note: localized("This padded index is retained as the interval's deterministic last burst.", "Chỉ số đã đệm này được giữ làm bóng nổ cuối xác định của khoảng."),
         });
       }
     }
   }
 
-  gridSnap({
-    title: { vi: `return dp[0][${n - 1}] = ${dp[0][n - 1]}`, en: `return dp[0][${n - 1}] = ${dp[0][n - 1]}` },
-    final: true,
-    codeLines: [13],
-    hlCell: [1, n],
-    vars: [{ name: "answer", value: dp[0][n - 1] }],
-    note: {
-      vi: `Đáp án = dp[0][${n - 1}] = ${dp[0][n - 1]} coin — làm nổ mọi bóng thật trong khoảng (0, ${n - 1}).`,
-      en: `Answer = dp[0][${n - 1}] = ${dp[0][n - 1]} coins — bursting every real balloon inside (0, ${n - 1}).`,
-    },
+  cursor = { length: null, left: null, right: null, k: null };
+  activeDpCell = null;
+  activeChoiceCell = null;
+  lastChoice = null;
+  multipliers = {
+    left: null,
+    k: null,
+    right: null,
+    values: { left: null, k: null, right: null },
+    product: null,
+  };
+  dependencyReads = { left: blankRead("left"), right: blankRead("right") };
+  candidate = blankCandidate();
+  reconstructionInitialized = true;
+  emit({
+    line: 18,
+    event: "reconstruction-init",
+    phase: "reconstruction",
+    title: localized("Initialize chronological burst order", "Khởi tạo thứ tự nổ theo thời gian"),
+    note: localized("order starts empty and receives each interval's last balloon after both children.", "order bắt đầu rỗng và nhận bóng cuối của mỗi khoảng sau hai khoảng con."),
   });
 
-  return { original: nums, answer: dp[0][n - 1], steps };
+  let rebuild;
+  rebuild = (left, right) => {
+    const frame = {
+      depth: reconstructionStack.length,
+      left,
+      right,
+      k: null,
+      stage: "choice-read",
+    };
+    reconstructionStack.push(frame);
+
+    const k = choice[left][right];
+    frame.k = k;
+    frame.stage = "choice-read";
+    activeChoiceCell = { row: left, column: right };
+    choiceRead = {
+      row: left,
+      column: right,
+      value: k,
+      status: "read",
+      cellStatus: choiceStatus[left][right],
+    };
+    activeReconstructionChoice = k === -1
+      ? null
+      : { ...balloonRef(k), interval: { left, right } };
+    emit({
+      line: 20,
+      event: "read-choice",
+      phase: "reconstruction",
+      title: localized(`Read choice[${left}][${right}] = ${k}`, `Đọc choice[${left}][${right}] = ${k}`),
+      note: localized("The stored k is the last balloon for this open interval.", "k đã lưu là bóng nổ cuối của khoảng mở này."),
+    });
+
+    const isBase = k === -1;
+    frame.stage = "base-condition";
+    emit({
+      line: 21,
+      event: "base-condition",
+      phase: "reconstruction",
+      condition: { expression: "k == -1", result: isBase },
+      title: localized(isBase ? "Base interval reached" : `Choice k = ${k} exists`, isBase ? "Đã tới khoảng base" : `Có lựa chọn k = ${k}`),
+      note: localized(isBase ? "No real balloon lies inside this interval." : "Rebuild both child intervals before appending k.", isBase ? "Không có bóng thật bên trong khoảng này." : "Tái dựng hai khoảng con trước khi thêm k."),
+    });
+
+    if (isBase) {
+      frame.stage = "base-return";
+      emit({
+        line: 22,
+        event: "base-return",
+        phase: "reconstruction",
+        timing: "before",
+        title: localized(`Return from rebuild(${left}, ${right})`, `Trả về từ rebuild(${left}, ${right})`),
+        note: localized("The base call adds nothing to the burst order.", "Lời gọi base không thêm gì vào thứ tự nổ."),
+      });
+      reconstructionStack.pop();
+      return;
+    }
+
+    frame.stage = "call-left";
+    activeReconstructionChoice = { ...balloonRef(k), interval: { left, right } };
+    choiceRead = { row: left, column: right, value: k, status: "read", cellStatus: choiceStatus[left][right] };
+    emit({
+      line: 23,
+      event: "call-left",
+      phase: "reconstruction",
+      timing: "before",
+      title: localized(`Call rebuild(${left}, ${k})`, `Gọi rebuild(${left}, ${k})`),
+      note: localized("The left subinterval bursts first in this deterministic witness.", "Khoảng con trái nổ trước trong witness xác định này."),
+    });
+    rebuild(left, k);
+
+    frame.stage = "call-right";
+    activeChoiceCell = { row: left, column: right };
+    activeReconstructionChoice = { ...balloonRef(k), interval: { left, right } };
+    choiceRead = { row: left, column: right, value: k, status: "read", cellStatus: choiceStatus[left][right] };
+    emit({
+      line: 24,
+      event: "call-right",
+      phase: "reconstruction",
+      timing: "before",
+      title: localized(`Call rebuild(${k}, ${right})`, `Gọi rebuild(${k}, ${right})`),
+      note: localized("The right subinterval follows the completed left subinterval.", "Khoảng con phải chạy sau khoảng con trái đã hoàn tất."),
+    });
+    rebuild(k, right);
+
+    frame.stage = "append-last";
+    activeChoiceCell = { row: left, column: right };
+    activeReconstructionChoice = { ...balloonRef(k), interval: { left, right } };
+    choiceRead = { row: left, column: right, value: k, status: "read", cellStatus: choiceStatus[left][right] };
+    burstItems.push({
+      step: burstItems.length + 1,
+      paddedIndex: k,
+      originalIndex: k - 1,
+      value: balloons[k],
+      interval: { left, right },
+    });
+    emit({
+      line: 25,
+      event: "append-last",
+      phase: "reconstruction",
+      title: localized(`Append padded index ${k}`, `Thêm chỉ số đệm ${k}`),
+      note: localized(`Balloon original[${k - 1}] = ${balloons[k]} now bursts.`, `Bóng original[${k - 1}] = ${balloons[k]} nổ ở bước này.`),
+    });
+    reconstructionStack.pop();
+  };
+
+  helperBound = true;
+  emit({
+    line: 19,
+    event: "bind-rebuild",
+    phase: "reconstruction",
+    title: localized("Bind recursive rebuild helper", "Liên kết hàm đệ quy rebuild"),
+    note: localized("The helper follows the choice matrix without changing the optimal score.", "Hàm phụ đi theo bảng choice mà không thay đổi điểm tối ưu."),
+  });
+
+  rootCalled = true;
+  activeChoiceCell = { row: 0, column: n - 1 };
+  choiceRead = {
+    row: 0,
+    column: n - 1,
+    value: choice[0][n - 1],
+    status: "pending",
+    cellStatus: choiceStatus[0][n - 1],
+  };
+  emit({
+    line: 26,
+    event: "call-root",
+    phase: "reconstruction",
+    timing: "before",
+    title: localized(`Call rebuild(0, ${n - 1})`, `Gọi rebuild(0, ${n - 1})`),
+    note: localized("The full padded interval now reconstructs one optimal chronological witness.", "Toàn khoảng đã đệm bắt đầu tái dựng một witness tối ưu theo thời gian."),
+  });
+  rebuild(0, n - 1);
+  reconstructionComplete = true;
+  activeChoiceCell = null;
+  activeReconstructionChoice = null;
+  choiceRead = { row: null, column: null, value: null, status: "idle", cellStatus: null };
+
+  const answer = dp[0][n - 1];
+  const burstOrder = burstOrderSnapshot();
+  const witness = {
+    padded: [...burstOrder.paddedIndices],
+    original: [...burstOrder.originalIndices],
+    values: [...burstOrder.values],
+    paddedIndices: [...burstOrder.paddedIndices],
+    originalIndices: [...burstOrder.originalIndices],
+    items: burstOrder.items.map((item) => ({ ...item, interval: { ...item.interval } })),
+  };
+  emit({
+    line: 27,
+    event: "final-return",
+    phase: "done",
+    timing: "before",
+    title: localized(`Return ${answer} maximum coins`, `Trả về tối đa ${answer} coin`),
+    note: localized(
+      `Chronological original indices: [${witness.original.join(", ")}]; values: [${witness.values.join(", ")}].`,
+      `Chỉ số gốc theo thời gian: [${witness.original.join(", ")}]; giá trị: [${witness.values.join(", ")}].`,
+    ),
+    answer,
+    final: true,
+  });
+
+  return {
+    original: [...nums],
+    answer,
+    witness,
+    burstOrder: witness.items.map((item) => ({ ...item, interval: { ...item.interval } })),
+    steps,
+  };
 }
 
 /**
@@ -21062,45 +21669,34 @@ module.exports = {
     titleVi: { vi: "Làm nổ bóng bay (Interval DP)", en: "Burst balloons (Interval DP)" },
     statement: {
       vi:
-        "Cho mảng nums là giá trị các quả bóng. Làm nổ từng quả để được nums[i-1]·nums[i]·nums[i+1] coin " +
-        "(bóng ngoài biên coi như 1). Tìm số coin TỐI ĐA. Nhập nums cách nhau dấu phẩy.",
+        "Cho mảng thật gồm 1–8 số nguyên 0..100 biểu diễn giá trị bóng. Làm nổ từng bóng để nhận nums[i-1]·nums[i]·nums[i+1] coin " +
+        "(ngoài biên là 1). Tìm số coin TỐI ĐA và tái dựng một thứ tự nổ tối ưu xác định.",
       en:
-        "Given nums representing balloon values, bursting balloon i earns nums[i-1]·nums[i]·nums[i+1] coins " +
-        "(out-of-bound balloons count as 1). Find the MAXIMUM coins. Enter nums comma-separated.",
+        "Given an actual array of 1–8 integers in 0..100 representing balloon values, bursting i earns nums[i-1]·nums[i]·nums[i+1] coins " +
+        "(out-of-bound balloons count as 1). Find the MAXIMUM coins and reconstruct one deterministic optimal burst order.",
     },
     defaultInput: [3, 1, 5, 8],
-    inputKind: "integer",
-    inputLabel: { vi: "nums (bóng)", en: "nums (balloons)" },
+    inputKind: "nonneg",
+    inputLabel: { vi: "nums (1–8 số nguyên 0..100)", en: "nums (1–8 integers, 0..100)" },
     extraParams: [],
+    debugMode: "line-by-line",
+    parseBurstBalloons312Input,
     approach: [
-      { vi: "Đệm 1 vào hai đầu để tránh xử lý biên. dp[left][right] = coin tối đa trong khoảng mở (left, right).", en: "Pad with 1 on both ends to avoid boundary cases. dp[left][right] = max coins in open interval (left, right)." },
-      { vi: "Chọn k là bóng nổ CUỐI CÙNG trong khoảng → khi đó nó chỉ còn cạnh balloons[left] và balloons[right].", en: "Pick k as the LAST balloon to burst in the interval → then it only touches balloons[left] and balloons[right]." },
-      { vi: "coins = balloons[left]·balloons[k]·balloons[right] + dp[left][k] + dp[k][right].", en: "coins = balloons[left]·balloons[k]·balloons[right] + dp[left][k] + dp[k][right]." },
-      { vi: "Duyệt theo độ dài khoảng tăng dần để dp con luôn sẵn sàng.", en: "Iterate by increasing interval length so sub-intervals are ready." },
+      { vi: "Đệm 1 ở hai đầu. dp[left][right] là coin tối đa trong khoảng mở (left, right).", en: "Pad both ends with 1. dp[left][right] is the maximum score inside open interval (left, right)." },
+      { vi: "Thử k làm bóng nổ CUỐI; đọc riêng dp[left][k] và dp[k][right] trước khi cộng tích biên.", en: "Try k as the LAST burst; read dp[left][k] and dp[k][right] separately before adding the boundary product." },
+      { vi: "choice lưu ứng viên đầu tiên hoặc ứng viên lớn hơn nghiêm ngặt, nên số 0 và tie vẫn có witness xác định.", en: "choice stores the first candidate or a strictly greater candidate, so zero scores and ties still have a deterministic witness." },
+      { vi: "rebuild đi trái, đi phải, rồi thêm k để tạo thứ tự nổ theo thời gian; maxCoins vẫn trả về dp[0][n-1].", en: "rebuild visits left, visits right, then appends k to form chronological order; maxCoins still returns dp[0][n-1]." },
     ],
     complexity: {
       time: "O(n³)",
       space: "O(n²)",
       note: {
-        vi: "n² khoảng, mỗi khoảng thử n điểm k → O(n³).",
-        en: "n² intervals, each trying n choices of k → O(n³).",
+        vi: "O(n³) để thử mọi bóng cuối; dp và choice dùng O(n²), tái dựng dùng O(n).",
+        en: "O(n³) to try every final balloon; dp and choice use O(n²), and reconstruction uses O(n).",
       },
     },
-    code: [
-      "class Solution:",
-      "    def maxCoins(self, nums):",
-      "        balloons = [1] + nums + [1]",
-      "        n = len(balloons)",
-      "        dp = [[0]*n for _ in range(n)]",
-      "        for length in range(2, n):",
-      "            for left in range(n - length):",
-      "                right = left + length",
-      "                for k in range(left + 1, right):",
-      "                    coins = balloons[left]*balloons[k]*balloons[right]",
-      "                    coins += dp[left][k] + dp[k][right]",
-      "                    dp[left][right] = max(dp[left][right], coins)",
-      "        return dp[0][n-1]",
-    ],
+    code: BURST_BALLOONS_312_SOURCE,
+    liveArgs: (input) => [parseBurstBalloons312Input(input)],
     builder: buildSteps312,
   },
   // Category metadata: recommended learning order + detailed guide.
