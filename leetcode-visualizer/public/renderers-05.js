@@ -1689,6 +1689,7 @@ function renderBitmaskBasicsView(step) {
   const width = Number.isInteger(view.width) ? view.width : Math.max(1, ...rows.map((row) => String(row.bits || "").length));
   const modeLabels = {
     "xor-fold": vi ? "XOR TRIỆT TIÊU CẶP" : "PAIR-CANCELING XOR",
+    "xor-game": vi ? "TRÒ CHƠI XOR" : "CHALKBOARD XOR GAME",
     popcount: vi ? "ĐẾM BIT 1" : "COUNT SET BITS",
     "power-of-two": vi ? "KIỂM TRA LŨY THỪA 2" : "POWER OF TWO CHECK",
     "xor-distance": vi ? "XOR TÌM BIT KHÁC" : "XOR DIFFERENCE",

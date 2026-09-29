@@ -1114,7 +1114,295 @@ function buildSteps1879(input, params = {}) {
   return { original: nums1, answer: dp[fullMask], steps };
 }
 
+/**
+ * LeetCode 810: Chalkboard XOR Game.
+ * Alice wins exactly when the initial XOR is zero or the array length is even.
+ * The trace folds the XOR first, then explains the game-theory parity theorem.
+ */
+function buildSteps810(input) {
+  const source = Array.isArray(input) ? [...input] : String(input ?? "").split(",");
+  if (!source.length || source.some((value) => String(value).trim() === "")) {
+    throw new Error("nums must contain 1 to 1000 non-negative integers below 65536.");
+  }
+  const nums = source.map(Number);
+  if (
+    nums.length > 1000
+    || nums.some((value) => !Number.isInteger(value) || value < 0 || value >= 65536)
+  ) {
+    throw new Error("nums must contain 1 to 1000 non-negative integers below 65536.");
+  }
+
+  const n = nums.length;
+  const width = bitWidth([...nums, n]);
+  const steps = [];
+  const labels = nums.map((_, index) => `[${index}]`);
+  const trail = [];
+  const stages = [
+    { vi: "1. XOR toàn mảng", en: "1. Fold the XOR" },
+    { vi: "2. Kiểm tra XOR = 0", en: "2. Check XOR = 0" },
+    { vi: "3. Kiểm tra chẵn lẻ", en: "3. Check parity" },
+    { vi: "4. Người thắng", en: "4. Winner" },
+  ];
+  const rule = {
+    vi: "Alice thắng khi xor_all = 0 HOẶC số phần tử là số chẵn.",
+    en: "Alice wins when xor_all = 0 OR the number of values is even.",
+  };
+
+  const snapshot = ({
+    phase,
+    stageIndex,
+    title,
+    note,
+    codeLines,
+    xorValue,
+    rows,
+    expression,
+    progress = null,
+    highlight = [],
+    vars = [],
+    result = null,
+    final = false,
+  }) => {
+    addStep(steps, {
+      problemId: 810,
+      mode: "xor-game",
+      phase,
+      stages,
+      stageIndex,
+      rule,
+      width,
+      title,
+      note,
+      codeLines,
+      arr: [...nums],
+      sub: labels,
+      highlight,
+      mark: [],
+      vars: [
+        { name: "n", value: n },
+        { name: "xor_all", value: xorValue },
+        ...vars,
+      ],
+      rows,
+      expression,
+      progress,
+      trail: trail.slice(-8),
+      result,
+      final,
+    });
+  };
+
+  let xorAll = 0;
+  snapshot({
+    phase: "xor",
+    stageIndex: 0,
+    title: { vi: "Bắt đầu với xor_all = 0", en: "Start with xor_all = 0" },
+    note: {
+      vi: "Gộp từng số bằng XOR để biết trạng thái ban đầu của bảng.",
+      en: "Fold each value with XOR to determine the board's initial state.",
+    },
+    codeLines: [3],
+    xorValue: xorAll,
+    rows: [bitRow("xor_all", xorAll, width, "result")],
+    expression: { vi: "xor_all = 0", en: "xor_all = 0" },
+    progress: { current: 0, total: n, label: { vi: "phần tử đã XOR", en: "values XORed" } },
+  });
+
+  // Keep large valid inputs responsive while still computing every value.
+  const headCount = 24;
+  const tailCount = 8;
+  const hasHiddenMiddle = n > headCount + tailCount;
+  let xorBeforeHidden = 0;
+  for (let index = 0; index < n; index += 1) {
+    const before = xorAll;
+    if (hasHiddenMiddle && index === headCount) xorBeforeHidden = before;
+    xorAll ^= nums[index];
+    trail.push({ label: `i=${index}`, value: xorAll, bits: bitString(xorAll, width) });
+
+    const showValue = !hasHiddenMiddle || index < headCount || index >= n - tailCount;
+    if (showValue) {
+      snapshot({
+        phase: "xor",
+        stageIndex: 0,
+        title: { vi: `xor_all ^= nums[${index}] → ${xorAll}`, en: `xor_all ^= nums[${index}] → ${xorAll}` },
+        note: {
+          vi: `${before} XOR ${nums[index]} = ${xorAll}. XOR gom toàn bộ bảng vào một giá trị duy nhất.`,
+          en: `${before} XOR ${nums[index]} = ${xorAll}. XOR condenses the whole board into one value.`,
+        },
+        codeLines: [4, 5],
+        xorValue: xorAll,
+        rows: [
+          bitRow("xor trước", before, width, "source"),
+          bitRow(`nums[${index}]`, nums[index], width, "active"),
+          bitRow("xor sau", xorAll, width, "result"),
+        ],
+        expression: { vi: `${before} ^ ${nums[index]} = ${xorAll}`, en: `${before} ^ ${nums[index]} = ${xorAll}` },
+        progress: { current: index + 1, total: n, label: { vi: "phần tử đã XOR", en: "values XORed" } },
+        highlight: [index],
+        vars: [{ name: "num", value: nums[index] }],
+      });
+    } else if (index === n - tailCount - 1) {
+      const hiddenCount = n - headCount - tailCount;
+      snapshot({
+        phase: "xor",
+        stageIndex: 0,
+        title: {
+          vi: `Đã XOR ${hiddenCount} phần tử giữa`,
+          en: `Folded ${hiddenCount} middle value${hiddenCount === 1 ? "" : "s"}`,
+        },
+        note: {
+          vi: "Dấu vết được rút gọn để giao diện phản hồi nhanh; mọi phần tử vẫn được dùng để tính đáp án.",
+          en: "The trace is compacted to keep the UI responsive; every value is still included in the answer.",
+        },
+        codeLines: [4, 5],
+        xorValue: xorAll,
+        rows: [
+          bitRow("xor trước đoạn ẩn", xorBeforeHidden, width, "source"),
+          bitRow("xor sau đoạn ẩn", xorAll, width, "result"),
+        ],
+        expression: {
+          vi: `${xorBeforeHidden} ^ (${hiddenCount} giá trị) = ${xorAll}`,
+          en: `${xorBeforeHidden} ^ (${hiddenCount} values) = ${xorAll}`,
+        },
+        progress: { current: index + 1, total: n, label: { vi: "phần tử đã XOR", en: "values XORed" } },
+      });
+    }
+  }
+
+  const xorIsZero = xorAll === 0;
+  snapshot({
+    phase: "zero-check",
+    stageIndex: 1,
+    title: {
+      vi: xorIsZero ? "xor_all = 0: Alice thắng ngay" : "xor_all ≠ 0: cần kiểm tra chẵn lẻ",
+      en: xorIsZero ? "xor_all = 0: Alice wins immediately" : "xor_all ≠ 0: check the length parity",
+    },
+    note: xorIsZero
+      ? {
+          vi: "Luật chơi tuyên bố Alice thắng nếu XOR ban đầu đã bằng 0; cô ấy không cần xóa số nào.",
+          en: "The rules declare Alice the winner when the initial XOR is already 0; she removes nothing.",
+        }
+      : {
+          vi: "XOR ban đầu khác 0, nên kết quả phụ thuộc vào số lượng phần tử là chẵn hay lẻ.",
+          en: "The initial XOR is nonzero, so the result depends on whether the number of values is even or odd.",
+        },
+    codeLines: [6],
+    xorValue: xorAll,
+    rows: [bitRow("xor_all", xorAll, width, xorIsZero ? "result" : "active")],
+    expression: { vi: `xor_all == 0 → ${xorIsZero}`, en: `xor_all == 0 → ${xorIsZero}` },
+    progress: { current: n, total: n, label: { vi: "phần tử đã XOR", en: "values XORed" } },
+    vars: [{ name: "xor_all == 0", value: xorIsZero }],
+  });
+
+  const evenLength = n % 2 === 0;
+  const answer = xorIsZero || evenLength;
+  snapshot({
+    phase: "parity-check",
+    stageIndex: 2,
+    title: xorIsZero
+      ? { vi: "Không cần xét chẵn lẻ", en: "No parity check is needed" }
+      : {
+          vi: evenLength ? `${n} phần tử: Alice có chiến lược thắng` : `${n} phần tử: Bob có chiến lược thắng`,
+          en: evenLength ? `${n} values: Alice has a winning strategy` : `${n} values: Bob has a winning strategy`,
+        },
+    note: xorIsZero
+      ? {
+          vi: "Vế đầu của phép OR đã đúng, nên độ dài mảng không thay đổi kết quả.",
+          en: "The first side of the OR is already true, so the array length cannot change the result.",
+        }
+      : evenLength
+        ? {
+            vi: "Với XOR khác 0 và n chẵn, không thể mọi số đều bằng xor_all. Alice xóa một số khác xor_all để không tạo XOR 0 và đưa Bob vào trạng thái lẻ.",
+            en: "With nonzero XOR and even n, not every value can equal xor_all. Alice removes a different value, avoids making XOR 0, and hands Bob an odd state.",
+          }
+        : {
+            vi: "Với XOR khác 0 và n lẻ, xóa xor_all sẽ thua ngay; mọi nước an toàn lại đưa Bob vào trạng thái chẵn thắng được.",
+            en: "With nonzero XOR and odd n, removing xor_all loses immediately; every safe move instead gives Bob a winning even state.",
+          },
+    codeLines: [6],
+    xorValue: xorAll,
+    rows: [
+      bitRow("xor_all", xorAll, width, xorIsZero ? "result" : "source"),
+      bitRow("n", n, width, evenLength ? "result" : "active"),
+    ],
+    expression: {
+      vi: `${xorIsZero} OR (${n} % 2 == 0 → ${evenLength}) = ${answer}`,
+      en: `${xorIsZero} OR (${n} % 2 == 0 → ${evenLength}) = ${answer}`,
+    },
+    vars: [{ name: "len(nums) % 2 == 0", value: evenLength }],
+  });
+
+  snapshot({
+    phase: "done",
+    stageIndex: 3,
+    title: {
+      vi: answer ? "Kết quả: Alice thắng" : "Kết quả: Alice thua",
+      en: answer ? "Result: Alice wins" : "Result: Alice loses",
+    },
+    note: {
+      vi: `return (${xorAll} == 0) or (${n} % 2 == 0) = ${answer}.`,
+      en: `return (${xorAll} == 0) or (${n} % 2 == 0) = ${answer}.`,
+    },
+    codeLines: [6],
+    xorValue: xorAll,
+    rows: [
+      bitRow("xor_all", xorAll, width, xorIsZero ? "result" : "source"),
+      bitRow("n", n, width, evenLength ? "result" : "source"),
+    ],
+    expression: {
+      vi: `xor_all == 0 or n chẵn → ${answer}`,
+      en: `xor_all == 0 or n is even → ${answer}`,
+    },
+    vars: [{ name: "answer", value: answer }],
+    result: {
+      label: { vi: "ALICE CÓ THỂ THẮNG?", en: "CAN ALICE WIN?" },
+      value: answer,
+      status: answer ? "success" : "danger",
+    },
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
+  810: {
+    id: 810,
+    difficulty: "hard",
+    slug: "chalkboard-xor-game",
+    category,
+    tags: [bitmaskTag, { key: "game-theory", vi: "Lý thuyết trò chơi", en: "Game Theory" }],
+    title: { vi: "Chalkboard XOR Game", en: "Chalkboard XOR Game" },
+    titleVi: { vi: "Trò chơi XOR trên bảng", en: "Chalkboard XOR game" },
+    statement: {
+      vi: "Alice và Bob lần lượt xóa một số khỏi bảng. Nếu một lượt xóa làm XOR của các số còn lại bằng 0, người vừa xóa sẽ thua; nếu người chơi bắt đầu lượt với XOR bằng 0, người đó thắng. Trả về liệu Alice có thể thắng khi cả hai chơi tối ưu hay không.",
+      en: "Alice and Bob alternately erase one number. If a removal makes the remaining values XOR to 0, the player who made that move loses; a player who starts a turn with XOR 0 wins. Return whether Alice can win with optimal play.",
+    },
+    defaultInput: [1, 1, 2],
+    inputKind: "nonneg",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "XOR toàn bộ nums để lấy trạng thái ban đầu.", en: "XOR every value to get the initial board state." },
+      { vi: "Nếu XOR bằng 0, Alice thắng ngay theo luật.", en: "If the XOR is 0, Alice wins immediately by the rules." },
+      { vi: "Nếu XOR khác 0, định lý chẵn lẻ cho biết Alice thắng đúng khi n chẵn.", en: "If the XOR is nonzero, the parity theorem says Alice wins exactly when n is even." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Một lượt XOR và một phép kiểm tra chẵn lẻ.", en: "One XOR pass and one parity check." },
+    },
+    code: [
+      "class Solution:",
+      "    def xorGame(self, nums):",
+      "        xor_all = 0",
+      "        for num in nums:",
+      "            xor_all ^= num",
+      "        return xor_all == 0 or len(nums) % 2 == 0",
+    ],
+    liveArgs: (input) => [parseIntegerArray(input, "nums")],
+    builder: buildSteps810,
+  },
   318: {
     id: 318, difficulty: "medium", slug: "maximum-product-of-word-lengths", category, tags: [bitmaskTag, { key: "string", vi: "Chuỗi", en: "String" }],
     title: { vi: "Maximum Product of Word Lengths", en: "Maximum Product of Word Lengths" }, titleVi: { vi: "Tích lớn nhất của độ dài hai từ", en: "Maximum product of word lengths" },
