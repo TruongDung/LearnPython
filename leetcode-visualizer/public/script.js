@@ -550,6 +550,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.crackingSafe753View), surface: "treeView", render: (step) => {
       renderCrackingSafe753View(step);
     } },
+    { predicate: (step) => Boolean(step.raceCar818View), surface: "treeView", render: (step) => {
+      renderRaceCar818View(step);
+    } },
     { predicate: (step) => Boolean(step.inversePairs629View), surface: "treeView", render: (step) => {
       renderKInversePairs629View(step);
     } },
