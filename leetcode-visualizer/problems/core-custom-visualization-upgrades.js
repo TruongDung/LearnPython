@@ -3,6 +3,7 @@
 // whose compact trace is replaced by an equivalent instruction-level DSU trace.
 
 const label = (vi, en) => ({ vi, en });
+const LINE_DEBUG_847 = require("./shortest-path-all-nodes-847-line-debug");
 
 function variableName(variable) {
   if (!variable) return "";
@@ -580,9 +581,10 @@ function installGraph(registry) {
     registry[787].tags = [...(registry[787].tags || []), { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" }];
   }
   if (registry[847]) {
-    const original = registry[847].builder;
-    registry[847].builder = (input, params = {}) => enhance847(original(input, params), input, params);
-    registry[847].debugMode = "semantic";
+    registry[847].builder = LINE_DEBUG_847.builder;
+    registry[847].code = LINE_DEBUG_847.code;
+    registry[847].code2 = LINE_DEBUG_847.code2;
+    registry[847].debugMode = "line-by-line";
     registry[847].tags = [...(registry[847].tags || []), { key: "bitmask-bfs", vi: "Bitmask BFS", en: "Bitmask BFS" }];
   }
 }

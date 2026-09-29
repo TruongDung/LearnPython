@@ -660,25 +660,34 @@ function renderVisitAll847View(step) {
   const vi = lang === "vi";
   const bfs = view.approach === 1;
   const phaseIndex = view.phase === "setup" ? 0 : view.phase === "result" ? 3 : view.phase === "floyd" ? 1 : 2;
+  const line = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
   const bits = String(view.bits || "").padStart(view.n || 0, "0");
   const mask = Array.from({ length: view.n || 0 }, (_, node) => {
     const bit = bits[bits.length - 1 - node] || "0";
     return `<span class="${bit === "1" ? "on" : ""}${node === view.currentNode ? " active" : ""}"><small>node ${node}</small><b>${bit}</b></span>`;
   }).join("");
   const stateCards = (states, kind) => states.length
-    ? states.map((state) => `<article class="${kind}"><header><small>node</small><b>${state.node}</b><em>d=${state.dist}</em></header><code>${requestedVizEsc(state.bits)}</code><footer>{${state.visited.join(", ")}}</footer></article>`).join("")
+    ? states.map((state) => `<article class="${kind}"><header><small>node</small><b>${state.node}</b><em>d=${state.dist ?? "—"}</em></header><code>${requestedVizEsc(state.bits)}</code><footer>{${(state.visited || []).join(", ")}}</footer></article>`).join("")
     : requestedVizEmpty("∅");
-  const bfsPanel = `<div class="rv-two-column"><section class="rv-panel"><h4>FRONTIER · ${view.frontierTotal} states</h4><div class="rv-mask-states">${stateCards(view.frontier || [], "frontier")}</div>${view.omittedFrontier ? `<small>+${view.omittedFrontier} hidden</small>` : ""}</section><section class="rv-panel"><h4>NEXT FRONTIER · ${view.nextFrontierTotal} states</h4><div class="rv-mask-states">${stateCards(view.nextFrontier || [], "next")}</div>${view.omittedNext ? `<small>+${view.omittedNext} hidden</small>` : ""}</section></div>`;
+  const stateBox = (state, title) => state
+    ? `<section><small>${requestedVizEsc(title)}</small><strong>(node=${state.node}, d=${state.dist ?? "—"})</strong><code>${requestedVizEsc(state.bits)}</code><em>{${(state.visited || []).join(", ")}}</em></section>`
+    : `<section class="empty"><small>${requestedVizEsc(title)}</small><strong>—</strong></section>`;
+  const transition = bfs ? `<div class="rv-mask-transition">${stateBox(view.currentState, vi ? "STATE VỪA POP" : "POPPED STATE")}<b>+</b><span><small>neighbor</small><strong>${view.neighbor ?? "—"}</strong></span><b>→</b>${stateBox(view.candidateState, vi ? "ỨNG VIÊN" : "CANDIDATE")}</div>` : "";
+  const queueStates = view.queue || view.frontier || [];
+  const bfsPanel = `<div class="rv-two-column"><section class="rv-panel"><h4>QUEUE AFTER LINE · ${view.frontierTotal} states</h4><div class="rv-mask-states">${stateCards(queueStates, "frontier")}</div>${view.omittedFrontier ? `<small>+${view.omittedFrontier} hidden</small>` : ""}</section><section class="rv-panel"><h4>${vi ? "Candidate của đúng dòng hiện tại" : "Candidate from the current line"}</h4><div class="rv-mask-states">${stateCards(view.candidateState ? [view.candidateState] : [], "next")}</div></section></div>`;
   const matrix = view.distanceMatrix
     ? `<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>i\\j</th>${view.distanceMatrix[0].map((_, index) => `<th>${index}</th>`).join("")}</tr></thead><tbody>${view.distanceMatrix.map((row, index) => `<tr><th>${index}</th>${row.map((value) => `<td>${requestedVizEsc(value)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
     : "";
-  const dpPanel = `<section class="rv-panel"><h4>${view.phase === "floyd" ? "Floyd-Warshall distance matrix" : "Bitmask DP progress"}</h4>${matrix || `<div class="rv-focus-equation"><span>popcount</span><strong>${view.popcount ?? "—"}/${view.n}</strong><span>dp[mask][end]</span><b>${view.dpValue ?? "—"}</b></div>`}${view.dpRow ? `<div class="rv-code-value"><small>dp[fullMask]</small><code>${requestedVizEsc(view.dpRow)}</code></div>` : ""}</section>`;
+  const indices = view.indices || {};
+  const dpFocus = `<div class="rv-mask-dp-focus"><span><small>mask</small><b>${requestedVizEsc(view.bits || "—")}</b></span><span><small>end</small><b>${indices.end ?? "—"}</b></span><span><small>neighbor</small><b>${indices.neighbor ?? "—"}</b></span><span><small>candidate</small><b>${view.candidateValue ?? "—"}</b></span><span><small>dp value</small><b>${view.dpValue ?? "—"}</b></span></div>`;
+  const dpPanel = `<section class="rv-panel"><h4>${view.phase === "floyd" ? "Floyd-Warshall distance matrix" : "Bitmask DP — one instruction at a time"}</h4>${matrix || dpFocus}${view.dpRow ? `<div class="rv-code-value"><small>dp[current mask]</small><code>${requestedVizEsc(view.dpRow)}</code></div>` : ""}</section>`;
   const result = view.answer !== null ? `<div class="rv-core-result"><small>SHORTEST LENGTH</small><strong>${requestedVizEsc(view.answer)}</strong></div>` : "";
+  const omitted = view.omittedInstructions ? `<div class="rv-callout">${vi ? "Trace đã giới hạn" : "Trace bounded"}: ${view.omittedInstructions} ${vi ? "instruction được ẩn; đáp án vẫn tính đầy đủ." : "instructions hidden; the answer is still complete."}</div>` : "";
 
-  requestedVizSet(`${requestedVizPhases(bfs ? (vi ? ["Mọi node là source", "Frontier hiện tại", "OR bit khi di chuyển", "Đạt full mask"] : ["Every node is a source", "Current frontier", "OR a bit on each move", "Reach full mask"]) : (vi ? ["Khởi tạo", "Floyd-Warshall", "DP theo popcount", "Full mask"] : ["Initialize", "Floyd-Warshall", "DP by popcount", "Full mask"]), phaseIndex)}
-    <div class="rv-action-banner"><b>${bfs ? "BITMASK BFS" : "FLOYD + BITMASK DP"} · ${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
-    <div class="rv-mask-stats"><span><small>distance</small><b>${view.dist ?? "—"}</b></span><span><small>visited states</small><b>${view.visitedStateCount}</b></span><span><small>coverage</small><b>${view.visited.length}/${view.n}</b></span><span><small>target</small><b>${requestedVizEsc(view.fullBits)}</b></span></div>
-    <div class="rv-two-column rv-mask-workspace"><section class="rv-panel"><h4>${vi ? "Graph — xanh là node trong mask mẫu" : "Graph — green nodes are in the sample mask"}</h4>${requestedCoreGraphSvg(view.nodes || [], view.edges || [])}</section><section class="rv-panel"><h4>visited_mask · bit i ↔ node i</h4><div class="rv-mask-bits">${mask}</div><div class="rv-callout compact">state = (node, visited_mask) · ${vi ? "cùng node nhưng mask khác là state khác" : "the same node with another mask is a different state"}</div></section></div>
-    ${bfs ? bfsPanel : dpPanel}${result}`,
+  requestedVizSet(`${requestedVizPhases(bfs ? (vi ? ["Khởi tạo mọi source", "Pop một state", "Xét một neighbor", "Đạt full mask"] : ["Initialize every source", "Pop one state", "Inspect one neighbor", "Reach full mask"]) : (vi ? ["Khởi tạo", "Floyd từng bộ ba", "DP từng transition", "Full mask"] : ["Initialize", "Floyd per triple", "DP per transition", "Full mask"]), phaseIndex)}
+    <div class="rv-action-banner"><b>${bfs ? "BITMASK BFS" : "FLOYD + BITMASK DP"} · ${line ? `LINE ${line} · ` : ""}${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <div class="rv-mask-stats"><span><small>distance / dp</small><b>${view.dist ?? "—"}</b></span><span><small>${bfs ? "visited states" : "hidden instructions"}</small><b>${bfs ? view.visitedStateCount : (view.omittedInstructions || 0)}</b></span><span><small>coverage</small><b>${view.visited.length}/${view.n}</b></span><span><small>target</small><b>${requestedVizEsc(view.fullBits)}</b></span></div>
+    <div class="rv-two-column rv-mask-workspace"><section class="rv-panel"><h4>${vi ? "Graph — xanh là node trong mask hiện tại" : "Graph — green nodes are in the current mask"}</h4>${requestedCoreGraphSvg(view.nodes || [], view.edges || [])}</section><section class="rv-panel"><h4>visited_mask · bit i ↔ node i</h4><div class="rv-mask-bits">${mask}</div><div class="rv-callout compact">state = (node, visited_mask) · ${vi ? "mỗi dòng chỉ thay đổi một phần state" : "each line changes only one part of state"}</div></section></div>
+    ${transition}${bfs ? bfsPanel : dpPanel}${omitted}${result}`,
   vi ? `Shortest Path Visiting All Nodes — cách ${view.approach}` : `Shortest Path Visiting All Nodes — approach ${view.approach}`);
 }
