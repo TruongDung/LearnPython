@@ -541,3 +541,144 @@ renderAds9017View = function renderAds9017LineDebugView(step) {
   }
   decorateRequestedLineDebug(step, view, { detail: step.note });
 };
+
+
+// ????????? Core algorithm custom views: #542, #684, #787, #847 ??????????????????????????????????????????????????????
+function requestedCoreGraphSvg(nodes, edges, options = {}) {
+  const width = 700;
+  const height = 330;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radiusX = Math.min(275, 70 + nodes.length * 22);
+  const radiusY = Math.min(125, 48 + nodes.length * 10);
+  const positions = new Map(nodes.map((node, index) => {
+    const angle = (Math.PI * 2 * index) / Math.max(1, nodes.length) - Math.PI / 2;
+    return [node.id, { x: cx + radiusX * Math.cos(angle), y: cy + radiusY * Math.sin(angle) }];
+  }));
+  const marker = options.directed
+    ? `<defs><marker id="rv-core-arrow" markerWidth="9" markerHeight="7" refX="20" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" /></marker></defs>`
+    : "";
+  const edgeHtml = (edges || []).map((edge) => {
+    const from = positions.get(edge.u);
+    const to = positions.get(edge.v);
+    if (!from || !to) return "";
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const label = edge.w === "" || edge.w === null || edge.w === undefined ? "" : `<text x="${midX}" y="${midY - 5}" text-anchor="middle">${requestedVizEsc(edge.w)}</text>`;
+    return `<g class="rv-core-edge${edge.current ? " current" : ""}${edge.state ? ` ${requestedVizEsc(edge.state)}` : ""}"><line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"${options.directed ? ' marker-end="url(#rv-core-arrow)"' : ""}/>${label}</g>`;
+  }).join("");
+  const nodeHtml = (nodes || []).map((node) => {
+    const point = positions.get(node.id);
+    const classes = ["rv-core-node", node.active ? "active" : "", node.visited ? "visited" : "", node.reachable ? "reachable" : "", node.isSource ? "source" : "", node.isTarget ? "target" : ""].filter(Boolean).join(" ");
+    const sub = node.cost === null || node.cost === undefined ? (node.sub || "") : `cost=${node.cost}`;
+    return `<g class="${classes}"><circle cx="${point.x}" cy="${point.y}" r="25"/><text class="id" x="${point.x}" y="${point.y + (sub ? 0 : 5)}" text-anchor="middle">${requestedVizEsc(node.id)}</text>${sub ? `<text class="sub" x="${point.x}" y="${point.y + 14}" text-anchor="middle">${requestedVizEsc(sub)}</text>` : ""}</g>`;
+  }).join("");
+  return `<div class="rv-core-graph"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${marker}${edgeHtml}${nodeHtml}</svg></div>`;
+}
+
+function renderMatrix542View(step) {
+  const view = step.matrix542View || {};
+  const vi = lang === "vi";
+  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "sources" ? 1 : view.phase === "bfs" ? 2 : 3;
+  const cells = (view.cells || []).flatMap((row) => row.map((cell) => {
+    const display = cell.distance !== null && cell.distance !== undefined
+      ? cell.distance
+      : view.phase === "setup" ? (cell.input ?? "?") : "???";
+    const classes = ["rv-matrix-cell", cell.state || "", cell.isSource ? "source" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>(${cell.row},${cell.col})</small><strong>${requestedVizEsc(display)}</strong><em>${cell.isSource ? "SOURCE" : cell.distance === null ? "UNVISITED" : `d=${cell.distance}`}</em></div>`;
+  })).join("");
+  const queue = (view.queue || []).length
+    ? view.queue.map((cell, index) => `<span class="${index === 0 ? "front" : ""}"><small>${index === 0 ? "FRONT" : `#${index + 1}`}</small><b>(${cell.row},${cell.col})</b><em>d=${cell.distance ?? "???"}</em></span>`).join("<i>???</i>")
+    : requestedVizEmpty(vi ? "Queue r???ng" : "Queue is empty");
+  const sources = (view.sources || []).map(([row, col]) => `<span>(${row},${col})</span>`).join("") || requestedVizEmpty("???");
+  const neighbor = view.neighbor
+    ? `<div class="rv-focus-equation${view.check?.unvisited === true ? " success" : ""}"><span>${view.current ? `(${view.current.join(",")})` : "?"} + ${view.direction ? `(${view.direction.join(",")})` : "?"}</span><strong>??? (${view.neighbor.join(",")})</strong><b>${view.check?.inBounds === false ? "OUT" : view.check?.unvisited === true ? "DISCOVER" : view.check?.unvisited === false ? "SKIP" : "CHECK"}</b></div>`
+    : "";
+  const result = view.phase === "result" && view.answer !== null
+    ? `<div class="rv-core-result ${view.invalid ? "error" : ""}"><small>RETURN</small><strong>${requestedVizEsc(JSON.stringify(view.answer))}</strong></div>`
+    : "";
+
+  requestedVizSet(`${requestedVizPhases(vi ? ["Kh???i t???o distance", "Thu th???p m???i source 0", "Multi-source BFS", "Ma tr???n k???t qu???"] : ["Initialize distances", "Collect every zero source", "Multi-source BFS", "Result matrix"], phaseIndex)}
+    <div class="rv-action-banner"><b>${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <div class="rv-matrix542-stats"><span><small>sources</small><b>${(view.sources || []).length}</b></span><span><small>queue</small><b>${(view.queue || []).length}</b></span><span><small>grid</small><b>${view.rows}??${view.cols}</b></span></div>
+    <section class="rv-panel"><h4>${vi ? "Distance grid ??? ??? l?? ch??a th??m" : "Distance grid ??? ??? means unvisited"}</h4><div class="rv-matrix-grid" style="--rv-matrix-cols:${view.cols}">${cells}</div></section>
+    ${neighbor}
+    <div class="rv-two-column"><section class="rv-panel"><h4>${vi ? "C??c source ???????c enqueue v???i d=0" : "Sources enqueued with d=0"}</h4><div class="rv-source-set">${sources}</div></section><section class="rv-panel"><h4>QUEUE ?? FRONT ??? BACK</h4><div class="rv-matrix-queue">${queue}</div></section></div>
+    ${result}`,
+  vi ? "Multi-source BFS cho ma tr???n kho???ng c??ch" : "Multi-source BFS distance matrix");
+}
+
+function renderUnionFind684View(step) {
+  const view = step.unionFind684View || {};
+  const vi = lang === "vi";
+  const phaseIndex = view.phase === "setup" ? 0 : ["edge", "find"].includes(view.phase) ? 1 : ["compare", "union"].includes(view.phase) ? 2 : 3;
+  const edges = (view.edges || []).map((edge) => `<span class="rv-dsu-edge ${requestedVizEsc(edge.state)}"><small>#${edge.index + 1}</small><b>${edge.u}???${edge.v}</b><em>${requestedVizEsc(edge.state)}</em></span>`).join("");
+  const nodes = (view.nodes || []).map((node) => `<article class="rv-dsu-node${node.active ? " active" : ""}${node.isRoot ? " root" : ""}"><header><small>NODE</small><b>${node.id}</b></header><div><span>parent</span><strong>${node.parent ?? "???"}</strong></div><div><span>rank</span><strong>${node.rank ?? "???"}</strong></div><footer>root ${node.root ?? "???"}</footer></article>`).join("");
+  const components = (view.components || []).map((component) => `<article><header><small>ROOT</small><b>${component.root}</b></header><div>${component.members.map((member) => `<span>${member}</span>`).join("")}</div></article>`).join("") || requestedVizEmpty("???");
+  const findState = view.findState;
+  const findPath = findState
+    ? `<section class="rv-panel"><h4>find(${findState.start}) ?? endpoint ${requestedVizEsc(findState.endpoint)}</h4><div class="rv-find-path">${findState.path.map((node, index) => `<span class="${findState.compressed.includes(node) ? "compressed" : node === findState.current ? "current" : ""}"><b>${node}</b><small>${node === findState.root ? "ROOT" : "parent"}</small></span>${index < findState.path.length - 1 ? "<i>???</i>" : ""}`).join("")}</div></section>`
+    : "";
+  const comparison = view.currentEdge
+    ? `<div class="rv-focus-equation${view.roots.u !== null && view.roots.u === view.roots.v ? " danger" : view.roots.u !== null && view.roots.v !== null ? " success" : ""}"><span>find(${view.currentEdge[0]}) = ${view.roots.u ?? "?"}</span><strong>${view.roots.u !== null && view.roots.v !== null ? (view.roots.u === view.roots.v ? "==" : "???") : "?"}</strong><span>find(${view.currentEdge[1]}) = ${view.roots.v ?? "?"}</span><b>${view.roots.u !== null && view.roots.u === view.roots.v ? "CYCLE" : ""}</b></div>`
+    : "";
+  const result = view.answer ? `<div class="rv-core-result"><small>REDUNDANT EDGE</small><strong>[${view.answer.join(", ")}]</strong></div>` : "";
+
+  requestedVizSet(`${requestedVizPhases(vi ? ["Kh???i t???o forest", "Find hai endpoint", "So root v?? union", "Ph??t hi???n cycle"] : ["Initialize forest", "Find both endpoints", "Compare roots and union", "Detect cycle"], phaseIndex)}
+    <div class="rv-action-banner"><b>${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <div class="rv-dsu-edge-stream">${edges}</div>
+    ${comparison}${findPath}
+    <div class="rv-two-column rv-dsu-workspace"><section class="rv-panel"><h4>${vi ? "DSU nodes ??? parent/rank/root" : "DSU nodes ??? parent/rank/root"}</h4><div class="rv-dsu-nodes">${nodes}</div></section><section class="rv-panel"><h4>${vi ? "Connected components hi???n t???i" : "Current connected components"}</h4><div class="rv-dsu-components">${components}</div></section></div>
+    ${result}`,
+  vi ? "Union-Find t??m c???nh t???o chu tr??nh" : "Union-Find redundant-edge detection");
+}
+
+function renderFlights787View(step) {
+  const view = step.flights787View || {};
+  const vi = lang === "vi";
+  const bellman = view.approach === 1;
+  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "result" ? 3 : bellman ? 1 : 2;
+  const costs = (view.nodes || []).map((node) => `<span class="${node.active ? "active" : ""}${node.isSource ? " source" : ""}${node.isTarget ? " target" : ""}"><small>city ${node.id}</small><b>${node.cost === null ? "???" : requestedVizNumber(node.cost)}</b></span>`).join("");
+  const flights = (view.edges || []).map((edge) => `<span class="${edge.current ? "active" : ""}"><b>${edge.u}???${edge.v}</b><em>$${requestedVizNumber(edge.w)}</em></span>`).join("");
+  const vector = (items, title) => items ? `<div class="rv-flight-vector"><label>${requestedVizEsc(title)}</label>${items.map((value, index) => `<span><small>${index}</small><b>${value === null ? "???" : requestedVizNumber(value)}</b></span>`).join("")}</div>` : "";
+  const bellmanPanel = bellman
+    ? `<section class="rv-panel"><h4>${vi ? "Frozen previous round ??? writable next round" : "Frozen previous round ??? writable next round"}</h4>${vector(view.oldCost, "cost (read only)")}${vector(view.nextCost || view.costs, "next_cost")}</section>
+       <div class="rv-focus-equation"><span>${vi ? "S??? chuy???n t???i ??a v??ng n??y" : "Flights allowed this round"}</span><strong>${view.allowedFlights ?? "???"}</strong><span>candidate</span><b>${view.candidate ?? "???"}</b></div>`
+    : `<section class="rv-panel"><h4>${vi ? "Dijkstra state + min-heap" : "Dijkstra state + min-heap"}</h4><div class="rv-flight-state"><span><small>price</small><b>${view.price ?? "???"}</b></span><span><small>city</small><b>${view.city ?? "???"}</b></span><span><small>flights used</small><b>${view.used ?? "???"}</b></span><span><small>candidate</small><b>${view.candidate ?? "???"}</b></span></div><div class="rv-code-value"><small>heap</small><code>${requestedVizEsc(view.heap || "[]")}</code></div><div class="rv-code-value"><small>best state table</small><code>${requestedVizEsc(view.best || "???")}</code></div></section>`;
+  const result = view.answer !== null ? `<div class="rv-core-result${view.answer === -1 ? " error" : ""}"><small>RETURN</small><strong>${requestedVizEsc(view.answer)}</strong></div>` : "";
+
+  requestedVizSet(`${requestedVizPhases(bellman ? (vi ? ["Kh???i t???o cost", "K+1 v??ng relax", "Ch???t t???ng v??ng", "Gi?? t???i dst"] : ["Initialize cost", "K+1 relaxation rounds", "Commit each round", "Cost to dst"]) : (vi ? ["X??y state graph", "Kh???i t???o best", "Pop/relax heap", "T???i dst"] : ["Build state graph", "Initialize best", "Pop/relax heap", "Reach dst"]), phaseIndex)}
+    <div class="rv-action-banner"><b>${bellman ? "BELLMAN-FORD" : "STATE DIJKSTRA"} ?? ${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <div class="rv-flight-stats"><span><small>src</small><b>${view.src ?? "???"}</b></span><span><small>dst</small><b>${view.dst ?? "???"}</b></span><span><small>k stops</small><b>${view.k ?? "???"}</b></span><span><small>max flights</small><b>${Number.isInteger(view.k) ? view.k + 1 : "???"}</b></span></div>
+    <div class="rv-two-column rv-flight-workspace"><section class="rv-panel"><h4>${vi ? "Directed flight network" : "Directed flight network"}</h4>${requestedCoreGraphSvg(view.nodes || [], view.edges || [], { directed: true })}<div class="rv-flight-edges">${flights}</div></section><section class="rv-panel"><h4>${vi ? "Chi ph?? t???t nh???t theo th??nh ph???" : "Best cost by city"}</h4><div class="rv-city-costs">${costs}</div></section></div>
+    ${bellmanPanel}${result}`,
+  vi ? `Cheapest Flights ??? c??ch ${view.approach}` : `Cheapest Flights ??? approach ${view.approach}`);
+}
+
+function renderVisitAll847View(step) {
+  const view = step.visitAll847View || {};
+  const vi = lang === "vi";
+  const bfs = view.approach === 1;
+  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "result" ? 3 : view.phase === "floyd" ? 1 : 2;
+  const bits = String(view.bits || "").padStart(view.n || 0, "0");
+  const mask = Array.from({ length: view.n || 0 }, (_, node) => {
+    const bit = bits[bits.length - 1 - node] || "0";
+    return `<span class="${bit === "1" ? "on" : ""}${node === view.currentNode ? " active" : ""}"><small>node ${node}</small><b>${bit}</b></span>`;
+  }).join("");
+  const stateCards = (states, kind) => states.length
+    ? states.map((state) => `<article class="${kind}"><header><small>node</small><b>${state.node}</b><em>d=${state.dist}</em></header><code>${requestedVizEsc(state.bits)}</code><footer>{${state.visited.join(", ")}}</footer></article>`).join("")
+    : requestedVizEmpty("???");
+  const bfsPanel = `<div class="rv-two-column"><section class="rv-panel"><h4>FRONTIER ?? ${view.frontierTotal} states</h4><div class="rv-mask-states">${stateCards(view.frontier || [], "frontier")}</div>${view.omittedFrontier ? `<small>+${view.omittedFrontier} hidden</small>` : ""}</section><section class="rv-panel"><h4>NEXT FRONTIER ?? ${view.nextFrontierTotal} states</h4><div class="rv-mask-states">${stateCards(view.nextFrontier || [], "next")}</div>${view.omittedNext ? `<small>+${view.omittedNext} hidden</small>` : ""}</section></div>`;
+  const matrix = view.distanceMatrix
+    ? `<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>i\\j</th>${view.distanceMatrix[0].map((_, index) => `<th>${index}</th>`).join("")}</tr></thead><tbody>${view.distanceMatrix.map((row, index) => `<tr><th>${index}</th>${row.map((value) => `<td>${requestedVizEsc(value)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
+    : "";
+  const dpPanel = `<section class="rv-panel"><h4>${view.phase === "floyd" ? "Floyd-Warshall distance matrix" : "Bitmask DP progress"}</h4>${matrix || `<div class="rv-focus-equation"><span>popcount</span><strong>${view.popcount ?? "???"}/${view.n}</strong><span>dp[mask][end]</span><b>${view.dpValue ?? "???"}</b></div>`}${view.dpRow ? `<div class="rv-code-value"><small>dp[fullMask]</small><code>${requestedVizEsc(view.dpRow)}</code></div>` : ""}</section>`;
+  const result = view.answer !== null ? `<div class="rv-core-result"><small>SHORTEST LENGTH</small><strong>${requestedVizEsc(view.answer)}</strong></div>` : "";
+
+  requestedVizSet(`${requestedVizPhases(bfs ? (vi ? ["M???i node l?? source", "Frontier hi???n t???i", "OR bit khi di chuy???n", "?????t full mask"] : ["Every node is a source", "Current frontier", "OR a bit on each move", "Reach full mask"]) : (vi ? ["Kh???i t???o", "Floyd-Warshall", "DP theo popcount", "Full mask"] : ["Initialize", "Floyd-Warshall", "DP by popcount", "Full mask"]), phaseIndex)}
+    <div class="rv-action-banner"><b>${bfs ? "BITMASK BFS" : "FLOYD + BITMASK DP"} ?? ${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <div class="rv-mask-stats"><span><small>distance</small><b>${view.dist ?? "???"}</b></span><span><small>visited states</small><b>${view.visitedStateCount}</b></span><span><small>coverage</small><b>${view.visited.length}/${view.n}</b></span><span><small>target</small><b>${requestedVizEsc(view.fullBits)}</b></span></div>
+    <div class="rv-two-column rv-mask-workspace"><section class="rv-panel"><h4>${vi ? "Graph ??? xanh l?? node trong mask m???u" : "Graph ??? green nodes are in the sample mask"}</h4>${requestedCoreGraphSvg(view.nodes || [], view.edges || [])}</section><section class="rv-panel"><h4>visited_mask ?? bit i ??? node i</h4><div class="rv-mask-bits">${mask}</div><div class="rv-callout compact">state = (node, visited_mask) ?? ${vi ? "c??ng node nh??ng mask kh??c l?? state kh??c" : "the same node with another mask is a different state"}</div></section></div>
+    ${bfs ? bfsPanel : dpPanel}${result}`,
+  vi ? `Shortest Path Visiting All Nodes ??? c??ch ${view.approach}` : `Shortest Path Visiting All Nodes ??? approach ${view.approach}`);
+}

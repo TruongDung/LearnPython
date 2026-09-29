@@ -247,6 +247,18 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.twitterView), surface: "treeView", render: (step) => {
       renderTwitterView(step);
     } },
+    { predicate: (step) => Boolean(step.matrix542View), surface: "treeView", render: (step) => {
+      renderMatrix542View(step);
+    } },
+    { predicate: (step) => Boolean(step.unionFind684View), surface: "treeView", render: (step) => {
+      renderUnionFind684View(step);
+    } },
+    { predicate: (step) => Boolean(step.flights787View), surface: "treeView", render: (step) => {
+      renderFlights787View(step);
+    } },
+    { predicate: (step) => Boolean(step.visitAll847View), surface: "treeView", render: (step) => {
+      renderVisitAll847View(step);
+    } },
     { predicate: (step) => Boolean(step.coins2218View), surface: "treeView", render: (step) => {
       renderCoins2218View(step);
     } },

@@ -8796,3 +8796,7 @@ Object.assign(module.exports, {
     },
   },
 });
+
+
+// Replace the compact generic LC 684 trace with a dedicated DSU forest lesson.
+require("./core-custom-visualization-upgrades").installUnionFind(module.exports);
