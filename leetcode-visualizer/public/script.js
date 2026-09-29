@@ -535,6 +535,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.longestIncreasingPath329View), surface: "treeView", render: (step) => {
       renderLongestIncreasingPath329View(step);
     } },
+    { predicate: (step) => Boolean(step.validParenthesesPath2267View), surface: "treeView", render: (step) => {
+      renderValidParenthesesPath2267View(step);
+    } },
     { predicate: (step) => Boolean(step.splitArray410View), surface: "treeView", render: (step) => {
       renderSplitArray410View(step);
     } },
