@@ -31,7 +31,7 @@ const categories = {
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: require("./bitmask"),
-  design: Object.assign(require("./music-player"), require("./sparse-vector")),
+  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018")),
   interview: require("./interview"),
 };
 
