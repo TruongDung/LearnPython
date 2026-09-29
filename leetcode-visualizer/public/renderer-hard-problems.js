@@ -621,7 +621,7 @@
                 <div class="hp-content-grid">${optionalCards.filter(Boolean).join("")}</div>
                 ${renderLegend(view.legend)}
                 <div class="hp-result-stack">
-                    ${renderAnswer(view)}
+                    ${step.final ? renderAnswer(view) : ""}
                     ${renderTruncation(view)}
                 </div>
             </article>`;

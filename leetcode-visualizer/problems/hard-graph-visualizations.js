@@ -1325,7 +1325,7 @@ module.exports = {
       },
     },
     code: CAT_MOUSE_913_SOURCE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parseCatMouse913Input,
     liveArgs: (input) => [parseCatMouse913Input(input)],
     builder: buildSteps913,
@@ -1376,7 +1376,7 @@ module.exports = {
       },
     },
     code: MIN_COST_1928_SOURCE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parseMinCost1928Input,
     liveArgs: (input, params) => {
       const parsed = parseMinCost1928Input(input, params);

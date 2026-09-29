@@ -1166,7 +1166,7 @@ module.exports = {
       note: bi("Có thể dùng hai hàng O(n); visualization giữ bảng 2D đầy đủ nhưng chỉ hiển thị một cửa sổ hàng bị chặn.", "Two O(n) rows suffice; the visualization retains the full 2D table but displays only a bounded row window."),
     },
     code: PLAYLIST_920_CODE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parseMusicPlaylists920Input,
     liveArgs: (input, params) => {
       const parsed = parseMusicPlaylists920Input(input, params);
@@ -1213,7 +1213,7 @@ module.exports = {
       note: bi("Mỗi vị trí cơ số x có tối đa hai phần còn lại liên quan (không nhớ hoặc có nhớ); trace và nhóm memo đều bị chặn hiển thị.", "Each base-x position has at most two relevant remaining values (without or with carry); trace and memo groups are display-bounded."),
     },
     code: LEAST_OPS_964_CODE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parseLeastOperators964Input,
     liveArgs: (input, params) => {
       const parsed = parseLeastOperators964Input(input, params);
@@ -1258,7 +1258,7 @@ module.exports = {
       note: bi("Mỗi start chỉ quét số chữ số của k; bảng visualization chỉ hiển thị một cửa sổ prefix bị chặn.", "Each start scans only k's digit count; the visualization table shows a bounded prefix window."),
     },
     code: RESTORE_1416_CODE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parseRestoreArray1416Input,
     liveArgs: (input, params) => {
       const parsed = parseRestoreArray1416Input(input, params);

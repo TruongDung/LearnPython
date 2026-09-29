@@ -1919,7 +1919,7 @@ module.exports = {
       ),
     },
     code: [...SOURCE_2003],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parse2003,
     liveArgs: (input, params = {}) => {
       const parsed = parse2003(input, params);
@@ -1979,7 +1979,7 @@ module.exports = {
       ),
     },
     code: [...SOURCE_2581],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parse2581,
     liveArgs: (input, params = {}) => {
       const parsed = parse2581(input, params);
@@ -2037,7 +2037,7 @@ module.exports = {
       ),
     },
     code: [...SOURCE_2646],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parse2646,
     liveArgs: (input, params = {}) => {
       const parsed = parse2646(input, params);

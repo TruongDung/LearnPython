@@ -1289,7 +1289,7 @@ module.exports = {
       ),
     },
     code: SOURCE_1723,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parseMinimumTimeRequired1723Input,
     parseMinimumTimeRequired1723Input,
     liveArgs: (input, params = {}) => {
@@ -1345,7 +1345,7 @@ module.exports = {
       ),
     },
     code: SOURCE_2172,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parseMaximumANDSum2172Input,
     parseMaximumANDSum2172Input,
     liveArgs: (input, params = {}) => {
