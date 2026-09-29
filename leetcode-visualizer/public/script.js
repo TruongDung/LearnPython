@@ -1033,6 +1033,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.prefixScores2416View), surface: "treeView", render: (step) => {
       renderPrefixScores2416View(step);
     } },
+    { predicate: (step) => Boolean(step.specialBinary761View), surface: "treeView", render: (step) => {
+      renderSpecialBinary761View(step);
+    } },
     { predicate: (step) => Boolean(step.braceExpansion1096View), surface: "treeView", render: (step) => {
       renderBraceExpansion1096View(step);
     } },
