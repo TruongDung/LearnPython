@@ -853,6 +853,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.queueView), surface: "treeView", render: (step) => {
       renderQueueView(step);
     } },
+    { predicate: (step) => Boolean(step.calculator770View), surface: "treeView", render: (step) => {
+      renderBasicCalculatorIV770View(step);
+    } },
     { predicate: (step) => Boolean(step.calculator772View), surface: "treeView", render: (step) => {
       renderCalculator772View(step);
     } },
@@ -1035,6 +1038,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.prefixScores2416View), surface: "treeView", render: (step) => {
       renderPrefixScores2416View(step);
+    } },
+    { predicate: (step) => Boolean(step.specialBinary761View), surface: "treeView", render: (step) => {
+      renderSpecialBinary761View(step);
     } },
     { predicate: (step) => Boolean(step.braceExpansion1096View), surface: "treeView", render: (step) => {
       renderBraceExpansion1096View(step);

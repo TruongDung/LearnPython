@@ -20,7 +20,7 @@ const categories = {
   trie: Object.assign(require("./trie"), require("./prefix-scores-2416")),
   hashmap: require("./hashmap"),
   greedy: require("./greedy"),
-  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./text-justification-68")),
+  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./basic-calculator-iv-770"), require("./special-binary-string-761"), require("./text-justification-68")),
   backtracking: require("./backtracking"),
   bst: require("./bst"),
   "binary-tree": require("./tree"),
