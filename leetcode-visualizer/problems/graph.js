@@ -4,6 +4,7 @@
 const {
   buildSteps1293,
   buildSteps1368,
+  buildSteps1391,
   buildSteps2290,
   buildSteps2577,
   buildSteps3341,
@@ -18992,7 +18993,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 210, 269, 399, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489, 4003, 3310],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 1391, 505, 1926, 207, 210, 269, 399, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489, 4003, 3310],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -21230,6 +21231,72 @@ module.exports = {
       "        return -1",
     ],
     builder: buildSteps815,
+  },
+  1391: {
+    id: 1391,
+    difficulty: "medium",
+    slug: "check-if-there-is-a-valid-path-in-a-grid",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Check if There is a Valid Path in a Grid", en: "Check if There is a Valid Path in a Grid" },
+    titleVi: { vi: "Kiểm tra đường đi hợp lệ trong lưới", en: "Validate a street path through the grid" },
+    statement: {
+      vi:
+        "Mỗi ô trong grid chứa một đoạn đường loại 1..6 với đúng hai đầu mở. Bắt đầu tại (0,0), chỉ được đi sang ô kề khi đường của cả hai ô nối khớp nhau, và không được đổi loại đường. " +
+        "Trả về true nếu có thể tới (m-1,n-1). Nhập kiểu LeetCode [[2,4,3],[6,5,2]] hoặc dạng '2,4,3|6,5,2'.",
+      en:
+        "Each grid cell contains one street type 1..6 with exactly two openings. Start at (0,0), move to an adjacent cell only when both streets connect, and do not change any street. " +
+        "Return true if (m-1,n-1) is reachable. Enter LeetCode form [[2,4,3],[6,5,2]] or '2,4,3|6,5,2'.",
+    },
+    defaultInput: "[[2,4,3],[6,5,2]]",
+    inputKind: "string",
+    inputLabel: { vi: "Grid loại đường 1..6", en: "Street grid with types 1..6" },
+    extraParams: [],
+    approach: [
+      { vi: "Xem mỗi ô là một node; hai đầu mở của loại 1..6 quyết định các hướng có thể rời ô.", en: "Treat every cell as a node; the two openings of types 1..6 determine its outgoing directions." },
+      { vi: "Một cạnh chỉ hợp lệ khi ô hiện tại mở về phía neighbor VÀ neighbor có đầu mở ngược lại.", en: "An edge is valid only when the current cell opens toward the neighbor AND the neighbor opens back." },
+      { vi: "Chạy BFS từ (0,0), đánh dấu visited ngay lúc enqueue để mỗi ô chỉ vào queue một lần.", en: "Run BFS from (0,0), marking cells when enqueued so each cell enters the queue once." },
+      { vi: "Nếu BFS lấy được target khỏi queue thì trả true; nếu queue rỗng trước đó thì trả false.", en: "Return true when BFS dequeues the target; return false if the queue empties first." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được enqueue tối đa một lần và chỉ xét đúng hai đầu mở. Queue, visited và parent dùng O(m·n).",
+        en: "Each cell is enqueued at most once and checks exactly two openings. Queue, visited, and parent use O(m·n).",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def hasValidPath(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        streets = {",
+      "            1: [(0, -1), (0, 1)],",
+      "            2: [(-1, 0), (1, 0)],",
+      "            3: [(0, -1), (1, 0)],",
+      "            4: [(0, 1), (1, 0)],",
+      "            5: [(0, -1), (-1, 0)],",
+      "            6: [(0, 1), (-1, 0)],",
+      "        }",
+      "        queue = deque([(0, 0)])",
+      "        visited = {(0, 0)}",
+      "",
+      "        while queue:",
+      "            row, col = queue.popleft()",
+      "            if row == rows - 1 and col == cols - 1:",
+      "                return True",
+      "            for delta_row, delta_col in streets[grid[row][col]]:",
+      "                next_row, next_col = row + delta_row, col + delta_col",
+      "                if not (0 <= next_row < rows and 0 <= next_col < cols) or (next_row, next_col) in visited:",
+      "                    continue",
+      "                if (-delta_row, -delta_col) not in streets[grid[next_row][next_col]]:",
+      "                    continue",
+      "                visited.add((next_row, next_col))",
+      "                queue.append((next_row, next_col))",
+      "        return False",
+    ],
+    builder: buildSteps1391,
   },
   1368: {
     id: 1368,

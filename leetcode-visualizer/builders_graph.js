@@ -3000,4 +3000,288 @@ function buildSteps815(input, params) {
   return {original, answer, steps};
 }
 
-module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps3341, buildSteps3342, buildSteps1377, parseWordLadder126, buildSteps126, buildSteps815 };
+// ─── 1391: Check if There Is a Valid Path in a Grid (BFS) ───
+function buildSteps1391(input) {
+  const raw = String(input ?? "").trim();
+  let grid = [];
+
+  if (raw) {
+    try {
+      if (raw.startsWith("[")) {
+        const parsed = JSON.parse(raw);
+        grid = Array.isArray(parsed)
+          ? parsed.map((row) => Array.isArray(row) ? row.map((value) => Number(value)) : [])
+          : [];
+      } else {
+        grid = raw
+          .split(/[|;]/)
+          .map((row) => row.trim())
+          .filter(Boolean)
+          .map((row) => row.split(",").map((value) => Number(value.trim())));
+      }
+    } catch (_error) {
+      grid = [];
+    }
+  }
+
+  const steps = [];
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+  const valid = rows > 0 && cols > 0 && rows <= 20 && cols <= 20
+    && grid.every((row) => row.length === cols
+      && row.every((value) => Number.isInteger(value) && value >= 1 && value <= 6));
+
+  const streets = {
+    1: { glyph: "─", openings: [[0, -1], [0, 1]] },
+    2: { glyph: "│", openings: [[-1, 0], [1, 0]] },
+    3: { glyph: "┐", openings: [[0, -1], [1, 0]] },
+    4: { glyph: "┌", openings: [[0, 1], [1, 0]] },
+    5: { glyph: "┘", openings: [[0, -1], [-1, 0]] },
+    6: { glyph: "└", openings: [[0, 1], [-1, 0]] },
+  };
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [5],
+      vars: [{ name: "answer", value: false }],
+      note: {
+        vi: "Grid phải là ma trận chữ nhật chỉ gồm các loại đường 1..6; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ tối đa 20×20.",
+        en: "The grid must be rectangular and contain only street types 1..6; separate rows with '|' or ';'. The visualization supports at most 20×20.",
+      },
+    });
+    return { original: grid, answer: false, steps };
+  }
+
+  const queue = [[0, 0]];
+  const visited = new Set(["0,0"]);
+  const processed = new Set();
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const key = (r, c) => `${r},${c}`;
+  const moveSymbol = (dr, dc) => dr === -1 ? "↑" : dr === 1 ? "↓" : dc === -1 ? "←" : "→";
+  const queueText = () => {
+    const visible = queue.slice(0, 10).map(([r, c]) => `(${r},${c})`).join(", ");
+    return `[${visible}${queue.length > 10 ? ", …" : ""}]`;
+  };
+
+  function makeCells(current = null, candidate = null, pathCells = new Set()) {
+    const queued = new Set(queue.map(([r, c]) => key(r, c)));
+    return grid.map((row, r) => row.map((street, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      if (visited.has(cellKey)) cls = "visited";
+      if (processed.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (candidate && candidate[0] === r && candidate[1] === c) cls = "neighbor";
+      if (pathCells.has(cellKey)) cls = "route";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+
+      const endpoint = r === 0 && c === 0
+        ? "S"
+        : r === rows - 1 && c === cols - 1
+          ? "T"
+          : "";
+      return {
+        label: streets[street].glyph,
+        meta: endpoint ? `${endpoint} · ${street}` : String(street),
+        cls,
+      };
+    }));
+  }
+
+  function pushStep({ title, codeLines, vars, note, current = null, candidate = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, candidate, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo BFS tại ô bắt đầu", en: "Initialize BFS at the start" },
+    current: [0, 0],
+    codeLines: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    vars: [
+      { name: "rows, cols", value: `${rows}, ${cols}` },
+      { name: "queue", value: queueText() },
+      { name: "visited", value: "{(0,0)}" },
+    ],
+    note: {
+      vi: "Mỗi ký hiệu biểu diễn hai đầu mở của một đoạn đường: ─, │, ┐, ┌, ┘, └ tương ứng loại 1..6. S là start và T là target.",
+      en: "Each glyph shows the two openings of one street: ─, │, ┐, ┌, ┘, └ correspond to types 1..6. S is the start and T is the target.",
+    },
+  });
+
+  let found = false;
+  while (queue.length) {
+    const [r, c] = queue.shift();
+    processed.add(key(r, c));
+
+    pushStep({
+      title: { vi: `Lấy ô (${r},${c}) khỏi queue`, en: `Dequeue cell (${r},${c})` },
+      current: [r, c],
+      codeLines: [17, 18],
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "street", value: `${grid[r][c]} (${streets[grid[r][c]].glyph})` },
+        { name: "queue", value: queueText() },
+      ],
+      note: {
+        vi: `Ô (${r},${c}) có đường loại ${grid[r][c]} với hai hướng mở ${streets[grid[r][c]].openings.map(([dr, dc]) => moveSymbol(dr, dc)).join(" và ")}.`,
+        en: `Cell (${r},${c}) has street type ${grid[r][c]}, open toward ${streets[grid[r][c]].openings.map(([dr, dc]) => moveSymbol(dr, dc)).join(" and ")}.`,
+      },
+    });
+
+    if (r === rows - 1 && c === cols - 1) {
+      found = true;
+      pushStep({
+        title: { vi: "Đã tới ô đích", en: "The target is reached" },
+        current: [r, c],
+        codeLines: [19, 20],
+        vars: [{ name: "target", value: `(${r}, ${c})` }, { name: "return", value: true }],
+        note: {
+          vi: "Target được lấy ra từ queue, nên tồn tại một chuỗi đường nối hợp lệ từ start.",
+          en: "The target was dequeued, so a chain of mutually connected streets exists from the start.",
+        },
+      });
+      break;
+    }
+
+    for (const [dr, dc] of streets[grid[r][c]].openings) {
+      const nr = r + dr;
+      const nc = c + dc;
+      const symbol = moveSymbol(dr, dc);
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+
+      if (!inBounds) {
+        pushStep({
+          title: { vi: `Hướng ${symbol} đi ra ngoài grid`, en: `${symbol} leaves the grid` },
+          current: [r, c],
+          codeLines: [21, 22, 23, 24],
+          vars: [
+            { name: "move", value: `(${dr}, ${dc}) ${symbol}` },
+            { name: "neighbor", value: `(${nr}, ${nc})` },
+            { name: "in bounds", value: false },
+          ],
+          note: {
+            vi: `Đầu mở ${symbol} của ô (${r},${c}) hướng ra ngoài biên nên không tạo cạnh trong graph.`,
+            en: `The ${symbol} opening of (${r},${c}) points outside the grid, so it creates no graph edge.`,
+          },
+        });
+        continue;
+      }
+
+      const neighborKey = key(nr, nc);
+      if (visited.has(neighborKey)) {
+        pushStep({
+          title: { vi: `(${nr},${nc}) đã được thăm`, en: `(${nr},${nc}) was already visited` },
+          current: [r, c],
+          candidate: [nr, nc],
+          codeLines: [21, 22, 23, 24],
+          vars: [
+            { name: "neighbor", value: `(${nr}, ${nc})` },
+            { name: "visited", value: true },
+          ],
+          note: {
+            vi: "Ô này đã được đánh dấu ngay khi enqueue, nên bỏ qua để tránh lặp trong các chu trình đường phố.",
+            en: "This cell was marked when enqueued, so skip it to avoid repeating street cycles.",
+          },
+        });
+        continue;
+      }
+
+      const neighborStreet = streets[grid[nr][nc]];
+      const connectsBack = neighborStreet.openings.some(([backDr, backDc]) => backDr === -dr && backDc === -dc);
+      pushStep({
+        title: connectsBack
+          ? { vi: `Hai ô nối khớp theo hướng ${symbol}`, en: `The streets connect toward ${symbol}` }
+          : { vi: `Đường bị đứt tại (${nr},${nc})`, en: `The street breaks at (${nr},${nc})` },
+        current: [r, c],
+        candidate: [nr, nc],
+        codeLines: [25, 26],
+        vars: [
+          { name: "current street", value: `${grid[r][c]} (${streets[grid[r][c]].glyph})` },
+          { name: "neighbor street", value: `${grid[nr][nc]} (${neighborStreet.glyph})` },
+          { name: "needed opening", value: moveSymbol(-dr, -dc) },
+          { name: "connects back", value: connectsBack },
+        ],
+        note: connectsBack
+          ? {
+              vi: `Ô (${r},${c}) mở ${symbol} và ô (${nr},${nc}) mở ngược lại ${moveSymbol(-dr, -dc)}, nên có thể đi qua.`,
+              en: `Cell (${r},${c}) opens ${symbol} and (${nr},${nc}) opens back ${moveSymbol(-dr, -dc)}, so the move is valid.`,
+            }
+          : {
+              vi: `Chỉ ô hiện tại mở ${symbol}; ô (${nr},${nc}) không mở ${moveSymbol(-dr, -dc)} để nối lại, nên không thể đi qua.`,
+              en: `Only the current cell opens ${symbol}; (${nr},${nc}) lacks the returning ${moveSymbol(-dr, -dc)} opening, so the move is invalid.`,
+            },
+      });
+      if (!connectsBack) continue;
+
+      visited.add(neighborKey);
+      parent[nr][nc] = [r, c];
+      queue.push([nr, nc]);
+      pushStep({
+        title: { vi: `Thêm (${nr},${nc}) vào queue`, en: `Enqueue (${nr},${nc})` },
+        current: [r, c],
+        candidate: [nr, nc],
+        codeLines: [27, 28],
+        vars: [
+          { name: "parent", value: `(${r}, ${c})` },
+          { name: "visited size", value: visited.size },
+          { name: "queue", value: queueText() },
+        ],
+        note: {
+          vi: "Kết nối hai chiều hợp lệ. Đánh dấu visited trước khi enqueue và lưu parent để dựng lại đường cuối.",
+          en: "The two-way connection is valid. Mark the cell before enqueueing and save its parent for final path reconstruction.",
+        },
+      });
+    }
+  }
+
+  const path = [];
+  if (found) {
+    let current = [rows - 1, cols - 1];
+    while (current) {
+      path.unshift(current);
+      current = parent[current[0]][current[1]];
+    }
+  }
+  const pathCells = new Set(path.map(([r, c]) => key(r, c)));
+  const pathText = path.map(([r, c]) => `(${r},${c})`).join(" → ");
+
+  pushStep({
+    title: found
+      ? { vi: "Kết quả: có đường đi hợp lệ", en: "Result: a valid path exists" }
+      : { vi: "Kết quả: không có đường đi hợp lệ", en: "Result: no valid path exists" },
+    pathCells,
+    final: true,
+    codeLines: found ? [19, 20] : [29],
+    vars: found
+      ? [{ name: "path", value: pathText }, { name: "answer", value: true }]
+      : [{ name: "queue", value: "[]" }, { name: "answer", value: false }],
+    note: found
+      ? {
+          vi: `Đường được tô xanh: ${pathText}. Mỗi cặp ô liên tiếp đều có hai đầu đường mở đối diện nhau.`,
+          en: `The path is highlighted in green: ${pathText}. Every consecutive pair has matching opposite openings.`,
+        }
+      : {
+          vi: "Queue đã rỗng mà target chưa được thăm. Mọi kết nối hợp lệ từ start đều đã duyệt, nên trả về false.",
+          en: "The queue is empty without reaching the target. Every valid connection from the start was explored, so return false.",
+        },
+  });
+
+  return { original: grid, answer: found, steps };
+}
+
+module.exports = { buildSteps1293, buildSteps1368, buildSteps1391, buildSteps2290, buildSteps2577, buildSteps3341, buildSteps3342, buildSteps1377, parseWordLadder126, buildSteps126, buildSteps815 };
