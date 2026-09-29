@@ -397,3 +397,147 @@ function renderAds9017View(step) {
     <div class="rv-callout">CTR = clicks / impressions · CVR = conversions / clicks · ${vi ? "mẫu số 0 → 0" : "zero denominator → 0"}</div>`,
   vi ? "Pipeline ads có dedupe eventId và metrics theo campaign" : "Ad pipeline with event-ID dedupe and per-campaign metrics");
 }
+
+
+// ─── Instruction-level debug refinements for #9001/#9006/#9013–#9017 ─────
+// Preserve the rich visual layouts above, then decorate them with the exact
+// source instruction and fix fields that intentionally do not exist yet.
+function requestedLineDebugText(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return pick(value);
+  return String(value);
+}
+
+function decorateRequestedLineDebug(step, view, options = {}) {
+  const root = $("treeView").querySelector(".requested-viz");
+  if (!root) return;
+  const line = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const operation = options.operation || view.operation || view.phase || "step";
+  const heading = `${line ? `LINE ${line} · ` : ""}${String(operation).replaceAll("-", " ").toUpperCase()}`;
+  let banner = root.querySelector(".rv-action-banner");
+  if (!banner) {
+    const phases = root.querySelector(".rv-phases");
+    const html = `<div class="rv-action-banner"><b>${requestedVizEsc(heading)}</b><span></span></div>`;
+    if (phases) phases.insertAdjacentHTML("afterend", html);
+    else root.insertAdjacentHTML("afterbegin", html);
+    banner = root.querySelector(".rv-action-banner");
+  }
+  const headingNode = banner.querySelector("b");
+  const textNode = banner.querySelector("span");
+  if (headingNode) headingNode.textContent = heading;
+  const detail = requestedLineDebugText(options.detail);
+  if (textNode && detail) textNode.textContent = detail;
+}
+
+const renderProfitTracker9001GroupedView = renderProfitTracker9001View;
+renderProfitTracker9001View = function renderProfitTracker9001LineDebugView(step) {
+  renderProfitTracker9001GroupedView(step);
+  const view = step.profitTrackerView || {};
+  decorateRequestedLineDebug(step, view, { operation: view.action?.type || view.phase });
+};
+
+const renderBfs9006GroupedView = renderBfs9006View;
+renderBfs9006View = function renderBfs9006LineDebugView(step) {
+  renderBfs9006GroupedView(step);
+  const view = step.bfs9006View || {};
+  decorateRequestedLineDebug(step, view, {
+    detail: view.actionText || step.note,
+  });
+};
+
+const renderSquare9013GroupedView = renderSquare9013View;
+renderSquare9013View = function renderSquare9013LineDebugView(step) {
+  renderSquare9013GroupedView(step);
+  const view = step.square9013View || {};
+  decorateRequestedLineDebug(step, view, { detail: step.note });
+};
+
+const renderLoyal9014GroupedView = renderLoyal9014View;
+renderLoyal9014View = function renderLoyal9014LineDebugView(step) {
+  renderLoyal9014GroupedView(step);
+  const view = step.loyal9014View || {};
+  const root = $("treeView").querySelector(".requested-viz");
+  if (root) {
+    const rows = root.querySelectorAll(".rv-loyal-table tbody tr");
+    (view.users || []).forEach((user, index) => {
+      const row = rows[index];
+      if (!row) return;
+      const status = user.evaluationState || "pending";
+      if (status === "pending" || status === "checking") {
+        row.classList.remove("pass", "fail");
+        row.classList.add(status);
+        const cells = row.querySelectorAll("td");
+        const dayCheck = cells[4]?.querySelector(".rv-check");
+        const distinctCheck = cells[5]?.querySelector(".rv-check");
+        const result = cells[6]?.querySelector(".rv-pass-badge");
+        if (user.presentBoth === null && dayCheck) {
+          dayCheck.classList.remove("yes", "no");
+          dayCheck.textContent = "…";
+        }
+        if (user.distinctEnough === null && distinctCheck) {
+          distinctCheck.classList.remove("yes", "no");
+          distinctCheck.textContent = `${user.distinctCount} · …`;
+        }
+        if (result) {
+          result.classList.remove("yes", "no");
+          result.textContent = status === "checking" ? (lang === "vi" ? "ĐANG XÉT" : "CHECKING") : (lang === "vi" ? "CHỜ" : "WAIT");
+        }
+      }
+    });
+  }
+  decorateRequestedLineDebug(step, view, { detail: step.note });
+};
+
+const renderSweep9015GroupedView = renderSweep9015View;
+renderSweep9015View = function renderSweep9015LineDebugView(step) {
+  renderSweep9015GroupedView(step);
+  const view = step.sweep9015View || {};
+  const root = $("treeView").querySelector(".requested-viz");
+  if (root && view.operation !== "count-overlaps") {
+    root.querySelector(".rv-focus-equation")?.remove();
+  }
+  decorateRequestedLineDebug(step, view, { detail: step.note });
+};
+
+const renderFriends9016GroupedView = renderFriends9016View;
+renderFriends9016View = function renderFriends9016LineDebugView(step) {
+  renderFriends9016GroupedView(step);
+  const view = step.friends9016View || {};
+  const root = $("treeView").querySelector(".requested-viz");
+  if (root) {
+    root.querySelectorAll(".rv-history").forEach((historyNode, index) => {
+      const position = view.histories?.[index]?.activePosition;
+      if (Number.isInteger(position)) historyNode.querySelectorAll("span")[position]?.classList.add("match");
+    });
+    root.querySelectorAll(".rv-index-bucket").forEach((bucketNode, index) => {
+      const bucket = view.buckets?.[index];
+      if (bucket && view.activeBucket && bucket.position === view.activeBucket.position && bucket.movie === view.activeBucket.movie) {
+        bucketNode.classList.add("active");
+      }
+    });
+  }
+  decorateRequestedLineDebug(step, view, { detail: step.note });
+};
+
+const renderAds9017GroupedView = renderAds9017View;
+renderAds9017View = function renderAds9017LineDebugView(step) {
+  renderAds9017GroupedView(step);
+  const view = step.ads9017View || {};
+  const root = $("treeView").querySelector(".requested-viz");
+  if (root) {
+    root.querySelectorAll(".rv-campaign-card").forEach((card, index) => {
+      const metric = view.campaigns?.[index];
+      if (!metric) return;
+      const header = card.querySelector("header");
+      if (header && Array.isArray(metric.users)) {
+        header.insertAdjacentHTML("beforeend", `<span>users={${metric.users.map(requestedVizEsc).join(", ") || "∅"}}</span>`);
+      }
+      const values = card.querySelectorAll(".rv-metric-grid span b");
+      if (metric.reach === null && values[0]) values[0].textContent = "—";
+      if (metric.ctr === null && values[2]) values[2].textContent = "—";
+      if (metric.cvr === null && values[3]) values[3].textContent = "—";
+      card.classList.toggle("active", metric.campaign === view.activeCampaign);
+    });
+  }
+  decorateRequestedLineDebug(step, view, { detail: step.note });
+};
