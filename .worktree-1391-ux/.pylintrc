@@ -1,0 +1,68 @@
+# Pylint configuration tuned for a LeetCode practice repository.
+#
+# LeetCode solutions follow conventions that pylint's defaults dislike but
+# which we cannot or do not want to change:
+#   * Method/argument names are camelCase because LeetCode's judge calls them
+#     (e.g. `threeSum`, `numCourses`).
+#   * Files are named after the problem (e.g. `Leetcode_103.py`).
+#   * Each file is a small `Solution` class with a single public method.
+#   * Solutions are self-contained scratch code without docstrings.
+#
+# The disables below silence that inherent noise while leaving real
+# correctness checks (undefined names, syntax errors, etc.) enabled.
+
+[MAIN]
+# Optional third-party imports (e.g. openai in misc scripts) need not resolve.
+ignore-paths=^Leetcode/misc/.*$
+
+[FORMAT]
+max-line-length=127
+
+[MESSAGES CONTROL]
+disable=
+    invalid-name,
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-return-statements,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-many-nested-blocks,
+    redefined-outer-name,
+    redefined-builtin,
+    unused-argument,
+    unused-variable,
+    unused-import,
+    duplicate-code,
+    bad-indentation,
+    multiple-statements,
+    wrong-import-position,
+    wrong-import-order,
+    import-outside-toplevel,
+    import-error,
+    no-else-return,
+    no-else-continue,
+    no-else-break,
+    chained-comparison,
+    consider-using-enumerate,
+    consider-using-max-builtin,
+    consider-using-min-builtin,
+    consider-using-dict-items,
+    consider-using-in,
+    consider-using-generator,
+    consider-iterating-dictionary,
+    use-implicit-booleaness-not-comparison,
+    inconsistent-return-statements,
+    unnecessary-comprehension,
+    unnecessary-pass,
+    unnecessary-lambda,
+    singleton-comparison,
+    pointless-statement,
+    superfluous-parens,
+    attribute-defined-outside-init,
+    unsupported-membership-test,
+    fixme
