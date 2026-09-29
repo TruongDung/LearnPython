@@ -241,8 +241,11 @@ app.post("/api/problem/:id/solve", (req, res) => {
   for (const p of problem.extraParams || []) {
     const v = params[p.key];
     if (p.type === "string") {
-      if (typeof v !== "string" || v.length === 0) {
-        return res.status(400).json({ error: `Tham số "${p.key}" phải là chuỗi không rỗng.` });
+      if (v === undefined && p.allowEmpty) {
+        params[p.key] = "";
+      } else if (typeof v !== "string" || (!p.allowEmpty && v.length === 0)) {
+        const requirement = p.allowEmpty ? "chuỗi" : "chuỗi không rỗng";
+        return res.status(400).json({ error: `Tham số "${p.key}" phải là ${requirement}.` });
       }
     } else if (p.type === "float") {
       if (typeof v !== "number" || !isFinite(v)) {

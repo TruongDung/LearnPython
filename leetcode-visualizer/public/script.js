@@ -853,6 +853,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.queueView), surface: "treeView", render: (step) => {
       renderQueueView(step);
     } },
+    { predicate: (step) => Boolean(step.calculator770View), surface: "treeView", render: (step) => {
+      renderBasicCalculatorIV770View(step);
+    } },
     { predicate: (step) => Boolean(step.calculator772View), surface: "treeView", render: (step) => {
       renderCalculator772View(step);
     } },
