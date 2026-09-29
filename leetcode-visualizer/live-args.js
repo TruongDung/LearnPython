@@ -459,6 +459,14 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       if (operations[0] && operations[0].name === "RideSharingSystem") operations.shift();
       return designConfig("RideSharingSystem", [], operations);
     }
+    case 9018: {
+      const parsed = problem.parseServerAllocator9018Input(input, params);
+      return designConfig(
+        "ServerAllocator",
+        [parsed.inventory],
+        parsed.operations.map((operation) => ({ name: operation.kind, args: [operation.arg] })),
+      );
+    }
     case 9001:
       return {
         functionName: "get_highest_earning_experiences",
