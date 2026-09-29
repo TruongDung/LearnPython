@@ -6,6 +6,7 @@ const CS753_DECISIONS = new Set([
   "enter-root",
   "descend",
   "start-dfs",
+  "inspect-value",
   "skip-seen",
   "consume",
   "emit-postorder",
