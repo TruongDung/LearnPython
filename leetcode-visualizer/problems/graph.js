@@ -30085,3 +30085,7 @@ Object.assign(module.exports, {
     builder: buildSteps785,
   },
 });
+
+
+// Attach dedicated teaching payloads after the base graph catalog is assembled.
+require("./core-custom-visualization-upgrades").installGraph(module.exports);
