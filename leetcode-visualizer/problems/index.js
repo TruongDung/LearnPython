@@ -11,8 +11,8 @@
 // can statically detect and include all category files.
 
 const categories = {
-  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514")),
-  sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing")),
+  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218")),
+  sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610")),
   graph: Object.assign(require("./graph"), require("./number-bfs"), require("./node-sequence-score")),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
@@ -20,7 +20,7 @@ const categories = {
   trie: Object.assign(require("./trie"), require("./prefix-scores-2416")),
   hashmap: require("./hashmap"),
   greedy: require("./greedy"),
-  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii")),
+  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./text-justification-68")),
   backtracking: require("./backtracking"),
   bst: require("./bst"),
   "binary-tree": require("./tree"),
@@ -32,7 +32,7 @@ const categories = {
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: require("./bitmask"),
   design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018")),
-  interview: require("./interview"),
+  interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };
 
 const SUPPORTED = {};

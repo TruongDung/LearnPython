@@ -3045,6 +3045,25 @@ function buildSteps1391(input) {
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
       arr: [],
       bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      validPath1391View: {
+        version: 1,
+        problemId: 1391,
+        phase: "invalid",
+        rows: 0,
+        cols: 0,
+        cells: [],
+        current: null,
+        probe: null,
+        queue: [],
+        path: [],
+        counts: { visited: 0, processed: 0, queued: 0 },
+        answer: false,
+        decision: { kind: "invalid" },
+        error: {
+          vi: "Grid phải là ma trận chữ nhật, chỉ chứa loại đường từ 1 đến 6 và không vượt quá 20×20.",
+          en: "The grid must be rectangular, contain only street types 1 through 6, and be at most 20×20.",
+        },
+      },
       highlight: [],
       mark: [],
       final: true,
@@ -3064,9 +3083,19 @@ function buildSteps1391(input) {
   const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
   const key = (r, c) => `${r},${c}`;
   const moveSymbol = (dr, dc) => dr === -1 ? "↑" : dr === 1 ? "↓" : dc === -1 ? "←" : "→";
+  const directionName = (dr, dc) => dr === -1 ? "up" : dr === 1 ? "down" : dc === -1 ? "left" : "right";
+  const oppositeDirection = { up: "down", down: "up", left: "right", right: "left" };
   const queueText = () => {
     const visible = queue.slice(0, 10).map(([r, c]) => `(${r},${c})`).join(", ");
     return `[${visible}${queue.length > 10 ? ", …" : ""}]`;
+  };
+  const variableValue = (vars, name) => {
+    const variable = (vars || []).find((entry) => entry.name === name);
+    return variable ? variable.value : undefined;
+  };
+  const parseCoordinate = (value) => {
+    const match = String(value ?? "").match(/\((-?\d+)\s*,\s*(-?\d+)\)/);
+    return match ? { row: Number(match[1]), column: Number(match[2]) } : null;
   };
 
   function makeCells(current = null, candidate = null, pathCells = new Set()) {
@@ -3094,11 +3123,129 @@ function buildSteps1391(input) {
     }));
   }
 
+  function makeDedicatedView({ codeLines, vars, current, candidate, pathCells, final }) {
+    const lines = Array.isArray(codeLines) ? codeLines : [];
+    const hasLine = (line) => lines.includes(line);
+    const phase = final
+      ? "complete"
+      : hasLine(27)
+        ? "enqueue"
+        : hasLine(25)
+          ? "connection-check"
+          : hasLine(23)
+            ? (candidate ? "visited-reject" : "bounds-reject")
+            : hasLine(19)
+              ? "target-reached"
+              : hasLine(17)
+                ? "dequeue"
+                : "initialize";
+
+    const path = [];
+    const pathValue = variableValue(vars, "path");
+    if (pathValue !== undefined) {
+      for (const match of String(pathValue).matchAll(/\((-?\d+)\s*,\s*(-?\d+)\)/g)) {
+        path.push({ row: Number(match[1]), column: Number(match[2]), order: path.length + 1 });
+      }
+    }
+    const pathSet = pathCells instanceof Set ? pathCells : new Set();
+    const pathOrder = new Map(path.map((cell) => [key(cell.row, cell.column), cell.order]));
+    const queued = new Set(queue.map(([r, c]) => key(r, c)));
+    const currentPoint = current ? { row: current[0], column: current[1] } : null;
+    let targetPoint = candidate ? { row: candidate[0], column: candidate[1] } : null;
+    if (!targetPoint && phase === "bounds-reject") {
+      targetPoint = parseCoordinate(variableValue(vars, "neighbor"));
+    }
+
+    let probe = null;
+    if (["bounds-reject", "visited-reject", "connection-check", "enqueue"].includes(phase)
+      && currentPoint && targetPoint) {
+      const dr = targetPoint.row - currentPoint.row;
+      const dc = targetPoint.column - currentPoint.column;
+      const direction = directionName(dr, dc);
+      const inBounds = targetPoint.row >= 0 && targetPoint.row < rows
+        && targetPoint.column >= 0 && targetPoint.column < cols;
+      const connectsValue = variableValue(vars, "connects back");
+      const connectsBack = phase === "enqueue"
+        ? true
+        : phase === "connection-check"
+          ? Boolean(connectsValue)
+          : null;
+      const verdict = phase === "bounds-reject"
+        ? "out-of-bounds"
+        : phase === "visited-reject"
+          ? "already-visited"
+          : phase === "enqueue"
+            ? "enqueued"
+            : connectsBack
+              ? "connected"
+              : "broken";
+      probe = {
+        from: { ...currentPoint },
+        to: { ...targetPoint },
+        direction,
+        requiredBack: oppositeDirection[direction],
+        inBounds,
+        alreadyVisited: phase === "visited-reject" ? true : inBounds ? false : null,
+        connectsBack,
+        verdict,
+      };
+    }
+
+    const answerValue = variableValue(vars, "answer");
+    const answer = typeof answerValue === "boolean"
+      ? answerValue
+      : phase === "target-reached"
+        ? true
+        : null;
+
+    const cells = grid.map((row, r) => row.map((street, c) => {
+      const cellKey = key(r, c);
+      const isStart = r === 0 && c === 0;
+      const isTarget = r === rows - 1 && c === cols - 1;
+      return {
+        row: r,
+        column: c,
+        type: street,
+        openings: streets[street].openings.map(([dr, dc]) => directionName(dr, dc)),
+        endpoint: isStart && isTarget ? "both" : isStart ? "start" : isTarget ? "target" : null,
+        visited: visited.has(cellKey),
+        processed: processed.has(cellKey),
+        queued: queued.has(cellKey),
+        current: Boolean(current && current[0] === r && current[1] === c),
+        candidate: Boolean(candidate && candidate[0] === r && candidate[1] === c),
+        path: pathSet.has(cellKey),
+        pathOrder: pathOrder.get(cellKey) || null,
+      };
+    }));
+
+    return {
+      version: 1,
+      problemId: 1391,
+      phase,
+      rows,
+      cols,
+      cells,
+      current: currentPoint,
+      probe,
+      queue: queue.map(([r, c], index) => ({ row: r, column: c, head: index === 0 })),
+      path,
+      counts: {
+        visited: visited.size,
+        processed: processed.size,
+        queued: queue.length,
+      },
+      answer,
+      decision: { kind: probe ? probe.verdict : phase },
+      error: null,
+    };
+  }
+
   function pushStep({ title, codeLines, vars, note, current = null, candidate = null, pathCells, final = false }) {
     steps.push({
       title,
       arr: [],
       bfsGrid: { rows, cols, cells: makeCells(current, candidate, pathCells) },
+      validPath1391View: makeDedicatedView({ codeLines, vars, current, candidate, pathCells, final }),
       highlight: [],
       mark: [],
       final,

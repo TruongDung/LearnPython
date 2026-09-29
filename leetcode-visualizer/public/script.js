@@ -244,8 +244,29 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.twitterView), surface: "treeView", render: (step) => {
       renderTwitterView(step);
     } },
+    { predicate: (step) => Boolean(step.coins2218View), surface: "treeView", render: (step) => {
+      renderCoins2218View(step);
+    } },
+    { predicate: (step) => Boolean(step.bfs9006View), surface: "treeView", render: (step) => {
+      renderBfs9006View(step);
+    } },
     { predicate: (step) => Boolean(step.profitTrackerView), surface: "treeView", render: (step) => {
-      renderProfitTrackerView(step);
+      renderProfitTracker9001View(step);
+    } },
+    { predicate: (step) => Boolean(step.square9013View), surface: "treeView", render: (step) => {
+      renderSquare9013View(step);
+    } },
+    { predicate: (step) => Boolean(step.loyal9014View), surface: "treeView", render: (step) => {
+      renderLoyal9014View(step);
+    } },
+    { predicate: (step) => Boolean(step.sweep9015View), surface: "treeView", render: (step) => {
+      renderSweep9015View(step);
+    } },
+    { predicate: (step) => Boolean(step.friends9016View), surface: "treeView", render: (step) => {
+      renderFriends9016View(step);
+    } },
+    { predicate: (step) => Boolean(step.ads9017View), surface: "treeView", render: (step) => {
+      renderAds9017View(step);
     } },
     { predicate: (step) => Boolean(step.cyclicSortView), surface: "treeView", render: (step) => {
       renderCyclicSortView(step);
@@ -499,6 +520,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.slidingMaximum239View), surface: "treeView", render: (step) => {
       renderSlidingMaximum239View(step);
     } },
+    { predicate: (step) => Boolean(step.visiblePoints1610View), surface: "treeView", render: (step) => {
+      renderVisiblePoints1610View(step);
+    } },
     { predicate: (step) => Boolean(step.medianFinder295View), surface: "treeView", render: (step) => {
       renderMedianFinder295View(step);
     } },
@@ -519,6 +543,21 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.freedomTrail514View), surface: "treeView", render: (step) => {
       renderFreedomTrail514View(step);
+    } },
+    { predicate: (step) => Boolean(step.inversePairs629View), surface: "treeView", render: (step) => {
+      renderKInversePairs629View(step);
+    } },
+    { predicate: (step) => Boolean(step.strangePrinter664View), surface: "treeView", render: (step) => {
+      renderStrangePrinter664View(step);
+    } },
+    { predicate: (step) => Boolean(step.countPalindromicSubsequences730View), surface: "treeView", render: (step) => {
+      renderCountPalindromicSubsequences730View(step);
+    } },
+    { predicate: (step) => Boolean(step.cherryPickup741View), surface: "treeView", render: (step) => {
+      renderCherryPickup741View(step);
+    } },
+    { predicate: (step) => Boolean(step.validPath1391View), surface: "treeView", render: (step) => {
+      renderValidPath1391View(step);
     } },
     { predicate: (step) => Boolean(step.serverAllocator9018View), surface: "treeView", render: (step) => {
       renderServerAllocator9018View(step);
@@ -696,6 +735,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.divideString2138View), surface: "treeView", render: (step) => {
       renderDivideString2138View(step);
+    } },
+    { predicate: (step) => Boolean(step.textJustification68View), surface: "treeView", render: (step) => {
+      renderTextJustification68View(step);
     } },
     { predicate: (step) => Boolean(step.maximizeScore2818View), surface: "treeView", render: (step) => {
       renderMaximizeScore2818View(step);
