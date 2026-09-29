@@ -18,6 +18,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-max-path-sum-124.js',
   'renderer-palindrome-cuts-132.js',
   'renderer-sliding-maximum-239.js',
+  'renderer-visible-points-1610.js',
   'renderer-median-finder-295.js',
   'renderer-remove-invalid-301.js',
   'renderer-burst-balloons-312.js',
@@ -26,8 +27,14 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-split-array-410.js',
   'renderer-all-one-432.js',
   'renderer-freedom-trail-514.js',
+  'renderer-k-inverse-pairs-629.js',
+  'renderer-strange-printer-664.js',
+  'renderer-count-different-palindromic-subsequences-730.js',
+  'renderer-cherry-pickup-741.js',
   'renderer-valid-path-1391.js',
   'renderer-server-allocator-9018.js',
+  'renderer-text-justification-68.js',
+  'renderer-requested-visualizations.js',
   'script.js',
 ]);
 
@@ -49,6 +56,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'max-path-sum-124.css',
   'palindrome-cuts-132.css',
   'sliding-maximum-239.css',
+  'visible-points-1610.css',
   'median-finder-295.css',
   'remove-invalid-301.css',
   'burst-balloons-312.css',
@@ -57,8 +65,14 @@ const STYLESHEET_ASSETS = Object.freeze([
   'split-array-410.css',
   'all-one-432.css',
   'freedom-trail-514.css',
+  'k-inverse-pairs-629.css',
+  'strange-printer-664.css',
+  'count-different-palindromic-subsequences-730.css',
+  'cherry-pickup-741.css',
   'valid-path-1391.css',
   'server-allocator-9018.css',
+  'text-justification-68.css',
+  'requested-visualizations.css',
 ]);
 
 const sourceCache = new Map();
