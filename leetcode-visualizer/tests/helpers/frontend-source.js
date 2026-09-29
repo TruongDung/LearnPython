@@ -26,8 +26,10 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-split-array-410.js',
   'renderer-all-one-432.js',
   'renderer-freedom-trail-514.js',
+  'renderer-race-car-818.js',
   'renderer-cracking-safe-753.js',
   'renderer-special-binary-string-761.js',
+  'renderer-basic-calculator-iv-770.js',
   'renderer-k-inverse-pairs-629.js',
   'renderer-strange-printer-664.js',
   'renderer-count-different-palindromic-subsequences-730.js',
@@ -36,6 +38,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-server-allocator-9018.js',
   'renderer-text-justification-68.js',
   'renderer-requested-visualizations.js',
+  'renderer-hard-problems.js',
   'script.js',
 ]);
 
@@ -65,8 +68,10 @@ const STYLESHEET_ASSETS = Object.freeze([
   'split-array-410.css',
   'all-one-432.css',
   'freedom-trail-514.css',
+  'race-car-818.css',
   'cracking-safe-753.css',
   'special-binary-string-761.css',
+  'basic-calculator-iv-770.css',
   'k-inverse-pairs-629.css',
   'strange-printer-664.css',
   'count-different-palindromic-subsequences-730.css',
@@ -75,6 +80,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'server-allocator-9018.css',
   'text-justification-68.css',
   'requested-visualizations.css',
+  'hard-problems.css',
 ]);
 
 const sourceCache = new Map();
