@@ -11,9 +11,9 @@
 // can statically detect and include all category files.
 
 const categories = {
-  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./valid-parentheses-path-2267")),
+  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./valid-parentheses-path-2267"), require("./hard-dp-visualizations")),
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610")),
-  graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score")),
+  graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations")),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
   array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation")),
@@ -23,14 +23,14 @@ const categories = {
   string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./basic-calculator-iv-770"), require("./special-binary-string-761"), require("./text-justification-68")),
   backtracking: require("./backtracking"),
   bst: require("./bst"),
-  "binary-tree": require("./tree"),
+  "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations")),
   heap: Object.assign(require("./heap"), require("./server-heap"), require("./meeting-rooms-iii")),
   "union-find": require("./union-find"),
   "linked-list": require("./linked-list"),
   "binary-lifting": require("./binary-lifting"),
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
-  bitmask: require("./bitmask"),
+  bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations")),
   design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018")),
   interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };

@@ -39,6 +39,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-server-allocator-9018.js',
   'renderer-text-justification-68.js',
   'renderer-requested-visualizations.js',
+  'renderer-hard-problems.js',
   'script.js',
 ]);
 
@@ -81,6 +82,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'server-allocator-9018.css',
   'text-justification-68.css',
   'requested-visualizations.css',
+  'hard-problems.css',
 ]);
 
 const sourceCache = new Map();
