@@ -25,6 +25,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-split-array-410.js',
   'renderer-all-one-432.js',
   'renderer-freedom-trail-514.js',
+  'renderer-valid-path-1391.js',
   'renderer-server-allocator-9018.js',
   'script.js',
 ]);
@@ -54,6 +55,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'split-array-410.css',
   'all-one-432.css',
   'freedom-trail-514.css',
+  'valid-path-1391.css',
   'server-allocator-9018.css',
 ]);
 

@@ -520,6 +520,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.freedomTrail514View), surface: "treeView", render: (step) => {
       renderFreedomTrail514View(step);
     } },
+    { predicate: (step) => Boolean(step.validPath1391View), surface: "treeView", render: (step) => {
+      renderValidPath1391View(step);
+    } },
     { predicate: (step) => Boolean(step.serverAllocator9018View), surface: "treeView", render: (step) => {
       renderServerAllocator9018View(step);
     } },
