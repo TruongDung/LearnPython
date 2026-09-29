@@ -1064,7 +1064,7 @@ module.exports = {
       { key: "heap", vi: "Heap / Hàng đợi ưu tiên", en: "Heap / Priority Queue" },
       { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     builder: buildSteps9001Easy,
   },
   9006: {
@@ -1107,7 +1107,7 @@ module.exports = {
       "        target = parent[target]",
       "    return path[::-1]",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     liveArgs: (input, params) => [parseEdges9006(input), String(params.start).trim(), String(params.target).trim()],
     builder: buildSteps9006Easy,
   },
@@ -1140,7 +1140,7 @@ module.exports = {
       "        if dfs(start): return path",
       "    return []",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     builder: buildSteps9013Easy,
   },
   9014: {
@@ -1165,7 +1165,7 @@ module.exports = {
       "            answer.append(user)",
       "    return answer",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     builder: buildSteps9014Easy,
   },
   9015: {
@@ -1191,7 +1191,7 @@ module.exports = {
       "            active.remove(interval_id)",
       "    return pairs, peak",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     liveArgs: (input) => [parseIntervals9015(input)],
     builder: buildSteps9015Easy,
   },
@@ -1228,7 +1228,7 @@ module.exports = {
       "        if len(positions) >= m: answer.append((users[left], users[right]))",
       "    return sorted(answer)",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     builder: buildSteps9016Easy,
   },
   9017: {
@@ -1260,7 +1260,22 @@ module.exports = {
       "# CTR = clicks / impressions if impressions else 0",
       "# CVR = conversions / clicks if clicks else 0",
     ],
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     builder: buildSteps9017Easy,
   },
 };
+
+// Replace grouped semantic snapshots with true instruction-by-instruction traces.
+// Keep this final merge after the inherited metadata so these builders are the
+// active runtime definitions without duplicating the catalog entries above.
+const requestedLineDebugOverrides = require("./requested-line-debug")({
+  label,
+  parseEdges9006,
+  parseDailyLogs9014,
+  parseIntervals9015,
+  parseHistories9016,
+  parseAdEvents9017,
+});
+for (const [id, override] of Object.entries(requestedLineDebugOverrides)) {
+  Object.assign(module.exports[id], override);
+}
