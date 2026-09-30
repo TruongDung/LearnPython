@@ -31,7 +31,7 @@ const categories = {
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723")),
-  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018")),
+  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635")),
   interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };
 

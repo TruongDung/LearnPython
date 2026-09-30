@@ -467,6 +467,46 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         parsed.operations.map((operation) => ({ name: operation.kind, args: [operation.arg] })),
       );
     }
+    case 2336: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "SmallestInfiniteSet",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
+    case 1845: {
+      const built = problem.builder(input, params);
+      return designConfig(
+        "SeatManager",
+        [built.original.n],
+        built.operations,
+      );
+    }
+    case 379: {
+      const built = problem.builder(input, params);
+      return designConfig(
+        "PhoneDirectory",
+        [built.original.maxNumbers],
+        built.operations,
+      );
+    }
+    case 2349: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "NumberContainers",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
+    case 635: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "LogSystem",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
     case 9001:
       return {
         functionName: "get_highest_earning_experiences",
