@@ -121,11 +121,16 @@ function sourceLine(fragment) {
 }
 
 const PYTHON_LINES = Object.freeze({
-  prepare: [sourceLine("ordered = sorted"), sourceLine("power1 ="), sourceLine("prefixes = []")],
-  choose: [sourceLine("low, high ="), sourceLine("middle =")],
+  prepare: [
+    sourceLine("ordered = sorted"),
+    sourceLine("power1 ="),
+    sourceLine("prefixes = []"),
+    sourceLine("low, high ="),
+  ],
+  choose: [sourceLine("while low < high"), sourceLine("middle =")],
   seed: [sourceLine("starts_by_hash ="), sourceLine("starts_by_hash.setdefault")],
   intersect: [sourceLine("for path_index in range(1"), sourceLine("common &= present")],
-  verify: [sourceLine("Hashes filter candidates"), sourceLine("same_hash ="), sourceLine("same_slice =")],
+  verify: [sourceLine("for key in common"), sourceLine("same_hash ="), sourceLine("same_slice =")],
   update: [sourceLine("if exists(middle)"), sourceLine("low = middle"), sourceLine("high = middle - 1")],
   finish: [sourceLine("return low")],
 });
@@ -460,7 +465,7 @@ function buildLongestCommonSubpath1923(input, params) {
       .filter((record) => record.verified)
       .map((record) => record.start);
 
-    tracer.emit({
+    const traceStep = {
       phaseIndex,
       codeLines,
       title,
@@ -533,6 +538,18 @@ function buildLongestCommonSubpath1923(input, params) {
       sequence: candidateSequence,
       final,
       answer: final ? answer : null,
+    };
+
+    const uniqueCodeLines = [...new Set(codeLines)];
+    uniqueCodeLines.forEach((line, index) => {
+      const isFinalLine = final && index === uniqueCodeLines.length - 1;
+      tracer.emit({
+        ...traceStep,
+        codeLines: [line],
+        title: bi(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
+        final: isFinalLine,
+        answer: isFinalLine ? answer : null,
+      });
     });
   }
 
@@ -759,7 +776,9 @@ function buildLongestCommonSubpath1923(input, params) {
 
     emitTrace({
       phaseIndex: 4,
-      codeLines: PYTHON_LINES.update,
+      codeLines: result.common
+        ? [PYTHON_LINES.update[0], PYTHON_LINES.update[1]]
+        : [PYTHON_LINES.update[0], PYTHON_LINES.update[2]],
       title: result.common
         ? bi(`Độ dài ${mid} tồn tại`, `Length ${mid} exists`)
         : bi(`Độ dài ${mid} không tồn tại`, `Length ${mid} does not exist`),
@@ -908,7 +927,7 @@ module.exports = {
         "S is the total path length and L is the shortest path. Exact verification runs only for matching keys; adversarial collisions can add O(S·L·log L) work.",
       ),
     },
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     code: LONGEST_COMMON_SUBPATH_1923_SOURCE,
     liveArgs: (input, params) => {
       const parsed = parseLongestCommonSubpath1923(input, params);
