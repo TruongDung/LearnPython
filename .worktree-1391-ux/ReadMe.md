@@ -1,1 +1,0 @@
-New learning for Python
