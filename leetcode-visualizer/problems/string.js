@@ -14218,6 +14218,204 @@ function buildSteps402(input, params = {}) {
   return { original: num, k: initialK, answer, steps };
 }
 
+// ─── 1111: Maximum Nesting Depth of Two Valid Parentheses Strings ───────────
+const PARENTHESES1111_LIMITS = { seq: 50 };
+
+function parseParentheses1111Input(input) {
+  const seq = String(input ?? "").trim();
+  if (!seq.length) throw new Error("seq must not be empty");
+  if (!/^[()]+$/.test(seq)) throw new Error("seq must contain only '(' and ')' characters");
+  if (seq.length > PARENTHESES1111_LIMITS.seq) throw new Error(`visualization supports seq up to ${PARENTHESES1111_LIMITS.seq} characters`);
+
+  // Validate parentheses balance
+  let balance = 0;
+  for (let i = 0; i < seq.length; i++) {
+    balance += seq[i] === '(' ? 1 : -1;
+    if (balance < 0) throw new Error("seq must be a valid parentheses string");
+  }
+  if (balance !== 0) throw new Error("seq must be a valid parentheses string");
+
+  return seq;
+}
+
+function buildSteps1111(input, params = {}) {
+  const seq = parseParentheses1111Input(input);
+  const seqChars = [...seq];
+  const steps = [];
+
+  let sourceDepth = 0;
+  let sourceMaxDepth = 0;
+  for (const ch of seqChars) {
+    sourceDepth += ch === "(" ? 1 : -1;
+    sourceMaxDepth = Math.max(sourceMaxDepth, sourceDepth);
+  }
+  const optimalMaxDepth = Math.ceil(sourceMaxDepth / 2);
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      parentheses1111View: {
+        seq: [...seqChars],
+        depthA: o.depthA === undefined ? 0 : o.depthA,
+        depthB: o.depthB === undefined ? 0 : o.depthB,
+        maxDepthA: o.maxDepthA === undefined ? 0 : o.maxDepthA,
+        maxDepthB: o.maxDepthB === undefined ? 0 : o.maxDepthB,
+        stackA: o.stackA ? [...o.stackA] : [],
+        stackB: o.stackB ? [...o.stackB] : [],
+        answer: o.answer ? [...o.answer] : [],
+        pointer: o.position === undefined ? -1 : o.position,
+        char: o.char || "",
+        splitType: o.splitType || "",
+        decision: o.decision || "",
+        phase: o.phase || "intro",
+        currentMaxDepth: o.currentMaxDepth === undefined ? 0 : o.currentMaxDepth,
+        sourceMaxDepth,
+        optimalMaxDepth,
+        finalAnswer: o.finalAnswer || null,
+      },
+    });
+  }
+
+  let depthA = 0;
+  let depthB = 0;
+  let maxDepthA = 0;
+  let maxDepthB = 0;
+  const stackA = [];
+  const stackB = [];
+  const answer = [];
+
+  snap({
+    phase: "intro",
+    title: { vi: `seq = "${seq}" (${seq.length} ký tự)`, en: `seq = "${seq}" (${seq.length} characters)` },
+    note: {
+      vi: `Chia các ký tự của seq thành hai chuỗi A và B hợp lệ để tối thiểu hóa độ sâu lồng lớn nhất. Chiến lược: gặp '(' thì gán vào chuỗi có độ sâu nhỏ hơn, gặp ')' thì gán vào chuỗi có độ sâu lớn hơn.`,
+      en: `Split seq characters into two valid strings A and B to minimize maximum nesting depth. Strategy: on '(' assign to string with smaller depth, on ')' assign to string with larger depth.`,
+    },
+    codeLines: [1, 2, 3],
+    depthA: 0,
+    depthB: 0,
+    maxDepthA: 0,
+    maxDepthB: 0,
+    stackA,
+    stackB,
+    answer: [],
+    position: -1,
+    decision: { vi: "Khởi tạo: depthA = 0, depthB = 0", en: "Initialize: depthA = 0, depthB = 0" },
+    vars: [{ name: "seq", value: seq }, { name: "length", value: seq.length }],
+  });
+
+  for (let i = 0; i < seq.length; i++) {
+    const ch = seq[i];
+    const assignToA = ch === "(" ? depthA <= depthB : depthA >= depthB;
+    const splitType = assignToA ? "A" : "B";
+
+    snap({
+      phase: "process",
+      title: { vi: `Xử lý seq[${i}] = '${ch}'`, en: `Processing seq[${i}] = '${ch}'` },
+      note: {
+        vi: `Độ sâu hiện tại: A = ${depthA}, B = ${depthB}. ${ch === '(' ? 'Mở ngoặc: gán vào chuỗi có độ sâu nhỏ hơn để cân bằng' : 'Đóng ngoặc: gán vào chuỗi có độ sâu lớn hơn để đóng đúng chuỗi'}.`,
+        en: `Current depth: A = ${depthA}, B = ${depthB}. ${ch === '(' ? 'Open paren: assign to string with smaller depth to balance' : 'Close paren: assign to string with larger depth to close in correct string'}.`,
+      },
+      codeLines: ch === '(' ? [5, 6, 7, 8, 9, 10] : [12, 13, 14, 15, 16, 17],
+      depthA,
+      depthB,
+      maxDepthA,
+      maxDepthB,
+      stackA,
+      stackB,
+      answer: [...answer],
+      position: i,
+      char: ch,
+      splitType,
+      currentMaxDepth: Math.max(depthA, depthB),
+      decision: ch === '('
+        ? { vi: `depthA = ${depthA}, depthB = ${depthB} → ${depthA <= depthB ? 'gán vào A' : 'gán vào B'}`, en: `depthA = ${depthA}, depthB = ${depthB} → ${depthA <= depthB ? 'assign to A' : 'assign to B'}` }
+        : { vi: `depthA = ${depthA}, depthB = ${depthB} → ${depthA >= depthB ? 'gán vào A' : 'gán vào B'}`, en: `depthA = ${depthA}, depthB = ${depthB} → ${depthA >= depthB ? 'assign to A' : 'assign to B'}` },
+      vars: [{ name: "i", value: i }, { name: "ch", value: ch }, { name: "depthA", value: depthA }, { name: "depthB", value: depthB }],
+    });
+
+    if (ch === "(") {
+      if (assignToA) {
+        depthA++;
+        maxDepthA = Math.max(maxDepthA, depthA);
+        stackA.push(i);
+        answer.push(0);
+      } else {
+        depthB++;
+        maxDepthB = Math.max(maxDepthB, depthB);
+        stackB.push(i);
+        answer.push(1);
+      }
+    } else {
+      if (assignToA) {
+        depthA--;
+        stackA.pop();
+        answer.push(0);
+      } else {
+        depthB--;
+        stackB.pop();
+        answer.push(1);
+      }
+    }
+
+    snap({
+      phase: "updated",
+      title: { vi: `Cập nhật: depthA = ${depthA}, depthB = ${depthB}`, en: `Updated: depthA = ${depthA}, depthB = ${depthB}` },
+      note: {
+        vi: `Sau khi xử lý seq[${i}] = '${ch}': độ sâu mới là A = ${depthA}, B = ${depthB}. Độ sâu tối đa hiện tại = ${Math.max(depthA, depthB)}.`,
+        en: `After processing seq[${i}] = '${ch}': new depth is A = ${depthA}, B = ${depthB}. Current maximum depth = ${Math.max(depthA, depthB)}.`,
+      },
+      codeLines: [],
+      depthA,
+      depthB,
+      maxDepthA,
+      maxDepthB,
+      stackA,
+      stackB,
+      answer: [...answer],
+      position: i,
+      char: ch,
+      splitType,
+      currentMaxDepth: Math.max(depthA, depthB),
+      decision: { vi: `Đã gán seq[${i}] vào ${answer[answer.length-1] === 0 ? 'A' : 'B'}`, en: `Assigned seq[${i}] to ${answer[answer.length-1] === 0 ? 'A' : 'B'}` },
+      vars: [{ name: "answer", value: answer.join(", ") }, { name: "maxDepth", value: Math.max(depthA, depthB) }],
+    });
+  }
+
+  const maxDepth = Math.max(maxDepthA, maxDepthB);
+
+  snap({
+    phase: "result",
+    title: { vi: `Kết quả: answer = [${answer.join(", ")}]`, en: `Result: answer = [${answer.join(", ")}]` },
+    note: {
+      vi: `Độ sâu tối đa cuối cùng = ${maxDepth}. Cả A và B đều hợp lệ. depth(seq) = ${sourceMaxDepth}, nên giá trị tối ưu là ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}.`,
+      en: `Final maximum depth = ${maxDepth}. Both A and B are valid. depth(seq) = ${sourceMaxDepth}, so the optimum is ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}.`,
+    },
+    codeLines: [19],
+    depthA,
+    depthB,
+    maxDepthA,
+    maxDepthB,
+    stackA,
+    stackB,
+    answer: [...answer],
+    position: seq.length - 1,
+    splitType: answer[answer.length - 1] === 0 ? "A" : "B",
+    currentMaxDepth: maxDepth,
+    finalAnswer: answer.join(", "),
+    decision: { vi: `Trả về [${answer.join(", ")}]`, en: `Return [${answer.join(", ")}]` },
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }, { name: "maxDepth", value: maxDepth }],
+    final: true,
+  });
+
+  return { input: seq, answer, sourceMaxDepth, optimalMaxDepth, steps };
+}
+
 Object.assign(module.exports, {
   622: {
     id: 622, difficulty: "medium", slug: "design-circular-queue",
@@ -19735,5 +19933,66 @@ Object.assign(module.exports, {
     ],
     liveArgs: (input) => [parseReverseDegree3498Input(input)],
     builder: buildSteps3498,
+  },
+  1111: {
+    id: 1111,
+    difficulty: "medium",
+    slug: "maximum-nesting-depth-of-two-valid-parentheses-strings",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "parentheses", vi: "Ngoặc", en: "Parentheses" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+    ],
+    title: { vi: "Maximum Nesting Depth of Two Valid Parentheses Strings", en: "Maximum Nesting Depth of Two Valid Parentheses Strings" },
+    titleVi: { vi: "Độ sâu lồng tối đa của hai chuỗi ngoặc hợp lệ", en: "Maximum nesting depth of two valid parentheses strings" },
+    statement: {
+      vi: "Cho một chuỗi ngoặc `seq`. Cần chia các ký tự của `seq` thành hai chuỗi `A` và `B` sao cho cả hai đều là chuỗi ngoặc hợp lệ và độ sâu lồng tối đa của chúng (`max(depth(A), depth(B))`) là nhỏ nhất. Trả về mảng `answer` trong đó `answer[i] = 0` nếu `seq[i]` thuộc về `A`, `1` nếu thuộc về `B`.",
+      en: "Given a parentheses string `seq`. We need to split the characters of `seq` into two strings `A` and `B` such that both are valid parentheses strings and their maximum nesting depth (`max(depth(A), depth(B))`) is minimized. Return an array `answer` where `answer[i] = 0` if `seq[i]` belongs to `A`, `1` if it belongs to `B`.",
+    },
+    defaultInput: "(()())",
+    inputKind: "string",
+    inputLabel: { vi: "seq (chỉ chứa '(' và ')')", en: "seq (contains only '(' and ')')" },
+    extraParams: [],
+    approach: [
+      { vi: "Ý tưởng chính: duyệt chuỗi từ trái sang phải, giữ độ sâu hiện tại của A và B. Gặp '(' thì gán vào chuỗi nào đang có độ sâu nhỏ hơn (để cân bằng). Gặp ')' thì gán vào chuỗi nào đang có độ sâu lớn hơn (vì cần đóng ngoặc ở đúng chuỗi).", en: "Main idea: traverse the string left to right, keep current depth of A and B. On '(' assign to the string with smaller current depth (to balance). On ')' assign to the string with larger current depth (because we need to close parentheses in the correct string)." },
+      { vi: "Độ sâu của một chuỗi hợp lệ: số '(' mở chưa đóng tại thời điểm đó. Mỗi khi gán '(' vào một chuỗi, độ sâu của chuỗi đó tăng 1. Mỗi khi gán ')' vào một chuỗi, độ sâu của chuỗi đó giảm 1.", en: "Depth of a valid string: number of '(' opened but not closed at that point. Each time we assign '(' to a string, its depth increases by 1. Each time we assign ')' to a string, its depth decreases by 1." },
+      { vi: "Chiến lược tham lam này đảm bảo độ sâu tối đa luôn ≤ ceil(depth(seq)/2). Bằng cách luôn cân bằng độ sâu giữa A và B, chúng ta giảm thiểu độ sâu lớn nhất.", en: "This greedy strategy ensures maximum depth is always ≤ ceil(depth(seq)/2). By always balancing depth between A and B, we minimize the maximum depth." },
+      { vi: "Bất biến đúng: độ sâu của A và B không bao giờ âm. Mỗi ')' được gán vào chuỗi đang có độ sâu lớn hơn nên luôn đóng được một '(' chưa đóng; cuối cùng cả hai độ sâu trở về 0. Chênh lệch độ sâu luôn không quá 1, nên độ sâu lớn nhất đạt ceil(depth(seq)/2).", en: "Correctness invariant: neither A nor B ever has negative depth. Each ')' goes to the currently deeper string, so it always closes an unmatched '('; both depths finish at 0. Their difference never exceeds 1, so the maximum depth reaches ceil(depth(seq)/2)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Chỉ duyệt một lần qua chuỗi, mỗi ký tự xử lý O(1). Mảng kết quả có độ dài n.",
+        en: "Single pass through the string, O(1) per character. Result array has length n.",
+      },
+    },
+    debugMode: "line-by-line",
+    code: [
+      "class Solution:",
+      "    def maxDepthAfterSplit(self, seq: str) -> List[int]:",
+      "        depth_a = depth_b = 0",
+      "        answer = []",
+      "        for ch in seq:",
+      "            if ch == '(':",
+      "                if depth_a <= depth_b:",
+      "                    depth_a += 1",
+      "                    answer.append(0)",
+      "                else:",
+      "                    depth_b += 1",
+      "                    answer.append(1)",
+      "            else:  # ch == ')'",
+      "                if depth_a >= depth_b:",
+      "                    depth_a -= 1",
+      "                    answer.append(0)",
+      "                else:",
+      "                    depth_b -= 1",
+      "                    answer.append(1)",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseParentheses1111Input(input)],
+    builder: buildSteps1111,
   },
 });

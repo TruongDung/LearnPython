@@ -6063,45 +6063,57 @@ function renderCircularMaximumSubarrayView(step) {
 function renderParentheses1111View(step) {
   const view = step.parentheses1111View || {};
   const vi = lang === "vi";
-  const seq = Array.isArray(view.seq) ? view.seq : [];
+  const seq = Array.isArray(view.seq) ? view.seq : [...String(view.seq || "")];
   const answer = Array.isArray(view.answer) ? view.answer : [];
-  const x = Number(view.x) || 0;
   const depthA = Number(view.depthA) || 0;
   const depthB = Number(view.depthB) || 0;
   const maxDepthA = Number(view.maxDepthA) || 0;
   const maxDepthB = Number(view.maxDepthB) || 0;
   const stackA = Array.isArray(view.stackA) ? view.stackA : [];
   const stackB = Array.isArray(view.stackB) ? view.stackB : [];
-  const pointer = Number(view.pointer) || -1;
-  const splitType = String(view.splitType || "B");
+  const pointer = Number.isInteger(view.pointer) ? view.pointer : -1;
+  const splitType = view.splitType === "A" || view.splitType === "B" ? view.splitType : "";
+  const sourceMaxDepth = Number(view.sourceMaxDepth) || 0;
+  const optimalMaxDepth = Number(view.optimalMaxDepth) || 0;
 
   const cells = [];
   for (let i = 0; i < seq.length; i++) {
     const c = seq[i];
-    const assignToA = answer[i] === 0;
     const isOpen = c === '(';
     const current = i === pointer;
+    const pendingChoice = current && splitType ? (splitType === "A" ? 0 : 1) : undefined;
+    const group = answer[i] === 0 || answer[i] === 1 ? answer[i] : pendingChoice;
+    const assignToA = group === 0;
+    const assignToB = group === 1;
     const inStackA = stackA.includes(i);
     const inStackB = stackB.includes(i);
-    const stackDepth = assignToA ? stackA.indexOf(i) + 1 : stackB.indexOf(i) + 1;
+    const stackDepth = assignToA
+      ? stackA.indexOf(i) + 1
+      : assignToB
+        ? stackB.indexOf(i) + 1
+        : 0;
     
-    const classes = ["pa1111-cell", assignToA ? "in-a" : "in-b", isOpen ? "open" : "close"];
+    const classes = ["pa1111-cell", isOpen ? "open" : "close"];
+    if (assignToA) classes.push("in-a");
+    if (assignToB) classes.push("in-b");
     if (current) classes.push("current");
     if (inStackA || inStackB) classes.push("in-stack");
     
-    const label = assignToA ? "A" : "B";
-    const depthLabel = stackDepth > 0 ? `depth=${stackDepth}` : "";
+    const label = assignToA ? "A" : assignToB ? "B" : "—";
     const stackMarker = stackDepth > 0 ? `<b>${stackDepth}</b>` : "";
     
     cells.push(`<span class="${classes.join(" ")}"><small>[${i}]</small><strong>${escapeHtml(c)}</strong><em>${escapeHtml(label)}</em>${stackMarker}</span>`);
   }
 
-  const balanceLabel = x < 0 ? "Invalid" : `${x} ('(' - ')')`;
-  const parityLabel = x & 1 ? vi ? "Lẻ → A" : "Odd → A" : vi ? "Chẵn → B" : "Even → B";
   const currentChar = pointer >= 0 && pointer < seq.length ? seq[pointer] : "—";
-  const assignment = pointer >= 0 && pointer < seq.length 
-    ? answer[pointer] === 0 ? "A" : "B"
+  const assignment = pointer >= 0 && pointer < seq.length
+    ? splitType || (answer[pointer] === 0 ? "A" : answer[pointer] === 1 ? "B" : "—")
     : "—";
+  const chooseRule = currentChar === "("
+    ? (vi ? "chọn depth nhỏ hơn" : "choose smaller depth")
+    : currentChar === ")"
+      ? (vi ? "chọn depth lớn hơn" : "choose larger depth")
+      : "—";
 
   const stackCellsA = [];
   const stackCellsB = [];
@@ -6117,12 +6129,12 @@ function renderParentheses1111View(step) {
 
   const phases = [
     { vi: "Đọc ký tự", en: "Read char", detail: currentChar },
-    { vi: "Cập nhật x", en: "Update x", detail: x },
-    { vi: "Kiểm tra parity", en: "Check parity", detail: parityLabel },
+    { vi: "So sánh depth", en: "Compare depths", detail: `A=${depthA}, B=${depthB}` },
+    { vi: "Chọn quy tắc", en: "Choose rule", detail: chooseRule },
     { vi: "Gán kết quả", en: "Assign result", detail: assignment },
   ].map((item, index) => {
-    const active = pointer >= 0 && index <= Math.min(3, pointer + 1);
-    const state = active ? (index === Math.min(3, pointer + 1) ? "active" : "done") : "pending";
+    const activePhase = view.phase === "intro" ? 0 : view.phase === "process" ? 2 : 3;
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
     return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
   }).join("");
 
@@ -6135,8 +6147,8 @@ function renderParentheses1111View(step) {
     </section>
     <section class="pa1111-stats">
       <span><small>${vi ? "KÝ TỰ HIỆN TẠI" : "CURRENT CHAR"}</small><strong>${escapeHtml(currentChar)}</strong></span>
-      <span><small>${vi ? "CÂN BẰNG x" : "BALANCE x"}</small><strong>${escapeHtml(balanceLabel)}</strong></span>
-      <span><small>x & 1</small><strong>${x & 1}</strong></span>
+      <span><small>DEPTH A</small><strong>${depthA}</strong></span>
+      <span><small>DEPTH B</small><strong>${depthB}</strong></span>
       <span><small>${vi ? "GÁN CHO" : "ASSIGN TO"}</small><strong>${escapeHtml(assignment)}</strong></span>
     </section>
     <section class="pa1111-sequence">
@@ -6157,15 +6169,15 @@ function renderParentheses1111View(step) {
     </div>
     <section class="pa1111-rules">
       <strong>${vi ? "QUY TẮC GÁN" : "ASSIGNMENT RULES"}</strong>
-      <div class="rule ${splitType === "A" ? "active" : ""}">
-        <small>${vi ? "NẾU x LẺ (1)" : "IF x ODD (1)"}</small>
-        <b>('(' hoặc ')') → A</b>
-        <em>answer[i] = 0</em>
+      <div class="rule ${currentChar === "(" ? "active" : ""}">
+        <small>${vi ? "GẶP '('" : "ON '('"}</small>
+        <b>${vi ? "Gán vào chuỗi có depth nhỏ hơn" : "Assign to the shallower string"}</b>
+        <em>${vi ? "giữ A và B cân bằng" : "keep A and B balanced"}</em>
       </div>
-      <div class="rule ${splitType === "B" ? "active" : ""}">
-        <small>${vi ? "NẾU x CHẴN (0)" : "IF x EVEN (0)"}</small>
-        <b>('(' hoặc ')') → B</b>
-        <em>answer[i] = 1</em>
+      <div class="rule ${currentChar === ")" ? "active" : ""}">
+        <small>${vi ? "GẶP ')'" : "ON ')'"}</small>
+        <b>${vi ? "Gán vào chuỗi có depth lớn hơn" : "Assign to the deeper string"}</b>
+        <em>${vi ? "đóng một '(' chưa đóng" : "close an unmatched '('"}</em>
       </div>
     </section>
     <aside class="pa1111-legend">
@@ -6179,7 +6191,7 @@ function renderParentheses1111View(step) {
     <section class="pa1111-result">
       <small>${vi ? "KẾT QUẢ" : "RESULT"}</small>
       <strong>answer = [${answer.join(", ")}]</strong>
-      <span>${vi ? `max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)}` : `max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)}`}</span>
+      <span>max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)} · ceil(depth(seq)/2) = ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}</span>
     </section>
   </section>`;
 }
