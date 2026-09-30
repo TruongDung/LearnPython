@@ -6054,3 +6054,132 @@ function renderCircularMaximumSubarrayView(step) {
   </section>`;
 }
 
+
+
+/**
+ * LeetCode 1111: Maximum Nesting Depth of Two Valid Parentheses Strings.
+ * Render parentheses splitting visualization.
+ */
+function renderParentheses1111View(step) {
+  const view = step.parentheses1111View || {};
+  const vi = lang === "vi";
+  const seq = Array.isArray(view.seq) ? view.seq : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const x = Number(view.x) || 0;
+  const depthA = Number(view.depthA) || 0;
+  const depthB = Number(view.depthB) || 0;
+  const maxDepthA = Number(view.maxDepthA) || 0;
+  const maxDepthB = Number(view.maxDepthB) || 0;
+  const stackA = Array.isArray(view.stackA) ? view.stackA : [];
+  const stackB = Array.isArray(view.stackB) ? view.stackB : [];
+  const pointer = Number(view.pointer) || -1;
+  const splitType = String(view.splitType || "B");
+
+  const cells = [];
+  for (let i = 0; i < seq.length; i++) {
+    const c = seq[i];
+    const assignToA = answer[i] === 0;
+    const isOpen = c === '(';
+    const current = i === pointer;
+    const inStackA = stackA.includes(i);
+    const inStackB = stackB.includes(i);
+    const stackDepth = assignToA ? stackA.indexOf(i) + 1 : stackB.indexOf(i) + 1;
+    
+    const classes = ["pa1111-cell", assignToA ? "in-a" : "in-b", isOpen ? "open" : "close"];
+    if (current) classes.push("current");
+    if (inStackA || inStackB) classes.push("in-stack");
+    
+    const label = assignToA ? "A" : "B";
+    const depthLabel = stackDepth > 0 ? `depth=${stackDepth}` : "";
+    const stackMarker = stackDepth > 0 ? `<b>${stackDepth}</b>` : "";
+    
+    cells.push(`<span class="${classes.join(" ")}"><small>[${i}]</small><strong>${escapeHtml(c)}</strong><em>${escapeHtml(label)}</em>${stackMarker}</span>`);
+  }
+
+  const balanceLabel = x < 0 ? "Invalid" : `${x} ('(' - ')')`;
+  const parityLabel = x & 1 ? vi ? "Lẻ → A" : "Odd → A" : vi ? "Chẵn → B" : "Even → B";
+  const currentChar = pointer >= 0 && pointer < seq.length ? seq[pointer] : "—";
+  const assignment = pointer >= 0 && pointer < seq.length 
+    ? answer[pointer] === 0 ? "A" : "B"
+    : "—";
+
+  const stackCellsA = [];
+  const stackCellsB = [];
+  
+  for (let i = 0; i < Math.max(stackA.length, stackB.length); i++) {
+    const hasA = i < stackA.length;
+    const hasB = i < stackB.length;
+    const depth = i + 1;
+    
+    stackCellsA.push(`<span class="${hasA ? "occupied" : "empty"}"><small>depth ${depth}</small><strong>${hasA ? `[${stackA[i]}]` : "—"}</strong></span>`);
+    stackCellsB.push(`<span class="${hasB ? "occupied" : "empty"}"><small>depth ${depth}</small><strong>${hasB ? `[${stackB[i]}]` : "—"}</strong></span>`);
+  }
+
+  const phases = [
+    { vi: "Đọc ký tự", en: "Read char", detail: currentChar },
+    { vi: "Cập nhật x", en: "Update x", detail: x },
+    { vi: "Kiểm tra parity", en: "Check parity", detail: parityLabel },
+    { vi: "Gán kết quả", en: "Assign result", detail: assignment },
+  ].map((item, index) => {
+    const active = pointer >= 0 && index <= Math.min(3, pointer + 1);
+    const state = active ? (index === Math.min(3, pointer + 1) ? "active" : "done") : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  $("treeView").innerHTML = `<section class="pa1111-viz" role="img" aria-label="LeetCode 1111: Split parentheses into A and B">
+    <div class="pa1111-phases">${phases}</div>
+    <section class="pa1111-action">
+      <small>${vi ? "DÒNG" : "LINE"} ${Array.isArray(step.codeLines) ? step.codeLines[0] || "—" : "—"}</small>
+      <strong>${escapeHtml(pick(step.title))}</strong>
+      <span>${escapeHtml(pick(step.note))}</span>
+    </section>
+    <section class="pa1111-stats">
+      <span><small>${vi ? "KÝ TỰ HIỆN TẠI" : "CURRENT CHAR"}</small><strong>${escapeHtml(currentChar)}</strong></span>
+      <span><small>${vi ? "CÂN BẰNG x" : "BALANCE x"}</small><strong>${escapeHtml(balanceLabel)}</strong></span>
+      <span><small>x & 1</small><strong>${x & 1}</strong></span>
+      <span><small>${vi ? "GÁN CHO" : "ASSIGN TO"}</small><strong>${escapeHtml(assignment)}</strong></span>
+    </section>
+    <section class="pa1111-sequence">
+      <header><strong>${vi ? "CHUỖI NGOẶC" : "PARENTHESES STRING"}</strong><span>${seq.length} chars</span></header>
+      <div class="pa1111-cells">${cells.join("")}</div>
+    </section>
+    <div class="pa1111-split">
+      <section class="pa1111-stack pa1111-stack-a">
+        <header><strong>STACK A</strong><span>depth=${maxDepthA}</span></header>
+        <div class="pa1111-stack-cells">${stackCellsA.join("")}</div>
+        <footer><small>${vi ? "Độ sâu hiện tại" : "Current depth"}</small><strong>${depthA}</strong></footer>
+      </section>
+      <section class="pa1111-stack pa1111-stack-b">
+        <header><strong>STACK B</strong><span>depth=${maxDepthB}</span></header>
+        <div class="pa1111-stack-cells">${stackCellsB.join("")}</div>
+        <footer><small>${vi ? "Độ sâu hiện tại" : "Current depth"}</strong><strong>${depthB}</strong></footer>
+      </section>
+    </div>
+    <section class="pa1111-rules">
+      <strong>${vi ? "QUY TẮC GÁN" : "ASSIGNMENT RULES"}</strong>
+      <div class="rule ${splitType === "A" ? "active" : ""}">
+        <small>${vi ? "NẾU x LẺ (1)" : "IF x ODD (1)"}</small>
+        <b>('(' hoặc ')') → A</b>
+        <em>answer[i] = 0</em>
+      </div>
+      <div class="rule ${splitType === "B" ? "active" : ""}">
+        <small>${vi ? "NẾU x CHẴN (0)" : "IF x EVEN (0)"}</small>
+        <b>('(' hoặc ')') → B</b>
+        <em>answer[i] = 1</em>
+      </div>
+    </section>
+    <aside class="pa1111-legend">
+      <span class="in-a"><i></i>${vi ? "thuộc A" : "in A"}</span>
+      <span class="in-b"><i></i>${vi ? "thuộc B" : "in B"}</span>
+      <span class="open"><i></i>${vi ? "mở ngoặc '('" : "open '('"}</span>
+      <span class="close"><i></i>${vi ? "đóng ngoặc ')'" : "close ')'"}</span>
+      <span class="current"><i></i>${vi ? "ký tự hiện tại" : "current char"}</span>
+      <span class="in-stack"><i></i>${vi ? "trong stack" : "in stack"}</span>
+    </aside>
+    <section class="pa1111-result">
+      <small>${vi ? "KẾT QUẢ" : "RESULT"}</small>
+      <strong>answer = [${answer.join(", ")}]</strong>
+      <span>${vi ? `max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)}` : `max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)}`}</span>
+    </section>
+  </section>`;
+}

@@ -16,6 +16,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.xMatrix2319View), surface: "treeView", render: (step) => {
       renderXMatrix2319View(step);
     } },
+    { predicate: (step) => Boolean(step.parentheses1111View), surface: "treeView", render: (step) => {
+      renderParentheses1111View(step);
+    } },
     { predicate: (step) => Boolean(step.reverseParen1190View), surface: "treeView", render: (step) => {
       renderReverseParen1190View(step);
     } },
