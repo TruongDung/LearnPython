@@ -26,11 +26,17 @@ function requestedVizSet(html, summary) {
 function renderCoins2218View(step) {
   const view = step.coins2218View || {};
   const vi = lang === "vi";
+  const approach = Number(view.approach) || 1;
+  const oneDimensional = approach === 2;
   const phaseIndex = view.phase === "init" || view.phase === "pile" ? 0
-    : view.phase === "state" ? 1 : 2;
-  const phases = vi
-    ? ["Prefix của mỗi pile", "So sánh take cho dp[i][j]", "Truy vết đáp án"]
-    : ["Prefix each pile", "Compare takes for dp[i][j]", "Reconstruct answer"];
+    : view.phase === "state" || view.phase === "copy" ? 1 : 2;
+  const phases = oneDimensional
+    ? (vi
+      ? ["Prefix của mỗi pile", "dp → new_dp", "Trả về dp[k]"]
+      : ["Prefix each pile", "dp → new_dp", "Return dp[k]"])
+    : (vi
+      ? ["Prefix của mỗi pile", "So sánh take cho dp[i][j]", "Truy vết đáp án"]
+      : ["Prefix each pile", "Compare takes for dp[i][j]", "Reconstruct answer"]);
 
   const selectedCounts = Array.isArray(view.selectedCounts) ? view.selectedCounts : null;
   const pilesHtml = (view.piles || []).map((pile) => {
@@ -54,15 +60,20 @@ function renderCoins2218View(step) {
     ? view.candidates.map((candidate) => `<div class="rv-coin-candidate${candidate.winner ? " winner" : ""}">
         <div class="rv-candidate-take"><small>take</small><strong>${candidate.take}</strong></div>
         <div><small>${vi ? "coin trên cùng" : "top coins"}</small><b>${candidate.coins.length ? candidate.coins.map(requestedVizEsc).join(" + ") : "∅"}</b></div>
-        <div class="rv-candidate-formula"><code>dp[${view.pileIndex}][${candidate.sourceCoins}]</code><span>+</span><code>prefix[${candidate.take}]</code><span>=</span><strong>${requestedVizEsc(candidate.previous)} + ${requestedVizEsc(candidate.pileValue)} = ${requestedVizEsc(candidate.total)}</strong></div>
+        <div class="rv-candidate-formula"><code>${oneDimensional ? `dp[${candidate.sourceCoins}]` : `dp[${view.pileIndex}][${candidate.sourceCoins}]`}</code><span>+</span><code>prefix[${candidate.take}]</code><span>=</span><strong>${requestedVizEsc(candidate.previous)} + ${requestedVizEsc(candidate.pileValue)} = ${requestedVizEsc(candidate.total)}</strong></div>
         <span class="rv-verdict">${candidate.winner ? (vi ? "TỐT NHẤT" : "BEST") : (vi ? "ứng viên" : "candidate")}</span>
       </div>`).join("")
     : requestedVizEmpty(view.phase === "state" ? (vi ? "Trạng thái này chưa có nguồn khả thi." : "This state has no reachable source.") : (vi ? "Chọn một ô DP để xem các phương án take." : "Select a DP state to see its take choices."));
 
-  const sourceKeys = new Set((view.candidates || []).map((candidate) => `${view.pileIndex},${candidate.sourceCoins}`));
-  const currentKey = Number.isInteger(view.pileIndex) && Number.isInteger(view.used) ? `${view.pileIndex + 1},${view.used}` : "";
+  const sourceKeys = new Set((view.candidates || []).map((candidate) => oneDimensional
+    ? `0,${candidate.sourceCoins}`
+    : `${view.pileIndex},${candidate.sourceCoins}`));
+  const currentKey = Number.isInteger(view.pileIndex) && Number.isInteger(view.used)
+    ? (oneDimensional ? `${view.dp.length - 1},${view.used}` : `${view.pileIndex + 1},${view.used}`)
+    : "";
+  const rowLabels = Array.isArray(view.dpRowLabels) ? view.dpRowLabels : [];
   const dpHtml = Array.isArray(view.dp) && view.dp.length
-    ? `<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>i \ j</th>${view.dp[0].map((_, index) => `<th>${index}</th>`).join("")}</tr></thead><tbody>${view.dp.map((row, i) => `<tr><th>${i === 0 ? "0 piles" : `P1..P${i}`}</th>${row.map((value, j) => {
+    ? `<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>${oneDimensional ? "array \\ j" : "i \\ j"}</th>${view.dp[0].map((_, index) => `<th>${index}</th>`).join("")}</tr></thead><tbody>${view.dp.map((row, i) => `<tr><th>${oneDimensional ? (rowLabels[i] || `row ${i}`) : (i === 0 ? "0 piles" : `P1..P${i}`)}</th>${row.map((value, j) => {
       const key = `${i},${j}`;
       const classes = [key === currentKey ? "current" : "", sourceKeys.has(key) ? "source" : "", view.phase === "done" && i === view.n && j === view.k ? "answer" : ""].filter(Boolean).join(" ");
       return `<td class="${classes}">${requestedVizEsc(value)}</td>`;
@@ -70,20 +81,26 @@ function renderCoins2218View(step) {
     : requestedVizEmpty("dp = []");
 
   const formula = view.phase === "state" && Number.isInteger(view.used)
-    ? `<div class="rv-focus-equation"><span>${vi ? "Đang tính" : "Computing"}</span><strong>dp[${view.pileIndex + 1}][${view.used}]</strong><span>= max theo take</span><b>${view.bestValue === null ? "−∞" : requestedVizEsc(view.bestValue)}</b></div>`
+    ? `<div class="rv-focus-equation"><span>${vi ? "Đang tính" : "Computing"}</span><strong>${oneDimensional ? `new_dp[${view.used}]` : `dp[${view.pileIndex + 1}][${view.used}]`}</strong><span>= max theo take</span><b>${view.bestValue === null ? "−∞" : requestedVizEsc(view.bestValue)}</b></div>`
     : view.phase === "done"
       ? `<div class="rv-focus-equation success"><span>${vi ? "Đúng" : "Exactly"}</span><strong>${view.k} coins</strong><span>${vi ? "giá trị lớn nhất" : "maximum value"}</span><b>${requestedVizEsc(view.answer)}</b></div>`
-      : `<div class="rv-focus-equation"><span>${vi ? "Quy tắc" : "Rule"}</span><strong>dp[i][j]</strong><span>= max(dp[i−1][j−t] + prefix[t])</span></div>`;
+      : oneDimensional
+        ? `<div class="rv-focus-equation"><span>${vi ? "Quy tắc" : "Rule"}</span><strong>new_dp[j]</strong><span>= max(new_dp[j], dp[j−x] + prefix[x])</span></div>`
+        : `<div class="rv-focus-equation"><span>${vi ? "Quy tắc" : "Rule"}</span><strong>dp[i][j]</strong><span>= max(dp[i−1][j−t] + prefix[t])</span></div>`;
 
   requestedVizSet(`${requestedVizPhases(phases, phaseIndex)}
     ${formula}
     <div class="rv-piles">${pilesHtml}</div>
     <div class="rv-two-column rv-coins-workspace">
       <section class="rv-panel"><h4>${vi ? "Các lựa chọn cho pile hiện tại" : "Choices for the current pile"}</h4><div class="rv-candidates">${candidatesHtml}</div></section>
-      <section class="rv-panel"><h4>${vi ? "Bảng DP — tím: nguồn, vàng: đích" : "DP table — purple: sources, amber: destination"}</h4>${dpHtml}</section>
+      <section class="rv-panel"><h4>${oneDimensional
+        ? (view.dp.length > 1
+          ? (vi ? "Hai snapshot O(k) — tím: dp nguồn, vàng: new_dp đích" : "Two O(k) snapshots — purple: source dp, amber: destination new_dp")
+          : (vi ? "Trạng thái dp một chiều — O(k) bộ nhớ" : "One-dimensional dp state — O(k) space"))
+        : (vi ? "Bảng DP — tím: nguồn, vàng: đích" : "DP table — purple: sources, amber: destination")}</h4>${dpHtml}</section>
     </div>
     ${view.omitted ? `<div class="rv-callout">${vi ? "Trace dài đã được rút gọn; bảng và đáp án vẫn đầy đủ." : "The long trace was shortened; the table and answer are complete."}</div>` : ""}`,
-  vi ? `Minh họa bài 2218 với ${view.n} pile và k=${view.k}` : `Problem 2218 visualization with ${view.n} piles and k=${view.k}`);
+  vi ? `Minh họa bài 2218, cách ${approach}, với ${view.n} pile và k=${view.k}` : `Problem 2218 approach ${approach} with ${view.n} piles and k=${view.k}`);
 }
 
 // ─── #9006: BFS shortest path ───────────────────────────────────────────────

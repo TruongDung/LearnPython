@@ -48,15 +48,9 @@ function buildSteps2218(input, params = {}) {
   }
 
   const n = piles.length;
-  const prefixes = piles.map((pile) => {
-    const prefix = [0];
-    for (const coin of pile) prefix.push(prefix[prefix.length - 1] + coin);
-    return prefix;
-  });
+  const prefixes = piles.map(() => [0]);
   const dp = Array.from({ length: n + 1 }, () => Array(k + 1).fill(Number.NEGATIVE_INFINITY));
   const choice = Array.from({ length: n + 1 }, () => Array(k + 1).fill(-1));
-  dp[0][0] = 0;
-  choice[0][0] = 0;
 
   const steps = [];
   let omitted = false;
@@ -83,17 +77,24 @@ function buildSteps2218(input, params = {}) {
       highlight: [],
       mark: [],
       final: Boolean(options.final),
-      codeLines: options.codeLines || [],
+      codeLines: [options.line],
       vars: options.vars || [],
       note: options.note,
       coins2218View: {
+        approach: 1,
         phase: options.phase,
+        operation: options.operation,
         n,
         k,
         totalCoins,
         piles: pileData(),
         pileIndex: options.pileIndex ?? null,
         used: options.used ?? null,
+        coinIndex: options.coinIndex ?? null,
+        take: options.take ?? null,
+        sourceCoins: options.sourceCoins ?? null,
+        reachable: options.reachable ?? null,
+        updated: options.updated ?? null,
         candidates,
         bestTake: options.bestTake ?? null,
         bestValue: options.bestValue ?? null,
@@ -107,17 +108,60 @@ function buildSteps2218(input, params = {}) {
 
   record({
     phase: "init",
-    title: label("Định nghĩa trạng thái DP", "Define the DP state"),
-    codeLines: [4, 5],
+    operation: "bind-class",
+    line: 1,
+    title: label("Khai báo lớp Solution", "Bind the Solution class"),
+    vars: [{ name: "piles", value: n }, { name: "k", value: k }],
+    note: label(
+      "Lớp chứa lời giải group-knapsack cho các prefix của từng pile.",
+      "The class contains the group-knapsack solution over pile prefixes.",
+    ),
+  });
+  record({
+    phase: "init",
+    operation: "enter-method",
+    line: 2,
+    title: label("Gọi maxValueOfCoins", "Enter maxValueOfCoins"),
+    vars: [{ name: "piles", value: n }, { name: "k", value: k }],
+    note: label(
+      `Cần lấy đúng ${k} coin từ ${n} pile.`,
+      `Take exactly ${k} coins from ${n} piles.`,
+    ),
+  });
+  record({
+    phase: "init",
+    operation: "set-n",
+    line: 3,
+    title: label(`n = ${n}`, `n = ${n}`),
+    vars: [{ name: "n", value: n }, { name: "total coins", value: totalCoins }, { name: "k", value: k }],
+    note: label("n là số pile.", "n is the number of piles."),
+  });
+  record({
+    phase: "init",
+    operation: "allocate-dp",
+    line: 4,
+    title: label("Khởi tạo bảng DP bằng −∞", "Allocate the DP table with −∞"),
     vars: [
-      { name: "piles", value: n },
-      { name: "total coins", value: totalCoins },
+      { name: "rows", value: n + 1 },
+      { name: "columns", value: k + 1 },
       { name: "k", value: k },
-      { name: "dp[0][0]", value: 0 },
     ],
     note: label(
-      "Mỗi pile chỉ được lấy một prefix từ trên xuống. dp[i][j] lưu giá trị tốt nhất khi lấy đúng j coin từ i pile đầu; chỉ dp[0][0] khả thi lúc đầu.",
-      "Each pile contributes only a top prefix. dp[i][j] is the best value using exactly j coins from the first i piles; initially only dp[0][0] is reachable.",
+      "dp[i][j] lưu giá trị lớn nhất khi lấy đúng j coin từ i pile đầu. −∞ biểu thị trạng thái chưa thể đạt tới.",
+      "dp[i][j] stores the best value from exactly j coins using the first i piles. −∞ marks an unreachable state.",
+    ),
+  });
+  dp[0][0] = 0;
+  choice[0][0] = 0;
+  record({
+    phase: "init",
+    operation: "seed-base-case",
+    line: 5,
+    title: label("dp[0][0] = 0", "dp[0][0] = 0"),
+    vars: [{ name: "dp[0][0]", value: 0 }],
+    note: label(
+      "Không dùng pile nào và lấy 0 coin cho tổng giá trị 0; đây là trạng thái nguồn duy nhất lúc đầu.",
+      "Using no piles and taking zero coins has value 0; this is the only initial source state.",
     ),
   });
 
@@ -125,31 +169,135 @@ function buildSteps2218(input, params = {}) {
     const pile = piles[pileIndex];
     record({
       phase: "pile",
+      operation: "select-pile",
+      line: 6,
       pileIndex,
-      title: label(`Pile ${pileIndex + 1}: tính prefix sum`, `Pile ${pileIndex + 1}: build prefix sums`),
-      codeLines: [7, 8],
+      title: label(`Bắt đầu pile ${pileIndex + 1}`, `Start pile ${pileIndex + 1}`),
       vars: [
+        { name: "i", value: pileIndex + 1 },
         { name: "pile", value: `[${pile.join(", ")}]` },
-        { name: "prefix", value: `[${prefixes[pileIndex].join(", ")}]` },
       ],
       note: label(
-        `prefix[t] là tổng của t coin trên cùng. Với pile này: [${prefixes[pileIndex].join(", ")}]. Nhờ đó mỗi lựa chọn take được tính O(1).`,
-        `prefix[t] is the value of the top t coins. For this pile: [${prefixes[pileIndex].join(", ")}]. Each take choice is then O(1).`,
+        `Xử lý pile ${pileIndex + 1}; mọi lựa chọn hợp lệ phải lấy một prefix từ trên xuống.`,
+        `Process pile ${pileIndex + 1}; every legal choice takes a top prefix.`,
       ),
     });
+    prefixes[pileIndex] = [0];
+    record({
+      phase: "pile",
+      operation: "init-prefix",
+      line: 7,
+      pileIndex,
+      title: label("prefix = [0]", "prefix = [0]"),
+      vars: [{ name: "prefix", value: "[0]" }],
+      note: label(
+        "Lấy 0 coin từ pile hiện tại có giá trị 0.",
+        "Taking zero coins from the current pile has value 0.",
+      ),
+    });
+    for (let coinIndex = 0; coinIndex < pile.length; coinIndex++) {
+      const coin = pile[coinIndex];
+      prefixes[pileIndex].push(prefixes[pileIndex][prefixes[pileIndex].length - 1] + coin);
+      record({
+        phase: "pile",
+        operation: "append-prefix",
+        line: 8,
+        pileIndex,
+        coinIndex,
+        title: label(
+          `Thêm coin ${coin}: prefix[${coinIndex + 1}] = ${prefixes[pileIndex][coinIndex + 1]}`,
+          `Add coin ${coin}: prefix[${coinIndex + 1}] = ${prefixes[pileIndex][coinIndex + 1]}`,
+        ),
+        vars: [
+          { name: "coin", value: coin },
+          { name: "prefix", value: `[${prefixes[pileIndex].join(", ")}]` },
+        ],
+        note: label(
+          `prefix[${coinIndex + 1}] là tổng của ${coinIndex + 1} coin trên cùng.`,
+          `prefix[${coinIndex + 1}] is the value of the top ${coinIndex + 1} coin(s).`,
+        ),
+      });
+    }
 
     for (let used = 0; used <= k; used++) {
       const candidates = [];
       let bestValue = Number.NEGATIVE_INFINITY;
       let bestTake = -1;
       const maxTake = Math.min(pile.length, used);
+      record({
+        phase: "state",
+        operation: "select-used",
+        line: 9,
+        pileIndex,
+        used,
+        candidates,
+        bestTake,
+        bestValue: null,
+        title: label(`Tính dp[${pileIndex + 1}][${used}]`, `Compute dp[${pileIndex + 1}][${used}]`),
+        vars: [
+          { name: "i", value: pileIndex + 1 },
+          { name: "used", value: used },
+          { name: "max take", value: maxTake },
+        ],
+        note: label(
+          `Thử mọi take từ 0 đến ${maxTake} cho ô đích này.`,
+          `Try every take from 0 through ${maxTake} for this destination cell.`,
+        ),
+      });
       for (let take = 0; take <= maxTake; take++) {
         const sourceCoins = used - take;
         const previous = dp[pileIndex][sourceCoins];
-        if (!Number.isFinite(previous)) continue;
+        const reachable = Number.isFinite(previous);
+        record({
+          phase: "state",
+          operation: "select-take",
+          line: 10,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          candidates,
+          bestTake,
+          bestValue: Number.isFinite(bestValue) ? bestValue : null,
+          title: label(`Thử take = ${take}`, `Try take = ${take}`),
+          vars: [
+            { name: "used", value: used },
+            { name: "take", value: take },
+            { name: "used - take", value: sourceCoins },
+          ],
+          note: label(
+            `Lựa chọn này cần trạng thái nguồn dp[${pileIndex}][${sourceCoins}].`,
+            `This choice needs source state dp[${pileIndex}][${sourceCoins}].`,
+          ),
+        });
+        record({
+          phase: "state",
+          operation: reachable ? "reachable-source" : "unreachable-source",
+          line: 11,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          reachable,
+          candidates,
+          bestTake,
+          bestValue: Number.isFinite(bestValue) ? bestValue : null,
+          title: reachable
+            ? label(`dp[${pileIndex}][${sourceCoins}] = ${previous} khả thi`, `dp[${pileIndex}][${sourceCoins}] = ${previous} is reachable`)
+            : label(`dp[${pileIndex}][${sourceCoins}] = −∞`, `dp[${pileIndex}][${sourceCoins}] = −∞`),
+          vars: [
+            { name: "source", value: `dp[${pileIndex}][${sourceCoins}]` },
+            { name: "previous", value: reachable ? previous : "−∞" },
+            { name: "reachable", value: reachable },
+          ],
+          note: reachable
+            ? label("Nguồn khả thi nên thực hiện phép chuyển trạng thái.", "The source is reachable, so execute the transition.")
+            : label("Nguồn không khả thi nên bỏ qua dòng cập nhật.", "The source is unreachable, so skip the update line."),
+        });
+        if (!reachable) continue;
         const pileValue = prefixes[pileIndex][take];
         const total = previous + pileValue;
-        candidates.push({
+        const candidate = {
           take,
           sourceCoins,
           previous,
@@ -157,49 +305,52 @@ function buildSteps2218(input, params = {}) {
           total,
           coins: pile.slice(0, take),
           winner: false,
-        });
+        };
+        candidates.push(candidate);
+        let updated = false;
         if (total > bestValue) {
+          candidates.forEach((item) => { item.winner = false; });
           bestValue = total;
           bestTake = take;
+          candidate.winner = true;
+          dp[pileIndex + 1][used] = bestValue;
+          choice[pileIndex + 1][used] = bestTake;
+          updated = true;
         }
+        record({
+          phase: "state",
+          operation: updated ? "update-cell" : "keep-cell",
+          line: 12,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          reachable: true,
+          updated,
+          candidates,
+          bestTake,
+          bestValue,
+          title: updated
+            ? label(`Cập nhật dp[${pileIndex + 1}][${used}] = ${bestValue}`, `Update dp[${pileIndex + 1}][${used}] = ${bestValue}`)
+            : label(`Giữ dp[${pileIndex + 1}][${used}] = ${bestValue}`, `Keep dp[${pileIndex + 1}][${used}] = ${bestValue}`),
+          vars: [
+            { name: "previous", value: previous },
+            { name: "prefix[take]", value: pileValue },
+            { name: "candidate", value: total },
+            { name: "updated", value: updated },
+            { name: `dp[${pileIndex + 1}][${used}]`, value: bestValue },
+          ],
+          note: updated
+            ? label(
+              `${previous} + ${pileValue} = ${total} tốt hơn giá trị cũ, nên ghi vào ô DP.`,
+              `${previous} + ${pileValue} = ${total} improves the old value, so write it to the DP cell.`,
+            )
+            : label(
+              `${previous} + ${pileValue} = ${total} không tốt hơn ${bestValue}, nên giữ nguyên ô DP.`,
+              `${previous} + ${pileValue} = ${total} does not improve ${bestValue}, so keep the DP cell.`,
+            ),
+        });
       }
-      if (bestTake >= 0) {
-        dp[pileIndex + 1][used] = bestValue;
-        choice[pileIndex + 1][used] = bestTake;
-        const winner = candidates.find((candidate) => candidate.take === bestTake);
-        if (winner) winner.winner = true;
-      }
-
-      const formula = candidates.length
-        ? candidates.map((candidate) => `t=${candidate.take}: ${candidate.previous}+${candidate.pileValue}=${candidate.total}`).join("; ")
-        : "không có trạng thái nguồn khả thi";
-      record({
-        phase: "state",
-        pileIndex,
-        used,
-        candidates,
-        bestTake,
-        bestValue: Number.isFinite(bestValue) ? bestValue : null,
-        title: Number.isFinite(bestValue)
-          ? label(`dp[${pileIndex + 1}][${used}] = ${bestValue}`, `dp[${pileIndex + 1}][${used}] = ${bestValue}`)
-          : label(`dp[${pileIndex + 1}][${used}] không khả thi`, `dp[${pileIndex + 1}][${used}] is unreachable`),
-        codeLines: [9, 10, 11, 12],
-        vars: [
-          { name: "pile i", value: pileIndex + 1 },
-          { name: "j (coins total)", value: used },
-          { name: "take", value: bestTake >= 0 ? bestTake : "—" },
-          { name: `dp[${pileIndex + 1}][${used}]`, value: Number.isFinite(bestValue) ? bestValue : "−∞" },
-        ],
-        note: Number.isFinite(bestValue)
-          ? label(
-            `Thử lấy t = 0..${maxTake} coin trên pile ${pileIndex + 1}. ${formula}. Tốt nhất là t=${bestTake}, nên ghi ${bestValue} vào ô đích.`,
-            `Try t = 0..${maxTake} top coins from pile ${pileIndex + 1}. ${formula}. The best is t=${bestTake}, so write ${bestValue} to the destination cell.`,
-          )
-          : label(
-            "Không thể lấy đúng số coin này từ các pile đã xét; ô giữ trạng thái không khả thi.",
-            "This exact coin count cannot be formed from the processed piles, so the state remains unreachable.",
-          ),
-      });
     }
   }
 
@@ -217,11 +368,12 @@ function buildSteps2218(input, params = {}) {
     .join(", ");
   record({
     phase: "done",
+    operation: "return-answer",
+    line: 13,
     pileIndex: n - 1,
     used: k,
     selectedCounts,
     title: label(`Đáp án = ${dp[n][k]}`, `Answer = ${dp[n][k]}`),
-    codeLines: [13],
     vars: [
       { name: "answer", value: dp[n][k] },
       { name: "take per pile", value: `[${selectedCounts.join(", ")}]` },
@@ -240,6 +392,330 @@ function buildSteps2218(input, params = {}) {
   });
 
   return { original: piles, k, selectedCounts, answer: dp[n][k], steps };
+}
+
+function buildSteps2218OneDimensional(input, params = {}) {
+  const piles = parsePiles2218(input);
+  const k = Number(params.k);
+  const totalCoins = piles.reduce((total, pile) => total + pile.length, 0);
+  if (!Number.isInteger(k) || k < 1 || k > MAX_K || k > totalCoins) {
+    throw new Error(`k phải là số nguyên trong [1, min(${MAX_K}, tổng số coin=${totalCoins})]`);
+  }
+
+  const n = piles.length;
+  const prefixes = piles.map(() => [0]);
+  let dp = Array(k + 1).fill(Number.NEGATIVE_INFINITY);
+  let newDp = null;
+  const steps = [];
+  let omitted = false;
+
+  const displayRow = (row) => row.map((value) => Number.isFinite(value) ? value : "·");
+  const displayDp = () => newDp === null ? [displayRow(dp)] : [displayRow(dp), displayRow(newDp)];
+  const rowLabels = () => newDp === null ? ["dp"] : ["dp (previous)", "new_dp"];
+  const pileData = () => piles.map((coins, index) => ({
+    index,
+    coins: [...coins],
+    prefix: [...prefixes[index]],
+  }));
+
+  function record(options) {
+    if (steps.length >= MAX_TRACE_STEPS && !options.final) {
+      omitted = true;
+      return;
+    }
+    const candidates = (options.candidates || []).map((candidate) => ({
+      ...candidate,
+      coins: [...candidate.coins],
+    }));
+    steps.push({
+      title: options.title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeBlock: 2,
+      codeLines: [options.line],
+      vars: options.vars || [],
+      note: options.note,
+      coins2218View: {
+        approach: 2,
+        phase: options.phase,
+        operation: options.operation,
+        n,
+        k,
+        totalCoins,
+        piles: pileData(),
+        pileIndex: options.pileIndex ?? null,
+        used: options.used ?? null,
+        coinIndex: options.coinIndex ?? null,
+        take: options.take ?? null,
+        sourceCoins: options.sourceCoins ?? null,
+        reachable: options.reachable ?? null,
+        updated: options.updated ?? null,
+        candidates,
+        bestTake: options.bestTake ?? null,
+        bestValue: options.bestValue ?? null,
+        dp: displayDp(),
+        dpRowLabels: rowLabels(),
+        selectedCounts: null,
+        answer: options.final ? dp[k] : null,
+        omitted,
+      },
+    });
+  }
+
+  record({
+    phase: "init",
+    operation: "bind-class",
+    line: 1,
+    title: label("Khai báo lớp Solution", "Bind the Solution class"),
+    vars: [{ name: "piles", value: n }, { name: "k", value: k }],
+    note: label("Cách 2 nén bảng DP xuống một chiều.", "Approach 2 compresses the DP table to one dimension."),
+  });
+  record({
+    phase: "init",
+    operation: "enter-method",
+    line: 2,
+    title: label("Gọi maxValueOfCoins", "Enter maxValueOfCoins"),
+    vars: [{ name: "piles", value: n }, { name: "k", value: k }],
+    note: label(`Cần lấy đúng ${k} coin từ ${n} pile.`, `Take exactly ${k} coins from ${n} piles.`),
+  });
+  record({
+    phase: "init",
+    operation: "set-negative-infinity",
+    line: 3,
+    title: label("Đặt NEG_INF = −∞", "Set NEG_INF = −∞"),
+    vars: [{ name: "NEG_INF", value: "−∞" }],
+    note: label("−∞ phân biệt trạng thái chưa thể lấy đúng số coin yêu cầu.", "−∞ marks an exact-count state that is not reachable yet."),
+  });
+  record({
+    phase: "init",
+    operation: "allocate-dp",
+    line: 4,
+    title: label("Khởi tạo dp một chiều bằng −∞", "Allocate the one-dimensional dp with −∞"),
+    vars: [{ name: "dp length", value: k + 1 }, { name: "k", value: k }],
+    note: label("dp[j] là tổng lớn nhất khi lấy đúng j coin từ các pile đã xử lý.", "dp[j] is the best value for taking exactly j coins from the processed piles."),
+  });
+  dp[0] = 0;
+  record({
+    phase: "init",
+    operation: "seed-base-case",
+    line: 5,
+    title: label("dp[0] = 0", "dp[0] = 0"),
+    vars: [{ name: "dp[0]", value: 0 }],
+    note: label("Lấy đúng 0 coin có tổng bằng 0; các số lượng khác vẫn chưa thể đạt tới.", "Taking exactly zero coins has value 0; every other count remains unreachable."),
+  });
+
+  for (let pileIndex = 0; pileIndex < n; pileIndex++) {
+    const pile = piles[pileIndex];
+    record({
+      phase: "pile",
+      operation: "select-pile",
+      line: 7,
+      pileIndex,
+      title: label(`Bắt đầu pile ${pileIndex + 1}`, `Start pile ${pileIndex + 1}`),
+      vars: [{ name: "pile", value: `[${pile.join(", ")}]` }],
+      note: label("Mỗi lựa chọn hợp lệ là một prefix của pile này.", "Every legal choice is a prefix of this pile."),
+    });
+
+    prefixes[pileIndex] = [0];
+    record({
+      phase: "pile",
+      operation: "init-prefix",
+      line: 8,
+      pileIndex,
+      title: label("prefix = [0]", "prefix = [0]"),
+      vars: [{ name: "prefix", value: "[0]" }],
+      note: label("Lấy 0 coin từ pile hiện tại có giá trị 0.", "Taking zero coins from this pile has value 0."),
+    });
+
+    for (let coinIndex = 0; coinIndex < pile.length; coinIndex++) {
+      const coin = pile[coinIndex];
+      record({
+        phase: "pile",
+        operation: "select-coin",
+        line: 10,
+        pileIndex,
+        coinIndex,
+        title: label(`Đọc coin ${coin}`, `Read coin ${coin}`),
+        vars: [{ name: "coin", value: coin }, { name: "index", value: coinIndex }],
+        note: label("Vòng lặp đọc coin tiếp theo từ trên xuống.", "The loop reads the next coin from top to bottom."),
+      });
+      prefixes[pileIndex].push(prefixes[pileIndex][prefixes[pileIndex].length - 1] + coin);
+      record({
+        phase: "pile",
+        operation: "append-prefix",
+        line: 11,
+        pileIndex,
+        coinIndex,
+        title: label(`prefix[${coinIndex + 1}] = ${prefixes[pileIndex][coinIndex + 1]}`, `prefix[${coinIndex + 1}] = ${prefixes[pileIndex][coinIndex + 1]}`),
+        vars: [{ name: "coin", value: coin }, { name: "prefix", value: `[${prefixes[pileIndex].join(", ")}]` }],
+        note: label(`Đây là tổng khi lấy ${coinIndex + 1} coin trên cùng.`, `This is the value of taking the top ${coinIndex + 1} coin(s).`),
+      });
+    }
+
+    newDp = [...dp];
+    record({
+      phase: "copy",
+      operation: "copy-dp",
+      line: 13,
+      pileIndex,
+      title: label("Sao chép dp sang new_dp", "Copy dp into new_dp"),
+      vars: [{ name: "new_dp", value: `[${displayRow(newDp).join(", ")}]` }],
+      note: label("Bản sao giữ sẵn trường hợp x = 0: không lấy coin từ pile hiện tại.", "The copy preserves the x = 0 case: take no coin from the current pile."),
+    });
+
+    for (let used = 1; used <= k; used++) {
+      const candidates = [];
+      let bestValue = newDp[used];
+      let bestTake = Number.isFinite(bestValue) ? 0 : -1;
+      if (Number.isFinite(bestValue)) {
+        candidates.push({
+          take: 0,
+          sourceCoins: used,
+          previous: dp[used],
+          pileValue: 0,
+          total: dp[used],
+          coins: [],
+          winner: true,
+        });
+      }
+      record({
+        phase: "state",
+        operation: "select-used",
+        line: 15,
+        pileIndex,
+        used,
+        candidates,
+        bestTake,
+        bestValue: Number.isFinite(bestValue) ? bestValue : null,
+        title: label(`Tính new_dp[${used}]`, `Compute new_dp[${used}]`),
+        vars: [{ name: "j", value: used }, { name: "current", value: Number.isFinite(bestValue) ? bestValue : "−∞" }],
+        note: label("Xét số coin cần lấy chính xác là j.", "Consider the exact target count j."),
+      });
+
+      const maxTake = Math.min(used, pile.length);
+      for (let take = 1; take <= maxTake; take++) {
+        const sourceCoins = used - take;
+        record({
+          phase: "state",
+          operation: "select-take",
+          line: 16,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          candidates,
+          bestTake,
+          bestValue: Number.isFinite(bestValue) ? bestValue : null,
+          title: label(`Thử x = ${take}`, `Try x = ${take}`),
+          vars: [{ name: "j", value: used }, { name: "x", value: take }, { name: "j - x", value: sourceCoins }],
+          note: label(`Thử lấy ${take} coin trên cùng của pile này.`, `Try taking the top ${take} coin(s) from this pile.`),
+        });
+
+        const previous = dp[sourceCoins];
+        const reachable = Number.isFinite(previous);
+        record({
+          phase: "state",
+          operation: reachable ? "reachable-source" : "unreachable-source",
+          line: 17,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          reachable,
+          candidates,
+          bestTake,
+          bestValue: Number.isFinite(bestValue) ? bestValue : null,
+          title: reachable
+            ? label(`dp[${sourceCoins}] = ${previous} khả thi`, `dp[${sourceCoins}] = ${previous} is reachable`)
+            : label(`dp[${sourceCoins}] = −∞`, `dp[${sourceCoins}] = −∞`),
+          vars: [{ name: `dp[${sourceCoins}]`, value: reachable ? previous : "−∞" }, { name: "reachable", value: reachable }],
+          note: reachable
+            ? label("Nguồn khả thi nên chạy phép cập nhật ở dòng kế tiếp.", "The source is reachable, so execute the update on the next line.")
+            : label("Nguồn chưa thể đạt tới nên bỏ qua phép cập nhật.", "The source is unreachable, so skip the update."),
+        });
+        if (!reachable) continue;
+
+        const pileValue = prefixes[pileIndex][take];
+        const total = previous + pileValue;
+        const candidate = {
+          take,
+          sourceCoins,
+          previous,
+          pileValue,
+          total,
+          coins: pile.slice(0, take),
+          winner: false,
+        };
+        candidates.push(candidate);
+        const oldValue = newDp[used];
+        const updated = total > oldValue;
+        if (updated) {
+          candidates.forEach((item) => { item.winner = false; });
+          newDp[used] = total;
+          bestValue = total;
+          bestTake = take;
+          candidate.winner = true;
+        }
+        record({
+          phase: "state",
+          operation: updated ? "update-cell" : "keep-cell",
+          line: 18,
+          pileIndex,
+          used,
+          take,
+          sourceCoins,
+          reachable: true,
+          updated,
+          candidates,
+          bestTake,
+          bestValue: Number.isFinite(newDp[used]) ? newDp[used] : null,
+          title: updated
+            ? label(`Cập nhật new_dp[${used}] = ${newDp[used]}`, `Update new_dp[${used}] = ${newDp[used]}`)
+            : label(`Giữ new_dp[${used}] = ${Number.isFinite(newDp[used]) ? newDp[used] : "−∞"}`, `Keep new_dp[${used}] = ${Number.isFinite(newDp[used]) ? newDp[used] : "−∞"}`),
+          vars: [
+            { name: "new_dp[j] before", value: Number.isFinite(oldValue) ? oldValue : "−∞" },
+            { name: "dp[j - x]", value: previous },
+            { name: "prefix[x]", value: pileValue },
+            { name: "candidate", value: total },
+            { name: "updated", value: updated },
+          ],
+          note: updated
+            ? label(`${previous} + ${pileValue} = ${total} tốt hơn giá trị cũ.`, `${previous} + ${pileValue} = ${total} improves the old value.`)
+            : label(`${previous} + ${pileValue} = ${total} không tốt hơn giá trị đang có.`, `${previous} + ${pileValue} = ${total} does not improve the current value.`),
+        });
+      }
+    }
+
+    dp = newDp;
+    newDp = null;
+    record({
+      phase: "copy",
+      operation: "commit-dp",
+      line: 23,
+      pileIndex,
+      title: label(`Gán dp = new_dp sau pile ${pileIndex + 1}`, `Assign dp = new_dp after pile ${pileIndex + 1}`),
+      vars: [{ name: "dp", value: `[${displayRow(dp).join(", ")}]` }],
+      note: label("Pile tiếp theo chỉ được đọc từ snapshot đã hoàn tất này.", "The next pile reads only from this completed snapshot."),
+    });
+  }
+
+  record({
+    phase: "done",
+    operation: "return-answer",
+    line: 25,
+    pileIndex: n - 1,
+    used: k,
+    title: label(`Đáp án = ${dp[k]}`, `Answer = ${dp[k]}`),
+    vars: [{ name: "dp[k]", value: dp[k] }, { name: "k", value: k }],
+    note: omitted
+      ? label("Trace dài đã được rút gọn, nhưng toàn bộ DP vẫn được tính và dp[k] là đáp án chính xác.", "The long trace was shortened, but the full DP was computed and dp[k] is the exact answer.")
+      : label("Sau khi xử lý mọi pile, dp[k] là giá trị lớn nhất khi lấy đúng k coin.", "After every pile is processed, dp[k] is the maximum value for taking exactly k coins."),
+    final: true,
+  });
+
+  return { original: piles, k, answer: dp[k], steps };
 }
 
 module.exports = {
@@ -264,19 +740,30 @@ module.exports = {
     inputLabel: label("piles: [[trên,...,dưới], ...]", "piles: [[top,...,bottom], ...]"),
     extraParams: [
       { key: "k", label: label("k (số coin phải lấy)", "k (exact coins to take)"), default: 2, min: 1, max: MAX_K },
+      {
+        key: "approach",
+        label: label("Cách giải", "Approach"),
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: label("Cách 1: DP 2D + truy vết", "Approach 1: 2D DP + reconstruction") },
+          { value: "2", label: label("Cách 2: DP 1D O(k)", "Approach 2: 1D DP O(k)") },
+        ],
+      },
     ],
     approach: [
       label("Tính prefix[t] cho mỗi pile: giá trị khi lấy đúng t coin trên cùng.", "Build prefix[t] for each pile: the value of taking exactly its top t coins."),
       label("dp[i][j] là giá trị lớn nhất khi lấy đúng j coin từ i pile đầu.", "dp[i][j] is the maximum value from exactly j coins using the first i piles."),
       label("Thử take coin ở pile hiện tại: dp[i][j] = max(dp[i−1][j−take] + prefix[take]).", "Try each take count in the current pile: dp[i][j] = max(dp[i−1][j−take] + prefix[take])."),
       label("Lưu lựa chọn tốt nhất để dựng lại số coin lấy từ từng pile.", "Store the best choice to reconstruct how many coins are taken from every pile."),
+      label("Cách 2 dùng dp một chiều và new_dp riêng cho từng pile, giảm bộ nhớ xuống O(k) mà không tái sử dụng cùng một pile.", "Approach 2 uses one-dimensional dp and a separate new_dp per pile, reducing space to O(k) without reusing the same pile."),
     ],
     complexity: {
       time: "O(n · k · maxPile)",
-      space: "O(n · k)",
+      space: "O(n · k) / O(k)",
       note: label(
-        "Có thể tối ưu phần tính đáp án xuống O(k); visualization giữ toàn bộ bảng để thấy chuyển trạng thái và truy vết.",
-        "The computation can use O(k) space; the visualization keeps the full table to show transitions and reconstruction.",
+        "Cách 1 giữ bảng O(n·k) để truy vết; Cách 2 chỉ giữ dp và new_dp, mỗi mảng O(k).",
+        "Approach 1 keeps an O(n·k) table for reconstruction; approach 2 keeps only dp and new_dp, each O(k).",
       ),
     },
     code: [
@@ -294,8 +781,38 @@ module.exports = {
       "                        dp[i][used] = max(dp[i][used], dp[i - 1][used - take] + prefix[take])",
       "        return dp[n][k]",
     ],
-    debugMode: "semantic",
+    code2: [
+      "class Solution:",
+      "    def maxValueOfCoins(self, piles: list[list[int]], k: int) -> int:",
+      "        NEG_INF = float(\"-inf\")",
+      "        dp = [NEG_INF] * (k + 1)",
+      "        dp[0] = 0",
+      "",
+      "        for pile in piles:",
+      "            prefix = [0]",
+      "",
+      "            for coin in pile:",
+      "                prefix.append(prefix[-1] + coin)",
+      "",
+      "            new_dp = dp[:]",
+      "",
+      "            for j in range(1, k + 1):",
+      "                for x in range(1, min(j, len(pile)) + 1):",
+      "                    if dp[j - x] != NEG_INF:",
+      "                        new_dp[j] = max(",
+      "                            new_dp[j],",
+      "                            dp[j - x] + prefix[x],",
+      "                        )",
+      "",
+      "            dp = new_dp",
+      "",
+      "        return dp[k]",
+    ],
+    codeLabel: label("Cách 1 · DP 2D + truy vết", "Approach 1 · 2D DP + reconstruction"),
+    code2Label: label("Cách 2 · DP 1D O(k)", "Approach 2 · 1D DP O(k)"),
+    debugMode: "line-by-line",
     liveArgs: (input, params) => [parsePiles2218(input), Number(params.k)],
     builder: buildSteps2218,
+    builder2: buildSteps2218OneDimensional,
   },
 };
