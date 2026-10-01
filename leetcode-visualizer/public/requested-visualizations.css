@@ -336,25 +336,46 @@ body[data-theme="light"] .requested-viz {
 .rv-find-path > i { color: var(--rv-purple); }
 
 .rv-flight-workspace { grid-template-columns: minmax(430px, 1.25fr) minmax(260px, .75fr); }
-.rv-flight-edges { display: flex; flex-wrap: wrap; gap: 5px; }
-.rv-flight-edges > span { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 7px; display: flex; gap: 6px; padding: 5px 8px; }
-.rv-flight-edges > span.active { border-color: var(--rv-amber); color: var(--rv-amber); }
-.rv-flight-edges em { color: var(--rv-muted); }
+.rv-flight-viz { display: grid; gap: 14px; }
+.rv-flight-viz .rv-panel { border-color: color-mix(in srgb, var(--rv-text) 20%, var(--rv-line)); box-shadow: 0 10px 26px color-mix(in srgb, #000 18%, transparent); }
+.rv-flight-viz .rv-panel h4 { color: var(--rv-text); font-size: 11px; font-weight: 800; letter-spacing: .045em; }
+.rv-flight-viz .rv-core-graph { background: radial-gradient(circle at center, color-mix(in srgb, var(--rv-blue) 19%, var(--rv-panel-2)), var(--rv-panel) 72%); border: 1px solid color-mix(in srgb, var(--rv-blue) 45%, var(--rv-line)); border-radius: 11px; min-height: 330px; }
+.rv-flight-viz .rv-core-edge line { opacity: 1; stroke: color-mix(in srgb, var(--rv-text) 64%, var(--rv-line)); stroke-width: 3.25; }
+.rv-flight-viz .rv-core-edge polygon { fill: color-mix(in srgb, var(--rv-text) 72%, var(--rv-line)); }
+.rv-flight-viz .rv-core-edge text { fill: var(--rv-text); font-size: 12px; font-weight: 850; stroke: var(--rv-panel); stroke-width: 7px; }
+.rv-flight-viz .rv-core-edge.current line { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--rv-amber) 70%, transparent)); stroke: var(--rv-amber); stroke-width: 6; }
+.rv-flight-viz .rv-core-edge.current polygon { fill: var(--rv-amber); }
+.rv-flight-viz .rv-core-node circle { fill: color-mix(in srgb, var(--rv-blue) 13%, var(--rv-panel-2)); stroke: color-mix(in srgb, var(--rv-text) 70%, var(--rv-line)); stroke-width: 3.5; }
+.rv-flight-viz .rv-core-node .id { fill: var(--rv-text); font-size: 15px; font-weight: 900; }
+.rv-flight-viz .rv-core-node .sub { fill: color-mix(in srgb, var(--rv-cyan) 82%, var(--rv-text)); font-size: 10px; font-weight: 800; }
+.rv-flight-viz .rv-core-node.reachable circle { fill: color-mix(in srgb, var(--rv-cyan) 18%, var(--rv-panel-2)); stroke: var(--rv-cyan); }
+.rv-flight-viz .rv-core-node.source circle { fill: color-mix(in srgb, var(--rv-cyan) 25%, var(--rv-panel-2)); stroke: var(--rv-cyan); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--rv-cyan) 55%, transparent)); }
+.rv-flight-viz .rv-core-node.target circle { fill: color-mix(in srgb, var(--rv-red) 20%, var(--rv-panel-2)); stroke: var(--rv-red); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--rv-red) 48%, transparent)); }
+.rv-flight-viz .rv-core-node.active circle { fill: color-mix(in srgb, var(--rv-amber) 27%, var(--rv-panel-2)); stroke: var(--rv-amber); stroke-width: 5; }
+.rv-flight-edges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.rv-flight-edges > span { background: color-mix(in srgb, var(--rv-text) 5%, var(--rv-panel-2)); border: 1px solid color-mix(in srgb, var(--rv-text) 28%, var(--rv-line)); border-radius: 8px; color: var(--rv-text); display: flex; font-weight: 750; gap: 8px; padding: 7px 10px; }
+.rv-flight-edges > span.active { background: color-mix(in srgb, var(--rv-amber) 15%, var(--rv-panel-2)); border-color: var(--rv-amber); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rv-amber) 40%, transparent); color: var(--rv-amber); }
+.rv-flight-edges em { color: color-mix(in srgb, var(--rv-cyan) 78%, var(--rv-text)); font-style: normal; font-weight: 850; }
 .rv-city-costs { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); }
-.rv-city-costs > span { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 8px; display: grid; padding: 8px; text-align: center; }
-.rv-city-costs small { color: var(--rv-muted); font-size: 8px; }
-.rv-city-costs b { font-size: 17px; }
+.rv-city-costs > span { background: color-mix(in srgb, var(--rv-text) 5%, var(--rv-panel-2)); border: 2px solid color-mix(in srgb, var(--rv-text) 30%, var(--rv-line)); border-radius: 9px; display: grid; min-height: 62px; padding: 10px; place-content: center; text-align: center; }
+.rv-city-costs small { color: color-mix(in srgb, var(--rv-text) 78%, var(--rv-muted)); font-size: 9px; font-weight: 750; }
+.rv-city-costs b { color: var(--rv-text); font-size: 20px; font-weight: 900; }
 .rv-city-costs > span.source { border-color: var(--rv-cyan); }
-.rv-city-costs > span.target { box-shadow: inset 0 0 0 1px var(--rv-red); }
-.rv-city-costs > span.active { background: color-mix(in srgb, var(--rv-amber) 12%, var(--rv-panel-2)); border-color: var(--rv-amber); }
+.rv-city-costs > span.source b { color: var(--rv-cyan); }
+.rv-city-costs > span.target { border-color: var(--rv-red); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rv-red) 40%, transparent); }
+.rv-city-costs > span.target b { color: var(--rv-red); }
+.rv-city-costs > span.active { background: color-mix(in srgb, var(--rv-amber) 18%, var(--rv-panel-2)); border-color: var(--rv-amber); }
 .rv-flight-vector { align-items: stretch; display: flex; gap: 5px; margin-bottom: 8px; overflow-x: auto; }
-.rv-flight-vector > label { align-content: center; color: var(--rv-muted); flex: 0 0 90px; font-size: 9px; }
-.rv-flight-vector > span { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 7px; display: grid; min-width: 52px; padding: 6px; text-align: center; }
-.rv-flight-vector small { color: var(--rv-muted); font-size: 8px; }
+.rv-flight-vector > label { align-content: center; color: var(--rv-text); flex: 0 0 105px; font-size: 10px; font-weight: 800; }
+.rv-flight-vector > span { background: color-mix(in srgb, var(--rv-blue) 8%, var(--rv-panel-2)); border: 2px solid color-mix(in srgb, var(--rv-text) 28%, var(--rv-line)); border-radius: 8px; display: grid; min-width: 56px; padding: 8px; text-align: center; }
+.rv-flight-vector small { color: color-mix(in srgb, var(--rv-text) 74%, var(--rv-muted)); font-size: 9px; font-weight: 750; }
+.rv-flight-vector b { color: var(--rv-text); font-size: 15px; }
+.rv-flight-round-panel { border-left: 4px solid var(--rv-purple) !important; }
+.rv-flight-equation { border-width: 2px; }
 .rv-flight-state { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(70px, 1fr)); }
-.rv-flight-state > span { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 8px; display: grid; padding: 7px; text-align: center; }
-.rv-flight-state small { color: var(--rv-muted); font-size: 8px; }
-.rv-flight-state b { color: var(--rv-amber); }
+.rv-flight-state > span { background: color-mix(in srgb, var(--rv-blue) 8%, var(--rv-panel-2)); border: 2px solid color-mix(in srgb, var(--rv-text) 28%, var(--rv-line)); border-radius: 8px; display: grid; padding: 9px; text-align: center; }
+.rv-flight-state small { color: color-mix(in srgb, var(--rv-text) 76%, var(--rv-muted)); font-size: 9px; font-weight: 750; }
+.rv-flight-state b { color: var(--rv-amber); font-size: 17px; }
 .rv-code-value { display: grid; gap: 4px; margin-top: 8px; }
 .rv-code-value small { color: var(--rv-muted); font-size: 8px; text-transform: uppercase; }
 .rv-code-value code { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 7px; color: var(--rv-purple); max-height: 90px; overflow: auto; padding: 7px; white-space: pre-wrap; }
