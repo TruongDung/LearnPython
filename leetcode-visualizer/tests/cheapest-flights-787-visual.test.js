@@ -66,3 +66,11 @@ test('787 ships dedicated high-contrast graph and state styles', () => {
   assert.match(css, /\.rv-flight-viz \.rv-core-node\.source circle[^}]*drop-shadow/s);
   assert.match(css, /\.rv-flight-viz \.rv-core-node\.target circle[^}]*drop-shadow/s);
 });
+
+test('787 layout stays inside the visualization panel without horizontal scrolling', () => {
+  const css = readFrontendStyles();
+  assert.match(css, /\.rv-flight-viz \{[^}]*container-type:\s*inline-size[^}]*overflow-x:\s*clip/s);
+  assert.match(css, /\.rv-flight-workspace \{[^}]*minmax\(0,\s*1\.25fr\)[^}]*minmax\(0,\s*\.75fr\)/s);
+  assert.match(css, /\.rv-flight-viz \.rv-core-graph svg \{[^}]*min-width:\s*0[^}]*width:\s*100%/s);
+  assert.match(css, /@container \(max-width:\s*700px\)\s*\{[^}]*\.rv-flight-workspace \{[^}]*grid-template-columns:\s*1fr/s);
+});

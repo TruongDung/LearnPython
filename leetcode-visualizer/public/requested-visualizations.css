@@ -335,11 +335,13 @@ body[data-theme="light"] .requested-viz {
 .rv-find-path small { color: var(--rv-muted); font-size: 8px; }
 .rv-find-path > i { color: var(--rv-purple); }
 
-.rv-flight-workspace { grid-template-columns: minmax(430px, 1.25fr) minmax(260px, .75fr); }
-.rv-flight-viz { display: grid; gap: 14px; }
+.rv-flight-workspace { grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); }
+.rv-flight-viz { container-type: inline-size; display: grid; gap: 14px; max-width: 100%; min-width: 0; overflow-x: clip; width: 100%; }
+.rv-flight-viz > * { max-width: 100%; min-width: 0; }
 .rv-flight-viz .rv-panel { border-color: color-mix(in srgb, var(--rv-text) 20%, var(--rv-line)); box-shadow: 0 10px 26px color-mix(in srgb, #000 18%, transparent); }
 .rv-flight-viz .rv-panel h4 { color: var(--rv-text); font-size: 11px; font-weight: 800; letter-spacing: .045em; }
-.rv-flight-viz .rv-core-graph { background: radial-gradient(circle at center, color-mix(in srgb, var(--rv-blue) 19%, var(--rv-panel-2)), var(--rv-panel) 72%); border: 1px solid color-mix(in srgb, var(--rv-blue) 45%, var(--rv-line)); border-radius: 11px; min-height: 330px; }
+.rv-flight-viz .rv-core-graph { background: radial-gradient(circle at center, color-mix(in srgb, var(--rv-blue) 19%, var(--rv-panel-2)), var(--rv-panel) 72%); border: 1px solid color-mix(in srgb, var(--rv-blue) 45%, var(--rv-line)); border-radius: 11px; min-height: 330px; overflow: hidden; }
+.rv-flight-viz .rv-core-graph svg { max-width: 100%; min-width: 0; width: 100%; }
 .rv-flight-viz .rv-core-edge line { opacity: 1; stroke: color-mix(in srgb, var(--rv-text) 64%, var(--rv-line)); stroke-width: 3.25; }
 .rv-flight-viz .rv-core-edge polygon { fill: color-mix(in srgb, var(--rv-text) 72%, var(--rv-line)); }
 .rv-flight-viz .rv-core-edge text { fill: var(--rv-text); font-size: 12px; font-weight: 850; stroke: var(--rv-panel); stroke-width: 7px; }
@@ -379,6 +381,17 @@ body[data-theme="light"] .requested-viz {
 .rv-code-value { display: grid; gap: 4px; margin-top: 8px; }
 .rv-code-value small { color: var(--rv-muted); font-size: 8px; text-transform: uppercase; }
 .rv-code-value code { background: var(--rv-panel-2); border: 1px solid var(--rv-line); border-radius: 7px; color: var(--rv-purple); max-height: 90px; overflow: auto; padding: 7px; white-space: pre-wrap; }
+
+@container (max-width: 700px) {
+  .rv-flight-workspace { grid-template-columns: 1fr; }
+  .rv-flight-cost-panel .rv-city-costs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@container (max-width: 440px) {
+  .rv-flight-cost-panel .rv-city-costs, .rv-flight-state { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rv-flight-vector { display: grid; grid-template-columns: minmax(72px, 1fr) repeat(2, minmax(50px, 1fr)); overflow-x: visible; }
+  .rv-flight-vector > label { grid-row: span 2; }
+}
 
 .rv-mask-workspace { grid-template-columns: minmax(400px, 1.15fr) minmax(270px, .85fr); }
 .rv-mask-bits { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); }
