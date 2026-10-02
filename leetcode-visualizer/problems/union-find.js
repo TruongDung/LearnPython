@@ -3385,13 +3385,15 @@ function buildSteps685(input) {
     throw new Error("Each directed edge must contain two positive integer nodes");
   }
 
-  const n = Math.max(...edges.flat());
+  const n = edges.length;
+  const maxNode = Math.max(...edges.flat());
   if (n > 12) throw new Error("Redundant Connection II visualization supports at most 12 nodes");
-  const incoming = new Array(n + 1).fill(0);
+  if (maxNode > n) throw new Error("Node labels must be between 1 and the number of edges");
+  const parent = Array.from({ length: n + 1 }, (_, index) => index);
   const uf = Array.from({ length: n + 1 }, (_, index) => index);
   const steps = [];
-  let first = null;
-  let second = null;
+  let candidate1 = null;
+  let candidate2 = null;
   let skippedIndex = -1;
   let cycle = null;
   const processed = new Set();
@@ -3401,12 +3403,11 @@ function buildSteps685(input) {
     while (uf[root] !== root) root = uf[root];
     return root;
   };
-  const find = (node) => {
-    if (uf[node] !== node) uf[node] = find(uf[node]);
-    return uf[node];
-  };
   const edgeText = (edge) => edge ? `[${edge[0]}, ${edge[1]}]` : "-";
-  const incomingText = () => `[${Array.from({ length: n }, (_, index) => `${index + 1}<-${incoming[index + 1] || "-"}`).join(", ")}]`;
+  const parentText = () => `[${Array.from({ length: n }, (_, index) => {
+    const node = index + 1;
+    return `${node}<-${parent[node] === node ? "-" : parent[node]}`;
+  }).join(", ")}]`;
   const ufText = () => `[${Array.from({ length: n }, (_, index) => `${index + 1}->${uf[index + 1]}`).join(", ")}]`;
 
   function snapshot({ title, note, codeLine, phase, activeIndex = -1, roots = null, decision = null, final = false, answer = null }) {
@@ -3419,25 +3420,25 @@ function buildSteps685(input) {
       mark: [],
       final,
       vars: [
-        { name: "first", value: edgeText(first) },
-        { name: "second", value: edgeText(second) },
+        { name: "candidate1", value: edgeText(candidate1) },
+        { name: "candidate2", value: edgeText(candidate2) },
         { name: "cycle", value: edgeText(cycle) },
-        { name: "incoming", value: incomingText() },
+        { name: "parent", value: parentText() },
         { name: "uf", value: ufText() },
       ],
       directed685View: {
         n,
         nodes: Array.from({ length: n }, (_, index) => index + 1),
         edges: edges.map(([u, v], index) => ({ u, v, index })),
-        incoming: incoming.slice(1),
+        incoming: parent.slice(1).map((value, index) => value === index + 1 ? 0 : value),
         uf: uf.slice(1),
         roots: Array.from({ length: n }, (_, index) => rootOf(index + 1)),
         phase,
         activeIndex,
         processedIndexes: [...processed],
         skippedIndex,
-        first: first ? [...first] : null,
-        second: second ? [...second] : null,
+        first: candidate1 ? [...candidate1] : null,
+        second: candidate2 ? [...candidate2] : null,
         cycle: cycle ? [...cycle] : null,
         rootsCompared: roots ? { ...roots } : null,
         decision: decision ? { ...decision } : null,
@@ -3453,9 +3454,21 @@ function buildSteps685(input) {
     phase: "init",
   });
   snapshot({
-    title: { vi: "incoming[node] = 0; first = second = None", en: "incoming[node] = 0; first = second = None" },
-    note: { vi: "incoming ghi nhận parent đầu tiên của từng node; first/second sẽ lưu hai cạnh cùng đi vào một node nếu có.", en: "incoming records each node's first parent; first/second will hold the two edges entering one node, if any." },
-    codeLine: 4,
+    title: { vi: "parent = [0, 1, 2, ... n]", en: "parent = [0, 1, 2, ... n]" },
+    note: { vi: "Ban đầu parent[v] == v nghĩa là node v chưa nhận cạnh đi vào nào.", en: "Initially parent[v] == v means node v has not received an incoming edge." },
+    codeLine: 6,
+    phase: "scan",
+  });
+  snapshot({
+    title: { vi: "candidate1 = None", en: "candidate1 = None" },
+    note: { vi: "candidate1 sẽ lưu cạnh parent đầu tiên nếu phát hiện một node có hai parent.", en: "candidate1 will store the earlier parent edge if a node with two parents is found." },
+    codeLine: 7,
+    phase: "scan",
+  });
+  snapshot({
+    title: { vi: "candidate2 = None", en: "candidate2 = None" },
+    note: { vi: "candidate2 sẽ lưu cạnh parent thứ hai và được bỏ tạm ở bước Union-Find.", en: "candidate2 will store the later parent edge and is temporarily skipped by Union-Find." },
+    codeLine: 8,
     phase: "scan",
   });
 
@@ -3463,30 +3476,48 @@ function buildSteps685(input) {
     const [u, v] = edges[index];
     snapshot({
       title: { vi: `Quét edge #${index}: ${u} -> ${v}`, en: `Scan edge #${index}: ${u} -> ${v}` },
-      note: { vi: `Kiểm tra node ${v} đã có parent trong incoming chưa.`, en: `Check whether node ${v} already has a parent in incoming.` },
-      codeLine: 6,
+      note: { vi: `Lấy u=${u}, v=${v} từ cạnh hiện tại.`, en: `Read u=${u}, v=${v} from the current edge.` },
+      codeLine: 10,
       phase: "scan",
       activeIndex: index,
       decision: { kind: "scan", edge: [u, v] },
     });
-    if (incoming[v] !== 0) {
-      first = [incoming[v], v];
-      second = [u, v];
+    snapshot({
+      title: { vi: `parent[${v}] ${parent[v] !== v ? "!=" : "=="} ${v}`, en: `parent[${v}] ${parent[v] !== v ? "!=" : "=="} ${v}` },
+      note: parent[v] !== v
+        ? { vi: `Node ${v} đã có parent ${parent[v]}, nên cạnh ${u} -> ${v} tạo xung đột hai parent.`, en: `Node ${v} already has parent ${parent[v]}, so edge ${u} -> ${v} creates a two-parent conflict.` }
+        : { vi: `Node ${v} chưa có parent; ghi nhận ${u} là parent đầu tiên.`, en: `Node ${v} has no parent yet; record ${u} as its first parent.` },
+      codeLine: 11,
+      phase: "scan",
+      activeIndex: index,
+      decision: { kind: "parent-check", node: v, parent: parent[v] },
+    });
+    if (parent[v] !== v) {
+      candidate1 = [parent[v], v];
+      snapshot({
+        title: { vi: `candidate1 = ${edgeText(candidate1)}`, en: `candidate1 = ${edgeText(candidate1)}` },
+        note: { vi: `${parent[v]} -> ${v} là cạnh parent đến trước.`, en: `${parent[v]} -> ${v} is the earlier parent edge.` },
+        codeLine: 12,
+        phase: "two-parent",
+        activeIndex: index,
+        decision: { kind: "candidate1", edge: [...candidate1] },
+      });
+      candidate2 = [u, v];
       skippedIndex = index;
       snapshot({
         title: { vi: `Node ${v} có hai parent`, en: `Node ${v} has two parents` },
-        note: { vi: `${incoming[v]} -> ${v} đến trước, ${u} -> ${v} đến sau. Tạm bỏ cạnh đến sau khi kiểm tra cycle.`, en: `${incoming[v]} -> ${v} arrived first and ${u} -> ${v} arrived later. Temporarily skip the later edge while checking cycles.` },
-        codeLine: 7,
+        note: { vi: `${u} -> ${v} là candidate2 đến sau; cạnh này sẽ được bỏ tạm khi kiểm tra cycle.`, en: `${u} -> ${v} is the later candidate2; temporarily skip it while checking for a cycle.` },
+        codeLine: 13,
         phase: "two-parent",
         activeIndex: index,
-        decision: { kind: "two-parent", node: v, first: [...first], second: [...second] },
+        decision: { kind: "two-parent", node: v, first: [...candidate1], second: [...candidate2] },
       });
     } else {
-      incoming[v] = u;
+      parent[v] = u;
       snapshot({
-        title: { vi: `incoming[${v}] = ${u}`, en: `incoming[${v}] = ${u}` },
+        title: { vi: `parent[${v}] = ${u}`, en: `parent[${v}] = ${u}` },
         note: { vi: `Đây là parent đầu tiên của node ${v}; chưa có xung đột parent.`, en: `This is node ${v}'s first parent; there is no parent conflict yet.` },
-        codeLine: 11,
+        codeLine: 15,
         phase: "scan",
         activeIndex: index,
         decision: { kind: "set-parent", node: v, parent: u },
@@ -3496,18 +3527,89 @@ function buildSteps685(input) {
 
   snapshot({
     title: { vi: "Khởi tạo Union-Find", en: "Initialize Union-Find" },
-    note: { vi: "DSU sẽ thử thêm mọi cạnh, trừ second (nếu tồn tại), để phát hiện cycle.", en: "DSU will try every edge except second (when present) to detect a cycle." },
-    codeLine: 12,
+    note: { vi: "Mỗi node bắt đầu là root của chính nó. DSU sẽ thêm mọi cạnh trừ candidate2 để phát hiện cycle.", en: "Every node starts as its own root. DSU adds every edge except candidate2 to detect a cycle." },
+    codeLine: 18,
+    phase: "union-init",
+  });
+  snapshot({
+    title: { vi: "Định nghĩa find(x)", en: "Define find(x)" },
+    note: { vi: "find dùng path halving: nối x với grandparent trong lúc đi lên root.", en: "find uses path halving: point x to its grandparent while walking toward the root." },
+    codeLine: 20,
     phase: "union-init",
   });
 
+  const findWithTrace = (start, activeIndex, edge, targetName) => {
+    let x = start;
+    while (true) {
+      const keepWalking = uf[x] !== x;
+      snapshot({
+        title: { vi: `uf[${x}] ${keepWalking ? "!=" : "=="} ${x}`, en: `uf[${x}] ${keepWalking ? "!=" : "=="} ${x}` },
+        note: keepWalking
+          ? { vi: `${x} chưa phải root, tiếp tục nén đường đi.`, en: `${x} is not a root, so continue path compression.` }
+          : { vi: `${x} là root; vòng lặp dừng.`, en: `${x} is a root, so the loop stops.` },
+        codeLine: 21,
+        phase: "find",
+        activeIndex,
+        decision: { kind: "find-check", edge, targetName, x, keepWalking },
+      });
+      if (!keepWalking) break;
+      const oldParent = uf[x];
+      uf[x] = uf[uf[x]];
+      snapshot({
+        title: { vi: `uf[${x}] = uf[${oldParent}] = ${uf[x]}`, en: `uf[${x}] = uf[${oldParent}] = ${uf[x]}` },
+        note: { vi: `Path halving rút ngắn đường từ ${x} đến root.`, en: `Path halving shortens ${x}'s path to the root.` },
+        codeLine: 22,
+        phase: "find",
+        activeIndex,
+        decision: { kind: "path-halving", edge, targetName, x, oldParent, newParent: uf[x] },
+      });
+      x = uf[x];
+      snapshot({
+        title: { vi: `x = ${x}`, en: `x = ${x}` },
+        note: { vi: "Di chuyển x lên parent mới để tiếp tục tìm root.", en: "Move x to its new parent and continue looking for the root." },
+        codeLine: 23,
+        phase: "find",
+        activeIndex,
+        decision: { kind: "find-move", edge, targetName, x },
+      });
+    }
+    snapshot({
+      title: { vi: `find(${start}) trả về ${x}`, en: `find(${start}) returns ${x}` },
+      note: { vi: `${x} là root đại diện của component chứa ${start}.`, en: `${x} is the representative root of the component containing ${start}.` },
+      codeLine: 24,
+      phase: "find",
+      activeIndex,
+      decision: { kind: "find-return", edge, targetName, start, root: x },
+    });
+    return x;
+  };
+
   for (let index = 0; index < edges.length; index++) {
     const [u, v] = edges[index];
-    if (index === skippedIndex) {
+    snapshot({
+      title: { vi: `Union-Find edge #${index}: ${u} -> ${v}`, en: `Union-Find edge #${index}: ${u} -> ${v}` },
+      note: { vi: `Bắt đầu xử lý cạnh ${u} -> ${v} ở lượt thứ hai.`, en: `Begin processing edge ${u} -> ${v} in the second pass.` },
+      codeLine: 26,
+      phase: "union-check",
+      activeIndex: index,
+      decision: { kind: "union-loop", edge: [u, v] },
+    });
+    const isCandidate2 = Boolean(candidate2 && candidate2[0] === u && candidate2[1] === v);
+    snapshot({
+      title: { vi: `candidate2 ${isCandidate2 ? "==" : "!="} [${u}, ${v}]`, en: `candidate2 ${isCandidate2 ? "==" : "!="} [${u}, ${v}]` },
+      note: isCandidate2
+        ? { vi: "Đây là cạnh parent thứ hai, nên bỏ tạm để xem phần còn lại có cycle không.", en: "This is the second-parent edge, so temporarily skip it and test whether the remainder cycles." }
+        : { vi: "Đây không phải candidate2; tiếp tục kiểm tra bằng Union-Find.", en: "This is not candidate2; continue with the Union-Find check." },
+      codeLine: 29,
+      phase: isCandidate2 ? "skip" : "union-check",
+      activeIndex: index,
+      decision: { kind: "candidate2-check", edge: [u, v], matches: isCandidate2 },
+    });
+    if (isCandidate2) {
       snapshot({
         title: { vi: `Bỏ tạm edge #${index}: ${u} -> ${v}`, en: `Temporarily skip edge #${index}: ${u} -> ${v}` },
-        note: { vi: "Đây là second, cạnh đến sau của node có hai parent. Nếu phần còn lại vẫn cycle thì first mới là cạnh cần xóa.", en: "This is second, the later edge into the two-parent node. If the rest still cycles, first is the edge to remove." },
-        codeLine: 20,
+        note: { vi: "continue chuyển sang cạnh tiếp theo mà không union candidate2.", en: "continue moves to the next edge without unioning candidate2." },
+        codeLine: 30,
         phase: "skip",
         activeIndex: index,
         decision: { kind: "skip", edge: [u, v] },
@@ -3515,73 +3617,101 @@ function buildSteps685(input) {
       continue;
     }
 
-    const ru = find(u);
-    const rv = find(v);
+    const rootU = findWithTrace(u, index, [u, v], "root_u");
     snapshot({
-      title: { vi: `find(${u}) = ${ru}, find(${v}) = ${rv}`, en: `find(${u}) = ${ru}, find(${v}) = ${rv}` },
-      note: ru === rv
-        ? { vi: "Hai đầu đã cùng component: edge này đóng một cycle.", en: "The endpoints already share a component: this edge closes a cycle." }
-        : { vi: "Hai đầu khác component: có thể union an toàn.", en: "The endpoints are in different components: union is safe." },
-      codeLine: 21,
+      title: { vi: `root_u = ${rootU}`, en: `root_u = ${rootU}` },
+      note: { vi: `Lưu root của ${u} vào root_u.`, en: `Store ${u}'s root in root_u.` },
+      codeLine: 32,
       phase: "union-check",
       activeIndex: index,
-      roots: { u: ru, v: rv },
-      decision: { kind: ru === rv ? "cycle" : "union", edge: [u, v], ru, rv },
+      roots: { u: rootU, v: null },
+      decision: { kind: "root-u", edge: [u, v], rootU },
     });
-    if (ru === rv) {
+    const rootV = findWithTrace(v, index, [u, v], "root_v");
+    snapshot({
+      title: { vi: `root_v = ${rootV}`, en: `root_v = ${rootV}` },
+      note: { vi: `Lưu root của ${v} vào root_v.`, en: `Store ${v}'s root in root_v.` },
+      codeLine: 33,
+      phase: "union-check",
+      activeIndex: index,
+      roots: { u: rootU, v: rootV },
+      decision: { kind: "root-v", edge: [u, v], rootU, rootV },
+    });
+    snapshot({
+      title: { vi: `root_u ${rootU === rootV ? "==" : "!="} root_v`, en: `root_u ${rootU === rootV ? "==" : "!="} root_v` },
+      note: rootU === rootV
+        ? { vi: "Hai đầu đã cùng component: cạnh này đóng cycle.", en: "The endpoints already share a component: this edge closes a cycle." }
+        : { vi: "Hai đầu thuộc hai component khác nhau: có thể union an toàn.", en: "The endpoints belong to different components: union is safe." },
+      codeLine: 35,
+      phase: "union-check",
+      activeIndex: index,
+      roots: { u: rootU, v: rootV },
+      decision: { kind: rootU === rootV ? "cycle" : "union", edge: [u, v], rootU, rootV },
+    });
+    if (rootU === rootV) {
       cycle = [u, v];
       snapshot({
-        title: { vi: `Cycle tìm thấy tại ${u} -> ${v}`, en: `Cycle found at ${u} -> ${v}` },
-        note: { vi: "Nếu không có xung đột hai parent, đây chính là cạnh cần xóa. Nếu có, nó quyết định chọn first.", en: "Without a two-parent conflict, this is the removal edge. With one, it decides that first must be removed." },
-        codeLine: 22,
+        title: { vi: `candidate1 là ${edgeText(candidate1)}`, en: `candidate1 is ${edgeText(candidate1)}` },
+        note: candidate1
+          ? { vi: "Cycle vẫn tồn tại sau khi bỏ candidate2, nên candidate1 là cạnh phải xóa.", en: "A cycle remains after skipping candidate2, so candidate1 must be removed." }
+          : { vi: "Không có node hai parent; chính cạnh hiện tại là cạnh thừa của cycle.", en: "There is no two-parent node; the current edge itself is the redundant cycle edge." },
+        codeLine: 37,
         phase: "cycle",
         activeIndex: index,
-        roots: { u: ru, v: rv },
-        decision: { kind: "cycle", edge: [u, v] },
+        roots: { u: rootU, v: rootV },
+        decision: { kind: "candidate1-check", edge: [u, v], candidate1: Boolean(candidate1) },
       });
-      break;
+      if (candidate1) {
+        snapshot({
+          title: { vi: `Trả về candidate1 ${edgeText(candidate1)}`, en: `Return candidate1 ${edgeText(candidate1)}` },
+          note: { vi: "Xóa cạnh parent đến trước sẽ đồng thời phá cycle và giải quyết node có hai parent.", en: "Removing the earlier parent edge both breaks the cycle and resolves the two-parent node." },
+          codeLine: 38,
+          phase: "done",
+          activeIndex: index,
+          roots: { u: rootU, v: rootV },
+          decision: { kind: "remove-first", answer: candidate1 },
+          answer: candidate1,
+          final: true,
+        });
+        return { original: edges, answer: candidate1, steps };
+      }
+      snapshot({
+        title: { vi: `Trả về [${u}, ${v}]`, en: `Return [${u}, ${v}]` },
+        note: { vi: "Không có xung đột hai parent, nên cạnh đóng cycle là đáp án.", en: "There is no two-parent conflict, so the cycle-closing edge is the answer." },
+        codeLine: 41,
+        phase: "done",
+        activeIndex: index,
+        roots: { u: rootU, v: rootV },
+        decision: { kind: "cycle-only", answer: [u, v] },
+        answer: [u, v],
+        final: true,
+      });
+      return { original: edges, answer: [u, v], steps };
     }
-    uf[ru] = rv;
+    uf[rootV] = rootU;
     processed.add(index);
     snapshot({
-      title: { vi: `Union ${ru} -> ${rv} bằng edge ${u} -> ${v}`, en: `Union ${ru} -> ${rv} via edge ${u} -> ${v}` },
+      title: { vi: `uf[${rootV}] = ${rootU}`, en: `uf[${rootV}] = ${rootU}` },
       note: { vi: "Cạnh này được giữ trong cây tạm thời vì nó nối hai component khác nhau.", en: "Keep this edge in the temporary tree because it joins two different components." },
-      codeLine: 23,
+      codeLine: 43,
       phase: "union",
       activeIndex: index,
-      roots: { u: ru, v: rv },
-      decision: { kind: "union", edge: [u, v], ru, rv },
+      roots: { u: rootU, v: rootV },
+      decision: { kind: "union", edge: [u, v], rootU, rootV },
     });
   }
 
-  let answer;
-  if (!first) {
-    answer = cycle || [];
-    snapshot({
-      title: { vi: `Không có node hai parent -> xóa ${edgeText(answer)}`, en: `No two-parent node -> remove ${edgeText(answer)}` },
-      note: { vi: "Trường hợp chỉ có cycle: cạnh đóng cycle là cạnh dư.", en: "Cycle-only case: the edge closing that cycle is redundant." },
-      codeLine: 24,
-      phase: "done",
-      decision: { kind: "cycle-only", answer },
-      answer,
-      final: true,
-    });
-  } else {
-    answer = cycle ? first : second;
-    snapshot({
-      title: { vi: `Chọn xóa ${edgeText(answer)}`, en: `Choose to remove ${edgeText(answer)}` },
-      note: cycle
-        ? { vi: "Bỏ second mà cycle vẫn còn, nên first nằm trong cycle và phải bị xóa.", en: "Skipping second still left a cycle, so first lies on that cycle and must be removed." }
-        : { vi: "Bỏ second làm đồ thị không cycle, nên second là cạnh dư gây hai parent.", en: "Skipping second leaves no cycle, so second is the redundant two-parent edge." },
-      codeLine: 25,
-      phase: "done",
-      decision: { kind: cycle ? "remove-first" : "remove-second", answer },
-      answer,
-      final: true,
-    });
-  }
+  snapshot({
+    title: { vi: `Không còn cycle -> trả về ${edgeText(candidate2)}`, en: `No cycle remains -> return ${edgeText(candidate2)}` },
+    note: { vi: "Bỏ candidate2 làm đồ thị trở thành rooted tree, nên candidate2 là cạnh dư.", en: "Skipping candidate2 leaves a rooted tree, so candidate2 is the redundant edge." },
+    codeLine: 46,
+    phase: "done",
+    decision: { kind: "remove-second", answer: candidate2 },
+    answer: candidate2,
+    final: true,
+  });
 
-  return { original: edges, answer, steps };
+  return { original: edges, answer: candidate2, steps };
 }
 
 // ─── 721: Accounts Merge ───
@@ -6157,31 +6287,53 @@ module.exports = {
     },
     code: [
       "class Solution:",
-      "    def findRedundantDirectedConnection(self, edges):",
+      "    def findRedundantDirectedConnection(self, edges: list[list[int]]) -> list[int]:",
       "        n = len(edges)",
-      "        incoming = [0] * (n + 1)",
-      "        first = second = None; skip = -1",
-      "        for i, (u, v) in enumerate(edges):",
-      "            if incoming[v] != 0:",
-      "                first = [incoming[v], v]",
-      "                second = [u, v]; skip = i",
+      "",
+      "        # Step 1: Find a node with 2 parents",
+      "        parent = list(range(n + 1))",
+      "        candidate1 = None",
+      "        candidate2 = None",
+      "",
+      "        for u, v in edges:",
+      "            if parent[v] != v:",
+      "                candidate1 = [parent[v], v]  # first edge",
+      "                candidate2 = [u, v]          # second edge",
       "            else:",
-      "                incoming[v] = u",
+      "                parent[v] = u",
+      "",
+      "        # Step 2: Union Find to detect cycle",
       "        uf = list(range(n + 1))",
-      "        cycle = None",
+      "",
       "        def find(x):",
       "            while uf[x] != x:",
       "                uf[x] = uf[uf[x]]",
       "                x = uf[x]",
       "            return x",
-      "        for i, (u, v) in enumerate(edges):",
-      "            if i == skip: continue",
-      "            ru, rv = find(u), find(v)",
-      "            if ru == rv: cycle = [u, v]; break",
-      "            uf[ru] = rv",
-      "        if first is None: return cycle",
-      "        return first if cycle else second",
+      "",
+      "        for u, v in edges:",
+      "",
+      "            # Temporarily skip second parent edge",
+      "            if candidate2 == [u, v]:",
+      "                continue",
+      "",
+      "            root_u = find(u)",
+      "            root_v = find(v)",
+      "",
+      "            if root_u == root_v:",
+      "                # Cycle still exists after removing candidate2",
+      "                if candidate1:",
+      "                    return candidate1",
+      "",
+      "                # No 2-parent problem, just a cycle",
+      "                return [u, v]",
+      "",
+      "            uf[root_v] = root_u",
+      "",
+      "        # No cycle after removing candidate2",
+      "        return candidate2",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps685,
   },
   721: {
