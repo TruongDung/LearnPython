@@ -628,26 +628,75 @@ function renderMatrix542View(step) {
 function renderUnionFind684View(step) {
   const view = step.unionFind684View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "setup" ? 0 : ["edge", "find"].includes(view.phase) ? 1 : ["compare", "union"].includes(view.phase) ? 2 : 3;
-  const edges = (view.edges || []).map((edge) => `<span class="rv-dsu-edge ${requestedVizEsc(edge.state)}"><small>#${edge.index + 1}</small><b>${edge.u}???${edge.v}</b><em>${requestedVizEsc(edge.state)}</em></span>`).join("");
-  const nodes = (view.nodes || []).map((node) => `<article class="rv-dsu-node${node.active ? " active" : ""}${node.isRoot ? " root" : ""}"><header><small>NODE</small><b>${node.id}</b></header><div><span>parent</span><strong>${node.parent ?? "???"}</strong></div><div><span>rank</span><strong>${node.rank ?? "???"}</strong></div><footer>root ${node.root ?? "???"}</footer></article>`).join("");
-  const components = (view.components || []).map((component) => `<article><header><small>ROOT</small><b>${component.root}</b></header><div>${component.members.map((member) => `<span>${member}</span>`).join("")}</div></article>`).join("") || requestedVizEmpty("???");
+  const phaseIndex = view.phase === "setup" ? 0
+    : ["edge", "find"].includes(view.phase) ? 1
+      : ["compare", "union"].includes(view.phase) ? 2 : 3;
+  const operationLabels = {
+    enter: vi ? "Nhận danh sách cạnh" : "Read the edge list",
+    "parent-init": vi ? "Mỗi node tự làm parent" : "Each node starts as its own parent",
+    "rank-init": vi ? "Rank ban đầu bằng 0" : "Initialize every rank to zero",
+    "define-find": vi ? "Chuẩn bị hàm tìm root" : "Define how to find a root",
+    "edge-loop": vi ? "Chọn cạnh tiếp theo" : "Take the next edge",
+    "find-check": vi ? "Đi theo con trỏ parent" : "Follow the parent pointer",
+    "path-compress": vi ? "Nén đường đi về root" : "Compress the path to the root",
+    "find-return": vi ? "Đã tìm thấy root" : "The root is known",
+    "root-u": vi ? "Lưu root của đầu u" : "Store the root of endpoint u",
+    "root-v": vi ? "Lưu root của đầu v" : "Store the root of endpoint v",
+    "cycle-check": vi ? "So sánh hai root" : "Compare the two roots",
+    "rank-compare": vi ? "Chọn root lớn hơn" : "Choose the higher-rank root",
+    "swap-roots": vi ? "Đổi thứ tự hai root" : "Swap the two roots",
+    "attach-root": vi ? "Gộp hai component" : "Merge the two components",
+    "rank-equality": vi ? "Kiểm tra rank bằng nhau" : "Check whether ranks are equal",
+    "rank-increment": vi ? "Tăng rank của root mới" : "Increase the new root's rank",
+    "return-redundant": vi ? "Trả về cạnh tạo chu trình" : "Return the cycle-forming edge",
+    "return-empty": vi ? "Không có cạnh thừa" : "No redundant edge",
+  };
+  const operation = view.operation || "step";
+  const operationLabel = operationLabels[operation] || operation;
+  const stateLabels = {
+    pending: vi ? "chưa xét" : "waiting",
+    current: vi ? "đang xét" : "current",
+    accepted: vi ? "đã gộp" : "merged",
+    redundant: vi ? "tạo cycle" : "cycle",
+  };
+  const edges = (view.edges || []).map((edge) => `<span class="rv-dsu-edge ${requestedVizEsc(edge.state)}"><small>${vi ? "cạnh" : "edge"} #${edge.index + 1}</small><b>${edge.u} — ${edge.v}</b><em>${requestedVizEsc(stateLabels[edge.state] || edge.state)}</em></span>`).join("");
+  const nodes = (view.nodes || []).map((node) => `<article class="rv-dsu-node${node.active ? " active" : ""}${node.isRoot ? " root" : ""}"><header><small>${vi ? "đỉnh" : "node"}</small><b>${node.id}</b></header><div><span>parent</span><strong>${node.parent ?? "—"}</strong></div><div><span>rank</span><strong>${node.rank ?? "—"}</strong></div><footer>${node.root === null || node.root === undefined ? (vi ? "chưa khởi tạo" : "not initialized") : `root = ${node.root}`}</footer></article>`).join("");
+  const components = (view.components || []).map((component) => {
+    const containsEndpoint = view.currentEdge && component.members.some((member) => view.currentEdge.includes(member));
+    return `<article class="${containsEndpoint ? "active" : ""}"><header><small>COMPONENT</small><b>root ${component.root}</b></header><div>${component.members.map((member) => `<span class="${view.currentEdge?.includes(member) ? "endpoint" : ""}">${member}</span>`).join("")}</div></article>`;
+  }).join("") || requestedVizEmpty(vi ? "Forest chưa được khởi tạo" : "The forest is not initialized yet");
   const findState = view.findState;
   const findPath = findState
-    ? `<section class="rv-panel"><h4>find(${findState.start}) ?? endpoint ${requestedVizEsc(findState.endpoint)}</h4><div class="rv-find-path">${findState.path.map((node, index) => `<span class="${findState.compressed.includes(node) ? "compressed" : node === findState.current ? "current" : ""}"><b>${node}</b><small>${node === findState.root ? "ROOT" : "parent"}</small></span>${index < findState.path.length - 1 ? "<i>???</i>" : ""}`).join("")}</div></section>`
+    ? `<section class="rv-panel rv-dsu-find-panel"><h4>find(${findState.start}) · ${findState.endpoint === "u" ? (vi ? "đầu trái u" : "left endpoint u") : (vi ? "đầu phải v" : "right endpoint v")}</h4><div class="rv-find-path">${findState.path.map((node, index) => `<span class="${findState.compressed.includes(node) ? "compressed" : node === findState.current ? "current" : ""}"><b>${node}</b><small>${node === findState.root ? "ROOT" : `parent[${node}]`}</small></span>${index < findState.path.length - 1 ? "<i>→</i>" : ""}`).join("")}</div><p>${findState.root === null ? (vi ? "Tiếp tục đi theo parent cho tới khi parent[x] = x." : "Keep following parent until parent[x] = x.") : (vi ? `Root tìm được là ${findState.root}.` : `The discovered root is ${findState.root}.`)}</p></section>`
     : "";
+  const rootsReady = view.roots.u !== null && view.roots.v !== null;
+  const sameRoot = rootsReady && view.roots.u === view.roots.v;
   const comparison = view.currentEdge
-    ? `<div class="rv-focus-equation${view.roots.u !== null && view.roots.u === view.roots.v ? " danger" : view.roots.u !== null && view.roots.v !== null ? " success" : ""}"><span>find(${view.currentEdge[0]}) = ${view.roots.u ?? "?"}</span><strong>${view.roots.u !== null && view.roots.v !== null ? (view.roots.u === view.roots.v ? "==" : "???") : "?"}</strong><span>find(${view.currentEdge[1]}) = ${view.roots.v ?? "?"}</span><b>${view.roots.u !== null && view.roots.u === view.roots.v ? "CYCLE" : ""}</b></div>`
+    ? `<section class="rv-dsu-decision${sameRoot ? " cycle" : rootsReady ? " safe" : " waiting"}">
+        <div class="rv-dsu-endpoint"><small>u</small><strong>${view.currentEdge[0]}</strong><span>root = <b>${view.roots.u ?? "?"}</b></span></div>
+        <div class="rv-dsu-verdict"><small>${vi ? "SO SÁNH ROOT" : "COMPARE ROOTS"}</small><strong>${rootsReady ? (sameRoot ? "=" : "≠") : "?"}</strong><b>${!rootsReady ? (vi ? "Đang chạy find…" : "Running find…") : sameRoot ? (vi ? "CÙNG NHÓM → CYCLE" : "SAME GROUP → CYCLE") : (vi ? "KHÁC NHÓM → UNION" : "DIFFERENT GROUPS → UNION")}</b></div>
+        <div class="rv-dsu-endpoint"><small>v</small><strong>${view.currentEdge[1]}</strong><span>root = <b>${view.roots.v ?? "?"}</b></span></div>
+      </section>`
     : "";
-  const result = view.answer ? `<div class="rv-core-result"><small>REDUNDANT EDGE</small><strong>[${view.answer.join(", ")}]</strong></div>` : "";
+  const result = view.answer ? `<div class="rv-core-result rv-dsu-result"><small>${vi ? "CẠNH THỪA" : "REDUNDANT EDGE"}</small><strong>[${view.answer.join(", ")}]</strong><span>${vi ? "Hai đầu đã thuộc cùng component, nên cạnh này khép chu trình." : "Both endpoints were already connected, so this edge closes a cycle."}</span></div>` : "";
+  const rule = sameRoot
+    ? (vi ? "Không union. Đây chính là cạnh cần xóa." : "Do not union. This is the edge to remove.")
+    : rootsReady
+      ? (vi ? "Hai root khác nhau, vì vậy cạnh này an toàn và hai component được gộp." : "The roots differ, so this edge is safe and the components can be merged.")
+      : (vi ? "Trước tiên tìm root của cả hai đầu cạnh." : "First find the root of both endpoints.");
 
-  requestedVizSet(`${requestedVizPhases(vi ? ["Kh???i t???o forest", "Find hai endpoint", "So root v?? union", "Ph??t hi???n cycle"] : ["Initialize forest", "Find both endpoints", "Compare roots and union", "Detect cycle"], phaseIndex)}
-    <div class="rv-action-banner"><b>${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
-    <div class="rv-dsu-edge-stream">${edges}</div>
-    ${comparison}${findPath}
-    <div class="rv-two-column rv-dsu-workspace"><section class="rv-panel"><h4>${vi ? "DSU nodes ??? parent/rank/root" : "DSU nodes ??? parent/rank/root"}</h4><div class="rv-dsu-nodes">${nodes}</div></section><section class="rv-panel"><h4>${vi ? "Connected components hi???n t???i" : "Current connected components"}</h4><div class="rv-dsu-components">${components}</div></section></div>
-    ${result}`,
-  vi ? "Union-Find t??m c???nh t???o chu tr??nh" : "Union-Find redundant-edge detection");
+  requestedVizSet(`<div class="rv-dsu684-viz">
+    ${requestedVizPhases(vi ? ["Khởi tạo các nhóm", "Tìm root của u và v", "So sánh rồi union", "Phát hiện chu trình"] : ["Initialize groups", "Find roots of u and v", "Compare and union", "Detect the cycle"], phaseIndex)}
+    <div class="rv-action-banner rv-dsu-action"><b>${requestedVizEsc(operationLabel)}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
+    <section class="rv-dsu-rule"><span>1</span><b>${vi ? "Chọn một cạnh" : "Pick an edge"}</b><i>→</i><span>2</span><b>${vi ? "Tìm hai root" : "Find both roots"}</b><i>→</i><span>3</span><b>${vi ? "Giống: cycle · Khác: union" : "Same: cycle · Different: union"}</b></section>
+    <section class="rv-panel rv-dsu-edges-panel"><h4>${vi ? "Dòng cạnh — đọc từ trái sang phải" : "Edge stream — process from left to right"}</h4><div class="rv-dsu-edge-stream">${edges}</div></section>
+    ${comparison}
+    <div class="rv-dsu-explanation ${sameRoot ? "cycle" : rootsReady ? "safe" : "waiting"}"><b>${sameRoot ? (vi ? "Vì sao có cycle?" : "Why is this a cycle?") : rootsReady ? (vi ? "Vì sao union được?" : "Why can we union?") : (vi ? "Đang làm gì?" : "What is happening?")}</b><span>${requestedVizEsc(rule)}</span></div>
+    ${findPath}
+    <div class="rv-two-column rv-dsu-workspace"><section class="rv-panel rv-dsu-components-panel"><h4>${vi ? "Các component hiện tại" : "Current connected components"}</h4><div class="rv-dsu-components">${components}</div></section><section class="rv-panel rv-dsu-table-panel"><h4>${vi ? "Bảng DSU (tham khảo)" : "DSU table (reference)"}</h4><div class="rv-dsu-nodes">${nodes}</div></section></div>
+    ${result}
+  </div>`,
+  vi ? "Union-Find tìm cạnh tạo chu trình" : "Union-Find redundant-edge detection");
 }
 
 function renderFlights787View(step) {
