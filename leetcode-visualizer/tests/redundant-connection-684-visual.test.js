@@ -98,6 +98,7 @@ test('684 renderer explains every trace frame without corrupted placeholders', (
 
 test('684 dedicated styles are responsive and prevent horizontal overflow', () => {
   const css = readFrontendStyles();
+  const appCore = fs.readFileSync(path.resolve(__dirname, '../public/app-core.js'), 'utf8');
   assert.match(css, /\.rv-dsu684-viz\s*\{/);
   assert.match(css, /\.rv-dsu684-viz[^}]*overflow-x:\s*clip/s);
   assert.match(css, /@container rv-dsu684 \(max-width:\s*620px\)/);
@@ -107,4 +108,6 @@ test('684 dedicated styles are responsive and prevent horizontal overflow', () =
   assert.match(css, /\.rv-dsu-rank-lesson/);
   assert.match(css, /\.rv-dsu-rank-compare/);
   assert.match(css, /\.rv-dsu-rank-tower/);
+  assert.match(appCore, /classList\.toggle\("problem-684-layout", problemId === 684\)/);
+  assert.match(css, /\.viz-split\.problem-684-layout \.code-panel[^{]*\{[^}]*max-height:\s*none[^}]*overflow-y:\s*hidden/s);
 });
