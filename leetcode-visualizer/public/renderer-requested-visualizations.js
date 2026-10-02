@@ -669,7 +669,8 @@ function renderUnionFind684View(step) {
   const nodes = (view.nodes || []).map((node) => `<article class="rv-dsu-node${node.active ? " active" : ""}${node.isRoot ? " root" : ""}"><header><small>${vi ? "đỉnh" : "node"}</small><b>${node.id}</b></header><div><span>parent</span><strong>${node.parent ?? "—"}</strong></div><div><span>rank</span><strong>${node.rank ?? "—"}</strong></div><footer>${node.root === null || node.root === undefined ? (vi ? "chưa khởi tạo" : "not initialized") : `root = ${node.root}`}</footer></article>`).join("");
   const components = (view.components || []).map((component) => {
     const containsEndpoint = view.currentEdge && component.members.some((member) => view.currentEdge.includes(member));
-    return `<article class="${containsEndpoint ? "active" : ""}"><header><small>COMPONENT</small><b>root ${component.root}</b></header><div>${component.members.map((member) => `<span class="${view.currentEdge?.includes(member) ? "endpoint" : ""}">${member}</span>`).join("")}</div></article>`;
+    const rootRank = (view.nodes || []).find((node) => node.id === component.root)?.rank;
+    return `<article class="${containsEndpoint ? "active" : ""}"><header><small>COMPONENT</small><b>root ${component.root}<em>rank ${rootRank ?? "—"}</em></b></header><div>${component.members.map((member) => `<span class="${view.currentEdge?.includes(member) ? "endpoint" : ""}">${member}</span>`).join("")}</div></article>`;
   }).join("") || requestedVizEmpty(vi ? "Forest chưa được khởi tạo" : "The forest is not initialized yet");
   const findState = view.findState;
   const findPath = findState
@@ -677,6 +678,53 @@ function renderUnionFind684View(step) {
     : "";
   const rootsReady = view.roots.u !== null && view.roots.v !== null;
   const sameRoot = rootsReady && view.roots.u === view.roots.v;
+  const rootXNode = rootsReady ? (view.nodes || []).find((node) => node.id === view.roots.u) : null;
+  const rootYNode = rootsReady ? (view.nodes || []).find((node) => node.id === view.roots.v) : null;
+  const rankOperations = ["rank-less-check", "attach-x-to-y", "rank-greater-check", "attach-y-to-x", "equal-rank-branch", "rank-increment"];
+  const isRankStep = rankOperations.includes(operation);
+  let comparedRankX = rootXNode?.rank ?? null;
+  let comparedRankY = rootYNode?.rank ?? null;
+  if (operation === "rank-increment" && comparedRankX !== null) comparedRankX -= 1;
+  const rankRelation = comparedRankX === null || comparedRankY === null ? "?"
+    : comparedRankX < comparedRankY ? "<" : comparedRankX > comparedRankY ? ">" : "=";
+  const rankRelationHtml = requestedVizEsc(rankRelation);
+  const rankLevels = (rank) => Array.from({ length: Math.min(Math.max((rank ?? 0) + 1, 1), 6) }, (_, index) => `<i style="width:${30 + index * 13}px"></i>`).join("");
+  let rankOutcome = vi
+    ? "Rank chỉ được so sánh sau khi đã tìm được hai root khác nhau."
+    : "Ranks are compared only after two different roots are found.";
+  if (sameRoot) {
+    rankOutcome = vi
+      ? "Hai đầu có cùng root nên dừng ngay: không cần so sánh rank và không union."
+      : "The endpoints share one root, so stop: no rank comparison and no union.";
+  } else if (isRankStep && rankRelation === "<") {
+    rankOutcome = vi
+      ? `Cây root ${view.roots.u} thấp hơn → cho ${view.roots.u} trỏ vào ${view.roots.v}. Rank không đổi.`
+      : `Root ${view.roots.u}'s tree is shorter → point ${view.roots.u} to ${view.roots.v}. Ranks stay unchanged.`;
+  } else if (isRankStep && rankRelation === ">") {
+    rankOutcome = vi
+      ? `Cây root ${view.roots.u} cao hơn → cho ${view.roots.v} trỏ vào ${view.roots.u}. Rank không đổi.`
+      : `Root ${view.roots.u}'s tree is taller → point ${view.roots.v} to ${view.roots.u}. Ranks stay unchanged.`;
+  } else if (isRankStep && rankRelation === "=") {
+    rankOutcome = operation === "rank-increment"
+      ? (vi
+        ? `Hai cây trước đó cao bằng nhau: đã chọn root ${view.roots.u}, nên rank tăng từ ${comparedRankX} lên ${comparedRankX + 1}.`
+        : `The trees had equal height: root ${view.roots.u} was chosen, so its rank grows from ${comparedRankX} to ${comparedRankX + 1}.`)
+      : (vi
+        ? `Hai cây cao bằng nhau → code chọn root ${view.roots.u}; sau khi nối, chỉ rank[${view.roots.u}] tăng 1.`
+        : `The trees have equal height → the code chooses root ${view.roots.u}; after linking, only rank[${view.roots.u}] increases by 1.`);
+  }
+  const rankLesson = operation === "rank-init" || rootsReady
+    ? `<section class="rv-panel rv-dsu-rank-lesson${isRankStep ? " active" : ""}${sameRoot ? " skipped" : ""}">
+        <header><div><small>${vi ? "UNION BY RANK" : "UNION BY RANK"}</small><h4>${vi ? "Rank = độ cao ước lượng của cây" : "Rank = estimated tree height"}</h4></div><strong>${vi ? "Không phải số node" : "Not the node count"}</strong></header>
+        ${rootsReady ? `<div class="rv-dsu-rank-compare">
+          <article class="${rankRelation === ">" || rankRelation === "=" ? "winner" : ""}"><small>root_x</small><b>${view.roots.u}</b><div class="rv-dsu-rank-tower">${rankLevels(comparedRankX)}</div><span>rank = <strong>${comparedRankX ?? "—"}</strong></span></article>
+          <div class="rv-dsu-rank-operator"><small>${vi ? "SO SÁNH" : "COMPARE"}</small><b>${sameRoot ? "SKIP" : rankRelationHtml}</b><span>${sameRoot ? (vi ? "cùng root" : "same root") : `rank_x ${rankRelationHtml} rank_y`}</span></div>
+          <article class="${rankRelation === "<" ? "winner" : ""}"><small>root_y</small><b>${view.roots.v}</b><div class="rv-dsu-rank-tower">${rankLevels(comparedRankY)}</div><span>rank = <strong>${comparedRankY ?? "—"}</strong></span></article>
+        </div>` : `<div class="rv-dsu-rank-basics"><span><b>rank 0</b>${vi ? "Một node, cây cao 1 tầng" : "One node, one tree level"}</span><i>→</i><span><b>rank + 1</b>${vi ? "Chỉ khi gộp hai cây cùng rank" : "Only when equal-rank trees merge"}</span></div>`}
+        <p>${requestedVizEsc(rankOutcome)}</p>
+        <footer><b>${vi ? "Quy tắc nhớ nhanh:" : "Memory rule:"}</b> ${vi ? "thấp nối vào cao; bằng nhau mới tăng rank." : "shorter goes under taller; only a tie increases rank."}</footer>
+      </section>`
+    : "";
   const comparison = view.currentEdge
     ? `<section class="rv-dsu-decision${sameRoot ? " cycle" : rootsReady ? " safe" : " waiting"}">
         <div class="rv-dsu-endpoint"><small>u</small><strong>${view.currentEdge[0]}</strong><span>root = <b>${view.roots.u ?? "?"}</b></span></div>
@@ -699,6 +747,7 @@ function renderUnionFind684View(step) {
     ${comparison}
     <div class="rv-dsu-explanation ${sameRoot ? "cycle" : rootsReady ? "safe" : "waiting"}"><b>${sameRoot ? (vi ? "Vì sao có cycle?" : "Why is this a cycle?") : rootsReady ? (vi ? "Vì sao union được?" : "Why can we union?") : (vi ? "Đang làm gì?" : "What is happening?")}</b><span>${requestedVizEsc(rule)}</span></div>
     ${findPath}
+    ${rankLesson}
     <div class="rv-two-column rv-dsu-workspace"><section class="rv-panel rv-dsu-components-panel"><h4>${vi ? "Các component hiện tại" : "Current connected components"}</h4><div class="rv-dsu-components">${components}</div></section><section class="rv-panel rv-dsu-table-panel"><h4>${vi ? "Bảng DSU (tham khảo)" : "DSU table (reference)"}</h4><div class="rv-dsu-nodes">${nodes}</div></section></div>
     ${result}
   </div>`,

@@ -78,8 +78,22 @@ test('684 renderer explains every trace frame without corrupted placeholders', (
   context.lang = 'en';
   context.renderUnionFind684View(run.steps.at(-1));
   assert.match(element.innerHTML, /SAME GROUP → CYCLE/);
+  assert.match(element.innerHTML, /Rank = estimated tree height/);
+  assert.match(element.innerHTML, /Not the node count/);
+  assert.match(element.innerHTML, /no rank comparison and no union/);
   assert.match(element.innerHTML, /REDUNDANT EDGE/);
   assert.match(element.innerHTML, /\[2, 3\]/);
+
+  const equalRankStep = run.steps.find(step => step.unionFind684View.operation === 'equal-rank-branch');
+  context.renderUnionFind684View(equalRankStep);
+  assert.match(element.innerHTML, /rank_x = rank_y/);
+  assert.match(element.innerHTML, /only rank\[1\] increases by 1/);
+
+  const lowerRankRun = problem.builder('1,2;3,2;1,3');
+  const lowerRankStep = lowerRankRun.steps.find(step => step.unionFind684View.operation === 'attach-x-to-y');
+  context.renderUnionFind684View(lowerRankStep);
+  assert.match(element.innerHTML, /rank_x &lt; rank_y/);
+  assert.match(element.innerHTML, /Ranks stay unchanged/);
 });
 
 test('684 dedicated styles are responsive and prevent horizontal overflow', () => {
@@ -90,4 +104,7 @@ test('684 dedicated styles are responsive and prevent horizontal overflow', () =
   assert.match(css, /@container rv-dsu684 \(max-width:\s*380px\)/);
   assert.match(css, /\.rv-dsu-decision/);
   assert.match(css, /\.rv-dsu-explanation/);
+  assert.match(css, /\.rv-dsu-rank-lesson/);
+  assert.match(css, /\.rv-dsu-rank-compare/);
+  assert.match(css, /\.rv-dsu-rank-tower/);
 });
