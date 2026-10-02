@@ -21,7 +21,7 @@ const categories = {
   hashmap: require("./hashmap"),
   greedy: Object.assign(require("./greedy"), require("./hard-greedy-2589"), require("./hard-geometry-3027")),
   string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./basic-calculator-iv-770"), require("./special-binary-string-761"), require("./text-justification-68"), require("./hard-string-1923")),
-  backtracking: require("./backtracking"),
+  backtracking: Object.assign(require("./backtracking"), require("./generate-parentheses-22")),
   bst: require("./bst"),
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
   heap: Object.assign(require("./heap"), require("./server-heap"), require("./meeting-rooms-iii")),

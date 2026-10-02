@@ -259,6 +259,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.unionFind684View), surface: "treeView", render: (step) => {
       renderUnionFind684View(step);
     } },
+    { predicate: (step) => Boolean(step.generateParentheses22View), surface: "treeView", render: (step) => {
+      renderGenerateParentheses22View(step);
+    } },
     { predicate: (step) => Boolean(step.flights787View), surface: "treeView", render: (step) => {
       renderFlights787View(step);
     } },
