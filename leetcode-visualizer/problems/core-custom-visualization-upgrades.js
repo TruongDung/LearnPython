@@ -136,23 +136,42 @@ function enhance542(result) {
 
 const CODE_684 = [
   "class Solution:",
-  "    def findRedundantConnection(self, edges):",
-  "        parent = list(range(len(edges) + 1))",
-  "        rank = [0] * (len(edges) + 1)",
+  "    def findRedundantConnection(self, edges: list[list[int]]) -> list[int]:",
+  "        n = len(edges)",
+  "",
+  "        parent = list(range(n + 1))",
+  "        rank = [0] * (n + 1)",
+  "",
   "        def find(x):",
   "            if parent[x] != x:",
-  "                parent[x] = find(parent[x])",
+  "                parent[x] = find(parent[x])   # Path Compression",
   "            return parent[x]",
+  "",
+  "        def union(x, y):",
+  "            root_x = find(x)",
+  "            root_y = find(y)",
+  "",
+  "            # Already connected -> cycle",
+  "            if root_x == root_y:",
+  "                return False",
+  "",
+  "            # Union by Rank",
+  "            if rank[root_x] < rank[root_y]:",
+  "                parent[root_x] = root_y",
+  "",
+  "            elif rank[root_x] > rank[root_y]:",
+  "                parent[root_y] = root_x",
+  "",
+  "            else:",
+  "                parent[root_y] = root_x",
+  "                rank[root_x] += 1",
+  "",
+  "            return True",
+  "",
   "        for u, v in edges:",
-  "            root_u = find(u)",
-  "            root_v = find(v)",
-  "            if root_u == root_v:",
+  "            if not union(u, v):",
   "                return [u, v]",
-  "            if rank[root_u] < rank[root_v]:",
-  "                root_u, root_v = root_v, root_u",
-  "            parent[root_v] = root_u",
-  "            if rank[root_u] == rank[root_v]:",
-  "                rank[root_u] += 1",
+  "",
   "        return []",
 ];
 
@@ -230,7 +249,7 @@ function buildSteps684Custom(input) {
       vars: [
         { name: "operation", value: operation },
         { name: "edge", value: currentEdge ? `[${currentEdge.join(", ")}]` : "—" },
-        { name: "root_u / root_v", value: `${roots.u ?? "—"} / ${roots.v ?? "—"}` },
+        { name: "root_x / root_y", value: `${roots.u ?? "—"} / ${roots.v ?? "—"}` },
         { name: "parent", value: parentReady ? `[${parent.slice(1).join(", ")}]` : "—" },
         { name: "rank", value: rankReady ? `[${rank.slice(1).join(", ")}]` : "—" },
       ],
@@ -265,17 +284,19 @@ function buildSteps684Custom(input) {
   }
 
   emit(2, "enter", { phase: "setup", note: label(`Nhận ${n} cạnh trên các node 1..${n}.`, `Receive ${n} edges over nodes 1..${n}.`) });
+  emit(3, "n-init", { phase: "setup", note: label(`n = ${n}, nên các node hợp lệ nằm trong 1..${n}.`, `n = ${n}, so valid node labels are 1..${n}.`) });
   parentReady = true;
-  emit(3, "parent-init", { phase: "setup" });
+  emit(5, "parent-init", { phase: "setup" });
   rankReady = true;
-  emit(4, "rank-init", { phase: "setup" });
-  emit(5, "define-find", { phase: "setup" });
+  emit(6, "rank-init", { phase: "setup" });
+  emit(8, "define-find", { phase: "setup" });
+  emit(13, "define-union", { phase: "setup", note: label("union(x, y) sẽ trả False nếu cạnh nối hai node đã cùng nhóm.", "union(x, y) returns False when the endpoints are already connected.") });
 
   function findWithTrace(value, endpoint) {
     const path = [value];
     let cursor = value;
     while (parent[cursor] !== cursor) {
-      emit(6, "find-check", {
+      emit(9, "find-check", {
         phase: "find",
         findState: { endpoint, start: value, current: cursor, path, root: null, compressed: [], condition: true },
       });
@@ -283,23 +304,27 @@ function buildSteps684Custom(input) {
       path.push(cursor);
     }
     const root = cursor;
-    emit(6, "find-check", {
+    emit(9, "find-check", {
       phase: "find",
       findState: { endpoint, start: value, current: cursor, path, root, compressed: [], condition: false },
     });
     const compressed = [];
+    emit(11, "find-return", {
+      phase: "find",
+      findState: { endpoint, start: value, current: root, path, root, compressed, condition: false },
+    });
     for (const node of path.slice(0, -1).reverse()) {
       parent[node] = root;
       compressed.push(node);
-      emit(7, "path-compress", {
+      emit(10, "path-compress", {
+        phase: "find",
+        findState: { endpoint, start: value, current: node, path, root, compressed, condition: false },
+      });
+      emit(11, "find-return", {
         phase: "find",
         findState: { endpoint, start: value, current: node, path, root, compressed, condition: false },
       });
     }
-    emit(8, "find-return", {
-      phase: "find",
-      findState: { endpoint, start: value, current: root, path, root, compressed, condition: false },
-    });
     return root;
   }
 
@@ -307,13 +332,18 @@ function buildSteps684Custom(input) {
     currentEdgeIndex = edgeIndex;
     const [u, v] = edges[edgeIndex];
     roots = { u: null, v: null };
-    emit(9, "edge-loop", { phase: "edge", edgeState: "current" });
+    emit(34, "edge-loop", { phase: "edge", edgeState: "current" });
+    emit(35, "union-call", {
+      phase: "edge",
+      edgeState: "current",
+      note: label(`Gọi union(${u}, ${v}); nếu trả False thì cạnh này tạo cycle.`, `Call union(${u}, ${v}); a False result means this edge forms a cycle.`),
+    });
     roots.u = findWithTrace(u, "u");
-    emit(10, "root-u", { phase: "compare", edgeState: "current" });
+    emit(14, "root-x", { phase: "compare", edgeState: "current" });
     roots.v = findWithTrace(v, "v");
-    emit(11, "root-v", { phase: "compare", edgeState: "current" });
+    emit(15, "root-y", { phase: "compare", edgeState: "current" });
     const createsCycle = roots.u === roots.v;
-    emit(12, "cycle-check", {
+    emit(18, "cycle-check", {
       phase: "compare",
       edgeState: createsCycle ? "redundant" : "current",
       note: createsCycle
@@ -321,8 +351,13 @@ function buildSteps684Custom(input) {
         : label(`Root ${roots.u} và ${roots.v} khác nhau; có thể union.`, `Roots ${roots.u} and ${roots.v} differ, so union is safe.`),
     });
     if (createsCycle) {
+      emit(19, "union-false", {
+        phase: "compare",
+        edgeState: "redundant",
+        note: label("union trả False vì hai đầu cạnh đã nằm trong cùng component.", "union returns False because both endpoints are already in the same component."),
+      });
       answer = [u, v];
-      emit(13, "return-redundant", {
+      emit(36, "return-redundant", {
         phase: "done",
         edgeState: "redundant",
         final: true,
@@ -331,25 +366,49 @@ function buildSteps684Custom(input) {
       return { original: edges, answer, steps };
     }
 
-    const shouldSwap = rank[roots.u] < rank[roots.v];
-    emit(14, "rank-compare", { phase: "union", edgeState: "current", swapped: shouldSwap });
-    if (shouldSwap) {
-      [roots.u, roots.v] = [roots.v, roots.u];
-      emit(15, "swap-roots", { phase: "union", edgeState: "current", swapped: true });
+    const leftRankIsSmaller = rank[roots.u] < rank[roots.v];
+    emit(22, "rank-less-check", { phase: "union", edgeState: "current" });
+    if (leftRankIsSmaller) {
+      parent[roots.u] = roots.v;
+      acceptedIndexes.add(edgeIndex);
+      emit(23, "attach-x-to-y", {
+        phase: "union",
+        edgeState: "accepted",
+        note: label(`rank[${roots.u}] nhỏ hơn, nên root ${roots.u} trỏ vào root ${roots.v}.`, `rank[${roots.u}] is smaller, so root ${roots.u} points to root ${roots.v}.`),
+      });
+    } else {
+      const leftRankIsLarger = rank[roots.u] > rank[roots.v];
+      emit(25, "rank-greater-check", { phase: "union", edgeState: "current" });
+      if (leftRankIsLarger) {
+        parent[roots.v] = roots.u;
+        acceptedIndexes.add(edgeIndex);
+        emit(26, "attach-y-to-x", {
+          phase: "union",
+          edgeState: "accepted",
+          note: label(`rank[${roots.u}] lớn hơn, nên root ${roots.v} trỏ vào root ${roots.u}.`, `rank[${roots.u}] is larger, so root ${roots.v} points to root ${roots.u}.`),
+        });
+      } else {
+        emit(28, "equal-rank-branch", { phase: "union", edgeState: "current" });
+        parent[roots.v] = roots.u;
+        acceptedIndexes.add(edgeIndex);
+        emit(29, "attach-y-to-x", {
+          phase: "union",
+          edgeState: "accepted",
+          note: label(`Hai rank bằng nhau; chọn root ${roots.u} làm root mới.`, `The ranks are equal; choose root ${roots.u} as the new root.`),
+        });
+        rank[roots.u]++;
+        emit(30, "rank-increment", { phase: "union", edgeState: "accepted" });
+      }
     }
-    parent[roots.v] = roots.u;
-    acceptedIndexes.add(edgeIndex);
-    emit(16, "attach-root", { phase: "union", edgeState: "accepted", swapped: shouldSwap });
-    const equalRank = rank[roots.u] === rank[roots.v];
-    emit(17, "rank-equality", { phase: "union", edgeState: "accepted", swapped: shouldSwap });
-    if (equalRank) {
-      rank[roots.u]++;
-      emit(18, "rank-increment", { phase: "union", edgeState: "accepted", swapped: shouldSwap });
-    }
+    emit(32, "union-true", {
+      phase: "union",
+      edgeState: "accepted",
+      note: label("union trả True: cạnh không tạo cycle.", "union returns True: the edge does not create a cycle."),
+    });
   }
 
   currentEdgeIndex = -1;
-  emit(19, "return-empty", { phase: "done", final: true });
+  emit(38, "return-empty", { phase: "done", final: true });
   return { original: edges, answer, steps };
 }
 
