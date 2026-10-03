@@ -10,6 +10,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
     } },
+    { predicate: (step) => Boolean(step.infiniteSet2336View), surface: "treeView", render: (step) => {
+      renderInfiniteSet2336View(step);
+    } },
     { predicate: (step) => Boolean(step.hardProblemView), surface: "treeView", render: (step) => {
       renderHardProblemView(step);
     } },

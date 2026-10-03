@@ -108,7 +108,7 @@ function buildSteps(input) {
 
   const emit = (line, phaseIndex, title, note, formula, final = false) => {
     const upper = Math.min(14, Math.max(6, nextSmallest + 3, ...heap));
-    tracer.emit({
+    const emitted = tracer.emit({
       phaseIndex,
       codeLines: [line],
       title: bi(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
@@ -162,6 +162,25 @@ function buildSteps(input) {
       final,
       answer: final ? [...outputs] : null,
     });
+    if (emitted) {
+      // Use the heap itself for membership: at lines 11 and 20 the dedup set
+      // intentionally trails heappop/heappush by one Python statement.
+      tracer.steps.at(-1).infiniteSet2336View = {
+        nextSmallest,
+        heap: [...heap],
+        addedSet: [...addedSet].sort((a, b) => a - b),
+        operation: current ? { ...current, args: [...current.args] } : null,
+        outputs: [...outputs],
+        history: history.map((entry) => ({ ...entry })),
+        line,
+        event: final ? "done" : ({
+          11: "pop-heap", 12: "dedup-remove", 13: "return-heap",
+          14: "select-fresh", 15: "pop-fresh", 16: "return-fresh",
+          18: "add-call", 19: "add-check", 20: "push-heap", 21: "dedup-add",
+        }[line] || "inspect"),
+        displayUpper: Math.max(20, nextSmallest + 8),
+      };
+    }
   };
 
   emit(1, 0, bi("Import min-heap", "Import min-heap"), bi("Heap giữ số nhỏ nhất được thêm trở lại ở gốc.", "The heap keeps the smallest added-back number at its root."), bi("heap root = min(added_back)", "heap root = min(added_back)"));
@@ -174,6 +193,7 @@ function buildSteps(input) {
     if (operation.name === "popSmallest") {
       emit(9, 1, bi("Gọi popSmallest", "Call popSmallest"), bi("Ưu tiên số đã trả lại; nếu không có thì dùng con trỏ mới.", "Prefer a returned number; otherwise use the fresh cursor."), bi("min(heap_min, next_smallest)", "min(heap_min, next_smallest)"));
       const hasReturned = heap.length > 0;
+      current.source = hasReturned ? "heap" : "tail";
       emit(10, 1, bi(hasReturned ? "Heap có ứng viên" : "Heap rỗng", hasReturned ? "The heap has a candidate" : "The heap is empty"), bi(hasReturned ? `Gốc heap ${heap[0]} là đáp án nhỏ nhất.` : `${nextSmallest} là số mới nhỏ nhất.`, hasReturned ? `Heap root ${heap[0]} is the minimum answer.` : `${nextSmallest} is the smallest fresh number.`), bi(`bool(added_back) = ${hasReturned}`, `bool(added_back) = ${hasReturned}`));
       let value;
       if (hasReturned) {
@@ -201,6 +221,7 @@ function buildSteps(input) {
     const value = operation.args[0];
     emit(18, 2, bi(`Gọi addBack(${value})`, `Call addBack(${value})`), bi("Chỉ số đã bị lấy và chưa có trong heap mới cần thêm.", "Only a popped number not already in the heap needs insertion."), bi(`num = ${value}`, `num = ${value}`));
     const shouldAdd = value < nextSmallest && !addedSet.has(value);
+    current.accepted = shouldAdd;
     emit(19, 2, bi(shouldAdd ? "Có thể thêm lại" : "Bỏ qua an toàn", shouldAdd ? "Add the number back" : "Safely ignore"), bi(shouldAdd ? `${value} nhỏ hơn con trỏ và chưa có trong set.` : `${value} vẫn còn trong tập hoặc đã được thêm lại.`, shouldAdd ? `${value} is below the cursor and absent from the set.` : `${value} is still present or was already added back.`), bi(`${value} < ${nextSmallest} and ${!addedSet.has(value)} = ${shouldAdd}`, `${value} < ${nextSmallest} and ${!addedSet.has(value)} = ${shouldAdd}`));
     if (shouldAdd) {
       heapPush(heap, value);
@@ -235,7 +256,7 @@ module.exports = {
     title: bi("Số nhỏ nhất trong tập vô hạn", "Smallest Number in Infinite Set"),
     titleVi: bi("Cấp số nhỏ nhất và cho phép trả lại", "Allocate the smallest number and add it back"),
     statement: bi("Tập ban đầu chứa mọi số nguyên dương. popSmallest lấy và xóa số nhỏ nhất; addBack thêm lại một số đã bị xóa.", "The set initially contains every positive integer. popSmallest removes and returns the minimum; addBack restores a removed number."),
-    defaultInput: '[["popSmallest"],["popSmallest"],["addBack",1],["popSmallest"],["popSmallest"],["popSmallest"]]',
+    defaultInput: '[["popSmallest"],["popSmallest"],["popSmallest"],["addBack",3],["addBack",1],["addBack",2],["popSmallest"],["popSmallest"],["popSmallest"],["popSmallest"]]',
     inputKind: "string",
     inputLabel: bi("Operations JSON", "Operations JSON"),
     extraParams: [],
