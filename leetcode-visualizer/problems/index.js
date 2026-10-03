@@ -16,7 +16,7 @@ const categories = {
   graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699")),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
-  array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation")),
+  array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation"), require("./disappeared-numbers-448")),
   trie: Object.assign(require("./trie"), require("./prefix-scores-2416"), require("./hard-trie-3045")),
   hashmap: require("./hashmap"),
   greedy: Object.assign(require("./greedy"), require("./hard-greedy-2589"), require("./hard-geometry-3027")),

@@ -43,6 +43,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-hard-problems.js',
   'renderer-smallest-infinite-set-2336.js',
   'renderer-special-characters-3121.js',
+  'renderer-disappeared-numbers-448.js',
   'script.js',
 ]);
 
@@ -89,6 +90,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'hard-problems.css',
   'smallest-infinite-set-2336.css',
   'special-characters-3121.css',
+  'disappeared-numbers-448.css',
 ]);
 
 const sourceCache = new Map();

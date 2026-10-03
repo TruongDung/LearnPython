@@ -10,6 +10,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
     } },
+    { predicate: (step) => Boolean(step.disappearedNumbers448View), surface: "treeView", render: (step) => {
+      renderDisappearedNumbers448View(step);
+    } },
     { predicate: (step) => Boolean(step.specialCharacters3121View), surface: "treeView", render: (step) => {
       renderSpecialCharacters3121View(step);
     } },
