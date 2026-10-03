@@ -2151,7 +2151,7 @@ async function runViz() {
 
   if (isString) {
     input = $("arrInput").value.trim();
-    if (input.length === 0) {
+    if (input.length === 0 && Number(problemData.id) !== 32) {
       return showError("runError", t().errArr);
     }
   } else if (isStringArray) {

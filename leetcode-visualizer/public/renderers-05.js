@@ -3114,9 +3114,10 @@ function renderParen32View(step) {
   }).join("") || `<span class="p32-empty">${vi ? "stack rỗng" : "empty stack"}</span>`;
 
   let action;
-  if (view.event === "push") action = vi ? `Gặp '(' -> push chỉ số ${current}.` : `Found '(' -> push index ${current}.`;
+  if (["enter", "init-best", "boundary", "loop", "char-check", "close-branch", "empty-check", "measure-branch", "loop-exit"].includes(view.event)) action = pick(step.title);
+  else if (view.event === "push") action = vi ? `Gặp '(' -> push chỉ số ${current}.` : `Found '(' -> push index ${current}.`;
   else if (view.event === "pop") action = vi ? `Gặp ')' -> pop một '(' hoặc mốc trên đỉnh.` : `Found ')' -> pop one '(' or the top boundary.`;
-  else if (view.event === "reset") action = vi ? `Stack rỗng: ')' tại ${current} không ghép được, trở thành mốc mới.` : `Stack is empty: ')' at ${current} cannot match, so it becomes the new boundary.`;
+  else if (view.event === "reset") action = vi ? `Đặt mốc mới ${current}: ')' này không ghép được.` : `Set new boundary ${current}: this ')' is unmatched.`;
   else if (view.event === "best") action = vi ? `Đo được ${view.decision.length} ký tự và cập nhật best.` : `Measured ${view.decision.length} characters and updated best.`;
   else if (view.event === "measure") action = vi ? `Đo từ mốc + 1 đến i: ${view.decision.length} ký tự.` : `Measure from boundary + 1 through i: ${view.decision.length} characters.`;
   else if (view.event === "return") action = vi ? `Trả về best = ${view.best}.` : `Return best = ${view.best}.`;
@@ -3131,7 +3132,7 @@ function renderParen32View(step) {
       <section class="p32-panel"><header><strong>s</strong><span>${vi ? "xanh = best, vàng = đoạn đang đo" : "green = best, yellow = span being measured"}</span></header><div class="p32-chars" style="--p32-count:${Math.max(chars.length, 1)}">${charsHtml}</div></section>
       <section class="p32-stack"><header><strong>INDEX STACK</strong><span>${vi ? "đỉnh ở trên" : "top at top"}</span></header><div>${stackHtml}</div></section>
     </section>
-    <section class="p32-result"><span><small>best</small><strong>${view.best || 0}</strong></span><span><small>${vi ? "đoạn tốt nhất" : "best span"}</small><strong>${escapeHtml(bestText)}</strong></span><span><small>rule</small><strong>length = i - stack[-1]</strong></span></section>
+    <section class="p32-result"><span><small>best</small><strong>${view.best ?? "-"}</strong></span><span><small>${vi ? "đoạn tốt nhất" : "best span"}</small><strong>${escapeHtml(bestText)}</strong></span><span><small>rule</small><strong>length = i - stack[-1]</strong></span></section>
   </section>`;
 }
 

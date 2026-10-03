@@ -10452,190 +10452,116 @@ function buildSteps1977(input) {
  * the bars is the best valid range found so far.
  */
 function buildSteps32(input) {
-  let raw = String(input ?? "").replace(/[^()]/g, "");
-  if (raw.length > 22) raw = raw.slice(0, 22);
-  const s = raw || "()()";
-  const n = s.length;
-  const chars = s.split("");
+  const s = String(input ?? "");
+  if (!/^[()]*$/.test(s)) throw new Error("s may contain only '(' and ')'.");
+  if (s.length > 22) throw new Error("The visualizer supports at most 22 characters.");
+  const chars = [...s];
   const arr = chars.map((ch) => (ch === "(" ? 10 : 6));
-  const rawLabels = chars.slice();
-  const sub = chars.map((ch, i) => `${ch}[${i}]`);
+  const sub = chars.map((ch, index) => `${ch}[${index}]`);
   const steps = [];
-  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
-  const stack = [-1];
-  let best = 0;
-  let bestL = -1;
-  let bestR = -1;
-  const bestMark = () => (bestL >= 0 ? Array.from({ length: bestR - bestL + 1 }, (_, k) => bestL + k) : []);
-  const stackStr = () => `[${stack.join(", ")}]`;
-  const push32 = (meta, step) => {
+  let stack = null;
+  let best = null;
+  let i = null;
+  let ch = null;
+  let bestRange = null;
+  const label = (vi, en) => ({ vi, en });
+  // Snapshots show the state after the highlighted statement. Conditions and
+  // else headers never apply the mutations belonging to their branch body.
+  const record = (line, event, title, note, meta = {}) => {
+    const currentIndex = meta.currentIndex ?? (i === null ? -1 : i);
+    const vars = [{ name: "s", value: JSON.stringify(s) }];
+    if (best !== null) vars.push({ name: "best", value: best });
+    if (stack !== null) vars.push({ name: "stack", value: [...stack] });
+    if (i !== null) vars.push({ name: "i", value: i }, { name: "ch", value: ch });
     steps.push({
-      ...step,
+      title: label(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
+      note, arr, raw: [...chars], sub,
+      codeLines: [line], vars,
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: bestRange ? Array.from({ length: bestRange[1] - bestRange[0] + 1 }, (_, k) => bestRange[0] + k) : [],
+      final: event === "return",
       paren32View: {
-        s,
-        chars: [...chars],
-        phase: meta.phase,
-        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
-        stack: [...stack],
+        s, chars: [...chars],
+        phase: meta.phase || "scan",
+        currentIndex,
+        stack: stack === null ? [] : [...stack],
         best,
-        bestRange: bestL >= 0 ? [bestL, bestR] : null,
-        candidateRange: meta.candidateRange || null,
-        event: meta.event || "",
+        bestRange: bestRange ? [...bestRange] : null,
+        candidateRange: meta.candidateRange ? [...meta.candidateRange] : null,
+        event,
         decision: meta.decision || null,
+        debugLine: line,
       },
     });
   };
 
-  // ─── Phase 0: what "valid" means ───
-  push32({ phase: "init", event: "boundary" }, {
-    title: { vi: "Chuỗi ngoặc hợp lệ là gì?", en: "What counts as valid?" },
-    arr,
-    raw: rawLabels,
-    sub,
-    highlight: [],
-    mark: [],
-    codeLines: [1, 2],
-    vars: [
-      { name: "s", value: `"${s}"` },
-      { name: "hợp lệ", value: `"()", "()()", "(())"` },
-      { name: "không hợp lệ", value: `"(", ")(", "(()"` },
-    ],
-    note: {
-      vi: "Đoạn hợp lệ là đoạn con LIÊN TIẾP đóng mở đúng cặp. Cần tìm đoạn dài nhất. Chiến thuật: duyệt từng ký tự với một stack lưu CHỈ SỐ — dưới đáy là mốc ranh giới, phía trên là các '(' chưa được ghép.",
-      en: "A valid part is a CONTIGUOUS substring with correctly paired brackets. We need the longest one. Strategy: scan character by character keeping a stack of INDICES — a base marker at the bottom, unmatched '(' indices above.",
-    },
-  });
+  record(2, "enter", label("Gọi longestValidParentheses(s)", "Call longestValidParentheses(s)"),
+    label("Tìm đoạn con liên tiếp có ngoặc đóng mở đúng cặp. Hiện chỉ có tham số s.", "Find a contiguous substring with correctly paired brackets. Only parameter s is in scope."), { phase: "init" });
+  best = 0;
+  record(3, "init-best", label("best = 0", "best = 0"),
+    label("Chưa tìm được cặp hợp lệ; stack chưa được khởi tạo.", "No valid pair found yet; stack has not been initialized."), { phase: "init" });
+  stack = [-1];
+  record(4, "boundary", label("stack = [-1]", "stack = [-1]"),
+    label("Mốc -1 nằm trước đầu chuỗi, giúp đo cả đoạn hợp lệ bắt đầu tại index 0.", "Boundary -1 is before the string, allowing a valid span starting at index 0."), { phase: "init" });
 
-  // ─── Phase 1: scan with the index stack ───
-
-  for (let i = 0; i < n; i++) {
-    const ch = chars[i];
-    if (ch === "(") {
+  for (let index = 0; index < chars.length; index++) {
+    i = index;
+    ch = chars[i];
+    record(5, "loop", label(`i = ${i}, ch = '${ch}'`, `i = ${i}, ch = '${ch}'`),
+      label("Lấy ký tự tiếp theo từ enumerate(s); stack và best giữ nguyên.", "Take the next character from enumerate(s); stack and best are unchanged."));
+    const isOpen = ch === "(";
+    record(6, "char-check", label(`ch == '(' → ${isOpen ? "True" : "False"}`, `ch == '(' → ${isOpen ? "True" : "False"}`),
+      label("Chỉ kiểm tra điều kiện; chưa append hoặc pop.", "Only test the condition; no append or pop yet."), { decision: { isOpen } });
+    if (isOpen) {
       stack.push(i);
-      push32({ phase: "scan", currentIndex: i, event: "push", decision: { index: i, char: ch } }, {
-        title: { vi: `s[${i}]='(' → đẩy ${i} vào stack`, en: `s[${i}]='(' → push ${i} onto the stack` },
-        arr,
-        raw: rawLabels,
-        sub,
-        highlight: [i],
-        mark: bestMark(),
-        codeLines: [6, 7],
-        vars: [
-          { name: "stack", value: stackStr() },
-          { name: "best hiện tại", value: fmt(best) },
-          { name: "ý nghĩa", value: `'(' tại ${i} đang chờ một ')' để ghép` },
-        ],
-        note: {
-          vi: `Gặp '(' thì chưa biết nó có được ghép hay không — cứ đẩy chỉ số ${i} lên đỉnh stack để chờ.`,
-          en: `A '(' cannot be judged yet — just push its index ${i} and wait for a matching ')'.`,
-        },
-      });
+      record(7, "push", label(`stack.append(${i})`, `stack.append(${i})`),
+        label(`Lưu chỉ số ${i} của '(' chưa ghép vào đỉnh stack.`, `Push index ${i} of the unmatched '(' onto the stack.`));
     } else {
+      record(8, "close-branch", label("Đi vào else: ch là ')'", "Enter else: ch is ')'"),
+        label("Bắt đầu nhánh ngoặc đóng; stack chưa thay đổi.", "Enter the closing-parenthesis branch; stack is unchanged."));
       const popped = stack.pop();
-      push32({ phase: "scan", currentIndex: i, event: "pop", decision: { index: i, char: ch, popped } }, {
-        title: { vi: `s[${i}]=')' → pop phần tử trên cùng`, en: `s[${i}]=')' → pop the top element` },
-        arr,
-        raw: rawLabels,
-        sub,
-        highlight: [i],
-        mark: bestMark(),
-        codeLines: [8, 9],
-        vars: [
-          { name: "stack sau khi pop", value: stackStr() },
-          { name: "best hiện tại", value: fmt(best) },
-          { name: "vì sao pop", value: "')' cần một '(' để ghép — thử lấy trên đỉnh" },
-        ],
-        note: {
-          vi: `Gặp ')' thì chắc chắn có một cặp vừa khép lại: lấy '(' gần nhất trên đỉnh ra khỏi stack. Phần tử còn lại trên đỉnh sẽ cho biết đoạn hợp lệ bắt đầu từ đâu.`,
-          en: `A ')' closes exactly one pair: pop the nearest '(' from the stack. Whatever remains on top tells us where the valid stretch begins.`,
-        },
-      });
-
-      if (stack.length === 0) {
+      record(9, "pop", label(`stack.pop() → ${popped}`, `stack.pop() → ${popped}`),
+        label(popped === -1 || chars[popped] === ")"
+          ? `Pop mốc ${popped}; ')' này không có '(' để ghép. Kiểm tra stack ở dòng tiếp theo.`
+          : `Pop chỉ số ${popped} của '(' để ghép với ')' tại ${i}.`,
+        popped === -1 || chars[popped] === ")"
+          ? `Pop boundary ${popped}; this ')' has no matching '('. Check the stack next.`
+          : `Pop index ${popped} of '(' to match ')' at ${i}.`), { decision: { popped } });
+      const empty = stack.length === 0;
+      record(10, "empty-check", label(`not stack → ${empty ? "True" : "False"}`, `not stack → ${empty ? "True" : "False"}`),
+        label(empty ? "Stack rỗng; dòng tiếp theo sẽ đặt mốc mới." : "Stack còn mốc để đo đoạn hợp lệ; đi vào else.",
+          empty ? "The stack is empty; the next line will set a new boundary." : "A boundary remains for measuring a valid span; enter else."), { decision: { empty } });
+      if (empty) {
         stack.push(i);
-        push32({ phase: "scan", currentIndex: i, event: "reset", decision: { index: i, char: ch, boundary: i } }, {
-          title: { vi: `Stack trống ⇒ ')' tại ${i} vô cứu`, en: `Stack empty ⇒ the ')' at ${i} is orphaned` },
-          arr,
-          raw: rawLabels,
-          sub,
-          highlight: [i],
-          mark: bestMark(),
-          codeLines: [10, 11],
-          vars: [
-            { name: "stack", value: stackStr() },
-            { name: "best hiện tại", value: fmt(best) },
-            { name: "mốc mới", value: String(i) },
-          ],
-          note: {
-            vi: `Pop xong mà stack rỗng nghĩa là ')' này KHÔNG có '(' nào để ghép — mọi đoạn hợp lệ đều phải kết thúc trước vị trí đó. Đẩy ${i} xuống làm mốc ranh giới mới.`,
-            en: `Popping emptied the stack: this ')' has NO '(' left to pair with — any valid substring must end before it. Push ${i} as the new boundary marker.`,
-          },
-        });
+        record(11, "reset", label(`stack.append(${i})`, `stack.append(${i})`),
+          label(`')' tại ${i} không ghép được. Đặt mốc ${i}; đoạn hợp lệ sau này phải bắt đầu sau mốc này.`,
+            `')' at ${i} is unmatched. Set boundary ${i}; future valid spans must start after it.`), { decision: { boundary: i } });
       } else {
-        const length = i - stack[stack.length - 1];
+        const boundary = stack[stack.length - 1];
+        const candidateRange = [boundary + 1, i];
+        record(12, "measure-branch", label("Đi vào else: stack còn phần tử", "Enter else: stack is nonempty"),
+          label("Có thể tính i - stack[-1]; best chưa thay đổi.", "We can compute i - stack[-1]; best is unchanged."), { phase: "measure", candidateRange });
+        const length = i - boundary;
+        const oldBest = best;
         const improved = length > best;
-        if (improved) {
-          best = length;
-          bestL = stack[stack.length - 1] + 1;
-          bestR = i;
-        }
-        const candidateRange = [stack[stack.length - 1] + 1, i];
-        push32({ phase: "measure", currentIndex: i, event: improved ? "best" : "measure", candidateRange, decision: { index: i, length, improved, boundary: stack[stack.length - 1] } }, {
-          title: improved
-            ? { vi: `Đoạn [${bestL}..${i}] dài ${fmt(length)} ⇒ best = ${fmt(best)}`, en: `Segment [${bestL}..${i}] has length ${length} ⇒ best = ${best}` }
-            : { vi: `Đoạn [${stack[stack.length - 1] + 1}..${i}] dài ${fmt(length)}, chưa vượt best ${fmt(best)}`, en: `Segment [${stack[stack.length - 1] + 1}..${i}] has length ${length}, below best ${best}` },
-          arr,
-          raw: rawLabels,
-          sub,
-          highlight: [i],
-          mark: bestMark(),
-          codeLines: [12, 13],
-          vars: [
-            { name: "đỉnh stack (mốc)", value: String(stack[stack.length - 1]) },
-            { name: "độ dài = i − mốc", value: `${i} − (${stack[stack.length - 1]}) = ${length}` },
-            { name: "best", value: fmt(best) },
-          ],
-          note: improved
-            ? {
-              vi: `Mọi ký tự từ ${bestL} đến ${i} đều nằm trong các cặp đã khép kín ⇒ đoạn dài ${length}. Đây là kỷ lục mới — vùng màu xanh trên chuỗi cập nhật theo.`,
-              en: `Every character from ${bestL} through ${i} sits inside closed pairs ⇒ length ${length}. New record — watch the green region update.`,
-            }
-            : {
-              vi: `Từ mốc ${stack[stack.length - 1]} trở đi đến ${i} đều hợp lệ, dài ${length}, nhưng vẫn thua kỷ lục ${best} nên best giữ nguyên.`,
-              en: `Everything from marker ${stack[stack.length - 1]} up to ${i} is valid, length ${length}, yet the record ${best} stands.`,
-            },
-        });
+        best = Math.max(best, length);
+        if (improved) bestRange = [...candidateRange];
+        record(13, improved ? "best" : "measure",
+          label(`best = max(${oldBest}, ${i} - (${boundary})) → ${best}`, `best = max(${oldBest}, ${i} - (${boundary})) → ${best}`),
+          label(`Đoạn [${boundary + 1}..${i}] hợp lệ, dài ${length}. ${improved ? "Cập nhật kỷ lục." : "Giữ nguyên kỷ lục."}`,
+            `Span [${boundary + 1}..${i}] is valid, length ${length}. ${improved ? "Update the record." : "Keep the record."}`),
+          { phase: "measure", candidateRange, decision: { boundary, length, oldBest, improved } });
       }
     }
   }
-
-  // ─── Phase 2: result ───
-  push32({ phase: "done", event: "return", candidateRange: bestL >= 0 ? [bestL, bestR] : null, decision: { answer: best } }, {
-    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
-    arr,
-    raw: rawLabels,
-    sub,
-    highlight: [],
-    mark: bestMark(),
-    final: true,
-    codeLines: [14],
-    vars: [
-      { name: "answer", value: best },
-      ...(best > 0 ? [{ name: "đoạn dài nhất", value: `"${s.slice(bestL, bestR + 1)}" (tại [${bestL}..${bestR}])` }] : []),
-    ],
-    note: {
-      vi: best > 0
-        ? `Chuỗi con "${s.slice(bestL, bestR + 1)}" tại vị trí [${bestL}..${bestR}] là đoạn hợp lệ dài nhất, gồm ${best} ký tự.`
-        : "Không có ký tự nào ghép được thành cặp ⇒ đáp án 0.",
-      en: best > 0
-        ? `The substring "${s.slice(bestL, bestR + 1)}" at positions [${bestL}..${bestR}] is the longest valid part, ${best} characters long.`
-        : "No characters manage to form a pair ⇒ the answer is 0.",
-    },
-  });
-
+  record(5, "loop-exit", label("enumerate(s) đã hết ký tự", "enumerate(s) is exhausted"),
+    label("Kết thúc vòng for; i và ch giữ giá trị cuối nếu vòng lặp đã chạy.", "Exit the for loop; i and ch retain their last values if the loop ran."), { currentIndex: -1 });
+  record(14, "return", label(`return best → ${best}`, `return best → ${best}`),
+    label(bestRange ? `Đoạn dài nhất: "${s.slice(bestRange[0], bestRange[1] + 1)}", độ dài ${best}.` : "Không có cặp hợp lệ; trả về 0.",
+      bestRange ? `Longest span: "${s.slice(bestRange[0], bestRange[1] + 1)}", length ${best}.` : "No valid pair; return 0."),
+    { phase: "done", currentIndex: -1, candidateRange: bestRange, decision: { answer: best } });
   return { original: s, answer: best, steps };
 }
-
 /**
  * LeetCode 1190: Reverse Substrings Between Each Pair of Parentheses.
  *
@@ -10961,6 +10887,7 @@ module.exports = {
       "                    best = max(best, i - stack[-1])",
       "        return best",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps32,
   },
   1977: {
