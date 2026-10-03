@@ -205,25 +205,77 @@ function sa9018Current(state, copy) {
 }
 function sa9018IdLine(type, state, copy) {
   const selected = state.operation.serverType === type.serverType ? state.operation.number : null;
-  const maximum = Math.min(64, Math.max(type.nextId || 1, selected || 1, ...type.used, ...type.available));
+  const maximum = Math.min(64, Math.max(20, (type.nextId || 1) + 8, selected || 1, ...type.used, ...type.heap));
   const used = new Set(type.used);
-  const available = new Set(type.available);
-  return `<div class="sa9018-id-scroll" tabindex="0"><ol class="sa9018-id-line">${Array.from({ length: maximum }, (_, index) => {
+  const available = new Set(type.heap);
+  const inFlight = ["pop-gap", "take-fresh", "advance-next-id", "remove-used"].includes(state.event);
+  return `<div class="sa9018-id-scroll" tabindex="0" aria-label="${sa9018Escape(`${type.serverType}: 1, 2, 3, …, ∞`)}"><ol class="sa9018-id-line">${Array.from({ length: maximum }, (_, index) => {
     const number = index + 1;
-    const status = used.has(number) ? "used" : available.has(number) ? "free" : number === type.nextId ? "fresh" : "unknown";
+    const transit = selected === number && inFlight && !used.has(number) && !available.has(number);
+    const status = used.has(number) ? "used" : available.has(number) ? "free" : transit ? "transit"
+      : type.nextId !== null && number >= type.nextId ? "fresh" : "unknown";
     const active = selected === number ? " active" : "";
-    const label = status === "used" ? copy.occupied : status === "free" ? copy.reusable : status === "fresh" ? copy.fresh : "—";
-    return `<li class="${status}${active}" title="${sa9018Escape(`${type.serverType}-${number}: ${label}`)}"><small>${number}</small><span>${status === "used" ? "●" : status === "free" ? "↺" : status === "fresh" ? "+" : "·"}</span><em>${sa9018Escape(label)}</em></li>`;
-  }).join("")}</ol></div>`;
+    const label = status === "used" ? copy.occupied : status === "free" ? copy.reusable : status === "fresh" ? copy.fresh
+      : status === "transit" ? (sa9018Locale() === "vi" ? "đang chuyển" : "in flight") : "—";
+    const marker = number === type.nextId ? "next ↓" : number === type.heap[0] ? "min ↓" : "&nbsp;";
+    return `<li class="${status}${active}" data-number="${number}" data-status="${status}" title="${sa9018Escape(`${type.serverType}-${number}: ${label}`)}"><small>${marker}</small><strong>${number}</strong><em>${sa9018Escape(label)}</em></li>`;
+  }).join("")}<li class="sa9018-infinity"><strong>… → ∞</strong><em>${sa9018Locale() === "vi" ? "tiếp tục mãi" : "continues forever"}</em></li></ol></div>`;
+}
+function sa9018HeapTree(type, state, copy) {
+  const vi = sa9018Locale() === "vi";
+  if (!type.heap.length) return `<div class="sa9018-heap-empty"><strong>∅</strong><span>${sa9018Escape(copy.noFree)}</span><p>${vi ? "deallocate trả ID đang dùng vào heap." : "deallocate returns an allocated ID to the heap."}</p></div>`;
+  const levels = Math.floor(Math.log2(type.heap.length)) + 1;
+  const width = Math.max(340, 2 ** (levels - 1) * 62);
+  const height = levels * 78 + 28;
+  const point = (index) => {
+    const level = Math.floor(Math.log2(index + 1));
+    const slot = index - (2 ** level - 1);
+    return { x: width * (slot + 0.5) / 2 ** level, y: 44 + level * 78 };
+  };
+  const edges = type.heap.map((number, index) => {
+    if (!index) return "";
+    const parent = point(Math.floor((index - 1) / 2));
+    const child = point(index);
+    return `<line x1="${parent.x}" y1="${parent.y + 22}" x2="${child.x}" y2="${child.y - 22}" />`;
+  }).join("");
+  const nodes = type.heap.map((number, index) => {
+    const { x, y } = point(index);
+    const inserted = state.event === "push-gap" && state.operation.serverType === type.serverType && state.operation.number === number;
+    return `<g class="sa9018-heap-node${index === 0 ? " root" : ""}${inserted ? " inserted" : ""}" data-number="${number}" data-index="${index}"><circle cx="${x}" cy="${y}" r="23" /><text x="${x}" y="${y + 5}">${number}</text><text class="sa9018-node-label" x="${x}" y="${y + 38}">${index === 0 ? "MIN / ROOT" : `[${index}]`}</text></g>`;
+  }).join("");
+  return `<div class="sa9018-heap-scroll" tabindex="0"><svg class="sa9018-heap-tree${type.heap.length <= 7 ? " compact" : ""}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${sa9018Escape(`${type.serverType}: ${vi ? "cây min-heap ID trống" : "min-heap of free IDs"}`)}">${edges}${nodes}</svg></div>`;
+}
+function sa9018Transfer(type, state) {
+  const vi = sa9018Locale() === "vi";
+  const op = state.operation;
+  if (op.serverType !== type.serverType || !["allocate", "deallocate"].includes(op.kind)) return "";
+  const number = op.number ?? op.expectedNumber;
+  const call = `${op.kind}("${op.arg}")`;
+  let from;
+  let to;
+  let ignored = false;
+  if (op.kind === "allocate") {
+    from = op.source === "reused" || (!op.source && type.heap.length) ? (vi ? "Gốc min-heap" : "Min-heap root") : (vi ? "Dãy ID mới" : "Fresh ID sequence");
+    to = number === null ? "?" : `${type.serverType}-${number}`;
+  } else {
+    from = op.arg;
+    ignored = op.source === "no-op" || ["missing-check-true", "ignore-missing"].includes(state.event);
+    to = ignored ? (vi ? "Không được cấp → bỏ qua" : "Not allocated → ignore") : "MIN-HEAP";
+  }
+  return `<div class="sa9018-transfer" data-event="${state.event}"><b>${sa9018Escape(from)}</b><span>→</span><code>${sa9018Escape(call)}</code><span>${ignored ? "↛" : "→"}</span><b class="sa9018-transfer-result">${sa9018Escape(to)}</b></div>`;
 }
 function sa9018TypeCard(type, state, copy) {
   const chipList = (values, empty, className, names = false) => values.length
     ? `<ol class="${className}">${values.map((number, index) => `<li class="${index === 0 && className.includes("heap") ? "root" : ""}"><small>${index === 0 && className.includes("heap") ? "min" : names ? `#${number}` : `i=${index}`}</small><strong>${sa9018Escape(names ? `${type.serverType}-${number}` : number)}</strong></li>`).join("")}</ol>`
     : `<p class="sa9018-empty">${sa9018Escape(empty)}</p>`;
-  return `<article class="sa9018-type ${state.operation.serverType === type.serverType ? "active" : ""}"><header><div><small>SERVER TYPE</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${sa9018Escape(copy.smallest)}</span><strong>${type.smallestAvailable ?? "—"}</strong></div></header><div class="sa9018-type-summary"><span>${sa9018Escape(copy.next)} <strong>${type.nextId ?? "—"}</strong></span><span>${sa9018Escape(copy.used)} <strong>${type.used.length}</strong></span><span>${sa9018Escape(copy.free)} <strong>${type.heap.length}</strong></span></div><h5>${sa9018Escape(copy.numberLine)}</h5>${sa9018IdLine(type, state, copy)}<div class="sa9018-type-columns"><section><h5>${sa9018Escape(copy.used)}</h5>${chipList(type.used, copy.noUsed, "sa9018-used-list", true)}</section><section><h5>${sa9018Escape(copy.free)}</h5>${chipList(type.heap, copy.noFree, "sa9018-heap-list")}</section></div><div class="sa9018-sorted"><span>${sa9018Escape(copy.available)}</span><code>[${type.available.join(", ")}]</code></div></article>`;
+  const vi = sa9018Locale() === "vi";
+  const tailNote = type.nextId === null ? (vi ? "Đang đọc inventory và xây heap." : "Reading inventory and building the heap.")
+    : (vi ? `Từ ${type.nextId} trở đi, mọi ID đều chưa cấp. ID nhỏ hơn được tái sử dụng qua heap.` : `Every ID from ${type.nextId} onward is unallocated. Smaller free IDs are reused through the heap.`);
+  return `<article class="sa9018-type ${state.operation.serverType === type.serverType ? "active" : ""}" data-server-type="${sa9018Escape(type.serverType)}"><header><div><small>SERVER TYPE</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${sa9018Escape(copy.smallest)}</span><strong>${type.smallestAvailable ?? "—"}</strong></div></header><div class="sa9018-type-summary"><span>${sa9018Escape(copy.next)} <strong>${type.nextId ?? "—"}</strong></span><span>${sa9018Escape(copy.used)} <strong>${type.used.length}</strong></span><span>${sa9018Escape(copy.free)} <strong>${type.heap.length}</strong></span></div><h5>${sa9018Escape(copy.numberLine)} · 1, 2, 3, …, ∞</h5>${sa9018IdLine(type, state, copy)}<div class="sa9018-id-legend"><span class="used">${sa9018Escape(copy.occupied)}</span><span class="free">${vi ? "Trống trong heap" : "Free in heap"}</span><span class="fresh">${vi ? "ID mới chưa cấp" : "Unallocated fresh ID"}</span></div><p class="sa9018-tail-note">${tailNote}</p>${sa9018Transfer(type, state)}<div class="sa9018-type-columns"><section class="sa9018-heap-panel"><h5>MIN-HEAP · free[${sa9018Escape(type.serverType)}]</h5>${sa9018HeapTree(type, state, copy)}<div class="sa9018-heap-array"><small>${vi ? "Mảng heap" : "Heap array"}</small><code>[${type.heap.join(", ")}]</code></div></section><section class="sa9018-used-panel"><h5>${sa9018Escape(copy.used)}</h5>${chipList(type.used, copy.noUsed, "sa9018-used-list", true)}<p>${vi ? "allocate lấy gốc heap trước; heap rỗng thì dùng next_id. deallocate đưa ID vào heap của đúng loại." : "allocate takes the heap root first; if empty, use next_id. deallocate returns the ID to its own type's heap."}</p></section></div><div class="sa9018-sorted"><span>${sa9018Escape(copy.available)}</span><code>[${type.available.join(", ")}]</code></div></article>`;
 }
 function sa9018Types(state, copy) {
-  const body = state.types.length ? state.types.map((type) => sa9018TypeCard(type, state, copy)).join("")
+  const types = [...state.types].sort((left, right) => Number(right.serverType === state.operation.serverType) - Number(left.serverType === state.operation.serverType));
+  const body = types.length ? types.map((type) => sa9018TypeCard(type, state, copy)).join("")
     : `<p class="sa9018-empty large">${sa9018Escape(copy.noTypes)}</p>`;
   return `<section class="sa9018-card sa9018-types"><header><div><h3>${sa9018Escape(copy.types)}</h3><p>${sa9018Escape(copy.typesHelp)}</p></div><strong>${state.types.length}</strong></header><div class="sa9018-type-grid">${body}</div></section>`;
 }
@@ -254,5 +306,9 @@ function renderServerAllocator9018View(step) {
   const copy = SA9018_TEXT[locale];
   const state = sa9018Normalize(step);
   const note = state.note ? `<aside class="sa9018-note"><strong>${sa9018Escape(copy.note)}</strong><p>${sa9018Escape(state.note)}</p></aside>` : "";
-  host.innerHTML = `<article class="sa9018-viz ${state.final ? "final" : ""}" role="region" aria-label="Server allocator, ${sa9018Escape(copy.line)} ${state.source.line}"><header class="sa9018-header"><div><span>${sa9018Escape(copy.kicker)}</span><h2>${sa9018Escape(state.title)}</h2></div><div><strong>${sa9018Escape(copy.line)} ${state.source.line}</strong><span>${state.timing === "before" ? sa9018Escape(copy.before) : sa9018Escape(copy.after)}</span><em>${sa9018Escape(sa9018EventLabel(state.event))}</em></div></header>${sa9018Flow(state, copy)}${sa9018Source(state, copy)}${sa9018Current(state, copy)}${sa9018Types(state, copy)}<div class="sa9018-grid">${sa9018History(state, copy)}<div class="sa9018-side">${sa9018Checks(state, copy)}${sa9018Counters(state, copy, locale)}</div></div>${note}</article>`;
+  host.innerHTML = `<article class="sa9018-viz ${state.final ? "final" : ""}" role="region" aria-label="Server allocator, ${sa9018Escape(copy.line)} ${state.source.line}"><header class="sa9018-header"><div><span>${sa9018Escape(copy.kicker)}</span><h2>${sa9018Escape(state.title)}</h2></div><div><strong>${sa9018Escape(copy.line)} ${state.source.line}</strong><span>${state.timing === "before" ? sa9018Escape(copy.before) : sa9018Escape(copy.after)}</span><em>${sa9018Escape(sa9018EventLabel(state.event))}</em></div></header>${sa9018Types(state, copy)}${note}${sa9018History(state, copy)}<details class="sa9018-details"><summary>${locale === "vi" ? "Chi tiết dòng lệnh và trạng thái" : "Code and state details"}</summary><div>${sa9018Flow(state, copy)}${sa9018Source(state, copy)}${sa9018Current(state, copy)}<div class="sa9018-grid">${sa9018Checks(state, copy)}${sa9018Counters(state, copy, locale)}</div></div></details></article>`;
+  if (host.querySelectorAll) host.querySelectorAll(".sa9018-id-scroll").forEach((strip) => {
+    const target = strip.querySelector(".active") || strip.querySelector(".fresh");
+    if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
+  });
 }
