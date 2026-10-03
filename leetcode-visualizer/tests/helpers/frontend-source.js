@@ -42,6 +42,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-requested-visualizations.js',
   'renderer-hard-problems.js',
   'renderer-smallest-infinite-set-2336.js',
+  'renderer-special-characters-3121.js',
   'script.js',
 ]);
 
@@ -87,6 +88,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'requested-visualizations.css',
   'hard-problems.css',
   'smallest-infinite-set-2336.css',
+  'special-characters-3121.css',
 ]);
 
 const sourceCache = new Map();

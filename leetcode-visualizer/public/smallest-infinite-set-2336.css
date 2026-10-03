@@ -93,3 +93,19 @@
 @keyframes inf2336-restore { from { transform: translateY(-6px); } to { transform: translateY(0); } }
 @container (max-width: 540px) { .inf2336-bottom { grid-template-columns: minmax(0, 1fr); } .inf2336-heading h3 { font-size: 14px; } .inf2336-flow { gap: 7px; font-size: 11px; } }
 @media (prefers-reduced-motion: reduce) { .inf2336-number.just-added { animation: none; } }
+.inf2336-bm-bit { font: 700 17px monospace; padding: 4px 13px; border-radius: 4px; background: color-mix(in srgb, currentColor 12%, transparent); }
+.inf2336-bm .inf2336-number.popped { opacity: 0.85; color: var(--inf2336-red); }
+.inf2336-bm .inf2336-number.minimum { border-color: var(--inf2336-gold); }
+.inf2336-bm .inf2336-infinity { flex-basis: 160px; }
+.inf2336-bm-calculation { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; min-width: 0; }
+.inf2336-bm-math { overflow-x: auto; padding: 12px; }
+.inf2336-bm-row { display: grid; grid-template-columns: 180px max-content minmax(70px, 1fr); align-items: center; gap: 14px; padding: 6px 0; width: max-content; min-width: 100%; }
+.inf2336-bm-row > code:first-child { color: var(--inf2336-purple); font-size: 12px; }
+.inf2336-bm-row > span { color: var(--text-muted); font: 12px monospace; text-align: right; }
+.inf2336-bm-binary { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.inf2336-bm-binary em { color: var(--text-muted); font-style: normal; font-size: 11px; margin-right: 6px; }
+.inf2336-bm-digit { display: inline-flex; width: 22px; height: 27px; align-items: center; justify-content: center; background: color-mix(in srgb, var(--inf2336-purple) 9%, transparent); border-radius: 4px; }
+.inf2336-bm-digit.selected { color: var(--inf2336-gold); outline: 1px solid var(--inf2336-gold); font-weight: 700; }
+.inf2336-bm-math p { font-size: 11px; line-height: 1.6; color: var(--text-muted); margin: 10px 0 0; }
+.inf2336-bm-math p b, .inf2336-bm-preview { color: var(--inf2336-gold); }
+@container (max-width: 540px) { .inf2336-bm-row { grid-template-columns: 135px max-content 65px; gap: 8px; } .inf2336-bm-digit { width: 19px; } }

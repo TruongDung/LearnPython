@@ -86,3 +86,68 @@ function renderInfiniteSet2336View(step) {
   const target = strip.querySelector(".current") || strip.querySelector(".cursor");
   if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
 }
+
+function renderInfiniteSet2336BitmaskView(step) {
+  const view = step.infiniteSet2336BitmaskView;
+  const text = (vi, en) => lang === "vi" ? vi : en;
+  const mask = BigInt(view.removed);
+  const op = view.operation;
+  const calc = view.calculation;
+  const active = op?.value ?? (calc?.kind === "pop" ? BigInt(calc.bit).toString(2).length : null);
+  const cells = Array.from({ length: view.width }, (_, index) => {
+    const value = index + 1;
+    const bit = Number((mask >> BigInt(index)) & 1n);
+    const classes = ["inf2336-number", bit ? "popped" : "present"];
+    if (value === view.minimum) classes.push("minimum");
+    if (value === active) classes.push("current");
+    if (value === active && view.event === "set-removed") classes.push("just-popped");
+    if (value === active && view.event === "clear-removed") classes.push("just-added");
+    return `<div class="${classes.join(" ")}" data-value="${value}" data-bit="${bit}" data-present="${!bit}"><small>${value === view.minimum ? "min ↓" : `bit ${index}`}</small><strong>${value}</strong><b class="inf2336-bm-bit">${bit}</b><span>${bit ? text("đã lấy", "popped") : text("còn", "present")}</span></div>`;
+  }).join("");
+  const binaryWidth = Math.min(48, Math.max(8, mask.toString(2).length + 2, calc?.kind === "pop" ? BigInt(calc.bit).toString(2).length + 2 : 0));
+  const binary = (value, selected = false) => {
+    const number = BigInt(value);
+    const cropped = number >= 0n && number.toString(2).length > binaryWidth;
+    const bits = Array.from({ length: binaryWidth }, (_, index) => {
+      const position = binaryWidth - index - 1;
+      const bit = (number >> BigInt(position)) & 1n;
+      const highlighted = selected && calc && (BigInt(calc.bit) & (1n << BigInt(position))) !== 0n;
+      return `<span class="inf2336-bm-digit${highlighted ? " selected" : ""}" title="bit ${position} · ${text("số", "number")} ${position + 1}">${bit}</span>`;
+    }).join("");
+    return `<code class="inf2336-bm-binary"><em>${number < 0n ? "…111" : cropped ? "…" : "…000"}</em>${bits}</code>`;
+  };
+  const compact = value => {
+    const str = String(value);
+    if (str.length <= 24) return str;
+    const number = BigInt(value);
+    return number > 0n && (number & (number - 1n)) === 0n ? `2^${number.toString(2).length - 1}` : `${str.slice(0, 10)}…${str.slice(-8)}`;
+  };
+  const row = (label, value, selected = false) => `<div class="inf2336-bm-row"><code>${escapeHtml(label)}</code>${binary(value, selected)}<span>${compact(value)}</span></div>`;
+  let calculation = `<p>${text("Chọn bước popSmallest hoặc addBack để xem phép toán từng bit.", "Step into popSmallest or addBack to see the bit operations.")}</p>`;
+  if (calc?.kind === "pop") {
+    calculation = `${row("removed", calc.mask)}${row("removed + 1", calc.plusOne)}${row("~removed", calc.inverted)}${row("free_bit = (+1) & ~", calc.bit, true)}<p><code>free_bit.bit_length() = ${BigInt(calc.bit).toString(2).length}</code> · ${text("Số được lấy", "Popped number")}: <b>${active}</b></p><p>${text("Trong hàng nhị phân: bit 0 ở bên phải. ~removed có các bit 1 kéo dài bên trái.", "In binary rows, bit 0 is on the right. ~removed has leading ones extending to the left.")}</p>`;
+  } else if (calc?.kind === "add") {
+    calculation = `${row("removed", calc.mask)}${row(`bit = 1 << ${op.value - 1}`, calc.bit, true)}${row("removed & ~bit", calc.cleared)}<p>${op.accepted === false ? text("Số đã có trong tập → bỏ qua, mask không đổi.", "Already present → ignore; the mask stays unchanged.") : text("Nếu bit đang là 1, xóa nó để thêm số trở lại.", "If the bit is 1, clear it to restore the number.")}</p>`;
+    if (op.value > binaryWidth) calculation += `<p class="inf2336-bm-preview">${text("Chỉ hiển thị", "Preview shows only")} ${binaryWidth} ${text("bit thấp. Bit", "low bits. Bit")} ${op.value - 1} ${text("của số", "for number")} ${op.value} ${text("nằm ngoài khung; dấu … biểu thị phần đã ẩn.", "is outside the preview; … marks the omitted high bits.")}</p>`;
+  }
+  let transition = text("Mọi bit bằng 0: tập chứa 1, 2, 3, …", "All bits start at 0: the set contains 1, 2, 3, …");
+  if (op?.name === "popSmallest") transition = `popSmallest() → ${active ?? "?"} · ${text("bật bit", "set bit")} 0 → 1`;
+  if (op?.name === "addBack") transition = `addBack(${op.value}) · ${op.accepted === false ? text("đã có → bỏ qua", "already present → ignore") : text("xóa bit", "clear bit") + " 1 → 0"}`;
+  if (view.event === "done") transition = text("Hoàn tất · mask ghi nhớ các số hiện đang bị lấy khỏi tập", "Complete · the mask records numbers currently removed from the set");
+  const outputs = view.history.map((entry, index) => `<span class="inf2336-output${entry.result === null ? " none" : ""}"><small>#${index + 1} ${escapeHtml(entry.label)}</small><b>${entry.result ?? "None"}</b></span>`).join("");
+  $("treeView").innerHTML = `<section class="inf2336-viz inf2336-bm" aria-label="${text("Mô phỏng Bitmask bài 2336", "2336 bitmask simulation")}">
+    <header class="inf2336-heading"><div><small>2336 · CÁCH 2 / APPROACH 2</small><h3>${text("Bitmask: mỗi bit đại diện một số", "Bitmask: one bit per number")}</h3></div><span class="inf2336-min">min = ${view.minimum}</span></header>
+    <section class="inf2336-list-panel"><header><strong>${text("SỐ k ↔ BIT k−1", "NUMBER k ↔ BIT k−1")}</strong><span>removed = ${view.removed}</span></header>
+      <div class="inf2336-strip">${cells}<div class="inf2336-infinity"><strong>0, 0, …</strong><span>${text("mọi số tiếp theo vẫn còn", "all later numbers are present")}</span></div></div>
+      <div class="inf2336-legend"><span class="present">0 = ${text("còn trong tập", "present")}</span><span class="popped">1 = ${text("đã bị lấy", "removed")}</span></div>
+      <p>${text("Ban đầu removed = 0. Những bit cao hơn luôn được hiểu là 0; không cần tạo một list vô hạn.", "Initially removed = 0. Higher bits are implicitly zero; no infinite list needs to be created.")}</p>
+    </section>
+    <section class="inf2336-flow" data-event="${view.event}"><code>${escapeHtml(transition)}</code></section>
+    <p class="inf2336-action">${escapeHtml(pick(step.title))}</p>
+    <section class="inf2336-bm-calculation"><header><strong>${text("PHÉP TOÁN BIT", "BIT OPERATIONS")}</strong><span>${text("Trạng thái trước phép cập nhật", "State before the update")}</span></header><div class="inf2336-bm-math">${calculation}</div></section>
+    <section class="inf2336-results"><header><strong>${text("KẾT QUẢ THAO TÁC", "OPERATION OUTPUTS")}</strong></header><div>${outputs || text("Chưa có thao tác hoàn tất", "No completed operations yet")}</div></section>
+  </section>`;
+  const strip = $("treeView").querySelector(".inf2336-strip");
+  const target = strip.querySelector(".current") || strip.querySelector(".minimum");
+  if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
+}

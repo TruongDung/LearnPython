@@ -225,6 +225,29 @@ body.light .sa9018-viz,
 .sa9018-details { border: 1px solid var(--sa-border); border-radius: 10px; background: var(--sa-panel); }
 .sa9018-details > summary { padding: 12px; color: var(--sa-cyan); font-size: .7rem; cursor: pointer; }
 .sa9018-details > div { display: grid; gap: 12px; padding: 0 12px 12px; }
+.sa9018-bm-mask { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; color: var(--sa-cyan); font-size: .72rem; }
+.sa9018-bm-mask code { color: var(--sa-violet); overflow-wrap: anywhere; }
+.sa9018-bm-strip { position: relative; overflow-x: auto; padding: 4px 12px 10px; }
+.sa9018-bm-strip ol { display: flex; gap: 5px; list-style: none; padding: 0; margin: 0; min-width: max-content; }
+.sa9018-bm-strip li { flex: 0 0 53px; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1px solid var(--sa-green); padding: 7px 3px; border-radius: 8px; color: var(--sa-green); background: color-mix(in srgb, var(--sa-green) 9%, var(--sa-panel)); }
+.sa9018-bm-strip li.used { color: var(--sa-blue); border-color: var(--sa-blue); background: color-mix(in srgb, var(--sa-blue) 12%, var(--sa-panel)); }
+.sa9018-bm-strip li.minimum { color: var(--sa-amber); border-color: var(--sa-amber); }
+.sa9018-bm-strip li.active { outline: 2px solid var(--sa-amber); outline-offset: 1px; }
+.sa9018-bm-strip li small, .sa9018-bm-strip li em { font-size: .55rem; font-style: normal; }
+.sa9018-bm-strip li strong { font-size: 24px; }
+.sa9018-bm-strip li.sa9018-bm-tail { flex-basis: 140px; justify-content: center; border-color: transparent; }
+.sa9018-bm-strip li.sa9018-bm-tail strong { font-size: 18px; }
+.sa9018-bm-explainer p { font-size: .7rem; color: var(--sa-muted); line-height: 1.6; }
+.sa9018-bm-formula { color: var(--sa-amber); font-family: monospace; font-size: .8rem; overflow-wrap: anywhere; }
+.sa9018-bm-table { overflow-x: auto; margin-top: 12px; }
+.sa9018-bm-table table { border-collapse: collapse; width: 100%; }
+.sa9018-bm-table th, .sa9018-bm-table td { border-bottom: 1px solid var(--sa-border); padding: 9px 5px; white-space: nowrap; text-align: left; font-size: .63rem; }
+.sa9018-bm-table th { color: var(--sa-cyan); font-weight: 400; }
+.sa9018-bm-digits { font-family: monospace; }
+.sa9018-bm-digits span { display: inline-block; padding: 3px; color: var(--sa-muted); }
+.sa9018-bm-digits span.selected { color: var(--sa-amber); background: color-mix(in srgb, var(--sa-amber) 16%, transparent); font-weight: 800; }
+.sa9018-bitmask .sa9018-details code { overflow-wrap: anywhere; font-size: .68rem; }
+.sa9018-bitmask .sa9018-details p { color: var(--sa-muted); font-size: .64rem; line-height: 1.6; }
 .sa9018-used-list,
 .sa9018-heap-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .sa9018-used-list li,

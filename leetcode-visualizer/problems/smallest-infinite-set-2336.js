@@ -1,6 +1,7 @@
 "use strict";
 
 const { bi, createTracer } = require("./hard-viz-shared");
+const BITMASK_2336 = require("./smallest-infinite-set-2336-bitmask");
 
 const PROBLEM_ID = 2336;
 const MAX_OPERATIONS = 40;
@@ -252,6 +253,7 @@ module.exports = {
     tags: [
       { key: "heap", vi: "Heap / Hàng đợi ưu tiên", en: "Heap / Priority Queue" },
       { key: "hash-set", vi: "Hash Set", en: "Hash Set" },
+      { key: "bitmask", vi: "Bitmask", en: "Bitmask" },
     ],
     title: bi("Số nhỏ nhất trong tập vô hạn", "Smallest Number in Infinite Set"),
     titleVi: bi("Cấp số nhỏ nhất và cho phép trả lại", "Allocate the smallest number and add it back"),
@@ -259,20 +261,32 @@ module.exports = {
     defaultInput: '[["popSmallest"],["popSmallest"],["popSmallest"],["addBack",3],["addBack",1],["addBack",2],["popSmallest"],["popSmallest"],["popSmallest"],["popSmallest"]]',
     inputKind: "string",
     inputLabel: bi("Operations JSON", "Operations JSON"),
-    extraParams: [],
+    extraParams: [{
+      key: "approach", type: "select", default: 1,
+      label: bi("Cách giải", "Approach"),
+      options: [
+        { value: 1, label: bi("Cách 1: Min-heap + con trỏ", "Approach 1: Min-heap + cursor") },
+        { value: 2, label: bi("Cách 2: Bitmask", "Approach 2: Bitmask") },
+      ],
+    }],
     debugMode: "line-by-line",
     approach: [
       bi("next_smallest đại diện cho đuôi vô hạn chưa từng bị lấy.", "next_smallest represents the untouched infinite tail."),
       bi("Min-heap chứa các số nhỏ hơn con trỏ đã được addBack.", "A min-heap stores numbers below the cursor that were added back."),
       bi("Hash set ngăn một số xuất hiện hai lần trong heap.", "A hash set prevents duplicate heap entries."),
+      bi("Cách 2: removed lưu các số đã bị lấy (bit 1). Tìm bit 0 thấp nhất để pop; xóa bit để addBack. Các bit cao mặc định bằng 0 biểu diễn phần tập vô hạn vẫn còn.", "Approach 2: removed stores popped numbers (1 bits). Find the lowest zero bit to pop; clear its bit to addBack. Implicit higher zero bits represent the remaining infinite set."),
     ],
     complexity: {
-      time: "pop/add O(log k)",
-      space: "O(k)",
-      note: bi("k là số phần tử đã addBack đang chờ trong heap.", "k is the number of added-back values waiting in the heap."),
+      time: "Heap: pop/add O(log k); bitmask: O(W) per call",
+      space: "Heap: O(k); bitmask: O(W)",
+      note: bi("k là số đã addBack đang chờ trong heap. W là số word của integer trong phép toán; Python int có độ dài tùy ý nên bitmask không luôn O(1).", "k counts added-back values waiting in the heap. W counts integer words involved in the operation; Python ints have arbitrary precision, so bitmask is not always O(1)."),
     },
     code: SOURCE,
+    codeLabel: bi("Cách 1: Min-heap + con trỏ", "Approach 1: Min-heap + cursor"),
+    code2: BITMASK_2336.SOURCE,
+    code2Label: bi("Cách 2: Bitmask", "Approach 2: Bitmask"),
     parseOperations,
     builder: buildSteps,
+    builder2: input => BITMASK_2336.buildSteps(input, parseOperations),
   },
 };

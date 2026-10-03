@@ -312,3 +312,62 @@ function renderServerAllocator9018View(step) {
     if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
   });
 }
+
+function renderServerAllocator9018BitmaskView(step) {
+  const host = typeof document !== "undefined" && document.getElementById
+    ? document.getElementById("treeView") : typeof $ === "function" ? $("treeView") : null;
+  if (!host) return;
+  const view = step.serverAllocator9018BitmaskView;
+  const vi = sa9018Locale() === "vi";
+  const text = (vn, en) => vi ? vn : en;
+  const op = view.operation;
+  const activeType = op?.serverType;
+  const selected = op?.number;
+  const types = [...view.types].sort((a, b) => Number(b.serverType === activeType) - Number(a.serverType === activeType));
+  const typeCards = types.map(type => {
+    const mask = BigInt(type.mask);
+    const width = Math.max(12, Math.min(64, type.width));
+    const cells = Array.from({ length: width }, (_, index) => {
+      const id = index + 1;
+      const used = Boolean(mask & (1n << BigInt(index)));
+      const active = activeType === type.serverType && selected === id;
+      return `<li class="${used ? "used" : "free"}${id === type.minimum ? " minimum" : ""}${active ? " active" : ""}" data-id="${id}" data-bit="${used ? 1 : 0}"><small>ID ${id}</small><strong>${used ? 1 : 0}</strong><em>bit ${index}</em></li>`;
+    }).join("");
+    return `<article class="sa9018-type${type.serverType === activeType ? " active" : ""}" data-server-type="${sa9018Escape(type.serverType)}"><header><div><small>USED MASK${type.preview ? ` · ${text("loại mới", "new type")}` : ""}</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${text("ID trống nhỏ nhất", "Smallest available ID")}</span><strong>${type.minimum}</strong></div></header>
+      <div class="sa9018-bm-mask"><span>mask = ${sa9018Escape(type.mask)}</span><code>0b${mask.toString(2)}</code></div>
+      <div class="sa9018-bm-strip" tabindex="0"><ol>${cells}<li class="sa9018-bm-tail"><strong>0, 0, …</strong><em>${text("ID cao hơn đều trống", "Higher IDs are all free")}</em></li></ol></div>
+      <p class="sa9018-tail-note">${text("ID tăng từ trái sang phải. Bit 1 = đang cấp; bit 0 = trống. Ô vàng là bit 0 thấp nhất.", "IDs increase left to right. Bit 1 = allocated; bit 0 = free. Gold marks the lowest zero bit.")}</p></article>`;
+  });
+
+  let calculation = "";
+  if (view.calculation) {
+    const calc = view.calculation;
+    const values = calc.kind === "allocate" ? [
+      ["mask", calc.mask], ["mask + 1", calc.plusOne], ["~mask", calc.inverted], ["free_bit = (mask + 1) & ~mask", calc.freeBit],
+    ] : [["mask", calc.mask], ["bit = 1 << (number - 1)", calc.bit], ["mask & ~bit", calc.cleared]];
+    const positive = values.map(([, value]) => BigInt(value)).filter(value => value >= 0n);
+    const width = Math.max(8, ...positive.map(value => value.toString(2).length + 1));
+    const clip = (1n << BigInt(width)) - 1n;
+    const selectedBit = calc.kind === "allocate" ? BigInt(calc.freeBit) : BigInt(calc.bit);
+    const rows = values.map(([label, decimal]) => {
+      const value = BigInt(decimal);
+      const digits = (value & clip).toString(2).padStart(width, "0");
+      const bits = [...digits].map((digit, index) => `<span class="${(1n << BigInt(width - index - 1)) === selectedBit ? "selected" : ""}">${digit}</span>`).join("");
+      return `<tr><th><code>${sa9018Escape(label)}</code></th><td class="sa9018-bm-digits">${bits}</td><td>${value < 0n ? `… ${text("bit dấu 1", "sign bits 1")}` : sa9018Escape(decimal)}</td></tr>`;
+    }).join("");
+    const formula = calc.kind === "allocate" ? "free_bit = (mask + 1) & ~mask" : "used_masks[type] = mask & ~bit";
+    calculation = `<section class="sa9018-card sa9018-bm-calculation"><header><div><h3>${text("Phép toán bit đang chạy", "Current bit operation")}</h3><p>${text("Nhị phân: bit thấp nhất ở bên phải; cột vàng là bit của ID đang xét.", "Binary: the lowest bit is on the right; the gold column is the selected ID bit.")}</p></div></header><strong class="sa9018-bm-formula">${formula}</strong><div class="sa9018-bm-table" tabindex="0"><table>${rows}</table></div><p class="sa9018-tail-note">${text("Các hàng tính toán dùng mask trước thao tác. Dãy bit phía trên là trạng thái ở dòng hiện tại.", "Calculation rows use the mask before the operation. The bit strip above shows the current line's state.")}</p></section>`;
+  }
+  const call = op ? op.kind === "init" ? op.arg : `${op.kind}("${op.arg}")` : text("Sẵn sàng", "Ready");
+  const outputRows = view.history.map((entry, index) => `<li><small>#${index + 1} ${sa9018Escape(entry.call)}</small><code>${sa9018Escape(entry.result ?? "None")}</code></li>`).join("");
+  host.innerHTML = `<article class="sa9018-viz sa9018-bitmask" role="region" aria-label="9018 Bitmask"><header class="sa9018-header"><div><span>9018 · ${text("CÁCH 2: BITMASK", "APPROACH 2: BITMASK")}</span><h2>${sa9018Escape(sa9018Text(step.title, vi ? "vi" : "en"))}</h2></div><div><strong>${text("DÒNG", "LINE")} ${view.line}</strong><code>${sa9018Escape(call)}</code></div></header>
+    <section class="sa9018-card sa9018-bm-explainer"><h3>${text("Một bit cho mỗi ID, một mask cho mỗi loại", "One bit per ID, one mask per type")}</h3><p>${text("Bit k−1 biểu diễn ID k. Không cần danh sách vô hạn, heap hay con trỏ.", "Bit k−1 represents ID k. No infinite list, heap, or cursor is needed.")}</p></section>
+    <div class="sa9018-type-grid">${typeCards[0] || `<p class="sa9018-empty large">${text("Chưa đọc loại server nào", "No server type read yet")}</p>`}</div>
+    ${calculation}${typeCards.length > 1 ? `<details class="sa9018-details"><summary>${text("Mask của các loại server khác", "Masks of other server types")}</summary><div>${typeCards.slice(1).join("")}</div></details>` : ""}<aside class="sa9018-note"><strong>${text("Ý nghĩa dòng này", "What this line does")}</strong><p>${sa9018Escape(sa9018Text(step.note, vi ? "vi" : "en"))}</p></aside>
+    <section class="sa9018-card"><h3>${text("Kết quả thao tác", "Operation outputs")}</h3><ol class="sa9018-outputs">${outputRows}</ol></section>
+    <details class="sa9018-details"><summary>${text("Dòng Python hiện tại", "Current Python line")}</summary><div><code>${sa9018Escape(view.source)}</code><p>${text("Python int có độ dài tùy ý. Phép toán mask tốn O(W), với W là số word lưu mask; ID rất lớn và thưa có thể tốn bộ nhớ.", "Python ints have arbitrary precision. Mask operations cost O(W), where W is the mask's word count; very large sparse IDs may consume substantial memory.")}</p></div></details></article>`;
+  if (host.querySelectorAll) host.querySelectorAll(".sa9018-bm-strip").forEach(strip => {
+    const target = strip.querySelector(".active") || strip.querySelector(".minimum");
+    if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
+  });
+}

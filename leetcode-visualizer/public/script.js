@@ -10,6 +10,15 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
     } },
+    { predicate: (step) => Boolean(step.specialCharacters3121View), surface: "treeView", render: (step) => {
+      renderSpecialCharacters3121View(step);
+    } },
+    { predicate: (step) => Boolean(step.serverAllocator9018BitmaskView), surface: "treeView", render: (step) => {
+      renderServerAllocator9018BitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.infiniteSet2336BitmaskView), surface: "treeView", render: (step) => {
+      renderInfiniteSet2336BitmaskView(step);
+    } },
     { predicate: (step) => Boolean(step.infiniteSet2336View), surface: "treeView", render: (step) => {
       renderInfiniteSet2336View(step);
     } },
