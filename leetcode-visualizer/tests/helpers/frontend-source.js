@@ -44,6 +44,10 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-smallest-infinite-set-2336.js',
   'renderer-special-characters-3121.js',
   'renderer-disappeared-numbers-448.js',
+  'renderer-partition-equal-subset-416.js',
+  'renderer-valid-parenthesis-string-678.js',
+  'renderer-furthest-houses-2078.js',
+  'renderer-maximum-distance-1855.js',
   'script.js',
 ]);
 
@@ -91,6 +95,10 @@ const STYLESHEET_ASSETS = Object.freeze([
   'smallest-infinite-set-2336.css',
   'special-characters-3121.css',
   'disappeared-numbers-448.css',
+  'partition-equal-subset-416.css',
+  'valid-parenthesis-string-678.css',
+  'furthest-houses-2078.css',
+  'maximum-distance-1855.css',
 ]);
 
 const sourceCache = new Map();

@@ -10,6 +10,18 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
     } },
+    { predicate: (step) => Boolean(step.maximumDistance1855View), surface: "treeView", render: (step) => {
+      renderMaximumDistance1855View(step);
+    } },
+    { predicate: (step) => Boolean(step.furthestHouses2078View || step.furthestHouses2078ScanView), surface: "treeView", render: (step) => {
+      renderFurthestHouses2078View(step);
+    } },
+    { predicate: (step) => Boolean(step.validParenthesis678View), surface: "treeView", render: (step) => {
+      renderValidParenthesis678View(step);
+    } },
+    { predicate: (step) => Boolean(step.equalSubset416View), surface: "treeView", render: (step) => {
+      renderEqualSubset416View(step);
+    } },
     { predicate: (step) => Boolean(step.disappearedNumbers448View), surface: "treeView", render: (step) => {
       renderDisappearedNumbers448View(step);
     } },
