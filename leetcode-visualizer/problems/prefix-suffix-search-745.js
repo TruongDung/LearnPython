@@ -125,14 +125,14 @@ module.exports = {
     title: bi("Tìm từ theo tiền tố và hậu tố", "Prefix and Suffix Search"),
     titleVi: bi("Lập bảng prefix/suffix giữ index lớn nhất", "Index prefix/suffix pairs with the largest word index"),
     statement: bi("WordFilter(words) nhận danh sách từ. f(pref,suff) trả index lớn nhất của từ bắt đầu bằng pref và kết thúc bằng suff; không có thì trả -1. Prefix và suffix có thể chồng lên nhau.", "WordFilter(words) indexes the dictionary. f(pref,suff) returns the largest index of a word starting with pref and ending with suff, or -1 if none exists. Prefix and suffix may overlap."),
-    defaultInput: ["apple", "apply", "apple"], inputKind: "stringArray",
+    defaultInput: ["apple"], inputKind: "stringArray",
     inputLabel: bi("words (1–10 từ; mỗi từ 1–7 chữ a-z)", "words (1–10 words; each 1–7 lowercase letters)"),
     extraParams: [
       { key: "approach", type: "select", default: 1, label: bi("Cách giải", "Approach"), options: [
         { value: 1, label: bi("Cách 1: Hash Map prefix/suffix", "Approach 1: Prefix/suffix Hash Map") },
         { value: 2, label: bi("Cách 2: Trie + đảo suffix", "Approach 2: Trie + reversed suffix") },
       ] },
-      { key: "queries", type: "string", default: '[["a","e"],["app","ly"],["x","e"],["apple","apple"]]', label: bi("queries JSON (1–12 cặp [pref,suff])", "queries JSON (1–12 [pref,suff] pairs)") },
+      { key: "queries", type: "string", default: '[["a","e"]]', label: bi("queries JSON (1–12 cặp [pref,suff])", "queries JSON (1–12 [pref,suff] pairs)") },
     ],
     debugMode: "line-by-line",
     approach: [
