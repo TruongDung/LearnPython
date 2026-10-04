@@ -2660,15 +2660,17 @@ function updateCodeHighlight(activeLines, codeBlock) {
       }
     });
 
-  // Auto-scroll to active line (line-by-line debug mode)
+  // Follow the active line inside the code panel without scrolling the page.
   if (firstActiveRow && panel) {
     setTimeout(() => {
+      if (!firstActiveRow.isConnected || !firstActiveRow.classList.contains("active")) return;
       const panelRect = panel.getBoundingClientRect();
       const rowRect = firstActiveRow.getBoundingClientRect();
-      
-      // If row is not fully visible in viewport
-      if (rowRect.top < panelRect.top || rowRect.bottom > panelRect.bottom) {
-        firstActiveRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      const top = panelRect.top + panel.clientTop;
+      const bottom = top + panel.clientHeight;
+
+      if (rowRect.top < top || rowRect.bottom > bottom) {
+        panel.scrollTop += rowRect.top - top - (panel.clientHeight - rowRect.height) / 2;
       }
     }, 0);
   }

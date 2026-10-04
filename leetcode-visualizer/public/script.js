@@ -1179,9 +1179,22 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
 ];
 
+let prefixSuffix745Layout = null;
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
+
+  const panel = $("vizPanel");
+  const keepViewport = Boolean(step.prefixSuffix745View || step.prefixSuffix745TrieView);
+  const viewport = { left: window.scrollX, top: window.scrollY };
+  panel.classList.toggle("ps745-stable-viewport", keepViewport);
+  // Reserve the tallest frame seen in this run so shorter frames cannot pull
+  // the viewport upward when the user is near the bottom of the page.
+  if (!keepViewport || prefixSuffix745Layout?.steps !== steps || prefixSuffix745Layout?.width !== panel.clientWidth) {
+    panel.style.minHeight = "";
+    prefixSuffix745Layout = keepViewport ? { steps, width: panel.clientWidth, height: 0 } : null;
+  }
 
   $("stepTitle").textContent = pick(step.title);
   $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
@@ -1219,6 +1232,12 @@ function renderStep() {
     show("answer");
   } else {
     hide("answer");
+  }
+
+  if (keepViewport) {
+    prefixSuffix745Layout.height = Math.max(prefixSuffix745Layout.height, panel.getBoundingClientRect().height);
+    panel.style.minHeight = `${Math.ceil(prefixSuffix745Layout.height)}px`;
+    window.scrollTo({ ...viewport, behavior: "instant" });
   }
 }
 
