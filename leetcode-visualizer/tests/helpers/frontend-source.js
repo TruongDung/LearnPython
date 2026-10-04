@@ -49,6 +49,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-furthest-houses-2078.js',
   'renderer-maximum-distance-1855.js',
   'renderer-prefix-suffix-search-745.js',
+  'renderer-prefix-suffix-trie-745.js',
   'renderer-match-substring-replacement-2301.js',
   'renderer-vowel-substrings-3306.js',
   'script.js',
@@ -103,6 +104,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'furthest-houses-2078.css',
   'maximum-distance-1855.css',
   'prefix-suffix-search-745.css',
+  'prefix-suffix-trie-745.css',
   'match-substring-replacement-2301.css',
   'vowel-substrings-3306.css',
 ]);

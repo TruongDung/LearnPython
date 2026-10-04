@@ -16,6 +16,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.matchReplacement2301View), surface: "treeView", render: (step) => {
       renderMatchReplacement2301View(step);
     } },
+    { predicate: (step) => Boolean(step.prefixSuffix745TrieView), surface: "treeView", render: (step) => {
+      renderPrefixSuffix745TrieView(step);
+    } },
     { predicate: (step) => Boolean(step.prefixSuffix745View), surface: "treeView", render: (step) => {
       renderPrefixSuffix745View(step);
     } },

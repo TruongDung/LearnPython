@@ -1,6 +1,7 @@
 "use strict";
 
 const { bi, parseStringArray, parsePlainParams } = require("./hard-viz-shared");
+const TRIE_745 = require("./prefix-suffix-trie-745");
 const SOURCE = Object.freeze([
   "class WordFilter:",
   "    def __init__(self, words: list[str]):",
@@ -120,21 +121,31 @@ module.exports = {
   745: {
     id: 745, difficulty: "hard", slug: "prefix-and-suffix-search",
     category: { key: "design", vi: "Thiết kế hệ thống", en: "Design" },
-    tags: [{ key: "hashmap", vi: "Hash Map", en: "Hash Map" }, { key: "string", vi: "Chuỗi", en: "String" }],
+    tags: [{ key: "hashmap", vi: "Hash Map", en: "Hash Map" }, { key: "string", vi: "Chuỗi", en: "String" }, { key: "trie", vi: "Trie", en: "Trie" }],
     title: bi("Tìm từ theo tiền tố và hậu tố", "Prefix and Suffix Search"),
     titleVi: bi("Lập bảng prefix/suffix giữ index lớn nhất", "Index prefix/suffix pairs with the largest word index"),
     statement: bi("WordFilter(words) nhận danh sách từ. f(pref,suff) trả index lớn nhất của từ bắt đầu bằng pref và kết thúc bằng suff; không có thì trả -1. Prefix và suffix có thể chồng lên nhau.", "WordFilter(words) indexes the dictionary. f(pref,suff) returns the largest index of a word starting with pref and ending with suff, or -1 if none exists. Prefix and suffix may overlap."),
     defaultInput: ["apple", "apply", "apple"], inputKind: "stringArray",
     inputLabel: bi("words (1–10 từ; mỗi từ 1–7 chữ a-z)", "words (1–10 words; each 1–7 lowercase letters)"),
-    extraParams: [{ key: "queries", type: "string", default: '[["a","e"],["app","ly"],["x","e"],["apple","apple"]]', label: bi("queries JSON (1–12 cặp [pref,suff])", "queries JSON (1–12 [pref,suff] pairs)") }],
+    extraParams: [
+      { key: "approach", type: "select", default: 1, label: bi("Cách giải", "Approach"), options: [
+        { value: 1, label: bi("Cách 1: Hash Map prefix/suffix", "Approach 1: Prefix/suffix Hash Map") },
+        { value: 2, label: bi("Cách 2: Trie + đảo suffix", "Approach 2: Trie + reversed suffix") },
+      ] },
+      { key: "queries", type: "string", default: '[["a","e"],["app","ly"],["x","e"],["apple","apple"]]', label: bi("queries JSON (1–12 cặp [pref,suff])", "queries JSON (1–12 [pref,suff] pairs)") },
+    ],
     debugMode: "line-by-line",
     approach: [
       bi("Với mỗi từ, ghép mọi prefix không rỗng với mọi suffix không rỗng. Lưu lookup[(pref,suff)] = index.", "For each word, pair every nonempty prefix with every nonempty suffix. Store lookup[(pref,suff)] = index."),
       bi("Index tăng dần nên khóa trùng được ghi đè bởi index lớn hơn. Từ trùng nhau vẫn có index riêng.", "Indices increase, so duplicate keys are overwritten with a larger index. Duplicate words still have distinct indices."),
       bi("f tạo khóa rồi tra bảng, không quét lại words. Thiếu khóa thì trả -1. Hai đoạn có thể chồng lên nhau.", "f builds the key and looks it up without scanning words. Missing keys return -1. Prefix and suffix may overlap."),
+      bi("Cách 2 giữ ý tưởng Trie và suffix đảo ngược: chèn mọi word[:p] + '{' + word[::-1], p = 1..L. Truy vấn đi theo pref + '{' + suff[::-1] và trả index tại nút cuối đường truy vấn.", "Approach 2 retains the Trie and reversed-suffix idea: insert every word[:p] + '{' + word[::-1], p = 1..L. A query follows pref + '{' + suff[::-1] and returns the index at the end of that query path."),
+      bi("Chỉ chèn word + '{' + reverse(word) sẽ sai: apple{elppa không chứa đường a{e cho f('a','e'). Phải chèn cả prefix ngắn. Mỗi nút cập nhật index lớn nhất, kể cả root; không cần truy vấn đến lá.", "Inserting only word + '{' + reverse(word) fails: apple{elppa has no a{e path for f('a','e'). Short prefixes must also be inserted. Each node retains the largest index, including the root; queries need not reach a leaf."),
       bi("Mô phỏng nhận tối đa 10 từ và 12 truy vấn để giữ đủ từng dòng; giới hạn đề bài là 10000 từ và 10000 truy vấn.", "The visualization accepts up to 10 words and 12 queries to retain every line; the problem allows 10000 words and 10000 queries."),
     ],
-    complexity: { time: "Build O(N·L³); f O(P + S) expected", space: "O(N·L³)", note: bi("Mỗi từ tạo L² cặp; cắt và hash chuỗi tốn O(L). P/S là độ dài truy vấn. L <= 7. Các snapshot chỉ phục vụ mô phỏng.", "Each word produces L² pairs; slicing and hashing strings cost O(L). P/S are query lengths, and L <= 7. Snapshots are only for visualization.") },
-    code: SOURCE, builder: buildSteps, parseWordFilter745Input: parseInput,
+    complexity: { time: "Map: O(N·L³); Trie: O(N·L²); f: O(P + S) expected", space: "Map: O(N·L³); Trie: O(N·L²)", note: bi("Map tạo L² cặp và hash chuỗi O(L). Trie chèn L đường, mỗi đường dài O(L); truy vấn đi P+1+S cạnh. L <= 7. Snapshot chỉ phục vụ mô phỏng.", "Map creates L² pairs and hashes strings in O(L). Trie inserts L paths of O(L) length; queries traverse P+1+S edges. L <= 7. Snapshots are only for visualization.") },
+    code: SOURCE, codeLabel: bi("Cách 1: Hash Map prefix/suffix", "Approach 1: Prefix/suffix Hash Map"),
+    code2: TRIE_745.SOURCE, code2Label: bi("Cách 2: Trie + đảo suffix", "Approach 2: Trie + reversed suffix"),
+    builder: buildSteps, builder2: (input, params) => TRIE_745.buildSteps(input, params, parseInput), parseWordFilter745Input: parseInput,
   },
 };

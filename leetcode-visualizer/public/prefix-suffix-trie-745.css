@@ -1,0 +1,38 @@
+.ps745-trie-viz .ps745-heading { flex-wrap: wrap; }
+.ps745-trie-viz .ps745-vars article:last-child { flex-basis: 100%; }
+.ps745-trie-viz .ps745-word code { overflow-wrap: anywhere; }
+.ps745-trie-input, .ps745-trie-path { margin-bottom: 12px; border: 1px solid var(--ps-border); border-radius: 12px; min-width: 0; overflow: hidden; }
+.ps745-trie-viz p { overflow-wrap: anywhere; padding: 8px 10px; }
+.ps745-trie-input-scroll { overflow-x: auto; position: relative; padding: 10px; }
+.ps745-trie-letters { display: flex; width: max-content; gap: 5px; }
+.ps745-trie-letter { display: flex; flex: 0 0 38px; width: 38px; flex-direction: column; align-items: center; gap: 5px; border: 1px solid var(--ps-border); border-radius: 7px; padding: 8px 3px; }
+.ps745-trie-letter b { font-size: 20px; }
+.ps745-trie-letter small { font-size: 9px; color: var(--ps-muted); }
+.ps745-trie-letter.prefix { color: var(--ps-purple); }
+.ps745-trie-letter.separator { color: var(--ps-gold); }
+.ps745-trie-letter.reverse { color: var(--ps-cyan); }
+.ps745-trie-letter.current { outline: 2px solid var(--ps-gold); outline-offset: 1px; }
+.ps745-trie-end { padding: 13px 8px; color: var(--ps-gold); }
+.ps745-trie-path-scroll { overflow-x: auto; position: relative; padding: 12px 10px 24px; }
+.ps745-trie-chain { display: flex; align-items: center; width: max-content; gap: 8px; }
+.ps745-trie-node { width: 62px; flex: 0 0 62px; border: 1px solid var(--ps-border); border-radius: 12px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative; }
+.ps745-trie-node small, .ps745-trie-node span { font-size: 9px; color: var(--ps-muted); }
+.ps745-trie-node b { font: 700 23px monospace; color: var(--ps-green); }
+.ps745-trie-node.cursor { border-color: var(--ps-gold); box-shadow: 0 0 0 1px var(--ps-gold); }
+.ps745-trie-node em { position: absolute; bottom: -20px; font-style: normal; font-size: 10px; color: var(--ps-gold); white-space: nowrap; }
+.ps745-trie-edge { display: grid; text-align: center; gap: 2px; color: var(--ps-purple); min-width: 20px; }
+.ps745-trie-edge b { font: 700 17px monospace; }
+.ps745-trie-edge span { color: var(--ps-muted); }
+.ps745-trie-children { border-top: 1px solid var(--ps-border); padding: 12px 10px; }
+.ps745-trie-children > strong { font-size: 11px; }
+.ps745-trie-children > div { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 10px; }
+.ps745-trie-children article { border: 1px solid var(--ps-border); border-radius: 8px; padding: 8px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ps745-trie-children article strong { color: var(--ps-cyan); font-size: 19px; }
+.ps745-trie-children article span { color: var(--ps-muted); }
+.ps745-trie-children article b { color: var(--ps-green); font-size: 10px; }
+.ps745-trie-children .chosen { border-color: var(--ps-gold); }
+.ps745-trie-children .created { background: color-mix(in srgb, var(--ps-green) 10%, transparent); }
+.ps745-trie-viz .ps745-trie-missing { color: var(--ps-gold); padding: 4px 0; }
+.ps745-trie-correction { border: 1px solid var(--ps-border); padding: 10px; border-radius: 10px; }
+.ps745-trie-correction summary { cursor: pointer; color: var(--ps-purple); }
+@container (max-width: 400px) { .ps745-trie-viz .ps745-heading h3 { font-size: 14px; } .ps745-trie-viz .ps745-vars span { font-size: 10px; } }
