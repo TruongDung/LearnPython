@@ -1,0 +1,60 @@
+/* Keep the existing step buttons available throughout a visualization. */
+#debugControls {
+  position: fixed;
+  inset: auto auto max(14px, env(safe-area-inset-bottom)) 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: none;
+  grid-template-columns: 44px 1fr 1.25fr 1fr 44px;
+  gap: 6px;
+  width: min(520px, calc(100vw - 160px));
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #3a4059;
+  border-radius: 14px;
+  background: #111322;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .32);
+}
+
+#debugControls button {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+#debugControls button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) #debugControls { display: grid; }
+
+#vizPanel { padding-bottom: 100px; }
+
+[data-theme="light"] #debugControls {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, .18);
+}
+
+@media (max-width: 640px) {
+  #debugControls {
+    width: calc(100vw - 24px);
+    gap: 5px;
+  }
+
+  #debugControls button { font-size: 12px; }
+
+  body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) .back-to-top {
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 70px);
+  }
+
+  body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) .catalog-jump-nav {
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 128px);
+    max-height: calc(100dvh - 156px);
+  }
+}

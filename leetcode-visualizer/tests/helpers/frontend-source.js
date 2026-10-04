@@ -107,6 +107,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'prefix-suffix-trie-745.css',
   'match-substring-replacement-2301.css',
   'vowel-substrings-3306.css',
+  'debug-controls.css',
 ]);
 
 const sourceCache = new Map();
