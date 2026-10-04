@@ -12,7 +12,7 @@
 
 const categories = {
   dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./valid-parentheses-path-2267"), require("./hard-dp-visualizations"), require("./hard-dp-3117")),
-  sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610"), require("./hard-range-visualizations")),
+  sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610"), require("./hard-range-visualizations"), require("./vowel-substrings-3306")),
   graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699")),
   math: require("./math"),
   "two-pointer": Object.assign(require("./two-pointer"), require("./maximum-distance-1855")),
@@ -20,7 +20,7 @@ const categories = {
   trie: Object.assign(require("./trie"), require("./prefix-scores-2416"), require("./hard-trie-3045")),
   hashmap: require("./hashmap"),
   greedy: Object.assign(require("./greedy"), require("./hard-greedy-2589"), require("./hard-geometry-3027"), require("./valid-parenthesis-string-678"), require("./furthest-houses-2078")),
-  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./basic-calculator-iv-770"), require("./special-binary-string-761"), require("./text-justification-68"), require("./hard-string-1923"), require("./special-characters-3121")),
+  string: Object.assign(require("./string"), require("./string-chunking"), require("./brace-expansion-ii"), require("./basic-calculator-iv-770"), require("./special-binary-string-761"), require("./text-justification-68"), require("./hard-string-1923"), require("./special-characters-3121"), require("./match-substring-replacement-2301")),
   backtracking: Object.assign(require("./backtracking"), require("./generate-parentheses-22")),
   bst: require("./bst"),
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
@@ -31,7 +31,7 @@ const categories = {
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723")),
-  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635")),
+  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635"), require("./prefix-suffix-search-745")),
   interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };
 

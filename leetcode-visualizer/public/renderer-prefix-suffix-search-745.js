@@ -1,0 +1,36 @@
+function renderPrefixSuffix745View(step) {
+  const view = step.prefixSuffix745View;
+  const text = (vi, en) => lang === "vi" ? vi : en;
+  const query = view.query;
+  const words = view.words.map((word, index) => {
+    const prefMatch = query ? word.startsWith(query.pref) : null;
+    const suffMatch = query ? word.endsWith(query.suff) : null;
+    const selected = query && query.result === index;
+    return `<article class="ps745-word${index === view.wordIndex ? " current" : ""}${selected ? " selected" : ""}${query && prefMatch && suffMatch ? " match" : ""}" data-index="${index}"><small>[${index}]</small><code>${word}</code>${query && query.result !== null ? `<span>${text("đầu", "pref")} ${prefMatch ? "✓" : "×"} · ${text("cuối", "suff")} ${suffMatch ? "✓" : "×"}</span>` : ""}${selected ? `<b>${text("Index lớn nhất ✓", "Largest index ✓")}</b>` : ""}</article>`;
+  }).join("");
+  const beforeVars = Object.fromEntries(view.beforeVars.map(entry => [entry.name, entry.value]));
+  const afterVars = Object.fromEntries(step.vars.map(entry => [entry.name, entry.value]));
+  const names = view.phase === "query" ? ["pref", "suff", "key"] : ["index", "p", "s", "pref", "suff"];
+  const format = value => value === undefined ? "—" : Array.isArray(value) ? `(${value.map(v => `'${v}'`).join(", ")})` : typeof value === "string" ? `'${value}'` : String(value);
+  const changes = names.map(name => `<article class="${JSON.stringify(beforeVars[name]) !== JSON.stringify(afterVars[name]) ? "changed" : ""}"><small>${name}</small><span>${escapeHtml(format(beforeVars[name]))} → <b>${escapeHtml(format(afterVars[name]))}</b></span></article>`).join("");
+  const debug = `<section class="ps745-debug" data-line="${view.line}"><header><strong>${text("DEBUG TỪNG DÒNG", "LINE-BY-LINE DEBUG")}</strong><span>${text("Đã chạy dòng", "Executed line")} ${view.line}</span></header><pre><code>${escapeHtml(view.source.trim())}</code></pre><div class="ps745-vars">${changes}</div><p>${text("Biến trước → sau. — nghĩa là chưa được gán trong lời gọi này.", "Variables before → after. — means not assigned in this call yet.")}</p><div class="ps745-next">${view.nextLine === null ? text("Đã hoàn tất mọi truy vấn.", "All queries are complete.") : `${text("Tiếp theo", "Next")}: ${text("dòng", "line")} ${view.nextLine}<code>${escapeHtml(view.nextSource.trim())}</code>`}</div></section>`;
+  let build = "";
+  if (view.word !== null) {
+    const letters = [...view.word].map((ch, index) => {
+      const prefix = view.pref !== null && index < view.pref.length;
+      const suffix = view.suff !== null && index >= view.word.length - view.suff.length;
+      return `<span class="ps745-letter${prefix && suffix ? " both" : prefix ? " prefix" : suffix ? " suffix" : ""}"><b>${ch}</b><small>[${index}]</small></span>`;
+    }).join("");
+    const columns = Array.from({ length: view.word.length }, (_, index) => `<th scope="col" class="${view.s === index + 1 ? " current" : ""}">${view.word.slice(-index - 1)}</th>`).join("");
+    const rows = view.grid.map((row, rowIndex) => `<tr><th scope="row" class="${view.p === rowIndex + 1 ? " current" : ""}">${view.word.slice(0, rowIndex + 1)}</th>${row.map((value, column) => `<td data-p="${rowIndex + 1}" data-s="${column + 1}" class="${value === null ? "empty" : "stored"}${view.event === "write" && view.p === rowIndex + 1 && view.s === column + 1 ? " active" : ""}">${value ?? "—"}</td>`).join("")}</tr>`).join("");
+    const assignment = view.pref !== null && view.suff !== null ? `<div class="ps745-key"><code>('${view.pref}', '${view.suff}')</code><span>→</span><b>${view.event === "write" ? `${view.previousIndex ?? "—"} → ${view.wordIndex}` : text("chưa ghi ở dòng này", "not written at this line")}</b></div>` : "";
+    build = `<section class="ps745-build"><header><strong>${text("ĐANG LẬP CHỈ MỤC", "INDEXING WORD")} [${view.wordIndex}]</strong><span>${view.word}</span></header><div class="ps745-letters">${letters}</div><div class="ps745-slices"><span class="prefix">prefix = ${view.pref === null ? "—" : `'${view.pref}'`}</span><span class="suffix">suffix = ${view.suff === null ? "—" : `'${view.suff}'`}</span></div><p>${text("Tím: prefix. Xanh: suffix. Hai màu: phần chồng nhau vẫn hợp lệ.", "Purple: prefix. Cyan: suffix. Both colors: overlap is allowed.")}</p>${assignment}<div class="ps745-grid-scroll"><table class="ps745-grid"><caption>${text("Hàng = prefix · cột = suffix · ô = index đang lưu", "Row = prefix · column = suffix · cell = stored index")}</caption><thead><tr><th scope="col">pref ↓ / suff →</th>${columns}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }
+  const queryPanel = query ? `<section class="ps745-query"><header><strong>f('${query.pref}', '${query.suff}')</strong><span>${text("Truy vấn", "Query")} ${query.index + 1}</span></header><div class="ps745-key"><code>('${query.pref}', '${query.suff}')</code><span>→</span><b>${query.result === null ? "?" : query.result}</b></div><p>${query.result === null ? text("Đã tạo key; dòng return tiếp theo mới tra bảng.", "The key is created; the next return line looks it up.") : query.result === -1 ? text("Khóa không có trong bảng: không từ nào khớp cả hai điều kiện.", "The key is absent: no word matches both conditions.") : text(`Bảng trả index ${query.result}: từ khớp có chỉ số lớn nhất. Các thẻ từ minh họa các lựa chọn; mã f chỉ tra bảng.`, `The lookup returns index ${query.result}: the largest matching index. Word cards illustrate the choices; f only looks up the key.`)}</p></section>` : "";
+  const recent = view.recent.map(entry => `<tr><td><code>('${entry.pref}', '${entry.suff}')</code></td><td>${entry.before ?? "—"} → <b>${entry.index}</b></td></tr>`).join("");
+  const history = view.outputs.map((value, index) => `<span><small>${index === 0 ? "WordFilter" : `f #${index}`}</small><b>${value === null ? "null" : value}</b></span>`).join("");
+  $("treeView").innerHTML = `<section class="ps745-viz" aria-label="${text("Mô phỏng tìm prefix và suffix 745", "745 prefix and suffix search simulation")}"><header class="ps745-heading"><div><small>745 · WORD FILTER</small><h3>${text("Prefix + suffix → index lớn nhất", "Prefix + suffix → largest index")}</h3></div><span>${view.lookupSize} ${text("khóa", "keys")}</span></header><div class="ps745-action"><strong>${escapeHtml(pick(step.title))}</strong><p>${escapeHtml(pick(step.note))}</p></div>${debug}${queryPanel}<div class="ps745-words">${words}</div>${build}<details class="ps745-recent"${view.event === "write" ? " open" : ""}><summary>${text("6 lần ghi bảng gần nhất", "6 latest lookup writes")}</summary><table><thead><tr><th>${text("Khóa", "Key")}</th><th>${text("Index cũ → mới", "Old → new index")}</th></tr></thead><tbody>${recent || `<tr><td colspan="2">${text("Chưa ghi khóa nào", "No keys written yet")}</td></tr>`}</tbody></table></details>${history ? `<section class="ps745-output"><header><strong>${text("KẾT QUẢ CÁC LỜI GỌI", "CALL RESULTS")}</strong></header><div>${history}</div></section>` : ""}</section>`;
+  const grid = $("treeView").querySelector(".ps745-grid-scroll");
+  const active = grid && grid.querySelector("td.active");
+  if (active) grid.scrollLeft = Math.max(0, active.offsetLeft - grid.clientWidth / 2 + active.offsetWidth / 2);
+}

@@ -327,6 +327,10 @@ function designConfig(className, constructorArgs, operations) {
 function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
   const words = (value) => String(value).split(",").map((item) => item.trim()).filter(Boolean);
   switch (problem.id) {
+    case 745: {
+      const parsed = problem.parseWordFilter745Input(input, params);
+      return designConfig("WordFilter", [parsed.words], parsed.queries.map(args => ({ name: "f", args })));
+    }
     case 715:
       return designConfig("RangeModule", [], problem.parseRangeOperations(input).map(([name, ...args]) => ({ name, args })));
     case 729:

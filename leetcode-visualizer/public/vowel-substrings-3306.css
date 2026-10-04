@@ -1,0 +1,69 @@
+.vs3306-viz { --vs-bg: #172135; --vs-panel: #111b2e; --vs-text: #e2e8f0; --vs-muted: #a4b2c8; --vs-line: #35445e; --vs-green: #74dfa8; --vs-blue: #86caff; --vs-red: #ff9caa; --vs-gold: #facc6b; color: var(--vs-text); container-type: inline-size; display: grid; gap: 14px; min-width: 0; font-size: 14px; }
+[data-theme="light"] .vs3306-viz { --vs-bg: #f1f5fa; --vs-panel: #fff; --vs-text: #172b45; --vs-muted: #52637c; --vs-line: #c7d4e4; --vs-green: #137845; --vs-blue: #1467a0; --vs-red: #b02941; --vs-gold: #9c6909; }
+.vs3306-viz * { box-sizing: border-box; }
+.vs3306-viz section, .vs3306-action { background: var(--vs-panel); border: 1px solid var(--vs-line); border-radius: 12px; padding: 14px; min-width: 0; }
+.vs3306-viz header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.vs3306-heading small { color: var(--vs-blue); letter-spacing: .08em; }
+.vs3306-heading h3 { margin: 4px 0 0; font-size: 19px; }
+.vs3306-heading > span { color: var(--vs-gold); background: var(--vs-bg); padding: 8px 12px; border-radius: 9px; font-weight: 700; }
+.vs3306-viz p { color: var(--vs-muted); line-height: 1.6; margin: 9px 0 0; overflow-wrap: anywhere; }
+.vs3306-viz header > span, .vs3306-viz small { color: var(--vs-muted); }
+.vs3306-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.vs3306-totals article { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--vs-line); background: var(--vs-panel); border-radius: 10px; }
+.vs3306-totals article.current { border-color: var(--vs-gold); }
+.vs3306-totals strong { font-size: 26px; color: var(--vs-blue); }
+.vs3306-totals .done strong { color: var(--vs-green); }
+.vs3306-totals span { font-size: 12px; color: var(--vs-muted); }
+.vs3306-action > strong { display: block; overflow-wrap: anywhere; }
+.vs3306-debug pre { background: var(--vs-bg); padding: 12px; border-radius: 8px; margin: 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vs-blue); }
+.vs3306-vars { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 10px 0; }
+.vs3306-vars article { background: var(--vs-bg); border: 1px solid var(--vs-line); border-radius: 8px; padding: 8px; }
+.vs3306-vars article.changed { border-color: var(--vs-gold); }
+.vs3306-vars span, .vs3306-vars small { display: block; overflow-wrap: anywhere; }
+.vs3306-next { border-top: 1px solid var(--vs-line); margin-top: 12px; padding-top: 10px; color: var(--vs-gold); }
+.vs3306-next code { display: block; overflow-wrap: anywhere; margin-top: 5px; color: var(--vs-text); }
+.vs3306-strip { overflow-x: auto; position: relative; padding: 10px 0; }
+.vs3306-row { display: flex; width: max-content; min-width: 100%; align-items: center; gap: 4px; }
+.vs3306-row > strong { position: sticky; left: 0; z-index: 2; flex: 0 0 42px; padding: 12px 3px; background: var(--vs-panel); }
+.vs3306-cells { display: flex; gap: 4px; }
+.vs3306-char { display: flex; flex: 0 0 44px; width: 44px; height: 78px; flex-direction: column; justify-content: center; align-items: center; border: 2px solid transparent; border-radius: 8px; gap: 4px; background: var(--vs-bg); }
+.vs3306-char b { font-size: 21px; }
+.vs3306-char small { font-size: 10px; white-space: nowrap; }
+.vs3306-char.vowel b { color: var(--vs-green); }
+.vs3306-char.consonant b { color: var(--vs-red); }
+.vs3306-char.window { background: color-mix(in srgb, var(--vs-blue) 14%, var(--vs-panel)); }
+.vs3306-char.right { border-color: var(--vs-gold); }
+.vs3306-char.left { border-left-color: var(--vs-blue); }
+.vs3306-char.removed b { text-decoration: line-through; opacity: .5; }
+.vs3306-start { flex: 0 0 44px; width: 44px; height: 30px; text-align: center; border-radius: 6px; padding-top: 5px; }
+.vs3306-start.valid { color: var(--vs-green); background: color-mix(in srgb, var(--vs-green) 13%, var(--vs-panel)); }
+.vs3306-viz .vs3306-pending { color: var(--vs-gold); }
+.vs3306-frequencies { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
+.vs3306-frequencies article { background: var(--vs-bg); border: 1px solid var(--vs-line); border-radius: 8px; padding: 9px 3px; text-align: center; display: grid; gap: 4px; }
+.vs3306-frequencies .present { border-color: var(--vs-green); }
+.vs3306-frequencies b { color: var(--vs-green); font-size: 20px; }
+.vs3306-frequencies strong { font-size: 18px; }
+.vs3306-frequencies .missing strong { color: var(--vs-red); }
+.vs3306-frequencies small { font-size: 10px; overflow-wrap: anywhere; }
+.vs3306-guard { display: grid; gap: 8px; border: 1px solid var(--vs-line); border-radius: 8px; padding: 10px; background: var(--vs-bg); }
+.vs3306-guard code { font-size: 12px; overflow-wrap: anywhere; }
+.vs3306-guard.passed { border-color: var(--vs-green); }
+.vs3306-guard.failed { border-color: var(--vs-red); }
+.vs3306-count > strong { color: var(--vs-gold); }
+.vs3306-table { display: flex; position: relative; gap: 4px; overflow-x: auto; margin: 12px 0; padding-bottom: 6px; }
+.vs3306-labels, .vs3306-column { display: grid; grid-template-rows: 24px 32px 32px 32px 32px; text-align: center; align-items: center; flex: 0 0 44px; width: 44px; border: 1px solid var(--vs-line); border-radius: 8px; }
+.vs3306-labels { position: sticky; left: 0; z-index: 2; background: var(--vs-panel); flex-basis: 65px; width: 65px; font-size: 11px; }
+.vs3306-column { background: var(--vs-bg); }
+.vs3306-column.current { border-color: var(--vs-gold); }
+.vs3306-column span { color: var(--vs-muted); }
+.vs3306-column .positive { color: var(--vs-green); }
+.vs3306-result { border-color: var(--vs-green) !important; }
+.vs3306-result > strong { color: var(--vs-green); }
+.vs3306-result > div { margin-top: 10px; overflow-wrap: anywhere; }
+.vs3306-result > div > b { color: var(--vs-green); font-size: 22px; }
+.vs3306-examples { display: grid; gap: 7px; margin: 12px 0; }
+.vs3306-examples article { display: flex; gap: 10px; padding: 7px 10px; border: 1px solid var(--vs-line); border-radius: 8px; }
+.vs3306-examples code { overflow-wrap: anywhere; }
+.vs3306-proof { padding: 12px; border: 1px solid var(--vs-line); border-radius: 10px; }
+.vs3306-proof summary { cursor: pointer; color: var(--vs-blue); }
+@container (max-width: 400px) { .vs3306-heading h3 { font-size: 17px; } .vs3306-viz section, .vs3306-action { padding: 10px; } .vs3306-vars { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vs3306-frequencies { gap: 4px; } }
