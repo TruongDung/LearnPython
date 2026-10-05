@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.goalParser1678View), surface: "treeView", render: (step) => {
+      renderGoalParser1678View(step);
+    } },
     { predicate: (step) => Boolean(step.equivalent1662View), surface: "treeView", render: (step) => {
       renderEquivalent1662View(step);
     } },

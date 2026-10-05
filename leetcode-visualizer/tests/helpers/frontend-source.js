@@ -63,6 +63,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-to-lower-case-709.js',
   'renderer-defanging-ip-1108.js',
   'renderer-equivalent-string-arrays-1662.js',
+  'renderer-goal-parser-1678.js',
   'script.js',
 ]);
 
@@ -130,6 +131,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'to-lower-case-709.css',
   'defanging-ip-1108.css',
   'equivalent-string-arrays-1662.css',
+  'goal-parser-1678.css',
 ]);
 
 const sourceCache = new Map();
