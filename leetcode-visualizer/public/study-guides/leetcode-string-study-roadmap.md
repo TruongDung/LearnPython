@@ -11,7 +11,7 @@ Nguồn: [LeetCode — String](https://leetcode.com/problem-list/string/). Dữ 
 3. Với mỗi bài: tự mô tả invariant hoặc trạng thái, làm tay một ví dụ, tự code, rồi giải thích độ phức tạp. Hoàn thành nhóm khi có thể giải lại mà không xem lời giải.
 4. Cột **Project = Có** nghĩa là ID có builder đã đăng ký trong leetcode-visualizer tại thời điểm tạo danh sách; không có nghĩa mọi visualization đều đã được đánh giá lại trong lần này. Premium là nhãn truy cập trên LeetCode.
 
-Project hỗ trợ **179/895 bài** trong danh mục, còn **716 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
+Project hỗ trợ **180/895 bài** trong danh mục, còn **715 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
 
 ## Tổng quan phần A
 
@@ -40,7 +40,7 @@ Quản lý chỉ số, ký tự, prefix; phân biệt nối chuỗi với sửa 
 | ---: | --- | --- | --- | --- |
 | 1 | [58. Length of Last Word](https://leetcode.com/problems/length-of-last-word/) | Easy |  | Có |
 | 2 | [709. To Lower Case](https://leetcode.com/problems/to-lower-case/) | Easy |  | Có |
-| 3 | [1108. Defanging an IP Address](https://leetcode.com/problems/defanging-an-ip-address/) | Easy |  | Chưa |
+| 3 | [1108. Defanging an IP Address](https://leetcode.com/problems/defanging-an-ip-address/) | Easy |  | Có |
 | 4 | [1662. Check If Two String Arrays are Equivalent](https://leetcode.com/problems/check-if-two-string-arrays-are-equivalent/) | Easy |  | Chưa |
 | 5 | [1678. Goal Parser Interpretation](https://leetcode.com/problems/goal-parser-interpretation/) | Easy |  | Chưa |
 | 6 | [1768. Merge Strings Alternately](https://leetcode.com/problems/merge-strings-alternately/) | Easy |  | Có |

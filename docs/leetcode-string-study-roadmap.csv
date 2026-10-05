@@ -1,7 +1,7 @@
 ﻿"Thứ tự học","Phần","Nhóm","ID","Tên bài","Độ khó","Premium","Có trong project","Link","Tags"
 "1","A","Duyệt, biến đổi và mô phỏng chuỗi","58","Length of Last Word","Easy","Không","Có","https://leetcode.com/problems/length-of-last-word/","String"
 "2","A","Duyệt, biến đổi và mô phỏng chuỗi","709","To Lower Case","Easy","Không","Có","https://leetcode.com/problems/to-lower-case/","String"
-"3","A","Duyệt, biến đổi và mô phỏng chuỗi","1108","Defanging an IP Address","Easy","Không","Chưa","https://leetcode.com/problems/defanging-an-ip-address/","String"
+"3","A","Duyệt, biến đổi và mô phỏng chuỗi","1108","Defanging an IP Address","Easy","Không","Có","https://leetcode.com/problems/defanging-an-ip-address/","String"
 "4","A","Duyệt, biến đổi và mô phỏng chuỗi","1662","Check If Two String Arrays are Equivalent","Easy","Không","Chưa","https://leetcode.com/problems/check-if-two-string-arrays-are-equivalent/","Array; String"
 "5","A","Duyệt, biến đổi và mô phỏng chuỗi","1678","Goal Parser Interpretation","Easy","Không","Chưa","https://leetcode.com/problems/goal-parser-interpretation/","String"
 "6","A","Duyệt, biến đổi và mô phỏng chuỗi","1768","Merge Strings Alternately","Easy","Không","Có","https://leetcode.com/problems/merge-strings-alternately/","Two Pointers; String"

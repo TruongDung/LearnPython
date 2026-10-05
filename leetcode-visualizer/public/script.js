@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.defang1108View), surface: "treeView", render: (step) => {
+      renderDefang1108View(step);
+    } },
     { predicate: (step) => Boolean(step.lowerCase709View), surface: "treeView", render: (step) => {
       renderLowerCase709View(step);
     } },

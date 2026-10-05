@@ -61,6 +61,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-match-substring-replacement-2301.js',
   'renderer-vowel-substrings-3306.js',
   'renderer-to-lower-case-709.js',
+  'renderer-defanging-ip-1108.js',
   'script.js',
 ]);
 
@@ -126,6 +127,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'different-parentheses-241.css',
   'apply-substitutions-3481.css',
   'to-lower-case-709.css',
+  'defanging-ip-1108.css',
 ]);
 
 const sourceCache = new Map();

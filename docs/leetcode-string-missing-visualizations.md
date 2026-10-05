@@ -1,18 +1,17 @@
 # Các bài String chưa có visualization
 
-Đối chiếu danh mục String trong lộ trình với builder đang đăng ký trong project ngày 2026-10-05: **716/895 bài chưa có visualization**; 179 bài đã đăng ký.
+Đối chiếu danh mục String trong lộ trình với builder đang đăng ký trong project ngày 2026-10-05: **715/895 bài chưa có visualization**; 180 bài đã đăng ký.
 
-Trong số bài còn thiếu: **36 bài nền tảng ở phần A** và **680 bài mở rộng ở phần B**.
+Trong số bài còn thiếu: **35 bài nền tảng ở phần A** và **680 bài mở rộng ở phần B**.
 
 Giữ nguyên thứ tự học của lộ trình. Cột STT học là số thứ tự trong danh sách đầy đủ. Trạng thái này dựa trên việc có builder đã đăng ký; danh mục LeetCode dùng bản chụp ngày 2026-10-05.
 
 [Lộ trình đầy đủ](leetcode-string-study-roadmap.md)
 
-## A.1. Duyệt, biến đổi và mô phỏng chuỗi — thiếu 6 bài
+## A.1. Duyệt, biến đổi và mô phỏng chuỗi — thiếu 5 bài
 
 | STT học | Bài | Độ khó | Premium |
 | ---: | --- | --- | --- |
-| 3 | [1108. Defanging an IP Address](https://leetcode.com/problems/defanging-an-ip-address/) | Easy |  |
 | 4 | [1662. Check If Two String Arrays are Equivalent](https://leetcode.com/problems/check-if-two-string-arrays-are-equivalent/) | Easy |  |
 | 5 | [1678. Goal Parser Interpretation](https://leetcode.com/problems/goal-parser-interpretation/) | Easy |  |
 | 8 | [541. Reverse String II](https://leetcode.com/problems/reverse-string-ii/) | Easy |  |
