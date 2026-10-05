@@ -48,6 +48,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-locked-parentheses-2116.js',
   'renderer-minimize-expression-2232.js',
   'renderer-different-parentheses-241.js',
+  'renderer-apply-substitutions-3481.js',
   'renderer-smallest-infinite-set-2336.js',
   'renderer-special-characters-3121.js',
   'renderer-disappeared-numbers-448.js',
@@ -122,6 +123,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'locked-parentheses-2116.css',
   'minimize-expression-2232.css',
   'different-parentheses-241.css',
+  'apply-substitutions-3481.css',
 ]);
 
 const sourceCache = new Map();
