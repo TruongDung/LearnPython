@@ -2259,15 +2259,27 @@ function renderSwimWater778View(step) {
     if (cell.inHeap) cls.push("inheap");
     if (cell.path) cls.push("path");
     if (cell.bottleneck) cls.push("bottleneck");
-    if (cell.cur) cls.push("cur");
+    // At the result, route/bottleneck colors take over from the active-cell ring.
+    if (cell.cur && !isDone) cls.push("cur");
     if (cell.probe && cell.verdict) cls.push("probe", `v-${cell.verdict}`);
     const badge = cell.verdict === "improved" ? "↓"
       : cell.verdict === "noImprove" ? "=" : "";
-    const role = cell.role === "start" ? "S" : cell.role === "target" ? "T" : "";
-    return `<div class="${cls.join(" ")}" style="--h:${(cell.elev / maxVal).toFixed(3)}">
+    const role = n === 1 ? "S/T" : cell.role === "start" ? "S" : cell.role === "target" ? "T" : "";
+    const stateLabels = [
+      cell.wet ? (vi ? "đã ngập" : "submerged") : (vi ? "chưa ngập" : "above water"),
+      cell.finalized ? (vi ? "đã chốt best" : "best settled") : "",
+      cell.inHeap ? (vi ? "đang chờ trong heap" : "waiting in heap") : "",
+      cell.cur && !isDone ? (vi ? "ô hiện tại" : "current cell") : "",
+      cell.path ? (vi ? "đường kết quả" : "final route") : "",
+      cell.bottleneck ? (vi ? "cao nhất trên đường" : "highest on route") : "",
+      cell.probe ? (cell.verdict === "candidate" ? (vi ? "đang tính thử, chưa cập nhật" : "candidate, not updated yet") : cell.verdict === "improved" ? (vi ? "vừa cập nhật best" : "best just improved") : (vi ? "không cải thiện best" : "no improvement")) : "",
+    ].filter(Boolean);
+    const cellLabel = `(${r},${c}), ${vi ? "độ cao" : "elevation"} ${cell.elev}, best = ${fmtBest(cell.best)}; ${stateLabels.join("; ")}`;
+    return `<div class="${cls.join(" ")}" data-r="${r}" data-c="${c}" title="${escapeHtml(cellLabel)}" aria-label="${escapeHtml(cellLabel)}" style="--h:${(cell.elev / maxVal).toFixed(3)}">
       ${role ? `<span class="rl">${role}</span>` : ""}
       <strong>${cell.elev}</strong>
       ${compact ? "" : `<span class="t">${cell.best === null || cell.best === undefined ? "∞" : `t${cell.best}`}</span>`}
+      ${cell.finalized ? `<span class="ck" aria-hidden="true">✓</span>` : ""}
       ${badge ? `<span class="vb">${badge}</span>` : ""}
     </div>`;
   }).join("")).join("");
@@ -2286,7 +2298,7 @@ function renderSwimWater778View(step) {
         <span class="op">max(</span><span class="a">${probe.fromTime}</span><span class="op">,</span><span class="b">${probe.elev}</span><span class="op">) =</span><strong>${probe.newTime}</strong>
       </div>
       <span class="why">${escapeHtml(why)}</span>
-      <em class="cmp">best: ${fmtBest(probe.oldBest)} ${probe.verdict === "improved" ? `→ ${probe.newTime}` : `(${vi ? "giữ nguyên" : "unchanged"})`}</em>
+      <em class="cmp">best: ${fmtBest(probe.oldBest)} ${probe.verdict === "improved" ? `→ ${probe.newTime}` : probe.verdict === "candidate" ? `(${vi ? "chưa cập nhật" : "not updated yet"})` : `(${vi ? "giữ nguyên" : "unchanged"})`}</em>
       <span class="nosum">${escapeHtml(vi ? `không phải ${probe.fromTime} + ${probe.elev} = ${probe.fromTime + probe.elev}` : `not ${probe.fromTime} + ${probe.elev} = ${probe.fromTime + probe.elev}`)}</span>
     </div>`;
   } else if (probe) {
@@ -2297,9 +2309,13 @@ function renderSwimWater778View(step) {
     </div>`;
   }
 
+  const currentLabel = isDone ? (vi ? "ĐÍCH" : "TARGET")
+    : view.phase === "init" ? (vi ? "XUẤT PHÁT" : "START")
+      : view.phase === "stale" ? (vi ? "BẢN GHI CŨ" : "STALE ENTRY")
+        : (vi ? "Ô HIỆN TẠI" : "CURRENT CELL");
   const curHtml = cur
-    ? `<div class="sw778-state"><small>${vi ? "ĐANG CHỐT" : "SETTLING"}</small><strong>(${cur.r},${cur.c})</strong><span>t = ${cur.time}</span></div>`
-    : `<div class="sw778-state idle"><small>${vi ? "ĐANG CHỐT" : "SETTLING"}</small><strong>—</strong></div>`;
+    ? `<div class="sw778-state"><small>${currentLabel}</small><strong>(${cur.r},${cur.c})</strong><span>t = ${cur.time}</span></div>`
+    : `<div class="sw778-state idle"><small>${currentLabel}</small><strong>—</strong></div>`;
 
   const countersHtml = `<div class="sw778-counters">
     <span><b>${counters.popped || 0}</b>${vi ? "pop" : "popped"}</span>
@@ -2347,14 +2363,17 @@ function renderSwimWater778View(step) {
       <section class="sw778-panel">
         <header>
           <strong>${vi ? `LƯỚI ${n}×${n} — số lớn = độ cao` : `GRID ${n}×${n} — the big number is elevation`}</strong>
-          <span>${vi ? (compact ? "xanh = đã chìm" : "xanh = đã chìm · t = mực nước nhỏ nhất đủ để tới ô") : (compact ? "blue = submerged" : "blue = submerged · t = lowest level that reaches the cell")}</span>
+          <span>${vi ? (compact ? "xanh dương = đã ngập, chưa chắc đã tới" : "xanh dương = đã ngập, chưa chắc đã tới · t = best đã biết") : (compact ? "blue = submerged, not necessarily reached" : "blue = submerged, not necessarily reached · t = known best")}</span>
         </header>
         <div class="sw778-grid" style="--sw-cols:${n}">${gridHtml}</div>
         <div class="sw778-legend">
           <span class="lg wet">${vi ? "đã chìm" : "submerged"}</span>
           <span class="lg dry">${vi ? "còn trên mặt nước" : "still above water"}</span>
-          <span class="lg cur">${vi ? "đang chốt" : "settling"}</span>
+          <span class="lg settled">${vi ? "đã chốt best" : "best settled"}</span>
+          <span class="lg cur">${vi ? "ô hiện tại" : "current cell"}</span>
           <span class="lg inheap">${vi ? "trong heap" : "in heap"}</span>
+          <span class="lg improved">${vi ? "↓ vừa cập nhật best" : "↓ best improved"}</span>
+          <span class="lg unchanged">${vi ? "= không cải thiện" : "= no improvement"}</span>
           <span class="lg path">${vi ? "đường kết quả" : "final route"}</span>
           <span class="lg bn">${vi ? "bottleneck" : "bottleneck"}</span>
         </div>

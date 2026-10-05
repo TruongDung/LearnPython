@@ -5383,7 +5383,7 @@ function buildSteps778(input) {
           vi: `Đích rời heap khi time = ${time} là nhỏ nhất trong toàn heap, nên không đường nào chờ ít hơn. Đường xanh: ${pathText}. Ô cao nhất trên đường là (${bottleneck[0]},${bottleneck[1]}) với độ cao ${grid[bottleneck[0]][bottleneck[1]]} — đó là ô BOTTLENECK quyết định đáp án; mọi ô khác trên đường đều thấp hơn nên nước đã phủ chúng từ trước.`,
           en: `The target left the heap when time = ${time} was the smallest in the whole heap, so no route waits less. Green route: ${pathText}. Its highest cell is (${bottleneck[0]},${bottleneck[1]}) at elevation ${grid[bottleneck[0]][bottleneck[1]]} — the BOTTLENECK that sets the answer; every other cell on the route is lower and was already submerged.`,
         },
-        codeLines: [16, 17],
+        codeLines: [17],
         cur,
         pathSet,
         path: path.map(([pr, pc]) => [pr, pc, grid[pr][pc]]),
@@ -5410,7 +5410,7 @@ function buildSteps778(input) {
         vi: `Pop ra ô có time nhỏ nhất: (${r},${c}), độ cao ${grid[r][c]}, tới được lúc t = ${time}. Mọi ô xanh trên lưới đã bị nước phủ (độ cao ≤ ${time}). Chưa phải đích (${n - 1},${n - 1}) nên thử 4 ô kề.`,
         en: `Pop the smallest time: (${r},${c}) at elevation ${grid[r][c]}, reachable at t = ${time}. Every blue cell on the grid is already submerged (elevation ≤ ${time}). Not the target (${n - 1},${n - 1}) yet, so try the four neighbours.`,
       },
-      codeLines: [12, 13, 16],
+      codeLines: [13],
       cur,
       decision: { vi: `Chốt (${r},${c}) ở t = ${time} — không thể tới sớm hơn.`, en: `Settled (${r},${c}) at t = ${time} — it cannot be reached sooner.` },
       vars: [
@@ -5468,8 +5468,35 @@ function buildSteps778(input) {
         continue;
       }
 
+      // Keep the visual state before best changes and before heappush.
+      snap({
+        phase: "neighbor",
+        title: { vi: `Thử (${nr},${nc}): max(${time}, ${elev}) = ${newTime}`, en: `Try (${nr},${nc}): max(${time}, ${elev}) = ${newTime}` },
+        note: {
+          vi: `${newTime} < best cũ (${Number.isFinite(oldBest) ? oldBest : "∞"}). Đã tìm được giá trị tốt hơn, nhưng chưa gán best và chưa đưa ô vào heap.`,
+          en: `${newTime} < the old best (${Number.isFinite(oldBest) ? oldBest : "∞"}). A better value was found, but best is not assigned and the cell is not in the heap yet.`,
+        },
+        codeLines: [22, 23],
+        cur,
+        probe: { ...probeBase, verdict: "candidate" },
+        decision: { vi: "Tính và kiểm tra giá trị thử; chưa thay đổi trạng thái ô.", en: "Calculate and check the candidate; the cell state is unchanged." },
+        vars: [{ name: "new_time", value: newTime }, { name: `best[${nr}][${nc}]`, value: Number.isFinite(oldBest) ? oldBest : "∞" }],
+      });
       best[nr][nc] = newTime;
       parent[nr][nc] = [r, c];
+      snap({
+        phase: "neighbor",
+        title: { vi: `Cập nhật best[${nr}][${nc}] = ${newTime}`, en: `Update best[${nr}][${nc}] = ${newTime}` },
+        note: {
+          vi: `Đã lưu best = ${newTime} cho ô (${nr},${nc}); ô chưa vào heap cho tới dòng heappush tiếp theo.`,
+          en: `Saved best = ${newTime} for (${nr},${nc}); it enters the heap on the following heappush line.`,
+        },
+        codeLines: [24],
+        cur,
+        probe: { ...probeBase, verdict: "improved" },
+        decision: { vi: "Đã cập nhật best (↓), chưa vào heap.", en: "Best updated (↓), not in the heap yet." },
+        vars: [{ name: "new_time", value: newTime }, { name: `best[${nr}][${nc}]`, value: newTime }, { name: "heap size", value: heap.length }],
+      });
       heap.push([newTime, nr, nc]);
       pushed += 1;
       sortHeap();
@@ -5487,7 +5514,7 @@ function buildSteps778(input) {
             ? ` — this cell is at ${elev}, above the current level ${time}, so you must WAIT for the water to rise to ${elev}.`
             : ` — this cell is at ${elev}, already under level ${time}, so stepping in costs no extra wait.`} Note the max rather than a sum: crossing one more low cell does not make the route more expensive. ${newTime} < the old best (${oldBest}), so update and push.`,
         },
-        codeLines: [22, 23, 24, 25],
+        codeLines: [25],
         cur,
         probe: { ...probeBase, verdict: "improved" },
         decision: needsRise
