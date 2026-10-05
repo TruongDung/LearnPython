@@ -42,6 +42,12 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-requested-visualizations.js',
   'renderer-hard-problems.js',
   'renderer-inform-employees-1376.js',
+  'renderer-remove-outermost-1021.js',
+  'renderer-score-parentheses-856.js',
+  'renderer-min-insertions-1541.js',
+  'renderer-locked-parentheses-2116.js',
+  'renderer-minimize-expression-2232.js',
+  'renderer-different-parentheses-241.js',
   'renderer-smallest-infinite-set-2336.js',
   'renderer-special-characters-3121.js',
   'renderer-disappeared-numbers-448.js',
@@ -110,6 +116,12 @@ const STYLESHEET_ASSETS = Object.freeze([
   'vowel-substrings-3306.css',
   'debug-controls.css',
   'inform-employees-1376.css',
+  'remove-outermost-1021.css',
+  'score-parentheses-856.css',
+  'min-insertions-1541.css',
+  'locked-parentheses-2116.css',
+  'minimize-expression-2232.css',
+  'different-parentheses-241.css',
 ]);
 
 const sourceCache = new Map();

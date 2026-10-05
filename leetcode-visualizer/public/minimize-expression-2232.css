@@ -1,0 +1,45 @@
+.me2232-viz { --me-bg:#111c2e; --me-text:#e2e8f0; --me-muted:#94a3b8; --me-border:#334155; --me-blue:#38bdf8; --me-yellow:#fbbf24; --me-green:#34d399; --me-purple:#c084fc; display:grid; gap:12px; min-width:0; text-align:left; color:var(--me-text); }
+.me2232-viz * { box-sizing:border-box; }
+.me2232-viz h3 { font:800 19px Consolas,monospace; margin:5px 0; color:var(--me-text); }
+.me2232-viz p { margin:6px 0; font-size:12px; line-height:1.6; color:var(--me-muted); }
+.me2232-viz small { color:var(--me-muted); font-size:10px; }
+.me2232-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.me2232-heading > div > small { color:var(--me-blue); font-weight:800; }
+.me2232-heading > span { font-size:11px; color:var(--me-muted); flex-shrink:0; }
+.me2232-card { background:var(--me-bg); border:1px solid var(--me-border); border-radius:10px; padding:12px; min-width:0; }
+.me2232-card > header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:7px; font-size:12px; }
+.me2232-card > header > span { font-size:11px; color:var(--me-muted); }
+.me2232-best { border-color:var(--me-green); }
+.me2232-best-value { font:800 26px Consolas,monospace; color:var(--me-green); }
+.me2232-best-expression { display:block; margin-top:8px; font:700 20px Consolas,monospace; color:var(--me-green); overflow-wrap:anywhere; }
+.me2232-best-expression.updating { font-size:12px; color:var(--me-yellow); }
+.me2232-expression { display:block; margin:12px 0; font:800 27px Consolas,monospace; overflow-wrap:anywhere; }
+.me2232-expression .outer { color:var(--me-blue); }
+.me2232-expression .inner { color:var(--me-green); }
+.me2232-expression .paren { color:var(--me-purple); }
+.me2232-parts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin:10px 0; }
+.me2232-parts > div { display:grid; align-content:start; gap:6px; padding:9px; border:1px solid var(--me-border); border-radius:7px; }
+.me2232-parts code { font-size:12px; color:var(--me-muted); overflow-wrap:anywhere; }
+.me2232-parts b { font:800 20px Consolas,monospace; overflow-wrap:anywhere; }
+.me2232-parts .outer b { color:var(--me-blue); }
+.me2232-parts .inner b { color:var(--me-green); }
+.me2232-formula { display:block; font:700 18px Consolas,monospace; margin:12px 0 0; color:var(--me-text); overflow-wrap:anywhere; }
+.me2232-action > strong { display:block; font-size:14px; color:var(--me-yellow); margin-top:6px; }
+.me2232-grid-scroll { overflow-x:auto; max-width:100%; padding:8px 0; }
+.me2232-grid { border-collapse:separate; border-spacing:4px; width:100%; font-size:12px; }
+.me2232-grid caption { text-align:left; font-size:11px; color:var(--me-muted); padding-bottom:6px; }
+.me2232-grid th { padding:6px; color:var(--me-muted); font-size:11px; }
+.me2232-grid td { padding:9px 7px; text-align:center; border:1px solid var(--me-border); border-radius:6px; color:var(--me-muted); white-space:nowrap; }
+.me2232-grid td.tested { color:var(--me-text); }
+.me2232-grid td.best { color:var(--me-green); border-color:var(--me-green); background:color-mix(in srgb,var(--me-green) 10%,var(--me-bg)); }
+.me2232-grid td.current { outline:2px solid var(--me-yellow); outline-offset:0; }
+.me2232-history ol { padding:0; margin:10px 0 0; list-style:none; display:grid; gap:6px; max-height:260px; overflow-y:auto; }
+.me2232-history li { display:grid; grid-template-columns:15px minmax(0,1fr) auto; gap:5px 8px; align-items:center; border:1px solid var(--me-border); border-radius:7px; padding:8px; font-size:11px; }
+.me2232-history li > span { color:var(--me-muted); }
+.me2232-history code { font-size:12px; overflow-wrap:anywhere; }
+.me2232-history b { font:800 16px Consolas,monospace; }
+.me2232-history li > small { grid-column:2 / 4; }
+.me2232-history li.best { border-color:var(--me-green); color:var(--me-green); }
+.me2232-history li.updating, .me2232-history li.pending { border-color:var(--me-yellow); }
+[data-theme="light"] .me2232-viz { --me-bg:#f8fafc; --me-text:#0f172a; --me-muted:#475569; --me-border:#cbd5e1; --me-blue:#0369a1; --me-yellow:#92400e; --me-green:#047857; --me-purple:#7e22ce; }
+@media (max-width:600px) { .me2232-parts { grid-template-columns:repeat(2,minmax(0,1fr)); } .me2232-heading { flex-wrap:wrap; } }

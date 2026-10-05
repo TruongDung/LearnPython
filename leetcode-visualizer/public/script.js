@@ -649,6 +649,24 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
       renderCountPaths1976View(step);
     } },
+    { predicate: (step) => Boolean(step.differentParentheses241View), surface: "treeView", render: (step) => {
+      renderDifferentParentheses241View(step);
+    } },
+    { predicate: (step) => Boolean(step.minimizeExpression2232View), surface: "treeView", render: (step) => {
+      renderMinimizeExpression2232View(step);
+    } },
+    { predicate: (step) => Boolean(step.lockedParentheses2116View), surface: "treeView", render: (step) => {
+      renderLockedParentheses2116View(step);
+    } },
+    { predicate: (step) => Boolean(step.minInsertions1541View), surface: "treeView", render: (step) => {
+      renderMinInsertions1541View(step);
+    } },
+    { predicate: (step) => Boolean(step.scoreParentheses856View), surface: "treeView", render: (step) => {
+      renderScoreParentheses856View(step);
+    } },
+    { predicate: (step) => Boolean(step.removeOutermost1021View), surface: "treeView", render: (step) => {
+      renderRemoveOutermost1021View(step);
+    } },
     { predicate: (step) => Boolean(step.informEmployees1376View), surface: "treeView", render: (step) => {
       renderInformEmployees1376View(step);
     } },
