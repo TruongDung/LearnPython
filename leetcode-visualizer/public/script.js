@@ -649,6 +649,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
       renderCountPaths1976View(step);
     } },
+    { predicate: (step) => Boolean(step.informEmployees1376View), surface: "treeView", render: (step) => {
+      renderInformEmployees1376View(step);
+    } },
     { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
       renderGraph(step);
     } },

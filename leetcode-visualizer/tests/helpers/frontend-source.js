@@ -41,6 +41,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-text-justification-68.js',
   'renderer-requested-visualizations.js',
   'renderer-hard-problems.js',
+  'renderer-inform-employees-1376.js',
   'renderer-smallest-infinite-set-2336.js',
   'renderer-special-characters-3121.js',
   'renderer-disappeared-numbers-448.js',
@@ -108,6 +109,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'match-substring-replacement-2301.css',
   'vowel-substrings-3306.css',
   'debug-controls.css',
+  'inform-employees-1376.css',
 ]);
 
 const sourceCache = new Map();

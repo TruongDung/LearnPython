@@ -27529,27 +27529,79 @@ function parse1376Data(input, params = {}) {
   const informTime = parseJson2050(params.informTime, "informTime");
   if (!Number.isInteger(headID) || headID < 0 || headID >= n || !Array.isArray(manager) || manager.length !== n || manager.some((boss) => !Number.isInteger(boss) || boss < -1 || boss >= n) || manager[headID] !== -1) throw new Error("manager must have n values from -1 to n - 1, with manager[headID] = -1");
   if (!Array.isArray(informTime) || informTime.length !== n || informTime.some((minutes) => !Number.isInteger(minutes) || minutes < 0)) throw new Error("informTime must contain n non-negative integers");
+  // Reject disconnected cycles / extra roots before tracing either traversal.
+  const children = Array.from({ length: n }, () => []);
+  manager.forEach((boss, employee) => { if (boss >= 0) children[boss].push(employee); });
+  const seen = new Set([headID]); const pending = [headID];
+  for (let i = 0; i < pending.length; i++) {
+    for (const child of children[pending[i]]) {
+      if (seen.has(child)) throw new Error("manager must form a tree rooted at headID");
+      seen.add(child); pending.push(child);
+    }
+  }
+  if (seen.size !== n) throw new Error("manager must form one connected tree rooted at headID");
   return { n, headID, manager: [...manager], informTime: [...informTime] };
 }
 
 function buildSteps1376(input, params = {}) {
+  return buildInformEmployees1376(input, params, false);
+}
+
+function buildSteps1376Dfs(input, params = {}) {
+  return buildInformEmployees1376(input, params, true);
+}
+
+function buildInformEmployees1376(input, params, dfs) {
   const { n, headID, manager, informTime } = parse1376Data(input, params);
   const children = Array.from({ length: n }, () => []);
-  for (let employee = 0; employee < n; employee += 1) if (manager[employee] !== -1) children[manager[employee]].push(employee);
-  const arrival = Array(n).fill(null); arrival[headID] = 0;
-  const queue = [[headID, 0]]; const informed = new Set(); const steps = []; let answer = 0;
-  function state({ hlNodes = [], hlEdges = [] } = {}) {
-    const annotations = {}; for (const [employee] of queue) annotations[employee] = "queue";
-    return { nodes: Array.from({ length: n }, (_, employee) => ({ id: employee, label: "E" + employee, sub: "tell=" + informTime[employee] + " · at=" + (arrival[employee] ?? "—") })), edges: manager.flatMap((boss, employee) => boss === -1 ? [] : [{ u: boss, v: employee }]), hlNodes, hlEdges, visitedNodes: [...informed], annotations, caption: { vi: "tell = thời gian manager báo tin · at = thời điểm nhân viên nhận tin · xanh = đã báo tin", en: "tell = manager's informing time · at = time employee receives news · green = has informed reports" } };
+  manager.forEach((boss, employee) => { if (boss >= 0) children[boss].push(employee); });
+  const arrival = Array(n).fill(null);
+  const pending = []; const processed = []; const steps = [];
+  let answer = 0, latest = headID, current = null, nextTime = null;
+  const kind = dfs ? "DFS" : "BFS", container = dfs ? "stack" : "queue";
+  const loc = (vi, en) => ({ vi, en });
+  const line = bfsLine => bfsLine - (dfs ? 1 : 0);
+  function route(employee) {
+    const path = [];
+    for (let node = employee; node !== -1; node = manager[node]) path.unshift(node);
+    return path;
   }
-  function snap(title, note, lines, opts = {}) { steps.push({ title, note, codeLines: lines, final: Boolean(opts.final), arr: [], highlight: [], mark: [], graph: state(opts), vars: [{ name: "queue", value: "[" + queue.map(([employee, minute]) => "(" + employee + "," + minute + ")").join(", ") + "]" }, { name: "answer", value: answer }] }); }
-  snap({ vi: "Dựng cây manager → employee", en: "Build manager → employee tree" }, { vi: "BFS lan thông tin từ head E" + headID + ".", en: "BFS propagates information from head E" + headID + "." }, [3, 4, 5], { hlNodes: [headID] });
-  while (queue.length) {
-    const [managerId, minute] = queue.shift(); informed.add(managerId); answer = Math.max(answer, minute);
-    snap({ vi: "E" + managerId + " nhận tin lúc " + minute, en: "E" + managerId + " receives news at " + minute }, { vi: "E" + managerId + " mất " + informTime[managerId] + " phút để báo cho direct reports.", en: "E" + managerId + " takes " + informTime[managerId] + " minutes to inform direct reports." }, [6, 7, 8], { hlNodes: [managerId] });
-    for (const employee of children[managerId]) { arrival[employee] = minute + informTime[managerId]; queue.push([employee, arrival[employee]]); snap({ vi: "E" + managerId + " → E" + employee + " lúc " + arrival[employee], en: "E" + managerId + " → E" + employee + " at " + arrival[employee] }, { vi: "Employee nhận tin sau thời gian báo của manager.", en: "The employee receives news after the manager's informing time." }, [9, 10], { hlNodes: [managerId, employee], hlEdges: [[managerId, employee]] }); }
+  function snap(event, title, note, bfsLine, extra = {}) {
+    steps.push({ title, note, codeLines: [line(bfsLine)], codeBlock: dfs ? 2 : 1,
+      final: event === "done", arr: [], highlight: [], mark: [],
+      informEmployees1376View: {
+        n, headID, manager: [...manager], informTime: [...informTime], children: children.map(row => [...row]),
+        arrival: [...arrival], pending: pending.map(([employee, time]) => ({ employee, time })),
+        processed: [...processed], current, nextTime, answer, latest, kind, event,
+        path: route(event === "done" ? latest : current ?? headID), ...extra,
+      },
+      vars: [{ name: container, value: JSON.stringify(pending) }, { name: "employee", value: current ?? "—" },
+        { name: "time", value: current === null ? "—" : arrival[current] }, { name: "next_time", value: nextTime ?? "—" }, { name: "answer", value: answer }],
+    });
   }
-  snap({ vi: "return answer = " + answer, en: "return answer = " + answer }, { vi: "Đây là thời điểm muộn nhất bất kỳ employee nhận tin.", en: "This is the latest time any employee receives news." }, [11], { final: true, hlNodes: [headID] });
+  snap("tree", loc("Cây quản lý: cấp trên → cấp dưới", "Manager tree: boss → reports"), loc("Mỗi cạnh mất informTime của cấp trên. Các cấp dưới nhận tin cùng lúc.", "Each edge takes the boss's informTime. Direct reports receive the news together."), 4);
+  arrival[headID] = 0; pending.push([headID, 0]);
+  snap("init", loc(`${kind}: bắt đầu từ E${headID}, lúc 0 phút`, `${kind}: start at E${headID}, at minute 0`), loc(dfs ? "Stack lấy phần tử vào sau ra trước (LIFO)." : "Queue lấy phần tử vào trước ra trước (FIFO).", dfs ? "The stack removes the last entry first (LIFO)." : "The queue removes the first entry first (FIFO)."), 7);
+  snap("answer-init", loc("answer = 0", "answer = 0"), loc("Theo dõi thời điểm nhận tin lớn nhất đã xét.", "Track the largest receive time processed so far."), 8);
+  while (pending.length) {
+    snap("loop", loc(`Còn ${pending.length} người chờ xét`, `${pending.length} employees waiting`), loc("Thứ tự duyệt không phải thứ tự thời gian thực.", "Traversal order is not a real-time clock."), 9);
+    const [employee, time] = dfs ? pending.pop() : pending.shift(); current = employee; nextTime = null;
+    processed.push(employee);
+    snap("pop", loc(`Xét E${employee}: nhận tin lúc ${time} phút`, `Process E${employee}: receives at minute ${time}`), loc(dfs ? "Lấy đỉnh stack; đi sâu nhánh vừa thêm." : "Lấy đầu queue; duyệt lần lượt theo tầng.", dfs ? "Pop the stack top; explore the most recently added branch." : "Remove the queue front; explore level by level."), 10);
+    const previousAnswer = answer;
+    if (time > answer) { answer = time; latest = employee; }
+    snap("max", loc(`answer = max(${previousAnswer}, ${time}) = ${answer}`, `answer = max(${previousAnswer}, ${time}) = ${answer}`), loc("Lấy max vì các nhánh báo tin song song; không cộng thời gian của các nhánh với nhau.", "Take max because branches inform in parallel; do not add separate branch times."), 11, { previousAnswer });
+    for (const child of children[employee]) {
+      nextTime = null;
+      snap("child", loc(`Chuẩn bị báo từ E${employee} → E${child}`, `Prepare E${employee} → E${child}`), loc("Cộng thời gian nhận tin của cấp trên với thời gian cấp trên báo tin.", "Add the boss's receive time and the boss's informing delay."), 12, { child });
+      nextTime = time + informTime[employee];
+      snap("calculate", loc(`${time} + ${informTime[employee]} = ${nextTime} phút`, `${time} + ${informTime[employee]} = ${nextTime} minutes`), loc(`E${child} sẽ nhận tin lúc ${nextTime}; chưa thêm vào ${container}.`, `E${child} will receive at ${nextTime}; not in the ${container} yet.`), 13, { child });
+      arrival[child] = nextTime; pending.push([child, nextTime]);
+      snap("push", loc(`Thêm (E${child}, ${nextTime}) vào ${container}`, `Add (E${child}, ${nextTime}) to the ${container}`), loc("Thời điểm nhận tin đã xác định. Người này đang chờ thuật toán xét, không phải chờ thêm thời gian thực.", "The receive time is determined. This employee awaits algorithm processing, not extra real-world time."), 14, { child });
+    }
+  }
+  current = null; nextTime = null;
+  snap("done", loc(`Mọi người nhận tin sau ${answer} phút`, `Everyone receives the news within ${answer} minutes`), loc(`Đường được tô hồng dẫn tới E${latest}, người nhận tin muộn nhất. Cộng độ trễ dọc đường này được ${answer}.`, `The pink route leads to E${latest}, a latest recipient. Its edge delays sum to ${answer}.`), 15);
   return { original: { n, headID, manager, informTime }, answer, steps };
 }
 
@@ -29087,6 +29139,7 @@ Object.assign(module.exports, {
     tags: [
       { key: "tree", vi: "Cây", en: "Tree" },
       { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
     ],
     title: { vi: "Time Needed to Inform All Employees", en: "Time Needed to Inform All Employees" },
     titleVi: { vi: "Thời gian báo tin cho toàn bộ nhân viên", en: "Time to inform all employees" },
@@ -29094,39 +29147,65 @@ Object.assign(module.exports, {
       vi: "manager[i] là manager của employee i; headID có manager -1. informTime[i] là thời gian employee i báo cho direct reports. Tìm thời gian tối thiểu để mọi employee nhận tin.",
       en: "manager[i] is employee i's manager; headID has manager -1. informTime[i] is the time employee i needs to inform direct reports. Find the minimum time for every employee to receive the news.",
     },
-    defaultInput: [6],
+    defaultInput: [7],
     inputKind: "positive",
     singleInput: true,
     maxInput: 12,
     inputLabel: { vi: "n - số nhân viên", en: "n - number of employees" },
     extraParams: [
-      { key: "headID", label: { vi: "headID", en: "headID" }, default: 2, min: 0 },
-      { key: "manager", type: "string", label: { vi: "manager dạng JSON", en: "manager as JSON" }, default: "[2,2,-1,2,2,2]" },
-      { key: "informTime", type: "string", label: { vi: "informTime dạng JSON", en: "informTime as JSON" }, default: "[0,0,1,0,0,0]" },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: BFS — dùng queue", en: "Approach 1: BFS — queue" } },
+        { value: "2", label: { vi: "Cách 2: DFS — dùng stack", en: "Approach 2: DFS — stack" } },
+      ] },
+      { key: "headID", label: { vi: "headID", en: "headID" }, default: 0, min: 0 },
+      { key: "manager", type: "string", label: { vi: "manager dạng JSON", en: "manager as JSON" }, default: "[-1,0,0,1,1,2,2]" },
+      { key: "informTime", type: "string", label: { vi: "informTime dạng JSON", en: "informTime as JSON" }, default: "[2,3,1,0,0,0,0]" },
     ],
     approach: [
       { vi: "Đảo mảng manager thành cây manager → direct reports.", en: "Turn the manager array into a manager → direct reports tree." },
-      { vi: "BFS từ head, giữ (employee, thời điểm nhận tin). Child nhận tin ở time + informTime[manager].", en: "BFS from the head, keeping (employee, receive time). A child receives news at time + informTime[manager]." },
-      { vi: "Thời điểm lớn nhất trong quá trình BFS là đáp án.", en: "The largest receive time during BFS is the answer." },
+      { vi: "BFS dùng queue (FIFO); DFS dùng stack (LIFO). Cả hai giữ (employee, thời điểm nhận tin).", en: "BFS uses a queue (FIFO); DFS uses a stack (LIFO). Both keep (employee, receive time)." },
+      { vi: "Child nhận tin lúc time + informTime[manager]. Đây là độ trễ của manager, không phải của child.", en: "A child receives at time + informTime[manager]. Use the manager's delay, not the child's." },
+      { vi: "Các nhánh truyền tin song song: đáp án = max(thời điểm nhận tin). Ví dụ nhánh 5 phút và nhánh 3 phút → đáp án 5.", en: "Branches inform in parallel: answer = max(receive times). A 5-minute branch and a 3-minute branch give answer 5." },
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi employee/cạnh manager được xử lý một lần.", en: "Each employee and manager edge is processed once." } },
     codeLabel: { vi: "BFS theo cây manager", en: "BFS over the manager tree" },
     code: [
       "from collections import deque",
       "class Solution:",
-      "    def numOfMinutes(self, n: int, headID: int, manager: List[int], informTime: List[int]) -> int:",
+      "    def numOfMinutes(self, n, headID, manager, informTime):",
       "        children = [[] for _ in range(n)]",
       "        for employee, boss in enumerate(manager):",
       "            if boss != -1: children[boss].append(employee)",
-      "        queue = deque([(headID, 0)]); answer = 0",
+      "        queue = deque([(headID, 0)])",
+      "        answer = 0",
       "        while queue:",
-      "            employee, minute = queue.popleft(); answer = max(answer, minute)",
-      "            for report in children[employee]:",
-      "                queue.append((report, minute + informTime[employee]))",
+      "            employee, time = queue.popleft()",
+      "            answer = max(answer, time)",
+      "            for child in children[employee]:",
+      "                next_time = time + informTime[employee]",
+      "                queue.append((child, next_time))",
+      "        return answer",
+    ],
+    code2Label: { vi: "Cách 2: DFS dùng stack", en: "Approach 2: DFS using a stack" },
+    code2: [
+      "class Solution:",
+      "    def numOfMinutes(self, n, headID, manager, informTime):",
+      "        children = [[] for _ in range(n)]",
+      "        for employee, boss in enumerate(manager):",
+      "            if boss != -1: children[boss].append(employee)",
+      "        stack = [(headID, 0)]",
+      "        answer = 0",
+      "        while stack:",
+      "            employee, time = stack.pop()",
+      "            answer = max(answer, time)",
+      "            for child in children[employee]:",
+      "                next_time = time + informTime[employee]",
+      "                stack.append((child, next_time))",
       "        return answer",
     ],
     liveArgs(input, params = {}) { const parsed = parse1376Data(input, params); return [parsed.n, parsed.headID, parsed.manager, parsed.informTime]; },
     builder: buildSteps1376,
+    builder2: buildSteps1376Dfs,
   },
   1519: {
     id: 1519,
