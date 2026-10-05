@@ -1439,18 +1439,28 @@ function buildSteps4(input, params) {
 
   const labelA = swapped ? "nums2" : "nums1";
   const labelB = swapped ? "nums1" : "nums2";
+  let left = 0, right = m;
 
   function snap(opts) {
+    const line = (opts.codeLines || [])[0];
+    const beforeSwap = line === 3 || line === 4;
     steps.push({
       title: opts.title,
       arr: [],
       partitionView: {
-        rowA: A,
-        rowB: B,
-        labelA,
-        labelB,
-        cutA: opts.i !== undefined ? opts.i : 0,
-        cutB: opts.j !== undefined ? opts.j : 0,
+        rowA: beforeSwap ? A0 : A,
+        rowB: beforeSwap ? B0 : B,
+        labelA: beforeSwap ? "nums1" : labelA,
+        labelB: beforeSwap ? "nums2" : labelB,
+        swapped: !beforeSwap && swapped,
+        phase: line < 6 ? "prepare" : line < 8 ? "search" : line < 10 ? "cut" : line < 14 ? "compare" : "median",
+        line,
+        left,
+        right,
+        half: Math.floor((m + n + 1) / 2),
+        cutA: line >= 8 ? opts.i : null,
+        cutB: line >= 9 ? opts.j : null,
+        answer: opts.final ? opts.answer : null,
         highlight: opts.highlight || {},
         status: opts.status || [],
       },
@@ -1501,7 +1511,6 @@ function buildSteps4(input, params) {
   }
 
   // Line 6: left, right = 0, m
-  let left = 0, right = m;
   snap({
     title: { vi: `left, right = 0, m → left=0, right=${m}`, en: `left, right = 0, m → left=0, right=${m}` },
     i: 0,
@@ -1679,21 +1688,17 @@ function buildSteps4(input, params) {
 
     if (isOdd) {
       // Line 17: return left_part
-      const fs = {
+      snap({
         title: { vi: `return left_part → ${median}`, en: `return left_part → ${median}` },
-        arr: [],
-        partitionView: {
-          rowA: A, rowB: B, labelA, labelB, cutA: i, cutB: j,
-          highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
-          status: [{ label: "answer", value: median }],
-        },
-        highlight: [], mark: [],
+        i, j,
+        highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
+        status: [{ label: "answer", value: median }],
+        answer: median,
         final: true,
         codeLines: [17],
         vars: [{ name: "answer", value: median }],
         note: { vi: `Median = ${median}.`, en: `Median = ${median}.` },
-      };
-      steps.push(fs);
+      });
       result = median;
       break;
     }
@@ -1712,21 +1717,17 @@ function buildSteps4(input, params) {
     });
 
     // Line 19: return (left_part + right_part) / 2
-    const fs = {
+    snap({
       title: { vi: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}`, en: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}` },
-      arr: [],
-      partitionView: {
-        rowA: A, rowB: B, labelA, labelB, cutA: i, cutB: j,
-        highlight: { rowA: [i > 0 ? i - 1 : -1, i < m ? i : -1].filter((x) => x >= 0), rowB: [j > 0 ? j - 1 : -1, j < n ? j : -1].filter((x) => x >= 0) },
-        status: [{ label: "answer", value: median }],
-      },
-      highlight: [], mark: [],
+      i, j,
+      highlight: { rowA: [i > 0 ? i - 1 : -1, i < m ? i : -1].filter((x) => x >= 0), rowB: [j > 0 ? j - 1 : -1, j < n ? j : -1].filter((x) => x >= 0) },
+      status: [{ label: "answer", value: median }],
+      answer: median,
       final: true,
       codeLines: [19],
       vars: [{ name: "left_part", value: maxLeft }, { name: "right_part", value: minRight }, { name: "answer", value: median }],
       note: { vi: `Median = (${maxLeft} + ${minRight}) / 2 = ${median}.`, en: `Median = (${maxLeft} + ${minRight}) / 2 = ${median}.` },
-    };
-    steps.push(fs);
+    });
     result = median;
     break;
   }
