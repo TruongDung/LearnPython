@@ -390,14 +390,15 @@ function renderCatalog() {
       studyGuide.className = "string-study-guide";
       const reader = document.createElement("a");
       reader.className = "trie-learn-suggestion string-study-link";
-      reader.href = "string-study-roadmap.html";
+      reader.href = `string-study-roadmap.html?lang=${lang}`;
       reader.target = "_blank";
       reader.rel = "noopener noreferrer";
       reader.innerHTML = `<span class="trie-learn-suggestion-icon">📘</span><span><strong>${lang === "vi" ? "Lộ trình học String · 895 bài" : "String learning roadmap · 895 problems"}</strong><small>${lang === "vi" ? "126 bài nền tảng → 769 bài mở rộng · danh sách đầy đủ theo thứ tự học" : "126 core → 769 additional problems · complete list in learning order"}</small></span><b aria-hidden="true">↗</b>`;
       const download = document.createElement("a");
       download.className = "trie-problem-link string-study-download";
-      download.href = "study-guides/leetcode-string-study-roadmap.md";
-      download.download = "leetcode-string-study-roadmap.md";
+      const filename = `leetcode-string-study-roadmap${lang === "en" ? ".en" : ""}.md`;
+      download.href = `study-guides/${filename}`;
+      download.download = filename;
       download.textContent = lang === "vi" ? "Tải file Markdown (.md)" : "Download Markdown (.md)";
       studyGuide.appendChild(reader);
       studyGuide.appendChild(download);
