@@ -2170,7 +2170,7 @@ async function runViz() {
   let input;
 
   if (isString) {
-    input = $("arrInput").value.trim();
+    input = problemData.preserveInputWhitespace ? $("arrInput").value : $("arrInput").value.trim();
     if (input.length === 0 && Number(problemData.id) !== 32) {
       return showError("runError", t().errArr);
     }

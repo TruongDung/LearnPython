@@ -130,6 +130,7 @@ app.get("/api/problem/:id", (req, res) => {
     statement: problem.statement,
     defaultInput: problem.defaultInput,
     inputKind: problem.inputKind,
+    preserveInputWhitespace: Boolean(problem.preserveInputWhitespace),
     extraParams: problem.extraParams || [],
     inputLabel: problem.inputLabel || null,
     complexity: problem.complexity || null,

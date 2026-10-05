@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.lowerCase709View), surface: "treeView", render: (step) => {
+      renderLowerCase709View(step);
+    } },
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
     } },
@@ -1997,7 +2000,7 @@ async function collectLiveCallArgs() {
   const isStringArray = problemData && problemData.inputKind === "stringArray";
   let input;
   if (isString) {
-    input = $("arrInput").value.trim();
+    input = problemData.preserveInputWhitespace ? $("arrInput").value : $("arrInput").value.trim();
   } else if (isStringArray) {
     const raw = $("arrInput").value.trim();
     input = raw.startsWith("[") ? JSON.parse(raw) : raw.split(",").map((s) => s.trim()).filter(Boolean);

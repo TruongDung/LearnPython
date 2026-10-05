@@ -60,6 +60,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-prefix-suffix-trie-745.js',
   'renderer-match-substring-replacement-2301.js',
   'renderer-vowel-substrings-3306.js',
+  'renderer-to-lower-case-709.js',
   'script.js',
 ]);
 
@@ -124,6 +125,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'minimize-expression-2232.css',
   'different-parentheses-241.css',
   'apply-substitutions-3481.css',
+  'to-lower-case-709.css',
 ]);
 
 const sourceCache = new Map();

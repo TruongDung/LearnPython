@@ -1,0 +1,24 @@
+.lc709-viz { --text:#e2e8f0; --muted:#94a3b8; --border:#334155; --surface:#111827; color:var(--text); padding:16px; min-width:0; }
+[data-theme="light"] .lc709-viz { --text:#172033; --muted:#64748b; --border:#cbd5e1; --surface:#f8fafc; }
+.lc709-viz * { box-sizing:border-box; }
+.lc709-viz > header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.lc709-viz h3 { margin:5px 0; font-size:20px; }
+.lc709-viz small,.lc709-rule,.lc709-legend { color:var(--muted); }
+.lc709-rule { font-size:13px; line-height:1.6; }
+.lc709-scroll { overflow-x:auto; position:relative; padding:10px 0; }
+.lc709-row { display:flex; align-items:center; gap:12px; width:max-content; min-width:100%; margin:8px 0; }
+.lc709-row > strong { width:52px; flex:none; font:12px monospace; }
+.lc709-row > div { display:flex; gap:6px; }
+.lc709-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; width:42px; height:78px; flex:none; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+.lc709-cell b { font:700 21px monospace; height:29px; }
+.lc709-cell small { font:10px monospace; }
+.lc709-cell span { height:17px; font:700 12px monospace; }
+.lc709-cell.converted { border-color:#34d399; background:rgba(52,211,153,.13); }
+.lc709-cell.current { outline:2px solid #a78bfa; outline-offset:1px; background:rgba(167,139,250,.18); }
+.lc709-cell.pending b { opacity:.4; }
+.lc709-legend { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:11px; margin:10px 0 18px; }
+.lc709-decision { border:1px solid var(--border); border-radius:10px; padding:14px; background:rgba(167,139,250,.08); font-size:14px; line-height:1.6; }
+.lc709-decision p { margin:6px 0 0; color:var(--muted); font-size:12px; }
+.lc709-result { margin-top:14px; display:flex; flex-direction:column; gap:6px; padding:14px; border:1px solid var(--border); border-radius:10px; }
+.lc709-result code { font-size:18px; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:600px) { .lc709-viz { padding:10px; } .lc709-viz h3 { font-size:17px; } }

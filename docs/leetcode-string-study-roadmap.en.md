@@ -11,7 +11,7 @@ Source: [LeetCode — String](https://leetcode.com/problem-list/string/). Data w
 3. For each problem, describe the invariant or state, work through an example by hand, write the code yourself and explain its complexity. Finish a group when you can solve its problems again without looking at a solution.
 4. **Project = Available** means the problem ID has a registered builder in leetcode-visualizer when this list was created. It does not mean every visualization was reviewed again for this list. Premium indicates access restrictions on LeetCode.
 
-The project supports **178/895 problems** in this catalog; **717 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
+The project supports **179/895 problems** in this catalog; **716 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
 
 ## Part A overview
 
@@ -39,7 +39,7 @@ Track indices, characters and prefixes; distinguish string concatenation from mu
 | Study order | Problem | Difficulty | Premium | Project |
 | ---: | --- | --- | --- | --- |
 | 1 | [58. Length of Last Word](https://leetcode.com/problems/length-of-last-word/) | Easy |  | Available |
-| 2 | [709. To Lower Case](https://leetcode.com/problems/to-lower-case/) | Easy |  | Not yet |
+| 2 | [709. To Lower Case](https://leetcode.com/problems/to-lower-case/) | Easy |  | Available |
 | 3 | [1108. Defanging an IP Address](https://leetcode.com/problems/defanging-an-ip-address/) | Easy |  | Not yet |
 | 4 | [1662. Check If Two String Arrays are Equivalent](https://leetcode.com/problems/check-if-two-string-arrays-are-equivalent/) | Easy |  | Not yet |
 | 5 | [1678. Goal Parser Interpretation](https://leetcode.com/problems/goal-parser-interpretation/) | Easy |  | Not yet |
