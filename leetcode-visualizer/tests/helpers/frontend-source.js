@@ -64,6 +64,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-defanging-ip-1108.js',
   'renderer-equivalent-string-arrays-1662.js',
   'renderer-goal-parser-1678.js',
+  'renderer-reverse-string-ii-541.js',
+  'renderer-reverse-words-iii-557.js',
   'script.js',
 ]);
 
@@ -132,6 +134,8 @@ const STYLESHEET_ASSETS = Object.freeze([
   'defanging-ip-1108.css',
   'equivalent-string-arrays-1662.css',
   'goal-parser-1678.css',
+  'reverse-string-ii-541.css',
+  'reverse-words-iii-557.css',
 ]);
 
 const sourceCache = new Map();

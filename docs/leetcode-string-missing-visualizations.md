@@ -1,19 +1,17 @@
 # Các bài String chưa có visualization
 
-Đối chiếu danh mục String trong lộ trình với builder đang đăng ký trong project ngày 2026-10-05: **713/895 bài chưa có visualization**; 182 bài đã đăng ký.
+Đối chiếu danh mục String trong lộ trình với builder đang đăng ký trong project ngày 2026-10-05: **711/895 bài chưa có visualization**; 184 bài đã đăng ký.
 
-Trong số bài còn thiếu: **33 bài nền tảng ở phần A** và **680 bài mở rộng ở phần B**.
+Trong số bài còn thiếu: **31 bài nền tảng ở phần A** và **680 bài mở rộng ở phần B**.
 
 Giữ nguyên thứ tự học của lộ trình. Cột STT học là số thứ tự trong danh sách đầy đủ. Trạng thái này dựa trên việc có builder đã đăng ký; danh mục LeetCode dùng bản chụp ngày 2026-10-05.
 
 [Lộ trình đầy đủ](leetcode-string-study-roadmap.md)
 
-## A.1. Duyệt, biến đổi và mô phỏng chuỗi — thiếu 3 bài
+## A.1. Duyệt, biến đổi và mô phỏng chuỗi — thiếu 1 bài
 
 | STT học | Bài | Độ khó | Premium |
 | ---: | --- | --- | --- |
-| 8 | [541. Reverse String II](https://leetcode.com/problems/reverse-string-ii/) | Easy |  |
-| 9 | [557. Reverse Words in a String III](https://leetcode.com/problems/reverse-words-in-a-string-iii/) | Easy |  |
 | 10 | [151. Reverse Words in a String](https://leetcode.com/problems/reverse-words-in-a-string/) | Medium |  |
 
 ## A.2. Đếm ký tự, Hash Map và anagram — thiếu 6 bài

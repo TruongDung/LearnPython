@@ -20,7 +20,7 @@ const SOURCE = [
 ];
 
 function parseInput(input) {
-  if (typeof input !== "string" || input.length < 1 || input.length > 100 || !/^(?:G|\(\)|\(al\))+$/.test(input)) {
+  if (typeof input !== "string" || input.length < 1 || input.length > 100 || input.match(/^(?:G|\(\)|\(al\))+$/)?.[0] !== input) {
     throw new Error("1678: command must contain only G, () and (al), totaling 1–100 characters / command chỉ gồm G, () và (al), dài 1–100 ký tự.");
   }
   return input;
