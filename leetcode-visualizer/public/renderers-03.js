@@ -86,53 +86,111 @@ function renderPartitionView(step) {
   const view = step.partitionView || {};
   const rowA = Array.isArray(view.rowA) ? view.rowA : [];
   const rowB = Array.isArray(view.rowB) ? view.rowB : [];
-  const cutA = Number.isInteger(view.cutA) ? view.cutA : 0;
-  const cutB = Number.isInteger(view.cutB) ? view.cutB : 0;
-  const statuses = Array.isArray(view.status) ? view.status : [];
-  const highlightIdx = view.highlight || {}; // { rowA: [i,...], rowB: [i,...] }
-  // labelA/labelB reflect which ORIGINAL array (nums1 or nums2) rowA/rowB
-  // actually is, since the algorithm may swap roles internally so binary
-  // search always runs on the shorter array.
+  const cutA = Number.isInteger(view.cutA) ? view.cutA : null;
+  const cutB = Number.isInteger(view.cutB) ? view.cutB : null;
+  const vi = lang === "vi";
+  const line = view.line || (step.codeLines || [])[0] || 0;
+  const phase = view.phase || "prepare";
+  const total = rowA.length + rowB.length;
+  const half = view.half ?? Math.ceil(total / 2);
   const labelA = view.labelA || "nums1";
   const labelB = view.labelB || "nums2";
+  const ready = cutA !== null && cutB !== null;
+  const aLeft = cutA === 0 ? -Infinity : rowA[cutA - 1];
+  const aRight = cutA === rowA.length ? Infinity : rowA[cutA];
+  const bLeft = cutB === 0 ? -Infinity : rowB[cutB - 1];
+  const bRight = cutB === rowB.length ? Infinity : rowB[cutB];
+  const maxLeft = ready ? Math.max(aLeft, bLeft) : null;
+  const minRight = ready ? Math.min(aRight, bRight) : null;
+  const odd = total % 2 === 1;
+  const format = value => value === Infinity ? "+∞" : value === -Infinity ? "−∞" : String(value);
+  const text = value => escapeHtml(String(value));
+  const hl = view.highlight || {};
+  const showLeftMedian = phase === "median" && line >= 15;
+  const showRightMedian = phase === "median" && line >= 18;
 
-  function renderRow(rowLabel, values, cut, hlSet) {
-    const cells = values.map((v, i) => {
-      const inLeft = i < cut;
-      const isHl = hlSet && hlSet.has(i);
-      const isInf = v === Infinity || v === -Infinity;
-      const label = isInf ? (v > 0 ? "+\u221E" : "-\u221E") : String(v);
-      return `<div class="partition-cell${inLeft ? " left-half" : " right-half"}${isHl ? " hl" : ""}">
-        <span class="partition-cell-idx">[${i}]</span>
-        <strong>${escapeHtml(label)}</strong>
+  function renderCells(values, start, end, side, cut, role, pointer, highlights) {
+    if (start === end) {
+      if (cut === null) return `<span class="partition-empty">${vi ? "Mảng rỗng" : "Empty array"}</span>`;
+      const value = side === "left" ? "−∞" : "+∞";
+      const boundary = side === "left" ? `${role}[${pointer}−1]` : `${role}[${pointer}]`;
+      return `<div class="partition-empty"><span>${vi ? "Rỗng" : "Empty"}</span><strong>${value}</strong><small>${boundary} (${vi ? "giá trị quy ước" : "sentinel"})</small></div>`;
+    }
+    return values.slice(start, end).map((value, offset) => {
+      const index = start + offset;
+      const boundary = cut !== null && (index === cut - 1 || index === cut);
+      const leftWinner = role === "A" ? aLeft >= bLeft : bLeft > aLeft;
+      const rightWinner = role === "A" ? aRight <= bRight : bRight < aRight;
+      const median = ready && boundary && ((side === "left" && showLeftMedian && leftWinner)
+        || (side === "right" && showRightMedian && rightWinner));
+      return `<div class="partition-cell${cut !== null ? ` ${side}-half` : ""}${highlights.has(index) ? " hl" : ""}${median ? " median" : ""}">
+        <span class="partition-cell-idx">[${index}]</span><strong>${text(value)}</strong>
+        ${boundary ? `<small class="partition-boundary">${role}[${index < cut ? `${pointer}−1` : pointer}]</small>` : ""}
+        ${median ? `<small class="partition-median-tag">${vi ? "Số giữa" : "Middle"}</small>` : ""}
       </div>`;
     }).join("");
-    return `<div class="partition-row">
-      <span class="partition-row-label">${escapeHtml(rowLabel)}</span>
-      <div class="partition-row-cells">${cells}</div>
+  }
+
+  function renderRow(rowLabel, values, cut, role, pointer, highlights) {
+    const label = `<div class="partition-row-label"><strong>${text(role)} = ${text(rowLabel)}</strong><small>${phase === "prepare" ? `${values.length} ${vi ? "phần tử" : "elements"}` : role === "A" ? (vi ? "Mảng ngắn hơn · tìm i ở đây" : "Shorter array · search i here") : (vi ? "j phụ thuộc vào i" : "j follows from i")}</small></div>`;
+    if (cut === null) {
+      return `<div class="partition-row uncut">${label}<div class="partition-uncut">${renderCells(values, 0, values.length, "right", null, role, pointer, highlights)}</div></div>`;
+    }
+    return `<div class="partition-row">${label}
+      <div class="partition-side partition-left">${renderCells(values, 0, cut, "left", cut, role, pointer, highlights)}</div>
+      <div class="partition-cut"><strong>${pointer} = ${cut}</strong><span aria-hidden="true"></span></div>
+      <div class="partition-side partition-right">${renderCells(values, cut, values.length, "right", cut, role, pointer, highlights)}</div>
     </div>`;
   }
 
-  const hlA = new Set(highlightIdx.rowA || []);
-  const hlB = new Set(highlightIdx.rowB || []);
-
-  const statusItems = statuses.map((item) => `<div>
-    <span>${escapeHtml(String(item.label ?? ""))}</span>
-    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
-  </div>`).join("");
-
-  const legend = `<div class="partition-legend">
-    <span><i class="partition-swatch partition-swatch-left"></i>${lang === "vi" ? "nửa TRÁI (đã chọn)" : "LEFT half (chosen)"}</span>
-    <span><i class="partition-swatch partition-swatch-right"></i>${lang === "vi" ? "nửa PHẢI" : "RIGHT half"}</span>
-  </div>`;
-
-  $("treeView").innerHTML = `
-    <div class="partition-viz">
-      ${renderRow(labelA, rowA, cutA, hlA)}
-      ${renderRow(labelB, rowB, cutB, hlB)}
-      ${legend}
-      <div class="partition-status">${statusItems}</div>
+  function comparison(leftName, leftValue, rightName, rightValue, checked, active) {
+    const ok = leftValue <= rightValue;
+    return `<div class="partition-check${active ? " active" : ""}${checked ? ok ? " pass" : " fail" : " pending"}">
+      <span>${leftName} ≤ ${rightName}</span><strong>${text(format(leftValue))} ≤ ${text(format(rightValue))}</strong>
+      <b>${checked ? ok ? (vi ? "✓ Đúng" : "✓ Pass") : (vi ? "✗ Sai" : "✗ Fail") : (vi ? "Chưa kiểm tra" : "Not checked yet")}</b>
     </div>`;
+  }
+
+  const checks = ready && line >= 10 ? `<div class="partition-checks">
+    ${comparison("A[i−1]", aLeft, "B[j]", bRight, true, line === 10 || line === 11)}
+    ${comparison("B[j−1]", bLeft, "A[i]", aRight, line >= 12, line === 12 || line === 13)}
+  </div>` : "";
+  let action = vi ? "Chọn mảng ngắn hơn làm A để tìm vị trí cắt." : "Use the shorter array as A to search for a cut.";
+  if (phase === "search") action = vi ? "Tìm số phần tử lấy từ A, không tìm giá trị trung vị trực tiếp." : "Search how many elements to take from A, rather than the median value.";
+  if (phase === "cut") action = cutB === null
+    ? (vi ? `Lấy ${cutA} phần tử đầu của A vào nửa trái; bước tiếp theo tính j.` : `Take the first ${cutA} A elements into the left half; calculate j next.`)
+    : (vi ? `Nửa trái lấy ${cutA} từ A + ${cutB} từ B = ${half} phần tử.` : `Left half takes ${cutA} from A + ${cutB} from B = ${half} elements.`);
+  if (ready && line >= 10 && line < 14) {
+    if (aLeft > bRight) action = vi ? `← Giảm i: ${format(aLeft)} ở trái A > ${format(bRight)} ở phải B. A đã lấy quá nhiều phần tử vào trái.` : `← Decrease i: ${format(aLeft)} on A's left > ${format(bRight)} on B's right. Too many A elements went left.`;
+    else if (line === 10) action = vi ? "So sánh thứ nhất đúng; tiếp theo kiểm tra B ở trái với A ở phải." : "First comparison passes; next check B's left against A's right.";
+    else if (bLeft > aRight) action = vi ? `Tăng i →: ${format(bLeft)} ở trái B > ${format(aRight)} ở phải A. Cần lấy thêm từ A, bớt từ B.` : `Increase i →: ${format(bLeft)} on B's left > ${format(aRight)} on A's right. Take more from A and less from B.`;
+    else action = vi ? "✓ Cả hai so sánh đúng: mọi số ở nửa trái ≤ mọi số ở nửa phải." : "✓ Both comparisons pass: every left-half value ≤ every right-half value.";
+  }
+  if (phase === "median") action = vi ? "✓ Vị trí cắt hợp lệ. Chỉ cần các số sát vạch cắt để lấy trung vị." : "✓ Valid partition. Only the values next to the cuts are needed for the median.";
+  const heading = phase === "prepare" ? (vi ? "Chuẩn bị hai mảng" : "Prepare the arrays")
+    : phase === "median" ? (vi ? "Lấy trung vị" : "Read the median")
+      : (vi ? "Chia thành hai nửa" : "Partition into two halves");
+  const counts = ready ? `<div class="partition-halves"><span>${vi ? "TRÁI" : "LEFT"}: ${cutA} + ${cutB} = ${half}</span><span>${vi ? "PHẢI" : "RIGHT"}: ${total - half}</span></div>` : "";
+  const range = phase !== "prepare" ? `<div class="partition-search"><span>${vi ? "Khoảng tìm i" : "Search range for i"}: <strong>[${view.left ?? 0}, ${view.right ?? rowA.length}]</strong></span><span>${vi ? "Trái cần" : "Left needs"} <strong>${half}/${total}</strong> ${vi ? "phần tử" : "elements"}</span>${ready ? `<span>j = ${half} − ${cutA} = <strong>${cutB}</strong></span>` : ""}</div>` : "";
+  const median = showLeftMedian ? `<div class="partition-result">
+    <span>${vi ? "Lớn nhất bên trái" : "Largest on the left"}: max(${text(format(aLeft))}, ${text(format(bLeft))}) = <strong>${text(maxLeft)}</strong></span>
+    ${showRightMedian ? `<span>${vi ? "Nhỏ nhất bên phải" : "Smallest on the right"}: min(${text(format(aRight))}, ${text(format(bRight))}) = <strong>${text(minRight)}</strong></span>` : ""}
+    ${line >= 16 ? `<span>${total} ${vi ? `phần tử (${odd ? "lẻ" : "chẵn"})` : `elements (${odd ? "odd" : "even"})`} → ${odd ? (vi ? "lấy 1 số giữa" : "take one middle value") : (vi ? "trung bình 2 số giữa" : "average two middle values")}</span>` : ""}
+    ${step.final ? `<strong class="partition-answer">Median = ${odd ? text(view.answer) : `(${text(maxLeft)} + ${text(minRight)}) / 2 = ${text(view.answer)}`}</strong>` : ""}
+  </div>` : "";
+
+  $("treeView").innerHTML = `<div class="partition-viz" data-phase="${text(phase)}">
+    <h4>${heading}</h4>
+    ${view.swapped ? `<div class="partition-swap">${vi ? "Đã đổi vai trò" : "Roles swapped"}: A = ${text(labelA)}, B = ${text(labelB)}.</div>` : ""}
+    ${range}${counts}
+    <div class="partition-arrays">
+      ${renderRow(labelA, rowA, cutA, "A", "i", new Set(hl.rowA || []))}
+      ${renderRow(labelB, rowB, cutB, "B", "j", new Set(hl.rowB || []))}
+    </div>
+    ${checks}
+    <div class="partition-action" aria-live="polite">${text(action)}</div>
+    ${median}
+  </div>`;
 }
 
 // ---- Two-pointer merge visualization (e.g. bai 88: Merge Sorted Array) ----

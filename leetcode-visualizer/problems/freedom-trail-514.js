@@ -109,6 +109,7 @@ function buildSteps514Exact(input, params) {
   let dp = new Map();
   let dpLayer = -1;
   let nextDp = null;
+  let nextDpChar = null;
   let parent = null;
   const parents = [];
   const dpRows = [];
@@ -239,6 +240,7 @@ function buildSteps514Exact(input, params) {
       },
       frontier: {
         layer: dpLayer,
+        nextChar: nextDpChar,
         dp: mapEntries(dp),
         next: mapEntries(nextDp),
         best: copyCandidate(best),
@@ -265,7 +267,7 @@ function buildSteps514Exact(input, params) {
       },
       invariants: {
         dpPositionsMatchLayer: dpLayer < 0 || mapEntries(dp).every((entry) => ring[entry.position] === key[dpLayer]),
-        nextPositionsMatchChar: nextDp === null || mapEntries(nextDp).every((entry) => ring[entry.position] === keyChar),
+        nextPositionsMatchChar: nextDp === null || nextDpChar === null || mapEntries(nextDp).every((entry) => ring[entry.position] === nextDpChar),
         parentCoversNext: nextDp === null || parent === null || mapEntries(nextDp).every((entry) => parent.has(entry.position)),
         costsFinite: [...dp.values(), ...(nextDp instanceof Map ? nextDp.values() : [])].every(Number.isSafeInteger),
         witnessValid: witnessIsValid(),
@@ -365,6 +367,7 @@ function buildSteps514Exact(input, params) {
     counters.keyLayers++;
     emit({ line: 10, event: "select-key-character", phase: "transition", timing: "before", condition: { expression: `${layer} < ${key.length}`, result: true }, title: localized(`Layer ${layer}: spell ${keyChar}`, `Tầng ${layer}: đánh ${keyChar}`), note: localized(`Current dp exactly represents key[:${layer}] = \"${key.slice(0, layer)}\".`, `dp hiện tại biểu diễn chính xác key[:${layer}] = \"${key.slice(0, layer)}\".`) });
     nextDp = new Map();
+    nextDpChar = keyChar;
     emit({ line: 11, event: "allocate-next-frontier", phase: "transition", title: localized("Initialize next_dp", "Khởi tạo next_dp"), note: localized(`Only ring positions containing ${keyChar} can appear in this frontier.`, `Chỉ vị trí ring chứa ${keyChar} mới xuất hiện trong frontier này.`) });
     parent = new Map();
     emit({ line: 12, event: "allocate-layer-parent", phase: "transition", title: localized("Initialize this layer's parent map", "Khởi tạo parent map của tầng"), note: localized("Each target stores its selected predecessor, physical direction, and turn count.", "Mỗi target lưu predecessor, hướng quay vật lý và số bước quay được chọn.") });
@@ -469,6 +472,7 @@ function buildSteps514Exact(input, params) {
   keyIndex = null;
   keyChar = null;
   nextDp = null;
+  nextDpChar = null;
   parent = null;
   resetTransition();
   emit({ line: 10, event: "key-loop-complete", phase: "transition", timing: "before", condition: { expression: `${key.length} < ${key.length}`, result: false }, title: localized("All key layers complete", "Mọi tầng key hoàn tất"), note: localized("Every final frontier state spells the entire key.", "Mọi trạng thái frontier cuối đều đã đánh toàn bộ key.") });

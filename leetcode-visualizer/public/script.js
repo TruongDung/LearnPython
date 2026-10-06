@@ -7,8 +7,68 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.goalParser1678View), surface: "treeView", render: (step) => {
+      renderGoalParser1678View(step);
+    } },
+    { predicate: (step) => Boolean(step.equivalent1662View), surface: "treeView", render: (step) => {
+      renderEquivalent1662View(step);
+    } },
+    { predicate: (step) => Boolean(step.defang1108View), surface: "treeView", render: (step) => {
+      renderDefang1108View(step);
+    } },
+    { predicate: (step) => Boolean(step.lowerCase709View), surface: "treeView", render: (step) => {
+      renderLowerCase709View(step);
+    } },
     { predicate: (step) => Boolean(step.__live), surface: "liveVarsView", render: (step) => {
       renderLiveVarsView(step);
+    } },
+    { predicate: (step) => Boolean(step.vowelSubstrings3306View), surface: "treeView", render: (step) => {
+      renderVowelSubstrings3306View(step);
+    } },
+    { predicate: (step) => Boolean(step.matchReplacement2301View), surface: "treeView", render: (step) => {
+      renderMatchReplacement2301View(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixSuffix745TrieView), surface: "treeView", render: (step) => {
+      renderPrefixSuffix745TrieView(step);
+    } },
+    { predicate: (step) => Boolean(step.prefixSuffix745View), surface: "treeView", render: (step) => {
+      renderPrefixSuffix745View(step);
+    } },
+    { predicate: (step) => Boolean(step.maximumDistance1855View), surface: "treeView", render: (step) => {
+      renderMaximumDistance1855View(step);
+    } },
+    { predicate: (step) => Boolean(step.furthestHouses2078View || step.furthestHouses2078ScanView), surface: "treeView", render: (step) => {
+      renderFurthestHouses2078View(step);
+    } },
+    { predicate: (step) => Boolean(step.validParenthesis678View), surface: "treeView", render: (step) => {
+      renderValidParenthesis678View(step);
+    } },
+    { predicate: (step) => Boolean(step.equalSubset416View), surface: "treeView", render: (step) => {
+      renderEqualSubset416View(step);
+    } },
+    { predicate: (step) => Boolean(step.disappearedNumbers448View), surface: "treeView", render: (step) => {
+      renderDisappearedNumbers448View(step);
+    } },
+    { predicate: (step) => Boolean(step.specialCharacters3121View), surface: "treeView", render: (step) => {
+      renderSpecialCharacters3121View(step);
+    } },
+    { predicate: (step) => Boolean(step.serverAllocator9018BitmaskView), surface: "treeView", render: (step) => {
+      renderServerAllocator9018BitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.infiniteSet2336BitmaskView), surface: "treeView", render: (step) => {
+      renderInfiniteSet2336BitmaskView(step);
+    } },
+    { predicate: (step) => Boolean(step.infiniteSet2336View), surface: "treeView", render: (step) => {
+      renderInfiniteSet2336View(step);
+    } },
+    { predicate: (step) => Boolean(step.hardProblemView), surface: "treeView", render: (step) => {
+      renderHardProblemView(step);
+    } },
+    { predicate: (step) => Boolean(step.xMatrix2319View), surface: "treeView", render: (step) => {
+      renderXMatrix2319View(step);
+    } },
+    { predicate: (step) => Boolean(step.parentheses1111View), surface: "treeView", render: (step) => {
+      renderParentheses1111View(step);
     } },
     { predicate: (step) => Boolean(step.reverseParen1190View), surface: "treeView", render: (step) => {
       renderReverseParen1190View(step);
@@ -244,8 +304,44 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.twitterView), surface: "treeView", render: (step) => {
       renderTwitterView(step);
     } },
+    { predicate: (step) => Boolean(step.matrix542View), surface: "treeView", render: (step) => {
+      renderMatrix542View(step);
+    } },
+    { predicate: (step) => Boolean(step.unionFind684View), surface: "treeView", render: (step) => {
+      renderUnionFind684View(step);
+    } },
+    { predicate: (step) => Boolean(step.generateParentheses22View), surface: "treeView", render: (step) => {
+      renderGenerateParentheses22View(step);
+    } },
+    { predicate: (step) => Boolean(step.flights787View), surface: "treeView", render: (step) => {
+      renderFlights787View(step);
+    } },
+    { predicate: (step) => Boolean(step.visitAll847View), surface: "treeView", render: (step) => {
+      renderVisitAll847View(step);
+    } },
+    { predicate: (step) => Boolean(step.coins2218View), surface: "treeView", render: (step) => {
+      renderCoins2218View(step);
+    } },
+    { predicate: (step) => Boolean(step.bfs9006View), surface: "treeView", render: (step) => {
+      renderBfs9006View(step);
+    } },
     { predicate: (step) => Boolean(step.profitTrackerView), surface: "treeView", render: (step) => {
-      renderProfitTrackerView(step);
+      renderProfitTracker9001View(step);
+    } },
+    { predicate: (step) => Boolean(step.square9013View), surface: "treeView", render: (step) => {
+      renderSquare9013View(step);
+    } },
+    { predicate: (step) => Boolean(step.loyal9014View), surface: "treeView", render: (step) => {
+      renderLoyal9014View(step);
+    } },
+    { predicate: (step) => Boolean(step.sweep9015View), surface: "treeView", render: (step) => {
+      renderSweep9015View(step);
+    } },
+    { predicate: (step) => Boolean(step.friends9016View), surface: "treeView", render: (step) => {
+      renderFriends9016View(step);
+    } },
+    { predicate: (step) => Boolean(step.ads9017View), surface: "treeView", render: (step) => {
+      renderAds9017View(step);
     } },
     { predicate: (step) => Boolean(step.cyclicSortView), surface: "treeView", render: (step) => {
       renderCyclicSortView(step);
@@ -499,6 +595,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.slidingMaximum239View), surface: "treeView", render: (step) => {
       renderSlidingMaximum239View(step);
     } },
+    { predicate: (step) => Boolean(step.visiblePoints1610View), surface: "treeView", render: (step) => {
+      renderVisiblePoints1610View(step);
+    } },
     { predicate: (step) => Boolean(step.medianFinder295View), surface: "treeView", render: (step) => {
       renderMedianFinder295View(step);
     } },
@@ -523,6 +622,27 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.freedomTrail514View), surface: "treeView", render: (step) => {
       renderFreedomTrail514View(step);
     } },
+    { predicate: (step) => Boolean(step.raceCar818View), surface: "treeView", render: (step) => {
+      renderRaceCar818View(step);
+    } },
+    { predicate: (step) => Boolean(step.crackingSafe753View), surface: "treeView", render: (step) => {
+      renderCrackingSafe753View(step);
+    } },
+    { predicate: (step) => Boolean(step.raceCar818View), surface: "treeView", render: (step) => {
+      renderRaceCar818View(step);
+    } },
+    { predicate: (step) => Boolean(step.inversePairs629View), surface: "treeView", render: (step) => {
+      renderKInversePairs629View(step);
+    } },
+    { predicate: (step) => Boolean(step.strangePrinter664View), surface: "treeView", render: (step) => {
+      renderStrangePrinter664View(step);
+    } },
+    { predicate: (step) => Boolean(step.countPalindromicSubsequences730View), surface: "treeView", render: (step) => {
+      renderCountPalindromicSubsequences730View(step);
+    } },
+    { predicate: (step) => Boolean(step.cherryPickup741View), surface: "treeView", render: (step) => {
+      renderCherryPickup741View(step);
+    } },
     { predicate: (step) => Boolean(step.validPath1391View), surface: "treeView", render: (step) => {
       renderValidPath1391View(step);
     } },
@@ -540,6 +660,30 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
       renderCountPaths1976View(step);
+    } },
+    { predicate: (step) => Boolean(step.substitutions3481View), surface: "treeView", render: (step) => {
+      renderSubstitutions3481View(step);
+    } },
+    { predicate: (step) => Boolean(step.differentParentheses241View), surface: "treeView", render: (step) => {
+      renderDifferentParentheses241View(step);
+    } },
+    { predicate: (step) => Boolean(step.minimizeExpression2232View), surface: "treeView", render: (step) => {
+      renderMinimizeExpression2232View(step);
+    } },
+    { predicate: (step) => Boolean(step.lockedParentheses2116View), surface: "treeView", render: (step) => {
+      renderLockedParentheses2116View(step);
+    } },
+    { predicate: (step) => Boolean(step.minInsertions1541View), surface: "treeView", render: (step) => {
+      renderMinInsertions1541View(step);
+    } },
+    { predicate: (step) => Boolean(step.scoreParentheses856View), surface: "treeView", render: (step) => {
+      renderScoreParentheses856View(step);
+    } },
+    { predicate: (step) => Boolean(step.removeOutermost1021View), surface: "treeView", render: (step) => {
+      renderRemoveOutermost1021View(step);
+    } },
+    { predicate: (step) => Boolean(step.informEmployees1376View), surface: "treeView", render: (step) => {
+      renderInformEmployees1376View(step);
     } },
     { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
       renderGraph(step);
@@ -703,6 +847,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.divideString2138View), surface: "treeView", render: (step) => {
       renderDivideString2138View(step);
     } },
+    { predicate: (step) => Boolean(step.textJustification68View), surface: "treeView", render: (step) => {
+      renderTextJustification68View(step);
+    } },
     { predicate: (step) => Boolean(step.maximizeScore2818View), surface: "treeView", render: (step) => {
       renderMaximizeScore2818View(step);
     } },
@@ -810,6 +957,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.queueView), surface: "treeView", render: (step) => {
       renderQueueView(step);
+    } },
+    { predicate: (step) => Boolean(step.calculator770View), surface: "treeView", render: (step) => {
+      renderBasicCalculatorIV770View(step);
     } },
     { predicate: (step) => Boolean(step.calculator772View), surface: "treeView", render: (step) => {
       renderCalculator772View(step);
@@ -994,6 +1144,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.prefixScores2416View), surface: "treeView", render: (step) => {
       renderPrefixScores2416View(step);
     } },
+    { predicate: (step) => Boolean(step.specialBinary761View), surface: "treeView", render: (step) => {
+      renderSpecialBinary761View(step);
+    } },
     { predicate: (step) => Boolean(step.braceExpansion1096View), surface: "treeView", render: (step) => {
       renderBraceExpansion1096View(step);
     } },
@@ -1062,9 +1215,22 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
 ];
 
+let prefixSuffix745Layout = null;
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
+
+  const panel = $("vizPanel");
+  const keepViewport = Boolean(step.prefixSuffix745View || step.prefixSuffix745TrieView);
+  const viewport = { left: window.scrollX, top: window.scrollY };
+  panel.classList.toggle("ps745-stable-viewport", keepViewport);
+  // Reserve the tallest frame seen in this run so shorter frames cannot pull
+  // the viewport upward when the user is near the bottom of the page.
+  if (!keepViewport || prefixSuffix745Layout?.steps !== steps || prefixSuffix745Layout?.width !== panel.clientWidth) {
+    panel.style.minHeight = "";
+    prefixSuffix745Layout = keepViewport ? { steps, width: panel.clientWidth, height: 0 } : null;
+  }
 
   $("stepTitle").textContent = pick(step.title);
   $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
@@ -1102,6 +1268,12 @@ function renderStep() {
     show("answer");
   } else {
     hide("answer");
+  }
+
+  if (keepViewport) {
+    prefixSuffix745Layout.height = Math.max(prefixSuffix745Layout.height, panel.getBoundingClientRect().height);
+    panel.style.minHeight = `${Math.ceil(prefixSuffix745Layout.height)}px`;
+    window.scrollTo({ ...viewport, behavior: "instant" });
   }
 }
 
@@ -1837,7 +2009,7 @@ async function collectLiveCallArgs() {
   const isStringArray = problemData && problemData.inputKind === "stringArray";
   let input;
   if (isString) {
-    input = $("arrInput").value.trim();
+    input = problemData.preserveInputWhitespace ? $("arrInput").value : $("arrInput").value.trim();
   } else if (isStringArray) {
     const raw = $("arrInput").value.trim();
     input = raw.startsWith("[") ? JSON.parse(raw) : raw.split(",").map((s) => s.trim()).filter(Boolean);

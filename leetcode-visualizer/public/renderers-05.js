@@ -1689,6 +1689,7 @@ function renderBitmaskBasicsView(step) {
   const width = Number.isInteger(view.width) ? view.width : Math.max(1, ...rows.map((row) => String(row.bits || "").length));
   const modeLabels = {
     "xor-fold": vi ? "XOR TRIỆT TIÊU CẶP" : "PAIR-CANCELING XOR",
+    "xor-game": vi ? "TRÒ CHƠI XOR" : "CHALKBOARD XOR GAME",
     popcount: vi ? "ĐẾM BIT 1" : "COUNT SET BITS",
     "power-of-two": vi ? "KIỂM TRA LŨY THỪA 2" : "POWER OF TWO CHECK",
     "xor-distance": vi ? "XOR TÌM BIT KHÁC" : "XOR DIFFERENCE",
@@ -3113,9 +3114,10 @@ function renderParen32View(step) {
   }).join("") || `<span class="p32-empty">${vi ? "stack rỗng" : "empty stack"}</span>`;
 
   let action;
-  if (view.event === "push") action = vi ? `Gặp '(' -> push chỉ số ${current}.` : `Found '(' -> push index ${current}.`;
+  if (["enter", "init-best", "boundary", "loop", "char-check", "close-branch", "empty-check", "measure-branch", "loop-exit"].includes(view.event)) action = pick(step.title);
+  else if (view.event === "push") action = vi ? `Gặp '(' -> push chỉ số ${current}.` : `Found '(' -> push index ${current}.`;
   else if (view.event === "pop") action = vi ? `Gặp ')' -> pop một '(' hoặc mốc trên đỉnh.` : `Found ')' -> pop one '(' or the top boundary.`;
-  else if (view.event === "reset") action = vi ? `Stack rỗng: ')' tại ${current} không ghép được, trở thành mốc mới.` : `Stack is empty: ')' at ${current} cannot match, so it becomes the new boundary.`;
+  else if (view.event === "reset") action = vi ? `Đặt mốc mới ${current}: ')' này không ghép được.` : `Set new boundary ${current}: this ')' is unmatched.`;
   else if (view.event === "best") action = vi ? `Đo được ${view.decision.length} ký tự và cập nhật best.` : `Measured ${view.decision.length} characters and updated best.`;
   else if (view.event === "measure") action = vi ? `Đo từ mốc + 1 đến i: ${view.decision.length} ký tự.` : `Measure from boundary + 1 through i: ${view.decision.length} characters.`;
   else if (view.event === "return") action = vi ? `Trả về best = ${view.best}.` : `Return best = ${view.best}.`;
@@ -3130,7 +3132,7 @@ function renderParen32View(step) {
       <section class="p32-panel"><header><strong>s</strong><span>${vi ? "xanh = best, vàng = đoạn đang đo" : "green = best, yellow = span being measured"}</span></header><div class="p32-chars" style="--p32-count:${Math.max(chars.length, 1)}">${charsHtml}</div></section>
       <section class="p32-stack"><header><strong>INDEX STACK</strong><span>${vi ? "đỉnh ở trên" : "top at top"}</span></header><div>${stackHtml}</div></section>
     </section>
-    <section class="p32-result"><span><small>best</small><strong>${view.best || 0}</strong></span><span><small>${vi ? "đoạn tốt nhất" : "best span"}</small><strong>${escapeHtml(bestText)}</strong></span><span><small>rule</small><strong>length = i - stack[-1]</strong></span></section>
+    <section class="p32-result"><span><small>best</small><strong>${view.best ?? "-"}</strong></span><span><small>${vi ? "đoạn tốt nhất" : "best span"}</small><strong>${escapeHtml(bestText)}</strong></span><span><small>rule</small><strong>length = i - stack[-1]</strong></span></section>
   </section>`;
 }
 
@@ -6053,3 +6055,144 @@ function renderCircularMaximumSubarrayView(step) {
   </section>`;
 }
 
+
+
+/**
+ * LeetCode 1111: Maximum Nesting Depth of Two Valid Parentheses Strings.
+ * Render parentheses splitting visualization.
+ */
+function renderParentheses1111View(step) {
+  const view = step.parentheses1111View || {};
+  const vi = lang === "vi";
+  const seq = Array.isArray(view.seq) ? view.seq : [...String(view.seq || "")];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const depthA = Number(view.depthA) || 0;
+  const depthB = Number(view.depthB) || 0;
+  const maxDepthA = Number(view.maxDepthA) || 0;
+  const maxDepthB = Number(view.maxDepthB) || 0;
+  const stackA = Array.isArray(view.stackA) ? view.stackA : [];
+  const stackB = Array.isArray(view.stackB) ? view.stackB : [];
+  const pointer = Number.isInteger(view.pointer) ? view.pointer : -1;
+  const splitType = view.splitType === "A" || view.splitType === "B" ? view.splitType : "";
+  const sourceMaxDepth = Number(view.sourceMaxDepth) || 0;
+  const optimalMaxDepth = Number(view.optimalMaxDepth) || 0;
+
+  const cells = [];
+  for (let i = 0; i < seq.length; i++) {
+    const c = seq[i];
+    const isOpen = c === '(';
+    const current = i === pointer;
+    const pendingChoice = current && splitType ? (splitType === "A" ? 0 : 1) : undefined;
+    const group = answer[i] === 0 || answer[i] === 1 ? answer[i] : pendingChoice;
+    const assignToA = group === 0;
+    const assignToB = group === 1;
+    const inStackA = stackA.includes(i);
+    const inStackB = stackB.includes(i);
+    const stackDepth = assignToA
+      ? stackA.indexOf(i) + 1
+      : assignToB
+        ? stackB.indexOf(i) + 1
+        : 0;
+    
+    const classes = ["pa1111-cell", isOpen ? "open" : "close"];
+    if (assignToA) classes.push("in-a");
+    if (assignToB) classes.push("in-b");
+    if (current) classes.push("current");
+    if (inStackA || inStackB) classes.push("in-stack");
+    
+    const label = assignToA ? "A" : assignToB ? "B" : "—";
+    const stackMarker = stackDepth > 0 ? `<b>${stackDepth}</b>` : "";
+    
+    cells.push(`<span class="${classes.join(" ")}"><small>[${i}]</small><strong>${escapeHtml(c)}</strong><em>${escapeHtml(label)}</em>${stackMarker}</span>`);
+  }
+
+  const currentChar = pointer >= 0 && pointer < seq.length ? seq[pointer] : "—";
+  const assignment = pointer >= 0 && pointer < seq.length
+    ? splitType || (answer[pointer] === 0 ? "A" : answer[pointer] === 1 ? "B" : "—")
+    : "—";
+  const chooseRule = currentChar === "("
+    ? (vi ? "chọn depth nhỏ hơn" : "choose smaller depth")
+    : currentChar === ")"
+      ? (vi ? "chọn depth lớn hơn" : "choose larger depth")
+      : "—";
+
+  const stackCellsA = [];
+  const stackCellsB = [];
+  
+  for (let i = 0; i < Math.max(stackA.length, stackB.length); i++) {
+    const hasA = i < stackA.length;
+    const hasB = i < stackB.length;
+    const depth = i + 1;
+    
+    stackCellsA.push(`<span class="${hasA ? "occupied" : "empty"}"><small>depth ${depth}</small><strong>${hasA ? `[${stackA[i]}]` : "—"}</strong></span>`);
+    stackCellsB.push(`<span class="${hasB ? "occupied" : "empty"}"><small>depth ${depth}</small><strong>${hasB ? `[${stackB[i]}]` : "—"}</strong></span>`);
+  }
+
+  const phases = [
+    { vi: "Đọc ký tự", en: "Read char", detail: currentChar },
+    { vi: "So sánh depth", en: "Compare depths", detail: `A=${depthA}, B=${depthB}` },
+    { vi: "Chọn quy tắc", en: "Choose rule", detail: chooseRule },
+    { vi: "Gán kết quả", en: "Assign result", detail: assignment },
+  ].map((item, index) => {
+    const activePhase = view.phase === "intro" ? 0 : view.phase === "process" ? 2 : 3;
+    const state = index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}"><small>${state === "done" ? "✓" : index + 1}</small><strong>${escapeHtml(vi ? item.vi : item.en)}</strong><em>${escapeHtml(item.detail)}</em></span>`;
+  }).join("");
+
+  $("treeView").innerHTML = `<section class="pa1111-viz" role="img" aria-label="LeetCode 1111: Split parentheses into A and B">
+    <div class="pa1111-phases">${phases}</div>
+    <section class="pa1111-action">
+      <small>${vi ? "DÒNG" : "LINE"} ${Array.isArray(step.codeLines) ? step.codeLines[0] || "—" : "—"}</small>
+      <strong>${escapeHtml(pick(step.title))}</strong>
+      <span>${escapeHtml(pick(step.note))}</span>
+    </section>
+    <section class="pa1111-stats">
+      <span><small>${vi ? "KÝ TỰ HIỆN TẠI" : "CURRENT CHAR"}</small><strong>${escapeHtml(currentChar)}</strong></span>
+      <span><small>DEPTH A</small><strong>${depthA}</strong></span>
+      <span><small>DEPTH B</small><strong>${depthB}</strong></span>
+      <span><small>${vi ? "GÁN CHO" : "ASSIGN TO"}</small><strong>${escapeHtml(assignment)}</strong></span>
+    </section>
+    <section class="pa1111-sequence">
+      <header><strong>${vi ? "CHUỖI NGOẶC" : "PARENTHESES STRING"}</strong><span>${seq.length} chars</span></header>
+      <div class="pa1111-cells">${cells.join("")}</div>
+    </section>
+    <div class="pa1111-split">
+      <section class="pa1111-stack pa1111-stack-a">
+        <header><strong>STACK A</strong><span>depth=${maxDepthA}</span></header>
+        <div class="pa1111-stack-cells">${stackCellsA.join("")}</div>
+        <footer><small>${vi ? "Độ sâu hiện tại" : "Current depth"}</small><strong>${depthA}</strong></footer>
+      </section>
+      <section class="pa1111-stack pa1111-stack-b">
+        <header><strong>STACK B</strong><span>depth=${maxDepthB}</span></header>
+        <div class="pa1111-stack-cells">${stackCellsB.join("")}</div>
+        <footer><small>${vi ? "Độ sâu hiện tại" : "Current depth"}</strong><strong>${depthB}</strong></footer>
+      </section>
+    </div>
+    <section class="pa1111-rules">
+      <strong>${vi ? "QUY TẮC GÁN" : "ASSIGNMENT RULES"}</strong>
+      <div class="rule ${currentChar === "(" ? "active" : ""}">
+        <small>${vi ? "GẶP '('" : "ON '('"}</small>
+        <b>${vi ? "Gán vào chuỗi có depth nhỏ hơn" : "Assign to the shallower string"}</b>
+        <em>${vi ? "giữ A và B cân bằng" : "keep A and B balanced"}</em>
+      </div>
+      <div class="rule ${currentChar === ")" ? "active" : ""}">
+        <small>${vi ? "GẶP ')'" : "ON ')'"}</small>
+        <b>${vi ? "Gán vào chuỗi có depth lớn hơn" : "Assign to the deeper string"}</b>
+        <em>${vi ? "đóng một '(' chưa đóng" : "close an unmatched '('"}</em>
+      </div>
+    </section>
+    <aside class="pa1111-legend">
+      <span class="in-a"><i></i>${vi ? "thuộc A" : "in A"}</span>
+      <span class="in-b"><i></i>${vi ? "thuộc B" : "in B"}</span>
+      <span class="open"><i></i>${vi ? "mở ngoặc '('" : "open '('"}</span>
+      <span class="close"><i></i>${vi ? "đóng ngoặc ')'" : "close ')'"}</span>
+      <span class="current"><i></i>${vi ? "ký tự hiện tại" : "current char"}</span>
+      <span class="in-stack"><i></i>${vi ? "trong stack" : "in stack"}</span>
+    </aside>
+    <section class="pa1111-result">
+      <small>${vi ? "KẾT QUẢ" : "RESULT"}</small>
+      <strong>answer = [${answer.join(", ")}]</strong>
+      <span>max(depth(A), depth(B)) = max(${maxDepthA}, ${maxDepthB}) = ${Math.max(maxDepthA, maxDepthB)} · ceil(depth(seq)/2) = ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}</span>
+    </section>
+  </section>`;
+}

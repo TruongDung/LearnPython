@@ -1,5 +1,7 @@
 "use strict";
 
+const BITMASK_9018 = require("./server-allocator-9018-bitmask");
+
 // Interview design problem — allocate the smallest available server name per type.
 
 const SERVER_ALLOCATOR_9018_MAX_INITIAL_SERVERS = 18;
@@ -553,21 +555,28 @@ module.exports = {
     id: 9018,
     difficulty: "medium",
     category: DESIGN,
-    tags: [HEAP, HASHMAP],
+    tags: [HEAP, HASHMAP, { key: "bitmask", vi: "Bitmask", en: "Bitmask" }],
     title: { vi: "Server Name Allocator", en: "Server Name Allocator" },
     titleVi: { vi: "Cấp tên server nhỏ nhất còn trống", en: "Allocate the smallest available server name" },
     statement: {
       vi: "Tên server có dạng <loại>-<số>. Khởi tạo từ inventory hiện có; allocate(loại) phải trả tên dùng số dương nhỏ nhất chưa được dùng của riêng loại đó. deallocate(tên) giải phóng số để lần cấp sau tái sử dụng. Deallocate tên không tồn tại hoặc đã giải phóng là no-op an toàn.",
       en: "Server names have the form <type>-<number>. Initialize from existing inventory; allocate(type) must return the name using that type's smallest unused positive number. deallocate(name) releases its number for reuse. Deallocating an unknown or already released name is a safe no-op.",
     },
-    defaultInput: '["api-1", "db-1"]',
+    defaultInput: '["api-2", "api-4", "api-6", "db-1"]',
     inputKind: "string",
     inputLabel: { vi: "Existing inventory (JSON string array)", en: "Existing inventory (JSON string array)" },
     extraParams: [{
       key: "operations",
       type: "string",
-      default: "allocate api | allocate db | allocate api | deallocate api-2 | deallocate api-1 | allocate api",
+      default: "allocate api | deallocate api-2 | deallocate api-4 | allocate api | allocate db | allocate api | allocate api | allocate api | allocate api",
       label: { vi: "Operations (ngăn cách bằng |)", en: "Operations (separated by |)" },
+    }, {
+      key: "approach", type: "select", default: 1,
+      label: { vi: "Cách giải", en: "Approach" },
+      options: [
+        { value: 1, label: { vi: "Cách 1: Min-heap + con trỏ", en: "Approach 1: Min-heap + cursor" } },
+        { value: 2, label: { vi: "Cách 2: Bitmask", en: "Approach 2: Bitmask" } },
+      ],
     }],
     debugMode: "line-by-line",
     parseServerAllocator9018Input,
@@ -576,16 +585,21 @@ module.exports = {
       { vi: "Khi init, tìm mọi ID bị thiếu dưới max hiện tại và heapify chúng thành min-heap free; next_id nằm ngay trên max.", en: "During init, find every missing ID below the current maximum and heapify those gaps into free; next_id sits just above the maximum." },
       { vi: "allocate ưu tiên heappop(free); chỉ dùng và tăng next_id khi heap rỗng. Vì vậy luôn chọn số nhỏ nhất.", en: "allocate prefers heappop(free); it uses and advances next_id only when the heap is empty. Therefore it always chooses the minimum." },
       { vi: "deallocate chỉ chuyển một ID thực sự đang dùng sang heap. Lệnh lặp hoặc không hợp lệ là no-op để tránh ID trùng.", en: "deallocate moves only a currently used ID into the heap. Repeated or unknown calls are no-ops, preventing duplicate free IDs." },
+      { vi: "Cách 2: bit k−1 biểu diễn ID k (1 = đang dùng). (mask + 1) & ~mask tìm bit 0 thấp nhất; OR để cấp, AND với ~bit để trả.", en: "Approach 2: bit k−1 represents ID k (1 = allocated). (mask + 1) & ~mask finds the lowest zero bit; OR allocates, AND with ~bit releases." },
     ],
     complexity: {
-      time: "init O(N + G), allocate/deallocate O(log Gₜ)",
-      space: "O(N + G + T)",
+      time: "Heap: init O(N + G), allocate/deallocate O(log Gₜ); bitmask: O(W) per call",
+      space: "Heap: O(N + G + T); bitmask: O(Σ Wₜ)",
       note: {
-        vi: "G là tổng số khoảng trống được tạo dưới max của từng loại; T là số loại. Visualizer giới hạn suffix để minh họa heap rõ ràng.",
-        en: "G is the total number of materialized gaps below each type's maximum; T is the type count. The visualizer bounds suffixes to keep the heap trace readable.",
+        vi: "G là số khoảng trống; T là số loại; W là số word của integer mask. Python int có độ dài tùy ý, nên bitmask không luôn O(1); ID rất lớn và thưa làm mask tốn bộ nhớ.",
+        en: "G counts gaps; T counts types; W counts integer-mask words. Python ints have arbitrary precision, so bitmask is not always O(1); very large sparse IDs consume mask memory.",
       },
     },
     code: SERVER_ALLOCATOR_9018_SOURCE,
+    codeLabel: { vi: "Cách 1: Min-heap + con trỏ", en: "Approach 1: Min-heap + cursor" },
+    code2: BITMASK_9018.SOURCE,
+    code2Label: { vi: "Cách 2: Bitmask", en: "Approach 2: Bitmask" },
     builder: buildServerAllocator9018Steps,
+    builder2: (input, params) => BITMASK_9018.buildSteps(input, params, parseServerAllocator9018Input),
   },
 };

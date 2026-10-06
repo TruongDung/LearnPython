@@ -9201,255 +9201,6 @@ function buildSteps120(input) {
 }
 
 /**
- * LeetCode 741: Cherry Pickup.
- * Two simultaneous walkers from (0,0) to (n-1,n-1).
- * State dp[c1][c2] for step t = r1+c1 = r2+c2 (r1 = t-c1, r2 = t-c2).
- * Visualization shows the grid + the two walker positions at each step.
- */
-function buildSteps741(input) {
-  // Parse grid: "0,1,-1|1,0,-1|1,1,1" → [[0,1,-1],[1,0,-1],[1,1,1]]
-  const grid = String(input).split("|").map((row) => row.trim().split(",").map(Number));
-  const n = grid.length;
-  const steps = [];
-  const NEG = -Infinity;
-
-  const cellLabel = (v) => (v === -1 ? "✗" : v === 1 ? "🍒" : "·");
-
-  function makeGrid(hlCells, pathCells) {
-    return {
-      dp: grid.map((row) => row.map((v) => cellLabel(v))),
-      text1: Array.from({ length: n }, (_, i) => `r${i}`),
-      text2: Array.from({ length: n }, (_, i) => `c${i}`),
-      hlCell: null,
-      pathCells: hlCells || [],
-      // reuse pathCells for highlighting both walkers
-      _extraPath: pathCells || [],
-    };
-  }
-
-  // Intro
-  steps.push({
-    title: { vi: "Đề bài", en: "Problem" },
-    arr: [],
-    grid: makeGrid([]),
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "n", value: n },
-      { name: "cells", value: "🍒=cherry(1), ✗=thorn(-1), ·=empty(0)" },
-    ],
-    note: {
-      vi:
-        `Lưới ${n}×${n}: 1=anh đào 🍒, 0=trống, -1=gai (không đi được).\n` +
-        `Đi từ (0,0) → (n-1,n-1) (chỉ phải/xuống), nhặt anh đào (ô thành 0), rồi quay về (0,0) (chỉ trái/lên).\n` +
-        `Tối đa hóa số anh đào nhặt được.`,
-      en:
-        `Grid ${n}×${n}: 1=cherry 🍒, 0=empty, -1=thorn (blocked).\n` +
-        `Go (0,0) → (n-1,n-1) (right/down only), pick cherries (cell becomes 0), then return to (0,0) (left/up).\n` +
-        `Maximize cherries collected.`,
-    },
-  });
-
-  // Key trick step
-  steps.push({
-    title: { vi: "Mẹo: 2 người cùng đi", en: "Trick: two simultaneous walkers" },
-    arr: [],
-    grid: makeGrid([[0, 0]]),
-    highlight: [],
-    mark: [],
-    codeLines: [6],
-    vars: [
-      { name: "walker A", value: "(r1, c1)" },
-      { name: "walker B", value: "(r2, c2)" },
-      { name: "constraint", value: "r1+c1 == r2+c2 == t" },
-    ],
-    note: {
-      vi:
-        `Thay vì đi-rồi-về, coi như HAI người cùng xuất phát (0,0) → (n-1,n-1).\n` +
-        `Cả hai đi cùng số bước t = r+c. Nên r1+c1 = r2+c2 = t → chỉ cần 3 biến (t, c1, c2).\n` +
-        `Nếu hai người ở cùng ô → chỉ tính anh đào 1 lần.`,
-      en:
-        `Instead of go-then-return, treat as TWO walkers both going (0,0) → (n-1,n-1).\n` +
-        `Both take t = r+c steps. So r1+c1 = r2+c2 = t → only 3 vars needed (t, c1, c2).\n` +
-        `If both on the same cell → count its cherry once.`,
-    },
-  });
-
-  // DP with memoization
-  const memo = new Map();
-  const key = (r1, c1, c2) => `${r1},${c1},${c2}`;
-
-  function dfs(r1, c1, c2) {
-    const r2 = r1 + c1 - c2;
-    // Out of bounds or thorn
-    if (r1 >= n || c1 >= n || r2 >= n || c2 >= n || grid[r1][c1] === -1 || grid[r2][c2] === -1) {
-      return NEG;
-    }
-    // Reached destination
-    if (r1 === n - 1 && c1 === n - 1) {
-      return grid[r1][c1];
-    }
-    const k = key(r1, c1, c2);
-    if (memo.has(k)) return memo.get(k);
-
-    // Cherries at current positions
-    let cherries = grid[r1][c1];
-    if (c1 !== c2) cherries += grid[r2][c2];
-
-    // Two walkers each move right or down: 4 combinations
-    const best = Math.max(
-      dfs(r1, c1 + 1, c2 + 1), // both right
-      dfs(r1 + 1, c1, c2 + 1), // A down, B right
-      dfs(r1, c1 + 1, c2),     // A right, B down
-      dfs(r1 + 1, c1, c2),     // both down
-    );
-
-    const result = best === NEG ? NEG : cherries + best;
-    memo.set(k, result);
-    return result;
-  }
-
-  const raw = dfs(0, 0, 0);
-  const answer = Math.max(0, raw === NEG ? 0 : raw);
-
-  // Reconstruct the two paths for visualization
-  const pathA = [];
-  const pathB = [];
-  if (answer > 0 || raw !== NEG) {
-    let r1 = 0, c1 = 0, c2 = 0;
-    while (true) {
-      pathA.push([r1, c1]);
-      const r2 = r1 + c1 - c2;
-      pathB.push([r2, c2]);
-      if (r1 === n - 1 && c1 === n - 1) break;
-      // Choose the move that matches the optimal value
-      const moves = [
-        [r1, c1 + 1, c2 + 1],
-        [r1 + 1, c1, c2 + 1],
-        [r1, c1 + 1, c2],
-        [r1 + 1, c1, c2],
-      ];
-      let chosen = null;
-      let bestVal = NEG;
-      for (const [nr1, nc1, nc2] of moves) {
-        const nr2 = nr1 + nc1 - nc2;
-        if (nr1 >= n || nc1 >= n || nr2 >= n || nc2 >= n) continue;
-        if (grid[nr1][nc1] === -1 || grid[nr2][nc2] === -1) continue;
-        const v = memo.has(key(nr1, nc1, nc2)) ? memo.get(key(nr1, nc1, nc2)) : dfs(nr1, nc1, nc2);
-        if (v > bestVal) { bestVal = v; chosen = [nr1, nc1, nc2]; }
-      }
-      if (!chosen) break;
-      [r1, c1, c2] = chosen;
-    }
-  }
-
-  // Show a few key path steps
-  const totalT = 2 * (n - 1);
-  const shown = Math.min(pathA.length, 6);
-  for (let idx = 0; idx < pathA.length; idx++) {
-    // Only show a handful of evenly-spaced steps to keep it concise
-    if (pathA.length > 6 && idx % Math.ceil(pathA.length / 6) !== 0 && idx !== pathA.length - 1) continue;
-    const [ar, ac] = pathA[idx];
-    const [br, bc] = pathB[idx];
-    const t = ar + ac;
-    const hl = ac === bc ? [[ar, ac]] : [[ar, ac], [br, bc]];
-
-    // Line 7: r2 = r1 + c1 - c2
-    steps.push({
-      title: { vi: `t=${t}: r2 = ${ar}+${ac}-${bc} = ${br}`, en: `t=${t}: r2 = ${ar}+${ac}-${bc} = ${br}` },
-      arr: [],
-      grid: makeGrid(hl, pathA.slice(0, idx + 1)),
-      highlight: [],
-      mark: [],
-      codeLines: [7],
-      vars: [
-        { name: "t", value: t },
-        { name: "r1, c1", value: `(${ar}, ${ac})` },
-        { name: "c2", value: bc },
-        { name: "r2 = r1+c1-c2", value: `${ar}+${ac}-${bc} = ${br}` },
-      ],
-      note: {
-        vi: `Bước t=${t}: A ở (${ar},${ac}). Từ c2=${bc} → r2 = ${ar}+${ac}-${bc} = ${br}. B ở (${br},${bc}).`,
-        en: `Step t=${t}: A at (${ar},${ac}). From c2=${bc} → r2 = ${ar}+${ac}-${bc} = ${br}. B at (${br},${bc}).`,
-      },
-    });
-
-    // Line 13: cherries = grid[r1][c1]
-    const cherriesA = grid[ar][ac] === 1 ? 1 : 0;
-    const cherriesB = (ac !== bc && grid[br][bc] === 1) ? 1 : 0;
-    const totalCherries = cherriesA + cherriesB;
-
-    steps.push({
-      title: { vi: `cherries = ${cherriesA}${ac !== bc ? ` + ${cherriesB} = ${totalCherries}` : " (cùng ô)"}`, en: `cherries = ${cherriesA}${ac !== bc ? ` + ${cherriesB} = ${totalCherries}` : " (same cell)"}` },
-      arr: [],
-      grid: makeGrid(hl, pathA.slice(0, idx + 1)),
-      highlight: [],
-      mark: [],
-      codeLines: [13],
-      vars: [
-        { name: "grid[r1][c1]", value: grid[ar][ac] },
-        { name: "same cell?", value: ac === bc },
-        { name: "cherries", value: totalCherries },
-      ],
-      note: {
-        vi: ac === bc
-          ? `Cùng ô → chỉ tính 1 lần: cherries = ${cherriesA}.`
-          : `Khác ô → cộng cả hai: grid[${ar}][${ac}]=${grid[ar][ac]}, grid[${br}][${bc}]=${grid[br][bc]}. Tổng = ${totalCherries}.`,
-        en: ac === bc
-          ? `Same cell → count once: cherries = ${cherriesA}.`
-          : `Different cells → add both: grid[${ar}][${ac}]=${grid[ar][ac]}, grid[${br}][${bc}]=${grid[br][bc]}. Total = ${totalCherries}.`,
-      },
-    });
-
-    // Line 15: cherries += max(4 transitions)
-    if (idx < pathA.length - 1) {
-      steps.push({
-        title: { vi: `Chọn best trong 4 hướng`, en: `Pick best from 4 directions` },
-        arr: [],
-        grid: makeGrid(hl, pathA.slice(0, idx + 1)),
-        highlight: [],
-        mark: [],
-        codeLines: [15],
-        vars: [
-          { name: "transitions", value: "RR, DR, RD, DD" },
-          { name: "next A", value: `(${pathA[idx+1][0]}, ${pathA[idx+1][1]})` },
-          { name: "next B", value: `(${pathB[idx+1][0]}, ${pathB[idx+1][1]})` },
-        ],
-        note: {
-          vi: `4 tổ hợp: A↓B↓, A↓B→, A→B↓, A→B→. Chọn tổ hợp cho giá trị dp lớn nhất.`,
-          en: `4 combinations: A↓B↓, A↓B→, A→B↓, A→B→. Choose combination with max dp value.`,
-        },
-      });
-    }
-  }
-
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [],
-    grid: makeGrid([], pathA),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [18],
-    vars: [
-      { name: "answer", value: answer },
-      { name: "states memoized", value: memo.size },
-    ],
-    note: {
-      vi:
-        `Số anh đào tối đa nhặt được = ${answer}.\n` +
-        (raw === NEG ? "(Không có đường đi hợp lệ → 0)" : `Đã memo ${memo.size} trạng thái.`),
-      en:
-        `Maximum cherries collected = ${answer}.\n` +
-        (raw === NEG ? "(No valid path → 0)" : `Memoized ${memo.size} states.`),
-    },
-  });
-
-  return { original: grid, answer, steps };
-}
-
-/**
  * LeetCode 931: Minimum Falling Path Sum.
  * dp[r][c] = matrix[r][c] + min(dp[r-1][c-1], dp[r-1][c], dp[r-1][c+1]).
  * First row = matrix first row. Answer = min of last row.
@@ -10276,183 +10027,6 @@ function buildSteps72Rolling(input, params) {
   return { word1, word2, answer, steps };
 }
 
-
-/**
- * LeetCode 416: Partition Equal Subset Sum.
- * Can we split nums into two subsets with equal sum?
- * Equivalent to: can we find a subset summing to totalSum/2?
- * dp[j] = True if sum j is achievable using some subset.
- * For each num: for j = target..num: dp[j] |= dp[j - num].
- */
-function buildSteps416(nums) {
-  const steps = [];
-  const total = nums.reduce((a, b) => a + b, 0);
-
-  steps.push({
-    title: { vi: `total = sum(nums) = ${total}`, en: `total = sum(nums) = ${total}` },
-    arr: [...nums],
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "total", value: total },
-    ],
-    note: {
-      vi: `Tính tổng mảng trước. Muốn chia đều thì tổng phải là số chẵn.`,
-      en: `Compute the total first. Equal partition is possible only when the total is even.`,
-    },
-  });
-
-  if (total % 2 !== 0) {
-    steps.push({
-      title: { vi: "Tổng lẻ → False", en: "Odd sum → False" },
-      arr: [...nums], highlight: [], mark: [], final: true, codeLines: [4],
-      vars: [{ name: "sum", value: total }, { name: "answer", value: false }],
-      note: { vi: `Tổng = ${total} (lẻ) → không thể chia đều. False.`, en: `Sum = ${total} (odd) → cannot partition equally. False.` },
-    });
-    return { original: [...nums], answer: false, steps };
-  }
-
-  const target = total / 2;
-  const dp = new Array(target + 1).fill(false);
-  dp[0] = true;
-
-  steps.push({
-    title: { vi: `target = ${target}`, en: `target = ${target}` },
-    arr: dp.map((v) => (v ? 1 : 0)),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [],
-    mark: [],
-    codeLines: [5],
-    vars: [
-      { name: "total", value: total },
-      { name: "target", value: target },
-    ],
-    note: {
-      vi: `Nếu tồn tại subset có tổng ${target}, phần còn lại cũng có tổng ${target}.`,
-      en: `If a subset sums to ${target}, the remaining subset also sums to ${target}.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Tạo bảng dp toàn False", en: "Create all-False dp table" },
-    arr: new Array(target + 1).fill(0),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [],
-    mark: [],
-    codeLines: [6],
-    vars: [
-      { name: "target", value: target },
-      { name: "dp", value: `[${new Array(target + 1).fill(".").join("")}]` },
-    ],
-    note: {
-      vi: `dp[j] = True nghĩa là tạo được tổng j từ các số đã xét.`,
-      en: `dp[j] = True means sum j is reachable using numbers processed so far.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "dp[0] = True", en: "dp[0] = True" },
-    arr: dp.map((v) => (v ? 1 : 0)),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [0],
-    mark: [0],
-    codeLines: [7],
-    vars: [
-      { name: "dp[0]", value: true },
-      { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` },
-    ],
-    note: {
-      vi: `Tổng 0 luôn tạo được bằng cách không chọn phần tử nào.`,
-      en: `Sum 0 is always reachable by choosing no elements.`,
-    },
-  });
-
-  for (const num of nums) {
-    steps.push({
-      title: { vi: `for num in nums: num = ${num}`, en: `for num in nums: num = ${num}` },
-      arr: dp.map((v) => (v ? 1 : 0)),
-      sub: dp.map((_, i) => String(i)),
-      highlight: [],
-      mark: dp[target] ? [target] : [],
-      codeLines: [8],
-      vars: [
-        { name: "num", value: num },
-        { name: "dp[target]", value: dp[target] },
-      ],
-      note: {
-        vi: `Bắt đầu xét số ${num}. Duyệt j giảm để mỗi số chỉ được dùng một lần.`,
-        en: `Start processing ${num}. Iterate j backwards so each number is used at most once.`,
-      },
-    });
-
-    for (let j = target; j >= num; j--) {
-      const beforeJ = dp[j];
-      const source = dp[j - num];
-
-      steps.push({
-        title: { vi: `for j: j = ${j}`, en: `for j: j = ${j}` },
-        arr: dp.map((v) => (v ? 1 : 0)),
-        sub: dp.map((_, i) => String(i)),
-        highlight: [j, j - num],
-        mark: dp[target] ? [target] : [],
-        codeLines: [9],
-        vars: [
-          { name: "num", value: num },
-          { name: "j", value: j },
-          { name: "dp[j]", value: beforeJ },
-          { name: "dp[j-num]", value: source },
-        ],
-        note: {
-          vi: `Kiểm tra có thể tạo tổng ${j} bằng cách thêm ${num} vào tổng ${j - num} không.`,
-          en: `Check whether sum ${j} can be reached by adding ${num} to sum ${j - num}.`,
-        },
-      });
-
-      dp[j] = dp[j] || dp[j - num];
-      steps.push({
-        title: { vi: `dp[${j}] = ${beforeJ} or ${source} → ${dp[j]}`, en: `dp[${j}] = ${beforeJ} or ${source} → ${dp[j]}` },
-        arr: dp.map((v) => (v ? 1 : 0)),
-        sub: dp.map((_, i) => String(i)),
-        highlight: [j, j - num],
-        mark: dp[j] && !beforeJ ? [j] : (dp[target] ? [target] : []),
-        codeLines: [10],
-        vars: [
-          { name: "num", value: num },
-          { name: "j", value: j },
-          { name: `old dp[${j}]`, value: beforeJ },
-          { name: `dp[${j - num}]`, value: source },
-          { name: `new dp[${j}]`, value: dp[j] },
-          { name: "dp[target]", value: dp[target] },
-        ],
-        note: {
-          vi: beforeJ === dp[j]
-            ? `Giá trị dp[${j}] không đổi.`
-            : `Tạo được tổng ${j}: lấy một subset tổng ${j - num}, rồi thêm ${num}.`,
-          en: beforeJ === dp[j]
-            ? `dp[${j}] stays unchanged.`
-            : `Sum ${j} is now reachable: take a subset summing to ${j - num}, then add ${num}.`,
-        },
-      });
-    }
-  }
-
-  const answer = dp[target];
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: dp.map((v) => (v ? 1 : 0)),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [], mark: answer ? [target] : [], final: true, codeLines: [10],
-    vars: [{ name: "answer", value: answer }, { name: "target", value: target }, { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` }],
-    note: {
-      vi: answer ? `dp[${target}] = True → có thể chia thành 2 tập bằng nhau (mỗi tập tổng ${target}).` : `dp[${target}] = False → không thể chia đều.`,
-      en: answer ? `dp[${target}] = True → can partition into two equal subsets (each sum ${target}).` : `dp[${target}] = False → cannot partition equally.`,
-    },
-  });
-
-  return { original: [...nums], answer, steps };
-}
 
 /**
  * LeetCode 1301: Number of Paths with Max Score.
@@ -12965,232 +12539,6 @@ function buildSteps516(input) {
     },
   });
   steps[steps.length - 1].final = true;
-
-  return { s, answer, steps };
-}
-
-/**
- * LeetCode 730: Count Different Palindromic Subsequences.
- * Interval DP by boundary character:
- *   dp[i][j] = number of distinct non-empty palindromic subsequences in s[i..j].
- * For each c in a..d, find first/last c inside the interval:
- *   no c      -> +0
- *   one c     -> +1        ("c")
- *   two+ c    -> +2 + dp[l+1][r-1]  ("c", "cc", and c + middle + c)
- */
-function buildSteps730(input) {
-  const s = typeof input === "string" ? input.trim() : String(input ?? "");
-  if (!s || !/^[a-d]+$/.test(s)) throw new Error("s must be a non-empty string using only a, b, c, d");
-  if (s.length > 10) throw new Error("Visualization for 730 supports s length <= 10.");
-
-  const MOD = 1_000_000_007;
-  const chars = ["a", "b", "c", "d"];
-  const n = s.length;
-  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
-  const known = Array.from({ length: n }, () => new Array(n).fill(false));
-  const steps = [];
-
-  const labels = Array.from({ length: n }, (_, idx) => ({ index: `i/j=${idx}`, char: s[idx] }));
-  const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
-  const display = () => {
-    const table = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        if (i <= j) table[i + 1][j + 1] = known[i][j] ? String(dp[i][j]) : "·";
-      }
-    }
-    return table;
-  };
-
-  const snap = (opts) => {
-    steps.push({
-      title: opts.title,
-      arr: [],
-      grid: {
-        dp: display(),
-        text1: s,
-        text2: s,
-        rowLabels: labels.map(({ char }, idx) => ({ index: `i=${idx}`, char })),
-        colLabels: labels.map(({ char }, idx) => ({ index: `j=${idx}`, char })),
-        hlCell: shift(opts.hlCell || null),
-        pathCells: (opts.pathCells || []).map(shift).filter(Boolean),
-        historyCells: (opts.historyCells || []).map(shift).filter(Boolean),
-        cellLabels: Object.fromEntries(
-          Object.entries(opts.cellLabels || {}).map(([key, value]) => {
-            const [r, c] = key.split(",").map(Number);
-            return [`${r + 1},${c + 1}`, value];
-          })
-        ),
-        largeCells: true,
-        caption: opts.caption,
-        secondaryCaption: opts.secondaryCaption,
-      },
-      highlight: [],
-      mark: [],
-      final: Boolean(opts.final),
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
-    });
-  };
-
-  snap({
-    title: { vi: "Khởi tạo interval DP", en: "Initialize interval DP" },
-    codeLines: [3, 4],
-    hlCell: [0, 0],
-    caption: { vi: "dp[i][j] đếm số palindrome subsequence khác nhau trong s[i..j]", en: "dp[i][j] counts distinct palindromic subsequences inside s[i..j]" },
-    secondaryCaption: { vi: "Bài chỉ dùng ký tự a, b, c, d nên ta có thể cộng đóng góp theo từng ký tự biên.", en: "Because s only uses a, b, c, d, we can add each boundary character's contribution." },
-    vars: [
-      { name: "s", value: JSON.stringify(s) },
-      { name: "n", value: n },
-      { name: "MOD", value: MOD },
-    ],
-    note: {
-      vi: "Điểm khó là tránh đếm trùng. Thay vì cộng dp kiểu bao hàm-loại trừ, ta nhóm palindrome theo ký tự ngoài cùng.",
-      en: "The hard part is avoiding duplicates. Instead of inclusion-exclusion, group palindromes by their outermost character.",
-    },
-  });
-
-  for (let len = 1; len <= n; len++) {
-    snap({
-      title: { vi: `Xét các đoạn dài ${len}`, en: `Process length ${len} intervals` },
-      codeLines: [5],
-      caption: { vi: `Tính mọi dp[i][j] với length=${len}`, en: `Compute every dp[i][j] with length=${len}` },
-      secondaryCaption: { vi: "Đoạn ngắn hơn đã có sẵn trước khi đoạn dài hơn cần dùng.", en: "Shorter intervals are ready before longer intervals need them." },
-      vars: [{ name: "length", value: len }],
-      note: {
-        vi: "Interval DP phải đi theo độ dài tăng dần vì công thức có thể dùng dp[l+1][r-1].",
-        en: "Interval DP moves by increasing length because the formula may use dp[l+1][r-1].",
-      },
-    });
-
-    for (let i = 0; i + len <= n; i++) {
-      const j = i + len - 1;
-      let total = 0;
-      snap({
-        title: { vi: `Tính dp[${i}][${j}]`, en: `Compute dp[${i}][${j}]` },
-        codeLines: [7, 8, 9],
-        hlCell: [i, j],
-        caption: { vi: `Đoạn "${s.slice(i, j + 1)}"`, en: `Interval "${s.slice(i, j + 1)}"` },
-        secondaryCaption: { vi: "Thử lần lượt ký tự ngoài cùng c = a, b, c, d.", en: "Try each outer character c = a, b, c, d." },
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "ans", value: total },
-        ],
-        note: {
-          vi: "Mỗi palindrome khác nhau có đúng một ký tự ngoài cùng, nên bốn nhóm này không trùng nhau.",
-          en: "Every distinct palindrome has exactly one outermost character, so these four groups do not overlap.",
-        },
-      });
-
-      for (const ch of chars) {
-        let left = i;
-        let right = j;
-        while (left <= j && s[left] !== ch) left += 1;
-        while (right >= i && s[right] !== ch) right -= 1;
-
-        let add = 0;
-        let reason;
-        let deps = [];
-        let cellLabels = {};
-        if (left > right) {
-          reason = {
-            vi: `Không có '${ch}' trong đoạn này -> cộng 0.`,
-            en: `No '${ch}' appears in this interval -> add 0.`,
-          };
-        } else if (left === right) {
-          add = 1;
-          cellLabels[`${left},${right}`] = { vi: "1 ký tự", en: "single" };
-          reason = {
-            vi: `Chỉ có một '${ch}' -> tạo palindrome "${ch}".`,
-            en: `Only one '${ch}' -> creates palindrome "${ch}".`,
-          };
-        } else {
-          const middle = left + 1 <= right - 1 ? dp[left + 1][right - 1] : 0;
-          add = (2 + middle) % MOD;
-          deps = left + 1 <= right - 1 ? [[left + 1, right - 1]] : [];
-          cellLabels[`${left},${left}`] = { vi: "trái", en: "left" };
-          cellLabels[`${right},${right}`] = { vi: "phải", en: "right" };
-          reason = {
-            vi: `Có ít nhất hai '${ch}': cộng "${ch}", "${ch}${ch}", và '${ch}' + middle + '${ch}'.`,
-            en: `At least two '${ch}': add "${ch}", "${ch}${ch}", and '${ch}' + middle + '${ch}'.`,
-          };
-        }
-
-        snap({
-          title: { vi: `Ký tự biên '${ch}'`, en: `Boundary character '${ch}'` },
-          codeLines: [10, 11, 12, 13, 14, 15, 16],
-          hlCell: [i, j],
-          pathCells: deps,
-          cellLabels,
-          caption: { vi: `first '${ch}' = ${left <= right ? left : "none"}, last '${ch}' = ${left <= right ? right : "none"}`, en: `first '${ch}' = ${left <= right ? left : "none"}, last '${ch}' = ${left <= right ? right : "none"}` },
-          secondaryCaption: reason,
-          vars: [
-            { name: "c", value: JSON.stringify(ch) },
-            { name: "left", value: left <= right ? left : "none" },
-            { name: "right", value: left <= right ? right : "none" },
-            { name: "add", value: add },
-            { name: "ans before", value: total },
-          ],
-          note: reason,
-        });
-
-        total = (total + add) % MOD;
-        snap({
-          title: { vi: `Cộng nhóm '${ch}' -> ans=${total}`, en: `Add '${ch}' group -> ans=${total}` },
-          codeLines: [17],
-          hlCell: [i, j],
-          pathCells: deps,
-          caption: { vi: `ans = (ans + ${add}) % MOD = ${total}`, en: `ans = (ans + ${add}) % MOD = ${total}` },
-          secondaryCaption: { vi: "Giữ modulo để tránh số quá lớn.", en: "Keep modulo to avoid huge numbers." },
-          vars: [
-            { name: "c", value: JSON.stringify(ch) },
-            { name: "add", value: add },
-            { name: "ans", value: total },
-          ],
-          note: {
-            vi: "Vì các nhóm theo ký tự ngoài cùng khác nhau, phép cộng này không đếm trùng.",
-            en: "Because groups are separated by outer character, this addition does not double count.",
-          },
-        });
-      }
-
-      dp[i][j] = total;
-      known[i][j] = true;
-      snap({
-        title: { vi: `Lưu dp[${i}][${j}] = ${total}`, en: `Store dp[${i}][${j}] = ${total}` },
-        codeLines: [18],
-        hlCell: [i, j],
-        caption: { vi: `dp[${i}][${j}] = ${total}`, en: `dp[${i}][${j}] = ${total}` },
-        secondaryCaption: { vi: `Đoạn "${s.slice(i, j + 1)}" có ${total} palindrome subsequence khác nhau.`, en: `Interval "${s.slice(i, j + 1)}" has ${total} distinct palindromic subsequences.` },
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: `dp[${i}][${j}]`, value: total },
-        ],
-        note: {
-          vi: "Ô này giờ có thể được dùng làm middle cho các đoạn lớn hơn.",
-          en: "This cell can now be used as the middle value for larger intervals.",
-        },
-      });
-    }
-  }
-
-  const answer = dp[0][n - 1];
-  snap({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    codeLines: [19],
-    hlCell: [0, n - 1],
-    caption: { vi: `countPalindromicSubsequences(${JSON.stringify(s)}) = ${answer}`, en: `countPalindromicSubsequences(${JSON.stringify(s)}) = ${answer}` },
-    secondaryCaption: { vi: "Đáp án nằm ở dp[0][n-1], toàn bộ chuỗi.", en: "The answer is dp[0][n-1], the whole string." },
-    vars: [{ name: "answer", value: answer }],
-    note: {
-      vi: `Có ${answer} palindromic subsequence khác nhau trong "${s}".`,
-      en: `There are ${answer} different palindromic subsequences in "${s}".`,
-    },
-    final: true,
-  });
 
   return { s, answer, steps };
 }
@@ -18830,77 +18178,6 @@ function buildSteps1000(input, params) {
 }
 
 /**
- * LeetCode 664: Strange Printer. Interval DP: dp[i][j] = số lượt in ít nhất cho s[i..j].
- */
-function buildSteps664(input) {
-  const s = String(input).replace(/[^\x21-\x7e]/g, "").slice(0, 12) || "aba";
-  const n = s.length;
-  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
-  const computed = Array.from({ length: n }, () => new Array(n).fill(false));
-  for (let i = 0; i < n; i++) { dp[i][i] = 1; computed[i][i] = true; }
-  const steps = [];
-  const chars = [...s];
-  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j < i ? "" : "·"))));
-  const push = (opts) => {
-    steps.push({
-      title: opts.title, arr: [],
-      grid: { dp: display(), text1: chars.slice(1), text2: chars.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
-      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
-    });
-  };
-
-  push({
-    title: { vi: `s = "${s}", dp[i][i] = 1`, en: `s = "${s}", dp[i][i] = 1` },
-    codeLines: [6],
-    caption: "dp[i][j] = số lượt in ít nhất cho đoạn s[i..j]",
-    vars: [{ name: "s", value: s }],
-    note: {
-      vi: `Máy in mỗi lượt in một dãy KÝ TỰ GIỐNG NHAU liên tiếp, đè lên vùng đã in. dp[i][j] = số lượt ít nhất để in s[i..j]. Cơ sở: một ký tự cần 1 lượt (đường chéo = 1).`,
-      en: `Each turn the printer prints a run of the SAME character over a region. dp[i][j] = min turns to print s[i..j]. Base: a single char needs 1 turn (diagonal = 1).`,
-    },
-  });
-
-  for (let len = 2; len <= n; len++) {
-    for (let i = 0; i + len - 1 < n; i++) {
-      const j = i + len - 1;
-      let best = dp[i][j - 1] + 1;
-      const src = [[i, j - 1]];
-      for (let k = i; k < j; k++) {
-        if (s[k] === s[j]) {
-          const cand = dp[i][k] + (k + 1 <= j - 1 ? dp[k + 1][j - 1] : 0);
-          if (cand < best) { best = cand; }
-        }
-      }
-      dp[i][j] = best;
-      computed[i][j] = true;
-      push({
-        title: { vi: `dp[${i}][${j}] ("${s.slice(i, j + 1)}") = ${best}`, en: `dp[${i}][${j}] ("${s.slice(i, j + 1)}") = ${best}` },
-        codeLines: [8, 10, 11],
-        hlCell: [i, j],
-        pathCells: src,
-        caption: `dp[${i}][${j}] = ${best} · đoạn "${s.slice(i, j + 1)}"`,
-        vars: [{ name: "đoạn", value: `"${s.slice(i, j + 1)}"` }, { name: `dp[${i}][${j}]`, value: best }],
-        note: {
-          vi: `In "${s.slice(i, j + 1)}": bắt đầu = dp[${i}][${j - 1}]+1 (in thêm ký tự '${s[j]}'). Nếu có k mà s[k]='${s[j]}', ta gộp lượt in → dp[${i}][k] + dp[k+1][${j - 1}]. Nhỏ nhất = ${best}.`,
-          en: `Print "${s.slice(i, j + 1)}": start = dp[${i}][${j - 1}]+1 (print extra '${s[j]}'). If some k has s[k]='${s[j]}', we merge a print → dp[${i}][k] + dp[k+1][${j - 1}]. Minimum = ${best}.`,
-        },
-      });
-    }
-  }
-
-  const answer = n ? dp[0][n - 1] : 0;
-  push({
-    title: { vi: `Kết quả: dp[0][${n - 1}] = ${answer}`, en: `Result: dp[0][${n - 1}] = ${answer}` },
-    codeLines: [12], hlCell: [0, n - 1], final: true,
-    caption: `Đáp án = ${answer} lượt in`,
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: `Số lượt in ít nhất cho cả chuỗi "${s}" = ${answer}.`, en: `Minimum turns to print "${s}" = ${answer}.` },
-  });
-
-  return { original: s, answer, steps };
-}
-
-/**
  * LeetCode 1563: Stone Game V. Interval DP: dp[i][j] = điểm tối đa Alice lấy trên stones[i..j].
  */
 function buildSteps1563(input) {
@@ -21025,38 +20302,6 @@ module.exports = {
     ],
     builder: buildSteps1000,
   },
-  664: {
-    id: 664,
-    difficulty: "hard",
-    slug: "strange-printer",
-    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
-    title: { vi: "Strange Printer", en: "Strange Printer" },
-    titleVi: { vi: "Máy in kỳ lạ", en: "Strange printer" },
-    statement: {
-      vi: "Máy in mỗi lượt in một dãy ký tự GIỐNG NHAU liên tiếp (đè lên vùng cũ). Tìm số lượt in ít nhất để in được chuỗi s.",
-      en: "Each turn the printer prints a run of the SAME character (over existing chars). Find the minimum turns to print string s.",
-    },
-    defaultInput: "aba",
-    inputKind: "string",
-    inputLabel: { vi: "s", en: "s" },
-    extraParams: [],
-    complexity: { time: "O(n³)", space: "O(n²)", note: { vi: "Interval DP trên chuỗi.", en: "Interval DP over the string." } },
-    code: [
-      "class Solution:",
-      "    def strangePrinter(self, s):",
-      "        n = len(s)",
-      "        dp = [[0]*n for _ in range(n)]",
-      "        for i in range(n-1, -1, -1):",
-      "            dp[i][i] = 1",
-      "            for j in range(i+1, n):",
-      "                dp[i][j] = dp[i][j-1] + 1",
-      "                for k in range(i, j):",
-      "                    if s[k] == s[j]:",
-      "                        dp[i][j] = min(dp[i][j], dp[i][k] + (dp[k+1][j-1] if k+1 <= j-1 else 0))",
-      "        return dp[0][n-1] if n else 0",
-    ],
-    builder: buildSteps664,
-  },
   1563: {
     id: 1563,
     difficulty: "hard",
@@ -21702,7 +20947,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 140, 91, 514, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473, 3414],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 629, 279, 139, 140, 91, 514, 818, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473, 3414],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -21735,10 +20980,12 @@ module.exports = {
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
           { id: 322, name: "Coin Change", pattern: "Unbounded Knapsack" },
           { id: 518, name: "Coin Change II", pattern: "Counting DP" },
+          { id: 629, name: "K Inverse Pairs Array", pattern: "Bounded Counting DP + Sliding Prefix Window" },
           { id: 279, name: "Perfect Squares", pattern: "Complete Knapsack" },
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
           { id: 514, name: "Freedom Trail", pattern: "Layered Position DP + Circular Transitions" },
+          { id: 818, name: "Race Car", pattern: "Distance DP + Optimal Command Reconstruction" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
           { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
@@ -21764,7 +21011,7 @@ module.exports = {
           {
             title: "Giai đoạn 3 — Knapsack",
             description: "Nhóm cực kỳ quan trọng: Unbounded Knapsack, Counting DP, 0/1 Knapsack kinh điển.",
-            problems: [322, 518, 279, 416],
+            problems: [322, 518, 629, 279, 416],
           },
           {
             title: "Giai đoạn 4 — String DP",
@@ -21803,10 +21050,12 @@ module.exports = {
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
           { id: 322, name: "Coin Change", pattern: "Unbounded Knapsack" },
           { id: 518, name: "Coin Change II", pattern: "Counting DP" },
+          { id: 629, name: "K Inverse Pairs Array", pattern: "Bounded Counting DP + Sliding Prefix Window" },
           { id: 279, name: "Perfect Squares", pattern: "Complete Knapsack" },
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
           { id: 514, name: "Freedom Trail", pattern: "Layered Position DP + Circular Transitions" },
+          { id: 818, name: "Race Car", pattern: "Distance DP + Optimal Command Reconstruction" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
           { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
@@ -21830,7 +21079,7 @@ module.exports = {
           {
             title: "Stage 3 — Knapsack",
             description: "Critical group: Unbounded Knapsack, Counting DP, classic 0/1 Knapsack.",
-            problems: [322, 518, 279, 416],
+            problems: [322, 518, 629, 279, 416],
           },
           {
             title: "Stage 4 — String DP",
@@ -22132,31 +21381,7 @@ module.exports = {
     ],
     builder: buildSteps44,
   },
-  416: {
-    id: 416, difficulty: "medium", slug: "partition-equal-subset-sum",
-    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
-    title: { vi: "Partition Equal Subset Sum", en: "Partition Equal Subset Sum" },
-    titleVi: { vi: "Chia tập bằng nhau (0/1 Knapsack)", en: "Equal partition (0/1 Knapsack)" },
-    statement: { vi: "Cho mảng nums. Có thể chia thành 2 tập con có tổng bằng nhau không?", en: "Given nums, can you partition it into two subsets with equal sum?" },
-    defaultInput: [1, 5, 11, 5],
-    inputKind: "positive",
-    extraParams: [],
-    complexity: { time: "O(n × sum/2)", space: "O(sum/2)", note: { vi: "n phần tử × target ô DP.", en: "n elements × target DP cells." } },
-    code: [
-      "class Solution:",
-      "    def canPartition(self, nums):",
-      "        total = sum(nums)",
-      "        if total % 2 != 0: return False",
-      "        target = total // 2",
-      "        dp = [False] * (target + 1)",
-      "        dp[0] = True",
-      "        for num in nums:",
-      "            for j in range(target, num-1, -1):",
-      "                dp[j] = dp[j] or dp[j-num]",
-      "        return dp[target]",
-    ],
-    builder: buildSteps416,
-  },
+  416: require("./partition-equal-subset-416")[416],
   474: {
     id: 474,
     difficulty: "medium",
@@ -22383,64 +21608,6 @@ module.exports = {
       "        return max(prev)",
     ],
     builder: buildSteps1937,
-  },
-  741: {
-    id: 741,
-    difficulty: "hard",
-    slug: "cherry-pickup",
-    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
-    title: { vi: "Cherry Pickup", en: "Cherry Pickup" },
-    titleVi: { vi: "Nhặt anh đào (DP 3 chiều)", en: "Cherry pickup (3D DP)" },
-    statement: {
-      vi:
-        "Lưới n×n: 1=anh đào, 0=trống, -1=gai (chặn). Đi từ (0,0) đến (n-1,n-1) chỉ phải/xuống (nhặt anh đào, ô thành 0), " +
-        "rồi quay về (0,0) chỉ trái/lên. Tối đa hóa số anh đào nhặt được. Nếu không có đường đi → 0. " +
-        "Nhập lưới: hàng cách bởi '|', giá trị cách bởi ','.",
-      en:
-        "Grid n×n: 1=cherry, 0=empty, -1=thorn (blocked). Go from (0,0) to (n-1,n-1) moving right/down (pick cherries, cell becomes 0), " +
-        "then return to (0,0) moving left/up. Maximize cherries collected. If no valid path → 0. " +
-        "Enter grid: rows separated by '|', values by ','.",
-    },
-    defaultInput: "0,1,-1|1,0,-1|1,1,1",
-    inputKind: "string",
-    inputLabel: { vi: "Lưới (hàng cách '|')", en: "Grid (rows separated by '|')" },
-    extraParams: [],
-    approach: [
-      { vi: "Đi-rồi-về khó tối ưu trực tiếp. Mẹo: coi như 2 người CÙNG đi từ (0,0) → (n-1,n-1).", en: "Go-then-return is hard to optimize directly. Trick: treat as 2 walkers BOTH going (0,0) → (n-1,n-1)." },
-      { vi: "Hai người đi cùng số bước t = r+c. Nên r1+c1 = r2+c2 → state chỉ cần (t, c1, c2) hoặc (r1, c1, c2).", en: "Both take t = r+c steps. So r1+c1 = r2+c2 → state only needs (t, c1, c2) or (r1, c1, c2)." },
-      { vi: "Mỗi bước, mỗi người chọn phải hoặc xuống → 4 tổ hợp chuyển trạng thái.", en: "Each step, each walker chooses right or down → 4 transition combinations." },
-      { vi: "Nếu hai người ở CÙNG ô → chỉ tính anh đào 1 lần (tránh đếm trùng).", en: "If both on the SAME cell → count its cherry only once (avoid double-counting)." },
-      { vi: "Đáp án = max(0, dp(0,0,0)). Nếu mọi đường bị gai chặn → 0.", en: "Answer = max(0, dp(0,0,0)). If all paths are blocked by thorns → 0." },
-    ],
-    complexity: {
-      time: "O(n³)",
-      space: "O(n³)",
-      note: {
-        vi: "State (r1, c1, c2) có O(n³) khả năng, mỗi state O(1). Memo O(n³).",
-        en: "State (r1, c1, c2) has O(n³) possibilities, each O(1). Memo O(n³).",
-      },
-    },
-    code: [
-      "class Solution:",
-      "    def cherryPickup(self, grid):",
-      "        n = len(grid)",
-      "        from functools import lru_cache",
-      "        @lru_cache(None)",
-      "        def dp(r1, c1, c2):",
-      "            r2 = r1 + c1 - c2",
-      "            if (r1>=n or c1>=n or r2>=n or c2>=n",
-      "                    or grid[r1][c1]==-1 or grid[r2][c2]==-1):",
-      "                return float('-inf')",
-      "            if r1==n-1 and c1==n-1:",
-      "                return grid[r1][c1]",
-      "            cherries = grid[r1][c1]",
-      "            if c1 != c2: cherries += grid[r2][c2]",
-      "            cherries += max(dp(r1,c1+1,c2+1), dp(r1+1,c1,c2+1),",
-      "                            dp(r1,c1+1,c2),   dp(r1+1,c1,c2))",
-      "            return cherries",
-      "        return max(0, dp(0, 0, 0))",
-    ],
-    builder: buildSteps741,
   },
   120: {
     id: 120,
@@ -24919,62 +24086,6 @@ module.exports = {
       "        return dp[0][n - 1]",
     ],
     builder: buildSteps516,
-  },
-  730: {
-    id: 730,
-    difficulty: "hard",
-    slug: "count-different-palindromic-subsequences",
-    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
-    tags: [
-      { key: "interval-dp", vi: "DP trên đoạn", en: "Interval DP" },
-      { key: "string", vi: "Chuỗi", en: "String" },
-      { key: "dedup", vi: "Tránh đếm trùng", en: "Deduplication" },
-    ],
-    title: { vi: "Count Different Palindromic Subsequences", en: "Count Different Palindromic Subsequences" },
-    titleVi: { vi: "Đếm subsequence đối xứng khác nhau", en: "Count different palindromic subsequences" },
-    statement: {
-      vi: "Cho chuỗi s chỉ gồm các ký tự a, b, c, d. Trả về số palindromic subsequence khác nhau, modulo 1e9+7.",
-      en: "Given a string s containing only a, b, c, d, return the number of different non-empty palindromic subsequences modulo 1e9+7.",
-    },
-    defaultInput: "bccb",
-    inputKind: "string",
-    inputLabel: { vi: "s (chỉ gồm a,b,c,d; tối đa 10 ký tự cho visualization)", en: "s (only a,b,c,d; up to 10 chars for visualization)" },
-    extraParams: [],
-    approach: [
-      { vi: "Interval DP: dp[i][j] = số palindrome subsequence khác nhau trong đoạn s[i..j].", en: "Interval DP: dp[i][j] = number of distinct palindromic subsequences inside s[i..j]." },
-      { vi: "Để tránh đếm trùng, chia theo ký tự ngoài cùng c trong {a,b,c,d}.", en: "To avoid duplicates, split by the outermost character c in {a,b,c,d}." },
-      { vi: "Với mỗi c, tìm vị trí đầu tiên l và cuối cùng r của c trong đoạn. Nếu l==r cộng 1; nếu l<r cộng 2 + dp[l+1][r-1].", en: "For each c, find its first position l and last position r in the interval. If l==r add 1; if l<r add 2 + dp[l+1][r-1]." },
-    ],
-    complexity: {
-      time: "O(4 * n^3)",
-      space: "O(n^2)",
-      note: {
-        vi: "Visualization quét tìm l/r trực tiếp cho dễ hiểu. Có thể tối ưu tìm l/r bằng next/prev occurrence.",
-        en: "The visualization scans for l/r directly for clarity. The l/r lookup can be optimized with next/prev occurrence arrays.",
-      },
-    },
-    code: [
-      "class Solution:",
-      "    def countPalindromicSubsequences(self, s: str) -> int:",
-      "        MOD = 10**9 + 7",
-      "        n = len(s)",
-      "        dp = [[0] * n for _ in range(n)]",
-      "        for length in range(1, n + 1):",
-      "            for i in range(n - length + 1):",
-      "                j = i + length - 1",
-      "                ans = 0",
-      "                for c in \"abcd\":",
-      "                    left, right = i, j",
-      "                    while left <= j and s[left] != c: left += 1",
-      "                    while right >= i and s[right] != c: right -= 1",
-      "                    if left > right: add = 0",
-      "                    elif left == right: add = 1",
-      "                    else: add = 2 + dp[left + 1][right - 1]",
-      "                    ans = (ans + add) % MOD",
-      "                dp[i][j] = ans",
-      "        return dp[0][n - 1]",
-    ],
-    builder: buildSteps730,
   },
   1682: {
     id: 1682,

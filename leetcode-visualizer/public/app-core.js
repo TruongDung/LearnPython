@@ -385,6 +385,26 @@ function renderCatalog() {
       itemsEl.appendChild(guideBox);
     }
 
+    if (group.key === "string") {
+      const studyGuide = document.createElement("div");
+      studyGuide.className = "string-study-guide";
+      const reader = document.createElement("a");
+      reader.className = "trie-learn-suggestion string-study-link";
+      reader.href = `string-study-roadmap.html?lang=${lang}`;
+      reader.target = "_blank";
+      reader.rel = "noopener noreferrer";
+      reader.innerHTML = `<span class="trie-learn-suggestion-icon">📘</span><span><strong>${lang === "vi" ? "Lộ trình học String · 895 bài" : "String learning roadmap · 895 problems"}</strong><small>${lang === "vi" ? "126 bài nền tảng → 769 bài mở rộng · danh sách đầy đủ theo thứ tự học" : "126 core → 769 additional problems · complete list in learning order"}</small></span><b aria-hidden="true">↗</b>`;
+      const download = document.createElement("a");
+      download.className = "trie-problem-link string-study-download";
+      const filename = `leetcode-string-study-roadmap${lang === "en" ? ".en" : ""}.md`;
+      download.href = `study-guides/${filename}`;
+      download.download = filename;
+      download.textContent = lang === "vi" ? "Tải file Markdown (.md)" : "Download Markdown (.md)";
+      studyGuide.appendChild(reader);
+      studyGuide.appendChild(download);
+      itemsEl.appendChild(studyGuide);
+    }
+
     if (group.key === "trie") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
@@ -2150,8 +2170,8 @@ async function runViz() {
   let input;
 
   if (isString) {
-    input = $("arrInput").value.trim();
-    if (input.length === 0) {
+    input = problemData.preserveInputWhitespace ? $("arrInput").value : $("arrInput").value.trim();
+    if (input.length === 0 && Number(problemData.id) !== 32) {
       return showError("runError", t().errArr);
     }
   } else if (isStringArray) {
@@ -2420,6 +2440,7 @@ function renderCode() {
     split.classList.toggle("problem-648-layout", problemId === 648);
     split.classList.toggle("problem-211-layout", problemId === 211);
     split.classList.toggle("problem-212-layout", problemId === 212);
+    split.classList.toggle("problem-684-layout", problemId === 684);
     split.classList.toggle("problem-685-layout", problemId === 685);
     split.classList.toggle("problem-2058-layout", problemId === 2058);
     split.classList.toggle("problem-2101-layout", problemId === 2101);
@@ -2659,15 +2680,17 @@ function updateCodeHighlight(activeLines, codeBlock) {
       }
     });
 
-  // Auto-scroll to active line (line-by-line debug mode)
+  // Follow the active line inside the code panel without scrolling the page.
   if (firstActiveRow && panel) {
     setTimeout(() => {
+      if (!firstActiveRow.isConnected || !firstActiveRow.classList.contains("active")) return;
       const panelRect = panel.getBoundingClientRect();
       const rowRect = firstActiveRow.getBoundingClientRect();
-      
-      // If row is not fully visible in viewport
-      if (rowRect.top < panelRect.top || rowRect.bottom > panelRect.bottom) {
-        firstActiveRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      const top = panelRect.top + panel.clientTop;
+      const bottom = top + panel.clientHeight;
+
+      if (rowRect.top < top || rowRect.bottom > bottom) {
+        panel.scrollTop += rowRect.top - top - (panel.clientHeight - rowRect.height) / 2;
       }
     }, 0);
   }

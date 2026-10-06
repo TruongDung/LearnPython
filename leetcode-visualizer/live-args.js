@@ -327,6 +327,10 @@ function designConfig(className, constructorArgs, operations) {
 function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
   const words = (value) => String(value).split(",").map((item) => item.trim()).filter(Boolean);
   switch (problem.id) {
+    case 745: {
+      const parsed = problem.parseWordFilter745Input(input, params);
+      return designConfig("WordFilter", [parsed.words], parsed.queries.map(args => ({ name: "f", args })));
+    }
     case 715:
       return designConfig("RangeModule", [], problem.parseRangeOperations(input).map(([name, ...args]) => ({ name, args })));
     case 729:
@@ -465,6 +469,46 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         "ServerAllocator",
         [parsed.inventory],
         parsed.operations.map((operation) => ({ name: operation.kind, args: [operation.arg] })),
+      );
+    }
+    case 2336: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "SmallestInfiniteSet",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
+    case 1845: {
+      const built = problem.builder(input, params);
+      return designConfig(
+        "SeatManager",
+        [built.original.n],
+        built.operations,
+      );
+    }
+    case 379: {
+      const built = problem.builder(input, params);
+      return designConfig(
+        "PhoneDirectory",
+        [built.original.maxNumbers],
+        built.operations,
+      );
+    }
+    case 2349: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "NumberContainers",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
+    case 635: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "LogSystem",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
       );
     }
     case 9001:

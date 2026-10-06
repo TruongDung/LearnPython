@@ -2975,12 +2975,13 @@
   user-select: none;
 }
 
-/* #685 has a compact, 25-line implementation: show all of it without an
-   internal scrollbar so the page remains the single scroll surface. */
+/* #684 and #685 fit beside their tall graph lessons: show all source lines
+   without an internal vertical scrollbar so the page is the only scroll surface. */
+.viz-split.problem-684-layout .code-panel,
 .viz-split.problem-685-layout .code-panel {
   height: auto;
   max-height: none;
-  overflow-y: visible;
+  overflow-y: hidden;
 }
 
 /* #2101 benefits from a wider canvas for its radius map and directed graph. */

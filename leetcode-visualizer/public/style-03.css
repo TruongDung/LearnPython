@@ -4567,48 +4567,6 @@
   border-color: #fbbf24;
 }
 
-[data-theme="light"] .partition-viz {
-  background:
-    linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent 36%),
-    #ffffff;
-  border-color: #cbd5e1;
-}
-
-[data-theme="light"] .partition-cell {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-[data-theme="light"] .partition-cell strong {
-  color: #0f172a;
-}
-
-[data-theme="light"] .partition-cell-idx,
-[data-theme="light"] .partition-row-label,
-[data-theme="light"] .partition-legend,
-[data-theme="light"] .partition-status span {
-  color: #475569;
-}
-
-[data-theme="light"] .partition-cell.left-half {
-  background: #ecfdf5;
-  border-color: #34d399;
-}
-
-[data-theme="light"] .partition-cell.right-half {
-  background: #eef2ff;
-  border-color: #818cf8;
-}
-
-[data-theme="light"] .partition-status div {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-[data-theme="light"] .partition-status strong {
-  color: #0f172a;
-}
-
 [data-theme="light"] .tp-merge-viz {
   background:
     linear-gradient(135deg, rgba(99, 102, 241, 0.05), transparent 36%),

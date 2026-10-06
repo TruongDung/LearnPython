@@ -12203,6 +12203,11 @@ Object.assign(module.exports, {
     ],
     debugMode: "line-by-line",
     builder: buildSteps2319,
+    liveArgs: (input) => {
+      const matrix = parseIntegerMatrix2D(input);
+      const n = matrix.length;
+      return [matrix];
+    },
   },
   422: {
     id: 422, difficulty: "easy", slug: "valid-word-square",

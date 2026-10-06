@@ -10452,190 +10452,116 @@ function buildSteps1977(input) {
  * the bars is the best valid range found so far.
  */
 function buildSteps32(input) {
-  let raw = String(input ?? "").replace(/[^()]/g, "");
-  if (raw.length > 22) raw = raw.slice(0, 22);
-  const s = raw || "()()";
-  const n = s.length;
-  const chars = s.split("");
+  const s = String(input ?? "");
+  if (!/^[()]*$/.test(s)) throw new Error("s may contain only '(' and ')'.");
+  if (s.length > 22) throw new Error("The visualizer supports at most 22 characters.");
+  const chars = [...s];
   const arr = chars.map((ch) => (ch === "(" ? 10 : 6));
-  const rawLabels = chars.slice();
-  const sub = chars.map((ch, i) => `${ch}[${i}]`);
+  const sub = chars.map((ch, index) => `${ch}[${index}]`);
   const steps = [];
-  const fmt = (v) => (v < 0 ? `(${v})` : `${v}`);
-  const stack = [-1];
-  let best = 0;
-  let bestL = -1;
-  let bestR = -1;
-  const bestMark = () => (bestL >= 0 ? Array.from({ length: bestR - bestL + 1 }, (_, k) => bestL + k) : []);
-  const stackStr = () => `[${stack.join(", ")}]`;
-  const push32 = (meta, step) => {
+  let stack = null;
+  let best = null;
+  let i = null;
+  let ch = null;
+  let bestRange = null;
+  const label = (vi, en) => ({ vi, en });
+  // Snapshots show the state after the highlighted statement. Conditions and
+  // else headers never apply the mutations belonging to their branch body.
+  const record = (line, event, title, note, meta = {}) => {
+    const currentIndex = meta.currentIndex ?? (i === null ? -1 : i);
+    const vars = [{ name: "s", value: JSON.stringify(s) }];
+    if (best !== null) vars.push({ name: "best", value: best });
+    if (stack !== null) vars.push({ name: "stack", value: [...stack] });
+    if (i !== null) vars.push({ name: "i", value: i }, { name: "ch", value: ch });
     steps.push({
-      ...step,
+      title: label(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
+      note, arr, raw: [...chars], sub,
+      codeLines: [line], vars,
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: bestRange ? Array.from({ length: bestRange[1] - bestRange[0] + 1 }, (_, k) => bestRange[0] + k) : [],
+      final: event === "return",
       paren32View: {
-        s,
-        chars: [...chars],
-        phase: meta.phase,
-        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
-        stack: [...stack],
+        s, chars: [...chars],
+        phase: meta.phase || "scan",
+        currentIndex,
+        stack: stack === null ? [] : [...stack],
         best,
-        bestRange: bestL >= 0 ? [bestL, bestR] : null,
-        candidateRange: meta.candidateRange || null,
-        event: meta.event || "",
+        bestRange: bestRange ? [...bestRange] : null,
+        candidateRange: meta.candidateRange ? [...meta.candidateRange] : null,
+        event,
         decision: meta.decision || null,
+        debugLine: line,
       },
     });
   };
 
-  // ─── Phase 0: what "valid" means ───
-  push32({ phase: "init", event: "boundary" }, {
-    title: { vi: "Chuỗi ngoặc hợp lệ là gì?", en: "What counts as valid?" },
-    arr,
-    raw: rawLabels,
-    sub,
-    highlight: [],
-    mark: [],
-    codeLines: [1, 2],
-    vars: [
-      { name: "s", value: `"${s}"` },
-      { name: "hợp lệ", value: `"()", "()()", "(())"` },
-      { name: "không hợp lệ", value: `"(", ")(", "(()"` },
-    ],
-    note: {
-      vi: "Đoạn hợp lệ là đoạn con LIÊN TIẾP đóng mở đúng cặp. Cần tìm đoạn dài nhất. Chiến thuật: duyệt từng ký tự với một stack lưu CHỈ SỐ — dưới đáy là mốc ranh giới, phía trên là các '(' chưa được ghép.",
-      en: "A valid part is a CONTIGUOUS substring with correctly paired brackets. We need the longest one. Strategy: scan character by character keeping a stack of INDICES — a base marker at the bottom, unmatched '(' indices above.",
-    },
-  });
+  record(2, "enter", label("Gọi longestValidParentheses(s)", "Call longestValidParentheses(s)"),
+    label("Tìm đoạn con liên tiếp có ngoặc đóng mở đúng cặp. Hiện chỉ có tham số s.", "Find a contiguous substring with correctly paired brackets. Only parameter s is in scope."), { phase: "init" });
+  best = 0;
+  record(3, "init-best", label("best = 0", "best = 0"),
+    label("Chưa tìm được cặp hợp lệ; stack chưa được khởi tạo.", "No valid pair found yet; stack has not been initialized."), { phase: "init" });
+  stack = [-1];
+  record(4, "boundary", label("stack = [-1]", "stack = [-1]"),
+    label("Mốc -1 nằm trước đầu chuỗi, giúp đo cả đoạn hợp lệ bắt đầu tại index 0.", "Boundary -1 is before the string, allowing a valid span starting at index 0."), { phase: "init" });
 
-  // ─── Phase 1: scan with the index stack ───
-
-  for (let i = 0; i < n; i++) {
-    const ch = chars[i];
-    if (ch === "(") {
+  for (let index = 0; index < chars.length; index++) {
+    i = index;
+    ch = chars[i];
+    record(5, "loop", label(`i = ${i}, ch = '${ch}'`, `i = ${i}, ch = '${ch}'`),
+      label("Lấy ký tự tiếp theo từ enumerate(s); stack và best giữ nguyên.", "Take the next character from enumerate(s); stack and best are unchanged."));
+    const isOpen = ch === "(";
+    record(6, "char-check", label(`ch == '(' → ${isOpen ? "True" : "False"}`, `ch == '(' → ${isOpen ? "True" : "False"}`),
+      label("Chỉ kiểm tra điều kiện; chưa append hoặc pop.", "Only test the condition; no append or pop yet."), { decision: { isOpen } });
+    if (isOpen) {
       stack.push(i);
-      push32({ phase: "scan", currentIndex: i, event: "push", decision: { index: i, char: ch } }, {
-        title: { vi: `s[${i}]='(' → đẩy ${i} vào stack`, en: `s[${i}]='(' → push ${i} onto the stack` },
-        arr,
-        raw: rawLabels,
-        sub,
-        highlight: [i],
-        mark: bestMark(),
-        codeLines: [6, 7],
-        vars: [
-          { name: "stack", value: stackStr() },
-          { name: "best hiện tại", value: fmt(best) },
-          { name: "ý nghĩa", value: `'(' tại ${i} đang chờ một ')' để ghép` },
-        ],
-        note: {
-          vi: `Gặp '(' thì chưa biết nó có được ghép hay không — cứ đẩy chỉ số ${i} lên đỉnh stack để chờ.`,
-          en: `A '(' cannot be judged yet — just push its index ${i} and wait for a matching ')'.`,
-        },
-      });
+      record(7, "push", label(`stack.append(${i})`, `stack.append(${i})`),
+        label(`Lưu chỉ số ${i} của '(' chưa ghép vào đỉnh stack.`, `Push index ${i} of the unmatched '(' onto the stack.`));
     } else {
+      record(8, "close-branch", label("Đi vào else: ch là ')'", "Enter else: ch is ')'"),
+        label("Bắt đầu nhánh ngoặc đóng; stack chưa thay đổi.", "Enter the closing-parenthesis branch; stack is unchanged."));
       const popped = stack.pop();
-      push32({ phase: "scan", currentIndex: i, event: "pop", decision: { index: i, char: ch, popped } }, {
-        title: { vi: `s[${i}]=')' → pop phần tử trên cùng`, en: `s[${i}]=')' → pop the top element` },
-        arr,
-        raw: rawLabels,
-        sub,
-        highlight: [i],
-        mark: bestMark(),
-        codeLines: [8, 9],
-        vars: [
-          { name: "stack sau khi pop", value: stackStr() },
-          { name: "best hiện tại", value: fmt(best) },
-          { name: "vì sao pop", value: "')' cần một '(' để ghép — thử lấy trên đỉnh" },
-        ],
-        note: {
-          vi: `Gặp ')' thì chắc chắn có một cặp vừa khép lại: lấy '(' gần nhất trên đỉnh ra khỏi stack. Phần tử còn lại trên đỉnh sẽ cho biết đoạn hợp lệ bắt đầu từ đâu.`,
-          en: `A ')' closes exactly one pair: pop the nearest '(' from the stack. Whatever remains on top tells us where the valid stretch begins.`,
-        },
-      });
-
-      if (stack.length === 0) {
+      record(9, "pop", label(`stack.pop() → ${popped}`, `stack.pop() → ${popped}`),
+        label(popped === -1 || chars[popped] === ")"
+          ? `Pop mốc ${popped}; ')' này không có '(' để ghép. Kiểm tra stack ở dòng tiếp theo.`
+          : `Pop chỉ số ${popped} của '(' để ghép với ')' tại ${i}.`,
+        popped === -1 || chars[popped] === ")"
+          ? `Pop boundary ${popped}; this ')' has no matching '('. Check the stack next.`
+          : `Pop index ${popped} of '(' to match ')' at ${i}.`), { decision: { popped } });
+      const empty = stack.length === 0;
+      record(10, "empty-check", label(`not stack → ${empty ? "True" : "False"}`, `not stack → ${empty ? "True" : "False"}`),
+        label(empty ? "Stack rỗng; dòng tiếp theo sẽ đặt mốc mới." : "Stack còn mốc để đo đoạn hợp lệ; đi vào else.",
+          empty ? "The stack is empty; the next line will set a new boundary." : "A boundary remains for measuring a valid span; enter else."), { decision: { empty } });
+      if (empty) {
         stack.push(i);
-        push32({ phase: "scan", currentIndex: i, event: "reset", decision: { index: i, char: ch, boundary: i } }, {
-          title: { vi: `Stack trống ⇒ ')' tại ${i} vô cứu`, en: `Stack empty ⇒ the ')' at ${i} is orphaned` },
-          arr,
-          raw: rawLabels,
-          sub,
-          highlight: [i],
-          mark: bestMark(),
-          codeLines: [10, 11],
-          vars: [
-            { name: "stack", value: stackStr() },
-            { name: "best hiện tại", value: fmt(best) },
-            { name: "mốc mới", value: String(i) },
-          ],
-          note: {
-            vi: `Pop xong mà stack rỗng nghĩa là ')' này KHÔNG có '(' nào để ghép — mọi đoạn hợp lệ đều phải kết thúc trước vị trí đó. Đẩy ${i} xuống làm mốc ranh giới mới.`,
-            en: `Popping emptied the stack: this ')' has NO '(' left to pair with — any valid substring must end before it. Push ${i} as the new boundary marker.`,
-          },
-        });
+        record(11, "reset", label(`stack.append(${i})`, `stack.append(${i})`),
+          label(`')' tại ${i} không ghép được. Đặt mốc ${i}; đoạn hợp lệ sau này phải bắt đầu sau mốc này.`,
+            `')' at ${i} is unmatched. Set boundary ${i}; future valid spans must start after it.`), { decision: { boundary: i } });
       } else {
-        const length = i - stack[stack.length - 1];
+        const boundary = stack[stack.length - 1];
+        const candidateRange = [boundary + 1, i];
+        record(12, "measure-branch", label("Đi vào else: stack còn phần tử", "Enter else: stack is nonempty"),
+          label("Có thể tính i - stack[-1]; best chưa thay đổi.", "We can compute i - stack[-1]; best is unchanged."), { phase: "measure", candidateRange });
+        const length = i - boundary;
+        const oldBest = best;
         const improved = length > best;
-        if (improved) {
-          best = length;
-          bestL = stack[stack.length - 1] + 1;
-          bestR = i;
-        }
-        const candidateRange = [stack[stack.length - 1] + 1, i];
-        push32({ phase: "measure", currentIndex: i, event: improved ? "best" : "measure", candidateRange, decision: { index: i, length, improved, boundary: stack[stack.length - 1] } }, {
-          title: improved
-            ? { vi: `Đoạn [${bestL}..${i}] dài ${fmt(length)} ⇒ best = ${fmt(best)}`, en: `Segment [${bestL}..${i}] has length ${length} ⇒ best = ${best}` }
-            : { vi: `Đoạn [${stack[stack.length - 1] + 1}..${i}] dài ${fmt(length)}, chưa vượt best ${fmt(best)}`, en: `Segment [${stack[stack.length - 1] + 1}..${i}] has length ${length}, below best ${best}` },
-          arr,
-          raw: rawLabels,
-          sub,
-          highlight: [i],
-          mark: bestMark(),
-          codeLines: [12, 13],
-          vars: [
-            { name: "đỉnh stack (mốc)", value: String(stack[stack.length - 1]) },
-            { name: "độ dài = i − mốc", value: `${i} − (${stack[stack.length - 1]}) = ${length}` },
-            { name: "best", value: fmt(best) },
-          ],
-          note: improved
-            ? {
-              vi: `Mọi ký tự từ ${bestL} đến ${i} đều nằm trong các cặp đã khép kín ⇒ đoạn dài ${length}. Đây là kỷ lục mới — vùng màu xanh trên chuỗi cập nhật theo.`,
-              en: `Every character from ${bestL} through ${i} sits inside closed pairs ⇒ length ${length}. New record — watch the green region update.`,
-            }
-            : {
-              vi: `Từ mốc ${stack[stack.length - 1]} trở đi đến ${i} đều hợp lệ, dài ${length}, nhưng vẫn thua kỷ lục ${best} nên best giữ nguyên.`,
-              en: `Everything from marker ${stack[stack.length - 1]} up to ${i} is valid, length ${length}, yet the record ${best} stands.`,
-            },
-        });
+        best = Math.max(best, length);
+        if (improved) bestRange = [...candidateRange];
+        record(13, improved ? "best" : "measure",
+          label(`best = max(${oldBest}, ${i} - (${boundary})) → ${best}`, `best = max(${oldBest}, ${i} - (${boundary})) → ${best}`),
+          label(`Đoạn [${boundary + 1}..${i}] hợp lệ, dài ${length}. ${improved ? "Cập nhật kỷ lục." : "Giữ nguyên kỷ lục."}`,
+            `Span [${boundary + 1}..${i}] is valid, length ${length}. ${improved ? "Update the record." : "Keep the record."}`),
+          { phase: "measure", candidateRange, decision: { boundary, length, oldBest, improved } });
       }
     }
   }
-
-  // ─── Phase 2: result ───
-  push32({ phase: "done", event: "return", candidateRange: bestL >= 0 ? [bestL, bestR] : null, decision: { answer: best } }, {
-    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
-    arr,
-    raw: rawLabels,
-    sub,
-    highlight: [],
-    mark: bestMark(),
-    final: true,
-    codeLines: [14],
-    vars: [
-      { name: "answer", value: best },
-      ...(best > 0 ? [{ name: "đoạn dài nhất", value: `"${s.slice(bestL, bestR + 1)}" (tại [${bestL}..${bestR}])` }] : []),
-    ],
-    note: {
-      vi: best > 0
-        ? `Chuỗi con "${s.slice(bestL, bestR + 1)}" tại vị trí [${bestL}..${bestR}] là đoạn hợp lệ dài nhất, gồm ${best} ký tự.`
-        : "Không có ký tự nào ghép được thành cặp ⇒ đáp án 0.",
-      en: best > 0
-        ? `The substring "${s.slice(bestL, bestR + 1)}" at positions [${bestL}..${bestR}] is the longest valid part, ${best} characters long.`
-        : "No characters manage to form a pair ⇒ the answer is 0.",
-    },
-  });
-
+  record(5, "loop-exit", label("enumerate(s) đã hết ký tự", "enumerate(s) is exhausted"),
+    label("Kết thúc vòng for; i và ch giữ giá trị cuối nếu vòng lặp đã chạy.", "Exit the for loop; i and ch retain their last values if the loop ran."), { currentIndex: -1 });
+  record(14, "return", label(`return best → ${best}`, `return best → ${best}`),
+    label(bestRange ? `Đoạn dài nhất: "${s.slice(bestRange[0], bestRange[1] + 1)}", độ dài ${best}.` : "Không có cặp hợp lệ; trả về 0.",
+      bestRange ? `Longest span: "${s.slice(bestRange[0], bestRange[1] + 1)}", length ${best}.` : "No valid pair; return 0."),
+    { phase: "done", currentIndex: -1, candidateRange: bestRange, decision: { answer: best } });
   return { original: s, answer: best, steps };
 }
-
 /**
  * LeetCode 1190: Reverse Substrings Between Each Pair of Parentheses.
  *
@@ -10961,6 +10887,7 @@ module.exports = {
       "                    best = max(best, i - stack[-1])",
       "        return best",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps32,
   },
   1977: {
@@ -14216,6 +14143,204 @@ function buildSteps402(input, params = {}) {
     { index: num.length - 1, final: true },
   );
   return { original: num, k: initialK, answer, steps };
+}
+
+// ─── 1111: Maximum Nesting Depth of Two Valid Parentheses Strings ───────────
+const PARENTHESES1111_LIMITS = { seq: 50 };
+
+function parseParentheses1111Input(input) {
+  const seq = String(input ?? "").trim();
+  if (!seq.length) throw new Error("seq must not be empty");
+  if (!/^[()]+$/.test(seq)) throw new Error("seq must contain only '(' and ')' characters");
+  if (seq.length > PARENTHESES1111_LIMITS.seq) throw new Error(`visualization supports seq up to ${PARENTHESES1111_LIMITS.seq} characters`);
+
+  // Validate parentheses balance
+  let balance = 0;
+  for (let i = 0; i < seq.length; i++) {
+    balance += seq[i] === '(' ? 1 : -1;
+    if (balance < 0) throw new Error("seq must be a valid parentheses string");
+  }
+  if (balance !== 0) throw new Error("seq must be a valid parentheses string");
+
+  return seq;
+}
+
+function buildSteps1111(input, params = {}) {
+  const seq = parseParentheses1111Input(input);
+  const seqChars = [...seq];
+  const steps = [];
+
+  let sourceDepth = 0;
+  let sourceMaxDepth = 0;
+  for (const ch of seqChars) {
+    sourceDepth += ch === "(" ? 1 : -1;
+    sourceMaxDepth = Math.max(sourceMaxDepth, sourceDepth);
+  }
+  const optimalMaxDepth = Math.ceil(sourceMaxDepth / 2);
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      note: o.note,
+      arr: [], highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      parentheses1111View: {
+        seq: [...seqChars],
+        depthA: o.depthA === undefined ? 0 : o.depthA,
+        depthB: o.depthB === undefined ? 0 : o.depthB,
+        maxDepthA: o.maxDepthA === undefined ? 0 : o.maxDepthA,
+        maxDepthB: o.maxDepthB === undefined ? 0 : o.maxDepthB,
+        stackA: o.stackA ? [...o.stackA] : [],
+        stackB: o.stackB ? [...o.stackB] : [],
+        answer: o.answer ? [...o.answer] : [],
+        pointer: o.position === undefined ? -1 : o.position,
+        char: o.char || "",
+        splitType: o.splitType || "",
+        decision: o.decision || "",
+        phase: o.phase || "intro",
+        currentMaxDepth: o.currentMaxDepth === undefined ? 0 : o.currentMaxDepth,
+        sourceMaxDepth,
+        optimalMaxDepth,
+        finalAnswer: o.finalAnswer || null,
+      },
+    });
+  }
+
+  let depthA = 0;
+  let depthB = 0;
+  let maxDepthA = 0;
+  let maxDepthB = 0;
+  const stackA = [];
+  const stackB = [];
+  const answer = [];
+
+  snap({
+    phase: "intro",
+    title: { vi: `seq = "${seq}" (${seq.length} ký tự)`, en: `seq = "${seq}" (${seq.length} characters)` },
+    note: {
+      vi: `Chia các ký tự của seq thành hai chuỗi A và B hợp lệ để tối thiểu hóa độ sâu lồng lớn nhất. Chiến lược: gặp '(' thì gán vào chuỗi có độ sâu nhỏ hơn, gặp ')' thì gán vào chuỗi có độ sâu lớn hơn.`,
+      en: `Split seq characters into two valid strings A and B to minimize maximum nesting depth. Strategy: on '(' assign to string with smaller depth, on ')' assign to string with larger depth.`,
+    },
+    codeLines: [1, 2, 3],
+    depthA: 0,
+    depthB: 0,
+    maxDepthA: 0,
+    maxDepthB: 0,
+    stackA,
+    stackB,
+    answer: [],
+    position: -1,
+    decision: { vi: "Khởi tạo: depthA = 0, depthB = 0", en: "Initialize: depthA = 0, depthB = 0" },
+    vars: [{ name: "seq", value: seq }, { name: "length", value: seq.length }],
+  });
+
+  for (let i = 0; i < seq.length; i++) {
+    const ch = seq[i];
+    const assignToA = ch === "(" ? depthA <= depthB : depthA >= depthB;
+    const splitType = assignToA ? "A" : "B";
+
+    snap({
+      phase: "process",
+      title: { vi: `Xử lý seq[${i}] = '${ch}'`, en: `Processing seq[${i}] = '${ch}'` },
+      note: {
+        vi: `Độ sâu hiện tại: A = ${depthA}, B = ${depthB}. ${ch === '(' ? 'Mở ngoặc: gán vào chuỗi có độ sâu nhỏ hơn để cân bằng' : 'Đóng ngoặc: gán vào chuỗi có độ sâu lớn hơn để đóng đúng chuỗi'}.`,
+        en: `Current depth: A = ${depthA}, B = ${depthB}. ${ch === '(' ? 'Open paren: assign to string with smaller depth to balance' : 'Close paren: assign to string with larger depth to close in correct string'}.`,
+      },
+      codeLines: ch === '(' ? [5, 6, 7, 8, 9, 10] : [12, 13, 14, 15, 16, 17],
+      depthA,
+      depthB,
+      maxDepthA,
+      maxDepthB,
+      stackA,
+      stackB,
+      answer: [...answer],
+      position: i,
+      char: ch,
+      splitType,
+      currentMaxDepth: Math.max(depthA, depthB),
+      decision: ch === '('
+        ? { vi: `depthA = ${depthA}, depthB = ${depthB} → ${depthA <= depthB ? 'gán vào A' : 'gán vào B'}`, en: `depthA = ${depthA}, depthB = ${depthB} → ${depthA <= depthB ? 'assign to A' : 'assign to B'}` }
+        : { vi: `depthA = ${depthA}, depthB = ${depthB} → ${depthA >= depthB ? 'gán vào A' : 'gán vào B'}`, en: `depthA = ${depthA}, depthB = ${depthB} → ${depthA >= depthB ? 'assign to A' : 'assign to B'}` },
+      vars: [{ name: "i", value: i }, { name: "ch", value: ch }, { name: "depthA", value: depthA }, { name: "depthB", value: depthB }],
+    });
+
+    if (ch === "(") {
+      if (assignToA) {
+        depthA++;
+        maxDepthA = Math.max(maxDepthA, depthA);
+        stackA.push(i);
+        answer.push(0);
+      } else {
+        depthB++;
+        maxDepthB = Math.max(maxDepthB, depthB);
+        stackB.push(i);
+        answer.push(1);
+      }
+    } else {
+      if (assignToA) {
+        depthA--;
+        stackA.pop();
+        answer.push(0);
+      } else {
+        depthB--;
+        stackB.pop();
+        answer.push(1);
+      }
+    }
+
+    snap({
+      phase: "updated",
+      title: { vi: `Cập nhật: depthA = ${depthA}, depthB = ${depthB}`, en: `Updated: depthA = ${depthA}, depthB = ${depthB}` },
+      note: {
+        vi: `Sau khi xử lý seq[${i}] = '${ch}': độ sâu mới là A = ${depthA}, B = ${depthB}. Độ sâu tối đa hiện tại = ${Math.max(depthA, depthB)}.`,
+        en: `After processing seq[${i}] = '${ch}': new depth is A = ${depthA}, B = ${depthB}. Current maximum depth = ${Math.max(depthA, depthB)}.`,
+      },
+      codeLines: [],
+      depthA,
+      depthB,
+      maxDepthA,
+      maxDepthB,
+      stackA,
+      stackB,
+      answer: [...answer],
+      position: i,
+      char: ch,
+      splitType,
+      currentMaxDepth: Math.max(depthA, depthB),
+      decision: { vi: `Đã gán seq[${i}] vào ${answer[answer.length-1] === 0 ? 'A' : 'B'}`, en: `Assigned seq[${i}] to ${answer[answer.length-1] === 0 ? 'A' : 'B'}` },
+      vars: [{ name: "answer", value: answer.join(", ") }, { name: "maxDepth", value: Math.max(depthA, depthB) }],
+    });
+  }
+
+  const maxDepth = Math.max(maxDepthA, maxDepthB);
+
+  snap({
+    phase: "result",
+    title: { vi: `Kết quả: answer = [${answer.join(", ")}]`, en: `Result: answer = [${answer.join(", ")}]` },
+    note: {
+      vi: `Độ sâu tối đa cuối cùng = ${maxDepth}. Cả A và B đều hợp lệ. depth(seq) = ${sourceMaxDepth}, nên giá trị tối ưu là ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}.`,
+      en: `Final maximum depth = ${maxDepth}. Both A and B are valid. depth(seq) = ${sourceMaxDepth}, so the optimum is ceil(${sourceMaxDepth}/2) = ${optimalMaxDepth}.`,
+    },
+    codeLines: [19],
+    depthA,
+    depthB,
+    maxDepthA,
+    maxDepthB,
+    stackA,
+    stackB,
+    answer: [...answer],
+    position: seq.length - 1,
+    splitType: answer[answer.length - 1] === 0 ? "A" : "B",
+    currentMaxDepth: maxDepth,
+    finalAnswer: answer.join(", "),
+    decision: { vi: `Trả về [${answer.join(", ")}]`, en: `Return [${answer.join(", ")}]` },
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }, { name: "maxDepth", value: maxDepth }],
+    final: true,
+  });
+
+  return { input: seq, answer, sourceMaxDepth, optimalMaxDepth, steps };
 }
 
 Object.assign(module.exports, {
@@ -19735,5 +19860,66 @@ Object.assign(module.exports, {
     ],
     liveArgs: (input) => [parseReverseDegree3498Input(input)],
     builder: buildSteps3498,
+  },
+  1111: {
+    id: 1111,
+    difficulty: "medium",
+    slug: "maximum-nesting-depth-of-two-valid-parentheses-strings",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [
+      { key: "string", vi: "Chuỗi", en: "String" },
+      { key: "parentheses", vi: "Ngoặc", en: "Parentheses" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+    ],
+    title: { vi: "Maximum Nesting Depth of Two Valid Parentheses Strings", en: "Maximum Nesting Depth of Two Valid Parentheses Strings" },
+    titleVi: { vi: "Độ sâu lồng tối đa của hai chuỗi ngoặc hợp lệ", en: "Maximum nesting depth of two valid parentheses strings" },
+    statement: {
+      vi: "Cho một chuỗi ngoặc `seq`. Cần chia các ký tự của `seq` thành hai chuỗi `A` và `B` sao cho cả hai đều là chuỗi ngoặc hợp lệ và độ sâu lồng tối đa của chúng (`max(depth(A), depth(B))`) là nhỏ nhất. Trả về mảng `answer` trong đó `answer[i] = 0` nếu `seq[i]` thuộc về `A`, `1` nếu thuộc về `B`.",
+      en: "Given a parentheses string `seq`. We need to split the characters of `seq` into two strings `A` and `B` such that both are valid parentheses strings and their maximum nesting depth (`max(depth(A), depth(B))`) is minimized. Return an array `answer` where `answer[i] = 0` if `seq[i]` belongs to `A`, `1` if it belongs to `B`.",
+    },
+    defaultInput: "(()())",
+    inputKind: "string",
+    inputLabel: { vi: "seq (chỉ chứa '(' và ')')", en: "seq (contains only '(' and ')')" },
+    extraParams: [],
+    approach: [
+      { vi: "Ý tưởng chính: duyệt chuỗi từ trái sang phải, giữ độ sâu hiện tại của A và B. Gặp '(' thì gán vào chuỗi nào đang có độ sâu nhỏ hơn (để cân bằng). Gặp ')' thì gán vào chuỗi nào đang có độ sâu lớn hơn (vì cần đóng ngoặc ở đúng chuỗi).", en: "Main idea: traverse the string left to right, keep current depth of A and B. On '(' assign to the string with smaller current depth (to balance). On ')' assign to the string with larger current depth (because we need to close parentheses in the correct string)." },
+      { vi: "Độ sâu của một chuỗi hợp lệ: số '(' mở chưa đóng tại thời điểm đó. Mỗi khi gán '(' vào một chuỗi, độ sâu của chuỗi đó tăng 1. Mỗi khi gán ')' vào một chuỗi, độ sâu của chuỗi đó giảm 1.", en: "Depth of a valid string: number of '(' opened but not closed at that point. Each time we assign '(' to a string, its depth increases by 1. Each time we assign ')' to a string, its depth decreases by 1." },
+      { vi: "Chiến lược tham lam này đảm bảo độ sâu tối đa luôn ≤ ceil(depth(seq)/2). Bằng cách luôn cân bằng độ sâu giữa A và B, chúng ta giảm thiểu độ sâu lớn nhất.", en: "This greedy strategy ensures maximum depth is always ≤ ceil(depth(seq)/2). By always balancing depth between A and B, we minimize the maximum depth." },
+      { vi: "Bất biến đúng: độ sâu của A và B không bao giờ âm. Mỗi ')' được gán vào chuỗi đang có độ sâu lớn hơn nên luôn đóng được một '(' chưa đóng; cuối cùng cả hai độ sâu trở về 0. Chênh lệch độ sâu luôn không quá 1, nên độ sâu lớn nhất đạt ceil(depth(seq)/2).", en: "Correctness invariant: neither A nor B ever has negative depth. Each ')' goes to the currently deeper string, so it always closes an unmatched '('; both depths finish at 0. Their difference never exceeds 1, so the maximum depth reaches ceil(depth(seq)/2)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Chỉ duyệt một lần qua chuỗi, mỗi ký tự xử lý O(1). Mảng kết quả có độ dài n.",
+        en: "Single pass through the string, O(1) per character. Result array has length n.",
+      },
+    },
+    debugMode: "line-by-line",
+    code: [
+      "class Solution:",
+      "    def maxDepthAfterSplit(self, seq: str) -> List[int]:",
+      "        depth_a = depth_b = 0",
+      "        answer = []",
+      "        for ch in seq:",
+      "            if ch == '(':",
+      "                if depth_a <= depth_b:",
+      "                    depth_a += 1",
+      "                    answer.append(0)",
+      "                else:",
+      "                    depth_b += 1",
+      "                    answer.append(1)",
+      "            else:  # ch == ')'",
+      "                if depth_a >= depth_b:",
+      "                    depth_a -= 1",
+      "                    answer.append(0)",
+      "                else:",
+      "                    depth_b -= 1",
+      "                    answer.append(1)",
+      "        return answer",
+    ],
+    liveArgs: (input) => [parseParentheses1111Input(input)],
+    builder: buildSteps1111,
   },
 });

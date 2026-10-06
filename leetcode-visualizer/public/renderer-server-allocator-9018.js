@@ -205,25 +205,77 @@ function sa9018Current(state, copy) {
 }
 function sa9018IdLine(type, state, copy) {
   const selected = state.operation.serverType === type.serverType ? state.operation.number : null;
-  const maximum = Math.min(64, Math.max(type.nextId || 1, selected || 1, ...type.used, ...type.available));
+  const maximum = Math.min(64, Math.max(20, (type.nextId || 1) + 8, selected || 1, ...type.used, ...type.heap));
   const used = new Set(type.used);
-  const available = new Set(type.available);
-  return `<div class="sa9018-id-scroll" tabindex="0"><ol class="sa9018-id-line">${Array.from({ length: maximum }, (_, index) => {
+  const available = new Set(type.heap);
+  const inFlight = ["pop-gap", "take-fresh", "advance-next-id", "remove-used"].includes(state.event);
+  return `<div class="sa9018-id-scroll" tabindex="0" aria-label="${sa9018Escape(`${type.serverType}: 1, 2, 3, …, ∞`)}"><ol class="sa9018-id-line">${Array.from({ length: maximum }, (_, index) => {
     const number = index + 1;
-    const status = used.has(number) ? "used" : available.has(number) ? "free" : number === type.nextId ? "fresh" : "unknown";
+    const transit = selected === number && inFlight && !used.has(number) && !available.has(number);
+    const status = used.has(number) ? "used" : available.has(number) ? "free" : transit ? "transit"
+      : type.nextId !== null && number >= type.nextId ? "fresh" : "unknown";
     const active = selected === number ? " active" : "";
-    const label = status === "used" ? copy.occupied : status === "free" ? copy.reusable : status === "fresh" ? copy.fresh : "—";
-    return `<li class="${status}${active}" title="${sa9018Escape(`${type.serverType}-${number}: ${label}`)}"><small>${number}</small><span>${status === "used" ? "●" : status === "free" ? "↺" : status === "fresh" ? "+" : "·"}</span><em>${sa9018Escape(label)}</em></li>`;
-  }).join("")}</ol></div>`;
+    const label = status === "used" ? copy.occupied : status === "free" ? copy.reusable : status === "fresh" ? copy.fresh
+      : status === "transit" ? (sa9018Locale() === "vi" ? "đang chuyển" : "in flight") : "—";
+    const marker = number === type.nextId ? "next ↓" : number === type.heap[0] ? "min ↓" : "&nbsp;";
+    return `<li class="${status}${active}" data-number="${number}" data-status="${status}" title="${sa9018Escape(`${type.serverType}-${number}: ${label}`)}"><small>${marker}</small><strong>${number}</strong><em>${sa9018Escape(label)}</em></li>`;
+  }).join("")}<li class="sa9018-infinity"><strong>… → ∞</strong><em>${sa9018Locale() === "vi" ? "tiếp tục mãi" : "continues forever"}</em></li></ol></div>`;
+}
+function sa9018HeapTree(type, state, copy) {
+  const vi = sa9018Locale() === "vi";
+  if (!type.heap.length) return `<div class="sa9018-heap-empty"><strong>∅</strong><span>${sa9018Escape(copy.noFree)}</span><p>${vi ? "deallocate trả ID đang dùng vào heap." : "deallocate returns an allocated ID to the heap."}</p></div>`;
+  const levels = Math.floor(Math.log2(type.heap.length)) + 1;
+  const width = Math.max(340, 2 ** (levels - 1) * 62);
+  const height = levels * 78 + 28;
+  const point = (index) => {
+    const level = Math.floor(Math.log2(index + 1));
+    const slot = index - (2 ** level - 1);
+    return { x: width * (slot + 0.5) / 2 ** level, y: 44 + level * 78 };
+  };
+  const edges = type.heap.map((number, index) => {
+    if (!index) return "";
+    const parent = point(Math.floor((index - 1) / 2));
+    const child = point(index);
+    return `<line x1="${parent.x}" y1="${parent.y + 22}" x2="${child.x}" y2="${child.y - 22}" />`;
+  }).join("");
+  const nodes = type.heap.map((number, index) => {
+    const { x, y } = point(index);
+    const inserted = state.event === "push-gap" && state.operation.serverType === type.serverType && state.operation.number === number;
+    return `<g class="sa9018-heap-node${index === 0 ? " root" : ""}${inserted ? " inserted" : ""}" data-number="${number}" data-index="${index}"><circle cx="${x}" cy="${y}" r="23" /><text x="${x}" y="${y + 5}">${number}</text><text class="sa9018-node-label" x="${x}" y="${y + 38}">${index === 0 ? "MIN / ROOT" : `[${index}]`}</text></g>`;
+  }).join("");
+  return `<div class="sa9018-heap-scroll" tabindex="0"><svg class="sa9018-heap-tree${type.heap.length <= 7 ? " compact" : ""}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${sa9018Escape(`${type.serverType}: ${vi ? "cây min-heap ID trống" : "min-heap of free IDs"}`)}">${edges}${nodes}</svg></div>`;
+}
+function sa9018Transfer(type, state) {
+  const vi = sa9018Locale() === "vi";
+  const op = state.operation;
+  if (op.serverType !== type.serverType || !["allocate", "deallocate"].includes(op.kind)) return "";
+  const number = op.number ?? op.expectedNumber;
+  const call = `${op.kind}("${op.arg}")`;
+  let from;
+  let to;
+  let ignored = false;
+  if (op.kind === "allocate") {
+    from = op.source === "reused" || (!op.source && type.heap.length) ? (vi ? "Gốc min-heap" : "Min-heap root") : (vi ? "Dãy ID mới" : "Fresh ID sequence");
+    to = number === null ? "?" : `${type.serverType}-${number}`;
+  } else {
+    from = op.arg;
+    ignored = op.source === "no-op" || ["missing-check-true", "ignore-missing"].includes(state.event);
+    to = ignored ? (vi ? "Không được cấp → bỏ qua" : "Not allocated → ignore") : "MIN-HEAP";
+  }
+  return `<div class="sa9018-transfer" data-event="${state.event}"><b>${sa9018Escape(from)}</b><span>→</span><code>${sa9018Escape(call)}</code><span>${ignored ? "↛" : "→"}</span><b class="sa9018-transfer-result">${sa9018Escape(to)}</b></div>`;
 }
 function sa9018TypeCard(type, state, copy) {
   const chipList = (values, empty, className, names = false) => values.length
     ? `<ol class="${className}">${values.map((number, index) => `<li class="${index === 0 && className.includes("heap") ? "root" : ""}"><small>${index === 0 && className.includes("heap") ? "min" : names ? `#${number}` : `i=${index}`}</small><strong>${sa9018Escape(names ? `${type.serverType}-${number}` : number)}</strong></li>`).join("")}</ol>`
     : `<p class="sa9018-empty">${sa9018Escape(empty)}</p>`;
-  return `<article class="sa9018-type ${state.operation.serverType === type.serverType ? "active" : ""}"><header><div><small>SERVER TYPE</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${sa9018Escape(copy.smallest)}</span><strong>${type.smallestAvailable ?? "—"}</strong></div></header><div class="sa9018-type-summary"><span>${sa9018Escape(copy.next)} <strong>${type.nextId ?? "—"}</strong></span><span>${sa9018Escape(copy.used)} <strong>${type.used.length}</strong></span><span>${sa9018Escape(copy.free)} <strong>${type.heap.length}</strong></span></div><h5>${sa9018Escape(copy.numberLine)}</h5>${sa9018IdLine(type, state, copy)}<div class="sa9018-type-columns"><section><h5>${sa9018Escape(copy.used)}</h5>${chipList(type.used, copy.noUsed, "sa9018-used-list", true)}</section><section><h5>${sa9018Escape(copy.free)}</h5>${chipList(type.heap, copy.noFree, "sa9018-heap-list")}</section></div><div class="sa9018-sorted"><span>${sa9018Escape(copy.available)}</span><code>[${type.available.join(", ")}]</code></div></article>`;
+  const vi = sa9018Locale() === "vi";
+  const tailNote = type.nextId === null ? (vi ? "Đang đọc inventory và xây heap." : "Reading inventory and building the heap.")
+    : (vi ? `Từ ${type.nextId} trở đi, mọi ID đều chưa cấp. ID nhỏ hơn được tái sử dụng qua heap.` : `Every ID from ${type.nextId} onward is unallocated. Smaller free IDs are reused through the heap.`);
+  return `<article class="sa9018-type ${state.operation.serverType === type.serverType ? "active" : ""}" data-server-type="${sa9018Escape(type.serverType)}"><header><div><small>SERVER TYPE</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${sa9018Escape(copy.smallest)}</span><strong>${type.smallestAvailable ?? "—"}</strong></div></header><div class="sa9018-type-summary"><span>${sa9018Escape(copy.next)} <strong>${type.nextId ?? "—"}</strong></span><span>${sa9018Escape(copy.used)} <strong>${type.used.length}</strong></span><span>${sa9018Escape(copy.free)} <strong>${type.heap.length}</strong></span></div><h5>${sa9018Escape(copy.numberLine)} · 1, 2, 3, …, ∞</h5>${sa9018IdLine(type, state, copy)}<div class="sa9018-id-legend"><span class="used">${sa9018Escape(copy.occupied)}</span><span class="free">${vi ? "Trống trong heap" : "Free in heap"}</span><span class="fresh">${vi ? "ID mới chưa cấp" : "Unallocated fresh ID"}</span></div><p class="sa9018-tail-note">${tailNote}</p>${sa9018Transfer(type, state)}<div class="sa9018-type-columns"><section class="sa9018-heap-panel"><h5>MIN-HEAP · free[${sa9018Escape(type.serverType)}]</h5>${sa9018HeapTree(type, state, copy)}<div class="sa9018-heap-array"><small>${vi ? "Mảng heap" : "Heap array"}</small><code>[${type.heap.join(", ")}]</code></div></section><section class="sa9018-used-panel"><h5>${sa9018Escape(copy.used)}</h5>${chipList(type.used, copy.noUsed, "sa9018-used-list", true)}<p>${vi ? "allocate lấy gốc heap trước; heap rỗng thì dùng next_id. deallocate đưa ID vào heap của đúng loại." : "allocate takes the heap root first; if empty, use next_id. deallocate returns the ID to its own type's heap."}</p></section></div><div class="sa9018-sorted"><span>${sa9018Escape(copy.available)}</span><code>[${type.available.join(", ")}]</code></div></article>`;
 }
 function sa9018Types(state, copy) {
-  const body = state.types.length ? state.types.map((type) => sa9018TypeCard(type, state, copy)).join("")
+  const types = [...state.types].sort((left, right) => Number(right.serverType === state.operation.serverType) - Number(left.serverType === state.operation.serverType));
+  const body = types.length ? types.map((type) => sa9018TypeCard(type, state, copy)).join("")
     : `<p class="sa9018-empty large">${sa9018Escape(copy.noTypes)}</p>`;
   return `<section class="sa9018-card sa9018-types"><header><div><h3>${sa9018Escape(copy.types)}</h3><p>${sa9018Escape(copy.typesHelp)}</p></div><strong>${state.types.length}</strong></header><div class="sa9018-type-grid">${body}</div></section>`;
 }
@@ -254,5 +306,68 @@ function renderServerAllocator9018View(step) {
   const copy = SA9018_TEXT[locale];
   const state = sa9018Normalize(step);
   const note = state.note ? `<aside class="sa9018-note"><strong>${sa9018Escape(copy.note)}</strong><p>${sa9018Escape(state.note)}</p></aside>` : "";
-  host.innerHTML = `<article class="sa9018-viz ${state.final ? "final" : ""}" role="region" aria-label="Server allocator, ${sa9018Escape(copy.line)} ${state.source.line}"><header class="sa9018-header"><div><span>${sa9018Escape(copy.kicker)}</span><h2>${sa9018Escape(state.title)}</h2></div><div><strong>${sa9018Escape(copy.line)} ${state.source.line}</strong><span>${state.timing === "before" ? sa9018Escape(copy.before) : sa9018Escape(copy.after)}</span><em>${sa9018Escape(sa9018EventLabel(state.event))}</em></div></header>${sa9018Flow(state, copy)}${sa9018Source(state, copy)}${sa9018Current(state, copy)}${sa9018Types(state, copy)}<div class="sa9018-grid">${sa9018History(state, copy)}<div class="sa9018-side">${sa9018Checks(state, copy)}${sa9018Counters(state, copy, locale)}</div></div>${note}</article>`;
+  host.innerHTML = `<article class="sa9018-viz ${state.final ? "final" : ""}" role="region" aria-label="Server allocator, ${sa9018Escape(copy.line)} ${state.source.line}"><header class="sa9018-header"><div><span>${sa9018Escape(copy.kicker)}</span><h2>${sa9018Escape(state.title)}</h2></div><div><strong>${sa9018Escape(copy.line)} ${state.source.line}</strong><span>${state.timing === "before" ? sa9018Escape(copy.before) : sa9018Escape(copy.after)}</span><em>${sa9018Escape(sa9018EventLabel(state.event))}</em></div></header>${sa9018Types(state, copy)}${note}${sa9018History(state, copy)}<details class="sa9018-details"><summary>${locale === "vi" ? "Chi tiết dòng lệnh và trạng thái" : "Code and state details"}</summary><div>${sa9018Flow(state, copy)}${sa9018Source(state, copy)}${sa9018Current(state, copy)}<div class="sa9018-grid">${sa9018Checks(state, copy)}${sa9018Counters(state, copy, locale)}</div></div></details></article>`;
+  if (host.querySelectorAll) host.querySelectorAll(".sa9018-id-scroll").forEach((strip) => {
+    const target = strip.querySelector(".active") || strip.querySelector(".fresh");
+    if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
+  });
+}
+
+function renderServerAllocator9018BitmaskView(step) {
+  const host = typeof document !== "undefined" && document.getElementById
+    ? document.getElementById("treeView") : typeof $ === "function" ? $("treeView") : null;
+  if (!host) return;
+  const view = step.serverAllocator9018BitmaskView;
+  const vi = sa9018Locale() === "vi";
+  const text = (vn, en) => vi ? vn : en;
+  const op = view.operation;
+  const activeType = op?.serverType;
+  const selected = op?.number;
+  const types = [...view.types].sort((a, b) => Number(b.serverType === activeType) - Number(a.serverType === activeType));
+  const typeCards = types.map(type => {
+    const mask = BigInt(type.mask);
+    const width = Math.max(12, Math.min(64, type.width));
+    const cells = Array.from({ length: width }, (_, index) => {
+      const id = index + 1;
+      const used = Boolean(mask & (1n << BigInt(index)));
+      const active = activeType === type.serverType && selected === id;
+      return `<li class="${used ? "used" : "free"}${id === type.minimum ? " minimum" : ""}${active ? " active" : ""}" data-id="${id}" data-bit="${used ? 1 : 0}"><small>ID ${id}</small><strong>${used ? 1 : 0}</strong><em>bit ${index}</em></li>`;
+    }).join("");
+    return `<article class="sa9018-type${type.serverType === activeType ? " active" : ""}" data-server-type="${sa9018Escape(type.serverType)}"><header><div><small>USED MASK${type.preview ? ` · ${text("loại mới", "new type")}` : ""}</small><h4>${sa9018Escape(type.serverType)}</h4></div><div><span>${text("ID trống nhỏ nhất", "Smallest available ID")}</span><strong>${type.minimum}</strong></div></header>
+      <div class="sa9018-bm-mask"><span>mask = ${sa9018Escape(type.mask)}</span><code>0b${mask.toString(2)}</code></div>
+      <div class="sa9018-bm-strip" tabindex="0"><ol>${cells}<li class="sa9018-bm-tail"><strong>0, 0, …</strong><em>${text("ID cao hơn đều trống", "Higher IDs are all free")}</em></li></ol></div>
+      <p class="sa9018-tail-note">${text("ID tăng từ trái sang phải. Bit 1 = đang cấp; bit 0 = trống. Ô vàng là bit 0 thấp nhất.", "IDs increase left to right. Bit 1 = allocated; bit 0 = free. Gold marks the lowest zero bit.")}</p></article>`;
+  });
+
+  let calculation = "";
+  if (view.calculation) {
+    const calc = view.calculation;
+    const values = calc.kind === "allocate" ? [
+      ["mask", calc.mask], ["mask + 1", calc.plusOne], ["~mask", calc.inverted], ["free_bit = (mask + 1) & ~mask", calc.freeBit],
+    ] : [["mask", calc.mask], ["bit = 1 << (number - 1)", calc.bit], ["mask & ~bit", calc.cleared]];
+    const positive = values.map(([, value]) => BigInt(value)).filter(value => value >= 0n);
+    const width = Math.max(8, ...positive.map(value => value.toString(2).length + 1));
+    const clip = (1n << BigInt(width)) - 1n;
+    const selectedBit = calc.kind === "allocate" ? BigInt(calc.freeBit) : BigInt(calc.bit);
+    const rows = values.map(([label, decimal]) => {
+      const value = BigInt(decimal);
+      const digits = (value & clip).toString(2).padStart(width, "0");
+      const bits = [...digits].map((digit, index) => `<span class="${(1n << BigInt(width - index - 1)) === selectedBit ? "selected" : ""}">${digit}</span>`).join("");
+      return `<tr><th><code>${sa9018Escape(label)}</code></th><td class="sa9018-bm-digits">${bits}</td><td>${value < 0n ? `… ${text("bit dấu 1", "sign bits 1")}` : sa9018Escape(decimal)}</td></tr>`;
+    }).join("");
+    const formula = calc.kind === "allocate" ? "free_bit = (mask + 1) & ~mask" : "used_masks[type] = mask & ~bit";
+    calculation = `<section class="sa9018-card sa9018-bm-calculation"><header><div><h3>${text("Phép toán bit đang chạy", "Current bit operation")}</h3><p>${text("Nhị phân: bit thấp nhất ở bên phải; cột vàng là bit của ID đang xét.", "Binary: the lowest bit is on the right; the gold column is the selected ID bit.")}</p></div></header><strong class="sa9018-bm-formula">${formula}</strong><div class="sa9018-bm-table" tabindex="0"><table>${rows}</table></div><p class="sa9018-tail-note">${text("Các hàng tính toán dùng mask trước thao tác. Dãy bit phía trên là trạng thái ở dòng hiện tại.", "Calculation rows use the mask before the operation. The bit strip above shows the current line's state.")}</p></section>`;
+  }
+  const call = op ? op.kind === "init" ? op.arg : `${op.kind}("${op.arg}")` : text("Sẵn sàng", "Ready");
+  const outputRows = view.history.map((entry, index) => `<li><small>#${index + 1} ${sa9018Escape(entry.call)}</small><code>${sa9018Escape(entry.result ?? "None")}</code></li>`).join("");
+  host.innerHTML = `<article class="sa9018-viz sa9018-bitmask" role="region" aria-label="9018 Bitmask"><header class="sa9018-header"><div><span>9018 · ${text("CÁCH 2: BITMASK", "APPROACH 2: BITMASK")}</span><h2>${sa9018Escape(sa9018Text(step.title, vi ? "vi" : "en"))}</h2></div><div><strong>${text("DÒNG", "LINE")} ${view.line}</strong><code>${sa9018Escape(call)}</code></div></header>
+    <section class="sa9018-card sa9018-bm-explainer"><h3>${text("Một bit cho mỗi ID, một mask cho mỗi loại", "One bit per ID, one mask per type")}</h3><p>${text("Bit k−1 biểu diễn ID k. Không cần danh sách vô hạn, heap hay con trỏ.", "Bit k−1 represents ID k. No infinite list, heap, or cursor is needed.")}</p></section>
+    <div class="sa9018-type-grid">${typeCards[0] || `<p class="sa9018-empty large">${text("Chưa đọc loại server nào", "No server type read yet")}</p>`}</div>
+    ${calculation}${typeCards.length > 1 ? `<details class="sa9018-details"><summary>${text("Mask của các loại server khác", "Masks of other server types")}</summary><div>${typeCards.slice(1).join("")}</div></details>` : ""}<aside class="sa9018-note"><strong>${text("Ý nghĩa dòng này", "What this line does")}</strong><p>${sa9018Escape(sa9018Text(step.note, vi ? "vi" : "en"))}</p></aside>
+    <section class="sa9018-card"><h3>${text("Kết quả thao tác", "Operation outputs")}</h3><ol class="sa9018-outputs">${outputRows}</ol></section>
+    <details class="sa9018-details"><summary>${text("Dòng Python hiện tại", "Current Python line")}</summary><div><code>${sa9018Escape(view.source)}</code><p>${text("Python int có độ dài tùy ý. Phép toán mask tốn O(W), với W là số word lưu mask; ID rất lớn và thưa có thể tốn bộ nhớ.", "Python ints have arbitrary precision. Mask operations cost O(W), where W is the mask's word count; very large sparse IDs may consume substantial memory.")}</p></div></details></article>`;
+  if (host.querySelectorAll) host.querySelectorAll(".sa9018-bm-strip").forEach(strip => {
+    const target = strip.querySelector(".active") || strip.querySelector(".minimum");
+    if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.offsetLeft - strip.clientWidth / 2 + target.offsetWidth / 2);
+  });
 }
