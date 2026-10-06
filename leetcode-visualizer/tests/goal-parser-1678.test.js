@@ -37,7 +37,7 @@ test('1678 appends before moving and skips exactly 1, 2 or 4 input characters', 
 });
 
 test('1678 validates complete tokens and supports the 100-character boundary', () => {
-  for (const invalid of ['', 'G'.repeat(101), '(a)', '(al', 'al', '()',null].filter(value=>value!=='()')) assert.throws(()=>problem.builder(invalid),/1678/);
+  for (const invalid of ['', 'G'.repeat(101), '(a)', '(al', 'al', 'G\n', '(al)\r\n', null]) assert.throws(()=>problem.builder(invalid),/1678/);
   for (const command of ['G'.repeat(100),'()'.repeat(50),'(al)'.repeat(25),'G','()','(al)']) {
     assert.equal(problem.builder(command).answer,command.replaceAll('()','o').replaceAll('(al)','al'));
   }
