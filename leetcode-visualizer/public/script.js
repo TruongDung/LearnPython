@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.reverseWords151View), surface: "treeView", render: (step) => {
+      renderReverseWords151View(step);
+    } },
     { predicate: (step) => Boolean(step.reverseWords557View), surface: "treeView", render: (step) => {
       renderReverseWords557View(step);
     } },

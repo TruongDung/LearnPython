@@ -11,7 +11,7 @@ Nguồn: [LeetCode — String](https://leetcode.com/problem-list/string/). Dữ 
 3. Với mỗi bài: tự mô tả invariant hoặc trạng thái, làm tay một ví dụ, tự code, rồi giải thích độ phức tạp. Hoàn thành nhóm khi có thể giải lại mà không xem lời giải.
 4. Cột **Project = Có** nghĩa là ID có builder đã đăng ký trong leetcode-visualizer tại thời điểm tạo danh sách; không có nghĩa mọi visualization đều đã được đánh giá lại trong lần này. Premium là nhãn truy cập trên LeetCode.
 
-Project hỗ trợ **184/895 bài** trong danh mục, còn **711 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
+Project hỗ trợ **185/895 bài** trong danh mục, còn **710 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
 
 ## Tổng quan phần A
 
@@ -47,7 +47,7 @@ Quản lý chỉ số, ký tự, prefix; phân biệt nối chuỗi với sửa 
 | 7 | [344. Reverse String](https://leetcode.com/problems/reverse-string/) | Easy |  | Có |
 | 8 | [541. Reverse String II](https://leetcode.com/problems/reverse-string-ii/) | Easy |  | Có |
 | 9 | [557. Reverse Words in a String III](https://leetcode.com/problems/reverse-words-in-a-string-iii/) | Easy |  | Có |
-| 10 | [151. Reverse Words in a String](https://leetcode.com/problems/reverse-words-in-a-string/) | Medium |  | Chưa |
+| 10 | [151. Reverse Words in a String](https://leetcode.com/problems/reverse-words-in-a-string/) | Medium |  | Có |
 | 11 | [14. Longest Common Prefix](https://leetcode.com/problems/longest-common-prefix/) | Easy |  | Có |
 | 12 | [443. String Compression](https://leetcode.com/problems/string-compression/) | Medium |  | Có |
 
