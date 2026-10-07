@@ -105,9 +105,31 @@
           <input id="problemId" type="number" placeholder="vd: 261" value="261" />
           <button id="loadBtn" data-i18n="loadBtn">Tải bài</button>
         </div>
-        <div class="keyword-search">
-          <label for="problemKeyword" data-i18n="keywordSearchLabel">Tìm theo từ khóa</label>
-          <input id="problemKeyword" type="search" autocomplete="off" placeholder="vd: meet, heap, tree..." />
+        <div class="catalog-search-tools">
+          <div class="keyword-search">
+            <label for="problemKeyword" data-i18n="keywordSearchLabel">Tìm theo từ khóa</label>
+            <input id="problemKeyword" type="search" autocomplete="off" placeholder="vd: meet, heap, tree..." />
+          </div>
+          <div class="category-picker">
+            <label for="categoryTagInput" data-i18n="categoryTagLabel">Category Tag</label>
+            <div id="categoryTagCombobox" class="category-combobox">
+              <input
+                id="categoryTagInput"
+                type="search"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="categoryTagList"
+                placeholder="Choose or type a category..."
+              />
+              <button id="categoryTagToggle" class="category-tag-toggle" type="button" aria-label="Show category tags" aria-controls="categoryTagList" aria-expanded="false">
+                <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 7.5 5 5 5-5" /></svg>
+              </button>
+              <div id="categoryTagList" class="category-tag-list hidden" role="listbox"></div>
+            </div>
+          </div>
         </div>
         <p id="searchError" class="error hidden"></p>
       </section>
