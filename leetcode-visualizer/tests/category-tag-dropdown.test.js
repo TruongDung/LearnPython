@@ -43,3 +43,8 @@ test('category combobox supports keyboard navigation and responsive layout', () 
   assert.match(css, /\.catalog-search-tools \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
   assert.match(css, /@media \(max-width: 680px\)[\s\S]*\.catalog-search-tools \{[\s\S]*grid-template-columns: 1fr/);
 });
+
+test('String catalog tag does not render a Markdown download link', () => {
+  assert.doesNotMatch(script, /string-study-download/);
+  assert.doesNotMatch(script, /download\.textContent = lang === "vi" \? "Tải file Markdown/);
+});

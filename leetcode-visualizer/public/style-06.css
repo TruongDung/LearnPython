@@ -579,7 +579,6 @@
 .trie-learn-content { overflow-y: auto; padding: 20px 24px 25px; overscroll-behavior: contain; }
 .string-study-guide { width:100%; margin-bottom:12px; }
 .string-study-guide .string-study-link { text-decoration:none; }
-.string-study-guide .string-study-download { display:inline-block; margin-top:7px; }
 .trie-learn-section + .trie-learn-section, .trie-roadmap { margin-top: 24px; }
 .trie-learn-section-title { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
 .trie-learn-section-title > span { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid #0ea5e9; border-radius: 9px; color: #7dd3fc; font: 750 10px Consolas, monospace; }

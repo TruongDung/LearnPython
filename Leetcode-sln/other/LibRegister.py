@@ -14,7 +14,6 @@ class Library:
         return ''.join(res)
 
 sol = Library()
-sol.__init__()
 sol.Register("NAME", "dv")
 sol.Register("DATE","1/1/1990")
 print(sol.Evaluate("Hello %NAME%, %DATE%"))
