@@ -1610,7 +1610,7 @@ function openCatalogGroupExclusively(groupKey, { scroll = false } = {}) {
   requestAnimationFrame(() => {
     const selectedGroup = [...document.querySelectorAll("#catalog .cat-group")]
       .find((groupEl) => groupEl.dataset.groupKey === groupKey);
-    selectedGroup?.scrollIntoView({ behavior: "smooth", block: "start" });
+    selectedGroup?.scrollIntoView({ behavior: "auto", block: "start" });
   });
 }
 

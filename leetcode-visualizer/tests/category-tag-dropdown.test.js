@@ -32,6 +32,8 @@ test('selecting or toggling a category uses exclusive accordion behavior', () =>
   assert.match(script, /querySelectorAll\("#catalog \.cat-group"\)\.forEach/);
   assert.match(script, /groupEl\.dataset\.groupKey === groupKey/);
   assert.match(script, /function selectCategoryTag\(groupKey\)[\s\S]*openCatalogGroupExclusively\(group\.key, \{ scroll: true \}\)/);
+  assert.match(script, /selectedGroup\?\.scrollIntoView\(\{ behavior: "auto", block: "start" \}\)/);
+  assert.doesNotMatch(script, /selectedGroup\?\.scrollIntoView\(\{ behavior: "smooth"/);
   assert.match(script, /toggleBtn\.addEventListener\("click"[\s\S]*openCatalogGroupExclusively/);
 });
 
