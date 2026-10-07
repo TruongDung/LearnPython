@@ -11,6 +11,8 @@ let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
 const companySubTabSelection = new Map(); // groupKey -> active sub-tab key
 let problemSearchQuery = "";
+let activeCatalogGroupKey = null;
+let categoryTagActiveIndex = -1;
 let debugBreakpoints = new Set();
 let debugWatches = [];
 let searchErrorState = null;
@@ -31,6 +33,12 @@ const I18N = {
     loadBtn: "Tải bài",
     keywordSearchLabel: "Tìm theo từ khóa",
     keywordSearchPlaceholder: "vd: meet, heap, tree...",
+    categoryTagLabel: "Thẻ danh mục",
+    categoryTagPlaceholder: "Chọn hoặc nhập danh mục...",
+    categoryTagToggle: "Hiện danh sách thẻ danh mục",
+    noCategoryTags: "Không tìm thấy danh mục.",
+    openCategory: (category) => `Mở danh mục ${category}`,
+    closeCategory: (category) => `Đóng danh mục ${category}`,
     searchResults: (count) => `${count} kết quả`,
     noSearchResults: (query) => `Không tìm thấy bài nào cho “${query}”.`,
     arrLabel: "Mảng đầu vào (cách nhau bởi dấu phẩy)",
@@ -79,6 +87,12 @@ const I18N = {
     loadBtn: "Load",
     keywordSearchLabel: "Search by keyword",
     keywordSearchPlaceholder: "e.g. meet, heap, tree...",
+    categoryTagLabel: "Category Tag",
+    categoryTagPlaceholder: "Choose or type a category...",
+    categoryTagToggle: "Show category tags",
+    noCategoryTags: "No categories found.",
+    openCategory: (category) => `Open ${category} category`,
+    closeCategory: (category) => `Close ${category} category`,
     searchResults: (count) => `${count} result${count === 1 ? "" : "s"}`,
     noSearchResults: (query) => `No problems found for “${query}”.`,
     arrLabel: "Input array (comma separated)",
@@ -140,6 +154,7 @@ function setLang(newLang) {
   renderProblem();
   renderRecentProblems();
   renderCatalog();
+  renderCategoryTagOptions();
   renderProblemSearchResults();
   renderSearchError();
   if (steps.length) renderStep();
@@ -162,6 +177,14 @@ function applyStaticStrings() {
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
   const keywordInput = $("problemKeyword");
   if (keywordInput) keywordInput.placeholder = t().keywordSearchPlaceholder;
+  const categoryInput = $("categoryTagInput");
+  if (categoryInput) {
+    categoryInput.placeholder = t().categoryTagPlaceholder;
+    const selectedGroup = (catalogData || []).find((group) => group.key === activeCatalogGroupKey);
+    if (selectedGroup && document.activeElement !== categoryInput) categoryInput.value = pick(selectedGroup);
+  }
+  const categoryToggle = $("categoryTagToggle");
+  if (categoryToggle) categoryToggle.setAttribute("aria-label", t().categoryTagToggle);
   const liveCopyButton = $("liveCopyBtn");
   if (liveCopyButton && !liveCopyButton.classList.contains("copied")) {
     liveCopyButton.setAttribute("aria-label", t().liveCopyBtn);
@@ -270,6 +293,7 @@ async function loadCatalog() {
     if (res.ok) {
       catalogData = data.groups;
       renderCatalog();
+      renderCategoryTagOptions();
       renderProblemSearchResults();
     }
   } catch (err) {
@@ -293,7 +317,10 @@ function renderCatalog() {
 
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "cat-toggle";
-    toggleBtn.textContent = "+";
+    const isExpanded = group.key === activeCatalogGroupKey;
+    toggleBtn.textContent = isExpanded ? "−" : "+";
+    toggleBtn.setAttribute("aria-label", isExpanded ? t().closeCategory(pick(group)) : t().openCategory(pick(group)));
+    toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
 
     const nameSpan = document.createElement("span");
     nameSpan.textContent = pick(group);
@@ -306,7 +333,9 @@ function renderCatalog() {
     titleEl.appendChild(countSpan);
 
     const itemsEl = document.createElement("div");
-    itemsEl.className = "cat-items collapsed";
+    itemsEl.id = `catalog-group-${group.key}`;
+    itemsEl.className = "cat-items" + (isExpanded ? "" : " collapsed");
+    toggleBtn.setAttribute("aria-controls", itemsEl.id);
 
     // Show recommended learning order banner if available
     if (group.recommendedOrderLabel) {
@@ -1544,8 +1573,12 @@ function renderCatalog() {
     // Toggle collapse/expand
     toggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const collapsed = itemsEl.classList.toggle("collapsed");
-      toggleBtn.textContent = collapsed ? "+" : "−";
+      const shouldExpand = itemsEl.classList.contains("collapsed");
+      openCatalogGroupExclusively(shouldExpand ? group.key : null);
+    });
+    titleEl.addEventListener("click", () => {
+      const shouldExpand = itemsEl.classList.contains("collapsed");
+      openCatalogGroupExclusively(shouldExpand ? group.key : null);
     });
 
     groupEl.appendChild(titleEl);
@@ -1553,6 +1586,122 @@ function renderCatalog() {
     container.appendChild(groupEl);
   });
   renderCatalogJumpNav();
+}
+
+function setCatalogGroupExpanded(groupEl, expanded) {
+  const items = groupEl.querySelector(".cat-items");
+  const toggle = groupEl.querySelector(".cat-toggle");
+  if (items) items.classList.toggle("collapsed", !expanded);
+  if (toggle) {
+    toggle.textContent = expanded ? "−" : "+";
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const group = (catalogData || []).find((item) => item.key === groupEl.dataset.groupKey);
+    if (group) toggle.setAttribute("aria-label", expanded ? t().closeCategory(pick(group)) : t().openCategory(pick(group)));
+  }
+}
+
+function openCatalogGroupExclusively(groupKey, { scroll = false } = {}) {
+  activeCatalogGroupKey = groupKey || null;
+  document.querySelectorAll("#catalog .cat-group").forEach((groupEl) => {
+    setCatalogGroupExpanded(groupEl, Boolean(groupKey) && groupEl.dataset.groupKey === groupKey);
+  });
+
+  if (!groupKey || !scroll) return;
+  requestAnimationFrame(() => {
+    const selectedGroup = [...document.querySelectorAll("#catalog .cat-group")]
+      .find((groupEl) => groupEl.dataset.groupKey === groupKey);
+    selectedGroup?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function categoryTagMatches(query) {
+  const normalizedQuery = normalizeProblemSearch(query);
+  if (!catalogData) return [];
+  if (!normalizedQuery) return catalogData;
+  return catalogData.filter((group) => normalizeProblemSearch([
+    group.key,
+    group.vi,
+    group.en,
+  ].filter(Boolean).join(" ")).includes(normalizedQuery));
+}
+
+function renderCategoryTagOptions(query = "") {
+  const list = $("categoryTagList");
+  const input = $("categoryTagInput");
+  if (!list || !input) return;
+
+  const matches = categoryTagMatches(query);
+  list.innerHTML = "";
+  categoryTagActiveIndex = matches.length && categoryTagActiveIndex >= 0
+    ? Math.min(categoryTagActiveIndex, matches.length - 1)
+    : -1;
+
+  if (!matches.length) {
+    const empty = document.createElement("div");
+    empty.className = "category-tag-empty";
+    empty.textContent = t().noCategoryTags;
+    list.appendChild(empty);
+    input.removeAttribute("aria-activedescendant");
+    return;
+  }
+
+  matches.forEach((group, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.id = `category-tag-option-${index}`;
+    option.className = "category-tag-option";
+    option.dataset.groupKey = group.key;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", group.key === activeCatalogGroupKey ? "true" : "false");
+    option.classList.toggle("keyboard-active", index === categoryTagActiveIndex);
+
+    const label = document.createElement("span");
+    label.textContent = pick(group);
+    const count = document.createElement("small");
+    count.textContent = group.problems.length;
+    option.append(label, count);
+    option.addEventListener("mousedown", (event) => event.preventDefault());
+    option.addEventListener("click", () => selectCategoryTag(group.key));
+    list.appendChild(option);
+  });
+
+  const activeOption = list.querySelector(".category-tag-option.keyboard-active");
+  if (activeOption) input.setAttribute("aria-activedescendant", activeOption.id);
+}
+
+function openCategoryTagDropdown({ showAll = false } = {}) {
+  const list = $("categoryTagList");
+  const input = $("categoryTagInput");
+  const toggle = $("categoryTagToggle");
+  if (!list || !input || !toggle) return;
+  categoryTagActiveIndex = -1;
+  renderCategoryTagOptions(showAll ? "" : input.value);
+  list.classList.remove("hidden");
+  input.setAttribute("aria-expanded", "true");
+  toggle.setAttribute("aria-expanded", "true");
+}
+
+function closeCategoryTagDropdown() {
+  const list = $("categoryTagList");
+  const input = $("categoryTagInput");
+  const toggle = $("categoryTagToggle");
+  list?.classList.add("hidden");
+  input?.setAttribute("aria-expanded", "false");
+  input?.removeAttribute("aria-activedescendant");
+  toggle?.setAttribute("aria-expanded", "false");
+  categoryTagActiveIndex = -1;
+}
+
+function selectCategoryTag(groupKey) {
+  const group = (catalogData || []).find((item) => item.key === groupKey);
+  if (!group) return;
+
+  problemSearchQuery = "";
+  $("problemKeyword").value = "";
+  renderProblemSearchResults();
+  $("categoryTagInput").value = pick(group);
+  closeCategoryTagDropdown();
+  openCatalogGroupExclusively(group.key, { scroll: true });
 }
 
 function normalizeProblemSearch(value) {
@@ -1646,24 +1795,74 @@ $("problemKeyword").addEventListener("input", (event) => {
   renderProblemSearchResults();
 });
 
+$("categoryTagInput").addEventListener("focus", (event) => {
+  event.target.select();
+  openCategoryTagDropdown({ showAll: true });
+});
+
+$("categoryTagInput").addEventListener("click", () => {
+  openCategoryTagDropdown({ showAll: true });
+});
+
+$("categoryTagInput").addEventListener("input", (event) => {
+  categoryTagActiveIndex = -1;
+  openCategoryTagDropdown();
+  renderCategoryTagOptions(event.target.value);
+});
+
+$("categoryTagInput").addEventListener("keydown", (event) => {
+  const list = $("categoryTagList");
+  const options = [...list.querySelectorAll(".category-tag-option")];
+  if (event.key === "Escape") {
+    closeCategoryTagDropdown();
+    return;
+  }
+  if (event.key === "Tab") {
+    closeCategoryTagDropdown();
+    return;
+  }
+  if (!["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) return;
+
+  event.preventDefault();
+  if (list.classList.contains("hidden")) {
+    openCategoryTagDropdown();
+    return;
+  }
+  if (!options.length) return;
+  if (event.key === "Enter") {
+    const option = options[Math.max(categoryTagActiveIndex, 0)];
+    if (option) selectCategoryTag(option.dataset.groupKey);
+    return;
+  }
+
+  const direction = event.key === "ArrowDown" ? 1 : -1;
+  categoryTagActiveIndex = (categoryTagActiveIndex + direction + options.length) % options.length;
+  options.forEach((option, index) => option.classList.toggle("keyboard-active", index === categoryTagActiveIndex));
+  const activeOption = options[categoryTagActiveIndex];
+  $("categoryTagInput").setAttribute("aria-activedescendant", activeOption.id);
+  activeOption.scrollIntoView({ block: "nearest" });
+});
+
+$("categoryTagToggle").addEventListener("click", () => {
+  const list = $("categoryTagList");
+  if (!list.classList.contains("hidden")) {
+    closeCategoryTagDropdown();
+    return;
+  }
+  $("categoryTagInput").focus();
+  openCategoryTagDropdown({ showAll: true });
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (!$("categoryTagCombobox").contains(event.target)) closeCategoryTagDropdown();
+});
+
 function markActiveChip() {
   document
     .querySelectorAll("#catalog .prob-chip, #problemSearchItems .prob-chip")
     .forEach((chip) => {
       const isActive = Number(chip.dataset.id) === currentProblemId;
       chip.classList.toggle("active", isActive);
-      // Auto-expand the parent group of the active problem
-      if (isActive) {
-        const group = chip.closest(".cat-group");
-        if (group) {
-          const items = group.querySelector(".cat-items");
-          const toggle = group.querySelector(".cat-toggle");
-          if (items && items.classList.contains("collapsed")) {
-            items.classList.remove("collapsed");
-            if (toggle) toggle.textContent = "−";
-          }
-        }
-      }
     });
 }
 
@@ -1729,6 +1928,7 @@ function jumpToCatalogGroup(groupKey) {
   }
 
   activeCatalogJumpKey = groupKey;
+  openCatalogGroupExclusively(groupKey);
   $("catalogJumpNav")?.querySelectorAll(".catalog-jump-btn").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.groupKey === groupKey);
   });
@@ -1737,13 +1937,6 @@ function jumpToCatalogGroup(groupKey) {
     const group = [...document.querySelectorAll("#catalog .cat-group")]
       .find((item) => item.dataset.groupKey === groupKey);
     if (!group) return;
-    const items = group.querySelector(".cat-items");
-    const toggle = group.querySelector(".cat-toggle");
-    if (items && items.classList.contains("collapsed")) {
-      items.classList.remove("collapsed");
-      if (toggle) toggle.textContent = "−";
-    }
-
     const target = [...group.querySelectorAll(".prob-chip")]
       .find((chip) => Number(chip.dataset.id) === Number(currentProblemId));
     const destination = target || group;
