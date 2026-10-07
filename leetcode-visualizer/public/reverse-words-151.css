@@ -8,7 +8,8 @@
 .rw151-viz > header > strong { flex:none; font:700 18px monospace; }
 .rw151-viz > header > strong small { display:block; margin-top:5px; font-size:10px; }
 .rw151-legend { display:flex; flex-wrap:wrap; gap:8px 14px; font-size:11px; color:var(--rw151-muted); margin:17px 0 10px; }
-.rw151-scroll { overflow-x:auto; position:relative; padding:5px 2px 16px; }
+.rw151-scroll { overflow-x:auto; position:relative; padding:5px 2px 16px; scrollbar-width:none; }
+.rw151-scroll::-webkit-scrollbar { display:none; }
 .rw151-source { display:flex; gap:4px; width:max-content; }
 .rw151-cell { display:flex; flex-direction:column; align-items:center; justify-content:space-between; width:38px; height:80px; padding:6px 2px; border:1px solid var(--rw151-border); border-radius:7px; background:var(--rw151-bg); flex:none; }
 .rw151-cell small,.rw151-cell span { font:10px monospace; }
