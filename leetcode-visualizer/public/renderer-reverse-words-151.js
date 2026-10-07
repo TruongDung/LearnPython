@@ -18,7 +18,4 @@ function renderReverseWords151View(step) {
     <h4>words · ${text("thứ tự đầu ra", "output order")}</h4><div class="rw151-words">${words || `<span class="rw151-empty">${text("Chưa thêm từ", "No words appended yet")}</span>`}</div>
     <div class="rw151-result"><small>${done ? text("Kết quả", "Answer") : text("Kết quả đang xây dựng", "Output so far")}</small><code>${escapeHtml(JSON.stringify(v.words.map(word => word.text).join(" ")))}</code></div>
   </section>`;
-  const strip = $("treeView").querySelector(".rw151-scroll");
-  const target = strip.querySelector(".pointer") || strip.querySelector(".active");
-  if (target) strip.scrollLeft = Math.max(0, target.offsetLeft - strip.clientWidth / 2);
 }
