@@ -131,6 +131,7 @@ app.get("/api/problem/:id", (req, res) => {
     defaultInput: problem.defaultInput,
     inputKind: problem.inputKind,
     preserveInputWhitespace: Boolean(problem.preserveInputWhitespace),
+    allowEmptyInput: Boolean(problem.allowEmptyInput),
     extraParams: problem.extraParams || [],
     inputLabel: problem.inputLabel || null,
     complexity: problem.complexity || null,
@@ -192,7 +193,7 @@ app.post("/api/problem/:id/solve", (req, res) => {
   const params = req.body.params || {};
 
   if (problem.inputKind === "string") {
-    if (typeof input !== "string" || input.length === 0) {
+    if (typeof input !== "string" || (!problem.allowEmptyInput && input.length === 0)) {
       return res.status(400).json({
         error: "Đầu vào s phải là một chuỗi không rỗng.",
       });

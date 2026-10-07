@@ -2357,7 +2357,7 @@ async function runViz() {
 
   if (isString) {
     input = problemData.preserveInputWhitespace ? $("arrInput").value : $("arrInput").value.trim();
-    if (input.length === 0 && Number(problemData.id) !== 32) {
+    if (input.length === 0 && !problemData.allowEmptyInput && Number(problemData.id) !== 32) {
       return showError("runError", t().errArr);
     }
   } else if (isStringArray) {
