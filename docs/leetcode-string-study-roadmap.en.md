@@ -1096,4 +1096,3 @@ Combine the foundations: KMP + DP, rolling hash + binary search, segment trees, 
 | 893 | [3777. Minimum Deletions to Make Alternating Substring](https://leetcode.com/problems/minimum-deletions-to-make-alternating-substring/) | Hard |  | Not yet |
 | 894 | [3841. Palindromic Path Queries in a Tree](https://leetcode.com/problems/palindromic-path-queries-in-a-tree/) | Hard |  | Not yet |
 | 895 | [3864. Minimum Cost to Partition a Binary String](https://leetcode.com/problems/minimum-cost-to-partition-a-binary-string/) | Hard |  | Not yet |
-
