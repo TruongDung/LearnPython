@@ -231,48 +231,431 @@ function buildSteps9009(input, params = {}) {
   return { original: merchants, answer: matches.map((merchant) => merchant.name), steps };
 }
 
+const CODE_9011 = [
+  "class DiskKV:",
+  "    def __init__(self):",
+  "        self.log = []",
+  "        self.index = {}",
+  "",
+  "    def put(self, key, value):",
+  "        offset = len(self.log)",
+  "        self.log.append((key, value, False))",
+  "        self.index[key] = offset",
+  "",
+  "    def update(self, key, value):",
+  "        if key not in self.index:",
+  "            return False",
+  "        self.put(key, value)",
+  "        return True",
+  "",
+  "    def delete(self, key):",
+  "        offset = len(self.log)",
+  "        self.log.append((key, None, True))",
+  "        self.index.pop(key, None)",
+  "",
+  "    def scan(self):",
+  "        answer = []",
+  "        for key in sorted(self.index):",
+  "            offset = self.index[key]",
+  "            value = self.log[offset][1]",
+  "            answer.append((key, value))",
+  "        return answer",
+  "",
+  "def execute(commands):",
+  "    store = DiskKV()",
+  "    for op, key, value in commands:",
+  "        if op == 'PUT':",
+  "            store.put(key, value)",
+  "        elif op == 'UPDATE':",
+  "            store.update(key, value)",
+  "        elif op == 'DELETE':",
+  "            store.delete(key)",
+  "        else:",
+  "            store.scan()",
+  "    return store.scan()",
+];
+
 function buildSteps9011(input) {
-  const commands = String(input || "").split("|").map((part) => part.trim()).filter(Boolean).map((part) => part.split(/\s+/));
-  if (!commands.length) throw new Error("Nhập thao tác như PUT a 1|UPDATE a 2|DELETE a|SCAN.");
-  const index = new Map(), log = [], steps = [];
-  const diskText = () => `[${log.map((record) => record.deleted ? `${record.key}:✕` : `${record.key}:${record.value}`).join(" | ")}]`;
-  const indexText = () => `{${[...index.entries()].map(([key, record]) => `${key}@${record.offset}`).join(", ")}}`;
-  const snap = (title, line, note, final = false) => steps.push({ title, arr: [], highlight: [], mark: [], final, codeLines: [line], vars: [{ name: "append-only file", value: diskText() }, { name: "index", value: indexText() }, { name: "sorted scan", value: `[${[...index.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, record]) => `${key}:${record.value}`).join(", ")}]` }], note });
-  snap({ vi: "Mở file log + index trong bộ nhớ", en: "Open the log file + in-memory index" }, 4, { vi: "Bản visual mô phỏng append-only segment trên disk; hash index giữ offset record mới nhất.", en: "This visual simulates an append-only disk segment; a hash index keeps the newest record offset." });
-  for (const tokens of commands) {
+  const rawCommands = String(input || "").split("|").map((part) => part.trim()).filter(Boolean);
+  if (!rawCommands.length) throw new Error("Nhập thao tác như PUT a 1|UPDATE a 2|DELETE a|SCAN.");
+
+  const commands = rawCommands.map((raw) => {
+    const tokens = raw.split(/\s+/);
     const op = tokens[0].toUpperCase();
-    if (op === "SCAN") { snap({ vi: "SCAN theo key tăng dần", en: "SCAN in ascending key order" }, 18, { vi: "Production store thường dùng SSTable/B-tree để scan sorted không phải sort mọi lần.", en: "A production store typically uses an SSTable/B-tree to scan sorted keys without sorting every time." }); continue; }
-    const key = tokens[1];
-    if (!key || !["PUT", "UPDATE", "DELETE"].includes(op) || ((op === "PUT" || op === "UPDATE") && tokens.length < 3)) throw new Error("Dùng PUT key value, UPDATE key value, DELETE key, hoặc SCAN.");
-    if (op === "UPDATE" && !index.has(key)) { snap({ vi: `UPDATE ${key}: key chưa tồn tại`, en: `UPDATE ${key}: key does not exist` }, 10, { vi: "Không ghi record mới khi update một key chưa tồn tại.", en: "No new record is written when updating a missing key." }); continue; }
-    const record = { key, value: op === "DELETE" ? null : tokens.slice(2).join(" "), deleted: op === "DELETE", offset: log.length };
-    log.push(record);
-    if (record.deleted) index.delete(key); else index.set(key, record);
-    snap({ vi: `${op} ${key}: append offset ${record.offset}`, en: `${op} ${key}: append offset ${record.offset}` }, record.deleted ? 14 : 8, record.deleted ? { vi: "DELETE ghi tombstone vào file rồi xóa key khỏi index; compaction sẽ reclaim byte cũ sau.", en: "DELETE appends a tombstone then removes the key from the index; compaction reclaims old bytes later." } : { vi: "PUT/UPDATE đều append record mới; index trỏ tới version mới nhất.", en: "Both PUT and UPDATE append a new record; the index points to the latest version." });
+    if (op === "SCAN" && tokens.length === 1) return { op, key: null, value: null, raw };
+    if (op === "DELETE" && tokens.length === 2) return { op, key: tokens[1], value: null, raw };
+    if ((op === "PUT" || op === "UPDATE") && tokens.length >= 3) {
+      return { op, key: tokens[1], value: tokens.slice(2).join(" "), raw };
+    }
+    throw new Error("Dùng PUT key value, UPDATE key value, DELETE key, hoặc SCAN.");
+  });
+
+  const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+  const steps = [];
+  let log = null;
+  let index = null;
+
+  const liveEntries = () => {
+    if (!index || !log) return [];
+    return [...index.entries()]
+      .sort(([left], [right]) => compareText(left, right))
+      .map(([key, offset]) => [key, log[offset].value]);
+  };
+  const diskText = () => log === null
+    ? "—"
+    : `[${log.map((record) => record.deleted ? `${record.key}:✕` : `${record.key}:${record.value}`).join(" | ")}]`;
+  const indexText = () => index === null
+    ? "—"
+    : `{${[...index.entries()].sort(([left], [right]) => compareText(left, right)).map(([key, offset]) => `${key}@${offset}`).join(", ")}}`;
+
+  function emit(line, operation, options = {}) {
+    const scan = options.scan || liveEntries();
+    steps.push({
+      title: options.title || { vi: `Dòng ${line}: ${operation}`, en: `Line ${line}: ${operation}` },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: [line],
+      vars: [
+        { name: "operation", value: operation },
+        { name: "command", value: options.command || "—" },
+        { name: "offset", value: options.offset ?? "—" },
+        { name: "append-only file", value: diskText() },
+        { name: "index", value: indexText() },
+        { name: "sorted scan", value: `[${scan.map(([key, value]) => `${key}:${value}`).join(", ")}]` },
+      ],
+      note: options.note || { vi: "Mỗi bước chỉ thực thi một dòng code đang được tô sáng.", en: "Each step executes only the single highlighted source line." },
+      diskKv9011View: {
+        operation,
+        command: options.command || null,
+        records: log ? log.map((record) => ({ ...record })) : [],
+        index: index ? [...index.entries()].map(([key, offset]) => ({ key, offset })) : [],
+        scan: scan.map(([key, value]) => ({ key, value })),
+        offset: options.offset ?? null,
+        key: options.key ?? null,
+        value: options.value ?? null,
+        result: options.result ?? null,
+      },
+    });
   }
-  const answer = [...index.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, record]) => [key, record.value]);
-  snap({ vi: `Return ${answer.length} live key(s)`, en: `Return ${answer.length} live key(s)` }, 20, { vi: "File I/O thực tế cần fsync, WAL/recovery, compaction và khóa/atomic rename; visual tập trung vào data path.", en: "Real file I/O also needs fsync, WAL/recovery, compaction, and locking/atomic rename; this visual focuses on the data path." }, true);
-  return { original: commands.map((tokens) => tokens.join(" ")), answer, steps };
+
+  function put(key, value, command) {
+    const offset = log.length;
+    emit(7, "offset = len(log)", { command, offset, key, value });
+    log.push({ key, value, deleted: false, offset });
+    emit(8, "append value record", { command, offset, key, value });
+    index.set(key, offset);
+    emit(9, "index[key] = offset", {
+      command,
+      offset,
+      key,
+      value,
+      note: { vi: `Index của ${key} trỏ tới version mới nhất ở offset ${offset}.`, en: `${key}'s index now points to the newest version at offset ${offset}.` },
+    });
+  }
+
+  function update(key, value, command) {
+    const missing = !index.has(key);
+    emit(12, "check key in index", { command, key, value, result: !missing });
+    if (missing) {
+      emit(13, "return False", {
+        command,
+        key,
+        value,
+        result: false,
+        note: { vi: "UPDATE key chưa tồn tại không ghi thêm record.", en: "Updating a missing key does not append a record." },
+      });
+      return false;
+    }
+    emit(14, "self.put(key, value)", { command, key, value });
+    put(key, value, command);
+    emit(15, "return True", { command, key, value, result: true });
+    return true;
+  }
+
+  function remove(key, command) {
+    const offset = log.length;
+    emit(18, "offset = len(log)", { command, offset, key });
+    log.push({ key, value: null, deleted: true, offset });
+    emit(19, "append tombstone", {
+      command,
+      offset,
+      key,
+      note: { vi: "Tombstone được giữ trong log để recovery biết key đã bị xóa.", en: "The tombstone stays in the log so recovery knows the key was deleted." },
+    });
+    index.delete(key);
+    emit(20, "index.pop(key, None)", { command, offset, key });
+  }
+
+  function scan(command) {
+    const answer = [];
+    emit(23, "answer = []", { command, scan: answer });
+    for (const key of [...index.keys()].sort(compareText)) {
+      emit(24, "iterate sorted key", { command, key, scan: answer });
+      const offset = index.get(key);
+      emit(25, "offset = index[key]", { command, key, offset, scan: answer });
+      const value = log[offset].value;
+      emit(26, "value = log[offset][1]", { command, key, value, offset, scan: answer });
+      answer.push([key, value]);
+      emit(27, "answer.append((key, value))", { command, key, value, offset, scan: answer });
+    }
+    emit(28, "return answer", {
+      command,
+      scan: answer,
+      result: answer,
+      note: { vi: "SCAN trả key sống theo thứ tự tăng dần; production dùng SSTable hoặc B-tree.", en: "SCAN returns live keys in ascending order; production uses an SSTable or B-tree." },
+    });
+    return answer;
+  }
+
+  emit(31, "store = DiskKV()", { command: "initialize" });
+  log = [];
+  emit(3, "self.log = []", { command: "initialize" });
+  index = new Map();
+  emit(4, "self.index = {}", {
+    command: "initialize",
+    note: { vi: "Log append-only nằm trên disk; hash index trong RAM giữ offset mới nhất.", en: "The append-only log lives on disk; the in-memory hash index keeps the newest offset." },
+  });
+
+  for (const command of commands) {
+    emit(32, "read next command", { command: command.raw, key: command.key, value: command.value });
+    const isPut = command.op === "PUT";
+    emit(33, "check PUT", { command: command.raw, key: command.key, value: command.value, result: isPut });
+    if (isPut) {
+      emit(34, "store.put(key, value)", { command: command.raw, key: command.key, value: command.value });
+      put(command.key, command.value, command.raw);
+      continue;
+    }
+
+    const isUpdate = command.op === "UPDATE";
+    emit(35, "check UPDATE", { command: command.raw, key: command.key, value: command.value, result: isUpdate });
+    if (isUpdate) {
+      emit(36, "store.update(key, value)", { command: command.raw, key: command.key, value: command.value });
+      update(command.key, command.value, command.raw);
+      continue;
+    }
+
+    const isDelete = command.op === "DELETE";
+    emit(37, "check DELETE", { command: command.raw, key: command.key, result: isDelete });
+    if (isDelete) {
+      emit(38, "store.delete(key)", { command: command.raw, key: command.key });
+      remove(command.key, command.raw);
+      continue;
+    }
+
+    emit(39, "enter SCAN branch", { command: command.raw });
+    emit(40, "store.scan()", { command: command.raw });
+    scan(command.raw);
+  }
+
+  emit(41, "return store.scan()", { command: "final scan" });
+  const answer = scan("final scan");
+  emit(41, "return final answer", {
+    command: "final scan",
+    scan: answer,
+    result: answer,
+    final: true,
+    note: { vi: "Kết quả chỉ chứa các key còn sống và version mới nhất của chúng.", en: "The result contains only live keys and their newest versions." },
+  });
+  return { original: rawCommands, answer, steps };
 }
 
+const CODE_9012 = [
+  "class VendingMachine:",
+  "    def __init__(self, coins):",
+  "        self.coins = sorted(set(coins))",
+  "",
+  "    def purchase(self, price, paid):",
+  "        if paid < price:",
+  "            raise ValueError('insufficient payment')",
+  "        change = paid - price",
+  "        return self.min_change(change)",
+  "",
+  "    def min_change(self, change):",
+  "        inf = change + 1",
+  "        dp = [inf] * (change + 1)",
+  "        pick = [-1] * (change + 1)",
+  "        dp[0] = 0",
+  "        for amount in range(1, change + 1):",
+  "            for coin in self.coins:",
+  "                if coin > amount:",
+  "                    break",
+  "                candidate = dp[amount - coin] + 1",
+  "                if candidate < dp[amount]:",
+  "                    dp[amount] = candidate",
+  "                    pick[amount] = coin",
+  "        if dp[change] == inf:",
+  "            return None",
+  "        answer = []",
+  "        amount = change",
+  "        while amount > 0:",
+  "            coin = pick[amount]",
+  "            answer.append(coin)",
+  "            amount -= coin",
+  "        return answer",
+];
+
 function buildSteps9012(input, params = {}) {
-  const coins = String(input || "").split(",").map((value) => Number(value.trim())).filter((value) => Number.isInteger(value) && value > 0).sort((a, b) => a - b);
-  const price = Number(params.price), paid = Number(params.paid);
-  if (!coins.length || !Number.isInteger(price) || !Number.isInteger(paid) || price < 0 || paid < price) throw new Error("Coins phải dương; paid phải lớn hơn hoặc bằng price.");
-  const change = paid - price, inf = change + 1, dp = Array(change + 1).fill(inf), pick = Array(change + 1).fill(-1), steps = [];
+  const tokens = String(input ?? "").split(",").map((value) => value.trim());
+  if (!tokens.length || tokens.some((value) => value === "" || !/^[+]?[0-9]+$/.test(value))) {
+    throw new Error("Coins phải là danh sách số nguyên dương, ngăn bằng dấu phẩy.");
+  }
+  const parsedCoins = tokens.map(Number);
+  if (parsedCoins.some((coin) => !Number.isSafeInteger(coin) || coin <= 0)) {
+    throw new Error("Coins phải là danh sách số nguyên dương, ngăn bằng dấu phẩy.");
+  }
+  const coins = [...new Set(parsedCoins)].sort((a, b) => a - b);
+  const price = Number(params.price);
+  const paid = Number(params.paid);
+  if (!Number.isSafeInteger(price) || !Number.isSafeInteger(paid) || price < 0 || paid < price) {
+    throw new Error("price và paid phải là số nguyên không âm; paid phải lớn hơn hoặc bằng price.");
+  }
+
+  const change = paid - price;
+  const steps = [];
+  let inf = null;
+  let dp = null;
+  let pick = null;
+  let answer = null;
+
+  function emit(line, operation, options = {}) {
+    const dpSnapshot = dp ? dp.map((value) => value === inf ? -1 : value) : [];
+    const pickSnapshot = pick ? [...pick] : [];
+    const active = [options.amount, options.previousAmount]
+      .filter((value, index, values) => Number.isInteger(value) && values.indexOf(value) === index);
+    steps.push({
+      title: options.title || { vi: `Dòng ${line}: ${operation}`, en: `Line ${line}: ${operation}` },
+      arr: dpSnapshot,
+      sub: dpSnapshot.map((_value, index) => `$${index}`),
+      highlight: active,
+      mark: dpSnapshot.map((value, index) => value >= 0 ? index : null).filter((index) => index !== null),
+      final: Boolean(options.final),
+      codeLines: [line],
+      vars: [
+        { name: "operation", value: operation },
+        { name: "price / paid", value: `${price} / ${paid}` },
+        { name: "change", value: change },
+        { name: "coins", value: `[${coins.join(", ")}]` },
+        { name: "amount", value: options.amount ?? "—" },
+        { name: "coin", value: options.coin ?? "—" },
+        { name: "candidate", value: options.candidate ?? "—" },
+        { name: "pick", value: pick ? `[${pick.join(", ")}]` : "—" },
+        { name: "answer", value: answer === null ? "—" : `[${answer.join(", ")}]` },
+      ],
+      note: options.note || { vi: "Mỗi bước chỉ thực thi một dòng code đang được tô sáng.", en: "Each step executes only the single highlighted source line." },
+      vending9012View: {
+        operation,
+        price,
+        paid,
+        change,
+        coins: [...coins],
+        inf,
+        dp: dpSnapshot,
+        pick: pickSnapshot,
+        amount: options.amount ?? null,
+        previousAmount: options.previousAmount ?? null,
+        coin: options.coin ?? null,
+        candidate: options.candidate ?? null,
+        improved: options.improved ?? null,
+        reachable: options.reachable ?? null,
+        answer: answer === null ? null : [...answer],
+      },
+    });
+  }
+
+  emit(3, "self.coins = sorted(set(coins))", {
+    note: { vi: "Loại coin trùng và sắp tăng để có thể dừng vòng lặp khi coin > amount.", en: "Deduplicate and sort coins so the loop can stop once coin > amount." },
+  });
+  const insufficient = paid < price;
+  emit(6, "check paid < price", { improved: insufficient });
+  emit(8, "change = paid - price", {
+    note: { vi: `Tiền thừa cần trả là ${paid} − ${price} = ${change}.`, en: `Required change is ${paid} − ${price} = ${change}.` },
+  });
+  emit(9, "return self.min_change(change)");
+
+  inf = change + 1;
+  emit(12, "inf = change + 1");
+  dp = Array(change + 1).fill(inf);
+  emit(13, "dp = [inf] * (change + 1)");
+  pick = Array(change + 1).fill(-1);
+  emit(14, "pick = [-1] * (change + 1)");
   dp[0] = 0;
-  const snap = (title, line, note, amount = null, final = false) => steps.push({ title, arr: dp.map((value) => value === inf ? -1 : value), sub: dp.map((value, index) => `$${index}`), highlight: amount === null ? [] : [amount], mark: amount === null ? [] : [amount], final, codeLines: [line], vars: [{ name: "price", value: price }, { name: "paid", value: paid }, { name: "change", value: change }, { name: "coin set", value: `[${coins.join(", ")}]` }], note });
-  snap({ vi: `VendingMachine: change = ${paid} − ${price} = ${change}`, en: `VendingMachine: change = ${paid} − ${price} = ${change}` }, 7, { vi: "Một object VendingMachine điều phối payment; hàm DP chọn cách trả tiền thừa ít xu nhất.", en: "A VendingMachine object orchestrates payment; DP chooses the fewest-coin change." });
+  emit(15, "dp[0] = 0", {
+    amount: 0,
+    note: { vi: "Cần 0 coin để tạo amount 0.", en: "Zero coins are needed to make amount 0." },
+  });
+
   for (let amount = 1; amount <= change; amount++) {
+    emit(16, "iterate amount", { amount });
     for (const coin of coins) {
-      if (coin <= amount && dp[amount - coin] + 1 < dp[amount]) { dp[amount] = dp[amount - coin] + 1; pick[amount] = coin; snap({ vi: `dp[${amount}] = dp[${amount - coin}] + 1 (coin ${coin})`, en: `dp[${amount}] = dp[${amount - coin}] + 1 (coin ${coin})` }, 13, { vi: "Thử thêm một coin vào cách trả tiền thừa tối ưu của amount−coin.", en: "Try adding one coin to the optimal change for amount−coin." }, amount); }
+      emit(17, "iterate coin", { amount, coin });
+      const tooLarge = coin > amount;
+      emit(18, "check coin > amount", { amount, coin, improved: tooLarge });
+      if (tooLarge) {
+        emit(19, "break", {
+          amount,
+          coin,
+          note: { vi: "Coins đã sort nên mọi coin phía sau cũng quá lớn.", en: "Coins are sorted, so every later coin is also too large." },
+        });
+        break;
+      }
+
+      const previousAmount = amount - coin;
+      const candidate = dp[previousAmount] + 1;
+      emit(20, "candidate = dp[amount - coin] + 1", { amount, previousAmount, coin, candidate });
+      const improved = candidate < dp[amount];
+      emit(21, "check candidate < dp[amount]", { amount, previousAmount, coin, candidate, improved });
+      if (!improved) continue;
+
+      dp[amount] = candidate;
+      emit(22, "dp[amount] = candidate", { amount, previousAmount, coin, candidate, improved: true });
+      pick[amount] = coin;
+      emit(23, "pick[amount] = coin", {
+        amount,
+        previousAmount,
+        coin,
+        candidate,
+        improved: true,
+        note: { vi: `Amount ${amount} tốt nhất hiện dùng ${candidate} coin; coin cuối là ${coin}.`, en: `The best solution for amount ${amount} now uses ${candidate} coin(s), ending with ${coin}.` },
+      });
     }
   }
-  const combination = [];
-  for (let amount = change; amount > 0 && pick[amount] !== -1; amount -= pick[amount]) combination.push(pick[amount]);
-  const answer = dp[change] === inf ? null : combination;
-  snap(answer ? { vi: `Return change: [${answer.join(", ")}]`, en: `Return change: [${answer.join(", ")}]` } : { vi: "Không thể trả đúng tiền thừa", en: "Exact change is impossible" }, 17, answer ? { vi: "Theo pick[] ngược từ change để dựng coin combination.", en: "Follow pick[] backward from change to reconstruct the coin combination." } : { vi: "Không có tổ hợp coin nào tạo đúng change.", en: "No coin combination produces exact change." }, change, true);
-  return { original: coins, answer, steps };
+
+  const reachable = dp[change] !== inf;
+  emit(24, "check dp[change] == inf", { amount: change, reachable });
+  if (!reachable) {
+    emit(25, "return None", {
+      amount: change,
+      reachable: false,
+      note: { vi: `Không có tổ hợp coin tạo đúng ${change}.`, en: `No coin combination makes exactly ${change}.` },
+    });
+    emit(9, "return None from purchase", { amount: change, reachable: false, final: true });
+    return { original: coins, answer: null, steps };
+  }
+
+  answer = [];
+  emit(26, "answer = []", { amount: change, reachable: true });
+  let amount = change;
+  emit(27, "amount = change", { amount, reachable: true });
+  while (amount > 0) {
+    emit(28, "check amount > 0", { amount, reachable: true });
+    const coin = pick[amount];
+    emit(29, "coin = pick[amount]", { amount, coin, reachable: true });
+    answer.push(coin);
+    emit(30, "answer.append(coin)", { amount, coin, reachable: true });
+    const previousAmount = amount;
+    amount -= coin;
+    emit(31, "amount -= coin", { amount, previousAmount, coin, reachable: true });
+  }
+  emit(28, "check amount > 0", { amount, reachable: true });
+  emit(32, "return answer", {
+    amount,
+    reachable: true,
+    note: { vi: "Dựng ngược theo pick[] tạo một tổ hợp có số coin tối thiểu.", en: "Following pick[] backward produces a minimum-coin combination." },
+  });
+  emit(9, "return answer from purchase", { amount, reachable: true, final: true });
+  return { original: coins, answer: [...answer], steps };
 }
 
 function buildSteps9013(input) {
@@ -430,14 +813,14 @@ module.exports = {
     statement: { vi: "Mô phỏng key-value store dựa trên append-only file: PUT/UPDATE ghi record mới, DELETE ghi tombstone, index key→offset trỏ record sống mới nhất, SCAN trả keys tăng dần.", en: "Simulate an append-only-file key-value store: PUT/UPDATE writes a new record, DELETE writes a tombstone, a key→offset index points to the newest live record, and SCAN returns ascending keys." },
     defaultInput: "PUT a 1|PUT b 2|UPDATE a 3|DELETE b|PUT c 4|SCAN", inputKind: "string", inputLabel: { vi: "ops: PUT/UPDATE/DELETE/SCAN (ngăn |)", en: "ops: PUT/UPDATE/DELETE/SCAN (separated by |)" }, extraParams: [],
     approach: [{ vi: "Append-only write biến update thành ghi tuần tự nhanh; index giữ record mới nhất.", en: "Append-only writes make updates fast sequential writes; the index retains the newest record." }, { vi: "DELETE dùng tombstone để recovery biết key đã bị xóa trước compaction.", en: "DELETE uses a tombstone so recovery knows the key was removed before compaction." }, { vi: "Sorted iteration cần SSTable/B-tree hoặc sorted memtable; demo sort live index để minh họa API.", en: "Sorted iteration needs an SSTable/B-tree or sorted memtable; the demo sorts the live index to illustrate the API." }], complexity: { time: "O(1) expected write/index · O(k log k) demo scan", space: "O(live keys + log)", note: { vi: "Production scan dùng cấu trúc sorted để O(log n + output), không sort lại như demo.", en: "Production scans use a sorted structure for O(log n + output), rather than re-sorting as in the demo." } },
-    code: ["class DiskKV:", "    def put(self, key, value):", "        offset = self.file.append((key, value))", "        self.index[key] = offset", "", "    def delete(self, key):", "        self.file.append((key, TOMBSTONE))", "        self.index.pop(key, None)", "", "    def scan(self):", "        for key in self.sstable.keys_in_order():", "            yield key, self.read(self.index[key])"], builder: buildSteps9011,
+    debugMode: "line-by-line", code: CODE_9011, builder: buildSteps9011,
   },
   9012: {
     id: 9012, difficulty: "medium", category: DESIGN, tags: [DP], title: { vi: "Vending Machine Change", en: "Vending Machine Change" }, titleVi: { vi: "Máy bán hàng và tiền thừa", en: "Vending machine and change" },
     statement: { vi: "Thiết kế VendingMachine nhận price/paid và tìm tổ hợp coin trả change với số coin ít nhất. Đây là module payment trong OOD; thuật toán bên trong dùng coin-change DP.", en: "Design a VendingMachine that receives price/paid and finds a minimum-coin change combination. This is a payment module in OOD; its internal algorithm uses coin-change DP." },
     defaultInput: "1,5,10,25", inputKind: "string", inputLabel: { vi: "coin denominations", en: "coin denominations" }, extraParams: [{ key: "price", label: { vi: "price", en: "price" }, default: 65, min: 0 }, { key: "paid", label: { vi: "paid", en: "paid" }, default: 100, min: 0 }],
     approach: [{ vi: "purchase xác thực paid ≥ price và tính change.", en: "purchase validates paid ≥ price and computes change." }, { vi: "dp[amount] là số coin ít nhất để trả amount; thử thêm từng denomination.", en: "dp[amount] is the fewest coins to return amount; try every denomination." }, { vi: "pick[] dựng lại coin combination để trả ra từ payment module.", en: "pick[] reconstructs the coin combination returned by the payment module." }], complexity: { time: "O(change × denominations)", space: "O(change)", note: { vi: "Nếu coin system lớn hoặc inventory hữu hạn, state cần thêm số lượng mỗi coin.", en: "With a large coin system or finite inventory, the state must also include each coin count." } },
-    code: ["class VendingMachine:", "    def purchase(self, price, paid):", "        if paid < price: raise ValueError('insufficient payment')", "        return self.min_change(paid - price)", "", "    def min_change(self, change):", "        dp = [float('inf')] * (change + 1)", "        dp[0] = 0", "        for amount in range(1, change + 1):", "            for coin in self.coins:", "                if coin <= amount:", "                    dp[amount] = min(dp[amount], dp[amount - coin] + 1)", "        return reconstruct(dp, change)"], builder: buildSteps9012,
+    debugMode: "line-by-line", code: CODE_9012, builder: buildSteps9012,
   },
   9013: {
     id: 9013, difficulty: "hard", category: GRAPH, tags: [BACKTRACKING], title: { vi: "Perfect-Square Arrangement", en: "Perfect-Square Arrangement" }, titleVi: { vi: "Sắp xếp sao cho tổng kề là square", en: "Arrange adjacent sums as squares" },

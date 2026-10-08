@@ -519,7 +519,7 @@ module.exports = {
         en: "Each constructor still reads all n dense entries. After compression, dot-product work depends only on the nonzero counts (nnz).",
       },
     },
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     codeLabel: { vi: "Hash map: duyệt map nhỏ hơn", en: "Hash maps: iterate smaller map" },
     code: HASH_MAP_CODE,
     code2Label: { vi: "Cặp đã sort: hai con trỏ", en: "Sorted pairs: two pointers" },
