@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.dictionary524View), surface: "treeView", render: (step) => {
+      renderDictionary524View(step);
+    } },
     { predicate: (step) => Boolean(step.backspace844View), surface: "treeView", render: (step) => {
       renderBackspace844View(step);
     } },

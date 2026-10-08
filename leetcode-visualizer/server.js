@@ -4,7 +4,8 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// 524 allows up to 1,000 dictionary words of 1,000 ASCII letters each.
+app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG } = require("./problems");

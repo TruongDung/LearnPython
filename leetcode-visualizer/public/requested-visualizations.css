@@ -202,9 +202,11 @@ body[data-theme="light"] .requested-viz {
 /* 9006: instruction-focused BFS with a visible FIFO and parent chain */
 .tree-view:has(.rv-bfs-9006) { min-width: 0; min-height: 0; overflow: visible; }
 .requested-viz:has(.rv-bfs-9006) { text-align: left; }
-body:has(.rv-bfs-9006) .catalog-jump-nav.is-visible { position: static; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; width: calc(100% - 28px); max-width: none; max-height: none; overflow: visible; margin: 12px auto 80px; }
+body:has(.rv-bfs-9006) { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+body:has(.rv-bfs-9006) .app { padding-bottom: 0; }
+body:has(.rv-bfs-9006) #vizPanel { padding-bottom: 24px; }
+body:has(.rv-bfs-9006) .catalog-jump-nav.is-visible { position: static; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; width: calc(100% - 28px); max-width: none; max-height: none; overflow: visible; margin: 12px auto 0; }
 body:has(.rv-bfs-9006) .catalog-quick-jump { position: static; }
-body:has(.rv-bfs-9006) .back-to-top { position: static; margin: 0 auto 80px; }
 .rv-bfs-9006 { container: bfs9006 / inline-size; display: grid; gap: 10px; width: 100%; min-width: 0; line-height: 1.4; }
 .rv-bfs-9006 * { box-sizing: border-box; }
 .rv-bfs-9006 > * { min-width: 0; }
@@ -309,6 +311,9 @@ body:has(.rv-bfs-9006) .back-to-top { position: static; margin: 0 auto 80px; }
 }
 @media (max-width: 768px) {
   .viz-right:has(.rv-bfs-9006) { max-height: none; min-height: 0; overflow: visible; }
+}
+@media (max-width: 640px) {
+  body:has(.rv-bfs-9006) .catalog-jump-nav.is-visible { width: calc(100% - 96px); margin-inline: 14px 82px; }
 }
 
 /* 9001 */
