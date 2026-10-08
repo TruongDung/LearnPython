@@ -74,6 +74,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-frequency-sort-451.js',
   'renderer-close-strings-1657.js',
   'renderer-distinct-triplets-1876.js',
+  'renderer-reverse-vowels-345.js',
+  'renderer-reverse-only-letters-917.js',
+  'renderer-backspace-compare-844.js',
   'script.js',
 ]);
 
@@ -152,6 +155,9 @@ const STYLESHEET_ASSETS = Object.freeze([
   'frequency-sort-451.css',
   'close-strings-1657.css',
   'distinct-triplets-1876.css',
+  'reverse-vowels-345.css',
+  'reverse-only-letters-917.css',
+  'backspace-compare-844.css',
 ]);
 
 const sourceCache = new Map();

@@ -11,7 +11,7 @@ Source: [LeetCode — String](https://leetcode.com/problem-list/string/). Data w
 3. For each problem, describe the invariant or state, work through an example by hand, write the code yourself and explain its complexity. Finish a group when you can solve its problems again without looking at a solution.
 4. **Project = Available** means the problem ID has a registered builder in leetcode-visualizer when this list was created. It does not mean every visualization was reviewed again for this list. Premium indicates access restrictions on LeetCode.
 
-The project supports **185/895 problems** in this catalog; **710 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
+The project supports **195/895 problems** in this catalog; **700 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
 
 ## Part A overview
 
@@ -58,16 +58,16 @@ Count frequencies, build one-to-one mappings and group strings by signatures.
 | Study order | Problem | Difficulty | Premium | Project |
 | ---: | --- | --- | --- | --- |
 | 13 | [383. Ransom Note](https://leetcode.com/problems/ransom-note/) | Easy |  | Available |
-| 14 | [242. Valid Anagram](https://leetcode.com/problems/valid-anagram/) | Easy |  | Not yet |
+| 14 | [242. Valid Anagram](https://leetcode.com/problems/valid-anagram/) | Easy |  | Available |
 | 15 | [387. First Unique Character in a String](https://leetcode.com/problems/first-unique-character-in-a-string/) | Easy |  | Available |
-| 16 | [389. Find the Difference](https://leetcode.com/problems/find-the-difference/) | Easy |  | Not yet |
-| 17 | [409. Longest Palindrome](https://leetcode.com/problems/longest-palindrome/) | Easy |  | Not yet |
+| 16 | [389. Find the Difference](https://leetcode.com/problems/find-the-difference/) | Easy |  | Available |
+| 17 | [409. Longest Palindrome](https://leetcode.com/problems/longest-palindrome/) | Easy |  | Available |
 | 18 | [771. Jewels and Stones](https://leetcode.com/problems/jewels-and-stones/) | Easy |  | Available |
 | 19 | [205. Isomorphic Strings](https://leetcode.com/problems/isomorphic-strings/) | Easy |  | Available |
-| 20 | [290. Word Pattern](https://leetcode.com/problems/word-pattern/) | Easy |  | Not yet |
+| 20 | [290. Word Pattern](https://leetcode.com/problems/word-pattern/) | Easy |  | Available |
 | 21 | [49. Group Anagrams](https://leetcode.com/problems/group-anagrams/) | Medium |  | Available |
-| 22 | [451. Sort Characters By Frequency](https://leetcode.com/problems/sort-characters-by-frequency/) | Medium |  | Not yet |
-| 23 | [1657. Determine if Two Strings Are Close](https://leetcode.com/problems/determine-if-two-strings-are-close/) | Medium |  | Not yet |
+| 22 | [451. Sort Characters By Frequency](https://leetcode.com/problems/sort-characters-by-frequency/) | Medium |  | Available |
+| 23 | [1657. Determine if Two Strings Are Close](https://leetcode.com/problems/determine-if-two-strings-are-close/) | Medium |  | Available |
 
 ### A.3. Two pointers and subsequences (8 problems)
 
@@ -77,9 +77,9 @@ Maintain a two-pointer invariant; distinguish substrings from subsequences.
 | ---: | --- | --- | --- | --- |
 | 24 | [125. Valid Palindrome](https://leetcode.com/problems/valid-palindrome/) | Easy |  | Available |
 | 25 | [680. Valid Palindrome II](https://leetcode.com/problems/valid-palindrome-ii/) | Easy |  | Available |
-| 26 | [345. Reverse Vowels of a String](https://leetcode.com/problems/reverse-vowels-of-a-string/) | Easy |  | Not yet |
-| 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Not yet |
-| 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Not yet |
+| 26 | [345. Reverse Vowels of a String](https://leetcode.com/problems/reverse-vowels-of-a-string/) | Easy |  | Available |
+| 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Available |
+| 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Available |
 | 29 | [392. Is Subsequence](https://leetcode.com/problems/is-subsequence/) | Easy |  | Available |
 | 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Not yet |
 | 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Not yet |
@@ -91,7 +91,7 @@ Know when to expand or shrink a window; track frequencies and validity.
 | Study order | Problem | Difficulty | Premium | Project |
 | ---: | --- | --- | --- | --- |
 | 32 | [1456. Maximum Number of Vowels in a Substring of Given Length](https://leetcode.com/problems/maximum-number-of-vowels-in-a-substring-of-given-length/) | Medium |  | Available |
-| 33 | [1876. Substrings of Size Three with Distinct Characters](https://leetcode.com/problems/substrings-of-size-three-with-distinct-characters/) | Easy |  | Not yet |
+| 33 | [1876. Substrings of Size Three with Distinct Characters](https://leetcode.com/problems/substrings-of-size-three-with-distinct-characters/) | Easy |  | Available |
 | 34 | [3. Longest Substring Without Repeating Characters](https://leetcode.com/problems/longest-substring-without-repeating-characters/) | Medium |  | Available |
 | 35 | [438. Find All Anagrams in a String](https://leetcode.com/problems/find-all-anagrams-in-a-string/) | Medium |  | Available |
 | 36 | [567. Permutation in String](https://leetcode.com/problems/permutation-in-string/) | Medium |  | Available |

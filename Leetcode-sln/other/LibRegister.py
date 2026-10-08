@@ -8,9 +8,15 @@ class Library:
         self.resgistrations[name] = val
     def Evaluate(self, template):
         res = []
+        inside = False
         for char in template:
-            if char != "%":
-                res.append(char)
+            if char == "%":
+                # open
+                inside = True
+
+                
+            else: # having %
+                pass
         return ''.join(res)
 
 sol = Library()

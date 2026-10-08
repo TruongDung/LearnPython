@@ -11,7 +11,7 @@ Nguồn: [LeetCode — String](https://leetcode.com/problem-list/string/). Dữ 
 3. Với mỗi bài: tự mô tả invariant hoặc trạng thái, làm tay một ví dụ, tự code, rồi giải thích độ phức tạp. Hoàn thành nhóm khi có thể giải lại mà không xem lời giải.
 4. Cột **Project = Có** nghĩa là ID có builder đã đăng ký trong leetcode-visualizer tại thời điểm tạo danh sách; không có nghĩa mọi visualization đều đã được đánh giá lại trong lần này. Premium là nhãn truy cập trên LeetCode.
 
-Project hỗ trợ **185/895 bài** trong danh mục, còn **710 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
+Project hỗ trợ **195/895 bài** trong danh mục, còn **700 bài** chưa đăng ký. Con số này bao gồm bài nằm trong nhóm DP, sliding window, trie… của project, không chỉ nhóm String ở giao diện.
 
 ## Tổng quan phần A
 
@@ -58,16 +58,16 @@ Quản lý chỉ số, ký tự, prefix; phân biệt nối chuỗi với sửa 
 | Thứ tự học | Bài | Độ khó | Premium | Project |
 | ---: | --- | --- | --- | --- |
 | 13 | [383. Ransom Note](https://leetcode.com/problems/ransom-note/) | Easy |  | Có |
-| 14 | [242. Valid Anagram](https://leetcode.com/problems/valid-anagram/) | Easy |  | Chưa |
+| 14 | [242. Valid Anagram](https://leetcode.com/problems/valid-anagram/) | Easy |  | Có |
 | 15 | [387. First Unique Character in a String](https://leetcode.com/problems/first-unique-character-in-a-string/) | Easy |  | Có |
-| 16 | [389. Find the Difference](https://leetcode.com/problems/find-the-difference/) | Easy |  | Chưa |
-| 17 | [409. Longest Palindrome](https://leetcode.com/problems/longest-palindrome/) | Easy |  | Chưa |
+| 16 | [389. Find the Difference](https://leetcode.com/problems/find-the-difference/) | Easy |  | Có |
+| 17 | [409. Longest Palindrome](https://leetcode.com/problems/longest-palindrome/) | Easy |  | Có |
 | 18 | [771. Jewels and Stones](https://leetcode.com/problems/jewels-and-stones/) | Easy |  | Có |
 | 19 | [205. Isomorphic Strings](https://leetcode.com/problems/isomorphic-strings/) | Easy |  | Có |
-| 20 | [290. Word Pattern](https://leetcode.com/problems/word-pattern/) | Easy |  | Chưa |
+| 20 | [290. Word Pattern](https://leetcode.com/problems/word-pattern/) | Easy |  | Có |
 | 21 | [49. Group Anagrams](https://leetcode.com/problems/group-anagrams/) | Medium |  | Có |
-| 22 | [451. Sort Characters By Frequency](https://leetcode.com/problems/sort-characters-by-frequency/) | Medium |  | Chưa |
-| 23 | [1657. Determine if Two Strings Are Close](https://leetcode.com/problems/determine-if-two-strings-are-close/) | Medium |  | Chưa |
+| 22 | [451. Sort Characters By Frequency](https://leetcode.com/problems/sort-characters-by-frequency/) | Medium |  | Có |
+| 23 | [1657. Determine if Two Strings Are Close](https://leetcode.com/problems/determine-if-two-strings-are-close/) | Medium |  | Có |
 
 ### A.3. Two pointers và subsequence (8 bài)
 
@@ -77,9 +77,9 @@ Giữ invariant của hai con trỏ; phân biệt substring và subsequence.
 | ---: | --- | --- | --- | --- |
 | 24 | [125. Valid Palindrome](https://leetcode.com/problems/valid-palindrome/) | Easy |  | Có |
 | 25 | [680. Valid Palindrome II](https://leetcode.com/problems/valid-palindrome-ii/) | Easy |  | Có |
-| 26 | [345. Reverse Vowels of a String](https://leetcode.com/problems/reverse-vowels-of-a-string/) | Easy |  | Chưa |
-| 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Chưa |
-| 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Chưa |
+| 26 | [345. Reverse Vowels of a String](https://leetcode.com/problems/reverse-vowels-of-a-string/) | Easy |  | Có |
+| 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Có |
+| 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Có |
 | 29 | [392. Is Subsequence](https://leetcode.com/problems/is-subsequence/) | Easy |  | Có |
 | 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Chưa |
 | 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Chưa |
@@ -91,7 +91,7 @@ Biết khi nào mở rộng/co cửa sổ; theo dõi tần suất và độ hợ
 | Thứ tự học | Bài | Độ khó | Premium | Project |
 | ---: | --- | --- | --- | --- |
 | 32 | [1456. Maximum Number of Vowels in a Substring of Given Length](https://leetcode.com/problems/maximum-number-of-vowels-in-a-substring-of-given-length/) | Medium |  | Có |
-| 33 | [1876. Substrings of Size Three with Distinct Characters](https://leetcode.com/problems/substrings-of-size-three-with-distinct-characters/) | Easy |  | Chưa |
+| 33 | [1876. Substrings of Size Three with Distinct Characters](https://leetcode.com/problems/substrings-of-size-three-with-distinct-characters/) | Easy |  | Có |
 | 34 | [3. Longest Substring Without Repeating Characters](https://leetcode.com/problems/longest-substring-without-repeating-characters/) | Medium |  | Có |
 | 35 | [438. Find All Anagrams in a String](https://leetcode.com/problems/find-all-anagrams-in-a-string/) | Medium |  | Có |
 | 36 | [567. Permutation in String](https://leetcode.com/problems/permutation-in-string/) | Medium |  | Có |
