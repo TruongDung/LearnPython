@@ -70,6 +70,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-find-the-difference-389.js',
   'renderer-longest-palindrome-409.js',
   'renderer-word-pattern-290.js',
+  'renderer-frequency-sort-451.js',
+  'renderer-close-strings-1657.js',
   'script.js',
 ]);
 
@@ -144,6 +146,8 @@ const STYLESHEET_ASSETS = Object.freeze([
   'find-the-difference-389.css',
   'longest-palindrome-409.css',
   'word-pattern-290.css',
+  'frequency-sort-451.css',
+  'close-strings-1657.css',
 ]);
 
 const sourceCache = new Map();
