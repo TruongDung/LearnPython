@@ -67,6 +67,10 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-reverse-string-ii-541.js',
   'renderer-reverse-words-iii-557.js',
   'renderer-reverse-words-151.js',
+  'renderer-valid-anagram-242.js',
+  'renderer-find-the-difference-389.js',
+  'renderer-longest-palindrome-409.js',
+  'renderer-word-pattern-290.js',
   'script.js',
 ]);
 
@@ -138,6 +142,10 @@ const STYLESHEET_ASSETS = Object.freeze([
   'reverse-string-ii-541.css',
   'reverse-words-iii-557.css',
   'reverse-words-151.css',
+  'valid-anagram-242.css',
+  'find-the-difference-389.css',
+  'longest-palindrome-409.css',
+  'word-pattern-290.css',
 ]);
 
 const sourceCache = new Map();

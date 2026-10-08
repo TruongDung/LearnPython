@@ -7,6 +7,18 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.wordPattern290View), surface: "treeView", render: (step) => {
+      renderWordPattern290View(step);
+    } },
+    { predicate: (step) => Boolean(step.palindrome409View), surface: "treeView", render: (step) => {
+      renderPalindrome409View(step);
+    } },
+    { predicate: (step) => Boolean(step.difference389View), surface: "treeView", render: (step) => {
+      renderDifference389View(step);
+    } },
+    { predicate: (step) => Boolean(step.anagram242View), surface: "treeView", render: (step) => {
+      renderAnagram242View(step);
+    } },
     { predicate: (step) => Boolean(step.reverseWords151View), surface: "treeView", render: (step) => {
       renderReverseWords151View(step);
     } },
