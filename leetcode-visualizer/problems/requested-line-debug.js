@@ -551,10 +551,11 @@ module.exports = function createRequestedLineDebug({
     };
     const userRows = () => {
       if (!allVideos || !perDay) return [];
-      return [...allVideos.keys()].sort((a, b) => compareText(a, b)).map((user) => {
+      const knownUsers = new Set([...perDay[0].keys(), ...perDay[1].keys(), ...allVideos.keys()]);
+      return [...knownUsers].sort((a, b) => compareText(a, b)).map((user) => {
         const day1 = [...(perDay[0].get(user) || [])].sort();
         const day2 = [...(perDay[1].get(user) || [])].sort();
-        const union = [...allVideos.get(user)].sort();
+        const union = [...(allVideos.get(user) || [])].sort();
         const evaluation = evaluations.get(user) || {};
         return {
           user,
@@ -799,6 +800,10 @@ module.exports = function createRequestedLineDebug({
       }
       const allBuckets = bucketRows();
       const allPairs = pairRows();
+      const activeBucketIndex = Number.isInteger(options.activePosition)
+        ? allBuckets.findIndex((bucket) => bucket.position === options.activePosition && bucket.movie === options.activeMovie)
+        : -1;
+      const bucketStart = activeBucketIndex < 0 ? 0 : Math.max(0, Math.min(activeBucketIndex - 15, allBuckets.length - 30));
       let visiblePairs = [];
       if (options.activePair) {
         const [left, right] = options.activePair;
@@ -836,7 +841,7 @@ module.exports = function createRequestedLineDebug({
             active: index === options.activeUser,
             activePosition: index === options.activeUser ? options.activePosition ?? null : null,
           })),
-          buckets: allBuckets.slice(0, 30),
+          buckets: allBuckets.slice(bucketStart, bucketStart + 30),
           omittedBuckets: Math.max(0, allBuckets.length - 30),
           activeBucket: Number.isInteger(options.activePosition) ? { position: options.activePosition, movie: options.activeMovie } : null,
           pairs: visiblePairs,

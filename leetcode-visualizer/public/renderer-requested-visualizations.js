@@ -18,8 +18,8 @@ function requestedVizEmpty(text) {
   return `<div class="rv-empty">${requestedVizEsc(text)}</div>`;
 }
 
-function requestedVizSet(html, summary) {
-  $("treeView").innerHTML = `<div class="requested-viz" role="img" aria-label="${requestedVizEsc(summary)}">${html}</div>`;
+function requestedVizSet(html, summary, role = "img") {
+  $("treeView").innerHTML = `<div class="requested-viz" role="${role}" aria-label="${requestedVizEsc(summary)}">${html}</div>`;
 }
 
 // ─── #2218: Maximum Value of K Coins From Piles ────────────────────────────
@@ -299,60 +299,120 @@ function renderSquare9013View(step) {
 function renderLoyal9014View(step) {
   const view = step.loyal9014View || {};
   const vi = lang === "vi";
+  const operation = view.operation || view.phase;
   const phaseIndex = view.phase === "init" ? 0 : view.phase === "ingest" ? 1 : view.phase === "evaluate" ? 2 : 3;
-  const dayColumn = (day) => {
-    const records = (view.records || []).filter((record) => record.day === day);
-    return `<section class="rv-log-day"><header><b>DAY ${day + 1}</b><span>${records.filter((record) => record.state === "done").length}/${records.length}</span></header><div>${records.map((record) => `<article class="${record.state}${view.activeUser === record.user ? " user-active" : ""}"><small>#${record.index + 1}</small><b>${requestedVizEsc(record.user)}</b><span>→</span><em>${requestedVizEsc(record.video)}</em></article>`).join("")}</div></section>`;
+  const allRecords = view.records || [];
+  const allUsers = view.users || [];
+  const activeRow = allUsers.find((row) => row.user === view.activeUser);
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const operations = {
+    import: ["Nạp thư viện", "Import"], call: ["Nhận hai daily logs", "Read two daily logs"], "per-day-init": ["Tạo Set cho từng ngày", "Initialize daily sets"], "all-videos-init": ["Tạo tập video distinct", "Initialize distinct video sets"],
+    "day-loop": ["Đọc ngày tiếp theo", "Read next day"], "record-loop": ["Đọc record", "Read record"], "per-day-add": ["Thêm video vào Set của ngày", "Add video to daily set"], "union-add": ["Thêm video vào union Set", "Add video to union set"],
+    "answer-init": ["Tạo kết quả", "Initialize result"], "user-loop": ["Xét user", "Evaluate user"], "check-days": ["Kiểm tra cả hai ngày", "Check both days"], "check-distinct": ["Kiểm tra video distinct", "Check distinct videos"],
+    "loyal-check": ["Xác định loyal customer", "Decide loyal customer"], "answer-append": ["Thêm user vào answer", "Add user to answer"], return: ["Trả loyal customers", "Return loyal customers"],
   };
-  const rows = (view.users || []).map((row) => `<tr class="${view.activeUser === row.user ? "active" : ""}${row.qualifies ? " pass" : " fail"}">
-    <td><b>${requestedVizEsc(row.user)}</b></td>
-    <td>${row.day1.length ? row.day1.map((video) => `<span>${requestedVizEsc(video)}</span>`).join("") : "—"}</td>
-    <td>${row.day2.length ? row.day2.map((video) => `<span>${requestedVizEsc(video)}</span>`).join("") : "—"}</td>
-    <td>${row.union.map((video) => `<span>${requestedVizEsc(video)}</span>`).join("") || "—"}</td>
-    <td><b class="rv-check ${row.presentBoth ? "yes" : "no"}">${row.presentBoth ? "✓" : "✕"}</b></td>
-    <td><b class="rv-check ${row.distinctCount >= 2 ? "yes" : "no"}">${row.distinctCount} ${row.distinctCount >= 2 ? "✓" : "✕"}</b></td>
-    <td><strong class="rv-pass-badge ${row.qualifies ? "yes" : "no"}">${row.qualifies ? "LOYAL" : "NO"}</strong></td>
-  </tr>`).join("");
-  const accepted = (view.answer || (view.users || []).filter((row) => row.qualifies).map((row) => row.user));
-  requestedVizSet(`${requestedVizPhases(vi ? ["Đọc 2 ngày", "Cập nhật Set", "Kiểm tra 3 điều kiện", "Loyal users"] : ["Read two days", "Update sets", "Check 3 conditions", "Loyal users"], phaseIndex)}
-    <div class="rv-log-flow">${dayColumn(0)}<div class="rv-flow-arrow"><span>→</span><b>user sets</b><span>→</span></div>${dayColumn(1)}</div>
-    <section class="rv-panel"><h4>${vi ? "Mỗi user phải PASS cả ba cột cuối" : "Each user must PASS all three final columns"}</h4><div class="rv-table-scroll"><table class="rv-data-table rv-loyal-table"><thead><tr><th>user</th><th>day 1</th><th>day 2</th><th>union distinct</th><th>${vi ? "cả 2 ngày" : "both days"}</th><th>distinct ≥ 2</th><th>result</th></tr></thead><tbody>${rows || `<tr><td colspan="7">—</td></tr>`}</tbody></table></div></section>
-    <div class="rv-results"><h4>${vi ? "Đang đủ điều kiện" : "Currently qualified"}</h4><div>${accepted.length ? accepted.map((user) => `<span><b>${requestedVizEsc(user)}</b></span>`).join("") : requestedVizEmpty("∅")}</div></div>`,
-  vi ? "Lọc khách trung thành từ hai daily logs" : "Filter loyal customers from two daily logs");
+  const dayColumn = (day) => {
+    const records = allRecords.filter((record) => record.day === day);
+    const done = records.filter((record) => record.state === "done").length;
+    const currentIndex = view.current?.day === day ? records.findIndex((record) => record.index === view.current.index) : -1;
+    const start = Math.max(0, Math.min(currentIndex < 0 ? Math.max(0, done - 3) : currentIndex - 1, records.length - 3));
+    const recordHtml = (record) => {
+      const active = record.day === view.current?.day && record.index === view.current?.index;
+      return `<article class="rv-loyal-record${active ? " active" : ""}${record.state === "done" ? " done" : ""}"><small>#${record.index + 1}</small><b>${requestedVizEsc(record.user)}</b><span>→</span><em>${requestedVizEsc(record.video)}</em></article>`;
+    };
+    return `<section class="rv-loyal-day${view.activeDay === day ? " active" : ""}"><header><b>${vi ? "NGÀY" : "DAY"} ${day + 1}</b><span>${done}/${records.length}</span></header><div>${records.slice(start, start + 3).map(recordHtml).join("")}</div>${records.length > 3 ? `<details><summary>${vi ? "Xem đủ" : "View all"} ${records.length} records</summary>${records.map(recordHtml).join("")}</details>` : ""}</section>`;
+  };
+  const videoChips = (videos) => videos.map((video) => `<span class="${view.current?.video === video ? "current" : ""}">${requestedVizEsc(video)}</span>`).join("") || `<em>∅</em>`;
+  const videoSet = (label, videos, focus) => `<section class="rv-loyal-set${focus ? " focus" : ""}"><header><small>${label}</small><b>${videos.length}</b></header><div class="rv-loyal-videos">${videoChips(videos.slice(0, 8))}</div>${videos.length > 8 ? `<details><summary>+${videos.length - 8} videos</summary><div class="rv-loyal-videos">${videoChips(videos.slice(8))}</div></details>` : ""}</section>`;
+  const statusText = (value) => value === true ? "PASS" : value === false ? "FAIL" : vi ? "CHƯA XÉT" : "PENDING";
+  const condition = (label, value, detail, focus) => `<div class="rv-loyal-condition${focus ? " focus" : ""}"><div><b>${label}</b><small>${detail}</small></div><span class="${value === true ? "pass" : value === false ? "fail" : "pending"}">${statusText(value)}</span></div>`;
+  const reasonText = (row) => row.reason === "missing-day" ? (vi ? "Thiếu ít nhất một ngày" : "Missing at least one day") : row.reason === "needs-two-distinct" ? (vi ? "Chưa đủ 2 video distinct" : "Fewer than 2 distinct videos") : row.qualifies === true ? (vi ? "Đạt cả hai điều kiện" : "Both conditions passed") : (vi ? "Chưa kết luận" : "Not decided yet");
+  const userCard = (row, focused) => `<article class="rv-loyal-user${focused ? " active" : ""}"><header><b>${requestedVizEsc(row.user)}</b><span class="${row.qualifies === true ? "pass" : row.qualifies === false ? "fail" : "pending"}">${row.qualifies === true ? "LOYAL" : row.qualifies === false ? (vi ? "KHÔNG ĐẠT" : "NOT LOYAL") : vi ? "ĐANG XÉT" : "IN PROGRESS"}</span></header>
+    <div class="rv-loyal-sets">${videoSet(vi ? "Ngày 1" : "Day 1", row.day1 || [], focused && operation === "per-day-add" && view.activeDay === 0)}${videoSet(vi ? "Ngày 2" : "Day 2", row.day2 || [], focused && operation === "per-day-add" && view.activeDay === 1)}${videoSet("Union distinct", row.union || [], focused && operation === "union-add")}</div>
+    <div class="rv-loyal-checks">${condition(vi ? "Có mặt cả hai ngày" : "Present on both days", row.presentBoth, `day1: ${row.day1.length} · day2: ${row.day2.length}`, focused && operation === "check-days")}${condition(vi ? "Ít nhất 2 video distinct" : "At least 2 distinct videos", row.distinctEnough, `|union| = ${row.distinctCount}`, focused && operation === "check-distinct")}
+      <div class="rv-loyal-decision${focused && operation === "loyal-check" ? " focus" : ""}"><small>${vi ? "Kết luận" : "Decision"}</small><b>${reasonText(row)}</b></div></div></article>`;
+  const activeCard = activeRow ? userCard(activeRow, true) : `<div class="rv-loyal-idle">${view.phase === "evaluate" ? (vi ? "Sẵn sàng kiểm tra từng user." : "Ready to evaluate each user.") : (vi ? "User và các Set xuất hiện khi bắt đầu xử lý record." : "User sets appear when records are processed.")}</div>`;
+  const answerChips = (users) => users.map((user) => `<span class="${operation === "answer-append" && user === view.activeUser ? "current" : ""}"><b>${requestedVizEsc(user)}</b></span>`).join("") || `<em>${vi ? "Chưa có loyal customer" : "No loyal customers yet"}</em>`;
+  const answerPanel = `<section class="rv-panel rv-loyal-answer${operation === "answer-append" ? " focus" : ""}${view.phase === "done" ? " done" : ""}"><header><h4>${view.phase === "done" ? (vi ? "Loyal customers cuối cùng" : "Final loyal customers") : (vi ? "Đã thêm vào answer" : "Appended to answer")}</h4><b>${answer.length}</b></header><div class="rv-loyal-answer-users">${answerChips(answer.slice(0, 8))}</div>${answer.length > 8 ? `<details><summary>+${answer.length - 8} users</summary><div class="rv-loyal-answer-users">${answerChips(answer.slice(8))}</div></details>` : ""}</section>`;
+  const reviewed = allUsers.filter((row) => row.qualifies !== null && row.qualifies !== undefined);
+  const review = `<details class="rv-loyal-review"><summary>${vi ? "Xem các user đã kiểm tra" : "View evaluated users"} · ${reviewed.length}</summary><div>${reviewed.map((row) => userCard(row, false)).join("")}</div></details>`;
+  requestedVizSet(`<div class="rv-loyal-9014 phase-${requestedVizEsc(view.phase || "init")}">
+    ${requestedVizPhases(vi ? ["Đọc logs", "Cập nhật Set", "Kiểm tra", "Kết quả"] : ["Read logs", "Update sets", "Evaluate", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(operations[operation]?.[vi ? 0 : 1] || operation)}</b></div>
+    <div class="rv-loyal-summary"><span><small>${vi ? "Đã đọc" : "Processed"}</small><b>${view.processed || 0}<em> / ${allRecords.length}</em></b></span><span><small>Users</small><b>${allUsers.length}</b></span><span><small>Loyal</small><b>${answer.length}</b></span><span><small>${vi ? "Ngày đang đọc" : "Current day"}</small><b>${Number.isInteger(view.activeDay) ? view.activeDay + 1 : "—"}</b></span></div>
+    ${phaseIndex < 2 ? `<section class="rv-panel rv-loyal-logs"><h4>${vi ? "Hai daily logs" : "Two daily logs"}</h4><div class="rv-loyal-days">${dayColumn(0)}${dayColumn(1)}</div></section>` : ""}
+    ${view.current ? `<div class="rv-loyal-current"><small>${vi ? "Record hiện tại" : "Current record"} · ${vi ? "ngày" : "day"} ${view.current.day + 1} · #${view.current.index + 1}</small><b>${requestedVizEsc(view.current.user)} <span>→</span> ${requestedVizEsc(view.current.video)}</b><code>${operation === "per-day-add" ? `day${view.current.day + 1}.add(${requestedVizEsc(view.current.video)})` : operation === "union-add" ? `union.add(${requestedVizEsc(view.current.video)})` : vi ? "Chưa cập nhật Set tại dòng này" : "No set update on this instruction"}</code></div>` : ""}
+    ${view.phase !== "done" ? activeCard : ""}
+    ${phaseIndex >= 2 ? `${answerPanel}${reviewed.length ? review : ""}` : ""}
+    <footer class="rv-loyal-rule"><b>${vi ? "Cả hai ngày AND distinct ≥ 2" : "Both days AND distinct ≥ 2"}</b><span>${vi ? "Video lặp chỉ được đếm một lần trong Set." : "Repeated videos count once in a set."}</span></footer></div>`,
+  vi ? "Lọc khách trung thành từ hai daily logs" : "Filter loyal customers from two daily logs", "group");
 }
 
 // ─── #9015: interval sweep line ─────────────────────────────────────────────
 function renderSweep9015View(step) {
   const view = step.sweep9015View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "init" ? 0 : ["start", "end"].includes(view.phase) ? 1 : 2;
-  const values = (view.intervals || []).flatMap((interval) => [interval.start, interval.end]);
+  const line = step.codeLines?.[0];
+  const operation = view.operation || view.phase;
+  const sweeping = ["start", "end"].includes(view.phase);
+  const sorted = sweeping || view.phase === "done" || Number(line) >= 6;
+  const phaseIndex = view.phase === "done" ? 3 : sweeping ? 2 : sorted ? 1 : 0;
+  const allIntervals = view.intervals || [];
+  const values = allIntervals.flatMap((interval) => [interval.start, interval.end]);
   const min = values.length ? Math.min(...values) : 0;
   const max = values.length ? Math.max(...values) : 1;
-  const span = max - min || 1;
-  const pct = (value) => ((value - min) / span) * 100;
-  const tracks = (view.intervals || []).map((interval) => {
+  const pct = (value) => max === min ? 50 : ((value - min) / (max - min)) * 100;
+  const orderedIntervals = [...allIntervals.filter((interval) => interval.current), ...allIntervals.filter((interval) => !interval.current && interval.active), ...allIntervals.filter((interval) => !interval.current && !interval.active)];
+  const visibleIntervals = allIntervals.length <= 8 ? allIntervals : orderedIntervals.slice(0, 8);
+  const track = (interval) => {
     const left = pct(interval.start);
-    const width = Math.max(1.5, pct(interval.end) - left);
-    return `<div class="rv-interval-track${interval.active ? " active" : ""}${interval.current ? " current" : ""}"><b>#${interval.id}</b><div><span style="left:${left}%;width:${width}%"><i>${requestedVizNumber(interval.start)}</i><i>${requestedVizNumber(interval.end)}</i></span></div></div>`;
+    const width = pct(interval.end) - left;
+    return `<div class="rv-sweep-lane${interval.active ? " active" : ""}${interval.current ? " current" : ""}"><div><b>#${interval.id}</b><small>[${requestedVizNumber(interval.start)}, ${requestedVizNumber(interval.end)}]</small></div><div class="rv-sweep-plot"><span class="rv-sweep-segment${interval.start === interval.end ? " point" : ""}" style="left:${left}%;width:${width}%"></span>${view.currentEvent ? `<i class="rv-sweep-line" style="left:${pct(view.currentEvent.time)}%"></i>` : ""}</div></div>`;
+  };
+  const tracks = visibleIntervals.map(track).join("");
+  const allEvents = view.events || [];
+  const eventIndex = Number.isInteger(view.eventIndex) ? view.eventIndex : -1;
+  const eventStart = Math.max(0, Math.min(eventIndex < 0 ? allEvents.length - 6 : eventIndex - 2, allEvents.length - 6));
+  const events = allEvents.slice(eventStart, eventStart + 6).map((event, offset) => {
+    const state = ["done", "current"].includes(event.state) ? event.state : "pending";
+    return `<div class="rv-sweep-event ${state} ${event.kind}"><header><small>#${eventStart + offset + 1}</small><b>${event.kind.toUpperCase()}</b></header><strong>t=${requestedVizNumber(event.time)}</strong><span>interval #${event.id}</span></div>`;
   }).join("");
-  const marker = view.currentEvent ? `<div class="rv-sweep-cursor" style="left:${pct(view.currentEvent.time)}%"><b>${requestedVizNumber(view.currentEvent.time)}</b></div>` : "";
-  const events = (view.events || []).map((event, index) => {
-    const state = view.phase === "done" ? "done" : event.state;
-    return `<div class="rv-event-chip ${state} ${event.kind}"><small>${index + 1}</small><b>${event.kind === "start" ? "+" : "−"} #${event.id}</b><span>@ ${requestedVizNumber(event.time)}</span></div>`;
-  }).join("");
-  const active = (view.activeAfter || []).length ? view.activeAfter.map((id) => `<span>#${id}</span>`).join("") : requestedVizEmpty("∅");
-  const newPairs = (view.newPairs || []).length ? view.newPairs.map(([a, b]) => `<span>#${a} ↔ #${b}</span>`).join("") : requestedVizEmpty(vi ? "Không thêm pair" : "No new pair");
-  requestedVizSet(`${requestedVizPhases(vi ? ["Sort START/END", "Quét từ trái sang phải", "Pairs + peak"] : ["Sort START/END", "Sweep left to right", "Pairs + peak"], phaseIndex)}
-    <div class="rv-sweep-stats"><span><small>pairs</small><b>${view.overlapPairs}</b></span><span><small>active</small><b>${(view.activeAfter || []).length}</b></span><span><small>peak</small><b>${view.maxActive}</b></span>${view.currentEvent ? `<span><small>${view.currentEvent.kind.toUpperCase()}</small><b>t=${requestedVizNumber(view.currentEvent.time)}</b></span>` : ""}</div>
-    <section class="rv-panel"><h4>${vi ? "Interval lanes · chấm tròn là closed endpoints" : "Interval lanes · circles are closed endpoints"}</h4><div class="rv-sweep-chart"><div class="rv-axis"><span>${requestedVizNumber(min)}</span><span>${requestedVizNumber(max)}</span>${marker}</div>${tracks}</div></section>
-    <section class="rv-panel"><h4>${vi ? "Event queue đã sort — cùng t: START trước END" : "Sorted event queue — same t: START before END"}</h4><div class="rv-event-stream">${events}</div></section>
-    <div class="rv-two-column">
-      <section class="rv-panel"><h4>active set</h4><div class="rv-active-set">${active}</div></section>
-      <section class="rv-panel"><h4>${vi ? "Pair mới ở START này" : "New pairs at this START"}</h4><div class="rv-pair-set">${newPairs}</div></section>
-    </div>
-    ${view.currentEvent && view.currentEvent.kind === "start" ? `<div class="rv-focus-equation"><strong>pairs</strong><span>+= active_before (${(view.activeBefore || []).length})</span><b>→ ${view.overlapPairs}</b></div>` : ""}`,
-  vi ? "Sweep line đếm overlap của closed intervals" : "Sweep line counting closed-interval overlaps");
+  const before = view.activeBefore || [];
+  const after = view.activeAfter || [];
+  const newPairs = view.newPairs || [];
+  const operations = {
+    call: ["Nhận intervals", "Read intervals"], "events-init": ["Tạo event queue", "Initialize event queue"], "interval-loop": ["Đọc interval", "Read interval"], "append-start": ["Thêm START", "Append START"], "append-end": ["Thêm END", "Append END"],
+    "sort-events": ["Sắp xếp events", "Sort events"], "active-init": ["Tạo active set", "Initialize active set"], "pairs-init": ["Đặt pairs = 0", "Initialize pairs"], "peak-init": ["Đặt peak = 0", "Initialize peak"],
+    "event-loop": ["Đọc event", "Read event"], "start-check": ["Kiểm tra START", "Check START"], "count-overlaps": ["Cộng overlap pairs", "Count overlap pairs"], "active-add": ["Thêm interval vào set", "Add interval to set"], "peak-update": ["Cập nhật peak", "Update peak"],
+    else: ["Xử lý END", "Process END"], "active-remove": ["Xóa interval khỏi set", "Remove interval from set"], return: ["Trả pairs và peak", "Return pairs and peak"],
+  };
+  const ready = (initLine) => sweeping || view.phase === "done" || !view.operation || Number(line) >= initLine;
+  const chips = (ids) => ids.map((id) => `<span class="${view.currentEvent?.id === id ? "current" : ""}">#${id}</span>`).join("") || `<em>∅</em>`;
+  const pairChips = (pairs) => pairs.map(([a, b]) => `<span>#${a} ↔ #${b}</span>`).join("");
+  const result = view.phase === "done" ? `<section class="rv-panel rv-sweep-result"><h4>${vi ? "Kết quả sweep line" : "Sweep-line result"}</h4><div><span><b>${view.overlapPairs}</b><small>${vi ? "cặp interval giao nhau" : "overlapping interval pairs"}</small></span><span><b>${view.maxActive}</b><small>${vi ? "interval cùng active tối đa" : "maximum active intervals"}</small></span></div></section>` : "";
+  let action = "";
+  if (view.currentEvent) {
+    const event = view.currentEvent;
+    const counted = ["count-overlaps", "active-add", "peak-update"].includes(operation);
+    const detail = operation === "count-overlaps" ? `${view.overlapPairs - before.length} + ${before.length} = ${view.overlapPairs}`
+      : operation === "active-add" ? `active.add(#${event.id}) · ${before.length} → ${after.length}`
+        : operation === "active-remove" ? `active.remove(#${event.id}) · ${before.length} → ${after.length}`
+          : operation === "peak-update" ? `peak = max(peak, ${after.length}) → ${view.maxActive}`
+            : event.kind === "start" ? (vi ? `Sẽ cộng ${before.length} pair từ active set trước event.` : `Will add ${before.length} pairs from the set before this event.`)
+              : (vi ? "END không tạo pair mới." : "END creates no new pairs.");
+    action = `<section class="rv-panel rv-sweep-work"><div class="rv-sweep-current ${event.kind}"><span><small>${event.kind.toUpperCase()} · #${event.id}</small><b>t=${requestedVizNumber(event.time)}</b></span><div class="${operation === "count-overlaps" ? "focus" : ""}"><small>${vi ? "Thao tác tại dòng hiện tại" : "Current instruction"}</small><strong>${requestedVizEsc(detail)}</strong></div></div>
+      <div class="rv-sweep-sets"><section class="${["active-add", "active-remove"].includes(operation) ? "focus" : ""}"><h4>active set · ${after.length}</h4><div class="rv-sweep-chips">${chips(after.slice(0, 8))}</div>${after.length > 8 ? `<details><summary>+${after.length - 8} intervals</summary><div class="rv-sweep-chips">${chips(after.slice(8))}</div></details>` : ""}<small>${vi ? "Trước event" : "Before event"}: {${before.map((id) => `#${id}`).join(", ") || "∅"}}</small></section>
+      <section class="${operation === "count-overlaps" ? "focus" : ""}"><h4>${vi ? "Pair mới" : "New pairs"} · ${newPairs.length}</h4><div class="rv-sweep-chips pairs">${newPairs.length ? pairChips(newPairs.slice(0, 6)) : `<em>${event.kind === "start" && !counted ? (vi ? "Chưa cộng pairs" : "Pairs not counted yet") : (vi ? "Không có pair mới" : "No new pairs")}</em>`}</div>${newPairs.length > 6 ? `<details><summary>+${newPairs.length - 6} pairs</summary><div class="rv-sweep-chips pairs">${pairChips(newPairs.slice(6))}</div></details>` : ""}</section></div></section>`;
+  }
+  requestedVizSet(`<div class="rv-sweep-9015 phase-${requestedVizEsc(view.phase || "init")}">
+    ${requestedVizPhases(vi ? ["Tạo events", "Sắp xếp", "Quét", "Kết quả"] : ["Build events", "Sort", "Sweep", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${line || "—"}</small><b>${requestedVizEsc(operations[operation]?.[vi ? 0 : 1] || operation)}</b></div>
+    <div class="rv-sweep-summary"><span class="${operation === "count-overlaps" ? "focus" : ""}"><small>Pairs</small><b>${ready(8) ? view.overlapPairs : "—"}</b></span><span class="${["active-add", "active-remove"].includes(operation) ? "focus" : ""}"><small>Active</small><b>${ready(7) ? after.length : "—"}</b></span><span class="${operation === "peak-update" ? "focus" : ""}"><small>Peak</small><b>${ready(9) ? view.maxActive : "—"}</b></span><span><small>${vi ? "Thời điểm" : "Time"}</small><b>${view.currentEvent ? requestedVizNumber(view.currentEvent.time) : "—"}</b></span></div>
+    ${result}
+    <section class="rv-panel rv-sweep-timeline"><h4>Timeline · ${allIntervals.length} intervals</h4><div class="rv-sweep-axis"><small>${vi ? "Interval" : "Interval"}</small><div><span>${requestedVizNumber(min)}</span><span>${requestedVizNumber(max)}</span></div></div>${tracks}${allIntervals.length > visibleIntervals.length ? `<details class="rv-sweep-more"><summary>+${allIntervals.length - visibleIntervals.length} ${vi ? "intervals khác" : "more intervals"}</summary>${allIntervals.filter((interval) => !visibleIntervals.includes(interval)).map(track).join("")}</details>` : ""}<footer>${vi ? "Xanh dương: đang xét · Xanh lá: active · Chấm tròn: có tính endpoint" : "Blue: current · Green: active · Dots: endpoints included"}</footer></section>
+    ${view.phase !== "done" ? `<section class="rv-panel rv-sweep-queue"><header><h4>${sorted ? (vi ? "Event queue đã sắp xếp" : "Sorted event queue") : (vi ? "Events đang tạo" : "Events being built")}</h4><small>${allEvents.length ? `${eventStart + 1}–${Math.min(eventStart + 6, allEvents.length)} / ${allEvents.length}` : "0"}</small></header><div class="rv-sweep-events">${events || `<em>${vi ? "Chưa có event" : "No events yet"}</em>`}</div></section>${action}` : ""}
+    <footer class="rv-sweep-rule"><b>${vi ? "Cùng thời điểm: START → END" : "Equal time: START → END"}</b><span>${vi ? "[a, b] và [b, c] vẫn giao nhau tại b." : "[a, b] and [b, c] overlap at b."}</span></footer></div>`,
+  vi ? "Sweep line đếm overlap của closed intervals" : "Sweep line counting closed-interval overlaps", "group");
 }
 
 // ─── #9016: movie-history friends ───────────────────────────────────────────
@@ -366,13 +426,13 @@ function renderFriends9016View(step) {
   const allHistories = view.histories || [];
   const prioritizedHistories = activeUsers.size
     ? [...allHistories.filter((history) => activeUsers.has(history.index)), ...allHistories.filter((history) => !activeUsers.has(history.index))]
-    : allHistories;
-  const visibleHistories = prioritizedHistories.slice(0, 6);
+    : [...allHistories.filter((history) => history.active), ...allHistories.filter((history) => !history.active)];
+  const visibleHistories = prioritizedHistories.slice(0, view.phase === "evaluate" && activeUsers.size ? 2 : 6);
   const histories = visibleHistories.map((history) => {
     const older = history.olderCount || 0;
     return `<article class="rv-history${history.active ? " active" : ""}${activeUsers.has(history.index) ? " comparing" : ""}" data-history-index="${history.index}">
-      <header><b>${requestedVizEsc(history.user)}</b>${older ? `<small>+${older} ${vi ? "cũ" : "older"}</small>` : ""}</header>
-      <div style="--rv-friend-cols:${Math.max(1, history.window.length)}">${history.window.map((movie, position) => `<span class="${activeUsers.has(history.index) && matchPositions.has(position) ? "match" : ""}" title="pos ${position}: ${requestedVizEsc(movie)}"><small>${position}</small><b>${requestedVizEsc(movie)}</b></span>`).join("") || `<em>${vi ? "Chưa cắt window" : "Window not sliced yet"}</em>`}</div>
+      <header><b>${requestedVizEsc(history.user)}</b><small>${history.active ? (vi ? "ĐANG ĐỌC" : "READING") : activeUsers.has(history.index) ? (vi ? "SO SÁNH" : "COMPARING") : older ? `+${older} ${vi ? "phim cũ" : "older movies"}` : `last ${view.k}`}</small></header>
+      <div style="--rv-friend-cols:${Math.max(1, Math.min(5, history.window.length))}">${history.window.map((movie, position) => `<span class="${activeUsers.has(history.index) && matchPositions.has(position) ? "match" : ""}${history.activePosition === position ? " current" : ""}" title="pos ${position}: ${requestedVizEsc(movie)}"><small>#${position}</small><b>${requestedVizEsc(movie)}</b></span>`).join("") || `<em>${vi ? "Chưa cắt window" : "Window not sliced yet"}</em>`}</div>
     </article>`;
   }).join("");
   const allBuckets = view.buckets || [];
@@ -386,56 +446,112 @@ function renderFriends9016View(step) {
     return `<div class="rv-index-bucket${active ? " active" : ""}" data-position="${bucket.position}" data-movie="${requestedVizEsc(bucket.movie)}"><code>(${bucket.position}, ${requestedVizEsc(bucket.movie)})</code><span>→</span><b>[${bucket.users.map(requestedVizEsc).join(", ")}]</b></div>`;
   }).join("");
   const visiblePairs = (view.pairs || []).slice(0, view.phase === "done" ? 6 : 1);
-  const pairs = visiblePairs.map((pair) => `<article class="rv-friend-pair${view.activePair && pair.a === view.activePair[0] && pair.b === view.activePair[1] ? " active" : ""}${pair.qualifies ? " pass" : " fail"}">
-    <div><b>${requestedVizEsc(pair.left)}</b><span>↔</span><b>${requestedVizEsc(pair.right)}</b></div><small>${vi ? "vị trí" : "positions"}: ${pair.positions.length ? pair.positions.join(", ") : "—"}</small><strong>${pair.count}/${view.k}</strong><span class="rv-pass-badge ${pair.qualifies ? "yes" : "no"}">${pair.qualifies ? `PASS ≥ ${view.m}` : `FAIL < ${view.m}`}</span>
+  const checked = ["threshold-check", "answer-append", "sort-and-return"].includes(view.operation) || !view.operation;
+  const pairs = visiblePairs.map((pair) => `<article class="rv-friend-pair${view.activePair && pair.a === view.activePair[0] && pair.b === view.activePair[1] ? " active" : ""}${checked ? pair.qualifies ? " pass" : " fail" : " pending"}">
+    <div><b>${requestedVizEsc(pair.left)}</b><span>↔</span><b>${requestedVizEsc(pair.right)}</b></div><strong>${pair.count}<em> / ${view.k}</em></strong><small>${vi ? "Vị trí khớp" : "Matched positions"}: ${pair.positions.length ? pair.positions.join(", ") : "—"}</small><span class="rv-pass-badge ${checked ? pair.qualifies ? "yes" : "no" : "pending"}">${checked ? pair.qualifies ? `PASS ≥ ${view.m}` : `FAIL < ${view.m}` : vi ? "CHỜ KIỂM TRA" : "AWAITING CHECK"}</span>
+    <div class="rv-friend-match-meter" aria-label="${pair.count} / ${view.k}">${Array.from({ length: view.k }, (_, position) => `<i class="${matchPositions.has(position) ? "match" : ""}">${position}</i>`).join("")}</div>
   </article>`).join("");
-  const allResults = view.results || [];
+  const allResults = view.phase === "done" && Array.isArray(view.answer) ? view.answer : view.results || [];
   const visibleResults = allResults.slice(0, 8);
-  const result = visibleResults.length ? visibleResults.map((pair) => `<span><b>${requestedVizEsc(pair[0])}</b> ↔ <b>${requestedVizEsc(pair[1])}</b></span>`).join("") : requestedVizEmpty("∅");
+  const result = visibleResults.length ? visibleResults.map((pair) => `<span><b>${requestedVizEsc(pair[0])}</b> ↔ <b>${requestedVizEsc(pair[1])}</b></span>`).join("") : requestedVizEmpty(vi ? "Chưa có pair đạt ngưỡng" : "No qualifying pair yet");
   const historyOmitted = Math.max(0, allHistories.length - visibleHistories.length);
   const bucketOmitted = Math.max(0, allBuckets.length - visibleBuckets.length) + (view.omittedBuckets || 0);
-  const resultOmitted = Math.max(0, allResults.length - visibleResults.length) + (view.omittedResults || 0);
+  const resultOmitted = Math.max(0, allResults.length - visibleResults.length) + (allResults === view.answer ? 0 : view.omittedResults || 0);
   const stage = view.phase === "index"
-    ? `<section class="rv-panel rv-friend-stage"><h4>inverted index · ${vi ? "5 bucket gần bước hiện tại" : "5 buckets around the current step"}</h4><div class="rv-friend-index">${buckets || requestedVizEmpty("index = {}")}</div>${bucketOmitted ? `<small class="rv-friend-more">+${bucketOmitted} ${vi ? "bucket đã thu gọn" : "compact buckets"}</small>` : ""}</section>`
+    ? `<section class="rv-panel rv-friend-stage"><h4>${vi ? "Index theo (vị trí, phim)" : "Index by (position, movie)"}</h4>${view.activeBucket ? `<div class="rv-friend-key"><small>${vi ? "Key đang xét" : "Current key"}</small><code>(${view.activeBucket.position}, ${requestedVizEsc(view.activeBucket.movie)})</code>${view.operation === "match-add" && activeRow ? `<span>${requestedVizEsc(activeRow.left)} ↔ ${requestedVizEsc(activeRow.right)} · ${vi ? "thêm vị trí" : "add position"} ${view.activeBucket.position}</span>` : ""}</div>` : ""}<div class="rv-friend-index">${buckets || requestedVizEmpty("index = {}")}</div>${bucketOmitted ? `<small class="rv-friend-more">+${bucketOmitted} ${vi ? "bucket đã thu gọn" : "compact buckets"}</small>` : ""}</section>`
     : view.phase === "evaluate"
       ? `<section class="rv-panel rv-friend-stage"><h4>${vi ? "Candidate đang xác nhận" : "Candidate being verified"}</h4><div class="rv-friend-pairs">${pairs || requestedVizEmpty(vi ? "Chưa có candidate" : "No candidate yet")}</div>${allResults.length ? `<div class="rv-friend-emitted"><small>${vi ? "Đã emit" : "Emitted"}</small>${result}</div>` : ""}</section>`
       : view.phase === "done"
-        ? `<section class="rv-panel rv-friend-stage rv-friend-done"><h4>${vi ? "Friend pairs cuối cùng" : "Final friend pairs"}</h4><div class="rv-friend-result">${result}</div>${resultOmitted ? `<small class="rv-friend-more">+${resultOmitted} ${vi ? "kết quả khác" : "more results"}</small>` : ""}</section>`
+        ? `<section class="rv-panel rv-friend-stage rv-friend-done"><h4>${vi ? "Friend pairs cuối cùng" : "Final friend pairs"} · ${allResults.length}</h4><div class="rv-friend-result">${result}</div>${resultOmitted ? `<details class="rv-friend-extra"><summary>+${resultOmitted} ${vi ? "kết quả khác" : "more results"}</summary><div class="rv-friend-result">${allResults.slice(8).map((pair) => `<span><b>${requestedVizEsc(pair[0])}</b> ↔ <b>${requestedVizEsc(pair[1])}</b></span>`).join("")}</div></details>` : ""}</section>`
         : `<div class="rv-friend-tip"><b>last-k</b><span>${vi ? "Cắt đúng k phim cuối trước khi tạo index." : "Slice the exact final k movies before indexing."}</span></div>`;
-  requestedVizSet(`<div class="rv-friends-9016 phase-${requestedVizEsc(view.phase || "init")}">${requestedVizPhases(vi ? ["Cắt last-k", "Index (position,movie)", "Đếm match ≥ m", "Friend pairs"] : ["Take last-k", "Index (position,movie)", "Count matches ≥ m", "Friend pairs"], phaseIndex)}
-    <div class="rv-friend-summary"><span><small>users</small><b>${allHistories.length}</b></span><span><small>window</small><b>k=${view.k}</b></span><span><small>threshold</small><b>m=${view.m}</b></span><span><small>${vi ? "friends" : "friends"}</small><b>${allResults.length}</b></span></div>
+  const operations = {
+    import: ["Nạp thư viện", "Import"], call: ["Nhận lịch sử phim", "Read movie histories"], "index-init": ["Tạo index", "Initialize index"], "matches-init": ["Tạo tập vị trí khớp", "Initialize match sets"], "sort-users": ["Sắp xếp users", "Sort users"],
+    "user-loop": ["Đọc user", "Read user"], "slice-window": ["Lấy k phim cuối", "Take last k movies"], "position-loop": ["Đọc vị trí và phim", "Read position and movie"], "prior-user-loop": ["Tìm user trong bucket", "Find users in bucket"],
+    "match-add": ["Ghi nhận vị trí khớp", "Record matching position"], "index-append": ["Thêm user vào index", "Add user to index"], "answer-init": ["Tạo kết quả", "Initialize results"], "pair-loop": ["Đọc candidate pair", "Read candidate pair"],
+    "threshold-check": ["Kiểm tra ngưỡng m", "Check threshold m"], "answer-append": ["Thêm friend pair", "Add friend pair"], "sort-and-return": ["Trả friend pairs", "Return friend pairs"],
+  };
+  const historyPanel = `<section class="rv-panel rv-friend-histories"><h4>${vi ? "k phim cuối của mỗi user" : "Each user's last k movies"}</h4><div class="rv-histories">${histories}</div>${historyOmitted ? `<small class="rv-friend-more">+${historyOmitted} ${vi ? "user đã thu gọn" : "compact users"}</small>` : ""}<footer class="rv-friend-legend"><span>${vi ? "Xanh dương: đang đọc" : "Blue: current position"}</span><span>${vi ? "Xanh lá: đã khớp" : "Green: matched position"}</span></footer></section>`;
+  requestedVizSet(`<div class="rv-friends-9016 phase-${requestedVizEsc(view.phase || "init")}">${requestedVizPhases(vi ? ["Lấy last-k", "Tạo index", "Kiểm tra m", "Kết quả"] : ["Take last-k", "Build index", "Check m", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(operations[view.operation]?.[vi ? 0 : 1] || view.operation || view.phase)}</b></div>
+    <div class="rv-friend-summary"><span><small>Users</small><b>${allHistories.length}</b></span><span><small>last-k</small><b>${view.k}</b></span><span><small>${vi ? "Ngưỡng m" : "Threshold m"}</small><b>${view.m}</b></span><span><small>Friend pairs</small><b>${allResults.length + (allResults === view.answer ? 0 : view.omittedResults || 0)}</b></span></div>
     <div class="rv-focus-equation"><span>${vi ? "Điều kiện" : "Rule"}</span><strong>matches ≥ ${view.m}</strong><span>${vi ? `trong ${view.k} vị trí` : `of ${view.k} positions`}</span></div>
-    <section class="rv-panel rv-friend-histories"><h4>${vi ? "Last-k windows · ô xanh khớp cùng vị trí" : "Last-k windows · green cells match at the same position"}</h4><div class="rv-histories">${histories}</div>${historyOmitted ? `<small class="rv-friend-more">+${historyOmitted} ${vi ? "user đã thu gọn" : "compact users"}</small>` : ""}</section>
-    ${stage}
+    ${view.phase === "done" ? `${stage}<details class="rv-friend-history-details"><summary>${vi ? "Xem last-k windows" : "View last-k windows"}</summary>${historyPanel}</details>` : `${historyPanel}${stage}`}
     ${view.omittedPairSteps || view.omittedPairs ? `<div class="rv-friend-more">+${(view.omittedPairSteps || 0) + (view.omittedPairs || 0)} ${vi ? "bước/pair đã thu gọn" : "compact step(s)/pair(s)"}</div>` : ""}</div>`,
-  vi ? `So khớp lịch sử phim m=${view.m} trong k=${view.k}` : `Movie-history matching with m=${view.m} of k=${view.k}`);
+  vi ? `So khớp lịch sử phim m=${view.m} trong k=${view.k}` : `Movie-history matching with m=${view.m} of k=${view.k}`, "group");
 }
 
 // ─── #9017: ad metrics pipeline ─────────────────────────────────────────────
 function renderAds9017View(step) {
   const view = step.ads9017View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "init" || view.phase === "receive" ? 0 : view.phase === "duplicate" ? 1 : view.phase === "aggregate" ? 2 : 3;
-  const events = (view.events || []).map((event, index) => `<article class="rv-ad-event ${event.state}">
-    <small>#${index + 1} · ${requestedVizEsc(event.eventId)}</small><b>${requestedVizEsc(event.type)}</b><span>${requestedVizEsc(event.campaign)} · ${requestedVizEsc(event.user)}</span><em>$${Number(event.cost).toFixed(2)}</em>
-  </article>`).join("");
-  const current = view.current ? `<div class="rv-ad-current"><span><small>eventId</small><b>${requestedVizEsc(view.current.eventId)}</b></span><span><small>type</small><b>${requestedVizEsc(view.current.type)}</b></span><span><small>campaign</small><b>${requestedVizEsc(view.current.campaign)}</b></span><span><small>user</small><b>${requestedVizEsc(view.current.user)}</b></span><span><small>cost</small><b>$${Number(view.current.cost).toFixed(2)}</b></span></div>` : requestedVizEmpty(vi ? "Chưa đọc event" : "No event read yet");
+  const operation = view.operation || view.phase;
+  const phaseIndex = view.phase === "derive" || view.phase === "done" ? 3
+    : view.phase === "aggregate" ? 2
+      : view.phase === "duplicate" || operation === "duplicate-check" ? 1 : 0;
+  const allEvents = view.events || [];
+  const eventIndex = Number.isInteger(view.eventIndex) ? view.eventIndex : -1;
+  const start = Math.max(0, Math.min(eventIndex - 2, allEvents.length - 6));
+  const statuses = vi ? { pending: "Chờ", current: "Đang xử lý", accepted: "Đã đếm", duplicate: "Bỏ qua" }
+    : { pending: "Queued", current: "Processing", accepted: "Counted", duplicate: "Skipped" };
+  const events = allEvents.slice(start, start + 6).map((event, offset) => {
+    const active = start + offset === eventIndex;
+    const state = ["accepted", "duplicate", "current"].includes(event.state) ? event.state : "pending";
+    return `<article class="rv-ad-event ${state}${active ? " active" : ""}"><header><small>#${start + offset + 1}</small><b>${requestedVizEsc(event.eventId)}</b></header>
+      <span>${requestedVizEsc(event.type)}</span><small>${requestedVizEsc(event.campaign)} · ${requestedVizEsc(event.user)}</small>
+      <footer><em>$${Number(event.cost).toFixed(2)}</em><span>${requestedVizEsc(active && state !== "duplicate" ? statuses.current : statuses[state])}</span></footer></article>`;
+  }).join("");
+  const accepted = allEvents.filter((event) => event.state === "accepted").length;
+  const skipped = allEvents.filter((event) => event.state === "duplicate").length;
+  const totalSpend = (view.campaigns || []).reduce((sum, metric) => sum + Number(metric.spend || 0), 0);
+  const current = view.current ? `<div class="rv-ad-current"><header><b>${requestedVizEsc(view.current.eventId)}</b><span>${requestedVizEsc(view.current.type)}</span></header><p>${requestedVizEsc(view.current.campaign)} <span>· ${requestedVizEsc(view.current.user)}</span></p><strong>$${Number(view.current.cost).toFixed(2)}</strong></div>`
+    : `<div class="rv-ad-idle">${requestedVizEsc(vi ? "Sẵn sàng đọc event đầu tiên" : "Ready for the first event")}</div>`;
   const gateClass = view.decision === "duplicate" ? "duplicate" : view.decision === "accepted" ? "accepted" : "checking";
-  const gateText = view.decision === "duplicate" ? (vi ? "ĐÃ THẤY ID → BỎ QUA" : "ID SEEN → SKIP") : view.decision === "accepted" ? (vi ? "ID MỚI → AGGREGATE" : "NEW ID → AGGREGATE") : (vi ? "KIỂM TRA eventId" : "CHECK eventId");
-  const campaigns = (view.campaigns || []).map((metric) => {
+  const gateText = view.decision === "duplicate" ? (vi ? "ID trùng · bỏ qua" : "Duplicate ID · skip") : view.decision === "accepted" ? (vi ? "ID mới · tiếp tục" : "New ID · continue") : (vi ? "Kiểm tra eventId" : "Check eventId");
+  const gateDetail = view.decision === "duplicate" ? (vi ? "Không tăng counter hoặc spend." : "Counters and spend stay unchanged.")
+    : view.decision === "accepted" ? (vi ? "Cập nhật campaign theo từng dòng code." : "Update the campaign one instruction at a time.")
+      : (vi ? "Chỉ đếm mỗi ID một lần." : "Count each event ID only once.");
+  const allCampaigns = view.campaigns || [];
+  const activeIndex = allCampaigns.findIndex((metric) => metric.campaign === view.activeCampaign);
+  const campaignStart = Math.max(0, Math.min(activeIndex - 1, allCampaigns.length - 4));
+  const visibleCampaigns = view.phase === "done" ? allCampaigns : allCampaigns.slice(campaignStart, campaignStart + 4);
+  const money = (value) => `$${Number(value || 0).toFixed(2)}`;
+  const ratio = (value) => value === null || value === undefined ? "—" : `${(value * 100).toFixed(1)}%`;
+  const campaigns = visibleCampaigns.map((metric) => {
+    const active = metric.campaign === view.activeCampaign;
+    const focusField = { "impression-increment": "impressions", "click-increment": "clicks", "conversion-increment": "conversions", "spend-add": "spend", "compute-reach": "reach", "compute-ctr": "ctr", "compute-cvr": "cvr" }[operation];
+    const focus = (field) => active && field === focusField ? " focus" : "";
     const peak = Math.max(1, metric.impressions, metric.clicks, metric.conversions);
-    const bar = (name, value, cls) => `<div class="rv-funnel-row ${cls}"><span>${name}</span><div><i style="width:${(value / peak) * 100}%"></i></div><b>${value}</b></div>`;
-    return `<article class="rv-campaign-card"><header><b>${requestedVizEsc(metric.campaign)}</b>${metric.warning ? `<span>⚠ ${requestedVizEsc(metric.warning)}</span>` : ""}</header>
+    const bar = (name, value, cls) => `<div class="rv-funnel-row ${cls}${focus(name)}"><span>${name}</span><div><i style="width:${(value / peak) * 100}%"></i></div><b>${value}</b></div>`;
+    const derived = (name, value, field, formula) => `<span class="${focus(field).trim()}"><small>${name}</small><b>${value}</b><em>${formula}</em></span>`;
+    const users = Array.isArray(metric.users) ? metric.users : [];
+    const warning = metric.warning === "clicks-exceed-impressions" ? (vi ? "Clicks vượt impressions" : "Clicks exceed impressions") : (vi ? "Conversions vượt clicks" : "Conversions exceed clicks");
+    return `<article class="rv-campaign-card${active ? " active" : ""}"><header><b>${requestedVizEsc(metric.campaign)}</b>${active ? `<small>${vi ? "ĐANG XÉT" : "ACTIVE"}</small>` : ""}</header>
       ${bar("impressions", metric.impressions, "impression")}${bar("clicks", metric.clicks, "click")}${bar("conversions", metric.conversions, "conversion")}
-      <div class="rv-metric-grid"><span><small>reach</small><b>${metric.reach}</b></span><span><small>spend</small><b>$${Number(metric.spend).toFixed(2)}</b></span><span><small>CTR</small><b>${(metric.ctr * 100).toFixed(1)}%</b></span><span><small>CVR</small><b>${(metric.cvr * 100).toFixed(1)}%</b></span></div>
+      <div class="rv-metric-grid">${derived("reach", metric.reach ?? "—", "reach", vi ? "user duy nhất" : "unique users")}${derived("spend", money(metric.spend), "spend", "Σ cost")}${derived("CTR", ratio(metric.ctr), "ctr", `${metric.clicks} / ${metric.impressions}`)}${derived("CVR", ratio(metric.cvr), "cvr", `${metric.conversions} / ${metric.clicks}`)}</div>
+      ${Array.isArray(metric.users) ? `<details class="rv-ad-users${active && operation === "reach-user-add" ? " focus" : ""}"><summary>users · ${users.length}${active && operation === "reach-user-add" && view.current ? ` · add(${requestedVizEsc(view.current.user)})` : ""}</summary><div>${users.map(requestedVizEsc).join(", ") || "∅"}</div></details>` : ""}
+      ${metric.warning ? `<p class="rv-ad-warning">⚠ ${requestedVizEsc(warning)}</p>` : ""}
     </article>`;
   }).join("");
-  const seen = (view.seenIds || []).length ? view.seenIds.map((id) => `<span>${requestedVizEsc(id)}</span>`).join("") : requestedVizEmpty("seen = ∅");
-  requestedVizSet(`${requestedVizPhases(vi ? ["Nhận event", "Dedupe eventId", "Aggregate campaign", "CTR / CVR"] : ["Receive event", "Dedupe eventId", "Aggregate campaign", "CTR / CVR"], phaseIndex)}
-    <section class="rv-panel"><h4>${vi ? "Append-only event stream" : "Append-only event stream"}</h4><div class="rv-ad-stream">${events}</div></section>
-    <div class="rv-ad-pipeline"><section class="rv-panel"><h4>${vi ? "Event hiện tại" : "Current event"}</h4>${current}</section><div class="rv-dedupe-gate ${gateClass}"><small>DEDUPE</small><b>${requestedVizEsc(gateText)}</b><span>${view.current ? requestedVizEsc(view.current.eventId) : "—"}</span></div><section class="rv-panel"><h4>${vi ? "ID trong cửa sổ dedupe" : "IDs in dedupe window"}</h4><div class="rv-seen-ids">${seen}</div></section></div>
-    <section class="rv-panel"><h4>${vi ? "Campaign metrics — funnel + công thức" : "Campaign metrics — funnel + formulas"}</h4><div class="rv-campaigns">${campaigns || requestedVizEmpty(vi ? "Chưa có campaign" : "No campaign yet")}</div></section>
-    <div class="rv-callout">CTR = clicks / impressions · CVR = conversions / clicks · ${vi ? "mẫu số 0 → 0" : "zero denominator → 0"}</div>`,
+  const seenIds = view.seenIds || [];
+  const seen = seenIds.map((id) => `<span class="${id === view.current?.eventId ? "active" : ""}">${requestedVizEsc(id)}</span>`).join("");
+  const instructionNames = {
+    import: ["Nạp thư viện", "Import"], call: ["Nhận stream", "Receive stream"], "seen-init": ["Tạo tập ID", "Initialize ID set"], "metrics-init": ["Tạo metrics", "Initialize metrics"],
+    "event-loop": ["Đọc event", "Read event"], "duplicate-check": ["Kiểm tra ID", "Check ID"], continue: ["Bỏ qua retry", "Skip retry"], "mark-seen": ["Ghi nhận ID", "Remember ID"], "metric-lookup": ["Lấy campaign", "Look up campaign"],
+    "reach-user-add": ["Thêm user vào tập", "Add user to set"], "spend-add": ["Cộng chi phí", "Add cost"], "impression-check": ["Kiểm tra impression", "Check impression"], "impression-increment": ["Tăng impressions", "Increment impressions"],
+    "click-check": ["Kiểm tra click", "Check click"], "click-increment": ["Tăng clicks", "Increment clicks"], "conversion-else": ["Chọn conversion", "Select conversion"], "conversion-increment": ["Tăng conversions", "Increment conversions"],
+    "answer-init": ["Tạo kết quả", "Initialize result"], "campaign-loop": ["Đọc campaign", "Read campaign"], "compute-reach": ["Tính reach", "Compute reach"], "compute-ctr": ["Tính CTR", "Compute CTR"], "compute-cvr": ["Tính CVR", "Compute CVR"],
+    "answer-campaign": ["Lưu metrics", "Save metrics"], return: ["Trả kết quả", "Return result"],
+  };
+  const instruction = instructionNames[operation]?.[vi ? 0 : 1] || operation || "";
+  requestedVizSet(`<div class="rv-ads-9017 phase-${requestedVizEsc(view.phase || "init")}">
+    ${requestedVizPhases(vi ? ["Nhận event", "Kiểm tra ID", "Cập nhật", "Kết quả"] : ["Receive", "Check ID", "Aggregate", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(instruction)}</b></div>
+    <div class="rv-ad-summary"><span><small>${vi ? "Đã đếm" : "Counted"}</small><b>${accepted}<em> / ${allEvents.length}</em></b></span><span><small>${vi ? "Bỏ qua" : "Skipped"}</small><b>${skipped}</b></span><span><small>Campaigns</small><b>${allCampaigns.length}</b></span><span><small>Spend</small><b>${money(totalSpend)}</b></span></div>
+    ${phaseIndex < 3 ? `<section class="rv-panel rv-ad-stream-panel"><header><h4>Event stream</h4><small>${allEvents.length ? `${start + 1}–${Math.min(start + 6, allEvents.length)} / ${allEvents.length}` : "0"}</small></header><div class="rv-ad-stream">${events || requestedVizEmpty(vi ? "Stream rỗng" : "Empty stream")}</div></section>` : ""}
+    ${phaseIndex < 3 ? `<section class="rv-panel rv-ad-processing"><div class="rv-ad-pipeline">${current}<div class="rv-dedupe-gate ${gateClass}"><small>DEDUPE · eventId</small><b>${requestedVizEsc(gateText)}</b><span>${requestedVizEsc(gateDetail)}</span></div></div>
+      <details class="rv-ad-seen"><summary>seen_ids <b>${seenIds.length}</b>${view.current ? `<span>${requestedVizEsc(view.current.eventId)} ${seenIds.includes(view.current.eventId) ? "∈" : "∉"} seen_ids</span>` : ""}</summary><div class="rv-seen-ids">${seen || "∅"}</div></details></section>` : ""}
+    <section class="rv-panel rv-ad-metrics"><header><h4>${vi ? "Metrics theo campaign" : "Campaign metrics"}</h4><small>${vi ? "Ô vàng = vừa tính" : "Gold cell = just computed"}</small></header><div class="rv-campaigns">${campaigns || `<div class="rv-ad-idle">${vi ? "Metrics xuất hiện khi event hợp lệ đầu tiên được xử lý." : "Metrics appear when the first accepted event is processed."}</div>`}</div>${allCampaigns.length > visibleCampaigns.length ? `<small class="rv-ad-more">+${allCampaigns.length - visibleCampaigns.length} ${vi ? "campaign khác · xem tất cả ở bước cuối" : "more campaigns · view all at the final step"}</small>` : ""}</section>
+    <footer class="rv-ad-formulas">CTR = clicks / impressions · CVR = conversions / clicks<br><span>${vi ? "Chưa tính: — · Mẫu số bằng 0: kết quả 0" : "Not computed: — · Zero denominator: result 0"}</span></footer></div>`,
   vi ? "Pipeline ads có dedupe eventId và metrics theo campaign" : "Ad pipeline with event-ID dedupe and per-campaign metrics");
 }
 
@@ -493,95 +609,8 @@ renderSquare9013View = function renderSquare9013LineDebugView(step) {
   decorateRequestedLineDebug(step, view, { detail: step.note });
 };
 
-const renderLoyal9014GroupedView = renderLoyal9014View;
-renderLoyal9014View = function renderLoyal9014LineDebugView(step) {
-  renderLoyal9014GroupedView(step);
-  const view = step.loyal9014View || {};
-  const root = $("treeView").querySelector(".requested-viz");
-  if (root) {
-    const rows = root.querySelectorAll(".rv-loyal-table tbody tr");
-    (view.users || []).forEach((user, index) => {
-      const row = rows[index];
-      if (!row) return;
-      const status = user.evaluationState || "pending";
-      if (status === "pending" || status === "checking") {
-        row.classList.remove("pass", "fail");
-        row.classList.add(status);
-        const cells = row.querySelectorAll("td");
-        const dayCheck = cells[4]?.querySelector(".rv-check");
-        const distinctCheck = cells[5]?.querySelector(".rv-check");
-        const result = cells[6]?.querySelector(".rv-pass-badge");
-        if (user.presentBoth === null && dayCheck) {
-          dayCheck.classList.remove("yes", "no");
-          dayCheck.textContent = "…";
-        }
-        if (user.distinctEnough === null && distinctCheck) {
-          distinctCheck.classList.remove("yes", "no");
-          distinctCheck.textContent = `${user.distinctCount} · …`;
-        }
-        if (result) {
-          result.classList.remove("yes", "no");
-          result.textContent = status === "checking" ? (lang === "vi" ? "ĐANG XÉT" : "CHECKING") : (lang === "vi" ? "CHỜ" : "WAIT");
-        }
-      }
-    });
-  }
-  decorateRequestedLineDebug(step, view, { detail: step.note });
-};
 
-const renderSweep9015GroupedView = renderSweep9015View;
-renderSweep9015View = function renderSweep9015LineDebugView(step) {
-  renderSweep9015GroupedView(step);
-  const view = step.sweep9015View || {};
-  const root = $("treeView").querySelector(".requested-viz");
-  if (root && view.operation !== "count-overlaps") {
-    root.querySelector(".rv-focus-equation")?.remove();
-  }
-  decorateRequestedLineDebug(step, view, { detail: step.note });
-};
 
-const renderFriends9016GroupedView = renderFriends9016View;
-renderFriends9016View = function renderFriends9016LineDebugView(step) {
-  renderFriends9016GroupedView(step);
-  const view = step.friends9016View || {};
-  const root = $("treeView").querySelector(".requested-viz");
-  if (root) {
-    root.querySelectorAll(".rv-history").forEach((historyNode) => {
-      const history = view.histories?.find((item) => item.index === Number(historyNode.dataset.historyIndex));
-      const position = history?.activePosition;
-      if (Number.isInteger(position)) historyNode.querySelectorAll("span")[position]?.classList.add("match");
-    });
-    root.querySelectorAll(".rv-index-bucket").forEach((bucketNode) => {
-      if (view.activeBucket && Number(bucketNode.dataset.position) === view.activeBucket.position && bucketNode.dataset.movie === view.activeBucket.movie) {
-        bucketNode.classList.add("active");
-      }
-    });
-  }
-  decorateRequestedLineDebug(step, view, { detail: step.note });
-};
-
-const renderAds9017GroupedView = renderAds9017View;
-renderAds9017View = function renderAds9017LineDebugView(step) {
-  renderAds9017GroupedView(step);
-  const view = step.ads9017View || {};
-  const root = $("treeView").querySelector(".requested-viz");
-  if (root) {
-    root.querySelectorAll(".rv-campaign-card").forEach((card, index) => {
-      const metric = view.campaigns?.[index];
-      if (!metric) return;
-      const header = card.querySelector("header");
-      if (header && Array.isArray(metric.users)) {
-        header.insertAdjacentHTML("beforeend", `<span>users={${metric.users.map(requestedVizEsc).join(", ") || "∅"}}</span>`);
-      }
-      const values = card.querySelectorAll(".rv-metric-grid span b");
-      if (metric.reach === null && values[0]) values[0].textContent = "—";
-      if (metric.ctr === null && values[2]) values[2].textContent = "—";
-      if (metric.cvr === null && values[3]) values[3].textContent = "—";
-      card.classList.toggle("active", metric.campaign === view.activeCampaign);
-    });
-  }
-  decorateRequestedLineDebug(step, view, { detail: step.note });
-};
 
 
 // ????????? Core algorithm custom views: #542, #684, #787, #847 ??????????????????????????????????????????????????????

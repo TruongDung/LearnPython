@@ -1305,7 +1305,7 @@ function renderStep() {
 
   // result box
   if (step.final) {
-    const displayedAnswer = Array.isArray(answerValue) ? JSON.stringify(answerValue) : answerValue;
+    const displayedAnswer = answerValue !== null && typeof answerValue === "object" ? JSON.stringify(answerValue) : answerValue;
     $("answer").textContent = t().answer(displayedAnswer);
     show("answer");
   } else {
