@@ -363,27 +363,51 @@ function renderFriends9016View(step) {
   const activeRow = (view.pairs || []).find((pair) => view.activePair && pair.a === view.activePair[0] && pair.b === view.activePair[1]);
   const matchPositions = new Set(activeRow ? activeRow.positions : []);
   const activeUsers = new Set(view.activePair || []);
-  const histories = (view.histories || []).map((history) => {
+  const allHistories = view.histories || [];
+  const prioritizedHistories = activeUsers.size
+    ? [...allHistories.filter((history) => activeUsers.has(history.index)), ...allHistories.filter((history) => !activeUsers.has(history.index))]
+    : allHistories;
+  const visibleHistories = prioritizedHistories.slice(0, 6);
+  const histories = visibleHistories.map((history) => {
     const older = history.olderCount || 0;
-    return `<article class="rv-history${history.active ? " active" : ""}${activeUsers.has(history.index) ? " comparing" : ""}">
+    return `<article class="rv-history${history.active ? " active" : ""}${activeUsers.has(history.index) ? " comparing" : ""}" data-history-index="${history.index}">
       <header><b>${requestedVizEsc(history.user)}</b>${older ? `<small>+${older} ${vi ? "cũ" : "older"}</small>` : ""}</header>
-      <div>${history.window.map((movie, position) => `<span class="${activeUsers.has(history.index) && matchPositions.has(position) ? "match" : ""}"><small>pos ${position}</small><b>${requestedVizEsc(movie)}</b></span>`).join("")}</div>
+      <div style="--rv-friend-cols:${Math.max(1, history.window.length)}">${history.window.map((movie, position) => `<span class="${activeUsers.has(history.index) && matchPositions.has(position) ? "match" : ""}" title="pos ${position}: ${requestedVizEsc(movie)}"><small>${position}</small><b>${requestedVizEsc(movie)}</b></span>`).join("") || `<em>${vi ? "Chưa cắt window" : "Window not sliced yet"}</em>`}</div>
     </article>`;
   }).join("");
-  const buckets = (view.buckets || []).map((bucket) => `<div class="rv-index-bucket"><code>(${bucket.position}, ${requestedVizEsc(bucket.movie)})</code><span>→</span><b>[${bucket.users.map(requestedVizEsc).join(", ")}]</b></div>`).join("");
-  const pairs = (view.pairs || []).map((pair) => `<tr class="${view.activePair && pair.a === view.activePair[0] && pair.b === view.activePair[1] ? "active" : ""}${pair.qualifies ? " pass" : " fail"}">
-    <td><b>${requestedVizEsc(pair.left)}</b> — <b>${requestedVizEsc(pair.right)}</b></td><td>${pair.positions.length ? pair.positions.join(", ") : "—"}</td><td><strong>${pair.count}/${view.k}</strong></td><td><span class="rv-pass-badge ${pair.qualifies ? "yes" : "no"}">${pair.qualifies ? `PASS ≥ ${view.m}` : `FAIL < ${view.m}`}</span></td>
-  </tr>`).join("");
-  const result = (view.results || []).length ? view.results.map((pair) => `<span><b>${requestedVizEsc(pair[0])}</b> ↔ <b>${requestedVizEsc(pair[1])}</b></span>`).join("") : requestedVizEmpty("∅");
-  requestedVizSet(`${requestedVizPhases(vi ? ["Cắt last-k", "Index (position,movie)", "Đếm match ≥ m", "Friend pairs"] : ["Take last-k", "Index (position,movie)", "Count matches ≥ m", "Friend pairs"], phaseIndex)}
-    <div class="rv-focus-equation"><span>${vi ? "Điều kiện thật" : "Actual rule"}</span><strong>matches ≥ ${view.m}</strong><span>${vi ? `trong ${view.k} vị trí` : `of ${view.k} positions`}</span></div>
-    <section class="rv-panel"><h4>${vi ? "Last-k windows — ô xanh là vị trí đang khớp" : "Last-k windows — green cells match at the same position"}</h4><div class="rv-histories">${histories}</div></section>
-    <div class="rv-two-column rv-friends-workspace">
-      <section class="rv-panel"><h4>inverted index: (position, movie) → users</h4><div class="rv-index-list">${buckets || requestedVizEmpty("index = {}")}</div>${view.omittedBuckets ? `<small>+${view.omittedBuckets} buckets</small>` : ""}</section>
-      <section class="rv-panel"><h4>${vi ? "Xác nhận candidate pairs" : "Verify candidate pairs"}</h4><div class="rv-table-scroll"><table class="rv-data-table"><thead><tr><th>pair</th><th>${vi ? "vị trí khớp" : "matching positions"}</th><th>count</th><th>m=${view.m}</th></tr></thead><tbody>${pairs || `<tr><td colspan="4">—</td></tr>`}</tbody></table></div></section>
-    </div>
-    <section class="rv-results"><h4>${vi ? "Pairs đã emit" : "Emitted pairs"}</h4><div>${result}</div></section>
-    ${view.omittedPairSteps || view.omittedPairs || view.omittedResults ? `<div class="rv-callout">${vi ? "Đã rút gọn phần hiển thị:" : "Display shortened:"} ${view.omittedPairSteps || 0} ${vi ? "bước kiểm tra ẩn" : "hidden checks"}, ${view.omittedPairs || 0} ${vi ? "pair không hiện trong bảng" : "pairs omitted from the table"}, ${view.omittedResults || 0} ${vi ? "kết quả còn lại" : "more results"}.</div>` : ""}`,
+  const allBuckets = view.buckets || [];
+  const activeBucketIndex = view.activeBucket
+    ? allBuckets.findIndex((bucket) => bucket.position === view.activeBucket.position && bucket.movie === view.activeBucket.movie)
+    : -1;
+  const bucketStart = activeBucketIndex >= 0 ? Math.max(0, Math.min(activeBucketIndex - 2, allBuckets.length - 5)) : Math.max(0, allBuckets.length - 5);
+  const visibleBuckets = allBuckets.slice(bucketStart, bucketStart + 5);
+  const buckets = visibleBuckets.map((bucket) => {
+    const active = view.activeBucket && bucket.position === view.activeBucket.position && bucket.movie === view.activeBucket.movie;
+    return `<div class="rv-index-bucket${active ? " active" : ""}" data-position="${bucket.position}" data-movie="${requestedVizEsc(bucket.movie)}"><code>(${bucket.position}, ${requestedVizEsc(bucket.movie)})</code><span>→</span><b>[${bucket.users.map(requestedVizEsc).join(", ")}]</b></div>`;
+  }).join("");
+  const visiblePairs = (view.pairs || []).slice(0, view.phase === "done" ? 6 : 1);
+  const pairs = visiblePairs.map((pair) => `<article class="rv-friend-pair${view.activePair && pair.a === view.activePair[0] && pair.b === view.activePair[1] ? " active" : ""}${pair.qualifies ? " pass" : " fail"}">
+    <div><b>${requestedVizEsc(pair.left)}</b><span>↔</span><b>${requestedVizEsc(pair.right)}</b></div><small>${vi ? "vị trí" : "positions"}: ${pair.positions.length ? pair.positions.join(", ") : "—"}</small><strong>${pair.count}/${view.k}</strong><span class="rv-pass-badge ${pair.qualifies ? "yes" : "no"}">${pair.qualifies ? `PASS ≥ ${view.m}` : `FAIL < ${view.m}`}</span>
+  </article>`).join("");
+  const allResults = view.results || [];
+  const visibleResults = allResults.slice(0, 8);
+  const result = visibleResults.length ? visibleResults.map((pair) => `<span><b>${requestedVizEsc(pair[0])}</b> ↔ <b>${requestedVizEsc(pair[1])}</b></span>`).join("") : requestedVizEmpty("∅");
+  const historyOmitted = Math.max(0, allHistories.length - visibleHistories.length);
+  const bucketOmitted = Math.max(0, allBuckets.length - visibleBuckets.length) + (view.omittedBuckets || 0);
+  const resultOmitted = Math.max(0, allResults.length - visibleResults.length) + (view.omittedResults || 0);
+  const stage = view.phase === "index"
+    ? `<section class="rv-panel rv-friend-stage"><h4>inverted index · ${vi ? "5 bucket gần bước hiện tại" : "5 buckets around the current step"}</h4><div class="rv-friend-index">${buckets || requestedVizEmpty("index = {}")}</div>${bucketOmitted ? `<small class="rv-friend-more">+${bucketOmitted} ${vi ? "bucket đã thu gọn" : "compact buckets"}</small>` : ""}</section>`
+    : view.phase === "evaluate"
+      ? `<section class="rv-panel rv-friend-stage"><h4>${vi ? "Candidate đang xác nhận" : "Candidate being verified"}</h4><div class="rv-friend-pairs">${pairs || requestedVizEmpty(vi ? "Chưa có candidate" : "No candidate yet")}</div>${allResults.length ? `<div class="rv-friend-emitted"><small>${vi ? "Đã emit" : "Emitted"}</small>${result}</div>` : ""}</section>`
+      : view.phase === "done"
+        ? `<section class="rv-panel rv-friend-stage rv-friend-done"><h4>${vi ? "Friend pairs cuối cùng" : "Final friend pairs"}</h4><div class="rv-friend-result">${result}</div>${resultOmitted ? `<small class="rv-friend-more">+${resultOmitted} ${vi ? "kết quả khác" : "more results"}</small>` : ""}</section>`
+        : `<div class="rv-friend-tip"><b>last-k</b><span>${vi ? "Cắt đúng k phim cuối trước khi tạo index." : "Slice the exact final k movies before indexing."}</span></div>`;
+  requestedVizSet(`<div class="rv-friends-9016 phase-${requestedVizEsc(view.phase || "init")}">${requestedVizPhases(vi ? ["Cắt last-k", "Index (position,movie)", "Đếm match ≥ m", "Friend pairs"] : ["Take last-k", "Index (position,movie)", "Count matches ≥ m", "Friend pairs"], phaseIndex)}
+    <div class="rv-friend-summary"><span><small>users</small><b>${allHistories.length}</b></span><span><small>window</small><b>k=${view.k}</b></span><span><small>threshold</small><b>m=${view.m}</b></span><span><small>${vi ? "friends" : "friends"}</small><b>${allResults.length}</b></span></div>
+    <div class="rv-focus-equation"><span>${vi ? "Điều kiện" : "Rule"}</span><strong>matches ≥ ${view.m}</strong><span>${vi ? `trong ${view.k} vị trí` : `of ${view.k} positions`}</span></div>
+    <section class="rv-panel rv-friend-histories"><h4>${vi ? "Last-k windows · ô xanh khớp cùng vị trí" : "Last-k windows · green cells match at the same position"}</h4><div class="rv-histories">${histories}</div>${historyOmitted ? `<small class="rv-friend-more">+${historyOmitted} ${vi ? "user đã thu gọn" : "compact users"}</small>` : ""}</section>
+    ${stage}
+    ${view.omittedPairSteps || view.omittedPairs ? `<div class="rv-friend-more">+${(view.omittedPairSteps || 0) + (view.omittedPairs || 0)} ${vi ? "bước/pair đã thu gọn" : "compact step(s)/pair(s)"}</div>` : ""}</div>`,
   vi ? `So khớp lịch sử phim m=${view.m} trong k=${view.k}` : `Movie-history matching with m=${view.m} of k=${view.k}`);
 }
 
@@ -522,13 +546,13 @@ renderFriends9016View = function renderFriends9016LineDebugView(step) {
   const view = step.friends9016View || {};
   const root = $("treeView").querySelector(".requested-viz");
   if (root) {
-    root.querySelectorAll(".rv-history").forEach((historyNode, index) => {
-      const position = view.histories?.[index]?.activePosition;
+    root.querySelectorAll(".rv-history").forEach((historyNode) => {
+      const history = view.histories?.find((item) => item.index === Number(historyNode.dataset.historyIndex));
+      const position = history?.activePosition;
       if (Number.isInteger(position)) historyNode.querySelectorAll("span")[position]?.classList.add("match");
     });
-    root.querySelectorAll(".rv-index-bucket").forEach((bucketNode, index) => {
-      const bucket = view.buckets?.[index];
-      if (bucket && view.activeBucket && bucket.position === view.activeBucket.position && bucket.movie === view.activeBucket.movie) {
+    root.querySelectorAll(".rv-index-bucket").forEach((bucketNode) => {
+      if (view.activeBucket && Number(bucketNode.dataset.position) === view.activeBucket.position && bucketNode.dataset.movie === view.activeBucket.movie) {
         bucketNode.classList.add("active");
       }
     });

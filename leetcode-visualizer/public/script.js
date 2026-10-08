@@ -1252,6 +1252,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.sparseVector1570View), surface: "treeView", render: (step) => {
       renderSparseVector1570View(step);
     } },
+    { predicate: (step) => Boolean(step.vending9012View), surface: "treeView", render: (step) => {
+      renderVendingMachine9012View(step);
+    } },
 ];
 
 let prefixSuffix745Layout = null;

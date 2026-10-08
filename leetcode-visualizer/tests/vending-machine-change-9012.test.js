@@ -2,7 +2,11 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 
+const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require("./helpers/frontend-source");
 const problem = require("../problems").SUPPORTED[9012];
 
 function minimumCoinCount(coins, change) {
@@ -72,4 +76,53 @@ test("9012 validates denominations and payment values", () => {
   assert.throws(() => problem.builder("1,5", { price: 6, paid: 5 }));
   assert.throws(() => problem.builder("1,5", { price: -1, paid: 5 }));
   assert.throws(() => problem.builder("1,5", { price: 0.5, paid: 5 }));
+});
+
+test("9012 dedicated renderer covers DP, reconstruction, and impossible states in both languages", () => {
+  const rendererPath = path.resolve(__dirname, "../public/renderer-vending-machine-change-9012.js");
+  const source = fs.readFileSync(rendererPath, "utf8");
+  const element = {};
+  const context = {
+    lang: "en",
+    $: () => element,
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+
+  const possible = problem.builder("1,3,4", { price: 0, paid: 6 });
+  const impossible = problem.builder("4,6", { price: 0, paid: 5 });
+  for (const language of ["en", "vi"]) {
+    context.lang = language;
+    for (const step of [...possible.steps, ...impossible.steps]) {
+      context.renderVendingMachine9012View(step);
+      assert.match(element.innerHTML, /vm9012-viz/);
+      assert.match(element.innerHTML, /vm9012-payment/);
+      assert.match(element.innerHTML, /vm9012-dp/);
+      assert.match(element.innerHTML, /vm9012-tray/);
+      assert.doesNotMatch(element.innerHTML, /undefined|NaN/);
+    }
+  }
+
+  context.lang = "en";
+  context.renderVendingMachine9012View(possible.steps.find((step) => step.codeLines[0] === 22));
+  assert.match(element.innerHTML, /is-improve/);
+  context.renderVendingMachine9012View(possible.steps.at(-1));
+  assert.match(element.innerHTML, /EXACT CHANGE/);
+  context.renderVendingMachine9012View(impossible.steps.at(-1));
+  assert.match(element.innerHTML, /EXACT CHANGE IMPOSSIBLE/);
+});
+
+test("9012 frontend loads its renderer and responsive scoped styles", () => {
+  const html = readFrontendIndex();
+  const javascript = readFrontendJavaScript();
+  const css = readFrontendStyles();
+
+  assert.match(html, /vending-machine-change-9012\.css/);
+  assert.match(html, /renderer-vending-machine-change-9012\.js/);
+  assert.match(javascript, /step\.vending9012View/);
+  assert.match(javascript, /renderVendingMachine9012View\(step\)/);
+  assert.match(css, /\.vm9012-viz \{/);
+  assert.match(css, /\.vm9012-table-scroll \{[^}]*overflow-x: auto;/);
+  assert.match(css, /\[data-theme="light"\] \.vm9012-viz/);
+  assert.match(css, /@container \(max-width: 560px\)/);
 });
