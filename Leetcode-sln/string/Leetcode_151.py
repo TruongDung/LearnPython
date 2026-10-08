@@ -1,18 +1,9 @@
 class Solution:
     def reverseWords(self, s: str) -> str:
-
-        s1 = "a"
-        print(id(s1))
-
-        lst = s.split()
-        lst.reverse()
-
-        result = ""
-
-        for i in (lst):
-            result += i + " "
-
-        return result
-
-sol = Solution()
-print(sol.reverseWords(" the  sky  is blue "))
+        words = s.split()
+        left, right = 0, len(words) - 1
+        while left < right:
+            words[left], words[right] = words[right], words[left]
+            left += 1
+            right -= 1
+        return " ".join(words)

@@ -11,7 +11,7 @@ Source: [LeetCode — String](https://leetcode.com/problem-list/string/). Data w
 3. For each problem, describe the invariant or state, work through an example by hand, write the code yourself and explain its complexity. Finish a group when you can solve its problems again without looking at a solution.
 4. **Project = Available** means the problem ID has a registered builder in leetcode-visualizer when this list was created. It does not mean every visualization was reviewed again for this list. Premium indicates access restrictions on LeetCode.
 
-The project supports **184/895 problems** in this catalog; **711 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
+The project supports **185/895 problems** in this catalog; **710 problems** are not yet registered. This includes problems under DP, sliding window, trie and other project categories, rather than only the String category in the UI.
 
 ## Part A overview
 
@@ -47,7 +47,7 @@ Track indices, characters and prefixes; distinguish string concatenation from mu
 | 7 | [344. Reverse String](https://leetcode.com/problems/reverse-string/) | Easy |  | Available |
 | 8 | [541. Reverse String II](https://leetcode.com/problems/reverse-string-ii/) | Easy |  | Available |
 | 9 | [557. Reverse Words in a String III](https://leetcode.com/problems/reverse-words-in-a-string-iii/) | Easy |  | Available |
-| 10 | [151. Reverse Words in a String](https://leetcode.com/problems/reverse-words-in-a-string/) | Medium |  | Not yet |
+| 10 | [151. Reverse Words in a String](https://leetcode.com/problems/reverse-words-in-a-string/) | Medium |  | Available |
 | 11 | [14. Longest Common Prefix](https://leetcode.com/problems/longest-common-prefix/) | Easy |  | Available |
 | 12 | [443. String Compression](https://leetcode.com/problems/string-compression/) | Medium |  | Available |
 
@@ -1096,4 +1096,3 @@ Combine the foundations: KMP + DP, rolling hash + binary search, segment trees, 
 | 893 | [3777. Minimum Deletions to Make Alternating Substring](https://leetcode.com/problems/minimum-deletions-to-make-alternating-substring/) | Hard |  | Not yet |
 | 894 | [3841. Palindromic Path Queries in a Tree](https://leetcode.com/problems/palindromic-path-queries-in-a-tree/) | Hard |  | Not yet |
 | 895 | [3864. Minimum Cost to Partition a Binary String](https://leetcode.com/problems/minimum-cost-to-partition-a-binary-string/) | Hard |  | Not yet |
-

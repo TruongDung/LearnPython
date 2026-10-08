@@ -3,7 +3,7 @@
 const bi = (vi, en) => ({ vi, en });
 const SOURCE = [
   "class Solution:",
-  "    def arrayStringsAreEqual(self, word1: list[str], word2: list[str]) -> bool:",
+  "    def arrayStringsAreEqual(self, word1, word2) -> bool:",
   "        s1 = ''.join(word1)",
   "        s2 = ''.join(word2)",
   "        if len(s1) != len(s2):",

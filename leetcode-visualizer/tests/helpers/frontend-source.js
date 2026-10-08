@@ -66,6 +66,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-goal-parser-1678.js',
   'renderer-reverse-string-ii-541.js',
   'renderer-reverse-words-iii-557.js',
+  'renderer-reverse-words-151.js',
   'script.js',
 ]);
 
@@ -136,6 +137,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'goal-parser-1678.css',
   'reverse-string-ii-541.css',
   'reverse-words-iii-557.css',
+  'reverse-words-151.css',
 ]);
 
 const sourceCache = new Map();
