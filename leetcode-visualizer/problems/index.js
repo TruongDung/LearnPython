@@ -15,7 +15,7 @@ const categories = {
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610"), require("./hard-range-visualizations"), require("./vowel-substrings-3306"), require("./distinct-triplets-1876")),
   graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699")),
   math: require("./math"),
-  "two-pointer": Object.assign(require("./two-pointer"), require("./maximum-distance-1855"), require("./reverse-vowels-345"), require("./reverse-only-letters-917"), require("./backspace-compare-844"), require("./longest-dictionary-word-524")),
+  "two-pointer": Object.assign(require("./two-pointer"), require("./maximum-distance-1855"), require("./reverse-vowels-345"), require("./reverse-only-letters-917"), require("./backspace-compare-844"), require("./longest-dictionary-word-524"), require("./minimum-length-1750")),
   array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation"), require("./disappeared-numbers-448")),
   trie: Object.assign(require("./trie"), require("./prefix-scores-2416"), require("./hard-trie-3045")),
   hashmap: require("./hashmap"),
