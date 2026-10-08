@@ -73,6 +73,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-word-pattern-290.js',
   'renderer-frequency-sort-451.js',
   'renderer-close-strings-1657.js',
+  'renderer-distinct-triplets-1876.js',
   'script.js',
 ]);
 
@@ -150,6 +151,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'word-pattern-290.css',
   'frequency-sort-451.css',
   'close-strings-1657.css',
+  'distinct-triplets-1876.css',
 ]);
 
 const sourceCache = new Map();
