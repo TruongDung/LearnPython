@@ -1075,9 +1075,9 @@ module.exports = {
     ),
     inputLabel: label("edges A-B (phẩy) hoặc JSON pairs", "A-B edges (comma-separated) or JSON pairs"),
     approach: [
-      label("Bimap name↔id nén tên node thành index; adjacency vẫn là mảng nhanh.", "A name↔id bimap compresses node names into indices while adjacency stays array-based."),
-      label("Queue FIFO duyệt theo lớp distance; đánh dấu ngay khi enqueue để không lặp node.", "A FIFO queue explores distance layers; mark nodes at enqueue time to avoid duplicates."),
-      label("parent của lần phát hiện đầu tiên tạo cây BFS và dựng lại shortest path.", "The first-discovery parent forms a BFS tree and reconstructs the shortest path."),
+      label("BFS đi theo từng lớp: start có distance = 0; mỗi neighbor mới nằm xa thêm một cạnh.", "BFS explores in layers: start has distance 0; each newly discovered neighbor is one edge farther away."),
+      label("Queue lấy node ở đầu và thêm ở cuối. Node đã có parent được bỏ qua để không duyệt lặp.", "The queue removes nodes from the front and adds them at the back. Skip nodes that already have a parent to avoid revisits."),
+      label("Từ target, đi ngược parent tới start rồi đảo path để có đường đi ngắn nhất.", "Follow parents from target back to start, then reverse the path to get the shortest route."),
     ],
     code: [
       "from collections import defaultdict, deque",

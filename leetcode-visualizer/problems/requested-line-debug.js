@@ -179,6 +179,7 @@ module.exports = function createRequestedLineDebug({
     let head = 0;
     let parent = null;
     let distance = null;
+    let graphReady = false;
 
     const edgeKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
     const pathEdgeKeys = (path) => new Set(path.slice(1).map((node, index) => edgeKey(path[index], node)));
@@ -216,6 +217,7 @@ module.exports = function createRequestedLineDebug({
           name,
           distance: distance ? distance[id] : null,
           parent: parent && Number.isInteger(parent[id]) ? names[parent[id]] : null,
+          discovered,
           status,
           isStart: id === idOf.get(start),
           isTarget: id === idOf.get(target),
@@ -256,6 +258,12 @@ module.exports = function createRequestedLineDebug({
           actionText: options.actionText || null,
           start,
           target,
+          graphReady,
+          queueReady: queue !== null,
+          parentReady: parent !== null,
+          distanceReady: distance !== null,
+          layoutEdges: edges.map(([left, right]) => ({ u: idOf.get(left), v: idOf.get(right) })),
+          adjacency: names.map((name, id) => ({ id, name, neighbors: adjacency[id].map((next) => names[next]) })),
           nodes,
           edges: graphEdges,
           queue: queueItems,
@@ -264,6 +272,7 @@ module.exports = function createRequestedLineDebug({
           neighbor: Number.isInteger(options.neighbor) ? options.neighbor : null,
           reason: options.reason || null,
           path: path.map((id) => names[id]),
+          pathReady: Array.isArray(options.path),
           distance: distance && distance[idOf.get(target)] !== null ? distance[idOf.get(target)] : null,
           answer,
         },
@@ -272,6 +281,7 @@ module.exports = function createRequestedLineDebug({
 
     emit(1, "import", { phase: "graph", actionText: label("Nạp defaultdict và deque.", "Load defaultdict and deque.") });
     emit(3, "call", { phase: "graph", actionText: label(`Nhận ${edges.length} cạnh, start=${start}, target=${target}.`, `Receive ${edges.length} edges, start=${start}, target=${target}.`) });
+    graphReady = true;
     emit(4, "graph-init", { phase: "graph", actionText: label("Khởi tạo adjacency list rỗng.", "Initialize an empty adjacency list.") });
 
     edges.forEach(([left, right], edgeIndex) => {
@@ -436,6 +446,8 @@ module.exports = function createRequestedLineDebug({
             current: Boolean(options.edge) && options.edge.includes(edge.u) && options.edge.includes(edge.v),
           })),
           path: currentPath,
+          pathReady,
+          used: usedReady ? [...used] : null,
           candidates: [...candidates],
           focus: options.focus ?? null,
           attempted: options.attempted ?? null,

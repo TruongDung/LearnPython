@@ -106,76 +106,129 @@ function renderCoins2218View(step) {
 // ─── #9006: BFS shortest path ───────────────────────────────────────────────
 function requestedBfsGraph(view) {
   const nodes = view.nodes || [];
-  const width = 720;
-  const height = 390;
-  const cx = width / 2;
-  const cy = height / 2;
-  const rx = Math.min(285, 48 + nodes.length * 18);
-  const ry = Math.min(145, 42 + nodes.length * 9);
-  const positions = new Map(nodes.map((node, index) => {
-    const angle = (Math.PI * 2 * index) / Math.max(1, nodes.length) - Math.PI / 2;
-    return [node.id, { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) }];
-  }));
+  if (!nodes.length || view.graphReady === false) return `<div class="rv-bfs-empty">${lang === "vi" ? "Graph sẽ xuất hiện ở bước khởi tạo." : "The graph appears at initialization."}</div>`;
+  // Layout uses input topology only; displayed edges, distances and colors use this instruction's state.
+  const adjacency = new Map(nodes.map((node) => [node.id, []]));
+  (view.layoutEdges || view.edges || []).forEach((edge) => { adjacency.get(edge.u)?.push(edge.v); adjacency.get(edge.v)?.push(edge.u); });
+  const start = nodes.find((node) => node.isStart)?.id;
+  const levels = new Map([[start, 0]]);
+  const order = [start];
+  for (let i = 0; i < order.length; i++) {
+    for (const next of adjacency.get(order[i]) || []) {
+      if (!levels.has(next)) { levels.set(next, levels.get(order[i]) + 1); order.push(next); }
+    }
+  }
+  const lastLevel = Math.max(0, ...levels.values()) + 1;
+  const groups = new Map();
+  nodes.forEach((node) => {
+    const level = levels.get(node.id) ?? lastLevel;
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level).push(node);
+  });
+  const compactLayers = groups.size <= 5 && Math.max(...[...groups.values()].map((group) => group.length)) <= 4;
+  const width = 380;
+  const height = compactLayers ? Math.max(130, Math.max(...[...groups.values()].map((group) => group.length)) * 78) : Math.ceil(nodes.length / 5) * 78;
+  const positions = new Map();
+  if (compactLayers) {
+    [...groups.values()].forEach((group, column) => group.forEach((node, row) => positions.set(node.id, {
+      x: groups.size === 1 ? width / 2 : 36 + column * (width - 72) / (groups.size - 1),
+      y: (row + .5) * height / group.length,
+    })));
+  } else {
+    nodes.forEach((node, index) => positions.set(node.id, { x: 38 + (Math.floor(index / 5) % 2 ? 4 - index % 5 : index % 5) * 76, y: 39 + Math.floor(index / 5) * 78 }));
+  }
+  const aliases = nodes.some((node) => node.name.length > 6);
   const edges = (view.edges || []).map((edge) => {
     const from = positions.get(edge.u);
     const to = positions.get(edge.v);
     if (!from || !to) return "";
     const cls = edge.path ? "path" : edge.current ? "current" : edge.tree ? "tree" : "";
-    return `<line class="rv-bfs-edge ${cls}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" />`;
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const bend = Math.abs(to.x - from.x) < 1 && distance > 90 || distance > 160;
+    const curve = bend ? `Q ${(from.x + to.x) / 2 - (to.y - from.y) / distance * 60} ${(from.y + to.y) / 2 + (to.x - from.x) / distance * 60}` : "L";
+    return `<path class="rv-bfs-map-edge ${cls}" d="M ${from.x} ${from.y} ${curve} ${to.x} ${to.y}"/>`;
   }).join("");
   const nodeSvg = nodes.map((node) => {
     const pos = positions.get(node.id);
-    const classes = ["rv-bfs-node", node.status, node.isStart ? "start" : "", node.isTarget ? "target" : "", node.isNeighbor ? "neighbor" : ""].filter(Boolean).join(" ");
-    const shortName = node.name.length > 10 ? `${node.name.slice(0, 9)}…` : node.name;
-    return `<g class="${classes}"><title>${requestedVizEsc(node.name)} · d=${node.distance === null ? "∞" : node.distance} · parent=${requestedVizEsc(node.parent || "—")}</title>
-      <circle cx="${pos.x}" cy="${pos.y}" r="27" />
-      <text class="name" x="${pos.x}" y="${pos.y - 2}" text-anchor="middle">${requestedVizEsc(shortName)}</text>
-      <text class="distance" x="${pos.x}" y="${pos.y + 14}" text-anchor="middle">d=${node.distance === null ? "∞" : node.distance}</text>
+    const classes = ["rv-bfs-map-node", node.status, node.isNeighbor ? "neighbor" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}"><title>${requestedVizEsc(node.name)} · d=${node.distance ?? "—"}</title>
+      <circle cx="${pos.x}" cy="${pos.y}" r="25" />
+      <text class="name" x="${pos.x}" y="${pos.y - 2}" text-anchor="middle">${requestedVizEsc(aliases ? `#${node.id + 1}` : node.name)}</text>
+      <text class="distance" x="${pos.x}" y="${pos.y + 14}" text-anchor="middle">d=${node.distance ?? "—"}</text>
     </g>`;
   }).join("");
-  return `<div class="rv-bfs-graph"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges}${nodeSvg}</svg></div>`;
+  return `<div class="rv-bfs-map"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges}${nodeSvg}</svg></div>${aliases ? `<div class="rv-bfs-map-note">${lang === "vi" ? "Tên dài dùng nhãn #; tên đầy đủ có trong thông tin node bên dưới." : "Long names use # labels; full names are listed in node details below."}</div>` : ""}`;
 }
 
 function renderBfs9006View(step) {
   const view = step.bfs9006View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "init" ? 0
-    : ["dequeue", "expanded"].includes(view.phase) ? 1
-      : ["inspect", "enqueue"].includes(view.phase) ? 2 : 3;
-  const queueHtml = (view.queue || []).length
-    ? view.queue.map((item, index) => `<div class="rv-queue-item${index === 0 ? " front" : ""}"><small>${index === 0 ? "FRONT" : `#${index + 1}`}</small><b>${requestedVizEsc(item.name)}</b><span>d=${requestedVizEsc(item.distance)}</span></div>`).join("")
-    : requestedVizEmpty(vi ? "Queue rỗng" : "Queue is empty");
-  const discovered = (view.nodes || []).filter((node) => node.distance !== null);
-  const parentHtml = discovered.map((node) => `<tr class="${node.isCurrent ? "active" : ""}${node.status === "path" ? " path" : ""}">
-    <td><b>${requestedVizEsc(node.name)}</b>${node.isStart ? " · S" : node.isTarget ? " · T" : ""}</td>
-    <td>${requestedVizEsc(node.distance)}</td><td>${requestedVizEsc(node.parent || "—")}</td><td><span class="rv-state-badge ${requestedVizEsc(node.status)}">${requestedVizEsc(node.status)}</span></td>
-  </tr>`).join("");
-  let actionText = vi ? "Khởi tạo start ở lớp 0." : "Initialize the start at layer 0.";
-  if (view.phase === "dequeue") actionText = vi ? "Lấy FRONT: đây là node gần nhất chưa mở rộng." : "Remove FRONT: this is the closest unexpanded node.";
-  else if (view.phase === "inspect" && view.neighbor !== null) actionText = view.reason === "already-discovered"
-    ? (vi ? "Neighbor đã có distance → bỏ qua, không đổi parent." : "The neighbor already has a distance → skip and keep its parent.")
-    : (vi ? "Neighbor chưa thấy → chuẩn bị gán parent và distance." : "The neighbor is unseen → assign parent and distance next.");
-  else if (view.phase === "enqueue") actionText = vi ? "Gắn vào cuối queue; cạnh này thuộc cây BFS." : "Append to the queue; this edge joins the BFS tree.";
-  else if (view.phase === "found") actionText = vi ? "Target được dequeue lần đầu → shortest path đã được chứng minh." : "The target is dequeued for the first time → shortest path is proven.";
-  else if (view.phase === "expanded") actionText = vi ? "Đã xét xong mọi neighbor; node chuyển thành expanded." : "All neighbors are processed; the node becomes expanded.";
-  else if (view.phase === "done") actionText = view.path.length ? `${vi ? "Đi ngược parent" : "Follow parents"}: ${view.path.map(requestedVizEsc).join(" ← ")}` : (vi ? "Queue rỗng trước khi tới target." : "The queue emptied before reaching the target.");
-
-  const pathHtml = view.path && view.path.length
-    ? `<div class="rv-path-result"><small>${vi ? "SHORTEST PATH" : "SHORTEST PATH"}</small>${view.path.map((name, index) => `<b>${requestedVizEsc(name)}</b>${index < view.path.length - 1 ? "<span>→</span>" : ""}`).join("")}<em>${view.distance} ${vi ? "cạnh" : "edge(s)"}</em></div>`
-    : "";
-
-  requestedVizSet(`${requestedVizPhases(vi ? ["Start + bimap", "Dequeue FIFO", "Xét neighbor", "Dựng path"] : ["Start + bimap", "FIFO dequeue", "Inspect neighbors", "Reconstruct path"], phaseIndex)}
-    <div class="rv-action-banner"><b>${requestedVizEsc((view.phase || "state").toUpperCase())}</b><span>${requestedVizEsc(actionText)}</span></div>
-    ${pathHtml}
-    <div class="rv-two-column rv-bfs-workspace">
-      <section class="rv-panel"><h4>${vi ? "Graph — màu thể hiện trạng thái BFS" : "Graph — colors show BFS state"}</h4>${requestedBfsGraph(view)}
-        <div class="rv-legend"><span class="queued">${vi ? "trong queue" : "queued"}</span><span class="current">${vi ? "đang mở rộng" : "current"}</span><span class="expanded">expanded</span><span class="path">path</span></div>
-      </section>
-      <section class="rv-panel rv-bfs-side"><h4>Queue · FRONT → BACK</h4><div class="rv-queue">${queueHtml}</div>
-        <h4>distance + parent</h4><div class="rv-table-scroll"><table class="rv-data-table"><thead><tr><th>node</th><th>d</th><th>parent</th><th>state</th></tr></thead><tbody>${parentHtml}</tbody></table></div>
-      </section>
-    </div>`,
-  vi ? `BFS từ ${view.start} tới ${view.target}` : `BFS from ${view.start} to ${view.target}`);
+  const operation = view.operation || view.phase;
+  const nodes = view.nodes || [];
+  const queue = view.queue || [];
+  const path = view.path || [];
+  const current = nodes.find((node) => node.id === view.current);
+  const neighbor = nodes.find((node) => node.id === view.neighbor);
+  const phaseIndex = ["graph", "init"].includes(view.phase) ? 0 : view.phase === "done" ? 3 : view.phase === "reconstruct" ? 2 : 1;
+  const discovered = nodes.filter((node) => node.discovered ?? node.distance !== null);
+  const names = {
+    import: ["Nạp thư viện", "Import"], call: ["Nhận graph, start và target", "Read graph, start and target"], "graph-init": ["Tạo danh sách neighbor", "Initialize neighbor lists"], "edge-loop": ["Đọc một cạnh", "Read an edge"], "append-left": ["Thêm neighbor chiều thứ nhất", "Add the first neighbor direction"], "append-right": ["Thêm neighbor chiều ngược lại", "Add the reverse neighbor direction"], "sort-loop": ["Chọn danh sách cần sắp xếp", "Choose a neighbor list"], "sort-neighbors": ["Sắp xếp thứ tự neighbor", "Sort neighbors"],
+    "queue-init": ["Đưa start vào queue", "Put start in the queue"], "parent-init": ["Đánh dấu start đã phát hiện", "Mark start discovered"], "distance-init": ["Khoảng cách của start là 0", "Set start distance to 0"], "while-check": ["Queue còn node để xử lý?", "Does the queue have work?"], dequeue: ["Lấy node ở đầu queue", "Remove the front node"], "target-check": ["Node này là target?", "Is this node the target?"], break: ["Đã tới target · dừng BFS", "Target reached · stop BFS"],
+    "neighbor-loop": ["Xét một neighbor", "Inspect a neighbor"], "visited-check": ["Neighbor đã phát hiện chưa?", "Was this neighbor discovered?"], continue: ["Đã phát hiện · bỏ qua", "Already discovered · skip"], "set-parent": ["Ghi nhớ đường đến neighbor", "Remember how to reach the neighbor"], "set-distance": ["Tính khoảng cách mới", "Compute the new distance"], enqueue: ["Thêm neighbor vào cuối queue", "Add neighbor at the back"],
+    "reachable-check": ["Có thể đi tới target?", "Is the target reachable?"], "return-empty": ["Không có đường đi", "No path exists"], "path-init": ["Tạo path rỗng", "Initialize path"], "cursor-init": ["Bắt đầu từ target", "Start from target"], "parent-loop": ["Đã đi hết chuỗi parent?", "Is the parent chain finished?"], "path-append": ["Thêm node vào path ngược", "Append to the backward path"], "follow-parent": ["Đi ngược về parent", "Follow the parent backward"], "path-reverse": ["Đảo path thành start → target", "Reverse path to start → target"], return: ["Trả đường đi ngắn nhất", "Return the shortest path"],
+  };
+  const parentName = (node) => node?.discovered ? node.isStart ? "None (start)" : node.parent ?? "—" : "—";
+  let explanation = typeof view.actionText === "object" ? view.actionText?.[vi ? "vi" : "en"] : view.actionText;
+  let equation = "";
+  if (operation === "dequeue") {
+    explanation = vi ? `${current?.name} được lấy ra khỏi đầu queue. Đây là node đang xử lý, không còn nằm trong queue.` : `${current?.name} was removed from the front. It is the current node and is no longer in the queue.`;
+    equation = `queue.popleft() → ${current?.name}`;
+  } else if (operation === "visited-check" || operation === "continue") {
+    explanation = view.reason === "already-discovered" ? (vi ? `${neighbor?.name} đã có trong parent. Giữ nguyên parent và distance, không thêm vào queue lần nữa.` : `${neighbor?.name} is already in parent. Keep its parent and distance; do not queue it again.`) : (vi ? `${neighbor?.name} chưa có trong parent. Các dòng tiếp theo sẽ gán parent, distance rồi thêm vào queue.` : `${neighbor?.name} is not in parent yet. The next instructions set its parent and distance, then enqueue it.`);
+    equation = `${neighbor?.name} ${view.reason === "already-discovered" ? "∈" : "∉"} parent`;
+  } else if (operation === "set-parent") {
+    explanation = vi ? `Lần đầu phát hiện ${neighbor?.name} từ ${current?.name}. Parent cho biết phải quay về node nào khi dựng path.` : `${neighbor?.name} was first discovered from ${current?.name}. Its parent tells us where to go backward when building the path.`;
+    equation = `parent[${neighbor?.name}] = ${current?.name}`;
+  } else if (operation === "set-distance") {
+    explanation = vi ? `Đi từ ${current?.name} sang ${neighbor?.name} qua thêm một cạnh.` : `Moving from ${current?.name} to ${neighbor?.name} adds one edge.`;
+    equation = `d[${neighbor?.name}] = ${current?.distance} + 1 = ${neighbor?.distance}`;
+  } else if (operation === "enqueue") {
+    explanation = vi ? `${neighbor?.name} được thêm ở cuối queue. Node ở đầu sẽ được xử lý trước.` : `${neighbor?.name} was added at the back. The node at the front will be processed first.`;
+    equation = `queue.append(${neighbor?.name})`;
+  } else if (operation === "path-append") {
+    explanation = vi ? `Thêm ${current?.name} vào path đang thu thập từ target về start. Path này chưa được đảo.` : `Append ${current?.name} while collecting the path from target back to start. This path has not been reversed yet.`;
+    equation = `path.append(${current?.name})`;
+  } else if (operation === "follow-parent") {
+    const last = path.at(-1);
+    explanation = current ? (vi ? `Từ ${last}, đi về parent là ${current.name}.` : `From ${last}, move back to its parent ${current.name}.`) : (vi ? "Parent của start là None: đã đi hết chuỗi parent." : "The start's parent is None: the parent chain is finished.");
+    equation = `node = parent[${last}] → ${current?.name ?? "None"}`;
+  } else if (operation === "path-reverse") {
+    explanation = vi ? "Đảo thứ tự vừa thu thập để đường đi bắt đầu ở start và kết thúc ở target." : "Reverse the collected order so the route begins at start and ends at target.";
+    equation = "path.reverse()";
+  }
+  const instruction = `<section class="rv-bfs-instruction${operation === "continue" ? " skip" : ""}">${current || neighbor ? `<header><span><small>${view.phase === "reconstruct" ? (vi ? "Cursor" : "Cursor") : vi ? "Đang xử lý" : "Current"}</small><b>${requestedVizEsc(current?.name ?? "—")}</b></span>${neighbor ? `<i>→</i><span><small>${vi ? "Neighbor đang xét" : "Neighbor"}</small><b>${requestedVizEsc(neighbor.name)}</b></span>` : ""}</header>` : ""}${equation ? `<code>${requestedVizEsc(equation)}</code>` : ""}<p>${requestedVizEsc(explanation || (vi ? "State phản ánh đúng dòng code đang sáng." : "The state reflects the highlighted source instruction."))}</p>${neighbor && ["neighbor-loop", "visited-check", "continue", "set-parent", "set-distance", "enqueue"].includes(operation) ? `<div class="rv-bfs-neighbor-facts"><span class="${operation === "set-parent" ? "focus" : ""}"><small>parent[${requestedVizEsc(neighbor.name)}]</small><b>${requestedVizEsc(parentName(neighbor))}</b></span><span class="${operation === "set-distance" ? "focus" : ""}"><small>distance</small><b>${neighbor.distance ?? "—"}</b></span><span class="${operation === "enqueue" ? "focus" : ""}"><small>${vi ? "Trong queue?" : "In queue?"}</small><b>${queue.some((item) => item.id === neighbor.id) ? (vi ? "Có" : "Yes") : vi ? "Không" : "No"}</b></span></div>` : ""}</section>`;
+  const queueItem = (item, index) => `<article class="rv-bfs-q-item${index === 0 ? " front" : ""}${operation === "enqueue" && item.id === neighbor?.id ? " focus" : ""}"><small>${index === 0 ? (vi ? "ĐẦU" : "FRONT") : index === queue.length - 1 ? (vi ? "CUỐI" : "BACK") : `#${index + 1}`}</small><b>${requestedVizEsc(item.name)}</b><span>d=${item.distance ?? "—"}</span></article>`;
+  const visibleQueue = queue.length > 6 ? `${queue.slice(0, 4).map(queueItem).join("")}<span class="rv-bfs-q-gap">⋯ +${queue.length - 5}</span>${queueItem(queue.at(-1), queue.length - 1)}` : queue.map(queueItem).join("");
+  const queuePanel = `<section class="rv-panel rv-bfs-queue-panel"><header><h4>${vi ? "Queue · lấy ở đầu, thêm ở cuối" : "Queue · remove front, add back"}</h4><span>${queue.length}</span></header><div class="rv-bfs-queue-items">${queue.length ? visibleQueue : `<div class="rv-bfs-empty">${view.queueReady === false ? (vi ? "Queue chưa khởi tạo." : "Queue is not initialized.") : vi ? "Queue rỗng." : "The queue is empty."}</div>`}</div>${queue.length > 6 ? `<details><summary>+${queue.length - 5} ${vi ? "node ở giữa" : "middle nodes"}</summary><div class="rv-bfs-queue-items">${queue.slice(4, -1).map((item, index) => queueItem(item, index + 4)).join("")}</div></details>` : ""}</section>`;
+  const forwardPath = operation === "path-reverse" || view.phase === "done";
+  const pathPanel = `<section class="rv-panel rv-bfs-route${view.phase === "done" && path.length ? " done" : ""}"><header><h4>${forwardPath ? (vi ? "Đường đi · start → target" : "Route · start → target") : vi ? "Thu thập path · target → start" : "Collect path · target → start"}</h4>${forwardPath && path.length ? `<span>${view.distance} ${vi ? "cạnh" : "edges"}</span>` : ""}</header>${path.length ? `<ol>${path.map((name, index) => `<li${operation === "path-append" && index === path.length - 1 ? ' class="focus"' : ""}><small>#${index + 1}${index ? " →" : ""}</small><b>${requestedVizEsc(name)}</b></li>`).join("")}</ol>` : `<div class="rv-bfs-empty">${view.phase === "done" ? (vi ? "Không có đường đi tới target." : "There is no path to the target.") : vi ? "Path đang rỗng; bắt đầu ở target." : "The path is empty; begin at target."}</div>`}</section>`;
+  const graphPanel = `<section class="rv-panel rv-bfs-graph-panel"><header><h4>${vi ? "Graph vô hướng" : "Undirected graph"}</h4><span>${nodes.length} nodes</span></header>${requestedBfsGraph(view)}<footer class="rv-bfs-map-legend"><span class="queued">${vi ? "Xanh: trong queue" : "Blue: queued"}</span><span class="current">${vi ? "Vàng: đang xử lý" : "Gold: current"}</span><span class="path">${vi ? "Xanh lá: path" : "Green: path"}</span></footer></section>`;
+  const states = vi ? { unseen: "Chưa phát hiện", discovered: "Đã có parent", queued: "Trong queue", current: "Đang xử lý", expanded: "Đã xét xong", path: "Trong path" } : { unseen: "Unseen", discovered: "Has parent", queued: "Queued", current: "Current", expanded: "Expanded", path: "In path" };
+  const records = `<details class="rv-bfs-node-details"><summary>${vi ? "Xem distance và parent của mọi node" : "View every node's distance and parent"} · ${discovered.length}/${nodes.length}</summary><div>${nodes.map((node) => `<article class="rv-bfs-record ${requestedVizEsc(node.status)}"><header><b>#${node.id + 1} · ${requestedVizEsc(node.name)}</b><small>${requestedVizEsc(states[node.status] || node.status)}</small></header><div><span>d = <b>${node.distance ?? "—"}</b></span><span>parent = <b>${requestedVizEsc(parentName(node))}</b></span></div></article>`).join("")}</div></details>`;
+  const adjacencyRows = view.adjacency || [];
+  const activeAdjacency = adjacencyRows.find((row) => row.id === view.current);
+  const adjacencyPanel = `<details class="rv-bfs-adjacency"${view.phase === "graph" && view.graphReady && nodes.length <= 6 ? " open" : ""}><summary>${vi ? "Danh sách neighbor · mỗi cạnh có 2 chiều" : "Neighbor lists · each edge has 2 directions"}</summary><div>${(activeAdjacency ? [activeAdjacency, ...adjacencyRows.filter((row) => row.id !== activeAdjacency.id)] : adjacencyRows).map((row) => `<article class="${row.id === view.current ? "focus" : ""}"><b>${requestedVizEsc(row.name)}</b><span>→ ${row.neighbors.map(requestedVizEsc).join(", ") || "∅"}</span></article>`).join("")}</div></details>`;
+  requestedVizSet(`<div class="rv-bfs-9006 phase-${requestedVizEsc(view.phase || "init")}">
+    ${requestedVizPhases(vi ? ["Dựng graph", "BFS theo lớp", "Dựng path", "Kết quả"] : ["Build graph", "BFS layers", "Build path", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(names[operation]?.[vi ? 0 : 1] || operation)}</b></div>
+    <div class="rv-bfs-endpoints"><span><small>START</small><b>${requestedVizEsc(view.start)}</b></span><i>→</i><span><small>TARGET</small><b>${requestedVizEsc(view.target)}</b></span></div>
+    <div class="rv-bfs-summary"><span><small>Queue</small><b>${view.queueReady === false ? "—" : queue.length}</b></span><span><small>${vi ? "Đã phát hiện" : "Discovered"}</small><b>${discovered.length}<em> / ${nodes.length}</em></b></span><span><small>d(target)</small><b>${view.distance ?? "—"}</b></span></div>
+    ${view.phase !== "done" ? instruction : `<div class="rv-bfs-result-note${path.length ? " found" : " unreachable"}"><b>${path.length ? (vi ? `Đường đi ngắn nhất: ${view.distance} cạnh` : `Shortest path: ${view.distance} edges`) : vi ? "Target không thể tới được" : "Target is unreachable"}</b><span>${path.length ? (vi ? "BFS xử lý các node gần start trước, nên lần phát hiện đầu tiên cho khoảng cách ngắn nhất." : "BFS processes closer nodes first, so first discovery gives the shortest distance.") : vi ? "Queue đã rỗng và target vẫn chưa có parent. Trả []." : "The queue is empty and target has no parent. Return []."}</span></div>`}
+    ${view.phase === "done" || view.phase === "reconstruct" && view.pathReady !== false ? pathPanel : view.phase !== "graph" && view.phase !== "reconstruct" ? queuePanel : ""}
+    ${nodes.length > 10 && view.phase !== "graph" ? `<details class="rv-bfs-big-graph"><summary>${vi ? "Xem toàn bộ graph" : "View the full graph"}</summary>${graphPanel}</details>` : graphPanel}
+    ${view.phase !== "graph" ? records : ""}${adjacencyPanel}
+    <footer class="rv-bfs-rule">${vi ? "distance = số cạnh từ start · parent = node dẫn tới lần đầu" : "distance = edges from start · parent = first-discovery predecessor"}</footer></div>`,
+  vi ? `BFS từ ${view.start} tới ${view.target}` : `BFS from ${view.start} to ${view.target}`, "group");
 }
 
 // ─── #9001: lazy max-heap profit tracker ────────────────────────────────────
@@ -237,62 +290,101 @@ function renderProfitTracker9001View(step) {
 // ─── #9013: perfect-square arrangement ─────────────────────────────────────
 function requestedSquareGraph(view) {
   const nodes = view.nodes || [];
-  const width = 680;
-  const height = 410;
-  const cx = width / 2;
-  const cy = height / 2;
-  const radius = Math.min(158, 60 + nodes.length * 7);
-  const positions = new Map(nodes.map((node, index) => {
-    const angle = (Math.PI * 2 * index) / Math.max(1, nodes.length) - Math.PI / 2;
-    return [node.value, { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) }];
+  if (!nodes.length) return `<div class="rv-square-idle">${lang === "vi" ? "Graph xuất hiện sau khi tạo values." : "The graph appears after values are initialized."}</div>`;
+  const edges = view.edges || [];
+  const neighbors = new Map(nodes.map((node) => [node.value, []]));
+  edges.forEach((edge) => { neighbors.get(edge.u)?.push(edge.v); neighbors.get(edge.v)?.push(edge.u); });
+  const order = (a, b) => neighbors.get(a).length - neighbors.get(b).length || a - b;
+  const seen = new Set();
+  const layout = [];
+  for (const start of nodes.map((node) => node.value).sort(order)) {
+    if (seen.has(start)) continue;
+    const queue = [start];
+    seen.add(start);
+    for (let i = 0; i < queue.length; i++) {
+      const value = queue[i];
+      layout.push(value);
+      for (const next of [...neighbors.get(value)].sort(order)) {
+        if (!seen.has(next)) { seen.add(next); queue.push(next); }
+      }
+    }
+  }
+  const columns = Math.min(5, nodes.length);
+  const width = columns * 72;
+  const height = Math.ceil(nodes.length / columns) * 70;
+  const positions = new Map(layout.map((value, index) => {
+    const row = Math.floor(index / columns);
+    const column = row % 2 ? columns - 1 - index % columns : index % columns;
+    return [value, { x: 36 + column * 72, y: 35 + row * 70 }];
   }));
-  const edges = (view.edges || []).map((edge) => {
+  const edgeSvg = edges.map((edge) => {
     const a = positions.get(edge.u);
     const b = positions.get(edge.v);
     if (!a || !b) return "";
-    const mx = (a.x + b.x) / 2;
-    const my = (a.y + b.y) / 2;
-    return `<g class="rv-square-edge${edge.inPath ? " path" : ""}${edge.current ? " current" : ""}"><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><rect x="${mx - 13}" y="${my - 9}" width="26" height="18" rx="6"/><text x="${mx}" y="${my + 4}" text-anchor="middle">${edge.sum}</text></g>`;
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    const curve = distance > 73 ? `Q ${(a.x + b.x) / 2 - (b.y - a.y) / distance * 50} ${(a.y + b.y) / 2 + (b.x - a.x) / distance * 50}` : "L";
+    return `<path class="rv-square-net-edge${edge.inPath ? " path" : ""}${edge.current ? " current" : ""}" d="M ${a.x} ${a.y} ${curve} ${b.x} ${b.y}"/>`;
   }).join("");
   const nodeSvg = nodes.map((node) => {
     const p = positions.get(node.value);
     const focus = node.value === view.focus;
-    return `<g class="rv-square-node ${requestedVizEsc(node.state)}${focus ? " focus" : ""}"><circle cx="${p.x}" cy="${p.y}" r="22"/><text x="${p.x}" y="${p.y + 5}" text-anchor="middle">${node.value}</text></g>`;
+    return `<g class="rv-square-net-node ${requestedVizEsc(node.state)}${focus ? " current" : ""}"><circle cx="${p.x}" cy="${p.y}" r="17"/><text x="${p.x}" y="${p.y + 5}" text-anchor="middle">${node.value}</text></g>`;
   }).join("");
-  return `<div class="rv-square-graph"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges}${nodeSvg}</svg></div>`;
+  return `<div class="rv-square-network"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edgeSvg}${nodeSvg}</svg></div>`;
 }
 
 function renderSquare9013View(step) {
   const view = step.square9013View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "graph" ? 0 : ["start", "choose", "try"].includes(view.phase) ? 1 : ["dead-end", "backtrack"].includes(view.phase) ? 2 : 3;
-  const pathHtml = (view.path || []).length
-    ? view.path.map((value, index) => {
-      const next = view.path[index + 1];
-      return `<div class="rv-path-node"><b>${value}</b><small>depth ${index + 1}</small></div>${next ? `<div class="rv-path-link"><span>+</span><strong>${value + next}=${Math.sqrt(value + next)}²</strong><span>→</span></div>` : ""}`;
-    }).join("")
-    : requestedVizEmpty(vi ? "Path đang rỗng" : "The path is empty");
-  const candidates = (view.candidates || []).length
-    ? view.candidates.map((value) => `<span class="rv-candidate-chip${value === view.attempted ? " active" : ""}"><b>${value}</b><small>${view.focus ? `${view.focus}+${value}=${view.focus + value}` : "legal"}</small></span>`).join("")
-    : requestedVizEmpty(vi ? "Không có legal-next" : "No legal next node");
-  let action = vi ? "Dựng cạnh khi tổng là số chính phương." : "Create an edge when the sum is a perfect square.";
-  if (view.phase === "choose") action = vi ? "Đưa node vào recursion path và khóa node đó." : "Push the node onto the recursion path and mark it used.";
-  else if (view.phase === "try") action = vi ? "Cạnh hợp lệ; đi sâu thêm một level." : "The edge is legal; recurse one level deeper.";
-  else if (view.phase === "dead-end") action = vi ? "Path chưa đủ n nhưng không còn neighbor → nhánh thất bại." : "The path is incomplete and has no unused neighbor → branch failure.";
-  else if (view.phase === "backtrack") action = vi ? "Bỏ lựa chọn cuối và thử candidate kế tiếp ở level trước." : "Remove the last choice and try the next candidate at the previous level.";
-  else if (view.phase === "done") action = view.solution ? (vi ? "Đã dùng mỗi số đúng một lần." : "Every number is used exactly once.") : (vi ? "Không còn nhánh hợp lệ." : "No legal branch remains.");
-
-  requestedVizSet(`${requestedVizPhases(vi ? ["Compatibility graph", "DFS chọn node", "Dead end + backtrack", "Arrangement"] : ["Compatibility graph", "DFS choices", "Dead end + backtrack", "Arrangement"], phaseIndex)}
-    <div class="rv-action-banner"><b>${requestedVizEsc((view.phase || "state").toUpperCase())}</b><span>${requestedVizEsc(action)}</span></div>
-    <div class="rv-square-stats"><span><small>${vi ? "đã thử" : "attempts"}</small><b>${view.attempts || 0}</b></span><span><small>backtracks</small><b>${view.backtracks || 0}</b></span><span><small>depth</small><b>${(view.path || []).length}/${view.n}</b></span>${view.omitted ? `<span><small>${vi ? "state ẩn" : "hidden states"}</small><b>${view.omitted}</b></span>` : ""}</div>
-    <section class="rv-panel"><h4>${vi ? "Path hiện tại — mỗi connector chứng minh tổng square" : "Current path — every connector proves a square sum"}</h4><div class="rv-square-path">${pathHtml}</div></section>
-    <div class="rv-two-column rv-square-workspace">
-      <section class="rv-panel"><h4>${vi ? "Compatibility graph (nhãn cạnh = tổng)" : "Compatibility graph (edge label = sum)"}</h4>${requestedSquareGraph(view)}</section>
-      <section class="rv-panel"><h4>${vi ? "Legal-next, sắp theo degree nhỏ trước" : "Legal next nodes, low degree first"}</h4><div class="rv-candidate-chips">${candidates}</div>
-        <div class="rv-callout compact">${vi ? "Màu xanh: đang ở path · vàng: đang thử · đỏ: dead end/backtrack" : "Green: on path · amber: trying · red: dead end/backtrack"}</div>
-      </section>
-    </div>`,
-  vi ? `Backtracking square arrangement n=${view.n}` : `Square-arrangement backtracking for n=${view.n}`);
+  const operation = view.operation || view.phase;
+  const phaseIndex = view.phase === "graph" ? 0 : view.phase === "done" ? 3 : ["dead-end", "backtrack"].includes(view.phase) ? 2 : 1;
+  const path = view.path || [];
+  const used = Array.isArray(view.used) ? view.used : null;
+  const nodes = view.nodes || [];
+  const solved = view.phase === "done" && Array.isArray(view.solution) && view.solution.length === view.n;
+  const operations = {
+    call: ["Nhận n", "Read n"], "define-is-square": ["Tạo hàm kiểm tra square", "Define square check"], "build-values": ["Tạo dãy 1..n", "Build values 1..n"], "build-graph": ["Dựng compatibility graph", "Build compatibility graph"],
+    "path-init": ["Tạo path rỗng", "Initialize path"], "used-init": ["Tạo used Set", "Initialize used set"], "define-dfs": ["Định nghĩa DFS", "Define DFS"], "sort-starts": ["Sắp xếp điểm bắt đầu", "Sort starting values"], "start-loop": ["Chọn điểm bắt đầu", "Choose starting value"], "call-dfs": ["Gọi DFS", "Call DFS"],
+    "path-append": ["Thêm node vào path", "Append node to path"], "mark-used": ["Đánh dấu node đã dùng", "Mark node used"], "complete-check": ["Kiểm tra độ dài path", "Check path length"], "build-candidates": ["Lấy neighbor chưa dùng", "Find unused neighbors"], "candidate-loop": ["Chọn candidate", "Choose candidate"], recurse: ["Đi sâu vào DFS", "Recurse into DFS"],
+    "child-result": ["Nhận kết quả nhánh con", "Receive child result"], "child-check": ["Kiểm tra nhánh con", "Check child result"], "return-true": ["Trả True", "Return True"], "unmark-used": ["Bỏ đánh dấu used", "Unmark used node"], "path-pop": ["Bỏ node cuối khỏi path", "Pop last path node"], "return-false": ["Trả False", "Return False"], "dfs-result": ["Nhận kết quả DFS", "Receive DFS result"], "found-check": ["Kiểm tra kết quả DFS", "Check DFS result"], "return-path": ["Trả arrangement", "Return arrangement"], "return-empty": ["Không có arrangement", "No arrangement exists"],
+  };
+  const pathTiles = path.map((value, index) => {
+    const previous = path[index - 1];
+    return `<li class="${operation === "path-append" && index === path.length - 1 ? "focus" : ""}"><header><small>#${index + 1}</small><b>${value}</b></header><span>${index ? `${previous}+${value}=${Math.sqrt(previous + value)}²` : vi ? "bắt đầu" : "start"}</span></li>`;
+  }).join("");
+  const pathPanel = `<section class="rv-panel rv-square-route${solved ? " solved" : ""}${operation === "path-pop" ? " removed" : ""}"><header><h4>${solved ? (vi ? "Arrangement tìm được" : "Found arrangement") : (vi ? "Path hiện tại" : "Current path")}</h4><span>${path.length}/${view.n}</span></header>${path.length ? `<ol>${pathTiles}</ol>` : `<div class="rv-square-idle">${view.pathReady === false ? (vi ? "Path chưa được khởi tạo." : "Path is not initialized yet.") : vi ? "Path đang rỗng." : "The path is empty."}</div>`}</section>`;
+  const membership = `<section class="rv-panel rv-square-used${["mark-used", "unmark-used"].includes(operation) ? " focus" : ""}"><header><h4>used Set</h4><span>${used ? used.length : "—"}</span></header>${used ? `<div>${nodes.map((node) => `<span class="${used.includes(node.value) ? "locked" : "free"}${node.value === view.focus ? " current" : ""}">${node.value}</span>`).join("")}</div><footer>${vi ? "Xanh lá: đã dùng · nhạt: còn trống" : "Green: used · muted: available"}</footer>` : `<div class="rv-square-idle">${vi ? "Set chưa được khởi tạo." : "The set is not initialized yet."}</div>`}</section>`;
+  const startFrame = ["sort-starts", "start-loop", "call-dfs", "dfs-result", "found-check"].includes(operation);
+  const candidateFrame = startFrame || ["build-candidates", "candidate-loop", "recurse", "child-result", "child-check", "unmark-used", "path-pop", "return-false"].includes(operation) || operation === "return-true" && view.reason === "child-success";
+  const candidates = (view.candidates || []).map((value) => {
+    const degree = nodes.find((node) => node.value === value)?.degree ?? 0;
+    return `<span class="rv-square-choice${value === view.attempted ? " current" : ""}${used?.includes(value) ? " used" : ""}"><b>${value}</b><small>deg ${degree}${used?.includes(value) ? " · used" : ""}</small></span>`;
+  }).join("");
+  const candidatePanel = candidateFrame ? `<section class="rv-panel rv-square-options${view.phase === "dead-end" ? " dead-end" : ""}"><h4>${startFrame ? (vi ? "Điểm bắt đầu · degree nhỏ trước" : "Starting values · lower degree first") : vi ? `Candidates của dfs(${view.focus}) · snapshot dòng 12` : `Candidates of dfs(${view.focus}) · line 12 snapshot`}</h4><div>${candidates || `<span class="rv-square-idle">${vi ? "Không còn neighbor chưa dùng." : "No unused neighbors remain."}</span>`}</div></section>` : "";
+  const currentValue = Number.isInteger(view.focus) ? view.focus : view.attempted;
+  let expression = "";
+  if (operation === "path-append") expression = `path.append(${currentValue})`;
+  else if (operation === "mark-used") expression = `used.add(${currentValue})`;
+  else if (operation === "unmark-used") expression = `used.remove(${currentValue})`;
+  else if (operation === "path-pop") expression = `path.pop() → ${currentValue}`;
+  else if (operation === "complete-check") expression = `len(path) == n → ${view.reason === "complete" ? "True" : "False"}`;
+  else if (operation === "recurse" || operation === "candidate-loop") expression = `${view.focus}+${view.attempted}=${Math.sqrt(view.focus + view.attempted)}² → dfs(${view.attempted})`;
+  else if (operation === "call-dfs") expression = `dfs(${view.attempted})`;
+  else if (operation === "return-true") expression = "return True";
+  else if (operation === "return-false") expression = "return False";
+  else if (["child-result", "child-check", "dfs-result", "found-check"].includes(operation)) expression = `${["child-result", "child-check"].includes(operation) ? "child_ok" : "found"} = ${["success", "true"].includes(view.reason) ? "True" : "False"}`;
+  else if (operation === "build-candidates") expression = `${(view.candidates || []).length} ${vi ? "neighbor chưa dùng" : "unused neighbors"}`;
+  const action = expression ? `<div class="rv-square-instruction${["dead-end", "backtrack"].includes(view.phase) ? " backtrack" : ""}"><small>${Number.isInteger(currentValue) ? `dfs(${currentValue})` : "DFS"}</small><code>${requestedVizEsc(expression)}</code>${view.phase === "dead-end" ? `<span>${vi ? "Path chưa đủ n; nhánh này phải quay lui." : "The path is incomplete; this branch must backtrack."}</span>` : ""}</div>` : "";
+  const graphPanel = `<section class="rv-panel rv-square-overview"><header><h4>Compatibility graph</h4><span>${(view.edges || []).length} ${vi ? "cạnh" : "edges"}</span></header>${requestedSquareGraph(view)}<footer>${vi ? "Cạnh a—b ⇔ a+b là square · xanh lá: path" : "Edge a—b ⇔ a+b is square · green: path"}</footer>${(view.edges || []).length ? `<details><summary>${vi ? "Xem tổng trên từng cạnh" : "View each edge sum"}</summary><div class="rv-square-edge-proofs">${view.edges.map((edge) => `<span>${edge.u}+${edge.v}=${edge.root}²</span>`).join("")}</div></details>` : ""}</section>`;
+  requestedVizSet(`<div class="rv-square-9013 phase-${requestedVizEsc(view.phase || "search")}">
+    ${requestedVizPhases(vi ? ["Dựng graph", "Chọn node", "Quay lui", "Kết quả"] : ["Build graph", "Choose node", "Backtrack", "Results"], phaseIndex)}
+    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(operations[operation]?.[vi ? 0 : 1] || operation)}</b></div>
+    <div class="rv-square-summary"><span><small>Path</small><b>${path.length}<em> / ${view.n}</em></b></span><span><small>Used</small><b>${used ? used.length : "—"}</b></span><span><small>${vi ? "Lần gọi DFS" : "DFS calls"}</small><b>${view.attempts || 0}</b></span><span><small>${vi ? "Quay lui" : "Backtracks"}</small><b>${view.backtracks || 0}</b></span></div>
+    ${view.phase === "graph" ? graphPanel : view.phase === "done" ? `${solved ? pathPanel : `<section class="rv-panel rv-square-no-solution"><b>${vi ? "Không tìm được arrangement" : "No arrangement exists"}</b><span>${vi ? "Mọi điểm bắt đầu và nhánh hợp lệ đều đã thất bại." : "Every starting value and legal branch failed."}</span></section>`}<div class="rv-square-verdict">${solved ? (vi ? "✓ Mỗi số xuất hiện đúng một lần; mọi tổng kề đều là square." : "✓ Every value appears once; every adjacent sum is square.") : (vi ? "Kết quả: []" : "Result: []")}</div>` : `${action}${pathPanel}${candidatePanel}${membership}`}
+    ${view.phase !== "graph" ? `<details class="rv-square-graph-details"><summary>${vi ? "Xem compatibility graph" : "View compatibility graph"}</summary>${graphPanel}</details>` : ""}
+    ${view.omitted ? `<div class="rv-square-trace-note">${view.omitted} ${vi ? "instruction trung gian đã thu gọn; kết quả cuối vẫn đầy đủ." : "intermediate instructions omitted; the final result is complete."}</div>` : ""}
+    <footer class="rv-square-rule">${vi ? "Mỗi số dùng một lần · tổng hai số kề là số chính phương" : "Use each value once · adjacent values sum to a perfect square"}</footer></div>`,
+  vi ? `Backtracking square arrangement n=${view.n}` : `Square-arrangement backtracking for n=${view.n}`, "group");
 }
 
 // ─── #9014: loyal customers ─────────────────────────────────────────────────
@@ -593,21 +685,7 @@ renderProfitTracker9001View = function renderProfitTracker9001LineDebugView(step
   decorateRequestedLineDebug(step, view, { operation: view.action?.type || view.phase });
 };
 
-const renderBfs9006GroupedView = renderBfs9006View;
-renderBfs9006View = function renderBfs9006LineDebugView(step) {
-  renderBfs9006GroupedView(step);
-  const view = step.bfs9006View || {};
-  decorateRequestedLineDebug(step, view, {
-    detail: view.actionText || step.note,
-  });
-};
 
-const renderSquare9013GroupedView = renderSquare9013View;
-renderSquare9013View = function renderSquare9013LineDebugView(step) {
-  renderSquare9013GroupedView(step);
-  const view = step.square9013View || {};
-  decorateRequestedLineDebug(step, view, { detail: step.note });
-};
 
 
 
