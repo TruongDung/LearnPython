@@ -1,5 +1,8 @@
+from typing import List
+
+
 class Solution:
-    def findLongestWord(self, s: str, dictionary: list[str]) -> str:
+    def findLongestWord(self, s: str, dictionary: List[str]) -> str:
         best = ""
         for word in dictionary:
             i, j = 0, 0
