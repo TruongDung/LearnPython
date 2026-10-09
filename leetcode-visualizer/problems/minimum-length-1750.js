@@ -43,7 +43,7 @@ function buildSteps(input) {
       arr: [], highlight: [], mark: [], codeLines: [line], title, note, final: phase === "done",
       vars: [{ name: "left", value: left }, { name: "right", value: right }, ...(char === null ? [] : [{ name: "char", value: char }])],
       similarEnds1750View: {
-        length: s.length, left, right, round, char, phase, startLeft, startRight, remaining, remainingPreview,
+        length: s.length, left, right, round, completedRounds: history.length, char, phase, startLeft, startRight, remaining, remainingPreview,
         leftChar: left <= right ? s[left] : null, rightChar: left <= right ? s[right] : null,
         cells: [...positions].sort((a, b) => a - b).map(index => ({ index, char: s[index] })),
         originalPreview: preview(s), omitted, activeIndex: extra.activeIndex ?? null,
