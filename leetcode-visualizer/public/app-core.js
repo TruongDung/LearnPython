@@ -6089,7 +6089,7 @@ function renderPathSumIIIView(step) {
   const proofClass = matches.length ? "match" : lookupReady ? "none" : "waiting";
   const proofHtml = `<section class="ps437-proof ${proofClass}">
     <small>${vi ? "PHÉP TRỪ QUAN TRỌNG" : "THE KEY SUBTRACTION"}</small>
-    <div><span><em>running</em><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b><span><em>needed</em><strong>${escapeHtml(view.needed ?? "?")}</strong></span><b>=</b><span><em>target</em><strong>${escapeHtml(view.target)}</strong></span></div>
+    <div><span><em>curr_sum</em><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b><span><em>needed</em><strong>${escapeHtml(view.needed ?? "?")}</strong></span><b>=</b><span><em>target</em><strong>${escapeHtml(view.target)}</strong></span></div>
     <p>${matches.length
       ? escapeHtml(vi ? `${matches.length} prefix khớp → thêm ${matches.length} path ở node này.` : `${matches.length} matching prefix(es) → add ${matches.length} path(s) at this node.`)
       : escapeHtml(lookupReady ? (vi ? `Không có prefix ${view.needed} trên path hiện tại.` : `Prefix ${view.needed} is absent from the current path.`) : (vi ? "Cộng node rồi tính needed." : "Add the node, then compute needed."))}</p>
@@ -6109,18 +6109,18 @@ function renderPathSumIIIView(step) {
 
   target.innerHTML = `<section class="ps437-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="ps437-phases">${phaseHtml}</div>
-    <section class="ps437-rule"><span><small>${vi ? "MỘT CÔNG THỨC" : "ONE FORMULA"}</small><strong>needed = running − target</strong></span><code>old prefix = needed ⇒ path sum = target</code></section>
+    <section class="ps437-rule"><span><small>${vi ? "MỘT CÔNG THỨC" : "ONE FORMULA"}</small><strong>needed = curr_sum − targetSum</strong></span><code>old prefix = needed ⇒ path sum = target</code></section>
     <section class="ps437-action ${statusTone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Tổng path" : "Paths"}: ${escapeHtml(view.answer)}</em></section>
     <div class="ps437-layout">
       <section class="ps437-tree-card"><header><strong>${vi ? "CÂY · PATH ROOT → CURRENT" : "TREE · ROOT → CURRENT PATH"}</strong><span>${vi ? "cam = current · xanh = path đang dùng" : "amber = current · green = active path"}</span></header><div id="ps437Tree" class="ps437-tree"></div></section>
       <aside class="ps437-side">
-        <section class="ps437-stats"><div><small>TARGET</small><strong>${escapeHtml(view.target)}</strong></div><div><small>RUNNING</small><strong>${escapeHtml(view.running ?? "—")}</strong></div><div><small>NEEDED</small><strong>${escapeHtml(view.needed ?? "—")}</strong></div><div><small>${vi ? "THÊM" : "ADD"}</small><strong>+${escapeHtml(view.added || 0)}</strong></div></section>
+        <section class="ps437-stats"><div><small>TARGET</small><strong>${escapeHtml(view.target)}</strong></div><div><small>CURR_SUM</small><strong>${escapeHtml(view.running ?? "—")}</strong></div><div><small>NEEDED</small><strong>${escapeHtml(view.needed ?? "—")}</strong></div><div><small>${vi ? "THÊM" : "ADD"}</small><strong>+${escapeHtml(view.added || 0)}</strong></div></section>
         ${proofHtml}
         <section class="ps437-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
       </aside>
     </div>
     <section class="ps437-path"><header><strong>${vi ? "PATH HIỆN TẠI VÀ PREFIX TẠI MỖI NODE" : "CURRENT PATH AND EACH NODE'S PREFIX"}</strong><span>${vi ? "P là tổng từ root" : "P is the sum from root"}</span></header><div>${pathHtml}</div></section>
-    <section class="ps437-map"><header><strong>prefix_count</strong><span>${vi ? "chỉ prefix trên path hiện tại" : "only prefixes on the current path"}</span></header><div>${mapHtml}</div></section>
+    <section class="ps437-map"><header><strong>prefix</strong><span>${vi ? "chỉ prefix trên path hiện tại" : "only prefixes on the current path"}</span></header><div>${mapHtml}</div></section>
     <section class="ps437-found"><header><strong>${vi ? "CÁC PATH ĐÃ TÌM THẤY" : "PATHS FOUND"}</strong><span>${vi ? "path có thể bắt đầu ở bất kỳ node" : "a path may start at any node"}</span></header><div>${pathsHtml}</div></section>
   </section>`;
 

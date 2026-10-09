@@ -1,5 +1,6 @@
 const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -7,6 +8,32 @@ const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 const { prepareGenericLiveArgs } = require('../live-args');
 
 const problem = SUPPORTED[437];
+
+const SOURCE = `from collections import defaultdict
+
+class Solution:
+    def pathSum(self, root, targetSum):
+        prefix = defaultdict(int)
+        prefix[0] = 1
+
+        def dfs(node, curr_sum):
+            if not node:
+                return 0
+
+            curr_sum += node.val
+
+            count = prefix[curr_sum - targetSum]
+
+            prefix[curr_sum] += 1
+
+            count += dfs(node.left, curr_sum)
+            count += dfs(node.right, curr_sum)
+
+            prefix[curr_sum] -= 1
+
+            return count
+
+        return dfs(root, 0)`;
 
 function parseCompactTree(input) {
   const values = input;
@@ -74,11 +101,28 @@ test('437 is registered as the Prefix Sum + DFS Path Sum III lesson', () => {
   assert.deepEqual(problem.tags.map(tag => tag.key), ['prefix-sum', 'dfs']);
   assert.equal(problem.complexity.time, 'O(n)');
   assert.equal(problem.complexity.space, 'O(h)');
-  assert.match(problem.code.join('\n'), /needed = running - targetSum/);
-  assert.match(problem.code.join('\n'), /prefix_count\[running\] -= 1  # backtrack/);
+  assert.equal(problem.code.join('\n'), SOURCE);
 
   const order = CATEGORY_ORDER['binary-tree'].order;
   assert.equal(order[order.indexOf(113) + 1], 437);
+});
+
+test('437 requested defaultdict snippet executes the published example', () => {
+  const harness = `
+class TreeNode:
+    def __init__(self, val, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+root = TreeNode(10,
+    TreeNode(5, TreeNode(3, TreeNode(3), TreeNode(-2)), TreeNode(2, None, TreeNode(1))),
+    TreeNode(-3, None, TreeNode(11)))
+assert Solution().pathSum(root, 8) == 3
+assert Solution().pathSum(None, 8) == 0
+`;
+  const executed = spawnSync(process.env.PYTHON || 'python3', ['-c', `${SOURCE}\n${harness}`], { encoding: 'utf8' });
+  assert.equal(executed.status, 0, executed.stderr);
 });
 
 test('437 matches the published examples and tricky repeated-prefix cases', () => {
@@ -134,6 +178,17 @@ test('437 trace teaches lookup before store and removes prefixes during backtrac
   assert.ok(views.every(view => view?.problemId === 437));
   assert.ok(run.steps.every(step => step.codeLines.length <= 1));
   assert.ok(run.steps.every(step => step.codeLines.every(line => line >= 1 && line <= problem.code.length)));
+
+  const lineFor = event => run.steps.find(step => step.pathSumIIIView.event === event).codeLines;
+  assert.deepEqual(lineFor('init-map'), [6]);
+  assert.deepEqual(lineFor('add-node'), [12]);
+  assert.deepEqual(lineFor('compute-needed'), [14]);
+  assert.deepEqual(lineFor('store-prefix'), [16]);
+  assert.deepEqual(lineFor('call-left'), [18]);
+  assert.deepEqual(lineFor('call-right'), [19]);
+  assert.deepEqual(lineFor('remove-prefix'), [21]);
+  assert.deepEqual(lineFor('return-subtree'), [23]);
+  assert.deepEqual(lineFor('done'), [25]);
 
   const events = new Set(views.map(view => view.event));
   for (const event of ['rule', 'init-map', 'enter', 'add-node', 'compute-needed', 'found', 'not-found', 'store-prefix', 'call-left', 'call-right', 'return-null', 'remove-prefix', 'return-subtree', 'done']) {
