@@ -64,7 +64,7 @@ test('1662 validates both arrays and accepts the original 1000-character limit',
 });
 
 test('1662 displayed Python and repository solution agree with examples and edge cases', () => {
-  const repository = fs.readFileSync(require.resolve('../../Leetcode-sln/string/Leetcode_1662.py'),'utf8');
+  const repository = fs.readFileSync(require.resolve('../../Leetcode-sln/string/Leetcode_1662.py'),'utf8').replace(/\r\n/g,'\n');
   assert.equal(repository.split('\n\n\n')[0],problem.code.join('\n'));
   const assertions = cases.map(([word1,word2,expected])=>`assert Solution().arrayStringsAreEqual(${JSON.stringify(word1)}, ${JSON.stringify(word2)}) is ${expected?'True':'False'}`).join('\n');
   const run = spawnSync('python',['-c',problem.code.join('\n')+'\n'+assertions],{encoding:'utf8'});

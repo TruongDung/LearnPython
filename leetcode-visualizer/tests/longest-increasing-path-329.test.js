@@ -88,9 +88,11 @@ test('329 accepts existing compact and JSON formats and validates matrices', () 
   }
   for (const input of ['', '1,;2,3', '1;;2', '[]', '[[1],[2,3]]', [[NaN]], [[1.5]], Array.from({length:7},()=>[1]), [Array(7).fill(1)], null]) assert.throws(()=>problem.builder(input),/329/);
 });
-test('329 displayed Python is the requested DFS, matches the saved solution and executes', () => {
-  const source = fs.readFileSync(require.resolve('../../Leetcode-sln/graph/Leetcode_329.py'),'utf8').trimEnd().replace(/\r\n/g,'\n');
-  assert.equal(source,problem.code.join('\n'));
+test('329 displayed Python is the requested DFS, is preserved in the saved solution and executes', () => {
+  const saved = fs.readFileSync(require.resolve('../../Leetcode-sln/graph/Leetcode_329.py'),'utf8').trimEnd().replace(/\r\n/g,'\n');
+  const source = problem.code.join('\n');
+  const preserved = saved.startsWith('# class Solution:') ? saved.split('\nclass Solution:')[0].split('\n').map(line=>line.startsWith('# ') ? line.slice(2) : line).join('\n').trimEnd() : saved;
+  assert.equal(preserved,source);
   assert.match(source,/rows, cols = len\(matrix\), len\(matrix\[0\]\)/);
   assert.match(source,/res = 0/); assert.match(source,/directions = \[\(1, 0\), \(-1, 0\), \(0, 1\), \(0, -1\)\]/);
   for (const number of [5,2,4,3,1]) assert.ok(source.includes(`# Subproblem ${number}:`));
@@ -98,6 +100,13 @@ test('329 displayed Python is the requested DFS, matches the saved solution and 
   assert.doesNotMatch(source,/next_cell|memo|cached|path =/);
   const checks = cases.map(([matrix,answer])=>`assert Solution().longestIncreasingPath(${JSON.stringify(matrix)}) == ${answer}`).join('\n');
   const run = spawnSync('python3',['-c',source+'\n'+checks],{encoding:'utf8'}); assert.equal(run.status,0,run.stderr);
+});
+
+test('329 saved path-reconstruction variant returns an optimal valid witness', () => {
+  const saved = fs.readFileSync(require.resolve('../../Leetcode-sln/graph/Leetcode_329.py'),'utf8');
+  if (!saved.includes('next_cell')) return;
+  const checks = cases.map(([matrix,answer])=>`matrix = ${JSON.stringify(matrix)}\npath = Solution().longestIncreasingPath(matrix)\nassert len(path) == ${answer}\nassert all(0 <= r < len(matrix) and 0 <= c < len(matrix[0]) for r, c in path)\nassert all(abs(r-nr)+abs(c-nc) == 1 and matrix[r][c] < matrix[nr][nc] for (r,c),(nr,nc) in zip(path,path[1:]))`).join('\n');
+  const run = spawnSync('python3',['-c',saved+'\n'+checks],{encoding:'utf8'}); assert.equal(run.status,0,run.stderr);
 });
 test('329 renders every source phase in both languages with no stale witness', () => {
   const element = { innerHTML: '' }, context = {lang:'vi',$:()=>element,escapeHtml:value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])),pick:value=>value[context.lang]};

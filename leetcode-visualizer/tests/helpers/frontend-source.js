@@ -82,6 +82,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-reverse-only-letters-917.js',
   'renderer-backspace-compare-844.js',
   'renderer-longest-dictionary-word-524.js',
+  'renderer-minimum-length-1750.js',
+  'renderer-increasing-paths-2328.js',
   'script.js',
 ]);
 
@@ -168,6 +170,8 @@ const STYLESHEET_ASSETS = Object.freeze([
   'reverse-only-letters-917.css',
   'backspace-compare-844.css',
   'longest-dictionary-word-524.css',
+  'minimum-length-1750.css',
+  'increasing-paths-2328.css',
 ]);
 
 const sourceCache = new Map();
