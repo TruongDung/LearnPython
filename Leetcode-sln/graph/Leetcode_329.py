@@ -1,9 +1,9 @@
 class Solution:
     def longestIncreasingPath(self, matrix):
-        m, n = len(matrix), len(matrix[0])
+        rows, cols = len(matrix), len(matrix[0])
 
         # Subproblem 5: Memoization
-        dp = [[0] * n for _ in range(m)]
+        dp = [[0] * cols for _ in range(rows)]
 
         # Subproblem 2: Four directions
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
@@ -19,8 +19,8 @@ class Solution:
                 nc = c + dc
 
                 # Subproblem 3: Check valid boundaries and increasing values
-                if (0 <= nr < m and
-                    0 <= nc < n and
+                if (0 <= nr < rows and
+                    0 <= nc < cols and
                     matrix[nr][nc] > matrix[r][c]):
 
                     best = max(best, 1 + dfs(nr, nc))
@@ -30,8 +30,8 @@ class Solution:
 
         # Subproblem 1: Traverse the entire matrix
         res = 0
-        for r in range(m):
-            for c in range(n):
+        for r in range(rows):
+            for c in range(cols):
                 res = max(res, dfs(r, c))
 
         return res

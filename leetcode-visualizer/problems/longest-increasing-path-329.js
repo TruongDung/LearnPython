@@ -3,10 +3,10 @@ const bi = (vi, en) => ({ vi, en });
 const SOURCE = [
   "class Solution:",
   "    def longestIncreasingPath(self, matrix):",
-  "        m, n = len(matrix), len(matrix[0])",
+  "        rows, cols = len(matrix), len(matrix[0])",
   "",
   "        # Subproblem 5: Memoization",
-  "        dp = [[0] * n for _ in range(m)]",
+  "        dp = [[0] * cols for _ in range(rows)]",
   "",
   "        # Subproblem 2: Four directions",
   "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
@@ -22,8 +22,8 @@ const SOURCE = [
   "                nc = c + dc",
   "",
   "                # Subproblem 3: Check valid boundaries and increasing values",
-  "                if (0 <= nr < m and",
-  "                    0 <= nc < n and",
+  "                if (0 <= nr < rows and",
+  "                    0 <= nc < cols and",
   "                    matrix[nr][nc] > matrix[r][c]):",
   "",
   "                    best = max(best, 1 + dfs(nr, nc))",
@@ -33,8 +33,8 @@ const SOURCE = [
   "",
   "        # Subproblem 1: Traverse the entire matrix",
   "        res = 0",
-  "        for r in range(m):",
-  "            for c in range(n):",
+  "        for r in range(rows):",
+  "            for c in range(cols):",
   "                res = max(res, dfs(r, c))",
   "",
   "        return res",
@@ -74,12 +74,12 @@ function buildSteps(input) {
       path: extra.path || [], answer: phase === "done" ? res : null,
     };
     steps.push({ arr: [], codeLines: extra.codeLines || [line], title, note, final: phase === "done", longestIncreasingPath329View: view,
-      vars: [ ...(res === null ? [] : [{ name: "res", value: res }]), ...(rows === null ? [] : [{ name: "m", value: rows }]), ...(cols === null ? [] : [{ name: "n", value: cols }]),
+      vars: [ ...(res === null ? [] : [{ name: "res", value: res }]), ...(rows === null ? [] : [{ name: "rows", value: rows }]), ...(cols === null ? [] : [{ name: "cols", value: cols }]),
         ...(current ? [{ name: "r, c", value: `${current.r}, ${current.c}` }, ...(current.best === null ? [] : [{ name: "best", value: current.best }]), ...(current.nr === null ? [] : [{ name: "nr", value: current.nr }]), ...(current.nc === null ? [] : [{ name: "nc", value: current.nc }])] : []) ],
     });
   };
   rows = matrix.length; cols = matrix[0].length;
-  emit(3, "setup", bi(`m = ${rows}, n = ${cols}`, `m = ${rows}, n = ${cols}`), bi("m là số hàng, n là số cột của ma trận.", "m is the number of rows; n is the number of columns."));
+  emit(3, "setup", bi(`rows = ${rows}, cols = ${cols}`, `rows = ${rows}, cols = ${cols}`), bi("rows là số hàng, cols là số cột của ma trận.", "rows is the number of rows; cols is the number of columns."));
   dp = Array.from({ length: rows }, () => Array(cols).fill(0));
   emit(6, "allocate", bi("Tạo dp: tất cả ô bằng 0", "Create dp: every cell is 0"), bi("dp[r][c] = độ dài đường tăng dài nhất BẮT ĐẦU tại (r,c). 0 nghĩa là chưa tính, không phải đáp án 0.", "dp[r][c] is the longest increasing path STARTING at (r,c). 0 means uncomputed, not a path of length zero."));
   emit(9, "directions", bi("Thử xuống → lên → phải → trái", "Try down → up → right → left"), bi("Chỉ đi bốn hướng và chỉ tới giá trị lớn hơn; không đi chéo.", "Move in four directions, only to larger values; no diagonal moves."));
@@ -168,7 +168,7 @@ module.exports = {
     statement: bi("Tìm độ dài đường tăng nghiêm ngặt dài nhất trong ma trận. Chỉ đi lên, xuống, trái, phải tới ô có giá trị lớn hơn. Mô phỏng nhận ma trận ≤6×6; nhập hàng cách bằng ; hoặc |, hoặc mảng JSON.", "Find the longest strictly increasing path in a matrix. Move up, down, left, or right to a larger value. The visualization accepts matrices ≤6×6; separate rows with ; or |, or use JSON."),
     defaultInput: "9,9,4;6,6,8;2,1,1", inputKind: "string", inputLabel: bi("Ma trận ≤6×6 (;, | hoặc JSON)", "Matrix ≤6×6 (;, |, or JSON)"), extraParams: [], debugMode: "line-by-line",
     approach: [bi("dfs(r,c) trả đường dài nhất bắt đầu tại (r,c). best ban đầu là 1.", "dfs(r,c) returns the longest path starting at (r,c). best starts at 1."), bi("Thử xuống, lên, phải, trái. Với ô kề lớn hơn, best = max(best, 1 + dfs(ô kề)).", "Try down, up, right, left. For a larger neighbor, best = max(best, 1 + dfs(neighbor))."), bi("Ghi dp sau khi xét đủ bốn hướng; dùng lại dp nếu ô đã tính.", "Write dp after checking all four directions; reuse it for computed cells."), bi("Vòng lặp ngoài lấy res = max(res, dfs(r,c)) cho mọi ô.", "The outer loop takes res = max(res, dfs(r,c)) for every cell.")],
-    complexity: { time: "O(m × n)", space: "O(m × n)", note: bi("Mỗi ô được tính một lần, xét bốn hướng. dp và stack DFS dùng O(m × n); không tính dữ liệu mô phỏng.", "Each cell is computed once and checks four directions. dp and the DFS stack use O(m × n); excludes trace data.") },
+    complexity: { time: "O(rows × cols)", space: "O(rows × cols)", note: bi("Mỗi ô được tính một lần, xét bốn hướng. dp và stack DFS dùng O(rows × cols); không tính dữ liệu mô phỏng.", "Each cell is computed once and checks four directions. dp and the DFS stack use O(rows × cols); excludes trace data.") },
     code: SOURCE, builder: buildSteps, liveArgs: input => [parseInput(input)], parseLongestIncreasingPath329Input: parseInput,
   },
 };

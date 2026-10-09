@@ -75,7 +75,7 @@ test('329 trace follows the annotated snippet, initializing res at line 32 and u
   assert.equal(writes.size,9);
   assert.ok(result.steps.at(-1).longestIncreasingPath329View.cacheHits > 0);
   assert.ok(result.steps[0].longestIncreasingPath329View.dp === null);
-  assert.deepEqual(result.steps[0].vars,[{name:'m',value:3},{name:'n',value:3}]);
+  assert.deepEqual(result.steps[0].vars,[{name:'rows',value:3},{name:'cols',value:3}]);
   const resInit = result.steps.findIndex(step=>step.longestIncreasingPath329View.phase==='init');
   assert.ok(result.steps.slice(0,resInit).every(step=>!step.vars.some(variable=>variable.name==='res')));
   assert.deepEqual(result.steps.find(step=>step.longestIncreasingPath329View.phase==='allocate').longestIncreasingPath329View.dp,Array.from({length:3},()=>[0,0,0]));
@@ -91,10 +91,10 @@ test('329 accepts existing compact and JSON formats and validates matrices', () 
 test('329 displayed Python is the requested DFS, matches the saved solution and executes', () => {
   const source = fs.readFileSync(require.resolve('../../Leetcode-sln/graph/Leetcode_329.py'),'utf8').trimEnd().replace(/\r\n/g,'\n');
   assert.equal(source,problem.code.join('\n'));
-  assert.match(source,/m, n = len\(matrix\), len\(matrix\[0\]\)/);
+  assert.match(source,/rows, cols = len\(matrix\), len\(matrix\[0\]\)/);
   assert.match(source,/res = 0/); assert.match(source,/directions = \[\(1, 0\), \(-1, 0\), \(0, 1\), \(0, -1\)\]/);
   for (const number of [5,2,4,3,1]) assert.ok(source.includes(`# Subproblem ${number}:`));
-  assert.match(source,/if \(0 <= nr < m and\n\s+0 <= nc < n and\n\s+matrix\[nr\]\[nc\] > matrix\[r\]\[c\]\):/);
+  assert.match(source,/if \(0 <= nr < rows and\n\s+0 <= nc < cols and\n\s+matrix\[nr\]\[nc\] > matrix\[r\]\[c\]\):/);
   assert.doesNotMatch(source,/next_cell|memo|cached|path =/);
   const checks = cases.map(([matrix,answer])=>`assert Solution().longestIncreasingPath(${JSON.stringify(matrix)}) == ${answer}`).join('\n');
   const run = spawnSync('python3',['-c',source+'\n'+checks],{encoding:'utf8'}); assert.equal(run.status,0,run.stderr);
