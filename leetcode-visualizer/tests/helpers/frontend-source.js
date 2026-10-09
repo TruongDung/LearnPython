@@ -38,6 +38,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-cherry-pickup-741.js',
   'renderer-valid-path-1391.js',
   'renderer-minimum-knight-moves-1197.js',
+  'renderer-available-captures-for-rook-999.js',
   'renderer-server-allocator-9018.js',
   'renderer-lib-register-9019.js',
   'renderer-text-justification-68.js',
@@ -80,6 +81,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-reverse-vowels-345.js',
   'renderer-reverse-only-letters-917.js',
   'renderer-backspace-compare-844.js',
+  'renderer-longest-dictionary-word-524.js',
   'script.js',
 ]);
 
@@ -121,6 +123,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'cherry-pickup-741.css',
   'valid-path-1391.css',
   'minimum-knight-moves-1197.css',
+  'available-captures-for-rook-999.css',
   'server-allocator-9018.css',
   'lib-register-9019.css',
   'text-justification-68.css',
@@ -164,6 +167,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'reverse-vowels-345.css',
   'reverse-only-letters-917.css',
   'backspace-compare-844.css',
+  'longest-dictionary-word-524.css',
 ]);
 
 const sourceCache = new Map();

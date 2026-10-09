@@ -2,8 +2,11 @@
 
 const bi = (vi, en) => ({ vi, en });
 const SOURCE = [
+  "from typing import List",
+  "",
+  "",
   "class Solution:",
-  "    def findLongestWord(self, s: str, dictionary: list[str]) -> str:",
+  "    def findLongestWord(self, s: str, dictionary: List[str]) -> str:",
   '        best = ""',
   "        for word in dictionary:",
   "            i, j = 0, 0",
@@ -55,32 +58,32 @@ function buildSteps(input, params) {
       },
     });
   };
-  emit(3, "init", bi("Bắt đầu với best = \"\"", 'Start with best = ""'), bi("Một từ hợp lệ phải xuất hiện trong s theo đúng thứ tự. Được bỏ ký tự, không được đổi thứ tự.", "A valid word must appear in s in the same order. Characters may be deleted, but never reordered."));
+  emit(6, "init", bi("Bắt đầu với best = \"\"", 'Start with best = ""'), bi("Một từ hợp lệ phải xuất hiện trong s theo đúng thứ tự. Được bỏ ký tự, không được đổi thứ tự.", "A valid word must appear in s in the same order. Characters may be deleted, but never reordered."));
   for (index = 0; index < dictionary.length; index++) {
     word = dictionary[index]; matches = [];
-    emit(4, "candidate", bi(`Thử từ ${index + 1}/${dictionary.length}: ${preview(word)}`, `Try word ${index + 1}/${dictionary.length}: ${preview(word)}`), bi("Kiểm tra từ này trước khi so sánh với best.", "Check this word before comparing it with best."));
+    emit(7, "candidate", bi(`Thử từ ${index + 1}/${dictionary.length}: ${preview(word)}`, `Try word ${index + 1}/${dictionary.length}: ${preview(word)}`), bi("Kiểm tra từ này trước khi so sánh với best.", "Check this word before comparing it with best."));
     i = 0; j = 0;
-    emit(5, "pointers", bi("i = 0, j = 0", "i = 0, j = 0"), bi("i duyệt s; j chỉ chữ tiếp theo cần tìm trong word.", "i scans s; j points to the next required letter in word."));
+    emit(8, "pointers", bi("i = 0, j = 0", "i = 0, j = 0"), bi("i duyệt s; j chỉ chữ tiếp theo cần tìm trong word.", "i scans s; j points to the next required letter in word."));
     while (i < s.length && j < word.length) {
       const compared = { i, j, source: s[i], target: word[j], equal: s[i] === word[j] };
-      emit(7, "compare", bi(`${s[i]} ${compared.equal ? "=" : "≠"} ${word[j]}`, `${s[i]} ${compared.equal ? "=" : "≠"} ${word[j]}`), compared.equal
+      emit(10, "compare", bi(`${s[i]} ${compared.equal ? "=" : "≠"} ${word[j]}`, `${s[i]} ${compared.equal ? "=" : "≠"} ${word[j]}`), compared.equal
         ? bi("Khớp: giữ ký tự này và chuyển sang chữ tiếp theo của word.", "Match: keep this character and move to the next letter of word.")
         : bi("Không khớp: bỏ ký tự này của s, vẫn tìm cùng một chữ trong word.", "Mismatch: delete this character from s; keep looking for the same letter in word."), { detail: true, compared });
       if (compared.equal) {
         matches.push(i); j++;
-        emit(8, "match", bi(`j → ${j}: đã khớp ${j}/${word.length} chữ`, `j → ${j}: matched ${j}/${word.length} letters`), bi("Chỉ khi hai chữ bằng nhau thì j mới tiến lên.", "j advances only when the two letters match."), { detail: true, compared });
+        emit(11, "match", bi(`j → ${j}: đã khớp ${j}/${word.length} chữ`, `j → ${j}: matched ${j}/${word.length} letters`), bi("Chỉ khi hai chữ bằng nhau thì j mới tiến lên.", "j advances only when the two letters match."), { detail: true, compared });
       }
       i++;
-      emit(9, "advance", bi(`i → ${i}`, `i → ${i}`), bi("i luôn tiến lên; các vị trí được giữ tăng dần nên thứ tự không đổi.", "i always advances; kept positions increase, preserving their order."), { detail: true });
+      emit(12, "advance", bi(`i → ${i}`, `i → ${i}`), bi("i luôn tiến lên; các vị trí được giữ tăng dần nên thứ tự không đổi.", "i always advances; kept positions increase, preserving their order."), { detail: true });
     }
     const valid = j === word.length;
     inspected++; if (valid) validCount++;
-    emit(10, "verdict", valid ? bi("Khớp đủ: từ hợp lệ", "All letters matched: valid word") : bi(`Chỉ khớp ${j}/${word.length}: loại từ này`, `Only ${j}/${word.length} matched: reject this word`), valid
+    emit(13, "verdict", valid ? bi("Khớp đủ: từ hợp lệ", "All letters matched: valid word") : bi(`Chỉ khớp ${j}/${word.length}: loại từ này`, `Only ${j}/${word.length} matched: reject this word`), valid
       ? bi("Đã tìm đủ các chữ theo thứ tự. Bây giờ mới xét độ dài và thứ tự từ điển.", "All letters were found in order. Now compare length and lexicographic order.")
       : bi(`Đã hết s nhưng còn thiếu chữ '${word[j]}'. best giữ nguyên.`, `s ended before the required '${word[j]}' was found. best stays unchanged.`));
     if (!valid) {
       history.push({ index, word: preview(word), valid, selected: false, reason: "invalid" });
-      emit(11, "reject", bi("Bỏ qua từ không hợp lệ", "Skip the invalid word"), bi("Độ dài lớn cũng không có ích nếu không tạo được từ này bằng cách xóa ký tự.", "A longer word cannot win unless it can be formed by deleting characters."));
+      emit(14, "reject", bi("Bỏ qua từ không hợp lệ", "Skip the invalid word"), bi("Độ dài lớn cũng không có ích nếu không tạo được từ này bằng cách xóa ký tự.", "A longer word cannot win unless it can be formed by deleting characters."));
       continue;
     }
     const better = word.length > best.length || (word.length === best.length && word < best);
@@ -91,17 +94,17 @@ function buildSteps(input, params) {
       "lex-smaller": bi(`Cùng ${word.length} chữ; '${preview(word)}' đứng trước '${preview(best)}' trong từ điển.`, `Both have ${word.length} letters; '${preview(word)}' comes before '${preview(best)}' lexicographically.`),
       "lex-keep": bi(`Cùng ${word.length} chữ; từ mới không đứng trước best trong từ điển.`, `Both have ${word.length} letters; the new word does not precede best lexicographically.`),
     }[reason];
-    emit(12, "choice", better ? bi("Từ mới thắng best", "The new word beats best") : bi("Giữ best hiện tại", "Keep the current best"), explanation);
+    emit(15, "choice", better ? bi("Từ mới thắng best", "The new word beats best") : bi("Giữ best hiện tại", "Keep the current best"), explanation);
     history.push({ index, word: preview(word), valid, selected: better, reason });
     if (better) {
       best = word; bestMatches = [...matches];
-      emit(13, "update", bi(`best ← ${preview(best)}`, `best ← ${preview(best)}`), explanation);
+      emit(16, "update", bi(`best ← ${preview(best)}`, `best ← ${preview(best)}`), explanation);
     } else {
-      emit(12, "keep", bi("best không đổi", "best stays unchanged"), explanation);
+      emit(15, "keep", bi("best không đổi", "best stays unchanged"), explanation);
     }
   }
   index = -1; word = best; matches = bestMatches; i = s.length; j = best.length;
-  emit(14, "done", best ? bi(`Kết quả: ${preview(best)}`, `Result: ${preview(best)}`) : bi('Kết quả: ""', 'Result: ""'), bi(`Đã kiểm tra ${inspected} từ, có ${validCount} từ hợp lệ. ${best ? "Các ô xanh cho thấy cách giữ lại từ thắng cuộc." : "Không có từ hợp lệ nên trả chuỗi rỗng."}`, `Checked ${inspected} words; ${validCount} are valid. ${best ? "Green cells show how to keep the winning word." : "No valid word exists, so return the empty string."}`));
+  emit(17, "done", best ? bi(`Kết quả: ${preview(best)}`, `Result: ${preview(best)}`) : bi('Kết quả: ""', 'Result: ""'), bi(`Đã kiểm tra ${inspected} từ, có ${validCount} từ hợp lệ. ${best ? "Các ô xanh cho thấy cách giữ lại từ thắng cuộc." : "Không có từ hợp lệ nên trả chuỗi rỗng."}`, `Checked ${inspected} words; ${validCount} are valid. ${best ? "Green cells show how to keep the winning word." : "No valid word exists, so return the empty string."}`));
   return { original: s, answer: best, steps };
 }
 

@@ -12982,4 +12982,5 @@ Object.assign(
   require("./shadow-pairs"),
   require("./equally-spaced-occurrences"),
   require("./minimum-time-difference"),
+  require("./available-captures-for-rook-999"),
 );

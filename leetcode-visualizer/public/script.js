@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.rook999View), surface: "treeView", render: (step) => {
+      renderAvailableCapturesForRook999View(step);
+    } },
     { predicate: (step) => Boolean(step.dictionary524View), surface: "treeView", render: (step) => {
       renderDictionary524View(step);
     } },

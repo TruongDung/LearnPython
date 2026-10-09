@@ -52,7 +52,7 @@ test('524 trace advances j only on matches and changes best only after selection
         else { assert.equal(next.phase, 'advance'); assert.equal(next.j, previous.j); assert.equal(next.i, previous.i + 1); }
       }
       if (k && view.best !== result.steps[k - 1].dictionary524View.best) {
-        assert.equal(view.phase, 'update'); assert.deepEqual(step.codeLines, [13]); assert.equal(view.j, view.word.length);
+        assert.equal(view.phase, 'update'); assert.deepEqual(step.codeLines, [16]); assert.equal(view.j, view.word.length);
       }
     }
     assert.equal(result.steps[0].dictionary524View.best, '');
