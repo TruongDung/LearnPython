@@ -84,6 +84,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-longest-dictionary-word-524.js',
   'renderer-minimum-length-1750.js',
   'renderer-increasing-paths-2328.js',
+  'renderer-increasing-cells-2713.js',
   'script.js',
 ]);
 
@@ -172,6 +173,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'longest-dictionary-word-524.css',
   'minimum-length-1750.css',
   'increasing-paths-2328.css',
+  'increasing-cells-2713.css',
 ]);
 
 const sourceCache = new Map();

@@ -120,5 +120,5 @@ test('329 renders every source phase in both languages with no stale witness', (
     }
   }
   const html = fs.readFileSync(require.resolve('../public/index.html'),'utf8');
-  assert.match(html,/renderer-longest-increasing-path-329.js\?v=longest-increasing-path-329-v3/);
+  assert.match(html,/renderer-longest-increasing-path-329.js\?v=longest-increasing-path-329-v4/);
 });

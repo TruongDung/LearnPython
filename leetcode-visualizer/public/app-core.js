@@ -2255,7 +2255,10 @@ function renderApproach() {
 
 // Display time/space complexity analysis
 function renderComplexity() {
-  const cx = problemData.complexity;
+  const approachInput = $("extraParams") && $("extraParams").querySelector('[data-param="approach"]');
+  const selectedApproach = Number(approachInput && approachInput.value);
+  const cx = selectedApproach === 3 && problemData.complexity3 ? problemData.complexity3
+    : selectedApproach === 2 && problemData.complexity2 ? problemData.complexity2 : problemData.complexity;
   if (!cx) {
     hide("complexity");
     hide("vizComplexity");
@@ -2321,6 +2324,7 @@ function renderExtraParams() {
     if (p.key === "approach") {
       inputEl.addEventListener("change", () => {
         resetLiveEditorState();
+        renderComplexity();
         if (steps.length) runViz();
       });
     }

@@ -2,6 +2,8 @@
 const bi = (vi, en) => ({ vi, en });
 const MOD = 1000000007;
 const DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const DFS = require("./increasing-paths-dfs-2328");
+const ENUMERATE = require("./increasing-paths-enumerate-2328");
 const SOURCE = [
   "class Solution:",
   "    def countPaths(self, grid):",
@@ -42,6 +44,22 @@ function parseInput(input) {
     throw new Error("2328: Use a rectangular grid with 1–1000 rows/columns, at most 100000 cells and values 1–100000 / Cần grid chữ nhật 1–1000 hàng/cột, tối đa 100000 ô, giá trị 1–100000.");
   }
   return grid.map(row => [...row]);
+}
+
+function enumeratePaths(grid) {
+  const rows = grid.length, cols = grid[0].length, paths = [];
+  if (rows * cols > 9) return paths;
+  const visit = path => {
+    if (paths.length >= 16) return;
+    paths.push(path.map(([r, c]) => ({ r, c, value: grid[r][c] })));
+    const [r, c] = path.at(-1);
+    for (const [dr, dc] of DIRECTIONS) {
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] > grid[r][c]) visit([...path, [nr, nc]]);
+    }
+  };
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) visit([[r, c]]);
+  return paths;
 }
 
 function buildSteps(input) {
@@ -106,19 +124,7 @@ function buildSteps(input) {
     history.push({ r, c, value, count: dp[r][c] });
     emit(20, "total", bi(`res = (${before} + ${dp[r][c]}) % MOD = ${res}`, `res = (${before} + ${dp[r][c]}) % MOD = ${res}`), bi("Đã hoàn tất ô này. Cộng các đường có điểm bắt đầu tại đây vào tổng; không đếm trùng với ô gốc khác.", "This cell is complete. Add paths starting here to the total; roots at other cells form different paths."), { calculation: { before, cellCount: dp[r][c], after: res } });
   }
-  const examplePaths = [];
-  if (rows * cols <= 9) {
-    const enumerate = path => {
-      if (examplePaths.length >= 16) return;
-      examplePaths.push(path.map(([r, c]) => ({ r, c, value: grid[r][c] })));
-      const [r, c] = path.at(-1);
-      for (const [dr, dc] of DIRECTIONS) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] > grid[r][c]) enumerate([...path, [nr, nc]]);
-      }
-    };
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) enumerate([[r, c]]);
-  }
+  const examplePaths = enumeratePaths(grid);
   current = null; index = -1;
   emit(21, "done", bi(`Tổng số đường tăng: ${res}`, `Total increasing paths: ${res}`), bi(`Cộng dp của ${processed} ô, lấy modulo 1,000,000,007. Mỗi đường được phân biệt bằng dãy index đã đi qua.`, `Sum dp across ${processed} cells modulo 1,000,000,007. Each path is distinguished by its sequence of visited indices.`), { examplePaths });
   return { original: grid, answer: res, dp: dp.map(row => [...row]), steps };
@@ -130,9 +136,26 @@ module.exports = {
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }, tags: [{ key: "graph", vi: "Đồ thị", en: "Graph" }, { key: "matrix", vi: "Ma trận", en: "Matrix" }],
     title: bi("Number of Increasing Paths in a Grid", "Number of Increasing Paths in a Grid"), titleVi: bi("Đếm tất cả đường tăng trong grid", "Count all increasing paths in the grid"),
     statement: bi("Đếm tất cả đường tăng nghiêm ngặt trong grid, đi bốn hướng. Được bắt đầu/kết thúc ở mọi ô; đường chỉ gồm một ô cũng được tính. Hai đường khác nhau nếu dãy index khác nhau. Trả kết quả modulo 10⁹ + 7. Ví dụ [[1,1],[3,4]] → 8.", "Count all strictly increasing four-directional paths in grid. Any cell can be a start or end; single-cell paths count too. Paths differ by their sequence of visited cells. Return the count modulo 10⁹ + 7. Example [[1,1],[3,4]] → 8."),
-    inputKind: "string", inputLabel: bi("grid — hàng cách bằng ; hoặc |, hoặc JSON", "grid — rows separated by ; or |, or JSON"), defaultInput: "1,1;3,4", extraParams: [], debugMode: "line-by-line",
-    approach: [bi("dp[r][c] đếm đường tăng BẮT ĐẦU tại ô (r,c); ban đầu bằng 1 cho đường chỉ chứa ô đó.", "dp[r][c] counts increasing paths STARTING at (r,c); initialize it to 1 for the single-cell path."), bi("Tính các ô theo giá trị giảm dần để dp của ô kề lớn hơn đã hoàn tất.", "Process cells by descending value so larger neighbors' dp values are already complete."), bi("Cộng dp của từng ô kề lớn hơn, rồi cộng dp của ô hiện tại vào res; luôn lấy modulo.", "Add dp from each larger neighbor, then add the current cell's dp to res; always reduce modulo MOD.")],
+    inputKind: "string", inputLabel: bi("grid — hàng cách bằng ; hoặc |, hoặc JSON", "grid — rows separated by ; or |, or JSON"), defaultInput: "1,1;3,4",
+    extraParams: [{ key: "approach", type: "select", default: 1, label: bi("Cách giải", "Approach"), options: [
+      { value: 1, label: bi("Cách 1: DP theo giá trị giảm dần", "Approach 1: DP by descending value") },
+      { value: 2, label: bi("Cách 2: DFS + memoization", "Approach 2: DFS + memoization") },
+      { value: 3, label: bi("Cách 3: In tất cả đường đi", "Approach 3: Print every path") },
+    ] }], debugMode: "line-by-line",
+    approach: [
+      bi("Cách 1 và 2: dp[r][c] đếm đường tăng BẮT ĐẦU tại ô (r,c), gồm đường chỉ chứa chính ô đó.", "Approaches 1 and 2: dp[r][c] counts increasing paths STARTING at (r,c), including the single-cell path."),
+      bi("Cách 1: khởi tạo dp = 1, tính theo giá trị giảm dần, cộng dp của ô kề lớn hơn rồi cộng vào res.", "Approach 1: initialize dp to 1, process descending values, add larger neighbors' dp, then add to res."),
+      bi("Cách 2: dp = 0 là chưa có cache. Mỗi DFS bắt đầu count = 1, cộng kết quả DFS con rồi lưu count % MOD vào dp.", "Approach 2: dp = 0 means no cached result. Each DFS starts count at 1, adds child DFS results, then stores count % MOD in dp."),
+      bi("Cách 2: ô đã có dp trả ngay. Vòng lặp ngoài cộng dfs của từng ô gốc vào ans và lấy modulo.", "Approach 2: return cached dp immediately. The outer loop adds each root's dfs to ans modulo MOD."),
+      bi("Cách 3: DFS + backtracking lưu bản sao mỗi prefix, kể cả đường dài 1. In đầy đủ theo độ dài; giữ các đường trùng giá trị nếu khác tọa độ.", "Approach 3: DFS + backtracking saves a copy of every prefix, including length-1 paths. Print all paths grouped by length; retain identical values at different coordinates."),
+    ],
     complexity: { time: "O(k log k)", space: "O(k)", note: bi("k = rows × cols. Sắp xếp k ô rồi xét bốn hướng mỗi ô. Hỗ trợ đầy đủ giới hạn 100000 ô; dữ liệu lớn hiển thị cửa sổ ≤6×6 và tối đa 600 bước trước kết quả cuối.", "k = rows × cols. Sort k cells, then inspect four neighbors per cell. Supports the full 100000-cell limit; large inputs show a ≤6×6 window and at most 600 steps before the final result.") },
-    code: SOURCE, builder: buildSteps, liveArgs: input => [parseInput(input)],
+    complexity2: { time: "O(k)", space: "O(k)", note: bi("k = rows × cols. DFS xét bốn hướng, lưu dp và dùng lại cache. Stack đệ quy có thể sâu tới k; Python cần giới hạn đệ quy đủ lớn cho đường rất dài. Visualization mô phỏng lời gọi bằng stack riêng để xử lý đủ 100000 ô.", "k = rows × cols. DFS checks four directions and reuses cached dp. Recursion may be k levels deep; Python needs a sufficient recursion limit for very long paths. The visualization simulates calls with explicit frames to support all 100000 cells.") },
+    code: SOURCE, codeLabel: bi("Cách 1: DP theo giá trị giảm dần", "Approach 1: DP by descending value"),
+    code2: DFS.SOURCE, code2Label: bi("Cách 2: DFS + memoization", "Approach 2: DFS + memoization"),
+    code3: ENUMERATE.SOURCE, code3Label: bi("Cách 3: In tất cả đường đi", "Approach 3: Print every path"),
+    complexity3: { time: "O(k + S)", space: "O(k + S)", note: bi("k = số ô; S = tổng số ô trên tất cả đường được in. Cách 3 tạo từng đường, không dùng memoization để gộp nhánh. Tối đa 36 ô và 5000 đường; vượt giới hạn sẽ báo lỗi, không cắt danh sách. Cách 1 và 2 dùng để đếm grid lớn.", "k = cell count; S = total cells across every printed path. Approach 3 creates each path without memoizing branches. At most 36 cells and 5000 paths; exceeding the limit reports an error without truncating the list. Use approaches 1 and 2 to count large grids.") },
+    builder: buildSteps, builder2: input => DFS.buildSteps(parseInput(input), enumeratePaths),
+    builder3: input => ENUMERATE.buildSteps(parseInput(input)), liveArgs: input => [parseInput(input)],
   },
 };

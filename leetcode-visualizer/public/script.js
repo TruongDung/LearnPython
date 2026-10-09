@@ -7,6 +7,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.increasingCells2713View), surface: "treeView", render: (step) => {
+      renderIncreasingCells2713View(step);
+    } },
     { predicate: (step) => Boolean(step.increasingPaths2328View), surface: "treeView", render: (step) => {
       renderIncreasingPaths2328View(step);
     } },

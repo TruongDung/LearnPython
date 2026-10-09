@@ -1,5 +1,6 @@
 "use strict";
 const bi = (vi, en) => ({ vi, en });
+const PATHS = require("./longest-increasing-paths-329");
 const SOURCE = [
   "class Solution:",
   "    def longestIncreasingPath(self, matrix):",
@@ -166,9 +167,21 @@ module.exports = {
     id: 329, difficulty: "hard", slug: "longest-increasing-path-in-a-matrix", category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: bi("Longest Increasing Path in a Matrix", "Longest Increasing Path in a Matrix"), titleVi: bi("Đường tăng dài nhất: DFS + dp", "Longest increasing path: DFS + dp"),
     statement: bi("Tìm độ dài đường tăng nghiêm ngặt dài nhất trong ma trận. Chỉ đi lên, xuống, trái, phải tới ô có giá trị lớn hơn. Mô phỏng nhận ma trận ≤6×6; nhập hàng cách bằng ; hoặc |, hoặc mảng JSON.", "Find the longest strictly increasing path in a matrix. Move up, down, left, or right to a larger value. The visualization accepts matrices ≤6×6; separate rows with ; or |, or use JSON."),
-    defaultInput: "9,9,4;6,6,8;2,1,1", inputKind: "string", inputLabel: bi("Ma trận ≤6×6 (;, | hoặc JSON)", "Matrix ≤6×6 (;, |, or JSON)"), extraParams: [], debugMode: "line-by-line",
-    approach: [bi("dfs(r,c) trả đường dài nhất bắt đầu tại (r,c). best ban đầu là 1.", "dfs(r,c) returns the longest path starting at (r,c). best starts at 1."), bi("Thử xuống, lên, phải, trái. Với ô kề lớn hơn, best = max(best, 1 + dfs(ô kề)).", "Try down, up, right, left. For a larger neighbor, best = max(best, 1 + dfs(neighbor))."), bi("Ghi dp sau khi xét đủ bốn hướng; dùng lại dp nếu ô đã tính.", "Write dp after checking all four directions; reuse it for computed cells."), bi("Vòng lặp ngoài lấy res = max(res, dfs(r,c)) cho mọi ô.", "The outer loop takes res = max(res, dfs(r,c)) for every cell.")],
+    defaultInput: "9,9,4;6,6,8;2,1,1", inputKind: "string", inputLabel: bi("Ma trận ≤6×6 (;, | hoặc JSON)", "Matrix ≤6×6 (;, |, or JSON)"),
+    extraParams: [{key:"approach",type:"select",default:1,label:bi("Cách giải","Approach"),options:[
+      {value:1,label:bi("Cách 1: DFS + memoization","Approach 1: DFS + memoization")},
+      {value:2,label:bi("Cách 2: Liệt kê tất cả đường đi","Approach 2: List every increasing path")},
+    ]}], debugMode: "line-by-line",
+    approach: [
+      bi("Cách 1: dfs(r,c) trả độ dài lớn nhất bắt đầu tại (r,c), lưu dp và dùng lại kết quả đã tính.", "Approach 1: dfs(r,c) returns the maximum length starting at (r,c), storing and reusing dp."),
+      bi("Cách 1: với ô kề lớn hơn, best = max(best, 1 + dfs(ô kề)). Vòng lặp ngoài lấy max cho mọi ô.", "Approach 1: for a larger neighbor, best = max(best, 1 + dfs(neighbor)). The outer loop takes the maximum across all cells."),
+      bi("Cách 2: lưu path.copy() ở mỗi ô, rồi cập nhật res = max(res, len(path)). Giữ cả các đường ngắn và đường trùng giá trị nhưng khác tọa độ.", "Approach 2: save path.copy() at each cell, then update res = max(res, len(path)). Keep shorter paths and identical values at different coordinates."),
+      bi("Cách 2: path.pop() khôi phục nhánh cha. Danh sách đầy đủ được in theo độ dài; nhóm đạt res được đánh dấu là dài nhất.", "Approach 2: path.pop() restores the parent branch. Print the complete list grouped by length; mark the res-length group as longest."),
+    ],
     complexity: { time: "O(rows × cols)", space: "O(rows × cols)", note: bi("Mỗi ô được tính một lần, xét bốn hướng. dp và stack DFS dùng O(rows × cols); không tính dữ liệu mô phỏng.", "Each cell is computed once and checks four directions. dp and the DFS stack use O(rows × cols); excludes trace data.") },
-    code: SOURCE, builder: buildSteps, liveArgs: input => [parseInput(input)], parseLongestIncreasingPath329Input: parseInput,
+    complexity2:{time:"O(k + S)",space:"O(k + S)",note:bi("k = rows × cols; S = tổng số ô trong tất cả đường đã liệt kê. Cách 2 lưu bản sao từng đường và nhóm theo độ dài, tối đa 5000 đường. Nếu vượt giới hạn sẽ báo lỗi, không cắt danh sách. res vẫn trả độ dài lớn nhất.","k = rows × cols; S = total cells across all enumerated paths. Approach 2 copies each path and groups by length, with a 5000-path limit. Exceeding it reports an error without truncating the list. res still returns the maximum length.")},
+    code: SOURCE, codeLabel:bi("Cách 1: DFS + memoization","Approach 1: DFS + memoization"),
+    code2:PATHS.SOURCE,code2Label:bi("Cách 2: Liệt kê tất cả đường đi","Approach 2: List every increasing path"),
+    builder: buildSteps,builder2:input=>PATHS.buildSteps(parseInput(input)), liveArgs: input => [parseInput(input)], parseLongestIncreasingPath329Input: parseInput,
   },
 };

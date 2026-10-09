@@ -136,6 +136,8 @@ app.get("/api/problem/:id", (req, res) => {
     extraParams: problem.extraParams || [],
     inputLabel: problem.inputLabel || null,
     complexity: problem.complexity || null,
+    complexity2: problem.complexity2 || null,
+    complexity3: problem.complexity3 || null,
     code: problem.code || [],
     codeVi: problem.codeVi || null,
     codeEn: problem.codeEn || null,
