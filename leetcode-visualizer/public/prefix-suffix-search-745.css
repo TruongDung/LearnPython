@@ -3,7 +3,7 @@
 .ps745-viz * { box-sizing: border-box; } .ps745-heading, .ps745-viz section > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ps745-heading { margin-bottom: 12px; } .ps745-heading small { font-size: 10px; color: var(--ps-purple); } .ps745-heading h3 { margin: 5px 0 0; font-size: 16px; } .ps745-heading > span { border: 1px solid var(--ps-green); color: var(--ps-green); padding: 7px; border-radius: 8px; white-space: nowrap; }
 .ps745-viz p { font-size: 11px; color: var(--ps-muted); line-height: 1.6; margin: 7px 0 0; } .ps745-action { padding: 10px 12px; margin-bottom: 12px; border-radius: 9px; background: color-mix(in srgb, var(--ps-gold) 7%, transparent); } .ps745-action strong { color: var(--ps-gold); }
-.ps745-debug, .ps745-build, .ps745-query, .ps745-output { border: 1px solid var(--ps-border); border-radius: 12px; overflow: hidden; min-width: 0; margin-bottom: 12px; }
+.ps745-debug, .ps745-build, .ps745-query, .ps745-output, .ps745-product { border: 1px solid var(--ps-border); border-radius: 12px; overflow: hidden; min-width: 0; margin-bottom: 12px; }
 .ps745-debug { border-color: var(--ps-gold); } .ps745-viz section > header { font-size: 10px; border-bottom: 1px solid var(--ps-border); padding: 10px; } .ps745-viz section > header span { color: var(--ps-muted); }
 .ps745-debug pre { margin: 0; padding: 12px 10px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 monospace; color: var(--ps-gold); background: color-mix(in srgb, var(--ps-gold) 6%, transparent); }
 .ps745-vars { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; } .ps745-vars article { display: flex; flex: 1 1 85px; flex-direction: column; align-items: center; gap: 6px; border: 1px solid var(--ps-border); border-radius: 8px; padding: 7px 3px; min-width: 0; }
@@ -22,5 +22,18 @@
 .ps745-query { border-color: var(--ps-purple); } .ps745-query .ps745-key { border-top: none; } .ps745-query .ps745-key b { font-size: 28px; }
 .ps745-recent { margin-bottom: 12px; border: 1px solid var(--ps-border); padding: 10px; border-radius: 9px; } .ps745-recent summary { cursor: pointer; color: var(--ps-muted); font-size: 11px; } .ps745-recent table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; } .ps745-recent th { color: var(--ps-muted); text-align: left; font-weight: 500; padding: 6px 0; } .ps745-recent td { border-top: 1px solid var(--ps-border); padding: 6px 0; } .ps745-recent code { font-size: 10px; overflow-wrap: anywhere; } .ps745-recent b { color: var(--ps-green); }
 .ps745-output > div { display: flex; gap: 7px; padding: 12px; overflow-x: auto; } .ps745-output > div > span { display: flex; flex: 0 0 65px; flex-direction: column; align-items: center; gap: 6px; border: 1px solid var(--ps-border); border-radius: 7px; padding: 7px; } .ps745-output small { color: var(--ps-muted); font-size: 9px; } .ps745-output b { color: var(--ps-green); font: 700 17px monospace; }
+.ps745-product { border-color: var(--ps-cyan); }
+.ps745-product-formula { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(130px, .7fr); align-items: center; gap: 9px; padding: 11px; }
+.ps745-product-formula > div { min-width: 0; }
+.ps745-product-formula small { display: block; margin-bottom: 6px; color: var(--ps-muted); font-size: 9px; }
+.ps745-product-formula > div > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.ps745-product-formula code { padding: 5px 6px; border: 1px solid var(--ps-border); border-radius: 6px; color: var(--ps-text); font-size: 9px; }
+.ps745-product-formula code.active { color: var(--ps-gold); border-color: var(--ps-gold); background: color-mix(in srgb, var(--ps-gold) 10%, transparent); }
+.ps745-product-formula > b { color: var(--ps-cyan); font-size: 18px; }
+.ps745-product-pair { display: grid; gap: 5px; padding: 8px; border: 1px solid var(--ps-cyan); border-radius: 8px; text-align: center; }
+.ps745-product-pair code { color: var(--ps-green); border: 0; font-size: 10px; }
+.ps745-product-pair span { color: var(--ps-muted); font: 9px monospace; }
+.ps745-product > p { margin: 0; padding: 0 11px 11px; }
 #vizPanel.ps745-stable-viewport { box-sizing: border-box; overflow-anchor: none; }
+@container (max-width: 600px) { .ps745-product-formula { grid-template-columns: 1fr auto 1fr; } .ps745-product-formula > b:nth-of-type(2) { display: none; } .ps745-product-pair { grid-column: 1 / -1; } }
 @container (max-width: 400px) { .ps745-heading h3 { font-size: 14px; } .ps745-recent td { font-size: 9px; } .ps745-letter b { font-size: 18px; } }

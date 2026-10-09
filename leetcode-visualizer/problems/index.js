@@ -31,12 +31,13 @@ const categories = {
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723")),
-  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635"), require("./prefix-suffix-search-745")),
+  design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./lib-register-9019"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635"), require("./prefix-suffix-search-745")),
   interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };
 
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
+const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
   496, 1475, 316, 402, 456, 503, 581, 654, 739, 769, 853, 901, 907, 962,
@@ -185,6 +186,26 @@ for (const id of BITMASK_IDS) {
   if (!tags.some((tag) => tag && tag.key === BITMASK_TAG.key)) {
     problem.tags = [...tags, BITMASK_TAG];
   }
+}
+
+// `dp` is the canonical key for Dynamic Programming. A few focused modules
+// historically used `dynamic-programming`, which made the catalog render two
+// groups with the same visible label. Normalize both categories and tags here
+// so future modules cannot accidentally split the group again.
+for (const problem of Object.values(SUPPORTED)) {
+  if (!problem || typeof problem !== "object") continue;
+  if (problem.category && ["dp", "dynamic-programming"].includes(problem.category.key)) {
+    problem.category = DP_TAG;
+  }
+  if (!Array.isArray(problem.tags)) continue;
+  const seenTagKeys = new Set();
+  problem.tags = problem.tags
+    .map((tag) => tag && ["dp", "dynamic-programming"].includes(tag.key) ? DP_TAG : tag)
+    .filter((tag) => {
+      if (!tag || !tag.key || seenTagKeys.has(tag.key)) return false;
+      seenTagKeys.add(tag.key);
+      return true;
+    });
 }
 
 // COMPANY_SUBTABS carries the full roster (including not-yet-built problems) so

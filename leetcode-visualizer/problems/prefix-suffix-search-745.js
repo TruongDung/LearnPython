@@ -2,6 +2,7 @@
 
 const { bi, parseStringArray, parsePlainParams } = require("./hard-viz-shared");
 const TRIE_745 = require("./prefix-suffix-trie-745");
+const PRODUCT_745 = require("./prefix-suffix-product-745");
 const SOURCE = Object.freeze([
   "class WordFilter:",
   "    def __init__(self, words: list[str]):",
@@ -131,6 +132,7 @@ module.exports = {
       { key: "approach", type: "select", default: 1, label: bi("Cách giải", "Approach"), options: [
         { value: 1, label: bi("Cách 1: Hash Map prefix/suffix", "Approach 1: Prefix/suffix Hash Map") },
         { value: 2, label: bi("Cách 2: Trie + đảo suffix", "Approach 2: Trie + reversed suffix") },
+        { value: 3, label: bi("Cách 3: Tích Descartes (không for lồng)", "Approach 3: Cartesian product (no nested for)") },
       ] },
       { key: "queries", type: "string", default: '[["a","e"]]', label: bi("queries JSON (1–12 cặp [pref,suff])", "queries JSON (1–12 [pref,suff] pairs)") },
     ],
@@ -141,11 +143,16 @@ module.exports = {
       bi("f tạo khóa rồi tra bảng, không quét lại words. Thiếu khóa thì trả -1. Hai đoạn có thể chồng lên nhau.", "f builds the key and looks it up without scanning words. Missing keys return -1. Prefix and suffix may overlap."),
       bi("Cách 2 giữ ý tưởng Trie và suffix đảo ngược: chèn mọi word[:p] + '{' + word[::-1], p = 1..L. Truy vấn đi theo pref + '{' + suff[::-1] và trả index tại nút cuối đường truy vấn.", "Approach 2 retains the Trie and reversed-suffix idea: insert every word[:p] + '{' + word[::-1], p = 1..L. A query follows pref + '{' + suff[::-1] and returns the index at the end of that query path."),
       bi("Chỉ chèn word + '{' + reverse(word) sẽ sai: apple{elppa không chứa đường a{e cho f('a','e'). Phải chèn cả prefix ngắn. Mỗi nút cập nhật index lớn nhất, kể cả root; không cần truy vấn đến lá.", "Inserting only word + '{' + reverse(word) fails: apple{elppa has no a{e path for f('a','e'). Short prefixes must also be inserted. Each node retains the largest index, including the root; queries need not reach a leaf."),
+      bi("Cách 3 tạo riêng mảng prefixes và suffixes, rồi dùng itertools.product để sinh tích Descartes. Code không có hai vòng for lồng nhau; product vẫn sinh đúng L² cặp theo thứ tự hàng × cột.", "Approach 3 builds separate prefix and suffix arrays, then uses itertools.product to generate their Cartesian product. The code has no two explicitly nested for loops; product still yields all L² row × column pairs."),
       bi("Mô phỏng nhận tối đa 10 từ và 12 truy vấn để giữ đủ từng dòng; giới hạn đề bài là 10000 từ và 10000 truy vấn.", "The visualization accepts up to 10 words and 12 queries to retain every line; the problem allows 10000 words and 10000 queries."),
     ],
-    complexity: { time: "Map: O(N·L³); Trie: O(N·L²); f: O(P + S) expected", space: "Map: O(N·L³); Trie: O(N·L²)", note: bi("Map tạo L² cặp và hash chuỗi O(L). Trie chèn L đường, mỗi đường dài O(L); truy vấn đi P+1+S cạnh. L <= 7. Snapshot chỉ phục vụ mô phỏng.", "Map creates L² pairs and hashes strings in O(L). Trie inserts L paths of O(L) length; queries traverse P+1+S edges. L <= 7. Snapshots are only for visualization.") },
+    complexity: { time: "Map/Product: O(N·L³); Trie: O(N·L²); f: O(P + S) expected", space: "Map/Product: O(N·L³); Trie: O(N·L²)", note: bi("Map và product đều tạo L² cặp rồi hash chuỗi O(L); product chỉ bỏ cú pháp vòng lặp lồng, không đổi độ phức tạp. Trie chèn L đường dài O(L). L <= 7.", "Map and product both create L² pairs and hash O(L)-length strings; product removes nested-loop syntax without changing complexity. Trie inserts L paths of O(L). L <= 7.") },
     code: SOURCE, codeLabel: bi("Cách 1: Hash Map prefix/suffix", "Approach 1: Prefix/suffix Hash Map"),
     code2: TRIE_745.SOURCE, code2Label: bi("Cách 2: Trie + đảo suffix", "Approach 2: Trie + reversed suffix"),
-    builder: buildSteps, builder2: (input, params) => TRIE_745.buildSteps(input, params, parseInput), parseWordFilter745Input: parseInput,
+    code3: PRODUCT_745.SOURCE, code3Label: bi("Cách 3: Tích Descartes (không for lồng)", "Approach 3: Cartesian product (no nested for)"),
+    builder: buildSteps,
+    builder2: (input, params) => TRIE_745.buildSteps(input, params, parseInput),
+    builder3: (input, params) => PRODUCT_745.buildSteps(input, params, parseInput),
+    parseWordFilter745Input: parseInput,
   },
 };

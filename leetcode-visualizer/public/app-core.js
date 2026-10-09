@@ -1329,6 +1329,135 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "bfs") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion bfs-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">≋</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "9 nhóm BFS · level order → state space → 0-1 BFS" : "9 BFS groups · level order → state space → 0-1 BFS"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "①", name: vi ? "1 · BFS nền tảng / Level order" : "1 · BFS fundamentals / Level order", problems: [
+            [102, "Binary Tree Level Order Traversal"], [107, "Binary Tree Level Order Traversal II"], [199, "Binary Tree Right Side View"], [515, "Find Largest Value in Each Tree Row"], [637, "Average of Levels in Binary Tree"],
+          ] },
+          { icon: "↝", name: vi ? "2 · Đường đi ngắn nhất không trọng số" : "2 · Unweighted shortest path", problems: [
+            [127, "Word Ladder"], [752, "Open the Lock"], [1091, "Shortest Path in Binary Matrix"], [9006, "Graph BFS Shortest Path"], [9007, "BFS Shortest Path in Obstacle Grid"],
+          ] },
+          { icon: "▦", name: vi ? "3 · BFS trên Grid" : "3 · Grid BFS", problems: [
+            [994, "Rotting Oranges"], [286, "Walls and Gates"], [542, "01 Matrix"], [934, "Shortest Bridge"], [1926, "Nearest Exit from Entrance in Maze"], [1293, "Shortest Path in a Grid with Obstacles Elimination"],
+          ] },
+          { icon: "◎", name: vi ? "4 · Multi-source BFS" : "4 · Multi-source BFS", problems: [
+            [994, "Rotting Oranges"], [542, "01 Matrix"], [1162, "As Far from Land as Possible"], [1765, "Map of Highest Peak"], [286, "Walls and Gates"], [934, "Shortest Bridge"],
+          ] },
+          { icon: "◇", name: vi ? "5 · BFS trên không gian trạng thái" : "5 · State-space BFS", problems: [
+            [752, "Open the Lock"], [2059, "Minimum Operations to Convert Number"], [3568, "Minimum Moves to Clean the Classroom"], [818, "Race Car"], [847, "Shortest Path Visiting All Nodes"], [864, "Shortest Path to Get All Keys"],
+          ] },
+          { icon: "⇄", name: vi ? "6 · Bidirectional BFS" : "6 · Bidirectional BFS", problems: [
+            [127, "Word Ladder"], [126, "Word Ladder II"], [752, "Open the Lock"],
+          ] },
+          { icon: "⇣", name: vi ? "7 · Topological / Reverse BFS" : "7 · Topological / Reverse BFS", problems: [
+            [207, "Course Schedule"], [210, "Course Schedule II"], [802, "Find Eventual Safe States"], [913, "Cat and Mouse"], [1136, "Parallel Courses"],
+          ] },
+          { icon: "01", name: vi ? "8 · 0-1 BFS với deque" : "8 · 0-1 BFS with a deque", problems: [
+            [1368, "Minimum Cost to Make at Least One Valid Path in a Grid"], [2290, "Minimum Obstacle Removal to Reach Corner"],
+          ] },
+          { icon: "♧", name: vi ? "9 · BFS theo tầng trên cây / đồ thị" : "9 · Layered BFS on trees / graphs", problems: [
+            [1311, "Get Watched Videos by Your Friends"], [1376, "Time Needed to Inform All Employees"], [742, "Closest Leaf in a Binary Tree"], [314, "Binary Tree Vertical Order Traversal"], [662, "Maximum Width of Binary Tree"],
+          ] },
+        ];
+        const levels = [
+          {
+            tone: "green",
+            icon: "🟢",
+            title: vi ? "Level 1 — Nắm queue và layer" : "Level 1 — Master queues and layers",
+            problems: [[102, "Level Order Traversal"], [994, "Rotting Oranges"], [542, "01 Matrix"], [785, "Is Graph Bipartite?"], [9006, "Graph BFS Shortest Path"]],
+          },
+          {
+            tone: "yellow",
+            icon: "🟡",
+            title: vi ? "Level 2 — Shortest path và state" : "Level 2 — Shortest paths and state",
+            problems: [[127, "Word Ladder"], [752, "Open the Lock"], [1091, "Shortest Path in Binary Matrix"], [1293, "Obstacle Elimination"], [2059, "Convert Number"]],
+          },
+          {
+            tone: "red",
+            icon: "🔴",
+            title: vi ? "Level 3 — Biến thể nâng cao" : "Level 3 — Advanced variants",
+            problems: [[126, "Word Ladder II"], [847, "Visit All Nodes"], [864, "Get All Keys"], [1368, "0-1 BFS"], [913, "Retrograde BFS"]],
+          },
+        ];
+        const sequence = [102, 994, 542, 785, 9006, 127, 752, 1091, 1293, 2059, 847, 1368, 126];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-bfs-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-bfs-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card bfs-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+        const levelCards = levels.map((level) => `<article class="trie-level-card ${level.tone}"><h4><span>${level.icon}</span>${level.title}</h4><ul>${level.problems.map(problemRow).join("")}</ul></article>`).join("");
+
+        $("trieLearnEyebrow").textContent = "BFS LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "9 nhóm BFS cần nhận diện" : "9 BFS patterns to recognize";
+        $("trieLearnIntro").textContent = vi
+          ? "Bắt đầu từ queue và duyệt theo layer, sau đó mở rộng sang shortest path, multi-source, state-space, bidirectional và 0-1 BFS."
+          : "Start with queues and layer traversal, then progress through shortest paths, multi-source, state-space, bidirectional, and 0-1 BFS.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình BFS" : "Close BFS learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "9 nhóm bài theo tín hiệu đề" : "9 groups by problem signal"}</h3><p>${vi ? "Nhìn nguồn khởi tạo, loại cạnh và state để chọn đúng biến thể BFS." : "Use the sources, edge costs, and state shape to choose the right BFS variant."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-learn-section">
+            <div class="trie-interview-note">⭐ <strong>${vi ? "Quy tắc chọn nhanh:" : "Quick selection rule:"}</strong> ${vi ? "cạnh cùng trọng số → BFS; trọng số chỉ 0/1 → 0-1 BFS; nhiều nguồn → enqueue tất cả trước vòng lặp." : "equal edge weights → BFS; only 0/1 weights → 0-1 BFS; multiple sources → enqueue all sources before the loop."}</div>
+            <div class="trie-level-grid">${levelCards}</div>
+          </section>
+          <section class="trie-roadmap bfs-roadmap">
+            <div class="trie-learn-section-title"><span>03</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Queue → layer → shortest path → mở rộng state → biến thể nâng cao." : "Queue → layers → shortest paths → expanded state → advanced variants."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-bfs-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.bfsProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "auto", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "backtracking") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";

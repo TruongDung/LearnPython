@@ -14,7 +14,7 @@ const brute = (words, pref, suff) => words.reduce((best, word, index) => word.st
 
 test('745 approach 2 registers Trie code and uses the same validation and live WordFilter operations', () => {
   assert.ok(problem.tags.some(tag => tag.key === 'trie'));
-  assert.equal(problem.extraParams.find(param => param.key === 'approach').options.length, 2);
+  assert.equal(problem.extraParams.find(param => param.key === 'approach').options.length, 3);
   assert.match(problem.code2.join('\n'), /word\[:p\] \+ '\{' \+ word\[::-1\]/);
   assert.deepEqual(prepareDesignLiveRun(problem, ['apple'], { queries: '[["a","e"]]', approach: 2 }, 2), {
     className: 'WordFilter', constructorArgs: [['apple']], operations: [{ name: 'f', args: ['a', 'e'] }],
