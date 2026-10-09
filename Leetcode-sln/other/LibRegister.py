@@ -14,14 +14,13 @@ class Library:
             inside = False
             for char in s:
                 if char == "%":
-                    if inside: #close 
+                    if inside: #close
                         name = ''.join(variable)
 
                         if name in visited:
                             raise ValueError("Cycle detected")
 
                         visited.add(name)
-                        
                         res.append(dfs(self.resgistrations.get(name,""), visited))
 
                         visited.remove(name)
@@ -31,7 +30,7 @@ class Library:
                     else: #open
                         inside = True
                 else:
-                    if inside: 
+                    if inside:
                         variable.append(char)
                     else:
                         res.append(char)

@@ -2630,159 +2630,252 @@ function buildSteps3286(input, params) {
 }
 
 /**
- * Generate steps for LeetCode 1197: Minimum Knight Moves.
- * BFS from (0,0) to (|x|,|y|), tracking visited cells on a grid.
+ * Generate an explanatory, line-by-line BFS trace for LeetCode 1197.
+ * Reflection symmetry maps the target to the first quadrant. Parent pointers
+ * reconstruct a real shortest path instead of drawing a start/end shortcut.
  */
 function buildSteps1197(input, params) {
-  const tx = Math.abs(parseInt(String(input), 10) || 0);
-  const ty = Math.abs(params.y || 0);
-  const steps = [];
-
-  const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-
-  // BFS with bounded grid for visualization
-  const minR = -2, minC = -2;
-  const maxR = tx + 2, maxC = ty + 2;
-  const rows = maxR - minR + 1;
-  const colsN = maxC - minC + 1;
-
-  // Grid to track distances
-  const dist = {};
-  const key = (r, c) => `${r},${c}`;
-  dist[key(0, 0)] = 0;
-
-  const queue = [[0, 0, 0]];
-  let answer = -1;
-  let bfsSteps = 0;
-
-  // Build grid view
-  function makeGrid(hlCell, pathCells) {
-    const dp = [];
-    for (let r = minR; r <= maxR; r++) {
-      const row = [];
-      for (let c = minC; c <= maxC; c++) {
-        const d = dist[key(r, c)];
-        row.push(d !== undefined ? String(d) : "·");
-      }
-      dp.push(row);
-    }
-    return {
-      dp,
-      text1: Array.from({ length: rows }, (_, i) => String(minR + i)),
-      text2: Array.from({ length: colsN }, (_, i) => String(minC + i)),
-      hlCell: hlCell ? [hlCell[0] - minR, hlCell[1] - minC] : null,
-      pathCells: (pathCells || []).map(([r, c]) => [r - minR, c - minC]),
-    };
+  const originalX = Number(input);
+  const originalY = Number(params.y);
+  if (!Number.isInteger(originalX) || !Number.isInteger(originalY)) {
+    throw new TypeError("#1197: x and y must be integers.");
+  }
+  if (Math.abs(originalX) > 20 || Math.abs(originalY) > 20) {
+    throw new RangeError("#1197: the detailed visualization supports coordinates from -20 to 20.");
   }
 
-  steps.push({
-    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
-    arr: [],
-    grid: makeGrid([0, 0], []),
-    highlight: [],
-    mark: [],
-    codeLines: [4, 5, 6, 7, 8],
-    vars: [
-      { name: "start", value: "(0, 0)" },
-      { name: "target", value: `(${tx}, ${ty})` },
-      { name: "queue", value: "[(0,0,0)]" },
-    ],
-    note: {
-      vi: `BFS từ (0,0) đến (${tx},${ty}). Mã di chuyển L-shape: 8 hướng.\nGrid hiển thị số bước tới mỗi ô đã thăm.`,
-      en: `BFS from (0,0) to (${tx},${ty}). Knight moves in L-shape: 8 directions.\nGrid shows steps to reach each visited cell.`,
-    },
-  });
-
-  // Run BFS
+  const tx = Math.abs(originalX);
+  const ty = Math.abs(originalY);
+  const minX = -2;
+  const minY = -2;
+  const maxX = tx + 2;
+  const maxY = ty + 2;
+  const moves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  const key = (x, y) => `${x},${y}`;
+  const parseKey = value => value.split(",").map(Number);
+  const queue = [[0, 0]];
+  const distance = new Map([[key(0, 0), 0]]);
+  const parent = new Map([[key(0, 0), null]]);
+  const steps = [];
   let head = 0;
-  while (head < queue.length) {
-    const [cx, cy, curSteps] = queue[head++];
+  let current = null;
+  let candidate = null;
+  let activeMove = null;
+  let decision = null;
+  let phase = "setup";
+  let answer = null;
+  let path = [];
+  let traceCompacted = false;
+  let popped = 0;
 
-    if (cx === tx && cy === ty) {
-      answer = curSteps;
-      // Reconstruct path (BFS guarantees shortest)
-      steps.push({
-        title: { vi: `✓ Đã tới (${tx},${ty}) trong ${answer} bước`, en: `✓ Reached (${tx},${ty}) in ${answer} moves` },
-        arr: [],
-        grid: makeGrid([tx, ty], [[0, 0], [tx, ty]]),
-        highlight: [],
-        mark: [],
-        codeLines: [11, 12],
-        vars: [
-          { name: "position", value: `(${cx}, ${cy})` },
-          { name: "steps", value: curSteps },
-          { name: "visited", value: Object.keys(dist).length },
-        ],
-        note: {
-          vi: `Đến đích (${tx},${ty})! Số bước tối thiểu = ${answer}.`,
-          en: `Reached target (${tx},${ty})! Minimum moves = ${answer}.`,
-        },
-      });
+  const localized = (en, vi) => ({ en, vi });
+  const cell = ([x, y]) => ({ x, y, distance: distance.get(key(x, y)) ?? null });
+  const snapshot = (line, event, final = false) => ({
+    line,
+    source: [
+      "from collections import deque", "", "class Solution:",
+      "    def minKnightMoves(self, x: int, y: int) -> int:",
+      "        x, y = abs(x), abs(y)",
+      "        bounds = (-2, x + 2, -2, y + 2)",
+      "        moves = [(-2,-1),(-2,1),(-1,-2),(-1,2),", "                 (1,-2),(1,2),(2,-1),(2,1)]",
+      "        queue = deque([(0, 0)])", "        distance = {(0, 0): 0}", "        parent = {(0, 0): None}",
+      "        while queue:", "            current = queue.popleft()", "            if current == (x, y):", "                break",
+      "            for dx, dy in moves:", "                nxt = (current[0] + dx, current[1] + dy)",
+      "                if not (bounds[0] <= nxt[0] <= bounds[1] and", "                        bounds[2] <= nxt[1] <= bounds[3]):",
+      "                    continue", "                if nxt in distance:", "                    continue",
+      "                distance[nxt] = distance[current] + 1", "                parent[nxt] = current", "                queue.append(nxt)",
+      "", "        path = []", "        node = (x, y)", "        while node is not None:", "            path.append(node)",
+      "            node = parent[node]", "        self.path = path[::-1]", "        return distance[(x, y)]",
+    ][line - 1],
+    event,
+    phase,
+    originalTarget: { x: originalX, y: originalY },
+    target: { x: tx, y: ty },
+    bounds: { minX, maxX, minY, maxY },
+    moves: moves.map(([dx, dy]) => ({ dx, dy })),
+    current: current ? cell(current) : null,
+    candidate: candidate ? { ...cell(candidate), dx: activeMove[0], dy: activeMove[1], decision } : null,
+    queue: queue.slice(head, head + 24).map(cell),
+    queueSize: queue.length - head,
+    visited: [...distance.entries()].map(([position, value]) => {
+      const [x, y] = parseKey(position);
+      return { x, y, distance: value };
+    }),
+    path: path.map(([x, y], index) => ({ x, y, step: index })),
+    answer,
+    popped,
+    traceCompacted,
+    final,
+  });
+  const emit = (line, event, title, note, final = false, condition = null) => {
+    steps.push({
+      arr: [], highlight: [], mark: [], codeLines: [line], final, title, note,
+      vars: [
+        { name: "target", value: `(${tx}, ${ty})` },
+        { name: "current", value: current ? `(${current[0]}, ${current[1]})` : "—" },
+        { name: "distance", value: current ? distance.get(key(...current)) : 0 },
+        { name: "queue size", value: queue.length - head },
+      ],
+      knight1197View: { ...snapshot(line, event, final), condition },
+    });
+  };
+
+  emit(5, "normalize", localized("Reflect target into the first quadrant", "Phản chiếu đích về góc phần tư thứ nhất"), localized(
+    `Knight moves are symmetric across both axes, so (${originalX}, ${originalY}) has the same answer as (${tx}, ${ty}).`,
+    `Nước mã đối xứng qua cả hai trục, nên (${originalX}, ${originalY}) có cùng đáp án với (${tx}, ${ty}).`,
+  ));
+  emit(6, "bounds", localized("Keep a safe finite search window", "Giới hạn một vùng tìm kiếm hữu hạn an toàn"), localized(
+    "A shortest route never needs to go more than two squares beyond the target in either normalized axis.",
+    "Đường đi ngắn nhất không cần vượt quá đích hơn hai ô trên mỗi trục đã chuẩn hóa.",
+  ));
+  emit(7, "moves", localized("Prepare all eight L-shaped moves", "Chuẩn bị đủ tám nước đi hình chữ L"), localized(
+    "Every candidate changes one coordinate by 2 and the other by 1.",
+    "Mỗi candidate đổi một tọa độ 2 đơn vị và tọa độ còn lại 1 đơn vị.",
+  ));
+  emit(9, "queue-init", localized("Put the start in the BFS queue", "Đưa điểm bắt đầu vào queue BFS"), localized(
+    "FIFO order makes all distance-0 cells run before distance 1, then distance 2, and so on.",
+    "Thứ tự FIFO xử lý hết lớp distance 0 trước lớp 1, rồi lớp 2, v.v.",
+  ));
+  emit(10, "distance-init", localized("Distance of the start is zero", "Khoảng cách của điểm đầu là 0"), localized(
+    "The distance map is also the visited set: first discovery is shortest in BFS.",
+    "Map distance đồng thời là visited set: lần khám phá đầu tiên luôn ngắn nhất trong BFS.",
+  ));
+  emit(11, "parent-init", localized("Start has no parent", "Điểm đầu không có parent"), localized(
+    "Each newly discovered square will remember the square that reached it.",
+    "Mỗi ô mới được khám phá sẽ nhớ ô đã dẫn tới nó.",
+  ));
+
+  let lastShownLayer = -1;
+  while (head < queue.length) {
+    current = queue[head++];
+    candidate = activeMove = null;
+    decision = null;
+    popped += 1;
+    const currentDistance = distance.get(key(...current));
+    const detailed = popped <= 3;
+    const showPop = detailed || currentDistance !== lastShownLayer || (current[0] === tx && current[1] === ty);
+    traceCompacted = !detailed;
+    phase = "search";
+    if (showPop) {
+      emit(13, "dequeue", localized(`Dequeue (${current[0]}, ${current[1]})`, `Lấy (${current[0]}, ${current[1]}) khỏi queue`), localized(
+        `This square belongs to BFS layer ${currentDistance}. ${queue.length - head} queued squares remain.`,
+        `Ô này thuộc lớp BFS ${currentDistance}. Queue còn ${queue.length - head} ô.`,
+      ));
+      lastShownLayer = currentDistance;
+      emit(14, "target-check", localized("Is this the target?", "Đây có phải ô đích?"), localized(
+        current[0] === tx && current[1] === ty ? "Yes. Because BFS pops by layer, this distance is minimal." : "No. Expand its eight knight moves.",
+        current[0] === tx && current[1] === ty ? "Có. Vì BFS lấy theo lớp, khoảng cách này là nhỏ nhất." : "Không. Mở rộng tám nước mã từ ô này.",
+      ), false, { expression: "current == target", result: current[0] === tx && current[1] === ty });
+    }
+    if (current[0] === tx && current[1] === ty) {
+      answer = currentDistance;
+      phase = "found";
+      emit(15, "target-found", localized(`Target found at distance ${answer}`, `Tìm thấy đích ở khoảng cách ${answer}`), localized(
+        "Stop BFS now; any later queue entry is in the same or a deeper layer.",
+        "Dừng BFS; mọi phần tử còn lại thuộc cùng lớp hoặc lớp sâu hơn.",
+      ));
       break;
     }
 
-    bfsSteps++;
-    // Only show some BFS expansion steps to keep it manageable
-    const showThisStep = bfsSteps <= 15 || curSteps <= 2;
-
-    let expanded = 0;
-    for (const [dx, dy] of knightMoves) {
-      const nx = cx + dx;
-      const ny = cy + dy;
-      if (nx < minR || nx > maxR || ny < minC || ny > maxC) continue;
-      if (dist[key(nx, ny)] !== undefined) continue;
-
-      dist[key(nx, ny)] = curSteps + 1;
-      queue.push([nx, ny, curSteps + 1]);
-      expanded++;
+    for (const move of moves) {
+      activeMove = move;
+      candidate = [current[0] + move[0], current[1] + move[1]];
+      decision = "checking";
+      if (detailed) emit(16, "select-move", localized(`Try move (${move[0]}, ${move[1]})`, `Thử nước (${move[0]}, ${move[1]})`), localized(
+        "Select one of the eight legal knight deltas.",
+        "Chọn một trong tám vector di chuyển hợp lệ của quân mã.",
+      ));
+      if (detailed) emit(17, "candidate", localized(`Candidate (${candidate[0]}, ${candidate[1]})`, `Candidate (${candidate[0]}, ${candidate[1]})`), localized(
+        `(${current[0]}, ${current[1]}) + (${move[0]}, ${move[1]}) = (${candidate[0]}, ${candidate[1]}).`,
+        `(${current[0]}, ${current[1]}) + (${move[0]}, ${move[1]}) = (${candidate[0]}, ${candidate[1]}).`,
+      ));
+      const inBounds = candidate[0] >= minX && candidate[0] <= maxX && candidate[1] >= minY && candidate[1] <= maxY;
+      decision = inBounds ? "in-bounds" : "out-of-bounds";
+      if (detailed) emit(18, "bounds-check", localized(inBounds ? "Candidate is inside the window" : "Candidate is outside the window", inBounds ? "Candidate nằm trong vùng" : "Candidate nằm ngoài vùng"), localized(
+        inBounds ? "Continue to the visited check." : "Skip it; this bounded detour cannot improve a shortest route.",
+        inBounds ? "Tiếp tục kiểm tra visited." : "Bỏ qua; đường vòng ngoài vùng này không thể cải thiện đường ngắn nhất.",
+      ), false, { expression: "candidate inside bounds", result: inBounds });
+      if (!inBounds) {
+        if (detailed) emit(20, "skip-bounds", localized("Skip out-of-bounds candidate", "Bỏ candidate ngoài vùng"), localized("Do not add it to distance, parent, or queue.", "Không thêm nó vào distance, parent hay queue."));
+        continue;
+      }
+      const seen = distance.has(key(...candidate));
+      decision = seen ? "visited" : "new";
+      if (detailed) emit(21, "visited-check", localized(seen ? "Already visited" : "First discovery", seen ? "Đã thăm" : "Khám phá lần đầu"), localized(
+        seen ? `Its shortest distance is already ${distance.get(key(...candidate))}; skip duplicate work.` : "BFS may safely lock in its shortest distance now.",
+        seen ? `Khoảng cách ngắn nhất đã là ${distance.get(key(...candidate))}; bỏ công việc trùng.` : "BFS có thể chốt khoảng cách ngắn nhất của ô này ngay bây giờ.",
+      ), false, { expression: "candidate in distance", result: seen });
+      if (seen) {
+        if (detailed) emit(22, "skip-visited", localized("Skip the duplicate", "Bỏ ô trùng"), localized("The square stays out of the queue a second time.", "Ô này không được đưa vào queue lần thứ hai."));
+        continue;
+      }
+      distance.set(key(...candidate), currentDistance + 1);
+      decision = "distance-set";
+      if (detailed) emit(23, "set-distance", localized(`Set distance ${currentDistance + 1}`, `Gán distance ${currentDistance + 1}`), localized(
+        "A child is exactly one knight move farther than its parent.",
+        "Ô con xa hơn parent đúng một nước mã.",
+      ));
+      parent.set(key(...candidate), [...current]);
+      decision = "parent-set";
+      if (detailed) emit(24, "set-parent", localized("Record the shortest-path parent", "Lưu parent của đường ngắn nhất"), localized(
+        `Parent[(${candidate[0]}, ${candidate[1]})] = (${current[0]}, ${current[1]}).`,
+        `Parent[(${candidate[0]}, ${candidate[1]})] = (${current[0]}, ${current[1]}).`,
+      ));
+      queue.push([...candidate]);
+      decision = "enqueued";
+      if (detailed) emit(25, "enqueue", localized("Enqueue the new square", "Đưa ô mới vào queue"), localized(
+        `It joins the back of BFS layer ${currentDistance + 1}.`,
+        `Ô được thêm vào cuối lớp BFS ${currentDistance + 1}.`,
+      ));
     }
-
-    if (showThisStep && expanded > 0) {
-      steps.push({
-        title: { vi: `BFS: (${cx},${cy}) step=${curSteps}`, en: `BFS: (${cx},${cy}) step=${curSteps}` },
-        arr: [],
-        grid: makeGrid([cx, cy], []),
-        highlight: [],
-        mark: [],
-        codeLines: [9, 10, 13, 14, 15, 16, 17],
-        vars: [
-          { name: "position", value: `(${cx}, ${cy})` },
-          { name: "steps", value: curSteps },
-          { name: "expanded", value: expanded },
-          { name: "queue size", value: queue.length - head },
-          { name: "visited", value: Object.keys(dist).length },
-        ],
-        note: {
-          vi: `Xử lý (${cx},${cy}) ở bước ${curSteps}. Thêm ${expanded} ô mới vào queue.`,
-          en: `Process (${cx},${cy}) at step ${curSteps}. Added ${expanded} new cells to queue.`,
-        },
-      });
-    }
-
-    if (steps.length > 60) break; // Safety limit
   }
 
-  if (answer === -1) answer = 0;
+  phase = "path";
+  current = [tx, ty];
+  candidate = activeMove = null;
+  decision = null;
+  emit(27, "path-init", localized("Create an empty path", "Tạo path rỗng"), localized(
+    "Follow parent pointers from the target back to the start.",
+    "Đi theo parent từ đích ngược về điểm bắt đầu.",
+  ));
+  let node = [tx, ty];
+  emit(28, "path-target", localized("Begin at the target", "Bắt đầu từ đích"), localized(
+    `node = (${tx}, ${ty}).`, `node = (${tx}, ${ty}).`,
+  ));
+  const reversePath = [];
+  while (node !== null) {
+    current = [...node];
+    emit(29, "path-check", localized("Parent walk continues", "Tiếp tục lần theo parent"), localized(
+      "The current node is not None, so it belongs in the reverse path.",
+      "Node hiện tại khác None nên thuộc reverse path.",
+    ), false, { expression: "node is not None", result: true });
+    reversePath.push([...node]);
+    path = [...reversePath].reverse();
+    emit(30, "path-append", localized(`Add (${node[0]}, ${node[1]})`, `Thêm (${node[0]}, ${node[1]})`), localized(
+      "The path is being collected target → start; it will be reversed once.",
+      "Path đang được thu theo chiều đích → đầu; cuối cùng sẽ đảo một lần.",
+    ));
+    const predecessor = parent.get(key(...node)) ?? null;
+    node = predecessor ? [...predecessor] : null;
+    if (node) current = [...node];
+    emit(31, "path-parent", localized(node ? `Move to parent (${node[0]}, ${node[1]})` : "Start has no parent", node ? `Đi tới parent (${node[0]}, ${node[1]})` : "Điểm đầu không có parent"), localized(
+      node ? "Continue walking backward." : "The backward walk is complete.",
+      node ? "Tiếp tục đi ngược." : "Đã hoàn tất lần ngược path.",
+    ));
+  }
+  current = [tx, ty];
+  path = [...reversePath].reverse();
+  emit(32, "path-ready", localized("Reverse into start → target order", "Đảo thành thứ tự đầu → đích"), localized(
+    `The reconstructed path contains ${path.length} squares and ${path.length - 1} moves.`,
+    `Path đã dựng có ${path.length} ô và ${path.length - 1} nước đi.`,
+  ));
+  phase = "done";
+  emit(33, "return", localized(`Return ${answer}`, `Trả về ${answer}`), localized(
+    `BFS distance and reconstructed path both confirm ${answer} minimum moves.`,
+    `Distance BFS và path đã dựng đều xác nhận tối thiểu ${answer} nước.`,
+  ), true);
 
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [],
-    grid: makeGrid([tx, ty], [[0, 0], [tx, ty]]),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [12],
-    vars: [
-      { name: "answer", value: answer },
-      { name: "cells visited", value: Object.keys(dist).length },
-    ],
-    note: {
-      vi: `Số bước mã tối thiểu từ (0,0) đến (${tx},${ty}) = ${answer}.`,
-      en: `Minimum knight moves from (0,0) to (${tx},${ty}) = ${answer}.`,
-    },
-  });
-
-  return { x: tx, y: ty, answer, steps };
+  return { x: originalX, y: originalY, normalizedX: tx, normalizedY: ty, answer, path, steps };
 }
 
 /**
@@ -21041,6 +21134,7 @@ module.exports = {
     difficulty: "medium",
     slug: "minimum-knight-moves",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "bfs", vi: "BFS", en: "BFS" }, { key: "shortest-path", vi: "Đường đi ngắn nhất", en: "Shortest Path" }],
     title: { vi: "Minimum Knight Moves", en: "Minimum Knight Moves" },
     titleVi: { vi: "Số bước mã tối thiểu", en: "Minimum knight moves" },
     statement: {
@@ -21051,22 +21145,22 @@ module.exports = {
         "On an infinite chessboard, a knight starts at (0,0). Find the minimum number of moves to reach (x,y). " +
         "A knight moves in an L-shape: (±1,±2) or (±2,±1). Uses BFS.",
     },
-    defaultInput: "2",
+    defaultInput: "5",
     inputKind: "string",
     inputLabel: { vi: "x (tọa độ đích)", en: "x (target x)" },
     extraParams: [
       {
         key: "y",
         label: { vi: "y (tọa độ đích)", en: "y (target y)" },
-        default: 1,
+        default: 5,
       },
     ],
     complexity: {
-      time: "O(|x|·|y|)",
-      space: "O(|x|·|y|)",
+      time: "O((|x|+5)·(|y|+5))",
+      space: "O((|x|+5)·(|y|+5))",
       note: {
-        vi: "BFS khám phá tối đa O(|x|·|y|) ô. Queue + visited set → O(|x|·|y|) bộ nhớ.",
-        en: "BFS explores at most O(|x|·|y|) cells. Queue + visited set → O(|x|·|y|) memory.",
+        vi: "Sau khi phản chiếu về góc phần tư thứ nhất, BFS chỉ xét hình chữ nhật [-2..|x|+2] × [-2..|y|+2]. Visualization chi tiết nhận tọa độ từ -20 đến 20.",
+        en: "After reflection into the first quadrant, BFS searches only [-2..|x|+2] × [-2..|y|+2]. The detailed visualization accepts coordinates from -20 to 20.",
       },
     },
     code: [
@@ -21075,20 +21169,36 @@ module.exports = {
       "class Solution:",
       "    def minKnightMoves(self, x: int, y: int) -> int:",
       "        x, y = abs(x), abs(y)",
-      "        queue = deque([(0, 0, 0)])",
-      "        visited = {(0, 0)}",
+      "        bounds = (-2, x + 2, -2, y + 2)",
       "        moves = [(-2,-1),(-2,1),(-1,-2),(-1,2),",
       "                 (1,-2),(1,2),(2,-1),(2,1)]",
+      "        queue = deque([(0, 0)])",
+      "        distance = {(0, 0): 0}",
+      "        parent = {(0, 0): None}",
       "        while queue:",
-      "            cx, cy, steps = queue.popleft()",
-      "            if cx == x and cy == y:",
-      "                return steps",
+      "            current = queue.popleft()",
+      "            if current == (x, y):",
+      "                break",
       "            for dx, dy in moves:",
-      "                nx, ny = cx+dx, cy+dy",
-      "                if (nx,ny) not in visited and -2<=nx<=x+2 and -2<=ny<=y+2:",
-      "                    visited.add((nx, ny))",
-      "                    queue.append((nx, ny, steps+1))",
+      "                nxt = (current[0] + dx, current[1] + dy)",
+      "                if not (bounds[0] <= nxt[0] <= bounds[1] and",
+      "                        bounds[2] <= nxt[1] <= bounds[3]):",
+      "                    continue",
+      "                if nxt in distance:",
+      "                    continue",
+      "                distance[nxt] = distance[current] + 1",
+      "                parent[nxt] = current",
+      "                queue.append(nxt)",
+      "",
+      "        path = []",
+      "        node = (x, y)",
+      "        while node is not None:",
+      "            path.append(node)",
+      "            node = parent[node]",
+      "        self.path = path[::-1]",
+      "        return distance[(x, y)]",
     ],
+    debugMode: "line-by-line",
     builder: buildSteps1197,
   },
   126: {
