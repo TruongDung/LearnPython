@@ -274,6 +274,20 @@ function buildSteps2421(input, params = {}) {
   const order = Array.from({ length: n }, (_, index) => index)
     .sort((a, b) => vals[a] - vals[b] || a - b);
 
+  // Độ sâu BFS từ node 0 để vẽ state graph theo layout cây (gọn, không tràn).
+  const depthOf = (() => {
+    const depth = new Array(n).fill(-1);
+    depth[0] = 0;
+    const queue = [0];
+    while (queue.length) {
+      const u = queue.shift();
+      for (const w of adj[u]) {
+        if (depth[w] === -1) { depth[w] = depth[u] + 1; queue.push(w); }
+      }
+    }
+    return depth;
+  })();
+
   const dsu = new DSU(n, null, false);
   const active = new Array(n).fill(false);
   const eventHistory = [];
@@ -320,14 +334,21 @@ function buildSteps2421(input, params = {}) {
     const visibleSet = new Set(visible);
     const shownEdges = edges.filter(([u, v]) => visibleSet.has(u) && visibleSet.has(v))
       .slice(0, LIMITS_2421.maxGraphEdges);
+    const maxDepth = Math.max(...visible.map((index) => depthOf[index]));
+    const levels = [];
+    for (let d = 0; d <= maxDepth; d += 1) {
+      const level = visible.filter((index) => depthOf[index] === d);
+      if (level.length) levels.push(level);
+    }
     return {
-      layout: "circle",
+      layout: "tree",
+      levels,
       nodes: visible.map((index) => ({
         id: index,
         label: String(index),
         sub: active[index]
           ? `v=${vals[index]} · root=${dsu.find(index)}`
-          : `v=${vals[index]} · inactive`,
+          : `v=${vals[index]}`,
         state: nodeState(index),
       })),
       edges: shownEdges.map(([u, v]) => {
@@ -491,20 +512,58 @@ function buildSteps2421(input, params = {}) {
     });
   }
 
-  emit2421({
-    phaseIndex: 0,
-    title: bi(
-      `Dựng cây ${n} node và sắp xếp theo giá trị tăng dần`,
-      `Build the ${n}-node tree and sort by ascending value`,
-    ),
-    note: bi(
-      `Thứ tự kích hoạt: [${order.slice(0, 12).join(", ")}${order.length > 12 ? ", …" : ""}]. Node giá trị nhỏ được kích hoạt trước để mọi láng giềng đã kích hoạt đều có giá trị không vượt quá node hiện tại.`,
-      `Activation order: [${order.slice(0, 12).join(", ")}${order.length > 12 ? ", …" : ""}]. Smaller values activate first so every activated neighbor has value at most the current node.`,
-    ),
-    action: bi("Dựng danh sách kề, mảng active và thứ tự order.", "Build the adjacency list, the active array, and the order."),
-    formula: bi(`answer = n = ${n}`, `answer = n = ${n}`),
-    codeLines: [8, 10, 11, 12, 13, 15, 16, 17, 37, 39],
+  // Debug line-by-line: mỗi step chỉ highlight đúng 1 dòng code đang chạy.
+  const lineStep = (phaseIndex, codeLine, title, note, action, formula) => emit2421({
+    phaseIndex, title, note, action, formula, codeLines: [codeLine],
   });
+
+  lineStep(0, 8,
+    bi(`Dòng 8: n = ${n}`, `Line 8: n = ${n}`),
+    bi(`Cây có ${n} node, đánh số 0..${n - 1}.`, `The tree has ${n} nodes numbered 0..${n - 1}.`),
+    bi("Đọc số node từ vals.", "Read the node count from vals."),
+    bi(`n = len(vals) = ${n}`, `n = len(vals) = ${n}`));
+
+  lineStep(0, 10,
+    bi("Dòng 10: tạo danh sách kề rỗng", "Line 10: create empty adjacency lists"),
+    bi("Mỗi node có một danh sách láng giềng riêng, ban đầu rỗng.", "Each node gets its own neighbor list, initially empty."),
+    bi("Khởi tạo adj.", "Initialize adj."),
+    bi("adj = [[] for _ in range(n)]", "adj = [[] for _ in range(n)]"));
+
+  lineStep(0, 11,
+    bi("Dòng 11: duyệt từng cạnh", "Line 11: iterate over edges"),
+    bi(`Thêm ${edges.length} cạnh vào adj theo cả hai chiều (dòng 12–13).`, `Add all ${edges.length} edges to adj in both directions (lines 12–13).`),
+    bi("Nối mỗi cạnh vào danh sách kề hai đầu.", "Append each edge to both endpoint lists."),
+    bi(`for u, v in edges:  (${edges.length} cạnh)`, `for u, v in edges:  (${edges.length} edges)`));
+
+  lineStep(0, 15,
+    bi("Dòng 15: parent[i] = i", "Line 15: parent[i] = i"),
+    bi("Mỗi node ban đầu là một tập riêng trong DSU.", "Each node starts as its own DSU set."),
+    bi("Khởi tạo DSU.", "Initialize the DSU."),
+    bi("parent = list(range(n))", "parent = list(range(n))"));
+
+  lineStep(0, 16,
+    bi("Dòng 16: size[i] = 1", "Line 16: size[i] = 1"),
+    bi("Mỗi component ban đầu có kích thước 1, dùng cho union theo kích thước.", "Each component starts with size 1, used for union by size."),
+    bi("Khởi tạo mảng size.", "Initialize the size array."),
+    bi("size = [1] * n", "size = [1] * n"));
+
+  lineStep(0, 17,
+    bi("Dòng 17: chưa node nào hoạt động", "Line 17: no active node yet"),
+    bi("active[node] chỉ thành True khi node đã được xử lý (giá trị ≤ giá trị hiện tại).", "active[node] becomes True only once the node is processed (value ≤ current value)."),
+    bi("Khởi tạo mảng active.", "Initialize the active array."),
+    bi("active = [False] * n", "active = [False] * n"));
+
+  lineStep(0, 37,
+    bi("Dòng 37: sắp xếp node theo giá trị", "Line 37: sort nodes by value"),
+    bi(`Thứ tự kích hoạt: [${order.slice(0, 12).join(", ")}${order.length > 12 ? ", …" : ""}]. Giá trị nhỏ trước để láng giềng đã kích hoạt luôn có giá trị ≤ hiện tại.`, `Activation order: [${order.slice(0, 12).join(", ")}${order.length > 12 ? ", …" : ""}]. Smaller values first so activated neighbors always have value ≤ current.`),
+    bi("Sắp xếp order theo vals tăng dần.", "Sort order by ascending vals."),
+    bi("order = sorted(range(n), key=lambda i: vals[i])", "order = sorted(range(n), key=lambda i: vals[i])"));
+
+  lineStep(0, 39,
+    bi(`Dòng 39: answer = ${n}`, `Line 39: answer = ${n}`),
+    bi("Mỗi node đơn tự tạo một đường tốt.", "Each single node forms one good path by itself."),
+    bi("Khởi tạo đáp án.", "Initialize the answer."),
+    bi(`answer = n = ${n}`, `answer = n = ${n}`));
 
   let i = 0;
   while (i < n) {
@@ -517,109 +576,145 @@ function buildSteps2421(input, params = {}) {
       j += 1;
     }
 
-    for (const node of currentGroupNodes) {
-      currentNode = node;
-      currentNeighbor = null;
-      dsu.activate(node);
-      active[node] = true;
-      activeCount += 1;
-      activeTransition = {
-        kind: "activate",
-        detail: `active[${node}] = True · v=${value}`,
-      };
-      rememberEvent(`+n${node}`, `v=${value}`, "active");
-      emit2421({
-        phaseIndex: 1,
-        title: bi(`Kích hoạt node ${node} (v=${value})`, `Activate node ${node} (v=${value})`),
-        note: bi(
-          `Node ${node} tạo component đơn lẻ. Các láng giềng đã kích hoạt đều có giá trị ≤ ${value} nên mọi đường đi qua chúng đều "tốt" nếu hai đầu cùng giá trị ${value}.`,
-          `Node ${node} starts a singleton component. All activated neighbors have value ≤ ${value}, so any path through them is "good" when both ends share value ${value}.`,
-        ),
-        action: bi("Bật node trong DSU và mảng active.", "Activate the node in the DSU and the active array."),
-        formula: bi(`active[${node}] = True`, `active[${node}] = True`),
-        codeLines: [47, 48],
-      });
-    }
+    lineStep(1, 42,
+      bi(`Dòng 42: while i < n — xử lý nhóm v=${value}`, `Line 42: while i < n — process group v=${value}`),
+      bi(`Nhóm gồm các node [${currentGroupNodes.join(", ")}] cùng giá trị ${value}.`, `The group holds nodes [${currentGroupNodes.join(", ")}] with value ${value}.`),
+      bi("Bắt đầu một nhóm giá trị.", "Start a value group."),
+      bi(`while i < n:  (i=${i}, v=${value})`, `while i < n:  (i=${i}, v=${value})`));
+
+    lineStep(1, 43,
+      bi(`Dòng 43: j = ${i}`, `Line 43: j = ${i}`),
+      bi("j quét từ i để gom các node cùng giá trị (dòng 46).", "j scans from i to collect equal-value nodes (line 46)."),
+      bi("Đánh dấu đầu nhóm.", "Mark the group start."),
+      bi(`j = i = ${i}`, `j = i = ${i}`));
 
     for (const node of currentGroupNodes) {
       currentNode = node;
+      currentNeighbor = null;
+      lineStep(1, 47,
+        bi(`Dòng 47: node = ${node}`, `Line 47: node = ${node}`),
+        bi(`Lấy node tiếp theo trong nhóm v=${value}.`, `Take the next node of group v=${value}.`),
+        bi("Chọn node để kích hoạt.", "Pick the node to activate."),
+        bi(`node = order[j] = ${node}`, `node = order[j] = ${node}`));
+
+      dsu.activate(node);
+      active[node] = true;
+      activeCount += 1;
+      activeTransition = { kind: "activate", detail: `active[${node}] = True · v=${value}` };
+      rememberEvent(`+n${node}`, `v=${value}`, "active");
+      lineStep(1, 48,
+        bi(`Dòng 48: kích hoạt node ${node}`, `Line 48: activate node ${node}`),
+        bi(`Node ${node} thành component đơn lẻ trong DSU.`, `Node ${node} becomes a singleton DSU component.`),
+        bi("Bật node trong DSU và mảng active.", "Activate the node in the DSU and active array."),
+        bi(`active[${node}] = True`, `active[${node}] = True`));
+
       for (const neighbor of adj[node]) {
-        if (!active[neighbor]) continue;
         currentNeighbor = neighbor;
-        const rootNode = dsu.find(node);
-        const rootNeighbor = dsu.find(neighbor);
-        if (rootNode === rootNeighbor) {
+        lineStep(2, 50,
+          bi(`Dòng 50: xét láng giềng ${neighbor} của node ${node}`, `Line 50: check neighbor ${neighbor} of node ${node}`),
+          bi(`Duyệt danh sách kề của node ${node}.`, `Iterate the adjacency list of node ${node}.`),
+          bi("Lấy láng giềng tiếp theo.", "Take the next neighbor."),
+          bi(`for nb in adj[${node}]  →  nb=${neighbor}`, `for nb in adj[${node}]  →  nb=${neighbor}`));
+
+        if (!active[neighbor]) {
+          lineStep(2, 51,
+            bi(`Dòng 51: active[${neighbor}] là False → bỏ qua`, `Line 51: active[${neighbor}] is False → skip`),
+            bi(`Láng giềng ${neighbor} (v=${vals[neighbor]}) chưa kích hoạt nên chưa thể gộp.`, `Neighbor ${neighbor} (v=${vals[neighbor]}) is not active yet, so no union.`),
+            bi("Kiểm tra active[nb].", "Check active[nb]."),
+            bi(`if active[${neighbor}]:  →  False`, `if active[${neighbor}]:  →  False`));
           currentNeighbor = null;
           continue;
         }
+        const alreadyUnited = dsu.find(node) === dsu.find(neighbor);
+        lineStep(2, 51,
+          bi(`Dòng 51: active[${neighbor}] là True → gọi union`, `Line 51: active[${neighbor}] is True → call union`),
+          bi(`Láng giềng ${neighbor} (v=${vals[neighbor]} ≤ ${value}) đã kích hoạt.`, `Neighbor ${neighbor} (v=${vals[neighbor]} ≤ ${value}) is active.`),
+          bi("Kiểm tra active[nb].", "Check active[nb]."),
+          bi(`if active[${neighbor}]:  →  True`, `if active[${neighbor}]:  →  True`));
+
         const root = dsu.union(node, neighbor);
-        currentUnionEdge = [node, neighbor];
-        activeTransition = {
-          kind: "union",
-          detail: `union(${node}, ${neighbor}) → root ${root}`,
-        };
-        rememberEvent(`n${node}↔n${neighbor}`, `root=${root}`, "updated");
-        emit2421({
-          phaseIndex: 2,
-          title: bi(`Gộp node ${node} với láng giềng ${neighbor}`, `Union node ${node} with neighbor ${neighbor}`),
-          note: bi(
-            `Láng giềng ${neighbor} đã kích hoạt (v=${vals[neighbor]} ≤ ${value}) nên hai component nhập thành một.`,
-            `Neighbor ${neighbor} is active (v=${vals[neighbor]} ≤ ${value}), so both components merge into one.`,
-          ),
-          action: bi("Union hai component theo kích thước.", "Union both components by size."),
-          formula: bi(`union(${node}, ${neighbor}) → root ${root}`, `union(${node}, ${neighbor}) → root ${root}`),
-          codeLines: [50, 51, 52],
-        });
+        if (!alreadyUnited) {
+          currentUnionEdge = [node, neighbor];
+          activeTransition = { kind: "union", detail: `union(${node}, ${neighbor}) → root ${root}` };
+          rememberEvent(`n${node}↔n${neighbor}`, `root=${root}`, "updated");
+        }
+        lineStep(2, 52,
+          alreadyUnited
+            ? bi(`Dòng 52: union(${node}, ${neighbor}) — đã cùng root`, `Line 52: union(${node}, ${neighbor}) — already same root`)
+            : bi(`Dòng 52: union(${node}, ${neighbor}) → root ${root}`, `Line 52: union(${node}, ${neighbor}) → root ${root}`),
+          alreadyUnited
+            ? bi("Hai node đã cùng component (ra == rb) nên union trả về ngay, không đổi gì.", "Both nodes already share a component (ra == rb), so union returns immediately with no change.")
+            : bi(`Gộp hai component (union theo kích thước) thành root ${root}.`, `Merge the two components (union by size) into root ${root}.`),
+          bi("Gọi union(a, b).", "Call union(a, b)."),
+          bi(`union(${node}, ${neighbor})`, `union(${node}, ${neighbor})`));
         currentUnionEdge = null;
         currentNeighbor = null;
       }
+
+      lineStep(1, 54,
+        bi("Dòng 54: j += 1", "Line 54: j += 1"),
+        bi("Sang node kế tiếp trong nhóm.", "Move to the next node in the group."),
+        bi("Tăng j.", "Increment j."),
+        bi("j += 1", "j += 1"));
     }
     currentNode = null;
     currentNeighbor = null;
 
+    lineStep(3, 57,
+      bi("Dòng 57: groups = defaultdict(int)", "Line 57: groups = defaultdict(int)"),
+      bi("Chuẩn bị đếm số node cùng giá trị theo từng component.", "Prepare to count equal-value nodes per component."),
+      bi("Tạo dict đếm.", "Create the counting dict."),
+      bi("groups = defaultdict(int)", "groups = defaultdict(int)"));
+
     const counts = new Map();
     for (const node of currentGroupNodes) {
+      currentNode = node;
+      lineStep(3, 59,
+        bi(`Dòng 59: duyệt node ${node} trong nhóm`, `Line 59: visit node ${node} in the group`),
+        bi(`Đếm node ${node} vào component chứa nó.`, `Count node ${node} into its component.`),
+        bi("Lặp k trên nhóm.", "Loop k over the group."),
+        bi(`for k in range(i, j)  →  order[k] = ${node}`, `for k in range(i, j)  →  order[k] = ${node}`));
       const root = dsu.find(node);
       counts.set(root, (counts.get(root) || 0) + 1);
+      lineStep(3, 60,
+        bi(`Dòng 60: root = find(${node}) = ${root}`, `Line 60: root = find(${node}) = ${root}`),
+        bi(`Node ${node} thuộc component root ${root}.`, `Node ${node} belongs to component root ${root}.`),
+        bi("Tìm root của node.", "Find the node's root."),
+        bi(`root = find(order[k]) = ${root}`, `root = find(order[k]) = ${root}`));
+      lineStep(3, 61,
+        bi(`Dòng 61: groups[${root}] = ${counts.get(root)}`, `Line 61: groups[${root}] = ${counts.get(root)}`),
+        bi(`Component root ${root} có ${counts.get(root)} node giá trị ${value}.`, `Component root ${root} holds ${counts.get(root)} nodes of value ${value}.`),
+        bi("Tăng bộ đếm.", "Increment the counter."),
+        bi(`groups[${root}] += 1`, `groups[${root}] += 1`));
     }
+    currentNode = null;
+
     let added = 0;
-    const parts = [];
+    const before = answer;
+    lineStep(3, 64,
+      bi("Dòng 64: duyệt từng component", "Line 64: iterate components"),
+      bi(`${counts.size} component chứa node giá trị ${value}.`, `${counts.size} component(s) hold value-${value} nodes.`),
+      bi("Lặp cnt trên groups.", "Loop cnt over groups."),
+      bi("for cnt in groups.values():", "for cnt in groups.values():"));
     for (const [root, count] of counts) {
       const contribution = (count * (count - 1)) / 2;
       added += contribution;
-      parts.push(`root ${root}: k=${count} → +${contribution}`);
+      answer += contribution;
+      activeTransition = { kind: "count", detail: `root ${root}: C(${count},2) = ${contribution} → answer = ${answer}` };
+      rememberEvent(`v=${value}@r${root}`, `+${contribution}`, contribution > 0 ? "updated" : "computed");
+      lineStep(3, 65,
+        bi(`Dòng 65: +${contribution}  (k=${count} tại root ${root})`, `Line 65: +${contribution}  (k=${count} at root ${root})`),
+        bi(`C(${count}, 2) = ${contribution} đường tốt mới; tổng hiện tại ${answer}.`, `C(${count}, 2) = ${contribution} new good paths; running total ${answer}.`),
+        bi("Cộng C(k,2) vào answer.", "Add C(k,2) to the answer."),
+        bi(`answer += ${count}*${count - 1}//2  →  ${answer}`, `answer += ${count}*${count - 1}//2  →  ${answer}`));
     }
-    const before = answer;
-    answer += added;
-    groupsDone.push({
-      value,
-      nodes: [...currentGroupNodes],
-      components: counts.size,
-      added,
-    });
-    activeTransition = {
-      kind: "count",
-      detail: `${before} + ${added} = ${answer}`,
-    };
-    rememberEvent(`v=${value}`, `+${added} good paths`, added > 0 ? "updated" : "computed");
-    emit2421({
-      phaseIndex: 3,
-      title: bi(
-        `Nhóm v=${value}: cộng ${added} đường tốt (tổng ${answer})`,
-        `Group v=${value}: add ${added} good paths (total ${answer})`,
-      ),
-      note: bi(
-        parts.length
-          ? `Trong nhóm, mỗi component có k node cùng giá trị tạo C(k,2) đường tốt: ${parts.join("; ")}.`
-          : "Nhóm rỗng, không cộng thêm.",
-        parts.length
-          ? `Inside the group, each component with k equal-value nodes forms C(k,2) good paths: ${parts.join("; ")}.`
-          : "Empty group, nothing added.",
-      ),
-      action: bi("Đếm node cùng giá trị theo component rồi cộng C(k,2).", "Count equal-value nodes per component, then add C(k,2)."),
-      formula: bi(`${before} + ${added} = ${answer}`, `${before} + ${added} = ${answer}`),
-      codeLines: [57, 59, 60, 61, 64, 65],
-    });
+    groupsDone.push({ value, nodes: [...currentGroupNodes], components: counts.size, added });
+
+    lineStep(3, 67,
+      bi("Dòng 67: i = j — sang nhóm kế tiếp", "Line 67: i = j — next group"),
+      bi(`Nhóm v=${value} xong: ${before} + ${added} = ${answer}.`, `Group v=${value} done: ${before} + ${added} = ${answer}.`),
+      bi("Nhảy i tới đầu nhóm mới.", "Jump i to the next group."),
+      bi("i = j", "i = j"));
 
     i = j;
   }
