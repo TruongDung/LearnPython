@@ -6070,58 +6070,67 @@ function renderPathSumIIIView(step) {
     if (value === null || value === undefined) return "—";
     return String(value);
   };
-  const stages = Array.isArray(view.stages) ? view.stages : [];
-  const stageIndex = Number.isInteger(view.stage) ? view.stage : 0;
-  const phaseHtml = stages.map((stage, index) => {
-    const state = index < stageIndex ? "done" : index === stageIndex ? "active" : "pending";
-    return `<span class="${state}"><i>${state === "done" ? "✓" : index + 1}</i><b>${escapeHtml(text(stage))}</b></span>`;
-  }).join("");
   const path = Array.isArray(view.path) ? view.path : [];
-  const pathHtml = path.length
-    ? path.map((item, index) => `<span class="${item.current ? "current" : ""}"><small>NODE</small><strong>${escapeHtml(item.value)}</strong><em>P=${escapeHtml(item.prefix)}</em></span>${index < path.length - 1 ? "<i>→</i>" : ""}`).join("")
-    : `<b class="ps437-empty">∅ ${vi ? "chưa vào node nào" : "no active node"}</b>`;
   const entries = Array.isArray(view.prefixEntries) ? view.prefixEntries : [];
-  const mapHtml = entries.length
-    ? entries.map((entry) => `<span class="${entry.sum === view.needed ? "needed" : ""}"><small>prefix</small><strong>${escapeHtml(entry.sum)}</strong><em>× ${escapeHtml(entry.count)}</em><code>${escapeHtml((entry.sources || []).join(" · "))}</code></span>`).join("")
-    : `<b class="ps437-empty">{}</b>`;
   const matches = Array.isArray(view.matches) ? view.matches : [];
   const lookupReady = view.needed !== null && view.needed !== undefined;
-  const proofClass = matches.length ? "match" : lookupReady ? "none" : "waiting";
-  const proofHtml = `<section class="ps437-proof ${proofClass}">
-    <small>${vi ? "PHÉP TRỪ QUAN TRỌNG" : "THE KEY SUBTRACTION"}</small>
-    <div><span><em>curr_sum</em><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b><span><em>needed</em><strong>${escapeHtml(view.needed ?? "?")}</strong></span><b>=</b><span><em>target</em><strong>${escapeHtml(view.target)}</strong></span></div>
-    <p>${matches.length
-      ? escapeHtml(vi ? `${matches.length} prefix khớp → thêm ${matches.length} path ở node này.` : `${matches.length} matching prefix(es) → add ${matches.length} path(s) at this node.`)
-      : escapeHtml(lookupReady ? (vi ? `Không có prefix ${view.needed} trên path hiện tại.` : `Prefix ${view.needed} is absent from the current path.`) : (vi ? "Cộng node rồi tính needed." : "Add the node, then compute needed."))}</p>
-  </section>`;
-  const stack = Array.isArray(view.stack) ? view.stack : [];
-  const stackHtml = stack.length
-    ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>${escapeHtml(frame.value)}</strong><small>${escapeHtml(frame.side)} · in=${escapeHtml(frame.incoming)} · run=${escapeHtml(frame.running)}</small><em>${escapeHtml(frame.stage)}</em></li>`).join("")
-    : `<li class="empty">${vi ? "Call stack rỗng" : "Call stack is empty"}</li>`;
+  const lookupEntry = lookupReady ? entries.find((entry) => entry.sum === view.needed) : null;
+  const lookupCount = matches.length ? Number(view.added || matches.length) : lookupEntry ? lookupEntry.count : 0;
+  const matchingIds = new Set(matches.flatMap((match) => Array.isArray(match.ids) ? match.ids : []));
+  const checkpointHtml = [
+    `<span class="ps437-checkpoint virtual ${lookupReady && view.needed === 0 ? "needed" : ""}"><small>${vi ? "TRƯỚC ROOT" : "BEFORE ROOT"}</small><strong>0</strong><em>prefix</em></span>`,
+    ...path.map((item) => `<i>→</i><span class="ps437-checkpoint ${item.current ? "current" : ""} ${lookupReady && item.prefix === view.needed ? "needed" : ""} ${matchingIds.has(item.id) ? "matched-node" : ""}"><small>node ${escapeHtml(item.value)}</small><strong>${escapeHtml(item.prefix)}</strong><em>prefix</em></span>`),
+  ].join("");
+  const mapHtml = entries.length
+    ? entries.map((entry) => `<span class="${entry.sum === view.needed ? "needed" : ""}"><strong>${escapeHtml(entry.sum)}</strong><i>→</i><em>${escapeHtml(entry.count)} ${vi ? "lần" : entry.count === 1 ? "time" : "times"}</em></span>`).join("")
+    : `<b class="ps437-empty">{}</b>`;
+  const matchExplanation = matches.length
+    ? matches.map((match) => `<span><strong>${escapeHtml(match.values.join(" + "))} = ${escapeHtml(view.target)}</strong><em>${vi ? `Bỏ phần trước prefix ${view.needed}; đoạn còn lại là một path hợp lệ.` : `Drop everything through prefix ${view.needed}; the remaining segment is a valid path.`}</em></span>`).join("")
+    : `<span><strong>${lookupReady ? `prefix[${escapeHtml(view.needed)}] = ${escapeHtml(lookupCount)}` : (vi ? "Chưa lookup" : "Not looked up yet")}</strong><em>${lookupReady ? (vi ? "Không có checkpoint phù hợp nên không thêm path." : "No matching checkpoint, so no path is added.") : (vi ? "Cộng node hiện tại trước, rồi mới tìm prefix cần." : "Add the current node first, then find the needed prefix.")}</em></span>`;
   const foundPaths = Array.isArray(view.foundPaths) ? view.foundPaths : [];
   const pathsHtml = foundPaths.length
     ? foundPaths.map((found, index) => `<span class="${index === foundPaths.length - 1 && matches.length ? "fresh" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(found.values.join(" → "))}</strong><em>sum = ${escapeHtml(view.target)}</em></span>`).join("")
     : `<b class="ps437-empty">${vi ? "Chưa tìm thấy path" : "No path found yet"}</b>`;
-  const statusTone = matches.length ? "match" : view.event === "remove-prefix" ? "backtrack" : "";
+  const statusTone = matches.length ? "match" : view.event === "remove-prefix" ? "backtrack" : lookupReady ? "checked" : "";
+  const progressStage = ["rule", "init", "enter", "null", "add"].includes(view.phase) ? 0
+    : ["need", "lookup"].includes(view.phase) ? 1 : 2;
+  const guide = [
+    { vi: "Cộng node vào curr_sum", en: "Add node to curr_sum" },
+    { vi: "Tìm prefix = curr_sum − target", en: "Find prefix = curr_sum − target" },
+    { vi: "DFS con rồi hoàn tác prefix", en: "DFS children, then undo prefix" },
+  ];
+  const guideHtml = guide.map((item, index) => `<span class="${index < progressStage ? "done" : index === progressStage ? "active" : ""}"><i>${index < progressStage ? "✓" : index + 1}</i><b>${escapeHtml(text(item))}</b></span>`).join("");
+  const operationText = view.event === "remove-prefix"
+    ? (vi ? `Rời node ${view.current?.value ?? "—"}: prefix[${view.running}] giảm 1 để nhánh kế tiếp không dùng nhầm.` : `Leave node ${view.current?.value ?? "—"}: decrement prefix[${view.running}] so the next branch cannot reuse it.`)
+    : matches.length
+      ? (vi ? `Có ${lookupCount} checkpoint mang prefix ${view.needed} → thêm ${lookupCount} path.` : `${lookupCount} checkpoint(s) carry prefix ${view.needed} → add ${lookupCount} path(s).`)
+      : lookupReady
+        ? (vi ? `Cần prefix ${view.needed}; hiện có ${lookupCount} checkpoint phù hợp.` : `Need prefix ${view.needed}; ${lookupCount} matching checkpoint(s) exist.`)
+        : (vi ? "Theo dõi tổng tiền tố trên đúng path DFS hiện tại." : "Track prefix sums only along the current DFS path.");
   const summary = vi
     ? `Bài 437, ${text(step.title)}. Đang có ${view.answer} path hợp lệ.`
     : `Problem 437, ${text(step.title)}. ${view.answer} valid paths found so far.`;
 
   target.innerHTML = `<section class="ps437-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <div class="ps437-phases">${phaseHtml}</div>
-    <section class="ps437-rule"><span><small>${vi ? "MỘT CÔNG THỨC" : "ONE FORMULA"}</small><strong>needed = curr_sum − targetSum</strong></span><code>old prefix = needed ⇒ path sum = target</code></section>
+    <div class="ps437-phases">${guideHtml}</div>
     <section class="ps437-action ${statusTone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Tổng path" : "Paths"}: ${escapeHtml(view.answer)}</em></section>
+    <section class="ps437-rule ${matches.length ? "match" : ""}">
+      <span><small>1 · CURR_SUM</small><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b>
+      <span><small>2 · TARGET</small><strong>${escapeHtml(view.target)}</strong></span><b>=</b>
+      <span><small>3 · NEEDED PREFIX</small><strong>${escapeHtml(view.needed ?? "?")}</strong></span><i>→</i>
+      <span class="lookup"><small>4 · LOOKUP</small><strong>${lookupReady ? `prefix[${escapeHtml(view.needed)}] = ${escapeHtml(lookupCount)}` : "prefix[?]"}</strong></span>
+    </section>
+    <p class="ps437-operation ${statusTone}">${escapeHtml(operationText)}</p>
     <div class="ps437-layout">
-      <section class="ps437-tree-card"><header><strong>${vi ? "CÂY · PATH ROOT → CURRENT" : "TREE · ROOT → CURRENT PATH"}</strong><span>${vi ? "cam = current · xanh = path đang dùng" : "amber = current · green = active path"}</span></header><div id="ps437Tree" class="ps437-tree"></div></section>
-      <aside class="ps437-side">
-        <section class="ps437-stats"><div><small>TARGET</small><strong>${escapeHtml(view.target)}</strong></div><div><small>CURR_SUM</small><strong>${escapeHtml(view.running ?? "—")}</strong></div><div><small>NEEDED</small><strong>${escapeHtml(view.needed ?? "—")}</strong></div><div><small>${vi ? "THÊM" : "ADD"}</small><strong>+${escapeHtml(view.added || 0)}</strong></div></section>
-        ${proofHtml}
-        <section class="ps437-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
-      </aside>
+      <section class="ps437-tree-card"><header><strong>${vi ? "CÂY · PATH DFS HIỆN TẠI" : "TREE · CURRENT DFS PATH"}</strong><span>${vi ? "cam = node hiện tại · xanh = path vừa khớp" : "amber = current · green = matched path"}</span></header><div id="ps437Tree" class="ps437-tree"></div></section>
+      <section class="ps437-prefix-board">
+        <header><strong>${vi ? "CHECKPOINT PREFIX TRÊN PATH" : "PREFIX CHECKPOINTS ON THE PATH"}</strong><span>${vi ? "số lớn = tổng từ root đến đây" : "large number = root-to-here sum"}</span></header>
+        <div class="ps437-checkpoints">${checkpointHtml}</div>
+        <div class="ps437-match-explanation ${matches.length ? "match" : ""}">${matchExplanation}</div>
+        <section class="ps437-map"><header><strong>prefix</strong><span>${vi ? "sum → số lần xuất hiện" : "sum → occurrence count"}</span></header><div>${mapHtml}</div></section>
+      </section>
     </div>
-    <section class="ps437-path"><header><strong>${vi ? "PATH HIỆN TẠI VÀ PREFIX TẠI MỖI NODE" : "CURRENT PATH AND EACH NODE'S PREFIX"}</strong><span>${vi ? "P là tổng từ root" : "P is the sum from root"}</span></header><div>${pathHtml}</div></section>
-    <section class="ps437-map"><header><strong>prefix</strong><span>${vi ? "chỉ prefix trên path hiện tại" : "only prefixes on the current path"}</span></header><div>${mapHtml}</div></section>
-    <section class="ps437-found"><header><strong>${vi ? "CÁC PATH ĐÃ TÌM THẤY" : "PATHS FOUND"}</strong><span>${vi ? "path có thể bắt đầu ở bất kỳ node" : "a path may start at any node"}</span></header><div>${pathsHtml}</div></section>
+    <section class="ps437-found"><header><strong>${vi ? "CÁC PATH ĐÃ ĐẾM" : "COUNTED PATHS"}</strong><span>${vi ? "mỗi path đi từ cha xuống con" : "each path follows parent-to-child edges"}</span></header><div>${pathsHtml}</div></section>
   </section>`;
 
   if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "ps437Tree");

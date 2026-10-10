@@ -265,12 +265,31 @@ test('437 custom renderer remains complete and readable in English and Vietnames
         const html = elementFor('treeView').innerHTML;
         assert.match(html, /ps437-viz/);
         assert.match(html, /ps437-rule/);
+        assert.match(html, /ps437-checkpoints/);
         assert.match(html, /ps437-map/);
         assert.match(html, /ps437-found/);
+        assert.doesNotMatch(html, /ps437-stack/);
         assert.doesNotMatch(html, /NaN|undefined|Infinity/);
       }
     }
   }
+  context.lang = 'en';
+  const example = runs[0];
+  const foundStep = example.steps.find(step => step.pathSumIIIView.event === 'found');
+  context.renderPathSumIIIView(foundStep);
+  const foundHtml = elementFor('treeView').innerHTML;
+  assert.match(foundHtml, /5 \+ 3 = 8/);
+  assert.match(foundHtml, /prefix\[10\] = 1/);
+  assert.match(foundHtml, /Drop everything through prefix 10/);
+
+  const backtrackStep = example.steps.find(step => step.pathSumIIIView.event === 'remove-prefix');
+  context.renderPathSumIIIView(backtrackStep);
+  assert.match(elementFor('treeView').innerHTML, /decrement prefix\[/);
+
+  const repeatedPrefixRun = problem.builder('0,0,0', { target: 0 });
+  const firstStore = repeatedPrefixRun.steps.find(step => step.pathSumIIIView.event === 'store-prefix' && step.pathSumIIIView.matches.length === 1);
+  context.renderPathSumIIIView(firstStore);
+  assert.match(elementFor('treeView').innerHTML, /prefix\[0\] = 1/);
   assert.ok(treeTargets.every(targetId => targetId === 'ps437Tree'));
   assert.match(styles, /\.ps437-layout/);
   assert.match(styles, /@container \(max-width: 760px\)/);

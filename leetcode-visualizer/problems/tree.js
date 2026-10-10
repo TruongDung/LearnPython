@@ -6746,6 +6746,8 @@ function buildSteps437(input, params = {}) {
       current: node,
       running,
       needed,
+      matches,
+      added,
     });
 
     frame.stage = "call-left";
@@ -6758,6 +6760,8 @@ function buildSteps437(input, params = {}) {
       current: node,
       running,
       needed,
+      matches,
+      added,
     });
     const leftCount = dfs(node.left, running, "left");
 
@@ -6771,6 +6775,8 @@ function buildSteps437(input, params = {}) {
       current: node,
       running,
       needed,
+      matches,
+      added,
       subtreeCount: added + leftCount,
     });
     const rightCount = dfs(node.right, running, "right");
@@ -6792,6 +6798,8 @@ function buildSteps437(input, params = {}) {
       current: node,
       running,
       needed,
+      matches,
+      added,
       subtreeCount,
     });
     pathNodes.pop();
