@@ -1597,12 +1597,14 @@ function renderWeightedIntervals3414View(step) {
 function renderAdvancedBitmaskView(step) {
   const view = step.advancedBitmaskView || {};
   const vi = lang === "vi";
+  const isGroupBacktracking = view.mode === "k-subsets-groups";
   const stages = Array.isArray(view.stages) ? view.stages : [];
   const stageIndex = Number.isInteger(view.stageIndex) ? view.stageIndex : 0;
   const modeLabels = {
     "word-product": vi ? "TỪ → MASK CHỮ CÁI" : "WORDS → LETTER MASKS",
     arrangement: vi ? "BACKTRACKING + USED MASK" : "BACKTRACKING + USED MASK",
     "k-subsets": vi ? "BUCKETS + USED MASK" : "BUCKETS + USED MASK",
+    "k-subsets-groups": vi ? "BACKTRACKING · K GROUP" : "BACKTRACKING · K GROUPS",
     team: vi ? "SKILL MASK + DP" : "SKILL MASK + DP",
     "gcd-pairs": vi ? "GHÉP CẶP + MEMO" : "PAIRING + MEMO",
     "xor-assignment": vi ? "GHÉP XOR + DP" : "XOR ASSIGNMENT + DP",
@@ -1667,9 +1669,9 @@ function renderAdvancedBitmaskView(step) {
     : "";
 
   $("treeView").innerHTML = `<section class="abm-viz" role="img" aria-label="${escapeHtml(modeLabels[view.mode] || "Advanced bitmask visualization")}">
-    <header><div><small>BITMASK WORKSHOP · #${escapeHtml(String(view.problemId || ""))}</small><strong>${escapeHtml(modeLabels[view.mode] || "ADVANCED BITMASK")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
+    <header><div><small>${isGroupBacktracking ? "BACKTRACKING WORKSHOP" : "BITMASK WORKSHOP"} · #${escapeHtml(String(view.problemId || ""))}</small><strong>${escapeHtml(modeLabels[view.mode] || "ADVANCED BITMASK")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="abm-phases">${phasesHtml}</div>
-    <section class="abm-rule"><b>${vi ? "Ý NGHĨA CỦA MASK" : "WHAT THE MASK MEANS"}</b><strong>${escapeHtml(pick(view.rule))}</strong></section>
+    <section class="abm-rule"><b>${isGroupBacktracking ? (vi ? "BẤT BIẾN VÀ CẮT NHÁNH" : "INVARIANT AND PRUNING") : (vi ? "Ý NGHĨA CỦA MASK" : "WHAT THE MASK MEANS")}</b><strong>${escapeHtml(pick(view.rule))}</strong></section>
     ${lanesHtml}
     ${masksHtml}
     ${operationHtml}

@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
+const { readFileSync } = require('node:fs');
+const { join } = require('node:path');
 const problem = require('../problems').SUPPORTED[698];
 
 const builder2 = problem.builder2;
@@ -10,6 +12,14 @@ test('698 approach 2 is registered with its own code and builder', () => {
   assert.equal(problem.code2.length, 37);
   assert.match(problem.code2Label.vi, /Cách 2/);
   assert.match(problem.codeLabel.vi, /Cách 1/);
+  const selector = problem.extraParams.find((param) => param.key === 'approach');
+  assert.ok(selector, 'the UI needs an approach selector to reach builder2');
+  assert.equal(selector.type, 'select');
+  assert.deepEqual(selector.options.map((option) => Number(option.value)), [1, 2]);
+  assert.equal(problem.complexity2.time, 'O(kⁿ)');
+  const renderer = readFileSync(join(__dirname, '..', 'public', 'renderers-05.js'), 'utf8');
+  assert.match(renderer, /"k-subsets-groups"/);
+  assert.match(renderer, /BACKTRACKING WORKSHOP/);
 });
 
 test('698 approach 2 solves the default input', () => {

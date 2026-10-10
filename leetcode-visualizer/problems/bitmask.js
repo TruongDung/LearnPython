@@ -1597,9 +1597,26 @@ module.exports = {
     title: { vi: "Partition to K Equal Sum Subsets", en: "Partition to K Equal Sum Subsets" }, titleVi: { vi: "Chia thành k tập con có tổng bằng nhau", en: "Partition into k equal-sum subsets" },
     statement: { vi: "Kiểm tra nums có thể chia thành k tập con không rỗng có cùng tổng hay không.", en: "Decide whether nums can be partitioned into k non-empty subsets with equal sums." },
     defaultInput: [4, 3, 2, 3, 5, 2, 1], inputKind: "positive", inputLabel: { vi: "nums", en: "nums" },
-    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 4 }],
-    approach: [{ vi: "Mỗi bucket phải đạt total/k.", en: "Each bucket must reach total/k." }, { vi: "Backtracking theo used mask và memo các state không thể hoàn tất.", en: "Backtrack on the used mask and memoize dead states." }],
+    extraParams: [
+      { key: "k", label: { vi: "k", en: "k" }, default: 4 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Bitmask DP + memo", en: "Approach 1: Bitmask DP + memo" } },
+          { value: "2", label: { vi: "Cách 2: Backtracking xếp vào k group", en: "Approach 2: Backtracking into k groups" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Mỗi bucket/group phải đạt total/k.", en: "Every bucket/group must reach total/k." },
+      { vi: "Cách 1 backtrack theo used mask và memo các state không thể hoàn tất.", en: "Approach 1 backtracks on a used mask and memoizes dead states." },
+      { vi: "Cách 2 sort giảm dần rồi xếp từng số vào k group; bỏ group vượt target hoặc có tổng trùng group đã thử.", en: "Approach 2 sorts descending and places each value into one of k groups, skipping groups that exceed target or duplicate an earlier group sum." },
+    ],
     complexity: { time: "O(n·2ⁿ)", space: "O(2ⁿ)", note: { vi: "Sort giảm dần giúp phát hiện nhánh sai sớm.", en: "Descending sort exposes bad branches early." } },
+    complexity2: { time: "O(kⁿ)", space: "O(n + k)", note: { vi: "Worst case thử k group cho mỗi số; sort giảm dần và cắt các group cùng tổng loại bỏ nhiều nhánh đối xứng.", en: "The worst case tries k groups for every value; descending order and equal-sum symmetry pruning remove many branches." } },
     codeLabel: { vi: "Cách 1 · Bitmask DP + memo", en: "Approach 1 · Bitmask DP + memo" },
     code: ["class Solution:", "    def canPartitionKSubsets(self, nums, k):", "        total = sum(nums)", "        if total % k: return False", "        target = total // k", "        nums.sort(reverse=True)", "        dead = set()", "        def dfs(used, bucket_sum, buckets_done):", "            if buckets_done == k - 1: return True", "            if bucket_sum == target:", "                return dfs(used, 0, buckets_done + 1)", "            if (used, bucket_sum) in dead: return False", "            for i, num in enumerate(nums):", "                if not used >> i & 1 and bucket_sum + num <= target:", "                    if dfs(used | 1 << i, bucket_sum + num, buckets_done): return True", "            dead.add((used, bucket_sum))", "            return False", "        return dfs(0, 0, 0)"],
     code2Label: { vi: "Cách 2 · Backtracking xếp vào k group", en: "Approach 2 · Backtracking into k groups" },
