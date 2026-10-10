@@ -57,15 +57,21 @@ print("py-ok")
   assert.match(run.stdout, /py-ok/);
 });
 
-test('1387 trace is line-by-line: every step highlights a real code line', () => {
+test('1387 trace is concise and professional: 1 step per number', () => {
   const result = problem.builder([12], { hi: 15, k: 2 });
-  assert.ok(result.steps.length > 20, `steps=${result.steps.length}`);
+  // 1 intro + 4 numbers + 1 sort + 1 answer = 7 steps
+  assert.equal(result.steps.length, 7);
   for (const s of result.steps) {
     assert.ok(s.codeLines.length > 0, `step missing codeLines: ${s.title.vi}`);
     for (const l of s.codeLines) assert.ok(l >= 1 && l <= problem.code.length, `bad line ${l}`);
   }
   const lines = new Set(result.steps.flatMap((s) => s.codeLines));
-  for (const l of [3, 5, 6, 7, 8, 12, 14, 16, 21]) assert.ok(lines.has(l), `line ${l} never highlighted`);
+  for (const l of [3, 5, 6, 7, 12, 14, 16, 17, 18, 19, 21]) assert.ok(lines.has(l), `line ${l} never highlighted`);
+  // power bar chart fills progressively: 1, 2, 3, 4 bars
+  const perNumber = result.steps.slice(1, 5);
+  assert.deepEqual(perNumber.map((s) => s.arr.length), [1, 2, 3, 4]);
+  assert.deepEqual(perNumber.map((s) => s.arr), [[9], [9, 9], [9, 9, 17], [9, 9, 17, 17]]);
+  assert.ok(perNumber.every((s, i) => s.highlight[0] === i), 'each step highlights its own new bar');
 });
 
 test('1387 trace shows memo hits when chains overlap', () => {
@@ -76,14 +82,15 @@ test('1387 trace shows memo hits when chains overlap', () => {
   assert.ok(hits.every((s) => s.codeLines.includes(14)), 'memo hits must highlight line 14');
 });
 
-test('1387 trace walks each Collatz link on line 7', () => {
-  const result = problem.builder([12], { hi: 12, k: 1 });
-  const walks = result.steps.filter((s) => s.codeLines[0] === 7 && s.title.vi.startsWith('power('));
-  // 12 -> 6 -> 3 -> 10 -> 5 -> 16 -> 8 -> 4 -> 2 -> 1 : 9 links down
-  assert.equal(walks.length, 9);
-  assert.ok(walks.every((s, i) => s.highlight[0] === i), 'highlight must walk the chain in order');
-  const unwind = result.steps.filter((s) => s.codeLines[0] === 12 && /Điền memo ngược/.test(s.title.vi));
-  assert.equal(unwind.length, 1, 'one unwind step fills memo backwards');
+test('1387 per-number step shows chain text and power breakdown', () => {
+  const result = problem.builder([12], { hi: 13, k: 1 });
+  const step = result.steps[2]; // power(13)
+  assert.match(step.title.vi, /power\(13\) = 9/);
+  const chainVar = step.vars.find((v) => v.name === "chuỗi");
+  assert.equal(chainVar.value, "13 → 40 → 20 → 10");
+  const breakdown = step.vars.find((v) => v.name === "power(13)");
+  assert.equal(breakdown.value, "3 + 6 = 9");
+  assert.match(step.note.vi, /3 mắt xích mới.*memo\[10\] = 6/);
 });
 
 test('1387 rejects invalid lo/hi/k', () => {
