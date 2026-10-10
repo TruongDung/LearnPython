@@ -65,7 +65,7 @@ test('1387 trace is line-by-line: every step highlights a real code line', () =>
     for (const l of s.codeLines) assert.ok(l >= 1 && l <= problem.code.length, `bad line ${l}`);
   }
   const lines = new Set(result.steps.flatMap((s) => s.codeLines));
-  for (const l of [3, 5, 6, 7, 8, 10]) assert.ok(lines.has(l), `line ${l} never highlighted`);
+  for (const l of [3, 5, 6, 7, 8, 12, 14, 16, 21]) assert.ok(lines.has(l), `line ${l} never highlighted`);
 });
 
 test('1387 trace shows memo hits when chains overlap', () => {
@@ -73,7 +73,7 @@ test('1387 trace shows memo hits when chains overlap', () => {
   const result = problem.builder([3], { hi: 6, k: 2 });
   const hits = result.steps.filter((s) => /memo hit/.test(s.title.vi));
   assert.ok(hits.length >= 2, `expected >= 2 memo hits, got ${hits.length}`);
-  assert.ok(hits.every((s) => s.codeLines.includes(8)), 'memo hits must highlight line 8');
+  assert.ok(hits.every((s) => s.codeLines.includes(14)), 'memo hits must highlight line 14');
 });
 
 test('1387 trace walks each Collatz link on line 7', () => {
@@ -82,7 +82,7 @@ test('1387 trace walks each Collatz link on line 7', () => {
   // 12 -> 6 -> 3 -> 10 -> 5 -> 16 -> 8 -> 4 -> 2 -> 1 : 9 links down
   assert.equal(walks.length, 9);
   assert.ok(walks.every((s, i) => s.highlight[0] === i), 'highlight must walk the chain in order');
-  const unwind = result.steps.filter((s) => s.codeLines[0] === 7 && /Điền memo ngược/.test(s.title.vi));
+  const unwind = result.steps.filter((s) => s.codeLines[0] === 12 && /Điền memo ngược/.test(s.title.vi));
   assert.equal(unwind.length, 1, 'one unwind step fills memo backwards');
 });
 
@@ -94,9 +94,9 @@ test('1387 rejects invalid lo/hi/k', () => {
   assert.throws(() => problem.builder([1], { hi: 100, k: 1 }), /tối đa/);
 });
 
-test('1387 metadata: medium, DP+hashmap+sorting tags, 10-line code', () => {
+test('1387 metadata: medium, DP+hashmap+sorting tags, 21-line code', () => {
   assert.equal(problem.difficulty, 'medium');
-  assert.equal(problem.code.length, 10);
+  assert.equal(problem.code.length, 21);
   const keys = problem.tags.map((t) => t.key).sort();
   assert.deepEqual(keys, ['dp', 'hashmap', 'sorting']);
   assert.equal(problem.slug, 'sort-integers-by-the-power-value');
