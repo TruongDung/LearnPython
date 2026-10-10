@@ -81,8 +81,8 @@ Maintain a two-pointer invariant; distinguish substrings from subsequences.
 | 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Available |
 | 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Available |
 | 29 | [392. Is Subsequence](https://leetcode.com/problems/is-subsequence/) | Easy |  | Available |
-| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Not yet |
-| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Not yet |
+| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Available |
+| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Available |
 
 ### A.4. Sliding windows and substrings (11 problems)
 

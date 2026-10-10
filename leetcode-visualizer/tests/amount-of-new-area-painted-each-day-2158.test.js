@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
+const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[2158];
+const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 
 // Brute-force oracle: simulate unit painting with a set.
 function brute(paint) {
@@ -123,4 +125,78 @@ test('2158 is registered under interview with Google-relevant metadata', () => {
   assert.equal(problem.premium, true);
   assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.code.length, 25);
+});
+
+test('2158 detailed view exposes paint ownership, successor links, find path, and the day ledger', () => {
+  const result = problem.builder('1-4,5-8,4-7');
+  assert.ok(result.steps.every((step) => step.paint2158View?.problemId === 2158));
+  const events = new Set(result.steps.map((step) => step.paint2158View.event));
+  for (const event of ['start-day', 'find-open', 'find-follow', 'find-base', 'compress-path', 'range-continue', 'paint-unit', 'link-successor', 'jump-next', 'range-stop', 'finish-day', 'done']) {
+    assert.ok(events.has(event), `missing ${event}`);
+  }
+
+  const jump = result.steps.find((step) => step.paint2158View.event === 'jump-next'
+    && step.paint2158View.currentDay === 2);
+  const view = jump.paint2158View;
+  assert.equal(view.lastPaintedUnit, 4);
+  assert.equal(view.lastSuccessor, 8);
+  assert.equal(view.units.find((unit) => unit.coordinate === 4).fresh, true);
+  assert.equal(view.units.find((unit) => unit.coordinate === 4).parent, 8);
+  assert.equal(view.oldArea, 2);
+  assert.equal(view.count, 1);
+  assert.equal(view.remainingArea, 0);
+  assert.deepEqual(view.dayRows.map((row) => row.newArea), [3, 3, 1]);
+
+  const follow = result.steps.find((step) => step.paint2158View.event === 'find-follow'
+    && step.paint2158View.find.path.length > 1);
+  assert.ok(follow.paint2158View.find.path.length >= 2);
+  const compressed = result.steps.find((step) => step.paint2158View.event === 'compress-path');
+  assert.ok(compressed.paint2158View.compression);
+});
+
+test('2158 dedicated renderer is wired, bilingual, and complete for every step', () => {
+  const index = readFrontendIndex();
+  const styles = readFrontendStyles();
+  const script = readFrontendJavaScript();
+  assert.match(index, /renderer-amount-painted-2158\.js/);
+  assert.match(index, /amount-painted-2158\.css/);
+  assert.match(styles, /\.ap2158-number-line/);
+  assert.match(script, /paint2158View/);
+
+  const start = script.indexOf('const AP2158_COPY');
+  const end = script.indexOf('\n"use strict";', start + 20);
+  const renderer = end > start ? script.slice(start, end) : script.slice(start);
+  const elements = new Map();
+  const elementFor = (id) => {
+    if (!elements.has(id)) elements.set(id, { innerHTML: '' });
+    return elements.get(id);
+  };
+  const context = { lang: 'en', $: elementFor };
+  vm.createContext(context);
+  vm.runInContext(renderer, context);
+
+  const result = problem.builder('1-4,5-8,4-7');
+  for (const language of ['en', 'vi']) {
+    context.lang = language;
+    for (const step of result.steps) {
+      context.renderAmountPainted2158View(step);
+      const html = elementFor('treeView').innerHTML;
+      assert.match(html, /ap2158-viz/);
+      assert.match(html, /ap2158-days/);
+      assert.match(html, /ap2158-units/);
+      assert.match(html, /ap2158-find/);
+      assert.match(html, /ap2158-parent/);
+      assert.doesNotMatch(html, /NaN|undefined|Infinity/);
+    }
+  }
+
+  const jump = result.steps.find((step) => step.paint2158View.event === 'jump-next'
+    && step.paint2158View.currentDay === 2);
+  context.lang = 'en';
+  context.renderAmountPainted2158View(jump);
+  const html = elementFor('treeView').innerHTML;
+  assert.match(html, /parent: 8/);
+  assert.match(html, /painted earlier/);
+  assert.match(html, /new today/);
+  assert.match(html, /\[3, 3\]/);
 });

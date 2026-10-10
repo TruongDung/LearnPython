@@ -1153,12 +1153,15 @@ function buildSteps2158(input) {
   const hi = Math.max(...segs.map(([, e]) => e));
   const showUnits = hi - lo <= MAX_UNITS2158;
   const paintedUnits = new Set();
+  const firstPaintDay = new Map();
   const steps = [];
   const parent = new Map();
   const res = [];
   const freshToday = new Set();
   let currentDay = -1;
   let start = null, end = null, count = 0, x = null, activeFind = null;
+  let findInput = null, findTarget = null, findResult = null, findHasParent = null;
+  let compression = null, lastPaintedUnit = null, lastSuccessor = null;
   let traceTruncated = false;
 
   const unitIndex = (unit) => unit - lo;
@@ -1166,6 +1169,96 @@ function buildSteps2158(input) {
     const pairs = [...parent.entries()].sort((a, b) => a[0] - b[0]);
     const shown = pairs.slice(0, 16).map(([from, to]) => `${from}→${to}`);
     return `{${shown.join(", ")}${pairs.length > shown.length ? `, … (${pairs.length} keys)` : ""}}`;
+  };
+  const eventName = (line) => ({
+    2: "call", 3: "init-parent", 5: "define-find", 12: "init-result",
+    14: "start-day", 15: "reset-count", 16: "find-start",
+    7: "find-base", 9: "compress-path", 10: "find-return",
+    19: "paint-unit", 20: "link-successor", 21: "jump-next",
+    23: "finish-day", 25: "done",
+  }[line] || (line === 6 ? (findHasParent ? "find-follow" : "find-open")
+    : line === 18 ? (x !== null && end !== null && x < end ? "range-continue" : "range-stop")
+      : "step"));
+  const phaseName = (line) => {
+    if ([2, 3, 5, 12].includes(line)) return "setup";
+    if ([6, 7, 9, 10, 16].includes(line)) return "find";
+    if ([18, 19, 20, 21].includes(line)) return "paint";
+    if ([14, 15, 23].includes(line)) return "day";
+    return line === 25 ? "done" : "trace";
+  };
+  const buildView2158 = (line, final = false, forcedEvent = null) => {
+    const units = [];
+    if (showUnits) {
+      for (let unit = lo; unit < hi; unit++) {
+        units.push({
+          coordinate: unit,
+          nextCoordinate: unit + 1,
+          inToday: start !== null && unit >= start && unit < end,
+          painted: paintedUnits.has(unit),
+          fresh: freshToday.has(unit),
+          firstPaintDay: firstPaintDay.has(unit) ? firstPaintDay.get(unit) : null,
+          parent: parent.has(unit) ? parent.get(unit) : null,
+          current: unit === x,
+          onFindPath: Array.isArray(activeFind) && activeFind.includes(unit),
+        });
+      }
+    }
+    const currentOld = showUnits && currentDay >= 0
+      ? units.filter((unit) => unit.inToday && unit.firstPaintDay !== null && unit.firstPaintDay < currentDay).length
+      : null;
+    const currentSpan = start === null ? 0 : end - start;
+    const dayRows = segs.map(([dayStart, dayEnd], day) => {
+      const completed = day < res.length;
+      const active = day === currentDay && !completed;
+      const newArea = completed ? res[day] : active ? count : null;
+      return {
+        day,
+        start: dayStart,
+        end: dayEnd,
+        span: dayEnd - dayStart,
+        status: completed ? "done" : active ? "active" : "upcoming",
+        newArea,
+        oldArea: completed ? dayEnd - dayStart - res[day] : active ? currentOld : null,
+      };
+    });
+    return {
+      problemId: 2158,
+      event: forcedEvent || eventName(line),
+      phase: phaseName(line),
+      line,
+      source: CODE2158[line - 1] || "",
+      lo,
+      hi,
+      showUnits,
+      segments: segs.map(([segmentStart, segmentEnd]) => ({ start: segmentStart, end: segmentEnd })),
+      dayRows,
+      currentDay,
+      start,
+      end,
+      span: currentSpan,
+      count,
+      oldArea: currentOld,
+      remainingArea: currentOld === null ? null : Math.max(0, currentSpan - currentOld - count),
+      x,
+      xInRange: x !== null && end !== null ? x < end : null,
+      units,
+      parentLinks: [...parent.entries()].sort((a, b) => a[0] - b[0]).map(([from, to]) => ({ from, to })),
+      find: {
+        input: findInput,
+        target: findTarget,
+        result: findResult,
+        hasParent: findHasParent,
+        path: activeFind === null ? [] : [...activeFind],
+      },
+      compression: compression ? { ...compression } : null,
+      lastPaintedUnit,
+      lastSuccessor,
+      freshToday: [...freshToday].sort((a, b) => a - b),
+      paintedCount: paintedUnits.size,
+      result: [...res],
+      traceTruncated,
+      final,
+    };
   };
   const snap = (line, title, note, final = false) => {
     if (!final && steps.length >= MAX_TRACE_STEPS2158) {
@@ -1201,6 +1294,7 @@ function buildSteps2158(input) {
         { name: "res", value: JSON.stringify(res) },
       ],
       note,
+      paint2158View: buildView2158(line, final),
     });
   };
   const event = (line, titleVi, titleEn, noteVi, noteEn) => snap(
@@ -1223,16 +1317,24 @@ function buildSteps2158(input) {
   function find(value) {
     const stack = [];
     let target = value;
+    findInput = value;
+    findTarget = value;
+    findResult = null;
+    findHasParent = null;
+    compression = null;
     activeFind = [value];
     while (true) {
       activeFind = stack.map((entry) => entry.key).concat(target);
       const hasParent = parent.has(target);
+      findTarget = target;
+      findHasParent = hasParent;
       event(6,
         hasParent ? `parent có khóa ${target}` : `${target} chưa có trong parent`,
         hasParent ? `parent contains key ${target}` : `${target} is absent from parent`,
         hasParent ? `parent[${target}] = ${parent.get(target)}; tiếp tục tìm đích.` : `Vì ${target} chưa sơn, find(${target}) trả về chính nó.`,
         hasParent ? `parent[${target}] = ${parent.get(target)}; follow the link.` : `Since ${target} is unpainted, find(${target}) returns itself.`);
       if (!hasParent) {
+        findResult = target;
         event(7, `return ${target}`, `return ${target}`,
           "Đây là đơn vị chưa sơn đầu tiên trên chuỗi successor.", "This is the first unpainted unit in the successor chain.");
         break;
@@ -1243,6 +1345,7 @@ function buildSteps2158(input) {
     while (stack.length) {
       const { key } = stack.pop();
       activeFind = stack.map((entry) => entry.key).concat(key);
+      compression = { from: key, to: target };
       event(9, `Nén đường đi: parent[${key}] = ${target}`, `Compress path: parent[${key}] = ${target}`,
         `Gán trực tiếp ${key} tới đơn vị chưa sơn ${target}.`, `Point ${key} directly to the unpainted unit ${target}.`);
       parent.set(key, target);
@@ -1250,6 +1353,9 @@ function buildSteps2158(input) {
         "Trả về đích sau khi nén đường đi.", "Return the destination after path compression.");
     }
     activeFind = null;
+    findTarget = target;
+    findResult = target;
+    findHasParent = null;
     return target;
   }
 
@@ -1259,6 +1365,13 @@ function buildSteps2158(input) {
     count = 0;
     x = null;
     freshToday.clear();
+    findInput = null;
+    findTarget = null;
+    findResult = null;
+    findHasParent = null;
+    compression = null;
+    lastPaintedUnit = null;
+    lastSuccessor = null;
     event(14, `Ngày ${day}: for start, end = [${start}, ${end})`,
       `Day ${day}: for start, end = [${start}, ${end})`,
       "Lấy đoạn sơn hiện tại; các tọa độ thuộc [start, end).", "Take the current half-open interval [start, end).");
@@ -1278,9 +1391,12 @@ function buildSteps2158(input) {
       if (!inRange) break;
 
       const paintedUnit = x;
+      lastPaintedUnit = paintedUnit;
+      lastSuccessor = null;
       count += 1;
       freshToday.add(paintedUnit);
       paintedUnits.add(paintedUnit);
+      firstPaintDay.set(paintedUnit, day);
       event(19, `count = ${count}`, `count = ${count}`,
         `Đơn vị ${paintedUnit} chưa sơn nên tăng diện tích mới lên 1.`,
         `Unit ${paintedUnit} was unpainted, so add 1 to today's new area.`);
@@ -1289,6 +1405,7 @@ function buildSteps2158(input) {
         `Đánh dấu ${paintedUnit} đã sơn bằng cách nối nó tới successor chưa sơn.`,
         `Mark ${paintedUnit} painted by linking it to its next unpainted successor.`);
       const successor = find(paintedUnit + 1);
+      lastSuccessor = successor;
       parent.set(paintedUnit, successor);
       event(21, `x = find(${paintedUnit})`, `x = find(${paintedUnit})`,
         "Nhảy tới đơn vị chưa sơn tiếp theo thay vì xét từng đơn vị đã sơn.",
@@ -1317,6 +1434,7 @@ function buildSteps2158(input) {
         vi: "Để tránh tạo trace quá lớn, các lần lặp còn lại được chạy đầy đủ nhưng không tạo thêm bước trung gian.",
         en: "To keep the trace bounded, remaining iterations still run fully but do not create intermediate steps.",
       },
+      paint2158View: buildView2158(18, false, "trace-truncated"),
     });
   }
   snap(25, { vi: `return ${JSON.stringify(res)}`, en: `return ${JSON.stringify(res)}` }, {

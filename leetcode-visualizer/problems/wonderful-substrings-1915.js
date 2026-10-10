@@ -68,6 +68,7 @@ function buildSteps1915(input) {
   let oneBitContribution = 0;
   let activeProbe = null;
   let evaluatedProbeCount = 0;
+  let probeSnapshot = null;
   let matchesCurrent = [];
 
   function probes() {
@@ -78,7 +79,7 @@ function buildSteps1915(input) {
     return candidates.map((probe, probeIndex) => ({
       ...probe,
       binary: binaryMask(probe.candidate),
-      count: frequency[probe.candidate],
+      count: probeSnapshot ? probeSnapshot[probeIndex] : frequency[probe.candidate],
       evaluated: probeIndex < evaluatedProbeCount,
       active: probeIndex === activeProbe,
       positions: [...positions[probe.candidate]],
@@ -101,7 +102,7 @@ function buildSteps1915(input) {
       note,
       arr: word.split(""),
       highlight: index >= 0 && !final ? [index] : [],
-      mark: Array.from({ length: Math.max(0, index) }, (_, offset) => offset),
+      mark: Array.from({ length: final ? word.length : Math.max(0, index) }, (_, offset) => offset),
       codeLines: [line],
       vars: [
         { name: "mask", value: binaryMask(mask) },
@@ -148,6 +149,7 @@ function buildSteps1915(input) {
     oneBitContribution = 0;
     activeProbe = null;
     evaluatedProbeCount = 0;
+    probeSnapshot = null;
     matchesCurrent = [];
     prefixes.push({ index, char, mask, binary: binaryMask(mask), stored: false });
 
@@ -162,6 +164,11 @@ function buildSteps1915(input) {
     push("flip-bit", 10,
       bi(`Lật bit '${char}': ${binaryMask(maskBefore)} → ${binaryMask(mask)}`, `Toggle '${char}': ${binaryMask(maskBefore)} → ${binaryMask(mask)}`),
       bi("Bit 1 nghĩa là chữ cái xuất hiện lẻ lần trong prefix hiện tại.", "A 1 bit means that letter occurs an odd number of times in the current prefix."));
+
+    probeSnapshot = [frequency[mask]];
+    for (let toggle = 0; toggle < ALPHABET_SIZE; toggle += 1) {
+      probeSnapshot.push(frequency[mask ^ (1 << toggle)]);
+    }
 
     activeProbe = 0;
     evaluatedProbeCount = 1;

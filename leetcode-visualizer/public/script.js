@@ -1183,6 +1183,12 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.edgeEquilibrium2846View), surface: "treeView", render: (step) => {
       renderEdgeEquilibrium2846View(step);
     } },
+    { predicate: (step) => Boolean(step.wonderful1915View), surface: "treeView", render: (step) => {
+      renderWonderful1915View(step);
+    } },
+    { predicate: (step) => Boolean(step.paint2158View), surface: "treeView", render: (step) => {
+      renderAmountPainted2158View(step);
+    } },
     { predicate: (step) => Boolean(step.shelfDp1105View), surface: "treeView", render: (step) => {
       renderShelfDp1105View(step);
     } },

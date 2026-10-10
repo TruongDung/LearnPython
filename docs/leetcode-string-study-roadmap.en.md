@@ -81,8 +81,8 @@ Maintain a two-pointer invariant; distinguish substrings from subsequences.
 | 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Available |
 | 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Available |
 | 29 | [392. Is Subsequence](https://leetcode.com/problems/is-subsequence/) | Easy |  | Available |
-| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Not yet |
-| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Not yet |
+| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Available |
+| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Available |
 
 ### A.4. Sliding windows and substrings (11 problems)
 
@@ -464,7 +464,7 @@ Count frequencies, build one-to-one mappings and group strings by signatures.
 | 331 | [1737. Change Minimum Characters to Satisfy One of Three Conditions](https://leetcode.com/problems/change-minimum-characters-to-satisfy-one-of-three-conditions/) | Medium |  | Not yet |
 | 332 | [1781. Sum of Beauty of All Substrings](https://leetcode.com/problems/sum-of-beauty-of-all-substrings/) | Medium |  | Not yet |
 | 333 | [1807. Evaluate the Bracket Pairs of a String](https://leetcode.com/problems/evaluate-the-bracket-pairs-of-a-string/) | Medium |  | Not yet |
-| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Not yet |
+| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Available |
 | 335 | [1930. Unique Length-3 Palindromic Subsequences](https://leetcode.com/problems/unique-length-3-palindromic-subsequences/) | Medium |  | Not yet |
 | 336 | [2023. Number of Pairs of Strings With Concatenation Equal to Target](https://leetcode.com/problems/number-of-pairs-of-strings-with-concatenation-equal-to-target/) | Medium |  | Not yet |
 | 337 | [2083. Substrings That Begin and End With the Same Letter](https://leetcode.com/problems/substrings-that-begin-and-end-with-the-same-letter/) | Medium | 🔒 | Not yet |

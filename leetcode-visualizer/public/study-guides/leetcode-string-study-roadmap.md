@@ -81,8 +81,8 @@ Giữ invariant của hai con trỏ; phân biệt substring và subsequence.
 | 27 | [917. Reverse Only Letters](https://leetcode.com/problems/reverse-only-letters/) | Easy |  | Có |
 | 28 | [844. Backspace String Compare](https://leetcode.com/problems/backspace-string-compare/) | Easy |  | Có |
 | 29 | [392. Is Subsequence](https://leetcode.com/problems/is-subsequence/) | Easy |  | Có |
-| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Chưa |
-| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Chưa |
+| 30 | [524. Longest Word in Dictionary through Deleting](https://leetcode.com/problems/longest-word-in-dictionary-through-deleting/) | Medium |  | Có |
+| 31 | [1750. Minimum Length of String After Deleting Similar Ends](https://leetcode.com/problems/minimum-length-of-string-after-deleting-similar-ends/) | Medium |  | Có |
 
 ### A.4. Sliding window và substring (11 bài)
 
