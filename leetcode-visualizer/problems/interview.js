@@ -840,6 +840,7 @@ function buildSteps843(input, params = {}) {
   const snap = (options) => steps.push({
     title: options.title,
     arr: options.arr || [],
+    sub: options.sub || [],
     highlight: options.highlight || [],
     mark: options.mark || [],
     final: Boolean(options.final),
@@ -866,7 +867,32 @@ function buildSteps843(input, params = {}) {
     },
   });
 
+  {
+    const exA = words0[0];
+    const exB = words0.length > 1 ? words0[1] : words0[0];
+    const per = [];
+    for (let k = 0; k < 6; k++) per.push(exA[k] === exB[k] ? 1 : 0);
+    const total = per.reduce((a, b) => a + b, 0);
+    snap({
+      title: { vi: `Ví dụ: matches("${exA}", "${exB}") = ${total}`, en: `Example: matches("${exA}", "${exB}") = ${total}` },
+      codeLines: [4],
+      arr: [...per],
+      sub: exA.split("").map((ch, k) => `${ch}/${exB[k]}`),
+      highlight: per.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+      vars: [
+        { name: "a", value: exA },
+        { name: "b", value: exB },
+        { name: "zip(a, b)", value: exA.split("").map((ch, k) => `(${ch},${exB[k]})`).join(" ") },
+      ],
+      note: {
+        vi: `Duyệt 6 vị trí: chỉ cộng 1 khi hai ký tự bằng nhau (cột highlight). Tổng = ${total}. Phép tính O(6) này chạy bên trong hai vòng lặp lồng nhau ở dòng 9–11.`,
+        en: `Scan 6 positions: add 1 only when both characters are equal (highlighted bars). Total = ${total}. This O(6) computation runs inside the two nested loops at lines 9–11.`,
+      },
+    });
+  }
+
   let candidates = [...words0];
+  const guesses = [];
   let found = null;
 
   for (let round = 1; round <= 10 && !found && candidates.length; round++) {
@@ -894,9 +920,10 @@ function buildSteps843(input, params = {}) {
     });
 
     const rows = candidates.map((cand) => {
-      const groups = [0, 0, 0, 0, 0, 0, 0];
-      for (const other of candidates) groups[matches(cand, other)]++;
-      return { cand, groups, score: Math.max(...groups) };
+      const groups = [[], [], [], [], [], [], []];
+      for (const other of candidates) groups[matches(cand, other)].push(other);
+      const counts = groups.map((g) => g.length);
+      return { cand, groups, counts, score: Math.max(...counts) };
     });
     let best = null;
     let bestScore = Infinity;
@@ -908,31 +935,56 @@ function buildSteps843(input, params = {}) {
       snap({
         title: { vi: `Ứng viên "${row.cand}": worst-group = ${row.score}`, en: `Candidate "${row.cand}": worst-group = ${row.score}` },
         codeLines: [12],
-        arr: [...row.groups],
-        highlight: [row.groups.indexOf(row.score)],
+        arr: [...row.counts],
+        sub: ["m=0", "m=1", "m=2", "m=3", "m=4", "m=5", "m=6"],
+        highlight: [row.counts.indexOf(row.score)],
         vars: [
-          { name: "groups[số vị trí trùng]", value: `[${row.groups.join(", ")}]` },
+          { name: "groups[số vị trí trùng]", value: `[${row.counts.join(", ")}]` },
+          { name: "nhóm chi tiết", value: row.groups.map((g, m) => (g.length ? `m=${m}: [${g.join(", ")}]` : null)).filter(Boolean).join(" · ") || "—" },
           { name: "score = max(groups)", value: row.score },
           { name: "best hiện tại", value: `${best} (score ${bestScore})` },
         ],
         note: {
-          vi: `Nếu đoán "${row.cand}", dù master trả về bao nhiêu thì nhóm còn lại lớn nhất cũng chỉ ${row.score} từ (cột được highlight). Chọn worst-group nhỏ nhất.`,
-          en: `Guessing "${row.cand}" leaves at most ${row.score} words no matter what the master returns (highlighted bar). Pick the smallest worst-group.`,
+          vi: `Dòng 9–11: so "${row.cand}" với từng ứng viên còn lại, gom vào 7 nhóm theo số vị trí trùng. Nếu đoán từ này, dù master trả về m nào thì nhóm còn lại lớn nhất cũng chỉ ${row.score} từ (cột highlight).`,
+          en: `Lines 9–11: compare "${row.cand}" against every remaining candidate, bucketing into 7 groups by match count. Guessing this word leaves at most ${row.score} words whichever m the master returns (highlighted bar).`,
         },
       });
     });
 
+    {
+      const scores = rows.map((row) => row.score);
+      const bestIdx = rows.findIndex((row) => row.cand === best);
+      snap({
+        title: { vi: `Minimax: chọn "${best}" (worst-group ${bestScore})`, en: `Minimax: pick "${best}" (worst-group ${bestScore})` },
+        codeLines: [13, 14],
+        arr: [...scores],
+        sub: rows.map((row) => row.cand),
+        highlight: [bestIdx],
+        vars: [
+          { name: "bảng điểm", value: scoreRowsText(rows, rows.length) },
+          { name: "best", value: best },
+          { name: "best_score", value: bestScore },
+        ],
+        note: {
+          vi: `Dòng 13–14 duyệt bảng điểm (mỗi cột là một ứng viên) và giữ từ có worst-group nhỏ nhất — cột highlight. Câu trả lời phỏng vấn: ta tối ưu cho trường hợp XẤU NHẤT của master, nên dù master trả về gì thì số ứng viên còn lại cũng ≤ ${bestScore}.`,
+          en: `Lines 13–14 scan the scoreboard (one bar per candidate) and keep the word with the smallest worst-group — the highlighted bar. The interview answer: we optimize for the master's WORST case, so at most ${bestScore} candidates survive no matter what is returned.`,
+        },
+      });
+    }
+
     const bestRow = rows.find((row) => row.cand === best);
     const x = masterGuess(best);
+    guesses.push(best);
     snap({
       title: { vi: `master.guess("${best}") → ${x}`, en: `master.guess("${best}") → ${x}` },
       codeLines: [16],
-      arr: [...bestRow.groups],
+      arr: [...bestRow.counts],
+      sub: ["m=0", "m=1", "m=2", "m=3", "m=4", "m=5", "m=6"],
       highlight: [x],
       vars: [
         { name: "guess", value: best },
         { name: "x = số vị trí trùng", value: x },
-        { name: "nhóm thực tế còn lại", value: `${bestRow.groups[x]} từ` },
+        { name: "nhóm thực tế còn lại", value: `${bestRow.counts[x]} từ` },
         { name: "scoreboard", value: scoreRowsText(rows) },
       ],
       note: {
@@ -949,6 +1001,7 @@ function buildSteps843(input, params = {}) {
         final: true,
         vars: [
           { name: "secret", value: secret },
+          { name: "các lần đoán", value: guesses.join(" → ") },
           { name: "số vòng đã dùng", value: `${round}/10` },
         ],
         note: {
@@ -960,17 +1013,23 @@ function buildSteps843(input, params = {}) {
     }
 
     const before = candidates.length;
+    const pairMatches = candidates.map((word) => ({ word, m: matches(word, best) }));
     candidates = candidates.filter((word) => matches(word, best) === x);
+    const kept = pairMatches.filter((entry) => entry.m === x).map((entry) => entry.word);
+    const removed = pairMatches.filter((entry) => entry.m !== x).map((entry) => entry.word);
     snap({
-      title: { vi: `Lọc: ${before} → ${candidates.length} ứng viên`, en: `Filter: ${before} → ${candidates.length} candidates` },
+      title: { vi: `Lọc: giữ ${kept.length}/${before} từ có matches == ${x}`, en: `Filter: keep ${kept.length}/${before} words with matches == ${x}` },
       codeLines: [19],
+      arr: pairMatches.map((entry) => entry.m),
+      sub: pairMatches.map((entry) => entry.word),
+      highlight: pairMatches.map((entry, i) => (entry.m === x ? i : -1)).filter((i) => i >= 0),
       vars: [
-        { name: "ứng viên còn lại", value: candidates.join(", ") || "—" },
-        { name: "đã loại", value: before - candidates.length },
+        { name: "giữ lại", value: kept.join(", ") || "—" },
+        { name: "loại bỏ", value: removed.join(", ") || "—" },
       ],
       note: {
-        vi: `Giữ lại từ có đúng ${x} vị trí trùng với "${best}". Vì đã minimax, tập ứng viên co rất nhanh.`,
-        en: `Keep words with exactly ${x} matches against "${best}". Thanks to minimax, candidates shrink fast.`,
+        vi: `Dòng 19 tính matches(w, "${best}") cho từng từ (mỗi cột một từ) và chỉ giữ nhóm m = ${x} được highlight — vì nếu secret là w thì master đã phải trả đúng ${x}. Nhờ minimax, nhóm sống sót luôn ≤ ${bestScore}.`,
+        en: `Line 19 computes matches(w, "${best}") for every word (one bar per word) and keeps only the highlighted m = ${x} group — had the secret been w, the master would have returned exactly ${x}. Thanks to minimax, the surviving group is always ≤ ${bestScore}.`,
       },
     });
   }
