@@ -1354,10 +1354,21 @@ const CODE1387 = [
   "",
   "        def power(x):",
   "            if x not in memo:",
-  "                memo[x] = 1 + power(x // 2 if x % 2 == 0 else 3 * x + 1)",
+  "                if x % 2 == 0:",
+  "                    next_x = x // 2",
+  "                else:",
+  "                    next_x = 3 * x + 1",
+  "",
+  "                memo[x] = 1 + power(next_x)",
+  "",
   "            return memo[x]",
   "",
-  "        return sorted(range(lo, hi + 1), key=lambda v: (power(v), v))[k - 1]",
+  "        nums = sorted(",
+  "            range(lo, hi + 1),",
+  "            key=lambda x: (power(x), x)",
+  "        )",
+  "",
+  "        return nums[k - 1]",
 ];
 
 const nextCollatz1387 = (x) => (x % 2 === 0 ? x / 2 : 3 * x + 1);
@@ -1405,29 +1416,29 @@ function buildSteps1387(input, params = {}) {
     note: { vi: "Mọi chuỗi Collatz đều kết thúc ở 1, nên power(1) = 0 bước. Memo lưu power đã tính để không tính lại.", en: "Every Collatz chain ends at 1, so power(1) = 0 steps. Memo stores computed powers to avoid recomputation." },
   });
 
-  // Dòng 10 — tổng quan range trước khi sort.
+  // Dòng 16–19 — tổng quan range trước khi sort.
   snap({
     title: { vi: `Xét các số từ ${lo} đến ${hi}, cần số thứ ${k} sau khi sort`, en: `Consider numbers ${lo}..${hi}; need the ${k}-th after sorting` },
     arr: values,
     sub: values.map(() => "?"),
-    codeLines: [10],
+    codeLines: [16, 17, 18, 19],
     vars: baseVars(),
-    note: { vi: "Dòng 10: sort range(lo, hi+1) theo key (power(v), v) rồi lấy [k-1]. Giờ tính power từng số.", en: "Line 10: sort range(lo, hi+1) by key (power(v), v), then take [k-1]. Now compute power for each number." },
+    note: { vi: "Dòng 16–19: nums = sorted(range(lo, hi+1), key=(power(x), x)). Giờ tính power từng số.", en: "Lines 16–19: nums = sorted(range(lo, hi+1), key=(power(x), x)). Now compute power for each number." },
   });
 
   // Tính power(v) cho từng v — trace line-by-line.
   for (const v of values) {
     if (memo.has(v)) {
-      // Đã có trong memo: dòng 6 false → dòng 8 trả về luôn.
+      // Đã có trong memo: dòng 6 false → dòng 14 trả về luôn.
       powers.set(v, memo.get(v));
       snap({
         title: { vi: `power(${v}) = ${memo.get(v)} — memo hit, khỏi tính lại`, en: `power(${v}) = ${memo.get(v)} — memo hit, no recomputation` },
         arr: values,
         sub: values.map((x) => (powers.has(x) ? String(powers.get(x)) : "?")),
         highlight: [v - lo],
-        codeLines: [5, 6, 8],
+        codeLines: [5, 6, 14],
         vars: [...baseVars(), { name: "x", value: v }, { name: `memo[${v}]`, value: memo.get(v) }],
-        note: { vi: `Dòng 6: ${v} đã có trong memo → bỏ qua đệ quy, dòng 8 trả về ngay. Đây là lý do memoization nhanh.`, en: `Line 6: ${v} is already memoized → skip recursion, line 8 returns immediately. This is why memoization is fast.` },
+        note: { vi: `Dòng 6: ${v} đã có trong memo → bỏ qua đệ quy, dòng 14 trả về ngay. Đây là lý do memoization nhanh.`, en: `Line 6: ${v} is already memoized → skip recursion, line 14 returns immediately. This is why memoization is fast.` },
       });
       continue;
     }
@@ -1453,33 +1464,34 @@ function buildSteps1387(input, params = {}) {
       note: { vi: `Dòng 6: ${v} not in memo → đi sâu. Chuỗi sẽ đi: ${chain.join(" → ")}.`, en: `Line 6: ${v} not in memo → go deeper. The chain walks: ${chain.join(" → ")}.` },
     });
 
-    // Dòng 7: bước xuống từng mắt xích x → next(x).
+    // Dòng 7–10: chọn next_x theo nhánh chẵn/lẻ, bước xuống từng mắt xích.
     for (let i = 0; i < links.length; i++) {
       const x = links[i];
       const nxt = chain[i + 1];
-      const rule = x % 2 === 0 ? `${x} chẵn → ${x}/2` : `${x} lẻ → 3×${x}+1`;
+      const even = x % 2 === 0;
+      const rule = even ? `${x} chẵn → ${x}//2` : `${x} lẻ → 3×${x}+1`;
       snap({
         title: { vi: `power(${x}): ${rule} = ${nxt}`, en: `power(${x}): ${rule} = ${nxt}` },
         arr: chain,
         sub: chain.map((_, j) => (j < i ? "✓" : j === i ? "→" : "?")),
         highlight: [i],
         mark: chain.map((_, j) => j).filter((j) => j < i),
-        codeLines: [7],
-        vars: [...baseVars(), { name: "x", value: x }, { name: "next(x)", value: nxt }, { name: "quy tắc", value: x % 2 === 0 ? "x chẵn → x/2" : "x lẻ → 3x+1" }],
-        note: { vi: `Dòng 7: memo[${x}] = 1 + power(${nxt}) — phải tính xong power(${nxt}) trước (đệ quy sâu thêm một tầng).`, en: `Line 7: memo[${x}] = 1 + power(${nxt}) — must finish power(${nxt}) first (one more recursion level).` },
+        codeLines: even ? [7, 8] : [7, 9, 10],
+        vars: [...baseVars(), { name: "x", value: x }, { name: "next_x", value: nxt }, { name: "quy tắc", value: even ? "x chẵn → x // 2" : "x lẻ → 3*x + 1" }],
+        note: { vi: `Dòng 7–${even ? "8" : "10"}: ${x} ${even ? "chẵn" : "lẻ"} → next_x = ${nxt}. Dòng 12 (memo[x] = 1 + power(next_x)) phải chờ power(${nxt}) xong — đệ quy sâu thêm một tầng.`, en: `Lines 7–${even ? "8" : "10"}: ${x} is ${even ? "even" : "odd"} → next_x = ${nxt}. Line 12 (memo[x] = 1 + power(next_x)) waits for power(${nxt}) — one more recursion level.` },
       });
     }
 
-    // Dòng 8: chạm memo ở tail → bung ngược.
+    // Dòng 14: chạm memo ở tail → bung ngược.
     snap({
       title: { vi: `power(${tail}) = ${memo.get(tail)} — chạm memo, bắt đầu điền ngược`, en: `power(${tail}) = ${memo.get(tail)} — memo hit, start unwinding` },
       arr: chain,
       sub: chain.map((_, j) => (j === chain.length - 1 ? String(memo.get(tail)) : "✓")),
       highlight: [chain.length - 1],
       mark: chain.map((_, j) => j).filter((j) => j < chain.length - 1),
-      codeLines: [8],
+      codeLines: [14],
       vars: [...baseVars(), { name: "x", value: tail }, { name: `memo[${tail}]`, value: memo.get(tail) }],
-      note: { vi: `Dòng 8: power(${tail}) trả về ${memo.get(tail)} ngay. Đệ quy bung ngược, mỗi tầng cộng 1 bước.`, en: `Line 8: power(${tail}) returns ${memo.get(tail)} immediately. The recursion unwinds, each level adding 1 step.` },
+      note: { vi: `Dòng 14: power(${tail}) trả về ${memo.get(tail)} ngay. Đệ quy bung ngược, mỗi tầng cộng 1 bước.`, en: `Line 14: power(${tail}) returns ${memo.get(tail)} immediately. The recursion unwinds, each level adding 1 step.` },
     });
 
     // Điền memo ngược cho các mắt xích mới.
@@ -1496,24 +1508,24 @@ function buildSteps1387(input, params = {}) {
       sub: chain.map((c) => String(memo.get(c))),
       highlight: [0],
       mark: chain.map((_, j) => j),
-      codeLines: [7],
+      codeLines: [12],
       vars: [...baseVars(), { name: `power(${v})`, value: memo.get(v) }, { name: "memo mới thêm", value: added.join(", ") }],
-      note: { vi: `Mỗi mắt xích cộng 1 bước so với mắt sau. ${links.length} giá trị mới vào memo — lần sau gặp lại sẽ hit ngay.`, en: `Each link adds 1 step over the next one. ${links.length} new values enter memo — future encounters hit instantly.` },
+      note: { vi: `Dòng 12: memo[x] = 1 + power(next_x) — mỗi mắt xích cộng 1 bước so với mắt sau. ${links.length} giá trị mới vào memo — lần sau gặp lại sẽ hit ngay.`, en: `Line 12: memo[x] = 1 + power(next_x) — each link adds 1 step over the next one. ${links.length} new values enter memo — future encounters hit instantly.` },
     });
   }
 
-  // Dòng 10 — bảng power trước sort.
+  // Dòng 16–19 — bảng power trước sort.
   const rows = values.map((x) => ({ x, p: powers.get(x) }));
   snap({
     title: { vi: "Đã có power của mọi số — chuẩn bị sort theo (power, value)", en: "All powers computed — ready to sort by (power, value)" },
     arr: values.map((x) => powers.get(x)),
     sub: values.map(String),
-    codeLines: [10],
+    codeLines: [16, 17, 18, 19],
     vars: [...baseVars(), { name: "bảng (số: power)", value: rows.map((r) => `${r.x}:${r.p}`).join(", ") }],
     note: { vi: "Key sort là tuple (power(v), v): power nhỏ đứng trước; power bằng nhau thì số nhỏ đứng trước.", en: "The sort key is the tuple (power(v), v): smaller power first; ties broken by the smaller value." },
   });
 
-  // Dòng 10 — kết quả sau sort, highlight phần tử thứ k.
+  // Dòng 21 — kết quả sau sort, highlight phần tử thứ k.
   const sorted = [...rows].sort((a, b) => (a.p - b.p) || (a.x - b.x));
   const answer = sorted[k - 1].x;
   snap({
@@ -1522,7 +1534,7 @@ function buildSteps1387(input, params = {}) {
     sub: sorted.map((r) => String(r.x)),
     highlight: [k - 1],
     mark: sorted.map((_, i) => i),
-    codeLines: [10],
+    codeLines: [21],
     final: true,
     vars: [...baseVars(), { name: "thứ tự sau sort", value: sorted.map((r) => r.x).join(", ") }, { name: "đáp án", value: answer }],
     note: { vi: `Phần tử thứ ${k} (index ${k - 1}) là ${answer} với power = ${sorted[k - 1].p}.`, en: `The ${k}-th element (index ${k - 1}) is ${answer} with power = ${sorted[k - 1].p}.` },
