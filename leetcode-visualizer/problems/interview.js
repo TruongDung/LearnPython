@@ -1087,6 +1087,233 @@ function buildSteps843(input, params = {}) {
   return { original: words0, answer: found, steps };
 }
 
+// ─── #2158: Amount of New Area Painted Each Day (Google — intervals) ─────────
+// Chuẩn phỏng vấn: giữ painted là các đoạn [s, e) rời nhau, đã sort.
+// Mỗi ngày: new = (e − s) − tổng phần giao với painted, rồi gộp đoạn mới vào.
+
+const MAX_PAINT2158 = 16;
+const MAX_UNITS2158 = 64;
+
+const CODE2158 = [
+  "class Solution:",
+  "    def amountPainted(self, paint):",
+  "        painted = []  # các đoạn [s, e) rời nhau, đã sort",
+  "        ans = []",
+  "        for s, e in paint:",
+  "            new = e - s",
+  "            merged = [s, e]",
+  "            rest = []",
+  "            for ps, pe in painted:",
+  "                if pe <= s or ps >= e:",
+  "                    rest.append([ps, pe])  # rời nhau: giữ nguyên",
+  "                else:",
+  "                    new -= min(pe, e) - max(ps, s)  # trừ phần đã sơn",
+  "                    merged[0] = min(merged[0], ps)",
+  "                    merged[1] = max(merged[1], pe)",
+  "            rest.append(merged)",
+  "            rest.sort()",
+  "            painted = rest",
+  "            ans.append(new)",
+  "        return ans",
+];
+
+function parsePaint2158(input) {
+  const text = String(input ?? "").trim();
+  if (!text) throw new Error("paint không được rỗng");
+  let raw;
+  if (text.startsWith("[")) {
+    try {
+      raw = JSON.parse(text);
+    } catch (_error) {
+      throw new Error("paint JSON phải là mảng các [start, end]");
+    }
+  } else {
+    raw = text.split(",").map((part) => part.trim()).filter(Boolean).map((part) => part.split("-").map(Number));
+  }
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > MAX_PAINT2158) {
+    throw new Error(`cần 1–${MAX_PAINT2158} đoạn sơn`);
+  }
+  return raw.map((pair) => {
+    if (!Array.isArray(pair) || pair.length !== 2) throw new Error(`đoạn ${JSON.stringify(pair)} phải có dạng start-end`);
+    const [s, e] = pair.map(Number);
+    if (!Number.isInteger(s) || !Number.isInteger(e) || s < 0 || e < 0) throw new Error(`"${s}-${e}": tọa độ phải là số nguyên ≥ 0`);
+    if (!(s < e)) throw new Error(`"${s}-${e}": cần start < end`);
+    return [s, e];
+  });
+}
+
+function buildSteps2158(input) {
+  const segs = parsePaint2158(input);
+  const lo = Math.min(...segs.map(([s]) => s));
+  const hi = Math.max(...segs.map(([, e]) => e));
+  const showUnits = hi - lo <= MAX_UNITS2158;
+
+  const steps = [];
+  const snap = (options) => steps.push({
+    title: options.title,
+    arr: options.arr || [],
+    sub: options.sub || [],
+    highlight: options.highlight || [],
+    mark: options.mark || [],
+    final: Boolean(options.final),
+    codeLines: options.codeLines || [],
+    vars: options.vars || [],
+    note: options.note,
+  });
+
+  const fmtSegs = (list) => (list.length ? list.map(([s, e]) => `[${s}, ${e})`).join(", ") : "∅");
+  const unitIndex = (u) => u - lo;
+  const dayIdx = (s, e) => { const idx = []; for (let u = s; u < e; u++) idx.push(unitIndex(u)); return idx; };
+  // Trục đơn vị: 0 = chưa sơn, 1 = đã sơn trước đó, 2 = mới sơn hôm nay.
+  const unitArr = (paintedBefore, freshUnits) => {
+    const arr = [], sub = [];
+    if (!showUnits) return { arr, sub };
+    const freshSet = new Set((freshUnits || []).map(unitIndex));
+    for (let u = lo; u < hi; u++) {
+      const was = paintedBefore.some(([ps, pe]) => ps <= u && u < pe);
+      arr.push(was ? 1 : (freshSet.has(unitIndex(u)) ? 2 : 0));
+      sub.push(String(u));
+    }
+    return { arr, sub };
+  };
+
+  {
+    const base = unitArr([], null);
+    snap({
+      title: { vi: "Khởi tạo", en: "Initialize" },
+      codeLines: [2, 3, 4],
+      arr: base.arr, sub: base.sub, highlight: [], mark: [],
+      vars: [
+        { name: "painted", value: "∅ — các đoạn [s, e) rời nhau, đã sort" },
+        { name: "ans", value: "[]" },
+      ],
+      note: {
+        vi: "painted giữ các đoạn đã sơn, luôn rời nhau và đã sort. Mỗi ngày: diện tích MỚI = độ dài đoạn − tổng phần giao với painted, rồi gộp đoạn mới vào painted.",
+        en: "painted keeps painted segments, always disjoint and sorted. Each day: NEW area = segment length − total overlap with painted, then merge the new segment into painted.",
+      },
+    });
+  }
+
+  const ans = [];
+  let painted = [];
+
+  segs.forEach(([s, e], d) => {
+    const paintedBefore = painted.map(([ps, pe]) => [ps, pe]);
+    const today = dayIdx(s, e);
+    const snapDay = (title, codeLines, vars, note, extra = {}) => {
+      const base = unitArr(paintedBefore, null);
+      snap({ title, codeLines, vars, note, arr: base.arr, sub: base.sub, highlight: today, mark: [], ...extra });
+    };
+
+    snapDay(
+      { vi: `Ngày ${d}: sơn [${s}, ${e})`, en: `Day ${d}: paint [${s}, ${e})` },
+      [5],
+      [
+        { name: "ngày", value: d },
+        { name: "đoạn sơn", value: `[${s}, ${e})` },
+        { name: "painted", value: fmtSegs(paintedBefore) },
+      ],
+      {
+        vi: `[${s}, ${e}) là half-open: sơn các đơn vị ${s}..${e - 1} (vùng highlight). Diện tích mới = số đơn vị trong vùng highlight chưa từng được sơn.`,
+        en: `[${s}, ${e}) is half-open: it paints units ${s}..${e - 1} (highlighted). New area = highlighted units never painted before.`,
+      },
+    );
+
+    let fresh = e - s;
+    let merged = [s, e];
+    const rest = [];
+
+    snapDay(
+      { vi: `new = ${e} − ${s} = ${fresh} (giả sử cả đoạn đều mới)`, en: `new = ${e} − ${s} = ${fresh} (assume all new)` },
+      [6],
+      [
+        { name: "new", value: fresh },
+        { name: "merged", value: `[${merged[0]}, ${merged[1]})` },
+      ],
+      {
+        vi: "Bắt đầu với giả định cả đoạn đều mới; mỗi phần giao với painted sẽ bị trừ ở dòng 13.",
+        en: "Start by assuming the whole segment is new; each overlap with painted is subtracted at line 13.",
+      },
+    );
+
+    for (const [ps, pe] of paintedBefore) {
+      if (pe <= s || ps >= e) {
+        rest.push([ps, pe]);
+        snapDay(
+          { vi: `[${ps}, ${pe}) rời [${s}, ${e}): giữ nguyên`, en: `[${ps}, ${pe}) is disjoint from [${s}, ${e}): keep` },
+          [10, 11],
+          [
+            { name: "xét", value: `[${ps}, ${pe})` },
+            { name: "giao nhau?", value: "không — một đoạn kết thúc trước khi đoạn kia bắt đầu" },
+            { name: "new", value: fresh },
+          ],
+          {
+            vi: "Hai đoạn half-open rời nhau khi pe ≤ s hoặc ps ≥ e: đoạn cũ giữ nguyên trong rest, new không đổi.",
+            en: "Two half-open segments are disjoint when pe ≤ s or ps ≥ e: the old segment stays in rest, new is unchanged.",
+          },
+        );
+      } else {
+        const overlap = Math.min(pe, e) - Math.max(ps, s);
+        const before = fresh;
+        fresh -= overlap;
+        merged = [Math.min(merged[0], ps), Math.max(merged[1], pe)];
+        snapDay(
+          { vi: `Giao [${ps}, ${pe}): trừ overlap ${overlap}`, en: `Overlaps [${ps}, ${pe}): subtract ${overlap}` },
+          [13, 14, 15],
+          [
+            { name: "overlap", value: `min(${pe}, ${e}) − max(${ps}, ${s}) = ${overlap}` },
+            { name: "new", value: `${before} − ${overlap} = ${fresh}` },
+            { name: "merged", value: `[${merged[0]}, ${merged[1]})` },
+          ],
+          {
+            vi: `Đơn vị ${Math.max(ps, s)}..${Math.min(pe, e) - 1} đã sơn trước đó nên không tính mới; đồng thời mở rộng merged để gộp đoạn cũ vào.`,
+            en: `Units ${Math.max(ps, s)}..${Math.min(pe, e) - 1} were already painted, so they are not new; merged is extended to absorb the old segment.`,
+          },
+        );
+      }
+    }
+
+    rest.push(merged);
+    rest.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    painted = rest;
+
+    const freshUnits = [];
+    for (let u = s; u < e; u++) {
+      if (!paintedBefore.some(([ps, pe]) => ps <= u && u < pe)) freshUnits.push(u);
+    }
+    const after = unitArr(paintedBefore, freshUnits);
+    const mark = freshUnits.map(unitIndex);
+    snap({
+      title: { vi: `Gộp: painted = ${fmtSegs(painted)}`, en: `Merge: painted = ${fmtSegs(painted)}` },
+      codeLines: [16, 17, 18],
+      arr: after.arr, sub: after.sub, highlight: today, mark,
+      vars: [
+        { name: "painted", value: fmtSegs(painted) },
+        { name: "đơn vị mới (xanh)", value: `${freshUnits.length}` },
+      ],
+      note: {
+        vi: "Thêm merged rồi sort lại: painted vẫn rời nhau và đã sort (dòng 16–18). Cột xanh (mark) là các đơn vị thật sự mới trong ngày.",
+        en: "Append merged and re-sort: painted stays disjoint and sorted (lines 16–18). Green (marked) bars are the truly new units of the day.",
+      },
+    });
+
+    ans.push(fresh);
+    snap({
+      title: { vi: `ans[${d}] = ${fresh}`, en: `ans[${d}] = ${fresh}` },
+      codeLines: [19],
+      arr: after.arr, sub: after.sub, highlight: today, mark,
+      vars: [{ name: "ans", value: `[${ans.join(", ")}]` }],
+      note: {
+        vi: `Ngày ${d} sơn mới ${fresh} đơn vị diện tích.`,
+        en: `Day ${d} paints ${fresh} new units of area.`,
+      },
+      final: d === segs.length - 1,
+    });
+  });
+
+  return { original: segs, answer: ans, steps };
+}
+
 module.exports = {
   2386: {
     id: 2386, difficulty: "hard", slug: "find-the-k-sum-of-an-array", category: HEAP, tags: [SORTING],
@@ -1181,5 +1408,15 @@ module.exports = {
     approach: [{ vi: "Với mỗi ứng viên, chia các từ còn lại thành 7 nhóm theo số vị trí trùng (0–6); score = kích thước nhóm lớn nhất.", en: "For each candidate, split remaining words into 7 groups by match count (0–6); score = the largest group size." }, { vi: "Đoán từ có score nhỏ nhất (minimax): dù master trả về gì, số ứng viên còn lại cũng ≤ score.", en: "Guess the word with the smallest score (minimax): no matter what the master returns, remaining candidates ≤ score." }, { vi: "Lọc wordlist chỉ giữ từ có đúng x vị trí trùng với từ vừa đoán, lặp lại.", en: "Filter the wordlist to words with exactly x matches against the guess, then repeat." }],
     complexity: { time: "O(30 · n²)", space: "O(n)", note: { vi: "Mỗi vòng tính match cho mọi cặp ứng viên (n²); n ≤ 24 trong visualizer.", en: "Each round computes match for every candidate pair (n²); n ≤ 24 in the visualizer." } },
     code: CODE843, builder: buildSteps843,
+  },
+  2158: {
+    id: 2158, difficulty: "hard", slug: "amount-of-new-area-painted-each-day", category: INTERVAL, tags: [INTERVAL, SWEEP],
+    title: { vi: "Diện tích mới sơn mỗi ngày", en: "Amount of New Area Painted Each Day" }, titleVi: { vi: "Sơn đoạn mỗi ngày, tính diện tích mới", en: "Paint segments daily, count the new area" },
+    statement: { vi: "Mỗi ngày i sơn đoạn half-open [start_i, end_i). Trả về mảng mà phần tử i là diện tích MỚI được sơn trong ngày i (phần đã sơn trước đó không tính).", en: "Each day i paints the half-open segment [start_i, end_i). Return an array where element i is the NEW area painted on day i (previously painted area doesn't count)." },
+    defaultInput: "1-4,4-7,1-7", inputKind: "string", inputLabel: { vi: "các đoạn start-end (cách nhau bởi dấu phẩy)", en: "start-end segments (comma separated)" },
+    extraParams: [],
+    approach: [{ vi: "Giữ painted là danh sách các đoạn [s, e) rời nhau, đã sort.", en: "Keep painted as a list of disjoint, sorted [s, e) segments." }, { vi: "Mỗi ngày: new = (e − s) − tổng phần giao với các đoạn đã sơn.", en: "Each day: new = (e − s) − total overlap with the painted segments." }, { vi: "Gộp đoạn mới với các đoạn giao nhau rồi sort lại để painted luôn rời nhau.", en: "Merge the new segment with every overlapping one and re-sort so painted stays disjoint." }],
+    complexity: { time: "O(n²) demo · O(n log n) với ordered map", space: "O(n)", note: { vi: "Bản visualizer duyệt tuyến tính qua painted để trace rõ từng bước; production dùng TreeMap/bisect để mỗi ngày O(log n).", en: "The visualizer scans painted linearly for a clear trace; production uses a TreeMap/bisect for O(log n) per day." } },
+    code: CODE2158, builder: buildSteps2158,
   },
 };
