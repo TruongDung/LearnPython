@@ -1192,6 +1192,23 @@ function buildSteps2158(input) {
         en: "painted keeps painted segments, always disjoint and sorted. Each day: NEW area = segment length − total overlap with painted, then merge the new segment into painted.",
       },
     });
+
+    snap({
+      title: { vi: "Cách đọc biểu đồ", en: "How to read the chart" },
+      codeLines: [3],
+      vars: [
+        { name: "cột thấp (0)", value: "đơn vị chưa sơn" },
+        { name: "cột cao (1)", value: "đơn vị đã sơn từ các ngày trước" },
+        { name: "cột cao nhất (2)", value: "đơn vị mới sơn hôm nay — chỉ xuất hiện ở bước gộp" },
+        { name: "viền vàng", value: "vùng đang xét: đoạn sơn hôm nay, phần overlap đang trừ, hoặc đoạn cũ đang kiểm tra" },
+        { name: "viền xanh lá", value: "đơn vị thật sự mới — chính là đáp án của ngày" },
+        { name: "số dưới mỗi cột", value: "tọa độ đơn vị (cột ghi 4 là đơn vị [4, 5))" },
+      ],
+      note: {
+        vi: "Mỗi cột là một đơn vị trên trục số. Đoạn [s, e) là half-open: gồm các đơn vị s..e−1, ví dụ [1, 4) sơn 3 đơn vị 1, 2, 3.",
+        en: "Each bar is one unit on the number line. [s, e) is half-open: it covers units s..e−1, e.g. [1, 4) paints 3 units: 1, 2, 3.",
+      },
+    });
   }
 
   const ans = [];
@@ -1243,32 +1260,39 @@ function buildSteps2158(input) {
           { vi: `[${ps}, ${pe}) rời [${s}, ${e}): giữ nguyên`, en: `[${ps}, ${pe}) is disjoint from [${s}, ${e}): keep` },
           [10, 11],
           [
-            { name: "xét", value: `[${ps}, ${pe})` },
-            { name: "giao nhau?", value: "không — một đoạn kết thúc trước khi đoạn kia bắt đầu" },
+            { name: "xét (vàng)", value: `[${ps}, ${pe})` },
+            { name: "kiểm tra rời nhau", value: `pe ≤ s? ${pe} ≤ ${s} → ${pe <= s ? "đúng" : "sai"} · ps ≥ e? ${ps} ≥ ${e} → ${ps >= e ? "đúng" : "sai"}` },
+            { name: "kết luận", value: "rời nhau — đoạn cũ giữ nguyên trong rest, new không đổi" },
             { name: "new", value: fresh },
           ],
           {
-            vi: "Hai đoạn half-open rời nhau khi pe ≤ s hoặc ps ≥ e: đoạn cũ giữ nguyên trong rest, new không đổi.",
-            en: "Two half-open segments are disjoint when pe ≤ s or ps ≥ e: the old segment stays in rest, new is unchanged.",
+            vi: "Hai đoạn half-open rời nhau khi pe ≤ s hoặc ps ≥ e: đoạn cũ (vàng) giữ nguyên trong rest, new không đổi.",
+            en: "Two half-open segments are disjoint when pe ≤ s or ps ≥ e: the old segment (amber) stays in rest, new is unchanged.",
           },
+          { highlight: dayIdx(ps, pe) },
         );
       } else {
         const overlap = Math.min(pe, e) - Math.max(ps, s);
         const before = fresh;
         fresh -= overlap;
         merged = [Math.min(merged[0], ps), Math.max(merged[1], pe)];
+        const ovS = Math.max(ps, s), ovE = Math.min(pe, e);
+        const ovUnits = [];
+        for (let u = ovS; u < ovE; u++) ovUnits.push(u);
         snapDay(
           { vi: `Giao [${ps}, ${pe}): trừ overlap ${overlap}`, en: `Overlaps [${ps}, ${pe}): subtract ${overlap}` },
           [13, 14, 15],
           [
+            { name: "phần giao (vàng)", value: `[${ovS}, ${ovE}) = đơn vị ${ovUnits.join(", ")}` },
             { name: "overlap", value: `min(${pe}, ${e}) − max(${ps}, ${s}) = ${overlap}` },
             { name: "new", value: `${before} − ${overlap} = ${fresh}` },
             { name: "merged", value: `[${merged[0]}, ${merged[1]})` },
           ],
           {
-            vi: `Đơn vị ${Math.max(ps, s)}..${Math.min(pe, e) - 1} đã sơn trước đó nên không tính mới; đồng thời mở rộng merged để gộp đoạn cũ vào.`,
-            en: `Units ${Math.max(ps, s)}..${Math.min(pe, e) - 1} were already painted, so they are not new; merged is extended to absorb the old segment.`,
+            vi: `Vùng vàng đã sơn từ trước nên không tính là mới — trừ thẳng khỏi new; đồng thời mở rộng merged để gộp đoạn cũ vào.`,
+            en: `The amber region was already painted, so it is not new — subtract it straight from new; merged is extended to absorb the old segment.`,
           },
+          { highlight: dayIdx(ovS, ovE) },
         );
       }
     }
@@ -1288,7 +1312,8 @@ function buildSteps2158(input) {
       codeLines: [16, 17, 18],
       arr: after.arr, sub: after.sub, highlight: today, mark,
       vars: [
-        { name: "painted", value: fmtSegs(painted) },
+        { name: "painted trước", value: fmtSegs(paintedBefore) },
+        { name: "painted sau", value: fmtSegs(painted) },
         { name: "đơn vị mới (xanh)", value: `${freshUnits.length}` },
       ],
       note: {
