@@ -263,4 +263,54 @@ for (const list of Object.values(COMPANY_LISTS)) {
   }
 }
 
-module.exports = { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG };
+// ─── 0/1 Knapsack full roster ────────────────────────────────────────────────
+// 24 problems across 3 groups. Entries whose id is not in SUPPORTED still
+// appear in the catalog as dimmed/unavailable chips.
+// Format: [id, title, difficulty]
+const KNAPSACK_ROSTER_RAW = [
+  // Nhóm A — kinh điển
+  [416,  "Partition Equal Subset Sum",                                      "medium"],
+  [494,  "Target Sum",                                                       "medium"],
+  [474,  "Ones and Zeroes",                                                  "medium"],
+  [1049, "Last Stone Weight II",                                             "medium"],
+  [2915, "Length of the Longest Subsequence That Sums to Target",           "medium"],
+  [2787, "Ways to Express an Integer as Sum of Powers",                     "medium"],
+  [3180, "Maximum Total Reward Using Operations I",                         "medium"],
+  [3181, "Maximum Total Reward Using Operations II",                        "hard"],
+  // Nhóm B — Subset / Counting / Partition
+  [698,  "Partition to K Equal Sum Subsets",                                "medium"],
+  [473,  "Matchsticks to Square",                                           "medium"],
+  [2035, "Partition Array Into Two Arrays to Minimize Sum Difference",      "hard"],
+  [805,  "Split Array With Same Average",                                   "hard"],
+  [879,  "Profitable Schemes",                                              "hard"],
+  [2518, "Number of Great Partitions",                                      "hard"],
+  [956,  "Tallest Billboard",                                               "hard"],
+  [1755, "Closest Subsequence Sum",                                         "hard"],
+  [1774, "Closest Dessert Cost",                                            "medium"],
+  // Nhóm C — biến thể nâng cao
+  [2291, "Maximum Profit From Trading Stocks",                              "medium"],
+  [2218, "Maximum Value of K Coins From Piles",                            "hard"],
+  [1981, "Minimize the Difference Between Target and Chosen Elements",      "medium"],
+  [2742, "Painting the Walls",                                              "hard"],
+  [2585, "Number of Ways to Earn Points",                                   "hard"],
+  [3082, "Find the Sum of the Power of All Subsequences",                   "hard"],
+  [3333, "Find the Original Typed String II",                               "hard"],
+];
+
+// Single "All" tab — same shape as COMPANY_SUBTABS so server.js / app-core.js
+// can reuse the same subTabs rendering path.
+const KNAPSACK_SUBTABS = [
+  {
+    key: "all",
+    vi: "Tất cả",
+    en: "All",
+    roster: KNAPSACK_ROSTER_RAW.map(([id, title, difficulty]) => ({
+      id,
+      title,
+      difficulty,
+      available: Boolean(SUPPORTED[id]),
+    })),
+  },
+];
+
+module.exports = { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG, KNAPSACK_SUBTABS, KNAPSACK_TAG };
