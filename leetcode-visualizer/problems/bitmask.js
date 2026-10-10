@@ -767,6 +767,175 @@ function buildSteps698(input, params = {}) {
   return { original: rawNums, answer, steps };
 }
 
+// ─── #698 cách 2: Backtracking xếp từng số vào k group ───────────────────────
+// Ý tưởng: sort giảm dần, DFS đặt nums[i] vào một trong k group sao cho tổng
+// mỗi group = target. Hai luật cắt nhánh: (1) groups[j] + nums[i] > target thì
+// bỏ qua; (2) groups[j] trùng tổng với group trước đó thì bỏ qua để tránh thử
+// các hoán vị đối xứng của cùng một cách chia.
+function buildSteps698Groups(input, params = {}) {
+  const rawNums = parseIntegerArray(input, "nums");
+  const k = Number(params.k ?? 4);
+  if (rawNums.length > 10 || rawNums.some((value) => value <= 0) || !Number.isInteger(k) || k < 1 || k > rawNums.length) {
+    throw new Error("Use 1 to 10 positive nums and an integer k from 1 to nums.length.");
+  }
+  const sorted = rawNums.map((value, originalIndex) => ({ value, originalIndex })).sort((left, right) => right.value - left.value);
+  const nums = sorted.map((item) => item.value);
+  const n = nums.length;
+  const total = nums.reduce((sum, value) => sum + value, 0);
+  const target = total / k;
+  const steps = [];
+  const stages = [
+    { vi: "1. Tính target", en: "1. Compute target" },
+    { vi: "2. Xếp số vào group", en: "2. Place a number into a group" },
+    { vi: "3. Cắt nhánh đối xứng", en: "3. Prune symmetric branches" },
+    { vi: "4. Quay lui", en: "4. Backtrack" },
+    { vi: "5. Kết luận", en: "5. Decide" },
+  ];
+  const rule = {
+    vi: "Xếp từng số (đã sort giảm dần) vào một trong k group sao cho tổng mỗi group = target. Bỏ qua group có tổng trùng với group trước đó để tránh thử các hoán vị đối xứng.",
+    en: "Place each number (sorted descending) into one of k groups so every group sums to target. Skip a group whose sum duplicates an earlier group to avoid symmetric permutations.",
+  };
+  const groups = Array.from({ length: k }, () => []);
+  const groupSum = new Array(k).fill(0);
+  const placement = new Array(n).fill(-1);
+  const skips = { over: 0, dup: 0 };
+  const TRACE_LIMIT = 280;
+  let traceTruncated = false;
+
+  const snapshot = ({ phase, groupIndex = 0, activeIndex = -1, line, title, note, status = "info", final = false, answer = null, reason = null }) => {
+    if (!final && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
+    const numberItems = sorted.map((item, index) => ({
+      label: `#${item.originalIndex}`,
+      value: item.value,
+      sub: placement[index] >= 0 ? `group ${placement[index] + 1}` : index === activeIndex ? "đang xét" : "chưa xếp",
+      badge: `số ${index + 1}`,
+      state: index === activeIndex ? (status === "danger" ? "danger" : "active") : placement[index] >= 0 ? "muted" : "",
+    }));
+    const groupItems = groups.map((members, gj) => {
+      const sum = groupSum[gj];
+      return {
+        label: `group ${gj + 1}`,
+        value: `${sum}/${Number.isInteger(target) ? target : "?"}`,
+        sub: members.length ? members.map((mi) => sorted[mi].value).join(" + ") : "trống",
+        badge: sum === target ? "đủ" : gj === groupIndex ? "đang thử" : "chờ",
+        state: sum === target ? "success" : gj === groupIndex ? "active" : "",
+      };
+    });
+    const opDetail = reason === "over"
+      ? { vi: `Vượt target nên continue (dòng 22).`, en: `Exceeds target, so continue (line 22).` }
+      : reason === "dup"
+        ? { vi: `Tổng ${groupSum[groupIndex]} đã có ở group trước → continue (dòng 25), tránh hoán vị đối xứng.`, en: `Sum ${groupSum[groupIndex]} already appears in an earlier group → continue (line 25), avoiding symmetric permutations.` }
+        : status === "danger" && activeIndex >= 0
+          ? { vi: "Không đặt được vào group này.", en: "Cannot place into this group." }
+          : { vi: "Đặt vừa; xếp vào group rồi đi sâu.", en: "It fits; place into the group and recurse." };
+    addAdvancedStep(steps, {
+      problemId: 698, mode: "k-subsets-groups", phase, stages,
+      stageIndex: phase === "start" ? 0 : phase === "backtrack" ? 3 : phase === "done" ? 4 : phase === "skip" ? 2 : 1,
+      rule, title, note, final, codeLines: [line], traceTruncated,
+      vars: [
+        { name: "target", value: Number.isInteger(target) ? target : "not integer" },
+        { name: "i (số đang xếp)", value: activeIndex >= 0 ? `${nums[activeIndex]} (#${sorted[activeIndex].originalIndex})` : "—" },
+        { name: "groups", value: `[${groupSum.join(", ")}]` },
+      ],
+      lanes: [
+        { title: { vi: "CÁC PHẦN TỬ", en: "ELEMENTS" }, hint: { vi: "đã sort giảm dần", en: "sorted descending" }, items: numberItems },
+        { title: { vi: `${k} GROUP CÙNG TARGET`, en: `${k} GROUPS SHARING ONE TARGET` }, hint: { vi: `tổng mỗi group = ${Number.isInteger(target) ? target : "?"}`, en: `each group sums to ${Number.isInteger(target) ? target : "?"}` }, items: groupItems },
+      ],
+      operation: activeIndex < 0 ? {
+        eyebrow: { vi: "TARGET", en: "TARGET" },
+        formula: `${total} / ${k} = ${Number.isInteger(target) ? target : "not integer"}`,
+        detail: Number.isInteger(target) ? { vi: "Tổng chia đều được; bắt đầu xếp từng số vào group.", en: "The total divides evenly; start placing numbers into groups." } : { vi: "Tổng không chia hết cho k.", en: "The total is not divisible by k." },
+        status: Number.isInteger(target) ? "info" : "danger",
+      } : {
+        eyebrow: { vi: `SỐ ${nums[activeIndex]} → GROUP ${groupIndex + 1}`, en: `NUMBER ${nums[activeIndex]} → GROUP ${groupIndex + 1}` },
+        formula: `${groupSum[groupIndex]} + ${nums[activeIndex]} ${groupSum[groupIndex] + nums[activeIndex] <= target ? "≤" : ">"} ${target}`,
+        detail: opDetail,
+        status,
+      },
+      states: { title: { vi: "NHÁNH ĐÃ CẮT", en: "PRUNED BRANCHES" }, hint: { vi: "tỉa đối xứng", en: "symmetry pruning" }, items: [
+        { label: "vượt target", value: skips.over, sub: "dòng 22", state: skips.over ? "muted" : "" },
+        { label: "trùng group trước", value: skips.dup, sub: "dòng 25", state: skips.dup ? "muted" : "" },
+      ] },
+      result: final ? { label: { vi: "CHIA ĐƯỢC?", en: "CAN PARTITION?" }, value: answer ? "True" : "False", detail: answer ? `${k} groups × ${target}` : "", status: answer ? "success" : "danger" } : null,
+    });
+  };
+
+  if (total % k !== 0 || nums[0] > target) {
+    const badTotal = total % k !== 0;
+    snapshot({
+      phase: "done", line: badTotal ? 6 : 12,
+      title: { vi: "Không thể chia đều", en: "Equal partition is impossible" },
+      note: badTotal
+        ? { vi: `Tổng ${total} không chia hết cho k=${k} (dòng 6).`, en: `Total ${total} is not divisible by k=${k} (line 6).` }
+        : { vi: `Số lớn nhất ${nums[0]} vượt target ${target} (dòng 12).`, en: `Largest value ${nums[0]} exceeds target ${target} (line 12).` },
+      final: true, answer: false, status: "danger",
+    });
+    return { original: rawNums, answer: false, steps };
+  }
+
+  const dfs = (i) => {
+    if (i === n) return true;
+    for (let j = 0; j < k; j++) {
+      if (groupSum[j] + nums[i] > target) {
+        skips.over += 1;
+        snapshot({
+          phase: "try", groupIndex: j, activeIndex: i, line: 22, reason: "over",
+          title: { vi: `Số ${nums[i]} không vừa group ${j + 1}`, en: `Number ${nums[i]} does not fit group ${j + 1}` },
+          note: { vi: `${groupSum[j]} + ${nums[i]} > ${target} → continue.`, en: `${groupSum[j]} + ${nums[i]} > ${target} → continue.` },
+          status: "danger",
+        });
+        continue;
+      }
+      if (groupSum.slice(0, j).includes(groupSum[j])) {
+        skips.dup += 1;
+        snapshot({
+          phase: "skip", groupIndex: j, activeIndex: i, line: 25, reason: "dup",
+          title: { vi: `Bỏ qua group ${j + 1} vì trùng tổng`, en: `Skip group ${j + 1}: duplicate sum` },
+          note: { vi: `groups[${j}] = ${groupSum[j]} đã xuất hiện trong groups[:${j}] — thử tiếp chỉ tạo hoán vị đối xứng của nhánh đã xét.`, en: `groups[${j}] = ${groupSum[j]} already appears in groups[:${j}] — continuing would only permute an explored branch.` },
+          status: "danger",
+        });
+        continue;
+      }
+      groupSum[j] += nums[i];
+      groups[j].push(i);
+      placement[i] = j;
+      snapshot({
+        phase: "choose", groupIndex: j, activeIndex: i, line: 28,
+        title: { vi: `Xếp ${nums[i]} vào group ${j + 1}`, en: `Place ${nums[i]} into group ${j + 1}` },
+        note: { vi: `groups[${j}] = ${groupSum[j]}. Đệ quy xếp số tiếp theo (dòng 30).`, en: `groups[${j}] = ${groupSum[j]}. Recurse to place the next number (line 30).` },
+        status: "success",
+      });
+      if (dfs(i + 1)) return true;
+      groupSum[j] -= nums[i];
+      groups[j].pop();
+      placement[i] = -1;
+      snapshot({
+        phase: "backtrack", groupIndex: j, activeIndex: i, line: 33,
+        title: { vi: `Quay lui: gỡ ${nums[i]} khỏi group ${j + 1}`, en: `Backtrack: remove ${nums[i]} from group ${j + 1}` },
+        note: { vi: "Nhánh này không chia hết được; thử group khác.", en: "This branch cannot complete the partition; try another group." },
+        status: "danger",
+      });
+    }
+    return false;
+  };
+
+  snapshot({
+    phase: "start", line: 9,
+    title: { vi: `target = ${total} / ${k} = ${target}`, en: `target = ${total} / ${k} = ${target}` },
+    note: { vi: "Sort giảm dần: số lớn được xếp trước nên nhánh sai lộ ra sớm.", en: "Sort descending: large numbers are placed first, exposing bad branches early." },
+  });
+  const answer = dfs(0);
+  snapshot({
+    phase: "done", groupIndex: Math.max(0, k - 1), line: 37,
+    title: { vi: answer ? "Chia được thành k group bằng nhau" : "Không có cách chia hợp lệ", en: answer ? "Partitioned into k equal groups" : "No valid partition exists" },
+    note: answer
+      ? { vi: `Mỗi group có tổng ${target} (dòng 18–19: xếp hết n số là xong).`, en: `Every group sums to ${target} (lines 18–19: placing all n numbers finishes).` }
+      : { vi: "Mọi nhánh đều bế tắc.", en: "Every branch dead-ends." },
+    final: true, answer, status: answer ? "success" : "danger",
+  });
+  return { original: rawNums, answer, steps };
+}
+
 function parsePeople1125(value) {
   const groups = String(value ?? "").split(";").map((group) => group.trim()).filter(Boolean);
   if (!groups.length) throw new Error("people must use semicolons between people and commas between skills.");
@@ -1431,8 +1600,11 @@ module.exports = {
     extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 4 }],
     approach: [{ vi: "Mỗi bucket phải đạt total/k.", en: "Each bucket must reach total/k." }, { vi: "Backtracking theo used mask và memo các state không thể hoàn tất.", en: "Backtrack on the used mask and memoize dead states." }],
     complexity: { time: "O(n·2ⁿ)", space: "O(2ⁿ)", note: { vi: "Sort giảm dần giúp phát hiện nhánh sai sớm.", en: "Descending sort exposes bad branches early." } },
+    codeLabel: { vi: "Cách 1 · Bitmask DP + memo", en: "Approach 1 · Bitmask DP + memo" },
     code: ["class Solution:", "    def canPartitionKSubsets(self, nums, k):", "        total = sum(nums)", "        if total % k: return False", "        target = total // k", "        nums.sort(reverse=True)", "        dead = set()", "        def dfs(used, bucket_sum, buckets_done):", "            if buckets_done == k - 1: return True", "            if bucket_sum == target:", "                return dfs(used, 0, buckets_done + 1)", "            if (used, bucket_sum) in dead: return False", "            for i, num in enumerate(nums):", "                if not used >> i & 1 and bucket_sum + num <= target:", "                    if dfs(used | 1 << i, bucket_sum + num, buckets_done): return True", "            dead.add((used, bucket_sum))", "            return False", "        return dfs(0, 0, 0)"],
-    liveArgs: (input, params = {}) => [parseIntegerArray(input, "nums"), Number(params.k)], builder: buildSteps698,
+    code2Label: { vi: "Cách 2 · Backtracking xếp vào k group", en: "Approach 2 · Backtracking into k groups" },
+    code2: ["class Solution:", "    def canPartitionKSubsets(self, nums: list[int], k: int) -> bool:", "        n = len(nums)", "        total = sum(nums)", "", "        if k > n or total % k != 0:", "            return False", "", "        target = total // k", "        nums.sort(reverse=True)", "", "        if nums[0] > target:", "            return False", "", "        groups = [0] * k", "", "        def dfs(i):", "            if i == n:", "                return True", "", "            for j in range(k):", "                if groups[j] + nums[i] > target:", "                    continue", "", "                if groups[j] in groups[:j]:", "                    continue", "", "                groups[j] += nums[i]", "", "                if dfs(i + 1):", "                    return True", "", "                groups[j] -= nums[i]", "", "            return False", "", "        return dfs(0)"],
+    liveArgs: (input, params = {}) => [parseIntegerArray(input, "nums"), Number(params.k)], builder: buildSteps698, builder2: buildSteps698Groups,
   },
   1125: {
     id: 1125, difficulty: "hard", slug: "smallest-sufficient-team", category, tags: [bitmaskTag, { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" }],
