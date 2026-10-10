@@ -771,25 +771,52 @@ const WORD843_RE = /^[a-z]{6}$/;
 const MAX_WORDS843 = 24;
 
 const CODE843 = [
+  "from typing import List",
+  "",
   "class Solution:",
-  "    def findSecretWord(self, words, master):",
-  "        def matches(a, b):",
+  "    def findSecretWord(self, words: List[str], master: 'Master') -> None:",
+  "",
+  "        def match(a, b):",
   "            return sum(x == y for x, y in zip(a, b))",
   "",
-  "        for _ in range(10):",
-  "            best, best_score = None, float(\"inf\")",
-  "            for cand in words:",
-  "                groups = [0] * 7",
-  "                for other in words:",
-  "                    groups[matches(cand, other)] += 1",
-  "                score = max(groups)",
-  "                if score < best_score:",
-  "                    best, best_score = cand, score",
+  "        candidates = words[:]",
+  "        n = len(words[0])",
   "",
-  "            x = master.guess(best)",
-  "            if x == 6:",
+  "        for _ in range(30):",
+  "            if not candidates:",
   "                return",
-  "            words = [w for w in words if matches(w, best) == x]",
+  "",
+  "            best_word = candidates[0]",
+  "            best_score = float('inf')",
+  "",
+  "            # Minimax: choose the best guess",
+  "            for word in candidates:",
+  "                groups = [0] * (n + 1)",
+  "",
+  "                for other in candidates:",
+  "                    if word == other:",
+  "                        continue",
+  "",
+  "                    count = match(word, other)",
+  "                    groups[count] += 1",
+  "",
+  "                worst = max(groups)",
+  "",
+  "                if worst < best_score:",
+  "                    best_score = worst",
+  "                    best_word = word",
+  "",
+  "            # Ask Master",
+  "            result = master.guess(best_word)",
+  "",
+  "            if result == n:",
+  "                return",
+  "",
+  "            # Eliminate inconsistent candidates",
+  "            candidates = [",
+  "                word for word in candidates",
+  "                if match(word, best_word) == result",
+  "            ]",
 ];
 
 function parseWordlist843(input) {
@@ -828,13 +855,15 @@ function buildSteps843(input, params = {}) {
   if (!WORD843_RE.test(secret)) throw new Error("secret phải gồm đúng 6 chữ cái a-z");
   if (!words0.includes(secret)) throw new Error("secret phải nằm trong wordlist (master chỉ giấu từ có trong list)");
 
-  const matches = (a, b) => {
+  const n = words0[0].length;
+  const match = (a, b) => {
     let count = 0;
-    for (let k = 0; k < 6; k++) if (a[k] === b[k]) count++;
+    for (let k = 0; k < n; k++) if (a[k] === b[k]) count++;
     return count;
   };
-  // master được mô phỏng: giấu secret đã chọn, guess(w) trả matches(w, secret)
-  const masterGuess = (word) => matches(word, secret);
+  // master được mô phỏng: giấu secret đã chọn, guess(w) trả match(w, secret)
+  const masterGuess = (word) => match(word, secret);
+  const groupSubs = Array.from({ length: n + 1 }, (_, m) => `m=${m}`);
 
   const steps = [];
   const snap = (options) => steps.push({
@@ -850,20 +879,21 @@ function buildSteps843(input, params = {}) {
   });
 
   const scoreRowsText = (rows, limit = 6) => {
-    const shown = rows.slice(0, limit).map((row) => `${row.cand}=${row.score}`);
+    const shown = rows.slice(0, limit).map((row) => `${row.word}=${row.worst}`);
     return shown.join(" | ") + (rows.length > limit ? ` | … +${rows.length - limit}` : "");
   };
 
   snap({
-    title: { vi: "Định nghĩa matches(a, b)", en: "Define matches(a, b)" },
-    codeLines: [4],
+    title: { vi: "Định nghĩa match(a, b)", en: "Define match(a, b)" },
+    codeLines: [6, 7],
     vars: [
       { name: "wordlist", value: words0.join(", ") },
+      { name: "n", value: n },
       { name: "secret", value: "•••••• (master giữ kín)" },
     ],
     note: {
-      vi: "matches đếm số vị trí i mà a[i] == b[i]. master.guess(w) trả về matches(w, secret) — visualizer mô phỏng master bằng secret bạn chọn.",
-      en: "matches counts positions i where a[i] == b[i]. master.guess(w) returns matches(w, secret) — the visualizer simulates the master with your chosen secret.",
+      vi: "match đếm số vị trí i mà a[i] == b[i]. master.guess(w) trả về match(w, secret) — visualizer mô phỏng master bằng secret bạn chọn.",
+      en: "match counts positions i where a[i] == b[i]. master.guess(w) returns match(w, secret) — the visualizer simulates the master with your chosen secret.",
     },
   });
 
@@ -871,11 +901,11 @@ function buildSteps843(input, params = {}) {
     const exA = words0[0];
     const exB = words0.length > 1 ? words0[1] : words0[0];
     const per = [];
-    for (let k = 0; k < 6; k++) per.push(exA[k] === exB[k] ? 1 : 0);
+    for (let k = 0; k < n; k++) per.push(exA[k] === exB[k] ? 1 : 0);
     const total = per.reduce((a, b) => a + b, 0);
     snap({
-      title: { vi: `Ví dụ: matches("${exA}", "${exB}") = ${total}`, en: `Example: matches("${exA}", "${exB}") = ${total}` },
-      codeLines: [4],
+      title: { vi: `Ví dụ: match("${exA}", "${exB}") = ${total}`, en: `Example: match("${exA}", "${exB}") = ${total}` },
+      codeLines: [7],
       arr: [...per],
       sub: exA.split("").map((ch, k) => `${ch}/${exB[k]}`),
       highlight: per.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
@@ -885,8 +915,8 @@ function buildSteps843(input, params = {}) {
         { name: "zip(a, b)", value: exA.split("").map((ch, k) => `(${ch},${exB[k]})`).join(" ") },
       ],
       note: {
-        vi: `Duyệt 6 vị trí: chỉ cộng 1 khi hai ký tự bằng nhau (cột highlight). Tổng = ${total}. Phép tính O(6) này chạy bên trong hai vòng lặp lồng nhau ở dòng 9–11.`,
-        en: `Scan 6 positions: add 1 only when both characters are equal (highlighted bars). Total = ${total}. This O(6) computation runs inside the two nested loops at lines 9–11.`,
+        vi: `Duyệt ${n} vị trí: chỉ cộng 1 khi hai ký tự bằng nhau (cột highlight). Tổng = ${total}. Phép tính O(${n}) này chạy bên trong hai vòng lặp lồng nhau ở dòng 23–28.`,
+        en: `Scan ${n} positions: add 1 only when both characters are equal (highlighted bars). Total = ${total}. This O(${n}) computation runs inside the two nested loops at lines 23–28.`,
       },
     });
   }
@@ -895,154 +925,161 @@ function buildSteps843(input, params = {}) {
   const guesses = [];
   let found = null;
 
-  for (let round = 1; round <= 10 && !found && candidates.length; round++) {
+  for (let round = 1; round <= 30 && !found && candidates.length; round++) {
     snap({
       title: { vi: `Vòng ${round}: còn ${candidates.length} ứng viên`, en: `Round ${round}: ${candidates.length} candidates` },
-      codeLines: [6],
+      codeLines: [12],
       vars: [
-        { name: "vòng", value: `${round}/10` },
+        { name: "vòng", value: `${round}/30` },
         { name: "ứng viên", value: candidates.join(", ") },
       ],
       note: {
-        vi: "Mỗi vòng được đoán tối đa 1 từ. Chiến lược minimax: chọn từ làm cho nhóm xấu nhất nhỏ nhất.",
-        en: "At most one guess per round. The minimax strategy: pick the word minimizing the worst group.",
+        vi: "Mỗi vòng được đoán tối đa 1 từ (dòng 12). Dòng 13 kiểm tra candidates rỗng — không bao giờ xảy ra với input hợp lệ vì secret luôn sống sót qua bước lọc. Chiến lược minimax: chọn từ làm cho nhóm xấu nhất nhỏ nhất.",
+        en: "At most one guess per round (line 12). Line 13 guards against empty candidates — never triggered on valid inputs because the secret always survives filtering. The minimax strategy: pick the word minimizing the worst group.",
       },
     });
 
     snap({
-      title: { vi: "Đặt lại best cho vòng mới", en: "Reset best for the new round" },
-      codeLines: [7],
-      vars: [{ name: "best, best_score", value: "None, +inf" }],
+      title: { vi: "Đặt lại best_word cho vòng mới", en: "Reset best_word for the new round" },
+      codeLines: [16, 17],
+      vars: [
+        { name: "best_word", value: candidates[0] },
+        { name: "best_score", value: "+inf" },
+        { name: "n", value: n },
+      ],
       note: {
-        vi: "best_score bắt đầu +inf để ứng viên đầu tiên luôn thắng vòng so sánh đầu.",
-        en: "best_score starts at +inf so the first candidate always wins the first comparison.",
+        vi: "Khác bản cũ (None), best_word khởi tạo bằng ứng viên đầu tiên; vòng so sánh đầu luôn có worst ≤ n−1 < +inf nên ứng viên đầu tiên luôn thắng lượt đầu.",
+        en: "Unlike the older version (None), best_word starts as the first candidate; the first comparison always wins since worst ≤ n−1 < +inf.",
       },
     });
 
-    const rows = candidates.map((cand) => {
-      const groups = [[], [], [], [], [], [], []];
-      for (const other of candidates) groups[matches(cand, other)].push(other);
+    const rows = candidates.map((word) => {
+      const groups = Array.from({ length: n + 1 }, () => []);
+      for (const other of candidates) {
+        if (other === word) continue; // dòng 24–25: không so từ với chính nó
+        groups[match(word, other)].push(other);
+      }
       const counts = groups.map((g) => g.length);
-      return { cand, groups, counts, score: Math.max(...counts) };
+      return { word, groups, counts, worst: Math.max(...counts) };
     });
-    let best = null;
+    let bestWord = candidates[0];
     let bestScore = Infinity;
     rows.forEach((row) => {
-      if (row.score < bestScore) {
-        best = row.cand;
-        bestScore = row.score;
+      if (row.worst < bestScore) {
+        bestScore = row.worst;
+        bestWord = row.word;
       }
       snap({
-        title: { vi: `Ứng viên "${row.cand}": worst-group = ${row.score}`, en: `Candidate "${row.cand}": worst-group = ${row.score}` },
-        codeLines: [12],
+        title: { vi: `Ứng viên "${row.word}": worst = ${row.worst}`, en: `Candidate "${row.word}": worst = ${row.worst}` },
+        codeLines: [30],
         arr: [...row.counts],
-        sub: ["m=0", "m=1", "m=2", "m=3", "m=4", "m=5", "m=6"],
-        highlight: [row.counts.indexOf(row.score)],
+        sub: [...groupSubs],
+        highlight: [row.counts.indexOf(row.worst)],
         vars: [
           { name: "groups[số vị trí trùng]", value: `[${row.counts.join(", ")}]` },
           { name: "nhóm chi tiết", value: row.groups.map((g, m) => (g.length ? `m=${m}: [${g.join(", ")}]` : null)).filter(Boolean).join(" · ") || "—" },
-          { name: "score = max(groups)", value: row.score },
-          { name: "best hiện tại", value: `${best} (score ${bestScore})` },
+          { name: "worst = max(groups)", value: row.worst },
+          { name: "best_word hiện tại", value: `${bestWord} (worst ${bestScore})` },
         ],
         note: {
-          vi: `Dòng 9–11: so "${row.cand}" với từng ứng viên còn lại, gom vào 7 nhóm theo số vị trí trùng. Nếu đoán từ này, dù master trả về m nào thì nhóm còn lại lớn nhất cũng chỉ ${row.score} từ (cột highlight).`,
-          en: `Lines 9–11: compare "${row.cand}" against every remaining candidate, bucketing into 7 groups by match count. Guessing this word leaves at most ${row.score} words whichever m the master returns (highlighted bar).`,
+          vi: `Dòng 23–28: so "${row.word}" với từng ứng viên KHÁC (dòng 24–25 bỏ qua chính nó) rồi gom vào ${n + 1} nhóm theo số vị trí trùng — tổng các nhóm = ${candidates.length - 1}. Nếu đoán từ này, dù master trả về m nào thì nhóm còn lại lớn nhất cũng chỉ ${row.worst} từ (cột highlight).`,
+          en: `Lines 23–28: compare "${row.word}" against every OTHER candidate (lines 24–25 skip itself), bucketing into ${n + 1} groups by match count — groups sum to ${candidates.length - 1}. Guessing this word leaves at most ${row.worst} words whichever m the master returns (highlighted bar).`,
         },
       });
     });
 
     {
-      const scores = rows.map((row) => row.score);
-      const bestIdx = rows.findIndex((row) => row.cand === best);
+      const scores = rows.map((row) => row.worst);
+      const bestIdx = rows.findIndex((row) => row.word === bestWord);
       snap({
-        title: { vi: `Minimax: chọn "${best}" (worst-group ${bestScore})`, en: `Minimax: pick "${best}" (worst-group ${bestScore})` },
-        codeLines: [13, 14],
+        title: { vi: `Minimax: chọn "${bestWord}" (worst ${bestScore})`, en: `Minimax: pick "${bestWord}" (worst ${bestScore})` },
+        codeLines: [32, 33, 34],
         arr: [...scores],
-        sub: rows.map((row) => row.cand),
+        sub: rows.map((row) => row.word),
         highlight: [bestIdx],
         vars: [
           { name: "bảng điểm", value: scoreRowsText(rows, rows.length) },
-          { name: "best", value: best },
+          { name: "best_word", value: bestWord },
           { name: "best_score", value: bestScore },
         ],
         note: {
-          vi: `Dòng 13–14 duyệt bảng điểm (mỗi cột là một ứng viên) và giữ từ có worst-group nhỏ nhất — cột highlight. Câu trả lời phỏng vấn: ta tối ưu cho trường hợp XẤU NHẤT của master, nên dù master trả về gì thì số ứng viên còn lại cũng ≤ ${bestScore}.`,
-          en: `Lines 13–14 scan the scoreboard (one bar per candidate) and keep the word with the smallest worst-group — the highlighted bar. The interview answer: we optimize for the master's WORST case, so at most ${bestScore} candidates survive no matter what is returned.`,
+          vi: `Dòng 32–34 duyệt bảng điểm (mỗi cột là một ứng viên) và giữ từ có worst nhỏ nhất — cột highlight. Câu trả lời phỏng vấn: ta tối ưu cho trường hợp XẤU NHẤT của master, nên dù master trả về gì thì số ứng viên còn lại cũng ≤ ${bestScore}.`,
+          en: `Lines 32–34 scan the scoreboard (one bar per candidate) and keep the word with the smallest worst — the highlighted bar. The interview answer: we optimize for the master's WORST case, so at most ${bestScore} candidates survive no matter what is returned.`,
         },
       });
     }
 
-    const bestRow = rows.find((row) => row.cand === best);
-    const x = masterGuess(best);
-    guesses.push(best);
+    const bestRow = rows.find((row) => row.word === bestWord);
+    const result = masterGuess(bestWord);
+    guesses.push(bestWord);
     snap({
-      title: { vi: `master.guess("${best}") → ${x}`, en: `master.guess("${best}") → ${x}` },
-      codeLines: [16],
+      title: { vi: `master.guess("${bestWord}") → ${result}`, en: `master.guess("${bestWord}") → ${result}` },
+      codeLines: [37],
       arr: [...bestRow.counts],
-      sub: ["m=0", "m=1", "m=2", "m=3", "m=4", "m=5", "m=6"],
-      highlight: [x],
+      sub: [...groupSubs],
+      highlight: [result],
       vars: [
-        { name: "guess", value: best },
-        { name: "x = số vị trí trùng", value: x },
-        { name: "nhóm thực tế còn lại", value: `${bestRow.counts[x]} từ` },
+        { name: "best_word", value: bestWord },
+        { name: "result = số vị trí trùng", value: result },
+        { name: "nhóm thực tế còn lại", value: `${bestRow.counts[result]} từ` },
         { name: "scoreboard", value: scoreRowsText(rows) },
       ],
       note: {
-        vi: `Master trả về ${x}: chỉ các từ trùng "${best}" đúng ${x} vị trí mới có thể là secret. Nhóm này ≤ worst-group đã tính.`,
-        en: `The master returns ${x}: only words matching "${best}" in exactly ${x} positions can still be the secret. This group is ≤ the computed worst-group.`,
+        vi: `Master trả về ${result}: chỉ các từ trùng "${bestWord}" đúng ${result} vị trí mới có thể là secret. Nhóm này ≤ worst đã tính ở dòng 30.`,
+        en: `The master returns ${result}: only words matching "${bestWord}" in exactly ${result} positions can still be the secret. This group is ≤ the worst computed at line 30.`,
       },
     });
 
-    if (x === 6) {
-      found = best;
+    if (result === n) {
+      found = bestWord;
       snap({
-        title: { vi: `Tìm thấy "${best}" ở vòng ${round}!`, en: `Found "${best}" in round ${round}!` },
-        codeLines: [18],
+        title: { vi: `Tìm thấy "${bestWord}" ở vòng ${round}!`, en: `Found "${bestWord}" in round ${round}!` },
+        codeLines: [40],
         final: true,
         vars: [
           { name: "secret", value: secret },
           { name: "các lần đoán", value: guesses.join(" → ") },
-          { name: "số vòng đã dùng", value: `${round}/10` },
+          { name: "số vòng đã dùng", value: `${round}/30` },
         ],
         note: {
-          vi: "x == 6 nghĩa là cả 6 vị trí đều trùng — đoán trúng từ bí mật.",
-          en: "x == 6 means all 6 positions match — the secret word is guessed.",
+          vi: `result == n (${n}) nghĩa là cả ${n} vị trí đều trùng — đoán trúng từ bí mật.`,
+          en: `result == n (${n}) means all ${n} positions match — the secret word is guessed.`,
         },
       });
       break;
     }
 
     const before = candidates.length;
-    const pairMatches = candidates.map((word) => ({ word, m: matches(word, best) }));
-    candidates = candidates.filter((word) => matches(word, best) === x);
-    const kept = pairMatches.filter((entry) => entry.m === x).map((entry) => entry.word);
-    const removed = pairMatches.filter((entry) => entry.m !== x).map((entry) => entry.word);
+    const pairMatches = candidates.map((word) => ({ word, m: match(word, bestWord) }));
+    candidates = candidates.filter((word) => match(word, bestWord) === result);
+    const kept = pairMatches.filter((entry) => entry.m === result).map((entry) => entry.word);
+    const removed = pairMatches.filter((entry) => entry.m !== result).map((entry) => entry.word);
     snap({
-      title: { vi: `Lọc: giữ ${kept.length}/${before} từ có matches == ${x}`, en: `Filter: keep ${kept.length}/${before} words with matches == ${x}` },
-      codeLines: [19],
+      title: { vi: `Lọc: giữ ${kept.length}/${before} từ có match == ${result}`, en: `Filter: keep ${kept.length}/${before} words with match == ${result}` },
+      codeLines: [43],
       arr: pairMatches.map((entry) => entry.m),
       sub: pairMatches.map((entry) => entry.word),
-      highlight: pairMatches.map((entry, i) => (entry.m === x ? i : -1)).filter((i) => i >= 0),
+      highlight: pairMatches.map((entry, i) => (entry.m === result ? i : -1)).filter((i) => i >= 0),
       vars: [
         { name: "giữ lại", value: kept.join(", ") || "—" },
         { name: "loại bỏ", value: removed.join(", ") || "—" },
       ],
       note: {
-        vi: `Dòng 19 tính matches(w, "${best}") cho từng từ (mỗi cột một từ) và chỉ giữ nhóm m = ${x} được highlight — vì nếu secret là w thì master đã phải trả đúng ${x}. Nhờ minimax, nhóm sống sót luôn ≤ ${bestScore}.`,
-        en: `Line 19 computes matches(w, "${best}") for every word (one bar per word) and keeps only the highlighted m = ${x} group — had the secret been w, the master would have returned exactly ${x}. Thanks to minimax, the surviving group is always ≤ ${bestScore}.`,
+        vi: `Dòng 43–46 tính match(w, "${bestWord}") cho từng từ (mỗi cột một từ) và chỉ giữ nhóm m = ${result} được highlight — vì nếu secret là w thì master đã phải trả đúng ${result}. Nhờ minimax, nhóm sống sót luôn ≤ ${bestScore}.`,
+        en: `Lines 43–46 compute match(w, "${bestWord}") for every word (one bar per word) and keep only the highlighted m = ${result} group — had the secret been w, the master would have returned exactly ${result}. Thanks to minimax, the surviving group is always ≤ ${bestScore}.`,
       },
     });
   }
 
   if (!found) {
     snap({
-      title: { vi: "Hết 10 vòng mà chưa tìm ra", en: "Out of guesses" },
-      codeLines: [6],
+      title: { vi: "Hết 30 vòng mà chưa tìm ra", en: "Out of guesses" },
+      codeLines: [12],
       final: true,
       vars: [{ name: "secret", value: secret }],
       note: {
-        vi: "Với chiến lược minimax, trường hợp này không xảy ra với input hợp lệ (n ≤ 100).",
-        en: "With the minimax strategy this never happens on valid inputs (n ≤ 100).",
+        vi: "Với chiến lược minimax, trường hợp này không xảy ra với input hợp lệ.",
+        en: "With the minimax strategy this never happens on valid inputs.",
       },
     });
   }
@@ -1137,12 +1174,12 @@ module.exports = {
   },
   843: {
     id: 843, difficulty: "hard", slug: "guess-the-word", category: STRING, tags: [STRING, MINIMAX],
-    title: { vi: "Đoán từ", en: "Guess the Word" }, titleVi: { vi: "Minimax đoán từ bí mật trong 10 lượt", en: "Minimax the secret word within 10 guesses" },
-    statement: { vi: "Cho wordlist gồm các từ 6 chữ cái phân biệt, một từ được master giấu kín. Mỗi lượt gọi master.guess(w) trả về số vị trí trùng với từ bí mật (tối đa 10 lượt). Tìm từ bí mật.", en: "Given a wordlist of distinct 6-letter words, the master hides one. Each turn, master.guess(w) returns the number of matching positions with the secret (at most 10 turns). Find the secret word." },
+    title: { vi: "Đoán từ", en: "Guess the Word" }, titleVi: { vi: "Minimax đoán từ bí mật trong 30 lượt", en: "Minimax the secret word within 30 guesses" },
+    statement: { vi: "Cho wordlist gồm các từ 6 chữ cái phân biệt, một từ được master giấu kín. Mỗi lượt gọi master.guess(w) trả về số vị trí trùng với từ bí mật (tối đa 30 lượt). Tìm từ bí mật.", en: "Given a wordlist of distinct 6-letter words, the master hides one. Each turn, master.guess(w) returns the number of matching positions with the secret (at most 30 turns). Find the secret word." },
     defaultInput: "acckzz,ccbazz,eiowzz,abcczz", inputKind: "string", inputLabel: { vi: "wordlist (cách nhau bởi dấu phẩy)", en: "wordlist (comma separated)" },
     extraParams: [{ key: "secret", type: "string", label: { vi: "từ bí mật (phải có trong wordlist)", en: "secret word (must be in wordlist)" }, default: "acckzz" }],
     approach: [{ vi: "Với mỗi ứng viên, chia các từ còn lại thành 7 nhóm theo số vị trí trùng (0–6); score = kích thước nhóm lớn nhất.", en: "For each candidate, split remaining words into 7 groups by match count (0–6); score = the largest group size." }, { vi: "Đoán từ có score nhỏ nhất (minimax): dù master trả về gì, số ứng viên còn lại cũng ≤ score.", en: "Guess the word with the smallest score (minimax): no matter what the master returns, remaining candidates ≤ score." }, { vi: "Lọc wordlist chỉ giữ từ có đúng x vị trí trùng với từ vừa đoán, lặp lại.", en: "Filter the wordlist to words with exactly x matches against the guess, then repeat." }],
-    complexity: { time: "O(10 · n²)", space: "O(n)", note: { vi: "Mỗi vòng tính matches cho mọi cặp ứng viên (n²); n ≤ 24 trong visualizer.", en: "Each round computes matches for every candidate pair (n²); n ≤ 24 in the visualizer." } },
+    complexity: { time: "O(30 · n²)", space: "O(n)", note: { vi: "Mỗi vòng tính match cho mọi cặp ứng viên (n²); n ≤ 24 trong visualizer.", en: "Each round computes match for every candidate pair (n²); n ≤ 24 in the visualizer." } },
     code: CODE843, builder: buildSteps843,
   },
 };

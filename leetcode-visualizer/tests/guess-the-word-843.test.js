@@ -29,19 +29,19 @@ test('843 finds every possible secret in the default wordlist', () => {
     const result = problem.builder(DEFAULT_WORDS, { secret });
     assert.equal(result.answer, secret, `secret=${secret}`);
     assert.equal(result.steps.at(-1).final, true);
-    const guesses = result.steps.filter((s) => s.codeLines[0] === 16).length;
-    assert.ok(guesses >= 1 && guesses <= 10, `guesses=${guesses}`);
+    const guesses = result.steps.filter((s) => s.codeLines[0] === 37).length;
+    assert.ok(guesses >= 1 && guesses <= 30, `guesses=${guesses}`);
   }
 });
 
-test('843 minimax finds the secret on random wordlists within 10 guesses', () => {
+test('843 minimax finds the secret on random wordlists within 30 guesses', () => {
   for (let seed = 1; seed <= 15; seed++) {
     const words = makeWords(12, seed);
     const secret = words[(seed * 5) % words.length];
     const result = problem.builder(words.join(','), { secret });
     assert.equal(result.answer, secret, `seed=${seed}`);
-    const guesses = result.steps.filter((s) => s.codeLines[0] === 16).length;
-    assert.ok(guesses <= 10, `seed=${seed} guesses=${guesses}`);
+    const guesses = result.steps.filter((s) => s.codeLines[0] === 37).length;
+    assert.ok(guesses <= 30, `seed=${seed} guesses=${guesses}`);
   }
 });
 
@@ -50,9 +50,9 @@ test('843 trace filters candidates consistently with the master answers', () => 
   const result = problem.builder(DEFAULT_WORDS, { secret });
   let candidates = [...WORDS];
   for (const step of result.steps) {
-    if (step.codeLines[0] !== 16) continue;
-    const guess = step.vars.find((v) => v.name === 'guess').value;
-    const x = step.vars.find((v) => v.name === 'x = số vị trí trùng').value;
+    if (step.codeLines[0] !== 37) continue;
+    const guess = step.vars.find((v) => v.name === 'best_word').value;
+    const x = step.vars.find((v) => v.name === 'result = số vị trí trùng').value;
     assert.equal(x, matches(guess, secret), `guess=${guess}`);
     assert.ok(candidates.includes(guess));
     candidates = candidates.filter((w) => matches(w, guess) === x);
@@ -65,20 +65,20 @@ test('843 minimax picks the candidate with the smallest worst-group', () => {
   const result = problem.builder(DEFAULT_WORDS, { secret: 'abcczz' });
   // First scoring round: every candidate step must show score = max(groups)
   // and the guessed word must be one of the minimal-score candidates.
-  const scoring = result.steps.filter((s) => s.codeLines[0] === 12).slice(0, WORDS.length);
+  const scoring = result.steps.filter((s) => s.codeLines[0] === 30).slice(0, WORDS.length);
   assert.equal(scoring.length, WORDS.length);
   let minScore = Infinity;
   for (const step of scoring) {
-    const score = step.vars.find((v) => v.name === 'score = max(groups)').value;
+    const score = step.vars.find((v) => v.name === 'worst = max(groups)').value;
     const groups = JSON.parse(step.vars.find((v) => v.name === 'groups[số vị trí trùng]').value);
     assert.equal(score, Math.max(...groups));
-    assert.equal(groups.reduce((a, b) => a + b, 0), WORDS.length);
+    assert.equal(groups.reduce((a, b) => a + b, 0), WORDS.length - 1); // skip-self: dòng 24–25
     minScore = Math.min(minScore, score);
   }
-  const guessStep = result.steps.find((s) => s.codeLines[0] === 16);
-  const guess = guessStep.vars.find((v) => v.name === 'guess').value;
+  const guessStep = result.steps.find((s) => s.codeLines[0] === 37);
+  const guess = guessStep.vars.find((v) => v.name === 'best_word').value;
   const guessScore = scoring.find((s) => s.title.en.includes(`"${guess}"`))
-    .vars.find((v) => v.name === 'score = max(groups)').value;
+    .vars.find((v) => v.name === 'worst = max(groups)').value;
   assert.equal(guessScore, minScore);
 });
 
@@ -137,5 +137,5 @@ test('843 is registered under interview with Google-relevant metadata', () => {
   assert.equal(problem.category.key, 'string');
   assert.ok(problem.tags.some((t) => t.key === 'minimax'));
   assert.ok(problem.extraParams.some((p) => p.key === 'secret'));
-  assert.equal(problem.code.length, 19);
+  assert.equal(problem.code.length, 46);
 });
