@@ -25,7 +25,7 @@ const categories = {
   bst: require("./bst"),
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
   heap: Object.assign(require("./heap"), require("./server-heap"), require("./meeting-rooms-iii")),
-  "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations")),
+  "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations"), require("./number-of-good-paths-2421")),
   "linked-list": require("./linked-list"),
   "binary-lifting": Object.assign(require("./binary-lifting"), require("./minimum-edge-weight-equilibrium-queries-2846")),
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
@@ -263,58 +263,4 @@ for (const list of Object.values(COMPANY_LISTS)) {
   }
 }
 
-// ─── 0/1 Knapsack tag ────────────────────────────────────────────────────────
-// Full roster of 24 problems (3 groups A/B/C). Problems that are not yet in
-// SUPPORTED still appear in the catalog as dimmed/unavailable chips so learners
-// can see the complete pattern landscape and track what is still missing.
-//
-// Format: [id, title, difficulty, subGroup]
-//   subGroup is informational only (used in the tab label).
-const KNAPSACK_ROSTER_RAW = [
-  // Nhóm A — kinh điển
-  [416,  "Partition Equal Subset Sum",                              "medium", "A"],
-  [494,  "Target Sum",                                              "medium", "A"],
-  [474,  "Ones and Zeroes",                                         "medium", "A"],
-  [1049, "Last Stone Weight II",                                    "medium", "A"],
-  [2915, "Length of the Longest Subsequence That Sums to Target",  "medium", "A"],
-  [2787, "Ways to Express an Integer as Sum of Powers",            "medium", "A"],
-  [3180, "Maximum Total Reward Using Operations I",                "medium", "A"],
-  [3181, "Maximum Total Reward Using Operations II",               "hard",   "A"],
-  // Nhóm B — Subset / Counting / Partition
-  [698,  "Partition to K Equal Sum Subsets",                       "medium", "B"],
-  [473,  "Matchsticks to Square",                                  "medium", "B"],
-  [2035, "Partition Array Into Two Arrays to Minimize Sum Difference", "hard", "B"],
-  [805,  "Split Array With Same Average",                          "hard",   "B"],
-  [879,  "Profitable Schemes",                                     "hard",   "B"],
-  [2518, "Number of Great Partitions",                             "hard",   "B"],
-  [956,  "Tallest Billboard",                                      "hard",   "B"],
-  [1755, "Closest Subsequence Sum",                                "hard",   "B"],
-  [1774, "Closest Dessert Cost",                                   "medium", "B"],
-  // Nhóm C — biến thể nâng cao
-  [2291, "Maximum Profit From Trading Stocks",                     "medium", "C"],
-  [2218, "Maximum Value of K Coins From Piles",                    "hard",   "C"],
-  [1981, "Minimize the Difference Between Target and Chosen Elements", "medium", "C"],
-  [2742, "Painting the Walls",                                     "hard",   "C"],
-  [2585, "Number of Ways to Earn Points",                          "hard",   "C"],
-  [3082, "Find the Sum of the Power of All Subsequences",          "hard",   "C"],
-  [3333, "Find the Original Typed String II",                      "hard",   "C"],
-];
-
-// Build the subtab structure expected by server.js / app-core.js.
-// We use a single "All" tab so the full list renders in one chip grid,
-// matching the same shape as COMPANY_SUBTABS for code reuse.
-const KNAPSACK_SUBTABS = [
-  {
-    key: "all",
-    vi: "Tất cả",
-    en: "All",
-    roster: KNAPSACK_ROSTER_RAW.map(([id, title, difficulty]) => ({
-      id,
-      title,
-      difficulty,
-      available: Boolean(SUPPORTED[id]),
-    })),
-  },
-];
-
-module.exports = { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG, KNAPSACK_SUBTABS, KNAPSACK_TAG };
+module.exports = { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG };
