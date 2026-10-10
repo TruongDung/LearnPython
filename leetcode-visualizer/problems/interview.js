@@ -14,6 +14,7 @@ const DP = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const BACKTRACKING = { key: "backtracking", vi: "Quay lui", en: "Backtracking" };
 const INTERVAL = { key: "interval", vi: "Khoảng", en: "Interval" };
 const SWEEP = { key: "sweep-line", vi: "Đường quét", en: "Sweep Line" };
+const MINIMAX = { key: "minimax", vi: "Minimax", en: "Minimax" };
 
 function buildSteps2386(input, params = {}) {
   const nums = (Array.isArray(input) ? input : []).map(Number);
@@ -761,6 +762,235 @@ function buildSteps9017(input) {
   return { original: events, answer, steps };
 }
 
+// ─── #843: Guess the Word (Google — minimax) ────────────────────────────────
+// Chuẩn phỏng vấn: mỗi vòng chọn từ làm cho NHÓM XẤU NHẤT nhỏ nhất có thể.
+// Nhóm = các từ còn lại có cùng số vị trí trùng với từ đoán; minimax đảm bảo
+// tập ứng viên co nhanh dù master trả về kết quả nào.
+
+const WORD843_RE = /^[a-z]{6}$/;
+const MAX_WORDS843 = 24;
+
+const CODE843 = [
+  "class Solution:",
+  "    def findSecretWord(self, words, master):",
+  "        def matches(a, b):",
+  "            return sum(x == y for x, y in zip(a, b))",
+  "",
+  "        for _ in range(10):",
+  "            best, best_score = None, float(\"inf\")",
+  "            for cand in words:",
+  "                groups = [0] * 7",
+  "                for other in words:",
+  "                    groups[matches(cand, other)] += 1",
+  "                score = max(groups)",
+  "                if score < best_score:",
+  "                    best, best_score = cand, score",
+  "",
+  "            x = master.guess(best)",
+  "            if x == 6:",
+  "                return",
+  "            words = [w for w in words if matches(w, best) == x]",
+];
+
+function parseWordlist843(input) {
+  let raw;
+  if (Array.isArray(input)) {
+    raw = input;
+  } else {
+    const text = String(input ?? "").trim();
+    if (!text) throw new Error("wordlist không được rỗng");
+    if (text.startsWith("[")) {
+      try {
+        raw = JSON.parse(text);
+      } catch (_error) {
+        throw new Error("wordlist JSON phải là mảng các chuỗi");
+      }
+    } else {
+      raw = text.split(",").map((word) => word.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > MAX_WORDS843) {
+    throw new Error(`wordlist cần 1–${MAX_WORDS843} từ phân biệt`);
+  }
+  const words = raw.map((word) => String(word).trim().toLowerCase());
+  const seen = new Set();
+  for (const word of words) {
+    if (!WORD843_RE.test(word)) throw new Error(`"${word}" phải gồm đúng 6 chữ cái a-z`);
+    if (seen.has(word)) throw new Error(`từ "${word}" bị trùng trong wordlist`);
+    seen.add(word);
+  }
+  return words;
+}
+
+function buildSteps843(input, params = {}) {
+  const words0 = parseWordlist843(input);
+  const secret = String(params.secret ?? "acckzz").trim().toLowerCase();
+  if (!WORD843_RE.test(secret)) throw new Error("secret phải gồm đúng 6 chữ cái a-z");
+  if (!words0.includes(secret)) throw new Error("secret phải nằm trong wordlist (master chỉ giấu từ có trong list)");
+
+  const matches = (a, b) => {
+    let count = 0;
+    for (let k = 0; k < 6; k++) if (a[k] === b[k]) count++;
+    return count;
+  };
+  // master được mô phỏng: giấu secret đã chọn, guess(w) trả matches(w, secret)
+  const masterGuess = (word) => matches(word, secret);
+
+  const steps = [];
+  const snap = (options) => steps.push({
+    title: options.title,
+    arr: options.arr || [],
+    highlight: options.highlight || [],
+    mark: options.mark || [],
+    final: Boolean(options.final),
+    codeLines: options.codeLines || [],
+    vars: options.vars || [],
+    note: options.note,
+  });
+
+  const scoreRowsText = (rows, limit = 6) => {
+    const shown = rows.slice(0, limit).map((row) => `${row.cand}=${row.score}`);
+    return shown.join(" | ") + (rows.length > limit ? ` | … +${rows.length - limit}` : "");
+  };
+
+  snap({
+    title: { vi: "Định nghĩa matches(a, b)", en: "Define matches(a, b)" },
+    codeLines: [4],
+    vars: [
+      { name: "wordlist", value: words0.join(", ") },
+      { name: "secret", value: "•••••• (master giữ kín)" },
+    ],
+    note: {
+      vi: "matches đếm số vị trí i mà a[i] == b[i]. master.guess(w) trả về matches(w, secret) — visualizer mô phỏng master bằng secret bạn chọn.",
+      en: "matches counts positions i where a[i] == b[i]. master.guess(w) returns matches(w, secret) — the visualizer simulates the master with your chosen secret.",
+    },
+  });
+
+  let candidates = [...words0];
+  let found = null;
+
+  for (let round = 1; round <= 10 && !found && candidates.length; round++) {
+    snap({
+      title: { vi: `Vòng ${round}: còn ${candidates.length} ứng viên`, en: `Round ${round}: ${candidates.length} candidates` },
+      codeLines: [6],
+      vars: [
+        { name: "vòng", value: `${round}/10` },
+        { name: "ứng viên", value: candidates.join(", ") },
+      ],
+      note: {
+        vi: "Mỗi vòng được đoán tối đa 1 từ. Chiến lược minimax: chọn từ làm cho nhóm xấu nhất nhỏ nhất.",
+        en: "At most one guess per round. The minimax strategy: pick the word minimizing the worst group.",
+      },
+    });
+
+    snap({
+      title: { vi: "Đặt lại best cho vòng mới", en: "Reset best for the new round" },
+      codeLines: [7],
+      vars: [{ name: "best, best_score", value: "None, +inf" }],
+      note: {
+        vi: "best_score bắt đầu +inf để ứng viên đầu tiên luôn thắng vòng so sánh đầu.",
+        en: "best_score starts at +inf so the first candidate always wins the first comparison.",
+      },
+    });
+
+    const rows = candidates.map((cand) => {
+      const groups = [0, 0, 0, 0, 0, 0, 0];
+      for (const other of candidates) groups[matches(cand, other)]++;
+      return { cand, groups, score: Math.max(...groups) };
+    });
+    let best = null;
+    let bestScore = Infinity;
+    rows.forEach((row) => {
+      if (row.score < bestScore) {
+        best = row.cand;
+        bestScore = row.score;
+      }
+      snap({
+        title: { vi: `Ứng viên "${row.cand}": worst-group = ${row.score}`, en: `Candidate "${row.cand}": worst-group = ${row.score}` },
+        codeLines: [12],
+        arr: [...row.groups],
+        highlight: [row.groups.indexOf(row.score)],
+        vars: [
+          { name: "groups[số vị trí trùng]", value: `[${row.groups.join(", ")}]` },
+          { name: "score = max(groups)", value: row.score },
+          { name: "best hiện tại", value: `${best} (score ${bestScore})` },
+        ],
+        note: {
+          vi: `Nếu đoán "${row.cand}", dù master trả về bao nhiêu thì nhóm còn lại lớn nhất cũng chỉ ${row.score} từ (cột được highlight). Chọn worst-group nhỏ nhất.`,
+          en: `Guessing "${row.cand}" leaves at most ${row.score} words no matter what the master returns (highlighted bar). Pick the smallest worst-group.`,
+        },
+      });
+    });
+
+    const bestRow = rows.find((row) => row.cand === best);
+    const x = masterGuess(best);
+    snap({
+      title: { vi: `master.guess("${best}") → ${x}`, en: `master.guess("${best}") → ${x}` },
+      codeLines: [16],
+      arr: [...bestRow.groups],
+      highlight: [x],
+      vars: [
+        { name: "guess", value: best },
+        { name: "x = số vị trí trùng", value: x },
+        { name: "nhóm thực tế còn lại", value: `${bestRow.groups[x]} từ` },
+        { name: "scoreboard", value: scoreRowsText(rows) },
+      ],
+      note: {
+        vi: `Master trả về ${x}: chỉ các từ trùng "${best}" đúng ${x} vị trí mới có thể là secret. Nhóm này ≤ worst-group đã tính.`,
+        en: `The master returns ${x}: only words matching "${best}" in exactly ${x} positions can still be the secret. This group is ≤ the computed worst-group.`,
+      },
+    });
+
+    if (x === 6) {
+      found = best;
+      snap({
+        title: { vi: `Tìm thấy "${best}" ở vòng ${round}!`, en: `Found "${best}" in round ${round}!` },
+        codeLines: [18],
+        final: true,
+        vars: [
+          { name: "secret", value: secret },
+          { name: "số vòng đã dùng", value: `${round}/10` },
+        ],
+        note: {
+          vi: "x == 6 nghĩa là cả 6 vị trí đều trùng — đoán trúng từ bí mật.",
+          en: "x == 6 means all 6 positions match — the secret word is guessed.",
+        },
+      });
+      break;
+    }
+
+    const before = candidates.length;
+    candidates = candidates.filter((word) => matches(word, best) === x);
+    snap({
+      title: { vi: `Lọc: ${before} → ${candidates.length} ứng viên`, en: `Filter: ${before} → ${candidates.length} candidates` },
+      codeLines: [19],
+      vars: [
+        { name: "ứng viên còn lại", value: candidates.join(", ") || "—" },
+        { name: "đã loại", value: before - candidates.length },
+      ],
+      note: {
+        vi: `Giữ lại từ có đúng ${x} vị trí trùng với "${best}". Vì đã minimax, tập ứng viên co rất nhanh.`,
+        en: `Keep words with exactly ${x} matches against "${best}". Thanks to minimax, candidates shrink fast.`,
+      },
+    });
+  }
+
+  if (!found) {
+    snap({
+      title: { vi: "Hết 10 vòng mà chưa tìm ra", en: "Out of guesses" },
+      codeLines: [6],
+      final: true,
+      vars: [{ name: "secret", value: secret }],
+      note: {
+        vi: "Với chiến lược minimax, trường hợp này không xảy ra với input hợp lệ (n ≤ 100).",
+        en: "With the minimax strategy this never happens on valid inputs (n ≤ 100).",
+      },
+    });
+  }
+
+  return { original: words0, answer: found, steps };
+}
+
 module.exports = {
   2386: {
     id: 2386, difficulty: "hard", slug: "find-the-k-sum-of-an-array", category: HEAP, tags: [SORTING],
@@ -845,5 +1075,15 @@ module.exports = {
   9017: {
     id: 9017, difficulty: "hard", category: DESIGN, tags: [HASHMAP, FILE_IO], title: { vi: "Ad Promotion Metrics System", en: "Ad Promotion Metrics System" }, titleVi: { vi: "Hệ thống promotion ads", en: "Ads promotion metrics system" }, statement: { vi: "Thiết kế pipeline promotion ads: schema campaign/creative/event, xử lý impression/click/conversion idempotent và tính spend, CTR, CVR. Input: type:campaign:user:cost.", en: "Design an ads-promotion pipeline: campaign/creative/event schema, idempotent impression/click/conversion processing, and spend, CTR, CVR metrics. Input: type:campaign:user:cost." }, defaultInput: "impression:summer:u1:0.05|impression:summer:u2:0.05|click:summer:u1:0.20|conversion:summer:u1:0|impression:winter:u3:0.04", inputKind: "string", inputLabel: { vi: "type:campaign:user:cost (ngăn |)", en: "type:campaign:user:cost (separated by |)" }, extraParams: [],
     approach: [{ vi: "OLTP schema: campaign, creative, budget; append-only event stream lưu delivery và attribution.", en: "OLTP schema: campaign, creative, budget; an append-only event stream stores delivery and attribution." }, { vi: "Idempotency key chống retry double-count; aggregate theo campaign cho dashboard.", en: "Idempotency keys prevent retry double-counting; aggregate by campaign for dashboards." }, { vi: "Track impressions, clicks, conversions, spend, CTR, CVR; alert pacing/budget và event lag.", en: "Track impressions, clicks, conversions, spend, CTR, CVR; alert on pacing/budget and event lag." }], complexity: { time: "O(events) streaming", space: "O(campaigns + dedupe window)", note: { vi: "Dedupe window có TTL; unique reach ở quy mô lớn dùng HyperLogLog hay sketch tương tự.", en: "The dedupe window has a TTL; unique reach at scale uses HyperLogLog or a similar sketch." } }, code: ["def consume(event):", "    if seen(event.id): return  # idempotency", "    mark_seen(event.id)", "    metric = campaign_metrics[event.campaign_id]", "    metric.spend += event.cost", "    if event.type == 'impression': metric.impressions += 1", "    if event.type == 'click': metric.clicks += 1", "    if event.type == 'conversion': metric.conversions += 1", "", "# CTR = clicks / impressions", "# CVR = conversions / clicks", "# persist raw events + daily aggregates"], builder: buildSteps9017,
+  },
+  843: {
+    id: 843, difficulty: "hard", slug: "guess-the-word", category: STRING, tags: [STRING, MINIMAX],
+    title: { vi: "Đoán từ", en: "Guess the Word" }, titleVi: { vi: "Minimax đoán từ bí mật trong 10 lượt", en: "Minimax the secret word within 10 guesses" },
+    statement: { vi: "Cho wordlist gồm các từ 6 chữ cái phân biệt, một từ được master giấu kín. Mỗi lượt gọi master.guess(w) trả về số vị trí trùng với từ bí mật (tối đa 10 lượt). Tìm từ bí mật.", en: "Given a wordlist of distinct 6-letter words, the master hides one. Each turn, master.guess(w) returns the number of matching positions with the secret (at most 10 turns). Find the secret word." },
+    defaultInput: "acckzz,ccbazz,eiowzz,abcczz", inputKind: "string", inputLabel: { vi: "wordlist (cách nhau bởi dấu phẩy)", en: "wordlist (comma separated)" },
+    extraParams: [{ key: "secret", type: "string", label: { vi: "từ bí mật (phải có trong wordlist)", en: "secret word (must be in wordlist)" }, default: "acckzz" }],
+    approach: [{ vi: "Với mỗi ứng viên, chia các từ còn lại thành 7 nhóm theo số vị trí trùng (0–6); score = kích thước nhóm lớn nhất.", en: "For each candidate, split remaining words into 7 groups by match count (0–6); score = the largest group size." }, { vi: "Đoán từ có score nhỏ nhất (minimax): dù master trả về gì, số ứng viên còn lại cũng ≤ score.", en: "Guess the word with the smallest score (minimax): no matter what the master returns, remaining candidates ≤ score." }, { vi: "Lọc wordlist chỉ giữ từ có đúng x vị trí trùng với từ vừa đoán, lặp lại.", en: "Filter the wordlist to words with exactly x matches against the guess, then repeat." }],
+    complexity: { time: "O(10 · n²)", space: "O(n)", note: { vi: "Mỗi vòng tính matches cho mọi cặp ứng viên (n²); n ≤ 24 trong visualizer.", en: "Each round computes matches for every candidate pair (n²); n ≤ 24 in the visualizer." } },
+    code: CODE843, builder: buildSteps843,
   },
 };
