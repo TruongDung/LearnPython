@@ -30,7 +30,7 @@ const categories = {
   "binary-lifting": Object.assign(require("./binary-lifting"), require("./minimum-edge-weight-equilibrium-queries-2846")),
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
-  bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723")),
+  bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723"), require("./wonderful-substrings-1915")),
   design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./lib-register-9019"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./log-system-635"), require("./prefix-suffix-search-745")),
   interview: Object.assign(require("./interview"), require("./requested-visualizations")),
 };
@@ -119,6 +119,7 @@ const COMPANY_LISTS = {
       [253, "Meeting Rooms II", "medium"],
       [834, "Sum of Distances in Tree", "hard"],
       [2846, "Minimum Edge Weight Equilibrium Queries in a Tree", "hard"],
+      [1915, "Number of Wonderful Substrings", "medium"],
       [2386, "Find the K-Sum of an Array", "hard"],
       [9005, "Next Word Predictor", "medium"],
       [9006, "Graph BFS Shortest Path", "medium"],

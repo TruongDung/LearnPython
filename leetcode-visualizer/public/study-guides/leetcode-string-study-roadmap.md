@@ -464,7 +464,7 @@ Quản lý chỉ số, ký tự, prefix; phân biệt nối chuỗi với sửa 
 | 331 | [1737. Change Minimum Characters to Satisfy One of Three Conditions](https://leetcode.com/problems/change-minimum-characters-to-satisfy-one-of-three-conditions/) | Medium |  | Chưa |
 | 332 | [1781. Sum of Beauty of All Substrings](https://leetcode.com/problems/sum-of-beauty-of-all-substrings/) | Medium |  | Chưa |
 | 333 | [1807. Evaluate the Bracket Pairs of a String](https://leetcode.com/problems/evaluate-the-bracket-pairs-of-a-string/) | Medium |  | Chưa |
-| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Chưa |
+| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Có |
 | 335 | [1930. Unique Length-3 Palindromic Subsequences](https://leetcode.com/problems/unique-length-3-palindromic-subsequences/) | Medium |  | Chưa |
 | 336 | [2023. Number of Pairs of Strings With Concatenation Equal to Target](https://leetcode.com/problems/number-of-pairs-of-strings-with-concatenation-equal-to-target/) | Medium |  | Chưa |
 | 337 | [2083. Substrings That Begin and End With the Same Letter](https://leetcode.com/problems/substrings-that-begin-and-end-with-the-same-letter/) | Medium | 🔒 | Chưa |

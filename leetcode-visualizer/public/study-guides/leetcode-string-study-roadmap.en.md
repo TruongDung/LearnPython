@@ -464,7 +464,7 @@ Count frequencies, build one-to-one mappings and group strings by signatures.
 | 331 | [1737. Change Minimum Characters to Satisfy One of Three Conditions](https://leetcode.com/problems/change-minimum-characters-to-satisfy-one-of-three-conditions/) | Medium |  | Not yet |
 | 332 | [1781. Sum of Beauty of All Substrings](https://leetcode.com/problems/sum-of-beauty-of-all-substrings/) | Medium |  | Not yet |
 | 333 | [1807. Evaluate the Bracket Pairs of a String](https://leetcode.com/problems/evaluate-the-bracket-pairs-of-a-string/) | Medium |  | Not yet |
-| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Not yet |
+| 334 | [1915. Number of Wonderful Substrings](https://leetcode.com/problems/number-of-wonderful-substrings/) | Medium |  | Available |
 | 335 | [1930. Unique Length-3 Palindromic Subsequences](https://leetcode.com/problems/unique-length-3-palindromic-subsequences/) | Medium |  | Not yet |
 | 336 | [2023. Number of Pairs of Strings With Concatenation Equal to Target](https://leetcode.com/problems/number-of-pairs-of-strings-with-concatenation-equal-to-target/) | Medium |  | Not yet |
 | 337 | [2083. Substrings That Begin and End With the Same Letter](https://leetcode.com/problems/substrings-that-begin-and-end-with-the-same-letter/) | Medium | 🔒 | Not yet |
