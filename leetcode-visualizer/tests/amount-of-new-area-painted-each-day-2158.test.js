@@ -114,5 +114,6 @@ test('2158 is registered under interview with Google-relevant metadata', () => {
   assert.equal(problem.difficulty, 'hard');
   assert.equal(problem.category.key, 'interval');
   assert.ok(problem.tags.some((t) => t.key === 'sweep-line'));
+  assert.equal(problem.premium, true);
   assert.equal(problem.code.length, 20);
 });

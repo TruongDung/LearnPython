@@ -1411,6 +1411,7 @@ module.exports = {
   },
   2158: {
     id: 2158, difficulty: "hard", slug: "amount-of-new-area-painted-each-day", category: INTERVAL, tags: [INTERVAL, SWEEP],
+    premium: true,
     title: { vi: "Diện tích mới sơn mỗi ngày", en: "Amount of New Area Painted Each Day" }, titleVi: { vi: "Sơn đoạn mỗi ngày, tính diện tích mới", en: "Paint segments daily, count the new area" },
     statement: { vi: "Mỗi ngày i sơn đoạn half-open [start_i, end_i). Trả về mảng mà phần tử i là diện tích MỚI được sơn trong ngày i (phần đã sơn trước đó không tính).", en: "Each day i paints the half-open segment [start_i, end_i). Return an array where element i is the NEW area painted on day i (previously painted area doesn't count)." },
     defaultInput: "1-4,4-7,1-7", inputKind: "string", inputLabel: { vi: "các đoạn start-end (cách nhau bởi dấu phẩy)", en: "start-end segments (comma separated)" },
