@@ -864,6 +864,8 @@ function buildSteps843(input, params = {}) {
   // master được mô phỏng: giấu secret đã chọn, guess(w) trả match(w, secret)
   const masterGuess = (word) => match(word, secret);
   const groupSubs = Array.from({ length: n + 1 }, (_, m) => `m=${m}`);
+  let candidates = [...words0];
+  const guessHistory = [];
 
   const steps = [];
   const snap = (options) => steps.push({
@@ -876,6 +878,16 @@ function buildSteps843(input, params = {}) {
     codeLines: options.codeLines || [],
     vars: options.vars || [],
     note: options.note,
+    guessWord843View: {
+      words: [...words0],
+      secret,
+      phase: "intro",
+      round: 0,
+      candidates: [...candidates],
+      history: guessHistory.map((entry) => ({ ...entry })),
+      scoreRows: [],
+      ...options.view,
+    },
   });
 
   const scoreRowsText = (rows, limit = 6) => {
@@ -895,6 +907,7 @@ function buildSteps843(input, params = {}) {
       vi: "match đếm số vị trí i mà a[i] == b[i]. master.guess(w) trả về match(w, secret) — visualizer mô phỏng master bằng secret bạn chọn.",
       en: "match counts positions i where a[i] == b[i]. master.guess(w) returns match(w, secret) — the visualizer simulates the master with your chosen secret.",
     },
+    view: { phase: "intro" },
   });
 
   {
@@ -918,10 +931,13 @@ function buildSteps843(input, params = {}) {
         vi: `Duyệt ${n} vị trí: chỉ cộng 1 khi hai ký tự bằng nhau (cột highlight). Tổng = ${total}. Phép tính O(${n}) này chạy bên trong hai vòng lặp lồng nhau ở dòng 23–28.`,
         en: `Scan ${n} positions: add 1 only when both characters are equal (highlighted bars). Total = ${total}. This O(${n}) computation runs inside the two nested loops at lines 23–28.`,
       },
+      view: {
+        phase: "match-example",
+        comparison: { left: exA, right: exB, result: total, revealRight: true },
+      },
     });
   }
 
-  let candidates = [...words0];
   const guesses = [];
   let found = null;
 
@@ -937,6 +953,7 @@ function buildSteps843(input, params = {}) {
         vi: "Mỗi vòng được đoán tối đa 1 từ (dòng 12). Dòng 13 kiểm tra candidates rỗng — không bao giờ xảy ra với input hợp lệ vì secret luôn sống sót qua bước lọc. Chiến lược minimax: chọn từ làm cho nhóm xấu nhất nhỏ nhất.",
         en: "At most one guess per round (line 12). Line 13 guards against empty candidates — never triggered on valid inputs because the secret always survives filtering. The minimax strategy: pick the word minimizing the worst group.",
       },
+      view: { phase: "round", round, candidates: [...candidates] },
     });
 
     snap({
@@ -951,6 +968,7 @@ function buildSteps843(input, params = {}) {
         vi: "Khác bản cũ (None), best_word khởi tạo bằng ứng viên đầu tiên; vòng so sánh đầu luôn có worst ≤ n−1 < +inf nên ứng viên đầu tiên luôn thắng lượt đầu.",
         en: "Unlike the older version (None), best_word starts as the first candidate; the first comparison always wins since worst ≤ n−1 < +inf.",
       },
+      view: { phase: "round", round, candidates: [...candidates], bestWord: candidates[0] },
     });
 
     const rows = candidates.map((word) => {
@@ -964,6 +982,12 @@ function buildSteps843(input, params = {}) {
     });
     let bestWord = candidates[0];
     let bestScore = Infinity;
+    const scoreRows = rows.map((row) => ({
+      word: row.word,
+      counts: [...row.counts],
+      groups: row.groups.map((group) => [...group]),
+      worst: row.worst,
+    }));
     rows.forEach((row) => {
       if (row.worst < bestScore) {
         bestScore = row.worst;
@@ -984,6 +1008,15 @@ function buildSteps843(input, params = {}) {
         note: {
           vi: `Dòng 23–28: so "${row.word}" với từng ứng viên KHÁC (dòng 24–25 bỏ qua chính nó) rồi gom vào ${n + 1} nhóm theo số vị trí trùng — tổng các nhóm = ${candidates.length - 1}. Nếu đoán từ này, dù master trả về m nào thì nhóm còn lại lớn nhất cũng chỉ ${row.worst} từ (cột highlight).`,
           en: `Lines 23–28: compare "${row.word}" against every OTHER candidate (lines 24–25 skip itself), bucketing into ${n + 1} groups by match count — groups sum to ${candidates.length - 1}. Guessing this word leaves at most ${row.worst} words whichever m the master returns (highlighted bar).`,
+        },
+        view: {
+          phase: "score",
+          round,
+          candidates: [...candidates],
+          scoreRows,
+          activeWord: row.word,
+          bestWord,
+          bestScore,
         },
       });
     });
@@ -1006,12 +1039,28 @@ function buildSteps843(input, params = {}) {
           vi: `Dòng 32–34 duyệt bảng điểm (mỗi cột là một ứng viên) và giữ từ có worst nhỏ nhất — cột highlight. Câu trả lời phỏng vấn: ta tối ưu cho trường hợp XẤU NHẤT của master, nên dù master trả về gì thì số ứng viên còn lại cũng ≤ ${bestScore}.`,
           en: `Lines 32–34 scan the scoreboard (one bar per candidate) and keep the word with the smallest worst — the highlighted bar. The interview answer: we optimize for the master's WORST case, so at most ${bestScore} candidates survive no matter what is returned.`,
         },
+        view: {
+          phase: "choose",
+          round,
+          candidates: [...candidates],
+          scoreRows,
+          activeWord: bestWord,
+          bestWord,
+          bestScore,
+        },
       });
     }
 
     const bestRow = rows.find((row) => row.word === bestWord);
     const result = masterGuess(bestWord);
     guesses.push(bestWord);
+    guessHistory.push({
+      round,
+      guess: bestWord,
+      result,
+      before: candidates.length,
+      after: result === n ? 1 : bestRow.groups[result].length,
+    });
     snap({
       title: { vi: `master.guess("${bestWord}") → ${result}`, en: `master.guess("${bestWord}") → ${result}` },
       codeLines: [37],
@@ -1027,6 +1076,17 @@ function buildSteps843(input, params = {}) {
       note: {
         vi: `Master trả về ${result}: chỉ các từ trùng "${bestWord}" đúng ${result} vị trí mới có thể là secret. Nhóm này ≤ worst đã tính ở dòng 30.`,
         en: `The master returns ${result}: only words matching "${bestWord}" in exactly ${result} positions can still be the secret. This group is ≤ the worst computed at line 30.`,
+      },
+      view: {
+        phase: "guess",
+        round,
+        candidates: [...candidates],
+        scoreRows,
+        activeWord: bestWord,
+        bestWord,
+        bestScore,
+        result,
+        comparison: { left: bestWord, right: secret, result, revealRight: true },
       },
     });
 
@@ -1044,6 +1104,18 @@ function buildSteps843(input, params = {}) {
         note: {
           vi: `result == n (${n}) nghĩa là cả ${n} vị trí đều trùng — đoán trúng từ bí mật.`,
           en: `result == n (${n}) means all ${n} positions match — the secret word is guessed.`,
+        },
+        view: {
+          phase: "found",
+          round,
+          candidates: [bestWord],
+          scoreRows,
+          activeWord: bestWord,
+          bestWord,
+          bestScore,
+          result,
+          found: bestWord,
+          comparison: { left: bestWord, right: secret, result, revealRight: true },
         },
       });
       break;
@@ -1068,6 +1140,21 @@ function buildSteps843(input, params = {}) {
         vi: `Dòng 43–46 tính match(w, "${bestWord}") cho từng từ (mỗi cột một từ) và chỉ giữ nhóm m = ${result} được highlight — vì nếu secret là w thì master đã phải trả đúng ${result}. Nhờ minimax, nhóm sống sót luôn ≤ ${bestScore}.`,
         en: `Lines 43–46 compute match(w, "${bestWord}") for every word (one bar per word) and keep only the highlighted m = ${result} group — had the secret been w, the master would have returned exactly ${result}. Thanks to minimax, the surviving group is always ≤ ${bestScore}.`,
       },
+      view: {
+        phase: "filter",
+        round,
+        candidates: [...candidates],
+        previousCandidates: pairMatches.map((entry) => entry.word),
+        scoreRows,
+        activeWord: bestWord,
+        bestWord,
+        bestScore,
+        result,
+        kept,
+        removed,
+        candidateMatches: pairMatches.map((entry) => ({ ...entry })),
+        comparison: { left: bestWord, right: secret, result, revealRight: true },
+      },
     });
   }
 
@@ -1081,6 +1168,7 @@ function buildSteps843(input, params = {}) {
         vi: "Với chiến lược minimax, trường hợp này không xảy ra với input hợp lệ.",
         en: "With the minimax strategy this never happens on valid inputs.",
       },
+      view: { phase: "failed", candidates: [...candidates] },
     });
   }
 

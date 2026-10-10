@@ -1072,7 +1072,7 @@ Ghép các nền tảng đã học: KMP + DP, rolling hash + binary search, segm
 | 869 | [631. Design Excel Sum Formula](https://leetcode.com/problems/design-excel-sum-formula/) | Hard | 🔒 | Chưa |
 | 870 | [753. Cracking the Safe](https://leetcode.com/problems/cracking-the-safe/) | Hard |  | Có |
 | 871 | [839. Similar String Groups](https://leetcode.com/problems/similar-string-groups/) | Hard |  | Chưa |
-| 872 | [843. Guess the Word](https://leetcode.com/problems/guess-the-word/) | Hard |  | Chưa |
+| 872 | [843. Guess the Word](https://leetcode.com/problems/guess-the-word/) | Hard |  | Có |
 | 873 | [1028. Recover a Tree From Preorder Traversal](https://leetcode.com/problems/recover-a-tree-from-preorder-traversal/) | Hard |  | Chưa |
 | 874 | [1153. String Transforms Into Another String](https://leetcode.com/problems/string-transforms-into-another-string/) | Hard | 🔒 | Chưa |
 | 875 | [1505. Minimum Possible Integer After at Most K Adjacent Swaps On Digits](https://leetcode.com/problems/minimum-possible-integer-after-at-most-k-adjacent-swaps-on-digits/) | Hard |  | Chưa |

@@ -1072,7 +1072,7 @@ Combine the foundations: KMP + DP, rolling hash + binary search, segment trees, 
 | 869 | [631. Design Excel Sum Formula](https://leetcode.com/problems/design-excel-sum-formula/) | Hard | 🔒 | Not yet |
 | 870 | [753. Cracking the Safe](https://leetcode.com/problems/cracking-the-safe/) | Hard |  | Available |
 | 871 | [839. Similar String Groups](https://leetcode.com/problems/similar-string-groups/) | Hard |  | Not yet |
-| 872 | [843. Guess the Word](https://leetcode.com/problems/guess-the-word/) | Hard |  | Not yet |
+| 872 | [843. Guess the Word](https://leetcode.com/problems/guess-the-word/) | Hard |  | Available |
 | 873 | [1028. Recover a Tree From Preorder Traversal](https://leetcode.com/problems/recover-a-tree-from-preorder-traversal/) | Hard |  | Not yet |
 | 874 | [1153. String Transforms Into Another String](https://leetcode.com/problems/string-transforms-into-another-string/) | Hard | 🔒 | Not yet |
 | 875 | [1505. Minimum Possible Integer After at Most K Adjacent Swaps On Digits](https://leetcode.com/problems/minimum-possible-integer-after-at-most-k-adjacent-swaps-on-digits/) | Hard |  | Not yet |

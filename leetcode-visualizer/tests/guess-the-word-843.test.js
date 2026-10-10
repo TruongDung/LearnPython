@@ -1,7 +1,15 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
 const problem = require('../problems').SUPPORTED[843];
+const {
+  JAVASCRIPT_ASSETS,
+  STYLESHEET_ASSETS,
+  readFrontendIndex,
+  readFrontendJavaScript,
+  readFrontendStyles,
+} = require('./helpers/frontend-source');
 
 const DEFAULT_WORDS = 'acckzz,ccbazz,eiowzz,abcczz';
 const WORDS = ['acckzz', 'ccbazz', 'eiowzz', 'abcczz'];
@@ -138,4 +146,42 @@ test('843 is registered under interview with Google-relevant metadata', () => {
   assert.ok(problem.tags.some((t) => t.key === 'minimax'));
   assert.ok(problem.extraParams.some((p) => p.key === 'secret'));
   assert.equal(problem.code.length, 46);
+});
+
+test('843 exposes a dedicated minimax visualization on every trace step', () => {
+  const result = problem.builder(DEFAULT_WORDS, { secret: 'eiowzz' });
+  assert.ok(result.steps.every((step) => step.guessWord843View));
+
+  const score = result.steps.find((step) => step.guessWord843View.phase === 'score');
+  assert.equal(score.guessWord843View.scoreRows.length, WORDS.length);
+  assert.ok(score.guessWord843View.scoreRows.every((row) => row.counts.length === 7));
+
+  const guess = result.steps.find((step) => step.guessWord843View.phase === 'guess');
+  assert.equal(guess.guessWord843View.comparison.right, 'eiowzz');
+  assert.equal(guess.guessWord843View.result, matches(guess.guessWord843View.bestWord, 'eiowzz'));
+
+  const filter = result.steps.find((step) => step.guessWord843View.phase === 'filter');
+  assert.ok(filter.guessWord843View.kept.includes('eiowzz'));
+  assert.equal(filter.guessWord843View.previousCandidates.length,
+    filter.guessWord843View.kept.length + filter.guessWord843View.removed.length);
+});
+
+test('843 dedicated frontend assets are loaded and registered before the app script', () => {
+  assert.ok(JAVASCRIPT_ASSETS.includes('renderer-guess-the-word-843.js'));
+  assert.ok(STYLESHEET_ASSETS.includes('guess-the-word-843.css'));
+
+  const javascript = readFrontendJavaScript();
+  const styles = readFrontendStyles();
+  const index = readFrontendIndex();
+  assert.match(javascript, /function renderGuessTheWord843View\(step\)/);
+  assert.match(javascript, /step\.guessWord843View/);
+  assert.match(javascript, /choose min\(max\(bucket\)\)/);
+  assert.match(styles, /\.gtw843-score-row/);
+  assert.match(styles, /\.gtw843-letter\.match/);
+  assert.ok(index.indexOf('renderer-guess-the-word-843.js') < index.indexOf('script.js?'));
+});
+
+test('843 is marked available in the string study roadmap', () => {
+  const roadmap = fs.readFileSync(require.resolve('../../docs/leetcode-string-study-roadmap.md'), 'utf8');
+  assert.match(roadmap, /\[843\. Guess the Word\]\([^\n]+\) \| Hard \|  \| Có \|/);
 });
