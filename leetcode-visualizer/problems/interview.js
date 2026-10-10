@@ -864,6 +864,8 @@ function buildSteps843(input, params = {}) {
   // master được mô phỏng: giấu secret đã chọn, guess(w) trả match(w, secret)
   const masterGuess = (word) => match(word, secret);
   const groupSubs = Array.from({ length: n + 1 }, (_, m) => `m=${m}`);
+  let candidates = [...words0];
+  const guessHistory = [];
 
   const steps = [];
   const snap = (options) => steps.push({
@@ -876,6 +878,16 @@ function buildSteps843(input, params = {}) {
     codeLines: options.codeLines || [],
     vars: options.vars || [],
     note: options.note,
+    guessWord843View: {
+      words: [...words0],
+      secret,
+      phase: "intro",
+      round: 0,
+      candidates: [...candidates],
+      history: guessHistory.map((entry) => ({ ...entry })),
+      scoreRows: [],
+      ...options.view,
+    },
   });
 
   const scoreRowsText = (rows, limit = 6) => {
@@ -895,6 +907,7 @@ function buildSteps843(input, params = {}) {
       vi: "match đếm số vị trí i mà a[i] == b[i]. master.guess(w) trả về match(w, secret) — visualizer mô phỏng master bằng secret bạn chọn.",
       en: "match counts positions i where a[i] == b[i]. master.guess(w) returns match(w, secret) — the visualizer simulates the master with your chosen secret.",
     },
+    view: { phase: "intro" },
   });
 
   {
@@ -918,10 +931,13 @@ function buildSteps843(input, params = {}) {
         vi: `Duyệt ${n} vị trí: chỉ cộng 1 khi hai ký tự bằng nhau (cột highlight). Tổng = ${total}. Phép tính O(${n}) này chạy bên trong hai vòng lặp lồng nhau ở dòng 23–28.`,
         en: `Scan ${n} positions: add 1 only when both characters are equal (highlighted bars). Total = ${total}. This O(${n}) computation runs inside the two nested loops at lines 23–28.`,
       },
+      view: {
+        phase: "match-example",
+        comparison: { left: exA, right: exB, result: total, revealRight: true },
+      },
     });
   }
 
-  let candidates = [...words0];
   const guesses = [];
   let found = null;
 
@@ -937,6 +953,7 @@ function buildSteps843(input, params = {}) {
         vi: "Mỗi vòng được đoán tối đa 1 từ (dòng 12). Dòng 13 kiểm tra candidates rỗng — không bao giờ xảy ra với input hợp lệ vì secret luôn sống sót qua bước lọc. Chiến lược minimax: chọn từ làm cho nhóm xấu nhất nhỏ nhất.",
         en: "At most one guess per round (line 12). Line 13 guards against empty candidates — never triggered on valid inputs because the secret always survives filtering. The minimax strategy: pick the word minimizing the worst group.",
       },
+      view: { phase: "round", round, candidates: [...candidates] },
     });
 
     snap({
@@ -951,6 +968,7 @@ function buildSteps843(input, params = {}) {
         vi: "Khác bản cũ (None), best_word khởi tạo bằng ứng viên đầu tiên; vòng so sánh đầu luôn có worst ≤ n−1 < +inf nên ứng viên đầu tiên luôn thắng lượt đầu.",
         en: "Unlike the older version (None), best_word starts as the first candidate; the first comparison always wins since worst ≤ n−1 < +inf.",
       },
+      view: { phase: "round", round, candidates: [...candidates], bestWord: candidates[0] },
     });
 
     const rows = candidates.map((word) => {
@@ -964,6 +982,12 @@ function buildSteps843(input, params = {}) {
     });
     let bestWord = candidates[0];
     let bestScore = Infinity;
+    const scoreRows = rows.map((row) => ({
+      word: row.word,
+      counts: [...row.counts],
+      groups: row.groups.map((group) => [...group]),
+      worst: row.worst,
+    }));
     rows.forEach((row) => {
       if (row.worst < bestScore) {
         bestScore = row.worst;
@@ -984,6 +1008,15 @@ function buildSteps843(input, params = {}) {
         note: {
           vi: `Dòng 23–28: so "${row.word}" với từng ứng viên KHÁC (dòng 24–25 bỏ qua chính nó) rồi gom vào ${n + 1} nhóm theo số vị trí trùng — tổng các nhóm = ${candidates.length - 1}. Nếu đoán từ này, dù master trả về m nào thì nhóm còn lại lớn nhất cũng chỉ ${row.worst} từ (cột highlight).`,
           en: `Lines 23–28: compare "${row.word}" against every OTHER candidate (lines 24–25 skip itself), bucketing into ${n + 1} groups by match count — groups sum to ${candidates.length - 1}. Guessing this word leaves at most ${row.worst} words whichever m the master returns (highlighted bar).`,
+        },
+        view: {
+          phase: "score",
+          round,
+          candidates: [...candidates],
+          scoreRows,
+          activeWord: row.word,
+          bestWord,
+          bestScore,
         },
       });
     });
@@ -1006,12 +1039,28 @@ function buildSteps843(input, params = {}) {
           vi: `Dòng 32–34 duyệt bảng điểm (mỗi cột là một ứng viên) và giữ từ có worst nhỏ nhất — cột highlight. Câu trả lời phỏng vấn: ta tối ưu cho trường hợp XẤU NHẤT của master, nên dù master trả về gì thì số ứng viên còn lại cũng ≤ ${bestScore}.`,
           en: `Lines 32–34 scan the scoreboard (one bar per candidate) and keep the word with the smallest worst — the highlighted bar. The interview answer: we optimize for the master's WORST case, so at most ${bestScore} candidates survive no matter what is returned.`,
         },
+        view: {
+          phase: "choose",
+          round,
+          candidates: [...candidates],
+          scoreRows,
+          activeWord: bestWord,
+          bestWord,
+          bestScore,
+        },
       });
     }
 
     const bestRow = rows.find((row) => row.word === bestWord);
     const result = masterGuess(bestWord);
     guesses.push(bestWord);
+    guessHistory.push({
+      round,
+      guess: bestWord,
+      result,
+      before: candidates.length,
+      after: result === n ? 1 : bestRow.groups[result].length,
+    });
     snap({
       title: { vi: `master.guess("${bestWord}") → ${result}`, en: `master.guess("${bestWord}") → ${result}` },
       codeLines: [37],
@@ -1027,6 +1076,17 @@ function buildSteps843(input, params = {}) {
       note: {
         vi: `Master trả về ${result}: chỉ các từ trùng "${bestWord}" đúng ${result} vị trí mới có thể là secret. Nhóm này ≤ worst đã tính ở dòng 30.`,
         en: `The master returns ${result}: only words matching "${bestWord}" in exactly ${result} positions can still be the secret. This group is ≤ the worst computed at line 30.`,
+      },
+      view: {
+        phase: "guess",
+        round,
+        candidates: [...candidates],
+        scoreRows,
+        activeWord: bestWord,
+        bestWord,
+        bestScore,
+        result,
+        comparison: { left: bestWord, right: secret, result, revealRight: true },
       },
     });
 
@@ -1044,6 +1104,18 @@ function buildSteps843(input, params = {}) {
         note: {
           vi: `result == n (${n}) nghĩa là cả ${n} vị trí đều trùng — đoán trúng từ bí mật.`,
           en: `result == n (${n}) means all ${n} positions match — the secret word is guessed.`,
+        },
+        view: {
+          phase: "found",
+          round,
+          candidates: [bestWord],
+          scoreRows,
+          activeWord: bestWord,
+          bestWord,
+          bestScore,
+          result,
+          found: bestWord,
+          comparison: { left: bestWord, right: secret, result, revealRight: true },
         },
       });
       break;
@@ -1068,6 +1140,21 @@ function buildSteps843(input, params = {}) {
         vi: `Dòng 43–46 tính match(w, "${bestWord}") cho từng từ (mỗi cột một từ) và chỉ giữ nhóm m = ${result} được highlight — vì nếu secret là w thì master đã phải trả đúng ${result}. Nhờ minimax, nhóm sống sót luôn ≤ ${bestScore}.`,
         en: `Lines 43–46 compute match(w, "${bestWord}") for every word (one bar per word) and keep only the highlighted m = ${result} group — had the secret been w, the master would have returned exactly ${result}. Thanks to minimax, the surviving group is always ≤ ${bestScore}.`,
       },
+      view: {
+        phase: "filter",
+        round,
+        candidates: [...candidates],
+        previousCandidates: pairMatches.map((entry) => entry.word),
+        scoreRows,
+        activeWord: bestWord,
+        bestWord,
+        bestScore,
+        result,
+        kept,
+        removed,
+        candidateMatches: pairMatches.map((entry) => ({ ...entry })),
+        comparison: { left: bestWord, right: secret, result, revealRight: true },
+      },
     });
   }
 
@@ -1081,6 +1168,7 @@ function buildSteps843(input, params = {}) {
         vi: "Với chiến lược minimax, trường hợp này không xảy ra với input hợp lệ.",
         en: "With the minimax strategy this never happens on valid inputs.",
       },
+      view: { phase: "failed", candidates: [...candidates] },
     });
   }
 
@@ -1088,33 +1176,38 @@ function buildSteps843(input, params = {}) {
 }
 
 // ─── #2158: Amount of New Area Painted Each Day (Google — intervals) ─────────
-// Chuẩn phỏng vấn: giữ painted là các đoạn [s, e) rời nhau, đã sort.
-// Mỗi ngày: new = (e − s) − tổng phần giao với painted, rồi gộp đoạn mới vào.
+// Successor DSU bỏ qua các đơn vị đã sơn: parent[x] trỏ tới đơn vị chưa sơn kế tiếp.
 
 const MAX_PAINT2158 = 16;
 const MAX_UNITS2158 = 64;
+const MAX_TRACE_STEPS2158 = 12000;
 
 const CODE2158 = [
   "class Solution:",
   "    def amountPainted(self, paint):",
-  "        painted = []  # các đoạn [s, e) rời nhau, đã sort",
-  "        ans = []",
-  "        for s, e in paint:",
-  "            new = e - s",
-  "            merged = [s, e]",
-  "            rest = []",
-  "            for ps, pe in painted:",
-  "                if pe <= s or ps >= e:",
-  "                    rest.append([ps, pe])  # rời nhau: giữ nguyên",
-  "                else:",
-  "                    new -= min(pe, e) - max(ps, s)  # trừ phần đã sơn",
-  "                    merged[0] = min(merged[0], ps)",
-  "                    merged[1] = max(merged[1], pe)",
-  "            rest.append(merged)",
-  "            rest.sort()",
-  "            painted = rest",
-  "            ans.append(new)",
-  "        return ans",
+  "        parent = {}",
+  "",
+  "        def find(x):",
+  "            if x not in parent:",
+  "                return x",
+  "",
+  "            parent[x] = find(parent[x])",
+  "            return parent[x]",
+  "",
+  "        res = []",
+  "",
+  "        for start, end in paint:",
+  "            count = 0",
+  "            x = find(start)",
+  "",
+  "            while x < end:",
+  "                count += 1",
+  "                parent[x] = find(x + 1)",
+  "                x = find(x)",
+  "",
+  "            res.append(count)",
+  "",
+  "        return res",
 ];
 
 function parsePaint2158(input) {
@@ -1147,196 +1240,296 @@ function buildSteps2158(input) {
   const lo = Math.min(...segs.map(([s]) => s));
   const hi = Math.max(...segs.map(([, e]) => e));
   const showUnits = hi - lo <= MAX_UNITS2158;
-
+  const paintedUnits = new Set();
+  const firstPaintDay = new Map();
   const steps = [];
-  const snap = (options) => steps.push({
-    title: options.title,
-    arr: options.arr || [],
-    sub: options.sub || [],
-    highlight: options.highlight || [],
-    mark: options.mark || [],
-    final: Boolean(options.final),
-    codeLines: options.codeLines || [],
-    vars: options.vars || [],
-    note: options.note,
-  });
+  const parent = new Map();
+  const res = [];
+  const freshToday = new Set();
+  let currentDay = -1;
+  let start = null, end = null, count = 0, x = null, activeFind = null;
+  let findInput = null, findTarget = null, findResult = null, findHasParent = null;
+  let compression = null, lastPaintedUnit = null, lastSuccessor = null;
+  let traceTruncated = false;
 
-  const fmtSegs = (list) => (list.length ? list.map(([s, e]) => `[${s}, ${e})`).join(", ") : "∅");
-  const unitIndex = (u) => u - lo;
-  const dayIdx = (s, e) => { const idx = []; for (let u = s; u < e; u++) idx.push(unitIndex(u)); return idx; };
-  // Trục đơn vị: 0 = chưa sơn, 1 = đã sơn trước đó, 2 = mới sơn hôm nay.
-  const unitArr = (paintedBefore, freshUnits) => {
-    const arr = [], sub = [];
-    if (!showUnits) return { arr, sub };
-    const freshSet = new Set((freshUnits || []).map(unitIndex));
-    for (let u = lo; u < hi; u++) {
-      const was = paintedBefore.some(([ps, pe]) => ps <= u && u < pe);
-      arr.push(was ? 1 : (freshSet.has(unitIndex(u)) ? 2 : 0));
-      sub.push(String(u));
-    }
-    return { arr, sub };
+  const unitIndex = (unit) => unit - lo;
+  const parentText = () => {
+    const pairs = [...parent.entries()].sort((a, b) => a[0] - b[0]);
+    const shown = pairs.slice(0, 16).map(([from, to]) => `${from}→${to}`);
+    return `{${shown.join(", ")}${pairs.length > shown.length ? `, … (${pairs.length} keys)` : ""}}`;
   };
-
-  {
-    const base = unitArr([], null);
-    snap({
-      title: { vi: "Khởi tạo", en: "Initialize" },
-      codeLines: [2, 3, 4],
-      arr: base.arr, sub: base.sub, highlight: [], mark: [],
-      vars: [
-        { name: "painted", value: "∅ — các đoạn [s, e) rời nhau, đã sort" },
-        { name: "ans", value: "[]" },
-      ],
-      note: {
-        vi: "painted giữ các đoạn đã sơn, luôn rời nhau và đã sort. Mỗi ngày: diện tích MỚI = độ dài đoạn − tổng phần giao với painted, rồi gộp đoạn mới vào painted.",
-        en: "painted keeps painted segments, always disjoint and sorted. Each day: NEW area = segment length − total overlap with painted, then merge the new segment into painted.",
-      },
-    });
-
-    snap({
-      title: { vi: "Cách đọc biểu đồ", en: "How to read the chart" },
-      codeLines: [3],
-      vars: [
-        { name: "cột thấp (0)", value: "đơn vị chưa sơn" },
-        { name: "cột cao (1)", value: "đơn vị đã sơn từ các ngày trước" },
-        { name: "cột cao nhất (2)", value: "đơn vị mới sơn hôm nay — chỉ xuất hiện ở bước gộp" },
-        { name: "viền vàng", value: "vùng đang xét: đoạn sơn hôm nay, phần overlap đang trừ, hoặc đoạn cũ đang kiểm tra" },
-        { name: "viền xanh lá", value: "đơn vị thật sự mới — chính là đáp án của ngày" },
-        { name: "số dưới mỗi cột", value: "tọa độ đơn vị (cột ghi 4 là đơn vị [4, 5))" },
-      ],
-      note: {
-        vi: "Mỗi cột là một đơn vị trên trục số. Đoạn [s, e) là half-open: gồm các đơn vị s..e−1, ví dụ [1, 4) sơn 3 đơn vị 1, 2, 3.",
-        en: "Each bar is one unit on the number line. [s, e) is half-open: it covers units s..e−1, e.g. [1, 4) paints 3 units: 1, 2, 3.",
-      },
-    });
-  }
-
-  const ans = [];
-  let painted = [];
-
-  segs.forEach(([s, e], d) => {
-    const paintedBefore = painted.map(([ps, pe]) => [ps, pe]);
-    const today = dayIdx(s, e);
-    const snapDay = (title, codeLines, vars, note, extra = {}) => {
-      const base = unitArr(paintedBefore, null);
-      snap({ title, codeLines, vars, note, arr: base.arr, sub: base.sub, highlight: today, mark: [], ...extra });
-    };
-
-    snapDay(
-      { vi: `Ngày ${d}: sơn [${s}, ${e})`, en: `Day ${d}: paint [${s}, ${e})` },
-      [5],
-      [
-        { name: "ngày", value: d },
-        { name: "đoạn sơn", value: `[${s}, ${e})` },
-        { name: "painted", value: fmtSegs(paintedBefore) },
-      ],
-      {
-        vi: `[${s}, ${e}) là half-open: sơn các đơn vị ${s}..${e - 1} (vùng highlight). Diện tích mới = số đơn vị trong vùng highlight chưa từng được sơn.`,
-        en: `[${s}, ${e}) is half-open: it paints units ${s}..${e - 1} (highlighted). New area = highlighted units never painted before.`,
-      },
-    );
-
-    let fresh = e - s;
-    let merged = [s, e];
-    const rest = [];
-
-    snapDay(
-      { vi: `new = ${e} − ${s} = ${fresh} (giả sử cả đoạn đều mới)`, en: `new = ${e} − ${s} = ${fresh} (assume all new)` },
-      [6],
-      [
-        { name: "new", value: fresh },
-        { name: "merged", value: `[${merged[0]}, ${merged[1]})` },
-      ],
-      {
-        vi: "Bắt đầu với giả định cả đoạn đều mới; mỗi phần giao với painted sẽ bị trừ ở dòng 13.",
-        en: "Start by assuming the whole segment is new; each overlap with painted is subtracted at line 13.",
-      },
-    );
-
-    for (const [ps, pe] of paintedBefore) {
-      if (pe <= s || ps >= e) {
-        rest.push([ps, pe]);
-        snapDay(
-          { vi: `[${ps}, ${pe}) rời [${s}, ${e}): giữ nguyên`, en: `[${ps}, ${pe}) is disjoint from [${s}, ${e}): keep` },
-          [10, 11],
-          [
-            { name: "xét (vàng)", value: `[${ps}, ${pe})` },
-            { name: "kiểm tra rời nhau", value: `pe ≤ s? ${pe} ≤ ${s} → ${pe <= s ? "đúng" : "sai"} · ps ≥ e? ${ps} ≥ ${e} → ${ps >= e ? "đúng" : "sai"}` },
-            { name: "kết luận", value: "rời nhau — đoạn cũ giữ nguyên trong rest, new không đổi" },
-            { name: "new", value: fresh },
-          ],
-          {
-            vi: "Hai đoạn half-open rời nhau khi pe ≤ s hoặc ps ≥ e: đoạn cũ (vàng) giữ nguyên trong rest, new không đổi.",
-            en: "Two half-open segments are disjoint when pe ≤ s or ps ≥ e: the old segment (amber) stays in rest, new is unchanged.",
-          },
-          { highlight: dayIdx(ps, pe) },
-        );
-      } else {
-        const overlap = Math.min(pe, e) - Math.max(ps, s);
-        const before = fresh;
-        fresh -= overlap;
-        merged = [Math.min(merged[0], ps), Math.max(merged[1], pe)];
-        const ovS = Math.max(ps, s), ovE = Math.min(pe, e);
-        const ovUnits = [];
-        for (let u = ovS; u < ovE; u++) ovUnits.push(u);
-        snapDay(
-          { vi: `Giao [${ps}, ${pe}): trừ overlap ${overlap}`, en: `Overlaps [${ps}, ${pe}): subtract ${overlap}` },
-          [13, 14, 15],
-          [
-            { name: "phần giao (vàng)", value: `[${ovS}, ${ovE}) = đơn vị ${ovUnits.join(", ")}` },
-            { name: "overlap", value: `min(${pe}, ${e}) − max(${ps}, ${s}) = ${overlap}` },
-            { name: "new", value: `${before} − ${overlap} = ${fresh}` },
-            { name: "merged", value: `[${merged[0]}, ${merged[1]})` },
-          ],
-          {
-            vi: `Vùng vàng đã sơn từ trước nên không tính là mới — trừ thẳng khỏi new; đồng thời mở rộng merged để gộp đoạn cũ vào.`,
-            en: `The amber region was already painted, so it is not new — subtract it straight from new; merged is extended to absorb the old segment.`,
-          },
-          { highlight: dayIdx(ovS, ovE) },
-        );
+  const eventName = (line) => ({
+    2: "call", 3: "init-parent", 5: "define-find", 12: "init-result",
+    14: "start-day", 15: "reset-count", 16: "find-start",
+    7: "find-base", 9: "compress-path", 10: "find-return",
+    19: "paint-unit", 20: "link-successor", 21: "jump-next",
+    23: "finish-day", 25: "done",
+  }[line] || (line === 6 ? (findHasParent ? "find-follow" : "find-open")
+    : line === 18 ? (x !== null && end !== null && x < end ? "range-continue" : "range-stop")
+      : "step"));
+  const phaseName = (line) => {
+    if ([2, 3, 5, 12].includes(line)) return "setup";
+    if ([6, 7, 9, 10, 16].includes(line)) return "find";
+    if ([18, 19, 20, 21].includes(line)) return "paint";
+    if ([14, 15, 23].includes(line)) return "day";
+    return line === 25 ? "done" : "trace";
+  };
+  const buildView2158 = (line, final = false, forcedEvent = null) => {
+    const units = [];
+    if (showUnits) {
+      for (let unit = lo; unit < hi; unit++) {
+        units.push({
+          coordinate: unit,
+          nextCoordinate: unit + 1,
+          inToday: start !== null && unit >= start && unit < end,
+          painted: paintedUnits.has(unit),
+          fresh: freshToday.has(unit),
+          firstPaintDay: firstPaintDay.has(unit) ? firstPaintDay.get(unit) : null,
+          parent: parent.has(unit) ? parent.get(unit) : null,
+          current: unit === x,
+          onFindPath: Array.isArray(activeFind) && activeFind.includes(unit),
+        });
       }
     }
-
-    rest.push(merged);
-    rest.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-    painted = rest;
-
-    const freshUnits = [];
-    for (let u = s; u < e; u++) {
-      if (!paintedBefore.some(([ps, pe]) => ps <= u && u < pe)) freshUnits.push(u);
+    const currentOld = showUnits && currentDay >= 0
+      ? units.filter((unit) => unit.inToday && unit.firstPaintDay !== null && unit.firstPaintDay < currentDay).length
+      : null;
+    const currentSpan = start === null ? 0 : end - start;
+    const dayRows = segs.map(([dayStart, dayEnd], day) => {
+      const completed = day < res.length;
+      const active = day === currentDay && !completed;
+      const newArea = completed ? res[day] : active ? count : null;
+      return {
+        day,
+        start: dayStart,
+        end: dayEnd,
+        span: dayEnd - dayStart,
+        status: completed ? "done" : active ? "active" : "upcoming",
+        newArea,
+        oldArea: completed ? dayEnd - dayStart - res[day] : active ? currentOld : null,
+      };
+    });
+    return {
+      problemId: 2158,
+      event: forcedEvent || eventName(line),
+      phase: phaseName(line),
+      line,
+      source: CODE2158[line - 1] || "",
+      lo,
+      hi,
+      showUnits,
+      segments: segs.map(([segmentStart, segmentEnd]) => ({ start: segmentStart, end: segmentEnd })),
+      dayRows,
+      currentDay,
+      start,
+      end,
+      span: currentSpan,
+      count,
+      oldArea: currentOld,
+      remainingArea: currentOld === null ? null : Math.max(0, currentSpan - currentOld - count),
+      x,
+      xInRange: x !== null && end !== null ? x < end : null,
+      units,
+      parentLinks: [...parent.entries()].sort((a, b) => a[0] - b[0]).map(([from, to]) => ({ from, to })),
+      find: {
+        input: findInput,
+        target: findTarget,
+        result: findResult,
+        hasParent: findHasParent,
+        path: activeFind === null ? [] : [...activeFind],
+      },
+      compression: compression ? { ...compression } : null,
+      lastPaintedUnit,
+      lastSuccessor,
+      freshToday: [...freshToday].sort((a, b) => a - b),
+      paintedCount: paintedUnits.size,
+      result: [...res],
+      traceTruncated,
+      final,
+    };
+  };
+  const snap = (line, title, note, final = false) => {
+    if (!final && steps.length >= MAX_TRACE_STEPS2158) {
+      traceTruncated = true;
+      return;
     }
-    const after = unitArr(paintedBefore, freshUnits);
-    const mark = freshUnits.map(unitIndex);
-    snap({
-      title: { vi: `Gộp: painted = ${fmtSegs(painted)}`, en: `Merge: painted = ${fmtSegs(painted)}` },
-      codeLines: [16, 17, 18],
-      arr: after.arr, sub: after.sub, highlight: today, mark,
+    const arr = [], sub = [];
+    if (showUnits) {
+      for (let unit = lo; unit < hi; unit++) {
+        arr.push(freshToday.has(unit) ? 2 : paintedUnits.has(unit) ? 1 : 0);
+        sub.push(String(unit));
+      }
+    }
+    const highlight = showUnits && start !== null && end !== null
+      ? Array.from({ length: end - start }, (_, index) => unitIndex(start + index))
+      : [];
+    const mark = showUnits ? [...freshToday].map(unitIndex) : [];
+    steps.push({
+      title,
+      arr,
+      sub,
+      highlight,
+      mark,
+      final,
+      codeLines: [line],
       vars: [
-        { name: "painted trước", value: fmtSegs(paintedBefore) },
-        { name: "painted sau", value: fmtSegs(painted) },
-        { name: "đơn vị mới (xanh)", value: `${freshUnits.length}` },
+        { name: "ngày", value: currentDay < 0 ? "—" : currentDay },
+        { name: "start, end", value: start === null ? "—" : `[${start}, ${end})` },
+        { name: "count", value: currentDay < 0 ? "—" : count },
+        { name: "x", value: x === null ? "—" : x },
+        { name: "find stack", value: activeFind === null ? "∅" : `[${activeFind.join(" → ")}]` },
+        { name: "parent", value: parentText() },
+        { name: "res", value: JSON.stringify(res) },
+      ],
+      note,
+      paint2158View: buildView2158(line, final),
+    });
+  };
+  const event = (line, titleVi, titleEn, noteVi, noteEn) => snap(
+    line,
+    { vi: titleVi, en: titleEn },
+    { vi: noteVi, en: noteEn },
+  );
+
+  event(2, "Gọi amountPainted", "Call amountPainted",
+    "Bắt đầu xử lý danh sách các đoạn sơn theo thứ tự.", "Start processing paint intervals in order.");
+  event(3, "Khởi tạo parent = {}", "Initialize parent = {}",
+    "parent[x] trỏ tới tọa độ chưa sơn đầu tiên sau x; khóa chưa có nghĩa là x chưa sơn.",
+    "parent[x] points to the first unpainted coordinate after x; a missing key means x is unpainted.");
+  event(5, "Định nghĩa find(x)", "Define find(x)",
+    "find trả về đơn vị chưa sơn đầu tiên từ x; nếu đi qua nhiều liên kết, nó nén đường đi.",
+    "find returns the first unpainted unit at or after x and compresses traversed links.");
+  event(12, "Khởi tạo res = []", "Initialize res = []",
+    "res sẽ lưu diện tích mới của từng ngày.", "res stores the newly painted area for each day.");
+
+  function find(value) {
+    const stack = [];
+    let target = value;
+    findInput = value;
+    findTarget = value;
+    findResult = null;
+    findHasParent = null;
+    compression = null;
+    activeFind = [value];
+    while (true) {
+      activeFind = stack.map((entry) => entry.key).concat(target);
+      const hasParent = parent.has(target);
+      findTarget = target;
+      findHasParent = hasParent;
+      event(6,
+        hasParent ? `parent có khóa ${target}` : `${target} chưa có trong parent`,
+        hasParent ? `parent contains key ${target}` : `${target} is absent from parent`,
+        hasParent ? `parent[${target}] = ${parent.get(target)}; tiếp tục tìm đích.` : `Vì ${target} chưa sơn, find(${target}) trả về chính nó.`,
+        hasParent ? `parent[${target}] = ${parent.get(target)}; follow the link.` : `Since ${target} is unpainted, find(${target}) returns itself.`);
+      if (!hasParent) {
+        findResult = target;
+        event(7, `return ${target}`, `return ${target}`,
+          "Đây là đơn vị chưa sơn đầu tiên trên chuỗi successor.", "This is the first unpainted unit in the successor chain.");
+        break;
+      }
+      stack.push({ key: target });
+      target = parent.get(target);
+    }
+    while (stack.length) {
+      const { key } = stack.pop();
+      activeFind = stack.map((entry) => entry.key).concat(key);
+      compression = { from: key, to: target };
+      event(9, `Nén đường đi: parent[${key}] = ${target}`, `Compress path: parent[${key}] = ${target}`,
+        `Gán trực tiếp ${key} tới đơn vị chưa sơn ${target}.`, `Point ${key} directly to the unpainted unit ${target}.`);
+      parent.set(key, target);
+      event(10, `return parent[${key}] = ${target}`, `return parent[${key}] = ${target}`,
+        "Trả về đích sau khi nén đường đi.", "Return the destination after path compression.");
+    }
+    activeFind = null;
+    findTarget = target;
+    findResult = target;
+    findHasParent = null;
+    return target;
+  }
+
+  for (let day = 0; day < segs.length; day++) {
+    [start, end] = segs[day];
+    currentDay = day;
+    count = 0;
+    x = null;
+    freshToday.clear();
+    findInput = null;
+    findTarget = null;
+    findResult = null;
+    findHasParent = null;
+    compression = null;
+    lastPaintedUnit = null;
+    lastSuccessor = null;
+    event(14, `Ngày ${day}: for start, end = [${start}, ${end})`,
+      `Day ${day}: for start, end = [${start}, ${end})`,
+      "Lấy đoạn sơn hiện tại; các tọa độ thuộc [start, end).", "Take the current half-open interval [start, end).");
+    event(15, "count = 0", "count = 0",
+      "Bắt đầu ngày mới với diện tích mới bằng 0.", "Start this day with zero newly painted area.");
+    event(16, `x = find(${start})`, `x = find(${start})`,
+      "Tìm đơn vị chưa sơn đầu tiên từ start; các đơn vị đã sơn sẽ được bỏ qua.",
+      "Find the first unpainted unit from start; already-painted units are skipped.");
+    x = find(start);
+
+    while (true) {
+      const inRange = x < end;
+      event(18, inRange ? `x = ${x} < ${end}: tiếp tục` : `x = ${x} ≥ ${end}: dừng`,
+        inRange ? `x = ${x} < ${end}: continue` : `x = ${x} ≥ ${end}: stop`,
+        inRange ? "x còn nằm trong đoạn hôm nay, nên đơn vị này sẽ được tính là mới." : "x đã chạm cuối đoạn; vòng lặp hôm nay kết thúc.",
+        inRange ? "x is still inside today's interval, so this unit is new." : "x reached the interval end; today's loop stops.");
+      if (!inRange) break;
+
+      const paintedUnit = x;
+      lastPaintedUnit = paintedUnit;
+      lastSuccessor = null;
+      count += 1;
+      freshToday.add(paintedUnit);
+      paintedUnits.add(paintedUnit);
+      firstPaintDay.set(paintedUnit, day);
+      event(19, `count = ${count}`, `count = ${count}`,
+        `Đơn vị ${paintedUnit} chưa sơn nên tăng diện tích mới lên 1.`,
+        `Unit ${paintedUnit} was unpainted, so add 1 to today's new area.`);
+      event(20, `parent[${paintedUnit}] = find(${paintedUnit + 1})`,
+        `parent[${paintedUnit}] = find(${paintedUnit + 1})`,
+        `Đánh dấu ${paintedUnit} đã sơn bằng cách nối nó tới successor chưa sơn.`,
+        `Mark ${paintedUnit} painted by linking it to its next unpainted successor.`);
+      const successor = find(paintedUnit + 1);
+      lastSuccessor = successor;
+      parent.set(paintedUnit, successor);
+      event(21, `x = find(${paintedUnit})`, `x = find(${paintedUnit})`,
+        "Nhảy tới đơn vị chưa sơn tiếp theo thay vì xét từng đơn vị đã sơn.",
+        "Jump to the next unpainted unit instead of revisiting painted units.");
+      x = find(paintedUnit);
+    }
+
+    res.push(count);
+    event(23, `res.append(${count})`, `res.append(${count})`,
+      `Lưu diện tích mới của ngày ${day} vào kết quả.`, `Append day ${day}'s new area to the result.`);
+  }
+
+  if (traceTruncated) {
+    steps.push({
+      title: {
+        vi: `Đã rút gọn trace sau ${MAX_TRACE_STEPS2158} bước`,
+        en: `Trace compacted after ${MAX_TRACE_STEPS2158} steps`,
+      },
+      arr: [], sub: [], highlight: [], mark: [], final: false,
+      codeLines: [18],
+      vars: [
+        { name: "parent", value: parentText() },
+        { name: "res", value: JSON.stringify(res) },
       ],
       note: {
-        vi: "Thêm merged rồi sort lại: painted vẫn rời nhau và đã sort (dòng 16–18). Cột xanh (mark) là các đơn vị thật sự mới trong ngày.",
-        en: "Append merged and re-sort: painted stays disjoint and sorted (lines 16–18). Green (marked) bars are the truly new units of the day.",
+        vi: "Để tránh tạo trace quá lớn, các lần lặp còn lại được chạy đầy đủ nhưng không tạo thêm bước trung gian.",
+        en: "To keep the trace bounded, remaining iterations still run fully but do not create intermediate steps.",
       },
+      paint2158View: buildView2158(18, false, "trace-truncated"),
     });
-
-    ans.push(fresh);
-    snap({
-      title: { vi: `ans[${d}] = ${fresh}`, en: `ans[${d}] = ${fresh}` },
-      codeLines: [19],
-      arr: after.arr, sub: after.sub, highlight: today, mark,
-      vars: [{ name: "ans", value: `[${ans.join(", ")}]` }],
-      note: {
-        vi: `Ngày ${d} sơn mới ${fresh} đơn vị diện tích.`,
-        en: `Day ${d} paints ${fresh} new units of area.`,
-      },
-      final: d === segs.length - 1,
-    });
-  });
-
-  return { original: segs, answer: ans, steps };
+  }
+  snap(25, { vi: `return ${JSON.stringify(res)}`, en: `return ${JSON.stringify(res)}` }, {
+    vi: "Trả về diện tích mới đã tính cho từng ngày.",
+    en: "Return the newly painted area computed for each day.",
+  }, true);
+  return { original: segs, answer: res, steps };
 }
 
 // ─── #1387: Sort Integers by The Power Value (Google — memoization) ─────────
@@ -1634,11 +1827,11 @@ module.exports = {
     premium: true,
     title: { vi: "Diện tích mới sơn mỗi ngày", en: "Amount of New Area Painted Each Day" }, titleVi: { vi: "Sơn đoạn mỗi ngày, tính diện tích mới", en: "Paint segments daily, count the new area" },
     statement: { vi: "Mỗi ngày i sơn đoạn half-open [start_i, end_i). Trả về mảng mà phần tử i là diện tích MỚI được sơn trong ngày i (phần đã sơn trước đó không tính).", en: "Each day i paints the half-open segment [start_i, end_i). Return an array where element i is the NEW area painted on day i (previously painted area doesn't count)." },
-    defaultInput: "1-4,4-7,1-7", inputKind: "string", inputLabel: { vi: "các đoạn start-end (cách nhau bởi dấu phẩy)", en: "start-end segments (comma separated)" },
+    defaultInput: "1-4,5-8,4-7", inputKind: "string", inputLabel: { vi: "các đoạn start-end (cách nhau bởi dấu phẩy)", en: "start-end segments (comma separated)" },
     extraParams: [],
-    approach: [{ vi: "Giữ painted là danh sách các đoạn [s, e) rời nhau, đã sort.", en: "Keep painted as a list of disjoint, sorted [s, e) segments." }, { vi: "Mỗi ngày: new = (e − s) − tổng phần giao với các đoạn đã sơn.", en: "Each day: new = (e − s) − total overlap with the painted segments." }, { vi: "Gộp đoạn mới với các đoạn giao nhau rồi sort lại để painted luôn rời nhau.", en: "Merge the new segment with every overlapping one and re-sort so painted stays disjoint." }],
-    complexity: { time: "O(n²) demo · O(n log n) với ordered map", space: "O(n)", note: { vi: "Bản visualizer duyệt tuyến tính qua painted để trace rõ từng bước; production dùng TreeMap/bisect để mỗi ngày O(log n).", en: "The visualizer scans painted linearly for a clear trace; production uses a TreeMap/bisect for O(log n) per day." } },
-    code: CODE2158, builder: buildSteps2158,
+    approach: [{ vi: "Xem [x, x + 1) là một ô diện tích. Mỗi ô chỉ được cộng vào đáp án đúng ngày đầu tiên nó được sơn.", en: "Treat [x, x + 1) as one area unit. A unit contributes only on the first day it is painted." }, { vi: "Ô x đã sơn sẽ có mũi tên parent[x] dẫn tới ô có thể còn trống tiếp theo; ô không có mũi tên nghĩa là còn trống.", en: "A painted unit x stores a parent[x] arrow to the next possibly empty unit; no arrow means the unit is empty." }, { vi: "Mỗi ngày lặp 4 bước: tìm ô trống → sơn và tăng count → tạo đường tắt rồi nhảy → lưu count.", en: "Each day repeats four moves: find an empty unit → paint and count it → create a shortcut and jump → save count." }],
+    complexity: { time: "Gần O(total painted units · α(n))", space: "O(total painted units)", note: { vi: "Successor DSU nén đường đi; mỗi đơn vị được sơn tối đa một lần.", en: "Successor DSU uses path compression; each unit is painted at most once." } },
+    code: CODE2158, debugMode: "line-by-line", builder: buildSteps2158,
   },
   1387: {
     id: 1387, difficulty: "medium", slug: "sort-integers-by-the-power-value", category: DP, tags: [DP, HASHMAP, SORTING],

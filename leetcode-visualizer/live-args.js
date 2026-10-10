@@ -503,6 +503,22 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
       );
     }
+    case 1146: {
+      const built = problem.builder(input, params);
+      return designConfig(
+        "SnapshotArray",
+        [built.original.length],
+        built.operations,
+      );
+    }
+    case 2013: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "DetectSquares",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
     case 635: {
       const operations = problem.parseOperations(input);
       return designConfig(

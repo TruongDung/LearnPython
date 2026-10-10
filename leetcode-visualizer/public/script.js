@@ -7,6 +7,27 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.crossword2018View), surface: "treeView", render: (step) => {
+      renderCrosswordPlacement2018View(step);
+    } },
+    { predicate: (step) => Boolean(step.snapshotArray1146View), surface: "treeView", render: (step) => {
+      renderSnapshotArray1146View(step);
+    } },
+    { predicate: (step) => Boolean(step.findReplace833View), surface: "treeView", render: (step) => {
+      renderFindReplace833View(step);
+    } },
+    { predicate: (step) => Boolean(step.removeOnes2128View), surface: "treeView", render: (step) => {
+      renderRemoveOnes2128View(step);
+    } },
+    { predicate: (step) => Boolean(step.detectSquares2013View), surface: "treeView", render: (step) => {
+      renderDetectSquares2013View(step);
+    } },
+    { predicate: (step) => Boolean(step.cookingTime2162View), surface: "treeView", render: (step) => {
+      renderCookingTime2162View(step);
+    } },
+    { predicate: (step) => Boolean(step.countWords2135View), surface: "treeView", render: (step) => {
+      renderCountWords2135View(step);
+    } },
     { predicate: (step) => Boolean(step.guessWord843View), surface: "treeView", render: (step) => {
       renderGuessTheWord843View(step);
     } },

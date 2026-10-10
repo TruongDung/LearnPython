@@ -944,7 +944,7 @@ Chứng minh lựa chọn tham lam; dùng heap hoặc monotonic stack khi cần.
 | 748 | [555. Split Concatenated Strings](https://leetcode.com/problems/split-concatenated-strings/) | Medium | 🔒 | Chưa |
 | 749 | [649. Dota2 Senate](https://leetcode.com/problems/dota2-senate/) | Medium |  | Chưa |
 | 750 | [763. Partition Labels](https://leetcode.com/problems/partition-labels/) | Medium |  | Chưa |
-| 751 | [833. Find And Replace in String](https://leetcode.com/problems/find-and-replace-in-string/) | Medium |  | Chưa |
+| 751 | [833. Find And Replace in String](https://leetcode.com/problems/find-and-replace-in-string/) | Medium |  | Có |
 | 752 | [893. Groups of Special-Equivalent Strings](https://leetcode.com/problems/groups-of-special-equivalent-strings/) | Medium |  | Chưa |
 | 753 | [937. Reorder Data in Log Files](https://leetcode.com/problems/reorder-data-in-log-files/) | Medium |  | Chưa |
 | 754 | [955. Delete Columns to Make Sorted II](https://leetcode.com/problems/delete-columns-to-make-sorted-ii/) | Medium |  | Chưa |
@@ -978,7 +978,7 @@ Chứng minh lựa chọn tham lam; dùng heap hoặc monotonic stack khi cần.
 | 782 | [1946. Largest Number After Mutating Substring](https://leetcode.com/problems/largest-number-after-mutating-substring/) | Medium |  | Chưa |
 | 783 | [1985. Find the Kth Largest Integer in the Array](https://leetcode.com/problems/find-the-kth-largest-integer-in-the-array/) | Medium |  | Chưa |
 | 784 | [2131. Longest Palindrome by Concatenating Two Letter Words](https://leetcode.com/problems/longest-palindrome-by-concatenating-two-letter-words/) | Medium |  | Chưa |
-| 785 | [2135. Count Words Obtained After Adding a Letter](https://leetcode.com/problems/count-words-obtained-after-adding-a-letter/) | Medium |  | Chưa |
+| 785 | [2135. Count Words Obtained After Adding a Letter](https://leetcode.com/problems/count-words-obtained-after-adding-a-letter/) | Medium |  | Có |
 | 786 | [2182. Construct String With Repeat Limit](https://leetcode.com/problems/construct-string-with-repeat-limit/) | Medium |  | Chưa |
 | 787 | [2207. Maximize Number of Subsequences in a String](https://leetcode.com/problems/maximize-number-of-subsequences-in-a-string/) | Medium |  | Chưa |
 | 788 | [2268. Minimum Number of Keypresses](https://leetcode.com/problems/minimum-number-of-keypresses/) | Medium | 🔒 | Chưa |
