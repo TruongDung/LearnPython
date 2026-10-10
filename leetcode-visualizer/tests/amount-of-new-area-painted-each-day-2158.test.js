@@ -195,8 +195,11 @@ test('2158 dedicated renderer is wired, bilingual, and complete for every step',
   context.lang = 'en';
   context.renderAmountPainted2158View(jump);
   const html = elementFor('treeView').innerHTML;
-  assert.match(html, /parent: 8/);
+  assert.match(html, /Jump from 4 straight to 8/);
+  assert.match(html, /4<\/span><i>→<\/i><span>8/);
   assert.match(html, /painted earlier/);
-  assert.match(html, /new today/);
-  assert.match(html, /\[3, 3\]/);
+  assert.match(html, /painted today/);
+  assert.match(html, /units in today&#39;s interval|units in today's interval/);
+  assert.match(html, /newly painted so far/);
+  assert.match(html, /class="is-done">3<\/span><span class="is-done">3/);
 });
