@@ -34,4 +34,3 @@ class Solution:
                 ans = (ans + dfs(r, c)) % MOD
 
         return ans
-

@@ -44,4 +44,3 @@ class Solution:
             print(f"Paths with length {length}: {formatted}.")
 
         return len(paths) % MOD
-
