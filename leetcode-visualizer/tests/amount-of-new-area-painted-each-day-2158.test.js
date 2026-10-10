@@ -48,22 +48,26 @@ test('2158 trace appends answers consistently with brute force', () => {
   const paint = [[1, 4], [4, 7], [1, 7], [2, 5], [0, 9]];
   const result = problem.builder(toInput(paint));
   const expected = brute(paint);
-  const appends = result.steps.filter((s) => s.codeLines[0] === 19);
+  const appends = result.steps.filter((s) => s.codeLines[0] === 23);
   assert.equal(appends.length, paint.length);
   appends.forEach((step, d) => {
-    const ans = JSON.parse(step.vars.find((v) => v.name === 'ans').value);
-    assert.deepEqual(ans, expected.slice(0, d + 1), `day=${d}`);
+    const res = JSON.parse(step.vars.find((v) => v.name === 'res').value);
+    assert.deepEqual(res, expected.slice(0, d + 1), `day=${d}`);
   });
 });
 
-test('2158 trace subtracts exactly the overlapped units', () => {
+test('2158 trace skips painted units with successor links', () => {
   const result = problem.builder('1-4,5-8,4-7');
-  // day 2 paints [4,7): overlaps [1,4)? no (adjacent half-open). overlaps [5,8) by 2 → new = 3-2 = 1
-  const day2 = result.steps.filter((s) => s.title.vi.startsWith('Ngày 2'));
-  const overlapSteps = result.steps.filter((s) => s.codeLines[0] === 13);
-  const day2Overlap = overlapSteps.filter((s) => s.vars.some((v) => v.name === 'new' && String(v.value).endsWith('= 1')));
-  assert.ok(day2Overlap.length >= 1, 'day 2 must subtract overlap down to new=1');
-  assert.ok(day2.length >= 1);
+  assert.deepEqual(result.answer, [3, 3, 1]);
+  assert.ok(result.steps.some((step) => (
+    step.codeLines[0] === 18
+    && step.title.vi === 'x = 8 ≥ 7: dừng'
+    && step.vars.find((v) => v.name === 'count').value === 1
+  )));
+  assert.ok(result.steps.some((step) => (
+    step.codeLines[0] === 10
+    && step.title.en === 'return parent[4] = 8'
+  )));
 });
 
 test('2158 validates paint input without silently accepting bad segments', () => {
@@ -101,11 +105,13 @@ test('2158 trace stays within the displayed source', () => {
   assert.ok(result.steps.length > 5);
   for (const step of result.steps) {
     assert.ok(step.codeLines.length >= 1);
+    assert.equal(step.codeLines.length, 1);
     assert.ok(step.codeLines.every((line) => line >= 1 && line <= problem.code.length));
     assert.ok(step.title.vi && step.title.en);
     assert.ok(step.note.vi && step.note.en);
   }
   assert.equal(result.steps.filter((s) => s.final).length, 1);
+  assert.equal(result.steps.at(-1).codeLines[0], 25);
 });
 
 test('2158 is registered under interview with Google-relevant metadata', () => {
@@ -115,5 +121,6 @@ test('2158 is registered under interview with Google-relevant metadata', () => {
   assert.equal(problem.category.key, 'interval');
   assert.ok(problem.tags.some((t) => t.key === 'sweep-line'));
   assert.equal(problem.premium, true);
-  assert.equal(problem.code.length, 20);
+  assert.equal(problem.debugMode, 'line-by-line');
+  assert.equal(problem.code.length, 25);
 });
