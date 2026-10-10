@@ -52,6 +52,21 @@ const BITMASK_IDS = new Set([
   78, 136, 191, 231, 268, 318, 338, 461, 476, 526, 693, 698, 868,
   1125, 1342, 1799, 1879, 2220,
 ]);
+const KNAPSACK_TAG = { key: "0-1-knapsack", vi: "Balo 0/1", en: "0/1 Knapsack" };
+// Problems with a built visualization that belong to the 0/1 Knapsack pattern.
+// Add more IDs here as new visualizations are built.
+const KNAPSACK_IDS = new Set([
+  // Nhóm A — kinh điển
+  416,  // Partition Equal Subset Sum
+  494,  // Target Sum
+  474,  // Ones and Zeroes
+  1049, // Last Stone Weight II
+  // Nhóm B — Subset / Counting / Partition
+  698,  // Partition to K Equal Sum Subsets
+  879,  // Profitable Schemes
+  // Nhóm C — biến thể nâng cao
+  2218, // Maximum Value of K Coins From Piles
+]);
 
 // ─── Company tag ────────────────────────────────────────────────────────────
 // One top-level "Company" group that the catalog renders with a sub-tab per
@@ -187,6 +202,15 @@ for (const id of BITMASK_IDS) {
   const tags = Array.isArray(problem.tags) ? problem.tags : [];
   if (!tags.some((tag) => tag && tag.key === BITMASK_TAG.key)) {
     problem.tags = [...tags, BITMASK_TAG];
+  }
+}
+
+for (const id of KNAPSACK_IDS) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some((tag) => tag && tag.key === KNAPSACK_TAG.key)) {
+    problem.tags = [...tags, KNAPSACK_TAG];
   }
 }
 
