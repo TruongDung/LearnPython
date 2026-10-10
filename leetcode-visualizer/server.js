@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG } = require("./problems");
+const { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG, KNAPSACK_SUBTABS, KNAPSACK_TAG } = require("./problems");
 const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
 const PREMIUM_PROBLEM_IDS = new Set([
@@ -91,6 +91,47 @@ app.get("/api/problems", (req, res) => {
     companyGroup.problems.sort((a, b) => a.id - b.id);
     groups.push(companyGroup);
     companyGroup.subTabs = (COMPANY_SUBTABS || []).map((tab) => {
+      const roster = (tab.roster || []).map((entry) => ({
+        ...entry,
+        premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
+      }));
+      return {
+        key: tab.key,
+        vi: tab.vi,
+        en: tab.en,
+        roster,
+        count: roster.filter((entry) => entry.available).length,
+        total: roster.length,
+      };
+    });
+  }
+
+  // The 0/1 Knapsack group is built the same way as the Company group: it uses
+  // a roster so the catalog can show all 24 pattern problems — including those
+  // not yet implemented — as dimmed chips.
+  const knapsackGroup = (KNAPSACK_SUBTABS || []).length
+    ? { key: KNAPSACK_TAG.key, vi: KNAPSACK_TAG.vi, en: KNAPSACK_TAG.en, problems: [] }
+    : null;
+  if (knapsackGroup) {
+    const seenIds = new Set();
+    for (const tab of KNAPSACK_SUBTABS) {
+      for (const entry of tab.roster || []) {
+        const p = SUPPORTED[entry.id];
+        if (!p || seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        knapsackGroup.problems.push({
+          id: p.id,
+          title: p.title,
+          titleVi: p.titleVi,
+          difficulty: p.difficulty || null,
+          premium: isPremium(p),
+          tags: Array.isArray(p.tags) ? p.tags : [],
+        });
+      }
+    }
+    knapsackGroup.problems.sort((a, b) => a.id - b.id);
+    groups.push(knapsackGroup);
+    knapsackGroup.subTabs = (KNAPSACK_SUBTABS || []).map((tab) => {
       const roster = (tab.roster || []).map((entry) => ({
         ...entry,
         premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
