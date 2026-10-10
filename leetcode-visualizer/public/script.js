@@ -100,6 +100,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.equalSubset416View), surface: "treeView", render: (step) => {
       renderEqualSubset416View(step);
     } },
+    { predicate: (step) => Boolean(step.longestSubsequence2915View), surface: "treeView", render: (step) => {
+      renderLongestSubsequence2915View(step);
+    } },
     { predicate: (step) => Boolean(step.disappearedNumbers448View), surface: "treeView", render: (step) => {
       renderDisappearedNumbers448View(step);
     } },

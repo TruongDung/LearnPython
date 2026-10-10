@@ -161,6 +161,7 @@ test('2158 dedicated renderer is wired, bilingual, and complete for every step',
   assert.match(index, /renderer-amount-painted-2158\.js/);
   assert.match(index, /amount-painted-2158\.css/);
   assert.match(styles, /\.ap2158-number-line/);
+  assert.match(styles, /body:has\(\.ap2158-viz\) #codePanel\s*\{[^}]*max-height:\s*none;[^}]*overflow-y:\s*hidden;/s);
   assert.match(script, /paint2158View/);
 
   const start = script.indexOf('const AP2158_COPY');

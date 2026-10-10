@@ -21,8 +21,8 @@ test("Dynamic Programming uses one canonical dp key across categories and tags",
     assert.equal(new Set(tagKeys).size, tagKeys.length, `problem ${problem.id} has duplicate tag keys`);
   }
 
-  assert.equal(dpProblemIds.size, 138);
-  for (const id of [787, 975, 1723, 1928, 2050, 2172, 2328, 2713, 2876, 2945, 3117, 3414]) {
+  assert.equal(dpProblemIds.size, 139);
+  for (const id of [787, 975, 1723, 1928, 2050, 2172, 2328, 2713, 2876, 2915, 2945, 3117, 3414]) {
     const problem = SUPPORTED[id];
     assert.ok(problem, `problem ${id} should be registered`);
     assert.ok(

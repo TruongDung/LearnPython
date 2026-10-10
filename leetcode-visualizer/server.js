@@ -8,7 +8,16 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG, KNAPSACK_SUBTABS, KNAPSACK_TAG } = require("./problems");
+const {
+  SUPPORTED,
+  CATEGORY_ORDER,
+  COMPANY_SUBTABS,
+  COMPANY_TAG,
+  KNAPSACK_SUBTABS,
+  KNAPSACK_TAG,
+  KNAPSACK_ORDER_LABEL,
+  KNAPSACK_GUIDE,
+} = require("./problems");
 const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
 const PREMIUM_PROBLEM_IDS = new Set([
@@ -109,11 +118,16 @@ app.get("/api/problems", (req, res) => {
   // The 0/1 Knapsack group is built the same way as the Company group: it uses
   // a roster so the catalog can show all 24 pattern problems — including those
   // not yet implemented — as dimmed chips.
+  const existingKnapsackGroup = groups.find((group) => group.key === KNAPSACK_TAG.key);
   const knapsackGroup = (KNAPSACK_SUBTABS || []).length
-    ? { key: KNAPSACK_TAG.key, vi: KNAPSACK_TAG.vi, en: KNAPSACK_TAG.en, problems: [] }
+    ? existingKnapsackGroup || { key: KNAPSACK_TAG.key, vi: KNAPSACK_TAG.vi, en: KNAPSACK_TAG.en, problems: [] }
     : null;
   if (knapsackGroup) {
-    const seenIds = new Set();
+    knapsackGroup.vi = KNAPSACK_TAG.vi;
+    knapsackGroup.en = KNAPSACK_TAG.en;
+    knapsackGroup.recommendedOrderLabel = KNAPSACK_ORDER_LABEL;
+    knapsackGroup.guide = KNAPSACK_GUIDE;
+    const seenIds = new Set(knapsackGroup.problems.map((problem) => problem.id));
     for (const tab of KNAPSACK_SUBTABS) {
       for (const entry of tab.roster || []) {
         const p = SUPPORTED[entry.id];
@@ -130,7 +144,7 @@ app.get("/api/problems", (req, res) => {
       }
     }
     knapsackGroup.problems.sort((a, b) => a.id - b.id);
-    groups.push(knapsackGroup);
+    if (!existingKnapsackGroup) groups.push(knapsackGroup);
     knapsackGroup.subTabs = (KNAPSACK_SUBTABS || []).map((tab) => {
       const roster = (tab.roster || []).map((entry) => ({
         ...entry,

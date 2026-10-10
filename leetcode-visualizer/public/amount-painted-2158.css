@@ -16,6 +16,12 @@
   border-radius: 18px;
   container-type: inline-size;
 }
+
+/* Show the complete #2158 snippet without a nested vertical scrollbar. */
+body:has(.ap2158-viz) #codePanel {
+  max-height: none;
+  overflow-y: hidden;
+}
 .ap2158-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .ap2158-header p { margin: 0 0 5px; color: var(--ap-find); font: 700 .7rem/1.2 ui-monospace, monospace; letter-spacing: .08em; }
 .ap2158-header h3 { margin: 0; font-size: clamp(1rem, 2.4vw, 1.35rem); }

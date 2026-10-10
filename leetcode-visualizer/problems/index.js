@@ -11,7 +11,7 @@
 // can statically detect and include all category files.
 
 const categories = {
-  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./valid-parentheses-path-2267"), require("./hard-dp-visualizations"), require("./hard-dp-3117"), require("./increasing-paths-2328"), require("./increasing-cells-2713")),
+  dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./longest-subsequence-target-2915"), require("./valid-parentheses-path-2267"), require("./hard-dp-visualizations"), require("./hard-dp-3117"), require("./increasing-paths-2328"), require("./increasing-cells-2713")),
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610"), require("./hard-range-visualizations"), require("./vowel-substrings-3306"), require("./distinct-triplets-1876")),
   graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699")),
   math: require("./math"),
@@ -61,6 +61,7 @@ const KNAPSACK_IDS = new Set([
   494,  // Target Sum
   474,  // Ones and Zeroes
   1049, // Last Stone Weight II
+  2915, // Length of the Longest Subsequence That Sums to Target
   // Nhóm B — Subset / Counting / Partition
   698,  // Partition to K Equal Sum Subsets
   879,  // Profitable Schemes
@@ -214,19 +215,24 @@ for (const id of KNAPSACK_IDS) {
   }
 }
 
-// `dp` is the canonical key for Dynamic Programming. A few focused modules
-// historically used `dynamic-programming`, which made the catalog render two
-// groups with the same visible label. Normalize both categories and tags here
-// so future modules cannot accidentally split the group again.
+// Keep aliases from splitting one visible catalog label into multiple groups.
+// `dp` and `0-1-knapsack` are the canonical keys for their respective topics.
 for (const problem of Object.values(SUPPORTED)) {
   if (!problem || typeof problem !== "object") continue;
   if (problem.category && ["dp", "dynamic-programming"].includes(problem.category.key)) {
     problem.category = DP_TAG;
   }
+  if (problem.category && ["knapsack", "0-1-knapsack"].includes(problem.category.key)) {
+    problem.category = KNAPSACK_TAG;
+  }
   if (!Array.isArray(problem.tags)) continue;
   const seenTagKeys = new Set();
   problem.tags = problem.tags
-    .map((tag) => tag && ["dp", "dynamic-programming"].includes(tag.key) ? DP_TAG : tag)
+    .map((tag) => {
+      if (tag && ["dp", "dynamic-programming"].includes(tag.key)) return DP_TAG;
+      if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
+      return tag;
+    })
     .filter((tag) => {
       if (!tag || !tag.key || seenTagKeys.has(tag.key)) return false;
       seenTagKeys.add(tag.key);
@@ -263,39 +269,168 @@ for (const list of Object.values(COMPANY_LISTS)) {
   }
 }
 
-// ─── 0/1 Knapsack full roster ────────────────────────────────────────────────
-// 24 problems across 3 groups. Entries whose id is not in SUPPORTED still
-// appear in the catalog as dimmed/unavailable chips.
+// ─── 0/1 Knapsack learning path ──────────────────────────────────────────────
+// 24 problems ordered from the core take/skip recurrence through counting,
+// grouped choices, richer partition states, and advanced optimizations.
+// Entries whose id is not in SUPPORTED still appear as dimmed catalog chips.
 // Format: [id, title, difficulty]
 const KNAPSACK_ROSTER_RAW = [
-  // Nhóm A — kinh điển
+  // Stage 1 — Core one-dimensional take/skip
   [416,  "Partition Equal Subset Sum",                                      "medium"],
-  [494,  "Target Sum",                                                       "medium"],
-  [474,  "Ones and Zeroes",                                                  "medium"],
   [1049, "Last Stone Weight II",                                             "medium"],
+  [494,  "Target Sum",                                                       "medium"],
   [2915, "Length of the Longest Subsequence That Sums to Target",           "medium"],
+  // Stage 2 — Counting and extra dimensions
+  [474,  "Ones and Zeroes",                                                  "medium"],
   [2787, "Ways to Express an Integer as Sum of Powers",                     "medium"],
-  [3180, "Maximum Total Reward Using Operations I",                         "medium"],
-  [3181, "Maximum Total Reward Using Operations II",                        "hard"],
-  // Nhóm B — Subset / Counting / Partition
-  [698,  "Partition to K Equal Sum Subsets",                                "medium"],
-  [473,  "Matchsticks to Square",                                           "medium"],
-  [2035, "Partition Array Into Two Arrays to Minimize Sum Difference",      "hard"],
-  [805,  "Split Array With Same Average",                                   "hard"],
   [879,  "Profitable Schemes",                                              "hard"],
   [2518, "Number of Great Partitions",                                      "hard"],
-  [956,  "Tallest Billboard",                                               "hard"],
-  [1755, "Closest Subsequence Sum",                                         "hard"],
+  [2585, "Number of Ways to Earn Points",                                   "hard"],
+  // Stage 3 — Bounded and grouped choices
   [1774, "Closest Dessert Cost",                                            "medium"],
-  // Nhóm C — biến thể nâng cao
   [2291, "Maximum Profit From Trading Stocks",                              "medium"],
   [2218, "Maximum Value of K Coins From Piles",                            "hard"],
   [1981, "Minimize the Difference Between Target and Chosen Elements",      "medium"],
-  [2742, "Painting the Walls",                                              "hard"],
-  [2585, "Number of Ways to Earn Points",                                   "hard"],
-  [3082, "Find the Sum of the Power of All Subsequences",                   "hard"],
   [3333, "Find the Original Typed String II",                               "hard"],
+  // Stage 4 — Richer partition state
+  [473,  "Matchsticks to Square",                                           "medium"],
+  [698,  "Partition to K Equal Sum Subsets",                                "medium"],
+  [805,  "Split Array With Same Average",                                   "hard"],
+  [956,  "Tallest Billboard",                                               "hard"],
+  // Stage 5 — Advanced optimization
+  [2742, "Painting the Walls",                                              "hard"],
+  [3082, "Find the Sum of the Power of All Subsequences",                   "hard"],
+  [3180, "Maximum Total Reward Using Operations I",                         "medium"],
+  [3181, "Maximum Total Reward Using Operations II",                        "hard"],
+  [1755, "Closest Subsequence Sum",                                         "hard"],
+  [2035, "Partition Array Into Two Arrays to Minimize Sum Difference",      "hard"],
 ];
+
+const KNAPSACK_ORDER_LABEL = {
+  vi: "Lộ trình 0/1 Knapsack: nền tảng → đếm & nhiều chiều → lựa chọn theo nhóm → partition → tối ưu nâng cao",
+  en: "0/1 Knapsack path: foundations → counting & dimensions → grouped choices → partition → advanced optimization",
+};
+
+const KNAPSACK_GUIDE = {
+  vi: {
+    intro:
+      "Học theo 24 bài dưới đây. Trước tiên hãy thuộc invariant cốt lõi: mỗi món chỉ được dùng tối đa một lần, nên khi tối ưu DP theo capacity phải duyệt capacity từ lớn xuống nhỏ. Sau đó mới mở rộng state, số cách chọn và kỹ thuật tối ưu.",
+    patterns: [
+      { id: 416, name: "Partition Equal Subset Sum", pattern: "Boolean subset sum · nền tảng" },
+      { id: 1049, name: "Last Stone Weight II", pattern: "Subset gần total / 2 nhất" },
+      { id: 494, name: "Target Sum", pattern: "Biến đổi dấu ± thành đếm subset" },
+      { id: 2915, name: "Longest Subsequence That Sums to Target", pattern: "Exact sum · tối đa số món" },
+      { id: 474, name: "Ones and Zeroes", pattern: "0/1 Knapsack hai capacity" },
+      { id: 2787, name: "Ways to Express an Integer as Sum of Powers", pattern: "Đếm subset với item sinh trước" },
+      { id: 879, name: "Profitable Schemes", pattern: "Hai chiều · profit được cap" },
+      { id: 2518, name: "Number of Great Partitions", pattern: "Đếm phần bù của partition xấu" },
+      { id: 2585, name: "Number of Ways to Earn Points", pattern: "Bounded knapsack · đếm cách" },
+      { id: 1774, name: "Closest Dessert Cost", pattern: "Mỗi item dùng 0/1/2 lần" },
+      { id: 2291, name: "Maximum Profit From Trading Stocks", pattern: "Budget → tối đa profit" },
+      { id: 2218, name: "Maximum Value of K Coins From Piles", pattern: "Group knapsack · chọn prefix" },
+      { id: 1981, name: "Minimize the Difference", pattern: "Chọn đúng một item mỗi hàng" },
+      { id: 3333, name: "Find the Original Typed String II", pattern: "Bounded choices + prefix sum" },
+      { id: 473, name: "Matchsticks to Square", pattern: "Partition thành 4 bucket" },
+      { id: 698, name: "Partition to K Equal Sum Subsets", pattern: "Partition k bucket · memo/bitmask" },
+      { id: 805, name: "Split Array With Same Average", pattern: "Subset theo cả count và sum" },
+      { id: 956, name: "Tallest Billboard", pattern: "DP theo hiệu hai phía" },
+      { id: 2742, name: "Painting the Walls", pattern: "Đổi bài toán thành capacity được bù" },
+      { id: 3082, name: "Sum of the Power of All Subsequences", pattern: "Contribution DP + combinatorics" },
+      { id: 3180, name: "Maximum Total Reward I", pattern: "Reachability có điều kiện" },
+      { id: 3181, name: "Maximum Total Reward II", pattern: "Bitset-optimized reachability" },
+      { id: 1755, name: "Closest Subsequence Sum", pattern: "Meet-in-the-middle subset sums" },
+      { id: 2035, name: "Partition Array Into Two Arrays", pattern: "Meet-in-the-middle theo cardinality" },
+    ],
+    stages: [
+      {
+        title: "Giai đoạn 1 — Thuộc công thức Take / Skip",
+        description: "Tự viết được dp[s] dạng boolean, max và count; giải thích vì sao vòng capacity phải chạy giảm dần để không dùng lại cùng một item.",
+        problems: [416, 1049, 494, 2915],
+      },
+      {
+        title: "Giai đoạn 2 — Đếm cách và mở rộng chiều",
+        description: "Thêm capacity thứ hai, state profit bị cap và số lượng mỗi loại; phân biệt boolean DP, optimization DP và counting DP.",
+        problems: [474, 2787, 879, 2518, 2585],
+      },
+      {
+        title: "Giai đoạn 3 — Bounded và Group Knapsack",
+        description: "Mỗi nhóm có nhiều lựa chọn nhưng chỉ được chốt một phương án: 0/1/2 món, một giao dịch, một prefix hoặc đúng một phần tử mỗi hàng.",
+        problems: [1774, 2291, 2218, 1981, 3333],
+      },
+      {
+        title: "Giai đoạn 4 — Partition với state giàu hơn",
+        description: "State không còn chỉ là một tổng: theo dõi bucket, số phần tử đã chọn hoặc chênh lệch giữa hai phía.",
+        problems: [473, 698, 805, 956],
+      },
+      {
+        title: "Giai đoạn 5 — Tối ưu hóa nâng cao",
+        description: "Học biến đổi capacity, contribution DP, bitset và meet-in-the-middle khi tổng hoặc n vượt giới hạn của DP cổ điển.",
+        problems: [2742, 3082, 3180, 3181, 1755, 2035],
+      },
+    ],
+    conclusion:
+      "Sau lộ trình này, bạn nên nhận ra bốn câu hỏi trước khi code: item dùng được mấy lần, state cần lưu gì, thứ tự duyệt capacity ra sao, và constraint có buộc dùng bitset hoặc meet-in-the-middle hay không.",
+  },
+  en: {
+    intro:
+      "Work through these 24 problems in order. First internalize the core invariant: each item may be used at most once, so a space-optimized capacity loop must run from high to low. Then extend the state, count choices, and learn the major optimizations.",
+    patterns: [
+      { id: 416, name: "Partition Equal Subset Sum", pattern: "Boolean subset sum · foundation" },
+      { id: 1049, name: "Last Stone Weight II", pattern: "Subset closest to total / 2" },
+      { id: 494, name: "Target Sum", pattern: "Transform ± signs into subset counting" },
+      { id: 2915, name: "Longest Subsequence That Sums to Target", pattern: "Exact sum · maximize item count" },
+      { id: 474, name: "Ones and Zeroes", pattern: "Two-capacity 0/1 Knapsack" },
+      { id: 2787, name: "Ways to Express an Integer as Sum of Powers", pattern: "Count subsets of generated items" },
+      { id: 879, name: "Profitable Schemes", pattern: "Two dimensions · capped profit" },
+      { id: 2518, name: "Number of Great Partitions", pattern: "Count the complement of bad partitions" },
+      { id: 2585, name: "Number of Ways to Earn Points", pattern: "Bounded knapsack · count ways" },
+      { id: 1774, name: "Closest Dessert Cost", pattern: "Use each item zero, one, or two times" },
+      { id: 2291, name: "Maximum Profit From Trading Stocks", pattern: "Budget → maximize profit" },
+      { id: 2218, name: "Maximum Value of K Coins From Piles", pattern: "Group knapsack · choose a prefix" },
+      { id: 1981, name: "Minimize the Difference", pattern: "Choose exactly one item per row" },
+      { id: 3333, name: "Find the Original Typed String II", pattern: "Bounded choices + prefix sums" },
+      { id: 473, name: "Matchsticks to Square", pattern: "Partition into four buckets" },
+      { id: 698, name: "Partition to K Equal Sum Subsets", pattern: "K buckets · memo/bitmask" },
+      { id: 805, name: "Split Array With Same Average", pattern: "Subset by both count and sum" },
+      { id: 956, name: "Tallest Billboard", pattern: "DP on the difference between sides" },
+      { id: 2742, name: "Painting the Walls", pattern: "Transform into compensated capacity" },
+      { id: 3082, name: "Sum of the Power of All Subsequences", pattern: "Contribution DP + combinatorics" },
+      { id: 3180, name: "Maximum Total Reward I", pattern: "Conditional reachability" },
+      { id: 3181, name: "Maximum Total Reward II", pattern: "Bitset-optimized reachability" },
+      { id: 1755, name: "Closest Subsequence Sum", pattern: "Meet-in-the-middle subset sums" },
+      { id: 2035, name: "Partition Array Into Two Arrays", pattern: "Meet-in-the-middle by cardinality" },
+    ],
+    stages: [
+      {
+        title: "Stage 1 — Master the Take / Skip recurrence",
+        description: "Write boolean, maximum, and counting forms of dp[s], and explain why capacity runs backward to avoid reusing the current item.",
+        problems: [416, 1049, 494, 2915],
+      },
+      {
+        title: "Stage 2 — Count ways and add dimensions",
+        description: "Add a second capacity, capped profit, and bounded quantities; distinguish feasibility, optimization, and counting DP.",
+        problems: [474, 2787, 879, 2518, 2585],
+      },
+      {
+        title: "Stage 3 — Bounded and Group Knapsack",
+        description: "A group offers several choices but only one decision is committed: zero/one/two items, one trade, one prefix, or one value per row.",
+        problems: [1774, 2291, 2218, 1981, 3333],
+      },
+      {
+        title: "Stage 4 — Partition with richer state",
+        description: "The state is no longer only a sum: track buckets, selected cardinality, or the difference between two sides.",
+        problems: [473, 698, 805, 956],
+      },
+      {
+        title: "Stage 5 — Advanced optimization",
+        description: "Learn capacity transformations, contribution DP, bitsets, and meet-in-the-middle when classic pseudo-polynomial DP no longer fits.",
+        problems: [2742, 3082, 3180, 3181, 1755, 2035],
+      },
+    ],
+    conclusion:
+      "After this path, ask four questions before coding: how often may each item be used, what must the state remember, which direction should capacity iterate, and do the constraints require a bitset or meet-in-the-middle approach?",
+  },
+};
 
 // Single "All" tab — same shape as COMPANY_SUBTABS so server.js / app-core.js
 // can reuse the same subTabs rendering path.
@@ -313,4 +448,13 @@ const KNAPSACK_SUBTABS = [
   },
 ];
 
-module.exports = { SUPPORTED, CATEGORY_ORDER, COMPANY_SUBTABS, COMPANY_TAG, KNAPSACK_SUBTABS, KNAPSACK_TAG };
+module.exports = {
+  SUPPORTED,
+  CATEGORY_ORDER,
+  COMPANY_SUBTABS,
+  COMPANY_TAG,
+  KNAPSACK_SUBTABS,
+  KNAPSACK_TAG,
+  KNAPSACK_ORDER_LABEL,
+  KNAPSACK_GUIDE,
+};
