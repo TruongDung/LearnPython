@@ -831,7 +831,7 @@ Viết rõ ý nghĩa trạng thái và base case; xử lý DP một chuỗi, hai
 | 642 | [712. Minimum ASCII Delete Sum for Two Strings](https://leetcode.com/problems/minimum-ascii-delete-sum-for-two-strings/) | Medium |  | Có |
 | 643 | [838. Push Dominoes](https://leetcode.com/problems/push-dominoes/) | Medium |  | Chưa |
 | 644 | [926. Flip String to Monotone Increasing](https://leetcode.com/problems/flip-string-to-monotone-increasing/) | Medium |  | Chưa |
-| 645 | [1048. Longest String Chain](https://leetcode.com/problems/longest-string-chain/) | Medium |  | Chưa |
+| 645 | [1048. Longest String Chain](https://leetcode.com/problems/longest-string-chain/) | Medium |  | Có |
 | 646 | [1525. Number of Good Ways to Split a String](https://leetcode.com/problems/number-of-good-ways-to-split-a-string/) | Medium |  | Chưa |
 | 647 | [1578. Minimum Time to Make Rope Colorful](https://leetcode.com/problems/minimum-time-to-make-rope-colorful/) | Medium |  | Chưa |
 | 648 | [1638. Count Substrings That Differ by One Character](https://leetcode.com/problems/count-substrings-that-differ-by-one-character/) | Medium |  | Chưa |

@@ -831,7 +831,7 @@ Define states and base cases clearly; use DP on one string, two strings and inte
 | 642 | [712. Minimum ASCII Delete Sum for Two Strings](https://leetcode.com/problems/minimum-ascii-delete-sum-for-two-strings/) | Medium |  | Available |
 | 643 | [838. Push Dominoes](https://leetcode.com/problems/push-dominoes/) | Medium |  | Not yet |
 | 644 | [926. Flip String to Monotone Increasing](https://leetcode.com/problems/flip-string-to-monotone-increasing/) | Medium |  | Not yet |
-| 645 | [1048. Longest String Chain](https://leetcode.com/problems/longest-string-chain/) | Medium |  | Not yet |
+| 645 | [1048. Longest String Chain](https://leetcode.com/problems/longest-string-chain/) | Medium |  | Available |
 | 646 | [1525. Number of Good Ways to Split a String](https://leetcode.com/problems/number-of-good-ways-to-split-a-string/) | Medium |  | Not yet |
 | 647 | [1578. Minimum Time to Make Rope Colorful](https://leetcode.com/problems/minimum-time-to-make-rope-colorful/) | Medium |  | Not yet |
 | 648 | [1638. Count Substrings That Differ by One Character](https://leetcode.com/problems/count-substrings-that-differ-by-one-character/) | Medium |  | Not yet |

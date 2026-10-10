@@ -7,6 +7,15 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.kSum2386View), surface: "treeView", render: (step) => {
+      renderKSum2386View(step);
+    } },
+    { predicate: (step) => Boolean(step.stringChain1048View), surface: "treeView", render: (step) => {
+      renderLongestStringChain1048View(step);
+    } },
+    { predicate: (step) => Boolean(step.stockPrice2034View), surface: "treeView", render: (step) => {
+      renderStockPrice2034View(step);
+    } },
     { predicate: (step) => Boolean(step.crossword2018View), surface: "treeView", render: (step) => {
       renderCrosswordPlacement2018View(step);
     } },

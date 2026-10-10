@@ -503,6 +503,14 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
       );
     }
+    case 2034: {
+      const operations = problem.parseOperations(input);
+      return designConfig(
+        "StockPrice",
+        [],
+        operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
+      );
+    }
     case 1146: {
       const built = problem.builder(input, params);
       return designConfig(
