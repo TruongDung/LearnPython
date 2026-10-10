@@ -35,6 +35,39 @@ class Solution:
 
         return dfs(root, 0)`;
 
+const SOURCE2 = `from collections import defaultdict
+
+class Solution:
+    def pathSumPaths(self, root, targetSum):
+        positions = defaultdict(list)
+        positions[0].append(-1)
+        path = []
+        result = []
+
+        def dfs(node, curr_sum):
+            if not node:
+                return
+
+            path.append(node.val)
+            curr_sum += node.val
+            need = curr_sum - targetSum
+
+            for start in positions.get(need, []):
+                result.append(path[start + 1:].copy())
+
+            positions[curr_sum].append(len(path) - 1)
+
+            dfs(node.left, curr_sum)
+            dfs(node.right, curr_sum)
+
+            positions[curr_sum].pop()
+            if not positions[curr_sum]:
+                del positions[curr_sum]
+            path.pop()
+
+        dfs(root, 0)
+        return result`;
+
 function parseCompactTree(input) {
   const values = input;
   if (!values.length || values[0] === null) return null;
@@ -94,6 +127,25 @@ function brutePathSum(values, target) {
   return count;
 }
 
+function brutePathLists(values, target) {
+  const root = parseCompactTree(values);
+  const result = [];
+  const path = [];
+  function dfs(node) {
+    if (!node) return;
+    path.push(node.val);
+    for (let start = 0; start < path.length; start += 1) {
+      const sum = path.slice(start).reduce((total, value) => total + value, 0);
+      if (sum === target) result.push(path.slice(start));
+    }
+    dfs(node.left);
+    dfs(node.right);
+    path.pop();
+  }
+  dfs(root);
+  return result;
+}
+
 test('437 is registered as the Prefix Sum + DFS Path Sum III lesson', () => {
   assert.equal(problem.id, 437);
   assert.equal(problem.slug, 'path-sum-iii');
@@ -102,6 +154,10 @@ test('437 is registered as the Prefix Sum + DFS Path Sum III lesson', () => {
   assert.equal(problem.complexity.time, 'O(n)');
   assert.equal(problem.complexity.space, 'O(h)');
   assert.equal(problem.code.join('\n'), SOURCE);
+  assert.equal(problem.code2.join('\n'), SOURCE2);
+  assert.equal(problem.complexity2.time, 'O(n + R)');
+  assert.equal(problem.complexity2.space, 'O(h + R)');
+  assert.deepEqual(problem.extraParams.find(param => param.key === 'approach').options.map(option => option.value), [1, 2]);
 
   const order = CATEGORY_ORDER['binary-tree'].order;
   assert.equal(order[order.indexOf(113) + 1], 437);
@@ -123,6 +179,84 @@ assert Solution().pathSum(None, 8) == 0
 `;
   const executed = spawnSync(process.env.PYTHON || 'python3', ['-c', `${SOURCE}\n${harness}`], { encoding: 'utf8' });
   assert.equal(executed.status, 0, executed.stderr);
+});
+
+test('437 approach 2 follow-up returns every matching path as a list of node values', () => {
+  const harness = `
+class TreeNode:
+    def __init__(self, val, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+root = TreeNode(10,
+    TreeNode(5, TreeNode(3, TreeNode(3), TreeNode(-2)), TreeNode(2, None, TreeNode(1))),
+    TreeNode(-3, None, TreeNode(11)))
+assert Solution().pathSumPaths(root, 8) == [[5, 3], [5, 2, 1], [-3, 11]]
+assert Solution().pathSumPaths(None, 8) == []
+`;
+  const executed = spawnSync(process.env.PYTHON || 'python3', ['-c', `${SOURCE2}\n${harness}`], { encoding: 'utf8' });
+  assert.equal(executed.status, 0, executed.stderr);
+
+  assert.deepEqual(problem.builder2(problem.defaultInput, { target: 8 }).answer, [[5, 3], [5, 2, 1], [-3, 11]]);
+  assert.deepEqual(problem.builder2('0,0,0', { target: 0 }).answer, [[0], [0, 0], [0], [0, 0], [0]]);
+  assert.deepEqual(problem.builder2('[]', { target: 8 }).answer, []);
+});
+
+test('437 approach 2 matches an independent path-list oracle on deterministic random trees', () => {
+  let seed = 2437;
+  const random = max => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed % max;
+  };
+
+  for (let trial = 0; trial < 100; trial += 1) {
+    const root = { val: random(11) - 5, left: null, right: null };
+    const queue = [root];
+    let nodeCount = 1;
+    const limit = 1 + random(16);
+    while (queue.length && nodeCount < limit) {
+      const node = queue.shift();
+      for (const side of ['left', 'right']) {
+        if (nodeCount >= limit || random(100) < 40) continue;
+        const child = { val: random(11) - 5, left: null, right: null };
+        node[side] = child;
+        queue.push(child);
+        nodeCount += 1;
+      }
+    }
+    const values = serializeCompact(root);
+    const target = random(17) - 8;
+    const input = values.map(value => value === null ? 'null' : value).join(',');
+    assert.deepEqual(problem.builder2(input, { target }).answer, brutePathLists(values, target), `${input}; target=${target}`);
+  }
+});
+
+test('437 approach 2 trace follows positions, slices paths, and highlights code block 2', () => {
+  const run = problem.builder2(problem.defaultInput, { target: 8 });
+  const views = run.steps.map(step => step.pathSumIIIView);
+  assert.ok(run.steps.every(step => step.codeBlock === 2));
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
+  assert.ok(run.steps.every(step => step.codeLines[0] >= 1 && step.codeLines[0] <= problem.code2.length));
+  assert.ok(views.every(view => view.approach === 2));
+
+  const lineFor = event => run.steps.find(step => step.pathSumIIIView.event === event).codeLines;
+  assert.deepEqual(lineFor('init-map'), [6]);
+  assert.deepEqual(lineFor('add-node'), [15]);
+  assert.deepEqual(lineFor('compute-needed'), [16]);
+  assert.deepEqual(lineFor('found'), [19]);
+  assert.deepEqual(lineFor('store-prefix'), [21]);
+  assert.deepEqual(lineFor('call-left'), [23]);
+  assert.deepEqual(lineFor('call-right'), [24]);
+  assert.deepEqual(lineFor('remove-prefix'), [26]);
+  assert.deepEqual(lineFor('done'), [32]);
+
+  const found = views.find(view => view.event === 'found');
+  assert.deepEqual(found.matches[0].values, [5, 3]);
+  assert.deepEqual(found.resultPaths, [[5, 3]]);
+  const final = views.at(-1);
+  assert.deepEqual(final.resultPaths, [[5, 3], [5, 2, 1], [-3, 11]]);
+  assert.deepEqual(final.prefixEntries, [{ sum: 0, count: 1, sources: ['before root'], positions: [-1] }]);
 });
 
 test('437 matches the published examples and tricky repeated-prefix cases', () => {
@@ -256,7 +390,7 @@ test('437 custom renderer remains complete and readable in English and Vietnames
   vm.createContext(context);
   vm.runInContext(script.slice(start, end), context);
 
-  const runs = [problem.builder(problem.defaultInput, { target: 8 }), problem.builder('[]', { target: 8 })];
+  const runs = [problem.builder(problem.defaultInput, { target: 8 }), problem.builder('[]', { target: 8 }), problem.builder2(problem.defaultInput, { target: 8 })];
   for (const language of ['en', 'vi']) {
     context.lang = language;
     for (const run of runs) {
@@ -290,8 +424,16 @@ test('437 custom renderer remains complete and readable in English and Vietnames
   const firstStore = repeatedPrefixRun.steps.find(step => step.pathSumIIIView.event === 'store-prefix' && step.pathSumIIIView.matches.length === 1);
   context.renderPathSumIIIView(firstStore);
   assert.match(elementFor('treeView').innerHTML, /prefix\[0\] = 1/);
+  const followUpFound = runs[2].steps.find(step => step.pathSumIIIView.event === 'found');
+  context.renderPathSumIIIView(followUpFound);
+  const followUpHtml = elementFor('treeView').innerHTML;
+  assert.match(followUpHtml, /APPROACH 2 · FOLLOW-UP/);
+  assert.match(followUpHtml, /List\[List\[int\]\]/);
+  assert.match(followUpHtml, /positions\[/);
+  assert.match(followUpHtml, /result\.append\(\[5, 3\]\)/);
   assert.ok(treeTargets.every(targetId => targetId === 'ps437Tree'));
   assert.match(styles, /\.ps437-layout/);
+  assert.match(styles, /\.ps437-followup/);
   assert.match(styles, /@container \(max-width: 760px\)/);
   assert.match(script, /Boolean\(step\.pathSumIIIView\)/);
 });

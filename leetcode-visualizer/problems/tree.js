@@ -6512,7 +6512,7 @@ function buildSteps113(input, params) {
 }
 
 // ─── 437: Path Sum III ───
-function buildSteps437(input, params = {}) {
+function buildSteps437(input, params = {}, options = {}) {
   const root = parseTreeEssentialsInput(input, {
     allowEmpty: true,
     minValue: -1000000000,
@@ -6523,6 +6523,10 @@ function buildSteps437(input, params = {}) {
   if (!Number.isInteger(target) || target < -1000000000 || target > 1000000000) {
     throw new Error("targetSum must be an integer from -1000000000 to 1000000000");
   }
+  const listMode = options.collectPaths === true;
+  const codeLine = listMode
+    ? { rule: 16, init: 6, enter: 10, null: 12, add: 15, lookup: 19, store: 21, left: 23, right: 24, backtrack: 26, returned: 29, done: 32 }
+    : { rule: 14, init: 6, enter: 8, null: 10, add: 12, lookup: 14, store: 16, left: 18, right: 19, backtrack: 21, returned: 23, done: 25 };
 
   const steps = [];
   const callStack = [];
@@ -6554,6 +6558,7 @@ function buildSteps437(input, params = {}) {
       sum,
       count,
       sources: (prefixSources.get(sum) || []).map((source) => source.label),
+      ...(listMode ? { positions: (prefixSources.get(sum) || []).map((source) => source.pathIndex) } : {}),
     }));
   const pathState = () => pathNodes.map((node, index) => ({
     id: node.id,
@@ -6592,16 +6597,20 @@ function buildSteps437(input, params = {}) {
       wordSet: matchIds.size ? matchIds : activePathIds,
       annotations: annotationsFor(current, matches),
       codeLines: line ? [line] : [],
+      codeBlock: listMode ? 2 : 1,
       vars: [
         { name: "curr_sum", value: running ?? "—" },
         { name: "needed", value: needed ?? "—" },
-        { name: "prefix", value: `{${mapEntries().map((entry) => `${entry.sum}:${entry.count}`).join(", ")}}` },
-        { name: "answer", value: answer },
+        { name: listMode ? "positions" : "prefix", value: listMode
+          ? `{${mapEntries().map((entry) => `${entry.sum}:[${entry.positions.join(",")}]`).join(", ")}}`
+          : `{${mapEntries().map((entry) => `${entry.sum}:${entry.count}`).join(", ")}}` },
+        { name: listMode ? "result" : "answer", value: listMode ? JSON.stringify(foundPaths.map((path) => path.values)) : answer },
       ],
       note,
     });
     treeStep.pathSumIIIView = {
       problemId: 437,
+      approach: listMode ? 2 : 1,
       stages,
       stage: phaseIndex(phase),
       phase,
@@ -6621,6 +6630,7 @@ function buildSteps437(input, params = {}) {
       prefixEntries: mapEntries(),
       stack: stackState(),
       foundPaths: foundPaths.map((path) => ({ values: [...path.values], from: path.from, end: path.end })),
+      resultPaths: foundPaths.map((path) => [...path.values]),
       answer,
     };
     treeStep.final = final;
@@ -6635,14 +6645,16 @@ function buildSteps437(input, params = {}) {
       vi: `Tại node hiện tại, cần một prefix cũ = curr_sum − target. Mỗi lần prefix cũ xuất hiện trên đường từ root sẽ tạo một path có tổng ${target}.`,
       en: `At the current node, we need an old prefix = curr_sum − target. Every occurrence of that old prefix on the root path creates one path summing to ${target}.`,
     },
-    line: 14,
+    line: codeLine.rule,
   });
   addStep({
     phase: "init",
     event: "init-map",
-    title: { vi: "prefix[0] = 1", en: "prefix[0] = 1" },
-    note: { vi: "Prefix 0 ảo nằm trước root, để path bắt đầu từ root cũng được đếm.", en: "A virtual prefix 0 sits before the root so paths starting at the root are counted too." },
-    line: 6,
+    title: listMode ? { vi: "positions[0] = [-1]", en: "positions[0] = [-1]" } : { vi: "prefix[0] = 1", en: "prefix[0] = 1" },
+    note: listMode
+      ? { vi: "Vị trí -1 nằm trước root, để cắt được path bắt đầu ngay tại root.", en: "Position -1 sits before the root so a path beginning at the root can be sliced out." }
+      : { vi: "Prefix 0 ảo nằm trước root, để path bắt đầu từ root cũng được đếm.", en: "A virtual prefix 0 sits before the root so paths starting at the root are counted too." },
+    line: codeLine.init,
   });
 
   function dfs(node, running, side) {
@@ -6657,7 +6669,7 @@ function buildSteps437(input, params = {}) {
       note: node
         ? { vi: `running trước khi cộng node là ${running}.`, en: `running is ${running} before adding this node.` }
         : { vi: "Nhánh rỗng không thể kết thúc path mới.", en: "An empty branch cannot end a new path." },
-      line: node ? 8 : 10,
+      line: node ? codeLine.enter : codeLine.null,
       current: node,
       running,
       subtreeCount: node ? null : 0,
@@ -6678,7 +6690,7 @@ function buildSteps437(input, params = {}) {
       event: "add-node",
       title: { vi: `curr_sum = ${before} + (${node.val}) = ${running}`, en: `curr_sum = ${before} + (${node.val}) = ${running}` },
       note: { vi: "curr_sum là tổng từ root đến node hiện tại, không phải chỉ path cần tìm.", en: "curr_sum is the sum from the root to the current node, not only the path we are looking for." },
-      line: 12,
+      line: codeLine.add,
       current: node,
       running,
     });
@@ -6690,7 +6702,7 @@ function buildSteps437(input, params = {}) {
       event: "compute-needed",
       title: { vi: `curr_sum − targetSum = ${running} − (${target}) = ${needed}`, en: `curr_sum − targetSum = ${running} − (${target}) = ${needed}` },
       note: { vi: `Nếu prefix cũ bằng ${needed}, phần path sau prefix đó có tổng ${running} − (${needed}) = ${target}.`, en: `If an old prefix equals ${needed}, the path after it sums to ${running} − (${needed}) = ${target}.` },
-      line: 14,
+      line: codeLine.rule,
       current: node,
       running,
       needed,
@@ -6715,12 +6727,18 @@ function buildSteps437(input, params = {}) {
       phase: "lookup",
       event: added ? "found" : "not-found",
       title: added
-        ? { vi: `prefix[${needed}] = ${added} → thêm ${added} path`, en: `prefix[${needed}] = ${added} → add ${added} path(s)` }
-        : { vi: `prefix[${needed}] = 0 → chưa có path mới`, en: `prefix[${needed}] = 0 → no new path` },
+        ? listMode
+          ? { vi: `Append ${added} path vào result`, en: `Append ${added} path(s) to result` }
+          : { vi: `prefix[${needed}] = ${added} → thêm ${added} path`, en: `prefix[${needed}] = ${added} → add ${added} path(s)` }
+        : listMode
+          ? { vi: `positions[${needed}] rỗng → không append`, en: `positions[${needed}] is empty → append nothing` }
+          : { vi: `prefix[${needed}] = 0 → chưa có path mới`, en: `prefix[${needed}] = 0 → no new path` },
       note: added
-        ? { vi: `Tìm thấy ${added} prefix khớp; answer tăng lên ${answer}.`, en: `Found ${added} matching prefix(es); answer increases to ${answer}.` }
+        ? listMode
+          ? { vi: `Cắt ${added} đoạn path[start + 1:] và lưu bản sao; result hiện có ${answer} path.`, en: `Slice and copy ${added} path[start + 1:] segment(s); result now contains ${answer} path(s).` }
+          : { vi: `Tìm thấy ${added} prefix khớp; answer tăng lên ${answer}.`, en: `Found ${added} matching prefix(es); answer increases to ${answer}.` }
         : { vi: "Không có prefix cũ cần thiết trên path root→current.", en: "The needed old prefix is absent from the root-to-current path." },
-      line: 14,
+      line: codeLine.lookup,
       current: node,
       running,
       needed,
@@ -6740,9 +6758,13 @@ function buildSteps437(input, params = {}) {
     addStep({
       phase: "store",
       event: "store-prefix",
-      title: { vi: `prefix[${running}] = ${oldCount + 1}`, en: `prefix[${running}] = ${oldCount + 1}` },
-      note: { vi: "Chỉ lưu prefix hiện tại SAU khi lookup, tránh ghép nó với chính nó thành path rỗng.", en: "Store the current prefix only AFTER lookup so it cannot pair with itself as an empty path." },
-      line: 16,
+      title: listMode
+        ? { vi: `positions[${running}].append(${pathNodes.length - 1})`, en: `positions[${running}].append(${pathNodes.length - 1})` }
+        : { vi: `prefix[${running}] = ${oldCount + 1}`, en: `prefix[${running}] = ${oldCount + 1}` },
+      note: listMode
+        ? { vi: "Lưu index cuối của path để lần sau có thể cắt đúng danh sách node values.", en: "Store the path-end index so a later match can slice out the exact node-value list." }
+        : { vi: "Chỉ lưu prefix hiện tại SAU khi lookup, tránh ghép nó với chính nó thành path rỗng.", en: "Store the current prefix only AFTER lookup so it cannot pair with itself as an empty path." },
+      line: codeLine.store,
       current: node,
       running,
       needed,
@@ -6756,7 +6778,7 @@ function buildSteps437(input, params = {}) {
       event: "call-left",
       title: { vi: `DFS con trái của ${node.val}`, en: `DFS the left child of ${node.val}` },
       note: { vi: `Con trái nhận curr_sum=${running} và prefix map hiện tại.`, en: `The left child receives curr_sum=${running} and the current prefix map.` },
-      line: 18,
+      line: codeLine.left,
       current: node,
       running,
       needed,
@@ -6771,7 +6793,7 @@ function buildSteps437(input, params = {}) {
       event: "call-right",
       title: { vi: `DFS con phải của ${node.val}`, en: `DFS the right child of ${node.val}` },
       note: { vi: `Nhánh trái đã tìm ${leftCount} path; tiếp tục nhánh phải với cùng curr_sum=${running}.`, en: `The left branch found ${leftCount} path(s); continue right with the same curr_sum=${running}.` },
-      line: 19,
+      line: codeLine.right,
       current: node,
       running,
       needed,
@@ -6792,9 +6814,13 @@ function buildSteps437(input, params = {}) {
     addStep({
       phase: "backtrack",
       event: "remove-prefix",
-      title: { vi: `Backtrack: xóa một prefix ${running}`, en: `Backtrack: remove one prefix ${running}` },
-      note: { vi: `Rời node ${node.val}; xóa prefix của nhánh này để nhánh anh em không dùng nhầm.`, en: `Leave node ${node.val}; remove this branch's prefix so a sibling branch cannot reuse it.` },
-      line: 21,
+      title: listMode
+        ? { vi: `Backtrack: positions[${running}].pop()`, en: `Backtrack: positions[${running}].pop()` }
+        : { vi: `Backtrack: xóa một prefix ${running}`, en: `Backtrack: remove one prefix ${running}` },
+      note: listMode
+        ? { vi: `Rời node ${node.val}; bỏ index của nhánh này trước khi sang nhánh anh em.`, en: `Leave node ${node.val}; remove this branch's index before visiting a sibling branch.` }
+        : { vi: `Rời node ${node.val}; xóa prefix của nhánh này để nhánh anh em không dùng nhầm.`, en: `Leave node ${node.val}; remove this branch's prefix so a sibling branch cannot reuse it.` },
+      line: codeLine.backtrack,
       current: node,
       running,
       needed,
@@ -6811,7 +6837,7 @@ function buildSteps437(input, params = {}) {
       event: "return-subtree",
       title: { vi: `Node ${node.val} trả ${subtreeCount} path`, en: `Node ${node.val} returns ${subtreeCount} path(s)` },
       note: { vi: `${added} tại node + ${leftCount} bên trái + ${rightCount} bên phải = ${subtreeCount}.`, en: `${added} at this node + ${leftCount} left + ${rightCount} right = ${subtreeCount}.` },
-      line: 23,
+      line: codeLine.returned,
       current: node,
       running,
       needed,
@@ -6822,16 +6848,25 @@ function buildSteps437(input, params = {}) {
   }
 
   dfs(root, 0, "root");
+  const resultPaths = foundPaths.map((path) => [...path.values]);
   addStep({
     phase: "done",
     event: "done",
-    title: { vi: `Kết quả: ${answer} path có tổng ${target}`, en: `Result: ${answer} path(s) sum to ${target}` },
-    note: { vi: "Prefix map đã trở lại {0:1}; mọi nhánh đều backtrack sạch.", en: "The prefix map is back to {0:1}; every branch was backtracked cleanly." },
-    line: 25,
+    title: listMode
+      ? { vi: `Kết quả: ${JSON.stringify(resultPaths)}`, en: `Result: ${JSON.stringify(resultPaths)}` }
+      : { vi: `Kết quả: ${answer} path có tổng ${target}`, en: `Result: ${answer} path(s) sum to ${target}` },
+    note: listMode
+      ? { vi: "result là list các list node.val; positions trở lại chỉ còn checkpoint -1.", en: "result is a list of node-value lists; positions is back to only the -1 checkpoint." }
+      : { vi: "Prefix map đã trở lại {0:1}; mọi nhánh đều backtrack sạch.", en: "The prefix map is back to {0:1}; every branch was backtracked cleanly." },
+    line: codeLine.done,
     subtreeCount: answer,
     final: true,
   });
-  return { input, target, answer, steps };
+  return { input, target, answer: listMode ? resultPaths : answer, steps };
+}
+
+function buildSteps437Paths(input, params = {}) {
+  return buildSteps437(input, params, { collectPaths: true });
 }
 
 // ─── 129: Sum Root to Leaf Numbers ───
@@ -10177,13 +10212,27 @@ module.exports = {
     defaultInput: "10,5,-3,3,2,null,11,3,-2,null,1",
     inputKind: "string",
     inputLabel: { vi: "Tree (level-order; null cho node rỗng)", en: "Tree (level-order; null for empty)" },
-    extraParams: [{ key: "target", label: { vi: "targetSum", en: "targetSum" }, default: 8, allowNegative: true }],
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Đếm path bằng prefix frequency", en: "Approach 1: Count paths with prefix frequencies" } },
+          { value: 2, label: { vi: "Cách 2 (follow-up): Trả về List[List[int]]", en: "Approach 2 (follow-up): Return List[List[int]]" } },
+        ],
+      },
+      { key: "target", label: { vi: "targetSum", en: "targetSum" }, default: 8, allowNegative: true },
+    ],
     approach: [
       { vi: "DFS mang curr_sum từ root. Tại node, path có tổng target khi tồn tại prefix cũ = curr_sum − target.", en: "DFS carries curr_sum from the root. At a node, a path sums to target when an old prefix equals curr_sum − target." },
       { vi: "prefix chỉ chứa các tổng tiền tố trên path root→node hiện tại; tăng trước khi đi xuống và giảm khi backtrack.", en: "prefix contains only prefix sums on the current root-to-node path; increment before descending and decrement while backtracking." },
       { vi: "Khởi tạo {0:1} để đếm path bắt đầu ngay từ root.", en: "Initialize {0:1} to count paths that begin at the root." },
+      { vi: "Follow-up: thay frequency bằng danh sách vị trí của từng prefix sum. Với mỗi start hợp lệ, append bản sao path[start+1:] vào result.", en: "Follow-up: replace each prefix frequency with its list of path positions. For every valid start, append a copy of path[start+1:] to result." },
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được duyệt một lần; map và call stack chứa tối đa một root-path.", en: "Each node is visited once; the map and call stack hold at most one root path." } },
+    complexity2: { time: "O(n + R)", space: "O(h + R)", note: { vi: "R là tổng số node values được sao chép vào mọi path kết quả; không thể tránh chi phí này khi phải trả toàn bộ path.", en: "R is the total number of node values copied into all returned paths; this output cost is unavoidable when every path must be returned." } },
     code: [
       "from collections import defaultdict",
       "",
@@ -10211,7 +10260,44 @@ module.exports = {
       "",
       "        return dfs(root, 0)",
     ],
+    codeLabel: { vi: "Cách 1: Đếm số path", en: "Approach 1: Count paths" },
+    code2Label: { vi: "Cách 2 · Follow-up: Trả về mọi path", en: "Approach 2 · Follow-up: Return every path" },
+    code2: [
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def pathSumPaths(self, root, targetSum):",
+      "        positions = defaultdict(list)",
+      "        positions[0].append(-1)",
+      "        path = []",
+      "        result = []",
+      "",
+      "        def dfs(node, curr_sum):",
+      "            if not node:",
+      "                return",
+      "",
+      "            path.append(node.val)",
+      "            curr_sum += node.val",
+      "            need = curr_sum - targetSum",
+      "",
+      "            for start in positions.get(need, []):",
+      "                result.append(path[start + 1:].copy())",
+      "",
+      "            positions[curr_sum].append(len(path) - 1)",
+      "",
+      "            dfs(node.left, curr_sum)",
+      "            dfs(node.right, curr_sum)",
+      "",
+      "            positions[curr_sum].pop()",
+      "            if not positions[curr_sum]:",
+      "                del positions[curr_sum]",
+      "            path.pop()",
+      "",
+      "        dfs(root, 0)",
+      "        return result",
+    ],
     builder: buildSteps437,
+    builder2: buildSteps437Paths,
   },
   129: {
     id: 129, difficulty: "medium", slug: "sum-root-to-leaf-numbers",

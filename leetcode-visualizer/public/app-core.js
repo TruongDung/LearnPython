@@ -6065,6 +6065,7 @@ function renderPathSumIIIView(step) {
   const view = step.pathSumIIIView || {};
   const target = $("treeView");
   const vi = lang === "vi";
+  const listMode = Number(view.approach) === 2;
   const text = (value) => {
     if (value && typeof value === "object" && !Array.isArray(value)) return pick(value);
     if (value === null || value === undefined) return "—";
@@ -6082,14 +6083,17 @@ function renderPathSumIIIView(step) {
     ...path.map((item) => `<i>→</i><span class="ps437-checkpoint ${item.current ? "current" : ""} ${lookupReady && item.prefix === view.needed ? "needed" : ""} ${matchingIds.has(item.id) ? "matched-node" : ""}"><small>node ${escapeHtml(item.value)}</small><strong>${escapeHtml(item.prefix)}</strong><em>prefix</em></span>`),
   ].join("");
   const mapHtml = entries.length
-    ? entries.map((entry) => `<span class="${entry.sum === view.needed ? "needed" : ""}"><strong>${escapeHtml(entry.sum)}</strong><i>→</i><em>${escapeHtml(entry.count)} ${vi ? "lần" : entry.count === 1 ? "time" : "times"}</em></span>`).join("")
+    ? entries.map((entry) => `<span class="${entry.sum === view.needed ? "needed" : ""}"><strong>${escapeHtml(entry.sum)}</strong><i>→</i><em>${listMode ? `[${escapeHtml((entry.positions || []).join(", "))}]` : `${escapeHtml(entry.count)} ${vi ? "lần" : entry.count === 1 ? "time" : "times"}`}</em></span>`).join("")
     : `<b class="ps437-empty">{}</b>`;
+  const lookupValue = listMode
+    ? `positions[${escapeHtml(view.needed)}] = [${escapeHtml((lookupEntry?.positions || []).join(", "))}]`
+    : `prefix[${escapeHtml(view.needed)}] = ${escapeHtml(lookupCount)}`;
   const matchExplanation = matches.length
-    ? matches.map((match) => `<span><strong>${escapeHtml(match.values.join(" + "))} = ${escapeHtml(view.target)}</strong><em>${vi ? `Bỏ phần trước prefix ${view.needed}; đoạn còn lại là một path hợp lệ.` : `Drop everything through prefix ${view.needed}; the remaining segment is a valid path.`}</em></span>`).join("")
-    : `<span><strong>${lookupReady ? `prefix[${escapeHtml(view.needed)}] = ${escapeHtml(lookupCount)}` : (vi ? "Chưa lookup" : "Not looked up yet")}</strong><em>${lookupReady ? (vi ? "Không có checkpoint phù hợp nên không thêm path." : "No matching checkpoint, so no path is added.") : (vi ? "Cộng node hiện tại trước, rồi mới tìm prefix cần." : "Add the current node first, then find the needed prefix.")}</em></span>`;
+    ? matches.map((match) => `<span><strong>${escapeHtml(match.values.join(" + "))} = ${escapeHtml(view.target)}</strong><em>${listMode ? `result.append([${escapeHtml(match.values.join(", "))}])` : (vi ? `Bỏ phần trước prefix ${view.needed}; đoạn còn lại là một path hợp lệ.` : `Drop everything through prefix ${view.needed}; the remaining segment is a valid path.`)}</em></span>`).join("")
+    : `<span><strong>${lookupReady ? lookupValue : (vi ? "Chưa lookup" : "Not looked up yet")}</strong><em>${lookupReady ? (vi ? "Không có checkpoint phù hợp nên không thêm path." : "No matching checkpoint, so no path is added.") : (vi ? "Cộng node hiện tại trước, rồi mới tìm prefix cần." : "Add the current node first, then find the needed prefix.")}</em></span>`;
   const foundPaths = Array.isArray(view.foundPaths) ? view.foundPaths : [];
   const pathsHtml = foundPaths.length
-    ? foundPaths.map((found, index) => `<span class="${index === foundPaths.length - 1 && matches.length ? "fresh" : ""}"><small>#${index + 1}</small><strong>${escapeHtml(found.values.join(" → "))}</strong><em>sum = ${escapeHtml(view.target)}</em></span>`).join("")
+    ? foundPaths.map((found, index) => `<span class="${index === foundPaths.length - 1 && matches.length ? "fresh" : ""}"><small>#${index + 1}</small><strong>${listMode ? `[${escapeHtml(found.values.join(", "))}]` : escapeHtml(found.values.join(" → "))}</strong><em>sum = ${escapeHtml(view.target)}</em></span>`).join("")
     : `<b class="ps437-empty">${vi ? "Chưa tìm thấy path" : "No path found yet"}</b>`;
   const statusTone = matches.length ? "match" : view.event === "remove-prefix" ? "backtrack" : lookupReady ? "checked" : "";
   const progressStage = ["rule", "init", "enter", "null", "add"].includes(view.phase) ? 0
@@ -6097,28 +6101,35 @@ function renderPathSumIIIView(step) {
   const guide = [
     { vi: "Cộng node vào curr_sum", en: "Add node to curr_sum" },
     { vi: "Tìm prefix = curr_sum − target", en: "Find prefix = curr_sum − target" },
-    { vi: "DFS con rồi hoàn tác prefix", en: "DFS children, then undo prefix" },
+    listMode
+      ? { vi: "Lưu vị trí, DFS rồi backtrack", en: "Store position, DFS, then backtrack" }
+      : { vi: "DFS con rồi hoàn tác prefix", en: "DFS children, then undo prefix" },
   ];
   const guideHtml = guide.map((item, index) => `<span class="${index < progressStage ? "done" : index === progressStage ? "active" : ""}"><i>${index < progressStage ? "✓" : index + 1}</i><b>${escapeHtml(text(item))}</b></span>`).join("");
   const operationText = view.event === "remove-prefix"
-    ? (vi ? `Rời node ${view.current?.value ?? "—"}: prefix[${view.running}] giảm 1 để nhánh kế tiếp không dùng nhầm.` : `Leave node ${view.current?.value ?? "—"}: decrement prefix[${view.running}] so the next branch cannot reuse it.`)
+    ? listMode
+      ? (vi ? `Rời node ${view.current?.value ?? "—"}: pop vị trí cuối khỏi positions[${view.running}].` : `Leave node ${view.current?.value ?? "—"}: pop the last index from positions[${view.running}].`)
+      : (vi ? `Rời node ${view.current?.value ?? "—"}: prefix[${view.running}] giảm 1 để nhánh kế tiếp không dùng nhầm.` : `Leave node ${view.current?.value ?? "—"}: decrement prefix[${view.running}] so the next branch cannot reuse it.`)
     : matches.length
-      ? (vi ? `Có ${lookupCount} checkpoint mang prefix ${view.needed} → thêm ${lookupCount} path.` : `${lookupCount} checkpoint(s) carry prefix ${view.needed} → add ${lookupCount} path(s).`)
+      ? listMode
+        ? (vi ? `Có ${lookupCount} vị trí bắt đầu → cắt và append ${lookupCount} list node values.` : `${lookupCount} start position(s) → slice and append ${lookupCount} node-value list(s).`)
+        : (vi ? `Có ${lookupCount} checkpoint mang prefix ${view.needed} → thêm ${lookupCount} path.` : `${lookupCount} checkpoint(s) carry prefix ${view.needed} → add ${lookupCount} path(s).`)
       : lookupReady
         ? (vi ? `Cần prefix ${view.needed}; hiện có ${lookupCount} checkpoint phù hợp.` : `Need prefix ${view.needed}; ${lookupCount} matching checkpoint(s) exist.`)
         : (vi ? "Theo dõi tổng tiền tố trên đúng path DFS hiện tại." : "Track prefix sums only along the current DFS path.");
   const summary = vi
-    ? `Bài 437, ${text(step.title)}. Đang có ${view.answer} path hợp lệ.`
-    : `Problem 437, ${text(step.title)}. ${view.answer} valid paths found so far.`;
+    ? `Bài 437, cách ${listMode ? 2 : 1}, ${text(step.title)}. Đang có ${view.answer} path hợp lệ.`
+    : `Problem 437, approach ${listMode ? 2 : 1}, ${text(step.title)}. ${view.answer} valid paths found so far.`;
 
-  target.innerHTML = `<section class="ps437-viz" role="img" aria-label="${escapeHtml(summary)}">
+  target.innerHTML = `<section class="ps437-viz approach-${listMode ? 2 : 1}" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ps437-followup ${listMode ? "active" : ""}"><strong>${listMode ? (vi ? "CÁCH 2 · FOLLOW-UP" : "APPROACH 2 · FOLLOW-UP") : (vi ? "CÁCH 1 · ĐẾM PATH" : "APPROACH 1 · COUNT PATHS")}</strong><span>${listMode ? "List[List[int]]" : "int"}</span></div>
     <div class="ps437-phases">${guideHtml}</div>
-    <section class="ps437-action ${statusTone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${vi ? "Tổng path" : "Paths"}: ${escapeHtml(view.answer)}</em></section>
+    <section class="ps437-action ${statusTone}"><span><small>${escapeHtml(String(view.event || "dfs").replaceAll("-", " ").toUpperCase())}</small><strong>${escapeHtml(text(step.title))}</strong></span><em>${listMode ? "result.length" : (vi ? "Tổng path" : "Paths")}: ${escapeHtml(view.answer)}</em></section>
     <section class="ps437-rule ${matches.length ? "match" : ""}">
       <span><small>1 · CURR_SUM</small><strong>${escapeHtml(view.running ?? "?")}</strong></span><b>−</b>
       <span><small>2 · TARGET</small><strong>${escapeHtml(view.target)}</strong></span><b>=</b>
       <span><small>3 · NEEDED PREFIX</small><strong>${escapeHtml(view.needed ?? "?")}</strong></span><i>→</i>
-      <span class="lookup"><small>4 · LOOKUP</small><strong>${lookupReady ? `prefix[${escapeHtml(view.needed)}] = ${escapeHtml(lookupCount)}` : "prefix[?]"}</strong></span>
+      <span class="lookup"><small>4 · LOOKUP</small><strong>${lookupReady ? lookupValue : (listMode ? "positions[?]" : "prefix[?]")}</strong></span>
     </section>
     <p class="ps437-operation ${statusTone}">${escapeHtml(operationText)}</p>
     <div class="ps437-layout">
@@ -6127,10 +6138,10 @@ function renderPathSumIIIView(step) {
         <header><strong>${vi ? "CHECKPOINT PREFIX TRÊN PATH" : "PREFIX CHECKPOINTS ON THE PATH"}</strong><span>${vi ? "số lớn = tổng từ root đến đây" : "large number = root-to-here sum"}</span></header>
         <div class="ps437-checkpoints">${checkpointHtml}</div>
         <div class="ps437-match-explanation ${matches.length ? "match" : ""}">${matchExplanation}</div>
-        <section class="ps437-map"><header><strong>prefix</strong><span>${vi ? "sum → số lần xuất hiện" : "sum → occurrence count"}</span></header><div>${mapHtml}</div></section>
+        <section class="ps437-map"><header><strong>${listMode ? "positions" : "prefix"}</strong><span>${listMode ? (vi ? "sum → các index trên path" : "sum → path indexes") : (vi ? "sum → số lần xuất hiện" : "sum → occurrence count")}</span></header><div>${mapHtml}</div></section>
       </section>
     </div>
-    <section class="ps437-found"><header><strong>${vi ? "CÁC PATH ĐÃ ĐẾM" : "COUNTED PATHS"}</strong><span>${vi ? "mỗi path đi từ cha xuống con" : "each path follows parent-to-child edges"}</span></header><div>${pathsHtml}</div></section>
+    <section class="ps437-found"><header><strong>${listMode ? (vi ? "RESULT · LIST CÁC NODE VALUES" : "RESULT · NODE-VALUE LISTS") : (vi ? "CÁC PATH ĐÃ ĐẾM" : "COUNTED PATHS")}</strong><span>${vi ? "mỗi path đi từ cha xuống con" : "each path follows parent-to-child edges"}</span></header><div>${pathsHtml}</div></section>
   </section>`;
 
   if (step.tree && Array.isArray(step.tree.nodes) && step.tree.nodes.length) renderTree(step, "ps437Tree");

@@ -4649,6 +4649,12 @@ html, body {
 /* ---- LeetCode 437: Path Sum III prefix-count DFS debugger ---- */
 .tree-view:has(.ps437-viz) { min-height: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
 .ps437-viz { container-type: inline-size; display: grid; gap: 11px; min-width: 0; color: #e2e8f0; }
+.ps437-followup { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; border: 1px solid #334155; border-radius: 9px; background: #111827; }
+.ps437-followup strong { color: #94a3b8; font-size: 10px; letter-spacing: .07em; }
+.ps437-followup span { padding: 4px 8px; border-radius: 999px; background: #1e293b; color: #cbd5e1; font: 800 10px "SFMono-Regular", Consolas, monospace; }
+.ps437-followup.active { border-color: #8b5cf6; background: linear-gradient(105deg, rgba(124,58,237,.18), rgba(14,165,233,.08)); }
+.ps437-followup.active strong { color: #c4b5fd; }
+.ps437-followup.active span { background: #4c1d95; color: #ede9fe; }
 .ps437-phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .ps437-phases span { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 38px; padding: 7px 8px; border: 1px solid #334155; border-radius: 8px; background: #111827; color: #64748b; }
 .ps437-phases i { display: grid; flex: 0 0 20px; width: 20px; height: 20px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 9px; font-style: normal; font-weight: 900; }
@@ -4731,6 +4737,12 @@ html, body {
 .ps437-empty { align-self: center; color: #64748b; font-size: 11px; font-weight: 600; }
 
 [data-theme="light"] .ps437-viz { color: #1e293b; }
+[data-theme="light"] .ps437-followup { border-color: #cbd5e1; background: #fff; }
+[data-theme="light"] .ps437-followup strong { color: #475569; }
+[data-theme="light"] .ps437-followup span { background: #e2e8f0; color: #334155; }
+[data-theme="light"] .ps437-followup.active { border-color: #8b5cf6; background: linear-gradient(105deg, #f5f3ff, #f0f9ff); }
+[data-theme="light"] .ps437-followup.active strong { color: #6d28d9; }
+[data-theme="light"] .ps437-followup.active span { background: #ede9fe; color: #5b21b6; }
 [data-theme="light"] .ps437-phases span, [data-theme="light"] .ps437-tree-card, [data-theme="light"] .ps437-proof, [data-theme="light"] .ps437-stack, [data-theme="light"] .ps437-path, [data-theme="light"] .ps437-map, [data-theme="light"] .ps437-found, [data-theme="light"] .ps437-stats { border-color: #cbd5e1; background: #fff; }
 [data-theme="light"] .ps437-phases span.active { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
 [data-theme="light"] .ps437-phases span.done { border-color: #22c55e; background: #f0fdf4; color: #166534; }
