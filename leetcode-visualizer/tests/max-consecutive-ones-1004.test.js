@@ -167,22 +167,29 @@ test('1004 dedicated renderer handles every state in English and Vietnamese', ()
   const overflow = runs[0].steps.find((step) => !step.maxConsecutiveOnes1004View.valid);
   context.lang = 'en';
   context.renderMaxConsecutiveOnes1004View(overflow);
-  assert.match(element.innerHTML, /INVALID · MUST SHRINK/);
-  assert.match(element.innerHTML, /OVER BUDGET/);
+  assert.match(element.innerHTML, /ones1004-array invalid/);
+  assert.match(element.innerHTML, /ones1004-budget invalid/);
+  assert.match(element.innerHTML, /<span class="over"><b>\+1<\/b>/);
+  assert.match(element.innerHTML, /0→1/);
+  assert.doesNotMatch(element.innerHTML, /ones1004-action|ones1004-metrics|ones1004-invariant/);
+
+  const compactText = element.innerHTML.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.ok(compactText.length < 230, `visual should stay compact, got ${compactText.length} chars`);
 
   context.renderMaxConsecutiveOnes1004View(runs[1].steps.at(-1));
-  assert.match(element.innerHTML, /k = 0 · no flip slots/);
+  assert.match(element.innerHTML, /class="none"><b>∅<\/b><small>k=0<\/small>/);
 });
 
 test('1004 frontend selects the dedicated responsive renderer', () => {
   const index = readFrontendIndex();
   const script = readFrontendJavaScript();
   const styles = readFrontendStyles();
-  assert.match(index, /renderer-max-consecutive-ones-1004\.js\?v=max-consecutive-ones-1004-v2/);
-  assert.match(index, /max-consecutive-ones-1004\.css\?v=max-consecutive-ones-1004-v2/);
+  assert.match(index, /renderer-max-consecutive-ones-1004\.js\?v=max-consecutive-ones-1004-v3/);
+  assert.match(index, /max-consecutive-ones-1004\.css\?v=max-consecutive-ones-1004-v3/);
   assert.match(script, /step\.maxConsecutiveOnes1004View/);
   assert.match(styles, /\.ones1004-viz/);
   assert.match(styles, /\[data-theme="light"\] \.ones1004-viz/);
   assert.match(styles, /@container \(max-width: 580px\)/);
   assert.match(styles, /\.ones1004-cells \{[^}]*overflow-x: auto/s);
+  assert.match(styles, /\.ones1004-bottom/);
 });
