@@ -5,6 +5,7 @@ const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
   'app-core.js',
+  'app-renderers-base.js',
   'renderers-01.js',
   'renderers-02.js',
   'renderers-03.js',
@@ -103,6 +104,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-increasing-paths-2328.js',
   'renderer-increasing-cells-2713.js',
   'script.js',
+  'live-editor.js',
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([

@@ -12,11 +12,13 @@ test('index loads only the shell assets synchronously and keeps visualization ch
   const styleTemplate = html.match(/<template id="problemVisualizationStyles"[\s\S]*?<\/template>/)?.[0] || '';
   const sharedScriptTemplate = html.match(/<template id="sharedVisualizationScripts"[\s\S]*?<\/template>/)?.[0] || '';
   const scriptTemplate = html.match(/<template id="problemVisualizationScripts"[\s\S]*?<\/template>/)?.[0] || '';
+  const liveEditorTemplate = html.match(/<template id="liveEditorScripts"[\s\S]*?<\/template>/)?.[0] || '';
   const activeHtml = html
     .replace(sharedStyleTemplate, '')
     .replace(styleTemplate, '')
     .replace(sharedScriptTemplate, '')
-    .replace(scriptTemplate, '');
+    .replace(scriptTemplate, '')
+    .replace(liveEditorTemplate, '');
   const shellStyles = new Set(['style.css', 'debug-controls.css']);
   const stylesheetAssets = [...activeHtml.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
     .map(match => match[1].split('?')[0]);
@@ -38,15 +40,19 @@ test('index loads only the shell assets synchronously and keeps visualization ch
     || asset === 'script.js'
     || shellScripts.has(asset);
   assert.deepEqual(localScriptTags.map(match => match[1].split('?')[0]), JAVASCRIPT_ASSETS.filter(isShellScript));
-  const isDeferredSharedScript = asset => /^renderers-\d+\.js$/.test(asset)
+  const isDeferredSharedScript = asset => asset === 'app-renderers-base.js'
+    || /^renderers-\d+\.js$/.test(asset)
     || asset === 'renderer-requested-visualizations.js'
     || asset === 'renderer-hard-problems.js';
   const deferredSharedScripts = [...sharedScriptTemplate.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)]
     .map(match => match[1].split('?')[0]);
   assert.deepEqual(deferredSharedScripts, JAVASCRIPT_ASSETS.filter(isDeferredSharedScript));
+  const deferredLiveEditorScripts = [...liveEditorTemplate.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)]
+    .map(match => match[1].split('?')[0]);
+  assert.deepEqual(deferredLiveEditorScripts, ['live-editor.js']);
   const deferredScripts = [...scriptTemplate.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)]
     .map(match => match[1].split('?')[0]);
-  assert.deepEqual(deferredScripts, JAVASCRIPT_ASSETS.filter(asset => !isShellScript(asset) && !isDeferredSharedScript(asset)));
+  assert.deepEqual(deferredScripts, JAVASCRIPT_ASSETS.filter(asset => asset !== 'live-editor.js' && !isShellScript(asset) && !isDeferredSharedScript(asset)));
   for (const [tag] of localScriptTags) {
     assert.doesNotMatch(tag, /\b(?:async|defer)\b|type=["']module["']/i);
   }
