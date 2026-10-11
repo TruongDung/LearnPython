@@ -185,11 +185,13 @@ test('1004 frontend selects the dedicated responsive renderer', () => {
   const script = readFrontendJavaScript();
   const styles = readFrontendStyles();
   assert.match(index, /renderer-max-consecutive-ones-1004\.js\?v=max-consecutive-ones-1004-v3/);
-  assert.match(index, /max-consecutive-ones-1004\.css\?v=max-consecutive-ones-1004-v3/);
+  assert.match(index, /max-consecutive-ones-1004\.css\?v=max-consecutive-ones-1004-v4/);
   assert.match(script, /step\.maxConsecutiveOnes1004View/);
   assert.match(styles, /\.ones1004-viz/);
   assert.match(styles, /\[data-theme="light"\] \.ones1004-viz/);
   assert.match(styles, /@container \(max-width: 580px\)/);
-  assert.match(styles, /\.ones1004-cells \{[^}]*overflow-x: auto/s);
+  assert.match(styles, /\.ones1004-cells \{[^}]*grid-template-columns: repeat\(auto-fit,[^}]*overflow: visible/s);
+  assert.match(styles, /\.ones1004-best > div \{[^}]*flex-wrap: wrap[^}]*overflow: visible/s);
+  assert.doesNotMatch(styles, /\.ones1004-(?:cells|best > div) \{[^}]*overflow-x: auto/s);
   assert.match(styles, /\.ones1004-bottom/);
 });

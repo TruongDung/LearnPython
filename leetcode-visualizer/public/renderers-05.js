@@ -1278,71 +1278,118 @@ function renderMinCostStairsView(step) {
   const isRolling = view.method === "rolling";
   const sources = new Set(view.sources || []);
   const phaseLabels = {
-    init: vi ? "Khởi tạo" : "Initialize",
-    compute: vi ? "Tính chi phí" : "Compute cost",
-    done: vi ? "Hoàn tất" : "Complete",
+    init: vi ? "Bắt đầu" : "Start",
+    compute: vi ? "Đang leo" : "Climbing",
+    done: vi ? "Tới đỉnh" : "At the top",
   };
 
-  // Cost stairs row (cost[i] for each stair).
-  const costHtml = cost.map((c, idx) => {
+  let chosenSource = null;
+  if (view.formula && !isRolling) {
+    chosenSource = view.formula.chosen === "A"
+      ? view.formula.optA.fromStep
+      : view.formula.optB.fromStep;
+  } else if (view.formula && isRolling) {
+    chosenSource = view.formula.prev1 <= view.formula.prev2
+      ? view.formula.i - 1
+      : view.formula.i - 2;
+  }
+
+  if (view.phase === "done" && cost.length >= 2) {
+    sources.add(cost.length - 2);
+    sources.add(cost.length - 1);
+    if (isRolling && view.rolling) {
+      chosenSource = view.rolling.prev1.value <= view.rolling.prev2.value
+        ? view.rolling.prev1.step
+        : view.rolling.prev2.step;
+    } else if (Array.isArray(view.dp)) {
+      const oneStep = view.dp[cost.length - 1] + cost[cost.length - 1];
+      const twoSteps = view.dp[cost.length - 2] + cost[cost.length - 2];
+      chosenSource = oneStep <= twoSteps ? cost.length - 1 : cost.length - 2;
+    }
+  }
+
+  const rollingByStep = new Map();
+  if (view.rolling) {
+    Object.values(view.rolling).forEach((item) => {
+      if (item && Number.isInteger(item.step)) rollingByStep.set(item.step, item.value);
+    });
+  }
+
+  const anchor = Math.max(0, Math.min(cost.length - 1, view.currentIndex));
+  const visibleLimit = 5;
+  const start = cost.length <= visibleLimit
+    ? 0
+    : Math.max(0, Math.min(cost.length - visibleLimit, anchor - 4));
+  const end = cost.length <= visibleLimit ? cost.length : start + visibleLimit;
+  const visible = cost.slice(start, end);
+  let stairSlot = 0;
+  const stairs = [];
+  if (start > 0) stairs.push(`<span class="mcs746-gap" aria-hidden="true">…</span>`);
+  visible.forEach((value, offset) => {
+    const idx = start + offset;
     const classes = ["mcs746-cost"];
     if (idx === view.currentIndex) classes.push("current");
     if (sources.has(idx)) classes.push("source");
-    return `<span class="${classes.join(" ")}"><small>${vi ? "bậc" : "step"} ${idx}</small><strong>${c}</strong></span>`;
-  }).join("");
+    if (idx === chosenSource) classes.push("chosen");
+    const stateValue = isRolling ? rollingByStep.get(idx) : view.dp?.[idx];
+    const state = stateValue === null || stateValue === undefined
+      ? `<em class="pending">dp ?</em>`
+      : `<em>dp ${stateValue}</em>`;
+    stairs.push(`<span class="${classes.join(" ")}" style="--mcs-level:${stairSlot}">
+      <small>#${idx}</small><strong>+$${value}</strong>${state}
+    </span>`);
+    stairSlot += 1;
+  });
+  if (end < cost.length) stairs.push(`<span class="mcs746-gap" aria-hidden="true">…</span>`);
 
-  // Formula box.
+  const topValue = view.answer ?? (!isRolling && Array.isArray(view.dp) ? view.dp[view.n] : null);
+  const topClasses = ["mcs746-top"];
+  if (view.currentIndex === view.n) topClasses.push("current");
+  if (view.phase === "done") topClasses.push("done");
+  stairs.push(`<span class="${topClasses.join(" ")}" style="--mcs-level:${stairSlot + 1}">
+    <small>TOP</small><strong>⚑</strong><em>${topValue === null || topValue === undefined ? "dp ?" : `dp ${topValue}`}</em>
+  </span>`);
+
+  const option = (from, jump, left, paid, total, chosen) => `<span class="mcs746-opt ${chosen ? "chosen" : ""}">
+    <small>#${from} ${jump}</small><strong>${left} + ${paid}</strong><em>= ${total}</em>
+  </span>`;
+
   let formulaHtml = "";
   if (view.formula && !isRolling) {
     const f = view.formula;
-    const aCls = f.chosen === "A" ? "chosen" : "";
-    const bCls = f.chosen === "B" ? "chosen" : "";
-    formulaHtml = `<div class="mcs746-formula">
-      <span class="mcs746-opt ${aCls}">${vi ? "từ bậc" : "from"} ${f.optA.fromStep}: ${f.optA.dp}+${f.optA.cost} = <b>${f.optA.total}</b></span>
-      <i>min</i>
-      <span class="mcs746-opt ${bCls}">${vi ? "từ bậc" : "from"} ${f.optB.fromStep}: ${f.optB.dp}+${f.optB.cost} = <b>${f.optB.total}</b></span>
-      <em>→ dp[${f.i}] = ${f.result}</em>
+    formulaHtml = `<div class="mcs746-formula" aria-label="${vi ? "So sánh hai cú nhảy" : "Compare two jumps"}">
+      ${option(f.optB.fromStep, "↗↗", f.optB.dp, f.optB.cost, f.optB.total, f.chosen === "B")}
+      ${option(f.optA.fromStep, "↗", f.optA.dp, f.optA.cost, f.optA.total, f.chosen === "A")}
+      <span class="mcs746-result"><small>min</small><strong>${f.result}</strong></span>
     </div>`;
   } else if (view.formula && isRolling) {
     const f = view.formula;
-    formulaHtml = `<div class="mcs746-formula"><span class="mcs746-opt chosen">curr = cost[${f.i}] + min(prev1=${f.prev1}, prev2=${f.prev2}) = ${f.cost} + ${f.min} = <b>${f.result}</b></span></div>`;
+    formulaHtml = `<div class="mcs746-formula" aria-label="${vi ? "So sánh hai cú nhảy" : "Compare two jumps"}">
+      <span class="mcs746-opt ${chosenSource === f.i - 2 ? "chosen" : ""}"><small>#${f.i - 2} ↗↗</small><strong>${f.prev2}</strong></span>
+      <span class="mcs746-opt ${chosenSource === f.i - 1 ? "chosen" : ""}"><small>#${f.i - 1} ↗</small><strong>${f.prev1}</strong></span>
+      <span class="mcs746-result"><small>+$${f.cost}</small><strong>${f.result}</strong></span>
+    </div>`;
   }
 
-  // dp row (method dp) or rolling registers (method rolling).
-  let stateHtml = "";
+  let memoryHtml = "";
   if (isRolling && view.rolling) {
     const r = view.rolling;
-    const reg = (name, item, hint) => `<article class="mcs746-reg ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `${vi ? "bậc" : "step"} ${item.step}` : hint}</em></article>`;
-    stateHtml = `<section class="mcs746-panel"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 2 biến" : "two-variable window"}</span></header><div class="mcs746-regs">
-      ${reg("prev2", r.prev2, vi ? "2 bậc trước" : "two back")}
-      ${reg("prev1", r.prev1, vi ? "1 bậc trước" : "one back")}
-      ${reg("curr", r.curr, vi ? "chi phí mới" : "new cost")}
-    </div></section>`;
-  } else if (Array.isArray(view.dp)) {
-    const dpHtml = view.dp.map((val, pos) => {
-      const classes = ["mcs746-dp"];
-      if (pos === view.currentIndex) classes.push("current");
-      if (sources.has(pos)) classes.push("source");
-      if (pos === view.n) classes.push("goal");
-      if (val === null || val === undefined) classes.push("pending");
-      return `<span class="${classes.join(" ")}"><small>${pos}${pos === view.n ? " ★" : ""}</small><strong>${val === null || val === undefined ? "?" : val}</strong></span>`;
-    }).join("");
-    stateHtml = `<section class="mcs746-panel"><header><strong>dp[0..${view.n}]</strong><span>${vi ? "★ = đỉnh cầu thang (đáp án)" : "★ = top of stairs (answer)"}</span></header><div class="mcs746-dps">${dpHtml}</div></section>`;
+    const reg = (name, item) => `<span class="mcs746-reg ${item ? "filled" : "empty"}"><small>${name}${item ? ` · #${item.step}` : ""}</small><strong>${item ? item.value : "—"}</strong></span>`;
+    memoryHtml = `<div class="mcs746-regs" aria-label="${vi ? "Bộ nhớ hai biến" : "Two-variable memory"}">
+      ${reg("prev2", r.prev2)}<i>→</i>${reg("prev1", r.prev1)}<i>→</i>${reg("curr", r.curr)}
+    </div>`;
   }
 
-  const methodLabel = isRolling
-    ? (vi ? "APPROACH 2 · O(1) — prev2/prev1" : "APPROACH 2 · O(1) — prev2/prev1")
-    : (vi ? "APPROACH 1 · bảng dp" : "APPROACH 1 · dp table");
+  const methodLabel = isRolling ? "O(1) · prev2 / prev1" : "DP · O(n)";
   const answerLine = view.answer === null || view.answer === undefined
     ? ""
-    : `<section class="mcs746-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong></section>`;
+    : `<section class="mcs746-answer"><span aria-hidden="true">🏁</span><small>MIN COST</small><strong>${view.answer}</strong></section>`;
 
-  $("treeView").innerHTML = `<section class="mcs746-viz" role="img" aria-label="${vi ? "Trực quan hóa Min Cost Climbing Stairs" : "Min Cost Climbing Stairs visualization"}">
-    <header><strong>MIN COST CLIMBING STAIRS</strong><span class="mcs746-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
-    <section class="mcs746-rule"><b>${escapeHtml(methodLabel)}</b><strong>${isRolling ? "curr = cost[i] + min(prev1, prev2)" : "dp[i] = min(dp[i-1]+cost[i-1], dp[i-2]+cost[i-2])"}</strong><span>${vi ? "trả cost để rời một bậc; leo 1 hoặc 2 bậc; bắt đầu ở bậc 0/1 miễn phí" : "pay a step's cost to leave it; climb 1 or 2 steps; start free at step 0/1"}</span></section>
-    <section class="mcs746-panel"><header><strong>cost</strong><span>${vi ? "vàng = bậc đang xét · tím = 2 nguồn" : "yellow = current step · purple = 2 sources"}</span></header><div class="mcs746-costs">${costHtml}</div></section>
+  $("treeView").innerHTML = `<section class="mcs746-viz" role="img" aria-label="${vi ? "Mô phỏng leo cầu thang với chi phí nhỏ nhất" : "Minimum-cost stair climbing simulation"}">
+    <header><strong>#746 · 🪜</strong><span class="mcs746-method">${escapeHtml(methodLabel)}</span><span class="mcs746-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="mcs746-panel"><div class="mcs746-costs">${stairs.join("")}</div></section>
     ${formulaHtml}
-    ${stateHtml}
+    ${memoryHtml}
     ${answerLine}
   </section>`;
 }

@@ -64,7 +64,7 @@
 .ones1004-array > header strong { color: var(--o-blue); font: 900 12px ui-monospace, monospace; }
 .ones1004-array > header b { display: grid; width: 24px; height: 24px; place-items: center; color: var(--o-on-green); background: var(--o-green); border-radius: 50%; }
 .ones1004-array.invalid > header b { color: #ffffff; background: var(--o-red); }
-.ones1004-cells { display: grid; grid-template-columns: repeat(var(--ones1004-count), minmax(54px, 1fr)); gap: 5px; overflow-x: auto; padding: 26px 10px 12px; }
+.ones1004-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); column-gap: 5px; row-gap: 26px; overflow: visible; padding: 26px 10px 12px; }
 .ones1004-cell { display: grid; position: relative; min-width: 54px; height: 86px; place-items: center; align-content: center; gap: 2px; color: var(--o-muted); background: var(--o-soft); border-radius: 8px; opacity: .34; }
 .ones1004-cell > small { position: absolute; top: -21px; left: 0; right: 0; color: var(--o-amber); text-align: center; font: 900 11px ui-monospace, monospace; }
 .ones1004-cell > strong { color: var(--o-text); font: 900 28px ui-monospace, monospace; }
@@ -98,7 +98,7 @@
 .ones1004-budget > div > span.none { color: var(--o-muted); }
 .ones1004-best { border-color: var(--o-green); }
 .ones1004-best > header b { color: var(--o-green); font: 900 15px ui-monospace, monospace; }
-.ones1004-best > div { display: flex; gap: 5px; min-height: 62px; align-items: center; overflow-x: auto; padding: 9px; }
+.ones1004-best > div { display: flex; flex-wrap: wrap; gap: 5px; min-height: 62px; align-items: center; overflow: visible; padding: 9px; }
 .ones1004-best > div > span { display: grid; flex: 0 0 38px; height: 44px; place-items: center; align-content: center; background: color-mix(in srgb, var(--o-green) 12%, var(--o-panel)); border-radius: 7px; }
 .ones1004-best > div > span b { color: var(--o-text); font: 900 16px ui-monospace, monospace; }
 .ones1004-best > div > span small { color: var(--o-muted); font: 700 8px ui-monospace, monospace; }
@@ -112,7 +112,7 @@
   .ones1004-stats span { flex: 1; }
   .ones1004-stage { grid-template-columns: 1fr; }
   .ones1004-stage > strong { width: 100%; }
-  .ones1004-cells { grid-template-columns: repeat(var(--ones1004-count), 58px); }
+  .ones1004-cells { grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); }
   .ones1004-bottom { grid-template-columns: 1fr; }
 }
 
