@@ -856,6 +856,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.underpaidManagers9022View), surface: "treeView", render: (step) => {
       renderUnderpaidManagers9022View(step);
     } },
+    { predicate: (step) => Boolean(step.fullBloomFlowers2251View), surface: "treeView", render: (step) => {
+      renderFullBloomFlowers2251View(step);
+    } },
     { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
       renderGraph(step);
     } },
