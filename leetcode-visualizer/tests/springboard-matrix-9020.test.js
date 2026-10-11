@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const vm = require('node:vm');
+const rendererSource = require('node:fs').readFileSync(require.resolve('../public/renderer-springboard-matrix-9020.js'), 'utf8');
 
 const { SUPPORTED } = require('../problems');
 const {
@@ -292,10 +293,6 @@ assert len({tuple(path) for path in paths}) == len(paths)
 });
 
 test('9020 dedicated renderer handles every trace step in English and Vietnamese', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderSpringboardMatrix9020View(step)');
-  const end = source.indexOf('\nfunction ', start + 20);
-  assert.ok(start >= 0 && end > start);
   const element = { innerHTML: '' };
   const context = {
     lang: 'en',
@@ -304,7 +301,7 @@ test('9020 dedicated renderer handles every trace step in English and Vietnamese
   };
   context.pick = (value) => value?.[context.lang] ?? value ?? '';
   vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(rendererSource, context);
   const run = problem.builder(problem.defaultInput);
   for (const language of ['en', 'vi']) {
     context.lang = language;
@@ -313,6 +310,9 @@ test('9020 dedicated renderer handles every trace step in English and Vietnamese
       assert.match(element.innerHTML, /spring9020-viz/);
       assert.match(element.innerHTML, /spring9020-board/);
       assert.match(element.innerHTML, /spring9020-route/);
+      assert.match(element.innerHTML, /spring9020-map-arrows/);
+      assert.match(element.innerHTML, /spring9020-jump/);
+      assert.doesNotMatch(element.innerHTML, /spring9020-step|spring9020-neighbors/);
       assert.equal((element.innerHTML.match(/class="spring9020-cell(?: |")/g) || []).length, 9);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity|object Object/);
     }
@@ -320,11 +320,6 @@ test('9020 dedicated renderer handles every trace step in English and Vietnamese
 });
 
 test('9020 follow-up renderer shows path copies, counts, and the complete grouped list', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderSpringboardMatrix9020View(step)');
-  const second = source.indexOf('function renderSpringboardPaths9020View(step)', start);
-  const end = source.indexOf('\nfunction ', second + 20);
-  assert.ok(start >= 0 && second > start && end > second);
   const element = { innerHTML: '' };
   const context = {
     lang: 'en',
@@ -333,7 +328,7 @@ test('9020 follow-up renderer shows path copies, counts, and the complete groupe
   };
   context.pick = (value) => value?.[context.lang] ?? value ?? '';
   vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(rendererSource, context);
   const run = problem.builder2(problem.defaultInput, { approach: 2 });
   const samples = [run.steps[0], run.steps.find((step) => step.springboardMatrix9020View.phase === 'record'), run.steps.at(-1)];
   for (const language of ['en', 'vi']) {
@@ -342,27 +337,27 @@ test('9020 follow-up renderer shows path copies, counts, and the complete groupe
       context.renderSpringboardMatrix9020View(step);
       assert.match(element.innerHTML, /spring9020-list-viz/);
       assert.match(element.innerHTML, /spring9020-list-summary/);
+      assert.match(element.innerHTML, /spring9020-copy/);
+      assert.match(element.innerHTML, /spring9020-mini-map/);
       assert.equal((element.innerHTML.match(/class="spring9020-cell(?: |")/g) || []).length, 9);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity|object Object/);
     }
   }
   context.lang = 'en';
   context.renderSpringboardMatrix9020View(run.steps.at(-1));
-  assert.match(element.innerHTML, /COMPLETE LIST GROUPED BY LENGTH/);
+  assert.match(element.innerHTML, /Saved paths/);
   assert.match(element.innerHTML, /91 paths/);
-  assert.match(element.innerHTML, /LONGEST/);
-  assert.equal((element.innerHTML.match(/<details/g) || []).length, 9);
+  assert.match(element.innerHTML, /Longest/);
+  assert.equal((element.innerHTML.match(/<details class="(?:longest|)"/g) || []).length, 9);
+  assert.equal((element.innerHTML.match(/<li>/g) || []).length, 91);
 });
 
 test('9020 visited-set visualization shows add, remove, returned length, and optimal path in both languages', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderSpringboardMatrix9020View(step)');
-  const end = source.indexOf('\nfunction ', start + 20);
   const element = { innerHTML: '' };
   const context = { lang: 'en', $: () => element, escapeHtml: String };
   context.pick = (value) => value?.[context.lang] ?? value ?? '';
   vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(rendererSource, context);
   const run = problem.builder3(problem.defaultInput);
   for (const language of ['en', 'vi']) {
     context.lang = language;
@@ -388,6 +383,6 @@ test('9020 frontend loads the dedicated responsive visualization', () => {
   assert.match(script, /renderSpringboardMatrix9020View\(step\)/);
   assert.match(styles, /\.spring9020-board \{/);
   assert.match(styles, /@container \(max-width: 500px\)/);
-  assert.match(styles, /\.spring9020-route > div \{[^}]*overflow-x: auto/s);
+  assert.match(styles, /\.spring9020-route > div \{[^}]*flex-wrap: wrap/s);
   assert.match(styles, /\.spring9020-list-output details/);
 });
