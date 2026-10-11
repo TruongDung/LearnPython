@@ -1,3 +1,8 @@
+/* Shell utility: must be available before any deferred visualization CSS. */
+.hidden {
+  display: none !important;
+}
+
 /* #31: four-stage next-permutation learning board. */
 .np31-viz {
   --np31-text: #e5e7eb;
