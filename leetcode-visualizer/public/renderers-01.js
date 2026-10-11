@@ -3714,6 +3714,17 @@ function renderTotalStrength2281View(step) {
     ? stack.map((index, position) => `<span class="${position === stack.length - 1 ? "top" : ""}"><b>i=${index}</b><small>${strength[index]}</small></span>`).join("<i>→</i>")
     : `<em>${vi ? "Stack đang trống" : "The stack is empty"}</em>`;
   const isBoundary = view.phase === "left" || view.phase === "right";
+  const stackTitle = view.phase === "right"
+    ? (vi ? "STACK TÌM NEXT ≤" : "STACK FOR NEXT ≤")
+    : view.phase === "left"
+      ? (vi ? "STACK TÌM PREVIOUS <" : "STACK FOR PREVIOUS <")
+      : (vi ? "HAI LƯỢT TÌM BIÊN ĐÃ XONG" : "BOUNDARY PASSES COMPLETE");
+  const stackDirection = isBoundary
+    ? (vi ? "đáy → đỉnh" : "bottom → top")
+    : (vi ? "left và right đã cố định" : "left and right are fixed");
+  const stackContent = isBoundary
+    ? stackHtml
+    : `<em>${vi ? "Stack không còn cần thiết; mỗi wizard đã có vùng sở hữu duy nhất." : "The stacks are no longer needed; every wizard now has one fixed ownership region."}</em>`;
   const hasComparison = isBoundary && current >= 0 && compared >= 0;
   const topValue = hasComparison ? strength[compared] : null;
   const currentValue = current >= 0 ? strength[current] : null;
@@ -3748,7 +3759,7 @@ function renderTotalStrength2281View(step) {
     <section class="ts2281-rule"><b>${vi ? "ĐỔI TỪ DUYỆT SUBARRAY SANG CONTRIBUTION" : "SWITCH FROM SUBARRAYS TO CONTRIBUTIONS"}</b><strong>contribution(i) = strength[i] × Σ sum(subarray owned by i)</strong><span>${vi ? "Biên bất đối xứng left < và right ≤ đảm bảo mỗi subarray có đúng một owner khi minimum bị trùng." : "Asymmetric left < and right ≤ boundaries give every subarray exactly one owner when minima tie."}</span></section>
     <section class="ts2281-metrics"><div><small>${vi ? "wizard hiện tại" : "current wizard"}</small><strong>${current >= 0 ? `i=${current}` : "—"}</strong></div><div><small>minimum value</small><strong>${currentValue == null ? "—" : currentValue}</strong></div><div><small>${vi ? "vùng sở hữu" : "ownership region"}</small><strong>${hasOwnedRegion ? `[${left[current] + 1}..${right[current] - 1}]` : "—"}</strong></div><div class="answer"><small>running answer</small><strong>${view.total ?? 0}</strong></div></section>
     <section class="ts2281-cards-wrap"><header><strong>${vi ? "BIÊN VÀ CONTRIBUTION CỦA TỪNG WIZARD" : "EACH WIZARD'S BOUNDARIES AND CONTRIBUTION"}</strong><span>${vi ? "viền xanh = trong stack · tím = current" : "blue edge = in stack · purple = current"}</span></header><div style="--ts2281-count:${Math.max(strength.length, 1)}">${cards}</div></section>
-    <section class="ts2281-stack"><header><strong>${view.phase === "right" ? (vi ? "STACK TÌM NEXT ≤" : "STACK FOR NEXT ≤") : (vi ? "STACK TÌM PREVIOUS <" : "STACK FOR PREVIOUS <")}</strong><span>${vi ? "đáy → đỉnh" : "bottom → top"}</span></header><div>${stackHtml}</div><p>${vi ? "Tie rule: trái pop ≥, phải chỉ pop >. Hai phía không được dùng cùng một dấu." : "Tie rule: the left pass pops ≥, while the right pass pops only >. The two sides must not use the same comparison."}</p></section>
+    <section class="ts2281-stack"><header><strong>${stackTitle}</strong><span>${stackDirection}</span></header><div>${stackContent}</div><p>${vi ? "Tie rule: trái pop ≥, phải chỉ pop >. Hai phía không được dùng cùng một dấu." : "Tie rule: the left pass pops ≥, while the right pass pops only >. The two sides must not use the same comparison."}</p></section>
     ${comparisonHtml}
     <section class="ts2281-prefix"><header><div><small>TWO PREFIX ARRAYS</small><strong>P[k] = Σ strength[0..k−1] · PP[k] = Σ P[0..k−1]</strong></div><span>${vi ? "PP cộng một dải P trong O(1)" : "PP sums a range of P in O(1)"}</span></header><div>${prefixCards}</div></section>
     <section class="ts2281-owner"><header><strong>${vi ? "CÁC SUBARRAY DO CURRENT MINIMUM SỞ HỮU" : "SUBARRAYS OWNED BY THE CURRENT MINIMUM"}</strong><span>${hasOwnedRegion ? `${view.leftCount ?? "?"} left × ${view.rightCount ?? "?"} right = ${ownedRanges.length}` : ""}</span></header><div class="ts2281-owner-array" style="--ts2281-count:${Math.max(strength.length, 1)}">${ownerCells}</div><div class="ts2281-ranges">${rangeHtml}</div></section>
