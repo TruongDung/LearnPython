@@ -109,6 +109,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 
 const STYLESHEET_ASSETS = Object.freeze([
   'style.css',
+  'shell-ui.css',
   'style-01.css',
   'style-02.css',
   'style-03.css',

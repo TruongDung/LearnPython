@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "public/index.html"), "utf8");
+const shellUi = fs.readFileSync(path.join(root, "public/shell-ui.css"), "utf8");
 const appCore = fs.readFileSync(path.join(root, "public/app-core.js"), "utf8");
 const baseRenderers = fs.readFileSync(path.join(root, "public/app-renderers-base.js"), "utf8");
 const liveEditor = fs.readFileSync(path.join(root, "public/live-editor.js"), "utf8");
@@ -14,6 +15,16 @@ test("problem-specific visualization assets are inert during initial page load",
   assert.match(html, /<template id="problemVisualizationStyles" data-problem-assets="styles">[\s\S]*max-consecutive-ones-1004\.css[\s\S]*<\/template>/);
   assert.match(html, /<template id="problemVisualizationScripts" data-problem-assets="scripts">[\s\S]*renderer-max-consecutive-ones-1004\.js[\s\S]*<\/template>/);
   assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g, ""), /renderer-max-consecutive-ones-1004\.(?:js|css)/);
+});
+
+test("the initial shell keeps code and theme controls styled before visualization assets load", () => {
+  const activeHtml = html.replace(/<template[\s\S]*?<\/template>/g, "");
+  assert.match(activeHtml, /<link rel="stylesheet" href="shell-ui\.css\?[^\"]+" \/>/);
+  assert.match(shellUi, /\.code-panel\s*\{/);
+  assert.match(shellUi, /\.code-line\s*\{/);
+  assert.match(shellUi, /\.theme-toggle\s*\{/);
+  assert.match(shellUi, /\.theme-auto\s*\{/);
+  assert.match(shellUi, /\[data-theme="light"\] body\s*\{/);
 });
 
 test("the client loads only the selected problem assets and preserves script order", () => {

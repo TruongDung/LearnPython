@@ -19,7 +19,7 @@ test('index loads only the shell assets synchronously and keeps visualization ch
     .replace(sharedScriptTemplate, '')
     .replace(scriptTemplate, '')
     .replace(liveEditorTemplate, '');
-  const shellStyles = new Set(['style.css', 'debug-controls.css']);
+  const shellStyles = new Set(['style.css', 'shell-ui.css', 'debug-controls.css']);
   const stylesheetAssets = [...activeHtml.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
     .map(match => match[1].split('?')[0]);
   assert.deepEqual(stylesheetAssets, STYLESHEET_ASSETS.filter(asset => shellStyles.has(asset)));
