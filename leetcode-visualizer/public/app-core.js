@@ -2616,6 +2616,8 @@ async function runViz() {
       return showError("runError", data.error || t().errSolve);
     }
 
+    await ensureSharedVisualizationAssets(data.steps || []);
+
     steps = shouldUseLineByLineDebug()
       ? expandStepsLineByLine(data.steps)
       : (data.steps || []);

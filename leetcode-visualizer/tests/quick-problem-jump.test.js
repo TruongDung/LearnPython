@@ -7,35 +7,49 @@ const html = readFrontendIndex();
 const script = readFrontendJavaScript();
 const css = readFrontendStyles();
 
-test('index loads shared assets synchronously and keeps problem assets inert in source order', () => {
+test('index loads only the shell assets synchronously and keeps visualization chunks inert', () => {
+  const sharedStyleTemplate = html.match(/<template id="sharedVisualizationStyles"[\s\S]*?<\/template>/)?.[0] || '';
   const styleTemplate = html.match(/<template id="problemVisualizationStyles"[\s\S]*?<\/template>/)?.[0] || '';
+  const sharedScriptTemplate = html.match(/<template id="sharedVisualizationScripts"[\s\S]*?<\/template>/)?.[0] || '';
   const scriptTemplate = html.match(/<template id="problemVisualizationScripts"[\s\S]*?<\/template>/)?.[0] || '';
-  const activeHtml = html.replace(styleTemplate, '').replace(scriptTemplate, '');
-  const sharedStyles = new Set(['requested-visualizations.css', 'hard-problems.css', 'debug-controls.css']);
-  const isSharedStyle = asset => /^style(?:-\d+)?\.css$/.test(asset) || sharedStyles.has(asset);
+  const activeHtml = html
+    .replace(sharedStyleTemplate, '')
+    .replace(styleTemplate, '')
+    .replace(sharedScriptTemplate, '')
+    .replace(scriptTemplate, '');
+  const shellStyles = new Set(['style.css', 'debug-controls.css']);
   const stylesheetAssets = [...activeHtml.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
     .map(match => match[1].split('?')[0]);
-  assert.deepEqual(stylesheetAssets, STYLESHEET_ASSETS.filter(isSharedStyle));
+  assert.deepEqual(stylesheetAssets, STYLESHEET_ASSETS.filter(asset => shellStyles.has(asset)));
+  const deferredSharedStyles = [...sharedStyleTemplate.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
+    .map(match => match[1].split('?')[0]);
+  const isDeferredSharedStyle = asset => /^style-\d+\.css$/.test(asset)
+    || asset === 'requested-visualizations.css'
+    || asset === 'hard-problems.css';
+  assert.deepEqual(deferredSharedStyles, STYLESHEET_ASSETS.filter(isDeferredSharedStyle));
   const deferredStyles = [...styleTemplate.matchAll(/<link rel="stylesheet" href="([^"]+)" \/>/g)]
     .map(match => match[1].split('?')[0]);
-  assert.deepEqual(deferredStyles, STYLESHEET_ASSETS.filter(asset => !isSharedStyle(asset)));
+  assert.deepEqual(deferredStyles, STYLESHEET_ASSETS.filter(asset => !shellStyles.has(asset) && !isDeferredSharedStyle(asset)));
 
   const externalScriptTags = [...activeHtml.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)];
-  assert.match(externalScriptTags[0][1], /monaco-editor@0\.52\.0\/min\/vs\/loader\.js/);
-  const localScriptTags = externalScriptTags.slice(1);
-  const sharedScripts = new Set(['renderer-requested-visualizations.js', 'renderer-hard-problems.js']);
-  const isSharedScript = asset => asset === 'app-core.js'
+  const localScriptTags = externalScriptTags;
+  const shellScripts = new Set();
+  const isShellScript = asset => asset === 'app-core.js'
     || asset === 'script.js'
-    || /^renderers-\d+\.js$/.test(asset)
-    || sharedScripts.has(asset);
-  assert.deepEqual(localScriptTags.map(match => match[1].split('?')[0]), JAVASCRIPT_ASSETS.filter(isSharedScript));
+    || shellScripts.has(asset);
+  assert.deepEqual(localScriptTags.map(match => match[1].split('?')[0]), JAVASCRIPT_ASSETS.filter(isShellScript));
+  const isDeferredSharedScript = asset => /^renderers-\d+\.js$/.test(asset)
+    || asset === 'renderer-requested-visualizations.js'
+    || asset === 'renderer-hard-problems.js';
+  const deferredSharedScripts = [...sharedScriptTemplate.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)]
+    .map(match => match[1].split('?')[0]);
+  assert.deepEqual(deferredSharedScripts, JAVASCRIPT_ASSETS.filter(isDeferredSharedScript));
   const deferredScripts = [...scriptTemplate.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)]
     .map(match => match[1].split('?')[0]);
-  assert.deepEqual(deferredScripts, JAVASCRIPT_ASSETS.filter(asset => !isSharedScript(asset)));
+  assert.deepEqual(deferredScripts, JAVASCRIPT_ASSETS.filter(asset => !isShellScript(asset) && !isDeferredSharedScript(asset)));
   for (const [tag] of localScriptTags) {
     assert.doesNotMatch(tag, /\b(?:async|defer)\b|type=["']module["']/i);
   }
-  assert.ok(html.indexOf(externalScriptTags[0][0]) < html.indexOf(localScriptTags[0][0]));
   assert.ok(html.indexOf(localScriptTags.at(-1)[0]) < html.indexOf('new MutationObserver'));
 });
 
