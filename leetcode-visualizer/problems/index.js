@@ -25,14 +25,14 @@ const categories = {
   bst: require("./bst"),
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
   heap: Object.assign(require("./heap"), require("./server-heap"), require("./meeting-rooms-iii")),
-  "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations"), require("./number-of-good-paths-2421")),
+  "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations"), require("./number-of-good-paths-2421"), require("./similar-string-groups-839")),
   "linked-list": require("./linked-list"),
   "binary-lifting": Object.assign(require("./binary-lifting"), require("./minimum-edge-weight-equilibrium-queries-2846")),
   "binary-search": Object.assign(require("./binary-search"), require("./range-module")),
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723"), require("./wonderful-substrings-1915")),
   design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./lib-register-9019"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./stock-price-2034"), require("./snapshot-array-1146"), require("./detect-squares-2013"), require("./log-system-635"), require("./prefix-suffix-search-745")),
-  interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./k-sum-2386")),
+  interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./k-sum-2386"), require("./underpaid-managers-9022")),
 };
 
 const SUPPORTED = {};

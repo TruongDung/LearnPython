@@ -418,6 +418,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.equivalent1061View), surface: "treeView", render: (step) => {
       renderEquivalent1061View(step);
     } },
+    { predicate: (step) => Boolean(step.similar839View), surface: "treeView", render: (step) => {
+      renderSimilarStringGroups839View(step);
+    } },
     { predicate: (step) => Boolean(step.islands305View), surface: "treeView", render: (step) => {
       renderIslands305View(step);
     } },
@@ -849,6 +852,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.informEmployees1376View), surface: "treeView", render: (step) => {
       renderInformEmployees1376View(step);
+    } },
+    { predicate: (step) => Boolean(step.underpaidManagers9022View), surface: "treeView", render: (step) => {
+      renderUnderpaidManagers9022View(step);
     } },
     { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
       renderGraph(step);
