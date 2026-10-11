@@ -24,6 +24,70 @@ let codeSnippetBlurred = true;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 const CODE_SNIPPET_BLURRED_KEY = "leetcodeCodeSnippetBlurred";
+const problemVisualizationAssetPromises = new Map();
+
+function problemVisualizationAssetNodes(problemId) {
+  const id = Number(problemId);
+  if (!Number.isInteger(id)) return [];
+  const suffix = new RegExp(`-${id}\\.(?:css|js)(?:[?#]|$)`);
+  return [...document.querySelectorAll("template[data-problem-assets]")]
+    .flatMap((template) => [...template.content.querySelectorAll("link[href], script[src]")])
+    .filter((asset) => suffix.test(asset.getAttribute("href") || asset.getAttribute("src") || ""));
+}
+
+function loadProblemVisualizationAsset(sourceAsset) {
+  const isStyle = sourceAsset.tagName === "LINK";
+  const url = sourceAsset.getAttribute(isStyle ? "href" : "src");
+  if (!url) return Promise.resolve();
+  if (problemVisualizationAssetPromises.has(url)) {
+    return problemVisualizationAssetPromises.get(url);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const asset = document.createElement(isStyle ? "link" : "script");
+    asset.dataset.problemAsset = url;
+    if (isStyle) {
+      asset.rel = "stylesheet";
+      asset.href = url;
+    } else {
+      asset.src = url;
+      asset.async = false;
+    }
+    asset.addEventListener("load", resolve, { once: true });
+    asset.addEventListener("error", () => {
+      problemVisualizationAssetPromises.delete(url);
+      reject(new Error(`Failed to load visualization asset: ${url}`));
+    }, { once: true });
+    document.head.appendChild(asset);
+  });
+  problemVisualizationAssetPromises.set(url, promise);
+  return promise;
+}
+
+async function ensureProblemVisualizationAssets(problemId) {
+  const assets = problemVisualizationAssetNodes(problemId);
+  const styles = assets.filter((asset) => asset.tagName === "LINK");
+  const scripts = assets.filter((asset) => asset.tagName === "SCRIPT");
+  const stylesReady = Promise.all(styles.map(loadProblemVisualizationAsset));
+
+  // Keep script execution deterministic for problems such as #745 that use
+  // two renderer modules. Styles can download in parallel with that chain.
+  for (const script of scripts) {
+    await loadProblemVisualizationAsset(script);
+  }
+  await stylesReady;
+}
+
+function warmProblemVisualizationAssets(problemId) {
+  const load = () => ensureProblemVisualizationAssets(problemId).catch((error) => {
+    console.error(error);
+  });
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(load, { timeout: 1500 });
+  } else {
+    window.setTimeout(load, 0);
+  }
+}
 
 // ---- UI strings by language ----
 const I18N = {
@@ -336,6 +400,27 @@ function renderCatalog() {
     itemsEl.id = `catalog-group-${group.key}`;
     itemsEl.className = "cat-items" + (isExpanded ? "" : " collapsed");
     toggleBtn.setAttribute("aria-controls", itemsEl.id);
+
+    const mountGroup = () => {
+      toggleBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openCatalogGroupExclusively(isExpanded ? null : group.key);
+      });
+      titleEl.addEventListener("click", () => {
+        openCatalogGroupExclusively(isExpanded ? null : group.key);
+      });
+      groupEl.appendChild(titleEl);
+      groupEl.appendChild(itemsEl);
+      container.appendChild(groupEl);
+    };
+
+    // Collapsed categories only need their header. Building every hidden chip
+    // created thousands of buttons and DOM nodes before mobile Safari became
+    // interactive. The active category is populated on demand after a click.
+    if (!isExpanded) {
+      mountGroup();
+      return;
+    }
 
     // Show recommended learning order banner if available
     if (group.recommendedOrderLabel) {
@@ -1692,20 +1777,7 @@ function renderCatalog() {
       itemsEl.appendChild(chip);
     });
 
-    // Toggle collapse/expand
-    toggleBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const shouldExpand = itemsEl.classList.contains("collapsed");
-      openCatalogGroupExclusively(shouldExpand ? group.key : null);
-    });
-    titleEl.addEventListener("click", () => {
-      const shouldExpand = itemsEl.classList.contains("collapsed");
-      openCatalogGroupExclusively(shouldExpand ? group.key : null);
-    });
-
-    groupEl.appendChild(titleEl);
-    groupEl.appendChild(itemsEl);
-    container.appendChild(groupEl);
+    mountGroup();
   });
   renderCatalogJumpNav();
 }
@@ -1724,9 +1796,7 @@ function setCatalogGroupExpanded(groupEl, expanded) {
 
 function openCatalogGroupExclusively(groupKey, { scroll = false } = {}) {
   activeCatalogGroupKey = groupKey || null;
-  document.querySelectorAll("#catalog .cat-group").forEach((groupEl) => {
-    setCatalogGroupExpanded(groupEl, Boolean(groupKey) && groupEl.dataset.groupKey === groupKey);
-  });
+  renderCatalog();
 
   if (!groupKey || !scroll) return;
   requestAnimationFrame(() => {
@@ -2177,6 +2247,7 @@ async function loadProblem({ scrollToEnd = false } = {}) {
     hide("vizPanel");
     steps = [];
     stopPlay();
+    warmProblemVisualizationAssets(data.id);
     if (scrollToEnd) jumpToPageEnd();
     return true;
   } catch (err) {
@@ -2532,11 +2603,14 @@ async function runViz() {
     });
 
   try {
-    const res = await fetch(`/api/problem/${currentProblemId}/solve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input, params }),
-    });
+    const [res] = await Promise.all([
+      fetch(`/api/problem/${currentProblemId}/solve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, params }),
+      }),
+      ensureProblemVisualizationAssets(currentProblemId),
+    ]);
     const data = await res.json();
     if (!res.ok) {
       return showError("runError", data.error || t().errSolve);

@@ -1,12 +1,22 @@
 const express = require("express");
+const compression = require("compression");
 const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 524 allows up to 1,000 dictionary words of 1,000 ASCII letters each.
+app.use(compression());
 app.use(express.json({ limit: "2mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "1y",
+  immutable: true,
+  setHeaders(res, filePath) {
+    if (path.basename(filePath) === "index.html") {
+      res.setHeader("Cache-Control", "no-cache");
+    }
+  },
+}));
 
 const {
   SUPPORTED,

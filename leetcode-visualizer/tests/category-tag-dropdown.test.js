@@ -27,10 +27,11 @@ test('category picker lists and filters every catalog group in both languages', 
   assert.match(script, /categoryTagInput"\)\.addEventListener\("input"/);
 });
 
-test('selecting or toggling a category uses exclusive accordion behavior', () => {
+test('selecting or toggling a category lazily renders one exclusive group', () => {
   assert.match(script, /function openCatalogGroupExclusively\(groupKey/);
-  assert.match(script, /querySelectorAll\("#catalog \.cat-group"\)\.forEach/);
-  assert.match(script, /groupEl\.dataset\.groupKey === groupKey/);
+  assert.match(script, /const isExpanded = group\.key === activeCatalogGroupKey/);
+  assert.match(script, /if \(!isExpanded\) \{\s*mountGroup\(\);\s*return;/);
+  assert.match(script, /activeCatalogGroupKey = groupKey \|\| null;\s*renderCatalog\(\);/);
   assert.match(script, /function selectCategoryTag\(groupKey\)[\s\S]*openCatalogGroupExclusively\(group\.key, \{ scroll: true \}\)/);
   assert.match(script, /selectedGroup\?\.scrollIntoView\(\{ behavior: "auto", block: "start" \}\)/);
   assert.doesNotMatch(script, /selectedGroup\?\.scrollIntoView\(\{ behavior: "smooth"/);
