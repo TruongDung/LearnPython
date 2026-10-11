@@ -386,3 +386,23 @@ test('9020 frontend loads the dedicated responsive visualization', () => {
   assert.match(styles, /\.spring9020-route > div \{[^}]*flex-wrap: wrap/s);
   assert.match(styles, /\.spring9020-list-output details/);
 });
+
+test('9020 jump simulation follows the actual landing and blocks visited destinations', () => {
+  const context = { escapeHtml: String };
+  vm.createContext(context);
+  vm.runInContext(rendererSource, context);
+  const run = problem.builder(problem.defaultInput);
+  const landing = run.steps.find((step) => step.springboardMatrix9020View.phase === 'land').springboardMatrix9020View;
+  const text = (vi, en) => en;
+  const landed = context.springboardJump9020(landing, run.original, landing.bestPath, text);
+  assert.match(landed, /\(0,0\) · 9 → \(0,1\) · 6/);
+  const setRun = problem.builder3(problem.defaultInput);
+  const blocked = setRun.steps.find((step) => {
+    const view = step.springboardMatrix9020View;
+    return view.phase === 'reject' && view.next && view.visited.some((cell) => String(cell) === String(view.next));
+  }).springboardMatrix9020View;
+  const rejected = context.springboardJump9020(blocked, setRun.original, blocked.path, text);
+  assert.match(rejected, /× Visited/);
+  assert.match(rejected, /spring9020-flight rejected/);
+  assert.doesNotMatch(rejected, /animateMotion/);
+});

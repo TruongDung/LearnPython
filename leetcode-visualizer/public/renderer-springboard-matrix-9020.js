@@ -61,7 +61,8 @@ function springboardJump9020(view, matrix, route, text) {
   const y = (height) => Math.round(157 - height / maxHeight * 100);
   const ay = y(a);
   const by = b == null ? ay : y(b);
-  const hopPath = `M 82 ${ay - 14} Q 180 ${Math.max(16, Math.min(ay, by) - 52)} 278 ${by - 14}`;
+  const arcTop = Math.max(12, limit != null ? y(limit) - 14 : Math.min(ay, by) - 24);
+  const hopPath = `M 82 ${ay - 14} Q 180 ${arcTop} 278 ${by - 14}`;
   const animate = to && allowed && ["move", "recurse", "extend", "land", "append"].includes(view.phase)
     && (typeof window === "undefined" || !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const actor = animate
@@ -132,10 +133,12 @@ function renderSpringboardScene9020(step) {
     if (key === currentKey) classes.push("current");
     if (key === nextKey && view.phase !== "reject") classes.push("next");
     if (key === removedKey) classes.push("removed");
+    if (key === nextKey && view.phase === "reject") classes.push("rejected-target");
     if (candidate) classes.push(candidate.allowed ? "candidate-ok" : "candidate-no");
-    const badge = key === removedKey ? "−" : key === currentKey ? "●" : key === nextKey && view.phase !== "reject" ? "↗"
+    const badge = key === removedKey ? "−" : key === nextKey && view.phase === "reject" ? "×" : key === currentKey ? "●" : key === nextKey ? "◎"
       : order.has(key) ? order.get(key) : final && routeOrder.has(key) ? routeOrder.get(key) : candidate ? candidate.allowed ? "✓" : "×" : "";
-    return `<article class="${classes.join(" ")}" title="(${r},${c}) · ${height}${order.has(key) ? ` · #${order.get(key)}` : ""}"><header><span>${r},${c}</span><b>${badge}</b></header><strong${height > 9999 ? ' style="font-size:clamp(8px, 2cqw, 12px)"' : ""}>${height}</strong>${key === currentKey ? '<i class="spring9020-player" aria-hidden="true">●</i>' : ""}</article>`;
+    const heightFont = Math.round(70 / cols / String(height).length * 100) / 100;
+    return `<article class="${classes.join(" ")}" title="(${r},${c}) · ${height}${order.has(key) ? ` · #${order.get(key)}` : ""}"><header><span>${r},${c}</span><b>${badge}</b></header><strong style="font-size:clamp(6px, ${heightFont}cqw, 25px)">${height}</strong>${key === currentKey ? '<i class="spring9020-player" aria-hidden="true">●</i>' : ""}</article>`;
   })).join("");
   const moves = springboardRoute9020(matrix, route);
   const edge = (from, to, tone, active = false) => {
@@ -158,7 +161,8 @@ function renderSpringboardScene9020(step) {
   }
 
   const histogram = method === 2 ? `<section class="spring9020-list-summary"><header><strong>${text("Độ dài", "Length")}</strong><span>${view.count} ${text("đường", "paths")}</span></header><div>${(view.counts || []).map((group) => `<span><small>${group.length}</small><i><b style="width:${Math.max(4, group.count / Math.max(1, ...view.counts.map((item) => item.count)) * 100)}%"></b></i><strong>${group.count}</strong></span>`).join("") || '<span class="spring9020-empty">∅</span>'}</div></section>` : "";
-  const groups = method === 2 && (view.groups || []).length ? `<section class="spring9020-list-output"><header><strong>${text("Đường đã lưu", "Saved paths")}</strong><span>${view.count}</span></header>${view.groups.map((group) => `<details class="${group.longest ? "longest" : ""}" ${group.longest ? "open" : ""}><summary><b>${group.length} cell</b><span>× ${group.paths.length}</span>${group.longest ? `<strong>★ ${text("Dài nhất", "Longest")}</strong>` : ""}</summary><ol>${group.paths.map((path, index) => `<li>${springboardMiniMap9020(matrix, path.coordinates, `#${index + 1}`)}<div>${path.values.map((value, position) => `<b>${value}</b>${position < path.values.length - 1 ? '<i>→</i>' : ""}`).join("")}</div></li>`).join("")}</ol></details>`).join("")}</section>` : "";
+  const orderedGroups = [...(view.groups || [])].sort((a, b) => b.length - a.length);
+  const groups = method === 2 && orderedGroups.length ? `<section class="spring9020-list-output"><header><strong>${text("Đường đã lưu", "Saved paths")}</strong><span>${view.count}</span></header>${orderedGroups.map((group) => `<details class="${group.longest ? "longest" : ""}" ${group.longest ? "open" : ""}><summary><b>${group.length} cell</b><span>× ${group.paths.length}</span>${group.longest ? `<strong>★ ${text("Dài nhất", "Longest")}</strong>` : ""}</summary><ol>${group.paths.map((path, index) => `<li>${springboardMiniMap9020(matrix, path.coordinates, `#${index + 1}`)}<div>${path.values.map((value, position) => `<b>${value}</b>${position < path.values.length - 1 ? '<i>→</i>' : ""}`).join("")}</div></li>`).join("")}</ol></details>`).join("")}</section>` : "";
   const details = `<details class="spring9020-info"><summary aria-label="${text("Giải thích bước này", "Step explanation")}">ⓘ</summary><p>${escapeHtml(pick(step.title) || "")}</p><p>${escapeHtml(pick(step.note) || "")}</p></details>`;
   $("treeView").innerHTML = `<section class="spring9020-viz ${method === 2 ? "spring9020-list-viz" : ""}" aria-label="Springboard matrix physics visualization">
     <header class="spring9020-header"><div><small>#9020 · ${text("Cách", "Method")} ${method}</small><h3>${methodLabel}</h3></div><div class="spring9020-answer"><span>★ ${text("Dài nhất", "Best")}</span><b>${answer ?? 0}</b></div>${details}</header>
