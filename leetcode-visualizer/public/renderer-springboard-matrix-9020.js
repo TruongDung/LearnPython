@@ -1,6 +1,7 @@
 function renderSpringboardMatrix9020View(step) {
   const view = step.springboardMatrix9020View || {};
   if (view.method === 2) return renderSpringboardPaths9020View(step);
+  const usesSet = view.method === 3;
   const vi = lang === "vi";
   const text = (viText, enText) => vi ? viText : enText;
   const matrix = Array.isArray(view.matrix) ? view.matrix : [];
@@ -16,12 +17,14 @@ function renderSpringboardMatrix9020View(step) {
   const bestOrder = new Map((view.bestPath || []).map((cell, index) => [keyOf(cell), index + 1]));
 
   const phaseLabels = [
-    ["setup", text("Mã hóa", "Encode")],
+    ["setup", usesSet ? "visited = set()" : text("Mã hóa", "Encode")],
     ["search", text("Tìm kiếm", "Search")],
-    ["replay", text("Replay physics", "Replay physics")],
+    ["replay", usesSet ? text("Quay lui", "Backtrack") : text("Replay physics", "Replay physics")],
     ["done", text("Kết quả", "Result")],
   ];
-  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "search" ? 1 : view.phase === "done" ? 3 : 2;
+  const phaseIndex = usesSet
+    ? ["setup", "init"].includes(view.phase) ? 0 : view.phase === "done" ? 3 : ["remove", "return", "update", "root-done"].includes(view.phase) ? 2 : 1
+    : view.phase === "setup" ? 0 : view.phase === "search" ? 1 : view.phase === "done" ? 3 : 2;
   const phases = phaseLabels.map(([, label], index) => (
     `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${label}</span>`
   )).join("");
@@ -106,7 +109,7 @@ function renderSpringboardMatrix9020View(step) {
 
   $("treeView").innerHTML = `<section class="spring9020-viz" aria-label="Springboard matrix physics visualization">
     <header class="spring9020-header">
-      <div><small>9020 · DFS + BITMASK</small><h3>${text("Đường nhảy lò xo dài nhất", "Longest springboard physics path")}</h3></div>
+      <div><small>9020 · DFS + ${usesSet ? "VISITED SET" : "BITMASK"}</small><h3>${text("Đường nhảy lò xo dài nhất", "Longest springboard physics path")}</h3></div>
       <div class="spring9020-answer"><span>${text("đường tối ưu", "best path")}</span><b>${view.answer}</b></div>
     </header>
     <nav class="spring9020-phases" aria-label="Progress">${phases}</nav>
@@ -116,8 +119,13 @@ function renderSpringboardMatrix9020View(step) {
       <article><span>${text("độ cao", "height")}</span><b>${currentHeight}</b></article>
       <article class="mode ${view.mode}"><span>${text("trạng thái", "state")}</span><b>${modeText}</b></article>
       <article><span>${text("trần bật", "ceiling")}</span><b>${ceilingText}</b></article>
-      <article><span>${text("đã ghé", "visited")}</span><b>${(view.path || []).length}/${view.answer}</b></article>
+      <article><span>${usesSet ? "best / answer" : text("đã ghé", "visited")}</span><b>${usesSet ? `${view.localBest ?? "—"} / ${view.answer}` : `${(view.path || []).length}/${view.answer}`}</b></article>
     </section>
+    ${usesSet ? `<section class="spring9020-visited-set ${view.phase}" aria-label="Visited set">
+      <header><strong>visited</strong><span>${(view.visited || []).length} ${text("cell trong nhánh", "cells in branch")}</span></header>
+      <div><b>{</b>${(view.visited || []).map((cell) => `<code class="${keyOf(cell) === currentKey && view.phase === "add" ? "added" : ""}">(${cell.join(", ")})</code>`).join("") || `<span>∅</span>`}<b>}</b>${view.removed ? `<code class="removed">− (${view.removed.join(", ")})</code>` : ""}</div>
+      <footer>${view.phase === "add" ? `<code>visited.add((${view.current.join(", ")}))</code> → ${text("chặn ghé lại", "block revisits")}` : view.removed ? `<code>visited.remove((${view.removed.join(", ")}))</code> → ${text("thử nhánh khác", "try another branch")}` : view.returned != null ? `<code>return ${view.returned}</code>` : text("Thêm khi đi sâu · xóa khi quay lui", "Add on entry · remove on backtrack")}</footer>
+    </section>` : ""}
     <section class="spring9020-rules" aria-label="Physics rules">${rules}</section>
     <div class="spring9020-main">
       <section class="spring9020-board-wrap">
@@ -131,10 +139,10 @@ function renderSpringboardMatrix9020View(step) {
       </section>
     </div>
     <section class="spring9020-route">
-      <header><strong>${text("REPLAY ĐƯỜNG TỐI ƯU", "OPTIMAL PATH REPLAY")}</strong><span>${text("mỗi cell chỉ xuất hiện một lần", "every cell appears once")}</span></header>
+      <header><strong>${usesSet && view.phase !== "done" ? text("NHÁNH DFS ĐANG CHẠY", "ACTIVE DFS BRANCH") : text("REPLAY ĐƯỜNG TỐI ƯU", "OPTIMAL PATH REPLAY")}</strong><span>${text("mỗi cell chỉ xuất hiện một lần", "every cell appears once")}</span></header>
       <div>${route}</div>
     </section>
-    <footer class="spring9020-footer"><span><b>${view.statesExplored}</b> ${text("state đã xét", "states searched")}</span><span><code>mask</code> ${text("chặn cell đã ghé", "blocks revisits")}</span><span><code>ceiling</code> ${text("giảm sau mỗi bước đi xuống", "drops after every descent")}</span></footer>
+    <footer class="spring9020-footer"><span><b>${view.statesExplored}</b> ${text("state đã xét", "states searched")}</span><span><code>${usesSet ? "visited" : "mask"}</code> ${text("chặn cell đã ghé", "blocks revisits")}</span><span>${usesSet ? `${view.processedRoots}/${view.totalRoots} ${text("điểm bắt đầu đã thử", "starting cells tried")}` : `<code>ceiling</code> ${text("giảm sau mỗi bước đi xuống", "drops after every descent")}`}</span></footer>
   </section>`;
 }
 

@@ -101,6 +101,70 @@ const SOURCE2 = [
   "        return longest, paths",
 ];
 
+const SOURCE3 = [
+  "from typing import List",
+  "",
+  "class Solution:",
+  "    def longestPhysicsPath(self, matrix: List[List[int]]) -> int:",
+  "        if not matrix or not matrix[0]:",
+  "            return 0",
+  "",
+  "        rows, cols = len(matrix), len(matrix[0])",
+  "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+  "",
+  "        visited = set()",
+  "",
+  "        def dfs(r, c, moving_down, ceiling):",
+  "            visited.add((r, c))",
+  "            best = 1",
+  "            height = matrix[r][c]",
+  "",
+  "            for dr, dc in directions:",
+  "                nr, nc = r + dr, c + dc",
+  "",
+  "                if not (0 <= nr < rows and 0 <= nc < cols):",
+  "                    continue",
+  "",
+  "                if (nr, nc) in visited:",
+  "                    continue",
+  "",
+  "                next_height = matrix[nr][nc]",
+  "",
+  "                if not moving_down:",
+  "                    if next_height > height:",
+  "                        continue",
+  "",
+  "                    next_down = True",
+  "                    next_ceiling = height",
+  "",
+  "                elif next_height <= height:",
+  "                    next_down = True",
+  "                    next_ceiling = height",
+  "",
+  "                elif next_height <= ceiling:",
+  "                    next_down = False",
+  "                    next_ceiling = -1",
+  "",
+  "                else:",
+  "                    continue",
+  "",
+  "                best = max(",
+  "                    best,",
+  "                    1 + dfs(nr, nc, next_down, next_ceiling)",
+  "                )",
+  "",
+  "            visited.remove((r, c))",
+  "            return best",
+  "",
+  "        answer = 0",
+  "",
+  "        for r in range(rows):",
+  "            for c in range(cols):",
+  "                answer = max(answer, dfs(r, c, False, -1))",
+  "",
+  "        return answer",
+];
+
 function parseMatrix(input) {
   let matrix = input;
   if (typeof input === "string") {
@@ -567,6 +631,150 @@ function buildSteps2(input) {
   };
 }
 
+function buildSteps3(input) {
+  const matrix = parseMatrix(input);
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  // Match the direction order in the supplied Python solution.
+  const directions = [DIRECTIONS[2], DIRECTIONS[0], DIRECTIONS[1], DIRECTIONS[3]];
+  const visited = new Set();
+  const path = [];
+  const frames = [];
+  const steps = [];
+  const traceLimit = 1200;
+  let statesExplored = 0;
+  let skippedSteps = 0;
+  let processedRoots = 0;
+  let answer = 0;
+  let bestPath = [];
+  const copyPath = (cells) => cells.map((cell) => [...cell]);
+  const keyOf = (r, c) => `${r},${c}`;
+  const lineOf = (source) => SOURCE3.indexOf(source) + 1;
+  const L = {
+    setup: lineOf("        rows, cols = len(matrix), len(matrix[0])"),
+    init: lineOf("        visited = set()"),
+    add: lineOf("            visited.add((r, c))"),
+    best: lineOf("            best = 1"),
+    outside: lineOf("                if not (0 <= nr < rows and 0 <= nc < cols):"),
+    visited: lineOf("                if (nr, nc) in visited:"),
+    height: lineOf("                next_height = matrix[nr][nc]"),
+    launch: lineOf("                    next_down = True"),
+    tooHigh: lineOf("                    if next_height > height:"),
+    coast: lineOf("                elif next_height <= height:"),
+    spring: lineOf("                    next_down = False"),
+    reject: lineOf("                else:"),
+    call: lineOf("                    1 + dfs(nr, nc, next_down, next_ceiling)"),
+    update: lineOf("                best = max("),
+    remove: lineOf("            visited.remove((r, c))"),
+    return: lineOf("            return best"),
+    root: lineOf("                answer = max(answer, dfs(r, c, False, -1))"),
+    done: lineOf("        return answer"),
+  };
+
+  const emit = ({ line, phase, title, note, next = null, nextMove = null, removed = null, returned = null, final = false }) => {
+    if (!final && steps.length >= traceLimit) {
+      skippedSteps += 1;
+      return;
+    }
+    const frame = frames.at(-1);
+    const current = frame ? [frame.r, frame.c] : null;
+    const candidates = frame ? directions.map(([dr, dc, arrow, direction]) => {
+      const nr = frame.r + dr;
+      const nc = frame.c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) {
+        return { direction, arrow, cell: [nr, nc], height: null, allowed: false, rule: "outside", visited: false };
+      }
+      const wasVisited = visited.has(keyOf(nr, nc));
+      const move = classifyMove(matrix, cols, current, [nr, nc], frame.mode, frame.ceiling);
+      return { direction, arrow, cell: [nr, nc], height: matrix[nr][nc], ...move, allowed: !wasVisited && move.allowed, visited: wasVisited };
+    }) : [];
+    const route = final ? bestPath : path;
+    const replay = route.length ? buildReplayStates(matrix, route.map(([r, c]) => r * cols + c)) : { moves: [] };
+    steps.push({
+      arr: [], codeBlock: 3, codeLines: [line], title, note, final,
+      vars: [
+        { name: "visited", value: `{${[...visited].map((key) => `(${key})`).join(", ")}}` },
+        { name: "moving_down", value: frame?.mode === "momentum" ? "True" : "False" },
+        { name: "ceiling", value: frame?.ceiling ?? -1 },
+        { name: "best", value: frame?.best ?? "—" },
+        { name: "answer", value: answer },
+      ],
+      springboardMatrix9020View: {
+        problemId: 9020, method: 3, matrix: copyPath(matrix), phase, current,
+        currentHeight: current ? matrix[current[0]][current[1]] : null,
+        mode: frame?.mode || "rest", ceiling: frame?.ceiling ?? null,
+        path: copyPath(path), visited: [...visited].map((key) => key.split(",").map(Number)),
+        bestPath: copyPath(route), optimalPath: copyPath(bestPath), moves: replay.moves,
+        next: next ? [...next] : null, nextMove, candidates, removed, returned,
+        localBest: frame?.best ?? null, answer, statesExplored, processedRoots,
+        totalRoots: rows * cols, skippedSteps, line,
+      },
+    });
+  };
+
+  emit({ line: L.setup, phase: "setup", title: bi(`Ma trận ${rows}×${cols}`, `${rows}×${cols} matrix`), note: bi("Thử DFS từ mỗi cell khi đang đứng yên.", "Try DFS from every cell at rest.") });
+  emit({ line: L.init, phase: "init", title: bi("visited = set()", "visited = set()"), note: bi("Set chỉ giữ các cell trên nhánh DFS hiện tại.", "The set contains only cells on the active DFS branch.") });
+
+  const dfs = (r, c, mode, ceiling) => {
+    const frame = { r, c, mode, ceiling, best: 1 };
+    frames.push(frame);
+    path.push([r, c]);
+    visited.add(keyOf(r, c));
+    statesExplored += 1;
+    let suffix = [[r, c]];
+    emit({ line: L.add, phase: "add", title: bi(`visited.add((${r}, ${c}))`, `visited.add((${r}, ${c}))`), note: bi("Đánh dấu cell trước khi đi sâu để chặn quay lại.", "Mark this cell before descending to prevent revisits.") });
+    emit({ line: L.best, phase: "best-init", title: bi("best = 1", "best = 1"), note: bi("Nếu không đi tiếp được, đường từ đây vẫn có một cell.", "If no next jump is possible, the path from here still contains one cell.") });
+    for (const [dr, dc] of directions) {
+      const nr = r + dr;
+      const nc = c + dc;
+      const next = [nr, nc];
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) {
+        emit({ line: L.outside, phase: "reject", title: bi(`Bỏ (${nr},${nc}): ngoài matrix`, `Skip (${nr},${nc}): outside matrix`), note: bi("Không gọi DFS.", "Do not call DFS.") });
+        continue;
+      }
+      if (visited.has(keyOf(nr, nc))) {
+        emit({ line: L.visited, phase: "reject", next, title: bi(`Bỏ (${nr},${nc}): đã có trong visited`, `Skip (${nr},${nc}): already in visited`), note: bi("Mỗi cell chỉ xuất hiện một lần trên một đường.", "Each cell appears only once in a path.") });
+        continue;
+      }
+      const transition = classifyMove(matrix, cols, [r, c], next, mode, ceiling);
+      const nextMove = { from: [r, c], to: next, ...transition };
+      emit({ line: L.height, phase: "inspect", next, title: bi(`Xét độ cao ${matrix[nr][nc]}`, `Inspect height ${matrix[nr][nc]}`), note: bi("So với độ cao hiện tại và trần bật.", "Compare with the current height and spring ceiling.") });
+      if (!transition.allowed) {
+        emit({ line: mode === "rest" ? L.tooHigh : L.reject, phase: "reject", next, title: bi(`Không thể nhảy tới (${nr},${nc})`, `Cannot jump to (${nr},${nc})`), note: mode === "rest" ? bi("Đang đứng yên: cell kế bên cao hơn.", "At rest: the adjacent cell is higher.") : bi(`Độ cao mới vượt trần ${ceiling}.`, `The new height exceeds ceiling ${ceiling}.`) });
+        continue;
+      }
+      emit({ line: L[transition.rule], phase: "move", next, nextMove, title: bi(`${matrix[r][c]} → ${matrix[nr][nc]}`, `${matrix[r][c]} → ${matrix[nr][nc]}`), note: transition.rule === "spring" ? bi("Bật lên trong trần → đứng yên, ceiling = -1.", "Spring upward within the ceiling → rest, ceiling = -1.") : bi(`Đi xuống → còn đà, ceiling = ${matrix[r][c]}.`, `Descend → momentum, ceiling = ${matrix[r][c]}.`) });
+      emit({ line: L.call, phase: "recurse", next, nextMove, title: bi(`Gọi dfs(${nr}, ${nc}, ${transition.nextMode === "momentum" ? "True" : "False"}, ${transition.nextCeiling ?? -1})`, `Call dfs(${nr}, ${nc}, ${transition.nextMode === "momentum" ? "True" : "False"}, ${transition.nextCeiling ?? -1})`), note: bi("Giữ nguyên visited của nhánh cha khi đi sâu.", "Keep the parent branch's visited cells while descending.") });
+      const child = dfs(nr, nc, transition.nextMode, transition.nextCeiling);
+      const previous = frame.best;
+      frame.best = Math.max(frame.best, 1 + child.length);
+      if (frame.best > previous) suffix = [[r, c], ...child.path];
+      emit({ line: L.update, phase: "update", returned: child.length, title: bi(`best = max(${previous}, 1 + ${child.length}) = ${frame.best}`, `best = max(${previous}, 1 + ${child.length}) = ${frame.best}`), note: bi("DFS con đã xóa cell của nó; visited trở về nhánh cha.", "The child DFS removed its cell; visited is restored to the parent branch.") });
+    }
+    visited.delete(keyOf(r, c));
+    path.pop();
+    emit({ line: L.remove, phase: "remove", removed: [r, c], title: bi(`visited.remove((${r}, ${c}))`, `visited.remove((${r}, ${c}))`), note: bi("Cell này được dùng lại trong một nhánh khác.", "This cell may be used again in another branch.") });
+    emit({ line: L.return, phase: "return", returned: frame.best, title: bi(`return ${frame.best}`, `return ${frame.best}`), note: bi("Trả độ dài tốt nhất bắt đầu tại cell này.", "Return the best length starting at this cell.") });
+    frames.pop();
+    return { length: frame.best, path: suffix };
+  };
+
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      emit({ line: L.root, phase: "root", title: bi(`Bắt đầu tại (${r},${c})`, `Start at (${r},${c})`), note: bi("visited rỗng; bắt đầu ở trạng thái đứng yên.", "visited is empty; start at rest.") });
+      const result = dfs(r, c, "rest", null);
+      if (result.length > answer) {
+        answer = result.length;
+        bestPath = copyPath(result.path);
+      }
+      processedRoots += 1;
+      emit({ line: L.root, phase: "root-done", returned: result.length, title: bi(`answer = ${answer}`, `answer = ${answer}`), note: bi(`Đã thử ${processedRoots}/${rows * cols} điểm bắt đầu; visited lại rỗng.`, `Tried ${processedRoots}/${rows * cols} starting cells; visited is empty again.`) });
+    }
+  }
+  emit({ line: L.done, phase: "done", final: true, title: bi(`Đường dài nhất: ${answer} cell`, `Longest path: ${answer} cells`), note: skippedSteps ? bi(`Đã xét đầy đủ ${statesExplored} lượt DFS. Hiển thị ${traceLimit} bước đầu và kết quả để giữ visualization nhẹ.`, `All ${statesExplored} DFS calls were searched. Show the first ${traceLimit} steps and the result to keep the visualization responsive.`) : bi("Đã thử mọi điểm bắt đầu và mọi nhánh hợp lệ; visited cuối cùng rỗng.", "Tried every starting cell and every legal branch; visited ends empty.") });
+  return { original: copyPath(matrix), answer, path: copyPath(bestPath), statesExplored, skippedSteps, steps };
+}
+
 module.exports = {
   9020: {
     id: 9020,
@@ -595,6 +803,7 @@ module.exports = {
       options: [
         { value: 1, label: bi("Cách 1: DFS + memo, lấy một đường tối ưu", "Approach 1: memoized DFS, one optimal path") },
         { value: 2, label: bi("Cách 2: Backtracking, lưu mọi đường", "Approach 2: backtracking, store every path") },
+        { value: 3, label: bi("Cách 3: DFS + visited set, không bitmask", "Approach 3: DFS + visited set, no bitmask") },
       ],
     }],
     debugMode: "line-by-line",
@@ -605,6 +814,7 @@ module.exports = {
       bi("DFS memoization thử mọi điểm bắt đầu; bitmask bảo đảm mỗi cell chỉ xuất hiện một lần trên đường.", "Memoized DFS tries every starting cell; the bitmask ensures every cell appears at most once in a path."),
       bi("Follow-up Cách 2 bỏ memoization, dùng path.copy() để lưu mọi đường hợp lệ trước khi backtrack.", "Follow-up Approach 2 drops memoization and uses path.copy() to store every valid path before backtracking."),
       bi("Danh sách được nhóm theo độ dài; các đường trùng giá trị nhưng khác tọa độ vẫn là hai đường riêng.", "The list is grouped by length; identical value sequences at different coordinates remain separate paths."),
+      bi("Cách 3 dùng visited set: add khi vào DFS, remove trước khi return để thử nhánh khác; không cần bitmask.", "Approach 3 uses a visited set: add on DFS entry, remove before returning to explore other branches; no bitmask is needed."),
     ],
     complexity: {
       time: "O(n² · 2ⁿ)",
@@ -616,12 +826,20 @@ module.exports = {
       space: "O(P · n)",
       note: bi("P là số đường hợp lệ được lưu, n = M×N. Mỗi đường được copy nên chi phí tỉ lệ tổng số cell trong toàn bộ danh sách.", "P is the number of stored valid paths and n = M×N. Every path is copied, so cost is proportional to the total cells across the complete list."),
     },
+    complexity3: {
+      time: "O(n · 3ⁿ)",
+      space: "O(n)",
+      note: bi("n = M×N. Thử mọi điểm bắt đầu; mỗi bước sau bước đầu có tối đa 3 hướng vì không quay lại cell trước. visited và stack có tối đa n cell; không memoization.", "n = M×N. Try every starting cell; after the first jump, each step has at most 3 directions because the previous cell is visited. The visited set and stack hold at most n cells; no memoization."),
+    },
     code: SOURCE,
     codeLabel: bi("Cách 1: DFS + memoization", "Approach 1: DFS + memoization"),
     code2: SOURCE2,
     code2Label: bi("Cách 2: Liệt kê và lưu mọi đường", "Approach 2: enumerate and store every path"),
+    code3: SOURCE3,
+    code3Label: bi("Cách 3: DFS + visited set (không bitmask)", "Approach 3: DFS + visited set (no bitmask)"),
     builder: buildSteps,
     builder2: buildSteps2,
+    builder3: buildSteps3,
     liveArgs: (input) => [parseMatrix(input)],
     parseSpringboardMatrix9020Input: parseMatrix,
     solvePhysicsPath9020: solvePhysicsPath,

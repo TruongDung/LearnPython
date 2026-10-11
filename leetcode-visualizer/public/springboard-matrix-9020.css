@@ -146,3 +146,23 @@
   .spring9020-candidate { grid-template-columns: 26px 76px 1fr; }
   .spring9020-last-saved { grid-template-columns: 1fr; }
 }
+.spring9020-visited-set {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #0f172a;
+}
+.spring9020-visited-set header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; color: #cbd5e1; font-size: 11px; }
+.spring9020-visited-set > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; margin: 8px 0; color: #94a3b8; }
+.spring9020-visited-set code { padding: 5px 8px; border: 1px solid #475569; border-radius: 6px; color: #e2e8f0; background: #1e293b; font-size: 12px; }
+.spring9020-visited-set code.added { border-color: #34d399; color: #a7f3d0; background: #064e3b; }
+.spring9020-visited-set code.removed { border-color: #fb7185; color: #fecdd3; background: #4c0519; text-decoration: line-through; }
+.spring9020-visited-set footer { color: #94a3b8; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+[data-theme="light"] .spring9020-visited-set { background: #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .spring9020-visited-set header { color: #334155; }
+[data-theme="light"] .spring9020-visited-set > div,
+[data-theme="light"] .spring9020-visited-set footer { color: #64748b; }
+[data-theme="light"] .spring9020-visited-set code { background: #e2e8f0; color: #0f172a; border-color: #94a3b8; }
+[data-theme="light"] .spring9020-visited-set code.added { background: #d1fae5; color: #065f46; border-color: #10b981; }
+[data-theme="light"] .spring9020-visited-set code.removed { background: #ffe4e6; color: #9f1239; border-color: #f43f5e; }

@@ -154,7 +154,7 @@ test('9020 matches independent brute force on every ternary 2x2 matrix', () => {
 test('9020 approach 2 stores every distinct coordinate path and groups all lengths', () => {
   assert.equal(typeof problem.builder2, 'function');
   assert.ok(Array.isArray(problem.code2));
-  assert.equal(problem.extraParams.find((param) => param.key === 'approach').options.length, 2);
+  assert.equal(problem.extraParams.find((param) => param.key === 'approach').options.length, 3);
   const run = problem.builder2(problem.defaultInput, { approach: 2 });
   assert.equal(run.answer, 9);
   assert.equal(run.allPaths.length, 91);
@@ -207,6 +207,53 @@ test('9020 trace preserves mode, ceiling, candidate rules, and unique visited ce
       }
     }
   }
+});
+
+test('9020 visited-set DFS matches exhaustive answers and restores the branch on backtracking', () => {
+  for (let encoded = 0; encoded < 3 ** 4; encoded += 1) {
+    let value = encoded;
+    const flat = Array.from({ length: 4 }, () => {
+      const digit = value % 3;
+      value = Math.floor(value / 3);
+      return digit;
+    });
+    const matrix = [flat.slice(0, 2), flat.slice(2)];
+    const run = problem.builder3(matrix);
+    assert.equal(run.answer, bruteForce(matrix), JSON.stringify(matrix));
+    assertLegalPath(matrix, run.path);
+    for (const step of run.steps) {
+      const view = step.springboardMatrix9020View;
+      assert.equal(step.codeBlock, 3);
+      assert.ok(step.codeLines.every((line) => problem.code3[line - 1]?.trim()));
+      assert.deepEqual(view.visited, view.path);
+      assert.equal(new Set(view.visited.map(String)).size, view.visited.length);
+      if (view.phase === 'add') assert.deepEqual(view.visited.at(-1), view.current);
+      if (view.phase === 'remove') assert.ok(!view.visited.some((cell) => String(cell) === String(view.removed)));
+      if (view.phase === 'root-done' || step.final) assert.deepEqual(view.visited, []);
+      assertLegalPath(matrix, view.path);
+    }
+  }
+});
+
+test('9020 visited-set trace limits rendering work while still searching every branch', () => {
+  const matrix = [[2, 2, 2], [2, 2, 2], [2, 2, 2]];
+  const run = problem.builder3(matrix);
+  assert.equal(run.answer, 9);
+  assert.ok(run.skippedSteps > 0);
+  assert.equal(run.steps.length, 1201);
+  const final = run.steps.at(-1);
+  assert.equal(final.final, true);
+  assert.equal(final.springboardMatrix9020View.answer, 9);
+  assert.equal(final.springboardMatrix9020View.processedRoots, 9);
+  assertLegalPath(matrix, final.springboardMatrix9020View.bestPath);
+});
+
+test('9020 supplied visited-set Python handles empty input and agrees with the other approaches', () => {
+  const cases = [[], [[]], [[0]], [[2, 2], [2, 2]], [[5, 1, 4], [2, 3, 0]], [[9, 6, 8], [5, 4, 7], [3, 2, 1]], [[1e9, 0, 1e9]], [[3, 1, 2, 3]]];
+  const expected = cases.map((matrix) => matrix.length && matrix[0].length ? problem.builder3(matrix).answer : 0);
+  const executed = spawnSync('python3', ['-c', `${problem.code3.join('\n')}\nimport json\ncases = json.loads(${JSON.stringify(JSON.stringify(cases))})\nprint(json.dumps([Solution().longestPhysicsPath(matrix) for matrix in cases]))`], { encoding: 'utf8' });
+  assert.equal(executed.status, 0, executed.stderr);
+  assert.deepEqual(JSON.parse(executed.stdout), expected);
 });
 
 test('9020 validates matrix shape, size, and height bounds', () => {
@@ -305,6 +352,30 @@ test('9020 follow-up renderer shows path copies, counts, and the complete groupe
   assert.match(element.innerHTML, /91 paths/);
   assert.match(element.innerHTML, /LONGEST/);
   assert.equal((element.innerHTML.match(/<details/g) || []).length, 9);
+});
+
+test('9020 visited-set visualization shows add, remove, returned length, and optimal path in both languages', () => {
+  const source = readFrontendJavaScript();
+  const start = source.indexOf('function renderSpringboardMatrix9020View(step)');
+  const end = source.indexOf('\nfunction ', start + 20);
+  const element = { innerHTML: '' };
+  const context = { lang: 'en', $: () => element, escapeHtml: String };
+  context.pick = (value) => value?.[context.lang] ?? value ?? '';
+  vm.createContext(context);
+  vm.runInContext(source.slice(start, end), context);
+  const run = problem.builder3(problem.defaultInput);
+  for (const language of ['en', 'vi']) {
+    context.lang = language;
+    for (const step of run.steps) {
+      context.renderSpringboardMatrix9020View(step);
+      assert.match(element.innerHTML, /DFS \+ VISITED SET/);
+      assert.match(element.innerHTML, /spring9020-visited-set/);
+      assert.doesNotMatch(element.innerHTML, /BITMASK|undefined|NaN|Infinity|object Object/);
+      assert.equal((element.innerHTML.match(/class="spring9020-cell(?: |")/g) || []).length, 9);
+      if (step.springboardMatrix9020View.phase === 'add') assert.match(element.innerHTML, /visited\.add/);
+      if (step.springboardMatrix9020View.phase === 'remove') assert.match(element.innerHTML, /visited\.remove/);
+    }
+  }
 });
 
 test('9020 frontend loads the dedicated responsive visualization', () => {
