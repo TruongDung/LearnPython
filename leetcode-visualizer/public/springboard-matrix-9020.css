@@ -1,0 +1,148 @@
+.spring9020-viz { --sp-bg: #0b1220; --sp-panel: #111b2e; --sp-panel-2: #162238; --sp-text: #e5edf8; --sp-muted: #9aabc2; --sp-line: #31415b; --sp-blue: #38bdf8; --sp-green: #34d399; --sp-amber: #fbbf24; --sp-red: #fb7185; --sp-purple: #c084fc; display: grid; gap: 12px; min-width: 0; padding: 15px; color: var(--sp-text); background: var(--sp-bg); border: 1px solid var(--sp-line); border-radius: 15px; font-size: 12px; container-type: inline-size; }
+[data-theme="light"] .spring9020-viz { --sp-bg: #f5f8fc; --sp-panel: #ffffff; --sp-panel-2: #eef3f9; --sp-text: #172033; --sp-muted: #607089; --sp-line: #c8d2df; --sp-blue: #0369a1; --sp-green: #047857; --sp-amber: #a16207; --sp-red: #be123c; --sp-purple: #7e22ce; }
+.spring9020-viz * { box-sizing: border-box; }
+.spring9020-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.spring9020-header small { color: var(--sp-blue); font: 800 10px ui-monospace, monospace; letter-spacing: .06em; }
+.spring9020-header h3 { margin: 3px 0 0; color: var(--sp-text); font-size: 17px; }
+.spring9020-answer { display: grid; min-width: 90px; padding: 8px 12px; text-align: right; background: color-mix(in srgb, var(--sp-green) 10%, var(--sp-panel)); border-radius: 10px; }
+.spring9020-answer span { color: var(--sp-muted); font-size: 10px; }
+.spring9020-answer b { color: var(--sp-green); font: 900 22px ui-monospace, monospace; }
+.spring9020-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.spring9020-phases span { display: flex; min-width: 0; align-items: center; gap: 6px; padding: 7px 8px; color: var(--sp-muted); background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 8px; font-size: 10px; }
+.spring9020-phases span b { display: grid; flex: 0 0 18px; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: var(--sp-panel-2); font: 800 9px ui-monospace, monospace; }
+.spring9020-phases span.done { color: var(--sp-green); border-color: color-mix(in srgb, var(--sp-green) 55%, var(--sp-line)); }
+.spring9020-phases span.active { color: var(--sp-text); border-color: var(--sp-blue); background: color-mix(in srgb, var(--sp-blue) 8%, var(--sp-panel)); }
+.spring9020-phases span.active b { color: var(--sp-bg); background: var(--sp-blue); }
+.spring9020-step { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; padding: 10px 12px; background: var(--sp-panel); border-left: 4px solid var(--sp-amber); border-radius: 9px; }
+.spring9020-step > b { grid-row: 1 / span 2; align-self: start; color: var(--sp-amber); font: 800 9px ui-monospace, monospace; }
+.spring9020-step > strong { font-size: 12px; }
+.spring9020-step > p { margin: 0; color: var(--sp-muted); font-size: 11px; }
+.spring9020-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.spring9020-metrics article { display: grid; gap: 3px; min-width: 0; padding: 8px 9px; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 8px; }
+.spring9020-metrics span { color: var(--sp-muted); font-size: 10px; }
+.spring9020-metrics b { overflow: hidden; color: var(--sp-text); font: 800 14px ui-monospace, monospace; text-overflow: ellipsis; }
+.spring9020-metrics .mode.momentum { border-color: var(--sp-purple); background: color-mix(in srgb, var(--sp-purple) 9%, var(--sp-panel)); }
+.spring9020-metrics .mode.momentum b { color: var(--sp-purple); }
+.spring9020-metrics .mode.rest { border-color: var(--sp-green); }
+.spring9020-metrics .mode.rest b { color: var(--sp-green); }
+.spring9020-rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.spring9020-rule { display: grid; gap: 3px; padding: 9px 10px; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 9px; }
+.spring9020-rule small, .spring9020-rule span { color: var(--sp-muted); font-size: 10px; }
+.spring9020-rule strong { color: var(--sp-text); font: 800 13px ui-monospace, monospace; }
+.spring9020-rule.active { border-color: var(--sp-amber); background: color-mix(in srgb, var(--sp-amber) 8%, var(--sp-panel)); box-shadow: inset 3px 0 var(--sp-amber); }
+.spring9020-main { display: grid; grid-template-columns: minmax(300px, 1.25fr) minmax(220px, .75fr); gap: 10px; min-width: 0; }
+.spring9020-board-wrap, .spring9020-neighbors, .spring9020-route { min-width: 0; overflow: hidden; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 11px; }
+.spring9020-board-wrap > header, .spring9020-neighbors > header, .spring9020-route > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-bottom: 1px solid var(--sp-line); }
+.spring9020-board-wrap > header strong, .spring9020-neighbors > header strong, .spring9020-route > header strong { font-size: 10px; letter-spacing: .04em; }
+.spring9020-board-wrap > header span, .spring9020-neighbors > header span, .spring9020-route > header span { color: var(--sp-muted); font: 10px ui-monospace, monospace; }
+.spring9020-board { display: grid; grid-template-columns: repeat(var(--spring9020-cols), minmax(74px, 1fr)); gap: 7px; padding: 11px; }
+.spring9020-cell { display: grid; position: relative; min-height: 78px; align-content: space-between; padding: 7px; color: var(--sp-muted); background: var(--sp-panel-2); border: 1px solid var(--sp-line); border-radius: 9px; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.spring9020-cell header { display: flex; align-items: center; justify-content: space-between; gap: 5px; font: 9px ui-monospace, monospace; }
+.spring9020-cell header b { color: var(--sp-amber); font-size: 8px; }
+.spring9020-cell > strong { color: var(--sp-text); font: 900 20px ui-monospace, monospace; text-align: center; }
+.spring9020-cell footer { font-size: 9px; text-align: center; }
+.spring9020-cell.visited { background: color-mix(in srgb, var(--sp-green) 8%, var(--sp-panel)); border-color: color-mix(in srgb, var(--sp-green) 60%, var(--sp-line)); }
+.spring9020-cell.candidate-ok { border-color: var(--sp-blue); box-shadow: inset 0 -3px var(--sp-blue); }
+.spring9020-cell.candidate-no { opacity: .6; border-style: dashed; }
+.spring9020-cell.current { z-index: 1; color: var(--sp-text); border-color: var(--sp-amber); background: color-mix(in srgb, var(--sp-amber) 13%, var(--sp-panel)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sp-amber) 55%, transparent); transform: translateY(-2px); }
+.spring9020-cell.next { border-color: var(--sp-purple); background: color-mix(in srgb, var(--sp-purple) 12%, var(--sp-panel)); box-shadow: inset 0 -3px var(--sp-purple); }
+.spring9020-cell.best { border-color: var(--sp-green); opacity: 1; }
+.spring9020-cell.saved { border-color: color-mix(in srgb, var(--sp-purple) 65%, var(--sp-line)); background: color-mix(in srgb, var(--sp-purple) 7%, var(--sp-panel)); }
+.spring9020-board-wrap > footer { display: flex; flex-wrap: wrap; gap: 11px; padding: 8px 11px; color: var(--sp-muted); border-top: 1px solid var(--sp-line); font-size: 9px; }
+.spring9020-board-wrap > footer span { display: flex; align-items: center; gap: 5px; }
+.spring9020-board-wrap > footer i { width: 10px; height: 10px; border: 2px solid var(--sp-line); border-radius: 2px; }
+.spring9020-board-wrap > footer i.visited { border-color: var(--sp-green); }
+.spring9020-board-wrap > footer i.current { border-color: var(--sp-amber); }
+.spring9020-board-wrap > footer i.ok { border-color: var(--sp-blue); }
+.spring9020-board-wrap > footer i.no { border-style: dashed; border-color: var(--sp-muted); }
+.spring9020-neighbors > div { display: grid; gap: 7px; padding: 10px; }
+.spring9020-neighbors p { margin: 0; color: var(--sp-muted); }
+.spring9020-candidate { display: grid; grid-template-columns: 26px minmax(72px, auto) 1fr; align-items: center; gap: 7px; min-height: 48px; padding: 7px 8px; background: var(--sp-panel-2); border-radius: 8px; }
+.spring9020-candidate > b { display: grid; width: 26px; height: 26px; place-items: center; color: var(--sp-text); background: var(--sp-panel); border-radius: 50%; font-size: 14px; }
+.spring9020-candidate > span { display: grid; }
+.spring9020-candidate > span strong { font-size: 10px; text-transform: uppercase; }
+.spring9020-candidate > span small { color: var(--sp-muted); font: 9px ui-monospace, monospace; }
+.spring9020-candidate > em { color: var(--sp-muted); font-size: 9px; font-style: normal; text-align: right; }
+.spring9020-candidate.ok { background: color-mix(in srgb, var(--sp-green) 9%, var(--sp-panel-2)); }
+.spring9020-candidate.ok > b, .spring9020-candidate.ok > em { color: var(--sp-green); }
+.spring9020-candidate.no { opacity: .72; }
+.spring9020-candidate.no > b { color: var(--sp-red); }
+.spring9020-route > div { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 11px; }
+.spring9020-route-node { display: grid; flex: 0 0 76px; gap: 2px; padding: 7px; color: var(--sp-muted); text-align: center; background: var(--sp-panel-2); border: 1px solid var(--sp-line); border-radius: 8px; }
+.spring9020-route-node small { font: 8px ui-monospace, monospace; }
+.spring9020-route-node b { color: var(--sp-text); font: 800 15px ui-monospace, monospace; }
+.spring9020-route-node.done { border-color: var(--sp-green); }
+.spring9020-route-node.current { border-color: var(--sp-amber); background: color-mix(in srgb, var(--sp-amber) 10%, var(--sp-panel)); }
+.spring9020-route-edge { display: grid; flex: 0 0 45px; justify-items: center; color: var(--sp-muted); }
+.spring9020-route-edge b { font-size: 18px; }
+.spring9020-route-edge small { font-size: 8px; white-space: nowrap; }
+.spring9020-route-edge.done { color: var(--sp-green); }
+.spring9020-route-edge.active { color: var(--sp-amber); }
+.spring9020-route-edge.spring.active, .spring9020-route-edge.spring.done { color: var(--sp-purple); }
+.spring9020-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 9px 16px; color: var(--sp-muted); font-size: 10px; }
+.spring9020-footer b { color: var(--sp-text); }
+.spring9020-footer code { color: var(--sp-blue); }
+.spring9020-list-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.spring9020-list-metrics article { display: grid; grid-template-columns: 1fr auto; gap: 2px 7px; min-width: 0; padding: 8px 10px; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 9px; }
+.spring9020-list-metrics article > span { align-self: center; color: var(--sp-muted); font-size: 10px; }
+.spring9020-list-metrics article > b { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--sp-text); font: 900 18px ui-monospace, monospace; }
+.spring9020-list-metrics article > small { color: var(--sp-muted); font-size: 9px; }
+.spring9020-list-metrics article.mode.momentum { border-color: var(--sp-purple); background: color-mix(in srgb, var(--sp-purple) 8%, var(--sp-panel)); }
+.spring9020-list-metrics article.mode.momentum > b { color: var(--sp-purple); font-size: 12px; }
+.spring9020-list-metrics article.mode.rest { border-color: var(--sp-green); }
+.spring9020-list-metrics article.mode.rest > b { color: var(--sp-green); font-size: 12px; }
+.spring9020-list-main { display: grid; grid-template-columns: minmax(300px, 1.2fr) minmax(220px, .8fr); gap: 10px; min-width: 0; }
+.spring9020-list-summary, .spring9020-active-branch, .spring9020-list-output { min-width: 0; overflow: hidden; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 11px; }
+.spring9020-list-summary > header, .spring9020-active-branch > header, .spring9020-list-output > header { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--sp-line); }
+.spring9020-list-summary > header strong, .spring9020-active-branch > header strong, .spring9020-list-output > header strong { font-size: 10px; letter-spacing: .04em; }
+.spring9020-list-summary > header span, .spring9020-active-branch > header span, .spring9020-list-output > header span { color: var(--sp-muted); font: 10px ui-monospace, monospace; }
+.spring9020-list-summary > div { display: grid; gap: 8px; padding: 10px; }
+.spring9020-list-summary > div > span { display: grid; grid-template-columns: 54px 1fr 34px; align-items: center; gap: 7px; }
+.spring9020-list-summary > div small { color: var(--sp-muted); font-size: 9px; }
+.spring9020-list-summary > div i { height: 7px; overflow: hidden; background: var(--sp-panel-2); border-radius: 999px; }
+.spring9020-list-summary > div i b { display: block; height: 100%; background: var(--sp-blue); border-radius: inherit; }
+.spring9020-list-summary > div strong { color: var(--sp-text); font: 800 10px ui-monospace, monospace; text-align: right; }
+.spring9020-active-branch > div { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 10px; }
+.spring9020-active-branch > div > span { display: grid; flex: 0 0 76px; gap: 2px; padding: 7px; text-align: center; background: var(--sp-panel-2); border: 1px solid var(--sp-green); border-radius: 8px; }
+.spring9020-active-branch > div > span small { color: var(--sp-muted); font: 8px ui-monospace, monospace; }
+.spring9020-active-branch > div > span b { color: var(--sp-text); font: 800 15px ui-monospace, monospace; }
+.spring9020-active-branch > div > em { color: var(--sp-muted); font-style: normal; }
+.spring9020-active-branch > div > p { margin: 0; color: var(--sp-muted); }
+.spring9020-active-branch > p { margin: 0; padding: 0 11px 10px; color: var(--sp-muted); font-size: 10px; }
+.spring9020-active-branch > p b { color: var(--sp-purple); }
+.spring9020-last-saved { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 11px; background: color-mix(in srgb, var(--sp-purple) 7%, var(--sp-panel)); border: 1px solid color-mix(in srgb, var(--sp-purple) 55%, var(--sp-line)); border-radius: 9px; }
+.spring9020-last-saved > span { color: var(--sp-muted); font-size: 10px; }
+.spring9020-last-saved > div { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; }
+.spring9020-last-saved > div b { flex: 0 0 auto; min-width: 26px; padding: 4px 6px; color: var(--sp-text); text-align: center; background: var(--sp-panel); border-radius: 6px; font: 800 11px ui-monospace, monospace; }
+.spring9020-last-saved > div em { color: var(--sp-purple); font-style: normal; }
+.spring9020-last-saved > code { color: var(--sp-purple); font-size: 9px; white-space: nowrap; }
+.spring9020-list-output.empty { padding: 11px; color: var(--sp-muted); font-size: 10px; }
+.spring9020-list-output.empty p { margin: 0; }
+.spring9020-list-output details { border-top: 1px solid var(--sp-line); }
+.spring9020-list-output details:first-of-type { border-top: 0; }
+.spring9020-list-output details.longest { background: color-mix(in srgb, var(--sp-green) 7%, var(--sp-panel)); }
+.spring9020-list-output summary { display: flex; align-items: center; gap: 10px; padding: 9px 11px; }
+.spring9020-list-output summary b { color: var(--sp-text); font-size: 11px; }
+.spring9020-list-output summary span { color: var(--sp-muted); font-size: 10px; }
+.spring9020-list-output summary strong { margin-left: auto; color: var(--sp-green); font-size: 9px; }
+.spring9020-list-output ol { display: grid; gap: 5px; max-height: 320px; overflow-y: auto; margin: 0; padding: 8px 11px 11px 38px; border-top: 1px solid var(--sp-line); }
+.spring9020-list-output li { padding-left: 3px; color: var(--sp-muted); }
+.spring9020-list-output li small { display: inline-block; width: 28px; color: var(--sp-muted); font: 8px ui-monospace, monospace; }
+.spring9020-list-output li b { color: var(--sp-text); font: 800 10px ui-monospace, monospace; }
+.spring9020-list-output li code { display: block; margin-top: 2px; color: var(--sp-muted); font-size: 9px; white-space: normal; overflow-wrap: anywhere; }
+@container (max-width: 680px) {
+  .spring9020-main { grid-template-columns: 1fr; }
+  .spring9020-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .spring9020-list-main { grid-template-columns: 1fr; }
+  .spring9020-list-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 500px) {
+  .spring9020-header { align-items: flex-start; }
+  .spring9020-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spring9020-rules { grid-template-columns: 1fr; }
+  .spring9020-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spring9020-board { grid-template-columns: repeat(var(--spring9020-cols), minmax(64px, 1fr)); gap: 5px; padding: 8px; }
+  .spring9020-cell { min-height: 70px; padding: 6px; }
+  .spring9020-candidate { grid-template-columns: 26px 76px 1fr; }
+  .spring9020-last-saved { grid-template-columns: 1fr; }
+}

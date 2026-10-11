@@ -196,11 +196,15 @@ test('2158 dedicated renderer is wired, bilingual, and complete for every step',
   context.lang = 'en';
   context.renderAmountPainted2158View(jump);
   const html = elementFor('treeView').innerHTML;
-  assert.match(html, /Jump from 4 straight to 8/);
-  assert.match(html, /4<\/span><i>→<\/i><span>8/);
-  assert.match(html, /painted earlier/);
-  assert.match(html, /painted today/);
-  assert.match(html, /units in today&#39;s interval|units in today's interval/);
-  assert.match(html, /newly painted so far/);
+  assert.match(html, /Jump: 4 → 8/);
+  assert.match(html, /ap2158-brush/);
+  assert.match(html, /ap2158-paint-fill/);
+  assert.match(html, /ap2158-day is-active/);
+  assert.match(html, /<s>4<\/s><i>→<\/i><b>8<\/b>/);
+  assert.match(html, /<b>3<\/b><i>=<\/i><span class="old">2<\/span><i>\+<\/i><span class="fresh">1<\/span>/);
   assert.match(html, /class="is-done">3<\/span><span class="is-done">3/);
+  assert.doesNotMatch(html, /ap2158-question|ap2158-recipe|ap2158-action/);
+
+  const visibleText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.ok(visibleText.length < 260, `visual should stay compact, got ${visibleText.length} chars`);
 });

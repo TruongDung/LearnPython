@@ -388,116 +388,216 @@ function buildSteps3Set(input) {
  * Expand right, then shrink left whenever the window contains more than k zeros.
  */
 function buildSteps1004(nums, params) {
-  const k = params.k;
+  if (!Array.isArray(nums) || nums.length === 0 || !nums.every((value) => value === 0 || value === 1)) {
+    throw new Error("1004 expects a non-empty binary array containing only 0 and 1.");
+  }
+  const k = Number(params && params.k);
+  if (!Number.isInteger(k) || k < 0 || k > nums.length) {
+    throw new Error(`1004 expects k to be an integer between 0 and nums.length (${nums.length}).`);
+  }
   const steps = [];
-
-  const inWindow = (i, j) => Array.from({ length: j - i + 1 }, (_, t) => i + t);
-
-  steps.push({
-    title: { vi: "Mảng ban đầu", en: "Initial array" },
-    arr: [...nums],
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5],
-    vars: [{ name: "k", value: k }],
-    note: {
-      vi: `Mảng nhị phân: [${nums.join(", ")}], k = ${k}. Được phép lật tối đa ${k} số 0 thành 1.`,
-      en: `Binary array: [${nums.join(", ")}], k = ${k}. You may flip at most ${k} zeros to ones.`,
-    },
-  });
-
   let left = 0;
   let zeroCount = 0;
   let maxLength = 0;
   let bestL = 0;
   let bestR = -1;
+  let right = -1;
 
-  for (let right = 0; right < nums.length; right++) {
-    if (nums[right] === 0) zeroCount += 1;
-
-    // Expand window to right
+  const indexes = (start, end) => end >= start
+    ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+    : [];
+  const snapshot = ({ event, phase, line, title, note, activeIndex = -1, removedIndex = -1, previousMax = maxLength, final = false }) => {
+    const windowIndices = indexes(left, right);
+    const bestIndices = indexes(bestL, bestR);
+    const flippedZeros = windowIndices.filter((index) => nums[index] === 0);
+    const pendingRightZero = (event === "expand" || event === "inspect-right")
+      && right >= 0
+      && nums[right] === 0;
+    const countedZeroIndices = event === "refund-flip"
+      ? flippedZeros.filter((index) => index !== removedIndex)
+      : pendingRightZero
+        ? flippedZeros.filter((index) => index !== right)
+        : flippedZeros;
     steps.push({
-      title: { vi: `Mở rộng: right = ${right}`, en: `Expand: right = ${right}` },
+      title,
       arr: [...nums],
-      highlight: inWindow(left, right),
-      mark: [],
-      codeLines: [6, 7, 8],
+      highlight: [...windowIndices],
+      mark: final ? [...bestIndices] : [],
+      final,
+      codeLines: [line],
       vars: [
         { name: "left", value: left },
-        { name: "right", value: right },
-        { name: "zeroCount", value: zeroCount },
-        { name: "maxLength", value: maxLength },
+        { name: "right", value: right >= 0 ? right : "—" },
+        { name: "zero_count", value: zeroCount },
+        { name: "k", value: k },
+        { name: "max_length", value: maxLength },
       ],
-      note: {
-        vi: `Thêm nums[${right}]=${nums[right]}. Số 0 trong cửa sổ [${left}..${right}] = ${zeroCount}.`,
-        en: `Add nums[${right}]=${nums[right]}. Zeros in window [${left}..${right}] = ${zeroCount}.`,
+      note,
+      maxConsecutiveOnes1004View: {
+        problemId: 1004,
+        nums: [...nums],
+        k,
+        left,
+        right,
+        zeroCount,
+        remainingFlips: k - zeroCount,
+        maxLength,
+        previousMax,
+        bestL,
+        bestR,
+        windowIndices,
+        bestIndices,
+        flippedZeros,
+        countedZeroIndices,
+        currentLength: right >= left ? right - left + 1 : 0,
+        valid: zeroCount <= k,
+        event,
+        phase,
+        line,
+        activeIndex,
+        removedIndex,
       },
     });
+  };
 
-    // Shrink window when zeros exceed k
-    while (zeroCount > k) {
-      const removed = nums[left];
-      if (nums[left] === 0) zeroCount -= 1;
+  snapshot({
+    event: "init-left",
+    phase: "init",
+    line: 3,
+    title: { vi: "Khởi tạo left = 0", en: "Initialize left = 0" },
+    note: { vi: "Cạnh trái sẽ chỉ di chuyển sang phải khi cửa sổ dùng quá k lượt lật.", en: "The left edge moves right only when the window uses more than k flips." },
+  });
+  snapshot({
+    event: "init-zero-count",
+    phase: "init",
+    line: 4,
+    title: { vi: "Chưa dùng lượt lật nào", en: "No flips used yet" },
+    note: { vi: "zero_count đếm số 0 bên trong cửa sổ hiện tại.", en: "zero_count tracks the zeros inside the current window." },
+  });
+  snapshot({
+    event: "init-best",
+    phase: "init",
+    line: 5,
+    title: { vi: "Khởi tạo kỷ lục = 0", en: "Initialize the record to 0" },
+    note: { vi: "max_length chỉ được cập nhật sau khi cửa sổ thỏa zero_count ≤ k.", en: "max_length is updated only after the window satisfies zero_count ≤ k." },
+  });
+
+  for (right = 0; right < nums.length; right++) {
+    snapshot({
+      event: "expand",
+      phase: "expand",
+      line: 6,
+      activeIndex: right,
+      title: { vi: `Mở rộng tới right = ${right}`, en: `Expand to right = ${right}` },
+      note: { vi: `Đưa nums[${right}] = ${nums[right]} vào cửa sổ [${left}..${right}].`, en: `Bring nums[${right}] = ${nums[right]} into window [${left}..${right}].` },
+    });
+    snapshot({
+      event: "inspect-right",
+      phase: "expand",
+      line: 7,
+      activeIndex: right,
+      title: nums[right] === 0
+        ? { vi: `nums[${right}] là 0`, en: `nums[${right}] is zero` }
+        : { vi: `nums[${right}] là 1`, en: `nums[${right}] is one` },
+      note: nums[right] === 0
+        ? { vi: "Số 0 mới cần một lượt flip, nên tăng zero_count.", en: "The new zero needs one flip, so increment zero_count." }
+        : { vi: "Số 1 không tiêu tốn budget flip.", en: "A one consumes no flip budget." },
+    });
+    if (nums[right] === 0) {
+      zeroCount += 1;
+      snapshot({
+        event: "use-flip",
+        phase: "expand",
+        line: 8,
+        activeIndex: right,
+        title: { vi: `Dùng flip cho index ${right}`, en: `Use a flip at index ${right}` },
+        note: { vi: `zero_count = ${zeroCount}; còn ${k - zeroCount} lượt flip chưa dùng.`, en: `zero_count = ${zeroCount}; ${k - zeroCount} flip slots remain.` },
+      });
+    }
+
+    while (true) {
+      const valid = zeroCount <= k;
+      snapshot({
+        event: "validate",
+        phase: valid ? "validate" : "shrink",
+        line: 9,
+        activeIndex: valid ? right : left,
+        title: valid
+          ? { vi: `${zeroCount} ≤ ${k}: cửa sổ hợp lệ`, en: `${zeroCount} ≤ ${k}: window is valid` }
+          : { vi: `${zeroCount} > ${k}: phải co bên trái`, en: `${zeroCount} > ${k}: shrink from the left` },
+        note: valid
+          ? { vi: "Budget flip đủ cho mọi số 0 trong cửa sổ.", en: "The flip budget covers every zero in the window." }
+          : { vi: "Cửa sổ tạm thời có quá nhiều số 0; chưa được cập nhật kỷ lục.", en: "The temporary window has too many zeros; do not update the record yet." },
+      });
+      if (valid) break;
+
+      const removedIndex = left;
+      const removedValue = nums[left];
+      snapshot({
+        event: "inspect-left",
+        phase: "shrink",
+        line: 10,
+        activeIndex: left,
+        removedIndex,
+        title: { vi: `Kiểm tra nums[left] = ${removedValue}`, en: `Inspect nums[left] = ${removedValue}` },
+        note: removedValue === 0
+          ? { vi: `Index ${left} đang dùng một flip; bỏ nó sẽ hoàn lại budget.`, en: `Index ${left} uses one flip; removing it refunds that budget slot.` }
+          : { vi: `Index ${left} là 1 nên bỏ nó không đổi zero_count.`, en: `Index ${left} is one, so removing it does not change zero_count.` },
+      });
+      if (removedValue === 0) {
+        zeroCount -= 1;
+        snapshot({
+          event: "refund-flip",
+          phase: "shrink",
+          line: 11,
+          activeIndex: left,
+          removedIndex,
+          title: { vi: `Hoàn lại flip ở index ${left}`, en: `Refund the flip at index ${left}` },
+          note: { vi: `zero_count giảm còn ${zeroCount}.`, en: `zero_count decreases to ${zeroCount}.` },
+        });
+      }
       left += 1;
-      steps.push({
-        title: { vi: `Co cửa sổ: left = ${left}`, en: `Shrink: left = ${left}` },
-        arr: [...nums],
-        highlight: inWindow(left, right),
-        mark: [],
-        codeLines: [9, 10, 11, 12],
-        vars: [
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "zeroCount", value: zeroCount },
-          { name: "maxLength", value: maxLength },
-        ],
-        note: {
-          vi: `Zeros vượt k=${k}. Bỏ nums[${left - 1}]=${removed} ở trái, left → ${left}. Zeros = ${zeroCount}.`,
-          en: `Zeros exceeded k=${k}. Drop nums[${left - 1}]=${removed} on left, left → ${left}. Zeros = ${zeroCount}.`,
-        },
+      snapshot({
+        event: "move-left",
+        phase: "shrink",
+        line: 12,
+        activeIndex: left,
+        removedIndex,
+        title: { vi: `Di chuyển left tới ${left}`, en: `Move left to ${left}` },
+        note: { vi: `Index ${removedIndex} rời cửa sổ; kiểm tra lại zero_count ≤ k.`, en: `Index ${removedIndex} leaves the window; check zero_count ≤ k again.` },
       });
     }
 
     const length = right - left + 1;
+    const previousMax = maxLength;
     if (length > maxLength) {
       maxLength = length;
       bestL = left;
       bestR = right;
-      steps.push({
-        title: { vi: `Cập nhật max = ${maxLength}`, en: `Update max = ${maxLength}` },
-        arr: [...nums],
-        highlight: inWindow(left, right),
-        mark: [],
-        codeLines: [13],
-        vars: [
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "maxLength", value: maxLength },
-          { name: "zeroCount", value: zeroCount },
-        ],
-        note: {
-          vi: `Cửa sổ [${left}..${right}] dài ${length} > kỷ lục cũ. maxLength = ${maxLength}.`,
-          en: `Window [${left}..${right}] of length ${length} beats the record. maxLength = ${maxLength}.`,
-        },
-      });
     }
+    snapshot({
+      event: length > previousMax ? "record-best" : "keep-best",
+      phase: "record",
+      line: 13,
+      activeIndex: right,
+      previousMax,
+      title: length > previousMax
+        ? { vi: `Kỷ lục mới: ${maxLength}`, en: `New record: ${maxLength}` }
+        : { vi: `Giữ kỷ lục: ${maxLength}`, en: `Keep the record: ${maxLength}` },
+      note: length > previousMax
+        ? { vi: `Cửa sổ hợp lệ [${left}..${right}] dài ${length}, lớn hơn ${previousMax}.`, en: `Valid window [${left}..${right}] has length ${length}, beating ${previousMax}.` }
+        : { vi: `Cửa sổ hợp lệ dài ${length}, chưa vượt kỷ lục ${maxLength}.`, en: `The valid window has length ${length}, which does not beat ${maxLength}.` },
+    });
   }
 
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums],
-    highlight: [],
-    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
+  right = nums.length - 1;
+  snapshot({
+    event: "done",
+    phase: "done",
+    line: 14,
+    title: { vi: `Trả về ${maxLength}`, en: `Return ${maxLength}` },
+    note: { vi: `Cửa sổ tốt nhất [${bestL}..${bestR}] có ${maxLength} phần tử sau khi lật tối đa ${k} số 0.`, en: `Best window [${bestL}..${bestR}] contains ${maxLength} values after flipping at most ${k} zeros.` },
     final: true,
-    codeLines: [14],
-    vars: [
-      { name: "maxLength", value: maxLength },
-      { name: "window", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "-" },
-    ],
-    note: {
-      vi: `Cửa sổ dài nhất là [${bestL}..${bestR}] với độ dài ${maxLength}. Đáp án = ${maxLength}.`,
-      en: `The longest window is [${bestL}..${bestR}] with length ${maxLength}. Answer = ${maxLength}.`,
-    },
   });
 
   return { original: [...nums], k, answer: maxLength, steps };
@@ -5480,6 +5580,7 @@ module.exports = {
         key: "k",
         label: { vi: "k (số 0 được phép lật)", en: "k (zeros you may flip)" },
         default: 2,
+        min: 0,
       },
     ],
     complexity: {
@@ -5494,15 +5595,15 @@ module.exports = {
       "class Solution:",
       "    def longestOnes(self, nums, k):",
       "        left = 0",
-      "        max_length = 0",
       "        zero_count = 0",
-      "        for right in range(len(nums)):",
-      "            if nums[right] == 0:",
+      "        max_length = 0",
+      "        for right, value in enumerate(nums):",
+      "            if value == 0:",
       "                zero_count += 1",
-      "                while zero_count > k:",
-      "                    if nums[left] == 0:",
-      "                        zero_count -= 1",
-      "                    left += 1",
+      "            while zero_count > k:",
+      "                if nums[left] == 0:",
+      "                    zero_count -= 1",
+      "                left += 1",
       "            max_length = max(max_length, right - left + 1)",
       "        return max_length",
     ],

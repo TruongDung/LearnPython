@@ -7,6 +7,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.springboardMatrix9020View), surface: "treeView", render: (step) => {
+      renderSpringboardMatrix9020View(step);
+    } },
+    { predicate: (step) => Boolean(step.maxConsecutiveOnes1004View), surface: "treeView", render: (step) => {
+      renderMaxConsecutiveOnes1004View(step);
+    } },
     { predicate: (step) => Boolean(step.kSum2386View), surface: "treeView", render: (step) => {
       renderKSum2386View(step);
     } },
