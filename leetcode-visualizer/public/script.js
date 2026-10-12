@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.directorySize9023View), surface: "treeView", render: (step) => {
+      renderDirectorySize9023View(step);
+    } },
     { predicate: (step) => Boolean(step.springboardMatrix9020View), surface: "treeView", render: (step) => {
       renderSpringboardMatrix9020View(step);
     } },
@@ -638,7 +641,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderBipartiteView(step);
     } },
     { predicate: (step) => Boolean(step.autocompleteView), surface: "treeView", render: (step) => {
-      renderAutocompleteView(step);
+      renderAutocomplete642View(step);
     } },
     { predicate: (step) => Boolean(step.fileSystemView), surface: "treeView", render: (step) => {
       renderFileSystemView(step);

@@ -1,0 +1,24 @@
+.ds9023-viz { --ds-bg:#101827;--ds-panel:#172337;--ds-line:#43536b;--ds-text:#e2e8f0;--ds-muted:#a8b6c9;--ds-blue:#38bdf8;--ds-green:#4ade80;--ds-amber:#fbbf24;--ds-red:#fb7185;display:grid;gap:10px;min-width:0;padding:12px;background:var(--ds-bg);color:var(--ds-text);border:1px solid var(--ds-line);border-radius:12px; }
+[data-theme="light"] .ds9023-viz { --ds-bg:#f5f8fc;--ds-panel:#fff;--ds-line:#b7c5d7;--ds-text:#172033;--ds-muted:#526379;--ds-blue:#0369a1;--ds-green:#047857;--ds-amber:#a16207;--ds-red:#be123c; }
+.ds9023-viz * { box-sizing:border-box; }
+#treeView:has(>.ds9023-viz) { padding:0;border:0;background:transparent;min-height:0;overflow:visible; }
+.ds9023-viz > header { display:flex;align-items:center;justify-content:space-between;gap:8px; }.ds9023-viz > header > div { min-width:0; }
+.ds9023-viz small { color:var(--ds-muted);font:10px ui-monospace,monospace; }.ds9023-viz h3 { margin:3px 0 0;font-size:15px; }
+.ds9023-viz output { max-width:100%;overflow-wrap:anywhere;color:var(--ds-green);font:800 20px ui-monospace,monospace; }
+.ds9023-viz svg { width:22px;height:22px;flex:none;fill:color-mix(in srgb,currentColor 12%,transparent);stroke:currentColor;stroke-width:1.5;stroke-linejoin:round; }
+.ds9023-query,.ds9023-read { display:flex;align-items:center;gap:7px;min-width:0;padding:9px;background:var(--ds-panel);border:1px solid var(--ds-blue);border-radius:8px; }
+.ds9023-query svg,.ds9023-read svg { color:var(--ds-blue); }.ds9023-query code,.ds9023-read code { flex:1;min-width:0;overflow-wrap:anywhere;font-size:11px; }.ds9023-query span { color:var(--ds-amber);font:700 11px ui-monospace,monospace;flex:none; }
+.ds9023-tree { position:relative;display:grid;gap:5px;min-width:0;max-height:420px;overflow-y:auto;padding:5px 0; }
+.ds9023-node { display:flex;align-items:center;gap:5px;min-width:0;margin-left:min(calc(var(--ds-depth) * 14px),26%);padding:7px 5px;border:1px solid var(--ds-line);border-radius:7px;background:var(--ds-panel); }
+.ds9023-node svg { color:var(--ds-blue);width:19px;height:19px; }.ds9023-node strong { flex:1;min-width:0;overflow-wrap:anywhere;font:700 11px ui-monospace,monospace; }.ds9023-node b { flex:none;color:var(--ds-text);font:750 11px ui-monospace,monospace; }
+.ds9023-branch { flex:none;color:var(--ds-muted);font-style:normal; }.ds9023-node > span { max-width:100%;overflow-wrap:anywhere;color:var(--ds-amber);font:700 10px ui-monospace,monospace; }
+.ds9023-node.visited { border-color:var(--ds-blue); }.ds9023-node.matched { border-color:var(--ds-green);background:color-mix(in srgb,var(--ds-green) 10%,var(--ds-panel)); }.ds9023-node.matched > span { color:var(--ds-green); }
+.ds9023-node.current { border-color:var(--ds-amber); }.ds9023-node.missing { border-color:var(--ds-red);border-style:dashed; }.ds9023-node.missing > span { color:var(--ds-red); }
+.ds9023-equation { display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:7px;color:var(--ds-green);font:700 15px ui-monospace,monospace; }.ds9023-equation i,.ds9023-read i { font-style:normal;color:var(--ds-muted); }
+.ds9023-read b { color:var(--ds-green);font:800 17px ui-monospace,monospace; }
+.ds9023-results { min-width:0;border:1px solid var(--ds-line);border-radius:8px;background:var(--ds-panel);overflow:hidden; }.ds9023-results header { padding:7px 9px;color:var(--ds-muted);font-size:11px;border-bottom:1px solid var(--ds-line); }.ds9023-results ol { display:grid;gap:5px;margin:0;padding:7px;list-style:none; }
+.ds9023-results li { display:flex;align-items:center;gap:6px;min-width:0;padding:5px;border:1px solid transparent;border-radius:5px; }.ds9023-results li.active { border-color:var(--ds-amber); }.ds9023-results svg { width:16px;height:16px;color:var(--ds-blue); }.ds9023-results code { flex:1;min-width:0;overflow-wrap:anywhere;font-size:10px; }.ds9023-results b { flex:none;color:var(--ds-green);font:700 11px ui-monospace,monospace; }
+.ds9023-viz > footer { display:flex;flex-wrap:wrap;gap:10px;color:var(--ds-muted);font-size:10px; }
+#vizPanel:has(.ds9023-viz) :is(#codePanel,#codePanel2) { max-height:none;overflow:visible;white-space:pre-wrap; }
+#vizPanel:has(.ds9023-viz) .code-line { min-width:0;width:100%;white-space:pre-wrap; }#vizPanel:has(.ds9023-viz) .code-line .txt { min-width:0;flex:1;white-space:pre-wrap;overflow-wrap:anywhere; }
+@media(max-width:768px) { #vizPanel:has(.ds9023-viz) { padding-inline:10px; }.viz-split:has(.ds9023-viz) .viz-right { order:-1; }.ds9023-viz { padding:8px;gap:8px; }.ds9023-viz h3 { font-size:14px; } }

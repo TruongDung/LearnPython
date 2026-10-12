@@ -4006,6 +4006,7 @@ module.exports = {
     },
     defaultInput: "i ",
     inputKind: "string",
+    preserveInputWhitespace: true,
     inputLabel: { vi: "Ký tự gõ vào", en: "Typed characters" },
     extraParams: [
       { key: "sentences", type: "string", label: { vi: "Câu lịch sử (cách bởi |)", en: "History sentences (| separated)" }, default: "i love you|island|iroman|i love leetcode" },

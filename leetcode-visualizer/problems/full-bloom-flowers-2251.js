@@ -33,6 +33,21 @@ const SOURCE_2251 = [
   "            answer.append(blooming - lo)",
   "        return answer",
 ];
+const BISECT_SOURCE_2251 = [
+  "from typing import List",
+  "from bisect import bisect_left, bisect_right",
+  "",
+  "class Solution:",
+  "    def fullBloomFlowers(self, flowers: List[List[int]], people: List[int]) -> List[int]:",
+  "        starts = sorted(start for start, end in flowers)",
+  "        ends = sorted(end for start, end in flowers)",
+  "        answer = []",
+  "        for time in people:",
+  "            started = bisect_right(starts, time)",
+  "            ended = bisect_left(ends, time)",
+  "            answer.append(started - ended)",
+  "        return answer",
+];
 
 function parseFullBloomInput2251(input) {
   let data = input;
@@ -211,6 +226,67 @@ const DEFAULT_INPUT_2251 = {
   people: [2, 3, 7, 11],
 };
 
+function buildBisectSteps2251(input) {
+  const { flowers, people } = parseFullBloomInput2251(input);
+  const starts = flowers.map(([start]) => start).sort((a, b) => a - b);
+  const ends = flowers.map(([, end]) => end).sort((a, b) => a - b);
+  const answers = Array(people.length).fill(null);
+  const steps = [];
+  let activePerson = null;
+  let search = null;
+  let bounds = { starts: null, ends: null };
+  // Emulate the library's insertion indices; the trace shows each bisect call,
+  // not a second copy of the manual binary-search implementation.
+  const insertionIndex = (values, target, right) => {
+    let lo = 0, hi = values.length;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (values[mid] < target || right && values[mid] === target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const emit = (event, title, codeLines, final = false) => {
+    steps.push({
+      title, note: bi("", ""), codeLines, codeBlock: 2, final,
+      arr: [...starts], sub: [...ends], highlight: [], mark: activePerson === null ? [] : [activePerson],
+      vars: [
+        { name: "time", value: activePerson === null ? "—" : people[activePerson] },
+        { name: "started", value: bounds.starts ?? "—" },
+        { name: "ended", value: bounds.ends ?? "—" },
+        { name: "answer", value: answers.map((value) => value === null ? "—" : value).join(", ") },
+      ],
+      fullBloomFlowers2251View: {
+        event, method: 2, flowers: flowers.map((flower) => [...flower]), starts: [...starts], ends: [...ends],
+        people: [...people], answers: [...answers], activePerson, bounds: { ...bounds }, search: search ? { ...search } : null,
+        final, answer: final ? [...answers] : null,
+      },
+    });
+  };
+  emit("intro", bi("Đếm bằng bisect_left và bisect_right", "Count with bisect_left and bisect_right"), [5]);
+  emit("sorted", bi("Sắp xếp starts và ends", "Sort starts and ends"), [6, 7, 8]);
+  people.forEach((time, personIndex) => {
+    activePerson = personIndex;
+    bounds = { starts: null, ends: null };
+    search = null;
+    emit("person", bi(`P${personIndex} · t = ${time}`, `P${personIndex} · t = ${time}`), [9]);
+    bounds.starts = insertionIndex(starts, time, true);
+    search = { phase: "starts", target: time, lo: bounds.starts, hi: bounds.starts, mid: null, count: bounds.starts };
+    emit("bisect-starts", bi(`bisect_right(starts, ${time}) = ${bounds.starts}`, `bisect_right(starts, ${time}) = ${bounds.starts}`), [10]);
+    bounds.ends = insertionIndex(ends, time, false);
+    search = { phase: "ends", target: time, lo: bounds.ends, hi: bounds.ends, mid: null, count: bounds.ends, startedCount: bounds.starts };
+    emit("bisect-ends", bi(`bisect_left(ends, ${time}) = ${bounds.ends}`, `bisect_left(ends, ${time}) = ${bounds.ends}`), [11]);
+    answers[personIndex] = bounds.starts - bounds.ends;
+    search = { ...search, phase: "result" };
+    emit("result", bi(`${bounds.starts} − ${bounds.ends} = ${answers[personIndex]} hoa`, `${bounds.starts} − ${bounds.ends} = ${answers[personIndex]} flowers`), [12]);
+  });
+  activePerson = null;
+  search = null;
+  bounds = { starts: null, ends: null };
+  emit("done", bi("Kết quả theo thứ tự people", "Results in people order"), [13], true);
+  return { original: { flowers, people }, answer: answers, steps };
+}
+
 module.exports = {
   2251: {
     id: 2251,
@@ -234,11 +310,19 @@ module.exports = {
       'JSON input: {"flowers":[[1,6],[3,7]],"people":[2,3]}',
     ),
     defaultInput: JSON.stringify(DEFAULT_INPUT_2251),
+    extraParams: [{
+      key: "approach", label: bi("Cách giải", "Approach"), type: "select", default: "1",
+      options: [
+        { value: "1", label: bi("1 · Tự viết binary search", "1 · Manual binary search") },
+        { value: "2", label: bi("2 · bisect_right và bisect_left", "2 · bisect_right and bisect_left") },
+      ],
+    }],
     debugMode: "line-by-line",
     approach: [
       bi("Tách mọi thời điểm bắt đầu và kết thúc thành hai mảng rồi sắp xếp độc lập.", "Extract and independently sort all start and end times."),
       bi("Với thời điểm t, upper bound trong starts đếm hoa đã bắt đầu (start ≤ t).", "For time t, upper bound in starts counts flowers that have started (start ≤ t)."),
       bi("Lower bound trong ends đếm hoa kết thúc trước t (end < t); trừ hai số để giữ tính đóng của khoảng.", "Lower bound in ends counts flowers ending before t (end < t); subtract to preserve inclusive intervals."),
+      bi("Cách 2: bisect_right(starts, t) − bisect_left(ends, t). Right đứng sau mọi start = t; left đứng trước mọi end = t.", "Approach 2: bisect_right(starts, t) − bisect_left(ends, t). Right follows all starts equal to t; left precedes all ends equal to t."),
       bi("Độ phức tạp: O(m log m + n log m), với m khoảng nở và n người.", "Complexity: O(m log m + n log m), for m intervals and n people."),
     ],
     complexity: {
@@ -247,7 +331,15 @@ module.exports = {
       note: bi("m là số khoảng hoa; n là số người đến thăm.", "m is the number of flower intervals; n is the number of visitors."),
     },
     code: SOURCE_2251,
+    codeLabel: bi("Cách 1: Tự viết binary search", "Approach 1: Manual binary search"),
     builder: buildSteps2251,
+    code2: BISECT_SOURCE_2251,
+    code2Label: bi("Cách 2: bisect_right và bisect_left", "Approach 2: bisect_right and bisect_left"),
+    builder2: buildBisectSteps2251,
+    complexity2: {
+      time: "O(m log m + n log m)", space: "O(m + n)",
+      note: bi("m là số hoa, n là số người. Mỗi bisect chạy O(log m).", "m flowers, n visitors. Each bisect runs in O(log m)."),
+    },
     liveArgs: (input) => {
       const { flowers, people } = parseFullBloomInput2251(input);
       return [flowers, people];

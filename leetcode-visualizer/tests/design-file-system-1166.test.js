@@ -47,6 +47,7 @@ test('1166 agrees with an independent hash-map oracle across deterministic opera
       operations.push(seed % 3 ? ['createPath', path, 1 + (seed >>> 12) % 1000] : ['get', path]);
     }
     assert.deepEqual(problem.builder(JSON.stringify(operations)).answer, oracle(operations));
+    assert.deepEqual(problem.builder2(JSON.stringify(operations)).answer, oracle(operations));
   }
 });
 
@@ -71,31 +72,65 @@ test('1166 snapshots isolate old states, highlight traversal, and preserve faile
 
 test('1166 rejects malformed input instead of silently dropping commands', () => {
   for (const input of ['', '[', 'oops()', 'create(/a)', 'get(/a,1)', 'create(/a,-1)', 'create(/a,0)', 'create(/a,1000000001)', 'create(/a,1.5)', 'create(/a,NaN)', 'create(/a/,1)', 'get(/a//b)', [['createPath', 'relative', 1]], [['get', null]], [['delete', '/a']], [['createPath', '/a', true]], [['get', '/' + 'a'.repeat(100)]], Array.from({ length: 10001 }, () => ['get', '/a'])]) {
-    assert.throws(() => problem.builder(input), /#1166/);
+    for (const builder of [problem.builder, problem.builder2]) assert.throws(() => builder(input), /#1166/);
   }
 });
 
 test('1166 caps the trace while preserving all 10000 outputs', () => {
   const operations = Array.from({ length: 10000 }, (_, index) => index === 0 ? ['createPath', '/a', 1000000000] : ['get', '/a']);
-  const run = problem.builder(operations);
-  assert.equal(run.answer.length, 10000);
-  assert.equal(run.answer[0], true);
-  assert.equal(run.answer.at(-1), 1000000000);
-  assert.equal(run.steps.length, 220);
-  assert.ok(run.steps.at(-1).fileSystem1166View.omittedSteps > 0);
-  assert.equal(run.steps.at(-1).fileSystem1166View.outputs.length, 10000);
+  for (const builder of [problem.builder, problem.builder2]) {
+    const run = builder(operations);
+    assert.equal(run.answer.length, 10000);
+    assert.equal(run.answer[0], true);
+    assert.equal(run.answer.at(-1), 1000000000);
+    assert.equal(run.steps.length, 220);
+    assert.ok(run.steps.at(-1).fileSystem1166View.omittedSteps > 0);
+    assert.equal(run.steps.at(-1).fileSystem1166View.outputs.length, 10000);
+  }
 });
 
 test('1166 Python code and Edit & Run agree for compact and JSON input', () => {
-  const cases = [problem.defaultInput, [['createPath', '/a', 1], ['createPath', '/a/b', 1000000000], ['get', '/a/b'], ['createPath', '/a', 2], ['createPath', '', 1], ['get', '']]];
-  for (const input of cases) {
-    const config = prepareDesignLiveRun(problem, input, {});
-    assert.equal(config.className, 'FileSystem');
-    assert.deepEqual(config.constructorArgs, []);
-    const source = `${problem.code.join('\n')}\nimport json, sys\ncase = json.loads(sys.stdin.read())\nfs = FileSystem()\nactual = [getattr(fs, op['name'])(*op['args']) for op in case['config']['operations']]\nassert actual == case['expected'], (actual, case['expected'])`;
-    const execution = spawnSync('python3', ['-c', source], { input: JSON.stringify({ config, expected: problem.builder(input).answer }), encoding: 'utf8' });
-    assert.equal(execution.status, 0, execution.stderr);
+  const cases = [problem.defaultInput, [['createPath', '/a', 1], ['createPath', '/a/b', 1000000000], ['get', '/a/b'], ['createPath', '/a', 2], ['createPath', '', 1], ['get', ''], ['get', '/'], ['createPath', '/', 1], ['createPath', '/absent/child', 3], ['get', '/a/missing']], [...Array.from({ length: 12 }, (_, i) => ['createPath', '/a'.repeat(i + 1), i + 1]), ['get', '/a'.repeat(12)]]];
+  for (const method of [1, 2]) {
+    for (const input of cases) {
+      const config = prepareDesignLiveRun(problem, input, { approach: String(method) }, method);
+      assert.equal(config.className, 'FileSystem');
+      assert.deepEqual(config.constructorArgs, []);
+      const source = `${(method === 2 ? problem.code2 : problem.code).join('\n')}\nimport json, sys\ncase = json.loads(sys.stdin.read())\nfs = FileSystem()\nactual = [getattr(fs, op['name'])(*op['args']) for op in case['config']['operations']]\nassert actual == case['expected'], (actual, case['expected'])`;
+      const execution = spawnSync('python3', ['-c', source], { input: JSON.stringify({ config, expected: problem.builder(input).answer }), encoding: 'utf8' });
+      assert.equal(execution.status, 0, execution.stderr);
+    }
   }
+});
+
+test('1166 explicit TrieNode trace shows the real pointer, values, and children', () => {
+  const input = [['createPath', '/a', 1], ['createPath', '/a/b', 2], ['createPath', '/a/b', 3], ['get', '/a/b'], ['get', '/a/missing'], ['createPath', '/missing/child', 4]];
+  const run = problem.builder2(input);
+  assert.deepEqual(run.answer, oracle(input));
+  for (const step of run.steps) {
+    const view = step.fileSystem1166View;
+    assert.equal(step.codeBlock, 2);
+    assert.equal(view.method, 2);
+    assert.ok(step.codeLines.every((line) => problem.code2[line - 1]?.trim()));
+    if (view.activeNode) {
+      const stored = view.nodes.find((node) => node.path === view.activeNode.path);
+      assert.equal(view.activeNode.value, stored.value);
+      assert.deepEqual(view.activeNode.children, view.nodes.filter((node) => node.parent === stored.path).map((node) => ({ name: node.name, value: node.value })));
+    }
+  }
+  const created = run.steps.find((step) => step.fileSystem1166View.phase === 'created' && step.fileSystem1166View.operationIndex === 1);
+  assert.equal(created.fileSystem1166View.current, '/a'); // Assignment inserts a child; node remains the parent.
+  assert.deepEqual(created.fileSystem1166View.activeNode, { path: '/a', value: 1, children: [{ name: 'b', value: 2 }] });
+  const found = run.steps.find((step) => step.fileSystem1166View.phase === 'found');
+  assert.deepEqual(found.fileSystem1166View.activeNode, { path: '/a/b', value: 2, children: [] });
+  const absent = run.steps.find((step) => step.fileSystem1166View.phase === 'not-found');
+  assert.equal(absent.fileSystem1166View.activeNode, null);
+  assert.equal(absent.vars.find((variable) => variable.name === 'node').value, 'None');
+  const rejected = run.steps.find((step) => step.fileSystem1166View.reason === 'missing-parent');
+  assert.equal(rejected.fileSystem1166View.activeNode.path, '/');
+  assert.deepEqual(run.steps[0].fileSystem1166View.activeNode, { path: '/', value: -1, children: [] });
+  found.fileSystem1166View.activeNode.children.push({ name: 'mutated', value: 9 });
+  assert.deepEqual(run.steps.at(-1).fileSystem1166View.activeNode.children, [{ name: 'a', value: 1 }]);
 });
 
 test('1166 dedicated renderer shows creation, missing folders, and values in both languages', () => {
@@ -106,15 +141,22 @@ test('1166 dedicated renderer shows creation, missing folders, and values in bot
   vm.runInContext(source, context);
   for (const language of ['en', 'vi']) {
     context.lang = language;
-    for (const step of problem.builder(problem.defaultInput).steps) {
-      context.renderFileSystem1166View(step);
-      assert.match(element.innerHTML, /fs1166-tree/);
-      assert.match(element.innerHTML, /<svg/);
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN|object Object/);
-      if (step.fileSystem1166View.phase === 'start') assert.match(element.innerHTML, /<output class="ok">—<\/output>/);
-      if (step.fileSystem1166View.phase === 'created') assert.match(element.innerHTML, /fs1166-node [^"]*added/);
-      if (step.fileSystem1166View.reason === 'missing-parent') assert.match(element.innerHTML, /fs1166-node [^"]*missing/);
-      if (step.fileSystem1166View.phase === 'found') assert.match(element.innerHTML, /<b>2<\/b>/);
+    for (const method of [1, 2]) {
+      for (const step of (method === 2 ? problem.builder2 : problem.builder)(problem.defaultInput).steps) {
+        context.renderFileSystem1166View(step);
+        assert.match(element.innerHTML, /fs1166-tree/);
+        assert.match(element.innerHTML, /<svg/);
+        assert.doesNotMatch(element.innerHTML, /undefined|NaN|object Object/);
+        if (step.fileSystem1166View.phase === 'start') assert.match(element.innerHTML, /<output class="ok">—<\/output>/);
+        if (step.fileSystem1166View.phase === 'created') assert.match(element.innerHTML, /fs1166-node [^"]*added/);
+        if (step.fileSystem1166View.reason === 'missing-parent') assert.match(element.innerHTML, /fs1166-node [^"]*missing/);
+        if (step.fileSystem1166View.phase === 'found') assert.match(element.innerHTML, /<b>2<\/b>/);
+        if (method === 2) {
+          assert.match(element.innerHTML, /fs1166-inspector/);
+          if (step.fileSystem1166View.activeNode) assert.match(element.innerHTML, /<code>children<\/code>/);
+          else assert.match(element.innerHTML, /node → None/);
+        } else assert.doesNotMatch(element.innerHTML, /fs1166-inspector/);
+      }
     }
   }
 });

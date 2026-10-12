@@ -5,6 +5,7 @@ function renderFileSystem1166View(step) {
   const format = (value) => value === null ? "—" : String(value);
   const folder = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l3 3h9v11H3Z"/><path d="M3 10h18"/></svg>';
   const operation = view.operation;
+  const pointerPresent = view.method !== 2 || view.activeNode !== null;
   const nodeByPath = new Map(view.nodes.map((node) => [node.path, node]));
   const selected = new Set(view.visited);
   const visible = new Set(["/", ...view.visited]);
@@ -23,7 +24,7 @@ function renderFileSystem1166View(step) {
   }
   entries.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const rows = entries.map((node) => {
-    const current = view.phase !== "done" && node.path === view.current;
+    const current = view.phase !== "done" && node.path === view.current && pointerPresent;
     const added = view.phase === "created" && node.path === operation?.path;
     const duplicate = view.reason === "exists" && node.path === operation?.path;
     const classes = ["fs1166-node", current ? "current" : "", selected.has(node.path) ? "visited" : "", added ? "added" : "", duplicate ? "blocked" : "", node.ghost ? rejected ? "missing" : "pending" : ""].filter(Boolean).join(" ");
@@ -31,7 +32,7 @@ function renderFileSystem1166View(step) {
     return `<article class="${classes}" style="--fs1166-depth:${node.depth}" role="listitem" title="${escapeHtml(node.path)}" aria-label="${escapeHtml(node.path)}${node.ghost ? ` · ${text("chưa có", "not stored")}` : node.value !== null ? ` = ${node.value}` : ""}"><i class="fs1166-branch" aria-hidden="true">${node.depth ? "└" : ""}</i>${folder}<strong>${escapeHtml(node.name)}</strong><b class="fs1166-value">${node.value === null ? "—" : node.value}</b><span class="fs1166-node-status">${status}</span></article>`;
   }).join("");
 
-  const breadcrumb = `<span class="${view.current === "/" ? "active" : ""}">/</span>${parts.map((part, index) => `<i>›</i><span class="${prefixes[index] === view.current ? "active" : selected.has(prefixes[index]) ? "visited" : rejected && !nodeByPath.has(prefixes[index]) ? "missing" : ""}">${escapeHtml(part)}</span>`).join("")}`;
+  const breadcrumb = `<span class="${view.current === "/" && pointerPresent ? "active" : ""}">/</span>${parts.map((part, index) => `<i>›</i><span class="${prefixes[index] === view.current && pointerPresent ? "active" : selected.has(prefixes[index]) ? "visited" : rejected && !nodeByPath.has(prefixes[index]) ? "missing" : ""}">${escapeHtml(part)}</span>`).join("")}`;
   const parent = operation?.path.slice(0, operation.path.lastIndexOf("/")) || "/";
   const parentExists = nodeByPath.has(parent);
   const targetNew = operation && (!nodeByPath.has(operation.path) || view.phase === "created");
@@ -45,14 +46,17 @@ function renderFileSystem1166View(step) {
   const displayedResult = view.phase === "done" ? latest : view.result;
   const resultTone = displayedResult === false || displayedResult === -1 ? "no" : "ok";
   const log = view.history.map((entry) => `<li><small>${entry.index}</small><span class="fs1166-log-op">${entry.name === "createPath" ? "+" : "⌕"}</span><code title="${escapeHtml(entry.name)}(${escapeHtml(entry.path)})">${escapeHtml(entry.path || '""')}</code><b class="${entry.result === false || entry.result === -1 ? "no" : "ok"}">${format(entry.result)}</b></li>`).join("");
+  const activeNode = view.activeNode;
+  const inspector = view.method === 2 ? `<section class="fs1166-inspector" aria-label="${text("Node Trie đang duyệt", "Active Trie node")}"><header><strong>node → ${activeNode ? "TrieNode" : "None"}</strong><span>${escapeHtml(activeNode?.path || "∅")}</span></header>${activeNode ? `<div class="fs1166-fields"><div><code>value</code><b>${activeNode.value}</b></div><div><code>children</code><div class="fs1166-children">${activeNode.children.slice(0, 12).map((child) => `<span>${folder}<code>${escapeHtml(child.name)}</code><i>→</i><b>${child.value}</b></span>`).join("") || '<span class="fs1166-empty">∅</span>'}${activeNode.children.length > 12 ? `<small>+${activeNode.children.length - 12}</small>` : ""}</div></div></div>` : '<div class="fs1166-none no">∅ → -1</div>'}</section>` : "";
 
   $("treeView").innerHTML = `<section class="fs1166-viz" aria-label="${text("Mô phỏng Design File System", "Design File System simulation")}">
-    <header class="fs1166-heading"><div><small>#1166 · TRIE</small><h3>Design File System</h3></div><output class="${resultTone}">${format(displayedResult)}</output></header>
+    <header class="fs1166-heading"><div><small>#1166 · ${view.method === 2 ? "PREFIX TREE · TrieNode" : "TRIE · dictionary"}</small><h3>Design File System</h3></div><output class="${resultTone}">${format(displayedResult)}</output></header>
     <nav class="fs1166-breadcrumb" aria-label="${text("Đường dẫn đang duyệt", "Active path")}">${breadcrumb}</nav>
     <div class="fs1166-layout">
       <section class="fs1166-directory"><header><strong>${folder} ${text("Cây thư mục", "Folders")}</strong><span>${view.nodes.length - 1}</span></header><div class="fs1166-tree" role="list">${rows}</div>${view.nodes.length > visible.size ? `<footer>+${view.nodes.length - visible.size} ${text("folder khác", "more folders")}</footer>` : ""}</section>
       <aside class="fs1166-side">
         <section class="fs1166-call"><header><strong>${operation?.name || (view.phase === "init" ? "FileSystem()" : text("Hoàn tất", "Complete"))}</strong><span>${view.operationIndex == null ? view.phase === "done" ? view.operationCount : 0 : view.operationIndex + 1}/${view.operationCount}</span></header><div class="fs1166-call-path">${folder}<code>${escapeHtml(operation ? operation.path || '""' : "/")}</code>${operation?.name === "createPath" ? `<b>${operation.value}</b>` : ""}</div>${checks}<div class="fs1166-result ${resultTone}"><span>${reason || "→"}</span><b>${format(view.result)}</b></div></section>
+        ${inspector}
         <section class="fs1166-log"><header><strong>${text("Thao tác", "Operations")}</strong><span>+ create · ⌕ get</span></header><ol>${log || '<li class="fs1166-empty">∅</li>'}</ol></section>
       </aside>
     </div>

@@ -22,7 +22,7 @@
 .fs1166-breadcrumb .visited { color: var(--fs-green); border-color: var(--fs-green); }
 .fs1166-breadcrumb .missing { color: var(--fs-red); border-color: var(--fs-red); border-style: dashed; }
 .fs1166-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; }
-.fs1166-directory, .fs1166-call, .fs1166-log { min-width: 0; overflow: hidden; background: var(--fs-panel); border: 1px solid var(--fs-line); border-radius: 10px; }
+.fs1166-directory, .fs1166-call, .fs1166-log, .fs1166-inspector { min-width: 0; overflow: hidden; background: var(--fs-panel); border: 1px solid var(--fs-line); border-radius: 10px; }
 .fs1166-viz section > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--fs-line); }
 .fs1166-viz section > header strong { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .fs1166-viz section > header span { color: var(--fs-muted); font: 9px ui-monospace, monospace; }
@@ -61,6 +61,19 @@
 .fs1166-log code { min-width: 0; flex: 1; overflow-wrap: anywhere; color: var(--fs-text); font-size: 10px; }
 .fs1166-log li > b { flex: none; font: 750 10px ui-monospace, monospace; }
 .fs1166-empty { color: var(--fs-muted); }
+.fs1166-inspector > header span { overflow-wrap: anywhere; }
+.fs1166-fields { display: grid; gap: 8px; padding: 10px; }
+.fs1166-fields > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 6px; }
+.fs1166-fields > div > code { color: var(--fs-muted); font-size: 11px; }
+.fs1166-fields > div > b { color: var(--fs-amber); font: 750 12px ui-monospace, monospace; }
+.fs1166-children { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.fs1166-children > span { display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 4px 5px; background: var(--fs-surface); border: 1px solid var(--fs-line); border-radius: 5px; }
+.fs1166-children svg { width: 15px; height: 15px; color: var(--fs-blue); }
+.fs1166-children code { min-width: 0; overflow-wrap: anywhere; color: var(--fs-text); font-size: 11px; }
+.fs1166-children i { flex: none; color: var(--fs-muted); font-style: normal; }
+.fs1166-children b { flex: none; color: var(--fs-green); font: 750 11px ui-monospace, monospace; }
+.fs1166-children small { color: var(--fs-muted); }
+.fs1166-none { padding: 12px; font: 750 14px ui-monospace, monospace; }
 .fs1166-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--fs-muted); font-size: 9px; }
 .fs1166-legend span { display: flex; align-items: center; gap: 5px; }
 .fs1166-legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--fs-amber); }
