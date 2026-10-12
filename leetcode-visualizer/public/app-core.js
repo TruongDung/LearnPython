@@ -2122,16 +2122,18 @@ function renderCatalogJumpNav() {
     button.addEventListener("click", () => jumpToCatalogGroup(group.key));
     nav.appendChild(button);
   });
+  updateCatalogDpMarker();
   updateBackToTopButton();
 }
 
-// A scrollbar bookmark for the DP category, independent of the selected problem.
+// Show the DP scrollbar bookmark only when DP is a tag of the selected problem.
 function updateCatalogDpMarker() {
   const marker = $("catalogDpMarker");
   if (!marker) return;
   const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
-  marker.hidden = !group;
-  if (!group) return;
+  const currentProblemHasDp = catalogGroupsForCurrentProblem().some((tag) => tag.key === "dp");
+  marker.hidden = !group || !currentProblemHasDp;
+  if (marker.hidden) return;
   marker.setAttribute("aria-label", lang === "vi" ? "Đi đến tag Dynamic Programming" : "Jump to Dynamic Programming");
   // Preserve its last position while search temporarily hides the catalog.
   if ($("catalog").classList.contains("hidden")) return;
