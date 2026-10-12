@@ -110,6 +110,7 @@ test('9023 renderer shows scan addition, cached values, and missing branches in 
 });
 
 test('9023 is registered as a custom interview problem with two lazy visualizations', () => {
+  assert.deepEqual(problem.title, { vi: 'Directory / File Size', en: 'Directory / File Size' });
   assert.equal(problem.category.key, 'interview');
   assert.equal(problem.slug, null); // A screenshot interview problem, not a LeetCode URL.
   assert.equal(problem.extraParams[0].options.length, 2);

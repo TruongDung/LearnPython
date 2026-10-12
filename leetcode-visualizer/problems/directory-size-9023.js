@@ -170,7 +170,7 @@ module.exports = {
     id: 9023, difficulty: "medium", slug: null,
     category: { key: "interview", vi: "Phỏng vấn", en: "Interview" },
     tags: [{ key: "trie", vi: "Trie", en: "Trie" }, { key: "string", vi: "Chuỗi", en: "String" }],
-    title: bi("Directory / File Size (GCS Paths)", "Directory / File Size (GCS Paths)"),
+    title: bi("Directory / File Size", "Directory / File Size"),
     titleVi: bi("Tính tổng dung lượng theo đường dẫn", "Total size by path"),
     statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9023). files chứa [size,path]. Tính dung lượng file hoặc tổng mọi file trong thư mục; path không có trả 0. Hai cách: quét file và Trie cache tổng. Mô phỏng tối đa 12 files, 8 queries, 8 phần/path; file không trùng hoặc đồng thời là thư mục. Dữ liệu mô phỏng, không kết nối GCS.", "Interview problem from the screenshot (internal ID #9023). files contains [size,path]. Return a file's size or the sum of files inside a directory; missing paths return 0. Compare file scanning and a Trie caching totals. Up to 12 files, 8 queries, 8 path parts; no duplicates or file-directory collisions. Simulated data; no GCS connection."),
     defaultInput: JSON.stringify({ files: [[2400, `${BUCKET}/training/onboarding.mp4`], [800, `${BUCKET}/training/intro_clip.mp4`], [350, `${BUCKET}/podcasts/welcome.mp3`]], queries: [`${BUCKET}/training`, `${BUCKET}/podcasts/welcome.mp3`, BUCKET, `${BUCKET}/unavailable`] }),
