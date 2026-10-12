@@ -1793,6 +1793,7 @@ function renderCatalog() {
     mountGroup();
   });
   renderCatalogJumpNav();
+  updateCatalogDpMarker();
 }
 
 function setCatalogGroupExpanded(groupEl, expanded) {
@@ -2123,6 +2124,49 @@ function renderCatalogJumpNav() {
   });
   updateBackToTopButton();
 }
+
+// A scrollbar bookmark for the DP category, independent of the selected problem.
+function updateCatalogDpMarker() {
+  const marker = $("catalogDpMarker");
+  if (!marker) return;
+  const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
+  marker.hidden = !group;
+  if (!group) return;
+  marker.setAttribute("aria-label", lang === "vi" ? "Đi đến tag Dynamic Programming" : "Jump to Dynamic Programming");
+  // Preserve its last position while search temporarily hides the catalog.
+  if ($("catalog").classList.contains("hidden")) return;
+  const height = window.innerHeight;
+  const range = Math.max(1, document.documentElement.scrollHeight - height);
+  const progress = Math.max(0, Math.min(1, (group.getBoundingClientRect().top + window.scrollY - 12) / range));
+  const top = 48 + progress * Math.max(0, height - 228);
+  marker.style.top = `${Math.round(top)}px`;
+}
+
+function jumpToDpCategory() {
+  if (!(catalogData || []).some(group => group.key === "dp")) return;
+  if (normalizeProblemSearch(problemSearchQuery)) {
+    problemSearchQuery = "";
+    $("problemKeyword").value = "";
+    renderProblemSearchResults();
+  }
+  activeCatalogJumpKey = "dp";
+  // Complete layout changes synchronously, before the browser paints the jump.
+  // Repeated clicks on an open DP group do not rebuild the catalog.
+  if (activeCatalogGroupKey !== "dp") openCatalogGroupExclusively("dp");
+  else renderCatalogJumpNav();
+  const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
+  if (!group) return;
+  const top = Math.max(0, group.getBoundingClientRect().top + window.scrollY - 12);
+  window.scrollTo({ top, left: window.scrollX, behavior: "instant" });
+  updateCatalogDpMarker();
+  updateBackToTopButton();
+}
+
+$("catalogDpMarker")?.addEventListener("click", jumpToDpCategory);
+window.addEventListener("resize", updateCatalogDpMarker, { passive: true });
+// Opening categories, running a visualization, and text reflow change page length.
+const catalogDpMarkerObserver = new ResizeObserver(updateCatalogDpMarker);
+catalogDpMarkerObserver.observe(document.body);
 
 function jumpToCatalogGroup(groupKey) {
   if (!currentProblemId) return;
