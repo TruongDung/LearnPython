@@ -3768,33 +3768,39 @@ select option {
   }
 }
 
-/* DP bookmark beside the scrollbar; its position represents the tag's location. */
-.catalog-dp-marker {
+.catalog-tag-markers {
   position: fixed;
-  top: 48px;
-  right: max(6px, env(safe-area-inset-right));
+  inset: 0;
   z-index: 90;
+  pointer-events: none;
+}
+.catalog-tag-markers[hidden] { display: none; }
+.catalog-tag-marker {
+  position: fixed;
+  right: max(6px, env(safe-area-inset-right));
   display: grid;
   place-items: center;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  min-height: 44px;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
   margin: 0;
   padding: 0;
-  border: 2px solid #fca5a5;
+  border: 2px solid #c7d2fe;
   border-radius: 50%;
-  background: #dc2626;
+  background: #4f46e5;
   color: #fff;
-  font: 700 12px/1 inherit;
-  box-shadow: 0 2px 8px rgb(127 29 29 / 25%);
+  font: 700 10px/1 inherit;
+  box-shadow: 0 2px 8px rgb(30 41 59 / 25%);
   cursor: pointer;
   transition: none;
   transform: none;
+  pointer-events: auto;
 }
-.catalog-dp-marker[hidden] { display: none; }
-.catalog-dp-marker:hover { background: #b91c1c; transform: none; }
-.catalog-dp-marker:focus-visible { outline: 3px solid #f87171; outline-offset: 3px; }
-
+.catalog-tag-marker.is-dp { border-color: #fca5a5; background: #dc2626; }
+.catalog-tag-marker:hover { background: #4338ca; transform: none; }
+.catalog-tag-marker.is-dp:hover { background: #b91c1c; }
+.catalog-tag-marker.is-active { box-shadow: 0 0 0 3px rgb(99 102 241 / 30%), 0 2px 8px rgb(30 41 59 / 25%); }
+.catalog-tag-marker:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
 
 

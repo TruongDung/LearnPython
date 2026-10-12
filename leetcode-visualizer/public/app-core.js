@@ -1793,7 +1793,7 @@ function renderCatalog() {
     mountGroup();
   });
   renderCatalogJumpNav();
-  updateCatalogDpMarker();
+  updateCatalogTagMarkerPositions();
 }
 
 function setCatalogGroupExpanded(groupEl, expanded) {
@@ -2122,53 +2122,87 @@ function renderCatalogJumpNav() {
     button.addEventListener("click", () => jumpToCatalogGroup(group.key));
     nav.appendChild(button);
   });
-  updateCatalogDpMarker();
+  renderCatalogTagMarkers();
   updateBackToTopButton();
 }
 
-// Show the DP scrollbar bookmark only when DP is a tag of the selected problem.
-function updateCatalogDpMarker() {
-  const marker = $("catalogDpMarker");
-  if (!marker) return;
-  const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
-  const currentProblemHasDp = catalogGroupsForCurrentProblem().some((tag) => tag.key === "dp");
-  marker.hidden = !group || !currentProblemHasDp;
-  if (marker.hidden) return;
-  marker.setAttribute("aria-label", lang === "vi" ? "Đi đến tag Dynamic Programming" : "Jump to Dynamic Programming");
-  // Preserve its last position while search temporarily hides the catalog.
-  if ($("catalog").classList.contains("hidden")) return;
+function catalogTagMarkerLabel(group) {
+  const parts = String(group.key || pick(group) || "").split(/[^a-z0-9]+/i).filter(Boolean);
+  if (parts.length > 1) return parts.map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+  return (parts[0] || "?").slice(0, 3).toUpperCase();
+}
+
+function renderCatalogTagMarkers() {
+  const nav = $("catalogTagMarkers");
+  if (!nav) return;
+  nav.replaceChildren();
+  const groups = catalogGroupsForCurrentProblem();
+  nav.hidden = groups.length === 0;
+  if (!groups.length) return;
+
+  nav.setAttribute("aria-label", lang === "vi" ? "Đi đến tag của bài hiện tại" : "Jump to a current problem tag");
+  groups.forEach((group) => {
+    const label = String(pick(group));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `catalog-tag-marker${group.key === "dp" ? " is-dp" : ""}${activeCatalogJumpKey === group.key ? " is-active" : ""}`;
+    button.dataset.groupKey = group.key;
+    button.textContent = catalogTagMarkerLabel(group);
+    button.setAttribute("aria-label", t().jumpToTag(label, currentProblemId));
+    button.title = label;
+    button.addEventListener("click", () => jumpToCatalogGroup(group.key));
+    nav.appendChild(button);
+  });
+  updateCatalogTagMarkerPositions();
+}
+
+function updateCatalogTagMarkerPositions() {
+  const nav = $("catalogTagMarkers");
+  if (!nav || nav.hidden) return;
+  const markers = [...nav.querySelectorAll(".catalog-tag-marker")];
+  const catalog = $("catalog");
+  const catalogHidden = catalog.classList.contains("hidden");
   const height = window.innerHeight;
+  const markerSize = 38;
+  const topInset = 48;
+  const bottomInset = 48;
+  const maxTop = Math.max(topInset, height - bottomInset - markerSize);
   const range = Math.max(1, document.documentElement.scrollHeight - height);
-  const progress = Math.max(0, Math.min(1, (group.getBoundingClientRect().top + window.scrollY - 12) / range));
-  const top = 48 + progress * Math.max(0, height - 228);
-  marker.style.top = `${Math.round(top)}px`;
-}
+  const groups = catalogGroupsForCurrentProblem();
+  const candidates = markers.map((marker, index) => {
+    const group = groups.find((item) => item.key === marker.dataset.groupKey);
+    const element = [...document.querySelectorAll("#catalog .cat-group")]
+      .find((item) => item.dataset.groupKey === marker.dataset.groupKey);
+    let desiredTop;
+    if (catalogHidden || !element || element.getBoundingClientRect().height === 0) {
+      const progress = markers.length < 2 ? 0 : index / (markers.length - 1);
+      desiredTop = topInset + progress * (maxTop - topInset);
+    } else {
+      const documentTop = element.getBoundingClientRect().top + window.scrollY - 12;
+      const progress = Math.max(0, Math.min(1, documentTop / range));
+      desiredTop = topInset + progress * (maxTop - topInset);
+    }
+    return { marker, key: group?.key || marker.dataset.groupKey, desiredTop };
+  }).sort((a, b) => a.desiredTop - b.desiredTop);
 
-function jumpToDpCategory() {
-  if (!(catalogData || []).some(group => group.key === "dp")) return;
-  if (normalizeProblemSearch(problemSearchQuery)) {
-    problemSearchQuery = "";
-    $("problemKeyword").value = "";
-    renderProblemSearchResults();
+  let previousTop = topInset - markerSize - 4;
+  candidates.forEach((candidate) => {
+    const top = Math.max(candidate.desiredTop, previousTop + markerSize + 4);
+    candidate.marker.style.top = `${Math.round(Math.min(top, maxTop))}px`;
+    previousTop = top;
+  });
+  const overflow = previousTop - maxTop;
+  if (overflow > 0) {
+    candidates.forEach((candidate) => {
+      candidate.marker.style.top = `${Math.max(topInset, Math.round(Number.parseFloat(candidate.marker.style.top) - overflow))}px`;
+    });
   }
-  activeCatalogJumpKey = "dp";
-  // Complete layout changes synchronously, before the browser paints the jump.
-  // Repeated clicks on an open DP group do not rebuild the catalog.
-  if (activeCatalogGroupKey !== "dp") openCatalogGroupExclusively("dp");
-  else renderCatalogJumpNav();
-  const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
-  if (!group) return;
-  const top = Math.max(0, group.getBoundingClientRect().top + window.scrollY - 12);
-  window.scrollTo({ top, left: window.scrollX, behavior: "instant" });
-  updateCatalogDpMarker();
-  updateBackToTopButton();
 }
 
-$("catalogDpMarker")?.addEventListener("click", jumpToDpCategory);
-window.addEventListener("resize", updateCatalogDpMarker, { passive: true });
+window.addEventListener("resize", updateCatalogTagMarkerPositions, { passive: true });
 // Opening categories, running a visualization, and text reflow change page length.
-const catalogDpMarkerObserver = new ResizeObserver(updateCatalogDpMarker);
-catalogDpMarkerObserver.observe(document.body);
+const catalogTagMarkerObserver = new ResizeObserver(updateCatalogTagMarkerPositions);
+catalogTagMarkerObserver.observe(document.body);
 
 function jumpToCatalogGroup(groupKey) {
   if (!currentProblemId) return;
@@ -2183,6 +2217,9 @@ function jumpToCatalogGroup(groupKey) {
   $("catalogJumpNav")?.querySelectorAll(".catalog-jump-btn").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.groupKey === groupKey);
   });
+  $("catalogTagMarkers")?.querySelectorAll(".catalog-tag-marker").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.groupKey === groupKey);
+  });
 
   requestAnimationFrame(() => {
     const group = [...document.querySelectorAll("#catalog .cat-group")]
@@ -2192,6 +2229,7 @@ function jumpToCatalogGroup(groupKey) {
       .find((chip) => Number(chip.dataset.id) === Number(currentProblemId));
     const destination = target || group;
     destination.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    updateCatalogTagMarkerPositions();
     if (!target) return;
     target.classList.remove("catalog-jump-target");
     requestAnimationFrame(() => target.classList.add("catalog-jump-target"));
