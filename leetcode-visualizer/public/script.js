@@ -97,6 +97,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.snapshotArray1146View), surface: "treeView", render: (step) => {
       renderSnapshotArray1146View(step);
     } },
+    { predicate: (step) => Boolean(step.fileSystem1166View), surface: "treeView", render: (step) => {
+      renderFileSystem1166View(step);
+    } },
     { predicate: (step) => Boolean(step.findReplace833View), surface: "treeView", render: (step) => {
       renderFindReplace833View(step);
     } },

@@ -12,6 +12,7 @@
   --sp-blue: #0369a1; --sp-green: #047857; --sp-amber: #a16207; --sp-red: #be123c; --sp-purple: #7e22ce;
 }
 .spring9020-viz * { box-sizing: border-box; }
+#treeView:has(> .spring9020-viz) { padding: 0; border: 0; background: transparent; min-height: 0; overflow: visible; }
 .spring9020-header { display: flex; align-items: center; gap: 10px; }
 .spring9020-header > div:first-child { flex: 1; min-width: 0; }
 .spring9020-header small { color: var(--sp-muted); font-size: 10px; }
@@ -151,4 +152,20 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .spring9020-cell { transition: none; }
+}
+
+@media (max-width: 768px) {
+  #vizPanel:has(.spring9020-viz) { padding-inline: 10px; }
+  #vizPanel:has(.spring9020-viz) .viz-head { flex-direction: row; align-items: center; }
+  #vizPanel:has(.spring9020-viz) .note:empty { display: none; }
+  .viz-split:has(.spring9020-viz) .viz-right { order: -1; }
+  .spring9020-viz { padding: 8px; gap: 8px; }
+  .spring9020-scene { grid-template-columns: 1fr; }
+  .spring9020-header h3 { font-size: 12px; }
+  .spring9020-map { max-width: 330px; margin: 6px auto; }
+  .spring9020-jump > svg { min-height: 0; max-height: 170px; }
+  .spring9020-physics-icons { padding: 4px; }
+  .spring9020-physics-icons > span { padding: 4px 2px; }
+  .spring9020-list-viz .spring9020-storage { grid-template-columns: 1fr; }
+  .spring9020-info summary { min-width: 36px; min-height: 44px; }
 }

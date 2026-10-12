@@ -3240,5 +3240,533 @@ select option {
   .cat-subtab { padding: 5px 9px; font-size: 11px; }
 }
 
+/* Core phone/tablet layout must load with the shell, not with a renderer. */
+@media (max-width: 768px) {
+  .app {
+    padding: 16px 12px 48px;
+  }
+
+  .stack-viz {
+    grid-template-columns: 1fr;
+  }
+
+  .stack-panel {
+    min-height: 190px;
+  }
+
+  header h1 {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    margin: 4px 0 16px;
+  }
+
+  /* Compact header actions */
+  .header-actions {
+    gap: 6px;
+  }
+
+  .theme-toggle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .theme-auto {
+    min-width: 46px;
+    height: 34px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .lang-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  .problem-search-results {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .problem-search-items {
+    grid-template-columns: 1fr;
+  }
+
+  /* Catalog */
+  .catalog {
+    margin-top: 16px;
+    gap: 8px;
+  }
+
+  .cat-group {
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .cat-title {
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .cat-items {
+    gap: 6px;
+  }
+
+  .prob-chip {
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+
+  .prob-chip .pid {
+    font-size: 12px;
+  }
+
+  .prob-chip .pname {
+    font-size: 10px;
+    max-width: 130px;
+  }
+
+  /* Panels */
+  .panel {
+    margin-top: 18px;
+    padding: 16px 14px;
+    border-radius: 14px;
+  }
+
+  .problem-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .problem-title-link {
+    font-size: 17px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .badge {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .title-vi {
+    font-size: 13px;
+    margin: 6px 0;
+  }
+
+  .statement {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* Approach box */
+  .approach-box {
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+
+  .approach-list {
+    font-size: 13px;
+    padding-left: 16px;
+    line-height: 1.6;
+  }
+
+  /* Complexity */
+  .complexity {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .cx-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .cx-note {
+    font-size: 12px;
+  }
+
+  /* Inputs */
+  input,
+  select {
+    font-size: 16px; /* >=16px prevents iOS Safari zoom on focus */
+    padding: 10px 12px;
+    border-radius: 9px;
+  }
+
+  label {
+    font-size: 13px;
+  }
+
+  .search-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .search-row button {
+    width: 100%;
+  }
+
+  .extra-params {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .extra-params .param {
+    width: 100%;
+  }
+
+  .extra-params .param input,
+  .extra-params .param select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #problemPanel[data-problem-id="1143"] .input-row,
+  #problemPanel[data-problem-id="115"] .input-row,
+  #problemPanel[data-problem-id="712"] .input-row,
+  #problemPanel[data-problem-id="1092"] .input-row,
+  #problemPanel[data-problem-id="10"] .input-row,
+  #problemPanel[data-problem-id="44"] .input-row {
+    display: block;
+  }
+
+  #problemPanel[data-problem-id="1143"] .extra-params,
+  #problemPanel[data-problem-id="115"] .extra-params,
+  #problemPanel[data-problem-id="712"] .extra-params,
+  #problemPanel[data-problem-id="1092"] .extra-params,
+  #problemPanel[data-problem-id="10"] .extra-params,
+  #problemPanel[data-problem-id="44"] .extra-params {
+    display: flex;
+    margin-top: 12px;
+  }
+
+  #problemPanel[data-problem-id="72"] .input-row {
+    display: block;
+  }
+
+  #problemPanel[data-problem-id="72"] .extra-params {
+    display: flex;
+    margin-top: 12px;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .run-btn {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  /* Visualization head */
+  .viz-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .viz-head h3 {
+    font-size: 16px;
+  }
+
+  /* Code panel: full width on mobile, scroll horizontally */
+  .code-panel {
+    max-height: 320px;
+    font-size: 12px;
+    border-radius: 10px;
+    position: static; /* disable sticky on mobile */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    /* iOS smooth horizontal scroll */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .code-line {
+    padding: 0 10px;
+    /* Keep line content together; horizontal scroll handles long lines */
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .code-line .ln {
+    width: 22px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  .code-line.active::before {
+    left: 16px;
+  }
+
+  .code-line .txt {
+    flex: 0 0 auto;
+    white-space: pre;
+  }
+
+  /* Bars: tighter spacing */
+  .bars {
+    gap: 6px;
+    min-height: 200px;
+    padding: 12px 10px;
+    border-radius: 10px;
+  }
+
+  .bar .val {
+    font-size: 12px;
+  }
+
+  .bar .idx {
+    font-size: 10px;
+  }
+
+  .bar .dp {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  /* Note */
+  .note {
+    margin: 12px 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 0 10px 10px 0;
+  }
+
+  /* Variables panel */
+  .vars-panel {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  /* On phone, put each variable on its own row so long names like
+     "dp[i-1] + cost[i-1]" always fit without breaking the layout. */
+  .vars-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .var-item {
+    font-size: 11px;
+    padding: 4px 8px;
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  /* Controls — sticky at bottom of viewport on mobile so
+     tapping Next/Prev doesn't jump the screen */
+  .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    background: #0c0a1a;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: nowrap;
+    gap: 5px;
+    margin: 0 -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .controls button {
+    min-width: 0;
+    padding: 10px 4px;
+    font-size: 12px;
+    flex: 1;
+  }
+
+  .kbd-hint {
+    display: none;
+  }
+
+  /* Answer box */
+  .answer {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  /* Tree/Graph view */
+  .tree-view,
+  .grid-view {
+    padding: 12px 8px;
+    border-radius: 10px;
+    min-height: 200px;
+  }
+
+  /* DP grid cells: smaller on mobile */
+  .dp-grid th,
+  .dp-grid td {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+
+  .dp-grid .cell-label {
+    top: 1px;
+    right: 1px;
+    left: auto;
+    transform: none;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-size: 6px;
+    line-height: 1.15;
+    box-shadow: none;
+  }
+
+  .dp-grid.has-cell-labels th,
+  .dp-grid.has-cell-labels td {
+    width: 50px;
+    min-width: 50px;
+    height: 44px;
+  }
+
+  .dp-grid.has-cell-labels .cell-label {
+    position: static;
+    display: block;
+    margin: 0 auto 3px;
+    transform: none;
+    font-size: 8px;
+    line-height: 1.1;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* iPhone SE and smaller phones */
+@media (max-width: 480px) {
+  .app {
+    padding: 12px 10px 40px;
+  }
+
+  /* Code panel tweaks for narrow phones */
+  .code-panel {
+    font-size: 11.5px;
+    max-height: 260px;
+    border-radius: 8px;
+    padding: 10px 0;
+  }
+
+  .code-line {
+    padding: 0 8px;
+  }
+
+  .code-line .ln {
+    width: 20px;
+    margin-right: 6px;
+    font-size: 10px;
+  }
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  .header-top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* On tiny screens still show the problem name — just trim to fit. */
+  .prob-chip .pname {
+    display: block;
+    font-size: 9.5px;
+    line-height: 1.25;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .prob-chip {
+    padding: 6px 10px;
+    min-width: 50px;
+    align-items: flex-start;
+  }
+
+  /* DP grid even smaller */
+  .dp-grid th,
+  .dp-grid td {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  /* Controls: still 1 row on tiny phones */
+  .controls {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .controls button {
+    flex: 1;
+    min-width: 0;
+    padding: 9px 2px;
+    font-size: 11px;
+  }
+
+  /* Code copy button smaller and repositioned */
+  .code-copy-btn {
+    top: 4px;
+    right: 4px;
+    padding: 3px 5px;
+  }
+
+  /* Code section label */
+  .code-section-label {
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  @supports (padding: env(safe-area-inset-left)) {
+    .app {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      padding-bottom: max(100px, env(safe-area-inset-bottom));
+    }
+  }
+  .theme-toggle { width: 44px; height: 44px; }
+  .theme-auto { min-height: 44px; }
+  .lang-btn { min-height: 38px; }
+  .viz-head h3 { min-width: 0; overflow-wrap: anywhere; }
+  .extra-params .param select { max-width: 100%; }
+  .input-row > input { width: 100%; max-width: 100%; }
+  .watch-row { min-width: 0; }
+  .watch-row input { min-width: 0; font-size: 16px; }
+  .watch-row button { flex: none; }
+}
+@media (max-width: 640px) {
+  /* Put tag shortcuts in the page flow instead of covering the simulation. */
+  body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) #catalogJumpNav.is-visible {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100% - 24px);
+    max-height: none;
+    margin: 12px auto calc(90px + env(safe-area-inset-bottom));
+    padding: 8px;
+    overflow: visible;
+  }
+  body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) #catalogJumpNav .catalog-quick-jump {
+    position: static;
+  }
+  body:has(#vizPanel:not(.hidden) #vizBody:not(.hidden)) .back-to-top {
+    position: static;
+    margin: 12px auto calc(80px + env(safe-area-inset-bottom));
+    transform: none;
+  }
+}
+
 
 

@@ -421,6 +421,9 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       return designConfig("TopVotedCandidate", [input, parseNumberList(params.times)],
         parseNumberList(params.queries).map((query) => ({ name: "q", args: [query] })));
     case 1166: {
+      if (typeof problem.parseOperations === "function") {
+        return designConfig("FileSystem", [], problem.parseOperations(input).map((operation) => ({ name: operation.name, args: [...operation.args] })));
+      }
       const aliases = { create: "createPath" };
       const operations = parseFunctionOperations(input).map((operation) => ({ ...operation, name: aliases[operation.name] || operation.name }));
       return designConfig("FileSystem", [], operations);
