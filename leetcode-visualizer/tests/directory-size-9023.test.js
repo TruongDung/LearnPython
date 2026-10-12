@@ -19,10 +19,14 @@ function oracle({ files, queries }) {
   });
 }
 
-test('9023 both methods return screenshot totals, file sizes, bucket sums and zero for misses', () => {
+test('9023 both methods return sample totals, file sizes, bucket sums and zero for misses', () => {
+  const sample = JSON.parse(problem.defaultInput);
+  assert.deepEqual(sample.files.map(([size]) => size), [2400, 800, 350]);
+  assert.deepEqual(sample.queries, ['gs://acme-assets.example.com/training', 'gs://acme-assets.example.com/podcasts/welcome.mp3', 'gs://acme-assets.example.com', 'gs://acme-assets.example.com/unavailable']);
+  assert.doesNotMatch(problem.defaultInput, /bucket\.storage\.google\.com|\/video\b|\/music\b/);
   for (const builder of [problem.builder, problem.builder2]) {
     const run = builder(problem.defaultInput);
-    assert.deepEqual(run.answer, [1500, 100, 1600, 0]);
+    assert.deepEqual(run.answer, [3200, 350, 3550, 0]);
     assert.deepEqual(snapshot(run.steps.at(-1)).answers, run.answer);
     assert.equal(run.steps.at(-1).final, true);
   }
@@ -51,8 +55,8 @@ test('9023 trace preserves old sums, accumulates ancestors and reads the cached 
   assert.deepEqual(initial.nodes.map(node => node.total), [0]);
   const built = snapshot(run.steps.findLast(step => snapshot(step).phase === 'build'));
   const sums = new Map(built.nodes.map(node => [node.path, node.total]));
-  assert.equal(sums.get('gs://bucket.storage.google.com/video'), 1500);
-  assert.equal(sums.get('gs://bucket.storage.google.com'), 1600);
+  assert.equal(sums.get('gs://acme-assets.example.com/training'), 3200);
+  assert.equal(sums.get('gs://acme-assets.example.com'), 3550);
   for (const step of run.steps) {
     assert.equal(step.codeBlock, 2);
     assert.ok(step.codeLines.every(line => problem.code2[line - 1]?.trim()));
@@ -65,7 +69,7 @@ test('9023 trace preserves old sums, accumulates ancestors and reads the cached 
   assert.ok(!missing.nodes.some(node => node.path === missing.missing));
   const scan = problem.builder(problem.defaultInput);
   const added = scan.steps.filter(step => snapshot(step).phase === 'add' && snapshot(step).queryIndex === 0);
-  assert.deepEqual(added.map(step => snapshot(step).total), [1000, 1500]);
+  assert.deepEqual(added.map(step => snapshot(step).total), [2400, 3200]);
   assert.deepEqual(snapshot(added[0]).matched, [0]);
 });
 

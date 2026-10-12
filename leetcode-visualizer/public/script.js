@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.maximizeSquares2897View), surface: "treeView", render: (step) => {
+      renderMaximizeSquares2897View(step);
+    } },
     { predicate: (step) => Boolean(step.directorySize9023View), surface: "treeView", render: (step) => {
       renderDirectorySize9023View(step);
     } },

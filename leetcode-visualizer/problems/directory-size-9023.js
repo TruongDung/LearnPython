@@ -164,7 +164,7 @@ function buildSteps(input, method) {
   return { original: { files, queries }, answer: answers, steps };
 }
 
-const BUCKET = "gs://bucket.storage.google.com";
+const BUCKET = "gs://acme-assets.example.com";
 module.exports = {
   9023: {
     id: 9023, difficulty: "medium", slug: null,
@@ -173,11 +173,11 @@ module.exports = {
     title: bi("Directory / File Size (GCS Paths)", "Directory / File Size (GCS Paths)"),
     titleVi: bi("Tính tổng dung lượng theo đường dẫn", "Total size by path"),
     statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9023). files chứa [size,path]. Tính dung lượng file hoặc tổng mọi file trong thư mục; path không có trả 0. Hai cách: quét file và Trie cache tổng. Mô phỏng tối đa 12 files, 8 queries, 8 phần/path; file không trùng hoặc đồng thời là thư mục. Dữ liệu mô phỏng, không kết nối GCS.", "Interview problem from the screenshot (internal ID #9023). files contains [size,path]. Return a file's size or the sum of files inside a directory; missing paths return 0. Compare file scanning and a Trie caching totals. Up to 12 files, 8 queries, 8 path parts; no duplicates or file-directory collisions. Simulated data; no GCS connection."),
-    defaultInput: JSON.stringify({ files: [[1000, `${BUCKET}/video/movie.mkv`], [500, `${BUCKET}/video/short_video.mp4`], [100, `${BUCKET}/music/song.mp3`]], queries: [`${BUCKET}/video`, `${BUCKET}/music/song.mp3`, BUCKET, `${BUCKET}/missing`] }),
+    defaultInput: JSON.stringify({ files: [[2400, `${BUCKET}/training/onboarding.mp4`], [800, `${BUCKET}/training/intro_clip.mp4`], [350, `${BUCKET}/podcasts/welcome.mp3`]], queries: [`${BUCKET}/training`, `${BUCKET}/podcasts/welcome.mp3`, BUCKET, `${BUCKET}/unavailable`] }),
     inputKind: "string", inputLabel: bi("JSON: files [[size,path]], queries [path]", "JSON: files [[size,path]], queries [path]"),
     extraParams: [{ key: "approach", label: bi("Cách giải", "Approach"), type: "select", default: "1", options: [{ value: "1", label: bi("1 · Quét file", "1 · Scan files") }, { value: "2", label: bi("2 · Trie + tổng cache", "2 · Trie + cached totals") }] }],
     debugMode: "line-by-line",
-    approach: [bi("Cách 1: cộng file có path == query hoặc bắt đầu bằng query + '/'. Không nhầm /video với /video2.", "Approach 1: sum files with path == query or starting with query + '/'. /video does not match /video2."), bi("Cách 2: mỗi file cộng size vào các node trên đường đi. Query chỉ duyệt tới node và đọc total.", "Approach 2: add each file's size to nodes along its path. Queries walk to the node and read total.")],
+    approach: [bi("Cách 1: cộng file có path == query hoặc bắt đầu bằng query + '/'. Không nhầm /training với /training2.", "Approach 1: sum files with path == query or starting with query + '/'. /training does not match /training2."), bi("Cách 2: mỗi file cộng size vào các node trên đường đi. Query chỉ duyệt tới node và đọc total.", "Approach 2: add each file's size to nodes along its path. Queries walk to the node and read total.")],
     complexity: { time: "O(Q·N·L)", space: "O(Q)", note: bi("N files, Q queries, L độ dài path; không tính dữ liệu đầu vào.", "N files, Q queries, L path length; excludes input storage.") },
     complexity2: { time: "O(N·L + Q·L)", space: "O(N·L + Q)", note: bi("Dựng Trie một lần; mỗi query chỉ đi theo path.", "Build the Trie once; each query only walks its path.") },
     code: SCAN_CODE, codeLabel: bi("Cách 1: Quét file theo prefix", "Approach 1: Scan files by prefix"), builder: input => buildSteps(input, 1),
