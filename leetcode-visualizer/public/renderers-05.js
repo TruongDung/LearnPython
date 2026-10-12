@@ -2290,57 +2290,101 @@ function renderClimbingStairsView(step) {
   const view = step.climbingStairsView || {};
   const vi = lang === "vi";
   const stairs = Array.isArray(view.stairs) ? view.stairs : [];
-  const formula = view.formula;
+  const surface = $("treeView");
   const labels = {
-    setup: vi ? "Tạo bảng" : "Build table",
-    base: vi ? "Base case" : "Base case",
-    calculate: vi ? "Cộng 2 đường đi" : "Add 2 paths",
+    setup: vi ? "Mỗi lần: +1 hoặc +2" : "Each move: +1 or +2",
+    base: vi ? "Điểm bắt đầu" : "Starting values",
+    calculate: vi ? "Gộp 2 nhóm cách" : "Combine both groups",
     "shift-prev2": vi ? "Dịch prev2" : "Shift prev2",
     "shift-prev1": vi ? "Dịch prev1" : "Shift prev1",
-    done: vi ? "Hoàn tất" : "Complete",
+    done: vi ? "Tới đích!" : "Reached the top!",
   };
-  const stairHtml = stairs.map((stair) => {
-    const value = stair.ways === null ? "?" : stair.ways;
-    const status = stair.ways === null ? (vi ? "chưa tính" : "not computed") : (vi ? "đã biết" : "known");
-    return `<article class="cs70-stair ${stair.state}"><small>${vi ? "BẬC" : "STEP"} ${stair.step}</small><strong>${value}</strong><em>${status}</em></article>`;
-  }).join("");
-
-  let equation = vi ? "Mỗi bậc sẽ được tính dần." : "Each step is computed in order.";
-  let reason = vi ? "" : "";
-  if (formula) {
-    equation = `ways(${formula.target}) = ways(${formula.oneStep}) + ways(${formula.twoSteps}) = ${formula.oneValue} + ${formula.twoValue} = <b>${formula.result}</b>`;
-    reason = vi
-      ? `Bậc ${formula.target}: bước cuối đi từ bậc ${formula.oneStep} bằng 1 bước HOẶC bậc ${formula.twoSteps} bằng 2 bước.`
-      : `For step ${formula.target}: the last move comes from step ${formula.oneStep} with 1 step OR step ${formula.twoSteps} with 2 steps.`;
-  } else if (view.phase === "base") {
-    equation = view.target === 0
-      ? (vi ? "ways(0) = 1  →  có 1 cách: chưa leo bước nào" : "ways(0) = 1  →  one way: take no steps")
-      : (vi ? "ways(1) = 1  →  chỉ leo một bước 1" : "ways(1) = 1  →  take one 1-step move");
-  } else if (view.phase === "done") {
-    const target = Number.isInteger(view.target) ? view.target : view.n;
-    const result = stairs[target] ? stairs[target].ways : "?";
-    equation = `ways(${target}) = <b>${result}</b>`;
-    reason = vi ? "Đây là số cách để chạm đúng bậc đích." : "This is the number of ways to reach the target step.";
-  }
-
   const rolling = view.rolling;
+  const focus = Number.isInteger(view.target) ? view.target
+    : rolling && rolling.curr ? rolling.curr.step
+      : rolling && rolling.prev1 ? rolling.prev1.step : Math.min(2, view.n);
+  const ways = (n) => {
+    let a = 1, b = 1;
+    for (let i = 2; i <= n; i++) [a, b] = [b, a + b];
+    return b;
+  };
+  // Keep the active step and both predecessors visible, even for n = 45.
+  const width = Math.max(280, Math.min(620, (surface.clientWidth || 620) - 34));
+  const capacity = Math.max(3, Math.min(7, Math.floor((width - 48) / 72)));
+  const start = Math.max(0, Math.min(focus - capacity + 1, stairs.length - capacity));
+  const visible = stairs.slice(start, start + capacity);
+  const stride = (width - 48) / visible.length;
+  const point = (i) => ({ x: 24 + (i - start + .5) * stride, y: 240 - (i - start) * 20 });
+  const hops = focus > 0 ? [1, 2].filter(hop => focus >= hop) : [];
+  const arrows = hops.map(hop => {
+    const from = point(focus - hop), to = point(focus);
+    const lift = hop === 1 ? 58 : 108;
+    return `<g class="cs70-hop hop-${hop}"><path d="M ${from.x} ${from.y - 8} C ${from.x} ${to.y - lift}, ${to.x - 16} ${to.y - lift}, ${to.x - 16} ${to.y - 8}" marker-end="url(#cs70-arrow-${hop})"/><text x="${(from.x + to.x - 16) / 2}" y="${to.y - lift + 8}" text-anchor="middle">+${hop}</text></g>`;
+  }).join("");
+  const blocks = visible.map(stair => {
+    const p = point(stair.step);
+    const source = focus >= 1 && stair.step === focus - 1 ? "one" : focus >= 2 && stair.step === focus - 2 ? "two" : "";
+    const state = stair.step === focus ? "active" : source || (stair.ways === null ? "future" : "known");
+    const value = stair.ways === null ? "?" : stair.ways;
+    return `<g class="cs70-block ${state}"><rect x="${p.x - stride / 2 + 3}" y="${p.y}" width="${stride - 6}" height="${310 - p.y}" rx="5"/><text class="cs70-count${String(value).length > 6 ? " long" : ""}" x="${p.x}" y="${p.y + 27}" text-anchor="middle">${value}</text><text class="cs70-unit" x="${p.x}" y="${p.y + 47}" text-anchor="middle">${vi ? "cách" : "ways"}</text><text class="cs70-step-label" x="${p.x}" y="333" text-anchor="middle">${vi ? "Bậc" : "Step"} ${stair.step}</text></g>`;
+  }).join("");
+  const at = point(focus);
+  const sceneTop = Math.max(0, Math.min(point(visible.at(-1).step).y, at.y - 36,
+    ...hops.map(hop => at.y - (hop === 1 ? 58 : 108))) - 24);
+  const person = `<g class="cs70-person" transform="translate(${at.x + 12} ${at.y - 3})" aria-hidden="true"><circle cx="0" cy="-30" r="6"/><path d="M 0 -23 V -10 M -9 -16 L 0 -21 L 9 -16 M 0 -10 L -7 0 M 0 -10 L 7 0"/></g>`;
+  const overview = `${start ? `<span>0 … ${start - 1}</span>` : ""}<span>${vi ? "Đích" : "Top"}: ${view.n}</span>`;
+  let equation = "";
+  if (["calculate", "done"].includes(view.phase) && focus >= 2) {
+    const f = view.formula;
+    equation = `<div class="cs70-equation${String(ways(focus)).length > 6 ? " large" : ""}" aria-label="${vi ? "Số cách" : "Ways"}: ${f ? f.oneValue : ways(focus - 1)} + ${f ? f.twoValue : ways(focus - 2)} = ${ways(focus)}"><b class="one">${f ? f.oneValue : ways(focus - 1)}</b><span>+</span><b class="two">${f ? f.twoValue : ways(focus - 2)}</b><span>=</span><b class="answer">${ways(focus)}</b><span>${vi ? "cách" : "ways"}</span></div>`;
+  } else if (view.phase === "base" || view.phase === "done") {
+    equation = `<div class="cs70-equation"><b class="answer">${ways(focus)}</b><span>${vi ? "cách" : "ways"}${focus === 0 ? (vi ? " · chưa bước" : " · no moves") : ""}</span></div>`;
+  }
+  // Enumerate only a bounded sample; never expand all Fibonacci paths for large n.
+  const samplePaths = (total, limit) => {
+    const result = [];
+    const visit = (remaining, path) => {
+      if (result.length >= limit) return;
+      if (remaining === 0) { result.push(path); return; }
+      for (const hop of [1, 2]) if (hop <= remaining) visit(remaining - hop, [...path, hop]);
+    };
+    visit(total, []);
+    return result;
+  };
+  const routeSvg = (path, lastHop) => {
+    const landings = [0];
+    path.forEach(hop => landings.push(landings.at(-1) + hop));
+    // Display a suffix for large inputs; the accessible label retains the full route.
+    const first = landings.findIndex(value => value >= focus - 6);
+    const shown = landings.slice(first);
+    const x = value => 18 + (value - shown[0]) * 31;
+    const svgWidth = x(focus) + 22;
+    const curves = shown.slice(1).map((value, index) => {
+      const previous = shown[index], hop = value - previous;
+      const isLast = index === shown.length - 2;
+      const left = x(previous), right = x(value), middle = (left + right) / 2;
+      return `<g class="${isLast ? `cs70-route-last hop-${lastHop}` : "cs70-route-earlier"}"><path d="M ${left} 34 Q ${middle} ${hop === 2 ? -8 : 8} ${right} 34"/><text x="${middle}" y="${hop === 2 ? 10 : 21}" text-anchor="middle">+${hop}</text></g>`;
+    }).join("");
+    const dots = shown.map(value => `<circle cx="${x(value)}" cy="34" r="3"/>`).join("");
+    return `<svg class="cs70-route" viewBox="0 0 ${svgWidth} 52" role="img" aria-label="${escapeHtml(path.join(' + ') + ' = ' + focus)}"><title>${escapeHtml(path.join(' + ') + ' = ' + focus)}</title>${curves}<g class="cs70-route-dots">${dots}</g><text x="18" y="50" text-anchor="middle">${first > 0 ? "…" : "0"}</text><text x="${x(focus)}" y="50" text-anchor="middle">${focus}</text></svg>`;
+  };
+  const showPaths = ["calculate", "done", "base"].includes(view.phase) && focus > 0;
+  const groups = showPaths ? hops.map(hop => {
+    const count = ways(focus - hop);
+    const paths = samplePaths(focus - hop, focus <= 6 ? 13 : 3).map(path => [...path, hop]);
+    return `<section class="cs70-path-group ${hop === 1 ? "one" : "two"}"><header><span>${vi ? "Bước cuối" : "Last move"} <b>+${hop}</b></span><strong>${count} ${vi ? "cách" : "ways"}</strong></header>${paths.map(path => routeSvg(path, hop)).join("")}${count > paths.length ? `<small>+ ${count - paths.length} ${vi ? "cách khác" : "other ways"}</small>` : ""}</section>`;
+  }).join("") : "";
   const rollingHtml = rolling ? [
-    ["prev2", rolling.prev2, vi ? "2 bậc trước" : "two steps back"],
-    ["prev1", rolling.prev1, vi ? "1 bậc trước" : "one step back"],
-    ["curr", rolling.curr, vi ? "kết quả mới" : "new result"],
-  ].map(([name, item, hint]) => `<article class="cs70-register ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `ways(${item.step})` : hint}</em></article>`).join("") : "";
-
-  const method = Number(view.approach) === 2
-    ? (vi ? "APPROACH 2 · chỉ giữ 2 biến" : "APPROACH 2 · keep only 2 variables")
-    : (vi ? "APPROACH 1 · bảng DP" : "APPROACH 1 · DP table");
-  const rollingSection = rollingHtml ? `<section class="cs70-rolling"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 2 giá trị" : "two-value window"}</span></header><div>${rollingHtml}</div></section>` : "";
-
-  $("treeView").innerHTML = `<section class="cs70-viz" role="img" aria-label="${vi ? "Trực quan hóa quy hoạch động leo cầu thang" : "Climbing stairs dynamic-programming visualization"}">
-    <header><strong>CLIMBING STAIRS</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || view.phase || "")}</span></header>
-    <section class="cs70-rule"><b>CORE RULE</b><strong>ways(i) = ways(i−1) + ways(i−2)</strong><span>${vi ? "Bước cuối chỉ có 2 lựa chọn: +1 hoặc +2." : "The final move has only 2 choices: +1 or +2."}</span></section>
-    <section class="cs70-action"><small>${escapeHtml(method)}</small><strong>${equation}</strong>${reason ? `<span>${escapeHtml(reason)}</span>` : ""}</section>
-    ${rollingSection}
-    <section class="cs70-table"><header><strong>${vi ? "BẢNG SỐ CÁCH ways(i)" : "WAYS(i) TABLE"}</strong><span>${vi ? "tím = 2 nguồn · vàng = ô đang tính · xanh = đã biết" : "purple = 2 sources · yellow = current target · green = known"}</span></header><div class="cs70-stairs">${stairHtml}</div></section>
+    ["prev2", rolling.prev2], ["prev1", rolling.prev1], ["curr", rolling.curr],
+  ].map(([name, item]) => `<div class="cs70-register ${view.phase === `shift-${name}` || (view.phase === "calculate" && name === "curr") ? "updated" : ""}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><span>${item ? `${vi ? "bậc" : "step"} ${item.step}` : ""}</span></div>`).join("") : "";
+  const shift = view.phase === "shift-prev2" ? "prev1 → prev2" : view.phase === "shift-prev1" ? "curr → prev1" : "";
+  surface.innerHTML = `<section class="cs70-viz" aria-label="${vi ? "Minh họa leo cầu thang" : "Climbing stairs visualization"}">
+    <header><strong>${vi ? "Leo cầu thang" : "Climbing stairs"}</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || "")}</span></header>
+    <div class="cs70-overview"><span>${vi ? "Số cách tới mỗi bậc" : "Ways to reach each step"}</span>${overview}</div>
+    <svg class="cs70-scene" viewBox="0 ${sceneTop} ${width} ${350 - sceneTop}" role="img" aria-label="${vi ? `Đang ở bậc ${focus}. Nhảy 1 hoặc 2 bậc.` : `At step ${focus}. Jump 1 or 2 steps.`}"><defs>${[1, 2].map(hop => `<marker id="cs70-arrow-${hop}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="cs70-arrow-fill hop-${hop}" d="M 0 0 L 10 5 L 0 10 Z"/></marker>`).join("")}</defs>${blocks}${arrows}${person}</svg>
+    ${equation}
+    ${rollingHtml ? `<section class="cs70-memory"><header><strong>${vi ? "Biến đang giữ" : "Stored variables"}</strong><span>${shift}</span></header><div>${rollingHtml}</div></section>` : ""}
+    ${groups ? `<section class="cs70-paths"><header>${vi ? "Đường đi" : "Routes"}${focus > 6 ? (vi ? " mẫu" : " (sample)") : ""} → ${vi ? "bậc" : "step"} ${focus}</header><div>${groups}</div></section>` : ""}
   </section>`;
 }
 
