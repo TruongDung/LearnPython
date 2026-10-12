@@ -6,6 +6,7 @@ const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 const JAVASCRIPT_ASSETS = Object.freeze([
   'app-core.js',
   'app-renderers-base.js',
+  'renderer-two-sum-bst-653.js',
   'renderers-01.js',
   'renderers-02.js',
   'renderers-03.js',
@@ -225,6 +226,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'minimum-length-1750.css',
   'increasing-paths-2328.css',
   'increasing-cells-2713.css',
+  'two-sum-bst-653.css',
 ]);
 
 const sourceCache = new Map();

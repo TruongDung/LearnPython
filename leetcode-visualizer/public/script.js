@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.bstTwoSum653View), surface: "treeView", render: (step) => {
+      renderTwoSumBst653View(step);
+    } },
     { predicate: (step) => Boolean(step.maximizeSquares2897View), surface: "treeView", render: (step) => {
       renderMaximizeSquares2897View(step);
     } },

@@ -153,7 +153,7 @@ test('2218 renderer handles every line-by-line state in both languages', () => {
         assert.match(element.innerHTML, /requested-viz/);
         assert.match(element.innerHTML, /rv-dp-table/);
         assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
-        assert.match(element.innerHTML, /<details class="c2218-dp">/);
+        assert.match(element.innerHTML, /<details class="c2218-dp" open>/);
         const v = step.coins2218View;
         const shownSelections = [...element.innerHTML.matchAll(/data-pile="(\d+)" data-coin="(\d+)" data-selected="true"/g)];
         if (v.phase === 'state' && Number.isInteger(v.take)) {

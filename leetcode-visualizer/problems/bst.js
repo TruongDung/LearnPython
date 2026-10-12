@@ -3867,7 +3867,7 @@ module.exports = {
     defaultInput: "5,3,6,2,4,null,7",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [
-      { key: "k", label: { vi: "target (tổng)", en: "target (sum)" }, default: 9 },
+      { key: "k", label: { vi: "k (tổng cần tìm)", en: "k (target sum)" }, default: 9, min: -100000, max: 100000, allowNegative: true },
       { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
         { value: "1", label: { vi: "Cách 1: Inorder + hai con trỏ", en: "Approach 1: Inorder + two pointers" } },
         { value: "2", label: { vi: "Cách 2: DFS + Hash Set", en: "Approach 2: DFS + Hash Set" } },
@@ -3916,8 +3916,8 @@ module.exports = {
       "            return dfs(node.left) or dfs(node.right)",
       "        return dfs(root)",
     ],
-    builder: buildSteps653,
-    builder2: buildSteps653HashSet,
+    builder: require("./two-sum-bst-653").buildSteps,
+    builder2: require("./two-sum-bst-653").buildStepsHash,
   },
   530: {
     id: 530, difficulty: "easy", slug: "minimum-absolute-difference-in-bst",

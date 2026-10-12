@@ -69,31 +69,47 @@ test('684 renderer explains every trace frame without corrupted placeholders', (
     for (const step of run.steps) {
       context.renderUnionFind684View(step);
       assert.match(element.innerHTML, /rv-dsu684-viz/);
-      assert.match(element.innerHTML, /rv-dsu-rule/);
-      assert.match(element.innerHTML, /rv-dsu-edge-stream/);
+      assert.match(element.innerHTML, /d684-graph/);
+      assert.match(element.innerHTML, /d684-stream/);
       assert.doesNotMatch(element.innerHTML, /\?\?\?|undefined|NaN|Infinity/);
+      const view = step.unionFind684View;
+      const lineIndices = [...element.innerHTML.matchAll(/<line class="d684-edge [^"]+" data-edge="(\d+)"/g)].map(match => Number(match[1]));
+      assert.deepEqual(lineIndices, view.edges.filter(edge => edge.state !== 'pending').map(edge => edge.index));
+      assert.equal((element.innerHTML.match(/<g class="d684-node /g) || []).length, view.nodes.length);
+      assert.match(element.innerHTML, /<details class="d684-table" open>/);
+      assert.doesNotMatch(element.innerHTML, /rv-action-banner|rv-dsu-explanation|Rank = estimated tree height/);
     }
   }
 
   context.lang = 'en';
   context.renderUnionFind684View(run.steps.at(-1));
-  assert.match(element.innerHTML, /SAME GROUP → CYCLE/);
-  assert.match(element.innerHTML, /Rank = estimated tree height/);
-  assert.match(element.innerHTML, /Not the node count/);
-  assert.match(element.innerHTML, /no rank comparison and no union/);
-  assert.match(element.innerHTML, /REDUNDANT EDGE/);
+  assert.match(element.innerHTML, /Cycle/);
+  assert.match(element.innerHTML, /d684-edge redundant" data-edge="2"/);
+  assert.match(element.innerHTML, /d684-edge route" data-edge="0"/);
+  assert.match(element.innerHTML, /d684-edge route" data-edge="1"/);
+  assert.doesNotMatch(element.innerHTML, /d684-rank/);
+  assert.match(element.innerHTML, /Remove edge/);
   assert.match(element.innerHTML, /\[2, 3\]/);
 
   const equalRankStep = run.steps.find(step => step.unionFind684View.operation === 'equal-rank-branch');
   context.renderUnionFind684View(equalRankStep);
-  assert.match(element.innerHTML, /rank_x = rank_y/);
-  assert.match(element.innerHTML, /only rank\[1\] increases by 1/);
+  assert.match(element.innerHTML, /d684-rank/);
+  assert.match(element.innerHTML, /<strong>=<\/strong>/);
+  assert.match(element.innerHTML, /rank 0/);
+  const incrementStep = run.steps.find(step => step.unionFind684View.operation === 'rank-increment');
+  context.renderUnionFind684View(incrementStep);
+  assert.match(element.innerHTML, /rank\[1\]: 0 → 1 ↑/);
 
   const lowerRankRun = problem.builder('1,2;3,2;1,3');
   const lowerRankStep = lowerRankRun.steps.find(step => step.unionFind684View.operation === 'attach-x-to-y');
   context.renderUnionFind684View(lowerRankStep);
-  assert.match(element.innerHTML, /rank_x &lt; rank_y/);
-  assert.match(element.innerHTML, /Ranks stay unchanged/);
+  assert.match(element.innerHTML, /<strong>&lt;<\/strong>/);
+  assert.match(element.innerHTML, /data-child="3" data-parent="1"/);
+  const longerCycle = problem.builder('1,2;2,3;3,4;1,4;1,5');
+  context.renderUnionFind684View(longerCycle.steps.at(-1));
+  for (const index of [0,1,2]) assert.match(element.innerHTML, new RegExp('d684-edge route" data-edge="'+index+'"'));
+  assert.match(element.innerHTML, /d684-edge redundant" data-edge="3"/);
+  assert.doesNotMatch(element.innerHTML, /<line[^>]*data-edge="4"/);
 });
 
 test('684 dedicated styles are responsive and prevent horizontal overflow', () => {
