@@ -154,6 +154,9 @@ test('2218 renderer handles every line-by-line state in both languages', () => {
         assert.match(element.innerHTML, /rv-dp-table/);
         assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
         assert.match(element.innerHTML, /<details class="c2218-dp" open>/);
+        assert.match(element.innerHTML, /c2218-recurrence/);
+        if (step.coins2218View.approach === 2) assert.match(element.innerHTML, /new_dp\[j\] = max\(new_dp\[j\], dp\[j−x\] \+ prefix\[x\]\)/);
+        else assert.match(element.innerHTML, /dp\[i\]\[j\] = max\(dp\[i\]\[j\], dp\[i−1\]\[j−t\] \+ prefix\[t\]\)/);
         const v = step.coins2218View;
         const shownSelections = [...element.innerHTML.matchAll(/data-pile="(\d+)" data-coin="(\d+)" data-selected="true"/g)];
         if (v.phase === 'state' && Number.isInteger(v.take)) {

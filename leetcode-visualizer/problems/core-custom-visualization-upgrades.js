@@ -412,6 +412,22 @@ function buildSteps684Custom(input) {
   return { original: edges, answer, steps };
 }
 
+function flightDiagnostic787(result) {
+  const {n,flights,src,dst}=result;
+  if(!Number.isInteger(n)||n>100||n<1||!Array.isArray(flights))return null;
+  const costs=Array(n).fill(Infinity),paths=Array(n).fill(null),done=new Set();costs[src]=0;paths[src]=[];
+  for(let i=0;i<n;i++) {
+    let u=-1;for(let city=0;city<n;city++)if(!done.has(city)&&(u<0||costs[city]<costs[u]))u=city;
+    if(u<0||!Number.isFinite(costs[u]))break;
+    if(u===dst)return {nodes:[src,...paths[u].map(edge=>edge.v)],edges:paths[u],cost:costs[u]};
+    done.add(u);
+    for(const [from,to,w] of flights)if(from===u&&costs[u]+w<costs[to]){
+      costs[to]=costs[u]+w;paths[to]=[...paths[u],{u:from,v:to,w}];
+    }
+  }
+  return null;
+}
+
 function enhance787(result, params = {}) {
   const approach = Number(params.approach) === 2 ? 2 : 1;
   const operationByLine = approach === 2 ? {
@@ -426,6 +442,18 @@ function enhance787(result, params = {}) {
     13: "relax", 14: "round-commit", 16: "return",
   };
   const flights = Array.isArray(result.flights) ? result.flights : [];
+  const numberOf=(step,names)=>{
+    const raw=findVariable(step,name=>names.includes(name));
+    if(raw===null||raw===undefined||raw==="")return null;
+    const numeric=Number(raw);return Number.isFinite(numeric)?numeric:null;
+  };
+  let frozen=null,round=null,popped={city:null,price:null,used:null},heapSnapshot=[],bestSnapshot=null;
+  const parseHeap=raw=>[...String(raw).matchAll(/\(([-\d.]+),\s*(\d+),\s*(\d+)\)/g)].map(match=>({price:Number(match[1]),city:Number(match[2]),used:Number(match[3])}));
+  const parseBest=raw=>{
+    const rows=Array.from({length:result.n},()=>[]);
+    for(const match of String(raw).matchAll(/(\d+):\[([^\]]*)\]/g))rows[Number(match[1])]=parseVector('['+match[2]+']');
+    return rows;
+  };
 
   for (const step of result.steps || []) {
     const line = Number(step.codeLines?.[0] || 0);
@@ -433,15 +461,30 @@ function enhance787(result, params = {}) {
     const currentEdge = step.graph?.hlEdges?.[0] || null;
     const graphNodes = step.graph?.nodes || [];
     const costs = graphNodes.map((node) => node.dist === "∞" || node.dist === Infinity ? null : Number(node.dist));
-    const oldCost = parseVector(findVariable(step, (name) => name.includes("cost (chỉ đọc)")));
+    const rawOld = parseVector(findVariable(step, (name) => name.includes("cost (chỉ đọc)")));
     const nextCost = parseVector(findVariable(step, (name) => name === "next_cost" || name.startsWith("next_cost (")));
-    const allowedFlights = numericVariable(step, ["allowed flights", "max flights", "max_flights"]);
-    const used = numericVariable(step, ["used"]);
-    const price = numericVariable(step, ["price"]);
-    const city = numericVariable(step, ["u"]);
-    const candidate = findVariable(step, (name) => name === "candidate" || name === "new_price");
+    const explicitRound = numberOf(step, ["allowed flights", "max flights"]);
+    if(approach===1&&line>=9&&line<=14&&explicitRound!==null)round=explicitRound;
+    if(approach===1&&line===9)frozen=[...costs];
+    if(rawOld)frozen=[...rawOld];
+    const oldCost=approach===1&&line>=9&&line<=14?frozen:null;
+    for(const key of ['used','price']){const value=numberOf(step,[key]);if(value!==null)popped[key]=value;}
+    const explicitCity=numberOf(step,['u']);if(explicitCity!==null)popped.city=explicitCity;
+    const allowedFlights=approach===1?round:(Number.isInteger(result.k)?result.k+1:null);
+    const used=approach===1?numberOf(step,['used']):popped.used,price=approach===1?numberOf(step,['price']):popped.price,city=approach===1?numberOf(step,['u']):popped.city;
+    const rawCandidate=findVariable(step, name=>name==='candidate'||name==='new_price');
+    const candidate=rawCandidate===null?null:typeof rawCandidate==='number'?rawCandidate:Number(String(rawCandidate).split('=').at(-1).trim());
     const heap = findVariable(step, (name) => name === "heap" || name === "heap còn lại");
     const best = findVariable(step, (name) => name === "best" || name === "best[city][used]");
+    if(heap!==null)heapSnapshot=parseHeap(heap);
+    if(best!==null&&approach===2)bestSnapshot=parseBest(best);
+    const path=step.final&&result.answer!==-1&&step.graph?{
+      nodes:[...step.graph.hlNodes],
+      edges:step.graph.hlEdges.map(([u,v])=>({u,v,w:flights.find(edge=>edge[0]===u&&edge[1]===v)?.[2]??0})),
+      cost:result.answer,
+    }:null;
+    const diagnostic=step.final?flightDiagnostic787(result):null;
+    const invalidRoute=diagnostic&&diagnostic.edges.length>result.k+1&&(result.answer===-1||diagnostic.cost<result.answer)?diagnostic:null;
     const phase = approach === 1
       ? (line <= 7 ? "setup" : line <= 14 ? "rounds" : "result")
       : (line <= 14 ? "setup" : line <= 27 ? "search" : "result");
@@ -478,6 +521,11 @@ function enhance787(result, params = {}) {
       candidate,
       heap: heap === null ? null : String(heap),
       best: best === null ? null : String(best),
+      heapStates:heapSnapshot.map(state=>({...state})),
+      bestMatrix:bestSnapshot?bestSnapshot.map(row=>[...row]):null,
+      nextUsed:numberOf(step,['next_used']),
+      path,
+      invalidRoute,
       variables,
       answer: step.final ? result.answer : null,
     };

@@ -65,10 +65,12 @@ function renderCoins2218View(step) {
   }).join('')}</tr>`).join('')}</tbody></table></div>`;
   const stage=final?'✓':v.phase==='pile'?'Σ':state?'↗':v.phase==='copy'?'⇄':'↓';
   const stageText=final?t('Tối ưu','Best'):v.phase==='pile'?t('Cộng từ trên','Sum from top'):state?`P${active+1} · j = ${v.used}`:v.phase==='copy'?'dp → new_dp':t('Chỉ lấy từ trên','Top coins only');
+  const recurrence=one?'new_dp[j] = max(new_dp[j], dp[j−x] + prefix[x])':'dp[i][j] = max(dp[i][j], dp[i−1][j−t] + prefix[t])';
+  const reference=`<section class="c2218-recurrence"><small>${t('Công thức DP · tham khảo','DP formula · reference')}</small><code>${recurrence}</code><div><span>${one?'dp → new_dp':t('i: số chồng','i: piles')}</span><span>${t('j: đúng j xu','j: exactly j coins')}</span><span>${one?'x':'t'}: ${t('lấy từ trên','take from top')}</span></div></section>`;
   requestedVizSet(`<section class="c2218-viz" data-phase="${v.phase}" data-method="${one?2:1}">
     <header class="c2218-heading"><div class="c2218-stage"><b>${stage}</b><span>${stageText}</span></div><div class="c2218-target"><small>k = ${v.k}</small><div class="c2218-slots">${slots(v.k,final?'filled':'')}</div></div>${final?`<strong class="c2218-answer">${v.answer}</strong>`:''}</header>
     <div class="c2218-piles">${pileHtml}</div>${equation}${choices}${basket}
-    <details class="c2218-dp" open><summary>${t('Bảng DP','DP table')} <span>↗</span></summary>${dpHtml}</details>
+    ${reference}<details class="c2218-dp" open><summary>${t('Bảng DP','DP table')} <span>↗</span></summary>${dpHtml}</details>
     ${v.omitted?`<small class="c2218-condensed">${t('Bước rút gọn','Condensed steps')} · ✓ ${v.answer??''}</small>`:''}
   </section>`,t(`Chọn đúng ${v.k} xu từ ${v.n} chồng`,`Take exactly ${v.k} coins from ${v.n} piles`),'group');
 }
@@ -786,25 +788,49 @@ function renderUnionFind684View(step) {
 }
 
 function renderFlights787View(step) {
-  const view = step.flights787View || {};
-  const vi = lang === "vi";
-  const bellman = view.approach === 1;
-  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "result" ? 3 : bellman ? 1 : 2;
-  const costs = (view.nodes || []).map((node) => `<span class="${node.active ? "active" : ""}${node.isSource ? " source" : ""}${node.isTarget ? " target" : ""}"><small>${vi ? "thành phố" : "city"} ${node.id}</small><b>${node.cost === null ? "∞" : requestedVizNumber(node.cost)}</b></span>`).join("");
-  const flights = (view.edges || []).map((edge) => `<span class="${edge.current ? "active" : ""}"><b>${edge.u} → ${edge.v}</b><em>$${requestedVizNumber(edge.w)}</em></span>`).join("");
-  const vector = (items, title) => items ? `<div class="rv-flight-vector"><label>${requestedVizEsc(title)}</label>${items.map((value, index) => `<span><small>${index}</small><b>${value === null ? "∞" : requestedVizNumber(value)}</b></span>`).join("")}</div>` : "";
-  const bellmanPanel = bellman
-    ? `<section class="rv-panel rv-flight-round-panel"><h4>${vi ? "Vòng trước đóng băng → vòng mới được ghi" : "Frozen previous round → writable next round"}</h4>${vector(view.oldCost, vi ? "cost (chỉ đọc)" : "cost (read only)")}${vector(view.nextCost || view.costs, "next_cost")}</section>
-       <div class="rv-focus-equation rv-flight-equation"><span>${vi ? "Số chuyến tối đa vòng này" : "Flights allowed this round"}</span><strong>${view.allowedFlights ?? "—"}</strong><span>${vi ? "ứng viên" : "candidate"}</span><b>${view.candidate ?? "—"}</b></div>`
-    : `<section class="rv-panel rv-flight-round-panel"><h4>${vi ? "Trạng thái Dijkstra + min-heap" : "Dijkstra state + min-heap"}</h4><div class="rv-flight-state"><span><small>${vi ? "giá" : "price"}</small><b>${view.price ?? "—"}</b></span><span><small>${vi ? "thành phố" : "city"}</small><b>${view.city ?? "—"}</b></span><span><small>${vi ? "số chuyến đã dùng" : "flights used"}</small><b>${view.used ?? "—"}</b></span><span><small>${vi ? "ứng viên" : "candidate"}</small><b>${view.candidate ?? "—"}</b></span></div><div class="rv-code-value"><small>heap</small><code>${requestedVizEsc(view.heap || "[]")}</code></div><div class="rv-code-value"><small>${vi ? "bảng trạng thái best" : "best state table"}</small><code>${requestedVizEsc(view.best || "—")}</code></div></section>`;
-  const result = view.answer !== null ? `<div class="rv-core-result${view.answer === -1 ? " error" : ""}"><small>RETURN</small><strong>${requestedVizEsc(view.answer)}</strong></div>` : "";
-
-  requestedVizSet(`<div class="rv-flight-viz">${requestedVizPhases(bellman ? (vi ? ["Khởi tạo cost", "K+1 vòng relax", "Chốt từng vòng", "Giá tại dst"] : ["Initialize cost", "K+1 relaxation rounds", "Commit each round", "Cost to dst"]) : (vi ? ["Xây state graph", "Khởi tạo best", "Pop/relax heap", "Tới dst"] : ["Build state graph", "Initialize best", "Pop/relax heap", "Reach dst"]), phaseIndex)}
-    <div class="rv-action-banner"><b>${bellman ? "BELLMAN-FORD" : "STATE DIJKSTRA"} · ${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
-    <div class="rv-flight-stats"><span><small>src</small><b>${view.src ?? "—"}</b></span><span><small>dst</small><b>${view.dst ?? "—"}</b></span><span><small>k stops</small><b>${view.k ?? "—"}</b></span><span><small>max flights</small><b>${Number.isInteger(view.k) ? view.k + 1 : "—"}</b></span></div>
-    <div class="rv-two-column rv-flight-workspace"><section class="rv-panel rv-flight-network-panel"><h4>${vi ? "Mạng chuyến bay có hướng" : "Directed flight network"}</h4>${requestedCoreGraphSvg(view.nodes || [], view.edges || [], { directed: true })}<div class="rv-flight-edges">${flights}</div></section><section class="rv-panel rv-flight-cost-panel"><h4>${vi ? "Chi phí tốt nhất theo thành phố" : "Best cost by city"}</h4><div class="rv-city-costs">${costs}</div></section></div>
-    ${bellmanPanel}${result}</div>`,
-  vi ? `Chuyến bay rẻ nhất — cách ${view.approach}` : `Cheapest Flights — approach ${view.approach}`);
+  const v=step.flights787View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
+  const bellman=v.approach===1,final=step.final,limit=(v.k??0)+1;
+  const nodes=v.nodes||[],edges=v.edges||[],positions=new Map(),middle=nodes.filter(n=>n.id!==v.src&&n.id!==v.dst),width=420,height=Math.max(280,(middle.length+1)*72);
+  positions.set(v.src,{x:45,y:height/2});positions.set(v.dst,{x:375,y:height/2});
+  middle.forEach((n,i)=>positions.set(n.id,{x:210,y:(i+1)*height/(middle.length+1)}));
+  const pathKeys=new Set((v.path?.edges||[]).map(e=>e.u+','+e.v)),pathNodes=new Set(v.path?.nodes||[]);
+  const marker=kind=>`<marker id="f787-arrow-${kind}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path class="${kind}" d="M0 0 L7 3.5 L0 7 Z"/></marker>`;
+  const connections=edges.map(e=>{
+    const a=positions.get(e.u),b=positions.get(e.v);if(!a||!b)return '';
+    const dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length;
+    const reciprocal=edges.some(other=>other.u===e.v&&other.v===e.u);
+    const bend=reciprocal?30:e.u===v.src&&e.v===v.dst&&middle.length?70:12;
+    const cx=(a.x+b.x)/2-uy*bend,cy=(a.y+b.y)/2+ux*bend;
+    const cls=final?(pathKeys.has(e.u+','+e.v)?'route':'dim'):e.current?'current':'normal';
+    const kind=cls==='route'?'route':cls==='current'?'current':'normal',px=(a.x+2*cx+b.x)/4,py=(a.y+2*cy+b.y)/4;
+    return `<g class="f787-edge ${cls}" data-flight="${e.u},${e.v}"><path d="M${a.x+ux*25} ${a.y+uy*25} Q${cx} ${cy} ${b.x-ux*29} ${b.y-uy*29}" marker-end="url(#f787-arrow-${kind})"/><rect x="${px-23}" y="${py-11}" width="46" height="22" rx="6"/><text x="${px}" y="${py+4}">${esc(e.w)}</text></g>`;
+  }).join('');
+  const cities=nodes.map(n=>{
+    const p=positions.get(n.id),cls=[n.isSource?'source':'',n.isTarget?'target':'',!final&&n.active?'active':'',pathNodes.has(n.id)?'route':''].join(' ');
+    return `<g class="f787-node ${cls}" data-city="${n.id}"><circle cx="${p.x}" cy="${p.y}" r="22"/><text class="id" x="${p.x}" y="${p.y+5}">${n.id}</text>${n.isSource||n.isTarget?`<text class="tag" x="${p.x}" y="${p.y-32}">${n.isSource?'src':'dst'}</text>`:''}</g>`;
+  }).join('');
+  const routeCard=(route,bad=false)=>{
+    if(!route)return '';const stops=Math.max(0,route.edges.length-1);
+    return `<section class="f787-route ${bad?'invalid':'valid'}"><header><small>${bad?t('Vượt giới hạn','Over the limit'):t('Đường rẻ nhất hợp lệ','Cheapest valid route')}</small><b>${bad?'×':'✓'} ${route.cost}</b></header><div class="f787-itinerary">${route.nodes.map((n,i)=>`${i?`<span class="f787-ticket"><small>${route.edges[i-1].w}</small><b>✈ →</b></span>`:''}<strong>${n}</strong>`).join('')}</div><footer><span>${route.edges.length}/${limit} ✈</span><span>${stops} ${t('điểm dừng','stops')} ${stops>v.k?'&gt;':'≤'} ${v.k}</span></footer></section>`;
+  };
+  const row=(items,name)=>`<tr><th>${name}</th>${items.map((value,i)=>`<td class="${v.currentEdge?.includes(i)?'active':''}">${value===null?'∞':value}</td>`).join('')}</tr>`;
+  const old=v.oldCost||v.costs,next=v.nextCost||v.costs;
+  const snapshots=bellman?`<section class="f787-snapshots"><header><b>${final?'cost':v.allowedFlights!==null?t('Vòng','Round')+' '+v.allowedFlights+' / '+limit:'cost → next_cost'}</b><small>${final?'✓':'❄ → ✎'}</small></header><div><table><thead><tr><th></th>${nodes.map(n=>`<th>${n.id}</th>`).join('')}</tr></thead><tbody>${final?row(v.costs,'cost'):row(old,'❄ cost')+row(next,'✎ next_cost')}</tbody></table></div></section>`:
+    `<section class="f787-state"><div><small>${t('Thành phố','City')}</small><b>${v.city??'—'}</b></div><div><small>${t('Đã bay','Flights used')}</small><b>${v.used??'—'}/${limit}</b></div><div><small>${t('Giá','Price')}</small><b>${v.price??'—'}</b></div></section>`;
+  const current=edges.find(e=>e.current),source=current?(bellman?v.oldCost?.[current.u]:v.price):null;
+  const amount=current&&typeof source==='number'?source+Number(current.w):null;
+  const equation=!final&&current?`<div class="f787-transfer ${amount===null?'blocked':''}"><div><small>${bellman?'❄ cost['+current.u+']':'price'}</small><b>${source??'∞'}</b></div><em>+</em><div><small>${current.u} → ${current.v}</small><b>${current.w}</b></div><em>=</em><div><small>${t('Ứng viên','Candidate')}</small><strong>${amount??'∞'}</strong></div></div>`:'';
+  const heap=!bellman&&!final?`<section class="f787-heap"><header><b>min-heap</b><small>${t('Giá nhỏ trước','Lowest price first')}</small></header><div>${(v.heapStates||[]).slice(0,6).map(s=>`<span><strong>${s.price}</strong><small>${t('TP','City')} ${s.city} · ${s.used} ✈</small></span>`).join('')||'<em>∅</em>'}</div>${v.heapStates?.length>6?`<small>+${v.heapStates.length-6}</small>`:''}</section>`:'';
+  const best=!bellman&&v.bestMatrix?`<details class="f787-best" open><summary>best[city][flights]</summary><div><table><thead><tr><th>city / ✈</th>${v.bestMatrix[0].map((_,i)=>`<th>${i}</th>`).join('')}</tr></thead><tbody>${v.bestMatrix.map((values,i)=>row(values,i)).join('')}</tbody></table></div></details>`:'';
+  const result=final&&v.answer===-1?`<div class="f787-no-route"><b>× −1</b><small>${t('Không có đường hợp lệ','No valid route')}</small></div>`:'';
+  requestedVizSet(`<section class="rv-flight-viz f787-viz" data-method="${v.approach}">
+    <header class="f787-heading"><b>787 · ${bellman?'Bellman-Ford':'Dijkstra'}</b><span>${v.src??'?'} → ${v.dst??'?'}</span></header>
+    <div class="f787-limit"><span>≤ ${v.k??'?'} ${t('điểm dừng','stops')}</span><strong>→ ≤ ${limit} ✈</strong></div>
+    <div class="f787-graph"><svg class="${nodes.length>6?'large':''}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${t('Chuyến bay có hướng và giá vé','Directed flights with ticket prices')}"><defs>${marker('normal')}${marker('current')}${marker('route')}</defs>${connections}${cities}</svg></div>
+    <div class="f787-legend"><span class="current">━ ${t('Đang xét','Current')}</span><span class="route">━ ${t('Đường chọn','Selected route')}</span></div>
+    ${final?routeCard(v.path)+routeCard(v.invalidRoute,true)+result:equation}
+    ${snapshots}${heap}${best}
+  </section>`,t('Chuyến bay trong giới hạn điểm dừng','Flights within the stop limit'),'group');
 }
 
 function renderVisitAll847View(step) {
