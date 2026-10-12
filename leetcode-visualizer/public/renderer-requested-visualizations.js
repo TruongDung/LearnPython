@@ -24,83 +24,53 @@ function requestedVizSet(html, summary, role = "img") {
 
 // ─── #2218: Maximum Value of K Coins From Piles ────────────────────────────
 function renderCoins2218View(step) {
-  const view = step.coins2218View || {};
-  const vi = lang === "vi";
-  const approach = Number(view.approach) || 1;
-  const oneDimensional = approach === 2;
-  const phaseIndex = view.phase === "init" || view.phase === "pile" ? 0
-    : view.phase === "state" || view.phase === "copy" ? 1 : 2;
-  const phases = oneDimensional
-    ? (vi
-      ? ["Prefix của mỗi pile", "dp → new_dp", "Trả về dp[k]"]
-      : ["Prefix each pile", "dp → new_dp", "Return dp[k]"])
-    : (vi
-      ? ["Prefix của mỗi pile", "So sánh take cho dp[i][j]", "Truy vết đáp án"]
-      : ["Prefix each pile", "Compare takes for dp[i][j]", "Reconstruct answer"]);
-
-  const selectedCounts = Array.isArray(view.selectedCounts) ? view.selectedCounts : null;
-  const pilesHtml = (view.piles || []).map((pile) => {
-    const active = pile.index === view.pileIndex;
-    const take = selectedCounts ? (selectedCounts[pile.index] || 0) : active && Number.isInteger(view.bestTake) && view.bestTake >= 0 ? view.bestTake : 0;
-    const visibleCoins = pile.coins.slice(0, 12);
-    const coinHtml = visibleCoins.map((coin, index) => `<div class="rv-coin${index < take ? " taken" : ""}">
-      <small>${index === 0 ? (vi ? "TRÊN" : "TOP") : `#${index + 1}`}</small><b>${requestedVizEsc(coin)}</b>
-    </div>`).join("");
-    const hidden = pile.coins.length - visibleCoins.length;
-    const prefixHtml = pile.prefix.slice(0, 13).map((sum, index) => `<span class="${index === take && active ? "active" : ""}"><small>t=${index}</small><b>${requestedVizEsc(sum)}</b></span>`).join("");
-    return `<section class="rv-pile${active ? " active" : ""}">
-      <header><b>P${pile.index + 1}</b><span>${vi ? "lấy từ trên xuống" : "take from the top"}</span></header>
-      <div class="rv-coin-stack">${coinHtml}${hidden > 0 ? `<em>+${hidden}</em>` : ""}</div>
-      <div class="rv-prefix-row">${prefixHtml}</div>
-      ${selectedCounts ? `<footer>${vi ? "chọn" : "take"} <strong>${take}</strong> ${vi ? "coin" : "coin(s)"}</footer>` : ""}
-    </section>`;
-  }).join("");
-
-  const candidatesHtml = (view.candidates || []).length
-    ? view.candidates.map((candidate) => `<div class="rv-coin-candidate${candidate.winner ? " winner" : ""}">
-        <div class="rv-candidate-take"><small>take</small><strong>${candidate.take}</strong></div>
-        <div><small>${vi ? "coin trên cùng" : "top coins"}</small><b>${candidate.coins.length ? candidate.coins.map(requestedVizEsc).join(" + ") : "∅"}</b></div>
-        <div class="rv-candidate-formula"><code>${oneDimensional ? `dp[${candidate.sourceCoins}]` : `dp[${view.pileIndex}][${candidate.sourceCoins}]`}</code><span>+</span><code>prefix[${candidate.take}]</code><span>=</span><strong>${requestedVizEsc(candidate.previous)} + ${requestedVizEsc(candidate.pileValue)} = ${requestedVizEsc(candidate.total)}</strong></div>
-        <span class="rv-verdict">${candidate.winner ? (vi ? "TỐT NHẤT" : "BEST") : (vi ? "ứng viên" : "candidate")}</span>
-      </div>`).join("")
-    : requestedVizEmpty(view.phase === "state" ? (vi ? "Trạng thái này chưa có nguồn khả thi." : "This state has no reachable source.") : (vi ? "Chọn một ô DP để xem các phương án take." : "Select a DP state to see its take choices."));
-
-  const sourceKeys = new Set((view.candidates || []).map((candidate) => oneDimensional
-    ? `0,${candidate.sourceCoins}`
-    : `${view.pileIndex},${candidate.sourceCoins}`));
-  const currentKey = Number.isInteger(view.pileIndex) && Number.isInteger(view.used)
-    ? (oneDimensional ? `${view.dp.length - 1},${view.used}` : `${view.pileIndex + 1},${view.used}`)
-    : "";
-  const rowLabels = Array.isArray(view.dpRowLabels) ? view.dpRowLabels : [];
-  const dpHtml = Array.isArray(view.dp) && view.dp.length
-    ? `<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>${oneDimensional ? "array \\ j" : "i \\ j"}</th>${view.dp[0].map((_, index) => `<th>${index}</th>`).join("")}</tr></thead><tbody>${view.dp.map((row, i) => `<tr><th>${oneDimensional ? (rowLabels[i] || `row ${i}`) : (i === 0 ? "0 piles" : `P1..P${i}`)}</th>${row.map((value, j) => {
-      const key = `${i},${j}`;
-      const classes = [key === currentKey ? "current" : "", sourceKeys.has(key) ? "source" : "", view.phase === "done" && i === view.n && j === view.k ? "answer" : ""].filter(Boolean).join(" ");
-      return `<td class="${classes}">${requestedVizEsc(value)}</td>`;
-    }).join("")}</tr>`).join("")}</tbody></table></div>`
-    : requestedVizEmpty("dp = []");
-
-  const formula = view.phase === "state" && Number.isInteger(view.used)
-    ? `<div class="rv-focus-equation"><span>${vi ? "Đang tính" : "Computing"}</span><strong>${oneDimensional ? `new_dp[${view.used}]` : `dp[${view.pileIndex + 1}][${view.used}]`}</strong><span>= max theo take</span><b>${view.bestValue === null ? "−∞" : requestedVizEsc(view.bestValue)}</b></div>`
-    : view.phase === "done"
-      ? `<div class="rv-focus-equation success"><span>${vi ? "Đúng" : "Exactly"}</span><strong>${view.k} coins</strong><span>${vi ? "giá trị lớn nhất" : "maximum value"}</span><b>${requestedVizEsc(view.answer)}</b></div>`
-      : oneDimensional
-        ? `<div class="rv-focus-equation"><span>${vi ? "Quy tắc" : "Rule"}</span><strong>new_dp[j]</strong><span>= max(new_dp[j], dp[j−x] + prefix[x])</span></div>`
-        : `<div class="rv-focus-equation"><span>${vi ? "Quy tắc" : "Rule"}</span><strong>dp[i][j]</strong><span>= max(dp[i−1][j−t] + prefix[t])</span></div>`;
-
-  requestedVizSet(`${requestedVizPhases(phases, phaseIndex)}
-    ${formula}
-    <div class="rv-piles">${pilesHtml}</div>
-    <div class="rv-two-column rv-coins-workspace">
-      <section class="rv-panel"><h4>${vi ? "Các lựa chọn cho pile hiện tại" : "Choices for the current pile"}</h4><div class="rv-candidates">${candidatesHtml}</div></section>
-      <section class="rv-panel"><h4>${oneDimensional
-        ? (view.dp.length > 1
-          ? (vi ? "Hai snapshot O(k) — tím: dp nguồn, vàng: new_dp đích" : "Two O(k) snapshots — purple: source dp, amber: destination new_dp")
-          : (vi ? "Trạng thái dp một chiều — O(k) bộ nhớ" : "One-dimensional dp state — O(k) space"))
-        : (vi ? "Bảng DP — tím: nguồn, vàng: đích" : "DP table — purple: sources, amber: destination")}</h4>${dpHtml}</section>
-    </div>
-    ${view.omitted ? `<div class="rv-callout">${vi ? "Trace dài đã được rút gọn; bảng và đáp án vẫn đầy đủ." : "The long trace was shortened; the table and answer are complete."}</div>` : ""}`,
-  vi ? `Minh họa bài 2218, cách ${approach}, với ${view.n} pile và k=${view.k}` : `Problem 2218 approach ${approach} with ${view.n} piles and k=${view.k}`);
+  const v=step.coins2218View,vi=lang==='vi',t=(a,b)=>vi?a:b;
+  const one=Number(v.approach)===2,final=v.phase==='done',state=v.phase==='state';
+  const active=Number.isInteger(v.pileIndex)?v.pileIndex:-1;
+  const take=final?null:Number.isInteger(v.take)?v.take:
+    v.phase==='pile'&&Number.isInteger(v.coinIndex)?v.coinIndex+1:Math.max(0,v.bestTake||0);
+  const coins=(values,cls='')=>values.slice(0,12).map(value=>`<span class="c2218-token ${cls}">${requestedVizEsc(value)}</span>`).join('')+(values.length>12?`<small>+${values.length-12}</small>`:'');
+  const slots=(count,cls='')=>Array.from({length:Math.min(count,12)},()=>`<i class="${cls}"></i>`).join('')+(count>12?`<small>+${count-12}</small>`:'');
+  const pileHtml=v.piles.map(p=>{
+    const selected=Array.isArray(v.selectedCounts)?v.selectedCounts[p.index]:p.index===active?take||0:0;
+    const selecting=final&&Array.isArray(v.selectedCounts);
+    const visible=p.coins.slice(0,12);
+    return `<article class="c2218-pile ${!final&&p.index===active?'active':''}">
+      <header><b>P${p.index+1}</b>${selected?`<span class="c2218-take">${selected} ×</span>`:''}</header>
+      <div class="c2218-down" aria-label="${t('Lấy từ trên xuống','Take from the top')}">↓</div>
+      <div class="c2218-stack">${visible.map((value,i)=>`<div class="c2218-coin ${i<selected?(selecting?'chosen':'trying'):selecting||selected?'remaining':''}" data-pile="${p.index}" data-coin="${i}" data-selected="${i<selected}" aria-label="P${p.index+1}, #${i+1}: ${value}"><b>${value}</b>${i<selected?`<span>${selecting?'✓':'→'}</span>`:''}</div>`).join('')}
+      ${p.coins.length>12?`<small>+${p.coins.length-12}</small>`:''}</div>
+      ${selected&&Number.isFinite(p.prefix[selected])?`<footer>Σ <b>${p.prefix[selected]}</b></footer>`:'<footer>·</footer>'}
+    </article>`;
+  }).join('');
+  const sourceRow=one?0:active,source=v.dp[sourceRow];
+  const previous=Number.isInteger(v.sourceCoins)&&source?source[v.sourceCoins]:null;
+  const prefix=active>=0&&v.piles[active]?v.piles[active].prefix[take]:null;
+  const ready=typeof previous==='number'&&typeof prefix==='number';
+  const comparing=state&&Number.isInteger(v.take);
+  const equation=comparing?`<section class="c2218-transfer ${v.reachable===false?'blocked':v.updated===false?'rejected':''}">
+    <div class="c2218-from"><small>${t('Trước đó','Earlier piles')}</small><div class="c2218-slots">${slots(v.sourceCoins,'source')}</div><b>${typeof previous==='number'?previous:'∅'}</b></div>
+    <em>+</em><div class="c2218-add"><small>P${active+1} · ${take} ×</small><div class="c2218-token-row">${take?coins(v.piles[active].coins.slice(0,take)):'<span class="c2218-zero">0</span>'}</div><b>${prefix??'·'}</b></div>
+    <em>→</em><div class="c2218-total"><small>${v.used} ${t('xu','coins')}</small><b>${ready?previous+prefix:'∅'}</b><span>${v.reachable===false||v.updated===false?'×':v.updated===true?'✓':'?'}</span></div>
+  </section>`:'';
+  const candidates=v.candidates||[],max=Math.max(1,...candidates.map(c=>c.total));
+  const choices=state?`<section class="c2218-choices"><header><b>${t('So sánh','Compare')}</b><small>${t('Lấy từ','Take from')} P${active+1}</small></header>${candidates.map(c=>`<div class="c2218-choice ${c.winner?'winner':''} ${c.take===v.take?'testing':''}" data-take="${c.take}" data-total="${c.total}">
+    <span class="c2218-choice-count">${c.take} ×</span><div class="c2218-choice-track"><div class="c2218-choice-bar" style="width:${Math.max(3,c.total/max*100)}%"></div><span>${c.previous} + ${c.pileValue}</span></div><b>${c.total}</b><span class="c2218-crown">${c.winner?'★':''}</span></div>`).join('')||'<div class="c2218-wait">…</div>'}</section>`:'';
+  const selectedCoins=Array.isArray(v.selectedCounts)?v.piles.flatMap(p=>p.coins.slice(0,v.selectedCounts[p.index])):[];
+  const basket=final?`<section class="c2218-basket"><div class="c2218-basket-icon" aria-hidden="true">✓</div><div><small>${t('Đúng','Exactly')} ${v.k} ${t('xu','coins')}</small><div class="c2218-token-row">${selectedCoins.length?coins(selectedCoins,'chosen'):`<div class="c2218-slots">${slots(v.k,'filled')}</div>`}</div></div><strong>${v.answer}</strong></section>`:'';
+  const currentRow=one?v.dp.length-1:active+1;
+  const dpHtml=`<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>${one?'dp':'P'} / j</th>${v.dp[0].map((_,j)=>`<th>${j}</th>`).join('')}</tr></thead><tbody>${v.dp.map((row,i)=>`<tr><th>${one?(v.dpRowLabels?.[i]||'dp'):i===0?'∅':`P1…P${i}`}</th>${row.map((value,j)=>{
+    const cls=final&&i===v.dp.length-1&&j===v.k?'answer':state&&i===currentRow&&j===v.used?'current':comparing&&i===sourceRow&&j===v.sourceCoins?'source':'';
+    return `<td class="${cls}">${requestedVizEsc(value)}</td>`;
+  }).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const stage=final?'✓':v.phase==='pile'?'Σ':state?'↗':v.phase==='copy'?'⇄':'↓';
+  const stageText=final?t('Tối ưu','Best'):v.phase==='pile'?t('Cộng từ trên','Sum from top'):state?`P${active+1} · j = ${v.used}`:v.phase==='copy'?'dp → new_dp':t('Chỉ lấy từ trên','Top coins only');
+  requestedVizSet(`<section class="c2218-viz" data-phase="${v.phase}" data-method="${one?2:1}">
+    <header class="c2218-heading"><div class="c2218-stage"><b>${stage}</b><span>${stageText}</span></div><div class="c2218-target"><small>k = ${v.k}</small><div class="c2218-slots">${slots(v.k,final?'filled':'')}</div></div>${final?`<strong class="c2218-answer">${v.answer}</strong>`:''}</header>
+    <div class="c2218-piles">${pileHtml}</div>${equation}${choices}${basket}
+    <details class="c2218-dp"><summary>${t('Bảng DP','DP table')} <span>↗</span></summary>${dpHtml}</details>
+    ${v.omitted?`<small class="c2218-condensed">${t('Bước rút gọn','Condensed steps')} · ✓ ${v.answer??''}</small>`:''}
+  </section>`,t(`Chọn đúng ${v.k} xu từ ${v.n} chồng`,`Take exactly ${v.k} coins from ${v.n} piles`),'group');
 }
 
 // ─── #9006: BFS shortest path ───────────────────────────────────────────────

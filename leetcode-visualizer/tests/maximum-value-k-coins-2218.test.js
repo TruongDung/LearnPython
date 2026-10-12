@@ -153,6 +153,22 @@ test('2218 renderer handles every line-by-line state in both languages', () => {
         assert.match(element.innerHTML, /requested-viz/);
         assert.match(element.innerHTML, /rv-dp-table/);
         assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+        assert.match(element.innerHTML, /<details class="c2218-dp">/);
+        const v = step.coins2218View;
+        const shownSelections = [...element.innerHTML.matchAll(/data-pile="(\d+)" data-coin="(\d+)" data-selected="true"/g)];
+        if (v.phase === 'state' && Number.isInteger(v.take)) {
+          // The picture must follow the attempted take, even when the previous best differs.
+          assert.equal(shownSelections.length, v.take);
+          assert.ok(shownSelections.every(match => Number(match[1]) === v.pileIndex && Number(match[2]) < v.take));
+        }
+        if (step.final && v.selectedCounts) {
+          assert.equal(shownSelections.length, v.k);
+          for (const match of shownSelections) assert.ok(Number(match[2]) < v.selectedCounts[Number(match[1])]);
+          assert.match(element.innerHTML, /c2218-basket/);
+          assert.doesNotMatch(element.innerHTML, /c2218-transfer/);
+        }
+        if (v.operation === 'unreachable-source') assert.match(element.innerHTML, /c2218-transfer blocked/);
+        if (v.operation === 'return-answer' && v.approach === 2) assert.match(element.innerHTML, /<td class="answer">101<\/td>/);
       }
     }
   }
