@@ -270,6 +270,8 @@ test('416 renderer assets are loaded ahead of the generic renderer with responsi
   assert.ok(registry.indexOf('step.equalSubset416BitsetView') < registry.indexOf('step.hardProblemView'));
   assert.match(readFrontendIndex(), /renderer-partition-equal-subset-416\.js/);
   assert.match(readFrontendIndex(), /partition-equal-subset-416\.css/);
+  assert.match(readFrontendIndex(), /equalSubset=equal-subset-416-v3/);
+  assert.match(readFrontendIndex(), /partition-equal-subset-416\.css\?v=equal-subset-416-v3/);
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.pe416-viz/);
   assert.match(readFrontendStyles(), /\.pe416-cells \{[^}]*flex-wrap:wrap/);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'partition-equal-subset-416.css'), 'utf8');
@@ -286,6 +288,7 @@ test('416 bitset renderer illustrates the old, shifted, and ORed bitsets in both
       context.renderEqualSubset416BitsetView(step);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
       const view = step.equalSubset416BitsetView;
+      assert.match(element.innerHTML, /pe416-bitset[^>]*data-method="2"/);
       view.sums.forEach((sum, index) => {
         assert.ok(element.innerHTML.includes(`data-row="after" data-sum="${sum}" data-bit="${view.after[index]}"`));
       });
