@@ -21,9 +21,11 @@ test("Profitable Schemes 879 keeps the sample answer and visual state aligned", 
   assert.equal(run.steps.at(-1).profitableSchemes879View.dp[5][3], 2);
   assert.ok(run.steps.every((step) => step.profitableSchemes879View));
   assert.deepEqual(
-    run.steps.map((step) => step.profitableSchemes879View.phase),
-    ["intro", "crime", "crime", "result"],
+    run.steps.filter(step => ['crime','result'].includes(step.profitableSchemes879View.phase)).map(step => step.profitableSchemes879View.phase),
+    ["crime", "crime", "result"],
   );
+  assert.equal(problem.debugMode, 'line');
+  assert.ok(run.steps.every(step => step.codeLines.length === 1));
 });
 
 test("Profitable Schemes 879 exposes before/after plans and source states per crime", () => {
@@ -32,8 +34,9 @@ test("Profitable Schemes 879 exposes before/after plans and source states per cr
     group: "2,2",
     profit: "2,3",
   });
-  const firstCrime = run.steps[1].profitableSchemes879View;
-  const secondCrime = run.steps[2].profitableSchemes879View;
+  const completed = run.steps.filter(step => step.profitableSchemes879View.phase === 'crime');
+  const firstCrime = completed[0].profitableSchemes879View;
+  const secondCrime = completed[1].profitableSchemes879View;
 
   assert.deepEqual(firstCrime.crimes[0], { index: 0, members: 2, gain: 2 });
   assert.equal(firstCrime.beforeDp[2][2], 0);
@@ -77,11 +80,11 @@ test("879 pictured subsets and both branches match exhaustive counting at every 
           if (v.activeCrime !== null && (mask & (1 << v.activeCrime))) take++; else skip++;
         }
       }
-      assert.equal(v.count, total);
+      if (v.phase === 'crime' || v.final) assert.equal(v.count, total);
       if (v.phase === 'crime') { assert.equal(v.takeCount,take); assert.equal(v.skipCount,skip); }
       for (const plan of [...v.samples,...v.skipSamples,...v.takeSamples]) {
         assert.equal(new Set(plan.jobs).size,plan.jobs.length);
-        assert.ok(plan.jobs.every(i=>i >= 0 && i < v.processedCount));
+        assert.ok(plan.jobs.every(i=>i >= 0 && i < Math.max(v.processedCount,(v.activeCrime ?? -1)+1)));
         assert.equal(plan.members,plan.jobs.reduce((sum,i)=>sum+group[i],0));
         assert.equal(plan.profit,plan.jobs.reduce((sum,i)=>sum+profit[i],0));
       }
@@ -120,8 +123,10 @@ test("879 pictures render both languages, correct threshold axes and real exampl
       context.lang=language;context.renderProfitableSchemes879View(step);
       assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity|nuevos|CORE RULE/);
       assert.match(host.innerHTML,/ps879-people-meter/);
-      assert.match(host.innerHTML,/<th>≥0<\/th>/);
-      assert.match(host.innerHTML,/<th>≤0<\/th>/);
+      if (step.profitableSchemes879View.allocated) {
+        assert.match(host.innerHTML,/<th>≥0<\/th>/);
+        assert.match(host.innerHTML,/<th>≤0<\/th>/);
+      }
       if(step.profitableSchemes879View.phase==='crime') assert.match(host.innerHTML,/ps879-branches/);
       if(step.final) assert.match(host.innerHTML,new RegExp(`<strong>${run.answer}</strong>`));
     }
@@ -137,4 +142,33 @@ test("879 rejects misleading input and displayed Python matches examples", () =>
   const source=`${problem.code.join('\n')}\nimport json,sys\nfor case in json.load(sys.stdin):\n    assert Solution().profitableSchemes(case['n'],case['minProfit'],case['group'],case['profit']) == case['answer']`;
   const run=spawnSync('python3',['-c',source],{encoding:'utf8',input:JSON.stringify(cases.map(c=>({...c,answer:problem.builder([c.n],{minProfit:c.minProfit,group:c.group.join(','),profit:c.profit.join(',')}).answer})))});
   assert.equal(run.status,0,run.stderr);
+});
+
+test('879 step-over stops match Python line events and live locals exactly', () => {
+  const cases = [
+    {n:5,minProfit:3,group:[2,2],profit:[2,3]},
+    {n:3,minProfit:0,group:[4],profit:[0]},
+    {n:2,minProfit:0,group:[1,1,1],profit:[0,0,0]},
+    {n:3,minProfit:4,group:[1,2,1],profit:[5,0,2]},
+  ];
+  const source=`${problem.code.join('\n')}\nimport json,sys\nresults=[]\nfor case in json.load(sys.stdin):\n    frames=[]\n    def trace(frame,event,arg):\n        if event == 'line' and frame.f_code.co_name == 'profitableSchemes':\n            # Inlined list comprehensions can repeat line 4 without changing the caller state.\n            if frame.f_lineno == 4 and frames and frames[-1]['line'] == 4:\n                return trace\n            state=frame.f_locals\n            frames.append({'line':frame.f_lineno,'dp':json.loads(json.dumps(state.get('dp'))),**{k:state.get(k) for k in ['MOD','i','j','m','p']}})\n        return trace\n    sys.settrace(trace)\n    Solution().profitableSchemes(case['n'],case['minProfit'],case['group'],case['profit'])\n    sys.settrace(None)\n    results.append(frames)\nprint(json.dumps(results))`;
+  const python=spawnSync('python3',['-c',source],{encoding:'utf8',input:JSON.stringify(cases),maxBuffer:4*1024*1024});
+  assert.equal(python.status,0,python.stderr);
+  const actual=cases.map(c=>problem.builder([c.n],{minProfit:c.minProfit,group:c.group.join(','),profit:c.profit.join(',')}).steps.map(step=>({line:step.codeLines[0],dp:step.profitableSchemes879View.dp,...step.profitableSchemes879View.pythonLocals})));
+  assert.deepEqual(actual,JSON.parse(python.stdout));
+  for(const c of cases) {
+    const run=problem.builder([c.n],{minProfit:c.minProfit,group:c.group.join(','),profit:c.profit.join(',')});
+    run.steps.forEach((step,index)=>{
+      const v=step.profitableSchemes879View;
+      if(step.codeLines[0]===10) {
+        const cell=v.cell,next=run.steps[index+1].profitableSchemes879View;
+        assert.equal(v.dp[cell.members][cell.profit],cell.previous);
+        assert.equal(next.dp[cell.members][cell.profit],cell.after);
+        const changes=v.dp.flatMap((row,i)=>row.flatMap((value,j)=>next.dp[i][j]===value?[]:[[i,j]]));
+        assert.ok(changes.length<=1);
+        assert.equal(cell.applied,false);
+        assert.equal(next.cell.applied,true);
+      }
+    });
+  }
 });

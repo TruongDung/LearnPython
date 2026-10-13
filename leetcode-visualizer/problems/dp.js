@@ -17440,71 +17440,107 @@ function buildSteps879(input, params) {
       profit.some(v => !Number.isSafeInteger(v) || v < 0)) {
     throw new Error("879: n = 1–10, minProfit = 0–12; group/profit need equal-length lists (1–100 jobs), positive group and nonnegative profit.");
   }
-  const crimes = group.map((g, i) => [g, profit[i] ?? 0]);
-
-  const dp = Array.from({ length: n + 1 }, () => new Array(minProfit + 1).fill(0));
-  for (let i = 0; i <= n; i++) dp[i][0] = 1;
-  const steps = [];
-  const crimeItems = crimes.map(([members, gain], index) => ({ index, members, gain }));
-  // A few real subsets per reachable (people, capped profit) state. Counts still
-  // come from DP; examples never enumerate the exponentially many subsets.
+  const crimes = group.map((members, index) => ({ index, members, gain: profit[index] }));
+  let dp = null, processedCount = 0, activeCrime = null, beforeDp = null;
+  let skipCount = null, takeCount = null, skipSamples = [], takeSamples = [], goalApplied = false;
   let sampleBuckets = new Map([["0,0", [{ jobs: [], members: 0, profit: 0 }]]]);
   let samplesTruncated = false;
+  const locals = { MOD: null, i: null, j: null, m: null, p: null };
   const allSamples = () => [...sampleBuckets.values()].flat().sort((a, b) => a.jobs.length - b.jobs.length);
-  const text1 = Array.from({ length: n }, (_, i) => `≤${i + 1} người`);
-  const text2 = Array.from({ length: minProfit }, (_, j) => `lãi≥${j + 1}`);
-  const display = () => dp.map((row) => row.map((v) => String(v)));
-  const push = (opts) => {
+  const chooseExamples = (plans, members, required) => {
+    const valid = plans.filter(plan => plan.members <= members && plan.profit >= required);
+    return (valid.length ? valid : plans).slice(0, 2);
+  };
+  const lines = {
+    3: { vi: "Đặt MOD", en: "Set MOD" },
+    4: { vi: "Tạo bảng DP", en: "Create DP" },
+    5: { vi: "Duyệt hàng cơ sở", en: "Loop through base rows" },
+    6: { vi: "Ghi 1 cách không chọn việc", en: "Store one empty scheme" },
+    7: { vi: "Duyệt từng việc", en: "Loop through jobs" },
+    8: { vi: "Duyệt số người giảm dần", en: "Loop members backwards" },
+    9: { vi: "Duyệt lợi nhuận giảm dần", en: "Loop profit backwards" },
+    10: { vi: "Cộng số cách vào một ô", en: "Add ways to one cell" },
+    11: { vi: "Trả kết quả", en: "Return the answer" },
+  };
+  const steps = [];
+  // Snapshots match a Python debugger stopped BEFORE the highlighted line.
+  const push = (line, opts = {}) => {
+    const matrix = dp ? dp.map(row => [...row]) : null;
+    const cell = opts.cell || null;
+    const count = dp ? dp[n][minProfit] : null;
+    const cellSkip = cell && cell.kind !== "base" ? cell.previous : skipCount;
+    const cellTake = cell && cell.kind !== "base" ? cell.added : takeCount;
+    const variables = [{ name: "n", value: n }, { name: "minProfit", value: minProfit }];
+    for (const [name, value] of Object.entries(locals)) if (value !== null) variables.push({ name, value });
+    if (cell) {
+      variables.push({ name: `dp[${cell.members}][${cell.profit}]`, value: matrix[cell.members][cell.profit] });
+      if (cell.kind !== "base") variables.push({ name: "added", value: cell.added });
+    }
+    const eligible = allSamples().filter(plan => plan.profit >= minProfit);
     steps.push({
-      title: opts.title, arr: [],
-      grid: { dp: display(), text1, text2, hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
-      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      title: { vi: `Dòng ${line}: ${lines[line].vi}`, en: `Line ${line}: ${lines[line].en}` },
+      arr: [], highlight: [], mark: [], codeLines: [line], debugLine: line,
+      final: line === 11, vars: variables,
+      note: { vi: "Trạng thái trước khi chạy dòng đang sáng.", en: "State before executing the highlighted line." },
       profitableSchemes879View: {
-        members: n,
-        minProfit,
-        crimes: crimeItems.map((crime) => ({ ...crime })),
-        dp: dp.map((row) => [...row]),
-        beforeDp: opts.beforeDp ? opts.beforeDp.map((row) => [...row]) : null,
-        updates: opts.updates ? opts.updates.map((update) => ({ ...update })) : [],
-        activeCrime: Number.isInteger(opts.activeCrime) ? opts.activeCrime : null,
-        phase: opts.phase || "overview",
-        answer: opts.final ? dp[n][minProfit] : null,
-        final: Boolean(opts.final),
-        count: dp[n][minProfit],
-        processedCount: opts.final ? crimes.length : Number.isInteger(opts.activeCrime) ? opts.activeCrime + 1 : 0,
-        skipCount: opts.skipCount ?? null,
-        takeCount: opts.takeCount ?? null,
-        samples: allSamples().filter(plan => plan.profit >= minProfit).slice(0, 6),
-        skipSamples: opts.skipSamples || [],
-        takeSamples: opts.takeSamples || [],
-        examplesOnly: samplesTruncated || allSamples().filter(plan => plan.profit >= minProfit).length > 6,
+        members: n, minProfit, crimes, dp: matrix, beforeDp,
+        activeCrime, phase: opts.phase || (activeCrime === null ? "intro" : "debug"),
+        answer: line === 11 ? count : null, final: line === 11, count,
+        processedCount, skipCount: cellSkip, takeCount: cellTake,
+        samples: eligible.slice(0, 6),
+        skipSamples: opts.skipSamples || skipSamples, takeSamples: opts.takeSamples || takeSamples,
+        examplesOnly: samplesTruncated || eligible.length > 6,
+        updates: opts.updates || (cell && cell.kind !== "base" ? [cell] : []),
+        debugLine: line, pythonLocals: { ...locals }, cell,
+        goalApplied, allocated: dp !== null,
       },
     });
   };
-
-  push({
-    phase: "intro",
-    title: { vi: "Mỗi việc: chọn hoặc bỏ", en: "Each job: take or skip" },
-    codeLines: [5],
-    caption: "dp[i][j] = số kế hoạch dùng ≤ i người, lợi nhuận ≥ j",
-    vars: [{ name: "n", value: n }, { name: "minProfit", value: minProfit }],
-    note: {
-      vi: "Mỗi việc chỉ được chọn một lần.",
-      en: "Each job can be chosen once.",
-    },
-  });
-
-  crimes.forEach(([m, p], idx) => {
-    const beforeDp = dp.map((row) => [...row]);
+  push(3);
+  locals.MOD = MOD;
+  push(4);
+  dp = Array.from({ length: n + 1 }, () => Array(minProfit + 1).fill(0));
+  for (let i = 0; i <= n; i++) {
+    push(5);
+    locals.i = i;
+    push(6, { cell: { kind: "base", members: i, profit: 0, previous: dp[i][0], after: 1, applied: false } });
+    dp[i][0] = 1;
+  }
+  push(5);
+  push(7);
+  crimes.forEach(({ members: m, gain: p }, idx) => {
+    activeCrime = idx;
+    locals.m = m; locals.p = p;
+    beforeDp = dp.map(row => [...row]);
     const beforeSamples = allSamples();
-    const skipCount = beforeDp[n][minProfit];
-    const takeCount = m <= n ? beforeDp[n - m][Math.max(0, minProfit - p)] : 0;
     const takePlans = beforeSamples.map(plan => ({ jobs: [...plan.jobs, idx], members: plan.members + m, profit: plan.profit + p }));
-    // Prefer successful examples; if there are none, show why the choice fails.
-    const chooseExamples = plans => {
-      const valid = plans.filter(plan => plan.members <= n && plan.profit >= minProfit);
-      return (valid.length ? valid : plans).slice(0, 2).map(plan => ({ ...plan, jobs: [...plan.jobs] }));
-    };
+    skipCount = beforeDp[n][minProfit];
+    takeCount = m <= n ? beforeDp[n - m][Math.max(0, minProfit - p)] : 0;
+    skipSamples = chooseExamples(beforeSamples, n, minProfit);
+    takeSamples = chooseExamples(takePlans, n, minProfit);
+    goalApplied = false;
+    const updates = [];
+    push(8);
+    for (let i = n; i >= m; i--) {
+      locals.i = i;
+      push(9);
+      let lastCell = null;
+      for (let j = minProfit; j >= 0; j--) {
+        locals.j = j;
+        const sourceMembers = i - m, sourceProfit = Math.max(0, j - p);
+        const previous = dp[i][j], added = dp[sourceMembers][sourceProfit];
+        const cell = { members: i, profit: j, sourceMembers, sourceProfit, previous, added, after: (previous + added) % MOD, applied: false };
+        const examples = { skipSamples: chooseExamples(beforeSamples, i, j), takeSamples: chooseExamples(takePlans, i, j) };
+        push(10, { cell, ...examples });
+        dp[i][j] = cell.after;
+        if (i === n && j === minProfit) goalApplied = true;
+        lastCell = { ...cell, applied: true };
+        updates.push(lastCell);
+        push(9, { cell: lastCell, ...examples });
+      }
+      push(8, { cell: lastCell, skipSamples: chooseExamples(beforeSamples, i, 0), takeSamples: chooseExamples(takePlans, i, 0) });
+    }
+    // Commit example subsets only after all rows for this job have been updated.
     for (const plan of takePlans) {
       if (plan.members > n) continue;
       const key = `${plan.members},${Math.min(minProfit, plan.profit)}`;
@@ -17512,54 +17548,11 @@ function buildSteps879(input, params) {
       if (bucket.length < 3) sampleBuckets.set(key, [...bucket, plan]);
       else samplesTruncated = true;
     }
-    const updates = [];
-    for (let i = n; i >= m; i--) {
-      for (let j = minProfit; j >= 0; j--) {
-        const sourceProfit = Math.max(0, j - p);
-        const previous = dp[i][j];
-        const added = dp[i - m][sourceProfit];
-        dp[i][j] = (previous + added) % MOD;
-        updates.push({
-          members: i,
-          profit: j,
-          sourceMembers: i - m,
-          sourceProfit,
-          previous,
-          added,
-          after: dp[i][j],
-        });
-      }
-    }
-    push({
-      phase: "crime",
-      activeCrime: idx,
-      beforeDp,
-      updates,
-      skipCount, takeCount,
-      skipSamples: chooseExamples(beforeSamples), takeSamples: chooseExamples(takePlans),
-      title: { vi: `Việc #${idx + 1}: ${skipCount} + ${takeCount} cách`, en: `Job #${idx + 1}: ${skipCount} + ${takeCount} ways` },
-      codeLines: [6, 7, 8, 9],
-      hlCell: [n, minProfit],
-      caption: `Sau phi vụ (${m} người, lãi ${p}): dp[${n}][${minProfit}] = ${dp[n][minProfit]}`,
-      vars: [{ name: "phi vụ", value: `${m} người, lãi ${p}` }, { name: `dp[${n}][${minProfit}]`, value: dp[n][minProfit] }],
-      note: {
-        vi: "Cộng số cách bỏ việc này và số cách chọn việc này.",
-        en: "Add the ways that skip this job and the ways that take it.",
-      },
-    });
+    processedCount++;
+    push(7, { phase: "crime", updates });
   });
-
-  const answer = dp[n][minProfit];
-  push({
-    phase: "result",
-    title: { vi: `Có ${answer} kế hoạch đạt mục tiêu`, en: `${answer} schemes meet the goal` },
-    codeLines: [11], hlCell: [n, minProfit], final: true,
-    caption: `Đáp án = ${answer}`,
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: `Số kế hoạch "có lãi" (≤ ${n} người, lãi ≥ ${minProfit}) = ${answer} (mod 1e9+7).`, en: `Number of profitable schemes (≤ ${n} members, profit ≥ ${minProfit}) = ${answer} (mod 1e9+7).` },
-  });
-
-  return { original: { n, minProfit, group, profit }, answer, steps };
+  push(11, { phase: "result" });
+  return { original: { n, minProfit, group, profit }, answer: dp[n][minProfit], steps };
 }
 
 /**
@@ -20172,7 +20165,7 @@ module.exports = {
     id: 879,
     difficulty: "hard",
     slug: "profitable-schemes",
-    debugMode: "semantic",
+    debugMode: "line",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Profitable Schemes", en: "Profitable Schemes" },
     titleVi: { vi: "Kế hoạch có lãi", en: "Profitable schemes" },
@@ -20196,12 +20189,12 @@ module.exports = {
       "    def profitableSchemes(self, n, minProfit, group, profit):",
       "        MOD = 10**9 + 7",
       "        dp = [[0]*(minProfit+1) for _ in range(n+1)]",
-      "        for i in range(n+1): dp[i][0] = 1",
+      "        for i in range(n+1):",
+      "            dp[i][0] = 1",
       "        for m, p in zip(group, profit):",
       "            for i in range(n, m-1, -1):",
       "                for j in range(minProfit, -1, -1):",
       "                    dp[i][j] = (dp[i][j] + dp[i-m][max(0, j-p)]) % MOD",
-      "                    # take this crime",
       "        return dp[n][minProfit]",
     ],
     builder: buildSteps879,
