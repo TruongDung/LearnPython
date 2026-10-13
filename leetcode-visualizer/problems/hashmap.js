@@ -8581,6 +8581,21 @@ function buildSteps496(input, params = {}) {
           { label: "nums1 result", value: resultText() },
         ],
       },
+      nextGreater496View: {
+        nums1: [...nums1],
+        nums2: [...nums2],
+        stack: stack.map((item) => ({ ...item })),
+        nextGreater: [...nextGreater.entries()].map(([from, to]) => ({ from, to })),
+        result: nums1.map((_, resultIndex) => result[resultIndex] ?? null),
+        phase,
+        index,
+        value,
+        compareIndex,
+        resolved: resolved ? { ...resolved } : null,
+        lookupIndex,
+        lookupValue,
+        final: Boolean(final),
+      },
     });
   };
 

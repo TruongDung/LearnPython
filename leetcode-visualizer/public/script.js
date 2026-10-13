@@ -1138,6 +1138,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.sortedSubmatrixView), surface: "treeView", render: (step) => {
       renderSortedSubmatrixView(step);
     } },
+    { predicate: (step) => Boolean(step.nextGreater496View), surface: "treeView", render: (step) => {
+      renderNextGreater496View(step);
+    } },
     { predicate: (step) => Boolean(step.stackView), surface: "treeView", render: (step) => {
       renderStackView(step);
     } },
