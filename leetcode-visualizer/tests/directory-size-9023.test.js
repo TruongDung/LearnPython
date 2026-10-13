@@ -117,6 +117,67 @@ test('9023 renderer shows scan addition, cached values, and missing branches in 
   }
 });
 
+function rendererClass() {
+  const context = { escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]) };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-directory-size-9023.js'), 'utf8'), context);
+  return vm.runInContext('DirectorySize9023Visualizer', context);
+}
+
+test('9023 standalone class keeps tree positions stable as cached nodes are built', () => {
+  const Visualizer = rendererClass();
+  const renderer = new Visualizer({ host: { innerHTML: '' } });
+  const trace = problem.builder2(problem.defaultInput).steps.map(snapshot);
+  const initial = renderer.layout(trace[0]);
+  for (const frame of trace.filter(frame => frame.phase === 'build')) {
+    const plan = renderer.layout(frame);
+    for (const node of frame.nodes) {
+      assert.equal(plan.nodes.get(node.path).x, initial.nodes.get(node.path).x);
+      assert.equal(plan.nodes.get(node.path).y, initial.nodes.get(node.path).y);
+    }
+  }
+});
+
+test('9023 class renders cache additions without future totals and separates query results', () => {
+  const Visualizer = rendererClass();
+  const firstHost = { innerHTML: '' };
+  const secondHost = { innerHTML: '' };
+  const first = new Visualizer({ host: firstHost, language: 'vi' });
+  const second = new Visualizer({ host: secondHost, language: 'en' });
+  const trace = problem.builder2(problem.defaultInput).steps;
+  first.render(trace[0]);
+  assert.doesNotMatch(firstHost.innerHTML, /3200|3550/);
+  const update = trace.find(step => snapshot(step).phase === 'build' && snapshot(step).current.endsWith('/training') && snapshot(step).total === 3200);
+  first.render(update);
+  assert.match(firstHost.innerHTML, /ds9023-delta/);
+  assert.match(firstHost.innerHTML, /2400<\/span><i>\+<\/i><span>800<\/span><i>=<\/i><b>3200/);
+  assert.doesNotMatch(firstHost.innerHTML, /3550/);
+  assert.doesNotMatch(firstHost.innerHTML, /<b>3200<\/b><\/li>/); // No query has run yet.
+  const before = firstHost.innerHTML;
+  second.render(trace.at(-1));
+  assert.equal(firstHost.innerHTML, before);
+  assert.match(secondHost.innerHTML, /<b>3550<\/b><\/li>/);
+  assert.match(firstHost.innerHTML, /Dung lượng thư mục/);
+  assert.match(secondHost.innerHTML, /Directory size/);
+});
+
+test('9023 tree escapes path labels and handles deep, empty and large-size inputs', () => {
+  const Visualizer = rendererClass();
+  const host = { innerHTML: '' };
+  const renderer = new Visualizer({ host });
+  const inputs = [
+    { files: [], queries: ['fo://missing'] },
+    { files: [[1000000000000, 'fo://b/a/c/d/e/f/g/<file>.mp4']], queries: ['fo://b/a', 'fo://b/a/missing'] },
+  ];
+  for (const input of inputs) for (const builder of [problem.builder, problem.builder2]) for (const step of builder(input).steps) {
+    renderer.render(step);
+    assert.doesNotMatch(host.innerHTML, /undefined|NaN|Infinity|<file>/);
+    const plan = renderer.layout(snapshot(step));
+    for (const node of plan.nodes.values()) assert.ok(node.x >= 54 && node.x + 54 <= plan.width);
+    if (snapshot(step).missing) assert.match(host.innerHTML, /ds9023-node folder[^"\n]* missing/);
+  }
+});
+
 test('9023 is registered as a custom interview problem with two lazy visualizations', () => {
   assert.deepEqual(problem.title, { vi: 'Directory / File Size', en: 'Directory / File Size' });
   assert.equal(problem.category.key, 'interview');

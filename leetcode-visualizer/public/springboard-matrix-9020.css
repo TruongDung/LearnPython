@@ -13,6 +13,11 @@
 }
 .spring9020-viz * { box-sizing: border-box; }
 #treeView:has(> .spring9020-viz) { padding: 0; border: 0; background: transparent; min-height: 0; overflow: visible; }
+#vizPanel:has(.spring9020-list-viz) :is(#codePanel, #codePanel2) {
+  max-height: none; overflow: visible; position: static; white-space: pre-wrap;
+}
+#vizPanel:has(.spring9020-list-viz) .code-line { min-width: 0; width: 100%; white-space: pre-wrap; }
+#vizPanel:has(.spring9020-list-viz) .code-line .txt { min-width: 0; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
 .spring9020-header { display: flex; align-items: center; gap: 10px; }
 .spring9020-header > div:first-child { flex: 1; min-width: 0; }
 .spring9020-header small { color: var(--sp-muted); font-size: 10px; }
