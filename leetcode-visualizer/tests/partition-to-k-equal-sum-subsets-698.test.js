@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[698];
 
 const builder2 = problem.builder2;
@@ -19,7 +20,40 @@ test('698 approach 2 is registered with its own code and builder', () => {
   assert.equal(problem.complexity2.time, 'O(kⁿ)');
   const renderer = readFileSync(join(__dirname, '..', 'public', 'renderers-05.js'), 'utf8');
   assert.match(renderer, /"k-subsets-groups"/);
-  assert.match(renderer, /BACKTRACKING WORKSHOP/);
+  assert.match(renderer, /p698-buckets/);
+  assert.match(readFileSync(join(__dirname, '..', 'public', 'style-07.css'), 'utf8'), /\.p698-cup/);
+});
+
+test('698 visualization emphasizes numbered tiles and equal-sum buckets for both approaches', () => {
+  const host = { innerHTML: '' };
+  const context = {
+    lang: 'en',
+    escapeHtml: String,
+    pick: (value) => typeof value === 'object' && value ? value.en : value,
+    $: () => host,
+  };
+  vm.createContext(context);
+  vm.runInContext(readFileSync(join(__dirname, '..', 'public', 'renderers-05.js'), 'utf8'), context);
+
+  for (const run of [
+    problem.builder(problem.defaultInput, { k: 4 }),
+    builder2(problem.defaultInput, { k: 4 }),
+  ]) {
+    const step = run.steps.find((item) => item.advancedBitmaskView.phase === 'choose') || run.steps.at(-1);
+    context.renderAdvancedBitmaskView(step);
+    assert.match(host.innerHTML, /p698-viz/);
+    assert.match(host.innerHTML, /p698-number/);
+    assert.match(host.innerHTML, /p698-bucket/);
+    assert.match(host.innerHTML, /p698-cup/);
+    assert.doesNotMatch(host.innerHTML, /abm-rule|abm-mask-panel|INVARIANT AND PRUNING/);
+    assert.equal((host.innerHTML.match(/class="p698-bucket /g) || []).length, 4);
+  }
+
+  const backtrack = builder2([3, 3, 3, 3, 2, 2, 2, 2], { k: 2 }).steps.find(
+    (step) => step.advancedBitmaskView.phase === 'backtrack',
+  );
+  context.renderAdvancedBitmaskView(backtrack);
+  assert.match(host.innerHTML, /p698-move undo/);
 });
 
 test('698 approach 2 solves the default input', () => {

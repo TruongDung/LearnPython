@@ -1715,6 +1715,56 @@ function renderAdvancedBitmaskView(step) {
     ? `<p class="abm-trace-note">${vi ? "Ví dụ lớn: chỉ hiển thị một phần trace để nút Prev/Next vẫn chạy mượt; kết quả vẫn được tính đầy đủ." : "Large example: only part of the trace is shown so Prev/Next stays responsive; the result is still fully computed."}</p>`
     : "";
 
+  if (view.problemId === 698) {
+    const elements = view.lanes?.[0]?.items || [];
+    const groups = view.lanes?.[1]?.items || [];
+    const target = groups[0]?.value?.split("/")[1] || "?";
+    const activeElement = elements.find((item) => ["active", "danger"].includes(item.state));
+    const activeGroup = groups.find((item) => item.state === "active");
+    const formula = view.operation?.formula || "";
+    const decision = view.phase === "choose"
+      ? { icon: "↓", label: vi ? "ĐẶT" : "PLACE", state: "place" }
+      : view.phase === "backtrack"
+        ? { icon: "↶", label: vi ? "GỠ" : "UNDO", state: "undo" }
+        : view.phase === "skip"
+          ? { icon: "×", label: "SKIP", state: "skip" }
+          : view.phase === "try" && view.operation?.status === "danger"
+            ? { icon: "×", label: ">", state: "skip" }
+            : null;
+    const numberTiles = elements.map((item) => {
+      const state = ["active", "danger"].includes(item.state) ? "active" : item.state === "muted" ? "placed" : "";
+      return `<span class="p698-number ${state}"><small>${escapeHtml(String(item.label || ""))}</small><b>${escapeHtml(String(item.value ?? ""))}</b>${state === "placed" ? '<i>✓</i>' : state === "active" ? `<i>${view.operation?.status === "danger" ? "?" : "•"}</i>` : ""}</span>`;
+    }).join("");
+    const groupCards = groups.map((group, index) => {
+      const [sumText = "0", targetText = target] = String(group.value || "0/?").split("/");
+      const sum = Number(sumText) || 0;
+      const capacity = Number(targetText);
+      const progress = Number.isFinite(capacity) && capacity > 0 ? Math.min(100, sum / capacity * 100) : 0;
+      const members = String(group.sub || "").split(" + ").filter((value) => value && value !== "empty" && value !== "trống");
+      const memberTiles = members.map((value) => `<span>${escapeHtml(value)}</span>`).join("");
+      return `<article class="p698-bucket ${group.state === "success" ? "full" : group.state === "active" ? "current" : ""}" data-group="${index}">
+        <header><b>G${index + 1}</b><strong>${escapeHtml(String(sumText))}<i>/</i>${escapeHtml(String(targetText))}</strong></header>
+        <div class="p698-fill"><i style="width:${progress}%"></i></div>
+        <div class="p698-cup">${memberTiles || '<span class="empty">·</span>'}</div>
+      </article>`;
+    }).join("");
+    const result = view.result
+      ? `<strong class="p698-result ${view.result.status === "success" ? "yes" : "no"}">${view.result.status === "success" ? "✓" : "×"}</strong>`
+      : "";
+    const motion = decision && activeElement && activeGroup
+      ? `<div class="p698-move ${decision.state}"><span>${escapeHtml(String(activeElement.value))}</span><b>${decision.icon}</b><span>G${groups.indexOf(activeGroup) + 1}</span><small>${escapeHtml(formula)}</small></div>`
+      : "";
+    const stepDots = stages.map((_, index) => `<i class="${index < stageIndex ? "done" : index === stageIndex ? "current" : ""}"></i>`).join("");
+    $("treeView").innerHTML = `<section class="abm-viz p698-viz" role="img" aria-label="${vi ? "Chia số vào các nhóm bằng nhau" : "Partition numbers into equal-sum groups"}">
+      <header><div><small>#698 · ${groups.length} ${vi ? "NHÓM" : "GROUPS"}</small><strong>Σ ${vi ? "MỖI NHÓM" : "EACH GROUP"} = ${escapeHtml(target)}</strong></div>${result}</header>
+      <div class="p698-progress">${stepDots}</div>
+      <div class="p698-numbers">${numberTiles}</div>
+      ${motion}
+      <div class="p698-buckets">${groupCards}</div>
+    </section>`;
+    return;
+  }
+
   $("treeView").innerHTML = `<section class="abm-viz" role="img" aria-label="${escapeHtml(modeLabels[view.mode] || "Advanced bitmask visualization")}">
     <header><div><small>${isGroupBacktracking ? "BACKTRACKING WORKSHOP" : "BITMASK WORKSHOP"} · #${escapeHtml(String(view.problemId || ""))}</small><strong>${escapeHtml(modeLabels[view.mode] || "ADVANCED BITMASK")}</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
     <div class="abm-phases">${phasesHtml}</div>
