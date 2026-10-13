@@ -335,7 +335,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderPascalTriangleView(step);
     } },
     { predicate: (step) => Boolean(step.fibonacciView), surface: "treeView", render: (step) => {
-      renderFibonacciView(step);
+      renderFibonacci509View(step);
     } },
     { predicate: (step) => Boolean(step.tribonacciView), surface: "treeView", render: (step) => {
       renderTribonacciView(step);

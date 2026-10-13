@@ -1709,10 +1709,10 @@ function attachFibonacciViews(n, approach, steps) {
       else if (phase === "preview" || phase === "calculate") rolling = {
         prev2: { step: index - 2, value: values[index - 2] },
         prev1: { step: index - 1, value: values[index - 1] },
-        curr: phase === "calculate" ? { step: index, value: values[index] } : null,
+        curr: phase === "calculate" ? { step: index, value: values[index] } : index > 2 ? { step: index - 1, value: values[index - 1] } : null,
       };
       else if (phase === "shift-prev2") rolling = { prev2: { step: index - 1, value: values[index - 1] }, prev1: { step: index - 1, value: values[index - 1] }, curr: { step: index, value: values[index] } };
-      else if (phase === "shift-prev1" || phase === "done") rolling = { prev2: { step: index - 1, value: values[index - 1] }, prev1: { step: index, value: values[index] }, curr: null };
+      else if (phase === "shift-prev1" || phase === "done") rolling = { prev2: { step: index - 1, value: values[index - 1] }, prev1: { step: index, value: values[index] }, curr: { step: index, value: values[index] } };
     }
 
     return {
@@ -1745,7 +1745,7 @@ function attachFibonacciViews(n, approach, steps) {
  */
 function buildSteps509(input, params) {
   const n = input[0];
-  const approach = (params && params.approach) || 1;
+  const approach = Number(params && params.approach) || 1;
 
   if (approach === 2) {
     return buildSteps509Optimized(n);
@@ -1891,7 +1891,7 @@ function buildSteps509Optimized(n) {
     highlight: [0, 1],
     mark: [],
     codeBlock: 2,
-    codeLines: [5],
+    codeLines: [6],
     vars: [
       { name: "n", value: n },
       { name: "prev2", value: 0 },
@@ -23400,7 +23400,7 @@ module.exports = {
       vi: "Dãy Fibonacci F(n) được định nghĩa: F(0) = 0, F(1) = 1, và F(n) = F(n-1) + F(n-2) với n > 1. Cho n, trả về F(n).",
       en: "The Fibonacci numbers F(n) are defined as: F(0) = 0, F(1) = 1, and F(n) = F(n-1) + F(n-2) for n > 1. Given n, return F(n).",
     },
-    defaultInput: [10],
+    defaultInput: [6],
     inputKind: "nonneg",
     inputLabel: { vi: "n", en: "n" },
     singleInput: true,

@@ -54,10 +54,10 @@ function parseInput(input) {
     try { data = JSON.parse(input); } catch { throw new Error('9023: JSON không hợp lệ / invalid JSON.'); }
   }
   if (!data || !Array.isArray(data.files) || data.files.length > 12 || !Array.isArray(data.queries) || data.queries.length < 1 || data.queries.length > 8) {
-    throw new Error('9023: dùng {"files":[[size,"gs://bucket/file"]],"queries":["gs://bucket"]}; tối đa 12 files và 1..8 queries.');
+    throw new Error('9023: dùng {"files":[[size,"fo://bucket/file"]],"queries":["fo://bucket"]}; tối đa 12 files và 1..8 queries.');
   }
   const validatePath = (path, file) => {
-    if (typeof path !== "string" || path.length > 200 || !path.startsWith("gs://")) throw new Error('9023: path phải có dạng gs://bucket/path, tối đa 200 ký tự.');
+    if (typeof path !== "string" || path.length > 200 || !path.startsWith("fo://")) throw new Error('9023: path phải có dạng fo://bucket/path, tối đa 200 ký tự.');
     const canonical = file ? path : path.replace(/\/+$/, "");
     const parts = canonical.slice(5).split("/");
     if (parts.length > 8 || parts.length < (file ? 2 : 1) || parts.some((part) => !part.trim() || part === "." || part === "..") || /\s/.test(parts[0])) throw new Error('9023: path phải có bucket và các phần không rỗng; tối đa 8 phần, không có . hoặc ...');
@@ -84,11 +84,11 @@ function parseInput(input) {
 
 function buildSteps(input, method) {
   const { files, queries } = parseInput(input);
-  const nodes = new Map([["gs://", { path: "gs://", name: "gs://", parent: null, depth: 0, total: method === 2 ? 0 : null, fileIndex: null, children: new Map() }]]);
+  const nodes = new Map([["fo://", { path: "fo://", name: "fo://", parent: null, depth: 0, total: method === 2 ? 0 : null, fileIndex: null, children: new Map() }]]);
   const answers = Array(queries.length).fill(null);
   const steps = [];
   const addNode = (parent, part, fileIndex = null) => {
-    const path = parent.path === "gs://" ? parent.path + part : `${parent.path}/${part}`;
+    const path = parent.path === "fo://" ? parent.path + part : `${parent.path}/${part}`;
     if (!nodes.has(path)) {
       const node = { path, name: part, parent: parent.path, depth: parent.depth + 1, total: method === 2 ? 0 : null, fileIndex, children: new Map() };
       nodes.set(path, node);
@@ -96,7 +96,7 @@ function buildSteps(input, method) {
     }
     return nodes.get(path);
   };
-  const emit = ({ phase, line, fileIndex = null, queryIndex = null, current = "gs://", visited = ["gs://"], matched = [], total = null, missing = null, match = null, final = false }) => {
+  const emit = ({ phase, line, fileIndex = null, queryIndex = null, current = "fo://", visited = ["fo://"], matched = [], total = null, missing = null, match = null, final = false }) => {
     const labels = { init: bi("Dữ liệu file", "File data"), build: bi("Cộng vào cache thư mục", "Add to folder cache"), query: bi("Tính dung lượng", "Calculate size"), scan: bi("Kiểm tra một file", "Check one file"), add: bi("Cộng file khớp", "Add matching file"), walk: bi("Duyệt đường dẫn", "Walk path"), result: bi("Dung lượng", "Size"), done: bi("Kết quả", "Results") };
     steps.push({
       title: labels[phase], note: bi("", ""), arr: [], codeBlock: method, codeLines: line ? [line] : [], final,
@@ -109,14 +109,14 @@ function buildSteps(input, method) {
   };
   if (method === 1) {
     files.forEach(([size, path], index) => {
-      let node = nodes.get("gs://");
+      let node = nodes.get("fo://");
       path.slice(5).split("/").forEach((part, i, parts) => { node = addNode(node, part, i === parts.length - 1 ? index : null); });
       node.total = size;
     });
   }
   emit({ phase: "init", line: method === 2 ? 8 : 3 });
   if (method === 2) files.forEach(([size, path], index) => {
-    let node = nodes.get("gs://");
+    let node = nodes.get("fo://");
     const visited = [node.path];
     node.total += size;
     emit({ phase: "build", line: 11, fileIndex: index, current: node.path, visited, total: node.total });
@@ -130,7 +130,7 @@ function buildSteps(input, method) {
   queries.forEach((rawQuery, queryIndex) => {
     const query = rawQuery.replace(/\/+$/, "");
     let total = 0;
-    let current = "gs://";
+    let current = "fo://";
     let missing = null;
     const visited = [current];
     const matched = [];
@@ -148,7 +148,7 @@ function buildSteps(input, method) {
     else {
       let node = nodes.get(current);
       for (const part of query.slice(5).split("/")) {
-        const next = current === "gs://" ? current + part : `${current}/${part}`;
+        const next = current === "fo://" ? current + part : `${current}/${part}`;
         node = node.children.get(part);
         if (!node) { missing = next; break; }
         current = node.path;
@@ -164,7 +164,7 @@ function buildSteps(input, method) {
   return { original: { files, queries }, answer: answers, steps };
 }
 
-const BUCKET = "gs://acme-assets.example.com";
+const BUCKET = "fo://acme-assets.example.com";
 module.exports = {
   9023: {
     id: 9023, difficulty: "medium", slug: null,
@@ -172,7 +172,7 @@ module.exports = {
     tags: [{ key: "trie", vi: "Trie", en: "Trie" }, { key: "string", vi: "Chuỗi", en: "String" }],
     title: bi("Directory / File Size", "Directory / File Size"),
     titleVi: bi("Tính tổng dung lượng theo đường dẫn", "Total size by path"),
-    statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9023). files chứa [size,path]. Tính dung lượng file hoặc tổng mọi file trong thư mục; path không có trả 0. Hai cách: quét file và Trie cache tổng. Mô phỏng tối đa 12 files, 8 queries, 8 phần/path; file không trùng hoặc đồng thời là thư mục. Dữ liệu mô phỏng, không kết nối GCS.", "Interview problem from the screenshot (internal ID #9023). files contains [size,path]. Return a file's size or the sum of files inside a directory; missing paths return 0. Compare file scanning and a Trie caching totals. Up to 12 files, 8 queries, 8 path parts; no duplicates or file-directory collisions. Simulated data; no GCS connection."),
+    statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9023). files chứa [size,path]. Tính dung lượng file hoặc tổng mọi file trong thư mục; path không có trả 0. Hai cách: quét file và Trie cache tổng. Mô phỏng tối đa 12 files, 8 queries, 8 phần/path; file không trùng hoặc đồng thời là thư mục. Dữ liệu mô phỏng, không kết nối dịch vụ lưu trữ.", "Interview problem from the screenshot (internal ID #9023). files contains [size,path]. Return a file's size or the sum of files inside a directory; missing paths return 0. Compare file scanning and a Trie caching totals. Up to 12 files, 8 queries, 8 path parts; no duplicates or file-directory collisions. Simulated data; no storage service connection."),
     defaultInput: JSON.stringify({ files: [[2400, `${BUCKET}/training/onboarding.mp4`], [800, `${BUCKET}/training/intro_clip.mp4`], [350, `${BUCKET}/podcasts/welcome.mp3`]], queries: [`${BUCKET}/training`, `${BUCKET}/podcasts/welcome.mp3`, BUCKET, `${BUCKET}/unavailable`] }),
     inputKind: "string", inputLabel: bi("JSON: files [[size,path]], queries [path]", "JSON: files [[size,path]], queries [path]"),
     extraParams: [{ key: "approach", label: bi("Cách giải", "Approach"), type: "select", default: "1", options: [{ value: "1", label: bi("1 · Quét file", "1 · Scan files") }, { value: "2", label: bi("2 · Trie + tổng cache", "2 · Trie + cached totals") }] }],

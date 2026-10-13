@@ -27,7 +27,7 @@ function renderDirectorySize9023View(step) {
   const history = view.queries.map((path, index) => `<li class="${index === view.queryIndex ? "active" : ""}">${folder}<code>${escapeHtml(path)}</code><b>${view.answers[index] ?? "—"}</b></li>`).join("");
   $("treeView").innerHTML = `<section class="ds9023-viz" aria-label="${t("Mô phỏng tính dung lượng file và thư mục", "File and directory size simulation")}">
     <header><div><small>#9023 · ${view.method === 1 ? "SCAN" : "TRIE"}</small><h3>${t("Dung lượng thư mục / file", "Directory / File Size")}</h3></div><output>${build ? `+${inputFile[0]}` : view.final ? "✓" : amount}</output></header>
-    <div class="ds9023-query">${build ? file : folder}<code>${escapeHtml(build ? inputFile[1] : query || "gs://")}</code><span>${build ? "↑" : view.missing ? "× → 0" : view.method === 1 && view.fileIndex !== null ? `${view.fileIndex + 1}/${view.files.length}` : "→"}</span></div>
+    <div class="ds9023-query">${build ? file : folder}<code>${escapeHtml(build ? inputFile[1] : query || "fo://")}</code><span>${build ? "↑" : view.missing ? "× → 0" : view.method === 1 && view.fileIndex !== null ? `${view.fileIndex + 1}/${view.files.length}` : "→"}</span></div>
     <div class="ds9023-tree" role="list">${rows}</div>
     ${equation}
     ${view.method === 2 && view.phase === "result" ? `<div class="ds9023-read">${folder}<code>${escapeHtml(view.missing || view.current)}</code><i>→</i><b>${amount}</b></div>` : ""}
