@@ -17593,6 +17593,7 @@ function buildSteps879(input, params) {
   const dp = Array.from({ length: n + 1 }, () => new Array(minProfit + 1).fill(0));
   for (let i = 0; i <= n; i++) dp[i][0] = 1;
   const steps = [];
+  const crimeItems = crimes.map(([members, gain], index) => ({ index, members, gain }));
   const text1 = Array.from({ length: n }, (_, i) => `≤${i + 1} người`);
   const text2 = Array.from({ length: minProfit }, (_, j) => `lãi≥${j + 1}`);
   const display = () => dp.map((row) => row.map((v) => String(v)));
@@ -17601,10 +17602,23 @@ function buildSteps879(input, params) {
       title: opts.title, arr: [],
       grid: { dp: display(), text1, text2, hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
       highlight: [], mark: [], final: Boolean(opts.final), codeBlock: 2, codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      profitableSchemes879View: {
+        members: n,
+        minProfit,
+        crimes: crimeItems.map((crime) => ({ ...crime })),
+        dp: dp.map((row) => [...row]),
+        beforeDp: opts.beforeDp ? opts.beforeDp.map((row) => [...row]) : null,
+        updates: opts.updates ? opts.updates.map((update) => ({ ...update })) : [],
+        activeCrime: Number.isInteger(opts.activeCrime) ? opts.activeCrime : null,
+        phase: opts.phase || "overview",
+        answer: opts.final ? dp[n][minProfit] : null,
+        final: Boolean(opts.final),
+      },
     });
   };
 
   push({
+    phase: "intro",
     title: { vi: `n=${n} người, minProfit=${minProfit}`, en: `n=${n} members, minProfit=${minProfit}` },
     codeLines: [5],
     caption: "dp[i][j] = số kế hoạch dùng ≤ i người, lợi nhuận ≥ j",
@@ -17616,12 +17630,30 @@ function buildSteps879(input, params) {
   });
 
   crimes.forEach(([m, p], idx) => {
+    const beforeDp = dp.map((row) => [...row]);
+    const updates = [];
     for (let i = n; i >= m; i--) {
       for (let j = minProfit; j >= 0; j--) {
-        dp[i][j] = (dp[i][j] + dp[i - m][Math.max(0, j - p)]) % MOD;
+        const sourceProfit = Math.max(0, j - p);
+        const previous = dp[i][j];
+        const added = dp[i - m][sourceProfit];
+        dp[i][j] = (previous + added) % MOD;
+        updates.push({
+          members: i,
+          profit: j,
+          sourceMembers: i - m,
+          sourceProfit,
+          previous,
+          added,
+          after: dp[i][j],
+        });
       }
     }
     push({
+      phase: "crime",
+      activeCrime: idx,
+      beforeDp,
+      updates,
       title: { vi: `Thêm phi vụ ${idx + 1}: ${m} người, lãi ${p}`, en: `Add crime ${idx + 1}: ${m} members, profit ${p}` },
       codeLines: [8, 9, 10],
       hlCell: [n, minProfit],
@@ -17636,6 +17668,7 @@ function buildSteps879(input, params) {
 
   const answer = dp[n][minProfit];
   push({
+    phase: "result",
     title: { vi: `Kết quả: dp[${n}][${minProfit}] = ${answer}`, en: `Result: dp[${n}][${minProfit}] = ${answer}` },
     codeLines: [11], hlCell: [n, minProfit], final: true,
     caption: `Đáp án = ${answer}`,
