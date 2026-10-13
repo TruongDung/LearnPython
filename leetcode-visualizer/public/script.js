@@ -295,7 +295,10 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.wordLadder126View), surface: "treeView", render: (step) => {
       renderWordLadder126View(step);
     } },
-    { predicate: (step) => Boolean(step.houseRobberView), surface: "treeView", render: (step) => {
+    { predicate: (step) => Boolean(step.houseRobberView) && step.houseRobberView.method !== "circular", surface: "treeView", render: (step) => {
+      renderHouseRobber198View(step);
+    } },
+    { predicate: (step) => Boolean(step.houseRobberView) && step.houseRobberView.method === "circular", surface: "treeView", render: (step) => {
       renderHouseRobberView(step);
     } },
     { predicate: (step) => Boolean(step.minCostStairsView), surface: "treeView", render: (step) => {

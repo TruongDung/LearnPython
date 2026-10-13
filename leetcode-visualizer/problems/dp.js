@@ -3067,7 +3067,21 @@ function buildSteps53DP(nums) {
  *  - dp[1] = max(nums[0], nums[1])
  *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (skip house i or rob house i)
  */
+// Reconstruct a valid plan from recorded prefix totals. This is visualization
+// bookkeeping, not memory used by the displayed O(1) Python solution.
+function trace198Path(totals, end) {
+  const houses = [];
+  for (let i = end; i >= 0;) {
+    if (totals[i] > (i > 0 ? totals[i - 1] : 0)) { houses.push(i); i -= 2; }
+    else i--;
+  }
+  return houses.reverse();
+}
+
 function buildSteps198(nums, params) {
+  if (!Array.isArray(nums) || nums.length === 0 || nums.some(value => !Number.isSafeInteger(value) || value < 0)) {
+    throw new Error("198: nums phải chứa các số nguyên không âm / nums must be a nonempty array of nonnegative integers.");
+  }
   const approach = (params && Number(params.approach)) || 1;
   if (approach === 2) return buildSteps198B(nums);
 
@@ -3075,15 +3089,7 @@ function buildSteps198(nums, params) {
   const dp = new Array(n).fill(null);
   const steps = [];
 
-  const robbedTrace = () => {
-    const houses = [];
-    let idx = n - 1;
-    while (idx >= 0) {
-      if (idx === 0 || dp[idx] !== dp[idx - 1]) { houses.push(idx); idx -= 2; }
-      else { idx -= 1; }
-    }
-    return houses;
-  };
+  const robbedTrace = (end = n - 1) => trace198Path(dp, end);
 
   const push = (meta, step) => {
     steps.push(Object.assign({}, step, {
@@ -3096,7 +3102,7 @@ function buildSteps198(nums, params) {
         sources: meta.sources || [],
         dp: dp.map((v) => v),
         formula: meta.formula || null,
-        robbed: meta.final ? robbedTrace() : (meta.robbed || null),
+        robbed: robbedTrace(meta.final ? n - 1 : meta.currentIndex ?? -1),
         answer: meta.final ? dp[n - 1] : null,
       },
     }));
@@ -3131,12 +3137,12 @@ function buildSteps198(nums, params) {
     const skip = dp[i - 1];
     const rob = dp[i - 2] + nums[i];
     dp[i] = Math.max(skip, rob);
-    const robbed = rob >= skip;
+    const robbed = rob > skip;
     push({
       phase: "compute",
       currentIndex: i,
       sources: [i - 2, i - 1],
-      formula: { i, skip: { from: i - 1, value: skip }, rob: { from: i - 2, value: dp[i - 2], money: nums[i], total: rob }, chosen: robbed ? "rob" : "skip", result: dp[i] },
+      formula: { i, skip: { from: i - 1, value: skip, houses: robbedTrace(i - 1) }, rob: { from: i - 2, value: dp[i - 2], money: nums[i], total: rob, houses: [...robbedTrace(i - 2), i] }, chosen: robbed ? "rob" : "skip", result: dp[i] },
     }, {
       title: { vi: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "CƯỚP 💰" : "BỎ ✗"}`, en: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "ROB 💰" : "SKIP ✗"}` },
       arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [i - 2, i - 1, i], mark: robbed ? [i - 2, i] : [i - 1],
@@ -3187,7 +3193,7 @@ function buildSteps198B(nums) {
   const n = nums.length;
   let prevRob = 0;
   let maxRob = 0;
-  const robbedFlags = new Array(n).fill(false);
+  const history = [];
 
   const push = (meta, step) => {
     steps.push(Object.assign({}, step, {
@@ -3200,7 +3206,7 @@ function buildSteps198B(nums) {
         sources: [],
         rolling: meta.rolling || null,
         formula: meta.formula || null,
-        robbed: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+        robbed: trace198Path(history, meta.final ? n - 1 : meta.currentIndex ?? -1),
         answer: meta.final ? maxRob : null,
       },
     }));
@@ -3221,12 +3227,12 @@ function buildSteps198B(nums) {
     const robVal = prevRob + current;
     const temp = Math.max(maxRob, robVal);
     const robbed = robVal > maxRob;
-    if (robbed) robbedFlags[i] = true;
+    history.push(temp);
 
     push({
       phase: "compute",
       currentIndex: i,
-      formula: { i, money: current, prevRob, maxRob, robVal, temp, chosen: robbed ? "rob" : "skip" },
+      formula: { i, money: current, prevRob, maxRob, robVal, temp, chosen: robbed ? "rob" : "skip", skipHouses: trace198Path(history, i - 1), robHouses: [...trace198Path(history, i - 2), i] },
       rolling: { prevRob, maxRob, temp },
     }, {
       title: { vi: `Nhà ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}`, en: `House ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}` },
@@ -3248,19 +3254,19 @@ function buildSteps198B(nums) {
     push({
       phase: "shift",
       currentIndex: i,
-      rolling: { prevRob, maxRob, temp: null },
+      rolling: { prevRob, maxRob, temp },
     }, {
       title: { vi: `Dời: prev_rob=${prevRob}, max_rob=${maxRob}`, en: `Shift: prev_rob=${prevRob}, max_rob=${maxRob}` },
-      arr: [...nums], highlight: [i], mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0), codeLines: [7], codeBlock: 2,
+      arr: [...nums], highlight: [i], mark: trace198Path(history, i), codeLines: [7], codeBlock: 2,
       vars: [{ name: "prev_rob", value: prevRob }, { name: "max_rob", value: maxRob }],
       note: { vi: `Dời cửa sổ: prev_rob ← max_rob cũ, max_rob ← temp. Giờ max_rob=${maxRob}.`, en: `Shift the window: prev_rob ← old max_rob, max_rob ← temp. Now max_rob=${maxRob}.` },
     });
   }
 
   const answer = maxRob;
-  push({ phase: "done", currentIndex: n - 1, final: true, rolling: { prevRob, maxRob, temp: null } }, {
+  push({ phase: "done", currentIndex: n - 1, final: true, rolling: { prevRob, maxRob, temp: maxRob } }, {
     title: { vi: `Kết quả: ${answer}$`, en: `Result: $${answer}` },
-    arr: [...nums], highlight: [], mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0), final: true, codeLines: [8], codeBlock: 2,
+    arr: [...nums], highlight: [], mark: trace198Path(history, n - 1), final: true, codeLines: [8], codeBlock: 2,
     vars: [{ name: "answer", value: answer }],
     note: { vi: `Sau khi duyệt hết: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ.`, en: `After the loop: max_rob = ${answer}. Only O(1) memory.` },
   });
