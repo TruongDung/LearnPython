@@ -2150,10 +2150,28 @@ function renderCatalogTagMarkers() {
     button.textContent = catalogTagMarkerLabel(group);
     button.setAttribute("aria-label", t().jumpToTag(label, currentProblemId));
     button.title = label;
-    button.addEventListener("click", () => jumpToCatalogGroup(group.key));
+    button.addEventListener("click", () => group.key === "dp" ? jumpToDpCategory() : jumpToCatalogGroup(group.key));
     nav.appendChild(button);
   });
   updateCatalogTagMarkerPositions();
+}
+
+function jumpToDpCategory() {
+  if (!(catalogData || []).some(group => group.key === "dp")) return;
+  if (normalizeProblemSearch(problemSearchQuery)) {
+    problemSearchQuery = "";
+    $("problemKeyword").value = "";
+    renderProblemSearchResults();
+  }
+  activeCatalogJumpKey = "dp";
+  // Open and measure in the same event: no intermediate paint or animated scroll.
+  if (activeCatalogGroupKey !== "dp") openCatalogGroupExclusively("dp");
+  else renderCatalogJumpNav();
+  const group = document.querySelector('#catalog .cat-group[data-group-key="dp"]');
+  if (!group) return;
+  window.scrollTo({ top: Math.max(0, group.getBoundingClientRect().top + window.scrollY - 12), behavior: "instant" });
+  updateCatalogTagMarkerPositions();
+  updateBackToTopButton();
 }
 
 function updateCatalogTagMarkerPositions() {

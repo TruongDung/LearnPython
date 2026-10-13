@@ -3790,7 +3790,10 @@ select option {
   border-radius: 50%;
   background: #4f46e5;
   color: #fff;
-  font: 700 10px/1 inherit;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
   box-shadow: 0 2px 8px rgb(30 41 59 / 25%);
   cursor: pointer;
   transition: none;

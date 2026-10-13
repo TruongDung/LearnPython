@@ -1176,6 +1176,7 @@ function renderWordLadder126View(step) {
 
 function renderHouseRobberView(step) {
   const view = step.houseRobberView || {};
+  if (view.method === "circular") return renderHouseRobber213View(step);
   const vi = lang === "vi";
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const method = view.method || "dp";
