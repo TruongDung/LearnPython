@@ -38,6 +38,7 @@ const categories = {
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
+const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
   496, 1475, 316, 402, 456, 503, 581, 654, 739, 769, 853, 901, 907, 962,
@@ -216,7 +217,7 @@ for (const id of KNAPSACK_IDS) {
 }
 
 // Keep aliases from splitting one visible catalog label into multiple groups.
-// `dp` and `0-1-knapsack` are the canonical keys for their respective topics.
+// `dp`, `0-1-knapsack`, and `frequency-count` are the canonical topic keys.
 for (const problem of Object.values(SUPPORTED)) {
   if (!problem || typeof problem !== "object") continue;
   if (problem.category && ["dp", "dynamic-programming"].includes(problem.category.key)) {
@@ -225,12 +226,16 @@ for (const problem of Object.values(SUPPORTED)) {
   if (problem.category && ["knapsack", "0-1-knapsack"].includes(problem.category.key)) {
     problem.category = KNAPSACK_TAG;
   }
+  if (problem.category && ["frequency", "frequency-count"].includes(problem.category.key)) {
+    problem.category = FREQUENCY_COUNT_TAG;
+  }
   if (!Array.isArray(problem.tags)) continue;
   const seenTagKeys = new Set();
   problem.tags = problem.tags
     .map((tag) => {
       if (tag && ["dp", "dynamic-programming"].includes(tag.key)) return DP_TAG;
       if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
+      if (tag && ["frequency", "frequency-count"].includes(tag.key)) return FREQUENCY_COUNT_TAG;
       return tag;
     })
     .filter((tag) => {
