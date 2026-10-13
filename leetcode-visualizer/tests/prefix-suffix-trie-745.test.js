@@ -183,7 +183,7 @@ print(json.dumps(results))
   });
 });
 
-test('745 Trie renderer shows parent/child transitions, current path, results and the corrected insertion in VI/EN', () => {
+test('745 Trie renderer draws actual branches, current path, pointer and results in VI/EN', () => {
   const element = { querySelector: () => null };
   const context = { lang: 'vi', $: () => element, escapeHtml: String };
   context.pick = value => value[context.lang];
@@ -195,18 +195,27 @@ test('745 Trie renderer shows parent/child transitions, current path, results an
     for (const step of run.steps) {
       context.renderPrefixSuffix745TrieView(step);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN/);
-      assert.match(element.innerHTML, /ps745-debug/);
-      assert.match(element.innerHTML, /ps745-trie-correction/);
+      assert.match(element.innerHTML, /<svg class="ps745-tree"/);
+      assert.doesNotMatch(element.innerHTML, /ps745-debug|ps745-action/);
+      assert.match(element.innerHTML, new RegExp(`data-line="${step.codeLines[0]}"`));
       assert.equal((element.innerHTML.match(/data-node=/g) || []).length, step.prefixSuffix745TrieView.path.length);
+      const view = step.prefixSuffix745TrieView;
+      if (view.cursorAssigned) assert.match(element.innerHTML, new RegExp(`class="ps745-tree-node cursor" data-tree-id="${view.cursor}"`));
+      if (view.event === 'create-node') {
+        assert.match(element.innerHTML, new RegExp(`class="ps745-tree-node created" data-tree-id="${view.created.id}"`));
+        assert.doesNotMatch(element.innerHTML, new RegExp(`class="ps745-tree-node cursor" data-tree-id="${view.created.id}"`));
+      }
+      if (view.query?.result === null) assert.doesNotMatch(element.innerHTML, /class="ps745-word selected/);
+      if (view.event === 'query-return' && view.query.result === -1) assert.match(element.innerHTML, /ps745-tree-node missing/);
     }
   }
 });
 
-test('745 Trie frontend dispatches its renderer and loads styles with automatic path scrolling', () => {
+test('745 Trie frontend dispatches its renderer and wraps paths instead of horizontal scrolling', () => {
   const registry = readFrontendJavaScript().split('const ORDERED_RENDERER_REGISTRY')[1];
   assert.ok(registry.indexOf('step.prefixSuffix745TrieView') < registry.indexOf('step.hardProblemView'));
   assert.match(readFrontendIndex(), /renderer-prefix-suffix-trie-745\.js/);
   assert.match(readFrontendIndex(), /prefix-suffix-trie-745\.css/);
-  assert.match(readFrontendStyles(), /\.ps745-trie-input-scroll \{[^}]*overflow-x: auto/);
-  assert.match(readFrontendStyles(), /\.ps745-trie-path-scroll \{[^}]*overflow-x: auto/);
+  assert.match(readFrontendStyles(), /\.ps745-trie-input-scroll \{[^}]*flex-wrap: wrap/);
+  assert.match(readFrontendStyles(), /\.ps745-trail \{[^}]*flex-wrap: wrap/);
 });

@@ -173,3 +173,92 @@ test("2251 is registered with problem-lazy assets and its renderer", () => {
   assert.match(script, /step\.fullBloomFlowers2251View[\s\S]*renderFullBloomFlowers2251View\(step\)/);
   assert.match(problemIndex, /require\("\.\/full-bloom-flowers-2251"\)/);
 });
+
+test('2251 manual counts become visible only after their respective searches finish', () => {
+  const input = { flowers: [[1, 2], [2, 2], [2, 3]], people: [2, 0, 2, 4] };
+  const run = problem.builder(input);
+  for (const step of run.steps) {
+    const frame = view(step);
+    if (frame.event === 'person' || frame.event === 'search-starts') assert.deepEqual(frame.bounds, { starts: null, ends: null });
+    if (frame.event === 'starts-count' || frame.event === 'search-ends') {
+      assert.equal(frame.bounds.starts, input.flowers.filter(([start]) => start <= input.people[frame.activePerson]).length);
+      assert.equal(frame.bounds.ends, null);
+    }
+    if (frame.event === 'result') {
+      assert.equal(frame.bounds.ends, input.flowers.filter(([, end]) => end < input.people[frame.activePerson]).length);
+      assert.equal(frame.answers[frame.activePerson], frame.bounds.starts - frame.bounds.ends);
+    }
+  }
+  assert.deepEqual(view(run.steps[0]).bounds, { starts: null, ends: null });
+});
+
+function pictureHarness(width = 274) {
+  const host = { innerHTML: '', clientWidth: width };
+  const context = { lang: 'en', $: () => host };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/renderer-full-bloom-flowers-2251.js'), 'utf8'), context);
+  return { host, context };
+}
+
+test('2251 timeline pictures match inclusive interval membership for every query', () => {
+  const input = { flowers: [[1, 2], [2, 2], [2, 3], [2, 2], [1000000000, 1000000000]], people: [3, 2, 0, 1, 2, 4, 1000000000] };
+  const { host, context } = pictureHarness();
+  for (const builder of [problem.builder, problem.builder2]) {
+    const run = builder(input);
+    const before = JSON.stringify(run);
+    for (const language of ['en', 'vi']) for (const step of run.steps) {
+      context.lang = language;
+      context.renderFullBloomFlowers2251View(step);
+      assert.doesNotMatch(host.innerHTML, /undefined|NaN|Infinity|<p>|fb2251-action/);
+      const frame = view(step);
+      if (frame.activePerson === null) continue;
+      const time = input.people[frame.activePerson];
+      const blooms = [...host.innerHTML.matchAll(/<g class="fb2251-flower [^\"]*" data-index="(\d+)" data-start="(\d+)" data-end="(\d+)" data-blooming="(true|false)"/g)];
+      assert.equal(blooms.length, input.flowers.length);
+      for (const match of blooms) {
+        const index = Number(match[1]);
+        assert.equal(match[4], String(input.flowers[index][0] <= time && time <= input.flowers[index][1]));
+      }
+      assert.match(host.innerHTML, new RegExp(`data-active-time="${time}"`));
+      const timeline = host.innerHTML.match(/<svg class="fb2251-timeline"[\s\S]*?<\/svg>/)[0];
+      assert.equal((timeline.match(/<svg/g) || []).length, 1, 'timeline icons must be direct SVG shapes, not nested SVG viewports');
+      assert.match(host.innerHTML, /Not to scale|Không theo tỷ lệ/);
+      for (let index = 0; index < input.people.length; index++) assert.match(host.innerHTML, new RegExp(`data-person="${index}" data-time="${input.people[index]}" data-answer="${frame.answers[index] ?? '\\?'}"`));
+    }
+    assert.equal(JSON.stringify(run), before);
+  }
+});
+
+test('2251 final flower matrix preserves unsorted and repeated visitors with exact counts', () => {
+  const input = { flowers: Array.from({ length: 12 }, (_, i) => [i, i + 3]), people: [3, 0, 3, 14, 2, 8, 5, 12] };
+  const { host, context } = pictureHarness();
+  for (const builder of [problem.builder, problem.builder2]) {
+    const run = builder(input);
+    context.renderFullBloomFlowers2251View(run.steps.at(-1));
+    const cells = [...host.innerHTML.matchAll(/data-flower="(\d+)" data-person="(\d+)" data-blooming="(true|false)"/g)];
+    assert.equal(cells.length, 96);
+    assert.equal(new Set(cells.map(match => `${match[1]}:${match[2]}`)).size, 96);
+    input.people.forEach((time, index) => {
+      const blooming = cells.filter(match => Number(match[2]) === index && match[3] === 'true');
+      assert.equal(blooming.length, run.answer[index]);
+      assert.match(host.innerHTML, new RegExp(`data-person="${index}" data-time="${time}" data-answer="${run.answer[index]}"`));
+    });
+  }
+});
+
+test('2251 resizing updates timeline geometry without accumulating observers', () => {
+  const { host, context } = pictureHarness(526);
+  host.querySelector = () => true;
+  let callback;
+  let observations = 0;
+  context.ResizeObserver = class { constructor(cb) { callback = cb; } observe() { observations++; } };
+  const step = problem.builder2(problem.defaultInput).steps.find(step => view(step).event === 'person');
+  context.renderFullBloomFlowers2251View(step);
+  context.renderFullBloomFlowers2251View(step);
+  assert.equal(observations, 1);
+  assert.match(host.innerHTML, /viewBox="0 0 500 /);
+  host.clientWidth = 274;
+  callback();
+  assert.match(host.innerHTML, /viewBox="0 0 248 /);
+  assert.equal(observations, 1);
+});

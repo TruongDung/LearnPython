@@ -140,7 +140,9 @@ test('745 renderer shows overlap, indexed grid cells, overwrites and matching re
     for (const step of problem.builder(['aa', 'aa'], { queries: [['aa', 'aa'], ['b', 'a']] }).steps) {
       context.renderPrefixSuffix745View(step);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN/);
-      assert.match(element.innerHTML, /ps745-debug/);
+      assert.match(element.innerHTML, new RegExp(`data-line="${step.codeLines[0]}"`));
+      assert.doesNotMatch(element.innerHTML, /ps745-debug|ps745-action/);
+      assert.match(element.innerHTML, /<details class="ps745-details">/);
       const view = step.prefixSuffix745View;
       if (view.word) assert.equal((element.innerHTML.match(/data-p=/g) || []).length, 4);
       if (view.event === 'write' && view.p === 2 && view.s === 2) assert.equal((element.innerHTML.match(/class="ps745-letter both"/g) || []).length, 2);
@@ -149,11 +151,34 @@ test('745 renderer shows overlap, indexed grid cells, overwrites and matching re
   }
 });
 
-test('745 frontend loads its dedicated renderer with scrolling and light theme', () => {
+test('745 frontend loads its dedicated renderer with a fitting grid and light theme', () => {
   const registry = readFrontendJavaScript().split('const ORDERED_RENDERER_REGISTRY')[1];
   assert.ok(registry.indexOf('step.prefixSuffix745View') < registry.indexOf('step.hardProblemView'));
   assert.match(readFrontendIndex(), /renderer-prefix-suffix-search-745\.js/);
   assert.match(readFrontendIndex(), /prefix-suffix-search-745\.css/);
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.ps745-viz/);
-  assert.match(readFrontendStyles(), /\.ps745-grid-scroll \{[^}]*overflow-x: auto/);
+  assert.match(readFrontendStyles(), /\.ps745-grid \{[^}]*table-layout: fixed/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'public', 'prefix-suffix-search-745.css'), 'utf8'), /overflow-x: auto/);
+});
+
+test('745 picture-first lookup keeps pending results unknown, highlights overlap and shows real overwrites', () => {
+  const element = {};
+  const context = { lang: 'en', $: () => element, escapeHtml: String, pick: value => value.en };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'renderer-prefix-suffix-search-745.js'), 'utf8'), context);
+  for (const build of [problem.builder, problem.builder3]) {
+    const run = build(['abcdefg', 'abcdefg'], { queries: [['abcdefg', 'abcdefg'], ['x', 'g']] });
+    const pending = run.steps.find(step => step.prefixSuffix745View.event === 'query-key');
+    context.renderPrefixSuffix745View(pending);
+    assert.match(element.innerHTML, /<b>\?<\/b>/);
+    assert.doesNotMatch(element.innerHTML, /ps745-word selected|ps745-checks/);
+    const overwrite = run.steps.find(step => step.prefixSuffix745View.event === 'write' && step.prefixSuffix745View.wordIndex === 1);
+    context.renderPrefixSuffix745View(overwrite);
+    assert.match(element.innerHTML, /<b>0 → 1<\/b>/);
+    assert.equal((element.innerHTML.match(/data-p=/g) || []).length, 49);
+    const found = run.steps.find(step => step.prefixSuffix745View.event === 'query-return' && step.prefixSuffix745View.query.result === 1);
+    context.renderPrefixSuffix745View(found);
+    assert.equal((element.innerHTML.match(/class="ps745-letter both"/g) || []).length, 14);
+    assert.equal((element.innerHTML.match(/ps745-word selected/g) || []).length, 1);
+  }
 });

@@ -90,6 +90,7 @@ function buildSteps2251(input) {
   const steps = [];
   let activePerson = null;
   let search = null;
+  let bounds = { starts: null, ends: null };
 
   function emit(event, title, note, codeLines, { final = false } = {}) {
     steps.push({
@@ -117,6 +118,7 @@ function buildSteps2251(input) {
         answers: [...answers],
         activePerson,
         search: search ? { ...search } : null,
+        bounds: { ...bounds },
         final,
         answer: final ? [...answers] : null,
       },
@@ -144,6 +146,7 @@ function buildSteps2251(input) {
 
   people.forEach((time, personIndex) => {
     activePerson = personIndex;
+    bounds = { starts: null, ends: null };
     let low = 0;
     let high = starts.length;
     search = { phase: "starts", target: time, lo: low, hi: high, mid: null, count: null, comparison: null };
@@ -169,6 +172,7 @@ function buildSteps2251(input) {
       else high = mid;
     }
     const startedCount = low;
+    bounds.starts = startedCount;
     search = { phase: "starts", target: time, lo: low, hi: high, mid: null, count: startedCount, comparison: null };
     emit(
       "starts-count",
@@ -196,6 +200,7 @@ function buildSteps2251(input) {
       else high = mid;
     }
     const endedCount = low;
+    bounds.ends = endedCount;
     answers[personIndex] = startedCount - endedCount;
     search = { phase: "result", target: time, lo: low, hi: high, mid: null, count: endedCount, startedCount, comparison: null };
     emit(
@@ -211,6 +216,7 @@ function buildSteps2251(input) {
 
   activePerson = null;
   search = null;
+  bounds = { starts: null, ends: null };
   emit(
     "done",
     bi("Hoàn tất số hoa nở cho mọi người", "Bloom counts for everyone are complete"),
