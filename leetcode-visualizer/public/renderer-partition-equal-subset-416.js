@@ -1,69 +1,61 @@
 function renderEqualSubset416View(step) {
   const view = step.equalSubset416View;
-  const text = (vi, en) => lang === "vi" ? vi : en;
+  if (!view) return;
+  const host = $("treeView");
+  const t = (vi, en) => lang === 'vi' ? vi : en;
   const tr = view.transition;
   const item = view.itemIndex;
-  const bit = value => value ? "True" : "False";
-  const targetReached = view.current?.[view.sums.indexOf(view.target)] === true;
-  const sourceIndices = new Set(tr?.sourceWitness || []);
-  const inputs = view.nums.map((num, index) => `<span class="pe416-input${index === item ? " active" : item !== null && index < item || view.event === "return" ? " processed" : ""}${sourceIndices.has(index) ? " witness" : ""}"><small>[${index}]</small><b>${num}</b><span>${index === item ? text("đang xét", "current") : sourceIndices.has(index) ? text("nhóm nguồn", "source group") : "&nbsp;"}</span></span>`).join("");
-  let focus;
+  const width = Math.max(230, (host.clientWidth || 526) - 26);
+  const icon = value => value ? '✓' : '·';
+  const reached = view.current?.[view.sums.indexOf(view.target)] === true;
+  const witness = new Set(tr?.sourceWitness || []);
+  const chip = (index, cls = '') => `<span class="pe416-input ${cls}" data-index="${index}"><small>${index}</small><b>${view.nums[index]}</b></span>`;
+  const start = view.nums.length <= 12 ? 0 : Math.max(0, (item ?? 0) - 5);
+  const end = Math.min(view.nums.length, start + 12);
+  const inputs = `${start ? `<small class="pe416-more">0…${start - 1}</small>` : ''}${view.nums.slice(start, end).map((_, offset) => {
+    const index = start + offset;
+    return chip(index, `${index === item ? 'active' : witness.has(index) ? 'witness' : item !== null && index < item || view.event === 'return' ? 'processed' : ''}`);
+  }).join('')}${end < view.nums.length ? `<small class="pe416-more">+${view.nums.length - end}</small>` : ''}`;
+  let focus = '';
   if (tr) {
-    const updated = view.event === "update";
-    focus = `<div class="pe416-formula"><div><small>${text("Không chọn số này", "Skip this number")}</small><code>dp[${tr.destination}]</code><b>${bit(tr.before)}</b></div><span>OR</span><div class="pe416-source"><small>${text("Chọn số", "Use number")} ${view.num}</small><code>dp[${tr.source}]</code><b>${bit(tr.from)}</b></div><span>→</span><div class="pe416-destination"><small>${updated ? text("Sau cập nhật", "After update") : text("Sẽ nhận", "Will become")}</small><code>dp[${tr.destination}]</code><b>${bit(tr.after)}</b></div></div>`;
-    const values = tr.sourceWitness.map(index => view.nums[index]);
-    focus += `<p class="pe416-proof">${tr.from ? `<b>${values.length ? values.join(" + ") : "0"}</b> + <b>${view.num}</b> = <b>${tr.destination}</b> · ${text("nhóm nguồn chỉ dùng các số trước đó", "the source group uses only earlier occurrences")}` : tr.before ? text("Tổng này đã tạo được từ trước; không cần chọn số hiện tại.", "This sum was already reachable; the current number can be skipped.") : text(`Chưa tạo được tổng ${tr.source}; chưa thể thêm ${view.num} để đạt ${tr.destination}.`, `Sum ${tr.source} is unreachable; adding ${view.num} cannot reach ${tr.destination}.`)}</p>`;
-  } else if (view.answer !== null) {
-    focus = `<p>${view.answer ? text("Đã tìm được một nhóm tổng target. Các phần tử còn lại tạo thành nhóm thứ hai có cùng tổng.", "A subset reaches target. All remaining occurrences form the other group with the same sum.") : view.target === null ? text("Tổng lẻ không thể tách thành hai tổng nguyên bằng nhau. Không cần tạo bảng DP.", "An odd total cannot split into two equal integer sums. No DP table is needed.") : text(`Sau khi xét tất cả số, vẫn không tạo được tổng ${view.target}.`, `After processing every number, sum ${view.target} remains unreachable.`)}</p>`;
-  } else if (item !== null) {
-    focus = `<p>${text("Đang xét", "Current number")}: <b>${view.num}</b> · ${view.num > view.target ? text("Lớn hơn target, bỏ qua.", "Exceeds target; skip it.") : text(`Duyệt tổng j từ ${view.target} xuống ${view.num}. Hàng Trước được giữ nguyên để so sánh.`, `Scan sum j from ${view.target} down to ${view.num}. The Before row is kept unchanged for comparison.`)}</p>`;
-  } else focus = `<p>${text("dp[s] = True nghĩa là có thể chọn một số phần tử đã xét để có tổng s. Tổng 0 tương ứng với nhóm rỗng.", "dp[s] = True means some processed occurrences can form sum s. Sum 0 corresponds to the empty group.")}</p>`;
-
-  let table = `<div class="pe416-empty">${view.answer === false ? text("Tổng lẻ → trả về False ngay", "Odd total → return False immediately") : text("Bảng DP sẽ xuất hiện sau khi tính target", "The DP table appears after target is calculated")}</div>`;
-  if (view.current) {
-    const columns = [];
-    let left = 52;
-    view.sums.forEach((sum, index) => {
-      if (index > 0 && sum !== view.sums[index - 1] + 1) { columns.push({ gap: true, left, width: 18 }); left += 22; }
-      columns.push({ sum, index, left, width: 34 }); left += 38;
-    });
-    const width = left - 4;
-    const grid = `48px ${columns.map(column => `${column.width}px`).join(" ")}`;
-    const numbers = columns.map(column => column.gap ? `<span class="pe416-gap">…</span>` : `<span class="pe416-sum${column.sum === view.target ? " goal" : ""}">${column.sum}${column.sum === view.target ? " ★" : ""}</span>`).join("");
-    const row = (values, before) => `<div class="pe416-dp-row ${before ? "before" : "now"}" style="grid-template-columns:${grid}"><strong>${before ? text("Trước", "Before") : text("Hiện tại", "Now")}</strong>${columns.map(column => {
-      if (column.gap) return `<span class="pe416-gap">…</span>`;
-      const reachable = values[column.index];
-      const classes = ["pe416-cell", reachable ? "yes" : "no"];
-      if (column.sum === view.target) classes.push("goal");
-      if (tr && column.sum === tr.source && before) classes.push("source");
-      if (tr && column.sum === tr.destination && !before) classes.push("destination");
-      if (!before && !view.before[column.index] && reachable) classes.push("new");
-      return `<span class="${classes.join(" ")}" data-row="${before ? "before" : "now"}" data-sum="${column.sum}" data-reachable="${reachable}" title="dp[${column.sum}] = ${bit(reachable)}">${reachable ? "✓" : "·"}</span>`;
-    }).join("")}</div>`;
-    let arrow = "";
-    if (tr) {
-      const start = columns.find(column => column.sum === tr.source).left + 17;
-      const end = columns.find(column => column.sum === tr.destination).left + 17;
-      arrow = `<svg class="pe416-transfer" width="${width}" height="28" role="img" aria-label="${text("Thêm số hiện tại vào tổng nguồn", "Add current number to source sum")}"><defs><marker id="pe416-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" /></marker></defs><path d="M${start},1 C${start},14 ${end},14 ${end},25" marker-end="url(#pe416-arrow)" /></svg>`;
-    }
-    table = `<div class="pe416-table-scroll"><div class="pe416-dp-table" style="width:${width}px"><div class="pe416-dp-row sums" style="grid-template-columns:${grid}"><strong>${text("Tổng s", "Sum s")}</strong>${numbers}</div>${item !== null ? row(view.before, true) + `<div class="pe416-arrow-space">${arrow}</div>` : ""}${row(view.current, false)}</div></div><div class="pe416-legend"><span class="yes">✓ = ${text("tạo được tổng", "reachable sum")}</span><span>· = ${text("chưa tạo được", "unreachable")}</span><span class="source">${text("Tím: tổng nguồn j−num", "Purple: source sum j−num")}</span><span class="destination">${text("Vàng: tổng đang cập nhật j", "Gold: destination sum j")}</span></div>${view.cropped ? `<p class="pe416-cropped">${text("Các ô có dấu … được thu gọn để tập trung vào nguồn, đích và target. DP vẫn tính mọi tổng.", "… collapses other cells to focus on the source, destination, and target. DP still computes every sum.")}</p>` : ""}`;
+    const sourceX = width * .17;
+    const numX = width * .5;
+    const destX = width * .83;
+    const box = Math.min(85, width * .26);
+    const actual = view.event === 'inspect' ? tr.before : tr.after;
+    const node = (x, y, sum, state, cls) => `<g class="pe416-node ${cls} ${state ? 'yes' : 'no'}" transform="translate(${x - box / 2},${y})"><rect width="${box}" height="76" rx="9"/><text class="pe416-svg-small" x="${box / 2}" y="17" text-anchor="middle">Σ</text><text class="pe416-svg-number ${String(sum).length > 4 ? 'long' : ''}" x="${box / 2}" y="43" text-anchor="middle">${sum}</text><text class="pe416-svg-state" x="${box / 2}" y="65" text-anchor="middle">${icon(state)}</text></g>`;
+    focus = `<svg class="pe416-transfer" viewBox="0 0 ${width} 186" role="img" aria-label="${tr.source} + ${view.num} = ${tr.destination}; ${view.event}"><defs><marker id="pe416-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z"/></marker></defs>
+      <text class="pe416-svg-small" x="${destX}" y="13" text-anchor="middle">${t('Bỏ', 'Skip')} · ${icon(tr.before)}</text>
+      <path class="pe416-keep" d="M${destX},19 L${destX},75" marker-end="url(#pe416-arrow)"/>
+      ${node(sourceX, 79, tr.source, tr.from, 'source')}
+      <text class="pe416-svg-small" x="${numX}" y="90" text-anchor="middle">+ nums[${item}]</text>
+      <g class="pe416-number" transform="translate(${numX - 20},99)"><rect width="40" height="40" rx="8"/><text x="20" y="27" text-anchor="middle">${view.num}</text></g>
+      <path class="pe416-take ${tr.from ? '' : 'blocked'} ${view.event === 'inspect' ? 'preview' : ''}" d="M${sourceX + box / 2 + 2},119 L${numX - 24},119 M${numX + 24},119 L${destX - box / 2 - 4},119" marker-end="url(#pe416-arrow)"/>
+      ${node(destX, 79, tr.destination, actual, 'destination')}
+      <text class="pe416-svg-small" x="${destX}" y="176" text-anchor="middle">${view.event === 'inspect' ? t('Thử', 'Try') : t('Cập nhật', 'Update')}</text>
+    </svg>`;
+    if (tr.from) focus += `<div class="pe416-witness">${tr.sourceWitness.length ? tr.sourceWitness.slice(0, 8).map(index => chip(index, 'witness')).join('<i>+</i>') : '<i>∅</i>'}${tr.sourceWitness.length > 8 ? `<small>+${tr.sourceWitness.length - 8}</small>` : ''}<i>+</i>${chip(item, 'active')}<i>→</i><b>Σ ${tr.destination}</b></div>`;
+  } else if (view.event === 'skip-large') {
+    focus = `<div class="pe416-reject"><b>${view.num}</b><span>&gt;</span><b>${view.target}</b><span>×</span></div>`;
   }
-  const history = view.history.map(row => `<div class="pe416-history-row"><b>${text("Sau", "After")} [${row.item}] = ${row.num}</b><span>${row.addedCount ? `+ {${row.added.join(", ")}${row.addedCount > row.added.length ? ", …" : ""}}` : text("không có tổng mới", "no new sums")}</span><small>${row.reachableCount} ${text("tổng tạo được", "reachable sums")}</small></div>`).join("");
-  const group = (label, indices) => `<div class="pe416-group"><header><b>${label}</b><strong>Σ = ${indices.reduce((sum, index) => sum + view.nums[index], 0)}</strong></header><div>${indices.map(index => `<span title="nums[${index}]"><b>${view.nums[index]}</b><small>[${index}]</small></span>`).join("")}</div></div>`;
-  const partition = view.partition ? `<section class="pe416-partition">${group(text("Nhóm A", "Group A"), view.partition.a)}${group(text("Nhóm B", "Group B"), view.partition.b)}</section>` : "";
-  $("treeView").innerHTML = `<section class="pe416-viz" aria-label="${text("Mô phỏng chia mảng tổng bằng nhau 416", "416 equal subset partition simulation")}">
-    <header class="pe416-heading"><div><small>416 · 0/1 KNAPSACK</small><h3>${text("Chỉ cần tìm một nhóm có tổng target", "Find one group whose sum is target")}</h3></div><span class="${view.answer === false ? "false" : targetReached ? "true" : "pending"}">${view.answer !== null ? bit(view.answer) : `dp[target] = ${view.current ? bit(targetReached) : "?"}`}</span></header>
-    <div class="pe416-goal"><div><small>${text("Tổng tất cả", "Total sum")}</small><b>${view.total}</b></div><span>÷ 2 →</span><div><small>target · ${text("mỗi nhóm", "each group")}</small><b>${view.target ?? (view.answer === false ? `${view.total / 2} ✕` : "?")}</b></div></div>
-    <section class="pe416-input-panel"><header><strong>nums</strong><span>${text("Mỗi vị trí chỉ dùng một lần", "Each occurrence is used once")}</span></header><div class="pe416-inputs">${inputs}</div></section>
-    <div class="pe416-action"><strong>${escapeHtml(pick(step.title))}</strong><p>${escapeHtml(pick(step.note))}</p></div>
-    <section class="pe416-focus">${focus}</section>
-    <section class="pe416-table-panel"><header><strong>${text("BẢNG CÁC TỔNG TẠO ĐƯỢC", "REACHABLE SUMS TABLE")}</strong><span>${item !== null && view.num <= view.target ? `j: ${view.target} → ${view.num} · ←` : "dp[s]"}</span></header>${table}</section>
-    ${partition}
-    <details class="pe416-direction"><summary>${text("Vì sao phải duyệt từ phải sang trái?", "Why scan from right to left?")}</summary><p>${text("Ví dụ chỉ có một số 2, ban đầu chỉ dp[0] = True.", "With just one occurrence of 2, initially only dp[0] is True.")}</p><div class="wrong"><b>${text("Duyệt thuận ✕", "Left to right ✕")}</b><code>0 → 2 → 4</code><span>${text("Ô 2 vừa được bật lại làm nguồn cho ô 4: dùng cùng số 2 hai lần.", "Newly reached 2 feeds 4: the same occurrence of 2 is used twice.")}</span></div><div class="correct"><b>${text("Duyệt ngược ✓", "Right to left ✓")}</b><code>4: False → 2: True</code><span>${text("Kiểm tra ô 4 khi ô 2 vẫn False, rồi mới bật ô 2. Một số 2 không tạo được tổng 4.", "Check 4 while 2 is still False, then mark 2. One occurrence of 2 cannot make sum 4.")}</span></div></details>
-    <details class="pe416-history"${view.event === "return" ? " open" : ""}><summary>${text("Tổng mới sau mỗi số", "New sums after each number")}</summary>${history || `<p>${text("Chưa xử lý xong số nào.", "No number has been fully processed yet.")}</p>`}${view.historyOmitted ? `<p>${view.historyOmitted} ${text("hàng trước được thu gọn.", "earlier rows are collapsed.")}</p>` : ""}</details>
-    ${view.shortened ? `<p class="pe416-shortened">${text("Trace dài đã được rút gọn; khung cuối và hai nhóm kết quả vẫn dùng toàn bộ đầu vào.", "The long trace is shortened; the final state and partition still use the complete input.")}</p>` : ""}
-  </section>`;
-  const scroll = $("treeView").querySelector(".pe416-table-scroll");
-  const destination = scroll?.querySelector(".destination");
-  if (destination) scroll.scrollLeft = Math.max(0, destination.offsetLeft - scroll.clientWidth / 2 + destination.offsetWidth / 2);
+  const row = (values, before) => `<section class="pe416-row"><header>${before ? t('Trước', 'Before') : t('Hiện tại', 'Now')} ${!before && item !== null ? '← j' : ''}</header><div class="pe416-cells">${view.sums.map((sum, index) => `${index && sum > view.sums[index - 1] + 1 ? '<small class="pe416-more">…</small>' : ''}<article class="pe416-cell ${values[index] ? 'yes' : 'no'} ${sum === view.target ? 'goal' : ''} ${before && tr?.source === sum ? 'source' : ''} ${!before && tr?.destination === sum ? 'destination' : ''} ${!before && !view.before[index] && values[index] ? 'new' : ''}" data-row="${before ? 'before' : 'now'}" data-sum="${sum}" data-reachable="${values[index]}"><small>${sum}</small><b>${icon(values[index])}</b></article>`).join('')}</div></section>`;
+  const table = view.current ? `${item !== null ? row(view.before, true) : ''}${row(view.current, false)}` : '';
+  const group = (label, indices) => {
+    const sum = indices.reduce((total, index) => total + view.nums[index], 0);
+    const shown = indices.slice(0, 8);
+    const rest = indices.slice(8);
+    return `<div class="pe416-group"><header><b>${label}</b><strong>Σ = ${sum}</strong></header><div>${shown.map(index => chip(index)).join('<i>+</i>')}</div>${rest.length ? `<details><summary>+${rest.length}</summary><div>${rest.map(index => chip(index)).join('')}</div></details>` : ''}</div>`;
+  };
+  const partition = view.partition ? `<section class="pe416-partition"><svg class="pe416-balance" viewBox="0 0 300 38" role="img" aria-label="${view.target} = ${view.target}"><path d="M20 14H280M75 14V33M225 14V33M150 14V33M136 33H164"/><text x="150" y="10" text-anchor="middle">=</text></svg><div>${group('A', view.partition.a)}${group('B', view.partition.b)}</div></section>` : '';
+  const goal = view.total === null ? '' : `<div class="pe416-goal"><b>Σ ${view.total}</b><span>÷ 2 →</span><strong>${view.target ?? (view.answer === false ? `${view.total / 2} ×` : '?')}</strong><small>target</small></div>`;
+  const direction = item !== null && !view.partition ? `<details class="pe416-direction"><summary>← ${t('Mỗi số 1 lần', 'Use each number once')}</summary><svg viewBox="0 0 300 112" role="img" aria-label="${t('Duyệt ngược: không dùng cùng số hai lần', 'Reverse traversal prevents reusing an occurrence')}"><g class="wrong"><text x="10" y="25">→</text><text x="50" y="25">0</text><path d="M70 20H105M137 20H173"/><text x="111" y="25">2</text><text x="180" y="25">4</text><text x="225" y="25">2 × 2 ✕</text></g><g class="correct"><text x="10" y="80">←</text><text x="50" y="80">4 ✕</text><path d="M94 74H140"/><text x="151" y="80">2 ✓</text><text x="225" y="80">2 × 1 ✓</text></g></svg></details>` : '';
+  host.innerHTML = `<section class="pe416-viz" aria-label="${t('Mô phỏng chia hai nhóm tổng bằng nhau', 'Equal subset partition simulation')}"><header class="pe416-heading"><small>#416 · 0/1 DP</small><strong class="${view.answer === false ? 'false' : reached ? 'true' : ''}">${view.answer === false ? '× False' : view.answer === true ? '✓ True' : '?'}</strong></header>${goal}<div class="pe416-inputs">${inputs}</div>${focus}${partition}${view.partition ? `<details class="pe416-full-dp"><summary>dp</summary>${table}</details>` : table}${view.answer === false && view.target !== null ? `<div class="pe416-reject">Σ ${view.target} <b>×</b></div>` : ''}${direction}<footer><span>✓ ${t('tạo được', 'reachable')}</span><span>· ${t('chưa tạo được', 'unreachable')}</span>${view.cropped ? '<span>…</span>' : ''}${view.shortened ? `<span>${t('Trace rút gọn', 'Shortened trace')}</span>` : ''}</footer></section>`;
+  host._equalSubset416Step = step;
+  host._equalSubset416Width = host.clientWidth;
+  if (typeof ResizeObserver !== 'undefined' && !host._equalSubset416Observer) {
+    host._equalSubset416Observer = new ResizeObserver(() => {
+      if (host.querySelector('.pe416-viz') && host.clientWidth !== host._equalSubset416Width) renderEqualSubset416View(host._equalSubset416Step);
+    });
+    host._equalSubset416Observer.observe(host);
+  }
 }
