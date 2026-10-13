@@ -282,7 +282,13 @@ module.exports = {
     statement: bi("Cho mảng số nguyên dương nums. Có thể chia tất cả phần tử thành hai nhóm, mỗi phần tử dùng đúng một lần, sao cho hai nhóm có tổng bằng nhau không?", "Given positive integers nums, can all occurrences be divided into two groups with equal sums, using each occurrence exactly once?"),
     defaultInput: [1, 5, 11, 5], inputKind: "positive",
     inputLabel: bi("nums (1–200 phần tử, giá trị 1–100)", "nums (1–200 values, each 1–100)"),
-    extraParams: [], debugMode: "line-by-line",
+    extraParams: [{
+      key: "approach", label: bi("Cách giải", "Approach"), type: "select", default: 1,
+      options: [
+        { value: 1, label: bi("Cách 1: DP mảng boolean", "Approach 1: Boolean-array DP") },
+        { value: 2, label: bi("Cách 2: Bitset (dịch + OR)", "Approach 2: Bitset (shift + OR)") },
+      ],
+    }], debugMode: "line-by-line",
     approach: [
       bi("Tổng lẻ thì False. Tổng chẵn: tìm một nhóm tổng target = total / 2.", "An odd total returns False. Otherwise find a subset totaling target = total / 2."),
       bi("dp[s] là True khi các số đã xét tạo được tổng s. dp[0] = True ứng với nhóm rỗng.", "dp[s] is True when processed numbers can make sum s. dp[0] = True represents the empty group."),

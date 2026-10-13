@@ -42,6 +42,10 @@ test('416 keeps the DP learning category and supplies validated line-by-line Pyt
 });
 
 test('416 bitset approach matches subset enumeration and exposes the shift-OR Python solution', () => {
+  const approach = problem.extraParams.find(param => param.key === 'approach');
+  assert.equal(approach.default, 1);
+  assert.deepEqual(approach.options.map(option => option.value), [1, 2]);
+  assert.equal(problem.builder2(problem.defaultInput, { approach: 2 }).answer, true);
   assert.match(problem.code2Label.vi, /Cách 2/);
   assert.match(problem.code2Label.en, /Approach 2/);
   assert.match(problem.code2.join('\n'), /bits \|= bits << num/);
@@ -269,6 +273,7 @@ test('416 renderer assets are loaded ahead of the generic renderer with responsi
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.pe416-viz/);
   assert.match(readFrontendStyles(), /\.pe416-cells \{[^}]*flex-wrap:wrap/);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'partition-equal-subset-416.css'), 'utf8');
+  assert.match(css, /data-method="1".*data-block="1".*data-method="2".*data-block="2"/);
   assert.doesNotMatch(css, /overflow-x:\s*auto/);
 });
 
