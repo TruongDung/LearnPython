@@ -11643,9 +11643,39 @@ function buildSteps1049(nums) {
   const total = nums.reduce((a, b) => a + b, 0);
   const target = Math.floor(total / 2);
   const dp = new Array(target + 1).fill(false);
+  const subsetStones = new Array(target + 1).fill(null);
   dp[0] = true;
+  subsetStones[0] = [];
 
   const trueIndices = () => dp.map((v, i) => v ? i : null).filter(x => x !== null);
+  const bestReachableSum = () => {
+    for (let sum = target; sum >= 0; sum--) {
+      if (dp[sum]) return sum;
+    }
+    return 0;
+  };
+  const partitionView = (phase, options = {}) => {
+    const bestSum = bestReachableSum();
+    const selected = subsetStones[bestSum] || [];
+    return {
+      phase,
+      stones: nums.map((weight, index) => ({
+        index,
+        weight,
+        state: index === options.stoneIndex ? "current" : index < (options.processedCount || 0) ? "processed" : "waiting",
+      })),
+      processedCount: options.processedCount || 0,
+      stoneIndex: Number.isInteger(options.stoneIndex) ? options.stoneIndex : null,
+      changedSums: options.changedSums ? [...options.changedSums] : [],
+      reachableSums: trueIndices(),
+      total,
+      target,
+      bestSum,
+      bestStones: [...selected],
+      otherStones: nums.map((_, index) => index).filter((index) => !selected.includes(index)),
+      answer: options.answer ?? null,
+    };
+  };
 
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
@@ -11670,19 +11700,21 @@ function buildSteps1049(nums) {
         `dp[j] = True if sum j is achievable. target = floor(${total}/2) = ${target}.\n` +
         `Answer = total - 2 * (largest achievable sum ≤ target).`,
     },
+    stoneWeight1049View: partitionView("intro"),
   });
 
-  for (const stone of nums) {
+  nums.forEach((stone, stoneIndex) => {
     const changed = [];
     for (let j = target; j >= stone; j--) {
       if (!dp[j] && dp[j - stone]) {
         dp[j] = true;
+        subsetStones[j] = [...subsetStones[j - stone], stoneIndex];
         changed.push(j);
       }
     }
 
     steps.push({
-      title: { vi: `Thêm đá ${stone}`, en: `Add stone ${stone}` },
+      title: { vi: `Xét đá ${stone}`, en: `Process stone ${stone}` },
       arr: dp.map((v) => (v ? 1 : 0)),
       sub: dp.map((_, i) => String(i)),
       highlight: changed,
@@ -11694,11 +11726,12 @@ function buildSteps1049(nums) {
         { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
       ],
       note: {
-        vi: `Xử lý stone=${stone}: tổng mới đạt được = [${changed.join(",")}].`,
-        en: `Process stone=${stone}: newly reachable sums = [${changed.join(",")}].`,
+        vi: `Thử đặt đá ${stone} vào một nhóm. Các tổng mới đạt được: [${changed.join(", ")}].`,
+        en: `Try placing stone ${stone} in one group. Newly reachable sums: [${changed.join(", ")}].`,
       },
+      stoneWeight1049View: partitionView("process", { stoneIndex, processedCount: stoneIndex + 1, changedSums: changed }),
     });
-  }
+  });
 
   // Find largest j where dp[j] is true
   let bestJ = 0;
@@ -11721,6 +11754,10 @@ function buildSteps1049(nums) {
       vi: `Tổng lớn nhất đạt được ≤ ${target} là ${bestJ}.\nĐáp án = ${total} - 2×${bestJ} = ${answer}.\n(Nhóm 1 nặng ${bestJ}, nhóm 2 nặng ${total - bestJ}, hiệu = ${answer}.)`,
       en: `Largest achievable sum ≤ ${target} is ${bestJ}.\nAnswer = ${total} - 2×${bestJ} = ${answer}.\n(Group 1 weighs ${bestJ}, group 2 weighs ${total - bestJ}, difference = ${answer}.)`,
     },
+    stoneWeight1049View: partitionView("done", {
+      processedCount: nums.length,
+      answer,
+    }),
   };
   steps.push(fs);
 
