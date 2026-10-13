@@ -2758,69 +2758,6 @@ function renderCandyAllocationView(step) {
     </div>`;
 }
 
-// ---- Multi-slot podium visualization (e.g. bai 628: track top-3 & bottom-2) ----
-function renderMultiSlotPodiumView(step) {
-  const view = step.multiSlotPodiumView || {};
-  const values = Array.isArray(view.values) ? view.values : [];
-  const visited = Array.isArray(view.visited) ? view.visited : [];
-  const current = Number.isInteger(view.current) ? view.current : -1;
-  const slots = Array.isArray(view.slots) ? view.slots : []; // [{ key, label, value, group, bump, transition }]
-  const formula = view.formula || null; // { label, value }
-  const mirrorHint = !!view.mirrorHint;
-
-  const valueCells = values.map((v, i) => {
-    const isCurrent = i === current;
-    const isDone = visited[i];
-    return `<div class="digit-cell${isCurrent ? " current" : ""}${isDone && !isCurrent ? " done" : ""}">
-      <span class="digit-cell-idx">[${i}]</span>
-      <strong>${escapeHtml(String(v))}</strong>
-    </div>`;
-  }).join("");
-
-  const groupClass = { top: "digit-slot-first", bottom: "digit-slot-second" };
-  const groupHeading = { top: lang === "vi" ? "TOP-3 (lớn nhất)" : "TOP-3 (largest)", bottom: lang === "vi" ? "BOTTOM-2 (nhỏ nhất)" : "BOTTOM-2 (smallest)" };
-
-  function renderGroup(groupKey) {
-    const groupSlots = slots.filter((s) => s.group === groupKey);
-    if (!groupSlots.length) return "";
-    const cells = groupSlots.map((slot) => {
-      const cls = groupClass[slot.group] || "digit-slot-answer";
-      const bump = slot.bump ? " bump" : "";
-      const val = slot.value === Infinity ? "+\u221E" : slot.value === -Infinity ? "-\u221E" : slot.value;
-      const transitionHtml = slot.transition
-        ? `<span class="digit-slot-transition">${escapeHtml(slot.transition)}</span>`
-        : "";
-      return `<div class="digit-slot ${cls}${bump}">
-        <span class="digit-slot-label">${escapeHtml(pick(slot.label) || slot.key)}</span>
-        <strong>${escapeHtml(String(val))}</strong>
-        ${transitionHtml}
-      </div>`;
-    }).join("");
-    return `<div class="multi-slot-group">
-      <span class="multi-slot-group-heading">${escapeHtml(groupHeading[groupKey] || groupKey)}</span>
-      <div class="multi-slot-group-cells">${cells}</div>
-    </div>`;
-  }
-
-  const formulaHtml = formula
-    ? `<div class="digit-slot digit-slot-answer"><span class="digit-slot-label">${escapeHtml(pick(formula.label) || (lang === "vi" ? "kết quả" : "result"))}</span><strong>${escapeHtml(String(formula.value))}</strong></div>`
-    : "";
-
-  const mirrorNote = mirrorHint
-    ? `<div class="multi-slot-mirror-hint">${lang === "vi" ? "\u2194 Y hệt logic top-3 ở trên, chỉ đổi chiều so sánh (< thay vì >)" : "\u2194 Same logic as top-3 above, just flipped comparison (< instead of >)"}</div>`
-    : "";
-
-  $("treeView").innerHTML = `
-    <div class="digit-podium-viz">
-      <div class="digit-strip">${valueCells}</div>
-      <div class="multi-slot-groups">
-        ${renderGroup("top")}
-        ${renderGroup("bottom")}
-      </div>
-      ${mirrorNote}
-      ${formulaHtml ? `<div class="digit-podium">${formulaHtml}</div>` : ""}
-    </div>`;
-}
 
 function renderDigitPodiumView(step) {
   const view = step.digitPodiumView || {};

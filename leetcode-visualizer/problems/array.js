@@ -1351,6 +1351,9 @@ function buildSteps1275(input) {
  * there's no risk of overwriting a value before it's been shifted down.
  */
 function buildSteps628(nums) {
+  if (!Array.isArray(nums) || nums.length < 3) {
+    throw new Error("628: cần ít nhất 3 số / use at least 3 numbers.");
+  }
   const steps = [];
 
   let first = -Infinity, second = -Infinity, third = -Infinity;
