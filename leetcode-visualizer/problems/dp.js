@@ -10924,13 +10924,19 @@ function buildSteps474(strs, params) {
     return { zeros, ones };
   }
 
+  const stringItems = clean.map((text, index) => ({
+    index,
+    text,
+    ...count01(text),
+  }));
+
   function gridSnap(opts) {
     const vars = [];
     if (opts.idx !== undefined) vars.push({ name: "idx", value: opts.idx });
     if (opts.z !== undefined) vars.push({ name: "z", value: opts.z });
     if (opts.o !== undefined) vars.push({ name: "o", value: opts.o });
     for (const item of opts.vars || []) vars.push(item);
-    steps.push({
+    const step = {
       title: opts.title,
       arr: clean.map((s) => s.length),
       sub: clean.map((s, idx) => `${idx}: ${s}`),
@@ -10950,10 +10956,32 @@ function buildSteps474(strs, params) {
       vars,
       note: opts.note,
       final: opts.final || false,
-    });
+      onesZeros474View: {
+        strings: stringItems.map((item) => ({ ...item })),
+        m,
+        n,
+        dp: dp.map((row) => [...row]),
+        phase: opts.phase || "overview",
+        activeIndex: Number.isInteger(opts.idx) ? opts.idx : null,
+        zeros: Number.isFinite(opts.zeros) ? opts.zeros : null,
+        ones: Number.isFinite(opts.ones) ? opts.ones : null,
+        z: Number.isFinite(opts.z) ? opts.z : null,
+        o: Number.isFinite(opts.o) ? opts.o : null,
+        sourceZ: Number.isFinite(opts.sourceZ) ? opts.sourceZ : null,
+        sourceO: Number.isFinite(opts.sourceO) ? opts.sourceO : null,
+        skip: Number.isFinite(opts.skip) ? opts.skip : null,
+        takeFrom: Number.isFinite(opts.takeFrom) ? opts.takeFrom : null,
+        take: Number.isFinite(opts.take) ? opts.take : null,
+        result: Number.isFinite(opts.result) ? opts.result : null,
+        answer: opts.final ? dp[m][n] : null,
+        final: Boolean(opts.final),
+      },
+    };
+    steps.push(step);
   }
 
   gridSnap({
+    phase: "intro",
     title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
     codeLines: [3],
     vars: [
@@ -10968,6 +10996,7 @@ function buildSteps474(strs, params) {
   });
 
   gridSnap({
+    phase: "initialize",
     title: { vi: "Khoi tao bang DP", en: "Initialize DP table" },
     codeLines: [5],
     vars: [{ name: "dp size", value: `${m + 1} x ${n + 1}` }],
@@ -10980,9 +11009,12 @@ function buildSteps474(strs, params) {
   clean.forEach((str, idx) => {
     const { zeros, ones } = count01(str);
     gridSnap({
+      phase: "inspect-string",
       title: { vi: `Xet strs[${idx}] = "${str}"`, en: `Process strs[${idx}] = "${str}"` },
     codeLines: [5, 6, 7],
       idx,
+      zeros,
+      ones,
       vars: [
         { name: "string", value: str },
         { name: "zeros", value: zeros },
@@ -10996,9 +11028,12 @@ function buildSteps474(strs, params) {
 
     if (zeros > m || ones > n) {
       gridSnap({
+        phase: "skip-string",
         title: { vi: "Bo qua: vuot capacity", en: "Skip: exceeds capacity" },
         codeLines: [9],
         idx,
+        zeros,
+        ones,
         vars: [
           { name: "zeros", value: zeros },
           { name: "ones", value: ones },
@@ -11014,10 +11049,13 @@ function buildSteps474(strs, params) {
 
     for (let z = m; z >= zeros; z--) {
       gridSnap({
+        phase: "scan-capacity",
         title: { vi: `Loop z=${z}`, en: `Loop z=${z}` },
         codeLines: [9],
         idx,
         z,
+        zeros,
+        ones,
         vars: [
           { name: "zeros", value: zeros },
           { name: "ones", value: ones },
@@ -11033,11 +11071,19 @@ function buildSteps474(strs, params) {
         const takeFrom = dp[z - zeros][o - ones];
         const take = takeFrom + 1;
         gridSnap({
+          phase: "compare",
           title: { vi: `Thu dat "${str}" vao dp[${z}][${o}]`, en: `Try taking "${str}" for dp[${z}][${o}]` },
           codeLines: [10, 11, 12, 13],
           idx,
           z,
           o,
+          zeros,
+          ones,
+          sourceZ: z - zeros,
+          sourceO: o - ones,
+          skip,
+          takeFrom,
+          take,
           hlCell: [z, o],
           pathCells: [[z - zeros, o - ones]],
           cellLabels: { [`${z - zeros},${o - ones}`]: "take from" },
@@ -11053,11 +11099,20 @@ function buildSteps474(strs, params) {
 
         dp[z][o] = Math.max(skip, take);
         gridSnap({
+          phase: "update",
           title: { vi: `dp[${z}][${o}] = ${dp[z][o]}`, en: `dp[${z}][${o}] = ${dp[z][o]}` },
           codeLines: [11, 12, 13, 14],
           idx,
           z,
           o,
+          zeros,
+          ones,
+          sourceZ: z - zeros,
+          sourceO: o - ones,
+          skip,
+          takeFrom,
+          take,
+          result: dp[z][o],
           hlCell: [z, o],
           pathCells: [[z - zeros, o - ones]],
           cellLabels: { [`${z - zeros},${o - ones}`]: "take from" },
@@ -11077,6 +11132,7 @@ function buildSteps474(strs, params) {
 
   const answer = dp[m][n];
   gridSnap({
+    phase: "result",
     title: { vi: `return dp[${m}][${n}] = ${answer}`, en: `return dp[${m}][${n}] = ${answer}` },
     codeLines: [16],
     hlCell: [m, n],

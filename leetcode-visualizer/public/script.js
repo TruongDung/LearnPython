@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.onesZeros474View), surface: "treeView", render: (step) => {
+      renderOnesAndZeroes474View(step);
+    } },
     { predicate: (step) => Boolean(step.targetSum494View), surface: "treeView", render: (step) => {
       renderTargetSum494View(step);
     } },
