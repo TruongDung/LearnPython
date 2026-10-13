@@ -16720,7 +16720,11 @@ function buildSteps118(input) {
 
 /** LeetCode 338: Counting Bits — dp[i] = dp[i>>1] + (i&1). */
 function buildSteps338(input) {
-  const n = Number(Array.isArray(input) ? input[0] : String(input).trim()) || 5;
+  const raw = Array.isArray(input) ? (input.length === 1 ? input[0] : null) : input;
+  const n = Number(raw);
+  if ((typeof raw !== "number" && typeof raw !== "string") || (typeof raw === "string" && !/^\d+$/.test(raw.trim())) || !Number.isInteger(n) || n < 0 || n > 256) {
+    throw new Error("338: n phải là số nguyên từ 0 đến 256 / visualization requires an integer n in [0,256].");
+  }
   const steps = [];
   const dp = new Array(n + 1).fill(0);
   const width = Math.max(1, n.toString(2).length);
@@ -16785,7 +16789,7 @@ function buildSteps338(input) {
   }
 
   push({ phase: "done", currentIndex: n, knownThrough: n, final: true }, {
-    title: { vi: `Kết quả: [${dp.join(", ")}]`, en: `Result: [${dp.join(", ")}]` },
+    title: { vi: `Kết quả: ${n + 1} số`, en: `Result: ${n + 1} counts` },
     arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [], mark: [], final: true,
     codeLines: [6],
     vars: [{ name: "answer", value: `[${dp.join(", ")}]` }],
@@ -20742,7 +20746,7 @@ module.exports = {
     titleVi: { vi: "Đếm bit 1 (Bit DP)", en: "Count 1-bits (Bit DP)" },
     statement: { vi: "Cho n, trả về mảng ans độ dài n+1 với ans[i] = số bit 1 của i. Nhập n.", en: "Given n, return an array ans of length n+1 where ans[i] = number of 1-bits in i. Enter n." },
     defaultInput: [5],
-    inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    inputKind: "nonneg", inputLabel: { vi: "n (mô phỏng 0..256)", en: "n (visualization 0..256)" }, singleInput: true, maxInput: 256, extraParams: [],
     approach: [
       { vi: "dp[i] = dp[i>>1] + (i&1).", en: "dp[i] = dp[i>>1] + (i&1)." },
       { vi: "i>>1 bỏ bit cuối; (i&1) là bit cuối.", en: "i>>1 drops the last bit; (i&1) is the last bit." },

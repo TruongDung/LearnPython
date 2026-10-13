@@ -314,7 +314,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderBitmaskBasicsView(step);
     } },
     { predicate: (step) => Boolean(step.countBitsView), surface: "treeView", render: (step) => {
-      renderCountBitsView(step);
+      renderCountingBits338View(step);
     } },
     { predicate: (step) => Boolean(step.wordBreakView), surface: "treeView", render: (step) => {
       renderWordBreakView(step);
