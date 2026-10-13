@@ -98,3 +98,73 @@ test("628 assets are lazy and its renderer is extracted from the shared bundle",
   assert.doesNotMatch(registry, /renderMultiSlotPodiumView/);
   assert.doesNotMatch(fs.readFileSync(require.resolve("../public/renderers-03.js"), "utf8"), /renderMultiSlotPodiumView/);
 });
+
+test("628 preserves the viewport and viz panel height between steps", () => {
+  const script = fs.readFileSync(require.resolve("../public/script.js"), "utf8");
+  const start = script.indexOf("let stableVisualizationLayout = null;");
+  const end = script.indexOf("\n// ---- Utilities ----", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const elements = new Map();
+  let panelHeight = 0;
+  const panel = {
+    clientWidth: 640,
+    classList: { toggle() {} },
+    style: {},
+    getBoundingClientRect: () => ({ height: panelHeight }),
+  };
+  const scrollPositions = [];
+  const context = {
+    steps: [
+      { multiSlotPodiumView: {}, codeLines: [], panelHeight: 480 },
+      { multiSlotPodiumView: {}, codeLines: [], panelHeight: 360 },
+    ],
+    stepIndex: 0,
+    answerValue: null,
+    window: {
+      scrollX: 12,
+      scrollY: 240,
+      scrollTo: position => scrollPositions.push(position),
+    },
+    $: id => {
+      if (id === "vizPanel") return panel;
+      if (!elements.has(id)) elements.set(id, {
+        disabled: false,
+        textContent: "",
+        classList: { add() {}, remove() {} },
+      });
+      return elements.get(id);
+    },
+    pick: value => value,
+    t: () => ({ stepCounter: (index, total) => `${index}/${total}` }),
+    updateCodeHighlight() {},
+    renderVars() {},
+    setPrimaryVisualizationSurface() {},
+    ORDERED_RENDERER_REGISTRY: [{
+      predicate: step => Boolean(step.multiSlotPodiumView),
+      surface: "treeView",
+      render: step => { panelHeight = step.panelHeight; },
+    }],
+    renderBars() {},
+    show() {},
+    hide() {},
+  };
+  vm.createContext(context);
+  vm.runInContext(script.slice(start, end), context);
+
+  context.renderStep();
+  assert.equal(panel.style.minHeight, "480px");
+  assert.deepEqual(JSON.parse(JSON.stringify(scrollPositions[0])), { left: 12, top: 240, behavior: "instant" });
+
+  context.stepIndex = 1;
+  context.renderStep();
+  assert.equal(panel.style.minHeight, "480px");
+  assert.deepEqual(JSON.parse(JSON.stringify(scrollPositions[1])), { left: 12, top: 240, behavior: "instant" });
+
+  context.steps = [{ codeLines: [] }];
+  context.stepIndex = 0;
+  context.renderStep();
+  assert.equal(panel.style.minHeight, "");
+  assert.equal(scrollPositions.length, 2);
+});
