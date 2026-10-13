@@ -9,6 +9,48 @@ const problem = require("../problems").SUPPORTED[496];
 
 const view = (step) => step.nextGreater496View;
 
+function render(step, language = "en") {
+  const host = { innerHTML: "" };
+  const context = { lang: language, $: () => host, escapeHtml: String };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/renderer-next-greater-496.js"), "utf8"), context);
+  context.renderNextGreater496View(step);
+  return host.innerHTML;
+}
+
+test("496 arrows point to the first greater index and distinguish pending map writes", () => {
+  const trace = problem.builder("2,1,3", { nums2: "2,1,3,6,4" }).steps;
+  const popped = trace.find((step) => step.codeLines[0] === 7 && view(step).resolved?.value === 1);
+  const saved = trace.find((step) => step.codeLines[0] === 8 && view(step).resolved?.value === 1);
+  assert.match(render(popped), /nge496-link pending" data-from="1" data-to="2"/);
+  assert.match(render(saved), /nge496-link" data-from="1" data-to="2"/);
+  assert.doesNotMatch(render(popped), /nge496-pair[^>]*><b>1<\/b>/);
+  assert.match(render(saved), /nge496-pair active[^>]*><b>1<\/b><i>→<\/i><b>3<\/b>/);
+  assert.doesNotMatch(render(saved), /nge496-answer filled/);
+});
+
+test("496 lookup diagrams show missing answers without filling result early", () => {
+  const trace = problem.builder("4,1,2", { nums2: "1,3,4,2" }).steps;
+  const missing = trace.find((step) => view(step).phase === "lookup" && view(step).lookupValue === 4);
+  assert.match(render(missing), /nge496-link missing/);
+  assert.match(render(missing), /None → −1/);
+  assert.doesNotMatch(render(missing), /nge496-answer[^>]*filled/);
+  const found = trace.find((step) => view(step).phase === "lookup" && view(step).lookupValue === 1);
+  assert.match(render(found), /nge496-link" data-from="0" data-to="1"/);
+  assert.match(render(trace.at(-1)), /nge496-answer filled missing/);
+});
+
+test("496 charts handle a single value and a full descending stack", () => {
+  for (const nums2 of ["0", "14,13,12,11,10,9,8,7,6,5,4,3,2,1"]) {
+    const trace = problem.builder(nums2.split(",")[0], { nums2 }).steps;
+    for (const step of trace) {
+      assert.doesNotMatch(render(step), /undefined|NaN|Infinity/);
+    }
+    const lastPush = trace.findLast((step) => step.codeLines[0] === 9);
+    assert.equal((render(lastPush).match(/class="nge496-stack-item[ "]/g) || []).length, view(lastPush).stack.length);
+  }
+});
+
 test("496 answers nums1 lookups from the next-greater map", () => {
   const result = problem.builder(problem.defaultInput, { nums2: "1,3,4,2" });
   assert.deepEqual(result.answer, [-1, 3, -1]);
