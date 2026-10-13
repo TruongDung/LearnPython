@@ -11120,6 +11120,7 @@ function buildSteps494(nums, params) {
   const target = params && Number.isFinite(Number(params.target)) ? Number(params.target) : 3;
   const steps = [];
   const total = nums.reduce((a, b) => a + b, 0);
+  let activeNumIndex = -1;
 
   // ── Feasibility check ───────────────────────────────────
   if (Math.abs(target) > total || ((total + target) % 2 !== 0)) {
@@ -11140,6 +11141,23 @@ function buildSteps494(nums, params) {
         vi: `${reason}. Không tồn tại cách gán → 0.`,
         en: `${reason.replace("là số lẻ, không chia đôi được", "is odd, cannot be halved")}. No assignment exists → 0.`,
       },
+    });
+    steps.forEach((step) => {
+      step.targetSum494View = {
+        nums: [...nums],
+        target,
+        total,
+        subsetTarget: null,
+        dp: [],
+        phase: "infeasible",
+        activeNumIndex: null,
+        currentSum: null,
+        sourceWays: null,
+        beforeWays: null,
+        afterWays: null,
+        answer: 0,
+        final: true,
+      };
     });
     return { original: [...nums], answer: 0, steps };
   }
@@ -11198,6 +11216,28 @@ function buildSteps494(nums, params) {
   // ── DP init ─────────────────────────────────────────────
   const dp = new Array(P + 1).fill(0);
   dp[0] = 1;
+  function attachTargetSum494(step, phase, options = {}) {
+    step.targetSum494View = {
+      nums: [...nums],
+      target,
+      total,
+      subsetTarget: P,
+      dp: [...dp],
+      phase,
+      activeNumIndex: Number.isInteger(options.activeNumIndex) ? options.activeNumIndex : null,
+      currentSum: Number.isFinite(options.currentSum) ? options.currentSum : null,
+      sourceWays: Number.isFinite(options.sourceWays) ? options.sourceWays : null,
+      beforeWays: Number.isFinite(options.beforeWays) ? options.beforeWays : null,
+      afterWays: Number.isFinite(options.afterWays) ? options.afterWays : null,
+      answer: options.answer ?? null,
+      final: Boolean(options.final),
+    };
+    return step;
+  }
+
+  ["intro", "feasibility", "reduction"].forEach((phase, index) => {
+    attachTargetSum494(steps[index], phase);
+  });
 
   steps.push({
     title: { vi: "Khởi tạo DP", en: "Initialize DP" },
@@ -11221,10 +11261,16 @@ function buildSteps494(nums, params) {
         `For each num, iterate j from P down to num: dp[j] += dp[j - num] (0/1 knapsack — each element used at most once).`,
     },
   });
+  attachTargetSum494(steps.at(-1), "initialize");
+
+  function snapshotTargetSum494(step, phase, options = {}) {
+    steps.push(attachTargetSum494(step, phase, options));
+  }
 
   // ── Process each num ────────────────────────────────────
   for (const num of nums) {
-    steps.push({
+    activeNumIndex++;
+    snapshotTargetSum494({
       title: { vi: `Bắt đầu num = ${num}`, en: `Start num = ${num}` },
       arr: dp.slice(),
       sub: dp.map((_, i) => String(i)),
@@ -11239,14 +11285,14 @@ function buildSteps494(nums, params) {
         vi: `Xử lý num = ${num}. Duyệt j từ ${P} xuống ${num}: dp[j] += dp[j - ${num}].`,
         en: `Process num = ${num}. Iterate j from ${P} down to ${num}: dp[j] += dp[j - ${num}].`,
       },
-    });
+    }, "choose-signs", { activeNumIndex });
 
     for (let j = P; j >= num; j--) {
       const beforeValue = dp[j];
       const addWays = dp[j - num];
       const updated = addWays > 0;
 
-      steps.push({
+      snapshotTargetSum494({
         title: { vi: `Xét j = ${j}`, en: `Consider j = ${j}` },
         arr: dp.slice(),
         sub: dp.map((_, i) => String(i)),
@@ -11268,10 +11314,15 @@ function buildSteps494(nums, params) {
               vi: `dp[${j - num}] = 0 → dp[${j}] không thay đổi.`, 
               en: `dp[${j - num}] = 0 → dp[${j}] stays unchanged.`, 
             },
+      }, "consider-sum", {
+        activeNumIndex,
+        currentSum: j,
+        sourceWays: addWays,
+        beforeWays: beforeValue,
       });
 
       dp[j] += addWays;
-      steps.push({
+      snapshotTargetSum494({
         title: { vi: `dp[${j}] += dp[${j - num}]`, en: `dp[${j}] += dp[${j - num}]` },
         arr: dp.slice(),
         sub: dp.map((_, i) => String(i)),
@@ -11292,10 +11343,16 @@ function buildSteps494(nums, params) {
               vi: `dp[${j}] vẫn là ${dp[j]}.`, 
               en: `dp[${j}] remains ${dp[j]}.`, 
             },
+      }, "update-sum", {
+        activeNumIndex,
+        currentSum: j,
+        sourceWays: addWays,
+        beforeWays: beforeValue,
+        afterWays: dp[j],
       });
     }
 
-    steps.push({
+    snapshotTargetSum494({
       title: { vi: `Sau num = ${num}`, en: `After num = ${num}` },
       arr: dp.slice(),
       sub: dp.map((_, i) => String(i)),
@@ -11310,10 +11367,10 @@ function buildSteps494(nums, params) {
         vi: `Hoàn tất xử lý num = ${num}. dp hiện tại = [${dp.join(",")}].`, 
         en: `Finished processing num = ${num}. Current dp = [${dp.join(",")}].`, 
       },
-    });
+    }, "finish-number", { activeNumIndex });
   }
   const answer = dp[P];
-  steps.push({
+  snapshotTargetSum494({
     title: { vi: "Kết quả", en: "Result" },
     arr: dp.slice(),
     sub: dp.map((_, i) => String(i)),
@@ -11327,7 +11384,7 @@ function buildSteps494(nums, params) {
       vi: `Số subset có tổng = ${P} = dp[${P}] = ${answer}. Đó cũng là số cách gán dấu ± để tổng = ${target}.`,
       en: `Number of subsets summing to ${P} = dp[${P}] = ${answer}. This equals the number of ± assignments totalling ${target}.`,
     },
-  });
+  }, "result", { answer, final: true });
 
   return { original: [...nums], answer, steps };
 }

@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.targetSum494View), surface: "treeView", render: (step) => {
+      renderTargetSum494View(step);
+    } },
     { predicate: (step) => Boolean(step.stoneWeight1049View), surface: "treeView", render: (step) => {
       renderLastStoneWeight1049View(step);
     } },
