@@ -332,7 +332,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderAlmostMissingView(step);
     } },
     { predicate: (step) => Boolean(step.pascalTriangleView), surface: "treeView", render: (step) => {
-      renderPascalTriangleView(step);
+      renderPascal118View(step);
     } },
     { predicate: (step) => Boolean(step.fibonacciView), surface: "treeView", render: (step) => {
       renderFibonacci509View(step);
