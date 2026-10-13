@@ -1,4 +1,4 @@
-const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
@@ -364,76 +364,84 @@ test('437 validates tree and target inputs and prepares the live Python argument
   ]);
 });
 
-test('437 custom renderer remains complete and readable in English and Vietnamese', () => {
-  const script = readFrontendJavaScript();
-  const styles = readFrontendStyles();
-  const start = script.indexOf('function renderPathSumIIIView(step)');
-  const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
-  assert.ok(start >= 0 && end > start);
-
-  const elements = new Map();
-  const elementFor = id => {
-    if (!elements.has(id)) elements.set(id, { innerHTML: '' });
-    return elements.get(id);
-  };
-  const treeTargets = [];
-  const context = {
-    lang: 'en',
-    $: elementFor,
-    escapeHtml: value => String(value ?? ''),
-    pick: value => value?.en ?? value?.vi ?? value ?? '',
-    renderTree: (_step, targetId) => {
-      treeTargets.push(targetId);
-      elementFor(targetId).innerHTML = '<svg class="tree-svg"></svg>';
-    },
-  };
+test('437 class renders both approaches with pictures in English and Vietnamese', () => {
+  const source = require('node:fs').readFileSync(require.resolve('../public/renderer-path-sum-437.js'), 'utf8');
+  const host = { innerHTML: '' };
+  const context = { lang: 'en', $: () => host, escapeHtml: value => String(value ?? '') };
   vm.createContext(context);
-  vm.runInContext(script.slice(start, end), context);
-
+  vm.runInContext(source, context);
   const runs = [problem.builder(problem.defaultInput, { target: 8 }), problem.builder('[]', { target: 8 }), problem.builder2(problem.defaultInput, { target: 8 })];
   for (const language of ['en', 'vi']) {
     context.lang = language;
-    for (const run of runs) {
-      for (const step of run.steps) {
-        context.renderPathSumIIIView(step);
-        const html = elementFor('treeView').innerHTML;
-        assert.match(html, /ps437-viz/);
-        assert.match(html, /ps437-rule/);
-        assert.match(html, /ps437-checkpoints/);
-        assert.match(html, /ps437-map/);
-        assert.match(html, /ps437-found/);
-        assert.doesNotMatch(html, /ps437-stack/);
-        assert.doesNotMatch(html, /NaN|undefined|Infinity/);
+    for (const run of runs) for (const step of run.steps) {
+      context.renderPathSumIIIView(step);
+      assert.match(host.innerHTML, /p437-viz/);
+      if (!step.final) {
+        assert.match(host.innerHTML, /p437-rule/);
+        assert.match(host.innerHTML, /p437-checkpoints/);
       }
+      assert.match(host.innerHTML, /p437-map/);
+      assert.match(host.innerHTML, /p437-found/);
+      if (step.tree.nodes.length || !step.final) assert.match(host.innerHTML, /<svg/);
+      else assert.match(host.innerHTML, /p437-empty-tree">∅/);
+      assert.doesNotMatch(host.innerHTML, /NaN|undefined|Infinity/);
+      assert.equal((host.innerHTML.match(/data-node-id=/g) || []).length, step.tree.nodes.length);
     }
   }
-  context.lang = 'en';
-  const example = runs[0];
-  const foundStep = example.steps.find(step => step.pathSumIIIView.event === 'found');
-  context.renderPathSumIIIView(foundStep);
-  const foundHtml = elementFor('treeView').innerHTML;
-  assert.match(foundHtml, /5 \+ 3 = 8/);
-  assert.match(foundHtml, /prefix\[10\] = 1/);
-  assert.match(foundHtml, /Drop everything through prefix 10/);
+  const found = runs[0].steps.find(step => step.pathSumIIIView.event === 'found');
+  context.renderPathSumIIIView(found);
+  assert.match(host.innerHTML, /data-match-ids="1,3"/);
+  assert.match(host.innerHTML, /data-lookup-count="1"/);
+  assert.match(host.innerHTML, /p437-checkpoint cut/);
+  const backtrack = runs[0].steps.find(step => step.pathSumIIIView.event === 'remove-prefix');
+  context.renderPathSumIIIView(backtrack);
+  assert.match(host.innerHTML, /p437-checkpoint removed/);
+  assert.match(host.innerHTML, /p437-undo-label/);
+  assert.match(host.innerHTML, /prefix\[21\] −1/);
+});
 
-  const backtrackStep = example.steps.find(step => step.pathSumIIIView.event === 'remove-prefix');
-  context.renderPathSumIIIView(backtrackStep);
-  assert.match(elementFor('treeView').innerHTML, /decrement prefix\[/);
+test('437 repeated prefix display preserves lookup count after storing current node', () => {
+  const source = require('node:fs').readFileSync(require.resolve('../public/renderer-path-sum-437.js'), 'utf8');
+  const host = { innerHTML: '' };
+  const context = { lang: 'en', $: () => host, escapeHtml: String };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const trace = problem.builder('0,0,0', { target: 0 }).steps;
+  const stored = trace.find(step => step.pathSumIIIView.event === 'store-prefix' && step.pathSumIIIView.matches.length === 1);
+  assert.equal(stored.pathSumIIIView.prefixEntries.find(entry => entry.sum === 0).count, 2);
+  context.renderPathSumIIIView(stored);
+  assert.match(host.innerHTML, /data-lookup-count="1"/);
+  assert.match(host.innerHTML, /<em>×2<\/em>/);
+  assert.doesNotMatch(host.innerHTML, /data-lookup-count="2"/);
+});
 
-  const repeatedPrefixRun = problem.builder('0,0,0', { target: 0 });
-  const firstStore = repeatedPrefixRun.steps.find(step => step.pathSumIIIView.event === 'store-prefix' && step.pathSumIIIView.matches.length === 1);
-  context.renderPathSumIIIView(firstStore);
-  assert.match(elementFor('treeView').innerHTML, /prefix\[0\] = 1/);
-  const followUpFound = runs[2].steps.find(step => step.pathSumIIIView.event === 'found');
-  context.renderPathSumIIIView(followUpFound);
-  const followUpHtml = elementFor('treeView').innerHTML;
-  assert.match(followUpHtml, /APPROACH 2 · FOLLOW-UP/);
-  assert.match(followUpHtml, /List\[List\[int\]\]/);
-  assert.match(followUpHtml, /positions\[/);
-  assert.match(followUpHtml, /result\.append\(\[5, 3\]\)/);
-  assert.ok(treeTargets.every(targetId => targetId === 'ps437Tree'));
-  assert.match(styles, /\.ps437-layout/);
-  assert.match(styles, /\.ps437-followup/);
-  assert.match(styles, /@container \(max-width: 760px\)/);
-  assert.match(script, /Boolean\(step\.pathSumIIIView\)/);
+test('437 class keeps repeated matches distinct and result lists do not reveal future paths', () => {
+  const source = require('node:fs').readFileSync(require.resolve('../public/renderer-path-sum-437.js'), 'utf8');
+  const context = { escapeHtml: String };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const Visualizer = vm.runInContext('PathSum437Visualizer', context);
+  const host = { innerHTML: '' };
+  const visualizer = new Visualizer({ host, language: 'vi' });
+  const trace = problem.builder2('0,0,null,0', { target: 0 }).steps;
+  visualizer.render(trace[0]);
+  assert.equal((host.innerHTML.match(/class="p437-result"/g) || []).length, 0);
+  const three = trace.find(step => step.pathSumIIIView.event === 'found' && step.pathSumIIIView.added === 3);
+  visualizer.render(three);
+  assert.equal((host.innerHTML.match(/class="p437-match"/g) || []).length, 3);
+  assert.equal((host.innerHTML.match(/p437-checkpoint cut/g) || []).length, 3);
+  visualizer.render(trace.at(-1));
+  assert.equal((host.innerHTML.match(/class="p437-result"/g) || []).length, 6);
+  assert.match(host.innerHTML, /List · 6/);
+  assert.match(host.innerHTML, /p437-map-position">-1/);
+});
+
+test('437 dedicated assets stay lazy and the renderer is extracted from the base bundle', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
+  assert.match(html, /path-sum-437\.css/);
+  assert.match(html, /renderer-path-sum-437\.js/);
+  assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g, ''), /(?:renderer-)?path-sum-437\.(?:css|js)/);
+  assert.doesNotMatch(fs.readFileSync(require.resolve('../public/app-renderers-base.js'), 'utf8'), /function renderPathSumIIIView/);
+  assert.match(readFrontendJavaScript(), /Boolean\(step\.pathSumIIIView\)/);
 });
