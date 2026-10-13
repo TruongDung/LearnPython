@@ -30,8 +30,8 @@ test('198 both approaches match exhaustive legal subsets, including ties and zer
       assert.equal(result.answer, brute(nums));
       for (const step of result.steps) {
         const view = step.houseRobberView;
-        valid(view.robbed, view.currentIndex);
-        assert.equal(sum(nums, view.robbed), brute(nums.slice(0, view.currentIndex + 1)));
+        valid(view.robbed, view.processedIndex);
+        assert.equal(sum(nums, view.robbed), brute(nums.slice(0, view.processedIndex + 1)));
         if (view.formula) {
           const f = view.formula;
           const skip = approach === 1 ? f.skip.houses : f.skipHouses;
@@ -42,7 +42,7 @@ test('198 both approaches match exhaustive legal subsets, including ties and zer
           assert.ok(!rob.includes(view.currentIndex - 1));
           assert.equal(sum(nums, skip), approach === 1 ? f.skip.value : f.maxRob);
           assert.equal(sum(nums, rob), approach === 1 ? f.rob.total : f.robVal);
-          assert.deepEqual(view.robbed, f.chosen === 'skip' ? skip : rob);
+          if(f.applied) assert.deepEqual(view.robbed, f.chosen === 'skip' ? skip : rob);
         }
       }
     }
@@ -75,7 +75,7 @@ test('198 rolling snapshots match live Python variables before and after simulta
   const source = `from typing import List\n${problem.code2.join('\n')}\nimport sys,json\nframes=[]\ndef trace(frame,event,arg):\n    if frame.f_code.co_name == 'rob' and event == 'line':\n        state=frame.f_locals\n        if frame.f_lineno == 8 or (frame.f_lineno == 6 and 'temp' in state):\n            frames.append({name: state[name] for name in ['prev_rob','max_rob','temp']})\n    return trace\nsys.settrace(trace)\nSolution().rob(${JSON.stringify(nums)})\nsys.settrace(None)\nprint(json.dumps(frames))`;
   const result = spawnSync('python3', ['-c', source], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  const snapshots = run(nums, 2).steps.filter(step => ['compute', 'shift'].includes(step.houseRobberView.phase)).map(step => {
+  const snapshots = run(nums, 2).steps.filter(step => step.codeLines[0] === 7 || (step.codeLines[0] === 5 && step.houseRobberView.rolling.temp !== null)).map(step => {
     const r = step.houseRobberView.rolling;
     return { prev_rob: r.prevRob, max_rob: r.maxRob, temp: r.temp };
   });
@@ -112,4 +112,52 @@ test('198 uses its own lazy renderer while 213 keeps the circular renderer', () 
   assert.doesNotMatch(readFrontendIndex().replace(/<template[\s\S]*?<\/template>/g, ''), /(?:renderer-)?house-robber-198\.(?:js|css)/);
   assert.equal(SUPPORTED[213].builder([2, 3, 2]).answer, 3);
   assert.equal(SUPPORTED[213].builder([1, 2, 3, 1]).answer, 4);
+});
+
+test('198 both approaches stop on one line with the exact live Python locals and DP', () => {
+  const cases=[[0],[5],[1,1],[2,7,9,3,1],[2,1,1,2],Array(100).fill(400)];
+  const keys=['n','i','current','prev_rob','max_rob','temp'];
+  assert.equal(problem.debugMode,'line');
+  for(const approach of [1,2]) {
+    const code=approach===1?problem.code:problem.code2;
+    const source=`from typing import List\n${code.join('\n')}\nimport sys,json\nresults=[]\nfor nums in json.load(sys.stdin):\n    frames=[]\n    def trace(frame,event,arg):\n        if frame.f_code.co_name == 'rob' and event == 'line':\n            state=frame.f_locals\n            frames.append({'line':frame.f_lineno-1,'dp':json.loads(json.dumps(state.get('dp'))),**{k:state.get(k) for k in ${JSON.stringify(keys)}}})\n        return trace\n    sys.settrace(trace)\n    Solution().rob(nums)\n    sys.settrace(None)\n    results.append(frames)\nprint(json.dumps(results))`;
+    const python=spawnSync('python3',['-c',source],{encoding:'utf8',input:JSON.stringify(cases),maxBuffer:4*1024*1024});
+    assert.equal(python.status,0,python.stderr);
+    const actual=cases.map(nums=>run(nums,approach).steps.map(step=>{
+      assert.equal(step.codeLines.length,1);
+      assert.equal(step.codeBlock,approach);
+      assert.equal(step.debugLine,step.codeLines[0]);
+      const v=step.houseRobberView;
+      return {line:step.codeLines[0],dp:v.dp??null,...Object.fromEntries(keys.map(k=>[k,v.pythonLocals[k]??null]))};
+    }));
+    assert.deepEqual(actual,JSON.parse(python.stdout));
+  }
+});
+
+test('198 computes temp before shifting registers and commits pictures only with max_rob', () => {
+  const rolling=run([2,7,9,3,1],2).steps;
+  rolling.forEach((step,index)=>{
+    const v=step.houseRobberView;
+    if(step.codeLines[0]===6) {
+      const assigned=rolling[index+1].houseRobberView,committed=rolling[index+2].houseRobberView;
+      assert.equal(v.pending,true);
+      assert.equal(assigned.rolling.temp,v.formula.temp);
+      assert.equal(assigned.rolling.prevRob,v.rolling.prevRob);
+      assert.equal(assigned.rolling.maxRob,v.rolling.maxRob);
+      assert.deepEqual(assigned.robbed,v.robbed);
+      assert.equal(committed.rolling.prevRob,v.rolling.maxRob);
+      assert.equal(committed.rolling.maxRob,v.formula.temp);
+      assert.equal(committed.pending,false);
+    }
+  });
+  const array=run([2,7,9,3,1],1).steps;
+  array.forEach((step,index)=>{
+    if([7,8,10].includes(step.codeLines[0])) {
+      const v=step.houseRobberView,next=array[index+1].houseRobberView;
+      assert.equal(v.pending,true);
+      assert.equal(v.dp[v.currentIndex],0);
+      assert.equal(next.dp[v.currentIndex],v.formula.result);
+      assert.ok(v.robbed.every(i=>i<v.currentIndex));
+    }
+  });
 });

@@ -3082,196 +3082,92 @@ function buildSteps198(nums, params) {
   if (!Array.isArray(nums) || nums.length === 0 || nums.some(value => !Number.isSafeInteger(value) || value < 0)) {
     throw new Error("198: nums phải chứa các số nguyên không âm / nums must be a nonempty array of nonnegative integers.");
   }
-  const approach = (params && Number(params.approach)) || 1;
-  if (approach === 2) return buildSteps198B(nums);
-
-  const n = nums.length;
-  const dp = new Array(n).fill(null);
-  const steps = [];
-
-  const robbedTrace = (end = n - 1) => trace198Path(dp, end);
-
-  const push = (meta, step) => {
-    steps.push(Object.assign({}, step, {
-      houseRobberView: {
-        method: "dp",
-        nums: [...nums],
-        n,
-        phase: meta.phase || "",
-        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
-        sources: meta.sources || [],
-        dp: dp.map((v) => v),
-        formula: meta.formula || null,
-        robbed: robbedTrace(meta.final ? n - 1 : meta.currentIndex ?? -1),
-        answer: meta.final ? dp[n - 1] : null,
-      },
-    }));
+  if (Number(params && params.approach) === 2) return buildSteps198B(nums);
+  const n = nums.length, steps = [];
+  let dp = null, processedIndex = -1;
+  const locals = { n: null, i: null };
+  const plan = end => dp ? trace198Path(dp, end) : [];
+  const push = (line, phase = "debug", formula = null) => {
+    const done = phase === "done";
+    const robbed = n === 1 && done ? (nums[0] > 0 ? [0] : []) : plan(processedIndex);
+    const currentIndex = formula ? formula.i : done ? n - 1 : processedIndex;
+    const variables = Object.entries(locals).filter(([, value]) => value !== null).map(([name,value]) => ({name,value}));
+    if (dp && currentIndex >= 0) variables.push({name:`dp[${currentIndex}]`,value:dp[currentIndex]});
+    if (done) variables.push({name:"answer",value:n===1?nums[0]:dp[n-1]});
+    const labels = {3:["Đếm số nhà","Count houses"],4:["Kiểm tra một nhà","Check for one house"],5:["Trả tiền nhà duy nhất","Return the only house"],
+      6:["Tạo bảng DP","Allocate DP"],7:["Ghi nhà đầu","Store the first house"],8:["So sánh hai nhà đầu","Compare the first two houses"],
+      9:["Duyệt nhà tiếp theo","Loop through houses"],10:["Ghi tiền lớn hơn vào dp[i]","Store the larger amount in dp[i]"],11:["Trả kết quả","Return the answer"]};
+    steps.push({
+      title:{vi:`Dòng ${line}: ${labels[line][0]}`,en:`Line ${line}: ${labels[line][1]}`},
+      arr:[...nums],sub:dp?dp.map(String):[],highlight:currentIndex>=0?[currentIndex]:[],mark:[...robbed],
+      codeLines:[line],codeBlock:1,debugLine:line,final:done,vars:variables,
+      note:{vi:"Trạng thái trước dòng đang sáng.",en:"State before the highlighted line."},
+      houseRobberView:{method:"dp",nums:[...nums],n,phase,currentIndex,processedIndex,
+        sources:formula?[formula.i-2,formula.i-1].filter(i=>i>=0):[],
+        dp:dp?[...dp]:null,formula,robbed,answer:done?(n===1?nums[0]:dp[n-1]):null,
+        debugLine:line,pythonLocals:{...locals},pending:formula?!formula.applied:false},
+    });
   };
-
-  if (n === 1) {
-    dp[0] = nums[0];
-    push({ phase: "done", currentIndex: 0, final: true }, {
-      title: { vi: `Chỉ 1 nhà → ${nums[0]}`, en: `Only 1 house → ${nums[0]}` },
-      arr: [...nums], sub: [`${nums[0]}`], highlight: [0], mark: [0], final: true,
-      codeLines: [5],
-      vars: [{ name: "answer", value: nums[0] }],
-      note: { vi: "Không có nhà liền kề để so sánh, cướp nhà duy nhất.", en: "No adjacent choice exists, rob the only house." },
-    });
-    return { original: [...nums], answer: nums[0], steps };
+  const compare = i => {
+    const skip = i > 0 ? dp[i-1] : 0;
+    const previous = i > 1 ? dp[i-2] : 0;
+    const rob = previous + nums[i];
+    return {i,skip:{from:i-1,value:skip,houses:plan(i-1)},
+      rob:{from:i-2,value:previous,money:nums[i],total:rob,houses:[...plan(i-2),i]},
+      chosen:rob>skip?"rob":"skip",result:Math.max(skip,rob),applied:false};
+  };
+  // As in Python step-over: stop before executing the highlighted line.
+  push(3); locals.n=n; push(4);
+  if(n===1) { processedIndex=0; push(5,"done"); return {original:[...nums],answer:nums[0],steps}; }
+  push(6); dp=Array(n).fill(0);
+  const first=compare(0); push(7,"compute",first); dp[0]=nums[0]; processedIndex=0;
+  const second=compare(1); push(8,"compute",second); dp[1]=second.result; processedIndex=1;
+  push(9,"loop");
+  for(let i=2;i<n;i++) {
+    locals.i=i;
+    const formula=compare(i);
+    push(10,"compute",formula);
+    dp[i]=formula.result; processedIndex=i;
+    push(9,"loop",{...formula,applied:true});
   }
-
-  dp[0] = nums[0];
-  dp[1] = Math.max(nums[0], nums[1]);
-  push({ phase: "base", currentIndex: 1, sources: [0, 1] }, {
-    title: { vi: `dp[0]=${dp[0]}, dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}`, en: `dp[0]=${dp[0]}, dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}` },
-    arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [0, 1], mark: [],
-    codeLines: [8],
-    vars: [{ name: "dp[0]", value: dp[0] }, { name: "dp[1]", value: dp[1] }],
-    note: {
-      vi: `🏠 Không được cướp 2 nhà liền kề. dp[i] = tiền tối đa tới nhà i. Base: dp[0]=nums[0]=${dp[0]}; hai nhà đầu chỉ chọn 1 → dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}.`,
-      en: `🏠 Cannot rob two adjacent houses. dp[i] = max loot up to house i. Base: dp[0]=nums[0]=${dp[0]}; among the first two pick one → dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}.`,
-    },
-  });
-
-  for (let i = 2; i < n; i++) {
-    const skip = dp[i - 1];
-    const rob = dp[i - 2] + nums[i];
-    dp[i] = Math.max(skip, rob);
-    const robbed = rob > skip;
-    push({
-      phase: "compute",
-      currentIndex: i,
-      sources: [i - 2, i - 1],
-      formula: { i, skip: { from: i - 1, value: skip, houses: robbedTrace(i - 1) }, rob: { from: i - 2, value: dp[i - 2], money: nums[i], total: rob, houses: [...robbedTrace(i - 2), i] }, chosen: robbed ? "rob" : "skip", result: dp[i] },
-    }, {
-      title: { vi: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "CƯỚP 💰" : "BỎ ✗"}`, en: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "ROB 💰" : "SKIP ✗"}` },
-      arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [i - 2, i - 1, i], mark: robbed ? [i - 2, i] : [i - 1],
-      codeLines: [10],
-      vars: [
-        { name: "bỏ nhà i (dp[i-1])", value: skip },
-        { name: "cướp nhà i (dp[i-2]+nums[i])", value: `${dp[i - 2]} + ${nums[i]} = ${rob}` },
-        { name: `dp[${i}]`, value: dp[i] },
-      ],
-      note: {
-        vi: `Nhà ${i} (tiền ${nums[i]}): BỎ → dp[${i - 1}]=${skip}; CƯỚP → dp[${i - 2}]+nums[${i}]=${rob}. Chọn lớn hơn → dp[${i}]=${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
-        en: `House ${i} (money ${nums[i]}): SKIP → dp[${i - 1}]=${skip}; ROB → dp[${i - 2}]+nums[${i}]=${rob}. Take the larger → dp[${i}]=${dp[i]} (${robbed ? "rob" : "skip"}).`,
-      },
-    });
-  }
-
-  const answer = dp[n - 1];
-  push({ phase: "done", currentIndex: n - 1, final: true }, {
-    title: { vi: `Kết quả: ${answer}$ 💰`, en: `Result: $${answer} 💰` },
-    arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [], mark: robbedTrace(), final: true,
-    codeLines: [11],
-    vars: [{ name: "answer", value: `${answer}$` }, { name: "robbed", value: `[${robbedTrace().join(", ")}]` }],
-    note: {
-      vi: `🎉 Tối đa = ${answer}$. Cướp các nhà [${robbedTrace().join(", ")}] (${robbedTrace().map((j) => nums[j]).join(" + ")} = ${answer}).`,
-      en: `🎉 Maximum = $${answer}. Rob houses [${robbedTrace().join(", ")}] (${robbedTrace().map((j) => nums[j]).join(" + ")} = ${answer}).`,
-    },
-  });
-
-  return { original: [...nums], answer, steps };
+  push(11,"done");
+  return {original:[...nums],answer:dp[n-1],steps};
 }
 
-/**
- * LeetCode 198 — Approach 2: Rolling variables (O(1) space).
- *
- * Instead of storing the whole dp[] array, keep only the last two values:
- *   max_rob  = best loot up to the current house
- *   prev_rob = best loot up to the house before that
- *
- * For each house `current`:
- *   temp = max(max_rob,             # skip this house
- *              prev_rob + current)  # rob this house (plus best before previous)
- *   prev_rob, max_rob = max_rob, temp
- *
- * Answer = max_rob after the loop.
- */
+/** LeetCode 198: true line stops for the O(1) implementation. */
 function buildSteps198B(nums) {
-  const steps = [];
-  const n = nums.length;
-  let prevRob = 0;
-  let maxRob = 0;
-  const history = [];
-
-  const push = (meta, step) => {
-    steps.push(Object.assign({}, step, {
-      houseRobberView: {
-        method: "rolling",
-        nums: [...nums],
-        n,
-        phase: meta.phase || "",
-        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
-        sources: [],
-        rolling: meta.rolling || null,
-        formula: meta.formula || null,
-        robbed: trace198Path(history, meta.final ? n - 1 : meta.currentIndex ?? -1),
-        answer: meta.final ? maxRob : null,
-      },
-    }));
+  const n=nums.length,steps=[],history=[];
+  let prevRob=null,maxRob=null,temp=null,current=null,processedIndex=-1;
+  const push=(line,phase="debug",formula=null,currentIndex=processedIndex) => {
+    const done=phase==="done",robbed=trace198Path(history,processedIndex);
+    const pythonLocals={prev_rob:prevRob,max_rob:maxRob,temp,current};
+    const labels={4:["Khởi tạo hai biến","Initialize two variables"],5:["Duyệt nhà tiếp theo","Loop through houses"],
+      6:["Tính temp","Compute temp"],7:["Dời hai biến cùng lúc","Shift both variables together"],8:["Trả max_rob","Return max_rob"]};
+    steps.push({
+      title:{vi:`Dòng ${line}: ${labels[line][0]}`,en:`Line ${line}: ${labels[line][1]}`},
+      arr:[...nums],highlight:currentIndex>=0?[currentIndex]:[],mark:[...robbed],final:done,
+      codeLines:[line],codeBlock:2,debugLine:line,
+      vars:Object.entries(pythonLocals).filter(([,value])=>value!==null).map(([name,value])=>({name,value})),
+      note:{vi:"Trạng thái trước dòng đang sáng.",en:"State before the highlighted line."},
+      houseRobberView:{method:"rolling",nums:[...nums],n,phase,currentIndex,processedIndex,sources:[],
+        rolling:{prevRob,maxRob,temp},formula,robbed,answer:done?maxRob:null,
+        debugLine:line,pythonLocals,pending:formula?!formula.applied:false},
+    });
   };
-
-  push({ phase: "init", currentIndex: -1, rolling: { prevRob: 0, maxRob: 0, temp: null } }, {
-    title: { vi: "Khởi tạo prev_rob = max_rob = 0", en: "Initialize prev_rob = max_rob = 0" },
-    arr: [...nums], highlight: [], mark: [], codeLines: [4], codeBlock: 2,
-    vars: [{ name: "prev_rob", value: 0 }, { name: "max_rob", value: 0 }],
-    note: {
-      vi: "Chỉ giữ 2 biến thay cho cả bảng dp: max_rob = tiền tối đa tới nhà hiện tại, prev_rob = tới nhà trước đó. Mỗi nhà: temp = max(max_rob, prev_rob + tiền), rồi dời.",
-      en: "Keep only 2 variables instead of the dp array: max_rob = best up to the current house, prev_rob = up to the house before. Each house: temp = max(max_rob, prev_rob + money), then shift.",
-    },
+  push(4,"init"); prevRob=0; maxRob=0; push(5,"loop");
+  nums.forEach((money,i)=>{
+    current=money;
+    const robVal=prevRob+money;
+    const formula={i,money,prevRob,maxRob,robVal,temp:Math.max(maxRob,robVal),chosen:robVal>maxRob?"rob":"skip",
+      skipHouses:trace198Path(history,i-1),robHouses:[...trace198Path(history,i-2),i],applied:false};
+    push(6,"compute",formula,i);
+    temp=formula.temp;
+    push(7,"assign",formula,i);
+    prevRob=maxRob; maxRob=temp; history.push(temp); processedIndex=i;
+    push(5,"shift",{...formula,applied:true},i);
   });
-
-  for (let i = 0; i < n; i++) {
-    const current = nums[i];
-    const robVal = prevRob + current;
-    const temp = Math.max(maxRob, robVal);
-    const robbed = robVal > maxRob;
-    history.push(temp);
-
-    push({
-      phase: "compute",
-      currentIndex: i,
-      formula: { i, money: current, prevRob, maxRob, robVal, temp, chosen: robbed ? "rob" : "skip", skipHouses: trace198Path(history, i - 1), robHouses: [...trace198Path(history, i - 2), i] },
-      rolling: { prevRob, maxRob, temp },
-    }, {
-      title: { vi: `Nhà ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}`, en: `House ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}` },
-      arr: [...nums], highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
-      vars: [
-        { name: "current", value: current },
-        { name: "bỏ (max_rob)", value: maxRob },
-        { name: "cướp (prev_rob + current)", value: `${prevRob} + ${current} = ${robVal}` },
-        { name: "temp", value: temp },
-      ],
-      note: {
-        vi: `Nhà ${i}: BỎ → max_rob=${maxRob}; CƯỚP → prev_rob+current=${prevRob}+${current}=${robVal}. temp = max = ${temp} (${robbed ? "cướp" : "bỏ"}).`,
-        en: `House ${i}: SKIP → max_rob=${maxRob}; ROB → prev_rob+current=${prevRob}+${current}=${robVal}. temp = max = ${temp} (${robbed ? "rob" : "skip"}).`,
-      },
-    });
-
-    prevRob = maxRob;
-    maxRob = temp;
-    push({
-      phase: "shift",
-      currentIndex: i,
-      rolling: { prevRob, maxRob, temp },
-    }, {
-      title: { vi: `Dời: prev_rob=${prevRob}, max_rob=${maxRob}`, en: `Shift: prev_rob=${prevRob}, max_rob=${maxRob}` },
-      arr: [...nums], highlight: [i], mark: trace198Path(history, i), codeLines: [7], codeBlock: 2,
-      vars: [{ name: "prev_rob", value: prevRob }, { name: "max_rob", value: maxRob }],
-      note: { vi: `Dời cửa sổ: prev_rob ← max_rob cũ, max_rob ← temp. Giờ max_rob=${maxRob}.`, en: `Shift the window: prev_rob ← old max_rob, max_rob ← temp. Now max_rob=${maxRob}.` },
-    });
-  }
-
-  const answer = maxRob;
-  push({ phase: "done", currentIndex: n - 1, final: true, rolling: { prevRob, maxRob, temp: maxRob } }, {
-    title: { vi: `Kết quả: ${answer}$`, en: `Result: $${answer}` },
-    arr: [...nums], highlight: [], mark: trace198Path(history, n - 1), final: true, codeLines: [8], codeBlock: 2,
-    vars: [{ name: "answer", value: answer }],
-    note: { vi: `Sau khi duyệt hết: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ.`, en: `After the loop: max_rob = ${answer}. Only O(1) memory.` },
-  });
-
-  return { original: [...nums], answer, steps };
+  push(8,"done");
+  return {original:[...nums],answer:maxRob,steps};
 }
 
 /**
@@ -22865,6 +22761,7 @@ module.exports = {
     id: 198,
     difficulty: "medium",
     slug: "house-robber",
+    debugMode: "line",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "House Robber", en: "House Robber" },
     titleVi: { vi: "Tên cướp nhà", en: "House robber" },
