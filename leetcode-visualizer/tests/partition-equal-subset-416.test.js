@@ -8,7 +8,7 @@ const { SUPPORTED } = require('../problems');
 const { readFrontendJavaScript, readFrontendStyles, readFrontendIndex } = require('./helpers/frontend-source');
 const problem = SUPPORTED[416];
 const localPython = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'python.exe');
-const python = process.env.PYTHON || (fs.existsSync(localPython) ? localPython : 'python');
+const python = process.env.PYTHON || (fs.existsSync(localPython) ? localPython : process.platform === 'win32' ? 'python' : 'python3');
 
 function oracle(nums) {
   const total = nums.reduce((sum, num) => sum + num, 0);
@@ -39,6 +39,64 @@ test('416 keeps the DP learning category and supplies validated line-by-line Pyt
     assert.throws(() => problem.builder(input));
     assert.throws(() => problem.liveArgs(input));
   }
+});
+
+test('416 bitset approach matches subset enumeration and exposes the shift-OR Python solution', () => {
+  assert.match(problem.code2Label.vi, /Cách 2/);
+  assert.match(problem.code2Label.en, /Approach 2/);
+  assert.match(problem.code2.join('\n'), /bits \|= bits << num/);
+  assert.deepEqual(problem.liveArgs([1, 5, 11, 5]), [[1, 5, 11, 5]]);
+  for (const [nums, answer] of [
+    [[1, 5, 11, 5], true], [[1, 2, 3, 5], false], [[2, 6], false],
+    [[1, 1], true], [[100], false], [[2, 2, 2, 2], true],
+  ]) {
+    assert.equal(problem.builder2(nums).answer, answer, String(nums));
+    assert.equal(problem.builder2(nums).steps.at(-1).equalSubset416BitsetView.answer, answer);
+  }
+  let seed = 9416;
+  for (let sample = 0; sample < 120; sample++) {
+    const nums = Array.from({ length: 1 + sample % 10 }, () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return 1 + seed % 10;
+    });
+    assert.equal(problem.builder2(nums).answer, oracle(nums), String(nums));
+  }
+  for (const input of [null, {}, [0], [-1], [101], [1.2], [Infinity], Array(201).fill(1)]) {
+    assert.throws(() => problem.builder2(input));
+  }
+});
+
+test('416 bitset snapshots model shift-OR without reusing an occurrence and execute as Python', () => {
+  const cases = [problem.defaultInput, [1, 2, 3, 5], [2, 6], [1, 1], [100, 100]];
+  const source = `import json, sys
+namespace = {}
+exec(compile(${JSON.stringify(problem.code2.join('\n'))}, 'solution416bitset.py', 'exec'), namespace)
+print(json.dumps([namespace['Solution']().canPartition(nums) for nums in json.load(sys.stdin)]))
+`;
+  const run = spawnSync(python, ['-c', source], { encoding: 'utf8', input: JSON.stringify(cases) });
+  assert.equal(run.status, 0, run.stderr);
+  const actual = JSON.parse(run.stdout);
+  cases.forEach((nums, index) => {
+    const visual = problem.builder2(nums);
+    assert.equal(visual.answer, actual[index]);
+    let reachable = 1n;
+    for (const step of visual.steps) {
+      assert.equal(step.codeLines.length, 1);
+      assert.ok(problem.code2[step.codeLines[0] - 1]?.trim());
+      const view = step.equalSubset416BitsetView;
+      if (view.target === null) continue;
+      const shifted = view.phase === 'shift-or' ? reachable << BigInt(view.num) : 0n;
+      const next = view.phase === 'shift-or' ? reachable | shifted : reachable;
+      view.sums.forEach((sum, cell) => {
+        assert.equal(view.before[cell], Number((reachable >> BigInt(sum)) & 1n));
+        assert.equal(view.shifted[cell], Number((shifted >> BigInt(sum)) & 1n));
+        assert.equal(view.after[cell], Number((next >> BigInt(sum)) & 1n));
+      });
+      if (view.phase === 'shift-or') reachable = next;
+    }
+  });
+  const twice = problem.builder2([2, 6]);
+  assert.equal(twice.answer, false, 'one occurrence of 2 cannot be reused to make 4');
 });
 
 test('416 agrees with subset enumeration and published examples without reusing an occurrence', () => {
@@ -205,12 +263,38 @@ test('416 renderer assets are loaded ahead of the generic renderer with responsi
   const source = readFrontendJavaScript();
   const registry = source.slice(source.indexOf('const ORDERED_RENDERER_REGISTRY'));
   assert.ok(registry.indexOf('step.equalSubset416View') < registry.indexOf('step.hardProblemView'));
+  assert.ok(registry.indexOf('step.equalSubset416BitsetView') < registry.indexOf('step.hardProblemView'));
   assert.match(readFrontendIndex(), /renderer-partition-equal-subset-416\.js/);
   assert.match(readFrontendIndex(), /partition-equal-subset-416\.css/);
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.pe416-viz/);
   assert.match(readFrontendStyles(), /\.pe416-cells \{[^}]*flex-wrap:wrap/);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'partition-equal-subset-416.css'), 'utf8');
   assert.doesNotMatch(css, /overflow-x:\s*auto/);
+});
+
+test('416 bitset renderer illustrates the old, shifted, and ORed bitsets in both languages', () => {
+  const { context, element } = rendererHarness();
+  const shift = problem.builder2([1, 5, 11, 5]).steps.find(step => step.equalSubset416BitsetView.phase === 'shift-or');
+  for (const language of ['vi', 'en']) {
+    context.lang = language;
+    for (const step of [...problem.builder2([1, 5, 11, 5]).steps, ...problem.builder2([1, 2, 3, 5]).steps]) {
+      context.renderEqualSubset416BitsetView(step);
+      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+      const view = step.equalSubset416BitsetView;
+      view.sums.forEach((sum, index) => {
+        assert.ok(element.innerHTML.includes(`data-row="after" data-sum="${sum}" data-bit="${view.after[index]}"`));
+      });
+      if (view.phase === 'shift-or') {
+        assert.match(element.innerHTML, /data-row="before"/);
+        assert.match(element.innerHTML, /data-row="shifted"/);
+        assert.match(element.innerHTML, /pe416-bit-row/);
+      }
+    }
+    context.renderEqualSubset416BitsetView(problem.builder2([1, 2, 3, 5]).steps.at(-1));
+    assert.match(element.innerHTML, /× False/);
+  }
+  context.renderEqualSubset416BitsetView(shift);
+  assert.match(element.innerHTML, /<< 1/);
 });
 
 test('416 graphical transitions keep preview DP values unchanged until the update', () => {

@@ -59,3 +59,27 @@ function renderEqualSubset416View(step) {
     host._equalSubset416Observer.observe(host);
   }
 }
+
+function renderEqualSubset416BitsetView(step) {
+  const view = step.equalSubset416BitsetView;
+  if (!view) return;
+  const host = $("treeView");
+  const t = (vi, en) => lang === "vi" ? vi : en;
+  const icon = value => value ? "1" : "0";
+  const start = view.nums.length <= 12 ? 0 : Math.max(0, (view.activeIndex ?? 0) - 5);
+  const end = Math.min(view.nums.length, start + 12);
+  const inputs = `${start ? `<small class="pe416-more">0…${start - 1}</small>` : ""}${view.nums.slice(start, end).map((num, offset) => {
+    const index = start + offset;
+    const cls = index === view.activeIndex ? "active" : index < (view.activeIndex ?? -1) || view.final ? "processed" : "";
+    return `<span class="pe416-input ${cls}" data-index="${index}"><small>${index}</small><b>${num}</b></span>`;
+  }).join("")}${end < view.nums.length ? `<small class="pe416-more">+${view.nums.length - end}</small>` : ""}`;
+  const row = (name, label, values, count, extra = "") => `<section class="pe416-bit-row"><header>${label}<small>${count}</small></header><div>${view.sums.map((sum, index) => `${index && sum > view.sums[index - 1] + 1 ? '<small class="pe416-more">…</small>' : ""}<article class="${values[index] ? "on" : "off"} ${sum === view.target ? "goal" : ""} ${extra && view.before[index] === 0 && view.after[index] === 1 ? "new" : ""}" data-row="${name}" data-sum="${sum}" data-bit="${values[index]}"><small>${sum}</small><b>${icon(values[index])}</b></article>`).join("")}</div></section>`;
+  const rows = view.target === null ? "" : `${view.phase === "shift-or" ? row("before", t("Trước", "Before"), view.before, view.beforeCount) : ""}${view.phase === "shift-or" ? row("shifted", `<< ${view.num}`, view.shifted, "") : ""}${row("after", view.phase === "shift-or" ? "OR" : t("Bitset hiện tại", "Current bitset"), view.after, view.afterCount, "new")}`;
+  const result = view.final
+    ? `<strong class="pe416-bit-answer ${view.answer ? "true" : "false"}">${view.answer ? "✓ True" : "× False"}</strong>`
+    : "<strong>?</strong>";
+  const status = view.target === null
+    ? `<div class="pe416-bit-odd">${t("Tổng lẻ", "Odd total")} · ${view.total} <b>×</b></div>`
+    : `<div class="pe416-bit-goal"><span>Σ ${view.total}</span><span>÷ 2 →</span><strong>${view.target}</strong><small>${t("bit cần bật", "target bit")}</small></div>`;
+  host.innerHTML = `<section class="pe416-viz pe416-bitset" aria-label="${t("Mô phỏng bitset cho bài 416", "416 bitset visualization")}"><header class="pe416-heading"><small>#416 · BITSET</small>${result}</header>${status}<div class="pe416-inputs">${inputs}</div><div class="pe416-bit-explain"><b>${t("Mỗi ô = một tổng", "Each cell = one sum")}</b><span>${view.phase === "shift-or" ? `${t("Dịch trái", "Shift left")} ${view.num} → OR · +${view.addedCount} ${t("tổng mới", "new sums")}` : t("1: tạo được · 0: chưa tạo được", "1: reachable · 0: unreachable")}</span></div>${rows}<footer><span>${t("Dịch bitset cũ: mỗi tổng s bật thêm s + num.", "Shift the old bitset: each sum s also sets s + num.")}</span><span>${t("Dùng bản cũ để không tái sử dụng cùng số.", "Shift the old snapshot to avoid reusing a number.")}</span></footer></section>`;
+}

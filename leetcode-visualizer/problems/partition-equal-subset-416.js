@@ -15,6 +15,17 @@ const SOURCE = Object.freeze([
   "                dp[j] = dp[j] or dp[j-num]",
   "        return dp[target]",
 ]);
+const BITSET_SOURCE = Object.freeze([
+  "class Solution:",
+  "    def canPartition(self, nums):",
+  "        total = sum(nums)",
+  "        if total % 2 != 0: return False",
+  "        target = total // 2",
+  "        bits = 1",
+  "        for num in nums:",
+  "            bits |= bits << num",
+  "        return ((bits >> target) & 1) == 1",
+]);
 
 function parseNums(input) {
   return parseIntegerArray(input, { problemId: 416, name: "nums", maxLength: 200, minValue: 1, maxValue: 100 });
@@ -140,6 +151,127 @@ function buildSteps(input) {
   return { original: [...nums], answer, steps };
 }
 
+function buildBitsetSteps(input) {
+  const nums = parseNums(input);
+  const total = nums.reduce((sum, num) => sum + num, 0);
+  const steps = [];
+  const odd = total % 2 !== 0;
+  const target = odd ? null : total / 2;
+  let bits = 1n;
+  let answer = odd ? false : null;
+  let activeIndex = null;
+
+  function shownSums(num = null) {
+    if (target === null) return [];
+    const sums = new Set();
+    const addRange = (center, radius) => {
+      if (!Number.isFinite(center)) return;
+      for (let sum = Math.max(0, center - radius); sum <= Math.min(target, center + radius); sum++) sums.add(sum);
+    };
+    if (target <= 40) {
+      addRange(0, target);
+    } else {
+      addRange(0, 5);
+      addRange(target, 7);
+      addRange(num, 3);
+      addRange(target - num, 3);
+    }
+    return [...sums].sort((a, b) => a - b);
+  }
+
+  function snapshot(line, event, title, note, opts = {}) {
+    const sums = shownSums(opts.num);
+    const before = opts.before ?? bits;
+    const shifted = opts.shifted ?? 0n;
+    const after = opts.after ?? bits;
+    const changedCount = (after & ~before).toString(2).replace(/0/g, "").length;
+    steps.push({
+      arr: [],
+      codeLines: [line],
+      final: Boolean(opts.final),
+      title: bi(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
+      note,
+      vars: [
+        { name: "total", value: total },
+        ...(target === null ? [] : [{ name: "target", value: target }]),
+        ...(opts.num === undefined ? [] : [{ name: "num", value: opts.num }]),
+      ],
+      equalSubset416BitsetView: {
+        nums: [...nums],
+        total,
+        target,
+        odd,
+        activeIndex,
+        num: opts.num ?? null,
+        sums,
+        before: sums.map((sum) => Number((before >> BigInt(sum)) & 1n)),
+        shifted: sums.map((sum) => Number((shifted >> BigInt(sum)) & 1n)),
+        after: sums.map((sum) => Number((after >> BigInt(sum)) & 1n)),
+        beforeCount: before.toString(2).replace(/0/g, "").length,
+        afterCount: after.toString(2).replace(/0/g, "").length,
+        addedCount: changedCount,
+        phase: event,
+        answer: opts.final ? answer : null,
+        final: Boolean(opts.final),
+      },
+    });
+  }
+
+  snapshot(3, "total", bi(`Tổng các số = ${total}`, `Sum of numbers = ${total}`), bi(
+    "Mỗi bit biểu diễn một tổng có thể tạo được.",
+    "Each set bit represents a sum we can make.",
+  ));
+  if (odd) {
+    answer = false;
+    snapshot(4, "odd-return", bi("Tổng lẻ → không thể chia đôi", "Odd total → cannot split equally"), bi(
+      `${total} là số lẻ nên trả về False.`,
+      `${total} is odd, so return False.`,
+    ), { final: true });
+    return { original: [...nums], answer, steps };
+  }
+
+  snapshot(5, "target", bi(`Mỗi nhóm cần tổng ${target}`, `Each group needs sum ${target}`), bi(
+    "Chỉ cần xem bit target có bật sau khi xử lý mọi số hay không.",
+    "We only need to check whether the target bit is set after all numbers.",
+  ));
+  snapshot(6, "init-bitset", bi("Bit 0 bật: tổng 0 tạo được", "Bit 0 on: sum 0 is reachable"), bi(
+    "bits = 1 chỉ bật bit thấp nhất, tương ứng với nhóm rỗng.",
+    "bits = 1 sets only the lowest bit, representing the empty subset.",
+  ));
+
+  nums.forEach((num, index) => {
+    activeIndex = index;
+    const before = bits;
+    snapshot(7, "select", bi(
+      `Xét nums[${index}] = ${num}`,
+      `Process nums[${index}] = ${num}`,
+    ), bi(
+      "Bitset trước khi dùng số hiện tại.",
+      "Bitset before processing the current number.",
+    ), { num, before, after: before });
+    const shifted = before << BigInt(num);
+    bits = before | shifted;
+    snapshot(8, "shift-or", bi(
+      `Số ${num}: dịch bit sang trái ${num} rồi OR`,
+      `Number ${num}: shift left ${num}, then OR`,
+    ), bi(
+      `Mỗi bit cũ tạo thêm một tổng mới lớn hơn ${num}. OR giữ các tổng cũ hoặc mới; dùng snapshot cũ nên mỗi số chỉ dùng một lần.`,
+      `Each old set bit creates a sum ${num} larger. OR keeps old and new sums; shifting the old snapshot means each number is used once.`,
+    ), { num, before, shifted, after: bits });
+  });
+
+  answer = ((bits >> BigInt(target)) & 1n) === 1n;
+  activeIndex = null;
+  snapshot(9, "return", bi(
+    answer ? `Bit ${target} bật → có thể chia` : `Bit ${target} tắt → không thể chia`,
+    answer ? `Bit ${target} is on → partition exists` : `Bit ${target} is off → no partition`,
+  ), bi(
+    `Đọc bit ${target}: ${answer ? "1" : "0"}.`,
+    `Read bit ${target}: ${answer ? "1" : "0"}.`,
+  ), { final: true });
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   416: {
     id: 416, difficulty: "medium", slug: "partition-equal-subset-sum",
@@ -156,8 +288,14 @@ module.exports = {
       bi("dp[s] là True khi các số đã xét tạo được tổng s. dp[0] = True ứng với nhóm rỗng.", "dp[s] is True when processed numbers can make sum s. dp[0] = True represents the empty group."),
       bi("Với số num: dp[j] = dp[j] or dp[j−num]. Không chọn num, hoặc thêm num vào nhóm tổng j−num.", "For num: dp[j] = dp[j] or dp[j−num]. Skip num, or add it to a group totaling j−num."),
       bi("Duyệt j từ phải sang trái để nguồn j−num chưa dùng số hiện tại. Nhờ đó không chọn cùng một phần tử hai lần.", "Scan j from right to left so source j−num has not used this occurrence. This prevents using one occurrence twice."),
+      bi("Cách 2: biểu diễn mọi tổng bằng bitset số nguyên. bits |= bits << num bật đồng thời các tổng mới trong một phép dịch và OR.", "Approach 2: encode reachable sums in an integer bitset. bits |= bits << num marks all new sums with one shift and OR."),
     ],
     complexity: { time: "O(n × target)", space: "O(target)", note: bi("Độ phức tạp của mã Python. Mô phỏng thêm bản sao và nhóm minh họa; trace dài được rút gọn nhưng vẫn tính đầy đủ đáp án.", "Complexity of the Python solution. The visualization also stores snapshots and witness groups; long traces are shortened while the full answer is computed.") },
-    code: SOURCE, builder: buildSteps, liveArgs: input => [parseNums(input)],
+    code: SOURCE,
+    code2Label: bi("Cách 2: Bitset (dịch + OR)", "Approach 2: Bitset (shift + OR)"),
+    code2: BITSET_SOURCE,
+    builder: buildSteps,
+    builder2: buildBitsetSteps,
+    liveArgs: input => [parseNums(input)],
   },
 };
