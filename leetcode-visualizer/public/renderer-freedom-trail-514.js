@@ -129,7 +129,7 @@ const FT514_TEXT = Object.freeze({
     line: "LINE",
     before: "before execution",
     after: "after execution",
-    eventRail: "Exact source and runtime event rail",
+    eventRail: "Full code · step trace",
     sourceAction: "Current source action",
     phase: "Phase",
     event: "Event",
@@ -207,7 +207,7 @@ const FT514_TEXT = Object.freeze({
     line: "DÒNG",
     before: "trước khi chạy",
     after: "sau khi chạy",
-    eventRail: "Mã nguồn chính xác và chuỗi sự kiện runtime",
+    eventRail: "Toàn bộ code · lịch sử bước",
     sourceAction: "Thao tác mã nguồn hiện tại",
     phase: "Giai đoạn",
     event: "Sự kiện",
@@ -500,11 +500,13 @@ function ft514RenderRail(state, copy, locale) {
   return `<nav class="ft514-rail-wrap" aria-label="${ft514Escape(copy.eventRail)}"><ol class="ft514-event-rail" role="list">${items}</ol></nav>`;
 }
 
-function ft514RenderSource(state, copy, locale) {
-  const eventLabel = ft514EventLabel(state.event, locale);
+function ft514RenderSource(state, copy) {
   const condition = state.condition.result === null ? copy.noCondition : `${state.condition.expression || copy.condition} → ${state.condition.result ? copy.trueValue : copy.falseValue}`;
   const conditionClass = state.condition.result === null ? "none" : state.condition.result ? "true" : "false";
-  return `<section class="ft514-source-card" aria-labelledby="ft514-source-title"><div class="ft514-source-expression"><small id="ft514-source-title">${ft514Escape(copy.sourceAction)}</small><code>${ft514Escape(state.source.text)}</code></div><dl class="ft514-source-facts"><div><dt>${ft514Escape(copy.phase)}</dt><dd>${ft514Escape(state.phase)}</dd></div><div><dt>${ft514Escape(copy.event)}</dt><dd>${ft514Escape(eventLabel)}</dd></div><div><dt>${ft514Escape(copy.condition)}</dt><dd class="ft514-condition-${conditionClass}">${ft514Escape(condition)}</dd></div></dl></section>`;
+  const conditionBadge = state.condition.result === null
+    ? ""
+    : `<span class="ft514-source-condition ft514-condition-${conditionClass}" title="${ft514Escape(condition)}" aria-label="${ft514Escape(condition)}">${state.condition.result ? "✓" : "×"}</span>`;
+  return `<section class="ft514-source-card" aria-labelledby="ft514-source-title"><div class="ft514-source-expression"><small id="ft514-source-title">${ft514Escape(copy.sourceAction)} · L${state.source.line}</small><code>${ft514Escape(state.source.text)}</code></div>${conditionBadge}</section>`;
 }
 
 function ft514AlignedPosition(state) {
@@ -536,7 +538,7 @@ function ft514RenderRing(state, copy) {
     const aria = `${copy.originalIndex} ${index}, ${copy.character} ${char}${roles.length ? `, ${roles.join(", ")}` : ""}`;
     return `<li class="${classes}" style="--ft514-angle:${angle.toFixed(3)}deg;--ft514-counter-angle:${(-angle).toFixed(3)}deg" aria-label="${ft514Escape(aria)}"><div><small>${index}</small><strong>${ft514Escape(char)}</strong></div></li>`;
   }).join("");
-  return `<section class="ft514-card ft514-ring-card" aria-labelledby="ft514-ring-title"><header><div><h3 id="ft514-ring-title">${ft514Escape(copy.ring)}</h3><p>${ft514Escape(copy.ringHelp)}</p></div><strong>${ft514Escape(copy.aligned)} ${aligned}</strong></header><div class="ft514-ring-stage" role="img" aria-label="${ft514Escape(`${copy.ring}: ${state.ring}; ${copy.aligned} ${aligned}`)}"><div class="ft514-selector"><span>▼</span><strong>${ft514Escape(copy.selector)}</strong></div><div class="ft514-ring-wheel"><ol role="list">${nodes}</ol><div class="ft514-ring-hub"><small>${ft514Escape(copy.aligned)}</small><strong>${aligned}</strong><span>${ft514Escape(state.ring[aligned])}</span></div></div></div></section>`;
+  return `<section class="ft514-card ft514-ring-card" aria-labelledby="ft514-ring-title"><header><div><h3 id="ft514-ring-title">${ft514Escape(copy.ring)}</h3></div><strong>${ft514Escape(copy.aligned)} ${aligned}</strong></header><div class="ft514-ring-stage" role="img" aria-label="${ft514Escape(`${copy.ring}: ${state.ring}; ${copy.aligned} ${aligned}`)}"><div class="ft514-selector"><span>▼</span><strong>${ft514Escape(copy.selector)}</strong></div><div class="ft514-ring-wheel"><ol role="list">${nodes}</ol><div class="ft514-ring-hub"><small>${ft514Escape(copy.aligned)}</small><strong>${aligned}</strong><span>${ft514Escape(state.ring[aligned])}</span></div></div></div></section>`;
 }
 
 function ft514DirectionLabel(direction, copy) {
@@ -554,7 +556,7 @@ function ft514RenderRotation(state, copy) {
     return `<div class="ft514-direction ft514-direction-${kind} ${selected ? "ft514-is-chosen" : ""}"><header><strong>${ft514Escape(label)}</strong><span>${ft514Escape(selected ? copy.chosen : copy.notChosen)}</span></header><div><b>${ft514Escape(ft514Display(value, copy))}</b><small>${ft514Escape(copy.turns)}</small></div><p aria-hidden="true">${kind === "clockwise" ? "↻" : "↺"}</p></div>`;
   };
   const path = state.rotation.path.length ? state.rotation.path.join(" → ") : copy.none;
-  return `<section class="ft514-card ft514-rotation-card" aria-labelledby="ft514-rotation-title"><header><div><h3 id="ft514-rotation-title">${ft514Escape(copy.rotation)}</h3><p>${ft514Escape(copy.rotationHelp)}</p></div><strong>${ft514Escape(ft514DirectionLabel(direction, copy))}</strong></header><div class="ft514-direction-grid">${card("clockwise", state.rotation.clockwise)}${card("counterclockwise", state.rotation.counterclockwise)}</div><dl><div><dt>${ft514Escape(copy.previous)}</dt><dd>${ft514Escape(ft514Display(state.cursor.previous, copy))}</dd></div><div><dt>${ft514Escape(copy.target)}</dt><dd>${ft514Escape(ft514Display(state.cursor.target, copy))}</dd></div><div><dt>${ft514Escape(copy.turns)}</dt><dd>${ft514Escape(ft514Display(state.rotation.turns, copy))}</dd></div><div><dt>${ft514Escape(copy.path)}</dt><dd>${ft514Escape(path)}</dd></div></dl></section>`;
+  return `<section class="ft514-card ft514-rotation-card" aria-labelledby="ft514-rotation-title"><header><div><h3 id="ft514-rotation-title">${ft514Escape(copy.rotation)}</h3></div><strong>${ft514Escape(ft514DirectionLabel(direction, copy))}</strong></header><div class="ft514-direction-grid">${card("clockwise", state.rotation.clockwise)}${card("counterclockwise", state.rotation.counterclockwise)}</div><dl><div><dt>${ft514Escape(copy.previous)}</dt><dd>${ft514Escape(ft514Display(state.cursor.previous, copy))}</dd></div><div><dt>${ft514Escape(copy.target)}</dt><dd>${ft514Escape(ft514Display(state.cursor.target, copy))}</dd></div><div><dt>${ft514Escape(copy.turns)}</dt><dd>${ft514Escape(ft514Display(state.rotation.turns, copy))}</dd></div><div><dt>${ft514Escape(copy.path)}</dt><dd>${ft514Escape(path)}</dd></div></dl></section>`;
 }
 
 function ft514RenderKey(state, copy) {
@@ -565,7 +567,7 @@ function ft514RenderKey(state, copy) {
     return `<li class="${current ? "ft514-is-current" : ""} ${done ? "ft514-is-done" : ""}"${current ? ' aria-current="step"' : ""}><small>${index}</small><strong>${ft514Escape(char)}</strong><span>${done ? "✓" : "·"}</span></li>`;
   }).join("");
   const occurrences = state.positions.entries.length ? state.positions.entries.map((entry) => `<li><strong>${ft514Escape(entry.char)}</strong><code>[${entry.indices.join(", ")}]</code></li>`).join("") : `<li class="ft514-empty">${ft514Escape(copy.pending)}</li>`;
-  return `<section class="ft514-card ft514-key-card" aria-labelledby="ft514-key-title"><header><div><h3 id="ft514-key-title">${ft514Escape(copy.key)}</h3><p>${ft514Escape(copy.keyHelp)}</p></div><strong>${ft514Escape(state.key)}</strong></header><ol class="ft514-key-list" role="list">${items}</ol><h4>${ft514Escape(copy.occurrenceIndex)}</h4><ul class="ft514-occurrences" role="list">${occurrences}</ul></section>`;
+  return `<section class="ft514-card ft514-key-card" aria-labelledby="ft514-key-title"><header><div><h3 id="ft514-key-title">${ft514Escape(copy.key)}</h3></div><strong>${ft514Escape(state.key)}</strong></header><ol class="ft514-key-list" role="list">${items}</ol><h4>${ft514Escape(copy.occurrenceIndex)}</h4><ul class="ft514-occurrences" role="list">${occurrences}</ul></section>`;
 }
 
 function ft514RenderDp(state, copy) {
@@ -582,7 +584,7 @@ function ft514RenderDp(state, copy) {
     return `<tr><th scope="row">${ft514Escape(label)}</th>${cells}</tr>`;
   }).join("");
   const chips = (entries, kind) => entries.length ? entries.map((entry) => `<li class="${entry.position === state.cursor.target || entry.position === state.cursor.previous ? "ft514-is-current" : ""}"><small>p${entry.position}</small><strong>${entry.cost}</strong><span>${ft514Escape(kind)}</span></li>`).join("") : `<li class="ft514-empty">${ft514Escape(copy.none)}</li>`;
-  return `<section class="ft514-card ft514-dp-card" aria-labelledby="ft514-dp-title"><header><div><h3 id="ft514-dp-title">${ft514Escape(copy.dp)}</h3><p>${ft514Escape(copy.dpHelp)}</p></div><strong>${state.table.length}</strong></header><div class="ft514-table-scroll" tabindex="0"><table><thead><tr><th></th>${headers}</tr></thead><tbody>${rows}</tbody></table></div><h4>${ft514Escape(copy.currentFrontier)}</h4><div class="ft514-frontiers"><div><small>${ft514Escape(copy.currentDp)}</small><ul role="list">${chips(state.frontier.dp, "dp")}</ul></div><div><small>${ft514Escape(copy.nextDp)}</small><ul role="list">${chips(state.frontier.next, "next")}</ul></div></div></section>`;
+  return `<section class="ft514-card ft514-dp-card" aria-labelledby="ft514-dp-title"><header><div><h3 id="ft514-dp-title">${ft514Escape(copy.dp)}</h3></div><strong>${state.table.length}</strong></header><div class="ft514-table-scroll" tabindex="0"><table><thead><tr><th></th>${headers}</tr></thead><tbody>${rows}</tbody></table></div><h4>${ft514Escape(copy.currentFrontier)}</h4><div class="ft514-frontiers"><div><small>${ft514Escape(copy.currentDp)}</small><ul role="list">${chips(state.frontier.dp, "dp")}</ul></div><div><small>${ft514Escape(copy.nextDp)}</small><ul role="list">${chips(state.frontier.next, "next")}</ul></div></div></section>`;
 }
 
 function ft514OutcomeLabel(outcome, copy) {
@@ -605,7 +607,7 @@ function ft514RenderCandidate(state, copy) {
   const factHtml = facts.length ? facts.map(([label, entry]) => `<div><dt>${ft514Escape(label)}</dt><dd>${entry}</dd></div>`).join("") : `<div class="ft514-empty">${ft514Escape(copy.pending)}</div>`;
   const incumbentText = incumbent ? `${incumbent.total} · p${incumbent.previous} · ${ft514DirectionLabel(incumbent.direction, copy)}` : copy.none;
   const parents = state.frontier.parent.length ? state.frontier.parent.map((link) => `<li><strong>p${link.position}</strong><span>← p${link.previous}</span><code>${ft514Escape(ft514DirectionLabel(link.direction, copy))} · ${link.turns}</code></li>`).join("") : `<li class="ft514-empty">${ft514Escape(copy.none)}</li>`;
-  return `<section class="ft514-card ft514-candidate-card ft514-outcome-${state.candidate.outcome}" aria-labelledby="ft514-candidate-title"><header><div><h3 id="ft514-candidate-title">${ft514Escape(copy.candidate)}</h3><p>${ft514Escape(copy.candidateHelp)}</p></div><strong>${ft514Escape(ft514OutcomeLabel(state.candidate.outcome, copy))}</strong></header><dl class="ft514-candidate-facts">${factHtml}</dl><div class="ft514-incumbent"><small>${ft514Escape(copy.incumbent)}</small><strong>${ft514Escape(incumbentText)}</strong></div><h4>${ft514Escape(copy.parents)}</h4><p class="ft514-parent-help">${ft514Escape(copy.parentsHelp)}</p><ul class="ft514-parent-list" role="list">${parents}</ul></section>`;
+  return `<section class="ft514-card ft514-candidate-card ft514-outcome-${state.candidate.outcome}" aria-labelledby="ft514-candidate-title"><header><div><h3 id="ft514-candidate-title">${ft514Escape(copy.candidate)}</h3></div><strong>${ft514Escape(ft514OutcomeLabel(state.candidate.outcome, copy))}</strong></header><dl class="ft514-candidate-facts">${factHtml}</dl><div class="ft514-incumbent"><small>${ft514Escape(copy.incumbent)}</small><strong>${ft514Escape(incumbentText)}</strong></div><h4>${ft514Escape(copy.parents)}</h4><ul class="ft514-parent-list" role="list">${parents}</ul></section>`;
 }
 
 function ft514RenderWitness(state, copy) {
@@ -616,7 +618,7 @@ function ft514RenderWitness(state, copy) {
     return `<li class="ft514-action ft514-action-${action.direction}"><header><small>#${action.layer}</small><strong>${ft514Escape(action.char)}</strong><span>+${action.cost}</span></header><div><code>${action.from} → ${action.to}</code><strong>${ft514Escape(ft514DirectionLabel(action.direction, copy))}</strong></div><p>${ft514Escape(copy.path)}: ${ft514Escape(path)}</p><footer><span>${action.turns} ${ft514Escape(copy.turns)}</span><b>● ${ft514Escape(copy.press)}</b></footer></li>`;
   }).join("") : `<li class="ft514-empty">${ft514Escape(copy.noActions)}</li>`;
   const answer = state.answer === null ? copy.waitingAnswer : String(state.answer);
-  return `<section class="ft514-card ft514-witness-card ${state.reconstruction.complete ? "ft514-is-complete" : ""}" aria-labelledby="ft514-witness-title" aria-live="polite"><header><div><small>${ft514Escape(copy.answer)}</small><h3 id="ft514-witness-title">${ft514Escape(answer)}</h3></div><div><strong>${ft514Escape(copy.reconstruction)}</strong><span>${ft514Escape(chronological ? copy.chronological : copy.reverseOrder)}</span></div></header><p>${ft514Escape(copy.reconstructionHelp)}</p><div class="ft514-action-scroll" tabindex="0"><ol role="list">${items}</ol></div></section>`;
+  return `<section class="ft514-card ft514-witness-card ${state.reconstruction.complete ? "ft514-is-complete" : ""}" aria-labelledby="ft514-witness-title" aria-live="polite"><header><div><small>${ft514Escape(copy.answer)}</small><h3 id="ft514-witness-title">${ft514Escape(answer)}</h3></div><div><strong>${ft514Escape(copy.reconstruction)}</strong><span>${ft514Escape(chronological ? copy.chronological : copy.reverseOrder)}</span></div></header><div class="ft514-action-scroll" tabindex="0"><ol role="list">${items}</ol></div></section>`;
 }
 
 function ft514RenderInvariants(state, copy) {
@@ -646,6 +648,10 @@ function renderFreedomTrail514View(step) {
   const eventLabel = ft514EventLabel(state.event, locale);
   const timingLabel = state.timing === "before" ? copy.before : copy.after;
   const summary = `${copy.region}. ${copy.line} ${state.source.line}. ${eventLabel}.`;
-  const note = state.note ? `<aside class="ft514-note"><strong>${ft514Escape(copy.note)}</strong><p>${ft514Escape(state.note)}</p></aside>` : "";
-  host.innerHTML = `<article class="ft514-viz ft514-phase-${state.phase} ${state.final ? "ft514-is-final" : ""}" role="region" aria-label="${ft514Escape(summary)}"><header class="ft514-header"><div><span>${ft514Escape(copy.kicker)}</span><h2>${ft514Escape(state.title)}</h2></div><div class="ft514-line-state"><strong>${ft514Escape(copy.line)} ${state.source.line}</strong><span class="ft514-timing-${state.timing}">${ft514Escape(timingLabel)}</span><em>${ft514Escape(eventLabel)}</em></div></header>${ft514RenderRail(state, copy, locale)}${ft514RenderSource(state, copy, locale)}<div class="ft514-ring-grid">${ft514RenderRing(state, copy)}${ft514RenderRotation(state, copy)}</div>${ft514RenderKey(state, copy)}<div class="ft514-dp-grid">${ft514RenderDp(state, copy)}${ft514RenderCandidate(state, copy)}</div>${ft514RenderWitness(state, copy)}<div class="ft514-footer-grid">${ft514RenderInvariants(state, copy)}${ft514RenderCounters(state, copy, locale)}</div>${note}</article>`;
+  const note = state.note ? `<details class="ft514-debug-details"><summary>${ft514Escape(copy.note)}</summary><p>${ft514Escape(state.note)}</p></details>` : "";
+  const witness = state.reconstruction.current || state.reconstruction.actions.length || state.reconstruction.complete
+    ? ft514RenderWitness(state, copy)
+    : "";
+  const diagnostics = `<details class="ft514-debug-details"><summary>${ft514Escape(copy.invariants)} · ${ft514Escape(copy.counters)}</summary><div class="ft514-footer-grid">${ft514RenderInvariants(state, copy)}${ft514RenderCounters(state, copy, locale)}</div></details>`;
+  host.innerHTML = `<article class="ft514-viz ft514-phase-${state.phase} ${state.final ? "ft514-is-final" : ""}" role="region" aria-label="${ft514Escape(summary)}"><header class="ft514-header"><div><span>${ft514Escape(copy.kicker)}</span><h2>${ft514Escape(state.title)}</h2></div><div class="ft514-line-state"><strong>${ft514Escape(copy.line)} ${state.source.line}</strong><span class="ft514-timing-${state.timing}">${ft514Escape(timingLabel)}</span></div></header>${ft514RenderSource(state, copy)}<div class="ft514-ring-grid">${ft514RenderRing(state, copy)}${ft514RenderRotation(state, copy)}</div>${ft514RenderKey(state, copy)}<div class="ft514-dp-grid">${ft514RenderDp(state, copy)}${ft514RenderCandidate(state, copy)}</div>${witness}<details class="ft514-debug-details"><summary>${ft514Escape(copy.eventRail)} · ${state.source.line}/${FT514_SOURCE.length}</summary>${ft514RenderRail(state, copy, locale)}</details>${diagnostics}${note}</article>`;
 }

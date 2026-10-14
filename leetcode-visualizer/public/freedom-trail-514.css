@@ -179,7 +179,8 @@ body.light .ft514-viz,
 
 .ft514-source-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   overflow: hidden;
 }
 
@@ -188,7 +189,6 @@ body.light .ft514-viz,
   align-content: center;
   gap: 8px;
   min-width: 0;
-  border-right: 1px solid var(--ft514-border);
   padding: 14px 16px;
 }
 
@@ -208,25 +208,6 @@ body.light .ft514-viz,
   white-space: pre;
 }
 
-.ft514-source-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  background: var(--ft514-border);
-}
-
-.ft514-source-facts > div {
-  min-width: 0;
-  padding: 9px 11px;
-  background: var(--ft514-panel);
-}
-
-.ft514-source-facts > div:last-child {
-  grid-column: 1 / -1;
-}
-
-.ft514-source-facts dt,
 .ft514-rotation-card dt,
 .ft514-candidate-facts dt {
   color: var(--ft514-muted);
@@ -236,7 +217,6 @@ body.light .ft514-viz,
   text-transform: uppercase;
 }
 
-.ft514-source-facts dd,
 .ft514-rotation-card dd,
 .ft514-candidate-facts dd {
   margin: 3px 0 0;
@@ -256,6 +236,18 @@ body.light .ft514-viz,
 
 .ft514-condition-none {
   color: var(--ft514-muted) !important;
+}
+
+.ft514-source-condition {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin: 0 13px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 900;
 }
 
 .ft514-card {
@@ -993,6 +985,32 @@ body.light .ft514-viz,
   color: var(--ft514-text);
 }
 
+.ft514-debug-details {
+  min-width: 0;
+  border: 1px solid var(--ft514-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--ft514-panel);
+}
+
+.ft514-debug-details > summary {
+  color: var(--ft514-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.ft514-debug-details[open] > summary {
+  margin-bottom: 9px;
+  color: var(--ft514-cyan);
+}
+
+.ft514-debug-details > p {
+  margin: 0;
+  color: var(--ft514-text);
+  font-size: 0.76rem;
+}
+
 .ft514-viz :focus-visible {
   outline: 2px solid var(--ft514-cyan);
   outline-offset: 2px;
@@ -1003,16 +1021,10 @@ body.light .ft514-viz,
 }
 
 @container ft514 (max-width: 920px) {
-  .ft514-source-card,
   .ft514-ring-grid,
   .ft514-dp-grid,
   .ft514-footer-grid {
     grid-template-columns: 1fr;
-  }
-
-  .ft514-source-expression {
-    border-right: 0;
-    border-bottom: 1px solid var(--ft514-border);
   }
 }
 
@@ -1028,15 +1040,10 @@ body.light .ft514-viz,
     text-align: left;
   }
 
-  .ft514-source-facts,
   .ft514-rotation-card > dl,
   .ft514-candidate-facts,
   .ft514-frontiers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ft514-source-facts > div:last-child {
-    grid-column: 1 / -1;
   }
 
   .ft514-ring-stage {
