@@ -181,8 +181,9 @@ test('843 dedicated frontend assets are loaded and registered before the app scr
   assert.match(styles, /\.gtw843-letter\.match/);
   assert.match(styles, /\.gtw843-chart-bucket/);
   assert.ok(index.indexOf('renderer-guess-the-word-843.js') < index.indexOf('script.js?'));
-  assert.match(index, /guess-the-word-843\.css\?v=guess-the-word-843-v3/);
-  assert.match(index, /renderer-guess-the-word-843\.js\?v=guess-the-word-843-v3/);
+  assert.match(renderer, /class GuessTheWord843Visualizer/);
+  assert.match(index, /guess-the-word-843\.css\?v=guess-the-word-843-v\d+/);
+  assert.match(index, /renderer-guess-the-word-843\.js\?v=guess-the-word-843-v\d+/);
   assert.match(index, /cc=robot-room-cleaner-489-v1/);
 });
 
@@ -208,7 +209,8 @@ test('843 renderer emphasizes matching letters, candidate cards, and minimax buc
     for (const step of result.steps) {
       context.renderGuessTheWord843View(step);
       assert.match(host.innerHTML, /gtw843-comparison/);
-      assert.match(host.innerHTML, /gtw843-word-dots/);
+      assert.match(host.innerHTML, /gtw843-letters/);
+      if (step.guessWord843View.phase !== 'found') assert.match(host.innerHTML, /gtw843-match-dots/);
       assert.match(host.innerHTML, /gtw843-pipeline/);
       assert.match(host.innerHTML, /gtw843-debug/);
       assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
@@ -233,4 +235,80 @@ test('843 renderer emphasizes matching letters, candidate cards, and minimax buc
 test('843 is marked available in the string study roadmap', () => {
   const roadmap = fs.readFileSync(require.resolve('../../docs/leetcode-string-study-roadmap.md'), 'utf8');
   assert.match(roadmap, /\[843\. Guess the Word\]\([^\n]+\) \| Hard \|  \| Có \|/);
+});
+
+function classRenderer(language = 'en') {
+  const host = { innerHTML: '' };
+  const context = { escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]) };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/renderer-guess-the-word-843.js'), 'utf8'), context);
+  const Visualizer = vm.runInContext('GuessTheWord843Visualizer', context);
+  return { host, visualizer: new Visualizer({ host, language }) };
+}
+
+test('843 Master rendering depends on its returned count, not hidden letters or matching positions', () => {
+  const { host, visualizer } = classRenderer();
+  const run = problem.builder(DEFAULT_WORDS, { secret: 'eiowzz' });
+  const guess = run.steps.find(step => step.guessWord843View.phase === 'guess');
+  visualizer.render(guess);
+  const original = host.innerHTML;
+  assert.match(original, /data-source="master"/);
+  assert.match(original, /Secret stays hidden/);
+  const master = visualizer.comparison(guess.guessWord843View);
+  assert.doesNotMatch(master, /gtw843-letter match|gtw843-letter miss/);
+  assert.match(master, /aria-label="2\/6"/);
+  const changed = JSON.parse(JSON.stringify(guess));
+  changed.guessWord843View.secret = 'abcdef';
+  changed.guessWord843View.comparison.right = 'abcdef';
+  visualizer.render(changed);
+  assert.equal(host.innerHTML, original);
+});
+
+test('843 scoring reveals only processed rows and skips the candidate itself in buckets', () => {
+  const { host, visualizer } = classRenderer();
+  const run = problem.builder(DEFAULT_WORDS, { secret: 'eiowzz' });
+  const scores = run.steps.filter(step => step.guessWord843View.phase === 'score' && step.guessWord843View.round === 1);
+  scores.forEach((step, index) => {
+    visualizer.render(step);
+    assert.equal((host.innerHTML.match(/class="gtw843-score-row/g) || []).length, index + 1);
+    const counts = [...host.innerHTML.matchAll(/data-bucket="(\d+)" data-count="(\d+)"/g)].map(match => Number(match[2]));
+    assert.equal(counts.length, 7);
+    assert.equal(counts.reduce((sum, count) => sum + count, 0), WORDS.length - 1);
+    assert.equal(counts[6], 0);
+  });
+});
+
+test('843 filter shows exact match counts and keeps only the returned feedback group', () => {
+  const { host, visualizer } = classRenderer('vi');
+  const filter = problem.builder(DEFAULT_WORDS, { secret: 'eiowzz' }).steps.find(step => step.guessWord843View.phase === 'filter');
+  visualizer.render(filter);
+  const cards = [...host.innerHTML.matchAll(/class="gtw843-word([^\"]*)" data-word="([^\"]+)" data-matches="(\d+)"/g)];
+  assert.equal(cards.length, WORDS.length);
+  for (const [, state, word, count] of cards) {
+    assert.equal(Number(count), matches(word, filter.guessWord843View.bestWord));
+    assert.equal(state.includes('kept'), Number(count) === filter.guessWord843View.result);
+    assert.equal(state.includes('removed'), Number(count) !== filter.guessWord843View.result);
+  }
+  assert.match(host.innerHTML, /4 → 1/);
+});
+
+test('843 class handles one and 24 candidates, zero matches, and independent languages', () => {
+  const english = classRenderer('en');
+  const vietnamese = classRenderer('vi');
+  const inputs = [
+    { words: ['aaaaaa'], secret: 'aaaaaa' },
+    { words: ['aaaaaa', 'bbbbbb'], secret: 'bbbbbb' },
+    { words: makeWords(24, 843), secret: makeWords(24, 843)[23] },
+  ];
+  for (const { words, secret } of inputs) {
+    const run = problem.builder(words, { secret });
+    for (const step of run.steps) {
+      english.visualizer.render(step);
+      vietnamese.visualizer.render(step);
+      assert.doesNotMatch(english.host.innerHTML, /undefined|NaN|Infinity/);
+      assert.match(english.host.innerHTML, /Guess the Word/);
+      assert.match(vietnamese.host.innerHTML, /Đoán từ/);
+    }
+    assert.match(english.host.innerHTML, /gtw843-found/);
+  }
 });
