@@ -1,0 +1,347 @@
+#treeView:has(>.wep2585-viz) {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.wep2585-viz {
+  --wep-bg: #101b2d;
+  --wep-panel: #182740;
+  --wep-edge: #344864;
+  --wep-text: #edf4ff;
+  --wep-muted: #9db0ca;
+  --wep-blue: #70b8ff;
+  --wep-violet: #c09aff;
+  --wep-green: #52dfae;
+  --wep-amber: #ffc36b;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--wep-edge);
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--wep-blue) 14%, transparent), transparent 48%), var(--wep-bg);
+  color: var(--wep-text);
+  font-size: 12px;
+}
+
+[data-theme="light"] .wep2585-viz {
+  --wep-bg: #f4f8ff;
+  --wep-panel: #fff;
+  --wep-edge: #cbd8e8;
+  --wep-text: #1d304b;
+  --wep-muted: #62758e;
+  --wep-blue: #2563eb;
+  --wep-violet: #7c3aed;
+  --wep-green: #07865c;
+  --wep-amber: #a45a00;
+}
+
+.wep2585-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wep2585-heading strong {
+  font-size: 0.85rem;
+}
+
+.wep2585-heading span,
+.wep2585-viz small {
+  color: var(--wep-muted);
+  font-size: 0.62rem;
+}
+
+.wep2585-target {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  border: 1px solid var(--wep-edge);
+  border-radius: 11px;
+  padding: 7px 10px;
+  background: var(--wep-panel);
+}
+
+.wep2585-target > small {
+  color: var(--wep-muted);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.wep2585-target > strong {
+  color: var(--wep-amber);
+  font-size: 1.35rem;
+}
+
+.wep2585-target > span {
+  color: var(--wep-muted);
+  font-size: 0.65rem;
+}
+
+.wep2585-target > b {
+  margin-left: auto;
+  color: var(--wep-green);
+  font-size: 1.3rem;
+}
+
+.wep2585-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wep2585-type {
+  min-width: 88px;
+  border: 1px solid var(--wep-edge);
+  border-radius: 9px;
+  padding: 6px 7px;
+  background: var(--wep-panel);
+}
+
+.wep2585-type.active {
+  border-color: var(--wep-amber);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wep-amber) 18%, transparent);
+}
+
+.wep2585-type header {
+  display: flex;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.wep2585-type header b {
+  color: var(--wep-muted);
+  font-size: 0.59rem;
+}
+
+.wep2585-type header strong {
+  color: var(--wep-text);
+  font-size: 0.62rem;
+}
+
+.wep2585-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.wep2585-questions i {
+  display: grid;
+  min-width: 22px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--wep-edge);
+  border-radius: 4px;
+  color: var(--wep-blue);
+  font-size: 0.52rem;
+  font-style: normal;
+}
+
+.wep2585-questions i.used {
+  border-color: var(--wep-green);
+  background: color-mix(in srgb, var(--wep-green) 17%, var(--wep-panel));
+  color: var(--wep-green);
+}
+
+.wep2585-dp {
+  min-width: 0;
+  border: 1px solid var(--wep-edge);
+  border-radius: 11px;
+  padding: 8px;
+  background: var(--wep-panel);
+}
+
+.wep2585-dp > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.wep2585-dp > header strong {
+  color: var(--wep-blue);
+  font-size: 0.8rem;
+}
+
+.wep2585-dp > header span {
+  color: var(--wep-muted);
+  font-size: 0.58rem;
+}
+
+.wep2585-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wep2585-cell {
+  display: grid;
+  min-width: 39px;
+  min-height: 46px;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid var(--wep-edge);
+  border-radius: 6px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--wep-bg) 68%, transparent);
+}
+
+.wep2585-cell small {
+  color: var(--wep-muted);
+  font-size: 0.5rem;
+}
+
+.wep2585-cell b {
+  color: var(--wep-text);
+  font-size: 0.68rem;
+}
+
+.wep2585-cell > span {
+  border-radius: 4px;
+  padding: 1px 3px;
+  background: color-mix(in srgb, var(--wep-violet) 16%, transparent);
+  color: var(--wep-violet);
+  font-size: 0.52rem;
+}
+
+.wep2585-cell.active {
+  border-color: var(--wep-amber);
+}
+
+.wep2585-cell.source {
+  border-color: var(--wep-blue);
+  background: color-mix(in srgb, var(--wep-blue) 11%, var(--wep-panel));
+}
+
+.wep2585-dp > small {
+  display: block;
+  margin-top: 5px;
+}
+
+.wep2585-transfer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--wep-blue) 7%, var(--wep-bg));
+}
+
+.wep2585-transfer > div {
+  display: grid;
+  min-width: 58px;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid var(--wep-blue);
+  border-radius: 7px;
+  padding: 4px 7px;
+}
+
+.wep2585-transfer > div.destination {
+  border-color: var(--wep-amber);
+}
+
+.wep2585-transfer > div strong {
+  color: var(--wep-text);
+  font-size: 0.83rem;
+}
+
+.wep2585-transfer > i,
+.wep2585-transfer > span {
+  color: var(--wep-muted);
+  font-size: 0.58rem;
+  font-style: normal;
+}
+
+.wep2585-transfer > i {
+  color: var(--wep-violet);
+}
+
+.wep2585-transfer > b {
+  color: var(--wep-green);
+  font-size: 1rem;
+}
+
+.wep2585-hint {
+  color: var(--wep-muted);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.wep2585-hint b {
+  color: var(--wep-amber);
+}
+
+.wep2585-answer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--wep-green);
+  border-radius: 10px;
+  padding: 7px;
+  background: color-mix(in srgb, var(--wep-green) 9%, var(--wep-panel));
+}
+
+.wep2585-answer span {
+  color: var(--wep-muted);
+  font-size: 0.7rem;
+}
+
+.wep2585-answer b {
+  color: var(--wep-green);
+  font-size: 1.3rem;
+}
+
+.wep2585-answer small {
+  font-size: 0.55rem;
+}
+
+.wep2585-truncated {
+  border: 1px dashed var(--wep-amber);
+  border-radius: 7px;
+  padding: 6px;
+}
+
+#vizPanel:has(.wep2585-viz) #stepNote {
+  display: none;
+}
+
+#vizPanel:has(.wep2585-viz) :is(#codePanel, #codePanel2) {
+  max-height: none;
+  overflow: visible;
+  position: static;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.wep2585-viz) .code-line {
+  width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.wep2585-viz) .code-line .txt {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .wep2585-viz {
+    padding: 9px;
+  }
+
+  .wep2585-type {
+    min-width: 78px;
+  }
+}
