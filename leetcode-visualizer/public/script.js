@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.restoreArray1416View), surface: "treeView", render: (step) => {
+      renderRestoreArray1416View(step);
+    } },
     { predicate: (step) => Boolean(step.greatPartitions2518View), surface: "treeView", render: (step) => {
       renderGreatPartitions2518View(step);
     } },

@@ -868,6 +868,11 @@ function buildSteps1416(input, params = {}) {
   const maxDigits = String(k).length;
   const dp = Array(n + 1).fill(0);
   dp[0] = 1;
+  // A bounded gallery of actual cuts, separate from the modulo counts.
+  const examples = Array.from({ length: n + 1 }, () => []);
+  examples[0] = [[]];
+  const sampleLimit = 8;
+  const copyExamples = (position) => examples[position].map(parts => [...parts]);
 
   const steps = [];
   let traceTruncated = false;
@@ -951,6 +956,16 @@ function buildSteps1416(input, params = {}) {
       mark,
       final,
       codeLines: [...codeLines],
+      restoreArray1416View: {
+        s, k, start, end, value, before, after, updated, final,
+        phase: phaseIndex,
+        sourceWays: dp[start],
+        sourceExamples: copyExamples(start),
+        targetExamples: copyExamples(targetPrefix),
+        cells: indices.map(index => ({ index, count: dp[index] })),
+        answer,
+        traceTruncated,
+      },
       vars: [
         { name: "s", value: s },
         { name: "k", value: k },
@@ -1078,6 +1093,10 @@ function buildSteps1416(input, params = {}) {
 
       const before = dp[end + 1];
       dp[end + 1] = (dp[end + 1] + dp[start]) % MOD;
+      for (const parts of examples[start]) {
+        if (examples[end + 1].length >= sampleLimit) break;
+        examples[end + 1].push([...parts, s.slice(start, end + 1)]);
+      }
       emit({
         phaseIndex: 3,
         title: bi(
