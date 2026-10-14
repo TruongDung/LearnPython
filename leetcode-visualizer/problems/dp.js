@@ -25507,7 +25507,15 @@ function buildSteps1531(input, params) {
       return;
     }
     steps.push({
-      title: opts.title,
+      title: opts.final
+        ? { vi: "Kết quả", en: "Result" }
+        : opts.action
+          ? { vi: opts.action === "keep" ? "Giữ" : "Xóa", en: opts.action === "keep" ? "Keep" : "Delete" }
+          : opts.codeLines?.[0] === 19
+            ? { vi: "So sánh", en: "Compare" }
+            : opts.codeLines?.[0] === 12
+              ? { vi: "Memo", en: "Memo" }
+              : { vi: "Quét", en: "Scan" },
       arr: [],
       grid: makeGrid(opts.i ?? n, opts),
       highlight: [],
@@ -25707,23 +25715,24 @@ function buildSteps1531(input, params) {
     i: n,
     last: "",
     count: 0,
-    kLeft: k,
+    kLeft: selectedK,
     caption: { vi: `getLengthOfOptimalCompression(${JSON.stringify(s)}, ${k}) = ${answer}`, en: `getLengthOfOptimalCompression(${JSON.stringify(s)}, ${k}) = ${answer}` },
     secondaryCaption: truncated
       ? { vi: "Trace đã được rút gọn; đáp án vẫn được tính đầy đủ.", en: "Trace was truncated; the answer was still computed fully." }
       : { vi: "Trace đã đi qua các state chính của memoized recursion.", en: "The trace visited the key states of the memoized recursion." },
-    vars: [
-      { name: "answer", value: answer },
-      { name: "memo size", value: memo.size },
-      { name: "memo hits", value: memoHits },
-    ],
     note: {
       vi: "Thiết kế state là phần khó nhất: last/count giúp biết khi nào chuỗi nén tăng độ dài.",
       en: "The state design is the hard part: last/count tells us when the compressed string length grows.",
     },
     final: true,
     force: true,
-    vars: [{ name: "kept", value: JSON.stringify(kept) }, { name: "compressed", value: compressed }],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "memo size", value: memo.size },
+      { name: "memo hits", value: memoHits },
+      { name: "kept", value: JSON.stringify(kept) },
+      { name: "compressed", value: compressed },
+    ],
     kept,
     compressed,
     answer,
@@ -25759,8 +25768,8 @@ Object.assign(module.exports, {
       { vi: "Edge case khó: giữ ký tự cùng run chỉ tăng độ dài nén khi count là 1, 9, hoặc 99.", en: "Hard edge case: keeping a same-run character only increases encoded length when count is 1, 9, or 99." },
     ],
     complexity: {
-      time: "O(n * k * alphabet * n) states in practice",
-      space: "O(n * k * alphabet * n)",
+      time: "O(n² · k · alphabet)",
+      space: "O(n² · k · alphabet)",
       note: {
         vi: "Visualization dùng top-down memo và giới hạn s length <= 12 để trace dễ theo dõi.",
         en: "The visualization uses top-down memoization and limits s length <= 12 so the trace stays readable.",

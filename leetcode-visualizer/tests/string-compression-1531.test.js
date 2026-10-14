@@ -36,6 +36,7 @@ test("1531 DP matches brute-force deletion choices and reconstructs an optimal R
   const cases = [
     ["aaabcccd", 2],
     ["aabbaa", 2],
+    ["aaaaaaaaaa", 0],
     ["aaaaaaaaaaa", 0],
     ["abc", 3],
     ["abc", 0],
