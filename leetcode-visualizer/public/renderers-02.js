@@ -3585,10 +3585,15 @@ function renderSqrtBinaryView(step) {
   const view = step.sqrtBinaryView;
   const el = $("treeView");
   const vi = lang === "vi";
+  const isPerfectSquare = view.problemId === 367;
   const phaseIndex = { setup: 0, range: 1, compare: 2, shrink: 3, done: 4 }[view.phase] ?? 0;
-  const phaseLabels = vi
-    ? ["1 · Tạo [lo, hi]", "2 · Kiểm tra while / mid", "3 · So mid² với x", "4 · Thu hẹp / trả về"]
-    : ["1 · Build [lo, hi]", "2 · Check while / mid", "3 · Compare mid² to x", "4 · Shrink / return"];
+  const phaseLabels = isPerfectSquare
+    ? vi
+      ? ["1 · Khoảng", "2 · Mid", "3 · So sánh", "4 · Kết quả"]
+      : ["1 · Range", "2 · Mid", "3 · Compare", "4 · Result"]
+    : vi
+      ? ["1 · Tạo [lo, hi]", "2 · Kiểm tra while / mid", "3 · So mid² với x", "4 · Thu hẹp / trả về"]
+      : ["1 · Build [lo, hi]", "2 · Check while / mid", "3 · Compare mid² to x", "4 · Shrink / return"];
   const phases = phaseLabels.map((label, index) => {
     const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
     return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
@@ -3624,7 +3629,9 @@ function renderSqrtBinaryView(step) {
   const rejectedStart = baseCase ? domainHi + 1 : Math.max(domainLo, view.hi + 1);
   const activeFrom = Math.max(domainLo, view.lo);
   const activeTo = Math.min(domainHi, view.hi);
-  const zones = baseCase
+  const zones = isPerfectSquare && (view.answer === true || (view.event === "exact-check" && view.comparison === "equal"))
+    ? segment(view.mid, view.mid, "answer")
+    : baseCase
     ? segment(view.answer, view.answer, "answer")
     : `${segment(domainLo, confirmedEnd, "confirmed")}${segment(activeFrom, activeTo, "active")}${segment(rejectedStart, domainHi, "rejected")}`;
 
@@ -3644,7 +3651,7 @@ function renderSqrtBinaryView(step) {
   const ticks = tickValues.map((value) => `<g class="sqrt-tick${value === view.answer ? " answer" : ""}">
     <line x1="${centerX(value)}" y1="${axisY - 23}" x2="${centerX(value)}" y2="${axisY + 23}"></line>
     <text class="value" x="${centerX(value)}" y="${axisY + 43}">${value}</text>
-    ${candidateCount <= 12 ? `<text class="square" x="${centerX(value)}" y="${axisY + 68}">${value}²=${value * value}</text>` : ""}
+    ${candidateCount <= 12 ? `<text class="square" x="${centerX(value)}" y="${axisY + 68}">${value}²=${isPerfectSquare ? (BigInt(value) * BigInt(value)).toString() : value * value}</text>` : ""}
   </g>`).join("");
 
   let markers = "";
@@ -3666,15 +3673,41 @@ function renderSqrtBinaryView(step) {
     markers += `<g class="sqrt-pointer mid"><line x1="${centerX(view.mid)}" y1="${axisY - 20}" x2="${centerX(view.mid)}" y2="${axisY - 62}"></line><path d="M ${centerX(view.mid) - 8} ${axisY - 61} L ${centerX(view.mid) + 8} ${axisY - 61} L ${centerX(view.mid)} ${axisY - 48} Z"></path><text x="${centerX(view.mid)}" y="${axisY - 72}">mid=${view.mid} · ${view.mid}²=${view.square}</text></g>`;
   }
 
-  const axisLabel = vi
-    ? `Binary search các số nguyên từ ${domainLo} đến ${domainHi}; vùng xanh lá đã xác nhận nhỏ, vùng xanh dương đang tìm, vùng đỏ quá lớn.`
-    : `Binary search over integers ${domainLo} through ${domainHi}; green is confirmed low, blue is active, and red is too large.`;
+  const axisLabel = isPerfectSquare
+    ? vi
+      ? `Tìm căn nguyên của ${view.x}; xanh dương còn ứng viên, xanh lá và đỏ đã loại.`
+      : `Search for the integer root of ${view.x}; blue is active, green and red are eliminated.`
+    : vi
+      ? `Binary search các số nguyên từ ${domainLo} đến ${domainHi}; vùng xanh lá đã xác nhận nhỏ, vùng xanh dương đang tìm, vùng đỏ quá lớn.`
+      : `Binary search over integers ${domainLo} through ${domainHi}; green is confirmed low, blue is active, and red is too large.`;
   const rangeSvg = `<svg class="sqrt-range-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(axisLabel)}">
     ${zones}<line class="sqrt-axis" x1="${plotLeft}" y1="${axisY}" x2="${plotRight}" y2="${axisY}"></line>${ticks}${markers}
   </svg>`;
 
   let actionHtml;
-  if (view.event === "base-case") {
+  if (isPerfectSquare && view.event === "init-range") {
+    actionHtml = `<div class="sqrt-action setup"><small>${vi ? "ỨNG VIÊN" : "CANDIDATES"}</small><strong>[${view.lo}, ${view.hi}]</strong><b>num = ${view.x}</b></div>`;
+  } else if (isPerfectSquare && view.event === "while-check") {
+    actionHtml = `<div class="sqrt-action condition ${view.whileResult ? "yes" : "no"}"><small>lo ≤ hi</small><strong>${view.lo} ≤ ${view.hi} → ${view.whileResult}</strong></div>`;
+  } else if (isPerfectSquare && view.event === "compute-mid") {
+    actionHtml = `<div class="sqrt-action mid"><small>MID</small><strong>(${view.lo} + ${view.hi}) // 2</strong><b>mid = ${view.mid}</b></div>`;
+  } else if (isPerfectSquare && view.event === "compute-square") {
+    actionHtml = `<div class="sqrt-action mid"><small>${vi ? "BÌNH PHƯƠNG" : "SQUARE"}</small><strong>${view.mid} × ${view.mid}</strong><b>${view.square}</b></div>`;
+  } else if (isPerfectSquare && view.event === "compare") {
+    actionHtml = `<div class="sqrt-action compare"><small>${vi ? "SO VỚI NUM" : "COMPARE TO NUM"}</small><strong>${view.square} ${view.comparison === "less" ? "&lt;" : "&gt;"} ${view.x}</strong><b>${view.comparison === "less" ? "→" : "←"}</b></div>`;
+  } else if (isPerfectSquare && view.event === "exact-check") {
+    actionHtml = `<div class="sqrt-action compare exact"><small>${vi ? "CHÍNH PHƯƠNG" : "PERFECT SQUARE"}</small><strong>${view.mid}² = ${view.x}</strong><b>${vi ? "đúng" : "true"} ✓</b></div>`;
+  } else if (isPerfectSquare && view.event === "return-true") {
+    actionHtml = `<div class="sqrt-action result"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${view.mid}² = ${view.x}</strong><b>true ✓</b></div>`;
+  } else if (isPerfectSquare && view.event === "else-branch") {
+    actionHtml = `<div class="sqrt-action compare"><small>else</small><strong>${view.square} &gt; ${view.x}</strong><b>←</b></div>`;
+  } else if (isPerfectSquare && view.event === "done-not-square") {
+    actionHtml = `<div class="sqrt-action result"><small>${vi ? "HẾT ỨNG VIÊN" : "NO CANDIDATES"}</small><strong>${vi ? `${view.x} không phải số chính phương` : `${view.x} is not a perfect square`}</strong><b>false ✕</b></div>`;
+  } else if (isPerfectSquare && view.event === "move-lo") {
+    actionHtml = `<div class="sqrt-action move right"><small>${view.square} &lt; ${view.x}</small><strong>lo = ${view.lo} →</strong></div>`;
+  } else if (isPerfectSquare && view.event === "move-hi") {
+    actionHtml = `<div class="sqrt-action move left"><small>${view.square} &gt; ${view.x}</small><strong>hi = ${view.hi} ←</strong></div>`;
+  } else if (view.event === "base-case") {
     actionHtml = `<div class="sqrt-action result"><small>BASE CASE</small><strong>x = ${view.x} &lt; 2</strong><b>return ${view.answer}</b></div>`;
   } else if (view.event === "init-range") {
     actionHtml = `<div class="sqrt-action setup"><small>${vi ? "KHOẢNG BAN ĐẦU" : "INITIAL RANGE"}</small><strong>[1, x // 2]</strong><b>[${view.lo}, ${view.hi}]</b><span>${vi ? "Đáp án không thể lớn hơn x // 2 khi x ≥ 2" : "For x ≥ 2, the answer cannot exceed x // 2"}</span></div>`;
@@ -3694,19 +3727,21 @@ function renderSqrtBinaryView(step) {
   }
 
   const rangeText = baseCase ? "—" : view.lo <= view.hi ? `[${view.lo}, ${view.hi}]` : "∅";
-  const bestConfirmed = baseCase ? view.answer : view.answer ?? Math.max(1, view.lo - 1);
-  const equation = Number.isInteger(view.mid)
+  const bestConfirmed = isPerfectSquare
+    ? view.answer === true ? "true ✓" : view.answer === false ? "false ✕" : "—"
+    : baseCase ? view.answer : view.answer ?? Math.max(1, view.lo - 1);
+  const equation = Number.isInteger(view.mid) && view.square !== null
     ? `<div class="sqrt-equation ${view.comparison || "pending"}"><span><small>mid</small><strong>${view.mid}</strong></span><i>→</i><span><small>mid²</small><strong>${view.square}</strong></span><i>${view.comparison === "less" ? "<" : view.comparison === "greater" ? ">" : view.comparison === "equal" ? "=" : "?"}</i><span><small>x</small><strong>${view.x}</strong></span></div>`
     : "";
 
   el.innerHTML = `<div class="sqrt-binary-viz">
     <div class="sqrt-phases">${phases}</div>
     <div class="sqrt-summary">
-      <span><small>TARGET x</small><strong>${view.x}</strong></span>
+      <span><small>${isPerfectSquare ? "NUM" : "TARGET x"}</small><strong>${view.x}</strong></span>
       <span><small>${vi ? "KHOẢNG ĐANG TÌM" : "ACTIVE RANGE"}</small><strong>${rangeText}</strong></span>
-      <span><small>${vi ? "ỨNG VIÊN ĐÃ XÁC NHẬN" : "CONFIRMED CANDIDATE"}</small><strong>${bestConfirmed ?? "—"}</strong></span>
+      <span><small>${isPerfectSquare ? (vi ? "ĐÁP ÁN" : "ANSWER") : (vi ? "ỨNG VIÊN ĐÃ XÁC NHẬN" : "CONFIRMED CANDIDATE")}</small><strong>${bestConfirmed ?? "—"}</strong></span>
     </div>
-    <div class="sqrt-chart">${rangeSvg}<div class="sqrt-legend"><span><i class="confirmed"></i>${vi ? "đã tìm bên phải" : "searched right"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active"}</span><span><i class="rejected"></i>${vi ? "quá lớn" : "too large"}</span></div></div>
+    <div class="sqrt-chart">${rangeSvg}<div class="sqrt-legend"><span><i class="confirmed"></i>${isPerfectSquare ? (vi ? "quá nhỏ" : "too small") : (vi ? "đã tìm bên phải" : "searched right")}</span><span><i class="active"></i>${vi ? "đang tìm" : "active"}</span><span><i class="rejected"></i>${vi ? "quá lớn" : "too large"}</span></div></div>
     ${equation}
     ${actionHtml}
   </div>`;

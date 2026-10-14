@@ -3169,6 +3169,17 @@ function buildSteps1044(input) {
       bestLength = mid;
       lo = mid + 1;
     } else {
+      addStep({
+        event: "else-branch",
+        phase: "compare",
+        title: { vi: "else · tìm trái", en: "else · search left" },
+        codeLines: [11],
+        mid,
+        square,
+        comparison,
+        vars: [{ name: "mid * mid < num", value: false }],
+        note: { vi: "mid² lớn hơn num.", en: "mid² is greater than num." },
+      });
       hi = mid - 1;
     }
     history.push({ round, lo: roundLo, hi: roundHi, mid, found, nextLo: lo, nextHi: hi });
@@ -3806,6 +3817,209 @@ function buildSteps69(input) {
   return { original: x, answer: hi, steps };
 }
 
+/** LeetCode 367: Valid Perfect Square — binary search for an exact square root. */
+function buildSteps367(input) {
+  const raw = Array.isArray(input) ? input[0] : input;
+  const num = Number(String(raw).trim());
+  if (!Number.isInteger(num) || num < 1 || num > 2147483647) {
+    throw new Error("num must be an integer between 1 and 2,147,483,647.");
+  }
+
+  const steps = [];
+  let lo = 1;
+  let hi = num;
+  const initialLo = lo;
+  const initialHi = hi;
+
+  function addStep({
+    event,
+    phase,
+    title,
+    codeLines,
+    note,
+    mid = null,
+    square = null,
+    comparison = null,
+    whileResult = null,
+    previousLo = null,
+    previousHi = null,
+    answer = null,
+    vars = [],
+    final = false,
+  }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+      sqrtBinaryView: {
+        problemId: 367,
+        event,
+        phase,
+        x: num,
+        initialLo,
+        initialHi,
+        lo,
+        hi,
+        mid,
+        square,
+        comparison,
+        whileResult,
+        previousLo,
+        previousHi,
+        answer,
+      },
+    });
+  }
+
+  addStep({
+    event: "init-range",
+    phase: "setup",
+    title: { vi: `lo=1 · hi=${num}`, en: `lo=1 · hi=${num}` },
+    codeLines: [3],
+    vars: [{ name: "num", value: num }, { name: "lo", value: lo }, { name: "hi", value: hi }],
+    note: { vi: "Mọi căn nguyên nằm trong [1, num].", en: "The integer square root lies in [1, num]." },
+  });
+
+  while (true) {
+    const canContinue = lo <= hi;
+    addStep({
+      event: "while-check",
+      phase: "range",
+      title: canContinue
+        ? { vi: `${lo} ≤ ${hi} · tiếp tục`, en: `${lo} ≤ ${hi} · continue` }
+        : { vi: `${lo} > ${hi} · dừng`, en: `${lo} > ${hi} · stop` },
+      codeLines: [4],
+      whileResult: canContinue,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "lo <= hi", value: canContinue }],
+      note: canContinue
+        ? { vi: "Khoảng xanh còn ứng viên.", en: "The blue range still has candidates." }
+        : { vi: "Không còn căn nguyên để thử.", en: "No integer root candidates remain." },
+    });
+    if (!canContinue) break;
+
+    const mid = Math.floor((lo + hi) / 2);
+    addStep({
+      event: "compute-mid",
+      phase: "compare",
+      title: { vi: `mid = (${lo}+${hi})//2 = ${mid}`, en: `mid = (${lo}+${hi})//2 = ${mid}` },
+      codeLines: [5],
+      mid,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }],
+      note: { vi: "Thử số ở giữa khoảng.", en: "Try the middle number." },
+    });
+
+    const square = (BigInt(mid) * BigInt(mid)).toString();
+    const squareValue = BigInt(square);
+    const targetValue = BigInt(num);
+    const comparison = squareValue === targetValue ? "equal" : squareValue < targetValue ? "less" : "greater";
+    addStep({
+      event: "compute-square",
+      phase: "compare",
+      title: { vi: `${mid}² = ${square}`, en: `${mid}² = ${square}` },
+      codeLines: [6],
+      mid,
+      square,
+      vars: [{ name: "mid", value: mid }, { name: "mid * mid", value: square }],
+      note: { vi: "So sánh bình phương với num.", en: "Compare the square with num." },
+    });
+
+    if (comparison === "equal") {
+      addStep({
+        event: "exact-check",
+        phase: "compare",
+        title: { vi: `${mid}² = ${num} ✓`, en: `${mid}² = ${num} ✓` },
+        codeLines: [7],
+        mid,
+        square,
+        comparison,
+        vars: [{ name: "mid * mid == num", value: true }],
+        note: { vi: `${num} là số chính phương.`, en: `${num} is a perfect square.` },
+      });
+      addStep({
+        event: "return-true",
+        phase: "done",
+        title: { vi: "return True ✓", en: "return True ✓" },
+        codeLines: [8],
+        mid,
+        square,
+        comparison,
+        answer: true,
+        final: true,
+        vars: [{ name: "return", value: true }],
+        note: { vi: "Đã tìm được căn nguyên.", en: "The integer root was found." },
+      });
+      return { original: num, answer: true, steps };
+    }
+
+    addStep({
+      event: "compare",
+      phase: "compare",
+      title: comparison === "less"
+        ? { vi: `${square} < ${num} · tìm phải`, en: `${square} < ${num} · search right` }
+        : { vi: `${square} > ${num} · tìm trái`, en: `${square} > ${num} · search left` },
+      codeLines: [9],
+      mid,
+      square,
+      comparison,
+      vars: [{ name: "mid * mid < num", value: comparison === "less" }],
+      note: comparison === "less"
+        ? { vi: "mid quá nhỏ · bỏ nửa trái.", en: "mid is too small · discard the left half." }
+        : { vi: "mid quá lớn · bỏ nửa phải.", en: "mid is too large · discard the right half." },
+    });
+
+    const previousLo = lo;
+    const previousHi = hi;
+    if (comparison === "less") {
+      lo = mid + 1;
+      addStep({
+        event: "move-lo",
+        phase: "shrink",
+        title: { vi: `lo = ${lo} →`, en: `lo = ${lo} →` },
+        codeLines: [10],
+        mid,
+        square,
+        comparison,
+        previousLo,
+        previousHi,
+        vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }],
+        note: { vi: `Các số ≤ ${mid} đều quá nhỏ.`, en: `All values ≤ ${mid} are too small.` },
+      });
+    } else {
+      hi = mid - 1;
+      addStep({
+        event: "move-hi",
+        phase: "shrink",
+        title: { vi: `hi = ${hi} ←`, en: `hi = ${hi} ←` },
+        codeLines: [12],
+        mid,
+        square,
+        comparison,
+        previousLo,
+        previousHi,
+        vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }],
+        note: { vi: `Các số ≥ ${mid} đều quá lớn.`, en: `All values ≥ ${mid} are too large.` },
+      });
+    }
+  }
+
+  addStep({
+    event: "done-not-square",
+    phase: "done",
+    title: { vi: "return False · không phải chính phương", en: "return False · not a perfect square" },
+    codeLines: [13],
+    answer: false,
+    final: true,
+    vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "return", value: false }],
+    note: { vi: "Đã loại hết mọi căn nguyên có thể.", en: "Every possible integer root has been eliminated." },
+  });
+  return { original: num, answer: false, steps };
+}
+
 /** LeetCode 278: First Bad Version — binary search for the leftmost bad. */
 function buildSteps278(input) {
   const n = Array.isArray(input) ? Number(input[0]) : Number(input);
@@ -3902,6 +4116,46 @@ module.exports = {
     complexity: { time: "O(log x)", space: "O(1)", note: { vi: "Chia đôi khoảng mỗi bước.", en: "Halve the range each step." } },
     code: ["class Solution:", "    def mySqrt(self, x):", "        if x < 2: return x", "        lo, hi = 1, x // 2", "        while lo <= hi:", "            mid = (lo + hi) // 2", "            if mid*mid == x: return mid", "            if mid*mid < x: lo = mid + 1", "            else: hi = mid - 1", "        return hi"],
     builder: buildSteps69,
+  },
+  367: {
+    id: 367,
+    difficulty: "easy",
+    slug: "valid-perfect-square",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Valid Perfect Square", en: "Valid Perfect Square" },
+    titleVi: { vi: "Số chính phương", en: "Valid perfect square" },
+    statement: {
+      vi: "Cho số nguyên dương num. Trả về true nếu num là bình phương của một số nguyên, ngược lại trả về false.",
+      en: "Given a positive integer num, return true if it is the square of an integer, or false otherwise.",
+    },
+    defaultInput: [16],
+    inputKind: "positive",
+    inputLabel: { vi: "num", en: "num" },
+    singleInput: true,
+    maxInput: 2147483647,
+    extraParams: [],
+    approach: [
+      { vi: "Tìm căn nguyên bằng binary search.", en: "Binary-search for the integer root." },
+      { vi: "mid² = num → true · nhỏ hơn → phải · lớn hơn → trái.", en: "mid² = num → true · smaller → right · larger → left." },
+    ],
+    complexity: { time: "O(log num)", space: "O(1)" },
+    debugMode: "line-by-line",
+    code: [
+      "class Solution:",
+      "    def isPerfectSquare(self, num):",
+      "        lo, hi = 1, num",
+      "        while lo <= hi:",
+      "            mid = (lo + hi) // 2",
+      "            square = mid * mid",
+      "            if square == num:",
+      "                return True",
+      "            if square < num:",
+      "                lo = mid + 1",
+      "            else:",
+      "                hi = mid - 1",
+      "        return False",
+    ],
+    builder: buildSteps367,
   },
   875: {
     id: 875,
