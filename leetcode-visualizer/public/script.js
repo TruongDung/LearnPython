@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.koko875View), surface: "treeView", render: (step) => {
+      renderKoko875View(step);
+    } },
     { predicate: (step) => Boolean(step.palindrome1312View), surface: "treeView", render: (step) => {
       renderMinInsertionsPalindrome1312View(step);
     } },

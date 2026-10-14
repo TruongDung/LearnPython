@@ -134,8 +134,8 @@ function buildSteps514Exact(input, params) {
     transition = {from:action.from,to:action.to,baseCost:turns+presses,clockwise:(action.from-action.to+n)%n,counterclockwise:(action.to-action.from+n)%n,turns:action.turns,direction:action.direction,total:turns+presses+action.cost};
     emit("replay-rotate", 29, {replay:{aligned,turns,presses,typed:key.slice(0,presses),action:{...action,rotationPath:[...action.rotationPath]},rotated:false}});
     aligned = action.to; turns += action.turns;
-    emit("replay-press", 29, {replay:{aligned,turns,presses,typed:key.slice(0,presses),action:{...action,rotationPath:[...action.rotationPath]},rotated:true}});
     presses++;
+    emit("replay-press", 29, {replay:{aligned,turns,presses,typed:key.slice(0,presses),action:{...action,rotationPath:[...action.rotationPath]},rotated:true}});
   }
   if (turns + presses !== answer || actions.map(a=>a.char).join("") !== key) throw new Error("514: Optimal path invariant failed");
   emit("final-return", 29, {final:true,answer,actions:actions.map(a=>({...a,rotationPath:[...a.rotationPath]})),replay:{aligned,turns,presses,typed:key,action:null,rotated:true},invariants:{witnessValid:true}});

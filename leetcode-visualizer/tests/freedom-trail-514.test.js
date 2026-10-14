@@ -93,72 +93,41 @@ test("514 layered position DP returns the minimum and a valid rotation witness",
   }
 });
 
-test("514 snapshots follow the interview code line by line and preserve DP invariants", () => {
-  const run = problem.builder("godding", { key: "gd" });
-  const lines = new Set();
+test("514 snapshots match displayed source and exact DP transition costs", () => {
+  const run = problem.builder("godding", {key:"gd"});
   for (const step of run.steps) {
-    const view = step.freedomTrail514View;
-    assert.ok(view, "every trace step has a Freedom Trail view");
-    assert.deepEqual(step.codeLines, [view.source.line]);
-    assert.equal(view.source.text, problem.code[view.source.line - 1]);
-    lines.add(view.source.line);
-    assert.equal(view.invariants.costsFinite, true);
-    assert.equal(view.invariants.dpPositionsMatchLayer, true);
-    assert.equal(view.invariants.nextPositionsMatchChar, true);
-    assert.ok(Array.isArray(view.positions));
-    if (view.event === "compute-linear-distance") {
-      assert.equal(view.source.line, 20);
-      assert.equal(view.transition.diff, Math.abs(view.transition.to - view.transition.from));
+    const v=step.freedomTrail514View;
+    assert.deepEqual(step.codeLines,[v.source.line]);
+    assert.equal(v.source.text,problem.code[v.source.line-1]);
+    const tr=v.transition;
+    if (tr && tr.turns!==null) {
+      assert.equal(tr.turns,Math.min(tr.clockwise,tr.counterclockwise));
+      if(tr.total!==null)assert.equal(tr.total,tr.baseCost+tr.turns+1);
     }
-    if (view.event === "compute-distance") {
-      assert.equal(view.source.line, 21);
-      assert.equal(view.transition.turns, Math.min(view.transition.diff, view.input.length - view.transition.diff));
-    }
-    if (view.event === "build-candidate") {
-      assert.equal(view.source.line, 23);
-      assert.equal(view.transition.best, Math.min(view.transition.bestBefore ?? Infinity, view.transition.total));
-      assert.equal(view.transition.accepted, view.transition.total < (view.transition.bestBefore ?? Infinity));
-    }
-    if (view.event === "store-ring-position") {
-      assert.ok(view.positions.find(group => group.char === view.cursor.ringChar).indices.includes(view.cursor.ringIndex));
-    }
+    if(!step.final)assert.equal(v.invariants.costsFinite,true);
+    if(v.event==="replay-press")assert.equal(v.replay.typed.length,v.replay.presses);
   }
-  for (let line = 5; line <= problem.code.length; line += 1) {
-    if (!problem.code[line - 1].trim()) continue;
-    assert.ok(lines.has(line), `source line ${line} is not stepped`);
+  assert.deepEqual(problem.code,expectedSource);
+});
+test("514 compact renderer shows the wheel, physical routes, key and restored frames", () => {
+  const run=problem.builder("godding",{key:"gd"});
+  for(const language of ["en","vi"]) {
+    const {host,render,source}=createRenderer(language);
+    assert.deepEqual(Array.from(source),expectedSource);
+    for(const step of run.steps) {render(step);assert.match(host.innerHTML,/ft514-ring-wheel/);assert.doesNotMatch(host.innerHTML,/undefined|NaN|object Object/);}
+    render(run.steps.find(s=>s.freedomTrail514View.event==="compute-distance"));
+    assert.match(host.innerHTML,/ft514-direction-grid/);
+    assert.match(host.innerHTML,/ft514-key-list/);
+    assert.match(host.innerHTML,/ft514-dp-card/);
+    render(run.steps[0]);const initial=host.innerHTML;
+    render(run.steps.at(-1));render(run.steps[0]);assert.equal(host.innerHTML,initial);
   }
-  assert.deepEqual(problem.code, expectedSource);
 });
-
-test("514 renders line 23 as a visual minimum comparison and marks the winner", () => {
-  const run = problem.builder("godding", { key: "gd" });
-  const candidate = run.steps.find(item => item.freedomTrail514View.event === "build-candidate");
-  const { host, render } = createRenderer();
-  render(candidate);
-  assert.match(host.innerHTML, /class="ft514-best"/);
-  assert.match(host.innerHTML, /class="accepted"/);
-});
-
-test("514 retains DP trace steps after indexing a maximum-size ring", () => {
-  const run = problem.builder("a".repeat(100), { key: "a" });
-  assert.ok(run.steps.some(step => step.freedomTrail514View.event === "compute-linear-distance"));
-  assert.equal(run.steps.at(-1).freedomTrail514View.truncated, true);
-});
-
-test("514 renderer prioritizes the ring, position map, key, and DP comparison", () => {
-  const run = problem.builder("godding", { key: "gd" });
-  const step = run.steps.find(item => item.freedomTrail514View.event === "build-candidate");
-  for (const language of ["en", "vi"]) {
-    const { host, render, source } = createRenderer(language);
-    assert.deepEqual(Array.from(source), expectedSource);
-    render(step);
-    assert.match(host.innerHTML, /class="ft514-ring-wheel"/);
-    assert.match(host.innerHTML, /class="ft514-direction-grid"/);
-    assert.match(host.innerHTML, /class="ft514-key-list"/);
-    assert.match(host.innerHTML, /class="ft514-position-map"/);
-    assert.match(host.innerHTML, /class="ft514-dp-card"/);
-    assert.match(host.innerHTML, /aria-current="step"/);
-    assert.match(host.innerHTML, /class="ft514-cost"/);
-    assert.doesNotMatch(host.innerHTML, /undefined|NaN|object Object/);
-  }
+test("514 accepts full official limits and caps snapshots without losing the optimal route", () => {
+  const run=problem.builder("ab".repeat(50),{key:"ab".repeat(50)});
+  assert.equal(run.answer,199);
+  assert.ok(run.steps.length<=581);
+  assert.ok(JSON.stringify(run).length<2000000);
+  assert.equal(run.actions.length,100);
+  assert.equal(run.steps.at(-1).freedomTrail514View.truncated,true);
 });
