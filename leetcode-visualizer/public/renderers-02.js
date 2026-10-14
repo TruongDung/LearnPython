@@ -2428,13 +2428,24 @@ function renderGridElim1293View(step) {
   const cells = Array.isArray(view.cells) ? view.cells : [];
   const queue = Array.isArray(view.queue) ? view.queue : [];
   const layers = Array.isArray(view.layers) ? view.layers : [];
-  const multiState = Array.isArray(view.multiState) ? view.multiState : [];
   const counters = view.counters || {};
   const cur = view.cur;
   const probe = view.probe;
   const isDone = view.answer !== null && view.answer !== undefined;
+  const path = Array.isArray(view.path) ? view.path : [];
+  const eliminated = new Set((view.eliminated || []).map(([r, c]) => `${r},${c}`));
+  const pathOrder = new Map(path.map(([r, c], index) => [`${r},${c}`, index]));
+  const finalRem = path.length && path.at(-1).length > 2 ? path.at(-1)[2] : k;
+  const activeRem = Math.max(0, Number(cur ? cur.rem : isDone ? finalRem : k) || 0);
 
-  // ── Grid ──────────────────────────────────────────────────────────────────
+  const budgetDots = (value, compact = false) => {
+    const amount = Math.max(0, Number(value) || 0);
+    const shown = Math.min(amount, compact ? 3 : 6);
+    return `<span class="ge1293-budget-dots" aria-hidden="true">${Array.from({ length: shown }, () => "<i></i>").join("")}${amount > shown ? `<b>+${amount - shown}</b>` : ""}</span>`;
+  };
+
+  // The board is the explanation: walls, the active state, queued cells, and
+  // the final route all share one surface instead of being repeated in prose.
   const gridHtml = cells.map((row, r) => row.map((cell, c) => {
     const cls = ["ge1293-cell", cell.wall ? "wall" : "empty"];
     if (cell.processed) cls.push("processed");
@@ -2443,148 +2454,108 @@ function renderGridElim1293View(step) {
     if (cell.path) cls.push("path");
     if (cell.cur) cls.push("cur");
     if (cell.probe && cell.verdict) cls.push("probe", `v-${cell.verdict}`);
-    const badge = cell.verdict === "enqueued" ? "✓"
+    if (eliminated.has(`${r},${c}`)) cls.push("broken");
+    const verdictIcon = cell.verdict === "enqueued" ? "✓"
       : cell.verdict === "dominated" ? "⊘"
-        : cell.verdict === "noK" ? "✕" : "";
-    const glyph = cell.role === "start" ? "S" : cell.role === "target" ? "T" : cell.wall ? "■" : "·";
-    const ks = cell.rems.length
-      ? `<div class="ks">${cell.rems.map((v) => `<i>${v}</i>`).join("")}</div>`
-      : `<div class="ks empty">·</div>`;
-    return `<div class="${cls.join(" ")}">
-      <span class="rc">${r},${c}</span>
-      <strong class="glyph">${glyph}</strong>
-      <span class="d">${cell.dist === null || cell.dist === undefined ? "—" : `d${cell.dist}`}</span>
-      ${ks}
-      ${badge ? `<span class="vb">${badge}</span>` : ""}
+        : cell.verdict === "noK" ? "×" : "";
+    const role = cell.role === "start" ? "S" : cell.role === "target" ? "T" : "";
+    const routeIndex = pathOrder.get(`${r},${c}`);
+    const rems = Array.isArray(cell.rems) ? cell.rems : [];
+    const aria = `${vi ? "ô" : "cell"} ${r},${c}; ${cell.wall ? (vi ? "tường" : "wall") : (vi ? "trống" : "open")}; ${vi ? "k đã thấy" : "seen k"}: ${rems.length ? rems.join(",") : "-"}`;
+    return `<div class="${cls.join(" ")}" data-r="${r}" data-c="${c}" aria-label="${aria}">
+      ${cell.dist === null || cell.dist === undefined ? "" : `<span class="ge1293-distance">${cell.dist}</span>`}
+      ${cell.wall ? `<span class="ge1293-bricks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>` : ""}
+      ${role ? `<strong class="ge1293-role ${cell.role}">${role}</strong>` : ""}
+      ${cell.cur ? `<span class="ge1293-runner" aria-hidden="true"><i></i></span>` : ""}
+      ${cell.path && routeIndex !== undefined ? `<span class="ge1293-route-step">${routeIndex}</span>` : ""}
+      ${cell.inQueue && !cell.cur ? `<span class="ge1293-queued-dot" aria-hidden="true"></span>` : ""}
+      ${rems.length ? `<span class="ge1293-cell-states">${rems.map((v) => `<i>${v}</i>`).join("")}</span>` : ""}
+      ${verdictIcon ? `<span class="ge1293-verdict">${verdictIcon}</span>` : ""}
     </div>`;
   }).join("")).join("");
 
-  // ── Side: the state being expanded and the move being tested ──────────────
-  const verdictText = {
-    oob: vi ? "ra ngoài lưới" : "outside the grid",
-    noK: vi ? "hết quyền phá" : "no eliminations left",
-    dominated: vi ? "bị state cũ dominate" : "dominated by an older state",
-    enqueued: vi ? "hợp lệ → vào queue" : "valid → enqueued",
+  const verdictVisual = {
+    oob: { icon: "↯", text: vi ? "ngoài lưới" : "outside" },
+    noK: { icon: "×", text: vi ? "hết k" : "no k" },
+    dominated: { icon: "⊘", text: vi ? "bỏ trùng" : "skip" },
+    enqueued: { icon: "✓", text: vi ? "vào hàng" : "queued" },
   };
-  const curHtml = cur
-    ? `<div class="ge1293-state cur">
-        <small>${vi ? "ĐANG MỞ RỘNG" : "EXPANDING"}</small>
-        <strong>(${cur.r},${cur.c})</strong>
-        <span>k=${cur.rem} · d=${cur.dist}</span>
-      </div>`
-    : `<div class="ge1293-state idle"><small>${vi ? "ĐANG MỞ RỘNG" : "EXPANDING"}</small><strong>—</strong></div>`;
-  const probeHtml = probe
-    ? `<div class="ge1293-state probe v-${probe.verdict}">
-        <small>${vi ? "THỬ NƯỚC ĐI" : "TESTING MOVE"}</small>
-        <strong>(${probe.r},${probe.c})</strong>
-        <span>${escapeHtml(verdictText[probe.verdict] || "")}</span>
-      </div>`
-    : "";
+  const probeState = probe ? verdictVisual[probe.verdict] || { icon: "?", text: "" } : null;
+  let moveArrow = "→";
+  if (cur && probe) {
+    const dr = probe.r - cur.r;
+    const dc = probe.c - cur.c;
+    moveArrow = dr === 1 ? "↓" : dr === -1 ? "↑" : dc === -1 ? "←" : "→";
+  }
+  const inBounds = probe && probe.r >= 0 && probe.r < rows && probe.c >= 0 && probe.c < cols;
+  const probeCell = inBounds ? cells[probe.r][probe.c] : null;
+  const probeRem = cur && probeCell ? cur.rem - Number(probeCell.wall) : null;
+  const moveHtml = cur ? `<div class="ge1293-move${probe ? ` v-${probe.verdict}` : ""}">
+      <div class="ge1293-move-node current"><b>${cur.r},${cur.c}</b>${budgetDots(cur.rem, true)}</div>
+      <span class="ge1293-move-arrow">${probe ? moveArrow : "✦"}</span>
+      ${probe ? `<div class="ge1293-move-node target${probeCell?.wall ? " wall" : ""}${!inBounds ? " outside" : ""}">
+        <b>${probe.r},${probe.c}</b>${probeRem !== null && probeRem >= 0 ? budgetDots(probeRem, true) : ""}
+      </div><span class="ge1293-move-result"><b>${probeState.icon}</b><small>${probeState.text}</small></span>` : `<div class="ge1293-compass" aria-label="${vi ? "bốn hướng" : "four directions"}"><i>↑</i><i>←</i><b>●</b><i>→</i><i>↓</i></div>`}
+    </div>` : `<div class="ge1293-map-key" aria-hidden="true"><b>S</b><span>→</span><i class="wall"></i><span>→</span><b>T</b></div>`;
 
-  const countersHtml = `<div class="ge1293-counters">
-    <span><b>${counters.popped || 0}</b>${vi ? "pop" : "popped"}</span>
-    <span><b>${counters.enqueued || 0}</b>${vi ? "vào queue" : "enqueued"}</span>
-    <span class="cut"><b>${counters.prunedDominated || 0}</b>${vi ? "bị dominate" : "dominated"}</span>
-    <span class="cut"><b>${counters.prunedNoK || 0}</b>${vi ? "thiếu k" : "no k"}</span>
-  </div>`;
-
-  // ── Queue ─────────────────────────────────────────────────────────────────
-  const QMAX = 26;
+  // A small queue train makes FIFO order readable without a table of tuples.
+  const QMAX = 12;
   const shown = queue.slice(0, QMAX);
-  const queueHtml = shown.map((q) => `<div class="ge1293-qchip${q.head ? " head" : ""}">
-      ${q.head ? `<em>${vi ? "đầu" : "head"}</em>` : ""}
-      <strong>${q.r},${q.c}</strong><span>k=${q.rem}</span><span>d=${q.dist}</span>
-    </div>`).join("") + (queue.length > QMAX ? `<div class="ge1293-qmore">+${queue.length - QMAX}</div>` : "");
+  const queueHtml = shown.map((q, index) => `${index ? `<span class="ge1293-rail" aria-hidden="true"></span>` : ""}<div class="ge1293-qnode${q.head ? " head" : ""}">
+      ${q.head ? `<em>▶</em>` : ""}<strong>${q.r},${q.c}</strong><span>${budgetDots(q.rem, true)}</span><small>${q.dist}</small>
+    </div>`).join("") + (queue.length > QMAX ? `<b class="ge1293-qmore">+${queue.length - QMAX}</b>` : "");
 
-  // ── BFS waves by distance ─────────────────────────────────────────────────
-  const maxLayer = layers.reduce((m, l) => Math.max(m, l.count), 1);
-  const layersHtml = layers.map((l) => `<div class="ge1293-layer">
-      <span class="lbl">d=${l.d}</span>
-      <span class="bar"><i style="width:${Math.max(6, Math.round((l.count / maxLayer) * 100))}%"></i></span>
-      <span class="cnt">${l.count}</span>
-    </div>`).join("");
-
-  // ── The payoff panel: cells that hold more than one state ─────────────────
-  const multiHtml = multiState.length
-    ? multiState.map((e) => `<span class="ge1293-multi"><b>(${e.r},${e.c})</b>${e.rems.map((v) => `<i>k=${v}</i>`).join("")}</span>`).join("")
-    : `<em class="ge1293-empty">${vi ? "chưa có ô nào cần tới 2 state — cứ chạy tiếp" : "no cell needs two states yet — keep stepping"}</em>`;
+  const layersHtml = layers.map((layer) => {
+    const dots = Array.from({ length: Math.min(layer.count, 7) }, () => "<i></i>").join("");
+    return `<div class="ge1293-wave"><b>${layer.d}</b><span>${dots}${layer.count > 7 ? `<em>+${layer.count - 7}</em>` : ""}</span></div>`;
+  }).join("");
 
   const shortcutHtml = view.shortcut
     ? `<div class="ge1293-shortcut${view.shortcut.applies ? " applies" : ""}">
-        <small>${vi ? "KIỂM TRA ĐƯỜNG THẲNG" : "STRAIGHT-ROUTE CHECK"}</small>
-        <strong>k = ${k} ${view.shortcut.applies ? "≥" : "<"} m+n-3 = ${view.shortcut.limit}</strong>
-        <span>${escapeHtml(view.shortcut.applies
-      ? (vi ? `Đường Manhattan ${view.shortcut.manhattan} bước chỉ qua ${view.shortcut.limit} ô trung gian; k đủ phá hết nên trả ngay ${view.shortcut.manhattan}.`
-        : `A Manhattan route of ${view.shortcut.manhattan} moves crosses only ${view.shortcut.limit} intermediate cells; k clears them all, so return ${view.shortcut.manhattan}.`)
-      : (vi ? "k chưa đủ để bảo đảm đi thẳng, nên phải BFS."
-        : "k is not enough to guarantee a straight route, so BFS is required."))}</span>
+        <b>S</b><span class="ge1293-shortcut-road">${Array.from({ length: Math.min(view.shortcut.limit, 7) }, () => "<i></i>").join("")}</span><b>T</b>
+        <strong>${k} ${view.shortcut.applies ? "≥" : "<"} ${view.shortcut.limit}</strong><em>${view.shortcut.applies ? "✓" : "→ BFS"}</em>
       </div>`
     : "";
 
-  const answerHtml = isDone
-    ? `<div class="ge1293-answer${view.answer === -1 ? " none" : ""}">
-        <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong>
-        <span>${view.answer === -1 ? (vi ? "không có đường nào" : "no route exists") : (vi ? "bước" : "moves")}</span>
-        ${view.eliminated && view.eliminated.length
-      ? `<em>${vi ? "đã phá" : "eliminated"}: ${view.eliminated.map(([r, c]) => `(${r},${c})`).join(", ")}</em>`
-      : ""}
-      </div>`
-    : "";
+  const answerHtml = isDone ? `<div class="ge1293-answer${view.answer === -1 ? " none" : ""}"><span>${view.answer === -1 ? "∅" : "✓"}</span><strong>${view.answer}</strong><small>${view.answer === -1 ? (vi ? "không có đường" : "no route") : (vi ? "bước" : "moves")}</small></div>` : "";
 
-  $("treeView").innerHTML = `<section class="ge1293-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa đường ngắn nhất khi được phá vật cản" : "Shortest path with obstacle elimination visualization")}">
-    <div class="ge1293-idea">
-      <small>${vi ? "Ý CHÍNH" : "THE KEY IDEA"}</small>
-      <span>${escapeHtml(vi
-      ? `Một ô KHÔNG phải một node. Đứng ở cùng ô mà còn 2 quyền phá khác hẳn còn 0 quyền, nên state là (hàng, cột, k còn lại) — mỗi ô có tới ${k + 1} state. Đánh dấu visited chỉ theo (hàng, cột) là sai.`
-      : `A cell is NOT a node. Being on the same cell with 2 eliminations left differs from having 0, so a state is (row, col, k remaining) — up to ${k + 1} states per cell. Marking visited by (row, col) alone is wrong.`)}</span>
-    </div>
+  $("treeView").innerHTML = `<section class="ge1293-viz" data-phase="${escapeHtml(view.phase || "")}" aria-label="${escapeHtml(vi ? "Bản đồ BFS phá vật cản" : "Obstacle elimination BFS map")}">
+    <header class="ge1293-hud">
+      <div class="ge1293-brand"><span>1293</span><strong>${vi ? "BFS PHÁ TƯỜNG" : "WALL-BREAK BFS"}</strong></div>
+      <div class="ge1293-budget" aria-label="k = ${activeRem}"><b>◆</b>${budgetDots(activeRem)}<strong>${activeRem}</strong></div>
+      ${answerHtml}
+    </header>
 
-    <div class="ge1293-main">
-      <section class="ge1293-panel">
-        <header>
-          <strong>${vi ? `LƯỚI ${rows}×${cols}` : `GRID ${rows}×${cols}`}</strong>
-          <span>${vi ? "d = số bước tới ô · ô vuông nhỏ = k còn lại của từng state" : "d = moves to reach · small squares = each state's remaining k"}</span>
-        </header>
-        <div class="ge1293-grid" style="--ge-cols:${cols}">${gridHtml}</div>
-        <div class="ge1293-legend">
-          <span class="lg s">S / T</span>
-          <span class="lg wall">■ ${vi ? "vật cản" : "obstacle"}</span>
-          <span class="lg cur">${vi ? "đang mở rộng" : "expanding"}</span>
-          <span class="lg queued">${vi ? "trong queue" : "in queue"}</span>
-          <span class="lg multi">${vi ? "≥2 state" : "≥2 states"}</span>
-          <span class="lg path">${vi ? "đường kết quả" : "final route"}</span>
+    <div class="ge1293-stage">
+      <div class="ge1293-board-wrap">
+        <div class="ge1293-board" style="--ge-cols:${cols};--ge-rows:${rows}">${gridHtml}</div>
+        <div class="ge1293-legend" aria-label="${vi ? "chú thích" : "legend"}">
+          <span><i class="current"></i>${vi ? "đang xét" : "current"}</span>
+          <span><i class="queued"></i>queue</span>
+          <span><i class="route"></i>${vi ? "đường đi" : "route"}</span>
+          <span><i class="states">2</i>${vi ? "k còn" : "k left"}</span>
         </div>
-      </section>
+      </div>
       <aside class="ge1293-side">
-        ${curHtml}
-        ${probeHtml}
-        ${countersHtml}
+        ${moveHtml}
         ${shortcutHtml}
+        <div class="ge1293-stats" aria-label="${vi ? "thống kê" : "statistics"}">
+          <span title="${vi ? "đã lấy khỏi hàng" : "popped"}"><i>↗</i><b>${counters.popped || 0}</b></span>
+          <span title="${vi ? "đã thêm vào hàng" : "enqueued"}"><i>＋</i><b>${counters.enqueued || 0}</b></span>
+          <span title="${vi ? "state bị bỏ" : "pruned states"}"><i>⊘</i><b>${(counters.prunedDominated || 0) + (counters.prunedNoK || 0) + (counters.prunedOob || 0)}</b></span>
+        </div>
       </aside>
     </div>
 
-    <section class="ge1293-panel">
-      <header><strong>${vi ? "QUEUE (FIFO) — lấy ra theo distance không giảm" : "QUEUE (FIFO) — popped in nondecreasing distance"}</strong><span>${queue.length}</span></header>
-      <div class="ge1293-queue">${queueHtml || `<em class="ge1293-empty">${vi ? "queue rỗng" : "queue is empty"}</em>`}</div>
+    <section class="ge1293-queue-panel">
+      <header><span>FIFO</span><b>${queue.length}</b></header>
+      <div class="ge1293-queue-track">${queueHtml || `<span class="ge1293-empty-queue">∅</span>`}</div>
     </section>
 
-    <div class="ge1293-cols2">
-      <section class="ge1293-panel">
-        <header><strong>${vi ? "SÓNG BFS — số state ở mỗi distance" : "BFS WAVES — states per distance"}</strong></header>
-        <div class="ge1293-layers">${layersHtml || `<em class="ge1293-empty">—</em>`}</div>
-      </section>
-      <section class="ge1293-panel">
-        <header><strong>${vi ? "Ô CÓ NHIỀU HƠN MỘT STATE" : "CELLS HOLDING MORE THAN ONE STATE"}</strong><span>${multiState.length}</span></header>
-        <div class="ge1293-multis">${multiHtml}</div>
-      </section>
-    </div>
-
-    ${answerHtml}
-
-    <div class="ge1293-decision${isDone ? " done" : ""}">
-      <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
-      <strong>${escapeHtml(pick(view.decision))}</strong>
-    </div>
+    <section class="ge1293-waves">
+      <header><span>0</span><i></i><b>${vi ? "SÓNG BFS" : "BFS WAVES"}</b></header>
+      <div class="ge1293-wave-track">${layersHtml || "<span>· · ·</span>"}</div>
+    </section>
   </section>`;
 }
 
