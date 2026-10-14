@@ -2,12 +2,13 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[843];
 const {
   JAVASCRIPT_ASSETS,
   STYLESHEET_ASSETS,
   readFrontendIndex,
-  readFrontendJavaScript,
   readFrontendStyles,
 } = require('./helpers/frontend-source');
 
@@ -170,15 +171,59 @@ test('843 dedicated frontend assets are loaded and registered before the app scr
   assert.ok(JAVASCRIPT_ASSETS.includes('renderer-guess-the-word-843.js'));
   assert.ok(STYLESHEET_ASSETS.includes('guess-the-word-843.css'));
 
-  const javascript = readFrontendJavaScript();
+  const renderer = fs.readFileSync(path.join(__dirname, '../public/renderer-guess-the-word-843.js'), 'utf8');
   const styles = readFrontendStyles();
   const index = readFrontendIndex();
-  assert.match(javascript, /function renderGuessTheWord843View\(step\)/);
-  assert.match(javascript, /step\.guessWord843View/);
-  assert.match(javascript, /choose min\(max\(bucket\)\)/);
+  assert.match(renderer, /function renderGuessTheWord843View\(step\)/);
+  assert.match(renderer, /step\.guessWord843View/);
   assert.match(styles, /\.gtw843-score-row/);
   assert.match(styles, /\.gtw843-letter\.match/);
+  assert.match(styles, /\.gtw843-chart-bucket/);
   assert.ok(index.indexOf('renderer-guess-the-word-843.js') < index.indexOf('script.js?'));
+  assert.match(index, /guess-the-word-843\.css\?v=guess-the-word-843-v2/);
+  assert.match(index, /renderer-guess-the-word-843\.js\?v=guess-the-word-843-v2/);
+});
+
+test('843 renderer emphasizes matching letters, candidate cards, and minimax buckets', () => {
+  const host = { innerHTML: '' };
+  const context = {
+    lang: 'en',
+    $: () => host,
+    escapeHtml: (value) => String(value).replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]),
+    pick: (value) => value[context.lang],
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../public/renderer-guess-the-word-843.js'), 'utf8'),
+    context,
+  );
+
+  const result = problem.builder(DEFAULT_WORDS, { secret: 'eiowzz' });
+  for (const language of ['vi', 'en']) {
+    context.lang = language;
+    for (const step of result.steps) {
+      context.renderGuessTheWord843View(step);
+      assert.match(host.innerHTML, /gtw843-comparison/);
+      assert.match(host.innerHTML, /gtw843-word-dots/);
+      assert.match(host.innerHTML, /gtw843-pipeline/);
+      assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
+    }
+  }
+
+  const score = result.steps.find((step) => step.guessWord843View.phase === 'score');
+  context.renderGuessTheWord843View(score);
+  assert.match(host.innerHTML, /gtw843-chart-bucket/);
+  assert.match(host.innerHTML, /gtw843-score-row/);
+
+  const filter = result.steps.find((step) => step.guessWord843View.phase === 'filter');
+  context.renderGuessTheWord843View(filter);
+  assert.match(host.innerHTML, /class="gtw843-word[^"]* kept/);
+  assert.match(host.innerHTML, /class="gtw843-word[^"]* removed/);
+
+  context.renderGuessTheWord843View(result.steps.at(-1));
+  assert.match(host.innerHTML, /gtw843-found/);
 });
 
 test('843 is marked available in the string study roadmap', () => {

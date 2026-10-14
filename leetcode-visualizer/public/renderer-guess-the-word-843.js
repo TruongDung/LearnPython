@@ -5,98 +5,102 @@ function renderGuessTheWord843View(step) {
   if (!view) return;
 
   const text = (vi, en) => lang === "vi" ? vi : en;
-  const phaseOrder = ["score", "choose", "guess", "filter"];
-  const activePhase = view.phase === "round" ? -1 : phaseOrder.indexOf(view.phase);
-  const doneThrough = view.phase === "found" ? 3 : activePhase;
-  const phaseLabels = [
-    ["1. Chia bucket", "1. Build buckets"],
-    ["2. Chọn minimax", "2. Pick minimax"],
-    ["3. Hỏi Master", "3. Ask Master"],
-    ["4. Lọc ứng viên", "4. Filter candidates"],
+  const stages = [
+    ["◉", text("Chia", "Group")],
+    ["★", text("Chọn", "Pick")],
+    ["?", text("Hỏi", "Ask")],
+    ["✓", text("Lọc", "Filter")],
   ];
-  const pipeline = phaseLabels.map((labels, index) => {
-    const classes = [index === activePhase ? "active" : "", index < doneThrough || view.phase === "found" ? "done" : ""].filter(Boolean).join(" ");
-    return `<span class="${classes}">${text(...labels)}</span>`;
+  const activeIndex = ["score", "choose", "guess", "filter", "found"].indexOf(view.phase);
+  const stagesHtml = stages.map(([icon, label], index) => {
+    const done = view.phase === "found" || index < activeIndex;
+    const active = index === activeIndex;
+    return `<span class="gtw843-stage${done ? " done" : ""}${active ? " active" : ""}"><i>${done ? "✓" : icon}</i><b>${label}</b></span>`;
   }).join("");
 
   const comparison = view.comparison;
-  let comparisonHtml = `<div class="gtw843-empty">${text(
-    "Master đang giấu một từ 6 ký tự. Ta chỉ được biết có bao nhiêu vị trí khớp.",
-    "The Master hides a six-letter word. We only learn how many positions match.",
-  )}</div>`;
-  if (comparison) {
-    const cells = [...comparison.left].map((letter, index) => {
-      const right = comparison.right[index];
-      const matches = letter === right;
-      return `<div class="gtw843-letter${matches ? " match" : " miss"}">
-        <small>${index}</small><b>${escapeHtml(letter)}</b><b>${comparison.revealRight ? escapeHtml(right) : "•"}</b><em>${matches ? "✓" : "×"}</em>
-      </div>`;
-    }).join("");
-    comparisonHtml = `<div class="gtw843-compare-labels"><span>${view.phase === "match-example" ? "a" : text("Đoán", "Guess")}</span><span>${view.phase === "match-example" ? "b" : "secret"}</span></div>
-      <div class="gtw843-letters">${cells}</div>
-      <div class="gtw843-feedback"><span>Master</span><b>${comparison.result} / 6</b><em>${text("vị trí khớp", "positions match")}</em></div>`;
-  }
+  const compareHtml = comparison
+    ? [...comparison.left].map((letter, index) => {
+      const matched = letter === comparison.right[index];
+      return `<span class="gtw843-compare-letter${matched ? " match" : " miss"}">
+        <small>${index + 1}</small><b>${escapeHtml(letter)}</b><i>${matched ? "✓" : "×"}</i>
+      </span>`;
+    }).join("")
+    : Array.from({ length: 6 }, (_, index) => `<span class="gtw843-compare-letter waiting"><small>${index + 1}</small><b>·</b><i>?</i></span>`).join("");
+  const feedback = comparison
+    ? `<strong>${comparison.result}<small>/6</small></strong>`
+    : `<strong>?</strong>`;
+  const attemptedWord = comparison?.left || view.activeWord || view.bestWord;
 
   const displayedCandidates = view.previousCandidates || view.candidates || [];
   const removed = new Set(view.removed || []);
   const kept = new Set(view.kept || []);
-  const matchesByWord = new Map((view.candidateMatches || []).map((entry) => [entry.word, entry.m]));
+  const matchesByWord = new Map((view.candidateMatches || []).map(({ word, m }) => [word, m]));
   const candidateCards = displayedCandidates.map((word) => {
-    const classes = ["gtw843-word"];
-    if (word === view.activeWord) classes.push("active");
-    if (removed.has(word)) classes.push("removed");
-    if (kept.has(word)) classes.push("kept");
-    if (view.found === word) classes.push("found");
-    let badge = "";
-    if (matchesByWord.has(word)) badge = `<small>match = ${matchesByWord.get(word)}</small>`;
-    else if (word === view.activeWord) badge = `<small>${text("đang xét", "current")}</small>`;
-    return `<span class="${classes.join(" ")}"><b>${escapeHtml(word)}</b>${badge}</span>`;
+    const classes = [
+      "gtw843-word",
+      word === view.activeWord ? "active" : "",
+      removed.has(word) ? "removed" : "",
+      kept.has(word) ? "kept" : "",
+      word === view.found ? "found" : "",
+    ].filter(Boolean).join(" ");
+    const matchCount = matchesByWord.get(word);
+    const markers = attemptedWord ? [...word].map((letter, index) => (
+      `<i class="${letter === attemptedWord[index] ? "same" : ""}"></i>`
+    )).join("") : "";
+    return `<span class="${classes}" title="${escapeHtml(word)}"><span class="gtw843-word-dots">${markers}</span><b>${escapeHtml(word)}</b>${matchCount !== undefined ? `<small>${matchCount}</small>` : ""}</span>`;
   }).join("");
 
-  let scoreTable = `<p class="gtw843-placeholder">${text(
-    "Ở bước kế tiếp, mỗi từ sẽ được chia thành 7 bucket theo số vị trí khớp.",
-    "Next, every word is split into seven buckets by its number of matching positions.",
-  )}</p>`;
+  let scoreChart;
   if (view.scoreRows?.length) {
-    const minWorst = Math.min(...view.scoreRows.map((row) => row.worst));
-    const rows = view.scoreRows.map((row) => {
-      const isBest = row.word === view.bestWord && ["choose", "guess", "filter", "found"].includes(view.phase);
-      const buckets = row.counts.map((count, matchCount) => {
-        const isWorst = count === row.worst && count > 0;
-        const actual = view.result === matchCount && row.word === view.bestWord && ["guess", "filter", "found"].includes(view.phase);
-        const details = row.groups[matchCount]?.length ? row.groups[matchCount].join(", ") : "∅";
-        return `<span class="gtw843-bucket${isWorst ? " worst" : ""}${actual ? " actual" : ""}" title="m=${matchCount}: ${escapeHtml(details)}"><small>${matchCount}</small><b>${count}</b></span>`;
-      }).join("");
-      return `<div class="gtw843-score-row${row.word === view.activeWord ? " active" : ""}${isBest ? " best" : ""}">
-        <strong>${escapeHtml(row.word)}</strong><div class="gtw843-buckets">${buckets}</div><span class="gtw843-worst${row.worst === minWorst ? " minimum" : ""}"><small>worst</small><b>${row.worst}</b></span>
-      </div>`;
-    }).join("");
-    scoreTable = `<div class="gtw843-score-head"><strong>${text("Từ đoán", "Guess")}</strong><span>match = 0 · 1 · 2 · 3 · 4 · 5 · 6</span><b>max(bucket)</b></div><div class="gtw843-score-scroll">${rows}</div>`;
+    const maxCount = Math.max(1, ...view.scoreRows.flatMap((row) => row.counts));
+    scoreChart = `<div class="gtw843-chart-legend"><span>${text("Từ", "Guess")}</span><div>${Array.from({ length: 7 }, (_, index) => `<i>${index}</i>`).join("")}</div><span>max</span></div>
+      <div class="gtw843-score-scroll">${view.scoreRows.map((row) => {
+        const best = row.word === view.bestWord && ["choose", "guess", "filter", "found"].includes(view.phase);
+        const current = row.word === view.activeWord;
+        const bucketCells = row.counts.map((count, index) => {
+          const actual = row.word === view.bestWord && comparison && comparison.result === index;
+          const height = Math.max(count > 0 ? 5 : 0, Math.round((count / maxCount) * 100));
+          return `<span class="gtw843-chart-bucket${count === row.worst && count ? " worst" : ""}${actual ? " actual" : ""}" title="${text("Khớp", "Match")} ${index}: ${count}">
+            <i style="--gtw843-bar-height:${height}%"></i><b>${count || ""}</b>
+          </span>`;
+        }).join("");
+        return `<div class="gtw843-score-row${current ? " active" : ""}${best ? " best" : ""}">
+          <strong>${escapeHtml(row.word)}</strong><div class="gtw843-buckets">${bucketCells}</div><span class="gtw843-worst">${row.worst}</span>
+        </div>`;
+      }).join("")}</div>`;
+  } else {
+    scoreChart = `<div class="gtw843-score-empty" aria-hidden="true">${Array.from({ length: 7 }, (_, index) => `<i>${index}</i>`).join("")}</div>`;
   }
 
-  const history = (view.history || []).map((entry) => `<div class="gtw843-history-row">
-    <span>#${entry.round}</span><b>${escapeHtml(entry.guess)}</b><strong>${entry.result}/6</strong><em>${entry.before} → ${entry.after}</em>
-  </div>`).join("");
+  const roundText = view.round
+    ? text(`Vòng ${view.round}`, `Round ${view.round}`)
+    : text("Bắt đầu", "Ready");
+  const candidateCount = view.candidates?.length ?? 0;
+  const resultCount = view.phase === "filter" ? kept.size : candidateCount;
 
-  const status = view.phase === "found"
-    ? text(`Tìm thấy ${view.found}!`, `Found ${view.found}!`)
-    : view.round
-      ? text(`Vòng ${view.round} · còn ${view.candidates.length} từ`, `Round ${view.round} · ${view.candidates.length} left`)
-      : text(`${view.words.length} từ ban đầu`, `${view.words.length} initial words`);
-
-  $("treeView").innerHTML = `<section class="gtw843-viz" aria-label="${text("Mô phỏng bài 843", "Problem 843 simulation")}">
-    <header class="gtw843-heading"><div><small>#843 · HARD · MINIMAX</small><h3>${text("Đoán từ bằng cách thu nhỏ trường hợp xấu nhất", "Guess by shrinking the worst case")}</h3></div><span class="${view.phase === "found" ? "success" : ""}">${escapeHtml(status)}</span></header>
-    <div class="gtw843-rule"><b>match(a, b)</b><span>${text("Đếm ký tự bằng nhau ở cùng vị trí — không phải số chữ cái chung.", "Count equal letters in the same positions—not shared letters.")}</span><code>sum(a[i] == b[i])</code></div>
-    <nav class="gtw843-pipeline" aria-label="${text("Bốn bước mỗi vòng", "Four steps per round")}">${pipeline}</nav>
-    <div class="gtw843-layout">
-      <section class="gtw843-panel gtw843-master"><header><strong>${text("Phản hồi của Master", "Master feedback")}</strong><span>${comparison ? `${comparison.result}/6` : "? / 6"}</span></header>${comparisonHtml}</section>
-      <section class="gtw843-panel gtw843-pool"><header><strong>${text("Tập ứng viên", "Candidate pool")}</strong><span>${displayedCandidates.length} ${text("từ", "words")}</span></header><div class="gtw843-words">${candidateCards}</div>${view.phase === "filter" ? `<p><b>${kept.size}</b> ${text("giữ lại", "kept")} · <b>${removed.size}</b> ${text("bị loại vì phản hồi không khớp", "removed because their feedback differs")}</p>` : ""}</section>
+  $("treeView").innerHTML = `<section class="gtw843-viz" aria-label="${text("Trò chơi đoán từ", "Guess the word game")}">
+    <header class="gtw843-heading">
+      <div class="gtw843-title"><span>#843</span><h3>${text("Đoán từ bí mật", "Guess the secret word")}</h3></div>
+      <div class="gtw843-round"><strong>${roundText}</strong><span>${view.phase === "found" ? "✓" : `${candidateCount} ${text("từ", "left")}`}</span></div>
+    </header>
+    <nav class="gtw843-pipeline" aria-label="${text("Các bước minimax", "Minimax steps")}">${stagesHtml}</nav>
+    <div class="gtw843-main">
+      <section class="gtw843-panel gtw843-master">
+        <header><strong>${text("Lượt đoán", "Guess")}</strong><span>${feedback}</span></header>
+        <div class="gtw843-comparison">${compareHtml}</div>
+        <div class="gtw843-feedback-label">${comparison ? text("vị trí trùng", "positions match") : text("6 ký tự", "6 letters")}</div>
+      </section>
+      <section class="gtw843-panel gtw843-pool">
+        <header><strong>${text("Ứng viên", "Candidates")}</strong><span>${resultCount}/${displayedCandidates.length}</span></header>
+        <div class="gtw843-words">${candidateCards || `<span class="gtw843-empty">∅</span>`}</div>
+        ${view.phase === "filter" ? `<footer><i class="kept"></i>${kept.size}<i class="eliminated"></i>${removed.size}</footer>` : ""}
+      </section>
     </div>
-    <div class="gtw843-action"><strong>${escapeHtml(pick(step.title))}</strong><p>${escapeHtml(pick(step.note))}</p></div>
-    <section class="gtw843-panel gtw843-score"><header><div><strong>${text("Bảng minimax", "Minimax scoreboard")}</strong><span>${text("Mỗi ô = số từ rơi vào bucket đó", "Each cell = words in that bucket")}</span></div><code>${text("chọn min(max(bucket))", "choose min(max(bucket))")}</code></header>${scoreTable}</section>
-    <div class="gtw843-bottom">
-      <section class="gtw843-panel gtw843-history"><header><strong>${text("Lịch sử hỏi Master", "Master query history")}</strong><span>${view.history.length}/30</span></header>${history || `<p>${text("Chưa đoán từ nào.", "No guesses yet.")}</p>`}</section>
-      <details class="gtw843-interview"${view.phase === "found" ? " open" : ""}><summary>${text("Cách giải thích trong phỏng vấn", "Interview explanation")}</summary><ol><li>${text("Với mỗi từ đoán, gom các từ khác theo match 0..6.", "For each possible guess, group other words by match 0..6.")}</li><li>${text("Bucket lớn nhất là số ứng viên có thể còn lại trong tình huống xấu nhất.", "The largest bucket is how many candidates may remain in the worst case.")}</li><li>${text("Chọn từ có bucket lớn nhất nhỏ nhất, hỏi Master, rồi chỉ giữ bucket được trả về.", "Choose the word with the smallest largest bucket, ask Master, then keep only the returned bucket.")}</li></ol><p><b>${text("Độ phức tạp:", "Complexity:")}</b> O(W² · L) ${text("mỗi vòng; L = 6.", "per round; L = 6.")}</p></details>
-    </div>
+    <section class="gtw843-panel gtw843-score">
+      <header><strong>${text("Chia nhóm theo số vị trí khớp", "Group by matching positions")}</strong><span>${Number.isFinite(view.bestScore) ? `${escapeHtml(view.bestWord)} · max ${view.bestScore}` : "0—6"}</span></header>
+      ${scoreChart}
+    </section>
+    ${view.phase === "found" ? `<div class="gtw843-found" aria-label="${text("Đã tìm thấy từ", "Secret found")}">${[...view.found].map((letter) => `<b>${escapeHtml(letter)}</b>`).join("")}</div>` : ""}
   </section>`;
 }
