@@ -72,4 +72,8 @@
 .gtw843-score-empty i{display:grid;place-items:center;height:25px;border-radius:5px;background:color-mix(in srgb,var(--g-blue) 8%,transparent);color:var(--g-muted);font:normal 9px ui-monospace,monospace}
 .gtw843-found{display:flex;justify-content:center;gap:5px}
 .gtw843-found b{display:grid;place-items:center;width:34px;height:36px;border:1px solid var(--g-green);border-radius:8px;background:color-mix(in srgb,var(--g-green) 13%,transparent);color:var(--g-green);font:900 18px ui-monospace,monospace}
+.gtw843-debug{display:flex;align-items:center;gap:8px;min-height:32px;padding:5px 8px;border:1px solid var(--g-border);border-radius:8px;background:color-mix(in srgb,var(--g-cyan) 6%,var(--g-panel));font-size:10px}
+.gtw843-debug span{display:grid;place-items:center;min-width:34px;height:22px;border-radius:5px;background:color-mix(in srgb,var(--g-cyan) 15%,transparent);color:var(--g-cyan);font:800 10px ui-monospace,monospace}
+.gtw843-debug strong{color:var(--g-text)}
+.gtw843-debug i{margin-left:auto;color:var(--g-muted);font-style:normal}
 @container (max-width:540px){.gtw843-viz{padding:9px}.gtw843-main{grid-template-columns:1fr}.gtw843-pool>.gtw843-words{max-height:112px}.gtw843-round{gap:5px;padding:5px 7px}.gtw843-round strong,.gtw843-round span{font-size:9px}.gtw843-stage{gap:3px}.gtw843-stage b{font-size:9px}.gtw843-score>header{align-items:flex-start}.gtw843-score>header span{white-space:normal;text-align:right}}

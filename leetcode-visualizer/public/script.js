@@ -145,6 +145,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.guessWord843View), surface: "treeView", render: (step) => {
       renderGuessTheWord843View(step);
     } },
+    { predicate: (step) => Boolean(step.robotRoomCleaner489View), surface: "treeView", render: (step) => {
+      renderRobotRoomCleaner489View(step);
+    } },
     { predicate: (step) => Boolean(step.increasingCells2713View), surface: "treeView", render: (step) => {
       renderIncreasingCells2713View(step);
     } },

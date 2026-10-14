@@ -78,6 +78,22 @@ function renderGuessTheWord843View(step) {
     : text("Bắt đầu", "Ready");
   const candidateCount = view.candidates?.length ?? 0;
   const resultCount = view.phase === "filter" ? kept.size : candidateCount;
+  const line = Number(step.codeLines?.[0]);
+  const lineLabels = {
+    6: text("Đếm vị trí", "Count positions"),
+    7: text("So ký tự", "Compare letters"),
+    12: text("Vòng đoán", "Guess loop"),
+    16: text("Khởi tạo", "Initialize"),
+    17: text("Điểm tốt nhất", "Best score"),
+    30: text("Nhóm xấu nhất", "Worst bucket"),
+    32: text("Chọn minimax", "Pick minimax"),
+    33: text("Cập nhật điểm", "Update score"),
+    34: text("Đổi từ đoán", "Update guess"),
+    37: text("Hỏi Master", "Ask Master"),
+    40: text("Đã tìm thấy?", "Found?"),
+    43: text("Lọc ứng viên", "Filter candidates"),
+  };
+  const lineLabel = lineLabels[line] || text("Đang chạy", "Running");
 
   $("treeView").innerHTML = `<section class="gtw843-viz" aria-label="${text("Trò chơi đoán từ", "Guess the word game")}">
     <header class="gtw843-heading">
@@ -85,6 +101,10 @@ function renderGuessTheWord843View(step) {
       <div class="gtw843-round"><strong>${roundText}</strong><span>${view.phase === "found" ? "✓" : `${candidateCount} ${text("từ", "left")}`}</span></div>
     </header>
     <nav class="gtw843-pipeline" aria-label="${text("Các bước minimax", "Minimax steps")}">${stagesHtml}</nav>
+    <div class="gtw843-debug" aria-label="${text(`Đang chạy dòng ${line}`, `Running line ${line}`)}">
+      <span>L${Number.isInteger(line) ? line : "—"}</span><strong>${lineLabel}</strong>
+      <i>${text("Từng dòng", "Line by line")}</i>
+    </div>
     <div class="gtw843-main">
       <section class="gtw843-panel gtw843-master">
         <header><strong>${text("Lượt đoán", "Guess")}</strong><span>${feedback}</span></header>

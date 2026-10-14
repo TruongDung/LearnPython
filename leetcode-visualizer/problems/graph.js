@@ -15335,6 +15335,7 @@ function buildSteps489(input) {
   const dirName = ["↑", "→", "↓", "←"];
   const visited = new Set();
   const cleaned = new Set();
+  const pathStack = [];
 
   function makeCells(cur, facing) {
     return grid.map((row, r) =>
@@ -15359,6 +15360,15 @@ function buildSteps489(input) {
       codeLines: opts.codeLines || [],
       vars: opts.vars || [],
       note: opts.note,
+      robotRoomCleaner489View: {
+        grid,
+        current: opts.cur ? [...opts.cur] : null,
+        facing: opts.facing ?? null,
+        cleaned: [...cleaned],
+        path: pathStack.map((frame) => ({ ...frame })),
+        attempt: opts.attempt ? { ...opts.attempt } : null,
+        action: opts.action || "scan",
+      },
     });
   }
 
@@ -15366,6 +15376,7 @@ function buildSteps489(input) {
     title: { vi: `Bắt đầu dfs tại (${start[0]},${start[1]})`, en: `Start dfs at (${start[0]},${start[1]})` },
     cur: start,
     facing: 0,
+    action: "start",
     codeLines: [3, 8, 17],
     vars: [
       { name: "start", value: `(${start[0]},${start[1]})` },
@@ -15387,6 +15398,7 @@ function buildSteps489(input) {
   function dfs(r, c, d) {
     if (guard > 400) return;
     guard += 1;
+    pathStack.push({ row: r, col: c, facing: d });
     visited.add(`${r},${c}`);
     cleaned.add(`${r},${c}`);
 
@@ -15394,6 +15406,7 @@ function buildSteps489(input) {
       title: { vi: `clean (${r},${c})`, en: `clean (${r},${c})` },
       cur: [r, c],
       facing: d,
+      action: "clean",
       codeLines: [9],
       vars: [
         { name: "position", value: `(${r},${c})` },
@@ -15415,10 +15428,12 @@ function buildSteps489(input) {
 
       if (notVisited && canMove) {
         snap({
-          title: { vi: `Hướng ${dirName[nd]}: move() tới (${nr},${nc}) ✓`, en: `Direction ${dirName[nd]}: move() to (${nr},${nc}) ✓` },
+          title: { vi: `Kiểm tra lối ${dirName[nd]} → (${nr},${nc})`, en: `Check ${dirName[nd]} → (${nr},${nc})` },
           cur: [r, c],
           facing: nd,
-          codeLines: [10, 11, 12, 13, 14],
+          action: "check",
+          attempt: { from: [r, c], to: [nr, nc], direction: nd, outcome: "move" },
+          codeLines: [10, 11, 12, 13],
           vars: [
             { name: "trying dir", value: dirName[nd] },
             { name: "next cell", value: `(${nr},${nc})` },
@@ -15429,19 +15444,85 @@ function buildSteps489(input) {
             en: `Direction ${dirName[nd]} to (${nr},${nc}): unvisited and move() succeeds → recurse dfs(${nr},${nc},${nd}).`,
           },
         });
-        dfs(nr, nc, nd);
-        // go_back
         snap({
-          title: { vi: `go_back → quay lại (${r},${c})`, en: `go_back → return to (${r},${c})` },
-          cur: [r, c],
+          title: { vi: `Đi vào (${nr},${nc})`, en: `Enter (${nr},${nc})` },
+          cur: [nr, nc],
           facing: nd,
-          codeLines: [4, 5, 6, 7, 15],
+          action: "move",
+          attempt: { from: [r, c], to: [nr, nc], direction: nd, outcome: "move" },
+          codeLines: [14],
+          vars: [
+            { name: "dfs", value: `(${nr},${nc},${dirName[nd]})` },
+            { name: "vị trí mới", value: `(${nr},${nc})` },
+          ],
+          note: {
+            vi: "move() thành công; gọi DFS sâu hơn từ ô mới.",
+            en: "move() succeeded; recurse from the newly reached cell.",
+          },
+        });
+        dfs(nr, nc, nd);
+        snap({
+          title: { vi: `Trở về từ dfs(${nr},${nc},${nd})`, en: `Return from dfs(${nr},${nc},${nd})` },
+          cur: [nr, nc],
+          facing: nd,
+          action: "return",
+          codeLines: [14],
+          vars: [{ name: "nhánh con", value: "xong" }],
+          note: {
+            vi: "Nhánh con đã thăm xong; robot còn ở ô con trước khi gọi go_back().",
+            en: "The child branch is complete; the robot is still at the child cell before go_back().",
+          },
+        });
+        snap({
+          title: { vi: `Gọi go_back() từ (${nr},${nc})`, en: `Call go_back() from (${nr},${nc})` },
+          cur: [nr, nc],
+          facing: nd,
+          action: "backtrack-start",
+          attempt: { from: [nr, nc], to: [r, c], direction: (nd + 2) % 4, outcome: "backtrack" },
+          codeLines: [15],
+          vars: [{ name: "ô cha", value: `(${r},${c})` }],
+          note: {
+            vi: "Bắt đầu lùi về ô cha để tiếp tục vòng lặp DFS.",
+            en: "Start retracing to the parent to continue the DFS loop.",
+          },
+        });
+        snap({
+          title: { vi: `go_back: quay 180° tại (${nr},${nc})`, en: `go_back: turn 180° at (${nr},${nc})` },
+          cur: [nr, nc],
+          facing: (nd + 2) % 4,
+          action: "turn",
+          codeLines: [5],
+          vars: [{ name: "turn", value: "180°" }],
+          note: {
+            vi: "Xoay tại chỗ để nhìn ngược về ô cha.",
+            en: "Rotate in place to face the parent cell.",
+          },
+        });
+        snap({
+          title: { vi: `move() lùi về (${r},${c})`, en: `move() back to (${r},${c})` },
+          cur: [r, c],
+          facing: (nd + 2) % 4,
+          action: "backtrack",
+          attempt: { from: [nr, nc], to: [r, c], direction: (nd + 2) % 4, outcome: "backtrack" },
+          codeLines: [6],
           vars: [
             { name: "back at", value: `(${r},${c})` },
           ],
           note: {
-            vi: `Đã lau xong nhánh (${nr},${nc}). go_back: quay 180°, move() về ô cũ, quay 180° lại để giữ đúng hướng đang xét.`,
-            en: `Finished the (${nr},${nc}) branch. go_back: turn 180°, move() back, turn 180° again to restore the scanning direction.`,
+            vi: `Lùi theo đường vừa đi từ (${nr},${nc}) về ô cha.`,
+            en: `Retrace the edge from (${nr},${nc}) to the parent cell.`,
+          },
+        });
+        snap({
+          title: { vi: `go_back: khôi phục hướng ${dirName[nd]}`, en: `go_back: restore facing ${dirName[nd]}` },
+          cur: [r, c],
+          facing: nd,
+          action: "turn",
+          codeLines: [7],
+          vars: [{ name: "facing", value: dirName[nd] }],
+          note: {
+            vi: "Xoay 180° lần nữa để tiếp tục quét các hướng còn lại.",
+            en: "Rotate 180° again to continue scanning the remaining directions.",
           },
         });
       } else {
@@ -15449,7 +15530,9 @@ function buildSteps489(input) {
           title: { vi: `Hướng ${dirName[nd]}: ${!canMove ? "tường/biên" : "đã thăm"} → bỏ qua`, en: `Direction ${dirName[nd]}: ${!canMove ? "wall/edge" : "visited"} → skip` },
           cur: [r, c],
           facing: nd,
-          codeLines: [13, 16],
+          action: notVisited ? "blocked" : "visited",
+          attempt: { from: [r, c], to: [nr, nc], direction: nd, outcome: !canMove ? "wall" : "visited" },
+          codeLines: [13],
           vars: [
             { name: "trying dir", value: dirName[nd] },
             { name: "next cell", value: `(${nr},${nc})` },
@@ -15461,7 +15544,20 @@ function buildSteps489(input) {
           },
         });
       }
+      snap({
+        title: { vi: `turnRight() → ${dirName[(nd + 1) % 4]}`, en: `turnRight() → ${dirName[(nd + 1) % 4]}` },
+        cur: [r, c],
+        facing: (nd + 1) % 4,
+        action: "turn",
+        codeLines: [16],
+        vars: [{ name: "facing kế", value: dirName[(nd + 1) % 4] }],
+        note: {
+          vi: "Xoay phải một lần để thử hướng kế tiếp.",
+          en: "Turn right once to test the next direction.",
+        },
+      });
     }
+    pathStack.pop();
   }
 
   dfs(start[0], start[1], 0);
@@ -15470,6 +15566,7 @@ function buildSteps489(input) {
   snap({
     title: { vi: `Hoàn tất: lau ${cleaned.size}/${totalFree} ô`, en: `Done: cleaned ${cleaned.size}/${totalFree} cells` },
     cur: null,
+    action: "done",
     final: true,
     codeLines: [17],
     vars: [
@@ -18386,6 +18483,7 @@ module.exports = {
   489: {
     id: 489,
     difficulty: "hard",
+    debugMode: "line-by-line",
     slug: "robot-room-cleaner",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "Robot Room Cleaner", en: "Robot Room Cleaner" },

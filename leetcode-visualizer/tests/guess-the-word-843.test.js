@@ -143,6 +143,7 @@ test('843 is registered under interview with Google-relevant metadata', () => {
   assert.equal(problem.id, 843);
   assert.equal(problem.slug, 'guess-the-word');
   assert.equal(problem.difficulty, 'hard');
+  assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.category.key, 'string');
   assert.ok(problem.tags.some((t) => t.key === 'minimax'));
   assert.ok(problem.extraParams.some((p) => p.key === 'secret'));
@@ -180,8 +181,9 @@ test('843 dedicated frontend assets are loaded and registered before the app scr
   assert.match(styles, /\.gtw843-letter\.match/);
   assert.match(styles, /\.gtw843-chart-bucket/);
   assert.ok(index.indexOf('renderer-guess-the-word-843.js') < index.indexOf('script.js?'));
-  assert.match(index, /guess-the-word-843\.css\?v=guess-the-word-843-v2/);
-  assert.match(index, /renderer-guess-the-word-843\.js\?v=guess-the-word-843-v2/);
+  assert.match(index, /guess-the-word-843\.css\?v=guess-the-word-843-v3/);
+  assert.match(index, /renderer-guess-the-word-843\.js\?v=guess-the-word-843-v3/);
+  assert.match(index, /cc=robot-room-cleaner-489-v1/);
 });
 
 test('843 renderer emphasizes matching letters, candidate cards, and minimax buckets', () => {
@@ -208,6 +210,7 @@ test('843 renderer emphasizes matching letters, candidate cards, and minimax buc
       assert.match(host.innerHTML, /gtw843-comparison/);
       assert.match(host.innerHTML, /gtw843-word-dots/);
       assert.match(host.innerHTML, /gtw843-pipeline/);
+      assert.match(host.innerHTML, /gtw843-debug/);
       assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
     }
   }
@@ -216,6 +219,7 @@ test('843 renderer emphasizes matching letters, candidate cards, and minimax buc
   context.renderGuessTheWord843View(score);
   assert.match(host.innerHTML, /gtw843-chart-bucket/);
   assert.match(host.innerHTML, /gtw843-score-row/);
+  assert.match(host.innerHTML, /L30/);
 
   const filter = result.steps.find((step) => step.guessWord843View.phase === 'filter');
   context.renderGuessTheWord843View(filter);
