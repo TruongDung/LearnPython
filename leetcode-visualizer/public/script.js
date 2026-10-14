@@ -172,6 +172,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.increasingPaths2328View), surface: "treeView", render: (step) => {
       renderIncreasingPaths2328View(step);
     } },
+    { predicate: (step) => Boolean(step.dessert1774View), surface: "treeView", render: (step) => {
+      renderClosestDessertCost1774View(step);
+    } },
     { predicate: (step) => Boolean(step.similarEnds1750View), surface: "treeView", render: (step) => {
       renderSimilarEnds1750View(step);
     } },
