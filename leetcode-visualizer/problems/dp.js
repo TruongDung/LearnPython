@@ -11495,15 +11495,15 @@ function buildSteps174(input) {
  */
 function buildSteps1049(nums) {
   const steps = [];
-  const total = nums.reduce((a, b) => a + b, 0);
-  const target = Math.floor(total / 2);
-  const dp = new Array(target + 1).fill(false);
-  const subsetStones = new Array(target + 1).fill(null);
-  dp[0] = true;
-  subsetStones[0] = [];
+  let total = null;
+  let target = null;
+  let dp = null;
+  let subsetStones = null;
+  let answer = null;
 
-  const trueIndices = () => dp.map((v, i) => v ? i : null).filter(x => x !== null);
+  const trueIndices = () => dp ? dp.map((v, i) => v ? i : null).filter(x => x !== null) : [];
   const bestReachableSum = () => {
+    if (!dp || target === null) return 0;
     for (let sum = target; sum >= 0; sum--) {
       if (dp[sum]) return sum;
     }
@@ -11511,16 +11511,25 @@ function buildSteps1049(nums) {
   };
   const partitionView = (phase, options = {}) => {
     const bestSum = bestReachableSum();
-    const selected = subsetStones[bestSum] || [];
+    const selected = subsetStones?.[bestSum] || [];
+    const processedCount = options.processedCount ?? 0;
     return {
       phase,
+      event: options.event || phase,
+      debugLine: options.debugLine ?? null,
+      source: options.source || null,
       stones: nums.map((weight, index) => ({
         index,
         weight,
-        state: index === options.stoneIndex ? "current" : index < (options.processedCount || 0) ? "processed" : "waiting",
+        state: index === options.stoneIndex ? "current" : index < processedCount ? "processed" : "waiting",
       })),
-      processedCount: options.processedCount || 0,
+      processedCount,
       stoneIndex: Number.isInteger(options.stoneIndex) ? options.stoneIndex : null,
+      currentJ: Number.isInteger(options.currentJ) ? options.currentJ : null,
+      sourceSum: Number.isInteger(options.sourceSum) ? options.sourceSum : null,
+      beforeValue: options.beforeValue ?? null,
+      sourceValue: options.sourceValue ?? null,
+      afterValue: options.afterValue ?? null,
       changedSums: options.changedSums ? [...options.changedSums] : [],
       reachableSums: trueIndices(),
       total,
@@ -11532,90 +11541,137 @@ function buildSteps1049(nums) {
     };
   };
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: dp.map((v) => (v ? 1 : 0)),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [0], mark: [], codeLines: [3, 4, 5, 6],
-    vars: [
-      { name: "stones", value: `[${nums.join(",")}]` },
-      { name: "sum", value: total },
-      { name: "target", value: `floor(${total}/2) = ${target}` },
-      { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
-    ],
-    note: {
-      vi:
-        `Bài toán tương đương: chia đá thành 2 nhóm sao cho |sum1 - sum2| TỐI THIỂU.\n` +
-        `= Tìm subset có tổng GẦN total/2 nhất (0/1 Knapsack).\n` +
-        `dp[j] = True nếu tổng j đạt được. target = floor(${total}/2) = ${target}.\n` +
-        `Đáp án = total - 2 * (tổng lớn nhất đạt được ≤ target).`,
-      en:
-        `Equivalent: partition stones into 2 groups minimizing |sum1 - sum2|.\n` +
-        `= Find a subset sum as CLOSE to total/2 as possible (0/1 Knapsack).\n` +
-        `dp[j] = True if sum j is achievable. target = floor(${total}/2) = ${target}.\n` +
-        `Answer = total - 2 * (largest achievable sum ≤ target).`,
-    },
-    stoneWeight1049View: partitionView("intro"),
-  });
+  const emit = (line, event, title, note, options = {}) => {
+    const activeStone = Number.isInteger(options.stoneIndex) ? nums[options.stoneIndex] : null;
+    const variables = [
+      { name: "stones", value: `[${nums.join(", ")}]` },
+      ...(total === null ? [] : [{ name: "total", value: total }]),
+      ...(target === null ? [] : [{ name: "target", value: target }]),
+      ...(activeStone === null ? [] : [{ name: "stone", value: activeStone }]),
+      ...(Number.isInteger(options.currentJ) ? [{ name: "j", value: options.currentJ }] : []),
+      ...(dp === null ? [] : [{ name: "dp (true)", value: `{${trueIndices().join(", ")}}` }]),
+    ];
+    steps.push({
+      title: {
+        vi: `Dòng ${line}: ${title.vi}`,
+        en: `Line ${line}: ${title.en}`,
+      },
+      arr: dp ? dp.map((value) => (value ? 1 : 0)) : [],
+      sub: dp ? dp.map((_, index) => String(index)) : [],
+      highlight: options.highlight ? [...options.highlight] : [],
+      mark: options.mark ? [...options.mark] : [],
+      codeLines: [line],
+      final: Boolean(options.final),
+      vars: variables,
+      note,
+      stoneWeight1049View: partitionView(options.phase || "process", {
+        ...options,
+        event,
+        debugLine: line,
+        source: options.source,
+      }),
+    });
+  };
+
+  total = nums.reduce((sum, stone) => sum + stone, 0);
+  emit(3, "total", { vi: `Tổng = ${total}`, en: `Total = ${total}` }, {
+    vi: "Cộng trọng lượng của mọi viên đá.",
+    en: "Add the weights of all stones.",
+  }, { phase: "intro", processedCount: 0 });
+
+  target = Math.floor(total / 2);
+  emit(4, "target", { vi: `Đích = ${target}`, en: `Target = ${target}` }, {
+    vi: "Chỉ cần tìm một nhóm có tổng gần một nửa nhất.",
+    en: "We only need a pile whose sum is as close to half as possible.",
+  }, { phase: "intro", processedCount: 0 });
+
+  dp = new Array(target + 1).fill(false);
+  subsetStones = new Array(target + 1).fill(null);
+  emit(6, "init-dp", { vi: "Tạo dãy DP", en: "Create the DP array" }, {
+    vi: "dp[j] cho biết tổng j đã tạo được hay chưa.",
+    en: "dp[j] tells whether sum j is reachable.",
+  }, { phase: "intro", processedCount: 0 });
+
+  dp[0] = true;
+  subsetStones[0] = [];
+  emit(7, "zero", { vi: "Tổng 0 luôn tạo được", en: "Sum 0 is reachable" }, {
+    vi: "Không chọn viên đá nào sẽ tạo tổng 0.",
+    en: "Choosing no stones makes sum 0.",
+  }, { phase: "intro", processedCount: 0, highlight: [0] });
 
   nums.forEach((stone, stoneIndex) => {
-    const changed = [];
-    for (let j = target; j >= stone; j--) {
-      if (!dp[j] && dp[j - stone]) {
-        dp[j] = true;
-        subsetStones[j] = [...subsetStones[j - stone], stoneIndex];
-        changed.push(j);
-      }
-    }
+    emit(9, "choose-stone", { vi: `Xét đá ${stone}`, en: `Process stone ${stone}` }, {
+      vi: "Viên đá hiện tại chỉ được dùng một lần.",
+      en: "The current stone may be used at most once.",
+    }, { stoneIndex, processedCount: stoneIndex, phase: "process" });
 
-    steps.push({
-      title: { vi: `Xét đá ${stone}`, en: `Process stone ${stone}` },
-      arr: dp.map((v) => (v ? 1 : 0)),
-      sub: dp.map((_, i) => String(i)),
-      highlight: changed,
-      mark: [],
-      codeLines: [7, 8, 9],
-      vars: [
-        { name: "stone", value: stone },
-        { name: "new sums", value: changed.length > 0 ? `[${changed.join(",")}]` : "none" },
-        { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
-      ],
-      note: {
-        vi: `Thử đặt đá ${stone} vào một nhóm. Các tổng mới đạt được: [${changed.join(", ")}].`,
-        en: `Try placing stone ${stone} in one group. Newly reachable sums: [${changed.join(", ")}].`,
-      },
-      stoneWeight1049View: partitionView("process", { stoneIndex, processedCount: stoneIndex + 1, changedSums: changed }),
-    });
+    for (let j = target; j >= stone; j--) {
+      const sourceSum = j - stone;
+      const beforeValue = dp[j];
+      const sourceValue = dp[sourceSum];
+      emit(10, "scan-sum", { vi: `Thử j = ${j}`, en: `Try j = ${j}` }, {
+        vi: `Đi từ phải sang trái để đá ${stone} không bị dùng lại trong cùng lượt.`,
+        en: `Scan right to left so stone ${stone} cannot be reused in this pass.`,
+      }, {
+        stoneIndex, processedCount: stoneIndex + 1, currentJ: j, sourceSum,
+        beforeValue, sourceValue, afterValue: beforeValue, highlight: [j], phase: "process",
+      });
+
+      dp[j] = beforeValue || sourceValue;
+      const changed = !beforeValue && sourceValue;
+      if (changed) {
+        subsetStones[j] = [...subsetStones[j - stone], stoneIndex];
+      }
+      emit(11, "update-dp", {
+        vi: `dp[${j}] = ${dp[j] ? "True" : "False"}`,
+        en: `dp[${j}] = ${dp[j] ? "True" : "False"}`,
+      }, {
+        vi: sourceValue
+          ? `${sourceSum} + ${stone} = ${j}: tạo được tổng ${j}.`
+          : `Chưa tạo được tổng ${sourceSum}, nên tổng ${j} chưa đổi.`,
+        en: sourceValue
+          ? `${sourceSum} + ${stone} = ${j}: sum ${j} is reachable.`
+          : `Sum ${sourceSum} is not reachable, so sum ${j} stays unchanged.`,
+      }, {
+        stoneIndex, processedCount: stoneIndex + 1, currentJ: j, sourceSum,
+        beforeValue, sourceValue, afterValue: dp[j], highlight: [j],
+        changedSums: changed ? [j] : [], phase: "process",
+      });
+    }
   });
 
-  // Find largest j where dp[j] is true
-  let bestJ = 0;
   for (let j = target; j >= 0; j--) {
-    if (dp[j]) { bestJ = j; break; }
+    emit(13, "scan-best", { vi: `Quét j = ${j}`, en: `Scan j = ${j}` }, {
+      vi: "Quét từ target xuống để gặp tổng lớn nhất có thể tạo trước.",
+      en: "Scan downward from target to find the largest reachable sum first.",
+    }, { processedCount: nums.length, currentJ: j, highlight: [j], phase: "search" });
+
+    emit(14, "check-best", {
+      vi: `dp[${j}] là ${dp[j] ? "True" : "False"}`,
+      en: `dp[${j}] is ${dp[j] ? "True" : "False"}`,
+    }, {
+      vi: dp[j] ? `Đã tìm thấy tổng tốt nhất: ${j}.` : `Tổng ${j} chưa tạo được, tiếp tục giảm j.`,
+      en: dp[j] ? `Found the best reachable sum: ${j}.` : `Sum ${j} is unreachable; keep scanning.`,
+    }, { processedCount: nums.length, currentJ: j, highlight: [j], phase: "search" });
+
+    if (dp[j]) {
+      answer = total - 2 * j;
+      emit(15, "return-answer", { vi: `Trả về ${answer}`, en: `Return ${answer}` }, {
+        vi: `${total} - 2 × ${j} = ${answer}.`,
+        en: `${total} - 2 × ${j} = ${answer}.`,
+      }, {
+        processedCount: nums.length, currentJ: j, highlight: [j], mark: [j],
+        phase: "done", answer, final: true,
+      });
+      return { original: [...nums], answer, steps };
+    }
   }
-  const answer = total - 2 * bestJ;
 
-  const fs = {
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: dp.map((v) => (v ? 1 : 0)),
-    sub: dp.map((_, i) => String(i)),
-    highlight: [bestJ], mark: [bestJ], final: true, codeLines: [10],
-    vars: [
-      { name: "best subset sum", value: bestJ },
-      { name: "answer", value: `${total} - 2×${bestJ} = ${answer}` },
-      { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
-    ],
-    note: {
-      vi: `Tổng lớn nhất đạt được ≤ ${target} là ${bestJ}.\nĐáp án = ${total} - 2×${bestJ} = ${answer}.\n(Nhóm 1 nặng ${bestJ}, nhóm 2 nặng ${total - bestJ}, hiệu = ${answer}.)`,
-      en: `Largest achievable sum ≤ ${target} is ${bestJ}.\nAnswer = ${total} - 2×${bestJ} = ${answer}.\n(Group 1 weighs ${bestJ}, group 2 weighs ${total - bestJ}, difference = ${answer}.)`,
-    },
-    stoneWeight1049View: partitionView("done", {
-      processedCount: nums.length,
-      answer,
-    }),
-  };
-  steps.push(fs);
-
+  answer = 0;
+  emit(17, "return-zero", { vi: "Trả về 0", en: "Return 0" }, {
+    vi: "Nhánh dự phòng nếu không có tổng nào được tìm thấy.",
+    en: "Fallback when no reachable sum is found.",
+  }, { processedCount: nums.length, phase: "done", answer, final: true });
   return { original: [...nums], answer, steps };
 }
 
@@ -23905,6 +23961,7 @@ module.exports = {
     inputKind: "positive",
     inputLabel: { vi: "Trọng lượng đá (dấu phẩy)", en: "Stone weights (comma-sep)" },
     extraParams: [],
+    debugMode: "line-by-line",
     approach: [
       { vi: "Tương đương: chia đá thành 2 nhóm sao cho |sum1 - sum2| TỐI THIỂU.", en: "Equivalent: partition stones into 2 groups minimizing |sum1 - sum2|." },
       { vi: "0/1 Knapsack: dp[j] = True nếu subset tổng j đạt được. target = floor(total/2).", en: "0/1 Knapsack: dp[j] = True if subset sum j is achievable. target = floor(total/2)." },
@@ -23913,17 +23970,22 @@ module.exports = {
     complexity: { time: "O(n · S)", space: "O(S)", note: { vi: "S = total/2. Mỗi đá duyệt S ô.", en: "S = total/2. Each stone iterates S cells." } },
     code: [
       "class Solution:",
-      "    def lastStoneWeightII(self, stones):",
+      "    def lastStoneWeightII(self, stones: List[int]) -> int:",
       "        total = sum(stones)",
       "        target = total // 2",
+      "",
       "        dp = [False] * (target + 1)",
       "        dp[0] = True",
-      "        for s in stones:",
-      "            for j in range(target, s - 1, -1):",
-      "                dp[j] = dp[j] or dp[j - s]",
+      "",
+      "        for stone in stones:",
+      "            for j in range(target, stone - 1, -1):",
+      "                dp[j] = dp[j] or dp[j - stone]",
+      "",
       "        for j in range(target, -1, -1):",
       "            if dp[j]:",
       "                return total - 2 * j",
+      "",
+      "        return 0",
     ],
     builder: buildSteps1049,
   },

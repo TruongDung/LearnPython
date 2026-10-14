@@ -9,6 +9,53 @@ const problem = require("../problems").SUPPORTED[1049];
 
 const view = (step) => step.stoneWeight1049View;
 
+test("1049 exposes the requested typed Python snippet and a true line-by-line trace", () => {
+  assert.equal(problem.debugMode, "line-by-line");
+  assert.deepEqual(problem.code, [
+    "class Solution:",
+    "    def lastStoneWeightII(self, stones: List[int]) -> int:",
+    "        total = sum(stones)",
+    "        target = total // 2",
+    "",
+    "        dp = [False] * (target + 1)",
+    "        dp[0] = True",
+    "",
+    "        for stone in stones:",
+    "            for j in range(target, stone - 1, -1):",
+    "                dp[j] = dp[j] or dp[j - stone]",
+    "",
+    "        for j in range(target, -1, -1):",
+    "            if dp[j]:",
+    "                return total - 2 * j",
+    "",
+    "        return 0",
+  ]);
+
+  const result = problem.builder(problem.defaultInput);
+  assert.ok(result.steps.length > 80);
+  for (const step of result.steps) {
+    assert.equal(step.codeLines.length, 1);
+    const line = step.codeLines[0];
+    assert.ok(problem.code[line - 1]?.trim(), `line ${line} must contain executable code`);
+    assert.equal(view(step).debugLine, line);
+  }
+  assert.deepEqual(result.steps.slice(0, 4).map((step) => step.codeLines[0]), [3, 4, 6, 7]);
+  assert.equal(result.steps.at(-1).codeLines[0], 15);
+  assert.ok(result.steps.at(-1).final);
+});
+
+test("1049 DP update steps match the displayed assignment", () => {
+  const result = problem.builder([2, 7, 4]);
+  const updates = result.steps.filter((step) => view(step).event === "update-dp");
+  assert.ok(updates.length > 0);
+  for (const step of updates) {
+    const state = view(step);
+    assert.equal(state.afterValue, state.beforeValue || state.sourceValue);
+    assert.equal(state.currentJ - state.sourceSum, state.stones[state.stoneIndex].weight);
+    assert.deepEqual(state.changedSums, !state.beforeValue && state.sourceValue ? [state.currentJ] : []);
+  }
+});
+
 test("1049 keeps the minimum last-stone weight and exposes a valid final split", () => {
   const result = problem.builder(problem.defaultInput);
   assert.equal(result.answer, 1);

@@ -34,6 +34,7 @@
 .lsw1049-activity{display:flex;align-items:center;justify-content:center;gap:8px;min-height:29px;color:var(--ls-orange);font:800 10px ui-monospace,monospace}
 .lsw1049-mini-stone{display:grid;place-items:center;width:28px;height:25px;border-radius:48% 42% 52% 44%;background:var(--ls-orange-bg);border:1px solid var(--ls-orange);font-size:12px}
 .lsw1049-activity-arrow{font-size:17px}.lsw1049-activity-mark{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:var(--ls-green-bg);color:var(--ls-green);font-size:14px}
+.lsw1049-activity-mark.is-false{background:var(--ls-orange-bg);color:var(--ls-orange)}.lsw1049-activity-mark.is-pending{background:var(--ls-purple-bg);color:var(--ls-purple)}
 .lsw1049-balance{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:end;gap:5px;min-height:116px;padding:15px 4px 5px}
 .lsw1049-beam{position:absolute;z-index:0;left:13%;right:13%;top:52px;height:5px;border-radius:5px;background:var(--ls-border);transform:rotate(var(--lsw1049-tilt));transform-origin:50% 50%;transition:transform .35s ease}
 .lsw1049-beam::before{content:"";position:absolute;left:50%;top:2px;width:5px;height:46px;transform:translateX(-50%);background:var(--ls-border)}

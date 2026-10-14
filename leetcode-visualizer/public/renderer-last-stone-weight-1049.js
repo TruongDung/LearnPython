@@ -7,6 +7,7 @@ function renderLastStoneWeight1049View(step) {
   const groupBWeight = view.total - view.bestSum;
   const difference = Math.abs(groupBWeight - view.bestSum);
   const tilt = view.total === 0 ? 0 : Math.max(-7, Math.min(7, ((groupBWeight - view.bestSum) / view.total) * 12));
+  const targetKnown = Number.isInteger(view.target);
 
   const stone = (item, extraClass = "") => `<span
     class="lsw1049-stone ${item.state} ${extraClass}"
@@ -24,8 +25,8 @@ function renderLastStoneWeight1049View(step) {
   const chartLeft = 30;
   const chartRight = 670;
   const chartY = 70;
-  const xFor = (sum) => chartLeft + (view.target === 0 ? 0 : (sum / view.target) * (chartRight - chartLeft));
-  const labelSums = new Set([0, view.target, view.bestSum, ...view.changedSums]);
+  const xFor = (sum) => chartLeft + (!targetKnown || view.target === 0 ? 0 : (sum / view.target) * (chartRight - chartLeft));
+  const labelSums = new Set([0, ...(targetKnown ? [view.target] : []), view.bestSum, ...view.changedSums]);
   const arcs = currentStone ? view.changedSums.slice(0, 14).map((sum, index) => {
     const from = sum - currentStone.weight;
     const x1 = xFor(from);
@@ -42,18 +43,38 @@ function renderLastStoneWeight1049View(step) {
       sum === view.bestSum ? "best" : "",
       sum === view.target ? "target" : "",
     ].filter(Boolean).join(" ");
-    const showLabel = view.target <= 24 || labelSums.has(sum);
+    const showLabel = (targetKnown && view.target <= 24) || labelSums.has(sum);
     return `<g class="${classes}" transform="translate(${xFor(sum)} ${chartY})">
       <circle r="${sum === view.bestSum ? 9 : 6}"><title>${t("Tổng đạt được", "Reachable sum")}: ${sum}</title></circle>
       ${showLabel ? `<text y="22" text-anchor="middle">${sum}</text>` : ""}
     </g>`;
   }).join("");
 
-  const activity = final
-    ? `<span class="lsw1049-activity-mark">✓</span><strong>${t("Cân bằng nhất", "Best balance")}</strong>`
-    : currentStone
-      ? `<span class="lsw1049-mini-stone">${currentStone.weight}</span><span class="lsw1049-activity-arrow">→</span><strong>DP</strong>`
-      : `<span class="lsw1049-activity-mark">◎</span><strong>${t("Tìm gần", "Aim for")} ${view.target}</strong>`;
+  let activity;
+  if (final) {
+    activity = `<span class="lsw1049-activity-mark">✓</span><strong>${t("Cân bằng nhất", "Best balance")}</strong>`;
+  } else if (view.event === "total") {
+    activity = `<strong>Σ = ${view.total}</strong>`;
+  } else if (view.event === "target") {
+    activity = `<span class="lsw1049-activity-mark">½</span><strong>${view.target}</strong>`;
+  } else if (view.event === "init-dp") {
+    activity = `<span class="lsw1049-activity-mark">□</span><strong>dp[0…${view.target}]</strong>`;
+  } else if (view.event === "zero") {
+    activity = `<span class="lsw1049-activity-mark">✓</span><strong>dp[0]</strong>`;
+  } else if (view.event === "scan-sum" || view.event === "update-dp") {
+    const status = view.event === "update-dp" ? (view.afterValue ? "✓" : "×") : "?";
+    const statusClass = status === "×" ? " is-false" : status === "?" ? " is-pending" : "";
+    activity = `<strong>${view.sourceSum}</strong><span class="lsw1049-activity-arrow">+${currentStone.weight} →</span><strong>${view.currentJ}</strong><span class="lsw1049-activity-mark${statusClass}">${status}</span>`;
+  } else if (view.event === "scan-best" || view.event === "check-best") {
+    const reachable = view.afterValue ?? view.reachableSums.includes(view.currentJ);
+    const status = view.event === "check-best" ? (reachable ? "✓" : "×") : "?";
+    const statusClass = status === "×" ? " is-false" : status === "?" ? " is-pending" : "";
+    activity = `<strong>dp[${view.currentJ}]</strong><span class="lsw1049-activity-mark${statusClass}">${status}</span>`;
+  } else if (currentStone) {
+    activity = `<span class="lsw1049-mini-stone">${currentStone.weight}</span><span class="lsw1049-activity-arrow">→</span><strong>DP</strong>`;
+  } else {
+    activity = `<span class="lsw1049-activity-mark">◎</span><strong>${t("Tìm gần", "Aim for")} ${targetKnown ? view.target : "?"}</strong>`;
+  }
 
   $("treeView").innerHTML = `<section class="lsw1049-viz" aria-label="${t("Minh hoạ chia đá thành hai nhóm", "Stone partition visualization")}">
     <header class="lsw1049-heading">
@@ -86,7 +107,7 @@ function renderLastStoneWeight1049View(step) {
     </section>
 
     <section class="lsw1049-sums" aria-label="${t("Các tổng có thể tạo", "Reachable subset sums")}">
-      <div class="lsw1049-target"><span>0</span><strong>⌊Σ÷2⌋ = ${view.target}</strong></div>
+      <div class="lsw1049-target"><span>0</span><strong>⌊Σ÷2⌋ = ${targetKnown ? view.target : "?"}</strong></div>
       <svg viewBox="0 0 ${chartWidth} 104" role="img" aria-label="${t("Đường đua tổng con đến một nửa tổng", "Subset sums racing toward half of the total")}">
         <line class="lsw1049-track" x1="${chartLeft}" y1="${chartY}" x2="${chartRight}" y2="${chartY}"></line>
         <line class="lsw1049-finish" x1="${chartRight}" y1="18" x2="${chartRight}" y2="${chartY + 11}"></line>
