@@ -25468,6 +25468,8 @@ function buildSteps1531(input, params) {
   const TRACE_LIMIT = 180;
   let memoHits = 0;
   let truncated = false;
+  const decisions = [];
+  const optimalActions = new Map();
 
   const displayLast = (last) => last || "∅";
   const encodeRun = (last, count) => {
@@ -25522,6 +25524,24 @@ function buildSteps1531(input, params) {
         ...(opts.vars || []),
       ],
       note: opts.note,
+      stringCompression1531View: {
+        s,
+        k,
+        i: opts.i ?? n,
+        last: opts.last || "",
+        count: opts.count ?? 0,
+        kLeft: opts.kLeft ?? 0,
+        action: opts.action || "",
+        phase: opts.codeLines?.[0] === 19 ? "compare" : opts.codeLines?.[0] === 12 ? "memo" : opts.final ? "final" : "scan",
+        final: Boolean(opts.final),
+        decisions: [...decisions],
+        nextRun: opts.vars?.find(variable => variable.name === "next run")?.value,
+        costs: opts.vars?.filter(variable => ["delete", "keep", "return"].includes(variable.name)) || [],
+        kept: opts.kept || [],
+        compressed: opts.compressed || "",
+        answer: opts.answer,
+        traceTruncated: Boolean(truncated),
+      },
     });
   };
 
@@ -25592,7 +25612,9 @@ function buildSteps1531(input, params) {
       vars: [{ name: "char", value: JSON.stringify(ch) }],
       note: { vi: "Đây là edge case quan trọng: đôi khi xoá một ký tự ở giữa làm hai run nhập lại và tiết kiệm nhiều hơn.", en: "Important edge case: deleting a middle character may merge runs and save more later." },
     });
+    decisions[i] = "delete";
     const deleteCost = dfs(i + 1, last, count, kLeft - 1, depth + 1);
+    delete decisions[i];
 
     let keepAdd;
     let nextLast;
@@ -25633,9 +25655,12 @@ function buildSteps1531(input, params) {
           : `Keep '${ch}' as a new run, so the encoded string pays one new letter.`,
       },
     });
+    decisions[i] = "keep";
     const keepCost = keepAdd + dfs(i + 1, nextLast, nextCount, kLeft, depth + 1);
+    delete decisions[i];
     const best = Math.min(deleteCost, keepCost);
     memo.set(key, best);
+    optimalActions.set(key, deleteCost < keepCost ? "delete" : "keep");
 
     snap({
       title: { vi: `Chọn min(delete, keep) = ${best}`, en: `Choose min(delete, keep) = ${best}` },
@@ -25654,6 +25679,28 @@ function buildSteps1531(input, params) {
   }
 
   const answer = dfs(0, "", 0, k, 0);
+  const kept = [];
+  let index = 0;
+  let selectedLast = "";
+  let selectedCount = 0;
+  let selectedK = k;
+  while (index < n) {
+    const action = optimalActions.get(keyOf(index, selectedLast, selectedCount, selectedK));
+    if (action === "keep") {
+      kept.push(index);
+      if (chars[index] === selectedLast) selectedCount += 1;
+      else {
+        selectedLast = chars[index];
+        selectedCount = 1;
+      }
+    } else {
+      selectedK -= 1;
+    }
+    index += 1;
+  }
+  const keptSet = new Set(kept);
+  const compressed = chars.filter((_, idx) => keptSet.has(idx)).join("")
+    .replace(/(.)\1*/g, (run, ch) => `${ch}${run.length > 1 ? run.length : ""}`);
   snap({
     title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
     codeLines: [21],
@@ -25676,6 +25723,10 @@ function buildSteps1531(input, params) {
     },
     final: true,
     force: true,
+    vars: [{ name: "kept", value: JSON.stringify(kept) }, { name: "compressed", value: compressed }],
+    kept,
+    compressed,
+    answer,
   });
 
   return { original: s, k, answer, steps };
