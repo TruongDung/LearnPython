@@ -3212,18 +3212,24 @@ function buildSteps1044(input) {
 function buildSteps875(input, params) {
   const parsedPiles = Array.isArray(input)
     ? [...input]
-    : String(input).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
-  const piles = parsedPiles.map((pile) => Math.max(1, Math.trunc(pile)));
-  if (!piles.length) piles.push(1);
+    : String(input).split(",").map((value) => Number(value.trim()));
+  if (!parsedPiles.length || parsedPiles.length > 10000
+    || parsedPiles.some((pile) => !Number.isInteger(pile) || pile < 1 || pile > 1000000000)) {
+    throw new Error("875: piles must contain 1–10000 integers from 1 to 1,000,000,000 / piles cần 1–10000 số nguyên từ 1 đến 1,000,000,000.");
+  }
+  const piles = parsedPiles;
   const parsedHours = params && params.h !== undefined ? Number(params.h) : 8;
-  const h = Number.isFinite(parsedHours) ? Math.max(piles.length, Math.trunc(parsedHours)) : 8;
+  if (!Number.isInteger(parsedHours) || parsedHours < piles.length || parsedHours > 1000000000) {
+    throw new Error("875: h must be an integer from piles.length to 1,000,000,000 / h cần là số nguyên từ piles.length đến 1,000,000,000.");
+  }
+  const h = parsedHours;
   const approach = Number(params && params.approach) === 2 ? 2 : 1;
   const manualCeil = approach === 2;
   const lowerName = manualCeil ? "start" : "lo";
   const upperName = manualCeil ? "end" : "hi";
   const line = manualCeil
     ? { init: [3, 4], while: 6, mid: 7, resetHours: 9, loopPile: 11, remainder: 12, exactAdd: 13, elseBranch: 14, roundedAdd: 15, feasible: 17, moveLo: 18, decisionElse: 19, moveHi: 20, done: 22 }
-    : { init: [5], while: 6, mid: 7, aggregateHours: 8, feasible: 9, moveHi: 10, decisionElse: 11, moveLo: 12, done: 13 };
+    : { init: [3], while: 4, mid: 5, aggregateHours: 6, feasible: 7, moveHi: 8, decisionElse: 9, moveLo: 10, done: 11 };
   const steps = [];
   const initialLo = 1;
   const initialHi = Math.max(...piles);
@@ -3306,8 +3312,8 @@ function buildSteps875(input, params) {
       { name: upperName, value: hi },
     ],
     note: {
-      vi: `Tốc độ tối thiểu là 1. Tốc độ max(piles)=${hi} chắc chắn đủ vì mỗi đống mất đúng 1 giờ. Ta tìm tốc độ khả thi đầu tiên.`,
-      en: `The minimum possible speed is 1. Speed max(piles)=${hi} is guaranteed to work because each pile takes one hour. Find the first feasible speed.`,
+      vi: `Tìm tốc độ khả thi đầu tiên trong [1, ${hi}].`,
+      en: `Find the first feasible speed in [1, ${hi}].`,
     },
   });
 
@@ -3323,8 +3329,8 @@ function buildSteps875(input, params) {
       whileResult: canContinue,
       vars: [{ name: lowerName, value: lo }, { name: upperName, value: hi }, { name: `${lowerName} < ${upperName}`, value: canContinue }],
       note: canContinue
-        ? { vi: `Đáp án vẫn nằm trong khoảng đóng [${lo}, ${hi}].`, en: `The answer is still inside the closed interval [${lo}, ${hi}].` }
-        : { vi: `Khoảng chỉ còn một tốc độ: ${lo}. Vòng lặp kết thúc.`, en: `Only one speed remains: ${lo}. The loop stops.` },
+        ? { vi: `Đáp án nằm trong [${lo}, ${hi}].`, en: `Answer is in [${lo}, ${hi}].` }
+        : { vi: `Còn một tốc độ: ${lo}.`, en: `One speed remains: ${lo}.` },
     });
     if (!canContinue) break;
 
@@ -3336,7 +3342,7 @@ function buildSteps875(input, params) {
       codeLine: line.mid,
       mid,
       vars: [{ name: lowerName, value: lo }, { name: upperName, value: hi }, { name: "mid", value: mid }],
-      note: { vi: `Koko thử ăn ${mid} quả mỗi giờ.`, en: `Koko tries eating ${mid} bananas per hour.` },
+      note: { vi: `Thử ${mid} quả/giờ.`, en: `Try ${mid} bananas/hour.` },
     });
 
     const fullBreakdown = breakdown(mid);
@@ -3353,7 +3359,7 @@ function buildSteps875(input, params) {
         perPile,
         totalHours,
         vars: [{ name: "mid", value: mid }, { name: "hours", value: totalHours }],
-        note: { vi: "Mỗi lần thử một tốc độ mid mới, tính lại tổng số giờ từ 0.", en: "For each new trial speed, count the total hours again from zero." },
+        note: { vi: "Tính lại giờ cho tốc độ mới.", en: "Recount hours for this speed." },
       });
 
       for (const item of fullBreakdown) {
@@ -3442,8 +3448,8 @@ function buildSteps875(input, params) {
           { name: "hours", value: totalHours },
         ],
         note: {
-          vi: `Mỗi đống phải làm tròn lên vì Koko không chuyển phần thời gian còn dư sang đống kế tiếp. Tổng cộng cần ${totalHours} giờ.`,
-          en: `Each pile rounds up because Koko cannot use leftover time on another pile. The total is ${totalHours} hours.`,
+          vi: `Làm tròn từng đống; tổng = ${totalHours} giờ.`,
+          en: `Round up each pile; total = ${totalHours} hours.`,
         },
       });
     }
@@ -3466,8 +3472,8 @@ function buildSteps875(input, params) {
         { name: manualCeil ? "hours > h" : "hours <= h", value: manualCeil ? !feasible : feasible },
       ],
       note: feasible
-        ? { vi: `Tốc độ ${mid} khả thi, nhưng có thể chưa nhỏ nhất. Giữ mid và thử các tốc độ chậm hơn.`, en: `Speed ${mid} is feasible, but it may not be minimal. Keep mid and try slower speeds.` }
-        : { vi: `Tốc độ ${mid} quá chậm. Vì tốc độ nhỏ hơn còn tốn nhiều giờ hơn, loại toàn bộ tốc độ ≤ ${mid}.`, en: `Speed ${mid} is too slow. Smaller speeds take at least as long, so remove every speed ≤ ${mid}.` },
+        ? { vi: `${mid} kịp giờ; thử tốc độ thấp hơn.`, en: `${mid} works; try lower speeds.` }
+        : { vi: `${mid} quá chậm; loại mọi tốc độ ≤ ${mid}.`, en: `${mid} is too slow; discard speeds ≤ ${mid}.` },
     });
 
     tested.push({ speed: mid, hours: totalHours, feasible });
@@ -3503,7 +3509,7 @@ function buildSteps875(input, params) {
         previousLo,
         previousHi,
         vars: [{ name: `old ${upperName}`, value: previousHi }, { name: upperName, value: hi }, { name: lowerName, value: lo }],
-        note: { vi: `Giữ ${mid} vì nó vẫn có thể là đáp án. Khoảng mới: [${lo}, ${hi}].`, en: `Keep ${mid} because it may be the answer. New interval: [${lo}, ${hi}].` },
+        note: { vi: `Giữ mid; khoảng mới [${lo}, ${hi}].`, en: `Keep mid; new range [${lo}, ${hi}].` },
       });
     } else {
       if (!manualCeil) {
@@ -3535,7 +3541,7 @@ function buildSteps875(input, params) {
         previousLo,
         previousHi,
         vars: [{ name: `old ${lowerName}`, value: previousLo }, { name: lowerName, value: lo }, { name: upperName, value: hi }],
-        note: { vi: `Loại [${previousLo}, ${mid}]. Khoảng mới: [${lo}, ${hi}].`, en: `Remove [${previousLo}, ${mid}]. New interval: [${lo}, ${hi}].` },
+        note: { vi: `Loại [${previousLo}, ${mid}]; còn [${lo}, ${hi}].`, en: `Discard [${previousLo}, ${mid}]; keep [${lo}, ${hi}].` },
       });
     }
   }
@@ -3563,11 +3569,11 @@ function buildSteps875(input, params) {
     ],
     note: {
       vi: slowerHours === null
-        ? `Tốc độ 1 cần ${answerHours} giờ ≤ ${h}; đây đã là tốc độ nhỏ nhất có thể.`
-        : `Tốc độ ${answer} cần ${answerHours} giờ ≤ ${h}, còn tốc độ ${answer - 1} cần ${slowerHours} giờ > ${h}. Vì vậy ${answer} là nhỏ nhất.`,
+        ? `1 cần ${answerHours}h ≤ ${h}h: tốc độ nhỏ nhất.`
+        : `${answer}: ${answerHours}h ≤ ${h}h; ${answer - 1}: ${slowerHours}h > ${h}h.`,
       en: slowerHours === null
-        ? `Speed 1 needs ${answerHours} hours ≤ ${h}; it is already the smallest possible speed.`
-        : `Speed ${answer} needs ${answerHours} hours ≤ ${h}, while speed ${answer - 1} needs ${slowerHours} hours > ${h}. Therefore ${answer} is minimal.`,
+        ? `Speed 1 needs ${answerHours}h ≤ ${h}h: the minimum.`
+        : `${answer}: ${answerHours}h ≤ ${h}h; ${answer - 1}: ${slowerHours}h > ${h}h.`,
     },
   });
 
@@ -4174,30 +4180,29 @@ module.exports = {
       {
         key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
         options: [
-          { value: "1", label: { vi: "Cách 1: math.ceil", en: "Approach 1: math.ceil" } },
+          { value: "1", label: { vi: "Cách 1: làm tròn nguyên", en: "Approach 1: integer ceiling" } },
           { value: "2", label: { vi: "Cách 2: % và //", en: "Approach 2: % and //" } },
         ],
       },
     ],
     approach: [
-      { vi: "Số giờ cần giảm dần khi tốc độ tăng → tính đơn điệu → binary search trên tốc độ.", en: "Hours needed decrease as speed increases → monotonic → binary search on speed." },
+      { vi: "Tốc độ tăng → số giờ giảm. Binary search tìm tốc độ khả thi đầu tiên.", en: "Higher speed means fewer hours. Binary search finds the first feasible speed." },
       { vi: "Khoảng tìm: [1, max(piles)]. hours(v) = Σ ceil(pile/v).", en: "Range: [1, max(piles)]. hours(v) = Σ ceil(pile/v)." },
-      { vi: "Cách 1 dùng math.ceil. Cách 2 tự làm tròn lên: chia hết thì pile // mid, có dư thì pile // mid + 1.", en: "Approach 1 uses math.ceil. Approach 2 rounds up manually: pile // mid when divisible, otherwise pile // mid + 1." },
-      { vi: "Cách 1: hours ≤ h thì hi=mid, ngược lại lo=mid+1. Cách 2: hours > h thì start=mid+1, ngược lại end=mid.", en: "Approach 1: hours ≤ h sets hi=mid, otherwise lo=mid+1. Approach 2: hours > h sets start=mid+1, otherwise end=mid." },
+      { vi: "ceil(pile / mid) = (pile + mid − 1) // mid; không cần số thực.", en: "ceil(pile / mid) = (pile + mid − 1) // mid; no floating point." },
+      { vi: "Kịp giờ: giữ mid (hi=mid). Quá giờ: bỏ mid (lo=mid+1).", en: "On time: keep mid (hi=mid). Too slow: discard it (lo=mid+1)." },
       { vi: "Kết quả là lo (Cách 1) hoặc start (Cách 2) — tốc độ nhỏ nhất khả thi.", en: "The answer is lo (Approach 1) or start (Approach 2) — the smallest feasible speed." },
     ],
     complexity: { time: "O(n log(max pile))", space: "O(1)", note: { vi: "Mỗi lần thử tốc độ tính giờ O(n).", en: "Each speed check computes hours in O(n)." } },
-    codeLabel: { vi: "Cách 1: math.ceil", en: "Approach 1: math.ceil" },
-    code2Label: { vi: "Cách 2: % và //", en: "Approach 2: % and //" },
+    codeLabel: { vi: "Chuẩn phỏng vấn · làm tròn nguyên", en: "Interview standard · integer ceiling" },
+    code2Label: { vi: "Cách khác · % và //", en: "Alternative · % and //" },
+    debugMode: "line-by-line",
     code: [
-      "import math",
-      "",
       "class Solution:",
       "    def minEatingSpeed(self, piles, h):",
       "        lo, hi = 1, max(piles)",
       "        while lo < hi:",
       "            mid = (lo + hi) // 2",
-      "            hours = sum(math.ceil(p / mid) for p in piles)",
+      "            hours = sum((pile + mid - 1) // mid for pile in piles)",
       "            if hours <= h:",
       "                hi = mid",
       "            else:",

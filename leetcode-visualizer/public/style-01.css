@@ -1129,23 +1129,42 @@
   text-align: left;
 }
 
+.koko-viz-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.koko-viz-heading > div { display: grid; gap: 3px; }
+.koko-viz-heading small,
+.koko-viz-heading > span { color: #94a3b8; font-size: 10px; font-weight: 850; letter-spacing: .06em; }
+.koko-viz-heading strong { color: #f8fafc; font-size: 16px; }
+.koko-viz-heading > span { padding: 5px 8px; border: 1px solid #334155; border-radius: 999px; letter-spacing: 0; }
+
 .koko-phases {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  max-width: 260px;
+  margin: 0 auto;
 }
 
 .koko-phases span {
-  min-width: 0;
-  padding: 7px 6px;
-  border-bottom: 3px solid #334155;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #334155;
+  border-radius: 50%;
   color: #94a3b8;
-  font-size: 12px;
-  font-weight: 750;
-  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
 }
 
-.koko-phases span.active { border-color: #f59e0b; color: #fbbf24; }
+.koko-phases span:not(:last-child)::after { position: absolute; left: 29px; width: 13px; height: 1px; background: #475569; content: ""; }
+.koko-phases span.active { border: 2px solid #f59e0b; color: #fbbf24; }
 .koko-phases span.done { border-color: #10b981; color: #6ee7b7; }
 
 .koko-summary {
@@ -1309,6 +1328,8 @@
 }
 
 .koko-hour-chips > span {
+  position: relative;
+  overflow: hidden;
   display: grid;
   place-items: center;
   min-width: 34px;
@@ -1322,6 +1343,9 @@
   font-weight: 850;
 }
 
+.koko-hour-chips > span i { position: absolute; inset: auto 0 0; width: var(--fill); height: 4px; border-radius: inherit; background: #f59e0b; }
+.koko-hour-chips > span b,
+.koko-hour-chips > span small { position: relative; z-index: 1; }
 .koko-hour-chips small { color: #fbbf24; font-size: 8px; font-weight: 750; }
 .koko-hour-chips > b { color: #94a3b8; font-size: 11px; }
 
@@ -1385,6 +1409,10 @@
 .koko-tested > span.slow { border-color: #ef4444; color: #fca5a5; }
 
 [data-theme="light"] .koko-speed-viz { color: #1e293b; }
+[data-theme="light"] .koko-viz-heading strong { color: #0f172a; }
+[data-theme="light"] .koko-viz-heading small,
+[data-theme="light"] .koko-viz-heading > span { color: #475569; }
+[data-theme="light"] .koko-viz-heading > span { border-color: #cbd5e1; }
 [data-theme="light"] .koko-phases span { border-color: #cbd5e1; color: #64748b; }
 [data-theme="light"] .koko-phases span.active { border-color: #d97706; color: #92400e; }
 [data-theme="light"] .koko-phases span.done { border-color: #059669; color: #047857; }
@@ -6660,4 +6688,3 @@
 .fsp-result { display: flex; justify-content: center; align-items: baseline; gap: 8px; }
 .fsp-result span { color: #94a3b8; font-size: 11px; font-weight: 800; text-transform: uppercase; }
 .fsp-result strong { color: #86efac; font-size: 22px; }
-

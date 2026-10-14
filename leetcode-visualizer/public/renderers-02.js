@@ -350,20 +350,13 @@ function renderKokoSpeedView(step) {
   const lowerName = manualCeil ? "start" : "lo";
   const upperName = manualCeil ? "end" : "hi";
   const phaseIndex = { setup: 0, range: 1, hours: 2, decision: 3, shrink: 3, done: 4 }[view.phase] ?? 0;
-  const phaseLabels = vi
-    ? ["1 · Chọn khoảng tốc độ", "2 · Thử tốc độ giữa", "3 · Tính giờ từng đống", "4 · Giữ nửa đúng"]
-    : ["1 · Set speed range", "2 · Try middle speed", "3 · Count each pile's hours", "4 · Keep the correct half"];
-  const phases = phaseLabels.map((label, index) => {
+  const phases = ["lo/hi", "mid", "hours", "keep half"].map((label, index) => {
     const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
-    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+    const translated = vi ? ["lo/hi", "mid", "giờ", "thu hẹp"][index] : label;
+    return `<span class="${state}" aria-label="${escapeHtml(translated)}"><b>${state === "done" ? "✓" : index + 1}</b></span>`;
   }).join("");
-
   const chosenSpeed = Number.isInteger(view.answer) ? view.answer : view.mid;
   const activeRange = `[${view.lo}, ${view.hi}]`;
-  const statusValue = view.totalHours === null
-    ? (vi ? "chưa tính" : "not counted")
-    : `${view.totalHours} / ${view.h} ${vi ? "giờ" : "hours"}`;
-
   const domainCount = view.initialHi - view.initialLo + 1;
   let speedValues;
   if (domainCount <= 24) {
@@ -391,7 +384,7 @@ function renderKokoSpeedView(step) {
     const tested = (view.tested || []).find((item) => item.speed === speed);
     const gapBefore = index > 0 && speed - speedValues[index - 1] > 1;
     const labels = [
-      isAnswer ? { text: vi ? "đáp án" : "answer", type: "is-answer" } : null,
+      isAnswer ? { text: vi ? "✓" : "✓", type: "is-answer" } : null,
       isMid ? { text: "mid", type: "is-mid" } : null,
       speed === view.lo && speed === view.hi
         ? { text: `${lowerName}=${upperName}`, type: "is-boundary" }
@@ -412,70 +405,63 @@ function renderKokoSpeedView(step) {
   const pileRows = view.piles.map((pile, index) => {
     const detail = perPile[index];
     if (!detail || !Number.isInteger(chosenSpeed)) {
-      return `<div class="koko-pile-row"><span class="koko-pile-id">${vi ? "Đống" : "Pile"} ${index + 1}</span><strong>${pile} 🍌</strong><span class="koko-pile-wait">${vi ? "chờ chọn tốc độ" : "waiting for a speed"}</span></div>`;
+      return `<div class="koko-pile-row"><span class="koko-pile-id">P${index + 1}</span><strong>${pile} 🍌</strong><span class="koko-pile-wait">···</span></div>`;
     }
-    const visibleHours = Math.min(detail.hours, 10);
+    const visibleHours = Math.min(detail.hours, 8);
     const hourChips = Array.from({ length: visibleHours }, (_, hourIndex) => {
-      const eaten = hourIndex < detail.hours - 1 || detail.remainder === 0 ? chosenSpeed : detail.remainder;
-      return `<span>${Math.min(eaten, pile)}<small>h${hourIndex + 1}</small></span>`;
+      const eaten = Math.min(chosenSpeed, pile - hourIndex * chosenSpeed);
+      const fill = Math.max(0, Math.min(100, Math.round((eaten / chosenSpeed) * 100)));
+      return `<span aria-label="${escapeHtml(`${eaten} ${vi ? "quả" : "bananas"} · ${vi ? "giờ" : "hour"} ${hourIndex + 1}`)}"><i style="--fill:${fill}%"></i><b>${eaten}</b><small>${hourIndex + 1}</small></span>`;
     }).join("");
     const extra = detail.hours > visibleHours ? `<b>+${detail.hours - visibleHours}</b>` : "";
     return `<div class="koko-pile-row">
-      <span class="koko-pile-id">${vi ? "Đống" : "Pile"} ${index + 1}</span>
+      <span class="koko-pile-id">P${index + 1}</span>
       <strong>${pile} 🍌</strong>
       <div class="koko-hour-chips" aria-label="${escapeHtml(`${detail.hours} hours`)}">${hourChips}${extra}</div>
-      <code>${manualCeil ? `${pile} // ${chosenSpeed}${detail.remainder === 0 ? "" : " + 1"}` : `ceil(${pile} / ${chosenSpeed})`} = ${detail.hours}h</code>
+      <code>${manualCeil ? `${pile} // ${chosenSpeed}${detail.remainder === 0 ? "" : " + 1"}` : `⌈${pile}/${chosenSpeed}⌉`} = ${detail.hours}h</code>
     </div>`;
   }).join("");
 
-  const hourEquation = perPile.length
-    ? `<div class="koko-hours-equation"><span>${perPile.map((item) => item.hours).join(" + ")}</span><i>=</i><strong>${view.totalHours}</strong><i>${view.totalHours <= view.h ? "≤" : ">"}</i><strong>h = ${view.h}</strong><b class="${view.totalHours <= view.h ? "works" : "slow"}">${view.totalHours <= view.h ? (vi ? "KỊP" : "WORKS") : (vi ? "QUÁ CHẬM" : "TOO SLOW")}</b></div>`
-    : `<div class="koko-hours-equation pending"><span>${manualCeil
-      ? (vi ? "Chọn mid, rồi dùng % và // để làm tròn từng đống" : "Choose mid, then use % and // to round each pile up")
-      : (vi ? "Chọn mid rồi tính ceil(pile / mid) cho từng đống" : "Choose mid, then compute ceil(pile / mid) for every pile")}</span></div>`;
-
-  let actionHtml;
-  if (view.event === "init-range") {
-    actionHtml = `<div class="koko-action setup"><small>${vi ? "KHOẢNG BAN ĐẦU" : "INITIAL RANGE"}</small><strong>${lowerName} = 1 · ${upperName} = max(piles) = ${view.initialHi}</strong><span>${vi ? `${upperName} luôn đủ nhanh: mỗi đống chỉ cần 1 giờ` : `${upperName} is guaranteed fast enough: every pile takes one hour`}</span></div>`;
-  } else if (view.event === "while-check") {
-    actionHtml = `<div class="koko-action condition ${view.whileResult ? "yes" : "no"}"><small>WHILE ${lowerName} &lt; ${upperName}</small><strong>${view.lo} &lt; ${view.hi} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? "Còn nhiều tốc độ cần phân biệt" : "Multiple candidate speeds remain") : (vi ? `${lowerName} gặp ${upperName}: đây là tốc độ khả thi đầu tiên` : `${lowerName} meets ${upperName}: this is the first feasible speed`)}</span></div>`;
-  } else if (view.event === "compute-mid") {
-    actionHtml = `<div class="koko-action mid"><small>COMPUTE MID</small><strong>(${view.lo} + ${view.hi}) // 2 = ${view.mid}</strong><span>${vi ? `Thử ăn ${view.mid} quả/giờ` : `Try eating ${view.mid} bananas/hour`}</span></div>`;
-  } else if (view.event === "calculate-hours") {
-    actionHtml = `<div class="koko-action count"><small>${vi ? "TÍNH TỔNG GIỜ" : "COUNT TOTAL HOURS"}</small><strong>hours = ${view.totalHours}</strong><span>${manualCeil ? (vi ? "Chia hết: pile // mid · Có dư: pile // mid + 1" : "Divisible: pile // mid · Remainder: pile // mid + 1") : (vi ? "Mỗi đống làm tròn lên riêng biệt bằng math.ceil" : "Round each pile up separately with math.ceil")}</span></div>`;
-  } else if (view.event === "feasible-check") {
-    actionHtml = `<div class="koko-action decision ${view.feasible ? "works" : "slow"}"><small>${manualCeil ? "IF hours &gt; h" : "IF hours &lt;= h"}</small><strong>${manualCeil ? `${view.totalHours} > ${view.h} → ${!view.feasible}` : `${view.totalHours} ${view.feasible ? "≤" : ">"} ${view.h} → ${view.feasible}`}</strong><span>${view.feasible ? (vi ? `mid kịp giờ; giữ mid bằng ${upperName} = mid` : `mid works; keep it with ${upperName} = mid`) : (vi ? `mid quá chậm; tăng ${lowerName} = mid + 1` : `mid is too slow; increase ${lowerName} = mid + 1`)}</span></div>`;
-  } else if (view.event === "move-hi") {
-    actionHtml = `<div class="koko-action move works"><small>${vi ? "GIỮ NỬA TRÁI" : "KEEP LEFT HALF"}</small><strong>${upperName} = mid = ${view.mid}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? "không bỏ mid vì mid có thể là đáp án" : "do not remove mid because it may be the answer"}</span></div>`;
-  } else if (view.event === "else-branch") {
-    actionHtml = manualCeil
-      ? `<div class="koko-action decision works"><small>ELSE</small><strong>${view.totalHours} ≤ ${view.h}</strong><span>${vi ? `Kịp giờ; tiếp theo đặt ${upperName} = mid` : `On time; set ${upperName} = mid next`}</span></div>`
-      : `<div class="koko-action decision slow"><small>ELSE</small><strong>${view.totalHours} &gt; ${view.h}</strong><span>${vi ? "Điều kiện if sai; tiếp theo tăng lo" : "The if condition is false; increase lo next"}</span></div>`;
-  } else if (view.event === "move-lo") {
-    actionHtml = `<div class="koko-action move slow"><small>${vi ? "BỎ NỬA TRÁI" : "REMOVE LEFT HALF"}</small><strong>${lowerName} = mid + 1 = ${view.lo}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? `loại mọi tốc độ ≤ ${view.mid}` : `remove every speed ≤ ${view.mid}`}</span></div>`;
-  } else {
-    const proof = view.answer === 1
-      ? (vi ? `1 là tốc độ nhỏ nhất có thể và chỉ cần ${view.totalHours} giờ` : `1 is the smallest possible speed and needs only ${view.totalHours} hours`)
-      : `${view.answer}: ${view.totalHours}h ≤ ${view.h}h · ${view.answer - 1}: ${view.slowerHours}h > ${view.h}h`;
-    actionHtml = `<div class="koko-action result"><small>${vi ? "CHỨNG MINH NHỎ NHẤT" : "MINIMUM PROOF"}</small><strong>return ${lowerName} = ${view.answer}</strong><span>${proof}</span></div>`;
-  }
-
+  const totalHours = perPile.length ? perPile.reduce((total, item) => total + item.hours, 0) : null;
+  const feasible = totalHours !== null ? totalHours <= view.h : null;
+  const totalEquation = perPile.length
+    ? `${perPile.map((item) => item.hours).join(" + ")} = ${totalHours} ${totalHours <= view.h ? "≤" : ">"} ${view.h}h`
+    : `${vi ? "mỗi đống làm tròn lên" : "ceil per pile"}`;
+  const interval = view.event === "move-hi"
+    ? `[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}]`
+    : view.event === "move-lo"
+      ? `[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}]`
+      : null;
+  const verdict = view.event === "done"
+    ? `${vi ? "Đáp án nhỏ nhất" : "Minimum speed"}: ${view.answer} 🍌/h`
+    : view.event === "feasible-check"
+      ? `${totalHours} ${feasible ? "≤" : ">"} ${view.h}h · ${feasible ? "✓" : "✕"}`
+      : view.event === "move-hi"
+        ? `${upperName} = mid = ${view.mid}`
+        : view.event === "move-lo"
+          ? `${lowerName} = mid + 1 = ${view.lo}`
+          : view.event === "compute-mid"
+            ? `mid = (${view.lo} + ${view.hi}) // 2 = ${view.mid}`
+            : view.event === "while-check"
+              ? `${view.lo} < ${view.hi} · ${view.whileResult ? "✓" : "✕"}`
+              : `${lowerName} = 1 · ${upperName} = max(piles) = ${view.initialHi}`;
   const testedHtml = (view.tested || []).length
-    ? `<div class="koko-tested"><small>${vi ? "ĐÃ THỬ" : "TESTED"}</small>${view.tested.map((item) => `<span class="${item.feasible ? "works" : "slow"}">k=${item.speed} → ${item.hours}h ${item.feasible ? "✓" : "✕"}</span>`).join("")}</div>`
+    ? `<div class="koko-tested" aria-label="${vi ? "Đã thử" : "Tested"}">${view.tested.map((item) => `<span class="${item.feasible ? "works" : "slow"}">${item.speed} · ${item.hours}h ${item.feasible ? "✓" : "✕"}</span>`).join("")}</div>`
     : "";
 
-  el.innerHTML = `<div class="koko-speed-viz">
-    <div class="koko-phases">${phases}</div>
+  el.innerHTML = `<div class="koko-speed-viz koko-interview-viz">
+    <header class="koko-viz-heading"><div><small>#875 · BINARY SEARCH</small><strong>${vi ? "Tìm tốc độ nhỏ nhất" : "Find minimum speed"}</strong></div><span>${vi ? "Từng dòng" : "Line by line"}</span></header>
+    <div class="koko-phases" aria-label="${vi ? "Các bước" : "Algorithm steps"}">${phases}</div>
     <div class="koko-summary">
-      <span><small>${vi ? "GIỚI HẠN" : "TIME LIMIT"}</small><strong>${view.h}h</strong></span>
-      <span><small>${vi ? "KHOẢNG TỐC ĐỘ" : "SPEED RANGE"}</small><strong>${activeRange}</strong></span>
-      <span><small>${vi ? "TỔNG GIỜ" : "TOTAL TIME"}</small><strong>${statusValue}</strong></span>
+      <span><small>⏱ h</small><strong>${view.h}</strong></span>
+      <span><small>🔎 ${lowerName}…${upperName}</small><strong>${activeRange}</strong></span>
+      <span><small>🍌/h · mid</small><strong>${view.mid ?? "—"}</strong></span>
     </div>
     <div class="koko-speed-line" role="img" aria-label="${escapeHtml(vi ? `Khoảng tốc độ đang tìm ${activeRange}` : `Active speed range ${activeRange}`)}">${speedCells}</div>
-    <div class="koko-speed-legend"><span><i class="slow"></i>${vi ? "quá chậm / đã loại" : "too slow / removed"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active range"}</span><span><i class="works"></i>${vi ? "đủ nhanh" : "fast enough"}</span></div>
-    <div class="koko-piles"><div class="koko-piles-title"><strong>${vi ? "Mỗi đống mất bao nhiêu giờ?" : "How many hours does each pile take?"}</strong><span>${Number.isInteger(chosenSpeed) ? `speed = ${chosenSpeed} 🍌/h` : "speed = ?"}</span></div>${pileRows}</div>
-    ${hourEquation}
-    ${actionHtml}
+    <div class="koko-speed-legend"><span><i class="slow"></i>${vi ? "chậm" : "slow"}</span><span><i class="active"></i>mid</span><span><i class="works"></i>${vi ? "đủ nhanh" : "feasible"}</span></div>
+    <div class="koko-piles"><div class="koko-piles-title"><strong>${vi ? "🍌 Theo từng đống" : "🍌 Per pile"}</strong><span>${Number.isInteger(chosenSpeed) ? `${chosenSpeed} 🍌/h` : "—"}</span></div>${pileRows}</div>
+    <div class="koko-hours-equation${feasible === null ? " pending" : ""}"><span>${totalEquation}</span><b class="${feasible === null ? "" : feasible ? "works" : "slow"}">${feasible === null ? "…" : feasible ? "✓" : "✕"}</b></div>
+    <div class="koko-action${view.event === "move-hi" || feasible === true ? " works" : view.event === "move-lo" || feasible === false ? " slow" : ""}"><strong>${escapeHtml(verdict)}</strong>${interval ? `<span>${interval}</span>` : ""}</div>
     ${testedHtml}
   </div>`;
 }
@@ -6026,4 +6012,3 @@ function renderDifferenceArrayView(step) {
       <div class="diff-status">${statusItems}</div>
     </div>`;
 }
-
