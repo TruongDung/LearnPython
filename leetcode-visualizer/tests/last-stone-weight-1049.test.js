@@ -35,7 +35,7 @@ test("1049 keeps subset witnesses valid after each stone is processed", () => {
   }
 });
 
-test("1049 draws the stone groups and reachable sums in both languages", () => {
+test("1049 draws a visual balance, stone belt, and subset-sum track in both languages", () => {
   const host = { innerHTML: "" };
   const context = {
     lang: "en",
@@ -59,11 +59,14 @@ test("1049 draws the stone groups and reachable sums in both languages", () => {
       assert.match(host.innerHTML, /lsw1049-viz/);
       assert.match(host.innerHTML, /lsw1049-stones/);
       assert.match(host.innerHTML, /lsw1049-sums/);
+      assert.match(host.innerHTML, /lsw1049-beam/);
+      assert.match(host.innerHTML, /lsw1049-track/);
       assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
     }
   }
   assert.match(host.innerHTML, /lsw1049-balance/);
-  assert.match(host.innerHTML, />11<\/strong>/);
+  assert.match(host.innerHTML, /is-final/);
+  assert.match(host.innerHTML, />1<\/strong>/);
 });
 
 test("1049 renderer is registered and loaded only with its visualization assets", () => {
