@@ -4289,6 +4289,7 @@ function buildSteps583(input, params) {
   gridSnap({
     title: { vi: "Tao bang dp", en: "Create dp table" },
     codeLines: [4],
+    phase: "table",
     vars: [
       { name: "dp size", value: `${m + 1} x ${n + 1}` },
       { name: "meaning", value: "min deletions" },
@@ -12682,7 +12683,17 @@ function buildSteps1312(input) {
       currentVars.push(item);
     }
     steps.push({
-      title: opts.title,
+      title: {
+        setup: { vi: "Chuỗi", en: "Input" },
+        table: { vi: "Khởi tạo DP", en: "Init DP" },
+        outer: { vi: "i", en: "i loop" },
+        interval: { vi: "j", en: "j loop" },
+        compare: { vi: "So sánh", en: "Compare" },
+        match: { vi: "Khớp", en: "Match" },
+        choose: { vi: "Chọn min", en: "Choose min" },
+        update: { vi: "Ghi DP", en: "Write DP" },
+        final: { vi: "Kết quả", en: "Result" },
+      }[opts.phase] || opts.title,
       arr: [],
       grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
       highlight: [],
@@ -12690,6 +12701,19 @@ function buildSteps1312(input) {
       codeLines: opts.codeLines || [],
       vars: currentVars,
       note: opts.note,
+      palindrome1312View: {
+        s,
+        phase: opts.phase || "setup",
+        i: hasActiveCell ? opts.hlCell[0] : null,
+        j: hasActiveCell ? opts.hlCell[1] : null,
+        same: opts.same ?? null,
+        inside: opts.inside ?? null,
+        leftOption: opts.leftOption ?? null,
+        rightOption: opts.rightOption ?? null,
+        chosen: opts.chosen || "",
+        answer: opts.answer ?? null,
+        palindrome: opts.palindrome || [],
+      },
     });
   }
 
@@ -12723,17 +12747,20 @@ function buildSteps1312(input) {
     gridSnap({
       title: { vi: "Chuoi rong", en: "Empty string" },
       codeLines: [11],
+      phase: "final",
+      answer: 0,
       vars: [{ name: "answer", value: 0 }],
       note: { vi: "Chuoi rong da la palindrome, can 0 lan chen.", en: "An empty string is already a palindrome, so it needs 0 insertions." },
     });
     steps[steps.length - 1].final = true;
-    return { s, answer: 0, steps };
+    return { s, answer: 0, palindrome: "", insertionOps: [], steps };
   }
 
   for (let i = n - 1; i >= 0; i--) {
     gridSnap({
       title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
       codeLines: [5],
+      phase: "outer",
       hlCell: [i, i],
       vars: [
         { name: `s[${i}]`, value: s[i] },
@@ -12749,6 +12776,7 @@ function buildSteps1312(input) {
       gridSnap({
         title: { vi: `Vong trong j=${j}`, en: `Inner loop j=${j}` },
         codeLines: [6],
+        phase: "interval",
         hlCell: [i, j],
         pathCells: [[i + 1, j - 1], [i + 1, j], [i, j - 1]].filter(([r, c]) => r < n && c >= 0 && r <= c),
         vars: [
@@ -12767,7 +12795,9 @@ function buildSteps1312(input) {
           en: `Compare s[${i}]='${s[i]}' and s[${j}]='${s[j]}'`,
         },
         codeLines: [7],
+        phase: "compare",
         hlCell: [i, j],
+        same,
         pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
         vars: [
           { name: `s[${i}]`, value: s[i] },
@@ -12790,7 +12820,11 @@ function buildSteps1312(input) {
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
           codeLines: [8],
+          phase: "match",
           hlCell: [i, j],
+          same: true,
+          inside: middle,
+          chosen: "inside",
           pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
           vars: [
             { name: "middle", value: middle },
@@ -12809,7 +12843,11 @@ function buildSteps1312(input) {
         gridSnap({
           title: { vi: "Nhanh else", en: "Else branch" },
           codeLines: [9],
+          phase: "choose",
           hlCell: [i, j],
+          same: false,
+          leftOption: dp[i + 1][j],
+          rightOption: dp[i][j - 1],
           pathCells: [[i + 1, j], [i, j - 1]],
           vars: [
             { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
@@ -12825,7 +12863,12 @@ function buildSteps1312(input) {
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
           codeLines: [10],
+          phase: "update",
           hlCell: [i, j],
+          same: false,
+          leftOption: dp[i + 1][j],
+          rightOption: dp[i][j - 1],
+          chosen: dp[i + 1][j] <= dp[i][j - 1] ? "left" : "right",
           pathCells: [[i + 1, j], [i, j - 1]],
           vars: [
             { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
@@ -12842,13 +12885,42 @@ function buildSteps1312(input) {
   }
 
   const answer = dp[0][n - 1];
+  const leftHalf = [];
+  const rightHalf = [];
+  const insertionOps = [];
+  let left = 0;
+  let right = n - 1;
+  while (left < right) {
+    if (s[left] === s[right]) {
+      leftHalf.push({ char: s[left], inserted: false });
+      rightHalf.unshift({ char: s[right], inserted: false });
+      left += 1;
+      right -= 1;
+    } else if (dp[left + 1][right] <= dp[left][right - 1]) {
+      leftHalf.push({ char: s[left], inserted: false });
+      rightHalf.unshift({ char: s[left], inserted: true });
+      insertionOps.push({ char: s[left], side: "right", at: right + 1 });
+      left += 1;
+    } else {
+      leftHalf.push({ char: s[right], inserted: true });
+      rightHalf.unshift({ char: s[right], inserted: false });
+      insertionOps.push({ char: s[right], side: "left", at: left });
+      right -= 1;
+    }
+  }
+  if (left === right) leftHalf.push({ char: s[left], inserted: false });
+  const palindrome = [...leftHalf, ...rightHalf];
   gridSnap({
     title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
     codeLines: [11],
+    phase: "final",
     hlCell: [0, n - 1],
+    answer,
+    palindrome,
     vars: [
       { name: "answer", value: answer },
-      { name: `dp[0][${n - 1}]`, value: answer },
+      { name: "palindrome", value: `"${palindrome.map(part => part.char).join("")}"` },
+      { name: "inserted", value: insertionOps.length },
     ],
     note: {
       vi: `Can it nhat ${answer} lan chen de bien "${s}" thanh palindrome.`,
@@ -12857,7 +12929,7 @@ function buildSteps1312(input) {
   });
   steps[steps.length - 1].final = true;
 
-  return { s, answer, steps };
+  return { s, answer, palindrome: palindrome.map(part => part.char).join(""), insertionOps, steps };
 }
 
 /**
