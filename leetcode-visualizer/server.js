@@ -234,7 +234,8 @@ app.post("/api/problem/:id/live-args", (req, res) => {
   if (typeof problem.liveArgs === "function") {
     try {
       const args = problem.liveArgs(input, params);
-      return res.json({ args });
+      const oracle = typeof problem.liveOracle === "function" ? problem.liveOracle(input, params) : null;
+      return res.json(oracle ? { args, oracle } : { args });
     } catch (err) {
       return res.status(400).json({ error: String((err && err.message) || err) });
     }

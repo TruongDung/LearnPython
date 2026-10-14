@@ -41,6 +41,7 @@ for (const problem of Object.values(SUPPORTED)) {
         method: method.name,
         code: code.join("\n"),
         args,
+        ...(typeof problem.liveOracle === "function" ? { oracle: problem.liveOracle(problem.defaultInput, params) } : {}),
       });
     } catch (error) {
       cases.push({ id: problem.id, block, prepareError: String(error.message || error) });

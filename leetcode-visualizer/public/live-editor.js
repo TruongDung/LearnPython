@@ -958,7 +958,7 @@ def __viz_materialize(value, context=None, namespace=None):
         return {key: __viz_materialize(item, context, namespace) for key, item in value.items()}
     return value
 
-def __viz_run_trace(user_code, method_name, call_args, design_config=None):
+def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracle_config=None):
     trace = []
     stdout_buffer = io.StringIO()
 
@@ -1039,6 +1039,17 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None):
         "HtmlParser": HtmlParser,
         "Employee": Employee,
     }
+    if oracle_config is not None:
+        if oracle_config.get("type") != "guess-number":
+            raise ValueError("Unknown live oracle type.")
+        oracle_n, oracle_pick = oracle_config.get("n"), oracle_config.get("pick")
+        if type(oracle_n) is not int or type(oracle_pick) is not int or not 1 <= oracle_pick <= oracle_n <= 2147483647:
+            raise ValueError("Invalid guess-number API configuration.")
+        def guess(number):
+            if type(number) is not int or not 1 <= number <= oracle_n:
+                raise ValueError("guess(number) requires an integer in [1, n].")
+            return -1 if number > oracle_pick else 1 if number < oracle_pick else 0
+        ns2["guess"] = guess
     exec(compiled, ns2)
     sys.settrace(tracer)
     try:
@@ -1090,6 +1101,7 @@ async function runLiveCode() {
     const liveCall = await collectLiveCallArgs();
     const args = liveCall.args || [];
     const design = liveCall.design || null;
+    const oracle = liveCall.oracle || null;
     const pyodide = await ensurePyodide();
 
     if (!pyodide.__viz_tracer_loaded) {
@@ -1108,6 +1120,7 @@ async function runLiveCode() {
     pyodide.globals.set("__viz_method_name", methodName);
     pyodide.globals.set("__viz_call_args", pyodide.toPy(args));
     pyodide.globals.set("__viz_design", design ? pyodide.toPy(design) : null);
+    pyodide.globals.set("__viz_oracle", oracle ? pyodide.toPy(oracle) : null);
 
     const runFn = pyodide.globals.get("__viz_run_trace");
     const resultProxy = runFn(
@@ -1115,6 +1128,7 @@ async function runLiveCode() {
       methodName,
       pyodide.globals.get("__viz_call_args"),
       pyodide.globals.get("__viz_design"),
+      pyodide.globals.get("__viz_oracle"),
     );
     const resultJs = resultProxy.toJs({ dict_converter: Object.fromEntries });
     resultProxy.destroy && resultProxy.destroy();
