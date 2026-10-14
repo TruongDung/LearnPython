@@ -4484,6 +4484,28 @@
 /* 1293 visual-first map (v2) */
 #treeView:has(> .ge1293-viz) { padding: 0; border: 0; background: transparent; min-width: 0; overflow: visible; }
 #vizPanel:has(.ge1293-viz) #stepNote { display: none; }
+/* Keep 1293's short solution fully visible. The page owns vertical scrolling;
+   long source lines wrap inside the left column instead of adding a second
+   horizontal scroll surface. */
+#vizPanel:has(.ge1293-viz) :is(#codePanel, #codePanel2) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  position: static;
+  white-space: pre-wrap;
+}
+#vizPanel:has(.ge1293-viz) .code-section,
+#vizPanel:has(.ge1293-viz) .code-line {
+  min-width: 0;
+  width: 100%;
+  white-space: pre-wrap;
+}
+#vizPanel:has(.ge1293-viz) .code-line .txt {
+  min-width: 0;
+  flex: 1 1 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .ge1293-viz, .ge1293-viz * { box-sizing: border-box; }
 .ge1293-viz {
   --ge-bg: #07111f;
