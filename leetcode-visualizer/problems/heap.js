@@ -1479,18 +1479,7 @@ function buildSteps1046(input) {
     title: { vi: "Hòn đá cuối cùng (Last Stone Weight)", en: "Last Stone Weight" },
     codeLines: [2],
     vars: [{ name: "stones", value: `[${stones.join(",")}]` }],
-    note: {
-      vi:
-        `Mỗi lần lấy 2 hòn đá NẶNG nhất (x ≥ y) đập nhau:\n` +
-        `• Nếu x == y → cả hai vỡ hết.\n` +
-        `• Nếu x > y → còn lại 1 hòn nặng x − y.\n` +
-        `Dùng MAX-HEAP để luôn lấy 2 hòn nặng nhất. Lặp tới khi còn ≤ 1 hòn.`,
-      en:
-        `Each turn take the 2 HEAVIEST stones (x ≥ y) and smash them:\n` +
-        `• If x == y → both destroyed.\n` +
-        `• If x > y → a stone of weight x − y remains.\n` +
-        `Use a MAX-HEAP to always pick the two heaviest. Repeat until ≤ 1 stone.`,
-    },
+    note: { vi: "Lấy hai viên nặng nhất; chênh lệch quay lại heap.", en: "Smash the two heaviest; push any difference back." },
   }));
 
   for (const s of stones) {
@@ -1499,7 +1488,7 @@ function buildSteps1046(input) {
       title: { vi: `Push ${s}`, en: `Push ${s}` },
       hlSet: new Set([heap.length - 1]), codeLines: [3, 4],
       vars: [{ name: "heap", value: arrStr() }],
-      note: { vi: `Thêm hòn ${s} vào max-heap rồi sift-up.`, en: `Add stone ${s} to the max-heap then sift-up.` },
+      note: { vi: `Thêm viên ${s} vào heap.`, en: `Add stone ${s} to the heap.` },
     }));
     siftUp(heap.length - 1);
   }
@@ -1512,7 +1501,7 @@ function buildSteps1046(input) {
       title: { vi: `Lấy hòn nặng nhất = ${root} (${roleVi})`, en: `Pop heaviest = ${root} (${roleEn})` },
       hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [6, 7],
       vars: [{ name: roleVi, value: root }, { name: "heap", value: arrStr() }],
-      note: { vi: `Gốc max-heap = hòn nặng nhất = ${root}. Đưa cuối lên gốc rồi sift-down.`, en: `Max-heap root = heaviest = ${root}. Move last to root then sift-down.` },
+      note: { vi: `Lấy viên nặng nhất: ${root}.`, en: `Take the heaviest: ${root}.` },
     }));
     if (heap.length > 0) siftDown(0);
     return root;
@@ -1528,7 +1517,7 @@ function buildSteps1046(input) {
         title: { vi: `${x} đập ${y} → còn ${diff}, push lại`, en: `${x} vs ${y} → ${diff} remains, push back` },
         hlSet: new Set([heap.length - 1]), codeLines: [8, 9],
         vars: [{ name: "x-y", value: `${x}-${y}=${diff}` }, { name: "heap", value: arrStr() }],
-        note: { vi: `x=${x} > y=${y} → hòn mới nặng ${diff} quay lại heap. Sift-up.`, en: `x=${x} > y=${y} → a new stone of weight ${diff} goes back in. Sift-up.` },
+        note: { vi: `Còn viên ${diff}; thêm lại vào heap.`, en: `${diff} remains; add it back to the heap.` },
       }));
       siftUp(heap.length - 1);
     } else {
@@ -1536,7 +1525,7 @@ function buildSteps1046(input) {
         title: { vi: `${x} đập ${y} → cả hai vỡ hết`, en: `${x} vs ${y} → both destroyed` },
         codeLines: [8],
         vars: [{ name: "heap", value: arrStr() }],
-        note: { vi: `x == y = ${x} → hai hòn triệt tiêu, không thêm gì.`, en: `x == y = ${x} → both cancel, nothing added.` },
+        note: { vi: `Hai viên bằng nhau → cùng vỡ.`, en: `Equal weights → both are destroyed.` },
       }));
     }
   }
@@ -1546,9 +1535,41 @@ function buildSteps1046(input) {
     title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
     codeLines: [10],
     vars: [{ name: "answer", value: answer }],
-    note: { vi: heap.length ? `Còn lại 1 hòn nặng ${answer}.` : `Không còn hòn nào → 0.`, en: heap.length ? `One stone of weight ${answer} remains.` : `No stones left → 0.` },
+    note: { vi: heap.length ? `Còn một viên: ${answer}.` : `Không còn viên nào.`, en: heap.length ? `One stone remains: ${answer}.` : `No stones remain.` },
   });
   fs.final = true; steps.push(fs);
+  let lastPickedX = null;
+  steps.forEach((step) => {
+    const title = step.title?.en || "";
+    const vars = step.vars || [];
+    const picked = vars.find((variable) => variable.name === "x" || variable.name === "y");
+    const clash = vars.find((variable) => variable.name === "x-y")?.value;
+    const match = typeof clash === "string" ? clash.match(/^(\d+)-(\d+)=(\d+)$/) : null;
+    const destroyedMatch = title.match(/^(\d+) vs (\d+) → both destroyed$/);
+    if (picked?.name === "x") lastPickedX = Number(picked.value);
+    const heapNodes = (step.tree?.nodes || [])
+      .map((node) => ({ index: node.id, weight: Number(node.label), highlighted: node.hl }))
+      .sort((left, right) => left.index - right.index);
+    const clashView = match
+      ? { x: Number(match[1]), y: Number(match[2]), difference: Number(match[3]) }
+      : destroyedMatch
+        ? { x: Number(destroyedMatch[1]), y: Number(destroyedMatch[2]), difference: 0 }
+      : picked?.name === "y" && lastPickedX !== null
+        ? { x: lastPickedX, y: Number(picked.value), difference: null }
+        : null;
+    step.lastStoneWeight1046View = {
+      heap: heapNodes,
+      phase: step.final ? "done"
+        : picked ? "pick"
+          : / vs | đập /.test(` ${title} `) ? "smash"
+            : title.startsWith("Push ") ? "push"
+              : title.startsWith("Sift-") ? "heapify" : "ready",
+      role: picked?.name || null,
+      picked: picked ? Number(picked.value) : null,
+      clash: clashView,
+      answer: step.final ? answer : null,
+    };
+  });
   return { input, answer, steps };
 }
 

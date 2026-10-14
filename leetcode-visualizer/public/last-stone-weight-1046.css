@@ -1,0 +1,95 @@
+.lsw1046-viz {
+  --lsw1046-ink: #233047;
+  --lsw1046-muted: #77839a;
+  --lsw1046-orange: #ef8b43;
+  --lsw1046-blue: #4e86d8;
+  --lsw1046-green: #3b9c79;
+  color: var(--lsw1046-ink);
+  display: grid;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 18px;
+}
+.lsw1046-heading,
+.lsw1046-title,
+.lsw1046-pile-label {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.lsw1046-title { gap: 10px; justify-content: flex-start; }
+.lsw1046-title > span {
+  background: #edf3fc;
+  border-radius: 10px;
+  color: var(--lsw1046-blue);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+.lsw1046-title h3 { font-size: 17px; margin: 0; }
+.lsw1046-answer {
+  align-items: center;
+  background: #f1f4f8;
+  border-radius: 12px;
+  display: flex;
+  gap: 9px;
+  padding: 8px 12px;
+}
+.lsw1046-answer small { color: var(--lsw1046-muted); font-size: 9px; font-weight: 800; }
+.lsw1046-answer strong { font-size: 22px; }
+.lsw1046-answer.is-final { background: #e7f5ef; color: #287757; }
+.lsw1046-scene {
+  background: linear-gradient(160deg, #f7f9fd, #eff3f9);
+  border: 1px solid #e4eaf3;
+  border-radius: 18px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr);
+  min-height: 190px;
+  overflow: hidden;
+  padding: 18px;
+}
+.lsw1046-pile-label { color: var(--lsw1046-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.lsw1046-pile-label span { background: #e4eaf3; border-radius: 99px; color: var(--lsw1046-ink); padding: 3px 8px; }
+.lsw1046-stones { align-content: start; display: flex; flex-wrap: wrap; gap: 10px; padding-top: 18px; }
+.lsw1046-stone {
+  align-items: center;
+  background: linear-gradient(145deg, #9ba8b8, #748298);
+  border: 3px solid #fff;
+  border-radius: 44% 56% 53% 47% / 54% 43% 57% 46%;
+  box-shadow: 0 5px 10px #23304725, inset 2px 3px 4px #ffffff70;
+  color: white;
+  display: inline-flex;
+  height: 46px;
+  justify-content: center;
+  min-width: 46px;
+  position: relative;
+  transform: rotate(-5deg);
+}
+.lsw1046-stone strong { font-size: 16px; text-shadow: 0 1px 2px #34425888; }
+.lsw1046-stone.is-heaviest { background: linear-gradient(145deg, #ffbb65, var(--lsw1046-orange)); }
+.lsw1046-stone.is-active { box-shadow: 0 0 0 3px #4e86d833, 0 5px 10px #23304725; }
+.lsw1046-stone i { color: #fff6c9; font-size: 9px; font-style: normal; position: absolute; right: -3px; top: -7px; }
+.lsw1046-stone.is-fighter { height: 64px; min-width: 64px; }
+.lsw1046-stone.is-fighter strong { font-size: 21px; }
+.lsw1046-action { align-items: center; border-left: 1px dashed #cbd5e3; display: flex; justify-content: center; min-width: 0; }
+.lsw1046-clash { align-items: center; animation: lsw1046-hit .35s ease-out; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.lsw1046-impact { color: var(--lsw1046-orange); font-size: 32px; }
+.lsw1046-result { background: #fff; border-radius: 99px; color: var(--lsw1046-green); font-size: 18px; font-weight: 900; padding: 7px 11px; }
+.lsw1046-clash.is-destroyed .lsw1046-stone { opacity: .38; transform: scale(.82) rotate(12deg); }
+.lsw1046-clash.is-destroyed .lsw1046-result { color: #b75b60; }
+.lsw1046-picked,
+.lsw1046-final-stone { align-items: center; color: var(--lsw1046-muted); display: flex; flex-direction: column; font-size: 12px; gap: 8px; }
+.lsw1046-picked b { color: var(--lsw1046-blue); margin-left: 4px; }
+.lsw1046-empty-stone { align-items: center; border: 2px dashed #b8c3d2; border-radius: 50%; color: #8995a8; display: inline-flex; font-size: 20px; height: 48px; justify-content: center; width: 48px; }
+.lsw1046-hint { color: #b3bdcc; display: flex; font-size: 23px; gap: 18px; }
+.lsw1046-hint span:nth-child(2) { color: #e3a35d; font-size: 35px; }
+@keyframes lsw1046-hit { from { opacity: .5; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+@media (max-width: 520px) {
+  .lsw1046-viz { padding: 12px; }
+  .lsw1046-title h3 { font-size: 14px; }
+  .lsw1046-scene { grid-template-columns: 1fr; padding: 14px; }
+  .lsw1046-action { border-left: 0; border-top: 1px dashed #cbd5e3; min-height: 100px; padding-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .lsw1046-clash { animation: none; } }
