@@ -123,10 +123,13 @@ test('1293 visual assets hide duplicate prose and carry a dedicated cache versio
   assert.match(css, /#vizPanel:has\(\.ge1293-viz\) #stepNote \{ display: none; \}/);
   assert.match(css, /#vizPanel:has\(\.ge1293-viz\) :is\(#codePanel, #codePanel2\) \{[\s\S]*?max-height: none;[\s\S]*?overflow: visible;/);
   assert.match(css, /#vizPanel:has\(\.ge1293-viz\) \.code-line \.txt \{[\s\S]*?white-space: pre-wrap;[\s\S]*?overflow-wrap: anywhere;/);
+  assert.match(css, /\.ge1293-stage \{[^}]*align-items: start;/);
+  assert.match(css, /\.ge1293-side \{[^}]*grid-template-rows: auto;[^}]*align-content: start;[^}]*align-self: start;/);
   assert.match(css, /\.ge1293-bricks/);
   assert.match(css, /\.ge1293-runner/);
   assert.match(css, /\.ge1293-queue-track/);
   assert.match(css, /\.ge1293-wave-track/);
   assert.equal((html.match(/grid-1293-pictures-v3/g) || []).length, 2);
   assert.equal((html.match(/no-scroll-1293-v1/g) || []).length, 1);
+  assert.equal((html.match(/compact-side-1293-v1/g) || []).length, 1);
 });

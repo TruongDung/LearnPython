@@ -4553,7 +4553,7 @@
 .ge1293-answer.none { border-color: rgba(251, 113, 133, 0.55); background: rgba(251, 113, 133, 0.1); }
 .ge1293-answer.none > span, .ge1293-answer.none > strong, .ge1293-answer.none > small { color: #fda4af; }
 
-.ge1293-stage { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(150px, 0.42fr); gap: 12px; align-items: stretch; }
+.ge1293-stage { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(150px, 0.42fr); gap: 12px; align-items: start; }
 .ge1293-board-wrap, .ge1293-side, .ge1293-queue-panel, .ge1293-waves { min-width: 0; border: 1px solid var(--ge-line); border-radius: 14px; background: var(--ge-panel); }
 .ge1293-board-wrap { display: grid; place-items: center; gap: 10px; padding: 12px; }
 .ge1293-board { display: grid; grid-template-columns: repeat(var(--ge-cols), minmax(38px, 72px)); grid-template-rows: repeat(var(--ge-rows), minmax(38px, 72px)); gap: 6px; justify-content: center; width: 100%; }
@@ -4595,7 +4595,7 @@
 .ge1293-legend i.route { background: var(--ge-green); border-radius: 50%; }
 .ge1293-legend i.states { border: 1px solid var(--ge-purple); color: #e9d5ff; }
 
-.ge1293-side { display: grid; grid-template-rows: minmax(112px, 1fr) auto auto; gap: 10px; padding: 11px; align-content: stretch; background: var(--ge-panel); }
+.ge1293-side { display: grid; grid-template-rows: auto; gap: 10px; padding: 11px; align-content: start; align-self: start; background: var(--ge-panel); }
 .ge1293-move { display: grid; grid-template-columns: minmax(52px, 1fr) 28px minmax(52px, 1fr); grid-template-rows: 1fr auto; align-items: center; justify-items: center; gap: 7px 4px; min-height: 105px; padding: 9px; border-radius: 11px; background: rgba(7, 17, 31, 0.6); }
 .ge1293-move-node { position: relative; display: grid; place-items: center; gap: 5px; width: min(66px, 100%); aspect-ratio: 1; border: 2px solid var(--ge-yellow); border-radius: 50%; background: rgba(245, 158, 11, 0.11); }
 .ge1293-move-node.target { border-color: var(--ge-cyan); background: rgba(56, 189, 248, 0.1); }
