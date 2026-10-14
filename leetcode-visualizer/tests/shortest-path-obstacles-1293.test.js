@@ -125,6 +125,9 @@ test('1293 visual assets hide duplicate prose and carry a dedicated cache versio
   assert.match(css, /#vizPanel:has\(\.ge1293-viz\) \.code-line \.txt \{[\s\S]*?white-space: pre-wrap;[\s\S]*?overflow-wrap: anywhere;/);
   assert.match(css, /\.ge1293-stage \{[^}]*align-items: start;/);
   assert.match(css, /\.ge1293-side \{[^}]*grid-template-rows: auto;[^}]*align-content: start;[^}]*align-self: start;/);
+  assert.match(css, /\.ge1293-wave-track \{[^}]*flex-wrap: wrap;[^}]*overflow-x: visible;/);
+  assert.match(css, /\[data-theme="light"\] \.ge1293-qnode > strong \{ color: #0f3d63; \}/);
+  assert.match(css, /\[data-theme="light"\] \.ge1293-wave > b \{[^}]*color: #075985;/);
   assert.match(css, /\.ge1293-bricks/);
   assert.match(css, /\.ge1293-runner/);
   assert.match(css, /\.ge1293-queue-track/);
@@ -132,4 +135,5 @@ test('1293 visual assets hide duplicate prose and carry a dedicated cache versio
   assert.equal((html.match(/grid-1293-pictures-v3/g) || []).length, 2);
   assert.equal((html.match(/no-scroll-1293-v1/g) || []).length, 1);
   assert.equal((html.match(/compact-side-1293-v1/g) || []).length, 1);
+  assert.equal((html.match(/light-waves-1293-v1/g) || []).length, 1);
 });
