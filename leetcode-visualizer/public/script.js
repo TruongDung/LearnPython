@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.maximumEvenSplit2178View), surface: "treeView", render: (step) => {
+      renderMaximumEvenSplit2178View(step);
+    } },
     { predicate: (step) => Boolean(step.lastStoneWeight1046View), surface: "treeView", render: (step) => {
       renderLastStoneWeight1046View(step);
     } },
