@@ -11,17 +11,46 @@ const expectedCode = [
   "class Solution:",
   "    def waysToReachTarget(self, target, types):",
   "        MOD = 10**9 + 7",
+  "",
   "        dp = [0] * (target + 1)",
   "        dp[0] = 1",
+  "",
   "        for count, points in types:",
   "            next_dp = [0] * (target + 1)",
+  "",
   "            for score in range(target + 1):",
-  "                max_questions = min(count, score // points)",
-  "                for used in range(max_questions + 1):",
-  "                    next_dp[score] = (next_dp[score] + dp[score - used * points]) % MOD",
+  "                next_dp[score] = dp[score]",
+  "",
+  "                if score >= points:",
+  "                    next_dp[score] += next_dp[score - points]",
+  "",
+  "                if score >= (count + 1) * points:",
+  "                    next_dp[score] -= dp[score - (count + 1) * points]",
+  "",
+  "                next_dp[score] %= MOD",
+  "",
   "            dp = next_dp",
+  "",
   "        return dp[target]",
 ];
+const eventLines = {
+  "bind-class": 1,
+  "enter-method": 2,
+  "set-modulo": 3,
+  "allocate-dp": 5,
+  "seed-empty-choice": 6,
+  "select-type": 8,
+  "allocate-next": 9,
+  "select-score": 11,
+  "copy-current": 12,
+  "check-include": 14,
+  "include-previous": 15,
+  "check-expire": 17,
+  "subtract-expired": 18,
+  "normalize-modulo": 20,
+  "commit-type": 22,
+  "return-answer": 24,
+};
 
 function oracle(target, types) {
   let dp = Array(target + 1).fill(0);
@@ -83,55 +112,40 @@ test("2585 counts ways modulo 1e9+7 against bounded brute force", () => {
 
 test("2585 Python snippet and snapshots step through every executable line", () => {
   const run = problem.builder(6, { types: sampleTypes });
+  const expirationRun = problem.builder(8, { types: [[1, 2]] });
   const visitedLines = new Set();
-  for (const step of run.steps) {
+  for (const step of [...run.steps, ...expirationRun.steps]) {
     const view = step.waysToEarnPoints2585View;
     assert.ok(view);
-    assert.deepEqual(step.codeLines, [view.event === "bind-class" ? 1
-      : view.event === "enter-method" ? 2
-        : view.event === "set-modulo" ? 3
-          : view.event === "allocate-dp" ? 4
-            : view.event === "seed-empty-choice" ? 5
-              : view.event === "select-type" ? 6
-                : view.event === "allocate-next" ? 7
-                  : view.event === "select-score" ? 8
-                    : view.event === "limit-questions" ? 9
-                      : view.event === "select-quantity" ? 10
-                        : view.event === "add-choice" ? 11
-                          : view.event === "commit-type" ? 12 : 13]);
-    visitedLines.add(view.event === "bind-class" ? 1
-      : view.event === "enter-method" ? 2
-        : view.event === "set-modulo" ? 3
-          : view.event === "allocate-dp" ? 4
-            : view.event === "seed-empty-choice" ? 5
-              : view.event === "select-type" ? 6
-                : view.event === "allocate-next" ? 7
-                  : view.event === "select-score" ? 8
-                    : view.event === "limit-questions" ? 9
-                      : view.event === "select-quantity" ? 10
-                        : view.event === "add-choice" ? 11
-                          : view.event === "commit-type" ? 12 : 13);
+    assert.deepEqual(step.codeLines, [eventLines[view.event]]);
+    visitedLines.add(eventLines[view.event]);
     assert.ok(view.cells.length <= 20);
-    if (view.event === "select-quantity") {
-      assert.equal(step.codeLines[0], 10);
-      assert.equal(view.transition.after, null);
-      assert.ok(view.transition.used <= view.transition.maxQuestions);
+    if (view.event === "include-previous") {
+      const { before, ways, after, score, source } = view.transition;
+      assert.equal(after, before + ways);
+      assert.equal(score - source, view.types[view.typeIndex].points);
     }
-    if (view.event === "add-choice") {
-      const { before, ways, after, score, source, used } = view.transition;
-      assert.equal(step.codeLines[0], 11);
-      assert.equal(after, (before + ways) % view.modulo);
-      assert.equal(score - source, used * view.types[view.typeIndex].points);
+    if (view.event === "subtract-expired") {
+      const { before, ways, after, score, source } = view.transition;
+      const { count, points } = view.types[view.typeIndex];
+      assert.equal(after, before - ways);
+      assert.equal(score - source, (count + 1) * points);
+    }
+    if (view.event === "normalize-modulo") {
+      assert.equal(view.transition.after, ((view.transition.before % view.modulo) + view.modulo) % view.modulo);
     }
   }
   assert.deepEqual(problem.code, expectedCode);
-  for (let line = 1; line <= problem.code.length; line += 1) assert.ok(visitedLines.has(line), `line ${line} is not stepped`);
+  for (let line = 1; line <= problem.code.length; line += 1) {
+    if (problem.code[line - 1].trim()) assert.ok(visitedLines.has(line), `line ${line} is not stepped`);
+  }
+  assert.ok(expirationRun.steps.some(step => step.waysToEarnPoints2585View.event === "subtract-expired"));
   assert.equal(run.steps.at(-1).waysToEarnPoints2585View.answer, 7);
 });
 
 test("2585 renderer shows bounded question groups and DP transitions in Vietnamese and English", () => {
   const run = problem.builder(6, { types: sampleTypes });
-  const step = run.steps.find(item => item.waysToEarnPoints2585View.event === "add-choice");
+  const step = run.steps.find(item => item.waysToEarnPoints2585View.event === "include-previous");
   for (const language of ["vi", "en"]) {
     const { host, renderer } = createRenderer(language);
     for (const current of run.steps) {

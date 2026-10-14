@@ -8,15 +8,26 @@ const CODE = Object.freeze([
   "class Solution:",
   "    def waysToReachTarget(self, target, types):",
   "        MOD = 10**9 + 7",
+  "",
   "        dp = [0] * (target + 1)",
   "        dp[0] = 1",
+  "",
   "        for count, points in types:",
   "            next_dp = [0] * (target + 1)",
+  "",
   "            for score in range(target + 1):",
-  "                max_questions = min(count, score // points)",
-  "                for used in range(max_questions + 1):",
-  "                    next_dp[score] = (next_dp[score] + dp[score - used * points]) % MOD",
+  "                next_dp[score] = dp[score]",
+  "",
+  "                if score >= points:",
+  "                    next_dp[score] += next_dp[score - points]",
+  "",
+  "                if score >= (count + 1) * points:",
+  "                    next_dp[score] -= dp[score - (count + 1) * points]",
+  "",
+  "                next_dp[score] %= MOD",
+  "",
   "            dp = next_dp",
+  "",
   "        return dp[target]",
 ]);
 
@@ -59,7 +70,6 @@ function buildSteps2585(input, params = {}) {
   let count = null;
   let points = null;
   let score = null;
-  let used = null;
   let transition = null;
   let answer = null;
   let truncated = false;
@@ -92,7 +102,8 @@ function buildSteps2585(input, params = {}) {
       vars: [
         { name: "type", value: typeIndex < 0 ? "—" : typeIndex },
         { name: "score", value: score ?? "—" },
-        { name: "used", value: used ?? "—" },
+        { name: "count", value: count ?? "—" },
+        { name: "points", value: points ?? "—" },
       ],
       waysToEarnPoints2585View: {
         target,
@@ -100,7 +111,6 @@ function buildSteps2585(input, params = {}) {
         typeIndex,
         activeType,
         score,
-        used,
         event,
         transition: transition ? { ...transition } : null,
         cells,
@@ -115,46 +125,67 @@ function buildSteps2585(input, params = {}) {
   record("bind-class", 1);
   record("enter-method", 2);
   record("set-modulo", 3);
-  record("allocate-dp", 4);
+  record("allocate-dp", 5);
   dp[0] = 1;
-  record("seed-empty-choice", 5);
+  record("seed-empty-choice", 6);
 
   for (typeIndex = 0; typeIndex < types.length; typeIndex += 1) {
     [count, points] = types[typeIndex];
     score = null;
-    used = null;
     transition = null;
-    record("select-type", 6);
+    record("select-type", 8);
     nextDp = Array(target + 1).fill(0);
-    record("allocate-next", 7);
+    record("allocate-next", 9);
     for (score = 0; score <= target; score += 1) {
-      used = null;
       transition = null;
-      record("select-score", 8);
-      const maxQuestions = Math.min(count, Math.floor(score / points));
-      record("limit-questions", 9);
-      for (used = 0; used <= maxQuestions; used += 1) {
-        const source = score - used * points;
-        const ways = dp[source];
+      record("select-score", 11);
+
+      const copiedWays = dp[score];
+      nextDp[score] = copiedWays;
+      transition = { operation: "copy", score, source: score, ways: copiedWays, before: 0, after: copiedWays };
+      record("copy-current", 12);
+
+      const canInclude = score >= points;
+      transition = { operation: "include-check", score, points, canApply: canInclude };
+      record("check-include", 14);
+      if (canInclude) {
+        const source = score - points;
         const before = nextDp[score];
-        transition = { score, used, source, ways, before, after: null, maxQuestions };
-        record("select-quantity", 10);
-        const after = (before + ways) % MOD;
+        const ways = nextDp[source];
+        const after = before + ways;
+        transition = { operation: "include", score, source, ways, before, after };
         nextDp[score] = after;
-        transition.after = after;
-        record("add-choice", 11);
+        record("include-previous", 15);
       }
+
+      const canExpire = score >= (count + 1) * points;
+      transition = { operation: "expire-check", score, points, count, canApply: canExpire };
+      record("check-expire", 17);
+      if (canExpire) {
+        const source = score - (count + 1) * points;
+        const before = nextDp[score];
+        const ways = dp[source];
+        const after = before - ways;
+        transition = { operation: "expire", score, source, ways, before, after };
+        nextDp[score] = after;
+        record("subtract-expired", 18);
+      }
+
+      const beforeModulo = nextDp[score];
+      const afterModulo = ((beforeModulo % MOD) + MOD) % MOD;
+      transition = { operation: "modulo", score, before: beforeModulo, after: afterModulo };
+      nextDp[score] = afterModulo;
+      record("normalize-modulo", 20);
     }
     dp = nextDp;
     score = null;
-    used = null;
     transition = null;
-    record("commit-type", 12);
+    record("commit-type", 22);
   }
 
   answer = dp[target];
   score = target;
-  record("return-answer", 13, true);
+  record("return-answer", 24, true);
   return { original: target, types, answer, steps };
 }
 
@@ -189,13 +220,13 @@ module.exports = {
     debugMode: "line-by-line",
     approach: [
       bi("dp[s] = số cách đạt s điểm sau các loại đã xử lý.", "dp[s] = ways to make score s using processed types."),
-      bi("Mỗi loại thử dùng 0..count câu; next_dp tách lớp mới để không dùng quá giới hạn.", "For each type, try 0..count questions; next_dp keeps the new layer separate to enforce the limit."),
-      bi("Cộng số cách từ dp[score − used × points], modulo 10⁹ + 7.", "Add ways from dp[score − used × points], modulo 10⁹ + 7."),
+      bi("Quét điểm tăng dần để cộng cách dùng thêm một câu vào next_dp.", "Scan scores upward to add ways that use one more question from this type."),
+      bi("Trừ cách đã vượt count câu; lấy modulo sau mỗi điểm.", "Subtract ways that exceed count questions; apply modulo at each score."),
     ],
     complexity: {
-      time: "O(target × Σ min(count, target / points))",
+      time: "O(target × types)",
       space: "O(target)",
-      note: bi("Duyệt số câu dùng được trong từng loại; mỗi loại ghi vào mảng kế tiếp.", "Enumerate how many questions to use per type; each type writes to a separate next array."),
+      note: bi("Cửa sổ trượt giới hạn số câu cho mỗi loại.", "A sliding window bounds the number of questions used per type."),
     },
     code: CODE,
     liveArgs: (input, params) => {
