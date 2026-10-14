@@ -4,44 +4,40 @@ const FREEDOM_TRAIL_514_MAX_RING = 8;
 const FREEDOM_TRAIL_514_MAX_KEY = 8;
 const FREEDOM_TRAIL_514_SOURCE = Object.freeze([
   "from collections import defaultdict",
+  "",
   "class Solution:",
-  "    def findRotateSteps(self, ring, key):",
+  "    def findRotateSteps(self, ring: str, key: str) -> int:",
   "        n = len(ring)",
+  "",
   "        positions = defaultdict(list)",
-  "        for index, char in enumerate(ring):",
-  "            positions[char].append(index)",
+  "        for i, char in enumerate(ring):",
+  "            positions[char].append(i)",
+  "",
   "        dp = {0: 0}",
-  "        parents = []",
+  "",
   "        for char in key:",
   "            next_dp = {}",
-  "            parent = {}",
+  "",
   "            for target in positions[char]:",
-  "                best = None",
-  "                for previous in sorted(dp):",
-  "                    clockwise = (previous - target) % n",
-  "                    counterclockwise = (target - previous) % n",
-  "                    if target == previous:",
-  "                        turns, direction, rank = 0, \"stay\", 0",
-  "                    elif clockwise <= counterclockwise:",
-  "                        turns, direction, rank = clockwise, \"clockwise\", 1",
-  "                    else:",
-  "                        turns, direction, rank = counterclockwise, \"counterclockwise\", 2",
-  "                    candidate = (dp[previous] + turns + 1, previous, rank, turns, direction)",
-  "                    if best is None or candidate[:3] < best[:3]:",
-  "                        best = candidate",
-  "                next_dp[target] = best[0]",
-  "                parent[target] = (best[1], best[3], best[4])",
+  "                best = float(\"inf\")",
+  "",
+  "                for prev, cost in dp.items():",
+  "                    diff = abs(target - prev)",
+  "                    steps = min(diff, n - diff)",
+  "",
+  "                    best = min(best, cost + steps + 1)",
+  "",
+  "                next_dp[target] = best",
+  "",
   "            dp = next_dp",
-  "            parents.append(parent)",
-  "        end = min(dp, key=lambda position: (dp[position], position))",
-  "        answer = dp[end]",
-  "        actions = []",
-  "        for layer in range(len(key) - 1, -1, -1):",
-  "            previous, turns, direction = parents[layer][end]",
-  "            actions.append((previous, end, direction, turns, key[layer]))",
-  "            end = previous",
-  "        actions.reverse()",
-  "        return answer",
+  "",
+  "        return min(dp.values())",
+]);
+const FREEDOM_TRAIL_514_DISPLAY_LINE = Object.freeze([
+  0,
+  1, 3, 4, 5, 7, 8, 9, 8, 11, 13, 14, 14, 16, 17, 19, 20, 21, 21, 21,
+  21, 21, 21, 23, 23, 23, 25, 25, 27, 27, 29, 29, 29, 29, 29, 29, 29,
+  29, 29, 29,
 ]);
 
 function parseFreedomTrail514Input(input, params) {
@@ -196,10 +192,14 @@ function buildSteps514Exact(input, params) {
   };
   const snapshotView = ({ line, event, phase, timing, condition, final }) => {
     const activeAligned = previous !== null ? previous : currentAction ? currentAction.from : 0;
+    const sourceLine = FREEDOM_TRAIL_514_DISPLAY_LINE[line];
+    if (!sourceLine || sourceLine > FREEDOM_TRAIL_514_SOURCE.length) {
+      throw new Error(`Freedom Trail trace line ${line} has no source mapping.`);
+    }
     return deepFreezeFreedomTrail514View({
       version: 1,
       problemId: 514,
-      source: { line, text: FREEDOM_TRAIL_514_SOURCE[line - 1] },
+      source: { line: sourceLine, text: FREEDOM_TRAIL_514_SOURCE[sourceLine - 1] },
       event,
       phase,
       timing,
@@ -298,7 +298,7 @@ function buildSteps514Exact(input, params) {
       highlight: highlighted,
       mark: witnessTargets,
       final,
-      codeLines: [line],
+      codeLines: [view.source.line],
       vars: [
         { name: "layer / key", value: keyIndex === null ? "—" : `${keyIndex} / ${keyChar}` },
         { name: "previous", value: previous ?? "—" },

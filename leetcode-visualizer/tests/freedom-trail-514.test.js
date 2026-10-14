@@ -36,8 +36,44 @@ function createRenderer(language = "en") {
     fs.readFileSync(require.resolve("../public/renderer-freedom-trail-514.js"), "utf8"),
     context,
   );
-  return { host, render: context.renderFreedomTrail514View };
+  return {
+    host,
+    render: context.renderFreedomTrail514View,
+    source: vm.runInContext("FT514_SOURCE", context),
+  };
 }
+
+const expectedSource = [
+  "from collections import defaultdict",
+  "",
+  "class Solution:",
+  "    def findRotateSteps(self, ring: str, key: str) -> int:",
+  "        n = len(ring)",
+  "",
+  "        positions = defaultdict(list)",
+  "        for i, char in enumerate(ring):",
+  "            positions[char].append(i)",
+  "",
+  "        dp = {0: 0}",
+  "",
+  "        for char in key:",
+  "            next_dp = {}",
+  "",
+  "            for target in positions[char]:",
+  "                best = float(\"inf\")",
+  "",
+  "                for prev, cost in dp.items():",
+  "                    diff = abs(target - prev)",
+  "                    steps = min(diff, n - diff)",
+  "",
+  "                    best = min(best, cost + steps + 1)",
+  "",
+  "                next_dp[target] = best",
+  "",
+  "            dp = next_dp",
+  "",
+  "        return min(dp.values())",
+];
 
 test("514 layered position DP returns the minimum and a valid rotation witness", () => {
   const cases = [
@@ -76,15 +112,18 @@ test("514 snapshots follow the interview code line by line and preserve DP invar
     }
   }
   for (let line = 1; line <= problem.code.length; line += 1) {
+    if (!problem.code[line - 1].trim()) continue;
     assert.ok(lines.has(line), `source line ${line} is not stepped`);
   }
+  assert.deepEqual(problem.code, expectedSource);
 });
 
 test("514 renderer prioritizes the ring, rotation choices, key, and DP over optional detail", () => {
   const run = problem.builder("godding", { key: "gd" });
   const step = run.steps.find(item => item.freedomTrail514View.event === "compute-clockwise");
   for (const language of ["en", "vi"]) {
-    const { host, render } = createRenderer(language);
+    const { host, render, source } = createRenderer(language);
+    assert.deepEqual(Array.from(source), expectedSource);
     render(step);
     assert.match(host.innerHTML, /class="ft514-ring-wheel"/);
     assert.match(host.innerHTML, /class="ft514-direction-grid"/);

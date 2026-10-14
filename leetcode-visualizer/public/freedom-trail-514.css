@@ -26,6 +26,12 @@
   box-sizing: border-box;
 }
 
+.viz-split:has(.ft514-viz) #codePanel {
+  height: auto;
+  max-height: none;
+  overflow-y: hidden;
+}
+
 body.light .ft514-viz,
 [data-theme="light"] .ft514-viz {
   --ft514-bg: #f3f8fb;
