@@ -4694,28 +4694,36 @@ function renderMountainArrayView(step) {
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const vi = lang === "vi";
   const phase = String(view.phase || "length");
-  const phaseIndex = phase === "done" ? 3
-    : ["descend-check", "descend", "descend-stop"].includes(phase) ? 2
-      : phase === "peak" ? 1 : 0;
-  const labels = vi
-    ? ["Leo nghiêm ngặt", "Đỉnh nội bộ", "Xuống nghiêm ngặt", "Kết quả"]
-    : ["Strict ascent", "Internal peak", "Strict descent", "Result"];
-  const phases = labels.map((label, index) => {
-    const done = phase === "done" || index < phaseIndex;
-    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
-  }).join("");
   const validated = new Set(Array.isArray(view.validatedEdges) ? view.validatedEdges : []);
   const activeEdge = Number.isInteger(view.activeEdge) ? view.activeEdge : null;
   const failedEdge = Number.isInteger(view.failedEdge) ? view.failedEdge : null;
   const peak = Number.isInteger(view.peak) ? view.peak : null;
   const current = Number.isInteger(view.i) ? view.i : 0;
-  const width = Math.max(360, nums.length * 76 + 28);
-  const height = 210;
+  const stageIndex = phase === "done" ? 3
+    : ["descend-check", "descend", "descend-stop"].includes(phase) ? 2
+      : phase === "peak" ? 1 : 0;
+  const stages = [
+    { icon: "↗", label: vi ? "LÊN" : "UP" },
+    { icon: "▲", label: vi ? "ĐỈNH" : "PEAK" },
+    { icon: "↘", label: vi ? "XUỐNG" : "DOWN" },
+  ].map((item, index) => {
+    const failedStage = view.reason === "no-descent" ? 1 : view.reason === "stopped-early" ? 2 : 0;
+    const state = phase === "done"
+      ? view.result ? "done" : index < failedStage ? "done" : index === failedStage ? "fail" : "pending"
+      : stageIndex > index ? "done" : stageIndex === index ? "active" : "pending";
+    return `<span class="${state}"><i>${item.icon}</i><b>${item.label}</b></span>`;
+  }).join("<em>→</em>");
+  const width = Math.max(340, nums.length * 76 + 20);
+  const height = 276;
+  const groundY = 224;
   const minValue = nums.length ? Math.min(...nums) : 0;
   const maxValue = nums.length ? Math.max(...nums) : 1;
   const range = Math.max(1, maxValue - minValue);
-  const xAt = (index) => nums.length <= 1 ? width / 2 : 38 + index * ((width - 76) / (nums.length - 1));
-  const yAt = (value) => 160 - ((value - minValue) / range) * 105;
+  const xAt = (index) => nums.length <= 1 ? width / 2 : 50 + index * ((width - 100) / (nums.length - 1));
+  const yAt = (value) => 188 - ((value - minValue) / range) * 116;
+  const silhouette = nums.length
+    ? `${xAt(0)},${groundY} ${nums.map((value, index) => `${xAt(index)},${yAt(value)}`).join(" ")} ${xAt(nums.length - 1)},${groundY}`
+    : "";
   const edges = nums.slice(0, -1).map((value, index) => {
     const next = nums[index + 1];
     const direction = value < next ? "up" : value > next ? "down" : "flat";
@@ -4724,46 +4732,45 @@ function renderMountainArrayView(step) {
     if (index === activeEdge) classes.push("active");
     if (index === failedEdge) classes.push("failed");
     const x1 = xAt(index), y1 = yAt(value), x2 = xAt(index + 1), y2 = yAt(next);
-    const symbol = direction === "up" ? "↑" : direction === "down" ? "↓" : "=";
-    return `<g class="${classes.join(" ")}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 7}" text-anchor="middle">${symbol}</text></g>`;
+    const symbol = direction === "up" ? "↗" : direction === "down" ? "↘" : "=";
+    const marker = index === activeEdge || index === failedEdge
+      ? `<g class="mt941-edge-mark" transform="translate(${(x1 + x2) / 2},${(y1 + y2) / 2})"><circle r="15"/><text y="5" text-anchor="middle">${symbol}</text></g>`
+      : "";
+    return `<g class="${classes.join(" ")}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>${marker}</g>`;
   }).join("");
   const points = nums.map((value, index) => {
     const classes = ["mt941-point"];
+    if (index <= current) classes.push("reached");
     if (index === current) classes.push("current");
     if (index === peak) classes.push("peak");
     if (failedEdge !== null && (index === failedEdge || index === failedEdge + 1)) classes.push("failed");
     const x = xAt(index), y = yAt(value);
-    return `<g class="${classes.join(" ")}"><circle cx="${x}" cy="${y}" r="7"/><text class="value" x="${x}" y="${y - 13}" text-anchor="middle">${escapeHtml(String(value))}</text><text class="index" x="${x}" y="${y + 24}" text-anchor="middle">[${index}]</text>${index === peak ? `<text class="peak-label" x="${x}" y="${Math.max(16, y - 31)}" text-anchor="middle">PEAK</text>` : ""}</g>`;
+    const pointer = index === current ? `<path class="pointer" d="M ${x - 8} ${groundY + 25} L ${x + 8} ${groundY + 25} L ${x} ${groundY + 13} Z"/>` : "";
+    const crown = index === peak ? `<text class="peak-label" x="${x}" y="${Math.max(28, y - 28)}" text-anchor="middle">▲</text>` : "";
+    return `<g class="${classes.join(" ")}">${pointer}<circle cx="${x}" cy="${y}" r="18"/><text class="value" x="${x}" y="${y + 5}" text-anchor="middle">${escapeHtml(String(value))}</text><text class="index" x="${x}" y="${groundY + 43}" text-anchor="middle">${index}</text>${crown}</g>`;
   }).join("");
   const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
-  let comparison = vi ? "Chưa so sánh hai điểm kề nhau" : "No adjacent comparison yet";
+  let comparison = `n = ${nums.length}`;
   if (activeEdge !== null && activeEdge + 1 < nums.length) {
     const leftValue = nums[activeEdge], rightValue = nums[activeEdge + 1];
     const descending = phase.startsWith("descend");
-    comparison = `arr[${activeEdge}] = ${leftValue} ${descending ? ">" : "<"} arr[${activeEdge + 1}] = ${rightValue}`;
+    comparison = `${leftValue} ${descending ? ">" : "<"} ${rightValue}`;
   } else if (peak !== null) {
-    comparison = `peak = index ${peak} · value ${nums[peak]}`;
+    comparison = `▲ ${nums[peak]}`;
   }
   const resultKnown = typeof view.result === "boolean";
   const resultClass = resultKnown ? (view.result ? "success" : "failure") : "checking";
-  const resultLabel = resultKnown ? (view.result ? "TRUE · VALID MOUNTAIN" : "FALSE · NOT A MOUNTAIN") : (vi ? "ĐANG KIỂM TRA" : "CHECKING");
-  const reasonText = view.reason === "too-short" ? (vi ? "Cần ít nhất 3 phần tử" : "At least 3 values are required")
-    : view.reason === "no-ascent" ? (vi ? "Đỉnh ở index 0: thiếu sườn lên" : "Peak at index 0: ascent is missing")
-      : view.reason === "no-descent" ? (vi ? "Đỉnh ở cuối: thiếu sườn xuống" : "Peak at the end: descent is missing")
-        : view.reason === "stopped-early" ? (vi ? "Sườn xuống bị phẳng hoặc tăng trở lại" : "The descent becomes flat or rises again")
-          : view.reason === "valid" ? (vi ? "Tăng tới một đỉnh rồi giảm tới cuối" : "Rises to one peak, then falls to the end")
-            : comparison;
-  const ascentState = view.reason === "no-ascent" ? "fail" : peak !== null ? "pass" : "active";
-  const peakState = ["no-ascent", "no-descent"].includes(view.reason) ? "fail" : peak !== null ? "pass" : "pending";
-  const descentState = view.reason === "stopped-early" ? "fail" : view.reason === "valid" ? "pass" : phase.startsWith("descend") ? "active" : "pending";
+  const resultLabel = resultKnown ? (view.result ? "✓ TRUE" : "✕ FALSE") : "…";
+  const reasonSymbol = view.reason === "too-short" ? "● ●  ✕"
+    : view.reason === "no-ascent" ? "✕  ↗"
+      : view.reason === "no-descent" ? "↗  ✕"
+        : view.reason === "stopped-early" ? "↘  ✕"
+          : view.reason === "valid" ? "↗  ▲  ↘" : comparison;
 
   $("treeView").innerHTML = `<div class="mt941-viz phase-${escapeHtml(phase)}">
-    <div class="mt941-phases">${phases}</div>
-    <div class="mt941-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
-    <div class="mt941-rules"><span class="${ascentState}"><b>1</b><small>${vi ? "SƯỜN LÊN" : "ASCENT"}</small><code>arr[j] &lt; arr[j+1]</code></span><span class="${peakState}"><b>2</b><small>PEAK</small><code>0 &lt; peak &lt; n-1</code></span><span class="${descentState}"><b>3</b><small>${vi ? "SƯỜN XUỐNG" : "DESCENT"}</small><code>arr[j] &gt; arr[j+1]</code></span></div>
-    <section class="mt941-profile"><header><strong>MOUNTAIN PROFILE</strong><code>${escapeHtml(comparison)}</code></header><div><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${vi ? "Biểu đồ đường của mảng núi" : "Line profile of the mountain array"}"><line class="mt941-ground" x1="22" y1="182" x2="${width - 22}" y2="182"/>${edges}${points}</svg></div></section>
-    <div class="mt941-metrics"><span><small>i</small><strong>${escapeHtml(String(current))}</strong></span><span><small>PEAK INDEX</small><strong>${peak === null ? "?" : escapeHtml(String(peak))}</strong></span><span><small>LAST INDEX</small><strong>${Math.max(0, nums.length - 1)}</strong></span></div>
-    <div class="mt941-result ${resultClass}"><small>${escapeHtml(resultLabel)}</small><strong>${escapeHtml(reasonText)}</strong></div>
+    <div class="mt941-top"><div class="mt941-stages">${stages}</div><div class="mt941-readout"><small>L${activeLine ?? "—"}</small><code>${escapeHtml(comparison)}</code><b>i=${escapeHtml(String(current))}</b></div></div>
+    <section class="mt941-profile"><div><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${vi ? "Các điểm của mảng tạo sườn lên, đỉnh và sườn xuống" : "Array points forming an ascent, peak, and descent"}"><line class="mt941-ground" x1="24" y1="${groundY}" x2="${width - 24}" y2="${groundY}"/>${silhouette ? `<polygon class="mt941-mountain-fill" points="${silhouette}"/>` : ""}${edges}${points}</svg></div></section>
+    <div class="mt941-bottom"><div class="mt941-symbols"><span>↗ <b>&lt;</b></span><span>▲</span><span>↘ <b>&gt;</b></span></div><div class="mt941-result ${resultClass}"><strong>${escapeHtml(resultLabel)}</strong><span>${escapeHtml(reasonSymbol)}</span></div></div>
   </div>`;
 }
 

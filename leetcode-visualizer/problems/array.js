@@ -306,6 +306,7 @@ function buildSteps941(nums) {
   if (peak === 0 || peak === n - 1) {
     result = false;
     reason = peak === 0 ? "no-ascent" : "no-descent";
+    if (peak === 0 && n > 1) failedEdge = 0;
     addStep(
       { vi: `peak = ${peak} nằm ở biên → False`, en: `peak = ${peak} is on a boundary → False` },
       { vi: peak === 0 ? "Không có sườn tăng trước đỉnh." : "Không có sườn giảm sau đỉnh.", en: peak === 0 ? "There is no ascent before the peak." : "There is no descent after the peak." },
