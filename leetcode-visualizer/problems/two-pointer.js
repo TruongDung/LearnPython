@@ -697,81 +697,121 @@ function buildSteps905(nums) {
   const steps = [];
   let left = 0;
   let right = n - 1;
+  let phase = "init";
+  let focus = [];
+  let swapPair = [];
+  let movedFrom = null;
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [...arr],
-    highlight: [left, right],
-    mark: [],
-    codeLines: [3, 4],
-    vars: [{ name: "left", value: left }, { name: "right", value: right }],
-    note: {
-      vi: `Hai con trỏ: left = 0 (tìm lẻ), right = ${right} (tìm chẵn). Khi gặp → hoán đổi.`,
-      en: `Two pointers: left = 0 (find odd), right = ${right} (find even). When found → swap.`,
-    },
+  const snapshot = () => ({
+    original: [...nums], arr: [...arr], left, right, phase,
+    focus: [...focus], swapPair: [...swapPair], movedFrom,
   });
+  const addStep = (title, note, codeLine, nextPhase, final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...arr],
+      highlight: [...focus],
+      mark: [],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "nums[left]", value: left < n ? arr[left] : "—" },
+        { name: "nums[right]", value: right >= 0 ? arr[right] : "—" },
+      ],
+      parity905View: snapshot(),
+    });
+  };
 
-  while (left < right) {
+  focus = n ? [left, right] : [];
+  addStep(
+    { vi: `left = 0, right = ${right}`, en: `left = 0, right = ${right}` },
+    { vi: "Hai con trỏ đi vào giữa.", en: "Two pointers move toward the middle." },
+    3, "init",
+  );
+
+  while (true) {
+    swapPair = [];
+    movedFrom = null;
+    focus = left <= right && n ? [left, right] : [];
+    addStep(
+      { vi: `${left} < ${right}?`, en: `${left} < ${right}?` },
+      { vi: left < right ? "Tiếp tục." : "Hai con trỏ đã gặp nhau.", en: left < right ? "Continue." : "The pointers have met." },
+      4, left < right ? "loop" : "meet",
+    );
+    if (!(left < right)) break;
+
+    focus = [left];
+    addStep(
+      { vi: `${arr[left]} % 2 = ${arr[left] % 2}`, en: `${arr[left]} % 2 = ${arr[left] % 2}` },
+      { vi: arr[left] % 2 === 0 ? "Đúng phía trái." : "Cần kiểm tra phía phải.", en: arr[left] % 2 === 0 ? "Correct on the left." : "Check the right side." },
+      5, "check-left",
+    );
     if (arr[left] % 2 === 0) {
-      steps.push({
-        title: { vi: `left=${left}: ${arr[left]} chẵn → tiến`, en: `left=${left}: ${arr[left]} even → advance` },
-        arr: [...arr],
-        highlight: [left],
-        mark: Array.from({ length: left }, (_, x) => x),
-        codeLines: [5, 6],
-        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "arr[left]", value: arr[left] }],
-        note: { vi: `${arr[left]} chẵn, đúng vị trí. left++.`, en: `${arr[left]} is even, correct side. left++.` },
-      });
-      left++;
-    } else if (arr[right] % 2 === 1) {
-      steps.push({
-        title: { vi: `right=${right}: ${arr[right]} lẻ → lùi`, en: `right=${right}: ${arr[right]} odd → retreat` },
-        arr: [...arr],
-        highlight: [right],
-        mark: [],
-        codeLines: [7, 8],
-        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "arr[right]", value: arr[right] }],
-        note: { vi: `${arr[right]} lẻ, đúng vị trí. right--.`, en: `${arr[right]} is odd, correct side. right--.` },
-      });
-      right--;
-    } else {
-      const tmp = arr[left];
-      arr[left] = arr[right];
-      arr[right] = tmp;
-      steps.push({
-        title: { vi: `Hoán đổi [${left}]↔[${right}]`, en: `Swap [${left}]↔[${right}]` },
-        arr: [...arr],
-        highlight: [left, right],
-        mark: [],
-        codeLines: [9, 10],
-        vars: [
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "swapped", value: `${arr[left]}↔${arr[right]}` },
-        ],
-        note: {
-          vi: `arr[${left}]=${arr[right]} (lẻ) và arr[${right}]=${arr[left]} (chẵn) → hoán đổi. left++, right--.`,
-          en: `arr[${left}]=${arr[right]} (odd) and arr[${right}]=${arr[left]} (even) → swap. left++, right--.`,
-        },
-      });
-      left++;
-      right--;
+      movedFrom = left;
+      left += 1;
+      focus = left <= right ? [left] : [];
+      addStep(
+        { vi: `left → ${left}`, en: `left → ${left}` },
+        { vi: "Số chẵn đã khóa ở bên trái.", en: "The even value is locked on the left." },
+        6, "move-left",
+      );
+      continue;
     }
+
+    focus = [right];
+    addStep(
+      { vi: `${arr[right]} % 2 = ${arr[right] % 2}`, en: `${arr[right]} % 2 = ${arr[right] % 2}` },
+      { vi: arr[right] % 2 === 1 ? "Đúng phía phải." : "Tìm thấy một cặp cần đổi.", en: arr[right] % 2 === 1 ? "Correct on the right." : "Found a pair to swap." },
+      7, "check-right",
+    );
+    if (arr[right] % 2 === 1) {
+      movedFrom = right;
+      right -= 1;
+      focus = left <= right ? [right] : [];
+      addStep(
+        { vi: `right → ${right}`, en: `right → ${right}` },
+        { vi: "Số lẻ đã khóa ở bên phải.", en: "The odd value is locked on the right." },
+        8, "move-right",
+      );
+      continue;
+    }
+
+    swapPair = [left, right];
+    focus = [...swapPair];
+    addStep(
+      { vi: "Lẻ ⇄ Chẵn", en: "Odd ⇄ Even" },
+      { vi: "Hai giá trị đang ở sai phía.", en: "Both values are on the wrong side." },
+      9, "pair",
+    );
+    [arr[left], arr[right]] = [arr[right], arr[left]];
+    addStep(
+      { vi: `Đổi ${arr[right]} ⇄ ${arr[left]}`, en: `Swap ${arr[right]} ⇄ ${arr[left]}` },
+      { vi: "Cặp đã về đúng phía.", en: "The pair is now on the correct sides." },
+      10, "swap",
+    );
+    movedFrom = left;
+    left += 1;
+    right -= 1;
+    focus = left <= right ? [left, right] : [];
+    addStep(
+      { vi: `left → ${left}, right → ${right}`, en: `left → ${left}, right → ${right}` },
+      { vi: "Khóa hai đầu vừa sửa.", en: "Lock both corrected ends." },
+      11, "move-both",
+    );
   }
 
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...arr],
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [11],
-    vars: [{ name: "result", value: [...arr] }],
-    note: {
-      vi: `Tất cả chẵn ở trái, lẻ ở phải: [${arr.join(", ")}].`,
-      en: `All evens on the left, odds on the right: [${arr.join(", ")}].`,
-    },
-  });
+  focus = [];
+  swapPair = [];
+  movedFrom = null;
+  addStep(
+    { vi: `return [${arr.join(", ")}]`, en: `return [${arr.join(", ")}]` },
+    { vi: "Chẵn bên trái, lẻ bên phải.", en: "Evens left, odds right." },
+    12, "done", true,
+  );
 
   return { original: [...nums], answer: arr, steps };
 }

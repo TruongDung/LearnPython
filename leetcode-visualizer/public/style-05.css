@@ -4126,6 +4126,67 @@ html, body {
 @media (max-width:560px) { .rg1299-viz{padding:11px 8px}.rg1299-top{grid-template-columns:auto auto}.rg1299-top code{grid-column:1/-1;grid-row:2}.rg1299-machine{grid-template-columns:70px 16px 70px 16px 70px;gap:3px}.rg1299-card{padding:6px}.rg1299-card>i{font-size:18px}.rg1299-card strong{font-size:15px}.rg1299-lane{grid-template-columns:30px minmax(0,1fr)} }
 @container (max-width:520px) { .rg1299-top{grid-template-columns:auto auto}.rg1299-top code{grid-column:1/-1;grid-row:2}.rg1299-lane{grid-template-columns:25px minmax(0,1fr);gap:4px}.rg1299-cells{gap:5px}.rg1299-cell{flex-basis:50px;min-height:60px}.rg1299-machine{grid-template-columns:68px 14px 68px 14px 68px;gap:3px}.rg1299-card{padding:5px}.rg1299-card>i{font-size:17px}.rg1299-card strong{font-size:14px}.rg1299-finish code{font-size:12px} }
 
+/* LeetCode 905 · Sort Array By Parity — picture-first */
+.p905-viz { container-type:inline-size; display:grid; gap:12px; min-width:0; padding:15px; color:#e2e8f0; background:radial-gradient(circle at 18% 30%,rgba(34,197,94,.12),transparent 34%),radial-gradient(circle at 82% 30%,rgba(168,85,247,.13),transparent 34%),#08111f; border:1px solid #263449; border-radius:16px; overflow:hidden; }
+.p905-top { display:grid; grid-template-columns:auto minmax(120px,1fr) auto auto; align-items:center; gap:10px; }
+.p905-top>span { display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font:800 11px Consolas,monospace; }
+.p905-top>span i { font-style:normal; font-size:12px; }
+.p905-top>.even { color:#86efac; background:rgba(34,197,94,.11); border:1px solid #22c55e; }
+.p905-top>.odd { color:#d8b4fe; background:rgba(168,85,247,.12); border:1px solid #a855f7; }
+.p905-top>div { display:grid; grid-template-columns:1fr 1.25fr 1fr; align-items:center; height:12px; overflow:hidden; border-radius:999px; }
+.p905-top>div b { display:grid; place-items:center; height:100%; color:#052e16; background:#22c55e; font-size:8px; }
+.p905-top>div b:last-child { color:#3b0764; background:#a855f7; }
+.p905-top>div em { display:grid; place-items:center; height:100%; color:#94a3b8; background:#334155; font:800 8px Consolas,monospace; font-style:normal; }
+.p905-top code { color:#7dd3fc; font:800 10px Consolas,monospace; }
+.p905-road { min-width:0; overflow-x:auto; padding:24px 4px 28px; background:linear-gradient(180deg,transparent 49%,#334155 50%,#334155 53%,transparent 54%); }
+.p905-cells { display:flex; justify-content:center; gap:9px; min-width:max-content; }
+.p905-cell { position:relative; flex:0 0 68px; min-height:76px; display:grid; place-items:center; align-content:center; color:#cbd5e1; background:#111c2f; border:2px solid #475569; border-radius:50% 50% 13px 13px; transition:transform .18s ease,opacity .18s ease; }
+.p905-cell small { position:absolute; top:6px; color:#64748b; font:700 8px Consolas,monospace; }
+.p905-cell strong { font:900 22px Consolas,monospace; }
+.p905-cell>i { position:absolute; bottom:5px; color:#94a3b8; font:800 8px Consolas,monospace; font-style:normal; }
+.p905-cell>b { position:absolute; bottom:-28px; min-width:27px; padding:3px 6px; color:#0f172a; background:#fbbf24; border-radius:8px; font:900 11px Consolas,monospace; text-align:center; }
+.p905-cell>b::before { content:"↑"; position:absolute; top:-15px; left:50%; color:#fbbf24; transform:translateX(-50%); }
+.p905-cell.even { border-color:#16a34a; }
+.p905-cell.even>i { color:#86efac; }
+.p905-cell.odd { border-color:#9333ea; }
+.p905-cell.odd>i { color:#d8b4fe; }
+.p905-cell.locked-left { color:#bbf7d0; background:rgba(34,197,94,.14); box-shadow:inset 0 -6px #22c55e; }
+.p905-cell.locked-right { color:#e9d5ff; background:rgba(168,85,247,.15); box-shadow:inset 0 -6px #a855f7; }
+.p905-cell.focus { z-index:1; transform:translateY(-6px) scale(1.06); border-color:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.14); }
+.p905-cell.swap { animation:p905Bounce .7s ease-in-out infinite alternate; }
+.p905-cell.odd-start::before { content:"│"; position:absolute; left:-9px; color:#94a3b8; font-size:34px; }
+.p905-action { min-height:74px; display:grid; place-items:center; align-content:center; gap:7px; padding:8px; background:rgba(15,23,42,.58); border:1px solid #334155; border-radius:13px; }
+.p905-action>strong { color:#fcd34d; font:900 19px Consolas,monospace; letter-spacing:.04em; }
+.p905-swap { display:flex; align-items:center; justify-content:center; gap:16px; }
+.p905-swap>span { position:relative; display:grid; grid-template-columns:auto auto; align-items:center; gap:6px; min-width:58px; padding:6px 9px; border:2px solid; border-radius:11px; }
+.p905-swap>span small { font:800 8px Consolas,monospace; }
+.p905-swap>span strong { font:900 18px Consolas,monospace; }
+.p905-swap>.even { color:#86efac; border-color:#22c55e; background:rgba(34,197,94,.1); }
+.p905-swap>.odd { color:#d8b4fe; border-color:#a855f7; background:rgba(168,85,247,.11); }
+.p905-swap>b { color:#fbbf24; font-size:26px; }
+.p905-swap.swap>b { color:#86efac; }
+.p905-finish { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; padding:10px 13px; background:rgba(15,23,42,.58); border:1px solid #334155; border-radius:12px; font:900 15px Consolas,monospace; text-align:center; }
+.p905-finish span:first-child { color:#86efac; }
+.p905-finish span:last-child { color:#d8b4fe; }
+.p905-finish i { color:#94a3b8; font-style:normal; }
+@keyframes p905Bounce { to { transform:translateY(-9px) scale(1.07); } }
+[data-theme="light"] .p905-viz { color:#1e293b; background:radial-gradient(circle at 18% 30%,rgba(34,197,94,.08),transparent 34%),radial-gradient(circle at 82% 30%,rgba(168,85,247,.08),transparent 34%),#f8fafc; border-color:#cbd5e1; }
+[data-theme="light"] .p905-top code { color:#0369a1; }
+[data-theme="light"] .p905-top>div em { background:#cbd5e1; color:#475569; }
+[data-theme="light"] .p905-road { background:linear-gradient(180deg,transparent 49%,#cbd5e1 50%,#cbd5e1 53%,transparent 54%); }
+[data-theme="light"] .p905-cell,[data-theme="light"] .p905-action,[data-theme="light"] .p905-finish { color:#334155; background:#fff; border-color:#cbd5e1; }
+[data-theme="light"] .p905-cell.even { border-color:#16a34a; }
+[data-theme="light"] .p905-cell.odd { border-color:#9333ea; }
+[data-theme="light"] .p905-cell.locked-left { color:#166534; background:#f0fdf4; }
+[data-theme="light"] .p905-cell.locked-right { color:#6b21a8; background:#faf5ff; }
+[data-theme="light"] .p905-cell.focus { border-color:#d97706; }
+[data-theme="light"] .p905-action>strong { color:#92400e; }
+[data-theme="light"] .p905-swap>.even { color:#166534; background:#f0fdf4; }
+[data-theme="light"] .p905-swap>.odd { color:#6b21a8; background:#faf5ff; }
+[data-theme="light"] .p905-finish span:first-child { color:#166534; }
+[data-theme="light"] .p905-finish span:last-child { color:#6b21a8; }
+@container (max-width:520px) { .p905-viz{padding:11px 8px}.p905-top{grid-template-columns:auto auto auto}.p905-top>div{grid-column:1/-1;grid-row:2}.p905-cell{flex-basis:56px;min-height:68px}.p905-cells{gap:6px}.p905-action>strong{font-size:16px}.p905-finish{font-size:12px} }
+
 /* LeetCode 941 · Valid Mountain Array — picture-first */
 .mt941-viz { display:grid; gap:10px; min-width:0; padding:14px; color:#e2e8f0; background:radial-gradient(circle at 50% 24%,rgba(56,189,248,.16),transparent 42%),#08111f; border:1px solid #263449; border-radius:16px; overflow:hidden; }
 .mt941-top,.mt941-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }

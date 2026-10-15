@@ -4670,6 +4670,56 @@ function renderReplaceGreatestView(step) {
   </div>`;
 }
 
+function renderSortParity905View(step) {
+  const view = step.parity905View || {};
+  const arr = Array.isArray(view.arr) ? view.arr : [];
+  const phase = String(view.phase || "init");
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const right = Number.isInteger(view.right) ? view.right : arr.length - 1;
+  const focus = new Set(Array.isArray(view.focus) ? view.focus : []);
+  const swapPair = Array.isArray(view.swapPair) ? view.swapPair : [];
+  const isDone = phase === "done";
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const firstOdd = isDone ? arr.findIndex(value => Math.abs(value % 2) === 1) : -1;
+  const cells = arr.map((value, index) => {
+    const even = value % 2 === 0;
+    const classes = ["p905-cell", even ? "even" : "odd"];
+    if (index < left || isDone && even) classes.push("locked-left");
+    if (index > right || isDone && !even) classes.push("locked-right");
+    if (focus.has(index)) classes.push("focus");
+    if (swapPair.includes(index)) classes.push("swap");
+    if (isDone && index === firstOdd) classes.push("odd-start");
+    const pointers = [];
+    if (!isDone && index === left) pointers.push("L");
+    if (!isDone && index === right) pointers.push("R");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(String(value))}</strong><i>${even ? "2k" : "2k+1"}</i>${pointers.length ? `<b>${pointers.join("·")}</b>` : ""}</div>`;
+  }).join("");
+  let actionIcon = "L　→　←　R";
+  if (phase === "check-left") actionIcon = `L　🔎　${escapeHtml(String(arr[left]))}`;
+  else if (phase === "move-left") actionIcon = "L　➜";
+  else if (phase === "check-right") actionIcon = `${escapeHtml(String(arr[right]))}　🔎　R`;
+  else if (phase === "move-right") actionIcon = "⬅　R";
+  else if (phase === "move-both") actionIcon = "L　➜　　　⬅　R";
+  else if (phase === "meet") actionIcon = "L　●　R";
+  else if (isDone) actionIcon = "✓　2k　│　2k+1";
+  let swapHtml = "";
+  if (swapPair.length === 2) {
+    const [a, b] = swapPair;
+    const beforeSwap = phase === "pair";
+    const leftValue = beforeSwap ? arr[a] : arr[b];
+    const rightValue = beforeSwap ? arr[b] : arr[a];
+    swapHtml = `<div class="p905-swap ${phase}"><span class="odd"><small>${beforeSwap ? "L" : "R"}</small><strong>${escapeHtml(String(leftValue))}</strong></span><b>⇄</b><span class="even"><small>${beforeSwap ? "R" : "L"}</small><strong>${escapeHtml(String(rightValue))}</strong></span></div>`;
+  }
+  const evenCount = arr.filter(value => value % 2 === 0).length;
+
+  $("treeView").innerHTML = `<div class="p905-viz phase-${escapeHtml(phase)}">
+    <div class="p905-top"><span class="even"><i>●</i> 2k</span><div><b>✓</b><em>?</em><b>✓</b></div><span class="odd">2k+1 <i>●</i></span><code>L${activeLine ?? "—"}</code></div>
+    <div class="p905-road"><div class="p905-cells">${cells}</div></div>
+    <div class="p905-action"><strong>${actionIcon}</strong>${swapHtml}</div>
+    ${isDone ? `<div class="p905-finish"><span>${arr.slice(0, evenCount).map(value => escapeHtml(String(value))).join("　")}</span><i>│</i><span>${arr.slice(evenCount).map(value => escapeHtml(String(value))).join("　")}</span></div>` : ""}
+  </div>`;
+}
+
 function renderMountainArrayView(step) {
   const view = step.mountainArrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
