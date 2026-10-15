@@ -5544,6 +5544,178 @@ select option {
   .di694-tile { width: 23px; height: 23px; }
 }
 
+/* #130 Surrounded Regions: border escape picture */
+.bfs-grid-view.sr130-host {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.sr130-grid {
+  gap: 5px;
+  padding: 13px;
+  border: 4px solid #64748b;
+  border-radius: 18px;
+  background: #1e293b;
+  box-shadow: inset 0 0 0 2px rgba(148, 163, 184, 0.15);
+}
+
+.sr130-grid .bfs-cell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  font-size: 18px;
+}
+.sr130-grid .bfs-cell.wall { background: #334155; color: #64748b; }
+.sr130-grid .bfs-cell.empty { background: #164e63; color: #cffafe; }
+.sr130-grid .bfs-cell.path { background: #059669; color: #ecfdf5; }
+.sr130-grid .bfs-cell.visited { background: #be123c; color: #fff1f2; }
+.sr130-grid .bfs-cell.queued { background: #a16207; color: #fef3c7; }
+.sr130-grid .bfs-cell.current { background: #f59e0b; color: #451a03; box-shadow: 0 0 0 3px #fde68a; }
+.sr130-grid .bfs-cell.board-edge { outline: 1px solid rgba(148, 163, 184, 0.4); }
+.sr130-grid .bfs-cell.escape-gate { outline: 3px solid #34d399; box-shadow: 0 0 15px rgba(52, 211, 153, 0.5); }
+.sr130-grid .bfs-cell-meta {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  color: currentColor;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.sr130-viz {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 720px);
+  margin: 16px auto 2px;
+  color: #e2e8f0;
+  text-align: left;
+}
+.sr130-topbar,
+.sr130-stages,
+.sr130-counts,
+.sr130-case header,
+.sr130-viz footer {
+  display: flex;
+  align-items: center;
+}
+.sr130-topbar { justify-content: space-between; gap: 12px; }
+.sr130-stages { gap: 5px; }
+.sr130-stage { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 11px; }
+.sr130-stage i {
+  display: inline-grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid #475569;
+  border-radius: 50%;
+  font-style: normal;
+}
+.sr130-stage.active { color: #fbbf24; }
+.sr130-stage.active i { border-color: #f59e0b; background: #f59e0b; color: #111827; }
+.sr130-stage.done { color: #6ee7b7; }
+.sr130-stage.done i { border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
+.sr130-stage-arrow { color: #475569; font-size: 20px; }
+.sr130-counts { gap: 7px; }
+.sr130-counts span {
+  min-width: 42px;
+  padding: 5px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  color: #94a3b8;
+  font-size: 11px;
+  text-align: center;
+}
+.sr130-counts b { color: #f8fafc; font-size: 14px; }
+.sr130-action {
+  justify-self: center;
+  min-width: 150px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #fde68a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+.sr130-cases { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sr130-case {
+  display: grid;
+  min-height: 145px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 15px;
+  background: rgba(30, 41, 59, 0.55);
+  opacity: 0.55;
+  transition: opacity 0.2s, border-color 0.2s, transform 0.2s;
+}
+.sr130-case.active,
+.sr130-case.done { opacity: 1; }
+.sr130-case.active { transform: translateY(-2px); }
+.sr130-case.keep.active { border-color: #10b981; }
+.sr130-case.flip.active { border-color: #fb7185; }
+.sr130-case header { justify-content: center; gap: 7px; color: #94a3b8; font-size: 10px; letter-spacing: 0.1em; }
+.sr130-case.keep.active header,
+.sr130-case.keep.done header { color: #6ee7b7; }
+.sr130-case.flip.active header,
+.sr130-case.flip.done header { color: #fda4af; }
+.sr130-mini-board {
+  display: grid;
+  grid-template-columns: repeat(var(--sr130-mini-cols), 23px);
+  gap: 3px;
+}
+.sr130-mini-cell {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 900;
+}
+.sr130-mini-cell.wall { background: #475569; color: #94a3b8; }
+.sr130-mini-cell.open { background: #155e75; color: #cffafe; }
+.sr130-mini-cell.safe { background: #10b981; color: #ecfdf5; }
+.sr130-mini-cell.open.edge { box-shadow: 0 0 0 2px #34d399; }
+.sr130-flip-picture { display: flex; align-items: center; gap: 9px; }
+.sr130-flip-picture > i { color: #fb7185; font-size: 22px; font-style: normal; }
+.sr130-viz footer { justify-content: center; gap: 18px; color: #64748b; font-size: 10px; }
+.sr130-viz footer span { display: inline-flex; align-items: center; gap: 5px; }
+.sr130-dot { width: 10px; height: 10px; border-radius: 3px; }
+.sr130-dot.safe { background: #10b981; }
+.sr130-dot.captured { background: #be123c; }
+
+[data-theme="light"] .bfs-grid-view.sr130-host { background: #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .sr130-grid { border-color: #94a3b8; background: #eef2f7; box-shadow: inset 0 0 0 2px #fff; }
+[data-theme="light"] .sr130-grid .bfs-cell.wall { background: #cbd5e1; color: #64748b; }
+[data-theme="light"] .sr130-grid .bfs-cell.empty { background: #cffafe; color: #155e75; }
+[data-theme="light"] .sr130-grid .bfs-cell.path { background: #10b981; color: #052e16; }
+[data-theme="light"] .sr130-grid .bfs-cell.visited { background: #fb7185; color: #4c0519; }
+[data-theme="light"] .sr130-viz { color: #1e293b; }
+[data-theme="light"] .sr130-stage { color: #94a3b8; }
+[data-theme="light"] .sr130-stage.done { color: #047857; }
+[data-theme="light"] .sr130-stage.done i { border-color: #10b981; background: #d1fae5; color: #047857; }
+[data-theme="light"] .sr130-stage-arrow,
+[data-theme="light"] .sr130-viz footer { color: #64748b; }
+[data-theme="light"] .sr130-counts span { border-color: #cbd5e1; color: #64748b; }
+[data-theme="light"] .sr130-counts b { color: #0f172a; }
+[data-theme="light"] .sr130-action { background: #fffbeb; color: #92400e; }
+[data-theme="light"] .sr130-case { border-color: #dbe3ef; background: #fff; }
+[data-theme="light"] .sr130-mini-cell.wall { background: #cbd5e1; color: #64748b; }
+
+@media (max-width: 700px) {
+  .sr130-topbar { align-items: flex-start; flex-direction: column; }
+  .sr130-stage b { display: none; }
+  .sr130-cases { grid-template-columns: 1fr; }
+  .sr130-case { min-height: 118px; }
+}
+
 /* LeetCode 1136: semester-by-semester Kahn BFS */
 .pc-viz {
   display: grid;

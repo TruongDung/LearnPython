@@ -129,6 +129,67 @@ function distinctIslandGuideHtml(view) {
   </section>`;
 }
 
+function surroundedRegionsGuideHtml(view) {
+  const vi = lang === "vi";
+  const phaseOrder = { border: 0, spread: 1, capture: 2, done: 3 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const labels = vi ? ["BIÊN", "LAN", "LẬT"] : ["EDGE", "SPREAD", "FLIP"];
+  const icons = ["▣", "⌁", "✕"];
+  const stages = labels.map((label, index) => {
+    const state = activePhase > index ? "done" : activePhase === index ? "active" : "pending";
+    return `<span class="sr130-stage ${state}"><i>${activePhase > index ? "✓" : icons[index]}</i><b>${label}</b></span>`;
+  }).join(`<span class="sr130-stage-arrow">›</span>`);
+
+  const board = (pattern, kind) => {
+    const rows = pattern.length;
+    const cols = pattern[0].length;
+    const cells = pattern.flatMap((row, r) => [...row].map((value, c) => {
+      const edge = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+      const cls = value === "X" ? "wall" : value === "S" ? "safe" : "open";
+      return `<span class="sr130-mini-cell ${cls}${edge ? " edge" : ""}">${value === "S" ? "O" : value}</span>`;
+    })).join("");
+    return `<div class="sr130-mini-board ${kind}" style="--sr130-mini-cols:${cols}">${cells}</div>`;
+  };
+
+  const safeBoard = board(["XXXX", "OSXX", "XSSX", "XXXX"], "safe-board");
+  const trappedBefore = board(["XXX", "XOX", "XXX"], "trapped-board");
+  const trappedAfter = board(["XXX", "XXX", "XXX"], "captured-board");
+  const keepState = view.phase === "done" ? "done" : ["border", "spread"].includes(view.phase) ? "active" : "";
+  const flipState = view.phase === "done" ? "done" : view.phase === "capture" ? "active" : "";
+  const action = view.phase === "done"
+    ? `✓ ${view.safeCount}   ·   ✕ ${view.capturedCount}`
+    : view.event === "border-seeds"
+      ? `O@edge × ${view.borderCount}`
+      : view.event === "mark-safe"
+        ? "O → ✓"
+        : view.event === "restore-safe"
+          ? "✓ → O"
+          : view.event === "flip"
+            ? "O → X"
+            : view.current
+              ? `(${view.current[0]},${view.current[1]})`
+              : "O → edge ?";
+  const summary = vi ? "Giữ O nối biên, lật O bị bao kín" : "Keep border-connected O, flip enclosed O";
+  return `<section class="sr130-viz phase-${view.phase}" aria-label="${escapeHtml(summary)}">
+    <header class="sr130-topbar">
+      <div class="sr130-stages">${stages}</div>
+      <div class="sr130-counts"><span>🛟 <b>${view.safeCount}</b></span><span>✕ <b>${view.capturedCount}</b></span></div>
+    </header>
+    <div class="sr130-action">${escapeHtml(action)}</div>
+    <div class="sr130-cases">
+      <article class="sr130-case keep ${keepState}">
+        <header><span>↗</span><b>${vi ? "BIÊN → GIỮ" : "EDGE → KEEP"}</b></header>
+        ${safeBoard}
+      </article>
+      <article class="sr130-case flip ${flipState}">
+        <header><span>▣</span><b>${vi ? "KÍN → LẬT" : "CLOSED → FLIP"}</b></header>
+        <div class="sr130-flip-picture">${trappedBefore}<i>→</i>${trappedAfter}</div>
+      </article>
+    </div>
+    <footer><span><i class="sr130-dot safe"></i>O</span><span><i class="sr130-dot captured"></i>O→X</span></footer>
+  </section>`;
+}
+
 function effortGuideHtml(view) {
   const vi = lang === "vi";
   const event = view.event || "init";
@@ -907,7 +968,9 @@ function renderBfsGrid(step) {
   const isPhonePath = variant === "phone-path";
   const isEffortGrid = variant === "effort-grid";
   const isDistinctIslands = variant === "distinct-islands";
+  const isSurroundedRegions = variant === "surrounded-regions";
   el.classList.toggle("distinct-islands-host", isDistinctIslands);
+  el.classList.toggle("sr130-host", isSurroundedRegions);
   const isMaxScoreGrid = variant === "max-score-grid";
   const isClassroomGrid = variant === "classroom-grid";
   const variantClass = isTicTacToe
@@ -918,15 +981,17 @@ function renderBfsGrid(step) {
         ? " effort-grid"
         : isDistinctIslands
           ? " distinct-islands-grid"
-          : isMaxScoreGrid
-            ? " max-score-grid"
-            : isClassroomGrid
-              ? " classroom-grid"
-              : "";
+          : isSurroundedRegions
+            ? " sr130-grid"
+            : isMaxScoreGrid
+              ? " max-score-grid"
+              : isClassroomGrid
+                ? " classroom-grid"
+                : "";
   const gridClass = `bfs-grid${variantClass}${isEffortGrid && step.effortView ? " minimax-effort-grid" : ""}`;
   const gridStyle = isTicTacToe
     ? ""
-    : isDistinctIslands
+    : isDistinctIslands || isSurroundedRegions
       ? ` style="grid-template-columns:repeat(${cols},minmax(0,1fr));max-width:${cols * 60 + 20}px;width:100%"`
       : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isMaxScoreGrid ? "74px" : isClassroomGrid ? "58px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
@@ -972,10 +1037,11 @@ function renderBfsGrid(step) {
     </div>`;
   }
   const guideHtml = step.distinctIslandView ? distinctIslandGuideHtml(step.distinctIslandView) : "";
+  const surroundedGuide = step.surroundedRegionsView ? surroundedRegionsGuideHtml(step.surroundedRegionsView) : "";
   const effortGuide = step.effortView ? effortGuideHtml(step.effortView) : "";
   const classroomGuide = step.classroomView ? classroomGuideHtml(step.classroomView) : "";
-  el.innerHTML = isDistinctIslands
-    ? html + guideHtml
+  el.innerHTML = isDistinctIslands || isSurroundedRegions
+    ? html + guideHtml + surroundedGuide
     : guideHtml + effortGuide + classroomGuide + html;
 }
 

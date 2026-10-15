@@ -625,8 +625,127 @@ function buildBoundaryFlood(input, config) {
   return { original, answer, steps };
 }
 
+function decorateSurroundedRegionsResult(result, marker, codeBlock) {
+  const original = result.original || [];
+  const rows = original.length;
+  const cols = rows ? original[0].length : 0;
+  const safe = new Set();
+  const queue = [];
+  const key = (row, col) => `${row},${col}`;
+  const isInside = (row, col) => row >= 0 && row < rows && col >= 0 && col < cols;
+  const seed = (row, col) => {
+    const cellKey = key(row, col);
+    if (isInside(row, col) && original[row][col] === "O" && !safe.has(cellKey)) {
+      safe.add(cellKey);
+      queue.push([row, col]);
+    }
+  };
+
+  for (let col = 0; col < cols; col++) {
+    seed(0, col);
+    seed(rows - 1, col);
+  }
+  for (let row = 0; row < rows; row++) {
+    seed(row, 0);
+    seed(row, cols - 1);
+  }
+  for (let index = 0; index < queue.length; index++) {
+    const [row, col] = queue[index];
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) seed(row + dr, col + dc);
+  }
+
+  const borderCount = [...safe].filter((cellKey) => {
+    const [row, col] = cellKey.split(",").map(Number);
+    return row === 0 || row === rows - 1 || col === 0 || col === cols - 1;
+  }).length;
+
+  for (const step of result.steps || []) {
+    if (!step.bfsGrid || step.bfsGrid.rows !== rows || step.bfsGrid.cols !== cols) continue;
+    const line = step.codeLines && step.codeLines[0];
+    let phase;
+    let event = "scan";
+    if (step.final) {
+      phase = "done";
+      event = "done";
+    } else if (codeBlock === 1) {
+      phase = line <= 13 ? "border" : line <= 20 ? "spread" : "capture";
+      if (line === 12 || line === 19) event = "mark-safe";
+      else if (line === 13) event = "border-seeds";
+      else if (line === 23) event = "flip";
+      else if (line === 24) event = "restore-safe";
+    } else {
+      phase = line === 3 ? "border" : line >= 20 ? "capture" : "spread";
+      if (line >= 14 && line <= 19) event = "border-seeds";
+      else if (line === 9) event = "mark-safe";
+      else if (line === 23) event = "flip";
+      else if (line === 25) event = "restore-safe";
+    }
+
+    let current = null;
+    let safeCount = 0;
+    let capturedCount = 0;
+    step.bfsGrid.variant = "surrounded-regions";
+    step.bfsGrid.cells = step.bfsGrid.cells.map((boardRow, row) => boardRow.map((cell, col) => {
+      const tokens = String(cell.cls || "empty").split(/\s+/).filter(Boolean);
+      const cellKey = key(row, col);
+      const isBorder = row === 0 || row === rows - 1 || col === 0 || col === cols - 1;
+      const isCurrent = tokens.includes("current");
+      const isSafeMarker = cell.label === marker;
+      const isRestoredSafe = (phase === "capture" || phase === "done") && cell.label === "O" && safe.has(cellKey);
+      const isCaptured = original[row][col] === "O" && cell.label === "X";
+      if (isCurrent) current = [row, col];
+      if (isSafeMarker || isRestoredSafe) safeCount++;
+      if (isCaptured) capturedCount++;
+
+      const keep = tokens.filter((token) => !["wall", "empty", "path", "visited", "board-edge", "escape-gate"].includes(token));
+      const base = isCaptured ? "visited" : isSafeMarker || isRestoredSafe ? "path" : cell.label === "X" ? "wall" : "empty";
+      const classes = [base, ...keep];
+      if (isBorder) classes.push("board-edge");
+      if (isBorder && original[row][col] === "O") classes.push("escape-gate");
+      return {
+        ...cell,
+        label: isSafeMarker ? "O" : cell.label,
+        cls: [...new Set(classes)].join(" "),
+        meta: isSafeMarker || isRestoredSafe ? "✓" : isCaptured ? "✕" : isBorder && original[row][col] === "O" ? "↗" : "",
+      };
+    }));
+
+    step.surroundedRegionsView = {
+      phase,
+      event,
+      current,
+      borderCount,
+      safeCount,
+      capturedCount,
+    };
+
+    const coord = current ? `(${current[0]},${current[1]})` : "";
+    if (event === "done") {
+      step.title = text(`✓ ${safeCount}  ·  ✕ ${capturedCount}`, `✓ ${safeCount}  ·  ✕ ${capturedCount}`);
+      step.note = text("Xong.", "Done.");
+    } else if (event === "flip") {
+      step.title = text(`${coord}: O → X`, `${coord}: O → X`);
+      step.note = text("Kín → lật.", "Closed → flip.");
+    } else if (event === "restore-safe") {
+      step.title = text(`${coord}: ${marker} → O`, `${coord}: ${marker} → O`);
+      step.note = text("Nối biên → giữ.", "Reaches edge → keep.");
+    } else if (event === "mark-safe") {
+      step.title = text(`${coord} → ✓`, `${coord} → ✓`);
+      step.note = text("Nối biên.", "Border-connected.");
+    } else if (event === "border-seeds") {
+      step.title = text(`O@edge × ${borderCount}`, `O@edge × ${borderCount}`);
+      step.note = text("Nguồn bắt đầu.", "Start sources.");
+    } else {
+      const label = phase === "border" ? "BIÊN" : phase === "spread" ? "LAN" : "LẬT";
+      step.title = text(coord || label, coord || (phase === "border" ? "EDGE" : phase === "spread" ? "SPREAD" : "FLIP"));
+      step.note = text(current ? "4 hướng." : "O → biên?", current ? "4 directions." : "O → edge?");
+    }
+  }
+  return result;
+}
+
 function buildSteps130Bfs(input) {
-  return buildBoundaryFlood(input, {
+  const result = buildBoundaryFlood(input, {
     allowed: new Set(["X", "O"]),
     toValue: String,
     cellName: "board[row][col]",
@@ -669,6 +788,7 @@ function buildSteps130Bfs(input) {
     },
     invalidNote: text("Board phải là ma trận chữ nhật chỉ gồm X và O.", "The board must be rectangular and contain only X and O."),
   });
+  return decorateSurroundedRegionsResult(result, "S", 1);
 }
 
 /**
@@ -971,7 +1091,7 @@ function buildSteps130Dfs(input) {
     },
   });
 
-  return { original, answer, steps };
+  return decorateSurroundedRegionsResult({ original, answer, steps }, "#", 2);
 }
 
 function buildSteps1020(input) {
@@ -1450,8 +1570,8 @@ const problems = {
     category: { key: "dfs", vi: "DFS", en: "DFS" },
     tags: [multiSourceTag, floodFillTag],
     title: text("Surrounded Regions", "Surrounded Regions"),
-    titleVi: text("Multi-source BFS từ các vùng ở biên", "Multi-source BFS from border regions"),
-    statement: text("Đổi mọi O bị X bao quanh thành X; các O nối bốn hướng tới biên được giữ lại.", "Flip every O surrounded by X; O cells connected in four directions to the border remain unchanged."),
+    titleVi: text("Giữ O nối biên, lật O bị bao kín", "Keep border O, flip enclosed O"),
+    statement: text("O chạm được biên thì giữ. O bị khóa kín thì đổi thành X.", "Keep O cells that reach an edge. Flip enclosed O cells to X."),
     defaultInput: "XXXX|XOOX|XXOX|XOXX",
     inputKind: "string",
     inputLabel: text("Board X/O (hàng cách '|')", "X/O board (rows separated by '|')"),
@@ -1468,9 +1588,9 @@ const problems = {
       },
     ],
     approach: [
-      text("Cách 1 (BFS): đưa mọi O biên vào queue, đánh dấu 'S' (safe), lan theo BFS.", "Approach 1 (BFS): put every border O in the queue, mark it 'S' (safe), spread via BFS."),
-      text("Cách 2 (DFS): gọi dfs(r,c) từ mọi ô biên. dfs đánh dấu 'O' thành '#' rồi đệ quy 4 hướng.", "Approach 2 (DFS): call dfs(r,c) from every border cell. dfs marks 'O' as '#' then recurses in 4 directions."),
-      text("Cả hai cách: O còn lại (không nối biên) → X; ô an toàn (S hoặc #) → khôi phục O.", "Both approaches: remaining O (not border-connected) → X; safe cells (S or #) → restored to O."),
+      text("Bắt đầu từ mọi O ở biên.", "Start from every border O."),
+      text("Lan 4 hướng, đánh dấu vùng an toàn.", "Spread in 4 directions and mark safe cells."),
+      text("O chưa đánh dấu → X. Vùng an toàn → O.", "Unmarked O → X. Safe cells → O."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô được quét hằng số lần; BFS dùng queue, DFS dùng call stack đệ quy.", "Each cell is scanned a constant number of times; BFS uses a queue, DFS uses the recursive call stack.") },
     codeLabel: text("Cách 1: Multi-source BFS", "Approach 1: Multi-source BFS"),
