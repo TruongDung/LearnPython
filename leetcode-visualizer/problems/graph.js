@@ -11900,48 +11900,40 @@ function buildStepsDistinctIslands(input) {
 
   // Intro (line 2)
   pushStep({
-    title: { vi: "Ý tưởng: ghi chữ ký hình dạng đảo", en: "Idea: record each island's shape signature" },
+    title: { vi: "Grid → shapes", en: "Grid → shapes" },
     codeLines: [2],
     vars: [
       { name: "rows", value: rows },
       { name: "cols", value: cols },
     ],
     note: {
-      vi:
-        `Đếm số ĐẢO KHÁC HÌNH. Hai đảo giống nhau nếu dịch tịnh tiến (không xoay/lật) thì trùng.\n` +
-        `Với mỗi đảo, DFS ghi lại tọa độ các ô TƯƠNG ĐỐI so với ô gốc → 'chữ ký'.\n` +
-        `Bỏ chữ ký vào set. Đáp án = số chữ ký khác nhau.\n\n` +
-        `Lưu ý: dfs() định nghĩa ở dòng 5-13 nhưng được GỌI ở dòng 18, nên con trỏ sẽ nhảy lên/xuống — đó là cách đệ quy chạy.`,
-      en:
-        `Count DISTINCT island shapes. Two islands are the same if a translation (no rotation/reflection) matches them.\n` +
-        `For each island, DFS records cell coordinates RELATIVE to the start → a 'signature'.\n` +
-        `Add signature to a set. Answer = number of distinct signatures.\n\n` +
-        `Note: dfs() is defined at lines 5-13 but CALLED at line 18, so the pointer jumps up/down — that's how recursion runs.`,
+      vi: "DFS từng đảo → trừ tọa độ gốc → đưa shape chuẩn hoá vào set.",
+      en: "DFS each island → subtract its origin → add the normalized shape to a set.",
     },
   });
 
   // Line 3: m, n = len(grid), len(grid[0])
   pushStep({
-    title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
+    title: { vi: `m × n = ${rows} × ${cols}`, en: `m × n = ${rows} × ${cols}` },
     codeLines: [3],
     vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
-    note: { vi: `Kích thước lưới: m=${rows} hàng, n=${cols} cột.`, en: `Grid size: m=${rows} rows, n=${cols} cols.` },
+    note: { vi: `Grid ${rows} × ${cols}.`, en: `Grid ${rows} × ${cols}.` },
   });
 
   // Line 4: visited = set()
   pushStep({
-    title: { vi: "visited = set() (tập chữ ký)", en: "visited = set() (signature set)" },
+    title: { vi: "shapes = { }", en: "shapes = { }" },
     codeLines: [4],
     vars: [{ name: "visited", value: "{}" }],
-    note: { vi: `Tạo set rỗng để lưu các chữ ký hình dạng khác nhau.`, en: `Create an empty set to store distinct shape signatures.` },
+    note: { vi: "Set chỉ giữ các shape khác nhau.", en: "A set keeps unique shapes only." },
   });
 
   // Line 14: for i in range(m) — start scanning
   pushStep({
-    title: { vi: "Bắt đầu quét lưới (for i, for j)", en: "Start scanning grid (for i, for j)" },
+    title: { vi: "Quét grid", en: "Scan grid" },
     codeLines: [14],
     vars: [{ name: "scan", value: "0..m-1, 0..n-1" }],
-    note: { vi: `Duyệt từng ô. Gặp đất '1' chưa thăm thì bắt đầu một đảo mới.`, en: `Scan every cell. Unvisited land '1' starts a new island.` },
+    note: { vi: "Gặp 1 chưa thăm → đảo mới.", en: "Unvisited 1 → new island." },
   });
 
   for (let r = 0; r < rows; r++) {
@@ -11953,7 +11945,7 @@ function buildStepsDistinctIslands(input) {
 
       // Step: found new land (line 16)
       pushStep({
-        title: { vi: `Tìm thấy đất mới tại (${r},${c})`, en: `New land found at (${r},${c})` },
+        title: { vi: `Gốc = (${r},${c})`, en: `Origin = (${r},${c})` },
         current: [r, c],
         origin: [r0, c0],
         phase: "scan",
@@ -11964,15 +11956,15 @@ function buildStepsDistinctIslands(input) {
           { name: "island #", value: islandCount },
         ],
         note: {
-          vi: `Ô (${r},${c}) = '1' chưa thăm → bắt đầu đảo mới. Ô này là GỐC (0,0) của chữ ký.`,
-          en: `Cell (${r},${c}) = '1' unvisited → start a new island. This is the ORIGIN (0,0) of the signature.`,
+          vi: `Chọn (${r},${c}) làm gốc → (0,0).`,
+          en: `Use (${r},${c}) as origin → (0,0).`,
         },
       });
 
       // Step: shape = [] (line 17)
       const shape = [];
       pushStep({
-        title: { vi: "shape = [] (khởi tạo chữ ký)", en: "shape = [] (init signature)" },
+        title: { vi: "shape = []", en: "shape = []" },
         current: [r, c],
         origin: [r0, c0],
         phase: "dfs",
@@ -11980,8 +11972,8 @@ function buildStepsDistinctIslands(input) {
         codeLines: [17],
         vars: [{ name: "shape", value: "[]" }],
         note: {
-          vi: `Tạo danh sách rỗng để ghi tọa độ tương đối của các ô trong đảo.`,
-          en: `Create an empty list to record relative coordinates of the island's cells.`,
+          vi: "Bắt đầu một shape mới.",
+          en: "Start a new shape.",
         },
       });
 
@@ -11996,8 +11988,8 @@ function buildStepsDistinctIslands(input) {
         codeLines: [18],
         vars: [{ name: "origin", value: `(${r0}, ${c0})` }],
         note: {
-          vi: `Bắt đầu DFS để lan khắp đảo và ghi hình dạng.`,
-          en: `Start DFS to spread across the island and record its shape.`,
+          vi: "DFS tô trọn đảo.",
+          en: "DFS paints the whole island.",
         },
       });
 
@@ -12024,7 +12016,7 @@ function buildStepsDistinctIslands(input) {
 
         // Step: grid[r][c] = 0 — mark visited (line 8)
         pushStep({
-          title: { vi: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (đánh dấu)`, en: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (mark visited)` },
+          title: { vi: `(${cr},${cc}): 1 → 0`, en: `(${cr},${cc}): 1 → 0` },
           current: [cr, cc],
           buildingCells: buildingCells.slice(),
           origin: [r0, c0],
@@ -12038,8 +12030,8 @@ function buildStepsDistinctIslands(input) {
             { name: "grid[r][c]", value: "0 (đã thăm)" },
           ],
           note: {
-            vi: `Ô (${cr},${cc}) là đất → đánh dấu đã thăm bằng cách gán grid = 0 (tránh lặp).`,
-            en: `Cell (${cr},${cc}) is land → mark visited by setting grid = 0 (avoid revisiting).`,
+            vi: "Đổi 1 → 0 để không quay lại.",
+            en: "Change 1 → 0 to avoid revisits.",
           },
         });
 
@@ -12059,8 +12051,8 @@ function buildStepsDistinctIslands(input) {
             { name: "shape", value: `[${shape.map(([a, b]) => `(${a},${b})`).join(", ")}]` },
           ],
           note: {
-            vi: `Ghi tọa độ TƯƠNG ĐỐI so với gốc (${r0},${c0}): (${rel[0]},${rel[1]}). Đây là 1 phần của chữ ký.`,
-            en: `Record coord RELATIVE to origin (${r0},${c0}): (${rel[0]},${rel[1]}). Part of the signature.`,
+            vi: `(${cr},${cc}) − (${r0},${c0}) = (${rel[0]},${rel[1]}).`,
+            en: `(${cr},${cc}) − (${r0},${c0}) = (${rel[0]},${rel[1]}).`,
           },
         });
 
@@ -12084,8 +12076,8 @@ function buildStepsDistinctIslands(input) {
       // Step: visited.add(tuple(sorted(shape))) (line 19)
       pushStep({
         title: {
-          vi: isNew ? `Chữ ký MỚI → distinct = ${distinctCount}` : `Chữ ký TRÙNG (đã có) → không tăng`,
-          en: isNew ? `NEW signature → distinct = ${distinctCount}` : `DUPLICATE signature → no increment`,
+          vi: isNew ? `+ S${thisShapeId}` : `= S${thisShapeId}`,
+          en: isNew ? `+ S${thisShapeId}` : `= S${thisShapeId}`,
         },
         buildingCells: buildingCells.slice(),
         origin: [r0, c0],
@@ -12102,12 +12094,8 @@ function buildStepsDistinctIslands(input) {
           { name: "distinct count", value: distinctCount },
         ],
         note: {
-          vi: isNew
-            ? `Chữ ký {${sig}} chưa có trong visited → thêm vào. Số đảo khác hình = ${distinctCount}.`
-            : `Chữ ký {${sig}} đã tồn tại trong visited → đảo này TRÙNG hình với đảo trước. Không tăng.`,
-          en: isNew
-            ? `Signature {${sig}} not in visited → add it. Distinct islands = ${distinctCount}.`
-            : `Signature {${sig}} already in visited → this island is a DUPLICATE shape. No increment.`,
+          vi: isNew ? "Shape mới → thêm vào set." : `Trùng S${thisShapeId} → bỏ qua.`,
+          en: isNew ? "New shape → add it to the set." : `Matches S${thisShapeId} → skip.`,
         },
       });
     }
@@ -12115,7 +12103,7 @@ function buildStepsDistinctIslands(input) {
 
   // Final (line 20)
   pushStep({
-    title: { vi: `Kết quả: ${distinctCount} đảo khác hình`, en: `Result: ${distinctCount} distinct islands` },
+    title: { vi: `|shapes| = ${distinctCount}`, en: `|shapes| = ${distinctCount}` },
     phase: "done",
     event: "done",
     final: true,
@@ -12125,8 +12113,8 @@ function buildStepsDistinctIslands(input) {
       { name: "distinct shapes", value: distinctCount },
     ],
     note: {
-      vi: `Có ${islandCount} đảo, trong đó ${distinctCount} hình khác nhau (số trên mỗi đảo = id hình dạng; đảo cùng số = cùng hình).`,
-      en: `${islandCount} islands total, ${distinctCount} distinct shapes (number on each island = shape id; same number = same shape).`,
+      vi: `|shapes| = ${distinctCount}.`,
+      en: `|shapes| = ${distinctCount}.`,
     },
   });
 
@@ -19125,14 +19113,14 @@ module.exports = {
         "one can be translated (no rotation/reflection) to equal the other. Count the number of DISTINCT island shapes. " +
         "Enter rows separated by '|', compact or comma-separated.",
     },
-    defaultInput: "11000|11000|00011|00011",
+    defaultInput: "1100011|1100011|0000000|1100000|1000000",
     inputKind: "string",
     inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
     approach: [
-      { vi: "Duyệt từng ô. Gặp đất '1' chưa thăm → bắt đầu một đảo mới.", en: "Scan every cell. Unvisited land '1' → start a new island." },
-      { vi: "DFS lan khắp đảo, ghi tọa độ mỗi ô TƯƠNG ĐỐI so với ô gốc → chữ ký hình dạng.", en: "DFS across the island, record each cell RELATIVE to the origin → shape signature." },
-      { vi: "Bỏ chữ ký (dạng chuẩn hóa) vào một set.", en: "Add the (canonical) signature to a set." },
-      { vi: "Đáp án = số chữ ký khác nhau = kích thước set.", en: "Answer = number of distinct signatures = set size." },
+      { vi: "Gặp 1 chưa thăm → DFS một đảo.", en: "Unvisited 1 → DFS one island." },
+      { vi: "Chuẩn hoá: (r − r₀, c − c₀).", en: "Normalize: (r − r₀, c − c₀)." },
+      { vi: "Thêm shape vào set.", en: "Add the shape to a set." },
+      { vi: "Đáp án = |set|.", en: "Answer = |set|." },
     ],
     complexity: {
       time: "O(m·n)",
