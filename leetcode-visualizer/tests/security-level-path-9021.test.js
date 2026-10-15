@@ -40,9 +40,9 @@ test('9021 returns the minimum key and highlights a concrete minimum route', () 
   assert.deepEqual(final.pathEdges.map(index => final.edges[index][2]), [4, 6, 8, 8]);
   assert.equal(Math.max(...final.pathEdges.map(index => final.edges[index][2])), run.answer);
   assert.deepEqual(final.history, [
-    { level: 7, reachable: false },
-    { level: 9, reachable: true },
+    { level: 6, reachable: false },
     { level: 8, reachable: true },
+    { level: 7, reachable: false },
   ]);
 });
 
@@ -50,6 +50,7 @@ test('9021 handles direct paths, equal endpoints, disconnected graphs and noncon
   const cases = [
     { input: { n: 2, edges: [[0, 1, 42]], u: 0, v: 1 }, answer: 42 },
     { input: { n: 3, edges: [[0, 1, 9]], u: 2, v: 2 }, answer: 0 },
+    { input: { n: 3, edges: [], u: 0, v: 1 }, answer: -1 },
     { input: { n: 4, edges: [[0, 1, 2], [2, 3, 3]], u: 0, v: 3 }, answer: -1 },
     { input: { n: 4, edges: [[0, 1, 2], [1, 3, 50], [0, 2, 11], [2, 3, 12]], u: 0, v: 3 }, answer: 12 },
   ];
@@ -84,14 +85,13 @@ test('9021 trace only crosses open edges and binary search retains the answer', 
     const view = frame(step);
     assert.ok(step.codeLines.every(line => problem.code[line - 1]?.trim()), `invalid code line in ${view.phase}`);
     assert.ok(view.seen.every(node => node >= 0 && node < view.n));
-    if (step.codeLines[0] !== 16) assert.ok(view.queue.every(node => view.seen.includes(node)));
+    if (step.codeLines[0] !== 22) assert.ok(view.queue.every(node => view.seen.includes(node)));
     for (const edgeId of view.crossedEdges) assert.ok(view.edges[edgeId][2] <= view.limit);
     if (view.activeEdge !== null && view.phase === 'locked') assert.ok(view.edges[view.activeEdge][2] > view.limit);
     if (view.phase === 'cross') assert.ok(view.edges[view.activeEdge][2] <= view.limit);
     if (view.levels.length && view.phase === 'narrow') {
       assert.ok(view.left <= view.right);
-      const upper = view.right === view.levels.length ? Infinity : view.levels[view.right];
-      assert.ok(view.levels[view.left] <= run.answer && run.answer <= upper);
+      assert.ok(view.levels[view.left] <= run.answer && run.answer <= view.levels[view.right]);
     }
   }
 });
@@ -102,23 +102,24 @@ test('9021 debug trace advances one executable source line at a time', () => {
     assert.equal(step.codeLines.length, 1);
     return step.codeLines[0];
   }));
-  for (const line of [5, 6, 7, 8, 10, 13, 16, 17, 19, 20, 21, 24, 25, 26, 27, 28, 29, 30, 32, 34, 35, 36, 37, 39, 40, 42, 44, 47]) {
+  for (const line of [5, 8, 9, 11, 12, 13, 14, 16, 19, 22, 23, 25, 26, 28, 29, 31, 32, 33, 34, 36, 39, 43, 45, 46, 48, 49, 51, 53]) {
     assert.ok(lines.has(line), `default trace should execute line ${line}`);
   }
-  const discover = run.steps.findIndex(step => step.codeLines[0] === 29 && frame(step).current === 1);
+  const discover = run.steps.findIndex(step => step.codeLines[0] === 33 && frame(step).current === 1);
   assert.ok(discover >= 0);
   assert.ok(frame(run.steps[discover]).seen.includes(1));
   assert.ok(!frame(run.steps[discover]).queue.includes(1));
-  assert.equal(run.steps[discover + 1].codeLines[0], 30);
+  assert.equal(run.steps[discover + 1].codeLines[0], 34);
   assert.ok(frame(run.steps[discover + 1]).queue.includes(1));
-  assert.ok(problem.builder({ n: 3, edges: [[0, 1, 2]], u: 2, v: 2 }).steps.some(step => step.codeLines[0] === 11));
-  assert.ok(problem.builder({ n: 4, edges: [[0, 1, 2], [2, 3, 3]], u: 0, v: 3 }).steps.some(step => step.codeLines[0] === 45));
+  assert.ok(problem.builder({ n: 3, edges: [[0, 1, 2]], u: 2, v: 2 }).steps.some(step => step.codeLines[0] === 6));
+  assert.ok(problem.builder({ n: 3, edges: [], u: 0, v: 1 }).steps.some(step => step.codeLines[0] === 17));
+  assert.ok(problem.builder({ n: 4, edges: [[0, 1, 2], [2, 3, 3]], u: 0, v: 3 }).steps.some(step => step.codeLines[0] === 40));
 });
 
 test('9021 rejects malformed and ambiguous graph inputs', () => {
   const bad = [
     null, '{', {}, { n: 1, edges: [[0, 1, 2]], u: 0, v: 0 },
-    { n: 3, edges: [], u: 0, v: 1 }, { n: 3, edges: [[0, 0, 1]], u: 0, v: 1 },
+    { n: 3, edges: [[0, 0, 1]], u: 0, v: 1 },
     { n: 3, edges: [[0, 3, 1]], u: 0, v: 1 }, { n: 3, edges: [[0, 1, 0]], u: 0, v: 1 },
     { n: 3, edges: [[0, 1, 2], [1, 0, 3]], u: 0, v: 1 }, { n: 3, edges: [[0, 1]], u: 0, v: 1 },
     { n: 3, edges: [[0, 1, 2]], u: -1, v: 1 },
@@ -127,11 +128,66 @@ test('9021 rejects malformed and ambiguous graph inputs', () => {
 });
 
 test('9021 displayed Python and Edit & Run arguments agree with the visualizer', () => {
+  const requestedSnippet = `from collections import deque
+
+class Solution:
+    def minimumSecurityLevel(self, n, edges, u, v):
+        if u == v:
+            return 0
+
+        graph = [[] for _ in range(n)]
+        levels = set()
+
+        for a, b, security in edges:
+            graph[a].append((b, security))
+            graph[b].append((a, security))
+            levels.add(security)
+
+        if not levels:
+            return -1
+
+        levels = sorted(levels)
+
+        def can_reach(limit):
+            queue = deque([u])
+            visited = {u}
+
+            while queue:
+                node = queue.popleft()
+
+                if node == v:
+                    return True
+
+                for nei, weight in graph[node]:
+                    if weight <= limit and nei not in visited:
+                        visited.add(nei)
+                        queue.append(nei)
+
+            return False
+
+        # Check if any path exists
+        if not can_reach(levels[-1]):
+            return -1
+
+        # Binary Search: First True
+        left, right = 0, len(levels) - 1
+
+        while left < right:
+            mid = (left + right) // 2
+
+            if can_reach(levels[mid]):
+                right = mid
+            else:
+                left = mid + 1
+
+        return levels[left]`;
+  assert.equal(problem.code.join('\n'), requestedSnippet);
   const cases = [
     JSON.parse(problem.defaultInput),
     { n: 2, edges: [[0, 1, 42]], u: 0, v: 1 },
     { n: 4, edges: [[0, 1, 2], [2, 3, 3]], u: 0, v: 3 },
     { n: 3, edges: [[0, 1, 9]], u: 2, v: 2 },
+    { n: 3, edges: [], u: 0, v: 1 },
   ];
   const source = `${problem.code.join('\n')}\nimport json, sys\nfor case in json.load(sys.stdin):\n    actual = Solution().minimumSecurityLevel(case['n'], case['edges'], case['u'], case['v'])\n    assert actual == case['expected'], (actual, case['expected'])`;
   const execution = spawnSync('python3', ['-c', source], { encoding: 'utf8', input: JSON.stringify(cases.map(input => ({ ...input, expected: oracle(input) }))) });

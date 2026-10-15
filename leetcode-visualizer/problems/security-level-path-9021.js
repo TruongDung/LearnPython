@@ -7,47 +7,53 @@ const CODE_9021 = [
   "",
   "class Solution:",
   "    def minimumSecurityLevel(self, n, edges, u, v):",
-  "        graph = [[] for _ in range(n)]",
-  "        for a, b, security in edges:",
-  "            graph[a].append((b, security))",
-  "            graph[b].append((a, security))",
-  "",
   "        if u == v:",
   "            return 0",
   "",
-  "        levels = sorted({security for _, _, security in edges})",
+  "        graph = [[] for _ in range(n)]",
+  "        levels = set()",
+  "",
+  "        for a, b, security in edges:",
+  "            graph[a].append((b, security))",
+  "            graph[b].append((a, security))",
+  "            levels.add(security)",
+  "",
+  "        if not levels:",
+  "            return -1",
+  "",
+  "        levels = sorted(levels)",
   "",
   "        def can_reach(limit):",
   "            queue = deque([u])",
-  "            seen = {u}",
+  "            visited = {u}",
   "",
   "            while queue:",
   "                node = queue.popleft()",
+  "",
   "                if node == v:",
   "                    return True",
   "",
-  "                for neighbor, security in graph[node]:",
-  "                    if security > limit:",
-  "                        continue",
-  "                    if neighbor in seen:",
-  "                        continue",
-  "                    seen.add(neighbor)",
-  "                    queue.append(neighbor)",
+  "                for nei, weight in graph[node]:",
+  "                    if weight <= limit and nei not in visited:",
+  "                        visited.add(nei)",
+  "                        queue.append(nei)",
   "",
   "            return False",
   "",
-  "        left, right = 0, len(levels)",
+  "        # Check if any path exists",
+  "        if not can_reach(levels[-1]):",
+  "            return -1",
+  "",
+  "        # Binary Search: First True",
+  "        left, right = 0, len(levels) - 1",
+  "",
   "        while left < right:",
   "            mid = (left + right) // 2",
-  "            limit = levels[mid]",
   "",
-  "            if can_reach(limit):",
+  "            if can_reach(levels[mid]):",
   "                right = mid",
   "            else:",
   "                left = mid + 1",
-  "",
-  "        if left == len(levels):",
-  "            return -1",
   "",
   "        return levels[left]",
 ];
@@ -60,8 +66,8 @@ function parseInput9021(input) {
   if (!data || !Number.isInteger(data.n) || data.n < 2 || data.n > 9) {
     throw new Error("9021: n phải là số nguyên từ 2 đến 9.");
   }
-  if (!Array.isArray(data.edges) || data.edges.length < 1 || data.edges.length > 16) {
-    throw new Error("9021: edges phải có từ 1 đến 16 cạnh [a,b,security].");
+  if (!Array.isArray(data.edges) || data.edges.length > 16) {
+    throw new Error("9021: edges phải có từ 0 đến 16 cạnh [a,b,security].");
   }
   if (!Number.isInteger(data.u) || !Number.isInteger(data.v) || data.u < 0 || data.u >= data.n || data.v < 0 || data.v >= data.n) {
     throw new Error("9021: u và v phải là node hợp lệ.");
@@ -86,14 +92,15 @@ function parseInput9021(input) {
 function buildSteps9021(input) {
   const { n, edges, u, v } = parseInput9021(input);
   const graph = Array.from({ length: n }, () => []);
-  const levels = [...new Set(edges.map((edge) => edge[2]))].sort((a, b) => a - b);
+  const levelSet = new Set();
+  let levels = [];
   const steps = [];
   const history = [];
   const builtEdges = new Set();
   let left = null;
   let right = null;
 
-  function emit({ phase, line, limit = null, mid = null, queue = [], seen = [], current = null, activeEdge = null, checkedEdges = [], crossedEdges = [], pathNodes = [], pathEdges = [], reachable = null, final = false }) {
+  function emit({ phase, line, limit = null, mid = null, queue = [], visited = [], current = null, activeEdge = null, checkedEdges = [], crossedEdges = [], pathNodes = [], pathEdges = [], reachable = null, final = false }) {
     const phaseTitles = {
       build: bi("Dựng đồ thị", "Build the graph"),
       check: bi("Kiểm tra điều kiện", "Check the condition"),
@@ -118,10 +125,11 @@ function buildSteps9021(input) {
         { name: "S", value: limit ?? "—" },
         { name: "node", value: current ?? "—" },
         { name: "queue", value: queue.length ? queue.join(" → ") : "∅" },
+        { name: "visited", value: (visited.size ?? visited.length) ? `{${[...visited].join(", ")}}` : "∅" },
       ],
       securityPath9021View: {
         n, edges: edges.map((edge) => [...edge]), u, v, levels: [...levels],
-        phase, limit, left, right, mid, queue: [...queue], seen: [...seen], current,
+        phase, limit, left, right, mid, queue: [...queue], seen: [...visited], current,
         activeEdge, checkedEdges: [...checkedEdges], crossedEdges: [...crossedEdges],
         builtEdges: [...builtEdges],
         pathNodes: [...pathNodes], pathEdges: [...pathEdges], reachable,
@@ -132,19 +140,19 @@ function buildSteps9021(input) {
 
   function bfs(limit, trace) {
     const queue = [u];
-    const seen = new Set();
+    const visited = new Set();
     const parent = Array(n).fill(null);
     const parentEdge = Array(n).fill(null);
     const checkedEdges = new Set();
     const crossedEdges = new Set();
-    if (trace) emit({ phase: "visit", line: 16, limit, queue, seen });
-    seen.add(u);
-    if (trace) emit({ phase: "visit", line: 17, limit, queue, seen, current: u });
+    if (trace) emit({ phase: "visit", line: 22, limit, queue, visited });
+    visited.add(u);
+    if (trace) emit({ phase: "visit", line: 23, limit, queue, visited, current: u });
     while (queue.length) {
-      if (trace) emit({ phase: "check", line: 19, limit, queue, seen, checkedEdges, crossedEdges });
+      if (trace) emit({ phase: "check", line: 25, limit, queue, visited, checkedEdges, crossedEdges });
       const node = queue.shift();
-      if (trace) emit({ phase: "visit", line: 20, limit, queue, seen, current: node, checkedEdges, crossedEdges });
-      if (trace) emit({ phase: "check", line: 21, limit, queue, seen, current: node, checkedEdges, crossedEdges });
+      if (trace) emit({ phase: "visit", line: 26, limit, queue, visited, current: node, checkedEdges, crossedEdges });
+      if (trace) emit({ phase: "check", line: 28, limit, queue, visited, current: node, checkedEdges, crossedEdges });
       if (node === v) {
         const pathNodes = [];
         const pathEdges = [];
@@ -154,81 +162,86 @@ function buildSteps9021(input) {
         }
         pathNodes.reverse();
         pathEdges.reverse();
-        if (trace) emit({ phase: "found", line: 22, limit, queue, seen, current: node, checkedEdges, crossedEdges, pathNodes, pathEdges, reachable: true });
+        if (trace) emit({ phase: "found", line: 29, limit, queue, visited, current: node, checkedEdges, crossedEdges, pathNodes, pathEdges, reachable: true });
         return { reachable: true, pathNodes, pathEdges };
       }
       for (const neighbor of graph[node]) {
         checkedEdges.add(neighbor.edgeId);
-        const base = { limit, queue, seen, current: node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges };
-        if (trace) emit({ phase: "inspect", line: 24, ...base });
-        if (trace) emit({ phase: "inspect", line: 25, ...base });
-        if (neighbor.security > limit) {
-          if (trace) emit({ phase: "locked", line: 26, ...base });
-          continue;
-        }
-        if (trace) emit({ phase: "check", line: 27, ...base });
-        if (seen.has(neighbor.node)) {
-          if (trace) emit({ phase: "skip", line: 28, ...base });
-          continue;
-        }
-        seen.add(neighbor.node);
+        const base = { limit, queue, visited, current: node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges };
+        if (trace) emit({ phase: "inspect", line: 31, ...base });
+        const canCross = neighbor.security <= limit && !visited.has(neighbor.node);
+        if (trace) emit({ phase: neighbor.security > limit ? "locked" : visited.has(neighbor.node) ? "skip" : "inspect", line: 32, ...base });
+        if (!canCross) continue;
+        visited.add(neighbor.node);
         parent[neighbor.node] = node;
         parentEdge[neighbor.node] = neighbor.edgeId;
-        if (trace) emit({ phase: "cross", line: 29, limit, queue, seen, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
+        if (trace) emit({ phase: "cross", line: 33, limit, queue, visited, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
         crossedEdges.add(neighbor.edgeId);
         queue.push(neighbor.node);
-        if (trace) emit({ phase: "cross", line: 30, limit, queue, seen, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
+        if (trace) emit({ phase: "cross", line: 34, limit, queue, visited, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
       }
     }
-    if (trace) emit({ phase: "check", line: 19, limit, queue, seen, checkedEdges, crossedEdges });
-    if (trace) emit({ phase: "miss", line: 32, limit, queue, seen, checkedEdges, crossedEdges, reachable: false });
+    if (trace) emit({ phase: "check", line: 25, limit, queue, visited, checkedEdges, crossedEdges });
+    if (trace) emit({ phase: "miss", line: 36, limit, queue, visited, checkedEdges, crossedEdges, reachable: false });
     return { reachable: false, pathNodes: [], pathEdges: [] };
   }
 
-  emit({ phase: "build", line: 5 });
-  edges.forEach(([a, b, security], edgeId) => {
-    emit({ phase: "build", line: 6, current: a, activeEdge: edgeId });
-    graph[a].push({ node: b, security, edgeId });
-    emit({ phase: "build", line: 7, current: a, activeEdge: edgeId });
-    graph[b].push({ node: a, security, edgeId });
-    builtEdges.add(edgeId);
-    emit({ phase: "build", line: 8, current: b, activeEdge: edgeId });
-  });
-  emit({ phase: "check", line: 10, seen: [u], current: u });
+  emit({ phase: "check", line: 5, visited: [u], current: u });
   if (u === v) {
-    emit({ phase: "done", line: 11, limit: 0, seen: [u], pathNodes: [u], reachable: true, final: true });
+    emit({ phase: "done", line: 6, limit: 0, visited: [u], pathNodes: [u], reachable: true, final: true });
     return { original: { n, edges, u, v }, answer: 0, steps };
   }
-  emit({ phase: "ready", line: 13 });
+  emit({ phase: "build", line: 8 });
+  emit({ phase: "build", line: 9 });
+  edges.forEach(([a, b, security], edgeId) => {
+    emit({ phase: "build", line: 11, current: a, activeEdge: edgeId });
+    graph[a].push({ node: b, security, edgeId });
+    emit({ phase: "build", line: 12, current: a, activeEdge: edgeId });
+    graph[b].push({ node: a, security, edgeId });
+    emit({ phase: "build", line: 13, current: b, activeEdge: edgeId });
+    levelSet.add(security);
+    builtEdges.add(edgeId);
+    emit({ phase: "build", line: 14, current: b, activeEdge: edgeId });
+  });
+  emit({ phase: "check", line: 16 });
+  if (!levelSet.size) {
+    emit({ phase: "done", line: 17, reachable: false, final: true });
+    return { original: { n, edges, u, v }, answer: -1, steps };
+  }
+  levels = [...levelSet].sort((a, b) => a - b);
+  emit({ phase: "ready", line: 19 });
+
+  const largestLevel = levels.at(-1);
+  emit({ phase: "check", line: 39, limit: largestLevel });
+  const pathExists = bfs(largestLevel, true);
+  if (!pathExists.reachable) {
+    emit({ phase: "done", line: 40, limit: largestLevel, reachable: false, final: true });
+    return { original: { n, edges, u, v }, answer: -1, steps };
+  }
+
   left = 0;
-  right = levels.length;
-  emit({ phase: "ready", line: 34 });
+  right = levels.length - 1;
+  emit({ phase: "ready", line: 43 });
   while (left < right) {
-    emit({ phase: "check", line: 35 });
+    emit({ phase: "check", line: 45 });
     const mid = Math.floor((left + right) / 2);
-    emit({ phase: "pick", line: 36, mid });
+    emit({ phase: "pick", line: 46, mid });
     const limit = levels[mid];
-    emit({ phase: "pick", line: 37, limit, mid });
-    emit({ phase: "check", line: 39, limit, mid });
+    emit({ phase: "check", line: 48, limit, mid });
     const result = bfs(limit, true);
     history.push({ level: limit, reachable: result.reachable });
     if (result.reachable) {
       right = mid;
-      emit({ phase: "narrow", line: 40, limit, mid, pathNodes: result.pathNodes, pathEdges: result.pathEdges, reachable: true });
+      emit({ phase: "narrow", line: 49, limit, mid, pathNodes: result.pathNodes, pathEdges: result.pathEdges, reachable: true });
     } else {
       left = mid + 1;
-      emit({ phase: "narrow", line: 42, limit, mid, reachable: false });
+      emit({ phase: "narrow", line: 51, limit, mid, reachable: false });
     }
   }
-  emit({ phase: "check", line: 35 });
-  emit({ phase: "check", line: 44, reachable: left < levels.length });
-  if (left === levels.length) {
-    emit({ phase: "done", line: 45, limit: levels.at(-1) ?? null, reachable: false, final: true });
-    return { original: { n, edges, u, v }, answer: -1, steps };
-  }
+  emit({ phase: "check", line: 45 });
   const answer = levels[left];
   const finalRoute = bfs(answer, false);
-  emit({ phase: "done", line: 47, limit: answer, mid: left, seen: finalRoute.pathNodes, pathNodes: finalRoute.pathNodes, pathEdges: finalRoute.pathEdges, reachable: true, final: true });
+  emit({ phase: "done", line: 53, limit: answer, mid: left, visited: finalRoute.pathNodes, pathNodes: finalRoute.pathNodes, pathEdges: finalRoute.pathEdges, reachable: true, final: true });
   return { original: { n, edges, u, v }, answer, steps };
 }
 

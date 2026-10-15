@@ -105,7 +105,7 @@ class SecurityPath9021Visualizer {
     return `<div class="sp9021-levels" aria-label="${this.t("Các mức chìa khóa", "Key levels")}">${view.levels.map((level, index) => {
       const state = result.has(level) ? (result.get(level) ? "yes" : "no") : "";
       const active = level === view.limit ? " active" : "";
-      const inRange = Number.isInteger(view.left) && Number.isInteger(view.right) && index >= view.left && index < view.right ? " in-range" : "";
+      const inRange = Number.isInteger(view.left) && Number.isInteger(view.right) && index >= view.left && index <= view.right ? " in-range" : "";
       return `<span class="${state}${active}${inRange}" aria-label="${this.escape(`S ${level}${state === "yes" ? ": reachable" : state === "no" ? ": blocked" : ""}`)}"><i>${state === "yes" ? "✓" : state === "no" ? "×" : ""}</i><b>${level}</b></span>`;
     }).join("")}</div>`;
   }
