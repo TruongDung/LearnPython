@@ -4617,75 +4617,56 @@ function renderReplaceGreatestView(step) {
   const view = step.replaceGreatestView || {};
   const original = Array.isArray(view.original) ? view.original : [];
   const arr = Array.isArray(view.arr) ? view.arr : [];
-  const vi = lang === "vi";
   const phase = String(view.phase || "length");
-  const phaseIndex = phase === "done" ? 3
-    : phase === "update" ? 2
-      : phase === "write" ? 1 : 0;
-  const labels = vi
-    ? ["Đọc từ phải", "Ghi maximum cũ", "Cập nhật maximum", "Kết quả"]
-    : ["Read from right", "Write old maximum", "Update maximum", "Result"];
-  const phases = labels.map((label, index) => {
-    const done = phase === "done" || index < phaseIndex;
-    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
-  }).join("");
   const current = Number.isInteger(view.currentI) ? view.currentI : null;
   const processedFrom = Number.isInteger(view.processedFrom) ? view.processedFrom : original.length;
   const maxSource = Number.isInteger(view.rightMaxSource) ? view.rightMaxSource : null;
   const writeSource = Number.isInteger(view.writeSource) ? view.writeSource : null;
+  const isDone = phase === "done";
+  const readDone = ["read", "write", "update", "done"].includes(phase);
+  const writeDone = ["write", "update", "done"].includes(phase);
+  const updateDone = ["update", "done"].includes(phase);
   const sourceCells = original.map((value, index) => {
     const classes = ["rg1299-cell"];
-    if (index >= processedFrom || phase === "done") classes.push("scanned");
+    if (index >= processedFrom || isDone) classes.push("scanned");
     if (index === current) classes.push("current");
     if (index === maxSource) classes.push("max-source");
     if (index === writeSource) classes.push("write-source");
-    const markers = [];
-    if (index === current) markers.push("i");
-    if (index === maxSource) markers.push("MAX");
-    if (index === writeSource && index !== maxSource) markers.push("WRITE");
-    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${markers.join(" · ")}</em></span>`;
+    const badge = index === current ? "i" : index === maxSource ? "★" : index === writeSource ? "↳" : "";
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(String(value))}</strong><em>${badge}</em></span>`;
   }).join("");
   const outputCells = arr.map((value, index) => {
-    const written = index >= processedFrom || phase === "done";
+    const written = index >= processedFrom || isDone;
     const classes = ["rg1299-cell", "output"];
     if (written) classes.push("written");
     if (index === current && written) classes.push("current-write");
-    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${written ? escapeHtml(String(value)) : "?"}</strong><em>${written ? (index === current ? "JUST WRITTEN" : "DONE") : "WAIT"}</em></span>`;
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${written ? escapeHtml(String(value)) : "·"}</strong><em>${index === current && written ? "↓" : written ? "✓" : ""}</em></span>`;
   }).join("");
   const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
   const curText = view.cur === null || view.cur === undefined ? "?" : String(view.cur);
   const oldMax = view.previousRightMax === null || view.previousRightMax === undefined ? -1 : view.previousRightMax;
   const writeText = view.writeValue === null || view.writeValue === undefined ? "?" : String(view.writeValue);
-  const flow = [
-    { key: "read", label: "SAVE ORIGINAL", code: `cur = ${curText}` },
-    { key: "write", label: "WRITE ANSWER", code: `arr[i] = ${writeText}` },
-    { key: "update", label: "PREPARE NEXT i", code: `right_max = max(${oldMax}, ${curText}) = ${view.rightMax}` },
-  ].map((item, index) => `<div class="rg1299-flow-step${phase === item.key ? " active" : ""}${["write", "update", "done"].includes(phase) && index === 0 ? " done" : ""}${["update", "done"].includes(phase) && index === 1 ? " done" : ""}${phase === "done" && index === 2 ? " done" : ""}"><small>${item.label}</small><code>${escapeHtml(item.code)}</code></div>${index < 2 ? "<i>→</i>" : ""}`).join("");
-  let statusLabel = vi ? "QUÉT TỪ PHẢI SANG TRÁI" : "SCAN RIGHT TO LEFT";
-  let statusDetail = vi ? "right_max chỉ chứa các giá trị hoàn toàn bên phải i." : "right_max contains only values strictly to the right of i.";
-  let statusClass = "scan";
-  if (phase === "write") {
-    statusLabel = vi ? "GHI TRƯỚC" : "WRITE FIRST";
-    statusDetail = vi ? `arr[${current}] nhận maximum cũ ${writeText}; chưa được dùng cur=${curText}.` : `arr[${current}] receives old maximum ${writeText}; cur=${curText} is not included yet.`;
-    statusClass = "write";
-  } else if (phase === "update") {
-    statusLabel = view.maxUpdated ? (vi ? "MAXIMUM MỚI" : "NEW MAXIMUM") : (vi ? "GIỮ MAXIMUM" : "KEEP MAXIMUM");
-    statusDetail = view.maxUpdated ? (vi ? `${curText} trở thành right_max cho index tiếp theo bên trái.` : `${curText} becomes right_max for the next index to the left.`) : (vi ? `${curText} không vượt ${oldMax}; right_max không đổi.` : `${curText} does not exceed ${oldMax}; right_max stays unchanged.`);
-    statusClass = view.maxUpdated ? "new-max" : "keep-max";
-  } else if (phase === "done") {
-    statusLabel = vi ? "HOÀN TẤT" : "DONE";
-    statusDetail = vi ? "Tất cả vị trí đã nhận maximum ở bên phải." : "Every position now stores the maximum to its right.";
-    statusClass = "done";
-  }
-
+  const nextMax = view.rightMax === null || view.rightMax === undefined ? -1 : view.rightMax;
+  const candidateMax = view.cur === null || view.cur === undefined
+    ? nextMax
+    : Math.max(Number(oldMax), Number(view.cur));
+  const machine = [
+    `<div class="rg1299-card pick${phase === "read" ? " active" : readDone ? " done" : ""}"><i>✋</i><small>cur</small><strong>${escapeHtml(curText)}</strong></div>`,
+    `<b class="rg1299-arrow">→</b>`,
+    `<div class="rg1299-card drop${phase === "write" ? " active" : writeDone ? " done" : ""}"><i>↓</i><small>arr[i]</small><strong>${escapeHtml(writeText)}</strong></div>`,
+    `<b class="rg1299-arrow">→</b>`,
+    `<div class="rg1299-card carry${phase === "update" ? " active" : updateDone ? " done" : ""}"><i>🏆</i><small>MAX</small><strong>${escapeHtml(String(nextMax))}</strong></div>`,
+  ].join("");
+  const scanPointer = current === null ? "←" : `i = ${current}　←`;
   $("treeView").innerHTML = `<div class="rg1299-viz phase-${escapeHtml(phase)}">
-    <div class="rg1299-phases">${phases}</div>
-    <div class="rg1299-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
-    <section class="rg1299-row"><header><strong>ORIGINAL · READ ONLY</strong><span>${vi ? "xanh = đã quét · MAX = nguồn maximum hiện tại" : "blue = scanned · MAX = current maximum source"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${sourceCells}</div></div></section>
-    <div class="rg1299-flow">${flow}</div>
-    <div class="rg1299-status ${statusClass}"><small>${escapeHtml(statusLabel)}</small><strong>${escapeHtml(statusDetail)}</strong></div>
-    <section class="rg1299-row"><header><strong>OUTPUT · arr</strong><span>${vi ? "? = chưa xử lý · lục = đã ghi đáp án" : "? = waiting · green = answer written"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${outputCells}</div></div></section>
-    <div class="rg1299-metrics"><span><small>OLD RIGHT_MAX</small><strong>${escapeHtml(String(oldMax))}</strong></span><span><small>CUR</small><strong>${escapeHtml(curText)}</strong></span><span class="max"><small>NEW RIGHT_MAX</small><strong>${escapeHtml(String(view.rightMax))}</strong></span></div>
+    <div class="rg1299-top"><span class="rg1299-direction">${escapeHtml(scanPointer)}</span><code>MAX = max(arr[i+1…n−1])</code><b>L${activeLine ?? "—"}</b></div>
+    <div class="rg1299-stage">
+      <div class="rg1299-lane source"><label>arr</label><div class="rg1299-scroll"><div class="rg1299-cells">${sourceCells}</div></div></div>
+      <div class="rg1299-machine">${machine}</div>
+      <div class="rg1299-lane result"><label>out</label><div class="rg1299-scroll"><div class="rg1299-cells">${outputCells}</div></div></div>
+    </div>
+    <div class="rg1299-equation${phase === "update" ? " active" : ""}"><b>max(</b><span class="old">${escapeHtml(String(oldMax))}</span><b>,</b><span class="cur">${escapeHtml(curText)}</span><b>)</b><i>→</i><strong>${escapeHtml(String(candidateMax))}</strong></div>
+    ${isDone ? `<div class="rg1299-finish"><i>✓</i><code>[${arr.map(value => escapeHtml(String(value))).join(", ")}]</code></div>` : ""}
   </div>`;
 }
 
