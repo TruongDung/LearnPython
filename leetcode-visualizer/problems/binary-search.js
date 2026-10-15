@@ -1750,44 +1750,41 @@ function fmt(v) {
  * Binary search on the ANSWER: the answer (the minimized largest sum) lies
  * somewhere in [max(nums), sum(nums)]. For a candidate `mid`, greedily count
  * how many groups are needed if no group's sum may exceed `mid`:
- *   - if that count <= k, mid is FEASIBLE (maybe can go smaller) → right = mid
- *   - if that count > k, mid is TOO SMALL (needs more groups than allowed) → left = mid + 1
+ *   - if that count <= k, max_sum is feasible → upper_bound = max_sum
+ *   - otherwise, max_sum is too small → lower_bound = max_sum + 1
  * The smallest feasible mid is the answer.
  */
 const SPLIT_ARRAY_410_MAX_LENGTH = 16;
 const SPLIT_ARRAY_410_MAX_VALUE = 1_000_000;
 const SPLIT_ARRAY_410_SOURCE = Object.freeze([
   "class Solution:",
-  "    def splitArray(self, nums, k):",
-  "        left, right = max(nums), sum(nums)",
-  "        while left < right:",
-  "            mid = (left + right) // 2",
-  "            groups = self.count_groups(nums, mid)",
-  "            if groups <= k:",
-  "                right = mid",
+  "    def splitArray(self, nums: list[int], k: int) -> int:",
+  "        \"\"\"Returns the minimum possible largest subarray sum.\"\"\"",
+  "        lower_bound = max(nums)",
+  "        upper_bound = sum(nums)",
+  "",
+  "        while lower_bound < upper_bound:",
+  "            max_sum = lower_bound + (upper_bound - lower_bound) // 2",
+  "            required_groups = self._count_groups(nums, max_sum)",
+  "            if required_groups <= k:",
+  "                upper_bound = max_sum",
   "            else:",
-  "                left = mid + 1",
-  "        cuts = self.build_cuts(nums, k, left)",
-  "        return left",
-  "    def count_groups(self, nums, limit):",
-  "        groups, running = 1, 0",
-  "        for num in nums:",
-  "            if running + num > limit:",
-  "                groups += 1",
-  "                running = 0",
-  "            running += num",
-  "        return groups",
-  "    def build_cuts(self, nums, k, limit):",
-  "        cuts = []",
-  "        groups_left, suffix_sum = k, 0",
-  "        for i in range(len(nums) - 1, -1, -1):",
-  "            must_cut = suffix_sum + nums[i] > limit or i + 1 < groups_left",
-  "            if must_cut:",
-  "                cuts.append(i + 1)",
-  "                groups_left -= 1",
-  "                suffix_sum = 0",
-  "            suffix_sum += nums[i]",
-  "        return sorted(cuts)",
+  "                lower_bound = max_sum + 1",
+  "",
+  "        return lower_bound",
+  "",
+  "    def _count_groups(self, nums: list[int], max_sum: int) -> int:",
+  "        \"\"\"Returns the minimum groups needed under max_sum.\"\"\"",
+  "        group_count = 1",
+  "        current_sum = 0",
+  "",
+  "        for value in nums:",
+  "            if current_sum + value > max_sum:",
+  "                group_count += 1",
+  "                current_sum = 0",
+  "            current_sum += value",
+  "",
+  "        return group_count",
 ]);
 
 function parseSplitArray410Input(input) {
@@ -2082,7 +2079,7 @@ function buildSteps410(input, params) {
     event: "bind-class",
     phase: "setup",
     title: localized("Bind Solution class", "Liên kết lớp Solution"),
-    note: localized("Create the class namespace that owns the answer and both traceable helpers.", "Tạo namespace lớp chứa hàm giải và hai helper có thể theo dõi."),
+    note: localized("Create the class namespace for the answer method and its helper.", "Tạo namespace lớp cho hàm giải và helper của nó."),
   });
   emit({
     line: 2,
@@ -2092,32 +2089,35 @@ function buildSteps410(input, params) {
     note: localized("The method must return the minimum possible largest sum for exactly k nonempty contiguous groups.", "Phương thức phải trả về tổng nhóm lớn nhất nhỏ nhất khi chia đúng k nhóm liên tiếp không rỗng."),
   });
   emit({
-    line: 13,
+    line: 17,
     event: "bind-count-method",
     phase: "setup",
     title: localized("Bind the greedy feasibility helper", "Liên kết helper kiểm tra tham lam"),
-    note: localized("count_groups computes the fewest groups needed under one candidate limit.", "count_groups tính số nhóm ít nhất cần dùng dưới một giới hạn ứng viên."),
-  });
-  emit({
-    line: 21,
-    event: "bind-cuts-method",
-    phase: "setup",
-    title: localized("Bind deterministic witness reconstruction", "Liên kết tái dựng witness xác định"),
-    note: localized("build_cuts will turn the final capacity into exactly k contiguous groups.", "build_cuts sẽ biến capacity cuối thành đúng k nhóm liên tiếp."),
+    note: localized("_count_groups computes the fewest groups needed under one candidate limit.", "_count_groups tính số nhóm ít nhất cần dùng dưới một giới hạn ứng viên."),
   });
 
   search.left = minimum;
+  emit({
+    line: 4,
+    event: "initialize-lower-bound",
+    phase: "search",
+    title: localized(`lower_bound = ${minimum}`, `lower_bound = ${minimum}`),
+    note: localized(
+      `No valid capacity can be below max(nums)=${minimum}.`,
+      `Không capacity hợp lệ nào có thể nhỏ hơn max(nums)=${minimum}.`,
+    ),
+  });
   search.right = maximum;
   search.initialized = true;
   search.outcome = "bounded";
   emit({
-    line: 3,
-    event: "initialize-bounds",
+    line: 5,
+    event: "initialize-upper-bound",
     phase: "search",
-    title: localized(`Search interval = [${minimum}, ${maximum}]`, `Khoảng tìm kiếm = [${minimum}, ${maximum}]`),
+    title: localized(`upper_bound = ${maximum}`, `upper_bound = ${maximum}`),
     note: localized(
-      `No group limit can be below max(nums)=${minimum}; sum(nums)=${maximum} is feasible as one group.`,
-      `Giới hạn không thể nhỏ hơn max(nums)=${minimum}; sum(nums)=${maximum} khả thi với một nhóm.`,
+      `sum(nums)=${maximum} is always feasible as one group.`,
+      `sum(nums)=${maximum} luôn khả thi khi gom thành một nhóm.`,
     ),
   });
 
@@ -2127,19 +2127,19 @@ function buildSteps410(input, params) {
     scan.active = true;
     scan.call = counters.feasibilityCalls;
     emit({
-      line: 6,
+      line: 9,
       event: "count-call",
       phase: "count",
       timing: "before",
-      title: localized(`Call count_groups at limit ${limit}`, `Gọi count_groups với giới hạn ${limit}`),
+      title: localized(`Call _count_groups at max_sum ${limit}`, `Gọi _count_groups với max_sum ${limit}`),
       note: localized("The assignment to groups waits until the helper returns.", "Phép gán cho groups chờ đến khi helper trả về."),
     });
     emit({
-      line: 13,
+      line: 17,
       event: "count-entry",
       phase: "count",
       timing: "before",
-      title: localized(`Enter count_groups(nums, ${limit})`, `Vào count_groups(nums, ${limit})`),
+      title: localized(`Enter _count_groups(nums, ${limit})`, `Vào _count_groups(nums, ${limit})`),
       note: localized("This call greedily packs every value from left to right.", "Lần gọi này xếp tham lam mọi giá trị từ trái sang phải."),
     });
 
@@ -2147,16 +2147,27 @@ function buildSteps410(input, params) {
     let running = 0;
     scan.groups = groups;
     scan.currentGroup = 0;
+    scan.running = null;
+    scan.runningBefore = null;
+    scan.runningAfter = null;
+    scan.groupSums = [];
+    emit({
+      line: 19,
+      event: "count-initialize",
+      phase: "count",
+      title: localized("Start with one group", "Bắt đầu với một nhóm"),
+      note: localized("At least one nonempty group is required.", "Cần ít nhất một nhóm không rỗng."),
+    });
     scan.running = running;
     scan.runningBefore = 0;
     scan.runningAfter = 0;
     scan.groupSums = [0];
     emit({
-      line: 14,
-      event: "count-initialize",
+      line: 20,
+      event: "sum-initialize",
       phase: "count",
-      title: localized("Start with group 1 and running sum 0", "Bắt đầu với nhóm 1 và tổng chạy 0"),
-      note: localized("At least one nonempty group is required; no number has been consumed yet.", "Cần ít nhất một nhóm không rỗng; chưa tiêu thụ số nào."),
+      title: localized("Start with current_sum = 0", "Bắt đầu với current_sum = 0"),
+      note: localized("No number has been consumed yet.", "Chưa duyệt phần tử nào."),
     });
 
     for (let index = 0; index < n; index++) {
@@ -2170,7 +2181,7 @@ function buildSteps410(input, params) {
       scan.overflow = null;
       scan.cut = blankCut();
       emit({
-        line: 15,
+        line: 22,
         event: "count-loop",
         phase: "count",
         timing: "before",
@@ -2190,7 +2201,7 @@ function buildSteps410(input, params) {
         reason: overflow ? "capacity" : "fits",
       };
       emit({
-        line: 16,
+        line: 23,
         event: overflow ? "overflow-true" : "overflow-false",
         phase: "count",
         condition: { expression: `${running} + ${num} > ${limit}`, result: overflow },
@@ -2211,7 +2222,7 @@ function buildSteps410(input, params) {
         scan.groupSums.push(0);
         scan.cut.status = "opened";
         emit({
-          line: 17,
+          line: 24,
           event: "open-greedy-group",
           phase: "count",
           title: localized(`Increase groups to ${groups}`, `Tăng groups lên ${groups}`),
@@ -2223,7 +2234,7 @@ function buildSteps410(input, params) {
         scan.runningAfter = 0;
         scan.cut.status = "reset";
         emit({
-          line: 18,
+          line: 25,
           event: "reset-running",
           phase: "count",
           title: localized("Reset running sum to 0", "Đặt lại tổng chạy về 0"),
@@ -2244,7 +2255,7 @@ function buildSteps410(input, params) {
       scan.runningAfter = running;
       scan.cut.status = overflow ? "placed-after-cut" : "placed";
       emit({
-        line: 19,
+        line: 26,
         event: "add-running",
         phase: "count",
         title: localized(`G${groups - 1}: ${addBefore} + ${num} = ${running}`, `G${groups - 1}: ${addBefore} + ${num} = ${running}`),
@@ -2256,7 +2267,7 @@ function buildSteps410(input, params) {
     scan.num = null;
     scan.complete = true;
     emit({
-      line: 15,
+      line: 22,
       event: "count-loop-complete",
       phase: "count",
       timing: "before",
@@ -2268,7 +2279,7 @@ function buildSteps410(input, params) {
     scan.active = false;
     scan.returnedGroups = groups;
     emit({
-      line: 20,
+      line: 28,
       event: "count-return",
       phase: "count",
       title: localized(`Return ${groups} groups`, `Trả về ${groups} nhóm`),
@@ -2282,7 +2293,7 @@ function buildSteps410(input, params) {
     search.iteration = counters.searchIterations;
     search.outcome = "searching";
     emit({
-      line: 4,
+      line: 7,
       event: "while-true",
       phase: "search",
       timing: "before",
@@ -2298,20 +2309,20 @@ function buildSteps410(input, params) {
     search.feasible = null;
     search.outcome = "testing";
     emit({
-      line: 5,
+      line: 8,
       event: "choose-mid",
       phase: "search",
-      title: localized(`mid = (${search.left} + ${search.right}) // 2 = ${search.mid}`, `mid = (${search.left} + ${search.right}) // 2 = ${search.mid}`),
-      note: localized("Use the lower midpoint so either boundary update strictly shrinks the interval.", "Dùng midpoint dưới để mỗi cập nhật biên đều thu hẹp khoảng nghiêm ngặt."),
+      title: localized(`max_sum = ${search.mid}`, `max_sum = ${search.mid}`),
+      note: localized("The overflow-safe midpoint keeps the search interval shrinking.", "Midpoint chống tràn giúp khoảng tìm kiếm luôn thu hẹp."),
     });
 
     const result = traceCountGroups(search.mid);
     search.groups = result.groups;
     emit({
-      line: 6,
+      line: 9,
       event: "count-assignment",
       phase: "search",
-      title: localized(`groups = ${result.groups}`, `groups = ${result.groups}`),
+      title: localized(`required_groups = ${result.groups}`, `required_groups = ${result.groups}`),
       note: localized(`Under limit ${search.mid}, the greedy partition needs ${result.groups} groups.`, `Với giới hạn ${search.mid}, partition tham lam cần ${result.groups} nhóm.`),
     });
 
@@ -2327,7 +2338,7 @@ function buildSteps410(input, params) {
       search.lastInfeasible = { limit: search.mid, groups: result.groups, reason: "too-many-groups" };
     }
     emit({
-      line: 7,
+      line: 10,
       event: feasible ? "feasible-mid" : "infeasible-mid",
       phase: "search",
       condition: { expression: `${result.groups} <= ${k}`, result: feasible },
@@ -2345,15 +2356,15 @@ function buildSteps410(input, params) {
       search.outcome = "move-right";
       counters.upperUpdates++;
       emit({
-        line: 8,
+        line: 11,
         event: "move-right",
         phase: "search",
-        title: localized(`right = ${search.mid}`, `right = ${search.mid}`),
+        title: localized(`upper_bound = ${search.mid}`, `upper_bound = ${search.mid}`),
         note: localized(`Keep feasible ${search.mid} and search the tighter interval [${search.left}, ${search.right}].`, `Giữ ${search.mid} khả thi và tìm trong khoảng chặt hơn [${search.left}, ${search.right}].`),
       });
     } else {
       emit({
-        line: 9,
+        line: 12,
         event: "else-branch",
         phase: "search",
         timing: "before",
@@ -2364,10 +2375,10 @@ function buildSteps410(input, params) {
       search.outcome = "move-left";
       counters.lowerUpdates++;
       emit({
-        line: 10,
+        line: 13,
         event: "move-left",
         phase: "search",
-        title: localized(`left = ${search.mid} + 1 = ${search.left}`, `left = ${search.mid} + 1 = ${search.left}`),
+        title: localized(`lower_bound = ${search.mid} + 1 = ${search.left}`, `lower_bound = ${search.mid} + 1 = ${search.left}`),
         note: localized(`Discard all capacities through ${search.mid}; continue in [${search.left}, ${search.right}].`, `Loại mọi capacity đến ${search.mid}; tiếp tục trong [${search.left}, ${search.right}].`),
       });
     }
@@ -2375,193 +2386,35 @@ function buildSteps410(input, params) {
 
   search.outcome = "converged";
   emit({
-    line: 4,
+    line: 7,
     event: "while-false",
     phase: "search",
     timing: "before",
     condition: { expression: `${search.left} < ${search.right}`, result: false },
     title: localized(`Bounds meet at ${search.left}`, `Hai biên gặp nhau tại ${search.left}`),
-    note: localized("The loop stops at the smallest feasible capacity; now reconstruct exactly k groups.", "Vòng lặp dừng tại capacity khả thi nhỏ nhất; giờ tái dựng đúng k nhóm."),
+    note: localized("The loop stops at the smallest feasible capacity.", "Vòng lặp dừng tại capacity khả thi nhỏ nhất."),
   });
 
-  witness.active = true;
+  // Build one exact-k partition for the picture only. This is deliberately
+  // outside SPLIT_ARRAY_410_SOURCE: the interview solution returns only the
+  // optimal value and does not carry visualization-only reconstruction code.
   witness.limit = search.left;
-  emit({
-    line: 11,
-    event: "cuts-call",
-    phase: "reconstruct",
-    timing: "before",
-    title: localized(`Call build_cuts at capacity ${search.left}`, `Gọi build_cuts với capacity ${search.left}`),
-    note: localized("The cuts variable is assigned only after the helper returns its sorted boundaries.", "Biến cuts chỉ được gán sau khi helper trả về các biên đã sắp xếp."),
-  });
-  witness.entered = true;
-  emit({
-    line: 21,
-    event: "cuts-entry",
-    phase: "reconstruct",
-    timing: "before",
-    title: localized("Enter build_cuts", "Vào build_cuts"),
-    note: localized("Scan right-to-left so capacity cuts and exact-group cuts are deterministic.", "Quét phải sang trái để cắt theo capacity và số nhóm một cách xác định."),
-  });
-
-  witness.rawCuts = [];
-  witness.cuts = [];
   witness.initialized = true;
-  emit({
-    line: 22,
-    event: "cuts-initialize",
-    phase: "reconstruct",
-    title: localized("Initialize cuts = []", "Khởi tạo cuts = []"),
-    note: localized("Each stored index will become the start of a group to its right.", "Mỗi index lưu lại sẽ là đầu của một nhóm ở bên phải."),
-  });
-
   witness.groupsLeft = k;
   witness.suffixSum = 0;
-  witness.suffixBefore = 0;
-  witness.suffixAfter = 0;
-  emit({
-    line: 23,
-    event: "witness-state-initialize",
-    phase: "reconstruct",
-    title: localized(`groups_left = ${k}, suffix_sum = 0`, `groups_left = ${k}, suffix_sum = 0`),
-    note: localized("groups_left counts the nonempty groups still required in the unprocessed prefix plus current suffix.", "groups_left đếm số nhóm không rỗng còn cần trong prefix chưa xử lý cộng suffix hiện tại."),
-  });
-
+  witness.rawCuts = [];
   for (let index = n - 1; index >= 0; index--) {
     const num = nums[index];
-    counters.reconstructionVisits++;
-    witness.index = index;
-    witness.num = num;
-    witness.visited = counters.reconstructionVisits;
-    witness.suffixBefore = witness.suffixSum;
-    witness.suffixAfter = witness.suffixSum;
-    witness.prospective = witness.suffixSum + num;
-    witness.mustCut = null;
-    witness.capacityCut = null;
-    witness.remainingCut = null;
-    witness.cut = { status: "idle", index: null, reason: null };
-    emit({
-      line: 24,
-      event: "witness-loop",
-      phase: "reconstruct",
-      timing: "before",
-      condition: { expression: `${index} >= 0`, result: true },
-      title: localized(`Visit nums[${index}] = ${num}`, `Xét nums[${index}] = ${num}`),
-      note: localized(`Try prepending ${num} to the suffix whose sum is ${witness.suffixSum}.`, `Thử thêm ${num} vào đầu suffix có tổng ${witness.suffixSum}.`),
-    });
-
-    counters.reconstructionChecks++;
-    const capacityCut = witness.suffixSum + num > search.left;
-    const remainingCut = index + 1 < witness.groupsLeft;
-    const mustCut = capacityCut || remainingCut;
-    witness.capacityCut = capacityCut;
-    witness.remainingCut = remainingCut;
-    witness.mustCut = mustCut;
-    witness.cut = {
-      status: mustCut ? "required" : "not-required",
-      index: mustCut ? index + 1 : null,
-      reason: capacityCut ? "capacity" : remainingCut ? "remaining-elements" : "fits",
-    };
-    emit({
-      line: 25,
-      event: mustCut ? "must-cut-true" : "must-cut-false",
-      phase: "reconstruct",
-      condition: {
-        expression: `${witness.suffixSum} + ${num} > ${search.left} or ${index + 1} < ${witness.groupsLeft}`,
-        result: mustCut,
-      },
-      title: localized(`must_cut = ${mustCut}`, `must_cut = ${mustCut}`),
-      note: capacityCut
-        ? localized("Adding this value would exceed the optimal capacity.", "Thêm giá trị này sẽ vượt capacity tối ưu.")
-        : remainingCut
-          ? localized("Force a cut so the remaining prefix has enough elements for all remaining groups.", "Buộc cắt để prefix còn đủ phần tử cho mọi nhóm còn lại.")
-          : localized("Neither rule requires a cut, so extend the current suffix group.", "Không quy tắc nào yêu cầu cắt, nên mở rộng nhóm suffix hiện tại."),
-    });
-    emit({
-      line: 26,
-      event: mustCut ? "cut-branch-true" : "cut-branch-false",
-      phase: "reconstruct",
-      timing: "before",
-      condition: { expression: "must_cut", result: mustCut },
-      title: localized(`if must_cut → ${mustCut}`, `if must_cut → ${mustCut}`),
-      note: mustCut
-        ? localized(`Create a boundary before index ${index + 1}.`, `Tạo biên trước index ${index + 1}.`)
-        : localized("Skip the three indented cut operations.", "Bỏ qua ba thao tác cắt thụt vào."),
-    });
-
-    if (mustCut) {
+    const exceedsCapacity = witness.suffixSum + num > search.left;
+    const mustReserveGroups = index + 1 < witness.groupsLeft;
+    if (exceedsCapacity || mustReserveGroups) {
       witness.rawCuts.push(index + 1);
-      witness.cut.status = "appended";
-      counters.witnessCuts++;
-      if (capacityCut) counters.capacityCuts++;
-      if (remainingCut) counters.remainingCuts++;
-      emit({
-        line: 27,
-        event: "append-cut",
-        phase: "reconstruct",
-        title: localized(`Append cut ${index + 1}`, `Thêm cut ${index + 1}`),
-        note: localized(`Reverse-order cuts are now [${witness.rawCuts.join(", ")}].`, `Các cut theo thứ tự ngược hiện là [${witness.rawCuts.join(", ")}].`),
-      });
-
       witness.groupsLeft--;
-      witness.cut.status = "group-reserved";
-      emit({
-        line: 28,
-        event: "decrement-groups-left",
-        phase: "reconstruct",
-        title: localized(`groups_left = ${witness.groupsLeft}`, `groups_left = ${witness.groupsLeft}`),
-        note: localized("The completed suffix reserves one of the required groups.", "Suffix vừa hoàn tất chiếm một trong các nhóm bắt buộc."),
-      });
-
       witness.suffixSum = 0;
-      witness.suffixAfter = 0;
-      witness.cut.status = "reset";
-      emit({
-        line: 29,
-        event: "reset-suffix",
-        phase: "reconstruct",
-        title: localized("Reset suffix_sum to 0", "Đặt lại suffix_sum về 0"),
-        note: localized("Start accumulating the next group immediately to the left.", "Bắt đầu cộng dồn nhóm tiếp theo ngay bên trái."),
-      });
     }
-
-    const suffixBeforeAdd = witness.suffixSum;
     witness.suffixSum += num;
-    witness.suffixBefore = suffixBeforeAdd;
-    witness.suffixAfter = witness.suffixSum;
-    witness.cut.status = mustCut ? "placed-after-cut" : "placed";
-    counters.suffixAdds++;
-    emit({
-      line: 30,
-      event: "add-suffix",
-      phase: "reconstruct",
-      title: localized(`${suffixBeforeAdd} + ${num} = ${witness.suffixSum}`, `${suffixBeforeAdd} + ${num} = ${witness.suffixSum}`),
-      note: localized(`The active suffix-group sum is ${witness.suffixSum}, still within ${search.left}.`, `Tổng nhóm suffix đang hoạt động là ${witness.suffixSum}, vẫn không vượt ${search.left}.`),
-    });
   }
-
-  witness.index = null;
-  witness.num = null;
-  emit({
-    line: 24,
-    event: "witness-loop-complete",
-    phase: "reconstruct",
-    timing: "before",
-    condition: { expression: "-1 >= 0", result: false },
-    title: localized("Right-to-left scan is complete", "Quét phải sang trái hoàn tất"),
-    note: localized(`The helper collected ${witness.rawCuts.length} boundaries for ${k} groups.`, `Helper đã thu ${witness.rawCuts.length} biên cho ${k} nhóm.`),
-  });
-
   witness.cuts = [...witness.rawCuts].sort((a, b) => a - b);
-  witness.active = false;
-  emit({
-    line: 31,
-    event: "cuts-return",
-    phase: "reconstruct",
-    title: localized(`Return sorted cuts [${witness.cuts.join(", ")}]`, `Trả cuts đã sắp xếp [${witness.cuts.join(", ")}]`),
-    note: localized("Ascending boundaries restore the original left-to-right array order.", "Các biên tăng dần khôi phục thứ tự mảng từ trái sang phải."),
-  });
-
   witness.callerAssigned = true;
   witness.boundaries = [0, ...witness.cuts, n];
   witness.partitions = witness.boundaries.slice(0, -1).map((start, group) => {
@@ -2584,20 +2437,9 @@ function buildSteps410(input, params) {
     && Math.max(...witness.partitions.map((partition) => partition.sum)) === search.left;
   if (!witnessValid) throw new Error("Split Array witness invariant failed.");
 
-  emit({
-    line: 11,
-    event: "cuts-assignment",
-    phase: "reconstruct",
-    title: localized(`cuts = [${witness.cuts.join(", ")}]`, `cuts = [${witness.cuts.join(", ")}]`),
-    note: localized(
-      `These ${k - 1} cuts define exactly ${k} nonempty groups with sums [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
-      `${k - 1} cut này tạo đúng ${k} nhóm không rỗng với tổng [${witness.partitions.map((partition) => partition.sum).join(", ")}].`,
-    ),
-  });
-
   answer = search.left;
   emit({
-    line: 12,
+    line: 15,
     event: "final-return",
     phase: "done",
     title: localized(`Return the minimum largest sum: ${answer}`, `Trả tổng lớn nhất nhỏ nhất: ${answer}`),
@@ -4308,17 +4150,16 @@ module.exports = {
     debugMode: "line-by-line",
     parseSplitArray410Input,
     approach: [
-      { vi: "Tìm kiếm nhị phân trên ĐÁP ÁN trong [max(nums), sum(nums)]; right luôn là capacity khả thi.", en: "Binary-search the ANSWER in [max(nums), sum(nums)]; right always remains a feasible capacity." },
-      { vi: "Với từng mid, count_groups duyệt từng phần tử và chỉ mở nhóm mới khi cộng thêm sẽ vượt mid.", en: "For each mid, count_groups visits every value and opens a new group only when the next addition would exceed mid." },
-      { vi: "groups ≤ k nghĩa là mid khả thi; ngược lại loại mid và mọi capacity nhỏ hơn.", en: "groups ≤ k makes mid feasible; otherwise discard mid and every smaller capacity." },
-      { vi: "Sau khi hai biên gặp nhau, quét phải→trái để tạo đúng k nhóm witness theo quy tắc cắt xác định.", en: "After the bounds meet, scan right→left to build exactly k witness groups with a deterministic cut rule." },
+      { vi: "Tìm kiếm nhị phân trên ĐÁP ÁN trong [max(nums), sum(nums)]; upper_bound luôn là capacity khả thi.", en: "Binary-search the ANSWER in [max(nums), sum(nums)]; upper_bound always remains a feasible capacity." },
+      { vi: "Với từng max_sum, _count_groups duyệt trái→phải và chỉ mở nhóm mới khi tổng kế tiếp vượt giới hạn.", en: "For each max_sum, _count_groups scans left to right and opens a new group only when the next sum exceeds the limit." },
+      { vi: "required_groups ≤ k nghĩa là max_sum khả thi; nếu không, loại max_sum và mọi capacity nhỏ hơn.", en: "required_groups ≤ k makes max_sum feasible; otherwise discard max_sum and every smaller capacity." },
     ],
     complexity: {
       time: "O(n·log(sum(nums)−max(nums)+1) + n)",
-      space: "O(k)",
+      space: "O(1)",
       note: {
-        vi: "Phần tìm đáp án dùng O(1) bộ nhớ thuật toán; mảng cuts O(k) chỉ tái dựng witness. Các frame debug bất biến tốn thêm bộ nhớ theo kích thước trace.",
-        en: "The answer search uses O(1) algorithmic space; the O(k) cuts array only reconstructs the witness. Immutable debug frames use additional trace-sized storage.",
+        vi: "Lời giải phỏng vấn dùng O(1) bộ nhớ phụ. Visualization tạo partition mẫu riêng và các frame debug tốn thêm bộ nhớ theo kích thước trace.",
+        en: "The interview solution uses O(1) auxiliary space. The visualization separately creates a sample partition, and immutable debug frames use additional trace-sized storage.",
       },
     },
     code: SPLIT_ARRAY_410_SOURCE,

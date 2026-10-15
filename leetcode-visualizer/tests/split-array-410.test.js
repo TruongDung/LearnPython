@@ -24,6 +24,25 @@ test("410 produces the expected minimum largest sum", () => {
   }
 });
 
+test("410 source is clean Google-style interview Python", () => {
+  const source = problem.code.join("\n");
+  assert.match(source, /nums: list\[int\], k: int\) -> int/);
+  assert.match(source, /Returns the minimum possible largest subarray sum/);
+  assert.match(source, /def _count_groups\(/);
+  assert.match(source, /lower_bound \+ \(upper_bound - lower_bound\) \/\/ 2/);
+  assert.doesNotMatch(source, /build_cuts|cuts\s*=/);
+  assert.equal(problem.complexity.space, "O(1)");
+  for (const line of problem.code) {
+    assert.ok(line.length <= 80, `line exceeds 80 columns: ${line}`);
+    assert.doesNotMatch(line, /\t|\s+$/);
+  }
+
+  for (const step of problem.builder([7, 2, 5, 10, 8], { k: 2 }).steps) {
+    const view = step.splitArray410View;
+    assert.equal(view.source.text, problem.code[view.source.line - 1]);
+  }
+});
+
 test("410 renderer stays pictorial and stable across every frame", () => {
   const source = fs.readFileSync(require.resolve("../public/renderer-split-array-410.js"), "utf8");
   for (const language of ["vi", "en"]) {
