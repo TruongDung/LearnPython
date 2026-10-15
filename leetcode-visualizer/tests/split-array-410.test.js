@@ -24,13 +24,12 @@ test("410 produces the expected minimum largest sum", () => {
   }
 });
 
-test("410 source is clean Google-style interview Python", () => {
+test("410 source matches the requested nested can_split solution", () => {
   const source = problem.code.join("\n");
-  assert.match(source, /nums: list\[int\], k: int\) -> int/);
-  assert.match(source, /Returns the minimum possible largest subarray sum/);
-  assert.match(source, /def _count_groups\(/);
-  assert.match(source, /lower_bound \+ \(upper_bound - lower_bound\) \/\/ 2/);
-  assert.doesNotMatch(source, /build_cuts|cuts\s*=/);
+  assert.match(source, /def can_split\(limit\):/);
+  assert.match(source, /if groups > k:\n\s+return False/);
+  assert.match(source, /if can_split\(mid\):/);
+  assert.doesNotMatch(source, /_count_groups|build_cuts|cuts\s*=/);
   assert.equal(problem.complexity.space, "O(1)");
   for (const line of problem.code) {
     assert.ok(line.length <= 80, `line exceeds 80 columns: ${line}`);
@@ -41,6 +40,15 @@ test("410 source is clean Google-style interview Python", () => {
     const view = step.splitArray410View;
     assert.equal(view.source.text, problem.code[view.source.line - 1]);
   }
+});
+
+test("410 can_split trace stops immediately after groups exceeds k", () => {
+  const run = problem.builder([1, 1, 100, 1, 1], { k: 1 });
+  const rejected = run.steps.find((step) => step.splitArray410View.event === "return-false");
+  assert.ok(rejected);
+  assert.equal(rejected.splitArray410View.source.line, 17);
+  assert.ok(rejected.splitArray410View.scan.processed < 5);
+  assert.equal(rejected.splitArray410View.scan.groups, 2);
 });
 
 test("410 renderer stays pictorial and stable across every frame", () => {

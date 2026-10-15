@@ -3,32 +3,33 @@
 const SA410_SOURCE = Object.freeze([
   "class Solution:",
   "    def splitArray(self, nums: list[int], k: int) -> int:",
-  "        \"\"\"Returns the minimum possible largest subarray sum.\"\"\"",
-  "        lower_bound = max(nums)",
-  "        upper_bound = sum(nums)",
+  "        left, right = max(nums), sum(nums)",
   "",
-  "        while lower_bound < upper_bound:",
-  "            max_sum = lower_bound + (upper_bound - lower_bound) // 2",
-  "            required_groups = self._count_groups(nums, max_sum)",
-  "            if required_groups <= k:",
-  "                upper_bound = max_sum",
+  "        def can_split(limit):",
+  "            groups = 1",
+  "            current_sum = 0",
+  "",
+  "            for num in nums:",
+  "                if current_sum + num > limit:",
+  "                    groups += 1",
+  "                    current_sum = 0",
+  "",
+  "                current_sum += num",
+  "",
+  "                if groups > k:",
+  "                    return False",
+  "",
+  "            return True",
+  "",
+  "        while left < right:",
+  "            mid = (left + right) // 2",
+  "",
+  "            if can_split(mid):",
+  "                right = mid",
   "            else:",
-  "                lower_bound = max_sum + 1",
+  "                left = mid + 1",
   "",
-  "        return lower_bound",
-  "",
-  "    def _count_groups(self, nums: list[int], max_sum: int) -> int:",
-  "        \"\"\"Returns the minimum groups needed under max_sum.\"\"\"",
-  "        group_count = 1",
-  "        current_sum = 0",
-  "",
-  "        for value in nums:",
-  "            if current_sum + value > max_sum:",
-  "                group_count += 1",
-  "                current_sum = 0",
-  "            current_sum += value",
-  "",
-  "        return group_count",
+  "        return left",
 ]);
 
 const SA410_EVENTS = Object.freeze({
@@ -52,7 +53,10 @@ const SA410_EVENTS = Object.freeze({
   "open-greedy-group": { en: "Open a new box", vi: "Mở hộp mới" },
   "reset-running": { en: "The new box starts empty", vi: "Hộp mới bắt đầu rỗng" },
   "add-running": { en: "Put the number in", vi: "Đặt số vào hộp" },
-  "count-return": { en: "Count the boxes", vi: "Đếm số hộp" },
+  "group-limit-ok": { en: "Still within k groups", vi: "Vẫn chưa vượt k nhóm" },
+  "early-reject": { en: "Too many groups — stop early", vi: "Quá nhiều nhóm — dừng sớm" },
+  "return-false": { en: "Return False", vi: "Trả về False" },
+  "count-return": { en: "Return True", vi: "Trả về True" },
   "count-assignment": { en: "Remember the box count", vi: "Ghi nhớ số hộp" },
   "feasible-mid": { en: "This capacity is large enough", vi: "Sức chứa này đủ lớn" },
   "infeasible-mid": { en: "This capacity is too small", vi: "Sức chứa này quá nhỏ" },
@@ -256,6 +260,9 @@ function sa410Action(state, copy, locale) {
   if (state.event === "choose-mid") return locale === "vi" ? `Thử sức chứa ${state.search.mid}` : `Try capacity ${state.search.mid}`;
   if (state.event === "overflow-true" && value !== null) return `${state.scan.running ?? 0} + ${value} > ${limit}  →  ✂`;
   if (state.event === "overflow-false" && value !== null) return `${state.scan.running ?? 0} + ${value} ≤ ${limit}  →  ✓`;
+  if (state.event === "early-reject") return `${state.scan.groups} > ${state.k}  →  False`;
+  if (state.event === "return-false") return `can_split(${limit})  →  False`;
+  if (state.event === "count-return") return `can_split(${limit})  →  True`;
   if (["feasible-mid", "move-right"].includes(state.event) && state.search.groups !== null) return `${state.search.groups} ≤ ${state.k}  →  ${locale === "vi" ? "thu hẹp bên phải" : "move right bound"}`;
   if (["infeasible-mid", "else-branch", "move-left"].includes(state.event) && state.search.groups !== null) return `${state.search.groups} > ${state.k}  →  ${locale === "vi" ? "tăng biên trái" : "move left bound"}`;
   if (state.phase === "reconstruct" && state.witness.index !== null) {

@@ -1748,10 +1748,10 @@ function fmt(v) {
  * non-empty contiguous subarrays to MINIMIZE the LARGEST subarray sum.
  *
  * Binary search on the ANSWER: the answer (the minimized largest sum) lies
- * somewhere in [max(nums), sum(nums)]. For a candidate `mid`, greedily count
- * how many groups are needed if no group's sum may exceed `mid`:
- *   - if that count <= k, max_sum is feasible → upper_bound = max_sum
- *   - otherwise, max_sum is too small → lower_bound = max_sum + 1
+ * somewhere in [max(nums), sum(nums)]. For a candidate `mid`, greedily test
+ * whether every value fits in at most k contiguous groups:
+ *   - if can_split(mid), mid is feasible → right = mid
+ *   - otherwise, mid is too small → left = mid + 1
  * The smallest feasible mid is the answer.
  */
 const SPLIT_ARRAY_410_MAX_LENGTH = 16;
@@ -1759,32 +1759,33 @@ const SPLIT_ARRAY_410_MAX_VALUE = 1_000_000;
 const SPLIT_ARRAY_410_SOURCE = Object.freeze([
   "class Solution:",
   "    def splitArray(self, nums: list[int], k: int) -> int:",
-  "        \"\"\"Returns the minimum possible largest subarray sum.\"\"\"",
-  "        lower_bound = max(nums)",
-  "        upper_bound = sum(nums)",
+  "        left, right = max(nums), sum(nums)",
   "",
-  "        while lower_bound < upper_bound:",
-  "            max_sum = lower_bound + (upper_bound - lower_bound) // 2",
-  "            required_groups = self._count_groups(nums, max_sum)",
-  "            if required_groups <= k:",
-  "                upper_bound = max_sum",
+  "        def can_split(limit):",
+  "            groups = 1",
+  "            current_sum = 0",
+  "",
+  "            for num in nums:",
+  "                if current_sum + num > limit:",
+  "                    groups += 1",
+  "                    current_sum = 0",
+  "",
+  "                current_sum += num",
+  "",
+  "                if groups > k:",
+  "                    return False",
+  "",
+  "            return True",
+  "",
+  "        while left < right:",
+  "            mid = (left + right) // 2",
+  "",
+  "            if can_split(mid):",
+  "                right = mid",
   "            else:",
-  "                lower_bound = max_sum + 1",
+  "                left = mid + 1",
   "",
-  "        return lower_bound",
-  "",
-  "    def _count_groups(self, nums: list[int], max_sum: int) -> int:",
-  "        \"\"\"Returns the minimum groups needed under max_sum.\"\"\"",
-  "        group_count = 1",
-  "        current_sum = 0",
-  "",
-  "        for value in nums:",
-  "            if current_sum + value > max_sum:",
-  "                group_count += 1",
-  "                current_sum = 0",
-  "            current_sum += value",
-  "",
-  "        return group_count",
+  "        return left",
 ]);
 
 function parseSplitArray410Input(input) {
@@ -2089,35 +2090,25 @@ function buildSteps410(input, params) {
     note: localized("The method must return the minimum possible largest sum for exactly k nonempty contiguous groups.", "Phương thức phải trả về tổng nhóm lớn nhất nhỏ nhất khi chia đúng k nhóm liên tiếp không rỗng."),
   });
   emit({
-    line: 17,
+    line: 5,
     event: "bind-count-method",
     phase: "setup",
     title: localized("Bind the greedy feasibility helper", "Liên kết helper kiểm tra tham lam"),
-    note: localized("_count_groups computes the fewest groups needed under one candidate limit.", "_count_groups tính số nhóm ít nhất cần dùng dưới một giới hạn ứng viên."),
+    note: localized("can_split checks whether one candidate limit needs at most k groups.", "can_split kiểm tra một giới hạn ứng viên có cần không quá k nhóm."),
   });
 
   search.left = minimum;
-  emit({
-    line: 4,
-    event: "initialize-lower-bound",
-    phase: "search",
-    title: localized(`lower_bound = ${minimum}`, `lower_bound = ${minimum}`),
-    note: localized(
-      `No valid capacity can be below max(nums)=${minimum}.`,
-      `Không capacity hợp lệ nào có thể nhỏ hơn max(nums)=${minimum}.`,
-    ),
-  });
   search.right = maximum;
   search.initialized = true;
   search.outcome = "bounded";
   emit({
-    line: 5,
-    event: "initialize-upper-bound",
+    line: 3,
+    event: "initialize-bounds",
     phase: "search",
-    title: localized(`upper_bound = ${maximum}`, `upper_bound = ${maximum}`),
+    title: localized(`left, right = ${minimum}, ${maximum}`, `left, right = ${minimum}, ${maximum}`),
     note: localized(
-      `sum(nums)=${maximum} is always feasible as one group.`,
-      `sum(nums)=${maximum} luôn khả thi khi gom thành một nhóm.`,
+      `The answer lies between max(nums)=${minimum} and sum(nums)=${maximum}.`,
+      `Đáp án nằm giữa max(nums)=${minimum} và sum(nums)=${maximum}.`,
     ),
   });
 
@@ -2127,20 +2118,12 @@ function buildSteps410(input, params) {
     scan.active = true;
     scan.call = counters.feasibilityCalls;
     emit({
-      line: 9,
+      line: 24,
       event: "count-call",
       phase: "count",
       timing: "before",
-      title: localized(`Call _count_groups at max_sum ${limit}`, `Gọi _count_groups với max_sum ${limit}`),
-      note: localized("The assignment to groups waits until the helper returns.", "Phép gán cho groups chờ đến khi helper trả về."),
-    });
-    emit({
-      line: 17,
-      event: "count-entry",
-      phase: "count",
-      timing: "before",
-      title: localized(`Enter _count_groups(nums, ${limit})`, `Vào _count_groups(nums, ${limit})`),
-      note: localized("This call greedily packs every value from left to right.", "Lần gọi này xếp tham lam mọi giá trị từ trái sang phải."),
+      title: localized(`Call can_split(${limit})`, `Gọi can_split(${limit})`),
+      note: localized("The helper stops as soon as it needs more than k groups.", "Helper dừng ngay khi cần nhiều hơn k nhóm."),
     });
 
     let groups = 1;
@@ -2152,7 +2135,7 @@ function buildSteps410(input, params) {
     scan.runningAfter = null;
     scan.groupSums = [];
     emit({
-      line: 19,
+      line: 6,
       event: "count-initialize",
       phase: "count",
       title: localized("Start with one group", "Bắt đầu với một nhóm"),
@@ -2163,7 +2146,7 @@ function buildSteps410(input, params) {
     scan.runningAfter = 0;
     scan.groupSums = [0];
     emit({
-      line: 20,
+      line: 7,
       event: "sum-initialize",
       phase: "count",
       title: localized("Start with current_sum = 0", "Bắt đầu với current_sum = 0"),
@@ -2181,7 +2164,7 @@ function buildSteps410(input, params) {
       scan.overflow = null;
       scan.cut = blankCut();
       emit({
-        line: 22,
+        line: 9,
         event: "count-loop",
         phase: "count",
         timing: "before",
@@ -2201,7 +2184,7 @@ function buildSteps410(input, params) {
         reason: overflow ? "capacity" : "fits",
       };
       emit({
-        line: 23,
+        line: 10,
         event: overflow ? "overflow-true" : "overflow-false",
         phase: "count",
         condition: { expression: `${running} + ${num} > ${limit}`, result: overflow },
@@ -2222,7 +2205,7 @@ function buildSteps410(input, params) {
         scan.groupSums.push(0);
         scan.cut.status = "opened";
         emit({
-          line: 24,
+          line: 11,
           event: "open-greedy-group",
           phase: "count",
           title: localized(`Increase groups to ${groups}`, `Tăng groups lên ${groups}`),
@@ -2234,7 +2217,7 @@ function buildSteps410(input, params) {
         scan.runningAfter = 0;
         scan.cut.status = "reset";
         emit({
-          line: 25,
+          line: 12,
           event: "reset-running",
           phase: "count",
           title: localized("Reset running sum to 0", "Đặt lại tổng chạy về 0"),
@@ -2255,19 +2238,48 @@ function buildSteps410(input, params) {
       scan.runningAfter = running;
       scan.cut.status = overflow ? "placed-after-cut" : "placed";
       emit({
-        line: 26,
+        line: 14,
         event: "add-running",
         phase: "count",
         title: localized(`G${groups - 1}: ${addBefore} + ${num} = ${running}`, `G${groups - 1}: ${addBefore} + ${num} = ${running}`),
         note: localized(`Index ${index} is now assigned to greedy group G${groups - 1}; its sum remains ≤ ${limit}.`, `Index ${index} được gán vào nhóm tham lam G${groups - 1}; tổng nhóm vẫn ≤ ${limit}.`),
       });
+
+      const tooManyGroups = groups > k;
+      emit({
+        line: 16,
+        event: tooManyGroups ? "early-reject" : "group-limit-ok",
+        phase: "count",
+        condition: { expression: `${groups} > ${k}`, result: tooManyGroups },
+        title: localized(
+          `${groups} groups ${tooManyGroups ? "exceed" : "do not exceed"} k=${k}`,
+          `${groups} nhóm ${tooManyGroups ? "vượt" : "không vượt"} k=${k}`,
+        ),
+        note: tooManyGroups
+          ? localized("Stop early: this limit is already impossible.", "Dừng sớm: giới hạn này chắc chắn không khả thi.")
+          : localized("Keep scanning the remaining values.", "Tiếp tục quét các giá trị còn lại."),
+      });
+      if (tooManyGroups) {
+        scan.index = null;
+        scan.num = null;
+        scan.active = false;
+        scan.returnedGroups = groups;
+        emit({
+          line: 17,
+          event: "return-false",
+          phase: "count",
+          title: localized("Return False", "Trả về False"),
+          note: localized("More than k groups are required.", "Cần nhiều hơn k nhóm."),
+        });
+        return { groups, feasible: false, groupOf: [...scan.groupOf], groupSums: [...scan.groupSums] };
+      }
     }
 
     scan.index = null;
     scan.num = null;
     scan.complete = true;
     emit({
-      line: 22,
+      line: 9,
       event: "count-loop-complete",
       phase: "count",
       timing: "before",
@@ -2279,13 +2291,13 @@ function buildSteps410(input, params) {
     scan.active = false;
     scan.returnedGroups = groups;
     emit({
-      line: 28,
+      line: 19,
       event: "count-return",
       phase: "count",
-      title: localized(`Return ${groups} groups`, `Trả về ${groups} nhóm`),
-      note: localized("Greedy cuts only when forced, so no packing under this limit can use fewer groups.", "Tham lam chỉ cắt khi bắt buộc, nên không cách xếp nào dưới giới hạn này dùng ít nhóm hơn."),
+      title: localized("Return True", "Trả về True"),
+      note: localized(`All values fit in ${groups} groups, no more than k=${k}.`, `Mọi giá trị vừa trong ${groups} nhóm, không quá k=${k}.`),
     });
-    return { groups, groupOf: [...scan.groupOf], groupSums: [...scan.groupSums] };
+    return { groups, feasible: true, groupOf: [...scan.groupOf], groupSums: [...scan.groupSums] };
   };
 
   while (search.left < search.right) {
@@ -2293,7 +2305,7 @@ function buildSteps410(input, params) {
     search.iteration = counters.searchIterations;
     search.outcome = "searching";
     emit({
-      line: 7,
+      line: 21,
       event: "while-true",
       phase: "search",
       timing: "before",
@@ -2309,25 +2321,18 @@ function buildSteps410(input, params) {
     search.feasible = null;
     search.outcome = "testing";
     emit({
-      line: 8,
+      line: 22,
       event: "choose-mid",
       phase: "search",
-      title: localized(`max_sum = ${search.mid}`, `max_sum = ${search.mid}`),
-      note: localized("The overflow-safe midpoint keeps the search interval shrinking.", "Midpoint chống tràn giúp khoảng tìm kiếm luôn thu hẹp."),
+      title: localized(`mid = ${search.mid}`, `mid = ${search.mid}`),
+      note: localized("Choose the lower midpoint of the current answer range.", "Chọn midpoint dưới của khoảng đáp án hiện tại."),
     });
 
     const result = traceCountGroups(search.mid);
     search.groups = result.groups;
-    emit({
-      line: 9,
-      event: "count-assignment",
-      phase: "search",
-      title: localized(`required_groups = ${result.groups}`, `required_groups = ${result.groups}`),
-      note: localized(`Under limit ${search.mid}, the greedy partition needs ${result.groups} groups.`, `Với giới hạn ${search.mid}, partition tham lam cần ${result.groups} nhóm.`),
-    });
 
     counters.feasibleChecks++;
-    const feasible = result.groups <= k;
+    const feasible = result.feasible;
     search.feasible = feasible;
     search.outcome = feasible ? "feasible" : "infeasible";
     if (feasible) {
@@ -2338,10 +2343,10 @@ function buildSteps410(input, params) {
       search.lastInfeasible = { limit: search.mid, groups: result.groups, reason: "too-many-groups" };
     }
     emit({
-      line: 10,
+      line: 24,
       event: feasible ? "feasible-mid" : "infeasible-mid",
       phase: "search",
-      condition: { expression: `${result.groups} <= ${k}`, result: feasible },
+      condition: { expression: `can_split(${search.mid})`, result: feasible },
       title: localized(
         `${result.groups} groups ${feasible ? "fit" : "do not fit"} k=${k}`,
         `${result.groups} nhóm ${feasible ? "không vượt" : "vượt"} k=${k}`,
@@ -2356,29 +2361,29 @@ function buildSteps410(input, params) {
       search.outcome = "move-right";
       counters.upperUpdates++;
       emit({
-        line: 11,
+        line: 25,
         event: "move-right",
         phase: "search",
-        title: localized(`upper_bound = ${search.mid}`, `upper_bound = ${search.mid}`),
+        title: localized(`right = ${search.mid}`, `right = ${search.mid}`),
         note: localized(`Keep feasible ${search.mid} and search the tighter interval [${search.left}, ${search.right}].`, `Giữ ${search.mid} khả thi và tìm trong khoảng chặt hơn [${search.left}, ${search.right}].`),
       });
     } else {
       emit({
-        line: 12,
+        line: 26,
         event: "else-branch",
         phase: "search",
         timing: "before",
         title: localized("Take the infeasible branch", "Đi vào nhánh bất khả thi"),
-        note: localized("groups <= k was false, so execution enters else without changing a bound yet.", "groups <= k sai, nên thực thi vào else nhưng chưa đổi biên."),
+        note: localized("can_split(mid) was false, so execution enters else.", "can_split(mid) trả về False nên thực thi đi vào else."),
       });
       search.left = search.mid + 1;
       search.outcome = "move-left";
       counters.lowerUpdates++;
       emit({
-        line: 13,
+        line: 27,
         event: "move-left",
         phase: "search",
-        title: localized(`lower_bound = ${search.mid} + 1 = ${search.left}`, `lower_bound = ${search.mid} + 1 = ${search.left}`),
+        title: localized(`left = ${search.mid} + 1 = ${search.left}`, `left = ${search.mid} + 1 = ${search.left}`),
         note: localized(`Discard all capacities through ${search.mid}; continue in [${search.left}, ${search.right}].`, `Loại mọi capacity đến ${search.mid}; tiếp tục trong [${search.left}, ${search.right}].`),
       });
     }
@@ -2386,7 +2391,7 @@ function buildSteps410(input, params) {
 
   search.outcome = "converged";
   emit({
-    line: 7,
+    line: 21,
     event: "while-false",
     phase: "search",
     timing: "before",
@@ -2439,7 +2444,7 @@ function buildSteps410(input, params) {
 
   answer = search.left;
   emit({
-    line: 15,
+    line: 29,
     event: "final-return",
     phase: "done",
     title: localized(`Return the minimum largest sum: ${answer}`, `Trả tổng lớn nhất nhỏ nhất: ${answer}`),
@@ -4150,9 +4155,9 @@ module.exports = {
     debugMode: "line-by-line",
     parseSplitArray410Input,
     approach: [
-      { vi: "Tìm kiếm nhị phân trên ĐÁP ÁN trong [max(nums), sum(nums)]; upper_bound luôn là capacity khả thi.", en: "Binary-search the ANSWER in [max(nums), sum(nums)]; upper_bound always remains a feasible capacity." },
-      { vi: "Với từng max_sum, _count_groups duyệt trái→phải và chỉ mở nhóm mới khi tổng kế tiếp vượt giới hạn.", en: "For each max_sum, _count_groups scans left to right and opens a new group only when the next sum exceeds the limit." },
-      { vi: "required_groups ≤ k nghĩa là max_sum khả thi; nếu không, loại max_sum và mọi capacity nhỏ hơn.", en: "required_groups ≤ k makes max_sum feasible; otherwise discard max_sum and every smaller capacity." },
+      { vi: "Tìm kiếm nhị phân trên ĐÁP ÁN trong [max(nums), sum(nums)]; right luôn là capacity khả thi.", en: "Binary-search the ANSWER in [max(nums), sum(nums)]; right always remains a feasible capacity." },
+      { vi: "Với từng mid, can_split duyệt trái→phải và chỉ mở nhóm mới khi tổng kế tiếp vượt giới hạn.", en: "For each mid, can_split scans left to right and opens a new group only when the next sum exceeds the limit." },
+      { vi: "Dừng sớm ngay khi groups > k; nếu không vượt k sau khi duyệt xong thì mid khả thi.", en: "Stop early as soon as groups > k; if the scan finishes within k groups, mid is feasible." },
     ],
     complexity: {
       time: "O(n·log(sum(nums)−max(nums)+1) + n)",
