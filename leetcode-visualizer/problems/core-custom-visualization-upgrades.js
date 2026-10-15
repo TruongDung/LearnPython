@@ -55,26 +55,24 @@ function parseNumberList(value) {
 
 function enhance542(result) {
   const original = Array.isArray(result.original) ? result.original : [];
+  const finalDistances = Array.isArray(result.answer) && result.answer.length ? result.answer : [];
+  const totalCells = original.reduce((sum, row) => sum + row.length, 0);
+  const maxDistance = finalDistances.length ? Math.max(0, ...finalDistances.flat()) : 0;
+  const targetLayers = Array.from({ length: maxDistance + 1 }, (_, distance) => ({
+    distance,
+    total: finalDistances.flat().filter((value) => value === distance).length,
+  }));
   const operationByLine = {
-    5: "enter",
-    6: "dimensions",
-    7: "distance-init",
-    8: "queue-init",
-    9: "scan-row",
-    10: "scan-cell",
-    11: "source-check",
-    12: "source-distance",
-    13: "source-enqueue",
-    14: "directions",
-    15: "queue-check",
-    16: "dequeue",
-    17: "direction-loop",
-    18: "neighbor-coordinate",
-    19: "neighbor-check",
-    20: "distance-update",
-    21: "neighbor-enqueue",
-    22: "return",
+    5: "enter", 6: "dimensions", 7: "distance-init", 8: "queue-init",
+    9: "scan-row", 10: "scan-cell", 11: "source-check", 12: "source-distance",
+    13: "source-enqueue", 14: "directions", 15: "queue-check", 16: "dequeue",
+    17: "direction-loop", 18: "neighbor-coordinate", 19: "neighbor-check",
+    20: "distance-update", 21: "neighbor-enqueue", 22: "return",
   };
+
+  let activeOrigin = null;
+  let activeDirection = null;
+  let activeNeighbor = null;
 
   for (const step of result.steps || []) {
     if (!step.bfsGrid) continue;
@@ -101,32 +99,133 @@ function enhance542(result) {
       index,
       distance: cells[row]?.[col]?.distance ?? null,
     }));
-    const currentCell = flatCells.find((cell) => cell.state === "current") || null;
+    const highlightedCell = flatCells.find((cell) => cell.state === "current") || null;
     const discoveredCell = flatCells.find((cell) => cell.state === "path") || null;
-    const nextRow = numericVariable(step, ["next_row"]);
-    const nextCol = numericVariable(step, ["next_col"]);
-    const deltaRow = numericVariable(step, ["delta_row"]);
-    const deltaCol = numericVariable(step, ["delta_col"]);
+    const readNumber = (names) => {
+      const value = findVariable(step, (name) => names.includes(name));
+      if (value === null || value === undefined || value === "") return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
+    const nextRow = readNumber(["next_row"]);
+    const nextCol = readNumber(["next_col"]);
+    const deltaRow = readNumber(["delta_row"]);
+    const deltaCol = readNumber(["delta_col"]);
     const inBounds = findVariable(step, (name) => name === "in bounds?");
     const unvisited = findVariable(step, (name) => name === "unvisited?");
     const phase = line <= 8 ? "setup" : line <= 14 ? "sources" : line <= 21 ? "bfs" : "result";
+    const operation = operationByLine[line] || (step.final ? "invalid" : "step");
 
+    if (operation === "dequeue" && highlightedCell) {
+      activeOrigin = [highlightedCell.row, highlightedCell.col];
+      activeDirection = null;
+      activeNeighbor = null;
+    }
+    if (operation === "direction-loop" && Number.isInteger(deltaRow) && Number.isInteger(deltaCol)) {
+      activeDirection = [deltaRow, deltaCol];
+      activeNeighbor = null;
+    }
+    if (operation === "neighbor-coordinate" && Number.isInteger(nextRow) && Number.isInteger(nextCol)) {
+      activeNeighbor = [nextRow, nextCol];
+    }
+    if (step.final) {
+      activeOrigin = null;
+      activeDirection = null;
+      activeNeighbor = null;
+    }
+
+    const discovered = discoveredCell
+      ? [discoveredCell.row, discoveredCell.col]
+      : ["distance-update", "neighbor-enqueue"].includes(operation) && activeNeighbor
+        ? [...activeNeighbor]
+        : null;
+    const discoveredValue = discovered ? cells[discovered[0]]?.[discovered[1]]?.distance : null;
+    const knownCount = flatCells.filter((cell) => cell.distance !== null).length;
+    const waves = targetLayers.map((layer) => ({
+      ...layer,
+      reached: flatCells.filter((cell) => cell.distance === layer.distance).length,
+    }));
+    const originCell = activeOrigin ? cells[activeOrigin[0]]?.[activeOrigin[1]] : null;
+    const activeDistance = discoveredValue ?? originCell?.distance ?? null;
+    const sourceFocus = phase === "sources" && highlightedCell ? [highlightedCell.row, highlightedCell.col] : null;
+    const current = phase === "bfs" ? activeOrigin : sourceFocus;
+    const neighbor = phase === "bfs" ? activeNeighbor : null;
+    const currentText = current ? `(${current.join(",")})` : "";
+    const neighborText = neighbor ? `(${neighbor.join(",")})` : "";
+    const nextDistance = discoveredValue ?? (originCell?.distance !== null && originCell?.distance !== undefined ? originCell.distance + 1 : null);
+    let shortTitle;
+    let shortNote;
+
+    if (step.final && !finalDistances.length) {
+      shortTitle = label("Đầu vào không hợp lệ", "Invalid input");
+      shortNote = label("Cần grid 0/1 có ít nhất một số 0.", "Use a 0/1 grid with at least one zero.");
+    } else if (operation === "distance-init") {
+      shortTitle = label(`∞ × ${totalCells}`, `∞ × ${totalCells}`);
+      shortNote = label("Chưa thăm.", "Unvisited.");
+    } else if (operation === "source-check") {
+      shortTitle = highlightedCell?.isSource ? label("0 → SOURCE", "0 → SOURCE") : label("1 → CHỜ", "1 → WAIT");
+      shortNote = highlightedCell?.isSource ? label("Nguồn d=0.", "Source d=0.") : label("Đợi sóng BFS.", "Wait for BFS wave.");
+    } else if (operation === "source-distance") {
+      shortTitle = label(`${sourceFocus ? `d(${sourceFocus.join(",")})` : "d(source)"} = 0`, `${sourceFocus ? `d(${sourceFocus.join(",")})` : "d(source)"} = 0`);
+      shortNote = label("Nguồn.", "Source.");
+    } else if (operation === "source-enqueue") {
+      shortTitle = label(`PUSH ${sourceFocus ? `(${sourceFocus.join(",")})` : "0"}`, `PUSH ${sourceFocus ? `(${sourceFocus.join(",")})` : "0"}`);
+      shortNote = label("Nhiều nguồn, một queue.", "Many sources, one queue.");
+    } else if (operation === "dequeue") {
+      shortTitle = label(`POP ${currentText} · d=${originCell?.distance ?? "?"}`, `POP ${currentText} · d=${originCell?.distance ?? "?"}`);
+      shortNote = label("Đầu queue.", "Queue front.");
+    } else if (operation === "neighbor-check") {
+      const verdict = inBounds === false ? "OUT" : unvisited === true ? "✓ NEW" : "× SKIP";
+      shortTitle = label(`${neighborText} · ${verdict}`, `${neighborText} · ${verdict}`);
+      shortNote = unvisited === true ? label("Lần đầu = ngắn nhất.", "First visit = shortest.") : label("Không cập nhật.", "No update.");
+    } else if (operation === "distance-update") {
+      shortTitle = label(`d${neighborText} = ${originCell?.distance ?? "?"} + 1 = ${nextDistance ?? "?"}`, `d${neighborText} = ${originCell?.distance ?? "?"} + 1 = ${nextDistance ?? "?"}`);
+      shortNote = label("Chốt khoảng cách.", "Lock distance.");
+    } else if (operation === "neighbor-enqueue") {
+      shortTitle = label(`PUSH ${neighborText}`, `PUSH ${neighborText}`);
+      shortNote = label("Lan tiếp.", "Keep spreading.");
+    } else if (step.final) {
+      shortTitle = label(`✓ ${totalCells}/${totalCells}`, `✓ ${totalCells}/${totalCells}`);
+      shortNote = label("Hoàn tất.", "Done.");
+    } else if (operation === "queue-check") {
+      shortTitle = label(`QUEUE · ${queue.length}`, `QUEUE · ${queue.length}`);
+      shortNote = label("FIFO.", "FIFO.");
+    } else if (operation === "direction-loop") {
+      shortTitle = label(activeDirection ? `Δ (${activeDirection.join(",")})` : "4 HƯỚNG", activeDirection ? `Δ (${activeDirection.join(",")})` : "4 DIRECTIONS");
+      shortNote = label("Thử hàng xóm.", "Try neighbor.");
+    } else if (operation === "neighbor-coordinate") {
+      shortTitle = label(`${currentText} → ${neighborText}`, `${currentText} → ${neighborText}`);
+      shortNote = label("Một bước.", "One step.");
+    } else {
+      const phaseTitle = phase === "setup" ? "SETUP" : phase === "sources" ? "SOURCES" : phase === "bfs" ? "WAVE" : "DISTANCE";
+      shortTitle = label(phaseTitle, phaseTitle);
+      shortNote = label("Multi-source BFS.", "Multi-source BFS.");
+    }
+
+    step.title = shortTitle;
+    step.note = shortNote;
     step.matrix542View = {
       phase: step.final ? "result" : phase,
-      operation: operationByLine[line] || (step.final ? "invalid" : "step"),
+      operation,
       rows,
       cols,
       cells,
       sources: flatCells.filter((cell) => cell.isSource).map(({ row, col }) => [row, col]),
       queue,
-      current: currentCell ? [currentCell.row, currentCell.col] : null,
-      discovered: discoveredCell ? [discoveredCell.row, discoveredCell.col] : null,
-      neighbor: Number.isInteger(nextRow) && Number.isInteger(nextCol) ? [nextRow, nextCol] : null,
-      direction: Number.isInteger(deltaRow) && Number.isInteger(deltaCol) ? [deltaRow, deltaCol] : null,
+      current,
+      origin: activeOrigin ? [...activeOrigin] : null,
+      discovered,
+      neighbor,
+      direction: activeDirection ? [...activeDirection] : null,
       check: {
         inBounds: typeof inBounds === "boolean" ? inBounds : null,
         unvisited: typeof unvisited === "boolean" ? unvisited : null,
       },
+      knownCount,
+      totalCells,
+      maxDistance,
+      activeDistance,
+      waves,
       answer: step.final ? result.answer : null,
       invalid: step.final && (!Array.isArray(result.answer) || result.answer.length === 0),
     };

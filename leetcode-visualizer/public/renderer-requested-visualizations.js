@@ -697,35 +697,81 @@ function requestedCoreGraphSvg(nodes, edges, options = {}) {
 }
 
 function renderMatrix542View(step) {
-  const view = step.matrix542View || {};
+  const v = step.matrix542View || {};
   const vi = lang === "vi";
-  const phaseIndex = view.phase === "setup" ? 0 : view.phase === "sources" ? 1 : view.phase === "bfs" ? 2 : 3;
-  const cells = (view.cells || []).flatMap((row) => row.map((cell) => {
-    const display = cell.distance !== null && cell.distance !== undefined
-      ? cell.distance
-      : view.phase === "setup" ? (cell.input ?? "?") : "???";
-    const classes = ["rv-matrix-cell", cell.state || "", cell.isSource ? "source" : ""].filter(Boolean).join(" ");
-    return `<div class="${classes}"><small>(${cell.row},${cell.col})</small><strong>${requestedVizEsc(display)}</strong><em>${cell.isSource ? "SOURCE" : cell.distance === null ? "UNVISITED" : `d=${cell.distance}`}</em></div>`;
+  const t = (viText, enText) => vi ? viText : enText;
+  const phaseIndex = v.phase === "bfs" ? 1 : v.phase === "result" ? 2 : 0;
+  const stages = [
+    ["◎", "SOURCE"],
+    [")))", "WAVE"],
+    ["#", "DIST"],
+  ].map(([icon, name], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}"><i>${index < phaseIndex ? "✓" : icon}</i><b>${name}</b></span>${index < 2 ? "<em>›</em>" : ""}`;
+  }).join("");
+  const key = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const originKey = key(v.origin || v.current);
+  const neighborKey = key(v.neighbor);
+  const discoveredKey = key(v.discovered);
+  const cells = (v.cells || []).flatMap((row) => row.map((cell) => {
+    const cellKey = `${cell.row},${cell.col}`;
+    const known = cell.distance !== null && cell.distance !== undefined;
+    const classes = [
+      "m542-cell",
+      cell.isSource ? "source" : "",
+      known ? "known" : "unknown",
+      cellKey === originKey ? "origin" : "",
+      cellKey === neighborKey ? "neighbor" : "",
+      cellKey === discoveredKey ? "discovered" : "",
+    ].filter(Boolean).join(" ");
+    const display = known ? cell.distance : v.phase === "setup" && v.operation !== "distance-init" ? (cell.input ?? "·") : "·";
+    const aria = cell.isSource
+      ? `(${cell.row},${cell.col}), source, distance 0`
+      : `(${cell.row},${cell.col}), ${known ? `distance ${cell.distance}` : "unvisited"}`;
+    return `<div class="${classes}" style="--m542-d:${known ? cell.distance : -1}" aria-label="${requestedVizEsc(aria)}">
+      <small>${cell.row},${cell.col}</small><strong>${requestedVizEsc(display)}</strong>${cell.isSource ? "<i>◎</i>" : ""}
+    </div>`;
   })).join("");
-  const queue = (view.queue || []).length
-    ? view.queue.map((cell, index) => `<span class="${index === 0 ? "front" : ""}"><small>${index === 0 ? "FRONT" : `#${index + 1}`}</small><b>(${cell.row},${cell.col})</b><em>d=${cell.distance ?? "???"}</em></span>`).join("<i>???</i>")
-    : requestedVizEmpty(vi ? "Queue r???ng" : "Queue is empty");
-  const sources = (view.sources || []).map(([row, col]) => `<span>(${row},${col})</span>`).join("") || requestedVizEmpty("???");
-  const neighbor = view.neighbor
-    ? `<div class="rv-focus-equation${view.check?.unvisited === true ? " success" : ""}"><span>${view.current ? `(${view.current.join(",")})` : "?"} + ${view.direction ? `(${view.direction.join(",")})` : "?"}</span><strong>??? (${view.neighbor.join(",")})</strong><b>${view.check?.inBounds === false ? "OUT" : view.check?.unvisited === true ? "DISCOVER" : view.check?.unvisited === false ? "SKIP" : "CHECK"}</b></div>`
-    : "";
-  const result = view.phase === "result" && view.answer !== null
-    ? `<div class="rv-core-result ${view.invalid ? "error" : ""}"><small>RETURN</small><strong>${requestedVizEsc(JSON.stringify(view.answer))}</strong></div>`
+  const waves = (v.waves || []).map((wave) => {
+    const complete = wave.total > 0 && wave.reached >= wave.total;
+    const active = v.phase === "bfs" && wave.distance === v.activeDistance;
+    return `<span class="${complete ? "done" : ""} ${active ? "active" : ""}" style="--wave:${wave.distance}"><i></i><b>d=${wave.distance}</b><small>${wave.reached}/${wave.total}</small></span>`;
+  }).join("<em>›</em>");
+  const queueItems = (v.queue || []).slice(0, 10).map((cell, index) => `<span class="${index === 0 ? "front" : ""}">
+    <small>${index === 0 ? "POP" : `+${index}`}</small><b>${cell.row},${cell.col}</b><i>${cell.distance ?? "·"}</i>
+  </span>`).join("<em>›</em>");
+  const queue = queueItems || `<b class="m542-empty">∅</b>`;
+  const queueMore = (v.queue || []).length > 10 ? `<small class="m542-more">+${v.queue.length - 10}</small>` : "";
+  const sourceDots = (v.sources || []).slice(0, 12).map(([row, col]) => `<i aria-label="source ${row},${col}">0</i>`).join("");
+  const sourceMore = (v.sources || []).length > 12 ? `<small>+${v.sources.length - 12}</small>` : "";
+  const origin = Array.isArray(v.origin) ? v.origin : null;
+  const neighbor = Array.isArray(v.neighbor) ? v.neighbor : null;
+  const originCell = origin ? v.cells?.[origin[0]]?.[origin[1]] : null;
+  const neighborCell = neighbor && neighbor[0] >= 0 && neighbor[0] < v.rows && neighbor[1] >= 0 && neighbor[1] < v.cols
+    ? v.cells?.[neighbor[0]]?.[neighbor[1]]
+    : null;
+  const discoveredNow = ["distance-update", "neighbor-enqueue"].includes(v.operation);
+  const verdict = v.check?.inBounds === false ? "× OUT" : discoveredNow || v.check?.unvisited === true ? "✓ NEW" : v.check?.unvisited === false ? "× SKIP" : "?";
+  const transfer = neighbor ? `<div class="m542-transfer ${discoveredNow || v.check?.unvisited === true ? "success" : v.check?.unvisited === false || v.check?.inBounds === false ? "skip" : ""}">
+    <span><small>${origin ? `(${origin.join(",")})` : "—"}</small><b>${originCell?.distance ?? "·"}</b></span>
+    <em>+1</em><strong>→</strong>
+    <span><small>(${neighbor.join(",")})</small><b>${neighborCell?.distance ?? (discoveredNow || v.check?.unvisited === true ? (originCell?.distance ?? 0) + 1 : "·")}</b></span>
+    <i>${verdict}</i>
+  </div>` : "";
+  const result = v.phase === "result"
+    ? `<div class="m542-done ${v.invalid ? "error" : ""}"><b>${v.invalid ? "!" : "✓"}</b><span>${v.invalid ? t("GRID KHÔNG HỢP LỆ", "INVALID GRID") : `${v.knownCount}/${v.totalCells}`}</span></div>`
     : "";
 
-  requestedVizSet(`${requestedVizPhases(vi ? ["Kh???i t???o distance", "Thu th???p m???i source 0", "Multi-source BFS", "Ma tr???n k???t qu???"] : ["Initialize distances", "Collect every zero source", "Multi-source BFS", "Result matrix"], phaseIndex)}
-    <div class="rv-action-banner"><b>${requestedVizEsc((view.operation || "step").toUpperCase())}</b><span>${requestedVizEsc(step.note ? pick(step.note) : "")}</span></div>
-    <div class="rv-matrix542-stats"><span><small>sources</small><b>${(view.sources || []).length}</b></span><span><small>queue</small><b>${(view.queue || []).length}</b></span><span><small>grid</small><b>${view.rows}??${view.cols}</b></span></div>
-    <section class="rv-panel"><h4>${vi ? "Distance grid ??? ??? l?? ch??a th??m" : "Distance grid ??? ??? means unvisited"}</h4><div class="rv-matrix-grid" style="--rv-matrix-cols:${view.cols}">${cells}</div></section>
-    ${neighbor}
-    <div class="rv-two-column"><section class="rv-panel"><h4>${vi ? "C??c source ???????c enqueue v???i d=0" : "Sources enqueued with d=0"}</h4><div class="rv-source-set">${sources}</div></section><section class="rv-panel"><h4>QUEUE ?? FRONT ??? BACK</h4><div class="rv-matrix-queue">${queue}</div></section></div>
-    ${result}`,
-  vi ? "Multi-source BFS cho ma tr???n kho???ng c??ch" : "Multi-source BFS distance matrix");
+  requestedVizSet(`<section class="m542-viz phase-${v.phase}" data-operation="${requestedVizEsc(v.operation || "step")}">
+    <header class="m542-header"><div class="m542-stages">${stages}</div><div class="m542-score"><span>◎ <b>${(v.sources || []).length}</b></span><span>✓ <b>${v.knownCount || 0}/${v.totalCells || 0}</b></span></div></header>
+    <div class="m542-source-picture"><div>${sourceDots}${sourceMore}</div><strong>→</strong><span>QUEUE</span><strong>→</strong><i>)))</i></div>
+    <div class="m542-waves">${waves || "<span><i></i><b>d=0</b><small>0/0</small></span>"}</div>
+    <div class="m542-grid" style="--m542-cols:${v.cols}">${cells}</div>
+    ${transfer}
+    <section class="m542-queue"><header><b>QUEUE</b><small>FRONT → BACK</small></header><div>${queue}${queueMore}</div></section>
+    ${result}
+    <footer><code>${t("lần đầu = ngắn nhất", "first visit = shortest")}</code><b>O(m·n)</b></footer>
+  </section>`, t("BFS đa nguồn: khoảng cách tới số 0 gần nhất", "Multi-source BFS: distance to the nearest zero"), "group");
 }
 
 function renderUnionFind684View(step) {

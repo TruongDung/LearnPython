@@ -18795,34 +18795,26 @@ module.exports = {
     tags: [{ key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" }],
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "01 Matrix", en: "01 Matrix" },
-    titleVi: { vi: "Khoảng cách đến số 0 gần nhất", en: "Distance to the nearest zero" },
+    titleVi: { vi: "Nhiều số 0, một làn sóng BFS", en: "Many zeros, one BFS wave" },
     statement: {
-      vi:
-        "Cho matrix rows×cols chỉ gồm 0 và 1, trong đó có ít nhất một ô 0. Với mỗi ô, hãy trả về khoảng cách đến ô 0 gần nhất. " +
-        "Khoảng cách giữa hai ô kề cạnh là 1. Nhập các hàng cách nhau bởi '|'.",
-      en:
-        "Given a rows×cols binary matrix containing at least one zero, return the distance from every cell to its nearest zero. " +
-        "The distance between edge-adjacent cells is 1. Enter rows separated by '|'.",
+      vi: "Với mỗi ô, tìm số bước ngắn nhất để tới một ô 0. Chỉ đi 4 hướng.",
+      en: "For every cell, find the fewest steps to a zero. Move in 4 directions.",
     },
     defaultInput: "0,0,0|0,1,0|1,1,1",
     inputKind: "string",
     inputLabel: { vi: "Matrix 0/1 (hàng cách '|')", en: "0/1 matrix (rows separated by '|')" },
     approach: [
       {
-        vi: "Khởi tạo distances = -1. Đưa tất cả ô 0 vào queue với distance = 0.",
-        en: "Initialize distances to -1. Put every zero in the queue with distance 0.",
+        vi: "Đưa tất cả ô 0 vào queue với d=0.",
+        en: "Put every zero in the queue with d=0.",
       },
       {
-        vi: "Chạy một lần multi-source BFS từ toàn bộ ô 0 cùng lúc.",
-        en: "Run one multi-source BFS from all zero cells simultaneously.",
+        vi: "Cho BFS lan đồng thời theo từng lớp.",
+        en: "Spread BFS in simultaneous layers.",
       },
       {
-        vi: "Lần đầu tới một ô chưa thăm, gán distance của nó bằng distance ô hiện tại + 1 rồi enqueue.",
-        en: "On the first visit to a cell, assign current distance + 1 and enqueue it.",
-      },
-      {
-        vi: "BFS thăm theo khoảng cách tăng dần, nên lần đầu tìm thấy một ô chính là khoảng cách ngắn nhất tới số 0.",
-        en: "BFS visits in increasing distance order, so a cell's first discovered distance is its shortest distance to zero.",
+        vi: "Lần đầu tới ô: d[next] = d[cur] + 1.",
+        en: "On first visit: d[next] = d[cur] + 1.",
       },
     ],
     complexity: {
