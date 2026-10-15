@@ -57,8 +57,8 @@ class SecurityPath9021Visualizer {
     const built = new Set(view.builtEdges || view.edges.map((_, index) => index));
     const orderedEdges = view.edges.map((edge, edgeId) => ({ edge, edgeId, geometry: this.edgeGeometry(edge[0], edge[1], points) }))
       .sort((first, second) => Number(first.geometry.curved) - Number(second.geometry.curved));
-    return orderedEdges.map(({ edge: [a, b, security], edgeId, geometry }) => {
-      const open = view.limit !== null && security <= view.limit;
+    return orderedEdges.map(({ edge: [a, b, safe], edgeId, geometry }) => {
+      const open = view.limit !== null && safe <= view.limit;
       const classes = [open ? "open" : "locked"];
       if (!built.has(edgeId)) classes.push("future");
       if (geometry.curved) classes.push("curved");
@@ -73,7 +73,7 @@ class SecurityPath9021Visualizer {
         <path class="sp9021-link" d="${geometry.path}" />
         <g class="sp9021-lock" transform="translate(${geometry.labelX.toFixed(2)},${geometry.labelY.toFixed(2)})">
           <rect x="-20" y="-14" width="40" height="28" rx="14" />
-          <text class="level" x="-4" y="5">${security}</text><text class="state" x="11" y="5">${label}</text>
+          <text class="level" x="-4" y="5">${safe}</text><text class="state" x="11" y="5">${label}</text>
         </g>
       </g>`;
     }).join("");
@@ -126,8 +126,8 @@ class SecurityPath9021Visualizer {
     const queue = view.queue.length
       ? view.queue.map((node) => `<span>${node}</span>`).join("<i>→</i>")
       : `<span class="empty">∅</span>`;
-    this.host.innerHTML = `<section class="sp9021-viz ${view.final ? "is-final" : ""}" aria-label="${this.t("Mô phỏng mức bảo mật nhỏ nhất", "Minimum security level simulation")}">
-      <header class="sp9021-heading"><strong>#9021 · ${this.t("Chìa khóa bảo mật", "Security key")}</strong><span>${view.final ? this.t("NHỎ NHẤT", "MINIMUM") : "BINARY SEARCH"}</span></header>
+    this.host.innerHTML = `<section class="sp9021-viz ${view.final ? "is-final" : ""}" aria-label="${this.t("Mô phỏng mức safe nhỏ nhất", "Minimum safe level simulation")}">
+      <header class="sp9021-heading"><strong>#9021 · ${this.t("Chìa khóa safe", "Safe key")}</strong><span>${view.final ? this.t("NHỎ NHẤT", "MINIMUM") : "BINARY SEARCH"}</span></header>
       <div class="sp9021-dashboard">
         <div class="sp9021-key ${status}"><div class="sp9021-key-shape"><i></i><b></b></div><small>S</small><output>${answer}</output><em>${statusMark}</em></div>
         <div class="sp9021-route-wrap"><small>u → v</small>${this.routeStrip(view)}</div>

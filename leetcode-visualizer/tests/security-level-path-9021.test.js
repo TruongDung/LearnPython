@@ -20,9 +20,9 @@ function oracle({ n, edges, u, v }) {
     for (let i = 0; i < n; i++) if (!used[i] && (node < 0 || best[i] < best[node])) node = i;
     if (node < 0 || best[node] === Infinity) break;
     used[node] = true;
-    for (const [a, b, security] of edges) {
+    for (const [a, b, safe] of edges) {
       const neighbor = a === node ? b : b === node ? a : -1;
-      if (neighbor >= 0) best[neighbor] = Math.min(best[neighbor], Math.max(best[node], security));
+      if (neighbor >= 0) best[neighbor] = Math.min(best[neighbor], Math.max(best[node], safe));
     }
   }
   return best[v] === Infinity ? -1 : best[v];
@@ -131,17 +131,17 @@ test('9021 displayed Python and Edit & Run arguments agree with the visualizer',
   const requestedSnippet = `from collections import deque
 
 class Solution:
-    def minimumSecurityLevel(self, n, edges, u, v):
+    def minimumSafeLevel(self, n, edges, u, v):
         if u == v:
             return 0
 
         graph = [[] for _ in range(n)]
         levels = set()
 
-        for a, b, security in edges:
-            graph[a].append((b, security))
-            graph[b].append((a, security))
-            levels.add(security)
+        for a, b, safe in edges:
+            graph[a].append((b, safe))
+            graph[b].append((a, safe))
+            levels.add(safe)
 
         if not levels:
             return -1
@@ -189,11 +189,11 @@ class Solution:
     { n: 3, edges: [[0, 1, 9]], u: 2, v: 2 },
     { n: 3, edges: [], u: 0, v: 1 },
   ];
-  const source = `${problem.code.join('\n')}\nimport json, sys\nfor case in json.load(sys.stdin):\n    actual = Solution().minimumSecurityLevel(case['n'], case['edges'], case['u'], case['v'])\n    assert actual == case['expected'], (actual, case['expected'])`;
+  const source = `${problem.code.join('\n')}\nimport json, sys\nfor case in json.load(sys.stdin):\n    actual = Solution().minimumSafeLevel(case['n'], case['edges'], case['u'], case['v'])\n    assert actual == case['expected'], (actual, case['expected'])`;
   const execution = spawnSync('python3', ['-c', source], { encoding: 'utf8', input: JSON.stringify(cases.map(input => ({ ...input, expected: oracle(input) }))) });
   assert.equal(execution.status, 0, execution.stderr);
   for (const input of cases) assert.deepEqual(problem.liveArgs(input), [input.n, input.edges, input.u, input.v]);
-  assert.deepEqual(extractLiveMethod(problem, 1), { name: 'minimumSecurityLevel', params: ['n', 'edges', 'u', 'v'] });
+  assert.deepEqual(extractLiveMethod(problem, 1), { name: 'minimumSafeLevel', params: ['n', 'edges', 'u', 'v'] });
 });
 
 test('9021 renderer keeps the graph visual, key states and final route clear in both languages', () => {

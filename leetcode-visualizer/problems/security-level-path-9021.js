@@ -6,17 +6,17 @@ const CODE_9021 = [
   "from collections import deque",
   "",
   "class Solution:",
-  "    def minimumSecurityLevel(self, n, edges, u, v):",
+  "    def minimumSafeLevel(self, n, edges, u, v):",
   "        if u == v:",
   "            return 0",
   "",
   "        graph = [[] for _ in range(n)]",
   "        levels = set()",
   "",
-  "        for a, b, security in edges:",
-  "            graph[a].append((b, security))",
-  "            graph[b].append((a, security))",
-  "            levels.add(security)",
+  "        for a, b, safe in edges:",
+  "            graph[a].append((b, safe))",
+  "            graph[b].append((a, safe))",
+  "            levels.add(safe)",
   "",
   "        if not levels:",
   "            return -1",
@@ -67,7 +67,7 @@ function parseInput9021(input) {
     throw new Error("9021: n phải là số nguyên từ 2 đến 9.");
   }
   if (!Array.isArray(data.edges) || data.edges.length > 16) {
-    throw new Error("9021: edges phải có từ 0 đến 16 cạnh [a,b,security].");
+    throw new Error("9021: edges phải có từ 0 đến 16 cạnh [a,b,safe].");
   }
   if (!Number.isInteger(data.u) || !Number.isInteger(data.v) || data.u < 0 || data.u >= data.n || data.v < 0 || data.v >= data.n) {
     throw new Error("9021: u và v phải là node hợp lệ.");
@@ -75,16 +75,16 @@ function parseInput9021(input) {
   const pairs = new Set();
   const edges = data.edges.map((edge) => {
     if (!Array.isArray(edge) || edge.length !== 3 || edge.some((value) => !Number.isInteger(value))) {
-      throw new Error("9021: mỗi cạnh phải là [a,b,security] gồm các số nguyên.");
+      throw new Error("9021: mỗi cạnh phải là [a,b,safe] gồm các số nguyên.");
     }
-    const [a, b, security] = edge;
-    if (a < 0 || a >= data.n || b < 0 || b >= data.n || a === b || security < 1 || security > 99) {
-      throw new Error("9021: đầu cạnh phải khác nhau, thuộc [0,n), security thuộc [1,99].");
+    const [a, b, safe] = edge;
+    if (a < 0 || a >= data.n || b < 0 || b >= data.n || a === b || safe < 1 || safe > 99) {
+      throw new Error("9021: đầu cạnh phải khác nhau, thuộc [0,n), safe thuộc [1,99].");
     }
     const key = a < b ? `${a}:${b}` : `${b}:${a}`;
     if (pairs.has(key)) throw new Error("9021: không dùng hai cạnh trùng giữa cùng một cặp node.");
     pairs.add(key);
-    return [a, b, security];
+    return [a, b, safe];
   });
   return { n: data.n, edges, u: data.u, v: data.v };
 }
@@ -169,8 +169,8 @@ function buildSteps9021(input) {
         checkedEdges.add(neighbor.edgeId);
         const base = { limit, queue, visited, current: node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges };
         if (trace) emit({ phase: "inspect", line: 31, ...base });
-        const canCross = neighbor.security <= limit && !visited.has(neighbor.node);
-        if (trace) emit({ phase: neighbor.security > limit ? "locked" : visited.has(neighbor.node) ? "skip" : "inspect", line: 32, ...base });
+        const canCross = neighbor.safe <= limit && !visited.has(neighbor.node);
+        if (trace) emit({ phase: neighbor.safe > limit ? "locked" : visited.has(neighbor.node) ? "skip" : "inspect", line: 32, ...base });
         if (!canCross) continue;
         visited.add(neighbor.node);
         parent[neighbor.node] = node;
@@ -193,13 +193,13 @@ function buildSteps9021(input) {
   }
   emit({ phase: "build", line: 8 });
   emit({ phase: "build", line: 9 });
-  edges.forEach(([a, b, security], edgeId) => {
+  edges.forEach(([a, b, safe], edgeId) => {
     emit({ phase: "build", line: 11, current: a, activeEdge: edgeId });
-    graph[a].push({ node: b, security, edgeId });
+    graph[a].push({ node: b, safe, edgeId });
     emit({ phase: "build", line: 12, current: a, activeEdge: edgeId });
-    graph[b].push({ node: a, security, edgeId });
+    graph[b].push({ node: a, safe, edgeId });
     emit({ phase: "build", line: 13, current: b, activeEdge: edgeId });
-    levelSet.add(security);
+    levelSet.add(safe);
     builtEdges.add(edgeId);
     emit({ phase: "build", line: 14, current: b, activeEdge: edgeId });
   });
@@ -256,14 +256,14 @@ module.exports = {
       { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
       { key: "bfs", vi: "BFS", en: "BFS" },
     ],
-    title: bi("Minimum Security Level", "Minimum Security Level"),
-    titleVi: bi("Chìa khóa nhỏ nhất để đi từ u tới v", "Minimum key to travel from u to v"),
-    statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9021). Đồ thị vô hướng có mức bảo mật trên mỗi cạnh. Chìa khóa mức S chỉ mở cạnh có security ≤ S. Tìm S nhỏ nhất để đi từ u tới v; trả -1 nếu không có đường đi.", "Interview problem from the screenshot (internal ID #9021). Each undirected edge has a security level. A key of level S opens edges with security ≤ S. Find the minimum S that connects u to v, or -1 if no path exists."),
+    title: bi("Minimum Safe Level", "Minimum Safe Level"),
+    titleVi: bi("Mức safe nhỏ nhất để đi từ u tới v", "Minimum safe level to travel from u to v"),
+    statement: bi("Bài phỏng vấn trong ảnh (ID nội bộ #9021). Đồ thị vô hướng có mức safe trên mỗi cạnh. Chìa khóa mức S chỉ mở cạnh có safe ≤ S. Tìm S nhỏ nhất để đi từ u tới v; trả -1 nếu không có đường đi.", "Interview problem from the screenshot (internal ID #9021). Each undirected edge has a safe level. A key of level S opens edges with safe ≤ S. Find the minimum S that connects u to v, or -1 if no path exists."),
     defaultInput: JSON.stringify({ n: 7, edges: [[0, 1, 4], [0, 2, 7], [1, 3, 6], [1, 4, 9], [2, 4, 5], [3, 5, 8], [4, 5, 6], [4, 6, 10], [5, 6, 8], [2, 3, 3]], u: 0, v: 6 }),
     inputKind: "string",
-    inputLabel: bi('JSON: {"n":7,"edges":[[a,b,security]],"u":0,"v":6}', 'JSON: {"n":7,"edges":[[a,b,security]],"u":0,"v":6}'),
+    inputLabel: bi('JSON: {"n":7,"edges":[[a,b,safe]],"u":0,"v":6}', 'JSON: {"n":7,"edges":[[a,b,safe]],"u":0,"v":6}'),
     debugMode: "line-by-line",
-    approach: [bi("Binary search mức security. Với mỗi S, BFS chỉ đi qua cạnh có security ≤ S.", "Binary-search the security levels. For each S, BFS traverses only edges with security ≤ S.")],
+    approach: [bi("Binary search mức safe. Với mỗi S, BFS chỉ đi qua cạnh có safe ≤ S.", "Binary-search the safe levels. For each S, BFS traverses only edges with safe ≤ S.")],
     complexity: { time: "O((V + E) log E)", space: "O(V + E)", note: bi("Mỗi lần thử chạy BFS; tìm kiếm trên các mức cạnh khác nhau.", "Each trial runs BFS over the graph; search only distinct edge levels.") },
     code: CODE_9021,
     codeLabel: bi("Binary Search + BFS", "Binary Search + BFS"),
