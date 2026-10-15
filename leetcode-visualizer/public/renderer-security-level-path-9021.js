@@ -22,25 +22,56 @@ class SecurityPath9021Visualizer {
     });
   }
 
+  edgeGeometry(a, b, points) {
+    const [x1, y1] = points[a];
+    const [x2, y2] = points[b];
+    const pair = a < b ? `${a}:${b}` : `${b}:${a}`;
+    if (pair === "1:4") {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.hypot(dx, dy) || 1;
+      const bridgeT = 0.545;
+      const bridgeX = x1 + dx * bridgeT;
+      const bridgeY = y1 + dy * bridgeT;
+      const beforeX = bridgeX - (dx / length) * 13;
+      const beforeY = bridgeY - (dy / length) * 13;
+      const afterX = bridgeX + (dx / length) * 13;
+      const afterY = bridgeY + (dy / length) * 13;
+      const controlX = bridgeX - (dy / length) * 22;
+      const controlY = bridgeY + (dx / length) * 22;
+      return {
+        path: `M ${x1} ${y1} L ${beforeX.toFixed(2)} ${beforeY.toFixed(2)} Q ${controlX.toFixed(2)} ${controlY.toFixed(2)} ${afterX.toFixed(2)} ${afterY.toFixed(2)} L ${x2} ${y2}`,
+        labelX: x1 + dx * 0.3,
+        labelY: y1 + dy * 0.3,
+        curved: true,
+      };
+    }
+    const labelT = pair === "2:3" ? 0.68 : 0.5;
+    return { path: `M ${x1} ${y1} L ${x2} ${y2}`, labelX: x1 + (x2 - x1) * labelT, labelY: y1 + (y2 - y1) * labelT, curved: false };
+  }
+
   edgeMarkup(view, points) {
     const checked = new Set(view.checkedEdges);
     const crossed = new Set(view.crossedEdges);
     const route = new Set(view.pathEdges);
-    return view.edges.map(([a, b, security], edgeId) => {
-      const [x1, y1] = points[a];
-      const [x2, y2] = points[b];
-      const mx = (x1 + x2) / 2;
-      const my = (y1 + y2) / 2;
+    const built = new Set(view.builtEdges || view.edges.map((_, index) => index));
+    const orderedEdges = view.edges.map((edge, edgeId) => ({ edge, edgeId, geometry: this.edgeGeometry(edge[0], edge[1], points) }))
+      .sort((first, second) => Number(first.geometry.curved) - Number(second.geometry.curved));
+    return orderedEdges.map(({ edge: [a, b, security], edgeId, geometry }) => {
       const open = view.limit !== null && security <= view.limit;
       const classes = [open ? "open" : "locked"];
+      if (!built.has(edgeId)) classes.push("future");
+      if (geometry.curved) classes.push("curved");
       if (checked.has(edgeId)) classes.push("checked");
       if (crossed.has(edgeId)) classes.push("crossed");
       if (view.activeEdge === edgeId) classes.push("active");
       if (route.has(edgeId)) classes.push("route");
       const label = open ? "✓" : "×";
-      return `<g class="sp9021-edge ${classes.join(" ")}" data-edge="${edgeId}">
-        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />
-        <g class="sp9021-lock" transform="translate(${mx},${my})">
+      const pair = a < b ? `${a}-${b}` : `${b}-${a}`;
+      return `<g class="sp9021-edge ${classes.join(" ")}" data-edge="${edgeId}" data-pair="${pair}" data-label-x="${geometry.labelX.toFixed(2)}" data-label-y="${geometry.labelY.toFixed(2)}">
+        ${geometry.curved ? `<path class="sp9021-bridge-underlay" d="${geometry.path}" />` : ""}
+        <path class="sp9021-link" d="${geometry.path}" />
+        <g class="sp9021-lock" transform="translate(${geometry.labelX.toFixed(2)},${geometry.labelY.toFixed(2)})">
           <rect x="-20" y="-14" width="40" height="28" rx="14" />
           <text class="level" x="-4" y="5">${security}</text><text class="state" x="11" y="5">${label}</text>
         </g>
@@ -74,7 +105,7 @@ class SecurityPath9021Visualizer {
     return `<div class="sp9021-levels" aria-label="${this.t("Các mức chìa khóa", "Key levels")}">${view.levels.map((level, index) => {
       const state = result.has(level) ? (result.get(level) ? "yes" : "no") : "";
       const active = level === view.limit ? " active" : "";
-      const inRange = index >= view.left && index <= view.right ? " in-range" : "";
+      const inRange = Number.isInteger(view.left) && Number.isInteger(view.right) && index >= view.left && index < view.right ? " in-range" : "";
       return `<span class="${state}${active}${inRange}" aria-label="${this.escape(`S ${level}${state === "yes" ? ": reachable" : state === "no" ? ": blocked" : ""}`)}"><i>${state === "yes" ? "✓" : state === "no" ? "×" : ""}</i><b>${level}</b></span>`;
     }).join("")}</div>`;
   }

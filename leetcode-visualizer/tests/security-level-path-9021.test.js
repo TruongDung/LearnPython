@@ -40,9 +40,9 @@ test('9021 returns the minimum key and highlights a concrete minimum route', () 
   assert.deepEqual(final.pathEdges.map(index => final.edges[index][2]), [4, 6, 8, 8]);
   assert.equal(Math.max(...final.pathEdges.map(index => final.edges[index][2])), run.answer);
   assert.deepEqual(final.history, [
-    { level: 6, reachable: false },
-    { level: 8, reachable: true },
     { level: 7, reachable: false },
+    { level: 9, reachable: true },
+    { level: 8, reachable: true },
   ]);
 });
 
@@ -84,15 +84,35 @@ test('9021 trace only crosses open edges and binary search retains the answer', 
     const view = frame(step);
     assert.ok(step.codeLines.every(line => problem.code[line - 1]?.trim()), `invalid code line in ${view.phase}`);
     assert.ok(view.seen.every(node => node >= 0 && node < view.n));
-    assert.ok(view.queue.every(node => view.seen.includes(node)));
+    if (step.codeLines[0] !== 16) assert.ok(view.queue.every(node => view.seen.includes(node)));
     for (const edgeId of view.crossedEdges) assert.ok(view.edges[edgeId][2] <= view.limit);
     if (view.activeEdge !== null && view.phase === 'locked') assert.ok(view.edges[view.activeEdge][2] > view.limit);
     if (view.phase === 'cross') assert.ok(view.edges[view.activeEdge][2] <= view.limit);
     if (view.levels.length && view.phase === 'narrow') {
       assert.ok(view.left <= view.right);
-      assert.ok(view.levels[view.left] <= run.answer && run.answer <= view.levels[view.right]);
+      const upper = view.right === view.levels.length ? Infinity : view.levels[view.right];
+      assert.ok(view.levels[view.left] <= run.answer && run.answer <= upper);
     }
   }
+});
+
+test('9021 debug trace advances one executable source line at a time', () => {
+  const run = problem.builder(problem.defaultInput);
+  const lines = new Set(run.steps.map(step => {
+    assert.equal(step.codeLines.length, 1);
+    return step.codeLines[0];
+  }));
+  for (const line of [5, 6, 7, 8, 10, 13, 16, 17, 19, 20, 21, 24, 25, 26, 27, 28, 29, 30, 32, 34, 35, 36, 37, 39, 40, 42, 44, 47]) {
+    assert.ok(lines.has(line), `default trace should execute line ${line}`);
+  }
+  const discover = run.steps.findIndex(step => step.codeLines[0] === 29 && frame(step).current === 1);
+  assert.ok(discover >= 0);
+  assert.ok(frame(run.steps[discover]).seen.includes(1));
+  assert.ok(!frame(run.steps[discover]).queue.includes(1));
+  assert.equal(run.steps[discover + 1].codeLines[0], 30);
+  assert.ok(frame(run.steps[discover + 1]).queue.includes(1));
+  assert.ok(problem.builder({ n: 3, edges: [[0, 1, 2]], u: 2, v: 2 }).steps.some(step => step.codeLines[0] === 11));
+  assert.ok(problem.builder({ n: 4, edges: [[0, 1, 2], [2, 3, 3]], u: 0, v: 3 }).steps.some(step => step.codeLines[0] === 45));
 });
 
 test('9021 rejects malformed and ambiguous graph inputs', () => {
@@ -144,6 +164,26 @@ test('9021 renderer keeps the graph visual, key states and final route clear in 
   assert.match(host.innerHTML, /sp9021-route found/);
   assert.match(host.innerHTML, /sp9021-edge open[^>]* route/);
   assert.match(host.innerHTML, /<output>8<\/output>/);
+});
+
+test('9021 separates the 1-4 and 2-3 edge labels and draws a visible bridge', () => {
+  const context = { escapeHtml: String };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-security-level-path-9021.js'), 'utf8'), context);
+  const Visualizer = vm.runInContext('SecurityPath9021Visualizer', context);
+  const renderer = new Visualizer({ host: {}, escape: String });
+  const points = renderer.positions(7);
+  const oneFour = renderer.edgeGeometry(1, 4, points);
+  const twoThree = renderer.edgeGeometry(2, 3, points);
+  assert.equal(oneFour.curved, true);
+  assert.match(oneFour.path, / L .* Q .* L /);
+  assert.equal(twoThree.curved, false);
+  assert.ok(Math.abs(oneFour.labelX - twoThree.labelX) >= 44 || Math.abs(oneFour.labelY - twoThree.labelY) >= 32);
+  const host = { innerHTML: '' };
+  new Visualizer({ host, escape: String }).render(problem.builder(problem.defaultInput).steps.at(-1));
+  assert.match(host.innerHTML, /data-pair="1-4"[^>]*data-label-x="194\.40"/);
+  assert.match(host.innerHTML, /data-pair="2-3"[^>]*data-label-x="243\.04"/);
+  assert.match(host.innerHTML, /sp9021-bridge-underlay/);
 });
 
 test('9021 is a lazy custom interview visualization registered in the app', () => {

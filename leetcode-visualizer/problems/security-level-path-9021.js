@@ -27,23 +27,27 @@ const CODE_9021 = [
   "                    return True",
   "",
   "                for neighbor, security in graph[node]:",
-  "                    if security <= limit and neighbor not in seen:",
-  "                        seen.add(neighbor)",
-  "                        queue.append(neighbor)",
+  "                    if security > limit:",
+  "                        continue",
+  "                    if neighbor in seen:",
+  "                        continue",
+  "                    seen.add(neighbor)",
+  "                    queue.append(neighbor)",
   "",
   "            return False",
   "",
-  "        if not levels or not can_reach(levels[-1]):",
-  "            return -1",
-  "",
-  "        left, right = 0, len(levels) - 1",
+  "        left, right = 0, len(levels)",
   "        while left < right:",
   "            mid = (left + right) // 2",
+  "            limit = levels[mid]",
   "",
-  "            if can_reach(levels[mid]):",
+  "            if can_reach(limit):",
   "                right = mid",
   "            else:",
   "                left = mid + 1",
+  "",
+  "        if left == len(levels):",
+  "            return -1",
   "",
   "        return levels[left]",
 ];
@@ -82,40 +86,44 @@ function parseInput9021(input) {
 function buildSteps9021(input) {
   const { n, edges, u, v } = parseInput9021(input);
   const graph = Array.from({ length: n }, () => []);
-  edges.forEach(([a, b, security], edgeId) => {
-    graph[a].push({ node: b, security, edgeId });
-    graph[b].push({ node: a, security, edgeId });
-  });
   const levels = [...new Set(edges.map((edge) => edge[2]))].sort((a, b) => a - b);
   const steps = [];
   const history = [];
-  let left = 0;
-  let right = Math.max(0, levels.length - 1);
+  const builtEdges = new Set();
+  let left = null;
+  let right = null;
 
   function emit({ phase, line, limit = null, mid = null, queue = [], seen = [], current = null, activeEdge = null, checkedEdges = [], crossedEdges = [], pathNodes = [], pathEdges = [], reachable = null, final = false }) {
     const phaseTitles = {
+      build: bi("Dựng đồ thị", "Build the graph"),
+      check: bi("Kiểm tra điều kiện", "Check the condition"),
       ready: bi("Chọn chìa khóa", "Choose a key"),
       pick: bi("Thử mức khóa", "Try key level"),
       visit: bi("BFS mở phòng", "BFS opens a room"),
       inspect: bi("Thử cánh cửa", "Try a door"),
       cross: bi("Cửa mở", "Door opens"),
       locked: bi("Cửa khóa", "Door locked"),
+      skip: bi("Đã ghé rồi", "Already visited"),
       found: bi("Đã nối tới v", "Reached v"),
       miss: bi("Chưa tới v", "Cannot reach v"),
       narrow: bi("Thu hẹp chìa khóa", "Narrow the key"),
       done: bi("Mức nhỏ nhất", "Minimum level"),
     };
     steps.push({
-      title: phaseTitles[phase], note: bi("", ""), codeLines: line ? [line] : [], final,
+      title: phaseTitles[phase], note: bi("", ""), codeLines: [line], final,
       vars: [
+        { name: "left", value: left ?? "—" },
+        { name: "right", value: right ?? "—" },
+        { name: "mid", value: mid ?? "—" },
         { name: "S", value: limit ?? "—" },
-        { name: "range", value: levels.length ? `${levels[left] ?? levels.at(-1)}..${levels[right] ?? levels.at(-1)}` : "—" },
+        { name: "node", value: current ?? "—" },
         { name: "queue", value: queue.length ? queue.join(" → ") : "∅" },
       ],
       securityPath9021View: {
         n, edges: edges.map((edge) => [...edge]), u, v, levels: [...levels],
         phase, limit, left, right, mid, queue: [...queue], seen: [...seen], current,
         activeEdge, checkedEdges: [...checkedEdges], crossedEdges: [...crossedEdges],
+        builtEdges: [...builtEdges],
         pathNodes: [...pathNodes], pathEdges: [...pathEdges], reachable,
         history: history.map((item) => ({ ...item })), final,
       },
@@ -124,15 +132,19 @@ function buildSteps9021(input) {
 
   function bfs(limit, trace) {
     const queue = [u];
-    const seen = new Set([u]);
+    const seen = new Set();
     const parent = Array(n).fill(null);
     const parentEdge = Array(n).fill(null);
     const checkedEdges = new Set();
     const crossedEdges = new Set();
     if (trace) emit({ phase: "visit", line: 16, limit, queue, seen });
+    seen.add(u);
+    if (trace) emit({ phase: "visit", line: 17, limit, queue, seen, current: u });
     while (queue.length) {
+      if (trace) emit({ phase: "check", line: 19, limit, queue, seen, checkedEdges, crossedEdges });
       const node = queue.shift();
       if (trace) emit({ phase: "visit", line: 20, limit, queue, seen, current: node, checkedEdges, crossedEdges });
+      if (trace) emit({ phase: "check", line: 21, limit, queue, seen, current: node, checkedEdges, crossedEdges });
       if (node === v) {
         const pathNodes = [];
         const pathEdges = [];
@@ -149,48 +161,74 @@ function buildSteps9021(input) {
         checkedEdges.add(neighbor.edgeId);
         const base = { limit, queue, seen, current: node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges };
         if (trace) emit({ phase: "inspect", line: 24, ...base });
+        if (trace) emit({ phase: "inspect", line: 25, ...base });
         if (neighbor.security > limit) {
-          if (trace) emit({ phase: "locked", line: 25, ...base });
+          if (trace) emit({ phase: "locked", line: 26, ...base });
           continue;
         }
-        if (seen.has(neighbor.node)) continue;
+        if (trace) emit({ phase: "check", line: 27, ...base });
+        if (seen.has(neighbor.node)) {
+          if (trace) emit({ phase: "skip", line: 28, ...base });
+          continue;
+        }
         seen.add(neighbor.node);
         parent[neighbor.node] = node;
         parentEdge[neighbor.node] = neighbor.edgeId;
+        if (trace) emit({ phase: "cross", line: 29, limit, queue, seen, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
         crossedEdges.add(neighbor.edgeId);
         queue.push(neighbor.node);
-        if (trace) emit({ phase: "cross", line: 27, limit, queue, seen, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
+        if (trace) emit({ phase: "cross", line: 30, limit, queue, seen, current: neighbor.node, activeEdge: neighbor.edgeId, checkedEdges, crossedEdges });
       }
     }
-    if (trace) emit({ phase: "miss", line: 29, limit, queue, seen, checkedEdges, crossedEdges, reachable: false });
+    if (trace) emit({ phase: "check", line: 19, limit, queue, seen, checkedEdges, crossedEdges });
+    if (trace) emit({ phase: "miss", line: 32, limit, queue, seen, checkedEdges, crossedEdges, reachable: false });
     return { reachable: false, pathNodes: [], pathEdges: [] };
   }
 
-  emit({ phase: "ready", line: 13 });
+  emit({ phase: "build", line: 5 });
+  edges.forEach(([a, b, security], edgeId) => {
+    emit({ phase: "build", line: 6, current: a, activeEdge: edgeId });
+    graph[a].push({ node: b, security, edgeId });
+    emit({ phase: "build", line: 7, current: a, activeEdge: edgeId });
+    graph[b].push({ node: a, security, edgeId });
+    builtEdges.add(edgeId);
+    emit({ phase: "build", line: 8, current: b, activeEdge: edgeId });
+  });
+  emit({ phase: "check", line: 10, seen: [u], current: u });
   if (u === v) {
     emit({ phase: "done", line: 11, limit: 0, seen: [u], pathNodes: [u], reachable: true, final: true });
     return { original: { n, edges, u, v }, answer: 0, steps };
   }
-  if (!levels.length || !bfs(levels.at(-1), false).reachable) {
-    const widest = levels.at(-1) ?? null;
-    const result = widest === null ? { reachable: false, pathNodes: [], pathEdges: [] } : bfs(widest, true);
-    emit({ phase: "done", line: 32, limit: widest, seen: [], pathNodes: result.pathNodes, pathEdges: result.pathEdges, reachable: false, final: true });
-    return { original: { n, edges, u, v }, answer: -1, steps };
-  }
-
+  emit({ phase: "ready", line: 13 });
+  left = 0;
+  right = levels.length;
+  emit({ phase: "ready", line: 34 });
   while (left < right) {
+    emit({ phase: "check", line: 35 });
     const mid = Math.floor((left + right) / 2);
+    emit({ phase: "pick", line: 36, mid });
     const limit = levels[mid];
-    emit({ phase: "pick", line: 36, limit, mid });
+    emit({ phase: "pick", line: 37, limit, mid });
+    emit({ phase: "check", line: 39, limit, mid });
     const result = bfs(limit, true);
     history.push({ level: limit, reachable: result.reachable });
-    if (result.reachable) right = mid;
-    else left = mid + 1;
-    emit({ phase: "narrow", line: result.reachable ? 39 : 41, limit, mid, pathNodes: result.pathNodes, pathEdges: result.pathEdges, reachable: result.reachable });
+    if (result.reachable) {
+      right = mid;
+      emit({ phase: "narrow", line: 40, limit, mid, pathNodes: result.pathNodes, pathEdges: result.pathEdges, reachable: true });
+    } else {
+      left = mid + 1;
+      emit({ phase: "narrow", line: 42, limit, mid, reachable: false });
+    }
+  }
+  emit({ phase: "check", line: 35 });
+  emit({ phase: "check", line: 44, reachable: left < levels.length });
+  if (left === levels.length) {
+    emit({ phase: "done", line: 45, limit: levels.at(-1) ?? null, reachable: false, final: true });
+    return { original: { n, edges, u, v }, answer: -1, steps };
   }
   const answer = levels[left];
   const finalRoute = bfs(answer, false);
-  emit({ phase: "done", line: 43, limit: answer, mid: left, seen: finalRoute.pathNodes, pathNodes: finalRoute.pathNodes, pathEdges: finalRoute.pathEdges, reachable: true, final: true });
+  emit({ phase: "done", line: 47, limit: answer, mid: left, seen: finalRoute.pathNodes, pathNodes: finalRoute.pathNodes, pathEdges: finalRoute.pathEdges, reachable: true, final: true });
   return { original: { n, edges, u, v }, answer, steps };
 }
 
