@@ -2345,44 +2345,48 @@ function renderDuplicateZerosView(step) {
   const view = step.duplicateZerosView || {};
   const source = Array.isArray(view.source) ? view.source : [];
   const output = Array.isArray(view.output) ? view.output : [];
-  const virtual = Array.isArray(view.virtual) ? view.virtual : output;
   const visibleLength = Number.isInteger(view.visibleLength) ? view.visibleLength : output.length;
   const read = Number.isInteger(view.read) ? view.read : -1;
   const write = Number.isInteger(view.write) ? view.write : -1;
-  const writes = new Set((Array.isArray(view.writes) ? view.writes : []).filter((index) => index >= 0 && index < virtual.length));
-  const finalized = new Set(Array.isArray(view.finalized) ? view.finalized : []);
-  const vi = lang === "vi";
-
-  const row = (values, type) => values.map((value, index) => {
-    const isRead = type === "source" && index === read;
-    const isWrite = type === "virtual" && writes.has(index);
-    const isFinal = type === "virtual" && finalized.has(index);
-    const isOverflow = type === "virtual" && index >= visibleLength;
-    const display = value === null || value === undefined ? "·" : String(value);
-    const pointer = isRead ? "i" : (type === "virtual" && index === write ? "j" : "");
-    return `<div class="dz-cell${isRead ? " read" : ""}${isWrite ? " write" : ""}${isFinal ? " final" : ""}${isOverflow ? " overflow" : ""}${pointer ? " pointer-cell" : ""}">
-      ${pointer ? `<b class="dz-pointer ${pointer}">${pointer}</b>` : ""}
-      <span>[${index}]</span><strong>${escapeHtml(display)}</strong>
-    </div>`;
+  const writes = new Set(Array.isArray(view.writes) ? view.writes : []);
+  const zeroCount = source.filter(value => value === 0).length;
+  const tapeLength = visibleLength + zeroCount;
+  const expanded = source.flatMap(value => value === 0 ? [0, 0] : [value]);
+  const isDone = Boolean(step.final);
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const currentValue = read >= 0 && read < source.length ? source[read] : null;
+  const sourceCells = source.map((value, index) => {
+    const classes = ["dz1089-cell", value === 0 ? "zero" : "value"];
+    if (index === read) classes.push("read");
+    if (read >= 0 && index > read) classes.push("consumed");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(String(value))}</strong>${value === 0 ? "<i>＋0</i>" : ""}${index === read ? "<b>i</b>" : ""}</div>`;
   }).join("");
+  const tapeCells = Array.from({ length: tapeLength }, (_, index) => {
+    const overflow = index >= visibleLength;
+    const finalized = isDone || index > write || writes.has(index);
+    const value = overflow ? expanded[index] : output[index];
+    const display = overflow ? String(expanded[index] ?? "·") : finalized ? String(value ?? "·") : "·";
+    const classes = ["dz1089-slot", overflow ? "overflow" : "kept"];
+    if (finalized && !overflow) classes.push("finalized");
+    if (writes.has(index)) classes.push("write");
+    if (index === write) classes.push("cursor");
+    if (overflow && index === write) classes.push("dropped");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(display)}</strong>${index === write ? "<b>j</b>" : ""}${overflow ? "<i>×</i>" : ""}</div>`;
+  }).join("");
+  const stamps = currentValue === null
+    ? "<span>·</span>"
+    : currentValue === 0
+      ? "<span class=zero>0</span><span class=zero>0</span>"
+      : `<span>${escapeHtml(String(currentValue))}</span>`;
+  const outside = write >= visibleLength;
+  const actionClass = isDone ? "done" : writes.size ? "writing" : outside ? "dropping" : "moving";
 
-  const writeLabel = write >= visibleLength
-    ? (vi ? `j = ${write} (ngoài mảng)` : `j = ${write} (outside array)`)
-    : write >= 0
-      ? `j = ${write}`
-      : (vi ? "j = -1 (hoàn tất)" : "j = -1 (complete)");
-  const summary = vi
-    ? `Đọc source[${read}] và ghi ngược trong không gian ${virtual.length} ô; chỉ giữ các ô 0 đến ${visibleLength - 1}.`
-    : `Read source[${read}] and write backwards in ${virtual.length} slots; keep only slots 0 through ${visibleLength - 1}.`;
-  const keptRange = visibleLength ? `[0..${visibleLength - 1}]` : "-";
-  const overflowRange = virtual.length > visibleLength ? `[${visibleLength}..${virtual.length - 1}]` : "-";
-
-  $("treeView").innerHTML = `<div class="duplicate-zeros-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <div class="dz-head"><span class="dz-badge read-badge">READ = ${read >= 0 ? read : "-"}</span><span class="dz-badge write-badge">${escapeHtml(writeLabel)}</span></div>
-    <div class="dz-row"><span class="dz-label">${vi ? "nguồn" : "source"}</span><div class="dz-cells">${row(source, "source")}</div></div>
-    <div class="dz-arrow">${vi ? "ghi từ phải sang trái" : "write from right to left"}</div>
-    <div class="dz-range"><span class="dz-keep">${vi ? `GIỮ ${keptRange}` : `KEEP ${keptRange}`}</span><span class="dz-drop">${vi ? `BỎ ${overflowRange}` : `DROP ${overflowRange}`}</span></div>
-    <div class="dz-row"><span class="dz-label">${vi ? "vùng ghi" : "write space"}</span><div class="dz-cells">${row(virtual, "virtual")}</div></div>
+  $("treeView").innerHTML = `<div class="dz1089-viz ${actionClass}">
+    <div class="dz1089-top"><span>n = ${visibleLength}</span><span class="zeros">0 × ${zeroCount}</span><strong>i ←　j ←</strong><code>L${activeLine ?? "—"}</code></div>
+    <div class="dz1089-source"><label>i</label><div class="dz1089-scroll"><div class="dz1089-cells">${sourceCells}</div></div></div>
+    <div class="dz1089-machine"><div class="input">${currentValue === null ? "·" : escapeHtml(String(currentValue))}</div><b>→</b><div class="stamps">${stamps}</div>${outside && !isDone ? "<em>✂</em>" : ""}</div>
+    <div class="dz1089-tape"><div class="dz1089-zones${zeroCount ? "" : " full"}" style="grid-template-columns:minmax(0,${Math.max(1, visibleLength)}fr)${zeroCount ? ` auto minmax(0,${zeroCount}fr)` : ""}"><span>✓ n</span>${zeroCount ? "<i>│</i><span>✂</span>" : ""}</div><div class="dz1089-scroll"><div class="dz1089-slots">${tapeCells}</div></div></div>
+    ${isDone ? `<div class="dz1089-finish"><i>✓</i><code>[${output.map(value => escapeHtml(String(value))).join(", ")}]</code></div>` : ""}
   </div>`;
 }
 

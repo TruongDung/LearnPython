@@ -1139,7 +1139,7 @@ function buildSteps1089(nums) {
     arr: [...arr], sub: null,
     duplicateZerosView: zeroView(n - 1, n + zeros - 1),
     highlight: arr.map((v, i) => v === 0 ? i : -1).filter((x) => x >= 0),
-    mark: [], codeLines: [5, 6],
+    mark: [], codeLines: [5],
     vars: [{ name: "i (read)", value: n - 1 }, { name: "arr.count(0)", value: zeros }, { name: "j (write)", value: n + zeros - 1 }],
     note: {
       vi: `j = n + arr.count(0) - 1 = ${n} + ${zeros} - 1 = ${n + zeros - 1}. Bây giờ j xuất hiện tại ô ${n + zeros - 1}.`,
@@ -1151,6 +1151,13 @@ function buildSteps1089(nums) {
   let right = n + zeros - 1;
   for (let left = n - 1; left >= 0; left--) {
     const value = nums[left];
+    steps.push({
+      title: { vi: `while i=${left} >= 0`, en: `while i=${left} >= 0` },
+      arr: [...arr], duplicateZerosView: zeroView(left, right),
+      highlight: [left], mark: [], codeLines: [6],
+      vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "condition", value: "True" }],
+      note: { vi: "Tiếp tục ghi ngược.", en: "Continue filling backwards." },
+    });
     steps.push({
       title: { vi: `Kiểm tra arr[i=${left}] == 0?`, en: `Check arr[i=${left}] == 0?` },
       arr: [...arr], duplicateZerosView: zeroView(left, right),
@@ -1269,6 +1276,14 @@ function buildSteps1089(nums) {
       });
     }
   }
+
+  steps.push({
+    title: { vi: "while i=-1 >= 0?", en: "while i=-1 >= 0?" },
+    arr: [...arr], duplicateZerosView: zeroView(-1, right),
+    highlight: [], mark: [], codeLines: [6],
+    vars: [{ name: "i (read)", value: -1 }, { name: "j (write)", value: right }, { name: "condition", value: "False" }],
+    note: { vi: "Dừng vòng lặp.", en: "Stop the loop." },
+  });
 
   const fs = {
     title: { vi: `Kết quả: [${arr.join(",")}]`, en: `Result: [${arr.join(",")}]` },
