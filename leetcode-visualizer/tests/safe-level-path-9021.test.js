@@ -8,7 +8,7 @@ const { extractLiveMethod } = require('../live-args');
 const { readFrontendIndex, readFrontendJavaScript, JAVASCRIPT_ASSETS, STYLESHEET_ASSETS } = require('./helpers/frontend-source');
 
 const problem = SUPPORTED[9021];
-const frame = step => step.securityPath9021View;
+const frame = step => step.safePath9021View;
 
 function oracle({ n, edges, u, v }) {
   if (u === v) return 0;
@@ -203,12 +203,12 @@ test('9021 renderer keeps the graph visual, key states and final route clear in 
     escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]),
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-security-level-path-9021.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-safe-level-path-9021.js'), 'utf8'), context);
   const run = problem.builder(problem.defaultInput);
   for (const language of ['en', 'vi']) {
     context.lang = language;
     for (const step of run.steps) {
-      context.renderSecurityPath9021View(step);
+      context.renderSafePath9021View(step);
       assert.match(host.innerHTML, /sp9021-graph/);
       assert.match(host.innerHTML, /<svg/);
       assert.match(host.innerHTML, /sp9021-key-shape/);
@@ -216,7 +216,7 @@ test('9021 renderer keeps the graph visual, key states and final route clear in 
       if (frame(step).phase === 'locked') assert.match(host.innerHTML, /sp9021-edge locked[^>]* active/);
     }
   }
-  context.renderSecurityPath9021View(run.steps.at(-1));
+  context.renderSafePath9021View(run.steps.at(-1));
   assert.match(host.innerHTML, /sp9021-route found/);
   assert.match(host.innerHTML, /sp9021-edge open[^>]* route/);
   assert.match(host.innerHTML, /<output>8<\/output>/);
@@ -225,8 +225,8 @@ test('9021 renderer keeps the graph visual, key states and final route clear in 
 test('9021 separates the 1-4 and 2-3 edge labels and draws a visible bridge', () => {
   const context = { escapeHtml: String };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-security-level-path-9021.js'), 'utf8'), context);
-  const Visualizer = vm.runInContext('SecurityPath9021Visualizer', context);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-safe-level-path-9021.js'), 'utf8'), context);
+  const Visualizer = vm.runInContext('SafePath9021Visualizer', context);
   const renderer = new Visualizer({ host: {}, escape: String });
   const points = renderer.positions(7);
   const oneFour = renderer.edgeGeometry(1, 4, points);
@@ -246,9 +246,9 @@ test('9021 is a lazy custom interview visualization registered in the app', () =
   assert.equal(problem.category.key, 'interview');
   assert.equal(problem.slug, null);
   assert.deepEqual(problem.tags.map(tag => tag.key), ['graph', 'binary-search', 'bfs']);
-  assert.ok(JAVASCRIPT_ASSETS.includes('renderer-security-level-path-9021.js'));
-  assert.ok(STYLESHEET_ASSETS.includes('security-level-path-9021.css'));
-  assert.match(readFrontendJavaScript(), /renderSecurityPath9021View\(step\)/);
+  assert.ok(JAVASCRIPT_ASSETS.includes('renderer-safe-level-path-9021.js'));
+  assert.ok(STYLESHEET_ASSETS.includes('safe-level-path-9021.css'));
+  assert.match(readFrontendJavaScript(), /renderSafePath9021View\(step\)/);
   const active = readFrontendIndex().replace(/<template[\s\S]*?<\/template>/g, '');
-  assert.doesNotMatch(active, /(?:renderer-)?security-level-path-9021\.(?:js|css)/);
+  assert.doesNotMatch(active, /(?:renderer-)?safe-level-path-9021\.(?:js|css)/);
 });

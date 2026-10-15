@@ -1,3 +1,4 @@
+/* 9021 safe-level visualization */
 .sp9021-viz{--sp-bg:#07131f;--sp-panel:#0d2030;--sp-line:#355066;--sp-text:#e8f2f8;--sp-muted:#8ea8bb;--sp-cyan:#38bdf8;--sp-green:#34d399;--sp-red:#fb7185;--sp-amber:#fbbf24;display:grid;gap:10px;min-width:0;padding:12px;border:1px solid var(--sp-line);border-radius:14px;background:radial-gradient(circle at 50% 40%,#102c3d 0,var(--sp-bg) 68%);color:var(--sp-text);font:12px/1.35 system-ui,sans-serif;overflow:hidden}
 [data-theme="light"] .sp9021-viz{--sp-bg:#eef7fb;--sp-panel:#fff;--sp-line:#a8c3d2;--sp-text:#102a3a;--sp-muted:#587184;--sp-cyan:#0284c7;--sp-green:#059669;--sp-red:#e11d48;--sp-amber:#b45309;background:radial-gradient(circle at 50% 40%,#fff 0,#e9f4f8 72%)}
 .sp9021-viz *{box-sizing:border-box}#treeView:has(>.sp9021-viz){padding:0;border:0;background:transparent;min-height:0;min-width:0;overflow:visible}#vizPanel:has(.sp9021-viz) #stepNote{display:none}

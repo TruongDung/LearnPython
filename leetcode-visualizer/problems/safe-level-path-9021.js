@@ -127,7 +127,7 @@ function buildSteps9021(input) {
         { name: "queue", value: queue.length ? queue.join(" → ") : "∅" },
         { name: "visited", value: (visited.size ?? visited.length) ? `{${[...visited].join(", ")}}` : "∅" },
       ],
-      securityPath9021View: {
+      safePath9021View: {
         n, edges: edges.map((edge) => [...edge]), u, v, levels: [...levels],
         phase, limit, left, right, mid, queue: [...queue], seen: [...visited], current,
         activeEdge, checkedEdges: [...checkedEdges], crossedEdges: [...crossedEdges],

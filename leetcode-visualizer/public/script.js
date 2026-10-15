@@ -76,8 +76,8 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
-    { predicate: (step) => Boolean(step.securityPath9021View), surface: "treeView", render: (step) => {
-      renderSecurityPath9021View(step);
+    { predicate: (step) => Boolean(step.safePath9021View), surface: "treeView", render: (step) => {
+      renderSafePath9021View(step);
     } },
     { predicate: (step) => Boolean(step.repairCars2594View), surface: "treeView", render: (step) => {
       renderRepairCars2594View(step);

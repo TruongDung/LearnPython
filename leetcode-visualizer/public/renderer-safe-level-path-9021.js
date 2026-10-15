@@ -1,4 +1,4 @@
-class SecurityPath9021Visualizer {
+class SafePath9021Visualizer {
   constructor({ host, language = "en", escape = escapeHtml }) {
     this.host = host;
     this.language = language;
@@ -117,7 +117,7 @@ class SecurityPath9021Visualizer {
   }
 
   render(step) {
-    const view = step.securityPath9021View;
+    const view = step.safePath9021View;
     if (!view) return;
     const points = this.positions(view.n);
     const answer = view.final ? (view.reachable ? view.limit : "−1") : view.limit ?? "?";
@@ -146,6 +146,6 @@ class SecurityPath9021Visualizer {
   }
 }
 
-function renderSecurityPath9021View(step) {
-  new SecurityPath9021Visualizer({ host: $("treeView"), language: lang, escape: escapeHtml }).render(step);
+function renderSafePath9021View(step) {
+  new SafePath9021Visualizer({ host: $("treeView"), language: lang, escape: escapeHtml }).render(step);
 }
