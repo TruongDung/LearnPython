@@ -85,6 +85,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.shipPackages1011View), surface: "treeView", render: (step) => {
       renderShipPackages1011View(step);
     } },
+    { predicate: (step) => Boolean(step.divideChocolate1231View), surface: "treeView", render: (step) => {
+      renderDivideChocolate1231View(step);
+    } },
     { predicate: (step) => Boolean(step.arrangingCoins441View), surface: "treeView", render: (step) => {
       renderArrangingCoins441View(step);
     } },
