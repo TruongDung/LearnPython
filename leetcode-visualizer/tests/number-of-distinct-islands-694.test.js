@@ -87,10 +87,20 @@ test("694 comparison frames show plus for a new shape and equals for a duplicate
 
 test("694 styles keep the grid and shape board responsive", () => {
   const css = fs.readFileSync(require.resolve("../public/style-04.css"), "utf8");
+  const renderer = fs.readFileSync(require.resolve("../public/app-renderers-base.js"), "utf8");
   const script = fs.readFileSync(require.resolve("../public/script.js"), "utf8");
   assert.match(css, /\.di694-normalizer\s*\{/);
   assert.match(css, /\.di694-shape-grid\s*\{/);
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*\.di694-normalizer/);
+  assert.match(renderer, /classList\.toggle\("distinct-islands-host", isDistinctIslands\)/);
   assert.match(script, /"app-renderers-base\.js":\["renderBfsGrid"\]/);
   assert.match(script, /"style-04\.css":\["renderBfsGrid"/);
+});
+
+test("694 follows the global light and dark theme toggle", () => {
+  const css = fs.readFileSync(require.resolve("../public/style-04.css"), "utf8");
+  assert.match(css, /\[data-theme="light"\] \.bfs-grid-view\.distinct-islands-host\s*\{[\s\S]*?background: #f8fafc/);
+  assert.match(css, /\[data-theme="light"\] \.distinct-islands-grid \.bfs-cell\.wall\s*\{[\s\S]*?background: #eef2f7/);
+  assert.match(css, /\[data-theme="light"\] \.distinct-islands-grid \.bfs-cell\.visited\s*\{[\s\S]*?background: #2563eb/);
+  assert.match(css, /\.bfs-grid-view\s*\{[\s\S]*?background: #0f172a/);
 });

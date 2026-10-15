@@ -907,6 +907,7 @@ function renderBfsGrid(step) {
   const isPhonePath = variant === "phone-path";
   const isEffortGrid = variant === "effort-grid";
   const isDistinctIslands = variant === "distinct-islands";
+  el.classList.toggle("distinct-islands-host", isDistinctIslands);
   const isMaxScoreGrid = variant === "max-score-grid";
   const isClassroomGrid = variant === "classroom-grid";
   const variantClass = isTicTacToe
