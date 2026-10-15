@@ -199,9 +199,9 @@ body.light .sa410-viz,
 .sa410-cut-decision b { font-size: 22px; }
 .sa410-cut-decision span { font-size: 10px; font-weight: 800; }
 
-.sa410-code { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 5px 8px; color: var(--s-muted); }
+.sa410-code { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 5px 8px; color: var(--s-muted); }
 .sa410-code span { flex: 0 0 auto; color: var(--s-blue); font-size: 8px; font-weight: 900; text-transform: uppercase; }
-.sa410-code code { min-width: 0; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.sa410-code code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 9px; white-space: pre-wrap; }
 
 @container sa410 (max-width: 560px) {
   .sa410-header { align-items: flex-start; }
@@ -224,7 +224,6 @@ body.light .sa410-viz,
   .sa410-stages li small { font-size: 8px; }
   .sa410-search { grid-template-columns: 1fr; }
   .sa410-capacity-orb { margin: auto; }
-  .sa410-code code { direction: rtl; text-align: left; }
 }
 
 @media (prefers-reduced-motion: reduce) {

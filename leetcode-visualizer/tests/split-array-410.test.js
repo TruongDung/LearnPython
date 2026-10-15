@@ -45,6 +45,15 @@ test("410 renderer stays pictorial and stable across every frame", () => {
   }
 });
 
+test("410 code snippet wraps instead of clipping long source lines", () => {
+  const css = fs.readFileSync(require.resolve("../public/split-array-410.css"), "utf8");
+  const codeStyle = css.match(/\.sa410-code code\s*\{([^}]+)\}/)?.[1];
+  assert.ok(codeStyle);
+  assert.match(codeStyle, /white-space:\s*pre-wrap/);
+  assert.match(codeStyle, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(codeStyle, /overflow:\s*hidden|text-overflow:\s*ellipsis|white-space:\s*nowrap/);
+});
+
 test("410 final frame shows exactly k boxes and k - 1 cuts", () => {
   const host = { innerHTML: "" };
   const context = { lang: "vi", document: { getElementById: () => host } };
