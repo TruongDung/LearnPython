@@ -6327,9 +6327,10 @@ module.exports = {
     id: 307,
     difficulty: "medium",
     slug: "range-sum-query-mutable",
-    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
     title: { vi: "Range Sum Query - Mutable", en: "Range Sum Query - Mutable" },
-    titleVi: { vi: "Truy vấn tổng đoạn có cập nhật", en: "Mutable range sum queries" },
+    titleVi: { vi: "Một điểm đổi, một đường cập nhật", en: "One value changes, one path updates" },
     statement: {
       vi: "Thiết kế NumArray hỗ trợ update(index, val) và trả về tổng nums[left..right] bằng sumRange(left, right).",
       en: "Design NumArray to support update(index, val) and return nums[left..right] with sumRange(left, right).",
@@ -6344,9 +6345,9 @@ module.exports = {
       default: "sumRange 0 2 | update 1 2 | sumRange 0 2",
     }],
     approach: [
-      { vi: "Segment Tree cách 2 dùng mảng 2*n: tree[n+i] là lá ứng với nums[i], tree[i] là tổng hai con.", en: "The second Segment Tree style uses a 2*n array: tree[n+i] is the leaf for nums[i], and tree[i] is the sum of its children." },
-      { vi: "update sửa lá index+n rồi đi ngược lên root, tính lại từng node cha.", en: "update changes the leaf index+n, then climbs to the root and recomputes each parent." },
-      { vi: "sumRange đưa left/right xuống hàng lá; gặp con phải ở trái hoặc con trái ở phải thì cộng node đó rồi nhảy lên cha.", en: "sumRange moves left/right to leaves; when the left pointer is a right child or the right pointer is a left child, add that node and climb." },
+      { vi: "Lá nằm ở tree[n..2n); node cha = tổng hai con.", en: "Leaves live at tree[n..2n); each parent is the sum of its children." },
+      { vi: "update: sửa một lá rồi đi lên gốc.", en: "update: change one leaf, then climb to the root." },
+      { vi: "sumRange: chọn các node phủ kín đoạn, không chồng nhau.", en: "sumRange: take non-overlapping nodes that exactly cover the range." },
     ],
     complexity: {
       time: "O(n) build, O(log n) update/query",
@@ -7860,6 +7861,8 @@ Object.assign(module.exports, {
     builder: buildSteps381,
   },
 });
+
+require("./core-custom-visualization-upgrades").installHashmap(module.exports);
 
 /**
  * LeetCode 149: Max Points on a Line.

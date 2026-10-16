@@ -1652,7 +1652,95 @@ function renderSumQueriesView(step) {
   </section>`;
 }
 
+function renderRangeSum307View(step) {
+  const view = step.segmentTreeView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const coverage = Array.isArray(view.coverage) ? view.coverage : [];
+  const activeNums = new Set(Array.isArray(view.activeNums) ? view.activeNums : []);
+  const activeTree = new Set(Array.isArray(view.activeTree) ? view.activeTree : []);
+  const selectedTree = new Set(Array.isArray(view.selectedTree) ? view.selectedTree : []);
+  const pointerNodes = new Set(Array.isArray(view.pointerNodes) ? view.pointerNodes : []);
+  const queryRange = Array.isArray(view.queryRange) ? view.queryRange : null;
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const operationIndex = Number.isInteger(view.operationIndex) ? view.operationIndex : -1;
+  const completed = Number(view.completedOperations) || 0;
+  const vi = lang === "vi";
+
+  const buildState = operationIndex < 0 ? "active" : "done";
+  const operationChips = [`<span class="${buildState}"><i>${buildState === "done" ? "✓" : "◆"}</i><b>BUILD</b></span>`]
+    .concat(operations.map((operation, index) => {
+      const state = index < completed ? "done" : index === operationIndex ? "active" : "";
+      const icon = operation.name === "sumrange" ? "Σ" : "↻";
+      const output = index < completed && Array.isArray(view.outputs)
+        ? (view.outputs[index] === null ? "✓" : `=${view.outputs[index]}`)
+        : "";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : icon}</i><b>${escapeHtml(operation.label)}</b>${output ? `<em>${escapeHtml(output)}</em>` : ""}</span>`;
+    })).join(`<strong class="rs307-chevron">›</strong>`);
+
+  const arrayCells = nums.map((value, index) => {
+    const inRange = queryRange && index >= queryRange[0] && index <= queryRange[1];
+    const classes = ["rs307-array-cell", inRange ? "in-range" : "", activeNums.has(index) ? "active" : ""].filter(Boolean).join(" ");
+    return `<div class="${classes}"><small>${index}</small><b>${escapeHtml(value)}</b>${inRange ? "<i>▔</i>" : ""}</div>`;
+  }).join("");
+
+  const nodeCount = tree.length;
+  const maxLevel = nodeCount > 0 ? Math.floor(Math.log2(nodeCount)) : 0;
+  const slot = 76;
+  const slots = Math.max(1, 2 ** maxLevel);
+  const width = Math.max(620, slots * slot);
+  const height = Math.max(92, (maxLevel + 1) * 72 + 20);
+  const nodePosition = (index) => {
+    const level = Math.floor(Math.log2(index));
+    const first = 2 ** level;
+    const span = 2 ** (maxLevel - level);
+    return {
+      x: ((index - first) * span + span / 2) * (width / slots),
+      y: 42 + level * 72,
+    };
+  };
+  const edgeSvg = Array.from({ length: nodeCount }, (_, offset) => offset + 1).filter((index) => index > 1).map((index) => {
+    const child = nodePosition(index);
+    const parent = nodePosition(Math.floor(index / 2));
+    const onPath = activeTree.has(index) && activeTree.has(Math.floor(index / 2));
+    return `<line class="${onPath ? "active" : ""}" x1="${parent.x}" y1="${parent.y + 25}" x2="${child.x}" y2="${child.y - 25}" />`;
+  }).join("");
+  const nodeSvg = tree.map((value, offset) => {
+    const index = offset + 1;
+    const { x, y } = nodePosition(index);
+    const covers = Array.isArray(coverage[offset]) ? coverage[offset] : [];
+    const contiguous = covers.every((item, coverIndex) => coverIndex === 0 || item === covers[coverIndex - 1] + 1);
+    const coverageText = covers.length === 0 ? "∅"
+      : covers.length === 1 ? `[${covers[0]}]`
+        : contiguous ? `[${covers[0]}…${covers.at(-1)}]` : `{${covers.join(",")}}`;
+    const selectedClass = selectedTree.has(index) ? (view.phase === "query" ? "take" : "path") : "";
+    const classes = [activeTree.has(index) ? "active" : "", selectedClass, pointerNodes.has(index) ? "pointer" : ""].filter(Boolean).join(" ");
+    return `<g class="rs307-node ${classes}" transform="translate(${x} ${y})"><title>tree[${index}] = ${escapeHtml(value)} · ${escapeHtml(coverageText)}</title><rect x="-31" y="-25" width="62" height="50" rx="10"/><text class="index" y="-10">t${index}</text><text class="value" y="8">${escapeHtml(value)}</text><text class="coverage" y="21">${escapeHtml(coverageText)}</text></g>`;
+  }).join("");
+  const treeSvg = nodeCount
+    ? `<svg class="rs307-tree" viewBox="0 0 ${width} ${height}" style="min-width:${Math.min(width, 2200)}px" role="img" aria-label="${vi ? "Cây đoạn lưu tổng" : "Segment tree storing sums"}"><g class="rs307-edges">${edgeSvg}</g>${nodeSvg}</svg>`
+    : `<div class="rs307-invalid">${vi ? "update i v | sumRange l r" : "update i v | sumRange l r"}</div>`;
+
+  const selectedFormula = view.phase === "query" && selectedTree.size
+    ? `<div class="rs307-picked">${[...selectedTree].map((index) => `<span>t${index}<b>${escapeHtml(tree[index - 1])}</b></span>`).join("<i>+</i>")}</div>`
+    : "";
+  const modeIcon = view.phase === "query" ? "Σ" : view.phase === "update" ? "↻" : "◆";
+  const modeLabel = view.phase === "query" ? "SUM" : view.phase === "update" ? "UPDATE" : view.phase === "result" ? "ERROR" : "BUILD";
+
+  $("treeView").innerHTML = `<section class="rs307-viz phase-${escapeHtml(view.phase || "build")}">
+    <header class="rs307-ops">${operationChips}</header>
+    <div class="rs307-array" style="--rs307-cols:${Math.max(1, nums.length)}">${arrayCells}</div>
+    <div class="rs307-tree-wrap">${treeSvg}</div>
+    <div class="rs307-action"><span><i>${modeIcon}</i><b>${modeLabel}</b><small>${escapeHtml(view.action || "")}</small></span><strong>${escapeHtml(view.equation || "")}</strong>${selectedFormula}</div>
+    <footer><span><i class="now"></i>${vi ? "ĐANG XÉT" : "NOW"}</span><span><i class="take"></i>TAKE</span><span><i class="lr"></i>L / R</span><b>O(log n)</b></footer>
+  </section>`;
+}
+
 function renderSegmentTreeView(step) {
+  if (step.segmentTreeView?.variant === "range-sum-307") {
+    renderRangeSum307View(step);
+    return;
+  }
   const view = step.segmentTreeView || {};
   const mapMode = view.mapMode === true;
   const nums = Array.isArray(view.nums) ? view.nums : [];

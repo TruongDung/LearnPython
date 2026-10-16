@@ -1,4 +1,4 @@
-// Custom teaching payloads for LC 542, 684, 787, and 847.
+// Custom teaching payloads for LC 307, 542, 684, 787, and 847.
 // Existing answer-producing builders remain the source of truth except for LC 684,
 // whose compact trace is replaced by an equivalent instruction-level DSU trace.
 
@@ -229,6 +229,103 @@ function enhance542(result) {
       answer: step.final ? result.answer : null,
       invalid: step.final && (!Array.isArray(result.answer) || result.answer.length === 0),
     };
+  }
+  return result;
+}
+
+function enhance307(result) {
+  const nums = Array.isArray(result.original?.nums) ? result.original.nums : [];
+  const rawOperations = String(result.original?.operations || "");
+  const operations = rawOperations.split("|").map((part) => part.trim()).filter(Boolean).map((text) => {
+    const [rawName, first, second] = text.split(/\s+/);
+    const name = String(rawName || "").toLowerCase();
+    return {
+      name,
+      first: Number(first),
+      second: Number(second),
+      label: name === "sumrange" ? `Σ(${first},${second})` : `U(${first}→${second})`,
+    };
+  });
+  const statusValue = (view, name) => view.status?.find((item) => item?.label === name)?.value ?? null;
+  const treeValue = (view, index) => Number.isInteger(index) && index > 0 ? view.tree?.[index - 1] : null;
+  let operationIndex = -1;
+
+  for (const step of result.steps || []) {
+    const view = step.segmentTreeView;
+    if (!view) continue;
+    const line = Number(step.codeLines?.[0] || 0);
+    if ((line === 10 || line === 18) && operationIndex + 1 < operations.length) operationIndex += 1;
+    const operation = operations[operationIndex] || null;
+    const activeTree = Array.isArray(view.activeTree) ? view.activeTree : [];
+    const selectedTree = Array.isArray(view.selectedTree) ? view.selectedTree : [];
+    const activeNums = Array.isArray(view.activeNums) ? view.activeNums : [];
+    const mode = view.mode || "idle";
+    let phase = "build";
+    let action = "INIT";
+    let equation = `${nums.length} → ${nums.length * 2}`;
+
+    if (mode === "build" && line === 5) {
+      action = "LEAF";
+      equation = `nums[${activeNums[0] ?? "?"}] → tree[${activeTree[0] ?? "?"}]`;
+    } else if (mode === "build" && line === 8) {
+      action = "↑ PARENT";
+      const [parent, left, right] = activeTree;
+      equation = `${treeValue(view, left)} + ${treeValue(view, right)} = ${treeValue(view, parent)}`;
+    } else if (mode === "update" && line === 10) {
+      phase = "update";
+      action = "FIND LEAF";
+      equation = `${activeNums[0] ?? "i"} + ${nums.length} = ${activeTree[0] ?? "pos"}`;
+    } else if (mode === "update" && line === 12) {
+      phase = "update";
+      action = "WRITE";
+      equation = `${statusValue(view, "old")} → ${statusValue(view, "new")}`;
+    } else if (mode === "update") {
+      phase = "update";
+      action = activeTree.length >= 3 ? "↑ PARENT" : "✓ UPDATE";
+      if (activeTree.length >= 3) {
+        const [parent, left, right] = activeTree;
+        equation = `${treeValue(view, left)} + ${treeValue(view, right)} = ${treeValue(view, parent)}`;
+      } else {
+        equation = operation ? operation.label : "✓";
+      }
+    } else if (mode === "query") {
+      phase = "query";
+      if (line === 18) action = "L / R";
+      else if (line === 24) action = "CHECK";
+      else if (line === 26 || line === 29) action = "+ TAKE";
+      else if (line === 33) action = "↑ PARENT";
+      else if (line === 35) action = "✓ SUM";
+      const total = statusValue(view, "total") ?? statusValue(view, "answer");
+      equation = line === 35
+        ? `${selectedTree.map((index) => treeValue(view, index)).join(" + ") || "0"} = ${statusValue(view, "answer")}`
+        : (total !== null ? `total = ${total}` : operation?.label || "Σ");
+    } else if (step.final) {
+      phase = "result";
+      action = "!";
+      equation = "INVALID";
+    }
+
+    const queryRange = operation?.name === "sumrange" ? [operation.first, operation.second] : null;
+    const pointerNodes = mode === "query" && [18, 24, 33].includes(line) ? activeTree.slice(0, 2) : [];
+    const operationComplete = line === 35 || (mode === "update" && line === 16 && activeTree.length === 0);
+    const completedOperations = Math.max(0, operationIndex + (operationComplete ? 1 : 0));
+    view.variant = "range-sum-307";
+    view.phase = phase;
+    view.action = action;
+    view.equation = equation;
+    view.operations = operations;
+    view.operationIndex = operationIndex;
+    view.completedOperations = completedOperations;
+    view.queryRange = queryRange;
+    view.pointerNodes = pointerNodes;
+    view.outputs = Array.isArray(result.answer) ? result.answer.slice(1) : [];
+    view.invalid = step.final && result.answer === null;
+
+    step.title = label(action, action);
+    step.note = label(
+      phase === "query" ? "Ghép các đoạn không chồng lặp." : phase === "update" ? "Chỉ sửa đường từ lá lên gốc." : "Lá trước, tổng cha sau.",
+      phase === "query" ? "Combine non-overlapping segments." : phase === "update" ? "Only the leaf-to-root path changes." : "Leaves first, parent sums next.",
+    );
   }
   return result;
 }
@@ -800,4 +897,11 @@ function installUnionFind(registry) {
   registry[684].debugMode = "line-by-line";
 }
 
-module.exports = { installGraph, installUnionFind };
+function installHashmap(registry) {
+  if (!registry[307]) return;
+  const original = registry[307].builder;
+  registry[307].builder = (input, params) => enhance307(original(input, params));
+  registry[307].debugMode = "line-by-line";
+}
+
+module.exports = { installGraph, installHashmap, installUnionFind };
