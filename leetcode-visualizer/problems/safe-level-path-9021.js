@@ -89,7 +89,10 @@ function parseInput9021(input) {
   return { n: data.n, edges, u: data.u, v: data.v };
 }
 
-function buildSteps9021(input) {
+function buildSteps9021(input, params = {}) {
+  if (String(params.approach || "1") === "2") {
+    return require("./safe-level-dijkstra-9021").buildSteps(parseInput9021(input));
+  }
   const { n, edges, u, v } = parseInput9021(input);
   const graph = Array.from({ length: n }, () => []);
   const levelSet = new Set();
@@ -264,10 +267,22 @@ module.exports = {
     inputKind: "string",
     inputLabel: bi('JSON: {"n":7,"edges":[[a,b,safe]],"u":0,"v":6}', 'JSON: {"n":7,"edges":[[a,b,safe]],"u":0,"v":6}'),
     debugMode: "line-by-line",
-    approach: [bi("Binary search mức safe. Với mỗi S, BFS chỉ đi qua cạnh có safe ≤ S.", "Binary-search the safe levels. For each S, BFS traverses only edges with safe ≤ S.")],
+    extraParams: [{ key: "approach", type: "select", default: "1", label: bi("Cách giải", "Approach"), options: [
+      { value: "1", label: bi("Cách 1: Binary Search + BFS", "Approach 1: Binary Search + BFS") },
+      { value: "2", label: bi("Cách 2: Dijkstra — Minimax Path", "Approach 2: Dijkstra — Minimax Path") },
+    ] }],
+    approach: [
+      bi("Cách 1: thử mức S bằng binary search và BFS.", "Approach 1: binary-search S and check connectivity with BFS."),
+      bi("Cách 2: best[x] lưu mức nhỏ nhất để tới x; pop cost nhỏ nhất từ min-heap.", "Approach 2: best[x] stores the minimum level to reach x; pop the smallest cost from the min-heap."),
+      bi("candidate = max(cost, weight). Chỉ cập nhật nếu nhỏ hơn best[nei].", "candidate = max(cost, weight). Update only if it improves best[nei]."),
+      bi("Bỏ bản ghi cũ. Khi pop v hợp lệ, trả cost; hết heap thì trả -1.", "Skip stale entries. Return cost when v is validly popped; return -1 if the heap empties."),
+    ],
     complexity: { time: "O((V + E) log E)", space: "O(V + E)", note: bi("Mỗi lần thử chạy BFS; tìm kiếm trên các mức cạnh khác nhau.", "Each trial runs BFS over the graph; search only distinct edge levels.") },
     code: CODE_9021,
     codeLabel: bi("Binary Search + BFS", "Binary Search + BFS"),
+    code2: require("./safe-level-dijkstra-9021").CODE,
+    code2Label: bi("Cách 2: Dijkstra — Minimax Path", "Approach 2: Dijkstra — Minimax Path"),
+    complexity2: { time: "O((V + E) log(V + E))", space: "O(V + E)", note: bi("Min-heap giữ các bản ghi cải thiện. Dùng max trên đường đi; dừng khi pop đích hợp lệ.", "The min-heap stores improving states. Path cost uses max; stop when the target is validly popped.") },
     builder: buildSteps9021,
     liveArgs: input => { const { n, edges, u, v } = parseInput9021(input); return [n, edges, u, v]; },
   },

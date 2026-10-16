@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.safeDijkstra9021View), surface: "treeView", render: (step) => {
+      renderSafeDijkstra9021View(step);
+    } },
     { predicate: (step) => Boolean(step.safePath9021View), surface: "treeView", render: (step) => {
       renderSafePath9021View(step);
     } },
