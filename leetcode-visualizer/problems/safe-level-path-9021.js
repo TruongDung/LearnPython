@@ -90,6 +90,9 @@ function parseInput9021(input) {
 }
 
 function buildSteps9021(input, params = {}) {
+  if (String(params.approach || "1") === "4") {
+    return require("./safe-level-dfs-9021").buildSteps(parseInput9021(input));
+  }
   if (String(params.approach || "1") === "3") {
     return require("./safe-level-kruskal-9021").buildSteps(parseInput9021(input));
   }
@@ -262,6 +265,7 @@ module.exports = {
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
       { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "dfs", vi: "DFS", en: "DFS" },
       { key: "minimax", vi: "Minimax", en: "Minimax" },
     ],
     title: bi("Minimum Safe Level", "Minimum Safe Level"),
@@ -275,6 +279,7 @@ module.exports = {
       { value: "1", label: bi("Cách 1: Binary Search + BFS", "Approach 1: Binary Search + BFS") },
       { value: "2", label: bi("Cách 2: Dijkstra — Minimax Path", "Approach 2: Dijkstra — Minimax Path") },
       { value: "3", label: bi("Cách 3: Kruskal + Union-Find (DSU)", "Approach 3: Kruskal + Union-Find (DSU)") },
+      { value: "4", label: bi("Cách 4: Binary Search + DFS (stack)", "Approach 4: Binary Search + DFS (stack)") },
     ] }],
     approach: [
       bi("Cách 1: thử mức S bằng binary search và BFS.", "Approach 1: binary-search S and check connectivity with BFS."),
@@ -282,6 +287,7 @@ module.exports = {
       bi("candidate = max(cost, weight). Chỉ cập nhật nếu nhỏ hơn best[nei].", "candidate = max(cost, weight). Update only if it improves best[nei]."),
       bi("Bỏ bản ghi cũ. Khi pop v hợp lệ, trả cost; hết heap thì trả -1.", "Skip stale entries. Return cost when v is validly popped; return -1 if the heap empties."),
       bi("Cách 3: thêm cạnh từ nhỏ tới lớn, dùng DSU gộp nhóm. Trả mức cạnh đầu tiên nối u với v.", "Approach 3: process edges from smallest to largest and merge components with DSU. Return the first edge level connecting u and v."),
+      bi("Cách 4: binary search S trên [0, max weight]. DFS dùng stack chỉ qua cạnh ≤ S; tới v thì giảm ngưỡng, chưa tới thì tăng.", "Approach 4: binary-search S in [0, max weight]. Iterative DFS crosses edges ≤ S; reach v to lower the threshold, otherwise raise it."),
     ],
     complexity: { time: "O((V + E) log E)", space: "O(V + E)", note: bi("Mỗi lần thử chạy BFS; tìm kiếm trên các mức cạnh khác nhau.", "Each trial runs BFS over the graph; search only distinct edge levels.") },
     code: CODE_9021,
@@ -292,6 +298,9 @@ module.exports = {
     code3: require("./safe-level-kruskal-9021").CODE,
     code3Label: bi("Cách 3: Kruskal + Union-Find (DSU)", "Approach 3: Kruskal + Union-Find (DSU)"),
     complexity3: { time: "O(V + E log E)", space: "O(V + E)", note: bi("Union theo size, find nén đường đi bằng path halving. sorted tạo bản sao O(E).", "Union by size and path halving in find. sorted creates an O(E) copy.") },
+    code4: require("./safe-level-dfs-9021").CODE,
+    code4Label: bi("Cách 4: Binary Search + DFS (stack)", "Approach 4: Binary Search + DFS (stack)"),
+    complexity4: { time: "O((V + E) log(W + 2))", space: "O(V + E)", note: bi("W = trọng số lớn nhất, bằng 0 khi không có cạnh. Kiểm tra kết nối trước; DFS đánh dấu khi push để không thêm trùng node. Không dùng đệ quy.", "W is the maximum edge weight, or 0 with no edges. Check connectivity first; DFS marks nodes when pushed to avoid duplicates. No recursion.") },
     builder: buildSteps9021,
     liveArgs: input => { const { n, edges, u, v } = parseInput9021(input); return [n, edges, u, v]; },
   },

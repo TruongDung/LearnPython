@@ -26,6 +26,7 @@ function splitPythonParams(source) {
 }
 
 function liveCodeFor(problem, codeBlock) {
+  if (Number(codeBlock) === 4 && Array.isArray(problem.code4)) return problem.code4;
   if (Number(codeBlock) === 3 && Array.isArray(problem.code3)) return problem.code3;
   if (Number(codeBlock) === 2 && Array.isArray(problem.code2)) return problem.code2;
   return problem.code || [];

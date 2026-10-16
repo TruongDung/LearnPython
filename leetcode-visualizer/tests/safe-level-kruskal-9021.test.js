@@ -98,7 +98,7 @@ print(json.dumps([__viz_run_trace(payload['code'],'minimumSafeLevel',[x['n'],x['
   assert.deepEqual(python(program,{code:p.code3.join("\n"),cases}),cases.map(oracle));
   const input=cases[0];assert.deepEqual(p.liveArgs(input),[input.n,input.edges,input.u,input.v]);
   assert.ok(p.builder(p.defaultInput).steps[0].safePath9021View);assert.ok(p.builder(p.defaultInput,{approach:2}).steps[0].safeDijkstra9021View);
-  assert.equal(p.extraParams.find(x=>x.key==="approach").options.at(-1).value,"3");
+  assert.ok(p.extraParams.find(x=>x.key==="approach").options.some(option=>option.value==="3"));
 });
 
 test("9021 DSU pictures render every frame in both languages and restore exactly on Prev",()=>{

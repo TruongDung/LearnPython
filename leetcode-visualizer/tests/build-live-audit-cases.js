@@ -7,14 +7,14 @@ const cases = [];
 const skipped = [];
 
 for (const problem of Object.values(SUPPORTED)) {
-  const blocks = [1, 2, 3].filter((block) => block === 1 || Array.isArray(problem[`code${block}`]));
+  const blocks = [1, 2, 3, 4].filter((block) => block === 1 || Array.isArray(problem[`code${block}`]));
   for (const block of blocks) {
     const method = extractLiveMethod(problem, block);
     const params = Object.fromEntries(
       (problem.extraParams || []).map((param) => [param.key, param.default]),
     );
     if (Object.prototype.hasOwnProperty.call(params, "approach")) params.approach = block;
-    const code = (block === 3 ? problem.code3 : block === 2 ? problem.code2 : problem.code) || [];
+    const code = (block === 1 ? problem.code : problem[`code${block}`]) || [];
     if (!method) {
       const design = prepareDesignLiveRun(problem, problem.defaultInput, params, block);
       if (!design) {
