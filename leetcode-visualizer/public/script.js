@@ -76,6 +76,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.guessCost375View), surface: "treeView", render: (step) => {
+      renderGuessCost375View(step);
+    } },
+    { predicate: (step) => Boolean(step.canIWin464View), surface: "treeView", render: (step) => {
+      renderCanIWin464View(step);
+    } },
     { predicate: (step) => Boolean(step.safeKruskal9021View), surface: "treeView", render: (step) => {
       renderSafeKruskal9021View(step);
     } },
