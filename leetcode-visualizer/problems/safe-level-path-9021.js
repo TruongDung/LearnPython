@@ -122,6 +122,7 @@ function buildSteps9021(input) {
         { name: "left", value: left ?? "—" },
         { name: "right", value: right ?? "—" },
         { name: "mid", value: mid ?? "—" },
+        { name: "limit", value: limit ?? "—" },
         { name: "S", value: limit ?? "—" },
         { name: "node", value: current ?? "—" },
         { name: "queue", value: queue.length ? queue.join(" → ") : "∅" },

@@ -83,6 +83,9 @@ test('9021 trace only crosses open edges and binary search retains the answer', 
   const run = problem.builder(problem.defaultInput);
   for (const step of run.steps) {
     const view = frame(step);
+    const limit = step.vars.find(variable => variable.name === 'limit');
+    assert.ok(limit, 'debug variables should include limit');
+    assert.equal(limit.value, view.limit ?? '—');
     assert.ok(step.codeLines.every(line => problem.code[line - 1]?.trim()), `invalid code line in ${view.phase}`);
     assert.ok(view.seen.every(node => node >= 0 && node < view.n));
     if (step.codeLines[0] !== 22) assert.ok(view.queue.every(node => view.seen.includes(node)));
