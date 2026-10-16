@@ -942,6 +942,99 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "minimax") {
+      // Learning-map styles are in the lazy shared stylesheet. The catalog
+      // can open before any visualization has requested that stylesheet.
+      const guideStyle = $("sharedVisualizationStyles").content.querySelector('link[href^="style-06.css"]');
+      const guideStylesReady = loadProblemVisualizationAsset(guideStyle);
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion minimax-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🎯</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Minimax · đường đi → quyết định → trò chơi" : "Minimax · paths → decisions → games"}</small></span><b aria-hidden="true">→</b>`;
+      learnButton.addEventListener("click", async () => {
+        await guideStylesReady;
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailable = vi ? "Chưa có visualization" : "Visualization not available";
+        const problemLink = (id, label, compact = false) => {
+          const className = compact ? "trie-problem-link" : "trie-problem-row";
+          const body = compact ? `#${id}` : `<span>#${id}</span><b>${label}</b>`;
+          return supportedIds.has(id)
+            ? `<a class="${className}" href="#leetcode-${id}" data-minimax-problem-id="${id}" aria-label="${vi ? "Mở bài" : "Open problem"} ${id}${compact ? "" : `: ${label}`}">${body}</a>`
+            : `<span class="${className} unavailable" aria-disabled="true" title="${unavailable}">${body}</span>`;
+        };
+        const sequence = (ids) => `<div class="trie-roadmap-sequence">${ids.map((id, i) => `${i ? '<i aria-hidden="true">→</i>' : ""}${problemLink(id, "", true)}`).join("")}</div>`;
+        const tracks = [
+          { icon: "🛤️", title: vi ? "01 · Tối ưu chi phí & đường đi" : "01 · Cost & path optimization", ids: [410, 1631, 778, 9021],
+            cue: vi ? "Chọn phương án có giá trị lớn nhất nhỏ nhất." : "Choose the option with the smallest maximum.",
+            problems: [
+              [410, "Split Array — Binary Search + Greedy"],
+              [1631, vi ? "Minimum Effort — max độ chênh hai ô" : "Minimum Effort — max adjacent difference"],
+              [778, vi ? "Rising Water — max độ cao trên đường" : "Rising Water — max height on the path"],
+              [9021, vi ? "Minimum Safe Level — BFS → Dijkstra → DSU · bài nội bộ" : "Minimum Safe Level — BFS → Dijkstra → DSU · custom problem"],
+            ], tip: vi ? "Sau #778: so sánh Dijkstra với Binary Search + BFS và Kruskal + DSU ở #9021." : "After #778: compare Dijkstra with Binary Search + BFS and Kruskal + DSU in #9021." },
+          { icon: "♟️", title: vi ? "02 · Quyết định & đối kháng" : "02 · Decisions & adversarial games", ids: [486, 375, 464],
+            cue: vi ? "Luôn tính cả phản hồi tốt nhất của đối thủ." : "Account for the opponent’s best response.",
+            problems: [
+              [486, vi ? "Predict the Winner — chênh lệch điểm · DP đoạn" : "Predict the Winner — score difference · interval DP"],
+              [375, vi ? "Guess Number II — chi phí tệ nhất · DP đoạn" : "Guess Number II — worst-case cost · interval DP"],
+              [464, vi ? "Can I Win — thắng / thua · Bitmask + Memo" : "Can I Win — win / lose · Bitmask + Memo"],
+            ], tip: vi ? "#375: guess + max(trái, phải). #464: có nước đi khiến đối thủ thua?" : "#375: guess + max(left, right). #464: can a move leave the opponent losing?" },
+        ];
+        $("trieLearnEyebrow").textContent = "MINIMAX LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Học Minimax từ đâu?" : "Where to start with Minimax?";
+        $("trieLearnIntro").textContent = vi ? "Hai nhánh học độc lập. Bấm số bài để mở visualization." : "Two independent learning tracks. Click a problem to open its visualization.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Minimax" : "Close Minimax roadmap");
+        content.innerHTML = `<div class="minimax-map">
+          <figure class="minimax-picture">
+            <figcaption>${vi ? "Minimax đường đi: lấy MAX mỗi đường, rồi chọn MIN" : "Minimax paths: MAX on each path, then choose MIN"}</figcaption>
+            <div class="minimax-route"><span>A</span><b>2</b><i>→</i><b class="peak">8</b><i>→</i><b>3</b><i>⇒</i><strong>max = 8</strong></div>
+            <div class="minimax-route chosen"><span>B ✓</span><b>4</b><i>→</i><b class="peak">5</b><i>→</i><b>1</b><i>⇒</i><strong>max = 5</strong></div>
+            <p>min(8, 5) = <strong>5 ✓</strong></p>
+          </figure>
+          <div class="minimax-tracks">${tracks.map((track) => `<section class="minimax-track"><h3>${track.icon} ${track.title}</h3><p>${track.cue}</p>${sequence(track.ids)}<ul>${track.problems.map(([id, label]) => `<li>${problemLink(id, label)}</li>`).join("")}</ul><p class="minimax-tip">💡 ${track.tip}</p></section>`).join("")}</div>
+          <section class="minimax-extras"><h3>${vi ? "🧭 Bài liên quan" : "🧭 Related practice"}</h3>
+            <ul><li>${problemLink(875, vi ? "Koko — khởi động Binary Search; không phải Minimax" : "Koko — Binary Search warm-up; not Minimax")}</li>
+            <li>${problemLink(1102, vi ? "Maximum Minimum Path — MAXIMIN: chọn min lớn nhất" : "Maximum Minimum Path — MAXIMIN: maximize the minimum")}</li>
+            <li>${problemLink(843, vi ? "Guess the Word — nâng cao: giảm nhóm ứng viên tệ nhất" : "Guess the Word — advanced: minimize the largest candidate bucket")}</li></ul>
+          </section>
+          <p class="minimax-check">${vi ? "✓ Trước khi sang bài tiếp: tự nêu trạng thái → lựa chọn → tình huống tệ nhất → độ phức tạp." : "✓ Before moving on: explain the state → choices → worst case → complexity."}</p>
+        </div>`;
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-minimax-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = link.dataset.minimaxProblemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) panel.scrollIntoView({ behavior: "auto", block: "start" });
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => { if (event.target === dialog) closeDialog(); };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     if (group.key === "mst") {
       const learnButton = document.createElement("button");
       learnButton.type = "button";
