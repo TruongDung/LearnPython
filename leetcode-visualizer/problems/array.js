@@ -8406,6 +8406,10 @@ function buildSteps493MergeSort(input) {
   let rangeCount = 0;
   let lastAdded = 0;
   let mergedRange = null;
+  let mergeLeft = null;
+  let mergeRight = null;
+  let mergeBuffer = [];
+  let mergePick = null;
 
   const makeView = () => ({
     phase,
@@ -8419,6 +8423,10 @@ function buildSteps493MergeSort(input) {
     rangeCount,
     lastAdded,
     mergedRange: mergedRange ? { ...mergedRange } : null,
+    mergeLeft,
+    mergeRight,
+    mergeBuffer: mergeBuffer.map((item) => ({ ...item })),
+    mergePick,
   });
   const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
     phase = nextPhase;
@@ -8445,7 +8453,7 @@ function buildSteps493MergeSort(input) {
       vi: "Một reverse pair cần i < j và nums[i] > 2 × nums[j]. Merge Sort giữ điều kiện index bằng cách chia nửa trái/phải, rồi sort mỗi nửa theo value để đếm nhanh.",
       en: "A reverse pair needs i < j and nums[i] > 2 × nums[j]. Merge Sort preserves index order through left/right halves, then sorts values for fast counting.",
     },
-    codeLine: 16,
+    codeLine: 27,
     nextPhase: "start",
     vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
   });
@@ -8458,6 +8466,10 @@ function buildSteps493MergeSort(input) {
     rangeCount = 0;
     lastAdded = 0;
     mergedRange = null;
+    mergeLeft = null;
+    mergeRight = null;
+    mergeBuffer = [];
+    mergePick = null;
     stack.push({ start, end, depth });
     addStep({
       title: { vi: `sort_count(${start}, ${end})`, en: `sort_count(${start}, ${end})` },
@@ -8602,11 +8614,113 @@ function buildSteps493MergeSort(input) {
       });
     }
 
-    const merged = working.slice(start, end).sort((a, b) => a.value - b.value || a.originalIndex - b.originalIndex);
-    working.splice(start, end - start, ...merged);
     leftPos = null;
     rightCursor = null;
     validPositions = [];
+    mergeBuffer = [];
+    mergePick = null;
+    addStep({
+      title: { vi: "Tạo buffer merge", en: "Create the merge buffer" },
+      note: { vi: "Hai nửa đã tăng dần; merge chỉ cần đi qua mỗi phần tử một lần.", en: "Both halves are sorted; merging visits each element once." },
+      codeLine: 14,
+      nextPhase: "merge",
+      vars: [{ name: "merged", value: "[]" }],
+    });
+    mergeLeft = start;
+    mergeRight = mid;
+    addStep({
+      title: { vi: `Con trỏ merge: ${start} | ${mid}`, en: `Merge pointers: ${start} | ${mid}` },
+      note: { vi: "Mỗi con trỏ bắt đầu ở đầu nửa tương ứng.", en: "Each pointer starts at the beginning of its half." },
+      codeLine: 15,
+      nextPhase: "merge",
+      vars: [{ name: "left, right", value: `${mergeLeft}, ${mergeRight}` }],
+    });
+    while (mergeLeft < mid && mergeRight < end) {
+      addStep({
+        title: { vi: "Cả hai nửa còn phần tử", en: "Both halves still have values" },
+        note: { vi: "So sánh hai đầu nhỏ nhất chưa lấy.", en: "Compare the two smallest remaining values." },
+        codeLine: 16,
+        nextPhase: "merge",
+      });
+      const takeLeft = working[mergeLeft].value <= working[mergeRight].value;
+      addStep({
+        title: {
+          vi: `${working[mergeLeft].value} ${takeLeft ? "≤" : ">"} ${working[mergeRight].value}`,
+          en: `${working[mergeLeft].value} ${takeLeft ? "≤" : ">"} ${working[mergeRight].value}`,
+        },
+        note: takeLeft
+          ? { vi: "Lấy phần tử nửa trái.", en: "Take the left-half value." }
+          : { vi: "Lấy phần tử nửa phải.", en: "Take the right-half value." },
+        codeLine: 17,
+        nextPhase: "merge-compare",
+      });
+      if (takeLeft) {
+        mergePick = mergeLeft;
+        mergeBuffer.push({ ...working[mergeLeft] });
+        addStep({
+          title: { vi: `Đẩy ${working[mergeLeft].value} vào buffer`, en: `Push ${working[mergeLeft].value} into the buffer` },
+          note: { vi: "Buffer luôn tăng dần.", en: "The buffer stays sorted." },
+          codeLine: 18,
+          nextPhase: "merge-pick",
+          vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.value).join(", ")}]` }],
+        });
+        mergeLeft += 1;
+        mergePick = null;
+        addStep({
+          title: { vi: `left → ${mergeLeft}`, en: `left → ${mergeLeft}` },
+          note: { vi: "Tiến con trỏ nửa trái.", en: "Advance the left pointer." },
+          codeLine: 19,
+          nextPhase: "merge",
+          vars: [{ name: "left", value: mergeLeft }],
+        });
+      } else {
+        mergePick = mergeRight;
+        mergeBuffer.push({ ...working[mergeRight] });
+        addStep({
+          title: { vi: `Đẩy ${working[mergeRight].value} vào buffer`, en: `Push ${working[mergeRight].value} into the buffer` },
+          note: { vi: "Buffer luôn tăng dần.", en: "The buffer stays sorted." },
+          codeLine: 21,
+          nextPhase: "merge-pick",
+          vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.value).join(", ")}]` }],
+        });
+        mergeRight += 1;
+        mergePick = null;
+        addStep({
+          title: { vi: `right → ${mergeRight}`, en: `right → ${mergeRight}` },
+          note: { vi: "Tiến con trỏ nửa phải.", en: "Advance the right pointer." },
+          codeLine: 22,
+          nextPhase: "merge",
+          vars: [{ name: "right", value: mergeRight }],
+        });
+      }
+    }
+    addStep({
+      title: { vi: "Một nửa đã hết", en: "One half is exhausted" },
+      note: { vi: "Phần còn lại đã tăng dần nên có thể nối thẳng.", en: "The remainder is already sorted, so append it directly." },
+      codeLine: 16,
+      nextPhase: "merge",
+    });
+    const leftRemainder = working.slice(mergeLeft, mid).map((item) => ({ ...item }));
+    mergeBuffer.push(...leftRemainder);
+    mergeLeft = mid;
+    addStep({
+      title: { vi: `Nối ${leftRemainder.length} phần tử trái`, en: `Append ${leftRemainder.length} left values` },
+      note: { vi: "Nửa trái còn lại đi vào cuối buffer.", en: "The remaining left half goes to the buffer tail." },
+      codeLine: 23,
+      nextPhase: "merge-tail",
+      vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.value).join(", ")}]` }],
+    });
+    const rightRemainder = working.slice(mergeRight, end).map((item) => ({ ...item }));
+    mergeBuffer.push(...rightRemainder);
+    mergeRight = end;
+    addStep({
+      title: { vi: `Nối ${rightRemainder.length} phần tử phải`, en: `Append ${rightRemainder.length} right values` },
+      note: { vi: "Nửa phải còn lại hoàn tất buffer.", en: "The remaining right half completes the buffer." },
+      codeLine: 24,
+      nextPhase: "merge-tail",
+      vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.value).join(", ")}]` }],
+    });
+    working.splice(start, end - start, ...mergeBuffer.map((item) => ({ ...item })));
     mergedRange = { start, end };
     addStep({
       title: { vi: `Merge và sort [${start}, ${end})`, en: `Merge and sort [${start}, ${end})` },
@@ -8614,14 +8728,14 @@ function buildSteps493MergeSort(input) {
         vi: `Đoạn sau merge: [${working.slice(start, end).map((item) => item.value).join(", ")}]. Cấp cha sẽ dùng thứ tự tăng dần này.`,
         en: `Merged range: [${working.slice(start, end).map((item) => item.value).join(", ")}]. The parent level will use this increasing order.`,
       },
-      codeLine: 14,
+      codeLine: 25,
       nextPhase: "merge",
       vars: [{ name: "sorted", value: `[${working.slice(start, end).map((item) => item.value).join(", ")}]` }],
     });
     addStep({
       title: { vi: `return count = ${rangeCount}`, en: `return count = ${rangeCount}` },
       note: { vi: `Đoạn [${start}, ${end}) đóng góp ${rangeCount} reverse pair.`, en: `Range [${start}, ${end}) contributes ${rangeCount} reverse pairs.` },
-      codeLine: 15,
+      codeLine: 26,
       nextPhase: "return",
       vars: [{ name: "count", value: rangeCount }],
     });
@@ -8637,10 +8751,14 @@ function buildSteps493MergeSort(input) {
   rangeCount = answer;
   lastAdded = 0;
   mergedRange = { start: 0, end: working.length };
+  mergeLeft = null;
+  mergeRight = null;
+  mergeBuffer = working.map((item) => ({ ...item }));
+  mergePick = null;
   addStep({
     title: { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
     note: { vi: `Có ${answer} cặp (i, j) thỏa i < j và nums[i] > 2 × nums[j].`, en: `${answer} pairs (i, j) satisfy i < j and nums[i] > 2 × nums[j].` },
-    codeLine: 16,
+    codeLine: 27,
     nextPhase: "done",
     vars: [{ name: "answer", value: answer }],
     final: true,
@@ -10375,7 +10493,18 @@ module.exports = {
       "                while right < end and nums[left] > 2 * nums[right]:",
       "                    right += 1",
       "                count += right - mid",
-      "            nums[start:end] = sorted(nums[start:end])",
+      "            merged = []",
+      "            left, right = start, mid",
+      "            while left < mid and right < end:",
+      "                if nums[left] <= nums[right]:",
+      "                    merged.append(nums[left])",
+      "                    left += 1",
+      "                else:",
+      "                    merged.append(nums[right])",
+      "                    right += 1",
+      "            merged.extend(nums[left:mid])",
+      "            merged.extend(nums[right:end])",
+      "            nums[start:end] = merged",
       "            return count",
       "        return sort_count(0, len(nums))",
     ],

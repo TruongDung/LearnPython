@@ -3215,6 +3215,7 @@ function renderReversePairsView(step) {
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const working = Array.isArray(view.working) ? view.working : [];
   const stack = Array.isArray(view.stack) ? view.stack : [];
+  const mergeBuffer = Array.isArray(view.mergeBuffer) ? view.mergeBuffer : [];
   const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
   const range = view.range || {};
   const start = Number.isInteger(range.start) ? range.start : -1;
@@ -3222,66 +3223,78 @@ function renderReversePairsView(step) {
   const end = Number.isInteger(range.end) ? range.end : -1;
   const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
   const rightCursor = Number.isInteger(view.rightCursor) ? view.rightCursor : null;
+  const mergeLeft = Number.isInteger(view.mergeLeft) ? view.mergeLeft : null;
+  const mergeRight = Number.isInteger(view.mergeRight) ? view.mergeRight : null;
+  const mergePick = Number.isInteger(view.mergePick) ? view.mergePick : null;
   const phase = String(view.phase || "start");
+  const countingPhase = ["count", "compare-valid", "move-right", "count-add"].includes(phase);
   const phaseIndex = ["start", "divide", "base"].includes(phase) ? 0
-    : ["count", "compare-valid", "move-right", "count-add"].includes(phase) ? 1
-      : ["merge", "return"].includes(phase) ? 2 : 3;
-  const phaseLabels = vi
-    ? ["1 · Chia theo index", "2 · Đếm pair chéo", "3 · Merge theo value", "4 · Kết quả"]
-    : ["1 · Divide by index", "2 · Count cross pairs", "3 · Merge by value", "4 · Result"];
-  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+    : countingPhase ? 1
+      : phase.startsWith("merge") || phase === "return" ? 2 : 3;
+  const phaseLabels = vi ? ["CHIA ÷2", "ĐẾM ×2", "MERGE ↑", "XONG ✓"] : ["SPLIT ÷2", "COUNT ×2", "MERGE ↑", "DONE ✓"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${index < phaseIndex ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`).join("");
 
-  const originalHtml = nums.map((value, index) => `<span class="rp493-original"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("");
-  const workingHtml = working.map((item, position) => {
-    const classes = ["rp493-work"];
-    if (position >= start && position < mid) classes.push("left-half");
-    if (position >= mid && position < end) classes.push("right-half");
-    if (position === leftPos) classes.push("left-current");
-    if (validPositions.has(position)) classes.push("valid");
-    if (position === rightCursor) classes.push("right-cursor");
-    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
-    const marker = position === leftPos ? "L" : position === rightCursor ? "R" : validPositions.has(position) ? "✓" : "";
-    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.value))}</strong><em>original i=${item.originalIndex}</em><i>${marker}</i></span>`;
+  const visualStart = start >= 0 ? start : 0;
+  const visualEnd = end >= 0 ? end : working.length;
+  const visualMid = mid >= 0 ? mid : Math.floor((visualStart + visualEnd) / 2);
+  const originalHtml = nums.map((value, index) => {
+    const side = index >= visualStart && index < visualMid ? " left" : index >= visualMid && index < visualEnd ? " right" : "";
+    return `<span class="rp493-original${side}"><small>${index}</small><strong>${escapeHtml(String(value))}</strong></span>`;
   }).join("");
+  const makeValueCard = (item, position, side) => {
+    const classes = ["rp493-value", side];
+    if (position === leftPos || position === mergeLeft || position === rightCursor || position === mergeRight) classes.push("pointer");
+    if (validPositions.has(position)) classes.push("valid");
+    if (position === mergePick) classes.push("picked");
+    const marker = position === leftPos || position === mergeLeft ? "L" : position === rightCursor || position === mergeRight ? "R" : validPositions.has(position) ? "✓" : "";
+    return `<span class="${classes.join(" ")}"><small>i${item.originalIndex}</small><strong>${escapeHtml(String(item.value))}</strong>${side === "right" && countingPhase ? `<em>2× = ${escapeHtml(String(2 * item.value))}</em>` : ""}${marker ? `<b>${marker}</b>` : ""}</span>`;
+  };
+  const leftHtml = working.slice(visualStart, visualMid).map((item, offset) => makeValueCard(item, visualStart + offset, "left")).join("");
+  const rightHtml = working.slice(visualMid, visualEnd).map((item, offset) => makeValueCard(item, visualMid + offset, "right")).join("");
   const stackHtml = stack.length
-    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
-    : `<span><strong>—</strong></span>`;
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><i>d${frame.depth}</i><b>${frame.start}..${frame.end - 1}</b></span>`).join('<i class="rp493-chevron">›</i>')
+    : `<span><b>0..${Math.max(0, nums.length - 1)}</b></span>`;
+  const bufferHtml = mergeBuffer.length
+    ? mergeBuffer.map((item, index) => `<span class="rp493-buffer-value"><small>${index}</small><strong>${escapeHtml(String(item.value))}</strong><em>i${item.originalIndex}</em></span>`).join("")
+    : Array.from({ length: Math.max(1, visualEnd - visualStart) }, () => '<span class="rp493-buffer-value empty">·</span>').join("");
 
   const leftItem = leftPos >= 0 ? working[leftPos] : null;
   const rightItem = rightCursor !== null && rightCursor >= 0 && rightCursor < end ? working[rightCursor] : null;
-  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
-  let actionMain = "nums[i] > 2 × nums[j]";
-  let actionDetail = vi ? "đồng thời original i < original j" : "while original i < original j";
+  const mergeLeftItem = mergeLeft !== null && mergeLeft < visualMid ? working[mergeLeft] : null;
+  const mergeRightItem = mergeRight !== null && mergeRight < visualEnd ? working[mergeRight] : null;
+  let actionIcon = "÷2";
+  let actionMain = `[${visualStart}..${Math.max(visualStart, visualEnd - 1)}]`;
+  let actionDetail = "i < j";
   if (leftItem && rightItem) {
     const valid = leftItem.value > 2 * rightItem.value;
-    actionLabel = valid ? (vi ? "PAIR HỢP LỆ" : "VALID PAIR") : (vi ? "DỪNG CON TRỎ" : "STOP POINTER");
+    actionIcon = valid ? "✓" : "×";
     actionMain = `${leftItem.value} ${valid ? ">" : "≤"} 2 × ${rightItem.value} = ${2 * rightItem.value}`;
-    actionDetail = valid
-      ? `${vi ? "original pair" : "original pair"} (${leftItem.originalIndex}, ${rightItem.originalIndex})`
-      : (vi ? "các right value phía sau còn lớn hơn" : "later right values are even larger");
+    actionDetail = `(${leftItem.originalIndex}, ${rightItem.originalIndex})`;
   } else if (leftItem && rightCursor !== null && rightCursor >= end) {
-    actionLabel = vi ? "HẾT NỬA PHẢI" : "RIGHT END";
-    actionMain = `right = ${rightCursor} = end`;
-    actionDetail = vi ? "mọi right value trong cửa sổ đều hợp lệ" : "every right value in the window is valid";
-  } else if (phase === "merge") {
-    actionLabel = "MERGE";
-    actionMain = `[${working.slice(start, end).map((item) => item.value).join(", ")}]`;
-    actionDetail = vi ? "đã sort để cấp cha dùng two pointers" : "sorted for the parent two-pointer scan";
+    actionIcon = "✓";
+    actionMain = "right = end";
+    actionDetail = `+${view.lastAdded ?? 0}`;
+  } else if (phase.startsWith("merge")) {
+    actionIcon = "↑";
+    actionMain = mergeLeftItem && mergeRightItem ? `${mergeLeftItem.value} ↔ ${mergeRightItem.value}` : (vi ? "Nối phần còn lại" : "Append the tail");
+    actionDetail = `[${mergeBuffer.map((item) => item.value).join(", ")}]`;
   } else if (phase === "done") {
-    actionLabel = "RETURN";
+    actionIcon = "✓";
     actionMain = String(view.rangeCount ?? 0);
-    actionDetail = vi ? "reverse pairs" : "reverse pairs";
+    actionDetail = "reverse pairs";
   }
-  const doubledRight = rightItem ? 2 * rightItem.value : null;
 
   $("treeView").innerHTML = `<div class="rp493-viz phase-${escapeHtml(phase)}">
     <div class="rp493-phases">${phases}</div>
-    <section class="rp493-section"><header><strong>ORIGINAL NUMS · ${vi ? "INDEX KHÔNG THAY ĐỔI" : "INDEX NEVER CHANGES"}</strong><span>i &lt; j</span></header><div class="rp493-scroll"><div class="rp493-row">${originalHtml}</div></div></section>
-    <div class="rp493-recursion"><div><small>RECURSION STACK</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
-    <section class="rp493-section"><header><strong>WORKING ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = pair hợp lệ" : "blue = left · purple = right · green = valid pair"}</span></header><div class="rp493-scroll"><div class="rp493-row">${workingHtml || "—"}</div></div></section>
-    <div class="rp493-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
-    <div class="rp493-metrics"><span><small>left value</small><strong>${leftItem ? escapeHtml(String(leftItem.value)) : "—"}</strong></span><span><small>2 × right</small><strong>${doubledRight === null ? "—" : escapeHtml(String(doubledRight))}</strong></span><span><small>right − mid</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
-    <div class="rp493-rule"><code>left.value &gt; 2 × right.value</code><span>${vi ? "right chỉ tiến → mỗi merge level O(n)" : "right only moves forward → O(n) per merge level"}</span></div>
+    <section class="rp493-index"><header><b>INDEX</b><span>i &lt; j</span></header><div class="rp493-scroll"><div class="rp493-originals">${originalHtml}</div></div></section>
+    <div class="rp493-recursion">${stackHtml}</div>
+    <div class="rp493-arena">
+      <section class="rp493-half left"><header><b>L</b><span>${visualStart}..${Math.max(visualStart, visualMid - 1)}</span></header><div>${leftHtml || "·"}</div></section>
+      <div class="rp493-action"><i>${escapeHtml(actionIcon)}</i><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span><output><small>COUNT</small>${escapeHtml(String(view.rangeCount ?? 0))}${countingPhase && view.lastAdded ? `<em>+${escapeHtml(String(view.lastAdded))}</em>` : ""}</output></div>
+      <section class="rp493-half right"><header><b>R</b><span>${visualMid}..${Math.max(visualMid, visualEnd - 1)}</span></header><div>${rightHtml || "·"}</div></section>
+    </div>
+    <section class="rp493-buffer"><header><b>MERGE ↑</b><span>${phase.startsWith("merge") || phase === "done" ? `${mergeBuffer.length}/${Math.max(0, visualEnd - visualStart)}` : "· · ·"}</span></header><div>${bufferHtml}</div></section>
+    <div class="rp493-rule"><code>i &lt; j</code><i>+</i><code>nums[i] &gt; 2×nums[j]</code><i>→</i><b>O(n log n)</b></div>
   </div>`;
 }
 
