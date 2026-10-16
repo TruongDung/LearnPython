@@ -265,7 +265,7 @@ for case in payload["cases"]:
             if oracle.get("type") != "guess-number":
                 raise ValueError("Unknown live oracle type")
             def guess(number, n=oracle["n"], pick=oracle["pick"]):
-                if type(number) is not int or not 1 <= number <= n:
+                if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= n:
                     raise ValueError("guess(number) requires an integer in [1, n]")
                 return -1 if number > pick else 1 if number < pick else 0
             scope["guess"] = guess

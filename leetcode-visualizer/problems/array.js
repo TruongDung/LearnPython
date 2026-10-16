@@ -8410,10 +8410,6 @@ function buildSteps493MergeSort(input) {
   let mergeRight = null;
   let mergeBuffer = [];
   let mergePick = null;
-  let mergeLeft = null;
-  let mergeRight = null;
-  let mergeBuffer = [];
-  let mergePick = null;
 
   const makeView = () => ({
     phase,
@@ -9293,6 +9289,10 @@ function buildSteps327MergeSort(input, params = {}) {
   let rangeCount = 0;
   let lastAdded = 0;
   let mergedRange = null;
+  let mergeLeft = null;
+  let mergeRight = null;
+  let mergeBuffer = [];
+  let mergePick = null;
 
   const snapshotView = () => ({
     phase,
