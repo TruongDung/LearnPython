@@ -90,6 +90,9 @@ function parseInput9021(input) {
 }
 
 function buildSteps9021(input, params = {}) {
+  if (String(params.approach || "1") === "3") {
+    return require("./safe-level-kruskal-9021").buildSteps(parseInput9021(input));
+  }
   if (String(params.approach || "1") === "2") {
     return require("./safe-level-dijkstra-9021").buildSteps(parseInput9021(input));
   }
@@ -270,12 +273,14 @@ module.exports = {
     extraParams: [{ key: "approach", type: "select", default: "1", label: bi("Cách giải", "Approach"), options: [
       { value: "1", label: bi("Cách 1: Binary Search + BFS", "Approach 1: Binary Search + BFS") },
       { value: "2", label: bi("Cách 2: Dijkstra — Minimax Path", "Approach 2: Dijkstra — Minimax Path") },
+      { value: "3", label: bi("Cách 3: Kruskal + Union-Find (DSU)", "Approach 3: Kruskal + Union-Find (DSU)") },
     ] }],
     approach: [
       bi("Cách 1: thử mức S bằng binary search và BFS.", "Approach 1: binary-search S and check connectivity with BFS."),
       bi("Cách 2: best[x] lưu mức nhỏ nhất để tới x; pop cost nhỏ nhất từ min-heap.", "Approach 2: best[x] stores the minimum level to reach x; pop the smallest cost from the min-heap."),
       bi("candidate = max(cost, weight). Chỉ cập nhật nếu nhỏ hơn best[nei].", "candidate = max(cost, weight). Update only if it improves best[nei]."),
       bi("Bỏ bản ghi cũ. Khi pop v hợp lệ, trả cost; hết heap thì trả -1.", "Skip stale entries. Return cost when v is validly popped; return -1 if the heap empties."),
+      bi("Cách 3: thêm cạnh từ nhỏ tới lớn, dùng DSU gộp nhóm. Trả mức cạnh đầu tiên nối u với v.", "Approach 3: process edges from smallest to largest and merge components with DSU. Return the first edge level connecting u and v."),
     ],
     complexity: { time: "O((V + E) log E)", space: "O(V + E)", note: bi("Mỗi lần thử chạy BFS; tìm kiếm trên các mức cạnh khác nhau.", "Each trial runs BFS over the graph; search only distinct edge levels.") },
     code: CODE_9021,
@@ -283,6 +288,9 @@ module.exports = {
     code2: require("./safe-level-dijkstra-9021").CODE,
     code2Label: bi("Cách 2: Dijkstra — Minimax Path", "Approach 2: Dijkstra — Minimax Path"),
     complexity2: { time: "O((V + E) log(V + E))", space: "O(V + E)", note: bi("Min-heap giữ các bản ghi cải thiện. Dùng max trên đường đi; dừng khi pop đích hợp lệ.", "The min-heap stores improving states. Path cost uses max; stop when the target is validly popped.") },
+    code3: require("./safe-level-kruskal-9021").CODE,
+    code3Label: bi("Cách 3: Kruskal + Union-Find (DSU)", "Approach 3: Kruskal + Union-Find (DSU)"),
+    complexity3: { time: "O(V + E log E)", space: "O(V + E)", note: bi("Union theo size, find nén đường đi bằng path halving. sorted tạo bản sao O(E).", "Union by size and path halving in find. sorted creates an O(E) copy.") },
     builder: buildSteps9021,
     liveArgs: input => { const { n, edges, u, v } = parseInput9021(input); return [n, edges, u, v]; },
   },
