@@ -262,6 +262,7 @@ module.exports = {
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
       { key: "bfs", vi: "BFS", en: "BFS" },
+      { key: "minimax", vi: "Minimax", en: "Minimax" },
     ],
     title: bi("Minimum Safe Level", "Minimum Safe Level"),
     titleVi: bi("Mức safe nhỏ nhất để đi từ u tới v", "Minimum safe level to travel from u to v"),

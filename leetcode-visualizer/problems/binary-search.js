@@ -4138,6 +4138,7 @@ module.exports = {
     difficulty: "hard",
     slug: "split-array-largest-sum",
     category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [{ key: "minimax", vi: "Minimax", en: "Minimax" }],
     title: { vi: "Split Array Largest Sum", en: "Split Array Largest Sum" },
     titleVi: { vi: "Chia mảng để tổng lớn nhất nhỏ nhất", en: "Split array to minimize the largest sum" },
     statement: {

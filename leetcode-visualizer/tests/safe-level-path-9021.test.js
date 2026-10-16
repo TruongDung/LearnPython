@@ -248,7 +248,7 @@ test('9021 separates the 1-4 and 2-3 edge labels and draws a visible bridge', ()
 test('9021 is a lazy custom interview visualization registered in the app', () => {
   assert.equal(problem.category.key, 'interview');
   assert.equal(problem.slug, null);
-  assert.deepEqual(problem.tags.map(tag => tag.key), ['graph', 'binary-search', 'bfs']);
+  assert.deepEqual(problem.tags.map(tag => tag.key), ['graph', 'binary-search', 'bfs', 'minimax']);
   assert.ok(JAVASCRIPT_ASSETS.includes('renderer-safe-level-path-9021.js'));
   assert.ok(STYLESHEET_ASSETS.includes('safe-level-path-9021.css'));
   assert.match(readFrontendJavaScript(), /renderSafePath9021View\(step\)/);
