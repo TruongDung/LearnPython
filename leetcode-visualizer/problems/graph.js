@@ -19311,7 +19311,10 @@ module.exports = {
     premium: true,
     slug: "path-with-maximum-minimum-value",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
-    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
+    tags: [
+      { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+      { key: "minimax", vi: "Minimax", en: "Minimax" },
+    ],
     title: { vi: "Path With Maximum Minimum Value", en: "Path With Maximum Minimum Value" },
     titleVi: { vi: "Đường có giá trị nhỏ nhất lớn nhất (max-heap)", en: "Path with maximum minimum value (max-heap)" },
     statement: {
@@ -21156,7 +21159,10 @@ module.exports = {
     difficulty: "hard",
     slug: "swim-in-rising-water",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
-    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
+    tags: [
+      { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+      { key: "minimax", vi: "Minimax", en: "Minimax" },
+    ],
     title: { vi: "Swim in Rising Water", en: "Swim in Rising Water" },
     titleVi: { vi: "Bơi trong nước đang dâng", en: "Swim in rising water" },
     statement: {

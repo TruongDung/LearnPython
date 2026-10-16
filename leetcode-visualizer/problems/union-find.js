@@ -6756,7 +6756,10 @@ module.exports = {
     difficulty: "medium",
     slug: "path-with-minimum-effort",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
-    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
+    tags: [
+      { key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" },
+      { key: "minimax", vi: "Minimax", en: "Minimax" },
+    ],
     title: { vi: "Path With Minimum Effort", en: "Path With Minimum Effort" },
     titleVi: { vi: "Đường đi với effort nhỏ nhất", en: "Path with minimum effort" },
     statement: {

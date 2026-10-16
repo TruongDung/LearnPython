@@ -20599,6 +20599,7 @@ module.exports = {
     difficulty: "medium",
     slug: "predict-the-winner",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [{ key: "minimax", vi: "Minimax", en: "Minimax" }],
     title: { vi: "Predict the Winner", en: "Predict the Winner" },
     titleVi: { vi: "Dự đoán người thắng (interval DP)", en: "Predict the winner (interval DP)" },
     statement: {
