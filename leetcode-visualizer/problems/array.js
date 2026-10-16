@@ -8410,6 +8410,10 @@ function buildSteps493MergeSort(input) {
   let mergeRight = null;
   let mergeBuffer = [];
   let mergePick = null;
+  let mergeLeft = null;
+  let mergeRight = null;
+  let mergeBuffer = [];
+  let mergePick = null;
 
   const makeView = () => ({
     phase,
@@ -9306,6 +9310,10 @@ function buildSteps327MergeSort(input, params = {}) {
     rangeCount,
     lastAdded,
     mergedRange: mergedRange ? { ...mergedRange } : null,
+    mergeLeft,
+    mergeRight,
+    mergeBuffer: mergeBuffer.map((item) => ({ ...item })),
+    mergePick,
     stack: stack.map((item) => ({ ...item })),
   });
   const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
@@ -9372,7 +9380,7 @@ function buildSteps327MergeSort(input, params = {}) {
       vi: "Mỗi lần chia, nửa trái chứa prefix index sớm hơn nửa phải. Sau khi hai nửa đã sort theo sum, dùng hai con trỏ để đếm cặp chéo.",
       en: "Each split keeps earlier prefix indices on the left. Once both halves are sorted by sum, two pointers count cross-half pairs.",
     },
-    codeLine: 21,
+    codeLine: 32,
     nextPhase: "divide",
   });
 
@@ -9385,6 +9393,10 @@ function buildSteps327MergeSort(input, params = {}) {
     rangeCount = 0;
     lastAdded = 0;
     mergedRange = null;
+    mergeLeft = null;
+    mergeRight = null;
+    mergeBuffer = [];
+    mergePick = null;
     stack.push({ start, end, depth });
     addStep({
       title: { vi: `sort_count(${start}, ${end})`, en: `sort_count(${start}, ${end})` },
@@ -9555,23 +9567,120 @@ function buildSteps327MergeSort(input, params = {}) {
       });
     }
 
-    const beforeMerge = working.slice(start, end).map((item) => ({ ...item }));
-    const merged = beforeMerge.sort((a, b) => a.sum - b.sum || a.originalIndex - b.originalIndex);
-    working.splice(start, end - start, ...merged);
-    mergedRange = { start, end };
     leftPos = null;
     low = null;
     high = null;
     validPositions = [];
+    lastAdded = 0;
+    mergeBuffer = [];
+    mergePick = null;
     addStep({
-      title: { vi: `Merge và sort đoạn [${start}, ${end})`, en: `Merge and sort [${start}, ${end})` },
-      note: {
-        vi: `Đoạn được sắp theo prefix sum để cấp cha có thể dùng hai con trỏ: [${working.slice(start, end).map((item) => item.sum).join(", ")}].`,
-        en: `Sort the range by prefix sum so its parent can use two pointers: [${working.slice(start, end).map((item) => item.sum).join(", ")}].`,
-      },
+      title: { vi: "Tạo buffer merge", en: "Create the merge buffer" },
+      note: { vi: "Hai nửa đã tăng dần; merge tuyến tính giữ tổng thời gian O(n log n).", en: "Both halves are sorted; a linear merge keeps total time O(n log n)." },
       codeLine: 19,
       nextPhase: "merge",
-      vars: [{ name: "sorted sums", value: `[${working.slice(start, end).map((item) => item.sum).join(", ")}]` }],
+      vars: [{ name: "merged", value: "[]" }],
+    });
+    mergeLeft = start;
+    mergeRight = mid;
+    addStep({
+      title: { vi: `Con trỏ merge: ${start} | ${mid}`, en: `Merge pointers: ${start} | ${mid}` },
+      note: { vi: "Mỗi con trỏ bắt đầu ở đầu nửa tương ứng.", en: "Each pointer starts at its half's first value." },
+      codeLine: 20,
+      nextPhase: "merge",
+      vars: [{ name: "left, right", value: `${mergeLeft}, ${mergeRight}` }],
+    });
+    while (mergeLeft < mid && mergeRight < end) {
+      addStep({
+        title: { vi: "Hai nửa đều còn prefix", en: "Both halves still have prefixes" },
+        note: { vi: "So sánh hai prefix sum nhỏ nhất chưa lấy.", en: "Compare the two smallest remaining prefix sums." },
+        codeLine: 21,
+        nextPhase: "merge",
+      });
+      const leftItem = working[mergeLeft];
+      const rightItem = working[mergeRight];
+      const takeLeft = leftItem.sum < rightItem.sum || (leftItem.sum === rightItem.sum && leftItem.originalIndex <= rightItem.originalIndex);
+      addStep({
+        title: { vi: `${leftItem.sum} ${takeLeft ? "≤" : ">"} ${rightItem.sum}`, en: `${leftItem.sum} ${takeLeft ? "≤" : ">"} ${rightItem.sum}` },
+        note: takeLeft ? { vi: "Lấy prefix bên trái.", en: "Take the left prefix." } : { vi: "Lấy prefix bên phải.", en: "Take the right prefix." },
+        codeLine: 22,
+        nextPhase: "merge-compare",
+      });
+      if (takeLeft) {
+        mergePick = mergeLeft;
+        mergeBuffer.push({ ...leftItem });
+        addStep({
+          title: { vi: `Đẩy ${leftItem.sum} vào buffer`, en: `Push ${leftItem.sum} into the buffer` },
+          note: { vi: "Buffer vẫn tăng dần.", en: "The buffer stays sorted." },
+          codeLine: 23,
+          nextPhase: "merge-pick",
+          vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.sum).join(", ")}]` }],
+        });
+        mergeLeft += 1;
+        mergePick = null;
+        addStep({
+          title: { vi: `left → ${mergeLeft}`, en: `left → ${mergeLeft}` },
+          note: { vi: "Tiến con trỏ nửa trái.", en: "Advance the left pointer." },
+          codeLine: 24,
+          nextPhase: "merge",
+          vars: [{ name: "left", value: mergeLeft }],
+        });
+      } else {
+        mergePick = mergeRight;
+        mergeBuffer.push({ ...rightItem });
+        addStep({
+          title: { vi: `Đẩy ${rightItem.sum} vào buffer`, en: `Push ${rightItem.sum} into the buffer` },
+          note: { vi: "Buffer vẫn tăng dần.", en: "The buffer stays sorted." },
+          codeLine: 26,
+          nextPhase: "merge-pick",
+          vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.sum).join(", ")}]` }],
+        });
+        mergeRight += 1;
+        mergePick = null;
+        addStep({
+          title: { vi: `right → ${mergeRight}`, en: `right → ${mergeRight}` },
+          note: { vi: "Tiến con trỏ nửa phải.", en: "Advance the right pointer." },
+          codeLine: 27,
+          nextPhase: "merge",
+          vars: [{ name: "right", value: mergeRight }],
+        });
+      }
+    }
+    addStep({
+      title: { vi: "Một nửa đã hết", en: "One half is exhausted" },
+      note: { vi: "Nối phần còn lại vì nó đã tăng dần.", en: "Append the already-sorted remainder." },
+      codeLine: 21,
+      nextPhase: "merge",
+    });
+    const leftTail = working.slice(mergeLeft, mid).map((item) => ({ ...item }));
+    mergeBuffer.push(...leftTail);
+    mergeLeft = mid;
+    addStep({
+      title: { vi: `Nối ${leftTail.length} prefix trái`, en: `Append ${leftTail.length} left prefixes` },
+      note: { vi: "Phần trái còn lại vào cuối buffer.", en: "The left remainder goes to the buffer tail." },
+      codeLine: 28,
+      nextPhase: "merge-tail",
+      vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.sum).join(", ")}]` }],
+    });
+    const rightTail = working.slice(mergeRight, end).map((item) => ({ ...item }));
+    mergeBuffer.push(...rightTail);
+    mergeRight = end;
+    addStep({
+      title: { vi: `Nối ${rightTail.length} prefix phải`, en: `Append ${rightTail.length} right prefixes` },
+      note: { vi: "Buffer chứa toàn bộ đoạn theo thứ tự tăng dần.", en: "The buffer now holds the full sorted range." },
+      codeLine: 29,
+      nextPhase: "merge-tail",
+      vars: [{ name: "merged", value: `[${mergeBuffer.map((item) => item.sum).join(", ")}]` }],
+    });
+    working.splice(start, end - start, ...mergeBuffer.map((item) => ({ ...item })));
+    mergedRange = { start, end };
+    mergePick = null;
+    addStep({
+      title: { vi: `Ghi buffer vào [${start}, ${end})`, en: `Write the buffer to [${start}, ${end})` },
+      note: { vi: "Đoạn đã sẵn sàng cho level cha.", en: "The range is ready for its parent level." },
+      codeLine: 30,
+      nextPhase: "merge-commit",
+      vars: [{ name: "prefix[start:end]", value: `[${working.slice(start, end).map((item) => item.sum).join(", ")}]` }],
     });
     addStep({
       title: { vi: `return count = ${rangeCount}`, en: `return count = ${rangeCount}` },
@@ -9579,7 +9688,7 @@ function buildSteps327MergeSort(input, params = {}) {
         vi: `Đoạn [${start}, ${end}) đóng góp tổng cộng ${rangeCount} range sum hợp lệ.`,
         en: `Range [${start}, ${end}) contributes ${rangeCount} valid range sums in total.`,
       },
-      codeLine: 20,
+      codeLine: 31,
       nextPhase: "return",
       vars: [{ name: "count", value: rangeCount }],
     });
@@ -9598,7 +9707,7 @@ function buildSteps327MergeSort(input, params = {}) {
       vi: `Có ${answer} subarray có tổng nằm trong [${lower}, ${upper}].`,
       en: `${answer} subarrays have sums in [${lower}, ${upper}].`,
     },
-    codeLine: 21,
+    codeLine: 32,
     nextPhase: "done",
     vars: [{ name: "answer", value: answer }],
     final: true,
@@ -10670,7 +10779,18 @@ module.exports = {
       "                while high < end and prefix[high][0] - prefix[left][0] <= upper:",
       "                    high += 1",
       "                count += high - low",
-      "            prefix[start:end] = sorted(prefix[start:end])",
+      "            merged = []",
+      "            left, right = start, mid",
+      "            while left < mid and right < end:",
+      "                if prefix[left] <= prefix[right]:",
+      "                    merged.append(prefix[left])",
+      "                    left += 1",
+      "                else:",
+      "                    merged.append(prefix[right])",
+      "                    right += 1",
+      "            merged.extend(prefix[left:mid])",
+      "            merged.extend(prefix[right:end])",
+      "            prefix[start:end] = merged",
       "            return count",
       "        return sort_count(0, len(prefix))",
     ],

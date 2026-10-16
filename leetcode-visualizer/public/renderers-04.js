@@ -108,6 +108,7 @@ function renderRangeSumCountView(step) {
   const prefixOriginal = Array.isArray(view.prefixOriginal) ? view.prefixOriginal : [];
   const working = Array.isArray(view.working) ? view.working : [];
   const stack = Array.isArray(view.stack) ? view.stack : [];
+  const mergeBuffer = Array.isArray(view.mergeBuffer) ? view.mergeBuffer : [];
   const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
   const range = view.range || {};
   const start = Number.isInteger(range.start) ? range.start : -1;
@@ -116,66 +117,75 @@ function renderRangeSumCountView(step) {
   const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
   const low = Number.isInteger(view.low) ? view.low : null;
   const high = Number.isInteger(view.high) ? view.high : null;
+  const mergeLeft = Number.isInteger(view.mergeLeft) ? view.mergeLeft : null;
+  const mergeRight = Number.isInteger(view.mergeRight) ? view.mergeRight : null;
+  const mergePick = Number.isInteger(view.mergePick) ? view.mergePick : null;
   const phase = String(view.phase || "prefix");
-  const phaseIndex = phase === "prefix" ? 0
-    : ["divide", "base"].includes(phase) ? 1
-      : ["merge", "return", "done"].includes(phase) ? 3 : 2;
-  const phaseLabels = vi
-    ? ["1 · Prefix Sum", "2 · Chia Merge Sort", "3 · Đếm cặp chéo", "4 · Merge"]
-    : ["1 · Prefix sums", "2 · Divide", "3 · Count cross pairs", "4 · Merge"];
-  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+  const countingPhase = ["count", "move-low", "move-high", "count-add"].includes(phase);
+  const mergingPhase = phase.startsWith("merge");
+  const phaseIndex = phase === "prefix" ? 0 : ["divide", "base"].includes(phase) ? 1 : countingPhase ? 2 : 3;
+  const phaseLabels = ["PΣ", "SPLIT ÷2", "[L..U]", "MERGE ↑"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${index < phaseIndex ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`).join("");
 
-  const numsHtml = nums.map((num, index) => `<span class="rs327-num${index === view.currentNumIndex ? " active" : ""}"><small>nums[${index}]</small><strong>${escapeHtml(String(num))}</strong></span>`).join("");
-  const prefixHtml = prefixOriginal.map((item) => `<span class="rs327-prefix"><small>P${escapeHtml(String(item.originalIndex))}</small><strong>${escapeHtml(String(item.sum))}</strong><em>nums[0..${item.originalIndex - 1}]</em></span>`).join("");
-  const workingHtml = working.map((item, position) => {
-    const classes = ["rs327-work"];
-    if (position >= start && position < mid) classes.push("left-half");
-    if (position >= mid && position < end) classes.push("right-half");
-    if (position === leftPos) classes.push("left-current");
-    if (validPositions.has(position)) classes.push("valid");
-    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
-    const markers = [];
-    if (position === low) markers.push("low");
-    if (position === high) markers.push("high");
-    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.sum))}</strong><em>P${escapeHtml(String(item.originalIndex))}</em><i>${escapeHtml(markers.join(" · "))}</i></span>`;
+  const prefixRail = prefixOriginal.map((item, index) => {
+    const active = index > 0 && index - 1 === view.currentNumIndex;
+    const addend = index === 0 ? "START" : `${nums[index - 1] >= 0 ? "+" : ""}${nums[index - 1]}`;
+    return `<span class="rs327i-prefix${active ? " active" : ""}"><small>${escapeHtml(addend)}</small><b>P${escapeHtml(String(item.originalIndex))}</b><strong>${escapeHtml(String(item.sum))}</strong></span>${index < prefixOriginal.length - 1 ? '<i class="rs327i-arrow">→</i>' : ""}`;
   }).join("");
-  const stackHtml = stack.length
-    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
-    : `<span><strong>—</strong></span>`;
 
+  const visualStart = start >= 0 ? start : 0;
+  const visualEnd = end >= 0 ? end : working.length;
+  const visualMid = mid >= 0 ? mid : Math.floor((visualStart + visualEnd) / 2);
   const leftItem = leftPos >= 0 ? working[leftPos] : null;
+  const makePrefixCard = (item, position, side) => {
+    const classes = ["rs327i-value", side];
+    if (position === leftPos || position === mergeLeft || position === mergeRight) classes.push("pointer");
+    if (validPositions.has(position)) classes.push("valid");
+    if (position === mergePick) classes.push("picked");
+    const marker = position === leftPos || position === mergeLeft ? "L" : position === mergeRight ? "R" : position === low ? "lo" : position === high ? "hi" : validPositions.has(position) ? "✓" : "";
+    const delta = countingPhase && side === "right" && leftItem ? item.sum - leftItem.sum : null;
+    return `<span class="${classes.join(" ")}"><small>P${escapeHtml(String(item.originalIndex))}</small><strong>${escapeHtml(String(item.sum))}</strong>${delta !== null ? `<em>Δ ${escapeHtml(String(delta))}</em>` : ""}${marker ? `<b>${escapeHtml(marker)}</b>` : ""}</span>`;
+  };
+  const leftHtml = working.slice(visualStart, visualMid).map((item, offset) => makePrefixCard(item, visualStart + offset, "left")).join("");
+  const rightHtml = working.slice(visualMid, visualEnd).map((item, offset) => makePrefixCard(item, visualMid + offset, "right")).join("");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><i>d${frame.depth}</i><b>${frame.start}..${frame.end - 1}</b></span>`).join('<i class="rs327i-chevron">›</i>')
+    : `<span><b>0..${Math.max(0, prefixOriginal.length - 1)}</b></span>`;
   const lowerTarget = leftItem ? leftItem.sum + Number(view.lower) : null;
   const upperTarget = leftItem ? leftItem.sum + Number(view.upper) : null;
-  const validItems = [...validPositions].map((position) => working[position]).filter(Boolean);
-  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
+  const mergeLeftItem = mergeLeft !== null && mergeLeft < visualMid ? working[mergeLeft] : null;
+  const mergeRightItem = mergeRight !== null && mergeRight < visualEnd ? working[mergeRight] : null;
+  let actionIcon = "Σ";
   let actionMain = `${view.lower} ≤ Pj − Pi ≤ ${view.upper}`;
-  let actionDetail = vi ? "Đếm cặp prefix với i < j" : "Count prefix pairs with i < j";
+  let actionDetail = "i < j";
   if (leftItem) {
-    actionLabel = vi ? "PREFIX TRÁI" : "LEFT PREFIX";
-    actionMain = `P${leftItem.originalIndex} = ${leftItem.sum} · right sum ∈ [${lowerTarget}, ${upperTarget}]`;
-    actionDetail = validItems.length
-      ? `${vi ? "hợp lệ" : "valid"}: ${validItems.map((item) => `P${item.originalIndex}=${item.sum}`).join(", ")}`
-      : (vi ? "chưa có prefix phải hợp lệ" : "no valid right prefix yet");
-  } else if (phase === "merge") {
-    actionLabel = "MERGE";
-    actionMain = `[${start}, ${end}) → ${working.slice(start, end).map((item) => item.sum).join(", ")}`;
-    actionDetail = vi ? "Sắp theo prefix sum cho level cha" : "Sorted by prefix sum for the parent level";
+    actionIcon = validPositions.size ? "✓" : "↔";
+    actionMain = `${leftItem.sum} + [${view.lower}, ${view.upper}]`;
+    actionDetail = `[${lowerTarget}, ${upperTarget}]`;
+  } else if (mergingPhase) {
+    actionIcon = "↑";
+    actionMain = mergeLeftItem && mergeRightItem ? `${mergeLeftItem.sum} ↔ ${mergeRightItem.sum}` : (vi ? "Nối phần còn lại" : "Append tail");
+    actionDetail = `[${mergeBuffer.map((item) => item.sum).join(", ")}]`;
   } else if (phase === "done") {
-    actionLabel = "RETURN";
+    actionIcon = "✓";
     actionMain = String(view.rangeCount);
-    actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+    actionDetail = vi ? "đoạn hợp lệ" : "valid ranges";
   }
-  const lowText = low === null ? "—" : low >= end && end >= 0 ? `${low} (end)` : String(low);
-  const highText = high === null ? "—" : high >= end && end >= 0 ? `${high} (end)` : String(high);
+  const bufferHtml = mergeBuffer.length
+    ? mergeBuffer.map((item, index) => `<span class="rs327i-buffer-value"><small>${index}</small><strong>${escapeHtml(String(item.sum))}</strong><em>P${escapeHtml(String(item.originalIndex))}</em></span>`).join("")
+    : Array.from({ length: Math.max(1, visualEnd - visualStart) }, () => '<span class="rs327i-buffer-value empty">·</span>').join("");
 
-  $("treeView").innerHTML = `<div class="rs327-viz phase-${escapeHtml(phase)}">
-    <div class="rs327-phases">${phases}</div>
-    <section class="rs327-section"><header><strong>NUMS → ORIGINAL PREFIX SUMS</strong><span>Pj − Pi = sum(nums[i..j−1])</span></header><div class="rs327-scroll"><div class="rs327-row">${numsHtml}</div><div class="rs327-row prefix">${prefixHtml}</div></div></section>
-    <div class="rs327-recursion"><div><small>${vi ? "RECURSION STACK" : "RECURSION STACK"}</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
-    <section class="rs327-section"><header><strong>WORKING PREFIX ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = valid" : "blue = left · purple = right · green = valid"}</span></header><div class="rs327-scroll"><div class="rs327-row working">${workingHtml || "—"}</div></div></section>
-    <div class="rs327-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
-    <div class="rs327-metrics"><span><small>low</small><strong>${escapeHtml(lowText)}</strong></span><span><small>high</small><strong>${escapeHtml(highText)}</strong></span><span><small>high − low</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
-    <div class="rs327-rule"><code>${escapeHtml(String(view.lower))} ≤ right.sum − left.sum ≤ ${escapeHtml(String(view.upper))}</code><span>${vi ? "low tìm cận dưới · high tìm sau cận trên" : "low finds lower bound · high finds after upper bound"}</span></div>
+  $("treeView").innerHTML = `<div class="rs327-viz rs327i-viz phase-${escapeHtml(phase)}">
+    <div class="rs327i-phases">${phases}</div>
+    <section class="rs327i-prefix-rail"><header><b>nums → PΣ</b><span>Pj − Pi</span></header><div class="rs327i-scroll"><div>${prefixRail || "·"}</div></div></section>
+    <div class="rs327i-recursion">${stackHtml}</div>
+    <div class="rs327i-arena">
+      <section class="rs327i-half left"><header><b>L</b><span>${visualStart}..${Math.max(visualStart, visualMid - 1)}</span></header><div>${leftHtml || "·"}</div></section>
+      <div class="rs327i-action"><i>${escapeHtml(actionIcon)}</i><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span><output><small>COUNT</small>${escapeHtml(String(view.rangeCount ?? 0))}${countingPhase && view.lastAdded ? `<em>+${escapeHtml(String(view.lastAdded))}</em>` : ""}</output></div>
+      <section class="rs327i-half right"><header><b>R</b><span>${visualMid}..${Math.max(visualMid, visualEnd - 1)}</span></header><div>${rightHtml || "·"}</div></section>
+    </div>
+    <section class="rs327i-buffer"><header><b>MERGE ↑</b><span>${mergingPhase || phase === "done" ? `${mergeBuffer.length}/${Math.max(0, visualEnd - visualStart)}` : "· · ·"}</span></header><div>${bufferHtml}</div></section>
+    <div class="rs327i-rule"><code>Pi + [lower, upper]</code><i>→</i><code>[low, high)</code><i>→</i><b>O(n log n)</b></div>
   </div>`;
 }
 
