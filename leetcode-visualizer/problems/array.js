@@ -7237,6 +7237,7 @@ function buildSteps315(input) {
   const ranks = new Map(values.map((value, index) => [value, index + 1]));
   const bit = Array(values.length + 1).fill(0);
   const answer = Array(n).fill(null);
+  const insertedIndices = new Set();
   const steps = [];
   let currentIndex = -1;
   let currentRank = null;
@@ -7263,6 +7264,7 @@ function buildSteps315(input) {
     queryPath: [...queryPath],
     updateCursor,
     updatePath: [...updatePath],
+    insertedIndices: [...insertedIndices],
     processedIndices: Array.from({ length: n }, (_, index) => index).filter((index) => answer[index] !== null),
   });
   const addStep = ({ title, note, codeLine, phase, vars = [], final = false }) => {
@@ -7502,6 +7504,7 @@ function buildSteps315(input) {
         vars: [{ name: "index", value: updateCursor }],
       });
     }
+    insertedIndices.add(index);
     addStep({
       title: { vi: `${updateCursor} >= ${bit.length} → kết thúc update`, en: `${updateCursor} >= ${bit.length} → finish update` },
       note: {
