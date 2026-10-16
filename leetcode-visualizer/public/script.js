@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.swimDijkstra778View), surface: "treeView", render: (step) => {
+      renderSwimRising778View(step);
+    } },
     { predicate: (step) => Boolean(step.guessCost375View), surface: "treeView", render: (step) => {
       renderGuessCost375View(step);
     } },
