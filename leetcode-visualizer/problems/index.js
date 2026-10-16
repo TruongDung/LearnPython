@@ -38,6 +38,7 @@ const categories = {
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
+const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
@@ -219,11 +220,14 @@ for (const id of KNAPSACK_IDS) {
 }
 
 // Keep aliases from splitting one visible catalog label into multiple groups.
-// `dp`, `0-1-knapsack`, and `frequency-count` are the canonical topic keys.
+// `dp`, `fenwick-tree`, `0-1-knapsack`, and `frequency-count` are canonical topic keys.
 for (const problem of Object.values(SUPPORTED)) {
   if (!problem || typeof problem !== "object") continue;
   if (problem.category && ["dp", "dynamic-programming"].includes(problem.category.key)) {
     problem.category = DP_TAG;
+  }
+  if (problem.category && ["fenwick", "fenwick-tree", "binary-indexed-tree"].includes(problem.category.key)) {
+    problem.category = FENWICK_TREE_TAG;
   }
   if (problem.category && ["knapsack", "0-1-knapsack"].includes(problem.category.key)) {
     problem.category = KNAPSACK_TAG;
@@ -236,6 +240,7 @@ for (const problem of Object.values(SUPPORTED)) {
   problem.tags = problem.tags
     .map((tag) => {
       if (tag && ["dp", "dynamic-programming"].includes(tag.key)) return DP_TAG;
+      if (tag && ["fenwick", "fenwick-tree", "binary-indexed-tree"].includes(tag.key)) return FENWICK_TREE_TAG;
       if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
       if (tag && ["frequency", "frequency-count"].includes(tag.key)) return FREQUENCY_COUNT_TAG;
       return tag;
