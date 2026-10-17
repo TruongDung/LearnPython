@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.smallestDivisor1283View), surface: "treeView", render: (step) => {
+      renderSmallestDivisor1283View(step);
+    } },
     { predicate: (step) => Boolean(step.safest2812View), surface: "treeView", render: (step) => {
       renderSafestPath2812View(step);
     } },
