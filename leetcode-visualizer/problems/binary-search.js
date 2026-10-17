@@ -4227,7 +4227,7 @@ module.exports = {
     builder: buildSteps2226,
   },
   __meta: {
-    order: [69, 1539, 410, 1283, 1482, 4, 33, 34, 911, 875, 1011, 1231, 1044],
+    order: [69, 1539, 410, 1283, 1482, 1552, 4, 33, 34, 911, 875, 1011, 1231, 1044],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {
