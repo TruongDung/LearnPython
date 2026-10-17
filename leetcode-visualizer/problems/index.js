@@ -13,7 +13,7 @@
 const categories = {
   dp: Object.assign(require("./dp"), require("./good-subsequences"), require("./weighted-intervals"), require("./palindrome-dp"), require("./counting-dp"), require("./shelf-dp"), require("./longest-line-matrix"), require("./freedom-trail-514"), require("./race-car-818"), require("./k-inverse-pairs-629"), require("./strange-printer-664"), require("./count-different-palindromic-subsequences-730"), require("./cherry-pickup-741"), require("./maximum-value-k-coins-2218"), require("./longest-subsequence-target-2915"), require("./valid-parentheses-path-2267"), require("./hard-dp-visualizations"), require("./hard-dp-3117"), require("./increasing-paths-2328"), require("./increasing-cells-2713"), require("./great-partitions-2518"), require("./number-of-ways-earn-points-2585"), require("./closest-dessert-cost-1774"), require("./guess-number-ii-375"), require("./can-i-win-464")),
   sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing"), require("./visible-points-1610"), require("./hard-range-visualizations"), require("./vowel-substrings-3306"), require("./distinct-triplets-1876")),
-  graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699"), require("./springboard-matrix-9020")),
+  graph: Object.assign(require("./graph"), require("./cracking-safe-753"), require("./number-bfs"), require("./node-sequence-score"), require("./hard-graph-visualizations"), require("./hard-graph-2699"), require("./springboard-matrix-9020"), require("./safest-path-grid-2812")),
   math: Object.assign(require("./math"), require("./minimum-cost-cooking-time-2162"), require("./maximum-even-split-2178")),
   "two-pointer": Object.assign(require("./two-pointer"), require("./maximum-distance-1855"), require("./reverse-vowels-345"), require("./reverse-only-letters-917"), require("./backspace-compare-844"), require("./longest-dictionary-word-524"), require("./minimum-length-1750")),
   array: Object.assign(require("./array"), require("./calendar"), require("./calendar-two"), require("./adjacent-increasing"), require("./digit-sum-index"), require("./maximum-sum-permutation"), require("./disappeared-numbers-448"), require("./remove-ones-2128")),
@@ -92,6 +92,7 @@ const COMPANY_LISTS = {
       [1937, "Maximum Number of Points with Cost", "medium"],
       [777, "Swap Adjacent in LR String", "medium"],
       [778, "Swim in Rising Water", "hard"],
+      [2812, "Find the Safest Path in a Grid", "medium"],
       [539, "Minimum Time Difference", "medium"],
       [1055, "Shortest Way to Form String", "medium"],
       [2101, "Detonate the Maximum Bombs", "medium"],
