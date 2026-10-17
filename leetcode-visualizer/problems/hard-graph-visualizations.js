@@ -3,7 +3,6 @@
 const CAT_MOUSE_913_MAX_NODES = 10;
 const CAT_MOUSE_913_MAX_EDGES = 24;
 const CAT_MOUSE_913_TRACE_LIMIT = 480;
-const CAT_MOUSE_913_TABLE_LIMIT = 16;
 const CAT_MOUSE_913_QUEUE_LIMIT = 16;
 
 const MIN_COST_1928_MAX_NODES = 12;
@@ -368,7 +367,6 @@ function buildSteps913(input) {
   ));
   const queue = [];
   const steps = [];
-  const recentStates = [];
   let queueHead = 0;
   let traceDropped = 0;
   let activeChild = null;
@@ -388,7 +386,7 @@ function buildSteps913(input) {
   };
 
   const stateKey = (state) => state ? `${state.mouse}:${state.cat}:${state.turn}` : null;
-  const turnCode = (turn) => turn === MOUSE_TURN ? "MOUSE" : "CAT";
+  const playerIcon = (turn) => turn === MOUSE_TURN ? "🐭" : "🐱";
   const outcomeCode = (outcome) => (
     outcome === MOUSE ? "MOUSE" : outcome === CAT ? "CAT" : "DRAW"
   );
@@ -396,17 +394,8 @@ function buildSteps913(input) {
     outcome === MOUSE ? "success" : outcome === CAT ? "danger" : "muted"
   );
   const stateText = (state) => state
-    ? `(m=${state.mouse}, c=${state.cat}, ${turnCode(state.turn)})`
+    ? `🐭${state.mouse} · 🐱${state.cat} · ${state.turn === MOUSE_TURN ? "🐭" : "🐱"}→`
     : "—";
-
-  function touchState(state) {
-    if (!state || state.cat === 0) return;
-    const key = stateKey(state);
-    const existing = recentStates.findIndex((item) => stateKey(item) === key);
-    if (existing !== -1) recentStates.splice(existing, 1);
-    recentStates.unshift({ mouse: state.mouse, cat: state.cat, turn: state.turn });
-    if (recentStates.length > CAT_MOUSE_913_TABLE_LIMIT * 2) recentStates.pop();
-  }
 
   function countOutcomes() {
     const result = { draw: 0, mouse: 0, cat: 0 };
@@ -423,38 +412,6 @@ function buildSteps913(input) {
     return result;
   }
 
-  function selectedStates() {
-    const selected = [];
-    const seen = new Set();
-    const add = (state) => {
-      if (!state || state.cat < 1 || state.cat >= n || state.mouse < 0 || state.mouse >= n) return;
-      const normalized = { mouse: state.mouse, cat: state.cat, turn: state.turn };
-      const key = stateKey(normalized);
-      if (seen.has(key) || selected.length >= CAT_MOUSE_913_TABLE_LIMIT) return;
-      seen.add(key);
-      selected.push(normalized);
-    };
-
-    add(activeParent);
-    add(activeChild);
-    add({ mouse: 1, cat: 2, turn: MOUSE_TURN });
-    add({ mouse: 1, cat: 2, turn: CAT_TURN });
-    for (let index = queueHead; index < queue.length && selected.length < CAT_MOUSE_913_TABLE_LIMIT; index += 1) {
-      add(queue[index]);
-    }
-    recentStates.forEach(add);
-    for (const wanted of [MOUSE, CAT, DRAW]) {
-      for (let mouse = 0; mouse < n && selected.length < CAT_MOUSE_913_TABLE_LIMIT; mouse += 1) {
-        for (let cat = 1; cat < n && selected.length < CAT_MOUSE_913_TABLE_LIMIT; cat += 1) {
-          for (let turn = 0; turn < 2 && selected.length < CAT_MOUSE_913_TABLE_LIMIT; turn += 1) {
-            if (color[mouse][cat][turn] === wanted) add({ mouse, cat, turn });
-          }
-        }
-      }
-    }
-    return selected;
-  }
-
   function queueView() {
     const remaining = queue.length - queueHead;
     const visibleCount = Math.min(remaining, CAT_MOUSE_913_QUEUE_LIMIT);
@@ -466,14 +423,14 @@ function buildSteps913(input) {
       const entry = queue[queueHead + index];
       visible.push({
         label: stateText(entry),
-        sub: `winner=${outcomeCode(entry.winner)}`,
+        sub: entry.winner === MOUSE ? "🐭" : "🐱",
         state: index === 0 ? "active" : outcomeState(entry.winner),
       });
     }
     if (remaining > CAT_MOUSE_913_QUEUE_LIMIT) {
       visible.push({
         label: `… +${remaining - directLimit}`,
-        sub: "bounded queue preview",
+        sub: "…",
         state: "muted",
       });
     }
@@ -487,9 +444,9 @@ function buildSteps913(input) {
       layout: "circle",
       nodes: Array.from({ length: n }, (_, id) => {
         const roles = [];
-        if (id === 0) roles.push("hole");
-        if (id === mouseNode) roles.push("mouse");
-        if (id === catNode) roles.push("cat");
+        if (id === 0) roles.push("🕳");
+        if (id === mouseNode) roles.push("🐭");
+        if (id === catNode) roles.push("🐱");
         let state = "default";
         if (id === mouseNode && id === catNode) state = "warning";
         else if (id === mouseNode) state = "success";
@@ -511,37 +468,40 @@ function buildSteps913(input) {
 
   function tableView() {
     return {
-      title: localized(
-        `Tối đa ${CAT_MOUSE_913_TABLE_LIMIT} trạng thái tích (đang hoạt động, queue, gần đây)`,
-        `Up to ${CAT_MOUSE_913_TABLE_LIMIT} product states (active, queued, recent)`,
-      ),
-      columns: [
-        localized("Lượt", "Turn"),
-        localized("Kết quả", "Outcome"),
-        localized("Bậc còn lại", "Remaining degree"),
-      ],
-      rows: selectedStates().map((state) => {
-        const outcome = color[state.mouse][state.cat][state.turn];
-        const isParent = stateKey(state) === stateKey(activeParent);
-        const isChild = stateKey(state) === stateKey(activeChild);
-        return {
-          label: `(m=${state.mouse}, c=${state.cat})`,
-          state: isParent ? "active" : isChild ? "info" : outcomeState(outcome),
-          cells: [
-            { value: turnCode(state.turn), state: state.turn === MOUSE_TURN ? "success" : "danger" },
-            { value: outcomeCode(outcome), state: outcomeState(outcome) },
-            { value: degree[state.mouse][state.cat][state.turn], state: degree[state.mouse][state.cat][state.turn] === 0 ? "warning" : "default" },
-          ],
-        };
-      }),
+      title: localized("🐭 hàng · 🐱 cột · số = bậc còn lại", "🐭 rows · 🐱 columns · number = remaining degree"),
+      columns: Array.from({ length: n - 1 }, (_, index) => {
+        const cat = index + 1;
+        return [
+          localized(`🐱${cat} · 🐭`, `🐱${cat} · 🐭`),
+          localized(`🐱${cat} · 🐱`, `🐱${cat} · 🐱`),
+        ];
+      }).flat(),
+      rows: Array.from({ length: n }, (_, mouse) => ({
+        label: `🐭 ${mouse}`,
+        state: "default",
+        cells: Array.from({ length: n - 1 }, (_, index) => {
+          const cat = index + 1;
+          return [MOUSE_TURN, CAT_TURN].map((turn) => {
+            const outcome = color[mouse][cat][turn];
+            const state = { mouse, cat, turn };
+            const cellState = stateKey(state) === stateKey(activeParent)
+              ? "active"
+              : stateKey(state) === stateKey(activeChild)
+                ? "info"
+                : outcomeState(outcome);
+            const result = outcome === MOUSE ? "🐭" : outcome === CAT ? "🐱" : "○";
+            return {
+              value: `${result} ${degree[mouse][cat][turn]}`,
+              state: cellState,
+            };
+          });
+        }).flat(),
+      })),
     };
   }
 
   function makeHardView({ phaseIndex, action, formula, answerValue }) {
     const totals = countOutcomes();
-    const currentOutcome = activeChild
-      ? color[activeChild.mouse][activeChild.cat][activeChild.turn]
-      : DRAW;
     return jsonSnapshot({
       problemId: 913,
       phaseIndex,
@@ -550,41 +510,20 @@ function buildSteps913(input) {
       action,
       formula,
       metrics: [
-        { label: localized("Trạng thái hợp lệ", "Legal states"), value: counters.legalStates, state: "info" },
-        { label: localized("Chuột thắng", "Mouse wins"), value: totals.mouse, state: "success" },
-        { label: localized("Mèo thắng", "Cat wins"), value: totals.cat, state: "danger" },
-        { label: localized("Chưa giải / hòa", "Unresolved / draw"), value: totals.draw, state: "muted" },
-        { label: localized("Queue còn lại", "Queue remaining"), value: queue.length - queueHead, state: "active" },
+        { label: localized("State", "States"), value: counters.legalStates, state: "info" },
+        { label: localized("🐭 thắng", "🐭 wins"), value: totals.mouse, state: "success" },
+        { label: localized("🐱 thắng", "🐱 wins"), value: totals.cat, state: "danger" },
+        { label: localized("○ chưa rõ", "○ unresolved"), value: totals.draw, state: "muted" },
+        { label: localized("Queue", "Queue"), value: queue.length - queueHead, state: "active" },
       ],
       graph: graphView(),
       table: tableView(),
       queue: queueView(),
-      groups: [
-        {
-          title: localized("Trạng thái đang lan truyền", "Propagation state"),
-          items: [
-            { label: "child", value: stateText(activeChild), state: outcomeState(currentOutcome) },
-            { label: "parent", value: stateText(activeParent), state: activeParent ? "active" : "muted" },
-          ],
-        },
-        {
-          title: localized("Bộ đếm", "Counters"),
-          items: [
-            { label: "pops", value: counters.queuePops, state: "info" },
-            { label: "degree--", value: counters.degreeReductions, state: "warning" },
-            { label: "forced", value: counters.forcedLosses, state: "danger" },
-          ],
-        },
-      ],
-      sequence: [
-        ...(activeParent ? [{ label: "parent", value: stateText(activeParent), state: "active" }] : []),
-        ...(activeChild ? [{ label: "child", value: stateText(activeChild), state: outcomeState(currentOutcome) }] : []),
-      ],
       legend: [
-        { label: localized("Chuột thắng", "Mouse win"), state: "success" },
-        { label: localized("Mèo thắng", "Cat win"), state: "danger" },
-        { label: localized("Hòa / chưa giải", "Draw / unresolved"), state: "muted" },
-        { label: localized("Trạng thái cha đang xét", "Parent under inspection"), state: "active" },
+        { label: localized("🐭 thắng", "🐭 wins"), state: "success" },
+        { label: localized("🐱 thắng", "🐱 wins"), state: "danger" },
+        { label: localized("○ chưa giải", "○ unresolved"), state: "muted" },
+        { label: localized("Cha đang xét", "Parent"), state: "active" },
       ],
       answer: answerValue,
       traceTruncated: traceDropped > 0,
@@ -602,6 +541,7 @@ function buildSteps913(input) {
     answerValue = null,
   }) {
     assertSemanticLines(codeLines, CAT_MOUSE_913_SOURCE, 913);
+    const codeLine = codeLines[codeLines.length - 1];
     if (!final && steps.length >= CAT_MOUSE_913_TRACE_LIMIT - 1) {
       traceDropped += 1;
       return;
@@ -613,9 +553,9 @@ function buildSteps913(input) {
       ? [...new Set([activeParent.mouse, activeParent.cat])]
       : [];
     steps.push({
-      title,
+      title: localized(`Dòng ${codeLine}: ${title.vi}`, `Line ${codeLine}: ${title.en}`),
       note,
-      codeLines: [...codeLines],
+      codeLines: [codeLine],
       vars: [
         { name: "child", value: stateText(activeChild) },
         { name: "parent", value: stateText(activeParent) },
@@ -656,7 +596,6 @@ function buildSteps913(input) {
     const entry = { mouse, cat, turn, winner };
     queue.push(entry);
     counters.resolved += 1;
-    touchState(entry);
     return true;
   }
 
@@ -728,7 +667,6 @@ function buildSteps913(input) {
     activeChild = { mouse: childEntry.mouse, cat: childEntry.cat, turn: childEntry.turn };
     activeParent = null;
     activeEdge = null;
-    touchState(activeChild);
     emit({
       title: localized(`Lấy ${stateText(activeChild)} = ${outcomeCode(childEntry.winner)}`, `Pop ${stateText(activeChild)} = ${outcomeCode(childEntry.winner)}`),
       note: localized("Đi ngược một nước từ trạng thái đã biết kết quả để chứng minh các trạng thái cha.", "Move one turn backward from a solved child to prove predecessor states."),
@@ -754,7 +692,6 @@ function buildSteps913(input) {
     for (const parent of parents) {
       counters.parentsExamined += 1;
       activeParent = parent;
-      touchState(parent);
       activeEdge = parent.turn === MOUSE_TURN
         ? { u: parent.mouse, v: childEntry.mouse }
         : { u: parent.cat, v: childEntry.cat };
@@ -777,10 +714,10 @@ function buildSteps913(input) {
         resolveState(parent.mouse, parent.cat, parent.turn, childEntry.winner);
         counters.immediateWins += 1;
         emit({
-          title: localized(`${turnCode(parent.turn)} chọn được nước thắng`, `${turnCode(parent.turn)} can choose a winning move`),
+          title: localized(`${playerIcon(parent.turn)} chọn được nước thắng`, `${playerIcon(parent.turn)} finds a winning move`),
           note: localized(
-            `Chỉ cần một nước tới child ${outcomeCode(childEntry.winner)}, người đang đi có thể ép thắng ngay.`,
-            `One move to a ${outcomeCode(childEntry.winner)} child is enough for the player to force a win.`,
+            `Một nước tới ${outcomeCode(childEntry.winner)} là đủ.`,
+            `One move to a ${outcomeCode(childEntry.winner)} is enough.`,
           ),
           codeLines: [37, 38, 39, 40, 41, 44, 45, 46],
           phaseIndex: 2,
@@ -795,7 +732,7 @@ function buildSteps913(input) {
           resolveState(parent.mouse, parent.cat, parent.turn, forcedWinner);
           counters.forcedLosses += 1;
           emit({
-            title: localized(`Mọi nước đi của ${turnCode(parent.turn)} đều thua`, `Every ${turnCode(parent.turn)} move loses`),
+            title: localized(`Mọi nước của ${playerIcon(parent.turn)} đều thua`, `Every ${playerIcon(parent.turn)} move loses`),
             note: localized("Bậc còn lại về 0: mọi child đều thắng cho đối thủ, nên cha bị ép thua.", "The remaining degree reached zero: every child wins for the opponent, so the parent is forced to lose."),
             codeLines: [44, 45, 47, 48, 49, 50],
             phaseIndex: 2,
@@ -823,7 +760,7 @@ function buildSteps913(input) {
   emit({
     title: localized(`${totals.draw} trạng thái còn lại là hòa`, `${totals.draw} remaining states are draws`),
     note: localized("Không bên nào có thể ép đi tới trạng thái thắng từ các state chưa được retrograde BFS giải.", "Neither player can force a winning terminal from states left unresolved by retrograde BFS."),
-    codeLines: [52],
+    codeLines: [53],
     phaseIndex: 3,
     action: localized("Giữ trạng thái chưa tô là DRAW", "Keep every uncolored state as DRAW"),
     formula: localized("color = DRAW sau BFS ⇒ vòng chơi tối ưu có thể kéo dài", "color = DRAW after BFS ⇒ optimal play can continue indefinitely"),
@@ -831,7 +768,6 @@ function buildSteps913(input) {
 
   const answer = color[1][2][MOUSE_TURN];
   activeChild = { mouse: 1, cat: 2, turn: MOUSE_TURN };
-  touchState(activeChild);
   emit({
     title: localized(`Kết quả ban đầu = ${outcomeCode(answer)} (${answer})`, `Initial state result = ${outcomeCode(answer)} (${answer})`),
     note: localized(
@@ -1306,7 +1242,7 @@ module.exports = {
       maxNodes: CAT_MOUSE_913_MAX_NODES,
       maxEdges: CAT_MOUSE_913_MAX_EDGES,
       maxTraceSteps: CAT_MOUSE_913_TRACE_LIMIT,
-      maxTableRows: CAT_MOUSE_913_TABLE_LIMIT,
+      maxTableRows: CAT_MOUSE_913_MAX_NODES,
       maxQueueItems: CAT_MOUSE_913_QUEUE_LIMIT,
     },
     approach: [
