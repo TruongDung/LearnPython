@@ -478,9 +478,9 @@ function renderCountSmallerView(step) {
 
 function renderTrappingRainView(step) {
   const view = step.trappingRainView || {};
+  const vi = lang === "vi";
   const heights = Array.isArray(view.height) ? view.height : [];
   const water = Array.isArray(view.water) ? view.water : [];
-  const statuses = Array.isArray(view.status) ? view.status : [];
   const left = Number.isInteger(view.left) ? view.left : -1;
   const right = Number.isInteger(view.right) ? view.right : -1;
   const current = Number.isInteger(view.current) ? view.current : -1;
@@ -489,57 +489,68 @@ function renderTrappingRainView(step) {
   const total = Number.isFinite(Number(view.total)) ? Number(view.total) : 0;
   const add = Number.isFinite(Number(view.add)) ? Number(view.add) : null;
   const maxLevel = Math.max(1, ...heights, ...water.map((w, i) => (heights[i] || 0) + (w || 0)), leftMax || 0, rightMax || 0);
-  const compact = heights.length >= 10;
+  const done = String(view.decision || "") === "done" || Boolean(step.final);
+  const choosing = current < 0 && Boolean(view.side);
+  const filling = current >= 0;
+  const phaseIndex = done ? 3 : filling ? 2 : choosing ? 1 : 0;
+  const phaseLabels = ["WALLS", "LOW SIDE", "FILL", "TOTAL"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${index < phaseIndex ? "✓" : index + 1}</i><b>${escapeHtml(label)}</b></span>`).join("");
+  const activeSide = view.side === "left" || view.side === "right" ? view.side : "";
+  const cap = activeSide === "left" ? leftMax : activeSide === "right" ? rightMax : null;
 
   const cells = heights.map((height, index) => {
     const w = water[index] || 0;
-    const landPct = Math.max(4, (height / maxLevel) * 100);
-    const waterPct = w > 0 ? Math.max(8, (w / maxLevel) * 100) : 0;
-    const classes = ["trap-cell"];
+    const landPct = Math.max(3, (height / maxLevel) * 100);
+    const waterPct = w > 0 ? (w / maxLevel) * 100 : 0;
+    const classes = ["trap42-cell"];
     if (index === left) classes.push("left");
     if (index === right) classes.push("right");
     if (index === current) classes.push("current");
     if (w > 0) classes.push("has-water");
-    return `<div class="${classes.join(" ")}" style="--land:${landPct}%;--water:${waterPct}%">
-      <div class="trap-tank">
-        ${w > 0 ? `<span class="trap-water"><b>${escapeHtml(String(w))}</b></span>` : ""}
-        <span class="trap-bar"><b>${escapeHtml(String(height))}</b></span>
+    if ((left >= 0 && index < left) || (right >= 0 && index > right) || done) classes.push("settled");
+    return `<div class="${classes.join(" ")}" style="--wall:${landPct}%;--water:${waterPct}%">
+      <div class="trap42-pointer-row">
+        ${!done && index === left ? '<span class="trap42-pointer left">L</span>' : ""}
+        ${!done && index === right ? '<span class="trap42-pointer right">R</span>' : ""}
       </div>
-      <div class="trap-index">[${index}]</div>
-      <div class="trap-pointer-row">
-        ${index === left ? '<span class="trap-pointer left">L</span>' : ""}
-        ${index === right ? '<span class="trap-pointer right">R</span>' : ""}
+      <div class="trap42-tank">
+        ${w > 0 ? `<span class="trap42-water"><b>+${escapeHtml(String(w))}</b></span>` : ""}
+        <span class="trap42-wall"><b>${escapeHtml(String(height))}</b></span>
       </div>
+      <small>${index}</small>
     </div>`;
   }).join("");
 
-  const statusItems = statuses.map((item) => `<div>
-    <span>${escapeHtml(String(item.label ?? ""))}</span>
-    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
-  </div>`).join("");
+  const leftGuide = leftMax === null ? "" : `<span class="trap42-guide left" style="--guide-y:${24 + (leftMax / maxLevel) * 190}px"><b>Lmax ${escapeHtml(String(leftMax))}</b></span>`;
+  const rightGuide = rightMax === null ? "" : `<span class="trap42-guide right" style="--guide-y:${24 + (rightMax / maxLevel) * 190}px"><b>Rmax ${escapeHtml(String(rightMax))}</b></span>`;
+  const compareSign = leftMax === null || rightMax === null ? "?" : leftMax < rightMax ? "<" : "≥";
+  let actionIcon = activeSide === "left" ? "←" : activeSide === "right" ? "→" : "↔";
+  let actionMain = activeSide && leftMax !== null && rightMax !== null ? `${leftMax} ${compareSign} ${rightMax}` : "L ↔ R";
+  let actionDetail = vi ? "chọn phía thấp hơn" : "choose the lower side";
+  if (filling && current < heights.length) {
+    actionIcon = add !== null && add > 0 ? "💧" : "✓";
+    actionMain = cap !== null ? `${cap} − ${heights[current]} = ${add ?? 0}` : String(view.decision || "");
+    actionDetail = `i = ${current}`;
+  }
+  if (done) {
+    actionIcon = "Σ";
+    actionMain = String(total);
+    actionDetail = vi ? "đơn vị nước" : "water units";
+  }
 
-  const formulaHtml = current >= 0
-    ? `<div class="trap-formula ${add && add > 0 ? "positive" : ""}">
-        <small>${escapeHtml(view.side === "left" ? "left side" : "right side")}</small>
-        <strong>${escapeHtml(String(view.decision || ""))}</strong>
-        <span>${escapeHtml(lang === "vi" ? "nước thêm" : "water added")} = ${escapeHtml(String(add ?? 0))}</span>
-      </div>`
-    : `<div class="trap-formula">
-        <small>${escapeHtml(lang === "vi" ? "quy tắc" : "rule")}</small>
-        <strong>${escapeHtml(leftMax !== null && rightMax !== null ? `min wall = min(${leftMax}, ${rightMax})` : "water = min(left_max, right_max) - height[i]")}</strong>
-        <span>${escapeHtml(lang === "vi" ? "luôn xử lý phía có max thấp hơn" : "process the side with the lower max")}</span>
-      </div>`;
-
-  $("treeView").innerHTML = `
-    <div class="trap-viz${compact ? " compact" : ""}">
-      <div class="trap-summary">
-        <span><small>left_max</small><b>${escapeHtml(String(leftMax ?? "-"))}</b></span>
-        <span><small>right_max</small><b>${escapeHtml(String(rightMax ?? "-"))}</b></span>
-        <span><small>total water</small><b>${escapeHtml(String(total))}</b></span>
+  $("treeView").innerHTML = `<div class="trap-viz trap42-viz phase-${escapeHtml(done ? "done" : filling ? "fill" : choosing ? "choose" : "walls")}">
+      <div class="trap42-phases">${phases}</div>
+      <div class="trap42-stage" style="--trap-cols:${Math.max(1, heights.length)}">
+        <div class="trap42-guides">${leftGuide}${rightGuide}</div>
+        <div class="trap42-chart">${cells || '<span class="trap42-empty">0</span>'}</div>
       </div>
-      <div class="trap-chart" style="--trap-cols:${Math.max(1, heights.length)}">${cells}</div>
-      ${formulaHtml}
-      <div class="trap-status">${statusItems}</div>
+      <div class="trap42-console">
+        <div class="trap42-bound left${activeSide === "left" ? " active" : ""}"><small>L MAX</small><b>${escapeHtml(String(leftMax ?? "–"))}</b></div>
+        <div class="trap42-action"><i>${escapeHtml(actionIcon)}</i><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+        <output><small>WATER</small><b>${escapeHtml(String(total))}</b>${add !== null && add > 0 && !done ? `<em>+${escapeHtml(String(add))}</em>` : ""}</output>
+        <div class="trap42-bound right${activeSide === "right" ? " active" : ""}"><small>R MAX</small><b>${escapeHtml(String(rightMax ?? "–"))}</b></div>
+      </div>
+      <div class="trap42-rule"><code>lower max</code><i>→</i><code>max − height[i]</code><i>→</i><b>O(n) · O(1)</b></div>
     </div>`;
 }
 
