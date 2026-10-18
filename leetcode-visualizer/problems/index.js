@@ -40,10 +40,6 @@ const CATEGORY_ORDER = {};
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
-const GRAPH_THEORY_TAG = { key: "graph-theory", vi: "Lý thuyết đồ thị", en: "Graph Theory" };
-// Keep the complete requested study list here. Unsupported IDs are skipped now
-// and automatically receive the tag when their visualization is implemented.
-const GRAPH_THEORY_IDS = new Set([133, 207, 210, 261, 269, 277, 310, 323]);
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
   496, 1475, 316, 402, 456, 503, 581, 654, 739, 769, 853, 901, 907, 962,
@@ -224,15 +220,6 @@ for (const id of KNAPSACK_IDS) {
   const tags = Array.isArray(problem.tags) ? problem.tags : [];
   if (!tags.some((tag) => tag && tag.key === KNAPSACK_TAG.key)) {
     problem.tags = [...tags, KNAPSACK_TAG];
-  }
-}
-
-for (const id of GRAPH_THEORY_IDS) {
-  const problem = SUPPORTED[id];
-  if (!problem) continue;
-  const tags = Array.isArray(problem.tags) ? problem.tags : [];
-  if (!tags.some((tag) => tag && tag.key === GRAPH_THEORY_TAG.key)) {
-    problem.tags = [...tags, GRAPH_THEORY_TAG];
   }
 }
 
