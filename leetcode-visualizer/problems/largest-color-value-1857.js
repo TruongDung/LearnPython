@@ -225,6 +225,7 @@ module.exports = {
     slug: "largest-color-value-in-a-directed-graph",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     tags: [
+      { key: "graph-theory", vi: "Lý thuyết đồ thị", en: "Graph Theory" },
       { key: "topological-sort", vi: "Sắp xếp topo", en: "Topological Sort" },
       { key: "dynamic-programming", vi: "Quy hoạch động", en: "Dynamic Programming" },
     ],

@@ -85,6 +85,7 @@ test("1857 solves DAGs and detects cycles", () => {
 test("1857 uses the requested Python and instruction-aligned frames", () => {
   assert.equal(problem.code.join("\n"), expectedCode);
   assert.equal(problem.debugMode, "line-by-line");
+  assert.ok(problem.tags.some(tag => tag.key === "graph-theory" && tag.en === "Graph Theory"));
   const run = problem.builder(problem.defaultInput, { edges: problem.extraParams[0].default });
   const events = new Set(run.steps.map(step => step.largestColor1857View.event));
   for (const event of ["edge-add", "indegree-add", "enqueue", "dequeue", "color-count", "dp-transfer", "indegree-drop", "ready-check", "result"]) {
