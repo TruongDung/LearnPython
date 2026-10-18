@@ -7177,9 +7177,9 @@
 .route1976-map { overflow: hidden; min-width: 0; border: 1px solid #25364d; border-radius: 12px; background: linear-gradient(180deg, rgba(56,189,248,.045), rgba(52,211,153,.025)); }
 .route1976-map svg { display: block; width: 100%; height: auto; max-height: 430px; }
 .route1976-wave { fill: none; stroke: rgba(56,189,248,.08); stroke-width: 70; stroke-linecap: round; }
-.route1976-road path { fill: none; stroke: var(--r1976-line); stroke-width: 4; stroke-linecap: round; transition: stroke .2s, stroke-width .2s; }
-.route1976-road.shortest path { stroke: #168b68; stroke-width: 6; }
-.route1976-road.active path { stroke: var(--r1976-amber); stroke-width: 9; filter: url(#route1976-glow); }
+.route1976-road path { fill: none; stroke: var(--r1976-line); stroke-width: 3; stroke-linecap: round; opacity: .62; transition: stroke .2s, stroke-width .2s, opacity .2s; }
+.route1976-road.shortest path { stroke: #168b68; stroke-width: 4.5; opacity: .9; }
+.route1976-road.active path { stroke: var(--r1976-amber); stroke-width: 7; opacity: 1; filter: url(#route1976-glow); }
 .route1976-road.active.shorter path { stroke: var(--r1976-green); }
 .route1976-road.active.equal path { stroke: var(--r1976-purple); }
 .route1976-road.active.longer path { stroke: var(--r1976-red); stroke-dasharray: 8 7; }
@@ -7188,6 +7188,8 @@
 .route1976-road.active .weight rect { fill: #422f09; stroke: var(--r1976-amber); }
 .route1976-road.active.equal .weight rect { fill: #3b1b52; stroke: var(--r1976-purple); }
 .route1976-road.active.longer .weight rect { fill: #4b1827; stroke: var(--r1976-red); }
+.route1976-viz.phase-done .route1976-road:not(.shortest) { opacity: .16; }
+.route1976-viz.phase-done .route1976-road.shortest path { stroke-width: 5; }
 .route1976-node .pulse { fill: transparent; stroke: transparent; stroke-width: 3; }
 .route1976-node .body { fill: #12243a; stroke: #5f7693; stroke-width: 3; }
 .route1976-node.finalized .body { stroke: var(--r1976-green); }

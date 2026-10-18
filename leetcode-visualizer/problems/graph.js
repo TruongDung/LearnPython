@@ -4247,8 +4247,8 @@ function make1976FlowLayout(n, roads) {
     }
   }
 
-  const positions = { 0: { x: 0, y: 0.12 } };
-  if (target !== 0) positions[target] = { x: 1, y: 0.12 };
+  const positions = { 0: { x: 0, y: 0.5 } };
+  if (target !== 0) positions[target] = { x: 1, y: 0.5 };
   const middle = Array.from({ length: n }, (_, id) => id)
     .filter((id) => id !== 0 && id !== target);
   const finiteLevels = [...new Set(middle.map((id) => layoutDist[id]).filter(Number.isFinite))]
@@ -4265,7 +4265,7 @@ function make1976FlowLayout(n, roads) {
     ids.forEach((id, row) => {
       positions[id] = {
         x: 0.12 + (0.76 * (column + 1)) / (levelCount + 1),
-        y: ids.length === 1 ? 0.62 : 0.34 + (0.54 * row) / (ids.length - 1),
+        y: ids.length === 1 ? 0.5 : 0.12 + (0.76 * row) / (ids.length - 1),
       };
     });
   });
@@ -4273,7 +4273,7 @@ function make1976FlowLayout(n, roads) {
     layout: "flow",
     positions,
     width: Math.max(760, levelCount * 170 + 360),
-    height: 500,
+    height: 560,
     dimUnfocused: true,
     caption: {
       vi: "Cạnh vô hướng • dưới node: d = thời gian ngắn nhất, w = số cách",

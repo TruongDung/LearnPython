@@ -1862,38 +1862,54 @@ function renderCountPaths1976View(step) {
   const t = (viText, enText) => vi ? viText : enText;
   const nodes = view.nodes || [];
   const edges = view.edges || step.graph?.edges || [];
-  const width = 680;
-  const height = 340;
+  const width = 720;
+  const height = 430;
   const positions = new Map(nodes.map((item) => {
     const normalized = view.positions?.[item.node] || { x: nodes.length <= 1 ? 0.5 : item.node / (nodes.length - 1), y: 0.5 };
-    return [item.node, { x: 65 + normalized.x * 550, y: 58 + normalized.y * 230 }];
+    return [item.node, { x: 65 + normalized.x * 590, y: 58 + normalized.y * 310 }];
   }));
   const activeEdge = view.activeEdge;
   const edgeMatches = (a, b, u, v) => (a === u && b === v) || (a === v && b === u);
   const shortest = view.shortestEdges || [];
-  const shorten = (u, v) => {
+  const shorten = (u, v, edgeIndex) => {
     const from = positions.get(u);
     const to = positions.get(v);
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const length = Math.max(1, Math.hypot(dx, dy));
+    const directToTarget = edgeMatches(u, v, 0, view.target);
+    if (directToTarget && nodes.length > 2) {
+      const leftToRight = from.x <= to.x;
+      const sx = from.x + (leftToRight ? 27 : -27);
+      const ex = to.x + (leftToRight ? -27 : 27);
+      return {
+        path: `M ${sx} ${from.y} Q ${width / 2} 24 ${ex} ${to.y}`,
+        lx: width / 2,
+        ly: 58,
+      };
+    }
+    const side = edgeIndex % 2 === 0 ? -1 : 1;
+    const labelOffset = 15;
+    const mx = (from.x + to.x) / 2;
+    const my = (from.y + to.y) / 2;
     return {
       sx: from.x + dx / length * 27,
       sy: from.y + dy / length * 27,
       ex: to.x - dx / length * 27,
       ey: to.y - dy / length * 27,
-      mx: (from.x + to.x) / 2,
-      my: (from.y + to.y) / 2,
+      path: `M ${from.x + dx / length * 27} ${from.y + dy / length * 27} L ${to.x - dx / length * 27} ${to.y - dy / length * 27}`,
+      lx: mx + (-dy / length) * labelOffset * side,
+      ly: my + (dx / length) * labelOffset * side,
     };
   };
-  const roadSvg = edges.map((edge) => {
-    const line = shorten(edge.u, edge.v);
+  const roadSvg = edges.map((edge, edgeIndex) => {
+    const line = shorten(edge.u, edge.v, edgeIndex);
     const active = activeEdge && edgeMatches(edge.u, edge.v, activeEdge.u, activeEdge.v);
     const isShortest = shortest.some((pathEdge) => edgeMatches(edge.u, edge.v, pathEdge.u, pathEdge.v));
     const relationClass = active && view.relation ? ` ${view.relation}` : "";
     return `<g class="route1976-road${isShortest ? " shortest" : ""}${active ? " active" : ""}${relationClass}" data-edge="${edge.u},${edge.v}">
-      <path d="M ${line.sx} ${line.sy} L ${line.ex} ${line.ey}"/>
-      <g class="weight"><rect x="${line.mx - 14}" y="${line.my - 10}" width="28" height="20" rx="8"/><text x="${line.mx}" y="${line.my + 4}">${esc(edge.w)}</text></g>
+      <path d="${line.path}"/>
+      <g class="weight"><rect x="${line.lx - 13}" y="${line.ly - 9}" width="26" height="18" rx="8"/><text x="${line.lx}" y="${line.ly + 4}">${esc(edge.w)}</text></g>
     </g>`;
   }).join("");
   const nodeSvg = nodes.map((item) => {
