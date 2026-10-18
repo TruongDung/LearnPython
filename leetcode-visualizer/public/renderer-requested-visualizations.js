@@ -951,6 +951,77 @@ function renderHighestPeak1765View(step) {
   </section>`, t("Nước ở độ cao 0; mỗi vòng sóng BFS nâng đất thêm một bậc", "Water is height 0; every BFS wave raises land by one level"), "group");
 }
 
+function renderWallsAndGates286View(step) {
+  const v = step.wallsGates286View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const phaseIndex = v.phase === "bfs" ? 1 : v.phase === "result" ? 2 : 0;
+  const stages = [
+    ["🚪", t("Đặt mọi gate vào queue", "Put every gate in the queue")],
+    ["〰️", t("Lan khoảng cách qua các phòng", "Spread distances through rooms")],
+    ["🏠", t("Hoàn thành bản đồ phòng", "Complete the room map")],
+  ].map(([icon, label], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}" aria-label="${esc(label)}"><i>${icon}</i>${index < phaseIndex ? '<b aria-hidden="true">✓</b>' : ""}</span>${index < 2 ? '<em aria-hidden="true">〰›</em>' : ""}`;
+  }).join("");
+  const keyOf = (cell) => Array.isArray(cell) ? cell.join(",") : "";
+  const currentKey = keyOf(v.current);
+  const discoveredKey = keyOf(v.discovered);
+  const originKey = keyOf(v.origin);
+  const directionArrow = new Map([
+    ["1,0", "↓"], ["-1,0", "↑"], ["0,1", "→"], ["0,-1", "←"],
+  ]).get(keyOf(v.direction)) || "";
+  const cells = (v.cells || []).flatMap((row) => row.map((cell) => {
+    const key = `${cell.row},${cell.col}`;
+    const classes = [
+      "wg286-cell",
+      cell.type,
+      cell.type === "room" && cell.distance < 0 ? "unknown" : "",
+      cell.type === "room" && cell.distance >= 0 ? `distance-${Math.min(cell.distance, 6)}` : "",
+      key === currentKey ? "current" : "",
+      key === discoveredKey ? "discovered" : "",
+      key === originKey ? "origin" : "",
+    ].filter(Boolean).join(" ");
+    const icon = cell.type === "wall" ? "🧱" : cell.type === "gate" ? "🚪" : "🏠";
+    const value = cell.type === "wall" ? "×" : cell.distance < 0 ? "?" : cell.distance;
+    const aria = cell.type === "wall"
+      ? t(`Tường tại (${cell.row},${cell.col})`, `Wall at (${cell.row},${cell.col})`)
+      : cell.type === "gate"
+        ? t(`Gate tại (${cell.row},${cell.col}), khoảng cách 0`, `Gate at (${cell.row},${cell.col}), distance 0`)
+        : cell.distance < 0
+          ? t(`Phòng chưa được điền tại (${cell.row},${cell.col})`, `Unfilled room at (${cell.row},${cell.col})`)
+          : t(`Phòng tại (${cell.row},${cell.col}), khoảng cách ${cell.distance}`, `Room at (${cell.row},${cell.col}), distance ${cell.distance}`);
+    const arrow = key === originKey && directionArrow ? `<span class="wg286-direction" aria-hidden="true">${directionArrow}</span>` : "";
+    const spark = key === discoveredKey ? '<span class="wg286-spark" aria-hidden="true">✦</span>' : "";
+    const waves = cell.type === "gate" ? '<span class="wg286-waves" aria-hidden="true"><i></i><i></i></span>' : "";
+    return `<div class="${classes}" aria-label="${esc(aria)}">${waves}<i class="wg286-room-icon" aria-hidden="true">${icon}</i><strong>${value}</strong>${arrow}${spark}</div>`;
+  })).join("");
+  const profile = (v.levels || []).map((level) => {
+    const dots = "●".repeat(Math.min(level.count, 5));
+    const more = level.count > 5 ? `+${level.count - 5}` : "";
+    return `<span class="${level.distance === v.maxDistance ? "last" : ""}" aria-label="${esc(t(`Khoảng cách ${level.distance}, ${level.count} ô`, `Distance ${level.distance}, ${level.count} cells`))}"><i aria-hidden="true">${level.distance === 0 ? "🚪" : "🏠"}</i><b>${level.distance}</b><small aria-hidden="true">${dots}${more}</small></span>`;
+  }).join("") || '<span class="empty" aria-hidden="true"><i>🚪</i><b>0</b><small>···</small></span>';
+  const queueItems = (v.queue || []).slice(0, 8).map((cell, index) => {
+    const left = ((cell.col + 0.5) / Math.max(1, v.cols) * 100).toFixed(2);
+    const top = ((cell.row + 0.5) / Math.max(1, v.rows) * 100).toFixed(2);
+    const columnSize = (100 / Math.max(1, v.cols)).toFixed(3);
+    const rowSize = (100 / Math.max(1, v.rows)).toFixed(3);
+    return `<span class="wg286-ticket ${index === 0 ? "front" : ""}" aria-label="${esc(t(`Ô (${cell.row},${cell.col}), khoảng cách ${cell.distance}`, `Cell (${cell.row},${cell.col}), distance ${cell.distance}`))}"><i class="wg286-mini-map" style="background-size:${columnSize}% ${rowSize}%"><b style="left:${left}%;top:${top}%"></b></i><em aria-hidden="true">${cell.distance === 0 ? "🚪" : "🏠"}</em><strong>${cell.distance}</strong></span>`;
+  }).join("") || `<b class="wg286-empty" aria-label="${t("Queue rỗng", "Empty queue")}">∅</b>`;
+  const queueMore = (v.queue || []).length > 8 ? `<small class="wg286-more">+${v.queue.length - 8}</small>` : "";
+  const result = v.phase === "result"
+    ? `<div class="wg286-result" aria-label="${esc(t(`Đã điền ${v.assignedRoomCount} trên ${v.roomTotal} phòng`, `Filled ${v.assignedRoomCount} of ${v.roomTotal} rooms`))}"><span aria-hidden="true">🚪</span><em aria-hidden="true">〰›</em><i aria-hidden="true">🏠</i><strong>${v.assignedRoomCount}/${v.roomTotal}</strong><b aria-hidden="true">✓</b></div>`
+    : "";
+  requestedVizSet(`<section class="wg286-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="wg286-header"><div class="wg286-stages">${stages}</div><div class="wg286-stats"><span aria-label="${t("Gate đã tìm thấy", "Gates found")}">🚪 <b>${v.sourceCount || 0}/${v.sourceTotal || 0}</b></span><span aria-label="${t("Phòng đã điền", "Rooms filled")}">🏠 <b>${v.assignedRoomCount || 0}/${v.roomTotal || 0}</b></span><span aria-label="${t("Số tường", "Walls")}">🧱 <b>${v.wallCount || 0}</b></span></div></header>
+    <div class="wg286-profile" aria-label="${t("Các vòng khoảng cách", "Distance rings")}">${profile}</div>
+    <div class="wg286-grid" style="--wg286-cols:${v.cols}">${cells}</div>
+    <section class="wg286-queue" aria-label="${t("Hàng đợi BFS", "BFS queue")}"><span aria-hidden="true">⇤</span><div>${queueItems}${queueMore}</div></section>
+    ${result}
+  </section>`, t("Gate phát sóng BFS; số trên mỗi phòng là khoảng cách tới gate gần nhất", "Gates seed BFS waves; each room number is its nearest-gate distance"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";

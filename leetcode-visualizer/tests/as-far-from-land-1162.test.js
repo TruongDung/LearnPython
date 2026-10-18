@@ -130,7 +130,7 @@ test("1162 renderer and styles are registered for lazy loading", () => {
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderLandDistance1162View"));
   assert.match(script, /"requested-visualizations\.css": PHASE_FOUR_RENDERER_BUNDLES\["renderer-requested-visualizations\.js"\]/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v17-1765-illustrated/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v18-286-illustrated/);
   assert.match(html, /land1162=picture-v2/);
   assert.match(css, /\.ld1162-viz\s*\{/);
   assert.match(css, /body:has\(\.ld1162-viz\) #stepNote \{ display: none; \}/);

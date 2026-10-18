@@ -151,8 +151,8 @@ test("1765 renderer and styles are registered for lazy loading", () => {
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderHighestPeak1765View"));
   assert.match(script, /highestPeak1765View/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v17-1765-illustrated/);
-  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v18-1765-illustrated/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v18-286-illustrated/);
+  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v19-286-illustrated/);
   assert.match(html, /peak1765=picture-v1/);
   assert.match(css, /\.hp1765-viz\s*\{/);
   assert.match(css, /#vizPanel:has\(\.hp1765-viz\) :is\(#codePanel, #codePanel2\)/);

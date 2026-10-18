@@ -697,45 +697,124 @@ function buildSteps1765(input) {
 const INF = 2147483647;
 
 function buildSteps286(input) {
-  return buildDistanceProblem(input, {
-    allowed: new Set(["-1", "0", String(INF)]),
-    toValue: Number,
-    inputName: "rooms[row][col]",
-    valueName: "rooms",
-    enterTitle: text("Bắt đầu wallsAndGates", "Enter wallsAndGates"),
-    initialValues: (grid) => grid.map((row) => [...row]),
-    initialDebug: "INF = 2147483647",
-    initTitle: text("INF = 2147483647", "INF = 2147483647"),
-    initNote: text("INF là phòng trống, -1 là tường và 0 là gate; rooms tự lưu distance.", "INF is an empty room, -1 is a wall, and 0 is a gate; rooms stores distances in place."),
-    isSource: (value) => value === 0,
-    isTarget: (value) => value === INF,
-    sourceValue: 0,
-    sourceCheckTitle: (row, col, yes) => text(`rooms[${row}][${col}] == 0 → ${yes}`, `rooms[${row}][${col}] == 0 → ${yes}`),
-    sourceTrueNote: text("Gate là một nguồn BFS.", "A gate is a BFS source."),
-    sourceFalseNote: text("Không phải gate; không enqueue ở bước khởi tạo.", "This is not a gate; do not enqueue it initially."),
-    sourceAssignTitle: (row, col) => text(`rooms[${row}][${col}] = 0`, `rooms[${row}][${col}] = 0`),
-    sourceAssignNote: text("Khoảng cách từ gate tới chính nó là 0.", "A gate's distance to itself is 0."),
-    early: (sources, _targets, values) => ({ stop: sources === 0, answer: sources === 0 ? values.map((row) => [...row]) : null }),
-    earlyTitle: ({ stop }) => text(`Không có gate → ${stop}`, `No gate → ${stop}`),
-    earlyNote: ({ stop }) => stop
-      ? text("Không có nguồn BFS nên rooms giữ nguyên.", "There is no BFS source, so rooms stays unchanged.")
-      : text("Có gate; bắt đầu lan khoảng cách.", "At least one gate exists; begin spreading distances."),
-    canVisit: (inputValue, value) => inputValue === INF && value === INF,
-    visitTitle: (row, col, yes) => text(`Ô (${row},${col}) là phòng INF → ${yes}`, `Cell (${row},${col}) is an INF room → ${yes}`),
-    visitTrueNote: text("Đây là phòng trống chưa được thăm.", "This is an unvisited empty room."),
-    visitFalseNote: text("Ô ngoài biên, là tường/gate, hoặc đã có khoảng cách; bỏ qua.", "The cell is out of bounds, a wall/gate, or already assigned; skip it."),
-    assignTitle: (row, col, value) => text(`rooms[${row}][${col}] = ${value}`, `rooms[${row}][${col}] = ${value}`),
-    assignNote: text("Khoảng cách phòng bằng khoảng cách ô hiện tại cộng 1.", "The room distance is the current distance plus 1."),
-    answer: (values) => values.map((row) => [...row]),
-    returnTitle: () => text("return rooms", "return rooms"),
-    returnNote: () => text("Trả về rooms sau khi điền khoảng cách gate gần nhất.", "Return rooms filled with nearest-gate distances."),
-    cell: (input, value) => {
-      if (input === -1) return { label: "X", cls: "wall" };
-      if (input === 0) return { label: "G", cls: "visited" };
-      return { label: value === INF ? "∞" : String(value), cls: value === INF ? "empty" : "visited" };
-    },
-    invalidNote: text("Rooms chỉ được chứa -1, 0 hoặc 2147483647.", "Rooms may contain only -1, 0, or 2147483647."),
-  });
+  const parsed = parseGrid(input, new Set(["-1", "0", String(INF)]));
+  const original = parsed.grid.map((row) => row.map(Number));
+  if (!parsed.valid) return invalidResult(original, text("Rooms chỉ được chứa -1, 0 hoặc 2147483647.", "Rooms may contain only -1, 0, or 2147483647."));
+
+  const rooms = original.map((row) => [...row]);
+  const rows = rooms.length;
+  const cols = rooms[0].length;
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const sourceTotal = original.flat().filter((value) => value === 0).length;
+  const roomTotal = original.flat().filter((value) => value === INF).length;
+  const wallCount = original.flat().filter((value) => value === -1).length;
+  let sourceCount = 0;
+  let queue = null;
+  let bfsStarted = false;
+  const key = (row, col) => `${row},${col}`;
+
+  function cells(current, discovered) {
+    const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
+    return rooms.map((matrixRow, row) => matrixRow.map((value, col) => {
+      const originalValue = original[row][col];
+      let label = originalValue === -1 ? "🧱" : originalValue === 0 ? "🚪" : value === INF ? "?" : String(value);
+      let cls = originalValue === -1 ? "wall" : originalValue === 0 ? "visited" : value === INF ? "empty" : "visited";
+      if (queued.has(key(row, col))) cls = "queued";
+      if (discovered && discovered[0] === row && discovered[1] === col) cls = "path";
+      if (current && current[0] === row && current[1] === col) cls = "current";
+      return { label, cls };
+    }));
+  }
+
+  function makeView(options) {
+    const assignedRoomCount = original.flatMap((matrixRow, row) => matrixRow.map((value, col) =>
+      value === INF && rooms[row][col] !== INF ? 1 : 0
+    )).reduce((sum, value) => sum + value, 0);
+    const distances = rooms.flat().filter((value) => value >= 0 && value !== INF);
+    const maxDistance = distances.length ? Math.max(...distances) : 0;
+    const levels = Array.from({ length: maxDistance + 1 }, (_, distance) => ({
+      distance,
+      count: rooms.flat().filter((value) => value === distance).length,
+    })).filter((level) => level.count > 0);
+    return {
+      phase: options.final ? "result" : bfsStarted ? "bfs" : "sources",
+      event: options.event || "setup",
+      rows,
+      cols,
+      cells: rooms.map((matrixRow, row) => matrixRow.map((value, col) => ({
+        row,
+        col,
+        type: original[row][col] === -1 ? "wall" : original[row][col] === 0 ? "gate" : "room",
+        distance: value === INF ? -1 : value,
+      }))),
+      current: options.current || null,
+      discovered: options.discovered || null,
+      origin: options.origin || null,
+      direction: options.direction || null,
+      queue: (queue || []).map(([row, col]) => ({ row, col, distance: rooms[row][col] })),
+      sourceCount,
+      sourceTotal,
+      assignedRoomCount,
+      roomTotal,
+      wallCount,
+      maxDistance,
+      levels,
+      answer: options.final ? rooms.map((row) => [...row]) : null,
+    };
+  }
+
+  const { steps, push } = createRecorder(rows, cols, cells, () => queue, (_codeLine, options) => ({
+    wallsGates286View: makeView(options),
+  }));
+
+  push(5, text("Bắt đầu wallsAndGates", "Enter wallsAndGates"), text("Điền rooms trực tiếp.", "Fill rooms in place."), { event: "enter" });
+  push(6, text("rooms không rỗng", "rooms is not empty"), text("Có bản đồ để xử lý.", "There is a map to process."), { event: "empty-check", vars: [{ name: "empty?", value: false }] });
+  push(9, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Kích thước bản đồ.", "Map dimensions."), { event: "dimensions", vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }] });
+  push(10, text("INF = 2147483647", "INF = 2147483647"), text("INF là phòng chưa được điền.", "INF is an unfilled room."), { event: "inf" });
+  queue = [];
+  push(11, text("queue = deque()", "queue = deque()"), text("Queue bắt đầu rỗng.", "The queue starts empty."), { event: "queue-init" });
+
+  for (let row = 0; row < rows; row++) {
+    push(13, text(`row = ${row}`, `row = ${row}`), text("Quét từng hàng.", "Scan each row."), { event: "scan-row", vars: [{ name: "row", value: row }] });
+    for (let col = 0; col < cols; col++) {
+      push(14, text(`col = ${col}`, `col = ${col}`), text("Quét từng ô.", "Scan each cell."), { event: "scan-cell", current: [row, col], vars: [{ name: "col", value: col }] });
+      const isGate = rooms[row][col] === 0;
+      push(15, text(`rooms[${row}][${col}] == 0 → ${isGate}`, `rooms[${row}][${col}] == 0 → ${isGate}`), isGate ? text("Tìm thấy gate.", "Gate found.") : text("Không phải gate.", "Not a gate."), { event: "gate-check", current: [row, col], vars: [{ name: "is gate?", value: isGate }] });
+      if (!isGate) continue;
+      queue.push([row, col]);
+      sourceCount += 1;
+      push(16, text(`queue.append((${row}, ${col}))`, `queue.append((${row}, ${col}))`), text("Gate vào queue ở khoảng cách 0.", "Gate enters the queue at distance 0."), { event: "gate-enqueue", current: [row, col], discovered: [row, col] });
+    }
+  }
+
+  push(18, text("Khai báo 4 hướng", "Define four directions"), text("Chỉ đi lên, xuống, trái, phải.", "Move only up, down, left, and right."), { event: "directions" });
+  bfsStarted = true;
+  while (queue.length) {
+    push(20, text("while queue → True", "while queue → True"), text("Lấy ô gần gate nhất trước.", "Process the nearest cell first."), { event: "while-check", vars: [{ name: "queue size", value: queue.length }] });
+    const [row, col] = queue.shift();
+    push(21, text(`popleft() → (${row}, ${col})`, `popleft() → (${row}, ${col})`), text("Đầu queue được mở rộng.", "Expand the front of the queue."), { event: "dequeue", current: [row, col], vars: [{ name: "distance", value: rooms[row][col] }] });
+
+    for (const [deltaRow, deltaCol] of directions) {
+      push(23, text(`hướng (${deltaRow}, ${deltaCol})`, `direction (${deltaRow}, ${deltaCol})`), text("Thử một hướng.", "Try one direction."), { event: "direction", current: [row, col], origin: [row, col], direction: [deltaRow, deltaCol] });
+      const nextRow = row + deltaRow;
+      push(24, text(`next_row = ${nextRow}`, `next_row = ${nextRow}`), text("Tính hàng kế tiếp.", "Compute the next row."), { event: "next-row", current: [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "next_row", value: nextRow }] });
+      const nextCol = col + deltaCol;
+      push(25, text(`next_col = ${nextCol}`, `next_col = ${nextCol}`), text("Tính cột kế tiếp.", "Compute the next column."), { event: "next-col", current: [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "next_col", value: nextCol }] });
+      const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+      const canVisit = inBounds && rooms[nextRow][nextCol] === INF;
+      push(27, text(`Phòng (${nextRow}, ${nextCol}) còn INF → ${canVisit}`, `Room (${nextRow}, ${nextCol}) is INF → ${canVisit}`), canVisit ? text("Sóng chạm phòng này lần đầu.", "The wave reaches this room first.") : text("Bị chặn hoặc đã điền.", "Blocked or already filled."), { event: "neighbor-check", current: inBounds ? [nextRow, nextCol] : [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "in bounds?", value: inBounds }, { name: "can visit?", value: canVisit }] });
+      if (!canVisit) continue;
+
+      rooms[nextRow][nextCol] = rooms[row][col] + 1;
+      push(31, text(`rooms[${nextRow}][${nextCol}] = ${rooms[nextRow][nextCol]}`, `rooms[${nextRow}][${nextCol}] = ${rooms[nextRow][nextCol]}`), text("Ghi khoảng cách tới gate gần nhất.", "Store the nearest-gate distance."), { event: "distance-update", current: [nextRow, nextCol], discovered: [nextRow, nextCol], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "distance", value: rooms[nextRow][nextCol] }] });
+      queue.push([nextRow, nextCol]);
+      push(32, text(`queue.append((${nextRow}, ${nextCol}))`, `queue.append((${nextRow}, ${nextCol}))`), text("Đưa phòng mới vào cuối queue.", "Add the new room to the back of the queue."), { event: "enqueue", current: [nextRow, nextCol], discovered: [nextRow, nextCol], origin: [row, col], direction: [deltaRow, deltaCol] });
+    }
+  }
+
+  const answer = rooms.map((row) => [...row]);
+  push(20, text("while queue → False", "while queue → False"), text("Queue rỗng; rooms đã được cập nhật tại chỗ.", "The queue is empty; rooms is updated in place."), { event: "result", final: true, vars: [{ name: "answer", value: JSON.stringify(answer) }] });
+  return { original, answer, steps };
 }
 
 function buildSteps934(input) {
@@ -1854,10 +1933,11 @@ const problems = {
     defaultInput: "2147483647,-1,0,2147483647|2147483647,2147483647,2147483647,-1|2147483647,-1,2147483647,-1|0,-1,2147483647,2147483647",
     inputKind: "string",
     inputLabel: text("Rooms (-1, 0, 2147483647)", "Rooms (-1, 0, 2147483647)"),
+    debugMode: "line-by-line",
     approach: [
-      text("Đưa tất cả gate vào queue trước khi BFS.", "Put every gate in the queue before BFS."),
-      text("Chỉ đi vào phòng còn INF; gán distance hiện tại + 1.", "Enter only INF rooms; assign current distance + 1."),
-      text("Tường chặn đường và mỗi phòng được enqueue tối đa một lần.", "Walls block movement and every room is enqueued at most once."),
+      text("🚪 Mọi gate cùng vào queue ở khoảng cách 0.", "🚪 Every gate enters the queue at distance 0."),
+      text("〰️ BFS lan qua phòng trống; 🧱 chặn đường.", "〰️ BFS spreads through empty rooms; 🧱 blocks the way."),
+      text("🏠 Lần chạm đầu tiên là gate gần nhất.", "🏠 The first arrival comes from the nearest gate."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Một lần multi-source BFS thay cho BFS riêng từ từng phòng.", "One multi-source BFS replaces a separate BFS from every room.") },
     code: [
@@ -1865,25 +1945,34 @@ const problems = {
       "from typing import List",
       "",
       "class Solution:",
-      "    def wallsAndGates(self, rooms: List[List[int]]) -> List[List[int]]:",
+      "    def wallsAndGates(self, rooms: List[List[int]]) -> None:",
+      "        if not rooms or not rooms[0]:",
+      "            return",
+      "",
       "        rows, cols = len(rooms), len(rooms[0])",
       "        INF = 2147483647",
       "        queue = deque()",
+      "",
       "        for row in range(rows):",
       "            for col in range(cols):",
       "                if rooms[row][col] == 0:",
-      "                    rooms[row][col] = 0",
       "                    queue.append((row, col))",
-      "        if not queue: return rooms",
+      "",
       "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
       "        while queue:",
       "            row, col = queue.popleft()",
+      "",
       "            for delta_row, delta_col in directions:",
-      "                next_row, next_col = row + delta_row, col + delta_col",
-      "                if 0 <= next_row < rows and 0 <= next_col < cols and rooms[next_row][next_col] == INF:",
+      "                next_row = row + delta_row",
+      "                next_col = col + delta_col",
+      "",
+      "                if (0 <= next_row < rows and",
+      "                    0 <= next_col < cols and",
+      "                    rooms[next_row][next_col] == INF):",
+      "",
       "                    rooms[next_row][next_col] = rooms[row][col] + 1",
       "                    queue.append((next_row, next_col))",
-      "        return rooms",
     ],
     builder: buildSteps286,
   },
