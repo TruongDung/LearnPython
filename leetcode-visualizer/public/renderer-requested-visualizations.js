@@ -870,6 +870,87 @@ function renderLandDistance1162View(step) {
   </section>`, t("Đất phát sóng BFS; số trên biển là khoảng cách tới đất gần nhất", "Land seeds BFS waves; water labels show nearest-land distance"), "group");
 }
 
+function renderHighestPeak1765View(step) {
+  const v = step.highestPeak1765View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const phaseIndex = v.phase === "bfs" ? 1 : v.phase === "result" ? 2 : 0;
+  const stages = [
+    ["💧", t("Đặt mọi ô nước ở độ cao 0", "Set every water cell to height 0")],
+    ["🌊", t("Sóng BFS lan qua đất", "BFS waves spread across land")],
+    ["🏔️", t("Hoàn thành bản đồ độ cao", "Complete the height map")],
+  ].map(([icon, label], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}" aria-label="${esc(label)}"><i>${icon}</i>${index < phaseIndex ? '<b aria-hidden="true">✓</b>' : ""}</span>${index < 2 ? '<em aria-hidden="true">〰›</em>' : ""}`;
+  }).join("");
+  const keyOf = (cell) => Array.isArray(cell) ? cell.join(",") : "";
+  const currentKey = keyOf(v.current);
+  const discoveredKey = keyOf(v.discovered);
+  const originKey = keyOf(v.origin);
+  const directionArrow = new Map([
+    ["1,0", "↓"], ["-1,0", "↑"], ["0,1", "→"], ["0,-1", "←"],
+  ]).get(keyOf(v.direction)) || "";
+  const peakKeys = new Set(v.phase === "result" && v.maxHeight >= 0
+    ? (v.cells || []).flatMap((row) => row)
+      .filter((cell) => cell.height === v.maxHeight)
+      .map((cell) => `${cell.row},${cell.col}`)
+    : []);
+  const terrainIcon = (cell) => {
+    if (cell.isWater) return "💧";
+    if (cell.height < 0) return "·";
+    if (cell.height === 1) return "🌱";
+    if (cell.height === 2) return "⛰️";
+    return "🏔️";
+  };
+  const cells = (v.cells || []).flatMap((row) => row.map((cell) => {
+    const key = `${cell.row},${cell.col}`;
+    const classes = [
+      "hp1765-cell",
+      cell.isWater ? "water" : cell.height < 0 ? "unknown" : `height-${Math.min(cell.height, 6)}`,
+      key === currentKey ? "current" : "",
+      key === discoveredKey ? "discovered" : "",
+      key === originKey ? "origin" : "",
+      peakKeys.has(key) ? "peak" : "",
+    ].filter(Boolean).join(" ");
+    const aria = cell.isWater
+      ? t(`Ô nước (${cell.row},${cell.col}), độ cao 0`, `Water (${cell.row},${cell.col}), height 0`)
+      : cell.height < 0
+        ? t(`Đất chưa có độ cao (${cell.row},${cell.col})`, `Unassigned land (${cell.row},${cell.col})`)
+        : t(`Đất (${cell.row},${cell.col}), độ cao ${cell.height}`, `Land (${cell.row},${cell.col}), height ${cell.height}`);
+    const arrow = key === originKey && directionArrow ? `<span class="hp1765-direction" aria-hidden="true">${directionArrow}</span>` : "";
+    const spark = key === discoveredKey ? '<span class="hp1765-spark" aria-hidden="true">✦</span>' : "";
+    const ripples = cell.isWater ? '<span class="hp1765-ripples" aria-hidden="true"><i></i><i></i></span>' : "";
+    return `<div class="${classes}" aria-label="${esc(aria)}">${ripples}<i class="hp1765-terrain" aria-hidden="true">${terrainIcon(cell)}</i><strong>${cell.height < 0 ? "?" : cell.height}</strong>${arrow}${spark}</div>`;
+  })).join("");
+  const profile = (v.levels || []).map((level) => {
+    const icon = level.height === 0 ? "💧" : level.height === 1 ? "🌱" : level.height === 2 ? "⛰️" : "🏔️";
+    const dots = "●".repeat(Math.min(level.count, 5));
+    const more = level.count > 5 ? `+${level.count - 5}` : "";
+    return `<span class="${level.height === v.maxHeight ? "top" : ""}" aria-label="${esc(t(`Độ cao ${level.height}, ${level.count} ô`, `Height ${level.height}, ${level.count} cells`))}"><i>${icon}</i><b>${level.height}</b><small aria-hidden="true">${dots}${more}</small></span>`;
+  }).join("") || '<span class="empty" aria-hidden="true"><i>💧</i><b>0</b><small>···</small></span>';
+  const queueItems = (v.queue || []).slice(0, 8).map((cell, index) => {
+    const left = ((cell.col + 0.5) / Math.max(1, v.cols) * 100).toFixed(2);
+    const top = ((cell.row + 0.5) / Math.max(1, v.rows) * 100).toFixed(2);
+    const columnSize = (100 / Math.max(1, v.cols)).toFixed(3);
+    const rowSize = (100 / Math.max(1, v.rows)).toFixed(3);
+    const icon = cell.height === 0 ? "💧" : cell.height === 1 ? "🌱" : cell.height === 2 ? "⛰️" : "🏔️";
+    return `<span class="hp1765-ticket ${index === 0 ? "front" : ""}" aria-label="${esc(t(`Ô (${cell.row},${cell.col}), độ cao ${cell.height}`, `Cell (${cell.row},${cell.col}), height ${cell.height}`))}"><i class="hp1765-mini-map" style="background-size:${columnSize}% ${rowSize}%"><b style="left:${left}%;top:${top}%"></b></i><em aria-hidden="true">${icon}</em><strong>${cell.height}</strong></span>`;
+  }).join("") || '<b class="hp1765-empty" aria-label="Empty queue">∅</b>';
+  const queueMore = (v.queue || []).length > 8 ? `<small class="hp1765-more">+${v.queue.length - 8}</small>` : "";
+  const peakCount = peakKeys.size;
+  const result = v.phase === "result"
+    ? `<div class="hp1765-result" aria-label="${esc(t(`Đỉnh cao nhất ${v.maxHeight}`, `Highest peak ${v.maxHeight}`))}"><span aria-hidden="true">💧</span><em aria-hidden="true">〰›</em><i aria-hidden="true">🏔️</i><strong>${v.maxHeight}</strong><small>×${peakCount}</small></div>`
+    : "";
+  requestedVizSet(`<section class="hp1765-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="hp1765-header"><div class="hp1765-stages">${stages}</div><div class="hp1765-stats"><span aria-label="${t("Nguồn nước đã tìm thấy", "Water sources found")}">💧 <b>${v.sourceCount || 0}/${v.sourceTotal || 0}</b></span><span aria-label="${t("Ô đã có độ cao", "Assigned cells")}">▦ <b>${v.assignedCount || 0}/${v.totalCells || 0}</b></span></div></header>
+    <div class="hp1765-profile" aria-label="${t("Các tầng độ cao", "Height levels")}">${profile}</div>
+    <div class="hp1765-grid" style="--hp1765-cols:${v.cols}">${cells}</div>
+    <section class="hp1765-queue" aria-label="${t("Hàng đợi BFS", "BFS queue")}"><span aria-hidden="true">⇤</span><div>${queueItems}${queueMore}</div></section>
+    ${result}
+  </section>`, t("Nước ở độ cao 0; mỗi vòng sóng BFS nâng đất thêm một bậc", "Water is height 0; every BFS wave raises land by one level"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";

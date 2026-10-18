@@ -486,41 +486,212 @@ function buildSteps1162(input) {
 }
 
 function buildSteps1765(input) {
-  return buildDistanceProblem(input, {
-    allowed: new Set(["0", "1"]),
-    toValue: Number,
-    inputName: "isWater[row][col]",
-    valueName: "height",
-    enterTitle: text("Bắt đầu highestPeak", "Enter highestPeak"),
-    initialValues: (grid) => grid.map((row) => row.map(() => -1)),
-    initialDebug: "all -1 (shown as ∞)",
-    initTitle: text("Khởi tạo height = -1", "Initialize height to -1"),
-    initNote: text("-1 là ô chưa được gán độ cao; visualization hiển thị ∞.", "-1 is an unassigned height; the visualization shows ∞."),
-    isSource: (value) => value === 1,
-    isTarget: (value) => value === 0,
-    sourceValue: 0,
-    sourceCheckTitle: (row, col, yes) => text(`isWater[${row}][${col}] == 1 → ${yes}`, `isWater[${row}][${col}] == 1 → ${yes}`),
-    sourceTrueNote: text("Ô nước phải có độ cao 0 và là nguồn BFS.", "A water cell must have height 0 and is a BFS source."),
-    sourceFalseNote: text("Ô đất sẽ được gán độ cao khi BFS lan tới.", "A land cell receives its height when BFS reaches it."),
-    sourceAssignTitle: (row, col) => text(`height[${row}][${col}] = 0`, `height[${row}][${col}] = 0`),
-    sourceAssignNote: text("Theo đề bài, mọi ô nước có độ cao 0.", "Every water cell has height 0."),
-    early: (sources) => ({ stop: sources === 0, answer: [] }),
-    earlyTitle: ({ stop }) => text(`Không có ô nước → ${stop}`, `No water source → ${stop}`),
-    earlyNote: ({ stop }) => stop
-      ? text("Input ngoài constraint vì không có ô nước.", "The input violates the constraint because it has no water cell.")
-      : text("Đã có ít nhất một nguồn nước; tiếp tục BFS.", "At least one water source exists; continue BFS."),
-    canVisit: (_input, value) => value === -1,
-    visitTitle: (row, col, yes) => text(`Ô (${row},${col}) chưa có height → ${yes}`, `Cell (${row},${col}) has no height → ${yes}`),
-    visitTrueNote: text("Lần đầu tới ô này cho độ cao nhỏ nhất hợp lệ từ nước.", "The first visit gives the minimum valid height from water."),
-    visitFalseNote: text("Ô ngoài biên hoặc đã được gán height; bỏ qua.", "The cell is out of bounds or already has a height; skip it."),
-    assignTitle: (row, col, value) => text(`height(${row},${col}) = ${value}`, `height(${row},${col}) = ${value}`),
-    assignNote: text("Height mới bằng height ô hiện tại cộng 1.", "The new height is the current height plus 1."),
-    answer: (values) => values.map((row) => [...row]),
-    returnTitle: () => text("return height", "return height"),
-    returnNote: () => text("Trả về bản đồ độ cao hoàn chỉnh.", "Return the completed height map."),
-    cell: (_input, value) => ({ label: value === -1 ? "∞" : String(value), cls: value === -1 ? "empty" : "visited" }),
-    invalidNote: text("isWater phải là ma trận chữ nhật chỉ gồm 0 và 1.", "isWater must be rectangular and contain only 0 and 1."),
+  const parsed = parseGrid(input, new Set(["0", "1"]));
+  const original = parsed.grid.map((row) => row.map(Number));
+  if (!parsed.valid) {
+    return invalidResult(
+      original,
+      text("isWater phải là ma trận chữ nhật chỉ gồm 0 và 1.", "isWater must be rectangular and contain only 0 and 1."),
+    );
+  }
+
+  const rows = original.length;
+  const cols = original[0].length;
+  const heights = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const sourceTotal = original.flat().filter((value) => value === 1).length;
+  const totalCells = rows * cols;
+  let sourceCount = 0;
+  let queue = null;
+
+  const cellKey = (row, col) => `${row},${col}`;
+  function cells(current, discovered) {
+    const queued = new Set((queue || []).map(([row, col]) => cellKey(row, col)));
+    return original.map((matrixRow, row) => matrixRow.map((isWater, col) => {
+      const height = heights[row][col];
+      let cls = height < 0 ? "empty" : "visited";
+      if (queued.has(cellKey(row, col))) cls = "queued";
+      if (discovered && discovered[0] === row && discovered[1] === col) cls = "path";
+      if (current && current[0] === row && current[1] === col) cls = "current";
+      return { label: isWater ? "💧" : height < 0 ? "?" : String(height), cls };
+    }));
+  }
+
+  function makeView(codeLine, options) {
+    const levels = new Map();
+    let assignedCount = 0;
+    let maxHeight = -1;
+    heights.forEach((row) => row.forEach((height) => {
+      if (height < 0) return;
+      assignedCount += 1;
+      maxHeight = Math.max(maxHeight, height);
+      levels.set(height, (levels.get(height) || 0) + 1);
+    }));
+    return {
+      phase: options.final ? "result" : codeLine >= 22 ? "bfs" : "sources",
+      event: options.event || "setup",
+      codeLine,
+      rows,
+      cols,
+      cells: original.map((matrixRow, row) => matrixRow.map((isWater, col) => ({
+        row,
+        col,
+        isWater: isWater === 1,
+        height: heights[row][col],
+      }))),
+      current: options.current ? [...options.current] : null,
+      discovered: options.discovered ? [...options.discovered] : null,
+      origin: options.origin ? [...options.origin] : null,
+      direction: options.direction ? [...options.direction] : null,
+      queue: (queue || []).map(([row, col]) => ({ row, col, height: heights[row][col] })),
+      sourceCount,
+      sourceTotal,
+      assignedCount,
+      totalCells,
+      maxHeight,
+      levels: Array.from(levels, ([height, count]) => ({ height, count })).sort((a, b) => a.height - b.height),
+      answer: options.final ? heights.map((row) => [...row]) : null,
+    };
+  }
+
+  const { steps, push } = createRecorder(
+    rows,
+    cols,
+    cells,
+    () => queue,
+    (codeLine, options) => ({ highestPeak1765View: makeView(codeLine, options) }),
+  );
+
+  push(5, text("Bắt đầu highestPeak", "Enter highestPeak"), text("Nhận bản đồ nước và đất.", "Receive the water-and-land map."), {
+    event: "enter",
+    vars: [{ name: "grid size", value: `${rows}×${cols}` }],
   });
+  push(6, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Lưu kích thước bản đồ.", "Store the map dimensions."), {
+    event: "dimensions",
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+  });
+  push(8, text("heights = -1", "heights = -1"), text("Mọi ô bắt đầu ở trạng thái chưa có độ cao.", "Every cell starts without a height."), {
+    event: "height-init",
+    vars: [{ name: "heights", value: "all -1" }],
+  });
+  queue = [];
+  push(9, text("queue = deque()", "queue = deque()"), text("Tạo hàng đợi BFS đa nguồn.", "Create the multi-source BFS queue."), {
+    event: "queue-init",
+  });
+
+  for (let row = 0; row < rows; row += 1) {
+    push(12, text(`Quét row = ${row}`, `Scan row = ${row}`), text("Tìm các ô nước.", "Find water cells."), {
+      event: "scan-row",
+      vars: [{ name: "row", value: row }],
+    });
+    for (let col = 0; col < cols; col += 1) {
+      push(13, text(`Quét ô (${row},${col})`, `Scan cell (${row},${col})`), text("Kiểm tra ô tiếp theo.", "Inspect the next cell."), {
+        event: "scan-cell",
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }],
+      });
+      const isWater = original[row][col] === 1;
+      push(14, text(`isWater[${row}][${col}] == 1 → ${isWater}`, `isWater[${row}][${col}] == 1 → ${isWater}`), isWater
+        ? text("Ô nước là một nguồn BFS.", "This water cell is a BFS source.")
+        : text("Ô đất sẽ nhận độ cao khi sóng lan tới.", "Land receives a height when the wave reaches it."), {
+        event: "source-check",
+        current: [row, col],
+        vars: [{ name: "is water?", value: isWater }],
+      });
+      if (!isWater) continue;
+      heights[row][col] = 0;
+      sourceCount += 1;
+      push(15, text(`heights[${row}][${col}] = 0`, `heights[${row}][${col}] = 0`), text("Mặt nước có độ cao 0.", "Water has height 0."), {
+        event: "source-height",
+        current: [row, col],
+        discovered: [row, col],
+        vars: [{ name: "height", value: 0 }],
+      });
+      queue.push([row, col]);
+      push(16, text(`queue.append((${row},${col}))`, `queue.append((${row},${col}))`), text("Thêm nguồn nước vào queue.", "Add the water source to the queue."), {
+        event: "source-enqueue",
+        current: [row, col],
+        vars: [{ name: "sources", value: sourceCount }],
+      });
+    }
+  }
+
+  push(18, text("Khai báo 4 hướng", "Define four directions"), text("Sóng lan xuống, lên, phải và trái.", "The wave expands down, up, right, and left."), {
+    event: "directions",
+    vars: [{ name: "directions", value: "↓ ↑ → ←" }],
+  });
+
+  while (queue.length) {
+    push(22, text("while queue → True", "while queue → True"), text("Queue còn ô cần lan tiếp.", "The queue still has a cell to expand."), {
+      event: "queue-check",
+      vars: [{ name: "queue size", value: queue.length }],
+    });
+    const [row, col] = queue.shift();
+    push(23, text(`popleft → (${row},${col})`, `popleft → (${row},${col})`), text("Lấy ô ở đầu queue.", "Remove the front cell."), {
+      event: "dequeue",
+      current: [row, col],
+      vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "height", value: heights[row][col] }],
+    });
+    for (const [dr, dc] of directions) {
+      push(25, text(`Thử hướng (${dr},${dc})`, `Try direction (${dr},${dc})`), text("Nhìn sang một ô kề.", "Look at one neighbor."), {
+        event: "direction",
+        current: [row, col],
+        origin: [row, col],
+        direction: [dr, dc],
+        vars: [{ name: "dr", value: dr }, { name: "dc", value: dc }],
+      });
+      const nr = row + dr;
+      const nc = col + dc;
+      push(26, text(`next = (${nr},${nc})`, `next = (${nr},${nc})`), text("Tính tọa độ ô kề.", "Compute the neighbor coordinates."), {
+        event: "neighbor",
+        current: [row, col],
+        origin: [row, col],
+        direction: [dr, dc],
+        vars: [{ name: "nr", value: nr }, { name: "nc", value: nc }],
+      });
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      const canVisit = inBounds && heights[nr][nc] === -1;
+      push(28, text(`Ô (${nr},${nc}) chưa có height → ${canVisit}`, `Cell (${nr},${nc}) has no height → ${canVisit}`), canVisit
+        ? text("Sóng chạm ô này lần đầu.", "The wave reaches this cell for the first time.")
+        : text("Ngoài biên hoặc đã có độ cao.", "Out of bounds or already assigned."), {
+        event: "neighbor-check",
+        current: inBounds ? [nr, nc] : [row, col],
+        origin: [row, col],
+        direction: [dr, dc],
+        vars: [{ name: "in bounds?", value: inBounds }, { name: "can visit?", value: canVisit }],
+      });
+      if (!canVisit) continue;
+      heights[nr][nc] = heights[row][col] + 1;
+      push(32, text(`heights[${nr}][${nc}] = ${heights[nr][nc]}`, `heights[${nr}][${nc}] = ${heights[nr][nc]}`), text("Độ cao tăng 1 khi đi xa nước thêm một ô.", "Height increases by 1 for each step away from water."), {
+        event: "height-update",
+        current: [nr, nc],
+        discovered: [nr, nc],
+        origin: [row, col],
+        direction: [dr, dc],
+        vars: [{ name: "new height", value: heights[nr][nc] }],
+      });
+      queue.push([nr, nc]);
+      push(33, text(`queue.append((${nr},${nc}))`, `queue.append((${nr},${nc}))`), text("Đưa ô mới vào cuối queue.", "Add the new cell to the back of the queue."), {
+        event: "enqueue",
+        current: [nr, nc],
+        discovered: [nr, nc],
+        origin: [row, col],
+        direction: [dr, dc],
+      });
+    }
+  }
+
+  push(22, text("while queue → False", "while queue → False"), text("Queue rỗng; bản đồ đã hoàn tất.", "The queue is empty; the map is complete."), {
+    event: "queue-empty",
+    vars: [{ name: "queue size", value: 0 }],
+  });
+  const answer = heights.map((row) => [...row]);
+  push(35, text("return heights", "return heights"), text("Trả về bản đồ độ cao.", "Return the height map."), {
+    event: "result",
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(answer) }],
+  });
+  return { original, answer, steps };
 }
 
 const INF = 2147483647;
@@ -1621,10 +1792,11 @@ const problems = {
     defaultInput: "0,1|0,0",
     inputKind: "string",
     inputLabel: text("isWater 0/1 (hàng cách '|')", "0/1 isWater grid (rows separated by '|')"),
+    debugMode: "line-by-line",
     approach: [
-      text("Đưa tất cả ô nước vào queue với height 0.", "Put every water cell in the queue with height 0."),
-      text("BFS lan ra đất; height mới bằng height hiện tại + 1.", "BFS expands onto land; each new height is current height + 1."),
-      text("Lần đầu một ô được thăm cho height nhỏ nhất từ nước và tối ưu height cực đại.", "A cell's first visit gives its minimum distance from water and optimizes the peak height."),
+      text("💧 Mọi ô nước cùng vào queue ở độ cao 0.", "💧 All water cells enter the queue at height 0."),
+      text("🌊 Sóng BFS lan đồng thời theo 4 hướng.", "🌊 BFS waves expand together in four directions."),
+      text("⛰️ Mỗi bước xa nước làm độ cao tăng 1.", "⛰️ Each step away from water raises the height by 1."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô được xử lý đúng một lần.", "Each cell is processed once.") },
     code: [
@@ -1634,23 +1806,35 @@ const problems = {
       "class Solution:",
       "    def highestPeak(self, isWater: List[List[int]]) -> List[List[int]]:",
       "        rows, cols = len(isWater), len(isWater[0])",
-      "        height = [[-1 for col in range(cols)] for row in range(rows)]",
+      "",
+      "        heights = [[-1] * cols for _ in range(rows)]",
       "        queue = deque()",
+      "",
+      "        # Step 1: Add all water cells to the queue",
       "        for row in range(rows):",
       "            for col in range(cols):",
       "                if isWater[row][col] == 1:",
-      "                    height[row][col] = 0",
+      "                    heights[row][col] = 0",
       "                    queue.append((row, col))",
-      "        if not queue: return []",
-      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
+      "        directions = [(1, 0), (-1, 0),",
+      "                      (0, 1), (0, -1)]",
+      "",
+      "        # Step 2: Multi-source BFS",
       "        while queue:",
       "            row, col = queue.popleft()",
-      "            for delta_row, delta_col in directions:",
-      "                next_row, next_col = row + delta_row, col + delta_col",
-      "                if 0 <= next_row < rows and 0 <= next_col < cols and height[next_row][next_col] == -1:",
-      "                    height[next_row][next_col] = height[row][col] + 1",
-      "                    queue.append((next_row, next_col))",
-      "        return height",
+      "",
+      "            for dr, dc in directions:",
+      "                nr, nc = row + dr, col + dc",
+      "",
+      "                if (0 <= nr < rows and",
+      "                    0 <= nc < cols and",
+      "                    heights[nr][nc] == -1):",
+      "",
+      "                    heights[nr][nc] = heights[row][col] + 1",
+      "                    queue.append((nr, nc))",
+      "",
+      "        return heights",
     ],
     builder: buildSteps1765,
   },
