@@ -774,6 +774,77 @@ function renderMatrix542View(step) {
   </section>`, t("BFS đa nguồn: khoảng cách tới số 0 gần nhất", "Multi-source BFS: distance to the nearest zero"), "group");
 }
 
+function renderLandDistance1162View(step) {
+  const v = step.landDistance1162View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const phaseIndex = v.phase === "bfs" ? 1 : v.phase === "result" ? 2 : 0;
+  const stages = [
+    ["🏝️", t("Đất", "Land")],
+    ["🌊", "BFS"],
+    ["🏁", t("Xa nhất", "Farthest")],
+  ].map(([icon, label], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}"><i>${index < phaseIndex ? "✓" : icon}</i><b>${label}</b></span>${index < 2 ? "<em>›</em>" : ""}`;
+  }).join("");
+  const currentKey = Array.isArray(v.current) ? v.current.join(",") : "";
+  const discoveredKey = Array.isArray(v.discovered) ? v.discovered.join(",") : "";
+  const farthestKey = v.phase === "result" && v.answer >= 0
+    ? (v.cells || []).flatMap((row) => row)
+      .filter((cell) => !cell.isLand && cell.distance === v.answer)
+      .map((cell) => `${cell.row},${cell.col}`)
+    : [];
+  const farthest = new Set(farthestKey);
+  const cells = (v.cells || []).flatMap((row) => row.map((cell) => {
+    const key = `${cell.row},${cell.col}`;
+    const classes = [
+      "ld1162-cell",
+      cell.isLand ? "land" : cell.distance < 0 ? "unknown" : `distance-${Math.min(cell.distance, 8)}`,
+      key === currentKey ? "current" : "",
+      key === discoveredKey ? "discovered" : "",
+      farthest.has(key) ? "farthest" : "",
+    ].filter(Boolean).join(" ");
+    const icon = cell.isLand ? "🏝️" : cell.distance < 0 ? "🌊" : "〰️";
+    const distance = cell.distance < 0 ? "∞" : cell.distance;
+    const aria = cell.isLand
+      ? t(`Đất (${cell.row},${cell.col})`, `Land (${cell.row},${cell.col})`)
+      : cell.distance < 0
+        ? t(`Biển chưa tới (${cell.row},${cell.col})`, `Unreached water (${cell.row},${cell.col})`)
+        : t(`Biển, khoảng cách ${cell.distance}`, `Water, distance ${cell.distance}`);
+    return `<div class="${classes}" aria-label="${requestedVizEsc(aria)}">
+      <small>${cell.row},${cell.col}</small><i>${icon}</i><strong>${distance}</strong>
+    </div>`;
+  })).join("");
+  const levels = (v.levels || []).map((level) => {
+    const maxLevel = Math.max(1, ...v.levels.map((item) => item.count));
+    const width = Math.max(8, level.count / maxLevel * 100);
+    return `<span class="${level.distance === v.maxDistance ? "farthest" : ""}">
+      <b>d=${level.distance}</b><i><em style="width:${width}%"></em></i><small>🌊 ${level.count}</small>
+    </span>`;
+  }).join("");
+  const queue = (v.queue || []).slice(0, 10).map((cell, index) => `<span class="${index === 0 ? "front" : ""}">
+    <small>${index === 0 ? "→" : index + 1}</small><b>${cell.row},${cell.col}</b><i>${cell.distance < 0 ? "∞" : cell.distance}</i>
+  </span>`).join("<em>›</em>") || `<b class="ld1162-empty">∅</b>`;
+  const more = (v.queue || []).length > 10 ? `<small class="ld1162-more">+${v.queue.length - 10}</small>` : "";
+  const answer = v.phase === "result" && v.answer !== null
+    ? `<div class="ld1162-answer ${v.answer < 0 ? "empty" : ""}" aria-label="${requestedVizEsc(v.answer < 0 ? t("Không có biển và đất cùng lúc", "No mix of land and water") : t(`Khoảng cách lớn nhất ${v.answer}`, `Maximum distance ${v.answer}`))}">
+      <span>🏁</span><strong>${v.answer < 0 ? "—" : requestedVizEsc(v.answer)}</strong><i>${v.answer < 0 ? "∅" : "🌊"}</i>
+    </div>`
+    : "";
+  const focus = Array.isArray(v.current) ? `(${v.current.join(",")})` : "—";
+  requestedVizSet(`<section class="ld1162-viz phase-${v.phase}" data-event="${requestedVizEsc(v.event)}">
+    <header class="ld1162-header"><div class="ld1162-stages">${stages}</div><div class="ld1162-stats">
+      <span aria-label="${t("Nguồn đất", "Land sources")}">🏝️ <b>${v.sourceCount || 0}/${v.sourceTotal || 0}</b></span>
+      <span aria-label="${t("Ô biển đã tới", "Water reached")}">🌊 <b>${v.knownWater || 0}/${v.waterCount || 0}</b></span>
+      <span aria-label="${t("Đang xét", "Current cell")}">📍 <b>${focus}</b></span>
+    </div></header>
+    <div class="ld1162-waves">${levels || `<span><b>d=0</b><i><em></em></i><small>🌊 0</small></span>`}</div>
+    <div class="ld1162-grid" style="--ld1162-cols:${v.cols}">${cells}</div>
+    <section class="ld1162-queue"><header><b>🧺 QUEUE</b><small>→ FRONT</small></header><div>${queue}${more}</div></section>
+    ${answer}
+  </section>`, t("Đất phát sóng BFS; số trên biển là khoảng cách tới đất gần nhất", "Land seeds BFS waves; water labels show nearest-land distance"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";

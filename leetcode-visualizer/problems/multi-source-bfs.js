@@ -54,7 +54,7 @@ function queueText(queue) {
     : `(${item[0]},${item[1]})`).join(", ")}]`;
 }
 
-function createRecorder(rows, cols, getCells, getQueue) {
+function createRecorder(rows, cols, getCells, getQueue, getExtraView = null) {
   const steps = [];
   function push(codeLine, title, note, options = {}) {
     const vars = [...(options.vars || [])];
@@ -75,6 +75,7 @@ function createRecorder(rows, cols, getCells, getQueue) {
       codeLines: [codeLine],
       vars,
       note,
+      ...(getExtraView ? getExtraView(codeLine, options) : {}),
     });
   }
   return { steps, push };
@@ -107,7 +108,25 @@ function buildDistanceProblem(input, config) {
     }));
   }
 
-  const recorder = createRecorder(rows, cols, cells, () => queue);
+  const recorder = createRecorder(
+    rows,
+    cols,
+    cells,
+    () => queue,
+    config.makeView
+      ? (codeLine, options) => ({
+        [config.viewKey]: config.makeView({
+          grid,
+          values,
+          queue,
+          sourceCount,
+          targetCount,
+          codeLine,
+          options,
+        }),
+      })
+      : null,
+  );
   const { steps, push } = recorder;
 
   push(5, config.enterTitle, text("Bắt đầu hàm với grid đầu vào.", "Enter the function with the input grid."), {
@@ -251,6 +270,75 @@ function buildSteps1162(input) {
     assignTitle: (row, col, value) => text(`distance(${row},${col}) = ${value}`, `distance(${row},${col}) = ${value}`),
     assignNote: text("Khoảng cách mới bằng khoảng cách ô hiện tại cộng 1.", "The new distance is the current distance plus 1."),
     answer: (values) => Math.max(...values.flat()),
+    viewKey: "landDistance1162View",
+    makeView: ({ grid, values, queue, sourceCount, targetCount, codeLine, options }) => {
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const levelCounts = new Map();
+      let knownWater = 0;
+      let maxDistance = -1;
+      let totalLand = 0;
+      let totalWater = 0;
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          if (grid[row][col] === 1) totalLand += 1;
+          else totalWater += 1;
+          const distance = values[row][col];
+          if (grid[row][col] !== 0 || distance < 0) continue;
+          knownWater += 1;
+          maxDistance = Math.max(maxDistance, distance);
+          levelCounts.set(distance, (levelCounts.get(distance) || 0) + 1);
+        }
+      }
+      const answerValue = options.final
+        ? Number(options.vars?.find((item) => item.name === "answer")?.value)
+        : null;
+      const phase = options.final || (codeLine === 14 && (sourceCount === 0 || targetCount === 0))
+        ? "result"
+        : codeLine >= 16
+          ? "bfs"
+          : "sources";
+      const events = {
+        10: "scan",
+        11: "source-check",
+        12: "source-distance",
+        13: "source-enqueue",
+        14: "edge-check",
+        15: "directions",
+        16: "queue-check",
+        17: "dequeue",
+        18: "direction",
+        19: "neighbor",
+        20: "neighbor-check",
+        21: "distance-update",
+        22: "enqueue",
+        23: "result",
+      };
+      return {
+        phase,
+        event: events[codeLine] || "setup",
+        codeLine,
+        rows,
+        cols,
+        cells: grid.map((gridRow, row) => gridRow.map((landRow, col) => ({
+          row,
+          col,
+          isLand: landRow === 1,
+          distance: landRow === 1 ? 0 : values[row][col],
+        }))),
+        current: options.current ? [...options.current] : null,
+        discovered: options.discovered ? [...options.discovered] : null,
+        queue: (queue || []).map(([row, col]) => ({ row, col, distance: values[row][col] })),
+        sourceCount,
+        sourceTotal: totalLand,
+        waterCount: totalWater,
+        knownWater,
+        maxDistance,
+        levels: Array.from(levelCounts, ([distance, count]) => ({ distance, count }))
+          .sort((a, b) => a.distance - b.distance),
+        answer: Number.isFinite(answerValue) ? answerValue : null,
+      };
+    },
     returnTitle: (answer) => text(`return ${JSON.stringify(answer)}`, `return ${JSON.stringify(answer)}`),
     returnNote: (answer) => text(`Khoảng cách xa nhất từ biển tới đất là ${answer}.`, `The farthest water-to-land distance is ${answer}.`),
     cell: (input, value) => ({ label: input === 1 && value === 0 ? "L" : value === -1 ? "∞" : String(value), cls: value === -1 ? "empty" : "visited" }),
@@ -1330,6 +1418,7 @@ const problems = {
     defaultInput: "1,0,1|0,0,0|1,0,1",
     inputKind: "string",
     inputLabel: text("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
+    debugMode: "line-by-line",
     approach: [
       text("Đưa tất cả ô đất vào queue với distance 0.", "Put every land cell in the queue with distance 0."),
       text("Multi-source BFS lan đồng thời ra mọi ô biển chưa thăm.", "Multi-source BFS expands simultaneously into every unvisited water cell."),
