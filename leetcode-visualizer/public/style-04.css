@@ -3897,6 +3897,24 @@ select option {
   min-width: 0;
 }
 
+.rotting-debug-line {
+  justify-self: end;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #67e8f9;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+.rotting-debug-line small {
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.rotting-debug-line strong {
+  font-size: 14px;
+}
+
 .rotting-phases {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4037,7 +4055,7 @@ select option {
 .rotting-cell {
   position: relative;
   min-width: 0;
-  min-height: 92px;
+  min-height: 86px;
   padding: 8px 5px 6px;
   display: grid;
   place-items: center;
@@ -4061,6 +4079,7 @@ select option {
   font-size: 8px;
   font-style: normal;
   font-weight: 800;
+  display: none;
 }
 
 .rotting-cell-badge {
@@ -4086,8 +4105,8 @@ select option {
 
 .rotting-orange {
   position: relative;
-  width: 43px;
-  height: 43px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   border: 2px solid #fbbf24;
@@ -4151,8 +4170,8 @@ select option {
 }
 
 .rotting-empty-mark {
-  width: 43px;
-  height: 43px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   border: 1px dashed #475569;
@@ -4353,7 +4372,7 @@ select option {
 
 .rotting-direction strong {
   color: #cbd5e1;
-  font-size: 13px;
+  font-size: 21px;
   line-height: 1;
 }
 
@@ -4635,6 +4654,7 @@ select option {
   color: #94a3b8;
   font-size: 9px;
   overflow-wrap: anywhere;
+  display: none;
 }
 
 .rotting-legend {
@@ -4677,6 +4697,7 @@ select option {
 [data-theme="light"] .rotting-directions-section,
 [data-theme="light"] .rotting-timeline > span { border-color: #cbd5e1; background: #ffffff; }
 [data-theme="light"] .rotting-status small,
+[data-theme="light"] .rotting-debug-line,
 [data-theme="light"] .rotting-grid-section > header,
 [data-theme="light"] .rotting-queue-section > header,
 [data-theme="light"] .rotting-directions-section > header,
@@ -4694,6 +4715,7 @@ select option {
 [data-theme="light"] .rotting-directions-section > header strong,
 [data-theme="light"] .rotting-timeline-section > header strong { color: #1e293b; }
 [data-theme="light"] .rotting-status strong,
+[data-theme="light"] .rotting-debug-line strong,
 [data-theme="light"] .rotting-queue-chip strong,
 [data-theme="light"] .rotting-coordinate strong,
 [data-theme="light"] .rotting-timeline strong,
@@ -4749,8 +4771,8 @@ select option {
 [data-theme="light"] .rotting-legend { color: #475569; }
 
 @media (max-width: 680px) {
-  .rotting-phases { grid-template-columns: 1fr; }
-  .rotting-phases span { min-height: 31px; justify-content: flex-start; text-align: left; }
+  .rotting-phases { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rotting-phases span { min-height: 31px; }
   .rotting-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rotting-grid-section > header,
   .rotting-queue-section > header,
@@ -6078,4 +6100,3 @@ select option {
   .pc-history { grid-column: auto; }
   .pc-svg { max-height: 430px; }
 }
-
