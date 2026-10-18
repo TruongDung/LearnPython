@@ -500,8 +500,14 @@ function buildSteps913(input) {
     };
   }
 
-  function makeHardView({ phaseIndex, action, formula, answerValue }) {
+  function makeHardView({ phaseIndex, action, formula, answerValue, event }) {
     const totals = countOutcomes();
+    const decorateState = (state) => state ? {
+      ...state,
+      winner: color[state.mouse][state.cat][state.turn],
+      degree: degree[state.mouse][state.cat][state.turn],
+    } : null;
+    const displayChild = activeChild || { mouse: 1, cat: 2, turn: MOUSE_TURN };
     return jsonSnapshot({
       problemId: 913,
       phaseIndex,
@@ -527,6 +533,17 @@ function buildSteps913(input) {
       ],
       answer: answerValue,
       traceTruncated: traceDropped > 0,
+      catMouse913: {
+        event,
+        nodeCount: n,
+        edges,
+        activeChild: decorateState(displayChild),
+        activeParent: decorateState(activeParent),
+        activeEdge,
+        queue: queue.slice(queueHead, queueHead + 10).map((entry) => ({ ...entry })),
+        queueRemaining: queue.length - queueHead,
+        totals,
+      },
     });
   }
 
@@ -537,6 +554,7 @@ function buildSteps913(input) {
     phaseIndex,
     action,
     formula,
+    event = "step",
     final = false,
     answerValue = null,
   }) {
@@ -568,7 +586,7 @@ function buildSteps913(input) {
       highlight: highlighted,
       mark: marked,
       final: Boolean(final),
-      hardProblemView: makeHardView({ phaseIndex, action, formula, answerValue }),
+      hardProblemView: makeHardView({ phaseIndex, action, formula, answerValue, event }),
     });
   }
 
@@ -586,6 +604,7 @@ function buildSteps913(input) {
     ),
     codeLines: [7, 8, 9, 10, 12, 13, 14, 15],
     phaseIndex: 0,
+    event: "setup",
     action: localized("Khởi tạo màu, bậc và queue", "Initialize colors, degrees, and queue"),
     formula: localized("degree(m,c,M)=|graph[m]|; degree(m,c,C)=|graph[c] \\ {0}|", "degree(m,c,M)=|graph[m]|; degree(m,c,C)=|graph[c] \\ {0}|"),
   });
@@ -611,6 +630,7 @@ function buildSteps913(input) {
         note: localized("Chuột đã tới node 0 nên trạng thái kết thúc là chuột thắng, bất kể lượt kế tiếp.", "The mouse has reached node 0, so this terminal state is a mouse win regardless of the next turn."),
         codeLines: [17, 18, 19, 20, turn === MOUSE_TURN ? 23 : 24],
         phaseIndex: 1,
+        event: "mouse-hole",
         action: localized("Gieo trạng thái chuột tới lỗ", "Seed a mouse-at-hole terminal"),
         formula: localized("mouse = 0 ⇒ MOUSE", "mouse = 0 ⇒ MOUSE"),
       });
@@ -629,6 +649,7 @@ function buildSteps913(input) {
         note: localized("Khi mouse == cat ở ngoài lỗ, mèo đã bắt được chuột nên mèo thắng.", "When mouse == cat away from the hole, the cat has caught the mouse and wins."),
         codeLines: [17, 18, 19, 20, turn === MOUSE_TURN ? 26 : 27],
         phaseIndex: 1,
+        event: "cat-catch",
         action: localized("Gieo trạng thái mèo bắt chuột", "Seed a cat-catches-mouse terminal"),
         formula: localized("mouse = cat ≠ 0 ⇒ CAT", "mouse = cat ≠ 0 ⇒ CAT"),
       });
@@ -653,6 +674,7 @@ function buildSteps913(input) {
           note: localized("Người đang tới lượt không thể đi, vì vậy đối thủ thắng trạng thái này.", "The player to move has no legal move, so the opponent wins this state."),
           codeLines: seed.turn === MOUSE_TURN ? [28, 29, 30, 31] : [28, 29, 32, 33],
           phaseIndex: 1,
+          event: "stuck",
           action: localized("Gieo trạng thái bậc 0", "Seed a zero-degree state"),
           formula: localized("degree = 0 ⇒ đối thủ thắng", "degree = 0 ⇒ opponent wins"),
         });
@@ -672,6 +694,7 @@ function buildSteps913(input) {
       note: localized("Đi ngược một nước từ trạng thái đã biết kết quả để chứng minh các trạng thái cha.", "Move one turn backward from a solved child to prove predecessor states."),
       codeLines: [35, 36],
       phaseIndex: 2,
+      event: "dequeue",
       action: localized("Lấy trạng thái đã giải khỏi queue", "Pop a solved state from the queue"),
       formula: localized("child đã biết ⇒ xét mọi predecessor hợp lệ", "known child ⇒ inspect every legal predecessor"),
     });
@@ -703,6 +726,7 @@ function buildSteps913(input) {
           note: localized("Mỗi trạng thái chỉ được tô màu và đưa vào queue một lần.", "Each state is colored and enqueued at most once."),
           codeLines: [37, 38, 39, 40, 41, 42, 43],
           phaseIndex: 2,
+          event: "skip",
           action: localized("Bỏ qua predecessor đã có kết quả", "Skip an already-solved predecessor"),
           formula: localized("color[parent] ≠ DRAW ⇒ continue", "color[parent] ≠ DRAW ⇒ continue"),
         });
@@ -721,6 +745,7 @@ function buildSteps913(input) {
           ),
           codeLines: [37, 38, 39, 40, 41, 44, 45, 46],
           phaseIndex: 2,
+          event: "winning-move",
           action: localized("Tô màu cha bằng kết quả thắng của người đi", "Color the parent as a win for the mover"),
           formula: localized("winner(child) = mover(parent) ⇒ color(parent)=winner", "winner(child) = mover(parent) ⇒ color(parent)=winner"),
         });
@@ -736,6 +761,7 @@ function buildSteps913(input) {
             note: localized("Bậc còn lại về 0: mọi child đều thắng cho đối thủ, nên cha bị ép thua.", "The remaining degree reached zero: every child wins for the opponent, so the parent is forced to lose."),
             codeLines: [44, 45, 47, 48, 49, 50],
             phaseIndex: 2,
+            event: "forced-loss",
             action: localized("Giải cha bằng quy tắc mọi nước đều thua", "Resolve the parent because all moves lose"),
             formula: localized("degree(parent)=0 ⇒ đối thủ của mover thắng", "degree(parent)=0 ⇒ mover's opponent wins"),
           });
@@ -745,6 +771,7 @@ function buildSteps913(input) {
             note: localized("Child này có lợi cho đối thủ, nhưng cha vẫn còn nước chưa được chứng minh là thua.", "This child favors the opponent, but the parent still has moves not yet proven losing."),
             codeLines: [44, 45, 47, 48],
             phaseIndex: 2,
+            event: "prune-move",
             action: localized("Loại một nước không thể thắng", "Eliminate one non-winning move"),
             formula: localized("child thắng cho đối thủ ⇒ degree(parent) -= 1", "child wins for opponent ⇒ degree(parent) -= 1"),
           });
@@ -762,6 +789,7 @@ function buildSteps913(input) {
     note: localized("Không bên nào có thể ép đi tới trạng thái thắng từ các state chưa được retrograde BFS giải.", "Neither player can force a winning terminal from states left unresolved by retrograde BFS."),
     codeLines: [53],
     phaseIndex: 3,
+    event: "draws",
     action: localized("Giữ trạng thái chưa tô là DRAW", "Keep every uncolored state as DRAW"),
     formula: localized("color = DRAW sau BFS ⇒ vòng chơi tối ưu có thể kéo dài", "color = DRAW after BFS ⇒ optimal play can continue indefinitely"),
   });
@@ -784,6 +812,7 @@ function buildSteps913(input) {
     ),
     codeLines: [53],
     phaseIndex: 4,
+    event: "result",
     action: localized("Trả màu của trạng thái xuất phát", "Return the initial state's color"),
     formula: localized("answer = color[1][2][MOUSE_TURN]", "answer = color[1][2][MOUSE_TURN]"),
     final: true,

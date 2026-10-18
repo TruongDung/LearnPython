@@ -593,6 +593,115 @@
             </aside>`;
     }
 
+    function renderCatMouse913View(step, view) {
+        const game = isRecord(view.catMouse913) ? view.catMouse913 : {};
+        const nodeCount = Number.isInteger(game.nodeCount) ? game.nodeCount : 0;
+        const child = isRecord(game.activeChild) ? game.activeChild : null;
+        const parent = isRecord(game.activeParent) ? game.activeParent : null;
+        const width = 620;
+        const height = nodeCount <= 7 ? 300 : 350;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radiusX = 230;
+        const radiusY = height / 2 - 55;
+        const positions = new Map();
+        for (let id = 0; id < nodeCount; id += 1) {
+            const angle = -Math.PI / 2 + (Math.PI * 2 * id) / Math.max(1, nodeCount);
+            positions.set(id, nodeCount === 1
+                ? { x: centerX, y: centerY }
+                : { x: centerX + Math.cos(angle) * radiusX, y: centerY + Math.sin(angle) * radiusY });
+        }
+
+        const activeEdge = isRecord(game.activeEdge) ? game.activeEdge : null;
+        const graphEdges = boundedArray(game.edges, LIMITS.edges).map((edge) => {
+            if (!isRecord(edge)) return "";
+            const source = positions.get(edge.u);
+            const target = positions.get(edge.v);
+            if (!source || !target) return "";
+            const isActive = activeEdge && (
+                (activeEdge.u === edge.u && activeEdge.v === edge.v)
+                || (activeEdge.u === edge.v && activeEdge.v === edge.u)
+            );
+            return `<line class="safe913-edge${isActive ? " active" : ""}" x1="${numberAttribute(source.x)}" y1="${numberAttribute(source.y)}" x2="${numberAttribute(target.x)}" y2="${numberAttribute(target.y)}"></line>`;
+        }).join("");
+
+        const graphNodes = Array.from({ length: nodeCount }, (_, id) => {
+            const point = positions.get(id);
+            const childMouse = child?.mouse === id;
+            const childCat = child?.cat === id;
+            const parentMouse = parent?.mouse === id;
+            const parentCat = parent?.cat === id;
+            const classes = [
+                "safe913-node",
+                id === 0 ? "hole" : "",
+                childMouse ? "mouse" : "",
+                childCat ? "cat" : "",
+                parentMouse || parentCat ? "parent" : "",
+                childMouse && childCat ? "caught" : "",
+            ].filter(Boolean).join(" ");
+            const tokenY = point.y + 7;
+            const mouseX = point.x + (childCat ? -14 : 0);
+            const catX = point.x + (childMouse ? 14 : 0);
+            return `<g class="${classes}" data-node="${id}">
+                <circle class="parent-ring" cx="${point.x}" cy="${point.y}" r="34"></circle>
+                <circle class="body" cx="${point.x}" cy="${point.y}" r="25"></circle>
+                <text class="id" x="${point.x}" y="${point.y + (id === 0 ? 19 : 6)}">${id}</text>
+                ${id === 0 ? `<text class="hole-icon" x="${point.x}" y="${point.y + 4}">🕳️</text>` : ""}
+                ${childMouse ? `<text class="token mouse-token" x="${mouseX}" y="${tokenY}">🐭</text>` : ""}
+                ${childCat ? `<text class="token cat-token" x="${catX}" y="${tokenY}">🐱</text>` : ""}
+                ${parentMouse && !childMouse ? `<text class="ghost mouse-ghost" x="${point.x - 11}" y="${point.y - 29}">🐭</text>` : ""}
+                ${parentCat && !childCat ? `<text class="ghost cat-ghost" x="${point.x + 11}" y="${point.y - 29}">🐱</text>` : ""}
+            </g>`;
+        }).join("");
+        const graph = `<div class="safe913-board"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escape(ui("Bàn chơi mèo chuột", "Cat and mouse game board"))}">${graphEdges}${graphNodes}</svg></div>`;
+
+        const outcomeIcon = (winner) => winner === 1 ? "🐭" : winner === 2 ? "🐱" : "∞";
+        const outcomeClass = (winner) => winner === 1 ? "mouse-win" : winner === 2 ? "cat-win" : "draw";
+        const stateCard = (state, role) => {
+            if (!state) return "";
+            return `<div class="safe913-state ${role} ${outcomeClass(state.winner)}"><span class="mouse-piece">🐭<b>${escape(state.mouse)}</b></span><span class="cat-piece">🐱<b>${escape(state.cat)}</b></span><i>${state.turn === 0 ? "🐭→" : "🐱→"}</i><strong>${outcomeIcon(state.winner)}</strong><small>${escape(state.degree)}</small></div>`;
+        };
+        const transition = parent && child
+            ? `<section class="safe913-transition" aria-label="${escape(ui("Truyền kết quả ngược từ trạng thái con về trạng thái cha", "Propagate the child result backward to its parent"))}">${stateCard(parent, "parent")}<em>${game.event === "winning-move" ? "✓" : game.event === "forced-loss" ? "×" : game.event === "prune-move" ? "−1" : "↩"}</em>${stateCard(child, "child")}</section>`
+            : child ? `<section class="safe913-transition single">${stateCard(child, "child")}</section>` : "";
+
+        const tableRows = isRecord(view.table) ? boundedArray(view.table.rows, LIMITS.rows) : [];
+        const matrix = (turn) => {
+            const columns = Math.max(1, nodeCount - 1);
+            const header = Array.from({ length: columns }, (_, index) => `<span class="axis cat-axis">🐱${index + 1}</span>`).join("");
+            const cells = tableRows.map((row, mouse) => {
+                const rowCells = Array.isArray(row.cells) ? row.cells : [];
+                const values = Array.from({ length: columns }, (_, index) => {
+                    const cell = normalizedCell(rowCells[index * 2 + turn]);
+                    const icon = String(cell.value).startsWith("🐭") ? "🐭" : String(cell.value).startsWith("🐱") ? "🐱" : "·";
+                    const cellClass = icon === "🐭" ? "mouse-win" : icon === "🐱" ? "cat-win" : "draw";
+                    const cat = index + 1;
+                    const isParent = parent && parent.mouse === mouse && parent.cat === cat && parent.turn === turn;
+                    const isChild = child && child.mouse === mouse && child.cat === cat && child.turn === turn;
+                    const degreeValue = String(cell.value).replace(/^[^\s]+\s*/, "");
+                    return `<span class="cell ${cellClass}${isParent ? " parent" : ""}${isChild ? " child" : ""}" aria-label="${escape(`mouse ${mouse}, cat ${cat}, turn ${turn}, ${cell.value}`)}"><b>${icon}</b><small>${escape(degreeValue)}</small></span>`;
+                }).join("");
+                return `<span class="axis mouse-axis">🐭${mouse}</span>${values}`;
+            }).join("");
+            return `<article class="safe913-matrix"><header><span>${turn === 0 ? "🐭→" : "🐱→"}</span></header><div style="--safe913-cols:${columns + 1}"><i></i>${header}${cells}</div></article>`;
+        };
+        const matrices = `<section class="safe913-matrices" aria-label="${escape(ui("Bản đồ kết quả trạng thái", "State outcome maps"))}">${matrix(0)}${matrix(1)}</section>`;
+
+        const queueItems = boundedArray(game.queue, 10).map((entry, index) => `<span class="${outcomeClass(entry.winner)}${index === 0 ? " front" : ""}"><i>🐭${escape(entry.mouse)}</i><i>🐱${escape(entry.cat)}</i><b>${entry.turn === 0 ? "🐭→" : "🐱→"}</b><strong>${outcomeIcon(entry.winner)}</strong></span>`).join("");
+        const queue = `<section class="safe913-queue" aria-label="${escape(ui("Hàng đợi trạng thái đã giải", "Solved-state queue"))}"><strong>⇤</strong><div>${queueItems || "<em>∅</em>"}${game.queueRemaining > 10 ? `<small>+${game.queueRemaining - 10}</small>` : ""}</div></section>`;
+
+        const stageIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+        const stageIcons = ["▦", "🕳️", "↩", "∞", "🏁"];
+        const stages = stageIcons.map((icon, index) => `<span class="${index < stageIndex ? "done" : index === stageIndex ? "active" : ""}"><i>${icon}</i>${index < stageIndex ? "<b>✓</b>" : ""}</span>${index < stageIcons.length - 1 ? "<em>›</em>" : ""}`).join("");
+        const totals = isRecord(game.totals) ? game.totals : { mouse: 0, cat: 0, draw: 0 };
+        const stats = `<div class="safe913-stats"><span class="mouse-win">🐭 <b>${escape(totals.mouse)}</b></span><span class="cat-win">🐱 <b>${escape(totals.cat)}</b></span><span class="draw">∞ <b>${escape(totals.draw)}</b></span><span>⇤ <b>${escape(game.queueRemaining || 0)}</b></span></div>`;
+        const result = step.final
+            ? `<section class="safe913-result ${outcomeClass(view.answer)}"><div><span>🐭1</span><em>vs</em><span>🐱2</span></div><strong>${outcomeIcon(view.answer)}</strong><b>${escape(displayValue(view.answer))}</b></section>`
+            : "";
+
+        return `<article class="safe913-viz phase-${escape(view.phase)}" data-event="${escape(game.event || "step")}" role="group" aria-label="${escape(ui("Trực quan trò chơi mèo và chuột", "Cat and Mouse game visualization"))}"><header class="safe913-header"><div class="safe913-stages">${stages}</div>${stats}</header>${graph}${transition}${queue}${matrices}${result}</article>`;
+    }
+
     function renderHardProblemView(step) {
         const treeView = $("treeView");
         if (!treeView) return;
@@ -602,6 +711,10 @@
             : null;
         if (!view) {
             treeView.innerHTML = renderUnavailable();
+            return;
+        }
+        if (Number(view.problemId) === 913 && isRecord(view.catMouse913)) {
+            treeView.innerHTML = renderCatMouse913View(step, view);
             return;
         }
 
