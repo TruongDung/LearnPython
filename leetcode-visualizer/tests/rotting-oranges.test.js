@@ -50,6 +50,8 @@ test('994 traces exactly one executable Python line per frame', () => {
 
 test('994 renderer and picture styles are registered for lazy loading', () => {
   const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
+  const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
+  const css = fs.readFileSync(require.resolve('../public/style-04.css'), 'utf8');
   const bundleManifest = JSON.parse(script.match(
     /const SHARED_RENDERER_BUNDLES = Object\.freeze\((\{[^\n]+\})\);/,
   )[1]);
@@ -59,6 +61,9 @@ test('994 renderer and picture styles are registered for lazy loading', () => {
 
   assert.ok(bundleManifest['app-renderers-base.js'].includes('renderRottingOrangesView'));
   assert.ok(styleManifest['style-04.css'].includes('renderRottingOrangesView'));
+  assert.match(html, /style-04\.css\?[^"\n]*rot994=no-scroll-v2/);
+  assert.match(css, /#vizPanel:has\(\.rotting-oranges-viz\) :is\(#codePanel, #codePanel2\) \{[\s\S]*?max-height: none;[\s\S]*?overflow: visible;[\s\S]*?position: static;/);
+  assert.match(css, /#vizPanel:has\(\.rotting-oranges-viz\) \.code-line \.txt \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: pre-wrap;/);
 });
 
 test('994 renderer emphasizes the orange grid and propagation arrows', () => {

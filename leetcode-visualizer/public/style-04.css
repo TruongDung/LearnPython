@@ -4770,6 +4770,29 @@ select option {
 [data-theme="light"] .rotting-action { background: #ecfeff; }
 [data-theme="light"] .rotting-legend { color: #475569; }
 
+/* Keep 994's full solution in the page flow instead of a nested code scroller. */
+#vizPanel:has(.rotting-oranges-viz) :is(#codePanel, #codePanel2) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  position: static;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.rotting-oranges-viz) .code-section,
+#vizPanel:has(.rotting-oranges-viz) .code-line {
+  min-width: 0;
+  width: 100%;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.rotting-oranges-viz) .code-line .txt {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 680px) {
   .rotting-phases { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rotting-phases span { min-height: 31px; }
