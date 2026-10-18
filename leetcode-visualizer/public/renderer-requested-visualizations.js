@@ -1022,6 +1022,87 @@ function renderWallsAndGates286View(step) {
   </section>`, t("Gate phát sóng BFS; số trên mỗi phòng là khoảng cách tới gate gần nhất", "Gates seed BFS waves; each room number is its nearest-gate distance"), "group");
 }
 
+function renderShortestBridge934View(step) {
+  const v = step.shortestBridge934View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const phaseIndex = v.phase === "mark" ? 1 : v.phase === "bfs" ? 2 : v.phase === "result" ? 3 : 0;
+  const stages = [
+    ["🔎", t("Tìm đảo đầu tiên", "Find the first island")],
+    ["🏝️", t("Tô toàn bộ đảo A", "Paint all of island A")],
+    ["🌊", t("Lan sóng qua nước", "Spread a wave across water")],
+    ["🪵", t("Nối tới đảo B", "Connect to island B")],
+  ].map(([icon, label], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}" aria-label="${esc(label)}"><i>${icon}</i>${index < phaseIndex ? '<b aria-hidden="true">✓</b>' : ""}</span>${index < 3 ? '<em aria-hidden="true">›</em>' : ""}`;
+  }).join("");
+  const keyOf = (cell) => Array.isArray(cell) ? cell.join(",") : "";
+  const currentKey = keyOf(v.current);
+  const discoveredKey = keyOf(v.discovered);
+  const originKey = keyOf(v.origin);
+  const targetKey = keyOf(v.target);
+  const directionArrow = new Map([
+    ["1,0", "↓"], ["-1,0", "↑"], ["0,1", "→"], ["0,-1", "←"],
+  ]).get(keyOf(v.direction)) || "";
+  const cells = (v.cells || []).flatMap((row) => row.map((cell) => {
+    const key = `${cell.row},${cell.col}`;
+    const classes = [
+      "sb934-cell",
+      cell.type,
+      cell.visited ? "visited" : "",
+      cell.bridge ? "bridge" : "",
+      key === currentKey ? "current" : "",
+      key === discoveredKey ? "discovered" : "",
+      key === originKey ? "origin" : "",
+      key === targetKey ? "target" : "",
+    ].filter(Boolean).join(" ");
+    const icon = cell.bridge ? "🪵" : cell.type === "water" ? (cell.visited ? "🌊" : "💧") : "🏝️";
+    const badge = cell.type === "island-a" ? "A" : cell.type === "island-b" ? "B" : cell.type === "land" ? "?" : cell.distance > 0 ? cell.distance : "";
+    const aria = cell.bridge
+      ? t(`Cầu tại (${cell.row},${cell.col})`, `Bridge at (${cell.row},${cell.col})`)
+      : cell.type === "water"
+        ? cell.distance > 0
+          ? t(`Sóng nước tại (${cell.row},${cell.col}), khoảng cách ${cell.distance}`, `Water wave at (${cell.row},${cell.col}), distance ${cell.distance}`)
+          : t(`Nước tại (${cell.row},${cell.col})`, `Water at (${cell.row},${cell.col})`)
+        : t(`Đảo ${badge} tại (${cell.row},${cell.col})`, `Island ${badge} at (${cell.row},${cell.col})`);
+    const arrow = key === originKey && directionArrow ? `<span class="sb934-direction" aria-hidden="true">${directionArrow}</span>` : "";
+    const spark = key === discoveredKey ? '<span class="sb934-spark" aria-hidden="true">✦</span>' : "";
+    const waves = cell.type === "water" && cell.visited && !cell.bridge ? '<span class="sb934-ripples" aria-hidden="true"><i></i><i></i></span>' : "";
+    return `<div class="${classes}" aria-label="${esc(aria)}">${waves}<i class="sb934-tile-icon" aria-hidden="true">${icon}</i>${badge !== "" ? `<strong>${badge}</strong>` : ""}${arrow}${spark}</div>`;
+  })).join("");
+  const waves = (v.levels || []).map((level) => {
+    const dots = "●".repeat(Math.min(level.count, 5));
+    const more = level.count > 5 ? `+${level.count - 5}` : "";
+    return `<span aria-label="${esc(t(`Vòng sóng ${level.distance}, ${level.count} ô`, `Wave ${level.distance}, ${level.count} cells`))}"><i aria-hidden="true">🌊</i><b>${level.distance}</b><small aria-hidden="true">${dots}${more}</small></span>`;
+  }).join("") || '<span class="empty" aria-hidden="true"><i>🌊</i><b>·</b><small>···</small></span>';
+  const ticket = (cell, index, kind) => {
+    const left = ((cell.col + 0.5) / Math.max(1, v.cols) * 100).toFixed(2);
+    const top = ((cell.row + 0.5) / Math.max(1, v.rows) * 100).toFixed(2);
+    const columnSize = (100 / Math.max(1, v.cols)).toFixed(3);
+    const rowSize = (100 / Math.max(1, v.rows)).toFixed(3);
+    const value = kind === "stack" ? "🏝️" : cell.distance === 0 ? "🏝️" : "🌊";
+    return `<span class="sb934-ticket ${index === 0 ? "front" : ""}" aria-label="${esc(t(`Ô (${cell.row},${cell.col})`, `Cell (${cell.row},${cell.col})`))}"><i class="sb934-mini-map" style="background-size:${columnSize}% ${rowSize}%"><b style="left:${left}%;top:${top}%"></b></i><em aria-hidden="true">${value}</em>${kind === "queue" ? `<strong>${cell.distance}</strong>` : ""}</span>`;
+  };
+  const stackItems = (v.stack || []).slice().reverse().slice(0, 7).map((cell, index) => ticket(cell, index, "stack")).join("") || `<b class="sb934-empty" aria-label="${t("Stack rỗng", "Empty stack")}">∅</b>`;
+  const queueItems = (v.queue || []).slice(0, 8).map((cell, index) => ticket(cell, index, "queue")).join("") || `<b class="sb934-empty" aria-label="${t("Queue rỗng", "Empty queue")}">∅</b>`;
+  const stackMore = (v.stack || []).length > 7 ? `<small class="sb934-more">+${v.stack.length - 7}</small>` : "";
+  const queueMore = (v.queue || []).length > 8 ? `<small class="sb934-more">+${v.queue.length - 8}</small>` : "";
+  const tray = v.phase === "mark"
+    ? `<section class="sb934-tray stack" aria-label="${t("DFS stack", "DFS stack")}"><span aria-hidden="true">⇥</span><div>${stackItems}${stackMore}</div></section>`
+    : `<section class="sb934-tray queue" aria-label="${t("Hàng đợi BFS", "BFS queue")}"><span aria-hidden="true">⇤</span><div>${queueItems}${queueMore}</div></section>`;
+  const result = v.phase === "result"
+    ? `<div class="sb934-result" aria-label="${esc(t(`Cầu ngắn nhất dài ${v.answer}`, `Shortest bridge length ${v.answer}`))}"><span aria-hidden="true">🏝️</span><i>A</i><em aria-hidden="true">${"🪵".repeat(Math.max(1, Math.min(v.bridgeLength || v.answer || 1, 6)))}</em><span aria-hidden="true">🏝️</span><i>B</i><strong>${v.answer}</strong></div>`
+    : "";
+  requestedVizSet(`<section class="sb934-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="sb934-header"><div class="sb934-stages">${stages}</div><div class="sb934-stats"><span aria-label="${t("Kích thước đảo A", "Island A size")}">🏝️A <b>${v.firstIslandSize || 0}</b></span><span aria-label="${t("Ô nước đã thăm", "Visited water cells")}">🌊 <b>${v.visitedWaterCount || 0}</b></span></div></header>
+    <div class="sb934-waves" aria-label="${t("Các vòng sóng BFS", "BFS wave rings")}"><b aria-hidden="true">🏝️A</b><em aria-hidden="true">〰›</em>${waves}<em aria-hidden="true">〰›</em><b aria-hidden="true">🏝️B</b></div>
+    <div class="sb934-grid" style="--sb934-cols:${v.cols}">${cells}</div>
+    ${tray}
+    ${result}
+  </section>`, t("Tô đảo A, lan sóng qua nước rồi đặt cầu tại đường chạm đảo B đầu tiên", "Paint island A, spread across water, then bridge the first path that reaches island B"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";

@@ -828,17 +828,23 @@ function buildSteps934(input) {
   const visited = new Set();
   const firstIsland = new Set();
   const waterDistance = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const parent = new Map();
+  const bridgePath = new Set();
   const key = (row, col) => `${row},${col}`;
-  let queue = [];
+  let queue = null;
+  let stack = null;
+  let phase = "scan";
+  let found = false;
+  let target = null;
 
   function cells(current, discovered, frontier) {
-    const queued = new Set(queue.map(([row, col]) => key(row, col)));
+    const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
     const frontierSet = new Set((frontier || []).map(([row, col]) => key(row, col)));
     return grid.map((matrixRow, row) => matrixRow.map((value, col) => {
       const cellKey = key(row, col);
-      let label = value === 1 ? "B" : waterDistance[row][col] >= 0 ? String(waterDistance[row][col]) : "";
+      let label = value === 1 ? (firstIsland.has(cellKey) ? "A" : "B") : waterDistance[row][col] >= 0 ? String(waterDistance[row][col]) : "💧";
       let cls = value === 1 ? "empty" : "wall";
-      if (firstIsland.has(cellKey)) { label = "A"; cls = "path"; }
+      if (firstIsland.has(cellKey) || bridgePath.has(cellKey)) cls = "path";
       else if (waterDistance[row][col] >= 0) cls = "visited";
       if (frontierSet.has(cellKey)) cls = "queued";
       if (queued.has(cellKey)) cls = "queued";
@@ -848,79 +854,162 @@ function buildSteps934(input) {
     }));
   }
 
-  const { steps, push } = createRecorder(rows, cols, cells, () => queue);
-  push(5, text("Bắt đầu shortestBridge", "Enter shortestBridge"), text("Cần tìm đảo thứ nhất rồi mở rộng BFS tới đảo thứ hai.", "Find the first island, then expand BFS until reaching the second."), { vars: [{ name: "grid size", value: `${rows}×${cols}` }] });
-  push(6, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Lưu kích thước grid.", "Store the grid dimensions."), { vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }] });
-  push(7, text("Khai báo 4 hướng", "Define four directions"), text("DFS và BFS đều dùng bốn hướng.", "Both DFS and BFS use four directions."), { vars: [{ name: "directions", value: "down, up, right, left" }] });
-  push(8, text("queue = deque()", "queue = deque()"), text("Queue sẽ chứa toàn bộ đảo thứ nhất như các nguồn BFS.", "The queue will contain the entire first island as BFS sources."));
-  push(9, text("visited = set()", "visited = set()"), text("Visited ngăn DFS/BFS xử lý trùng ô.", "Visited prevents duplicate DFS/BFS processing."), { vars: [{ name: "visited", value: 0 }] });
-  push(10, text("Định nghĩa mark_first_island", "Define mark_first_island"), text("Helper DFS đánh dấu toàn bộ đảo đầu tiên.", "The DFS helper marks the whole first island."));
-
-  let found = false;
-  push(19, text("found = False", "found = False"), text("Cờ này dừng scan ngay sau khi tìm thấy đảo đầu tiên.", "This flag stops the scan after the first island is found."), { vars: [{ name: "found", value: false }] });
-  for (let scanRow = 0; scanRow < rows && !found; scanRow++) {
-    push(20, text(`Quét row = ${scanRow}`, `Scan row = ${scanRow}`), text("Tìm ô đất đầu tiên.", "Search for the first land cell."), { vars: [{ name: "row", value: scanRow }] });
-    for (let scanCol = 0; scanCol < cols; scanCol++) {
-      push(21, text(`Quét ô (${scanRow},${scanCol})`, `Scan cell (${scanRow},${scanCol})`), text("Kiểm tra ô hiện tại.", "Inspect the current cell."), { current: [scanRow, scanCol], vars: [{ name: "col", value: scanCol }, { name: "grid[row][col]", value: grid[scanRow][scanCol] }] });
-      const isLand = grid[scanRow][scanCol] === 1;
-      push(22, text(`grid[${scanRow}][${scanCol}] == 1 → ${isLand}`, `grid[${scanRow}][${scanCol}] == 1 → ${isLand}`), isLand ? text("Đã tìm thấy đảo đầu tiên.", "The first island has been found.") : text("Đây là nước; tiếp tục quét.", "This is water; continue scanning."), { current: [scanRow, scanCol], vars: [{ name: "is land?", value: isLand }] });
-      if (!isLand) continue;
-      push(23, text(`mark_first_island(${scanRow},${scanCol})`, `mark_first_island(${scanRow},${scanCol})`), text("Bắt đầu DFS từ ô đất đầu tiên.", "Start DFS from the first land cell."), { current: [scanRow, scanCol] });
-      const stack = [[scanRow, scanCol]];
-      push(11, text(`stack = [(${scanRow},${scanCol})]`, `stack = [(${scanRow},${scanCol})]`), text("Đặt ô bắt đầu vào DFS stack.", "Put the starting cell on the DFS stack."), { current: [scanRow, scanCol], vars: [{ name: "stack", value: JSON.stringify(stack) }] });
-      while (stack.length) {
-        push(12, text("while stack → True", "while stack → True"), text("DFS stack còn ô cần xử lý.", "The DFS stack still has a cell."), { vars: [{ name: "stack", value: JSON.stringify(stack) }] });
-        const [row, col] = stack.pop();
-        push(13, text(`stack.pop() → (${row},${col})`, `stack.pop() → (${row},${col})`), text("Lấy một ô khỏi DFS stack.", "Pop one cell from the DFS stack."), { current: row >= 0 && row < rows && col >= 0 && col < cols ? [row, col] : null, vars: [{ name: "row", value: row }, { name: "col", value: col }] });
-        const validLand = row >= 0 && row < rows && col >= 0 && col < cols && grid[row][col] === 1 && !visited.has(key(row, col));
-        push(14, text(`Ô (${row},${col}) là đất chưa thăm → ${validLand}`, `Cell (${row},${col}) is unvisited land → ${validLand}`), validLand ? text("Đưa ô này vào đảo A.", "Add this cell to island A.") : text("Ô không hợp lệ hoặc đã thăm; continue.", "The cell is invalid or visited; continue."), { current: row >= 0 && row < rows && col >= 0 && col < cols ? [row, col] : null, vars: [{ name: "valid land?", value: validLand }] });
-        if (!validLand) continue;
-        visited.add(key(row, col));
-        firstIsland.add(key(row, col));
-        push(15, text(`visited.add((${row},${col}))`, `visited.add((${row},${col}))`), text("Đánh dấu ô thuộc đảo đầu tiên.", "Mark the cell as part of the first island."), { current: [row, col], vars: [{ name: "island A size", value: firstIsland.size }] });
-        waterDistance[row][col] = 0;
-        queue.push([row, col, 0]);
-        push(16, text(`queue.append((${row},${col},0))`, `queue.append((${row},${col},0))`), text("Mỗi ô đảo A là một nguồn BFS distance 0.", "Every island-A cell is a BFS source at distance 0."), { current: [row, col] });
-        for (const [deltaRow, deltaCol] of directions) {
-          push(17, text(`DFS thử hướng (${deltaRow},${deltaCol})`, `DFS tries direction (${deltaRow},${deltaCol})`), text("Chuẩn bị thêm ô lân cận vào stack.", "Prepare to add a neighbor to the stack."), { current: [row, col], vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }] });
-          stack.push([row + deltaRow, col + deltaCol]);
-          push(18, text("stack.append(neighbor)", "stack.append(neighbor)"), text("DFS sẽ kiểm tra neighbor ở bước sau.", "DFS will inspect this neighbor later."), { current: [row, col], vars: [{ name: "stack", value: JSON.stringify(stack) }] });
-        }
-      }
-      push(12, text("while stack → False", "while stack → False"), text("Đã đánh dấu xong đảo đầu tiên.", "The first island is fully marked."), { vars: [{ name: "island A size", value: firstIsland.size }] });
-      found = true;
-      push(24, text("found = True", "found = True"), text("Đặt cờ để dừng quét grid.", "Set the flag to stop scanning the grid."));
-      push(25, text("break", "break"), text("Thoát vòng lặp cột.", "Break out of the column loop."));
+  function makeView(options) {
+    const levels = [];
+    for (let distance = 1; distance <= rows * cols; distance++) {
+      const count = waterDistance.flat().filter((value) => value === distance).length;
+      if (count) levels.push({ distance, count });
     }
-    if (found) push(26, text("if found: break", "if found: break"), text("Thoát vòng lặp hàng sau khi đã có đảo A.", "Break the row loop after finding island A."));
+    const visitedWaterCount = [...visited].filter((cellKey) => {
+      const [row, col] = cellKey.split(",").map(Number);
+      return original[row][col] === 0;
+    }).length;
+    return {
+      phase: options.final ? "result" : phase,
+      event: options.event || "setup",
+      rows,
+      cols,
+      cells: grid.map((matrixRow, row) => matrixRow.map((value, col) => {
+        const cellKey = key(row, col);
+        return {
+          row,
+          col,
+          type: value === 0 ? "water" : firstIsland.has(cellKey) ? "island-a" : found ? "island-b" : "land",
+          distance: waterDistance[row][col],
+          visited: visited.has(cellKey),
+          bridge: bridgePath.has(cellKey),
+        };
+      })),
+      current: options.current || null,
+      discovered: options.discovered || null,
+      origin: options.origin || null,
+      direction: options.direction || null,
+      target: options.target || target,
+      queue: (queue || []).map(([row, col, distance]) => ({ row, col, distance })),
+      stack: (stack || []).map(([row, col]) => ({ row, col })),
+      firstIslandSize: firstIsland.size,
+      visitedWaterCount,
+      levels,
+      answer: options.final ? options.answer : null,
+      bridgeLength: bridgePath.size,
+    };
   }
 
+  const { steps, push } = createRecorder(rows, cols, cells, () => queue, (_codeLine, options) => ({
+    shortestBridge934View: makeView(options),
+  }));
+
+  push(5, text("Bắt đầu shortestBridge", "Enter shortestBridge"), text("Nối hai đảo bằng ít ô nước nhất.", "Connect the islands through the fewest water cells."), { event: "enter" });
+  push(6, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Kích thước bản đồ.", "Map dimensions."), { event: "dimensions", vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }] });
+  push(7, text("Khai báo 4 hướng", "Define four directions"), text("Chỉ đi bốn hướng.", "Move in four directions."), { event: "directions" });
+  queue = [];
+  push(9, text("queue = deque()", "queue = deque()"), text("Queue sẽ chứa đảo A rồi sóng nước.", "The queue will hold island A, then water waves."), { event: "queue-init" });
+  push(10, text("visited = set()", "visited = set()"), text("Không xử lý một ô hai lần.", "Do not process a cell twice."), { event: "visited-init" });
+  push(12, text("Định nghĩa mark_first_island", "Define mark_first_island"), text("DFS tô toàn bộ đảo đầu tiên.", "DFS paints the whole first island."), { event: "define-dfs" });
+  push(32, text("found = False", "found = False"), text("Chưa tìm thấy đảo A.", "Island A has not been found."), { event: "found-init" });
+
+  function markFirstIsland(startRow, startCol) {
+    phase = "mark";
+    stack = [[startRow, startCol]];
+    push(13, text(`stack = [(${startRow}, ${startCol})]`, `stack = [(${startRow}, ${startCol})]`), text("Đặt ô đầu tiên vào stack.", "Put the first cell on the stack."), { event: "stack-init", current: [startRow, startCol] });
+    visited.add(key(startRow, startCol));
+    firstIsland.add(key(startRow, startCol));
+    push(14, text(`visited.add((${startRow}, ${startCol}))`, `visited.add((${startRow}, ${startCol}))`), text("Đánh dấu mảnh đầu tiên của đảo A.", "Mark the first piece of island A."), { event: "island-mark", current: [startRow, startCol], discovered: [startRow, startCol] });
+
+    while (stack.length) {
+      push(16, text("while stack → True", "while stack → True"), text("Stack còn ô đất.", "The stack still has land."), { event: "stack-check" });
+      const [row, col] = stack.pop();
+      push(17, text(`stack.pop() → (${row}, ${col})`, `stack.pop() → (${row}, ${col})`), text("Lấy một mảnh đảo A.", "Pop one island-A cell."), { event: "stack-pop", current: [row, col] });
+      queue.push([row, col, 0]);
+      push(18, text(`queue.append((${row}, ${col}, 0))`, `queue.append((${row}, ${col}, 0))`), text("Mảnh đảo này trở thành nguồn BFS.", "This island cell becomes a BFS source."), { event: "source-enqueue", current: [row, col] });
+
+      for (const [dr, dc] of directions) {
+        push(20, text(`hướng (${dr}, ${dc})`, `direction (${dr}, ${dc})`), text("Nhìn sang ô bên cạnh.", "Look at a neighboring cell."), { event: "dfs-direction", current: [row, col], origin: [row, col], direction: [dr, dc] });
+        const nr = row + dr;
+        const nc = col + dc;
+        push(21, text(`nr=${nr}, nc=${nc}`, `nr=${nr}, nc=${nc}`), text("Tính tọa độ kế bên.", "Compute the neighbor coordinates."), { event: "dfs-neighbor", current: [row, col], origin: [row, col], direction: [dr, dc] });
+        const canMark = nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === 1 && !visited.has(key(nr, nc));
+        push(23, text(`Ô (${nr}, ${nc}) là đất mới → ${canMark}`, `Cell (${nr}, ${nc}) is new land → ${canMark}`), canMark ? text("Cùng đảo A.", "It belongs to island A.") : text("Bỏ qua.", "Skip it."), { event: "dfs-check", current: nr >= 0 && nr < rows && nc >= 0 && nc < cols ? [nr, nc] : [row, col], origin: [row, col], direction: [dr, dc] });
+        if (!canMark) continue;
+        visited.add(key(nr, nc));
+        firstIsland.add(key(nr, nc));
+        push(28, text(`visited.add((${nr}, ${nc}))`, `visited.add((${nr}, ${nc}))`), text("Tô thêm một mảnh đảo A.", "Paint another island-A cell."), { event: "island-mark", current: [nr, nc], discovered: [nr, nc], origin: [row, col], direction: [dr, dc] });
+        stack.push([nr, nc]);
+        push(29, text(`stack.append((${nr}, ${nc}))`, `stack.append((${nr}, ${nc}))`), text("Đưa mảnh mới vào stack.", "Push the new piece onto the stack."), { event: "stack-push", current: [nr, nc], discovered: [nr, nc] });
+      }
+    }
+    push(16, text("while stack → False", "while stack → False"), text("Đảo A đã được tô xong.", "Island A is fully painted."), { event: "stack-empty" });
+    stack = [];
+  }
+
+  for (let scanRow = 0; scanRow < rows; scanRow++) {
+    push(34, text(`row = ${scanRow}`, `row = ${scanRow}`), text("Quét từng hàng.", "Scan each row."), { event: "scan-row", vars: [{ name: "row", value: scanRow }] });
+    push(35, text(`found → ${found}`, `found → ${found}`), found ? text("Đã có đảo A.", "Island A is ready.") : text("Tiếp tục tìm đảo A.", "Keep searching for island A."), { event: "found-check" });
+    if (found) {
+      push(36, text("break", "break"), text("Dừng quét.", "Stop scanning."), { event: "scan-break" });
+      break;
+    }
+    for (let scanCol = 0; scanCol < cols; scanCol++) {
+      push(38, text(`col = ${scanCol}`, `col = ${scanCol}`), text("Nhìn từng ô.", "Inspect each cell."), { event: "scan-cell", current: [scanRow, scanCol], vars: [{ name: "col", value: scanCol }] });
+      const isLand = grid[scanRow][scanCol] === 1;
+      push(39, text(`grid[${scanRow}][${scanCol}] == 1 → ${isLand}`, `grid[${scanRow}][${scanCol}] == 1 → ${isLand}`), isLand ? text("Bắt gặp đảo A.", "Island A found.") : text("Đây là nước.", "This is water."), { event: "land-check", current: [scanRow, scanCol] });
+      if (!isLand) continue;
+      push(40, text(`mark_first_island(${scanRow}, ${scanCol})`, `mark_first_island(${scanRow}, ${scanCol})`), text("Tô đảo A.", "Paint island A."), { event: "dfs-call", current: [scanRow, scanCol] });
+      markFirstIsland(scanRow, scanCol);
+      phase = "scan";
+      found = true;
+      push(41, text("found = True", "found = True"), text("Đảo A đã sẵn sàng.", "Island A is ready."), { event: "found" });
+      push(42, text("break", "break"), text("Dừng quét cột.", "Stop scanning columns."), { event: "column-break" });
+      break;
+    }
+  }
+
+  phase = "bfs";
   while (queue.length) {
-    push(27, text("while queue → True", "while queue → True"), text("Mở rộng đồng thời từ toàn bộ đảo A.", "Expand simultaneously from the entire island A."));
+    push(45, text("while queue → True", "while queue → True"), text("Sóng BFS tiếp tục lan.", "The BFS wave keeps spreading."), { event: "while-check" });
     const [row, col, distance] = queue.shift();
-    push(28, text(`popleft → (${row},${col},d=${distance})`, `popleft → (${row},${col},d=${distance})`), text("Lấy một frontier cell khỏi queue.", "Remove one frontier cell from the queue."), { current: [row, col], vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "distance", value: distance }] });
-    for (const [deltaRow, deltaCol] of directions) {
-      push(29, text(`BFS thử hướng (${deltaRow},${deltaCol})`, `BFS tries direction (${deltaRow},${deltaCol})`), text("Xét một neighbor của frontier.", "Inspect one frontier neighbor."), { current: [row, col], vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }] });
-      const nextRow = row + deltaRow;
-      const nextCol = col + deltaCol;
-      push(30, text(`next = (${nextRow},${nextCol})`, `next = (${nextRow},${nextCol})`), text("Tính tọa độ neighbor.", "Compute the neighbor coordinates."), { current: [row, col], vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }] });
-      const canInspect = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols && !visited.has(key(nextRow, nextCol));
-      push(31, text(`Neighbor hợp lệ và chưa thăm → ${canInspect}`, `Neighbor is valid and unvisited → ${canInspect}`), canInspect ? text("Có thể mở rộng vào ô này.", "BFS may expand into this cell.") : text("Ngoài biên hoặc đã thăm; continue.", "Out of bounds or visited; continue."), { current: canInspect ? [nextRow, nextCol] : [row, col], vars: [{ name: "can inspect?", value: canInspect }] });
-      if (!canInspect) continue;
-      const reachedSecond = grid[nextRow][nextCol] === 1;
-      push(32, text(`grid[${nextRow}][${nextCol}] == 1 → ${reachedSecond}`, `grid[${nextRow}][${nextCol}] == 1 → ${reachedSecond}`), reachedSecond ? text("Đã chạm đảo B; distance là số ô nước cần lật.", "Island B is reached; distance is the number of water cells to flip.") : text("Đây là nước; tiếp tục mở rộng.", "This is water; continue expanding."), { current: [nextRow, nextCol], vars: [{ name: "reached island B?", value: reachedSecond }] });
+    push(46, text(`popleft() → (${row}, ${col}, ${distance})`, `popleft() → (${row}, ${col}, ${distance})`), text("Lấy đầu sóng gần nhất.", "Take the nearest wave front."), { event: "dequeue", current: [row, col], vars: [{ name: "distance", value: distance }] });
+
+    for (const [dr, dc] of directions) {
+      push(48, text(`hướng (${dr}, ${dc})`, `direction (${dr}, ${dc})`), text("Lan sang một hướng.", "Spread in one direction."), { event: "bfs-direction", current: [row, col], origin: [row, col], direction: [dr, dc] });
+      const nr = row + dr;
+      const nc = col + dc;
+      push(49, text(`nr=${nr}, nc=${nc}`, `nr=${nr}, nc=${nc}`), text("Tính ô kế tiếp.", "Compute the next cell."), { event: "bfs-neighbor", current: [row, col], origin: [row, col], direction: [dr, dc] });
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      push(51, text(`Ô (${nr}, ${nc}) trong grid → ${inBounds}`, `Cell (${nr}, ${nc}) is in bounds → ${inBounds}`), inBounds ? text("Ô hợp lệ.", "The cell is valid.") : text("Ngoài bản đồ.", "Outside the map."), { event: "bounds-check", current: inBounds ? [nr, nc] : [row, col], origin: [row, col], direction: [dr, dc] });
+      if (!inBounds) {
+        push(53, text("continue", "continue"), text("Bỏ qua ngoài biên.", "Skip out of bounds."), { event: "bounds-continue", current: [row, col], origin: [row, col], direction: [dr, dc] });
+        continue;
+      }
+      const alreadyVisited = visited.has(key(nr, nc));
+      push(55, text(`(${nr}, ${nc}) in visited → ${alreadyVisited}`, `(${nr}, ${nc}) in visited → ${alreadyVisited}`), alreadyVisited ? text("Đã đi qua ô này.", "This cell was already seen.") : text("Ô mới.", "A new cell."), { event: "visited-check", current: [nr, nc], origin: [row, col], direction: [dr, dc] });
+      if (alreadyVisited) {
+        push(56, text("continue", "continue"), text("Không đi lại.", "Do not revisit."), { event: "visited-continue", current: [nr, nc], origin: [row, col], direction: [dr, dc] });
+        continue;
+      }
+      const reachedSecond = grid[nr][nc] === 1;
+      push(58, text(`grid[${nr}][${nc}] == 1 → ${reachedSecond}`, `grid[${nr}][${nc}] == 1 → ${reachedSecond}`), reachedSecond ? text("Chạm đảo B!", "Island B reached!") : text("Tiếp tục qua nước.", "Keep crossing water."), { event: "second-island-check", current: [nr, nc], origin: [row, col], direction: [dr, dc], target: reachedSecond ? [nr, nc] : null });
       if (reachedSecond) {
-        push(33, text(`return ${distance}`, `return ${distance}`), text(`Cầu ngắn nhất cần lật ${distance} ô nước.`, `The shortest bridge flips ${distance} water cell(s).`), { current: [nextRow, nextCol], final: true, vars: [{ name: "answer", value: distance }] });
+        target = [nr, nc];
+        let cursor = key(row, col);
+        while (cursor && !firstIsland.has(cursor)) {
+          bridgePath.add(cursor);
+          cursor = parent.get(cursor);
+        }
+        push(59, text(`return ${distance}`, `return ${distance}`), text("Cầu ngắn nhất đã nối hai đảo.", "The shortest bridge now joins the islands."), { event: "result", current: [nr, nc], origin: [row, col], direction: [dr, dc], target: [nr, nc], final: true, answer: distance, vars: [{ name: "answer", value: distance }] });
         return { original, answer: distance, steps };
       }
-      visited.add(key(nextRow, nextCol));
-      waterDistance[nextRow][nextCol] = distance + 1;
-      push(34, text(`visited.add((${nextRow},${nextCol}))`, `visited.add((${nextRow},${nextCol}))`), text("Đánh dấu ô nước để không enqueue trùng.", "Mark the water cell to avoid duplicate enqueue."), { current: [nextRow, nextCol], discovered: [nextRow, nextCol], vars: [{ name: "new distance", value: distance + 1 }] });
-      queue.push([nextRow, nextCol, distance + 1]);
-      push(35, text(`queue.append((${nextRow},${nextCol},${distance + 1}))`, `queue.append((${nextRow},${nextCol},${distance + 1}))`), text("Thêm water frontier mới vào queue.", "Append the new water frontier to the queue."), { current: [nextRow, nextCol], discovered: [nextRow, nextCol] });
+
+      visited.add(key(nr, nc));
+      waterDistance[nr][nc] = distance + 1;
+      parent.set(key(nr, nc), key(row, col));
+      push(61, text(`visited.add((${nr}, ${nc}))`, `visited.add((${nr}, ${nc}))`), text("Đánh dấu một ô nước mới.", "Mark a new water cell."), { event: "water-visit", current: [nr, nc], discovered: [nr, nc], origin: [row, col], direction: [dr, dc] });
+      queue.push([nr, nc, distance + 1]);
+      push(62, text(`queue.append((${nr}, ${nc}, ${distance + 1}))`, `queue.append((${nr}, ${nc}, ${distance + 1}))`), text("Đưa đầu sóng mới vào queue.", "Add the new wave front to the queue."), { event: "enqueue", current: [nr, nc], discovered: [nr, nc], origin: [row, col], direction: [dr, dc] });
     }
   }
-  push(36, text("return -1", "return -1"), text("Không tìm thấy đảo thứ hai.", "No second island was found."), { final: true, vars: [{ name: "answer", value: -1 }] });
+  push(45, text("while queue → False", "while queue → False"), text("Không còn đầu sóng.", "No wave front remains."), { event: "queue-empty" });
+  push(64, text("return -1", "return -1"), text("Không tìm thấy đảo B.", "Island B was not found."), { event: "result", final: true, answer: -1, vars: [{ name: "answer", value: -1 }] });
   return { original, answer: -1, steps };
 }
 
@@ -1988,45 +2077,77 @@ const problems = {
     defaultInput: "0,1,0|0,0,0|0,0,1",
     inputKind: "string",
     inputLabel: text("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
+    debugMode: "line-by-line",
     approach: [
-      text("DFS đánh dấu toàn bộ đảo đầu tiên A.", "DFS marks the entire first island A."),
-      text("Đưa mọi ô của A vào queue như nhiều nguồn BFS distance 0.", "Put every A cell in the queue as a BFS source at distance 0."),
-      text("BFS qua nước; lần đầu chạm đảo B là số ô nước nhỏ nhất cần lật.", "BFS across water; the first contact with island B gives the minimum flips."),
+      text("🔎 Tìm một ô đất rồi tô trọn đảo A.", "🔎 Find one land cell, then paint all of island A."),
+      text("🌊 Cho mọi ô đảo A cùng phát sóng BFS.", "🌊 Let every island-A cell seed the BFS wave."),
+      text("🪵 Lần đầu chạm đảo B tạo cây cầu ngắn nhất.", "🪵 The first contact with island B forms the shortest bridge."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("DFS và BFS mỗi ô tối đa một lần.", "DFS and BFS each process a cell at most once.") },
     code: [
-      "from collections import deque", "from typing import List", "", "class Solution:",
+      "from collections import deque",
+      "from typing import List",
+      "",
+      "class Solution:",
       "    def shortestBridge(self, grid: List[List[int]]) -> int:",
       "        rows, cols = len(grid), len(grid[0])",
-      "        directions = [(1,0), (-1,0), (0,1), (0,-1)]",
+      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
       "        queue = deque()",
       "        visited = set()",
+      "",
       "        def mark_first_island(start_row, start_col):",
       "            stack = [(start_row, start_col)]",
+      "            visited.add((start_row, start_col))",
+      "",
       "            while stack:",
       "                row, col = stack.pop()",
-      "                if not (0 <= row < rows and 0 <= col < cols) or (row, col) in visited or grid[row][col] != 1: continue",
-      "                visited.add((row, col))",
       "                queue.append((row, col, 0))",
-      "                for delta_row, delta_col in directions:",
-      "                    stack.append((row + delta_row, col + delta_col))",
+      "",
+      "                for dr, dc in directions:",
+      "                    nr, nc = row + dr, col + dc",
+      "",
+      "                    if (0 <= nr < rows and",
+      "                        0 <= nc < cols and",
+      "                        grid[nr][nc] == 1 and",
+      "                        (nr, nc) not in visited):",
+      "",
+      "                        visited.add((nr, nc))",
+      "                        stack.append((nr, nc))",
+      "",
+      "        # Step 1: Find and mark the first island",
       "        found = False",
+      "",
       "        for row in range(rows):",
+      "            if found:",
+      "                break",
+      "",
       "            for col in range(cols):",
       "                if grid[row][col] == 1:",
       "                    mark_first_island(row, col)",
       "                    found = True",
       "                    break",
-      "            if found: break",
+      "",
+      "        # Step 2: Multi-source BFS",
       "        while queue:",
       "            row, col, distance = queue.popleft()",
-      "            for delta_row, delta_col in directions:",
-      "                next_row, next_col = row + delta_row, col + delta_col",
-      "                if not (0 <= next_row < rows and 0 <= next_col < cols) or (next_row, next_col) in visited: continue",
-      "                if grid[next_row][next_col] == 1:",
+      "",
+      "            for dr, dc in directions:",
+      "                nr, nc = row + dr, col + dc",
+      "",
+      "                if not (0 <= nr < rows and",
+      "                        0 <= nc < cols):",
+      "                    continue",
+      "",
+      "                if (nr, nc) in visited:",
+      "                    continue",
+      "",
+      "                if grid[nr][nc] == 1:",
       "                    return distance",
-      "                visited.add((next_row, next_col))",
-      "                queue.append((next_row, next_col, distance + 1))",
+      "",
+      "                visited.add((nr, nc))",
+      "                queue.append((nr, nc, distance + 1))",
+      "",
       "        return -1",
     ],
     builder: buildSteps934,

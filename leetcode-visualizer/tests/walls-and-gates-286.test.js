@@ -147,9 +147,9 @@ test("286 renderer and no-scroll styles are registered for lazy loading", () => 
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderWallsAndGates286View"));
   assert.match(script, /wallsGates286View/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v18-286-illustrated/);
-  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v19-286-illustrated/);
-  assert.match(html, /walls286=picture-v1/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v19-934-illustrated/);
+  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v20-934-illustrated/);
+  assert.match(html, /walls286=picture-v1&bridge934=picture-v1/);
   assert.match(css, /\.wg286-viz\s*\{/);
   assert.match(css, /#vizPanel:has\(\.wg286-viz\) :is\(#codePanel, #codePanel2\)/);
   assert.match(renderer, /function renderWallsAndGates286View\(step\)/);
