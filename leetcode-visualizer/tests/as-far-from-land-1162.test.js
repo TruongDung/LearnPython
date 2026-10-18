@@ -40,9 +40,15 @@ test("1162 returns the farthest distance, including no-land and no-water cases",
 
 test("1162 exposes one executable Python line and a focused BFS view per frame", () => {
   assert.equal(problem.debugMode, "line-by-line");
+  assert.equal(problem.code[6], "        queue = deque()");
+  assert.equal(problem.code[19], "        distance = -1");
+  assert.equal(problem.code[24], "            for _ in range(len(queue)):");
+  assert.equal(problem.code[34], "                        grid[nr][nc] = 1");
+  assert.equal(problem.code[37], "        return distance");
+  assert.ok(!problem.code.some(line => line.includes("distance = [[")));
   const run = problem.builder(problem.defaultInput);
   const events = new Set(run.steps.map(step => step.landDistance1162View?.event));
-  for (const event of ["source-check", "source-enqueue", "dequeue", "neighbor-check", "distance-update", "enqueue", "result"]) {
+  for (const event of ["source-check", "source-enqueue", "wave-start", "dequeue", "neighbor-check", "distance-update", "enqueue", "result"]) {
     assert.ok(events.has(event), event);
   }
   for (const step of run.steps) {

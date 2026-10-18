@@ -250,112 +250,239 @@ function buildDistanceProblem(input, config) {
 }
 
 function buildSteps1162(input) {
-  return buildDistanceProblem(input, {
-    allowed: new Set(["0", "1"]),
-    toValue: Number,
-    inputName: "grid[row][col]",
-    valueName: "distance",
-    enterTitle: text("Bắt đầu maxDistance", "Enter maxDistance"),
-    initialValues: (grid) => grid.map((row) => row.map(() => -1)),
-    initialDebug: "all -1 (shown as ∞)",
-    initTitle: text("Khởi tạo distance = -1", "Initialize distance to -1"),
-    initNote: text("-1 là ô biển chưa được BFS tới; visualization hiển thị ∞.", "-1 is undiscovered water; the visualization shows ∞."),
-    isSource: (value) => value === 1,
-    isTarget: (value) => value === 0,
-    sourceValue: 0,
-    sourceCheckTitle: (row, col, yes) => text(`grid[${row}][${col}] == 1 → ${yes}`, `grid[${row}][${col}] == 1 → ${yes}`),
-    sourceTrueNote: text("Ô đất là một nguồn BFS.", "A land cell is a BFS source."),
-    sourceFalseNote: text("Ô biển sẽ nhận khoảng cách từ nguồn đất gần nhất.", "A water cell will receive its distance from the nearest land source."),
-    sourceAssignTitle: (row, col) => text(`distance[${row}][${col}] = 0`, `distance[${row}][${col}] = 0`),
-    sourceAssignNote: text("Khoảng cách của đất tới đất gần nhất là 0.", "A land cell's distance to land is 0."),
-    early: (sources, targets) => ({ stop: sources === 0 || targets === 0, answer: -1 }),
-    earlyTitle: ({ stop }) => text(`Không có đất hoặc không có biển → ${stop}`, `No land or no water → ${stop}`),
-    earlyNote: ({ stop }) => stop
-      ? text("Đề yêu cầu cả đất và biển; trường hợp này trả -1.", "The problem needs both land and water; return -1.")
-      : text("Có cả đất và biển nên tiếp tục BFS.", "Both land and water exist, so continue BFS."),
-    canVisit: (_input, value) => value === -1,
-    visitTitle: (row, col, yes) => text(`Ô (${row},${col}) là biển chưa thăm → ${yes}`, `Cell (${row},${col}) is unvisited water → ${yes}`),
-    visitTrueNote: text("Lần đầu tới ô biển này cho khoảng cách ngắn nhất.", "The first visit to this water cell gives its shortest distance."),
-    visitFalseNote: text("Ô ngoài biên hoặc đã có khoảng cách; bỏ qua.", "The cell is out of bounds or already has a distance; skip it."),
-    assignTitle: (row, col, value) => text(`distance(${row},${col}) = ${value}`, `distance(${row},${col}) = ${value}`),
-    assignNote: text("Khoảng cách mới bằng khoảng cách ô hiện tại cộng 1.", "The new distance is the current distance plus 1."),
-    answer: (values) => Math.max(...values.flat()),
-    viewKey: "landDistance1162View",
-    makeView: ({ grid, values, queue, sourceCount, targetCount, codeLine, options }) => {
-      const rows = grid.length;
-      const cols = grid[0].length;
-      const levelCounts = new Map();
-      let knownWater = 0;
-      let maxDistance = -1;
-      let totalLand = 0;
-      let totalWater = 0;
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          if (grid[row][col] === 1) totalLand += 1;
-          else totalWater += 1;
-          const distance = values[row][col];
-          if (grid[row][col] !== 0 || distance < 0) continue;
-          knownWater += 1;
-          maxDistance = Math.max(maxDistance, distance);
-          levelCounts.set(distance, (levelCounts.get(distance) || 0) + 1);
-        }
+  const parsed = parseGrid(input, new Set(["0", "1"]));
+  const original = parsed.grid.map((row) => row.map(Number));
+  if (!parsed.valid) {
+    return invalidResult(
+      original,
+      text("Grid phải là ma trận chữ nhật chỉ gồm 0 và 1.", "Grid must be rectangular and contain only 0 and 1."),
+    );
+  }
+
+  const grid = original.map((row) => [...row]);
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const values = original.map((row) => row.map((value) => value === 1 ? 0 : -1));
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const sourceTotal = original.flat().filter((value) => value === 1).length;
+  const waterCount = rows * cols - sourceTotal;
+  let sourceCount = 0;
+  let queue = null;
+
+  const cellKey = (row, col) => `${row},${col}`;
+  function cells(current, discovered) {
+    const queued = new Set((queue || []).map(([row, col]) => cellKey(row, col)));
+    return original.map((matrixRow, row) => matrixRow.map((inputValue, col) => {
+      const value = values[row][col];
+      let cls = inputValue === 1 ? "visited" : value < 0 ? "empty" : "visited";
+      if (queued.has(cellKey(row, col))) cls = "queued";
+      if (discovered && discovered[0] === row && discovered[1] === col) cls = "path";
+      if (current && current[0] === row && current[1] === col) cls = "current";
+      return { label: inputValue === 1 ? "L" : value < 0 ? "∞" : String(value), cls };
+    }));
+  }
+
+  function makeView(codeLine, options) {
+    const levelCounts = new Map();
+    let knownWater = 0;
+    let maxDistance = -1;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const value = values[row][col];
+        if (original[row][col] !== 0 || value < 0) continue;
+        knownWater += 1;
+        maxDistance = Math.max(maxDistance, value);
+        levelCounts.set(value, (levelCounts.get(value) || 0) + 1);
       }
-      const answerValue = options.final
-        ? Number(options.vars?.find((item) => item.name === "answer")?.value)
-        : null;
-      const phase = options.final || (codeLine === 14 && (sourceCount === 0 || targetCount === 0))
-        ? "result"
-        : codeLine >= 16
-          ? "bfs"
-          : "sources";
-      const events = {
-        10: "scan",
-        11: "source-check",
-        12: "source-distance",
-        13: "source-enqueue",
-        14: "edge-check",
-        15: "directions",
-        16: "queue-check",
-        17: "dequeue",
-        18: "direction",
-        19: "neighbor",
-        20: "neighbor-check",
-        21: "distance-update",
-        22: "enqueue",
-        23: "result",
-      };
-      return {
-        phase,
-        event: events[codeLine] || "setup",
-        codeLine,
-        rows,
-        cols,
-        cells: grid.map((gridRow, row) => gridRow.map((landRow, col) => ({
-          row,
-          col,
-          isLand: landRow === 1,
-          distance: landRow === 1 ? 0 : values[row][col],
-        }))),
-        current: options.current ? [...options.current] : null,
-        discovered: options.discovered ? [...options.discovered] : null,
-        origin: options.origin ? [...options.origin] : null,
-        direction: options.direction ? [...options.direction] : null,
-        queue: (queue || []).map(([row, col]) => ({ row, col, distance: values[row][col] })),
-        sourceCount,
-        sourceTotal: totalLand,
-        waterCount: totalWater,
-        knownWater,
-        maxDistance,
-        levels: Array.from(levelCounts, ([distance, count]) => ({ distance, count }))
-          .sort((a, b) => a.distance - b.distance),
-        answer: Number.isFinite(answerValue) ? answerValue : null,
-      };
-    },
-    returnTitle: (answer) => text(`return ${JSON.stringify(answer)}`, `return ${JSON.stringify(answer)}`),
-    returnNote: (answer) => text(`Khoảng cách xa nhất từ biển tới đất là ${answer}.`, `The farthest water-to-land distance is ${answer}.`),
-    cell: (input, value) => ({ label: input === 1 && value === 0 ? "L" : value === -1 ? "∞" : String(value), cls: value === -1 ? "empty" : "visited" }),
-    invalidNote: text("Grid phải là ma trận chữ nhật chỉ gồm 0 và 1.", "The grid must be rectangular and contain only 0 and 1."),
+    }
+    const answerValue = options.final
+      ? Number(options.vars?.find((item) => item.name === "answer")?.value)
+      : null;
+    const events = {
+      9: "scan",
+      10: "scan",
+      11: "source-check",
+      12: "source-enqueue",
+      14: "edge-check",
+      15: "result",
+      17: "directions",
+      20: "distance-init",
+      22: "queue-check",
+      23: "wave-start",
+      25: "layer-item",
+      26: "dequeue",
+      28: "direction",
+      29: "neighbor",
+      31: "neighbor-check",
+      35: "distance-update",
+      36: "enqueue",
+      38: "result",
+    };
+    return {
+      phase: options.final ? "result" : codeLine >= 22 ? "bfs" : "sources",
+      event: events[codeLine] || "setup",
+      codeLine,
+      rows,
+      cols,
+      cells: original.map((matrixRow, row) => matrixRow.map((inputValue, col) => ({
+        row,
+        col,
+        isLand: inputValue === 1,
+        distance: inputValue === 1 ? 0 : values[row][col],
+      }))),
+      current: options.current ? [...options.current] : null,
+      discovered: options.discovered ? [...options.discovered] : null,
+      origin: options.origin ? [...options.origin] : null,
+      direction: options.direction ? [...options.direction] : null,
+      queue: (queue || []).map(([row, col]) => ({ row, col, distance: values[row][col] })),
+      sourceCount,
+      sourceTotal,
+      waterCount,
+      knownWater,
+      maxDistance,
+      levels: Array.from(levelCounts, ([distance, count]) => ({ distance, count }))
+        .sort((a, b) => a.distance - b.distance),
+      answer: Number.isFinite(answerValue) ? answerValue : null,
+    };
+  }
+
+  const { steps, push } = createRecorder(
+    rows,
+    cols,
+    cells,
+    () => queue,
+    (codeLine, options) => ({ landDistance1162View: makeView(codeLine, options) }),
+  );
+
+  push(5, text("Bắt đầu maxDistance", "Enter maxDistance"), text("Nhận bản đồ đất và biển.", "Receive the land-and-water grid."), {
+    vars: [{ name: "grid size", value: `${rows}×${cols}` }],
   });
+  push(6, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Lưu kích thước grid.", "Store the grid dimensions."), {
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+  });
+  queue = [];
+  push(7, text("queue = deque()", "queue = deque()"), text("Tạo queue cho BFS đa nguồn.", "Create the multi-source BFS queue."));
+
+  for (let row = 0; row < rows; row += 1) {
+    push(9, text(`Quét row = ${row}`, `Scan row = ${row}`), text(`Bắt đầu hàng ${row}.`, `Begin row ${row}.`), {
+      vars: [{ name: "row", value: row }],
+    });
+    for (let col = 0; col < cols; col += 1) {
+      push(10, text(`Quét ô (${row},${col})`, `Scan cell (${row},${col})`), text("Tìm các ô đất ban đầu.", "Find the initial land cells."), {
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }],
+      });
+      const isLand = grid[row][col] === 1;
+      push(11, text(`grid[${row}][${col}] == 1 → ${isLand}`, `grid[${row}][${col}] == 1 → ${isLand}`), isLand
+        ? text("Đây là một nguồn BFS.", "This is a BFS source.")
+        : text("Ô biển chờ sóng BFS lan tới.", "This water cell waits for a BFS wave."), {
+        current: [row, col],
+        vars: [{ name: "is land?", value: isLand }],
+      });
+      if (!isLand) continue;
+      sourceCount += 1;
+      queue.push([row, col]);
+      push(12, text(`queue.append((${row},${col}))`, `queue.append((${row},${col}))`), text("Đưa nguồn đất vào queue.", "Put the land source in the queue."), {
+        current: [row, col],
+        vars: [{ name: "sources", value: sourceCount }],
+      });
+    }
+  }
+
+  const earlyStop = queue.length === 0 || queue.length === rows * cols;
+  push(14, text(`Không có đất hoặc không có biển → ${earlyStop}`, `No land or no water → ${earlyStop}`), earlyStop
+    ? text("Không có đủ cả đất và biển.", "The grid does not contain both land and water.")
+    : text("Có cả đất và biển; tiếp tục BFS.", "Both land and water exist; continue BFS."), {
+    vars: [{ name: "queue size", value: queue.length }],
+  });
+  if (earlyStop) {
+    push(15, text("return -1", "return -1"), text("Trường hợp đặc biệt trả về -1.", "Return -1 for the edge case."), {
+      final: true,
+      vars: [{ name: "answer", value: -1 }],
+    });
+    return { original, answer: -1, steps };
+  }
+
+  push(17, text("Khai báo 4 hướng", "Define four directions"), text("BFS đi xuống, lên, phải và trái.", "BFS moves down, up, right, and left."), {
+    vars: [{ name: "directions", value: "down, up, right, left" }],
+  });
+  let distance = -1;
+  push(20, text("distance = -1", "distance = -1"), text("Mỗi vòng while sẽ tăng thêm một lớp khoảng cách.", "Each while-loop pass advances one distance layer."), {
+    vars: [{ name: "distance", value: distance }],
+  });
+
+  while (queue.length) {
+    push(22, text("while queue → True", "while queue → True"), text("Queue còn một lớp cần mở rộng.", "The queue still has a layer to expand."), {
+      vars: [{ name: "condition", value: true }, { name: "queue size", value: queue.length }],
+    });
+    distance += 1;
+    push(23, text(`distance += 1 → ${distance}`, `distance += 1 → ${distance}`), text(`Bắt đầu lớp sóng ${distance}.`, `Begin wave ${distance}.`), {
+      vars: [{ name: "distance", value: distance }],
+    });
+    const layerSize = queue.length;
+    for (let index = 0; index < layerSize; index += 1) {
+      push(25, text(`Ô ${index + 1}/${layerSize} trong lớp`, `Cell ${index + 1}/${layerSize} in layer`), text("Chỉ xử lý các ô đã có sẵn trong lớp này.", "Process only the cells already in this layer."), {
+        vars: [{ name: "layer size", value: layerSize }, { name: "index", value: index }],
+      });
+      const [row, col] = queue.shift();
+      push(26, text(`popleft → (${row},${col})`, `popleft → (${row},${col})`), text("Lấy ô đầu queue.", "Remove the front cell."), {
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "distance", value: distance }],
+      });
+      for (const [dr, dc] of directions) {
+        push(28, text(`Thử hướng (${dr},${dc})`, `Try direction (${dr},${dc})`), text("Nhìn sang một ô kề.", "Look at one neighboring cell."), {
+          current: [row, col],
+          origin: [row, col],
+          direction: [dr, dc],
+          vars: [{ name: "dr", value: dr }, { name: "dc", value: dc }],
+        });
+        const nr = row + dr;
+        const nc = col + dc;
+        push(29, text(`next = (${nr},${nc})`, `next = (${nr},${nc})`), text("Tính vị trí ô kề.", "Compute the neighbor position."), {
+          current: [row, col],
+          origin: [row, col],
+          direction: [dr, dc],
+          vars: [{ name: "nr", value: nr }, { name: "nc", value: nc }],
+        });
+        const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+        const canVisit = inBounds && grid[nr][nc] === 0;
+        push(31, text(`Ô (${nr},${nc}) là biển chưa thăm → ${canVisit}`, `Cell (${nr},${nc}) is unvisited water → ${canVisit}`), canVisit
+          ? text("Sóng BFS có thể lan vào ô này.", "The BFS wave can enter this cell.")
+          : text("Ngoài biên hoặc đã biến thành đất; bỏ qua.", "Out of bounds or already marked as land; skip it."), {
+          current: inBounds ? [nr, nc] : [row, col],
+          origin: [row, col],
+          direction: [dr, dc],
+          vars: [{ name: "in bounds?", value: inBounds }, { name: "can visit?", value: canVisit }],
+        });
+        if (!canVisit) continue;
+        grid[nr][nc] = 1;
+        values[nr][nc] = distance + 1;
+        push(35, text(`grid[${nr}][${nc}] = 1`, `grid[${nr}][${nc}] = 1`), text("Đánh dấu ngay để ô biển không vào queue lần nữa.", "Mark it immediately so it cannot be enqueued twice."), {
+          current: [nr, nc],
+          discovered: [nr, nc],
+          origin: [row, col],
+          direction: [dr, dc],
+          vars: [{ name: "new distance", value: values[nr][nc] }],
+        });
+        queue.push([nr, nc]);
+        push(36, text(`queue.append((${nr},${nc}))`, `queue.append((${nr},${nc}))`), text("Đưa ô mới vào lớp sóng kế tiếp.", "Add the new cell to the next wave."), {
+          current: [nr, nc],
+          discovered: [nr, nc],
+          origin: [row, col],
+          direction: [dr, dc],
+        });
+      }
+    }
+  }
+
+  push(22, text("while queue → False", "while queue → False"), text("Không còn ô nào; BFS hoàn tất.", "No cells remain; BFS is complete."), {
+    vars: [{ name: "condition", value: false }, { name: "distance", value: distance }],
+  });
+  push(38, text(`return ${distance}`, `return ${distance}`), text(`Lớp cuối cùng có khoảng cách ${distance}.`, `The last wave has distance ${distance}.`), {
+    final: true,
+    vars: [{ name: "answer", value: distance }],
+  });
+  return { original, answer: distance, steps };
 }
 
 function buildSteps1765(input) {
@@ -1432,9 +1559,9 @@ const problems = {
     inputLabel: text("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
     debugMode: "line-by-line",
     approach: [
-      text("Đưa tất cả ô đất vào queue với distance 0.", "Put every land cell in the queue with distance 0."),
-      text("Multi-source BFS lan đồng thời ra mọi ô biển chưa thăm.", "Multi-source BFS expands simultaneously into every unvisited water cell."),
-      text("Giá trị distance lớn nhất sau BFS là đáp án.", "The largest distance after BFS is the answer."),
+      text("Đưa tất cả ô đất vào queue làm nguồn BFS.", "Put every land cell in the queue as a BFS source."),
+      text("Xử lý trọn từng lớp queue rồi tăng distance.", "Process one complete queue layer, then increase distance."),
+      text("Đổi biển đã thăm thành 1 để không enqueue lại.", "Turn visited water into 1 so it cannot be enqueued again."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô được enqueue tối đa một lần.", "Each cell is enqueued at most once.") },
     code: [
@@ -1444,23 +1571,38 @@ const problems = {
       "class Solution:",
       "    def maxDistance(self, grid: List[List[int]]) -> int:",
       "        rows, cols = len(grid), len(grid[0])",
-      "        distance = [[-1 for col in range(cols)] for row in range(rows)]",
       "        queue = deque()",
+      "",
       "        for row in range(rows):",
       "            for col in range(cols):",
       "                if grid[row][col] == 1:",
-      "                    distance[row][col] = 0",
       "                    queue.append((row, col))",
-      "        if not queue or len(queue) == rows * cols: return -1",
-      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
+      "        if not queue or len(queue) == rows * cols:",
+      "            return -1",
+      "",
+      "        directions = [(1, 0), (-1, 0),",
+      "                      (0, 1), (0, -1)]",
+      "",
+      "        distance = -1",
+      "",
       "        while queue:",
-      "            row, col = queue.popleft()",
-      "            for delta_row, delta_col in directions:",
-      "                next_row, next_col = row + delta_row, col + delta_col",
-      "                if 0 <= next_row < rows and 0 <= next_col < cols and distance[next_row][next_col] == -1:",
-      "                    distance[next_row][next_col] = distance[row][col] + 1",
-      "                    queue.append((next_row, next_col))",
-      "        return max(max(row) for row in distance)",
+      "            distance += 1",
+      "",
+      "            for _ in range(len(queue)):",
+      "                row, col = queue.popleft()",
+      "",
+      "                for dr, dc in directions:",
+      "                    nr, nc = row + dr, col + dc",
+      "",
+      "                    if (0 <= nr < rows and",
+      "                        0 <= nc < cols and",
+      "                        grid[nr][nc] == 0):",
+      "",
+      "                        grid[nr][nc] = 1",
+      "                        queue.append((nr, nc))",
+      "",
+      "        return distance",
     ],
     builder: buildSteps1162,
   },
