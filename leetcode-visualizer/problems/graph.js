@@ -24275,9 +24275,11 @@ function buildSteps802(input) {
   const graph = parseAdjacency802(input);
   const n = graph.length;
   const reverse = Array.from({ length: n }, () => []);
+  const originalOutdegree = graph.map((neighbors) => neighbors.length);
   const outdegree = graph.map((neighbors) => neighbors.length);
   const queue = [];
   const safe = new Set();
+  const removedEdges = new Set();
   const steps = [];
 
   function graphState({ hlNodes = [], hlEdges = [], restrictedNodes = [] } = {}) {
@@ -24298,7 +24300,26 @@ function buildSteps802(input) {
     };
   }
 
-  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    hlNodes,
+    hlEdges,
+    final = false,
+    answer = null,
+    event = "build",
+    phase = "build",
+    current = null,
+    predecessor = null,
+    activeEdge = null,
+    outdegreeBefore = null,
+    outdegreeAfter = null,
+  }) {
+    const safeNodes = [...safe].sort((a, b) => a - b);
+    const unsafeNodes = final
+      ? Array.from({ length: n }, (_, node) => node).filter((node) => !safe.has(node))
+      : [];
     steps.push({
       title,
       note,
@@ -24312,9 +24333,27 @@ function buildSteps802(input) {
         { name: "graph", value: JSON.stringify(graph) },
         { name: "outdegree", value: "[" + outdegree.join(", ") + "]" },
         { name: "queue", value: "[" + queue.join(", ") + "]" },
-        { name: "safe", value: "[" + [...safe].sort((a, b) => a - b).join(", ") + "]" },
+        { name: "safe", value: "[" + safeNodes.join(", ") + "]" },
         ...(answer === null ? [] : [{ name: "answer", value: "[" + answer.join(", ") + "]" }]),
       ],
+      safe802View: {
+        graph: graph.map((neighbors) => [...neighbors]),
+        edges: graph.flatMap((neighbors, node) => neighbors.map((next) => ({ u: node, v: next }))),
+        originalOutdegree: [...originalOutdegree],
+        outdegree: [...outdegree],
+        queue: [...queue],
+        safe: safeNodes,
+        removedEdges: [...removedEdges].map((key) => key.split(",").map(Number)),
+        unsafe: unsafeNodes,
+        event,
+        phase,
+        current,
+        predecessor,
+        activeEdge: activeEdge ? [...activeEdge] : null,
+        outdegreeBefore,
+        outdegreeAfter,
+        answer: answer ? [...answer] : null,
+      },
     });
   }
 
@@ -24324,7 +24363,9 @@ function buildSteps802(input) {
       vi: "Một node là eventual safe nếu mọi đường đi từ nó cuối cùng tới terminal node. Ta đi ngược từ terminal node để lần lượt loại các cạnh đi ra.",
       en: "A node is eventually safe if every path from it ends at a terminal node. Work backward from terminal nodes, removing outgoing edges one by one.",
     },
-    codeLines: [3, 4, 5],
+    codeLines: [8],
+    event: "build",
+    phase: "build",
   });
 
   for (let node = 0; node < n; node += 1) {
@@ -24333,7 +24374,9 @@ function buildSteps802(input) {
   snapshot({
     title: { vi: "reverse graph đã hoàn tất", en: "Reverse graph complete" },
     note: { vi: "reverse[x] chứa các node trỏ tới x, để khi x an toàn ta có thể cập nhật các predecessor.", en: "reverse[x] stores nodes pointing to x, so once x is safe we can update its predecessors." },
-    codeLines: [5, 6, 7],
+    codeLines: [12],
+    event: "reverse-ready",
+    phase: "build",
   });
 
   for (let node = 0; node < n; node += 1) {
@@ -24342,8 +24385,10 @@ function buildSteps802(input) {
   snapshot({
     title: { vi: "Đưa terminal node vào queue", en: "Enqueue terminal nodes" },
     note: { vi: "Các node [" + queue.join(", ") + "] có outdegree = 0 nên chắc chắn safe.", en: "Nodes [" + queue.join(", ") + "] have outdegree 0, so they are certainly safe." },
-    codeLines: [8],
+    codeLines: [13],
     hlNodes: [...queue],
+    event: "terminals",
+    phase: "terminals",
   });
 
   while (queue.length) {
@@ -24351,40 +24396,64 @@ function buildSteps802(input) {
     snapshot({
       title: { vi: "node = queue.popleft() = " + node, en: "node = queue.popleft() = " + node },
       note: { vi: "Lấy node safe " + node + " để xử lý các cạnh đi vào nó.", en: "Pop safe node " + node + " and process edges entering it." },
-      codeLines: [9, 10],
+      codeLines: [16],
       hlNodes: [node],
+      event: "dequeue",
+      phase: "peel",
+      current: node,
     });
     safe.add(node);
     snapshot({
       title: { vi: "safe.append(" + node + ")", en: "safe.append(" + node + ")" },
       note: { vi: "Node " + node + " được đánh dấu safe.", en: "Mark node " + node + " as safe." },
-      codeLines: [11],
+      codeLines: [17],
       hlNodes: [node],
+      event: "mark-safe",
+      phase: "peel",
+      current: node,
     });
 
     for (const previous of reverse[node]) {
       snapshot({
         title: { vi: "Xét predecessor " + previous + " → " + node, en: "Inspect predecessor " + previous + " → " + node },
         note: { vi: "Vì " + node + " đã safe, cạnh " + previous + " → " + node + " không còn là một lối đi tới cycle.", en: "Because " + node + " is safe, edge " + previous + " → " + node + " no longer leads toward a cycle." },
-        codeLines: [12],
+        codeLines: [18],
         hlNodes: [previous, node],
         hlEdges: [[previous, node]],
+        event: "inspect-edge",
+        phase: "peel",
+        current: node,
+        predecessor: previous,
+        activeEdge: [previous, node],
       });
+      const before = outdegree[previous];
       outdegree[previous] -= 1;
+      removedEdges.add(previous + "," + node);
       snapshot({
         title: { vi: "outdegree[" + previous + "] -= 1 → " + outdegree[previous], en: "outdegree[" + previous + "] -= 1 → " + outdegree[previous] },
         note: { vi: "Giảm số cạnh đi ra chưa được chứng minh safe của node " + previous + ".", en: "Decrease the number of not-yet-proven-safe outgoing edges of node " + previous + "." },
-        codeLines: [13],
+        codeLines: [19],
         hlNodes: [previous],
         hlEdges: [[previous, node]],
+        event: "cut-edge",
+        phase: "peel",
+        current: node,
+        predecessor: previous,
+        activeEdge: [previous, node],
+        outdegreeBefore: before,
+        outdegreeAfter: outdegree[previous],
       });
       if (outdegree[previous] === 0) {
         queue.push(previous);
         snapshot({
           title: { vi: "outdegree = 0 → queue.append(" + previous + ")", en: "outdegree = 0 → queue.append(" + previous + ")" },
           note: { vi: "Mọi cạnh đi ra của " + previous + " giờ đều dẫn tới node safe, nên " + previous + " cũng safe.", en: "All outgoing edges from " + previous + " now lead to safe nodes, so " + previous + " is safe too." },
-          codeLines: [14, 15],
+          codeLines: [21],
           hlNodes: [previous],
+          event: "enqueue",
+          phase: "peel",
+          current: node,
+          predecessor: previous,
         });
       }
     }
@@ -24397,10 +24466,12 @@ function buildSteps802(input) {
     note: unsafe.length
       ? { vi: "Các node [" + unsafe.join(", ") + "] không bị loại hết, nên chúng nằm trong hoặc có thể đi vào cycle.", en: "Nodes [" + unsafe.join(", ") + "] were not removed, so they are in or can reach a cycle." }
       : { vi: "Mọi node đều được loại từ terminal node, nên tất cả đều safe.", en: "Every node was removed starting from a terminal node, so all nodes are safe." },
-    codeLines: [16],
+    codeLines: [22],
     hlNodes: unsafe,
     final: true,
     answer,
+    event: "result",
+    phase: "result",
   });
 
   return { original: graph, answer, steps };
@@ -26700,6 +26771,7 @@ Object.assign(module.exports, {
     codeLabel: { vi: "Reverse graph + Kahn BFS", en: "Reverse graph + Kahn BFS" },
     code: [
       "from collections import deque",
+      "from typing import List",
       "",
       "class Solution:",
       "    def eventualSafeNodes(self, graph: List[List[int]]) -> List[int]:",

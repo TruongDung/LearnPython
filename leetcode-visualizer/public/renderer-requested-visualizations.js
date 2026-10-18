@@ -1255,6 +1255,115 @@ function renderLargestColor1857View(step) {
   </section>`, t("Đếm màu dọc theo mũi tên bằng topo BFS; vòng đỏ là chu trình", "Count colors along arrows with topological BFS; the red loop marks a cycle"), "group");
 }
 
+// ─── #802: Find Eventual Safe States ──────────────────────────────────────
+function renderSafeStates802View(step) {
+  const v = step.safe802View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const graph = v.graph || [];
+  const n = graph.length;
+  const safe = new Set(v.safe || []);
+  const unsafe = new Set(v.unsafe || []);
+  const queued = new Set(v.queue || []);
+  const activeEdge = Array.isArray(v.activeEdge) ? v.activeEdge.join(",") : "";
+  const removed = new Set((v.removedEdges || []).map((edge) => edge.join(",")));
+  const width = 620;
+  const height = n <= 8 ? 300 : 360;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radiusX = n <= 2 ? 145 : 225;
+  const radiusY = n <= 2 ? 0 : height / 2 - 55;
+  const positions = new Map();
+  Array.from({ length: n }, (_, id) => id).forEach((id) => {
+    const angle = -Math.PI / 2 + 2 * Math.PI * id / Math.max(1, n);
+    positions.set(id, {
+      x: n === 1 ? centerX : centerX + radiusX * Math.cos(angle),
+      y: n === 1 ? centerY : centerY + radiusY * Math.sin(angle),
+    });
+  });
+
+  const edgePath = (u, to) => {
+    const from = positions.get(u);
+    const dest = positions.get(to);
+    if (!from || !dest) return "";
+    if (u === to) {
+      return `M ${from.x - 18} ${from.y - 17} C ${from.x - 58} ${from.y - 65}, ${from.x + 58} ${from.y - 65}, ${from.x + 18} ${from.y - 17}`;
+    }
+    const dx = dest.x - from.x;
+    const dy = dest.y - from.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const sx = from.x + dx / length * 27;
+    const sy = from.y + dy / length * 27;
+    const ex = dest.x - dx / length * 31;
+    const ey = dest.y - dy / length * 31;
+    const opposite = graph[to]?.includes(u);
+    if (opposite) {
+      const bend = u < to ? 22 : -22;
+      const mx = (sx + ex) / 2 - dy / length * bend;
+      const my = (sy + ey) / 2 + dx / length * bend;
+      return `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`;
+    }
+    return `M ${sx} ${sy} L ${ex} ${ey}`;
+  };
+
+  const edges = (v.edges || []).map(({ u, v: to }) => {
+    const key = `${u},${to}`;
+    const classes = [
+      "safe802-edge",
+      key === activeEdge ? "active" : "",
+      removed.has(key) ? "removed" : "",
+      unsafe.has(u) && unsafe.has(to) ? "danger" : "",
+    ].filter(Boolean).join(" ");
+    return `<path class="${classes}" data-edge="${key}" d="${edgePath(u, to)}" marker-end="url(#safe802-arrow)"/>`;
+  }).join("");
+
+  const nodes = Array.from({ length: n }, (_, id) => {
+    const pos = positions.get(id);
+    const isTerminal = (v.originalOutdegree?.[id] || 0) === 0;
+    const classes = [
+      "safe802-node",
+      safe.has(id) ? "safe" : "",
+      unsafe.has(id) ? "unsafe" : "",
+      queued.has(id) ? "queued" : "",
+      id === v.current ? "current" : "",
+      id === v.predecessor ? "predecessor" : "",
+      isTerminal ? "terminal" : "",
+    ].filter(Boolean).join(" ");
+    const label = t(
+      `Node ${id}, còn ${v.outdegree?.[id] ?? 0} cạnh ra${safe.has(id) ? ", an toàn" : ""}`,
+      `Node ${id}, ${v.outdegree?.[id] ?? 0} outgoing edges remain${safe.has(id) ? ", safe" : ""}`,
+    );
+    return `<g class="${classes}" data-node="${id}" aria-label="${esc(label)}">
+      <circle class="halo" cx="${pos.x}" cy="${pos.y}" r="34"/>
+      <circle class="body" cx="${pos.x}" cy="${pos.y}" r="25"/>
+      <text class="number" x="${pos.x}" y="${pos.y + 7}">${id}</text>
+      <g class="degree"><circle cx="${pos.x + 25}" cy="${pos.y - 22}" r="12"/><text x="${pos.x + 25}" y="${pos.y - 18}">${v.outdegree?.[id] ?? 0}</text></g>
+      ${isTerminal ? `<text class="flag" x="${pos.x - 31}" y="${pos.y - 24}">⚑</text>` : ""}
+      ${safe.has(id) ? `<text class="shield" x="${pos.x - 33}" y="${pos.y + 38}">🛡</text>` : ""}
+      ${unsafe.has(id) ? `<text class="loop" x="${pos.x - 33}" y="${pos.y + 38}">⟳</text>` : ""}
+    </g>`;
+  }).join("");
+
+  const graphPicture = `<div class="safe802-graph"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Đồ thị đang bóc dần từ terminal node", "Graph peeling backward from terminal nodes"))}"><defs><marker id="safe802-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs>${edges}${nodes}</svg></div>`;
+
+  const queue = `<section class="safe802-queue" aria-label="${esc(t("Hàng đợi", "Queue"))}"><strong aria-hidden="true">⇤</strong><div>${(v.queue || []).map((id, index) => `<span class="${index === 0 ? "front" : ""}"><i>🛡</i><b>${id}</b></span>`).join("") || "<em>∅</em>"}</div></section>`;
+  const safeShelf = `<section class="safe802-shelf" aria-label="${esc(t("Các node đã an toàn", "Safe nodes found"))}"><strong aria-hidden="true">🛡</strong><div>${(v.safe || []).map((id) => `<span>${id}</span>`).join("") || "<em>· · ·</em>"}</div></section>`;
+  const cut = Number.isInteger(v.predecessor) && Number.isInteger(v.current)
+    ? `<section class="safe802-cut ${v.event === "cut-edge" ? "cut" : "inspect"}" aria-label="${esc(t(`Cập nhật cạnh ${v.predecessor} tới ${v.current}`, `Update edge ${v.predecessor} to ${v.current}`))}"><span>${v.predecessor}</span><em>→</em><b>${v.event === "cut-edge" ? "✂" : "?"}</b><em>→</em><span class="safe">${v.current}</span><div><i>${v.outdegreeBefore ?? v.outdegree?.[v.predecessor] ?? "·"}</i><strong>→</strong><i>${v.outdegreeAfter ?? "·"}</i></div></section>`
+    : "";
+  const phaseIndex = v.phase === "build" ? 0 : v.phase === "terminals" ? 1 : v.phase === "peel" ? 2 : 3;
+  const stageIcons = ["→", "⚑", "✂", "🛡"];
+  const stages = stageIcons.map((icon, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${icon}</i>${index < phaseIndex ? "<b>✓</b>" : ""}</span>${index < 3 ? "<em>›</em>" : ""}`).join("");
+  const result = v.phase === "result"
+    ? `<section class="safe802-result"><div class="good"><strong>🛡</strong>${(v.answer || []).map((id) => `<span>${id}</span>`).join("") || "<em>∅</em>"}</div>${(v.unsafe || []).length ? `<div class="bad"><strong>⟳</strong>${v.unsafe.map((id) => `<span>${id}</span>`).join("")}</div>` : ""}</section>`
+    : "";
+  requestedVizSet(`<section class="safe802-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="safe802-header"><div class="safe802-stages">${stages}</div><div class="safe802-stats"><span>🛡 <b>${(v.safe || []).length}/${n}</b></span><span>⇤ <b>${(v.queue || []).length}</b></span></div></header>
+    ${graphPicture}${cut}<div class="safe802-trays">${queue}${safeShelf}</div>${result}
+  </section>`, t("Bóc ngược từ terminal node: cạnh bị cắt, outdegree về 0 thì node nhận khiên", "Peel backward from terminal nodes: cut edges; a node receives a shield when its outdegree reaches zero"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";
