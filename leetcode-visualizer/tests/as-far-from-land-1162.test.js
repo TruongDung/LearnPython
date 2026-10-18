@@ -61,6 +61,10 @@ test("1162 exposes one executable Python line and a focused BFS view per frame",
   assert.equal(final.answer, 2);
   assert.equal(final.knownWater, final.waterCount);
   assert.ok(final.cells.flat().some(cell => !cell.isLand && cell.distance === final.answer));
+  const spread = run.steps.find(step => step.landDistance1162View.event === "distance-update").landDistance1162View;
+  assert.ok(Array.isArray(spread.origin));
+  assert.ok(Array.isArray(spread.direction));
+  assert.equal(Math.abs(spread.direction[0]) + Math.abs(spread.direction[1]), 1);
   const otherDistanceProblem = SUPPORTED[1765].builder("0,0|0,0");
   assert.ok(otherDistanceProblem.steps.every(step => !step.landDistance1162View));
 });
@@ -96,10 +100,17 @@ test("1162 renderer is picture-first and bilingual", () => {
       assert.match(html, /ld1162-grid/);
       assert.match(html, /ld1162-waves/);
       assert.match(html, /ld1162-queue/);
+      assert.match(html, /ld1162-mini-map|ld1162-empty/);
       assert.match(html, /🏝️|🌊/);
       assert.doesNotMatch(html, /undefined|NaN|object Object/);
     }
   }
+  const spreadHtml = render(frames[1], "vi");
+  assert.match(spreadHtml, /ld1162-cell-rings/);
+  assert.match(spreadHtml, /ld1162-direction/);
+  assert.match(spreadHtml, /ld1162-spark/);
+  assert.doesNotMatch(spreadHtml, />QUEUE</);
+  assert.doesNotMatch(spreadHtml, />FRONT</);
 });
 
 test("1162 renderer and styles are registered for lazy loading", () => {
@@ -113,8 +124,8 @@ test("1162 renderer and styles are registered for lazy loading", () => {
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderLandDistance1162View"));
   assert.match(script, /"requested-visualizations\.css": PHASE_FOUR_RENDERER_BUNDLES\["renderer-requested-visualizations\.js"\]/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v13-1162/);
-  assert.match(html, /land1162=picture-v1/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v15-1162-illustrated/);
+  assert.match(html, /land1162=picture-v2/);
   assert.match(css, /\.ld1162-viz\s*\{/);
   assert.match(css, /body:has\(\.ld1162-viz\) #stepNote \{ display: none; \}/);
   assert.match(renderer, /function renderLandDistance1162View\(step\)/);

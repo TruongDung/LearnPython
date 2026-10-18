@@ -778,17 +778,24 @@ function renderLandDistance1162View(step) {
   const v = step.landDistance1162View || {};
   const vi = lang === "vi";
   const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
   const phaseIndex = v.phase === "bfs" ? 1 : v.phase === "result" ? 2 : 0;
   const stages = [
-    ["🏝️", t("Đất", "Land")],
-    ["🌊", "BFS"],
-    ["🏁", t("Xa nhất", "Farthest")],
+    ["🏝️", t("Tất cả ô đất cùng bắt đầu", "All land cells start together")],
+    ["🌊", t("Sóng BFS lan từng lớp", "BFS waves expand layer by layer")],
+    ["🎯", t("Chọn ô biển xa nhất", "Pick the farthest water cell")],
   ].map(([icon, label], index) => {
     const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
-    return `<span class="${state}"><i>${index < phaseIndex ? "✓" : icon}</i><b>${label}</b></span>${index < 2 ? "<em>›</em>" : ""}`;
+    const check = index < phaseIndex ? `<b aria-hidden="true">✓</b>` : "";
+    return `<span class="${state}" aria-label="${esc(label)}"><i>${icon}</i>${check}</span>${index < 2 ? "<em aria-hidden=\"true\">〰›</em>" : ""}`;
   }).join("");
   const currentKey = Array.isArray(v.current) ? v.current.join(",") : "";
   const discoveredKey = Array.isArray(v.discovered) ? v.discovered.join(",") : "";
+  const originKey = Array.isArray(v.origin) ? v.origin.join(",") : "";
+  const directionKey = Array.isArray(v.direction) ? v.direction.join(",") : "";
+  const directionArrow = new Map([
+    ["1,0", "↓"], ["-1,0", "↑"], ["0,1", "→"], ["0,-1", "←"],
+  ]).get(directionKey) || "";
   const farthestKey = v.phase === "result" && v.answer >= 0
     ? (v.cells || []).flatMap((row) => row)
       .filter((cell) => !cell.isLand && cell.distance === v.answer)
@@ -802,45 +809,63 @@ function renderLandDistance1162View(step) {
       cell.isLand ? "land" : cell.distance < 0 ? "unknown" : `distance-${Math.min(cell.distance, 8)}`,
       key === currentKey ? "current" : "",
       key === discoveredKey ? "discovered" : "",
+      key === originKey ? "origin" : "",
       farthest.has(key) ? "farthest" : "",
     ].filter(Boolean).join(" ");
-    const icon = cell.isLand ? "🏝️" : cell.distance < 0 ? "🌊" : "〰️";
-    const distance = cell.distance < 0 ? "∞" : cell.distance;
+    const icon = cell.isLand ? "🏝️" : "🌊";
+    const distance = cell.distance < 0 ? "?" : cell.distance;
     const aria = cell.isLand
       ? t(`Đất (${cell.row},${cell.col})`, `Land (${cell.row},${cell.col})`)
       : cell.distance < 0
         ? t(`Biển chưa tới (${cell.row},${cell.col})`, `Unreached water (${cell.row},${cell.col})`)
         : t(`Biển, khoảng cách ${cell.distance}`, `Water, distance ${cell.distance}`);
-    return `<div class="${classes}" aria-label="${requestedVizEsc(aria)}">
-      <small>${cell.row},${cell.col}</small><i>${icon}</i><strong>${distance}</strong>
+    const rings = !cell.isLand && cell.distance >= 0
+      ? `<span class="ld1162-cell-rings" aria-hidden="true"><i></i><i></i></span>`
+      : "";
+    const arrow = key === originKey && directionArrow
+      ? `<span class="ld1162-direction" aria-hidden="true">${directionArrow}</span>`
+      : "";
+    const marker = key === discoveredKey
+      ? `<span class="ld1162-spark" aria-hidden="true">✦</span>`
+      : key === currentKey && !directionArrow
+        ? `<span class="ld1162-focus" aria-hidden="true">⌖</span>`
+        : "";
+    return `<div class="${classes}" aria-label="${esc(aria)}">
+      ${rings}<i class="ld1162-terrain" aria-hidden="true">${icon}</i><strong>${distance}</strong>${arrow}${marker}
     </div>`;
   })).join("");
   const levels = (v.levels || []).map((level) => {
-    const maxLevel = Math.max(1, ...v.levels.map((item) => item.count));
-    const width = Math.max(8, level.count / maxLevel * 100);
-    return `<span class="${level.distance === v.maxDistance ? "farthest" : ""}">
-      <b>d=${level.distance}</b><i><em style="width:${width}%"></em></i><small>🌊 ${level.count}</small>
+    const drops = "●".repeat(Math.min(level.count, 5));
+    const overflow = level.count > 5 ? `+${level.count - 5}` : "";
+    const aria = t(`Lớp sóng ${level.distance}, ${level.count} ô biển`, `Wave ${level.distance}, ${level.count} water cells`);
+    return `<span class="${level.distance === v.maxDistance ? "farthest" : ""}" aria-label="${esc(aria)}">
+      <i><b>${level.distance}</b></i><small aria-hidden="true">${drops}${overflow}</small>
     </span>`;
   }).join("");
-  const queue = (v.queue || []).slice(0, 10).map((cell, index) => `<span class="${index === 0 ? "front" : ""}">
-    <small>${index === 0 ? "→" : index + 1}</small><b>${cell.row},${cell.col}</b><i>${cell.distance < 0 ? "∞" : cell.distance}</i>
-  </span>`).join("<em>›</em>") || `<b class="ld1162-empty">∅</b>`;
-  const more = (v.queue || []).length > 10 ? `<small class="ld1162-more">+${v.queue.length - 10}</small>` : "";
+  const queue = (v.queue || []).slice(0, 8).map((cell, index) => {
+    const left = ((cell.col + 0.5) / Math.max(1, v.cols) * 100).toFixed(2);
+    const top = ((cell.row + 0.5) / Math.max(1, v.rows) * 100).toFixed(2);
+    const columnSize = (100 / Math.max(1, v.cols)).toFixed(3);
+    const rowSize = (100 / Math.max(1, v.rows)).toFixed(3);
+    const aria = t(`Ô (${cell.row},${cell.col}), khoảng cách ${cell.distance}`, `Cell (${cell.row},${cell.col}), distance ${cell.distance}`);
+    return `<span class="ld1162-ticket ${index === 0 ? "front" : ""}" aria-label="${esc(aria)}">
+      <i class="ld1162-mini-map" style="background-size:${columnSize}% ${rowSize}%"><b style="left:${left}%;top:${top}%"></b></i><strong>${cell.distance < 0 ? "?" : cell.distance}</strong>
+    </span>`;
+  }).join("") || `<b class="ld1162-empty" aria-label="${t("Queue rỗng", "Empty queue")}">∅</b>`;
+  const more = (v.queue || []).length > 8 ? `<small class="ld1162-more">+${v.queue.length - 8}</small>` : "";
   const answer = v.phase === "result" && v.answer !== null
-    ? `<div class="ld1162-answer ${v.answer < 0 ? "empty" : ""}" aria-label="${requestedVizEsc(v.answer < 0 ? t("Không có biển và đất cùng lúc", "No mix of land and water") : t(`Khoảng cách lớn nhất ${v.answer}`, `Maximum distance ${v.answer}`))}">
-      <span>🏁</span><strong>${v.answer < 0 ? "—" : requestedVizEsc(v.answer)}</strong><i>${v.answer < 0 ? "∅" : "🌊"}</i>
+    ? `<div class="ld1162-answer ${v.answer < 0 ? "empty" : ""}" aria-label="${esc(v.answer < 0 ? t("Không có biển và đất cùng lúc", "No mix of land and water") : t(`Khoảng cách lớn nhất ${v.answer}`, `Maximum distance ${v.answer}`))}">
+      <span aria-hidden="true">🎯</span><strong>${v.answer < 0 ? "—" : esc(v.answer)}</strong><i aria-hidden="true">${v.answer < 0 ? "∅" : "🌊"}</i>
     </div>`
     : "";
-  const focus = Array.isArray(v.current) ? `(${v.current.join(",")})` : "—";
   requestedVizSet(`<section class="ld1162-viz phase-${v.phase}" data-event="${requestedVizEsc(v.event)}">
     <header class="ld1162-header"><div class="ld1162-stages">${stages}</div><div class="ld1162-stats">
-      <span aria-label="${t("Nguồn đất", "Land sources")}">🏝️ <b>${v.sourceCount || 0}/${v.sourceTotal || 0}</b></span>
-      <span aria-label="${t("Ô biển đã tới", "Water reached")}">🌊 <b>${v.knownWater || 0}/${v.waterCount || 0}</b></span>
-      <span aria-label="${t("Đang xét", "Current cell")}">📍 <b>${focus}</b></span>
+      <span aria-label="${t("Nguồn đất đã tìm thấy", "Land sources found")}">🏝️ <b>${v.sourceCount || 0}/${v.sourceTotal || 0}</b></span>
+      <span aria-label="${t("Ô biển đã tới", "Water reached")}">💧 <b>${v.knownWater || 0}/${v.waterCount || 0}</b></span>
     </div></header>
-    <div class="ld1162-waves">${levels || `<span><b>d=0</b><i><em></em></i><small>🌊 0</small></span>`}</div>
+    <div class="ld1162-waves" aria-label="${t("Các lớp sóng BFS", "BFS wave layers")}"><b aria-hidden="true">🏝️</b><em aria-hidden="true">〰›</em>${levels || `<span class="empty"><i><b>?</b></i><small aria-hidden="true">···</small></span>`}<em aria-hidden="true">〰›</em><b aria-hidden="true">🎯</b></div>
     <div class="ld1162-grid" style="--ld1162-cols:${v.cols}">${cells}</div>
-    <section class="ld1162-queue"><header><b>🧺 QUEUE</b><small>→ FRONT</small></header><div>${queue}${more}</div></section>
+    <section class="ld1162-queue" aria-label="${t("Hàng đợi BFS, phần tử đầu ở bên trái", "BFS queue, front item on the left")}"><span class="ld1162-queue-mouth" aria-hidden="true">⇤</span><div>${queue}${more}</div></section>
     ${answer}
   </section>`, t("Đất phát sóng BFS; số trên biển là khoảng cách tới đất gần nhất", "Land seeds BFS waves; water labels show nearest-land distance"), "group");
 }

@@ -199,18 +199,24 @@ function buildDistanceProblem(input, config) {
     for (const [deltaRow, deltaCol] of directions) {
       push(18, text(`Thử hướng (${deltaRow},${deltaCol})`, `Try direction (${deltaRow},${deltaCol})`), text("Xét một ô lân cận.", "Inspect one neighboring cell."), {
         current: [row, col],
+        origin: [row, col],
+        direction: [deltaRow, deltaCol],
         vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }],
       });
       const nextRow = row + deltaRow;
       const nextCol = col + deltaCol;
       push(19, text(`next = (${nextRow},${nextCol})`, `next = (${nextRow},${nextCol})`), text("Tính tọa độ ô kế tiếp.", "Compute the neighboring coordinates."), {
         current: [row, col],
+        origin: [row, col],
+        direction: [deltaRow, deltaCol],
         vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
       });
       const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
       const canVisit = inBounds && config.canVisit(grid[nextRow][nextCol], values[nextRow][nextCol]);
       push(20, config.visitTitle(nextRow, nextCol, canVisit), canVisit ? config.visitTrueNote : config.visitFalseNote, {
         current: inBounds ? [nextRow, nextCol] : [row, col],
+        origin: [row, col],
+        direction: [deltaRow, deltaCol],
         vars: [{ name: "in bounds?", value: inBounds }, { name: "can visit?", value: canVisit }],
       });
       if (!canVisit) continue;
@@ -218,12 +224,16 @@ function buildDistanceProblem(input, config) {
       push(21, config.assignTitle(nextRow, nextCol, values[nextRow][nextCol]), config.assignNote, {
         current: [nextRow, nextCol],
         discovered: [nextRow, nextCol],
+        origin: [row, col],
+        direction: [deltaRow, deltaCol],
         vars: [{ name: "current value", value: values[row][col] }, { name: "new value", value: values[nextRow][nextCol] }],
       });
       queue.push([nextRow, nextCol]);
       push(22, text(`queue.append((${nextRow},${nextCol}))`, `queue.append((${nextRow},${nextCol}))`), text("Thêm ô vừa khám phá vào queue.", "Append the discovered cell to the queue."), {
         current: [nextRow, nextCol],
         discovered: [nextRow, nextCol],
+        origin: [row, col],
+        direction: [deltaRow, deltaCol],
       });
     }
   }
@@ -328,6 +338,8 @@ function buildSteps1162(input) {
         }))),
         current: options.current ? [...options.current] : null,
         discovered: options.discovered ? [...options.discovered] : null,
+        origin: options.origin ? [...options.origin] : null,
+        direction: options.direction ? [...options.direction] : null,
         queue: (queue || []).map(([row, col]) => ({ row, col, distance: values[row][col] })),
         sourceCount,
         sourceTotal: totalLand,
