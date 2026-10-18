@@ -1478,6 +1478,28 @@ body:has(.m542-viz) #stepNote { display: none; }
 .ld1162-answer.empty > strong { color: var(--rv-muted); }
 body:has(.ld1162-viz) #stepNote { display: none; }
 
+/* Let 1162's complete solution use the page scroll instead of a nested code
+   scroller. Long lines wrap so the code remains readable on narrow screens. */
+#vizPanel:has(.ld1162-viz) :is(#codePanel, #codePanel2) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  position: static;
+  white-space: pre-wrap;
+}
+#vizPanel:has(.ld1162-viz) .code-section,
+#vizPanel:has(.ld1162-viz) .code-line {
+  min-width: 0;
+  width: 100%;
+  white-space: pre-wrap;
+}
+#vizPanel:has(.ld1162-viz) .code-line .txt {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 560px) {
   .ld1162-header { justify-content: center; }
   .ld1162-stages > span > i { font-size: 17px; height: 34px; width: 34px; }

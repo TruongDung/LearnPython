@@ -130,9 +130,11 @@ test("1162 renderer and styles are registered for lazy loading", () => {
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderLandDistance1162View"));
   assert.match(script, /"requested-visualizations\.css": PHASE_FOUR_RENDERER_BUNDLES\["renderer-requested-visualizations\.js"\]/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v15-1162-illustrated/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v16-1162-code-expanded/);
   assert.match(html, /land1162=picture-v2/);
   assert.match(css, /\.ld1162-viz\s*\{/);
   assert.match(css, /body:has\(\.ld1162-viz\) #stepNote \{ display: none; \}/);
+  assert.match(css, /#vizPanel:has\(\.ld1162-viz\) :is\(#codePanel, #codePanel2\) \{[\s\S]*?max-height: none;[\s\S]*?overflow: visible;[\s\S]*?position: static;/);
+  assert.match(css, /#vizPanel:has\(\.ld1162-viz\) \.code-line \.txt \{[\s\S]*?overflow-wrap: anywhere;[\s\S]*?white-space: pre-wrap;/);
   assert.match(renderer, /function renderLandDistance1162View\(step\)/);
 });
