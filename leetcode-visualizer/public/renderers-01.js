@@ -2327,51 +2327,109 @@ function renderMaze499View(step) {
 function renderRestricted1786View(step) {
   const view = step.restricted1786View || {};
   const vi = lang === "vi";
-  const phases = vi
-    ? ["1. Dựng graph", "2. Dijkstra từ n", "3. Hướng cạnh", "4. DP đếm đường"]
-    : ["1. Build graph", "2. Dijkstra from n", "3. Orient edges", "4. Count with DP"];
-  const phaseIndex = view.phase === "build" || view.phase === "invalid" ? 0
-    : ["dijkstra", "stale", "relax"].includes(view.phase) ? 1
-      : view.phase === "orient" ? 2 : 3;
-  const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : ""} ${index < phaseIndex ? "done" : ""}">${index < phaseIndex ? "✓ " : ""}${label}</span>`).join("");
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = escapeHtml;
+  const n = Number(view.n) || 0;
   const distances = view.distances || [];
   const ways = view.ways || [];
-  const distanceHtml = distances.map((item) => `<div class="restricted1786-dist ${item.current ? "current" : ""} ${item.settled ? "settled" : ""}"><small>node ${item.node}</small><strong>${escapeHtml(item.value)}</strong><span>${item.settled ? (vi ? "đã chốt" : "settled") : "dist"}</span></div>`).join("");
-  const waysHtml = ways.map((item) => `<div class="restricted1786-way ${item.source ? "source" : ""} ${item.target ? "target" : ""}"><small>node ${item.node}</small><strong>${item.value}</strong><span>ways[${item.node}]</span></div>`).join("");
-  const heap = view.heap || [];
-  const heapHtml = heap.length
-    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>#${index + 1}</small><strong>(${item.distance}, ${item.node})</strong></span>`).join("")
-    : `<em>${vi ? "heap rỗng" : "empty heap"}</em>`;
-  const restricted = view.restrictedEdges || [];
-  const restrictedHtml = restricted.length
-    ? restricted.map((edge) => `<span class="${view.activeEdge && ((view.activeEdge.u === edge.from && view.activeEdge.v === edge.to) || (view.activeEdge.v === edge.from && view.activeEdge.u === edge.to)) ? "active" : ""}"><b>${edge.from}</b><i>→</i><b>${edge.to}</b><small>${view.distances.find((item) => item.node === edge.from)?.value} &gt; ${view.distances.find((item) => item.node === edge.to)?.value}</small></span>`).join("")
-    : `<em>${vi ? "chờ Dijkstra hoàn tất" : "waiting for Dijkstra"}</em>`;
-  const order = view.order || [];
-  const orderHtml = order.length ? order.map((node, index) => `<span class="${node === view.dpSource ? "active" : ""} ${node === view.dpTarget ? "target" : ""}"><small>${index}</small><b>${node}</b><em>d=${distances.find((item) => item.node === node)?.value}</em></span>`).join("") : "";
-  let formula;
-  if (view.phase === "relax" && view.activeEdge) {
-    formula = `<strong>${view.currentNode} → ${view.activeEdge.v}</strong><span>${view.candidate} &lt; ${escapeHtml(view.oldDistance)} → ${view.improves ? "True" : "False"}</span>`;
-  } else if (view.phase === "dp-update") {
-    formula = `<strong>ways[${view.dpTarget}] += ways[${view.dpSource}]</strong><span>+${view.contribution} · dist[${view.dpTarget}] &gt; dist[${view.dpSource}]</span>`;
-  } else {
-    formula = `<strong>dist[u] &gt; dist[v]</strong><span>${vi ? "chỉ đi từ cao xuống thấp" : "move only from higher to lower"}</span>`;
+  const edges = view.edges || step.graph?.edges || [];
+  const distanceOf = (node) => {
+    const value = distances.find((item) => item.node === node)?.value;
+    return typeof value === "number" && Number.isFinite(value) ? value : Infinity;
+  };
+  const distanceLabelOf = (node) => distances.find((item) => item.node === node)?.value ?? "∞";
+  const wayOf = (node) => ways.find((item) => item.node === node)?.value ?? 0;
+  const finiteDistances = distances.map((item) => item.value).filter((value) => typeof value === "number" && Number.isFinite(value));
+  const maxDistance = Math.max(1, ...finiteDistances);
+  const slopePhase = ["orient", "dp", "dp-update", "done"].includes(view.phase);
+  const width = 620;
+  const height = 310;
+  const positions = new Map();
+  for (let node = 1; node <= n; node += 1) {
+    const x = n === 1 ? width / 2 : 65 + (node - 1) * (width - 130) / Math.max(1, n - 1);
+    const distance = distanceOf(node);
+    const y = Number.isFinite(distance) ? height - 52 - distance / maxDistance * (height - 112) : 47;
+    positions.set(node, { x, y });
   }
-  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : step.codeLines;
-  const summary = vi ? `Bài 1786: ways[1] = ${view.answer}.` : `Problem 1786: ways[1] = ${view.answer}.`;
-  $("treeView").innerHTML = `<section class="restricted1786-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <div class="restricted1786-phases">${phaseHtml}</div>
-    <header class="restricted1786-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></header>
-    <div class="restricted1786-formula">${formula}</div>
-    <div class="restricted1786-workspace">
-      <section class="restricted1786-graph"><header><strong>WEIGHTED GRAPH</strong><span>start = 1 · target = ${view.n}</span></header><div id="restricted1786Graph"></div></section>
-      <section class="restricted1786-state"><header><strong>DIJKSTRA STATE</strong><span>${vi ? "khoảng cách tới node cuối" : "distance to last node"}</span></header><div class="restricted1786-distances">${distanceHtml}</div><div class="restricted1786-heap"><header><strong>MIN-HEAP</strong><span>(distance, node)</span></header><div>${heapHtml}</div></div></section>
-    </div>
-    <section class="restricted1786-slopes"><header><strong>RESTRICTED DIRECTIONS</strong><span>${vi ? "mũi tên luôn giảm dist" : "arrows strictly decrease dist"}</span></header><div>${restrictedHtml}</div></section>
-    ${orderHtml ? `<section class="restricted1786-order"><header><strong>DP ORDER</strong><span>${vi ? "dist tăng dần để truyền ways ngược lên" : "increasing dist for backward propagation"}</span></header><div>${orderHtml}</div></section>` : ""}
-    <section class="restricted1786-ways"><header><strong>WAYS</strong><span>mod 10⁹+7</span></header><div>${waysHtml}</div></section>
-    <div class="restricted1786-result ${view.phase === "done" ? "visible" : ""}"><small>ANSWER</small><strong>${view.answer}</strong><span>${vi ? "restricted paths từ 1 tới n" : "restricted paths from 1 to n"}</span></div>
+  const restrictedByIndex = new Map((view.restrictedEdges || []).map((edge) => [edge.index, edge]));
+  const activeMatches = (u, v) => view.activeEdge && (
+    (view.activeEdge.u === u && view.activeEdge.v === v)
+    || (view.activeEdge.u === v && view.activeEdge.v === u)
+  );
+  const shorten = (fromNode, toNode) => {
+    const from = positions.get(fromNode);
+    const to = positions.get(toNode);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    return {
+      sx: from.x + dx / length * 29,
+      sy: from.y + dy / length * 29,
+      ex: to.x - dx / length * 33,
+      ey: to.y - dy / length * 33,
+      mx: (from.x + to.x) / 2,
+      my: (from.y + to.y) / 2,
+    };
+  };
+  const graphEdges = edges.map((edge, fallbackIndex) => {
+    const index = Number.isInteger(edge.index) ? edge.index : fallbackIndex;
+    const slope = restrictedByIndex.get(index);
+    const fromNode = slopePhase && slope ? slope.from : edge.u;
+    const toNode = slopePhase && slope ? slope.to : edge.v;
+    const line = shorten(fromNode, toNode);
+    const active = activeMatches(edge.u, edge.v);
+    const classes = ["rp1786-edge", slopePhase && slope ? "downhill" : "road", active ? (view.improves === false ? "rejected" : "active") : ""].filter(Boolean).join(" ");
+    const marker = slopePhase && slope ? ` marker-end="url(#rp1786-arrow${active ? "-active" : ""})"` : "";
+    return `<g class="${classes}" data-edge="${edge.u},${edge.v}"><path d="M ${line.sx} ${line.sy} L ${line.ex} ${line.ey}"${marker}/><rect x="${line.mx - 14}" y="${line.my - 10}" width="28" height="20" rx="7"/><text x="${line.mx}" y="${line.my + 4}">${esc(edge.w)}</text></g>`;
+  }).join("");
+  const graphNodes = distances.map((item) => {
+    const point = positions.get(item.node);
+    const classes = [
+      "rp1786-node",
+      item.settled ? "settled" : "",
+      item.current ? "current" : "",
+      item.node === 1 ? "start" : "",
+      item.node === n ? "finish" : "",
+      item.node === view.dpSource ? "dp-source" : "",
+      item.node === view.dpTarget ? "dp-target" : "",
+    ].filter(Boolean).join(" ");
+    return `<g class="${classes}" data-node="${item.node}">
+      <circle class="halo" cx="${point.x}" cy="${point.y}" r="35"/>
+      <circle class="body" cx="${point.x}" cy="${point.y}" r="25"/>
+      <text class="number" x="${point.x}" y="${point.y + 7}">${item.node}</text>
+      <g class="distance"><rect x="${point.x - 22}" y="${point.y - 43}" width="44" height="20" rx="10"/><text x="${point.x}" y="${point.y - 29}">${item.value}</text></g>
+      ${slopePhase ? `<g class="ways"><rect x="${point.x - 22}" y="${point.y + 28}" width="44" height="20" rx="10"/><text x="${point.x}" y="${point.y + 42}">×${wayOf(item.node)}</text></g>` : ""}
+      ${item.node === 1 ? `<text class="flag" x="${point.x - 31}" y="${point.y + 5}">🚩</text>` : ""}
+      ${item.node === n ? `<text class="flag finish-flag" x="${point.x + 31}" y="${point.y + 5}">🏁</text>` : ""}
+    </g>`;
+  }).join("");
+  const terrainLines = Array.from({ length: 4 }, (_, index) => {
+    const y = 55 + index * 60;
+    return `<line x1="25" y1="${y}" x2="595" y2="${y}"/><text x="31" y="${y - 5}">${index === 3 ? "0" : ""}</text>`;
+  }).join("");
+  const graph = `<div class="rp1786-map"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Bản đồ độ cao khoảng cách tới node đích", "Distance-height map to the destination"))}"><defs><marker id="rp1786-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker><marker id="rp1786-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker></defs><g class="terrain">${terrainLines}</g>${graphEdges}${graphNodes}</svg></div>`;
+
+  const phaseIndex = view.phase === "build" || view.phase === "invalid" ? 0
+    : ["dijkstra", "stale", "relax"].includes(view.phase) ? 1
+      : view.phase === "orient" ? 2 : ["dp", "dp-update"].includes(view.phase) ? 3 : 4;
+  const stages = ["🗺️", "🎯", "⛰️", "🔢", "🏁"].map((icon, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${icon}</i>${index < phaseIndex ? "<b>✓</b>" : ""}</span>${index < 4 ? "<em>›</em>" : ""}`).join("");
+  const stats = `<div class="rp1786-stats"><span>🎯 <b>${view.settledCount || 0}/${n}</b></span><span>↘ <b>${(view.restrictedEdges || []).length}</b></span><span>🚩 <b>${view.answer || 0}</b></span></div>`;
+  const heap = `<section class="rp1786-heap"><strong>♢</strong><div>${(view.heap || []).slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><i>${item.distance}</i><b>${item.node}</b></span>`).join("") || "<em>∅</em>"}</div></section>`;
+  let action = "";
+  if (view.phase === "relax" && view.activeEdge) {
+    action = `<section class="rp1786-action relax ${view.improves ? "yes" : "no"}"><span>${view.currentNode}</span><em>+${view.activeEdge.w}</em><strong>${view.candidate}</strong><i>${view.improves ? "↓" : "×"}</i><span>${view.activeEdge.v}</span></section>`;
+  } else if (view.phase === "dp-update") {
+    action = `<section class="rp1786-action dp"><span>${view.dpTarget}<small>×${view.beforeWays ?? "·"}</small></span><em>+</em><span>${view.dpSource}<small>×${view.contribution}</small></span><strong>→</strong><span>${view.dpTarget}<small>×${wayOf(view.dpTarget)}</small></span></section>`;
+  } else if (view.phase === "orient") {
+    action = `<section class="rp1786-action slope"><span>high</span><strong>↘</strong><span>low</span><i>✓</i></section>`;
+  }
+  const order = (view.order || []).length ? `<section class="rp1786-order"><strong>🏁</strong>${view.order.map((node, index) => `<span class="${node === view.dpSource ? "active" : ""} ${node === view.dpTarget ? "target" : ""}"><b>${node}</b><small>${esc(distanceLabelOf(node))}</small></span>${index < view.order.length - 1 ? "<em>→</em>" : ""}`).join("")}</section>` : "";
+  const result = view.phase === "done" ? `<section class="rp1786-result"><span>🚩1</span><em>↘ ··· ↘</em><span>🏁${n}</span><strong>${view.answer}</strong></section>` : "";
+  const summary = t(`Bài 1786: có ${view.answer} restricted paths.`, `Problem 1786: ${view.answer} restricted paths.`);
+  $("treeView").innerHTML = `<section class="rp1786-viz phase-${esc(view.phase)}" data-event="${esc(view.event || view.phase)}" role="group" aria-label="${esc(summary)}">
+    <header class="rp1786-header"><div class="rp1786-stages">${stages}</div>${stats}</header>
+    ${graph}${action}${["dijkstra", "stale", "relax"].includes(view.phase) ? heap : ""}${order}${result}
   </section>`;
-  renderGraph(step, "restricted1786Graph");
 }
 
 function renderMultiDijkstra2203View(step) {

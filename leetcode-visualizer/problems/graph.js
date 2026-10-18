@@ -22395,7 +22395,7 @@ function buildSteps1786(input, params = {}) {
     return [{ index, from, to, w }];
   });
 
-  function snapshot({ title, note, phase, codeLine, currentNode = null, activeEdge = null, candidate = null, oldDistance = null, improves = null, dpSource = null, dpTarget = null, contribution = null, order = [], final = false }) {
+  function snapshot({ title, note, phase, event = phase, codeLine, currentNode = null, activeEdge = null, candidate = null, oldDistance = null, improves = null, dpSource = null, dpTarget = null, contribution = null, beforeWays = null, order = [], final = false }) {
     const restricted = restrictedEdges();
     const graphHighlights = activeEdge ? [[activeEdge.u, activeEdge.v]] : [];
     const step = {
@@ -22412,7 +22412,9 @@ function buildSteps1786(input, params = {}) {
       },
       restricted1786View: {
         phase,
+        event,
         n,
+        edges: edges.map(([u, v, w], index) => ({ u, v, w, index })),
         distances: nodes.map((node) => ({ node, value: fmt(dist[node]), settled: settled.has(node), current: node === currentNode })),
         ways: nodes.map((node) => ({ node, value: ways[node], source: node === dpSource, target: node === dpTarget })),
         heap: heap.map(([distance, node], index) => ({ distance, node, index })),
@@ -22425,8 +22427,11 @@ function buildSteps1786(input, params = {}) {
         dpSource,
         dpTarget,
         contribution,
+        beforeWays,
         order,
         answer: ways[1],
+        settledCount: settled.size,
+        finiteCount: nodes.filter((node) => Number.isFinite(dist[node])).length,
       },
       vars: [
         { name: "dist", value: `[${nodes.map((node) => fmt(dist[node])).join(", ")}]` },
@@ -22451,14 +22456,14 @@ function buildSteps1786(input, params = {}) {
   snapshot({
     title: { vi: "Dựng đồ thị vô hướng", en: "Build the undirected graph" },
     note: { vi: "Mỗi cạnh được lưu theo cả hai chiều để chạy Dijkstra từ node n.", en: "Store every edge in both directions before running Dijkstra from node n." },
-    phase: "build", codeLine: 7,
+    phase: "build", event: "build", codeLine: 7,
   });
   dist[n] = 0;
   heap.push([0, n]);
   snapshot({
     title: { vi: `Bắt đầu Dijkstra từ node ${n}`, en: `Start Dijkstra from node ${n}` },
     note: { vi: "dist[x] sẽ là khoảng cách ngắn nhất từ x tới node cuối.", en: "dist[x] becomes the shortest distance from x to the last node." },
-    phase: "dijkstra", codeLine: 12, currentNode: n,
+    phase: "dijkstra", event: "seed-target", codeLine: 12, currentNode: n,
   });
 
   while (heap.length) {
@@ -22468,7 +22473,7 @@ function buildSteps1786(input, params = {}) {
       snapshot({
         title: { vi: `Bỏ state cũ (${distance}, ${u})`, en: `Skip stale state (${distance}, ${u})` },
         note: { vi: `dist[${u}] hiện nhỏ hơn ${distance}.`, en: `dist[${u}] is already smaller than ${distance}.` },
-        phase: "stale", codeLine: 16, currentNode: u,
+        phase: "stale", event: "stale", codeLine: 16, currentNode: u,
       });
       continue;
     }
@@ -22476,7 +22481,7 @@ function buildSteps1786(input, params = {}) {
     snapshot({
       title: { vi: `Chốt dist[${u}] = ${distance}`, en: `Finalize dist[${u}] = ${distance}` },
       note: { vi: "Node có distance nhỏ nhất được pop và chốt trước.", en: "The node with the smallest distance is popped and finalized first." },
-      phase: "dijkstra", codeLine: 14, currentNode: u,
+      phase: "dijkstra", event: "settle", codeLine: 14, currentNode: u,
     });
     for (const { to: v, w } of graph[u]) {
       const candidate = distance + w;
@@ -22494,7 +22499,7 @@ function buildSteps1786(input, params = {}) {
         note: improves
           ? { vi: `${distance} + ${w} tốt hơn khoảng cách cũ.`, en: `${distance} + ${w} improves the previous distance.` }
           : { vi: `${distance} + ${w} không tạo đường ngắn hơn.`, en: `${distance} + ${w} does not produce a shorter route.` },
-        phase: "relax", codeLine: 20, currentNode: u, activeEdge: { u, v, w }, candidate, oldDistance, improves,
+        phase: "relax", event: improves ? "relax-improve" : "relax-skip", codeLine: 20, currentNode: u, activeEdge: { u, v, w }, candidate, oldDistance, improves,
       });
     }
   }
@@ -22503,20 +22508,20 @@ function buildSteps1786(input, params = {}) {
   snapshot({
     title: { vi: "Hướng mỗi cạnh từ dist cao xuống dist thấp", en: "Orient every edge from higher dist to lower dist" },
     note: { vi: "Restricted path chỉ được đi xuống dốc distance; các cạnh bằng distance không hợp lệ.", en: "A restricted path only moves downhill in distance; equal-distance edges are not allowed." },
-    phase: "orient", codeLine: 24, order,
+    phase: "orient", event: "orient", codeLine: 24, order,
   });
 
   ways[n] = 1;
   snapshot({
     title: { vi: `ways[${n}] = 1`, en: `ways[${n}] = 1` },
     note: { vi: "Có đúng một cách đứng sẵn tại node đích.", en: "There is one way to already be at the destination." },
-    phase: "dp", codeLine: 25, dpSource: n, order,
+    phase: "dp", event: "dp-seed", codeLine: 25, dpSource: n, order,
   });
   for (const u of order) {
     snapshot({
       title: { vi: `Xử lý DP tại node ${u}`, en: `Process DP at node ${u}` },
       note: { vi: `ways[${u}] = ${ways[u]} được truyền ngược lên các node có dist lớn hơn.`, en: `ways[${u}] = ${ways[u]} propagates backward to neighbors with larger dist.` },
-      phase: "dp", codeLine: 27, dpSource: u, order,
+      phase: "dp", event: "dp-node", codeLine: 27, dpSource: u, order,
     });
     for (const { to: v, w } of graph[u]) {
       if (!(dist[v] > dist[u])) continue;
@@ -22525,14 +22530,14 @@ function buildSteps1786(input, params = {}) {
       snapshot({
         title: { vi: `ways[${v}] = ${before} + ${ways[u]} = ${ways[v]}`, en: `ways[${v}] = ${before} + ${ways[u]} = ${ways[v]}` },
         note: { vi: `Restricted edge là ${v} → ${u} vì dist[${v}] > dist[${u}].`, en: `The restricted edge is ${v} → ${u} because dist[${v}] > dist[${u}].` },
-        phase: "dp-update", codeLine: 30, activeEdge: { u: v, v: u, w }, dpSource: u, dpTarget: v, contribution: ways[u], order,
+        phase: "dp-update", event: "dp-update", codeLine: 30, activeEdge: { u: v, v: u, w }, dpSource: u, dpTarget: v, contribution: ways[u], beforeWays: before, order,
       });
     }
   }
   snapshot({
     title: { vi: `Có ${ways[1]} restricted paths`, en: `There are ${ways[1]} restricted paths` },
     note: { vi: "ways[1] là số đường từ node 1 tới n luôn giảm strictly theo dist.", en: "ways[1] counts paths from node 1 to n whose dist values strictly decrease." },
-    phase: "done", codeLine: 31, dpSource: 1, order, final: true,
+    phase: "done", event: "result", codeLine: 31, dpSource: 1, order, final: true,
   });
   return { original: edges, edges, n, answer: ways[1], steps };
 }
