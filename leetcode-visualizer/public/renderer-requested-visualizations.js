@@ -1167,6 +1167,94 @@ function renderPacificAtlantic417View(step) {
   </section>`, t("Hai BFS đi ngược từ hai đại dương; ô nhận cả P và A phát sáng", "Two reverse BFS searches start at the oceans; cells receiving both P and A glow"), "group");
 }
 
+function renderLargestColor1857View(step) {
+  const v = step.largestColor1857View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const n = (v.colors || "").length;
+  const palette = ["#fb7185", "#60a5fa", "#34d399", "#fbbf24", "#a78bfa", "#22d3ee", "#f472b6", "#a3e635", "#fb923c", "#818cf8"];
+  const colorFor = (index) => palette[index % palette.length];
+  const nodeColor = (id) => colorFor(Math.max(0, (v.colors || "a").charCodeAt(id) - 97));
+  const activeEdgeKey = Array.isArray(v.activeEdge) ? v.activeEdge.join(",") : "";
+  const processed = new Set(v.processed || []);
+  const cycle = new Set(v.cycleNodes || []);
+  const queued = new Set(v.queue || []);
+
+  const adjacency = Array.from({ length: n }, () => []);
+  const staticIn = Array(n).fill(0);
+  (v.edges || []).forEach(({ u, v: to }) => { adjacency[u]?.push(to); staticIn[to] += 1; });
+  const levels = Array(n).fill(null);
+  const layerQueue = [];
+  staticIn.forEach((degree, id) => { if (degree === 0) { levels[id] = 0; layerQueue.push(id); } });
+  for (let index = 0; index < layerQueue.length; index++) {
+    const id = layerQueue[index];
+    for (const next of adjacency[id]) {
+      levels[next] = Math.max(levels[next] ?? 0, levels[id] + 1);
+      staticIn[next] -= 1;
+      if (staticIn[next] === 0) layerQueue.push(next);
+    }
+  }
+  const maxDagLevel = Math.max(0, ...levels.filter(Number.isInteger));
+  levels.forEach((level, id) => { if (level === null) levels[id] = maxDagLevel + 1; });
+  const groups = new Map();
+  levels.forEach((level, id) => { if (!groups.has(level)) groups.set(level, []); groups.get(level).push(id); });
+  const width = 620;
+  const maxGroup = Math.max(1, ...[...groups.values()].map((group) => group.length));
+  const height = Math.max(190, maxGroup * 82 + 28);
+  const positions = new Map();
+  [...groups.entries()].sort((a, b) => a[0] - b[0]).forEach(([level, group], column) => {
+    group.forEach((id, row) => positions.set(id, {
+      x: groups.size === 1 ? width / 2 : 54 + column * (width - 108) / (groups.size - 1),
+      y: (row + 1) * height / (group.length + 1),
+    }));
+  });
+  const edges = (v.edges || []).map(({ u, v: to }) => {
+    const from = positions.get(u), dest = positions.get(to);
+    if (!from || !dest) return "";
+    const active = `${u},${to}` === activeEdgeKey;
+    const done = processed.has(u);
+    const curved = Math.abs(from.y - dest.y) < 3 && Math.abs(from.x - dest.x) < 3;
+    const path = curved
+      ? `M ${from.x} ${from.y - 25} C ${from.x + 70} ${from.y - 90}, ${dest.x - 70} ${dest.y - 90}, ${dest.x} ${dest.y - 25}`
+      : `M ${from.x} ${from.y} L ${dest.x} ${dest.y}`;
+    return `<path class="lc1857-edge ${active ? "active" : done ? "done" : ""} ${cycle.has(u) && cycle.has(to) ? "cycle" : ""}" d="${path}" marker-end="url(#lc1857-arrow)"/>`;
+  }).join("");
+  const nodes = Array.from({ length: n }, (_, id) => {
+    const pos = positions.get(id);
+    const classes = ["lc1857-node", processed.has(id) ? "processed" : "", queued.has(id) ? "queued" : "", id === v.current ? "current" : "", id === v.neighbor ? "neighbor" : "", cycle.has(id) ? "cycle" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}" data-node="${id}" style="--node-color:${nodeColor(id)}" aria-label="${esc(t(`Đỉnh ${id}, màu ${v.colors[id]}, indegree ${v.indegree?.[id] ?? 0}`, `Node ${id}, color ${v.colors[id]}, indegree ${v.indegree?.[id] ?? 0}`))}">
+      <circle class="halo" cx="${pos.x}" cy="${pos.y}" r="31"/><circle class="body" cx="${pos.x}" cy="${pos.y}" r="24"/>
+      <text class="letter" x="${pos.x}" y="${pos.y + 7}">${esc(v.colors[id])}</text>
+      <text class="id" x="${pos.x}" y="${pos.y - 34}">#${id}</text>
+      <text class="degree" x="${pos.x + 25}" y="${pos.y - 19}">${v.indegree?.[id] ?? 0}</text>
+      ${cycle.has(id) ? `<text class="cycle-mark" x="${pos.x - 25}" y="${pos.y + 35}">⟳</text>` : ""}
+    </g>`;
+  }).join("");
+  const graph = `<div class="lc1857-graph"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Đồ thị có hướng tô màu", "Colored directed graph"))}"><defs><marker id="lc1857-arrow" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs>${edges}${nodes}</svg></div>`;
+
+  const beadRow = (node, role) => {
+    if (!Number.isInteger(node)) return `<div class="lc1857-beads empty">∅</div>`;
+    const row = v.dp?.[node] || [];
+    const indexes = row.map((count, color) => count > 0 || color === v.activeColor ? color : null).filter(Number.isInteger);
+    const beads = indexes.length ? indexes.map((color) => `<span class="${color === v.activeColor ? "active" : ""}" style="--bead:${colorFor(color)}"><i>${String.fromCharCode(97 + color)}</i><b>${row[color]}</b></span>`).join("") : '<em>···</em>';
+    return `<div class="lc1857-dp-card ${role}"><header><span style="--node-color:${nodeColor(node)}">${v.colors[node]}</span><b>#${node}</b></header><div class="lc1857-beads">${beads}</div></div>`;
+  };
+  const transfer = Number.isInteger(v.current) && Number.isInteger(v.neighbor)
+    ? `<section class="lc1857-transfer"><div>${beadRow(v.current, "from")}</div><strong class="${v.accepted === false ? "rejected" : ""}">→</strong><div>${beadRow(v.neighbor, "to")}</div>${Number.isInteger(v.activeColor) ? `<aside style="--bead:${colorFor(v.activeColor)}"><i>${String.fromCharCode(97 + v.activeColor)}</i><span>${v.before ?? "·"}</span><em>max</em><span>${v.incoming ?? "·"}</span><b>${v.after ?? v.dp?.[v.neighbor]?.[v.activeColor] ?? "·"}</b></aside>` : ""}</section>`
+    : `<section class="lc1857-focus">${beadRow(Number.isInteger(v.current) ? v.current : v.bestColor?.node, "single")}</section>`;
+  const queue = `<section class="lc1857-queue" aria-label="${t("Hàng đợi topo", "Topological queue")}"><strong aria-hidden="true">⇤</strong><div>${(v.queue || []).map((id, index) => `<span class="${index === 0 ? "front" : ""}" style="--node-color:${nodeColor(id)}"><i>${v.colors[id]}</i><b>#${id}</b></span>`).join("") || '<em>∅</em>'}</div></section>`;
+  const phaseIndex = v.phase === "build" ? 0 : v.phase === "sources" ? 1 : v.phase === "topo" ? 2 : 3;
+  const stages = [["→", "graph"], ["0", "indegree"], ["⇤", "topo"], [v.phase === "cycle" ? "⟳" : "🏆", "result"]].map(([icon, label], index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}" aria-label="${label}"><i>${icon}</i>${index < phaseIndex ? "<b>✓</b>" : ""}</span>${index < 3 ? "<em>›</em>" : ""}`).join("");
+  const result = ["result", "cycle"].includes(v.phase)
+    ? `<div class="lc1857-result ${v.phase}"><span>${v.phase === "cycle" ? "⟳" : "🏆"}</span><strong>${v.answer}</strong>${v.phase === "result" && Number.isInteger(v.bestColor?.color) ? `<i style="--bead:${colorFor(v.bestColor.color)}">${String.fromCharCode(97 + v.bestColor.color)}</i>` : ""}</div>`
+    : "";
+  requestedVizSet(`<section class="lc1857-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="lc1857-header"><div class="lc1857-stages">${stages}</div><div class="lc1857-stats"><span>✓ <b>${v.visited}/${n}</b></span><span>🏆 <b>${v.answer}</b></span></div></header>
+    ${graph}${transfer}${queue}${result}
+  </section>`, t("Đếm màu dọc theo mũi tên bằng topo BFS; vòng đỏ là chu trình", "Count colors along arrows with topological BFS; the red loop marks a cycle"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";

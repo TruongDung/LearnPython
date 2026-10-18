@@ -181,9 +181,9 @@ test("934 renderer and no-scroll styles are registered for lazy loading", () => 
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderShortestBridge934View"));
   assert.match(script, /shortestBridge934View/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v20-417-illustrated/);
-  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v21-417-illustrated/);
-  assert.match(html, /bridge934=picture-v1&water417=picture-v1/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v21-1857-illustrated/);
+  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v22-1857-illustrated/);
+  assert.match(html, /bridge934=picture-v1&water417=picture-v1&color1857=picture-v1/);
   assert.match(css, /\.sb934-viz\s*\{/);
   assert.match(css, /#vizPanel:has\(\.sb934-viz\) :is\(#codePanel, #codePanel2\)/);
   assert.match(renderer, /function renderShortestBridge934View\(step\)/);

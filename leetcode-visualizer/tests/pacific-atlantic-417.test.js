@@ -142,9 +142,9 @@ test("417 renderer and no-scroll styles are registered for lazy loading", () => 
 
   assert.ok(manifest["renderer-requested-visualizations.js"].includes("renderPacificAtlantic417View"));
   assert.match(script, /pacificAtlantic417View/);
-  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v20-417-illustrated/);
-  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v21-417-illustrated/);
-  assert.match(html, /water417=picture-v1/);
+  assert.match(html, /requested-visualizations\.css\?v=requested-visualizations-v21-1857-illustrated/);
+  assert.match(html, /renderer-requested-visualizations\.js\?v=requested-visualizations-v22-1857-illustrated/);
+  assert.match(html, /water417=picture-v1&color1857=picture-v1/);
   assert.match(css, /\.pa417-viz\s*\{/);
   assert.match(css, /#vizPanel:has\(\.pa417-viz\) :is\(#codePanel, #codePanel2\)/);
   assert.match(renderer, /function renderPacificAtlantic417View\(step\)/);
