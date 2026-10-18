@@ -41,14 +41,51 @@ const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming"
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
 const TOPOLOGICAL_SORT_TAG = { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" };
-// Full requested study list. Unsupported IDs are skipped until their
-// visualizations are implemented, then receive this tag automatically.
-const TOPOLOGICAL_SORT_IDS = new Set([
-  207, 210, 269, 310, 329, 444, 631, 802, 851, 913,
-  1059, 1136, 1203, 1245, 1462, 1591, 1632, 1728, 1786, 1857,
-  1916, 1976, 2050, 2115, 2127, 2192, 2204, 2246, 2328, 2360,
-  2371, 2392, 2603, 2876, 3383, 3435, 3481, 3530, 3620, 3812,
-]);
+// Full requested study roster. Built problems receive the tag; unbuilt ones
+// remain in the roster so the catalog can render them as dimmed placeholders.
+const TOPOLOGICAL_SORT_ROSTER_RAW = [
+  [207, "Course Schedule", "medium"],
+  [210, "Course Schedule II", "medium"],
+  [269, "Alien Dictionary", "hard"],
+  [310, "Minimum Height Trees", "medium"],
+  [329, "Longest Increasing Path in a Matrix", "hard"],
+  [444, "Sequence Reconstruction", "medium"],
+  [631, "Design Excel Sum Formula", "hard"],
+  [802, "Find Eventual Safe States", "medium"],
+  [851, "Loud and Rich", "medium"],
+  [913, "Cat and Mouse", "hard"],
+  [1059, "All Paths from Source Lead to Destination", "medium"],
+  [1136, "Parallel Courses", "medium"],
+  [1203, "Sort Items by Groups Respecting Dependencies", "hard"],
+  [1245, "Tree Diameter", "medium"],
+  [1462, "Course Schedule IV", "medium"],
+  [1591, "Strange Printer II", "hard"],
+  [1632, "Rank Transform of a Matrix", "hard"],
+  [1728, "Cat and Mouse II", "hard"],
+  [1786, "Number of Restricted Paths From First to Last Node", "medium"],
+  [1857, "Largest Color Value in a Directed Graph", "hard"],
+  [1916, "Count Ways to Build Rooms in an Ant Colony", "hard"],
+  [1976, "Number of Ways to Arrive at Destination", "medium"],
+  [2050, "Parallel Courses III", "hard"],
+  [2115, "Find All Possible Recipes from Given Supplies", "medium"],
+  [2127, "Maximum Employees to Be Invited to a Meeting", "hard"],
+  [2192, "All Ancestors of a Node in a Directed Acyclic Graph", "medium"],
+  [2204, "Distance to a Cycle in Undirected Graph", "hard"],
+  [2246, "Longest Path With Different Adjacent Characters", "hard"],
+  [2328, "Number of Increasing Paths in a Grid", "hard"],
+  [2360, "Longest Cycle in a Graph", "hard"],
+  [2371, "Minimize Maximum Value in a Grid", "hard"],
+  [2392, "Build a Matrix With Conditions", "hard"],
+  [2603, "Collect Coins in a Tree", "hard"],
+  [2876, "Count Visited Nodes in a Directed Graph", "hard"],
+  [3383, "Minimum Runes to Add to Cast Spell", "hard"],
+  [3435, "Frequencies of Shortest Supersequences", "hard"],
+  [3481, "Apply Substitutions", "medium"],
+  [3530, "Maximum Profit from Valid Topological Order in DAG", "hard"],
+  [3620, "Network Recovery Pathways", "hard"],
+  [3812, "Minimum Edge Toggles on a Tree", "hard"],
+];
+const TOPOLOGICAL_SORT_IDS = new Set(TOPOLOGICAL_SORT_ROSTER_RAW.map(([id]) => id));
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
   496, 1475, 316, 402, 456, 503, 581, 654, 739, 769, 853, 901, 907, 962,
@@ -483,6 +520,20 @@ const KNAPSACK_SUBTABS = [
   },
 ];
 
+const TOPOLOGICAL_SORT_SUBTABS = [
+  {
+    key: "all",
+    vi: "Tất cả",
+    en: "All",
+    roster: TOPOLOGICAL_SORT_ROSTER_RAW.map(([id, title, difficulty]) => ({
+      id,
+      title,
+      difficulty,
+      available: Boolean(SUPPORTED[id]),
+    })),
+  },
+];
+
 module.exports = {
   SUPPORTED,
   CATEGORY_ORDER,
@@ -492,4 +543,6 @@ module.exports = {
   KNAPSACK_TAG,
   KNAPSACK_ORDER_LABEL,
   KNAPSACK_GUIDE,
+  TOPOLOGICAL_SORT_SUBTABS,
+  TOPOLOGICAL_SORT_TAG,
 };

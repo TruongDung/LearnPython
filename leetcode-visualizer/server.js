@@ -27,6 +27,8 @@ const {
   KNAPSACK_TAG,
   KNAPSACK_ORDER_LABEL,
   KNAPSACK_GUIDE,
+  TOPOLOGICAL_SORT_SUBTABS,
+  TOPOLOGICAL_SORT_TAG,
 } = require("./problems");
 const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
@@ -156,6 +158,55 @@ app.get("/api/problems", (req, res) => {
     knapsackGroup.problems.sort((a, b) => a.id - b.id);
     if (!existingKnapsackGroup) groups.push(knapsackGroup);
     knapsackGroup.subTabs = (KNAPSACK_SUBTABS || []).map((tab) => {
+      const roster = (tab.roster || []).map((entry) => ({
+        ...entry,
+        premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
+      }));
+      return {
+        key: tab.key,
+        vi: tab.vi,
+        en: tab.en,
+        roster,
+        count: roster.filter((entry) => entry.available).length,
+        total: roster.length,
+      };
+    });
+  }
+
+  // Topological Sort keeps the complete 40-problem study roster visible.
+  // Entries without a visualization are sent as unavailable placeholders and
+  // the shared catalog renderer displays them as disabled, dimmed chips.
+  const existingTopologicalGroup = groups.find((group) => group.key === TOPOLOGICAL_SORT_TAG.key);
+  const topologicalGroup = (TOPOLOGICAL_SORT_SUBTABS || []).length
+    ? existingTopologicalGroup || {
+        key: TOPOLOGICAL_SORT_TAG.key,
+        vi: TOPOLOGICAL_SORT_TAG.vi,
+        en: TOPOLOGICAL_SORT_TAG.en,
+        problems: [],
+      }
+    : null;
+  if (topologicalGroup) {
+    topologicalGroup.vi = TOPOLOGICAL_SORT_TAG.vi;
+    topologicalGroup.en = TOPOLOGICAL_SORT_TAG.en;
+    const seenIds = new Set(topologicalGroup.problems.map((problem) => problem.id));
+    for (const tab of TOPOLOGICAL_SORT_SUBTABS) {
+      for (const entry of tab.roster || []) {
+        const p = SUPPORTED[entry.id];
+        if (!p || seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        topologicalGroup.problems.push({
+          id: p.id,
+          title: p.title,
+          titleVi: p.titleVi,
+          difficulty: p.difficulty || null,
+          premium: isPremium(p),
+          tags: Array.isArray(p.tags) ? p.tags : [],
+        });
+      }
+    }
+    topologicalGroup.problems.sort((a, b) => a.id - b.id);
+    if (!existingTopologicalGroup) groups.push(topologicalGroup);
+    topologicalGroup.subTabs = TOPOLOGICAL_SORT_SUBTABS.map((tab) => {
       const roster = (tab.roster || []).map((entry) => ({
         ...entry,
         premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
