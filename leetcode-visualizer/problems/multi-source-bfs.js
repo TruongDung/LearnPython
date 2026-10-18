@@ -1026,6 +1026,9 @@ function buildSteps417(input) {
   let pacific = new Set();
   let atlantic = new Set();
   let active = null;
+  let collecting = false;
+  let result = [];
+  const maxHeight = Math.max(...heights.flat());
 
   function cells(current, discovered, frontier) {
     const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
@@ -1043,7 +1046,54 @@ function buildSteps417(input) {
     }));
   }
 
-  const { steps, push } = createRecorder(rows, cols, cells, () => queue);
+  function makeView(codeLine, options) {
+    const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
+    const selected = new Set(result.map(([row, col]) => key(row, col)));
+    const bothCount = [...pacific].filter((cellKey) => atlantic.has(cellKey)).length;
+    const defaultEvent = ({
+      5: "enter", 12: "dequeue", 16: "height-check", 17: "reach", 18: "enqueue",
+      20: "pacific-sources", 21: "atlantic-sources", 22: "ocean-start",
+      23: "ocean-start", 27: "intersection-check", 28: "result-add", 29: "result",
+    })[codeLine] || "step";
+    return {
+      phase: options.final ? "result" : collecting ? "intersection" : active === "Pacific" ? "pacific" : active === "Atlantic" ? "atlantic" : "setup",
+      event: options.event || defaultEvent,
+      activeOcean: active,
+      rows,
+      cols,
+      maxHeight,
+      cells: heights.map((matrixRow, row) => matrixRow.map((height, col) => {
+        const cellKey = key(row, col);
+        const p = pacific.has(cellKey);
+        const a = atlantic.has(cellKey);
+        return {
+          row,
+          col,
+          height,
+          state: p && a ? "both" : p ? "pacific" : a ? "atlantic" : "none",
+          queued: queued.has(cellKey),
+          selected: selected.has(cellKey),
+          pacificBorder: row === 0 || col === 0,
+          atlanticBorder: row === rows - 1 || col === cols - 1,
+        };
+      })),
+      current: options.current || null,
+      discovered: options.discovered || null,
+      origin: options.origin || null,
+      direction: options.direction || null,
+      canFlow: typeof options.canFlow === "boolean" ? options.canFlow : null,
+      queue: (queue || []).map(([row, col]) => ({ row, col, height: heights[row][col] })),
+      pacificCount: pacific.size,
+      atlanticCount: atlantic.size,
+      bothCount,
+      resultCount: result.length,
+      answer: options.final ? result.map((cell) => [...cell]) : null,
+    };
+  }
+
+  const { steps, push } = createRecorder(rows, cols, cells, () => queue, (codeLine, options) => ({
+    pacificAtlantic417View: makeView(codeLine, options),
+  }));
   push(5, text("Bắt đầu pacificAtlantic", "Enter pacificAtlantic"), text("Chạy reverse-flow BFS riêng từ hai đại dương.", "Run separate reverse-flow BFS searches from both oceans."), { vars: [{ name: "grid size", value: `${rows}×${cols}` }] });
   push(6, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Lưu kích thước heights.", "Store the heights dimensions."), { vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }] });
   push(7, text("Khai báo 4 hướng", "Define four directions"), text("Nước kết nối theo bốn hướng.", "Water connects in four directions."), { vars: [{ name: "directions", value: "down, up, right, left" }] });
@@ -1065,13 +1115,13 @@ function buildSteps417(input) {
     addUnique(pacificStarts, pacificStartSet, row, 0);
     addUnique(atlanticStarts, atlanticStartSet, row, cols - 1);
   }
-  push(20, text(`Pacific starts = ${pacificStarts.length} ô`, `Pacific starts = ${pacificStarts.length} cells`), text("Pacific chạm biên trên và biên trái.", "The Pacific touches the top and left borders."), { frontier: pacificStarts, vars: [{ name: "pacific_starts", value: queueText(pacificStarts) }] });
-  push(21, text(`Atlantic starts = ${atlanticStarts.length} ô`, `Atlantic starts = ${atlanticStarts.length} cells`), text("Atlantic chạm biên dưới và biên phải.", "The Atlantic touches the bottom and right borders."), { frontier: atlanticStarts, vars: [{ name: "atlantic_starts", value: queueText(atlanticStarts) }] });
+  push(20, text(`Pacific starts = ${pacificStarts.length} ô`, `Pacific starts = ${pacificStarts.length} cells`), text("Pacific chạm biên trên và biên trái.", "The Pacific touches the top and left borders."), { event: "pacific-sources", frontier: pacificStarts, vars: [{ name: "pacific_starts", value: queueText(pacificStarts) }] });
+  push(21, text(`Atlantic starts = ${atlanticStarts.length} ô`, `Atlantic starts = ${atlanticStarts.length} cells`), text("Atlantic chạm biên dưới và biên phải.", "The Atlantic touches the bottom and right borders."), { event: "atlantic-sources", frontier: atlanticStarts, vars: [{ name: "atlantic_starts", value: queueText(atlanticStarts) }] });
 
   function runOcean(starts, oceanName, reachable, callLine) {
     active = oceanName;
     queue = null;
-    push(callLine, text(`bfs(${oceanName})`, `bfs(${oceanName})`), text(`Bắt đầu BFS ngược từ toàn bộ biên ${oceanName}.`, `Start reverse BFS from the entire ${oceanName} border.`), { frontier: starts, vars: [{ name: "ocean", value: oceanName }] });
+    push(callLine, text(`bfs(${oceanName})`, `bfs(${oceanName})`), text(`Bắt đầu BFS ngược từ toàn bộ biên ${oceanName}.`, `Start reverse BFS from the entire ${oceanName} border.`), { event: "ocean-start", frontier: starts, vars: [{ name: "ocean", value: oceanName }] });
     reachable.clear();
     for (const [row, col] of starts) reachable.add(key(row, col));
     push(9, text(`reachable = set(${oceanName}_starts)`, `reachable = set(${oceanName}_starts)`), text("Mọi ô biên của đại dương đều reachable ban đầu.", "Every ocean-border cell is initially reachable."), { frontier: starts, vars: [{ name: "reachable", value: reachable.size }] });
@@ -1080,23 +1130,23 @@ function buildSteps417(input) {
     while (queue.length) {
       push(11, text("while queue → True", "while queue → True"), text(`Queue ${oceanName} còn ô cần mở rộng.`, `The ${oceanName} queue still has a cell.`));
       const [row, col] = queue.shift();
-      push(12, text(`popleft → (${row},${col})`, `popleft → (${row},${col})`), text("Lấy một ô khỏi queue.", "Remove one cell from the queue."), { current: [row, col], vars: [{ name: "height", value: heights[row][col] }, { name: "ocean", value: oceanName }] });
+      push(12, text(`popleft → (${row},${col})`, `popleft → (${row},${col})`), text("Lấy một ô khỏi queue.", "Remove one cell from the queue."), { event: "dequeue", current: [row, col], vars: [{ name: "height", value: heights[row][col] }, { name: "ocean", value: oceanName }] });
       for (const [deltaRow, deltaCol] of directions) {
-        push(13, text(`Thử hướng (${deltaRow},${deltaCol})`, `Try direction (${deltaRow},${deltaCol})`), text("Xét neighbor theo reverse flow.", "Inspect a neighbor under reverse flow."), { current: [row, col], vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }] });
+        push(13, text(`Thử hướng (${deltaRow},${deltaCol})`, `Try direction (${deltaRow},${deltaCol})`), text("Xét neighbor theo reverse flow.", "Inspect a neighbor under reverse flow."), { event: "direction", current: [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }] });
         const nextRow = row + deltaRow;
         const nextCol = col + deltaCol;
-        push(14, text(`next = (${nextRow},${nextCol})`, `next = (${nextRow},${nextCol})`), text("Tính tọa độ neighbor.", "Compute the neighbor coordinates."), { current: [row, col], vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }] });
+        push(14, text(`next = (${nextRow},${nextCol})`, `next = (${nextRow},${nextCol})`), text("Tính tọa độ neighbor.", "Compute the neighbor coordinates."), { event: "neighbor", current: [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }] });
         const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
         const newCell = inBounds && !reachable.has(key(nextRow, nextCol));
-        push(15, text(`Hợp lệ và chưa reachable → ${newCell}`, `Valid and not reachable → ${newCell}`), newCell ? text("Tiếp tục kiểm tra điều kiện height.", "Continue to the height condition.") : text("Ngoài biên hoặc đã reachable; continue.", "Out of bounds or already reachable; continue."), { current: inBounds ? [nextRow, nextCol] : [row, col], vars: [{ name: "new cell?", value: newCell }] });
+        push(15, text(`Hợp lệ và chưa reachable → ${newCell}`, `Valid and not reachable → ${newCell}`), newCell ? text("Tiếp tục kiểm tra điều kiện height.", "Continue to the height condition.") : text("Ngoài biên hoặc đã reachable; continue.", "Out of bounds or already reachable; continue."), { event: "new-cell-check", current: inBounds ? [nextRow, nextCol] : [row, col], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "new cell?", value: newCell }] });
         if (!newCell) continue;
         const canReverseFlow = heights[nextRow][nextCol] >= heights[row][col];
-        push(16, text(`${heights[nextRow][nextCol]} >= ${heights[row][col]} → ${canReverseFlow}`, `${heights[nextRow][nextCol]} >= ${heights[row][col]} → ${canReverseFlow}`), canReverseFlow ? text("Neighbor cao hơn/bằng nên có thể chảy xuôi về đại dương.", "The neighbor is equal/higher, so it can flow down to the ocean.") : text("Neighbor thấp hơn; reverse BFS không đi tới.", "The neighbor is lower; reverse BFS cannot enter it."), { current: [nextRow, nextCol], vars: [{ name: "can reverse flow?", value: canReverseFlow }] });
+        push(16, text(`${heights[nextRow][nextCol]} >= ${heights[row][col]} → ${canReverseFlow}`, `${heights[nextRow][nextCol]} >= ${heights[row][col]} → ${canReverseFlow}`), canReverseFlow ? text("Neighbor cao hơn/bằng nên có thể chảy xuôi về đại dương.", "The neighbor is equal/higher, so it can flow down to the ocean.") : text("Neighbor thấp hơn; reverse BFS không đi tới.", "The neighbor is lower; reverse BFS cannot enter it."), { event: "height-check", current: [nextRow, nextCol], origin: [row, col], direction: [deltaRow, deltaCol], canFlow: canReverseFlow, vars: [{ name: "can reverse flow?", value: canReverseFlow }] });
         if (!canReverseFlow) continue;
         reachable.add(key(nextRow, nextCol));
-        push(17, text(`reachable.add((${nextRow},${nextCol}))`, `reachable.add((${nextRow},${nextCol}))`), text(`Đánh dấu ô có thể chảy tới ${oceanName}.`, `Mark the cell as able to flow to ${oceanName}.`), { current: [nextRow, nextCol], discovered: [nextRow, nextCol], vars: [{ name: "reachable", value: reachable.size }] });
+        push(17, text(`reachable.add((${nextRow},${nextCol}))`, `reachable.add((${nextRow},${nextCol}))`), text(`Đánh dấu ô có thể chảy tới ${oceanName}.`, `Mark the cell as able to flow to ${oceanName}.`), { event: "reach", current: [nextRow, nextCol], discovered: [nextRow, nextCol], origin: [row, col], direction: [deltaRow, deltaCol], vars: [{ name: "reachable", value: reachable.size }] });
         queue.push([nextRow, nextCol]);
-        push(18, text(`queue.append((${nextRow},${nextCol}))`, `queue.append((${nextRow},${nextCol}))`), text("Thêm ô mới vào queue.", "Append the new cell to the queue."), { current: [nextRow, nextCol], discovered: [nextRow, nextCol] });
+        push(18, text(`queue.append((${nextRow},${nextCol}))`, `queue.append((${nextRow},${nextCol}))`), text("Thêm ô mới vào queue.", "Append the new cell to the queue."), { event: "enqueue", current: [nextRow, nextCol], discovered: [nextRow, nextCol], origin: [row, col], direction: [deltaRow, deltaCol] });
       }
     }
     push(11, text("while queue → False", "while queue → False"), text(`BFS ${oceanName} hoàn tất.`, `${oceanName} BFS is complete.`), { vars: [{ name: "reachable", value: reachable.size }] });
@@ -1107,20 +1157,21 @@ function buildSteps417(input) {
   runOcean(atlanticStarts, "Atlantic", atlantic, 23);
   queue = [];
   active = null;
-  const result = [];
+  collecting = true;
+  result = [];
   push(24, text("result = []", "result = []"), text("Chuẩn bị lấy giao của hai tập reachable.", "Prepare to intersect the two reachable sets."), { vars: [{ name: "Pacific", value: pacific.size }, { name: "Atlantic", value: atlantic.size }] });
   for (let row = 0; row < rows; row++) {
     push(25, text(`Quét result row = ${row}`, `Scan result row = ${row}`), text("Quét các ô theo thứ tự hàng.", "Scan cells in row order."), { vars: [{ name: "row", value: row }] });
     for (let col = 0; col < cols; col++) {
       push(26, text(`Quét result cell (${row},${col})`, `Scan result cell (${row},${col})`), text("Kiểm tra membership trong hai tập.", "Check membership in both sets."), { current: [row, col], vars: [{ name: "col", value: col }] });
       const both = pacific.has(key(row, col)) && atlantic.has(key(row, col));
-      push(27, text(`Pacific AND Atlantic → ${both}`, `Pacific AND Atlantic → ${both}`), both ? text("Ô này chảy được tới cả hai đại dương.", "This cell can flow to both oceans.") : text("Ô không nằm trong giao; bỏ qua.", "The cell is not in the intersection; skip it."), { current: [row, col], vars: [{ name: "both oceans?", value: both }] });
+      push(27, text(`Pacific AND Atlantic → ${both}`, `Pacific AND Atlantic → ${both}`), both ? text("Ô này chảy được tới cả hai đại dương.", "This cell can flow to both oceans.") : text("Ô không nằm trong giao; bỏ qua.", "The cell is not in the intersection; skip it."), { event: "intersection-check", current: [row, col], vars: [{ name: "both oceans?", value: both }] });
       if (!both) continue;
       result.push([row, col]);
-      push(28, text(`result.append([${row},${col}])`, `result.append([${row},${col}])`), text("Thêm tọa độ vào kết quả.", "Append the coordinate to the result."), { current: [row, col], discovered: [row, col], vars: [{ name: "result", value: JSON.stringify(result) }] });
+      push(28, text(`result.append([${row},${col}])`, `result.append([${row},${col}])`), text("Thêm tọa độ vào kết quả.", "Append the coordinate to the result."), { event: "result-add", current: [row, col], discovered: [row, col], vars: [{ name: "result", value: JSON.stringify(result) }] });
     }
   }
-  push(29, text("return result", "return result"), text("Trả về mọi ô chảy được tới cả Pacific và Atlantic.", "Return every cell that can flow to both Pacific and Atlantic."), { final: true, vars: [{ name: "answer", value: JSON.stringify(result) }] });
+  push(29, text("return result", "return result"), text("Trả về mọi ô chảy được tới cả Pacific và Atlantic.", "Return every cell that can flow to both Pacific and Atlantic."), { event: "result", final: true, vars: [{ name: "answer", value: JSON.stringify(result) }] });
   return { original, answer: result, steps };
 }
 
@@ -2164,10 +2215,11 @@ const problems = {
     defaultInput: "1,2,2,3,5|3,2,3,4,4|2,4,5,3,1|6,7,1,4,5|5,1,1,2,4",
     inputKind: "string",
     inputLabel: text("Heights (hàng cách '|')", "Heights (rows separated by '|')"),
+    debugMode: "line-by-line",
     approach: [
-      text("Đi ngược dòng từ toàn bộ biên Pacific và Atlantic.", "Run reverse flow from every Pacific and Atlantic border cell."),
-      text("Reverse BFS chỉ đi sang ô có height lớn hơn hoặc bằng ô hiện tại.", "Reverse BFS moves only to a cell whose height is at least the current height."),
-      text("Giao của hai tập reachable là kết quả.", "The intersection of the two reachable sets is the result."),
+      text("🌊P lan vào từ biên trên + trái.", "🌊P spreads inward from the top + left edges."),
+      text("A🌊 lan vào từ biên dưới + phải, chỉ đi lên cao.", "A🌊 spreads inward from the bottom + right edges, only uphill."),
+      text("✨ Ô nhận được cả hai màu là đáp án.", "✨ Cells receiving both colors are the answer."),
     ],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Hai BFS tuyến tính trên cùng grid.", "Two linear BFS traversals over the same grid.") },
     code: [

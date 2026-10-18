@@ -1103,6 +1103,70 @@ function renderShortestBridge934View(step) {
   </section>`, t("Tô đảo A, lan sóng qua nước rồi đặt cầu tại đường chạm đảo B đầu tiên", "Paint island A, spread across water, then bridge the first path that reaches island B"), "group");
 }
 
+function renderPacificAtlantic417View(step) {
+  const v = step.pacificAtlantic417View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const phaseIndex = v.phase === "pacific" ? 1 : v.phase === "atlantic" ? 2 : ["intersection", "result"].includes(v.phase) ? 3 : 0;
+  const stages = [
+    ["🌊P", t("Bắt đầu từ Pacific", "Start from the Pacific")],
+    ["↗⛰️", t("Đi ngược lên cao", "Climb in reverse")],
+    ["A🌊", t("Bắt đầu từ Atlantic", "Start from the Atlantic")],
+    ["✨", t("Lấy phần giao", "Take the overlap")],
+  ].map(([icon, label], index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+    return `<span class="${state}" aria-label="${esc(label)}"><i>${icon}</i>${index < phaseIndex ? '<b aria-hidden="true">✓</b>' : ""}</span>${index < 3 ? '<em aria-hidden="true">›</em>' : ""}`;
+  }).join("");
+  const keyOf = (cell) => Array.isArray(cell) ? cell.join(",") : "";
+  const currentKey = keyOf(v.current);
+  const discoveredKey = keyOf(v.discovered);
+  const originKey = keyOf(v.origin);
+  const directionArrow = new Map([
+    ["1,0", "↓"], ["-1,0", "↑"], ["0,1", "→"], ["0,-1", "←"],
+  ]).get(keyOf(v.direction)) || "";
+  const terrainIcon = (height) => {
+    const ratio = height / Math.max(1, v.maxHeight || 1);
+    return ratio > .72 ? "🏔️" : ratio > .38 ? "⛰️" : "🌱";
+  };
+  const flatCells = (v.cells || []).flatMap((row) => row);
+  const cells = flatCells.map((cell) => {
+    const key = `${cell.row},${cell.col}`;
+    const classes = [
+      "pa417-cell", cell.state, cell.queued ? "queued" : "", cell.selected ? "selected" : "",
+      key === currentKey ? "current" : "", key === discoveredKey ? "discovered" : "", key === originKey ? "origin" : "",
+    ].filter(Boolean).join(" ");
+    const aria = t(`Ô (${cell.row},${cell.col}), cao ${cell.height}, ${cell.state}`, `Cell (${cell.row},${cell.col}), height ${cell.height}, ${cell.state}`);
+    const arrow = key === originKey && directionArrow ? `<span class="pa417-direction" aria-hidden="true">${directionArrow}</span>` : "";
+    const spark = key === discoveredKey ? '<span class="pa417-spark" aria-hidden="true">✦</span>' : "";
+    const badges = `${["pacific", "both"].includes(cell.state) ? '<i class="pa417-p" aria-hidden="true">P</i>' : ""}${["atlantic", "both"].includes(cell.state) ? '<i class="pa417-a" aria-hidden="true">A</i>' : ""}`;
+    return `<div class="${classes}" aria-label="${esc(aria)}"><span class="pa417-terrain" aria-hidden="true">${terrainIcon(cell.height)}</span><strong>${cell.height}</strong>${badges}${arrow}${spark}</div>`;
+  }).join("");
+  const origin = flatCells.find((cell) => `${cell.row},${cell.col}` === originKey);
+  const candidate = flatCells.find((cell) => `${cell.row},${cell.col}` === currentKey);
+  const comparison = v.event === "height-check" && origin && candidate
+    ? `<div class="pa417-compare ${v.canFlow ? "yes" : "no"}" aria-label="${esc(t(`So sánh độ cao ${candidate.height} với ${origin.height}`, `Compare height ${candidate.height} with ${origin.height}`))}"><span>${terrainIcon(origin.height)}<b>${origin.height}</b></span><em>≤</em><span>${terrainIcon(candidate.height)}<b>${candidate.height}</b></span><strong>${v.canFlow ? "✓" : "×"}</strong></div>`
+    : "";
+  const queueItems = (v.queue || []).slice(0, 8).map((cell, index) => {
+    const left = ((cell.col + 0.5) / Math.max(1, v.cols) * 100).toFixed(2);
+    const top = ((cell.row + 0.5) / Math.max(1, v.rows) * 100).toFixed(2);
+    const columnSize = (100 / Math.max(1, v.cols)).toFixed(3);
+    const rowSize = (100 / Math.max(1, v.rows)).toFixed(3);
+    return `<span class="pa417-ticket ${index === 0 ? "front" : ""}" aria-label="${esc(t(`Ô (${cell.row},${cell.col}), cao ${cell.height}`, `Cell (${cell.row},${cell.col}), height ${cell.height}`))}"><i class="pa417-mini-map" style="background-size:${columnSize}% ${rowSize}%"><b style="left:${left}%;top:${top}%"></b></i><em aria-hidden="true">${terrainIcon(cell.height)}</em><strong>${cell.height}</strong></span>`;
+  }).join("") || `<b class="pa417-empty" aria-label="${t("Queue rỗng", "Empty queue")}">∅</b>`;
+  const queueMore = (v.queue || []).length > 8 ? `<small class="pa417-more">+${v.queue.length - 8}</small>` : "";
+  const result = v.phase === "result"
+    ? `<div class="pa417-result" aria-label="${esc(t(`${v.resultCount} ô chảy được tới cả hai đại dương`, `${v.resultCount} cells reach both oceans`))}"><span aria-hidden="true">🌊P</span><em>+</em><span aria-hidden="true">A🌊</span><em>=</em><i aria-hidden="true">✨</i><strong>${v.resultCount}</strong></div>`
+    : "";
+  requestedVizSet(`<section class="pa417-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="pa417-header"><div class="pa417-stages">${stages}</div><div class="pa417-stats"><span aria-label="${t("Ô tới Pacific", "Pacific cells")}">🌊P <b>${v.pacificCount || 0}</b></span><span aria-label="${t("Ô tới Atlantic", "Atlantic cells")}">A🌊 <b>${v.atlanticCount || 0}</b></span><span aria-label="${t("Ô tới cả hai", "Both oceans")}">✨ <b>${v.bothCount || 0}</b></span></div></header>
+    ${comparison}
+    <div class="pa417-map"><span class="pa417-ocean pacific" aria-hidden="true">🌊 P</span><div class="pa417-grid" style="--pa417-cols:${v.cols}">${cells}</div><span class="pa417-ocean atlantic" aria-hidden="true">A 🌊</span></div>
+    <section class="pa417-queue ${String(v.activeOcean || "").toLowerCase()}" aria-label="${t("Hàng đợi BFS", "BFS queue")}"><span aria-hidden="true">${v.activeOcean === "Atlantic" ? "A🌊" : "🌊P"}</span><div>${queueItems}${queueMore}</div></section>
+    ${result}
+  </section>`, t("Hai BFS đi ngược từ hai đại dương; ô nhận cả P và A phát sáng", "Two reverse BFS searches start at the oceans; cells receiving both P and A glow"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";
