@@ -24846,6 +24846,7 @@ function buildSteps1462(input, params = {}) {
   const { n, prerequisites, queries } = parse1462Data(input, params);
   const direct = Array.from({ length: n }, () => Array(n).fill(false));
   const reach = Array.from({ length: n }, () => Array(n).fill(false));
+  const queryResults = Array(queries.length).fill(null);
   const steps = [];
 
   function graphState({ hlNodes = [], hlEdges = [] } = {}) {
@@ -24876,7 +24877,24 @@ function buildSteps1462(input, params = {}) {
     return reach.map((row) => row.map((value) => value ? "1" : "0").join(" ")).join(" | ");
   }
 
-  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    hlNodes,
+    hlEdges,
+    phase = "build",
+    event = "step",
+    via = null,
+    from = null,
+    to = null,
+    path = [],
+    queryIndex = null,
+    final = false,
+    answer = null,
+  }) {
+    const directCount = direct.reduce((total, row) => total + row.filter(Boolean).length, 0);
+    const reachCount = reach.reduce((total, row) => total + row.filter(Boolean).length, 0);
     steps.push({
       title,
       note,
@@ -24891,6 +24909,34 @@ function buildSteps1462(input, params = {}) {
         { name: "reach matrix", value: matrixText() },
         ...(answer === null ? [] : [{ name: "answers", value: "[" + answer.map((value) => String(value)).join(", ") + "]" }]),
       ],
+      course1462View: {
+        phase,
+        event,
+        n,
+        direct: direct.map((row) => [...row]),
+        reach: reach.map((row) => [...row]),
+        edges: reach.flatMap((row, edgeFrom) => row.flatMap((connected, edgeTo) => connected ? [{
+          from: edgeFrom,
+          to: edgeTo,
+          kind: direct[edgeFrom][edgeTo] ? "direct" : "inferred",
+        }] : [])),
+        via,
+        from,
+        to,
+        path: [...path],
+        queryIndex,
+        queries: queries.map(([queryFrom, queryTo], index) => ({
+          from: queryFrom,
+          to: queryTo,
+          result: queryResults[index],
+          current: index === queryIndex,
+        })),
+        directCount,
+        inferredCount: reachCount - directCount,
+        knownCount: reachCount,
+        answeredCount: queryResults.filter((value) => value !== null).length,
+        trueCount: queryResults.filter((value) => value === true).length,
+      },
     });
   }
 
@@ -24898,6 +24944,8 @@ function buildSteps1462(input, params = {}) {
     title: { vi: "reach = [[False] * n for _ in range(n)]", en: "reach = [[False] * n for _ in range(n)]" },
     note: { vi: "reach[a][b] sẽ là True khi a là prerequisite trực tiếp hoặc gián tiếp của b.", en: "reach[a][b] will be True when a is a direct or indirect prerequisite of b." },
     codeLines: [3],
+    phase: "build",
+    event: "setup",
   });
 
   for (const [from, to] of prerequisites) {
@@ -24909,6 +24957,11 @@ function buildSteps1462(input, params = {}) {
       codeLines: [4, 5],
       hlNodes: [from, to],
       hlEdges: [[from, to]],
+      phase: "build",
+      event: "direct",
+      from,
+      to,
+      path: [from, to],
     });
   }
 
@@ -24918,6 +24971,9 @@ function buildSteps1462(input, params = {}) {
       note: { vi: "Tìm mọi cặp course có thể nối qua " + via + ".", en: "Find every pair of courses that can be connected through " + via + "." },
       codeLines: [6],
       hlNodes: [via],
+      phase: "closure",
+      event: "via",
+      via,
     });
     for (let from = 0; from < n; from += 1) {
       if (!reach[from][via]) continue;
@@ -24930,15 +24986,23 @@ function buildSteps1462(input, params = {}) {
           codeLines: [7, 8, 10, 11, 12],
           hlNodes: [from, via, to],
           hlEdges: [[from, via], [via, to], [from, to]],
+          phase: "closure",
+          event: "infer",
+          via,
+          from,
+          to,
+          path: [from, via, to],
         });
       }
     }
   }
 
   const answer = [];
-  for (const [from, to] of queries) {
+  for (let queryIndex = 0; queryIndex < queries.length; queryIndex += 1) {
+    const [from, to] = queries[queryIndex];
     const result = reach[from][to];
     answer.push(result);
+    queryResults[queryIndex] = result;
     snapshot({
       title: { vi: "Query [" + from + ", " + to + "] → " + result, en: "Query [" + from + ", " + to + "] → " + result },
       note: result
@@ -24947,6 +25011,12 @@ function buildSteps1462(input, params = {}) {
       codeLines: [13],
       hlNodes: [from, to],
       hlEdges: result ? [[from, to]] : [],
+      phase: "query",
+      event: "query",
+      from,
+      to,
+      path: result ? [from, to] : [],
+      queryIndex,
     });
   }
 
@@ -24954,6 +25024,8 @@ function buildSteps1462(input, params = {}) {
     title: { vi: "return answers", en: "return answers" },
     note: { vi: "Kết quả theo đúng thứ tự queries.", en: "Results are returned in the same order as queries." },
     codeLines: [13],
+    phase: "result",
+    event: "result",
     final: true,
     answer,
   });

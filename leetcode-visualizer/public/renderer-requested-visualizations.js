@@ -1364,6 +1364,117 @@ function renderSafeStates802View(step) {
   </section>`, t("Bóc ngược từ terminal node: cạnh bị cắt, outdegree về 0 thì node nhận khiên", "Peel backward from terminal nodes: cut edges; a node receives a shield when its outdegree reaches zero"), "group");
 }
 
+// ─── #1462: Course Schedule IV ───────────────────────────────────────────
+function renderCourse1462View(step) {
+  const v = step.course1462View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const n = Number(v.n) || 0;
+  const width = 620;
+  const height = n <= 6 ? 300 : 350;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radiusX = n <= 2 ? 145 : 225;
+  const radiusY = n <= 2 ? 0 : height / 2 - 55;
+  const positions = new Map();
+  for (let id = 0; id < n; id += 1) {
+    const angle = -Math.PI / 2 + 2 * Math.PI * id / Math.max(1, n);
+    positions.set(id, n === 1
+      ? { x: centerX, y: centerY }
+      : { x: centerX + radiusX * Math.cos(angle), y: centerY + radiusY * Math.sin(angle) });
+  }
+
+  const pathKeys = new Set((v.path || []).slice(1).map((node, index) => `${v.path[index]},${node}`));
+  if (Number.isInteger(v.from) && Number.isInteger(v.to)) pathKeys.add(`${v.from},${v.to}`);
+  const edgePath = (fromId, toId) => {
+    const from = positions.get(fromId);
+    const to = positions.get(toId);
+    if (!from || !to) return "";
+    if (fromId === toId) {
+      return `M ${from.x - 18} ${from.y - 19} C ${from.x - 58} ${from.y - 68}, ${from.x + 58} ${from.y - 68}, ${from.x + 18} ${from.y - 19}`;
+    }
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const sx = from.x + dx / length * 30;
+    const sy = from.y + dy / length * 30;
+    const ex = to.x - dx / length * 34;
+    const ey = to.y - dy / length * 34;
+    const reverse = (v.edges || []).some((edge) => edge.from === toId && edge.to === fromId);
+    if (!reverse) return `M ${sx} ${sy} L ${ex} ${ey}`;
+    const bend = fromId < toId ? 22 : -22;
+    const mx = (sx + ex) / 2 - dy / length * bend;
+    const my = (sy + ey) / 2 + dx / length * bend;
+    return `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`;
+  };
+
+  const graphEdges = (v.edges || []).map((edge) => {
+    const key = `${edge.from},${edge.to}`;
+    const active = pathKeys.has(key);
+    return `<path class="cs1462-edge ${esc(edge.kind)}${active ? " active" : ""}" data-edge="${key}" d="${edgePath(edge.from, edge.to)}" marker-end="url(#cs1462-arrow-${active ? "active" : edge.kind})"/>`;
+  }).join("");
+  const graphNodes = Array.from({ length: n }, (_, id) => {
+    const point = positions.get(id);
+    const classes = [
+      "cs1462-node",
+      id === v.via ? "via" : "",
+      id === v.from ? "from" : "",
+      id === v.to ? "to" : "",
+    ].filter(Boolean).join(" ");
+    return `<g class="${classes}" data-course="${id}">
+      <circle class="halo" cx="${point.x}" cy="${point.y}" r="36"/>
+      <circle class="body" cx="${point.x}" cy="${point.y}" r="27"/>
+      <text class="book" x="${point.x}" y="${point.y + 7}">📘</text>
+      <text class="number" x="${point.x}" y="${point.y + 7}">${id}</text>
+      ${id === v.via ? `<text class="link" x="${point.x + 25}" y="${point.y - 24}">🔗</text>` : ""}
+    </g>`;
+  }).join("");
+  const graph = `<div class="cs1462-graph"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Sơ đồ môn học và điều kiện tiên quyết", "Course prerequisite graph"))}"><defs>
+    <marker id="cs1462-arrow-direct" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="cs1462-arrow-inferred" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="cs1462-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+  </defs>${graphEdges}${graphNodes}</svg></div>`;
+
+  const course = (id, role = "") => `<span class="${role}"><i>📘</i><b>${id}</b></span>`;
+  let bridge = "";
+  if (v.event === "infer" && Array.isArray(v.path) && v.path.length === 3) {
+    bridge = `<section class="cs1462-bridge" aria-label="${esc(t("Nối quan hệ bắc cầu", "Connect a transitive prerequisite"))}">${course(v.path[0], "from")}<em>→</em>${course(v.path[1], "via")}<em>→</em>${course(v.path[2], "to")}<strong>⇒</strong>${course(v.path[0], "from")}<em>→</em>${course(v.path[2], "to")}</section>`;
+  } else if (v.event === "direct" && Number.isInteger(v.from) && Number.isInteger(v.to)) {
+    bridge = `<section class="cs1462-bridge direct">${course(v.from, "from")}<em>→</em>${course(v.to, "to")}<strong>✓</strong></section>`;
+  } else if (v.event === "query" && Number.isInteger(v.from) && Number.isInteger(v.to)) {
+    const result = v.queries?.[v.queryIndex]?.result === true;
+    bridge = `<section class="cs1462-bridge query ${result ? "yes" : "no"}">${course(v.from, "from")}<em>→?</em>${course(v.to, "to")}<strong>${result ? "✓" : "×"}</strong></section>`;
+  }
+
+  const matrixCells = Array.from({ length: n }, (_, from) => {
+    const cells = Array.from({ length: n }, (_, to) => {
+      const isDirect = Boolean(v.direct?.[from]?.[to]);
+      const connected = Boolean(v.reach?.[from]?.[to]);
+      const active = from === v.from && to === v.to;
+      const classes = ["cell", isDirect ? "direct" : connected ? "inferred" : "empty", active ? "active" : ""].filter(Boolean).join(" ");
+      return `<span class="${classes}" aria-label="${esc(t(`Môn ${from} là tiên quyết của môn ${to}: ${connected}`, `Course ${from} is a prerequisite of course ${to}: ${connected}`))}"><b>${connected ? isDirect ? "→" : "↝" : "·"}</b></span>`;
+    }).join("");
+    return `<span class="axis">📘${from}</span>${cells}`;
+  }).join("");
+  const matrixHeader = Array.from({ length: n }, (_, id) => `<span class="axis">📘${id}</span>`).join("");
+  const matrix = `<section class="cs1462-matrix" aria-label="${esc(t("Ma trận quan hệ tiên quyết", "Prerequisite reachability matrix"))}"><div style="--cs1462-cols:${n + 1}"><i></i>${matrixHeader}${matrixCells}</div></section>`;
+
+  const queries = `<section class="cs1462-queries" aria-label="${esc(t("Các truy vấn", "Queries"))}"><strong>?</strong><div>${(v.queries || []).map((query) => `<span class="${query.current ? "current" : ""} ${query.result === true ? "yes" : query.result === false ? "no" : "pending"}"><i>📘${query.from}</i><em>→</em><i>📘${query.to}</i><b>${query.result === true ? "✓" : query.result === false ? "×" : "?"}</b></span>`).join("") || "<em>∅</em>"}</div></section>`;
+  const phaseIndex = v.phase === "build" ? 0 : v.phase === "closure" ? 1 : v.phase === "query" ? 2 : 3;
+  const stageIcons = ["📚", "🔗", "?", "✅"];
+  const stages = stageIcons.map((icon, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${icon}</i>${index < phaseIndex ? "<b>✓</b>" : ""}</span>${index < 3 ? "<em>›</em>" : ""}`).join("");
+  const stats = `<div class="cs1462-stats"><span>→ <b>${v.directCount || 0}</b></span><span>↝ <b>${v.inferredCount || 0}</b></span><span>? <b>${v.answeredCount || 0}/${(v.queries || []).length}</b></span></div>`;
+  const result = v.phase === "result"
+    ? `<section class="cs1462-result">${(v.queries || []).map((query) => `<div class="${query.result ? "yes" : "no"}">${course(query.from)}<em>→</em>${course(query.to)}<strong>${query.result ? "✓" : "×"}</strong></div>`).join("")}</section>`
+    : "";
+
+  requestedVizSet(`<section class="cs1462-viz phase-${esc(v.phase)}" data-event="${esc(v.event)}">
+    <header class="cs1462-header"><div class="cs1462-stages">${stages}</div>${stats}</header>
+    ${graph}${bridge}<div class="cs1462-lower">${matrix}${queries}</div>${result}
+  </section>`, t("Nối các môn học qua từng điểm trung gian rồi trả lời truy vấn bằng dấu tích hoặc dấu nhân", "Connect courses through each intermediate node, then answer queries with a check or cross"), "group");
+}
+
 function renderUnionFind684View(step) {
   const v=step.unionFind684View,t=(vi,en)=>lang==="vi"?vi:en,esc=requestedVizEsc;
   const current=v.edges.find(e=>e.index===v.currentEdgeIndex),cycle=current?.state==="redundant";
