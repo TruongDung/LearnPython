@@ -40,6 +40,15 @@ const CATEGORY_ORDER = {};
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
+const TOPOLOGICAL_SORT_TAG = { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" };
+// Full requested study list. Unsupported IDs are skipped until their
+// visualizations are implemented, then receive this tag automatically.
+const TOPOLOGICAL_SORT_IDS = new Set([
+  207, 210, 269, 310, 329, 444, 631, 802, 851, 913,
+  1059, 1136, 1203, 1245, 1462, 1591, 1632, 1728, 1786, 1857,
+  1916, 1976, 2050, 2115, 2127, 2192, 2204, 2246, 2328, 2360,
+  2371, 2392, 2603, 2876, 3383, 3435, 3481, 3530, 3620, 3812,
+]);
 const MONOTONIC_STACK_TAG = { key: "monotonic-stack", vi: "Monotonic Stack", en: "Monotonic Stack" };
 const MONOTONIC_STACK_IDS = new Set([
   496, 1475, 316, 402, 456, 503, 581, 654, 739, 769, 853, 901, 907, 962,
@@ -223,8 +232,17 @@ for (const id of KNAPSACK_IDS) {
   }
 }
 
+for (const id of TOPOLOGICAL_SORT_IDS) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some((tag) => tag && tag.key === TOPOLOGICAL_SORT_TAG.key)) {
+    problem.tags = [...tags, TOPOLOGICAL_SORT_TAG];
+  }
+}
+
 // Keep aliases from splitting one visible catalog label into multiple groups.
-// `dp`, `fenwick-tree`, `0-1-knapsack`, and `frequency-count` are canonical topic keys.
+// These canonical topic objects keep aliases and translated labels from splitting groups.
 for (const problem of Object.values(SUPPORTED)) {
   if (!problem || typeof problem !== "object") continue;
   if (problem.category && ["dp", "dynamic-programming"].includes(problem.category.key)) {
@@ -247,6 +265,7 @@ for (const problem of Object.values(SUPPORTED)) {
       if (tag && ["fenwick", "fenwick-tree", "binary-indexed-tree"].includes(tag.key)) return FENWICK_TREE_TAG;
       if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
       if (tag && ["frequency", "frequency-count"].includes(tag.key)) return FREQUENCY_COUNT_TAG;
+      if (tag && tag.key === "topological-sort") return TOPOLOGICAL_SORT_TAG;
       return tag;
     })
     .filter((tag) => {
