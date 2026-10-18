@@ -4379,6 +4379,7 @@ function buildSteps1976(input, params) {
     previousWays = null,
     incomingWays = null,
     answerValue = null,
+    event = null,
   }) {
     const highlightedEdge = final ? null : hlEdges[0];
     const resolvedEdge = activeEdge || (highlightedEdge
@@ -4398,6 +4399,11 @@ function buildSteps1976(input, params) {
       graph: makeGraph(hlNodes, hlEdges, annotations),
       countPaths1976View: {
         phase: phase || phaseForLine(codeLine, final),
+        event: event || (final ? "result" : relation || phase || phaseForLine(codeLine, final)),
+        n,
+        edges: roads.map(([u, v, w], index) => ({ u, v, w, index })),
+        positions: layout.positions,
+        shortestEdges: predecessors.flatMap((fromNodes, v) => [...fromNodes].map((u) => ({ u, v }))),
         nodes: nodes.map((node) => ({
           node,
           distance: formatDist(dist[node]),
@@ -4418,6 +4424,7 @@ function buildSteps1976(input, params) {
         incomingWays,
         answer: answerValue,
         target: n - 1,
+        finalizedCount: finalized.size,
       },
       highlight: [],
       mark: [],

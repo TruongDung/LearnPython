@@ -7140,6 +7140,121 @@
   .cp1976-side { margin-top: 10px; }
 }
 
+/* #1976 Count Paths — picture-first shortest-route map */
+.route1976-viz {
+  --r1976-bg: #07111f;
+  --r1976-panel: #0d1b2d;
+  --r1976-line: #40526a;
+  --r1976-text: #e5edf7;
+  --r1976-blue: #38bdf8;
+  --r1976-green: #34d399;
+  --r1976-purple: #c084fc;
+  --r1976-amber: #fbbf24;
+  --r1976-red: #fb7185;
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #25364d;
+  border-radius: 14px;
+  background: radial-gradient(circle at 15% 0%, rgba(56, 189, 248, .09), transparent 30%), var(--r1976-bg);
+  color: var(--r1976-text);
+  container-type: inline-size;
+}
+.route1976-viz, .route1976-viz * { box-sizing: border-box; }
+.route1976-viz > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.route1976-stages { display: flex; align-items: center; gap: 5px; }
+.route1976-stages > span { position: relative; display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid #334155; border-radius: 50%; background: #101d30; opacity: .46; }
+.route1976-stages > span i { font-size: 18px; font-style: normal; }
+.route1976-stages > span b { position: absolute; right: -3px; bottom: -2px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: #047857; color: white; font: 900 9px/1 sans-serif; }
+.route1976-stages > span.is-active { border-color: var(--r1976-amber); box-shadow: 0 0 0 4px rgba(251,191,36,.12); opacity: 1; }
+.route1976-stages > span.is-done { border-color: var(--r1976-green); opacity: .82; }
+.route1976-stages > em { color: #52647c; font: 900 17px sans-serif; }
+.route1976-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.route1976-stats span { padding: 6px 9px; border: 1px solid #31445e; border-radius: 999px; background: #101d30; color: #a9b8cb; font: 700 11px Consolas, monospace; }
+.route1976-stats b { color: white; }
+.route1976-map { overflow: hidden; min-width: 0; border: 1px solid #25364d; border-radius: 12px; background: linear-gradient(180deg, rgba(56,189,248,.045), rgba(52,211,153,.025)); }
+.route1976-map svg { display: block; width: 100%; height: auto; max-height: 430px; }
+.route1976-wave { fill: none; stroke: rgba(56,189,248,.08); stroke-width: 70; stroke-linecap: round; }
+.route1976-road path { fill: none; stroke: var(--r1976-line); stroke-width: 4; stroke-linecap: round; transition: stroke .2s, stroke-width .2s; }
+.route1976-road.shortest path { stroke: #168b68; stroke-width: 6; }
+.route1976-road.active path { stroke: var(--r1976-amber); stroke-width: 9; filter: url(#route1976-glow); }
+.route1976-road.active.shorter path { stroke: var(--r1976-green); }
+.route1976-road.active.equal path { stroke: var(--r1976-purple); }
+.route1976-road.active.longer path { stroke: var(--r1976-red); stroke-dasharray: 8 7; }
+.route1976-road .weight rect { fill: #101d30; stroke: #52647c; }
+.route1976-road .weight text { fill: #dbe8f8; font: 800 11px Consolas, monospace; text-anchor: middle; }
+.route1976-road.active .weight rect { fill: #422f09; stroke: var(--r1976-amber); }
+.route1976-road.active.equal .weight rect { fill: #3b1b52; stroke: var(--r1976-purple); }
+.route1976-road.active.longer .weight rect { fill: #4b1827; stroke: var(--r1976-red); }
+.route1976-node .pulse { fill: transparent; stroke: transparent; stroke-width: 3; }
+.route1976-node .body { fill: #12243a; stroke: #5f7693; stroke-width: 3; }
+.route1976-node.finalized .body { stroke: var(--r1976-green); }
+.route1976-node.current .pulse { stroke: var(--r1976-amber); stroke-dasharray: 5 4; }
+.route1976-node.candidate .pulse { stroke: var(--r1976-blue); }
+.route1976-node.source .body { fill: #2c2609; stroke: var(--r1976-amber); }
+.route1976-node.target .body { fill: #083326; stroke: var(--r1976-green); }
+.route1976-node .id { fill: white; font: 900 18px Consolas, monospace; text-anchor: middle; }
+.route1976-node .clock rect { fill: #e0f2fe; stroke: #38bdf8; }
+.route1976-node .clock text { fill: #075985; font: 850 10px Consolas, monospace; text-anchor: middle; }
+.route1976-node .ways rect { fill: #3b1b52; stroke: var(--r1976-purple); }
+.route1976-node .ways text { fill: #e9d5ff; font: 850 11px Consolas, monospace; text-anchor: middle; }
+.route1976-node .flag { font-size: 17px; text-anchor: middle; }
+.route1976-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 61px; padding: 8px 12px; border: 2px solid #3b506c; border-radius: 12px; background: #0d1b2d; }
+.route1976-action > span { display: grid; grid-template-columns: auto auto; align-items: center; gap: 5px; padding: 5px 9px; border: 2px solid #536b89; border-radius: 999px; }
+.route1976-action span b { color: white; font: 900 16px Consolas, monospace; }
+.route1976-action span small { color: #9bdffc; font: 750 10px Consolas, monospace; }
+.route1976-action > em { color: #a9b8cb; font: 850 15px Consolas, monospace; font-style: normal; }
+.route1976-action > strong { min-width: 35px; color: var(--r1976-blue); font: 900 22px Consolas, monospace; text-align: center; }
+.route1976-action > i { color: var(--r1976-amber); font: 900 22px Consolas, monospace; font-style: normal; }
+.route1976-action > mark { padding: 5px 8px; border-radius: 8px; background: rgba(192,132,252,.16); color: #e9d5ff; font: 850 13px Consolas, monospace; }
+.route1976-action.shorter { border-color: var(--r1976-green); }
+.route1976-action.equal { border-color: var(--r1976-purple); }
+.route1976-action.longer { border-color: var(--r1976-red); opacity: .8; }
+.route1976-action.equal > i { color: var(--r1976-purple); }
+.route1976-action.longer > i { color: var(--r1976-red); }
+.route1976-heap { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 44px; padding: 7px 10px; border: 1px solid #25364d; border-radius: 11px; background: #0d1b2d; }
+.route1976-heap > strong { color: var(--r1976-blue); font: 900 21px sans-serif; }
+.route1976-heap > span { display: grid; grid-template-columns: auto auto; gap: 5px; padding: 4px 8px; border: 1px solid #3b506c; border-radius: 999px; }
+.route1976-heap > span.front { border-color: var(--r1976-amber); background: rgba(251,191,36,.1); }
+.route1976-heap span i { color: #7dd3fc; font: 750 10px Consolas, monospace; font-style: normal; }
+.route1976-heap span b { color: white; font: 900 11px Consolas, monospace; }
+.route1976-heap > em { color: #6b7e96; font-style: normal; }
+.route1976-result { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; min-height: 76px; padding: 10px 16px; border: 2px solid var(--r1976-green); border-radius: 13px; background: linear-gradient(90deg, rgba(52,211,153,.08), rgba(56,189,248,.08)); }
+.route1976-result span { color: #dbeafe; font: 900 16px Consolas, monospace; }
+.route1976-result em { border-bottom: 4px solid #168b68; color: #86efac; font: 850 13px Consolas, monospace; font-style: normal; text-align: center; }
+.route1976-result strong { display: grid; place-items: center; min-width: 53px; height: 53px; border-radius: 50%; background: var(--r1976-green); color: #052e25; font: 950 27px Consolas, monospace; }
+[data-theme="light"] .route1976-viz { --r1976-bg: #f8fbff; --r1976-panel: #fff; --r1976-line: #94a3b8; --r1976-text: #0f172a; border-color: #cbd5e1; }
+[data-theme="light"] .route1976-stages > span, [data-theme="light"] .route1976-stats span, [data-theme="light"] .route1976-action, [data-theme="light"] .route1976-heap { background: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .route1976-stats b, [data-theme="light"] .route1976-action span b, [data-theme="light"] .route1976-heap span b { color: #0f172a; }
+[data-theme="light"] .route1976-map { border-color: #cbd5e1; background: linear-gradient(180deg, #effaff, #f0fdf8); }
+[data-theme="light"] .route1976-road .weight rect { fill: #fff; }
+[data-theme="light"] .route1976-road .weight text { fill: #334155; }
+[data-theme="light"] .route1976-node .body { fill: #fff; }
+[data-theme="light"] .route1976-node.source .body { fill: #fffbeb; }
+[data-theme="light"] .route1976-node.target .body { fill: #ecfdf5; }
+[data-theme="light"] .route1976-node .id { fill: #0f172a; }
+[data-theme="light"] .route1976-node .ways rect { fill: #f3e8ff; }
+[data-theme="light"] .route1976-node .ways text { fill: #6b21a8; }
+[data-theme="light"] .route1976-result span { color: #0f172a; }
+[data-theme="light"] .route1976-result em { border-color: #047857; color: #047857; }
+body:has(.route1976-viz) #stepNote { display: none; }
+#vizPanel:has(.route1976-viz) :is(#codePanel, #codePanel2) { height: auto; max-height: none; overflow: visible; position: static; white-space: pre-wrap; }
+#vizPanel:has(.route1976-viz) .code-section,
+#vizPanel:has(.route1976-viz) .code-line { min-width: 0; width: 100%; white-space: pre-wrap; }
+#vizPanel:has(.route1976-viz) .code-line .txt { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+@container (max-width: 590px) {
+  .route1976-viz { padding: 8px; }
+  .route1976-viz > header { align-items: flex-start; flex-direction: column; }
+  .route1976-stats { justify-content: flex-start; }
+  .route1976-action { gap: 5px; padding-inline: 6px; }
+  .route1976-action > span { padding-inline: 6px; }
+  .route1976-action > mark { font-size: 10px; }
+  .route1976-result { grid-template-columns: auto 1fr auto; }
+  .route1976-result strong { grid-column: 1 / -1; justify-self: center; }
+}
+
 /* ---- 1658: keep the middle, remove both ends ---- */
 .co1658-viz { --co-bg: #0f172a; --co-panel: #17233a; --co-border: #334155; --co-text: #e2e8f0; --co-muted: #94a3b8; display: grid; gap: 12px; width: 100%; min-width: 0; padding: 14px; border: 1px solid var(--co-border); border-radius: 12px; background: var(--co-bg); color: var(--co-text); container-type: inline-size; }
 .co1658-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px 14px; align-items: baseline; }
