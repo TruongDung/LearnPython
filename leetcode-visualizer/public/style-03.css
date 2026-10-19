@@ -3224,6 +3224,201 @@
   border-color: rgba(217, 119, 6, 0.65);
 }
 
+/* ---- Skyline #218 · picture-first debugger ---- */
+.skyline-viz {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  color: #e2e8f0;
+  background:
+    radial-gradient(circle at 82% 0%, rgba(56, 189, 248, 0.1), transparent 30%),
+    radial-gradient(circle at 8% 100%, rgba(245, 158, 11, 0.08), transparent 30%),
+    #090e1a;
+  border: 1px solid #243047;
+  border-radius: 18px;
+  container-type: inline-size;
+  overflow: hidden;
+}
+
+.skyline-head,
+.skyline-city-card > header,
+.skyline-heap-tree > header,
+.skyline-height-card > header,
+.skyline-output > header,
+.skyline-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skyline-head small,
+.skyline-city-card > header,
+.skyline-heap-tree > header,
+.skyline-height-card > header,
+.skyline-output > header,
+.skyline-action small {
+  color: #8491a8;
+  font: 700 10px/1.2 "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.skyline-head strong {
+  display: block;
+  margin-top: 5px;
+  color: #f8fafc;
+  font-size: 17px;
+  letter-spacing: 0.025em;
+}
+
+.skyline-head > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  color: #fef3c7;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: 999px;
+  font: 800 10px/1 "SFMono-Regular", Consolas, monospace;
+}
+
+.skyline-head > span b { font-size: 17px; }
+.skyline-phases { display: grid; grid-template-columns: repeat(5, minmax(72px, 1fr)); gap: 6px; }
+.skyline-phases span { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; color: #64748b; background: rgba(15, 23, 42, 0.74); border: 1px solid #273449; border-radius: 9px; }
+.skyline-phases span b { font-size: 16px; }
+.skyline-phases span small { font: 750 9px/1.1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+.skyline-phases span.done { color: #86efac; border-color: rgba(34, 197, 94, 0.35); }
+.skyline-phases span.active { color: #fef3c7; background: rgba(245, 158, 11, 0.13); border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.08); }
+
+.skyline-events { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 5px 3px 8px; }
+.skyline-event { position: relative; display: grid; place-items: center; flex: 1 0 54px; min-width: 54px; color: #64748b; font-family: "SFMono-Regular", Consolas, monospace; }
+.skyline-event::before { position: absolute; top: 10px; right: 50%; width: 100%; height: 2px; content: ""; background: #26334a; z-index: 0; }
+.skyline-event:first-child::before { display: none; }
+.skyline-event b { position: relative; display: grid; width: 24px; height: 24px; place-items: center; background: #111827; border: 2px solid #334155; border-radius: 50%; font-size: 10px; z-index: 1; }
+.skyline-event small { min-height: 11px; margin-top: 3px; font-size: 8px; }
+.skyline-event.done { color: #86efac; }
+.skyline-event.done::before { background: rgba(34, 197, 94, 0.45); }
+.skyline-event.done b { background: #052e24; border-color: #22c55e; }
+.skyline-event.current { color: #fde68a; }
+.skyline-event.current::before { background: linear-gradient(90deg, rgba(34, 197, 94, 0.45), #f59e0b); }
+.skyline-event.current b { color: #111827; background: #fbbf24; border-color: #fef3c7; box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.12); transform: scale(1.12); }
+
+.skyline-city-card,
+.skyline-heap-tree,
+.skyline-height-card,
+.skyline-output { background: rgba(15, 23, 42, 0.68); border: 1px solid #273449; border-radius: 13px; }
+.skyline-city-card > header,
+.skyline-heap-tree > header,
+.skyline-height-card > header,
+.skyline-output > header { min-height: 37px; padding: 0 12px; border-bottom: 1px solid #253147; }
+.skyline-city-card > header strong,
+.skyline-heap-tree > header strong,
+.skyline-height-card > header strong,
+.skyline-output > header strong { color: #cbd5e1; }
+.skyline-city-card > header span { display: flex; align-items: center; gap: 6px; font-size: 9px; text-transform: none; }
+.skyline-city-card > header i { width: 12px; height: 8px; border-radius: 2px; }
+.skyline-city-card > header i.active { background: rgba(16, 185, 129, 0.42); border: 1px solid #10b981; }
+.skyline-city-card > header i.outline { height: 3px; margin-left: 5px; background: #f59e0b; }
+.skyline-city-scroll { overflow-x: auto; padding: 4px 8px 0; }
+.skyline-svg { min-width: 620px; }
+.skyline-building-label { fill: #a5b4fc; font: 700 10px/1 "SFMono-Regular", Consolas, monospace; }
+.skyline-building.focus rect { fill: rgba(245, 158, 11, 0.32); stroke: #fbbf24; stroke-width: 3; }
+.skyline-building.focus .skyline-building-label { fill: #fef3c7; font-weight: 800; }
+.skyline-building.passed:not(.focus):not(.active) { opacity: 0.38; }
+.skyline-sweep { stroke: #fb7185; stroke-width: 2.5; }
+.skyline-sweep-arrow { fill: none; stroke: #fb7185; stroke-width: 2; }
+
+.skyline-lower { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(190px, 0.8fr); gap: 12px; }
+.skyline-heap-tree > header span { color: #fbbf24; font-size: 9px; letter-spacing: 0; text-transform: none; }
+.skyline-heap-tree > svg { display: block; width: 100%; max-height: 245px; }
+.skyline-heap-edges line { stroke: #475569; stroke-width: 2; }
+.skyline-heap-node rect { fill: #172033; stroke: #64748b; stroke-width: 1.5; }
+.skyline-heap-node text { pointer-events: none; font-family: "SFMono-Regular", Consolas, monospace; }
+.skyline-heap-node .height { fill: #e2e8f0; font-size: 11px; font-weight: 800; }
+.skyline-heap-node .right { fill: #94a3b8; font-size: 8px; }
+.skyline-heap-node.root rect { fill: rgba(245, 158, 11, 0.16); stroke: #f59e0b; stroke-width: 2.5; }
+.skyline-heap-node.root .height { fill: #fde68a; }
+.skyline-heap-node.focus rect { filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.65)); stroke: #38bdf8; }
+.skyline-heap-node.stale { opacity: 0.42; }
+.skyline-heap-node.stale rect { stroke-dasharray: 4 3; }
+.skyline-heap-empty { display: grid; min-height: 126px; place-content: center; place-items: center; gap: 6px; }
+.skyline-heap-empty span { color: #475569; font-size: 40px; }
+.skyline-heap-empty small { font: 700 9px/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+
+.skyline-height-card { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+.skyline-height-card > header span { color: #fbbf24; font-size: 17px; }
+.skyline-height-compare { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 16px 10px 8px; }
+.skyline-height-compare span { display: grid; min-width: 64px; place-items: center; padding: 9px; background: #111827; border: 1px solid #334155; border-radius: 10px; }
+.skyline-height-compare span.current { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+.skyline-height-compare small { color: #64748b; font: 700 9px/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+.skyline-height-compare b { margin-top: 4px; color: #cbd5e1; font: 900 24px/1 "SFMono-Regular", Consolas, monospace; }
+.skyline-height-compare span.current b { color: #fde68a; }
+.skyline-height-compare > i { color: #38bdf8; font: 900 24px/1 sans-serif; font-style: normal; }
+.skyline-height-bars { display: flex; align-items: end; justify-content: center; gap: 22px; height: 72px; padding: 0 24px 12px; border-bottom: 3px solid #334155; }
+.skyline-height-bars i { display: block; width: 42px; height: var(--h); max-height: 60px; background: linear-gradient(#64748b, #334155); border-radius: 5px 5px 0 0; transition: height 0.2s ease; }
+.skyline-height-bars i.current { background: linear-gradient(#fbbf24, #d97706); }
+
+.skyline-output > div { display: flex; align-items: center; gap: 0; min-height: 54px; overflow-x: auto; padding: 9px 12px; }
+.skyline-output > div > span { position: relative; display: grid; grid-template-columns: 22px 22px; place-items: center; flex: 0 0 55px; color: #fde68a; }
+.skyline-output > div > span::before { position: absolute; left: -12px; width: 24px; height: 2px; content: ""; background: #f59e0b; }
+.skyline-output > div > span:first-child::before { display: none; }
+.skyline-output > div > span i { position: absolute; left: -3px; width: 7px; height: 7px; background: #fbbf24; border: 2px solid #111827; border-radius: 50%; }
+.skyline-output > div > span b,
+.skyline-output > div > span small { display: grid; width: 24px; height: 24px; place-items: center; font: 800 10px/1 "SFMono-Regular", Consolas, monospace; }
+.skyline-output > div > span b { color: #93c5fd; background: rgba(59, 130, 246, 0.12); border-radius: 5px 0 0 5px; }
+.skyline-output > div > span small { color: #fef3c7; background: rgba(245, 158, 11, 0.13); border-radius: 0 5px 5px 0; }
+.skyline-output > div > span.new { animation: skyline-pop 0.35s ease-out; }
+.skyline-output em { color: #64748b; font-size: 11px; font-style: normal; }
+@keyframes skyline-pop { 50% { transform: translateY(-5px) scale(1.08); } }
+
+.skyline-action { padding: 10px 12px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 11px; justify-content: flex-start; }
+.skyline-action > span { display: grid; width: 38px; height: 38px; place-items: center; color: #fef3c7; background: rgba(245, 158, 11, 0.13); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px; font-size: 19px; }
+.skyline-action strong { display: block; margin-top: 3px; color: #e2e8f0; font-size: 12px; }
+body:has(.skyline-viz) #stepNote { display: none; }
+
+[data-theme="light"] .skyline-viz { color: #0f172a; background: radial-gradient(circle at 82% 0%, rgba(14, 165, 233, 0.08), transparent 30%), #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .skyline-head strong { color: #0f172a; }
+[data-theme="light"] .skyline-phases span,
+[data-theme="light"] .skyline-event b,
+[data-theme="light"] .skyline-city-card,
+[data-theme="light"] .skyline-heap-tree,
+[data-theme="light"] .skyline-height-card,
+[data-theme="light"] .skyline-output,
+[data-theme="light"] .skyline-height-compare span { background: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .skyline-phases span.active { background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .skyline-event.current b { color: #fff; background: #d97706; }
+[data-theme="light"] .skyline-event.done b { background: #ecfdf5; }
+[data-theme="light"] .skyline-building.focus rect { fill: rgba(245, 158, 11, 0.22); stroke: #d97706; }
+[data-theme="light"] .skyline-building-label { fill: #4338ca; }
+[data-theme="light"] .skyline-building.focus .skyline-building-label { fill: #92400e; }
+[data-theme="light"] .skyline-heap-node rect { fill: #f8fafc; stroke: #94a3b8; }
+[data-theme="light"] .skyline-heap-node .height { fill: #334155; }
+[data-theme="light"] .skyline-heap-node.root rect { fill: #fffbeb; stroke: #d97706; }
+[data-theme="light"] .skyline-heap-node.root .height { fill: #92400e; }
+[data-theme="light"] .skyline-height-compare b,
+[data-theme="light"] .skyline-action strong { color: #0f172a; }
+[data-theme="light"] .skyline-height-compare span.current { background: #fffbeb; }
+[data-theme="light"] .skyline-action { background: #f0f9ff; border-color: #bae6fd; }
+
+@container (max-width: 720px) {
+  .skyline-viz { padding: 11px; }
+  .skyline-head { align-items: flex-start; }
+  .skyline-head > span { padding: 7px 8px; }
+  .skyline-phases { grid-template-columns: repeat(5, 76px); overflow-x: auto; }
+  .skyline-phases span { min-height: 34px; }
+  .skyline-lower { grid-template-columns: 1fr; }
+  .skyline-height-card { min-height: 220px; }
+}
+
+@container (max-width: 480px) {
+  .skyline-head strong { font-size: 14px; }
+  .skyline-head > span { font-size: 8px; }
+  .skyline-city-card > header span { display: none; }
+  .skyline-action strong { font-size: 11px; }
+}
+
 /* ---- Grid view (DP 2D) ---- */
 .grid-view {
   margin-top: 4px;

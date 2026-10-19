@@ -2641,6 +2641,7 @@ function buildSteps218(input) {
   let i = 0;
   let sweepX = null;
   let currentHeight = 0;
+  let eventIndex = -1;
 
   const higherPriority = (a, b) => a.height > b.height
     || (a.height === b.height && a.right < b.right)
@@ -2693,7 +2694,18 @@ function buildSteps218(input) {
     ? []
     : buildings.filter(([left, right]) => left <= sweepX && sweepX < right).map((building) => building[3]);
 
-  function snapshot({ title, codeLine, note, extraVars = [], final = false, force = false }) {
+  function snapshot({
+    title,
+    codeLine,
+    note,
+    phase = "setup",
+    focusBuildingId = null,
+    previousHeight = null,
+    changed = null,
+    extraVars = [],
+    final = false,
+    force = false,
+  }) {
     if (!detailedTrace && !force) return;
     const step = {
       title,
@@ -2707,6 +2719,12 @@ function buildSteps218(input) {
         sweepX,
         currentHeight,
         activeBuildingIds: activeIds(),
+        events: [...events],
+        eventIndex,
+        phase,
+        focusBuildingId,
+        previousHeight,
+        changed,
       },
       codeLines: [codeLine],
       vars: [
@@ -2724,6 +2742,7 @@ function buildSteps218(input) {
   snapshot({
     title: { vi: "Lấy tất cả mốc trái/phải và sắp xếp", en: "Collect and sort every left/right edge" },
     codeLine: 5,
+    phase: "events",
     extraVars: [{ name: "events", value: `[${events.join(", ")}]` }],
     note: {
       vi: "Chỉ tại cạnh trái hoặc phải của một tòa nhà, độ cao skyline mới có thể thay đổi.",
@@ -2734,25 +2753,30 @@ function buildSteps218(input) {
   snapshot({
     title: { vi: "Khởi tạo max-heap rỗng", en: "Initialize an empty max-heap" },
     codeLine: 6,
+    phase: "heap-init",
     note: { vi: "Heap lưu (-height, right) trong Python; hình hiển thị height dương cho dễ đọc.", en: "Python stores (-height, right); the visual shows positive heights for readability." },
   });
   snapshot({
     title: { vi: "Khởi tạo danh sách kết quả", en: "Initialize the result list" },
     codeLine: 7,
+    phase: "answer-init",
     note: { vi: "answer sẽ chỉ chứa các điểm mà độ cao thực sự thay đổi.", en: "answer will contain only points where the height actually changes." },
   });
   snapshot({
     title: { vi: "Bắt đầu từ tòa nhà đầu tiên", en: "Start at the first building" },
     codeLine: 8,
+    phase: "pointer-init",
     extraVars: [{ name: "i", value: i }],
     note: { vi: "i trỏ tới tòa nhà chưa được đưa vào heap.", en: "i points to the next building not yet pushed into the heap." },
   });
 
   for (const x of events) {
     sweepX = x;
+    eventIndex += 1;
     snapshot({
       title: { vi: `Đưa đường quét tới x = ${x}`, en: `Move the sweep line to x = ${x}` },
       codeLine: 10,
+      phase: "sweep",
       extraVars: [{ name: "i", value: i }],
       note: { vi: `Xử lý toàn bộ cạnh bắt đầu và kết thúc tại x = ${x}.`, en: `Process every start and end edge at x = ${x}.` },
     });
@@ -2762,12 +2786,16 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Tòa nhà ${i} bắt đầu tại ${left} ≤ ${x}`, en: `Building ${i} starts at ${left} ≤ ${x}` },
         codeLine: 11,
+        phase: "start-check",
+        focusBuildingId: id,
         extraVars: [{ name: "i", value: i }, { name: "buildings[i]", value: `[${left}, ${right}, ${height}]` }],
         note: { vi: "Điều kiện đúng, nên tòa nhà này phải tham gia heap trước khi lấy độ cao lớn nhất.", en: "The condition is true, so this building must enter the heap before reading the maximum height." },
       });
       snapshot({
         title: { vi: `Tách left=${left}, right=${right}, height=${height}`, en: `Unpack left=${left}, right=${right}, height=${height}` },
         codeLine: 12,
+        phase: "unpack",
+        focusBuildingId: id,
         extraVars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "height", value: height }],
         note: { vi: "right dùng để nhận biết entry hết hạn; height quyết định ưu tiên trong max-heap.", en: "right detects expiration; height determines max-heap priority." },
       });
@@ -2775,6 +2803,8 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Push (-${height}, ${right}) vào heap`, en: `Push (-${height}, ${right}) into the heap` },
         codeLine: 13,
+        phase: "push",
+        focusBuildingId: id,
         extraVars: [{ name: "root", value: `h${heap[0].height}→${heap[0].right}` }],
         note: { vi: `Sau sift-up, root là tòa nhà cao nhất đang có trong heap: h=${heap[0].height}.`, en: `After sift-up, the root is the tallest building in the heap: h=${heap[0].height}.` },
       });
@@ -2782,6 +2812,8 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Tăng i lên ${i}`, en: `Advance i to ${i}` },
         codeLine: 14,
+        phase: "advance",
+        focusBuildingId: id,
         extraVars: [{ name: "i", value: i }],
         note: { vi: "Chuyển con trỏ sang tòa nhà chưa thêm tiếp theo.", en: "Move the pointer to the next building not yet added." },
       });
@@ -2790,6 +2822,7 @@ function buildSteps218(input) {
     snapshot({
       title: { vi: "Không còn tòa nhà mới tại x này", en: "No more buildings start by this x" },
       codeLine: 11,
+      phase: "start-done",
       extraVars: [{ name: "i", value: i }],
       note: { vi: i >= buildings.length ? "Đã đưa toàn bộ tòa nhà vào heap." : `Tòa nhà kế tiếp bắt đầu tại ${buildings[i][0]} > ${x}.`, en: i >= buildings.length ? "Every building has been pushed." : `The next building starts at ${buildings[i][0]} > ${x}.` },
     });
@@ -2799,6 +2832,8 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Root h${expired.height} hết hạn tại ${expired.right}`, en: `Root h${expired.height} expired at ${expired.right}` },
         codeLine: 16,
+        phase: "expire-check",
+        focusBuildingId: expired.id,
         extraVars: [{ name: "heap[0].right", value: expired.right }, { name: "expired?", value: `${expired.right} ≤ ${x}` }],
         note: { vi: "Lazy removal chỉ cần xóa entry hết hạn khi nó lên root; entry hết hạn nằm dưới không thể ảnh hưởng maximum.", en: "Lazy removal deletes an expired entry only when it reaches the root; expired entries below it cannot affect the maximum." },
       });
@@ -2806,6 +2841,8 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Pop tòa nhà h${removed.height} khỏi heap`, en: `Pop building h${removed.height} from the heap` },
         codeLine: 17,
+        phase: "pop",
+        focusBuildingId: removed.id,
         extraVars: [{ name: "removed", value: `h${removed.height}→${removed.right}` }, { name: "new root", value: heap.length ? `h${heap[0].height}→${heap[0].right}` : "none" }],
         note: { vi: heap.length ? "Sift-down đưa entry ưu tiên cao nhất còn lại lên root." : "Heap đã rỗng vì không còn tòa nhà phủ vị trí x này.", en: heap.length ? "Sift-down moves the highest-priority remaining entry to the root." : "The heap is empty because no building covers this x." },
       });
@@ -2814,6 +2851,7 @@ function buildSteps218(input) {
     snapshot({
       title: { vi: heap.length ? "Root hiện tại chưa hết hạn" : "Heap không còn entry", en: heap.length ? "The current root is still active" : "The heap has no entries" },
       codeLine: 16,
+      phase: "expire-done",
       extraVars: [{ name: "condition", value: heap.length ? `${heap[0].right} ≤ ${x} is false` : "heap is empty" }],
       note: { vi: "Vòng xóa lazy dừng; root bây giờ hợp lệ hoặc heap rỗng.", en: "Lazy removal stops; the root is now valid or the heap is empty." },
     });
@@ -2822,6 +2860,7 @@ function buildSteps218(input) {
     snapshot({
       title: { vi: `Độ cao tại x=${x} là ${currentHeight}`, en: `Height at x=${x} is ${currentHeight}` },
       codeLine: 19,
+      phase: "height",
       extraVars: [{ name: "height", value: currentHeight }],
       note: { vi: heap.length ? "Root của max-heap cho độ cao lớn nhất đang phủ x." : "Không có tòa nhà đang hoạt động nên độ cao trở về 0.", en: heap.length ? "The max-heap root gives the tallest height covering x." : "No building is active, so the height returns to 0." },
     });
@@ -2831,6 +2870,9 @@ function buildSteps218(input) {
     snapshot({
       title: { vi: changed ? "Độ cao đã thay đổi" : "Độ cao không đổi", en: changed ? "The height changed" : "The height did not change" },
       codeLine: 20,
+      phase: "compare",
+      previousHeight,
+      changed,
       extraVars: [{ name: "previous height", value: previousHeight === null ? "none" : previousHeight }, { name: "changed", value: changed }],
       note: { vi: changed ? "Đây là một điểm ngoặt mới của skyline." : "Không thêm điểm vì skyline vẫn nằm ngang ở cùng độ cao.", en: changed ? "This is a new skyline key point." : "No point is added because the skyline stays at the same height." },
     });
@@ -2840,6 +2882,9 @@ function buildSteps218(input) {
       snapshot({
         title: { vi: `Thêm điểm [${x}, ${currentHeight}]`, en: `Append point [${x}, ${currentHeight}]` },
         codeLine: 21,
+        phase: "append",
+        previousHeight,
+        changed: true,
         extraVars: [{ name: "new point", value: `[${x}, ${currentHeight}]` }],
         note: { vi: "Nối điểm mới bằng đoạn ngang rồi đoạn dọc để tạo đường bao skyline.", en: "Connect the new point with horizontal and vertical segments to form the skyline outline." },
       });
@@ -2849,6 +2894,7 @@ function buildSteps218(input) {
   snapshot({
     title: { vi: `Hoàn tất skyline với ${answer.length} điểm`, en: `Finish the skyline with ${answer.length} points` },
     codeLine: 23,
+    phase: "done",
     extraVars: [{ name: "return", value: answerText() }],
     note: { vi: "Mỗi điểm liên tiếp có độ cao khác nhau; điểm cuối đưa đường bao trở về mặt đất.", en: "Consecutive points have different heights; the final point returns the outline to ground level." },
     final: true,
@@ -4283,6 +4329,7 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Tòa nhà (left,right,height; ...)", en: "Buildings (left,right,height; ...)" },
     extraParams: [],
+    debugMode: "line-by-line",
     approach: [
       { vi: "Sweep line qua mọi cạnh trái/phải theo thứ tự x tăng dần.", en: "Sweep through every left/right edge in increasing x order." },
       { vi: "Max-heap lưu (height, right). Push tòa nhà đã bắt đầu và lazy-pop root đã kết thúc.", en: "A max-heap stores (height, right). Push started buildings and lazily pop expired roots." },

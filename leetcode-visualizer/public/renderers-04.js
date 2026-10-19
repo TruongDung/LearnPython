@@ -2003,20 +2003,54 @@ function renderEvenOddRatioView(step) {
 
 function renderSkylineView(step) {
   const view = step.skylineView || {};
+  const vi = lang === "vi";
   const buildings = Array.isArray(view.buildings) ? view.buildings : [];
   const skyline = Array.isArray(view.skyline) ? view.skyline : [];
   const heap = Array.isArray(view.heap) ? view.heap : [];
+  const events = Array.isArray(view.events) ? view.events : [];
   const activeIds = new Set(Array.isArray(view.activeBuildingIds) ? view.activeBuildingIds : []);
   const sweepX = Number.isFinite(view.sweepX) ? view.sweepX : null;
+  const focusBuildingId = Number.isInteger(view.focusBuildingId) ? view.focusBuildingId : null;
+  const phase = String(view.phase || "setup");
+  const activeLine = (step.codeLines || [])[0] ?? "—";
 
   if (buildings.length === 0) {
-    $("treeView").innerHTML = `<div class="skyline-empty">${escapeHtml(lang === "vi" ? "Chưa có tòa nhà hợp lệ." : "No valid buildings.")}</div>`;
+    $("treeView").innerHTML = `<div class="skyline-empty">${escapeHtml(vi ? "Chưa có tòa nhà hợp lệ." : "No valid buildings.")}</div>`;
     return;
   }
 
-  const width = 760;
-  const height = 340;
-  const pad = { left: 48, right: 22, top: 24, bottom: 46 };
+  const phaseMeta = {
+    events: ["🗺", vi ? "MỐC X" : "X EVENTS", 0],
+    "heap-init": ["◇", "HEAP", 0],
+    "answer-init": ["◇", vi ? "KẾT QUẢ" : "OUTPUT", 0],
+    "pointer-init": ["▶", vi ? "BẮT ĐẦU" : "START", 0],
+    sweep: ["│", vi ? "QUÉT" : "SWEEP", 0],
+    "start-check": ["?", vi ? "CẠNH TRÁI" : "LEFT EDGE", 1],
+    unpack: ["⌗", vi ? "ĐỌC TÒA NHÀ" : "READ BUILDING", 1],
+    push: ["↓", "PUSH", 1],
+    advance: ["→", "NEXT", 1],
+    "start-done": ["✓", vi ? "ĐÃ THÊM" : "ADDED", 1],
+    "expire-check": ["?", vi ? "HẾT HẠN" : "EXPIRED?", 2],
+    pop: ["↑", "POP", 2],
+    "expire-done": ["✓", vi ? "ROOT HỢP LỆ" : "VALID ROOT", 2],
+    height: ["♛", vi ? "LẤY MAX" : "READ MAX", 3],
+    compare: ["↕", vi ? "SO ĐỘ CAO" : "COMPARE", 4],
+    append: ["◆", vi ? "GHI ĐIỂM" : "KEY POINT", 4],
+    done: ["✓", vi ? "HOÀN TẤT" : "DONE", 4],
+  };
+  const [phaseIcon, phaseLabel, activeStage] = phaseMeta[phase] || ["•", phase.toUpperCase(), 0];
+  const stages = [
+    ["│", vi ? "quét x" : "sweep x"],
+    ["🏢", vi ? "thêm" : "push"],
+    ["⌫", vi ? "xóa cũ" : "pop old"],
+    ["♛", vi ? "lấy max" : "read max"],
+    ["◆", vi ? "ghi góc" : "key point"],
+  ];
+  const phaseStrip = stages.map(([icon, label], index) => `<span class="${index === activeStage ? "active" : ""}${index < activeStage ? " done" : ""}"><b>${icon}</b><small>${label}</small></span>`).join("");
+
+  const width = 820;
+  const height = 350;
+  const pad = { left: 50, right: 24, top: 38, bottom: 46 };
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const minX = Math.min(...buildings.map((building) => building[0]));
@@ -2049,8 +2083,12 @@ function renderSkylineView(step) {
     const y = yScale(buildingHeight);
     const rectWidth = Math.max(1, xScale(right) - x);
     const rectHeight = groundY - y;
-    return `<g class="skyline-building${activeIds.has(index) ? " active" : ""}">
+    const focus = focusBuildingId === index;
+    const passed = sweepX !== null && right <= sweepX;
+    const labelX = x + rectWidth / 2;
+    return `<g class="skyline-building${activeIds.has(index) ? " active" : ""}${focus ? " focus" : ""}${passed ? " passed" : ""}">
       <rect x="${x}" y="${y}" width="${rectWidth}" height="${rectHeight}"></rect>
+      ${rectWidth > 44 ? `<text class="skyline-building-label" x="${labelX}" y="${Math.min(groundY - 8, y + 18)}" text-anchor="middle">B${index + 1} · h${buildingHeight}</text>` : ""}
       <title>[${left}, ${right}, ${buildingHeight}]</title>
     </g>`;
   }).join("");
@@ -2077,37 +2115,73 @@ function renderSkylineView(step) {
       <text class="skyline-key-label" x="${px}" y="${labelY}" text-anchor="middle">${escapeXml(`[${x},${value}]`)}</text>`;
   }).join("") : "";
 
-  const sweepLine = sweepX === null ? "" : `<line class="skyline-sweep" x1="${xScale(sweepX)}" y1="${pad.top}" x2="${xScale(sweepX)}" y2="${groundY}"></line>
-    <text class="skyline-sweep-label" x="${xScale(sweepX)}" y="${pad.top - 7}" text-anchor="middle">x=${sweepX}</text>`;
+  const sweepLine = sweepX === null ? "" : `<g class="skyline-sweep-group"><line class="skyline-sweep" x1="${xScale(sweepX)}" y1="${pad.top}" x2="${xScale(sweepX)}" y2="${groundY}"></line>
+    <path class="skyline-sweep-arrow" d="M ${xScale(sweepX) - 8} ${pad.top + 8} L ${xScale(sweepX)} ${pad.top + 16} L ${xScale(sweepX) + 8} ${pad.top + 8}"></path>
+    <text class="skyline-sweep-label" x="${xScale(sweepX)}" y="${pad.top - 10}" text-anchor="middle">x=${sweepX}</text></g>`;
 
-  const heapItems = heap.length > 0
-    ? heap.map((entry, index) => {
-      const stale = sweepX !== null && entry.right <= sweepX;
-      return `<span class="skyline-heap-entry${index === 0 ? " root" : ""}${stale ? " stale" : ""}">
-        ${index === 0 ? `<strong>${escapeHtml(lang === "vi" ? "root" : "root")}</strong> ` : ""}h${escapeHtml(entry.height)} → ${escapeHtml(entry.right)}${stale ? ` (${escapeHtml(lang === "vi" ? "hết hạn" : "expired")})` : ""}
-      </span>`;
-    }).join("")
-    : `<span class="skyline-heap-empty">${escapeHtml(lang === "vi" ? "heap rỗng" : "empty heap")}</span>`;
+  const eventRail = events.map((event, index) => {
+    const starts = buildings.filter((building) => building[0] === event).length;
+    const ends = buildings.filter((building) => building[1] === event).length;
+    const state = index === view.eventIndex ? " current" : index < view.eventIndex ? " done" : "";
+    return `<span class="skyline-event${state}"><b>${event}</b><small>${starts ? `+${starts}` : ""}${starts && ends ? " · " : ""}${ends ? `−${ends}` : ""}</small></span>`;
+  }).join("");
 
-  const summary = lang === "vi"
+  const heapWidth = 520;
+  const heapLevels = heap.length ? Math.floor(Math.log2(heap.length)) + 1 : 1;
+  const heapHeight = Math.max(126, 62 * heapLevels);
+  const heapPositions = heap.map((entry, index) => {
+    const level = Math.floor(Math.log2(index + 1));
+    const first = (2 ** level) - 1;
+    const position = index - first;
+    const slots = 2 ** level;
+    return { x: ((position + 1) / (slots + 1)) * heapWidth, y: 34 + level * 58, entry, index };
+  });
+  const heapEdges = heapPositions.slice(1).map((node) => {
+    const parent = heapPositions[Math.floor((node.index - 1) / 2)];
+    return `<line x1="${parent.x}" y1="${parent.y + 18}" x2="${node.x}" y2="${node.y - 18}"></line>`;
+  }).join("");
+  const heapNodes = heapPositions.map(({ x, y, entry, index }) => {
+    const stale = sweepX !== null && entry.right <= sweepX;
+    const focus = focusBuildingId === entry.id;
+    return `<g class="skyline-heap-node${index === 0 ? " root" : ""}${stale ? " stale" : ""}${focus ? " focus" : ""}" transform="translate(${x} ${y})">
+      <rect x="-30" y="-20" width="60" height="40" rx="10"></rect>
+      <text class="height" x="0" y="0" text-anchor="middle">${index === 0 ? "♛ " : ""}h${entry.height}</text>
+      <text class="right" x="0" y="13" text-anchor="middle">→ ${entry.right}</text>
+    </g>`;
+  }).join("");
+  const heapTree = heap.length
+    ? `<svg viewBox="0 0 ${heapWidth} ${heapHeight}" aria-label="max heap"><g class="skyline-heap-edges">${heapEdges}</g>${heapNodes}</svg>`
+    : `<div class="skyline-heap-empty"><span>∅</span><small>${vi ? "heap rỗng" : "empty heap"}</small></div>`;
+
+  const rootHeight = heap.length ? heap[0].height : 0;
+  const previousHeight = Number.isFinite(view.previousHeight)
+    ? view.previousHeight
+    : skyline.length > 1 ? skyline[skyline.length - 2][1] : skyline.length ? skyline[skyline.length - 1][1] : 0;
+  const comparisonSymbol = view.changed === null ? "?" : view.changed ? "≠" : "=";
+  const outputPoints = skyline.map(([x, value], index) => `<span class="${index === skyline.length - 1 && phase === "append" ? "new" : ""}"><i></i><b>${x}</b><small>${value}</small></span>`).join("");
+
+  const summary = vi
     ? `Biểu đồ ${buildings.length} tòa nhà; đường quét ${sweepX === null ? "chưa bắt đầu" : `tại x=${sweepX}`}; skyline hiện có ${skyline.length} điểm.`
     : `Chart of ${buildings.length} buildings; sweep line ${sweepX === null ? "not started" : `at x=${sweepX}`}; current skyline has ${skyline.length} points.`;
 
-  $("treeView").innerHTML = `<div class="skyline-viz">
-    <svg class="skyline-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
-      <title>${escapeXml(summary)}</title>
-      ${gridLines}
-      ${xAxisLabels}
-      ${buildingRects}
-      ${sweepLine}
-      ${skylinePath ? `<path class="skyline-outline" d="${skylinePath}"></path>` : ""}
-      ${keyPoints}
-    </svg>
-    <div class="skyline-heap" aria-label="${escapeHtml(lang === "vi" ? "Trạng thái max-heap" : "Max-heap state")}">
-      <span class="skyline-heap-label">max-heap</span>
-      ${heapItems}
+  $("treeView").innerHTML = `<section class="skyline-viz phase-${escapeHtml(phase)}" role="img" aria-label="${escapeHtml(summary)}">
+    <header class="skyline-head"><div><small>SWEEP LINE + MAX-HEAP · #218</small><strong>${vi ? "NHÌN ĐƯỜNG CHÂN TRỜI ĐỔI HÌNH" : "WATCH THE SKYLINE CHANGE"}</strong></div><span><b>${phaseIcon}</b>${escapeHtml(phaseLabel)} · L${activeLine}</span></header>
+    <div class="skyline-phases">${phaseStrip}</div>
+    <div class="skyline-events" aria-label="${vi ? "Các mốc quét" : "Sweep events"}">${eventRail}</div>
+    <section class="skyline-city-card">
+      <header><strong>${vi ? "THÀNH PHỐ NHÌN TỪ XA" : "CITY FROM A DISTANCE"}</strong><span><i class="active"></i>${vi ? "đang phủ x" : "covers x"}<i class="outline"></i>skyline</span></header>
+      <div class="skyline-city-scroll"><svg class="skyline-svg" viewBox="0 0 ${width} ${height}" aria-hidden="true">
+        ${gridLines}${xAxisLabels}${buildingRects}${sweepLine}
+        ${skylinePath ? `<path class="skyline-outline" d="${skylinePath}"></path>` : ""}${keyPoints}
+      </svg></div>
+    </section>
+    <div class="skyline-lower">
+      <section class="skyline-heap-tree"><header><strong>MAX-HEAP</strong><span>${vi ? "♛ root = tòa cao nhất còn phủ x" : "♛ root = tallest building covering x"}</span></header>${heapTree}</section>
+      <section class="skyline-height-card"><header><strong>${vi ? "ĐỘ CAO HIỆN TẠI" : "CURRENT HEIGHT"}</strong><span>${phaseIcon}</span></header><div class="skyline-height-compare"><span><small>${vi ? "trước" : "before"}</small><b>${previousHeight}</b></span><i>${comparisonSymbol}</i><span class="current"><small>root</small><b>${rootHeight}</b></span></div><div class="skyline-height-bars"><i style="--h:${Math.max(4, previousHeight / maxBuildingHeight * 100)}%"></i><i class="current" style="--h:${Math.max(4, rootHeight / maxBuildingHeight * 100)}%"></i></div></section>
     </div>
-  </div>`;
+    <section class="skyline-output"><header><strong>${vi ? "ĐIỂM NGOẶT" : "KEY POINTS"}</strong><span>answer</span></header><div>${outputPoints || `<em>${vi ? "chưa có" : "none yet"}</em>`}</div></section>
+    <footer class="skyline-action"><span>${phaseIcon}</span><div><small>${vi ? "DÒNG" : "LINE"} ${activeLine}</small><strong>${escapeHtml(pick(step.title))}</strong></div></footer>
+  </section>`;
 }
 
 // ---- Closed-interval sorting and merging (#56) ----
