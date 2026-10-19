@@ -1883,9 +1883,9 @@ function renderCountPaths1976View(step) {
       const sx = from.x + (leftToRight ? 27 : -27);
       const ex = to.x + (leftToRight ? -27 : 27);
       return {
-        path: `M ${sx} ${from.y} Q ${width / 2} 24 ${ex} ${to.y}`,
-        lx: width / 2,
-        ly: 58,
+        path: `M ${sx} ${from.y} Q ${width / 2} -160 ${ex} ${to.y}`,
+        lx: width / 2 + 90,
+        ly: 24,
       };
     }
     const side = edgeIndex % 2 === 0 ? -1 : 1;

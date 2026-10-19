@@ -55,6 +55,10 @@ test("1976 emits map-ready Dijkstra and shortest-route DAG states", () => {
   assert.equal(finalView.answer, 4);
   assert.equal(finalView.finalizedCount, 7);
   assert.equal(finalView.shortestEdges.length, 9);
+  assert.equal(finalView.positions[0].y, 0.5);
+  assert.equal(finalView.positions[6].y, 0.5);
+  assert.ok(finalView.positions[2].y < finalView.positions[3].y);
+  assert.ok(finalView.positions[3].y < finalView.positions[4].y);
 });
 
 test("1976 renderer visualizes roads, comparisons, path counts, and result", () => {
@@ -91,8 +95,8 @@ test("1976 picture renderer, styles, and cache keys are registered", () => {
   assert.match(script, /"renderers-01\.js":\[[^\]]*"renderCountPaths1976View"/);
   assert.match(script, /"style-09\.css":\[[^\]]*"renderCountPaths1976View"/);
   assert.match(script, /countPaths1976View/);
-  assert.match(html, /style-09\.css[^"\n]*count1976=picture-v1/);
-  assert.match(html, /renderers-01\.js[^"\n]*count1976=picture-v1/);
+  assert.match(html, /style-09\.css[^"\n]*count1976=picture-v3/);
+  assert.match(html, /renderers-01\.js[^"\n]*count1976=picture-v3/);
   assert.match(css, /\.route1976-viz\s*\{/);
   assert.match(css, /#vizPanel:has\(\.route1976-viz\) :is\(#codePanel, #codePanel2\)/);
   assert.match(renderer, /function renderCountPaths1976View\(step\)/);
