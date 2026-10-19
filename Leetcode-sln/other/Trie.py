@@ -27,6 +27,15 @@ class Solution:
         return [index.calculate_size(path) for path in queries]
 
 sol = Solution()
-files = [2400,"fo://acme-assets.example.com/training/onboarding.mp4"],[800,"fo://acme-assets.example.com/training/intro_clip.mp4"],[350,"fo://acme-assets.example.com/podcasts/welcome.mp3"]
-quer = ["fo://acme-assets.example.com/training","fo://acme-assets.example.com/podcasts/welcome.mp3","fo://acme-assets.example.com","fo://acme-assets.example.com/unavailable"]
+files = [
+    [2400, "fo://acme-assets.example.com/training/onboarding.mp4"],
+    [800, "fo://acme-assets.example.com/training/intro_clip.mp4"],
+    [350, "fo://acme-assets.example.com/podcasts/welcome.mp3"],
+]
+quer = [
+    "fo://acme-assets.example.com/training",
+    "fo://acme-assets.example.com/podcasts/welcome.mp3",
+    "fo://acme-assets.example.com",
+    "fo://acme-assets.example.com/unavailable",
+]
 sol.calculateSizes(files, quer)
