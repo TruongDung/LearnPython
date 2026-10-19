@@ -1607,3 +1607,82 @@ function renderVisitAll847View(step) {
     ${bfs ? bfsPanel : dpPanel}${result}`,
   vi ? `Shortest Path Visiting All Nodes ??? c??ch ${view.approach}` : `Shortest Path Visiting All Nodes ??? approach ${view.approach}`);
 }
+
+function renderParallelCourses2050View(step) {
+  const view = step.parallel2050View || {};
+  const vi = lang === "vi";
+  const t = (viText, enText) => vi ? viText : enText;
+  const esc = requestedVizEsc;
+  const courses = view.courses || [];
+  const relations = view.relations || [];
+  const levels = new Array((view.n || courses.length) + 1).fill(0);
+  for (let pass = 0; pass < (view.n || courses.length); pass += 1) {
+    for (const relation of relations) levels[relation.after] = Math.max(levels[relation.after], levels[relation.before] + 1);
+  }
+  const maxLevel = Math.max(0, ...levels);
+  const grouped = new Map();
+  for (const course of courses) {
+    const level = levels[course.id] || 0;
+    if (!grouped.has(level)) grouped.set(level, []);
+    grouped.get(level).push(course.id);
+  }
+  const width = 700;
+  const height = Math.max(190, Math.max(...[...grouped.values()].map((ids) => ids.length), 1) * 72 + 54);
+  const positions = new Map();
+  for (const [level, ids] of grouped) {
+    ids.forEach((id, index) => positions.set(id, {
+      x: maxLevel === 0 ? width / 2 : 65 + level * (width - 130) / maxLevel,
+      y: 42 + (index + 1) * (height - 72) / (ids.length + 1),
+    }));
+  }
+  const criticalPairs = new Set((view.criticalPath || []).slice(1).map((course, index) => `${view.criticalPath[index]},${course}`));
+  const edgeSvg = relations.map((relation) => {
+    const from = positions.get(relation.before);
+    const to = positions.get(relation.after);
+    if (!from || !to) return "";
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const active = view.activeEdge && view.activeEdge.u === relation.before && view.activeEdge.v === relation.after;
+    const critical = view.phase === "done" && criticalPairs.has(`${relation.before},${relation.after}`);
+    const className = active ? "active" : critical ? "critical" : "normal";
+    return `<path class="pc2050-edge ${className}" d="M ${from.x + dx / length * 27} ${from.y + dy / length * 27} L ${to.x - dx / length * 31} ${to.y - dy / length * 31}" marker-end="url(#pc2050-arrow-${className})"/>`;
+  }).join("");
+  const nodeSvg = courses.map((course) => {
+    const point = positions.get(course.id);
+    const critical = view.phase === "done" && (view.criticalPath || []).includes(course.id);
+    const classes = ["pc2050-node", course.completed ? "completed" : "", course.queued ? "queued" : "", course.current ? "current" : "", course.next ? "next" : "", critical ? "critical" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}" data-course="${course.id}"><circle class="halo" cx="${point.x}" cy="${point.y}" r="31"/><circle class="body" cx="${point.x}" cy="${point.y}" r="23"/><text class="book" x="${point.x}" y="${point.y + 6}">📘</text><text class="id" x="${point.x}" y="${point.y + 7}">${course.id}</text><g class="duration"><rect x="${point.x - 20}" y="${point.y + 27}" width="40" height="18" rx="9"/><text x="${point.x}" y="${point.y + 40}">⏱${course.duration}</text></g></g>`;
+  }).join("");
+  const marker = (name, color) => `<marker id="pc2050-arrow-${name}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${color}"/></marker>`;
+  const graph = `<div class="pc2050-graph"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(t("Sơ đồ môn học tiên quyết", "Course prerequisite map"))}"><defs>${marker("normal", "#718096")}${marker("active", "#f59e0b")}${marker("critical", "#8b5cf6")}</defs>${edgeSvg}${nodeSvg}</svg></div>`;
+
+  const horizon = Math.max(1, view.horizon || view.maxFinish || 1);
+  const ticks = Array.from({ length: 6 }, (_, index) => Math.round(horizon * index / 5));
+  const criticalCourses = new Set(view.phase === "done" ? view.criticalPath || [] : []);
+  const timeline = courses.map((course) => {
+    const left = course.start / horizon * 100;
+    const widthPercent = Math.max(2.5, course.duration / horizon * 100);
+    const classes = [course.completed ? "completed" : "", course.queued ? "queued" : "", course.current ? "current" : "", course.next ? "next" : "", criticalCourses.has(course.id) ? "critical" : ""].filter(Boolean).join(" ");
+    return `<div class="pc2050-row ${classes}" data-course="${course.id}"><strong>📘${course.id}</strong><div class="pc2050-track">${ticks.map((tick) => `<i style="left:${tick / horizon * 100}%"></i>`).join("")}<span class="pc2050-bar" style="left:${left}%;width:${widthPercent}%"><b>${course.duration}</b></span><em style="left:${course.finish / horizon * 100}%">${course.finish}</em></div></div>`;
+  }).join("");
+  const axis = `<div class="pc2050-axis"><strong>⏱</strong><div>${ticks.map((tick) => `<span style="left:${tick / horizon * 100}%">${tick}</span>`).join("")}</div></div>`;
+
+  let action = "";
+  if (view.event === "update-finish") {
+    const source = courses.find((course) => course.id === view.currentCourse);
+    const target = courses.find((course) => course.id === view.nextCourse);
+    action = `<section class="pc2050-action ${view.improved ? "move" : "keep"}"><span><i>📘</i><b>${view.currentCourse}</b><small>${source?.finish ?? "?"}</small></span><em>+</em><span><i>⏱</i><b>${target?.duration ?? "?"}</b></span><strong>${view.candidate}</strong><i>max</i><strong>${view.previousFinish}</strong><mark>${view.improved ? "→ " + (target?.finish ?? view.candidate) : "✓ " + view.previousFinish}</mark></section>`;
+  } else if (view.event === "release-prereq") {
+    const target = courses.find((course) => course.id === view.nextCourse);
+    action = `<section class="pc2050-unlock"><span>📘${view.nextCourse}</span><strong>${target?.indegree === 0 ? "🔓" : "🔒"}</strong><b>${target?.indegree ?? 0}</b></section>`;
+  } else if (view.event === "enqueue") {
+    action = `<section class="pc2050-unlock ready"><span>📘${view.currentCourse}</span><strong>🔓 → 🚦</strong></section>`;
+  }
+  const queue = `<section class="pc2050-queue"><strong>🚦</strong>${(view.queue || []).map((course, index) => `<span class="${index === 0 ? "front" : ""}">📘<b>${course}</b></span>`).join("") || "<em>∅</em>"}</section>`;
+  const result = view.phase === "done" ? `<section class="pc2050-result"><div>${(view.criticalPath || []).map((course, index) => `${index ? "<em>→</em>" : ""}<span>📘<b>${course}</b></span>`).join("")}</div><strong>${view.answer}</strong><i>⏱</i></section>` : "";
+  const phaseIndex = view.phase === "build" ? 0 : view.phase === "ready" ? 1 : view.phase === "done" ? 3 : 2;
+  const stages = ["🧱", "🚦", "🏃", "🏁"].map((icon, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><i>${icon}</i>${index < phaseIndex ? "<b>✓</b>" : ""}</span>${index < 3 ? "<em>›</em>" : ""}`).join("");
+  const stats = `<div class="pc2050-stats"><span>✓ <b>${view.completedCount || 0}/${view.n || 0}</b></span><span>🚦 <b>${(view.queue || []).length}</b></span><span>⏱ <b>${view.answer ?? view.maxFinish ?? 0}</b></span></div>`;
+  requestedVizSet(`<section class="pc2050-viz phase-${esc(view.phase)}" data-event="${esc(view.event)}"><header><div class="pc2050-stages">${stages}</div>${stats}</header>${graph}<section class="pc2050-timeline">${axis}${timeline}</section>${action}${view.phase !== "done" ? queue : ""}${result}</section>`, t("Lịch học song song và critical path", "Parallel course timeline and critical path"), "group");
+}

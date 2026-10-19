@@ -25087,6 +25087,7 @@ function buildSteps2050(input, params = {}) {
   const finish = [0, ...time];
   const queue = [];
   const completed = new Set();
+  const criticalParent = Array(n + 1).fill(null);
   const steps = [];
 
   function graphState({ hlNodes = [], hlEdges = [] } = {}) {
@@ -25113,7 +25114,23 @@ function buildSteps2050(input, params = {}) {
     };
   }
 
-  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false, answer = null }) {
+  function criticalPathTo(course) {
+    const path = [];
+    const seen = new Set();
+    while (course !== null && course > 0 && !seen.has(course)) {
+      seen.add(course);
+      path.unshift(course);
+      course = criticalParent[course];
+    }
+    return path;
+  }
+
+  function snapshot({ title, note, codeLines, hlNodes = [], hlEdges = [], final = false, answer = null, event = "setup", currentCourse = null, nextCourse = null, candidate = null, previousFinish = null, improved = null }) {
+    const maxFinish = Math.max(...finish.slice(1));
+    const provisionalTarget = finish.slice(1).indexOf(maxFinish) + 1;
+    const criticalPath = criticalPathTo(provisionalTarget);
+    const activeEdge = currentCourse !== null && nextCourse !== null ? { u: currentCourse, v: nextCourse } : null;
+    const phase = final ? "done" : event === "setup" || event === "add-edge" ? "build" : event === "seed-queue" ? "ready" : event === "update-finish" || event === "release-prereq" ? "update" : "run";
     steps.push({
       title,
       note,
@@ -25124,10 +25141,42 @@ function buildSteps2050(input, params = {}) {
       highlight: [],
       mark: [],
       graph: graphState({ hlNodes, hlEdges }),
+      parallel2050View: {
+        phase,
+        event,
+        n,
+        courses: Array.from({ length: n }, (_, index) => {
+          const course = index + 1;
+          return {
+            id: course,
+            duration: time[index],
+            start: finish[course] - time[index],
+            finish: finish[course],
+            indegree: indegree[course],
+            queued: queue.includes(course),
+            completed: completed.has(course),
+            current: course === currentCourse,
+            next: course === nextCourse,
+          };
+        }),
+        relations: relations.map(([before, after], index) => ({ before, after, index })),
+        queue: [...queue],
+        completedCount: completed.size,
+        currentCourse,
+        nextCourse,
+        activeEdge,
+        candidate,
+        previousFinish,
+        improved,
+        maxFinish,
+        horizon: time.reduce((sum, duration) => sum + duration, 0),
+        criticalPath,
+        answer,
+      },
       vars: [
         { name: "relations", value: JSON.stringify(relations) },
         { name: "indegree", value: "[" + indegree.slice(1).join(", ") + "]" },
-        { name: "finish", value: "[" + finish.slice(1).join(", ") + "]" },
+        { name: "finish_time", value: "[" + finish.slice(1).join(", ") + "]" },
         { name: "queue", value: "[" + queue.join(", ") + "]" },
         ...(answer === null ? [] : [{ name: "answer", value: answer }]),
       ],
@@ -25138,6 +25187,7 @@ function buildSteps2050(input, params = {}) {
     title: { vi: "Dựng graph, indegree và finish", en: "Build graph, indegree, and finish" },
     note: { vi: "finish[course] bắt đầu bằng thời lượng riêng của course. Khi prerequisite hoàn tất, ta cập nhật finish của course kế tiếp bằng thời điểm muộn nhất trong các prerequisite.", en: "finish[course] starts at the course's own duration. When a prerequisite finishes, update the next course with the latest prerequisite completion time." },
     codeLines: [4, 5, 6],
+    event: "setup",
   });
   for (const [before, after] of relations) {
     graph[before].push(after);
@@ -25145,17 +25195,21 @@ function buildSteps2050(input, params = {}) {
     snapshot({
       title: { vi: "Thêm quan hệ C" + before + " → C" + after, en: "Add relation C" + before + " → C" + after },
       note: { vi: "C" + before + " phải hoàn tất trước khi C" + after + " có thể bắt đầu; indegree[C" + after + "] tăng lên " + indegree[after] + ".", en: "C" + before + " must finish before C" + after + " can start; indegree[C" + after + "] becomes " + indegree[after] + "." },
-      codeLines: [7, 8, 9],
+      codeLines: [10, 11, 12],
       hlNodes: [before, after],
       hlEdges: [[before, after]],
+      event: "add-edge",
+      currentCourse: before,
+      nextCourse: after,
     });
   }
   for (let course = 1; course <= n; course += 1) if (indegree[course] === 0) queue.push(course);
   snapshot({
     title: { vi: "Đưa course indegree = 0 vào queue", en: "Enqueue indegree-0 courses" },
     note: { vi: "Các course [" + queue.join(", ") + "] không có prerequisite, nên có thể bắt đầu ngay tại thời điểm 0.", en: "Courses [" + queue.join(", ") + "] have no prerequisites, so they can start at time 0." },
-    codeLines: [10],
+    codeLines: [14, 15, 16, 17],
     hlNodes: [...queue],
+    event: "seed-queue",
   });
 
   while (queue.length) {
@@ -25164,36 +25218,51 @@ function buildSteps2050(input, params = {}) {
     snapshot({
       title: { vi: "Pop C" + course + " (hoàn tất lúc " + finish[course] + ")", en: "Pop C" + course + " (finishes at " + finish[course] + ")" },
       note: { vi: "C" + course + " đã có mọi prerequisite. Thời điểm hoàn tất sớm nhất của nó là " + finish[course] + ".", en: "C" + course + " has every prerequisite satisfied. Its earliest finish time is " + finish[course] + "." },
-      codeLines: [11, 12],
+      codeLines: [19, 20],
       hlNodes: [course],
+      event: "pop",
+      currentCourse: course,
     });
 
     for (const next of graph[course]) {
       const candidate = finish[course] + time[next - 1];
       const previous = finish[next];
       finish[next] = Math.max(finish[next], candidate);
+      const improved = finish[next] > previous;
+      if (improved) criticalParent[next] = course;
       snapshot({
         title: { vi: "finish[C" + next + "] = max(" + previous + ", " + finish[course] + " + " + time[next - 1] + ") → " + finish[next], en: "finish[C" + next + "] = max(" + previous + ", " + finish[course] + " + " + time[next - 1] + ") → " + finish[next] },
         note: { vi: "Nếu C" + next + " có nhiều prerequisite, nó chỉ bắt đầu sau prerequisite hoàn tất muộn nhất. Candidate từ C" + course + " là " + candidate + ".", en: "If C" + next + " has multiple prerequisites, it starts after the latest one finishes. The candidate through C" + course + " is " + candidate + "." },
-        codeLines: [13, 14],
+        codeLines: [22, 23, 24, 25, 26],
         hlNodes: [course, next],
         hlEdges: [[course, next]],
+        event: "update-finish",
+        currentCourse: course,
+        nextCourse: next,
+        candidate,
+        previousFinish: previous,
+        improved,
       });
       indegree[next] -= 1;
       snapshot({
         title: { vi: "indegree[C" + next + "] -= 1 → " + indegree[next], en: "indegree[C" + next + "] -= 1 → " + indegree[next] },
         note: { vi: "Đã hoàn tất một prerequisite của C" + next + ".", en: "One prerequisite of C" + next + " has finished." },
-        codeLines: [15],
+        codeLines: [28],
         hlNodes: [next],
         hlEdges: [[course, next]],
+        event: "release-prereq",
+        currentCourse: course,
+        nextCourse: next,
       });
       if (indegree[next] === 0) {
         queue.push(next);
         snapshot({
           title: { vi: "indegree = 0 → queue.append(C" + next + ")", en: "indegree = 0 → queue.append(C" + next + ")" },
           note: { vi: "Mọi prerequisite của C" + next + " đã hoàn tất, nên course này sẵn sàng được xử lý.", en: "Every prerequisite of C" + next + " has finished, so this course is ready to process." },
-          codeLines: [16, 17],
+          codeLines: [30, 31],
           hlNodes: [next],
+          event: "enqueue",
+          currentCourse: next,
         });
       }
     }
@@ -25203,9 +25272,10 @@ function buildSteps2050(input, params = {}) {
   snapshot({
     title: { vi: "return max(finish) → " + answer, en: "return max(finish) → " + answer },
     note: { vi: "Tổng thời gian tối thiểu để hoàn tất mọi course là thời điểm hoàn tất muộn nhất.", en: "The minimum total time to finish every course is the latest finish time." },
-    codeLines: [18],
+    codeLines: [33],
     final: true,
     answer,
+    event: "result",
   });
   return { original: { n, relations, time }, answer, steps };
 }
@@ -27294,23 +27364,38 @@ Object.assign(module.exports, {
     codeLabel: { vi: "Kahn topological sort + DP thời gian", en: "Kahn topological sort + time DP" },
     code: [
       "from collections import deque",
+      "from typing import List",
       "",
       "class Solution:",
       "    def minimumTime(self, n: int, relations: List[List[int]], time: List[int]) -> int:",
       "        graph = [[] for _ in range(n + 1)]",
       "        indegree = [0] * (n + 1)",
-      "        finish = [0] + time[:]",
+      "        finish_time = [0] + time[:]",
+      "",
       "        for before, after in relations:",
-      "            graph[before].append(after); indegree[after] += 1",
-      "        queue = deque(course for course in range(1, n + 1) if indegree[course] == 0)",
+      "            graph[before].append(after)",
+      "            indegree[after] += 1",
+      "",
+      "        queue = deque(",
+      "            course for course in range(1, n + 1)",
+      "            if indegree[course] == 0",
+      "        )",
+      "",
       "        while queue:",
       "            course = queue.popleft()",
-      "            for nxt in graph[course]:",
-      "                finish[nxt] = max(finish[nxt], finish[course] + time[nxt - 1])",
-      "                indegree[nxt] -= 1",
-      "                if indegree[nxt] == 0:",
-      "                    queue.append(nxt)",
-      "        return max(finish)",
+      "",
+      "            for next_course in graph[course]:",
+      "                finish_time[next_course] = max(",
+      "                    finish_time[next_course],",
+      "                    finish_time[course] + time[next_course - 1]",
+      "                )",
+      "",
+      "                indegree[next_course] -= 1",
+      "",
+      "                if indegree[next_course] == 0:",
+      "                    queue.append(next_course)",
+      "",
+      "        return max(finish_time)",
     ],
     liveArgs(input, params = {}) {
       const parsed = parse2050Data(input, params);
