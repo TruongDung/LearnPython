@@ -306,6 +306,7 @@ app.get("/api/problem/:id", (req, res) => {
     complexity3: problem.complexity3 || null,
     complexity4: problem.complexity4 || null,
     complexity5: problem.complexity5 || null,
+    complexity6: problem.complexity6 || null,
     code: problem.code || [],
     codeVi: problem.codeVi || null,
     codeEn: problem.codeEn || null,
@@ -313,12 +314,14 @@ app.get("/api/problem/:id", (req, res) => {
     code3: problem.code3 || null,
     code4: problem.code4 || null,
     code5: problem.code5 || null,
+    code6: problem.code6 || null,
     codeCsharp: problem.codeCsharp || null,
     codeLabel: problem.codeLabel || null,
     code2Label: problem.code2Label || null,
     code3Label: problem.code3Label || null,
     code4Label: problem.code4Label || null,
     code5Label: problem.code5Label || null,
+    code6Label: problem.code6Label || null,
     approach: problem.approach || null,
     debugMode: problem.debugMode || null,
     hasLiveArgs: typeof problem.liveArgs === "function",
@@ -455,7 +458,9 @@ app.post("/api/problem/:id/solve", (req, res) => {
 
   try {
     const requestedApproach = Number(params.approach) || 1;
-    const codeBlock = requestedApproach === 5 && problem.code5
+    const codeBlock = requestedApproach === 6 && problem.code6
+      ? 6
+      : requestedApproach === 5 && problem.code5
       ? 5
       : requestedApproach === 4 && problem.code4
       ? 4
@@ -464,7 +469,9 @@ app.post("/api/problem/:id/solve", (req, res) => {
       : requestedApproach === 2 && problem.code2
         ? 2
         : 1;
-    const result = requestedApproach === 5 && typeof problem.builder5 === "function"
+    const result = requestedApproach === 6 && typeof problem.builder6 === "function"
+      ? problem.builder6(input, params)
+      : requestedApproach === 5 && typeof problem.builder5 === "function"
       ? problem.builder5(input, params)
       : requestedApproach === 4 && typeof problem.builder4 === "function"
       ? problem.builder4(input, params)
