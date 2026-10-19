@@ -23,7 +23,7 @@ const requestedIds = [
 
 test("all available requested problems are grouped under Segment Tree", () => {
   const available = requestedIds.filter((id) => SUPPORTED[id]);
-  assert.equal(available.length, 30);
+  assert.equal(available.length, 31);
   for (const id of available) {
     const problem = SUPPORTED[id];
     const belongsToSegmentTree = problem.category === SEGMENT_TREE_TAG
@@ -38,8 +38,8 @@ test("the Segment Tree roster exposes all 87 requested problems", () => {
   assert.equal(all.roster.length, 87);
   assert.deepEqual(all.roster.map((problem) => problem.id), requestedIds);
   assert.equal(new Set(all.roster.map((problem) => problem.id)).size, 87);
-  assert.equal(all.roster.filter((problem) => problem.available).length, 30);
-  assert.equal(all.roster.filter((problem) => !problem.available).length, 57);
+  assert.equal(all.roster.filter((problem) => problem.available).length, 31);
+  assert.equal(all.roster.filter((problem) => !problem.available).length, 56);
   for (const problem of all.roster) {
     assert.ok(problem.title.length > 3, `#${problem.id} title`);
     assert.match(problem.difficulty, /^(easy|medium|hard)$/);

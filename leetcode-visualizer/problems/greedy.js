@@ -4063,8 +4063,28 @@ module.exports = {
   },
 };
 
-// LeetCode 621: the closed-form schedule length is easier to inspect when
-// the frequency table and the frame it creates are kept visible together.
+// Construct a concrete optimal schedule for the visual illustration. The
+// displayed Python solution still computes its answer with the frequency bound.
+function illustrateSchedule621(counts, n) {
+  const remaining = { ...counts };
+  const readyAt = Object.fromEntries(Object.keys(counts).map(task => [task, 0]));
+  const schedule = [];
+  while (Object.values(remaining).some(count => count > 0)) {
+    const time = schedule.length;
+    const task = Object.keys(remaining)
+      .filter(task => remaining[task] > 0 && readyAt[task] <= time)
+      .sort((a, b) => remaining[b] - remaining[a] || a.localeCompare(b))[0] || null;
+    if (task !== null) {
+      remaining[task]--;
+      readyAt[task] = time + n + 1;
+    }
+    schedule.push({ time: time + 1, task, remaining: { ...remaining },
+      // Number of whole intervals still blocked at the next CPU slot.
+      cooldown: Object.fromEntries(Object.keys(counts).map(label => [label, Math.max(0, readyAt[label] - time - 1)])) });
+  }
+  return schedule;
+}
+
 function buildSteps621(input, params = {}) {
   const raw = String(input ?? "").trim().toUpperCase();
   const tasks = raw.includes(",")
@@ -4077,6 +4097,7 @@ function buildSteps621(input, params = {}) {
 
   const counts = {};
   const steps = [];
+  let schedule = [];
   const snapshot = (title, line, note, extra = {}) => steps.push({
     title,
     arr: [...tasks],
@@ -4096,6 +4117,7 @@ function buildSteps621(input, params = {}) {
       maxFreq: extra.maxFreq ?? null, maxCount: extra.maxCount ?? null,
       frame: extra.frame ?? null, answer: extra.answer ?? null,
       phase: extra.phase || "setup",
+      schedule, cursor: extra.cursor ?? null,
     },
   });
 
@@ -4105,36 +4127,46 @@ function buildSteps621(input, params = {}) {
     { phase: "count" },
   );
   tasks.forEach((task) => { counts[task] = (counts[task] || 0) + 1; });
+  schedule = illustrateSchedule621(counts, n);
   snapshot(
-    { vi: "freq = Counter(tasks)", en: "freq = Counter(tasks)" }, 5,
+    { vi: "Gom các chữ giống nhau", en: "Group matching letters" }, 5,
     { vi: `Bảng tần suất có ${Object.keys(counts).length} loại task.`, en: `The frequency table has ${Object.keys(counts).length} task type(s).` },
     { phase: "frequency" },
   );
 
   const maxFreq = Math.max(...Object.values(counts));
   snapshot(
-    { vi: `max_freq = ${maxFreq}`, en: `max_freq = ${maxFreq}` }, 6,
-    { vi: `Task xuất hiện nhiều nhất có ${maxFreq} bản sao, nên tạo ${maxFreq - 1} khoảng cooldown giữa chúng.`, en: `The most frequent task appears ${maxFreq} times, creating ${maxFreq - 1} cooldown gaps.` },
+    { vi: `Task nhiều nhất: ${maxFreq} lần`, en: `Most frequent task: ${maxFreq} copies` }, 6,
+    { vi: `${maxFreq - 1} khoảng chờ giữa các lần chạy.`, en: `${maxFreq - 1} cooldown gaps between runs.` },
     { maxFreq, phase: "max-frequency" },
   );
 
   const maxCount = Object.values(counts).filter((count) => count === maxFreq).length;
   snapshot(
-    { vi: `max_count = ${maxCount}`, en: `max_count = ${maxCount}` }, 7,
-    { vi: `${maxCount} task cùng đạt max_freq; chúng chiếm các ô cuối của khung lịch.`, en: `${maxCount} task(s) tie at max_freq; they occupy the frame's final slots.` },
+    { vi: `${maxCount} loại cùng nhiều nhất`, en: `${maxCount} types tie for most frequent` }, 7,
+    { vi: `Đuôi khung cần ${maxCount} ô.`, en: `The frame tail needs ${maxCount} slots.` },
     { maxFreq, maxCount, phase: "tie-count" },
   );
 
   const frame = (maxFreq - 1) * (n + 1) + maxCount;
   snapshot(
-    { vi: `frame = (${maxFreq} - 1) × (${n} + 1) + ${maxCount} = ${frame}`, en: `frame = (${maxFreq} - 1) × (${n} + 1) + ${maxCount} = ${frame}` }, 8,
-    { vi: "Mỗi khối có 1 task chủ đạo và n vị trí chờ; block cuối chỉ cần các task đồng hạng.", en: "Each block has one dominant task and n cooling slots; the final block only needs the tied tasks." },
+    { vi: `Khung chờ: ${frame} ô`, en: `Cooldown bound: ${frame} slots` }, 8,
+    { vi: "So sánh khung chờ với tổng số task.", en: "Compare the cooldown bound with the task count." },
     { maxFreq, maxCount, frame, phase: "frame" },
   );
 
   const answer = Math.max(tasks.length, frame);
+  schedule.forEach((slot, cursor) => {
+    snapshot(
+      { vi: `t=${slot.time} · ${slot.task === null ? "CPU nghỉ" : `Chạy ${slot.task}`}`, en: `t=${slot.time} · ${slot.task === null ? "CPU idle" : `Run ${slot.task}`}` }, null,
+      { vi: slot.task === null ? "Mọi task còn lại đều đang cooldown." : `Chạy ${slot.task}, rồi chờ ${n} ô trước khi chạy lại ${slot.task}.`, en: slot.task === null ? "Every remaining task is cooling down." : `Run ${slot.task}, then leave ${n} slots before running ${slot.task} again.` },
+      { maxFreq, maxCount, frame, phase: "schedule", cursor },
+    );
+    // Illustrative CPU ticks are not execution steps of the formula-only code.
+    steps.at(-1).codeLines = [];
+  });
   snapshot(
-    { vi: `return max(${tasks.length}, ${frame}) = ${answer}`, en: `return max(${tasks.length}, ${frame}) = ${answer}` }, 9,
+    { vi: `Hoàn tất · ${answer} đơn vị thời gian`, en: `Complete · ${answer} time units` }, 9,
     { vi: frame > tasks.length ? "Khung cooldown dài hơn số task, nên có idle slot." : "Task còn lại lấp đủ mọi idle slot, nên chỉ cần số task thực tế.", en: frame > tasks.length ? "The cooldown frame is longer than the task count, so idle slots are required." : "Other tasks fill every idle slot, so the real task count is enough." },
     { maxFreq, maxCount, frame, answer, phase: "done", final: true },
   );
@@ -4148,13 +4180,13 @@ Object.assign(module.exports, {
     tags: [{ key: "counting", vi: "Đếm tần suất", en: "Counting" }],
     title: { vi: "Task Scheduler", en: "Task Scheduler" },
     titleVi: { vi: "Lập lịch task có cooldown", en: "Schedule tasks with cooldown" },
-    statement: { vi: "Mỗi task cần 1 đơn vị thời gian. Hai task cùng loại phải cách nhau ít nhất n đơn vị. Tìm thời gian ngắn nhất để hoàn tất tất cả task.", en: "Each task takes one unit. Equal tasks must be separated by at least n intervals. Find the shortest total schedule length." },
-    defaultInput: "A,A,A,B,B,B", inputKind: "string", inputLabel: { vi: "tasks (A,A,A,B,B,B)", en: "tasks (A,A,A,B,B,B)" },
-    extraParams: [{ key: "n", type: "number", label: { vi: "cooldown n", en: "cooldown n" }, default: 2, min: 0 }],
+    statement: { vi: "1 task = 1 ô thời gian. Giữa hai task cùng chữ phải có ít nhất n ô khác. Tìm tổng thời gian ngắn nhất.", en: "1 task = 1 time slot. Leave at least n other slots between matching letters. Find the shortest total time." },
+    defaultInput: "A,A,A,B,B,B", inputKind: "string", inputLabel: { vi: "tasks (tối đa 18): A,A,A,B,B,B", en: "tasks (up to 18): A,A,A,B,B,B" },
+    extraParams: [{ key: "n", type: "number", label: { vi: "Số ô chờ n (0–8)", en: "Cooldown slots n (0–8)" }, default: 2, min: 0, max: 8 }],
     approach: [
-      { vi: "Đếm tần suất; max_freq quyết định số hàng cooldown bắt buộc.", en: "Count frequencies; max_freq determines the required cooldown rows." },
-      { vi: "Khung tối thiểu là (max_freq - 1) × (n + 1) + số task đồng hạng max_freq.", en: "The minimum frame is (max_freq - 1) × (n + 1) + the number of tasks tied at max_freq." },
-      { vi: "Lấy max với tổng số task vì task khác có thể lấp các khoảng idle.", en: "Take the maximum with the task count because other tasks can fill idle slots." },
+      { vi: "Đếm số bản sao của từng chữ.", en: "Count the copies of each letter." },
+      { vi: "Xen task khác vào khoảng chờ; hết task hợp lệ thì CPU nghỉ.", en: "Fill cooldown gaps with other tasks; idle only when none is ready." },
+      { vi: "Đáp án = max(số task, khung cooldown).", en: "Answer = max(task count, cooldown frame)." },
     ],
     complexity: { time: "O(T)", space: "O(1)", note: { vi: "Chỉ đếm tối đa 26 chữ cái viết hoa.", en: "Only up to 26 uppercase task labels are counted." } },
     code: [

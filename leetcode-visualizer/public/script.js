@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.queue406View), surface: "treeView", render: (step) => {
+      renderQueue406View(step);
+    } },
     { predicate: (step) => Boolean(step.magnetic1552View), surface: "treeView", render: (step) => {
       renderMagneticForce1552View(step);
     } },

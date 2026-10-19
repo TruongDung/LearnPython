@@ -1640,36 +1640,58 @@ function renderSequenceTraceView(step) {
 }
 
 function renderTaskSchedulerView(step) {
-  const view = step.taskSchedulerView || {};
+  const view = step.taskSchedulerView;
   const vi = lang === "vi";
-  const counts = Object.entries(view.counts || {}).sort(([a], [b]) => a.localeCompare(b));
-  const answer = view.answer == null ? "—" : String(view.answer);
-  const maxFreq = view.maxFreq == null ? "—" : view.maxFreq;
-  const maxCount = view.maxCount == null ? "—" : view.maxCount;
-  const frame = view.frame == null ? "—" : view.frame;
-  const taskCount = Array.isArray(view.tasks) ? view.tasks.length : 0;
-  const slots = view.frame == null
-    ? ""
-    : Array.from({ length: Math.min(Number(view.frame), 24) }, (_, index) => `<div class="seqtrace-cell${index >= taskCount ? " outside" : ""}"><small>slot ${index + 1}</small><strong>${index < taskCount ? "task" : "idle"}</strong><em>${index < taskCount ? "filled" : "cooldown"}</em></div>`).join("");
-  const phaseText = {
-    count: vi ? "Đếm task" : "Count tasks",
-    frequency: vi ? "Bảng tần suất" : "Frequency table",
-    "max-frequency": vi ? "Tần suất lớn nhất" : "Maximum frequency",
-    "tie-count": vi ? "Đếm task đồng hạng" : "Count tied tasks",
-    frame: vi ? "Khung cooldown" : "Cooldown frame",
-    done: vi ? "Thời gian tối thiểu" : "Minimum time",
-  }[view.phase] || String(view.phase || "setup");
-  const freqCells = counts.length
-    ? counts.map(([task, count]) => `<div class="seqtrace-cell${count === view.maxFreq ? " matched" : ""}"><small>task</small><strong>${escapeHtml(task)}</strong><em>freq = ${count}</em></div>`).join("")
-    : `<div class="seqtrace-cell"><small>freq</small><strong>—</strong><em>counting</em></div>`;
-  $("treeView").innerHTML = `
-    <section class="seqtrace-viz" role="img" aria-label="Task Scheduler frequency visualization">
-      <header><strong>TASK SCHEDULER · FREQUENCY FRAME</strong><span>${escapeHtml(phaseText)}</span></header>
-      <section class="seqtrace-row target"><header><strong>FREQUENCY TABLE</strong><span>n = ${view.n ?? 0}</span><div class="seqtrace-cells" style="--seqtrace-cols:${Math.max(1, Math.min(counts.length, 8))}">${freqCells}</div></section>
-      <section class="seqtrace-row binary"><header><strong>MINIMUM COOLDOWN FRAME</strong><span>(max_freq - 1) × (n + 1) + max_count</span><div class="seqtrace-cells" style="--seqtrace-cols:${Math.max(1, Math.min(Number(view.frame) || 1, 10))}">${slots || `<div class="seqtrace-cell"><small>frame</small><strong>—</strong><em>waiting</em></div>`}</div></section>
-      <section class="seqtrace-rule"><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><strong>max(total tasks, frame)</strong><span>max_freq = ${maxFreq} · max_count = ${maxCount} · frame = ${frame}</span></section>
-      <footer><span><small>${vi ? "số task" : "task count"}</small><strong>${taskCount}</strong></span><span class="answer"><small>${vi ? "thời gian" : "time"}</small><strong>${answer}</strong></span></footer>
-    </section>`;
+  const text = (a, b) => vi ? a : b;
+  const host = $("treeView");
+  const schedule = view.schedule || [];
+  const done = view.phase === "done";
+  const running = view.phase === "schedule";
+  const stage = running || done ? 2 : view.phase === "frame" ? 1 : 0;
+  const counts = Object.entries(view.counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const labels = [...new Set(view.tasks)].sort();
+  const kind = task => `ts621-kind-${labels.indexOf(task) % 6}`;
+  const block = task => `<span class="ts621-task ${kind(task)}">${escapeHtml(task)}</span>`;
+  const frequencies = counts.length ? counts.map(([task, count]) => `<div class="ts621-frequency${count === view.maxFreq ? " is-max" : ""}"><b>${escapeHtml(task)}</b><div>${Array.from({length: count}, () => block(task)).join("")}</div><strong>×${count}</strong></div>`).join("") : `<div class="ts621-input">${view.tasks.map(block).join("")}</div>`;
+  const first = counts[0]?.[0] || view.tasks[0];
+  const rule = `<div class="ts621-rule"><span>${text("Cùng chữ", "Same letter")}</span>${block(first)}<div class="ts621-gap"><small>n=${view.n} ${text("ô ở giữa", "slots between")}</small><div>${view.n ? Array.from({length:view.n}, () => '<i aria-hidden="true">·</i>').join("") : "∅"}</div></div>${block(first)}</div>`;
+  const math = view.frame === null ? "" : `<details class="ts621-math"${view.phase === "frame" ? " open" : ""}><summary>${text("Vì sao là số ô tối thiểu?", "Why is this the minimum?")}</summary><div class="ts621-bound"><span>${text("Số task", "Tasks")}</span><div><i style="width:${100 * view.tasks.length / Math.max(view.tasks.length, view.frame)}%"></i></div><b>${view.tasks.length}</b><span>${text("Khung chờ", "Cooldown bound")}</span><div><i style="width:${100 * view.frame / Math.max(view.tasks.length, view.frame)}%"></i></div><b>${view.frame}</b></div><p>(${view.maxFreq} − 1) × (${view.n} + 1) + ${view.maxCount} = ${view.frame}</p><p>max(${view.tasks.length}, ${view.frame}) = <b>${Math.max(view.tasks.length, view.frame)}</b></p></details>`;
+
+  function draw(selected = null, restoreFocus = false) {
+    const cursor = done ? (selected ?? 0) : view.cursor;
+    const slot = schedule[cursor];
+    const task = slot?.task;
+    const nextIndex = task ? schedule.findIndex((entry, i) => i > cursor && entry.task === task) : -1;
+    const windowEnd = task ? Math.min(cursor + view.n, schedule.length - 1) : -1;
+    const before = cursor > 0 ? schedule[cursor - 1] : { remaining: view.counts, cooldown: {} };
+    const pools = slot ? labels.filter(label => before.remaining[label] > 0).map(label => {
+      const wait = before.cooldown[label] || 0;
+      return `<span class="ts621-pool-item ${kind(label)}${wait ? " is-cooling" : ""}"><b>${label}</b> ×${before.remaining[label]} <small>${wait ? text(`chờ ${wait}`, `wait ${wait}`) : text("sẵn sàng", "ready")}</small></span>`;
+    }).join("") : "";
+    const tiles = schedule.map((entry, i) => {
+      const future = !done && i > view.cursor;
+      const gap = task && i > cursor && i <= windowEnd;
+      const same = task && i === nextIndex && !future;
+      const active = i === cursor;
+      const cls = `ts621-slot ${future ? "is-future" : entry.task === null ? "is-idle" : kind(entry.task)}${gap ? " is-gap" : ""}${active ? " is-current" : ""}${same ? " is-next" : ""}`;
+      const content = `<small>t=${entry.time}</small><b>${future ? "·" : entry.task || "☕"}</b><span>${active ? "CPU ↑" : future ? "" : entry.task === null ? text("nghỉ", "idle") : same ? text("lặp lại", "repeat") : ""}</span>`;
+      return done ? `<button type="button" class="${cls}" data-ts621-slot="${i}" aria-pressed="${active}" aria-label="t=${entry.time} · ${entry.task || text("CPU nghỉ", "CPU idle")}">${content}</button>` : `<div class="${cls}" role="img" aria-label="t=${entry.time} · ${future ? text("chưa chạy", "not run yet") : entry.task || text("CPU nghỉ", "CPU idle")}">${content}</div>`;
+    }).join("");
+    let detail = "";
+    if (slot) {
+      detail = task === null ? text("☕ CPU nghỉ · tất cả task còn lại đang chờ", "☕ CPU idle · every remaining task is cooling down")
+        : nextIndex !== -1 ? text(`${task} tại t=${cursor + 1} → ${nextIndex - cursor - 1} ô ở giữa → ${task} tại t=${nextIndex + 1} ✓`, `${task} at t=${cursor + 1} → ${nextIndex - cursor - 1} slots between → ${task} at t=${nextIndex + 1} ✓`)
+          : text(`${task} chạy lần cuối · không cần chờ thêm sau đó`, `Last ${task} · no extra wait is needed afterwards`);
+    }
+    const timeline = running || done ? `<div class="ts621-timeline-heading"><strong>${text("Lịch CPU minh họa", "Illustrative CPU schedule")}</strong><span>${text("1 ô = 1 đơn vị", "1 slot = 1 unit")}</span></div><div class="ts621-timeline">${tiles}</div><div class="ts621-detail" role="status" aria-live="polite">${detail}</div><div class="ts621-legend"><span>↑ CPU</span><span>┄ ${text("khoảng chờ của chữ đang xét", "selected letter's cooldown")}</span><span>☕ ${text("CPU nghỉ", "CPU idle")}</span></div><div class="ts621-pool"><small>${text("Trước", "Before")} t=${cursor + 1}</small><div>${pools}</div></div>` : rule;
+    const result = done ? `<div class="ts621-result"><span>${view.tasks.length} ${text("task", "tasks")}</span><i>+</i><span>${schedule.length - view.tasks.length} ${text("ô nghỉ", "idle slots")}</span><i>=</i><strong>${view.answer}</strong><span>${text("đơn vị thời gian", "time units")}</span></div>` : "";
+    host.innerHTML = `<section class="ts621-viz" aria-label="${text("621 · Lập lịch CPU", "621 · CPU task scheduler")}"><div class="ts621-stages">${[text("1 · Đếm chữ", "1 · Count letters"), text("2 · Khung chờ", "2 · Cooldown bound"), text("3 · Chạy CPU", "3 · Run CPU")].map((label, i) => `<span class="${stage === i ? "active" : ""}">${label}</span>`).join("")}<b>n=${view.n}</b></div>${running || done ? "" : `<div class="ts621-frequencies">${frequencies}</div>`}${timeline}${result}${done ? `<small class="ts621-hint">${text("Bấm từng ô để xem khoảng chờ.", "Select a slot to inspect its cooldown.")}</small>` : ""}${math}</section>`;
+    host.querySelectorAll("[data-ts621-slot]").forEach(button => {
+      button.addEventListener("click", () => draw(Number(button.dataset.ts621Slot), true));
+    });
+    if (restoreFocus) host.querySelector(`[data-ts621-slot="${cursor}"]`).focus();
+  }
+  draw();
 }
 
 function renderHappyNumberView(step) {
