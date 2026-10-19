@@ -5,8 +5,8 @@ const vm = require("node:vm");
 const { spawnSync } = require("node:child_process");
 const { SUPPORTED } = require("../problems");
 const problem = SUPPORTED[300];
-const unitProblem = SUPPORTED[9024];
-const runApproach = (nums, approach) => (approach >= 4 ? unitProblem : problem).builder(nums, { approach });
+const plusOneSample = [2, 1, 3, 2, 4, 3, 2, 5, 4, 5];
+const runApproach = (nums, approach) => problem.builder(nums, { approach });
 
 function exhaustive(nums, unitStep = false) {
   let best = 0;
@@ -25,28 +25,25 @@ function validPath(nums, path, unitStep = false) {
   return path.every((index, i) => index >= 0 && index < nums.length && (!i || index > path[i - 1] && (unitStep ? nums[index] === nums[path[i - 1]] + 1 : nums[index] > nums[path[i - 1]])));
 }
 
-test("9024 is a standalone screenshot exercise with six approaches and its own method and input", () => {
-  assert.equal(unitProblem.slug, null);
-  assert.deepEqual(unitProblem.defaultInput, [2, 1, 3, 2, 4, 3, 2, 5, 4, 5]);
-  assert.equal(unitProblem.extraParams[0].default, 5);
-  assert.deepEqual(unitProblem.extraParams[0].options.map(option => option.value), [4, 5, 6]);
-  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), [1, 2, 3]);
-  assert.equal(problem.code4, undefined);
-  assert.equal(problem.code5, undefined);
-  assert.equal(unitProblem.builder(unitProblem.defaultInput).answer, 5);
-  const indices = unitProblem.builder4(unitProblem.defaultInput).answer;
+test("300 exposes six approaches and labels approaches 4–6 as special +1 variants", () => {
+  assert.equal(SUPPORTED[9024], undefined);
+  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), [1, 2, 3, 4, 5, 6]);
+  assert.match(problem.extraParams[0].options[3].label.vi, /Biến thể \+1/);
+  assert.match(problem.extraParams[0].options[4].label.vi, /Biến thể \+1/);
+  assert.match(problem.extraParams[0].options[5].label.vi, /Biến thể \+1/);
+  assert.equal(problem.builder(plusOneSample, { approach: 5 }).answer, 5);
+  const indices = problem.builder4(plusOneSample).answer;
   assert.deepEqual(indices, [1, 3, 5, 8, 9]);
-  assert.deepEqual(indices.map(index => unitProblem.defaultInput[index]), [1, 2, 3, 4, 5]);
+  assert.deepEqual(indices.map(index => plusOneSample[index]), [1, 2, 3, 4, 5]);
   for (const approach of [4, 5, 6]) {
-    const source = unitProblem[`code${approach}`];
-    assert.match(source.join("\n"), /def longestSubsequence\(self, nums\):/);
-    assert.doesNotMatch(source.join("\n"), /lengthOfLIS/);
-    for (const step of runApproach(unitProblem.defaultInput, approach).steps) {
-      assert.equal(step.lis300View.problemId, 9024);
+    const source = problem[`code${approach}`];
+    assert.match(source.join("\n"), /def lengthOfLIS\(self, nums\):/);
+    for (const step of runApproach(plusOneSample, approach).steps) {
+      assert.equal(step.lis300View.problemId, 300);
       assert.equal(step.lis300View.source, source[step.codeLines[0] - 1].trim());
     }
   }
-  assert.throws(() => unitProblem.builder5([]), /#9024/);
+  assert.throws(() => problem.builder5([]), /#300/);
 });
 
 test("Subsequence visualizations keep all six approaches correct, including negatives, duplicates and actual witnesses", () => {
@@ -76,7 +73,7 @@ test("Subsequence visualizations keep all six approaches correct, including nega
 });
 
 test("300 line numbers and every variable snapshot match actual Python execution", () => {
-  const cases = [problem.defaultInput, unitProblem.defaultInput, [1], [2, 2, 2], [-2, -1, -1, 0], [3, 5, 6, 2], [3, 2, 1], [1, 3, 2, 4, 3, 5, 4]];
+  const cases = [problem.defaultInput, plusOneSample, [1], [2, 2, 2], [-2, -1, -1, 0], [3, 5, 6, 2], [3, 2, 1], [1, 3, 2, 4, 3, 5, 4]];
   const script = `import sys, json
 data = json.load(sys.stdin)
 results = []
@@ -102,7 +99,7 @@ for source in data['sources']:
         results.append({'answer': answer, 'events': events})
 print(json.dumps(results))
 `;
-  const execution = spawnSync(process.env.PYTHON || "python", ["-c", script], { input: JSON.stringify({ sources: [problem.code, problem.code2, problem.code3, unitProblem.code4, unitProblem.code5, unitProblem.code6].map(code => code.join("\n")), cases }), encoding: "utf8" });
+  const execution = spawnSync(process.env.PYTHON || "python", ["-c", script], { input: JSON.stringify({ sources: [problem.code, problem.code2, problem.code3, problem.code4, problem.code5, problem.code6].map(code => code.join("\n")), cases }), encoding: "utf8" });
   assert.equal(execution.status, 0, execution.stderr);
   const expected = JSON.parse(execution.stdout);
   let index = 0;
@@ -120,7 +117,7 @@ test("300 renderer shows candidate comparisons, dp transitions and truthful tail
   vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-lis-300.js"), "utf8"), context);
   for (const lang of ["vi", "en"]) for (const approach of [1, 2, 3, 4, 5, 6]) {
     context.lang = lang;
-    const run = runApproach(approach === 6 ? unitProblem.defaultInput : problem.defaultInput, approach);
+    const run = runApproach(approach >= 4 ? plusOneSample : problem.defaultInput, approach);
     for (const step of run.steps) {
       context.renderLis300View(step);
       assert.match(host.innerHTML, /l300-line/);
@@ -139,14 +136,14 @@ test("300 renderer shows candidate comparisons, dp transitions and truthful tail
     if (approach === 4) {
       assert.match(host.innerHTML, /l300-unit-rule/);
       assert.match(host.innerHTML, /nums\[j\] \+ 1 = nums\[i\]/);
-      assert.match(host.innerHTML, /index = \[2, 4\]/);
-      assert.match(host.innerHTML, /(?:giá trị|values) = \[2, 3\]/);
-      assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[2, 4\]/s);
+      assert.match(host.innerHTML, /index = \[1, 3, 5, 8, 9\]/);
+      assert.match(host.innerHTML, /(?:giá trị|values) = \[1, 2, 3, 4, 5\]/);
+      assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[1, 3, 5, 8, 9\]/s);
       assert.doesNotMatch(host.innerHTML, /nums\[j\] &lt; nums\[i\]/);
     }
     if (approach === 5) {
       assert.match(host.innerHTML, /nums\[j\] \+ 1 = nums\[i\]/);
-      assert.match(host.innerHTML, /max\(dp\) = <strong>2<\/strong>/);
+      assert.match(host.innerHTML, /max\(dp\) = <strong>5<\/strong>/);
       assert.doesNotMatch(host.innerHTML, /l300-index-values|l300-reconstruction|Trả về index|Return indices/);
     }
     if (approach === 6) {
@@ -157,57 +154,58 @@ test("300 renderer shows candidate comparisons, dp transitions and truthful tail
   }
 });
 
-test("9024 approach 5 returns only max length with no reconstruction variables", () => {
-  assert.equal(unitProblem.code5.at(-1), "        return max(dp)");
-  assert.doesNotMatch(unitProblem.code5.join("\n"), /parent|indices|reverse/);
+test("300 approach 5 returns only max length with no reconstruction variables", () => {
+  assert.equal(problem.code5.at(-1), "        return max(dp)");
+  assert.doesNotMatch(problem.code5.join("\n"), /parent|indices|reverse/);
   for (const [nums, expected] of [[problem.defaultInput, 2], [[1, 3, 2, 4, 3, 5, 4], 4], [[1, 3, 5], 1], [[3, 2, 1], 1], [[-2, 0, -1, 1, 0], 3], [[2, 2, 3, 4], 3]]) {
-    const run = unitProblem.builder5(nums);
+    const run = problem.builder5(nums);
     assert.equal(typeof run.answer, "number");
     assert.equal(run.answer, expected);
-    assert.equal(run.answer, unitProblem.builder4(nums).answer.length);
+    assert.equal(run.answer, problem.builder4(nums).answer.length);
     for (const step of run.steps) assert.ok(step.vars.every(variable => ["nums", "n", "dp", "i", "j"].includes(variable.name)));
   }
   const { extractLiveMethod } = require("../live-args");
   assert.deepEqual(extractLiveMethod({ code: ["class Solution:", "    def first(self, old): pass"], code5: ["class Solution:", "    def fifth(self, nums): pass"] }, 5), { name: "fifth", params: ["nums"] });
   const source = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
-  const context = { problemData: unitProblem, $: () => ({ querySelector: () => ({ value: "5" }) }) };
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "5" }) }) };
   vm.createContext(context);
   vm.runInContext(source.slice(source.indexOf("function selectedLiveCodeBlock()"), source.indexOf("function clearedSolutionSkeleton(")), context);
   assert.equal(context.selectedLiveCodeBlock(), 5);
-  assert.equal(context.currentPrimaryCode(), unitProblem.code5.join("\n"));
+  assert.equal(context.currentPrimaryCode(), problem.code5.join("\n"));
 });
 
-test("9024 approach 6 uses a value map without losing longer prefixes on duplicates", () => {
-  assert.match(unitProblem.code6.join("\n"), /dp\[x\] = max\(dp\.get\(x, 0\), dp\.get\(x - 1, 0\) \+ 1\)/);
+test("300 approach 6 uses a value map without losing longer prefixes on duplicates", () => {
+  assert.match(problem.code6.join("\n"), /dp\[x\] = max\(dp\.get\(x, 0\), dp\.get\(x - 1, 0\) \+ 1\)/);
   const cases = [
-    [unitProblem.defaultInput, 5],
+    [plusOneSample, 5],
     [[1, 2, 3, 2, 4, 3, 5], 5],
     [[-3, -2, -1, -2, 0, 1], 5],
     [[2, 2, 2], 1],
     [[3, 2, 1], 1],
   ];
   for (const [nums, expected] of cases) {
-    const run = unitProblem.builder6(nums);
+    const run = problem.builder6(nums);
     assert.equal(run.answer, expected);
     assert.equal(run.chain.length, expected);
     assert.ok(validPath(nums, run.chain, true));
-    assert.ok(run.steps.every(step => step.codeBlock === 6 && step.lis300View.source === unitProblem.code6[step.codeLines[0] - 1].trim()));
+    assert.ok(run.steps.every(step => step.codeBlock === 6 && step.lis300View.source === problem.code6[step.codeLines[0] - 1].trim()));
   }
   const { extractLiveMethod } = require("../live-args");
-  assert.deepEqual(extractLiveMethod(unitProblem, 6), { name: "longestSubsequence", params: ["nums"] });
+  assert.deepEqual(extractLiveMethod(problem, 6), { name: "lengthOfLIS", params: ["nums"] });
   const source = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
-  const context = { problemData: unitProblem, $: () => ({ querySelector: () => ({ value: "6" }) }) };
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "6" }) }) };
   vm.createContext(context);
   vm.runInContext(source.slice(source.indexOf("function selectedLiveCodeBlock()"), source.indexOf("function clearedSolutionSkeleton(")), context);
   assert.equal(context.selectedLiveCodeBlock(), 6);
-  assert.equal(context.currentPrimaryCode(), unitProblem.code6.join("\n"));
+  assert.equal(context.currentPrimaryCode(), problem.code6.join("\n"));
 });
 
-test("9024 approach 4 requires values exactly +1, preserves order, and may skip indices", () => {
-  assert.equal(unitProblem.code4[8], "                if nums[j] + 1 == nums[i]:");
-  assert.deepEqual(unitProblem.builder4(problem.defaultInput).answer, [2, 4]);
-  assert.deepEqual(unitProblem.builder4([1, 3, 5, 7]).answer, [0]);
-  const nums = [1, 3, 2, 4, 3, 5, 4], run = unitProblem.builder4(nums);
+test("300 approach 4 is an explicitly +1-only subsequence variant", () => {
+  assert.equal(problem.code4[8], "                if nums[j] + 1 == nums[i]:");
+  assert.deepEqual(problem.builder4(plusOneSample).answer, [1, 3, 5, 8, 9]);
+  assert.deepEqual(problem.builder4([1, 3, 5, 7]).answer, [0]);
+  assert.notEqual(problem.builder([1, 3, 5, 7], { approach: 4 }).answer.length, problem.builder([1, 3, 5, 7], { approach: 3 }).answer.length);
+  const nums = [1, 3, 2, 4, 3, 5, 4], run = problem.builder4(nums);
   assert.deepEqual(run.answer, [0, 2, 4, 6]);
   assert.deepEqual(run.answer.map(index => nums[index]), [1, 2, 3, 4]);
   for (const step of run.steps) {
@@ -219,8 +217,8 @@ test("9024 approach 4 requires values exactly +1, preserves order, and may skip 
     assert.equal(view.unitStep, true);
     assert.ok(validPath(nums, view.candidate, true));
   }
-  assert.deepEqual(unitProblem.builder4([3, 2, 1]).answer, [0]);
-  assert.deepEqual(unitProblem.builder4([2, 2, 3, 3, 4]).answer, [0, 2, 4]);
+  assert.deepEqual(problem.builder4([3, 2, 1]).answer, [0]);
+  assert.deepEqual(problem.builder4([2, 2, 3, 3, 4]).answer, [0, 2, 4]);
 });
 
 test("300 approach 3 uses range(n) and lists only eligible indices checked so far", () => {
