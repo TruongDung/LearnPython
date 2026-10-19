@@ -94,6 +94,10 @@ test("42 renderer is picture-first in Vietnamese and English", () => {
       assert.match(html, /trap42-chart/);
       assert.match(html, /trap42-action/);
       assert.match(html, /trap42-rule/);
+      assert.match(html, /trap42-formula/);
+      assert.match(html, /water\[i\]/);
+      assert.match(html, /min\(<var>leftMax\[i\]<\/var>, <var>rightMax\[i\]<\/var>\)/);
+      assert.match(html, /height\[i\]/);
       assert.doesNotMatch(html, /undefined|NaN|\?\?\?/);
     }
   }
@@ -106,7 +110,8 @@ test("42 styles support themes, narrow layouts, and fresh assets", () => {
   assert.match(css, /@container trap42 \(max-width: 380px\)/);
   assert.match(css, /\[data-theme="light"\] \.trap42-viz/);
   assert.match(css, /body:has\(\.trap42-viz\) #stepNote/);
-  assert.match(html, /trap-water-42-v5/);
+  assert.match(css, /\.trap42-formula/);
+  assert.match(html, /trap-water-42-v6/);
   assert.equal(problem.complexity.time, "O(n)");
   assert.equal(problem.complexity.space, "O(1)");
 });

@@ -550,7 +550,12 @@ function renderTrappingRainView(step) {
         <output><small>WATER</small><b>${escapeHtml(String(total))}</b>${add !== null && add > 0 && !done ? `<em>+${escapeHtml(String(add))}</em>` : ""}</output>
         <div class="trap42-bound right${activeSide === "right" ? " active" : ""}"><small>R MAX</small><b>${escapeHtml(String(rightMax ?? "–"))}</b></div>
       </div>
-      <div class="trap42-rule"><code>lower max</code><i>→</i><code>max − height[i]</code><i>→</i><b>O(n) · O(1)</b></div>
+      <div class="trap42-rule">
+        <span class="trap42-formula" aria-label="water at i equals the minimum of left max and right max, minus height at i">
+          <var>water[i]</var><i>=</i><strong>min(<var>leftMax[i]</var>, <var>rightMax[i]</var>)</strong><i>−</i><var>height[i]</var>
+        </span>
+        <b>O(n) · O(1)</b>
+      </div>
     </div>`;
 }
 
@@ -1764,7 +1769,86 @@ function renderRangeSum307View(step) {
   </section>`;
 }
 
+function renderRangeSum308View(step) {
+  const view = step.segmentTreeView || {};
+  const vi = lang === "vi";
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const rows = matrix.length;
+  const cols = rows && Array.isArray(matrix[0]) ? matrix[0].length : 0;
+  const phase = String(view.phase || "build");
+  const activeMatrix = new Set((view.activeMatrix || []).map(([row, col]) => `${row}:${col}`));
+  const activeBit = new Set((view.activeBit || []).map(([row, col]) => `${row}:${col}`));
+  const visitedBit = new Set((view.visitedBit || []).map(([row, col]) => `${row}:${col}`));
+  const queryRect = Array.isArray(view.queryRect) ? view.queryRect : null;
+  const prefixRect = Array.isArray(view.prefixRect) ? view.prefixRect : null;
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const operationIndex = Number.isInteger(view.operationIndex) ? view.operationIndex : -1;
+  const completed = Number(view.completedOperations) || 0;
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const maxValue = Math.max(1, ...matrix.flat().map((value) => Math.abs(Number(value) || 0)));
+  const bitValues = bit.slice(1).flatMap((row) => Array.isArray(row) ? row.slice(1) : []);
+  const maxBit = Math.max(1, ...bitValues.map((value) => Math.abs(Number(value) || 0)));
+  const inRect = (row, col, rect) => rect && row >= rect[0] && row <= rect[2] && col >= rect[1] && col <= rect[3];
+
+  const operationChips = [`<span class="${operationIndex < 0 ? "active" : "done"}"><i>${operationIndex < 0 ? "▦" : "✓"}</i><b>BUILD</b></span>`]
+    .concat(operations.map((operation, index) => {
+      const state = index < completed ? "done" : index === operationIndex ? "active" : "";
+      const output = index < outputs.length && outputs[index] !== null && outputs[index] !== undefined ? `=${outputs[index]}` : "";
+      return `<span class="${state}"><i>${state === "done" ? "✓" : operation.name === "update" ? "↻" : "Σ"}</i><b>${escapeHtml(operation.label)}</b>${output ? `<em>${escapeHtml(output)}</em>` : ""}</span>`;
+    })).join('<i class="rs308-next">›</i>');
+
+  const matrixCells = matrix.flatMap((row, rowIndex) => row.map((value, colIndex) => {
+    const key = `${rowIndex}:${colIndex}`;
+    const classes = [
+      "rs308-cell", activeMatrix.has(key) ? "active" : "",
+      inRect(rowIndex, colIndex, queryRect) ? "query" : "",
+      inRect(rowIndex, colIndex, prefixRect) ? "prefix" : "",
+    ].filter(Boolean).join(" ");
+    const heat = Math.min(1, Math.abs(Number(value) || 0) / maxValue).toFixed(2);
+    return `<span class="${classes}" style="--heat:${heat}"><small>${rowIndex},${colIndex}</small><b>${escapeHtml(value)}</b></span>`;
+  })).join("");
+
+  const bitCells = bit.slice(1).flatMap((row, rowOffset) => (Array.isArray(row) ? row.slice(1) : []).map((value, colOffset) => {
+    const rowIndex = rowOffset + 1;
+    const colIndex = colOffset + 1;
+    const key = `${rowIndex}:${colIndex}`;
+    const classes = ["rs308-cell", "bit", activeBit.has(key) ? "active" : "", visitedBit.has(key) ? "visited" : ""].filter(Boolean).join(" ");
+    const heat = Math.min(1, Math.abs(Number(value) || 0) / maxBit).toFixed(2);
+    return `<span class="${classes}" style="--heat:${heat}"><small>${rowIndex},${colIndex}</small><b>${escapeHtml(value)}</b><i>${escapeHtml(`${rowIndex & -rowIndex}×${colIndex & -colIndex}`)}</i></span>`;
+  })).join("");
+
+  const [row1 = 0, col1 = 0, row2 = 0, col2 = 0] = queryRect || [];
+  const cornerCoords = [[row2, col2], [row1 - 1, col2], [row2, col1 - 1], [row1 - 1, col1 - 1]];
+  const cornerValues = Array.isArray(view.cornerValues) ? view.cornerValues : [];
+  const cornerSigns = Array.isArray(view.cornerSigns) ? view.cornerSigns : ["+", "−", "−", "+"];
+  const corners = cornerCoords.map(([row, col], index) => {
+    const value = cornerValues[index];
+    const ready = value !== null && value !== undefined;
+    return `<div class="rs308-corner c${index + 1}${ready ? " ready" : ""}"><i>${escapeHtml(cornerSigns[index] || "+")}</i><small>P(${row},${col})</small><b>${ready ? escapeHtml(value) : "·"}</b></div>`;
+  }).join("");
+  const showCorners = queryRect || phase === "query" || phase === "answer";
+  const phaseIcon = phase === "update" ? "↻" : phase === "query" ? "⌗" : phase === "answer" ? "✓" : "▦";
+  const phaseLabel = phase === "update" ? "UPDATE" : phase === "query" ? "QUERY" : phase === "answer" ? "ANSWER" : phase === "error" ? "INPUT" : "BUILD";
+
+  $("treeView").innerHTML = `<section class="rs308-viz phase-${escapeHtml(phase)}">
+    <header class="rs308-ops">${operationChips}</header>
+    <div class="rs308-flow">
+      <section class="rs308-board matrix"><header><span>▦</span><b>MATRIX</b><small>${rows}×${cols}</small></header><div class="rs308-grid" style="--rows:${Math.max(1, rows)};--cols:${Math.max(1, cols)}">${matrixCells}</div></section>
+      <div class="rs308-ripple"><i>${phase === "update" ? "＋δ" : phase === "query" ? "↙ lowbit" : "→"}</i><span>${phase === "update" ? (vi ? "lan 2 chiều" : "2D ripple") : phase === "query" ? (vi ? "gom ô" : "collect") : "lowbit"}</span></div>
+      <section class="rs308-board bit"><header><span>◫</span><b>2D BIT</b><small>${rows}×${cols}</small></header><div class="rs308-grid" style="--rows:${Math.max(1, rows)};--cols:${Math.max(1, cols)}">${bitCells}</div></section>
+    </div>
+    ${showCorners ? `<div class="rs308-corners">${corners}<strong>=</strong><output>${view.answer === null || view.answer === undefined ? "?" : escapeHtml(view.answer)}</output></div>` : ""}
+    <div class="rs308-action"><i>${phaseIcon}</i><span><small>${phaseLabel} · LINE ${(step.codeLines || ["—"])[0]}</small><b>${escapeHtml(view.action || "")}</b></span><strong>${escapeHtml(view.equation || "")}</strong></div>
+    <footer><span><i class="matrix"></i>${vi ? "ô nguồn" : "source"}</span><span><i class="query"></i>${vi ? "vùng hỏi" : "query"}</span><span><i class="active"></i>${vi ? "đang chạm" : "touch"}</span><span><i class="visited"></i>${vi ? "đã gom" : "collected"}</span><b>O(log m · log n)</b></footer>
+  </section>`;
+}
+
 function renderSegmentTreeView(step) {
+  if (step.segmentTreeView?.variant === "range-sum-2d-308") {
+    renderRangeSum308View(step);
+    return;
+  }
   if (step.segmentTreeView?.variant === "range-sum-307") {
     renderRangeSum307View(step);
     return;
