@@ -131,6 +131,8 @@ const I18N = {
     timeLabel: "Thời gian",
     spaceLabel: "Bộ nhớ",
     varsLabel: "Biến (debug)",
+    watchAdd: "Theo dõi",
+    watchLabel: "Biến hoặc phần tử cần theo dõi",
     approachLabel: "Ý chính",
     kbdHint: "Phím tắt: ← Lùi · → hoặc F10 Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",
     errEmptyId: "Vui lòng nhập số bài.",
@@ -185,6 +187,8 @@ const I18N = {
     timeLabel: "Time",
     spaceLabel: "Space",
     varsLabel: "Variables (debug)",
+    watchAdd: "Watch",
+    watchLabel: "Watch variable or element",
     approachLabel: "Key Idea",
     kbdHint: "Shortcuts: ← Prev · → or F10 Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
@@ -2735,22 +2739,26 @@ $("runBtn").addEventListener("click", runViz);
 function addDebugWatchFromInput() {
   const input = $("watchInput");
   if (!input) return;
-  const names = input.value
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
+  const names = splitDebugWatches(input.value);
+  if (!names.length) {
+    const hint = $("watchHint");
+    if (hint) hint.textContent = lang === "vi" ? "Nhập tên biến hoặc chọn từ gợi ý bên trên." : "Enter a variable name or choose a suggestion above.";
+    input.setAttribute("aria-invalid", "true");
+    input.focus();
+    return;
+  }
   names.forEach((name) => {
     if (!debugWatches.includes(name)) debugWatches.push(name);
   });
   input.value = "";
-  if (steps.length) renderStep();
+  if (steps.length) renderVars(steps[stepIndex], steps[stepIndex - 1]);
 }
 
 document.addEventListener("click", (e) => {
   if (e.target && e.target.id === "watchAddBtn") addDebugWatchFromInput();
   if (e.target && e.target.dataset && e.target.dataset.removeWatch) {
     debugWatches = debugWatches.filter((name) => name !== e.target.dataset.removeWatch);
-    if (steps.length) renderStep();
+    if (steps.length) renderVars(steps[stepIndex], steps[stepIndex - 1]);
   }
 });
 
@@ -3332,9 +3340,121 @@ function updateCodeHighlight(activeLines, codeBlock) {
 // ---- Variables panel (debug) ----
 // Format variable value for display (array -> "[a, b, c]").
 function formatVarValue(value) {
-  if (Array.isArray(value)) return `[${value.join(", ")}]`;
+  if (Array.isArray(value)) return `[${value.map(item => typeof item === "string" ? JSON.stringify(item) : formatVarValue(item)).join(", ")}]`;
   if (value === null) return "null";
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function debugVariableName(variable) {
+  return typeof variable.name === "object" && variable.name
+    ? (variable.name.en || variable.name.vi || JSON.stringify(variable.name)) : variable.name;
+}
+
+function splitDebugWatches(input) {
+  const names = [];
+  let start = 0, depth = 0, quote = "", escaped = false;
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === "[" || char === "(") depth++;
+    else if (char === "]" || char === ")") depth--;
+    else if (char === "," && depth === 0) { names.push(input.slice(start, i).trim()); start = i + 1; }
+  }
+  names.push(input.slice(start).trim());
+  return names.filter(Boolean);
+}
+
+// Read recorded data only. Watch paths never execute JavaScript or Python.
+function resolveDebugWatch(expression, step) {
+  const values = Object.create(null);
+  (step?.vars || []).forEach(variable => {
+    values[debugVariableName(variable)] = Object.hasOwn(variable, "rawValue") ? variable.rawValue : variable.value;
+  });
+  const source = expression.trim();
+  if (Object.hasOwn(values, source)) return { found: true, value: values[source] };
+  const length = /^len\(\s*(.*?)\s*\)$/.exec(source);
+  const path = length ? length[1] : source;
+  const root = /^([A-Za-z_]\w*)/.exec(path);
+  if (!root) return { found: false, error: "syntax" };
+  let tail = path.slice(root[0].length).trim();
+  const keys = [];
+  while (tail) {
+    const match = /^(?:\.([A-Za-z_]\w*)|\[\s*(-?\d+|[A-Za-z_]\w*|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\])/.exec(tail);
+    if (!match) return { found: false, error: "syntax" };
+    if (match[1]) keys.push({ value: match[1] });
+    else if (/^-?\d+$/.test(match[2])) keys.push({ value: Number(match[2]) });
+    else if (match[2][0] === '"') {
+      try { keys.push({ value: JSON.parse(match[2]) }); } catch (_) { return { found: false, error: "syntax" }; }
+    } else if (match[2][0] === "'") keys.push({ value: match[2].slice(1, -1).replace(/\\(['\\])/g, "$1") });
+    else keys.push({ variable: match[2] });
+    tail = tail.slice(match[0].length).trim();
+  }
+  if (!Object.hasOwn(values, root[1])) return { found: false, error: "missing" };
+  let value = values[root[1]];
+  for (const key of keys) {
+    if (key.variable && !Object.hasOwn(values, key.variable)) return { found: false, error: "missing" };
+    let index = key.variable ? values[key.variable] : key.value;
+    if (typeof index !== "number" && typeof index !== "string") return { found: false, error: "index" };
+    if (["__proto__", "prototype", "constructor"].includes(String(index))) return { found: false, error: "syntax" };
+    if (Array.isArray(value) || typeof value === "string") {
+      const sequence = typeof value === "string" ? Array.from(value) : value;
+      if (index === "length") { value = sequence.length; continue; }
+      if (typeof index === "string" && /^-?\d+$/.test(index)) index = Number(index);
+      if (!Number.isInteger(index)) return { found: false, error: "index" };
+      if (index < 0) index += sequence.length;
+      if (index < 0 || index >= sequence.length) return { found: false, error: "index" };
+      value = sequence[index];
+    } else if (value !== null && typeof value === "object" && Object.hasOwn(value, index)) value = value[index];
+    else return { found: false, error: "missing" };
+  }
+  if (length) {
+    if (Array.isArray(value)) value = value.length;
+    else if (typeof value === "string") value = Array.from(value).length;
+    else if (value !== null && typeof value === "object") value = Object.keys(value).length;
+    else return { found: false, error: "length" };
+  }
+  return { found: true, value };
+}
+
+function debugWatchError(error) {
+  const messages = {
+    missing: { vi: "Không có ở bước này", en: "Not available at this step" },
+    index: { vi: "Chỉ số không hợp lệ ở bước này", en: "Index unavailable at this step" },
+    syntax: { vi: "Dùng tên biến, [chỉ số], .thuộc tính hoặc len(...)", en: "Use a variable, [index], .property or len(...)" },
+    length: { vi: "Biến này không có độ dài", en: "This value has no length" },
+  };
+  return pick(messages[error] || messages.missing);
+}
+
+function renderDebugWatchSuggestions(step) {
+  const variables = step.vars || [];
+  const names = variables.map(debugVariableName);
+  const input = $("watchInput");
+  const suggestions = $("watchSuggestions");
+  const raw = variable => Object.hasOwn(variable, "rawValue") ? variable.rawValue : variable.value;
+  const sequence = variables.find(variable => Array.isArray(raw(variable)))
+    || variables.find(variable => typeof raw(variable) === "string" && !["—", "-"].includes(raw(variable)));
+  const example = sequence ? `${debugVariableName(sequence)}[0], len(${debugVariableName(sequence)})` : "";
+  if (input) {
+    input.setAttribute("aria-label", t().watchLabel);
+    input.removeAttribute("aria-invalid");
+    input.placeholder = names.length ? `${lang === "vi" ? "VD" : "e.g."}: ${names.slice(0, 3).join(", ")}` : t().watchLabel;
+  }
+  if (suggestions) {
+    suggestions.innerHTML = "";
+    [...names, ...splitDebugWatches(example)].forEach(name => {
+      const option = document.createElement("option");
+      option.value = name;
+      suggestions.appendChild(option);
+    });
+  }
+  const hint = $("watchHint");
+  if (hint) hint.textContent = `${lang === "vi" ? "Biến ở bước này" : "Variables at this step"}: ${names.slice(0, 8).join(", ") || "—"}${names.length > 8 ? ", …" : ""}${example ? ` · ${example}` : ""}`;
 }
 
 // Render variables for current step; highlight variables that changed from previous step.
@@ -3343,13 +3463,14 @@ function renderVars(step, prevStep) {
   const grid = $("varsGrid");
   const watchGrid = $("watchGrid");
   const vars = step.vars || [];
+  renderDebugWatchSuggestions(step);
 
   if (!vars.length && !debugWatches.length) {
     panel.classList.add("hidden");
     return;
   }
 
-  const prevValues = {};
+  const prevValues = Object.create(null);
   if (prevStep && Array.isArray(prevStep.vars)) {
     prevStep.vars.forEach((v) => {
       const key = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
@@ -3362,7 +3483,8 @@ function renderVars(step, prevStep) {
     const item = document.createElement("div");
     item.className = opts.watch ? "var-item watch-item" : "var-item";
     const varKey = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
-    if (prevStep && varKey in prevValues && prevValues[varKey] !== valStr) {
+    if (prevStep && ((opts.watch && opts.previous?.found && formatVarValue(opts.previous.value) !== valStr)
+      || (!opts.watch && varKey in prevValues && prevValues[varKey] !== valStr))) {
       item.classList.add("changed");
     }
 
@@ -3387,23 +3509,19 @@ function renderVars(step, prevStep) {
       remove.className = "watch-remove";
       remove.textContent = "x";
       remove.dataset.removeWatch = varKey;
+      remove.setAttribute("aria-label", `${lang === "vi" ? "Bỏ theo dõi" : "Remove watch"} ${varKey}`);
       item.appendChild(remove);
     }
     return item;
   };
 
-  const varsByName = {};
-  vars.forEach((v) => {
-    const key = typeof v.name === "object" && v.name ? (v.name.en || v.name.vi || JSON.stringify(v.name)) : v.name;
-    varsByName[key] = v;
-  });
-
   if (watchGrid) {
     watchGrid.innerHTML = "";
     debugWatches.forEach((name) => {
-      const watched = varsByName[name] || { name, value: "not in scope" };
-      const item = makeVarItem(watched, { watch: true });
-      if (!varsByName[name]) item.classList.add("missing");
+      const resolved = resolveDebugWatch(name, step);
+      const watched = { name, value: resolved.found ? resolved.value : debugWatchError(resolved.error) };
+      const item = makeVarItem(watched, { watch: true, previous: resolveDebugWatch(name, prevStep) });
+      if (!resolved.found) item.classList.add("missing");
       watchGrid.appendChild(item);
     });
     watchGrid.classList.toggle("hidden", debugWatches.length === 0);

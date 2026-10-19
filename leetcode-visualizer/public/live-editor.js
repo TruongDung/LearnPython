@@ -1164,7 +1164,7 @@ function enterLiveStepMode(userCode, answer) {
   steps = liveSteps.map((s) => ({
     title: { vi: `Dòng ${s.line}`, en: `Line ${s.line}` },
     codeLines: [s.line],
-    vars: Object.entries(s.vars).map(([name, value]) => ({ name, value: formatLiveValue(value) })),
+    vars: Object.entries(s.vars).map(([name, value]) => ({ name, value: formatLiveValue(value), rawValue: value })),
     stdout: s.stdout,
     note: { vi: "", en: "" },
     final: s.isLast,
