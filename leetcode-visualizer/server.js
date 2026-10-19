@@ -27,6 +27,8 @@ const {
   KNAPSACK_TAG,
   KNAPSACK_ORDER_LABEL,
   KNAPSACK_GUIDE,
+  SEGMENT_TREE_SUBTABS,
+  SEGMENT_TREE_TAG,
   TOPOLOGICAL_SORT_SUBTABS,
   TOPOLOGICAL_SORT_TAG,
 } = require("./problems");
@@ -158,6 +160,54 @@ app.get("/api/problems", (req, res) => {
     knapsackGroup.problems.sort((a, b) => a.id - b.id);
     if (!existingKnapsackGroup) groups.push(knapsackGroup);
     knapsackGroup.subTabs = (KNAPSACK_SUBTABS || []).map((tab) => {
+      const roster = (tab.roster || []).map((entry) => ({
+        ...entry,
+        premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,
+      }));
+      return {
+        key: tab.key,
+        vi: tab.vi,
+        en: tab.en,
+        roster,
+        count: roster.filter((entry) => entry.available).length,
+        total: roster.length,
+      };
+    });
+  }
+
+  // Segment Tree keeps the complete requested roster visible. Supported
+  // problems are clickable; entries without a visualization are dimmed.
+  const existingSegmentTreeGroup = groups.find((group) => group.key === SEGMENT_TREE_TAG.key);
+  const segmentTreeGroup = (SEGMENT_TREE_SUBTABS || []).length
+    ? existingSegmentTreeGroup || {
+        key: SEGMENT_TREE_TAG.key,
+        vi: SEGMENT_TREE_TAG.vi,
+        en: SEGMENT_TREE_TAG.en,
+        problems: [],
+      }
+    : null;
+  if (segmentTreeGroup) {
+    segmentTreeGroup.vi = SEGMENT_TREE_TAG.vi;
+    segmentTreeGroup.en = SEGMENT_TREE_TAG.en;
+    const seenIds = new Set(segmentTreeGroup.problems.map((problem) => problem.id));
+    for (const tab of SEGMENT_TREE_SUBTABS) {
+      for (const entry of tab.roster || []) {
+        const p = SUPPORTED[entry.id];
+        if (!p || seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        segmentTreeGroup.problems.push({
+          id: p.id,
+          title: p.title,
+          titleVi: p.titleVi,
+          difficulty: p.difficulty || null,
+          premium: isPremium(p),
+          tags: Array.isArray(p.tags) ? p.tags : [],
+        });
+      }
+    }
+    segmentTreeGroup.problems.sort((a, b) => a.id - b.id);
+    if (!existingSegmentTreeGroup) groups.push(segmentTreeGroup);
+    segmentTreeGroup.subTabs = SEGMENT_TREE_SUBTABS.map((tab) => {
       const roster = (tab.roster || []).map((entry) => ({
         ...entry,
         premium: entry.available && SUPPORTED[entry.id] ? isPremium(SUPPORTED[entry.id]) : false,

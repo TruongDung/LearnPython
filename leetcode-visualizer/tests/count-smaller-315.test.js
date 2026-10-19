@@ -118,6 +118,6 @@ test("315 styles are responsive and theme-aware with concise interview metadata"
   assert.match(css, /body:has\(\.cs315-viz\) #stepNote/);
   assert.match(html, /count-smaller-315-v2/);
   assert.equal(problem.approach.length, 3);
-  assert.deepEqual(problem.tags.map((tag) => tag.key), ["fenwick-tree", "coordinate-compression"]);
+  assert.deepEqual(problem.tags.map((tag) => tag.key), ["fenwick-tree", "coordinate-compression", "segment-tree"]);
   assert.equal(problem.complexity.time, "O(n log n)");
 });

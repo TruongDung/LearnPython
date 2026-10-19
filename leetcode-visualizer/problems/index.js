@@ -40,6 +40,100 @@ const CATEGORY_ORDER = {};
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
+const SEGMENT_TREE_TAG = { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" };
+// Full Segment Tree study roster. Built problems receive the tag; unbuilt ones
+// stay in the roster so the catalog can render them as dimmed placeholders.
+// Format: [id, title, difficulty]
+const SEGMENT_TREE_ROSTER_RAW = [
+  [218, "The Skyline Problem", "hard"],
+  [307, "Range Sum Query - Mutable", "medium"],
+  [308, "Range Sum Query 2D - Mutable", "medium"],
+  [315, "Count of Smaller Numbers After Self", "hard"],
+  [327, "Count of Range Sum", "hard"],
+  [406, "Queue Reconstruction by Height", "medium"],
+  [493, "Reverse Pairs", "hard"],
+  [673, "Number of Longest Increasing Subsequence", "medium"],
+  [683, "K Empty Slots", "hard"],
+  [699, "Falling Squares", "hard"],
+  [715, "Range Module", "hard"],
+  [729, "My Calendar I", "medium"],
+  [731, "My Calendar II", "medium"],
+  [732, "My Calendar III", "hard"],
+  [850, "Rectangle Area II", "hard"],
+  [1157, "Online Majority Element In Subarray", "hard"],
+  [1395, "Count Number of Teams", "medium"],
+  [1505, "Minimum Possible Integer After at Most K Adjacent Swaps On Digits", "hard"],
+  [1521, "Find a Value of a Mysterious Function Closest to Target", "hard"],
+  [1622, "Fancy Sequence", "hard"],
+  [1649, "Create Sorted Array through Instructions", "hard"],
+  [1687, "Delivering Boxes from Storage to Ports", "hard"],
+  [2031, "Count Subarrays With More Ones Than Zeros", "medium"],
+  [2080, "Range Frequency Queries", "medium"],
+  [2158, "Amount of New Area Painted Each Day", "hard"],
+  [2179, "Count Good Triplets in an Array", "hard"],
+  [2213, "Longest Substring of One Repeating Character", "hard"],
+  [2276, "Count Integers in Intervals", "hard"],
+  [2286, "Booking Concert Tickets in Groups", "hard"],
+  [2407, "Longest Increasing Subsequence II", "hard"],
+  [2424, "Longest Uploaded Prefix", "medium"],
+  [2426, "Number of Pairs Satisfying Inequality", "hard"],
+  [2519, "Count the Number of K-Big Indices", "hard"],
+  [2569, "Handling Sum Queries After Update", "hard"],
+  [2659, "Make Array Empty", "hard"],
+  [2736, "Maximum Sum Queries", "hard"],
+  [2907, "Maximum Profitable Triplets With Increasing Prices I", "medium"],
+  [2913, "Subarrays Distinct Element Sum of Squares I", "easy"],
+  [2916, "Subarrays Distinct Element Sum of Squares II", "hard"],
+  [2921, "Maximum Profitable Triplets With Increasing Prices II", "hard"],
+  [2926, "Maximum Balanced Subsequence Sum", "hard"],
+  [2940, "Find Building Where Alice and Bob Can Meet", "hard"],
+  [3072, "Distribute Elements Into Two Arrays II", "hard"],
+  [3109, "Find the Index of Permutation", "medium"],
+  [3117, "Minimum Sum of Values by Dividing Array", "hard"],
+  [3161, "Block Placement Queries", "hard"],
+  [3165, "Maximum Sum of Subsequence With Non-adjacent Elements", "hard"],
+  [3171, "Find Subarray With Bitwise OR Closest to K", "hard"],
+  [3187, "Peaks in Array", "hard"],
+  [3209, "Number of Subarrays With AND Value of K", "hard"],
+  [3291, "Minimum Number of Valid Strings to Form Target I", "medium"],
+  [3292, "Minimum Number of Valid Strings to Form Target II", "hard"],
+  [3380, "Maximum Area Rectangle With Point Constraints I", "medium"],
+  [3382, "Maximum Area Rectangle With Point Constraints II", "hard"],
+  [3410, "Maximize Subarray Sum After Removing All Occurrences of One Element", "hard"],
+  [3420, "Count Non-Decreasing Subarrays After K Operations", "hard"],
+  [3454, "Separate Squares II", "hard"],
+  [3477, "Fruits Into Baskets II", "easy"],
+  [3479, "Fruits Into Baskets III", "medium"],
+  [3480, "Maximize Subarrays After Removing One Conflicting Pair", "hard"],
+  [3501, "Maximize Active Section with Trade II", "hard"],
+  [3515, "Shortest Path in a Weighted Tree", "hard"],
+  [3520, "Minimum Threshold for Inversion Pairs Count", "medium"],
+  [3525, "Find X Value of Array II", "hard"],
+  [3569, "Maximize Count of Distinct Primes After Split", "hard"],
+  [3605, "Minimum Stability Factor of Array", "hard"],
+  [3624, "Number of Integers With Popcount-Depth Equal to K II", "hard"],
+  [3691, "Maximum Total Subarray Value II", "hard"],
+  [3719, "Longest Balanced Subarray I", "medium"],
+  [3721, "Longest Balanced Subarray II", "hard"],
+  [3737, "Count Subarrays With Majority Element I", "medium"],
+  [3739, "Count Subarrays With Majority Element II", "hard"],
+  [3762, "Minimum Operations to Equalize Subarrays", "hard"],
+  [3768, "Minimum Inversion Count in Subarrays of Fixed Length", "hard"],
+  [3777, "Minimum Deletions to Make Alternating Substring", "hard"],
+  [3841, "Palindromic Path Queries in a Tree", "hard"],
+  [3901, "Good Subsequence Queries", "hard"],
+  [3915, "Maximum Sum of Alternating Subsequence With Distance at Least K", "hard"],
+  [3930, "Power Update After K-th Largest Insertion II", "hard"],
+  [3935, "Power Update After K-th Largest Insertion I", "medium"],
+  [4011, "Count Subarrays With Even Odd Ratio I", "medium"],
+  [4013, "Count Subarrays With Even Odd Ratio II", "hard"],
+  [4017, "Peaks in Array II", "hard"],
+  [4033, "Valid K-Unique Subarrays I", "hard"],
+  [4042, "Valid K-Unique Subarrays II", "hard"],
+  [4051, "Count Subarrays with Distant Sums", "hard"],
+  [4055, "Count Shadow Pairs II", "hard"],
+];
+const SEGMENT_TREE_IDS = new Set(SEGMENT_TREE_ROSTER_RAW.map(([id]) => id));
 const TOPOLOGICAL_SORT_TAG = { key: "topological-sort", vi: "Topological Sort", en: "Topological Sort" };
 // Full requested study roster. Built problems receive the tag; unbuilt ones
 // remain in the roster so the catalog can render them as dimmed placeholders.
@@ -269,6 +363,16 @@ for (const id of KNAPSACK_IDS) {
   }
 }
 
+for (const id of SEGMENT_TREE_IDS) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  if (problem.category && problem.category.key === SEGMENT_TREE_TAG.key) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some((tag) => tag && tag.key === SEGMENT_TREE_TAG.key)) {
+    problem.tags = [...tags, SEGMENT_TREE_TAG];
+  }
+}
+
 for (const id of TOPOLOGICAL_SORT_IDS) {
   const problem = SUPPORTED[id];
   if (!problem) continue;
@@ -294,6 +398,9 @@ for (const problem of Object.values(SUPPORTED)) {
   if (problem.category && ["frequency", "frequency-count"].includes(problem.category.key)) {
     problem.category = FREQUENCY_COUNT_TAG;
   }
+  if (problem.category && problem.category.key === "segment-tree") {
+    problem.category = SEGMENT_TREE_TAG;
+  }
   if (!Array.isArray(problem.tags)) continue;
   const seenTagKeys = new Set();
   problem.tags = problem.tags
@@ -302,6 +409,7 @@ for (const problem of Object.values(SUPPORTED)) {
       if (tag && ["fenwick", "fenwick-tree", "binary-indexed-tree"].includes(tag.key)) return FENWICK_TREE_TAG;
       if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
       if (tag && ["frequency", "frequency-count"].includes(tag.key)) return FREQUENCY_COUNT_TAG;
+      if (tag && tag.key === "segment-tree") return SEGMENT_TREE_TAG;
       if (tag && tag.key === "topological-sort") return TOPOLOGICAL_SORT_TAG;
       return tag;
     })
@@ -534,6 +642,20 @@ const TOPOLOGICAL_SORT_SUBTABS = [
   },
 ];
 
+const SEGMENT_TREE_SUBTABS = [
+  {
+    key: "all",
+    vi: "Tất cả",
+    en: "All",
+    roster: SEGMENT_TREE_ROSTER_RAW.map(([id, title, difficulty]) => ({
+      id,
+      title,
+      difficulty,
+      available: Boolean(SUPPORTED[id]),
+    })),
+  },
+];
+
 module.exports = {
   SUPPORTED,
   CATEGORY_ORDER,
@@ -543,6 +665,8 @@ module.exports = {
   KNAPSACK_TAG,
   KNAPSACK_ORDER_LABEL,
   KNAPSACK_GUIDE,
+  SEGMENT_TREE_SUBTABS,
+  SEGMENT_TREE_TAG,
   TOPOLOGICAL_SORT_SUBTABS,
   TOPOLOGICAL_SORT_TAG,
 };
