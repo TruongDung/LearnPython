@@ -305,17 +305,20 @@ app.get("/api/problem/:id", (req, res) => {
     complexity2: problem.complexity2 || null,
     complexity3: problem.complexity3 || null,
     complexity4: problem.complexity4 || null,
+    complexity5: problem.complexity5 || null,
     code: problem.code || [],
     codeVi: problem.codeVi || null,
     codeEn: problem.codeEn || null,
     code2: problem.code2 || null,
     code3: problem.code3 || null,
     code4: problem.code4 || null,
+    code5: problem.code5 || null,
     codeCsharp: problem.codeCsharp || null,
     codeLabel: problem.codeLabel || null,
     code2Label: problem.code2Label || null,
     code3Label: problem.code3Label || null,
     code4Label: problem.code4Label || null,
+    code5Label: problem.code5Label || null,
     approach: problem.approach || null,
     debugMode: problem.debugMode || null,
     hasLiveArgs: typeof problem.liveArgs === "function",
@@ -452,14 +455,18 @@ app.post("/api/problem/:id/solve", (req, res) => {
 
   try {
     const requestedApproach = Number(params.approach) || 1;
-    const codeBlock = requestedApproach === 4 && problem.code4
+    const codeBlock = requestedApproach === 5 && problem.code5
+      ? 5
+      : requestedApproach === 4 && problem.code4
       ? 4
       : requestedApproach === 3 && problem.code3
       ? 3
       : requestedApproach === 2 && problem.code2
         ? 2
         : 1;
-    const result = requestedApproach === 4 && typeof problem.builder4 === "function"
+    const result = requestedApproach === 5 && typeof problem.builder5 === "function"
+      ? problem.builder5(input, params)
+      : requestedApproach === 4 && typeof problem.builder4 === "function"
       ? problem.builder4(input, params)
       : requestedApproach === 3 && typeof problem.builder3 === "function"
       ? problem.builder3(input, params)

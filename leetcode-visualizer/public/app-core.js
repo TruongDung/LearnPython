@@ -32,7 +32,8 @@ function problemVisualizationAssetNodes(problemId) {
   const suffix = new RegExp(`-${id}\\.(?:css|js)(?:[?#]|$)`);
   return [...document.querySelectorAll("template[data-problem-assets]")]
     .flatMap((template) => [...template.content.querySelectorAll("link[href], script[src]")])
-    .filter((asset) => suffix.test(asset.getAttribute("href") || asset.getAttribute("src") || ""));
+    .filter((asset) => suffix.test(asset.getAttribute("href") || asset.getAttribute("src") || "")
+      || (asset.getAttribute("data-problem-ids") || "").split(/\s+/).includes(String(id)));
 }
 
 function loadProblemVisualizationAsset(sourceAsset) {
@@ -2540,7 +2541,8 @@ function renderApproach() {
 function renderComplexity() {
   const approachInput = $("extraParams") && $("extraParams").querySelector('[data-param="approach"]');
   const selectedApproach = Number(approachInput && approachInput.value);
-  const cx = selectedApproach === 4 && problemData.complexity4 ? problemData.complexity4
+  const cx = selectedApproach === 5 && problemData.complexity5 ? problemData.complexity5
+    : selectedApproach === 4 && problemData.complexity4 ? problemData.complexity4
     : selectedApproach === 3 && problemData.complexity3 ? problemData.complexity3
     : selectedApproach === 2 && problemData.complexity2 ? problemData.complexity2 : problemData.complexity;
   if (!cx) {
@@ -3065,9 +3067,10 @@ function renderCode() {
   const code2 = (problemData && problemData.code2) || null;
   const code3 = (problemData && problemData.code3) || null;
   const code4 = (problemData && problemData.code4) || null;
+  const code5 = (problemData && problemData.code5) || null;
   const codeCsharp = (problemData && problemData.codeCsharp) || null;
   panel.innerHTML = "";
-  if (code.length === 0 && !code2 && !code3 && !code4 && !codeCsharp) {
+  if (code.length === 0 && !code2 && !code3 && !code4 && !code5 && !codeCsharp) {
     panel.classList.add("hidden");
     $("codeBlurBtn").classList.add("hidden");
     return;
@@ -3141,7 +3144,7 @@ function renderCode() {
     section.className = "code-section";
     section.dataset.block = "1";
 
-    if (code2 || code3 || code4) {
+    if (code2 || code3 || code4 || code5) {
       const label = document.createElement("div");
       label.className = "code-section-label";
       const customLabel = problemData && problemData.codeLabel;
@@ -3269,6 +3272,31 @@ function renderCode() {
     });
     pyBlock.appendChild(section);
   }
+  if (code5) {
+    const section = document.createElement("div");
+    section.className = "code-section";
+    section.dataset.block = "5";
+    const label = document.createElement("div");
+    label.className = "code-section-label";
+    label.textContent = problemData.code5Label ? pick(problemData.code5Label) : (lang === "vi" ? "Cách 5" : "Approach 5");
+    section.appendChild(label);
+    section.appendChild(createCopyBtn(code5));
+    code5.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "code-line code5-line";
+      row.dataset.line5 = idx + 1;
+      const ln = document.createElement("span");
+      ln.className = "ln";
+      ln.textContent = idx + 1;
+      const txt = document.createElement("span");
+      txt.className = "txt";
+      txt.innerHTML = renderCodeLineHtml(line);
+      row.append(ln, txt);
+      attachBreakpoint(row, 5, idx + 1);
+      section.appendChild(row);
+    });
+    pyBlock.appendChild(section);
+  }
   panel.appendChild(pyBlock);
 
   // ── C# block ──
@@ -3295,7 +3323,7 @@ function renderCode() {
 function updateCodeHighlight(activeLines, codeBlock) {
   const set = new Set(activeLines);
   const block = String(codeBlock || 1);
-  const targetAttr = codeBlock === 4 ? "line4" : codeBlock === 3 ? "line3" : codeBlock === 2 ? "line2" : "line";
+  const targetAttr = codeBlock === 5 ? "line5" : codeBlock === 4 ? "line4" : codeBlock === 3 ? "line3" : codeBlock === 2 ? "line2" : "line";
 
   // Only operate on the currently visible language block (or the whole panel if no lang blocks).
   const panel = $("codePanel");

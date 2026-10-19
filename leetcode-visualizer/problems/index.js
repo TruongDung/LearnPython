@@ -32,7 +32,7 @@ const categories = {
   "monotonic-stack": require("./monotonic-stack"),
   bitmask: Object.assign(require("./bitmask"), require("./hard-bitmask-visualizations"), require("./hard-bitmask-1723"), require("./wonderful-substrings-1915"), require("./maximize-squares-2897")),
   design: Object.assign(require("./music-player"), require("./sparse-vector"), require("./server-allocator-9018"), require("./lib-register-9019"), require("./smallest-infinite-set-2336"), require("./seat-manager-1845"), require("./phone-directory-379"), require("./number-containers-2349"), require("./stock-price-2034"), require("./snapshot-array-1146"), require("./detect-squares-2013"), require("./log-system-635"), require("./prefix-suffix-search-745")),
-  interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./k-sum-2386"), require("./safe-level-path-9021"), require("./underpaid-managers-9022"), require("./directory-size-9023")),
+  interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./k-sum-2386"), require("./safe-level-path-9021"), require("./underpaid-managers-9022"), require("./directory-size-9023"), require("./unit-step-subsequence-9024")),
 };
 
 const SUPPORTED = {};

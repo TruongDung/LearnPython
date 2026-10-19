@@ -520,6 +520,7 @@ function loadPyodideRuntime() {
 function selectedLiveCodeBlock() {
   const approachInput = $("extraParams") && $("extraParams").querySelector('[data-param="approach"]');
   const selected = approachInput ? Number(approachInput.value) : 1;
+  if (selected === 5 && problemData && problemData.code5) return 5;
   if (selected === 4 && problemData && problemData.code4) return 4;
   if (selected === 3 && problemData && problemData.code3) return 3;
   if (selected === 2 && problemData && problemData.code2) return 2;
@@ -532,6 +533,7 @@ function currentLiveSourceKey() {
 
 function currentPrimaryCode() {
   const codeBlock = selectedLiveCodeBlock();
+  if (codeBlock === 5) return (problemData.code5 || []).join("\n");
   if (codeBlock === 4) return (problemData.code4 || []).join("\n");
   if (codeBlock === 3) return (problemData.code3 || []).join("\n");
   if (codeBlock === 2) return (problemData.code2 || []).join("\n");
