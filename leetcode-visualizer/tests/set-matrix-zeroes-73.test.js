@@ -4,7 +4,9 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs"), vm = require("node:vm");
 const problem = require("../problems").SUPPORTED[73];
 const cases = [ [[1,1,1],[1,0,1],[1,1,1]], [[0,1,2,0],[3,4,5,2],[1,3,1,5]], [[1,0],[3,4]], [[1,2],[0,4]],
-  [[0,2],[3,4]], [[1,2],[3,4]], [[0,0],[0,0]], [[0]], [[7]], [[1,0,3]], [[1],[0],[3]], [[-1,2,0],[3,4,-5]] ];
+  [[0,2],[3,4]], [[1,2],[3,4]], [[0,0],[0,0]], [[0]], [[7]], [[1,0,3]], [[1],[0],[3]], [[-1,2,0],[3,4,-5]],
+  [[-2147483648,0,2147483647],[4,5,6]],
+  Array.from({ length: 6 }, (_, r) => Array.from({ length: 8 }, (_, c) => r === 5 && c === 7 ? 0 : r * 8 + c + 1)) ];
 let seed = 73;
 function random(n) { seed = (seed * 1664525 + 1013904223) >>> 0; return seed % n; }
 for (let i = 0; i < 80; i++) { const m = random(5) + 1, n = random(6) + 1; cases.push(Array.from({ length: m }, () => Array.from({ length: n }, () => random(5) - 2))); }
