@@ -147,6 +147,29 @@ test("300 renderer shows candidate comparisons, dp transitions and truthful tail
   }
 });
 
+test("300 code view keeps both scroll directions for long approach 5 lines", () => {
+  const css = fs.readFileSync(require.resolve("../public/lis-300.css"), "utf8");
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-panel \{[^}]*max-height:min\(58vh,520px\);[^}]*overflow:auto;/);
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-line \{[^}]*width:max-content;[^}]*white-space:pre;/);
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-line \.txt \{[^}]*min-width:max-content;[^}]*overflow-wrap:normal;/);
+  assert.doesNotMatch(css, /#vizPanel:has\(\.l300-viz\) \.code-panel \{[^}]*overflow:visible/);
+  assert.match(html, /lis-300\.css\?v=lis-300-fullscreen-editor-v3/);
+});
+
+test("300 opens the editor full-screen without wrapping for approaches 1 through 5", () => {
+  const css = fs.readFileSync(require.resolve("../public/lis-300.css"), "utf8");
+  const editor = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(css, /body:has\(\.l300-viz\) \.viz-split\.live-editing \{[^}]*position:fixed;[^}]*inset:0;[^}]*width:100vw;[^}]*height:100dvh;/);
+  assert.match(css, /\.viz-split\.live-editing \.live-editor-wrap \{[^}]*grid-template-rows:minmax\(0,1fr\) auto auto;[^}]*height:100%;/);
+  assert.match(css, /\.viz-split\.live-editing \.monaco-editor-host \{[^}]*height:100%;/);
+  assert.match(editor, /wordWrap: "off"/);
+  assert.match(editor, /horizontal: "auto"/);
+  assert.match(editor, /horizontalScrollbarSize: 10/);
+  assert.match(html, /live-editor\.js\?[^"\n]*lis-fullscreen=v3/);
+});
+
 test("300 approach 4 uses the concise dp.get recurrence", () => {
   assert.match(problem.code4.join("\n"), /dp = \{\}[\s\S]*max_len = 0/);
   assert.match(problem.code4.join("\n"), /for num in nums:[\s\S]*dp\[num\] = dp\.get\(num - 1, 0\) \+ 1/);
