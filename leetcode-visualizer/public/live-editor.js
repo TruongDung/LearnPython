@@ -724,7 +724,10 @@ function initLiveEditorResize() {
 function setLiveEditorLayoutMode(on) {
   const wrap = $("liveEditorWrap");
   const split = wrap && wrap.closest(".viz-split");
-  if (split) split.classList.toggle("live-editing", on);
+  if (split) {
+    split.classList.toggle("live-editing", on);
+    split.classList.toggle("live-editing-621", on && Number(currentProblemId) === 621);
+  }
   if (wrap && on) wrap.style.setProperty("--live-editor-width", "100%");
   if (monacoEditorInstance) requestAnimationFrame(() => monacoEditorInstance.layout());
 }
