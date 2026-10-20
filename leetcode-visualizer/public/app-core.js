@@ -2541,7 +2541,8 @@ function renderApproach() {
 function renderComplexity() {
   const approachInput = $("extraParams") && $("extraParams").querySelector('[data-param="approach"]');
   const selectedApproach = Number(approachInput && approachInput.value);
-  const cx = selectedApproach === 6 && problemData.complexity6 ? problemData.complexity6
+  const cx = selectedApproach === 7 && problemData.complexity7 ? problemData.complexity7
+    : selectedApproach === 6 && problemData.complexity6 ? problemData.complexity6
     : selectedApproach === 5 && problemData.complexity5 ? problemData.complexity5
     : selectedApproach === 4 && problemData.complexity4 ? problemData.complexity4
     : selectedApproach === 3 && problemData.complexity3 ? problemData.complexity3
@@ -3070,9 +3071,10 @@ function renderCode() {
   const code4 = (problemData && problemData.code4) || null;
   const code5 = (problemData && problemData.code5) || null;
   const code6 = (problemData && problemData.code6) || null;
+  const code7 = (problemData && problemData.code7) || null;
   const codeCsharp = (problemData && problemData.codeCsharp) || null;
   panel.innerHTML = "";
-  if (code.length === 0 && !code2 && !code3 && !code4 && !code5 && !code6 && !codeCsharp) {
+  if (code.length === 0 && !code2 && !code3 && !code4 && !code5 && !code6 && !code7 && !codeCsharp) {
     panel.classList.add("hidden");
     $("codeBlurBtn").classList.add("hidden");
     return;
@@ -3146,7 +3148,7 @@ function renderCode() {
     section.className = "code-section";
     section.dataset.block = "1";
 
-    if (code2 || code3 || code4 || code5 || code6) {
+    if (code2 || code3 || code4 || code5 || code6 || code7) {
       const label = document.createElement("div");
       label.className = "code-section-label";
       const customLabel = problemData && problemData.codeLabel;
@@ -3324,6 +3326,31 @@ function renderCode() {
     });
     pyBlock.appendChild(section);
   }
+  if (code7) {
+    const section = document.createElement("div");
+    section.className = "code-section";
+    section.dataset.block = "7";
+    const label = document.createElement("div");
+    label.className = "code-section-label";
+    label.textContent = problemData.code7Label ? pick(problemData.code7Label) : (lang === "vi" ? "Cách 7" : "Approach 7");
+    section.appendChild(label);
+    section.appendChild(createCopyBtn(code7));
+    code7.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "code-line code7-line";
+      row.dataset.line7 = idx + 1;
+      const ln = document.createElement("span");
+      ln.className = "ln";
+      ln.textContent = idx + 1;
+      const txt = document.createElement("span");
+      txt.className = "txt";
+      txt.innerHTML = renderCodeLineHtml(line);
+      row.append(ln, txt);
+      attachBreakpoint(row, 7, idx + 1);
+      section.appendChild(row);
+    });
+    pyBlock.appendChild(section);
+  }
   panel.appendChild(pyBlock);
 
   // ── C# block ──
@@ -3350,7 +3377,7 @@ function renderCode() {
 function updateCodeHighlight(activeLines, codeBlock) {
   const set = new Set(activeLines);
   const block = String(codeBlock || 1);
-  const targetAttr = codeBlock === 6 ? "line6" : codeBlock === 5 ? "line5" : codeBlock === 4 ? "line4" : codeBlock === 3 ? "line3" : codeBlock === 2 ? "line2" : "line";
+  const targetAttr = codeBlock === 7 ? "line7" : codeBlock === 6 ? "line6" : codeBlock === 5 ? "line5" : codeBlock === 4 ? "line4" : codeBlock === 3 ? "line3" : codeBlock === 2 ? "line2" : "line";
 
   // Only operate on the currently visible language block (or the whole panel if no lang blocks).
   const panel = $("codePanel");

@@ -307,6 +307,7 @@ app.get("/api/problem/:id", (req, res) => {
     complexity4: problem.complexity4 || null,
     complexity5: problem.complexity5 || null,
     complexity6: problem.complexity6 || null,
+    complexity7: problem.complexity7 || null,
     code: problem.code || [],
     codeVi: problem.codeVi || null,
     codeEn: problem.codeEn || null,
@@ -315,6 +316,7 @@ app.get("/api/problem/:id", (req, res) => {
     code4: problem.code4 || null,
     code5: problem.code5 || null,
     code6: problem.code6 || null,
+    code7: problem.code7 || null,
     codeCsharp: problem.codeCsharp || null,
     codeLabel: problem.codeLabel || null,
     code2Label: problem.code2Label || null,
@@ -322,6 +324,7 @@ app.get("/api/problem/:id", (req, res) => {
     code4Label: problem.code4Label || null,
     code5Label: problem.code5Label || null,
     code6Label: problem.code6Label || null,
+    code7Label: problem.code7Label || null,
     approach: problem.approach || null,
     debugMode: problem.debugMode || null,
     hasLiveArgs: typeof problem.liveArgs === "function",
@@ -458,7 +461,9 @@ app.post("/api/problem/:id/solve", (req, res) => {
 
   try {
     const requestedApproach = Number(params.approach) || 1;
-    const codeBlock = requestedApproach === 6 && problem.code6
+    const codeBlock = requestedApproach === 7 && problem.code7
+      ? 7
+      : requestedApproach === 6 && problem.code6
       ? 6
       : requestedApproach === 5 && problem.code5
       ? 5
@@ -469,7 +474,9 @@ app.post("/api/problem/:id/solve", (req, res) => {
       : requestedApproach === 2 && problem.code2
         ? 2
         : 1;
-    const result = requestedApproach === 6 && typeof problem.builder6 === "function"
+    const result = requestedApproach === 7 && typeof problem.builder7 === "function"
+      ? problem.builder7(input, params)
+      : requestedApproach === 6 && typeof problem.builder6 === "function"
       ? problem.builder6(input, params)
       : requestedApproach === 5 && typeof problem.builder5 === "function"
       ? problem.builder5(input, params)

@@ -6,14 +6,15 @@ const { spawnSync } = require("node:child_process");
 const { SUPPORTED } = require("../problems");
 const problem = SUPPORTED[300];
 const plusOneSample = [2, 1, 3, 2, 4, 3, 2, 5, 4, 5];
-const runApproach = (nums, approach) => problem.builder(nums, { approach });
+const plusKSample = [1, 3, 5, 2, 4, 6, 8];
+const runApproach = (nums, approach, k = 2) => problem.builder(nums, { approach, k });
 
-function exhaustive(nums, unitStep = false) {
+function exhaustive(nums, difference = null) {
   let best = 0;
   for (let mask = 1; mask < 1 << nums.length; mask++) {
     let previous = -Infinity, size = 0, valid = true;
     for (let i = 0; i < nums.length; i++) if (mask & 1 << i) {
-      if (size && (unitStep ? nums[i] !== previous + 1 : nums[i] <= previous)) { valid = false; break; }
+      if (size && (difference === null ? nums[i] <= previous : nums[i] !== previous + difference)) { valid = false; break; }
       previous = nums[i]; size++;
     }
     if (valid) best = Math.max(best, size);
@@ -21,48 +22,61 @@ function exhaustive(nums, unitStep = false) {
   return best;
 }
 
-function validPath(nums, path, unitStep = false) {
-  return path.every((index, i) => index >= 0 && index < nums.length && (!i || index > path[i - 1] && (unitStep ? nums[index] === nums[path[i - 1]] + 1 : nums[index] > nums[path[i - 1]])));
+function validPath(nums, path, difference = null) {
+  return path.every((index, i) => index >= 0 && index < nums.length && (!i || index > path[i - 1] && (difference === null ? nums[index] > nums[path[i - 1]] : nums[index] === nums[path[i - 1]] + difference)));
 }
 
-test("300 exposes six approaches and labels approaches 4–6 as special +1 variants", () => {
+test("300 exposes approaches 1 through 7", () => {
   assert.equal(SUPPORTED[9024], undefined);
-  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), [1, 2, 3, 4, 5, 6, 7]);
   assert.match(problem.extraParams[0].options[3].label.vi, /Biến thể \+1/);
-  assert.match(problem.extraParams[0].options[4].label.vi, /Biến thể \+1/);
-  assert.match(problem.extraParams[0].options[5].label.vi, /Biến thể \+1/);
-  assert.equal(problem.builder(plusOneSample, { approach: 5 }).answer, 5);
-  const indices = problem.builder4(plusOneSample).answer;
-  assert.deepEqual(indices, [1, 3, 5, 8, 9]);
-  assert.deepEqual(indices.map(index => plusOneSample[index]), [1, 2, 3, 4, 5]);
-  for (const approach of [4, 5, 6]) {
-    const source = problem[`code${approach}`];
-    assert.match(source.join("\n"), /def lengthOfLIS\(self, nums\):/);
-    for (const step of runApproach(plusOneSample, approach).steps) {
-      assert.equal(step.lis300View.problemId, 300);
-      assert.equal(step.lis300View.source, source[step.codeLines[0] - 1].trim());
-    }
+  assert.ok(problem.code4);
+  assert.ok(problem.code5);
+  assert.ok(problem.code6);
+  assert.ok(problem.code7);
+  assert.ok(problem.builder4);
+  assert.ok(problem.builder5);
+  assert.ok(problem.builder6);
+  assert.ok(problem.builder7);
+  assert.equal(problem.extraParams[1].key, "k");
+  assert.equal(problem.extraParams[1].default, 2);
+  assert.match(problem.code4.join("\n"), /def lengthOfLIS\(self, nums\):/);
+  for (const step of runApproach(plusOneSample, 4).steps) {
+    assert.equal(step.lis300View.problemId, 300);
+    assert.equal(step.lis300View.source, problem.code4[step.codeLines[0] - 1].trim());
   }
-  assert.throws(() => problem.builder5([]), /#300/);
+  for (const step of runApproach(plusOneSample, 5).steps) {
+    assert.equal(step.lis300View.problemId, 300);
+    assert.equal(step.lis300View.source, problem.code5[step.codeLines[0] - 1].trim());
+  }
+  for (const step of runApproach(plusKSample, 6, 2).steps) {
+    assert.equal(step.lis300View.problemId, 300);
+    assert.equal(step.lis300View.source, problem.code6[step.codeLines[0] - 1].trim());
+  }
+  for (const step of runApproach(plusKSample, 7, 2).steps) {
+    assert.equal(step.lis300View.problemId, 300);
+    assert.equal(step.lis300View.source, problem.code7[step.codeLines[0] - 1].trim());
+  }
 });
 
-test("Subsequence visualizations keep all six approaches correct, including negatives, duplicates and actual witnesses", () => {
+test("Subsequence visualizations keep the remaining approaches correct", () => {
   let seed = 300;
   const cases = [problem.defaultInput, [1], [2, 2, 2], [3, 5, 6, 2], [-3, -2, -2, 0], [5, 4, 3, 2], [1, 2, 3, 4]];
   for (let trial = 0; trial < 100; trial++) cases.push(Array.from({ length: 1 + trial % 8 }, () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed % 11 - 5; }));
-  for (const nums of cases) for (const approach of [1, 2, 3, 4, 5, 6]) {
+  for (const nums of cases) for (const approach of [1, 2, 3, 4, 5, 6, 7]) {
     const original = [...nums], run = runApproach(nums, approach);
-    const returnsIndices = approach === 3 || approach === 4;
-    assert.equal(returnsIndices ? run.answer.length : run.answer, exhaustive(nums, approach >= 4));
+    const returnsIndices = approach === 3 || approach === 5 || approach === 7;
+    const difference = approach === 4 || approach === 5 ? 1 : approach === 6 || approach === 7 ? 2 : null;
+    assert.equal(returnsIndices ? run.answer.length : run.answer, exhaustive(nums, difference));
     if (returnsIndices) assert.deepEqual(run.answer, run.chain);
     assert.deepEqual(nums, original);
     assert.equal(run.chain.length, returnsIndices ? run.answer.length : run.answer);
-    assert.ok(validPath(nums, run.chain, approach >= 4));
+    assert.ok(validPath(nums, run.chain, difference));
     for (const step of run.steps) {
       assert.equal(step.codeLines.length, 1);
       assert.equal(step.codeBlock, approach);
-      assert.ok(validPath(nums, step.lis300View.witness, approach >= 4));
-      if (approach !== 2 && approach !== 6 && step.lis300View.event !== "update" && step.lis300View.dp.length && step.lis300View.end >= 0) {
+      assert.ok(validPath(nums, step.lis300View.witness, difference));
+      if ((approach === 1 || approach === 3) && step.lis300View.event !== "update" && step.lis300View.dp.length && step.lis300View.end >= 0) {
         assert.equal(step.lis300View.witness.length, step.lis300View.dp[step.lis300View.end]);
       }
     }
@@ -77,7 +91,8 @@ test("300 line numbers and every variable snapshot match actual Python execution
   const script = `import sys, json
 data = json.load(sys.stdin)
 results = []
-for source in data['sources']:
+for spec in data['sources']:
+    source = spec['code']
     namespace = {}
     exec(compile(source, '<lis300>', 'exec'), namespace)
     for nums in data['cases']:
@@ -94,16 +109,20 @@ for source in data['sources']:
         sys.settrace(trace)
         solution = namespace['Solution']()
         method = getattr(solution, 'longestSubsequence', None) or solution.lengthOfLIS
-        answer = method(list(nums))
+        answer = method(list(nums), *spec['args'])
         sys.settrace(None)
         results.append({'answer': answer, 'events': events})
 print(json.dumps(results))
 `;
-  const execution = spawnSync(process.env.PYTHON || "python", ["-c", script], { input: JSON.stringify({ sources: [problem.code, problem.code2, problem.code3, problem.code4, problem.code5, problem.code6].map(code => code.join("\n")), cases }), encoding: "utf8" });
+  const sources = [problem.code, problem.code2, problem.code3, problem.code4, problem.code5]
+    .map(code => ({ code: code.join("\n"), args: [] }));
+  sources.push({ code: problem.code6.join("\n"), args: [2] });
+  sources.push({ code: problem.code7.join("\n"), args: [2] });
+  const execution = spawnSync(process.env.PYTHON || "python3", ["-c", script], { input: JSON.stringify({ sources, cases }), encoding: "utf8" });
   assert.equal(execution.status, 0, execution.stderr);
   const expected = JSON.parse(execution.stdout);
   let index = 0;
-  for (const approach of [1, 2, 3, 4, 5, 6]) for (const nums of cases) {
+  for (const approach of [1, 2, 3, 4, 5, 6, 7]) for (const nums of cases) {
     const run = runApproach(nums, approach), real = expected[index++];
     assert.deepEqual(run.answer, real.answer);
     assert.deepEqual(run.steps.map(step => ({ line: step.codeLines[0], locals: Object.fromEntries(step.vars.map(v => [v.name, v.value])) })), real.events, `approach ${approach}, nums=${nums}`);
@@ -113,16 +132,19 @@ print(json.dumps(results))
 test("300 renderer shows candidate comparisons, dp transitions and truthful tails in both languages", () => {
   const host = { innerHTML: "" };
   const context = { lang: "vi", $: () => host, escapeHtml: value => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;") };
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(html, /renderer-lis-300\.js\?v=subsequence-300-plus-k-indices-v3/);
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-lis-300.js"), "utf8"), context);
-  for (const lang of ["vi", "en"]) for (const approach of [1, 2, 3, 4, 5, 6]) {
+  for (const lang of ["vi", "en"]) for (const approach of [1, 2, 3, 4, 5, 6, 7]) {
     context.lang = lang;
-    const run = runApproach(approach >= 4 ? plusOneSample : problem.defaultInput, approach);
+    const sample = approach === 4 || approach === 5 ? plusOneSample : approach === 6 || approach === 7 ? plusKSample : problem.defaultInput;
+    const run = runApproach(sample, approach, 2);
     for (const step of run.steps) {
       context.renderLis300View(step);
       assert.match(host.innerHTML, /l300-line/);
       assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
-      if (step.lis300View.event === "compare" && approach !== 2 && !step.lis300View.comparison) assert.match(host.innerHTML, approach === 3 || approach === 4 ? /Bỏ qua dòng 10|Skip line 10/ : /Bỏ qua dòng 8|Skip line 8/);
+      if (step.lis300View.event === "compare" && (approach === 1 || approach === 3) && !step.lis300View.comparison) assert.match(host.innerHTML, approach === 3 ? /Bỏ qua dòng 10|Skip line 10/ : /Bỏ qua dòng 8|Skip line 8/);
       if (step.lis300View.reconstructing && !step.final) assert.match(host.innerHTML, /l300-reconstruction/);
       if (approach === 2) assert.match(host.innerHTML, /tails is not necessarily|tails không nhất thiết/);
     }
@@ -134,48 +156,58 @@ test("300 renderer shows candidate comparisons, dp transitions and truthful tail
       assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[2, 3, 5, 6\]/s);
     }
     if (approach === 4) {
-      assert.match(host.innerHTML, /l300-unit-rule/);
-      assert.match(host.innerHTML, /nums\[j\] \+ 1 = nums\[i\]/);
-      assert.match(host.innerHTML, /index = \[1, 3, 5, 8, 9\]/);
-      assert.match(host.innerHTML, /(?:giá trị|values) = \[1, 2, 3, 4, 5\]/);
-      assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[1, 3, 5, 8, 9\]/s);
-      assert.doesNotMatch(host.innerHTML, /nums\[j\] &lt; nums\[i\]/);
-    }
-    if (approach === 5) {
-      assert.match(host.innerHTML, /nums\[j\] \+ 1 = nums\[i\]/);
-      assert.match(host.innerHTML, /max\(dp\) = <strong>5<\/strong>/);
-      assert.doesNotMatch(host.innerHTML, /l300-index-values|l300-reconstruction|Trả về index|Return indices/);
-    }
-    if (approach === 6) {
-      assert.match(host.innerHTML, /dp\[x\] = max\(dp\[x\], dp\[x - 1\] \+ 1\)/);
+      assert.match(host.innerHTML, /dp\[num\] = dp\.get\(num - 1, 0\) \+ 1/);
       assert.match(host.innerHTML, /max_len = <strong>5<\/strong>/);
       assert.match(host.innerHTML, /dp\[5\]/);
     }
+    if (approach === 5) {
+      assert.match(host.innerHTML, /end_at/);
+      assert.match(host.innerHTML, /parent/);
+      assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[1, 3, 5, 8, 9\]/s);
+    }
+    if (approach === 6) {
+      assert.match(host.innerHTML, /dp\[num\] = dp\.get\(num - k, 0\) \+ 1/);
+      assert.match(host.innerHTML, /k=2/);
+      assert.match(host.innerHTML, /max_len = <strong>4<\/strong>/);
+      assert.match(host.innerHTML, /dp\[8\]/);
+    }
+    if (approach === 7) {
+      assert.match(host.innerHTML, /dp\[num\] = dp\.get\(num - k, 0\) \+ 1/);
+      assert.match(host.innerHTML, /end_at/);
+      assert.match(host.innerHTML, /parent/);
+      assert.match(host.innerHTML, /k=2/);
+      assert.match(host.innerHTML, /(?:Trả về index|Return indices).*\[3, 4, 5, 6\]/s);
+    }
   }
 });
 
-test("300 approach 5 returns only max length with no reconstruction variables", () => {
-  assert.equal(problem.code5.at(-1), "        return max(dp)");
-  assert.doesNotMatch(problem.code5.join("\n"), /parent|indices|reverse/);
-  for (const [nums, expected] of [[problem.defaultInput, 2], [[1, 3, 2, 4, 3, 5, 4], 4], [[1, 3, 5], 1], [[3, 2, 1], 1], [[-2, 0, -1, 1, 0], 3], [[2, 2, 3, 4], 3]]) {
-    const run = problem.builder5(nums);
-    assert.equal(typeof run.answer, "number");
-    assert.equal(run.answer, expected);
-    assert.equal(run.answer, problem.builder4(nums).answer.length);
-    for (const step of run.steps) assert.ok(step.vars.every(variable => ["nums", "n", "dp", "i", "j"].includes(variable.name)));
-  }
-  const { extractLiveMethod } = require("../live-args");
-  assert.deepEqual(extractLiveMethod({ code: ["class Solution:", "    def first(self, old): pass"], code5: ["class Solution:", "    def fifth(self, nums): pass"] }, 5), { name: "fifth", params: ["nums"] });
-  const source = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
-  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "5" }) }) };
-  vm.createContext(context);
-  vm.runInContext(source.slice(source.indexOf("function selectedLiveCodeBlock()"), source.indexOf("function clearedSolutionSkeleton(")), context);
-  assert.equal(context.selectedLiveCodeBlock(), 5);
-  assert.equal(context.currentPrimaryCode(), problem.code5.join("\n"));
+test("300 code view keeps both scroll directions for long approach 5 lines", () => {
+  const css = fs.readFileSync(require.resolve("../public/lis-300.css"), "utf8");
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-panel \{[^}]*max-height:min\(58vh,520px\);[^}]*overflow:auto;/);
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-line \{[^}]*width:max-content;[^}]*white-space:pre;/);
+  assert.match(css, /#vizPanel:has\(\.l300-viz\) \.code-line \.txt \{[^}]*min-width:max-content;[^}]*overflow-wrap:normal;/);
+  assert.doesNotMatch(css, /#vizPanel:has\(\.l300-viz\) \.code-panel \{[^}]*overflow:visible/);
+  assert.match(html, /lis-300\.css\?v=lis-300-fullscreen-editor-v3/);
 });
 
-test("300 approach 6 uses a value map without losing longer prefixes on duplicates", () => {
-  assert.match(problem.code6.join("\n"), /dp\[x\] = max\(dp\.get\(x, 0\), dp\.get\(x - 1, 0\) \+ 1\)/);
+test("300 opens the editor full-screen without wrapping for approaches 1 through 7", () => {
+  const css = fs.readFileSync(require.resolve("../public/lis-300.css"), "utf8");
+  const editor = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(css, /body:has\(\.l300-viz\) \.viz-split\.live-editing \{[^}]*position:fixed;[^}]*inset:0;[^}]*width:100vw;[^}]*height:100dvh;/);
+  assert.match(css, /\.viz-split\.live-editing \.live-editor-wrap \{[^}]*grid-template-rows:minmax\(0,1fr\) auto auto;[^}]*height:100%;/);
+  assert.match(css, /\.viz-split\.live-editing \.monaco-editor-host \{[^}]*height:100%;/);
+  assert.match(editor, /wordWrap: "off"/);
+  assert.match(editor, /horizontal: "auto"/);
+  assert.match(editor, /horizontalScrollbarSize: 10/);
+  assert.match(html, /live-editor\.js\?[^"\n]*lis-fullscreen=v3/);
+});
+
+test("300 approach 4 uses the concise dp.get recurrence", () => {
+  assert.match(problem.code4.join("\n"), /dp = \{\}[\s\S]*max_len = 0/);
+  assert.match(problem.code4.join("\n"), /for num in nums:[\s\S]*dp\[num\] = dp\.get\(num - 1, 0\) \+ 1/);
+  assert.doesNotMatch(problem.code4.join("\n"), /max\(dp\.get/);
   const cases = [
     [plusOneSample, 5],
     [[1, 2, 3, 2, 4, 3, 5], 5],
@@ -184,41 +216,118 @@ test("300 approach 6 uses a value map without losing longer prefixes on duplicat
     [[3, 2, 1], 1],
   ];
   for (const [nums, expected] of cases) {
-    const run = problem.builder6(nums);
+    const run = problem.builder4(nums);
     assert.equal(run.answer, expected);
     assert.equal(run.chain.length, expected);
-    assert.ok(validPath(nums, run.chain, true));
-    assert.ok(run.steps.every(step => step.codeBlock === 6 && step.lis300View.source === problem.code6[step.codeLines[0] - 1].trim()));
+    assert.ok(validPath(nums, run.chain, 1));
+    assert.ok(run.steps.every(step => step.codeBlock === 4 && step.lis300View.source === problem.code4[step.codeLines[0] - 1].trim()));
   }
   const { extractLiveMethod } = require("../live-args");
-  assert.deepEqual(extractLiveMethod(problem, 6), { name: "lengthOfLIS", params: ["nums"] });
+  assert.deepEqual(extractLiveMethod(problem, 4), { name: "lengthOfLIS", params: ["nums"] });
   const source = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
-  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "6" }) }) };
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "4" }) }) };
   vm.createContext(context);
   vm.runInContext(source.slice(source.indexOf("function selectedLiveCodeBlock()"), source.indexOf("function clearedSolutionSkeleton(")), context);
+  assert.equal(context.selectedLiveCodeBlock(), 4);
+  assert.equal(context.currentPrimaryCode(), problem.code4.join("\n"));
+});
+
+test("300 approach 5 backtracks the hash-map variant into indices", () => {
+  const source = problem.code5.join("\n");
+  assert.match(source, /dp\[num\] = dp\.get\(num - 1, 0\) \+ 1/);
+  assert.match(source, /parent\[i\] = end_at\.get\(num - 1, -1\)/);
+  assert.match(source, /indices\.append\(best_end\)[\s\S]*indices\.reverse\(\)[\s\S]*return indices/);
+  const cases = [
+    [plusOneSample, [1, 3, 5, 8, 9]],
+    [[1, 2, 3, 2, 4, 3, 5], [0, 1, 2, 4, 6]],
+    [[-3, -2, -1, -2, 0, 1], [0, 1, 2, 4, 5]],
+    [[2, 2, 2], [0]],
+    [[3, 2, 1], [0]],
+  ];
+  for (const [nums, expected] of cases) {
+    const run = problem.builder5(nums);
+    assert.deepEqual(run.answer, expected);
+    assert.deepEqual(run.chain, expected);
+    assert.ok(validPath(nums, run.answer, 1));
+    assert.ok(run.steps.every(step => step.codeBlock === 5 && step.lis300View.source === problem.code5[step.codeLines[0] - 1].trim()));
+  }
+  const { extractLiveMethod } = require("../live-args");
+  assert.deepEqual(extractLiveMethod(problem, 5), { name: "lengthOfLIS", params: ["nums"] });
+  const editorSource = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "5" }) }) };
+  vm.createContext(context);
+  vm.runInContext(editorSource.slice(editorSource.indexOf("function selectedLiveCodeBlock()"), editorSource.indexOf("function clearedSolutionSkeleton(")), context);
+  assert.equal(context.selectedLiveCodeBlock(), 5);
+  assert.equal(context.currentPrimaryCode(), problem.code5.join("\n"));
+});
+
+test("300 approach 6 generalizes the hash-map recurrence from +1 to +k", () => {
+  const source = problem.code6.join("\n");
+  assert.match(source, /def lengthOfLIS\(self, nums, k\):/);
+  assert.match(source, /dp\[num\] = dp\.get\(num - k, 0\) \+ 1/);
+  const cases = [
+    [plusKSample, 2, 4],
+    [[7, 5, 3, 1], -2, 4],
+    [[2, 2, 2], 0, 3],
+    [[1, 2, 4, 7], 3, 3],
+  ];
+  for (const [nums, k, expected] of cases) {
+    const run = problem.builder6(nums, { k });
+    assert.equal(run.answer, expected);
+    assert.equal(run.chain.length, expected);
+    assert.ok(validPath(nums, run.chain, k));
+    assert.ok(run.steps.every(step => step.codeBlock === 6 && step.lis300View.gap === k && step.lis300View.source === problem.code6[step.codeLines[0] - 1].trim()));
+  }
+  assert.deepEqual(problem.liveArgs(plusKSample, { approach: 6, k: 2 }), [plusKSample, 2]);
+  const { extractLiveMethod } = require("../live-args");
+  assert.deepEqual(extractLiveMethod(problem, 6), { name: "lengthOfLIS", params: ["nums", "k"] });
+  const editorSource = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "6" }) }) };
+  vm.createContext(context);
+  vm.runInContext(editorSource.slice(editorSource.indexOf("function selectedLiveCodeBlock()"), editorSource.indexOf("function clearedSolutionSkeleton(")), context);
   assert.equal(context.selectedLiveCodeBlock(), 6);
   assert.equal(context.currentPrimaryCode(), problem.code6.join("\n"));
 });
 
-test("300 approach 4 is an explicitly +1-only subsequence variant", () => {
-  assert.equal(problem.code4[8], "                if nums[j] + 1 == nums[i]:");
-  assert.deepEqual(problem.builder4(plusOneSample).answer, [1, 3, 5, 8, 9]);
-  assert.deepEqual(problem.builder4([1, 3, 5, 7]).answer, [0]);
-  assert.notEqual(problem.builder([1, 3, 5, 7], { approach: 4 }).answer.length, problem.builder([1, 3, 5, 7], { approach: 3 }).answer.length);
-  const nums = [1, 3, 2, 4, 3, 5, 4], run = problem.builder4(nums);
-  assert.deepEqual(run.answer, [0, 2, 4, 6]);
-  assert.deepEqual(run.answer.map(index => nums[index]), [1, 2, 3, 4]);
-  for (const step of run.steps) {
-    const view = step.lis300View;
-    view.eligibleByEnd.forEach((eligible, end) => {
-      const expected = Array.from({ length: view.checkedByEnd[end] }, (_, j) => j).filter(j => nums[j] + 1 === nums[end]);
-      assert.deepEqual(eligible, expected);
-    });
-    assert.equal(view.unitStep, true);
-    assert.ok(validPath(nums, view.candidate, true));
+test("300 approach 7 backtracks the +k hash-map variant into indices", () => {
+  const source = problem.code7.join("\n");
+  assert.match(source, /def lengthOfLIS\(self, nums, k\):/);
+  assert.match(source, /dp\[num\] = dp\.get\(num - k, 0\) \+ 1/);
+  assert.match(source, /parent\[i\] = end_at\.get\(num - k, -1\)/);
+  assert.match(source, /indices\.append\(best_end\)[\s\S]*indices\.reverse\(\)[\s\S]*return indices/);
+  const cases = [
+    [plusKSample, 2, [3, 4, 5, 6]],
+    [[7, 5, 3, 1], -2, [0, 1, 2, 3]],
+    [[2, 2, 2], 0, [0, 1, 2]],
+    [[1, 2, 4, 7], 3, [0, 2, 3]],
+  ];
+  for (const [nums, k, expected] of cases) {
+    const run = problem.builder7(nums, { k });
+    assert.deepEqual(run.answer, expected);
+    assert.deepEqual(run.chain, expected);
+    assert.ok(validPath(nums, run.answer, k));
+    assert.ok(run.steps.every(step => step.codeBlock === 7 && step.lis300View.gap === k && step.lis300View.source === problem.code7[step.codeLines[0] - 1].trim()));
   }
-  assert.deepEqual(problem.builder4([3, 2, 1]).answer, [0]);
-  assert.deepEqual(problem.builder4([2, 2, 3, 3, 4]).answer, [0, 2, 4]);
+  assert.deepEqual(problem.liveArgs(plusKSample, { approach: 7, k: 2 }), [plusKSample, 2]);
+  const { extractLiveMethod } = require("../live-args");
+  assert.deepEqual(extractLiveMethod(problem, 7), { name: "lengthOfLIS", params: ["nums", "k"] });
+  const editorSource = fs.readFileSync(require.resolve("../public/live-editor.js"), "utf8");
+  const context = { problemData: problem, $: () => ({ querySelector: () => ({ value: "7" }) }) };
+  vm.createContext(context);
+  vm.runInContext(editorSource.slice(editorSource.indexOf("function selectedLiveCodeBlock()"), editorSource.indexOf("function clearedSolutionSkeleton(")), context);
+  assert.equal(context.selectedLiveCodeBlock(), 7);
+  assert.equal(context.currentPrimaryCode(), problem.code7.join("\n"));
+
+  const appCore = fs.readFileSync(require.resolve("../public/app-core.js"), "utf8");
+  const server = fs.readFileSync(require.resolve("../server.js"), "utf8");
+  const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
+  assert.match(appCore, /const code7 = .*problemData\.code7/);
+  assert.match(appCore, /row\.dataset\.line7 = idx \+ 1/);
+  assert.match(appCore, /codeBlock === 7 \? "line7"/);
+  assert.match(server, /complexity7: problem\.complexity7/);
+  assert.match(server, /requestedApproach === 7 && typeof problem\.builder7/);
+  assert.match(html, /app-core\.js\?[^"\n]*code7=v1/);
+  assert.match(html, /live-editor\.js\?[^"\n]*code7=v1/);
 });
 
 test("300 approach 3 uses range(n) and lists only eligible indices checked so far", () => {
@@ -247,5 +356,6 @@ test("300 approach 3 uses range(n) and lists only eligible indices checked so fa
 
 test("300 validates explicit visualization bounds", () => {
   for (const input of [[], [1.5], [10001], [-10001], Array(41).fill(1)]) assert.throws(() => problem.builder(input), /#300/);
+  for (const approach of [6, 7]) for (const k of [1.5, -10001, 10001, "x"]) assert.throws(() => problem.builder(plusKSample, { approach, k }), /#300/);
   assert.equal(problem.debugMode, "line-by-line");
 });
