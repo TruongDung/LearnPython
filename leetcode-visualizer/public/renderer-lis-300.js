@@ -1,10 +1,10 @@
 function renderLis300View(step) {
   const v = step.lis300View;
   const text = (vi, en) => lang === "vi" ? vi : en;
-  const hashMode = v.approach === 6;
+  const hashMode = v.approach === 4;
   const dpMode = v.approach !== 2;
-  const indexMode = v.approach === 3 || v.approach === 4;
-  const unitStep = v.approach === 4 || v.approach === 5 || hashMode;
+  const indexMode = v.approach === 3;
+  const unitStep = hashMode;
   const relation = unitStep ? "nums[j] + 1 = nums[i]" : "nums[j] &lt; nums[i]";
   const final = Boolean(step.final);
   const activeJ = dpMode && ["inner", "compare", "improve-check", "update", "parent"].includes(v.event) ? v.j : null;
@@ -27,7 +27,7 @@ function renderLis300View(step) {
   if (hashMode) {
     const entries = Object.entries(v.mapDp).sort((a, b) => Number(a[0]) - Number(b[0]));
     work = `<div class="l300-tail-heading"><strong>dp</strong><span>${text("độ dài tốt nhất kết thúc bằng giá trị", "best length ending at value")}</span></div><div class="l300-tails">${entries.length ? entries.map(([value, length]) => `<div class="l300-tail${Number(value) === v.x ? " current" : ""}"><small>dp[${value}]</small><b>${length}</b></div>`).join("") : '<span class="l300-empty">∅</span>'}</div>`;
-    if (v.transition) work += `<div class="l300-update"><span>dp[${v.transition.value}]: <b>${v.transition.before}</b></span><span>max(${v.transition.before}, ${v.transition.previousLength} + 1)</span><strong>→ ${v.transition.after}</strong></div>`;
+    if (v.transition) work += `<div class="l300-update"><span>dp.get(${v.transition.value - 1}, 0): <b>${v.transition.previousLength}</b></span><span>+ 1</span><strong>→ dp[${v.transition.value}] = ${v.transition.after}</strong></div>`;
   } else if (dpMode) {
     if (activeJ !== null) work = `<div class="l300-compare${v.comparison === false ? " rejected" : v.comparison === true ? " accepted" : ""}"><span><small>${unitStep ? "nums[j] + 1" : "nums[j]"}</small><b>${v.nums[v.j]}${unitStep ? " + 1" : ""}</b></span><strong>${unitStep ? "=" : "&lt;"}</strong><span><small>nums[i]</small><b>${v.nums[v.i]}</b></span><strong>${v.comparison === null ? "?" : v.comparison ? "✓" : "×"}</strong>${v.comparison === false ? `<small>${text(`Bỏ qua dòng ${v.line + 1}`, `Skip line ${v.line + 1}`)}</small>` : ""}</div>`;
     if (v.transition) work += `<div class="l300-update"><span>dp[${v.i}]: <b>${v.transition.before}</b></span><span>max</span><span>dp[${v.j}]+1: <b>${v.transition.candidate}</b></span><strong>→ ${v.transition.after}</strong></div>`;
@@ -51,10 +51,10 @@ function renderLis300View(step) {
   const differs = dpMode && v.candidate.length && v.candidate.join(",") !== v.witness.join(",");
   const stage = final || v.reconstructing ? 2 : ["length", "initialize", "parents", "validate", "max-initialize"].includes(v.event) ? 0 : 1;
   $("treeView").innerHTML = `<section class="l300-viz" aria-label="${text("300 · Dãy con tăng dài nhất", "300 · Longest increasing subsequence")}">
-    <div class="l300-stages">${[text("1 · Khởi tạo", "1 · Initialize"), hashMode ? "2 · dp[x]" : dpMode ? (unitStep ? "2 · j +1 → i" : "2 · j → i") : text("2 · Tìm & cập nhật", "2 · Search & update"), unitStep ? text("3 · Dãy +1", "3 · +1 subsequence") : "3 · LIS"].map((label, index) => `<span class="${index === stage ? "active" : ""}">${label}</span>`).join("")}</div>
+    <div class="l300-stages">${[text("1 · Khởi tạo", "1 · Initialize"), hashMode ? "2 · dp[num]" : dpMode ? (unitStep ? "2 · j +1 → i" : "2 · j → i") : text("2 · Tìm & cập nhật", "2 · Search & update"), unitStep ? text("3 · Dãy +1", "3 · +1 subsequence") : "3 · LIS"].map((label, index) => `<span class="${index === stage ? "active" : ""}">${label}</span>`).join("")}</div>
     <div class="l300-line"><b>L${v.line}</b><code>${escapeHtml(v.source)}</code></div>
-    <div class="l300-meaning">${hashMode ? text("dp[x] = độ dài tốt nhất kết thúc bằng giá trị x", "dp[x] = best length ending at value x") : dpMode ? text("dp[i] = dài nhất kết thúc tại i", "dp[i] = longest length ending at i") : text("Giữ thứ tự gốc · được bỏ qua số", "Keep original order · skipping is allowed")}</div>
-    ${unitStep ? `<div class="l300-unit-rule"><strong>+1</strong><code>${hashMode ? "dp[x] = max(dp[x], dp[x - 1] + 1)" : "nums[j] + 1 = nums[i]"}</code><small>${text("Giữ thứ tự · được bỏ qua phần tử", "Keep order · skipping is allowed")}</small></div>` : ""}
+    <div class="l300-meaning">${hashMode ? text("dp[num] = độ dài dãy +1 kết thúc bằng num", "dp[num] = +1 subsequence length ending at num") : dpMode ? text("dp[i] = dài nhất kết thúc tại i", "dp[i] = longest length ending at i") : text("Giữ thứ tự gốc · được bỏ qua số", "Keep original order · skipping is allowed")}</div>
+    ${unitStep ? `<div class="l300-unit-rule"><strong>+1</strong><code>${hashMode ? "dp[num] = dp.get(num - 1, 0) + 1" : "nums[j] + 1 = nums[i]"}</code><small>${text("Giữ thứ tự · được bỏ qua phần tử", "Keep order · skipping is allowed")}</small></div>` : ""}
     <div class="l300-array" aria-label="nums${dpMode && !hashMode ? " / dp" : ""}">${columns}</div>
     ${work}
     ${reconstruction}
