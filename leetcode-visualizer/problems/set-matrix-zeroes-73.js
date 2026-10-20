@@ -3,7 +3,39 @@ const base = require("./array")[73];
 const bi = (vi, en) => ({ vi, en });
 const clone = matrix => matrix.map(row => [...row]);
 const code = [...base.code.slice(0, -1), "        return"];
-const code2 = [...base.code2];
+const code2 = [
+  "class Solution:",
+  "    def setZeroes(self, matrix):",
+  "        rows, cols = len(matrix), len(matrix[0])",
+  "        first_row_has_zero = False",
+  "        first_col_has_zero = False",
+  "        for c in range(cols):",
+  "            if matrix[0][c] == 0:",
+  "                first_row_has_zero = True",
+  "        for r in range(rows):",
+  "            if matrix[r][0] == 0:",
+  "                first_col_has_zero = True",
+  "",
+  "        for r in range(1, rows):",
+  "            for c in range(1, cols):",
+  "                if matrix[r][c] == 0:",
+  "                    matrix[r][0] = 0",
+  "                    matrix[0][c] = 0",
+  "",
+  "        for r in range(1, rows):",
+  "            for c in range(1, cols):",
+  "                if matrix[r][0] == 0 or matrix[0][c] == 0:",
+  "                    matrix[r][c] = 0",
+  "",
+  "        if first_row_has_zero:",
+  "            for c in range(cols):",
+  "                matrix[0][c] = 0",
+  "",
+  "        if first_col_has_zero:",
+  "            for r in range(rows):",
+  "                matrix[r][0] = 0",
+  "        return",
+];
 function parse(input) {
   const text = String(input).trim();
   let matrix;
@@ -71,25 +103,35 @@ function build(input, approach) {
     }));
     emit(14, "done", "return", bi("Xong · matrix đã đổi tại chỗ", "Done · matrix updated in place"));
   } else {
-    locals.first_row_has_zero = matrix[0].some(value => value === 0);
-    emit(4, "flags", "row-flag", bi(`Hàng đầu có 0? ${locals.first_row_has_zero ? "Có" : "Không"}`, `First row has zero? ${locals.first_row_has_zero ? "Yes" : "No"}`));
-    locals.first_col_has_zero = matrix.some(row => row[0] === 0);
-    emit(5, "flags", "col-flag", bi(`Cột đầu có 0? ${locals.first_col_has_zero ? "Có" : "Không"}`, `First column has zero? ${locals.first_col_has_zero ? "Yes" : "No"}`));
-    loop("r", 1, rows, 7, "mark", r => loop("c", 1, cols, 8, "mark", c => {
+    locals.first_row_has_zero = false;
+    emit(4, "flags", "row-flag-init", bi("first_row_has_zero = False", "first_row_has_zero = False"));
+    locals.first_col_has_zero = false;
+    emit(5, "flags", "col-flag-init", bi("first_col_has_zero = False", "first_col_has_zero = False"));
+    loop("c", 0, cols, 6, "flags", c => {
+      const zero = matrix[0][c] === 0;
+      emit(7, "flags", "check-row-zero", bi(`matrix[0][${c}] == 0?`, `matrix[0][${c}] == 0?`), { active: [0, c], decision: zero });
+      if (zero) { locals.first_row_has_zero = true; emit(8, "flags", "row-flag", bi("Nhớ: hàng đầu có 0", "Remember: first row has zero"), { active: [0, c] }); }
+    });
+    loop("r", 0, rows, 9, "flags", r => {
+      const zero = matrix[r][0] === 0;
+      emit(10, "flags", "check-col-zero", bi(`matrix[${r}][0] == 0?`, `matrix[${r}][0] == 0?`), { active: [r, 0], decision: zero });
+      if (zero) { locals.first_col_has_zero = true; emit(11, "flags", "col-flag", bi("Nhớ: cột đầu có 0", "Remember: first column has zero"), { active: [r, 0] }); }
+    });
+    loop("r", 1, rows, 13, "mark", r => loop("c", 1, cols, 14, "mark", c => {
       const zero = matrix[r][c] === 0;
-      emit(9, "mark", "check-zero", bi(`${matrix[r][c]} == 0? ${zero ? "Đúng" : "Sai"}`, `${matrix[r][c]} == 0? ${zero ? "True" : "False"}`), { active: [r, c], decision: zero });
-      if (zero) { write(r, 0, 10, "mark", [r, c]); write(0, c, 11, "mark", [r, c]); }
+      emit(15, "mark", "check-zero", bi(`${matrix[r][c]} == 0? ${zero ? "Đúng" : "Sai"}`, `${matrix[r][c]} == 0? ${zero ? "True" : "False"}`), { active: [r, c], decision: zero });
+      if (zero) { write(r, 0, 16, "mark", [r, c]); write(0, c, 17, "mark", [r, c]); }
     }));
-    loop("r", 1, rows, 13, "apply", r => loop("c", 1, cols, 14, "apply", c => {
+    loop("r", 1, rows, 19, "apply", r => loop("c", 1, cols, 20, "apply", c => {
       const zero = matrix[r][0] === 0 || matrix[0][c] === 0;
-      emit(15, "apply", "check-marker", bi(zero ? "Có marker → xóa ô" : "Không có marker → giữ ô", zero ? "Marked → zero cell" : "Unmarked → keep cell"), { active: [r, c], decision: zero });
-      if (zero) write(r, c, 16, "apply");
+      emit(21, "apply", "check-marker", bi(zero ? "Có marker → xóa ô" : "Không có marker → giữ ô", zero ? "Marked → zero cell" : "Unmarked → keep cell"), { active: [r, c], decision: zero });
+      if (zero) write(r, c, 22, "apply");
     }));
-    emit(18, "edges", "check-row-flag", bi(`Xóa hàng đầu? ${locals.first_row_has_zero ? "Có" : "Không"}`, `Zero first row? ${locals.first_row_has_zero ? "Yes" : "No"}`), { decision: locals.first_row_has_zero });
-    if (locals.first_row_has_zero) loop("c", 0, cols, 19, "edges", c => write(0, c, 20, "edges"));
-    emit(22, "edges", "check-col-flag", bi(`Xóa cột đầu? ${locals.first_col_has_zero ? "Có" : "Không"}`, `Zero first column? ${locals.first_col_has_zero ? "Yes" : "No"}`), { decision: locals.first_col_has_zero });
-    if (locals.first_col_has_zero) loop("r", 0, rows, 23, "edges", r => write(r, 0, 24, "edges"));
-    emit(25, "done", "return", bi("Xong · matrix đã đổi tại chỗ", "Done · matrix updated in place"));
+    emit(24, "edges", "check-row-flag", bi(`Xóa hàng đầu? ${locals.first_row_has_zero ? "Có" : "Không"}`, `Zero first row? ${locals.first_row_has_zero ? "Yes" : "No"}`), { decision: locals.first_row_has_zero });
+    if (locals.first_row_has_zero) loop("c", 0, cols, 25, "edges", c => write(0, c, 26, "edges"));
+    emit(28, "edges", "check-col-flag", bi(`Xóa cột đầu? ${locals.first_col_has_zero ? "Có" : "Không"}`, `Zero first column? ${locals.first_col_has_zero ? "Yes" : "No"}`), { decision: locals.first_col_has_zero });
+    if (locals.first_col_has_zero) loop("r", 0, rows, 29, "edges", r => write(r, 0, 30, "edges"));
+    emit(31, "done", "return", bi("Xong · matrix đã đổi tại chỗ", "Done · matrix updated in place"));
   }
   if (!detailed) steps.push({ title: bi("Ma trận kết quả", "Result matrix"), codeLines: [], codeBlock: approach, final: true, vars: [], note: bi("", ""), arr: [], highlight: [], mark: [],
     matrixZero73View: { mode: "summary", approach, phase: "done", event: "return", line: null, source: "", rows, cols,

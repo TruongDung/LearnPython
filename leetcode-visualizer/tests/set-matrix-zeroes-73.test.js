@@ -7,9 +7,7 @@ const cases = [ [[1,1,1],[1,0,1],[1,1,1]], [[0,1,2,0],[3,4,5,2],[1,3,1,5]], [[1,
   [[0,2],[3,4]], [[1,2],[3,4]], [[0,0],[0,0]], [[0]], [[7]], [[1,0,3]], [[1],[0],[3]], [[-1,2,0],[3,4,-5]] ];
 let seed = 73;
 function random(n) { seed = (seed * 1664525 + 1013904223) >>> 0; return seed % n; }
-for (let i = 0; i < 80; i++) cases.push(Array.from({ length: random(5) + 1 }, () => Array(random(1) + 1)));
-// Generate rectangular random cases, including many repeated zeroes.
-for (let i = 12; i < cases.length; i++) { const m = random(5) + 1, n = random(6) + 1; cases[i] = Array.from({ length: m }, () => Array.from({ length: n }, () => random(5) - 2)); }
+for (let i = 0; i < 80; i++) { const m = random(5) + 1, n = random(6) + 1; cases.push(Array.from({ length: m }, () => Array.from({ length: n }, () => random(5) - 2))); }
 const build = (matrix, approach) => problem[approach === 1 ? "builder" : "builder2"](JSON.stringify(matrix));
 function oracle(matrix) {
   const rows = new Set(), cols = new Set();
@@ -74,7 +72,7 @@ print(json.dumps(out))
 });
 
 test("73 marker writes happen on separate lines and original edge flags never change", () => {
-  const run = build(cases[0], 2), rowWrite = run.steps.find(s => s.matrixZero73View.line === 10), colWrite = run.steps.find(s => s.matrixZero73View.line === 11);
+  const run = build(cases[0], 2), rowWrite = run.steps.find(s => s.matrixZero73View.line === 16), colWrite = run.steps.find(s => s.matrixZero73View.line === 17);
   assert.deepEqual(rowWrite.matrixZero73View.matrix, [[1,1,1],[0,0,1],[1,1,1]]);
   assert.deepEqual(colWrite.matrixZero73View.matrix, [[1,0,1],[0,0,1],[1,1,1]]);
   assert.deepEqual(rowWrite.matrixZero73View.cause, [1,1]);
