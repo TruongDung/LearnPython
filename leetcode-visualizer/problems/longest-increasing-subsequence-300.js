@@ -40,6 +40,24 @@ const code5 = [
   "        indices.reverse()",
   "        return indices",
 ];
+const code6 = [
+  "class Solution:",
+  "    def lengthOfLIS(self, nums, k):",
+  "        dp = {}",
+  "        max_len = 0",
+  "",
+  "        for num in nums:",
+  "            dp[num] = dp.get(num - k, 0) + 1",
+  "            max_len = max(max_len, dp[num])",
+  "",
+  "        return max_len",
+];
+
+function parseDifference(value) {
+  const k = Number(value ?? 2);
+  if (!Number.isInteger(k) || k < -10000 || k > 10000) throw new Error("#300: k must be an integer from -10000 to 10000");
+  return k;
+}
 function buildHashMap(input) {
   const nums = parseNums(input);
   const dp = Object.create(null);
@@ -264,6 +282,94 @@ function buildHashMapIndices(input) {
   return { original: nums, answer: [...indices], chain: [...indices], steps };
 }
 
+function buildHashMapDifference(input, rawK = 2) {
+  const nums = parseNums(input);
+  const k = parseDifference(rawK);
+  const dp = Object.create(null);
+  const parents = nums.map(() => -1);
+  const bestIndexByValue = Object.create(null);
+  const steps = [];
+  let maxLen = 0;
+  let bestEnd = -1;
+  let initialized = false;
+  let num = null;
+  let index = null;
+  let transition = null;
+
+  function emit(line, event, final = false) {
+    const labels = {
+      initialize: bi("Tạo dp rỗng", "Create empty dp"),
+      "max-initialize": bi("Đặt max_len = 0", "Set max_len = 0"),
+      visit: bi(`Xét num = ${num}`, `Visit num = ${num}`),
+      update: bi(`Nối từ ${num - k} đến ${num}`, `Extend ${num - k} to ${num}`),
+      maximum: bi(`Cập nhật max_len = ${maxLen}`, `Update max_len = ${maxLen}`),
+      "loop-end": bi("Hết nums", "No more nums"),
+      result: bi(`Trả về ${maxLen}`, `Return ${maxLen}`),
+    };
+    const witness = [];
+    for (let at = bestEnd; at >= 0; at = parents[at]) witness.push(at);
+    witness.reverse();
+    const snapshot = Object.assign({}, dp);
+    const locals = { nums: [...nums], k };
+    if (initialized) locals.dp = snapshot;
+    if (event !== "initialize") locals.max_len = maxLen;
+    if (num !== null) locals.num = num;
+    steps.push({
+      arr: [],
+      codeLines: [line],
+      codeBlock: 6,
+      final,
+      title: bi(`Dòng ${line} · ${labels[event].vi}`, `Line ${line} · ${labels[event].en}`),
+      note: bi("", ""),
+      vars: Object.entries(locals).map(([name, value]) => ({ name, value })),
+      lis300View: {
+        problemId: 300,
+        approach: 6,
+        gap: k,
+        line,
+        source: code6[line - 1].trim(),
+        event,
+        nums: [...nums],
+        mapDp: snapshot,
+        x: num,
+        index,
+        end: bestEnd,
+        transition: transition && { ...transition },
+        candidate: [],
+        witness,
+        answer: final ? maxLen : null,
+      },
+    });
+  }
+
+  initialized = true;
+  emit(3, "initialize");
+  emit(4, "max-initialize");
+  nums.forEach((value, currentIndex) => {
+    num = value;
+    index = currentIndex;
+    transition = null;
+    emit(6, "visit");
+    const previousValue = num - k;
+    const before = dp[num] || 0;
+    const previousLength = dp[previousValue] || 0;
+    dp[num] = previousLength + 1;
+    parents[currentIndex] = previousLength ? bestIndexByValue[previousValue] : -1;
+    bestIndexByValue[num] = currentIndex;
+    transition = { value: num, previousValue, before, candidate: dp[num], after: dp[num], previousLength };
+    emit(7, "update");
+    maxLen = Math.max(maxLen, dp[num]);
+    if (dp[num] === maxLen) bestEnd = bestIndexByValue[num];
+    emit(8, "maximum");
+  });
+  emit(6, "loop-end");
+  index = null;
+  transition = null;
+  emit(10, "result", true);
+  const witness = steps.at(-1).lis300View.witness;
+  return { original: nums, k, answer: maxLen, chain: witness, steps };
+}
+
 module.exports = { 300: {
   id: 300, difficulty: "medium", slug: "longest-increasing-subsequence",
   category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
@@ -279,7 +385,8 @@ module.exports = { 300: {
     { value: 3, label: bi("3 · DP range(n): danh sách index", "3 · DP range(n): index lists") },
     { value: 4, label: bi("4 · Biến thể +1: hash map O(n)", "4 · +1 variant: hash map O(n)") },
     { value: 5, label: bi("5 · Hash map +1: danh sách index", "5 · +1 hash map: index list") },
-  ] }],
+    { value: 6, label: bi("6 · Nâng cao: hash map +k O(n)", "6 · Advanced: +k hash map O(n)") },
+  ] }, { key: "k", type: "number", min: -10000, max: 10000, step: 1, default: 2, label: bi("k · chỉ dùng cho cách 6", "k · approach 6 only") }],
   approach: [
     bi("DP: dp[i] = dài nhất kết thúc tại i.", "DP: dp[i] = longest length ending at i."),
     bi("Chỉ nối j → i khi nums[j] < nums[i].", "Extend j → i only when nums[j] < nums[i]."),
@@ -287,26 +394,31 @@ module.exports = { 300: {
     bi("Cách 3: lưu parent, lần ngược rồi trả về danh sách index.", "Approach 3: save parent links, backtrack and return the indices."),
     bi("Cách 4 dùng hash map để tìm dãy +1 theo thứ tự đầu vào trong O(n); đây cũng là biến thể đặc biệt, không giải LIS tổng quát.", "Approach 4 uses a hash map to find a +1 subsequence in input order in O(n); it is also a special variant, not a general LIS solution."),
     bi("Cách 5 thêm parent và end_at vào cách 4 để lần ngược, rồi trả về danh sách index.", "Approach 5 adds parent and end_at to approach 4, backtracks, then returns the index list."),
+    bi("Cách 6 tổng quát hóa cách 4: nối num − k → num bằng dp[num] = dp.get(num − k, 0) + 1.", "Approach 6 generalizes approach 4: extend num − k → num with dp[num] = dp.get(num − k, 0) + 1."),
   ],
-  complexity: { time: "O(n²) / O(n log n) / O(n)", space: "O(n)", note: bi("Cách 1, 3: DP · Cách 2: tails · Cách 4, 5: hash map +1.", "Approaches 1, 3: DP · Approach 2: tails · Approaches 4, 5: +1 hash map.") },
-  code: DP_CODE, code2: BINARY_CODE, code3: INDEX_CODE, code4, code5,
+  complexity: { time: "O(n²) / O(n log n) / O(n)", space: "O(n)", note: bi("Cách 1, 3: DP · Cách 2: tails · Cách 4, 5: hash map +1 · Cách 6: hash map +k.", "Approaches 1, 3: DP · Approach 2: tails · Approaches 4, 5: +1 hash map · Approach 6: +k hash map.") },
+  code: DP_CODE, code2: BINARY_CODE, code3: INDEX_CODE, code4, code5, code6,
   codeLabel: bi("1 · DP O(n²)", "1 · DP O(n²)"), code2Label: bi("2 · tails O(n log n)", "2 · tails O(n log n)"),
   code3Label: bi("3 · DP range(n): danh sách index", "3 · DP range(n): index lists"),
   code4Label: bi("4 · Biến thể +1: hash map dp[num]", "4 · +1 variant: hash map dp[num]"),
   code5Label: bi("5 · Hash map +1: trả về index", "5 · +1 hash map: return indices"),
+  code6Label: bi("6 · Nâng cao: hash map dp[num − k]", "6 · Advanced: dp[num − k] hash map"),
   complexity4: { time: "O(n)", space: "O(n)" },
   complexity5: { time: "O(n)", space: "O(n)" },
+  complexity6: { time: "O(n)", space: "O(n)" },
   builder: (input, params = {}) => {
     const approach = Number(params.approach);
     return approach === 2 ? buildBinary(input)
       : approach === 3 ? buildIndices(input, 3)
       : approach === 4 ? buildHashMap(input)
       : approach === 5 ? buildHashMapIndices(input)
+      : approach === 6 ? buildHashMapDifference(input, params.k)
       : buildDp(input);
   },
   builder2: buildBinary,
   builder3: input => buildIndices(input, 3),
   builder4: buildHashMap,
   builder5: buildHashMapIndices,
-  liveArgs: input => [parseNums(input)],
+  builder6: (input, params = {}) => buildHashMapDifference(input, params.k),
+  liveArgs: (input, params = {}) => Number(params.approach) === 6 ? [parseNums(input), parseDifference(params.k)] : [parseNums(input)],
 } };
