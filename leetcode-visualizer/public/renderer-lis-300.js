@@ -1,12 +1,12 @@
 function renderLis300View(step) {
   const v = step.lis300View;
   const text = (vi, en) => lang === "vi" ? vi : en;
-  const hashMode = v.approach === 4 || v.approach === 5 || v.approach === 6;
-  const differenceMode = v.approach === 6;
+  const hashMode = v.approach === 4 || v.approach === 5 || v.approach === 6 || v.approach === 7;
+  const differenceMode = v.approach === 6 || v.approach === 7;
   const gap = differenceMode ? v.gap : 1;
   const gapLabel = gap >= 0 ? `+${gap}` : `${gap}`;
   const dpMode = v.approach !== 2;
-  const indexMode = v.approach === 3 || v.approach === 5;
+  const indexMode = v.approach === 3 || v.approach === 5 || v.approach === 7;
   const unitStep = hashMode;
   const relation = unitStep ? `nums[j] ${gapLabel} = nums[i]` : "nums[j] &lt; nums[i]";
   const final = Boolean(step.final);
@@ -54,7 +54,7 @@ function renderLis300View(step) {
   }
   const indexHistory = indexMode && !hashMode && final ? `<details class="l300-index-history"><summary>${text("j hợp lệ theo từng i", "Eligible j indices for each i")}</summary><table><thead><tr><th scope="col">i</th><th scope="col">nums[i]</th><th scope="col">j: ${relation}</th><th scope="col">dp[i]</th></tr></thead><tbody>${v.nums.map((value, i) => `<tr><th scope="row">${i}</th><td>${value}</td><td><code>[${v.eligibleByEnd[i].join(", ")}]</code></td><td>${v.dp[i]}</td></tr>`).join("")}</tbody></table></details>` : "";
   const reconstruction = indexMode && v.reconstructing && !final ? `<section class="l300-reconstruction" aria-label="${text("Lần ngược parent", "Backtrack parent links")}"><header><strong>${["reverse"].includes(v.event) ? text("Đảo lại → thứ tự gốc", "Reverse → original order") : text("Lần ngược parent ←", "Follow parent links ←")}</strong><code>end = ${v.cursor}</code></header><div>${v.indices?.length ? v.indices.map(index => `<b>[${index}]</b>`).join('<span>→</span>') : '<span class="l300-empty">∅</span>'}</div><code>indices = [${(v.indices || []).join(", ")}]</code></section>` : "";
-  const witnessLabel = final ? (unitStep ? (indexMode ? text("Index của dãy +1 dài nhất", "Indices of a longest +1 subsequence") : differenceMode ? text(`Dãy có hiệu k dài nhất · k=${gap}`, `Longest fixed-difference subsequence · k=${gap}`) : text("Dãy +1 dài nhất", "A longest +1 subsequence")) : indexMode ? text("Index của một LIS", "Indices of one LIS") : text("Một LIS thực sự", "One actual LIS")) : dpMode ? text(`${indexMode ? "Index tốt nhất" : "Dãy tốt nhất"} kết thúc ở [${v.end}]`, `Best ${indexMode ? "indices" : "subsequence"} ending at [${v.end}]`) : text("Một dãy tăng đã tìm được", "An increasing subsequence found so far");
+  const witnessLabel = final ? (unitStep ? (differenceMode ? (indexMode ? text(`Index của dãy có hiệu k dài nhất · k=${gap}`, `Indices of the longest fixed-difference subsequence · k=${gap}`) : text(`Dãy có hiệu k dài nhất · k=${gap}`, `Longest fixed-difference subsequence · k=${gap}`)) : indexMode ? text("Index của dãy +1 dài nhất", "Indices of a longest +1 subsequence") : text("Dãy +1 dài nhất", "A longest +1 subsequence")) : indexMode ? text("Index của một LIS", "Indices of one LIS") : text("Một LIS thực sự", "One actual LIS")) : dpMode ? text(`${indexMode ? "Index tốt nhất" : "Dãy tốt nhất"} kết thúc ở [${v.end}]`, `Best ${indexMode ? "indices" : "subsequence"} ending at [${v.end}]`) : text("Một dãy tăng đã tìm được", "An increasing subsequence found so far");
   const differs = dpMode && v.candidate.length && v.candidate.join(",") !== v.witness.join(",");
   const stage = final || v.reconstructing ? 2 : ["length", "initialize", "parents", "validate", "max-initialize"].includes(v.event) ? 0 : 1;
   $("treeView").innerHTML = `<section class="l300-viz" aria-label="${text("300 · Dãy con tăng dài nhất", "300 · Longest increasing subsequence")}">
