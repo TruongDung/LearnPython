@@ -76,6 +76,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.prefixScore2416View), surface: "treeView", render: (step) => {
+      renderPrefixScores2416Pictures(step);
+    } },
+    { predicate: (step) => Boolean(step.wordDictionary211View), surface: "treeView", render: (step) => {
+      renderWordDictionary211View(step);
+    } },
     { predicate: (step) => Boolean(step.uniqueEmail929View), surface: "treeView", render: (step) => {
       renderUniqueEmail929View(step);
     } },

@@ -1,269 +1,183 @@
-const label = (vi, en) => ({ vi, en });
-const TRACE_WORDS = 8;
-const TRACE_CHARS = 40;
-const PREVIEW_NODES = 28;
-const PREVIEW_DEPTH = 8;
+"use strict";
 
-function parseWords2416(input) {
+const bi = (vi, en) => ({ vi, en });
+const CODE = [
+  "class TrieNode:",
+  "    def __init__(self):",
+  "        self.children = {}",
+  "        self.count = 0",
+  "",
+  "class Solution:",
+  "    def sumPrefixScores(self, words):",
+  "        root = TrieNode()",
+  "        for word in words:",
+  "            node = root",
+  "            for ch in word:",
+  "                if ch not in node.children:",
+  "                    node.children[ch] = TrieNode()",
+  "                node = node.children[ch]",
+  "                node.count += 1",
+  "        answer = []",
+  "        for word in words:",
+  "            node = root",
+  "            total = 0",
+  "            for ch in word:",
+  "                node = node.children[ch]",
+  "                total += node.count",
+  "            answer.append(total)",
+  "        return answer",
+];
+
+function parseWords(input) {
   let words = input;
   if (typeof input === "string") {
     const raw = input.trim();
-    if (raw.startsWith("[")) {
-      try {
-        words = JSON.parse(raw);
-      } catch (_error) {
-        throw new Error("words must be valid JSON or comma-separated lowercase words");
-      }
-    } else {
-      words = raw.split(/[,;]/).map((word) => word.trim());
-    }
+    try { words = raw.startsWith("[") ? JSON.parse(raw) : raw.split(/[,;]/).map(word => word.trim()); }
+    catch { throw new Error("#2416: Nhập mảng JSON hoặc các từ cách nhau bằng dấu phẩy / Enter a JSON array or comma-separated words."); }
   }
-  if (!Array.isArray(words) || words.length < 1 || words.length > 1000
-    || !words.every((word) => typeof word === "string" && word.length >= 1
-      && word.length <= 1000 && /^[a-z]+$/.test(word))) {
-    throw new Error("words must contain 1..1000 lowercase a-z words, each 1..1000 letters long");
+  if (!Array.isArray(words) || words.length < 1 || words.length > 1000 || words.some(word => typeof word !== "string" || !/^[a-z]{1,1000}$/.test(word))) {
+    throw new Error("#2416: 1–1000 từ a–z, mỗi từ 1–1000 ký tự / Use 1–1000 lowercase words, each 1–1000 letters.");
   }
-  return words;
+  return [...words];
 }
 
-function buildSteps2416(input) {
-  const words = parseWords2416(input);
-  const totalChars = words.reduce((sum, word) => sum + word.length, 0);
-  const nodes = [{ id: 0, char: "", parent: null, depth: 0, count: 0, children: new Map() }];
-  const steps = [];
-  const answer = [];
-  let node = null;
-  let wordIndex = null;
-  let charIndex = null;
-  let ch = null;
-  let nextNode = null;
-  let total = null;
-  let addedCount = null;
-
-  function pathFor(current) {
-    const path = [];
-    for (let cursor = current; cursor !== null; cursor = nodes[cursor].parent) path.push(cursor);
-    return path.reverse();
+// Large inputs retain the complete O(S) answer without an unbounded debug recording.
+function buildSummary(words) {
+  const nodes = [{ children: Object.create(null), count: 0 }];
+  for (const word of words) {
+    let node = 0;
+    for (const ch of word) {
+      if (!Object.hasOwn(nodes[node].children, ch)) {
+        nodes[node].children[ch] = nodes.length;
+        nodes.push({ children: Object.create(null), count: 0 });
+      }
+      node = nodes[node].children[ch]; nodes[node].count++;
+    }
   }
-
-  function prefixFor(current) {
-    return pathFor(current).slice(1).map((id) => nodes[id].char).join("");
+  const answer = words.map(word => {
+    let node = 0, total = 0;
+    for (const ch of word) { node = nodes[node].children[ch]; total += nodes[node].count; }
+    return total;
+  });
+  const preview = [];
+  function visit(id, parent, prefix, ch) {
+    if (preview.length >= 28 || prefix.length > 8) return;
+    preview.push({ id, parent, prefix, ch, count: nodes[id].count, members: [], children: [] });
+    for (const [key, child] of Object.entries(nodes[id].children)) visit(child, id, prefix + key, key);
   }
+  visit(0, null, "", "root");
+  const visible = new Set(preview.map(node => node.id));
+  preview.forEach(node => { node.children = Object.values(nodes[node.id].children).filter(id => visible.has(id)); });
+  return { original: words, answer, steps: [{ arr: [], codeLines: [], final: true,
+    title: bi("Kết quả · dữ liệu lớn", "Result · large input"), note: bi("", ""),
+    vars: [{ name: "answer", value: [...answer] }],
+    prefixScore2416View: { phase: "done", mode: "summary", words: words.slice(0, 8), wordCount: words.length,
+      nodes: preview, nodeCount: nodes.length, wordIndex: null, current: null, path: [], terms: [],
+      answer: [...answer], wordResults: [], line: null, source: "", total: null, transition: null, pending: null },
+  }] };
+}
 
-  function record(phase, title, line, note, final = false) {
-    const word = wordIndex === null ? null : words[wordIndex];
-    const path = node === null ? [] : pathFor(node);
-    const visible = nodes.slice(0, PREVIEW_NODES).filter((item) => item.depth <= PREVIEW_DEPTH);
-    const vars = [{ name: "words", value: words.length }, { name: "trie_nodes", value: nodes.length }];
-    if (wordIndex !== null) vars.push({ name: "i", value: wordIndex }, { name: "word", value: word });
-    if (ch !== null) vars.push({ name: "ch", value: ch });
-    if (node !== null) vars.push({ name: "node.count", value: nodes[node].count });
-    if (total !== null) vars.push({ name: "total", value: total });
-    steps.push({
-      title, arr: [], highlight: [], mark: [], codeLines: [line], vars, note, final,
-      prefixScores2416View: {
-        phase, words: words.slice(0, TRACE_WORDS), wordCount: words.length, totalChars,
-        wordIndex, word,
-        charIndex, ch, currentNode: node, nextNode,
-        currentPrefix: node === null ? "" : prefixFor(node),
-        nextPrefix: word !== null && charIndex !== null ? word.slice(0, charIndex + 1) : "",
-        activePath: path, count: node === null ? null : nodes[node].count,
-        addedCount, total, answer: [...answer], nodeCount: nodes.length,
-        nodes: visible.map((item) => ({
-          id: item.id, parent: item.parent, char: item.char, depth: item.depth,
-          prefix: prefixFor(item.id), count: item.count,
-        })),
-        shortened: words.length > TRACE_WORDS || totalChars > TRACE_CHARS
-          || nodes.length > PREVIEW_NODES,
-      },
+function buildSteps(input) {
+  const words = parseWords(input);
+  if (words.length > 8 || words.reduce((sum, word) => sum + word.length, 0) > 40) return buildSummary(words);
+  const solution = { kind: "solution" }, locals = { self: solution, words }, frames = [{ scope: "sumPrefixScores", locals }];
+  const steps = [], allNodes = [], wordResults = [];
+  let root = null, phase = "build", wordIndex = null, terms = [], transition = null;
+  const rawNode = node => ({ ...(node.children === null ? {} : { children: Object.fromEntries(Object.entries(node.children).map(([ch, child]) => [ch, rawNode(child)])) }), ...(node.count === null ? {} : { count: node.count }) });
+  function pathTo(node) { const result = []; for (let at = node; at; at = at.parent) result.unshift(at.id); return result; }
+  function emit(line, event, label, final = false) {
+    const frame = frames.at(-1);
+    const current = frame.locals.self?.kind === "node" ? frame.locals.self : locals.node || root;
+    const reachable = [];
+    function visit(node) {
+      reachable.push({ id: node.id, parent: node.parent?.id ?? null, ch: node.ch, prefix: node.prefix, count: node.count,
+        members: [...node.members], children: Object.values(node.children || {}).map(child => child.id) });
+      Object.values(node.children || {}).forEach(visit);
+    }
+    if (root) visit(root);
+    const vars = Object.entries(frame.locals).map(([name, value]) => value?.kind ? {
+      name, value: value.kind === "node" ? `TrieNode(${JSON.stringify(value.prefix || "root")})` : "Solution",
+      rawValue: value.kind === "node" ? rawNode(value) : {},
+    } : { name, value: Array.isArray(value) ? [...value] : value });
+    steps.push({ arr: [], codeBlock: 1, codeLines: [line], final,
+      title: bi(`Dòng ${line} · ${label.vi}`, `Line ${line} · ${label.en}`), note: bi("", ""), vars,
+      prefixScore2416View: { line, source: CODE[line - 1].trim(), event, scope: frame.scope, phase: final ? "done" : phase,
+        mode: "trace", words: [...words], wordCount: words.length, wordIndex: final ? null : wordIndex,
+        nodes: reachable, nodeCount: allNodes.length, current: current?.id ?? null, path: current ? pathTo(current) : [],
+        pending: current && !reachable.some(node => node.id === current.id) ? { ch: current.ch, prefix: current.prefix } : null,
+        terms: terms.map(term => ({ ...term })), total: phase === "score" ? locals.total ?? null : null,
+        transition: transition && { ...transition }, answer: locals.answer ? [...locals.answer] : [],
+        wordResults: wordResults.map(result => ({ ...result, terms: result.terms.map(term => ({ ...term })) })) },
     });
   }
-
-  record("enter", label("Vào hàm sumPrefixScores", "Enter sumPrefixScores"), 6,
-    label("Điểm của một prefix là số từ trong input bắt đầu bằng prefix đó.",
-      "A prefix's score is the number of input words starting with it."));
-  node = 0;
-  record("root", label("Tạo gốc Trie", "Create Trie root"), 7,
-    label("Mỗi nút con sẽ lưu số từ đi qua prefix của nút đó.",
-      "Each child node counts the words passing through its prefix."));
-
-  let tracedBuildChars = 0;
-  for (let i = 0; i < words.length; i++) {
-    wordIndex = i;
-    charIndex = null;
-    ch = null;
-    nextNode = null;
-    node = 0;
-    const traceWord = i < TRACE_WORDS && tracedBuildChars < TRACE_CHARS;
-    if (traceWord) record("build-word", label(`Chèn "${words[i]}"`, `Insert "${words[i]}"`), 8,
-      label("Bắt đầu thêm từ này vào Trie.", "Start inserting this word into the Trie."));
-    if (traceWord) record("build-root", label("node = root", "node = root"), 9,
-      label("Mỗi từ đều bắt đầu từ gốc.", "Every word starts at the root."));
-    for (let j = 0; j < words[i].length; j++) {
-      charIndex = j;
-      ch = words[i][j];
-      nextNode = nodes[node].children.get(ch) ?? null;
-      const trace = i < TRACE_WORDS && tracedBuildChars < TRACE_CHARS;
-      if (trace) record("build-char", label(`Ký tự '${ch}'`, `Character '${ch}'`), 10,
-        label(`Prefix đang xây: "${words[i].slice(0, j + 1)}".`,
-          `Building prefix "${words[i].slice(0, j + 1)}".`));
-      const missing = nextNode === null;
-      if (trace) record("check-child", label(missing ? `Chưa có cạnh '${ch}'` : `Đã có cạnh '${ch}'`,
-        missing ? `Missing '${ch}' edge` : `Existing '${ch}' edge`), 11,
-      missing
-        ? label("Tạo nút mới cho prefix này.", "Create a node for this prefix.")
-        : label("Dùng lại nút prefix đã có.", "Reuse the existing prefix node."));
+  function makeNode(ch, parent) {
+    const node = { kind: "node", id: allNodes.length, parent, ch, prefix: parent ? parent.prefix + ch : "", children: null, count: null, members: [] };
+    allNodes.push(node);
+    frames.push({ scope: "TrieNode.__init__", locals: { self: node } });
+    node.children = Object.create(null); emit(3, "children-init", bi("children = {}", "children = {}"));
+    node.count = 0; emit(4, "count-init", bi("count = 0", "count = 0"));
+    frames.pop(); return node;
+  }
+  root = makeNode("root", null); locals.root = root;
+  emit(8, "root", bi("Tạo root", "Create root"));
+  words.forEach((word, index) => {
+    wordIndex = index; locals.word = word; transition = null;
+    emit(9, "build-word", bi(`Thêm ${word}`, `Insert ${word}`));
+    locals.node = root; emit(10, "build-root", bi("node → root", "node → root"));
+    for (const ch of word) {
+      locals.ch = ch; transition = null;
+      emit(11, "build-char", bi(`Đọc '${ch}'`, `Read '${ch}'`));
+      const missing = !Object.hasOwn(locals.node.children, ch);
+      emit(12, "check-child", bi(missing ? `Thiếu cạnh '${ch}'` : `Dùng lại '${ch}'`, missing ? `Missing '${ch}' edge` : `Reuse '${ch}'`));
       if (missing) {
-        nextNode = nodes.length;
-        nodes.push({ id: nextNode, char: ch, parent: node, depth: nodes[node].depth + 1,
-          count: 0, children: new Map() });
-        nodes[node].children.set(ch, nextNode);
-        if (trace) record("create-child", label(`Tạo nút "${words[i].slice(0, j + 1)}"`,
-          `Create node "${words[i].slice(0, j + 1)}"`), 12,
-        label("Nút mới có count = 0 trước khi từ hiện tại đi qua.",
-          "A new node starts at count = 0 before this word passes through."));
+        locals.node.children[ch] = makeNode(ch, locals.node);
+        emit(13, "create", bi(`Tạo prefix ${word.slice(0, locals.node.prefix.length + 1)}`, `Create prefix ${word.slice(0, locals.node.prefix.length + 1)}`));
       }
-      node = nextNode;
-      if (trace) record("move-build", label(`Đi tới "${words[i].slice(0, j + 1)}"`,
-        `Move to "${words[i].slice(0, j + 1)}"`), 13,
-      label("Nút hiện tại đại diện cho prefix vừa đọc.",
-        "The current node represents the prefix just read."));
-      nodes[node].count++;
-      if (trace) record("count", label(`count("${words[i].slice(0, j + 1)}") = ${nodes[node].count}`,
-        `count("${words[i].slice(0, j + 1)}") = ${nodes[node].count}`), 14,
-      label("Tăng 1 vì từ này có prefix tương ứng.",
-        "Add one because this word has the current prefix."));
-      tracedBuildChars++;
+      locals.node = locals.node.children[ch];
+      emit(14, "build-move", bi(`node → ${locals.node.prefix}`, `node → ${locals.node.prefix}`));
+      const before = locals.node.count;
+      locals.node.count++; locals.node.members.push(index);
+      transition = { id: locals.node.id, before, after: locals.node.count };
+      emit(15, "increment", bi(`count(${locals.node.prefix}): ${before} → ${locals.node.count}`, `count(${locals.node.prefix}): ${before} → ${locals.node.count}`));
     }
-  }
-
-  wordIndex = null;
-  charIndex = null;
-  ch = null;
-  nextNode = null;
-  node = null;
-  record("answer-init", label("Tạo mảng kết quả", "Initialize answer array"), 15,
-    label("Trie đã lưu điểm của từng prefix; giờ cộng các điểm theo mỗi từ.",
-      "The Trie now holds every prefix score; sum them for each word."));
-
-  let tracedQueryChars = 0;
-  for (let i = 0; i < words.length; i++) {
-    wordIndex = i;
-    charIndex = null;
-    ch = null;
-    nextNode = null;
-    node = null;
-    total = null;
-    addedCount = null;
-    const traceWord = i < TRACE_WORDS && tracedQueryChars < TRACE_CHARS;
-    if (traceWord) record("score-word", label(`Tính điểm "${words[i]}"`,
-      `Score "${words[i]}"`), 16,
-    label("Duyệt lại đường prefix của từ trong Trie đã hoàn chỉnh.",
-      "Walk this word's prefix path through the completed Trie."));
-    node = 0;
-    if (traceWord) record("score-root", label("node = root", "node = root"), 17,
-      label("Bắt đầu cộng từ nút gốc.", "Start the sum at the root."));
-    total = 0;
-    if (traceWord) record("total-init", label("total = 0", "total = 0"), 18,
-      label("Chưa cộng prefix nào của từ này.", "No prefix of this word has been added yet."));
-    for (let j = 0; j < words[i].length; j++) {
-      charIndex = j;
-      ch = words[i][j];
-      addedCount = null;
-      const trace = i < TRACE_WORDS && tracedQueryChars < TRACE_CHARS;
-      if (trace) record("score-char", label(`Ký tự '${ch}'`, `Character '${ch}'`), 19,
-        label(`Đi tới prefix "${words[i].slice(0, j + 1)}".`,
-          `Move to prefix "${words[i].slice(0, j + 1)}".`));
-      node = nodes[node].children.get(ch);
-      if (trace) record("move-score", label(`Đọc count("${words[i].slice(0, j + 1)}") = ${nodes[node].count}`,
-        `Read count("${words[i].slice(0, j + 1)}") = ${nodes[node].count}`), 20,
-      label("Count tại nút là số từ chia sẻ prefix này.",
-        "This node's count is the number of words sharing this prefix."));
-      addedCount = nodes[node].count;
-      total += addedCount;
-      if (trace) record("add-score", label(`total += ${addedCount} → ${total}`,
-        `total += ${addedCount} → ${total}`), 21,
-      label("Cộng điểm prefix này vào tổng của từ.",
-        "Add this prefix's score to the word's total."));
-      tracedQueryChars++;
+    transition = null; emit(11, "build-inner-end", bi("Hết ký tự", "No more characters"));
+  });
+  emit(9, "build-outer-end", bi("Đã đếm mọi prefix", "All prefix counts built"));
+  phase = "score"; wordIndex = null; locals.answer = [];
+  emit(16, "answer-init", bi("answer = []", "answer = []"));
+  words.forEach((word, index) => {
+    wordIndex = index; locals.word = word; terms = [];
+    emit(17, "score-word", bi(`Tính điểm ${word}`, `Score ${word}`));
+    locals.node = root; emit(18, "score-root", bi("node → root", "node → root"));
+    locals.total = 0; emit(19, "total-init", bi("total = 0", "total = 0"));
+    for (const ch of word) {
+      locals.ch = ch; emit(20, "score-char", bi(`Đọc '${ch}'`, `Read '${ch}'`));
+      locals.node = locals.node.children[ch];
+      emit(21, "score-move", bi(`${locals.node.prefix} · count ${locals.node.count}`, `${locals.node.prefix} · count ${locals.node.count}`));
+      locals.total += locals.node.count;
+      terms.push({ id: locals.node.id, prefix: locals.node.prefix, count: locals.node.count });
+      emit(22, "add-score", bi(`total += ${locals.node.count} → ${locals.total}`, `total += ${locals.node.count} → ${locals.total}`));
     }
-    answer.push(total);
-    if (traceWord) record("append-answer", label(`answer[${i}] = ${total}`,
-      `answer[${i}] = ${total}`), 22,
-    label("Đã cộng điểm mọi prefix không rỗng của từ này.",
-      "All nonempty prefix scores for this word have been added."));
-  }
-  wordIndex = null;
-  charIndex = null;
-  ch = null;
-  node = null;
-  nextNode = null;
-  total = null;
-  addedCount = null;
-  record("done", label(`Trả về [${answer.join(", ")}]`,
-    `Return [${answer.join(", ")}]`), 23,
-  label("Mỗi phần tử là tổng count trên đường Trie của từ tương ứng.",
-    "Each result sums the counts along its word's Trie path."), true);
-  return { original: words, answer, steps };
+    emit(20, "score-inner-end", bi("Hết ký tự", "No more characters"));
+    locals.answer.push(locals.total);
+    wordResults.push({ word, total: locals.total, terms: terms.map(term => ({ ...term })) });
+    emit(23, "append", bi(`answer[${index}] = ${locals.total}`, `answer[${index}] = ${locals.total}`));
+  });
+  emit(17, "score-outer-end", bi("Đã tính mọi từ", "All word scores computed"));
+  emit(24, "done", bi(`Trả về [${locals.answer.join(", ")}]`, `Return [${locals.answer.join(", ")}]`), true);
+  return { original: words, answer: [...locals.answer], steps };
 }
 
-module.exports = {
-  2416: {
-    id: 2416,
-    difficulty: "hard",
-    slug: "sum-of-prefix-scores-of-strings",
-    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
-    tags: [{ key: "trie", vi: "Trie", en: "Trie" },
-      { key: "prefix-sum", vi: "Tổng điểm prefix", en: "Prefix scores" }],
-    title: label("Sum of Prefix Scores of Strings", "Sum of Prefix Scores of Strings"),
-    titleVi: label("Tổng điểm các tiền tố của chuỗi", "Sum of prefix scores of strings"),
-    statement: label(
-      "Điểm của một prefix là số từ bắt đầu bằng prefix đó. Với mỗi từ, trả tổng điểm của mọi prefix không rỗng.",
-      "A prefix's score is the number of words starting with it. For each word, sum the scores of its nonempty prefixes."
-    ),
-    defaultInput: '["abc","ab","bc","b"]',
-    inputKind: "string",
-    inputLabel: label("words (JSON hoặc cách nhau dấu phẩy)", "words (JSON or comma-separated)"),
-    extraParams: [],
-    approach: [
-      label("Chèn tất cả từ vào Trie; mỗi lần một từ đi qua nút prefix thì tăng count ở nút đó.",
-        "Insert every word into a Trie, incrementing the count of each prefix node it visits."),
-      label("Đi lại từng từ trong Trie và cộng count của các nút trên đường đi.",
-        "Walk each word again, summing the counts along its Trie path."),
-      label("Từ trùng nhau vẫn được chèn nhiều lần vì mỗi bản sao đều góp 1 vào điểm prefix.",
-        "Duplicate words are inserted separately because every copy contributes to prefix scores."),
-    ],
-    complexity: { time: "O(L)", space: "O(L)",
-      note: label("L là tổng độ dài mọi từ; mỗi ký tự được đi qua hai lần. Không tính trace minh họa.",
-        "L is the total length of all words; each character is visited twice. Teaching trace is excluded.") },
-    debugMode: "line-by-line",
-    code: [
-      "class TrieNode:",
-      "    def __init__(self):",
-      "        self.children = {}",
-      "        self.count = 0",
-      "",
-      "class Solution:",
-      "    def sumPrefixScores(self, words):",
-      "        root = TrieNode()",
-      "        for word in words:",
-      "            node = root",
-      "            for ch in word:",
-      "                if ch not in node.children:",
-      "                    node.children[ch] = TrieNode()",
-      "                node = node.children[ch]",
-      "                node.count += 1",
-      "        answer = []",
-      "        for word in words:",
-      "            node = root",
-      "            total = 0",
-      "            for ch in word:",
-      "                node = node.children[ch]",
-      "                total += node.count",
-      "            answer.append(total)",
-      "        return answer",
-    ],
-    builder: buildSteps2416,
-    liveArgs(input) { return [parseWords2416(input)]; },
-  },
-};
+module.exports = { 2416: {
+  id: 2416, difficulty: "hard", slug: "sum-of-prefix-scores-of-strings",
+  category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+  tags: [{ key: "prefix-sum", vi: "Tổng điểm prefix", en: "Prefix scores" }],
+  title: bi("Sum of Prefix Scores of Strings", "Sum of Prefix Scores of Strings"),
+  titleVi: bi("Điểm prefix · Đếm rồi cộng", "Prefix scores · Count, then sum"),
+  statement: bi("Mỗi prefix được bao nhiêu từ dùng chung? Cộng các số đếm đó cho từng từ. Ví dụ abc: 2 + 2 + 1 = 5.", "How many words share each prefix? Sum those counts for each word. Example abc: 2 + 2 + 1 = 5."),
+  defaultInput: '["abc","ab","bc","b"]', inputKind: "string",
+  inputLabel: bi("words · JSON hoặc cách nhau dấu phẩy", "words · JSON or comma-separated"), extraParams: [],
+  approach: [bi("Xây Trie: mỗi từ đi qua → count +1", "Build Trie: each passing word → count +1"), bi("Tính điểm: cộng count trên đường đi · không cộng root", "Score: sum path counts · exclude root")],
+  complexity: { time: "O(S)", space: "O(S)", note: bi("S = tổng ký tự. Debug đầy đủ khi ≤8 từ và ≤40 ký tự; dữ liệu lớn vẫn tính toàn bộ kết quả.", "S = total characters. Full debug for ≤8 words and ≤40 characters; larger inputs still compute every result.") },
+  debugMode: "line-by-line", code: CODE, builder: buildSteps, liveArgs: input => [parseWords(input)],
+} };

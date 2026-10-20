@@ -414,7 +414,9 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         ...words(params.search).map((word) => ({ name: "search", args: [word] })),
       ]);
     case 677:
-      return designConfig("MapSum", [], parseFunctionOperations(input));
+      return designConfig("MapSum", [], typeof problem.parseMapSum677Operations === "function"
+        ? problem.parseMapSum677Operations(input).map(({ name, args }) => ({ name, args }))
+        : parseFunctionOperations(input));
     case 352: {
       const operations = parseFunctionOperations(input);
       if (operations[0] && operations[0].name.toLowerCase() === "summaryranges") operations.shift();
