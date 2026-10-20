@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.uniqueEmail929View), surface: "treeView", render: (step) => {
+      renderUniqueEmail929View(step);
+    } },
     { predicate: (step) => Boolean(step.lis300View), surface: "treeView", render: (step) => {
       renderLis300View(step);
     } },
