@@ -116,6 +116,18 @@ const VPP2267_TEXT = Object.freeze({
     witnessPath: "Balanced witness path",
     noWitness: "No valid witness path exists for this result.",
     prefixBalances: "Prefix balances",
+    path: "DFS path",
+    saved: "memo",
+    calls: "calls",
+    cuts: "cuts",
+    hits: "hits",
+    startShort: "start",
+    endShort: "finish",
+    lengthShort: "even cells",
+    currentPrefix: "unclosed (",
+    roomLeft: "moves left",
+    validPath: "valid path",
+    invalidPath: "no valid path",
     traceLimited: "The teaching trace reached its frame limit; computation continued to the exact answer.",
     note: "Why this step matters",
   }),
@@ -182,6 +194,18 @@ const VPP2267_TEXT = Object.freeze({
     witnessPath: "Đường witness cân bằng",
     noWitness: "Không có đường witness hợp lệ cho kết quả này.",
     prefixBalances: "Balance từng tiền tố",
+    path: "Đường DFS",
+    saved: "memo",
+    calls: "lần gọi",
+    cuts: "cắt",
+    hits: "hit",
+    startShort: "bắt đầu",
+    endShort: "kết thúc",
+    lengthShort: "số ô chẵn",
+    currentPrefix: "ngoặc ( đang mở",
+    roomLeft: "bước còn lại",
+    validPath: "đường hợp lệ",
+    invalidPath: "không có đường hợp lệ",
     traceLimited: "Trace giảng dạy đã đạt giới hạn frame; thuật toán vẫn tính tiếp để có đáp án chính xác.",
     note: "Ý nghĩa của bước này",
   }),
@@ -436,22 +460,22 @@ function vpp2267CoordinateText(coordinate, fallback) {
 
 function vpp2267RenderSource(state, copy) {
   const condition = state.condition.result === null
-    ? copy.noCondition
-    : `${state.condition.expression || copy.condition} → ${vpp2267BoolText(state.condition.result, copy)}`;
-  const conditionClass = state.condition.result === null ? "idle" : state.condition.result ? "true" : "false";
-  return `<section class="vpp2267-card vpp2267-source" aria-labelledby="vpp2267-source-title"><div><small id="vpp2267-source-title">${vpp2267Escape(copy.source)}</small><code>${vpp2267Escape(state.source.text)}</code></div><dl><div><dt>${vpp2267Escape(copy.phase)}</dt><dd>${vpp2267Escape(state.phase)}</dd></div><div><dt>${vpp2267Escape(copy.event)}</dt><dd>${vpp2267Escape(state.eventLabel)}</dd></div><div><dt>${vpp2267Escape(copy.condition)}</dt><dd class="vpp2267-condition-${conditionClass}">${vpp2267Escape(condition)}</dd></div></dl></section>`;
+    ? ""
+    : `<span class="vpp2267-condition-${state.condition.result ? "true" : "false"}" aria-label="${vpp2267Escape(copy.condition)}: ${vpp2267Escape(vpp2267BoolText(state.condition.result, copy))}">${state.condition.result ? "✓" : "×"}</span>`;
+  return `<section class="vpp2267-source" aria-label="${vpp2267Escape(copy.source)}"><span>${vpp2267Escape(copy.line)} ${state.source.line}</span><code>${vpp2267Escape(state.source.text)}</code>${condition}</section>`;
 }
 
 function vpp2267RenderPrecheck(state, copy) {
   const checks = [
-    [copy.start, state.precheck.startValid],
-    [copy.end, state.precheck.endValid],
-    [copy.even, state.precheck.evenPathLength],
-  ].map(([label, value]) => {
+    ["(", copy.startShort, state.precheck.startValid],
+    [")", copy.endShort, state.precheck.endValid],
+    ["2k", copy.lengthShort, state.precheck.evenPathLength],
+  ].map(([symbol, label, value]) => {
     const status = value === null ? "pending" : value ? "pass" : "fail";
-    return `<li class="vpp2267-check-${status}"><span aria-hidden="true"></span><strong>${vpp2267Escape(label)}</strong><small>${vpp2267Escape(copy[status])}</small></li>`;
+    const mark = value === null ? "·" : value ? "✓" : "×";
+    return `<li class="vpp2267-check-${status}" aria-label="${vpp2267Escape(label)}: ${vpp2267Escape(copy[status])}"><strong aria-hidden="true">${symbol}</strong><span>${vpp2267Escape(label)}</span><em aria-hidden="true">${mark}</em></li>`;
   }).join("");
-  return `<section class="vpp2267-card vpp2267-precheck" aria-labelledby="vpp2267-precheck-title"><header><h3 id="vpp2267-precheck-title">${vpp2267Escape(copy.precheck)}</h3><code>${vpp2267Escape(copy.pathLength)} = ${state.pathLength}</code></header><ul role="list">${checks}</ul></section>`;
+  return `<ul class="vpp2267-precheck" role="list" aria-label="${vpp2267Escape(copy.precheck)}">${checks}</ul>`;
 }
 
 function vpp2267SameCoordinate(coordinate, row, column) {
@@ -460,15 +484,23 @@ function vpp2267SameCoordinate(coordinate, row, column) {
 
 function vpp2267RenderGrid(state, copy) {
   if (!state.rows || !state.columns) {
-    return `<section class="vpp2267-card"><h3>${vpp2267Escape(copy.grid)}</h3><p>${vpp2267Escape(copy.pending)}</p></section>`;
+    return `<section class="vpp2267-grid-card"><span>${vpp2267Escape(copy.pending)}</span></section>`;
   }
   const stackKeys = new Set(state.stack.map((frame) => `${frame.row},${frame.column}`));
   const witnessKeys = new Set(state.witness.cells.map((cell) => `${cell.row},${cell.column}`));
-  const headers = Array.from({ length: state.columns }, (_, column) => `<th scope="col">c${column}</th>`).join("");
+  const visiblePath = state.witness.cells.length
+    ? state.witness.cells
+    : state.stack.map((frame, index) => ({ ...frame, step: index + 1 }));
+  const pathByCoordinate = new Map(visiblePath.map((cell, index) => {
+    const next = visiblePath[index + 1];
+    const arrow = !next ? "" : next.row > cell.row ? "↓" : "→";
+    return [`${cell.row},${cell.column}`, { step: cell.step || index + 1, balance: cell.balance, arrow }];
+  }));
   const rows = state.matrix.map((row, rowIndex) => {
     const cells = row.map((char, columnIndex) => {
       const key = `${rowIndex},${columnIndex}`;
       const memoStates = state.memo.entries.filter((entry) => entry.row === rowIndex && entry.column === columnIndex);
+      const pathCell = pathByCoordinate.get(key);
       const roles = [];
       const classes = [];
       if (vpp2267SameCoordinate(state.state.coordinate, rowIndex, columnIndex)) {
@@ -496,47 +528,54 @@ function vpp2267RenderGrid(state, copy) {
         classes.push("vpp2267-is-witness");
       }
       if (memoStates.length) classes.push(memoStates.some((entry) => entry.result) ? "vpp2267-has-true" : "vpp2267-has-false");
-      const balances = memoStates.length
-        ? memoStates.map((entry) => `${entry.balance}:${entry.result ? "T" : "F"}`).join(" · ")
-        : copy.noMemo;
-      const aria = `[${rowIndex}, ${columnIndex}] ${char}; ${roles.join(", ") || copy.none}; memo ${balances}`;
-      return `<td><div class="vpp2267-cell ${classes.join(" ")}" aria-label="${vpp2267Escape(aria)}"><small>r${rowIndex} c${columnIndex}</small><strong>${vpp2267Escape(char)}</strong><code>${vpp2267Escape(balances)}</code></div></td>`;
+      const memoDots = memoStates.slice(-5).map((entry) => `<i class="vpp2267-memo-dot vpp2267-memo-${entry.result ? "true" : "false"}" title="b=${vpp2267Escape(entry.balance === null ? copy.none : entry.balance)}">${vpp2267Escape(entry.balance === null ? "·" : entry.balance)}</i>`).join("");
+      const endpoint = rowIndex === 0 && columnIndex === 0
+        ? `<b class="vpp2267-endpoint">S</b>`
+        : rowIndex === state.rows - 1 && columnIndex === state.columns - 1
+          ? `<b class="vpp2267-endpoint">E</b>`
+          : "";
+      const stepBadge = pathCell ? `<b class="vpp2267-step">${pathCell.step}</b>` : "";
+      const arrow = pathCell && pathCell.arrow ? `<span class="vpp2267-path-arrow" aria-hidden="true">${pathCell.arrow}</span>` : "";
+      const aria = `[${rowIndex}, ${columnIndex}] ${char}; ${roles.join(", ") || copy.none}; memo ${memoStates.length}`;
+      return `<td><div class="vpp2267-cell ${classes.join(" ")}" aria-label="${vpp2267Escape(aria)}">${endpoint}${stepBadge}<strong>${vpp2267Escape(char)}</strong>${arrow}<div class="vpp2267-memo-dots" aria-hidden="true">${memoDots}</div></div></td>`;
     }).join("");
-    return `<tr><th scope="row">r${rowIndex}</th>${cells}</tr>`;
+    return `<tr>${cells}</tr>`;
   }).join("");
   const legend = [
-    ["current", copy.current], ["candidate", copy.candidate], ["stack", copy.activePath],
-    ["witness", copy.witness], ["memo", copy.memoWrite],
+    ["current", copy.current], ["stack", copy.path], ["memo", copy.saved],
   ].map(([kind, label]) => `<li class="vpp2267-legend-${kind}"><span aria-hidden="true"></span>${vpp2267Escape(label)}</li>`).join("");
-  return `<section class="vpp2267-card vpp2267-grid-card" aria-labelledby="vpp2267-grid-title"><header><div><h3 id="vpp2267-grid-title">${vpp2267Escape(copy.grid)}</h3><p>${vpp2267Escape(copy.gridHelp)}</p></div><ul class="vpp2267-legend" role="list">${legend}</ul></header><div class="vpp2267-grid-scroll" role="region" tabindex="0" aria-label="${vpp2267Escape(copy.grid)}"><table><caption>${vpp2267Escape(copy.gridHelp)}</caption><thead><tr><th aria-hidden="true"></th>${headers}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  return `<section class="vpp2267-grid-card" aria-labelledby="vpp2267-grid-title"><header><h3 id="vpp2267-grid-title">${vpp2267Escape(copy.path)}</h3><ul class="vpp2267-legend" role="list">${legend}</ul></header><div class="vpp2267-grid-scroll" role="region" aria-label="${vpp2267Escape(copy.grid)}"><table><caption>${vpp2267Escape(copy.gridHelp)}</caption><tbody>${rows}</tbody></table></div></section>`;
 }
 
 function vpp2267RenderBalance(state, copy, locale) {
-  const facts = [
-    [copy.incoming, state.state.incomingBalance],
-    [copy.character, state.state.char],
-    [copy.delta, state.state.delta === null ? null : state.state.delta > 0 ? "+1" : "−1"],
-    [copy.afterCell, state.state.balance],
-    [copy.remaining, state.state.remaining],
-  ].map(([label, value]) => `<div><dt>${vpp2267Escape(label)}</dt><dd>${vpp2267Escape(value === null ? copy.none : value)}</dd></div>`).join("");
-  const balance = state.state.balance === null ? 0 : Math.max(0, state.state.balance);
+  const incoming = state.state.incomingBalance;
+  const balanceValue = state.state.balance;
+  const balance = balanceValue === null ? 0 : Math.max(0, balanceValue);
   const remaining = state.state.remaining === null ? 0 : Math.max(0, state.state.remaining);
-  const meterWidth = Math.round((balance / Math.max(1, balance + remaining)) * 100);
   const pruneText = (VPP2267_PRUNE_LABELS[state.prune.kind] || VPP2267_PRUNE_LABELS.none)[locale];
-  return `<section class="vpp2267-card vpp2267-balance-card" aria-labelledby="vpp2267-balance-title"><header><h3 id="vpp2267-balance-title">${vpp2267Escape(copy.balance)}</h3><code>${vpp2267Escape(state.state.key || copy.none)}</code></header><dl>${facts}</dl><div class="vpp2267-balance-meter" role="meter" aria-valuemin="0" aria-valuemax="${Math.max(1, balance + remaining)}" aria-valuenow="${balance}"><span style="width:${meterWidth}%"></span></div><p>${vpp2267Escape(copy.feasible)}</p><aside class="vpp2267-prune vpp2267-prune-${state.prune.active ? "active" : "idle"}"><strong>${vpp2267Escape(copy.prune)}</strong><span>${vpp2267Escape(state.prune.active ? pruneText : copy.noPrune)}</span></aside></section>`;
+  const tokens = balanceValue === null
+    ? `<span class="vpp2267-empty-token">?</span>`
+    : balanceValue < 0
+      ? `<span class="vpp2267-balance-token vpp2267-negative">)</span>`
+      : balance === 0
+        ? `<span class="vpp2267-empty-token">0</span>`
+        : Array.from({ length: Math.min(balance, 7) }, () => `<span class="vpp2267-balance-token">(</span>`).join("") + (balance > 7 ? `<span class="vpp2267-more-token">+${balance - 7}</span>` : "");
+  const remainingDots = Array.from({ length: Math.min(remaining, 12) }, () => "<i></i>").join("");
+  return `<section class="vpp2267-balance-card ${state.prune.active ? "vpp2267-prune-active" : ""}" aria-labelledby="vpp2267-balance-title"><header><h3 id="vpp2267-balance-title">${vpp2267Escape(copy.balance)}</h3><div class="vpp2267-equation" aria-label="${vpp2267Escape(copy.incoming)} ${incoming ?? copy.none}, ${vpp2267Escape(copy.character)} ${state.state.char || copy.none}, ${vpp2267Escape(copy.afterCell)} ${balanceValue ?? copy.none}"><span>${vpp2267Escape(incoming === null ? copy.none : incoming)}</span><b>${vpp2267Escape(state.state.char || "?")}</b><em>=</em><strong>${vpp2267Escape(balanceValue === null ? copy.none : balanceValue)}</strong></div></header><div class="vpp2267-token-stack" aria-label="${balance} ${vpp2267Escape(copy.currentPrefix)}">${tokens}</div><div class="vpp2267-room"><div aria-hidden="true">${remainingDots}</div><span>${remaining} ${vpp2267Escape(copy.roomLeft)}</span></div>${state.prune.active ? `<div class="vpp2267-stop"><b aria-hidden="true">✕</b><span>${vpp2267Escape(pruneText)}</span></div>` : ""}</section>`;
 }
 
 function vpp2267RenderBranch(state, copy) {
   const direction = state.branch.direction ? copy[state.branch.direction] : copy.none;
-  const facts = [
-    [copy.direction, direction],
-    [copy.from, vpp2267CoordinateText(state.branch.from, copy.none)],
-    [copy.to, vpp2267CoordinateText(state.branch.to, copy.none)],
-    [copy.inBounds, vpp2267BoolText(state.branch.inBounds, copy)],
-    [copy.result, vpp2267BoolText(state.branch.result, copy)],
-    [copy.status, state.branch.status],
-  ].map(([label, value]) => `<div><dt>${vpp2267Escape(label)}</dt><dd>${vpp2267Escape(value)}</dd></div>`).join("");
-  return `<section class="vpp2267-card vpp2267-branch vpp2267-branch-${state.branch.status}" aria-labelledby="vpp2267-branch-title" aria-live="polite"><header><h3 id="vpp2267-branch-title">${vpp2267Escape(copy.branch)}</h3><span>${vpp2267Escape(direction)}</span></header><dl>${facts}</dl></section>`;
+  const currentChar = state.branch.from && state.matrix[state.branch.from.row]
+    ? state.matrix[state.branch.from.row][state.branch.from.column]
+    : state.state.char || "?";
+  const targetInGrid = state.branch.to && state.branch.to.row >= 0 && state.branch.to.column >= 0
+    && state.branch.to.row < state.rows && state.branch.to.column < state.columns;
+  const targetChar = targetInGrid ? state.matrix[state.branch.to.row][state.branch.to.column] : "×";
+  const arrow = state.branch.direction === "down" ? "↓" : state.branch.direction === "right" ? "→" : "↘";
+  const resultMark = state.branch.result === null ? "" : state.branch.result ? "✓" : "×";
+  const aria = `${copy.branch}: ${direction}; ${copy.from} ${vpp2267CoordinateText(state.branch.from, copy.none)}; ${copy.to} ${vpp2267CoordinateText(state.branch.to, copy.none)}; ${copy.status} ${state.branch.status}`;
+  return `<section class="vpp2267-branch vpp2267-branch-${state.branch.status}" aria-label="${vpp2267Escape(aria)}" aria-live="polite"><h3>${vpp2267Escape(copy.branch)}</h3><div class="vpp2267-move vpp2267-move-${state.branch.direction || "idle"}"><span class="vpp2267-move-node">${vpp2267Escape(currentChar)}</span><b aria-hidden="true">${arrow}</b><span class="vpp2267-move-node vpp2267-target">${vpp2267Escape(targetChar)}<i>${resultMark}</i></span></div><small>${vpp2267Escape(direction)}</small></section>`;
 }
 
 function vpp2267RenderStack(state, copy) {
@@ -555,19 +594,22 @@ function vpp2267RenderMemo(state, copy) {
 }
 
 function vpp2267RenderCounters(state, copy, locale) {
-  const items = Object.entries(VPP2267_COUNTER_LABELS).map(([key, labels]) => `<li><small>${vpp2267Escape(labels[locale])}</small><strong>${state.counters[key]}</strong></li>`).join("");
-  return `<section class="vpp2267-card vpp2267-counters" aria-labelledby="vpp2267-counters-title"><header><h3 id="vpp2267-counters-title">${vpp2267Escape(copy.counters)}</h3></header><ul role="list">${items}</ul></section>`;
+  const items = [
+    ["↳", copy.calls, state.counters.dfsCalls],
+    ["⚡", copy.hits, state.counters.memoHits],
+    ["✂", copy.cuts, state.counters.prunes],
+    ["●", copy.saved, state.memo.size],
+  ].map(([icon, label, value]) => `<li aria-label="${vpp2267Escape(label)}: ${value}"><span aria-hidden="true">${icon}</span><strong>${value}</strong><small>${vpp2267Escape(label)}</small></li>`).join("");
+  return `<ul class="vpp2267-counters" role="list" aria-label="${vpp2267Escape(copy.counters)}">${items}</ul>`;
 }
 
 function vpp2267RenderWitness(state, copy) {
-  const answerText = state.answer === null ? copy.pending : state.answer ? copy.trueValue : copy.falseValue;
-  const path = state.witness.cells.length
-    ? `<ol role="list">${state.witness.cells.map((cell) => `<li><small>#${cell.step} · (${cell.row}, ${cell.column})</small><strong>${vpp2267Escape(cell.char)}</strong><code>b=${vpp2267Escape(cell.balance === null ? copy.none : cell.balance)}</code></li>`).join("")}</ol>`
-    : `<div class="vpp2267-empty">${vpp2267Escape(copy.noWitness)}</div>`;
-  const balances = state.witness.prefixBalances.length
-    ? state.witness.prefixBalances.map((value) => value === null ? copy.none : value).join(" → ")
-    : copy.none;
-  return `<section class="vpp2267-card vpp2267-witness vpp2267-answer-${state.answer === null ? "pending" : state.answer ? "true" : "false"}" aria-labelledby="vpp2267-witness-title" aria-live="polite"><header><div><small>${vpp2267Escape(copy.answer)}</small><h3 id="vpp2267-witness-title">${vpp2267Escape(answerText)}</h3></div><code>${vpp2267Escape(state.witness.string || copy.none)}</code></header><p>${vpp2267Escape(copy.witnessPath)}</p><div class="vpp2267-witness-scroll">${path}</div><footer><small>${vpp2267Escape(copy.prefixBalances)}</small><code>${vpp2267Escape(balances)}</code></footer></section>`;
+  if (state.answer === null) return "";
+  if (!state.answer) {
+    return `<section class="vpp2267-witness vpp2267-answer-false" aria-live="polite"><b aria-hidden="true">×</b><div><small>${vpp2267Escape(copy.answer)}</small><h3>${vpp2267Escape(copy.invalidPath)}</h3></div></section>`;
+  }
+  const path = state.witness.cells.map((cell, index) => `<li><span>${vpp2267Escape(cell.char)}</span><small>${vpp2267Escape(cell.balance === null ? copy.none : cell.balance)}</small></li>${index < state.witness.cells.length - 1 ? `<i aria-hidden="true">→</i>` : ""}`).join("");
+  return `<section class="vpp2267-witness vpp2267-answer-true" aria-label="${vpp2267Escape(copy.validPath)}: ${vpp2267Escape(state.witness.string)}" aria-live="polite"><header><b aria-hidden="true">✓</b><div><small>${vpp2267Escape(copy.answer)}</small><h3>${vpp2267Escape(copy.validPath)}</h3></div><code>${vpp2267Escape(state.witness.string)}</code></header><ol role="list">${path}</ol></section>`;
 }
 
 function renderValidParenthesesPath2267View(step) {
@@ -579,14 +621,16 @@ function renderValidParenthesesPath2267View(step) {
   const state = vpp2267Normalize(step);
   const locale = state.locale;
   const copy = VPP2267_TEXT[locale];
-  const timing = state.timing === "before" ? copy.before : copy.after;
   const summary = `${copy.region}. ${copy.line} ${state.source.line}. ${state.eventLabel}.`;
   const traceWarning = state.trace.truncated
     ? `<aside class="vpp2267-trace-warning"><strong>${vpp2267Escape(copy.traceLimited)}</strong><span>${state.trace.dropped}</span></aside>`
     : "";
-  const note = state.note
-    ? `<aside class="vpp2267-note"><strong>${vpp2267Escape(copy.note)}</strong><p>${vpp2267Escape(state.note)}</p></aside>`
+  const showSearch = !state.final && Boolean(state.state.coordinate || state.counters.dfsCalls);
+  const searchVisuals = showSearch
+    ? `<aside class="vpp2267-logic">${vpp2267RenderBalance(state, copy, locale)}${vpp2267RenderBranch(state, copy)}${vpp2267RenderCounters(state, copy, locale)}</aside>`
     : "";
-
-  host.innerHTML = `<article class="vpp2267-viz vpp2267-phase-${vpp2267Escape(state.phase)} ${state.final ? "vpp2267-is-final" : ""}" role="region" aria-label="${vpp2267Escape(summary)}"><header class="vpp2267-header"><div><span>${vpp2267Escape(copy.kicker)}</span><h2>${vpp2267Escape(state.title)}</h2></div><div class="vpp2267-line-state"><strong>${vpp2267Escape(copy.line)} ${state.source.line}</strong><span>${vpp2267Escape(timing)}</span><em>${vpp2267Escape(state.eventLabel)}</em></div></header>${traceWarning}${vpp2267RenderSource(state, copy)}${vpp2267RenderPrecheck(state, copy)}${vpp2267RenderGrid(state, copy)}<div class="vpp2267-analysis-grid">${vpp2267RenderBalance(state, copy, locale)}${vpp2267RenderBranch(state, copy)}</div><div class="vpp2267-runtime-grid">${vpp2267RenderStack(state, copy)}${vpp2267RenderMemo(state, copy)}</div>${vpp2267RenderCounters(state, copy, locale)}${vpp2267RenderWitness(state, copy)}${note}</article>`;
+  const finalCounters = state.final && state.counters.dfsCalls
+    ? vpp2267RenderCounters(state, copy, locale)
+    : "";
+  host.innerHTML = `<article class="vpp2267-viz vpp2267-phase-${vpp2267Escape(state.phase)} ${state.final ? "vpp2267-is-final" : ""}" role="region" aria-label="${vpp2267Escape(summary)}"><header class="vpp2267-header"><div><span>#2267 · DFS + MEMO</span><h2>${vpp2267Escape(state.title)}</h2></div><div class="vpp2267-line-state"><strong>${vpp2267Escape(state.eventLabel)}</strong><span>${vpp2267Escape(copy.line)} ${state.source.line}</span></div></header>${traceWarning}${vpp2267RenderSource(state, copy)}${vpp2267RenderPrecheck(state, copy)}<div class="vpp2267-stage ${showSearch ? "" : "vpp2267-stage-single"}">${vpp2267RenderGrid(state, copy)}${searchVisuals}</div>${finalCounters}${vpp2267RenderWitness(state, copy)}</article>`;
 }
