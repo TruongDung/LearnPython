@@ -181,6 +181,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.waysToEarnPoints2585View), surface: "treeView", render: (step) => {
       renderWaysToEarnPoints2585View(step);
     } },
+    { predicate: (step) => Boolean(step.waysToExpressPowers2787View), surface: "treeView", render: (step) => {
+      renderWaysToExpressPowers2787View(step);
+    } },
     { predicate: (step) => Boolean(step.maximumEvenSplit2178View), surface: "treeView", render: (step) => {
       renderMaximumEvenSplit2178View(step);
     } },
