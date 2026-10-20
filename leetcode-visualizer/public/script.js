@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.matrixZero73View), surface: "treeView", render: (step) => {
+      renderMatrixZero73Pictures(step);
+    } },
     { predicate: (step) => Boolean(step.kthLargest215View), surface: "treeView", render: (step) => {
       renderKthLargest215Pictures(step);
     } },
