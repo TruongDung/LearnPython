@@ -124,3 +124,26 @@ test("677 parser and Edit & Run use the same commands and validation", () => {
   for (const input of ["", "delete(a)", "insert(a,)", "insert(a,-1)", "insert(a,1001)", "insert(a,1.5)", "insert(A,3)", "sum()", "sum(a,b)", `sum(${'a'.repeat(51)})`, Array(51).fill("sum(a)").join(";")]) assert.throws(() => problem.builder(input), /#677/);
   assert.equal(problem.debugMode, "line-by-line");
 });
+
+test("677 all trace and summary frames render, with signed deltas and direct cached query results", () => {
+  const host = { innerHTML: "", querySelectorAll: () => [], querySelector: () => null };
+  const context = { lang: "vi", $: () => host, escapeHtml: value => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;") };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-map-sum-677.js"), "utf8"), context);
+  for (const language of ["vi", "en"]) for (const input of [...cases, Array(13).fill("sum(a)").join(";")]) {
+    context.lang = language;
+    const run = problem.builder(input);
+    for (const step of run.steps) {
+      context.renderMapSum677Pictures(step);
+      assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
+      assert.match(host.innerHTML, /m677-tree/);
+      if (step.mapSum677View.delta < 0) assert.match(host.innerHTML, /decreasing/);
+      if (step.mapSum677View.event === "update") assert.match(host.innerHTML, /m677-change/);
+      if (step.mapSum677View.event === "sum-return") assert.match(host.innerHTML, /Đọc Σ đã lưu|Read cached Σ/);
+      if (step.mapSum677View.event === "missing-return") assert.match(host.innerHTML, /m677-missing-edge/);
+    }
+    assert.match(host.innerHTML, /m677-answer/);
+  }
+  context.renderMapSum677Pictures(problem.builder(problem.defaultInput).steps.at(-1));
+  assert.match(host.innerHTML, /\[3, 5, 4\]/);
+});
