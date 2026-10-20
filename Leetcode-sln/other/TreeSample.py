@@ -31,7 +31,7 @@ class WordDictionary:
                 return False
 
             return dfs(node.children[ch], index+1)
-            
+
         return dfs(self.root, 0)
 
 
