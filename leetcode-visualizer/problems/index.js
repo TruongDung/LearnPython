@@ -24,7 +24,7 @@ const categories = {
   backtracking: Object.assign(require("./backtracking"), require("./generate-parentheses-22")),
   bst: require("./bst"),
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
-  heap: Object.assign(require("./heap"), require("./kth-largest-215"), require("./server-heap"), require("./meeting-rooms-iii")),
+  heap: Object.assign(require("./heap"), require("./kth-largest-215"), require("./server-heap"), require("./meeting-rooms-iii"), require("./minimum-interval-1851")),
   "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations"), require("./number-of-good-paths-2421"), require("./similar-string-groups-839")),
   "linked-list": require("./linked-list"),
   "binary-lifting": Object.assign(require("./binary-lifting"), require("./minimum-edge-weight-equilibrium-queries-2846")),
