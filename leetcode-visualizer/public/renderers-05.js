@@ -889,7 +889,7 @@ function renderNumberOfLISView(step) {
   </section>`;
 }
 
-function renderLIS2407View(step) {
+function renderLIS2407LegacyView(step) {
   const view = step.lis2407View || {};
   const vi = lang === "vi";
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -1026,6 +1026,124 @@ function renderLIS2407View(step) {
       <header><strong>RANGE-MAX TREE</strong><span>${escapeHtml(selectedText)}</span></header>
       <div class="lis2407-tree">${treeHtml}</div>
     </section>
+  </section>`;
+}
+
+function renderLIS2407View(step) {
+  const view = step.lis2407View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const owners = Array.isArray(view.owners) ? view.owners : [];
+  const coverage = Array.isArray(view.coverage) ? view.coverage : [];
+  const queryNodes = Array.isArray(view.queryNodes) ? view.queryNodes : [];
+  const updatePath = Array.isArray(view.updatePath) ? view.updatePath : [];
+  const chain = Array.isArray(view.chain) ? view.chain : [];
+  const chainSet = new Set(chain);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const predecessorIndex = Number.isInteger(view.predecessorIndex) ? view.predecessorIndex : -1;
+  const operation = String(view.operation || "init");
+  const currentValue = currentIndex >= 0 ? nums[currentIndex] : null;
+  const finiteDp = dp.filter(Number.isFinite);
+  const maxDp = Math.max(1, ...finiteDp);
+  const answer = Number.isFinite(view.answer) ? view.answer : Math.max(0, ...finiteDp);
+  const hasWindow = Number.isInteger(view.leftCoord)
+    && Number.isInteger(view.rightCoord)
+    && view.leftCoord <= view.rightCoord;
+  const phase = {
+    init: ["○", vi ? "Bắt đầu" : "Start"],
+    scan: ["👀", vi ? "Chọn trụ" : "Pick"],
+    bounds: ["⌗", vi ? "Khoanh vùng" : "Window"],
+    query: ["MAX", vi ? "Lấy cao nhất" : "Peak"],
+    dp: ["+1", vi ? "Xây trụ" : "Build"],
+    update: ["↑", vi ? "Báo lên cây" : "Lift"],
+    best: ["★", vi ? "Kỷ lục" : "Best"],
+    done: ["✓", vi ? "Hoàn tất" : "Done"],
+  }[operation] || ["·", operation];
+
+  const bridgeHtml = nums.map((value, index) => {
+    const height = Number.isFinite(dp[index]) ? Math.max(1, dp[index]) : 0;
+    const classes = ["lisx2407-pillar"];
+    if (height) classes.push("is-built");
+    if (index === currentIndex) classes.push("is-current");
+    if (index === predecessorIndex) classes.push("is-predecessor");
+    if (chainSet.has(index)) classes.push("is-chain");
+    return `<article class="${classes.join(" ")}" style="--pillar-level:${height};--pillar-max:${maxDp}" aria-label="nums ${index} = ${escapeHtml(String(value))}, dp = ${height || 0}">
+      <span class="lisx2407-dp">${height || "·"}</span>
+      <div class="lisx2407-column"><i></i><i></i><i></i></div>
+      <strong>${escapeHtml(String(value))}</strong>
+    </article>`;
+  }).join("");
+
+  let hopHtml = "";
+  if (currentIndex >= 0) {
+    const from = predecessorIndex >= 0 ? nums[predecessorIndex] : "∅";
+    const gap = predecessorIndex >= 0 ? currentValue - nums[predecessorIndex] : null;
+    hopHtml = `<div class="lisx2407-hop" aria-label="${vi ? "Cầu đang chọn" : "Selected bridge"}">
+      <b>${escapeHtml(String(from))}</b><span>⟶</span><b>${escapeHtml(String(currentValue))}</b>${gap === null ? "" : `<em>+${gap}</em>`}
+    </div>`;
+  }
+
+  const stationsHtml = values.map((value, coord) => {
+    const node = Math.max(1, Number(view.size) || 1) + coord;
+    const best = tree[node - 1] ?? 0;
+    const owner = owners[node - 1] ?? -1;
+    const classes = ["lisx2407-station"];
+    if (hasWindow && coord >= view.leftCoord && coord <= view.rightCoord) classes.push("is-window");
+    if (value === currentValue) classes.push("is-target");
+    if (owner === predecessorIndex && predecessorIndex >= 0) classes.push("is-predecessor");
+    return `<article class="${classes.join(" ")}" aria-label="value ${escapeHtml(String(value))}, best ${escapeHtml(String(best))}">
+      <b>${escapeHtml(String(value))}</b><i></i><small>${escapeHtml(String(best))}</small>
+    </article>`;
+  }).join("");
+
+  const nodeCard = (node, mode) => {
+    const range = coverage[node - 1];
+    const left = Array.isArray(range) ? values[range[0]] : "?";
+    const right = Array.isArray(range) ? values[range[1]] : "?";
+    const rangeText = left === right ? String(left) : `${left}…${right}`;
+    const best = tree[node - 1] ?? 0;
+    return `<article class="lisx2407-tree-node ${mode}"><small>${escapeHtml(rangeText)}</small><strong>${escapeHtml(String(best))}</strong></article>`;
+  };
+  const activeNodes = operation === "query" ? queryNodes : operation === "update" ? updatePath : [];
+  const activeMode = operation === "query" ? "is-query" : "is-update";
+  const nodesHtml = activeNodes.length
+    ? activeNodes.map((node, index) => `${index ? '<span class="lisx2407-node-arrow">→</span>' : ""}${nodeCard(node, activeMode)}`).join("")
+    : `<div class="lisx2407-tree-sleep"><span>△</span><span>△ △</span><span>△ △ △ △</span></div>`;
+  const treeResult = operation === "query"
+    ? `<b class="lisx2407-tree-result">= ${escapeHtml(String(view.queryLength ?? 0))}</b>`
+    : operation === "update" ? `<b class="lisx2407-tree-result">↑ root</b>` : "";
+
+  const previous = Number.isFinite(view.queryLength) ? view.queryLength : 0;
+  const currentDp = currentIndex >= 0 && Number.isFinite(dp[currentIndex]) ? dp[currentIndex] : null;
+  const formulaHtml = currentIndex >= 0
+    ? `<div class="lisx2407-formula"><span>MAX</span><b>${previous}</b><i>+</i><b>1</b><i>=</i><strong>${currentDp ?? "?"}</strong></div>`
+    : `<div class="lisx2407-formula"><span>dp</span><b>0</b><i>→</i><strong>${answer}</strong></div>`;
+
+  const chainHtml = chain.length
+    ? chain.map((index, position) => `${position ? '<span class="lisx2407-chain-arrow">→</span>' : ""}<b>${escapeHtml(String(nums[index]))}</b>`).join("")
+    : "";
+  const finalHtml = operation === "done"
+    ? `<section class="lisx2407-finish"><div>${chainHtml}</div><strong>🏆 ${answer}</strong></section>`
+    : "";
+  const windowLabel = currentValue === null
+    ? "[ — ]"
+    : `[ ${Number(currentValue) - Number(view.k)} … ${Number(currentValue) - 1} ]`;
+
+  $("treeView").innerHTML = `<section class="lisx2407-viz" role="img" aria-label="${vi ? "Minh họa dãy con tăng dài nhất có giới hạn" : "Illustration of constrained longest increasing subsequence"}">
+    <header class="lisx2407-head"><strong>#2407 · LIS II</strong><span>k=${escapeHtml(String(view.k ?? "—"))}</span><em>${phase[0]} ${escapeHtml(phase[1])}</em></header>
+    <section class="lisx2407-sky">
+      ${hopHtml}
+      <div class="lisx2407-bridge" style="--pillar-count:${Math.max(1, nums.length)}">${bridgeHtml}</div>
+      <div class="lisx2407-ground"></div>
+    </section>
+    ${finalHtml || `<section class="lisx2407-workbench">
+      <div class="lisx2407-window"><header><span>↔</span><b>${escapeHtml(windowLabel)}</b></header><div class="lisx2407-axis">${stationsHtml}</div></div>
+      <div class="lisx2407-treebox"><header><span>🌲</span><b>${operation === "query" ? "MAX" : operation === "update" ? "↑" : "·"}</b></header><div class="lisx2407-active-nodes">${nodesHtml}${treeResult}</div></div>
+    </section>`}
+    <footer class="lisx2407-bottom">${formulaHtml}<div class="lisx2407-score"><span>🏆</span><strong>${answer}</strong></div></footer>
   </section>`;
 }
 

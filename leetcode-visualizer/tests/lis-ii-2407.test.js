@@ -129,9 +129,9 @@ test('2407 custom renderer handles every state in English and Vietnamese', () =>
     context.lang = language;
     for (const step of trace) {
       context.renderLIS2407View(step);
-      assert.match(element.innerHTML, /lis2407-viz/);
-      assert.match(element.innerHTML, /COMPRESSED VALUE AXIS|TRỤC GIÁ TRỊ ĐÃ NÉN/);
-      assert.match(element.innerHTML, /RANGE-MAX TREE/);
+      assert.match(element.innerHTML, /lisx2407-viz/);
+      assert.match(element.innerHTML, /lisx2407-bridge/);
+      assert.match(element.innerHTML, /lisx2407-formula/);
       assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
     }
   }
@@ -139,9 +139,10 @@ test('2407 custom renderer handles every state in English and Vietnamese', () =>
 
 test('2407 has responsive, scoped visualization styles', () => {
   const css = readFrontendStyles();
-  assert.match(css, /\.lis2407-viz/);
-  assert.match(css, /\.lis2407-leaf\.is-eligible/);
-  assert.match(css, /\.lis2407-node\.is-query/);
-  assert.match(css, /\.lis2407-node\.is-update/);
+  assert.match(css, /\.lisx2407-viz/);
+  assert.match(css, /\.lisx2407-pillar\.is-chain/);
+  assert.match(css, /\.lisx2407-station\.is-window/);
+  assert.match(css, /\.lisx2407-tree-node\.is-query/);
+  assert.match(css, /\.lisx2407-tree-node\.is-update/);
   assert.match(css, /@container \(max-width: 390px\)/);
 });

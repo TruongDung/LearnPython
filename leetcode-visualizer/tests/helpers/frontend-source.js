@@ -155,6 +155,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'style-07.css',
   'style-08.css',
   'style-09.css',
+  'lis-ii-2407.css',
   'sparse-vector-1570.css',
   'regex-match-10.css',
   'wildcard-match-44.css',
