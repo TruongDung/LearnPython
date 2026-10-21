@@ -30,7 +30,7 @@ const code = [...prefix,
   "                buckets[pattern].clear()",
   "        return 0",
 ];
-const code2 = [...prefix,
+const code2 = ["from collections import defaultdict",...prefix.slice(1),
   "        front, back = [beginWord], [endWord]",
   "        dist_front, dist_back = {beginWord: 1}, {endWord: 1}",
   "        while front and back:",
@@ -83,7 +83,7 @@ function build(input,params = {},approach = 1) {
     const final=answer!==null;
     steps.push({title:bi(`Dòng ${line} · ${title.vi}`,`Line ${line} · ${title.en}`),codeLines:[line],codeBlock:approach,final,arr:[],highlight:[],mark:[],note:bi("",""),
       vars:Object.entries(locals).map(([name,value])=>({name,rawValue:clone(value),value:name==="self"?"Solution":clone(value)})),
-      ladder127View:{mode:"trace",approach,phase,event,line,source:source[line-1].trim(),begin,end,graph,word:current,
+      ladder127View:{mode:"trace",approach,phase,event,line,source:source[line-1].trim(),begin,end,graph,word:current,buildingWord:phase==="build"?locals.word??null:null,
         candidate:phase==="search" && ["candidate","meet-check","discover","enqueue","distance"].includes(event)?locals.nxt??null:null,
         pattern:locals.pattern??null,bucket:locals.pattern && locals.buckets?.has(locals.pattern)?[...locals.buckets.get(locals.pattern)]:[],
         queue:clone(locals.queue??[]),front:clone(locals.front??[]),back:clone(locals.back??[]),following:clone(locals.following??[]),frontOrigin,
@@ -92,7 +92,7 @@ function build(input,params = {},approach = 1) {
     });
   }
   function loop(name,values,line,event,body) {
-    for(const value of values) {locals[name]=value;trace(line,event,bi(`${name} = ${value}`,`${name} = ${value}`));if(body(value)) return true;}
+    for(const value of values) {locals[name]=value;if(event==="expand-word"){current=value;expanded.push(value);}trace(line,event,bi(`${name} = ${value}`,`${name} = ${value}`));if(body(value)) return true;}
     trace(line,event+"-end",bi(`Hết vòng ${name}`,`${name} loop ends`));return false;
   }
   function fromRoot(word,parents) {const result=[word];while(parents.has(word)){word=parents.get(word);result.push(word);}return result.reverse();}
@@ -137,7 +137,6 @@ function build(input,params = {},approach = 1) {
     if(swap){[locals.front,locals.back]=[locals.back,locals.front];frontOrigin=frontOrigin==="start"?"end":"start";trace(16,"swap-front",bi("Đổi hai frontier", "Swap frontiers"));[locals.dist_front,locals.dist_back]=[locals.dist_back,locals.dist_front];trace(17,"swap-distance",bi("Đổi hai bảng khoảng cách", "Swap distance maps"));}
     locals.following=[];trace(18,"following",bi("Tầng mới rỗng", "Next layer starts empty"));
     const met=loop("word",locals.front,19,"expand-word",word=>{
-      current=word;expanded.push(word);
       return loop("i",Array.from({length:word.length},(_,i)=>i),20,"search-index",i=>{
         locals.pattern=word.slice(0,i)+"*"+word.slice(i+1);trace(21,"pattern",bi(`Tìm nhóm ${locals.pattern}`,`Look up ${locals.pattern}`));
         return loop("nxt",bucket(locals.pattern),22,"neighbor",nxt=>{
@@ -154,6 +153,8 @@ function build(input,params = {},approach = 1) {
   return finish(0,29);
 }
 module.exports = {127:{...base,code,code2,builder:(input,params)=>build(input,params,1),builder2:(input,params)=>build(input,params,2),debugMode:"line-by-line",allowEmptyInput:true,
+  codeLabel:bi("Cách 1 · BFS một chiều", "Approach 1 · One-way BFS"),code2Label:bi("Cách 2 · BFS hai chiều", "Approach 2 · Bidirectional BFS"),
+  extraParams:[...base.extraParams.filter(p=>p.key!=="approach"),{key:"approach",type:"select",default:1,label:bi("Cách giải", "Approach"),options:[{value:1,label:bi("Cách 1 · BFS một chiều", "Approach 1 · One-way BFS")},{value:2,label:bi("Cách 2 · BFS hai chiều", "Approach 2 · Bidirectional BFS")}]}],
   titleVi:bi("Mỗi cạnh đổi 1 chữ · BFS tìm đường ít từ nhất", "One letter per edge · BFS finds the fewest words"),
   statement:bi("Nối hai từ khi khác đúng 1 chữ. Tìm đường ngắn nhất từ beginWord đến endWord; đếm cả hai đầu. Không có đường → 0.", "Connect words differing in exactly one letter. Find the shortest beginWord → endWord path; count both ends. No path → 0."),
   approach:[bi("Cách 1: BFS từng tầng từ beginWord.", "Approach 1: BFS by layers from beginWord."),bi("Cách 2: BFS từ hai đầu, mở phía ít từ hơn.", "Approach 2: BFS from both ends, expand the smaller frontier."),bi("Chung mẫu * → chỉ khác vị trí có dấu *.", "Shared * pattern → only the wildcard position can differ.")],
