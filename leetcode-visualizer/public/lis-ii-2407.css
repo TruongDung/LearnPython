@@ -1,23 +1,29 @@
 .lisx2407-viz {
-  --lisx-ink: #e8efff;
-  --lisx-muted: #92a2c4;
-  --lisx-panel: rgba(15, 23, 42, 0.78);
-  --lisx-line: rgba(148, 163, 184, 0.24);
-  --lisx-blue: #38bdf8;
-  --lisx-gold: #fbbf24;
-  --lisx-purple: #c084fc;
-  --lisx-green: #34d399;
+  --lisx-bg: #040713;
+  --lisx-surface: #091329;
+  --lisx-surface-raised: #111f3b;
+  --lisx-ink: #f5f8ff;
+  --lisx-muted: #a8b7d8;
+  --lisx-panel: rgba(9, 19, 41, 0.94);
+  --lisx-line: rgba(137, 165, 222, 0.3);
+  --lisx-blue: #49c9ff;
+  --lisx-gold: #ffd447;
+  --lisx-purple: #d49aff;
+  --lisx-green: #42e6ad;
   display: grid;
   gap: 12px;
   min-height: 100%;
   padding: 14px;
   color: var(--lisx-ink);
+  color-scheme: dark;
   background:
-    radial-gradient(circle at 12% 4%, rgba(56, 189, 248, 0.15), transparent 30%),
-    radial-gradient(circle at 88% 8%, rgba(192, 132, 252, 0.13), transparent 28%),
-    #080d1b;
-  border: 1px solid rgba(96, 165, 250, 0.22);
+    radial-gradient(circle at 12% 4%, rgba(73, 201, 255, 0.19), transparent 31%),
+    radial-gradient(circle at 88% 8%, rgba(212, 154, 255, 0.16), transparent 29%),
+    linear-gradient(145deg, #071022 0%, var(--lisx-bg) 66%);
+  border: 1px solid rgba(96, 165, 250, 0.3);
   border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(210, 231, 255, 0.06), 0 18px 50px rgba(0, 0, 0, 0.28);
+  isolation: isolate;
   overflow: hidden;
 }
 
@@ -62,7 +68,7 @@
   background:
     linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.9));
+    linear-gradient(180deg, rgba(17, 31, 59, 0.62), rgba(4, 7, 19, 0.96));
   background-size: 28px 28px, 28px 28px, auto;
 }
 
@@ -126,7 +132,7 @@
   border: 1px solid var(--lisx-line);
   border-radius: 50%;
   font-size: 0.7rem;
-  background: #0b1222;
+  background: var(--lisx-surface);
 }
 
 .lisx2407-column {
@@ -182,7 +188,7 @@
 .lisx2407-ground {
   height: 7px;
   margin: 0 -10px;
-  background: linear-gradient(90deg, #334155, #64748b 50%, #334155);
+  background: linear-gradient(90deg, #182743, #597198 50%, #182743);
   box-shadow: 0 -5px 15px rgba(148, 163, 184, 0.12);
 }
 
@@ -242,7 +248,7 @@
 .lisx2407-station i {
   width: 2px;
   height: 12px;
-  background: #64748b;
+  background: #7183a8;
 }
 
 .lisx2407-station small {
@@ -251,7 +257,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #1e293b;
+  background: var(--lisx-surface-raised);
 }
 
 .lisx2407-station.is-window {
@@ -289,7 +295,7 @@
   padding: 4px;
   border: 1px solid var(--lisx-line);
   border-radius: 8px 8px 12px 12px;
-  background: #111b30;
+  background: var(--lisx-surface);
 }
 
 .lisx2407-tree-node small {
@@ -345,7 +351,7 @@
   padding: 7px 12px;
   border: 1px solid var(--lisx-line);
   border-radius: 13px;
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(9, 19, 41, 0.9);
 }
 
 .lisx2407-formula span {
@@ -365,7 +371,7 @@
   min-width: 31px;
   height: 31px;
   border-radius: 8px;
-  background: #1e293b;
+  background: var(--lisx-surface-raised);
 }
 
 .lisx2407-formula strong {
@@ -430,29 +436,13 @@
   font-size: 1.35rem;
 }
 
+html[data-theme="light"] .lisx2407-viz,
 body.light-mode .lisx2407-viz {
-  --lisx-ink: #172033;
-  --lisx-muted: #64748b;
-  --lisx-panel: rgba(255, 255, 255, 0.86);
-  --lisx-line: rgba(71, 85, 105, 0.2);
+  color: var(--lisx-ink);
   background:
-    radial-gradient(circle at 12% 4%, rgba(14, 165, 233, 0.12), transparent 30%),
-    radial-gradient(circle at 88% 8%, rgba(168, 85, 247, 0.1), transparent 28%),
-    #eef5ff;
-}
-
-body.light-mode .lisx2407-sky {
-  background-color: rgba(255, 255, 255, 0.72);
-}
-
-body.light-mode .lisx2407-dp,
-body.light-mode .lisx2407-tree-node {
-  background: #f8fafc;
-}
-
-body.light-mode .lisx2407-station small,
-body.light-mode .lisx2407-formula b {
-  background: #e2e8f0;
+    radial-gradient(circle at 12% 4%, rgba(73, 201, 255, 0.19), transparent 31%),
+    radial-gradient(circle at 88% 8%, rgba(212, 154, 255, 0.16), transparent 29%),
+    linear-gradient(145deg, #071022 0%, var(--lisx-bg) 66%);
 }
 
 @container (max-width: 720px) {

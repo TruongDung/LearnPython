@@ -140,6 +140,9 @@ test('2407 custom renderer handles every state in English and Vietnamese', () =>
 test('2407 has responsive, scoped visualization styles', () => {
   const css = readFrontendStyles();
   assert.match(css, /\.lisx2407-viz/);
+  assert.match(css, /color-scheme:\s*dark/);
+  assert.match(css, /html\[data-theme="light"\] \.lisx2407-viz/);
+  assert.doesNotMatch(css, /#eef5ff|rgba\(255, 255, 255, 0\.86\)/);
   assert.match(css, /\.lisx2407-pillar\.is-chain/);
   assert.match(css, /\.lisx2407-station\.is-window/);
   assert.match(css, /\.lisx2407-tree-node\.is-query/);

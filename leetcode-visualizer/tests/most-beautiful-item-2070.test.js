@@ -32,7 +32,13 @@ function rendererHarness() {
 
 test("2070 matches the official example and brute-force cases", () => {
   assert.ok(problem);
+  assert.equal(typeof problem.builder2, "function");
+  assert.match(problem.code2.join("\n"), /prefix\.append\(best\)|while lo < hi/);
+  assert.equal(problem.complexity2.time, "O(n log n + q log n)");
+  const selector = problem.extraParams.find((param) => param.key === "approach");
+  assert.deepEqual(selector.options.map((option) => Number(option.value)), [1, 2]);
   assert.deepEqual(problem.builder(problem.defaultInput).answer, [2, 4, 5, 5, 6, 6]);
+  assert.deepEqual(problem.builder2(problem.defaultInput).answer, [2, 4, 5, 5, 6, 6]);
   assert.deepEqual(problem.builder({ items: [[10, 100]], queries: [1, 10, 20] }).answer, [0, 100, 100]);
   assert.deepEqual(problem.builder({ items: [[2, 4], [2, 9], [1, 3]], queries: [2, 1, 2] }).answer, [9, 3, 9]);
 
@@ -44,6 +50,7 @@ test("2070 matches the official example and brute-force cases", () => {
       queries: Array.from({ length: 1 + next() % 9 }, () => 1 + next() % 18),
     };
     assert.deepEqual(problem.builder(input).answer, brute(input.items, input.queries));
+    assert.deepEqual(problem.builder2(input).answer, brute(input.items, input.queries));
   }
 });
 
@@ -99,6 +106,39 @@ test("2070 displayed Python returns the same result", () => {
   const execution = spawnSync("python3", ["-c", source], { input: JSON.stringify(cases), encoding: "utf8" });
   assert.equal(execution.status, 0, execution.stderr);
   assert.deepEqual(JSON.parse(execution.stdout), cases.map((input) => brute(input.items, input.queries)));
+
+  const source2 = `${problem.code2.join("\n")}\nimport json, sys\nprint(json.dumps([Solution().maximumBeauty(case["items"], case["queries"]) for case in json.load(sys.stdin)]))`;
+  const execution2 = spawnSync("python3", ["-c", source2], { input: JSON.stringify(cases), encoding: "utf8" });
+  assert.equal(execution2.status, 0, execution2.stderr);
+  assert.deepEqual(JSON.parse(execution2.stdout), cases.map((input) => brute(input.items, input.queries)));
+});
+
+test("2070 approach 2 builds prefix maxima and binary-searches every query", () => {
+  const run = problem.builder2(problem.defaultInput);
+  const frames = run.steps.map(view);
+  const final = frames.at(-1);
+  assert.equal(final.approach, 2);
+  assert.deepEqual(final.prices, [1, 2, 3, 3, 5]);
+  assert.deepEqual(final.prefix, [2, 4, 4, 5, 6]);
+  assert.deepEqual(final.answers, [2, 4, 5, 5, 6, 6]);
+  assert.ok(final.resolved.every(Boolean));
+  assert.ok(frames.some((frame) => frame.event === "compare-mid" && frame.comparison.allowed));
+  assert.ok(frames.some((frame) => frame.event === "compare-mid" && !frame.comparison.allowed));
+  assert.ok(frames.some((frame) => frame.event === "search-done" && frame.selectedIndex === -1) === false);
+
+  for (const frame of frames) {
+    for (let index = 1; index < frame.prefix.length; index += 1) {
+      assert.ok(frame.prefix[index] >= frame.prefix[index - 1]);
+    }
+    if (frame.event === "compare-mid") {
+      assert.ok(frame.mid >= 0 && frame.mid < frame.prices.length);
+      assert.equal(frame.comparison.allowed, frame.prices[frame.mid] <= frame.activeQuery.value);
+    }
+  }
+
+  const belowAll = problem.builder2({ items: [[10, 100]], queries: [1] }).steps.map(view);
+  assert.ok(belowAll.some((frame) => frame.event === "search-done" && frame.selectedIndex === -1));
+  assert.deepEqual(belowAll.at(-1).answers, [0]);
 });
 
 test("2070 renderer stays picture-first in Vietnamese and English", () => {
@@ -123,17 +163,41 @@ test("2070 renderer stays picture-first in Vietnamese and English", () => {
   for (const answer of [2, 4, 5, 5, 6, 6]) assert.match(host.innerHTML, new RegExp(`◆${answer}`));
 });
 
+test("2070 approach 2 renderer shows the sort-prefix-binary-search pipeline", () => {
+  const { context, host } = rendererHarness();
+  const run = problem.builder2(problem.defaultInput);
+  for (const language of ["vi", "en"]) {
+    context.lang = language;
+    for (const step of run.steps) {
+      context.renderMostBeautifulItem2070View(step);
+      assert.match(host.innerHTML, /mbi2070-prefix-viz/);
+      assert.match(host.innerHTML, /mbi2070-pipeline/);
+      assert.match(host.innerHTML, /mbi2070-prefix-market/);
+      assert.match(host.innerHTML, /SORT[\s\S]*PREFIX MAX[\s\S]*BINARY SEARCH/);
+      assert.equal((host.innerHTML.match(/class="mbi2070-prefix-item(?: |")/g) || []).length, 5);
+      assert.equal((host.innerHTML.match(/class="mbi2070-query(?: |")/g) || []).length, 6);
+      assert.doesNotMatch(host.innerHTML, /undefined|NaN|Infinity|object Object/);
+      assert.doesNotMatch(host.innerHTML, /<table|<details|<p[ >]/);
+    }
+  }
+
+  context.renderMostBeautifulItem2070View(run.steps.at(-1));
+  assert.equal((host.innerHTML.match(/class="mbi2070-answer is-ready"/g) || []).length, 6);
+});
+
 test("2070 assets are lazy-wired with responsive, theme-aware styles", () => {
   const html = readFrontendIndex();
   const activeHtml = html.replace(/<template[\s\S]*?<\/template>/g, "");
   const js = readFrontendJavaScript();
   const css = readFrontendStyles();
-  assert.match(html, /<template id="problemVisualizationStyles"[\s\S]*most-beautiful-item-2070\.css\?v=most-beautiful-item-2070-v1[\s\S]*<\/template>/);
-  assert.match(html, /<template id="problemVisualizationScripts"[\s\S]*renderer-most-beautiful-item-2070\.js\?v=most-beautiful-item-2070-v1[\s\S]*<\/template>/);
+  assert.match(html, /<template id="problemVisualizationStyles"[\s\S]*most-beautiful-item-2070\.css\?v=most-beautiful-item-2070-v2[\s\S]*<\/template>/);
+  assert.match(html, /<template id="problemVisualizationScripts"[\s\S]*renderer-most-beautiful-item-2070\.js\?v=most-beautiful-item-2070-v2[\s\S]*<\/template>/);
   assert.doesNotMatch(activeHtml, /most-beautiful-item-2070\.(?:css|js)/);
   assert.match(html, /beauty2070=picture-v1/);
   assert.match(js, /step\.mostBeautifulItem2070View/);
   assert.match(js, /renderMostBeautifulItem2070View/);
   assert.match(css, /@container mbi2070 \(max-width: 600px\)/);
   assert.match(css, /\[data-theme="light"\] \.mbi2070-viz/);
+  assert.match(css, /\.mbi2070-prefix-item\.is-mid/);
+  assert.match(css, /\.mbi2070-prefix-item\.is-selected/);
 });

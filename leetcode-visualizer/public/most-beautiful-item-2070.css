@@ -481,6 +481,247 @@ body.light .mbi2070-viz,
   color: var(--mbi-green);
 }
 
+.mbi2070-pipeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--mbi-muted);
+}
+
+.mbi2070-pipeline b {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: color-mix(in srgb, var(--mbi-cyan) 11%, var(--mbi-panel));
+  color: var(--mbi-cyan);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.mbi2070-pipeline b:nth-of-type(2) {
+  color: var(--mbi-green);
+}
+
+.mbi2070-pipeline b:nth-of-type(3) {
+  color: var(--mbi-pink);
+}
+
+.mbi2070-pipeline i {
+  color: var(--mbi-line);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.mbi2070-prefix-stage {
+  gap: 9px;
+}
+
+.mbi2070-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.mbi2070-search-status > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 47px;
+  border-radius: 9px;
+  padding: 4px 7px;
+  background: color-mix(in srgb, var(--mbi-bg) 48%, transparent);
+}
+
+.mbi2070-search-status small {
+  color: var(--mbi-muted);
+  font-size: 0.55rem;
+  font-weight: 900;
+}
+
+.mbi2070-search-status b {
+  color: var(--mbi-text);
+  font-size: 0.72rem;
+}
+
+.mbi2070-search-status .is-mid {
+  background: color-mix(in srgb, var(--mbi-pink) 15%, var(--mbi-panel));
+}
+
+.mbi2070-search-status .is-mid b {
+  color: var(--mbi-pink);
+}
+
+.mbi2070-search-status > i {
+  color: var(--mbi-line);
+  font-style: normal;
+}
+
+.mbi2070-prefix-market {
+  display: grid;
+  grid-template-columns: repeat(var(--mbi-prefix-count), minmax(54px, 1fr));
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 3px solid color-mix(in srgb, var(--mbi-line) 75%, transparent);
+  padding: 9px 3px 6px;
+  scrollbar-width: thin;
+}
+
+.mbi2070-prefix-item {
+  position: relative;
+  display: grid;
+  grid-template-rows: 36px 54px 26px;
+  justify-items: center;
+  min-width: 50px;
+  overflow: hidden;
+  border-radius: 11px 11px 4px 4px;
+  background: color-mix(in srgb, var(--mbi-bg) 52%, transparent);
+  opacity: 0.48;
+  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+}
+
+.mbi2070-prefix-cap {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  width: 100%;
+  background: color-mix(in srgb, var(--mbi-green) 9%, transparent);
+}
+
+.mbi2070-prefix-cap small {
+  color: var(--mbi-muted);
+  font-size: 0.5rem;
+  font-weight: 900;
+}
+
+.mbi2070-prefix-cap b {
+  color: var(--mbi-green);
+  font-size: 0.68rem;
+}
+
+.mbi2070-prefix-gem {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+}
+
+.mbi2070-prefix-gem span {
+  color: var(--mbi-blue);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.mbi2070-prefix-gem b {
+  color: var(--mbi-text);
+  font-size: 0.7rem;
+}
+
+.mbi2070-prefix-item > strong {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  background: color-mix(in srgb, var(--mbi-gold) 14%, var(--mbi-panel));
+  color: var(--mbi-gold);
+  font-size: 0.68rem;
+}
+
+.mbi2070-prefix-item > i {
+  position: absolute;
+  top: 43px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mbi-pink);
+  color: var(--mbi-bg);
+  font-size: 0.9rem;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.mbi2070-prefix-item.is-built {
+  opacity: 1;
+}
+
+.mbi2070-prefix-item.is-current {
+  background: color-mix(in srgb, var(--mbi-cyan) 17%, var(--mbi-panel));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--mbi-cyan) 55%, transparent);
+  opacity: 1;
+  transform: translateY(-4px);
+}
+
+.mbi2070-prefix-item.is-range {
+  background: color-mix(in srgb, var(--mbi-pink) 11%, var(--mbi-panel));
+  opacity: 1;
+}
+
+.mbi2070-prefix-item.is-searched:not(.is-range) {
+  filter: saturate(0.35);
+  opacity: 0.33;
+}
+
+.mbi2070-prefix-item.is-mid {
+  background: color-mix(in srgb, var(--mbi-pink) 23%, var(--mbi-panel));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--mbi-pink) 62%, transparent);
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.mbi2070-prefix-item.is-selected {
+  background: color-mix(in srgb, var(--mbi-green) 20%, var(--mbi-panel));
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--mbi-green) 68%, transparent);
+  opacity: 1;
+  transform: translateY(-5px);
+}
+
+.mbi2070-bs-result {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 9px;
+  min-height: 66px;
+  border-radius: 14px;
+  padding: 8px 14%;
+  background: color-mix(in srgb, var(--mbi-bg) 50%, transparent);
+}
+
+.mbi2070-bs-result span,
+.mbi2070-bs-result b {
+  display: grid;
+  place-items: center;
+  min-width: 49px;
+  min-height: 40px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--mbi-gold) 14%, var(--mbi-panel));
+  color: var(--mbi-gold);
+  font-size: 0.86rem;
+}
+
+.mbi2070-bs-result b {
+  background: color-mix(in srgb, var(--mbi-green) 14%, var(--mbi-panel));
+  color: var(--mbi-green);
+}
+
+.mbi2070-bs-result i {
+  color: var(--mbi-muted);
+  font-style: normal;
+}
+
+.mbi2070-bs-idle {
+  grid-template-columns: auto 1fr auto 1fr auto;
+}
+
+.mbi2070-bs-idle strong {
+  color: var(--mbi-pink);
+  font-size: 1.1rem;
+}
+
 @container mbi2070 (max-width: 600px) {
   .mbi2070-heading {
     grid-template-columns: 1fr auto;
@@ -508,6 +749,10 @@ body.light .mbi2070-viz,
   .mbi2070-equation b {
     min-width: 38px;
   }
+
+  .mbi2070-prefix-market {
+    grid-template-columns: repeat(var(--mbi-prefix-count), minmax(49px, 1fr));
+  }
 }
 
 @container mbi2070 (max-width: 390px) {
@@ -533,10 +778,27 @@ body.light .mbi2070-viz,
   .mbi2070-record > span {
     grid-row: auto;
   }
+
+  .mbi2070-pipeline {
+    gap: 4px;
+  }
+
+  .mbi2070-pipeline b {
+    padding-inline: 6px;
+    font-size: 0.57rem;
+  }
+
+  .mbi2070-search-status {
+    gap: 4px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mbi2070-beauty {
+    transition: none;
+  }
+
+  .mbi2070-prefix-item {
     transition: none;
   }
 }
