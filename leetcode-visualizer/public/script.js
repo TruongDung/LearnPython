@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.heaters475View), surface: "treeView", render: (step) => {
+      renderHeaters475Pictures(step);
+    } },
     { predicate: (step) => Boolean(step.minSwaps801View), surface: "treeView", render: (step) => {
       renderMinimumSwaps801Pictures(step);
     } },
