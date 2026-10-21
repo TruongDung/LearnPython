@@ -970,8 +970,37 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
     trace = []
     stdout_buffer = io.StringIO()
 
+    def list_node_snapshot(node, seen=None, remaining=200):
+        if node is None:
+            return None
+        if not isinstance(node, ListNode):
+            return safe_repr(node)
+        seen = set() if seen is None else seen
+        if id(node) in seen:
+            return "<cycle>"
+        if remaining == 0:
+            return "<truncated>"
+        seen.add(id(node))
+        return {"val": safe_repr(node.val), "next": list_node_snapshot(node.next, seen, remaining - 1)}
+
+    def list_result(node):
+        values, seen = [], set()
+        while node is not None:
+            if not isinstance(node, ListNode):
+                return {"values": values, "next": safe_repr(node)}
+            if id(node) in seen:
+                return {"values": values, "cycle": True}
+            if len(values) == 200:
+                return values + ["<truncated>"]
+            seen.add(id(node))
+            values.append(safe_repr(node.val))
+            node = node.next
+        return values
+
     def safe_repr(value, depth=0):
         try:
+            if isinstance(value, ListNode):
+                return list_node_snapshot(value)
             if depth > 3:
                 return "..."
             if isinstance(value, (int, float, str, bool)) or value is None:
@@ -1097,7 +1126,7 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
     finally:
         sys.settrace(None)
 
-    return {"trace": trace, "result": safe_repr(result), "stdout": stdout_buffer.getvalue()}
+    return {"trace": trace, "result": list_result(result) if isinstance(result, ListNode) else safe_repr(result), "stdout": stdout_buffer.getvalue()}
 `;
 
 async function runLiveCode() {

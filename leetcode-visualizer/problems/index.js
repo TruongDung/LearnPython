@@ -26,7 +26,7 @@ const categories = {
   "binary-tree": Object.assign(require("./tree"), require("./hard-tree-visualizations"), require("./hard-tree-2872")),
   heap: Object.assign(require("./heap"), require("./kth-largest-215"), require("./server-heap"), require("./meeting-rooms-iii"), require("./minimum-interval-1851")),
   "union-find": Object.assign(require("./union-find"), require("./hard-union-find-visualizations"), require("./number-of-good-paths-2421"), require("./similar-string-groups-839")),
-  "linked-list": require("./linked-list"),
+  "linked-list": Object.assign(require("./linked-list"), require("./swap-nodes-24")),
   "binary-lifting": Object.assign(require("./binary-lifting"), require("./minimum-edge-weight-equilibrium-queries-2846")),
   "binary-search": Object.assign(require("./binary-search"), require("./sqrt-69"), require("./range-module"), require("./full-bloom-flowers-2251"), require("./most-beautiful-item-2070"), require("./arranging-coins-441"), require("./guess-number-374"), require("./repair-cars-2594"), require("./divide-chocolate-1231"), require("./kth-missing-positive-1539"), require("./smallest-divisor-1283"), require("./min-days-bouquets-1482"), require("./magnetic-force-1552")),
   "monotonic-stack": require("./monotonic-stack"),
