@@ -23,6 +23,24 @@ const code = [
   "            radius = max(radius, nearest)",
   "        return radius",
 ];
+const code2 = [
+  "from bisect import bisect_left",
+  "",
+  "class Solution:",
+  "    def findRadius(self, houses, heaters):",
+  "        heaters.sort()",
+  "        radius = 0",
+  "        for house in houses:",
+  "            pos = bisect_left(heaters, house)",
+  "            nearest = 10**9",
+  "            if pos > 0:",
+  "                nearest = min(nearest, house - heaters[pos-1])",
+  "            if pos < len(heaters):",
+  "                nearest = min(nearest, heaters[pos] - house)",
+  "            radius = max(radius, nearest)",
+  "        return radius",
+];
+const bisectLines = { 3:5, 4:6, 5:7, 7:8, 13:9, 14:10, 15:11, 16:12, 17:13, 18:14, 19:15 };
 function parseList(input, name) {
   let values = input;
   if (typeof input === "string") {
@@ -54,14 +72,15 @@ function solve(houses, heaters) {
   }
   return { radius, bottleneck };
 }
-function builder(input, params = {}) {
+function build(input, params = {}, approach = 1) {
+  const source = approach === 2 ? code2 : code;
   const [houses, heaters] = parse(input, params), originalHeaters = [...heaters], steps = [], history = [];
   const detailed = houses.length <= 12 && heaters.length <= 12;
   if (!detailed) {
     heaters.sort((a,b) => a-b);
     const result = solve(houses, heaters);
-    return { original: [...houses], answer: result.radius, steps: [{ title: bi("Kết quả · tính đủ toàn bộ đầu vào", "Result · full input computed"), codeLines: [], final: true, vars: [], arr: [], highlight: [], mark: [], note: bi("", ""),
-      heaters475View: { mode: "summary", houses: houses.slice(0,12), heaters: heaters.slice(0,12), totalHouses: houses.length, totalHeaters: heaters.length, radius: result.radius,
+    return { original: [...houses], answer: result.radius, steps: [{ title: bi("Kết quả · tính đủ toàn bộ đầu vào", "Result · full input computed"), codeLines: [], codeBlock: approach, final: true, vars: [], arr: [], highlight: [], mark: [], note: bi("", ""),
+      heaters475View: { mode: "summary", approach, houses: houses.slice(0,12), heaters: heaters.slice(0,12), totalHouses: houses.length, totalHeaters: heaters.length, radius: result.radius,
         houseIndex: null, house: null, line: null, source: "", event: "return", left: null, right: null, mid: null, check: null, candidate: null, nearest: null, chosen: null, distances: { left: null, right: null }, history: [], bottleneck: result.bottleneck, update: null }
     }] };
   }
@@ -69,11 +88,14 @@ function builder(input, params = {}) {
   let houseIndex = null, distances = { left: null, right: null }, chosen = null, bottleneck = null;
   function emit(line, event, title, options = {}) {
     const final = line === 19;
-    steps.push({ title: bi(`Dòng ${line} · ${title.vi}`, `Line ${line} · ${title.en}`), codeLines: [line], final, arr: [], highlight: [], mark: [], note: bi("", ""),
+    const visibleLine = approach === 2 ? bisectLines[line] : line;
+    const position = approach === 2 ? locals.pos : locals.left;
+    steps.push({ title: bi(`Dòng ${visibleLine} · ${title.vi}`, `Line ${visibleLine} · ${title.en}`), codeLines: [visibleLine], codeBlock: approach, final, arr: [], highlight: [], mark: [], note: bi("", ""),
       vars: Object.entries(locals).map(([name, raw]) => ({ name, rawValue: Array.isArray(raw) ? [...raw] : typeof raw === "object" ? { ...raw } : raw, value: name === "self" ? "Solution" : Array.isArray(raw) ? [...raw] : raw })),
-      heaters475View: { mode: "trace", houses: [...houses], heaters: [...heaters], originalHeaters: [...originalHeaters], totalHouses: houses.length, totalHeaters: heaters.length,
-        line, source: code[line-1].trim(), event, radius: locals.radius ?? null, houseIndex, house: houseIndex === null ? null : locals.house,
-        left: event === "house" ? null : locals.left ?? null, right: event === "house" ? null : locals.right ?? null, mid: [8,9,10,12].includes(line) ? locals.mid : null,
+      heaters475View: { mode: "trace", approach, houses: [...houses], heaters: [...heaters], originalHeaters: [...originalHeaters], totalHouses: houses.length, totalHeaters: heaters.length,
+        line: visibleLine, source: source[visibleLine-1].trim(), event, radius: locals.radius ?? null, houseIndex, house: houseIndex === null ? null : locals.house,
+        left: event === "house" ? null : position ?? null, right: approach === 2 || event === "house" ? null : locals.right ?? null, mid: approach === 1 && [8,9,10,12].includes(line) ? locals.mid : null,
+        pos: approach === 2 && event !== "house" ? locals.pos ?? null : null,
         nearest: line >= 13 ? locals.nearest ?? null : null, chosen, distances: { ...distances }, check: options.check ?? null, candidate: options.candidate ?? null,
         history: history.map(row => ({ ...row })), bottleneck: bottleneck && { ...bottleneck }, update: options.update || null }
     });
@@ -83,30 +105,37 @@ function builder(input, params = {}) {
   for (let index = 0; index < houses.length; index++) {
     houseIndex = index; locals.house = houses[index]; distances = { left: null, right: null }; chosen = null;
     emit(5,"house",bi(`Nhà #${index}: ${locals.house}`, `House #${index}: ${locals.house}`));
-    locals.left = 0; locals.right = heaters.length; emit(6,"bounds",bi("Tìm máy đầu tiên ≥ nhà", "Find first heater ≥ house"));
-    while (true) {
-      const active = locals.left < locals.right;
-      emit(7,active ? "while" : "position",bi(active ? "Còn khoảng tìm kiếm" : `Vị trí chèn: ${locals.left}`, active ? "Search range remains" : `Insertion index: ${locals.left}`),{check:active});
-      if (!active) break;
-      locals.mid = Math.floor((locals.left + locals.right)/2); emit(8,"mid",bi(`Thử máy #${locals.mid}`, `Try heater #${locals.mid}`));
-      const less = heaters[locals.mid] < locals.house;
-      emit(9,"compare",bi(`${heaters[locals.mid]} < ${locals.house}? ${less ? "✓" : "✕"}`,`${heaters[locals.mid]} < ${locals.house}? ${less ? "✓" : "✕"}`),{check:less});
-      if (less) { locals.left = locals.mid+1; emit(10,"move-left",bi(`left → ${locals.left}`,`left → ${locals.left}`)); }
-      else { locals.right = locals.mid; emit(12,"move-right",bi(`right ← ${locals.right}`,`right ← ${locals.right}`)); }
+    if (approach === 2) {
+      // bisect_left is one executed Python call; its internals are not source locals.
+      locals.pos = lowerBound(heaters,locals.house);
+      emit(7,"position",bi(`bisect_left → pos = ${locals.pos}`,`bisect_left → pos = ${locals.pos}`));
+    } else {
+      locals.left = 0; locals.right = heaters.length; emit(6,"bounds",bi("Tìm máy đầu tiên ≥ nhà", "Find first heater ≥ house"));
+      while (true) {
+        const active = locals.left < locals.right;
+        emit(7,active ? "while" : "position",bi(active ? "Còn khoảng tìm kiếm" : `Vị trí chèn: ${locals.left}`, active ? "Search range remains" : `Insertion index: ${locals.left}`),{check:active});
+        if (!active) break;
+        locals.mid = Math.floor((locals.left + locals.right)/2); emit(8,"mid",bi(`Thử máy #${locals.mid}`, `Try heater #${locals.mid}`));
+        const less = heaters[locals.mid] < locals.house;
+        emit(9,"compare",bi(`${heaters[locals.mid]} < ${locals.house}? ${less ? "✓" : "✕"}`,`${heaters[locals.mid]} < ${locals.house}? ${less ? "✓" : "✕"}`),{check:less});
+        if (less) { locals.left = locals.mid+1; emit(10,"move-left",bi(`left → ${locals.left}`,`left → ${locals.left}`)); }
+        else { locals.right = locals.mid; emit(12,"move-right",bi(`right ← ${locals.right}`,`right ← ${locals.right}`)); }
+      }
     }
+    const position = approach === 2 ? locals.pos : locals.left;
     locals.nearest = INF; emit(13,"reset",bi("Bắt đầu chọn máy gần nhất", "Start choosing the nearest heater"));
-    const hasLeft = locals.left > 0;
+    const hasLeft = position > 0;
     emit(14,"has-left",bi(hasLeft ? "Có máy bên trái" : "Không có máy bên trái",hasLeft ? "Left heater exists" : "No left heater"),{check:hasLeft});
     if (hasLeft) {
-      const before = locals.nearest, candidate = locals.house - heaters[locals.left-1]; distances.left = candidate;
-      locals.nearest = Math.min(before,candidate); chosen = locals.left-1;
+      const before = locals.nearest, candidate = locals.house - heaters[position-1]; distances.left = candidate;
+      locals.nearest = Math.min(before,candidate); chosen = position-1;
       emit(15,"left-distance",bi(`Khoảng cách trái: ${candidate}`,`Left distance: ${candidate}`),{candidate,update:{name:"nearest",operator:"min",before,candidate,after:locals.nearest}});
     }
-    const hasRight = locals.left < heaters.length;
+    const hasRight = position < heaters.length;
     emit(16,"has-right",bi(hasRight ? "Có máy bên phải (hoặc trùng nhà)" : "Không có máy bên phải",hasRight ? "Right heater exists (or at house)" : "No right heater"),{check:hasRight});
     if (hasRight) {
-      const before = locals.nearest, candidate = heaters[locals.left] - locals.house; distances.right = candidate;
-      if (candidate < before) chosen = locals.left;
+      const before = locals.nearest, candidate = heaters[position] - locals.house; distances.right = candidate;
+      if (candidate < before) chosen = position;
       locals.nearest = Math.min(before,candidate);
       emit(17,"right-distance",bi(`Khoảng cách phải: ${candidate}`,`Right distance: ${candidate}`),{candidate,update:{name:"nearest",operator:"min",before,candidate,after:locals.nearest}});
     }
@@ -119,12 +148,18 @@ function builder(input, params = {}) {
   emit(19,"return",bi(`Bán kính nhỏ nhất: ${locals.radius}`,`Minimum radius: ${locals.radius}`));
   return { original: [...houses], answer: locals.radius, steps };
 }
-module.exports = { 475: { ...base, code, builder, debugMode: "line-by-line",
+module.exports = { 475: { ...base, code, code2, builder: (input,params) => build(input,params,1), builder2: (input,params) => build(input,params,2), debugMode: "line-by-line",
+  codeLabel: bi("Cách 1 · Tự viết binary search", "Approach 1 · Manual binary search"),
+  code2Label: bi("Cách 2 · bisect_left", "Approach 2 · bisect_left"),
   titleVi: bi("Nhà xa máy nhất quyết định bán kính", "The hardest house determines the radius"),
   statement: bi("Mỗi máy sưởi phủ [vị trí − r, vị trí + r]. Tìm r nhỏ nhất để phủ tất cả nhà; mọi máy dùng chung r.", "Each heater covers [position − r, position + r]. Find the smallest shared r that covers every house."),
   inputLabel: bi("houses · vị trí nhà (1..10^9)", "houses · house positions (1..10^9)"),
-  extraParams: [{ key:"heaters",type:"string",default:"2,9",label:bi("heaters · vị trí máy sưởi, cách nhau dấu phẩy", "heaters · comma-separated heater positions") }],
-  approach: [bi("Mỗi nhà → máy gần nhất (min).", "Each house → nearest heater (min)."),bi("Mọi nhà → bán kính lớn nhất cần dùng (max).", "All houses → largest required distance (max).")],
+  extraParams: [{ key:"heaters",type:"string",default:"2,9",label:bi("heaters · vị trí máy sưởi, cách nhau dấu phẩy", "heaters · comma-separated heater positions") },
+    { key:"approach",type:"select",default:1,label:bi("Cách giải", "Approach"),options:[
+      {value:1,label:bi("Cách 1 · Tự viết binary search", "Approach 1 · Manual binary search")},
+      {value:2,label:bi("Cách 2 · bisect_left", "Approach 2 · bisect_left")}
+    ] }],
+  approach: [bi("Mỗi nhà → máy gần nhất (min).", "Each house → nearest heater (min)."),bi("Mọi nhà → bán kính lớn nhất cần dùng (max).", "All houses → largest required distance (max)."),bi("Cách 2: bisect_left → pos; so hai máy ở pos−1 và pos.", "Approach 2: bisect_left → pos; compare heaters at pos−1 and pos.")],
   complexity: { time:"O(n log n + m log n)",space:"O(n)",note:bi("m nhà, n máy; Python sort dùng O(n) bộ nhớ phụ. Debug ≤12 nhà và ≤12 máy; đầu vào lớn tính đủ, hình xem trước 12 vị trí mỗi loại.", "m houses, n heaters; Python sort uses O(n) auxiliary space. Full debug for ≤12 of each; larger inputs compute fully and preview 12 of each.") },
   liveArgs: (input,params) => parse(input,params)
 } };

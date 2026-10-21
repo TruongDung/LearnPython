@@ -18,6 +18,7 @@ function heaters475Geometry(houses, heaters) {
 }
 function renderHeaters475Pictures(step, previewRadius = null) {
   const v = step.heaters475View, t = (vi,en) => lang === 'vi' ? vi : en, esc = value => escapeHtml(String(value));
+  const bisect = v.approach === 2;
   const final = Boolean(step.final), summary = v.mode === 'summary', radius = previewRadius === null ? v.radius : previewRadius;
   const fmt = value => value === null || value === undefined ? '—' : value === 1000000000 ? '∞' : value;
   const geo = heaters475Geometry(v.houses,v.heaters), {width,x} = geo;
@@ -40,15 +41,26 @@ function renderHeaters475Pictures(step, previewRadius = null) {
     const index = neighborsKnown ? side === 'left' ? v.left-1 : v.left : null;
     const exists = index !== null && index >= 0 && index < v.heaters.length;
     const distance = v.distances[side], chosen = index !== null && index === v.chosen;
-    return `<div class="h475-neighbor${chosen ? ' chosen' : ''}"><small>${side === 'left' ? t('Máy bên trái','Left heater') : t('Máy bên phải','Right heater')}</small><div><b>♨ ${exists ? v.heaters[index] : neighborsKnown ? '∅' : '?'}</b><span>→</span><b>⌂ ${v.house ?? '?'}</b></div><code>${distance !== null ? `|${v.heaters[index]} − ${v.house}| = ${distance}` : neighborsKnown && !exists ? t('Không có máy','No heater') : t('Chưa tính','Not computed')}</code></div>`;
+    return `<div class="h475-neighbor${chosen ? ' chosen' : ''}"><small>${bisect ? side === 'left' ? 'pos−1 · ' : 'pos · ' : ''}${side === 'left' ? t('Máy bên trái','Left heater') : t('Máy bên phải','Right heater')}</small><div><b>♨ ${exists ? v.heaters[index] : neighborsKnown ? '∅' : '?'}</b><span>→</span><b>⌂ ${v.house ?? '?'}</b></div><code>${distance !== null ? `|${v.heaters[index]} − ${v.house}| = ${distance}` : neighborsKnown && !exists ? t('Không có máy','No heater') : t('Chưa tính','Not computed')}</code></div>`;
   }
-  const search = !summary && !final && v.left !== null ? `<div class="h475-search"><small>${t('Máy đã sắp xếp · khoảng tìm kiếm [left, right)', 'Sorted heaters · search range [left, right)')}</small><div>${v.heaters.map((heater,i) => `<span class="${i >= v.left && i < v.right ? 'in-range' : 'outside'}${i === v.mid ? ' mid' : ''}"><small>#${i}</small><b>${heater}</b><em>${[i === v.left ? 'left' : '',i === v.right ? 'right' : '',i === v.mid ? 'mid' : ''].filter(Boolean).join(' · ') || '·'}</em></span>`).join('')}<span class="h475-end${v.left === v.heaters.length ? ' insert' : ''}"><small>#${v.heaters.length}</small><b>END</b><em>${[v.left === v.heaters.length ? 'left' : '',v.right === v.heaters.length ? 'right' : ''].filter(Boolean).join(' · ') || '·'}</em></span></div></div>` : '';
+  function searchPicture() {
+    if (summary || final || v.left === null) return '';
+    const caption = bisect ? t('bisect_left → pos · máy đầu tiên ≥ nhà', 'bisect_left → pos · first heater ≥ house') : t('Máy đã sắp xếp · khoảng tìm kiếm [left, right)', 'Sorted heaters · search range [left, right)');
+    const cells = v.heaters.map((heater,i) => {
+      const state = bisect ? i === v.pos ? 'insert' : 'outside' : `${i >= v.left && i < v.right ? 'in-range' : 'outside'}${i === v.mid ? ' mid' : ''}`;
+      const label = bisect ? i === v.pos ? 'pos' : '·' : [i === v.left ? 'left' : '',i === v.right ? 'right' : '',i === v.mid ? 'mid' : ''].filter(Boolean).join(' · ') || '·';
+      return `<span class="${state}"><small>#${i}</small><b>${heater}</b><em>${label}</em></span>`;
+    }).join('');
+    const endLabel = bisect ? v.pos === v.heaters.length ? 'pos' : '·' : [v.left === v.heaters.length ? 'left' : '',v.right === v.heaters.length ? 'right' : ''].filter(Boolean).join(' · ') || '·';
+    return `<div class="h475-search"><small>${caption}</small><div>${cells}<span class="h475-end${v.left === v.heaters.length ? ' insert' : ''}"><small>#${v.heaters.length}</small><b>END</b><em>${endLabel}</em></span></div></div>`;
+  }
+  const search = searchPicture();
   const update = v.update ? `<div class="h475-update"><code>${v.update.name} = ${v.update.operator}(${fmt(v.update.before)}, ${fmt(v.update.candidate)}) = <b>${v.update.after}</b></code></div>` : '';
   const history = v.history.length ? `<div class="h475-history"><small>${t('Nhà đã xét → khoảng cách tới máy gần nhất','Processed house → nearest heater distance')}</small><div>${v.history.map(row => `<span class="${v.bottleneck?.index === row.index ? 'bottleneck' : ''}"><small>⌂ ${row.house}</small><b>${row.nearest}</b><small>♨ ${row.heater}</small></span>`).join('')}<i>→ max = ${v.radius}</i></div></div>` : '';
   const proof = final ? `<div class="h475-proof"><strong>r = ${v.radius}</strong><span>⌂ ${v.bottleneck.house} → ♨ ${v.bottleneck.heaterPosition} · d = ${v.bottleneck.nearest}</span><small>${t('Nhà này bắt buộc r ≥','This house requires r ≥')} ${v.radius}</small></div>` : '';
   const uncovered = !summary && radius !== null ? v.houses.filter(house => !covered(house)).length : null;
   $('treeView').innerHTML = `<section class="h475-viz" aria-label="475 · Heaters">
-    <header><strong>475 · ${t('Sưởi ấm tất cả nhà','Warm every house')}</strong><button type="button" data-h475-next ${final ? 'disabled' : ''}>${t('Nhà tiếp','Next house')} ⏭</button><button type="button" data-h475-result>${t('Kết quả','Result')}</button></header>
+    <header><strong>475 · ${bisect ? 'bisect_left' : t('Sưởi ấm tất cả nhà','Warm every house')}</strong><button type="button" data-h475-next ${final ? 'disabled' : ''}>${t('Nhà tiếp','Next house')} ⏭</button><button type="button" data-h475-result>${t('Kết quả','Result')}</button></header>
     ${summary ? `<div class="h475-summary">${v.totalHouses} ${t('nhà','houses')} · ${v.totalHeaters} ${t('máy · đã tính đủ. Hình chỉ xem trước 12 nhà và 12 máy; có thể có máy ngoài hình phủ nhà. Debug từng dòng với ≤12 mỗi loại.','heaters · fully computed. Picture previews 12 of each; off-screen heaters may cover houses. Line debug for ≤12 of each.')}</div>` : `<div class="h475-line"><b>L${v.line}</b><code>${esc(v.source)}</code></div>`}
     <div class="h475-metrics"><span><small>⌂ ${t('Nhà đang xét','Current house')}</small><b>${houseText}</b></span><span><small>min · ${t('máy gần nhất','nearest heater')}</small><b>${final ? '—' : fmt(v.nearest)}</b></span><span><small>${previewRadius === null ? 'max · radius' : t('Bán kính thử','Preview radius')}</small><b>r = ${radius ?? '—'}</b></span></div>
     <div class="h475-road"><svg viewBox="0 0 ${width} 243" style="width:${width}px;height:243px" role="img" aria-label="${t('Nhà, máy sưởi và vùng phủ với bán kính','Houses, heaters and coverage at radius')} ${radius ?? '?'}">${bands}<path class="h475-axis" d="M20,134 H${width-20}"/>${ruler}${connection}${heaterIcons}${houseIcons}</svg></div>

@@ -14,8 +14,8 @@ function random(n) {seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;
 for (let i=0;i<150;i++) cases.push([Array.from({length:1+random(7)},()=>1+random(35)),Array.from({length:1+random(7)},()=>1+random(35))]);
 
 test('475 answers, coverage and bottleneck prove the minimum radius against an independent oracle',()=>{
-  for (const [houses,heaters] of cases) {
-    const before=JSON.stringify([houses,heaters]), run=problem.builder(houses,{heaters});
+  for (const [houses,heaters] of cases) for (const build of [problem.builder,problem.builder2]) {
+    const before=JSON.stringify([houses,heaters]), run=build(houses,{heaters});
     assert.equal(run.answer,oracle(houses,heaters));
     const last=run.steps.at(-1).heaters475View;
     assert.equal(last.bottleneck.nearest,run.answer);
@@ -27,7 +27,9 @@ test('475 answers, coverage and bottleneck prove the minimum radius against an i
   }
 });
 
-test('475 every executed line, sorting mutation and complete local snapshots match CPython',()=>{
+for (const approach of [1,2]) test(`475 approach ${approach}: executed lines and complete local snapshots match CPython`,()=>{
+  const code = approach === 2 ? problem.code2 : problem.code;
+  const build = approach === 2 ? problem.builder2 : problem.builder;
   const python=`import json,sys
 data=json.load(sys.stdin)
 ns={}
@@ -50,10 +52,10 @@ for houses,heaters in data['cases']:
     sys.settrace(None)
     out.append({'answer':answer,'events':events})
 print(json.dumps(out))`;
-  const result=spawnSync('python',['-c',python],{input:JSON.stringify({code:problem.code.join('\n'),cases}),encoding:'utf8',maxBuffer:48*1024*1024});
+  const result=spawnSync('python',['-c',python],{input:JSON.stringify({code:code.join('\n'),cases}),encoding:'utf8',maxBuffer:48*1024*1024});
   assert.equal(result.status,0,result.stderr);
   JSON.parse(result.stdout).forEach((actual,i)=>{
-    const run=problem.builder(cases[i][0],{heaters:cases[i][1]});
+    const run=build(cases[i][0],{heaters:cases[i][1]});
     assert.equal(run.answer,actual.answer);
     assert.deepEqual(run.steps.map(s=>({line:s.codeLines[0],locals:Object.fromEntries(s.vars.map(v=>[v.name,v.rawValue]))})),actual.events,JSON.stringify(cases[i]));
   });
@@ -76,6 +78,55 @@ test('475 trace does not invent binary-search locals or future radius/distance u
   }
   assert.equal(first.heaters475View.history.length,0);
   assert.equal(run.steps.find(s=>s.heaters475View.event==='radius').heaters475View.history.length,1);
+});
+
+test('475 bisect_left marks insertion boundaries, first duplicate and only actual source locals',()=>{
+  const options=problem.extraParams.find(p=>p.key==='approach');
+  assert.equal(options.type,'select');
+  assert.deepEqual(options.options.map(option=>option.value),[1,2]);
+  for(const [houses,heaters] of [[[1,2,8,9],[8,2,2]],[[1],[9]],[[9],[1]],[[2],[2,2,2]]]) {
+    const run=problem.builder2(houses,{heaters});
+    const positions=run.steps.filter(s=>s.heaters475View.event==='position');
+    assert.equal(positions.length,houses.length);
+    for(const step of run.steps) {
+      const v=step.heaters475View;
+      assert.equal(step.codeBlock,2);
+      assert.equal(v.approach,2);
+      assert.equal(v.source,problem.code2[v.line-1].trim());
+      assert.ok(step.vars.every(variable=>!['left','right','mid'].includes(variable.name)));
+      assert.equal(v.mid,null);assert.equal(v.right,null);
+      if(v.event==='house') assert.equal(v.pos,null);
+      if(v.event==='position') {
+        assert.equal(step.codeLines[0],8);
+        const expected=v.heaters.findIndex(heater=>heater>=v.house);
+        assert.equal(v.pos,expected<0?v.heaters.length:expected);
+        assert.equal(step.vars.find(variable=>variable.name==='pos').rawValue,v.pos);
+      }
+    }
+    const {context,host}=rendererContext();
+    for(const step of positions) {
+      context.renderHeaters475Pictures(step);
+      assert.match(host.innerHTML,/bisect_left → pos/);
+      assert.doesNotMatch(host.innerHTML,/<em>[^<]*(left|right|mid)/);
+      assert.match(host.innerHTML,/<em>pos<\/em>/);
+    }
+  }
+  const large=problem.builder2(Array(13).fill(15),{heaters:'2,9'});
+  assert.equal(large.answer,6);
+  assert.equal(large.steps[0].codeBlock,2);
+  assert.equal(large.steps[0].heaters475View.approach,2);
+});
+
+test('475 live editor selects the bisect source for approach 2 and manual search for approach 1',()=>{
+  const source=fs.readFileSync(require.resolve('../public/live-editor.js'),'utf8');
+  let selected=2;
+  const context={problemData:problem,lang:'vi',$:()=>({querySelector:()=>({value:selected})})};
+  vm.createContext(context);
+  vm.runInContext(source.match(/function selectedLiveCodeBlock\(\) \{[\s\S]*?\n\}/)[0]+'\n'+source.match(/function currentPrimaryCode\(\) \{[\s\S]*?\n\}/)[0],context);
+  assert.equal(context.selectedLiveCodeBlock(),2);
+  assert.equal(context.currentPrimaryCode(),problem.code2.join('\n'));
+  selected=1;
+  assert.equal(context.currentPrimaryCode(),problem.code.join('\n'));
 });
 
 test('475 validation, string heater input and live arguments preserve both unsorted arrays',()=>{
@@ -126,9 +177,9 @@ test('475 diagram geometry keeps coordinate order, zero-radius coverage, duplica
 
 test('475 pictures render all frames in both languages and radius previews expose uncovered houses',()=>{
   const {context,listeners,controls,host}=rendererContext();
-  for(const language of ['vi','en']) for(const [houses,heaters] of cases.slice(0,13)) {
+  for(const language of ['vi','en']) for(const [houses,heaters] of cases.slice(0,13)) for(const build of [problem.builder,problem.builder2]) {
     context.lang=language;
-    for(const step of problem.builder(houses,{heaters}).steps) {
+    for(const step of build(houses,{heaters}).steps) {
       context.renderHeaters475Pictures(step);
       assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity/);
       assert.match(host.innerHTML,/h475-road/);
@@ -151,12 +202,13 @@ test('475 pictures render all frames in both languages and radius previews expos
   assert.doesNotMatch(host.innerHTML,/All houses covered/);
 });
 
-test('475 actual editable-code tracer receives both arrays and returns the same answer',()=>{
+for (const approach of [1,2]) test(`475 approach ${approach}: editable-code tracer returns the correct answer`,()=>{
+  const code = approach === 2 ? problem.code2 : problem.code;
   const source=fs.readFileSync(require.resolve('../public/live-editor.js'),'utf8');
   const tracer=vm.runInNewContext(source.match(/const TRACER_PY = (`[\s\S]*?`);/)[1]);
   const python=tracer+`\nimport json,sys\ndata=json.load(sys.stdin)\nprint(json.dumps([__viz_run_trace(data['code'],'findRadius',args) for args in data['args']]))`;
   const selected=cases.slice(0,13);
-  const execution=spawnSync('python',['-c',python],{input:JSON.stringify({code:problem.code.join('\n'),args:selected.map(([houses,heaters])=>problem.liveArgs(houses,{heaters}))}),encoding:'utf8',maxBuffer:8*1024*1024});
+  const execution=spawnSync('python',['-c',python],{input:JSON.stringify({code:code.join('\n'),args:selected.map(([houses,heaters])=>problem.liveArgs(houses,{heaters}))}),encoding:'utf8',maxBuffer:8*1024*1024});
   assert.equal(execution.status,0,execution.stderr);
   JSON.parse(execution.stdout).forEach((run,i)=>{assert.equal(run.result,oracle(...selected[i]));assert.ok(run.trace.length>0);assert.deepEqual(run.trace.at(-1).vars.houses,selected[i][0]);assert.deepEqual(run.trace.at(-1).vars.heaters,[...selected[i][1]].sort((a,b)=>a-b));});
 });
