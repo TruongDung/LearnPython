@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.flatten114View), surface: "treeView", render: (step) => {
+      renderFlatten114Pictures(step);
+    } },
     { predicate: (step) => Boolean(step.atoi8View), surface: "treeView", render: (step) => {
       renderAtoi8Pictures(step);
     } },
