@@ -1036,6 +1036,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.fullBloomFlowers2251View), surface: "treeView", render: (step) => {
       renderFullBloomFlowers2251View(step);
     } },
+    { predicate: (step) => Boolean(step.mostBeautifulItem2070View), surface: "treeView", render: (step) => {
+      renderMostBeautifulItem2070View(step);
+    } },
     { predicate: (step) => Boolean(step.parallel2050View), surface: "treeView", render: (step) => {
       renderParallelCourses2050View(step);
     } },

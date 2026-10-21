@@ -1,0 +1,218 @@
+"use strict";
+
+const bi = (vi, en) => ({ vi, en });
+const MAX_ITEMS_2070 = 14;
+const MAX_QUERIES_2070 = 10;
+const MAX_VALUE_2070 = 1_000_000_000;
+
+const CODE_2070 = Object.freeze([
+  "class Solution:",
+  "    def maximumBeauty(self, items, queries):",
+  "        items.sort()",
+  "        ordered = sorted((query, index) for index, query in enumerate(queries))",
+  "        answer = [0] * len(queries)",
+  "        best = 0",
+  "        item = 0",
+  "        for query, index in ordered:",
+  "            while item < len(items) and items[item][0] <= query:",
+  "                best = max(best, items[item][1])",
+  "                item += 1",
+  "            answer[index] = best",
+  "        return answer",
+]);
+
+function parse2070Input(input) {
+  let data = input;
+  if (typeof input === "string") {
+    try {
+      data = JSON.parse(input);
+    } catch (_error) {
+      throw new Error('2070: enter JSON like {"items":[[1,2],[3,5]],"queries":[2,3]}.');
+    }
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("2070: input must be an object with items and queries arrays.");
+  }
+  const { items, queries } = data;
+  if (!Array.isArray(items) || items.length < 1 || items.length > MAX_ITEMS_2070) {
+    throw new Error(`2070: enter 1–${MAX_ITEMS_2070} [price, beauty] items.`);
+  }
+  if (!Array.isArray(queries) || queries.length < 1 || queries.length > MAX_QUERIES_2070) {
+    throw new Error(`2070: enter 1–${MAX_QUERIES_2070} queries.`);
+  }
+  const parsedItems = items.map((item, index) => {
+    if (!Array.isArray(item) || item.length !== 2
+      || item.some((value) => !Number.isSafeInteger(value) || value < 1 || value > MAX_VALUE_2070)) {
+      throw new Error(`2070: item ${index + 1} must be [price, beauty] with values in [1, ${MAX_VALUE_2070}].`);
+    }
+    return [...item];
+  });
+  if (queries.some((query) => !Number.isSafeInteger(query) || query < 1 || query > MAX_VALUE_2070)) {
+    throw new Error(`2070: every query must be an integer in [1, ${MAX_VALUE_2070}].`);
+  }
+  return { items: parsedItems, queries: [...queries] };
+}
+
+function buildSteps2070(input) {
+  const { items, queries } = parse2070Input(input);
+  const originalItems = items.map(([price, beauty], id) => ({ id, price, beauty }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((left, right) => left.price - right.price || left.beauty - right.beauty || left.id - right.id);
+  const orderedQueries = queries
+    .map((value, originalIndex) => ({ value, originalIndex }))
+    .sort((left, right) => left.value - right.value || left.originalIndex - right.originalIndex);
+  const answers = Array(queries.length).fill(0);
+  const resolved = Array(queries.length).fill(false);
+  const steps = [];
+  let itemsSorted = false;
+  let queriesSorted = false;
+  let best = 0;
+  let pointer = 0;
+  let queryOrderIndex = -1;
+  let activeItemIndex = null;
+  let comparison = null;
+  let previousBest = 0;
+
+  function emit(event, line, final = false) {
+    const activeQuery = queryOrderIndex >= 0 && queryOrderIndex < orderedQueries.length
+      ? orderedQueries[queryOrderIndex]
+      : null;
+    steps.push({
+      title: bi("Quét giá, giữ món đẹp nhất", "Sweep prices, keep the best beauty"),
+      note: bi("", ""),
+      codeLines: [line],
+      final,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      vars: [
+        { name: "query", value: activeQuery?.value ?? "—" },
+        { name: "item", value: pointer },
+        { name: "best", value: best },
+        { name: "answer", value: answers.map((value, index) => resolved[index] ? value : "—").join(", ") },
+      ],
+      mostBeautifulItem2070View: {
+        event,
+        items: originalItems.map((item) => ({ ...item })),
+        sortedItems: sortedItems.map((item) => ({ ...item })),
+        itemsSorted,
+        queries: [...queries],
+        orderedQueries: orderedQueries.map((query) => ({ ...query })),
+        queriesSorted,
+        answers: [...answers],
+        resolved: [...resolved],
+        queryOrderIndex,
+        activeQuery: activeQuery ? { ...activeQuery } : null,
+        pointer,
+        activeItemIndex,
+        comparison: comparison ? { ...comparison } : null,
+        best,
+        previousBest,
+        final,
+      },
+    });
+  }
+
+  emit("bind-class", 1);
+  emit("enter-method", 2);
+  itemsSorted = true;
+  emit("sort-items", 3);
+  queriesSorted = true;
+  emit("sort-queries", 4);
+  emit("allocate-answer", 5);
+  emit("seed-best", 6);
+  emit("seed-pointer", 7);
+
+  for (queryOrderIndex = 0; queryOrderIndex < orderedQueries.length; queryOrderIndex += 1) {
+    const activeQuery = orderedQueries[queryOrderIndex];
+    activeItemIndex = null;
+    comparison = null;
+    emit("pick-query", 8);
+    while (pointer < sortedItems.length && sortedItems[pointer].price <= activeQuery.value) {
+      activeItemIndex = pointer;
+      comparison = {
+        price: sortedItems[pointer].price,
+        query: activeQuery.value,
+        allowed: true,
+      };
+      emit("open-gate", 9);
+      previousBest = best;
+      best = Math.max(best, sortedItems[pointer].beauty);
+      emit("raise-best", 10);
+      pointer += 1;
+      emit("advance-item", 11);
+    }
+    activeItemIndex = pointer < sortedItems.length ? pointer : null;
+    comparison = pointer < sortedItems.length ? {
+      price: sortedItems[pointer].price,
+      query: activeQuery.value,
+      allowed: false,
+    } : { price: null, query: activeQuery.value, allowed: false };
+    emit("close-gate", 9);
+    answers[activeQuery.originalIndex] = best;
+    resolved[activeQuery.originalIndex] = true;
+    activeItemIndex = null;
+    emit("place-answer", 12);
+  }
+
+  queryOrderIndex = orderedQueries.length;
+  activeItemIndex = null;
+  comparison = null;
+  emit("return-answer", 13, true);
+  return {
+    original: { items: items.map((item) => [...item]), queries: [...queries] },
+    answer: answers,
+    steps,
+  };
+}
+
+const DEFAULT_INPUT_2070 = {
+  items: [[1, 2], [3, 2], [2, 4], [5, 6], [3, 5]],
+  queries: [1, 2, 3, 4, 5, 6],
+};
+
+module.exports = {
+  2070: {
+    id: 2070,
+    difficulty: "medium",
+    slug: "most-beautiful-item-for-each-query",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "sorting", vi: "Sắp xếp", en: "Sorting" },
+      { key: "offline-query", vi: "Truy vấn offline", en: "Offline Query" },
+    ],
+    title: bi("Most Beautiful Item for Each Query", "Most Beautiful Item for Each Query"),
+    titleVi: bi("Món đồ đẹp nhất trong ngân sách", "Most beautiful item within each budget"),
+    statement: bi(
+      `Mỗi món có [giá, độ đẹp]. Với từng ngân sách, tìm độ đẹp lớn nhất trong các món có giá không vượt ngân sách. Visualization hỗ trợ tối đa ${MAX_ITEMS_2070} món và ${MAX_QUERIES_2070} truy vấn.`,
+      `Each item has [price, beauty]. For every budget, return the greatest beauty among items whose price does not exceed it. This visualization supports up to ${MAX_ITEMS_2070} items and ${MAX_QUERIES_2070} queries.`,
+    ),
+    inputKind: "string",
+    inputLabel: bi(
+      'JSON: {"items":[[giá,đẹp],...],"queries":[...]}',
+      'JSON: {"items":[[price,beauty],...],"queries":[...]}',
+    ),
+    defaultInput: JSON.stringify(DEFAULT_INPUT_2070),
+    debugMode: "line-by-line",
+    approach: [
+      bi("Xếp món và ngân sách từ nhỏ đến lớn.", "Sort items and budgets from low to high."),
+      bi("Kéo cổng giá sang phải; mỗi món chỉ đi qua một lần.", "Move the price gate right; each item passes once."),
+      bi("Giữ kỷ lục beauty và đặt vào đúng vị trí query ban đầu.", "Keep the beauty record and place it back in the query's original slot."),
+    ],
+    complexity: {
+      time: "O(n log n + q log q)",
+      space: "O(q)",
+      note: bi("Sau khi sắp xếp, con trỏ đi qua mỗi món đúng một lần.", "After sorting, the pointer visits each item exactly once."),
+    },
+    code: CODE_2070,
+    liveArgs: (input) => {
+      const parsed = parse2070Input(input);
+      return [parsed.items, parsed.queries];
+    },
+    parseInput: parse2070Input,
+    builder: buildSteps2070,
+  },
+};
