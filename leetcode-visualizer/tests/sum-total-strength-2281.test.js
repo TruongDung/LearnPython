@@ -82,7 +82,7 @@ test('2281 assigns every subarray to exactly one minimum owner', () => {
   const run = problem.builder(strength.join(','));
   const ownershipSteps = run.steps.filter((step) => (
     step.totalStrength2281View.phase === 'contribution'
-    && step.codeLines[0] === 23
+    && step.codeLines[0] === 24
   ));
   const owned = new Map();
 
@@ -187,8 +187,8 @@ test('2281 dedicated renderer is wired, responsive, bilingual, and complete', ()
 
   context.lang = 'en';
   context.renderTotalStrength2281View(runs[0].steps.at(-1));
-  assert.match(element.innerHTML, /TOTAL STRENGTH OF ALL SUBARRAYS/);
-  assert.match(element.innerHTML, /BOUNDARY PASSES COMPLETE/);
-  assert.match(element.innerHTML, /every wizard now has one fixed ownership region/);
+  assert.match(element.innerHTML, /class="ts2281-bar/);
+  assert.match(element.innerHTML, /class="ts2281-matrix-empty/);
+  assert.match(element.innerHTML, /<small>ANSWER<\/small>/);
   assert.match(element.innerHTML, /<strong>44<\/strong>/);
 });

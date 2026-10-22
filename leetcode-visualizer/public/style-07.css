@@ -3424,6 +3424,94 @@
   .ts2281-compare > p { grid-template-columns: 44px 1fr; }
 }
 
+/* 2281 picture-first pass: code remains line-stepped; the side panel explains with shapes. */
+.ts2281-viz { gap: 8px; padding: 12px; }
+.ts2281-viz > header > span { max-width: 56%; }
+.ts2281-phases { gap: 4px; }
+.ts2281-phases span { min-height: 27px; padding: 3px; gap: 4px; font-size: 9px; }
+.ts2281-phases span b { flex-basis: 16px; width: 16px; height: 16px; }
+.ts2281-bars, .ts2281-prefix, .ts2281-owner, .ts2281-stack, .ts2281-compare, .ts2281-blocks > div, .ts2281-ledger, .ts2281-result, .ts2281-formula { padding: 8px; }
+.ts2281-bars > div { display: flex; align-items: end; justify-content: center; gap: clamp(6px, 2vw, 18px); min-height: 78px; padding: 8px 6px 0; }
+.ts2281-bar { position: relative; display: flex; flex: 1 1 34px; flex-direction: column; align-items: center; justify-content: end; gap: 2px; min-width: 25px; max-width: 76px; color: #334155; }
+.ts2281-bar i { display: block; width: 72%; min-width: 12px; max-width: 38px; background: #cbd5e1; border-radius: 5px 5px 0 0; }
+.ts2281-bar b { position: absolute; top: -17px; font: 700 10px Consolas, monospace; }
+.ts2281-bar small { position: absolute; bottom: -16px; color: #64748b; font: 9px Consolas, monospace; }
+.ts2281-bar em { position: absolute; bottom: -29px; color: #64748b; font: 7px Consolas, monospace; font-style: normal; white-space: nowrap; }
+.ts2281-bar.owned i { background: #7dd3fc; }
+.ts2281-bar.current i { background: #8b5cf6; box-shadow: 0 0 0 3px #ede9fe; }
+.ts2281-bar.compared i { background: #fbbf24; }
+.ts2281-bar.popped i { background: #fb7185; }
+.ts2281-bar.left-boundary::after, .ts2281-bar.right-boundary::after { position: absolute; bottom: -34px; color: #0369a1; font: 800 9px Consolas, monospace; }
+.ts2281-bar.left-boundary::after { content: "L"; }
+.ts2281-bar.right-boundary::after { content: "R"; }
+.ts2281-bars > footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 37px; color: #64748b; font-size: 9px; }
+.ts2281-bars > footer b { color: #5b21b6; }
+.ts2281-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.ts2281-metrics > div { padding: 6px 8px; text-align: center; }
+.ts2281-metrics small { font-size: 8px; }
+.ts2281-metrics strong { font-size: 12px; }
+.ts2281-metrics .minimum { border-color: #a78bfa; background: #f5f3ff; }
+.ts2281-stack { gap: 5px; }
+.ts2281-stack > header { align-items: center; }
+.ts2281-stack > div { min-height: 34px; justify-content: center; }
+.ts2281-stack > div span { flex-basis: 52px; padding: 4px; }
+.ts2281-stack > div span b, .ts2281-stack > div span small { font-size: 9px; }
+.ts2281-compare > p { grid-template-columns: 42px 1fr; padding: 5px; font-size: 9px; }
+.ts2281-prefix { gap: 4px; }
+.ts2281-prefix > header { align-items: center; }
+.ts2281-prefix > header strong { font: 800 10px Consolas, monospace; }
+.ts2281-prefix-labels, .ts2281-prefix > div:not(.ts2281-prefix-labels) { display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 3px; overflow: visible; }
+.ts2281-prefix-labels { color: #64748b; text-align: center; font: 800 8px Consolas, monospace; }
+.ts2281-prefix-labels span { grid-row: 1; }
+.ts2281-prefix-labels b { grid-row: 1; }
+.ts2281-prefix > div:not(.ts2281-prefix-labels) span { display: grid; gap: 2px; min-width: 0; padding: 4px 2px; text-align: center; }
+.ts2281-prefix > div:not(.ts2281-prefix-labels) small { font-size: 7px; }
+.ts2281-prefix > div:not(.ts2281-prefix-labels) b, .ts2281-prefix > div:not(.ts2281-prefix-labels) strong { font-size: 9px; }
+.ts2281-prefix > div:not(.ts2281-prefix-labels) b::before { content: "P "; color: #64748b; font-size: 7px; }
+.ts2281-prefix > div:not(.ts2281-prefix-labels) strong::before { content: "PP "; color: #64748b; font-size: 7px; }
+.ts2281-owner { gap: 6px; }
+.ts2281-owner > header { align-items: center; }
+.ts2281-owner-array { gap: 3px; }
+.ts2281-owner-array span { gap: 1px; min-width: 0; padding: 4px 2px; }
+.ts2281-owner-array small { font-size: 7px; }
+.ts2281-owner-array b { font-size: 11px; }
+.ts2281-matrix { display: grid; grid-template-columns: 28px repeat(var(--ts2281-cols, 1), minmax(34px, 1fr)); gap: 3px; max-width: 430px; margin: 0 auto; text-align: center; }
+.ts2281-matrix > b { align-self: end; padding: 2px; color: #0369a1; font: 800 9px Consolas, monospace; }
+.ts2281-matrix > span { display: grid; min-height: 26px; place-items: center; color: #075985; background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 5px; font: 700 9px Consolas, monospace; }
+.ts2281-matrix-empty { display: grid; min-height: 36px; place-items: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 9px; }
+.ts2281-blocks { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 16px minmax(0, 1fr); gap: 4px; }
+.ts2281-blocks > div { gap: 3px; text-align: center; }
+.ts2281-blocks small { font-size: 7px; }
+.ts2281-blocks b { font-size: 15px; }
+.ts2281-blocks > i { font-size: 15px; }
+.ts2281-formula { gap: 3px; }
+.ts2281-formula strong { font-size: 10px; }
+.ts2281-formula span { display: none; }
+.ts2281-ledger { gap: 5px; }
+.ts2281-ledger > header { align-items: center; }
+.ts2281-ledger > div { gap: 4px; }
+.ts2281-ledger > div span { flex-basis: 72px; gap: 2px; padding: 4px; }
+.ts2281-ledger small { font-size: 7px; }
+.ts2281-ledger b { font-size: 10px; }
+.ts2281-result { grid-template-columns: auto 1fr; align-items: center; }
+.ts2281-result small { margin-right: 8px; }
+.ts2281-result span { display: none; }
+[data-theme="dark"] .ts2281-bar { color: #cbd5e1; }
+[data-theme="dark"] .ts2281-bar i { background: #475569; }
+[data-theme="dark"] .ts2281-bar.owned i { background: #0284c7; }
+[data-theme="dark"] .ts2281-bar.current i { background: #8b5cf6; box-shadow: 0 0 0 3px #4c1d95; }
+[data-theme="dark"] .ts2281-bar.compared i { background: #d97706; }
+[data-theme="dark"] .ts2281-bar.popped i { background: #e11d48; }
+[data-theme="dark"] .ts2281-metrics .minimum { background: #2e1065; border-color: #7c3aed; }
+[data-theme="dark"] .ts2281-matrix > span { color: #bae6fd; background: #082f49; border-color: #0369a1; }
+
+@media (max-width: 600px) {
+  .ts2281-viz { padding: 9px 6px; }
+  .ts2281-blocks { grid-template-columns: 1fr; }
+  .ts2281-blocks > i { line-height: 10px; }
+  .ts2281-prefix > div:not(.ts2281-prefix-labels) { grid-template-columns: repeat(auto-fit, minmax(34px, 1fr)); }
+}
+
 /* Shared step-by-step tree DP lesson for 2246, 834, 2858, and 1466. */
 .tdp-viz { display: grid; gap: 12px; width: 100%; min-width: 0; padding: 16px; color: #172033; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
 .tdp-viz > header, .tdp-graph-wrap > header, .tdp-edges > header, .tdp-nodes > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }

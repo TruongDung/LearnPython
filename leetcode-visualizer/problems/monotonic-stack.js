@@ -3464,9 +3464,31 @@ function buildSteps2281(input) {
 
   snapshot({
     phase: "left",
-    codeLines: [1, 3, 4, 5, 6, 7],
-    title: text("Bước 1: tìm previous strictly-smaller", "Step 1: find the previous strictly-smaller value"),
-    note: text("Pop khi top >= current, nên phần tử còn lại ở đỉnh phải nhỏ hơn current thật sự.", "Pop while top >= current, so the remaining top must be strictly smaller than current."),
+    codeLines: [1],
+    title: text("Import", "Import"),
+    note: text("Bắt đầu chạy hàm.", "Start the function."),
+    action: "from itertools import accumulate",
+  });
+  for (const [line, title, action] of [
+    [3, "class Solution", "class Solution:"],
+    [4, "totalStrength", "def totalStrength(self, strength):"],
+    [5, "MOD", "MOD = 10**9 + 7"],
+    [6, "n", `n = ${n}`],
+    [7, "left + stack", "left = [-1] * n · stack = []"],
+  ]) {
+    snapshot({
+      phase: "left",
+      codeLines: [line],
+      title: text(title, title),
+      note: text("—", "—"),
+      action,
+    });
+  }
+  snapshot({
+    phase: "left",
+    codeLines: [8],
+    title: text("Biên nhỏ hơn bên trái", "Previous smaller boundary"),
+    note: text("Pop ≥ để giữ biên trái < current.", "Pop ≥ so the left boundary is < current."),
     action: "left[i] = previous index with strength < strength[i]",
   });
   for (let i = 0; i < n; i++) {
@@ -3523,11 +3545,25 @@ function buildSteps2281(input) {
     });
   }
 
+  snapshot({
+    phase: "right",
+    codeLines: [13],
+    title: text("Mảng right", "Right-boundary array"),
+    note: text("Khởi tạo mọi biên phải bằng n.", "Initialize every right boundary to n."),
+    action: `right = [${n}] * n`,
+  });
   stack.length = 0;
   snapshot({
     phase: "right",
-    codeLines: [13, 14],
-    title: text("Bước 2: tìm next smaller-or-equal", "Step 2: find the next smaller-or-equal value"),
+    codeLines: [14],
+    title: text("Stack mới", "Fresh stack"),
+    note: text("Bắt đầu lượt quét ngược.", "Start the reverse scan."),
+    action: "stack = []",
+  });
+  snapshot({
+    phase: "right",
+    codeLines: [15],
+    title: text("Biên nhỏ hơn hoặc bằng bên phải", "Next smaller-or-equal boundary"),
     note: text("Lần này chỉ pop khi top > current; giá trị bằng nhau được giữ để làm biên phải và tránh đếm trùng subarray.", "This pass pops only when top > current; equal values stay as right boundaries so subarrays are not counted twice."),
     action: "right[i] = next index with strength ≤ strength[i]",
   });
@@ -3650,6 +3686,14 @@ function buildSteps2281(input) {
     action: "contribution = minimum × sum(all owned subarray sums)",
   });
   for (let i = 0; i < n; i++) {
+    snapshot({
+      phase: "contribution",
+      codeLines: [23],
+      current: i,
+      title: text(`i = ${i}`, `i = ${i}`),
+      note: text("Chọn minimum tiếp theo.", "Select the next minimum."),
+      action: `for i=${i}, value=${strength[i]}`,
+    });
     const l = left[i];
     const r = right[i];
     const leftCount = i - l;
@@ -3662,7 +3706,7 @@ function buildSteps2281(input) {
     }
     snapshot({
       phase: "contribution",
-      codeLines: [23, 24],
+      codeLines: [24],
       current: i,
       ownedRanges,
       leftCount,
