@@ -69,7 +69,7 @@ function renderPictureLesson(step, selection = {}) {
     }));
     const line=trail.length>1?`<polyline class="pl-route" points="${trail.map(([r,c])=>`${38+c*52},${38+r*52}`).join(' ')}"/>`:'';
     picture=svg(back+line+front,w,h);const keyNames=Array.from({length:6},(_,i)=>String.fromCharCode(97+i));
-    badge=`${replayIndex===null?(t('BFS · bước ','BFS · distance ')+v.dist):t('Phát lại đường tối ưu · bước ','Replay optimal path · step ')+replayIndex} · mask=${mask.toString(2).padStart(6,'0')}`;
+    badge=final&&v.answer===-1?t('Không có đường · queue = ∅','No route · queue = ∅'):`${replayIndex===null?(t('BFS · bước ','BFS · distance ')+v.dist):t('Phát lại đường tối ưu · bước ','Replay optimal path · step ')+replayIndex} · mask=${mask.toString(2).padStart(6,'0')}`;
     panels=chips(keyNames.filter((_,i)=>v.target&(1<<i)).map((key,i)=>`<b class="${mask&(1<<(key.charCodeAt(0)-97))?'pl-good':'pl-muted'}">${mask&(1<<(key.charCodeAt(0)-97))?'✓ ':''}${key}</b>`));
     if(!final&&v.nextMask!==null)panels+=`<div class="pl-badge">${t('Trạng thái thử','Candidate state')} (${v.neighbor.join(',')}) · ${v.mask.toString(2).padStart(6,'0')} → ${v.nextMask.toString(2).padStart(6,'0')}</div>`;
     panels+=`<div class="pl-panel"><small>queue · ${v.queueTotal} ${t('trạng thái','states')}</small>${chips(v.queue.slice(0,6).map(([r,c,k,d])=>`(${r},${c})<code>${k.toString(2).padStart(6,'0')}</code><small>d=${d}</small>`))}</div><small class="pl-hint">${t('Số nhỏ trên ô = số bộ chìa khác nhau đã tới ô đó.','Small cell badges count the different key sets seen at that cell.')}</small>`;

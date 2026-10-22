@@ -1,4 +1,3 @@
-const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -68,12 +67,12 @@ test('2242 agrees with exhaustive length-four paths on small random graphs', () 
 test('2242 trace keeps top-three lists and rejects repeated outer nodes', () => {
   const run = solve([100, 90, 80, 70], [[0, 1], [0, 2], [1, 2], [1, 3]]);
   assert.equal(run.answer, 340);
-  const middle = run.steps.find((step) => step.nodeSequence2242View.phase === 'middle'
-    && step.nodeSequence2242View.edgeIndex === 0).nodeSequence2242View;
-  assert.deepEqual(middle.leftTop.map((item) => item.id), [1, 2]);
-  assert.deepEqual(middle.rightTop.map((item) => item.id), [0, 2, 3]);
-  assert.ok(run.steps.some((step) => step.nodeSequence2242View.reason === 'a=d'));
-  assert.deepEqual(run.steps.at(-1).nodeSequence2242View.bestPath.length, 4);
+  const middle = run.steps.find((step) => step.pictureView.event === 'middle edge'
+    && step.pictureView.middle.join(',') === '0,1').pictureView;
+  assert.deepEqual(middle.top.find(item => item.id === 0).neighbors, [1, 2]);
+  assert.deepEqual(middle.top.find(item => item.id === 1).neighbors, [0, 2, 3]);
+  assert.ok(run.steps.some((step) => step.pictureView.valid === false && step.pictureView.candidate[0] === step.pictureView.candidate[3]));
+  assert.deepEqual(run.steps.at(-1).pictureView.best.length, 4);
   assert.equal(run.steps.at(-1).codeLines[0], 19);
 });
 
@@ -81,17 +80,17 @@ test('2242 debug advances through one executed Python line per step', () => {
   assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.code.length, 19);
   assert.deepEqual(solve([1, 2, 3, 4], []).steps.map((step) => step.codeLines[0]),
-    [2, 3, 4, 11, 19]);
+    [3, 4, 5, 11, 12, 19]);
   const run = solve([100, 90, 80, 70], [[0, 1], [0, 2], [1, 2], [1, 3]]);
   for (const [index, step] of run.steps.entries()) {
     assert.equal(step.codeLines.length, 1, `step ${index}`);
     assert.ok(step.codeLines[0] >= 2 && step.codeLines[0] <= 19, `step ${index}`);
     if (step.codeLines[0] === 15) {
       const next = run.steps[index + 1];
-      assert.equal(next.codeLines[0], step.nodeSequence2242View.valid ? 17 : 16);
-      if (step.nodeSequence2242View.valid) {
+      assert.equal(next.codeLines[0], step.pictureView.valid ? 17 : 16);
+      if (step.pictureView.valid) {
         assert.equal(run.steps[index + 2].codeLines[0], 18);
-        assert.equal(step.nodeSequence2242View.answer, run.steps[index + 1].nodeSequence2242View.answer);
+        assert.equal(step.pictureView.answer, run.steps[index + 1].pictureView.answer);
       }
     }
   }
@@ -99,14 +98,14 @@ test('2242 debug advances through one executed Python line per step', () => {
 
 test('2242 debug shows append, sort, trim check, and pop separately', () => {
   const run = solve([1, 2, 3, 4, 5], [[0, 1], [0, 2], [0, 3], [0, 4]]);
-  const start = run.steps.findIndex((step) => step.nodeSequence2242View.phase === 'build-edge'
-    && step.nodeSequence2242View.edgeIndex === 3);
+  const start = run.steps.findIndex((step) => step.pictureView.event === 'edge'
+    && step.vars.find(v => v.name === 'v').rawValue === 4);
   const sequence = run.steps.slice(start, start + 6);
   assert.deepEqual(sequence.map((step) => step.codeLines[0]), [5, 6, 7, 8, 9, 10]);
-  assert.deepEqual(sequence.map((step) => step.nodeSequence2242View.helperTop.length),
-    [0, 3, 4, 4, 4, 3]);
-  assert.equal(sequence[4].nodeSequence2242View.trimCondition, true);
-  assert.deepEqual(sequence[5].nodeSequence2242View.helperTop, [4, 3, 2]);
+  const top = step => step.vars.find(v => v.name === 'top').rawValue['0'];
+  assert.deepEqual(sequence.map((step) => top(step).length), [3, 3, 4, 4, 4, 3]);
+  assert.equal(sequence[4].pictureView.event, 'True');
+  assert.deepEqual(top(sequence[5]), [4, 3, 2]);
 });
 
 test('2242 validates score and undirected-edge constraints', () => {
@@ -126,20 +125,17 @@ test('2242 shortens large traces but checks all middle edges', () => {
   const run = solve(scores, edges);
   assert.equal(run.answer, 4);
   assert.ok(run.steps.length < 220);
-  assert.equal(run.steps.at(-1).nodeSequence2242View.shortened, true);
+  assert.equal(run.steps.at(-1).pictureView.mode, 'summary');
   assert.equal(run.steps.at(-1).final, true);
 });
 
 test('2242 renderer handles every phase in English and Vietnamese', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderNodeSequence2242View(step)');
-  const end = source.indexOf('\nfunction renderSlidingFreqView(step)', start);
-  assert.ok(start >= 0 && end > start);
-  const element = {};
+  const source = fs.readFileSync(require.resolve('../public/renderer-picture-lessons.js'), 'utf8');
+  const element = { querySelector: () => ({ addEventListener() {}, clientWidth: 600 }), querySelectorAll: () => [] };
   const context = { lang: 'en', $: () => element, escapeHtml: String,
     pick: (value) => value?.en ?? value?.vi ?? value ?? '' };
   vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(source, context);
   for (const language of ['en', 'vi']) {
     context.lang = language;
     for (const run of [
@@ -147,15 +143,15 @@ test('2242 renderer handles every phase in English and Vietnamese', () => {
       solve([1, 2, 3, 4], []),
     ]) {
       for (const step of run.steps) {
-        context.renderNodeSequence2242View(step);
-        assert.match(element.innerHTML, /ns2242-viz/);
-        assert.match(element.innerHTML, /ns2242-path/);
+        context.renderPictureLesson(step);
+        assert.match(element.innerHTML, /pl-viz/);
+        assert.match(element.innerHTML, /pl-picture/);
         assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
       }
     }
   }
-  const css = readFrontendStyles();
-  assert.match(css, /\.ns2242-viz \{/);
-  assert.match(css, /\.ns2242-path\.rejected/);
-  assert.match(css, /\.ns2242-build/);
+  const css = fs.readFileSync(require.resolve('../public/picture-lessons.css'), 'utf8');
+  assert.match(css, /\.pl-viz\{/);
+  assert.match(css, /\.pl-path \.bad/);
+  assert.match(css, /\.pl-chips/);
 });
