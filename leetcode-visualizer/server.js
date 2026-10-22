@@ -21,6 +21,8 @@ app.use(express.static(path.join(__dirname, "public"), {
 const {
   SUPPORTED,
   CATEGORY_ORDER,
+  PREFIX_MAX_TAG,
+  PREFIX_MAX_SUBTABS,
   COMPANY_SUBTABS,
   COMPANY_TAG,
   KNAPSACK_SUBTABS,
@@ -271,6 +273,21 @@ app.get("/api/problems", (req, res) => {
       };
     });
   }
+  // Reuse the catalog's sub-tab roster support so every requested lesson is
+  // visible, with missing visualizations shown as disabled entries.
+  const prefixGroup = groups.find(group => group.key === PREFIX_MAX_TAG.key) || {
+    ...PREFIX_MAX_TAG, problems: [],
+    recommendedOrderLabel: CATEGORY_ORDER[PREFIX_MAX_TAG.key].label,
+    guide: CATEGORY_ORDER[PREFIX_MAX_TAG.key].guide,
+  };
+  if (!groups.includes(prefixGroup)) groups.push(prefixGroup);
+  prefixGroup.subTabs = PREFIX_MAX_SUBTABS.map(tab => {
+    const roster = tab.roster.map(entry => ({
+      ...entry,
+      premium: entry.available ? isPremium(SUPPORTED[entry.id]) : false,
+    }));
+    return { ...tab, roster, count: roster.filter(entry => entry.available).length, total: roster.length };
+  });
   groups.sort((a, b) => a.key.localeCompare(b.key));
   res.json({ groups });
 });

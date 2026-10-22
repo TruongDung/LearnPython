@@ -37,6 +37,7 @@ const categories = {
 
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
+const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LABEL, PREFIX_MAX_GUIDE, prefixMaxSubTabs } = require('./prefix-max-catalog');
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
@@ -335,6 +336,15 @@ for (const [catKey, mod] of Object.entries(categories)) {
     }
   }
 }
+
+for (const { id } of PREFIX_MAX_ROSTER) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some(tag => tag && tag.key === PREFIX_MAX_TAG.key)) problem.tags = [...tags, PREFIX_MAX_TAG];
+}
+CATEGORY_ORDER[PREFIX_MAX_TAG.key] = { order: PREFIX_MAX_ORDER, label: PREFIX_MAX_ORDER_LABEL, guide: PREFIX_MAX_GUIDE };
+const PREFIX_MAX_SUBTABS = prefixMaxSubTabs(SUPPORTED);
 
 for (const id of MONOTONIC_STACK_IDS) {
   const problem = SUPPORTED[id];
@@ -659,6 +669,8 @@ const SEGMENT_TREE_SUBTABS = [
 module.exports = {
   SUPPORTED,
   CATEGORY_ORDER,
+  PREFIX_MAX_TAG,
+  PREFIX_MAX_SUBTABS,
   COMPANY_SUBTABS,
   COMPANY_TAG,
   KNAPSACK_SUBTABS,
