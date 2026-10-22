@@ -10,6 +10,7 @@ class Solution:
             prefix_max.append(best)
 
         res = []
+        print(prefix_max)
 
         for query in queries:
             low = 0
