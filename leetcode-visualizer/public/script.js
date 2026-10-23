@@ -1118,6 +1118,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.parallel2050View), surface: "treeView", render: (step) => {
       renderParallelCourses2050View(step);
     } },
+    { predicate: (step) => Boolean(step.courseSchedule207View), surface: "treeView", render: (step) => {
+      renderCourseSchedule207View(step);
+    } },
     { predicate: (step) => Boolean(step.graph), surface: "treeView", render: (step) => {
       renderGraph(step);
     } },

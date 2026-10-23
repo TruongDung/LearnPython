@@ -6888,6 +6888,287 @@ function buildSteps207(input, params) {
 }
 
 /**
+ * Compact visual trace for LeetCode 207.
+ * The base trace above remains for backwards-compatible graph lessons; this
+ * one supplies a focused course/queue teaching payload for the current card.
+ */
+function buildSteps207Visual(input, params = {}) {
+  const config = params || {};
+  const rawCourseCount = config.numCourses === undefined || config.numCourses === ""
+    ? 4
+    : Number(config.numCourses);
+  if (!Number.isInteger(rawCourseCount) || rawCourseCount < 1 || rawCourseCount > 10) {
+    throw new Error("numCourses must be a whole number from 1 to 10.");
+  }
+  const numCourses = rawCourseCount;
+  const raw = input === undefined || input === null ? "" : String(input).trim();
+  const pairs = [];
+  const seen = new Set();
+
+  if (raw) {
+    raw.split(",").forEach((part) => {
+      const match = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!match) {
+        throw new Error('Use pairs like "1-0,2-0": course-prerequisite.');
+      }
+      const course = Number(match[1]);
+      const prerequisite = Number(match[2]);
+      if (course >= numCourses || prerequisite >= numCourses) {
+        throw new Error("Every course id must be between 0 and numCourses - 1.");
+      }
+      const key = prerequisite + ">" + course;
+      if (seen.has(key)) {
+        throw new Error("Each prerequisite pair may appear only once.");
+      }
+      seen.add(key);
+      pairs.push([course, prerequisite]);
+    });
+  }
+  if (pairs.length > 24) {
+    throw new Error("Use at most 24 prerequisite pairs in the visualizer.");
+  }
+
+  const courses = Array.from({ length: numCourses }, (_, index) => index);
+  const adjacency = Array.from({ length: numCourses }, () => []);
+  const indegree = Array(numCourses).fill(0);
+  const queue = [];
+  const completed = [];
+  const edgeStates = new Map(pairs.map(([course, prerequisite]) => [
+    prerequisite + ">" + course,
+    "waiting",
+  ]));
+  const steps = [];
+  let activeCourse = null;
+  let activeEdge = null;
+  let answer = null;
+  const bi = (vi, en) => ({ vi, en });
+  const queueLabel = () => "[" + queue.join(", ") + "]";
+
+  function makeGraph(highlightNodes, highlightEdges) {
+    const annotations = {};
+    queue.forEach((course) => { annotations[course] = "ready"; });
+    return {
+      nodes: courses.map((id) => ({ id, dist: indegree[id] })),
+      edges: pairs.map(([course, prerequisite]) => ({ u: prerequisite, v: course, w: "" })),
+      hlNodes: highlightNodes || [],
+      hlEdges: highlightEdges || [],
+      visitedNodes: [...completed],
+      annotations,
+    };
+  }
+
+  function makeCourseView(phase) {
+    return {
+      n: numCourses,
+      edges: pairs.map(([course, prerequisite]) => ({
+        from: prerequisite,
+        to: course,
+        status: edgeStates.get(prerequisite + ">" + course) || "waiting",
+      })),
+      indegree: [...indegree],
+      queue: [...queue],
+      completed: [...completed],
+      activeCourse,
+      activeEdge: activeEdge ? { ...activeEdge } : null,
+      blocked: answer === false ? courses.filter((course) => !completed.includes(course)) : [],
+      phase: phase || "build",
+      answer,
+    };
+  }
+
+  function snap(options) {
+    const vars = [
+      { name: "ready", value: queueLabel() },
+      { name: "done", value: completed.length + "/" + numCourses },
+      ...(options.vars || []),
+    ];
+    steps.push({
+      title: options.title,
+      note: options.note || bi("", ""),
+      arr: [],
+      graph: makeGraph(options.highlightNodes, options.highlightEdges),
+      courseSchedule207View: makeCourseView(options.phase),
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: options.codeLines || [],
+      vars,
+    });
+  }
+
+  snap({
+    title: bi("Chuẩn bị hàng đợi", "Prepare the queue"),
+    codeLines: [1],
+    phase: "intro",
+    vars: [
+      { name: "n", value: numCourses },
+      { name: "pairs", value: pairs.map(([course, prerequisite]) => "[" + course + "," + prerequisite + "]").join(" ") || "[]" },
+    ],
+  });
+  snap({
+    title: bi("Solution", "Solution"),
+    codeLines: [2],
+    phase: "intro",
+  });
+  snap({
+    title: bi("canFinish", "canFinish"),
+    codeLines: [3],
+    phase: "intro",
+  });
+  snap({
+    title: bi("Tạo các môn", "Create course lists"),
+    codeLines: [4],
+    phase: "build",
+  });
+  snap({
+    title: bi("Mỗi môn bắt đầu 0", "Each course starts at 0"),
+    codeLines: [5],
+    phase: "build",
+    vars: [{ name: "in", value: "[" + indegree.join(", ") + "]" }],
+  });
+
+  pairs.forEach(([course, prerequisite]) => {
+    activeEdge = { from: prerequisite, to: course };
+    snap({
+      title: bi("C" + prerequisite + " → C" + course, "C" + prerequisite + " → C" + course),
+      codeLines: [6],
+      phase: "build",
+      highlightNodes: [prerequisite, course],
+      highlightEdges: [[prerequisite, course]],
+    });
+    adjacency[prerequisite].push(course);
+    edgeStates.set(prerequisite + ">" + course, "built");
+    snap({
+      title: bi("Nối mũi tên", "Add arrow"),
+      codeLines: [7],
+      phase: "build",
+      highlightNodes: [prerequisite, course],
+      highlightEdges: [[prerequisite, course]],
+    });
+    indegree[course] += 1;
+    snap({
+      title: bi("C" + course + ": in = " + indegree[course], "C" + course + ": in = " + indegree[course]),
+      codeLines: [8],
+      phase: "build",
+      highlightNodes: [course],
+      highlightEdges: [[prerequisite, course]],
+      vars: [{ name: "in", value: "[" + indegree.join(", ") + "]" }],
+    });
+    activeEdge = null;
+  });
+
+  courses.filter((course) => indegree[course] === 0).forEach((course) => queue.push(course));
+  snap({
+    title: bi("Sẵn sàng: " + queueLabel(), "Ready: " + queueLabel()),
+    codeLines: [9],
+    phase: "ready",
+    highlightNodes: [...queue],
+  });
+  snap({
+    title: bi("done = 0", "done = 0"),
+    codeLines: [10],
+    phase: "ready",
+  });
+
+  while (queue.length) {
+    activeCourse = queue[0];
+    snap({
+      title: bi("Còn môn sẵn sàng", "Ready course found"),
+      codeLines: [11],
+      phase: "learn",
+      highlightNodes: [activeCourse],
+    });
+
+    const course = queue.shift();
+    activeCourse = course;
+    snap({
+      title: bi("Lấy C" + course, "Take C" + course),
+      codeLines: [12],
+      phase: "learn",
+      highlightNodes: [course],
+    });
+
+    completed.push(course);
+    snap({
+      title: bi("Học xong C" + course, "Finish C" + course),
+      codeLines: [13],
+      phase: "learn",
+      highlightNodes: [course],
+    });
+
+    if (!adjacency[course].length) {
+      snap({
+        title: bi("C" + course + " không mở môn mới", "C" + course + " unlocks none"),
+        codeLines: [14],
+        phase: "unlock",
+        highlightNodes: [course],
+      });
+    }
+
+    adjacency[course].forEach((nextCourse) => {
+      activeEdge = { from: course, to: nextCourse };
+      edgeStates.set(course + ">" + nextCourse, "active");
+      snap({
+        title: bi("C" + course + " mở C" + nextCourse, "C" + course + " unlocks C" + nextCourse),
+        codeLines: [14],
+        phase: "unlock",
+        highlightNodes: [course, nextCourse],
+        highlightEdges: [[course, nextCourse]],
+      });
+      indegree[nextCourse] -= 1;
+      edgeStates.set(course + ">" + nextCourse, "released");
+      snap({
+        title: bi("C" + nextCourse + ": " + (indegree[nextCourse] + 1) + " → " + indegree[nextCourse], "C" + nextCourse + ": " + (indegree[nextCourse] + 1) + " → " + indegree[nextCourse]),
+        codeLines: [15],
+        phase: "unlock",
+        highlightNodes: [nextCourse],
+        highlightEdges: [[course, nextCourse]],
+        vars: [{ name: "in", value: "[" + indegree.join(", ") + "]" }],
+      });
+      const isReady = indegree[nextCourse] === 0;
+      snap({
+        title: isReady
+          ? bi("C" + nextCourse + " sẵn sàng", "C" + nextCourse + " is ready")
+          : bi("C" + nextCourse + " vẫn chờ", "C" + nextCourse + " still waits"),
+        codeLines: [16],
+        phase: "unlock",
+        highlightNodes: [nextCourse],
+        highlightEdges: [[course, nextCourse]],
+      });
+      if (isReady) {
+        queue.push(nextCourse);
+        snap({
+          title: bi("Đưa C" + nextCourse + " vào hàng", "Queue C" + nextCourse),
+          codeLines: [17],
+          phase: "ready",
+          highlightNodes: [nextCourse],
+        });
+      }
+      activeEdge = null;
+    });
+    activeCourse = null;
+  }
+
+  snap({
+    title: bi("Hàng đợi trống", "Queue is empty"),
+    codeLines: [11],
+    phase: completed.length === numCourses ? "done" : "cycle",
+  });
+  answer = completed.length === numCourses;
+  snap({
+    title: answer
+      ? bi("✓ Học hết " + numCourses + " môn", "✓ All " + numCourses + " courses")
+      : bi("⟳ Còn vòng chờ", "⟳ Waiting cycle remains"),
+    codeLines: [18],
+    phase: answer ? "done" : "cycle",
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+
+  return { numCourses, prerequisites: pairs, answer, steps };
+}
+
+/**
  * Layout helper for LeetCode 1136: places each course in the column of the
  * semester it WOULD be taken in (simulated once upfront via Kahn's algorithm),
  * so the visualization directly shows "these courses are grouped together"
@@ -20632,29 +20913,22 @@ module.exports = {
     slug: "course-schedule",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "Course Schedule", en: "Course Schedule" },
-    titleVi: { vi: "Lịch học (kiểm tra chu trình)", en: "Can finish all courses?" },
+    titleVi: { vi: "Học → mở khóa", en: "Learn → unlock" },
     statement: {
-      vi:
-        "Có numCourses môn học (đánh số 0..numCourses-1) và mảng prerequisites, trong đó [a, b] nghĩa là PHẢI HỌC b TRƯỚC a. " +
-        "Trả về true nếu có thể hoàn thành tất cả môn học (đồ thị không có chu trình), false nếu không. " +
-        "Nhập tiên quyết: cặp a-b cách bởi dấu phẩy (vd: 1-0,2-1).",
-      en:
-        "There are numCourses courses (0..numCourses-1) and an array prerequisites where [a, b] means b must be taken before a. " +
-        "Return true if you can finish all courses (no cycle), false otherwise. " +
-        "Enter prerequisites as a-b pairs separated by comma (e.g. 1-0,2-1).",
+      vi: "Mỗi cặp a-b nghĩa là học b trước a. Học hết mọi môn thì true; bị kẹt trong vòng chờ thì false.",
+      en: "Each a-b pair means take b before a. Return true when every course can be completed.",
     },
-    defaultInput: "1-0,2-1,3-2",
+    defaultInput: "1-0,2-0,3-1,3-2",
     inputKind: "string",
-    inputLabel: { vi: "Tiên quyết (a-b = học b trước a)", en: "Prerequisites (a-b = b before a)" },
+    inputLabel: { vi: "Tiên quyết (a-b = b → a)", en: "Prerequisites (a-b = b → a)" },
     debugMode: "line-by-line",
     extraParams: [
-      { key: "numCourses", label: { vi: "numCourses (số môn)", en: "numCourses" }, default: 4 },
+      { key: "numCourses", label: { vi: "Số môn (n)", en: "Courses (n)" }, default: 4 },
     ],
     approach: [
-      { vi: "Đây là bài topological sort cổ điển — kiểm tra đồ thị có chu trình không.", en: "Classic topological sort — detect whether the graph has a cycle." },
-      { vi: "Mỗi [a, b] tạo cạnh b → a (b là tiên quyết của a). Đếm in-degree mỗi nút.", en: "Each [a, b] creates edge b → a (b is prereq of a). Count in-degree for each node." },
-      { vi: "Kahn's algorithm: lặp đi lặp lại, lấy mọi nút có in-degree = 0, giảm in-degree các nút phụ thuộc.", en: "Kahn's algorithm: repeatedly take all nodes with in-degree = 0, decrement dependents." },
-      { vi: "Nếu cuối cùng học hết tất cả → không chu trình → true. Nếu kẹt lại (còn nút mà in-degree > 0) → có chu trình → false.", en: "If all nodes are processed → no cycle → true. If stuck (nodes remain with in-degree > 0) → cycle → false." },
+      { vi: "Mũi tên b → a: học b sẽ mở khóa a.", en: "An arrow b → a means finishing b unlocks a." },
+      { vi: "Cho các môn có in = 0 vào hàng đợi.", en: "Put every course with in = 0 into the queue." },
+      { vi: "Lấy một môn, giảm in của các môn sau nó. Học đủ n môn thì true.", en: "Take a course and reduce its next courses. Reaching n courses returns true." },
     ],
     complexity: {
       time: "O(V + E)",
@@ -20665,38 +20939,26 @@ module.exports = {
       },
     },
     code: [
-      "from collections import defaultdict, deque",
-      "from typing import List",
-      "",
+      "from collections import deque",
       "class Solution:",
-      "    def canFinish(self, numCourses: int, prerequisites: List[List[int]]) -> bool:",
-      "        graph = defaultdict(list)",
-      "        indegree = [0] * numCourses",
-      "",
-      "        for course, prerequisite in prerequisites:",
-      "            graph[prerequisite].append(course)",
+      "    def canFinish(self, n, prerequisites):",
+      "        graph = [[] for _ in range(n)]",
+      "        indegree = [0] * n",
+      "        for course, prereq in prerequisites:",
+      "            graph[prereq].append(course)",
       "            indegree[course] += 1",
-      "",
-      "        queue = deque(",
-      "            course for course in range(numCourses)",
-      "            if indegree[course] == 0",
-      "        )",
-      "",
-      "        processed_count = 0",
-      "",
+      "        queue = deque(i for i in range(n) if indegree[i] == 0)",
+      "        done = 0",
       "        while queue:",
       "            course = queue.popleft()",
-      "            processed_count += 1",
-      "",
-      "            for next_course in graph[course]:",
-      "                indegree[next_course] -= 1",
-      "",
-      "                if indegree[next_course] == 0:",
-      "                    queue.append(next_course)",
-      "",
-      "        return processed_count == numCourses",
+      "            done += 1",
+      "            for nxt in graph[course]:",
+      "                indegree[nxt] -= 1",
+      "                if indegree[nxt] == 0:",
+      "                    queue.append(nxt)",
+      "        return done == n",
     ],
-    builder: buildSteps207,
+    builder: buildSteps207Visual,
   },
   210: {
     id: 210,
