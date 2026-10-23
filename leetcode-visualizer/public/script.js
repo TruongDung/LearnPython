@@ -719,6 +719,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.strangePrinterII1591View), surface: "treeView", render: (step) => {
       renderStrangePrinterII1591View(step);
     } },
+    { predicate: (step) => Boolean(step.rankTransformMatrix1632View), surface: "treeView", render: (step) => {
+      renderRankTransformMatrix1632View(step);
+    } },
     { predicate: (step) => Boolean(step.course1462View), surface: "treeView", render: (step) => {
       renderCourse1462View(step);
     } },
