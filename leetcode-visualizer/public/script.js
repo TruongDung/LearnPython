@@ -215,6 +215,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.waysToExpressPowers2787View), surface: "treeView", render: (step) => {
       renderWaysToExpressPowers2787View(step);
     } },
+    { predicate: (step) => Boolean(step.originalTypedString3333View), surface: "treeView", render: (step) => {
+      renderOriginalTypedString3333View(step);
+    } },
     { predicate: (step) => Boolean(step.maximumEvenSplit2178View), surface: "treeView", render: (step) => {
       renderMaximumEvenSplit2178View(step);
     } },
@@ -295,6 +298,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.dessert1774View), surface: "treeView", render: (step) => {
       renderClosestDessertCost1774View(step);
+    } },
+    { predicate: (step) => Boolean(step.minimizeDifference1981View), surface: "treeView", render: (step) => {
+      renderMinimizeDifference1981View(step);
     } },
     { predicate: (step) => Boolean(step.similarEnds1750View), surface: "treeView", render: (step) => {
       renderSimilarEnds1750View(step);
