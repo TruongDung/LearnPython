@@ -1,0 +1,100 @@
+.mtr3181-viz {
+  --mtr-bg: #101a2b;
+  --mtr-panel: #19263a;
+  --mtr-edge: #354963;
+  --mtr-text: #f2f6ff;
+  --mtr-muted: #aebbd0;
+  --mtr-blue: #7dd3fc;
+  --mtr-violet: #b39aff;
+  --mtr-gold: #ffd166;
+  --mtr-green: #4ade80;
+  --mtr-id-bg: #30285a;
+  --mtr-token-bg: #263750;
+  --mtr-current-bg: #4b3621;
+  --mtr-cell-bg: #25344a;
+  --mtr-reachable-bg: #17364c;
+  --mtr-eligible-bg: #164b5c;
+  --mtr-preview-bg: #624a21;
+  --mtr-new-bg: #173c30;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px;
+  overflow: hidden;
+  border: 1px solid var(--mtr-edge);
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 0, #263855, transparent 55%), var(--mtr-bg);
+  color: var(--mtr-text);
+  font: 12px/1.35 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .mtr3181-viz {
+  --mtr-bg: #f7f9ff;
+  --mtr-panel: #fff;
+  --mtr-edge: #cbd5e1;
+  --mtr-text: #172033;
+  --mtr-muted: #64748b;
+  --mtr-blue: #0369a1;
+  --mtr-violet: #6d28d9;
+  --mtr-gold: #92400e;
+  --mtr-green: #166534;
+  --mtr-id-bg: #ede9fe;
+  --mtr-token-bg: #f1f5f9;
+  --mtr-current-bg: #fff7ed;
+  --mtr-cell-bg: #fff;
+  --mtr-reachable-bg: #e0f2fe;
+  --mtr-eligible-bg: #cffafe;
+  --mtr-preview-bg: #ffedd5;
+  --mtr-new-bg: #dcfce7;
+  background: radial-gradient(circle at 50% 0, #e6eafe, transparent 55%), var(--mtr-bg);
+}
+
+.mtr3181-viz *, .mtr3181-viz *::before, .mtr3181-viz *::after { box-sizing: border-box; }
+#treeView:has(> .mtr3181-viz) { min-width: 0; padding: 0; border: 0; background: transparent; }
+#vizPanel:has(.mtr3181-viz) #stepNote { display: none; }
+.mtr3181-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mtr3181-head > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mtr3181-head > div > span { display: grid; place-items: center; width: 38px; height: 24px; border-radius: 12px; background: var(--mtr-id-bg); color: var(--mtr-violet); font: 800 10px ui-monospace, monospace; }
+.mtr3181-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.mtr3181-head > b { flex: 0 0 auto; padding: 4px 9px; border-radius: 14px; background: var(--mtr-panel); color: var(--mtr-green); font: 900 15px ui-monospace, monospace; }
+.mtr3181-rewards { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 6px; border-radius: 11px; background: var(--mtr-panel); }
+.mtr3181-reward { display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px; min-width: 36px; padding: 4px 6px; border: 1px solid var(--mtr-edge); border-radius: 8px; background: var(--mtr-token-bg); color: var(--mtr-muted); }
+.mtr3181-reward i { font-size: 11px; font-style: normal; }
+.mtr3181-reward b { font: 900 11px ui-monospace, monospace; }
+.mtr3181-reward.is-seen { color: var(--mtr-text); }
+.mtr3181-reward.is-current { transform: translateY(-2px); border-color: var(--mtr-gold); background: var(--mtr-current-bg); color: var(--mtr-gold); }
+.mtr3181-action { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 4px 7px; border: 1px solid var(--mtr-edge); border-radius: 10px; background: var(--mtr-panel); color: var(--mtr-gold); }
+.mtr3181-action > span[aria-hidden="true"] { font-size: 18px; }
+.mtr3181-action > b { font: 900 13px ui-monospace, monospace; }
+.mtr3181-action > small { color: var(--mtr-muted); font-size: 9px; }
+.mtr3181-flow { display: flex; align-items: center; gap: 7px; color: var(--mtr-blue); }
+.mtr3181-flow b { font: 800 11px ui-monospace, monospace; }
+.mtr3181-flow i { color: var(--mtr-gold); font-size: 16px; font-style: normal; }
+.mtr3181-flow strong { padding: 3px 6px; border-radius: 6px; background: var(--mtr-current-bg); color: var(--mtr-gold); font: 900 10px ui-monospace, monospace; }
+.mtr3181-track-label { display: flex; justify-content: space-between; padding: 0 3px; color: var(--mtr-muted); font: 700 9px ui-monospace, monospace; }
+.mtr3181-track-label b { color: var(--mtr-green); }
+.mtr3181-track { display: grid; grid-template-columns: repeat(var(--mtr3181-count, 24), minmax(20px, 1fr)); gap: 3px; min-width: 0; padding: 6px; overflow-x: auto; border-radius: 11px; background: var(--mtr-panel); }
+.mtr3181-cell { position: relative; display: grid; justify-items: center; align-content: center; min-width: 20px; min-height: 39px; gap: 1px; border: 1px solid var(--mtr-edge); border-radius: 6px; background: var(--mtr-cell-bg); color: var(--mtr-muted); }
+.mtr3181-cell small { font: 700 8px ui-monospace, monospace; }
+.mtr3181-cell b { font: 900 9px ui-monospace, monospace; }
+.mtr3181-cell.is-reachable { background: var(--mtr-reachable-bg); color: var(--mtr-blue); }
+.mtr3181-cell.is-eligible { border-color: var(--mtr-blue); background: var(--mtr-eligible-bg); color: var(--mtr-blue); }
+.mtr3181-cell.is-preview { border-color: var(--mtr-gold); background: var(--mtr-preview-bg); color: var(--mtr-gold); }
+.mtr3181-cell.is-new { border-color: var(--mtr-green); background: var(--mtr-new-bg); color: var(--mtr-green); box-shadow: inset 0 0 0 1px var(--mtr-green); }
+.mtr3181-cell.is-gate { border-right: 2px dashed var(--mtr-gold); }
+.mtr3181-cell.is-answer { outline: 2px solid var(--mtr-green); outline-offset: 1px; z-index: 1; }
+.mtr3181-witness { display: flex; align-items: center; gap: 6px; min-height: 31px; padding: 4px 8px; border-radius: 9px; background: var(--mtr-panel); }
+.mtr3181-witness > span { font-size: 16px; }
+.mtr3181-witness > div { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 4px; }
+.mtr3181-witness > div small { color: var(--mtr-muted); font-size: 9px; }
+.mtr3181-coin { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px; border: 1px solid var(--mtr-edge); border-radius: 6px; background: var(--mtr-token-bg); color: var(--mtr-gold); }
+.mtr3181-coin i { font-size: 10px; font-style: normal; }
+.mtr3181-coin b { font: 800 9px ui-monospace, monospace; }
+.mtr3181-witness > b { color: var(--mtr-green); font: 900 11px ui-monospace, monospace; }
+
+@media (max-width: 480px) {
+  .mtr3181-viz { gap: 7px; padding: 8px; }
+  .mtr3181-track { gap: 2px; padding: 4px; }
+  .mtr3181-cell { min-width: 18px; min-height: 34px; }
+}
