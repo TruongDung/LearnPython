@@ -224,6 +224,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.tallestBillboard956View), surface: "treeView", render: (step) => {
       renderTallestBillboard956View(step);
     } },
+    { predicate: (step) => Boolean(step.paintingWalls2742View), surface: "treeView", render: (step) => {
+      renderPaintingWalls2742View(step);
+    } },
     { predicate: (step) => Boolean(step.maximumEvenSplit2178View), surface: "treeView", render: (step) => {
       renderMaximumEvenSplit2178View(step);
     } },
