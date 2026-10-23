@@ -1112,6 +1112,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.minimumHeightTrees310View), surface: "treeView", render: (step) => {
       renderMinimumHeightTrees310View(step);
     } },
+    { predicate: (step) => Boolean(step.sequenceReconstruction444View), surface: "treeView", render: (step) => {
+      renderSequenceReconstruction444View(step);
+    } },
     { predicate: (step) => Boolean(step.shiftGridView), surface: "treeView", render: (step) => {
       renderShiftGridView(step);
     } },
