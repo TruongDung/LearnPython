@@ -221,6 +221,12 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.sameAverage805View), surface: "treeView", render: (step) => {
       renderSplitArraySameAverage805View(step);
     } },
+    { predicate: (step) => Boolean(step.closestSum1755View), surface: "treeView", render: (step) => {
+      renderClosestSubsequenceSum1755View(step);
+    } },
+    { predicate: (step) => Boolean(step.partition2035View), surface: "treeView", render: (step) => {
+      renderPartitionArray2035View(step);
+    } },
     { predicate: (step) => Boolean(step.tallestBillboard956View), surface: "treeView", render: (step) => {
       renderTallestBillboard956View(step);
     } },
