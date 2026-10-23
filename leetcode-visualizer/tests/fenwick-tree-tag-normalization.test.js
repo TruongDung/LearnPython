@@ -21,5 +21,5 @@ test("Fenwick Tree uses one canonical catalog key", () => {
     if (keys.includes("fenwick-tree")) fenwickProblemIds.add(problem.id);
   }
 
-  assert.deepEqual([...fenwickProblemIds].sort((a, b) => a - b), [315, 327, 1649, 2426, 4051, 4055]);
+  assert.deepEqual([...fenwickProblemIds].sort((a, b) => a - b), [308, 315, 327, 1649, 2426, 4051, 4055]);
 });

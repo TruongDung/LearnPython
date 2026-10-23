@@ -29,7 +29,7 @@ test("0/1 Knapsack uses one canonical key across categories and tags", () => {
     assert.equal(new Set(tagKeys).size, tagKeys.length, `problem ${problem.id} has duplicate tag keys`);
   }
 
-  assert.deepEqual([...knapsackProblemIds].sort((a, b) => a - b), [416, 474, 494, 698, 879, 1049, 2218, 2518, 2915]);
+  assert.deepEqual([...knapsackProblemIds].sort((a, b) => a - b), [416, 474, 494, 698, 879, 1049, 2218, 2291, 2518, 2585, 2787, 2915]);
 });
 
 test("0/1 Knapsack exposes a complete bilingual 24-problem learning path", () => {
