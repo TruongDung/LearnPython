@@ -14,7 +14,7 @@ const SOURCE = [
   "        dp[0] = {0}",
   "        for value in nums:",
   "            for count in range(max(sizes), 0, -1):",
-  "                dp[count] |= {s + value for s in dp[count - 1]} ",
+  "                dp[count] |= {s + value for s in dp[count - 1]}",
   "        return any(total*k//n in dp[k] for k in sizes)",
 ];
 
@@ -48,12 +48,16 @@ function buildSteps(input) {
   let after = null;
   let answer = null;
   let witnessMask = null;
+  let countIndex = null;
+  let activeBeforeSums = [];
+  let activeAfterSums = [];
+  let activeAfterCount = 0;
 
   function sample(set, target) {
     const values = [...set].sort((a, b) => a - b);
     if (values.length <= 100) return values;
     const keep = new Set([values[0], values.at(-1)]);
-    for (let offset = -6; offset <= 6; offset++) {
+    if (Number.isFinite(target)) for (let offset = -6; offset <= 6; offset++) {
       const value = target + offset;
       if (set.has(value)) keep.add(value);
     }
@@ -79,10 +83,10 @@ function buildSteps(input) {
       arr: [...nums],
       highlight: itemIndex >= 0 ? [itemIndex] : [],
       mark: witnessMask === null ? [] : nums.map((_, index) => (witnessMask & (1 << index)) ? index : -1).filter((index) => index >= 0),
-      codeLines: [phase === "start" ? 3 : phase === "sizes" ? 4 : phase === "no-size" ? 7 : phase === "seed" ? 9 : phase === "item" ? 10 : 13],
+      codeLines: [({ start: 3, sizes: 4, "no-size": 7, allocate: 8, seed: 9, item: 10, count: 11, merge: 12, done: 13 })[phase] || 3],
       title: bi(
-        phase === "start" ? "Tính tổng và trung bình" : phase === "sizes" ? "Chỉ thử kích thước hợp lệ" : phase === "no-size" ? "Không thể chia đều" : phase === "item" ? `Thêm ${currentValue} vào tập con` : answer ? "Tìm thấy hai tập cùng trung bình" : "Không có tập con phù hợp",
-        phase === "start" ? "Find the total and average" : phase === "sizes" ? "Keep only valid subset sizes" : phase === "no-size" ? "No valid subset size" : phase === "item" ? `Add ${currentValue} to subsets` : answer ? "Two subsets share an average" : "No matching subset",
+        phase === "start" ? "Tính tổng" : phase === "sizes" ? "Chọn cỡ hợp lệ" : phase === "no-size" ? "Không thể chia đều" : phase === "allocate" ? "Tạo các ngăn DP" : phase === "seed" ? "Bắt đầu từ tổng 0" : phase === "item" ? `Chọn ${currentValue}` : phase === "count" ? `Thử nhóm ${countIndex}` : phase === "merge" ? `Cộng ${currentValue} vào nhóm ${countIndex}` : answer ? "Tìm thấy hai tập cùng trung bình" : "Không có tập con phù hợp",
+        phase === "start" ? "Find the total" : phase === "sizes" ? "Keep valid sizes" : phase === "no-size" ? "No valid subset size" : phase === "allocate" ? "Create DP buckets" : phase === "seed" ? "Start with sum 0" : phase === "item" ? `Pick ${currentValue}` : phase === "count" ? `Try group ${countIndex}` : phase === "merge" ? `Add ${currentValue} to group ${countIndex}` : answer ? "Two subsets share an average" : "No matching subset",
       ),
       note: bi("", ""),
       final,
@@ -91,12 +95,14 @@ function buildSteps(input) {
         { name: "total", value: total },
         { name: "sizes", value: sizes.map((item) => item.size).join(", ") || "∅" },
         { name: "value", value: currentValue ?? "—" },
+        { name: "count", value: countIndex ?? "—" },
         { name: "answer", value: answer === null ? "—" : answer },
       ],
       sameAverage805View: {
         phase, nums: [...nums], n, total, averageNumerator: total, averageDenominator: n,
         candidates: sizes.map((item) => ({ ...item })),
-        itemIndex, currentValue, before: candidateViews(before), after: candidateViews(after || dp),
+        itemIndex, currentValue, countIndex, activeBeforeSums, activeAfterSums, activeAfterCount,
+        before: candidateViews(before), after: candidateViews(after || dp),
         processedCount: itemIndex + 1,
         answer, witnessMask,
       },
@@ -113,6 +119,9 @@ function buildSteps(input) {
 
   const maxSize = sizes.at(-1).size;
   dp = Array.from({ length: maxSize + 1 }, () => new Map());
+  before = null;
+  after = dp;
+  emit("allocate");
   dp[0].set(0, 0);
   before = null;
   after = dp;
@@ -120,16 +129,32 @@ function buildSteps(input) {
 
   for (itemIndex = 0; itemIndex < n; itemIndex++) {
     currentValue = nums[itemIndex];
-    before = dp;
-    dp = dp.map((map) => new Map(map));
+    before = dp.map((map) => new Map(map));
+    after = dp;
+    activeBeforeSums = [];
+    activeAfterSums = [];
+    countIndex = null;
+    emit("item");
     for (let count = maxSize; count >= 1; count--) {
-      for (const [partial, mask] of before[count - 1]) {
+      countIndex = count;
+      const snapshot = dp.map((map) => new Map(map));
+      before = snapshot;
+      after = dp;
+      activeBeforeSums = sample(snapshot[count].keys(), null);
+      activeAfterSums = activeBeforeSums;
+      activeAfterCount = snapshot[count].size;
+      emit("count");
+      for (const [partial, mask] of snapshot[count - 1]) {
         const sum = partial + currentValue;
         if (!dp[count].has(sum)) dp[count].set(sum, mask | (1 << itemIndex));
       }
+      before = snapshot;
+      after = dp;
+      activeBeforeSums = sample(snapshot[count].keys(), null);
+      activeAfterSums = sample(dp[count].keys(), null);
+      activeAfterCount = dp[count].size;
+      emit("merge");
     }
-    after = dp;
-    emit("item");
   }
 
   for (const { size, target } of sizes) {
@@ -141,6 +166,10 @@ function buildSteps(input) {
   }
   itemIndex = n - 1;
   currentValue = null;
+  countIndex = null;
+  activeBeforeSums = [];
+  activeAfterSums = [];
+  activeAfterCount = 0;
   before = dp;
   after = dp;
   emit("done", true);

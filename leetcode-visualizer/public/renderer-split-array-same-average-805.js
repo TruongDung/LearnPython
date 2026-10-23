@@ -8,12 +8,13 @@ function renderSplitArraySameAverage805View(step) {
   })[char]);
   const numbers = view.nums.map((value, index) => {
     const selected = view.witnessMask !== null && (view.witnessMask & (1 << index));
-    const current = index === view.itemIndex && view.phase === "item";
-    const untouched = index > view.itemIndex && view.phase === "item";
+    const stepping = ["item", "count", "merge"].includes(view.phase);
+    const current = index === view.itemIndex && stepping;
+    const untouched = index > view.itemIndex && stepping;
     return `<span class="sa805-number${current ? " is-current" : ""}${selected ? " is-selected" : ""}${untouched ? " is-waiting" : ""}">${value}</span>`;
   }).join("");
   const candidateChips = view.candidates.length
-    ? view.candidates.map(({ size, target }) => `<span class="sa805-candidate${view.after.find((entry) => entry.size === size)?.reachable ? " is-hit" : ""}"><small>k=${size}</small><b>${target}</b></span>`).join("")
+    ? view.candidates.map(({ size, target }) => `<span class="sa805-candidate${view.after.find((entry) => entry.size === size)?.reachable ? " is-hit" : ""}${view.countIndex === size ? " is-active" : ""}"><small>k=${size}</small><b>${target}</b></span>`).join("")
     : `<span class="sa805-none">${text("Không có tổng nguyên", "No integer target")}</span>`;
 
   const beforeBySize = new Map(view.before.map((item) => [item.size, item]));
@@ -22,7 +23,6 @@ function renderSplitArraySameAverage805View(step) {
   const plotRight = 674;
   const plotWidth = 740;
   const rowHeight = 48;
-  const plotHeight = Math.max(90, view.candidates.length * rowHeight + 34);
   const x = (value) => plotLeft + (value / view.total) * (plotRight - plotLeft);
   const dots = (entry, y, className) => (entry?.sums || []).map((sum) => `<circle class="${className}" cx="${x(sum)}" cy="${y}" r="2.7"><title>${sum}</title></circle>`).join("");
   const tracks = view.candidates.map(({ size, target }, index) => {
@@ -40,10 +40,22 @@ function renderSplitArraySameAverage805View(step) {
       <text class="sa805-count" x="${plotRight + 7}" y="${y + 4}">${after?.stateCount ?? 0}</text>
     </g>`;
   }).join("");
-  const axisY = 24 + view.candidates.length * rowHeight;
+  const hasActiveRow = ["count", "merge"].includes(view.phase) && view.countIndex !== null;
+  const activeY = 24 + view.candidates.length * rowHeight;
+  const activeTarget = view.candidates.find((item) => item.size === view.countIndex)?.target;
+  const activeRow = hasActiveRow ? `<g class="sa805-track sa805-active-track">
+      <text class="sa805-track-label" x="8" y="${activeY + 4}">DP ${view.countIndex}</text>
+      <line class="sa805-track-line" x1="${plotLeft}" x2="${plotRight}" y1="${activeY}" y2="${activeY}"/>
+      ${dots({ sums: view.activeBeforeSums }, activeY + 7, "sa805-dot-before")}${dots({ sums: view.activeAfterSums }, activeY - 7, "sa805-dot-active")}
+      ${activeTarget !== undefined ? `<line class="sa805-target-line" x1="${x(activeTarget)}" x2="${x(activeTarget)}" y1="${activeY - 15}" y2="${activeY + 15}"/>` : ""}
+      <text class="sa805-count" x="${plotRight + 7}" y="${activeY + 4}">${view.activeAfterCount}</text>
+    </g>` : "";
+  const rowCount = view.candidates.length + Number(hasActiveRow);
+  const axisY = 24 + rowCount * rowHeight;
+  const plotHeight = Math.max(90, rowCount * rowHeight + 50);
   const chart = view.candidates.length
     ? `<div class="sa805-chart-wrap"><svg class="sa805-chart" viewBox="0 0 ${plotWidth} ${plotHeight}" role="img" aria-label="${text("Các tổng tập con khả thi và mục tiêu cần đạt", "Reachable subset sums and required targets")}">
-        ${tracks}<line class="sa805-axis" x1="${plotLeft}" x2="${plotRight}" y1="${axisY}" y2="${axisY}"/><text class="sa805-axis-label" x="${plotLeft}" y="${axisY + 18}">0</text><text class="sa805-axis-label" x="${plotRight}" y="${axisY + 18}" text-anchor="end">${view.total}</text>
+        ${tracks}${activeRow}<line class="sa805-axis" x1="${plotLeft}" x2="${plotRight}" y1="${axisY}" y2="${axisY}"/><text class="sa805-axis-label" x="${plotLeft}" y="${axisY + 18}">0</text><text class="sa805-axis-label" x="${plotRight}" y="${axisY + 18}" text-anchor="end">${view.total}</text>
       </svg></div>`
     : `<div class="sa805-no-candidates">${text("Không có k nào để total × k ÷ n ra số nguyên.", "No k makes total × k ÷ n an integer.")}</div>`;
 
@@ -65,7 +77,7 @@ function renderSplitArraySameAverage805View(step) {
   $("treeView").innerHTML = `<section class="sa805-viz" aria-label="${text("Trực quan hóa bài 805", "Problem 805 visualization")}" aria-live="polite">
     <header class="sa805-head"><strong>#805 · ${text("Cùng trung bình", "Same average")}</strong><span>${average} <i>=</i> ${Number((view.total / view.n).toFixed(2))}</span>${answer}</header>
     <div class="sa805-numbers">${numbers}</div>
-    <div class="sa805-formula"><span>k</span><i>→</i><span>total × k ÷ n</span><i>→</i><b>${text("tổng cần tìm", "target sum")}</b></div>
+    <div class="sa805-formula" aria-label="${text("k × tổng ÷ số phần tử = tổng mục tiêu", "k × total ÷ number of items = target sum")}"><span>k</span><i>×</i><span>Σ ÷ n</span><i>=</i><b>Σk</b></div>
     <div class="sa805-candidates">${candidateChips}</div>
     <div class="sa805-legend"><span><i class="before"></i>${text("Trước", "Before")}</span><span><i class="after"></i>${text("Sau", "After")}</span><span><i class="target"></i>${text("Mục tiêu", "Target")}</span></div>
     ${chart}
