@@ -326,33 +326,40 @@
 /* #2472: palindrome lookup table feeding a left-to-right prefix DP. */
 .tree-view:has(> .p2472-viz) { min-width: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
 .p2472-viz {
-  --p2472-text: #e2e8f0;
-  --p2472-muted: #94a3b8;
-  --p2472-panel: #111827;
-  --p2472-soft: rgba(15, 23, 42, .72);
-  --p2472-border: #334155;
-  --p2472-active: #a78bfa;
+  --p2472-background: #0f172a;
+  --p2472-text: #f1f5f9;
+  --p2472-muted: #b4c0d2;
+  --p2472-panel: #172338;
+  --p2472-soft: #223149;
+  --p2472-border: #40516b;
+  --p2472-active: #c4b5fd;
   --p2472-current: #fbbf24;
-  --p2472-good: #34d399;
+  --p2472-good: #4ade80;
   --p2472-bad: #fb7185;
   container-type: inline-size;
   display: grid;
   gap: 11px;
   width: 100%;
   min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--p2472-border);
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 0, #263855, transparent 55%), var(--p2472-background);
   color: var(--p2472-text);
   text-align: left;
 }
 [data-theme="light"] .p2472-viz {
+  --p2472-background: #f5f8ff;
   --p2472-text: #172033;
-  --p2472-muted: #64748b;
-  --p2472-panel: #fff;
-  --p2472-soft: #f8fafc;
-  --p2472-border: #d6deea;
+  --p2472-muted: #526176;
+  --p2472-panel: #ffffff;
+  --p2472-soft: #eef3fb;
+  --p2472-border: #c7d2e2;
   --p2472-active: #6d28d9;
-  --p2472-current: #b45309;
-  --p2472-good: #047857;
+  --p2472-current: #9a3412;
+  --p2472-good: #166534;
   --p2472-bad: #be123c;
+  background: radial-gradient(circle at 50% 0, #e6eafe, transparent 58%), var(--p2472-background);
 }
 .p2472-viz > header,
 .p2472-string > header,
