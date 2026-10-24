@@ -173,7 +173,7 @@ class MostBeautifulItem2070Visualizer {
 
   renderPrefixBinary(v) {
     const method = v.approach === 3 ? "BISECT RIGHT" : "BINARY SEARCH";
-    this.host.innerHTML = `<section class="mbi2070-viz mbi2070-prefix-viz" role="region" aria-label="2070 Sort Prefix Max Binary Search">
+    this.host.innerHTML = `<section class="mbi2070-viz mbi2070-prefix-viz" data-approach="${v.approach}" role="region" aria-label="2070 Sort Prefix Max Binary Search">
       <header class="mbi2070-heading">
         <span>#2070 · PREFIX + ${method}</span><strong>${this.eventLabel(v.event)}</strong>
         <b>${v.activeQuery ? `$${v.activeQuery.value}` : "⌕"}</b>

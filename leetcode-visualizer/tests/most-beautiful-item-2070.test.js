@@ -240,8 +240,8 @@ test("2070 assets are lazy-wired with responsive, theme-aware styles", () => {
   const activeHtml = html.replace(/<template[\s\S]*?<\/template>/g, "");
   const js = readFrontendJavaScript();
   const css = readFrontendStyles();
-  assert.match(html, /<template id="problemVisualizationStyles"[\s\S]*most-beautiful-item-2070\.css\?v=most-beautiful-item-2070-v2[\s\S]*<\/template>/);
-  assert.match(html, /<template id="problemVisualizationScripts"[\s\S]*renderer-most-beautiful-item-2070\.js\?v=most-beautiful-item-2070-v3[\s\S]*<\/template>/);
+  assert.match(html, /<template id="problemVisualizationStyles"[\s\S]*most-beautiful-item-2070\.css\?v=most-beautiful-item-2070-v3[\s\S]*<\/template>/);
+  assert.match(html, /<template id="problemVisualizationScripts"[\s\S]*renderer-most-beautiful-item-2070\.js\?v=most-beautiful-item-2070-v4[\s\S]*<\/template>/);
   assert.doesNotMatch(activeHtml, /most-beautiful-item-2070\.(?:css|js)/);
   assert.match(html, /beauty2070=picture-v1/);
   assert.match(js, /step\.mostBeautifulItem2070View/);
@@ -250,4 +250,7 @@ test("2070 assets are lazy-wired with responsive, theme-aware styles", () => {
   assert.match(css, /\[data-theme="light"\] \.mbi2070-viz/);
   assert.match(css, /\.mbi2070-prefix-item\.is-mid/);
   assert.match(css, /\.mbi2070-prefix-item\.is-selected/);
+  assert.match(css, /#vizPanel:has\(\.mbi2070-prefix-viz\[data-approach="3"\]\) #codePanel\s*\{[^}]*max-height:\s*none;[^}]*overflow:\s*visible;/);
+  assert.match(css, /#vizPanel:has\(\.mbi2070-prefix-viz\[data-approach="3"\]\) \.code-line \.txt\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*pre-wrap;/);
+  assert.match(html, /most-beautiful-item-2070\.css\?v=most-beautiful-item-2070-v3/);
 });
