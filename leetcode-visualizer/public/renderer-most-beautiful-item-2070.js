@@ -41,6 +41,17 @@ class MostBeautifulItem2070Visualizer {
       "search-done": this.t("Chốt giá cuối", "Lock last price"),
       "place-answer-bs": this.t("Lấy prefix max", "Read prefix max"),
       "return-answer-bs": this.t("Hoàn tất", "Done"),
+      "seed-prefix": this.t("Prefix đầu", "First prefix"),
+      "pick-query-bisect": this.t("Query mới", "New query"),
+      "init-bisect": this.t("Tìm vị trí chèn", "Find insertion point"),
+      "bisect-mid": this.t("Chọn giữa", "Pick midpoint"),
+      "bisect-compare": this.t("So giá", "Compare price"),
+      "bisect-right": this.t("Dịch phải", "Move right"),
+      "bisect-left": this.t("Dịch trái", "Move left"),
+      "bisect-done": this.t("Chốt idx", "Lock idx"),
+      "place-answer-bisect": this.t("Lấy prefix max", "Read prefix max"),
+      "no-affordable-item": this.t("Không có món phù hợp", "No affordable item"),
+      "return-answer-bisect": this.t("Hoàn tất", "Done"),
     })[event] || "";
   }
 
@@ -161,12 +172,13 @@ class MostBeautifulItem2070Visualizer {
   }
 
   renderPrefixBinary(v) {
+    const method = v.approach === 3 ? "BISECT RIGHT" : "BINARY SEARCH";
     this.host.innerHTML = `<section class="mbi2070-viz mbi2070-prefix-viz" role="region" aria-label="2070 Sort Prefix Max Binary Search">
       <header class="mbi2070-heading">
-        <span>#2070 · PREFIX + BINARY SEARCH</span><strong>${this.eventLabel(v.event)}</strong>
+        <span>#2070 · PREFIX + ${method}</span><strong>${this.eventLabel(v.event)}</strong>
         <b>${v.activeQuery ? `$${v.activeQuery.value}` : "⌕"}</b>
       </header>
-      <div class="mbi2070-pipeline" aria-label="Sort then Prefix Max then Binary Search"><b>SORT</b><i>→</i><b>PREFIX MAX</b><i>→</i><b>BINARY SEARCH</b></div>
+      <div class="mbi2070-pipeline" aria-label="Sort then Prefix Max then ${method}"><b>SORT</b><i>→</i><b>PREFIX MAX</b><i>→</i><b>${method}</b></div>
       <div class="mbi2070-queries">${this.queryLine(v)}</div>
       <main class="mbi2070-stage mbi2070-prefix-stage">
         ${this.searchStatus(v)}
@@ -180,7 +192,7 @@ class MostBeautifulItem2070Visualizer {
   render(step) {
     const v = step.mostBeautifulItem2070View;
     if (!v) return;
-    if (v.approach === 2) {
+    if (v.approach === 2 || v.approach === 3) {
       this.renderPrefixBinary(v);
       return;
     }
