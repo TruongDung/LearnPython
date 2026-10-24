@@ -755,7 +755,255 @@ function buildStepsFixedMatch(input, params, config) {
 }
 
 function buildSteps438(input, params) {
-  return buildStepsFixedMatch(input, params, { patternKey: "p", defaultPattern: "abc", textLabel: "s", resultName: "anagram starts", existsOnly: false });
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const p = String(params?.p ?? "abc");
+  if (!/^[a-z]{0,100}$/.test(s)) throw new Error("438: s must contain 0–100 lowercase English letters / s phải gồm 0–100 chữ thường a–z.");
+  if (!/^[a-z]{1,100}$/.test(p)) throw new Error("438: p must contain 1–100 lowercase English letters / p phải gồm 1–100 chữ thường a–z.");
+
+  const steps = [];
+  const need = Array(26).fill(0);
+  const window = Array(26).fill(0);
+  const answers = [];
+  const alphabetIndex = (char) => char.charCodeAt(0) - 97;
+  let left = 0;
+  let matches = 0;
+  let required = 0;
+  let right = -1;
+  let ch = null;
+  let idx = null;
+  let event = "setup";
+  let answerAdded = false;
+
+  const emit = (line, title, note, final = false) => {
+    const letters = [...new Set(`${p}${ch || ""}${s.slice(left, right + 1)}`)].sort();
+    const needCounts = Object.fromEntries(letters.map((letter) => [letter, need[alphabetIndex(letter)]]));
+    const windowCounts = Object.fromEntries(letters.map((letter) => [letter, window[alphabetIndex(letter)]]));
+    steps.push({
+      arr: [],
+      codeLines: [line],
+      codeBlock: 1,
+      title: { vi: title.vi, en: title.en },
+      note: { vi: note.vi, en: note.en },
+      final,
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "ch", value: ch ?? "-" },
+        { name: "idx", value: idx ?? "-" },
+        { name: "matches", value: matches },
+        { name: "required", value: required },
+        { name: "ans", value: `[${answers.join(", ")}]` },
+      ],
+      anagram438View: {
+        s,
+        p,
+        left,
+        right,
+        ch,
+        idx,
+        matches,
+        required,
+        need: needCounts,
+        window: windowCounts,
+        answers: [...answers],
+        answerAdded,
+        event,
+        final,
+      },
+    });
+  };
+
+  emit(3, { vi: "So sánh độ dài", en: "Check the lengths" }, {
+    vi: `|p| = ${p.length} · |s| = ${s.length}`,
+    en: `|p| = ${p.length} · |s| = ${s.length}`,
+  });
+  if (p.length > s.length) {
+    event = "short";
+    emit(4, { vi: "p dài hơn s → []", en: "p is longer than s → []" }, {
+      vi: "Không có cửa sổ đủ dài.",
+      en: "No window can be long enough.",
+    }, true);
+    return { original: s, p, answer: [], steps };
+  }
+
+  event = "init";
+  emit(6, { vi: "Tạo 2 mảng đếm", en: "Create two counters" }, {
+    vi: "Mỗi ô ứng với một chữ a–z.",
+    en: "One slot for each letter a–z.",
+  });
+  emit(7, { vi: "Khởi tạo window", en: "Initialize window" }, {
+    vi: "Cả hai bộ đếm bắt đầu từ 0.",
+    en: "Both counters start at 0.",
+  });
+
+  for (ch of p) {
+    idx = alphabetIndex(ch);
+    event = "need-index";
+    emit(9, { vi: `p: chữ '${ch}'`, en: `p: letter '${ch}'` }, {
+      vi: `Chữ '${ch}' nằm ở ô ${idx}.`,
+      en: `'${ch}' is stored in slot ${idx}.`,
+    });
+    need[idx] += 1;
+    event = "need-count";
+    emit(10, { vi: `need['${ch}'] → ${need[idx]}`, en: `need['${ch}'] → ${need[idx]}` }, {
+      vi: "Tăng số lần chữ này cần có.",
+      en: "Increase how many times this letter is needed.",
+    });
+  }
+
+  ch = null;
+  idx = null;
+  event = "setup";
+  emit(12, { vi: "left = 0", en: "left = 0" }, {
+    vi: "Đầu trái của cửa sổ.",
+    en: "The window's left edge.",
+  });
+  emit(13, { vi: "ans = []", en: "ans = []" }, {
+    vi: "Chưa tìm thấy vị trí nào.",
+    en: "No matching start index yet.",
+  });
+  emit(14, { vi: "matches = 0", en: "matches = 0" }, {
+    vi: "Số chữ đang có đúng tần suất.",
+    en: "Letters currently at the needed frequency.",
+  });
+  required = Object.values(need).filter((count) => count > 0).length;
+  event = "required";
+  emit(15, { vi: `required = ${required}`, en: `required = ${required}` }, {
+    vi: "Đếm số chữ khác nhau trong p.",
+    en: "Count distinct letters in p.",
+  });
+
+  for (right = 0; right < s.length; right++) {
+    ch = s[right];
+    idx = alphabetIndex(ch);
+    answerAdded = false;
+    event = "read";
+    emit(17, { vi: `right = ${right} · '${ch}'`, en: `right = ${right} · '${ch}'` }, {
+      vi: "Đọc chữ mới ở cạnh phải.",
+      en: "Read the new right-edge letter.",
+    });
+    event = "window-index";
+    emit(18, { vi: `idx('${ch}') = ${idx}`, en: `idx('${ch}') = ${idx}` }, {
+      vi: "Đổi chữ thành vị trí 0–25.",
+      en: "Map the letter to slot 0–25.",
+    });
+    window[idx] += 1;
+    event = "window-count";
+    emit(19, { vi: `window['${ch}'] → ${window[idx]}`, en: `window['${ch}'] → ${window[idx]}` }, {
+      vi: "Ghi nhận chữ vừa vào cửa sổ.",
+      en: "Count the letter entering the window.",
+    });
+
+    event = "compare";
+    emit(21, { vi: "Tần suất đã khớp?", en: "Frequency now matches?" }, {
+      vi: `window['${ch}'] = ${window[idx]} · need = ${need[idx]}`,
+      en: `window['${ch}'] = ${window[idx]} · need = ${need[idx]}`,
+    });
+    if (need[idx] > 0 && window[idx] === need[idx]) {
+      matches += 1;
+      event = "add-match";
+      emit(22, { vi: `matches → ${matches}`, en: `matches → ${matches}` }, {
+        vi: `Tần suất '${ch}' vừa khớp.`,
+        en: `'${ch}' now has the needed frequency.`,
+      });
+    } else {
+      event = "check-over";
+      emit(23, { vi: "Kiểm tra dư 1 chữ", en: "Check for one extra copy" }, {
+        vi: `window['${ch}'] = ${window[idx]} · need = ${need[idx]}`,
+        en: `window['${ch}'] = ${window[idx]} · need = ${need[idx]}`,
+      });
+      if (need[idx] > 0 && window[idx] === need[idx] + 1) {
+        matches -= 1;
+        event = "remove-match";
+        emit(24, { vi: `matches → ${matches}`, en: `matches → ${matches}` }, {
+          vi: `'${ch}' thừa; không còn khớp.`,
+          en: `One extra '${ch}' breaks its match.`,
+        });
+      }
+    }
+
+    if (right - left + 1 > p.length) {
+      event = "shrink";
+      emit(26, { vi: "Cửa sổ quá dài", en: "Window is too long" }, {
+        vi: `Độ dài ${right - left + 1} > ${p.length}.`,
+        en: `Length ${right - left + 1} > ${p.length}.`,
+      });
+      const outgoing = s[left];
+      idx = alphabetIndex(outgoing);
+      event = "outgoing-index";
+      emit(27, { vi: `Bỏ s[${left}] = '${outgoing}'`, en: `Remove s[${left}] = '${outgoing}'` }, {
+        vi: `Chữ rời cửa sổ nằm ở ô ${idx}.`,
+        en: `The outgoing letter is in slot ${idx}.`,
+      });
+      event = "compare-remove";
+      emit(29, { vi: "Tần suất đang khớp?", en: "Frequency currently matches?" }, {
+        vi: `window['${outgoing}'] = ${window[idx]} · need = ${need[idx]}`,
+        en: `window['${outgoing}'] = ${window[idx]} · need = ${need[idx]}`,
+      });
+      if (need[idx] > 0 && window[idx] === need[idx]) {
+        matches -= 1;
+        event = "lose-match";
+        emit(30, { vi: `matches → ${matches}`, en: `matches → ${matches}` }, {
+          vi: `Bỏ '${outgoing}' làm mất một tần suất khớp.`,
+          en: `Removing '${outgoing}' breaks one frequency match.`,
+        });
+      } else {
+        event = "check-remove-over";
+        emit(31, { vi: "Kiểm tra trước khi bỏ", en: "Check before removing" }, {
+          vi: `window['${outgoing}'] = ${window[idx]} · need = ${need[idx]}`,
+          en: `window['${outgoing}'] = ${window[idx]} · need = ${need[idx]}`,
+        });
+        if (need[idx] > 0 && window[idx] === need[idx] + 1) {
+          matches += 1;
+          event = "restore-match";
+          emit(32, { vi: `matches → ${matches}`, en: `matches → ${matches}` }, {
+            vi: `Bỏ '${outgoing}' đưa tần suất về đúng.`,
+            en: `Removing '${outgoing}' restores its match.`,
+          });
+        }
+      }
+      window[idx] -= 1;
+      event = "remove-char";
+      emit(34, { vi: `window['${outgoing}'] → ${window[idx]}`, en: `window['${outgoing}'] → ${window[idx]}` }, {
+        vi: "Giảm bộ đếm của chữ rời đi.",
+        en: "Decrement the outgoing letter's counter.",
+      });
+      left += 1;
+      event = "move-left";
+      emit(35, { vi: `left → ${left}`, en: `left → ${left}` }, {
+        vi: "Cửa sổ trở lại đúng độ dài p.",
+        en: "The window returns to p's length.",
+      });
+    }
+
+    const isFullMatch = right - left + 1 === p.length && matches === required;
+    event = isFullMatch ? "match" : "check";
+    emit(37, {
+      vi: isFullMatch ? "Cửa sổ khớp!" : "Chưa phải anagram",
+      en: isFullMatch ? "Anagram found!" : "Not an anagram",
+    }, {
+      vi: `matches ${matches}/${required}`,
+      en: `matches ${matches}/${required}`,
+    });
+    if (isFullMatch) {
+      answers.push(left);
+      answerAdded = true;
+      event = "save";
+      emit(38, { vi: `Lưu vị trí ${left}`, en: `Save index ${left}` }, {
+        vi: "Ghi nhận cửa sổ này; tiếp tục tìm cửa sổ khác.",
+        en: "Record this window and keep searching.",
+      });
+    }
+  }
+
+  ch = null;
+  idx = null;
+  event = "done";
+  emit(40, { vi: `Kết quả: [${answers.join(", ")}]`, en: `Result: [${answers.join(", ")}]` }, {
+    vi: "Mọi vị trí anagram đã được tìm thấy.",
+    en: "All anagram start indices have been found.",
+  }, true);
+  return { original: s, p, answer: answers, steps };
 }
 
 function buildSteps567(input, params) {
@@ -1242,6 +1490,51 @@ module.exports = {
   },
 };
 
-module.exports[438] = { id: 438, difficulty: "medium", slug: "find-all-anagrams-in-a-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Find All Anagrams in a String", en: "Find All Anagrams in a String" }, titleVi: { vi: "Tìm mọi anagram trong chuỗi", en: "Find all anagrams in a string" }, statement: { vi: "Tìm mọi vị trí bắt đầu trong s mà substring là anagram của p.", en: "Find all start indices in s whose substring is an anagram of p." }, defaultInput: "cbaebabacd", inputKind: "string", inputLabel: { vi: "Chuỗi s", en: "String s" }, extraParams: [{ key: "p", type: "string", label: { vi: "Pattern p", en: "Pattern p" }, default: "abc" }], complexity: { time: "O(|s| + |p|)", space: "O(alphabet)", note: { vi: "Fixed window có độ dài bằng p và so sánh frequency map.", en: "Use a fixed window of p's length and compare frequency maps." } }, code: ["class Solution:", "    def findAnagrams(self, s, p):", "        need = Counter(p)", "        window = {}; left = 0; ans = []", "        for right, ch in enumerate(s):", "            window[ch] = window.get(ch, 0) + 1", "            if right - left + 1 > len(p):", "                remove_from(window, s[left])", "                left += 1", "            if right - left + 1 == len(p) and window == need:", "                ans.append(left)", "        return ans"], builder: buildSteps438 };
+module.exports[438] = { id: 438, difficulty: "medium", slug: "find-all-anagrams-in-a-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Find All Anagrams in a String", en: "Find All Anagrams in a String" }, titleVi: { vi: "Tìm mọi anagram trong chuỗi", en: "Find all anagrams in a string" }, statement: { vi: "Cho s và p chỉ gồm chữ thường a–z. Tìm mọi vị trí bắt đầu trong s mà substring là anagram của p.", en: "Given lowercase strings s and p, return every start index where a substring of s is an anagram of p." }, defaultInput: "cbaebabacd", inputKind: "string", inputLabel: { vi: "s — 0–100 chữ thường a–z", en: "s — 0–100 lowercase letters a–z" }, extraParams: [{ key: "p", type: "string", label: { vi: "p — 1–100 chữ thường a–z", en: "p — 1–100 lowercase letters a–z" }, default: "abc" }], approach: [
+  { vi: "Đếm chữ trong p bằng mảng 26 ô.", en: "Count p with a 26-slot array." },
+  { vi: "Trượt cửa sổ dài |p|; matches đếm số chữ có tần suất khớp.", en: "Slide a |p|-length window; matches counts letters at the needed frequency." },
+  { vi: "Khi matches == required, lưu left.", en: "When matches == required, save left." },
+  ], complexity: { time: "O(|s| + |p|)", space: "O(1)", note: { vi: "Mảng 26 ô và `matches` tránh so sánh lại toàn bộ bảng ở mỗi cửa sổ.", en: "Two 26-slot arrays and `matches` avoid rescanning the full alphabet for every window." } }, debugMode: "line-by-line", code: [
+  "class Solution:",
+  "    def findAnagrams(self, s: str, p: str) -> list[int]:",
+  "        if len(p) > len(s):",
+  "            return []",
+  "",
+  "        need = [0] * 26",
+  "        window = [0] * 26",
+  "",
+  "        for ch in p:",
+  "            need[ord(ch) - ord('a')] += 1",
+  "",
+  "        left = 0",
+  "        ans = []",
+  "        matches = 0",
+  "        required = sum(1 for x in need if x > 0)",
+  "",
+  "        for right, ch in enumerate(s):",
+  "            idx = ord(ch) - ord('a')",
+  "            window[idx] += 1",
+  "",
+  "            if need[idx] > 0 and window[idx] == need[idx]:",
+  "                matches += 1",
+  "            elif need[idx] > 0 and window[idx] == need[idx] + 1:",
+  "                matches -= 1",
+  "",
+  "            if right - left + 1 > len(p):",
+  "                idx = ord(s[left]) - ord('a')",
+  "",
+  "                if need[idx] > 0 and window[idx] == need[idx]:",
+  "                    matches -= 1",
+  "                elif need[idx] > 0 and window[idx] == need[idx] + 1:",
+  "                    matches += 1",
+  "",
+  "                window[idx] -= 1",
+  "                left += 1",
+  "",
+  "            if right - left + 1 == len(p) and matches == required:",
+  "                ans.append(left)",
+  "",
+  "        return ans",
+  ], builder: buildSteps438, liveArgs: (input, params) => [input, String(params?.p ?? "abc")] };
 
 module.exports[567] = { id: 567, difficulty: "medium", slug: "permutation-in-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Permutation in String", en: "Permutation in String" }, titleVi: { vi: "Hoán vị trong chuỗi", en: "Permutation in String" }, statement: { vi: "Kiểm tra s2 có chứa một hoán vị của s1 hay không.", en: "Check whether s2 contains a permutation of s1." }, defaultInput: "eidbaooo", inputKind: "string", inputLabel: { vi: "Chuỗi s2", en: "String s2" }, extraParams: [{ key: "s1", type: "string", label: { vi: "Pattern s1", en: "Pattern s1" }, default: "ab" }], complexity: { time: "O(|s1| + |s2|)", space: "O(alphabet)", note: { vi: "Fixed window có độ dài bằng s1.", en: "Use a fixed window of s1's length." } }, code: ["class Solution:", "    def checkInclusion(self, s1, s2):", "        need = Counter(s1)", "        window = {}; left = 0", "        for right, ch in enumerate(s2):", "            window[ch] = window.get(ch, 0) + 1", "            if right - left + 1 > len(s1):", "                remove_from(window, s2[left])", "                left += 1", "            if right - left + 1 == len(s1) and window == need:", "                return True", "        return False"], builder: buildSteps567 };
