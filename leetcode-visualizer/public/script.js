@@ -365,6 +365,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.anagram242View), surface: "treeView", render: (step) => {
       renderAnagram242View(step);
     } },
+    { predicate: (step) => Boolean(step.anagram438View), surface: "treeView", render: (step) => {
+      renderFindAnagrams438View(step);
+    } },
     { predicate: (step) => Boolean(step.reverseWords151View), surface: "treeView", render: (step) => {
       renderReverseWords151View(step);
     } },
