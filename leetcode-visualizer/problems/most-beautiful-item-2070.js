@@ -45,6 +45,34 @@ const CODE_2070_PREFIX_BINARY = Object.freeze([
   "        return answer",
 ]);
 
+const CODE_2070_BISECT = Object.freeze([
+  "from bisect import bisect_right",
+  "",
+  "class Solution:",
+  "    def maximumBeauty(self, items: list[list[int]], queries: list[int]) -> list[int]:",
+  "        items.sort()",
+  "",
+  "        n = len(items)",
+  "        prefix_max = [0] * n",
+  "",
+  "        prefix_max[0] = items[0][1]",
+  "",
+  "        for i in range(1, n):",
+  "            prefix_max[i] = max(prefix_max[i - 1], items[i][1])",
+  "",
+  "        res = []",
+  "",
+  "        for query in queries:",
+  "            idx = bisect_right(items, [query, float('inf')]) - 1",
+  "",
+  "            if idx >= 0:",
+  "                res.append(prefix_max[idx])",
+  "            else:",
+  "                res.append(0)",
+  "",
+  "        return res",
+]);
+
 function parse2070Input(input) {
   let data = input;
   if (typeof input === "string") {
@@ -335,6 +363,153 @@ function buildPrefixBinarySteps2070(input) {
   };
 }
 
+function buildBisectSteps2070(input) {
+  const { items, queries } = parse2070Input(input);
+  const originalItems = items.map(([price, beauty], id) => ({ id, price, beauty }));
+  const sortedItems = originalItems
+    .map((item) => ({ ...item }))
+    .sort((left, right) => left.price - right.price || left.beauty - right.beauty || left.id - right.id);
+  const prices = [];
+  const prefix = [];
+  const answers = Array(queries.length).fill(0);
+  const resolved = Array(queries.length).fill(false);
+  const steps = [];
+  let itemsSorted = false;
+  let best = 0;
+  let previousBest = 0;
+  let activeItemIndex = null;
+  let queryOrderIndex = -1;
+  let activeQuery = null;
+  let lo = null;
+  let hi = null;
+  let mid = null;
+  let selectedIndex = null;
+  let comparison = null;
+  let searchPath = [];
+
+  function emit(event, line, final = false) {
+    steps.push({
+      title: bi("Sort → Prefix Max → bisect_right", "Sort → Prefix Max → bisect_right"),
+      note: bi("", ""),
+      codeLines: [line],
+      codeBlock: 3,
+      final,
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      vars: [
+        { name: "query", value: activeQuery?.value ?? "—" },
+        { name: "lo", value: lo ?? "—" },
+        { name: "hi", value: hi ?? "—" },
+        { name: "mid", value: mid ?? "—" },
+        { name: "idx", value: selectedIndex ?? "—" },
+        { name: "best", value: best },
+        { name: "res", value: answers.map((value, index) => resolved[index] ? value : "—").join(", ") },
+      ],
+      mostBeautifulItem2070View: {
+        approach: 3,
+        event,
+        items: originalItems.map((item) => ({ ...item })),
+        sortedItems: sortedItems.map((item) => ({ ...item })),
+        itemsSorted,
+        prices: [...prices],
+        prefix: [...prefix],
+        queries: [...queries],
+        orderedQueries: queries.map((value, originalIndex) => ({ value, originalIndex })),
+        queriesSorted: false,
+        answers: [...answers],
+        resolved: [...resolved],
+        queryOrderIndex,
+        activeQuery: activeQuery ? { ...activeQuery } : null,
+        activeItemIndex,
+        pointer: prefix.length,
+        comparison: comparison ? { ...comparison } : null,
+        best,
+        previousBest,
+        lo,
+        hi,
+        mid,
+        selectedIndex,
+        searchPath: [...searchPath],
+        final,
+      },
+    });
+  }
+
+  emit("bind-class", 3);
+  emit("enter-method", 4);
+  itemsSorted = true;
+  emit("sort-items", 5);
+  emit("make-prefix", 8);
+  activeItemIndex = 0;
+  best = sortedItems[0].beauty;
+  prefix.push(best);
+  prices.push(sortedItems[0].price);
+  emit("seed-prefix", 10);
+
+  for (let index = 1; index < sortedItems.length; index += 1) {
+    activeItemIndex = index;
+    emit("prefix-item", 12);
+    previousBest = best;
+    best = Math.max(best, sortedItems[index].beauty);
+    prices.push(sortedItems[index].price);
+    prefix.push(best);
+    emit("prefix-best", 13);
+  }
+
+  activeItemIndex = null;
+  emit("make-answer", 15);
+  for (queryOrderIndex = 0; queryOrderIndex < queries.length; queryOrderIndex += 1) {
+    activeQuery = { value: queries[queryOrderIndex], originalIndex: queryOrderIndex };
+    lo = 0;
+    hi = sortedItems.length;
+    mid = null;
+    selectedIndex = null;
+    comparison = null;
+    searchPath = [];
+    emit("pick-query-bisect", 17);
+    emit("init-bisect", 18);
+    while (lo < hi) {
+      mid = Math.floor((lo + hi) / 2);
+      searchPath.push(mid);
+      emit("bisect-mid", 18);
+      comparison = {
+        price: sortedItems[mid].price,
+        query: activeQuery.value,
+        allowed: sortedItems[mid].price <= activeQuery.value,
+      };
+      emit("bisect-compare", 18);
+      if (comparison.allowed) {
+        lo = mid + 1;
+        emit("bisect-right", 18);
+      } else {
+        hi = mid;
+        emit("bisect-left", 18);
+      }
+    }
+    selectedIndex = lo - 1;
+    activeItemIndex = selectedIndex >= 0 ? selectedIndex : null;
+    comparison = null;
+    emit("bisect-done", 18);
+    answers[queryOrderIndex] = selectedIndex >= 0 ? prefix[selectedIndex] : 0;
+    resolved[queryOrderIndex] = true;
+    emit(selectedIndex >= 0 ? "place-answer-bisect" : "no-affordable-item", selectedIndex >= 0 ? 21 : 23);
+  }
+
+  queryOrderIndex = queries.length;
+  activeQuery = null;
+  activeItemIndex = null;
+  mid = null;
+  comparison = null;
+  emit("return-answer-bisect", 25, true);
+  return {
+    original: { items: items.map((item) => [...item]), queries: [...queries] },
+    answer: answers,
+    steps,
+  };
+}
+
 const DEFAULT_INPUT_2070 = {
   items: [[1, 2], [3, 2], [2, 4], [5, 6], [3, 5]],
   queries: [1, 2, 3, 4, 5, 6],
@@ -371,6 +546,7 @@ module.exports = {
       options: [
         { value: "1", label: bi("1 · Sort query + quét giá", "1 · Sort queries + price sweep") },
         { value: "2", label: bi("2 · Prefix Max + Binary Search", "2 · Prefix Max + Binary Search") },
+        { value: "3", label: bi("3 · Prefix Max + bisect_right", "3 · Prefix Max + bisect_right") },
       ],
     }],
     debugMode: "line-by-line",
@@ -378,6 +554,7 @@ module.exports = {
       bi("Cách 1: xếp cả món và query; kéo cổng giá sang phải, mỗi món đi qua một lần.", "Approach 1: sort items and queries; sweep the price gate so each item passes once."),
       bi("Cách 2: Sort → Prefix Max → Binary Search.", "Approach 2: Sort → Prefix Max → Binary Search."),
       bi("prefix[i] là beauty lớn nhất đến giá i; mỗi query tìm giá cuối cùng không vượt ngân sách.", "prefix[i] is the best beauty through price i; each query finds the last affordable price."),
+      bi("Cách 3: Sort → Prefix Max → bisect_right; `float('inf')` lấy hết món cùng mức giá.", "Approach 3: Sort → Prefix Max → bisect_right; `float('inf')` includes every item at the query price."),
     ],
     complexity: {
       time: "O(n log n + q log q)",
@@ -389,10 +566,17 @@ module.exports = {
       space: "O(n + q)",
       note: bi("Dựng prefix max một lần; mỗi query tìm kiếm nhị phân độc lập.", "Build prefix maxima once; each query runs an independent binary search."),
     },
+    complexity3: {
+      time: "O(n log n + q log n)",
+      space: "O(n + q)",
+      note: bi("Sắp xếp items, dựng prefix max; bisect_right tìm điểm chèn phải cho mỗi query.", "Sort items and build prefix maxima; bisect_right finds the right insertion point for each query."),
+    },
     code: CODE_2070,
     codeLabel: bi("Cách 1 · Sort query + quét giá", "Approach 1 · Sort queries + price sweep"),
     code2: CODE_2070_PREFIX_BINARY,
     code2Label: bi("Cách 2 · Sort → Prefix Max → Binary Search", "Approach 2 · Sort → Prefix Max → Binary Search"),
+    code3: CODE_2070_BISECT,
+    code3Label: bi("Cách 3 · Prefix Max + bisect_right", "Approach 3 · Prefix Max + bisect_right"),
     liveArgs: (input) => {
       const parsed = parse2070Input(input);
       return [parsed.items, parsed.queries];
@@ -400,5 +584,6 @@ module.exports = {
     parseInput: parse2070Input,
     builder: buildSteps2070,
     builder2: buildPrefixBinarySteps2070,
+    builder3: buildBisectSteps2070,
   },
 };
