@@ -98,6 +98,39 @@ const BFS_SOURCE = Object.freeze([
   "        return components",
 ]);
 
+const RECURSIVE_SOURCE = Object.freeze([
+  "from typing import List",
+  "import sys",
+  "",
+  "class Solution:",
+  "    def maxKDivisibleComponents(",
+  "        self, n: int, edges: List[List[int]], values: List[int], k: int",
+  "    ) -> int:",
+  "        sys.setrecursionlimit(max(sys.getrecursionlimit(), n + 100))",
+  "        graph = [[] for _ in range(n)]",
+  "        for u, v in edges:",
+  "            graph[u].append(v)",
+  "            graph[v].append(u)",
+  "",
+  "        components = 0",
+  "",
+  "        def dfs(node, parent):",
+  "            nonlocal components",
+  "            subtotal = values[node]",
+  "            for neighbor in graph[node]:",
+  "                if neighbor == parent:",
+  "                    continue",
+  "                child_sum = dfs(neighbor, node)",
+  "                subtotal += child_sum",
+  "            if subtotal % k == 0:",
+  "                components += 1",
+  "                return 0",
+  "            return subtotal",
+  "",
+  "        dfs(0, -1)",
+  "        return components",
+]);
+
 function undirectedKey(left, right) {
   return left < right ? `${left}:${right}` : `${right}:${left}`;
 }
@@ -625,6 +658,150 @@ function buildBfsSteps2872(input, params = {}) {
   return { original: { n, edges: edges.map(edge => [...edge]), values: [...values], k }, answer: locals.components, steps };
 }
 
+function buildRecursiveSteps2872(input, params = {}) {
+  const { n, edges, values, k, total, tree } = parseMaximumKDivisibleComponents2872Input(input, params);
+  const steps = [], frames = [];
+  const main = { n, edges: edges.map(edge => [...edge]), values: [...values], k };
+  const sums = Array(n).fill(null), contribution = Array(n).fill(null);
+  const processed = new Set(), cutEdges = new Set(), cuts = [], completed = [];
+  let previousVars = watches(main);
+
+  function stateOf(frame) {
+    return frame.name === "dfs"
+      ? { ...frame.locals, graph: main.graph, k, values: main.values, components: main.components }
+      : main;
+  }
+  function watches(state) {
+    return [
+      { name: "node", value: state.node ?? "—" },
+      { name: "parent", value: state.parent ?? "—" },
+      { name: "subtotal", value: state.subtotal ?? "—" },
+      { name: "child_sum", value: state.child_sum ?? "—" },
+      { name: "subtotal % k", value: state.subtotal === undefined ? "—" : state.subtotal % k },
+      { name: "components", value: state.components ?? "—" },
+    ];
+  }
+  function emit(frame, line, detail = {}) {
+    if (steps.length >= LIMITS.maxTraceSteps) throw new Error("#2872: full recursive line trace exceeded its bound");
+    frame.line = line;
+    const state = JSON.parse(JSON.stringify(stateOf(frame)));
+    const stage = line <= 16 ? "graph" : line === 30 ? "done" : "recursive";
+    const activeNode = frame.name === "dfs" ? state.node : stage === "graph" ? state.u ?? null : null;
+    const phase = detail.phase || (stage === "graph" ? "graph" : stage === "done" ? "done" : "inspect");
+    const labels = {
+      graph: bi("Chuẩn bị DFS đệ quy", "Prepare recursive DFS"),
+      inspect: bi("DFS · duyệt nút hiện tại", "DFS · inspect the current node"),
+      call: bi("Gọi dfs, chờ hàm con", "Call dfs and wait for its return"),
+      receive: bi("Nhận child_sum", "Receive child_sum"),
+      merge: bi("Cộng child_sum", "Add child_sum"),
+      check: bi("Kiểm tra chia hết", "Check divisibility"),
+      count: bi("Tăng components", "Increment components"),
+      cut: bi("Cắt cạnh, return 0", "Cut the edge and return 0"),
+      close: bi("Khép nhóm gốc, return 0", "Close the root component and return 0"),
+      carry: bi("Trả subtotal cho cha", "Return subtotal to the parent"),
+      done: bi("Trả kết quả DFS", "Return the DFS result"),
+    };
+    const cursor = {};
+    let edgeFocus = null;
+    if ([10, 11, 12].includes(line) && state.u !== undefined && !detail.exhausted) {
+      cursor.u = state.u; cursor.v = state.v; edgeFocus = [state.u, state.v];
+    } else if ([19, 20, 21, 22, 23].includes(line) && state.neighbor !== undefined && !detail.exhausted) {
+      cursor.neighbor = state.neighbor; edgeFocus = [state.node, state.neighbor];
+    }
+    const pieces = new Map(collectFinalComponents(tree, values, cutEdges).map(piece => [piece.root, piece]));
+    const closedGroups = completed.map((component, id) => ({ id, ...component, members: [...pieces.get(component.root).members] }));
+    const vars = watches(state), label = labels[phase];
+    steps.push({
+      title: bi(`Dòng ${line} · ${label.vi}`, `Line ${line} · ${label.en}`), note: bi("", ""),
+      arr: [...values], sub: values.map(() => ""), highlight: activeNode === null ? [] : [activeNode], mark: [...processed],
+      codeLines: [line], codeBlock: 3, vars, final: line === 30,
+      kDivisible2872View: {
+        n, k, algorithm: "recursive", stage, phase, activeNode,
+        source: { line, text: RECURSIVE_SOURCE[line - 1], timing: detail.callTarget ? "before-call" : "after" },
+        functionName: frame.name, locals: state, beforeVars: previousVars,
+        callStack: frames.filter(item => item.name === "dfs").map(item => ({ line: item.line, ...item.locals })),
+        callTarget: detail.callTarget ?? null, returned: detail.returned ?? null,
+        condition: typeof detail.condition === "boolean" ? detail.condition : null,
+        exhausted: Boolean(detail.exhausted), nextLine: null, nextSource: null,
+        cursor, edgeFocus, graph: state.graph ?? Array.from({ length: n }, () => []),
+        arrayChanges: detail.arrayChanges || {}, components: main.components ?? 0,
+        values: [...values], edges: edges.map(edge => [...edge]),
+        parent: [...tree.parent], children: tree.children.map(children => [...children]),
+        processed: [...processed], subtotal: [...sums], activeSum: state.subtotal ?? null,
+        contribution: [...contribution], cuts: cuts.map(cut => ({ ...cut })), closedGroups,
+        transfer: detail.transfer || null, traceTruncated: false,
+      },
+    });
+    previousVars = vars.map(variable => ({ ...variable }));
+  }
+
+  const entry = { name: "maxKDivisibleComponents", line: 8, locals: main };
+  frames.push(entry);
+  emit(entry, 8);
+  main.graph = Array.from({ length: n }, () => []); emit(entry, 9);
+  for (const [u, v] of edges) {
+    main.u = u; main.v = v; emit(entry, 10, { condition: true });
+    main.graph[u].push(v); emit(entry, 11, { arrayChanges: { graph: u } });
+    main.graph[v].push(u); emit(entry, 12, { arrayChanges: { graph: v } });
+  }
+  emit(entry, 10, { condition: false, exhausted: true });
+  main.components = 0; emit(entry, 14);
+  emit(entry, 16);
+
+  function dfs(node, parent) {
+    const frame = { name: "dfs", line: 18, locals: { node, parent } };
+    const local = frame.locals;
+    frames.push(frame);
+    local.subtotal = values[node]; sums[node] = local.subtotal; emit(frame, 18);
+    for (const neighbor of main.graph[node]) {
+      local.neighbor = neighbor; emit(frame, 19, { condition: true });
+      const isParent = neighbor === parent;
+      emit(frame, 20, { condition: isParent });
+      if (isParent) { emit(frame, 21); continue; }
+      emit(frame, 22, { phase: "call", callTarget: { node: neighbor, parent: node } });
+      local.child_sum = dfs(neighbor, node);
+      emit(frame, 22, { phase: "receive" });
+      const before = local.subtotal;
+      local.subtotal += local.child_sum; sums[node] = local.subtotal;
+      emit(frame, 23, { phase: "merge", transfer: { from: neighbor, to: node, amount: local.child_sum, before, after: local.subtotal } });
+    }
+    emit(frame, 19, { condition: false, exhausted: true });
+    const divisible = local.subtotal % k === 0;
+    emit(frame, 24, { phase: "check", condition: divisible });
+    if (divisible) {
+      main.components++; emit(frame, 25, { phase: "count" });
+      contribution[node] = 0; processed.add(node); completed.push({ root: node, sum: local.subtotal });
+      if (parent !== -1) {
+        cutEdges.add(undirectedKey(parent, node)); cuts.push({ parent, child: node, sum: local.subtotal });
+      }
+      emit(frame, 26, { phase: parent === -1 ? "close" : "cut", returned: 0 });
+      frames.pop();
+      return 0;
+    }
+    contribution[node] = local.subtotal; processed.add(node);
+    emit(frame, 27, { phase: "carry", returned: local.subtotal });
+    frames.pop();
+    return local.subtotal;
+  }
+
+  emit(entry, 29, { phase: "call", callTarget: { node: 0, parent: -1 } });
+  const rootContribution = dfs(0, -1);
+  emit(entry, 29, { phase: "receive" });
+  const finalComponents = collectFinalComponents(tree, values, cutEdges);
+  if (rootContribution !== 0 || processed.size !== n || cutEdges.size !== main.components - 1
+    || finalComponents.length !== main.components || finalComponents.some(component => component.sum % k !== 0)
+    || finalComponents.reduce((sum, component) => sum + component.sum, 0) !== total) {
+    throw new Error("#2872: recursive DFS components violate the divisibility invariant");
+  }
+  emit(entry, 30, { returned: main.components });
+  steps.forEach((step, index) => {
+    const nextLine = steps[index + 1]?.codeLines[0] ?? null;
+    step.kDivisible2872View.nextLine = nextLine;
+    step.kDivisible2872View.nextSource = nextLine === null ? null : RECURSIVE_SOURCE[nextLine - 1];
+  });
+  return { original: { n, edges: edges.map(edge => [...edge]), values: [...values], k }, answer: main.components, steps };
+}
+
 module.exports = {
   2872: {
     id: 2872,
@@ -663,6 +840,7 @@ module.exports = {
         options: [
           { value: "1", label: bi("Cách 1 · DFS hậu tự", "Approach 1 · Postorder DFS") },
           { value: "2", label: bi("Cách 2 · BFS tỉa lá", "Approach 2 · BFS leaf pruning") },
+          { value: "3", label: bi("Cách 3 · DFS đệ quy", "Approach 3 · Recursive DFS") },
         ],
       },
       {
@@ -694,6 +872,10 @@ module.exports = {
         "BFS: đưa các lá vào queue. Gỡ từng lá, chuyển carry sang nút kề; bậc còn 1 thì thêm lá mới vào queue.",
         "BFS: queue the leaves. Remove each leaf and pass its contribution to its neighbor; enqueue a neighbor when its degree becomes 1.",
       ),
+      bi(
+        "DFS đệ quy: mỗi lời gọi giữ subtotal riêng; nhận child_sum từ hàm con, rồi cộng vào subtotal. Chia hết thì trả 0.",
+        "Recursive DFS: each call keeps its own subtotal, receives child_sum, and adds it. A divisible subtotal returns 0.",
+      ),
     ],
     complexity: {
       time: "O(n)",
@@ -705,8 +887,10 @@ module.exports = {
     },
     codeLabel: bi("Cách 1 · DFS hậu tự", "Approach 1 · Postorder DFS"),
     code2Label: bi("Cách 2 · BFS tỉa lá", "Approach 2 · BFS leaf pruning"),
+    code3Label: bi("Cách 3 · DFS đệ quy", "Approach 3 · Recursive DFS"),
     code: SOURCE,
     code2: BFS_SOURCE,
+    code3: RECURSIVE_SOURCE,
     debugMode: "line-by-line",
     parser: parseMaximumKDivisibleComponents2872Input,
     parseMaximumKDivisibleComponents2872Input,
@@ -720,6 +904,7 @@ module.exports = {
       ];
     },
     builder(input, params = {}) {
+      if (Number(params.approach) === 3) return buildRecursiveSteps2872(input, params);
       return Number(params.approach) === 2 ? buildBfsSteps2872(input, params) : buildSteps2872(input, params);
     },
   },

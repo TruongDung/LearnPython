@@ -8,6 +8,7 @@ const { test } = require("node:test");
 const problem = require("../problems").SUPPORTED[2872];
 const watchNames = ["node", "k", "subtotal", "subtotal % k", "contribution[node]", "components"];
 const bfsWatchNames = ["node", "k", "subtotal[node]", "carry", "degree[node]", "components"];
+const recursiveWatchNames = ["node", "parent", "subtotal", "child_sum", "subtotal % k", "components"];
 const examples = [
   { edges: [[0, 2], [1, 2], [1, 3], [2, 4]], values: [1, 8, 1, 4, 4], k: 6, answer: 2 },
   { edges: [], values: [6], k: 3, answer: 1 },
@@ -35,7 +36,7 @@ function exhaustive(edges, values, k) {
   return best;
 }
 
-test("2872 DFS and BFS maximize components, checked against every possible cut", () => {
+test("2872 all three approaches maximize components, checked against every possible cut", () => {
   let seed = 2872;
   const random = bound => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % bound; };
   const cases = [...examples];
@@ -46,7 +47,7 @@ test("2872 DFS and BFS maximize components, checked against every possible cut",
     values[n - 1] += (k - values.reduce((sum, value) => sum + value, 0) % k) % k;
     cases.push({ edges, values, k });
   }
-  for (const item of cases) for (const approach of [1, 2]) {
+  for (const item of cases) for (const approach of [1, 2, 3]) {
     const run = solve(item, approach);
     assert.equal(run.answer, exhaustive(item.edges, item.values, item.k));
     if (item.answer !== undefined) assert.equal(run.answer, item.answer);
@@ -90,7 +91,7 @@ test("2872 pictures and six fixed watches follow merges, cuts, and zero contribu
 });
 
 test("2872 retains every executed line even for 96 nodes", () => {
-  for (const star of [false, true]) for (const approach of [1, 2]) {
+  for (const star of [false, true]) for (const approach of [1, 2, 3]) {
     const item = { values: Array(96).fill(1), k: star ? 1 : 3, edges: Array.from({ length: 95 }, (_, i) => [star ? 0 : i, i + 1]) };
     const run = solve(item, approach);
     assert.equal(run.answer, star ? 96 : 32);
@@ -272,6 +273,128 @@ test("2872 BFS pictures show queue, degrees and subtotals, including transfers t
       if (v.locals.subtotal) assert.match(html, /<code>subtotal<\/code>/);
       if (v.transfer?.amount > 0) assert.match(html, /<g class="kd2872-flow">/);
       if (v.transfer?.amount === 0) assert.doesNotMatch(html, /<g class="kd2872-flow">/);
+      if (v.phase === "cut") assert.match(html, /class="kd2872-cut"/);
+    }
+    context.renderKDivisibleComponents2872View(run.steps[0]);
+    const first = host.innerHTML;
+    context.renderKDivisibleComponents2872View(run.steps.at(-1));
+    context.renderKDivisibleComponents2872View(run.steps[0]);
+    assert.equal(host.innerHTML, first);
+  }
+});
+
+test("2872 recursive calls, returns, frame locals and line timing match CPython", () => {
+  const program = problem.code3.join("\n") + `
+import copy, json
+cases = json.load(sys.stdin)
+runs = []
+for args in cases:
+    events, active, pending = [], [], {}
+    def snapshot(frame, line, timing, returned=None, target=None):
+        state = copy.deepcopy({name: value for name, value in frame.f_locals.items()
+                               if name != 'self' and not callable(value)})
+        stack = []
+        for item in active:
+            if item.f_code.co_name == 'dfs':
+                stack.append(dict(line=pending.get(id(item), item.f_lineno), **{
+                    name: value for name, value in item.f_locals.items()
+                    if name in ('node', 'parent', 'subtotal', 'neighbor', 'child_sum')
+                }))
+        events.append({'line': line, 'timing': timing, 'functionName': frame.f_code.co_name,
+                       'locals': state, 'callStack': copy.deepcopy(stack), 'returned': returned, 'callTarget': target})
+    def trace(frame, event, arg):
+        if frame.f_code.co_name not in ('maxKDivisibleComponents', 'dfs'):
+            return trace
+        if event == 'call':
+            if frame.f_code.co_name == 'dfs':
+                caller = frame.f_back
+                snapshot(caller, pending[id(caller)], 'before-call', target={
+                    'node': frame.f_locals['node'], 'parent': frame.f_locals['parent']})
+            active.append(frame)
+        elif event == 'line':
+            previous = pending.get(id(frame))
+            if previous is not None:
+                snapshot(frame, previous, 'after')
+            pending[id(frame)] = frame.f_lineno
+        elif event == 'return':
+            snapshot(frame, pending[id(frame)], 'after', returned=arg)
+            active.pop()
+            del pending[id(frame)]
+        return trace
+    sys.settrace(trace)
+    answer = Solution().maxKDivisibleComponents(*args)
+    sys.settrace(None)
+    runs.append({'answer': answer, 'events': events})
+print(json.dumps(runs))
+`;
+  const cases = [...examples, { edges: [[3, 0], [1, 0], [4, 1], [2, 0]], values: [2, 3, 4, 5, 6], k: 5 }];
+  const run = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["-c", program], {
+    input: JSON.stringify(cases.map(item => problem.liveArgs(item.edges, { values: item.values, k: item.k }))),
+    encoding: "utf8", maxBuffer: 8 * 1024 * 1024,
+  });
+  assert.equal(run.status, 0, run.stderr);
+  JSON.parse(run.stdout).forEach((expected, index) => {
+    const actual = solve(cases[index], 3);
+    assert.equal(actual.answer, expected.answer);
+    assert.deepEqual(actual.steps.map(step => {
+      const v = step.kDivisible2872View;
+      assert.equal(step.codeBlock, 3);
+      assert.deepEqual(step.codeLines, [v.source.line]);
+      assert.equal(v.source.text, problem.code3[v.source.line - 1]);
+      assert.deepEqual(step.vars.map(variable => variable.name), recursiveWatchNames);
+      const state = v.locals;
+      assert.deepEqual(step.vars.map(variable => variable.value), [
+        state.node ?? "—", state.parent ?? "—", state.subtotal ?? "—", state.child_sum ?? "—",
+        state.subtotal === undefined ? "—" : state.subtotal % state.k, state.components ?? "—",
+      ]);
+      return { line: v.source.line, timing: v.source.timing, functionName: v.functionName,
+        locals: v.locals, callStack: v.callStack, returned: v.returned, callTarget: v.callTarget };
+    }), expected.events, `recursive case ${index}`);
+  });
+});
+
+test("2872 recursive parents wait for a return before assigning and adding child_sum", () => {
+  const run = solve(examples[0], 3);
+  assert.equal(run.steps.filter(step => step.kDivisible2872View.callTarget).length, 5);
+  for (let i = 0; i < run.steps.length; i++) {
+    const v = run.steps[i].kDivisible2872View;
+    assert.equal(v.components, v.closedGroups.length + (v.phase === "count" ? 1 : 0));
+    if (v.functionName !== "dfs" || v.returned === null || v.locals.parent === -1) continue;
+    const parent = v.callStack.at(-2);
+    const received = run.steps[i + 1].kDivisible2872View;
+    const merged = run.steps[i + 2].kDivisible2872View;
+    assert.equal(received.source.line, 22);
+    assert.equal(received.source.timing, "after");
+    assert.equal(received.locals.node, v.locals.parent);
+    assert.equal(received.locals.child_sum, v.returned);
+    assert.equal(received.locals.subtotal, parent.subtotal);
+    assert.equal(received.callStack.length, v.callStack.length - 1);
+    assert.equal(merged.source.line, 23);
+    assert.equal(merged.locals.subtotal, parent.subtotal + v.returned);
+  }
+  const index = run.steps.findIndex(step => step.kDivisible2872View.phase === "cut");
+  assert.deepEqual(run.steps.slice(index - 2, index + 1).map(step => step.codeLines[0]), [24, 25, 26]);
+  assert.deepEqual(run.steps[index - 1].kDivisible2872View.cuts, []);
+  assert.equal(run.steps[index].kDivisible2872View.cuts.length, 1);
+  assert.equal(run.steps.at(-1).kDivisible2872View.callStack.length, 0);
+});
+
+test("2872 recursive pictures show waiting frames, active calls and return values in both languages", () => {
+  const host = { innerHTML: "", querySelector: () => null };
+  const context = { lang: "vi", $: () => host, escapeHtml: value => String(value).replace(/[&<>"']/g, "_") };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-k-divisible-components-2872.js"), "utf8"), context);
+  for (const language of ["vi", "en"]) for (const item of [examples[0], examples[5]]) {
+    context.lang = language;
+    const run = solve(item, 3);
+    for (const step of run.steps) {
+      context.renderKDivisibleComponents2872View(step);
+      const html = host.innerHTML, v = step.kDivisible2872View;
+      assert.doesNotMatch(html, /undefined|NaN|Infinity|object Object/);
+      assert.match(html, /class="kd2872-call-stack"/);
+      if (v.callStack.length > 1) assert.match(html, /class="waiting"/);
+      if (v.callTarget) assert.match(html, /↓ dfs\(/);
+      if (v.returned !== null) assert.match(html, new RegExp(`↑ return ${v.returned}`));
       if (v.phase === "cut") assert.match(html, /class="kd2872-cut"/);
     }
     context.renderKDivisibleComponents2872View(run.steps[0]);

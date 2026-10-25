@@ -54,6 +54,7 @@
 .kd2872-node circle { fill: var(--kd-node); stroke: var(--kd-blue); stroke-width: 1.5; }
 .kd2872-node.closed circle { fill: color-mix(in srgb, var(--kd-tone) 16%, var(--kd-panel)); stroke: var(--kd-tone); stroke-width: 2; }
 .kd2872-node.queued circle { stroke-dasharray: 5 3; stroke: var(--kd-gold); }
+.kd2872-node.on-call-stack circle { stroke: var(--kd-purple); stroke-width: 3; }
 .kd2872-node.active circle { stroke: var(--kd-gold); stroke-width: 4; }
 .kd2872-value { fill: var(--kd-text); font-size: 15px; }
 .kd2872-id { fill: var(--kd-muted); font-size: 12px; }
@@ -103,4 +104,14 @@
 .kd2872-viz .tone-3 { --kd-tone: var(--kd-gold); }
 .kd2872-viz .tone-4 { --kd-tone: var(--kd-red); }
 .kd2872-viz .tone-5 { --kd-tone: var(--kd-cyan); }
+.kd2872-call-stack { display: grid; gap: 6px; }
+.kd2872-call-stack > code { font-size: 11px; color: var(--kd-muted); }
+.kd2872-call-stack > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kd2872-call-stack article { display: grid; gap: 4px; padding: 8px; min-width: 0; border-left: 2px solid var(--kd-purple); border-radius: 6px; background: var(--kd-panel); }
+.kd2872-call-stack article.top { border-color: var(--kd-gold); }
+.kd2872-call-stack strong { color: var(--kd-purple); font: 12px monospace; }
+.kd2872-call-stack .top strong { color: var(--kd-gold); }
+.kd2872-call-stack span { color: var(--kd-text); font: 11px monospace; overflow-wrap: anywhere; }
+.kd2872-call-stack small { color: var(--kd-muted); font-size: 10px; }
+.kd2872-call-action { color: var(--kd-gold); font: 13px monospace; text-align: center; }
 @media (max-width: 520px) { .kd2872-canvas { max-height: 360px; } .kd2872-math { justify-content: center; } }
