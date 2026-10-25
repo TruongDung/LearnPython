@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { test } = require("node:test");
+const { spawnSync } = require("node:child_process");
 const problem = require("../problems").SUPPORTED[9006];
 
 function renderer() {
@@ -121,4 +122,80 @@ test("9006 keeps a wide queue's front and new back visible and escapes full node
   assert.equal((graph.match(/class="rv-bfs-map-node /g) || []).length, 24);
   assert.equal((graph.match(/class="rv-bfs-map-edge /g) || []).length, 23);
   assert.doesNotMatch(graph, /NaN|undefined|Infinity/);
+});
+
+test("9006 keeps six essential watches stable and agrees with Python after each instruction", () => {
+  const cases = [
+    { edges: [["A", "B"], ["A", "C"], ["B", "D"], ["C", "D"], ["D", "E"]], start: "A", target: "E" },
+    { edges: [["A", "B"], ["B", "C"], ["C", "A"], ["C", "D"]], start: "A", target: "D" },
+    { edges: [["A", "B"], ["C", "D"]], start: "A", target: "D" },
+    { edges: [["A", "B"]], start: "A", target: "A" },
+    { edges: [["S", "z"], ["S", "ä"], ["z", "T"], ["ä", "T"]], start: "S", target: "T" },
+  ];
+  const program = problem.code.join("\n") + `
+import json, sys
+runs = []
+for case in json.load(sys.stdin):
+    events, pending = [], None
+    def snapshot(frame, line):
+        state = frame.f_locals
+        node, nxt = state.get('node', '—'), state.get('nxt', '—')
+        distance, parent = state.get('distance', {}), state.get('parent', {})
+        watches = [
+            'None' if node is None else node, nxt, distance.get(node, '—'),
+            'None' if nxt in parent and parent[nxt] is None else parent.get(nxt, '—'),
+            distance.get(nxt, '—'), len(state['queue']) if 'queue' in state else '—',
+        ]
+        events.append({'line': line, 'watches': watches})
+    def trace(frame, event, arg):
+        global pending
+        if frame.f_code.co_name != 'shortest_path':
+            return trace
+        if event == 'line':
+            if pending is not None:
+                snapshot(frame, pending)
+            pending = frame.f_lineno
+        elif event == 'return':
+            snapshot(frame, pending)
+            pending = None
+        return trace
+    sys.settrace(trace)
+    answer = shortest_path(case['edges'], case['start'], case['target'])
+    sys.settrace(None)
+    runs.append({'answer': answer, 'events': events})
+print(json.dumps(runs))
+`;
+  const python = spawnSync("python3", ["-c", program], { input: JSON.stringify(cases), encoding: "utf8" });
+  assert.equal(python.status, 0, python.stderr);
+  const watchNames = ["node", "nxt", "distance[node]", "parent[nxt]", "distance[nxt]", "len(queue)"];
+  JSON.parse(python.stdout).forEach((expected, index) => {
+    const item = cases[index], run = problem.builder(item.edges, item);
+    assert.deepEqual(run.answer, expected.answer);
+    let cursor = 0;
+    for (const step of run.steps) {
+      assert.deepEqual(step.vars.map(variable => variable.name), watchNames);
+      assert.equal(step.codeLines.length, 1);
+      const line = step.codeLines[0];
+      if (line <= 3) continue;
+      while (cursor < expected.events.length && expected.events[cursor].line !== line) cursor++;
+      assert.ok(cursor < expected.events.length, `case ${index}, source line ${line}`);
+      assert.deepEqual(step.vars.map(variable => variable.value), expected.events[cursor++].watches,
+        `case ${index}, source line ${line}, ${step.bfs9006View.operation}`);
+    }
+  });
+});
+
+test("9006 keeps the full map visible, uses diagrams instead of paragraphs, and can step backward", () => {
+  const { context, element } = renderer();
+  const edges = Array.from({ length: 12 }, (_, index) => ["S", `N${index}`]);
+  const run = problem.builder(edges, { start: "S", target: "N11" });
+  const selected = run.steps.find(step => step.bfs9006View.operation === "set-distance");
+  context.renderBfs9006View(selected);
+  const first = element.innerHTML;
+  assert.match(first, /rv-bfs-hop/);
+  assert.match(first, /rv-bfs-graph-panel/);
+  assert.doesNotMatch(first, /rv-bfs-big-graph|<p[ >]/);
+  context.renderBfs9006View(run.steps.at(-1));
+  context.renderBfs9006View(selected);
+  assert.equal(element.innerHTML, first);
 });

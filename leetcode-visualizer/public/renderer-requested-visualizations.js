@@ -102,7 +102,7 @@ function requestedBfsGraph(view) {
   const height = compactLayers ? Math.max(130, Math.max(...[...groups.values()].map((group) => group.length)) * 78) : Math.ceil(nodes.length / 5) * 78;
   const positions = new Map();
   if (compactLayers) {
-    [...groups.values()].forEach((group, column) => group.forEach((node, row) => positions.set(node.id, {
+    [...groups.entries()].sort((a, b) => a[0] - b[0]).forEach(([, group], column) => group.forEach((node, row) => positions.set(node.id, {
       x: groups.size === 1 ? width / 2 : 36 + column * (width - 72) / (groups.size - 1),
       y: (row + .5) * height / group.length,
     })));
@@ -127,80 +127,107 @@ function requestedBfsGraph(view) {
       <circle cx="${pos.x}" cy="${pos.y}" r="25" />
       <text class="name" x="${pos.x}" y="${pos.y - 2}" text-anchor="middle">${requestedVizEsc(aliases ? `#${node.id + 1}` : node.name)}</text>
       <text class="distance" x="${pos.x}" y="${pos.y + 14}" text-anchor="middle">d=${node.distance ?? "—"}</text>
+      ${node.isStart || node.isTarget ? `<text class="endpoint" x="${pos.x}" y="${pos.y - 32}" text-anchor="middle">${node.isStart && node.isTarget ? "START / TARGET" : node.isStart ? "START" : "TARGET"}</text>` : ""}
     </g>`;
   }).join("");
-  return `<div class="rv-bfs-map"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges}${nodeSvg}</svg></div>${aliases ? `<div class="rv-bfs-map-note">${lang === "vi" ? "Tên dài dùng nhãn #; tên đầy đủ có trong thông tin node bên dưới." : "Long names use # labels; full names are listed in node details below."}</div>` : ""}`;
+  return `<div class="rv-bfs-map"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${edges}${nodeSvg}</svg></div>${aliases ? `<div class="rv-bfs-map-note"># → ${lang === "vi" ? "tên đầy đủ trong mục parent · distance" : "full names under parent · distance"}</div>` : ""}`;
 }
 
 function renderBfs9006View(step) {
-  const view = step.bfs9006View || {};
-  const vi = lang === "vi";
-  const operation = view.operation || view.phase;
-  const nodes = view.nodes || [];
-  const queue = view.queue || [];
-  const path = view.path || [];
-  const current = nodes.find((node) => node.id === view.current);
-  const neighbor = nodes.find((node) => node.id === view.neighbor);
-  const phaseIndex = ["graph", "init"].includes(view.phase) ? 0 : view.phase === "done" ? 3 : view.phase === "reconstruct" ? 2 : 1;
-  const discovered = nodes.filter((node) => node.discovered ?? node.distance !== null);
-  const names = {
-    import: ["Nạp thư viện", "Import"], call: ["Nhận graph, start và target", "Read graph, start and target"], "graph-init": ["Tạo danh sách neighbor", "Initialize neighbor lists"], "edge-loop": ["Đọc một cạnh", "Read an edge"], "append-left": ["Thêm neighbor chiều thứ nhất", "Add the first neighbor direction"], "append-right": ["Thêm neighbor chiều ngược lại", "Add the reverse neighbor direction"], "sort-loop": ["Chọn danh sách cần sắp xếp", "Choose a neighbor list"], "sort-neighbors": ["Sắp xếp thứ tự neighbor", "Sort neighbors"],
-    "queue-init": ["Đưa start vào queue", "Put start in the queue"], "parent-init": ["Đánh dấu start đã phát hiện", "Mark start discovered"], "distance-init": ["Khoảng cách của start là 0", "Set start distance to 0"], "while-check": ["Queue còn node để xử lý?", "Does the queue have work?"], dequeue: ["Lấy node ở đầu queue", "Remove the front node"], "target-check": ["Node này là target?", "Is this node the target?"], break: ["Đã tới target · dừng BFS", "Target reached · stop BFS"],
-    "neighbor-loop": ["Xét một neighbor", "Inspect a neighbor"], "visited-check": ["Neighbor đã phát hiện chưa?", "Was this neighbor discovered?"], continue: ["Đã phát hiện · bỏ qua", "Already discovered · skip"], "set-parent": ["Ghi nhớ đường đến neighbor", "Remember how to reach the neighbor"], "set-distance": ["Tính khoảng cách mới", "Compute the new distance"], enqueue: ["Thêm neighbor vào cuối queue", "Add neighbor at the back"],
-    "reachable-check": ["Có thể đi tới target?", "Is the target reachable?"], "return-empty": ["Không có đường đi", "No path exists"], "path-init": ["Tạo path rỗng", "Initialize path"], "cursor-init": ["Bắt đầu từ target", "Start from target"], "parent-loop": ["Đã đi hết chuỗi parent?", "Is the parent chain finished?"], "path-append": ["Thêm node vào path ngược", "Append to the backward path"], "follow-parent": ["Đi ngược về parent", "Follow the parent backward"], "path-reverse": ["Đảo path thành start → target", "Reverse path to start → target"], return: ["Trả đường đi ngắn nhất", "Return the shortest path"],
+  const v = step.bfs9006View || {}, vi = lang === "vi", t = (a, b) => vi ? a : b;
+  const op = v.operation || v.phase, nodes = v.nodes || [], queue = v.queue || [], path = v.path || [];
+  const current = nodes.find(node => node.id === v.current), neighbor = nodes.find(node => node.id === v.neighbor);
+  const done = v.phase === "done", backward = v.phase === "reconstruct" && op !== "path-reverse";
+  const parentName = node => node?.discovered ? node.isStart ? "None" : node.parent ?? "—" : "—";
+  const token = (name, cls = "", detail = "") => `<span class="rv-bfs-token ${cls}" title="${requestedVizEsc(name)}"><b>${requestedVizEsc(name)}</b>${detail ? `<small>${requestedVizEsc(detail)}</small>` : ""}</span>`;
+  const captions = {
+    import: t("Nạp thư viện", "Import"), call: t("Nhận input", "Read input"),
+    "graph-init": t("Tạo graph", "Create graph"), "edge-loop": t("Chọn cạnh", "Select edge"),
+    "append-left": t("Thêm một chiều", "Add one direction"), "append-right": t("Thêm chiều ngược", "Add reverse direction"),
+    "sort-loop": t("Chọn node", "Select node"), "sort-neighbors": t("Sắp xếp neighbor", "Sort neighbors"),
+    "queue-init": t("Đưa start vào queue", "Queue the start"), "parent-init": t("Đánh dấu start", "Discover start"),
+    "distance-init": t("Bắt đầu tại d = 0", "Start at d = 0"), "while-check": t("Queue còn node?", "Queue has nodes?"),
+    dequeue: t("Lấy đầu queue", "Pop the front"), "target-check": t("Đã tới target?", "At target?"),
+    break: t("Tới đích · dừng BFS", "Target reached · stop BFS"), "neighbor-loop": t("Xét neighbor", "Inspect neighbor"),
+    "visited-check": t("Đã phát hiện?", "Already discovered?"), continue: t("Bỏ qua · giữ parent cũ", "Skip · keep the first parent"),
+    "set-parent": t("Ghi parent", "Set parent"), "set-distance": t("Đi thêm 1 cạnh", "Travel one more edge"),
+    enqueue: t("Thêm cuối queue", "Append at the back"), "reachable-check": t("Có đường tới target?", "Target reachable?"),
+    "path-init": t("Tạo path", "Create path"), "cursor-init": t("Bắt đầu ở target", "Begin at target"),
+    "parent-loop": t("Còn parent?", "More parents?"), "path-append": t("Thêm vào path ngược", "Collect backward"),
+    "follow-parent": t("Lần ngược parent", "Follow parent"), "path-reverse": t("Đảo đường đi", "Reverse the path"),
   };
-  const parentName = (node) => node?.discovered ? node.isStart ? "None (start)" : node.parent ?? "—" : "—";
-  let explanation = typeof view.actionText === "object" ? view.actionText?.[vi ? "vi" : "en"] : view.actionText;
-  let equation = "";
-  if (operation === "dequeue") {
-    explanation = vi ? `${current?.name} được lấy ra khỏi đầu queue. Đây là node đang xử lý, không còn nằm trong queue.` : `${current?.name} was removed from the front. It is the current node and is no longer in the queue.`;
-    equation = `queue.popleft() → ${current?.name}`;
-  } else if (operation === "visited-check" || operation === "continue") {
-    explanation = view.reason === "already-discovered" ? (vi ? `${neighbor?.name} đã có trong parent. Giữ nguyên parent và distance, không thêm vào queue lần nữa.` : `${neighbor?.name} is already in parent. Keep its parent and distance; do not queue it again.`) : (vi ? `${neighbor?.name} chưa có trong parent. Các dòng tiếp theo sẽ gán parent, distance rồi thêm vào queue.` : `${neighbor?.name} is not in parent yet. The next instructions set its parent and distance, then enqueue it.`);
-    equation = `${neighbor?.name} ${view.reason === "already-discovered" ? "∈" : "∉"} parent`;
-  } else if (operation === "set-parent") {
-    explanation = vi ? `Lần đầu phát hiện ${neighbor?.name} từ ${current?.name}. Parent cho biết phải quay về node nào khi dựng path.` : `${neighbor?.name} was first discovered from ${current?.name}. Its parent tells us where to go backward when building the path.`;
-    equation = `parent[${neighbor?.name}] = ${current?.name}`;
-  } else if (operation === "set-distance") {
-    explanation = vi ? `Đi từ ${current?.name} sang ${neighbor?.name} qua thêm một cạnh.` : `Moving from ${current?.name} to ${neighbor?.name} adds one edge.`;
-    equation = `d[${neighbor?.name}] = ${current?.distance} + 1 = ${neighbor?.distance}`;
-  } else if (operation === "enqueue") {
-    explanation = vi ? `${neighbor?.name} được thêm ở cuối queue. Node ở đầu sẽ được xử lý trước.` : `${neighbor?.name} was added at the back. The node at the front will be processed first.`;
-    equation = `queue.append(${neighbor?.name})`;
-  } else if (operation === "path-append") {
-    explanation = vi ? `Thêm ${current?.name} vào path đang thu thập từ target về start. Path này chưa được đảo.` : `Append ${current?.name} while collecting the path from target back to start. This path has not been reversed yet.`;
-    equation = `path.append(${current?.name})`;
-  } else if (operation === "follow-parent") {
-    const last = path.at(-1);
-    explanation = current ? (vi ? `Từ ${last}, đi về parent là ${current.name}.` : `From ${last}, move back to its parent ${current.name}.`) : (vi ? "Parent của start là None: đã đi hết chuỗi parent." : "The start's parent is None: the parent chain is finished.");
-    equation = `node = parent[${last}] → ${current?.name ?? "None"}`;
-  } else if (operation === "path-reverse") {
-    explanation = vi ? "Đảo thứ tự vừa thu thập để đường đi bắt đầu ở start và kết thúc ở target." : "Reverse the collected order so the route begins at start and ends at target.";
-    equation = "path.reverse()";
+  const inputEdge = (v.activeEdge || []).map(id => nodes.find(node => node.id === id)?.name ?? "—");
+  const a = current?.name ?? "—", b = neighbor?.name ?? "—";
+  const equations = {
+    import: "defaultdict + deque", call: `${v.start} → ${v.target}`, "graph-init": "graph = {}",
+    "edge-loop": `${inputEdge.join(" — ")}`, "append-left": `graph[${a}].append(${b})`,
+    "append-right": `graph[${a}].append(${b})`, "sort-loop": `node = ${a}`,
+    "sort-neighbors": `graph[${a}].sort()`, "queue-init": `queue = [${v.start}]`,
+    "parent-init": `parent[${v.start}] = None`, "distance-init": `distance[${v.start}] = 0`,
+    "while-check": `bool(queue) → ${queue.length ? "True" : "False"}`,
+    dequeue: `queue.popleft() → ${a}`, "target-check": `${a} == ${v.target} → ${v.reason === "target" ? "True" : "False"}`,
+    break: "break",
+    "neighbor-loop": `node → nxt: ${a} → ${b}`,
+    "visited-check": `${b} ${v.reason === "already-discovered" ? "∈" : "∉"} parent`,
+    continue: `${b} ∈ parent → continue`, "set-parent": `parent[${b}] = ${a}`,
+    "set-distance": `distance[${b}] = ${current?.distance ?? "—"} + 1 = ${neighbor?.distance ?? "—"}`,
+    enqueue: `queue.append(${b})`, "reachable-check": `${v.target} ${v.reason === "unreachable" ? "∉" : "∈"} parent`,
+    "path-init": "path = []", "cursor-init": `node = ${v.target}`,
+    "parent-loop": `node is not None → ${v.reason === "false" ? "False" : "True"}`,
+    "path-append": `path.append(${a})`, "follow-parent": `parent[${path.at(-1) ?? "—"}] → ${current?.name ?? "None"}`,
+    "path-reverse": "path.reverse()",
+  };
+  let actionPicture = "";
+  if (op === "edge-loop" && inputEdge.length === 2) {
+    actionPicture = `<div class="rv-bfs-hop">${token(inputEdge[0])}<span class="rv-bfs-hop-arrow"><small>edges</small><i>—</i></span>${token(inputEdge[1])}</div>`;
+  } else if (neighbor && current) {
+    const skip = op === "continue" || op === "visited-check" && v.reason === "already-discovered";
+    actionPicture = `<div class="rv-bfs-hop${skip ? " skipped" : ""}">
+      ${token(a, "current", `d=${current.distance ?? "—"}`)}
+      <span class="rv-bfs-hop-arrow"><small>${op === "set-distance" ? "+1" : skip ? t("đã có parent", "has parent") : "node → nxt"}</small><i>${skip ? "↛" : "⟶"}</i></span>
+      ${token(b, skip ? "seen" : "neighbor", `d=${neighbor.distance ?? "—"}`)}</div>`;
+  } else if (v.phase === "reconstruct" && op === "follow-parent") {
+    actionPicture = `<div class="rv-bfs-hop">${token(path.at(-1) ?? "—", "path")}<span class="rv-bfs-hop-arrow"><small>parent</small><i>⟶</i></span>${token(current?.name ?? "None", "current")}</div>`;
   }
-  const instruction = `<section class="rv-bfs-instruction${operation === "continue" ? " skip" : ""}">${current || neighbor ? `<header><span><small>${view.phase === "reconstruct" ? (vi ? "Cursor" : "Cursor") : vi ? "Đang xử lý" : "Current"}</small><b>${requestedVizEsc(current?.name ?? "—")}</b></span>${neighbor ? `<i>→</i><span><small>${vi ? "Neighbor đang xét" : "Neighbor"}</small><b>${requestedVizEsc(neighbor.name)}</b></span>` : ""}</header>` : ""}${equation ? `<code>${requestedVizEsc(equation)}</code>` : ""}<p>${requestedVizEsc(explanation || (vi ? "State phản ánh đúng dòng code đang sáng." : "The state reflects the highlighted source instruction."))}</p>${neighbor && ["neighbor-loop", "visited-check", "continue", "set-parent", "set-distance", "enqueue"].includes(operation) ? `<div class="rv-bfs-neighbor-facts"><span class="${operation === "set-parent" ? "focus" : ""}"><small>parent[${requestedVizEsc(neighbor.name)}]</small><b>${requestedVizEsc(parentName(neighbor))}</b></span><span class="${operation === "set-distance" ? "focus" : ""}"><small>distance</small><b>${neighbor.distance ?? "—"}</b></span><span class="${operation === "enqueue" ? "focus" : ""}"><small>${vi ? "Trong queue?" : "In queue?"}</small><b>${queue.some((item) => item.id === neighbor.id) ? (vi ? "Có" : "Yes") : vi ? "Không" : "No"}</b></span></div>` : ""}</section>`;
-  const queueItem = (item, index) => `<article class="rv-bfs-q-item${index === 0 ? " front" : ""}${operation === "enqueue" && item.id === neighbor?.id ? " focus" : ""}"><small>${index === 0 ? (vi ? "ĐẦU" : "FRONT") : index === queue.length - 1 ? (vi ? "CUỐI" : "BACK") : `#${index + 1}`}</small><b>${requestedVizEsc(item.name)}</b><span>d=${item.distance ?? "—"}</span></article>`;
-  const visibleQueue = queue.length > 6 ? `${queue.slice(0, 4).map(queueItem).join("")}<span class="rv-bfs-q-gap">⋯ +${queue.length - 5}</span>${queueItem(queue.at(-1), queue.length - 1)}` : queue.map(queueItem).join("");
-  const queuePanel = `<section class="rv-panel rv-bfs-queue-panel"><header><h4>${vi ? "Queue · lấy ở đầu, thêm ở cuối" : "Queue · remove front, add back"}</h4><span>${queue.length}</span></header><div class="rv-bfs-queue-items">${queue.length ? visibleQueue : `<div class="rv-bfs-empty">${view.queueReady === false ? (vi ? "Queue chưa khởi tạo." : "Queue is not initialized.") : vi ? "Queue rỗng." : "The queue is empty."}</div>`}</div>${queue.length > 6 ? `<details><summary>+${queue.length - 5} ${vi ? "node ở giữa" : "middle nodes"}</summary><div class="rv-bfs-queue-items">${queue.slice(4, -1).map((item, index) => queueItem(item, index + 4)).join("")}</div></details>` : ""}</section>`;
-  const forwardPath = operation === "path-reverse" || view.phase === "done";
-  const pathPanel = `<section class="rv-panel rv-bfs-route${view.phase === "done" && path.length ? " done" : ""}"><header><h4>${forwardPath ? (vi ? "Đường đi · start → target" : "Route · start → target") : vi ? "Thu thập path · target → start" : "Collect path · target → start"}</h4>${forwardPath && path.length ? `<span>${view.distance} ${vi ? "cạnh" : "edges"}</span>` : ""}</header>${path.length ? `<ol>${path.map((name, index) => `<li${operation === "path-append" && index === path.length - 1 ? ' class="focus"' : ""}><small>#${index + 1}${index ? " →" : ""}</small><b>${requestedVizEsc(name)}</b></li>`).join("")}</ol>` : `<div class="rv-bfs-empty">${view.phase === "done" ? (vi ? "Không có đường đi tới target." : "There is no path to the target.") : vi ? "Path đang rỗng; bắt đầu ở target." : "The path is empty; begin at target."}</div>`}</section>`;
-  const graphPanel = `<section class="rv-panel rv-bfs-graph-panel"><header><h4>${vi ? "Graph vô hướng" : "Undirected graph"}</h4><span>${nodes.length} nodes</span></header>${requestedBfsGraph(view)}<footer class="rv-bfs-map-legend"><span class="queued">${vi ? "Xanh: trong queue" : "Blue: queued"}</span><span class="current">${vi ? "Vàng: đang xử lý" : "Gold: current"}</span><span class="path">${vi ? "Xanh lá: path" : "Green: path"}</span></footer></section>`;
-  const states = vi ? { unseen: "Chưa phát hiện", discovered: "Đã có parent", queued: "Trong queue", current: "Đang xử lý", expanded: "Đã xét xong", path: "Trong path" } : { unseen: "Unseen", discovered: "Has parent", queued: "Queued", current: "Current", expanded: "Expanded", path: "In path" };
-  const records = `<details class="rv-bfs-node-details"><summary>${vi ? "Xem distance và parent của mọi node" : "View every node's distance and parent"} · ${discovered.length}/${nodes.length}</summary><div>${nodes.map((node) => `<article class="rv-bfs-record ${requestedVizEsc(node.status)}"><header><b>#${node.id + 1} · ${requestedVizEsc(node.name)}</b><small>${requestedVizEsc(states[node.status] || node.status)}</small></header><div><span>d = <b>${node.distance ?? "—"}</b></span><span>parent = <b>${requestedVizEsc(parentName(node))}</b></span></div></article>`).join("")}</div></details>`;
-  const adjacencyRows = view.adjacency || [];
-  const activeAdjacency = adjacencyRows.find((row) => row.id === view.current);
-  const adjacencyPanel = `<details class="rv-bfs-adjacency"${view.phase === "graph" && view.graphReady && nodes.length <= 6 ? " open" : ""}><summary>${vi ? "Danh sách neighbor · mỗi cạnh có 2 chiều" : "Neighbor lists · each edge has 2 directions"}</summary><div>${(activeAdjacency ? [activeAdjacency, ...adjacencyRows.filter((row) => row.id !== activeAdjacency.id)] : adjacencyRows).map((row) => `<article class="${row.id === view.current ? "focus" : ""}"><b>${requestedVizEsc(row.name)}</b><span>→ ${row.neighbors.map(requestedVizEsc).join(", ") || "∅"}</span></article>`).join("")}</div></details>`;
-  requestedVizSet(`<div class="rv-bfs-9006 phase-${requestedVizEsc(view.phase || "init")}">
-    ${requestedVizPhases(vi ? ["Dựng graph", "BFS theo lớp", "Dựng path", "Kết quả"] : ["Build graph", "BFS layers", "Build path", "Results"], phaseIndex)}
-    <div class="rv-action-banner"><small>${vi ? "DÒNG" : "LINE"} ${step.codeLines?.[0] || "—"}</small><b>${requestedVizEsc(names[operation]?.[vi ? 0 : 1] || operation)}</b></div>
-    <div class="rv-bfs-endpoints"><span><small>START</small><b>${requestedVizEsc(view.start)}</b></span><i>→</i><span><small>TARGET</small><b>${requestedVizEsc(view.target)}</b></span></div>
-    <div class="rv-bfs-summary"><span><small>Queue</small><b>${view.queueReady === false ? "—" : queue.length}</b></span><span><small>${vi ? "Đã phát hiện" : "Discovered"}</small><b>${discovered.length}<em> / ${nodes.length}</em></b></span><span><small>d(target)</small><b>${view.distance ?? "—"}</b></span></div>
-    ${view.phase !== "done" ? instruction : `<div class="rv-bfs-result-note${path.length ? " found" : " unreachable"}"><b>${path.length ? (vi ? `Đường đi ngắn nhất: ${view.distance} cạnh` : `Shortest path: ${view.distance} edges`) : vi ? "Target không thể tới được" : "Target is unreachable"}</b><span>${path.length ? (vi ? "BFS xử lý các node gần start trước, nên lần phát hiện đầu tiên cho khoảng cách ngắn nhất." : "BFS processes closer nodes first, so first discovery gives the shortest distance.") : vi ? "Queue đã rỗng và target vẫn chưa có parent. Trả []." : "The queue is empty and target has no parent. Return []."}</span></div>`}
-    ${view.phase === "done" || view.phase === "reconstruct" && view.pathReady !== false ? pathPanel : view.phase !== "graph" && view.phase !== "reconstruct" ? queuePanel : ""}
-    ${nodes.length > 10 && view.phase !== "graph" ? `<details class="rv-bfs-big-graph"><summary>${vi ? "Xem toàn bộ graph" : "View the full graph"}</summary>${graphPanel}</details>` : graphPanel}
-    ${view.phase !== "graph" ? records : ""}${adjacencyPanel}
-    <footer class="rv-bfs-rule">${vi ? "distance = số cạnh từ start · parent = node dẫn tới lần đầu" : "distance = edges from start · parent = first-discovery predecessor"}</footer></div>`,
-  vi ? `BFS từ ${view.start} tới ${view.target}` : `BFS from ${view.start} to ${view.target}`, "group");
+  const facts = neighbor && ["neighbor-loop", "visited-check", "continue", "set-parent", "set-distance", "enqueue"].includes(op)
+    ? `<div class="rv-bfs-neighbor-facts">
+      <span class="${op === "set-parent" ? "focus" : ""}"><small>parent[${requestedVizEsc(b)}]</small><b>${requestedVizEsc(parentName(neighbor))}</b></span>
+      <span class="${op === "set-distance" ? "focus" : ""}"><small>distance[${requestedVizEsc(b)}]</small><b>${neighbor.distance ?? "—"}</b></span>
+      <span class="${op === "enqueue" ? "focus" : ""}"><small>∈ queue</small><b>${queue.some(item => item.id === neighbor.id) ? "✓" : "−"}</b></span></div>` : "";
+  const instruction = `<section class="rv-bfs-instruction${op === "continue" ? " skip" : ""}">
+    ${actionPicture}<code>${requestedVizEsc(equations[op] || op)}</code>${facts}</section>`;
+  const queueItem = (item, index) => `<article class="rv-bfs-q-item${index === 0 ? " front" : ""}${op === "enqueue" && item.id === neighbor?.id ? " focus" : ""}">
+    <small>${index === 0 ? "FRONT" : index === queue.length - 1 ? "BACK" : `#${index + 1}`}</small>
+    <b>${requestedVizEsc(item.name)}</b><span>d=${item.distance ?? "—"}</span></article>`;
+  const visibleQueue = queue.length > 6
+    ? `${queue.slice(0, 4).map(queueItem).join("")}<span class="rv-bfs-q-gap">⋯ +${queue.length - 5}</span>${queueItem(queue.at(-1), queue.length - 1)}`
+    : queue.map(queueItem).join("");
+  const queuePanel = `<section class="rv-panel rv-bfs-queue-panel">
+    <header><h4>FIFO · queue</h4><span>${queue.length} nodes</span></header>
+    <div class="rv-bfs-queue-direction"><span>← popleft()</span><span>append() ←</span></div>
+    <div class="rv-bfs-queue-items">${queue.length ? visibleQueue : `<span class="rv-bfs-empty">[ ] ${v.queueReady === false ? t("chưa khởi tạo", "not initialized") : "∅"}</span>`}</div>
+    ${op === "dequeue" && current ? `<div class="rv-bfs-dequeued">↳ ${token(a, "current")}<small>node</small></div>` : ""}
+    ${queue.length > 6 ? `<details><summary>+${queue.length - 5} ${t("node ở giữa", "middle nodes")}</summary><div class="rv-bfs-queue-items">${queue.slice(4, -1).map((item, index) => queueItem(item, index + 4)).join("")}</div></details>` : ""}</section>`;
+  const pathPanel = `<section class="rv-panel rv-bfs-route${done && path.length ? " done" : ""}">
+    <header><h4>${backward ? t("Thu thập path · target → start", "Collect path · target → start") : t("Đường đi · start → target", "Route · start → target")}</h4><span>${backward ? "↶ parent" : path.length ? "✓" : "∅"}</span></header>
+    ${path.length ? `<ol>${path.map((name, index) => `<li${op === "path-append" && index === path.length - 1 ? ' class="focus"' : ""}><small>${index ? "→" : "#1"}</small><b>${requestedVizEsc(name)}</b></li>`).join("")}</ol>` : `<div class="rv-bfs-empty">[ ]</div>`}</section>`;
+  const adjacency = (v.adjacency || []).find(row => row.id === v.current);
+  const neighborStrip = v.phase === "graph" && adjacency
+    ? `<div class="rv-bfs-neighbor-strip"><code>graph[${requestedVizEsc(adjacency.name)}]</code><i>→</i><div>${adjacency.neighbors.map(name => token(name, name === b ? "neighbor" : "")).join("") || "∅"}</div></div>` : "";
+  const graphPanel = `<section class="rv-panel rv-bfs-graph-panel${nodes.length > 10 ? " many-nodes" : ""}"><header><h4>${t("Bản đồ BFS", "BFS map")}</h4><span>d = ${t("số cạnh từ start", "edges from start")}</span></header>
+    ${requestedBfsGraph(v)}
+    <footer class="rv-bfs-map-legend"><span class="queued">● queue</span><span class="current">● node</span><span class="neighbor">◌ nxt</span><span class="path">● path</span></footer>${neighborStrip}</section>`;
+  const records = `<details class="rv-bfs-node-details"><summary>parent · distance · ${t("mọi node", "all nodes")}</summary><div>
+    ${nodes.map(node => `<article class="rv-bfs-record ${requestedVizEsc(node.status)}"><header><b>#${node.id + 1} · ${requestedVizEsc(node.name)}</b><small>d=${node.distance ?? "—"}</small></header><div><span>parent = <b>${requestedVizEsc(parentName(node))}</b></span></div></article>`).join("")}</div></details>`;
+  const phaseIndex = ["graph", "init"].includes(v.phase) ? 0 : done ? 3 : v.phase === "reconstruct" ? 2 : 1;
+  requestedVizSet(`<div class="rv-bfs-9006 rv-bfs-pictures phase-${requestedVizEsc(v.phase || "init")}">
+    <div class="rv-bfs-heading"><b>BFS · ${t("Đường đi ngắn nhất", "Shortest path")}</b><span>${t("Dòng", "Line")} ${step.codeLines?.[0] || "—"}</span></div>
+    ${requestedVizPhases(vi ? ["Graph", "BFS", "Path", "Đích"] : ["Graph", "BFS", "Path", "Done"], phaseIndex)}
+    <div class="rv-bfs-endpoints"><span><small>START</small><b>${requestedVizEsc(v.start)}</b></span><i>⟶</i><span><small>TARGET</small><b>${requestedVizEsc(v.target)}</b></span><strong>d = ${v.distance ?? "—"}</strong></div>
+    ${graphPanel}
+    ${done ? `<div class="rv-bfs-result-note${path.length ? " found" : " unreachable"}"><b>${path.length ? `✓ ${v.distance} ${t("cạnh", "edges")}` : t("∅ Không có đường đi", "∅ No path")}</b></div>` : `<div class="rv-bfs-process"><div><div class="rv-bfs-action-label">${requestedVizEsc(captions[op] || op)}</div>${instruction}</div>${!["graph", "reconstruct"].includes(v.phase) ? queuePanel : ""}</div>`}
+    ${done || v.phase === "reconstruct" && v.pathReady ? pathPanel : ""}
+    ${records}</div>`, t(`BFS từ ${v.start} tới ${v.target}`, `BFS from ${v.start} to ${v.target}`), "group");
 }
 
 // ─── #9001: lazy max-heap profit tracker ────────────────────────────────────

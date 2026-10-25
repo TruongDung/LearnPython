@@ -180,6 +180,9 @@ module.exports = function createRequestedLineDebug({
     let parent = null;
     let distance = null;
     let graphReady = false;
+    // Focused diagram nodes can differ from Python's persistent loop variables.
+    let localNode;
+    let localNext;
 
     const edgeKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`);
     const pathEdgeKeys = (path) => new Set(path.slice(1).map((node, index) => edgeKey(path[index], node)));
@@ -235,13 +238,14 @@ module.exports = function createRequestedLineDebug({
         final: Boolean(options.final),
         codeLines: [line],
         vars: [
-          { name: "operation", value: operation },
-          { name: "queue (front → back)", value: `[${queueItems.map((item) => item.name).join(", ")}]` },
-          { name: "node", value: Number.isInteger(options.current) ? names[options.current] : "—" },
-          { name: "nxt", value: Number.isInteger(options.neighbor) ? names[options.neighbor] : "—" },
-          { name: "path", value: `[${path.map((id) => names[id]).join(", ")}]` },
+          { name: "node", value: localNode === null ? "None" : names[localNode] ?? "—" },
+          { name: "nxt", value: names[localNext] ?? "—" },
+          { name: "distance[node]", value: distance?.[localNode] ?? "—" },
+          { name: "parent[nxt]", value: parent?.[localNext] === null ? "None" : names[parent?.[localNext]] ?? "—" },
+          { name: "distance[nxt]", value: distance?.[localNext] ?? "—" },
+          { name: "len(queue)", value: queue === null ? "—" : queueItems.length },
         ],
-        note: options.note || label("State chỉ phản ánh lệnh vừa được tô sáng.", "The state reflects only the highlighted instruction."),
+        note: options.note || label("", ""),
         graph: {
           nodes: nodes.map((node) => ({ id: node.id, label: node.name, sub: node.distance === null ? "d=∞" : `d=${node.distance}` })),
           edges: graphEdges,
@@ -270,6 +274,7 @@ module.exports = function createRequestedLineDebug({
           expanded: [...expanded],
           current: Number.isInteger(options.current) ? options.current : null,
           neighbor: Number.isInteger(options.neighbor) ? options.neighbor : null,
+          activeEdge: options.edge ? [...options.edge] : null,
           reason: options.reason || null,
           path: path.map((id) => names[id]),
           pathReady: Array.isArray(options.path),
@@ -296,6 +301,7 @@ module.exports = function createRequestedLineDebug({
     });
 
     names.forEach((name, id) => {
+      localNode = id;
       emit(8, "sort-loop", { phase: "graph", current: id, actionText: label(`Chuẩn bị sort neighbor của ${name}.`, `Prepare to sort ${name}'s neighbors.`) });
       adjacency[id].sort((a, b) => compareText(names[a], names[b]));
       emit(9, "sort-neighbors", { phase: "graph", current: id, actionText: label(`Thứ tự ${name}: [${adjacency[id].map((next) => names[next]).join(", ")}].`, `${name} order: [${adjacency[id].map((next) => names[next]).join(", ")}].`) });
@@ -316,6 +322,7 @@ module.exports = function createRequestedLineDebug({
     while (head < queue.length) {
       emit(13, "while-check", { phase: "dequeue", reason: "true", actionText: label("Queue còn phần tử: tiếp tục BFS.", "The queue is non-empty: continue BFS.") });
       const node = queue[head++];
+      localNode = node;
       emit(14, "dequeue", { phase: "dequeue", current: node, actionText: label(`popleft() → ${names[node]}.`, `popleft() → ${names[node]}.`) });
       const isTarget = node === targetId;
       emit(15, "target-check", { phase: "target-check", current: node, reason: isTarget ? "target" : "not-target", actionText: isTarget ? label(`${names[node]} là target.`, `${names[node]} is the target.`) : label(`${names[node]} chưa phải target.`, `${names[node]} is not the target.`) });
@@ -326,6 +333,7 @@ module.exports = function createRequestedLineDebug({
       }
 
       for (const next of adjacency[node]) {
+        localNext = next;
         emit(17, "neighbor-loop", { phase: "inspect", current: node, neighbor: next, edge: [node, next], actionText: label(`Xét ${names[node]} → ${names[next]}.`, `Inspect ${names[node]} → ${names[next]}.`) });
         const alreadyDiscovered = parent[next] !== undefined;
         emit(18, "visited-check", { phase: "inspect", current: node, neighbor: next, edge: [node, next], reason: alreadyDiscovered ? "already-discovered" : "unseen", actionText: alreadyDiscovered ? label(`${names[next]} đã có parent.`, `${names[next]} already has a parent.`) : label(`${names[next]} chưa được phát hiện.`, `${names[next]} is undiscovered.`) });
@@ -357,12 +365,14 @@ module.exports = function createRequestedLineDebug({
     const path = [];
     emit(25, "path-init", { phase: "reconstruct", path, actionText: label("Khởi tạo path rỗng.", "Initialize an empty path.") });
     let node = targetId;
+    localNode = node;
     emit(26, "cursor-init", { phase: "reconstruct", current: node, path, actionText: label(`Bắt đầu từ target ${target}.`, `Start from target ${target}.`) });
     while (node !== null) {
       emit(27, "parent-loop", { phase: "reconstruct", current: node, path, reason: "true", actionText: label(`${names[node]} chưa phải None.`, `${names[node]} is not None.`) });
       path.push(node);
       emit(28, "path-append", { phase: "reconstruct", current: node, path, actionText: label(`path.append(${names[node]}).`, `path.append(${names[node]}).`) });
       node = parent[node];
+      localNode = node;
       emit(29, "follow-parent", { phase: "reconstruct", current: Number.isInteger(node) ? node : null, path, actionText: Number.isInteger(node) ? label(`Đi tới parent ${names[node]}.`, `Move to parent ${names[node]}.`) : label("Đã vượt qua start → None.", "Moved past start → None.") });
     }
     emit(27, "parent-loop", { phase: "reconstruct", path, reason: "false", actionText: label("Cursor là None: dừng dựng ngược.", "The cursor is None: stop walking backward.") });
