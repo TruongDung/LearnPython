@@ -976,10 +976,10 @@ function renderBfsGrid(step) {
     const vi = lang === "vi";
     const countPhase = view.phase === "count";
     const phaseHtml = [
-      { icon: "🌊", label: vi ? "Tràn từ bờ" : "Flood from edge", active: !countPhase, done: countPhase },
-      { icon: "🏝️", label: vi ? "Đếm đảo kín" : "Count closed", active: countPhase, done: view.done },
-    ].map((phase) => `<span class="${phase.active ? "is-active" : ""} ${phase.done ? "is-done" : ""}"><b>${phase.icon}</b><small>${escapeHtml(phase.label)}</small></span>`).join("");
-    const cellIcons = { water: "🌊", flooded: "💧", land: "🌿", island: "🏝️" };
+      { icon: "🌊", label: vi ? "Nước tràn từ biên" : "Flood from the edge", active: !countPhase, done: countPhase },
+      { icon: "⌕", label: vi ? "Tìm đất còn lại" : "Find remaining land", active: countPhase && !view.done, done: view.done },
+      { icon: "🏝", label: vi ? "Đảo kín đã đếm" : "Closed islands counted", active: view.done, done: view.done },
+    ].map((phase) => `<span class="${phase.active ? "is-active" : ""} ${phase.done ? "is-done" : ""}" title="${escapeXml(phase.label)}" aria-label="${escapeXml(phase.label)}"><b aria-hidden="true">${phase.icon}</b></span>`).join("");
     const cellsHtml = cells.map((row, r) => row.map((cell, c) => {
       const kind = cell.kind || "water";
       const name = {
@@ -992,22 +992,23 @@ function renderBfsGrid(step) {
       if (cell.isBorder) classes.push("is-edge");
       if (cell.isCurrent) classes.push("is-current");
       return `<div class="${classes.join(" ")}" aria-label="${escapeXml(`${name}, ${r},${c}`)}" title="${escapeXml(`${name} (${r}, ${c})`)}">
-        <span class="ci1254-icon">${cellIcons[kind]}</span>
-        ${cell.meta ? `<small>${escapeXml(cell.meta)}</small>` : ""}
-        ${cell.isCurrent ? `<b class="ci1254-current-tag">DFS</b>` : ""}
+        <i class="ci1254-mark" aria-hidden="true"></i>
+        ${cell.meta ? `<small>${escapeXml(cell.meta.replace("#", ""))}</small>` : ""}
+        ${cell.isCurrent ? `<b class="ci1254-current-tag" aria-hidden="true">✦</b>` : ""}
       </div>`;
     }).join("")).join("");
-    el.innerHTML = `<section class="ci1254-viz" role="img" aria-label="${vi ? "Đất chạm bờ bị ngập, các đảo kín được đếm" : "Flood edge-connected land, then count closed islands"}">
+    const sceneState = view.done ? "is-finished" : countPhase ? "is-counting" : "is-flooding";
+    el.innerHTML = `<section class="ci1254-viz ${sceneState}" role="img" aria-label="${vi ? "Bản đồ nước và đất: đất nối ra biên bị nhấn chìm, đảo nằm trong được đếm" : "Land connected to the border is flooded; islands left inside are counted"}">
       <div class="ci1254-phases">${phaseHtml}</div>
-      <div class="ci1254-board-scroll"><div class="ci1254-board" style="--ci-cols:${cols}">${cellsHtml}</div></div>
+      <div class="ci1254-board-scroll"><div class="ci1254-scene"><div class="ci1254-tide" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="ci1254-board" style="--ci-cols:${cols}">${cellsHtml}</div></div></div>
       <div class="ci1254-footer">
-        <div class="ci1254-legend">
-          <span><i class="is-land">🌿</i>${vi ? "đất" : "land"}</span>
-          <span><i class="is-water">🌊</i>${vi ? "nước" : "water"}</span>
-          <span><i class="is-flooded">💧</i>${vi ? "đất chạm bờ" : "edge land"}</span>
-          <span><i class="is-island">🏝️</i>${vi ? "đảo kín" : "closed island"}</span>
+        <div class="ci1254-legend" aria-label="${vi ? "Chú giải" : "Legend"}">
+          <span class="is-water" title="${vi ? "nước" : "water"}" aria-label="${vi ? "nước" : "water"}"><i></i></span>
+          <span class="is-land" title="${vi ? "đất chưa thăm" : "unvisited land"}" aria-label="${vi ? "đất chưa thăm" : "unvisited land"}"><i></i></span>
+          <span class="is-flooded" title="${vi ? "đất nối biên đã ngập" : "flooded edge land"}" aria-label="${vi ? "đất nối biên đã ngập" : "flooded edge land"}"><i></i></span>
+          <span class="is-island" title="${vi ? "đảo kín đã tìm" : "closed island found"}" aria-label="${vi ? "đảo kín đã tìm" : "closed island found"}"><i></i></span>
         </div>
-        <div class="ci1254-count"><span>🏝️</span><strong>${view.count}</strong></div>
+        <div class="ci1254-count" title="${vi ? "Số đảo kín" : "Closed islands"}" aria-label="${vi ? `Số đảo kín: ${view.count}` : `Closed islands: ${view.count}`}" aria-live="polite"><span aria-hidden="true">🏝</span><strong>${view.count}</strong></div>
       </div>
     </section>`;
     return;

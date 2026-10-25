@@ -1247,9 +1247,26 @@ function buildSteps1254(input) {
   }
 
   function snap(o) {
+    const line = (o.codeLines || [])[0];
+    const current = o.cur || null;
+    const isCounting = line >= 20 || Boolean(o.final);
+    const at = current ? `(${current[0]}, ${current[1]})` : "";
+    const compact = o.final
+      ? { title: tr(`🏁 ${closedCount} đảo kín`, `🏁 ${closedCount} closed island${closedCount === 1 ? "" : "s"}`), note: tr("", "") }
+      : isCounting && line === 25
+        ? { title: tr(`✅ Đảo #${island}`, `✅ Island #${island}`), note: tr("+1", "+1") }
+        : isCounting && line === 23 && current && work[current[0]][current[1]] === 0
+          ? { title: tr("🏝️ Đảo kín mới", "🏝️ New closed island"), note: tr(at, at) }
+          : isCounting
+            ? { title: tr("🔎 Quét bên trong", "🔎 Scan inside"), note: tr(at, at) }
+            : line === 9
+              ? { title: tr("🌊 Nhấn chìm", "🌊 Flood away"), note: tr(at, at) }
+              : line === 3
+                ? { title: tr("🗺️ Bản đồ", "🗺️ Map"), note: tr("", "") }
+                : { title: tr("🌊 Dọn đất chạm biên", "🌊 Clear border land"), note: tr(at, at) };
     steps.push({
-      title: o.title, arr: [], codeBlock: 1,
-      bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
+      title: compact.title, arr: [], codeBlock: 1,
+      bfsGrid: { rows, cols, cells: makeCells(current) },
       closedIsland1254View: {
         phase: (o.codeLines || []).some((line) => line >= 20) || o.final ? "count" : "flood",
         count: closedCount,
@@ -1257,13 +1274,8 @@ function buildSteps1254(input) {
       },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: [
-        ...(o.vars || []),
-        { name: "call stack", value: stackText() },
-        { name: "depth", value: callStack.length },
-        { name: "count", value: closedCount },
-      ],
-      note: o.note,
+      vars: [],
+      note: compact.note,
     });
   }
 
